@@ -11,7 +11,7 @@ const json = async path => JSON.parse(await readFile(join(root, path), 'utf8'));
 // Resolve the prepared artifact independently of inventory.mjs. A path alias must name real world bytes; a
 // content-addressed alias must resolve through the server's core set (worlds/core-assets/index.json + *.index.json),
 // to the bytes GET /assets/<sha> sends: the rendition (renditions.json) when one exists, else the file itself.
-function manifestFile(alias, entry, core, renditions) {
+function manifestFile(alias, entry, core, renditions, modulars = []) {
   const canonical = /^(?:\/worlds)?\/assets\/([a-f0-9]{64})\.([a-z0-9]+)$/.exec(alias);
   if (canonical) {
     const [, sha, ext] = canonical;
@@ -24,6 +24,14 @@ function manifestFile(alias, entry, core, renditions) {
     return ren ? ren.path : asset.path;
   }
   if (alias.startsWith('/blobs/')) return alias;   // BLOBS: checked against served-blobs.json below
+  // CDN3: /modular (root, /worlds, legacy /mars-assets) from mars/viewer/public/modular; a query must be one the
+  // record says the client puts on that file.
+  const modular = /^(?:\/worlds|\/mars-assets)?\/modular\/([^?]+)(\?.*)?$/.exec(alias);
+  if (modular) {
+    assert.equal(entry.of, undefined, `${alias}: only hash aliases may be renditions`);
+    if (modular[2]) assert.ok(modulars.find(r => r.url === '/modular/' + modular[1])?.queries?.includes(modular[2]), `${alias}: query not recorded for this file`);
+    return 'mars/viewer/public/modular/' + modular[1];
+  }
   const named = /^(?:\/worlds)?\/world-assets\/(.+)$/.exec(alias);
   assert.ok(named, `${alias}: unknown prepared manifest alias`);
   assert.equal(entry.of, undefined, `${alias}: only hash aliases may be renditions`);
@@ -32,7 +40,7 @@ function manifestFile(alias, entry, core, renditions) {
 
 async function actualWorldBytes(path) {
   const parts = path.split('/');
-  assert.equal(parts[0], 'worlds', `${path}: file must be inside repo worlds/`);
+  assert.ok(parts[0] === 'worlds' || path.startsWith('mars/viewer/public/modular/'), `${path}: file must be inside repo worlds/ or mars/viewer/public/modular/`);
   assert.ok(parts.length > 1 && parts.every(p => /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(p)), `${path}: unsafe world file path`);
   let file = root;
   for (const [i, part] of parts.entries()) {
@@ -57,11 +65,11 @@ test('every prepared CDN alias matches independently hashed on-disk world files'
   assert.equal(manifest.version, 1);
   const entries = Object.entries(manifest.assets);
   const files = new Map();
-  let namedCount = 0, canonicalCount = 0, blobCount = 0;
+  let namedCount = 0, canonicalCount = 0, blobCount = 0, modularCount = 0;
   for (const [alias, entry] of entries) {
     assert.match(entry.sha256, /^[a-f0-9]{64}$/, `${alias}: invalid SHA-256`);
     assert.ok(Number.isSafeInteger(entry.bytes) && entry.bytes > 0, `${alias}: invalid byte count`);
-    const path = manifestFile(alias, entry, core, ren.renditions);
+    const path = manifestFile(alias, entry, core, ren.renditions, served.objects.filter(r => r.class === 'modular'));
     if (path.startsWith('/blobs/')) {
       const record = blobs.objects.find(b => b.blob === alias);
       assert.ok(record && record.sha256 === entry.sha256 && record.bytes === entry.bytes && alias.includes(`/${entry.sha256.slice(0, 2)}/${entry.sha256}.`), `${alias}: no matching BLOBS record`);
@@ -72,6 +80,7 @@ test('every prepared CDN alias matches independently hashed on-disk world files'
     const record = entry.licence === 'served-public' ? served.objects.find(r => r.sha256 === entry.sha256) : reviewed.derivatives.find(d => d.sha256 === entry.sha256);
     assert.ok(record && record.bytes === entry.bytes, `${alias}: no ${entry.licence} record for these bytes`);
     if (/^\/(?:worlds\/)?world-assets\//.test(alias)) namedCount++;
+    else if (path.startsWith('mars/viewer/public/modular/')) modularCount++;
     else canonicalCount++;
   }
   // CDN2 (Gene, 2026-10-20): the whole core set, private Mars College and Little Martians files included, is published.
@@ -79,7 +88,11 @@ test('every prepared CDN alias matches independently hashed on-disk world files'
   assert.equal(canonicalCount, 2 * glbs, 'both hash namespaces for every core-set GLB');
   const objects = new Set([...files.values()].map(f => f.sha256));
   assert.equal(objects.size, reviewed.derivatives.length + served.objects.length, 'every reviewed and served-public object, nothing else');
-  assert.equal(namedCount, 2 * files.size, 'both named world-assets namespaces for every file');
+  const worldFiles = [...files.keys()].filter(p => p.startsWith('worlds/')).length, modularFiles = files.size - worldFiles;
+  assert.equal(namedCount, 2 * worldFiles, 'both named world-assets namespaces for every file');
+  const queries = served.objects.reduce((n, r) => n + (r.queries?.length ?? 0), 0);
+  assert.equal(modularCount, 3 * modularFiles + 2 * queries, '/modular, /worlds/modular, /mars-assets/modular for every file, plus each client query in the first two');
+  assert.equal(modularFiles, served.objects.filter(r => r.class === 'modular').length, 'every /modular file');
   assert.equal(blobCount, blobs.objects.length, 'every client BLOBS file');
   const lods = (await json('worlds/core-assets/lods.index.json')).assets;
   for (const sha of Object.keys(lods)) assert.ok(manifest.assets[`/assets/${sha}.glb`] && manifest.assets[`/worlds/assets/${sha}.glb`], `lod ${sha} is published`);

@@ -3,7 +3,8 @@
 // the build contains the CDN code; 3.50 shipped with the GLB download worker bypassing it. This loads real pages in real
 // Chrome (desktop + phone, dpr 1 and 2, the asset worker ON as visitors have it) and FAILS (exit 1) when:
 //   - a GLB/texture the shipped manifest maps is answered by the origin (status 200) instead of assets.eden.art,
-//   - an assets.eden.art request is not 200, or a page loaded listed assets but none from assets.eden.art,
+//   - an assets.eden.art request is not 200, an assets/br/ object did not arrive Content-Encoding br (CDN3),
+//     or a page loaded listed assets but none from assets.eden.art,
 //   - the page's asset worker delivered GLBs but none from the CDN (window.__assetWorker.cdn === 0).
 // Read-only public page loads; no credentials.
 //   node tools/cdn/cdn-walk.mjs <outDir> <url>... [--manifest apps/web/src/cdn-manifest.json] [--wait 25000] [--devices desktop1,phone2]
@@ -38,7 +39,7 @@ try {
     page.on('response', (r) => {   // includes the dedicated asset worker's fetches
       const u = new URL(r.url()); if (!ASSET.test(u.pathname)) return;
       const cdn = u.host === 'assets.eden.art';
-      reqs.push({ host: u.host, path: u.pathname + u.search, status: r.status(), listed: cdn || !!manifestAsset(manifest, r.url(), page.url() || url) });
+      reqs.push({ host: u.host, path: u.pathname + u.search, status: r.status(), encoding: r.headers()['content-encoding'] ?? null, listed: cdn || !!manifestAsset(manifest, r.url(), page.url() || url) });
     });
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch((e) => errors.push('goto ' + e.message.slice(0, 120)));
     await page.waitForTimeout(WAIT);
@@ -50,10 +51,12 @@ try {
     const problems = [
       ...originListed.map((p) => `origin served a CDN-listed asset: ${p}`),
       ...cdn.filter((r) => r.status !== 200).map((r) => `CDN ${r.status}: ${r.path}`),
+      // CDN3: a precompressed object reaches Chrome (br over HTTPS) as its stored q11 bytes, never re-encoded.
+      ...cdn.filter((r) => r.status === 200 && r.path.startsWith('/assets/br/') && r.encoding !== 'br').map((r) => `CDN br object arrived ${r.encoding ?? 'identity'}: ${r.path}`),
       ...(reqs.some((r) => r.listed) && !cdn.length ? ['listed assets loaded, none from assets.eden.art'] : []),
       ...(worker && worker.delivered > 0 && !worker.cdn && reqs.some((r) => r.listed && /\.glb$/.test(r.path)) ? [`asset worker delivered ${worker.delivered} GLBs, 0 from the CDN`] : []),
     ];
-    const row = { url, dev, total: reqs.length, cdn: cdn.length, originListed, worker, problems, errors, pass: problems.length === 0, reqs };
+    const row = { url, dev, total: reqs.length, cdn: cdn.length, cdnBr: cdn.filter((r) => r.encoding === 'br' && r.path.startsWith('/assets/br/')).length, originListed, worker, problems, errors, pass: problems.length === 0, reqs };
     rows.push(row); console.log(JSON.stringify({ ...row, reqs: undefined, originListed: originListed.slice(0, 5) }));
     await ctx.close();
   }

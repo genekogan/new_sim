@@ -67,12 +67,12 @@ Live evidence: all 571 core-set hash aliases served by https://sim.eden.art matc
 
 ## Excluded large assets and world-scoped publication
 
-The prepared manifest contains 2,296 aliases for 573 objects (130,857,360 bytes): 96 CC0 (76 models, 20 lod1 meshes)
-and 477 served-public. These stay on origin because the origin is as fast or faster (see the audit in `docs/god/CDN.md`):
+Since CDN3 the prepared manifest contains 3,017 aliases for 806 objects (215,060,804 decoded bytes, 138,477,901 stored):
+96 CC0 (76 models, 20 lod1 meshes), 477 served-public core-set files, 3 BLOBS and 230 `/modular` GLBs; 742 of them are
+precompressed (below). These stay on origin because the origin is as fast or faster (see the audit in `docs/god/CDN.md`):
 
 | Asset | Why it stays on origin |
 |---|---|
-| `/modular/environment/*` (character models, clips, Eden packs; every world) | Same: origin q11 brotli, the CDN 18-45% larger (environment set 1,661,713 vs 2,022,329 B). |
 | Vite bundles (`/assets/*.js`, css) | Same edge, origin q11 brotli, and a second host adds 31-51 ms of connection setup on the boot path. |
 | Mars campus `/browser/campus.glb?v=20260922b` | Already on the CDN, world-scoped (below). |
 
@@ -80,10 +80,80 @@ The `/blobs/assets/<sha>` files the client names (Mars backdrop base and detail 
 (coordinator, 2026-10-20: /w/mars loads its campus from them): `served-blobs.json` records them (exact sha/bytes, a local
 copy of the bytes for the publisher, which file names them), and a test fails when a `/blobs/assets/` literal in
 `apps/web/src` has no record. Measured trade-off: the origin sends them as quality-11 brotli (base tier 1,407,181 B) and the
-CDN at about quality 4 (1,554,144 B, +10%), so precompressed upload (below) is what makes them strictly faster.
+CDN at about quality 4 (1,554,144 B, +10%); stored precompressed (CDN3, below) they are byte-for-byte the origin's 1,407,181 B.
 
-A precompressed upload (objects stored with `Content-Encoding: br` at quality 11) would make the CDN at least as small as
-the origin for all of these; the design and its open check are in `docs/god/CDN.md`.
+## Precompressed objects and `/modular` (CDN3, 2026-10-20)
+
+`assets.eden.art` compresses on the fly at about brotli quality 4; the origin sends `/blobs`, `/modular` and the Vite
+bundles as precompressed quality 11. So every compressible object is now stored as its **quality-11 brotli bytes**
+(lgwin 24, the largest window browsers decode) with `Content-Encoding: br`, under its own key namespace
+`assets/br/<sha[0:2]>/<sha>.<ext>`. The CDN then sends exactly the origin's smallest encoding from the nearest edge, with
+no per-request compression at the edge.
+
+- **When:** GLB/bin/HDR/EXR (and JSON/GLTF/WASM/SVG if ever approved) whose q11 output saves at least 3%. Images and the
+  64 core GLBs that do not compress (meshopt/KTX-heavy) stay identity under their CDN1/CDN2 keys, already uploaded.
+- **Why a new key:** the 576 identity objects CDN1/CDN2 uploaded are immutable (`If-None-Match: *`, metadata must match),
+  and the releases that reference them keep working. A br key never collides with them. 742 new objects, 0 overwrites.
+- **Integrity:** `sha256`/`bytes` in the plan and the client manifest are the decoded file's. `fetch` decodes
+  `Content-Encoding` in the page and in the asset worker alike, so the client's length and SHA-256 checks run on the
+  decoded bytes (shown in real Chrome by `browser-proof.mjs`, whose stand-in sends br for br keys: the worker fetched an
+  `assets/br/` lod with `content-encoding: br`, verified it and rendered it; a valid br stream of wrong bytes fell back to
+  the origin). The plan records `encoding: 'br'`, `encodedBytes`, `encodedSha256`.
+- **Clients without br:** Cloudflare decodes a stored br body for a client that does not accept br. Measured live on the
+  same edge (sim.eden.art `/blobs` base tier, a cached br variant): a br client got 1,407,181 B `content-encoding: br`;
+  no `Accept-Encoding`, `identity` and `gzip` clients got the decoded 4,585,464 B (weak ETag, HIT, correct sha). The R2
+  custom domain is the same edge; the release owner's one-object test (below) proves it for an R2 object before the full
+  upload. Every browser sends br over HTTPS, and a wrong body fails the client's hash and falls back to the origin, so
+  the Sim client is safe either way. Never set `Cache-Control: no-transform` on these objects (it would stop the decode).
+- **Publisher:** `inventory` writes the q11 bytes to a content-addressed cache (`$EDEN_CDN_BR_CACHE`, default
+  `$TMPDIR/eden-cdn-br`; the plan records it) and `publish --apply` uses an entry only after it decodes to the plan's sha256
+  and its own sha256 equals `encodedSha256` (otherwise it recompresses, deterministically on the same Node). PUT carries
+  `Content-Encoding: br`, `Content-Length` = encoded size and `x-amz-meta-encoded-sha256`; HEAD/readback metadata must match
+  both, and the readback asks for br and hashes the decoded stream. `--only <key>[,<key>]` publishes just those keys of the
+  reviewed plan; `--identity` writes a CDN2-style plan; `--base <manifest>` keeps that manifest's world-scoped section.
+- **Checker:** for a br key, `verify.mjs` GETs with `Accept-Encoding` br (MISS), br (HIT: must be `content-encoding: br`,
+  the stored length), Chrome's `gzip, deflate, br, zstd` (must stay br, not be transcoded), identity (must arrive
+  decoded) and gzip, hashing the decoded body each time. `--key a,b,c` checks
+  several keys.
+
+`/modular` (`served-public.json`, class `modular`, generated by `served-public.mjs`): every GLB under
+`mars/viewer/public/modular` (14 environment files: the three wire meshes, two clips files, three single-file fallback
+characters, six Eden packs; 216 humanoid kit parts and rigs). Each record carries the exact version query the client puts
+on it (`queries`), read from the client's own pinned URL expressions (`character-wire.ts` sha prefixes, `people.ts`
+`?v=ual-1`, `IMPORTS_TAG`), and the manifest gets that query alias in the root and `/worlds` namespaces next to the bare
+names (`/modular/**`, `/worlds/modular/**`, `/mars-assets/modular/**`). Rights text: CC0 (Quaternius, Kenney), kept.
+
+Paired wire bytes, 2026-10-20 (Chrome's `Accept-Encoding: gzip, deflate, br, zstd`, 8 parallel transfers, median of 3;
+`team/scratch/t4/cdn3/measure/`): origin = sim.eden.art through Cloudflare; CDN today = the identity objects on
+assets.eden.art (q4 on the fly); CDN3 = the stored q11 bytes, served by a local stand-in (its times are loopback only).
+
+| Class (objects) | Origin | CDN today | CDN3 | CDN3 vs origin |
+|---|---|---|---|---|
+| Core CC0 by hash (94) | 3,718,359 B, 0.88 s | 1,612,393 B, 0.84 s | 1,354,633 B | -63.6% |
+| Core served-public by hash (477) | 118,074,262 B, 5.61 s | 110,899,453 B, 5.82 s | <= 108,086,573 B (64 stay identity, still q4 at the edge) | -8.5% |
+| /blobs Mars backdrop + fork campus (3) | 22,097,032 B, 0.70 s | 25,992,771 B, 1.05 s | 22,097,032 B | 0.0% (same bytes) |
+| /modular arrival set: wire meshes, clips, Eden packs (11) | 1,459,486 B, 0.19 s | not on CDN | 1,370,104 B | -6.1% |
+| /modular fallback characters (3) | 1,209,736 B, 0.13 s | not on CDN | 1,209,736 B | 0.0% |
+| /modular humanoid kit (216) | 4,814,562 B, 1.85 s | not on CDN | 4,356,965 B | -9.5% |
+
+Release owner, two steps (`P` = the reviewed dry-run plan, `T` = a fresh dated directory; the key is used by path only):
+
+```sh
+# 1. one new br object, then prove it live with and without br
+EDEN_ASSETS_CREDENTIALS=<private-secrets>/eden-assets-r2.env node tools/cdn/publish.mjs --apply --plan $P --only <br key> --receipt $T/receipt-test.json
+node tools/cdn/verify.mjs https://assets.eden.art $P --key <br key> --out $T/proof-test.json        # MISS br, HIT br, Chrome's header, identity, gzip
+curl -s -o /dev/null -w '%{size_download} %header{content-encoding}\n' -H 'Accept-Encoding: br' https://assets.eden.art/<br key>   # stored size, br
+curl -s https://assets.eden.art/<br key> | shasum -a 256                                             # no Accept-Encoding: decoded sha256
+# 2. the full set (existing objects are verified and skipped), then a cache proof on three new br keys
+EDEN_ASSETS_CREDENTIALS=<private-secrets>/eden-assets-r2.env node tools/cdn/publish.mjs --apply --plan $P --receipt $T/receipt.json
+node tools/cdn/verify.mjs https://assets.eden.art $P --key <k1>,<k2>,<k3> --out $T/proof.json
+```
+
+If step 1 shows a non-br client receiving br bytes, stop before step 2: the Sim client is still correct (browsers decode
+br; a wrong body falls back to the origin), but record it and decide with the coordinator.
+
+World-scoped objects (Mars campus, Little Martians scans) stay identity: the current client requests none of them (CDN2
+capture: 0 requests); precompress them the same way if a world starts loading them again.
 
 Before the CDN rule above, the release owner's default permitted assets already served publicly to a world to use CDN
 delivery **for that same world under a world-scoped path** (the records below are still live and still valid). Since
@@ -189,8 +259,9 @@ node <worktrees>/lane-cdn/tools/cdn/verify.mjs https://assets.eden.art <team>/sc
 Use `--key assets/aa/<sha>.glb` to check a particular model, `--sample N` for more objects. The first GET must report MISS;
 the second must report HIT and a numeric Age. GET primes the actual body cache. If someone already warmed the object,
 strict fresh-MISS proof fails honestly; `--allow-warm` permits a separate warm recheck, labelled as such in its report.
-No cache purge or cache-busting query is performed. These checks use no credentials. No Brotli rule is assumed: hashes are
-for decoded bytes and the checker requests identity encoding.
+No cache purge or cache-busting query is performed. These checks use no credentials. Hashes are for decoded bytes. An
+identity object is checked with identity requests; a precompressed (`assets/br/`) object with br, br, Chrome's header, identity and gzip
+requests (CDN3 above).
 
 Focused local verification (synthetic fixtures and mocked HTTP; no real credential/network access):
 
@@ -205,7 +276,7 @@ Verify the checked-in prepared manifest independently against actual repo files 
 node --test <worktrees>/lane-cdn/tools/cdn/manifest-integrity.test.mjs
 ```
 
-This checks every alias (2,296 today), and that each hash alias carries the bytes the origin route sends. Named `/world-assets/` and `/worlds/world-assets/` entries resolve to their
+This checks every alias (3,017 today, `/modular` included), and that each hash alias carries the bytes the origin route sends. Named `/world-assets/` and `/worlds/world-assets/` entries resolve to their
 literal files under repo `worlds/`; canonical hash aliases resolve through the reviewed core index. Unknown, unsafe,
 unresolvable or symlinked paths fail, and every entry must match an independently computed file SHA-256 and byte count.
 

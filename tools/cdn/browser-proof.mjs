@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import { deflateSync, crc32 } from 'node:zlib';
+import { brotliCompressSync, constants as zlib, deflateSync, crc32 } from 'node:zlib';
 import { startWorld } from '../god-skill/dev-world.mjs';
 import { findPlaywright } from '../god-skill/lib/look.mjs';
 import { chromeLease } from '../god-skill/lib/chrome-lease.mjs';
@@ -24,12 +24,12 @@ const [sha, record] = Object.entries(index.assets).find(([, a]) => a.name === 'c
 const bytes = readFileSync(resolve(root, record.path));
 assert.equal(createHash('sha256').update(bytes).digest('hex'), sha);
 const assetPath = `${prefix}/w/cdn-proof/assets/${sha}.glb`;
-const key = `assets/${sha.slice(0, 2)}/${sha}.glb`;
+const key = `assets/${sha.slice(0, 2)}/${sha}.glb`, brKey = `assets/br/${sha.slice(0, 2)}/${sha}.glb`;
 // Z2 (2026-10-20): a far cow loads its lod1 first (make.lod1), by its own sha; the proof accepts and serves either.
 const lods = JSON.parse(readFileSync(resolve(root, 'worlds/core-assets/lods.index.json'), 'utf8')).assets;
 const [lodSha, lodRecord] = Object.entries(lods).find(([, a]) => a.source?.includes(sha)) ?? [];
 const lodBytes = lodRecord ? readFileSync(resolve(root, lodRecord.path)) : null;
-const lodKey = lodSha ? `assets/${lodSha.slice(0, 2)}/${lodSha}.glb` : null, lodPath = lodSha ? `${prefix}/w/cdn-proof/assets/${lodSha}.glb` : null;
+const lodKey = lodSha ? `assets/${lodSha.slice(0, 2)}/${lodSha}.glb` : null, lodBrKey = lodSha ? `assets/br/${lodSha.slice(0, 2)}/${lodSha}.glb` : null, lodPath = lodSha ? `${prefix}/w/cdn-proof/assets/${lodSha}.glb` : null;
 // Original checkerboard texture: no external asset or licence dependency.
 const chunk = (type, data) => { const tag = Buffer.from(type); const size = Buffer.alloc(4); size.writeUInt32BE(data.length); const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(Buffer.concat([tag, data]))); return Buffer.concat([size, tag, data, crc]); };
 const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(8, 0); ihdr.writeUInt32BE(8, 4); ihdr[8] = 8; ihdr[9] = 2;
@@ -43,7 +43,10 @@ mkdirSync(out, { recursive: true });
 if (mode === 'serve') {
   const webDir = resolve(opt('web-dir', '<team>/scratch/cdn/web-on'));
   const manifest = JSON.parse(readFileSync(resolve(opt('manifest', '<team>/scratch/cdn/cdn-manifest.json')), 'utf8'));
-  assert.deepEqual(manifest.assets[`${prefix}/assets/${sha}.glb`], { key, sha256: sha, bytes: bytes.length, licence: 'CC0-1.0' }, 'proof must use the actual inventory publication alias');
+  // CDN3: the cow is a precompressed (q11 br) object in the current manifest; an identity key is accepted too.
+  const cowEntry = manifest.assets[`${prefix}/assets/${sha}.glb`];
+  assert.deepEqual({ ...cowEntry, key: undefined }, { key: undefined, sha256: sha, bytes: bytes.length, licence: 'CC0-1.0' }, 'proof must use the actual inventory publication alias');
+  assert.ok([key, brKey].includes(cowEntry.key), cowEntry.key);
   manifest.assets[pngPath] = { key: pngKey, sha256: pngSha, bytes: png.length, licence: 'own-work' };
   // Amend only the disposable test build's emitted manifest with the synthetic PNG entry.
   // Production uses the untouched manifest emitted by Vite from the reviewed source JSON.
@@ -69,10 +72,16 @@ if (mode === 'serve') {
   const startCdn = async () => {
     if (cdn?.listening) return;
     cdn = createServer((req, res) => {
-      const source = req.url === '/' + key ? bytes : req.url === '/' + pngKey ? png : lodKey && req.url === '/' + lodKey ? lodBytes : null;
+      const u = req.url, br = u === '/' + brKey || (lodBrKey && u === '/' + lodBrKey);
+      const source = u === '/' + key || u === '/' + brKey ? bytes : u === '/' + pngKey ? png : lodKey && (u === '/' + lodKey || u === '/' + lodBrKey) ? lodBytes : null;
       if (!source) { res.writeHead(404).end(); return; }
-      const body = corrupt ? Buffer.alloc(source.length, 0) : source;
-      res.writeHead(200, { 'content-type': source === png ? 'image/png' : 'model/gltf-binary', 'content-length': body.length, 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
+      const plain = corrupt ? Buffer.alloc(source.length, 0) : source;
+      // CDN3: a br key holds q11 brotli bytes. Like Cloudflare, send them as Content-Encoding br to a br client and
+      // decoded to any other. Corrupt = a valid br stream of the wrong (same-length) bytes, so only the hash catches it.
+      // Chrome does not advertise br on plain-HTTP loopback, so the stand-in sends br for br keys regardless (as the edge
+      // does for every browser over HTTPS): the proof is that the browser decodes it and the transport hashes the result.
+      const encode = br, body = encode ? brotliCompressSync(plain, { params: { [zlib.BROTLI_PARAM_QUALITY]: 11, [zlib.BROTLI_PARAM_LGWIN]: 24 } }) : plain;
+      res.writeHead(200, { 'content-type': source === png ? 'image/png' : 'model/gltf-binary', 'content-length': body.length, ...(encode ? { 'content-encoding': 'br', vary: 'Accept-Encoding' } : {}), 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
       res.end(body);
     });
     await new Promise((yes, no) => cdn.once('error', no).listen(5811, '127.0.0.1', yes));
@@ -138,7 +147,7 @@ if (mode === 'serve') {
       await page.route('**/*', route => { const u = new URL(route.request().url()); return ['blob:', 'data:'].includes(u.protocol) || ['127.0.0.1', 'localhost'].includes(u.hostname) ? route.continue() : route.abort(); });
       const tracked = url => url.includes(sha) || (lodSha && url.includes(lodSha)) || url.includes(pngSha) || url.endsWith('/cdn-proof.png');
       page.on('request', req => { if (tracked(req.url())) requests.push(req.url()); });
-      page.on('response', res => { if (tracked(res.url())) responses.push({ url: res.url(), status: res.status() }); });
+      page.on('response', res => { if (tracked(res.url())) responses.push({ url: res.url(), status: res.status(), encoding: res.headers()['content-encoding'] ?? null }); });
       page.on('requestfailed', req => { if (tracked(req.url())) failed.push({ url: req.url(), error: req.failure()?.errorText }); });
       page.on('pageerror', error => errors.push(error.message));
       await page.goto(`${origin}${prefix}/w/cdn-proof?dev=1&weather=clear`, { waitUntil: 'domcontentloaded' });
@@ -159,7 +168,10 @@ if (mode === 'serve') {
         await page.getByRole('button', { name: 'cottage', exact: true }).click({ timeout: 5000 });
       })().catch(() => page.keyboard.press('Escape'));
       await page.waitForTimeout(1500);
-      assert.ok(requests.some(url => url === 'http://127.0.0.1:5811/' + key || (lodKey && url === 'http://127.0.0.1:5811/' + lodKey)), 'CDN was attempted');
+      const cdnKeys = [key, brKey, lodKey, lodBrKey].filter(Boolean).map(k => 'http://127.0.0.1:5811/' + k);
+      assert.ok(requests.some(url => cdnKeys.includes(url)), 'CDN was attempted');
+      // CDN3: a br key arrives Content-Encoding br; the browser (page or worker) decodes it before the hash check.
+      for (const row of responses.filter(r => r.url.startsWith('http://127.0.0.1:5811/assets/br/') && r.status === 200)) assert.equal(row.encoding, 'br', row.url);
       // CDN2: GLBs are downloaded in the asset worker (asset-fetch.ts); its requests count like the page's.
       const originLoaded = responses.some(row => (row.url === origin + assetPath || (lodPath && row.url === origin + lodPath)) && row.status === 200);
       assert.equal(originLoaded, scenario !== 'cdn', 'only failure scenarios fetch origin');

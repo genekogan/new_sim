@@ -1,7 +1,10 @@
 // Read-only asset inventory. No network or credential access.
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { promisify } from 'node:util';
+import { brotliCompress, brotliDecompress, constants as zlib } from 'node:zlib';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { coreSet } from './served-public.mjs';
@@ -16,7 +19,60 @@ export const ALLOWED_LICENCES = new Set(['CC0-1.0', 'own-work', 'served-public']
 export const CLIENT_EXTENSIONS = new Set(['.glb', '.bin', '.ktx2', '.png', '.jpg', '.jpeg', '.webp', '.avif', '.hdr', '.exr']);
 const normalizedLicence = licence => licence === 'own work' ? 'own-work' : 'CC0-1.0';
 export const keyFor = (sha, ext) => `assets/${sha.slice(0, 2)}/${sha}${ext}`;
-export function validKey(key, sha) { return /^[0-9a-f]{64}$/.test(sha) && new RegExp(`^assets/${sha.slice(0, 2)}/${sha}\\.[a-z0-9]+$`).test(key); }
+/** CDN3 (2026-10-20): a precompressed object lives under its own key namespace, `assets/br/<aa>/<sha>.<ext>`, stored as
+ *  quality-11 brotli bytes with `Content-Encoding: br`. sha256/bytes stay those of the decoded file (what fetch hands the
+ *  client), so a br key never collides with the identity object CDN1/CDN2 uploaded under `assets/<aa>/<sha>.<ext>`. */
+export const brKeyFor = (sha, ext) => `assets/br/${sha.slice(0, 2)}/${sha}${ext}`;
+export const isBrKey = key => typeof key === 'string' && key.startsWith('assets/br/');
+export function validKey(key, sha) { return /^[0-9a-f]{64}$/.test(sha) && new RegExp(`^assets/(?:br/)?${sha.slice(0, 2)}/${sha}\\.[a-z0-9]+$`).test(key); }
+
+// Precompression (CDN3). Origin sends /blobs, /modular and the Vite bundles as quality-11 brotli; assets.eden.art
+// compresses on the fly at about quality 4 (CDN2 audit), so the CDN only beats the origin when it stores q11 itself.
+// Images (PNG/JPEG/WebP/AVIF/KTX2) are already entropy-coded and stay identity.
+export const BR_EXTENSIONS = new Set(['.glb', '.bin', '.hdr', '.exr', '.gltf', '.json', '.wasm', '.svg']);
+/** Store br only when it saves at least this fraction (below it, identity costs no more on the wire than br would). */
+export const BR_MIN_SAVING = 0.03;
+/** lgwin 24 is the largest window every browser's decoder accepts (large-window brotli is not web brotli). */
+export const BR_PARAMS = Object.freeze({ quality: 11, lgwin: 24 });
+export const DEFAULT_BR_CACHE = process.env.EDEN_CDN_BR_CACHE || join(tmpdir(), 'eden-cdn-br');
+const compress = promisify(brotliCompress), decompress = promisify(brotliDecompress);
+const digest = buffer => createHash('sha256').update(buffer).digest('hex');
+export function brotli(buffer) {
+  return compress(buffer, { params: { [zlib.BROTLI_PARAM_QUALITY]: BR_PARAMS.quality, [zlib.BROTLI_PARAM_LGWIN]: BR_PARAMS.lgwin, [zlib.BROTLI_PARAM_MODE]: zlib.BROTLI_MODE_GENERIC, [zlib.BROTLI_PARAM_SIZE_HINT]: buffer.length } });
+}
+/** The q11 brotli bytes of `file`, whose decoded sha256/bytes must be the given ones. A content-addressed cache
+ *  (`<cache>/<sha256>.q11w24.br`) is reused only after it decodes to exactly those bytes; otherwise it is rebuilt. */
+export async function encodedCopy(file, sha256, bytes, cache = DEFAULT_BR_CACHE) {
+  const cached = join(cache, `${sha256}.q${BR_PARAMS.quality}w${BR_PARAMS.lgwin}.br`);
+  try {
+    const encoded = await readFile(cached), decoded = await decompress(encoded);
+    if (decoded.length === bytes && digest(decoded) === sha256) return { encoded, encodedBytes: encoded.length, encodedSha256: digest(encoded) };
+  } catch { /* absent or undecodable cache entry: rebuild it */ }
+  const raw = await readFile(file);
+  if (raw.length !== bytes || digest(raw) !== sha256) throw Error(`${file}: bytes differ from the recorded sha256 before compression`);
+  const encoded = await brotli(raw), check = await decompress(encoded);
+  if (check.length !== bytes || digest(check) !== sha256) throw Error(`${file}: brotli round trip failed`);
+  await mkdir(cache, { recursive: true });
+  const tmp = `${cached}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(tmp, encoded); await rename(tmp, cached);
+  return { encoded, encodedBytes: encoded.length, encodedSha256: digest(encoded) };
+}
+/** Decide each compressible object's encoding: q11 br under its br key when that saves >= BR_MIN_SAVING. Rewrites the
+ *  manifest entries that point at a re-keyed object. Runs four compressions at a time (zlib's thread pool). */
+export async function precompress(objects, assets, { cache = DEFAULT_BR_CACHE, concurrency = 4 } = {}) {
+  const queue = objects.filter(o => BR_EXTENSIONS.has(extname(o.key))), rekeyed = new Map();
+  await Promise.all(Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
+    for (let o; (o = queue.shift());) {
+      const { encodedBytes, encodedSha256 } = await encodedCopy(o.file, o.sha256, o.bytes, cache);
+      if (encodedBytes > o.bytes * (1 - BR_MIN_SAVING)) continue;
+      const key = brKeyFor(o.sha256, extname(o.key));
+      rekeyed.set(o.key, key);
+      Object.assign(o, { key, encoding: 'br', encodedBytes, encodedSha256 });
+    }
+  }));
+  for (const a of Object.values(assets)) if (rekeyed.has(a.key)) a.key = rekeyed.get(a.key);
+  return rekeyed.size;
+}
 
 export function parseCsv(text) {
   const rows = []; let row = [], cell = '', quoted = false;
@@ -84,7 +140,8 @@ export function defaultRoots(root) {
     { dir: join(root, 'apps/web/public'), prefixes: ['/', '/worlds/'], pages: ['/w/eden', '/w/mars', '/w/littlemartians', '/worlds'] },
   ];
 }
-export async function inventory({ root = ROOT, sources = DEFAULT_SOURCES, roots = defaultRoots(root), now = new Date(), reviewed, served, blobs } = {}) {
+/** `brotli`: precompression options ({ cache }), or false for identity-only objects (CDN1/CDN2 plans). */
+export async function inventory({ root = ROOT, sources = DEFAULT_SOURCES, roots = defaultRoots(root), now = new Date(), reviewed, served, blobs, brotli: brOptions = {} } = {}) {
   const rows = parseCsv(await readFile(sources, 'utf8')), byPath = new Map(), missingRoots = [];
   reviewed ??= await readReviewed();
   // The BLOBS list names this repo's client files; an inventory of another root (a test fixture) has none by default.
@@ -114,6 +171,12 @@ export async function inventory({ root = ROOT, sources = DEFAULT_SOURCES, roots 
   for (const [base, alias] of [['/browser/campus.glb', '/browser/campus.glb?v=20260922b']]) {
     if (assets[base]) assets[alias] = assets[base];
     else if (byPath.has(base)) { const item = excluded.find(r => r.path === base); excluded.push({ ...item, path: alias }); }
+  }
+  // CDN3: /modular files carry the exact version query the client puts on them (served-public.json `queries`). A query
+  // alias names the same bytes as its bare path, in both the root and /worlds namespaces.
+  for (const r of served.objects) for (const q of r.queries ?? []) for (const prefix of ['', '/worlds']) {
+    const entry = assets[prefix + r.url];
+    if (entry) { assets[prefix + r.url + q] = entry; objects.get(entry.key)?.paths.push(prefix + r.url + q); }
   }
   // Runtime mesh endpoints use a SHA, independent of the core catalogue's on-disk name. Each alias names the bytes the
   // origin's GET /assets/<sha> sends: the core set (worlds/core-assets/*index.json) with its renditions, plus reviewed
@@ -146,12 +209,15 @@ export async function inventory({ root = ROOT, sources = DEFAULT_SOURCES, roots 
     objects.get(key).paths.push(b.blob);
   }
   const files = [...hashes].map(([file, digest]) => ({ file, ...digest }));
+  const all = [...objects.values()];
+  if (brOptions !== false) await precompress(all, assets, brOptions);
   return {
     version: 1, generatedAt: now.toISOString(), root: resolve(root), sources: resolve(sources), bucket: 'eden-assets',
     coverage: ['/w/eden', '/w/mars', '/w/littlemartians', '/worlds'],
     note: 'Local public-asset inventory, not a live traffic capture. Missing roots and unlicensed files are explicit. No network or credentials used.',
-    manifest: { version: 1, assets }, objects: [...objects.values()].sort((a, b) => a.key.localeCompare(b.key)), excluded, missingRoots, missingBlobs,
-    totals: { candidateFiles: files.length, candidateBytes: files.reduce((n, f) => n + f.bytes, 0), candidatePaths: candidates.length, publishableObjects: objects.size, publishableBytes: [...objects.values()].reduce((n, f) => n + f.bytes, 0), publishablePaths: Object.keys(assets).length, excludedPaths: excluded.length },
+    ...(brOptions !== false ? { brotli: { ...BR_PARAMS, minSaving: BR_MIN_SAVING, cache: resolve(brOptions.cache ?? DEFAULT_BR_CACHE) } } : {}),
+    manifest: { version: 1, assets }, objects: all.sort((a, b) => a.key.localeCompare(b.key)), excluded, missingRoots, missingBlobs,
+    totals: { candidateFiles: files.length, candidateBytes: files.reduce((n, f) => n + f.bytes, 0), candidatePaths: candidates.length, publishableObjects: objects.size, publishableBytes: all.reduce((n, f) => n + f.bytes, 0), brObjects: all.filter(o => o.encoding === 'br').length, storedBytes: all.reduce((n, f) => n + (f.encodedBytes ?? f.bytes), 0), publishablePaths: Object.keys(assets).length, excludedPaths: excluded.length },
     largestFiles: files.sort((a, b) => b.bytes - a.bytes).slice(0, 20),
   };
 }

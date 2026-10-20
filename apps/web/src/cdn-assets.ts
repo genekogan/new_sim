@@ -33,7 +33,9 @@ export function readCdnManifest(value: unknown): CdnManifest {
   const assets: Record<string, CdnAsset> = Object.create(null);
   for (const [path, a] of Object.entries((value as CdnManifest).assets)) {
     if (!validPath(path) || !validEntry(a) || !LICENCES.has(a.licence)) throw Error('Invalid CDN asset');
-    const match = /^assets\/([a-f0-9]{2})\/([a-f0-9]{64})\.[a-z0-9]+$/.exec(a.key);
+    // CDN3: `assets/br/<aa>/<sha>.<ext>` is the same file stored as q11 brotli (Content-Encoding br); fetch decodes it, so
+    // sha256/bytes are still the decoded file's and both checks below run on what the loaders get.
+    const match = /^assets\/(?:br\/)?([a-f0-9]{2})\/([a-f0-9]{64})\.[a-z0-9]+$/.exec(a.key);
     if (!match || match[1] !== a.sha256.slice(0, 2) || match[2] !== a.sha256) throw Error('Invalid CDN key');
     const canonical = /^(?:\/worlds)?\/assets\/([a-f0-9]{64})\.[a-z0-9]+$/.exec(path);
     if (a.of !== undefined && (!canonical || !/^[a-f0-9]{64}$/.test(a.of) || a.of === a.sha256)) throw Error('Invalid CDN rendition alias');

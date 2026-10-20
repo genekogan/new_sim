@@ -1,4 +1,4 @@
-# CDN publishing path (lane cdn, 2026-10-15; CDN rule and audit, CDN2, 2026-10-20)
+# CDN publishing path (lane cdn, 2026-10-15; CDN rule and audit, CDN2, 2026-10-20; precompressed objects, CDN3, 2026-10-20)
 
 ## The rule (Gene, 2026-10-20)
 
@@ -29,8 +29,8 @@ sends it uncompressed, or it is incompressible and the CDN gives better caching.
 | Core set by hash: `/assets/<sha>`, `/worlds/assets/<sha>`, `/w/<slug>/assets/<sha>`, `/worlds/w/<slug>/assets/<sha>` (every placed core mesh, lods, littlemartians-two art; 117 of the arium's 119 asset requests, 74.6 MB) | yes (sha) | uncompressed: Cloudflare caches the route without encoding | br q4: 76 CC0 models 3,336,012 -> 1,392,741 B, 0.18 -> 0.14 s; whole set -34% (core index), -11% (lods), -7% (littlemartians-two), -36% (mars-fidelity) | **On the CDN.** 571 shas, 573 objects / 130.9 MB incl. the 125 private lods; renditions mapped (`of`). Live evidence 571/571 bytes match. |
 | Same files by name: `/world-assets/**`, `/worlds/world-assets/**` | per release | br ~q11 (verdelis 1,614,028 B) | br q4 (1,638,445 B, +1.5%) | On the CDN (the four aliases). The client asks for these by sha, so the name aliases are rarely used. |
 | Little Martians scans/buildings on /w/littlemartians; Mars campus + BLOBS copy on /w/mars | yes | | | Already on the CDN, world-scoped (lane cdn2, Oct 16). Unchanged. |
-| Mars backdrop tiers + fork campus `/blobs/assets/<sha>` (/w/mars) | yes (sha) | br q11 precompressed: base 4,585,464 -> 1,407,181 B | q4 estimate 1,554,144 B (+10%) | **On the CDN** (coordinator, 2026-10-20: /w/mars loads its campus from these). 3 objects, 51.9 MB, `served-blobs.json`. +10% wire bytes until precompressed upload; R's walk measures it. |
-| Character models, clips, Eden packs `/modular/environment/*`, `/worlds/modular/*` (every world, ~4.4 MB raw) | name, max-age 600 / 86400 | br q11 (`/modular`), ~q5 (`/worlds/modular`) | q4: +18-45% (environment set 1,661,713 vs 2,022,329 B) | **Origin**, same reason. |
+| Mars backdrop tiers + fork campus `/blobs/assets/<sha>` (/w/mars) | yes (sha) | br q11 precompressed: 3 files 22,097,032 B | CDN2 (q4 on the fly): 25,992,771 B (+17.6%); CDN3 stored q11: 22,097,032 B (the same bytes) | **On the CDN**, precompressed (CDN3). 3 objects, 51.9 MB raw, `served-blobs.json`. |
+| Character models, clips, Eden packs `/modular/environment/*?v=`, humanoid kit `/modular/humanoid/**` (and `/worlds/modular/**`) | per release (version query or kit sha) | br: arrival set 1,459,486 B, fallback characters 1,209,736 B, kit 4,814,562 B | CDN3 stored q11: 1,370,104 B (-6.1%), 1,209,736 B (0%), 4,356,965 B (-9.5%) | **On the CDN** since CDN3: 230 GLBs, exact client query aliases (served-public class `modular`). |
 | Vite bundles `/assets/*.js`, css, mp4, icons (~1 MB br per page) | yes (hashed) | br q11 precompressed (release.sh), edge HIT | q4, plus a second host: +31-51 ms connection setup on the boot path; script tags bypass the fetch transport | **Origin.** |
 | Draco decoder `/mars-assets/draco/*` (wasm, js; ~70 KB) | name, max-age 600 | br | | **Origin.** Tiny, and the transport does not map wasm. A longer origin max-age would remove its revalidations. |
 | World JSON: `/engine/*.json`, templates, `scene.json`, footprints | name | br | | **Origin.** The client manifest carries no JSON (mutable, path-pinned). |
@@ -40,14 +40,23 @@ sends it uncompressed, or it is incompressible and the CDN gives better caching.
 | API (`/v1/*`, snapshot, config, scenes) | no | | | Dynamic. |
 | God uploads `/worlds/w/<slug>/assets/<sha>` outside the core set | yes (sha) | uncompressed (same route) | | Designed below, not built. 0 of the arium's 119 asset requests today. |
 
-### Design: precompressed objects (would move BLOBS, `/modular` and give the core set another ~5-10%)
+CDN3 (2026-10-20) re-measured the core set with Chrome's Accept-Encoding: origin 94 CC0 3,718,359 B / 477 served-public
+118,074,262 B; CDN2 (q4 on the fly) 1,612,393 / 110,899,453 B; CDN3 stored q11 1,354,633 / <= 108,086,573 B (-64% / -8.5% vs
+origin, -16% / -2.5% vs CDN2).
 
-Upload each compressible object (GLB, JSON) as quality-11 brotli bytes with `Content-Encoding: br`, same key, and keep
-`x-amz-meta-sha256` = the decoded bytes' hash. Browsers then receive exactly the origin's smallest encoding from the
-nearest edge, and the client's hash check is unchanged (fetch decodes). Open check before relying on it (the October 11
-design flagged the same): on the real domain, a client that does not send `br` must still get decodable bytes, and the
-Compression Rule must not recompress. The publisher's HEAD/readback checks and `verify.mjs` (which asks for identity)
-need a `content-encoding` field. This needs the key and one live object to prove, so it is the release owner's step.
+### Precompressed objects (CDN3, built; moves BLOBS and `/modular`, gives the core set another 2-16%)
+
+Each compressible object whose quality-11 brotli saves at least 3% is stored as those bytes with `Content-Encoding: br`
+under a new key, `assets/br/<aa>/<sha>.<ext>` (the CDN1/CDN2 identity keys are immutable and stay valid for the releases
+that use them); `x-amz-meta-sha256` stays the decoded bytes' hash, `x-amz-meta-encoded-sha256` names the stored bytes.
+Browsers receive exactly the origin's smallest encoding from the nearest edge, without on-the-fly compression at the
+edge, and the client's hash check is unchanged because fetch decodes, in the page and in the asset worker (real Chrome:
+`tools/cdn/browser-proof.mjs`). Clients without br: Cloudflare decodes a cached br body for them, measured live on the
+same edge for the origin's `/blobs` br variant (identity/no-header/gzip clients got the decoded bytes, weak ETag, HIT);
+the release owner's one-object test proves it for an R2 object before the full upload (`tools/cdn/README.md`). If an
+edge ever sent br to a non-br client, the Sim client would still be correct (browsers decode br; a wrong body fails the
+hash and falls back to the origin). Objects must never carry `Cache-Control: no-transform`. Details, paired numbers and
+the release-owner steps: `tools/cdn/README.md`, "Precompressed objects and `/modular`".
 
 ### Design: god uploads on the CDN (not built; tell main before building an uploader)
 

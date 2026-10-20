@@ -198,3 +198,23 @@ test('a CDN body that stalls falls back to the exact origin request; an oversize
     } finally { clearTimeout(keepAlive); }
   }
 });
+
+test('CDN3: precompressed br keys validate, still hash-bound; /modular resolves by exact version query', async () => {
+  const brEntry = { ...entry, key: `assets/br/${sha256.slice(0, 2)}/${sha256}.glb` };
+  const m = readCdnManifest({ version: 1, assets: { '/modular/environment/x.glb?v=abc': brEntry } });
+  assert.equal(manifestAsset(m, '/modular/environment/x.glb?v=abc', page), brEntry);
+  assert.equal(manifestAsset(m, '/modular/environment/x.glb?v=new', page), undefined);
+  for (const key of [`assets/br/00/${sha256}.glb`, `assets/gz/${sha256.slice(0, 2)}/${sha256}.glb`, `assets/br/br/${sha256.slice(0, 2)}/${sha256}.glb`]) {
+    assert.throws(() => readCdnManifest({ version: 1, assets: { '/a.glb': { ...entry, key } } }), /Invalid CDN key/);
+  }
+  // The browser decodes Content-Encoding br before the body reaches the transport: the check runs on the decoded bytes.
+  const calls: string[] = [];
+  const response = await cdnFetch(async (input) => { calls.push(String(input)); return new Response(bytes, { headers: { 'content-encoding': 'br' } }); }, m, 'https://assets.eden.art', page)('https://sim.eden.art/modular/environment/x.glb?v=abc');
+  assert.deepEqual(new Uint8Array(await response.arrayBuffer()), bytes);
+  assert.deepEqual(calls, ['https://assets.eden.art/' + brEntry.key]);
+  const prepared = readCdnManifest(JSON.parse(readFileSync(new URL('./cdn-manifest.json', import.meta.url), 'utf8')));
+  for (const prefix of ['', '/worlds']) {
+    const mesh = manifestAsset(prepared, `${prefix}/modular/environment/animated-casual.mesh.glb?v=767b7c427cc6`, page);
+    assert.equal(mesh?.sha256.slice(0, 12), '767b7c427cc6'); assert.match(mesh!.key, /^assets\/br\//);
+  }
+});

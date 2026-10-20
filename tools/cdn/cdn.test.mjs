@@ -4,8 +4,10 @@ import { chmod, mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from 
 import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { CACHE, DEFAULT_SOURCES, inventory, keyFor, licenceEvidence, parseCsv, readReviewed, readServed, shaFile } from './inventory.mjs';
-import { buildRecords } from './served-public.mjs';
+import { BR_PARAMS, CACHE, DEFAULT_SOURCES, brKeyFor, brotli, encodedCopy, inventory, keyFor, licenceEvidence, parseCsv, readReviewed, readServed, shaFile } from './inventory.mjs';
+import { brotliDecompressSync } from 'node:zlib';
+import { createServer } from 'node:http';
+import { buildRecords, modularRecords } from './served-public.mjs';
 import { ENDPOINT, loadCredentials, publish, signRequest, sigv4Headers } from './publish.mjs';
 import { verify } from './verify.mjs';
 import { withNewReceipt } from './receipt.mjs';
@@ -135,7 +137,8 @@ test('CDN2: every /blobs/assets/ file the web client names has a BLOBS record an
   for (const path of named) {
     const r = blobs.find(b => b.blob === path);
     assert.ok(r, `${path}: add it to served-blobs.json`);
-    assert.deepEqual(manifest[path], { key: keyFor(r.sha256, '.glb'), sha256: r.sha256, bytes: r.bytes, licence: 'served-public' });
+    // CDN3: stored precompressed (q11 br) under assets/br/ when that saves >= 3%; the entry always names the decoded bytes.
+    assert.deepEqual(manifest[path], { key: brKeyFor(r.sha256, '.glb'), sha256: r.sha256, bytes: r.bytes, licence: 'served-public' });
   }
 });
 
@@ -318,3 +321,122 @@ test('both CLI commands refuse existing receipt paths before reading a plan or a
     assert.equal(await readFile(receipt, 'utf8'), 'preserve this audit record');
   }
 }));
+
+// ---- CDN3 (2026-10-20): precompressed q11 brotli objects and the /modular class ----
+const glbish = Buffer.from(Array.from({ length: 400 }, (_, i) => `node_${i % 23} mesh primitive accessor ${i % 7};`).join('')), glbSha = hash(glbish);
+async function brFixture(fn) {
+  return fixture(async ctx => {
+    const file = join(ctx.dir, 'big.glb'), cache = join(ctx.dir, 'br-cache');
+    await writeFile(file, glbish);
+    await writeFile(ctx.sources, `path,url,author,licence,date_utc,sha256,bytes,note\nfixture.glb,https://example.test/source,Fixture,CC0-1.0,2026-10-15,${sha256},${data.length},synthetic\nbig.glb,https://example.test/big,Fixture,CC0-1.0,2026-10-20,${glbSha},${glbish.length},synthetic compressible\n`);
+    const pub = join(ctx.dir, 'public'); await mkdir(pub); await writeFile(join(pub, 'big.glb'), glbish); await writeFile(join(pub, 'small.glb'), data);
+    const plan = await inventory({ root: ctx.dir, sources: ctx.sources, roots: [{ dir: pub, prefixes: ['/'], pages: [] }], reviewed: { derivatives: [] }, brotli: { cache } });
+    return fn({ ...ctx, cache, plan, br: plan.objects.find(o => o.sha256 === glbSha) });
+  });
+}
+const brHeaders = br => ({ 'content-length': String(br.encodedBytes), 'content-type': 'model/gltf-binary', 'cache-control': CACHE, 'content-encoding': 'br', 'x-amz-meta-sha256': br.sha256, 'x-amz-meta-encoded-sha256': br.encodedSha256, 'x-amz-meta-licence': 'CC0-1.0' });
+
+test('CDN3: inventory stores compressible objects as q11 br under assets/br/, keeps incompressible ones identity', async () => brFixture(async ({ plan, br, cache }) => {
+  assert.deepEqual(plan.brotli, { ...BR_PARAMS, minSaving: 0.03, cache });
+  assert.equal(br.key, brKeyFor(glbSha, '.glb')); assert.equal(br.encoding, 'br'); assert.equal(br.bytes, glbish.length);
+  const stored = await readFile(join(cache, `${glbSha}.q11w24.br`));
+  assert.equal(stored.length, br.encodedBytes); assert.equal(hash(stored), br.encodedSha256); assert.deepEqual(brotliDecompressSync(stored), glbish);
+  assert.deepEqual(stored, await brotli(glbish), 'deterministic q11 output');
+  assert.ok(br.encodedBytes < glbish.length * 0.2);
+  // The manifest names the decoded bytes; only the key changes.
+  assert.deepEqual(plan.manifest.assets['/big.glb'], { key: br.key, sha256: glbSha, bytes: glbish.length, licence: 'CC0-1.0' });
+  const small = plan.objects.find(o => o.sha256 === sha256);
+  assert.equal(small.key, keyFor(sha256, '.glb')); assert.equal(small.encoding, undefined, '24 bytes do not compress: identity');
+  assert.equal(plan.totals.brObjects, 1); assert.equal(plan.totals.storedBytes, br.encodedBytes + data.length);
+  // A corrupt cache entry is rebuilt, never trusted.
+  await writeFile(join(cache, `${glbSha}.q11w24.br`), 'garbage');
+  assert.equal((await encodedCopy(br.file, glbSha, glbish.length, cache)).encodedSha256, br.encodedSha256);
+}));
+
+test('CDN3: publish PUTs the stored br bytes with Content-Encoding br and verifies the decoded readback', async () => brFixture(async ({ plan, br, sources }) => {
+  const calls = [];
+  const result = await publish({ ...plan, objects: [br] }, { sources, credentials, fetcher: async (url, opts) => {
+    calls.push([opts.method, opts.headers['accept-encoding']]);
+    if (opts.method === 'HEAD') return new Response(null, { status: 404 });
+    if (opts.method === 'PUT') {
+      assert.equal(opts.headers['content-encoding'], 'br'); assert.equal(opts.headers['x-amz-meta-sha256'], glbSha);
+      assert.equal(opts.headers['x-amz-meta-encoded-sha256'], br.encodedSha256); assert.equal(opts.headers['x-amz-content-sha256'], br.encodedSha256, 'signed payload = stored bytes');
+      assert.deepEqual(brotliDecompressSync(opts.body), glbish); assert.ok(url.includes('/assets/br/'));
+      return new Response(null);
+    }
+    return new Response(glbish, { headers: brHeaders(br) });   // fetch hands back the decoded body
+  } });
+  assert.deepEqual(calls, [['HEAD', undefined], ['PUT', undefined], ['GET', 'br']]);
+  assert.deepEqual(result.results[0], { key: br.key, disposition: 'uploaded', bytes: glbish.length, sha256: glbSha, encoding: 'br', encodedBytes: br.encodedBytes, encodedSha256: br.encodedSha256, verified: true });
+  // An existing object without the encoding (or with the identity length) is a conflict, never overwritten.
+  for (const conflict of [{ 'content-encoding': undefined }, { 'content-length': String(glbish.length) }, { 'x-amz-meta-encoded-sha256': 'x' }]) {
+    const headers = Object.fromEntries(Object.entries({ ...brHeaders(br), ...conflict }).filter(([, v]) => v !== undefined));
+    await assert.rejects(publish({ ...plan, objects: [br] }, { sources, credentials, fetcher: async () => new Response(null, { headers }) }), /Refusing immutable overwrite/);
+  }
+}));
+
+test('CDN3: tampered precompressed plans fail before any request; --only publishes one reviewed key', async () => brFixture(async ({ plan, br, sources }) => {
+  const options = { sources, credentials, fetcher: async () => assert.fail('network must not be called') };
+  for (const bad of [{ encodedBytes: br.encodedBytes + 1 }, { encodedSha256: '0'.repeat(64) }, { key: keyFor(glbSha, '.glb') }, { encoding: 'gzip' }, { encodedBytes: glbish.length }]) {
+    await assert.rejects(publish({ ...plan, objects: [{ ...br, ...bad }] }, options), /Brotli bytes differ|Invalid precompressed|Unknown object encoding/);
+  }
+  const identity = plan.objects.find(o => o.sha256 === sha256);
+  await assert.rejects(publish({ ...plan, objects: [{ ...identity, key: brKeyFor(sha256, '.glb') }] }, options), /Invalid precompressed/);
+  await assert.rejects(publish(plan, { ...options, only: ['assets/br/00/missing.glb'] }), /--only/);
+  const keys = [];
+  await publish(plan, { sources, credentials, only: [br.key], fetcher: async (url, opts) => { keys.push(url); return new Response(opts.method === 'HEAD' ? null : glbish, { headers: brHeaders(br) }); } });
+  assert.ok(keys.length === 2 && keys.every(u => u.includes(br.key)));
+}));
+
+test('CDN3: Node fetch decodes a stored br response, so publish and verify hash the decoded file (real HTTP)', async () => brFixture(async ({ br }) => {
+  const stored = await brotli(glbish);
+  const server = createServer((req, res) => {
+    const br = /\bbr\b/.test(req.headers['accept-encoding'] ?? '');
+    res.writeHead(200, { 'content-type': 'model/gltf-binary', ...(br ? { 'content-encoding': 'br', 'content-length': stored.length } : { 'content-length': glbish.length }) });
+    res.end(br ? stored : glbish);
+  });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  try {
+    for (const ae of ['br', 'identity']) {
+      const r = await fetch(`http://127.0.0.1:${server.address().port}/x.glb`, { headers: { 'accept-encoding': ae } });
+      const body = Buffer.from(await r.arrayBuffer());
+      assert.equal(hash(body), br.sha256); assert.equal(body.length, br.bytes);
+      assert.equal(r.headers.get('content-encoding'), ae === 'br' ? 'br' : null);
+      if (ae === 'br') assert.equal(Number(r.headers.get('content-length')), stored.length);
+    }
+  } finally { server.close(); }
+}));
+
+test('CDN3: the checker asks br, br, Chrome\'s header, identity, gzip and requires br bytes for br and decoded bytes for the rest', async () => brFixture(async ({ br }) => {
+  const make = (wrong) => { const seen = []; return { seen, fetcher: async (_, opts) => {
+    const ae = opts.headers['Accept-Encoding']; seen.push(ae);
+    const wantsBr = /\bbr\b/.test(ae), send = wrong === ae ? (wantsBr ? 'identity' : 'br') : (wantsBr ? 'br' : 'identity');
+    const h = { ...publicHeaders, 'content-type': 'model/gltf-binary', 'cf-cache-status': seen.length === 1 ? 'MISS' : 'HIT', ...(seen.length > 1 ? { age: '3' } : {}), ...(send === 'br' ? { 'content-encoding': 'br', 'content-length': String(br.encodedBytes) } : { 'content-length': String(glbish.length) }) };
+    return new Response(glbish, { headers: h });
+  } }; };
+  const ok = make(null), report = await verify('https://assets.example.test', { objects: [br] }, { wait: async () => {}, fetcher: ok.fetcher });
+  assert.deepEqual(ok.seen, ['br', 'br', 'gzip, deflate, br, zstd', 'identity', 'gzip']); assert.equal(report.ok, true, JSON.stringify(report.results[0].errors));
+  assert.deepEqual(report.results[0].requests.map(r => [r.acceptEncoding, r.contentEncoding, r.wireBytes]), [['br', 'br', br.encodedBytes], ['br', 'br', br.encodedBytes], ['gzip, deflate, br, zstd', 'br', br.encodedBytes], ['identity', null, glbish.length], ['gzip', null, glbish.length]]);
+  const bad1 = await verify('https://assets.example.test', { objects: [br] }, { wait: async () => {}, fetcher: make('br').fetcher });
+  assert.match(bad1.results[0].errors.join(), /br request: content-encoding none/);
+  const bad2 = await verify('https://assets.example.test', { objects: [br] }, { wait: async () => {}, fetcher: make('identity').fetcher });
+  assert.match(bad2.results[0].errors.join(), /identity request: got content-encoding br/);
+}));
+
+test('CDN3: /modular records carry the exact version queries the client requests, in both namespaces', async () => {
+  const served = await readServed(), modular = served.objects.filter(r => r.class === 'modular');
+  assert.deepEqual(modular, await modularRecords());
+  const manifest = JSON.parse(await readFile(new URL('../../apps/web/src/cdn-manifest.json', import.meta.url), 'utf8')).assets;
+  const wire = await readFile(new URL('../../mars/viewer/app/engine-view/character-wire.ts', import.meta.url), 'utf8');
+  // The 11 files every world requests at arrival (CDN2 capture, 2026-10-20), with their live query strings.
+  const arrival = ['animated-casual.mesh.glb?v=767b7c427cc6', 'animated-woman.mesh.glb?v=7cce8c4153ce', 'animated-punk.mesh.glb?v=3d971341fe35', 'clips-ual.glb?v=372246400b19', 'clips-ual-woman.glb?v=0b81be6416c1',
+    'eden-boats-bikes.glb?v=imports-1', 'eden-animals.glb?v=imports-1', 'eden-crops.glb?v=imports-1', 'eden-nature.glb?v=imports-1', 'eden-food.glb?v=imports-1', 'eden-interior.glb?v=imports-1'];
+  for (const f of arrival) for (const prefix of ['/modular/environment/', '/worlds/modular/environment/']) {
+    const entry = manifest[prefix + f], r = modular.find(x => x.url === '/modular/environment/' + f.split('?')[0]);
+    assert.ok(entry && r, `${prefix}${f} is not on the CDN`);
+    assert.deepEqual([entry.sha256, entry.bytes, entry.licence], [r.sha256, r.bytes, 'served-public']);
+    if (/[0-9a-f]{12}$/.test(f)) { assert.equal(f.split('=')[1], r.sha256.slice(0, 12), `${f}: query is the file's own sha prefix`); assert.ok(wire.includes(r.sha256)); }
+  }
+  assert.ok(modular.filter(r => r.url.startsWith('/modular/humanoid/')).length >= 200, 'the humanoid kit');
+  for (const r of modular) assert.ok(manifest[r.url] && manifest['/worlds' + r.url], `${r.url}: bare name in both namespaces`);
+});

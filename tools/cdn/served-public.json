@@ -3930,6 +3930,1888 @@
    "rights": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "index": "index.json",
    "source": "worlds/littlemartians/characters/kin/green-brains-out.glb (Polycam scan of a ceramic head, rebuilt by tools/floaters/build-assets.mjs)"
+  },
+  {
+   "sha256": "67adf57862cff4cfa02fac223b87e7f66e178ad1b94bd4cd77167b9efb583590",
+   "bytes": 1857308,
+   "path": "mars/viewer/public/modular/environment/animated-casual.glb",
+   "rights": "CC0-1.0: Quaternius animated people and Universal Animation Library clips (modular/ASSETS.md); eden-*.glb packs from Quaternius/Kenney CC0 sources (team/asset-scouting/SOURCES.csv, mars/scripts/imports/export_pack.py)",
+   "class": "modular",
+   "url": "/modular/environment/animated-casual.glb",
+   "queries": [
+    "?v=ual-1"
+   ]
+  },
+  {
+   "sha256": "767b7c427cc651a8f4084b1b5d07882bbc4a3a6b5658aeaf8d866ade3179d277",
+   "bytes": 691076,
+   "path": "mars/viewer/public/modular/environment/animated-casual.mesh.glb",
+   "rights": "CC0-1.0: Quaternius animated people and Universal Animation Library clips (modular/ASSETS.md); eden-*.glb packs from Quaternius/Kenney CC0 sources (team/asset-scouting/SOURCES.csv, mars/scripts/imports/export_pack.py)",
+   "class": "modular",
+   "url": "/modular/environment/animated-casual.mesh.glb",
+   "queries": [
+    "?v=767b7c427cc6"
+   ]
+  },
+  {
+   "sha256": "0ed3ebd87144d372b84c0524a2f843c3eb4391573eeb420e29f8cb80ab1a7f0b",
+   "bytes": 1807856,
+   "path": "mars/viewer/public/modular/environment/animated-punk.glb",
+   "rights": "CC0-1.0: Quaternius animated people and Universal Animation Library clips (modular/ASSETS.md); eden-*.glb packs from Quaternius/Kenney CC0 sources (team/asset-scouting/SOURCES.csv, mars/scripts/imports/export_pack.py)",
+   "class": "modular",
+   "url": "/modular/environment/animated-punk.glb",
+   "queries": [
+    "?v=ual-1"
+   ]
+  },
+  {
+   "sha256": "3d971341fe35889ccb82783e332dfcf9594b52d181aab0711a449b5aea99c0d1",
+   "bytes": 640724,
+   "path": "mars/viewer/public/modular/environment/animated-punk.mesh.glb",
+   "rights": "CC0-1.0: Quaternius animated people and Universal Animation Library clips (modular/ASSETS.md); eden-*.glb packs from Quaternius/Kenney CC0 sources (team/asset-scouting/SOURCES.csv, mars/scripts/imports/export_pack.py)",
+   "class": "modular",
+   "url": "/modular/environment/animated-punk.mesh.glb",
+   "queries": [
+    "?v=3d971341fe35"
+   ]
+  },
+  {
+   "sha256": "679d905e85b5becd8a822a60c4741a67bbd6382b2198fd51b361de42a8532a63",
+   "bytes": 1917076,
+   "path": "mars/viewer/public/modular/environment/animated-woman.glb",
+   "rights": "CC0-1.0: Quaternius animated people and Universal Animation Library clips (modular/ASSETS.md); eden-*.glb packs from Quaternius/Kenney CC0 sources (team/asset-scouting/SOURCES.csv, mars/scripts/imports/export_pack.py)",
+   "class": "modular",
+   "url": "/modular/environment/animated-woman.glb",
+   "queries": [
+    "?v=ual-1"
+   ]
+  },
+  {
+   "sha256": "7cce8c4153ce36fdd7e22f71c37e22eddc620a8ce7b35ae3bb1eb5345f931245",
+   "bytes": 742640,
+   "path": "mars/viewer/public/modular/environment/animated-woman.mesh.glb",
+   "rights": "CC0-1.0: Quaternius animated people and Universal Animation Library clips (modular/ASSETS.md); eden-*.glb packs from Quaternius/Kenney CC0 sources (team/asset-scouting/SOURCES.csv, mars/scripts/imports/export_pack.py)",
+   "class": "modular",
+   "url": "/modular/environment/animated-woman.mesh.glb",
+   "queries": [
+    "?v=7cce8c4153ce"
+   ]
+  },
+  {
+   "sha256": "0b81be6416c1dd64ccd3a5b2a15e35f50759444b23c91521b8d0407af223b61f",
+   "bytes": 1184832,
+   "path": "mars/viewer/public/modular/environment/clips-ual-woman.glb",
+   "rights": "CC0-1.0: Quaternius animated people and Universal Animation Library clips (modular/ASSETS.md); eden-*.glb packs from Quaternius/Kenney CC0 sources (team/asset-scouting/SOURCES.csv, mars/scripts/imports/export_pack.py)",
+   "class": "modular",
+   "url": "/modular/environment/clips-ual-woman.glb",
+   "queries": [
+    "?v=0b81be6416c1"
+   ]
+  },
+  {
+   "sha256": "372246400b19e034e073899e064ff9c6c3a75fd2ffda8b004c0176810e8199ff",
+   "bytes": 1179384,
+   "path": "mars/viewer/public/modular/environment/clips-ual.glb",
+   "rights": "CC0-1.0: Quaternius animated people and Universal Animation Library clips (modular/ASSETS.md); eden-*.glb packs from Quaternius/Kenney CC0 sources (team/asset-scouting/SOURCES.csv, mars/scripts/imports/export_pack.py)",
+   "class": "modular",
+   "url": "/modular/environment/clips-ual.glb",
+   "queries": [
+    "?v=372246400b19"
+   ]
+  },
+  {
+   "sha256": "b022ab99abc062d2e83c692935b4dac87a54ed9f562243a4d35d8b1a6f26d823",
+   "bytes": 1065648,
+   "path": "mars/viewer/public/modular/environment/eden-animals.glb",
+   "rights": "CC0-1.0: Quaternius animated people and Universal Animation Library clips (modular/ASSETS.md); eden-*.glb packs from Quaternius/Kenney CC0 sources (team/asset-scouting/SOURCES.csv, mars/scripts/imports/export_pack.py)",
+   "class": "modular",
+   "url": "/modular/environment/eden-animals.glb",
+   "queries": [
+    "?v=imports-1"
+   ]
+  },
+  {
+   "sha256": "de0b97e889411b81702407458da7a1fe06782561d3e8835b881874aaed3207f9",
+   "bytes": 76784,
+   "path": "mars/viewer/public/modular/environment/eden-boats-bikes.glb",
+   "rights": "CC0-1.0: Quaternius animated people and Universal Animation Library clips (modular/ASSETS.md); eden-*.glb packs from Quaternius/Kenney CC0 sources (team/asset-scouting/SOURCES.csv, mars/scripts/imports/export_pack.py)",
+   "class": "modular",
+   "url": "/modular/environment/eden-boats-bikes.glb",
+   "queries": [
+    "?v=imports-1"
+   ]
+  },
+  {
+   "sha256": "290e08892740e3fb83c0be5cced6dfb1f0a7fab57670e0785812031419b0cec6",
+   "bytes": 288184,
+   "path": "mars/viewer/public/modular/environment/eden-crops.glb",
+   "rights": "CC0-1.0: Quaternius animated people and Universal Animation Library clips (modular/ASSETS.md); eden-*.glb packs from Quaternius/Kenney CC0 sources (team/asset-scouting/SOURCES.csv, mars/scripts/imports/export_pack.py)",
+   "class": "modular",
+   "url": "/modular/environment/eden-crops.glb",
+   "queries": [
+    "?v=imports-1"
+   ]
+  },
+  {
+   "sha256": "858c15d2257bd06258e4869044a755a409e57356866a3243f8950db648af6466",
+   "bytes": 64316,
+   "path": "mars/viewer/public/modular/environment/eden-food.glb",
+   "rights": "CC0-1.0: Quaternius animated people and Universal Animation Library clips (modular/ASSETS.md); eden-*.glb packs from Quaternius/Kenney CC0 sources (team/asset-scouting/SOURCES.csv, mars/scripts/imports/export_pack.py)",
+   "class": "modular",
+   "url": "/modular/environment/eden-food.glb",
+   "queries": [
+    "?v=imports-1"
+   ]
+  },
+  {
+   "sha256": "a0f184db92cc90861b8a0af58217964df506fb48857c4b51a5117ed6dfab15b5",
+   "bytes": 3880,
+   "path": "mars/viewer/public/modular/environment/eden-interior.glb",
+   "rights": "CC0-1.0: Quaternius animated people and Universal Animation Library clips (modular/ASSETS.md); eden-*.glb packs from Quaternius/Kenney CC0 sources (team/asset-scouting/SOURCES.csv, mars/scripts/imports/export_pack.py)",
+   "class": "modular",
+   "url": "/modular/environment/eden-interior.glb",
+   "queries": [
+    "?v=imports-1"
+   ]
+  },
+  {
+   "sha256": "53a16ebef1d6d149363dddbf72fc2b54fcff661a69e375e0a06310693b560918",
+   "bytes": 397780,
+   "path": "mars/viewer/public/modular/environment/eden-nature.glb",
+   "rights": "CC0-1.0: Quaternius animated people and Universal Animation Library clips (modular/ASSETS.md); eden-*.glb packs from Quaternius/Kenney CC0 sources (team/asset-scouting/SOURCES.csv, mars/scripts/imports/export_pack.py)",
+   "class": "modular",
+   "url": "/modular/environment/eden-nature.glb",
+   "queries": [
+    "?v=imports-1"
+   ]
+  },
+  {
+   "sha256": "eee3d8cfa12e60828a3e3003a0cd37ae36bc07ac5ddd175541aa07b34d42d0e1",
+   "bytes": 53004,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-adventurer.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-adventurer.fem.glb"
+  },
+  {
+   "sha256": "64fd924de45a127c8fdc502ec16941476f524ac8425a84a39b81e943416b95d9",
+   "bytes": 53008,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-adventurer.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-adventurer.masc.glb"
+  },
+  {
+   "sha256": "e809a74cf3e7c408674131e764ea103e95b57f119521fc73689f12862f1b6c0b",
+   "bytes": 53208,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-beach.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-beach.fem.glb"
+  },
+  {
+   "sha256": "ef1ab9e15a07eba4311ed4080831998313cc8b8616f11231adcdb8ea0de0c227",
+   "bytes": 53208,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-beach.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-beach.masc.glb"
+  },
+  {
+   "sha256": "95bce20f48801c5432bcae7e30f9b7698f39fe1b43c04478ea5457764e7e6d2f",
+   "bytes": 48712,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-casual-hoodie.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-casual-hoodie.fem.glb"
+  },
+  {
+   "sha256": "697f98bf8a45d8c4e2ee58841f16a5988cee95732d8b6de3df736bb68ed121fe",
+   "bytes": 48712,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-casual-hoodie.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-casual-hoodie.masc.glb"
+  },
+  {
+   "sha256": "7f3d8ae96f249473f2e2a9659eefd72e1c4b85b7929b7bd8d689112821962789",
+   "bytes": 58948,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-farmer.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-farmer.fem.glb"
+  },
+  {
+   "sha256": "900342f6de7feed2ff83cb913d39e7b785376f1ab54f2150e4aa1b32e357153f",
+   "bytes": 58948,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-farmer.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-farmer.masc.glb"
+  },
+  {
+   "sha256": "24b04cc36c8f480e10fb39d73b9f54b279e7207580d8b72ef018c484846ee9bd",
+   "bytes": 47700,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-jeans.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-jeans.fem.glb"
+  },
+  {
+   "sha256": "3d4e5cbf76d42acf40abccf230eccbec731c8abea736e5c22c2c125983a9d9e6",
+   "bytes": 47704,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-jeans.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-jeans.masc.glb"
+  },
+  {
+   "sha256": "f44c14ff173b886c8ced6f95216e3e4b141e5b086ae600844f79765265cf155b",
+   "bytes": 114548,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-king.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-king.fem.glb"
+  },
+  {
+   "sha256": "4a50930a687a89161ba0c40a011323ea6a2a66e3b64a5a2094b571e51d80e1ae",
+   "bytes": 114548,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-king.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-king.masc.glb"
+  },
+  {
+   "sha256": "0dcc17722e681ceb1bc5df2bea8403e7427c8fafd563e0a8705d49af86b97486",
+   "bytes": 46604,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-ripped.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-ripped.fem.glb"
+  },
+  {
+   "sha256": "d8c5a43af2d0b4fa507e043dbb6943b36c7bee073b2ad2946be8e01ffb5a4232",
+   "bytes": 46604,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-ripped.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-ripped.masc.glb"
+  },
+  {
+   "sha256": "4f8b1d32351f7d94e40ea94a96903ae1b005b340187eb684f155291bd5853fe9",
+   "bytes": 45796,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-slacks.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-slacks.fem.glb"
+  },
+  {
+   "sha256": "bc50b03fb183c55bd4faee38a33f3c1b6e0f14401dfcf6e9e8640ecebe011bcd",
+   "bytes": 45800,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-slacks.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-slacks.masc.glb"
+  },
+  {
+   "sha256": "8cd609eca55dc5bb4961dfaaa4e924a030209f5821c24aa00d4d477b8009fa90",
+   "bytes": 69096,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-spacesuit.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-spacesuit.fem.glb"
+  },
+  {
+   "sha256": "6e8629313b6fcc7a21d2487e434786187870f1191bfa03443c47dca052e25810",
+   "bytes": 69100,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-spacesuit.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-spacesuit.masc.glb"
+  },
+  {
+   "sha256": "96af47c42cb93fd55e7aa090bbfff200c5c3bc07568598ed555006ab82d228e4",
+   "bytes": 46632,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-suit.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-suit.fem.glb"
+  },
+  {
+   "sha256": "fa7e39b676a15a274fa56dad55d955042380a33a424a6232f18ea3fbf7ff6887",
+   "bytes": 46636,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-suit.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-suit.masc.glb"
+  },
+  {
+   "sha256": "bf01fd26e615e60de30ca62a72861c325467992a8e538bc6f85c170b838c4db5",
+   "bytes": 111412,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-swat.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-swat.fem.glb"
+  },
+  {
+   "sha256": "7789f6c15d31f07e7e052f6f4d1fd901a42ccfc9586e0224f82503165d5d64a3",
+   "bytes": 111412,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-swat.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-swat.masc.glb"
+  },
+  {
+   "sha256": "aaf8437045476d195262a9d37914af4cabf9b9207a3cd192cfe1253102dde26b",
+   "bytes": 89664,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-woman-adventurer.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-woman-adventurer.fem.glb"
+  },
+  {
+   "sha256": "d5d2c46ea983b6d553f64aee4678b22021f06ee44de04d2dc1e9175556a90bd8",
+   "bytes": 89664,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-woman-adventurer.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-woman-adventurer.masc.glb"
+  },
+  {
+   "sha256": "c02ea9e3f960c2a63b7eeafc73e94b0937f13f9c0d32af4e1cd73abe01a0ea68",
+   "bytes": 45824,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-woman-casual-2.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-woman-casual-2.fem.glb"
+  },
+  {
+   "sha256": "85c90e42c0b87925ca0507d0f15a03d91aa37728e9428a015c4c3cec7edb1031",
+   "bytes": 45824,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-woman-casual-2.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-woman-casual-2.masc.glb"
+  },
+  {
+   "sha256": "0596218ace9c5cf84e46ddea091c9a73c6292505531946baf814ea02b7027699",
+   "bytes": 31592,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-woman-formal.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-woman-formal.fem.glb"
+  },
+  {
+   "sha256": "96bfd131230b43ba45a70400a27d9f8a0b401c5865a980e306df7c2b813f62d1",
+   "bytes": 31592,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-woman-formal.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-woman-formal.masc.glb"
+  },
+  {
+   "sha256": "347c8bd2f9eaf27c6123819221e8ce6fc7849eb1a745af29476687823d9df9fd",
+   "bytes": 39352,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-woman-medieval.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-woman-medieval.fem.glb"
+  },
+  {
+   "sha256": "82275819964c01e439c40c6686e9b55502a2e1d23fce38df36444fe8c6700cab",
+   "bytes": 39352,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-woman-medieval.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-woman-medieval.masc.glb"
+  },
+  {
+   "sha256": "5ccf05e778d0b318e9e7212b8dc3abb0bc9b61b54626d2cdaeb93f8d609da160",
+   "bytes": 50952,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-woman-punk.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-woman-punk.fem.glb"
+  },
+  {
+   "sha256": "95195510db5e7655ba5e47401d19d51045483a1968fb70f3c83f107acaf2b49d",
+   "bytes": 50952,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-woman-punk.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-woman-punk.masc.glb"
+  },
+  {
+   "sha256": "20c12f093de535b2a0c970a227b3e85641243b343665731793d3fc15143748ef",
+   "bytes": 35716,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-woman-scifi.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-woman-scifi.fem.glb"
+  },
+  {
+   "sha256": "4849a9e2cba24e533ae7e84c9aacb2e84a577b5390c003ffbef59321b38aa108",
+   "bytes": 35720,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-woman-scifi.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-woman-scifi.masc.glb"
+  },
+  {
+   "sha256": "a449e68a25073882aa0a1245d0a2e3de82ca3590aa7e44f782b6fc131e8bbecf",
+   "bytes": 82088,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-woman-soldier.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-woman-soldier.fem.glb"
+  },
+  {
+   "sha256": "cf21503863b38c19925025ad19417e254e45fde783261e7a9fdfcff4782f875b",
+   "bytes": 82088,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-woman-soldier.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-woman-soldier.masc.glb"
+  },
+  {
+   "sha256": "f661cb497f64de13f848cdee8de80c81b1b6991cdf7cd1fe7dcde12fb4c03005",
+   "bytes": 43596,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-woman-suit.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-woman-suit.fem.glb"
+  },
+  {
+   "sha256": "cfd9bffce33a46c9c4aa4b2435d44ce7590472b8d3973654da8b07e1a0085837",
+   "bytes": 43600,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-woman-suit.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-woman-suit.masc.glb"
+  },
+  {
+   "sha256": "bb0fc7e1d14fbd3c8381b750962d54a0e96efe4f20db82f97aaf163bb1f9599f",
+   "bytes": 36212,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-woman-witch.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-woman-witch.fem.glb"
+  },
+  {
+   "sha256": "72fd57aa07644964a753f5e2ad7c61eafa25cf68b407633b9c3f2388e3fc435b",
+   "bytes": 36216,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-woman-witch.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-woman-witch.masc.glb"
+  },
+  {
+   "sha256": "62b8a7cc6f993fc40136cacff7dca9e265f1c2845b49372df65b4cc574b74f33",
+   "bytes": 52988,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-woman-worker.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-woman-worker.fem.glb"
+  },
+  {
+   "sha256": "6762c9596c24194b2074b9f03fd4e1b7f9de9412d39df4acc3a431d833af715c",
+   "bytes": 52992,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-woman-worker.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-woman-worker.masc.glb"
+  },
+  {
+   "sha256": "fdc3eadf3422d34da756ff937e50daa02f1725e59e3eafa993f3f2074af62f99",
+   "bytes": 52992,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-worker.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-worker.fem.glb"
+  },
+  {
+   "sha256": "03435953d91f034a0cc94c1082c129c48df9972281212ff3dee339606ab85f7c",
+   "bytes": 52996,
+   "path": "mars/viewer/public/modular/humanoid/parts/bottom-worker.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/bottom-worker.masc.glb"
+  },
+  {
+   "sha256": "20b5c47af2cedf9583509e220701756068f837493b463c0f307055d68fcd8a7a",
+   "bytes": 32108,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-adventurer.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-adventurer.fem.glb"
+  },
+  {
+   "sha256": "32a90ba14dc95b5d24b408534b473429a754bab758feb53574180a9874b17cba",
+   "bytes": 32112,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-adventurer.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-adventurer.masc.glb"
+  },
+  {
+   "sha256": "bda30eedb671a2d234fd7ee6b364bdcf0209ccb1700552159307eeafec4e5d6e",
+   "bytes": 42020,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-beach.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-beach.fem.glb"
+  },
+  {
+   "sha256": "854b9b98c9bc462ad354a95bd24236eb4569a6059778a6230c192f63d954621c",
+   "bytes": 42024,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-beach.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-beach.masc.glb"
+  },
+  {
+   "sha256": "5aed9f7f779ede2c312fe666af39c4b958f237d7474d0de94987b2b0a621a0df",
+   "bytes": 31376,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-casual-hoodie.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-casual-hoodie.fem.glb"
+  },
+  {
+   "sha256": "e0080b0890a16ec3c65d839066de182f814db6c557b2b1a03d99178c5fd37d44",
+   "bytes": 31380,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-casual-hoodie.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-casual-hoodie.masc.glb"
+  },
+  {
+   "sha256": "e1f5e08413b62697a3900bd274bf287220b4d528af10c7f9710c14c0b0feff69",
+   "bytes": 51944,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-farmer.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-farmer.fem.glb"
+  },
+  {
+   "sha256": "0de225c64fff9182ea5b7d4cfafd997b0a3eb805d264f335e081ef6d12e58f61",
+   "bytes": 51944,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-farmer.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-farmer.masc.glb"
+  },
+  {
+   "sha256": "24f9f3a7444f34cb094bab627e82327bda84e4362872b8873c8c75bf3941b400",
+   "bytes": 96084,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-king.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-king.fem.glb"
+  },
+  {
+   "sha256": "78f1f79000d11c78224055665821d702b0cd8221b42f3018e78f317dbe5b2c1d",
+   "bytes": 96088,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-king.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-king.masc.glb"
+  },
+  {
+   "sha256": "a943f8387df371763b4b63d05094ec4799b17fbbe8b07e06446c4ce43958774a",
+   "bytes": 32092,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-open.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-open.fem.glb"
+  },
+  {
+   "sha256": "8a34012b472e06e1d9d66d0d9c69eb2b57815396e678a4d8c1a27ec1a8760f3d",
+   "bytes": 32096,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-open.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-open.masc.glb"
+  },
+  {
+   "sha256": "65589bec02772712db54ea54c9c375dff6d5353a6f634d3c912bda0c9cc0ec78",
+   "bytes": 33344,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-pierced.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-pierced.fem.glb"
+  },
+  {
+   "sha256": "1f541aa04d6e3951ca93c9c92e27c1ed20d87aa90ebe2ee7e44c0a779e999d49",
+   "bytes": 33348,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-pierced.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-pierced.masc.glb"
+  },
+  {
+   "sha256": "d98db4a704e280ad48658908e70cbd5eada709ee381c37e3b669066724fb20bf",
+   "bytes": 26464,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-soft.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-soft.fem.glb"
+  },
+  {
+   "sha256": "6697edb9e82a8189dad85f31979db60b07a7a8ae39c9b8772fae1507b178de8f",
+   "bytes": 26464,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-soft.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-soft.masc.glb"
+  },
+  {
+   "sha256": "2884c403461af9150b0af3476c5d62bba16d6941d2307809710184e00e7f786f",
+   "bytes": 284348,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-spacesuit.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-spacesuit.fem.glb"
+  },
+  {
+   "sha256": "4e69e132afe7fb3927d934d45c80cdb756b7335ff7eee028fc8cc37b215c6498",
+   "bytes": 284348,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-spacesuit.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-spacesuit.masc.glb"
+  },
+  {
+   "sha256": "7fea5850d28b82253e59e7648cd5526af01ace8223a127a721aeabe780c01eb6",
+   "bytes": 32092,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-suit.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-suit.fem.glb"
+  },
+  {
+   "sha256": "aa8d667e974b2b404115a479128631fa6131884a885c986cc6339e3e37db9cd1",
+   "bytes": 32096,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-suit.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-suit.masc.glb"
+  },
+  {
+   "sha256": "019d7d052f0ab01da54b13eb39988ba12b68ad224d9bcc04ff25831e526a0e50",
+   "bytes": 108328,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-swat.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-swat.fem.glb"
+  },
+  {
+   "sha256": "169f3181a2bad9a6925a7df3b24f87773294fbbb6aa5d6f469dbdb752850a937",
+   "bytes": 108328,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-swat.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-swat.masc.glb"
+  },
+  {
+   "sha256": "14e4e2e30a0faccee1427c58e2c6a66071a08d8520db4bba320986134efb0b5c",
+   "bytes": 24200,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-woman-adventurer.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-woman-adventurer.fem.glb"
+  },
+  {
+   "sha256": "c8398a7bb3339e84f899ca42b8c9b41850bccfe2c945171a49f4694c8391fce8",
+   "bytes": 24200,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-woman-adventurer.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-woman-adventurer.masc.glb"
+  },
+  {
+   "sha256": "d57d81b1bd67d565cbb6818f5b7933cddc1e1b8fc3776b2de5ad943c522761af",
+   "bytes": 26492,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-woman-casual-2.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-woman-casual-2.fem.glb"
+  },
+  {
+   "sha256": "f05f50a1031e5ca559a048bfb1ed12aa00b04505dd070bf2fce8ef4f4f3eb524",
+   "bytes": 26492,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-woman-casual-2.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-woman-casual-2.masc.glb"
+  },
+  {
+   "sha256": "886bb98a51d1281ce14dcc54f19190ba2848a5213659449a90ba544ef9ea9ea2",
+   "bytes": 29960,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-woman-formal.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-woman-formal.fem.glb"
+  },
+  {
+   "sha256": "8db3bd05826715c167f31844538582ad6801a00dc9a537516a9f32514fa42f35",
+   "bytes": 29960,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-woman-formal.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-woman-formal.masc.glb"
+  },
+  {
+   "sha256": "4f056b6b7532febd18b865e6783a86a81b30143a52c0027e03b275d28673142f",
+   "bytes": 60724,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-woman-medieval.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-woman-medieval.fem.glb"
+  },
+  {
+   "sha256": "a9028266ffeda8cfb5f3b8d503f4cb306840882baa963cf23e32c9a8bbe92804",
+   "bytes": 60724,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-woman-medieval.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-woman-medieval.masc.glb"
+  },
+  {
+   "sha256": "7ef96ff645a618af2baf8ef7d667e65af4a904c738a981669b20db6918e0f6fb",
+   "bytes": 37340,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-woman-punk.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-woman-punk.fem.glb"
+  },
+  {
+   "sha256": "5c075917a5d070562a58d77bb79bc76e8b198f2bfd1b22daad0761ba4adc83a2",
+   "bytes": 37344,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-woman-punk.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-woman-punk.masc.glb"
+  },
+  {
+   "sha256": "31959a8f90a8f7cd4800e99f62fe2169aad63f1f6ddeb2468e31aba6be2e3922",
+   "bytes": 35780,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-woman-scifi.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-woman-scifi.fem.glb"
+  },
+  {
+   "sha256": "57d15960a72cbf15989173179d057d0c7872a629859cc157a841e279f90c6bd4",
+   "bytes": 35780,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-woman-scifi.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-woman-scifi.masc.glb"
+  },
+  {
+   "sha256": "1e675c7f045599114f1d48c8d3f0241fe23e62c95f4b43e0f093f937fe222fd1",
+   "bytes": 24008,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-woman-soldier.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-woman-soldier.fem.glb"
+  },
+  {
+   "sha256": "c6790e77292c54a7fd7fc492e598215462ba74f2585bc1a8bf3f9de0fc19577b",
+   "bytes": 24012,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-woman-soldier.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-woman-soldier.masc.glb"
+  },
+  {
+   "sha256": "ac6de30ab4da62d42da435c94241fbc324fe81807ce7c77ec6b8d7374ec8e337",
+   "bytes": 26480,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-woman-suit.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-woman-suit.fem.glb"
+  },
+  {
+   "sha256": "1cfd8487154cda853d06faca93834d9657646c464b6d4b836f9ff9d6b255aae3",
+   "bytes": 26484,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-woman-suit.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-woman-suit.masc.glb"
+  },
+  {
+   "sha256": "4517bdc69a2a126ac122b701c86e3996ec37e152c17cee56ded242b52d7382ef",
+   "bytes": 41320,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-woman-witch.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-woman-witch.fem.glb"
+  },
+  {
+   "sha256": "2d28c3a696bc54fa45810603134f27cfff30248aaa244fee0821d949da305d1c",
+   "bytes": 41320,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-woman-witch.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-woman-witch.masc.glb"
+  },
+  {
+   "sha256": "27e63dbb9f00dc346776130770c55f6b9c7298e653c26434db33a920d7e89e6e",
+   "bytes": 40784,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-woman-worker.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-woman-worker.fem.glb"
+  },
+  {
+   "sha256": "671db0062e13af94d33beda9aa140d95c4a379bf875ae503269d6487b0cc50ef",
+   "bytes": 40788,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-woman-worker.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-woman-worker.masc.glb"
+  },
+  {
+   "sha256": "cc89029307cbe2a394cb26fe620d0de8ba265c05c831fb2efdcf6053f41ad78e",
+   "bytes": 51244,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-worker.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-worker.fem.glb"
+  },
+  {
+   "sha256": "56f45ec7941e44fb23a45084b042e036ec6c1262c2670f29ad63ca18a35fa207",
+   "bytes": 51244,
+   "path": "mars/viewer/public/modular/humanoid/parts/face-worker.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/face-worker.masc.glb"
+  },
+  {
+   "sha256": "500b2189b90f1fb73d64c9ab2f37b3fe0d168d2e72806f78ce868424e6785ada",
+   "bytes": 199036,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-adventurer.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-adventurer.fem.glb"
+  },
+  {
+   "sha256": "4f08318f4cdf6aaab69d5691975eb18fda688409e7e373cda1e065891815ef53",
+   "bytes": 199040,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-adventurer.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-adventurer.masc.glb"
+  },
+  {
+   "sha256": "17e25b8987292a3d9f88567613bf793dfe13375bf6d38eb9c01701d0f3fab255",
+   "bytes": 104832,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-beach.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-beach.fem.glb"
+  },
+  {
+   "sha256": "1c705d6260796d112c478f84624f24f1705d757fc8590d8eac962fa44b25b03a",
+   "bytes": 104832,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-beach.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-beach.masc.glb"
+  },
+  {
+   "sha256": "8b84d5fd959ab59eafb5e6985c6ea2ba241d25f3da12e691f8e951f0e31cba7a",
+   "bytes": 135356,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-bob.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-bob.fem.glb"
+  },
+  {
+   "sha256": "7c02d2e46c053f9658d775b083f69c688fe419a95d8621cf30229728bad0a046",
+   "bytes": 135360,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-bob.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-bob.masc.glb"
+  },
+  {
+   "sha256": "2956c6b03b50c6c39d09d714d9863bf1338624de5f1cb6aeb89570d1ce3fae3e",
+   "bytes": 90608,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-casual-hoodie.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-casual-hoodie.fem.glb"
+  },
+  {
+   "sha256": "c9e48944e7e837af2b56e3fd88fe4e56bd3226d4ca370f46ec44fc158d8d9972",
+   "bytes": 90608,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-casual-hoodie.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-casual-hoodie.masc.glb"
+  },
+  {
+   "sha256": "68e6b9ba61b00075507749f076ee3100a4c0b686575cc3b824d8f0a0f38829c0",
+   "bytes": 151672,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-king.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-king.fem.glb"
+  },
+  {
+   "sha256": "39a53fe15816edd9ada166d1bb76f07b26bfdb5268f419b15f37470762a50415",
+   "bytes": 151672,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-king.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-king.masc.glb"
+  },
+  {
+   "sha256": "d9361e7da2401c63f64a908316498126c3250f48a295e2ba9852b23a0b525bba",
+   "bytes": 47552,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-mohawk.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-mohawk.fem.glb"
+  },
+  {
+   "sha256": "6bc016720d18ebcc7e7eb56a68c2d9496fa789f9aec482675aee794cde6a84f6",
+   "bytes": 47552,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-mohawk.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-mohawk.masc.glb"
+  },
+  {
+   "sha256": "bc64122fc4d6e8d0caf7271ca9aa60a16c4c8bb9a6f7745790f73b511a5bbf30",
+   "bytes": 76964,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-short.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-short.fem.glb"
+  },
+  {
+   "sha256": "9e0b4fe746575850a1b37b9c8974e75010c30dc7c95a4ea9a6a314dc14e055e2",
+   "bytes": 76964,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-short.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-short.masc.glb"
+  },
+  {
+   "sha256": "481b0e279330e10da533c874a8344745e1a8b223cc25fa969d00e98d5cad62f3",
+   "bytes": 123152,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-suit.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-suit.fem.glb"
+  },
+  {
+   "sha256": "b88c07d1fcdb34b281101fd138786bdebac61a008280dbfdb28faaf58fcc2e8d",
+   "bytes": 123152,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-suit.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-suit.masc.glb"
+  },
+  {
+   "sha256": "f5fde7705b6dbdcf341967a3395a53bdd20d2f04fa53e9cdf71ff67973f658e7",
+   "bytes": 19440,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-woman-adventurer.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-woman-adventurer.fem.glb"
+  },
+  {
+   "sha256": "6bf6832a61af9de79b79ff45585e701a43af62e984ea1b9a55e8f8a04b818324",
+   "bytes": 19440,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-woman-adventurer.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-woman-adventurer.masc.glb"
+  },
+  {
+   "sha256": "4f748f3b8c76f580d51c44ab7871f302e28ff22f7d857af8f63ee9d39f672189",
+   "bytes": 135392,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-woman-casual-2.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-woman-casual-2.fem.glb"
+  },
+  {
+   "sha256": "a7fca3ce792767e7498e910571781a0ea9b8c2cc945d00125beab86d808a6949",
+   "bytes": 135392,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-woman-casual-2.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-woman-casual-2.masc.glb"
+  },
+  {
+   "sha256": "61efce9d6d5ecd3f074fed41aadd2232b2d04d0b7cc60ab7f5797388fd71fc57",
+   "bytes": 131224,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-woman-formal.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-woman-formal.fem.glb"
+  },
+  {
+   "sha256": "af705c218352d46d3bd4e38ee93059f3ff4902fa793a517fdc1c29a03e963fdc",
+   "bytes": 131224,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-woman-formal.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-woman-formal.masc.glb"
+  },
+  {
+   "sha256": "f0487ab626c9d11156b48d09c3ac371d34570ae93f7d92be99f018c9bfee922c",
+   "bytes": 69016,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-woman-medieval.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-woman-medieval.fem.glb"
+  },
+  {
+   "sha256": "10353910c1f96602e51b380e5a8727f5e2622c8bfd8b66261ab20f409620269f",
+   "bytes": 69016,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-woman-medieval.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-woman-medieval.masc.glb"
+  },
+  {
+   "sha256": "5abae272336d1fb77631bc20c868f2edb63c1a293194716a383d8f71ecca04e7",
+   "bytes": 50248,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-woman-punk.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-woman-punk.fem.glb"
+  },
+  {
+   "sha256": "604f9cbba0ce506ab28e6e94fbc99dac272ae149f1ea54143d800dbf9f708ecb",
+   "bytes": 50252,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-woman-punk.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-woman-punk.masc.glb"
+  },
+  {
+   "sha256": "e3081f36ba9f86bb2765b6944670fd01642513c735b8a908ee72df4f1ec68a03",
+   "bytes": 129564,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-woman-scifi.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-woman-scifi.fem.glb"
+  },
+  {
+   "sha256": "ca9fab9e3a377581b9e9c63a2ffd2e80bb30a98c730eb321e5b7b5ce47ffe908",
+   "bytes": 129568,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-woman-scifi.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-woman-scifi.masc.glb"
+  },
+  {
+   "sha256": "fb04fa53c5719426b42f47408c3eee3cc91d4746ac69200dc56cae1097c0c8bf",
+   "bytes": 155872,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-woman-soldier.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-woman-soldier.fem.glb"
+  },
+  {
+   "sha256": "07d8e34b0a372a9e2148a0de1362f99778f5d173b5cc098b33b4b5d149eb407c",
+   "bytes": 155872,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-woman-soldier.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-woman-soldier.masc.glb"
+  },
+  {
+   "sha256": "f19e9563cca6a29581517d198d01c1ea4bf34fcf9f874eb6ab465c05e0783a6e",
+   "bytes": 135380,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-woman-suit.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-woman-suit.fem.glb"
+  },
+  {
+   "sha256": "429ff890e0ba5c8497b7c4497c19fe9e57ad7a6fe63d560f9f3173294bc8b534",
+   "bytes": 135380,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-woman-suit.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-woman-suit.masc.glb"
+  },
+  {
+   "sha256": "7b31467d8ab0f7013fc6813777cccbb3453cec931763d42f78b27cb0af1102a0",
+   "bytes": 146700,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-woman-witch.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-woman-witch.fem.glb"
+  },
+  {
+   "sha256": "6243eef07b40d71dbfacb93d9b9dfd79fb42b86a5828c2822093b283c980480c",
+   "bytes": 146704,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-woman-witch.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-woman-witch.masc.glb"
+  },
+  {
+   "sha256": "20831cb72a8654f5e11ac75f5d4b28f2e70ad09b0f70771328e73b0e758f3911",
+   "bytes": 97008,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-woman-worker.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-woman-worker.fem.glb"
+  },
+  {
+   "sha256": "5c3618ee26faae760a5e11de6c99fe40e903952a2c9646d9ea6a16d5a485a58b",
+   "bytes": 97008,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-woman-worker.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-woman-worker.masc.glb"
+  },
+  {
+   "sha256": "1565455efaf8cfbf51de85305cdc8c5d65db1be6376e5741d2628313ad6efe80",
+   "bytes": 9276,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-worker.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-worker.fem.glb"
+  },
+  {
+   "sha256": "01759f19fea740afe4b1e13ba503bac8451f314d609144261e3b40ba5c5f9cbe",
+   "bytes": 9276,
+   "path": "mars/viewer/public/modular/humanoid/parts/hair-worker.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/hair-worker.masc.glb"
+  },
+  {
+   "sha256": "b94be84378a54e99f31bd578a2588d7501e22e579671ee947de01dee27b9c0d6",
+   "bytes": 27148,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-adventurer.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-adventurer.fem.glb"
+  },
+  {
+   "sha256": "b82b64940cadae9d9ddeacd5ad19473c53c8481a091f8a2e71eaf4de350f1501",
+   "bytes": 27148,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-adventurer.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-adventurer.masc.glb"
+  },
+  {
+   "sha256": "08dbe2abc6985127dc0ff85ab961fa1bd5b05771346f592456d2fc0da8446a09",
+   "bytes": 44088,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-beach.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-beach.fem.glb"
+  },
+  {
+   "sha256": "ab32535b8eb3ece17a79c9b0a9b7e2bd1ef93322ddf1869a52aee366e9816f4e",
+   "bytes": 44088,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-beach.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-beach.masc.glb"
+  },
+  {
+   "sha256": "025e14e5dbdf1cb0f23b4b1c6075e11117e661e7b452e16d4e157ec1226749df",
+   "bytes": 35860,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-boots.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-boots.fem.glb"
+  },
+  {
+   "sha256": "9de96ba3c62a488fed999341bdf712daa4a2faf382e894604e58b6de09d4f991",
+   "bytes": 35864,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-boots.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-boots.masc.glb"
+  },
+  {
+   "sha256": "e3f5cb0795966d8ca317e453c29be81c24745dadc5d7cef12864f6806c7e0faa",
+   "bytes": 33404,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-casual-hoodie.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-casual-hoodie.fem.glb"
+  },
+  {
+   "sha256": "dd640a2eaa089476b468a419679367d513bd0436bfe34f180c025cd1adc96cb3",
+   "bytes": 33408,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-casual-hoodie.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-casual-hoodie.masc.glb"
+  },
+  {
+   "sha256": "b74b87781937bbf65d590e299e314a32c0d987b9eaf62879bc4c59c120a42b45",
+   "bytes": 25436,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-farmer.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-farmer.fem.glb"
+  },
+  {
+   "sha256": "94ab8acb0e247a22b21ce67c6f6dd8303b6114dabc085d6f3cdcbd35081259d7",
+   "bytes": 25440,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-farmer.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-farmer.masc.glb"
+  },
+  {
+   "sha256": "fe48220ae81d8f6659a699a39c213aa603d91cb5689934813844e343e44a131f",
+   "bytes": 35160,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-flats.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-flats.fem.glb"
+  },
+  {
+   "sha256": "5553e0f9b2f1927e5e716484ce795ec32c8062a52bdea4ebc231511283b6c3da",
+   "bytes": 35160,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-flats.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-flats.masc.glb"
+  },
+  {
+   "sha256": "85e7d9e145f872a3542e9294faa40afdb150648791224b09ad4576640e2fb30a",
+   "bytes": 34216,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-king.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-king.fem.glb"
+  },
+  {
+   "sha256": "31407b5d82448f9b0491f9a600ee2519bc96786663f2ee97771d01df0fa2d2c1",
+   "bytes": 34220,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-king.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-king.masc.glb"
+  },
+  {
+   "sha256": "88323365db3c7ba5bfa2106198619006f2a84185f06a1901b905992e3415b41c",
+   "bytes": 35872,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-sneakers.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-sneakers.fem.glb"
+  },
+  {
+   "sha256": "e3fac34998f11304f7ec0ca9146240454eff99f9ad4a5c237307f7aa6b43b1f6",
+   "bytes": 35872,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-sneakers.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-sneakers.masc.glb"
+  },
+  {
+   "sha256": "353b1a4be72c85ec8102d7f0c9a4a0030db21aa54158e7434c3d0cb807098c6b",
+   "bytes": 34228,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-spacesuit.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-spacesuit.fem.glb"
+  },
+  {
+   "sha256": "f87cff839f2735091eaf4f4d0db3810bab1abd49eee9141299b73e6ec5d4f6b5",
+   "bytes": 34228,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-spacesuit.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-spacesuit.masc.glb"
+  },
+  {
+   "sha256": "1005a8eb6ab53c30dc4a36dfcf9697af64c9d089faf8bdb3fc632569be8a113f",
+   "bytes": 34368,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-suit.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-suit.fem.glb"
+  },
+  {
+   "sha256": "aa01b528694952a442b9e852e99d71ffa6ebcb405018ec4bb9e9511805adeab3",
+   "bytes": 34372,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-suit.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-suit.masc.glb"
+  },
+  {
+   "sha256": "3c8d3c88b78ba9eab75f9ee76302c3b12022f279c6b4116afeeff47934527c4f",
+   "bytes": 34952,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-swat.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-swat.fem.glb"
+  },
+  {
+   "sha256": "fa16051e68958f2df8ef3b4e890b978d66b6ed3d68bf3bb611af1a6b21bceb4c",
+   "bytes": 34956,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-swat.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-swat.masc.glb"
+  },
+  {
+   "sha256": "8ea254726895acefe29bcacaffdfab51075fe067eda80127f704b9a56c2eac81",
+   "bytes": 50200,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-woman-adventurer.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-woman-adventurer.fem.glb"
+  },
+  {
+   "sha256": "5fc1affa8b85979b7cf2d032ca5036eee1ebf4e3275c705fd2dfaeed5b825eaf",
+   "bytes": 50204,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-woman-adventurer.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-woman-adventurer.masc.glb"
+  },
+  {
+   "sha256": "f14f29e1ca00456ace3fb7e84b107e43abbf4d6bb66d388b56fa94be06093ca7",
+   "bytes": 35184,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-woman-casual-2.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-woman-casual-2.fem.glb"
+  },
+  {
+   "sha256": "e534881f55cb6d79fda80cf37ea5062f5b1a7a9ac305769499d3e2130d24cdf7",
+   "bytes": 35184,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-woman-casual-2.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-woman-casual-2.masc.glb"
+  },
+  {
+   "sha256": "741ba25724624ab63db3c8fa2ba232ac5e8c5ad5ebc535880f88d75d9155468f",
+   "bytes": 32088,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-woman-formal.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-woman-formal.fem.glb"
+  },
+  {
+   "sha256": "ed6efcb55fb0da374cceeb94efbe9de579b7d92ca6cc0b9027b25fe664140b85",
+   "bytes": 32088,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-woman-formal.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-woman-formal.masc.glb"
+  },
+  {
+   "sha256": "340de6f49ad4f0bf1248f3e3d60c4a49cc55476a157a88be60c5b49a95b2c3e3",
+   "bytes": 36948,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-woman-medieval.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-woman-medieval.fem.glb"
+  },
+  {
+   "sha256": "320c5db0779581ea95a27a03b08e68bb410aa849cae2b3e2c2064032a3f408de",
+   "bytes": 36944,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-woman-medieval.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-woman-medieval.masc.glb"
+  },
+  {
+   "sha256": "c58c100ca7cfa22ae344726bf73a0d22d77dd9964ca555e8cd6a730143d45280",
+   "bytes": 44720,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-woman-punk.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-woman-punk.fem.glb"
+  },
+  {
+   "sha256": "93cd43010ee0f4d932a0f38a2715801f185e1f860e4ecd98cb1c571556d7551a",
+   "bytes": 44720,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-woman-punk.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-woman-punk.masc.glb"
+  },
+  {
+   "sha256": "99192e98e00fe5e9b47ebd80f20f018f6fef38ff74d783d91cf1ed7bdacf80e0",
+   "bytes": 41240,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-woman-scifi.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-woman-scifi.fem.glb"
+  },
+  {
+   "sha256": "1c6f2289084b5b571f2b39c91275fcbcea0521c6821d13f38a7fae73773c5993",
+   "bytes": 41240,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-woman-scifi.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-woman-scifi.masc.glb"
+  },
+  {
+   "sha256": "98af55039cf7fc1bce3ade2e30cc0812c62cb1df8ccbef8ce7527d26e6dbee84",
+   "bytes": 66564,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-woman-soldier.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-woman-soldier.fem.glb"
+  },
+  {
+   "sha256": "7c30ab244b1d7dbd3b6c4ac08dffd9045a2690751318dab9c3a678908e9db132",
+   "bytes": 66564,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-woman-soldier.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-woman-soldier.masc.glb"
+  },
+  {
+   "sha256": "f5f9805c03e527f926c749beec5b7531ad087c2e8105d242aacde271ab798ea3",
+   "bytes": 34068,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-woman-suit.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-woman-suit.fem.glb"
+  },
+  {
+   "sha256": "3f871397e1efb2e6014b277f0c76a7c2eaec2f9b8bc0fb9235631bbc7aaa1f34",
+   "bytes": 34068,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-woman-suit.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-woman-suit.masc.glb"
+  },
+  {
+   "sha256": "b679921c8f363fc7e95c770bc762a75f4346d714ef72b6b6f4c79937104dae5c",
+   "bytes": 38244,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-woman-witch.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-woman-witch.fem.glb"
+  },
+  {
+   "sha256": "7390f15a18fb34f85e3b0ce872b53b3db691b014ad26dc0c84455dbc493111ac",
+   "bytes": 38244,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-woman-witch.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-woman-witch.masc.glb"
+  },
+  {
+   "sha256": "c315870085a587edfd3235b785c52b708c11bad0236c1373e29903a7d40a17fd",
+   "bytes": 34072,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-woman-worker.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-woman-worker.fem.glb"
+  },
+  {
+   "sha256": "629e8f01a178c50dca2eae97eeaa27186a97a3f870f5bc226e0510e1257175b0",
+   "bytes": 34076,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-woman-worker.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-woman-worker.masc.glb"
+  },
+  {
+   "sha256": "9780dbe13b818b15e437aab2075d315ba65d50a38998c166bc539313a3047010",
+   "bytes": 30400,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-worker.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-worker.fem.glb"
+  },
+  {
+   "sha256": "4d47b8ea8e4a9d7f962a1528d24e2fc70fdfe2fa5a72b2d628b73517a57ad538",
+   "bytes": 30400,
+   "path": "mars/viewer/public/modular/humanoid/parts/shoes-worker.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/shoes-worker.masc.glb"
+  },
+  {
+   "sha256": "bc27a0baca90b930a473e7dafb4ef18548b698761a4999f00fc2c1b1d5575a40",
+   "bytes": 329324,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-adventurer.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-adventurer.fem.glb"
+  },
+  {
+   "sha256": "ebd3899cdc60658fec0fb7a58c8ce2848fa3b9f326c71f3cff035c001784e5a1",
+   "bytes": 329328,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-adventurer.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-adventurer.masc.glb"
+  },
+  {
+   "sha256": "236db8388da0f64fb952c869ae50fcd88fc299d840ae03beadb3f7621178cb35",
+   "bytes": 174932,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-beach.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-beach.fem.glb"
+  },
+  {
+   "sha256": "d2563fe59b09863074d05624febb59a264c81801ff7d4c1587f57d0e12f21309",
+   "bytes": 174932,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-beach.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-beach.masc.glb"
+  },
+  {
+   "sha256": "61effeb8d3705cc2c38a0bf7ca46d20e7ed09ac1d702de6435101ad8b59370c6",
+   "bytes": 191644,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-casual-hoodie.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-casual-hoodie.fem.glb"
+  },
+  {
+   "sha256": "7f3b6d028d8660843f79505119d850ec9f868b3159ce3a2e45645121c86ae249",
+   "bytes": 191644,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-casual-hoodie.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-casual-hoodie.masc.glb"
+  },
+  {
+   "sha256": "dcf2ff08a6750286a3b7ec0cc6e1597d6192c3081fe8721aee89c62d85ba862b",
+   "bytes": 210676,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-farmer.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-farmer.fem.glb"
+  },
+  {
+   "sha256": "57d14c35be37c29197bdee76744d5acfdff9a7a717e008ecf6fa03e3dc86780f",
+   "bytes": 210672,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-farmer.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-farmer.masc.glb"
+  },
+  {
+   "sha256": "a37d867dee94acd3656ee560b49c05942a20d21a0cf2bcc947a4999ef5af5d2d",
+   "bytes": 186096,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-jacket.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-jacket.fem.glb"
+  },
+  {
+   "sha256": "6de0614182d623905d7af00e4c03a0261a2be7755a55925720ebe37ca16cea0b",
+   "bytes": 186096,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-jacket.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-jacket.masc.glb"
+  },
+  {
+   "sha256": "d0a686000e136ec50de69fc4ac9014c7f24d10eb57b5276bf04983554f0c8a4a",
+   "bytes": 279184,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-king.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-king.fem.glb"
+  },
+  {
+   "sha256": "a5925a824f472d8e38340b8deea2aa16e6d2e25deea40528e0085336b793b5a4",
+   "bytes": 279188,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-king.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-king.masc.glb"
+  },
+  {
+   "sha256": "c79e705bf20a4e61fde326adcfebd83d0443ab8cecf666f419f201a6280d3a22",
+   "bytes": 176560,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-shirt.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-shirt.fem.glb"
+  },
+  {
+   "sha256": "fd538199b2105380d917f7ebff18101eec42fcb327fbefeffa45814f5f080e0a",
+   "bytes": 176560,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-shirt.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-shirt.masc.glb"
+  },
+  {
+   "sha256": "189252b30d940c403f36232e29c6540a66869184af9952c9cb9aa41a494f993c",
+   "bytes": 250340,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-spacesuit.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-spacesuit.fem.glb"
+  },
+  {
+   "sha256": "6eeb560d84053a5db89fa1a8bd6f392ac9d83aad6bcc1ac011647a3ced599956",
+   "bytes": 250340,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-spacesuit.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-spacesuit.masc.glb"
+  },
+  {
+   "sha256": "93953de9747e905aaf42cf1d5cd2ef4016af5fd29035fcdf44d2190b5d4f5acd",
+   "bytes": 183992,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-suit.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-suit.fem.glb"
+  },
+  {
+   "sha256": "b08504fe80d2053f562a17912d9bddaf176d24bbdbe3763c0718e234494e6676",
+   "bytes": 183992,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-suit.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-suit.masc.glb"
+  },
+  {
+   "sha256": "29d15e77e302cd48c921d699f94f99cc95a1fbe0c6dfdbe8b2ab0c70a2242988",
+   "bytes": 192916,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-swat.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-swat.fem.glb"
+  },
+  {
+   "sha256": "9efae7d3f450f75637485662f6baa3cf71849d27cc4dd5c208fb096788d08781",
+   "bytes": 192916,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-swat.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-swat.masc.glb"
+  },
+  {
+   "sha256": "659bc125c6c5a4583428e7af17963ab4583deac6f2b70fc8ff6d25c44eebc812",
+   "bytes": 167016,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-tank.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-tank.fem.glb"
+  },
+  {
+   "sha256": "45d6ed18765a9059e90cca1aab0610cc1e408a9455c33a63c095e99f8df789b3",
+   "bytes": 167016,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-tank.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-tank.masc.glb"
+  },
+  {
+   "sha256": "c8f5be42df99cc9ca01f2df171f2a7a2493f3dc99c25379f65a35015cc5ca991",
+   "bytes": 247720,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-woman-adventurer.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-woman-adventurer.fem.glb"
+  },
+  {
+   "sha256": "8bdfe36d2e398b00f40161c900afc745add2b26559c3ca98356945d8daa41418",
+   "bytes": 247724,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-woman-adventurer.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-woman-adventurer.masc.glb"
+  },
+  {
+   "sha256": "281ee22418872b3667f84b36f040e8f182e5a1596235f8450502ae425b6ea9fa",
+   "bytes": 165312,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-woman-casual-2.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-woman-casual-2.fem.glb"
+  },
+  {
+   "sha256": "5540828812e45212a59c0b4d608b639581b928427c587ae46240ea7e7ea4cab0",
+   "bytes": 165312,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-woman-casual-2.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-woman-casual-2.masc.glb"
+  },
+  {
+   "sha256": "e9c2c3278492d83b58d035b2ffca078bfcb7ac3e7abb34ef7afb8aa860f9cab9",
+   "bytes": 164964,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-woman-formal.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-woman-formal.fem.glb"
+  },
+  {
+   "sha256": "596900a8b4ef38e24084fefa92ec020bd664a5f9af5a8603f250789d2a29a4b1",
+   "bytes": 164968,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-woman-formal.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-woman-formal.masc.glb"
+  },
+  {
+   "sha256": "b3e2b3942d397eaddc992a4c45c1e6ba993b075e2568a558fd9d34f31ff238f1",
+   "bytes": 201992,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-woman-medieval.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-woman-medieval.fem.glb"
+  },
+  {
+   "sha256": "2c1cfa3f0fd82658ed842b9bb7f6a9fd79cf67487d304aeabe111f292ba38947",
+   "bytes": 201992,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-woman-medieval.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-woman-medieval.masc.glb"
+  },
+  {
+   "sha256": "d3573da2f2ab824a0a960813f5d73cbcce3117164fba8f68cbdca3919724fa12",
+   "bytes": 190316,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-woman-punk.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-woman-punk.fem.glb"
+  },
+  {
+   "sha256": "44cc340726903a70942d9014ae0e444a205b82c04263279816fb7eed42b4cc96",
+   "bytes": 190316,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-woman-punk.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-woman-punk.masc.glb"
+  },
+  {
+   "sha256": "ac318347d156ce9478bf69892dc11ad76da3a32bb26dcae6f715310b47d27c5a",
+   "bytes": 203248,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-woman-scifi.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-woman-scifi.fem.glb"
+  },
+  {
+   "sha256": "ea2b37ed971cf04b30b93bb560489fe29560b206e88a60357733b6cfb765d260",
+   "bytes": 203248,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-woman-scifi.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-woman-scifi.masc.glb"
+  },
+  {
+   "sha256": "52640c4ee8e405a04284bbf3fbbc693ea9d689357fa026cc223fffce4e337db9",
+   "bytes": 170336,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-woman-soldier.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-woman-soldier.fem.glb"
+  },
+  {
+   "sha256": "d5eb482ad03ab6824c154975cca2d3707c124610201cda115f7c31e2df41e825",
+   "bytes": 170336,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-woman-soldier.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-woman-soldier.masc.glb"
+  },
+  {
+   "sha256": "8181d930f9b1e1293f0bb489aa245d1b45af1d09fddea6cac16566f4786ce55a",
+   "bytes": 172288,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-woman-suit.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-woman-suit.fem.glb"
+  },
+  {
+   "sha256": "4703bc4775c3585a4b707a9b1211ea1291f98220656cf72c9745804cbd373821",
+   "bytes": 172288,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-woman-suit.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-woman-suit.masc.glb"
+  },
+  {
+   "sha256": "ed65a2c57fd54bc6a2eeab30bc2845981cf96b810272ff7fc5abab185e91ff0d",
+   "bytes": 176936,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-woman-witch.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-woman-witch.fem.glb"
+  },
+  {
+   "sha256": "c4eb36075a0c09cacc23dc562f44769d2bc4b06f95a90d2fe73a651efe5f4ea1",
+   "bytes": 176936,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-woman-witch.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-woman-witch.masc.glb"
+  },
+  {
+   "sha256": "93cf4a198cebd628d4c82aba3b58f047da939d7a3165f20c4a92561884ae514a",
+   "bytes": 163388,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-woman-worker.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-woman-worker.fem.glb"
+  },
+  {
+   "sha256": "88942abc9ee99745301a66ca0e4d31e38d886d12bbc7361f4c3c051e3aa7992d",
+   "bytes": 163392,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-woman-worker.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-woman-worker.masc.glb"
+  },
+  {
+   "sha256": "ef45aa125c2dbc5e2e65765af84c332c9fa0da5da76e0b79bc80df54f6039ede",
+   "bytes": 189816,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-worker.fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-worker.fem.glb"
+  },
+  {
+   "sha256": "bed4717a912a54db453353b1fa6a08c07506217278a3b2272a1f6c50fd5bd7b4",
+   "bytes": 189816,
+   "path": "mars/viewer/public/modular/humanoid/parts/top-worker.masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/parts/top-worker.masc.glb"
+  },
+  {
+   "sha256": "c91698535a9080819f16413877b0cd18b3b4fb32f70e89e13283182255fc41d7",
+   "bytes": 541872,
+   "path": "mars/viewer/public/modular/humanoid/rig-fem.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/rig-fem.glb"
+  },
+  {
+   "sha256": "12dd4434a772b97980c6d81bdde69f4e27e3c07326ce56e4d550a63303694c0d",
+   "bytes": 541648,
+   "path": "mars/viewer/public/modular/humanoid/rig-masc.glb",
+   "rights": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+   "class": "modular",
+   "url": "/modular/humanoid/rig-masc.glb"
   }
  ]
 }
