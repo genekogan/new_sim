@@ -9,6 +9,7 @@
 // It also offers Souls the ground's reference points through the edge:
 // `walk:flag-<name>` for every god flag, `swim:<water>` for every water body
 // (walk to its nearest shore, then swim to its middle).
+import type { DatabaseSync } from 'node:sqlite';
 import type { Db } from '../db.ts';
 import type { WorldHost } from '../world.ts';
 import type { GodMode } from './god.ts';
@@ -21,7 +22,11 @@ export function ensureGroundTable(db: Db) {
 /** Register every recipe this world has logged (call before the engine boots/replays). Returns how many. */
 export function loadGroundRecipes(db: Db, worldId: string): number {
   ensureGroundTable(db);
-  const rows = db.db.prepare('SELECT hash, body FROM world_ground_recipes_v1 WHERE world_id=?').all(worldId) as { hash: string; body: string }[];
+  return registerGroundRecipes(db.db, worldId);
+}
+/** The registering half of loadGroundRecipes, on any connection: a release's pre-warm reads them read-only (standby.ts). */
+export function registerGroundRecipes(conn: Pick<DatabaseSync, 'prepare'>, worldId: string): number {
+  const rows = conn.prepare('SELECT hash, body FROM world_ground_recipes_v1 WHERE world_id=?').all(worldId) as { hash: string; body: string }[];
   for (const r of rows) { const h = registerGroundRecipe(JSON.parse(r.body) as Ground); if (h !== r.hash) throw new Error(`ground.recipe-hash-mismatch: stored ${r.hash}, computed ${h}`); }
   return rows.length;
 }

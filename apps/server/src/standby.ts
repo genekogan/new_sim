@@ -10,11 +10,12 @@ export const STANDBY_MARK = '[standby] ready';
 /** G9 (lane Z1): the pre-warm also runs the boot's heaviest step once, on a READ-ONLY connection (it cannot write: SQLite
  *  refuses), so the restore after the signal runs warm code over cached pages. The rehearsed engine is thrown away: the
  *  real boot still restores the snapshot the previous process saves as it stops. Best effort: any failure is only logged. */
-export function rehearseRestore(dbPath: string, worldId: string, factory: { rulesVersion: string; restore(runtime: never): unknown; canRestoreSnapshot?(v: string): boolean }): void {
+export function rehearseRestore(dbPath: string, worldId: string, factory: { rulesVersion: string; restore(runtime: never): unknown; canRestoreSnapshot?(v: string): boolean }, prepare?: (db: DatabaseSync) => void): void {
   const t0 = performance.now();
   let db: DatabaseSync | undefined;
   try {
     db = new DatabaseSync(dbPath, { readOnly: true });
+    prepare?.(db);   // what the boot registers before it restores (an entity world's ground recipes)
     const r = db.prepare('SELECT tick, rules_version, snapshot FROM snapshots WHERE world_id = ? ORDER BY tick DESC LIMIT 1').get(worldId) as { tick: number; rules_version: string; snapshot: string } | undefined;
     if (!r || (r.rules_version !== factory.rulesVersion && !factory.canRestoreSnapshot?.(r.rules_version))) return;
     factory.restore((JSON.parse(r.snapshot) as { runtime: never }).runtime);

@@ -24,7 +24,7 @@ import { installEngineBridge } from './god/engine-bridge.ts';
 import { installWorldEnv } from './god/world-env.ts';
 import { installLightning } from './god/lightning.ts';
 import { installGovernance } from './god/governance-edge.ts';
-import { GroundHost, installGroundCapabilities, loadGroundRecipes } from './god/ground-host.ts';
+import { GroundHost, installGroundCapabilities, loadGroundRecipes, registerGroundRecipes } from './god/ground-host.ts';
 import { stripWorldRequestPath } from './world-request-path.ts';
 import {edenCoreRequested,edenHistoryFactory,installEdenCore,settleEmptyEden,drainEdenThought,installEdenLifeV1,installEdenExpansionV1} from './eden-bootstrap.ts';
 import {IntentControlV2} from './intent-control.ts';
@@ -43,7 +43,7 @@ let warmFactory: Awaited<ReturnType<typeof plainFactory>> | undefined;
 await standby(async () => {
   if (config.engine === 'mars') await import('@sim/engine-mars');
   await import('./edge/body/migrate-looks.ts');
-  if (!edenCoreRequested(config, process.env)) { warmFactory = await plainFactory(); rehearseRestore(join(config.dataDir, 'sim.db'), config.worldId, warmFactory as never); }
+  if (!edenCoreRequested(config, process.env)) { warmFactory = await plainFactory(); rehearseRestore(join(config.dataDir, 'sim.db'), config.worldId, warmFactory as never, (ro) => { if (config.worldEngine && ro.prepare("SELECT 1 FROM sqlite_master WHERE name='world_ground_recipes_v1'").get()) registerGroundRecipes(ro, config.worldId); }); }
 });
 bootAt.go = performance.now();
 
