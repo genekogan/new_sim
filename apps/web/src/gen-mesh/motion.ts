@@ -12,6 +12,7 @@ import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
 import {defLights,flickers,lightPatternLevel,lightPhase} from '../WorldNightLights.ts';
 import { hasFlames } from '../fx/flames.ts';
 import { pose, RouteCache, rand, seedOf, type BehaviorKind, type Plan, type Pose, type Surroundings, type V2 } from './creatures/behavior.ts';
+import { clearFor, giveWay, giveWayState, lookFor, peopleNear, peopleNow, setPeopleSource, type GiveWayState } from './creatures/give-way.ts';
 
 /** True if this entity needs per-frame motion (the layer only calls `animate` for these). */
 export function hasMotion(def: StoredDef): boolean {
@@ -191,6 +192,8 @@ export type Rig = {
   gait: Gait; kind: BehaviorKind; speed: number; radius: number; seed: number; follow?: string;
   /** E2 #3: run from people closer than this (m); 0/undefined = unbothered */
   flee?: number; fleeState?: FleeState;
+  /** ANI: the drawn offset while giving way to a Soul */
+  giveWay?: GiveWayState;
   model: WorldModel | null; species?: string;
   roles: Record<string, THREE.Object3D | undefined>;
   /** hip height, body length (m, at scale 1) */
@@ -241,6 +244,8 @@ export function creatureStep(obj: THREE.Object3D, rig: Rig, entity: Entity | nul
   else P = pose(rig.plan, t, rig.world!, rig.cache!);
   // E2 #3: shy animals bolt from people who come close, then wander back to their routine
   if (rig.flee && rig.gait !== 'fish-swim' && kind !== 'follow') P = fleeStep(rig.fleeState ??= { ox: 0, oz: 0, dist: 0, t }, P, fleeSources(t), rig.flee, rig.speed * s, t, (x, z) => rig.world!.free(x, z, rig.plan!.size));
+  // ANI: everything on foot gives way to Souls instead of walking through them (drawn offset only; see give-way.ts)
+  else if (rig.gait !== 'fish-swim' && P.alt < 0.3) P = yieldTo(rig.giveWay ??= giveWayState(), P, clearFor(rig.length * s), t, (x, z) => rig.world!.free(x, z, rig.plan!.size));
   // vertical: ground, water surface, or flight altitude
   const g = model.terrain.sample(P.x, P.z), wl = waterAt(model, P.x, P.z);
   const homeG = model.terrain.sample(hx, hz);
@@ -260,10 +265,9 @@ export function creatureStep(obj: THREE.Object3D, rig: Rig, entity: Entity | nul
 }
 // ---------------------------------------------------------------- E2 #3: flee
 export type FleeState = { ox: number; oz: number; dist: number; t: number };
-let fleeProvider: (() => readonly (readonly [number, number])[]) | null = null, fleeFrame = Number.NaN, fleeList: readonly (readonly [number, number])[] = [];
-/** The live view tells motion where people are (Souls' figures, x/z); null = nobody to run from. */
-export function setFleeSources(fn: (() => readonly (readonly [number, number])[]) | null) { fleeProvider = fn; fleeFrame = Number.NaN; }
-function fleeSources(t: number) { if (t !== fleeFrame) { fleeFrame = t; try { fleeList = fleeProvider?.() ?? []; } catch { fleeList = []; } } return fleeList; }
+/** The live view tells motion where people are (Souls' figures, x/z); null = nobody to run from or give way to. */
+export const setFleeSources = setPeopleSource;
+const fleeSources = peopleNow;
 /** Offset the routine pose away from anyone within `reach`: a bolt at a run (3x walking, at least 1.5 m/s) for up to
  *  twice `reach` from the routine spot, stopping at anything solid; once nobody is near, walk back to the routine.
  *  `st` keeps the offset (the routine itself stays a pure function of time). */
@@ -283,6 +287,14 @@ export function fleeStep(st: FleeState, P: Pose, people: readonly (readonly [num
   const back = Math.max(0.3, speed), step = Math.min(off, back * dt);
   st.ox -= (st.ox / off) * step; st.oz -= (st.oz / off) * step; st.dist += step;
   return { ...P, x: P.x + st.ox, z: P.z + st.oz, yaw: Math.atan2(-st.ox, -st.oz), speed: back, dist: st.dist, rest: 0, activity: 'walk', alt: 0 };
+}
+/** The routine pose `P`, moved out of the way of the people about (give-way.ts). */
+export function yieldTo(st: GiveWayState, P: Pose, clear: number, t: number, free?: (x: number, z: number) => boolean): Pose {
+  const g = giveWay(st, P.x, P.z, P.yaw, P.speed > 0.05, peopleNear(t, P.x, P.z, lookFor(st, clear)), clear, t, free);
+  if (!g.active) return g.extra ? { ...P, dist: P.dist + g.extra } : P;
+  const stepping = g.speed > 0.15;
+  return { ...P, x: g.x, z: g.z, yaw: g.yaw, speed: stepping ? Math.max(P.speed, g.speed) : P.speed, dist: P.dist + g.extra,
+    rest: stepping ? 0 : P.rest, activity: stepping && P.activity !== 'walk' ? 'walk' : P.activity };
 }
 function idlePose(x: number, z: number, yaw: number): Pose { return { x, z, yaw, speed: 0, dist: 0, rest: 1, activity: 'look', alt: 0, u: 0 }; }
 

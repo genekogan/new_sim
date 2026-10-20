@@ -4,6 +4,7 @@ import {disposeSkeletons} from '../../../../../lib/three-resources.ts';
 import type {GLTF} from 'three/addons/loaders/GLTFLoader.js';
 import {hash01,loadPack,decorationGround} from './assets.ts';
 import {HERDS,FLOCKS,AVOID,type Herd,type Rect} from './animal-plan.ts';
+import {clearFor,giveWay,giveWayState,lookFor,peopleNear,type GiveWayState} from '../../../../../../../apps/web/src/gen-mesh/creatures/give-way.ts';
 /** Animals of Eden (scenery only, never engine actors): farm animals in the farm hamlet's pastures, dogs and cats about
  * town and the gardens, deer and foxes at the woodland edges, birds wheeling over the meadows. Each animal wanders a
  * fixed zone on a schedule that is a pure function of wall-clock time (UTC seconds) and its id, so every viewer sees
@@ -13,7 +14,8 @@ import {HERDS,FLOCKS,AVOID,type Herd,type Rect} from './animal-plan.ts';
 const DRAW_M=140,ANIMATE_M=70,ROAM_SEGMENTS=6;
 /** Placement adapter outside the animation mixer; never modifies source rigs/tracks. */
 export const animalFacingYaw=(model:string,yaw:number)=>yaw-(['dog','cat'].includes(model)?Math.PI/2:0);
-type Agent={id:string;herd:Herd;root:THREE.Object3D;model:THREE.Object3D;mixer:THREE.AnimationMixer;acts:Record<string,THREE.AnimationAction|undefined>;cur:string;speed:number};
+type Agent={id:string;herd:Herd;root:THREE.Object3D;model:THREE.Object3D;mixer:THREE.AnimationMixer;acts:Record<string,THREE.AnimationAction|undefined>;cur:string;speed:number;
+ /** ANI: drawn offset while giving way to a Soul; body length (m) */gw:GiveWayState;len:number};
 type Flyer={root:THREE.Object3D;model:THREE.Object3D;mixer:THREE.AnimationMixer;act?:THREE.AnimationAction;c:[number,number];r:number;h:number;w:number;ph:number;y?:number};
 const inRect=(r:Rect,x:number,z:number)=>x>=r[0]&&x<=r[2]&&z>=r[1]&&z<=r[3];
 const blocked=(x:number,z:number,zone:readonly Rect[])=>!zone.some(r=>inRect(r,x,z))||AVOID.some(r=>inRect(r,x,z));
@@ -57,7 +59,10 @@ export function createEdenAnimals(ground:(x:number,z:number)=>number|null,assets
  hook.onBeforeRender=(_r,_s,camera)=>{if(!ready||closed)return;camera.getWorldPosition(cam);const t=Date.now()/1000;update(t,t-last>1?0:t-last);last=t;};
  function update(t:number,_dt:number){
   for(const a of agents){
-   const [x,z,yaw,moving]=agentAt(a.herd,a.id,t),d=Math.hypot(x-cam.x,z-cam.z);
+   const [rx,rz,ryaw,rmoving]=agentAt(a.herd,a.id,t);
+   // ANI: give way to Souls (drawn offset only; the schedule stays a pure function of time); off the zone = hold
+   const c=clearFor(a.len),g=giveWay(a.gw,rx,rz,ryaw,rmoving,peopleNear(t,rx,rz,lookFor(a.gw,c)),c,t,(px,pz)=>!AVOID.some(r=>inRect(r,px,pz)));
+   const x=g.x,z=g.z,yaw=g.yaw,moving=rmoving||g.speed>0.15,d=Math.hypot(x-cam.x,z-cam.z);
    const y=decorationGround(ground,x,z);a.root.visible=d<DRAW_M&&y!==null;if(!a.root.visible)continue;
    a.root.position.set(x,y!,z);a.root.rotation.y=animalFacingYaw(a.herd.model,yaw);
    if(d>ANIMATE_M&&a.cur)continue;
@@ -88,7 +93,8 @@ export function createEdenAnimals(ground:(x:number,z:number)=>number|null,assets
     // outside the mixer, so animated root tracks cannot reset terrain height.
     const mixer=new THREE.AnimationMixer(model),acts:Agent['acts']={};
     for(const k of ['idle','walk','eat'] as const){const c=clipOf(gltf,h.model,h.clips[k]);if(c){const a=mixer.clipAction(c);a.play();a.setEffectiveWeight(0);acts[k]=a;}}
-    agents.push({id,herd:h,root,model,mixer,acts,cur:'',speed:h.clipRate??1});group.add(root);
+    const size=new THREE.Box3().setFromObject(root).getSize(new THREE.Vector3());
+    agents.push({id,herd:h,root,model,mixer,acts,cur:'',speed:h.clipRate??1,gw:giveWayState(),len:Math.max(size.x,size.z)||1});group.add(root);
    }
   }
   for(const fl of FLOCKS){
