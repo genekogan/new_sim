@@ -44,7 +44,7 @@ export function WorldOwnerOps() {
 
   return (
     <details className="gp-owner-ops" data-owner-ops="1" open={open} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
-      <summary>This world: {cobuild ? 'co-builders, ' : ''}hand on, archive{pending ? <span className="gp-count">{pending}</span> : null}</summary>
+      <summary>{cobuild ? 'Co-builders, hand on, archive' : 'Hand on or archive'}{pending ? <span className="gp-count">{pending}</span> : null}</summary>
       {(cobuild || oldCobuilders > 0) && <div className="gp-ops-block" data-ops="cobuilders">
         <div className="gp-row"><b>Co-builders</b>{cobuild && <button className="gp-btn" data-ops-invite="1" disabled={!!busy} onClick={() => void invite('cobuild')}>Invite</button>}</div>
         {state && (state.cobuilders.length

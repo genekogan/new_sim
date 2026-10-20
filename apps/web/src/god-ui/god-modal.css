@@ -12,7 +12,7 @@
   display: flex; flex-direction: column;
 }
 .god-modal:not([open]) { display: none; }
-.god-modal-owner { min-height: min(600px, calc(100dvh - 48px)); }
+.god-modal-owner { height: min(660px, calc(100dvh - 48px)); } /* one size for every section: switching sections never resizes the sheet */
 .god-modal::backdrop { background: #10151445; }
 @media (prefers-color-scheme: dark) { .god-modal { --gm-on: #5fd08a; --gm-off: #ff7b72; --gm-prog: #e8b64c; } }
 .god-modal code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--gm-soft); padding: 0 3px; border-radius: 3px; }
@@ -44,7 +44,7 @@
 .gm-note { font-size: 13px; }
 
 /* body: sections left, pane right */
-.gm-body { display: grid; grid-template-columns: 158px minmax(0, 1fr); min-height: 0; flex: 1; }
+.gm-body { display: grid; grid-template-columns: 158px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); min-height: 0; flex: 1; }
 .gm-nav { display: flex; flex-direction: column; gap: 1px; padding: 12px 8px 14px 12px; border-right: 1px solid var(--gm-line); overflow: auto; }
 .god-modal .gm-nav button { min-height: 0; display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; padding: 7px 10px; border: 0; border-radius: 9px; background: transparent;
   color: var(--gm-dim); font: 500 13.5px/1.25 system-ui, sans-serif; text-align: left; cursor: pointer; }
@@ -126,13 +126,13 @@
 .god-modal .gp-owner-ops { margin-top: 0; border-top: 0; padding-top: 0; }
 .god-modal .gp-owner-ops > summary { color: var(--fg); font-size: 13.5px; font-weight: 600; }
 /* the Constitution inside the sheet: no card of its own */
-.god-modal .cn-card { position: static; width: auto; max-width: none; max-height: none; overflow: visible; margin: 0; padding: 0; background: none; box-shadow: none; border: 0; color: var(--fg); }
+.god-modal .cn-card { position: static; width: auto; max-width: none; max-height: none; overflow: visible; margin: 0; padding: 0; background: none; box-shadow: none; backdrop-filter: none; border: 0; color: var(--fg); font-size: 13.5px; }
 .god-modal .cn-head > b { font-size: 16px; }
 .god-modal .cn-sec, .god-modal .cn-changed { border-color: var(--gm-line); }
 
 /* visitors: one column, read-only */
 .gm-visitor { overflow: auto; overscroll-behavior: contain; padding: 4px 22px 22px; max-height: calc(min(720px, 100dvh - 48px) - 72px); box-sizing: border-box; }
-.gm-become { margin: 14px 0 6px; padding: 16px 18px; border-radius: 14px; background: var(--gm-soft); border: 1px solid var(--gm-line); }
+.god-modal .gm-become { margin: 14px 0 6px; padding: 16px 18px; border-radius: 14px; background: var(--gm-soft); border: 1px solid var(--gm-line); }
 .gm-become h3, .gm-const > h3 { margin: 0 0 6px; font: 650 16px/1.25 system-ui, sans-serif; color: var(--fg); letter-spacing: -.01em; }
 .gm-become p { margin: 0 0 12px; color: color-mix(in srgb, var(--fg) 82%, transparent); }
 .gm-become .gm-fine { margin: 10px 0 0; font-size: 12.5px; color: var(--gm-dim); }
@@ -141,7 +141,7 @@
 .god-modal .gm-primary { background: var(--fg); color: var(--bg); border: 1px solid var(--fg); }
 .god-modal .gm-secondary { background: transparent; color: var(--fg); border: 1px solid color-mix(in srgb, var(--fg) 28%, transparent); }
 .gm-become .gp-btn { min-height: 36px; }
-.gm-const { margin-top: 18px; }
+.god-modal .gm-const { margin-top: 18px; }
 .gm-const .cn-head { display: none; }
 
 /* the God button (Shell's top bar, right of Explore): Explore's pill, plus the agent's dot and a pairing badge */
@@ -157,6 +157,7 @@
 /* phones and narrow windows: sections become a strip under the header */
 @media (max-width: 700px) {
   .god-modal { width: calc(100vw - 16px); max-height: calc(100dvh - 24px); border-radius: 16px; }
+  .god-modal-owner { height: calc(100dvh - 24px); }
   .god-modal .gm-head { flex-wrap: wrap; padding: 14px 12px 10px 14px; gap: 10px; }
   .gm-mark { width: 32px; height: 32px; }
   .gm-pill { order: 3; flex-basis: auto; margin-left: 42px; font-size: 12px; }
