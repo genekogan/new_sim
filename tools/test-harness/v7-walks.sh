@@ -11,12 +11,19 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="$(mkdir -p "${1:?usage: v7-walks.sh <outDir>}" && cd "$1" && pwd)"
 export CHROME_LEASE_MODULE=<team>/ops/chrome-lease.mjs
 export WALK_BUILDS='{"head":5870}' OLD_WORLDS_OUT="$OUT/old-worlds"
-MARS_WEB="$ROOT/.lane/mars-web"; PIDS=()
+MARS_WEB_SRC="$ROOT/.lane/mars-web"; MARS_WEB="$OUT/mars-web"; PIDS=()
 cleanup() { for p in "${PIDS[@]:-}"; do [ -n "$p" ] && kill "$p" 2>/dev/null; done; }
 trap cleanup EXIT
 cd "$ROOT" || exit 1
 for p in $(seq 5870 5879); do lsof -nP -iTCP:$p -sTCP:LISTEN >/dev/null 2>&1 && { echo "port $p busy: stop"; exit 1; }; done
-[ -d "$MARS_WEB" ] || { echo "missing $MARS_WEB overlay"; exit 1; }
+[ -d "$MARS_WEB_SRC" ] || { echo "missing $MARS_WEB_SRC overlay"; exit 1; }
+# The walks' mars-web is the lane overlay with /modular (the humanoid kit, the environment GLBs and the character wire
+# files *.mesh.glb + clips-*.glb) taken from THIS checkout, as release.sh builds a release; a lane overlay's /modular can
+# predate them (the 404s of /worlds/modular/environment/*.mesh.glb in V7 walk-new, 2026-10-20).
+mkdir -p "$MARS_WEB" || exit 1
+SRC_REAL="$(cd "$MARS_WEB_SRC" && pwd -P)"; for e in "$SRC_REAL"/*; do ln -sfn "$e" "$MARS_WEB/${e##*/}"; done
+ln -sfn "$ROOT/mars/viewer/public/modular" "$MARS_WEB/modular"
+[ -f "$MARS_WEB/modular/humanoid/kit.json" ] && [ -f "$MARS_WEB/modular/environment/clips-ual.glb" ] || { echo "no humanoid kit / character wire files in $MARS_WEB/modular"; exit 1; }
 heavy() { python3 <team>/ops/with-heavy-slot.py --owner gate --purpose "$1" --timeout 1800 -- "${@:2}"; }
 heavy v7-build-root pnpm --filter @sim/web build > "$OUT/build-root.log" 2>&1 || { echo build-root failed; exit 1; }
 heavy v7-build-worlds bash -c "cd apps/web && npx vite build --base /worlds/ --outDir $OUT/web-worlds --emptyOutDir" > "$OUT/build-worlds.log" 2>&1 || { echo build-worlds failed; exit 1; }

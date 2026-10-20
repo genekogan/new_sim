@@ -22,6 +22,9 @@ try{for(const dpr of [1,2]){const browser=await chromium.launch({channel:'chrome
   await page.waitForTimeout(3000);run.geometry=await page.evaluate(geometry);
   run.header=await page.evaluate(()=>[...document.querySelectorAll('.hud-actions button, .hud-actions a, .hud-actions summary')].map(e=>(e.getAttribute('aria-label')||e.textContent||'').trim().slice(0,30)));
   await page.screenshot({path:resolve(out,`world-arrived-dpr${dpr}.png`)});
+  // G4: the owner's God modal opens by itself on desktop (GodPanel's remembered choice defaults to open) and covers the
+  // canvas, so the input checks below would test the modal: close it first (it is reopened from the God button below)
+  if(await page.locator('[data-god-modal][open]').count()){await page.keyboard.press('Escape');await page.waitForTimeout(400);}
   const a=await page.evaluate(cam);const cx=Math.round(W*.45),cy=Math.round(H*.6);
   await page.mouse.move(cx,cy);await page.mouse.down();for(let k=1;k<=10;k++)await page.mouse.move(cx+k*16,cy-k*2);await page.mouse.up();await page.waitForTimeout(700);const d=await page.evaluate(cam);
   await page.mouse.move(cx,cy);await page.mouse.wheel(0,-600);await page.waitForTimeout(900);const wh=await page.evaluate(cam);
