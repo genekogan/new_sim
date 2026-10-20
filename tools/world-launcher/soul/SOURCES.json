@@ -3,15 +3,15 @@
   "cli": {
     "file": "eden-agent.mjs",
     "version": "1.9",
-    "sha256": "e75308716e007dde91a40d7bf21bc5076781dfcfbec208574270c12ebd4a4649",
-    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-a936cfde.manifest.json)",
-    "source": "a936cfded079d77b33276b5db99bf62461f3f9f9",
-    "note": "trunk release 3: 1.9 + owner inbox listen/ack, look around (knowledge), travel, stroll in place, owner queue protection, speech truth, first wait reads from c_0, profile photo auto / body photo, looks v2 (accessories, outfits, shape); body-shape numbers parsed"
+    "sha256": "c136e9f84563c7b4b99f7a8f3358bf32e297cb878a30dcc810718af442641835",
+    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-024038bc.manifest.json)",
+    "source": "024038bcf501537f131ed91a8aff4a89fea0c918",
+    "note": "trunk release 3: 1.9 + owner inbox listen/ack, look around (knowledge), travel, stroll in place, owner queue protection, speech truth, first wait reads from c_0, profile photo auto / body photo, looks v2 (accessories, outfits, shape); body-shape numbers parsed; 1.9.3: approval start/poll/cancel retry a restarting world (no answer, 429, 5xx) until their deadline, refused approvals print their reason"
   },
   "skill": {
     "file": "skill.md",
-    "sha256": "7802ca66760bea0afe49c43e92c4f30ee3b71c5cff24bb52d5090385fe0667b0",
-    "from": "git show a936cfde:tools/edge-skill/SKILL.md",
+    "sha256": "393949f0b0de52890982aa047a02eb848f5cf95837fe4d41c318deb5b0db31cb",
+    "from": "git show 024038bc:tools/edge-skill/SKILL.md",
     "note": "template; the world fills {{BASE}}. Includes owner inbox, knowledge at scales, travel, creature guidance and looks v2 / portraits."
   },
   "instructions": {
