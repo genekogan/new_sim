@@ -27,11 +27,14 @@ export function peopleNow(t: number): readonly Person[] {
 }
 // A crowd (more than a few dozen people) is bucketed once per frame into 4 m cells, so each animal looks at the
 // people in the cells round it instead of at everyone.
-const CELL = 4, FEW = 24, near: Person[] = [];
+const CELL = 4, FEW = 24, near: Person[] = [], NOBODY: readonly Person[] = [];
+/** ?giveway=0: animals walk through people as before (before/after comparisons) */
+const OFF = typeof location !== 'undefined' && new URLSearchParams(location.search).get('giveway') === '0';
 let gridOf: readonly Person[] | null = null; const grid = new Map<number, Person[]>();
 const cellKey = (ix: number, iz: number) => (ix + 32768) * 65536 + (iz + 32768);
 /** The people this frame who may be within `r` of (x, z) (a superset; the returned array is reused next call). */
 export function peopleNear(t: number, x: number, z: number, r: number): readonly Person[] {
+  if (OFF) return NOBODY;
   const all = peopleNow(t);
   if (all.length <= FEW) return all;
   if (gridOf !== all) {
