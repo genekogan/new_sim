@@ -3,12 +3,19 @@ import {bodyLimit} from 'hono/body-limit';
 import type {Db, UserRow} from './db.ts';
 import type {GodMode} from './god/god.ts';
 import {ApiError, type Souls} from './souls.ts';
-import {AgentInbox, type InboxScope} from './inbox.ts';
+import {AgentInbox, type InboxScope, type TicketFocus} from './inbox.ts';
+import type {WorldModel} from '@sim/world-compiler';
 
 type Deps = {db: Db; worldId: string; souls: Souls; god?: GodMode; edge?: boolean; requireUser(c: Context): Promise<UserRow>; ownerSoul(c: Context, id: string): Promise<{id: string; owner: string}>; now?: () => number};
 type Agent = {kind: 'god' | 'soul'; scope: InboxScope};
 export function mountAgentInbox(app: Hono, d: Deps) {
   const inbox = new AgentInbox(d.db, d.worldId, d.now);
+  if (d.god) {
+    const god = d.god;
+    // G4: the edits that commit while the god holds a command are that command's; its ack records where they are.
+    god.onCommit(c => { if (god.owner && (c.diff.upserts.length || c.diff.removes.length)) inbox.recordTouched({scope: 'god', owner: god.owner}, [...c.diff.upserts.map(e => e.id), ...c.diff.removes]); });
+    inbox.focusOf = ids => focusOf(god.model, ids);
+  }
   const bearer = (c: Context) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
   const agent = (c: Context): Agent | null => {
     const token = bearer(c);
@@ -39,10 +46,14 @@ export function mountAgentInbox(app: Hono, d: Deps) {
     // Versioned strict contracts (intent-v2 receipts, history pages, arrivals; the MCP tools that relay them) must keep their
     // exact JSON shape: strict clients reject an extra key. They carry the inbox in the header, like binary/stream replies.
     const contract = /\/intent-v2(\/|$)/.test(c.req.path);
+    // G4: a successful ack answers with the command it acknowledged; it does not hand over the next queued one (the next
+    // listen does). Any other private answer carries, and so delivers, the command the agent should see.
+    const acked = c.res.status >= 200 && c.res.status < 300 && /\/v1\/(god|edge)\/inbox\/[^/]+\/ack$/.test(c.req.path);
+    const carry = (own?: unknown) => acked && own ? own : inbox.deliver(current.scope);
     if (contract || !c.res.headers.get('content-type')?.includes('application/json')) {
       if (c.res.status < 200 || c.res.status >= 300) return;
       inbox.touch(current.scope);
-      const encoded = Buffer.from(JSON.stringify({inbox: inbox.deliver(current.scope)}), 'utf8').toString('base64url');
+      const encoded = Buffer.from(JSON.stringify({inbox: carry()}), 'utf8').toString('base64url');
       // Binary and streaming consumers read one private header without changing
       // the image/event bytes or waiting for a streaming body to finish.
       c.res.headers.set('X-Sim-Agent-Inbox', encoded);
@@ -53,7 +64,7 @@ export function mountAgentInbox(app: Hono, d: Deps) {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return;
     inbox.touch(current.scope);
     const headers = new Headers(c.res.headers); headers.set('Cache-Control', 'no-store'); headers.delete('ETag'); headers.delete('Content-Length');
-    c.res = new Response(JSON.stringify({...payload, inbox: inbox.deliver(current.scope)}), {status: c.res.status, headers});
+    c.res = new Response(JSON.stringify({...payload, inbox: carry((payload as {inbox?: unknown}).inbox)}), {status: c.res.status, headers});
   });
   for (const path of ['/v1/god/inbox', '/v1/god/inbox/*', '/v1/edge/inbox/*', '/v1/edge/owner/:soulId/inbox', ...(d.edge ? ['/v1/souls/:soulId/command'] : [])]) {
     app.use(path, async (c, next) => { c.header('Cache-Control', 'no-store'); await next(); });
@@ -71,7 +82,7 @@ export function mountAgentInbox(app: Hono, d: Deps) {
     return {scope: `soul:${soul.id}`, owner: soul.owner};
   };
   const ownerRoutes = (path: string, owner: (c: Context) => Promise<InboxScope>, bucket: 'god-inbox' | 'cmd', command = false) => {
-    if (!command) app.get(path, async c => c.json({inbox: inbox.view(await owner(c))}));
+    if (!command) app.get(path, async c => c.json({inbox: inbox.ownerView(await owner(c))}));
     app.post(path, async c => {
       const s = await owner(c), b = await json(c);
       if (command && (typeof b.text !== 'string' || !b.text.trim() || b.text.length > 280)) throw new ApiError(400, 'invalid', 'text is required (1–280 characters)');
@@ -82,35 +93,55 @@ export function mountAgentInbox(app: Hono, d: Deps) {
       return c.json({ok: true, inbox: inbox.send(s, b.text)});
     });
   };
-  if (d.god) ownerRoutes('/v1/god/inbox', godOwner, 'god-inbox');
+  if (d.god) {
+    ownerRoutes('/v1/god/inbox', godOwner, 'god-inbox');
+    // G4: the owner takes back a command that is waiting (or one the agent holds and never finished).
+    app.post('/v1/god/inbox/:id/withdraw', async c => { const s = await godOwner(c); limit(`god-inbox:${s.owner}`, 20); return c.json({ok: true, inbox: inbox.withdraw(s, c.req.param('id')!)}); });
+  }
   ownerRoutes('/v1/edge/owner/:soulId/inbox', soulOwner, 'cmd');
   // Edge Souls use the existing owner command channel; the new box endpoint is
   // an alias over its same latest record and 20/min owner bucket. Central minds
   // keep their existing translator route in http.ts.
   if (d.edge) ownerRoutes('/v1/souls/:soulId/command', soulOwner, 'cmd', true);
   const agentRoutes = (path: string, kind: Agent['kind']) => {
-    const listeners = new Map<string, number>();
     app.get(`${path}/listen`, async c => {
       const s = requireAgent(c, kind), raw = c.req.query('timeoutMs'), timeout = raw === undefined ? 25_000 : Number(raw), after = c.req.query('after');
       if (!Number.isInteger(timeout) || timeout < 0 || timeout > 55_000 || (after?.length ?? 0) > 100) throw new ApiError(400, 'invalid', 'timeoutMs must be 0..55000 and after must be a message id');
       const key = JSON.stringify(s); limit(`inbox-listen:${kind}:${key}`, 120);
-      if ((listeners.get(key) ?? 0) >= 2) throw new ApiError(429, 'rate-limited', 'at most two inbox listeners per agent');
-      listeners.set(key, (listeners.get(key) ?? 0) + 1);
+      if (inbox.listenerCount(s) >= 2) throw new ApiError(429, 'rate-limited', 'at most two inbox listeners per agent');
+      const end = inbox.listening(s);   // G4: the owner's "connected" is a listener waiting now
       try {
         await inbox.listen(s, after, timeout, c.req.raw.signal);
         const current = requireAgent(c, kind);
         if (current.owner !== s.owner || current.scope !== s.scope) throw new ApiError(401, 'unauthorized', 'agent authority changed');
         return c.json({inbox: inbox.view(s)});
-      } finally { const count = (listeners.get(key) ?? 1) - 1; if (count) listeners.set(key, count); else listeners.delete(key); }
+      } finally { end(); }
     });
     app.post(`${path}/:id/ack`, async c => {
       const s = requireAgent(c, kind), b = await json(c); limit(`inbox-ack:${kind}:${JSON.stringify(s)}`, 120);
       const current = requireAgent(c, kind);
       if (current.owner !== s.owner || current.scope !== s.scope) throw new ApiError(401, 'unauthorized', 'agent authority changed');
-      return c.json({inbox: inbox.acknowledge(s, c.req.param('id')!, b.reply)});
+      return c.json({inbox: inbox.acknowledge(s, c.req.param('id')!, b.reply, b.outcome)});
     });
   };
   if (d.god) agentRoutes('/v1/god/inbox', 'god');
   agentRoutes('/v1/edge/inbox', 'soul');
   return inbox;
+}
+
+/** Where a command's edits are now: the box around the touched things still in the world (shaped things by their shape). */
+export function focusOf(model: WorldModel, ids: string[]): TicketFocus | null {
+  let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity, ys = 0, count = 0, label: string | undefined;
+  for (const id of ids.slice(0, 300)) {
+    const e = model.entities.get(id); if (!e) continue;
+    const sh = (e as {shape?: {area?: number[][]; path?: number[][]}}).shape, pts = sh?.area ?? sh?.path;
+    let y = 0;
+    if (pts?.length) for (const p of pts) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); z0 = Math.min(z0, p[1]); z1 = Math.max(z1, p[1]); }
+    else { let w; try { w = model.worldPose(e); } catch { continue; } x0 = Math.min(x0, w.x); x1 = Math.max(x1, w.x); z0 = Math.min(z0, w.z); z1 = Math.max(z1, w.z); y = w.y; }
+    ys += y; count++;
+    if (!label && e.in.parent === 'world') label = e.name ?? e.def.replace(/^core[/-]/, '').replace(/@\d+$/, '');
+  }
+  if (!count) return null;
+  const r = (v: number) => Math.round(v * 10) / 10;
+  return {x: r((x0 + x1) / 2), y: r(ys / count), z: r((z0 + z1) / 2), span: r(Math.max(6, x1 - x0, z1 - z0)), ...(label ? {label} : {}), count};
 }
