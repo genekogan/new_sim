@@ -9,8 +9,8 @@ const {build} = createRequire(require.resolve('vite/package.json'))('esbuild');
 const dir = await mkdtemp(join(tmpdir(), 'sim-inbox-render-'));
 Object.assign(globalThis, {location: {origin: 'http://localhost:5960', pathname: '/w/inbox/', search: '', hash: ''}, sessionStorage: {getItem: () => null}});
 const outfile = join(dir, 'render.cjs');
-await build({stdin: {contents: `export {AgentMessageBoxView} from './AgentMessageBox.tsx';export {publishSession} from './auth-session.ts';export {SoulFocus} from './SoulFocus.tsx';export {createElement} from 'react';export {renderToStaticMarkup} from 'react-dom/server';`, resolveDir: new URL('.', import.meta.url).pathname, loader: 'tsx'}, outfile, bundle: true, format: 'cjs', platform: 'node', jsx: 'automatic', loader: {'.css': 'empty'}, logLevel: 'silent'});
-const {AgentMessageBoxView, publishSession, SoulFocus, createElement: h, renderToStaticMarkup: render} = require(outfile);
+await build({stdin: {contents: `export {AgentMessageBoxView} from './AgentMessageBox.tsx';export {watchStatus} from './god-ui/god-api.ts';export {watchInbox, godState} from './god-ui/god-store.ts';export {publishSession} from './auth-session.ts';export {SoulFocus} from './SoulFocus.tsx';export {createElement} from 'react';export {renderToStaticMarkup} from 'react-dom/server';`, resolveDir: new URL('.', import.meta.url).pathname, loader: 'tsx'}, outfile, bundle: true, format: 'cjs', platform: 'node', jsx: 'automatic', loader: {'.css': 'empty'}, logLevel: 'silent'});
+const {AgentMessageBoxView, watchStatus, watchInbox, godState, publishSession, SoulFocus, createElement: h, renderToStaticMarkup: render} = require(outfile);
 const props = {kind: 'god', prompt: 'Resume the existing agent and listen.', text: '', onText() {}, onSend() {}, onCopy() {}};
 test('absent and unknown agent presence make no delivery claim; start prompt is copyable', () => {
   const absent = render(h(AgentMessageBoxView, {...props, inbox: {connected: false, lastSeenAt: null, latest: null}}));
@@ -39,5 +39,27 @@ test('Soul card inbox belongs only to its authenticated owner, including account
     const html = render(h(SoulFocus, {sim, auth, api: async () => {throw Error('Rendering must not request');}, selected: 's_A', select() {}, manage() {}}));
     assert.equal(html.includes('data-agent-message="soul"'), identity === 'acct_A');
   }
+});
+// G4: the God box is the God modal's agent section now (the God button watches the owner's inbox while the world's status
+// says owner). Signing out resets the status even when the provider keeps the same label, so the owner view and the
+// command log go away with it.
+test('God box disappears on sign-out even if the provider retains the same label', async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => ({ok: true, status: 200, json: async () => String(url).includes('/v1/god/inbox')
+    ? {inbox: {connected: true, lastSeenAt: 1, latest: null, queued: 1, log: [{id: 'm1', text: 'Build a barn', state: 'sent', sentAt: 1}]}}
+    : {you: 'owner', pending: [], agents: 1}});
+  const until = async (ok) => { for (let i = 0; i < 200 && !ok(); i++) await new Promise((r) => setTimeout(r, 5)); assert.ok(ok()); };
+  const session = {mode: 'dev', ready: true, authed: true, label: 'same-label', getToken: async () => 'dev:same-label', login() {}, logout() {}};
+  publishSession(session);
+  const seen = []; const stopStatus = watchStatus((s) => seen.push(s?.you ?? null));
+  try {
+    await until(() => seen.at(-1) === 'owner');
+    const stopInbox = watchInbox();   // what GodButton does while the status says owner
+    await until(() => godState().inbox?.log?.length === 1);
+    publishSession({...session, authed: false});
+    assert.equal(seen.at(-1), null);   // the owner status is gone at once, same label or not
+    stopInbox();                      // GodButton stops watching when owner turns false
+    assert.equal(godState().inbox, null);
+  } finally { stopStatus(); globalThis.fetch = realFetch; }
 });
 test.after(() => rm(dir, {recursive: true, force: true}));
