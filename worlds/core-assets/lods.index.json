@@ -2021,6 +2021,34 @@
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lod1 of worlds/littlemartians-two/assets/exhibit-drive-16b887532619.glb (98b5e811f409823458f6a8cec00970518b42164599761e1e1d964ab86088bfa1)"
   },
+  "9807bc05cd81c21b056982c8995c14fd5cef4c0ac34741f51dc00e0b7b73da15": {
+   "ext": "glb",
+   "kind": "mesh",
+   "path": "worlds/core-assets/lods/9807bc05cd81c21b056982c8995c14fd5cef4c0ac34741f51dc00e0b7b73da15.glb",
+   "bytes": 193780,
+   "tris": 2966,
+   "textures": 5,
+   "texPx": 512,
+   "box": [
+    12.614,
+    3.292,
+    7.653
+   ],
+   "min": [
+    -6.307,
+    0,
+    -3.827
+   ],
+   "animations": [],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "mars-kitchen-lod1",
+   "license": "Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
+   "source": "lod1 of worlds/core-assets/mars/kitchen.glb (11fb51931920e868e00e4b4566508c5e25ed996b475bd5301b7abae9e1be491e)"
+  },
   "9abcc3287bf74ee2d6e8020a20c7875dbc6f9e67278d8f732ab98d21ec5cbbe9": {
    "ext": "glb",
    "kind": "mesh",
@@ -2743,34 +2771,6 @@
    "name": "oak-tree-1-pack-lod1",
    "license": "CC0 1.0",
    "source": "lod1 of worlds/core-assets/packs/oak-tree-1-pack.glb (7193f408900c387d06c9b2f14d8d670eacd63b327fb4248d35d2d616187ae524)"
-  },
-  "be64bf6497e05333ada7bd5a5968eaee650814301c5445b47614fc2e56d4e17a": {
-   "ext": "glb",
-   "kind": "mesh",
-   "path": "worlds/core-assets/lods/be64bf6497e05333ada7bd5a5968eaee650814301c5445b47614fc2e56d4e17a.glb",
-   "bytes": 210088,
-   "tris": 5877,
-   "textures": 5,
-   "texPx": 512,
-   "box": [
-    12.614,
-    3.292,
-    7.653
-   ],
-   "min": [
-    -6.307,
-    0,
-    -3.827
-   ],
-   "animations": [],
-   "extensions": [
-    "EXT_meshopt_compression",
-    "EXT_texture_webp",
-    "KHR_mesh_quantization"
-   ],
-   "name": "mars-kitchen-lod1",
-   "license": "Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
-   "source": "lod1 of worlds/core-assets/mars/kitchen.glb (11fb51931920e868e00e4b4566508c5e25ed996b475bd5301b7abae9e1be491e)"
   },
   "bf3a1fe776dd7ed808683409539759af90a83e1ae4844965cea3aee9ea1b7bc8": {
    "ext": "glb",

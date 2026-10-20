@@ -1,0 +1,383 @@
+{
+ "note": "G2 budget failures held on purpose, each with its reason. catalogue-checks fails on any G2 failure not listed here, and the test fails when a listed item passes (remove it then).",
+ "G2": {
+  "core-badger@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-bird@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-butterfly@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-cat@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-ceramic-tower@1": {
+   "why": "lod1 5819 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-chicken@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-cow@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-crab@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-crow@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-deer@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-dog@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-donkey@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-duck@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-far-land@1": {
+   "why": "area/scatter generator: the bake estimate grows with the area and is held against a per-object class cap; not a wrong estimate (Z2, 2026-10-20)"
+  },
+  "core-fox@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-frog@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-goat@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-goose@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-hamster@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-hedgehog@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-heron@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-horse@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-litter-scatter@1": {
+   "why": "area/scatter generator: the bake estimate grows with the area and is held against a per-object class cap; not a wrong estimate (Z2, 2026-10-20)"
+  },
+  "core-lm-celadon-beacon@1": {
+   "why": "lod1 3103 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-ceramic-verdelis-longplant@1": {
+   "why": "lod1 1163 tris (cap 600): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-madmaraca@1": {
+   "why": "lod1 6208 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-minarete@1": {
+   "why": "lod1 1551 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-museum-africa-basket@1": {
+   "why": "lod1 793 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-museum-dragon-vase@1": {
+   "why": "lod1 775 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-museum-ganesha-small@1": {
+   "why": "lod1 1551 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-museum-goldentower@1": {
+   "why": "lod1 775 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-museum-greece-vase@1": {
+   "why": "lod1 1551 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-museum-guanyin5@1": {
+   "why": "lod1 1573 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-museum-guardian-colorful@1": {
+   "why": "lod1 1551 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-museum-laughting-fatman@1": {
+   "why": "lod1 776 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-museum-rhino@1": {
+   "why": "lod1 1551 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-museum-tower-wine@1": {
+   "why": "lod1 1551 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-museum-tower2@1": {
+   "why": "lod1 775 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-american-base-old@1": {
+   "why": "lod1 3099 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-asian-art-museum@1": {
+   "why": "no lod1: no reduction up to 16x the cap matched at the switch distance; near model 29971 tris (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-camel-sculpture@1": {
+   "why": "no lod1: no reduction up to 16x the cap matched at the switch distance; near model 16784 tris (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-chapel-composition@1": {
+   "why": "no lod1: no reduction up to 16x the cap matched at the switch distance; near model 29733 tris (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-china-buddha@1": {
+   "why": "lod1 1554 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-fey-castle@1": {
+   "why": "no lod1: no reduction up to 16x the cap matched at the switch distance; near model 29997 tris (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-forte-sao-filipe-chapel@1": {
+   "why": "lod1 3099 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-forte-sao-filipe-corner3@1": {
+   "why": "lod1 1550 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-forte-sao-filipe-corner@1": {
+   "why": "lod1 3097 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-forte-sao-filipe-corridor@1": {
+   "why": "lod1 1548 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-forte-sao-filipe-open@1": {
+   "why": "lod1 3098 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-gold-rust-buddha@1": {
+   "why": "lod1 1523 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-golden-gate-park-tree@1": {
+   "why": "lod1 3083 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-golden-woman-standing@1": {
+   "why": "no lod1: no reduction up to 16x the cap matched at the switch distance; near model 29823 tris (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-graffiti-abandoned-room@1": {
+   "why": "lod1 1552 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-greenman-altar@1": {
+   "why": "lod1 6196 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-gruta-m-republica@1": {
+   "why": "lod1 6194 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-lisbon-archways-corridor@1": {
+   "why": "lod1 3145 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-minarete-portal@1": {
+   "why": "lod1 6207 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-moorish-castle-top@1": {
+   "why": "lod1 1552 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-moorish-entrance@1": {
+   "why": "lod1 1551 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-museu-azulejo-corridor@1": {
+   "why": "lod1 1551 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-museu-azulejo-main@1": {
+   "why": "lod1 3103 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-museu-azulejo-quad@1": {
+   "why": "lod1 6205 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-poly-01@1": {
+   "why": "lod1 783 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-poly-02@1": {
+   "why": "lod1 1551 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-poly-05@1": {
+   "why": "lod1 3102 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-poly-07@1": {
+   "why": "no lod1: no reduction up to 16x the cap matched at the switch distance; near model 29997 tris (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-poly-08@1": {
+   "why": "lod1 772 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-poly-09@1": {
+   "why": "lod1 3101 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-poly-10@1": {
+   "why": "lod1 792 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-poly-12@1": {
+   "why": "lod1 1550 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-poly-13@1": {
+   "why": "lod1 776 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-poly-15@1": {
+   "why": "lod1 1551 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-poly-18@1": {
+   "why": "lod1 1552 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-poly-19@1": {
+   "why": "lod1 1539 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-pupila-corridor@1": {
+   "why": "no lod1: no reduction up to 16x the cap matched at the switch distance; near model 30054 tris (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-quinta-corredor-escada@1": {
+   "why": "lod1 3099 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-quinta-fonte@1": {
+   "why": "lod1 3103 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-quinta-palacio-interior@1": {
+   "why": "lod1 6205 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-quinta-poco@1": {
+   "why": "lod1 6206 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-quinta-tower-curly@1": {
+   "why": "lod1 6190 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-randy2@1": {
+   "why": "no lod1: no reduction up to 16x the cap matched at the switch distance; near model 29682 tris (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-randy3@1": {
+   "why": "no lod1: no reduction up to 16x the cap matched at the switch distance; near model 29643 tris (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-rua-fado@1": {
+   "why": "lod1 3121 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-se-entrada@1": {
+   "why": "lod1 3090 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-setubal-casa-escadas@1": {
+   "why": "no lod1: no reduction up to 16x the cap matched at the switch distance; near model 29985 tris (Z2, 2026-10-20)"
+  },
+  "core-lm-scan-two-warriors@1": {
+   "why": "no lod1: no reduction up to 16x the cap matched at the switch distance; near model 23789 tris (Z2, 2026-10-20)"
+  },
+  "core-lm-verdelis@1": {
+   "why": "lod1 1164 tris (cap 600): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-mars-boat-1@2": {
+   "why": "no lod1: no reduction up to 16x the cap matched at the switch distance; near model 5482 tris (Z2, 2026-10-20)"
+  },
+  "core-mars-chiba@2": {
+   "why": "lod1 38868 tris (cap 6000): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-mars-shelter-2@1": {
+   "why": "lod1 6218 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-mars-shelter-4@1": {
+   "why": "lod1 1551 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-mars-shelter-6@2": {
+   "why": "no lod1: no reduction up to 16x the cap matched at the switch distance; near model 888 tris (Z2, 2026-10-20)"
+  },
+  "core-mars-site-object-2@1": {
+   "why": "lod1 773 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-mars-toilet-1@2": {
+   "why": "lod1 1580 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-mars-tool-camp@2": {
+   "why": "lod1 23119 tris (cap 6000): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-mars-vehicle-10@2": {
+   "why": "lod1 12472 tris (cap 1200): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-mars-vehicle-1@1": {
+   "why": "lod1 2382 tris (cap 1200): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-mars-vehicle-2@1": {
+   "why": "no lod1: no reduction up to 16x the cap matched at the switch distance; near model 11817 tris (Z2, 2026-10-20)"
+  },
+  "core-mars-vehicle-3@1": {
+   "why": "lod1 9297 tris (cap 1200): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-mars-vehicle-4@1": {
+   "why": "lod1 2325 tris (cap 1200): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-mars-vehicle-5@1": {
+   "why": "no lod1: no reduction up to 16x the cap matched at the switch distance; near model 15503 tris (Z2, 2026-10-20)"
+  },
+  "core-mars-vehicle-6@1": {
+   "why": "lod1 9294 tris (cap 1200): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-mars-vehicle-7@1": {
+   "why": "no lod1: no reduction up to 16x the cap matched at the switch distance; near model 5068 tris (Z2, 2026-10-20)"
+  },
+  "core-mars-vehicle-8@1": {
+   "why": "lod1 9272 tris (cap 1200): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-mars-vehicle-9@1": {
+   "why": "lod1 18580 tris (cap 1200): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-minaret-temple@1": {
+   "why": "lod1 3102 tris (cap 400): smaller versions did not match at the switch distance (Z2, 2026-10-20)"
+  },
+  "core-orchard@1": {
+   "why": "area/scatter generator: the bake estimate grows with the area and is held against a per-object class cap; not a wrong estimate (Z2, 2026-10-20)"
+  },
+  "core-otter@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-owl@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-parrot@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-pig@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-pigeon@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-pug@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-rabbit@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-reedbed@1": {
+   "why": "area/scatter generator: the bake estimate grows with the area and is held against a per-object class cap; not a wrong estimate (Z2, 2026-10-20)"
+  },
+  "core-seagull@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-sheep@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-squirrel@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-swan@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-tire-line@1": {
+   "why": "area/scatter generator: the bake estimate grows with the area and is held against a per-object class cap; not a wrong estimate (Z2, 2026-10-20)"
+  },
+  "core-tire-ring@1": {
+   "why": "area/scatter generator: the bake estimate grows with the area and is held against a per-object class cap; not a wrong estimate (Z2, 2026-10-20)"
+  },
+  "core-tire-tracks@1": {
+   "why": "area/scatter generator: the bake estimate grows with the area and is held against a per-object class cap; not a wrong estimate (Z2, 2026-10-20)"
+  },
+  "core-turtle@1": {
+   "why": "kit creature: one merged static draw plus one pivot draw per animated role (legs, head, tail, wings); a skinned single draw would never freeze on phones (Z2, 2026-10-20)"
+  },
+  "core-wetland@1": {
+   "why": "area/scatter generator: the bake estimate grows with the area and is held against a per-object class cap; not a wrong estimate (Z2, 2026-10-20)"
+  },
+  "core-wildflowers@1": {
+   "why": "area/scatter generator: the bake estimate grows with the area and is held against a per-object class cap; not a wrong estimate (Z2, 2026-10-20)"
+  },
+  "core-woodland@1": {
+   "why": "area/scatter generator: the bake estimate grows with the area and is held against a per-object class cap; not a wrong estimate (Z2, 2026-10-20)"
+  }
+ }
+}
