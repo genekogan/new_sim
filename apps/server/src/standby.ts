@@ -4,6 +4,8 @@
 // SIGUSR2: the visible pause is only the stop plus opening the data, not the module loading. Nothing is opened before
 // the signal, so the world still has exactly one writer. SIGTERM while waiting exits at once (nothing to save).
 import { DatabaseSync } from 'node:sqlite';
+import { setFlagsFromString } from 'node:v8';
+import { runInNewContext } from 'node:vm';
 
 export const STANDBY_MARK = '[standby] ready';
 
@@ -11,6 +13,8 @@ export const STANDBY_MARK = '[standby] ready';
  *  refuses), so the restore after the signal runs warm code over cached pages. The rehearsed engine is thrown away: the
  *  real boot still restores the snapshot the previous process saves as it stops. Best effort: any failure is only logged. */
 export function rehearseRestore(dbPath: string, worldId: string, factory: { rulesVersion: string; restore(runtime: never): unknown; canRestoreSnapshot?(v: string): boolean }, prepare?: (db: DatabaseSync) => void): void {
+  // (lane Z1b) a restored Mars engine also builds its static navigation grids here and keeps them for the boot after
+  // the go (MarsEngine.warmStaticGridsForBootV1): that boot's first tick otherwise builds them inside the pause
   const t0 = performance.now();
   let db: DatabaseSync | undefined;
   try {
@@ -18,10 +22,18 @@ export function rehearseRestore(dbPath: string, worldId: string, factory: { rule
     prepare?.(db);   // what the boot registers before it restores (an entity world's ground recipes)
     const r = db.prepare('SELECT tick, rules_version, snapshot FROM snapshots WHERE world_id = ? ORDER BY tick DESC LIMIT 1').get(worldId) as { tick: number; rules_version: string; snapshot: string } | undefined;
     if (!r || (r.rules_version !== factory.rulesVersion && !factory.canRestoreSnapshot?.(r.rules_version))) return;
-    factory.restore((JSON.parse(r.snapshot) as { runtime: never }).runtime);
-    console.log(`[standby] rehearsed the restore of tick ${r.tick} (read-only) in ${Math.round(performance.now() - t0)} ms`);
+    const engine = factory.restore((JSON.parse(r.snapshot) as { runtime: never }).runtime) as { warmStaticGridsForBootV1?(): number } | undefined;
+    const restored = performance.now(), kept = engine?.warmStaticGridsForBootV1?.() ?? 0;
+    console.log(`[standby] rehearsed the restore of tick ${r.tick} (read-only) in ${Math.round(restored - t0)} ms${kept ? `; built its static grids for the boot in ${Math.round(performance.now() - restored)} ms` : ''}`);
   } catch (e) { console.log(`[standby] restore rehearsal skipped: ${(e as Error).message}`); }
   finally { try { db?.close(); } catch { /* closed */ } }
+  collectRehearsal();
+}
+
+/** (lane Z1b) One full garbage collection after the rehearsal, still before the go: the thrown-away engine is otherwise
+ *  collected lazily and the world keeps its pages (Eden's fork ran ~220 MB bigger). Best effort. */
+function collectRehearsal(): void {
+  try { setFlagsFromString('--expose-gc'); (runInNewContext('gc') as () => void)(); } catch { /* no gc: the heap shrinks later */ }
 }
 
 export async function standby(warm: () => Promise<unknown> = async () => {}): Promise<void> {

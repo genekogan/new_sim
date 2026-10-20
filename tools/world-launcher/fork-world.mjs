@@ -53,12 +53,31 @@ async function main() {
   check(process.env.BRAIN_MODE === 'fake' && !process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY && !process.env.TYPESAFE_API_KEY, 'a fork runs no model (fake brain, no keys)');
   const key = d.worldKey;
   // load the entry point's code first: under a release handover (SIM_STANDBY=1) the process waits here, nothing opened
-  const entry = await import(pathToFileURL(join(d.input, key === 'eden' ? 'tools/core/edge-server.mjs' : 'tools/core/multiworld/world-server.mjs')).href);
-  const { standby } = await import(pathToFileURL(join(ROOT, 'apps/server/src/standby.ts')).href);
+  const entryFile = join(d.input, key === 'eden' ? 'tools/core/edge-server.mjs' : 'tools/core/multiworld/world-server.mjs');
+  const entry = await import(pathToFileURL(entryFile).href);
+  const { standby, rehearseRestore } = await import(pathToFileURL(join(ROOT, 'apps/server/src/standby.ts')).href);
   await standby(async () => {   // the server modules the entry point loads while it boots (same env, so the same config)
     const mods = ['db', 'world', 'auth', 'brain', 'souls', 'hub', 'http', 'mcp', 'living', 'world-request-path', 'edge/ledger/ledger', ...(key === 'eden' ? ['eden-bootstrap', 'intent-control'] : [])];
-    for (const m of [...mods.map((x) => `apps/server/src/${x}.ts`), 'packages/engine-mars/src/index.ts']) await import(pathToFileURL(join(d.input, m)).href);
+    // (lane Z1b) and every other module the entry point load()s while it boots (config.ts stays with the entry point,
+    // which imports it with its own DATA_DIR): ~0.1 s of /w/eden's pause was module loading after the go
+    const lazy = [...readFileSync(entryFile, 'utf8').matchAll(/load\('([^']+\.ts)'\)/g)].map((m) => m[1]).filter((m) => !m.endsWith('/config.ts'));
+    for (const m of new Set([...mods.map((x) => `apps/server/src/${x}.ts`), 'packages/engine-mars/src/index.ts', ...lazy])) {
+      try { await import(pathToFileURL(join(d.input, m)).href); } catch (e) { console.log(`[standby] not preloaded: ${m}: ${e.message}`); }
+    }
+    // (lane Z1b) Eden rehearses its restore as a /worlds world does (standby.ts rehearseRestore): the engine factory the
+    // entry point builds, over a READ-ONLY connection (SQLite refuses writes; closed before the go: one writer), and the
+    // restored engine's static navigation grids kept for the boot. Mars and Little Martians take over in ~1 s warm.
+    if (key === 'eden') {
+      const dbPath = join(d.dataDir, 'sim.db'), ro = new DatabaseSync(dbPath, { readOnly: true });
+      try {
+        const { Db } = await import(pathToFileURL(join(d.input, 'apps/server/src/db.ts')).href), { edenHistoryFactory } = await import(pathToFileURL(join(d.input, 'apps/server/src/eden-bootstrap.ts')).href);
+        const view = Object.assign(Object.create(Db.prototype), { db: ro, path: dbPath });   // a Db's reads on the read-only connection
+        rehearseRestore(dbPath, d.worldId, await edenHistoryFactory(view, d.worldId, { lifeV1: true, newcomerResourcesV1: true, sleepSnapshotV1: true, groundV1: true, lectureV1: true }));
+      } catch (e) { console.log(`[standby] restore rehearsal skipped: ${e.message}`); }
+      finally { ro.close(); }
+    }
   });
+  const goAt = performance.now();
   const souls = (db) => db.prepare('SELECT id,entity_id,retired_at FROM souls WHERE world_id=? ORDER BY id').all(d.worldId);
   const cold = new DatabaseSync(join(d.dataDir, 'sim.db'), { readOnly: true });
   const before = { events: cold.prepare('SELECT count(*) n, max(seq) m FROM events WHERE world_id=?').get(d.worldId), soulsSHA256: hash(JSON.stringify(souls(cold))) };
@@ -79,9 +98,11 @@ async function main() {
   }
   try {
     check(app.cfg.authProvider === 'clerk' && app.auth.ready && !app.auth.devAuth && app.host.worldId === d.worldId, 'configured authority/readiness differs');
-    const events = app.db.events(d.worldId); check(events.length >= before.events.n, 'accepted history shrank during boot');
+    // (lane Z1b) counted, not read: loading every event (~35k on Eden) blocked the first /healthz ~0.1 s
+    const events = app.db.db.prepare('SELECT count(*) n, max(seq) m FROM events WHERE world_id=?').get(d.worldId); check(events.n >= before.events.n, 'accepted history shrank during boot');
     check(hash(JSON.stringify(souls(app.db.db))) === before.soulsSHA256, 'current or retired Souls changed during boot');
-    console.log(JSON.stringify({ phase: 'ready', fork: key, worldId: d.worldId, url: app.cfg.publicUrl, port: d.port, build: d.build, pid: process.pid, events: events.length, maxSeq: events.at(-1)?.seq, activeSouls: app.db.liveSouls(d.worldId).length, readyAtUTC: new Date().toISOString() }));
+    console.log(JSON.stringify({ phase: 'ready', fork: key, worldId: d.worldId, url: app.cfg.publicUrl, port: d.port, build: d.build, pid: process.pid, events: events.n, maxSeq: events.m ?? undefined, activeSouls: app.db.liveSouls(d.worldId).length, readyAtUTC: new Date().toISOString() }));
+    if (process.env.SIM_STANDBY === '1') console.log(`[boot] ready ${((performance.now() - goAt) / 1000).toFixed(2)} s after the standby go`);
   } catch (error) { await close(); throw error; }
 }
 

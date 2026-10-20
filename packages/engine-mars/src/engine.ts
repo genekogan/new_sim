@@ -1,6 +1,6 @@
 import {bodyProfile} from '../../../mars/viewer/engine/bodies/navigation.ts';
 import {immutableAuthoredBoundaryFact} from '../../../mars/viewer/engine/spatial/edits.ts';
-import {withStaticGridReadCache} from '../../../mars/viewer/engine/spatial/grid.ts';
+import {keepStaticGridsForBoot,withStaticGridReadCache} from '../../../mars/viewer/engine/spatial/grid.ts';
 import {edenGroundTransitionV1Schema,type EdenGroundTransitionV1} from '@sim/engine-contract';
 import type {EdenGroundReaderV1} from './eden-ground.ts';
 import {readClassroom} from '../../../mars/viewer/engine/activities/classroom.ts';
@@ -717,6 +717,10 @@ export class MarsEngine implements Engine {
   }
 
   // ------------------------------------------------------------------ programs
+  /** G9 lane Z1b, a release's standby process only (apps/server/src/standby.ts rehearseRestore): build this restored
+   *  engine's static navigation grids now and keep them for the boot after the go (grid.ts keepStaticGridsForBoot), which
+   *  would otherwise build them in its first tick. The engine itself is then thrown away. Returns the grid sets kept. */
+  warmStaticGridsForBootV1():number {const sp=this.rt.services?.spatial;if(!sp?.sync)return 0;return keepStaticGridsForBoot(()=>{sp.sync(this.rt.world);void sp.grids;});}
   withFeasibilityRead<T>(read:()=>T):T {const previous=this.feasibilityRead;this.feasibilityRead=previous??new Map();try{return withStaticGridReadCache(read);}finally{this.feasibilityRead=previous;}}
   private physicalReplacementIssue(action:string):Diag|null {
     const record=this.rt.records.get(action),key=this.feasibilityRead?hashOf({action,tick:this.rt.tick,events:this.rt.events.length,native:this.rt.stateHash(),status:record?.status,phase:record?.phase,quiet:this.quiet,cfg:this.cfg}):undefined;

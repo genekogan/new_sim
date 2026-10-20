@@ -251,6 +251,19 @@ export function withStaticGridReadCache<T>(read: () => T): T {
   staticGridReadDepth++;
   try { return read(); } finally { staticGridReadDepth--; }
 }
+/** G9 lane Z1b: a release's standby process (apps/server/src/standby.ts) rehearses its world's restore before the go and
+ *  builds that world's static grids inside keepStaticGridsForBoot; the boot after the go then takes them, by the same
+ *  exact-geometry key as the read cache, instead of rebuilding them in its first tick (~0.8 s of /w/eden's pause on a
+ *  laptop). Each kept set is handed out once (its owner is the boot's engine from then on; the rehearsed engine never
+ *  ticked); a different scene builds as before, and after BOOT_GRID_TRIES builds without a match the rest are dropped. */
+const bootGrids = new Map<string, GridSet>(), BOOT_GRID_TRIES = 4;
+let keepingForBoot = false, bootGridMisses = 0;
+export function keepStaticGridsForBoot(build: () => void): number {
+  keepingForBoot = true;
+  try { build(); } finally { keepingForBoot = false; }
+  bootGridMisses = 0;
+  return bootGrids.size;
+}
 function detachedGrids(grids: GridSet): GridSet {
   const levels = new Map<number, LevelGrid>();
   for (const [id, g] of grids.levels) {
@@ -274,7 +287,19 @@ function gridStorageBytes(grids: GridSet): number {
  * grids are deliberately excluded; profiles and permissions are checked later.
  * Exact ordered geometry includes nav edits, contributor output and height bands. */
 export function buildStaticGrids(scene: SpatialScene, cell = 0.1, prefix?: StaticRaster, keepColumns = false): GridSet {
-  if (!staticGridReadDepth) return buildGrids(scene, cell, prefix, keepColumns);
+  if (keepingForBoot) {
+    const key = hashOf({ format: 'static-grid-read/1', scene, cell, keepColumns, step: STEP, bodyHeight: BODY_HEIGHT }), grids = buildGrids(scene, cell, prefix, keepColumns);
+    bootGrids.set(key, grids);   // not copied: the rehearsed engine that asked for them is thrown away unticked
+    return grids;
+  }
+  if (!staticGridReadDepth) {
+    if (bootGrids.size) {
+      const key = hashOf({ format: 'static-grid-read/1', scene, cell, keepColumns, step: STEP, bodyHeight: BODY_HEIGHT }), kept = bootGrids.get(key);
+      if (kept) { bootGrids.delete(key); return kept; }
+      if (++bootGridMisses >= BOOT_GRID_TRIES) bootGrids.clear();
+    }
+    return buildGrids(scene, cell, prefix, keepColumns);
+  }
   const key = hashOf({ format: 'static-grid-read/1', scene, cell, keepColumns, step: STEP, bodyHeight: BODY_HEIGHT });
   const cached = staticGridReads.get(key);
   if (cached) {
