@@ -35,6 +35,7 @@ import { GodNotices } from './notices.ts';
 import { MapNotices, mapChanges, mapNoticeText, nearSite, planMapNotices, type MapChange, type MapPlan, type MapResident } from './map-notices.ts';
 import type { ApplyContext, WalkoutPrep } from './god.ts';
 import type { BuildNotice } from './builds.ts';
+import { arrivalNote } from '../arrival-placement.ts';
 /** Where a refused body placement points: people as scenery (harvest fix 'figures'). core/figure@1 has no body component,
  *  so it is never a Soul, never simulated or counted as a resident; it places like any prop. */
 export const PEOPLE_AS_SCENERY = 'for people as scenery (a crowd, waiters, stallholders, a choir) place core/figure@1 instead: `place figure --at x,z --param pose=stand|walk|sit|carry|serve|wave --param hat=none|cap|sunhat|chef|scarf --param top=#hex` (one figure per placement; children --scale 0.6); it is a prop, never a resident';
@@ -173,6 +174,7 @@ export class EngineBridge {
       refuse: (after, diff, ops, o) => this.protectedBody(after, diff, ops, o?.undo === true),
       prepare: (before, after, diff, _ops, o) => this.prepareWalkouts(before, after, diff, o?.dry === true),
       apply: (moved, o) => { const late = this.applyWalkouts(moved, this.stuckPlanned.splice(0)); this.stageMapNotices(o); return late; },
+      arrivalNote: diff => this.arrivalNoteFor(diff),
     };
     // R8: residents near a visible map change hear of it once per request; a build near them, at start and at done.
     this.mapNotices = new MapNotices((soulId, text, place) => this.notices.notify(soulId, { text, tick: this.engine.world.tick, native: true, ...(place ? { place } : {}) }), () => this.god.now());
@@ -579,6 +581,21 @@ export class EngineBridge {
   }
   /** Plan who walks out of an accepted edit's way (pure). A planning fault never refuses the edit: it is logged, and
    *  the engine's own step-clear of buried bodies still applies. `dry` (dry run, preview): plan only, nothing rewritten. */
+  /** arrival-search/1: the god's note when an edit blocks the arrival point ("new Souls will arrive nearby at x, z"),
+   *  checked only for edits near it (80 m), ground edits, or while a note stands; said again only when it changes. */
+  private arrivalNoted: string | null = null;
+  private arrivalNoteFor(diff: Diff): string[] {
+    try {
+      const a = this.host.engine.anchors?.()[0]?.point as unknown;
+      const at = Array.isArray(a) && a.length === 2 && a.every(v => typeof v === 'number') ? a as [number, number] : null;
+      const near = (e: Parameters<WorldModel['worldPose']>[0]) => { if (!at) return true; const p = this.model.worldPose(e); return Math.hypot(p.x - at[0], p.z - at[1]) <= 80; };
+      if (!this.arrivalNoted && !diff.tiles.length && !diff.upserts.some(near)) return [];
+      this.flush(); this.host.drainInputs();
+      const text = arrivalNote(this.host);
+      if (text === this.arrivalNoted) return [];
+      this.arrivalNoted = text; return text ? [text] : [];
+    } catch (e) { this.log(`arrival note: ${(e as Error).message}`); return []; }
+  }
   private prepareWalkouts(before: WorldModel, after: WorldModel, diff: Diff, dry = false): WalkoutPrep {
     try {
       if (!dry) { this.flush(); this.host.drainInputs(); this.stuckPlanned = []; this.mapPlanned = null; }

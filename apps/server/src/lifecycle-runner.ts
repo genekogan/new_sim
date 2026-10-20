@@ -1,6 +1,7 @@
 // Internal opt-in native producer. Production bootstrap/HTTP do not install it.
 import { TERMINAL } from '@sim/engine-contract';
 import { probeNativeHumanBirth } from '@sim/engine-mars';
+import { planNativeBirth } from './arrival-placement.ts';
 import { soulLifecycleSchema, ownerLifecycleListSchema, type SoulLifecycle } from '@sim/protocol';
 import { LifecycleJournal, type LifecycleOperation, type LifecycleScope } from './lifecycle-journal.ts';
 import type { WorldHost } from './world.ts';
@@ -17,13 +18,6 @@ function refers(value:unknown,id:string):boolean {
  * Character text can change canonically; the immutable birth description is
  * evidence of admission, not the current row/Mind/kernel character value.
  * The caller still checks current user/invitation/control authority separately. */
-/** The world's arrival point (its first anchor) as a birth-near/1 hint, only when a solid is built over it (a crowd on a
- * clear arrival point still refuses, as before); none when the engine names no such point. */
-function arrivalNear(host:WorldHost):{at:[number,number]}|undefined{
-  if(!(host.engine as {arrivalBuiltOverV1?():boolean}).arrivalBuiltOverV1?.())return undefined;
-  const p=host.engine.anchors?.()[0]?.point as unknown;
-  return Array.isArray(p)&&p.length===2&&p.every(v=>typeof v==='number'&&Number.isFinite(v))?{at:[p[0],p[1]]}:undefined;
-}
 export function lifecycleBodyReady(host:WorldHost,op:LifecycleOperation):boolean {
   return ownedBodyCorresponds(host,op.scope,host.currentProfileName(op.scope.soulId,op.name));
 }
@@ -117,21 +111,23 @@ export class LifecycleRunner {
       const guard=()=>{this.current(op);const row=this.host.db.soul(s.soulId);if(!row||row.retired_at===null)throw new Error('Durable retirement lost its revocation');return true as const;};
       this.queue(op,this.host.enqueueChecked('retire',`soul:${s.soulId}`,{soulId:s.soulId,entityId:s.entityId},guard,e=>this.journal.linkAccepted(s,op.requestId,e,guard)));return;
     }
-    // birth-near/1 (lane PB): a god may build over the arrival point (bench-hamlet's telescope on it refused every approved
-    // Soul). The birth lands on the nearest clear standing ground to it instead; journaled in the birth, so replay is exact.
-    const near=arrivalNear(this.host);
-    const probe=()=>{
+    // arrival-search/1 (lane ARR): when the arrival point cannot take the Soul (built over, walled in, under water,
+    // crowded) the birth lands on the nearest open standing ground instead, recorded in the birth as birth-near/1
+    // {at, first:true}, so replay is exact. Planned once; the guards re-probe that same placement.
+    const who={id:s.entityId,label:op.name,soul:s.soulId};
+    const checks=()=>{
       this.current(op);if(!this.authority(op))throw new LifecycleDeferred('Current admission authority is unavailable');
       const row=this.host.db.soul(s.soulId);
       if(!row||row.retired_at!==null)throw new Error('Pending lifecycle birth lost its owned reservation');
       if(this.host.minds.has(s.soulId)||this.host.mindByEntity.has(s.entityId)||this.host.kernel.things[s.soulId]||this.host.kernel.decks[s.soulId])throw new Error('Pending lifecycle birth already owns canonical Mind/kernel identity');
-      return probeNativeHumanBirth(this.host.engine,this.host.factory,{id:s.entityId,label:op.name,soul:s.soulId,...(near?{near}:{})});
     };
-    const preview=probe();
+    checks();
+    const {probe:preview,near}=planNativeBirth(this.host,who);
+    const probe=()=>{checks();return probeNativeHumanBirth(this.host.engine,this.host.factory,{...who,...(near?{near}:{})});};
     if(preview.outcome==='deferred')return;
     if(preview.outcome==='unavailable'&&preview.diagnostic.code==='birth.arrival-unavailable'){
       this.journal.refuseArrival(s,op.requestId,()=>{
-        const current=probe();return current.outcome==='unavailable'&&current.diagnostic.code==='birth.arrival-unavailable'
+        checks();const current=planNativeBirth(this.host,who).probe;return current.outcome==='unavailable'&&current.diagnostic.code==='birth.arrival-unavailable'
           &&!this.host.engine.world.entities[s.entityId]&&!this.host.minds.has(s.soulId)&&!this.host.kernel.things[s.soulId];
       });return;
     }

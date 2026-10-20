@@ -331,7 +331,7 @@ export function buildApp(d: Deps) {
     const user=await requireUser(c),lifecycle=d.souls.lifecycleReceipt(user.id,requestId);
     if(user.id!==userId)throw new ApiError(404,'not-found','no such lifecycle');
     c.header('Cache-Control','no-store');
-    if(lifecycle.state==='refused')return c.json({ok:false,code:'arrival-unavailable',message:'No safe arrival is available.',lifecycle},409);
+    if(lifecycle.state==='refused')return c.json({ok:false,code:'arrival-unavailable',message:'There is no clear ground for the Soul to stand on in this world.',lifecycle},409);
     const terminal=(lifecycle.state==='admitted'&&lifecycle.ready)||lifecycle.state==='retired';
     if(optIn)return c.json({lifecycle},terminal?200:202);
     if(!terminal)return c.json({ok:false,code:'lifecycle-pending',message:'Completion is unconfirmed; refresh the private lifecycle receipt.',lifecycle},503);

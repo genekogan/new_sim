@@ -12,7 +12,7 @@ export type ApprovalStatus = 'pending' | 'creating' | 'ready' | 'refused' | 'can
 /** `inWindow`: lane PUX, the request was addressed (with a window code) to one account, whose open world window shows it. */
 export type ApprovalDTO = { id: string; worldId: string; agentLabel: string; name: string; description: string; mode: 'create' | 'repair'; status: ApprovalStatus; soulId: string | null; createdAt: number; expiresAt: number; inWindow: boolean; reason?: { code: 'arrival-unavailable'; message: string } };
 /** Lane PB: 'refused' only ever follows an approval whose Soul then could not arrive; say so, for the person and the agent. */
-export const ARRIVAL_REFUSAL = { code: 'arrival-unavailable', message: 'Approved, but the Soul could not arrive: there is no clear ground to stand on near this world\'s arrival point. Nothing was created. The world\'s god can clear the arrival point; then ask your agent to try again.' } as const;
+export const ARRIVAL_REFUSAL = { code: 'arrival-unavailable', message: 'Approved, but the Soul could not arrive: there is no clear ground for it to stand on in this world. Nothing was created. The world\'s god can clear some ground; then ask your agent to try again.' } as const;
 /** `forCode`: a window code the human's signed-in page gave them for their agent (lane PUX); never part of the request's identity. */
 export type StartApprovalInput = { agentLabel: string; name: string; description?: string; idempotencyKey: string; pollSecret?: string; forCode?: string };
 /** Lane PUX: a short code a signed-in page shows its person, for their agent's request to reach that page. */

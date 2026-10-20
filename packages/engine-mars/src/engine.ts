@@ -25,6 +25,7 @@ import {applyWorldEdit,type WorldEditV1} from './entity-physics.ts';
 import {applyUpperFloorsV1,placeLevelOf,previewUpperFloorsV1,type UpperFloorsFactV1,type UpperFloorsV1} from './upper-floors.ts';
 import {registerAssets} from './catalog-adapter.ts';
 import {socialEdenTransitionV1Schema,type SocialEdenTransitionV1} from '@sim/engine-contract';
+import {searchArrival,arrivalPocket,type ArrivalGround,type ArrivalPocket,type ArrivalSpot} from './arrival-search.ts';
 import {attachGround,groundRegistry,installGroundV1 as installGround,previewGroundV1,standHeight,groundArrival,inDeepWater} from './ground-bridge.ts';
 // The Mars engine behind Sim's engine contract.
 //
@@ -1178,13 +1179,36 @@ export class MarsEngine implements Engine {
     this.out.changes.push([this.rt.tick, id, 'present', e]);
     return id;
   }
-  /** birth-near/1 (lane PB): is a solid built over the arrival point's own standing disc? Read-only. The server offers
-   * a birth the nearest clear ground only then, so a crowd standing on a clear arrival point still refuses as before. */
-  arrivalBuiltOverV1(): boolean {
-    const [ax, az] = this.rt.world.groundV1 ? groundArrival(this.rt, this.cfg.arrival) : this.cfg.arrival;
+  /** arrival-search/1 (lane ARR): the standing geometry a new body of `label` reads (see arrival-search.ts). Read-only. */
+  private arrivalGroundV1(label?: string): { g: ArrivalGround; at: [number, number] } {
+    const at: [number, number] = this.rt.world.groundV1 ? groundArrival(this.rt, this.cfg.arrival) : [this.cfg.arrival[0], this.cfg.arrival[1]];
+    const floater = this.cfg.scene === 'littlemartians' && ['Verdelis','Kalama','Kweku','Mycos','Ada','Shuijing','Nyx'].includes(label ?? '');
+    const radius = floater ? .35 : HUMAN_RADIUS;
     const spatial = this.rt.services.spatial as Spatial; spatial.sync(this.rt.world);
-    const grid = spatial.levelAt(0, [ax, az]);
-    return !!grid && clearanceAt(grid, [ax, az]) < HUMAN_RADIUS;
+    const f = this.rt.world.groundV1 ? spatial.ground?.field : undefined;
+    // one clearance reader per 64 m tile (paged ground: read off the windows without building fine tiles), capped at the radius
+    const readers = new Map<number, ((q: [number, number]) => number) | null>();
+    const clear = (q: [number, number]) => {
+      const tx = Math.floor(q[0] / 64), tz = Math.floor(q[1] / 64), k = (tx + 4096) * 8192 + tz + 4096;
+      let read = readers.get(k);
+      if (read === undefined) { read = spatial.clearanceCapped(0, [tx * 64 + 32, tz * 64 + 32], radius); readers.set(k, read); }
+      return read ? read(q) : 0;
+    };
+    const people = Object.values(this.ents).filter((e: any) => e.kind === 'human' && (e.human?.level ?? 0) === 0).map((e: any) => [e.pose.p[0], e.pose.p[2]] as [number, number]);
+    const b = f ? f.extent : spatial.base.bounds;
+    return { at, g: { clear, medium: f ? (q) => f.medium(q[0], q[1]) : () => 0, bounds: [b[0], b[1], b[2], b[3]], people, radius, cos: dcos, sin: dsin } };
+  }
+  /** arrival-search/1: the nearest standing spot to the arrival point in the world's open walkable area, else the nearest
+   * spot of its largest pocket; null when the world has no standing ground at all. Read-only: the server records the spot
+   * as the birth's birth-near/1 hint {at, first:true}, so replay never searches. */
+  arrivalSearchV1(label?: string): ArrivalSpot | null { const { g, at } = this.arrivalGroundV1(label); return searchArrival(g, at); }
+  /** arrival-search/1: is the point in the open walkable area, and how large is its pocket when not? Read-only. */
+  arrivalPocketV1(p: [number, number], label?: string): ArrivalPocket { return arrivalPocket(this.arrivalGroundV1(label).g, p); }
+  /** arrival-search/1: the world itself keeps a new body off the arrival point (a solid built over it, deep water) or
+   * walls it off from the open area. Bodies standing there do not count. Read-only; the god's arrival note. */
+  arrivalBlockedV1(): boolean {
+    const { g, at } = this.arrivalGroundV1(), q: [number, number] = [at[0], at[1]];
+    return !(g.clear(q) >= g.radius && g.medium(q) <= 1) || !arrivalPocket(g, q).open;
   }
   /** birth-near/1: the nearest ground point (rings of 0.25 m out to 12 m) with a clear standing disc, nobody within
    * 0.8 m and no deep water. Walkability from there is proved by the caller's own physical walk, never assumed. */

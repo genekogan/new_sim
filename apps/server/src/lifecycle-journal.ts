@@ -108,11 +108,11 @@ export class LifecycleJournal {
   }
   /** Called ONLY by this Db's WorldHost acceptance journal after its event
    * insert, while the same writer transaction is still open. Never appends. */
-  /** `near` (birth-near/1): the placement hint the runner put in the birth, the world's arrival point; identity is unchanged. */
-  linkAccepted(scope:LifecycleScope,requestId:string,event:LogEvent,guard:Guard,near?:{at:[number,number]}):true{
+  /** `near` (birth-near/1): the placement hint the runner put in the birth ({at} legacy, {at, first:true} arrival-search/1); identity is unchanged. */
+  linkAccepted(scope:LifecycleScope,requestId:string,event:LogEvent,guard:Guard,near?:{at:[number,number];first?:true}):true{
     if(!this.db.db.isTransaction)throw new Error('Lifecycle link requires the host acceptance transaction');
     this.guarded(guard);const op=this.required(scope,requestId),row=this.current(scope);
-    if(near&&(op.operation!=='create'||!Array.isArray(near.at)||near.at.length!==2||!near.at.every(Number.isFinite)||Object.keys(near).length!==1))throw new Error('Lifecycle birth placement hint is malformed');
+    if(near&&(op.operation!=='create'||!Array.isArray(near.at)||near.at.length!==2||!near.at.every(Number.isFinite)||Object.keys(near).some(k=>k!=='at'&&k!=='first')||('first' in near&&near.first!==true)))throw new Error('Lifecycle birth placement hint is malformed');
     const payload=op.operation==='create'?{soulId:scope.soulId,entityId:scope.entityId,owner:scope.owner,name:op.name,description:op.description,...(near?{near}:{})}:{soulId:scope.soulId,entityId:scope.entityId};
     const stored=this.db.tailEvents(scope.worldId,1)[0];
     if(op.state!=='pending'||(op.operation==='create'?row.retired_at!==null:row.retired_at===null)

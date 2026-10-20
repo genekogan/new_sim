@@ -4,6 +4,7 @@ import type {WorldAccounts} from './accounts/service.ts';
 import { randomBytes } from 'node:crypto';
 import {PROBE_PREFIX, PROBE_OWNER, isVerificationProbe} from './verification-probe.ts';
 import { createSoulSchema, describeIntent, intentSchema, proposeCardsSchema, steerSchema, type EventKind, type MandateRule, type AgendaStep, type BirthPayload, type DeckPayload, type IntentPayload, type LogEvent, type WireIntent } from '@sim/protocol';
+import { planNativeBirth } from './arrival-placement.ts';
 import {mandateOf,explicitTrigger} from './mandate.ts';
 import {clockAt} from '@sim/brain';
 import { deckView } from './deck.ts';
@@ -208,7 +209,10 @@ export class Souls {
     if (this.db.soulByName(this.host.worldId, p.data.name)) throw new ApiError(409, 'name-taken', `a soul named ${p.data.name} already exists`);
     const id = newId('s'); const entityId = `h_${id.slice(2)}`;
     this.db.createSoul({ id, worldId: this.host.worldId, owner, entityId, name: p.data.name, description: p.data.description, native });
-    await this.host.enqueue('birth', native ? 'world' : `soul:${id}`, { soulId: id, entityId, name: p.data.name, description: p.data.description, owner } satisfies BirthPayload);
+    // arrival-search/1: a direct (non-lifecycle) birth also moves off a blocked arrival point; the default stays as it was.
+    let near: { at: [number, number]; first: true } | undefined;
+    if (!native) try { near = planNativeBirth(this.host, { id: entityId, label: p.data.name, soul: id }).near; } catch { near = undefined; }
+    await this.host.enqueue('birth', native ? 'world' : `soul:${id}`, { soulId: id, entityId, name: p.data.name, description: p.data.description, owner, ...(near ? { near } : {}) } satisfies BirthPayload);
     return this.db.soul(id)!;
   }
   async retire(soul: SoulRow) {

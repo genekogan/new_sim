@@ -107,7 +107,7 @@ export class GodMode {
    *  G1 "god rules": `prepare` plans, on the would-be world, the residents an accepted edit/undo/redo walks out of its
    *  way (listed as `moved` in the durable receipt), and `apply` moves them after the SQL commit in the same request.
    *  Null in worlds without the engine. */
-  bodies: { uses: UsesHook; lifted?: (ids: string[], after?: WorldModel) => string[]; refuse?: (after: WorldModel, diff: Diff, ops: Op[], o?: { undo?: boolean }) => Failure | null; prepare?: (before: WorldModel, after: WorldModel, diff: Diff, ops: Op[], o?: { dry?: boolean }) => WalkoutPrep; apply?: (moved: ResidentMove[], o?: ApplyContext) => string[] | void } | null = null;
+  bodies: { uses: UsesHook; lifted?: (ids: string[], after?: WorldModel) => string[]; refuse?: (after: WorldModel, diff: Diff, ops: Op[], o?: { undo?: boolean }) => Failure | null; prepare?: (before: WorldModel, after: WorldModel, diff: Diff, ops: Op[], o?: { dry?: boolean }) => WalkoutPrep; apply?: (moved: ResidentMove[], o?: ApplyContext) => string[] | void; arrivalNote?: (diff: Diff) => string[] } | null = null;
   /** Bridge admission/decoration must run before the accepted receipt is persisted, and never on replay. */
   actGuard: ((batch: unknown) => Result | null) | null = null;
   finalizeAct: ((result: Result, after: WorldModel) => Result) | null = null;
@@ -446,6 +446,9 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     this.publish(result.seq, tick, r.diff!, 'god', deltas);
     this.builds.announceCommitted(updates.writes);
     for (const a of r.diff!.answers) { const row = this.store.prayer(a.prayer); if (row) this.push('prayer', row); }
+    // arrival-search/1: an edit that blocks (or keeps blocking, differently) the arrival point says where new Souls will arrive.
+    const arrival = this.bodies?.arrivalNote?.(r.diff!) ?? [];
+    if (arrival.length) { result.warnings.push(...arrival); if (clientRef !== undefined) this.store.amendReceipt(clientRef, result); }
     return result;
   }
   undo(): Result & { reverted?: number } {
