@@ -17,11 +17,29 @@ require the verified human owner. Toy retains `toy-1` and its database.
 No timetable/routine object. World customs and perception inform decisions;
 triggers cause thinking, and only an explicit NOW instruction runs directly.
 
-Before releases: `pnpm check` (Sim + Mars engine), focused browser smoke;
-full Mars release gate once at tranche end. Staging precedes production.
-Keep rollback receipts under `/srv/sim/ops/<build>`, and update STATUS,
-runbook and `<eden4>/MERGE-LOG.md`. Do not replay passing checks without
-a source change or unresolved finding that warrants it.
+## Releases (current since 2026-10-20; the old `pnpm check` / staging / `/srv/sim/ops` recipe is retired)
+
+Only the release owner (R, id on the top line of `<team>/lanes/ROSTER.md`, holding `team/lanes/DEPLOY.lock`) ships,
+writes to eden2 and pushes. A lane hands R `branch@sha` + a gate receipt; R ships it on current main.
+- **Gate (Modal; never full suites on the laptop):** `tools/test-harness/release-gate.sh <head> --baseline <main sha>
+  --out <dir>`. Clean = 0 new failures, 0 blockers, 0 unexpected skips; the standing quarantine
+  (`tools/test-harness/quarantine.json`) has **9 entries** (11 retired). GitHub Actions runs fail at start (account
+  billing, Gene's); the Modal gate is the release check.
+- **Build:** `tools/world-launcher/deploy/release.sh production --reload` (exactly HEAD of a clean tree). The asset CDN is
+  ON by default (`SIM_ASSETS_CDN_ENABLED=0` opts out for one release; other values refused); the build fails without the CDN
+  origin + `cdn-manifest-*.json` in dist, or without the Eden experience pin call. It keeps the stage links + 3 newest
+  `/srv/sim-worlds/releases`. New CDN objects go up first with `tools/cdn/publish.mjs` (R only; key by path, never read).
+- **Order per ship:** compact backups of production and legacy (`pre-r<NNN>-<stage>-<ts>`) → `release.sh legacy`
+  (upload only) → [live probe: `deploy/release-probe.mjs ... --expect-build we-<sha12>`, wait for `<dir>/ready`] →
+  `release.sh production --reload` → legacy: `sha256sum -c FILES.sha256` in `/srv/sim-old/releases/<build>-root`, then
+  its `activate.sh legacy <rel> --reload`, update `LEGACY-RELEASE` → [touch `<dir>/released`] → healthz (build, 6/6,
+  hostOk) → walks (all worlds, desktop + phone, poster + stall) → `node tools/cdn/cdn-walk.mjs <out>
+  https://sim.eden.art/worlds/w/eden-2026/ https://sim.eden.art/w/mars https://sim.eden.art/w/eden` (must PASS) → lane
+  live checks → fast-forward main + push → SHIP-LOG (`<team>/reviews/sim-release-20261015/SHIP-LOG.md`) with the
+  rollback commands (`activate.sh <stage> <previous release> --reload`).
+- **eden2 retention:** `tools/world-launcher/deploy/retention.sh --host root@eden2` lists what keep-N would delete
+  (10 routine backups per stage; 5 legacy releases + linked + in use). Dry run is the default; `--apply` needs Gene's yes.
+- Do not replay passing checks without a source change or unresolved finding that warrants it.
 
 Imported `mars/AGENTS.md` carries original-checkout history; its prohibitions
 on authorized Eden fork work are superseded by Gene's kickoff, while engine
