@@ -85,33 +85,3 @@ export function JoinPanel({ signedIn, worldName, base }: { signedIn: boolean; wo
     </div>
   );
 }
-
-/** `#approve/<id>`: an agent asks to connect to (or create) the signed-in person's Soul. Same semantics as main's card. */
-export function ApprovalCard({ id, signedIn, onDone }: { id: string; signedIn: boolean; onDone: () => void }) {
-  const [a, setA] = useState<J.Approval | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const check = useCallback(async (action?: 'approve' | 'cancel') => {
-    setBusy(true); setErr(null);
-    try { setA(await J.approval(id, action)); } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
-  }, [id]);
-  useEffect(() => { if (signedIn) void check(); }, [signedIn, check]);
-  useEffect(() => { if (a?.status !== 'creating') return; const t = setInterval(() => void check(), 3000); return () => clearInterval(t); }, [a?.status, check]);
-  return (
-    <div className="gp-pairs jp-approval" data-approval={id} data-approval-status={a?.status ?? ''}>
-      <b>Your agent asks to {a?.mode === 'create' ? 'create a Soul for you' : a?.mode === 'repair' ? 'connect to your Soul' : 'create or connect a Soul'}</b>
-      {!signedIn && <p>Sign in with the account that owns the Soul to review this request.</p>}
-      {a && <p><b>{a.name}</b>{a.soulId ? <span className="gp-dim"> · {a.soulId}</span> : null}<br /><span className="gp-dim">agent: {a.agentLabel} (its own label)</span></p>}
-      {a?.status === 'pending' && <>
-        <p className="gp-dim">The agent can perceive, act and edit this Soul's profile. Signing out doesn't revoke it.</p>
-        <div className="gp-row"><button className="gp-btn gp-primary" data-approve-agent={id} disabled={busy} onClick={() => void check('approve')}>Approve</button><button className="gp-btn" disabled={busy} onClick={() => void check('cancel')}>Refuse</button></div>
-      </>}
-      {a?.status === 'creating' && <p role="status">Approved. Waiting for the world to confirm the body is ready…</p>}
-      {a?.status === 'ready' && <p role="status" className="gp-ok">Connected. Your agent finishes from its own folder (<code>approval wait</code>).</p>}
-      {a?.status === 'refused' && <p role="alert" className="gp-bad" data-approval-reason={a.reason?.code ?? 'refused'}>{typeof a.reason?.message === 'string' ? a.reason.message : 'Approved, but the Soul could not arrive in this world. Nothing was created; ask your agent to try again.'}</p>}
-      {a && ['cancelled', 'expired'].includes(a.status) && <p role="status">This request is {a.status}.</p>}
-      {err && <p className="gp-bad">{err}</p>}
-      <div className="gp-row"><span /><button className="gp-mini" onClick={onDone}>close</button></div>
-    </div>
-  );
-}

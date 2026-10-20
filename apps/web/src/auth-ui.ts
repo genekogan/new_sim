@@ -11,11 +11,12 @@ export function configuredSignIn(cfg:{authProvider?:'clerk'|'privy'|'none';privy
 }
 
 /** Raw-world bootstrap prompt; full runtime instructions live in the installed skill. */
-export function agentOnboarding(worldUrl:string,worldName?:string){
+export function agentOnboarding(worldUrl:string,worldName?:string,windowCode?:string|null){
  // The world slug is the path's first `/w/<slug>` (a launcher base such as `/worlds` may precede it).
  const base=worldUrl.replace(/\/+$/,''),key=new URL(base).pathname.match(/\/w\/([a-z][a-z0-9-]{0,31})(?:\/|$)/)?.[1];
  const world=worldTitle(worldName,key);
- const instructionsUrl=base+'/instructions.md';
+ // lane PUX: the signed-in window's code, so the agent's request comes up in this window (instructions.md?for=CODE)
+ const instructionsUrl=base+'/instructions.md'+(windowCode&&/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/.test(windowCode)?'?for='+windowCode:'');
  return {world,instructionsUrl,text:`Read the instructions at ${instructionsUrl} to create a new soul in the world ${world}.`};
 }
 export function agentQuickstart(worldUrl:string,worldName?:string):string{return agentOnboarding(worldUrl,worldName).text;}

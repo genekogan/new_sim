@@ -1,0 +1,49 @@
+// Lane PUX (Gene 2026-10-20: "it would be nice if the approval request comes up in your existing window"): the signed-in
+// page asks the world, every few seconds while it is visible, which Soul requests are waiting for this account (requests
+// an agent addressed with this person's window code). GodPanel shows the newest one the person has not closed in this tab.
+import { useEffect, useState } from 'react';
+import { worldKey } from '../world-path.ts';
+import * as J from './join-api.ts';
+
+export const WINDOW_POLL_MS = 4500;
+const KEY = `sim.approvalsClosed:${worldKey}`;
+
+/** The request to show: the newest waiting one this tab has not closed (the server lists newest first). */
+export function pickWindowApproval(waiting: readonly Pick<J.Approval, 'id' | 'status'>[], closed: ReadonlySet<string>): string | null {
+  return waiting.find((a) => a.status === 'pending' && !closed.has(a.id))?.id ?? null;
+}
+export function closedApprovals(storage: Pick<Storage, 'getItem'> | null = safeSession()): Set<string> {
+  try { const v = JSON.parse(storage?.getItem(KEY) ?? '[]'); return new Set(Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []); } catch { return new Set(); }
+}
+export function closeApproval(id: string, storage: Pick<Storage, 'getItem' | 'setItem'> | null = safeSession()): Set<string> {
+  const next = closedApprovals(storage); next.delete(id); next.add(id);
+  try { storage?.setItem(KEY, JSON.stringify([...next].slice(-20))); } catch { /* private mode: this tab only */ }
+  return next;
+}
+function safeSession(): Storage | null { try { return typeof sessionStorage === 'undefined' ? null : sessionStorage; } catch { return null; } }
+
+/** Requests waiting for the signed-in account; polls only while `enabled` and the tab is visible; stops for good when the
+ *  world has no such list (an older server). */
+export function useWindowApprovals(enabled: boolean): J.Approval[] {
+  const [waiting, setWaiting] = useState<J.Approval[]>([]);
+  useEffect(() => {
+    if (!enabled) { setWaiting([]); return; }
+    let live = true, timer: ReturnType<typeof setTimeout> | undefined, stopped = false, asking = false;
+    const tick = async () => {
+      clearTimeout(timer);
+      if (!live || stopped || asking) return;
+      if (typeof document !== 'undefined' && document.hidden) return;   // resumes on visibilitychange
+      asking = true;
+      const list = await J.waitingApprovals().finally(() => { asking = false; });
+      if (!live) return;
+      if (list === null) { stopped = true; setWaiting([]); return; }
+      setWaiting((prev) => (prev.length === list.length && prev.every((a, i) => a.id === list[i]!.id && a.status === list[i]!.status) ? prev : list));
+      timer = setTimeout(() => void tick(), WINDOW_POLL_MS);
+    };
+    const onVisible = () => { if (!document.hidden) void tick(); };
+    document.addEventListener('visibilitychange', onVisible);
+    void tick();
+    return () => { live = false; clearTimeout(timer); document.removeEventListener('visibilitychange', onVisible); };
+  }, [enabled]);
+  return waiting;
+}

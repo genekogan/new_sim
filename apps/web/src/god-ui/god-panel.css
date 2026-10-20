@@ -116,14 +116,38 @@
   .gp-owner-ops input { background: #2a2b28; color: #ebeae3; border-color: rgba(255, 255, 255, .2); }
   .gp-btn.gp-danger:not(:disabled) { border-color: #e88; color: #f2a0a0; }
 }
-/* Lane HF: the approval link's card (god-ui/ApprovalDialog.tsx), a modal in the top layer, centred, until it is answered */
-.gp-approval-dialog { width: min(420px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); overflow: auto; box-sizing: border-box; margin: auto; padding: 6px 16px 14px; border: 0; border-radius: 14px; background: rgba(252, 251, 247, .98); color: #1c1c1a; box-shadow: 0 10px 40px rgba(0, 0, 0, .28), 0 0 0 1px rgba(0, 0, 0, .05); font: 14px/1.45 system-ui, -apple-system, sans-serif; }
-.gp-approval-dialog:focus { outline: none; }
-.gp-approval-dialog::backdrop { background: rgba(16, 21, 20, .35); }
-.gp-approval-dialog .gp-pairs { margin: 10px 0 0; padding: 10px 12px; }
-.gp-approval-dialog .gp-block { margin-top: 10px; }
-.gp-approval-dialog .gp-btn, .gp-approval-dialog .gp-mini { min-height: 36px; }
-@media (pointer: coarse) { .gp-approval-dialog .gp-btn, .gp-approval-dialog .gp-mini { min-height: 44px; min-width: 44px; } }
-@media (prefers-color-scheme: dark) {
-  .gp-approval-dialog { background: rgba(28, 29, 27, .97); color: #ebeae3; box-shadow: 0 10px 40px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .06); }
-}
+/* The agent-approval card (god-ui/ApprovalDialog.tsx). Lane HF: a modal in the top layer until it is answered.
+   Lane PUX: a small frosted card in the top right, under the header, with the look of Explore and the account menu. */
+.ap-dialog { position: fixed; inset: calc(var(--app-hud-bottom, 56px) + 8px) calc(16px + var(--sa-r, 0px)) auto auto; margin: 0;
+  width: min(340px, calc(100vw - 32px)); max-height: calc(100dvh - var(--app-hud-bottom, 56px) - 24px); overflow: auto; box-sizing: border-box;
+  padding: 14px 14px 12px 16px; border-radius: 18px; color: var(--fg); font: 14px/1.4 system-ui, sans-serif;
+  background: color-mix(in srgb, var(--panel) 72%, transparent); -webkit-backdrop-filter: blur(22px) saturate(1.2); backdrop-filter: blur(22px) saturate(1.2);
+  border: 1px solid color-mix(in srgb, var(--fg) 15%, transparent); box-shadow: 0 16px 50px #0004; }
+.ap-dialog:focus { outline: none; }
+.ap-dialog::backdrop { background: #10151418; }
+.ap-card { position: relative; }
+.ap-close { position: absolute; top: -8px; right: -8px; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: color-mix(in srgb, var(--fg) 70%, transparent); font-size: 22px; line-height: 1; cursor: pointer; }
+.ap-close:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 8%, transparent); }
+.ap-head { display: flex; align-items: center; gap: 12px; padding-right: 28px; }
+.ap-avatar { flex: 0 0 48px; width: 48px; height: 48px; border-radius: 50%; object-fit: cover; }
+.ap-generic { display: grid; place-items: center; color: var(--fg); background: color-mix(in srgb, var(--fg) 9%, transparent); overflow: hidden; }
+.ap-generic svg { width: 100%; height: 100%; }
+.ap-who { display: flex; flex-direction: column; min-width: 0; }
+.ap-kicker { font: 650 11px/1.3 system-ui, sans-serif; text-transform: uppercase; letter-spacing: .08em; color: color-mix(in srgb, var(--fg) 62%, transparent); }
+.ap-name { font: 650 18px/1.25 system-ui, sans-serif; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ap-agent { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: color-mix(in srgb, var(--fg) 66%, transparent); min-width: 0; overflow-wrap: anywhere; }
+.ap-info { display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 1px solid currentColor; background: transparent; color: inherit; font: italic 600 11px/1 Georgia, serif; cursor: pointer; flex: none; }
+.ap-info[aria-expanded="true"] { color: var(--fg); }
+.ap-note { margin: 10px 0 0; font-size: 12.5px; color: color-mix(in srgb, var(--fg) 75%, transparent); }
+.ap-actions { display: flex; gap: 8px; margin-top: 14px; }
+.ap-btn { flex: 1; min-height: 38px; padding: 0 14px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--fg) 20%, transparent); background: color-mix(in srgb, var(--bg) 45%, transparent); color: var(--fg); font: 600 14px/1 system-ui, sans-serif; cursor: pointer; }
+.ap-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+.ap-btn.ap-primary { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.ap-btn.ap-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--fg) 86%, transparent); }
+.ap-btn:disabled { opacity: .55; cursor: default; }
+.ap-line { margin: 12px 0 0; font-weight: 600; }
+.ap-line.ap-ok { color: var(--ok); }
+.ap-line.ap-bad { color: var(--bad); font-weight: 500; font-size: 13px; }
+.ap-signin { margin-top: 10px; }
+@media (pointer: coarse) { .ap-btn, .ap-close { min-height: 44px; } .ap-close { width: 44px; height: 44px; top: -12px; right: -12px; } .ap-info { width: 26px; height: 26px; } }
+@media (max-width: 460px) { .ap-dialog { inset: calc(var(--app-hud-bottom, 56px) + 8px) calc(8px + var(--sa-r, 0px)) auto calc(8px + var(--sa-l, 0px)); width: auto; } }

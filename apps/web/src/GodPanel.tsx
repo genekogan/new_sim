@@ -21,6 +21,7 @@ import { ForsakeWorld } from './god-ui/WorldOwnerOps.tsx';
 import { PrayersWaiting } from './god-ui/Prayers.tsx';
 import { godFeature } from './god-ui/features.ts';
 import { approvalFromHash, landingHash } from './god-ui/join-api.ts';
+import { closeApproval, closedApprovals, pickWindowApproval, useWindowApprovals } from './god-ui/window-approvals.ts';
 import { OfferCard, offerFromHash } from './god-ui/OfferCard.tsx';
 import './god-ui/god-panel.css';
 
@@ -147,8 +148,17 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
   const signedIn = session.authed && !!status && status.you !== 'anonymous';
   // Lane HF (Gene 2026-10-20): the approval stays on screen and on top for everyone, the god included, whatever loads or
   // settles later (Clerk, the god's status, God Mode, the arrival), until approved, refused or closed. Closing drops the link.
-  const approvalDone = () => { approvalClosed = true; setApprovalId(null); if (approvalFromHash(location.hash)) history.replaceState(null, '', location.pathname + location.search); };
-  const approvalModal = approvalId && <ApprovalDialog id={approvalId} signedIn={signedIn} onDone={approvalDone} signIn={!signedIn && <>{signInButton}{signInForm}</>} />;
+  // Lane PUX: a request the person's agent addressed to this window (its window code) shows here too, with no navigation.
+  const waiting = useWindowApprovals(signedIn && session.mode !== 'dev');
+  const [windowId, setWindowId] = useState<string | null>(null);
+  useEffect(() => { if (!windowId) setWindowId(pickWindowApproval(waiting, closedApprovals())); }, [waiting, windowId]);
+  const shownId = approvalId ?? windowId;
+  const approvalDone = () => {
+    if (shownId) closeApproval(shownId);
+    if (approvalId) { approvalClosed = true; setApprovalId(null); if (approvalFromHash(location.hash)) history.replaceState(null, '', location.pathname + location.search); }
+    else setWindowId(null);
+  };
+  const approvalModal = shownId && <ApprovalDialog id={shownId} signedIn={signedIn} onDone={approvalDone} signIn={!signedIn && <>{signInButton}{signInForm}</>} />;
   const canUndo = (edits ?? []).some((e) => !e.undone && e.kind !== 'undo' && e.ops.length > 0);
   // a new owner whose agent is not connected yet: God opens by itself once (it shows the line to give the agent)
   useEffect(() => {

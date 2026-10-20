@@ -1,11 +1,81 @@
-// Lane HF (hotfix, Gene 2026-10-20): an agent's approval link (#approve/<id>) shows its card as a modal dialog on top of
-// everything, for everyone who opens it (the world's god included), from the first render until the person approves,
-// refuses or closes it. Before, the god's card lived inside the God modal: it flashed while Clerk was still loading (the
-// page saw an anonymous visitor's floating card), then vanished once the god's status arrived with God Mode closed.
-// A modal dialog sits in the browser's top layer, above every z-index; a later modal (God Mode, Explore, the account menu,
-// the return card) would sit above it, so whenever another dialog opens this one is lifted back over it.
-import { useEffect, useRef, type ReactNode } from 'react';
-import { ApprovalCard } from './JoinPanel.tsx';
+// An agent asks to make (or reconnect) the signed-in person's Soul: this card answers it.
+// Lane HF (Gene 2026-10-20): a modal dialog in the browser's top layer, above every z-index, from the first render until it
+// is answered or closed; when another dialog opens (God Mode, Explore, the account menu) this one is lifted back over it.
+// Lane PUX (Gene 2026-10-20b): the same guarantee, drawn as a small frosted card in the top right like the other menus,
+// with the Soul's picture (or a generic one), short copy, the agent's self-chosen name behind an (i), Ask again once a
+// request timed out, and "Connected" closing itself after 5 s. It opens from the agent's link (#approve/<id>) or, with no
+// navigation at all, in the window that gave the agent its window code (GodPanel's window-approvals poll).
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import * as J from './join-api.ts';
+
+const AVATAR = <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="15" r="7" fill="currentColor" opacity=".55" /><path d="M6 36a14 14 0 0 1 28 0" fill="currentColor" opacity=".55" /></svg>;
+/** The Soul's picture only from this site or https (the server builds it; never a script URL). */
+export const safePhoto = (url: string | null | undefined) => typeof url === 'string' && (/^https:\/\//.test(url) || /^\/(?!\/)/.test(url)) ? url : null;
+/** What the card says under the name, per status (short on purpose: Gene, "avoid verbosity"). */
+export function approvalLine(a: J.Approval | null, refusedHere: boolean): string | null {
+  if (!a) return null;
+  switch (a.status) {
+    case 'creating': return 'Making the body…';
+    case 'ready': return 'Connected';
+    case 'cancelled': return refusedHere ? 'Refused' : 'Withdrawn by the agent';
+    case 'expired': return 'Timed out';
+    case 'refused': return typeof a.reason?.message === 'string' ? a.reason.message : 'Approved, but the Soul could not arrive. Nothing was created; ask your agent to try again.';
+    default: return null;
+  }
+}
+export const CONNECTED_CLOSE_MS = 5000;
+
+export function ApprovalCard({ id, signedIn, signIn, onDone }: { id: string; signedIn: boolean; signIn?: ReactNode; onDone: () => void }) {
+  const [a, setA] = useState<J.Approval | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [about, setAbout] = useState(false);
+  const [refusedHere, setRefusedHere] = useState(false);
+  const check = useCallback(async (action?: 'approve' | 'cancel' | 'renew') => {
+    if (action) setBusy(true);
+    setErr(null);
+    try { const next = await J.approval(id, action); setA(next); if (action === 'cancel' && next.status === 'cancelled') setRefusedHere(true); }
+    catch (e) { setErr((e as Error).message); }
+    finally { if (action) setBusy(false); }
+  }, [id]);
+  useEffect(() => { if (signedIn) void check(); }, [signedIn, check]);
+  // follow the request while it can still change on its own (the agent withdraws it, it times out, the body arrives)
+  const live = a?.status === 'pending' || a?.status === 'creating';
+  useEffect(() => { if (!live) return; const t = setInterval(() => void check(), a?.status === 'creating' ? 2000 : 4000); return () => clearInterval(t); }, [live, a?.status, check]);
+  const done = useRef(onDone); done.current = onDone;   // the parent re-renders often; the 5 s must not restart each time
+  useEffect(() => { if (a?.status !== 'ready') return; const t = setTimeout(() => done.current(), CONNECTED_CLOSE_MS); return () => clearTimeout(t); }, [a?.status]);
+  const photo = safePhoto(a?.photo);
+  const line = approvalLine(a, refusedHere);
+  const kicker = a?.mode === 'repair' ? 'Connect your Soul' : 'New Soul';
+  return (
+    <div className="ap-card" data-approval={id} data-approval-status={a?.status ?? ''}>
+      <button type="button" className="ap-close" data-approval-close="1" aria-label="Close" onClick={onDone}>×</button>
+      <div className="ap-head">
+        {photo ? <img className="ap-avatar" src={photo} alt="" /> : <span className="ap-avatar ap-generic">{AVATAR}</span>}
+        <div className="ap-who">
+          <span className="ap-kicker">{kicker}</span>
+          <b className="ap-name" data-approval-name="1">{a?.name ?? (signedIn ? '…' : 'Your agent is asking')}</b>
+          {a && <span className="ap-agent">
+            {a.agentLabel}
+            <button type="button" className="ap-info" aria-expanded={about} aria-label="About this agent" data-approval-about="1" onClick={() => setAbout((v) => !v)}>i</button>
+          </span>}
+        </div>
+      </div>
+      {about && a && <p className="ap-note" data-approval-note="1">The name your agent gave itself. Approve only if you started it: it will act as this Soul.</p>}
+      {!signedIn && <><p className="ap-line">Sign in to answer.</p>{signIn && <div className="ap-signin">{signIn}</div>}</>}
+      {a?.status === 'pending' && <div className="ap-actions">
+        <button type="button" className="ap-btn ap-primary" data-approve-agent={id} disabled={busy} onClick={() => void check('approve')}>Approve</button>
+        <button type="button" className="ap-btn" data-refuse-agent={id} disabled={busy} onClick={() => void check('cancel')}>Refuse</button>
+      </div>}
+      {line && <p className={'ap-line' + (a?.status === 'ready' ? ' ap-ok' : a?.status === 'refused' ? ' ap-bad' : '')}
+        role={a?.status === 'refused' ? 'alert' : 'status'} {...(a?.status === 'refused' ? { 'data-approval-reason': a.reason?.code ?? 'refused' } : {})}>{line}</p>}
+      {a?.status === 'expired' && <div className="ap-actions">
+        <button type="button" className="ap-btn ap-primary" data-approval-renew={id} disabled={busy} onClick={() => void check('renew')}>Ask again</button>
+      </div>}
+      {err && <p className="ap-line ap-bad">{err}</p>}
+    </div>
+  );
+}
 
 export function ApprovalDialog({ id, signedIn, signIn, onDone }: { id: string; signedIn: boolean; signIn?: ReactNode; onDone: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -20,12 +90,11 @@ export function ApprovalDialog({ id, signedIn, signIn, onDone }: { id: string; s
     others.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['open'] });
     document.addEventListener('fullscreenchange', raise);
     return () => { others.disconnect(); document.removeEventListener('fullscreenchange', raise); if (node.open) node.close(); };
-  }, []);
-  // Escape is the person closing it, as the card's own "close" is; the request stays pending for the agent. Focus starts on
-  // the dialog itself, not on a button (Enter must not approve, refuse or close by accident)
-  return <dialog ref={ref} className="gp-approval-dialog" data-approval-dialog={id} aria-label="Approve your agent" tabIndex={-1}
+  }, [id]);
+  // Escape is the person closing it, as the card's own × is; the request stays pending for the agent. Focus starts on the
+  // dialog itself, not on a button (Enter must not approve, refuse or close by accident)
+  return <dialog ref={ref} className="ap-dialog" data-approval-dialog={id} aria-label="Approve your agent" tabIndex={-1}
     onCancel={(e) => { e.preventDefault(); onDone(); }}>
-    <ApprovalCard id={id} signedIn={signedIn} onDone={onDone} />
-    {signIn && <div className="gp-block">{signIn}</div>}
+    <ApprovalCard key={id} id={id} signedIn={signedIn} signIn={signIn} onDone={onDone} />
   </dialog>;
 }

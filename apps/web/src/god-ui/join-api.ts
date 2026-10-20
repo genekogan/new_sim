@@ -8,7 +8,9 @@ import { userAuthHeaders } from '../auth-session.ts';
 
 export type MySoul = { id: string; name: string; entityId: string; hasToken: boolean };
 export type SoulHere = { id: string; entityId: string; name: string; since: number; active: boolean; p?: [number, number, number] };
-export type Approval = { id: string; worldId: string; agentLabel: string; name: string; description: string; mode: 'create' | 'repair'; status: 'pending' | 'creating' | 'ready' | 'refused' | 'cancelled' | 'expired'; soulId: string | null; expiresAt: number; reason?: { code: string; message: string } };
+export type Approval = { id: string; worldId: string; agentLabel: string; name: string; description: string; mode: 'create' | 'repair'; status: 'pending' | 'creating' | 'ready' | 'refused' | 'cancelled' | 'expired'; soulId: string | null; expiresAt: number; reason?: { code: string; message: string };
+  /** Lane PUX: addressed to this account with a window code, so its open world window shows it; the Soul's picture once it exists. */
+  inWindow?: boolean; photo?: string | null };
 
 /** The signed-in person's Souls in this world; null when nobody is signed in (or the world refuses them). */
 export async function mySouls(): Promise<MySoul[] | null> {
@@ -27,12 +29,33 @@ export const landingHash = typeof location === 'undefined' ? '' : location.hash;
 export const approvalFromHash = (hash: string) => /^#approve\/(ap_[a-f0-9]{32})$/.exec(hash)?.[1] ?? null;
 const valid = (a: Approval | undefined, id: string): a is Approval => !!a && a.id === id && ['create', 'repair'].includes(a.mode) && ['pending', 'creating', 'ready', 'refused', 'cancelled', 'expired'].includes(a.status) && typeof a.name === 'string' && typeof a.agentLabel === 'string' && (a.soulId === null || /^s_[A-Za-z0-9_-]+$/.test(a.soulId));
 /** Read (or act on) one approval as the signed-in person. */
-export async function approval(id: string, action?: 'approve' | 'cancel'): Promise<Approval> {
+export async function approval(id: string, action?: 'approve' | 'cancel' | 'renew'): Promise<Approval> {
   const headers = await userAuthHeaders(); if (!headers.authorization) throw new Error('Sign in first.');
   const r = await fetch(apiPath(`/v1/account/approvals/${id}${action ? '/' + action : ''}`), { method: action ? 'POST' : 'GET', headers: { ...headers, ...(action ? { 'content-type': 'application/json' } : {}) }, ...(action ? { body: '{}' } : {}), cache: 'no-store' });
   const d = await r.json().catch(() => ({})) as { approval?: Approval; message?: string };
   if (!r.ok || !valid(d.approval, id)) throw new Error(r.status === 403 ? 'This approval belongs to another account.' : d.message ?? 'This approval is unavailable. Sign in with the intended account and check again.');
   return d.approval;
+}
+/** Lane PUX: the requests waiting for this account in this world (addressed to it with a window code), newest first.
+ *  null = this world has no such list (an older server), stop asking. */
+export async function waitingApprovals(): Promise<Approval[] | null> {
+  const headers = await userAuthHeaders(); if (!headers.authorization) return [];
+  try {
+    const r = await fetch(apiPath('/v1/account/approvals'), { headers, cache: 'no-store' });
+    if (r.status === 404 || r.status === 405) return null;
+    if (!r.ok) return [];
+    const d = await r.json() as { approvals?: Approval[] };
+    return (d.approvals ?? []).filter((a) => a && typeof a.id === 'string' && valid(a, a.id));
+  } catch { return []; }
+}
+/** Lane PUX: this page's window code (ABCD-EFGH), for the New Soul prompt; an agent that passes it reaches this window. */
+export async function windowCode(): Promise<string | null> {
+  const headers = await userAuthHeaders(); if (!headers.authorization) return null;
+  try {
+    const r = await fetch(apiPath('/v1/account/window-code'), { method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: '{}', cache: 'no-store' });
+    const d = await r.json().catch(() => ({})) as { code?: string };
+    return r.ok && typeof d.code === 'string' && /^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/.test(d.code) ? d.code : null;
+  } catch { return null; }
 }
 
 /** The absolute URL of this world (what agents fetch), from the server's own base when known. */
