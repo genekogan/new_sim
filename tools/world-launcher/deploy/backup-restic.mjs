@@ -18,7 +18,8 @@
 //
 // restore: restores one snapshot's mirror into <dir> (refuses a non-empty dir), so <dir> is laid out like the stage's data dir;
 // quick_checks every database; exits non-zero if any check fails. Boot one world from it:
-//   node tools/god-skill/dev-world.mjs <slug> <port> --data <dir>/worlds/<slug>
+//   ENABLE_WORLD_ENGINE=1 SOUL_LIFECYCLE=1 node tools/god-skill/dev-world.mjs <slug> <port> --data <dir>/worlds/<slug>
+//   (SOUL_LIFECYCLE=1 as the launcher sets it: without it a production world's history refuses its engine, +crew-removal/1)
 //
 // Env (systemd: EnvironmentFile=-/etc/sim-worlds/backup.env; every key has a default):
 //   RESTIC_REPOSITORY      /srv/sim-worlds-backups/restic        RESTIC_PASSWORD_FILE  /etc/sim-worlds/restic.pass
@@ -175,7 +176,7 @@ function runRestore(stage, when, dir) {
   let bad = 0;
   for (const f of dbs) { const r = quickCheck(join(dir, f)); if (r !== 'ok') bad++; console.log(`${r === 'ok' ? 'ok  ' : 'BAD '} ${f}${r === 'ok' ? '' : ` ${r.slice(0, 200)}`}`); }
   console.log(`restore ${stage} ${pick.short_id} (${new Date(pick.time).toISOString()}) -> ${dir}: ${dbs.length - bad}/${dbs.length} databases ok` +
-    `; boot one world: node tools/god-skill/dev-world.mjs <slug> <port> --data ${join(dir, 'worlds', '<slug>')}`);
+    `; boot one world: ENABLE_WORLD_ENGINE=1 SOUL_LIFECYCLE=1 node tools/god-skill/dev-world.mjs <slug> <port> --data ${join(dir, 'worlds', '<slug>')}`);
   if (bad || !dbs.length) process.exitCode = 1;
 }
 

@@ -110,3 +110,39 @@ the longest error run, the slowest request, and how long each world's socket was
 world (to an unknown route; any 4xx counts as answered), which is what catches a connection closed under a request.
 Locally, put a reverse proxy with Caddy's transport defaults in front of the keeper and probe through it: the proxy's
 502s are exactly what a visitor would see (lane W rig: `team/scratch/r31w/`).
+
+## Nightly backups: versioned (restic)
+`sim-worlds-backup@<stage>.timer` (03:30 UTC) runs `deploy/backup-restic.mjs backup <stage>` as `simworlds`. It is separate
+from ship.sh's compact backup, which a release still takes first. Each night it:
+
+1. copies `accounts.sqlite`, `forks/accounts.sqlite` and every `worlds/<slug>/sim.db` with SQLite's online backup API
+   in one step, so the copies are consistent while the worlds run, and runs `PRAGMA quick_check` on each copy;
+2. adds `worlds.json`, `audit.jsonl` and the uploaded files in `worlds/assets` (backup.mjs never had these). It copies
+   only files that are new or changed into the mirror at `/srv/sim-worlds-backups/staging/<stage>`;
+3. takes one restic snapshot of that mirror into `/srv/sim-worlds-backups/restic`, tagged `<stage>`;
+4. **deletes** old snapshots: `forget --prune` keeps 7 daily, 4 weekly and 6 monthly snapshots per stage
+   (`SIM_BACKUP_KEEP`). Then `check` reads a seventh of the data, so all of it is read once a week;
+5. copies the snapshots off the box to `SIM_BACKUP_OFFSITE` (an R2 bucket) and applies the same retention there.
+   This step runs only when that setting is present.
+
+The script exits 1 if any database fails its check; the other databases are still snapshotted. host-health flags it.
+
+Restic stores only the chunks it has not seen before, compressed. The copies keep the live file's page layout, so
+unchanged pages are byte-identical from night to night. Measured on 15 real eden2 backups (lane BK, 2026-10-20):
+~13 MB a night for production + legacy, against ~260 MB for a dated full copy. Retention caps the repository at ~240 MB
+at today's sizes. The floor is set by each world's 5 MB whole-state JSON snapshot, which it rewrites every 5 minutes.
+
+Settings live in `/etc/sim-worlds/backup.env` (`backup.env.example`). The repository password is
+`/etc/sim-worlds/restic.pass`, root:simworlds 0640. Without that password the backups cannot be read. The script
+never creates a repository: if the disk or the path is missing, it fails instead of starting an empty one.
+
+- Restore (one command; never overwrites a non-empty directory; quick_checks every database, exit 1 if any is bad):
+  `node /srv/sim-worlds/production/tools/world-launcher/deploy/backup-restic.mjs restore production <latest|YYYY-MM-DD|id> <empty dir>`.
+  The directory is laid out like `/srv/sim-worlds-data/<stage>`. `... list [<stage>]` shows the snapshots.
+- Boot one restored world locally: `ENABLE_WORLD_ENGINE=1 SOUL_LIFECYCLE=1 node tools/god-skill/dev-world.mjs <slug> <port> --data <dir>/worlds/<slug>`.
+  Without `SOUL_LIFECYCLE=1`, which the launcher sets, a production world's history refuses the engine
+  (`+crew-removal/1`).
+- Put a world back live: stop it, swap its `sim.db` for the restored one, start it. Only R does this.
+- Rollback to the dated full copies: point the unit's ExecStart back at `deploy/backup.mjs` (kept in the tree).
+- Tests: `node --test tools/world-launcher/backup-restic.test.mjs` (real restic; it skips when restic is not installed).
+- eden2 has restic 0.16.4 from apt; the script uses only flags that 0.16 has.
