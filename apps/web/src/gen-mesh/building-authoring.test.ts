@@ -13,6 +13,7 @@ import { solve } from '../../../../tools/god-skill/lib/solver.mjs';
 import { buildingLayout } from '../../../../packages/generators/src/building.ts';
 import fixtures from '../../../../packages/generators/src/fixtures/building-dress.json' with { type: 'json' };
 import defaults from './building-defaults.fixture.json' with { type: 'json' };
+import looks from './building-looks.json' with { type: 'json' };
 import { meshFor, type MeshCtx } from './registry.ts';
 import { MaterialLib } from './materials.ts';
 import './building.mesh.ts';
@@ -61,6 +62,11 @@ test('all 40 library buildings retain exact pre-XP3 positions, normals, colours 
     assert.deepEqual(rest, expected, name);
     if (EXACT) assert.equal(actual, hash, `${name}: exact bytes on the authoring platform`);
   }
+});
+
+test('every facade-seed alias (building-looks.json) names a current library building revision', () => {
+  const current = new Set(CORE_KIT.map((d) => w.resolvedDef(`${d.name}@${d.version ?? 1}`)!).filter((d) => d.make.kind === 'gen' && d.make.gen === 'building/1').map((d) => d.hash));
+  for (const [hash, was] of Object.entries(looks)) { assert.ok(current.has(hash), `stale alias ${hash.slice(0, 12)} (was ${was.slice(0, 12)})`); assert.notEqual(hash, was); }
 });
 
 test('each ornament switch removes only its own triangles, without changing the remaining seeded facade', () => {
