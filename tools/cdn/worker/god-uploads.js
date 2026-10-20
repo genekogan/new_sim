@@ -62,12 +62,13 @@ async function readCapped(body, max) {
 
 /**
  * The handler. `deps` exists for the local tests: `fetch` (the origin), `caches` (the edge cache; absent = none),
- * `subtle` (Web Crypto). In Cloudflare all three are the runtime's own.
+ * `subtle` (Web Crypto), `origin` (a loopback stand-in for sim.eden.art). In Cloudflare these are the runtime's own.
  */
 export async function handle(request, env, ctx, deps = {}) {
   const originFetch = deps.fetch ?? globalThis.fetch.bind(globalThis);
   const edge = 'caches' in deps ? deps.caches : globalThis.caches?.default;
   const subtle = deps.subtle ?? globalThis.crypto.subtle;
+  const origin = deps.origin ?? ORIGIN;   // tests and the local stand-in only
   const method = request.method.toUpperCase();
   if (method === 'OPTIONS') return new Response(null, { status: 204, headers: { ...cors, 'access-control-allow-methods': 'GET, HEAD', 'access-control-allow-headers': '*', 'access-control-max-age': '86400' } });
   if (method !== 'GET' && method !== 'HEAD') return refuse(405, 'method', method);
@@ -99,7 +100,7 @@ export async function handle(request, env, ctx, deps = {}) {
   if (obj) await obj.arrayBuffer().catch(() => {});   // a stray object without our metadata is never served; re-pulled below
 
   // Miss: pull from the god world's own route, verify, store.
-  const source = `${ORIGIN}/worlds/w/${p.slug}/assets/${p.sha}.${p.ext}`;
+  const source = `${origin}/worlds/w/${p.slug}/assets/${p.sha}.${p.ext}`;
   let res;
   try { res = await originFetch(source, { method: 'GET', redirect: 'manual', headers: { accept: '*/*', 'user-agent': 'eden-assets-pull/1 (god-uploads worker)' } }); }
   catch { return refuse(502, 'origin-unreachable', method); }

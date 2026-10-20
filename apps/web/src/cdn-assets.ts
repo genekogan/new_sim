@@ -77,8 +77,32 @@ export function manifestAsset(manifest: CdnManifest, input: string, pageUrl: str
     // Entity worlds serve stored bytes under their own slug. Only a reviewed immutable hash may share
     // the canonical /assets alias; this does not turn arbitrary world paths or uploads into public CDN URLs.
     const stored = /^(\/worlds)?\/w\/[a-z][a-z0-9-]{0,31}\/assets\/([a-f0-9]{64}\.[a-z0-9]+)$/.exec(url.pathname);
-    return stored ? manifest.assets[(stored[1] ?? '') + '/assets/' + stored[2]] : undefined;
+    return (stored ? manifest.assets[(stored[1] ?? '') + '/assets/' + stored[2]] : undefined) ?? godUpload(url.pathname, pageUrl);
   } catch { return; }
+}
+
+// CDN4 (2026-10-20): god uploads (POST /v1/god/assets) through the pull-through Worker on assets.eden.art/w/*
+// (tools/cdn/worker/god-uploads.js). An upload is not in the release manifest, so its route is derived from the page:
+// a GLB a /worlds god world serves under its own `/worlds/w/<slug>/assets/<sha>.glb` whose byte count the world's snapshot
+// listed (`assetBytes`, noteUploadSizes) maps to `w/<slug>/assets/<sha>.glb`. The transport's checks are unchanged:
+// exactly that many bytes hashing to the sha in the URL, else the exact original request. The legacy root worlds
+// (`/w/<slug>`) serve no uploads, so only `/worlds/w/` pages qualify. Off: SIM_GOD_UPLOADS_CDN=0 at build, `?godcdn=0`.
+declare const __SIM_GOD_UPLOADS_CDN__: boolean | undefined;
+export const UPLOAD_MAX_BYTES = 32 * 1024 * 1024;   // the Worker's own cap
+const UPLOAD = /^\/worlds\/w\/([a-z][a-z0-9-]{0,31})\/assets\/([a-f0-9]{64})\.glb$/;
+const uploadSizes = new Map<string, number>();
+const godUploadsOn = () => (typeof __SIM_GOD_UPLOADS_CDN__ === 'undefined' || __SIM_GOD_UPLOADS_CDN__) &&
+  !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('godcdn') === '0');
+/** Byte counts of the GLBs this world's defs load (snapshot `assetBytes`: what its /assets route sends, by sha). */
+export function noteUploadSizes(sizes: Record<string, number> | undefined): void {
+  for (const [sha, bytes] of Object.entries(sizes ?? {})) if (/^[a-f0-9]{64}$/.test(sha) && Number.isSafeInteger(bytes) && bytes >= 1 && bytes <= UPLOAD_MAX_BYTES) uploadSizes.set(sha, bytes);
+}
+/** Tests: forget every noted size. */
+export function clearUploadSizesForTest() { uploadSizes.clear(); }
+function godUpload(pathname: string, pageUrl: string): CdnAsset | undefined {
+  const m = UPLOAD.exec(pathname), bytes = m ? uploadSizes.get(m[2]) : undefined;
+  if (!m || bytes === undefined || pageWorld(pageUrl) !== `/worlds/w/${m[1]}` || !godUploadsOn()) return;
+  return { key: `w/${m[1]}/assets/${m[2]}.glb`, sha256: m[2], bytes, licence: 'god-upload' };
 }
 
 /** `timeoutMs` bounds the wait for CDN headers and every stall in its body (no bytes for that long), so a large world

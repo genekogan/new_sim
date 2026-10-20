@@ -344,3 +344,17 @@ then pass `--prefix /worlds --out <team>/scratch/cdn/browser-worlds` to both `se
 The fixture sets the runtime's `WORLD_PATH` to its exact advertised namespace. Its proxy preserves world HTTP/WS
 paths, strips `/worlds` only for shared static files, and checks the actual bootstrap identity before Chrome starts.
 It never contacts a live world or CDN.
+
+## God uploads: the pull-through Worker (CDN4, 2026-10-20)
+
+`worker/god-uploads.js` is a Cloudflare Worker for the route `assets.eden.art/w/*` (R2 binding `ASSETS` -> `eden-assets`; no
+secrets, no key on eden2). `GET /w/<slug>/assets/<sha>.<ext>`: an R2 hit is served with the CDN header contract (immutable,
+Content-Type, CORS for https://sim.eden.art, `Content-Encoding br` when stored so, ETag `"<sha>"`) and kept in the edge cache;
+a miss is pulled from the god world's own route `https://sim.eden.art/worlds/w/<slug>/assets/<sha>.<ext>`, hashed while it
+is read (cap 32 MiB), stored at `w/<slug>/assets/<sha>.<ext>` only when the digest equals the path's sha, and returned.
+Every refusal is `no-store` with `x-eden-cdn: refused:<reason>`. Tests: `node --test tools/cdn/worker/god-uploads.test.mjs`
+(fake R2, origin and edge cache). Deployment (dashboard, coordinator): `worker/DEPLOY.md`. Proof after deploy:
+`node tools/cdn/worker/verify-worker.mjs --god <scratch god folder> --out <receipt>`; `--self-test` runs the same checks
+against loopback stand-ins. The client maps a god upload only when the world's snapshot sized it (`assetBytes`), so the
+length and SHA checks are the same as for manifest objects; `cdn-walk.mjs` counts these requests (`cdnUploads`).
+

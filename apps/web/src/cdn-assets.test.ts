@@ -218,3 +218,47 @@ test('CDN3: precompressed br keys validate, still hash-bound; /modular resolves 
     assert.equal(mesh?.sha256.slice(0, 12), '767b7c427cc6'); assert.match(mesh!.key, /^assets\/br\//);
   }
 });
+
+test('CDN4: a god upload the snapshot sized maps to the pull-through Worker, only on its own /worlds world page', async () => {
+  const { noteUploadSizes, clearUploadSizesForTest, UPLOAD_MAX_BYTES } = await import('./cdn-assets.ts');
+  const up = createHash('sha256').update('a god upload').digest('hex'), other = 'e'.repeat(64);
+  const own = 'https://sim.eden.art/worlds/w/bench-hamlet/', path = `/worlds/w/bench-hamlet/assets/${up}.glb`;
+  assert.equal(manifestAsset(manifest, path, own), undefined, 'unsized: origin');
+  noteUploadSizes({ [up]: 12, [other]: UPLOAD_MAX_BYTES + 1, nothex: 5, ['f'.repeat(64)]: 0 } as Record<string, number>);
+  assert.deepEqual(manifestAsset(manifest, path, own), { key: `w/bench-hamlet/assets/${up}.glb`, sha256: up, bytes: 12, licence: 'god-upload' });
+  assert.equal(manifestAsset(manifest, `https://sim.eden.art${path}`, own)?.key, `w/bench-hamlet/assets/${up}.glb`);
+  for (const [url, pageUrl, why] of [
+    [path, 'https://sim.eden.art/worlds/w/other-world/', 'another world page'],
+    [path, 'https://sim.eden.art/w/bench-hamlet', 'a legacy root page'],
+    [`/w/bench-hamlet/assets/${up}.glb`, 'https://sim.eden.art/w/bench-hamlet', 'legacy root worlds serve no uploads'],
+    [`${path}?v=1`, own, 'a query'],
+    [`/worlds/w/bench-hamlet/assets/${up}.png`, own, 'not a GLB'],
+    [`/worlds/w/bench-hamlet/assets/${other}.glb`, own, 'over the cap'],
+    [`https://other.test${path}`, own, 'cross-origin'],
+  ] as const) assert.equal(manifestAsset(manifest, url, pageUrl), undefined, why);
+  // A manifest entry for the same sha wins (core set, renditions); the upload route is only the fallback.
+  const core = readCdnManifest({ version: 1, assets: { [`/worlds/assets/${sha256}.glb`]: entry } });
+  noteUploadSizes({ [sha256]: bytes.length });
+  assert.equal(manifestAsset(core, `/worlds/w/bench-hamlet/assets/${sha256}.glb`, own), entry);
+
+  // The transport: exact bytes + sha in, else the exact original request.
+  const body = new TextEncoder().encode('a god upload');
+  noteUploadSizes({ [up]: body.length });
+  const calls: string[] = [];
+  const ok: typeof fetch = async (input) => { calls.push(String(input)); return new Response(body); };
+  const r = await cdnFetch(ok, manifest, 'https://assets.eden.art', own)(`https://sim.eden.art${path}`);
+  assert.deepEqual(new Uint8Array(await r.arrayBuffer()), body);
+  assert.deepEqual(calls, [`https://assets.eden.art/w/bench-hamlet/assets/${up}.glb`]);
+  for (const bad of [new Response('x'.repeat(body.length)), new Response('not deployed', { status: 404 }), new Response(body.slice(1))]) {
+    const seen: string[] = [];
+    const f: typeof fetch = async (input) => { seen.push(String(input)); return seen.length === 1 ? bad : new Response('origin'); };
+    assert.equal(await (await cdnFetch(f, manifest, 'https://assets.eden.art', own)(`https://sim.eden.art${path}`)).text(), 'origin');
+    assert.deepEqual(seen, [`https://assets.eden.art/w/bench-hamlet/assets/${up}.glb`, `https://sim.eden.art${path}`]);
+  }
+  // ?godcdn=0 turns the route off at run time.
+  const loc = globalThis.location;
+  (globalThis as { location: unknown }).location = new URL(`${own}?godcdn=0`);
+  try { assert.equal(manifestAsset(manifest, path, own), undefined); } finally { (globalThis as { location: unknown }).location = loc; }
+  clearUploadSizesForTest();
+  assert.equal(manifestAsset(manifest, path, own), undefined);
+});

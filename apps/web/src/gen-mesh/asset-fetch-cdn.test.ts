@@ -66,3 +66,19 @@ test('worker: verified CDN bytes are delivered without touching the origin; anyt
     assert.deepEqual(r, { fetched: ['https://assets.eden.art/assets/aa/x.glb', 'https://sim.eden.art/w/eden/assets/x.glb'], cdn: false, bytes: [7, 7, 7] }, why);
   }
 });
+
+test('CDN4: the asset worker gets the Worker route for a sized god upload on its own /worlds page', async () => {
+  const { setCdnRouteForTest, readCdnManifest, noteUploadSizes, clearUploadSizesForTest } = await import('../cdn-assets.ts');
+  const { fetchInWorker } = await import('./asset-fetch.ts');
+  const up = 'a'.repeat(64), loc = globalThis.location;
+  (globalThis as { location: unknown }).location = new URL('https://sim.eden.art/worlds/w/bench-hamlet/');
+  try {
+    setCdnRouteForTest(readCdnManifest(manifest));
+    noteUploadSizes({ [up]: 4096 });
+    await fetchInWorker(`/worlds/w/bench-hamlet/assets/${up}.glb`);
+    assert.deepEqual(posted.at(-1)!.cdn, { url: `https://assets.eden.art/w/bench-hamlet/assets/${up}.glb`, sha256: up, bytes: 4096 });
+    assert.equal(posted.at(-1)!.url, `https://sim.eden.art/worlds/w/bench-hamlet/assets/${up}.glb`, 'the original URL stays the fallback');
+    await fetchInWorker(`/worlds/w/bench-hamlet/assets/${'b'.repeat(64)}.glb`);
+    assert.equal(posted.at(-1)!.cdn, undefined, 'an upload the snapshot did not size: origin');
+  } finally { clearUploadSizesForTest(); setCdnRouteForTest(null); (globalThis as { location: unknown }).location = loc; }
+});

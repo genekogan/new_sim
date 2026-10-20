@@ -5,7 +5,10 @@
 //   - a GLB/texture the shipped manifest maps is answered by the origin (status 200) instead of assets.eden.art,
 //   - an assets.eden.art request is not 200, an assets/br/ object did not arrive Content-Encoding br (CDN3),
 //     or a page loaded listed assets but none from assets.eden.art,
-//   - the page's asset worker delivered GLBs but none from the CDN (window.__assetWorker.cdn === 0).
+//   - the page's asset worker delivered GLBs but none from the CDN (window.__assetWorker.cdn === 0),
+//   - CDN4: a god upload (/worlds/w/<slug>/assets/<sha>.glb, not in the manifest) came from the origin with no request to
+//     the pull-through Worker (assets.eden.art/w/<slug>/assets/<sha>.glb) for that sha first. Worker requests are counted
+//     per page as cdnUploads, split by the Worker's x-eden-cdn answer (miss = pulled from origin, hit = R2, edge = cache).
 // Read-only public page loads; no credentials.
 //   node tools/cdn/cdn-walk.mjs <outDir> <url>... [--manifest apps/web/src/cdn-manifest.json] [--wait 25000] [--devices desktop1,phone2]
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -39,7 +42,9 @@ try {
     page.on('response', (r) => {   // includes the dedicated asset worker's fetches
       const u = new URL(r.url()); if (!ASSET.test(u.pathname)) return;
       const cdn = u.host === 'assets.eden.art';
-      reqs.push({ host: u.host, path: u.pathname + u.search, status: r.status(), encoding: r.headers()['content-encoding'] ?? null, listed: cdn || !!manifestAsset(manifest, r.url(), page.url() || url) });
+      const listed = cdn || !!manifestAsset(manifest, r.url(), page.url() || url), h = r.headers();
+      const upload = cdn ? /^\/w\/[a-z][a-z0-9-]{0,31}\/assets\/([0-9a-f]{64})\./.exec(u.pathname)?.[1] : !listed ? /^\/worlds\/w\/[a-z][a-z0-9-]{0,31}\/assets\/([0-9a-f]{64})\.glb$/.exec(u.pathname)?.[1] : undefined;
+      reqs.push({ host: u.host, path: u.pathname + u.search, status: r.status(), encoding: h['content-encoding'] ?? null, listed, ...(upload ? { upload, worker: h['x-eden-cdn'] ?? null } : {}) });
     });
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch((e) => errors.push('goto ' + e.message.slice(0, 120)));
     await page.waitForTimeout(WAIT);
@@ -48,6 +53,8 @@ try {
     await page.screenshot({ path: `${out}/${tag}.png` }).catch(() => {});
     const cdn = reqs.filter((r) => r.host === 'assets.eden.art');
     const originListed = reqs.filter((r) => r.host !== 'assets.eden.art' && r.listed && r.status === 200).map((r) => r.path);
+    const cdnUploads = cdn.filter((r) => r.upload), originUploads = reqs.filter((r) => r.host !== 'assets.eden.art' && r.upload && r.status === 200);
+    const tried = new Set(cdnUploads.map((r) => r.upload));
     const problems = [
       ...originListed.map((p) => `origin served a CDN-listed asset: ${p}`),
       ...cdn.filter((r) => r.status !== 200).map((r) => `CDN ${r.status}: ${r.path}`),
@@ -55,8 +62,10 @@ try {
       ...cdn.filter((r) => r.status === 200 && r.path.startsWith('/assets/br/') && r.encoding !== 'br').map((r) => `CDN br object arrived ${r.encoding ?? 'identity'}: ${r.path}`),
       ...(reqs.some((r) => r.listed) && !cdn.length ? ['listed assets loaded, none from assets.eden.art'] : []),
       ...(worker && worker.delivered > 0 && !worker.cdn && reqs.some((r) => r.listed && /\.glb$/.test(r.path)) ? [`asset worker delivered ${worker.delivered} GLBs, 0 from the CDN`] : []),
+      ...originUploads.filter((r) => !tried.has(r.upload)).map((r) => `god upload from the origin without a CDN attempt: ${r.path}`),
     ];
-    const row = { url, dev, total: reqs.length, cdn: cdn.length, cdnBr: cdn.filter((r) => r.encoding === 'br' && r.path.startsWith('/assets/br/')).length, originListed, worker, problems, errors, pass: problems.length === 0, reqs };
+    const row = { url, dev, total: reqs.length, cdn: cdn.length, cdnBr: cdn.filter((r) => r.encoding === 'br' && r.path.startsWith('/assets/br/')).length,
+      cdnUploads: cdnUploads.length, cdnUploadStates: Object.fromEntries(['miss', 'hit', 'edge'].map((k) => [k, cdnUploads.filter((r) => r.worker === k).length])), originUploads: originUploads.length, originListed, worker, problems, errors, pass: problems.length === 0, reqs };
     rows.push(row); console.log(JSON.stringify({ ...row, reqs: undefined, originListed: originListed.slice(0, 5) }));
     await ctx.close();
   }

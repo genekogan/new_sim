@@ -38,7 +38,7 @@ sends it uncompressed, or it is incompressible and the CDN gives better caching.
 | Catalogue thumbnails `/v1/god/defs/<ref>/thumb.png` | no (by ref) | | | **Origin.** God tooling only; mutable. |
 | Fonts | | | | None loaded from the origin. |
 | API (`/v1/*`, snapshot, config, scenes) | no | | | Dynamic. |
-| God uploads `/worlds/w/<slug>/assets/<sha>` outside the core set | yes (sha) | uncompressed (same route) | | Designed below, not built. 0 of the arium's 119 asset requests today. |
+| God uploads `/worlds/w/<slug>/assets/<sha>` outside the core set | yes (sha) | uncompressed (same route) | pull-through Worker (CDN4) | **On the CDN once the Worker is deployed** (`tools/cdn/worker/`). 0 of the arium's 119 asset requests today. |
 
 CDN3 (2026-10-20) re-measured the core set with Chrome's Accept-Encoding: origin 94 CC0 3,718,359 B / 477 served-public
 118,074,262 B; CDN2 (q4 on the fly) 1,612,393 / 110,899,453 B; CDN3 stored q11 1,354,633 / <= 108,086,573 B (-64% / -8.5% vs
@@ -58,7 +58,19 @@ edge ever sent br to a non-br client, the Sim client would still be correct (bro
 hash and falls back to the origin). Objects must never carry `Cache-Control: no-transform`. Details, paired numbers and
 the release-owner steps: `tools/cdn/README.md`, "Precompressed objects and `/modular`".
 
-### Design: god uploads on the CDN (not built; tell main before building an uploader)
+### God uploads on the CDN: the pull-through Worker (CDN4, 2026-10-20; built, deployed by the coordinator)
+
+Gene, 2026-10-20: "Yes: build the pull-through Cloudflare Worker for god uploads on assets.eden.art; do the Cloudflare step
+in my Chrome." Option 1 below is built: `tools/cdn/worker/god-uploads.js` on the route `assets.eden.art/w/*` with the R2
+binding `ASSETS` (bucket `eden-assets`). It serves only `/w/<slug>/assets/<sha>.<ext>` (glb/png/jpg/json), pulls a miss from
+`https://sim.eden.art/worlds/w/<slug>/assets/<sha>.<ext>` (the legacy root worlds serve no uploads), stores it under
+`w/<slug>/assets/<sha>.<ext>` only when its SHA-256 equals the path's, and refuses (no-store) mismatches, origin errors,
+oversize (32 MiB) bodies and malformed paths. The client side: a world's snapshot `assetBytes` sizes every GLB its defs
+load; a `/worlds/w/<slug>/assets/<sha>.glb` the manifest does not list is fetched from the Worker on that world's own page,
+in the page and in the asset worker, with the usual length + SHA check and origin fallback (`SIM_GOD_UPLOADS_CDN=0` at
+build or `?godcdn=0` turns it off). Deployment and proof: `tools/cdn/worker/DEPLOY.md`, `verify-worker.mjs`. Original
+design note follows.
+
 
 A god upload (`POST /v1/god/assets`) is content-addressed and, outside the core set, never has a rendition, so its URL
 sha is its content sha. Two ways:

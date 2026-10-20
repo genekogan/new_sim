@@ -22,6 +22,7 @@ import { stepSurfaceKit } from './WorldEdenSurfaceKit.ts';
 import { waterMaterial, waterMesh } from './gen-mesh/water.ts';
 import { assetUrl, loadAsset } from './gen-mesh/gltf-assets.ts';
 import { assetBytes } from './asset-bytes.ts';
+import { noteUploadSizes } from './cdn-assets.ts';
 import { eagerShas, planEager } from './gen-mesh/lazy-assets.ts';
 import { progressiveNearM } from './quality-tier.ts';
 import { arrivalOver } from './arrival-marks.ts';
@@ -104,6 +105,7 @@ export class WorldEntityLayer {
       const snap = got.snap as unknown as Snapshot; if (this.signal.aborted || snap.contract !== 'world/1') return;
       ageNow(snap, r);
       const prevGround = JSON.stringify(this.model?.ground() ?? null);
+      noteUploadSizes(snap.assetBytes);   // CDN4: god uploads may come from assets.eden.art (cdn-assets.ts)
       this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground }, undefined, undefined, { lazyIndex: true });
       this.seq = snap.seq;
       this.sites.reset(snap.builds ?? [], snap.buildsRev ?? 0, snap.now);
@@ -127,6 +129,7 @@ export class WorldEntityLayer {
     try { const got = await loadSnapshot(this.api('/v1/world/snapshot'), signal, true); onSnapshot?.(); if (!got || signal.aborted) return; const r = got.response; noteSnapshotVersion(r.headers.get('x-moderation-version')); snap = got.snap as unknown as Snapshot;
       ageNow(snap, r); } catch { onSnapshot?.(); return; }
     if (signal.aborted || snap.contract !== 'world/1') return;
+    noteUploadSizes(snap.assetBytes);   // CDN4
     this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground }, undefined, undefined, { lazyIndex: true });
     // the loading bar's total: VOCAB-MECH lazy GLBs (gen-mesh/lazy-assets.ts) — only the eager set, nearest the arrival
     // lane PERF: nearest the arrival target (entity-arrival.ts frames the centre of what was built; ?at= for shots), not the origin
