@@ -44,9 +44,11 @@ const KEEP = (env.SIM_BACKUP_KEEP || '--keep-daily 7 --keep-weekly 4 --keep-mont
 const HOST = hostname().split('.')[0];
 const STAGE_RE = /^[a-z][a-z0-9-]{0,31}$/;
 
-/** Run restic; returns stdout. Throws with restic's stderr on failure unless `ok` lists acceptable exit codes. */
+/** Run restic; returns stdout. Throws with restic's stderr on failure unless `ok` lists acceptable exit codes. Every command but
+ *  unlock waits up to an hour for a lock (production and legacy start at the same 03:30: one's prune/check holds the repo). */
 function restic(args, { repo, ok = [0], quiet = false } = {}) {
-  const r = spawnSync(BIN, [...(repo ? ['-r', repo] : []), ...args], { env, encoding: 'utf8', maxBuffer: 256 << 20 });
+  const wait = args[0] === 'unlock' ? [] : ['--retry-lock', '1h'];
+  const r = spawnSync(BIN, [...(repo ? ['-r', repo] : []), ...wait, ...args], { env, encoding: 'utf8', maxBuffer: 256 << 20 });
   if (r.error) throw new Error(`${BIN}: ${r.error.message}`);
   if (!ok.includes(r.status)) throw new Error(`restic ${args[0]} exited ${r.status}: ${(r.stderr || r.stdout).trim().split('\n').slice(-3).join(' | ')}`);
   if (!quiet && r.stderr.trim()) process.stderr.write(r.stderr);
@@ -127,13 +129,13 @@ async function runBackup(stage) {
   // 4. snapshot, retention, check
   const before = repoBytes(env.RESTIC_REPOSITORY);
   const time = env.SIM_BACKUP_TIME ? ['--time', env.SIM_BACKUP_TIME] : [];
-  const summary = restic(['backup', '--json', '--retry-lock', '1h', '--host', HOST, '--tag', stage, ...time, out]).split('\n')
+  const summary = restic(['backup', '--json', '--host', HOST, '--tag', stage, ...time, out]).split('\n')
     .map((l) => { try { return JSON.parse(l); } catch { return null; } }).find((m) => m?.message_type === 'summary');
   if (!summary?.snapshot_id) throw new Error('restic backup: no snapshot id in its summary');
-  const forget = ['forget', '--retry-lock', '1h', '--host', HOST, '--tag', stage, ...KEEP, '--prune'];
+  const forget = ['forget', '--host', HOST, '--tag', stage, ...KEEP, '--prune'];
   restic(forget, { quiet: true });
   const day = Number(new Date().getUTCDay());
-  restic(['check', '--retry-lock', '1h', '--read-data-subset', `${day + 1}/7`], { quiet: true });
+  restic(['check', '--read-data-subset', `${day + 1}/7`], { quiet: true });
   const kept = JSON.parse(restic(['snapshots', '--json', '--host', HOST, '--tag', stage], { quiet: true }) || '[]').length;
   const after = repoBytes(env.RESTIC_REPOSITORY);
 
@@ -144,7 +146,7 @@ async function runBackup(stage) {
     try {
       const inited = spawnSync(BIN, ['-r', off, 'cat', 'config'], { env, encoding: 'utf8' }).status === 0;
       if (!inited) restic(['init', ...from, '--copy-chunker-params'], { repo: off, quiet: true });
-      restic(['copy', '--retry-lock', '1h', ...from, '--host', HOST, '--tag', stage], { repo: off, quiet: true });
+      restic(['copy', ...from, '--host', HOST, '--tag', stage], { repo: off, quiet: true });
       restic(forget, { repo: off, quiet: true });
       offsite = `; offsite ${inited ? 'copied' : 'initialised + copied'}`;
     } catch (e) { failed.push(`offsite: ${e.message}`); offsite = '; offsite FAILED'; }
