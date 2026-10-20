@@ -54,7 +54,7 @@ Objects: object <ID> \xB7 mark <note|sign|offering|proposal> "Title" "Text"
 Travel: travel \xB7 travel <world on this site> \xB7 travel home (this folder follows)
 Auto mode: dashboard [--engine codex] \xB7 live [--engine codex] \xB7 cost
 While live: tell "<human request>" --wait \xB7 report
-Owner inbox: listen [--after message-id] [--timeout 25] [--once|--follow] \xB7 ack <message-id> ["short reply"]
+Owner inbox: listen (waits until your human writes, prints every waiting message; run it again after each batch) \xB7 ack <message-id> ["Got it: ..."] \xB7 result <message-id> done|failed "what happened"
 Manual session: attend 90 \xB7 act/say/converse \xB7 attend --release
 Pause with the dashboard or its pause API; STOP ends the ordinary live loop.
 Guide: SKILL.md (Start or resume; Observe, resolve, finish).
@@ -83,8 +83,16 @@ function noticeInboxHeader(headers) {
     return false;
   }
 }
-async function clientListen(args, { call: call2, sleep: sleep2 = (ms) => new Promise((resolve9) => setTimeout(resolve9, ms)), write, stop }) {
-  let seconds = 25, after, once = false, follow = false;
+var LISTEN_NEXT = 'From your human, oldest first. For each: ack <id> "Got it: <what you will do>" at once, do it, then result <id> done|failed "<what happened>". Then run listen again right away (it waits as long as needed).';
+var transient = (r) => r.status === 0 || r.status === 429 || r.status >= 500;
+function handed(data, after) {
+  if (Array.isArray(data.backlog)) return data.backlog.filter((m2) => m2 && typeof m2.id === "string" && m2.state !== "acknowledged");
+  const m = data.inbox.latest;
+  return m && m.state !== "acknowledged" && m.id !== after ? [m] : [];
+}
+var line = (m, emittedAt) => ({ id: m.id, text: m.text, sentAt: m.sentAt, emittedAt });
+async function clientListen(args, { call: call2, sleep: sleep2 = (ms) => new Promise((resolve9) => setTimeout(resolve9, ms)), write, stop, now: now2 = Date.now }) {
+  let seconds, after, once = false, follow = false;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--once") once = true;
@@ -98,14 +106,25 @@ async function clientListen(args, { call: call2, sleep: sleep2 = (ms) => new Pro
     } else throw new Error("usage: listen [--after message-id] [--timeout seconds] [--once|--follow]");
   }
   if (once && follow) throw new Error("listen takes --follow or --once, not both");
+  seconds ??= once ? 25 : 50;
   if (!Number.isFinite(seconds) || seconds < 0 || seconds > 55) throw new Error("listen --timeout takes seconds from 0 to 55");
   if (seconds === 0 && !once) throw new Error("listen --timeout 0 requires --once");
-  if (follow) return followInbox({ poll: (last) => call2(`/v1/edge/inbox/listen?${new URLSearchParams({ timeoutMs: String(Math.round(seconds * 1e3)), ...last ? { after: last } : {} })}`, { timeoutMs: Math.round(seconds * 1e3) + 1e4 }), after, wait: sleep2, write, stop });
-  const query = new URLSearchParams({ timeoutMs: String(Math.round(seconds * 1e3)), ...after ? { after } : {} });
-  for (; ; ) {
-    const response = await call2(`/v1/edge/inbox/listen?${query}`, { timeoutMs: Math.round(seconds * 1e3) + 1e4 });
-    const data = inboxResult(response, "listen"), message = data.inbox.latest;
-    if (once || message && message.state !== "acknowledged" && message.id !== after) return data;
+  const poll = (last) => call2(`/v1/edge/inbox/listen?${new URLSearchParams({ timeoutMs: String(Math.round(seconds * 1e3)), ...last ? { after: last } : {} })}`, { timeoutMs: Math.round(seconds * 1e3) + 1e4 });
+  if (follow) return followInbox({ poll, after, wait: sleep2, write, stop, now: now2 });
+  if (once) return inboxResult(await poll(after), "listen");
+  for (let delay = 0; ; ) {
+    const r = await poll(after);
+    if (transient(r)) {
+      delay = Math.min(3e4, delay ? delay * 2 : 1e3);
+      await sleep2(delay);
+      continue;
+    }
+    delay = 0;
+    const messages = handed(inboxResult(r, "listen"), after);
+    if (messages.length) {
+      const at = new Date(now2()).toISOString();
+      return { messages: messages.map((m) => line(m, at)), waiting: messages.length, next: LISTEN_NEXT };
+    }
     await sleep2(50);
   }
 }
@@ -115,26 +134,37 @@ async function clientAck(args, { call: call2 }) {
   if (reply !== void 0 && (typeof reply !== "string" || reply.length > 140)) throw new Error("ack reply must be at most 140 characters");
   return inboxResult(await call2(`/v1/edge/inbox/${encodeURIComponent(id3)}/ack`, { body: reply === void 0 ? {} : { reply } }), "ack");
 }
+async function clientResult(args, { call: call2 }) {
+  const [id3, outcome, text3] = args;
+  if (typeof id3 !== "string" || !id3.trim() || !["done", "failed"].includes(outcome) || typeof text3 !== "string" || !text3.trim() || args.length > 3) throw new Error('usage: result <message-id> done|failed "what happened, up to 140 characters"');
+  if (text3.length > 140 || /[\r\n]/.test(text3)) throw new Error("result text must be one line of at most 140 characters");
+  const r = await call2(`/v1/edge/inbox/${encodeURIComponent(id3)}/result`, { body: { text: text3, outcome } });
+  if (r.status === 404 && !r.data?.code && !r.data?.error?.code) throw new Error("result: this world does not take results yet; put the outcome in the ack reply instead");
+  return inboxResult(r, "result");
+}
 function inboxResult(response, operation) {
   if (response.status < 200 || response.status >= 300) throw new Error(`${operation}: HTTP ${response.status} ${JSON.stringify(response.data).slice(0, 300)}`);
   if (!response.data?.inbox) throw new Error(`${operation}: this world does not serve the owner inbox yet`);
   return response.data;
 }
-async function followInbox({ poll, after, write = (line) => process.stdout.write(line + "\n"), wait: wait2, stop = () => false }) {
+async function followInbox({ poll, after, write = (line2) => process.stdout.write(line2 + "\n"), wait: wait2, stop = () => false, now: now2 = Date.now }) {
   let last = after, delay = 0;
   while (!stop()) {
     const r = await poll(last);
-    if (r.status === 0 || r.status === 429 || r.status >= 500) {
+    if (transient(r)) {
       delay = Math.min(3e4, delay ? delay * 2 : 1e3);
       await wait2(delay);
       continue;
     }
     delay = 0;
-    const m = inboxResult(r, "listen").inbox.latest;
-    if (m && m.state !== "acknowledged" && m.id !== last) {
-      write(JSON.stringify({ id: m.id, text: m.text, sentAt: m.sentAt }));
-      last = m.id;
-    } else await wait2(50);
+    const messages = handed(inboxResult(r, "listen"), last).filter((m) => m.id !== last);
+    if (!messages.length) {
+      await wait2(50);
+      continue;
+    }
+    const at = new Date(now2()).toISOString();
+    for (const m of messages) write(JSON.stringify(line(m, at)));
+    last = messages.at(-1).id;
   }
 }
 
@@ -357,9 +387,9 @@ function dashboardProjection(root, { offset = 0, limit = 40 } = {}) {
   const size = existsSync(p) ? lstatSync2(p).size : 0;
   let text3 = chunk(root, "live-log.jsonl", Math.max(0, size - 131072), 131072).text;
   if (size > 131072) text3 = text3.slice(text3.indexOf("\n") + 1);
-  const rows = text3.split("\n").filter(Boolean).flatMap((line) => {
+  const rows = text3.split("\n").filter(Boolean).flatMap((line2) => {
     try {
-      const r = JSON.parse(line), row = { at: r.t ?? null };
+      const r = JSON.parse(line2), row = { at: r.t ?? null };
       for (const key of ["reason", "results", "stop", "stopReason", "queueComplete", "lease"]) if (r[key] != null) row[key] = typeof r[key] === "object" ? clean2(JSON.stringify(r[key])) : clean2(r[key]);
       if (r.modelProcess) row.modelProcess = { status: r.modelProcess.status, pid: r.modelProcess.pid };
       if (r.terminalReceive) row.terminal = clean2(JSON.stringify({ id: r.terminalReceive.receiptId, phase: r.terminalReceive.phase }));
@@ -405,10 +435,10 @@ async function startClientDashboard({ directory = process.cwd(), cli, liveArgs =
       logCarry += decoder.write(buffer.subarray(0, count2));
       let cut;
       while ((cut = logCarry.indexOf("\n")) >= 0) {
-        const line = logCarry.slice(0, cut);
+        const line2 = logCarry.slice(0, cut);
         logCarry = logCarry.slice(cut + 1);
         try {
-          const event = JSON.parse(line).modelProcess;
+          const event = JSON.parse(line2).modelProcess;
           if (!event || !Number.isSafeInteger(event.pgid) || event.pgid < 1) continue;
           if (event.status === "started") sdk.set(event.pgid, event);
           else if (["exited", "spawn-error"].includes(event.status)) sdk.delete(event.pgid);
@@ -652,9 +682,9 @@ async function clientProfile(id3, args, { call: call2, directory = process.cwd()
     method = "PATCH";
     path = "/v1/souls/" + encodeURIComponent(id3) + "/profile";
   }
-  const result = await call2(path, { as: "owner", method, body: body2 });
-  if (result.status !== 200 || result.data?.ok !== true) return refusal(result);
-  const profile2 = dto(result.data.profile, id3);
+  const result2 = await call2(path, { as: "owner", method, body: body2 });
+  if (result2.status !== 200 || result2.data?.ok !== true) return refusal(result2);
+  const profile2 = dto(result2.data.profile, id3);
   const response = { accepted: true, changed: profile2.revision !== current.revision, profile: profile2 };
   if (photoBytes) {
     const hash3 = createHash("sha256").update(photoBytes).digest("hex"), file = join3(resolve3(directory), "profile-source-" + hash3 + ".png");
@@ -824,9 +854,9 @@ function resolveSoulReferences(values, { worldId, rosters, constraints: constrai
   }
   const chosen = [];
   for (const ref of requested) {
-    const result = pick(ref);
-    if (!result.ok) return { ...result, requested };
-    chosen.push({ ...result.chosen, matchedBy: ref.id ? result.chosen.matchedBy : "name" });
+    const result2 = pick(ref);
+    if (!result2.ok) return { ...result2, requested };
+    chosen.push({ ...result2.chosen, matchedBy: ref.id ? result2.chosen.matchedBy : "name" });
   }
   if (new Set(chosen.map((c) => c.id)).size !== chosen.length) return refuse("soul.references-duplicate", "Several supplied references name the same Soul; nothing was implicitly duplicated.", requested);
   if (constraints2 !== void 0) {
@@ -992,18 +1022,18 @@ function openClientConversations({ scope, soulId, name = soulId, initial, onChan
     if (op === "decline" && g.role !== "invited" || op === "leave" && !["member", "asked"].includes(g.role)) return denied("conversation.not-current", "That operation does not match current consent state.", { conversation: id3 });
     return { allowed: true, revision };
   }
-  function response(op, request, result, { revision: beganRevision } = {}) {
-    const accepted2 = plain2(result) && (result.accepted === true || result.accepted === void 0 && result.ok === true) && result.ok !== false;
+  function response(op, request, result2, { revision: beganRevision } = {}) {
+    const accepted2 = plain2(result2) && (result2.accepted === true || result2.accepted === void 0 && result2.ok === true) && result2.ok !== false;
     if (!accepted2) {
-      const id4 = typeof result?.conversation === "string" ? result.conversation : request.conversation ?? request.id, g2 = groups.get(id4);
-      if (g2 && result?.code === "conversation.closed") {
+      const id4 = typeof result2?.conversation === "string" ? result2.conversation : request.conversation ?? request.id, g2 = groups.get(id4);
+      if (g2 && result2?.code === "conversation.closed") {
         g2.state = "closed";
         g2.attached = false;
         changed();
       }
-      return { recorded: false, accepted: false, code: result?.code ?? "conversation.refused" };
+      return { recorded: false, accepted: false, code: result2?.code ?? "conversation.refused" };
     }
-    const view2 = plain2(result.conversation) ? result.conversation : null, id3 = view2?.id ?? result.conversation ?? request.conversation ?? request.id;
+    const view2 = plain2(result2.conversation) ? result2.conversation : null, id3 = view2?.id ?? result2.conversation ?? request.conversation ?? request.id;
     if (!CV.test(id3 ?? "")) return { recorded: false, accepted: true, warning: "Accepted response lacked a canonical conversation ID." };
     const newerOwnMembership = Number.isSafeInteger(beganRevision) && (groups.get(id3)?.lastSelfMembershipRevision ?? 0) > beganRevision;
     const stale = Number.isSafeInteger(beganRevision) && beganRevision !== revision;
@@ -1015,7 +1045,7 @@ function openClientConversations({ scope, soulId, name = soulId, initial, onChan
       if (op !== "say") return { recorded: false, accepted: true, conversation: id3, warning: "Canonical roster missing; refresh owned context, no open membership invented." };
     }
     if (op === "start" && !g.topic && typeof (request.topic ?? request.text) === "string") g.topic = { text: (request.topic ?? request.text).slice(0, 200), source: request.separate ? "explicit-separate-topic" : "accepted-start-opening", untrusted: true };
-    if (op === "say" && typeof request.text === "string" && plain2(result.turn)) turn(g, { ...result.turn, from: self, text: request.text.trim() }, "accepted-own-turn");
+    if (op === "say" && typeof request.text === "string" && plain2(result2.turn)) turn(g, { ...result2.turn, from: self, text: request.text.trim() }, "accepted-own-turn");
     if ((op === "leave" || op === "decline") && !newerOwnMembership) {
       g.role = op === "leave" ? "left" : "declined";
       g.attached = false;
@@ -1199,14 +1229,14 @@ async function executeReplySteps(steps, { queue, id: id3, source: source2, repla
     return { results, again: false, retained: true };
   }
   for (const step of steps) {
-    let result;
+    let result2;
     try {
-      result = await runPublic(step);
+      result2 = await runPublic(step);
     } catch (error) {
-      result = { accepted: false, code: "local.public-error", reason: error.message, line: "error: " + String(error.message).slice(0, 200), again: true };
+      result2 = { accepted: false, code: "local.public-error", reason: error.message, line: "error: " + String(error.message).slice(0, 200), again: true };
     }
-    results.push({ operation: step.converse ? "converse:" + step.converse : step.act ?? (step.say ? "say" : "public-step"), ...result });
-    if (result.accepted !== true && result.readOnly !== true) return { results, again: true, retained: false };
+    results.push({ operation: step.converse ? "converse:" + step.converse : step.act ?? (step.say ? "say" : "public-step"), ...result2 });
+    if (result2.accepted !== true && result2.readOnly !== true) return { results, again: true, retained: false };
   }
   return { results, again: results.some((r) => r.again), retained: false };
 }
@@ -1496,9 +1526,9 @@ function openClientQueue(directory, { adapter, scope = null, now: now2 = Date.no
       save2();
       return null;
     }
-    let result;
+    let result2;
     try {
-      result = await adapter.send({ ...body2, clientRef: ref });
+      result2 = await adapter.send({ ...body2, clientRef: ref });
     } catch (error) {
       if (error.code === "local.attended" && error.requestNotSent) {
         for (const key of Object.keys(step)) delete step[key];
@@ -1511,16 +1541,16 @@ function openClientQueue(directory, { adapter, scope = null, now: now2 = Date.no
       return null;
     }
     lease();
-    if (!result?.accepted || !result.receipt?.id) {
+    if (!result2?.accepted || !result2.receipt?.id) {
       step.status = "failed";
       step.failedAt = now2();
-      step.refusalConfirmed = result?.accepted === false;
-      step.code = result?.code ?? "transport.invalid-response";
-      step.reason = result?.reason ?? "No accepted receipt";
+      step.refusalConfirmed = result2?.accepted === false;
+      step.code = result2?.code ?? "transport.invalid-response";
+      step.reason = result2?.reason ?? "No accepted receipt";
       notify("refusal", step);
       return null;
     }
-    return result.receipt;
+    return result2.receipt;
   }
   async function drive(context = {}, paused = false) {
     const pausedNow = () => paused || isPaused();
@@ -1629,9 +1659,9 @@ function openClientQueue(directory, { adapter, scope = null, now: now2 = Date.no
         save2();
         return snapshot();
       }
-      let result2;
+      let result3;
       try {
-        result2 = await adapter.runPublic(step.publicStep);
+        result3 = await adapter.runPublic(step.publicStep);
       } catch (error) {
         step.status = "blocked";
         step.reason = String(error.message).slice(0, 300);
@@ -1639,28 +1669,28 @@ function openClientQueue(directory, { adapter, scope = null, now: now2 = Date.no
         return snapshot();
       }
       lease();
-      step.result = result2;
-      if (result2?.requestNotSent && result2.acceptedMembership !== true) {
-        if (result2.accepted === false) {
+      step.result = result3;
+      if (result3?.requestNotSent && result3.acceptedMembership !== true) {
+        if (result3.accepted === false) {
           step.status = before;
           save2();
           return snapshot();
         }
         step.status = "blocked";
-        step.reason = result2.reason ?? "Prior effects are unconfirmed";
+        step.reason = result3.reason ?? "Prior effects are unconfirmed";
         notify("public-step-outcome-uncertain", step);
         return snapshot();
       }
-      if (result2?.receipt?.id) {
-        step.receiptId = result2.receipt.id;
-        step.receipt = result2.receipt;
+      if (result3?.receipt?.id) {
+        step.receiptId = result3.receipt.id;
+        step.receipt = result3.receipt;
         step.status = "running";
         save2();
         return snapshot();
       }
-      step.status = result2?.again ? "failed" : "completed";
+      step.status = result3?.again ? "failed" : "completed";
       save2();
-      if (result2?.again) {
+      if (result3?.again) {
         notify("public-step-refusal", step);
         return snapshot();
       }
@@ -1713,11 +1743,11 @@ function openClientQueue(directory, { adapter, scope = null, now: now2 = Date.no
       }
     }
     const body2 = { capability: step.act, params: step.until ? { ...step.params, seconds: step.holdProfile.seconds } : step.params ?? {} };
-    const result = await send(step, body2, "hold-" + (step.renewal ?? 0), pausedNow);
-    if (!result) return snapshot();
-    step.receiptId = result.id;
-    step.receipt = result;
-    step.status = result.phase === "waiting" ? "waiting" : "running";
+    const result2 = await send(step, body2, "hold-" + (step.renewal ?? 0), pausedNow);
+    if (!result2) return snapshot();
+    step.receiptId = result2.id;
+    step.receipt = result2;
+    step.status = result2.phase === "waiting" ? "waiting" : "running";
     state.notice = null;
     state.replaceReceiptId = null;
     save2();
@@ -1837,9 +1867,9 @@ async function readClientStream(url, { fetcher = fetch, headers = {}, signal, on
     if (controller.signal.aborted) return { status: 0, reason: reason ?? "aborted", hello, lastFrameAt };
     const decoder = new TextDecoder();
     for (; ; ) {
-      const result = await reader.read();
-      if (result.done) break;
-      buffer = (buffer + decoder.decode(result.value, { stream: true })).replace(/\r\n/g, "\n");
+      const result2 = await reader.read();
+      if (result2.done) break;
+      buffer = (buffer + decoder.decode(result2.value, { stream: true })).replace(/\r\n/g, "\n");
       if (Buffer.byteLength(buffer) > maxFrameBytes) {
         stop("frame-too-large");
         break;
@@ -1849,9 +1879,9 @@ async function readClientStream(url, { fetcher = fetch, headers = {}, signal, on
         const block = buffer.slice(0, cut);
         buffer = buffer.slice(cut + 2);
         const item = { event: "message", data: "" };
-        for (const line of block.split("\n")) {
-          if (!line || line.startsWith(":")) continue;
-          const i = line.indexOf(":"), key = i < 0 ? line : line.slice(0, i), value = i < 0 ? "" : line.slice(i + 1).replace(/^ /, "");
+        for (const line2 of block.split("\n")) {
+          if (!line2 || line2.startsWith(":")) continue;
+          const i = line2.indexOf(":"), key = i < 0 ? line2 : line2.slice(0, i), value = i < 0 ? "" : line2.slice(i + 1).replace(/^ /, "");
           if (key === "data") item.data += (item.data ? "\n" : "") + value;
           else if (key === "event") item.event = value;
           else if (key === "id") item.id = value;
@@ -1906,16 +1936,16 @@ function placeHierarchy(places) {
 }
 function currentPlaceAncestors(place, rows = {}) {
   if (typeof place !== "string" || !ID2.test(place)) return [];
-  const result = [], seen = /* @__PURE__ */ new Set();
+  const result2 = [], seen = /* @__PURE__ */ new Set();
   let id3 = place;
   while (id3 !== null && id3 !== void 0) {
-    if (!ID2.test(id3) || seen.has(id3) || result.length >= 1e3) throw Error("invalid place hierarchy");
+    if (!ID2.test(id3) || seen.has(id3) || result2.length >= 1e3) throw Error("invalid place hierarchy");
     seen.add(id3);
-    result.push(id3);
+    result2.push(id3);
     if (!Object.hasOwn(rows, id3)) break;
     id3 = rows[id3];
   }
-  return result;
+  return result2;
 }
 function recordedVisitParent(receipt2) {
   if (receipt2?.phase !== "completed") return null;
@@ -2140,11 +2170,11 @@ function codexExecBrain({ model, system, resumeId, stateless, effort, executable
           buffer += chunk2;
           let cut;
           while ((cut = buffer.indexOf("\n")) >= 0) {
-            const line = buffer.slice(0, cut);
+            const line2 = buffer.slice(0, cut);
             buffer = buffer.slice(cut + 1);
             let row;
             try {
-              row = JSON.parse(line);
+              row = JSON.parse(line2);
             } catch {
               continue;
             }
@@ -2240,8 +2270,8 @@ function timePair(anchor, targetWorldMinutes) {
   clockAt(anchor, anchor.realMs);
   return { worldMinutes: targetWorldMinutes, realMs: anchor.paused ? null : anchor.realMs + (targetWorldMinutes - anchor.worldMinutes) * anchor.realMsPerWorldMinute, paused: !!anchor.paused };
 }
-function parseWorldRoutine(line, id3) {
-  const match = /^\s*-\s*(\d{2}):(\d{2})\s+(daily|(?:mon|tue|wed|thu|fri|sat|sun)(?:,(?:mon|tue|wed|thu|fri|sat|sun))*)\s*·\s*(.+?)\s*·\s*(\d+(?:\.\d+)?m|until \d{2}:\d{2})\s*$/.exec(line);
+function parseWorldRoutine(line2, id3) {
+  const match = /^\s*-\s*(\d{2}):(\d{2})\s+(daily|(?:mon|tue|wed|thu|fri|sat|sun)(?:,(?:mon|tue|wed|thu|fri|sat|sun))*)\s*·\s*(.+?)\s*·\s*(\d+(?:\.\d+)?m|until \d{2}:\d{2})\s*$/.exec(line2);
   if (!match) throw new Error("Expected HH:MM daily|weekdays \xB7 instruction \xB7 duration or until HH:MM");
   const minute = Number(match[1]) * 60 + Number(match[2]);
   if (Number(match[1]) > 23 || Number(match[2]) > 59 || !id3) throw new Error("Invalid routine time/id");
@@ -2280,7 +2310,7 @@ function routineOccurrences({ routines, fromWorldMinutes, toWorldMinutes, epochW
 }
 
 // tools/edge-skill/client-schedule.mjs
-var id = (kind, line) => `${kind}-${createHash3("sha256").update(line.trim()).digest("hex").slice(0, 24)}`;
+var id = (kind, line2) => `${kind}-${createHash3("sha256").update(line2.trim()).digest("hex").slice(0, 24)}`;
 var offsets = { UTC: 0, Z: 0, EDT: -240, EST: -300 };
 var weekdays = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 var formatters = /* @__PURE__ */ new Map();
@@ -2321,44 +2351,44 @@ function realTimeForLocal(date, time, zone) {
 }
 function parseSchedule(markdown) {
   if (typeof markdown !== "string" || Buffer.byteLength(markdown) > 32768) throw new Error("Schedule exceeds 32 KiB");
-  const result = { routines: [], commitments: [], reviews: [] };
+  const result2 = { routines: [], commitments: [], reviews: [] };
   let section = null;
   for (const [index, raw] of markdown.split("\n").entries()) {
-    const line = raw.trim();
-    if (/^## /.test(line)) {
-      section = /^## Routines\b/.test(line) ? "routines" : /^## Commitments\b/.test(line) ? "commitments" : /^## Reviews\b/.test(line) ? "reviews" : null;
+    const line2 = raw.trim();
+    if (/^## /.test(line2)) {
+      section = /^## Routines\b/.test(line2) ? "routines" : /^## Commitments\b/.test(line2) ? "commitments" : /^## Reviews\b/.test(line2) ? "reviews" : null;
       continue;
     }
-    if (!line.startsWith("- ") || !section) continue;
-    if (result.routines.length + result.commitments.length + result.reviews.length >= 64) throw new Error("Too many schedule entries");
+    if (!line2.startsWith("- ") || !section) continue;
+    if (result2.routines.length + result2.commitments.length + result2.reviews.length >= 64) throw new Error("Too many schedule entries");
     try {
-      if (section === "routines") result.routines.push(parseWorldRoutine(line, id("routine", line)));
+      if (section === "routines") result2.routines.push(parseWorldRoutine(line2, id("routine", line2)));
       if (section === "commitments") {
-        const m = /^- (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}) (\S+) \(real\)\s*·\s*(.+?)(?:\s*·\s*(.+))?$/.exec(line);
+        const m = /^- (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}) (\S+) \(real\)\s*·\s*(.+?)(?:\s*·\s*(.+))?$/.exec(line2);
         if (!m) throw new Error("Commitment requires YYYY-MM-DD HH:MM timezone (real) \xB7 instruction");
-        result.commitments.push({ id: id("commitment", line), atRealMs: realTimeForLocal(m[1], m[2], m[3]), zone: m[3], instruction: m[4], evidence: m[5] ?? null });
+        result2.commitments.push({ id: id("commitment", line2), atRealMs: realTimeForLocal(m[1], m[2], m[3]), zone: m[3], instruction: m[4], evidence: m[5] ?? null });
       }
       if (section === "reviews") {
-        const pieces = line.slice(2).split(/\s*·\s*/);
+        const pieces = line2.slice(2).split(/\s*·\s*/);
         if (pieces.length % 2) throw new Error("Review entries require cadence \xB7 instruction pairs");
         for (let i = 0; i < pieces.length; i += 2) {
           const m = /^(daily|weekly (sun|mon|tue|wed|thu|fri|sat)) (\d{2}:\d{2}) (\S+)$/.exec(pieces[i]);
           if (!m) throw new Error("Review requires daily|weekly weekday HH:MM timezone");
           dateParts("2026-01-01", m[3]);
           realTimeForLocal("2026-01-01", m[3], m[4]);
-          if (result.routines.length + result.commitments.length + result.reviews.length >= 64) throw new Error("Too many schedule entries");
-          result.reviews.push({ id: id("review", `${pieces[i]} \xB7 ${pieces[i + 1]}`), weekday: m[2] ? weekdays.indexOf(m[2]) : null, time: m[3], zone: m[4], instruction: pieces[i + 1] });
+          if (result2.routines.length + result2.commitments.length + result2.reviews.length >= 64) throw new Error("Too many schedule entries");
+          result2.reviews.push({ id: id("review", `${pieces[i]} \xB7 ${pieces[i + 1]}`), weekday: m[2] ? weekdays.indexOf(m[2]) : null, time: m[3], zone: m[4], instruction: pieces[i + 1] });
         }
       }
     } catch (error) {
       throw new Error(`Schedule line ${index + 1}: ${error.message}`);
     }
   }
-  for (const entries of Object.values(result)) {
+  for (const entries of Object.values(result2)) {
     if (new Set(entries.map((e) => e.id)).size !== entries.length) throw new Error("Duplicate schedule entry");
     if (entries.some((e) => !e.instruction.trim() || e.instruction.length > 500)) throw new Error("Schedule instructions require 1\u2013500 characters");
   }
-  return result;
+  return result2;
 }
 function nextReview(review, afterRealMs) {
   if (!Number.isFinite(afterRealMs)) throw new Error("Invalid real clock");
@@ -2499,13 +2529,13 @@ function openClientLiving(directory, { scope, queue, adapter = {}, now: now2 = D
     const real = now2(), q = queue.snapshot();
     for (const r of Object.values(state.reminders)) {
       if (!r.cancelPending || r.cancelRetryAt > real) continue;
-      let result;
+      let result2;
       try {
-        result = await adapter.cancelReminder?.(r.id);
+        result2 = await adapter.cancelReminder?.(r.id);
       } catch {
       }
-      if (result?.cancelled || result?.alreadyDelivered) {
-        r.status = result.alreadyDelivered ? "delivered" : "cancelled";
+      if (result2?.cancelled || result2?.alreadyDelivered) {
+        r.status = result2.alreadyDelivered ? "delivered" : "cancelled";
         r.cancelPending = false;
         event("reminder-cancelled", { id: r.id, status: r.status });
       } else r.cancelRetryAt = real + 6e4;
@@ -2989,9 +3019,9 @@ function validateRemember(input) {
   const selector = selectors[0];
   keys(input, ["id", "at", selector, ...selector === "self" ? [] : selector === "goal" ? ["note", "horizon", "metric", "next"] : ["note"]]);
   if (selector === "self") {
-    list(input.self, 20).forEach((line) => {
-      text2(line, 200);
-      if (/[\r\n]/.test(line)) fail2("self entries must be single lines");
+    list(input.self, 20).forEach((line2) => {
+      text2(line2, 200);
+      if (/[\r\n]/.test(line2)) fail2("self entries must be single lines");
     });
   } else {
     id2(input[selector]);
@@ -3290,9 +3320,9 @@ Confirmed physical meetings ${p.meetings.length}
   if (existsSync6(log)) {
     const raw = readFileSync6(safe4(log), "utf8");
     if (raw && !raw.endsWith("\n")) fail2("incomplete machine log; preserve for review");
-    for (const line of raw.split("\n").filter(Boolean)) {
-      if (Buffer.byteLength(line) > MAX_RECORD + 100) fail2("machine log record too large");
-      const r = JSON.parse(line);
+    for (const line2 of raw.split("\n").filter(Boolean)) {
+      if (Buffer.byteLength(line2) > MAX_RECORD + 100) fail2("machine log record too large");
+      const r = JSON.parse(line2);
       keys(r, ["version", "kind", "value"]);
       if (r.version !== VERSION || !["event", "remember"].includes(r.kind)) fail2("unsupported machine log");
       const normalized = r.kind === "event" ? validateEvent(r.value) : validateRemember(r.value);
@@ -3315,10 +3345,10 @@ Confirmed physical meetings ${p.meetings.length}
     let used = Buffer.byteLength(lines[0]), kept = 0;
     for (const e of reading) {
       if (kept === 2) break;
-      const line = JSON.stringify({ receiptId: e.receiptId, at: e.at, capability: e.act, phase: e.phase, summary: e.summary, placeId: e.placeId ?? null, untrusted: e.untrusted, learnedSources: e.learned.slice(0, 2).map((f) => ({ source: f.source, provenance: f.provenance, untrusted: f.untrusted, factExcerpt: f.fact.length > 300 ? f.fact.slice(0, 299) + "\u2026" : f.fact })) });
-      if (used + Buffer.byteLength(line) + 1 > 2400) continue;
-      lines.push(line);
-      used += Buffer.byteLength(line) + 1;
+      const line2 = JSON.stringify({ receiptId: e.receiptId, at: e.at, capability: e.act, phase: e.phase, summary: e.summary, placeId: e.placeId ?? null, untrusted: e.untrusted, learnedSources: e.learned.slice(0, 2).map((f) => ({ source: f.source, provenance: f.provenance, untrusted: f.untrusted, factExcerpt: f.fact.length > 300 ? f.fact.slice(0, 299) + "\u2026" : f.fact })) });
+      if (used + Buffer.byteLength(line2) + 1 > 2400) continue;
+      lines.push(line2);
+      used += Buffer.byteLength(line2) + 1;
       kept++;
     }
     if (!kept) lines.push("No completed reading receipt fits this compact view. This is not proof no reading exists.");
@@ -3628,7 +3658,7 @@ async function travelCommand(args, { load: load2, save: save2, live: live2 = () 
 }
 
 // tools/edge-skill/eden-agent.mjs
-var SKILL_VERSION = "1.9.4";
+var SKILL_VERSION = "1.9.5";
 var CONTRACT = "eden-edge/1";
 var API_CONTRACT = "eden-edge/1.1";
 var STATE = ".eden-agent.json";
@@ -4778,10 +4808,10 @@ function claudeBrain({ model, system, resumeId, stateless, effort }) {
     const p = proc, epoch = ++generation, logger = telemetry;
     logger?.({ modelProcess: { pid: p.pid, pgid: process.platform === "win32" ? null : p.pid, generation: epoch, session: id3, status: "started" } });
     p.once("close", (code, signal) => logger?.({ modelProcess: { pid: p.pid, pgid: process.platform === "win32" ? null : p.pid, generation: epoch, session: id3, status: "exited", code, signal } }));
-    lineReader(p.stdout, (line) => {
+    lineReader(p.stdout, (line2) => {
       let e;
       try {
-        e = JSON.parse(line);
+        e = JSON.parse(line2);
       } catch {
         return;
       }
@@ -5050,8 +5080,8 @@ async function live(...argv) {
     } catch {
     }
   });
-  const rememberResult = (result) => {
-    const recorded = { at: now(), operation: String(result.operation ?? "public").slice(0, 160), accepted: typeof result.accepted === "boolean" ? result.accepted : null, readOnly: result.readOnly === true, followupRequested: result.followupRequested === true, code: typeof result.code === "string" ? result.code.slice(0, 100) : null, reason: typeof result.reason === "string" ? result.reason.slice(0, 240) : null, receiptId: result.receiptId ?? result.receipt?.id ?? null, queueRetained: result.queueRetained === true, line: String(result.line ?? "").slice(0, 400) };
+  const rememberResult = (result2) => {
+    const recorded = { at: now(), operation: String(result2.operation ?? "public").slice(0, 160), accepted: typeof result2.accepted === "boolean" ? result2.accepted : null, readOnly: result2.readOnly === true, followupRequested: result2.followupRequested === true, code: typeof result2.code === "string" ? result2.code.slice(0, 100) : null, reason: typeof result2.reason === "string" ? result2.reason.slice(0, 240) : null, receiptId: result2.receiptId ?? result2.receipt?.id ?? null, queueRetained: result2.queueRetained === true, line: String(result2.line ?? "").slice(0, 400) };
     S.publicResults.push(recorded);
     S.publicResults = S.publicResults.slice(-8);
     saveS();
@@ -5064,9 +5094,9 @@ async function live(...argv) {
     saveS();
   } });
   const localResult = (operation, accepted2, reason, selector) => {
-    const result = localOperations.record({ operation, accepted: accepted2, reason, selector });
-    logLive({ localOperationResult: result });
-    return result;
+    const result2 = localOperations.record({ operation, accepted: accepted2, reason, selector });
+    logLive({ localOperationResult: result2 });
+    return result2;
   };
   const projectionProblem = (channel, error, extra = {}) => {
     const problem = { at: now(), channel, error: clip(error.message, 240), ...extra };
@@ -5202,15 +5232,15 @@ async function live(...argv) {
     adapter: {
       async runPublic(step) {
         receiptReads.invalidateNonterminal();
-        const result = await runStep(step);
-        if (result.readOnly === true) {
-          result.followupRequested = result.again === true;
-          result.again = false;
-        } else if (result.accepted !== true) result.again = true;
-        rememberResult({ operation: step.converse ? "converse:" + step.converse : step.act ?? (step.say ? "say" : "public-step"), ...result });
-        logLive({ publicVerdict: { operation: step.converse ?? step.act ?? "public", accepted: result.accepted ?? null, code: result.code ?? null, reason: result.reason ?? null } });
-        if (result?.receipt?.id && !stopping) receiptReads.track(result.receipt.id);
-        return result;
+        const result2 = await runStep(step);
+        if (result2.readOnly === true) {
+          result2.followupRequested = result2.again === true;
+          result2.again = false;
+        } else if (result2.accepted !== true) result2.again = true;
+        rememberResult({ operation: step.converse ? "converse:" + step.converse : step.act ?? (step.say ? "say" : "public-step"), ...result2 });
+        logLive({ publicVerdict: { operation: step.converse ?? step.act ?? "public", accepted: result2.accepted ?? null, code: result2.code ?? null, reason: result2.reason ?? null } });
+        if (result2?.receipt?.id && !stopping) receiptReads.track(result2.receipt.id);
+        return result2;
       },
       async send(body2) {
         receiptReads.invalidateNonterminal();
@@ -5627,9 +5657,9 @@ async function live(...argv) {
       pending.push({ kind: "queue.refusal", text: error.message, _rx: Date.now() });
     }
     const results = [], localOwnerResults = [];
-    const localOwnerResult = (operation, accepted2, line) => {
-      localOwnerResults.push({ operation, accepted: accepted2, line });
-      results.push(line);
+    const localOwnerResult = (operation, accepted2, line2) => {
+      localOwnerResults.push({ operation, accepted: accepted2, line: line2 });
+      results.push(line2);
     };
     let follow = false;
     if (reviewTask?.compile && steps.length) {
@@ -5652,9 +5682,9 @@ async function live(...argv) {
     const identityOwner = own ?? later ?? S.identityGoal;
     const identity = await qualifyIdentitySteps(steps, identityOwner?.text ?? "", identityOwner?.id ?? identityOwner?.ownerRequestId ?? null);
     const execution = identity.ok ? await executeReplySteps(identity.steps, { queue: bodyQueue, id: own?.id ?? "wake-" + randomUUID4(), source: own ? "owner" : "mind", force: own?.force === true, replace: !!own || bodyQueue.snapshot().steps.some((s2) => ["failed", "interrupted", "blocked"].includes(s2.status)), pump: () => bodyQueue.pump(queueContext(), leaseHeld()), runPublic: runStep }) : { results: [{ operation: "identity-preflight", accepted: false, code: identity.code, reason: identity.reason, line: `refused ${identity.code}: ${identity.reason}` }], again: true, retained: false };
-    for (const result of execution.results) {
-      rememberResult(result);
-      results.push(result.line);
+    for (const result2 of execution.results) {
+      rememberResult(result2);
+      results.push(result2.line);
     }
     follow = execution.again;
     if (S.identityGoal && execution.results.some((r) => r.accepted == null && r.readOnly !== true && r.queueRetained !== true)) {
@@ -5726,7 +5756,7 @@ async function live(...argv) {
     }
     if (reviewTask && !reviewTask.compile) cadences.completeReview(reviewTask);
     if (typeof plan2.notes === "string" && plan2.notes.trim()) try {
-      clientMemory.remember({ self: plan2.notes.trim().split("\n").slice(0, 20).map((line) => line.slice(0, 200)) });
+      clientMemory.remember({ self: plan2.notes.trim().split("\n").slice(0, 20).map((line2) => line2.slice(0, 200)) });
     } catch (error) {
       logLive({ memoryProblem: error.message });
     }
@@ -5811,36 +5841,36 @@ async function live(...argv) {
         return { ok: false, code: "soul.scope-unavailable", reason: "Actual world identity is absent from legacy boot; new exact-name binding is unqualified. Wait/clarify or use an explicit canonical ID through the unchanged manual API." };
       }
       const resolveRefs = (values) => identityEvidence.resolve(values);
-      let result = bindLiveSoulReferences(refs2, { ownerText, identityBasis: st.identityBasis, resolve: resolveRefs, social: socialIdentityStep(st), nearby: lastHere?.near ?? [], selfName: persona.name });
-      if (!result.ok && /unavailable|not-found|unknown/.test(result.code ?? "") && identityEvidence.refreshDue()) {
+      let result2 = bindLiveSoulReferences(refs2, { ownerText, identityBasis: st.identityBasis, resolve: resolveRefs, social: socialIdentityStep(st), nearby: lastHere?.near ?? [], selfName: persona.name });
+      if (!result2.ok && /unavailable|not-found|unknown/.test(result2.code ?? "") && identityEvidence.refreshDue()) {
         try {
           await identityEvidence.refresh();
-          result = bindLiveSoulReferences(refs2, { ownerText, identityBasis: st.identityBasis, resolve: resolveRefs, social: socialIdentityStep(st), nearby: lastHere?.near ?? [], selfName: persona.name });
+          result2 = bindLiveSoulReferences(refs2, { ownerText, identityBasis: st.identityBasis, resolve: resolveRefs, social: socialIdentityStep(st), nearby: lastHere?.near ?? [], selfName: persona.name });
         } catch (error) {
           logLive({ identityRefresh: { error: clip(error.message, 160) } });
         }
       }
-      const evidence = { at: now(), ownerRequestId: ownerId, operation: st.converse ?? st.act, ok: result.ok, code: result.code ?? null, reason: result.reason ?? null, basis: result.basis ?? null, worldId, rosterNote: "Identity evidence only; proximity and action admission remain server-owned.", requested: (Array.isArray(result.requested ?? refs2) ? result.requested ?? refs2 : [result.requested ?? refs2]).slice(0, 8).map((r) => typeof r === "string" ? r.slice(0, 200) : { ...typeof r?.id === "string" ? { id: r.id.slice(0, 110) } : {}, ...typeof r?.name === "string" ? { name: r.name.slice(0, 200) } : {} }), chosen: result.chosen ?? [] };
+      const evidence = { at: now(), ownerRequestId: ownerId, operation: st.converse ?? st.act, ok: result2.ok, code: result2.code ?? null, reason: result2.reason ?? null, basis: result2.basis ?? null, worldId, rosterNote: "Identity evidence only; proximity and action admission remain server-owned.", requested: (Array.isArray(result2.requested ?? refs2) ? result2.requested ?? refs2 : [result2.requested ?? refs2]).slice(0, 8).map((r) => typeof r === "string" ? r.slice(0, 200) : { ...typeof r?.id === "string" ? { id: r.id.slice(0, 110) } : {}, ...typeof r?.name === "string" ? { name: r.name.slice(0, 200) } : {} }), chosen: result2.chosen ?? [] };
       S.identitySelections.push(evidence);
       S.identitySelections = S.identitySelections.slice(-6);
       saveS();
       logLive({ identityVerdict: evidence });
-      if (!result.ok) return result;
-      if (createdGoal && ["literal-generic-choice", "nearby-social-choice"].includes(result.basis)) {
+      if (!result2.ok) return result2;
+      if (createdGoal && ["literal-generic-choice", "nearby-social-choice"].includes(result2.basis)) {
         S.identityGoal = null;
         saveS();
         createdGoal = false;
       }
-      if (st.converse === "start") qualified.push({ ...st, with: result.chosen.map((x) => x.id) });
+      if (st.converse === "start") qualified.push({ ...st, with: result2.chosen.map((x) => x.id) });
       else {
         if (participantRefs !== void 0) {
-          qualified.push({ ...st, params: { ...st.params, with: Array.isArray(participantRefs) ? result.chosen.map((x) => x.id) : result.chosen[0]?.id } });
+          qualified.push({ ...st, params: { ...st.params, with: Array.isArray(participantRefs) ? result2.chosen.map((x) => x.id) : result2.chosen[0]?.id } });
           continue;
         }
         if (!st.act) return { ok: false, code: "identity.body-action-required", reason: "An explicit body target must accompany a body action." };
-        if (result.chosen.length !== 1) return { ok: false, code: "identity.single-body-target", reason: "A body target needs exactly one identified Soul." };
+        if (result2.chosen.length !== 1) return { ok: false, code: "identity.single-body-target", reason: "A body target needs exactly one identified Soul." };
         const prefix = st.act.includes(":") ? st.act.slice(0, st.act.lastIndexOf(":")) : st.act;
-        qualified.push({ ...st, act: prefix + ":" + result.chosen[0].id });
+        qualified.push({ ...st, act: prefix + ":" + result2.chosen[0].id });
       }
     }
     return { ok: true, steps: qualified };
@@ -6384,11 +6414,14 @@ async function listen(...args) {
 async function ack(...args) {
   return clientAck(args, { call });
 }
+async function result(...args) {
+  return clientResult(args, { call });
+}
 async function look(what, ...rest) {
   if (what !== "around") throw new Error("usage: look around [--full]   (a body action: act look <target>; your appearance: body look)");
   return explore(...rest);
 }
-var commands = { look, listen, ack, body, travel, live, dashboard, profile, tell, report, view, cost, plan, events, attend, register, status, approval, "pair-soul": pairSoul, "select-soul": selectSoul, "create-soul": createSoul, here, observe, capabilities, map, digest, calendar, whatson, explore, act, resolve: resolveAct, say, converse, object, mark, project, wait, receipt, accept, decline, version: async () => ({ skillVersion: SKILL_VERSION, contract: CONTRACT, apiContract: API_CONTRACT }) };
+var commands = { look, listen, ack, result, body, travel, live, dashboard, profile, tell, report, view, cost, plan, events, attend, register, status, approval, "pair-soul": pairSoul, "select-soul": selectSoul, "create-soul": createSoul, here, observe, capabilities, map, digest, calendar, whatson, explore, act, resolve: resolveAct, say, converse, object, mark, project, wait, receipt, accept, decline, version: async () => ({ skillVersion: SKILL_VERSION, contract: CONTRACT, apiContract: API_CONTRACT }) };
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync2(process.argv[1])).href) {
   const [cmd, ...args] = process.argv.slice(2);
   if (!cmd || ["help", "--help", "-h"].includes(cmd)) {
@@ -6451,6 +6484,7 @@ export {
   register,
   report,
   resolveAct,
+  result,
   rewrite,
   say,
   searchTerms,
