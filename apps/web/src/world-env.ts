@@ -23,6 +23,12 @@ export function calendarClock(clock: string | null, state: unknown): string | nu
   if (!clock || typeof cal !== 'string' || !/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(cal) || !/^\d{4}-\d{2}-\d{2}T/.test(clock)) return clock;
   return `${clock.slice(0, 5)}${cal}${clock.slice(10)}`;
 }
+/** P7d: the world's clock when the server sent this page (apps/server/src/edge-snapshot.ts withWorldClock), as the naive
+ *  local datetime the sky takes (a take's clock goes through shiftIso: no zone; the sun's position is NaN with one), or null. */
+export function entryWorldClock(): string | null {
+  const c = typeof window === 'undefined' ? null : (window as unknown as { __simWorldClock?: unknown }).__simWorldClock;
+  return typeof c === 'string' ? c.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?/)?.[0] ?? null : null;
+}
 export function shotClockAt(clock: string | null, hour: number | null): string | null {
   if (hour === null || !clock || !Number.isInteger(hour) || hour < 0 || hour >= 1440 || !/^\d{4}-\d{2}-\d{2}T/.test(clock)) return clock;
   return `${clock.slice(0, 10)}T${String(Math.floor(hour / 60)).padStart(2, '0')}:${String(hour % 60).padStart(2, '0')}:00`;

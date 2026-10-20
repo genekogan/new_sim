@@ -11,7 +11,7 @@ import { ApiError } from './souls.ts';
 import { GodMode } from './god/god.ts';
 import { mountGodRoutes } from './god/routes.ts';
 import { mountModeration } from './moderation/routes.ts';
-import { EDGE_SNAPSHOT_CACHE, SNAPSHOT_KEY_HEADER, mountEdgeSnapshot, safeKey, snapshotKey, withSnapshotKey } from './edge-snapshot.ts';
+import { EDGE_SNAPSHOT_CACHE, SNAPSHOT_KEY_HEADER, mountEdgeSnapshot, safeKey, snapshotKey, withSnapshotKey, withWorldClock } from './edge-snapshot.ts';
 
 /** The http.ts wiring in miniature: moderation first, then the edge snapshot, then the god routes. */
 function world(t: { after(f: () => void): void }) {
@@ -79,4 +79,11 @@ test('the page HTML carries the key first thing in <head>; no key leaves it unto
   const a = 'a'.repeat(32), b = 'b'.repeat(32);
   assert.ok(withSnapshotKey(html, '12.0.0.0', { defs: a, ground: b }).includes(`<script>window.__simSnapshotKey="12.0.0.0";window.__simSnapshotParts=["${a}","${b}"]</script>`), 'P7: the parts ride with the key');
   assert.ok(!withSnapshotKey(html, '12.0.0.0', { defs: '</script>', ground: b }).includes('__simSnapshotParts'), 'only well-formed refs');
+});
+
+test("P7d: the page HTML carries the world's clock for the phone's early poster; anything but an ISO time leaves it untouched", () => {
+  const html = '<!doctype html><html><head><title>Sim</title></head><body></body></html>';
+  assert.ok(withWorldClock(html, '2026-03-04T21:15:00.000Z').includes('<head><script>window.__simWorldClock="2026-03-04T21:15:00.000Z"</script><title>'));
+  for (const bad of [null, 12, '', 'now', '2026-03-04T21:15:00Z"</script><script>x()', '2026-03-04']) assert.equal(withWorldClock(html, bad), html);
+  assert.equal(withWorldClock('<p>no head</p>', '2026-03-04T21:15:00Z'), '<p>no head</p>');
 });

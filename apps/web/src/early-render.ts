@@ -11,7 +11,7 @@ import { createWorldAtmosphere } from './WorldAtmosphere.ts';
 import { installLookToneCurve, installMaterialDetail, lookExposure, lookSettings, setMaterialDetail } from './rendering/WorldLook.ts';
 import { browserQuality } from './quality-tier.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
-import { entityWorldState, setWeatherOf, shotClockAt } from './world-env.ts';
+import { calendarClock, entityWorldState, entryWorldClock, setWeatherOf, shotClockAt } from './world-env.ts';
 import { visitorPreviewHour } from './visitor-hour.ts';
 import { arrivalGate } from './gen-mesh/lazy-assets.ts';
 import { compileSceneAsync } from './gen-mesh/texture-budget.ts';
@@ -75,12 +75,18 @@ function arrive(early: EarlyLayer, made: NonNullable<Made>, done: () => void) {
   arrivalMark('early-render-built');
   const target = new THREE.Vector3().fromArray(pose.target);
   camera.position.fromArray(pose.eye); camera.lookAt(target);
-  // a frame as LiveWorld's first on this path: things at their stored pose, the pre-clock sky, the god's weather
+  // the world's clock as the page's HTML gave it (the server writes it; apps/server/src/edge-snapshot.ts withWorldClock): the
+  // sky, sun and night fill as LiveWorld's first take will set them, instead of the no-clock midday it then jumped from
+  let clock = calendarClock(entryWorldClock(), entityWorldState(layer));
+  if (clock) { light.setNightLighting(true); light.update(shotClockAt(clock, visitorPreviewHour()));
+    if (!Number.isFinite(light.daylight)) { clock = null; light.setNightLighting(false); light.update(null); } }   // a clock the sun cannot place: midday, never a black poster
+  hand.clock = clock;
+  // a frame as LiveWorld's first on this path: things at their stored pose, the world's clock, the god's weather
   const prepare = () => {
     layer.interiorFrom = camera.position; layer.freezeSettled = quality.tier === 'phone';
     layer.update(0, performance.now());
     atmosphere.update({ seconds: 0, dt: 0, daylight: light.daylight, camera, eden: true, reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
-      clock: shotClockAt(null, visitorPreviewHour()), profile: 'world', weather: setWeatherOf(entityWorldState(layer)), indoors: () => false });
+      clock: shotClockAt(clock, visitorPreviewHour()), profile: 'world', weather: setWeatherOf(entityWorldState(layer)), indoors: () => false });
     if (look.enabled) { if (look.follow) light.follow(target, camera.position); renderer.toneMappingExposure = lookExposure(light.daylight, look.nightExposure); }
   };
   const draw = () => {
