@@ -334,8 +334,9 @@ export class GroundNav {
     return t;
   }
 
-  /** A tile's relevant obstacles and content key for an (never mutated) obstacle list, memoised per list. */
-  private tileEntry(tx: number, tz: number, obstacles: Obstacle[]): { rel: Obstacle[]; key: string } {
+  /** A tile's relevant obstacles and content key for an (never mutated) obstacle list, memoised per list (also read by
+   *  the connectivity audit, connectivity.ts, to relabel only the tiles whose content changed). */
+  tileEntry(tx: number, tz: number, obstacles: Obstacle[]): { rel: Obstacle[]; key: string } {
     let known = this.tileKeys.get(obstacles);
     if (!known) this.tileKeys.set(obstacles, (known = new Map()));
     const k = `${this.field.id}|${obstacles.length}|${tx},${tz}`;

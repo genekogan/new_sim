@@ -71,6 +71,7 @@ import { listTable, stableIndices, withEntityList, type EntityTable } from '../.
 import { CATALOG, HUMAN_RADIUS } from '../../../mars/viewer/engine/world/catalog.ts';
 import { HUMAN_PROFILE as HUMAN_PROFILE_V1 } from '../../../mars/viewer/engine/spatial/types.ts';
 import type { Spatial } from '../../../mars/viewer/engine/spatial/service.ts';
+import { NavConnectivity, NAV_CONNECT_POLICY, CONNECT_CLEAR, type ConnPoint, type ConnVerdict } from '../../../mars/viewer/engine/spatial/connectivity.ts';
 // L1: Object.values(entities)'s list, ~2.7x cheaper on a big world's dictionary-mode object (fresh array each call)
 import { listEntities } from '../../../mars/viewer/engine/world/entity-list.ts';
 import type {NativeBoatControlsV1} from '@sim/engine-contract';
@@ -1832,6 +1833,36 @@ export class MarsEngine implements Engine {
   groundBoundsV1():[number,number,number,number]{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);return [...spatial.scene.bounds] as [number,number,number,number];}
   /** nav read: the navigation epoch after syncing (moves exactly when the static world the planner sees changes). */
   navEpochV1():number{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);return spatial.epoch;}
+  /** lane NAV (nav-connect/1, connectivity.ts): the world's level-0 connectivity, relabelled for what changed since the last
+   *  read (only the edited ground tiles on a ground world). The main area is the one holding the arrival point. Pure read. */
+  private conn?:NavConnectivity;
+  connectivityV1():NavConnectivity{
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);
+    if(!this.conn||this.conn.spatial!==spatial)this.conn=new NavConnectivity(spatial,{anchors:()=>[this.rt.world.groundV1?groundArrival(this.rt,this.cfg.arrival):this.cfg.arrival]});
+    this.conn.update();return this.conn;
+  }
+  /** lane NAV: is each standing point connected to the main walkable area (levels and stairs as the planner sees them)?
+   *  Points off the main component, and upper floors, are settled by the planner (reachV1 to the nearest main point). */
+  navCheckV1(points:ConnPoint[]):ConnVerdict[]{const c=this.connectivityV1();return this.readPassV1(()=>c.check(points,(a,b)=>this.reachV1(a,b).ok));}
+  /** lane NAV: the nearest point of the main walkable area to p with room to stand, away from other bodies (rescue target). */
+  navNearestMainV1(p:[number,number],except?:string,maxR=40):[number,number]|null{
+    const c=this.connectivityV1(),people=listEntities(this.ents).filter((o:any)=>o.kind==='human'&&o.id!==except&&(o.human?.level??0)===0).map((o:any)=>[o.pose.p[0],o.pose.p[2]] as [number,number]);
+    return c.nearestMain(p,maxR,undefined,(q)=>people.some(([x,z])=>hypot(x-q[0],z-q[1])<.8));
+  }
+  /** lane NAV: what the engine itself offers as destinations — every seat and berth's standing approach, and a standing
+   *  spot inside each place region (the one nearest its centre that is on the main area, else its centre) — for the audit. */
+  navTargetsV1():(ConnPoint&{kind:'seat'|'berth'|'region';of:string})[]{
+    const out:(ConnPoint&{kind:'seat'|'berth'|'region';of:string})[]=[],w=this.rt.world,c=this.connectivityV1();
+    for(const id of Object.keys(w.entities).sort()){const e=w.entities[id];if(e.kind!=='fixture')continue;
+      for(const slot of fixtureSlots(this.rt,e)){if(slot.kind!=='seat'&&slot.kind!=='berth')continue;const a=seatApproach(this.rt,slot);if(!Array.isArray(a))continue;out.push({id:slot.id,of:id,kind:slot.kind,p:[a[0],a[1]],level:slot.level??0,tol:.5});}}
+    for(const id of Object.keys(w.regions).sort()){const r=w.regions[id];if(r.kind==='no-go'||!r.polygon?.length)continue;
+      const xs=r.polygon.map((v:any)=>v[0]),zs=r.polygon.map((v:any)=>v[1]),ctr=centroid(r.polygon) as [number,number];let best:[number,number]|null=null,bd=Infinity;
+      for(let x=Math.min(...xs)+.5;x<Math.max(...xs);x+=1)for(let z=Math.min(...zs)+.5;z<Math.max(...zs);z+=1){if(!inPoly(x,z,r.polygon))continue;const d=hypot(x-ctr[0],z-ctr[1]);if(d<bd&&c.rootAt([x,z])===c.main){best=[x,z];bd=d;}}
+      out.push({id,of:id,kind:'region',p:best??ctr,level:0,tol:.5});}
+    return out;
+  }
+  /** lane NAV: the audit's policy id and passable clearance (reports). */
+  navPolicyV1(){return {policy:NAV_CONNECT_POLICY,clear:CONNECT_CLEAR};}
   /** nav/1 read: clearance (m) of level-0 standing ground at a point (0 off ground or inside a solid). */
   clearanceAtV1(x:number,z:number,level=0):number{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const clear=spatial.clearanceReader(level,[x,z]);return clear?clear([x,z]):0;}
   /** nav read (L1): clearanceAtV1 capped at `cap` — the same value below it, `cap` at or above it — answered off the paged
