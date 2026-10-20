@@ -39,6 +39,8 @@ const publicStats = (st: ServerStats): ServerStats => ({ ...st, brain: { mode: s
 const MAX_BUFFERED = 1_000_000;
 /** Longest the world clock waits for a join set (lane P5); under the frame loop's 1 s elapsed cap, so no world time is lost. */
 const JOIN_HOLD_MS = 750, JOIN_HOLD_REST_MS = 2_000;
+/** A world's stop waits this long for its sockets to finish the close handshake, then cuts the rest (Hub.closeClients). */
+export const CLOSE_GRACE_MS = 500;
 
 /** Live viewers never read a take's static physics (entityPhysicsV1: every building's floors, walls and stairs; they
  *  draw geometry from /v1/scene). On a built world it is ~3 MB of JSON per one-second chunk (Eden 2026), so the live
@@ -68,6 +70,8 @@ export class Hub {
   /** Other WebSocket endpoints on this server (EVENTS-v1 /v1/edge/events/ws); each returns true when it took the upgrade. */
   upgradeHandlers: ((req: import('node:http').IncomingMessage, socket: import('node:stream').Duplex, head: Buffer) => boolean)[] = [];
   clients = new Set<Client>();
+  /** Every upgraded socket on this server (viewers and other WebSocket endpoints) until it is closed. */
+  private upgraded = new Set<import('node:stream').Duplex>();
   brain!: Brain;
   startedAt = Date.now();
   /** Changes with every start of the process: a client may resume only from batches this process sent. */
@@ -96,6 +100,7 @@ export class Hub {
     }
     this.wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024, perMessageDeflate: {threshold: 1024, clientNoContextTakeover: true, serverNoContextTakeover: true, concurrencyLimit: 4} });
     server.on('upgrade', (req, socket, head) => {
+      this.upgraded.add(socket); socket.once('close', () => this.upgraded.delete(socket));
       if (!req.url?.startsWith('/ws')) { for (const h of this.upgradeHandlers) { try { if (h(req, socket, head)) return; } catch { /* a handler fault falls through */ } } socket.destroy(); return; }
       this.wss.handleUpgrade(req, socket, head, (ws) => this.onConnect(ws, req));
     });
@@ -366,6 +371,22 @@ export class Hub {
   /** Model calls go to admins, and to the owner of the Soul a call is about. World-level calls (narrator, director) are admin only. */
   brainCall(call: BrainCall) { this.broadcast({ t: 'brain', calls: [call] }, (c) => !!c.me && (c.me.role === 'admin' || (!!call.soulId && c.me.souls.includes(call.soulId)))); }
   refreshMe(userId: string) { for (const c of this.clients) if ((c.authUserId===undefined?c.me?.userId:c.authUserId) === userId) { if(this.lifecycleSouls)this.refreshAuthority(c);else{const u = this.db.user(userId); if (u) c.me = this.auth.me(u);} } }
+
+  /** A world's stop (lane MEM3): every viewer gets a 1001 close, and any upgraded socket (viewer or edge event stream) still
+   *  open graceMs later is cut. A peer that never answers the close (a frozen or background tab, a phone asleep or off the
+   *  network, a dead path behind the proxy) otherwise held server.close() and wss.close() for ws's 30 s close timeout, past
+   *  the launcher's 10 s SIGKILL: no stop snapshot, a 10 s handover pause (legacy /w/eden at 3.53 and 3.57). Resolves when
+   *  every socket is closed. */
+  closeClients(reason: string, graceMs = CLOSE_GRACE_MS): Promise<void> {
+    for (const ws of this.wss.clients) ws.close(1001, reason);
+    const open = [...this.upgraded].filter((s) => !s.destroyed);
+    if (!open.length) return Promise.resolve();
+    return new Promise((done) => {
+      let left = open.length;
+      const cut = setTimeout(() => { for (const s of open) s.destroy(); }, graceMs);
+      for (const s of open) s.once('close', () => { if (--left === 0) { clearTimeout(cut); done(); } });
+    });
+  }
 
   private sweep() {
     for (const c of this.clients) { if (!c.alive) { c.ws.terminate(); this.clients.delete(c); continue; } c.alive = false; try { c.ws.ping(); } catch { /* closed */ } }

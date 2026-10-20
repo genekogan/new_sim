@@ -166,7 +166,7 @@ export async function openWorldServer({input,dataDir,worldKey,worldId,port,build
   });
   await new Promise((yes,no)=>{server.once('error',no);server.listen(port,'127.0.0.1',yes);});host.start();void (async()=>{try{const {legacyLookBootHook}=await load('apps/server/src/edge/body/migrate-looks.ts');await legacyLookBootHook(host,db,edge,dataDir,process.env,m=>console.error(m));}catch(e){console.error('[legacy-looks] failed:',e?.message??e);}try{const {retireResidentsBootHook}=await load('apps/server/src/retire-residents.ts');await retireResidentsBootHook(souls,db,host.worldId,dataDir,process.env,m=>console.error(m));}catch(e){console.error('[retire-residents] failed:',e?.message??e);}})(); // one-shot <dataDir>/legacy-looks.env (looks v2), <dataDir>/retire-residents.env (3.1.1)
   async function close(){
-   if(closing)return;closing=true;brain.quiesce();host.stop();edge.comms?.close();for(const c of hub.clients)c.ws.close(1001,'local world stopping');
+   if(closing)return;closing=true;brain.quiesce();host.stop();edge.comms?.close();void hub.closeClients('local world stopping');
    const closed=new Promise(r=>server.close(r));server.closeAllConnections?.();const pump=setInterval(()=>host.drainInputs(),10);
    try{await closed;await brain.settled();host.drainInputs();if(host.engine.canSnapshot?.())host.saveSnapshot(true);else host.persistClockFrontier();}
    finally{clearInterval(pump);await new Promise(r=>hub.wss.close(r));auth.close();db.close();releaseLock();}

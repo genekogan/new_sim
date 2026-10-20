@@ -221,7 +221,7 @@ const shutdown = async (sig: string) => {
   if (config.mindDriver === 'edge') { host.stop(); edge?.comms?.close(); }
   if(edenCore){
     brain.quiesce();takes.stop();clearTimeout(firstBackup);clearInterval(backupTimer);
-    for(const c of hub.clients)c.ws.close(1001,'server restarting');
+    void hub.closeClients('server restarting');
     const closed=new Promise<void>(resolve=>server.close(()=>resolve()));
     await drainEdenThought(host,brain,intentV2,closed,[()=>edenLifeHandles?.settled()??Promise.resolve(),()=>takes.settled(),()=>Promise.all(backupWork)]);
     edenLifeHandles?.close();
@@ -231,7 +231,7 @@ const shutdown = async (sig: string) => {
   const saveAt = performance.now();
   try { host.saveSnapshot(true); } catch (e) { console.error('[world] snapshot failed', e); }
   console.log(`[world] ${sig}: snapshot saved in ${Math.round(performance.now() - saveAt)} ms (capture ${Math.round(host.snapshotMs.capture)}, write ${Math.round(host.snapshotMs.persist)})`);
-  server.close(); for (const c of hub.clients) c.ws.close(1001, 'server restarting');
+  server.close(); void hub.closeClients('server restarting');
   auth.close();db.close(); process.exit(0);
 };
 process.on('SIGTERM', () => void shutdown('SIGTERM').catch(()=>console.error('[world] shutdown is incomplete; retain database and inspect')));

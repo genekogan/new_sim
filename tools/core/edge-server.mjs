@@ -171,7 +171,7 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
     async function close(){if(closing)return;closing=true;brain.quiesce?.();
       // Stop the world clock FIRST: once the port is released another process may start on this data dir,
       // so this process must not advance or persist the clock frontier afterwards (two-writer frontier fault).
-      host.stop();edge.comms?.close();for(const c of hub.clients)c.ws.close(1001,'local server stopping');
+      host.stop();edge.comms?.close();void hub.closeClients('local server stopping');
       const closed=new Promise(r=>server.close(r));server.closeAllConnections?.();const pump=setInterval(()=>host.drainInputs(),10);
       const failures=[];
       try{await closed;for(const handle of [provisionBirths,socialInstallation,foodDelivery,shoreInstallation,kitchenInstallation])handle?.close();const outcomes=await Promise.allSettled([service.settled(),brain.settled?.(),...[provisionBirths,socialInstallation,foodDelivery,shoreInstallation,kitchenInstallation].map(h=>h?.settled())]);for(const r of outcomes)if(r.status==='rejected')failures.push(r.reason);host.drainInputs();}finally{clearInterval(pump);}
