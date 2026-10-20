@@ -115,13 +115,7 @@
 .human-world .world-back{font:600 13px/1.2 system-ui,sans-serif;color:var(--fg);text-decoration:none;padding:6px 10px;border-radius:999px;border:1px solid var(--line)}
 .human-world .world-back:hover{border-color:var(--accent)}
 @media (max-width:700px){
- .human-world:not(.has-advanced) .world-hud.slim{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px;align-items:center}
- .human-world:not(.has-advanced) .world-hud.slim>*{grid-column:1/-1}
- .human-world:not(.has-advanced) .world-hud.slim>.hud-status{grid-column:1;grid-row:1}
- .human-world:not(.has-advanced) .world-hud.slim>.eden-tour{grid-column:2;grid-row:1}
- .human-world:not(.has-advanced) .world-hud.slim>.hud-actions{grid-column:3;grid-row:1;margin-left:0;width:auto;flex-wrap:nowrap}
- .human-world:not(.has-advanced) .world-hud.slim>.hud-camera-row{grid-column:1/-1;grid-row:2}
- .human-world:not(.has-advanced) .world-hud.slim .viewer-status,.human-world:not(.has-advanced) .world-hud.slim .viewer-broadcast,.human-world:not(.has-advanced) .world-hud.slim .viewer-following,.human-world:not(.has-advanced) .world-hud.slim .bring-agent-open{min-height:34px}
+  .human-world:not(.has-advanced) .world-hud.slim .viewer-status,.human-world:not(.has-advanced) .world-hud.slim .viewer-broadcast,.human-world:not(.has-advanced) .world-hud.slim .viewer-following,.human-world:not(.has-advanced) .world-hud.slim .bring-agent-open{min-height:34px}
  .human-world:not(.has-advanced) .world-hud.slim .hud-camera{width:34px;height:34px;min-height:34px}
  .human-world:not(.has-advanced) .world-hud.slim .eden-tour select{height:34px;max-width:100%;padding:0 26px 0 12px;font-size:12.5px}
  .human-world:not(.has-advanced) .world-hud.slim .bring-agent-open{padding:6px 12px;font-size:12.5px}
@@ -138,7 +132,7 @@
 @media (prefers-reduced-motion:reduce){.viewer-follow-hint{animation:none}}
 
 .my-souls{display:flex;gap:5px;align-items:center}.my-souls-label{font-size:11px;color:var(--muted)}.my-souls>button{padding:0;border-radius:50%;overflow:hidden;width:34px;height:34px;border:1px solid var(--line)}.soul-avatar{display:block;width:32px;height:32px;object-fit:cover;border-radius:50%}.soul-avatar.initials{display:grid;place-items:center;color:white;font-size:11px;font-weight:650}.my-souls-gone{font-size:10px;color:var(--muted)}.my-souls-more{position:relative;font-size:11px}.my-souls-more>div{position:absolute;right:0;top:100%;background:var(--panel);padding:8px;border:1px solid var(--line);z-index:8;min-width:120px}.my-souls-more button{display:block;white-space:nowrap}
-@media(max-width:700px){.my-souls-label{display:none}.my-souls{gap:3px}.my-souls>button{width:28px;height:28px}.soul-avatar{width:26px;height:26px}.hud-actions{flex-wrap:wrap}}
+@media(max-width:700px){.my-souls-label{display:none}.my-souls{gap:3px}.my-souls>button{width:28px;height:28px}.soul-avatar{width:26px;height:26px}}
 
 .world-hover-tooltip{position:absolute;z-index:7;max-width:250px;padding:7px 10px;border-radius:7px;background:var(--panel,#fff);color:var(--fg,#332d24);box-shadow:0 2px 10px #0003;font-size:12px;pointer-events:none}.world-hover-tooltip[hidden]{display:none}.world-place-card{position:absolute;right:calc(12px + var(--sa-r));top:calc(90px + var(--sa-t));z-index:6;max-width:310px;padding:18px;background:var(--panel,#fff);border:1px solid var(--line);border-radius:12px;box-shadow:0 4px 18px #0003}.world-place-card h2{margin:0 24px 10px 0;font-size:18px}.world-place-card p{font-size:13px}
 
@@ -159,14 +153,10 @@
 .human-world .account-menu{position:relative}.human-world .account-avatar{list-style:none;display:grid;place-items:center;width:38px;height:38px;border-radius:50%;overflow:hidden;border:1px solid var(--glass-line,var(--line));background:var(--glass,var(--panel));cursor:pointer;font:600 16px/1 system-ui,sans-serif}.account-avatar::-webkit-details-marker{display:none}.account-avatar img{width:100%;height:100%;object-fit:cover;object-position:center}.account-avatar:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
 .account-menu-items{position:absolute;right:0;top:calc(100% + 8px);display:flex;flex-direction:column;gap:4px;min-width:150px;padding:8px;border-radius:14px;background:var(--glass,var(--panel));border:1px solid var(--glass-line,var(--line));box-shadow:var(--glass-shadow,0 4px 18px #0003);backdrop-filter:blur(16px);z-index:16}.account-menu-items button{white-space:nowrap;text-align:left;justify-content:flex-start;width:100%}
 .human-world .my-souls .soul-avatar{width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:center}.human-world .my-souls>button{display:grid;place-items:center;padding:0!important;min-height:0;width:34px;height:34px;flex:0 0 34px;border-radius:50%;overflow:hidden}.human-world .my-souls-gone{display:none}
-.human-world:not(.has-advanced) .world-hud.slim{display:grid;grid-template-columns:max-content max-content minmax(0,1fr) max-content}
-.human-world:not(.has-advanced) .world-hud.slim>.hud-status{grid-column:1;grid-row:1}
-.human-world:not(.has-advanced) .world-hud.slim>.hud-camera-row{grid-column:2;grid-row:1}
-.human-world:not(.has-advanced) .world-hud.slim>.hud-actions{grid-column:4;grid-row:1;margin-left:0}
-.human-world:not(.has-advanced) .world-hud.slim .hud-explore-group{position:static;transform:none;grid-column:3;grid-row:1;display:flex;align-items:center;justify-content:center;gap:10px;min-width:0;max-width:100%}
+.human-world:not(.has-advanced) .world-hud.slim .hud-explore-group{position:static;transform:none;display:flex;align-items:center;justify-content:center;gap:10px;min-width:0;max-width:100%}
 .human-world:not(.has-advanced) .world-hud.slim .hud-explore-group .explore-control{position:static;left:auto;transform:none;margin-left:0;flex:0 1 auto}
-@media(max-width:700px){.human-world:not(.has-advanced) .world-hud.slim .hud-explore-group{position:static;transform:none;grid-column:2;grid-row:1;min-width:0;max-width:none;justify-content:center;gap:5px}.human-world .my-souls>button{width:26px;height:26px;flex-basis:26px}.hud-explore-group .my-souls-more{font-size:10px}.hud-explore-group .explore-open{padding:7px 9px!important}.hud-explore-group .explore-open kbd{display:none}.human-world .account-avatar{width:34px;height:34px}.hud-explore-group .my-souls{gap:3px}}
-@media(max-width:460px){.human-world:not(.has-advanced) .world-hud.slim .hud-explore-group{grid-column:1/4;grid-row:2;justify-content:center}.account-menu-items{min-width:140px}}
+@media(max-width:700px){.human-world:not(.has-advanced) .world-hud.slim .hud-explore-group{position:static;transform:none;min-width:0;max-width:none;justify-content:center;gap:5px}.human-world .my-souls>button{width:26px;height:26px;flex-basis:26px}.hud-explore-group .my-souls-more{font-size:10px}.hud-explore-group .explore-open{padding:7px 9px!important}.hud-explore-group .explore-open kbd{display:none}.human-world .account-avatar{width:34px;height:34px}.hud-explore-group .my-souls{gap:3px}}
+@media(max-width:460px){.account-menu-items{min-width:140px}}
 .human-world .my-souls-more button{display:flex;align-items:center;gap:7px}.human-world .my-souls-more .soul-avatar{width:26px;height:26px;flex:0 0 26px}
 .hud-explore-group .my-souls{overflow:visible;max-width:none}.hud-explore-group .my-souls-more>div{top:calc(100% + 8px);border-radius:12px;box-shadow:var(--glass-shadow,0 4px 18px #0003)}
 
@@ -175,23 +165,6 @@
 .hud-explore-group .explore-open{max-width:100%;min-width:0}
 .hud-explore-group .explore-open>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hud-explore-group .explore-open svg,.hud-explore-group .explore-open kbd,.hud-explore-group .my-souls,.hud-explore-group .god-control{flex-shrink:0}
-@media(min-width:701px) and (max-width:1050px){
- .human-world:not(.has-advanced) .world-hud.slim{grid-template-columns:max-content minmax(0,1fr) max-content}
- .human-world:not(.has-advanced) .world-hud.slim>.hud-camera-row{justify-self:start}
- .human-world:not(.has-advanced) .world-hud.slim>.hud-actions{grid-column:3}
- .human-world:not(.has-advanced) .world-hud.slim>.hud-explore-group{grid-column:1/-1;grid-row:2}
-}
-@media(max-width:700px){
- .human-world:not(.has-advanced) .world-hud.slim{grid-template-columns:minmax(0,1fr) auto;gap:6px}
- .human-world:not(.has-advanced) .world-hud.slim>.hud-status{grid-column:1;grid-row:1}
- .human-world:not(.has-advanced) .world-hud.slim>.hud-actions{grid-column:2;grid-row:1}
- .human-world:not(.has-advanced) .world-hud.slim>.hud-camera-row{grid-column:1/-1;grid-row:2}
- .human-world:not(.has-advanced) .world-hud.slim>.hud-explore-group{grid-column:1/-1;grid-row:3;justify-content:center;max-width:100%;gap:5px}
-}
-/* Lane U2 (Gene 2026-10-20: "center-justified to the center"): on one-row desktops the Explore group spans the whole
-   header row and sits on the page's centre line, whatever the left (status, camera) and right (account) sides measure;
-   the empty third column keeps them apart. Narrower desktops (row 2) and phones (row 3) already centre it on its own row. */
-@media(min-width:1051px){.human-world:not(.has-advanced) .world-hud.slim>.hud-explore-group{grid-column:1/-1;grid-row:1;justify-self:center;width:max-content}}
 .invite-link-dialog::backdrop{background:#0008}
 .gp-copy-control{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:6px;min-width:0;max-width:100%}
 .gp-copy-control>[role=status]{font:12px/1.4 system-ui,sans-serif;white-space:normal}
@@ -230,10 +203,64 @@
 .time-preview .dim{opacity:.7;font-size:12px}
 /* Lane P6 (2026-10-19): small screens only (HudMore.tsx sets html.phone-tidy there, never on desktop). Secondary controls
    leave the world view and are offered from the HUD's one "More" button; watch mode keeps only the primary chrome. */
-html.phone-tidy .human-world:not(.has-advanced) .account-sign-in,html.phone-tidy .human-world:not(.has-advanced) [data-god-panel-toggle],html.phone-tidy .human-world:not(.has-advanced) [data-god-open="visitor"],html.phone-tidy .human-world:not(.has-advanced) .visitor-controls,html.phone-tidy .human-world:not(.has-advanced) .account-more,html.phone-tidy .eden-sound-toggle{display:none!important}
+html.phone-tidy .human-world:not(.has-advanced) .account-sign-in,html.phone-tidy .human-world:not(.has-advanced) [data-god-panel-toggle],html.phone-tidy .human-world:not(.has-advanced) .visitor-controls,html.phone-tidy .eden-sound-toggle{display:none!important}
 .hud-more-wrap{position:relative;display:inline-flex;flex:none}
 .human-world:not(.has-advanced) .world-hud.slim .hud-more{flex:none;padding:0}
 .hud-more-menu{position:absolute;top:calc(100% + 8px);right:0;z-index:20;display:flex;flex-direction:column;gap:2px;min-width:200px;max-width:calc(100vw - 16px - var(--sa-l) - var(--sa-r));padding:6px;border-radius:14px;border:1px solid var(--glass-line,var(--line));background:var(--glass,var(--panel));-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:var(--glass-shadow)}
 .human-world .hud-more-menu button{flex:none;display:block;width:100%;min-height:40px;padding:10px 12px;border:0;border-radius:10px;background:transparent;color:var(--fg);font:600 13px/1.2 system-ui,sans-serif;text-align:left;cursor:pointer}
 .human-world .hud-more-menu button:hover,.human-world .hud-more-menu button:focus-visible{background:color-mix(in srgb,var(--fg) 8%,transparent)}
 .hud-more-empty{padding:10px 12px;font:13px/1.2 system-ui,sans-serif;opacity:.7}
+
+/* Lane U3 (Gene 2026-10-20b): the top bar is always one line, at every width.
+   [Eden][● Live · time][Broadcast][camera] … [Explore][God][your Souls] … [New Soul][avatar | Sign in][More]
+   Three max-content columns: the Explore group sits on the page's centre line whenever the sides leave room, else between
+   them. A bar that does not fit overflows its columns; hud-fit.ts then adds steps to data-fit (order and reasons there):
+   labels go first, icons stay; on small screens whole controls move into More; last, the status chip truncates. */
+.human-world:not(.has-advanced) .world-hud.slim{display:grid;grid-template-columns:minmax(max-content,1fr) max-content minmax(max-content,1fr);grid-auto-rows:auto;align-items:center;gap:8px}
+.human-world:not(.has-advanced) .world-hud.slim>.hud-left{grid-column:1;grid-row:1;justify-self:start;display:flex;align-items:center;gap:8px;min-width:0}
+.human-world:not(.has-advanced) .world-hud.slim .hud-left>*{flex:none}
+.human-world:not(.has-advanced) .world-hud.slim>.hud-explore-group{grid-column:2;grid-row:1;justify-self:center;flex-wrap:nowrap}
+.human-world:not(.has-advanced) .world-hud.slim>.hud-actions{grid-column:3;grid-row:1;justify-self:end;display:flex;flex-wrap:nowrap;align-items:center;gap:8px;margin-left:0}
+.human-world:not(.has-advanced) .world-hud.slim>.local-integration,.human-world:not(.has-advanced) .world-hud.slim>.local-connection-help{grid-column:1/-1;grid-row:2;justify-self:start}
+.human-world:not(.has-advanced) .world-hud.slim .viewer-status,.human-world:not(.has-advanced) .world-hud.slim .explore-open,.human-world:not(.has-advanced) .world-hud.slim .bring-agent-open{white-space:nowrap}
+/* The Eden mark (EdenMark.tsx), top left: a glass circle like the camera button, so the green star reads over grass too */
+.human-world .eden-mark{display:grid;place-items:center;flex:none;width:38px;height:38px;box-sizing:border-box;border-radius:50%;border:1px solid var(--glass-line,var(--line));background:var(--glass,var(--panel));-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:var(--glass-shadow,none)}
+.human-world .eden-mark svg{display:block;width:24px;height:24px}
+.human-world .eden-mark:hover{border-color:color-mix(in srgb,var(--fg) 30%,transparent)}
+@media(max-width:700px){
+ .human-world:not(.has-advanced) .world-hud.slim,.human-world:not(.has-advanced) .world-hud.slim>.hud-left,.human-world:not(.has-advanced) .world-hud.slim>.hud-actions,.human-world:not(.has-advanced) .world-hud.slim .hud-camera-row{gap:6px}
+ .human-world .eden-mark{width:34px;height:34px}.human-world .eden-mark svg{width:21px;height:21px}
+}
+@media(pointer:coarse){.human-world .eden-mark{width:44px;height:44px}}
+/* A click or tap on the world takes the keyboard (WASD) without a focus ring around the whole page (WorldNavigation.ts
+   marks that focus); reaching the world with Tab still shows the browser's ring. */
+canvas[data-pointer-focus]:focus{outline:none}
+/* Fit steps (hud-fit.ts). A hidden label stays the control's accessible name. */
+.world-hud[data-fit~="keys"] .hud-explore-group kbd{display:none}
+.world-hud[data-fit~="broadcast"] .viewer-broadcast-label,
+.world-hud[data-fit~="god"] .god-open>span:not(.gp-badge),
+.world-hud[data-fit~="newsoul"] .bring-agent-open>span,
+.world-hud[data-fit~="explore"] .explore-open:not(.god-open)>span{position:absolute!important;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.human-world:not(.has-advanced) .world-hud.slim[data-fit~="broadcast"] .viewer-broadcast,
+.human-world:not(.has-advanced) .world-hud.slim[data-fit~="god"] .god-open,
+.human-world:not(.has-advanced) .world-hud.slim[data-fit~="newsoul"] .bring-agent-open,
+.human-world:not(.has-advanced) .world-hud.slim[data-fit~="explore"] .explore-open:not(.god-open){width:38px;padding:0!important;gap:0;justify-content:center;flex:none}
+.human-world:not(.has-advanced) .world-hud.slim[data-fit~="broadcast"] .viewer-broadcast-dot{width:9px;height:9px}
+.human-world:not(.has-advanced) .world-hud.slim[data-fit~="broadcast"] .viewer-following{max-width:150px}
+.world-hud[data-fit~="god"] .god-open .god-dot{position:absolute;top:5px;right:5px;width:7px;height:7px}
+.world-hud[data-fit~="live"] [data-viewer-status].ok{font-size:0}
+.world-hud[data-fit~="live"] [data-viewer-status].ok::before{margin-right:7px!important}
+.world-hud[data-fit~="live"] .world-time .world-day{display:none}
+@media(max-width:700px){.human-world:not(.has-advanced) .world-hud.slim[data-fit~="broadcast"] .viewer-broadcast,.human-world:not(.has-advanced) .world-hud.slim[data-fit~="god"] .god-open,.human-world:not(.has-advanced) .world-hud.slim[data-fit~="newsoul"] .bring-agent-open,.human-world:not(.has-advanced) .world-hud.slim[data-fit~="explore"] .explore-open:not(.god-open){width:34px}}
+@media(pointer:coarse){.human-world:not(.has-advanced) .world-hud.slim[data-fit~="broadcast"] .viewer-broadcast,.human-world:not(.has-advanced) .world-hud.slim[data-fit~="god"] .god-open,.human-world:not(.has-advanced) .world-hud.slim[data-fit~="newsoul"] .bring-agent-open,.human-world:not(.has-advanced) .world-hud.slim[data-fit~="explore"] .explore-open:not(.god-open){width:44px}}
+/* small screens only (the HUD's More menu exists there and offers each of these: HudMore.tsx MORE_TARGETS) */
+html.phone-tidy .world-hud[data-fit~="fullscreen"] .hud-camera-row .fullscreen-toggle,
+html.phone-tidy .world-hud[data-fit~="follow"] .hud-camera-slot,
+html.phone-tidy .world-hud[data-fit~="camera"] .hud-camera-row>.hud-camera:not(.fullscreen-toggle),
+html.phone-tidy .world-hud[data-fit~="souls"] .hud-explore-group .my-souls,
+html.phone-tidy .world-hud[data-fit~="godmore"] .god-control{display:none!important}
+.human-world:not(.has-advanced) .world-hud.slim[data-fit~="squeeze"]{grid-template-columns:minmax(0,max-content) minmax(0,1fr) max-content}
+.human-world:not(.has-advanced) .world-hud.slim[data-fit~="squeeze"]>.hud-left{overflow:hidden}
+.human-world:not(.has-advanced) .world-hud.slim[data-fit~="squeeze"] .hud-left>.hud-status{flex:0 1 auto;min-width:0}
+.human-world:not(.has-advanced) .world-hud.slim[data-fit~="squeeze"]>.hud-explore-group{min-width:0;max-width:100%}
+.human-world:not(.has-advanced) .world-hud[data-fit~="live"] .viewer-status .world-time-button{margin-left:0;padding-left:2px;padding-right:2px}

@@ -19,7 +19,8 @@ export function GodButton() {
   const [status, setStatus] = useState<G.Status | null>(null);
   const { open, inbox } = useGod();
   const owner = status?.you === 'owner' || status?.you === 'god';
-  const pendingSeen = useRef(0);
+  const pendingSeen = useRef(0), ownerNow = useRef(false);
+  ownerNow.current = owner;
   useEffect(() => G.watchStatus(setStatus), []);
   useEffect(() => { if (owner) return watchInbox(); }, [owner]);
   // #godpair/<code> (the link a god agent prints) and a new pairing request open God on the agent section
@@ -27,26 +28,28 @@ export function GodButton() {
   useEffect(() => { const n = status?.pending.length ?? 0; if (owner && n > pendingSeen.current) openGod('agent'); pendingSeen.current = n; }, [status, owner]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (!isGodKey(e)) return;
+      if (!isGodKey(e) || !ownerNow.current) return;
       // another modal (Explore) is open: leave it alone
       if (document.querySelector('dialog[open]:not([data-god-modal]), [role="dialog"][aria-modal="true"]:not([data-god-modal])')) return;
       e.preventDefault(); toggleGod();
     };
     addEventListener('keydown', key); return () => removeEventListener('keydown', key);
   }, []);
-  if (!status) return null;
+  // U3 (Gene 2026-10-20b): "god mode button at top should only be there if you are actually god": visitors, signed-out
+  // people and a godless world's claimant get no God button (nor ⌘G); claiming stays on the claim card (GodPanel).
+  if (!status || !owner) return null;
   const paired = (status.agents ?? 0) > 0;
   // the owner's agent: green when connected, red when not (or not paired yet: connecting it is the first thing to do)
-  const live = !owner ? null : !paired ? 'off' : inbox ? (inbox.connected ? 'on' : 'off') : null;
-  const title = owner ? `God: your agent, this world's edits, flags and Constitution (${godKeyLabel()})` : `God: this world's Constitution, and how to become a god (${godKeyLabel()})`;
+  const live = !paired ? 'off' : inbox ? (inbox.connected ? 'on' : 'off') : null;
+  const title = `God mode: your agent and this world (${godKeyLabel()})`;
   return (
     <span className="god-control">
-      <button type="button" className="explore-open god-open" data-god-open={owner ? 'owner' : 'visitor'} data-agent={live ?? undefined}
+      <button type="button" className="explore-open god-open" data-god-open="owner" data-agent={live ?? undefined}
         aria-haspopup="dialog" aria-expanded={open} title={title} onClick={() => toggleGod()}>
         {BOLT}<span>God</span>
         {live && <i className={'god-dot ' + live} aria-label={live === 'on' ? 'agent connected' : 'agent not connected'} />}
         <kbd>{godKeyLabel()}</kbd>
-        {owner && status.pending.length ? <span className="gp-badge" aria-label={`${status.pending.length} pairing request`}>{status.pending.length}</span> : null}
+        {status.pending.length ? <span className="gp-badge" aria-label={`${status.pending.length} pairing request`}>{status.pending.length}</span> : null}
       </button>
     </span>
   );

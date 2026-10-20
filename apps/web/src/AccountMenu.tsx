@@ -4,11 +4,10 @@ import {copyText,manualCopyHint} from './clipboard.ts';
 import {requestFeedback,FEEDBACK_LABEL} from './feedback-request.ts';
 export type AccountMenuAuth={ready:boolean;authed:boolean;label:string|null;avatarUrl?:string|null;signInUrl?:string;login():void;logout(returnUrl?:string):Promise<void>|void};
 /** Explicit auth-off worlds retain their existing creation entry; required auth never falls back. */
-export function WorldAccountControls({signinEnabled,accountAuthRequired,auth,newSoul,inviteUrl}:{signinEnabled:boolean;accountAuthRequired?:boolean;auth:AccountMenuAuth;newSoul?:ReactNode;inviteUrl?:string}){return signinEnabled?<AccountMenu auth={auth} newSoul={newSoul} inviteUrl={inviteUrl}/>:<>{accountAuthRequired!==true&&newSoul}<VisitorMenu/></>;}
-/** Lane U2: Feedback lives in a menu, never as its own button: the account menu when signed in, else this small More
- * menu beside Sign in (phones hide it: the HUD's More menu offers the same item). */
+export function WorldAccountControls({signinEnabled,accountAuthRequired,auth,newSoul,inviteUrl}:{signinEnabled:boolean;accountAuthRequired?:boolean;auth:AccountMenuAuth;newSoul?:ReactNode;inviteUrl?:string}){return signinEnabled?<AccountMenu auth={auth} newSoul={newSoul} inviteUrl={inviteUrl}/>:<>{accountAuthRequired!==true&&newSoul}</>;}
+/** Lane U2: Feedback lives in a menu, never as its own button: the account menu when signed in. Lane U3 (Gene
+ * 2026-10-20b): signed out there is no More (⋯) menu beside Sign in any more; phones' HUD More menu still offers it. */
 export function FeedbackItem(){return <button type="button" data-feedback-open="" onClick={requestFeedback}>{FEEDBACK_LABEL}</button>;}
-function VisitorMenu(){return <MenuDetails className="account-menu account-more" summary={<summary className="account-avatar account-more-open" aria-label="More" title="More"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="4.5" cy="10" r="1.6" fill="currentColor"/><circle cx="10" cy="10" r="1.6" fill="currentColor"/><circle cx="15.5" cy="10" r="1.6" fill="currentColor"/></svg></summary>}><FeedbackItem/></MenuDetails>;}
 /** A <details> menu that closes on an item, a click outside, Escape or focus leaving it. */
 function MenuDetails({className,summary,children}:{className:string;summary:ReactNode;children:ReactNode}){
  const menu=useRef<HTMLDetailsElement>(null);
@@ -25,12 +24,13 @@ function MenuDetails({className,summary,children}:{className:string;summary:Reac
 }
 /** Sign-out returns to the exact world route/view, never the provider's root default. */
 export function worldSignOutReturnUrl(location:Pick<Location,'origin'|'pathname'|'search'|'hash'>){return location.origin+location.pathname+location.search+location.hash;}
+/** Lane U3 (Gene 2026-10-20b): New Soul is always its own button, left of the profile picture (or of Sign in). */
 export function AccountMenu({auth,newSoul,inviteUrl}:{auth:AccountMenuAuth;newSoul?:ReactNode;inviteUrl?:string}){
  if(!auth.ready)return <span className="dim">Signing in…</span>;
- if(!auth.authed)return <>{auth.signInUrl?<a className="account-sign-in" href={auth.signInUrl}>Sign in</a>:<button type="button" className="account-sign-in" onClick={auth.login}>Sign in</button>}{newSoul}<VisitorMenu/></>;
- return <MenuDetails className="account-menu" summary={<summary className="account-avatar" aria-label="Account menu" title={auth.label??'Your account'}>{auth.avatarUrl?<img src={auth.avatarUrl} alt="" referrerPolicy="no-referrer"/>:<span aria-hidden="true">{auth.label?.trim()[0]?.toUpperCase()??'●'}</span>}</summary>}>
-  {newSoul}{inviteUrl&&<InviteLink url={inviteUrl}/>}<FeedbackItem/><button type="button" onClick={()=>{void auth.logout(worldSignOutReturnUrl(location));}}>Sign out</button>
- </MenuDetails>;
+ if(!auth.authed)return <>{newSoul}{auth.signInUrl?<a className="account-sign-in" href={auth.signInUrl}>Sign in</a>:<button type="button" className="account-sign-in" onClick={auth.login}>Sign in</button>}</>;
+ return <>{newSoul}<MenuDetails className="account-menu" summary={<summary className="account-avatar" aria-label="Account menu" title={auth.label??'Your account'}>{auth.avatarUrl?<img src={auth.avatarUrl} alt="" referrerPolicy="no-referrer"/>:<span aria-hidden="true">{auth.label?.trim()[0]?.toUpperCase()??'●'}</span>}</summary>}>
+  {inviteUrl&&<InviteLink url={inviteUrl}/>}<FeedbackItem/><button type="button" onClick={()=>{void auth.logout(worldSignOutReturnUrl(location));}}>Sign out</button>
+ </MenuDetails></>;
 }
 /** The copied link and its outcome stay visible after the account menu closes. */
 function InviteLink({url}:{url:string}){

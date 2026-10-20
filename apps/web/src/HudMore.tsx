@@ -1,4 +1,5 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
+import { requestFeedback } from './feedback-request.ts';
 
 // Lane P6 (2026-10-19, Gene): "a light pass to cut button clutter on small screens. Hide secondary controls behind one
 // menu and keep watch mode clean. Don't redesign." On small screens only, the world page's secondary controls (Sign in,
@@ -9,30 +10,43 @@ import { useEffect, useReducer, useRef, useState } from 'react';
 export const SMALL_SCREEN = '(max-width: 700px), (pointer: coarse)';
 export const TIDY_CLASS = 'phone-tidy';
 
-/** The secondary controls the menu offers, in menu order. The selectors are the existing controls' own. */
-export const MORE_TARGETS: readonly { key: string; selector: string; label?: string }[] = [
+/** The secondary controls the menu offers, in menu order. The selectors are the existing controls' own. A control is
+ * offered only while it is not on screen (hidden on small screens, folded into a closed menu, or moved off the one-line
+ * top bar by hud-fit.ts), so nothing is offered twice; `fallback` stands in when the page has no such control. */
+export const MORE_TARGETS: readonly { key: string; selector: string; label?: string; fallback?: () => void }[] = [
   { key: 'sign-in', selector: '.account-sign-in', label: 'Sign in' },
   { key: 'claim', selector: '[data-god-panel-toggle]' },
-  // G4: the God button (the Constitution lives in it now); a visitor's is hidden on small screens and offered here
-  { key: 'god', selector: '[data-god-open="visitor"]', label: 'God' },
-  { key: 'feedback', selector: '[data-feedback-open]', label: 'Feedback' },  // U2: in the account / signed-out menu now
+  // U3: only the world's god has a God button; on a narrow phone bar it moves here
+  { key: 'god', selector: '[data-god-open]', label: 'God' },
+  // U2: in the account menu when signed in; U3: signed out there is no desktop menu for it, so the phone's More asks directly
+  { key: 'feedback', selector: '[data-feedback-open]', label: 'Feedback', fallback: requestFeedback },
   { key: 'visitor', selector: '.visitor-controls button' },  // Since your last visit, when VisitorWelcome.RETURN_HISTORY is on
+  // U3: top-bar controls hud-fit.ts moves off a narrow phone bar, in the order they leave it
+  { key: 'fullscreen', selector: '.hud-camera-row .fullscreen-toggle' },
+  { key: 'follow', selector: '.hud-camera-slot .viewer-broadcast, .hud-camera-slot .viewer-following button' },
+  { key: 'camera', selector: '.hud-camera-row .hud-camera[aria-label="Camera controls"]' },
+  { key: 'souls', selector: '.hud-explore-group .my-souls > button' },
   { key: 'sound', selector: '.eden-sound-toggle [data-sound]' },
 ];
 
-type Target = Pick<HTMLElement, 'click' | 'textContent' | 'getAttribute' | 'hidden'>;
-export type MoreItem = { key: string; label: string; target: Target };
+type Target = Pick<HTMLElement, 'click' | 'textContent' | 'getAttribute' | 'hidden'> & { checkVisibility?: (o?: { visibilityProperty?: boolean }) => boolean; getClientRects?: () => { length: number } };
+export type MoreItem = { key: string; label: string; target: Pick<Target, 'click'> };
 
-/** The menu's items: each existing control that is on the page now (a hidden Music button is skipped). */
+/** On screen now: not display:none, not inside a closed <details> (whose contents still have boxes in Chrome) and not
+ * visibility:hidden. Test doubles without layout count as off screen. */
+const shown = (t: Target) => t.checkVisibility ? t.checkVisibility({ visibilityProperty: true }) : !!t.getClientRects && t.getClientRects().length > 0;
+
+/** The menu's items: each existing control that is on the page but not on screen (a hidden Music button is skipped). */
 export function collectMoreItems(root: { querySelectorAll(selector: string): ArrayLike<Target> }): MoreItem[] {
   const items: MoreItem[] = [];
   for (const t of MORE_TARGETS) {
     const found = Array.from(root.querySelectorAll(t.selector));
     found.forEach((target, i) => {
-      if (target.hidden) return;
+      if (target.hidden || shown(target)) return;
       const label = t.label ?? target.getAttribute('aria-label') ?? (target.textContent ?? '').replace(/^\s*✦\s*/, '').trim();
       if (label) items.push({ key: i ? `${t.key}-${i}` : t.key, label, target });
     });
+    if (!found.length && t.fallback && t.label) items.push({ key: t.key, label: t.label, target: { click: t.fallback } });
   }
   return items;
 }

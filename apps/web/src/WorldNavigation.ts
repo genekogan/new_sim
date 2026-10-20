@@ -76,7 +76,7 @@ export class WorldNavigation {
       surface.addEventListener(name,callback,options);this.listeners.push([surface,name,callback,options]);
     };
     listen(canvas,'focus',()=>{if(!this.disposed)this.setOwned(true);});
-    listen(canvas,'blur',()=>this.release(false));
+    listen(canvas,'blur',()=>{delete canvas.dataset.pointerFocus;this.release(false);});
     listen(canvas,'compositionstart',()=>{this.composing=true;this.release(false);});
     listen(canvas,'compositionend',()=>{this.composing=false;});
     listen(canvas,'keydown',(event:KeyboardEvent)=>{
@@ -87,7 +87,8 @@ export class WorldNavigation {
     });
     listen(canvas,'keyup',(event:KeyboardEvent)=>{this.keys.delete(event.code);});
     listen(canvas,'pointerdown',(event:PointerEvent)=>{
-      canvas.focus({preventScroll:true});this.setOwned(true);
+      // U3: a click or tap takes the keyboard (WASD) without the focus ring around the whole world; Tab still shows it
+      canvas.dataset.pointerFocus='';canvas.focus({preventScroll:true});this.setOwned(true);
       const free=this.context().mode==='manual'&&this.context().navigation==='free';
       const look=free&&(event.button===2||event.pointerType==='touch');
       this.pointers.set(event.pointerId,{x:event.clientX,y:event.clientY,type:event.pointerType,look});

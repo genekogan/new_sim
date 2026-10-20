@@ -17,6 +17,9 @@ import { describeIntent } from '@sim/protocol';
 import { makeApi, useSim, type Sim } from './useSim.ts';
 import {WorldAccountControls} from './AccountMenu.tsx';
 import {SoulAccount} from './SoulAccount.tsx';
+import {useSignOutAtOnce} from './sign-out-now.ts';
+import {EdenMark} from './EdenMark.tsx';
+import {useHudFit} from './hud-fit.ts';
 import {LocalIntegrationNotice,LocalConnectionHelp,DebugPanel} from './LocalIntegration.tsx';
 import './world-chrome.css';
 import {createApiRequest} from './api-request.ts';
@@ -69,7 +72,8 @@ const ADMIN_TABS = new Set<string>(['spend', 'admin']);
 const hashTab = (): { tab: Tab; pair: string | null; soul?:string|null } => { const soul=soulFromFragment(location.hash); if(soul)return {tab:'watch',pair:null,soul}; let h = ''; try { h = decodeURIComponent(location.hash.slice(1)); } catch { /* a mangled link: fall back to the first tab */ } if (h.startsWith('pair/')) return /^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/.test(h.slice(5)) ? { tab: 'my soul', pair: h.slice(5) } : { tab: 'my soul', pair: null }; return { tab: (TABS as readonly string[]).includes(h) ? (h as Tab) : 'watch', pair: null, soul:null }; };
 type Tab = (typeof TABS)[number];
 
-export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true }: { cfg: Cfg; auth: AuthCtx; arrivalEnabled?:boolean;humanPresetsEnabled?:boolean }) {
+export function Shell({ cfg, auth: providerAuth, arrivalEnabled=false,humanPresetsEnabled=true }: { cfg: Cfg; auth: AuthCtx; arrivalEnabled?:boolean;humanPresetsEnabled?:boolean }) {
+  const auth = useSignOutAtOnce(providerAuth);  // U3: signed-out everywhere the moment Sign out is pressed
   const tokenReader = useRef(auth.getToken);
   tokenReader.current = auth.getToken;
   // the god panel and the Join flow act as this same person (auth-session.ts)
@@ -108,6 +112,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
   const [lessonOpen,setLessonOpen]=useState(false);
   // VF3 (Gene): Advanced is unlisted; reach it at #advanced (or any Advanced tab's hash).
   const [advanced, setAdvanced] = useState(() => !['watch', 'my soul'].includes(hashTab().tab) || location.hash === '#advanced');
+  const [hud, setHud] = useState<HTMLElement | null>(null);useHudFit(advanced ? null : hud);  // U3: one-line top bar
   const [statusSlot, setStatusSlot] = useState<HTMLDivElement | null>(null), [cameraSlot, setCameraSlot] = useState<HTMLDivElement | null>(null);
   // UI2: the Soul panel opens only from a name plate, a name in a thread, or a shared Soul link.
   const [panelOpen, setPanelOpen] = useState(() => !!hashTab().soul);
@@ -163,15 +168,14 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
       <VisitorWelcome key={privatePanelKey} api={api} siteApi={siteApi} worldPath={worldPath} ownerId={currentMe?.userId??null} worldId={cfg.worldId} worldName={worldName} build={cfg.build} handle={viewerHandle} state={viewerState}/>
       <WorldSpeechOverlay root={frame} sim={sim} state={viewerState} active={!advanced} handle={viewerHandle}/>
       {!advanced && <ViewerFrame handle={viewerHandle} state={viewerState} dt={sim.conn.welcome?.dt ?? 0.05} navigationOpen={navigationOpen} onNavigationChange={setNavigationOpen} onNavigationOpen={openNavigation} worldTime={worldTimeText(worldClockAt((sim as Sim&{takes?:{chunks?:unknown[]}|null}).takes?.chunks,viewerState?.shownTick))} connected={!connectionLost(sim.conn)} connecting={!sim.conn.welcome} worldName={worldName} followName={viewerState?.cameraMode === 'follow' ? r.souls.get(viewerState.selection.soulId ?? '')?.name ?? null : null} slots={{ status: statusSlot, camera: cameraSlot }} initial={initialProgress} />}
-      <header className={`world-hud${advanced ? '' : ' slim'}`}>
+      <header ref={setHud} className={`world-hud${advanced ? '' : ' slim'}`}>
         {advanced && <>
         <a href="/" className="world-home">SIM</a>
         <span className="world-name">{worldName}</span>
         <span className={st.state === 'open' ? 'ok' : 'dim'}>{st.state === 'open' ? '● Connected' : 'Connecting…'}</span>
         </>}
-        {!advanced&&<div className="hud-status" ref={setStatusSlot}/>}
+        {!advanced&&<div className="hud-left"><EdenMark/><div className="hud-status" ref={setStatusSlot}/><div className="hud-camera-row"><div className="hud-camera-slot" ref={setCameraSlot}/><button className="hud-camera" aria-label="Camera controls" aria-expanded={navigationOpen} title="Camera controls" onClick={()=>setNavigationOpen(o=>!o)}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6.5h3l1.4-2h5.2l1.4 2h3v9.5H3z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><circle cx="10" cy="11" r="3" fill="none" stroke="currentColor" strokeWidth="1.5"/></svg></button><FullscreenToggle/></div></div>}
         {!advanced&&exploreOn&&tourHandle?.frameLocation&&<div className="hud-explore-group"><EdenTour worldName={exploreName} locations={exploreLocations} presence={explorePresence(sim.edge??[],r.souls.keys())} room={viewerState?.room} souls={r.souls} present={new Set([...r.souls.values()].filter(s=>r.entities[s.entityId]).map(s=>s.id))} onOpen={()=>{viewerHandle?.releaseInput?.();setNavigationOpen(false);}} onSoul={id=>{if(!viewerHandle?.selectSoul(id))return false;return viewerHandle.frameSouls?.([id])??false;}} preview={placePreview} onView={place=>{const viewed=tourHandle.frameLocation?.(place)??false;if(viewed){setPanelOpen(false);setNavigationOpen(false);}return viewed;}}/>{launcherWorld&&<GodButton/>}<MySouls ids={ownedIds} souls={r.souls} present={new Set([...r.souls.values()].filter(s=>r.entities[s.entityId]).map(s=>s.id))} select={inspect}/></div>}
-        {!advanced&&<div className="hud-camera-row"><div className="hud-camera-slot" ref={setCameraSlot}/><button className="hud-camera" aria-label="Camera controls" aria-expanded={navigationOpen} title="Camera controls" onClick={()=>setNavigationOpen(o=>!o)}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6.5h3l1.4-2h5.2l1.4 2h3v9.5H3z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><circle cx="10" cy="11" r="3" fill="none" stroke="currentColor" strokeWidth="1.5"/></svg></button><FullscreenToggle/></div>}
         {!launcherWorld&&<LocalIntegrationNotice source={cfg.localIntegrationMetadataPath}/>}{AUTH_UI&&!launcherWorld&&<LocalConnectionHelp devAuth={cfg.devAuth}/>}
         <div className="hud-actions">
           {advanced&&<a className="world-back" href="#watch" onClick={e => { e.preventDefault(); setAdvanced(false); setPairCode(null); setTab('watch'); history.replaceState(null, '', '#watch'); }}>← Back to the world</a>}

@@ -162,7 +162,7 @@ export function ViewerFrame({ handle, state, dt, navigationOpen, onNavigationCha
         {kind === 'follow'
           ? <span className="viewer-following"><span className="viewer-following-label" title={followName ?? 'a Soul'}>Following <b>{followName ?? 'a Soul'}</b></span><button type="button" aria-label="Stop following" title="Stop following" onClick={yourCamera}><span aria-hidden="true">×</span></button></span>
           : <button type="button" className="viewer-broadcast" aria-pressed={kind === 'broadcast'} title={kind === 'broadcast' ? 'Broadcast is directing the camera. Turn off to take it yourself.' : 'Let Broadcast direct the camera again'}
-              onClick={() => kind === 'broadcast' ? yourCamera() : toBroadcast()}>{kind === 'broadcast' ? <><span className="viewer-broadcast-dot" aria-hidden="true" />Broadcast</> : <><span className="viewer-broadcast-icon" aria-hidden="true">↺</span>Back to broadcast</>}</button>}
+              onClick={() => kind === 'broadcast' ? yourCamera() : toBroadcast()}>{kind === 'broadcast' ? <><span className="viewer-broadcast-dot" aria-hidden="true" /><span className="viewer-broadcast-label">Broadcast</span></> : <><span className="viewer-broadcast-icon" aria-hidden="true">↺</span><span className="viewer-broadcast-label">Back to broadcast</span></>}</button>}
       </div> : null;
   return <>
     {arrivalShown && !blocked && initial?.stage !== 'failed' && <div className="viewer-arrival" data-done={!card} role="status" aria-live="polite">
