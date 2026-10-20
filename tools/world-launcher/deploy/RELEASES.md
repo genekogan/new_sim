@@ -4,6 +4,40 @@
 **keeper** (`tools/world-launcher/keeper.mjs`). The keeper holds the port and runs the launcher from the release that
 `/srv/sim-worlds/<stage>` points at.
 
+## Shipping a release: ship.sh
+`deploy/ship.sh --label <n>` runs a whole release in the proven order. Run it from the release worktree, clean, at
+the gated head, with `node_modules` and `.lane/mars-web` in place. `<n>` is the release number without dots (353 for
+3.53). The steps:
+
+| step | what it does | its bar |
+|---|---|---|
+| preflight | local checks: clean tree, tools, Mars web assets, probe god folder; prints the deploy lease | nothing missing |
+| backup | `ship/compact-backup.sh` (VACUUM INTO) of every production + legacy db, then `PRAGMA quick_check` on each copy | every db `ok` |
+| legacy-upload | `release.sh legacy` builds and uploads `we-<sha12>-root` without activating it | exit 0 |
+| probe-start | `release-probe.mjs` in the background (desktop + phone, CLI edits, `--expect-build`); waits for `probe/ready` | ready within 10 min |
+| release | `release.sh production --reload` | exit 0 |
+| legacy-activate | `sha256sum -c FILES.sha256`, `activate.sh legacy … --reload`, then the laptop's `LEGACY-RELEASE` | exit 0 |
+| released / probe-check | touch `probe/released`; the probe watches 60 s more | exit 0 (1 = visitor bar missed, 3 = rolled back) |
+| walks | `ship/walk.mjs`: 7 worlds at desktop dpr 1+2, 3 worlds on a phone | 17 arrivals, 0 errors, 0 resync, picks ok |
+| poster | `ship/poster.mjs` x3 on Eden 2026 (phone) + `poster-count.py` | a world frame every run, never blank after it |
+| stall | `ship/stall.mjs` x4 on Eden 2026 (phone) | no frame gap over 1 s |
+| cdn-walk | `tools/cdn/cdn-walk.mjs` on Eden 2026, /w/mars, /w/eden | PASS |
+
+`ship/checks.mjs` gives each step's verdict. Outputs go to `team/scratch/ship/<n>/`: `STEPS.txt` (one line per step),
+`ship.log`, `ROLLBACK.txt`, and each step's logs and shots. Any failure stops the run. ship.sh then prints what is live
+at that moment, the rollback commands (the previous production and legacy releases, read before the first change), and
+the `--from <step>` that resumes it. It never rolls back on its own: `activate.sh` already does that for a failed
+handover, and the probe's exit 3 says it happened.
+
+- `--dry-run` prints every step with its exact commands. Nothing runs, and eden2 is not contacted. It exits 1 when
+  preflight would stop a real run.
+- `--from <step>` resumes after a fix (same `--label`, same outputs). `--no-probe` skips the three probe steps.
+- The legacy handover itself is `activate.sh`'s job. ship.sh only calls it, so changes to the handover (keeper,
+  `children.mjs`) reach ship.sh without touching it.
+- The release owner still does the lane-specific live checks, the fast-forward of main and the push, the SHIP-LOG entry and RESUME.
+- Tests: `node --test tools/world-launcher/ship.test.mjs` stubs every command (`SHIP_TEST=1`, `SHIP_SSH`, `SHIP_SCP`,
+  `SHIP_NODE`, `SHIP_PYTHON`, `SHIP_RELEASE_SH`).
+
 ## What a release does
 1. `activate.sh` points the stage link at the new release, keeping the old one as `<stage>.previous`.
 2. It runs `systemctl reload sim-worlds@<stage>` (SIGHUP to the keeper), which starts the handover:

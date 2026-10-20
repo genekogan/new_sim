@@ -39,6 +39,8 @@ writes to eden2 and pushes. A lane hands R `branch@sha` + a gate receipt; R ship
   rollback commands (`activate.sh <stage> <previous release> --reload`).
 - **eden2 retention:** `tools/world-launcher/deploy/retention.sh --host root@eden2` lists what keep-N would delete
   (10 routine backups per stage; 5 legacy releases + linked + in use). Dry run is the default; `--apply` needs Gene's yes.
+- **One command:** `tools/world-launcher/deploy/ship.sh --label <n>` runs that order from backups to cdn-walk (`--dry-run`
+  first; see `tools/world-launcher/deploy/RELEASES.md`); R still does lane checks, main + push, SHIP-LOG.
 - Do not replay passing checks without a source change or unresolved finding that warrants it.
 
 Imported `mars/AGENTS.md` carries original-checkout history; its prohibitions
