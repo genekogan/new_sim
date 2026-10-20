@@ -51,7 +51,8 @@ export function mountAgentInbox(app: Hono, d: Deps) {
     const acked = c.res.status >= 200 && c.res.status < 300 && /\/v1\/(god|edge)\/inbox\/[^/]+\/(ack|result)$/.test(c.req.path);
     // MSG: a Soul's messages have one consumer, its listen (which hands over the whole backlog). Other answers carry a
     // private notice of the oldest waiting message but do not mark it received, so a listen never misses its wake-up.
-    const carry = (own?: unknown) => acked && own ? own : current.kind === 'god' ? inbox.deliver(current.scope) : inbox.view(current.scope);
+    const soulListen = current.kind === 'soul' && c.res.status === 200 && c.req.path.endsWith('/v1/edge/inbox/listen');
+    const carry = (own?: unknown) => (acked || soulListen) && own ? own : current.kind === 'god' ? inbox.deliver(current.scope) : inbox.view(current.scope);
     if (contract || !c.res.headers.get('content-type')?.includes('application/json')) {
       if (c.res.status < 200 || c.res.status >= 300) return;
       inbox.touch(current.scope);
@@ -117,7 +118,9 @@ export function mountAgentInbox(app: Hono, d: Deps) {
         const current = requireAgent(c, kind);
         if (current.owner !== s.owner || current.scope !== s.scope) throw new ApiError(401, 'unauthorized', 'agent authority changed');
         // MSG: a Soul's listen hands over every waiting message at once, oldest first (the agent works through them all).
-        return c.json(kind === 'soul' ? {inbox: inbox.view(s), backlog: inbox.takeBacklog(s)} : {inbox: inbox.view(s)});
+        // An older CLI reads `latest`: the first one after its cursor, so its listen/follow loop walks the queue in order.
+        if (kind === 'soul') { const backlog = inbox.takeBacklog(s, after), v = inbox.view(s); return c.json({inbox: {...v, latest: backlog[0] ?? v.latest}, backlog}); }
+        return c.json({inbox: inbox.view(s)});
       } finally { end(); }
     });
     app.post(`${path}/:id/ack`, async c => {

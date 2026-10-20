@@ -155,6 +155,12 @@ test('real owner and paired HTTP flows: absent, browser, command polling, listen
     const next = await req(path, 'dev:alice', {text: 'the house!!!!'});
     const woke = await listening; assert.deepEqual(woke.data.backlog.map((m: any) => m.id), [next.data.inbox.latest.id]); assert.ok(performance.now() - begun < 10_000);
     assert.equal((await req(`/v1/edge/inbox/${next.data.inbox.latest.id}/ack`, tokenA, {reply: 'Going to the house.'})).status, 200);
+    // an older CLI's `listen --follow` loop (after = the last it printed) walks the queue in order and then waits
+    const m1 = (await req(path, 'dev:alice', {text: 'one'})).data.inbox.latest.id, m2 = (await req(path, 'dev:alice', {text: 'two'})).data.inbox.latest.id;
+    const f1 = await req('/v1/edge/inbox/listen?timeoutMs=25000', tokenA); assert.equal(f1.data.inbox.latest.id, m1); assert.equal(f1.data.backlog.length, 2);
+    const f2 = await req(`/v1/edge/inbox/listen?after=${m1}&timeoutMs=25000`, tokenA); assert.equal(f2.data.inbox.latest.id, m2, 'the next after the cursor, though one is unacked'); assert.deepEqual(f2.data.backlog.map((m: any) => m.id), [m2]);
+    const t0 = performance.now(), f3 = await req(`/v1/edge/inbox/listen?after=${m2}&timeoutMs=60`, tokenA); assert.ok(performance.now() - t0 >= 50, 'nothing new after the cursor: it waits'); assert.deepEqual(f3.data.backlog, []);
+    for (const id of [m1, m2]) assert.equal((await req(`/v1/edge/inbox/${id}/ack`, tokenA, {})).status, 200);
   }
   const foreign = await req('/v1/edge/observe', tokenB); assert.equal(foreign.data.inbox.latest, null);
   const callsBefore = f.db.brainCalls(100).length, eventsBefore = f.host.seq;

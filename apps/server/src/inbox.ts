@@ -123,9 +123,14 @@ export class AgentInbox {
     const log = this.all(s, 'ORDER BY n DESC LIMIT ?', GOD_LOG_VIEW).map(r => this.ticket(r));
     return {...v, latest: newest ? this.message(newest) : null, log};
   }
-  /** A Soul's listen: every message not acknowledged, oldest first; each is now delivered (the agent holds them all). */
-  takeBacklog(s: InboxScope): InboxMessage[] {
-    const rows = this.all(s, 'AND acknowledged_at IS NULL ORDER BY n LIMIT ?', SOUL_QUEUE_MAX), now = this.now();
+  /** Where a Soul's listen `after` cursor stands (0 = before everything; an unknown or pruned id counts as 0). */
+  private cursor(s: InboxScope, after: string | undefined) { return after ? this.get(s, 'AND id=?', after)?.n ?? 0 : 0; }
+  /** A Soul's listen: the first message not acknowledged after the cursor (an older CLI's listen/follow loop sees it). */
+  nextAfter(s: InboxScope, after: string | undefined) { const r = this.get(s, 'AND acknowledged_at IS NULL AND n>? ORDER BY n LIMIT 1', this.cursor(s, after)); return r ? this.message(r) : null; }
+  /** A Soul's listen: every message not acknowledged (after the cursor), oldest first; each is now delivered (the agent
+   *  holds them all). */
+  takeBacklog(s: InboxScope, after?: string): InboxMessage[] {
+    const rows = this.all(s, 'AND acknowledged_at IS NULL AND n>? ORDER BY n LIMIT ?', this.cursor(s, after), SOUL_QUEUE_MAX), now = this.now();
     for (const r of rows) if (r.delivered_at === null) { this.set(s, 'delivered_at=?', r.n, now); r.delivered_at = now; }
     return rows.map(r => this.message(r));
   }
@@ -218,7 +223,8 @@ export class AgentInbox {
   }
   listenerCount(s: InboxScope) { return this.listeners.get(this.key(s)) ?? 0; }
   async listen(s: InboxScope, after: string | undefined, timeoutMs: number, signal: AbortSignal) {
-    const pending = () => { const m = this.view(s).latest; return !!m && m.id !== after && m.state !== 'acknowledged'; };
+    // A Soul's listen wakes for any message not acknowledged after its cursor (none = any); the god's, as before.
+    const pending = this.god(s) ? () => { const m = this.view(s).latest; return !!m && m.id !== after && m.state !== 'acknowledged'; } : () => !!this.nextAfter(s, after);
     if (pending() || signal.aborted || timeoutMs === 0) return;
     const key = this.key(s);
     await new Promise<void>(resolve => {
