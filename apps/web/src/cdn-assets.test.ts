@@ -106,6 +106,34 @@ test('CDN timeout covers streaming body and falls back; caller cancellation stop
   } finally { clearTimeout(keepAlive); }
 });
 
+test('PF2: a CDN request with no answer in 4 s is asked for at the origin beside it; the first answer wins, the other is cancelled', async () => {
+  const asked: string[] = [], cancelled: string[] = [];
+  const hanging = (url: string, init?: RequestInit) => new Promise<Response>((_, reject) => init?.signal?.addEventListener('abort', () => { cancelled.push(url); reject(init.signal?.reason); }));
+  // the CDN never answers; the origin answers at once
+  const stalled: typeof fetch = async (input, init) => { const url = String(input); asked.push(url); return url.startsWith('https://assets.eden.art/') ? hanging(url, init) : new Response('origin'); };
+  const t0 = Date.now();
+  assert.equal(await (await cdnFetch(stalled, manifest, 'https://assets.eden.art', page, 12_000, undefined, 40)('/worlds/assets/model.glb')).text(), 'origin');
+  assert.ok(Date.now() - t0 < 2_000, 'the origin answered after the hedge, not after the 12 s timeout');
+  assert.deepEqual(asked, [`https://assets.eden.art/${entry.key}`, '/worlds/assets/model.glb']);
+  assert.deepEqual(cancelled, [`https://assets.eden.art/${entry.key}`]);
+  // the CDN answers (late, after the hedge) before the origin, which then is cancelled; the CDN bytes are used
+  asked.length = 0; cancelled.length = 0;
+  let cdnAnswer!: (r: Response) => void;
+  const slowCdn: typeof fetch = async (input, init) => { const url = String(input); asked.push(url);
+    return url.startsWith('https://assets.eden.art/') ? new Promise<Response>((r) => { cdnAnswer = r; }) : hanging(url, init); };
+  const task = cdnFetch(slowCdn, manifest, 'https://assets.eden.art', page, 12_000, undefined, 20)('/worlds/assets/model.glb');
+  await new Promise((r) => setTimeout(r, 60));
+  cdnAnswer(new Response(bytes));
+  assert.deepEqual([...new Uint8Array(await (await task).arrayBuffer())], [...bytes]);
+  assert.deepEqual(asked, [`https://assets.eden.art/${entry.key}`, '/worlds/assets/model.glb']);
+  assert.deepEqual(cancelled, ['/worlds/assets/model.glb']);
+  // a CDN answer within the hedge time: only the CDN is asked
+  asked.length = 0;
+  const ok: typeof fetch = async (input) => { asked.push(String(input)); return new Response(bytes); };
+  await (await cdnFetch(ok, manifest, 'https://assets.eden.art', page)('/worlds/assets/model.glb')).arrayBuffer();
+  assert.deepEqual(asked, [`https://assets.eden.art/${entry.key}`]);
+});
+
 test('unmapped, range and non-GET requests retain their ordinary transport', async () => {
   const calls: (RequestInfo | URL)[] = [];
   const original: typeof fetch = async input => { calls.push(input); return new Response('origin'); };

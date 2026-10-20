@@ -107,8 +107,12 @@ function godUpload(pathname: string, pageUrl: string): CdnAsset | undefined {
 
 /** `timeoutMs` bounds the wait for CDN headers and every stall in its body (no bytes for that long), so a large world
  *  file on a slow but moving connection is not abandoned halfway. `onProgress` reports verified-download progress
- *  under the original URL while the body is buffered for its hash check. */
-export function cdnFetch(original: Fetch, manifest: CdnManifest, origin: string, pageUrl: string, timeoutMs = 12_000, onProgress?: CdnProgress): Fetch {
+ *  under the original URL while the body is buffered for its hash check. PF2 (2026-10-20), as the page-entry snapshot
+ *  (snapshot-wire.ts hedged): when the CDN has not answered in `hedgeMs`, the original request is made beside it and
+ *  whichever answers first is used (the other is cancelled), instead of waiting out the 12 s timeout on a stalled CDN
+ *  request. */
+export const CDN_HEDGE_MS = 4_000;
+export function cdnFetch(original: Fetch, manifest: CdnManifest, origin: string, pageUrl: string, timeoutMs = 12_000, onProgress?: CdnProgress, hedgeMs = CDN_HEDGE_MS): Fetch {
   const remote = cdnOrigin(origin);
   return async (input, init) => {
     const request = input instanceof Request ? input : null;
@@ -121,11 +125,24 @@ export function cdnFetch(original: Fetch, manifest: CdnManifest, origin: string,
     const stall = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     const arm = () => { clearTimeout(timer); timer = setTimeout(() => stall.abort(new DOMException('CDN stalled', 'TimeoutError')), timeoutMs); };
+    const beside = new AbortController();
+    let hedge: Promise<Response> | null = null, hedgeTimer: ReturnType<typeof setTimeout> | undefined;
     try {
       arm();
       const signal = callerSignal ? AbortSignal.any([callerSignal, stall.signal]) : stall.signal;
       // Never send an origin's auth headers, cookies or referrer to the public bucket.
-      const response = await original(remote + '/' + asset.key, { method: 'GET', mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer', signal });
+      const fromCdn = original(remote + '/' + asset.key, { method: 'GET', mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer', signal });
+      const first = await new Promise<Response | 'original'>((resolve, reject) => {
+        fromCdn.then(resolve, reject);
+        hedgeTimer = setTimeout(() => {
+          hedge = original(input, { ...init, signal: callerSignal ? AbortSignal.any([callerSignal, beside.signal]) : beside.signal });
+          hedge.then(() => resolve('original'), () => {});
+        }, hedgeMs);
+      });
+      clearTimeout(hedgeTimer);
+      if (first === 'original') { stall.abort(new DOMException('answered from the original', 'AbortError')); return hedge!; }
+      beside.abort();
+      const response = first;
       if (!response.ok || !response.body) throw Error('CDN response failed');
       const reader = response.body.getReader();
       signal.addEventListener('abort', () => { void reader.cancel().catch(() => {}); }, { once: true });
@@ -149,9 +166,9 @@ export function cdnFetch(original: Fetch, manifest: CdnManifest, origin: string,
       return new Response(bytes, { status: 200, headers: outHeaders });
     } catch (error) {
       if (callerSignal?.aborted) throw error;
-      // The caller's exact request survives HTTP/CORS/network/timeout/integrity errors.
-      return original(input, init);
-    } finally { clearTimeout(timer); }
+      // The caller's exact request survives HTTP/CORS/network/timeout/integrity errors (the one already beside it, if any).
+      return hedge && !beside.signal.aborted ? hedge : original(input, init);
+    } finally { clearTimeout(timer); clearTimeout(hedgeTimer); }
   };
 }
 
