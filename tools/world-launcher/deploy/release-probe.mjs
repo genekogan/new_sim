@@ -3,7 +3,7 @@
 //
 //   node tools/world-launcher/deploy/release-probe.mjs --origin https://sim.eden.art \
 //        --pages /worlds/w/eden-2026/,/w/eden/ [--phone-pages /worlds/w/eden-2026/,/w/eden/] --out <dir> \
-//        [--cli <god dir>[,<god dir>…]] [--arrive-every 6] [--max-min 20] [--lease <team>/ops/chrome-lease.mjs]
+//        [--cli <god dir>[,<god dir>…]] [--cli-every 1] [--arrive-every 6] [--max-min 20] [--lease <team>/ops/chrome-lease.mjs]
 //   … wait for <dir>/ready, release, wait ~20 s, then: touch <dir>/stop   (or Ctrl-C) → <dir>/report.json + a summary
 //
 // Watchers: real Chrome (headless, Playwright from mars/viewer) with one desktop context at dpr 1 holding every --pages
@@ -15,12 +15,12 @@
 // visitor opens one of the pages in a new tab (round robin, both devices) and must get a 2xx/3xx page with no error
 // text within 10 s: a visitor arriving mid-release.
 // CLI loop (optional; a god folder per world, as `eden-god.mjs register` + `pair`/`mint` leave it): `place barrel
-// --free --name z1-<run>-<n>` back to back. A call that fails is retried up to 3 times (as an agent would); a retry
+// --free --name z1-<run>-<n>`, one call started per --cli-every seconds (default 1, under the edit rate limit). A call that fails is retried up to 3 times (as an agent would); a retry
 // that finds the name already taken counts as landed. At the end `export` lists the world: lost = a name the CLI said it
 // placed that is missing, duplicate = a name placed twice. Every placed barrel is then removed (`clear` by name) unless
 // --keep-edits. Unclean = a CLI failure whose output is not the CLI's own sentence (an HTML page, a stack trace).
 //
-// Bar (G9): errorPages 0, lost 0, unclean 0, every reconnect <= 5000 ms, no page reloaded.
+// Bar (G9): errorPages 0, every arrival loaded (document 2xx/3xx within 30 s), lost 0, unclean 0, every reconnect <= 5000 ms, no page reloaded.
 import { createRequire } from 'node:module';
 import { execFile } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -40,6 +40,7 @@ const arriveEvery = Number(flag('arrive-every', 6)) * 1000;
 const maxMs = Number(flag('max-min', 20)) * 60_000;
 const settleMs = Number(flag('settle-s', 20)) * 1000;
 const keepEdits = argv.includes('--keep-edits');
+const cliEvery = Number(flag('cli-every', 1)) * 1000;   // one edit per second per god, under the world's edit rate limit
 const leasePath = flag('lease', existsSync('<team>/ops/chrome-lease.mjs') ? '<team>/ops/chrome-lease.mjs' : null);
 if (!origin || !pages.length || !out) { console.error('usage: release-probe.mjs --origin <url> --pages <path,…> --out <dir> [--phone-pages …] [--cli <dir,…>]'); process.exit(2); }
 mkdirSync(out, { recursive: true });
@@ -102,7 +103,7 @@ async function mark(w) {
 }
 const slugOf = (p) => p.replace(/^\/|\/$/g, '').replace(/[^a-z0-9]+/gi, '-') || 'home';
 async function sample(w) {
-  const txt = await w.page.evaluate(() => document.body?.innerText ?? '').catch(() => '');
+  const txt = await textOf(w.page); if (txt === null) { w.busy = (w.busy ?? 0) + 1; return; }
   const e = txt.match(ERROR_TEXT); if (e) w.errorText.push({ at: at(), text: e[0] });
   const rc = txt.match(/Reconnecting[^\n]*/); if (rc) w.reconnectingText.push({ at: at(), text: rc[0].slice(0, 80) });
 }
@@ -124,21 +125,23 @@ async function finish(w) {
 const isWorldSocketIn = isWorldSocket;
 
 // ---------- fresh arrivals during the release
+// The page's text is read with a 2 s cap: a page whose main thread is busy (a heavy world building its scene on a loaded
+// machine) is slow, not an error page — it counts as 'busy' samples, and as loaded once its document came back 2xx/3xx.
+const textOf = (page) => Promise.race([page.evaluate(() => document.body?.innerText ?? ''), new Promise((r) => setTimeout(() => r(null), 2000))]).catch(() => '');
 async function arrive(ctx, device, path) {
-  const a = { at: at(), device, path, status: null, errorText: null, ms: null };
+  const a = { at: at(), device, path, status: null, errorText: null, gotoMs: null, busy: 0, ms: null };
   const page = await ctx.newPage(); const s = Date.now();
-  const cap = setTimeout(() => { a.error = 'no page in 40 s'; void page.close().catch(() => {}); }, 40_000);
   try {
     const r = await page.goto(origin + path, { waitUntil: 'domcontentloaded', timeout: 30_000 });
-    a.status = r?.status() ?? null;
-    for (let i = 0; i < 20 && !a.errorText; i++) {
-      const txt = await page.evaluate(() => document.body?.innerText ?? '').catch(() => '');
-      const m = txt.match(ERROR_TEXT); if (m) a.errorText = m[0];
-      await page.waitForTimeout(500);
+    a.status = r?.status() ?? null; a.gotoMs = Date.now() - s;
+    for (let i = 0; i < 10 && !a.errorText; i++) {
+      const txt = await textOf(page);
+      if (txt === null) a.busy++; else { const m = txt.match(ERROR_TEXT); if (m) a.errorText = m[0]; }
+      await new Promise((r) => setTimeout(r, 500));
     }
   } catch (e) { a.error = e.message.slice(0, 120); }
-  clearTimeout(cap); a.ms = Date.now() - s;
-  await page.close().catch(() => {});
+  a.ms = Date.now() - s;
+  await Promise.race([page.close(), new Promise((r) => setTimeout(r, 5000))]).catch(() => {});
   return a;
 }
 
@@ -149,11 +152,14 @@ const run = (dir, args, timeout = 240_000) => new Promise((yes) => {
 });
 async function cliLoop(dir, runId, stopped) {
   const c = { dir, calls: 0, placed: [], failures: [], retries: 0, slowestMs: 0, unclean: 0 };
+  let lastStart = 0;
   for (let n = 1; !stopped(); n++) {
     const name = `z1-${runId}-${n}`;
     let landed = false;
     for (let attempt = 0; attempt < 4 && !landed; attempt++) {
       if (attempt) { c.retries++; await new Promise((r) => setTimeout(r, 1000)); }
+      const wait = lastStart + cliEvery - Date.now(); if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      lastStart = Date.now();
       const startAt = at(), r = await run(dir, ['place', 'barrel', '--free', '--name', name]); c.calls++;
       c.slowestMs = Math.max(c.slowestMs, r.ms);
       if (r.ms > 5000) (c.slow ??= []).push({ name, startAt, ms: r.ms, code: r.code, out: r.out.slice(-400) });
@@ -222,14 +228,15 @@ report.bar = {
   drops: drops.length,
   reconnectMaxMs: drops.length ? Math.max(...drops.map((d) => d.reconnectMs ?? Infinity)) : 0,
   notResumed: drops.filter((d) => d.reconnectMs === null).length,
-  arrivals: report.arrivals.length, arrivalsNotLoaded: report.arrivals.filter((a) => a.error).map((a) => `${a.device} ${a.path} +${(a.at / 1000).toFixed(1)}s: ${a.error}`),
+  arrivals: report.arrivals.length, arrivalsSlowestGotoMs: Math.max(0, ...report.arrivals.map((a) => a.gotoMs ?? 0)),
+  arrivalsBusy: report.arrivals.filter((a) => a.busy).length, arrivalsNotLoaded: report.arrivals.filter((a) => a.error).map((a) => `${a.device} ${a.path} +${(a.at / 1000).toFixed(1)}s: ${a.error}`),
   cliCalls: report.cli.reduce((n, c) => n + c.calls, 0), cliPlaced: report.cli.reduce((n, c) => n + c.placed.length, 0),
   cliFailures: report.cli.reduce((n, c) => n + c.failures.length, 0), cliRetries: report.cli.reduce((n, c) => n + c.retries, 0),
   lost: report.cli.reduce((n, c) => n + (c.lost?.length ?? 0), 0), duplicates: report.cli.reduce((n, c) => n + (c.duplicates?.length ?? 0), 0),
   unclean: report.cli.reduce((n, c) => n + c.unclean, 0), cliSlowestMs: Math.max(0, ...report.cli.map((c) => c.slowestMs)),
 };
 const b = report.bar;
-b.pass = b.errorPages === 0 && b.lost === 0 && b.unclean === 0 && b.notResumed === 0 && b.reconnectMaxMs <= 5000 && b.reloaded.length === 0;
+b.pass = b.errorPages === 0 && b.arrivalsNotLoaded.length === 0 && b.lost === 0 && b.unclean === 0 && b.notResumed === 0 && b.reconnectMaxMs <= 5000 && b.reloaded.length === 0;
 report.endedAt = iso();
 writeFileSync(join(out, 'report.json'), JSON.stringify(report, null, 2) + '\n');
 console.log(JSON.stringify(b, null, 1));
