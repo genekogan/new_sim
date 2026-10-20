@@ -4,7 +4,8 @@ import { chmod, mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from 
 import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { CACHE, DEFAULT_SOURCES, inventory, keyFor, licenceEvidence, parseCsv, readReviewed, shaFile } from './inventory.mjs';
+import { CACHE, DEFAULT_SOURCES, inventory, keyFor, licenceEvidence, parseCsv, readReviewed, readServed, shaFile } from './inventory.mjs';
+import { buildRecords } from './served-public.mjs';
 import { ENDPOINT, loadCredentials, publish, signRequest, sigv4Headers } from './publish.mjs';
 import { verify } from './verify.mjs';
 import { withNewReceipt } from './receipt.mjs';
@@ -101,6 +102,45 @@ test('the 20 reviewed lod1 records are exactly the CC0 lods, each from an approv
     assert.equal(lods[d.sha256].source, `lod1 of ${parent.path} (${parent.sha256})`);
   }
 });
+
+test('CDN2: served-public.json is current and holds the 125 private lods, each pinned to its lod bytes', async () => {
+  const served = await readServed();
+  assert.deepEqual(served, await buildRecords(), 'stale: run node tools/cdn/served-public.mjs --write and review the diff');
+  assert.equal(served.rule.date, '2026-10-20');
+  const lods = JSON.parse(await readFile(new URL('../../worlds/core-assets/lods.index.json', import.meta.url), 'utf8')).assets;
+  const records = served.objects.filter(r => r.path.startsWith('worlds/core-assets/lods/'));
+  const priv = Object.entries(lods).filter(([, a]) => a.license !== 'CC0 1.0');
+  assert.equal(priv.length, 125); assert.equal(records.length, 125);
+  for (const [sha, a] of priv) {
+    const r = records.find(x => x.sha256 === sha);
+    assert.ok(r, `private lod ${a.name} has no record`);
+    assert.deepEqual({ bytes: r.bytes, path: r.path, rights: r.rights, source: r.source }, { bytes: a.bytes, path: a.path, rights: a.license, source: a.source });
+    assert.deepEqual(await shaFile(new URL('../../' + r.path, import.meta.url)), { sha256: sha, bytes: r.bytes });
+  }
+  const reviewed = await readReviewed();
+  for (const r of served.objects) assert.ok(!reviewed.derivatives.some(d => d.sha256 === r.sha256), `${r.path}: CC0-reviewed bytes never need a served-public record`);
+  assert.equal(licenceEvidence([], records[0].sha256, records[0].bytes, reviewed, served).licence, 'served-public');
+  assert.equal(licenceEvidence([], records[0].sha256, records[0].bytes + 1, reviewed, served).licence, 'unknown');
+});
+
+test('hash aliases carry the bytes the origin route sends: a rendition under its source sha, marked `of`', async () => fixture(async ({ dir, sources }) => {
+  const src = Buffer.from('source mesh'), ren = Buffer.from('smaller rendition'), plain = Buffer.from('plain mesh');
+  const [s, r, p] = [src, ren, plain].map(hash);
+  const core = join(dir, 'worlds/core-assets'); await mkdir(join(core, 'renditions'), { recursive: true });
+  await writeFile(join(core, 'src.glb'), src); await writeFile(join(core, `renditions/${r}.glb`), ren); await writeFile(join(core, 'plain.glb'), plain);
+  await writeFile(join(core, 'index.json'), JSON.stringify({ assets: { [s]: { ext: 'glb', path: 'worlds/core-assets/src.glb', license: 'private' }, [p]: { ext: 'glb', path: 'worlds/core-assets/plain.glb', license: 'private' } } }));
+  await writeFile(join(core, 'renditions.json'), JSON.stringify({ schema: 'core-renditions/1', renditions: { [s]: { sha: r, path: `worlds/core-assets/renditions/${r}.glb` } } }));
+  const reviewed = { derivatives: [], sources: {} };
+  const served = await buildRecords(dir, reviewed);
+  assert.deepEqual(served.objects.map(o => [o.path, o.renditionOf]), [['worlds/core-assets/plain.glb', undefined], [`worlds/core-assets/renditions/${r}.glb`, [s]]]);
+  const plan = await inventory({ root: dir, sources, roots: [{ dir: join(dir, 'worlds'), prefixes: ['/world-assets/'], pages: ['/worlds'] }], reviewed, served });
+  for (const prefix of ['/assets/', '/worlds/assets/']) {
+    assert.deepEqual(plan.manifest.assets[`${prefix}${s}.glb`], { key: keyFor(r, '.glb'), sha256: r, bytes: ren.length, licence: 'served-public', of: s });
+    assert.deepEqual(plan.manifest.assets[`${prefix}${p}.glb`], { key: keyFor(p, '.glb'), sha256: p, bytes: plain.length, licence: 'served-public' });
+  }
+  assert.equal(plan.manifest.assets[`/assets/${r}.glb`], undefined, 'the origin has no /assets route for a rendition sha');
+  assert.equal(plan.objects.length, 2, 'the unserved source bytes are not uploaded');
+}));
 
 test('SigV4 signs immutable precondition, payload, date, target and metadata without leaking secret', () => {
   const signed = signRequest({ method: 'PUT', key: object.key, credentials, body: data, now: new Date('2026-10-15T00:01:02Z'), headers: { 'if-none-match': '*', 'content-type': object.contentType, 'cache-control': CACHE, 'x-amz-meta-sha256': sha256 } });

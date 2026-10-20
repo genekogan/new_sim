@@ -1,29 +1,31 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { lstat, readFile } from 'node:fs/promises';
+import { lstat, readdir, readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const json = async path => JSON.parse(await readFile(join(root, path), 'utf8'));
 
-// Resolve the prepared artifact independently of inventory.mjs. A path alias must name
-// real world bytes; a content-addressed alias must resolve through the reviewed core index (or, for the 20 CC0
-// lod1 meshes, the core lods index).
-function manifestFile(alias, entry, index, reviewed) {
+// Resolve the prepared artifact independently of inventory.mjs. A path alias must name real world bytes; a
+// content-addressed alias must resolve through the server's core set (worlds/core-assets/index.json + *.index.json),
+// to the bytes GET /assets/<sha> sends: the rendition (renditions.json) when one exists, else the file itself.
+function manifestFile(alias, entry, core, renditions) {
   const canonical = /^(?:\/worlds)?\/assets\/([a-f0-9]{64})\.([a-z0-9]+)$/.exec(alias);
   if (canonical) {
     const [, sha, ext] = canonical;
-    assert.equal(entry.sha256, sha, `${alias}: filename must match its declared SHA-256`);
-    const asset = index.assets[sha];
+    const asset = core[sha];
     assert.ok(asset, `${alias}: no core index file for this hash`);
     assert.equal(asset.ext, ext, `${alias}: core index extension differs`);
-    assert.ok(reviewed.derivatives.some(d => d.sha256 === sha && d.bytes === entry.bytes && d.path === asset.path), `${alias}: no reviewed core output`);
-    return asset.path;
+    const ren = ext === 'glb' ? renditions[sha] : undefined;
+    assert.equal(entry.of, ren ? sha : undefined, `${alias}: a rendition alias names its requested sha in 'of', no other alias does`);
+    assert.equal(entry.sha256, ren ? ren.sha : sha, `${alias}: must carry the bytes the origin route sends`);
+    return ren ? ren.path : asset.path;
   }
   const named = /^(?:\/worlds)?\/world-assets\/(.+)$/.exec(alias);
   assert.ok(named, `${alias}: unknown prepared manifest alias`);
+  assert.equal(entry.of, undefined, `${alias}: only hash aliases may be renditions`);
   return 'worlds/' + named[1];
 }
 
@@ -42,34 +44,37 @@ async function actualWorldBytes(path) {
   return { sha256: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.length };
 }
 
-test('all 384 prepared CDN aliases match independently hashed on-disk world files', async t => {
-  const [manifest, core, lods, reviewed] = await Promise.all([
-    json('apps/web/src/cdn-manifest.json'),
-    json('worlds/core-assets/index.json'),
-    json('worlds/core-assets/lods.index.json'),
-    json('tools/cdn/approved-derivatives.json'),
+test('every prepared CDN alias matches independently hashed on-disk world files', async t => {
+  const dir = join(root, 'worlds/core-assets');
+  const [manifest, reviewed, served, ren] = await Promise.all([
+    json('apps/web/src/cdn-manifest.json'), json('tools/cdn/approved-derivatives.json'), json('tools/cdn/served-public.json'), json('worlds/core-assets/renditions.json'),
   ]);
-  const index = { assets: { ...core.assets, ...lods.assets } };
+  const core = {};
+  for (const name of ['index.json', ...(await readdir(dir)).filter(n => n.endsWith('.index.json')).sort()]) {
+    for (const [sha, a] of Object.entries((await json('worlds/core-assets/' + name)).assets)) core[sha] ??= a;
+  }
   assert.equal(manifest.version, 1);
   const entries = Object.entries(manifest.assets);
-  assert.equal(entries.length, 384, 'retain the complete prepared publication manifest');
   const files = new Map();
   let namedCount = 0, canonicalCount = 0;
   for (const [alias, entry] of entries) {
     assert.match(entry.sha256, /^[a-f0-9]{64}$/, `${alias}: invalid SHA-256`);
     assert.ok(Number.isSafeInteger(entry.bytes) && entry.bytes > 0, `${alias}: invalid byte count`);
-    const path = manifestFile(alias, entry, index, reviewed);
+    const path = manifestFile(alias, entry, core, ren.renditions);
     if (!files.has(path)) files.set(path, await actualWorldBytes(path));
     assert.deepEqual(files.get(path), { sha256: entry.sha256, bytes: entry.bytes }, `${alias}: prepared bytes differ from ${path}`);
+    const record = entry.licence === 'served-public' ? served.objects.find(r => r.sha256 === entry.sha256) : reviewed.derivatives.find(d => d.sha256 === entry.sha256);
+    assert.ok(record && record.bytes === entry.bytes, `${alias}: no ${entry.licence} record for these bytes`);
     if (/^\/(?:worlds\/)?world-assets\//.test(alias)) namedCount++;
     else canonicalCount++;
   }
-  assert.equal(namedCount, 192, 'verify both named world-assets namespaces');
-  assert.equal(canonicalCount, 192, 'verify both canonical asset namespaces');
-  assert.equal(files.size, 96, 'all prepared aliases resolve to the 96 reviewed files (76 CC0 models + 20 CC0 lod1)');
-  // The private lods (Little Martians, Mars College) never enter the shared manifest.
-  const cc0Lods = new Set(Object.entries(lods.assets).filter(([, a]) => a.license === 'CC0 1.0').map(([sha]) => sha));
-  assert.equal(cc0Lods.size, 20);
-  for (const [alias, entry] of entries) if (lods.assets[entry.sha256]) assert.ok(cc0Lods.has(entry.sha256), `${alias}: private lod in the shared manifest`);
+  // CDN2 (Gene, 2026-10-20): the whole core set, private Mars College and Little Martians files included, is published.
+  const glbs = Object.values(core).filter(a => a.ext === 'glb').length;
+  assert.equal(canonicalCount, 2 * glbs, 'both hash namespaces for every core-set GLB');
+  const objects = new Set([...files.values()].map(f => f.sha256));
+  assert.equal(objects.size, reviewed.derivatives.length + served.objects.length, 'every reviewed and served-public object, nothing else');
+  assert.equal(namedCount, 2 * files.size, 'both named world-assets namespaces for every file');
+  const lods = (await json('worlds/core-assets/lods.index.json')).assets;
+  for (const sha of Object.keys(lods)) assert.ok(manifest.assets[`/assets/${sha}.glb`] && manifest.assets[`/worlds/assets/${sha}.glb`], `lod ${sha} is published`);
   t.diagnostic(`${entries.length} aliases verified against ${files.size} independently hashed files (${[...files.values()].reduce((n, f) => n + f.bytes, 0)} unique bytes)`);
 });

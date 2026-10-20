@@ -2,7 +2,9 @@
 // Never infer a CDN URL from a filename: only the reviewed, hash-pinned publication manifest can opt a file in.
 import { ImageLoader } from 'three';
 
-export type CdnAsset = { key: string; sha256: string; bytes: number; licence: string };
+/** `of`: on a hash alias (`/assets/<of>.glb`) whose origin sends a smaller rendition under that sha, the requested sha;
+ *  `sha256`/`bytes` are then the rendition's, i.e. exactly what the origin route delivers. */
+export type CdnAsset = { key: string; sha256: string; bytes: number; licence: string; of?: string };
 /** `assets`: the shared CC0/own-work catalogue. `worlds`: world-scoped publications, keyed by the exact world page
  *  namespace (`/w/<slug>` or `/worlds/w/<slug>`); an entry there only applies on that world's own page. */
 export type CdnManifest = { version: 1; assets: Record<string, CdnAsset>; worlds?: Record<string, Record<string, CdnAsset>> };
@@ -10,7 +12,9 @@ export type CdnProgress = (url: string, loaded: number, total: number) => void;
 type Fetch = typeof fetch;
 const FILE = /\.(glb|bin|ktx2|png|jpe?g|webp|avif|hdr|exr)$/i;
 const IMAGE = /\.(png|jpe?g|webp|avif)$/i;
-const LICENCES = new Set(['CC0-1.0', 'own-work']);
+/** served-public (Gene, 2026-10-20): any file the origin already serves publicly by hash may come from the CDN when that
+ *  loads faster. The label records why it is published, not a reuse licence (tools/cdn/served-public.json keeps rights). */
+const LICENCES = new Set(['CC0-1.0', 'own-work', 'served-public']);
 /** World-scoped art keeps its own rights; it is never CC0, never shared and never a hash alias for another world. */
 const SCOPED = 'world-scoped';
 const WORLD = /^(?:\/worlds)?\/w\/[a-z][a-z0-9-]{0,31}$/;
@@ -32,7 +36,8 @@ export function readCdnManifest(value: unknown): CdnManifest {
     const match = /^assets\/([a-f0-9]{2})\/([a-f0-9]{64})\.[a-z0-9]+$/.exec(a.key);
     if (!match || match[1] !== a.sha256.slice(0, 2) || match[2] !== a.sha256) throw Error('Invalid CDN key');
     const canonical = /^(?:\/worlds)?\/assets\/([a-f0-9]{64})\.[a-z0-9]+$/.exec(path);
-    if (canonical && canonical[1] !== a.sha256) throw Error('Invalid CDN hash alias');
+    if (a.of !== undefined && (!canonical || !/^[a-f0-9]{64}$/.test(a.of) || a.of === a.sha256)) throw Error('Invalid CDN rendition alias');
+    if (canonical && canonical[1] !== (a.of ?? a.sha256)) throw Error('Invalid CDN hash alias');
     assets[path] = a;
   }
   const worlds: Record<string, Record<string, CdnAsset>> = Object.create(null);

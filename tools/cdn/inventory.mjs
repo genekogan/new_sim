@@ -4,13 +4,15 @@ import { createReadStream } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { coreSet } from './served-public.mjs';
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 export const DEFAULT_SOURCES = '<team>/asset-scouting/SOURCES.csv';
 export const CACHE = 'public, max-age=31536000, immutable';
 export const TYPES = { '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream', '.wasm': 'application/wasm', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.avif': 'image/avif', '.ktx2': 'image/ktx2', '.hdr': 'image/vnd.radiance', '.exr': 'image/x-exr' };
 const SOURCE_LICENCES = new Set(['CC0-1.0', 'CC0 1.0', 'CC0-1.0 sources', 'own work']);
-export const ALLOWED_LICENCES = new Set(['CC0-1.0', 'own-work']);
+// served-public (CDN2, Gene 2026-10-20): already public on the origin by hash; the CDN is a transport, not a licence.
+export const ALLOWED_LICENCES = new Set(['CC0-1.0', 'own-work', 'served-public']);
 export const CLIENT_EXTENSIONS = new Set(['.glb', '.bin', '.ktx2', '.png', '.jpg', '.jpeg', '.webp', '.avif', '.hdr', '.exr']);
 const normalizedLicence = licence => licence === 'own work' ? 'own-work' : 'CC0-1.0';
 export const keyFor = (sha, ext) => `assets/${sha.slice(0, 2)}/${sha}${ext}`;
@@ -36,7 +38,7 @@ export async function shaFile(file) {
   for await (const chunk of createReadStream(file)) { bytes += chunk.length; h.update(chunk); }
   return { sha256: h.digest('hex'), bytes };
 }
-export function licenceEvidence(rows, sha256, bytes, reviewed = { derivatives: [] }) {
+export function licenceEvidence(rows, sha256, bytes, reviewed = { derivatives: [] }, served = { objects: [] }) {
   const matches = rows.filter(r => r.sha256 === sha256 && Number(r.bytes) === bytes);
   // Conflicting/restricted rows cannot silently be overridden by an allowlisted label.
   if (matches.some(r => !SOURCE_LICENCES.has(r.licence))) return { reason: 'restricted or conflicting SOURCES.csv licence', licence: matches.map(r => r.licence).join('; ') };
@@ -50,9 +52,12 @@ export function licenceEvidence(rows, sha256, bytes, reviewed = { derivatives: [
     }
     return { reason: 'reviewed derivative source records changed or missing from SOURCES.csv', licence: 'unknown' };
   }
+  const record = served.objects.find(r => r.sha256 === sha256 && r.bytes === bytes);
+  if (record) return { licence: 'served-public', source: { servedPublic: record.path, rights: record.rights } };
   return { reason: 'no exact SHA-256/bytes licence record in SOURCES.csv or reviewed derivative allowlist', licence: 'unknown' };
 }
 export async function readReviewed() { return JSON.parse(await readFile(new URL('./approved-derivatives.json', import.meta.url), 'utf8')); }
+export async function readServed() { return JSON.parse(await readFile(new URL('./served-public.json', import.meta.url), 'utf8')); }
 async function filesUnder(dir) {
   let entries; try { entries = await readdir(dir, { withFileTypes: true }); } catch (e) { if (e.code === 'ENOENT') return []; throw e; }
   const files = [];
@@ -75,9 +80,9 @@ export function defaultRoots(root) {
     { dir: join(root, 'apps/web/public'), prefixes: ['/', '/worlds/'], pages: ['/w/eden', '/w/mars', '/w/littlemartians', '/worlds'] },
   ];
 }
-export async function inventory({ root = ROOT, sources = DEFAULT_SOURCES, roots = defaultRoots(root), now = new Date(), reviewed } = {}) {
+export async function inventory({ root = ROOT, sources = DEFAULT_SOURCES, roots = defaultRoots(root), now = new Date(), reviewed, served } = {}) {
   const rows = parseCsv(await readFile(sources, 'utf8')), byPath = new Map(), missingRoots = [];
-  reviewed ??= await readReviewed();
+  reviewed ??= await readReviewed(); served ??= await readServed();
   // The immutable release overlay takes precedence over source-public fallbacks.
   for (const spec of roots) {
     try { if (!(await stat(spec.dir)).isDirectory()) throw Error('Asset root is not a directory'); } catch (e) { if (e.code === 'ENOENT') { missingRoots.push(spec.dir); continue; } throw e; }
@@ -89,7 +94,7 @@ export async function inventory({ root = ROOT, sources = DEFAULT_SOURCES, roots 
   const hashes = new Map(), candidates = [], assets = {}, objects = new Map(), excluded = [];
   for (const candidate of [...byPath.values()].sort((a, b) => a.path.localeCompare(b.path))) {
     if (!hashes.has(candidate.file)) hashes.set(candidate.file, await shaFile(candidate.file));
-    const digest = hashes.get(candidate.file), evidence = licenceEvidence(rows, digest.sha256, digest.bytes, reviewed);
+    const digest = hashes.get(candidate.file), evidence = licenceEvidence(rows, digest.sha256, digest.bytes, reviewed, served);
     const item = { ...candidate, ...digest, licence: evidence.licence };
     candidates.push(item);
     if (evidence.reason) { excluded.push({ ...item, reason: evidence.reason }); continue; }
@@ -103,15 +108,19 @@ export async function inventory({ root = ROOT, sources = DEFAULT_SOURCES, roots 
     if (assets[base]) assets[alias] = assets[base];
     else if (byPath.has(base)) { const item = excluded.find(r => r.path === base); excluded.push({ ...item, path: alias }); }
   }
-  // Runtime mesh endpoints use a SHA, independent of the core catalogue's on-disk name.
-  // Only explicitly reviewed core outputs receive these public aliases.
-  for (const object of objects.values()) {
-    if (!reviewed.derivatives.some(d => d.sha256 === object.sha256 && d.bytes === object.bytes)) continue;
-    const ext = extname(object.file).toLowerCase();
-    if (!CLIENT_EXTENSIONS.has(ext)) continue;
+  // Runtime mesh endpoints use a SHA, independent of the core catalogue's on-disk name. Each alias names the bytes the
+  // origin's GET /assets/<sha> sends: the core set (worlds/core-assets/*index.json) with its renditions, plus reviewed
+  // outputs. A rendition alias carries `of` (the requested sha); the entry's sha256 is the bytes actually delivered.
+  const targets = new Map();
+  for (const d of reviewed.derivatives) targets.set(d.sha256, { sha256: d.sha256, ext: extname(d.path).toLowerCase() });
+  for (const [s, a] of (await coreSet(root)).assets) targets.set(s, { sha256: a.served?.sha256 ?? s, ext: '.' + a.ext });
+  const bySha = new Map([...objects.values()].map(o => [o.sha256, o]));
+  for (const [s, t] of [...targets].sort(([a], [b]) => a.localeCompare(b))) {
+    const object = bySha.get(t.sha256);
+    if (!object || !CLIENT_EXTENSIONS.has(t.ext) || extname(object.file).toLowerCase() !== t.ext) continue;
     for (const prefix of ['/assets/', '/worlds/assets/']) {
-      const path = `${prefix}${object.sha256}${ext}`;
-      assets[path] = { key: object.key, sha256: object.sha256, bytes: object.bytes, licence: object.licence };
+      const path = `${prefix}${s}${t.ext}`;
+      assets[path] = { key: object.key, sha256: object.sha256, bytes: object.bytes, licence: object.licence, ...(s !== object.sha256 ? { of: s } : {}) };
       if (!object.paths.includes(path)) object.paths.push(path);
     }
   }

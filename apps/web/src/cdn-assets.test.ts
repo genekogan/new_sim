@@ -17,6 +17,12 @@ test('only explicit local manifest paths opt in, retaining query version pins an
   assert.throws(() => readCdnManifest({ version: 1, assets: { '/private.glb': { ...entry, licence: 'private' } } }));
   assert.throws(() => readCdnManifest({ version: 1, assets: { '/a.glb': { ...entry, key: 'assets/00/other.glb' } } }));
   assert.throws(() => readCdnManifest({ version: 1, assets: { [`/assets/${'0'.repeat(64)}.glb`]: entry } }));
+  // A rendition alias names its requested sha; only hash aliases may, and never with the delivered sha.
+  const of = 'f'.repeat(64);
+  assert.equal(readCdnManifest({ version: 1, assets: { [`/assets/${of}.glb`]: { ...entry, of, licence: 'served-public' } } }).assets[`/assets/${of}.glb`].sha256, sha256);
+  assert.throws(() => readCdnManifest({ version: 1, assets: { [`/assets/${'e'.repeat(64)}.glb`]: { ...entry, of } } }), /Invalid CDN hash alias/);
+  assert.throws(() => readCdnManifest({ version: 1, assets: { '/a.glb': { ...entry, of } } }), /rendition/);
+  assert.throws(() => readCdnManifest({ version: 1, assets: { [`/assets/${sha256}.glb`]: { ...entry, of: sha256 } } }), /rendition/);
   assert.throws(() => cdnOrigin('https://other.test'));
   assert.throws(() => cdnOrigin('http://127.0.0.1:5811/path'));
   assert.equal(cdnOrigin('http://127.0.0.1:5811'), 'http://127.0.0.1:5811');
@@ -35,13 +41,18 @@ test('prepared publication manifest validates and resolves real core mesh reques
   const prepared = readCdnManifest(JSON.parse(readFileSync(new URL('./cdn-manifest.json', import.meta.url), 'utf8')));
   const cow = 'bbb287748cb8dbbe4fbf63ca5d92c823cda863139bb4830182b3fc66a1f6deb9';
   for (const prefix of ['', '/worlds']) assert.equal(manifestAsset(prepared, `${prefix}/w/fresh-owner-world/assets/${cow}.glb`, page)?.sha256, cow);
-  // CDN1: the CC0 lod1 meshes (make.lod1, fetched by SHA like any core mesh) resolve too; the private lods stay on origin.
+  // CDN1: the CC0 lod1 meshes (make.lod1, fetched by SHA like any core mesh) resolve too. CDN2 (Gene, 2026-10-20): so do
+  // the private lods and every other core-set file the origin already serves by hash (served-public).
   const cowLod = '2d26b0ae1d8c726aba1d6f13c4c05712dbd4c728412334c7a03cac93ac4042e5';
-  const minaretLod = '00e3310904d14f07bf29b30800e12f4b811fc55232f32a76a5525756afcb31d1'; // Little Martians: private
+  const minaretLod = '00e3310904d14f07bf29b30800e12f4b811fc55232f32a76a5525756afcb31d1'; // Little Martians
   for (const prefix of ['', '/worlds']) {
     assert.equal(manifestAsset(prepared, `${prefix}/w/eden/assets/${cowLod}.glb`, page)?.sha256, cowLod);
-    assert.equal(manifestAsset(prepared, `${prefix}/w/littlemartians/assets/${minaretLod}.glb`, page), undefined);
+    assert.equal(manifestAsset(prepared, `${prefix}/w/littlemartians/assets/${minaretLod}.glb`, page)?.licence, 'served-public');
   }
+  // A core mesh whose origin route sends a rendition maps to the rendition's bytes (what the origin delivers).
+  const withRendition = Object.entries(prepared.assets).find(([path, a]) => a.of && path.startsWith('/assets/'));
+  assert.ok(withRendition);
+  assert.equal(manifestAsset(prepared, `/worlds/w/any-world/assets/${withRendition[1].of}.glb`, page)?.sha256, withRendition[1].sha256);
   assert.equal(manifestAsset(prepared, '/browser/campus.glb?v=20260922b', page), undefined, 'campus remains excluded pending publication provenance');
 });
 
