@@ -1,10 +1,15 @@
-# Nightly consistent copy of a launcher stage's databases (lane CLOUD): accounts.sqlite (the Clerk-linked
-# registry: who owns which world) and worlds.json, plus each world's sim.db. Online SQLite backups, safe while
-# the worlds run. Destination /srv/sim-worlds-backups/%i/<YYYYMMDD>/; see backup.mjs for retention.
+# Nightly versioned backup of a launcher stage (lane BK, 2026-10-20; was lane CLOUD's dated full copies, backup.mjs):
+# online SQLite backups of accounts.sqlite, forks/accounts.sqlite and every worlds/<slug>/sim.db (consistent while the
+# worlds run, each quick_checked), worlds.json, audit.jsonl and the uploaded worlds/assets, snapshotted into one restic
+# repository (only changed chunks are stored: ~13 MB a night for production + legacy instead of ~260 MB), then
+# forget --prune keeps 7 daily, 4 weekly, 6 monthly snapshots. Settings: /etc/sim-worlds/backup.env (backup.env.example).
+# Same unit name as before, so host-health's backup check needs no change.
 #   enable:  systemctl enable --now sim-worlds-backup@production.timer
 #   run now: systemctl start sim-worlds-backup@production.service
+#   restore: node /srv/sim-worlds/production/tools/world-launcher/deploy/backup-restic.mjs restore production latest <empty dir>
+# Rollback to the old dated copies: ExecStart=... deploy/backup.mjs /srv/sim-worlds-data/%i /srv/sim-worlds-backups/%i
 [Unit]
-Description=Nightly backup of sim-worlds@%i databases
+Description=Nightly backup of sim-worlds@%i databases (restic)
 
 [Service]
 Type=oneshot
@@ -12,7 +17,9 @@ User=simworlds
 Group=simworlds
 Nice=10
 IOSchedulingClass=idle
-ExecStart=/usr/bin/node --no-warnings /srv/sim-worlds/%i/tools/world-launcher/deploy/backup.mjs /srv/sim-worlds-data/%i /srv/sim-worlds-backups/%i
+EnvironmentFile=-/etc/sim-worlds/backup.env
+ExecStart=/usr/bin/node --no-warnings /srv/sim-worlds/%i/tools/world-launcher/deploy/backup-restic.mjs backup %i
+TimeoutStartSec=2h
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true

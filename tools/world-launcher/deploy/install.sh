@@ -35,7 +35,9 @@ CONF
 fi
 chown root:simworlds /etc/sim-worlds/*.conf && chmod 640 /etc/sim-worlds/*.conf
 # The Soul CLI 1.9 and its guides ship inside each release (tools/world-launcher/soul/, pinned by sha in SOURCES.json),
-# so no --soul-* flags are needed. Nightly backup destination:
+# so no --soul-* flags are needed. Nightly backup destination (restic repository /srv/sim-worlds-backups/restic: created once
+# by hand with `restic init`, never here, so a missing disk can't start an empty one; settings in /etc/sim-worlds/backup.env,
+# see backup.env.example; its password /etc/sim-worlds/restic.pass root:simworlds 0640 is provisioned once, never by this script):
 install -d -o simworlds -g simworlds -m 750 /srv/sim-worlds-backups
 
 install -m 644 "$UNIT_SRC" /etc/systemd/system/sim-worlds@.service
