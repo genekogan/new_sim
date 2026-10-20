@@ -4,6 +4,7 @@
 import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { applyBatch, coreRef, type DefInput, type ResidentMove, type Result } from '@sim/world-compiler';
+import { meter } from '@sim/world-compiler/work-meter';
 import { mediumAt } from '@sim/ground';
 import { Db } from '../db.ts';
 import { GodMode } from './god.ts';
@@ -220,17 +221,21 @@ test('route checks share one budget per edit: residents past it are relocated, n
   if (process.env.GOD_WALKOUT_BENCH === '1') console.log(`walk-out plan: 24 residents, no routes: ${ms.toFixed(1)} ms`);
 });
 
-test('bench: walk-out planning for N residents among M entities stays fast', { skip: process.env.GOD_WALKOUT_BENCH !== '1' }, async t => {
+// Z3: work budgets, not milliseconds (see @sim/world-compiler/work-meter): the same answer on any CPU, so it runs in the gate.
+// Measured 2026-10-20, identical on every run: planning 40 residents among 1,501 entities 358,325 (routes open) and
+// 361,596 (closed, 64 route checks: the shared per-edit budget). The work budget is about 2x; routes keep the edit's 64.
+const WALKOUT_WORK = { plan: 720_000, routes: 64 };
+test('bench: walk-out planning for N residents among M entities stays fast', async t => {
   const god = godWorld(t), ops: unknown[] = [];
   for (let i = 0; i < 1500; i++) ops.push({ op: 'place', def: coreRef(i % 3 ? 'bench' : 'lamp-post'), p: [-60 + (i % 40) * 3, -60 + Math.floor(i / 40) * 3.2] });
   for (let i = 0; i < ops.length; i += 250) ok(god.act({ ops: ops.slice(i, i + 250) }));
   ok(god.act({ ops: [{ op: 'place', def: coreRef('cottage'), name: 'hut', p: [70, 70], params: { w: 16, d: 12 } }] }));
-  const bodies: Record<string, Body> = {}, minds = [];
+  const bodies: Record<string, Body> = {}, minds: { soulId: string; entityId: string; name: string }[] = [];
   for (let i = 0; i < 40; i++) { const id = `h_res${i}`; bodies[id] = { p: [64 + (i % 8) * 1.5, 0, 66 + Math.floor(i / 8) * 1.6], human: { activity: 'idle' } }; minds.push({ soulId: `s_res${i}`, entityId: id, name: `R${i}` }); }
   for (const route of [true, false]) {
     const eng = crowd(bodies, { route }), t0 = performance.now();
-    const plan = planEdit(god, eng, [{ op: 'move', id: 'hut', p: [40, 70] }], minds), ms = performance.now() - t0;
-    console.log(`walk-out plan: ${plan.moved.length} of 40 residents, ${god.model.entities.size} entities, routes ${route ? 'open' : 'closed'}: ${ms.toFixed(0)} ms (${eng.routes} route checks)`);
-    assert.ok(ms < 1500, `${ms} ms`);
+    const { value: plan, work: w } = meter(() => planEdit(god, eng, [{ op: 'move', id: 'hut', p: [40, 70] }], minds)), ms = performance.now() - t0;
+    console.log(`walk-out plan: ${plan.moved.length} of 40 residents, ${god.model.entities.size} entities, routes ${route ? 'open' : 'closed'}: ${ms.toFixed(0)} ms (${eng.routes} route checks) work=${JSON.stringify(w)}`);
+    assert.ok(w.total <= WALKOUT_WORK.plan, `walk-out plan work ${w.total}`); assert.ok(eng.routes <= WALKOUT_WORK.routes, `route checks ${eng.routes}`);
   }
 });

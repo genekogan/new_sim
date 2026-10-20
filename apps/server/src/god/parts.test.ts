@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { Hono } from 'hono';
 import { coreLibrary, coreRef } from '@sim/world-compiler';
+import { meter, work } from '@sim/world-compiler/work-meter';
 import { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
 import { GodMode, type GodOptions } from './god.ts';
@@ -309,17 +310,23 @@ test('a find miss is logged once at offset zero', async t => {
   assert.equal(f.query('god_find_misses_v1').length, 1); assert.equal(f.query('god_find_misses_v1')[0].query, 'zqxwzqxw');
 });
 
-// Opt-in local measurements only; no staged agent experiment.
-test('bench: onDone with 256 roots and 5000 entities stays below 20ms', { skip: process.env.PARTS_BENCH !== '1' }, t => {
+// Measured 2026-10-20: onDone 70,049 (13 per node), origins overhead -0.06%. Budgets are about 2x.
+const ONDONE_WORK = 140_000, ORIGINS_TOTAL_PCT = 2;
+// Z3: work budgets, not milliseconds (see @sim/world-compiler/work-meter): the same answer on any CPU, so these run in the gate.
+test('bench: onDone with 256 roots and 5000 entities stays below 20ms', t => {
   const f = fixture(t); accepted(f.act([define()])); const b = f.start();
   const roots: string[] = [];
   for (let i = 0; i < 5000; i++) { const id = 'e_' + i, parent = i < 256 ? 'world' : 'e_' + (i % 256); if (i < 256) roots.push(id);
     f.god.model.insert({ id, def: 'gothic-tower@1', name: 'part-' + i, in: { parent }, p: [0, 0, 0], by: 'god', born: 0, v: 1 }); }
   const row = f.god.store.build(b.id)!, body = JSON.parse(row.body) as BuildBody; body.roots = roots; body.done = { at: 1_000_000, byLabel: 'maker' };
   f.db.db.prepare("UPDATE god_builds_v1 SET status='done',body=? WHERE world_id=? AND id=?").run(JSON.stringify(body), 'parts-test', b.id);
-  const at = performance.now(); f.god.parts.onDone(b.id); const ms = performance.now() - at; console.log('PARTS_BENCH onDone ms=' + ms.toFixed(3)); assert.ok(ms < 20, String(ms)); assert.equal(uses(f)[0].placed, 5000);
+  const at = performance.now(), { work: w } = meter(() => f.god.parts.onDone(b.id)), ms = performance.now() - at;
+  console.log(`PARTS_BENCH onDone ms=${ms.toFixed(3)} work=${JSON.stringify(w)}`);
+  // Linear in the subtree (5256 nodes), a few units of work per node; a scan of every entity per root is ~1.3M.
+  assert.ok(w.total <= ONDONE_WORK, `onDone work ${w.total} > ${ONDONE_WORK}: ${JSON.stringify(w)}`); assert.ok(w.sql <= 16, `onDone SQL statements ${w.sql}`);
+  assert.equal(uses(f)[0].placed, 5000);
 });
-test('bench: median act overhead with origins versus without origins is below 2%', { skip: process.env.PARTS_BENCH !== '1' }, t => {
+test('bench: median act overhead with origins versus without origins is below 2%', t => {
   const f = fixture(t), withOrigins: number[] = [], withoutOrigins: number[] = [], origins = f.god.parts.origins.bind(f.god.parts);
   // M2's design fixture has four define edits among 24 edits: one define per six batches.
   // Pair identical workloads, alternate order, and include both define and ordinary placement batches.
@@ -329,9 +336,11 @@ test('bench: median act overhead with origins versus without origins is below 2%
     const name = `bench-${i}-${Number(enabled)}`, ops: unknown[] = [];
     if (i % 6 === 0) { ops.push(define(kit(name))); refs.set(enabled, name + '@1'); }
     ops.push(place(refs.get(enabled)!, name, 0));
-    const at = performance.now(); accepted(f.act(ops));
-    if (i > 39) (enabled ? withOrigins : withoutOrigins).push(performance.now() - at);
+    const w = work(() => accepted(f.act(ops))).total;
+    if (i > 39) (enabled ? withOrigins : withoutOrigins).push(w);
   }
   const median = (a: number[]) => a.sort((a, b) => a - b)[a.length >> 1], yes = median(withOrigins), no = median(withoutOrigins), overhead = (yes / no - 1) * 100;
-  console.log(`PARTS_BENCH act workload=1-define-per-6-batches median origins=${yes.toFixed(3)}ms baseline=${no.toFixed(3)}ms overhead=${overhead.toFixed(2)}%`); assert.ok(overhead < 2, String(overhead));
+  const sum = (a: number[]) => a.reduce((x, y) => x + y, 0), total = (sum(withOrigins) / sum(withoutOrigins) - 1) * 100;
+  console.log(`PARTS_BENCH act workload=1-define-per-6-batches median work origins=${yes} baseline=${no} overhead=${overhead.toFixed(2)}% total overhead=${total.toFixed(2)}%`);
+  assert.ok(overhead < 2, String(overhead)); assert.ok(total < ORIGINS_TOTAL_PCT, `total origins overhead ${total}%`);
 });

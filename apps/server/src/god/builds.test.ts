@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { performance } from 'node:perf_hooks';
 import { Hono } from 'hono';
 import { coreRef, hashOf } from '@sim/world-compiler';
+import { work } from '@sim/world-compiler/work-meter';
 import { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
 import { GodMode, type GodEvent, type WorldDiffMessage, type WorldBuildMessage, type GodOptions } from './god.ts';
@@ -456,33 +456,39 @@ test('closed retention prunes by rev and never loses the world revision high-wat
   const next = f.god.builds.start({ id: 'next', title: 'Next', steps: ['a'], site: { at: [0, 0], size: [10, 10] } }, caller) as any; assert.equal(next.build.rev, 405);
 });
 
-test('bench: commitBatch 300 five-place batches with/without build plus 300 undos', { skip: process.env.BUILD_BENCH !== '1' }, t => {
+// Z3: work budgets, not milliseconds (see @sim/world-compiler/work-meter): the same answer on any CPU, so these run in the gate.
+// Measured 2026-10-20, identical on every run: build overhead 1,935 per five-place batch (a plain batch is 44,642 at p50),
+// touch 1, undo p95 70,035; two live claims add 662 per batch and 3,410 to the 200-upsert check. Budgets are about 2x.
+const BUILD_WORK = { overheadP95: 4_000, touchMax: 2, undoP95: 140_000 }, CLAIM_WORK = { overheadP95: 1_400, check200Overhead: 7_000 };
+const p95 = (xs: number[]) => { const sorted = [...xs].sort((a, b) => a - b); return { p50: sorted[Math.floor(sorted.length * .5)], p95: sorted[Math.floor(sorted.length * .95)], max: sorted.at(-1)! }; };
+test('bench: commitBatch 300 five-place batches with/without build plus 300 undos', t => {
   const summary: any = {};
   const fixtures = [false, true].map(withBuild => {
     const f = fixture({ buildPauseMs: 600_000 }); t.after(() => f.db.close());
     const started = withBuild ? f.god.builds.start({ id: 'church', title: 'Bench', steps: ['shell'], site: { at: [0, 0], size: [200, 200] } }, f.god.godIdentity(f.token)!) as any : null;
-    return { f, started, withBuild, times: [] as number[], receipt: [] as number[], deltas: [] as number[], sse: [] as number[] };
+    return { f, started, withBuild, work: [] as number[], receipt: [] as number[], deltas: [] as number[], sse: [] as number[] };
   });
-  // As in the claims bench, interleave modes to share warmup and scheduler/thermal drift.
-  for (let batch = 0; batch < 500; batch++) for (const sample of batch % 2 ? [...fixtures].reverse() : fixtures) {
+  for (let batch = 0; batch < 500; batch++) for (const sample of fixtures) {
     const { f, started, withBuild } = sample; if (!withBuild && batch >= 300) continue;
     const ops = Array.from({ length: 5 }, (_, j) => { const i = batch * 5 + j; return f.place(`b-${i}`, -96 + i % 49 * 4, -96 + Math.floor(i / 49) * 4); });
-    const begin = performance.now(), result = f.god.act({ ops, clientRef: `bench-${batch}`, ...(started ? { build: f.field(started.lease) } : {}) }); const elapsed = performance.now() - begin; assertAccepted(result);
-    if (batch < 300) { sample.times.push(elapsed); sample.receipt.push(Buffer.byteLength(JSON.stringify(result))); const m = f.emitted.at(-1) as WorldDiffMessage; sample.deltas.push(Buffer.byteLength(JSON.stringify(m.builds ?? []))); sample.sse.push(Buffer.byteLength(JSON.stringify(f.events.at(-1)))); }
+    let result: any; const w = work(() => { result = f.god.act({ ops, clientRef: `bench-${batch}`, ...(started ? { build: f.field(started.lease) } : {}) }); }).total; assertAccepted(result);
+    if (batch < 300) { sample.work.push(w); sample.receipt.push(Buffer.byteLength(JSON.stringify(result))); const m = f.emitted.at(-1) as WorldDiffMessage; sample.deltas.push(Buffer.byteLength(JSON.stringify(m.builds ?? []))); sample.sse.push(Buffer.byteLength(JSON.stringify(f.events.at(-1)))); }
   }
-  for (const { f, withBuild, times, receipt, deltas, sse } of fixtures) {
+  for (const { f, withBuild, work: commits, receipt, deltas, sse } of fixtures) {
     const undo: number[] = [], touch: number[] = [];
     const ring500Bytes = withBuild ? Buffer.byteLength(JSON.stringify(f.events.slice(-500))) : undefined;
     const tokenHash = f.god.godIdentity(f.token)!.hash;
-    if (withBuild) for (let i = 0; i < 10000; i++) { const begin = performance.now(); f.god.builds.touch(tokenHash); touch.push(performance.now() - begin); }
-    if (withBuild) for (let i = 0; i < 300; i++) { const begin = performance.now(); assertAccepted(f.god.undo()); undo.push(performance.now() - begin); }
-    const stats = (xs: number[]) => { const sorted = [...xs].sort((a, b) => a - b); return { p50: sorted[Math.floor(sorted.length * .5)], p95: sorted[Math.floor(sorted.length * .95)] }; };
-    summary[withBuild ? 'build' : 'plain'] = { ms: stats(times), receiptBytes: stats(receipt), deltaBytes: stats(deltas), sseBytes: stats(sse), ...(undo.length ? { undoMs: stats(undo), ring500Bytes, touchMs: stats(touch) } : {}) };
+    if (withBuild) for (let i = 0; i < 10000; i++) touch.push(work(() => f.god.builds.touch(tokenHash)).total);
+    if (withBuild) for (let i = 0; i < 300; i++) undo.push(work(() => assertAccepted(f.god.undo())).total);
+    summary[withBuild ? 'build' : 'plain'] = { work: p95(commits), receiptBytes: p95(receipt), deltaBytes: p95(deltas), sseBytes: p95(sse), ...(undo.length ? { undoWork: p95(undo), ring500Bytes, touchWork: p95(touch) } : {}) };
   }
-  summary.overheadMs = { p50: summary.build.ms.p50 - summary.plain.ms.p50, p95: summary.build.ms.p95 - summary.plain.ms.p95 };
+  // The two worlds commit identical batches, so the per-batch difference is the build's own work.
+  const overhead = fixtures[1].work.slice(0, 300).map((w, i) => w - fixtures[0].work[i]);
+  summary.overheadWork = p95(overhead);
   console.log('BUILD_BENCH ' + JSON.stringify(summary));
-  assert.ok(summary.overheadMs.p95 <= .5, `build p95 overhead ${summary.overheadMs.p95}ms exceeds 0.5ms`);
-  assert.ok(summary.build.deltaBytes.p95 <= 400); assert.ok(summary.build.touchMs.p95 <= .05);
+  assert.ok(summary.overheadWork.p95 <= BUILD_WORK.overheadP95, `build p95 overhead work ${summary.overheadWork.p95} exceeds ${BUILD_WORK.overheadP95}`);
+  assert.ok(summary.build.deltaBytes.p95 <= 400); assert.ok(summary.build.touchWork.max <= BUILD_WORK.touchMax, `touch work ${summary.build.touchWork.max}`);
+  assert.ok(summary.build.undoWork.p95 <= BUILD_WORK.undoP95, `undo p95 work ${summary.build.undoWork.p95}`);
 });
 
 // C1b adversarial-review regressions. Numbers match evidence/review-c1.json confirmed[].
@@ -708,35 +714,34 @@ test('C1b #17: empty and mixed undo stacks seek the partial index instead of sca
   reads = journalReads(f, () => { assert.equal(f.god.store.undoable(), null); }); indexedReads(f, reads, 'world_edits_v1_stack');
 });
 
-test('bench: 300 five-place build commits with two live claims versus none; 200-upsert check', { skip: process.env.CLAIM_BENCH !== '1' }, t => {
+test('bench: 300 five-place build commits with two live claims versus none; 200-upsert check', t => {
   const summary: any = {};
-  const stats = (xs: number[]) => { const sorted = [...xs].sort((a, b) => a - b); return { p50: sorted[Math.floor(sorted.length * .5)], p95: sorted[Math.floor(sorted.length * .95)] }; };
   const fixtures = [false, true].map(withClaims => {
     const f = fixture({ buildPauseMs: 600_000 }); t.after(() => f.db.close());
     const started = f.god.builds.start({ id: 'church', title: 'Claims bench', steps: ['shell'], site: { at: [0, 0], size: [200, 200] } }, f.god.godIdentity(f.token)!) as any;
     const build = f.field(started.lease);
     assertAccepted(f.god.act({ ops: [f.place('east-anchor', -80, 90), f.place('tower-anchor', 80, 90)], build }));
     if (withClaims) for (const [part, root, x] of [['east-aisle', 'east-anchor', -80], ['tower', 'tower-anchor', 80]] as const) assert.equal(f.god.builds.claim('church', { part, root, region: { at: [x, 90], size: [12, 12] } }, f.god.godIdentity(f.other)!).ok, true);
-    return { f, build, times: [] as number[], withClaims };
+    return { f, build, work: [] as number[], withClaims };
   });
-  // Interleave the two worlds so warmup, thermal drift and scheduler noise affect both modes.
-  for (let batch = 0; batch < 300; batch++) for (const { f, build, times } of batch % 2 ? [...fixtures].reverse() : fixtures) {
-    const ops = Array.from({ length: 5 }, (_, j) => { const i = batch * 5 + j; return f.place(`c-${i}`, -96 + i % 49 * 4, -96 + Math.floor(i / 49) * 4); });
-    const begin = performance.now(), r = f.god.act({ ops, build, clientRef: `claims-bench-${batch}` }); times.push(performance.now() - begin); assertAccepted(r);
+  for (let batch = 0; batch < 300; batch++) for (const sample of fixtures) {
+    const { f, build } = sample, ops = Array.from({ length: 5 }, (_, j) => { const i = batch * 5 + j; return f.place(`c-${i}`, -96 + i % 49 * 4, -96 + Math.floor(i / 49) * 4); });
+    let r: any; sample.work.push(work(() => { r = f.god.act({ ops, build, clientRef: `claims-bench-${batch}` }); }).total); assertAccepted(r);
   }
-  for (const { f, build, times, withClaims } of fixtures) {
+  for (const { f, build, withClaims } of fixtures) {
     const before = f.god.model, after = before.fork();
     const upserts = Array.from(before.entities.values()).slice(2, 202).map(e => ({ ...e, v: e.v + 1 }));
     for (const e of upserts) { after.delete(e.id); after.insert(e); }
     const diff = { upserts, removes: [], defs: [], tiles: [], answers: [] }, admission = f.god.builds.admit(build, {}, f.god.godIdentity(f.token)!);
-    const checks: number[] = [];
-    for (let i = 0; i < 1000; i++) { const begin = performance.now(), r = f.god.builds.check(admission, before, after, diff, []); checks.push(performance.now() - begin); assert.ok('made' in r); }
-    summary[withClaims ? 'twoLiveClaims' : 'none'] = { commitMs: stats(times), check200Ms: stats(checks), diff: upserts.length };
+    let r: any; const check200 = work(() => { r = f.god.builds.check(admission, before, after, diff, []); }).total; assert.ok('made' in r);
+    summary[withClaims ? 'twoLiveClaims' : 'none'] = { check200Work: check200, diff: upserts.length };
   }
-  summary.overheadMs = { p50: summary.twoLiveClaims.commitMs.p50 - summary.none.commitMs.p50, p95: summary.twoLiveClaims.commitMs.p95 - summary.none.commitMs.p95 };
+  const overhead = fixtures[1].work.map((w, i) => w - fixtures[0].work[i]);
+  summary.commitWork = { none: p95(fixtures[0].work), twoLiveClaims: p95(fixtures[1].work) }; summary.overheadWork = p95(overhead);
+  summary.check200Overhead = summary.twoLiveClaims.check200Work - summary.none.check200Work;
   console.log('CLAIM_BENCH ' + JSON.stringify(summary));
-  assert.ok(summary.overheadMs.p95 <= 1, `claims p95 overhead ${summary.overheadMs.p95}ms exceeds 1ms`);
-  assert.ok(summary.twoLiveClaims.check200Ms.p95 - summary.none.check200Ms.p95 <= 1);
+  assert.ok(summary.overheadWork.p95 <= CLAIM_WORK.overheadP95, `claims p95 overhead work ${summary.overheadWork.p95} exceeds ${CLAIM_WORK.overheadP95}`);
+  assert.ok(summary.check200Overhead <= CLAIM_WORK.check200Overhead, `200-upsert check overhead work ${summary.check200Overhead}`);
 });
 
 

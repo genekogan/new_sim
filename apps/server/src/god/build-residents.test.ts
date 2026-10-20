@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { setImmediate } from 'node:timers/promises';
 import { performance } from 'node:perf_hooks';
 import { coreRef } from '@sim/world-compiler';
+import { work } from '@sim/world-compiler/work-meter';
 import { Hono } from 'hono';
 import { fixture, invite, accept, factory } from '../../test/native-owner-fixture.ts';
 import { EdgeLedger } from '../edge/ledger/ledger.ts';
@@ -187,15 +188,23 @@ test('closure lift, done and abandon reopen capabilities; lifted build keeps its
   w.start({ id: 'renovation' }); await w.settle(1); blocked(cap(w, s, 'walk:church'), 'site.under-construction'); w.god.builds.abandon('renovation', {}, () => ({ accepted: true, reverted: [], notReverted: [] })); await w.settle(1); assert.equal(cap(w, s, 'walk:church').available, true);
 });
 
-test('bench: capabilities for 20 Souls, idle evacuation with 8 sites', { skip: process.env.BUILD_BENCH !== '1', timeout: 120_000 }, async t => {
+// Z3: work budgets, not milliseconds (see @sim/world-compiler/work-meter): the same answer on any CPU, so it runs in the gate.
+// Measured 2026-10-20, identical on every run: capabilities for 20 Souls 744,455 (max of 30 ticks), +296,620 with a build
+// open, an idle evacuation with 8 sites 2,311. Budgets are about 2x.
+const RESIDENT_WORK = { capabilities20: 1_500_000, buildOverhead: 600_000, evacuate20x8: 4_700 };
+test('bench: capabilities for 20 Souls, idle evacuation with 8 sites', { timeout: 120_000 }, async t => {
   const w = world(t); await w.build();
   const souls: Awaited<ReturnType<typeof w.soul>>[] = []; for (let i = 0; i < 20; i++) souls.push(await w.soul(`bench${i}`, `Resident${i}`));
-  const stats = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); return { p50: s[Math.floor(s.length * .5)], p95: s[Math.floor(s.length * .95)] }; };
-  const measure = () => { const samples: number[] = []; for (let i = 0; i < 30; i++) { w.host.engine.world.tick++; const start = performance.now(); for (const soul of souls) w.edge.capabilities(soul); samples.push(performance.now() - start); } return stats(samples); };
+  const stats = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); return { p50: s[Math.floor(s.length * .5)], p95: s[Math.floor(s.length * .95)], max: s.at(-1)! }; };
+  const measure = () => { const samples: number[] = []; for (let i = 0; i < 30; i++) { w.host.engine.world.tick++; samples.push(work(() => { for (const soul of souls) w.edge.capabilities(soul); }).total); } return stats(samples); };
   measure(); const plain = measure(); w.start(); measure(); const build = measure();
   for (let i = 1; i < 8; i++) w.start({ id: `site-${i}`, root: undefined, site: { at: [i * 20 - 80, 40], size: [10, 10] } });
-  const samples: number[] = []; for (let i = 0; i < 100; i++) { const start = performance.now(); w.bridge.evacuateSites(); samples.push(performance.now() - start); }
-  console.log('RESIDENT_BENCH ' + JSON.stringify({ capabilities20Ms: { plain, build }, evacuate20x8Ms: stats(samples) }));
+  const samples: number[] = []; for (let i = 0; i < 100; i++) samples.push(work(() => w.bridge.evacuateSites()).total);
+  const evacuate = stats(samples);
+  console.log('RESIDENT_BENCH ' + JSON.stringify({ capabilities20Work: { plain, build }, evacuate20x8Work: evacuate }));
+  assert.ok(plain.max <= RESIDENT_WORK.capabilities20, `capabilities work ${plain.max}`);
+  assert.ok(build.max - plain.max <= RESIDENT_WORK.buildOverhead, `capabilities build overhead work ${build.max - plain.max}`);
+  assert.ok(evacuate.max <= RESIDENT_WORK.evacuate20x8, `evacuation work ${evacuate.max}`);
 });
 
 test('C1b #9: plans into a closing site are blocked even when their named plaza surrounds it', async t => {

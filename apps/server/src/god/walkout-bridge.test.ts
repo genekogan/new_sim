@@ -9,6 +9,7 @@ import { setImmediate } from 'node:timers/promises';
 import { performance } from 'node:perf_hooks';
 import { kernelHash } from '@sim/kernel';
 import { coreRef } from '@sim/world-compiler';
+import { meter, type Work } from '@sim/world-compiler/work-meter';
 import { fixture, invite, accept, factory, seed } from '../../test/native-owner-fixture.ts';
 import { WorldHost } from '../world.ts';
 import { EdgeLedger } from '../edge/ledger/ledger.ts';
@@ -223,7 +224,12 @@ test('a walk-out the engine refuses at fold time is named in the durable receipt
   assert.match((w.edge.observe(dee as never, new Set()) as any).notices[0].text, /you could not step clear, so you stayed where you were\.$/);
 });
 
-test('bench: a real-engine walk-out of 16 residents among many entities', { skip: process.env.GOD_WALKOUT_BENCH !== '1', timeout: 600000 }, async t => {
+// Z3: work budgets, not milliseconds (see @sim/world-compiler/work-meter): the same answer on any CPU, so it runs in the gate.
+// Measured 2026-10-20, identical on every run: moving the hut (16 residents among 1,217 entities) 223,022 in all, planning
+// 134,023, moves 60,237; moving it back over 7 of them 104,160. Budgets are 1.5x of the larger edit (the real engine
+// leaves a little run-to-run slack: 222,067 when the whole file runs first).
+const BRIDGE_WORK = { edit: 335_000, prepare: 200_000, apply: 90_000 };
+test('bench: a real-engine walk-out of 16 residents among many entities', { timeout: 600000 }, async t => {
   const w = await world(); w.brain.quiesce(); t.after(cleanup(w));
   await w.settle(2);
   const filler: unknown[] = [];
@@ -235,14 +241,15 @@ test('bench: a real-engine walk-out of 16 residents among many entities', { skip
   for (let i = 0; i < 16; i++) residents.push(await w.soul(`r${i}`, `R${i}`));
   for (const [i, s] of residents.entries()) await accept(w.host, w.host.enqueue('edge-relocate', 'test:bench', { soulId: s.soulId, entityId: s.entityId, to: [-4.5 + (i % 4) * 2.5, -23 + Math.floor(i / 4) * 2], why: 'bench fixture' }));
   await w.settle(3);
-  // Time the planning (prepare) and the moves (apply) apart from the rest of the edit.
-  const bodies = w.god.bodies!, spent = { prepare: 0, apply: 0 };
-  w.god.bodies = { ...bodies, prepare: (...a) => { const t0 = performance.now(); try { return bodies.prepare!(...a); } finally { spent.prepare += performance.now() - t0; } }, apply: (m) => { const t0 = performance.now(); try { return bodies.apply!(m); } finally { spent.apply += performance.now() - t0; } } };
+  // Count the planning (prepare) and the moves (apply) apart from the rest of the edit.
+  const bodies = w.god.bodies!, spent = { prepare: 0, apply: 0 }, metered = <T>(key: keyof typeof spent, fn: () => T) => { const { value, work } = meter(fn); spent[key] += work.total; return value; };
+  w.god.bodies = { ...bodies, prepare: (...a) => metered('prepare', () => bodies.prepare!(...a)), apply: (m) => metered('apply', () => bodies.apply!(m)) };
   for (const [label, ops] of [['moved hut', [{ op: 'move', id: 'hut', p: [30, -20] }]], ['moved back over them', [{ op: 'move', id: 'hut', p: [2, -21] }]]] as const) {
     spent.prepare = spent.apply = 0;
-    const t0 = performance.now(), r: any = w.god.act({ ops }), ms = performance.now() - t0;
-    console.log(`${label}: ${r.moved?.length ?? 0} residents moved among ${w.god.model.entities.size} entities in ${ms.toFixed(0)} ms (planning ${spent.prepare.toFixed(0)} ms, moves ${spent.apply.toFixed(0)} ms)`);
-    assert.equal(r.accepted, true); assert.ok(ms < 4000, `${ms} ms`);
+    const t0 = performance.now(), { value: r, work: total }: { value: any; work: Work } = meter(() => w.god.act({ ops })), ms = performance.now() - t0;
+    console.log(`${label}: ${r.moved?.length ?? 0} residents moved among ${w.god.model.entities.size} entities in ${ms.toFixed(0)} ms; work ${total.total} (planning ${spent.prepare}, moves ${spent.apply}) ${JSON.stringify(total)}`);
+    assert.equal(r.accepted, true); assert.ok(r.moved?.length > 0, 'residents were moved');
+    assert.ok(total.total <= BRIDGE_WORK.edit, `edit work ${total.total}`); assert.ok(spent.prepare <= BRIDGE_WORK.prepare, `planning work ${spent.prepare}`); assert.ok(spent.apply <= BRIDGE_WORK.apply, `moves work ${spent.apply}`);
     await w.settle(3);
   }
 });
