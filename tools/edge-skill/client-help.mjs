@@ -15,7 +15,7 @@ Objects: object <ID> · mark <note|sign|offering|proposal> "Title" "Text"
 Travel: travel · travel <world on this site> · travel home (this folder follows)
 Auto mode: dashboard [--engine codex] · live [--engine codex] · cost
 While live: tell "<human request>" --wait · report
-Owner inbox: listen [--after message-id] [--timeout 25] [--once|--follow] · ack <message-id> ["short reply"]
+Owner inbox: listen (waits until your human writes, prints every waiting message; run it again after each batch) · ack <message-id> ["Got it: ..."] · result <message-id> done|failed "what happened"
 Manual session: attend 90 · act/say/converse · attend --release
 Pause with the dashboard or its pause API; STOP ends the ordinary live loop.
 Guide: SKILL.md (Start or resume; Observe, resolve, finish).

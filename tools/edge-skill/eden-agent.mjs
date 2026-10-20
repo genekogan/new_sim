@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import {ownerReplyWithLocalResults,ownerAnswerText,routeOwnerReport} from './client-owner-reply.mjs';
 import {clientHelp} from './client-help.mjs';
-import {clientListen,clientAck,noticeOwnerInbox,noticeInboxHeader} from './client-inbox.mjs';
+import {clientListen,clientAck,clientResult,noticeOwnerInbox,noticeInboxHeader} from './client-inbox.mjs';
 // Eden edge agent CLI — skill 1.0.0 for contract eden-edge/1 (team/CONTRACTS/EDGE-CONTRACT-v1.md).
 // Dependency-free, Node 18+. One Soul, one world, any folder. State in ./.eden-agent.json is PRIVATE
 // (identity + Soul token). Edge verbs use /v1/edge/* with the Soul token; when a world does not serve
@@ -34,7 +34,7 @@ import {publishCompletedOwnerQueue} from './client-owner-result.mjs';
 import {openClientMemory} from './client-memory.mjs';
 import {travelCommand} from './client-travel.mjs';
 
-export const SKILL_VERSION='1.9.4';
+export const SKILL_VERSION='1.9.5';
 export const CONTRACT='eden-edge/1';
 export const API_CONTRACT='eden-edge/1.1'; // Additive support; preserve legacy wire contract.
 const STATE='.eden-agent.json';
@@ -1183,9 +1183,11 @@ export async function dashboard(...args){
 }
 export async function listen(...args){return clientListen(args,{call});}
 export async function ack(...args){return clientAck(args,{call});}
+/** 1.9.5 (lane MSG): the second answer on the owner's card, when the work ends: result <id> done|failed "what happened". */
+export async function result(...args){return clientResult(args,{call});}
 /** look around — the same as explore. */
 export async function look(what,...rest){if(what!=='around')throw new Error('usage: look around [--full]   (a body action: act look <target>; your appearance: body look)');return explore(...rest);}
-const commands={look,listen,ack,body,travel,live,dashboard,profile,tell,report,view,cost,plan,events,attend,register,status,approval,'pair-soul':pairSoul,'select-soul':selectSoul,'create-soul':createSoul,here,observe,capabilities,map,digest,calendar,whatson,explore,act,resolve:resolveAct,say,converse,object,mark,project,wait,receipt,accept,decline,version:async()=>({skillVersion:SKILL_VERSION,contract:CONTRACT,apiContract:API_CONTRACT})};
+const commands={look,listen,ack,result,body,travel,live,dashboard,profile,tell,report,view,cost,plan,events,attend,register,status,approval,'pair-soul':pairSoul,'select-soul':selectSoul,'create-soul':createSoul,here,observe,capabilities,map,digest,calendar,whatson,explore,act,resolve:resolveAct,say,converse,object,mark,project,wait,receipt,accept,decline,version:async()=>({skillVersion:SKILL_VERSION,contract:CONTRACT,apiContract:API_CONTRACT})};
 if(process.argv[1]&&import.meta.url===pathToFileURL(realpathSync(process.argv[1])).href){
  const [cmd,...args]=process.argv.slice(2);
  if(!cmd||['help','--help','-h'].includes(cmd)){console.log(clientHelp(SKILL_VERSION,CONTRACT));process.exit(0);}

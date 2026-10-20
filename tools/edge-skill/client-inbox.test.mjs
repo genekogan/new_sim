@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { clientListen, clientAck, noticeOwnerInbox, noticeInboxHeader } from './client-inbox.mjs';
+import { clientListen, clientAck, clientResult, noticeOwnerInbox, noticeInboxHeader, LISTEN_NEXT } from './client-inbox.mjs';
 import { listen, ack, here } from './eden-agent.mjs';
 import { clientHelp } from './client-help.mjs';
 import { readClientStream } from './client-stream.mjs';
@@ -14,13 +14,36 @@ function context(responses) {
   return { calls, sleeps, call: async (path, options) => { calls.push({ path, options }); return { status: 200, data: responses.shift() }; }, sleep: async ms => sleeps.push(ms) };
 }
 
-test('Soul inbox listen keeps long-polling until a newer unacknowledged message then returns without ack', async () => {
+test('Soul inbox listen keeps long-polling until a newer unacknowledged message then returns without ack (older world: latest only)', async () => {
   const fresh = envelope(latest('new'));
   const ctx = context([envelope(null), envelope(latest('read', 'acknowledged')), envelope(latest('old')), fresh]);
-  assert.deepEqual(await clientListen(['--after', 'old', '--timeout', '5'], ctx), fresh);
+  ctx.now = () => Date.UTC(2026, 9, 20, 23, 0, 0);
+  assert.deepEqual(await clientListen(['--after', 'old', '--timeout', '5'], ctx), { messages: [{ id: 'new', text: 'Please visit the library.', sentAt: 1, emittedAt: '2026-10-20T23:00:00.000Z' }], waiting: 1, next: LISTEN_NEXT });
   assert.equal(ctx.calls.length, 4);
   assert.ok(ctx.calls.every(c => c.path === '/v1/edge/inbox/listen?timeoutMs=5000&after=old' && c.options.timeoutMs === 15000));
   assert.equal(ctx.sleeps.length, 3);
+});
+
+test('Soul inbox listen (1.9.5) blocks with no time limit, rides out outages, then prints the whole backlog oldest first and nothing secret', async () => {
+  const backlog = ['go find the horses', 'hello?', 'can you ride the horse?'].map((text, i) => ({ id: `m${i}`, text, state: i ? 'sent' : 'delivered', sentAt: 10 + i, deliveredAt: 20 }));
+  const answers = [{ status: 0, data: { error: { code: 'unreachable' } } }, { status: 502, data: { raw: '<html>' } }, { status: 429, data: {} }, { status: 200, data: { ...envelope(null), backlog: [] } }, { status: 200, data: { inbox: { connected: true, latest: backlog[0], presence: 'listening', lastSeenAt: 5 }, backlog } }];
+  const calls = [], sleeps = [];
+  const out = await clientListen([], { call: async (path, options) => { calls.push([path, options.timeoutMs]); return answers.shift(); }, sleep: async ms => sleeps.push(ms), now: () => 0 });
+  assert.deepEqual(out.messages.map(m => m.text), ['go find the horses', 'hello?', 'can you ride the horse?']);
+  assert.deepEqual(Object.keys(out), ['messages', 'waiting', 'next']); assert.deepEqual(Object.keys(out.messages[0]), ['id', 'text', 'sentAt', 'emittedAt']);
+  assert.equal(out.waiting, 3); assert.match(out.next, /ack <id>.*result <id>.*listen again/);
+  assert.deepEqual(sleeps, [1000, 2000, 4000, 50], 'outages back off; an empty answer re-polls at once');
+  assert.ok(calls.every(([path, ms]) => path === '/v1/edge/inbox/listen?timeoutMs=50000' && ms === 60000), 'default: 50 s long-polls, no cursor');
+  await assert.rejects(clientListen([], { call: async () => ({ status: 401, data: { error: 'revoked' } }), sleep: async () => {} }), /HTTP 401/, 'a revoked credential is final');
+});
+
+test('Soul inbox result: the second answer (done|failed), validated before the network', async () => {
+  const done = envelope({ ...latest('m/1', 'acknowledged'), outcome: 'done', result: 'Arrived.' }), ctx = context([done]);
+  assert.deepEqual(await clientResult(['m/1', 'done', 'Arrived.'], ctx), done);
+  assert.equal(ctx.calls[0].path, '/v1/edge/inbox/m%2F1/result'); assert.deepEqual(ctx.calls[0].options.body, { text: 'Arrived.', outcome: 'done' });
+  for (const args of [[], ['m'], ['m', 'ok', 'x'], ['m', 'done'], ['m', 'done', ''], ['m', 'done', 'x'.repeat(141)], ['m', 'failed', 'a\nb'], ['m', 'done', 'x', 'y']]) await assert.rejects(clientResult(args, ctx));
+  assert.equal(ctx.calls.length, 1);
+  await assert.rejects(clientResult(['m', 'done', 'x'], { call: async () => ({ status: 404, data: { raw: 'Not Found' } }) }), /put the outcome in the ack reply/);
 });
 
 test('Soul inbox --once returns the timeout response for /loop', async () => {
@@ -61,12 +84,12 @@ test('Soul CLI dispatch uses its own authenticated inbox and surfaces piggyback 
   const responses = [envelope(message), envelope({ ...message, state: 'acknowledged' }), { ...envelope(message), soul: { id: 'synthetic-soul' }, doHere: [], exits: [] }];
   globalThis.fetch = async (url, options) => { calls.push({ url, ...options }); return Response.json(responses.shift()); };
   t.after(() => { process.chdir(cwd); globalThis.fetch = fetcher; console.error = error; rmSync(dir, { recursive: true, force: true }); });
-  assert.equal((await listen()).inbox.latest.id, message.id);
+  assert.equal((await listen()).messages[0].id, message.id);
   assert.equal((await ack(message.id, 'Read.')).inbox.latest.state, 'acknowledged');
   await here();
   assert.equal(calls.length, 3);
   assert.ok(calls.every(c => c.headers.authorization === 'Bearer synthetic-inbox-fixture'));
-  assert.match(calls[0].url, /\/v1\/edge\/inbox\/listen\?timeoutMs=25000$/);
+  assert.match(calls[0].url, /\/v1\/edge\/inbox\/listen\?timeoutMs=50000$/);
   assert.deepEqual(JSON.parse(calls[1].body), { reply: 'Read.' });
   assert.deepEqual(notices, ['OWNER MESSAGE ' + JSON.stringify(message)]);
 });
@@ -101,8 +124,16 @@ test('Soul inbox --follow streams one compact line per new message and backs off
   const calls = [], lines = [], sleeps = [];
   const call = async path => { calls.push(path); const data = answers.shift(); return data ? { status: 200, data } : { status: 0, data: { error: { code: 'unreachable' } } }; };
   await clientListen(['--follow', '--timeout', '5'], { call, sleep: async ms => sleeps.push(ms), write: line => lines.push(JSON.parse(line)), stop: () => !answers.length });
-  assert.deepEqual(lines.map(l => l.id), ['a', 'b']);
+  assert.deepEqual(lines.map(l => l.id), ['a', 'b']); assert.ok(lines.every(l => typeof l.emittedAt === 'string'));
   assert.deepEqual(calls, ['/v1/edge/inbox/listen?timeoutMs=5000', '/v1/edge/inbox/listen?timeoutMs=5000&after=a', '/v1/edge/inbox/listen?timeoutMs=5000&after=a', '/v1/edge/inbox/listen?timeoutMs=5000&after=a']);
   assert.ok(sleeps.includes(1000));
   await assert.rejects(clientListen(['--follow', '--once'], { call }), /not both/);
+});
+
+test('Soul inbox --follow on a 1.9.5 world prints every message of a backlog, in order, once', async () => {
+  const m = (id, state = 'delivered') => ({ id, text: id, state, sentAt: 1 });
+  const answers = [{ inbox: { latest: m('a') }, backlog: [m('a'), m('b'), m('c')] }, { inbox: { latest: m('d') }, backlog: [m('d')] }];
+  const calls = [], lines = [];
+  await clientListen(['--follow'], { call: async path => { calls.push(path); return { status: 200, data: answers.shift() }; }, sleep: async () => {}, write: l => lines.push(JSON.parse(l).id), stop: () => !answers.length });
+  assert.deepEqual(lines, ['a', 'b', 'c', 'd']); assert.equal(calls[1], '/v1/edge/inbox/listen?timeoutMs=50000&after=c');
 });
