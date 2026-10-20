@@ -17,14 +17,15 @@ The existing key expires October 20. If its one-time secret was lost or expired,
 Object Read & Write key scoped only to `eden-assets`. Agents must not retrieve, display or install its values.
 
 The local inventory covers the three root worlds' public sources, the immutable release overlay and `/worlds` assets.
-Unknown/restricted assets remain explicit exclusions. A reviewed 76-model CC0 derivative allowlist is tied to the
-source-pack records in `team/asset-scouting/SOURCES.csv`; it permits 3,337,244 bytes. The measured campus is
+Unknown/restricted assets remain explicit exclusions. A reviewed CC0 derivative allowlist (76 models plus their 20 CC0 lod1 meshes, 96 objects) is tied
+to the source-pack records in `team/asset-scouting/SOURCES.csv`; it permits 3,745,692 bytes. The 125 private lods stay on origin. The measured campus is
 70,772,556 bytes (67.49 MiB) and is excluded pending explicit publication provenance. This work does not by itself
 move the large private Mars or Little Martians files to the CDN.
 
-The web switch is **off by default**. After upload and the public cache/hash checker pass, release the reviewed public
-manifest at `apps/web/src/cdn-manifest.json`, then build both root and `/worlds` web artifacts with
-`SIM_ASSETS_CDN_ENABLED=1`. `SIM_ASSETS_CDN_ORIGIN` defaults to `https://assets.eden.art`; only this origin and explicit
+The web switch is off in a plain vite build; `tools/world-launcher/deploy/release.sh` builds both root and `/worlds` web
+artifacts with `SIM_ASSETS_CDN_ENABLED=1` by default (CDN1, 2026-10-20) and refuses a build without the CDN origin or the
+manifest (`SIM_ASSETS_CDN_ENABLED=0` opts one release out). Upload new manifest entries and pass the public cache/hash
+checker before releasing the reviewed manifest at `apps/web/src/cdn-manifest.json`. `SIM_ASSETS_CDN_ORIGIN` defaults to `https://assets.eden.art`; only this origin and explicit
 loopback HTTP stand-ins are accepted. Vite emits the manifest as a hashed `/assets/cdn-manifest-*.json` file, so both
 existing static servers can serve it and immutable caching cannot retain a prior release's manifest. The same client
 entry point handles both builds. Content-hashed world asset

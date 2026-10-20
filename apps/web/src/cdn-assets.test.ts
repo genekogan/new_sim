@@ -35,6 +35,13 @@ test('prepared publication manifest validates and resolves real core mesh reques
   const prepared = readCdnManifest(JSON.parse(readFileSync(new URL('./cdn-manifest.json', import.meta.url), 'utf8')));
   const cow = 'bbb287748cb8dbbe4fbf63ca5d92c823cda863139bb4830182b3fc66a1f6deb9';
   for (const prefix of ['', '/worlds']) assert.equal(manifestAsset(prepared, `${prefix}/w/fresh-owner-world/assets/${cow}.glb`, page)?.sha256, cow);
+  // CDN1: the CC0 lod1 meshes (make.lod1, fetched by SHA like any core mesh) resolve too; the private lods stay on origin.
+  const cowLod = '2d26b0ae1d8c726aba1d6f13c4c05712dbd4c728412334c7a03cac93ac4042e5';
+  const minaretLod = '00e3310904d14f07bf29b30800e12f4b811fc55232f32a76a5525756afcb31d1'; // Little Martians: private
+  for (const prefix of ['', '/worlds']) {
+    assert.equal(manifestAsset(prepared, `${prefix}/w/eden/assets/${cowLod}.glb`, page)?.sha256, cowLod);
+    assert.equal(manifestAsset(prepared, `${prefix}/w/littlemartians/assets/${minaretLod}.glb`, page), undefined);
+  }
   assert.equal(manifestAsset(prepared, '/browser/campus.glb?v=20260922b', page), undefined, 'campus remains excluded pending publication provenance');
 });
 

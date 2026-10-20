@@ -76,13 +76,29 @@ test('reviewed CC0 derivatives require pinned output bytes and every source-fami
   assert.equal(licenceEvidence([source], sha256, data.length + 1, reviewed).licence, 'unknown');
 });
 
-test('checked-in derivative allowlist pins exactly 76 current files and source chains', async () => {
+test('checked-in derivative allowlist pins exactly 96 current files and source chains', async () => {
   const reviewed = await readReviewed();
-  assert.equal(reviewed.derivatives.length, 76); assert.equal(reviewed.derivatives.reduce((n, d) => n + d.bytes, 0), 3337244);
+  assert.equal(reviewed.derivatives.length, 96); assert.equal(reviewed.derivatives.reduce((n, d) => n + d.bytes, 0), 3745692);
   for (const d of reviewed.derivatives) {
     const actual = await shaFile(new URL('../../' + d.path, import.meta.url));
     assert.deepEqual(actual, { sha256: d.sha256, bytes: d.bytes });
     assert.ok(reviewed.sources[d.source]?.length);
+  }
+});
+
+test('the 20 reviewed lod1 records are exactly the CC0 lods, each from an approved CC0 model of the same family', async () => {
+  const reviewed = await readReviewed();
+  const raw = await readFile(new URL('../../worlds/core-assets/lods.index.json', import.meta.url));
+  assert.equal(createHash('sha256').update(raw).digest('hex'), reviewed.lodsIndexSha256, 'lods.index.json changed: re-review the lod records');
+  const lods = JSON.parse(raw.toString('utf8')).assets;
+  const recorded = reviewed.derivatives.filter(d => d.path.startsWith('worlds/core-assets/lods/'));
+  assert.equal(recorded.length, 20);
+  assert.deepEqual(recorded.map(d => d.sha256).sort(), Object.keys(lods).filter(sha => lods[sha].license === 'CC0 1.0').sort());
+  for (const d of recorded) {
+    const parent = reviewed.derivatives.find(p => p.path === d.lodOf.path && p.sha256 === d.lodOf.sha256 && !p.lodOf);
+    assert.ok(parent, `${d.path}: parent is not an approved model`);
+    assert.equal(d.source, parent.source); assert.equal(d.licence, 'CC0-1.0');
+    assert.equal(lods[d.sha256].source, `lod1 of ${parent.path} (${parent.sha256})`);
   }
 });
 

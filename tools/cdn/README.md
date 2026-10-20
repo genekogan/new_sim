@@ -31,14 +31,17 @@ Publishing always reads the canonical `DEFAULT_SOURCES` CSV, ignoring a plan's `
 only; the function-level override exists for isolated tests. The upload receipt records its actual `sources` path and
 `sourcesSha256`, calculated from the same raw CSV bytes parsed for approval, so the policy snapshot is auditable.
 `approved-derivatives.json` additionally pins the 76 reviewed CC0 split models from `worlds/core-assets/index.json`
-to the source families in `tools/god-skill/scripts/import-packs.mjs` and exact CSV source-pack rows. Changed/missing source
+to the source families in `tools/god-skill/scripts/import-packs.mjs` and exact CSV source-pack rows, plus (CDN1, 2026-10-20)
+the 20 CC0 lod1 meshes in `worlds/core-assets/lods/` (`tools/core-lods`), each pinned to its own bytes and to its approved
+parent model (`lodOf`, same source family); `lodsIndexSha256` pins `lods.index.json`. The other 125 lods (103 Little Martians,
+22 Mars College) have no record and stay on origin: a rights decision for Gene and the Little Martians artist, not this list. Changed/missing source
 records, changed derivative bytes, unknown or restricted licences are excluded. This is a bounded shared CC0 list.
 World-specific art can instead qualify for delivery to its existing public world under the scoped authorization below;
 an existing URL alone does not establish its owner, rights constraints or permitted audience.
 
 ## Excluded large assets and world-scoped publication
 
-The prepared manifest still contains 304 aliases for 76 CC0 models (3,337,244 unique bytes). It excludes these assets:
+The prepared manifest contains 384 aliases for 96 CC0 objects: 76 models (3,337,244 bytes) and 20 lod1 meshes (408,448 bytes). It excludes these assets:
 
 | Asset | Local evidence and current hold |
 |---|---|
@@ -166,7 +169,7 @@ Verify the checked-in prepared manifest independently against actual repo files 
 node --test <worktrees>/lane-cdn/tools/cdn/manifest-integrity.test.mjs
 ```
 
-This retains and checks all 304 aliases. Named `/world-assets/` and `/worlds/world-assets/` entries resolve to their
+This retains and checks all 384 aliases. Named `/world-assets/` and `/worlds/world-assets/` entries resolve to their
 literal files under repo `worlds/`; canonical hash aliases resolve through the reviewed core index. Unknown, unsafe,
 unresolvable or symlinked paths fail, and every entry must match an independently computed file SHA-256 and byte count.
 
@@ -176,7 +179,9 @@ Protocol references: [AWS SigV4 signed payloads](https://docs.aws.amazon.com/Ama
 
 ## Web switch and local browser proof
 
-The site switch is build-time `SIM_ASSETS_CDN_ENABLED=1`, **off when absent**. `SIM_ASSETS_CDN_ORIGIN` defaults to
+The site switch is build-time `SIM_ASSETS_CDN_ENABLED=1`, **off when absent** in a plain vite build. `release.sh` (production,
+staging, legacy, `--local`) defaults it **on** since CDN1 (3.20-3.49 shipped without it) and fails a build that lacks the
+origin or `cdn-manifest-*.json`; `SIM_ASSETS_CDN_ENABLED=0 release.sh ...` turns it off for one release. `SIM_ASSETS_CDN_ORIGIN` defaults to
 `https://assets.eden.art`; only that origin and loopback HTTP test origins are accepted. Release the public manifest
 with the web app at `apps/web/src/cdn-manifest.json`, after its objects have been uploaded and verified. Vite emits its
 hashed URL under `/assets/`, with the correct build prefix; both existing static servers serve this path. The prepared

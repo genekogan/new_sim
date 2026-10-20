@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "reviewedAt": "2026-10-15",
-  "note": "Bounded reviewed CC0 derivatives only. Output hashes pinned to current core index; source families crosslinked through import-packs.mjs record() to exact SOURCES.csv pack rows. Not an approval for other art, Mars campus or Little Martians.",
+  "reviewedAt": "2026-10-20",
+  "note": "Bounded reviewed CC0 derivatives only. Output hashes pinned to current core index; source families crosslinked through import-packs.mjs record() to exact SOURCES.csv pack rows. 2026-10-20 (CDN1): plus the 20 CC0 lod1 meshes (tools/core-lods) of approved pack outputs, each pinned to its lod bytes and to its parent derivative (lodOf); lods.index.json pinned by lodsIndexSha256. Not an approval for other art, Mars campus or Little Martians.",
   "indexSha256": "d579e39d8a65b745381816b50f77c56f58d3f49347708256a3ccc8aa75a929ba",
   "importerSha256": "78db6799ac659f737b24e319d268de534ab0e92f011b9dd0a9ddf6b623d9eb42",
   "sources": {
@@ -648,6 +648,227 @@
       "path": "worlds/core-assets/packs/willow-tree-2-pack.glb",
       "licence": "CC0-1.0",
       "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "0b82f68fca5fbbf123ef246b4a1f83322699d7af7b9624aafc70005c204c3a5d",
+      "bytes": 7316,
+      "path": "worlds/core-assets/lods/0b82f68fca5fbbf123ef246b4a1f83322699d7af7b9624aafc70005c204c3a5d.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb",
+      "lodOf": {
+        "path": "worlds/core-assets/packs/oak-tree-3-pack.glb",
+        "sha256": "2f6da2495eaa7d34b662a06b2474600d31a459de20d8777d7b8fe0de9f5681cd"
+      }
+    },
+    {
+      "sha256": "25d0a0418048d404a45316643c02fbad7f9f0b4fe093c42a3af230a4e1877166",
+      "bytes": 47460,
+      "path": "worlds/core-assets/lods/25d0a0418048d404a45316643c02fbad7f9f0b4fe093c42a3af230a4e1877166.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb",
+      "lodOf": {
+        "path": "worlds/core-assets/packs/horse-pack.glb",
+        "sha256": "58b10fb973fd888e96f8828f267f34f51f71adeb7fb042d9a88d626375ca664a"
+      }
+    },
+    {
+      "sha256": "2d26b0ae1d8c726aba1d6f13c4c05712dbd4c728412334c7a03cac93ac4042e5",
+      "bytes": 48240,
+      "path": "worlds/core-assets/lods/2d26b0ae1d8c726aba1d6f13c4c05712dbd4c728412334c7a03cac93ac4042e5.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb",
+      "lodOf": {
+        "path": "worlds/core-assets/packs/cow-pack.glb",
+        "sha256": "bbb287748cb8dbbe4fbf63ca5d92c823cda863139bb4830182b3fc66a1f6deb9"
+      }
+    },
+    {
+      "sha256": "365c426769c075039170178f1f52d7f5cb407471ef17405f1f0b28e7e4b54e4f",
+      "bytes": 7712,
+      "path": "worlds/core-assets/lods/365c426769c075039170178f1f52d7f5cb407471ef17405f1f0b28e7e4b54e4f.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb",
+      "lodOf": {
+        "path": "worlds/core-assets/packs/autumn-tree-2-pack.glb",
+        "sha256": "6cec8a1181248d885081ba1615db427b2a988a5c60f63222bb89cb1f3a2d3c6c"
+      }
+    },
+    {
+      "sha256": "3790066fd3698889a71df959041d9e01615b579429a82504432f2535ae7514dc",
+      "bytes": 8196,
+      "path": "worlds/core-assets/lods/3790066fd3698889a71df959041d9e01615b579429a82504432f2535ae7514dc.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb",
+      "lodOf": {
+        "path": "worlds/core-assets/packs/birch-tree-autumn-pack.glb",
+        "sha256": "502acf583bda8dd3ca841a56b5994eeca541f347ad308b203bb9f69d81f350d7"
+      }
+    },
+    {
+      "sha256": "38ffa3e4fa766ea180017b0318409c5a9d92ec34711d80fe2b9f3c8a6847a2ca",
+      "bytes": 43468,
+      "path": "worlds/core-assets/lods/38ffa3e4fa766ea180017b0318409c5a9d92ec34711d80fe2b9f3c8a6847a2ca.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb",
+      "lodOf": {
+        "path": "worlds/core-assets/packs/pug-pack.glb",
+        "sha256": "d8a6505ebaac115fbe3ee002c629072dac95a00abb9745dd201678d8c4de63cf"
+      }
+    },
+    {
+      "sha256": "41d31d509ddf82d73659855bd23aebcce70ec76f7ecfd64f2e228832cc2b8b51",
+      "bytes": 41916,
+      "path": "worlds/core-assets/lods/41d31d509ddf82d73659855bd23aebcce70ec76f7ecfd64f2e228832cc2b8b51.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb",
+      "lodOf": {
+        "path": "worlds/core-assets/packs/cat-pack.glb",
+        "sha256": "ab41fe85d961afd8d8eb82de9221db16e9f67743a6dc157f2178b43a46c53497"
+      }
+    },
+    {
+      "sha256": "7c847d21d16422e21f6584a4e881735d2e7eff0799249d63a215a6e041411630",
+      "bytes": 6236,
+      "path": "worlds/core-assets/lods/7c847d21d16422e21f6584a4e881735d2e7eff0799249d63a215a6e041411630.glb",
+      "licence": "CC0-1.0",
+      "source": "Kenney Watercraft + Nature Kit canoe, Quaternius Ships + Public Transport (CC0), via eden-boats-bikes.glb",
+      "lodOf": {
+        "path": "worlds/core-assets/packs/bicycle-pack.glb",
+        "sha256": "042ab9c25542cf8aea3b2ac715bf93db37aaa59a585d2337741a64ca82b3f3a2"
+      }
+    },
+    {
+      "sha256": "82de678ab3c33b03f51cbf0ec2f2e072fd58ea420188a7d31f60fd06bd554fc8",
+      "bytes": 44144,
+      "path": "worlds/core-assets/lods/82de678ab3c33b03f51cbf0ec2f2e072fd58ea420188a7d31f60fd06bd554fc8.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb",
+      "lodOf": {
+        "path": "worlds/core-assets/packs/llama-pack.glb",
+        "sha256": "773b49ee4e32510bfb8d76a1f5a65e424cfa0df58a52ca3b288a1f73c9aad8be"
+      }
+    },
+    {
+      "sha256": "8ebe58d8086ec15b898f8d747ccd8ba25e7228ef2f2fc16c5e3701604f008fc5",
+      "bytes": 7676,
+      "path": "worlds/core-assets/lods/8ebe58d8086ec15b898f8d747ccd8ba25e7228ef2f2fc16c5e3701604f008fc5.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb",
+      "lodOf": {
+        "path": "worlds/core-assets/packs/oak-tree-2-pack.glb",
+        "sha256": "50af2b6a406a2bd84f41c27583c0f41ce67626fb7b334323ea33b0f67a43b936"
+      }
+    },
+    {
+      "sha256": "a0702a50cadd546385ac4eca0423b114efc2e2e8ad39b2b43fed153ae0255892",
+      "bytes": 7648,
+      "path": "worlds/core-assets/lods/a0702a50cadd546385ac4eca0423b114efc2e2e8ad39b2b43fed153ae0255892.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb",
+      "lodOf": {
+        "path": "worlds/core-assets/packs/birch-tree-2-pack.glb",
+        "sha256": "b9ce50a5e6193b3702e2eb140ea6812b8e4e842213bf1cc1f660353bc6e93295"
+      }
+    },
+    {
+      "sha256": "a0810730665c8b6da1a2d295c120a68491e7424b69d73b5fc9dd876729f97228",
+      "bytes": 41460,
+      "path": "worlds/core-assets/lods/a0810730665c8b6da1a2d295c120a68491e7424b69d73b5fc9dd876729f97228.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb",
+      "lodOf": {
+        "path": "worlds/core-assets/packs/dog-pack.glb",
+        "sha256": "0ac8885e23cbf4e7df854a69375f598531e0c2cc8943c67346443adc4bf5842f"
+      }
+    },
+    {
+      "sha256": "ab08c7c42b394cef9985c2677e7891a7f0ecdf5b936f1391a0b9f79fb6cfe449",
+      "bytes": 6968,
+      "path": "worlds/core-assets/lods/ab08c7c42b394cef9985c2677e7891a7f0ecdf5b936f1391a0b9f79fb6cfe449.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Crops (CC0), via eden-crops.glb",
+      "lodOf": {
+        "path": "worlds/core-assets/packs/pumpkin-crop-pack.glb",
+        "sha256": "d259b393e7efa317aa0388804678df172d9a14fc6f24e13b280e6274ce412f39"
+      }
+    },
+    {
+      "sha256": "ad0f795331f42c1ba437c35bfd9f50256bfcb4f1d569961d1de3b9dd63d1087f",
+      "bytes": 7596,
+      "path": "worlds/core-assets/lods/ad0f795331f42c1ba437c35bfd9f50256bfcb4f1d569961d1de3b9dd63d1087f.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb",
+      "lodOf": {
+        "path": "worlds/core-assets/packs/willow-tree-1-pack.glb",
+        "sha256": "7013a500bc8d8cae466478a3a34d66b09769462fa1a35928495ad62e1d0509b3"
+      }
+    },
+    {
+      "sha256": "ba2ba87ff47d090b47ef03c47d3c659983b5c1e520c5db06e278d224e66d6789",
+      "bytes": 8196,
+      "path": "worlds/core-assets/lods/ba2ba87ff47d090b47ef03c47d3c659983b5c1e520c5db06e278d224e66d6789.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb",
+      "lodOf": {
+        "path": "worlds/core-assets/packs/birch-tree-1-pack.glb",
+        "sha256": "5a1263a5998f1257fbf5b446e500a370b5b8a49145876a89ce682c1683ab70fc"
+      }
+    },
+    {
+      "sha256": "bb557b7e96654d08e2c59159a01e245f5b572a9ae9e2f777503e171dcd1a8dc8",
+      "bytes": 7656,
+      "path": "worlds/core-assets/lods/bb557b7e96654d08e2c59159a01e245f5b572a9ae9e2f777503e171dcd1a8dc8.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb",
+      "lodOf": {
+        "path": "worlds/core-assets/packs/oak-tree-1-pack.glb",
+        "sha256": "7193f408900c387d06c9b2f14d8d670eacd63b327fb4248d35d2d616187ae524"
+      }
+    },
+    {
+      "sha256": "dc0a1ab2d772a9916f3261a275bb9599820f887fb0918dc4cda68dbffcab3705",
+      "bytes": 7672,
+      "path": "worlds/core-assets/lods/dc0a1ab2d772a9916f3261a275bb9599820f887fb0918dc4cda68dbffcab3705.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb",
+      "lodOf": {
+        "path": "worlds/core-assets/packs/willow-tree-2-pack.glb",
+        "sha256": "7b56767effb0e15ed9ced482f36ae44720d4dbc5c4a7602029a204aca13ca155"
+      }
+    },
+    {
+      "sha256": "dc9ef144f7991c9303243f92dc82e5cee23e04d091d1730d49349dbe5cdd65d4",
+      "bytes": 44972,
+      "path": "worlds/core-assets/lods/dc9ef144f7991c9303243f92dc82e5cee23e04d091d1730d49349dbe5cdd65d4.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb",
+      "lodOf": {
+        "path": "worlds/core-assets/packs/sheep-pack.glb",
+        "sha256": "8b9fb92ac975c3d24466f44ecc434e8298815e3cb77434dc82877cfce5ea6407"
+      }
+    },
+    {
+      "sha256": "e7fcf5fee84d1b5742e7c7deec605d4eed4fd95231d455e09f02b56d9dc79af5",
+      "bytes": 6236,
+      "path": "worlds/core-assets/lods/e7fcf5fee84d1b5742e7c7deec605d4eed4fd95231d455e09f02b56d9dc79af5.glb",
+      "licence": "CC0-1.0",
+      "source": "Kenney Watercraft + Nature Kit canoe, Quaternius Ships + Public Transport (CC0), via eden-boats-bikes.glb",
+      "lodOf": {
+        "path": "worlds/core-assets/packs/bicycle-simple-pack.glb",
+        "sha256": "4f199bbf415045461ac97033e196c8cd692b404398ded414007b97ee9ee1f0cd"
+      }
+    },
+    {
+      "sha256": "ee8bf34415efa3b6721ee7dc79d165ace3b6d368c3bcb1348a74efa19c6d9ec7",
+      "bytes": 7680,
+      "path": "worlds/core-assets/lods/ee8bf34415efa3b6721ee7dc79d165ace3b6d368c3bcb1348a74efa19c6d9ec7.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb",
+      "lodOf": {
+        "path": "worlds/core-assets/packs/autumn-tree-1-pack.glb",
+        "sha256": "67a97b2b279cf86f472ac508a29a7c4daf3acd0a448e1847e0b0bdb1edd6f0eb"
+      }
     }
-  ]
+  ],
+  "lodsIndexSha256": "22d7af13ee831d058347aefc1c37ef91dc73d6827c6d8a7ce1981114de63415b"
 }

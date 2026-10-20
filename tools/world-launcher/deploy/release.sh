@@ -42,8 +42,20 @@ echo "$BUILD" > "$OUT/BUILD"
 # the laptop's old-world build pins it (hotfix-integration-00x WEB-MANIFEST.json flags); the /worlds/w/eden fork runs that
 # world id. Without it the fork drew only the bare commons (lane FORKFIX). New worlds have other ids: unaffected.
 EDEN_WORLDS="${VITE_EDEN_EXPERIENCE_WORLD_IDS-pm-preview-eden-20261005}"
-BUILD_ID="$BUILD" VITE_EDEN_EXPERIENCE_WORLD_IDS="$EDEN_WORLDS" pnpm --filter @sim/web exec vite build --logLevel warn --outDir "$OUT/apps/web/dist" --emptyOutDir --base "$BASE/"
+# CDN1 (2026-10-20): reviewed CC0 models come from assets.eden.art (apps/web/src/cdn-manifest.json; tools/cdn/README.md).
+# The switch is build-time and off when absent in vite, so every live build from 3.20 (we-f62375187ae5) to 3.49 shipped
+# without it: the release defaults it ON. Turn it off for one release with SIM_ASSETS_CDN_ENABLED=0 release.sh ...
+CDN="${SIM_ASSETS_CDN_ENABLED-1}"
+case "$CDN" in 0|1) ;; *) echo "SIM_ASSETS_CDN_ENABLED must be 0 or 1 (got '$CDN')"; exit 2;; esac
+CDN_ORIGIN="${SIM_ASSETS_CDN_ORIGIN:-https://assets.eden.art}"
+[ "$CDN" = 1 ] || echo "   CDN OFF for this build (SIM_ASSETS_CDN_ENABLED=0): every model is served from origin"
+BUILD_ID="$BUILD" VITE_EDEN_EXPERIENCE_WORLD_IDS="$EDEN_WORLDS" SIM_ASSETS_CDN_ENABLED="$CDN" SIM_ASSETS_CDN_ORIGIN="$CDN_ORIGIN" pnpm --filter @sim/web exec vite build --logLevel warn --outDir "$OUT/apps/web/dist" --emptyOutDir --base "$BASE/"
 grep -qE "(src=|\")$BASE/assets/" "$OUT/apps/web/dist/index.html" || { echo "web build is not under $BASE/"; exit 1; }
+# With the switch on, the bundle must carry the CDN origin (the flag-off build tree-shakes it away) and the manifest.
+if [ "$CDN" = 1 ]; then
+  grep -qsF "$CDN_ORIGIN" "$OUT"/apps/web/dist/assets/*.js || { echo "web build lacks the CDN origin $CDN_ORIGIN although SIM_ASSETS_CDN_ENABLED=1"; exit 1; }
+  ls "$OUT"/apps/web/dist/assets/cdn-manifest-*.json >/dev/null 2>&1 || { echo "web build lacks cdn-manifest-*.json"; exit 1; }
+fi
 # The pin is inlined as the argument of Shell's edenReleaseWorlds call (minified f(`id,...`)); the id also appears hard-coded
 # elsewhere (classroom, old Eden), so match the call, in whatever chunk the bundler put Shell (P7d merged it into main).
 [ -z "$EDEN_WORLDS" ] || grep -qsE "[A-Za-z_\$][A-Za-z0-9_\$]*\(\`${EDEN_WORLDS%%,*}" "$OUT"/apps/web/dist/assets/*.js || { echo "web build lacks the Eden experience pin ($EDEN_WORLDS)"; exit 1; }
