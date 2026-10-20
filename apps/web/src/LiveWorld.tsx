@@ -666,6 +666,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const eyes=WorldEyes.fromSearch(location.search,{renderer,camera,scene,body:id=>people?.bodyObject(id)??floaters.object(id)??standIns.getObjectByName(id)??null,souls:()=>[...context.current.sim.conn.replica.souls.values()].map(x=>x.entityId),overlays:()=>[speechLayer.group,ring,orbitPivot.group,fading.group,hover.marker],tick:()=>shown.current.tick,ready:()=>sceneSettled&&drawnTick.current!==null});
     const officeGuardFrom=new THREE.Vector3(),authoredBoundaries=new WorldAuthoredBoundaries();
     let shadowFrame=0;  // P1 phones
+    let earlyPrep:0|1|2|3=0;const earlyPrepWanted=new URLSearchParams(location.search).get('earlyPrep')!=='0';  // P7c: 1 = this frame prepares and links, 2 = linking, 3 = done
     let programsPending=false,arrivedOnce=false,earlyPending=0,buildingFrameAt=-Infinity,layerStarted=false,afterNextDraw:(()=>void)|null=null;  // afterNextDraw: ?shot waits for a frame drawn after the build  // lane W1: the built world's shaders are still linking in parallel: no frame yet
     const animate = () => {
       officeGuardFrom.copy(camera.position);
@@ -908,11 +909,14 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(arrivalStage==='first-frame'||arrivalStage==='ready'||arrivalStage==='failed'||arrivalStage==='cancelled')arrivedOnce=true;
       // P7 lever D (phone, new world): the near world is built and its programs linked: draw it now and lift the card after
       // that frame, without the socket's first data (the take's scene, people and the initial gate follow when it comes)
-      if(earlyWanted&&!arrivedOnce&&layerStarted&&entityLayer.active&&!entityLayer.building&&!programsPending){arrivedOnce=true;earlyPending=2;earlyArrival.reveal();}
+      // P7c: first one frame that does everything a drawn frame does but draw (it adds the far stand-ins, the atmosphere,
+      // the detail swaps) and links the programs that adds in parallel; the first drawn frame then links none (it linked
+      // ~12 one by one, ~0.15-0.2 s at 4x). ?earlyPrep=0 skips it
+      if(earlyWanted&&!arrivedOnce&&layerStarted&&entityLayer.active&&!entityLayer.building&&!programsPending){if(earlyPrep===0)earlyPrep=earlyPrepWanted?1:3;else if(earlyPrep===3){arrivedOnce=true;earlyPending=2;earlyArrival.reveal();}}
       if(bodyModels.held&&arrivalOver()){bodyModels.held=false;startTemplates();}  // P1 phones: the people stream in now
       if(newWorld&&!templatesStarted&&!bodyModels.held&&(arrivedOnce||layerStarted&&!entityLayer.active)){startTemplates();}
       // (never for ?shot pictures or a Soul's eyes: those tools time their own frames)
-      const holdDraw=!shotMode&&!eyes&&(programsPending||(arrivalStage!==undefined&&!arrivedOnce));
+      const holdDraw=!shotMode&&!eyes&&(programsPending||(arrivalStage!==undefined&&!arrivedOnce&&earlyPrep!==1));
       if(quality.tier==='phone'&&!eyes&&!shotMode){entityLayer.interiorFrom=camera.position;entityLayer.freezeSettled=true;}else{entityLayer.interiorFrom=null;entityLayer.freezeSettled=false;}  // P1 phones: far buildings' furniture is not drawn
       entityLayer.applyEdge(context.current.sim.edge??[]);if(!holdDraw)entityLayer.update(step,now,geometry.group);  // no-ops unless this is a new (entity) world
       navigation?.update(step);
@@ -971,9 +975,9 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if((!initialGate||initialGate.snapshot().stage==='ready')&&batchEnabled&&(batchGeometry!==geometry||batchRevision!==geometry.staticRenderRevision))void prepareStaticRendering();
       if(geometry.backdropDetailPending&&(!initialGate||initialGate.snapshot().stage==='ready'))geometry.backdropDetailWhenSettled(loader,now);  // W3: the campus's exact furniture after arrival
       if(look.enabled&&entityLayer.active&&!expansion){if(look.follow)light.follow(controls.target,camera.position);renderer.toneMappingExposure=lookExposure(light.daylight,look.nightExposure);}
-      if(adaptive&&entityLayer.active&&!eyes)adaptive.frame(now);const draw=()=>{diagnostics.beginRender(renderer);if(!eyes)entityLayer.cull(camera,renderer.domElement.clientHeight,renderer.shadowMap.autoUpdate||renderer.shadowMap.needsUpdate);if(distanceDetail&&!eyes)distanceDetail.apply(scene,camera,renderer.domElement.clientHeight);if(meshLod&&!eyes)meshLod.apply(scene,camera,renderer.domElement.clientHeight);if(farStandIns&&!eyes)farStandIns.apply(scene,camera,renderer.domElement.clientHeight);try{if(!eyes?.render()){if(post&&entityLayer.active)post.render(renderer,scene,camera);else renderer.render(scene,camera);}}finally{farStandIns?.restore();meshLod?.restore();distanceDetail?.restore();entityLayer.uncull();diagnostics.endRender();}};
+      if(adaptive&&entityLayer.active&&!eyes)adaptive.frame(now);const draw=()=>{diagnostics.beginRender(renderer);if(!eyes)entityLayer.cull(camera,renderer.domElement.clientHeight,renderer.shadowMap.autoUpdate||renderer.shadowMap.needsUpdate);if(distanceDetail&&!eyes)distanceDetail.apply(scene,camera,renderer.domElement.clientHeight);if(meshLod&&!eyes)meshLod.apply(scene,camera,renderer.domElement.clientHeight);if(farStandIns&&!eyes)farStandIns.apply(scene,camera,renderer.domElement.clientHeight);try{if(earlyPrep===1){earlyPrep=2;const done=()=>{earlyPrep=3;};void Promise.race([renderer.compileAsync(scene,camera),new Promise(r=>setTimeout(r,3000))]).then(done,done);}else if(!eyes?.render()){if(post&&entityLayer.active)post.render(renderer,scene,camera);else renderer.render(scene,camera);}}finally{farStandIns?.restore();meshLod?.restore();distanceDetail?.restore();entityLayer.uncull();diagnostics.endRender();}};
       if(quality.shadowEvery>1&&!eyes){renderer.shadowMap.autoUpdate=false;if(shadowFrame++%quality.shadowEvery===0)renderer.shadowMap.needsUpdate=true;}  // P1 phones: the shadow map every n-th frame
-      if(holdDraw){/* nothing to show yet */}else{if(batchEnabled)staticBatches.withRender(draw);else draw();if(afterNextDraw){const f=afterNextDraw;afterNextDraw=null;f();}if(earlyPending&&mount.current?.style.visibility==='visible'&&!mount.current.parentElement?.querySelector('.world-initial-loading')&&--earlyPending===0)requestAnimationFrame(()=>{if(!abort.signal.aborted)earlyArrival.mark();});}  // P7 fix: two frames drawn with nothing covering the canvas, then the next frame (the second is on screen) lifts the card
+      if(holdDraw){/* nothing to show yet */}else if(earlyPrep===1){if(batchEnabled)staticBatches.withRender(draw);else draw();}else{if(batchEnabled)staticBatches.withRender(draw);else draw();if(afterNextDraw){const f=afterNextDraw;afterNextDraw=null;f();}if(earlyPending&&mount.current?.style.visibility==='visible'&&!mount.current.parentElement?.querySelector('.world-initial-loading')&&--earlyPending===0)requestAnimationFrame(()=>{if(!abort.signal.aborted)earlyArrival.mark();});}  // P7 fix: two frames drawn with nothing covering the canvas, then the next frame (the second is on screen) lifts the card
       shadowDetail?.restore();
       idleLife.restore();
       fading.restore();

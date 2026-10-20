@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {placeName,doingText,activityWords} from '../src/place-names.ts';
+import {placeName,doingText,activityWords,placeNamesReady} from '../src/place-names.ts';
 import {connectionLost,arrivalStage,heldLabel} from '../src/viewer-arrival.ts';
 
-test('VF1: ids in a doing line read as human names, never raw ids', () => {
+test('VF1: ids in a doing line read as human names, never raw ids', async () => {
+  await placeNamesReady;
   assert.equal(placeName('commons-bench-east'), 'East bench, Commons gathering lawn');
   assert.equal(placeName('commons-mat-3'), 'Sleeping mat 3');
   assert.equal(placeName('walk:region-park'), placeName('region-park'));

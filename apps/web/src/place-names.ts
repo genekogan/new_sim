@@ -1,5 +1,4 @@
 import {EDEN_VIEWER_PLACES} from './WorldEdenPlaceData.ts';
-import spotData from '../../../worlds/eden/activity-spots.v1.json' with {type:'json'};
 import {humanActivity} from './human-activity.ts';
 
 /** VF1: human names for the ids a Soul's "doing" can carry ("commons-bench-east", "walk:region-park",
@@ -8,7 +7,11 @@ import {humanActivity} from './human-activity.ts';
  * Presentation only: never use these strings as identifiers. */
 const NAMES=new Map<string,string>();
 for(const p of EDEN_VIEWER_PLACES)if(p.name&&p.name!==p.id)NAMES.set(p.id,p.name);
-for(const s of (spotData as {spots?:{id?:unknown;label?:unknown}[]}).spots??[])if(typeof s.id==='string'&&typeof s.label==='string'&&s.label)NAMES.set(s.id,s.label);
+/** P7c: World's activity-spot labels (~22 KB br of /w/eden data) load beside the page instead of before its first frame
+ * (a phone's arrival waits for every byte in front of it); until then those ids read as plain words. */
+export const placeNamesReady:Promise<void>=import('../../../worlds/eden/activity-spots.v1.json',{with:{type:'json'}}).then((m:{default:{spots?:{id?:unknown;label?:unknown}[]}})=>{
+ for(const s of m.default.spots??[])if(typeof s.id==='string'&&typeof s.label==='string'&&s.label)NAMES.set(s.id,s.label);
+},()=>{});
 
 const ID=/^[a-z0-9]+([-_:.][a-z0-9]+)+$/i;
 const DIRECTION=new Set(['north','south','east','west','northeast','northwest','southeast','southwest','upper','lower','left','right','front','back','inner','outer']);
