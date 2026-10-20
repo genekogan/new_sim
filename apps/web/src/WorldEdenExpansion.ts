@@ -16,6 +16,7 @@ import {createWorldGroundDetails} from './WorldGroundDetails.ts';
 import {EDEN_VIEWER_PLACES} from './WorldEdenPlaceData.ts';
 import {applyWorldRealism,applySceneryRealism,releaseWorldRealism,disposeBuildingIdentity,setRealismTime} from './WorldEdenRealism.ts';
 import * as THREE from 'three';
+import { compileSceneAsync } from './gen-mesh/texture-budget.ts';
 import {arrivalMark} from './arrival-marks.ts';
 import {createAcademicVenueScenery,academicVenuePlan} from '../../../mars/viewer/app/engine-view/content/assets/eden-expansion-assets/venue.ts';
 import {createEdenNeighborhood} from '../../../mars/viewer/app/engine-view/content/assets/eden-expansion-assets/neighborhood.ts';
@@ -107,7 +108,7 @@ export function createWorldEdenExpansion(officeGuards:readonly OfficeGuardBox[]=
  // after the card), so the owner also starts it directly (warmUp)
  let warmStarted=false;
  const startWarm=(renderer:THREE.WebGLRenderer,scene:THREE.Object3D,camera:THREE.Camera)=>{if(warmStarted||closed||warm)return;warmStarted=true;setTimeout(()=>{if(closed||warm)return;
-   try{const shown=group.visible;group.visible=true;const pending=renderer.compileAsync(scene,camera);group.visible=shown;pending.then(()=>{warm=true;arrivalMark('expansion-warm');},()=>{warm=true;});}catch{warm=true;}},0);};
+   try{const shown=group.visible;group.visible=true;const pending=compileSceneAsync(renderer,scene,camera,30_000);group.visible=shown;pending.then(()=>{warm=true;arrivalMark('expansion-warm');},()=>{warm=true;});}catch{warm=true;}},0);};
  /** Lazily drawn fixtures, commons dressing and native fixtures bring new materials; finish them at most once a second (skinned actors excluded). */
  let backdrop:THREE.Group|null=null;
  const refreshRealism=()=>{const now=performance.now();if(now-realismAt<1000)return;realismAt=now;applyWorldRealism(group,{buildings:true});if(backdrop){applyWorldRealism(backdrop);if(backdrop.parent)applySceneryRealism(backdrop.parent,[group,backdrop]);}};

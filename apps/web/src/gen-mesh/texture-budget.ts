@@ -138,3 +138,13 @@ export function uploadTextures(g: GLTF): Promise<void> {
     if (!scheduled) { scheduled = true; requestAnimationFrame(pump); }
   });
 }
+
+/** A whole scene's programs linked in parallel, as three's compileAsync, but through waitForPrograms: three's own poll
+ *  threw `reading 'isReady'` from its timer when a material was disposed mid-compile (on 3.32/3.33 phones ~1 in 3 loads of
+ *  a new world: the early layer replaces near-ring materials while LiveWorld compiles) and then never resolved, so the
+ *  arrival waited for its 3 s fallback, or for good where there was none. Every whole-scene compile goes through this. */
+export function compileSceneAsync(r: THREE.WebGLRenderer, scene: THREE.Object3D, camera: THREE.Camera, timeoutMs = 3000): Promise<void> {
+  let mats: unknown;
+  try { mats = r.compile(scene, camera); } catch { return Promise.resolve(); }
+  return waitForPrograms(r, mats instanceof Set ? mats as Set<object> : new Set(), () => true, timeoutMs);
+}

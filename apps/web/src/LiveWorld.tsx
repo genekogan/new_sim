@@ -84,7 +84,7 @@ import { GodWorldLiving, calendarClock, entityWorldState, godRoomViews, godTourV
 import { setFleeSources } from './gen-mesh/motion.ts';
 import { WorldLightning } from './WorldLightning.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
-import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { worldResolution } from './adaptive-resolution.ts';import { browserQuality } from './quality-tier.ts';import { WorldDistanceDetail } from './WorldDistanceDetail.ts';import { WorldMeshLod, PHONE_MESH_LOD, DESKTOP_MESH_LOD, workerSimplifier, type Simplifier } from './WorldMeshLod.ts';import { WorldFarStandIns, PHONE_STAND_INS, rendererSnapshotter } from './WorldFarStandIns.ts';import { setTextureRenderer } from './gen-mesh/texture-budget.ts';
+import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { worldResolution } from './adaptive-resolution.ts';import { browserQuality } from './quality-tier.ts';import { WorldDistanceDetail } from './WorldDistanceDetail.ts';import { WorldMeshLod, PHONE_MESH_LOD, DESKTOP_MESH_LOD, workerSimplifier, type Simplifier } from './WorldMeshLod.ts';import { WorldFarStandIns, PHONE_STAND_INS, rendererSnapshotter } from './WorldFarStandIns.ts';import { compileSceneAsync, setTextureRenderer } from './gen-mesh/texture-budget.ts';
 // P1 phones: the god panel and the constitution card are lazy chunks, mounted once the arrival card has gone (20 s cap), or
 // at once when the landing URL carries something for the panel (#join, #approve/…, an offer or pairing link, a preview)
 const GodPanel=lazy(()=>import('./GodPanel.tsx').then(m=>({default:m.GodPanel})));
@@ -361,7 +361,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(abort.signal.aborted)return;frameEntityWorld();setEntityWorld(entityLayer.active);
       // lane W1: link the built world's shaders in parallel (KHR_parallel_shader_compile) before its first frame, instead
       // of the first frame stalling the page on each program (~0.2-0.35 s); frames wait for it, at most 3 s
-      if(entityLayer.active&&typeof renderer.compileAsync==='function'){programsPending=true;const done=()=>{programsPending=false;arrivalMark('programs-linked');};void Promise.race([renderer.compileAsync(scene,camera),new Promise(r=>setTimeout(r,3000))]).then(done,done);}
+      if(entityLayer.active){programsPending=true;const done=()=>{programsPending=false;arrivalMark('programs-linked');};void compileSceneAsync(renderer,scene,camera).then(done,done);}
       // r2.1: and after the first world clock reaches the lights (all views/frames of `look --hour` honour the hour)
       if(shotMode){await whenAssetsSettled();await whenShotClock(()=>light.daylight!==null,{timeoutMs:shotHour!==null?15_000:4_000,signal:abort.signal});await whenArrivalCardGone({signal:abort.signal});await new Promise<void>(r=>{afterNextDraw=r;});requestAnimationFrame(()=>requestAnimationFrame(()=>{
         if(abort.signal.aborted)return;document.title=entityLayer.active?'ready':'no-entity-world';
@@ -1003,7 +1003,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         // is built, its programs linked and shown (at most 15 s), so the card never goes over the bare hills (live /w/eden
         // on a 4x phone: the town appeared ~1.5 s after the card) and the compile below covers its lights
         if(context.current.edenExpansion){const until=performance.now()+15_000;while(expansionWantedNow!==false&&!expansionFailed&&!past.current&&!expansion?.group.visible&&performance.now()<until){await new Promise(r=>setTimeout(r,100));if(abort.signal.aborted||initialGate!==gate||!gate.attached)return;}}
-        await prepareStaticRendering();if(abort.signal.aborted||initialGate!==gate||!gate.attached)return;await(typeof renderer.compileAsync==='function'?renderer.compileAsync(scene,camera):Promise.resolve(renderer.compile(scene,camera)));})();void prepared.then(()=>{if(!abort.signal.aborted&&initialGate===gate)gate.preparationComplete(gate.generation);},()=>{if(!abort.signal.aborted&&initialGate===gate)gate.preparationFailed('Rendering preparation');});}
+        await prepareStaticRendering();if(abort.signal.aborted||initialGate!==gate||!gate.attached)return;await compileSceneAsync(renderer,scene,camera);})();void prepared.then(()=>{if(!abort.signal.aborted&&initialGate===gate)gate.preparationComplete(gate.generation);},()=>{if(!abort.signal.aborted&&initialGate===gate)gate.preparationFailed('Rendering preparation');});}
       if (!renderer.getContext().isContextLost()) {if(at.take&&!holdDraw&&initialGate?.snapshot().stage==='first-frame')initialGate.firstFrame(initialGate.generation);drawnTick.current = at.take&&initialGate?.snapshot().stage==='ready' ? at.tick : null;if(drawnTick.current!==null)arrivalMark('first-live-frame');}
       // A paused seek is a discrete displayed moment. Publish its first drawn
       // frame immediately; moving playback retains the existing 250ms cadence.

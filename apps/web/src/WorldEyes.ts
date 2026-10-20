@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { compileSceneAsync } from './gen-mesh/texture-budget.ts';
 /** Eyes mode (M3, `?eyes=1`): the viewer as a hidden render surface for GET /v1/edge/view. A server-side render
  * worker (one headless browser, one page) calls `window.edenEyes.capture(job)`; this module poses the camera at the
  * Soul's eyes (or overhead for map mode), hides every Soul body the server did not list as seen (and the Soul's own
@@ -37,7 +38,7 @@ export class WorldEyes {
     if (this.disposed) return Promise.resolve({ok: false, error: 'viewer closed'});
     if (!this.host.ready()) return Promise.resolve({ok: false, error: 'scene not loaded yet'});
     // first job: compile every material in the scene once (software GL otherwise stalls for seconds on new shaders)
-    this.compiled ??= this.host.renderer.compileAsync(this.host.scene, this.host.camera).catch(() => undefined);
+    this.compiled ??= compileSceneAsync(this.host.renderer, this.host.scene, this.host.camera, 30_000);
     const started = performance.now();
     return this.compiled.then(() => new Promise<EyesResult>(resolve => this.queue.push({job, resolve, frames: 0, started})));
   }
