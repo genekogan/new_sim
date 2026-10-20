@@ -36,10 +36,13 @@ type Host = { layer: { model?: WorldModel | null; group?: THREE.Object3D; ground
 const MAX_VOICES = 12, TICK_MS = 100;
 /** A voice no longer heard stays alive (silent) this long before it stops, so a camera move does not restart it. */
 const LINGER_MS = 8000, MAX_LIVE = MAX_VOICES + 8;
+/** Quiet voices that only schedule notes (birds, crickets, bells) hold no running nodes, just a gain: they linger outside
+ * MAX_LIVE, longer and under a looser bound, so flying fast across a wood does not evict and restart them. */
+const MAX_LIVE_EVENTS = 48, LINGER_EVENTS_MS = 20000;
 
 // ------------------------------------------------------------------ synthesis (procedural, no files)
 
-type Voice = { kind: SoundKind; variant: number; source: Source; out: GainNode; stop: () => void; tick: (t: number, e: Emitter) => void; gain: number; quietSince: number };
+type Voice = { kind: SoundKind; variant: number; source: Source; out: GainNode; loops: boolean; stop: () => void; tick: (t: number, e: Emitter) => void; gain: number; quietSince: number };
 let ctx: AudioContext | null = null, master: GainNode | null = null, noiseBuf: AudioBuffer | null = null;
 let settings: SoundSettings = { ...DEFAULT_SETTINGS };
 
@@ -159,7 +162,7 @@ function makeVoice(c: AudioContext, kind: SoundKind, variant: number, source: So
       if (variant === 1) { burst(c, out, at, 0.07, 0.5, 2400); burst(c, out, at + 0.015, 0.05, 0.3, 4200); } else { burst(c, out, at, 0.09, 0.9, 260, 'lowpass'); tone(c, out, at, 90, 60, 0.07, 0.25); }
       return Math.max(0.28, 0.75 / Math.sqrt(sp)); }); break;
   }
-  return { kind, variant, source, out, gain: 0, quietSince: 0, tick: (t, e) => tick(t, e), stop: () => { for (const n of nodes) { try { n.stop(); } catch { /* stopped */ } } setTimeout(() => out.disconnect(), 200); } };
+  return { kind, variant, source, out, loops: nodes.length > 0, gain: 0, quietSince: 0, tick: (t, e) => tick(t, e), stop: () => { for (const n of nodes) { try { n.stop(); } catch { /* stopped */ } } setTimeout(() => out.disconnect(), 200); } };
 }
 /** A one-shot for `mode: 'change'` (a door creak, a bell ringing, a splash). */
 function oneShot(c: AudioContext, kind: SoundKind, gain: number) {
@@ -260,9 +263,15 @@ function step(host: Host) {
   // out of hearing: fade, keep the voice LINGER_MS (a camera move brings it straight back, not from the start), then stop
   for (const [id, v] of voices) if (!live.has(id)) {
     if (!v.quietSince) { v.quietSince = now; v.gain = 0; v.out.gain.setTargetAtTime(0, t, 0.3); }
-    else if (now - v.quietSince > LINGER_MS) stopVoice(id, v, 'out of hearing');
+    else if (now - v.quietSince > (v.loops ? LINGER_MS : LINGER_EVENTS_MS)) stopVoice(id, v, 'out of hearing');
   }
-  if (voices.size > MAX_LIVE) for (const [id, v] of [...voices].filter(([, v]) => v.quietSince).sort((a, b) => a[1].quietSince - b[1].quietSince)) { if (voices.size <= MAX_LIVE) break; stopVoice(id, v, 'too many'); }
+  // too many lingering: stop the longest-quiet first (looping voices cost CPU while silent, note-only voices almost nothing)
+  for (const [loops, cap] of [[true, MAX_LIVE], [false, MAX_LIVE_EVENTS]] as const) {
+    const kept = [...voices].filter(([, v]) => v.loops === loops);
+    if (kept.length <= cap) continue;
+    let n = kept.length;
+    for (const [id, v] of kept.filter(([, v]) => v.quietSince).sort((a, b) => a[1].quietSince - b[1].quietSince)) { if (n <= cap) break; stopVoice(id, v, 'too many'); n--; }
+  }
 }
 
 // ------------------------------------------------------------------ the speaker button
