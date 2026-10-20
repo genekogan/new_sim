@@ -1,7 +1,7 @@
 // CATRUN: the shared core library (engine fix i). A world stores only what it uses; its own hashes win; eden/* aliases core/*.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CORE_KIT, WorldModel, applyBatch, buildLibrary, coreLibrary, type Accepted, type DefInput } from './index.ts';
+import { CORE_KIT, WorldModel, applyBatch, buildLibrary, coreLibrary, nearHash, type Accepted, type DefInput } from './index.ts';
 
 const lib = coreLibrary();
 const bare = (seed = 'lib') => { const w = new WorldModel({ constants: { extent: 1000, ground: 'land' }, seed }); w.library = lib; return w; };
@@ -101,4 +101,15 @@ test('library: pack namespaces alias too: lm/<x>@v → core/lm-<x>@v, mars/<x>@v
   assert.equal(w.def(`lm/${lm.name.slice(8)}@${lm.version}`), lm);
   assert.equal(w.def(`mars/${mars.name.slice(10)}@${mars.version}`), mars);
   assert.equal(w.def('eden/no-such-thing@1'), undefined);
+});
+
+test('a mesh given a distant version (make.lod1) keeps its near model\'s hash for the thumbnail rendered before', () => {
+  const w = legacy(), d = CORE_KIT.find((x) => x.name === 'core-ceramic-tower')!;
+  const withLod = w.def('core/ceramic-tower@1')!;
+  assert.equal(withLod.make.kind, 'mesh'); assert.ok(withLod.make.kind === 'mesh' && withLod.make.lod1);
+  const { lod1: _l, ...make } = withLod.make as { lod1?: string };
+  const near = w.fork(); const bareDef = near.defineDef({ ...d, make } as DefInput, 'core', 0);
+  assert.notEqual(bareDef.hash, withLod.hash);
+  assert.equal(nearHash(withLod), bareDef.hash);
+  assert.equal(nearHash(bareDef), undefined);
 });

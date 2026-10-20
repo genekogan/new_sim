@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import type { Context, Hono } from 'hono';
 import type { Baked, Vec2, Vec3 } from '@sim/generators';
 import type { AssetInfo, AssetLookup, StoredDef } from '@sim/world-compiler';
-import { vocab } from '@sim/world-compiler';
+import { nearHash, vocab } from '@sim/world-compiler';
 import { CREATION_LIMITS as L, assertFootprint, footprintToBaked, type LmFootprint } from '@sim/generators';
 import { assetBytesOf, mountCatalogRoutes } from './catalog.ts';
 import { WireCache, acceptsBrotli, readRenditions } from './asset-wire.ts';
@@ -396,6 +396,12 @@ export class AssetStore {
     for (const p of [join(this.dir, 'thumbs', `${defHash}.png`), join(REPO_ROOT, 'worlds/core-assets/thumbs', `${defHash}.png`)]) if (existsSync(p)) return p;
     return null;
   }
+  /** A def's thumbnail and the hash it is filed under: its own, else (a mesh given a distant version) the one rendered
+   *  under its hash before lod1 was attached, since the near model it pictures is unchanged. */
+  thumbOf(def: Omit<StoredDef, 'by'> & { by?: string }): { file: string; hash: string } | null {
+    for (const hash of [def.hash, nearHash(def)]) { const file = hash ? this.thumbFile(hash) : null; if (file) return { file, hash: hash! }; }
+    return null;
+  }
   putThumb(defHash: string, png: Uint8Array) {
     const s = imageSize(png);
     if (s.type !== 'png') throw refuse(415, 'asset.type', 'thumbnails are PNG');
@@ -645,7 +651,7 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
     const facets = { category: c.req.query('category') || undefined, form: c.req.query('form') || undefined, has: c.req.queries('has')?.flatMap((h) => h.split(',')).filter(Boolean) };
     const all = searchDefs(library().map((x) => ({ ...x, by: undefined })), q, { tag, limit: offset + limit, ...facets, used: hash => d.god.parts.used(hash) }), hits = all.slice(offset);
     const compact = c.req.query('compact') === '1';
-    const defs = hits.map((h) => { const used = d.god.parts.badge(h.def.hash); return { ...(compact ? { ...vocab.manifestRow(h.def as never, { bytes: assetBytesOf(h.def as never, store), publicRef: publicRef(h.def) }), ...(q ? { score: h.score, why: h.why } : {}) } : { ...h.def, publicRef: publicRef(h.def), category: vocab.categoryOf(h.def as never), interfaces: vocab.interfacesOf(h.def as never), ...(q ? { score: h.score, why: h.why } : {}), thumb: store.thumbFile(h.def.hash) ? `/thumbs/${h.def.hash}.png` : null }), ...(used.length ? { used, usedIn: used } : {}) }; });
+    const defs = hits.map((h) => { const used = d.god.parts.badge(h.def.hash); return { ...(compact ? { ...vocab.manifestRow(h.def as never, { bytes: assetBytesOf(h.def as never, store), publicRef: publicRef(h.def) }), ...(q ? { score: h.score, why: h.why } : {}) } : { ...h.def, publicRef: publicRef(h.def), category: vocab.categoryOf(h.def as never), interfaces: vocab.interfacesOf(h.def as never), ...(q ? { score: h.score, why: h.why } : {}), thumb: ((t) => t ? `/thumbs/${t.hash}.png` : null)(store.thumbOf(h.def)) }), ...(used.length ? { used, usedIn: used } : {}) }; });
     if (q.trim() && !all.length && offset === 0) d.god.recordFindMiss(q);
     return c.json({ defs, count: defs.length, offset, query: q || null, ...(facets.category || facets.has?.length || facets.form ? { facets } : {}), ...(q && !defs.length ? { hint: 'nothing in the library matches; define it (kit/2 parts, a generator, or an imported mesh: POST /v1/god/assets)' } : {}) }, 200, noStore);
   });
@@ -656,9 +662,9 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
     const def = findDef(ref);
     if (!def) throw new ApiError(404, 'not-found', `no def ${ref}; search with GET /v1/god/defs?q=`);
     if (thumb) {
-      const f = store.thumbFile(def.hash);
-      if (!f) throw new ApiError(404, 'not-found', 'no thumbnail rendered yet (tools/god-skill/scripts/thumbs.mjs)');
-      return c.body(readFileSync(f) as never, 200, { 'content-type': 'image/png', etag: `"${def.hash}"`, 'cache-control': 'public, max-age=3600' });
+      const t = store.thumbOf(def);
+      if (!t) throw new ApiError(404, 'not-found', 'no thumbnail rendered yet (tools/god-skill/scripts/thumbs.mjs)');
+      return c.body(readFileSync(t.file) as never, 200, { 'content-type': 'image/png', etag: `"${t.hash}"`, 'cache-control': 'public, max-age=3600' });
     }
     d.requireGod(c);
     const { by: _by, ...pub } = def;
@@ -671,7 +677,7 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
       components: Object.keys(def.components ?? {}), extends: extendsChain,
       category: vocab.categoryOf(def as never), interfaces: vocab.interfacesOf(def as never), manifest: vocab.manifestLine(vocab.manifestRow(def as never, { bytes: assetBytesOf(def, store), publicRef: publicRef(def) })),
       asset: asset ? (({ baked: _b, ...m }) => ({ ...m, url: `/assets/${m.sha}.${m.ext}` }))(asset) : null,
-      thumb: store.thumbFile(def.hash) ? `/thumbs/${def.hash}.png` : null,
+      thumb: ((t) => t ? `/thumbs/${t.hash}.png` : null)(store.thumbOf(def)),
     }, 200, noStore);
   });
   app.post('/v1/god/defs/*', async (c) => {

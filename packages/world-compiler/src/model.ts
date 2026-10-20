@@ -72,6 +72,15 @@ const BAKE_TEXT = new WeakMap<object, string>();
 const textOf = (v: unknown): string => { if (v === null || typeof v !== 'object') return JSON.stringify(v) ?? ''; let t = BAKE_TEXT.get(v); if (t === undefined) { t = stableStringify(v); t.charCodeAt(0); BAKE_TEXT.set(v, t); } return t; };   // charCodeAt flattens the rope once
 function bakeKey(def: unknown, params: unknown, seed: number, shape: unknown): string { return cacheKeyOfText(`[${textOf(def)},${textOf(params)},${textOf(seed)},${textOf(shape)}]`); }
 
+/** Z2: the hash a mesh def had before its distant version (make.lod1) was attached, else undefined. The near model,
+ *  and so the def's thumbnail, is the same under both hashes (defineDef hashes the parsed def without its budget). */
+export function nearHash(d: Omit<StoredDef, 'by'> & { by?: string }): string | undefined {
+  if (d.make.kind !== 'mesh' || !d.make.lod1) return undefined;
+  const { budget: _b, hash: _h, ref: _r, by: _by, born: _born, ...rest } = d;
+  const { lod1: _l, ...make } = d.make;
+  return hashOf({ ...rest, make });
+}
+
 export class WorldModel {
   constants: WorldConstants;
   state: WorldState;
