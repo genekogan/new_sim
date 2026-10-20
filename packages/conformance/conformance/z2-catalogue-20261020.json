@@ -1,6 +1,6 @@
 {
   "schema": "catalog-conformance-supplement/1",
-  "note": "Tranche 2026-10-20 lane Z2 (catalogue repairs). Exact re-pins, reviewed against origin/main 62876c57c with the same --k 2 run (team/scratch/t4/z2/ef4/cmp.py): (1) 918 findings identical but for the def hash: 145 mesh defs now carry make.lod1 (a distant version; the EF4 budget stage still measures the unchanged near model) and the placement-fix revisions changed other hashes; (2) 42 gallery-budget findings on building-class kit defs are new or larger (e.g. core-hotel params.w.max 8438 -> 12454 triangles, cap 6000) because the salvaged placement fixes (ba0300658) resize authored room layouts with the building instead of clipping them (building-plan.ts) and raise minimum sizes, which also moves the seeded random samples; 9 of these points were refused placements on main. In exchange 71 placement findings (place/architecture, place/architecture.sealed) are gone and 71 more samples place; core-mine-cart construction view drops 9 -> 5 draws. No qualification gaps changed. Then (agent #4, same day): core-hall keeps w min 3, core-townhouse w min 5.2, core-shop d min 5 (bakery, clinic, post office inherit) and core-factory gets its own w min 5, so no stored Eden 2026 or godmode-lab building is out of range; re-pinned from a fresh --k 2 run (team/scratch/t4/z2/ef4/head2.json, repin.py): only core-townhouse's two findings re-hash, same details.",
+  "note": "Tranche 2026-10-20 lane Z2 (catalogue repairs). Exact re-pins, reviewed against origin/main 62876c57c with the same --k 2 run (team/scratch/t4/z2/ef4/cmp.py): (1) 918 findings identical but for the def hash: 145 mesh defs now carry make.lod1 (a distant version; the EF4 budget stage still measures the unchanged near model) and the placement-fix revisions changed other hashes; (2) 42 gallery-budget findings on building-class kit defs are new or larger (e.g. core-hotel params.w.max 8438 -> 12454 triangles, cap 6000) because the salvaged placement fixes (ba0300658) resize authored room layouts with the building instead of clipping them (building-plan.ts) and raise minimum sizes, which also moves the seeded random samples; 9 of these points were refused placements on main. In exchange 71 placement findings (place/architecture, place/architecture.sealed) are gone and 71 more samples place; core-mine-cart construction view drops 9 -> 5 draws. No qualification gaps changed. Then (agent #4, same day): core-hall keeps w min 3, core-townhouse w min 5.2, core-shop d min 5 (bakery, clinic, post office inherit) and core-factory gets its own w min 5, so no stored Eden 2026 or godmode-lab building is out of range; re-pinned from a fresh --k 2 run (team/scratch/t4/z2/ef4/head2.json, repin.py): only core-townhouse's two findings re-hash, same details. Then (agent #5): the furnished types' blanket minimum (0.85 of the authored w and d) became each type's measured smallest placeable footprint (vocab-w3.mjs FURNISHED_MIN; a 10 x 12 church places again), which re-hashes 27 furnished defs and moves their seeded random samples; re-pinned from a fresh --k 2 run (team/scratch/t4/z2/ef4/head5.json): still only gallery-budget triangle findings on the same 13 defs, 960 -> 957 sample points (one fewer each on core-fire-station, core-hotel and core-prison).",
   "findings": [
     {
       "def": "core-apartment-block@1",
@@ -207,10 +207,10 @@
     },
     {
       "def": "core-bank@1",
-      "hash": "1791871506707cc23101ab4b5117138b2c053ac62144579362618a5a08f67c72",
+      "hash": "43832151c76c965a9de89a3baf8c2a1dc238fccfe57b5af55b893831fe0e571d",
       "stage": "gallery-budget",
       "code": "triangles",
-      "detail": "6830 > 6000",
+      "detail": "6160 > 6000",
       "fields": [
         "random[0]"
       ]
@@ -287,10 +287,10 @@
     },
     {
       "def": "core-cabin@1",
-      "hash": "9f9142af1082c797fff0208a3a566aee5002ce386a2627b4016bad4556a77758",
+      "hash": "67daa59b29e89af250a3eb638a8fe66cdb504add0a26c7a0d2f935ffa7010a20",
       "stage": "gallery-budget",
       "code": "triangles",
-      "detail": "6428 > 6000",
+      "detail": "6240 > 6000",
       "fields": [
         "random[0]"
       ]
@@ -325,10 +325,10 @@
     },
     {
       "def": "core-church@1",
-      "hash": "6f776f4db64160132c3cd6d1671b162c1e5edc7da345263308497cf8561b3632",
+      "hash": "b137f1f3db006f42b2dae9c6bb14df4abf42dbaed8332c91feaec11da6583f81",
       "stage": "gallery-budget",
       "code": "triangles",
-      "detail": "7284 > 6000",
+      "detail": "6684 > 6000",
       "fields": [
         "random[1]"
       ]
@@ -383,7 +383,7 @@
     },
     {
       "def": "core-dormitory@1",
-      "hash": "1600142998b605cdb3e3b6e030ab74435b556c2bb9f0f1af1a24b4875ff7e535",
+      "hash": "8ce6fd21fab4c61f5513e46f8b45b5a61e51e9e234bd959f03e8702916fa56fa",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6776 > 6000",
@@ -393,7 +393,7 @@
     },
     {
       "def": "core-dormitory@1",
-      "hash": "1600142998b605cdb3e3b6e030ab74435b556c2bb9f0f1af1a24b4875ff7e535",
+      "hash": "8ce6fd21fab4c61f5513e46f8b45b5a61e51e9e234bd959f03e8702916fa56fa",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "7332 > 6000",
@@ -453,7 +453,7 @@
     },
     {
       "def": "core-fire-station@1",
-      "hash": "74500f7cfb0738f78f0a39be061f77e77d585828875c2191d0546c87d4261c99",
+      "hash": "b184cb69c908a5ab8916215ed3ddd12e924bb5ada78922a87158a7f979b99946",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6032 > 6000",
@@ -463,20 +463,10 @@
     },
     {
       "def": "core-fire-station@1",
-      "hash": "74500f7cfb0738f78f0a39be061f77e77d585828875c2191d0546c87d4261c99",
+      "hash": "b184cb69c908a5ab8916215ed3ddd12e924bb5ada78922a87158a7f979b99946",
       "stage": "gallery-budget",
       "code": "triangles",
-      "detail": "6768 > 6000",
-      "fields": [
-        "random[0]"
-      ]
-    },
-    {
-      "def": "core-fire-station@1",
-      "hash": "74500f7cfb0738f78f0a39be061f77e77d585828875c2191d0546c87d4261c99",
-      "stage": "gallery-budget",
-      "code": "triangles",
-      "detail": "7594 > 6000",
+      "detail": "7422 > 6000",
       "fields": [
         "random[1]"
       ]
@@ -497,7 +487,7 @@
     },
     {
       "def": "core-hospital@1",
-      "hash": "8f4486a452dc112ff0de22a002bee399568a8c26881239f2392b5116ceadb583",
+      "hash": "3e67ee37ae4d841d6960688808c6599aa244ec5fe90d69cd0427e401f1a40545",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "7198 > 6000",
@@ -507,17 +497,17 @@
     },
     {
       "def": "core-hospital@1",
-      "hash": "8f4486a452dc112ff0de22a002bee399568a8c26881239f2392b5116ceadb583",
+      "hash": "3e67ee37ae4d841d6960688808c6599aa244ec5fe90d69cd0427e401f1a40545",
       "stage": "gallery-budget",
       "code": "triangles",
-      "detail": "8380 > 6000",
+      "detail": "8352 > 6000",
       "fields": [
         "random[0]"
       ]
     },
     {
       "def": "core-hospital@1",
-      "hash": "8f4486a452dc112ff0de22a002bee399568a8c26881239f2392b5116ceadb583",
+      "hash": "3e67ee37ae4d841d6960688808c6599aa244ec5fe90d69cd0427e401f1a40545",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "8830 > 6000",
@@ -527,7 +517,7 @@
     },
     {
       "def": "core-hospital@1",
-      "hash": "8f4486a452dc112ff0de22a002bee399568a8c26881239f2392b5116ceadb583",
+      "hash": "3e67ee37ae4d841d6960688808c6599aa244ec5fe90d69cd0427e401f1a40545",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "9136 > 6000",
@@ -537,7 +527,7 @@
     },
     {
       "def": "core-hotel@1",
-      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "hash": "2ce8e700bec7886d07aa0c92fa123bf2d559dec5338017d7b4c56e5a7c1cda89",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "12454 > 6000",
@@ -547,7 +537,7 @@
     },
     {
       "def": "core-hotel@1",
-      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "hash": "2ce8e700bec7886d07aa0c92fa123bf2d559dec5338017d7b4c56e5a7c1cda89",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "12750 > 6000",
@@ -557,17 +547,17 @@
     },
     {
       "def": "core-hotel@1",
-      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "hash": "2ce8e700bec7886d07aa0c92fa123bf2d559dec5338017d7b4c56e5a7c1cda89",
       "stage": "gallery-budget",
       "code": "triangles",
-      "detail": "18858 > 6000",
+      "detail": "18478 > 6000",
       "fields": [
         "random[1]"
       ]
     },
     {
       "def": "core-hotel@1",
-      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "hash": "2ce8e700bec7886d07aa0c92fa123bf2d559dec5338017d7b4c56e5a7c1cda89",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6546 > 6000",
@@ -577,17 +567,7 @@
     },
     {
       "def": "core-hotel@1",
-      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
-      "stage": "gallery-budget",
-      "code": "triangles",
-      "detail": "6646 > 6000",
-      "fields": [
-        "params.w.min"
-      ]
-    },
-    {
-      "def": "core-hotel@1",
-      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "hash": "2ce8e700bec7886d07aa0c92fa123bf2d559dec5338017d7b4c56e5a7c1cda89",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6730 > 6000",
@@ -597,7 +577,7 @@
     },
     {
       "def": "core-hotel@1",
-      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "hash": "2ce8e700bec7886d07aa0c92fa123bf2d559dec5338017d7b4c56e5a7c1cda89",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "7082 > 6000",
@@ -607,7 +587,17 @@
     },
     {
       "def": "core-hotel@1",
-      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "hash": "2ce8e700bec7886d07aa0c92fa123bf2d559dec5338017d7b4c56e5a7c1cda89",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7150 > 6000",
+      "fields": [
+        "params.d.min"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "2ce8e700bec7886d07aa0c92fa123bf2d559dec5338017d7b4c56e5a7c1cda89",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "7282 > 6000",
@@ -617,7 +607,7 @@
     },
     {
       "def": "core-hotel@1",
-      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "hash": "2ce8e700bec7886d07aa0c92fa123bf2d559dec5338017d7b4c56e5a7c1cda89",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "7350 > 6000",
@@ -627,7 +617,7 @@
     },
     {
       "def": "core-hotel@1",
-      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "hash": "2ce8e700bec7886d07aa0c92fa123bf2d559dec5338017d7b4c56e5a7c1cda89",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "7390 > 6000",
@@ -637,7 +627,7 @@
     },
     {
       "def": "core-hotel@1",
-      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "hash": "2ce8e700bec7886d07aa0c92fa123bf2d559dec5338017d7b4c56e5a7c1cda89",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "7414 > 6000",
@@ -647,7 +637,7 @@
     },
     {
       "def": "core-hotel@1",
-      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "hash": "2ce8e700bec7886d07aa0c92fa123bf2d559dec5338017d7b4c56e5a7c1cda89",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "7450 > 6000",
@@ -657,7 +647,6 @@
         "params.balcony=true",
         "params.chimney=false",
         "params.chimney=true",
-        "params.d.min",
         "params.doorLamp=false",
         "params.doorLamp=true",
         "params.floors.max",
@@ -699,7 +688,7 @@
     },
     {
       "def": "core-hotel@1",
-      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "hash": "2ce8e700bec7886d07aa0c92fa123bf2d559dec5338017d7b4c56e5a7c1cda89",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "7470 > 6000",
@@ -709,7 +698,7 @@
     },
     {
       "def": "core-hotel@1",
-      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "hash": "2ce8e700bec7886d07aa0c92fa123bf2d559dec5338017d7b4c56e5a7c1cda89",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "7506 > 6000",
@@ -719,7 +708,7 @@
     },
     {
       "def": "core-hotel@1",
-      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "hash": "2ce8e700bec7886d07aa0c92fa123bf2d559dec5338017d7b4c56e5a7c1cda89",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "7678 > 6000",
@@ -729,7 +718,7 @@
     },
     {
       "def": "core-hotel@1",
-      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "hash": "2ce8e700bec7886d07aa0c92fa123bf2d559dec5338017d7b4c56e5a7c1cda89",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "7930 > 6000",
@@ -739,17 +728,17 @@
     },
     {
       "def": "core-hotel@1",
-      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "hash": "2ce8e700bec7886d07aa0c92fa123bf2d559dec5338017d7b4c56e5a7c1cda89",
       "stage": "gallery-budget",
       "code": "triangles",
-      "detail": "8746 > 6000",
+      "detail": "8166 > 6000",
       "fields": [
         "random[0]"
       ]
     },
     {
       "def": "core-hotel@1",
-      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "hash": "2ce8e700bec7886d07aa0c92fa123bf2d559dec5338017d7b4c56e5a7c1cda89",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "9732 > 6000",
@@ -759,7 +748,7 @@
     },
     {
       "def": "core-house@1",
-      "hash": "8830e3e7a7c0161559fa5aa1c6c29865bc4fe1d3b5c1a88a41b659675a0b62f1",
+      "hash": "983a0e17e18ad3c471a3af80e4d5aafaa262b2f60d6e1528bd25bff8eab4f603",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6244 > 6000",
@@ -769,20 +758,20 @@
     },
     {
       "def": "core-house@1",
-      "hash": "8830e3e7a7c0161559fa5aa1c6c29865bc4fe1d3b5c1a88a41b659675a0b62f1",
+      "hash": "983a0e17e18ad3c471a3af80e4d5aafaa262b2f60d6e1528bd25bff8eab4f603",
       "stage": "gallery-budget",
       "code": "triangles",
-      "detail": "7816 > 6000",
+      "detail": "6674 > 6000",
       "fields": [
         "random[1]"
       ]
     },
     {
       "def": "core-house@1",
-      "hash": "8830e3e7a7c0161559fa5aa1c6c29865bc4fe1d3b5c1a88a41b659675a0b62f1",
+      "hash": "983a0e17e18ad3c471a3af80e4d5aafaa262b2f60d6e1528bd25bff8eab4f603",
       "stage": "gallery-budget",
       "code": "triangles",
-      "detail": "8582 > 6000",
+      "detail": "8110 > 6000",
       "fields": [
         "random[0]"
       ]
@@ -2278,7 +2267,7 @@
     },
     {
       "def": "core-mall@1",
-      "hash": "c3259a7abecffcb3541f0f53e57b189a6d47dada45ef379629a64ac3a531377e",
+      "hash": "09eec3430f5e209ec1f4ea6dfa235fd5a6342ab2882b11a446e332c363f28c6d",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6890 > 6000",
@@ -2288,17 +2277,7 @@
     },
     {
       "def": "core-mansion@1",
-      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
-      "stage": "gallery-budget",
-      "code": "triangles",
-      "detail": "10724 > 6000",
-      "fields": [
-        "random[0]"
-      ]
-    },
-    {
-      "def": "core-mansion@1",
-      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "hash": "5241876127e1b004eec23c3404f02ee1ef7ba0f1973ad8cc7bfe4bc8305395cb",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6088 > 6000",
@@ -2308,7 +2287,7 @@
     },
     {
       "def": "core-mansion@1",
-      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "hash": "5241876127e1b004eec23c3404f02ee1ef7ba0f1973ad8cc7bfe4bc8305395cb",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6096 > 6000",
@@ -2318,7 +2297,7 @@
     },
     {
       "def": "core-mansion@1",
-      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "hash": "5241876127e1b004eec23c3404f02ee1ef7ba0f1973ad8cc7bfe4bc8305395cb",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6136 > 6000",
@@ -2328,7 +2307,7 @@
     },
     {
       "def": "core-mansion@1",
-      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "hash": "5241876127e1b004eec23c3404f02ee1ef7ba0f1973ad8cc7bfe4bc8305395cb",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6160 > 6000",
@@ -2338,7 +2317,7 @@
     },
     {
       "def": "core-mansion@1",
-      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "hash": "5241876127e1b004eec23c3404f02ee1ef7ba0f1973ad8cc7bfe4bc8305395cb",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6196 > 6000",
@@ -2390,7 +2369,7 @@
     },
     {
       "def": "core-mansion@1",
-      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "hash": "5241876127e1b004eec23c3404f02ee1ef7ba0f1973ad8cc7bfe4bc8305395cb",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6216 > 6000",
@@ -2400,7 +2379,7 @@
     },
     {
       "def": "core-mansion@1",
-      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "hash": "5241876127e1b004eec23c3404f02ee1ef7ba0f1973ad8cc7bfe4bc8305395cb",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6252 > 6000",
@@ -2410,7 +2389,7 @@
     },
     {
       "def": "core-mansion@1",
-      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "hash": "5241876127e1b004eec23c3404f02ee1ef7ba0f1973ad8cc7bfe4bc8305395cb",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6412 > 6000",
@@ -2420,7 +2399,7 @@
     },
     {
       "def": "core-mansion@1",
-      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "hash": "5241876127e1b004eec23c3404f02ee1ef7ba0f1973ad8cc7bfe4bc8305395cb",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6424 > 6000",
@@ -2430,7 +2409,7 @@
     },
     {
       "def": "core-mansion@1",
-      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "hash": "5241876127e1b004eec23c3404f02ee1ef7ba0f1973ad8cc7bfe4bc8305395cb",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "8036 > 6000",
@@ -2440,7 +2419,17 @@
     },
     {
       "def": "core-mansion@1",
-      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "hash": "5241876127e1b004eec23c3404f02ee1ef7ba0f1973ad8cc7bfe4bc8305395cb",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "8336 > 6000",
+      "fields": [
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-mansion@1",
+      "hash": "5241876127e1b004eec23c3404f02ee1ef7ba0f1973ad8cc7bfe4bc8305395cb",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "9140 > 6000",
@@ -2450,7 +2439,7 @@
     },
     {
       "def": "core-mansion@1",
-      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "hash": "5241876127e1b004eec23c3404f02ee1ef7ba0f1973ad8cc7bfe4bc8305395cb",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "9300 > 6000",
@@ -2834,17 +2823,17 @@
     },
     {
       "def": "core-office-block@1",
-      "hash": "279ac3dc8615244f23a12eeb7d402cadaca3a5e255effb99a99913e88a0491b9",
+      "hash": "29a725ec5cd6d503ea5c34d8439e1be35778e5e96269a4396f0a73a7a393b416",
       "stage": "gallery-budget",
       "code": "triangles",
-      "detail": "12902 > 6000",
+      "detail": "12204 > 6000",
       "fields": [
         "random[1]"
       ]
     },
     {
       "def": "core-office-block@1",
-      "hash": "279ac3dc8615244f23a12eeb7d402cadaca3a5e255effb99a99913e88a0491b9",
+      "hash": "29a725ec5cd6d503ea5c34d8439e1be35778e5e96269a4396f0a73a7a393b416",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6918 > 6000",
@@ -2858,7 +2847,7 @@
     },
     {
       "def": "core-office-block@1",
-      "hash": "279ac3dc8615244f23a12eeb7d402cadaca3a5e255effb99a99913e88a0491b9",
+      "hash": "29a725ec5cd6d503ea5c34d8439e1be35778e5e96269a4396f0a73a7a393b416",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "7470 > 6000",
@@ -2868,7 +2857,7 @@
     },
     {
       "def": "core-office-block@1",
-      "hash": "279ac3dc8615244f23a12eeb7d402cadaca3a5e255effb99a99913e88a0491b9",
+      "hash": "29a725ec5cd6d503ea5c34d8439e1be35778e5e96269a4396f0a73a7a393b416",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "7754 > 6000",
@@ -2878,20 +2867,10 @@
     },
     {
       "def": "core-office-block@1",
-      "hash": "279ac3dc8615244f23a12eeb7d402cadaca3a5e255effb99a99913e88a0491b9",
+      "hash": "29a725ec5cd6d503ea5c34d8439e1be35778e5e96269a4396f0a73a7a393b416",
       "stage": "gallery-budget",
       "code": "triangles",
-      "detail": "9658 > 6000",
-      "fields": [
-        "random[0]"
-      ]
-    },
-    {
-      "def": "core-prison@1",
-      "hash": "f7a1af93f7377cb38d1cd6efe9ac9a65bb2c2078cbc2f032588da69dcc66890e",
-      "stage": "gallery-budget",
-      "code": "triangles",
-      "detail": "6222 > 6000",
+      "detail": "9646 > 6000",
       "fields": [
         "random[0]"
       ]
@@ -2937,7 +2916,7 @@
     },
     {
       "def": "core-school@1",
-      "hash": "f0adfdbcc2b202a56f8471556a0c49ba53a26f64a470bc566dbfe15d9a779811",
+      "hash": "38555abe0259a5e9fc3da7b0f6578ccf8bc2baeabefdc2af3e270bc35d5e5bae",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6050 > 6000",
@@ -2947,7 +2926,7 @@
     },
     {
       "def": "core-school@1",
-      "hash": "f0adfdbcc2b202a56f8471556a0c49ba53a26f64a470bc566dbfe15d9a779811",
+      "hash": "38555abe0259a5e9fc3da7b0f6578ccf8bc2baeabefdc2af3e270bc35d5e5bae",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6070 > 6000",
@@ -2957,17 +2936,17 @@
     },
     {
       "def": "core-school@1",
-      "hash": "f0adfdbcc2b202a56f8471556a0c49ba53a26f64a470bc566dbfe15d9a779811",
+      "hash": "38555abe0259a5e9fc3da7b0f6578ccf8bc2baeabefdc2af3e270bc35d5e5bae",
       "stage": "gallery-budget",
       "code": "triangles",
-      "detail": "6746 > 6000",
+      "detail": "6400 > 6000",
       "fields": [
         "random[0]"
       ]
     },
     {
       "def": "core-school@1",
-      "hash": "f0adfdbcc2b202a56f8471556a0c49ba53a26f64a470bc566dbfe15d9a779811",
+      "hash": "38555abe0259a5e9fc3da7b0f6578ccf8bc2baeabefdc2af3e270bc35d5e5bae",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6794 > 6000",
@@ -2977,7 +2956,7 @@
     },
     {
       "def": "core-school@1",
-      "hash": "f0adfdbcc2b202a56f8471556a0c49ba53a26f64a470bc566dbfe15d9a779811",
+      "hash": "38555abe0259a5e9fc3da7b0f6578ccf8bc2baeabefdc2af3e270bc35d5e5bae",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "7076 > 6000",
@@ -2987,17 +2966,17 @@
     },
     {
       "def": "core-school@1",
-      "hash": "f0adfdbcc2b202a56f8471556a0c49ba53a26f64a470bc566dbfe15d9a779811",
+      "hash": "38555abe0259a5e9fc3da7b0f6578ccf8bc2baeabefdc2af3e270bc35d5e5bae",
       "stage": "gallery-budget",
       "code": "triangles",
-      "detail": "7552 > 6000",
+      "detail": "7540 > 6000",
       "fields": [
         "random[1]"
       ]
     },
     {
       "def": "core-school@1",
-      "hash": "f0adfdbcc2b202a56f8471556a0c49ba53a26f64a470bc566dbfe15d9a779811",
+      "hash": "38555abe0259a5e9fc3da7b0f6578ccf8bc2baeabefdc2af3e270bc35d5e5bae",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "8544 > 6000",
@@ -3007,7 +2986,7 @@
     },
     {
       "def": "core-school@1",
-      "hash": "f0adfdbcc2b202a56f8471556a0c49ba53a26f64a470bc566dbfe15d9a779811",
+      "hash": "38555abe0259a5e9fc3da7b0f6578ccf8bc2baeabefdc2af3e270bc35d5e5bae",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "9378 > 6000",
@@ -3031,27 +3010,27 @@
     },
     {
       "def": "core-townhouse-row@1",
-      "hash": "cebd5fc43046373d0621ed6860ec47c42aad5b628ff23517fc2b5a332e1f738d",
+      "hash": "d1d08f9a925c62925ebd6fbf967ccfb697b2a4f4f3babab19918580134cc6eae",
       "stage": "gallery-budget",
       "code": "triangles",
-      "detail": "11080 > 6000",
-      "fields": [
-        "random[0]"
-      ]
-    },
-    {
-      "def": "core-townhouse-row@1",
-      "hash": "cebd5fc43046373d0621ed6860ec47c42aad5b628ff23517fc2b5a332e1f738d",
-      "stage": "gallery-budget",
-      "code": "triangles",
-      "detail": "11306 > 6000",
+      "detail": "10938 > 6000",
       "fields": [
         "random[1]"
       ]
     },
     {
       "def": "core-townhouse-row@1",
-      "hash": "cebd5fc43046373d0621ed6860ec47c42aad5b628ff23517fc2b5a332e1f738d",
+      "hash": "d1d08f9a925c62925ebd6fbf967ccfb697b2a4f4f3babab19918580134cc6eae",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "10974 > 6000",
+      "fields": [
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-townhouse-row@1",
+      "hash": "d1d08f9a925c62925ebd6fbf967ccfb697b2a4f4f3babab19918580134cc6eae",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6100 > 6000",
@@ -3061,7 +3040,7 @@
     },
     {
       "def": "core-townhouse-row@1",
-      "hash": "cebd5fc43046373d0621ed6860ec47c42aad5b628ff23517fc2b5a332e1f738d",
+      "hash": "d1d08f9a925c62925ebd6fbf967ccfb697b2a4f4f3babab19918580134cc6eae",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6336 > 6000",
@@ -3071,7 +3050,7 @@
     },
     {
       "def": "core-townhouse-row@1",
-      "hash": "cebd5fc43046373d0621ed6860ec47c42aad5b628ff23517fc2b5a332e1f738d",
+      "hash": "d1d08f9a925c62925ebd6fbf967ccfb697b2a4f4f3babab19918580134cc6eae",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6420 > 6000",
@@ -3081,7 +3060,7 @@
     },
     {
       "def": "core-townhouse-row@1",
-      "hash": "cebd5fc43046373d0621ed6860ec47c42aad5b628ff23517fc2b5a332e1f738d",
+      "hash": "d1d08f9a925c62925ebd6fbf967ccfb697b2a4f4f3babab19918580134cc6eae",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "8284 > 6000",
@@ -3091,7 +3070,7 @@
     },
     {
       "def": "core-townhouse-row@1",
-      "hash": "cebd5fc43046373d0621ed6860ec47c42aad5b628ff23517fc2b5a332e1f738d",
+      "hash": "d1d08f9a925c62925ebd6fbf967ccfb697b2a4f4f3babab19918580134cc6eae",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "8800 > 6000",

@@ -335,15 +335,23 @@ function layOut(name, def, params, recipe) {
   return { parts, baked, dropped: f.dropped, rooms: baked.rooms.map((r) => r.id) };
 }
 const report = [];
+/** Z2: each furnished type's smallest footprint, as a fraction of its authored w and d: the smallest 0.05 step from which
+ *  every step up to the authored size still places (w alone, d alone and both; never under 3 m). Measured on the resizing
+ *  plans by team/scratch/t4/z2/looks/floor.mts; the earlier blanket 0.85 refused sizes that place (a 10 x 12 church). */
+const FURNISHED_MIN = { house: 0.45, 'apartment-block': 0.85, 'townhouse-row': 0.7, cabin: 0.6, mansion: 0.35, dormitory: 0.4, hotel: 0.55,
+  'mobile-home': 0.75, 'corner-shop': 0.5, supermarket: 0.35, restaurant: 0.35, cafe: 0.7, bar: 0.4, bank: 0.3, 'office-block': 0.55, mall: 0.3,
+  garage: 0.45, 'petrol-station': 0.45, school: 0.75, hospital: 0.4, library: 0.35, 'town-hall': 0.4, 'police-station': 0.75, 'fire-station': 0.4,
+  church: 0.3, prison: 0.4, theatre: 0.55, museum: 0.3 };
 /** A furnished building type: building/1 with an explicit plan, its recipe and LAYERS defaults. */
 function furnished({ name, category, synonyms, description, params: p0, plan, recipe, layers, outside = [], tags = [] }) {
+  if (!FURNISHED_MIN[name]) throw new Error(`furnished ${name}: measure its smallest footprint (FURNISHED_MIN)`);
   // These plans preserve their room proportions when the creator resizes the footprint.
   plan = { ...plan, size: [p0.w, p0.d] };
   const params = buildingDefaults({ ...p0, plan });
   const genParams = GENERATORS['building/1'].params;
   const def = { schema: 'def/1', name: `core-${name}`, version: 1, description, tags: [...new Set([...category.split('.'), 'furnished', ...tags])], category, synonyms,
     form: 'point', make: { kind: 'gen', gen: 'building/1', args: { style: 'plan', furnish: name } },
-    params: Object.fromEntries(Object.entries({ ...p0, plan }).map(([k, v]) => [k, { ...genParams[k], ...(['w', 'd'].includes(k) ? { min: Math.round(v * 0.85 * 100) / 100 } : {}), ...(name === 'townhouse-row' && k === 'floorHeight' ? { max: 4.6 } : {}), default: v }])) };
+    params: Object.fromEntries(Object.entries({ ...p0, plan }).map(([k, v]) => [k, { ...genParams[k], ...(['w', 'd'].includes(k) ? { min: Math.max(3, Math.round(v * FURNISHED_MIN[name] * 100) / 100) } : {}), ...(name === 'townhouse-row' && k === 'floorHeight' ? { max: 4.6 } : {}), default: v }])) };
   const rec = { schema: 'furnish/1', style: name, rooms: recipe };
   const L = layOut(name, def, params, rec);
   def.contents = [...L.parts, ...outside];
