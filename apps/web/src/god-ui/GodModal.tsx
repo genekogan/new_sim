@@ -113,7 +113,7 @@ function GodConsole({ paired, tools, prayers }: { paired: boolean; tools: ReactN
   const waiting = inbox?.queued ?? 0, connected = !!inbox?.connected;
   return <div className="gm-console" data-god-console="1" data-agent-message="god">
     <form className="gm-compose" onSubmit={(e) => { e.preventDefault(); void send(); }}>
-      <textarea ref={box} rows={2} aria-label="Command for your agent" placeholder={paired ? 'Tell your agent what to build or change…' : 'Write a command now; it waits until your agent connects…'}
+      <textarea ref={box} rows={2} aria-label="Command for your agent" placeholder={paired ? 'Tell your agent what to build or change…' : 'Write a command; it waits for your agent…'}
         value={text} maxLength={1000} disabled={sending} onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />
       <button type="submit" className="gm-send" disabled={sending || !text.trim()}>{sending ? 'Sending…' : 'Send'}</button>

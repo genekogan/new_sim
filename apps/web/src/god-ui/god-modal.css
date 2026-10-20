@@ -221,6 +221,7 @@
   .god-modal .gm-head { flex-wrap: wrap; padding: 14px 12px 10px 14px; gap: 10px; }
   .gm-mark, .god-modal .gm-back { width: 32px; height: 32px; }
   .gm-pill { order: 3; flex-basis: auto; margin-left: 42px; font-size: 12px; }
+  .god-modal .gm-titles { min-width: max-content; }   /* the title never squeezes onto two lines: the agent pill wraps below it */
   .gm-scroll { padding: 14px 14px 0; }
   .gm-visitor { padding: 2px 14px 18px; max-height: none; }
   .gm-connect-line { flex-direction: column; align-items: stretch; }
