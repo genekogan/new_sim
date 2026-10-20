@@ -11,8 +11,8 @@ import {WorldHost} from './world.ts';
 import {besideEachOther, TOGETHER_RADIUS} from './edge/ledger/together.ts';
 import {mountEdgeRoutes, edgeSoulResolver} from './edge/routes.ts';
 
-async function world(n: number) {
-  const ids=process.env.TOGETHER_DIAGNOSTIC_IDS?.split(',');const w = await edenNavWorld(n,{...(ids?{diagnosticSoulIds:ids}:{})}), app = new Hono(), bearer = (c: any) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
+async function world(n: number, pinned?: string[]) {
+  const ids=pinned??process.env.TOGETHER_DIAGNOSTIC_IDS?.split(',');const w = await edenNavWorld(n,{...(ids?{diagnosticSoulIds:ids}:{})}), app = new Hono(), bearer = (c: any) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
   const comms = mountEdgeRoutes(app, {host: w.f.host, db: w.f.db, souls: w.f.souls, soul: edgeSoulResolver(w.f.host, w.f.souls, bearer), ledger: w.ledger});
   const body = (s: {entityId: string}) => (w.engine.world.entities as any)[s.entityId];
   const act = async (s: typeof w.souls[number], capability: string, params?: object, ok = true) => {const out: any = await w.act(s, capability, params); if (ok) assert.equal(out.accepted, true, capability + ' ' + JSON.stringify(out)); return out;};
@@ -167,6 +167,23 @@ test('together: hug (accept), high-five (decline), handshake (lapses), hug back 
   const kiss: any = await w.act(a, 'kiss ' + b.name, undefined, false); assert.equal(kiss.accepted, false);
   assert.deepEqual(w.f.host.engine.runtime.violations, []); assert.equal(w.f.db.paidCost(), 0);
   await w.replayExact();
+});
+
+// F1 (2026-10-20): with these soul ids the host's meet spot is a detour around the third soul, so the guest accepts while the
+// host is still walking. The guest used to plan against the moving host, walked across its path (nudging it aside) and
+// ended with the bystander between them: both waited for clearance until pose.pair-not-ready (~1% of random-id runs).
+test('together: a guest who accepts while the host is still walking meets it at its spot (pinned ids)', {timeout: 300000}, async t => {
+  const w = await world(3, ['s_f3b92c1af4', 's_a8326af58b', 's_b4e25bf470']); t.after(() => {w.comms.close(); w.f.host.stop(); w.f.db.close();});
+  const [a, b, c] = w.souls;
+  const walks = await Promise.all(w.souls.map(s => w.act(s, 'walk:social-eden-fire-circle'))) as any[];
+  await w.run(walks.map((o, i) => ({soulId: w.souls[i].soulId, id: o.receipt.id})), 8000);
+  if (w.gap(a, b) > 6) {const g = await w.act(b, 'go-near:' + a.soulId); await w.run([{soulId: b.soulId, id: g.receipt.id}], 3000);}
+  if (w.gap(a, c) > 8) {const g = await w.act(c, 'go-near:' + a.soulId); await w.run([{soulId: c.soulId, id: g.receipt.id}], 3000);}
+  const hug = await w.act(a, 'hug ' + b.name); for (let i = 0; i < 40; i++) w.f.host.tickOnce();
+  const yes = await w.act(b, 'accept'); assert.match(yes.resolved?.to ?? '', /^accept:/);
+  let both = 0; await w.run([{soulId: a.soulId, id: hug.receipt.id}, {soulId: b.soulId, id: yes.receipt.id}], 3000, () => {if (w.body(a).human.activity === 'hug' && w.body(b).human.activity === 'hug') both++;});
+  assert.equal(w.phase(a, hug).phase, 'completed', JSON.stringify(w.phase(a, hug))); assert.equal(w.phase(b, yes).phase, 'completed', JSON.stringify(w.phase(b, yes)));
+  assert.ok(both > 0, 'they hugged together');
 });
 
 test('together: pick up, carry, give (accepted), put down, pick up again, eat; hands hold one thing', {timeout: 900000}, async t => {

@@ -83,7 +83,10 @@ export type Invite = {id: string; what: string; host: {soulId: string; name: str
   /** E2 #2 (2026-10-16): activity invitations carry the group window policy their poses use (absent on older invitations). */
   windowPolicy?: 'once-v1'; activity?: string; seconds?: number; gap?: number; prop?: string; base?: string;
   createdTick: number; expiresTick: number; state: 'pending' | 'closed'; responses: Record<string, 'accepted' | 'declined' | 'expired' | 'cancelled'>;
-  hostReceipt: string | null; guestReceipts: Record<string, string>; item?: {id: string; kind: ItemKind; name: string}; ride?: {object: string; carrier: string}; place?: string | null};
+  hostReceipt: string | null; guestReceipts: Record<string, string>;
+  /** F1 (2026-10-20): where the host will stand for a paired gesture or hand-over (its meet spot, or where it already
+   *  stood), so a guest who accepts while the host is still walking there plans against that spot, not the moving body. */
+  meetAt?: V2; item?: {id: string; kind: ItemKind; name: string}; ride?: {object: string; carrier: string}; place?: string | null};
 export type Item = {id: string; kind: ItemKind; name: string; holder: string | null; placeId: string | null; at: V2 | null; state: 'held' | 'placed' | 'gone'; claimedBy: string | null; by: string | null; createdAt: number; placedAt: number | null};
 type ItemOp = {soulId: string; op: 'pick-up' | 'put-down' | 'consume' | 'give' | 'take'; item?: string; kind?: ItemKind; source?: string; to?: string; invite?: string};
 type Follow = {receipt: string; soulId: string; target: string; untilTick: number; withHost?: string};
@@ -144,10 +147,11 @@ export class Together {
     return true;
   }
   /** Where to stand to meet someone face to face: within 1.1 m of them with a clear line between (nearest to `from`),
-   *  so a hug or a hand-over never reaches across a fire, a bench or a wall. Null when they are already in reach. */
-  meetSteps(me: string, other: string, standoff = 1.1, gap = 0.8): Steps | null {
+   *  so a hug or a hand-over never reaches across a fire, a bench or a wall. Null when they are already in reach.
+   *  `otherAt`: where the other body is going to stand (a host still walking to its meet spot), instead of where it is. */
+  meetSteps(me: string, other: string, standoff = 1.1, gap = 0.8, otherAt?: V2): Steps | null {
     const mb = this.p.body(me), ob = this.p.body(other); if (!mb || !ob) return [{verb: 'walk_to', params: {to: other, standoff}}];
-    const from: V2 = [mb.pose.p[0], mb.pose.p[2]], at: V2 = [ob.pose.p[0], ob.pose.p[2]], d = Math.hypot(at[0] - from[0], at[1] - from[1]);
+    const from: V2 = [mb.pose.p[0], mb.pose.p[2]], at: V2 = otherAt ?? [ob.pose.p[0], ob.pose.p[2]], d = Math.hypot(at[0] - from[0], at[1] - from[1]);
     const e = this.p.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number};
     const people = Object.values(this.w.entities).filter(x => x.kind === 'human' && x.id !== me && x.id !== other).map(x => [x.pose.p[0], x.pose.p[2]] as V2);
     // hotfix: where both will stand for the gesture (`gap` apart, meeting between) and the way there stay clear of bystanders
@@ -333,10 +337,11 @@ export class Together {
       const meet = this.meetSteps(soul.entityId, g.entityId, 1.1, def?.gap ?? 0.8);
       if (!meet) return {code: 'gesture.no-room', reason: `There is no clear spot beside ${g.name} right now (someone else is standing too close); try again in a moment or somewhere roomier.`};
       const out = structuredClone(steps).flatMap(s => s.verb === 'walk_to' && s.params.to === g.entityId ? meet : [s]);
+      const meetAt: V2 = meet[0].verb === 'walk_to' ? meet[0].params.to as V2 : [r2(me.pose.p[0]), r2(me.pose.p[2])];
       for (const s of out) if (s.verb === 'mars:pose_v1') {s.params.group = id; s.params.seconds = seconds;if(tag.kind==='paired')s.params.pairedPolicy='ready-v1';}
       return {steps: out, commit: receipt => {
         const inv: Invite = {id, what: tag.kind === 'paired' ? tag.what : 'give', kind: tag.kind, host: {soulId: soul.soulId, name: soul.name}, guests: [{soulId: g.soulId, name: g.name}], capability: cap.id,
-          ...(tag.kind==='paired'?{pairedPolicy:'ready-v1' as const}:{}), label: tag.kind === 'paired' ? `offers you ${def!.ask}` : `wants to give you ${held!.name}`, activity: def?.activity ?? 'take', seconds, gap: def?.gap ?? 0.8, ...(held ? {item: {id: held.id, kind: held.kind, name: held.name}, prop: held.kind} : {}),
+          ...(tag.kind==='paired'?{pairedPolicy:'ready-v1' as const}:{}), meetAt, label: tag.kind === 'paired' ? `offers you ${def!.ask}` : `wants to give you ${held!.name}`, activity: def?.activity ?? 'take', seconds, gap: def?.gap ?? 0.8, ...(held ? {item: {id: held.id, kind: held.kind, name: held.name}, prop: held.kind} : {}),
           createdTick: this.tick, expiresTick: this.tick + (def?.lapse ?? 30) * 20, state: 'pending', responses: {}, hostReceipt: receipt, guestReceipts: {}};
         this.saveInvite(inv); this.announce(inv);
         if (held) this.saveOp(receipt, {soulId: soul.soulId, op: 'give', item: held.id, to: g.soulId, invite: id});
@@ -434,7 +439,10 @@ export class Together {
       if (inv.kind === 'give' && this.heldBy(soul.soulId)) return {code: 'hands.full', reason: `Your hands are full; put down ${this.heldBy(soul.soulId)!.name} first.`};
       if (this.asleep(soul.entityId)) return {code: 'state.asleep', reason: 'Wake up first.'};
       const seatedTake = inv.kind === 'give' && this.seated(soul.entityId);
-      const meet = seatedTake ? [] : this.meetSteps(soul.entityId, host.entityId, 1.1, inv.gap ?? 0.8);
+      // F1: until the host has reached its own meet spot (its grouped pose not yet begun), meet it there; planning against
+      // the still-walking body sent the guest across the host's path and could leave a bystander standing between them
+      const hostAt = inv.meetAt && hb.human?.together?.group !== inv.id ? inv.meetAt : undefined;
+      const meet = seatedTake ? [] : this.meetSteps(soul.entityId, host.entityId, 1.1, inv.gap ?? 0.8, hostAt);
       if (!meet) return {code: 'gesture.no-room', reason: `There is no clear spot beside ${inv.host.name} right now (someone else is standing too close); try again in a moment.`};
       const steps: Steps = [...(seatedTake ? [] : [...this.standFirst(soul.entityId), ...meet]),
         pose(inv.activity!, inv.seconds!, {group: inv.id, gap: inv.gap, ...(inv.pairedPolicy?{pairedPolicy:inv.pairedPolicy}:{}), waitSeconds: 30, alone: 'fail', clear: true, ...(inv.kind === 'give' ? {prop: inv.item!.kind, hold: inv.item!.kind} : {})})];
