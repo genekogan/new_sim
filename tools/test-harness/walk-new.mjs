@@ -36,7 +36,11 @@ try{for(const dpr of [1,2]){const browser=await chromium.launch({channel:'chrome
   const live=page.locator('summary', {hasText:/Live here yourself/}).first();await live.waitFor({state:'visible',timeout:15000}).catch(()=>{});if(await live.isVisible().catch(()=>false))await live.click();
   const nameBox=page.locator('[data-soul-name]').first();
   if(await nameBox.isVisible().catch(()=>false)){await nameBox.click();await page.keyboard.type('Ana');await page.locator('[data-join-go]').first().click();await page.waitForTimeout(800);run.joinLine=await page.locator('[data-join-line]').first().innerText().catch(()=>null);}
-  else run.joinLine='(join form not visible)';
+  else{// G5: the owner's own Soul starts from New Soul (beside the avatar), not a Souls tab in God Mode
+   await page.keyboard.press('Escape');await page.waitForTimeout(300);
+   const ns=page.locator('.bring-agent-open').first();if(!(await ns.isVisible().catch(()=>false)))await page.locator('summary.account-avatar').first().click().catch(()=>{});
+   if(await ns.isVisible().catch(()=>false)){await ns.click();run.joinLine=await page.locator('.bring-agent-prompt').first().innerText({timeout:15000}).catch(()=>null);}
+   if(!run.joinLine)run.joinLine='(join form not visible)';}
   await page.screenshot({path:resolve(out,`world-join-dpr${dpr}.png`)});
   run.errors=errors;report.runs.push(run);console.log(JSON.stringify({...run,joinLine:run.joinLine?.slice(0,140)}));await ctx.close();}
  finally{await browser.close();}}}
