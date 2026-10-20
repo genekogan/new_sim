@@ -12,7 +12,8 @@ the agent you bring.
 Commands marked **(R1)** use vocabulary that lands with the R1 release (buildings
 `building/1` from L2, `road/river/bridge` from L3, `look`/`export` from L7). On
 a build without them, skip that beat; the rest of the script stands on its own.
-`tools/god-skill/e2e/launcher.mjs` replays beats 1–5 and 8 automatically.
+`tools/god-skill/e2e/launcher.mjs` walks today's one-view God Mode automatically (Connect line, pairing, a command
+acked, undo/redo, weather, Forsake confirmations); it no longer replays these beats.
 
 ## Before the talk (5 minutes, off stage)
 
@@ -26,8 +27,8 @@ node tools/world-launcher/launcher.mjs          # http://127.0.0.1:4980 ; worlds
   back row can read the panel.
 - In a second window, a terminal in an empty folder (`mkdir ~/demo && cd ~/demo`)
   with your agent (Claude Code, Codex) ready but not yet started.
-- Optional rehearsal: `node tools/god-skill/e2e/launcher.mjs` runs the whole
-  flow on its own launcher (:5149) in a few minutes and leaves screenshots in
+- Optional rehearsal: `node tools/god-skill/e2e/launcher.mjs` walks God Mode on its own launcher (:5877, a web
+  build made with `--base /worlds/` in `.lane/web-worlds`) in a few minutes and leaves screenshots in
   `.lane/e2e-launcher/<stamp>/`.
 
 ## 0:00 — the homepage

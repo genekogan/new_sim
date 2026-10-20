@@ -1,7 +1,9 @@
 #!/bin/bash
 # V7 gate step: real-input walks in real Chrome (Metal GPU, shared lease) of THIS checkout, on safe ports 5870-5879.
 #   tools/test-harness/v7-walks.sh <outDir>      (run from the candidate checkout; builds web into <outDir>, ~10 min)
-# Old worlds (eden/mars/littlemartians, root path) 5870-5872; launcher + new-world walk 5873 (children 5874-5876).
+# Old worlds (eden/mars/littlemartians, root path) 5870-5872; launcher + new-world walk 5873 (children 5874-5876);
+# the God modal e2e (tools/god-skill/e2e/launcher.mjs: Connect, pairing, a command acked, undo/redo, weather, Forsake) runs
+# its own launcher on 5877 (children 5878-5879).
 # Writes <outDir>/v7-receipt.json (status pass|fail, per-check results, source sha) and prints one RELEASE_GATE_V7 line.
 # Only processes this script starts are ever stopped. Never touches 4930-4970 / 4986 / 4987.
 set -u
@@ -26,4 +28,5 @@ node tools/world-launcher/launcher.mjs --port 5873 --range 5874-5876 --data "$OU
 for i in $(seq 1 30); do curl -s -m 2 http://127.0.0.1:5873/worlds/__sim/worlds.json >/dev/null && break; sleep 1; done
 perl -e 'alarm 1800; exec @ARGV' node tools/test-harness/walk-new.mjs http://127.0.0.1:5873 "$OUT/new" > "$OUT/walk-new.log" 2>&1; RC_NEW=$?
 cleanup; PIDS=()
-node tools/test-harness/v7-receipt.mjs "$OUT" "$ROOT" "$RC_OLD" "$RC_NEW"
+perl -e 'alarm 1200; exec @ARGV' node tools/god-skill/e2e/launcher.mjs --port 5877 --range 5878-5879 --web "$OUT/web-worlds" --mars-web "$MARS_WEB" --out "$OUT/god" > "$OUT/god-modal.log" 2>&1; RC_GOD=$?
+node tools/test-harness/v7-receipt.mjs "$OUT" "$ROOT" "$RC_OLD" "$RC_NEW" "$RC_GOD"

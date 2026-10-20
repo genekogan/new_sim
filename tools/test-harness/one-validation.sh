@@ -108,15 +108,11 @@ step V6-party 1500 node tools/god-skill/e2e/party.mjs --no-shots --port 5421
 step V6-souls-r2 1500 node tools/god-skill/e2e/souls-r2.mjs --no-shots --port 5422
 step V6-join-clerk 900 node tools/god-skill/e2e/join.mjs --mode clerk --base /worlds --port 5425 --range 5426-5429
 step V6-join-dev 900 node tools/god-skill/e2e/join.mjs --mode dev --no-shots --port 5430 --range 5431-5434
-# V6-launcher is not a gate step (Z3, 2026-10-20): stale since G5 removed the God modal's tabs, it fails the same 8 of 14
-# steps on a laptop GPU and on Modal (release-gate.mjs). A laptop run still runs it, as a reminder until it is rewritten.
-if [ "${REMOTE_SUITE_CPU:-}" != 1 ]; then
-  step V6-launcher 900 node tools/god-skill/e2e/launcher.mjs --port 5435 --range 5436-5440
-fi
 for e in souls-ux mars-two lm-two; do [ -f tools/god-skill/e2e/$e.mjs ] && step V6-$e 1500 node tools/god-skill/e2e/$e.mjs --no-shots --port 5423; done
 # V7 real input in real Chrome (lease, GPU), dpr 1 and 2
 #   old worlds: local root-path eden/mars/LM from this tree (5401-5403) beside the baseline tree (5411-5413)
 #   new world:  launcher under /worlds (5441, children 5442-5444): home → New world → arrival, camera, Join line
+#   God modal:  its own launcher under /worlds (5445, children 5446-5447): tools/god-skill/e2e/launcher.mjs
 if ! skipped V7 && want V7; then
 OLD_WORLDS_OUT="$OUT/old-worlds" node tools/test-harness/old-worlds.mjs "$ROOT" 5401 head > "$OUT/V7-servers-head.log" 2>&1 & P1=$!
 OLD_WORLDS_OUT="$OUT/old-worlds" node tools/test-harness/old-worlds.mjs "$BASELINE" 5411 base > "$OUT/V7-servers-base.log" 2>&1 & P2=$!
@@ -128,6 +124,8 @@ for i in $(seq 1 30); do curl -s -m 2 http://127.0.0.1:5441/worlds/__sim/worlds.
 step V7-new-world 1800 node tools/test-harness/walk-new.mjs http://127.0.0.1:5441 "$OUT/V7-new-world"
 step V7-camera-dpr2 900 node tools/god-skill/e2e/camera-probe.mjs "$(node -e "const r=require('$OUT/V7-new-world/report.json');console.log((r.runs[0].created||'').split('?')[0])")" --dpr 2 --out "$OUT/V7-camera-dpr2"
 kill $P3 2>/dev/null; sleep 3
+# the God modal (B8, the rewritten launcher e2e): Connect, pairing, a command acked, undo/redo, weather, Forsake; own launcher
+step V7-god-modal 900 node tools/god-skill/e2e/launcher.mjs --port 5445 --range 5446-5447 --web "$ROOT/.lane/web-worlds" --mars-web "$ROOT/.lane/mars-web" --out "$OUT/V7-god-modal"
 fi
 # V8 old-world data safety: production histories copied READ-ONLY, booted check-only on the baseline and on HEAD
 step V8-history-boot 3600 node tools/test-harness/history-boot-compare.mjs --descriptors "$DESCRIPTORS" --baseline "$BASELINE" --candidate "$ROOT" --out "$OUT/V8-history" --worlds mars,littlemartians,eden
