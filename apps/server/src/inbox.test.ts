@@ -9,6 +9,7 @@ import {fixture, invite, accept} from '../test/native-owner-fixture.ts';
 import {buildApp} from './http.ts';
 import {config} from './config.ts';
 import {GodMode} from './god/god.ts';
+import {coreRef} from '@sim/world-compiler';
 import {EdgeLedger} from './edge/ledger/ledger.ts';
 import {streamSSE} from 'hono/streaming';
 
@@ -113,9 +114,12 @@ test('real owner and paired HTTP flows: absent, browser, command polling, listen
     assert.equal(response.headers.get('Cache-Control'), 'no-store'); assert.equal(response.headers.get('ETag'), null);
     assert.deepEqual(new Uint8Array(await response.arrayBuffer()), expected, 'private header leaves original binary/SSE bytes unchanged');
   }
+  // the god's box is a queue: finish the binary note it still holds, so the largest command is the one it carries next
+  const held = (await req('/v1/god/inbox', 'dev:alice')).data.inbox.latest;
+  assert.equal((await req(`/v1/god/inbox/${held.id}/ack`, godToken, {})).status, 200);
   const largest = await req('/v1/god/inbox', 'dev:alice', {text: '\ufffd'.repeat(1000)});
   await req('/v1/god/status', godToken);
-  await req(`/v1/god/inbox/${largest.data.inbox.latest.id}/ack`, godToken, {reply: '\u0000'.repeat(140)});
+  assert.equal((await req(`/v1/god/inbox/${largest.data.inbox.latest.id}/ack`, godToken, {reply: '\u0000'.repeat(140)})).status, 200);
   const maxHeader = await app.request('/v1/test-inbox-binary', {headers: {authorization: `Bearer ${godToken}`}});
   assert.ok(Buffer.byteLength(maxHeader.headers.get('X-Sim-Agent-Inbox')!) < 8000, 'max UTF16 text plus escaped reply stays under an 8KB header'); await maxHeader.arrayBuffer();
   const privateId = (await req(`/v1/edge/owner/${a.id}/inbox`, 'dev:alice')).data.inbox.latest.id;
@@ -136,4 +140,108 @@ test('owner box and edge command need an invited owner (same gate as the central
   for (const path of [`/v1/souls/${s.id}/command`, `/v1/edge/owner/${s.id}/inbox`]) {
     const r = await post(path); assert.equal(r.status, 403, path); assert.equal(((await r.json()) as {code?: string; error?: string}).code ?? 'invite-required', 'invite-required');
   }
+});
+
+test('god queue: commands typed while away wait in order; tickets move pending -> in progress -> done/failed/withdrawn', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'sim-godq-')); t.after(() => rmSync(dir, {recursive: true, force: true}));
+  let db = new Db(join(dir, 'q.db')), now = 1000, inbox = new AgentInbox(db, 'w1', () => now);
+  const g = {scope: 'god', owner: 'alice'}, other = {scope: 'god', owner: 'bob'};
+  const a = inbox.send(g, 'Build a pier').latest!; now++;
+  const b = inbox.send(g, 'Paint the barn red').latest!; now++;
+  const c = inbox.send(g, 'Plant an orchard').latest!; now++;
+  // nothing overwrote anything: the agent sees the oldest, with how many wait; the owner sees all three newest first
+  let seen = inbox.view(g); assert.equal(seen.latest!.id, a.id); assert.equal(seen.queued, 3); assert.equal(seen.presence, 'away'); assert.equal(seen.connected, false);
+  let log = inbox.ownerView(g).log!; assert.deepEqual(log.map(x => x.id), [c.id, b.id, a.id]); assert.deepEqual(log.map(x => x.state), ['sent', 'sent', 'sent']);
+  assert.equal(inbox.ownerView(g).latest!.id, c.id, 'the owner box shows the newest command');
+  assert.equal(inbox.view(other).latest, null, 'another owner never sees them');
+  // delivery hands over only the head; touched edits belong to the command in progress
+  inbox.recordTouched(g, ['x0']); assert.equal(inbox.ownerView(g).log![2].touched, undefined, 'nothing is recorded before delivery');
+  inbox.touch(g); assert.equal(inbox.deliver(g).latest!.id, a.id);
+  assert.deepEqual(inbox.ownerView(g).log!.map(x => x.state), ['sent', 'sent', 'delivered']);
+  assert.equal(inbox.view(g).presence, 'working');
+  inbox.recordTouched(g, ['pier', 'post-1', 'pier']);
+  const focus = {x: 10, y: 1, z: -4, span: 12, label: 'pier', count: 2};
+  let asked: string[] = []; inbox.focusOf = ids => { asked = ids; return focus; };
+  // a successful ack answers with the finished command; the next waits for the next listen
+  assert.throws(() => inbox.acknowledge(g, a.id, undefined, 'maybe'), /done or failed/);
+  const acked = inbox.acknowledge(g, a.id, 'Pier built at the lake.');
+  assert.equal(acked.latest!.id, a.id); assert.equal(acked.latest!.state, 'acknowledged'); assert.equal(acked.latest!.outcome, 'done'); assert.equal(acked.queued, 2);
+  assert.deepEqual(asked, ['pier', 'post-1']);
+  assert.equal(inbox.ownerView(g).log!.find(x => x.id === b.id)!.state, 'sent', 'the ack did not deliver the next command');
+  assert.deepEqual(inbox.acknowledge(g, a.id, 'retry').latest!.reply, 'Pier built at the lake.', 'an ack retry is idempotent');
+  // listen after the finished one returns at once with the next, in order
+  await inbox.listen(g, a.id, 25_000, new AbortController().signal);
+  assert.equal(inbox.deliver(g).latest!.id, b.id);
+  assert.throws(() => inbox.acknowledge(g, a.id, 'late retry'), /no longer the latest/, 'a retry after a later delivery is refused, as before');
+  inbox.focusOf = () => null;
+  assert.equal(inbox.acknowledge(g, b.id, 'No barn in this world.', 'failed').latest!.outcome, 'failed');
+  // the owner withdraws the last; a listener waiting behind it wakes
+  let woke = false; const waiting = inbox.listen(g, c.id, 25_000, new AbortController().signal).then(() => { woke = true; });
+  await new Promise(r => setImmediate(r)); assert.equal(woke, false, 'a listener that already has c waits');
+  inbox.withdraw(g, c.id); await waiting; assert.equal(woke, true);
+  assert.throws(() => inbox.withdraw(g, c.id), /already finished/); assert.throws(() => inbox.withdraw(g, 'msg_none'), /no such/);
+  assert.throws(() => inbox.withdraw({scope: 'soul:s', owner: 'alice'}, c.id), /only god/);
+  log = inbox.ownerView(g).log!;
+  assert.deepEqual(log.map(x => [x.state, x.outcome, x.reply ?? null]), [['acknowledged', 'withdrawn', null], ['acknowledged', 'failed', 'No barn in this world.'], ['acknowledged', 'done', 'Pier built at the lake.']]);
+  assert.deepEqual(log[2].focus, focus); assert.equal(log[2].touched, 2); assert.equal(log[1].focus, undefined);
+  seen = inbox.view(g); assert.equal(seen.queued, 0); assert.equal(seen.latest!.id, c.id, 'with nothing waiting the agent sees the newest, finished');
+  await inbox.listen(g, undefined, 5, new AbortController().signal);
+  // presence: a listener waiting now; a call within 30 s; else away
+  const end = inbox.listening(g); assert.equal(inbox.view(g).presence, 'listening'); assert.equal(inbox.listenerCount(g), 1); end(); end(); assert.equal(inbox.listenerCount(g), 0);
+  inbox.touch(g); now += 29_000; assert.equal(inbox.view(g).presence, 'recent'); now += 2_000; assert.equal(inbox.view(g).presence, 'away');
+  // the queue is bounded, and it survives a restart
+  for (let i = 0; i < 50; i++) inbox.send(g, `cmd ${i}`);
+  assert.throws(() => inbox.send(g, 'one too many'), (e: {status?: number; code?: string}) => e.status === 429 && e.code === 'queue-full');
+  db.close(); db = new Db(join(dir, 'q.db')); inbox = new AgentInbox(db, 'w1', () => now); t.after(() => db.close());
+  assert.equal(inbox.view(g).latest!.text, 'cmd 0'); assert.equal(inbox.view(g).queued, 50); assert.equal(inbox.ownerView(g).log!.length, 50);
+});
+
+test('god queue: a message waiting in the old one-message box moves into the queue at boot', t => {
+  const db = new Db(':memory:'); t.after(() => db.close());
+  db.db.exec(`CREATE TABLE agent_inbox_v1 (world_id TEXT NOT NULL, scope TEXT NOT NULL, owner TEXT NOT NULL, id TEXT, text TEXT, sent_at INTEGER, delivered_at INTEGER, acknowledged_at INTEGER, reply TEXT, last_seen_at INTEGER, PRIMARY KEY(world_id,scope,owner)) WITHOUT ROWID`);
+  db.db.prepare('INSERT INTO agent_inbox_v1 VALUES(?,?,?,?,?,?,?,?,?,?)').run('w', 'god', 'alice', 'msg_old', 'Old pending command', 5, 6, null, null, 7);
+  db.db.prepare('INSERT INTO agent_inbox_v1 VALUES(?,?,?,?,?,?,?,?,?,?)').run('w', 'god', 'bob', 'msg_done', 'Finished command', 5, 6, 8, 'ok', 7);
+  const inbox = new AgentInbox(db, 'w', () => 100), again = new AgentInbox(db, 'w', () => 100);
+  const v = again.view({scope: 'god', owner: 'alice'}); assert.equal(v.latest!.id, 'msg_old'); assert.equal(v.latest!.state, 'delivered'); assert.equal(v.queued, 1);
+  assert.equal(inbox.view({scope: 'god', owner: 'bob'}).latest, null, 'a finished message is not replayed');
+  assert.equal(db.db.prepare('SELECT COUNT(*) n FROM god_inbox_queue_v1').get()!.n, 1, 'migrating twice adds nothing');
+});
+
+test('god queue over HTTP: a real build links its ticket to where it stands; failed and withdrawn tickets; presence flips', async t => {
+  const f = fixture(':memory:'); f.brain.quiesce(); t.after(() => { f.host.stop(); f.db.close(); });
+  await invite(f, 'alice');
+  const god = new GodMode(f.db, {worldId: f.host.worldId, ownerId: 'dev:alice', tick: () => f.host.engine.world.tick, emit() {}});
+  const owner = f.db.user('dev:alice')!, godToken = god.mintFor(owner, 'scripted');
+  const app = buildApp({cfg: {...config, port: 5962, worldPath: '/w/eden', publicUrl: 'http://127.0.0.1:5962/w/eden', accountAuthRequired: false, webDir: '/nonexistent-inbox-fixture', marsWebDir: '/nonexistent-inbox-fixture'}, db: f.db, host: f.host, auth: f.auth, brain: f.brain, souls: f.souls, edge: new EdgeLedger(f.host, f.db), god, hub: {clients: new Map(), refreshMe() {}} as never});
+  const req = async (path: string, token?: string, body?: unknown) => {
+    const r = await app.request(path, {method: body === undefined ? 'GET' : 'POST', headers: {...(token ? {authorization: `Bearer ${token}`} : {}), 'content-type': 'application/json'}, ...(body === undefined ? {} : {body: JSON.stringify(body)})});
+    return {status: r.status, data: await r.json() as any};
+  };
+  const ownerBox = async () => (await req('/v1/god/inbox', 'dev:alice')).data.inbox;
+  const texts = ['Put a cottage by the knoll', 'Paint the moon green', 'Never mind the third'];
+  for (const text of texts) assert.equal((await req('/v1/god/inbox', 'dev:alice', {text})).status, 200);
+  let box = await ownerBox(); assert.equal(box.presence, 'away'); assert.equal(box.connected, false); assert.deepEqual(box.log.map((x: any) => x.text), [...texts].reverse());
+  // the agent comes back: a listen hands over the first command (in progress), the others stay pending
+  const first = (await req('/v1/god/inbox/listen?timeoutMs=0', godToken)).data.inbox; assert.equal(first.latest.text, texts[0]); assert.equal(first.queued, 3);
+  box = await ownerBox(); assert.equal(box.presence, 'working'); assert.deepEqual(box.log.map((x: any) => x.state), ['sent', 'sent', 'delivered']);
+  const built = await req('/v1/god/act', godToken, {ops: [{op: 'place', tmp: '$c', def: coreRef('cottage'), name: 'knoll-cottage', p: [48, 10], r: 1.2}, {op: 'place', def: coreRef('bench'), name: 'porch-bench', in: {parent: '$c'}, p: [0, 0, 5]}]});
+  assert.equal(built.data.accepted, true, JSON.stringify(built.data).slice(0, 300));
+  const done = await req(`/v1/god/inbox/${first.latest.id}/ack`, godToken, {reply: 'Cottage and bench by the knoll.'});
+  assert.equal(done.status, 200); assert.equal(done.data.inbox.latest.id, first.latest.id); assert.equal(done.data.inbox.latest.outcome, 'done');
+  box = await ownerBox(); const t0 = box.log[2];
+  assert.equal(t0.outcome, 'done'); assert.equal(t0.reply, 'Cottage and bench by the knoll.'); assert.equal(t0.touched, 2);
+  assert.equal(t0.focus.label, 'knoll-cottage'); assert.equal(t0.focus.count, 2); assert.ok(Math.abs(t0.focus.x - 48) < 8 && Math.abs(t0.focus.z - 10) < 8, JSON.stringify(t0.focus)); assert.ok(t0.focus.span >= 6);
+  assert.equal(box.log[1].state, 'sent', 'the ack did not hand over the next command');
+  // an old CLI's loop: listen after the acked id gets the next in order
+  const second = (await req(`/v1/god/inbox/listen?after=${first.latest.id}&timeoutMs=0`, godToken)).data.inbox; assert.equal(second.latest.text, texts[1]);
+  assert.equal((await req(`/v1/god/inbox/${second.latest.id}/ack`, godToken, {reply: 'There is no moon to paint.', outcome: 'failed'})).data.inbox.latest.outcome, 'failed');
+  assert.equal((await req(`/v1/god/inbox/${second.latest.id}/ack`, godToken, {outcome: 'shrug'})).status, 400);
+  const third = (await ownerBox()).log[0];
+  assert.equal((await req(`/v1/god/inbox/${third.id}/withdraw`, godToken, {})).status >= 400, true, 'the agent cannot withdraw');
+  assert.equal((await req(`/v1/god/inbox/${third.id}/withdraw`, 'dev:alice', {})).data.inbox.log[0].outcome, 'withdrawn');
+  box = await ownerBox(); assert.deepEqual(box.log.map((x: any) => x.outcome), ['withdrawn', 'failed', 'done']); assert.equal(box.queued, 0);
+  // presence flips to listening while a long-poll is open, and back when it ends
+  const ac = new AbortController(), open = app.request(`/v1/god/inbox/listen?after=${third.id}&timeoutMs=300`, {headers: {authorization: `Bearer ${godToken}`}, signal: ac.signal});
+  await new Promise(r => setTimeout(r, 30)); assert.equal((await ownerBox()).presence, 'listening');
+  await (await open).arrayBuffer(); assert.equal((await ownerBox()).presence, 'recent');
 });
