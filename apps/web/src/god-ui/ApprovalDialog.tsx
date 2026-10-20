@@ -7,23 +7,9 @@
 // navigation at all, in the window that gave the agent its window code (GodPanel's window-approvals poll).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import * as J from './join-api.ts';
+import { approvalLine, CONNECTED_CLOSE_MS, safePhoto } from './window-approvals.ts';
 
 const AVATAR = <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="15" r="7" fill="currentColor" opacity=".55" /><path d="M6 36a14 14 0 0 1 28 0" fill="currentColor" opacity=".55" /></svg>;
-/** The Soul's picture only from this site or https (the server builds it; never a script URL). */
-export const safePhoto = (url: string | null | undefined) => typeof url === 'string' && (/^https:\/\//.test(url) || /^\/(?!\/)/.test(url)) ? url : null;
-/** What the card says under the name, per status (short on purpose: Gene, "avoid verbosity"). */
-export function approvalLine(a: J.Approval | null, refusedHere: boolean): string | null {
-  if (!a) return null;
-  switch (a.status) {
-    case 'creating': return 'Making the body…';
-    case 'ready': return 'Connected';
-    case 'cancelled': return refusedHere ? 'Refused' : 'Withdrawn by the agent';
-    case 'expired': return 'Timed out';
-    case 'refused': return typeof a.reason?.message === 'string' ? a.reason.message : 'Approved, but the Soul could not arrive. Nothing was created; ask your agent to try again.';
-    default: return null;
-  }
-}
-export const CONNECTED_CLOSE_MS = 5000;
 
 export function ApprovalCard({ id, signedIn, signIn, onDone }: { id: string; signedIn: boolean; signIn?: ReactNode; onDone: () => void }) {
   const [a, setA] = useState<J.Approval | null>(null);

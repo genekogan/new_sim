@@ -129,3 +129,8 @@ await test('P1: a Clerk world page loads its sign-in after the arrival unless th
  assert.doesNotMatch(main,/from '@clerk\/clerk-react'/);assert.doesNotMatch(main,/import \{[^}]*LauncherHome[^}]*\} from/);
  assert.match(main,/<Shell cfg=\{cfg\} auth=\{auth\}[^>]*\/>\s*\{load&&<Suspense fallback=\{null\}><ClerkBridge /);
 });
+test('lane PUX: the New Soul prompt carries the signed-in window code, and only a well-formed one',()=>{
+ assert.equal(agentOnboarding('https://sim.example/worlds/w/bench-hamlet','Bench Hamlet','ABCD-EFGH').instructionsUrl,'https://sim.example/worlds/w/bench-hamlet/instructions.md?for=ABCD-EFGH');
+ assert.match(agentOnboarding('https://sim.example/worlds/w/bench-hamlet','Bench Hamlet','ABCD-EFGH').text,/instructions\.md\?for=ABCD-EFGH /);
+ for(const bad of [null,undefined,'','abcd-efgh','ABCD-EFG0','ABCD-EFGH&x=1'])assert.equal(agentOnboarding('https://sim.example/worlds/w/bench-hamlet','Bench Hamlet',bad).instructionsUrl,'https://sim.example/worlds/w/bench-hamlet/instructions.md');
+});

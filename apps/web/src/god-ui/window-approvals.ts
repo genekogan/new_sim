@@ -22,6 +22,22 @@ export function closeApproval(id: string, storage: Pick<Storage, 'getItem' | 'se
 }
 function safeSession(): Storage | null { try { return typeof sessionStorage === 'undefined' ? null : sessionStorage; } catch { return null; } }
 
+/** The Soul's picture only from this site or https (the server builds it; never a script URL). */
+export const safePhoto = (url: string | null | undefined) => typeof url === 'string' && (/^https:\/\//.test(url) || /^\/(?!\/)/.test(url)) ? url : null;
+/** What the card says under the name, per status (short on purpose: Gene, "avoid verbosity"). */
+export function approvalLine(a: J.Approval | null, refusedHere: boolean): string | null {
+  if (!a) return null;
+  switch (a.status) {
+    case 'creating': return 'Making the body…';
+    case 'ready': return 'Connected';
+    case 'cancelled': return refusedHere ? 'Refused' : 'Withdrawn by the agent';
+    case 'expired': return 'Timed out';
+    case 'refused': return typeof a.reason?.message === 'string' ? a.reason.message : 'Approved, but the Soul could not arrive. Nothing was created; ask your agent to try again.';
+    default: return null;
+  }
+}
+export const CONNECTED_CLOSE_MS = 5000;
+
 /** Requests waiting for the signed-in account; polls only while `enabled` and the tab is visible; stops for good when the
  *  world has no such list (an older server). */
 export function useWindowApprovals(enabled: boolean): J.Approval[] {

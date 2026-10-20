@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { strikesBetween, SOUND_MPS, type Strike } from '@sim/world-compiler';
 import { warmSceneChange } from './gen-mesh/texture-budget.ts';
 import { arrivalMark, arrivalOver } from './arrival-marks.ts';
+import { audible } from './audio-focus.ts';
 
 type ModelLike = { state: unknown; seed: string; ground(): { extent: readonly number[] } };
 type LayerLike = { active: boolean; groundAt(x: number, z: number): number | null };
@@ -114,7 +115,7 @@ export class WorldLightning {
     // thunder: after the distance at the speed of sound, louder and sharper the nearer
     const cam = camera.position, dist = Math.hypot(cam.x - s.x, cam.y - gy, cam.z - s.z), delay = dist / SOUND_MPS;
     const gain = Math.max(0.04, Math.min(1, 1 / (1 + dist / 260))) * (0.6 + 0.4 * s.power);
-    const sound = this.muted ? 'muted' : this.thunder(delay, dist, gain, r) ? 'scheduled' : 'locked';
+    const sound = this.muted || !audible() ? 'muted' : this.thunder(delay, dist, gain, r) ? 'scheduled' : 'locked';
     this.heard.push({ tick: s.tick, x: s.x, z: s.z, god: !!s.god, dist: Math.round(dist), delay: Math.round(delay * 100) / 100, gain: Math.round(gain * 100) / 100, at: Date.now(), sound });
     if (this.heard.length > 40) this.heard.shift();
   }
