@@ -3067,10 +3067,10 @@ async function listen(flags2 = {}, { poll: pollFn, beat = () => {
     await wait(idleWait(quick));
   }
 }
-async function ack(id, reply) {
-  if (typeof id !== "string" || !id.trim()) throw new Error('usage: ack <message-id> ["reply up to 140 characters"]');
+async function ack(id, reply, failed = false) {
+  if (typeof id !== "string" || !id.trim()) throw new Error('usage: ack <message-id> ["reply up to 140 characters"] [--failed]');
   if (reply !== void 0 && (typeof reply !== "string" || reply.length > 140)) throw new Error("ack reply must be at most 140 characters");
-  return ok(await call(`/v1/god/inbox/${encodeURIComponent(id)}/ack`, { body: reply === void 0 ? {} : { reply } }), "ack");
+  return ok(await call(`/v1/god/inbox/${encodeURIComponent(id)}/ack`, { body: { ...reply === void 0 ? {} : { reply }, ...failed ? { outcome: "failed" } : {} } }), "ack");
 }
 async function followInbox({ poll, after, write = (line2) => process.stdout.write(line2 + "\n"), wait = sleep, stop = () => false, beat = () => {
 } }) {
@@ -3469,7 +3469,7 @@ var GOV_POS = { amendments: 0, decide: 2, governance: 0 };
 var GOV_HELP = `govern: amendments [--all] \xB7 decide <id> accept [--text <md|file>] [--reason r] \xB7 decide <id> decline --reason "<why>" \xB7 governance [--residents-decide on|off] (off by default)`;
 
 // lib/version.mjs
-var SKILL_VERSION = "1.5";
+var SKILL_VERSION = "1.6";
 
 // cli.mjs
 var SELF = (() => {
@@ -5165,7 +5165,7 @@ async function status() {
   return `${s.world} \u2014 you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ""}${s.build ? `; ${buildHeader(s.build, st.builds?.find((b) => b.id === s.build.id))}` : ""}; skill ${SKILL_VERSION}${v ? `; server protocol ${v.protocol}, schema ${v.schema}, skill ${v.skill}, source ${v.source}` : ""}`;
 }
 var BOOL = /* @__PURE__ */ new Set(["fix", "helper", "local", "remote", "no-build", "done", "force", "undo", "float", "dry", "plan", "nudge", "json", "all", "keep", "hide-roofs", "stop", "site", "unused", "off", "md", "fresh", "remove", "free", "list", ...ENV_BOOLS, ...LAYERS_BOOLS]);
-var boolsFor = (cmd) => cmd === "look" ? /* @__PURE__ */ new Set([...BOOL, "inside"]) : cmd === "listen" ? /* @__PURE__ */ new Set([...BOOL, "once", "follow"]) : BOOL;
+var boolsFor = (cmd) => cmd === "look" ? /* @__PURE__ */ new Set([...BOOL, "inside"]) : cmd === "listen" ? /* @__PURE__ */ new Set([...BOOL, "once", "follow"]) : cmd === "ack" ? /* @__PURE__ */ new Set([...BOOL, "failed"]) : BOOL;
 function parseFlags(argv, bools = BOOL) {
   const flags2 = {}, rest = [];
   for (let i = 0; i < argv.length; i++) {
@@ -5191,7 +5191,7 @@ var FLAGS = {
   trace: "build limit",
   build: "title steps at offset size yaw mass brief root take done force undo say timeout asks include district plots file delete to dry helper ttl",
   listen: "after timeout once follow",
-  ack: "",
+  ack: "failed",
   "verify-use": "seat from uses",
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`,
   terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
@@ -5276,7 +5276,7 @@ var COMMANDS = {
     listenerBeat();
     autoWarm(SELF);
   } }),
-  ack: (r) => ack(r[0], r[1]),
+  ack: (r, f) => ack(r[0], r[1], !!f.failed),
   build: (r, f) => build2(r[0], r.slice(1), f),
   "verify-use": (r, f) => verifyUse(r[0], f),
   register: (r, f) => register(r[0], r[1] ?? f.identity),
@@ -5383,7 +5383,7 @@ resume: omit id to resume the only paused build or active build with a dead lead
 mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' \xB7 preview '<batch>' \xB7 commit <preview-id> \xB7 act '<batch>' \xB7 dryrun '<batch>' \xB7 request <clientRef>
 world:  sky [--palette p --sun s] \xB7 time [19:30|7pm] [--speed h/h] [--pause|--resume] \xB7 weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] \xB7 strike [--at x,z|thing] \xB7 constitution <md> \xB7 expand <m> \xB7 export [file] \xB7 import <genesis.json> \xB7 define <def.json> \xB7 define-kit <kit.json> \xB7 furnish <house>[/room]
-inbox:  listen [--after message-id] [--timeout 25] [--once|--follow] \xB7 ack <message-id> [reply] (a reply of up to 140 characters)
+inbox:  listen [--after message-id] [--timeout 25] [--once|--follow] \xB7 ack <message-id> [reply] [--failed] (a reply of up to 140 characters; --failed when it could not be done)
 pair:   register <world-url> \xB7 pair \xB7 flags \xB7 flag <label> --at x,z \xB7 prayers [--all] (answered too) \xB7 answer <id> <text> \xB7 status
 ${LAND_HELP}
 find:   catalog [--category c] [--has slot:sit|actuator:door|comp:light] [--page n] (every def, one line each) \xB7 find <words> [--category c] [--has \u2026] \xB7 recommend <what you want> \xB7 taxonomy (categories, counts, param conventions, actuators)

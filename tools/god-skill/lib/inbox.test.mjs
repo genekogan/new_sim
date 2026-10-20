@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { listen, ack, idleWait } from './inbox.mjs';
 import { call } from './state.mjs';
-import { COMMANDS, checkArgs, parseFlags } from '../cli.mjs';
+import { COMMANDS, CLI_SHAPE, checkArgs, parseFlags } from '../cli.mjs';
 import { noticeOwnerInbox, noticeInboxHeader } from './inbox-notice.mjs';
 import { remoteLook } from './remote-look.mjs';
 import { follow } from './mirror.mjs';
@@ -58,6 +58,17 @@ test('god inbox ack escapes ids and sends only the optional 140-character reply'
   assert.equal(calls[0].url, 'https://inbox.invalid/w/test/v1/god/inbox/id%2Fpart/ack');
   assert.deepEqual(JSON.parse(calls[0].body), { reply: 'x'.repeat(140) });
   assert.deepEqual(JSON.parse(calls[1].body), {});
+});
+
+test('god inbox ack --failed marks the command not done, with or without a reply (G4)', async t => {
+  const result = envelope({ ...latest('id', 'acknowledged'), reply: 'No barn here.', outcome: 'failed' });
+  const { calls } = fixture(t, [result, result]);
+  await COMMANDS.ack(['id', 'No barn here.'], { failed: true });
+  await ack('id', undefined, true);
+  assert.deepEqual(JSON.parse(calls[0].body), { reply: 'No barn here.', outcome: 'failed' });
+  assert.deepEqual(JSON.parse(calls[1].body), { outcome: 'failed' });
+  const { flags, rest } = parseFlags(['id', 'reply', '--failed'], CLI_SHAPE.boolsFor('ack'));
+  assert.equal(flags.failed, true); assert.deepEqual(rest, ['id', 'reply']); checkArgs('ack', flags, rest);
 });
 
 test('god inbox rejects invalid options and long replies before any request', async t => {

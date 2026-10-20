@@ -31,10 +31,11 @@ export async function listen(flags = {}, { poll: pollFn, beat = () => {}, wait =
   }
 }
 
-export async function ack(id, reply) {
-  if (typeof id !== 'string' || !id.trim()) throw new Error('usage: ack <message-id> ["reply up to 140 characters"]');
+/** ack: the owner's command is finished. `failed` (ack --failed) marks it not done, the reply saying why (G4). */
+export async function ack(id, reply, failed = false) {
+  if (typeof id !== 'string' || !id.trim()) throw new Error('usage: ack <message-id> ["reply up to 140 characters"] [--failed]');
   if (reply !== undefined && (typeof reply !== 'string' || reply.length > 140)) throw new Error('ack reply must be at most 140 characters');
-  return ok(await call(`/v1/god/inbox/${encodeURIComponent(id)}/ack`, { body: reply === undefined ? {} : { reply } }), 'ack');
+  return ok(await call(`/v1/god/inbox/${encodeURIComponent(id)}/ack`, { body: { ...(reply === undefined ? {} : { reply }), ...(failed ? { outcome: 'failed' } : {}) } }), 'ack');
 }
 
 /** listen --follow: never returns; prints one compact JSON line per new owner message

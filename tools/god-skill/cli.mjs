@@ -1347,7 +1347,7 @@ export async function status() { const s = load(); const st = ok(await call('/v1
 /** Flags that never take a value (the next word stays a positional argument). */
 const BOOL = new Set(['fix', 'helper', 'local', 'remote' /* W2 remote looks */, 'no-build', 'done', 'force', 'undo', 'float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'site', 'unused', 'off', 'md', 'fresh', 'remove', 'free', 'list', ...ENV_BOOLS, ...LAYERS_BOOLS]);
 // listen --once/--follow are switches; `hours --follow field@open=…` takes a value, so they are listen-only.
-const boolsFor = (cmd) => (cmd === 'look' ? new Set([...BOOL, 'inside']) : cmd === 'listen' ? new Set([...BOOL, 'once', 'follow']) : BOOL);
+const boolsFor = (cmd) => (cmd === 'look' ? new Set([...BOOL, 'inside']) : cmd === 'listen' ? new Set([...BOOL, 'once', 'follow']) : cmd === 'ack' ? new Set([...BOOL, 'failed']) : BOOL);
 export function parseFlags(argv, bools = BOOL) {
   const flags = {}, rest = [];
   for (let i = 0; i < argv.length; i++) {
@@ -1370,7 +1370,7 @@ const REL = 'at offset near around dist dir count facing yaw against between alo
 const FLAGS = {
   doctor: 'fix local', trace: 'build limit',
   build: 'title steps at offset size yaw mass brief root take done force undo say timeout asks include district plots file delete to dry helper ttl',
-  listen: 'after timeout once follow', ack: '',
+  listen: 'after timeout once follow', ack: 'failed',
   'verify-use': 'seat from uses',
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`, terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
   move: `${REL} by in local nudge note dry plan`, look: 'at from dist inside floor keep remote out span height width h hide-roofs stop hour weather views site frames every', kit: 'hour weather beside out width h', defs: 'tag all unused remove', where: 'at offset', reach: '', clear: 'size', free: 'near radius count slope',
@@ -1424,7 +1424,7 @@ export const CLI_SHAPE = { POS, FLAGS, BOOL, NUMERIC, boolsFor };
 const readArg = (r) => (r[0] !== undefined ? (existsSync(r[0]) && !r[0].trim().startsWith('{') ? readFileSync(r[0], 'utf8') : r[0]) : readFileSync(0, 'utf8'));
 export const COMMANDS = { doctor: (r, f) => doctor(f), trace: (r, f) => trace(f),
   kit: (r, f) => { if (r[0] !== 'look' || !r[1]) throw Error('usage: kit look <kit.json> [--hour 21] [--beside core/church@1] [--out file]'); return kitLook(readArg(r.slice(1)), f); },
-  listen: (r, f) => listen(f, { beat: () => { listenerBeat(); autoWarm(SELF); } }), ack: (r) => ack(r[0], r[1]),
+  listen: (r, f) => listen(f, { beat: () => { listenerBeat(); autoWarm(SELF); } }), ack: (r, f) => ack(r[0], r[1], !!f.failed),
   build: (r, f) => build(r[0], r.slice(1), f),
   'verify-use': (r, f) => verifyUse(r[0], f),
   register: (r, f) => register(r[0], r[1] ?? f.identity), pair: (r) => pair(r[0]), mint: (r) => mint(r[0]), status,
@@ -1461,7 +1461,7 @@ resume: omit id to resume the only paused build or active build with a dead lead
 mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' · preview '<batch>' · commit <preview-id> · act '<batch>' · dryrun '<batch>' · request <clientRef>
 world:  sky [--palette p --sun s] · time [19:30|7pm] [--speed h/h] [--pause|--resume] · weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] · strike [--at x,z|thing] · constitution <md> · expand <m> · export [file] · import <genesis.json> · define <def.json> · define-kit <kit.json> · furnish <house>[/room]
-inbox:  listen [--after message-id] [--timeout 25] [--once|--follow] · ack <message-id> [reply] (a reply of up to 140 characters)
+inbox:  listen [--after message-id] [--timeout 25] [--once|--follow] · ack <message-id> [reply] [--failed] (a reply of up to 140 characters; --failed when it could not be done)
 pair:   register <world-url> · pair · flags · flag <label> --at x,z · prayers [--all] (answered too) · answer <id> <text> · status
 ${LAND_HELP}
 find:   catalog [--category c] [--has slot:sit|actuator:door|comp:light] [--page n] (every def, one line each) · find <words> [--category c] [--has …] · recommend <what you want> · taxonomy (categories, counts, param conventions, actuators)

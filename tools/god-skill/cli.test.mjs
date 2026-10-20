@@ -100,10 +100,10 @@ test('request looks up an escaped receipt ref without writing', async (t) => {
 });
 
 test('status exposes the local skill and server version tuple', async (t) => {
-  fixture(t, { you: 'god', entities: 3, seq: 8, versions: { protocol: 'god/1', schema: 'god-schema/1', skill: '1.5', source: 'abc123' } });
-  assert.equal(SKILL_VERSION, '1.5');
+  fixture(t, { you: 'god', entities: 3, seq: 8, versions: { protocol: 'god/1', schema: 'god-schema/1', skill: '1.6', source: 'abc123' } });
+  assert.equal(SKILL_VERSION, '1.6');
   const text = await status();
-  for (const part of ['skill 1.5', 'protocol god/1', 'schema god-schema/1', 'source abc123']) assert.ok(text.includes(part), part);
+  for (const part of ['skill 1.6', 'protocol god/1', 'schema god-schema/1', 'source abc123']) assert.ok(text.includes(part), part);
 });
 
 test('answer and layer commands use receipt-protected acts with fresh refs', async (t) => {

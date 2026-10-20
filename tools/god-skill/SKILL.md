@@ -19,7 +19,7 @@ node eden-god.mjs pair                       # prints a link; the owner approves
 ```
 `.eden-god.json` holds the token: never print it. Owner messages: `node eden-god.mjs listen --json` as a background Bash
 command (`run_in_background: true`; not a Monitor, which expires) returns the next message; handle it, `ack <id> "short
-reply"` (≤ 140 characters), listen again (also, silently, if it exits without one). `listen --follow` is for scripts.
+reply"` (≤ 140 characters; add `--failed` if you could not do it), listen again (also, silently, if it exits without one). `listen --follow` is for scripts.
 
 ## The world in one page
 
