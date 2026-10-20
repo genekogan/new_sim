@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {createConnectedNativeShore} from '../../../mars/viewer/app/engine-view/content/environment/connected-native-shore.ts';
 import {waterMaterial,waterMesh} from './gen-mesh/water.ts';
+import {fallingWaterMaterial} from './fx/water.ts';
+import {installAtmosphereChunks,MIST} from './atmosphere/chunks.ts';
 import {WorldWaterDetail,WATER_DETAIL,SWIMMERS,findWaterRegions,patchUnderwaterBody,patchWaterSurface,waterUnder,markHeight} from './WorldWaterDetail.ts';
 
 const row=[-3.5,-3.5,-3.5,-3.5,-3.5,-3.5,-3.5,-3.5,-3.5,-3.5,-3.5,-3.5,-3.2,-2.9,-2.6,-2.3,-2,-1.87,-1.74,-1.6099999999999999,-1.48,-1.35,-1.22,-1.0899999999999999,-0.96,-0.8300000000000001,-0.7,-0.5700000000000001,-0.43999999999999995,-0.31000000000000005,-0.17999999999999994,-0.050000000000000044,0,0,0];
@@ -33,6 +35,25 @@ void test('new-engine water material: ripples perturb the lit normal after its o
  assert.ok(own>0&&mine>own,'swimmer slope follows the material\'s own wave normal');
  assert.ok(s.fragmentShader.indexOf('waterGlitter(vWaterSurfW')<s.fragmentShader.indexOf('#include <tonemapping_fragment>'));
  assert.match(s.vertexShader,/vWaterSurfW=\(modelMatrix\*edenWp\)\.xyz/);
+});
+
+void test('W5 fog: the still-water glint cap comes before the fog, so a far lake fades into rain and fog like the land',()=>{
+ for(const flow of [0,0.7]){const s=compile(waterMaterial({flow}),'physical'),f=s.fragmentShader;
+  const cap=f.indexOf('gl_FragColor.rgb = min(gl_FragColor.rgb'),fog=f.indexOf('#include <fog_fragment>');
+  assert.ok(cap>0&&fog>cap,`cap before fog (flow ${flow})`);assert.ok(f.indexOf('#include <colorspace_fragment>')<cap);
+  assert.equal(f.slice(f.indexOf('#include <dithering_fragment>')).includes('min(gl_FragColor'),false,'nothing clamps the fogged colour');}
+});
+
+void test('W5 fog: old Eden calm water and fountain sheets take the scene fog chunks and share the host fog uniforms',()=>{
+ installAtmosphereChunks();
+ const o=shore();o.group.updateMatrixWorld(true);const [r]=findWaterRegions(o.group);const m=r.mesh!.material as THREE.ShaderMaterial;
+ for(const mat of [m,fallingWaterMaterial('sheet'),fallingWaterMaterial('spray')]){
+  assert.equal(mat.fog,true);assert.ok(mat.uniforms.fogColor&&mat.uniforms.fogDensity,'fog uniforms');
+  assert.match(mat.vertexShader,/vec4 mvPosition\s*=\s*viewMatrix\s*\*\s*w(orld)?;[\s\S]*#include <fog_vertex>/);assert.match(mat.vertexShader,/#include <fog_pars_vertex>/);
+  assert.match(mat.fragmentShader,/#include <fog_pars_fragment>[\s\S]*gl_FragColor\s*=\s*vec4\([\s\S]*#include <fog_fragment>/);
+  const s=compile(mat);assert.equal(s.uniforms.uEdenMist,MIST,'rain mist uniform is the shared one');}
+ // the old scenes' captured shape the swimmer patch keys on is unchanged
+ assert.match(m.fragmentShader,/gl_FragColor=vec4\(colour,/);assert.match(m.vertexShader,/vWorld/);o.dispose();
 });
 
 void test('bodies: underwater fade is a per-material patch, below the level only, inside the water bounds only',()=>{

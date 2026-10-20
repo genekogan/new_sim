@@ -7,6 +7,7 @@
 // All curtains and sprays share one material; geometry is built once per kit prototype (kit.mesh.ts caches it).
 import * as THREE from 'three';
 import { RIPPLE } from '../atmosphere/motion.ts';
+import { FOG_FRAGMENT, FOG_PARS_FRAGMENT, FOG_PARS_VERTEX, FOG_VERTEX, withSceneFog } from '../../../../mars/viewer/app/engine-view/content/environment/scene-fog.ts';
 
 const KEY = 'eden-w2-water-v1';
 const ripples = new WeakMap<THREE.Material, THREE.Material>();
@@ -44,11 +45,12 @@ const streaks: Partial<Record<'sheet' | 'spray', THREE.ShaderMaterial>> = {};
 /** Falling water: bright streaks scrolling down a translucent sheet (uv.y = 1 at the top). Shared by every fountain.
  *  'spray' is for kit shapes, which carry no uv: the streaks are laid out in world space instead. */
 export function fallingWaterMaterial(kind: 'sheet' | 'spray' = 'sheet'): THREE.ShaderMaterial {
-  return streaks[kind] ??= new THREE.ShaderMaterial({
-    name: `falling water (${kind})`, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false,
+  // W5: in the scene fog like the basin it falls into
+  return streaks[kind] ??= withSceneFog(new THREE.ShaderMaterial({
+    name: `falling water (${kind})`, transparent: true, depthWrite: false, side: THREE.DoubleSide,
     defines: kind === 'spray' ? { EDEN_WORLD_UV: 1 } : {},
     uniforms: { uEdenRipple: RIPPLE },
-    vertexShader: /* glsl */`varying vec2 vUv; varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position, 1.0);
+    vertexShader: /* glsl */`varying vec2 vUv; varying vec3 vW;${FOG_PARS_VERTEX} void main(){ vec4 w = modelMatrix * vec4(position, 1.0);
       #ifdef USE_INSTANCING
       w = modelMatrix * instanceMatrix * vec4(position, 1.0);
       #endif
@@ -57,8 +59,8 @@ export function fallingWaterMaterial(kind: 'sheet' | 'spray' = 'sheet'): THREE.S
       #else
       vUv = uv;
       #endif
-      vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
-    fragmentShader: /* glsl */`uniform vec4 uEdenRipple; varying vec2 vUv; varying vec3 vW;
+      vW = w.xyz; vec4 mvPosition = viewMatrix * w; gl_Position = projectionMatrix * mvPosition;${FOG_VERTEX} }`,
+    fragmentShader: /* glsl */`uniform vec4 uEdenRipple; varying vec2 vUv; varying vec3 vW;${FOG_PARS_FRAGMENT}
       float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       void main(){
         float t = uEdenRipple.x * (0.35 + 0.65 * uEdenRipple.y), cx = vUv.x * 64.0, col = floor(cx), s = h(vec2(col, 1.7));
@@ -71,9 +73,9 @@ export function fallingWaterMaterial(kind: 'sheet' | 'spray' = 'sheet'): THREE.S
         float edge = smoothstep(0.0, 0.12, vUv.y) * smoothstep(1.0, 0.85, vUv.y);
         #endif
         float a = (0.18 + 0.5 * streak) * edge * (0.6 + 0.4 * h(vec2(col, 9.3)));
-        gl_FragColor = vec4(mix(vec3(0.62, 0.78, 0.86), vec3(0.95, 0.98, 1.0), streak), a);
+        gl_FragColor = vec4(mix(vec3(0.62, 0.78, 0.86), vec3(0.95, 0.98, 1.0), streak), a);${FOG_FRAGMENT}
       }`,
-  });
+  }));
 }
 
 /** A kit shape that draws moving water (a jet, spray, cascade or waterfall). */

@@ -51,7 +51,9 @@ export function waterMaterial(opts: { flow?: number; color?: string; opacity?: n
       // flowing water: cap the sun glint at a pale blue so a grazing view never reads as a white strip
       // still water: a low sun (a June dusk) lit every wave crest of the three-wave normal into a grid of white diamonds;
       // the glint is capped at a bright sky blue there (it still reads as sun on water, never as a white tiled patch)
-      .replace('#include <dithering_fragment>', '#include <dithering_fragment>\n  gl_FragColor.rgb = min(gl_FragColor.rgb, uFlow > 0.0 ? vec3(0.58, 0.74, 0.84) : mix(vec3(0.7, 0.8, 0.87), vec3(0.42, 0.56, 0.66), smoothstep(45.0, 150.0, length(vWaterWorld - cameraPosition))));');
+      // W5: the cap comes before the fog, so it caps the glint, not the fog: after it, a far lake in rain or fog was
+      // clamped back to blue-grey and drew as a flat unfogged quad while the land around it faded into the fog
+      .replace('#include <fog_fragment>', '  gl_FragColor.rgb = min(gl_FragColor.rgb, uFlow > 0.0 ? vec3(0.58, 0.74, 0.84) : mix(vec3(0.7, 0.8, 0.87), vec3(0.42, 0.56, 0.66), smoothstep(45.0, 150.0, length(vWaterWorld - cameraPosition))));\n#include <fog_fragment>');
   };
   m.customProgramCacheKey = () => `l3-water-${flow > 0 ? 'flow' : 'still'}`;
   cache.set(key, m);

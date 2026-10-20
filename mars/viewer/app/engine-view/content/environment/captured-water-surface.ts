@@ -1,6 +1,7 @@
 // Captured calm water appearance only. One native-datum plane, no physical waves.
 import * as THREE from 'three';
 import {inspectNativeShoreTerrain,type NativeShoreTerrainInput} from './native-shore-terrain.ts';
+import {FOG_FRAGMENT,FOG_PARS_FRAGMENT,FOG_PARS_VERTEX,FOG_VERTEX,withSceneFog} from './scene-fog.ts';
 export type CapturedWaterInput={readonly id:string;readonly datumY:number;readonly wetBoundsXZ:readonly number[]};
 type P=[number,number,number];
 function waterCopy(input:CapturedWaterInput){
@@ -21,9 +22,10 @@ export function inspectCapturedWaterSurface(terrain:NativeShoreTerrainInput,wate
 }
 // Original shore-water.ts recipe adapted locally: same two phase directions,
 // weaker slopes/highlights and explicit bounded alpha. No source shader mutation.
-const vertexShader=`varying vec3 vWorld;
-void main(){vec4 world=modelMatrix*vec4(position,1.0);vWorld=world.xyz;gl_Position=projectionMatrix*viewMatrix*world;}`;
-const fragmentShader=`uniform float uViewTime;uniform float uDaylight;uniform vec3 uBaseColor;uniform float uBaseAlpha;uniform float uGrazingAlpha;varying vec3 vWorld;
+// W5: the scene fog (scene-fog.ts) like the land around it; a far pond no longer stays unfogged in rain.
+const vertexShader=`varying vec3 vWorld;${FOG_PARS_VERTEX}
+void main(){vec4 world=modelMatrix*vec4(position,1.0);vWorld=world.xyz;vec4 mvPosition=viewMatrix*world;gl_Position=projectionMatrix*mvPosition;${FOG_VERTEX}}`;
+const fragmentShader=`uniform float uViewTime;uniform float uDaylight;uniform vec3 uBaseColor;uniform float uBaseAlpha;uniform float uGrazingAlpha;varying vec3 vWorld;${FOG_PARS_FRAGMENT}
 void main(){
   // Four drifting wave trains (swell to capillary); finer trains fade before they alias. Alpha formula unchanged.
   vec2 p=vWorld.xz;float t=uViewTime;
@@ -45,15 +47,14 @@ void main(){
   colour*=mix(vec3(.11,.16,.23),vec3(1.0),clamp(uDaylight,0.0,1.0));
   gl_FragColor=vec4(colour,uBaseAlpha+uGrazingAlpha*grazing);
   #include <tonemapping_fragment>
-  #include <colorspace_fragment>
-}`;
+  #include <colorspace_fragment>${FOG_FRAGMENT}}`;
 export function createCapturedWaterSurface(terrain:NativeShoreTerrainInput,water:CapturedWaterInput):{group:THREE.Group;setViewTime(seconds:number):void;dispose():void}{
   const spec=inspectCapturedWaterSurface(terrain,water),group=new THREE.Group();group.name='Captured native-datum calm-water appearance';
   const geometry=new THREE.BufferGeometry();let material:THREE.ShaderMaterial|undefined;let mesh:THREE.Mesh<THREE.BufferGeometry,THREE.ShaderMaterial>|undefined;
   const release=()=>{const errors:unknown[]=[];for(const f of[()=>group.removeFromParent(),()=>geometry.dispose(),()=>material?.dispose(),()=>group.clear()])try{f();}catch(e){errors.push(e);}return errors;};
   try{
     geometry.setAttribute('position',new THREE.Float32BufferAttribute(spec.vertices.flat(),3));geometry.setIndex(spec.indices);geometry.computeVertexNormals();
-    material=new THREE.ShaderMaterial({uniforms:{uViewTime:{value:0},uDaylight:{value:1},uBaseColor:{value:new THREE.Color('#4f969b')},uBaseAlpha:{value:spec.alpha.frontOn},uGrazingAlpha:{value:spec.alpha.grazingIncreaseMax}},vertexShader,fragmentShader,transparent:true,depthWrite:false,side:THREE.DoubleSide,forceSinglePass:true});
+    material=withSceneFog(new THREE.ShaderMaterial({uniforms:{uViewTime:{value:0},uDaylight:{value:1},uBaseColor:{value:new THREE.Color('#4f969b')},uBaseAlpha:{value:spec.alpha.frontOn},uGrazingAlpha:{value:spec.alpha.grazingIncreaseMax}},vertexShader,fragmentShader,transparent:true,depthWrite:false,side:THREE.DoubleSide,forceSinglePass:true}));
     mesh=new THREE.Mesh(geometry,material);mesh.name='eden-shore-water';mesh.castShadow=false;group.add(mesh);
   }catch(error){const errors=release();if(errors.length)throw new AggregateError([error,...errors],'Captured water creation and rollback failed',{cause:error});throw error;}
   const ownedMaterial=material;let closed=false;
