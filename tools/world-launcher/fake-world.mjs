@@ -2,6 +2,8 @@
 // touches (healthz, god status), streams SSE, and echoes a raw WebSocket-style
 // upgrade. Not a Sim server; never used outside tests.
 import { createServer } from 'node:http';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 const slug = process.env.WORLD_KEY, port = Number(process.env.PORT);
 const base = process.env.WORLD_PATH ?? `/w/${slug}`;
 const server = createServer((req, res) => {
@@ -26,8 +28,17 @@ server.on('upgrade', (req, socket) => {
   socket.on('data', (d) => socket.write(Buffer.from(String(d).toUpperCase())));
 });
 if (process.env.FAKE_BOOT_FAIL === slug) process.exit(9);
+// FAKE_STOP_MS: a running world takes that long to exit on SIGTERM ('never': only SIGKILL stops it).
+if (process.env.FAKE_STOP_MS) process.on('SIGTERM', () => { if (process.env.FAKE_STOP_MS !== 'never') setTimeout(() => process.exit(0), Number(process.env.FAKE_STOP_MS)); });
+// FAKE_LOCK=1: edge-server.mjs's single-writer lock in DATA_DIR (a live other pid in it: refuse to open, exit 7).
+const lock = () => {
+  if (process.env.FAKE_LOCK !== '1') return;
+  const file = join(process.env.DATA_DIR, 'edge-server.lock');
+  try { const { pid } = JSON.parse(readFileSync(file, 'utf8')); process.kill(pid, 0); if (pid !== process.pid) { console.log(`fork refused: another edge server (pid ${pid}) is still running on this data dir`); process.exit(7); } } catch { /* free */ }
+  mkdirSync(process.env.DATA_DIR, { recursive: true }); writeFileSync(file, JSON.stringify({ pid: process.pid }));
+};
 // FAKE_LOAD_MS: "code loading" (before the standby mark); FAKE_BOOT_MS: opening the data. SIM_STANDBY=1 waits for SIGUSR2 between.
-const open = () => setTimeout(() => server.listen(port, '127.0.0.1'), Number(process.env.FAKE_BOOT_MS ?? 50));
+const open = () => { lock(); setTimeout(() => server.listen(port, '127.0.0.1'), Number(process.env.FAKE_BOOT_MS ?? 50)); };
 setTimeout(() => {
   if (process.env.SIM_STANDBY !== '1') return open();
   const hold = setInterval(() => {}, 1 << 30);

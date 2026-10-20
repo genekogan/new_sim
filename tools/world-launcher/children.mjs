@@ -11,6 +11,8 @@ import { cgroupHeadroomMb, memAvailableMb, PREWARM_MB, prewarmBlocked, rotateLog
 export const STANDBY_MARK = '[standby] ready';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/** `p`, or undefined after `ms` (the timer does not outlive it). */
+const within = (p, ms) => { let t; return Promise.race([p, new Promise((r) => { t = setTimeout(r, ms); })]).finally(() => clearTimeout(t)); };
 export const backoffMs = (n) => Math.min(30_000, 500 * 2 ** Math.max(0, n));
 
 /** True when nothing listens on 127.0.0.1:port (we can bind it ourselves). */
@@ -32,6 +34,7 @@ export class ChildPool {
    *           soulCliFile?: string | null, soulSkillFile?: string | null, soulInstructionsFile?: string | null }} o
    * maxRunning / minFreeMb: before a world boots, idle worlds are put to sleep until it fits; when none can sleep the
    * boot is refused (error.code 'capacity'). busy(slug): a world with live viewers is never put to sleep.
+   * stopGraceMs: how long stop() waits after SIGTERM before SIGKILL (10 s; tests shorten it).
    * sleepMs (lane P3): freezeIdle() freezes a world nobody asked anything for that long (see there); 0/absent: never.
    */
   constructor(o) {
@@ -53,7 +56,7 @@ export class ChildPool {
   }
   /** Take an adopted world over: `release(slug)` makes the previous launcher stop it (snapshot saved, process gone);
    *  then it boots here on the same data. Requests that arrive meanwhile wait on `ready` instead of failing. */
-  async takeOver(slug, release, { timeoutMs = 180_000 } = {}) {
+  async takeOver(slug, release, { timeoutMs = 180_000, goneMs = 15_000 } = {}) {
     const k = this.kids.get(slug);
     if (!k?.adopted) return k?.port ?? null;
     // pre-warm: the next process loads its code while the previous one still serves (no database, no port yet); until
@@ -63,9 +66,12 @@ export class ChildPool {
     if (noRoom) k.lastWarm = { ok: false, error: `cold: ${noRoom}` };
     const warm = !this.o.prewarm || noRoom ? null : await this.standby(k).catch((e) => { k.lastWarm = { ok: false, error: e.message }; return null; });
     k.status = 'handover'; this.o.onChange?.(slug);
+    const prev = k.adopted.pid;
     k.ready = (async () => {
       k.pauseStart = Date.now();   // from here the world does not answer until the new process does
-      try { await release(slug); k.releaseMs = Date.now() - k.pauseStart; }
+      // the previous process must be gone, not only released: while its pid lives it holds the data dir (edge-server.lock)
+      // and the next one refuses to open it (3.53: a release SIGKILLed after 10 s and answered before the exit)
+      try { await release(slug); await this.gone(slug, prev, goneMs); k.releaseMs = Date.now() - k.pauseStart; }
       catch (e) { warm?.child.kill('SIGTERM'); k.status = 'failed'; k.lastError = `handover: ${e.message}`; this.o.onChange?.(slug); throw e; }
       k.adopted = null; this.savePids();
       if (this.closing || this.fenced) { warm?.child.kill('SIGTERM'); k.status = 'stopped'; throw new Error(`world ${slug}: this launcher is closing`); }
@@ -79,6 +85,16 @@ export class ChildPool {
       return this.boot(k, timeoutMs);   // no standby process (old release, or it failed): a cold boot, as before
     })().finally(() => { k.ready = null; });
     return k.ready;
+  }
+  /** Resolves once process `pid` no longer exists (polled); throws after `ms`. */
+  async gone(slug, pid, ms) {
+    if (!Number.isInteger(pid)) return;
+    const t0 = Date.now();
+    for (;;) {
+      try { process.kill(pid, 0); } catch (e) { if (e.code === 'ESRCH') return; }   // EPERM: alive, someone else's
+      if (Date.now() - t0 >= ms) throw new Error(`previous process of ${slug} (pid ${pid}) still running ${Math.round((Date.now() - t0) / 1000)} s after its release`);
+      await sleep(25);
+    }
   }
   /** Start the world's next process in standby (SIM_STANDBY=1, apps/server/src/standby.ts) on its current port, which
    *  is free again once the previous process is released; resolves when it reports its code loaded. */
@@ -299,8 +315,11 @@ export class ChildPool {
     const c = k.child; if (!c) { k.status = 'stopped'; return; }
     this.thaw(k);   // a frozen world handles SIGTERM (saves its snapshot) only once it runs again
     c.kill('SIGTERM');
-    await Promise.race([new Promise((r) => c.once('exit', r)), sleep(10_000)]);
-    if (c.exitCode === null && c.signalCode === null) c.kill('SIGKILL');
+    const exited = () => c.exitCode !== null || c.signalCode !== null;
+    const exit = exited() ? Promise.resolve() : new Promise((r) => c.once('exit', r));
+    await within(exit, this.o.stopGraceMs ?? 10_000);
+    // ...and the stop is over only once the process is gone (a handover's next process waits for it: the data-dir lock)
+    if (!exited()) { c.kill('SIGKILL'); await within(exit, 5_000); }
     k.status = 'stopped';
   }
   async closeAll() { this.closing = true; await Promise.all([...this.kids.keys()].map((s) => this.stop(s))); }
