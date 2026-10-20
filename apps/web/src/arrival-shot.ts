@@ -8,6 +8,7 @@
 // Souls keeps the framing of what was built (entity-arrival.ts), where LiveWorld leaves the camera once it knows.
 // Whether Souls live here comes with the page, as the world clock does (apps/server/src/edge-snapshot.ts withWorldClock).
 import { entityArrivalPose } from './entity-arrival.ts';
+import { liftHorizon } from './broadcast-horizon.ts';
 import { entryWorldSouls, godTourViews } from './world-env.ts';
 
 type ArrivalLayer = { viewBounds(): readonly [number, number, number, number]; entityCount: number; groundAt: (x: number, z: number) => number | null; arrivalAt(): [number, number] | null };
@@ -19,9 +20,10 @@ export type WorldArrival = { target: [number, number, number]; eye: [number, num
 export function worldArrivalPose(layer: ArrivalLayer, aspect: number, souls: number | null = entryWorldSouls()): WorldArrival {
   if (souls !== null && souls > 0) {
     const view = godTourViews(layer, layer.groundAt)[0];
-    // = WorldTour.openingMove(view).at(0), the push's start (arrival-shot.test.ts holds them equal); WorldTour itself stays
-    // out of the phone's first phase
-    if (view) return { target: [...view.target], eye: [...view.p], fov: 45, opening: view.id };
+    // = WorldTour.openingMove(view).at(0), the push's start, lifted toward the horizon as WorldBroadcast.sample lifts every
+    // Broadcast pose (C1, broadcast-horizon.ts) - so the poster is the broadcast's first frame (arrival-shot.test.ts holds
+    // them equal). Lifted here once; WorldTour's moves stay unlifted. WorldTour itself stays out of the phone's first phase
+    if (view) return { target: liftHorizon(view.p, view.target), eye: [...view.p], fov: 45, opening: view.id };
   }
   const a = entityArrivalPose(layer.viewBounds(), layer.entityCount, layer.groundAt, 45, aspect, 1, layer.arrivalAt());
   return { target: a.target, eye: a.eye, fov: 45, opening: null };
