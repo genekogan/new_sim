@@ -64,3 +64,12 @@ export const config = {
 };
 mkdirSync(config.dataDir, { recursive: true });
 export type Config = typeof config;
+
+/** The world's public base URL from configuration alone (never a request's Host). A launcher child runs with PUBLIC_URL =
+ *  the bare origin and WORLD_PATH = /worlds/w/<slug>: origin + world path. The legacy servers (tools/core) set PUBLIC_URL
+ *  to the full world URL (origin + world path) already: kept as given. E.g. https://sim.eden.art/worlds/w/<slug>,
+ *  https://sim.eden.art/w/eden. */
+export const publicWorldBase = (cfg: Pick<Config, 'publicUrl' | 'worldPath'>) => {
+  const u = new URL(cfg.publicUrl), path = u.pathname.replace(/\/+$/, '');
+  return u.origin + (path || cfg.worldPath.replace(/\/+$/, ''));
+};
