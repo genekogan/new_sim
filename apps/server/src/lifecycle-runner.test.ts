@@ -132,3 +132,19 @@ test('inconsistent existing native or kernel identity remains a visible invarian
     assert.equal(f.db.events(worldId).some(e=>e.kind==='birth'),false);assert.equal(projectLifecycle(f.host,f.journal.get(scope,requestId)!).state,'pending');
   }
 });
+
+// Lane PB (hotfix, Gene 2026-10-20): a god built over the arrival point (bench-hamlet: a giant telescope on (0,0)), so
+// every approved Soul ended "refused" (arrival-unavailable) right after the person clicked Approve. A lifecycle birth now
+// carries birth-near/1: the nearest clear standing ground to the arrival point, as verifier probes already did.
+test('a built-over arrival point admits the approved Soul on the nearest clear ground, exactly on replay',async t=>{
+  const { EDEN_COMMONS_WORLD } = await import('@sim/engine-mars');
+  const built=await marsFactory({...EDEN_COMMONS_WORLD,safeCrewRemoval:true,arrival:[9,-1.8],reference:[10,-1.8]});   // on the commons platform
+  const f=fixture(':memory:',built);t.after(()=>f.db.close());
+  f.journal.acceptCreate(scope,requestId,input,()=>true);await settle(f);const op=f.journal.get(scope,requestId)!;
+  assert.equal(op.state,'complete',`state ${op.state}: ${projectLifecycle(f.host,op).reason}`);assert.equal(f.runner.faults.size,0);
+  assert.equal(lifecycleBodyReady(f.host,op),true);
+  const body=f.host.engine.world.entities.h_A!;assert.ok(Math.hypot(body.pose.p[0]-9,body.pose.p[2]+1.8)<=12,'landed near the arrival point');
+  const birth=f.db.events(worldId).find(e=>e.kind==='birth')!;assert.deepEqual(birth.payload.near,{at:[9,-1.8]});
+  const restart=new WorldHost(f.db,built,seed,1e9,worldId);restart.boot();assert.equal(lifecycleBodyReady(restart,op),true);
+  assert.equal(restart.engine.stateHash(),f.host.engine.stateHash());assert.equal(kernelHash(restart.kernel),kernelHash(f.host.kernel));
+});

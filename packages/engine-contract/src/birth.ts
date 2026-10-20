@@ -5,6 +5,8 @@ import type { Vec3 } from './world.ts';
 // a public admission receipt; its exact base must be rechecked by the sequencer.
 export const humanBirthRequestSchema = z.object({
   id:z.string().min(1).max(96), label:z.string().min(1).max(80), soul:z.string().min(1).max(96),
+  // birth-near/1 (BirthNearV1): a built-over arrival point lands on the nearest clear standing ground instead of refusing
+  near:z.object({at:z.tuple([z.number().finite(),z.number().finite()]),first:z.boolean().optional()}).strict().optional(),
 }).strict();
 export type HumanBirthRequest = z.infer<typeof humanBirthRequestSchema>;
 export type HumanBirthProbe = {

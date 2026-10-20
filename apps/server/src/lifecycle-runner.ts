@@ -17,6 +17,11 @@ function refers(value:unknown,id:string):boolean {
  * Character text can change canonically; the immutable birth description is
  * evidence of admission, not the current row/Mind/kernel character value.
  * The caller still checks current user/invitation/control authority separately. */
+/** The world's arrival point (its first anchor) as a birth-near/1 hint, or none when the engine names no such point. */
+function arrivalNear(host:WorldHost):{at:[number,number]}|undefined{
+  const p=host.engine.anchors?.()[0]?.point as unknown;
+  return Array.isArray(p)&&p.length===2&&p.every(v=>typeof v==='number'&&Number.isFinite(v))?{at:[p[0],p[1]]}:undefined;
+}
 export function lifecycleBodyReady(host:WorldHost,op:LifecycleOperation):boolean {
   return ownedBodyCorresponds(host,op.scope,host.currentProfileName(op.scope.soulId,op.name));
 }
@@ -110,12 +115,15 @@ export class LifecycleRunner {
       const guard=()=>{this.current(op);const row=this.host.db.soul(s.soulId);if(!row||row.retired_at===null)throw new Error('Durable retirement lost its revocation');return true as const;};
       this.queue(op,this.host.enqueueChecked('retire',`soul:${s.soulId}`,{soulId:s.soulId,entityId:s.entityId},guard,e=>this.journal.linkAccepted(s,op.requestId,e,guard)));return;
     }
+    // birth-near/1 (lane PB): a god may build over the arrival point (bench-hamlet's telescope on it refused every approved
+    // Soul). The birth lands on the nearest clear standing ground to it instead; journaled in the birth, so replay is exact.
+    const near=arrivalNear(this.host);
     const probe=()=>{
       this.current(op);if(!this.authority(op))throw new LifecycleDeferred('Current admission authority is unavailable');
       const row=this.host.db.soul(s.soulId);
       if(!row||row.retired_at!==null)throw new Error('Pending lifecycle birth lost its owned reservation');
       if(this.host.minds.has(s.soulId)||this.host.mindByEntity.has(s.entityId)||this.host.kernel.things[s.soulId]||this.host.kernel.decks[s.soulId])throw new Error('Pending lifecycle birth already owns canonical Mind/kernel identity');
-      return probeNativeHumanBirth(this.host.engine,this.host.factory,{id:s.entityId,label:op.name,soul:s.soulId});
+      return probeNativeHumanBirth(this.host.engine,this.host.factory,{id:s.entityId,label:op.name,soul:s.soulId,...(near?{near}:{})});
     };
     const preview=probe();
     if(preview.outcome==='deferred')return;
@@ -130,8 +138,8 @@ export class LifecycleRunner {
     // A changed placement remains pending; it is reclassified only by pump's
     // exact ordinary-unavailable path, never an arbitrary exception handler.
     const guard=()=>{const p=probe();if(p.outcome!=='ready')throw new LifecycleDeferred('Native admission changed');return true as const;};
-    const payload={soulId:s.soulId,entityId:s.entityId,owner:s.owner,name:op.name,description:op.description};
-    this.queue(op,this.host.enqueueChecked('birth',op.native?'world':`soul:${s.soulId}`,payload,guard,e=>this.journal.linkAccepted(s,op.requestId,e,guard)));
+    const payload={soulId:s.soulId,entityId:s.entityId,owner:s.owner,name:op.name,description:op.description,...(near?{near}:{})};
+    this.queue(op,this.host.enqueueChecked('birth',op.native?'world':`soul:${s.soulId}`,payload,guard,e=>this.journal.linkAccepted(s,op.requestId,e,guard,near)));
   }
   ownerPage(owner:string,cursor:string|null=null,associated:readonly string[]=[]){
     const page=this.journal.ownerPage(this.host.worldId,owner,cursor,associated);
