@@ -68,7 +68,9 @@ test('checked-in records validate: only world-scoped keys, own rights, live-rele
   assert.equal(manifestAsset(client, '/browser/campus.glb?v=20260922b', 'https://sim.eden.art/w/mars')?.bytes, 70772556);
   assert.equal(manifestAsset(client, '/browser/campus.glb?v=20260922b', 'https://sim.eden.art/w/eden'), undefined);
   assert.equal(manifestAsset(client, '/world-assets/littlemartians/characters/kin/chebel.glb', 'https://sim.eden.art/w/littlemartians')?.licence, LICENCE);
-  assert.equal(manifestAsset(client, '/world-assets/littlemartians/characters/kin/chebel.glb', 'https://sim.eden.art/w/eden'), undefined);
+  // Since CDN2's rule (Gene, 2026-10-20) the same file is also a shared served-public object; another world's page gets that one,
+  // never the world-scoped publication.
+  assert.notEqual(manifestAsset(client, '/world-assets/littlemartians/characters/kin/chebel.glb', 'https://sim.eden.art/w/eden')?.licence, LICENCE);
 });
 
 test('records refuse open-licence relabelling, unreviewed worlds and mismatched paths', () => {
