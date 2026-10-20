@@ -1,6 +1,6 @@
 {
   "schema": "catalog-conformance-supplement/1",
-  "note": "Tranche 2026-10-20 lane Z2 (catalogue repairs). Exact re-pins, reviewed against origin/main 62876c57c with the same --k 2 run (team/scratch/t4/z2/ef4/cmp.py): (1) 918 findings identical but for the def hash: 145 mesh defs now carry make.lod1 (a distant version; the EF4 budget stage still measures the unchanged near model) and the placement-fix revisions changed other hashes; (2) 42 gallery-budget findings on building-class kit defs are new or larger (e.g. core-hotel params.w.max 8438 -> 12454 triangles, cap 6000) because the salvaged placement fixes (ba0300658) resize authored room layouts with the building instead of clipping them (building-plan.ts) and raise minimum sizes, which also moves the seeded random samples; 9 of these points were refused placements on main. In exchange 71 placement findings (place/architecture, place/architecture.sealed) are gone and 71 more samples place; core-mine-cart construction view drops 9 -> 5 draws. No qualification gaps changed.",
+  "note": "Tranche 2026-10-20 lane Z2 (catalogue repairs). Exact re-pins, reviewed against origin/main 62876c57c with the same --k 2 run (team/scratch/t4/z2/ef4/cmp.py): (1) 918 findings identical but for the def hash: 145 mesh defs now carry make.lod1 (a distant version; the EF4 budget stage still measures the unchanged near model) and the placement-fix revisions changed other hashes; (2) 42 gallery-budget findings on building-class kit defs are new or larger (e.g. core-hotel params.w.max 8438 -> 12454 triangles, cap 6000) because the salvaged placement fixes (ba0300658) resize authored room layouts with the building instead of clipping them (building-plan.ts) and raise minimum sizes, which also moves the seeded random samples; 9 of these points were refused placements on main. In exchange 71 placement findings (place/architecture, place/architecture.sealed) are gone and 71 more samples place; core-mine-cart construction view drops 9 -> 5 draws. No qualification gaps changed. Then (agent #4, same day): core-hall keeps w min 3, core-townhouse w min 5.2, core-shop d min 5 (bakery, clinic, post office inherit) and core-factory gets its own w min 5, so no stored Eden 2026 or godmode-lab building is out of range; re-pinned from a fresh --k 2 run (team/scratch/t4/z2/ef4/head2.json, repin.py): only core-townhouse's two findings re-hash, same details.",
   "findings": [
     {
       "def": "core-apartment-block@1",
@@ -3101,7 +3101,7 @@
     },
     {
       "def": "core-townhouse@1",
-      "hash": "eedc36c2d37fdeb3607cd9959ffecfa8c2240ab1ba5a0527882a6d313f5af2fa",
+      "hash": "39b5e57f1e2b874ddfc16163822f71ea7595ea4bcd5657583a5266f1330770dc",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "6618 > 6000",
@@ -3111,7 +3111,7 @@
     },
     {
       "def": "core-townhouse@1",
-      "hash": "eedc36c2d37fdeb3607cd9959ffecfa8c2240ab1ba5a0527882a6d313f5af2fa",
+      "hash": "39b5e57f1e2b874ddfc16163822f71ea7595ea4bcd5657583a5266f1330770dc",
       "stage": "gallery-budget",
       "code": "triangles",
       "detail": "7166 > 6000",
