@@ -73,3 +73,16 @@ test('the restore rehearsal reads the latest snapshot read-only beside a live wr
   assert.throws(() => statSync(join(path, '..', 'missing.db')), 'a missing database is not created');
   writer.close();
 });
+
+test('the boot grids wait in a file beside the database, read once and removed (lane t4-mem)', async () => {
+  const { mkdtempSync, readdirSync } = await import('node:fs'), { tmpdir } = await import('node:os'), { join } = await import('node:path');
+  const { bootGridFile } = await import('./standby.ts');
+  const dir = mkdtempSync(join(tmpdir(), 'standby-grids-')), f = bootGridFile(dir);
+  f.put('0', [new Uint8Array([1, 2, 3]), new Uint8Array([4])]);
+  assert.deepEqual(readdirSync(dir), ['.standby-grids-0.bin']);
+  assert.deepEqual([...f.take('0')!], [1, 2, 3, 4]);
+  assert.deepEqual(readdirSync(dir), [], 'removed once read');
+  assert.equal(f.take('0'), null);
+  f.put('1', [new Uint8Array(8)]); f.drop('1');
+  assert.deepEqual(readdirSync(dir), []);
+});

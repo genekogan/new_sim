@@ -32,6 +32,7 @@ export type LevelGrid = {
 };
 
 export type GridSet = { cell: number; levels: Map<number, LevelGrid> };
+type PackedBlockers = { cells: Uint16Array | Int32Array; ids: string[]; count: number };
 
 /**
  * LevelGrid.blockers as a dense per-cell table: a Map<number, string> whose entries live in an
@@ -65,6 +66,23 @@ export class BlockerMap extends Map<number, string> {
     let bytes = this.cells.byteLength + this.ids.length * 8 + this.index.size * 72;
     for (const id of this.ids) bytes += id.length * 2;
     return bytes;
+  }
+
+  /** (boot keep, lane t4-mem) The cell table as index + 1 in 16 bits when the id table allows (0: no blocker), else as
+   *  is; with the id table and count, BlockerMap.unpack rebuilds an equal map. */
+  pack(): PackedBlockers {
+    if (this.ids.length >= 0xffff) return { cells: this.cells, ids: this.ids, count: this.count };
+    const cells = new Uint16Array(this.cells.length);
+    for (let i = 0; i < cells.length; i++) cells[i] = this.cells[i] + 1;
+    return { cells, ids: this.ids, count: this.count };
+  }
+
+  static unpack(p: PackedBlockers): BlockerMap {
+    const m = new BlockerMap(0), n = p.cells.length;
+    if (p.cells instanceof Uint16Array) { m.cells = new Int32Array(n); for (let i = 0; i < n; i++) m.cells[i] = p.cells[i] - 1; }
+    else m.cells = p.cells.slice();
+    m.ids = p.ids; m.index = new Map(p.ids.map((id, k) => [id, k])); m.count = p.count;
+    return m;
   }
 
   override get size(): number {
@@ -256,13 +274,98 @@ export function withStaticGridReadCache<T>(read: () => T): T {
  *  exact-geometry key as the read cache, instead of rebuilding them in its first tick (~0.8 s of /w/eden's pause on a
  *  laptop). Each kept set is handed out once (its owner is the boot's engine from then on; the rehearsed engine never
  *  ticked); a different scene builds as before, and after BOOT_GRID_TRIES builds without a match the rest are dropped. */
-const bootGrids = new Map<string, GridSet>(), BOOT_GRID_TRIES = 4;
-let keepingForBoot = false, bootGridMisses = 0;
-export function keepStaticGridsForBoot(build: () => void): number {
-  keepingForBoot = true;
+const bootGrids = new Map<string, PackedGrids>(), BOOT_GRID_TRIES = 4;
+let keepingForBoot = false, bootGridMisses = 0, bootStore: BootGridStore | null = null, bootNames = 0;
+/** Where a standby keeps its packed boot grids until the go: a file beside the world's database (apps/server/src/standby.ts),
+ *  so the standby process does not hold them while the world's running process still serves. `take` reads and removes it. */
+export type BootGridStore = { put(name: string, parts: Uint8Array[]): void; take(name: string): Uint8Array | null; drop(name: string): void };
+export function keepStaticGridsForBoot(build: () => void, store?: BootGridStore): number {
+  dropBootGrids();
+  keepingForBoot = true; bootStore = store ?? null;
   try { build(); } finally { keepingForBoot = false; }
   bootGridMisses = 0;
   return bootGrids.size;
+}
+function dropBootGrids() { for (const p of bootGrids.values()) if (p.file) bootStore?.drop(p.file.name); bootGrids.clear(); }
+
+/** (lane t4-mem) A kept set waits packed: clearance as the squared cell distance of its EDT in 16 bits (every cell checked
+ *  against the exact metres it expands to; free is then clearance > 0), blockers as 16-bit indices, no column pass (it is
+ *  recomputed when first needed: columnsFor). Eden: 272 MB as built, 67 MB packed, and that in a file when a store is given. */
+type Part = Uint8Array | Uint16Array | Int32Array | Float32Array;
+type PackedLevel = { base: Omit<LevelGrid, 'free' | 'clearance' | 'blockers'>; columns: boolean;
+  q?: number; table?: Float32Array; clearance?: number; free?: number; blockers: { cells: number; ids: string[]; count: number } | Map<number, string> };
+type PackedGrids = { cell: number; levels: [number, PackedLevel][]; parts: Part[] | null; file: { name: string; layout: [Kind, number, number][]; bytes: number; nonce: Float64Array } | null };
+type Kind = 'u8' | 'u16' | 'i32' | 'f32';
+const KINDS = { u8: Uint8Array, u16: Uint16Array, i32: Int32Array, f32: Float32Array };
+const kindOf = (x: Part): Kind => (x instanceof Uint16Array ? 'u16' : x instanceof Int32Array ? 'i32' : x instanceof Float32Array ? 'f32' : 'u8');
+
+function packLevel(g: LevelGrid, parts: Part[]): PackedLevel {
+  const { free, clearance, blockers, ...base } = g, n = free.length, half = g.cell / 2;
+  let packedBlockers: PackedLevel['blockers'] = blockers;
+  if (blockers instanceof BlockerMap) { const b = blockers.pack(); packedBlockers = { cells: parts.push(b.cells) - 1, ids: b.ids, count: b.count }; }
+  const p: PackedLevel = { base, columns: COLUMNS.has(g), blockers: packedBlockers };
+  const q = new Uint16Array(n);
+  let max = 0, fits = true;
+  for (let i = 0; i < n && fits; i++) {
+    const c = clearance[i];
+    if (c === 0) continue;
+    const r = (c + half) / g.cell, d = Math.round(r * r);
+    if (d < 1 || d > 0xffff) fits = false; else { q[i] = d; if (d > max) max = d; }
+  }
+  const table = new Float32Array(max + 1);
+  for (let d = 1; d <= max; d++) table[d] = Math.max(0, Math.sqrt(d) * g.cell - half);   // edtRows' exact expression
+  for (let i = 0; i < n && fits; i++) if (table[q[i]] !== clearance[i] || free[i] !== (q[i] ? 1 : 0)) fits = false;
+  if (fits) { p.q = parts.push(q) - 1; p.table = table; }
+  else { p.clearance = parts.push(clearance) - 1; p.free = parts.push(free) - 1; }
+  return p;
+}
+function unpackLevel(p: PackedLevel, part: (k: number) => Part, owned: boolean): LevelGrid {
+  const n = p.base.nx * p.base.nz;
+  let free: Uint8Array, clearance: Float32Array;
+  if (p.q !== undefined) {
+    const q = part(p.q) as Uint16Array, t = p.table!;
+    free = new Uint8Array(n); clearance = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const d = q[i]; if (d) { free[i] = 1; clearance[i] = t[d]; } }
+  } else {
+    clearance = part(p.clearance!) as Float32Array; free = part(p.free!) as Uint8Array;
+    if (!owned) { clearance = clearance.slice(); free = free.slice(); }
+  }
+  const b = p.blockers, blockers = b instanceof Map ? b : BlockerMap.unpack({ cells: part(b.cells) as Uint16Array | Int32Array, ids: b.ids, count: b.count });
+  const g: LevelGrid = { ...p.base, free, clearance, blockers };
+  if (p.columns) LAZY_COLUMNS.add(g);
+  return g;
+}
+function packGrids(grids: GridSet): PackedGrids {
+  const parts: Part[] = [], levels: [number, PackedLevel][] = [];
+  for (const [id, g] of grids.levels) levels.push([id, packLevel(g, parts)]);
+  const packed: PackedGrids = { cell: grids.cell, levels, parts, file: null };
+  if (bootStore) {
+    // [nonce][part 0][part 1]…, each on an 8-byte boundary so every part reads back as a typed view of the one buffer
+    const nonce = new Float64Array([Math.random(), Date.now()]), bytes: Uint8Array[] = [new Uint8Array(nonce.buffer)], layout: [Kind, number, number][] = [];
+    let at = 16;
+    for (const x of parts) {
+      layout.push([kindOf(x), at, x.length]); bytes.push(new Uint8Array(x.buffer, x.byteOffset, x.byteLength));
+      const pad = (8 - (x.byteLength % 8)) % 8; if (pad) bytes.push(new Uint8Array(pad));
+      at += x.byteLength + pad;
+    }
+    const name = String(bootNames++);
+    try { bootStore.put(name, bytes); packed.file = { name, layout, bytes: at, nonce }; packed.parts = null; } catch { bootStore.drop(name); /* no room on disk: they wait here */ }
+  }
+  return packed;
+}
+function unpackGrids(p: PackedGrids): GridSet | null {
+  let part: (k: number) => Part = (k) => p.parts![k], owned = true;
+  if (p.file) {
+    const f = p.file, read = bootStore?.take(f.name);
+    if (!read || read.byteLength !== f.bytes) return null;
+    const b = read.byteOffset % 8 ? read.slice() : read, head = new Float64Array(b.buffer, b.byteOffset, 2);
+    if (head[0] !== f.nonce[0] || head[1] !== f.nonce[1]) return null;   // not the file this process wrote
+    part = (k) => { const [kind, at, length] = f.layout[k]; return new KINDS[kind](b.buffer as ArrayBuffer, b.byteOffset + at, length); };
+    owned = false;
+  }
+  const levels = new Map<number, LevelGrid>();
+  for (const [id, l] of p.levels) levels.set(id, unpackLevel(l, part, owned));
+  return { cell: p.cell, levels };
 }
 function detachedGrids(grids: GridSet): GridSet {
   const levels = new Map<number, LevelGrid>();
@@ -289,14 +392,14 @@ function gridStorageBytes(grids: GridSet): number {
 export function buildStaticGrids(scene: SpatialScene, cell = 0.1, prefix?: StaticRaster, keepColumns = false): GridSet {
   if (keepingForBoot) {
     const key = hashOf({ format: 'static-grid-read/1', scene, cell, keepColumns, step: STEP, bodyHeight: BODY_HEIGHT }), grids = buildGrids(scene, cell, prefix, keepColumns);
-    bootGrids.set(key, grids);   // not copied: the rehearsed engine that asked for them is thrown away unticked
+    bootGrids.set(key, packGrids(grids));   // the rehearsed engine that asked for them is thrown away unticked
     return grids;
   }
   if (!staticGridReadDepth) {
     if (bootGrids.size) {
       const key = hashOf({ format: 'static-grid-read/1', scene, cell, keepColumns, step: STEP, bodyHeight: BODY_HEIGHT }), kept = bootGrids.get(key);
-      if (kept) { bootGrids.delete(key); return kept; }
-      if (++bootGridMisses >= BOOT_GRID_TRIES) bootGrids.clear();
+      if (kept) { bootGrids.delete(key); const grids = unpackGrids(kept); if (grids) return grids; }
+      else if (++bootGridMisses >= BOOT_GRID_TRIES) dropBootGrids();
     }
     return buildGrids(scene, cell, prefix, keepColumns);
   }
@@ -363,6 +466,13 @@ function stampLevel(scene: SpatialScene, lv: Level, cell: number, lat: Lattice, 
 
 /** Column pass (squared vertical distance to the nearest blocked cell) of each LevelGrid built with `keepColumns`. */
 const COLUMNS = new WeakMap<LevelGrid, Float64Array>();
+/** Grids handed over from a standby's kept set (packed without their column pass): it is recomputed on first use. */
+const LAZY_COLUMNS = new WeakSet<LevelGrid>();
+function columnsFor(g: LevelGrid): Float64Array | undefined {
+  let cols = COLUMNS.get(g);
+  if (!cols && LAZY_COLUMNS.has(g)) { cols = columnsOf(g.free, g.nx, g.nz); COLUMNS.set(g, cols); LAZY_COLUMNS.delete(g); }
+  return cols;
+}
 
 /** Grid-relevant identity of an obstacle / surface (what the raster reads). */
 const obstacleKey = (o: Obstacle) => `${o.id}|${o.obb.c[0]},${o.obb.c[1]},${o.obb.half[0]},${o.obb.half[1]},${o.obb.yaw}|${o.y0},${o.y1}`;
@@ -421,7 +531,7 @@ export function updateGrids(prev: GridSet, prevScene: SpatialScene, scene: Spati
       for (let j = j0; j <= j1; j++)
         for (let i = i0, c = j * nx + i0; i <= i1; i++, c++)
           if (free[c] !== old.free[c]) { if (i < ci0) ci0 = i; if (i > ci1) ci1 = i; if (j < cj0) cj0 = j; if (j > cj1) cj1 = j; }
-    const cols = COLUMNS.get(old) ?? columnsOf(old.free, nx, nz);
+    const cols = columnsFor(old) ?? columnsOf(old.free, nx, nz);
     const g: LevelGrid = { ...old, free, blockers };
     if (ci1 >= 0) {
       const patched = patchClearance(old, free, cols, [ci0, ci1, cj0, cj1]);
@@ -512,7 +622,7 @@ export function gridsWithObstacles(base: GridSet, extra: Obstacle[]): GridSet {
       }, true);
     }
     if (!free) { levels.set(id, g); continue; }
-    const cols = COLUMNS.get(g);
+    const cols = columnsFor(g);
     const clearance = cols ? patchClearance(g, free, cols, [ci0, ci1, cj0, cj1]).clearance : edt(free, g.nx, g.nz, g.cell);
     levels.set(id, { ...g, free, blockers, clearance });
   }
