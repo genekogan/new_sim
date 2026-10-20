@@ -2,15 +2,17 @@
 // Strikes come from the world (packages/world-compiler lightning.ts: the storm's own, deterministic from the world tick,
 // and the god's `weather.strike`), so the server tells the Souls about the very bolts drawn here. Each strike draws a
 // jagged bolt from the cloud base to the ground with a few branches, flickers for a third of a second, lights the scene
-// (a cold point light at the strike and a sky-wide flash), and plays thunder after distance / 343 m/s: a sharp crack when
+// (a cold point light at the strike, shared by every bolt, and a sky-wide flash), and plays thunder after distance / 343 m/s: a sharp crack when
 // it is close, a long low rumble when it is far (WebAudio, synthesised; the browser lets it sound after the first click
 // or key). Presentation only; nothing here is authoritative.
 import * as THREE from 'three';
 import { strikesBetween, SOUND_MPS, type Strike } from '@sim/world-compiler';
+import { warmSceneChange } from './gen-mesh/texture-budget.ts';
+import { arrivalMark, arrivalOver } from './arrival-marks.ts';
 
 type ModelLike = { state: unknown; seed: string; ground(): { extent: readonly number[] } };
 type LayerLike = { active: boolean; groundAt(x: number, z: number): number | null };
-type Bolt = { group: THREE.Group; light: THREE.PointLight; born: number; seed: number; power: number };
+type Bolt = { group: THREE.Group; x: number; y: number; z: number; born: number; seed: number; power: number };
 type Heard = { tick: number; x: number; z: number; god: boolean; dist: number; delay: number; gain: number; at: number; sound: 'scheduled' | 'locked' | 'muted' };
 
 const CLOUD_BASE = 230;          // m above the ground where a bolt leaves the cloud
@@ -22,6 +24,15 @@ export class WorldLightning {
   private lastTick = -1;
   private bolts: Bolt[] = [];
   private flash = new THREE.HemisphereLight(0xdfe7ff, 0x3a4060, 0);
+  /** B2 (3.34 phone stall): ONE point light for every bolt, in the scene from the time its programs are linked (warmed)
+   *  while a storm is on, and only lit by bolts. A point light that comes and goes with each bolt changes every lit
+   *  material's shader: the first strike linked ~16 programs one by one on the frame that drew it (live Eden 2026; a
+   *  real phone stalls on each link, and on a busy laptop one link took 25-80 s), and two bolts at once linked a third
+   *  set. Until it is warmed, a bolt lights the scene with the flash only. */
+  private light = new THREE.PointLight(0xcfd9ff, 0, 900, 1.4);
+  private lightState: 'off' | 'queued' | 'warming' | 'on' = 'off';
+  private warmAt = 0;               // performance.now() ms after which the warm may start (2 s past the arrival, then idle time)
+  private lightWanted = 0;          // performance.now() ms until which the light stays in the scene (storm, or a recent bolt)
   private flashLevel = 0;
   private audio: AudioContext | null = null;
   private noise: AudioBuffer | null = null;
@@ -46,6 +57,7 @@ export class WorldLightning {
   update(tick: number, camera: THREE.Camera, dt: number, reducedMotion = false) {
     const m = this.model();
     if (!this.layer.active || !m || !Number.isFinite(tick)) return;
+    this.keepLight(m);
     // first frame, a jump (replay, resync) or time running back: start from here, no backlog of old strikes
     if (this.lastTick < 0 || tick < this.lastTick || tick - this.lastTick > 400) this.lastTick = tick;
     else if (tick > this.lastTick) {
@@ -54,15 +66,17 @@ export class WorldLightning {
       for (const s of list) this.fire(s, camera, reducedMotion);
     }
     const now = performance.now() / 1000;
+    let lightNow = 0;
     for (const b of [...this.bolts]) {
       const held = performance.now() < this.holdUntil, age = held ? 0.01 : now - b.born;
-      if (age > BOLT_LIFE) { this.group.remove(b.group); this.group.remove(b.light); b.group.traverse((o) => (o as THREE.Mesh).geometry?.dispose()); b.light.dispose(); this.bolts.splice(this.bolts.indexOf(b), 1); continue; }
+      if (age > BOLT_LIFE) { this.group.remove(b.group); b.group.traverse((o) => (o as THREE.Mesh).geometry?.dispose()); this.bolts.splice(this.bolts.indexOf(b), 1); continue; }
       // the return strokes: bright, dim, bright again, fading
       const k = reducedMotion ? 1 - age / BOLT_LIFE : (age < 0.07 ? 1 : age < 0.12 ? 0.25 : age < 0.2 ? 0.95 : age < 0.26 ? 0.2 : 0.7) * (1 - age / BOLT_LIFE);
       b.group.visible = k > 0.05;
       b.group.children.forEach((c, i) => { ((c as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = (i % 2 ? 0.22 : 1) * Math.min(1, k * 1.3); });
-      b.light.intensity = 600 * b.power * k;
+      const lit = 600 * b.power * k; if (lit >= lightNow) { lightNow = lit; this.light.position.set(b.x, b.y, b.z); }
     }
+    this.light.intensity = lightNow;
     this.flashLevel = performance.now() < this.holdUntil ? 0.9 : Math.max(0, this.flashLevel - dt * 5.5);
     this.flash.intensity = Math.min(0.7, this.flashLevel * 0.35) * (reducedMotion ? 0.5 : 1);
   }
@@ -93,9 +107,9 @@ export class WorldLightning {
       for (let i = 1; i <= 7; i++) bp.push(from.clone().addScaledVector(dir, (len * i) / 7).add(new THREE.Vector3((r() - 0.5) * 7, (r() - 0.5) * 2, (r() - 0.5) * 7)));
       strand(bp, 0.18);
     }
-    const light = new THREE.PointLight(0xcfd9ff, 0, 900, 1.4); light.position.set(s.x, gy + 30, s.z);
-    this.group.add(bolt); this.group.add(light);
-    this.bolts.push({ group: bolt, light, born: performance.now() / 1000, seed: s.tick, power: s.power });
+    this.group.add(bolt);
+    this.bolts.push({ group: bolt, x: s.x, y: gy + 30, z: s.z, born: performance.now() / 1000, seed: s.tick, power: s.power });
+    this.lightWanted = Math.max(this.lightWanted, performance.now() + 60_000);
     this.flashLevel = Math.min(2, this.flashLevel + 1.6 * s.power);
     // thunder: after the distance at the speed of sound, louder and sharper the nearer
     const cam = camera.position, dist = Math.hypot(cam.x - s.x, cam.y - gy, cam.z - s.z), delay = dist / SOUND_MPS;
@@ -145,11 +159,41 @@ export class WorldLightning {
     return true;
   }
 
-  inspect() { return { bolts: this.bolts.length, heard: this.heard.length, last: this.heard.slice(-6), audio: this.audio?.state ?? 'locked', flash: Math.round(this.flashLevel * 100) / 100 }; }
+  /** The shared bolt light: wanted while the world's weather is a storm (or a minute after any bolt, e.g. a god's strike in
+   *  fair weather). Its programs are linked in parallel first (warmSceneChange: the scene compiled with the light and a bolt
+   *  in it, both taken out again before the next frame), only 2 s after the arrival and in idle time, so it never competes with the arrival's frames.
+   *  It leaves a minute after the storm and the last bolt; the programs without it are still cached then. */
+  private keepLight(m: ModelLike) {
+    const now = performance.now(), w = (m.state as { weather?: { kind?: string } } | null)?.weather;
+    if (w?.kind === 'storm') this.lightWanted = Math.max(this.lightWanted, now + 60_000);
+    const want = now < this.lightWanted;
+    if (want && this.lightState === 'off' && arrivalOver()) {
+      // the warm's whole-scene compile is a ~300 ms frame on a 4x-throttled phone: not on the arrival's frames, in idle time
+      if (!this.warmAt) this.warmAt = now + 2000;
+      if (now < this.warmAt) return;
+      this.lightState = 'queued';
+      const idle = (window as { requestIdleCallback?: (fn: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+      if (idle) idle(() => this.warmLight(), { timeout: 1500 }); else setTimeout(() => this.warmLight(), 0);
+    } else if (!want && this.lightState === 'on' && !this.bolts.length) { this.group.remove(this.light); this.lightState = 'off'; }
+  }
+
+  private warmLight() {
+    if (this.lightState !== 'queued') return;
+    this.lightState = 'warming'; arrivalMark('bolt-light-warming');
+    const probe = new THREE.Group(), box = new THREE.BoxGeometry(0.01, 0.01, 0.01);
+    probe.add(new THREE.Mesh(box, this.core), new THREE.Mesh(box, this.glow)); probe.position.set(0, -1e4, 0);
+    void warmSceneChange(() => { this.group.add(this.light, probe); }, () => { this.group.remove(this.light, probe); }).then(() => {
+      box.dispose(); if (this.lightState !== 'warming') return;
+      this.lightState = 'on'; this.light.intensity = 0; this.group.add(this.light); arrivalMark('bolt-light-on');
+    });
+  }
+
+  inspect() { return { light: this.lightState, bolts: this.bolts.length, heard: this.heard.length, last: this.heard.slice(-6), audio: this.audio?.state ?? 'locked', flash: Math.round(this.flashLevel * 100) / 100 }; }
 
   dispose() {
     for (const ev of ['pointerdown', 'keydown', 'touchstart']) removeEventListener(ev, this.unlock);
-    for (const b of this.bolts) { b.group.traverse((o) => (o as THREE.Mesh).geometry?.dispose()); b.light.dispose(); }
+    for (const b of this.bolts) b.group.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
+    this.lightState = 'off'; this.light.dispose();
     this.bolts = []; this.group.clear(); this.core.dispose(); this.glow.dispose();
     void this.audio?.close().catch(() => {}); this.audio = null;
   }

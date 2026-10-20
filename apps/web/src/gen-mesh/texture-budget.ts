@@ -148,3 +148,15 @@ export function compileSceneAsync(r: THREE.WebGLRenderer, scene: THREE.Object3D,
   try { mats = r.compile(scene, camera); } catch { return Promise.resolve(); }
   return waitForPrograms(r, mats instanceof Set ? mats as Set<object> : new Set(), () => true, timeoutMs);
 }
+
+/** Link, in parallel, the programs a change to the scene will need before any frame draws it: `add` puts the change in
+ *  (e.g. a light, which changes the program of every lit material), the whole scene is compiled against it, `remove` takes
+ *  it out again at once, and the promise resolves once those programs have linked (or at `timeoutMs`). Adding it for real
+ *  afterwards then links nothing on the frame. True when warmed; false without a renderer (nothing compiled). */
+export function warmSceneChange(add: () => void, remove: () => void, timeoutMs = 10_000): Promise<boolean> {
+  const r = renderer, s = scene, c = camera; if (!r || !s || !c) return Promise.resolve(false);
+  let mats: unknown = null;
+  add(); try { mats = r.compile(s, c); } catch { /* compiled on first draw instead */ } finally { remove(); }
+  if (!(mats instanceof Set)) return Promise.resolve(false);
+  return waitForPrograms(r, mats as Set<object>, () => renderer === r, timeoutMs).then(() => true);
+}
