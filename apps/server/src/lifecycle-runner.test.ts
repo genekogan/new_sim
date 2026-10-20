@@ -11,6 +11,7 @@ import { LifecycleRunner,projectLifecycle,lifecycleBodyReady } from './lifecycle
 import type { WorldState as NativeWorldState } from '../../../mars/viewer/engine/world/types.ts';
 import { fixture,settle,factory,seed,worldId,scope,requestId,retireId,input } from '../test/lifecycle-native-fixture.ts';
 const nativeWorld=(host:WorldHost)=>host.engine.world as NativeWorldState;
+const r3=(n:number)=>Math.round(n*1000)/1000;
 
 test('actual native producer admits one human-owned body/kernel/Mind and publishes fresh strict private readiness',async t=>{
   const f=fixture();t.after(()=>f.db.close());const op=f.journal.acceptCreate(scope,requestId,input,()=>true);
@@ -24,8 +25,11 @@ test('actual native producer admits one human-owned body/kernel/Mind and publish
   assert.equal(restart.engine.stateHash(),f.host.engine.stateHash());assert.equal(kernelHash(restart.kernel),kernelHash(f.host.kernel));assert.equal(f.db.paidCost(),0);
 });
 
+// arrival-search/1 (lane ARR): refused only when the world has no standing ground at all. The engine's search answers
+// null then (arrival-search.test.ts covers the geometry); here the search is held to null on an arrival off the ground.
 test('actual native unavailable arrival creates no birth, releases reservation and preserves tick/restart liveness',async t=>{
   const bad=await marsFactory({...GREEN_FIELD_WORLD,safeCrewRemoval:true,arrival:[500,500],reference:[501,500]});const f=fixture(':memory:',bad);t.after(()=>f.db.close());
+  (f.host.engine as unknown as {arrivalSearchV1():null}).arrivalSearchV1=()=>null;
   f.journal.acceptCreate(scope,requestId,input,()=>true);await settle(f);const op=f.journal.get(scope,requestId)!;
   assert.equal(op.state,'refused');assert.equal(f.runner.faults.size,0);assert.equal(projectLifecycle(f.host,op).reason,'arrival-unavailable');
   assert.equal(f.db.events(worldId).some(e=>e.kind==='birth'),false);assert.equal(f.db.soulsOf('owner').length,0);assert.equal(f.db.soulByName(worldId,'alice'),undefined);
@@ -144,7 +148,32 @@ test('a built-over arrival point admits the approved Soul on the nearest clear g
   assert.equal(op.state,'complete',`state ${op.state}: ${projectLifecycle(f.host,op).reason}`);assert.equal(f.runner.faults.size,0);
   assert.equal(lifecycleBodyReady(f.host,op),true);
   const body=f.host.engine.world.entities.h_A!;assert.ok(Math.hypot(body.pose.p[0]-9,body.pose.p[2]+1.8)<=12,'landed near the arrival point');
-  const birth=f.db.events(worldId).find(e=>e.kind==='birth')!;assert.deepEqual(birth.payload.near,{at:[9,-1.8]});
+  const birth=f.db.events(worldId).find(e=>e.kind==='birth')!;assert.deepEqual(birth.payload.near,{at:[r3(body.pose.p[0]),r3(body.pose.p[2])],first:true},'arrival-search/1 records the exact spot');
   const restart=new WorldHost(f.db,built,seed,1e9,worldId);restart.boot();assert.equal(lifecycleBodyReady(restart,op),true);
   assert.equal(restart.engine.stateHash(),f.host.engine.stateHash());assert.equal(kernelHash(restart.kernel),kernelHash(f.host.kernel));
+});
+
+// arrival-search/1 (lane ARR, Gene 2026-10-20: "find a place for them to go and not have spurious refusals").
+test('an arrival point off the world\'s ground admits the Soul on the nearest ground of the world, exactly on replay',async t=>{
+  const off=await marsFactory({...GREEN_FIELD_WORLD,safeCrewRemoval:true,arrival:[500,500],reference:[501,500]});const f=fixture(':memory:',off);t.after(()=>f.db.close());
+  f.journal.acceptCreate(scope,requestId,input,()=>true);await settle(f);const op=f.journal.get(scope,requestId)!;
+  assert.equal(op.state,'complete',`state ${op.state}: ${projectLifecycle(f.host,op).reason}`);assert.equal(f.runner.faults.size,0);
+  const body=f.host.engine.world.entities.h_A!,birth=f.db.events(worldId).find(e=>e.kind==='birth')!;
+  assert.deepEqual(birth.payload.near,{at:[r3(body.pose.p[0]),r3(body.pose.p[2])],first:true});
+  const restart=new WorldHost(f.db,off,seed,1e9,worldId);restart.boot();assert.equal(lifecycleBodyReady(restart,op),true);
+  assert.equal(restart.engine.stateHash(),f.host.engine.stateHash());assert.equal(kernelHash(restart.kernel),kernelHash(f.host.kernel));
+});
+test('a clear arrival point keeps the default placement: the birth carries no hint',async t=>{
+  const f=fixture(':memory:');t.after(()=>f.db.close());
+  f.journal.acceptCreate(scope,requestId,input,()=>true);await settle(f);const op=f.journal.get(scope,requestId)!;
+  assert.equal(op.state,'complete');const birth=f.db.events(worldId).find(e=>e.kind==='birth')!;assert.equal('near' in birth.payload,false);
+});
+test('old histories replay unchanged: a birth with lane PB\'s {at} hint (births without a hint: every replay test above)',async t=>{
+  const { EDEN_COMMONS_WORLD } = await import('@sim/engine-mars');
+  const built=await marsFactory({...EDEN_COMMONS_WORLD,safeCrewRemoval:true,arrival:[9,-1.8],reference:[10,-1.8]});
+  const f=fixture(':memory:',built);t.after(()=>f.db.close());
+  const a=f.host.enqueue('birth','scripted:legacy',{soulId:'s_old',entityId:'h_old',name:'Old',description:'pre-ARR birth with the PB hint',owner:'scripted:owner',near:{at:[9,-1.8]}});f.host.drainInputs();await a;
+  const restart=new WorldHost(f.db,built,seed,1e9,worldId);restart.boot();
+  assert.equal(restart.engine.stateHash(),f.host.engine.stateHash());
+  assert.deepEqual(restart.engine.world.entities.h_old?.pose.p,f.host.engine.world.entities.h_old?.pose.p);
 });

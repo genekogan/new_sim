@@ -40,7 +40,8 @@ const key = (i: number, j: number) => (i + OFF) * SPAN + (j + OFF);
 /** One search's view of the lattice anchored at `o` (lattice point (i, j) is o + (i, j) × 0.25 m). */
 class Lattice {
   private passCache = new Map<number, boolean>();
-  constructor(readonly g: ArrivalGround, readonly o: Vec2) {}
+  readonly g: ArrivalGround; readonly o: Vec2;
+  constructor(g: ArrivalGround, o: Vec2) { this.g = g; this.o = o; }
   at(i: number, j: number): Vec2 { return [r3(this.o[0] + i * S), r3(this.o[1] + j * S)]; }
   private inside(q: Vec2) { const [x0, z0, x1, z1] = this.g.bounds; return q[0] > x0 && q[0] < x1 && q[1] > z0 && q[1] < z1; }
   /** A body's disc is clear here and the ground is walkable, wadeable or swimmable: a flood may pass. */

@@ -54,14 +54,20 @@ test('ordinary invited owners create 24 actual Souls after a logged corrected co
   assert.throws(()=>new WorldHost(f.db,legacyReader,f.host.seed,1e9,f.host.worldId,{durableClockV1:true}).boot(),/incompatible/);
 });
 
-test('unsafe legacy commons HTTP admission refuses before birth, releases reservation and never faults the healthy standing population',async t=>{
+// arrival-search/1 (lane ARR, 2026-10-20). This test used to expect the 13th Soul refused: the legacy placer's six rings
+// round the commons arrival (<= 4.5 m) were full and its last candidate overlapped commons-bench-east, so the native
+// safety check refused it. That refusal guarded no capacity or anti-flood rule (the only real limit is maxSoulsPerUser,
+// 409 'too-many'), so the 13th is now born on the nearest open ground instead, recorded as birth-near/1 {at, first:true}.
+// The refusal path itself (no birth, reservation released, liveness) is lifecycle-runner.test.ts's unavailable test.
+test('a crowded legacy commons arrival admits the 13th Soul on the nearest open ground and never faults the standing population',async t=>{
   const factory=await marsFactory({...EDEN_COMMONS_WORLD,safeCrewRemoval:true}),f=fixture(':memory:',factory);t.after(()=>f.db.close());f.souls.enableLifecycle();
   for(let i=0;i<4;i++)await invite(f,'legacy'+i);
   for(let i=0;i<12;i++)await create(f,'legacy'+Math.floor(i/4),'Resident '+i);
-  const seq=f.host.seq,hash=f.host.engine.stateHash();
-  const response=await f.app.request('/v1/souls',{method:'POST',headers:{authorization:'Bearer dev:legacy3','content-type':'application/json','X-Sim-Lifecycle':'1'},body:JSON.stringify({name:'Thirteenth',description:'local'})});
-  assert.equal(response.status,409);const data=await response.json() as {lifecycle:{state:string;ready:boolean;soulId:string;entityId:string}};
-  assert.equal(data.lifecycle.state,'refused');assert.equal(data.lifecycle.ready,false);assert.equal(f.db.soulsOf('dev:legacy3').length,0);
-  assert.equal(f.host.seq,seq);assert.equal(f.host.engine.stateHash(),hash);assert.equal(f.host.engine.world.entities[data.lifecycle.entityId],undefined);
+  const before=f.db.events(f.host.worldId).filter(e=>e.kind==='birth');assert.equal(before.some(e=>'near' in e.payload),false,'the twelve keep the default placement');
+  const born=await create(f,'legacy3','Thirteenth'),body=f.host.engine.world.entities[born.entityId]!;
+  const birth=f.db.events(f.host.worldId).find(e=>e.kind==='birth'&&e.payload.soulId===born.soulId)!;
+  assert.equal(birth.payload.near?.first,true);assert.deepEqual(birth.payload.near.at,[Math.round(body.pose.p[0]*1000)/1000,Math.round(body.pose.p[2]*1000)/1000]);
+  const [ax,az]=EDEN_COMMONS_WORLD.arrival;assert.ok(Math.hypot(body.pose.p[0]-ax,body.pose.p[2]-az)<12,'nearby');
+  for(const e of Object.values(f.host.engine.world.entities))if(e.kind==='human'&&e.id!==body.id)assert.ok(Math.hypot(e.pose.p[0]-body.pose.p[0],e.pose.p[2]-body.pose.p[2])>=0.8);
   for(let i=0;i<20;i++)f.host.tickOnce();assert.deepEqual(f.host.engine.runtime.violations,[]);assert.equal(f.db.paidCost(),0);
 });
