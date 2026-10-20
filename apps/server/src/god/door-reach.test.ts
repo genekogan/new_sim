@@ -39,7 +39,7 @@ test('bench-hamlet: the cottage on the knoll is enterable from the arrival point
     await w.settle(4);
     const e = w.god.model.get('cottage')!;
     const start: Vec2 = onKnoll ? [0, 3.5] : [-30, -20];
-    const out: string[] = [label, `y=${e.p[1].toFixed(3)}`];
+    const out: string[] = [label, `y=${e.p?.[1]?.toFixed(3)}`];
     for (const room of ['cottage', 'cottage/living', 'cottage/bedroom', 'cottage/kitchen']) {
       const th = w.bridge.nav.thing(room);
       const goal = th ? w.bridge.nav.goal(th, start) : null;
@@ -49,6 +49,44 @@ test('bench-hamlet: the cottage on the knoll is enterable from the arrival point
     console.log(out.join(' '));
     w.act([{ op: 'remove', id: 'cottage' }]);
     await w.settle(2);
+  }
+});
+
+test('bench-hamlet: an old pad/1 cottage pad is re-cut at boot and the cottage becomes enterable', { timeout: 300_000 }, async (t) => {
+  const w = fixture(':memory:', factory, { durableClockV1: true });
+  w.brain.quiesce();
+  t.after(() => { w.brain.quiesce(); w.host.stop(); w.db.close(); });
+  const opts = { worldId: w.host.worldId, ownerId: 'owner', tick: () => w.host.engine.world.tick, emit() {} };
+  const first = new GodMode(w.db, opts);
+  const r = first.act({ ops: [
+    { op: 'place', def: coreRef('knoll'), name: 'knoll', p: [40, 10], params: { height: 4, radius: 22, peak: 1, edge: 8 } },
+    { op: 'place', def: coreRef('cottage'), name: 'cottage', p: [44, 10], r: -1.0685826404927201, params: COTTAGE },
+  ] }) as any;
+  assert.equal(r.accepted, true, JSON.stringify(r));
+  const id = first.model.get('cottage')!.id;
+  // what a world built before pad/2 stored: the same flat at the same level, a 1.5 m blend, no grade, no landings
+  const row = w.db.db.prepare('SELECT body FROM world_meta_v1 WHERE world_id=?').get(w.host.worldId) as { body: string };
+  const meta = JSON.parse(row.body);
+  const pad = meta.ground.landforms.find((l: any) => l.id === `${id}:pad`);
+  assert.ok(pad?.grade, 'a new placement gets a graded pad');
+  delete pad.grade; delete pad.aprons; pad.edge = 1.5;
+  w.db.db.prepare('UPDATE world_meta_v1 SET body=? WHERE world_id=?').run(JSON.stringify(meta), w.host.worldId);
+  const god = new GodMode(w.db, opts);
+  assert.deepEqual(god.regraded, [id]);
+  const after = god.model.ground().landforms.find((l) => l.id === `${id}:pad`) as any;
+  assert.equal(after.grade, 0.45); assert.ok(after.aprons?.length >= 1);
+  assert.equal(after.level, pad.level);
+  assert.deepEqual(god.model.get('cottage')!.p, first.model.get('cottage')!.p, 'the cottage stays where it stood');
+  assert.deepEqual(new GodMode(w.db, opts).regraded, [], 'a graded pad is left alone at the next boot');
+  new GroundHost(w.db, w.host, god);
+  const edge = new EdgeLedger(w.host, w.db), bridge = installEngineBridge({ host: w.host, god, edge, log() {}, worldClock: false, worldLore: false });
+  t.after(() => edge.comms?.close());
+  for (let i = 0; i < 6; i++) { w.host.tickOnce(); await setImmediate(); w.host.drainInputs(); }
+  const start: Vec2 = [0, 3.5];
+  for (const room of ['cottage', 'cottage/living', 'cottage/bedroom']) {
+    const th = bridge.nav.thing(room), goal = th ? bridge.nav.goal(th, start) : null;
+    const reach = goal ? (w.host.engine as any).reachV1({ p: start, level: 0 }, goal) : null;
+    assert.equal(reach?.ok, true, `${room}: ${goal ? reach?.code : 'no goal'}`);
   }
 });
 

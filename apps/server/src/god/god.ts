@@ -152,6 +152,26 @@ export class GodMode {
     this.onBuild(e => { if (e.kind === 'done') this.parts.onDone(e.id); });
     this.parts.backfill();
     if (!loaded && opts.genesis) this.applyGenesis(opts.genesis);
+    if (loaded) this.regraded = this.regradePads();
+  }
+  /** pad/2 at boot (lane RT): ids of standing buildings whose stored foundation pad was re-cut this boot. */
+  regraded: string[] = [];
+  /**
+   * pad/2 (lane RT, 2026-10-20): a foundation pad stored before pad/2 (no `grade`: a 1.5 m smoothstep blend that can cut an
+   * unwalkable bank across a door on a slope) is re-cut once, at boot, as a graded pad with door landings. It is a trusted
+   * engine self-move of the standing building to its own pose (compile.ts `move`: clear the old pad, re-admit the stored
+   * pose, padFor with grading), journaled by 'engine' like any other engine edit, so the new ground is a durable recorded
+   * fact (the GroundHost built next logs it as a new groundV1) and earlier history replays unchanged. Idempotent: a graded
+   * pad is never touched again. A refused move leaves that building as it was.
+   */
+  private regradePads(): string[] {
+    const ids = this.model.ground().landforms
+      .filter((lf) => lf.kind === 'pad' && (lf as { grade?: number }).grade === undefined && lf.id.endsWith(':pad'))
+      .map((lf) => lf.id.slice(0, -':pad'.length)).filter((id) => this.model.entities.has(id));
+    if (!ids.length) return [];
+    const note = 'pad/2: re-cut an old foundation pad as graded banks with door landings (lane RT)';
+    if (this.engineAct(ids.map((id): Op => ({ op: 'move', id, mode: 'strict' })), note).accepted) return ids;
+    return ids.filter((id) => this.engineAct([{ op: 'move', id, mode: 'strict' }], note).accepted);
   }
 
   // ---------- authority ----------
