@@ -72,70 +72,6 @@
       "reason": "Engine gap: tilted solar modules read flat (solar-panel 1.18x0.65 x8 + 1.18x1.02 x9, pinned 1.59x1.07 x10); plywood-4x8 89 (was 79, W51 re-seed).",
       "owner": "World / Core historical Mars construction owners (L3 reviewed 2026-10-17)",
       "exit": "§d engine solar frame (solar-frame-45-2x4 + install_panel; a tilted module now reads as a flat 1.18 m panel); then re-pin counts"
-    },
-    {
-      "step": "V3-packages",
-      "id": "world-compiler > 40 furnished library buildings + church replay: plan latency",
-      "status": "skip",
-      "reason": "Baseline-only (Z3, 2026-10-20): before Z3 this bench was a wall-clock timing test that skipped unless its env var (BUILD_BENCH / CLAIM_BENCH / PARTS_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH) was set. From Z3 on it counts work (@sim/world-compiler/work-meter), always runs and passes on a candidate that contains Z3; a baseline without Z3 still skips it, and every baseline skip needs an entry. Drop this entry once the live release (the gate baseline) contains Z3.",
-      "owner": "Godmode build/perf owners",
-      "exit": "drop this entry once the gate baseline (live) contains Z3"
-    },
-    {
-      "step": "V5-server-full",
-      "id": "bench: capabilities for 20 Souls, idle evacuation with 8 sites",
-      "status": "skip",
-      "reason": "Baseline-only (Z3, 2026-10-20): before Z3 this bench was a wall-clock timing test that skipped unless its env var (BUILD_BENCH / CLAIM_BENCH / PARTS_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH) was set. From Z3 on it counts work (@sim/world-compiler/work-meter), always runs and passes on a candidate that contains Z3; a baseline without Z3 still skips it, and every baseline skip needs an entry. Drop this entry once the live release (the gate baseline) contains Z3.",
-      "owner": "Godmode build/perf owners",
-      "exit": "drop this entry once the gate baseline (live) contains Z3"
-    },
-    {
-      "step": "V5-server-full",
-      "id": "bench: commitBatch 300 five-place batches with/without build plus 300 undos",
-      "status": "skip",
-      "reason": "Baseline-only (Z3, 2026-10-20): before Z3 this bench was a wall-clock timing test that skipped unless its env var (BUILD_BENCH / CLAIM_BENCH / PARTS_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH) was set. From Z3 on it counts work (@sim/world-compiler/work-meter), always runs and passes on a candidate that contains Z3; a baseline without Z3 still skips it, and every baseline skip needs an entry. Drop this entry once the live release (the gate baseline) contains Z3.",
-      "owner": "Godmode build/perf owners",
-      "exit": "drop this entry once the gate baseline (live) contains Z3"
-    },
-    {
-      "step": "V5-server-full",
-      "id": "bench: 300 five-place build commits with two live claims versus none; 200-upsert check",
-      "status": "skip",
-      "reason": "Baseline-only (Z3, 2026-10-20): before Z3 this bench was a wall-clock timing test that skipped unless its env var (BUILD_BENCH / CLAIM_BENCH / PARTS_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH) was set. From Z3 on it counts work (@sim/world-compiler/work-meter), always runs and passes on a candidate that contains Z3; a baseline without Z3 still skips it, and every baseline skip needs an entry. Drop this entry once the live release (the gate baseline) contains Z3.",
-      "owner": "Godmode build/perf owners",
-      "exit": "drop this entry once the gate baseline (live) contains Z3"
-    },
-    {
-      "step": "V5-server-full",
-      "id": "bench: onDone with 256 roots and 5000 entities stays below 20ms",
-      "status": "skip",
-      "reason": "Baseline-only (Z3, 2026-10-20): before Z3 this bench was a wall-clock timing test that skipped unless its env var (BUILD_BENCH / CLAIM_BENCH / PARTS_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH) was set. From Z3 on it counts work (@sim/world-compiler/work-meter), always runs and passes on a candidate that contains Z3; a baseline without Z3 still skips it, and every baseline skip needs an entry. Drop this entry once the live release (the gate baseline) contains Z3.",
-      "owner": "Godmode build/perf owners",
-      "exit": "drop this entry once the gate baseline (live) contains Z3"
-    },
-    {
-      "step": "V5-server-full",
-      "id": "bench: median act overhead with origins versus without origins is below 2%",
-      "status": "skip",
-      "reason": "Baseline-only (Z3, 2026-10-20): before Z3 this bench was a wall-clock timing test that skipped unless its env var (BUILD_BENCH / CLAIM_BENCH / PARTS_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH) was set. From Z3 on it counts work (@sim/world-compiler/work-meter), always runs and passes on a candidate that contains Z3; a baseline without Z3 still skips it, and every baseline skip needs an entry. Drop this entry once the live release (the gate baseline) contains Z3.",
-      "owner": "Godmode build/perf owners",
-      "exit": "drop this entry once the gate baseline (live) contains Z3"
-    },
-    {
-      "step": "V5-server-full",
-      "id": "bench: a real-engine walk-out of 16 residents among many entities",
-      "status": "skip",
-      "reason": "Baseline-only (Z3, 2026-10-20): before Z3 this bench was a wall-clock timing test that skipped unless its env var (BUILD_BENCH / CLAIM_BENCH / PARTS_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH) was set. From Z3 on it counts work (@sim/world-compiler/work-meter), always runs and passes on a candidate that contains Z3; a baseline without Z3 still skips it, and every baseline skip needs an entry. Drop this entry once the live release (the gate baseline) contains Z3.",
-      "owner": "Godmode build/perf owners",
-      "exit": "drop this entry once the gate baseline (live) contains Z3"
-    },
-    {
-      "step": "V5-server-full",
-      "id": "bench: walk-out planning for N residents among M entities stays fast",
-      "status": "skip",
-      "reason": "Baseline-only (Z3, 2026-10-20): before Z3 this bench was a wall-clock timing test that skipped unless its env var (BUILD_BENCH / CLAIM_BENCH / PARTS_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH) was set. From Z3 on it counts work (@sim/world-compiler/work-meter), always runs and passes on a candidate that contains Z3; a baseline without Z3 still skips it, and every baseline skip needs an entry. Drop this entry once the live release (the gate baseline) contains Z3.",
-      "owner": "Godmode build/perf owners",
-      "exit": "drop this entry once the gate baseline (live) contains Z3"
     }
   ],
   "scopeExclusions": [
@@ -168,6 +104,54 @@
       "at": "2026-10-20",
       "by": "Z3",
       "why": "Stale: those tests pass on every gate baseline since lane/d3c-yearbuild-20261017 landed, so the entries matched nothing (receipt team/scratch/t4/g5/gate/run-9131d053c)."
+    },
+    {
+      "entry": "V3-packages / world-compiler > 40 furnished library buildings + church replay: plan latency",
+      "at": "2026-10-20",
+      "by": "Z3",
+      "why": "Bench now counts work and always runs (Z3); the gate baseline (live 3.45 we-8f1d0b49daeb) contains Z3, so no baseline skips it any more and the baseline-only entry is dropped."
+    },
+    {
+      "entry": "V5-server-full / bench: capabilities for 20 Souls, idle evacuation with 8 sites",
+      "at": "2026-10-20",
+      "by": "Z3",
+      "why": "Bench now counts work and always runs (Z3); the gate baseline (live 3.45 we-8f1d0b49daeb) contains Z3, so no baseline skips it any more and the baseline-only entry is dropped."
+    },
+    {
+      "entry": "V5-server-full / bench: commitBatch 300 five-place batches with/without build plus 300 undos",
+      "at": "2026-10-20",
+      "by": "Z3",
+      "why": "Bench now counts work and always runs (Z3); the gate baseline (live 3.45 we-8f1d0b49daeb) contains Z3, so no baseline skips it any more and the baseline-only entry is dropped."
+    },
+    {
+      "entry": "V5-server-full / bench: 300 five-place build commits with two live claims versus none; 200-upsert check",
+      "at": "2026-10-20",
+      "by": "Z3",
+      "why": "Bench now counts work and always runs (Z3); the gate baseline (live 3.45 we-8f1d0b49daeb) contains Z3, so no baseline skips it any more and the baseline-only entry is dropped."
+    },
+    {
+      "entry": "V5-server-full / bench: onDone with 256 roots and 5000 entities stays below 20ms",
+      "at": "2026-10-20",
+      "by": "Z3",
+      "why": "Bench now counts work and always runs (Z3); the gate baseline (live 3.45 we-8f1d0b49daeb) contains Z3, so no baseline skips it any more and the baseline-only entry is dropped."
+    },
+    {
+      "entry": "V5-server-full / bench: median act overhead with origins versus without origins is below 2%",
+      "at": "2026-10-20",
+      "by": "Z3",
+      "why": "Bench now counts work and always runs (Z3); the gate baseline (live 3.45 we-8f1d0b49daeb) contains Z3, so no baseline skips it any more and the baseline-only entry is dropped."
+    },
+    {
+      "entry": "V5-server-full / bench: a real-engine walk-out of 16 residents among many entities",
+      "at": "2026-10-20",
+      "by": "Z3",
+      "why": "Bench now counts work and always runs (Z3); the gate baseline (live 3.45 we-8f1d0b49daeb) contains Z3, so no baseline skips it any more and the baseline-only entry is dropped."
+    },
+    {
+      "entry": "V5-server-full / bench: walk-out planning for N residents among M entities stays fast",
+      "at": "2026-10-20",
+      "by": "Z3",
+      "why": "Bench now counts work and always runs (Z3); the gate baseline (live 3.45 we-8f1d0b49daeb) contains Z3, so no baseline skips it any more and the baseline-only entry is dropped."
     }
   ]
 }
