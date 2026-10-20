@@ -12,12 +12,18 @@ import { CopyButton } from './markdown.tsx';
 type Cobuilder = { account: string; at: number };
 type Offer = { kind: 'cobuild' | 'transfer'; to?: string; expires: number };
 const at = (sub: string) => `${BASE}/__sim/worlds/${worldKey}/${sub}`;
+class Unavailable extends Error { constructor() { super('This world is not run by the Sim launcher, so it cannot be handed on or archived from here.'); } }
 async function call<T>(sub: string, body?: unknown): Promise<T> {
   const r = await fetch(at(sub), { method: body === undefined ? 'GET' : 'POST', headers: { 'content-type': 'application/json', ...(await userAuthHeaders()) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  // A world the Sim launcher does not run answers these paths with the page itself (HTML), not JSON: say so plainly
+  // instead of reading an empty object as "no offers" and crashing on it.
+  if (!/json/.test(r.headers.get('content-type') ?? '')) throw new Unavailable();
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.message ?? d.code ?? `HTTP ${r.status}`);
   return d as T;
 }
+const asState = (d: Partial<{ enabled: boolean; cobuilders: Cobuilder[]; offers: Offer[] }>) =>
+  ({ enabled: !!d.enabled, cobuilders: Array.isArray(d.cobuilders) ? d.cobuilders : [], offers: Array.isArray(d.offers) ? d.offers : [] });
 const short = (a: string) => a.replace(/^dev:/, '');
 
 export function ForsakeWorld({ name }: { name: string }) {
@@ -27,7 +33,11 @@ export function ForsakeWorld({ name }: { name: string }) {
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ text: string; bad?: boolean } | null>(null);
-  const load = useCallback(async () => { try { setState(await call('cobuilders')); } catch (e) { setNote({ text: (e as Error).message, bad: true }); } }, []);
+  const [unavailable, setUnavailable] = useState(false);
+  const load = useCallback(async () => {
+    try { setState(asState(await call('cobuilders'))); }
+    catch (e) { if (e instanceof Unavailable) setUnavailable(true); setNote({ text: (e as Error).message, bad: !(e instanceof Unavailable) }); }
+  }, []);
   useEffect(() => { void load(); }, [load]);
   const run = async (key: string, fn: () => Promise<void>) => {
     setBusy(key); setNote(null);
@@ -59,7 +69,7 @@ export function ForsakeWorld({ name }: { name: string }) {
                 <button type="button" className="gm-quiet" onClick={() => setHanding(false)}>Cancel</button>
               </div>
             </div>
-            : <button type="button" className="gm-danger-ghost" data-ops-transfer="1" disabled={!!busy} onClick={() => setHanding(true)}>Create a handoff link…</button>}
+            : <button type="button" className="gm-danger-ghost" data-ops-transfer="1" disabled={!!busy || unavailable} onClick={() => setHanding(true)}>Create a handoff link…</button>}
         {pending > 0 && <div className="gm-danger-row gm-danger-pending"><span>{pending === 1 ? '1 open link' : `${pending} open links`}</span><button type="button" className="gm-quiet" data-ops-cancel="1" disabled={!!busy} onClick={() => void cancel()}>Cancel {pending === 1 ? 'it' : 'them'}</button></div>}
       </section>
       <section className="gm-danger" data-ops="archive">
@@ -68,7 +78,7 @@ export function ForsakeWorld({ name }: { name: string }) {
         <label className="gm-danger-label" htmlFor="gm-archive-confirm">Type <code>{worldKey}</code> to confirm</label>
         <div className="gm-danger-row">
           <input id="gm-archive-confirm" data-ops-confirm="1" value={confirm} autoComplete="off" spellCheck={false} onChange={(e) => setConfirm(e.target.value.trim())} placeholder={worldKey} />
-          <button type="button" className="gm-danger-btn" data-ops-archive="1" disabled={confirm !== worldKey || !!busy} onClick={() => void archive()}>{busy === 'archive' ? 'Archiving…' : 'Archive world'}</button>
+          <button type="button" className="gm-danger-btn" data-ops-archive="1" disabled={confirm !== worldKey || !!busy || unavailable} onClick={() => void archive()}>{busy === 'archive' ? 'Archiving…' : 'Archive world'}</button>
         </div>
       </section>
       {(cobuild || oldCobuilders > 0) && <section className="gm-danger gm-danger-soft" data-ops="cobuilders">
