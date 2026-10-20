@@ -3,8 +3,9 @@
 // top right, with no navigation and no second tab. Real launcher in Clerk mode (synthetic issuer, as approve-on-top.mjs),
 // the Soul CLI from source (tools/edge-skill/eden-agent.mjs) run in its own folders, Chrome lease, real GPU.
 //   A  gene: the world page is open; New Soul shows a prompt whose link carries this window's code; the agent runs
-//      `create-soul "Ana" --for CODE`; the card appears top right in the SAME page (no hash, no new page); Approve ->
-//      "Connected" -> the card closes itself; the agent's `approval wait` ends paired.
+//      `create-soul "Ana" --for CODE`; the card appears top right in the SAME page (no hash, no new page), with no agent
+//      label outside its (i); Approve -> "Ana is being prepared by your agent. Please wait…" with a spinner -> the body is
+//      ready -> the card closes itself and the camera follows Ana (Gene 2026-10-20c); the agent's `approval wait` ends paired.
 //   B  ana: the request times out (its expiry is moved into the past in the test world's own DB: the server would take
 //      15 min) -> "Timed out" + Ask again -> pending -> Approve -> the agent (approval wait through expiry) ends paired.
 //   C  cy, phone dpr 3: the card on a phone, light and dark; Refuse -> "Refused"; the agent's request is cancelled.
@@ -152,18 +153,32 @@ try {
     check('A4 the card appears top right in the same page, no navigation', topRight(w) && page.url() === urlBefore && ctx.pages().length === pagesBefore && w.status === 'pending' && w.name === 'Ana' && w.avatar, { ms: Date.now() - t0, ...w });
     await shot(page, 'A4-card-desktop-dpr1-light');
     await page.emulateMedia({ colorScheme: 'dark' }); await sleep(300); await shot(page, 'A4-card-desktop-dpr1-dark'); await page.emulateMedia({ colorScheme: 'light' });
+    const id = JSON.stringify(made).match(/ap_[a-f0-9]{32}/)?.[0];
+    const label = (await call(`${base}/v1/account/approvals/${id}`, { sub: 'user_gene' })).data?.approval?.agentLabel;
+    const plain = await page.locator('[data-approval]').innerText();
+    check('A5a no agent label, folder or approval-wait talk on the card', !!label && !plain.includes(label) && !/label|folder|approval wait|Connected|s_[A-Za-z0-9]/.test(plain), { plain, label });
     await page.locator('[data-approval-about]').click(); await sleep(200);
-    check('A5 the (i) note explains the agent label', /gave itself/.test(await page.locator('[data-approval-note]').innerText()));
+    check('A5 the (i) note holds the agent name', (await page.locator('[data-approval-note]').innerText()).startsWith(`Asked by ${label}.`));
     await shot(page, 'A5-card-info-open');
+    await page.locator('[data-approval-about]').click();
+    // what the card shows between Approve and the body (it can be short): recorded by an observer, not by polling
+    await page.evaluate(() => { const seen = window.__apSeen = []; new MutationObserver(() => { const p = document.querySelector('[data-approval-preparing]'); if (p) { const sp = p.querySelector('.ap-spinner'); const r = sp?.getBoundingClientRect(); seen.push({ text: p.textContent, spinner: !!sp && r.width > 0 && getComputedStyle(sp).animationName === 'ap-spin', buttons: document.querySelectorAll('[data-approve-agent],[data-refuse-agent]').length }); } }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true }); });
     await page.locator('[data-approve-agent]').click();
-    await waitStatus(page, 'ready', 90_000);
-    check('A6 Approve -> Connected', /Connected/.test(await page.locator('[data-approval]').innerText()));
-    await shot(page, 'A6-connected');
-    await page.waitForSelector('[data-approval]', { state: 'detached', timeout: 9_000 }).then(() => true, () => false).then((gone) => check('A7 Connected closes itself within ~5 s', gone));
+    await page.waitForSelector('[data-approval-preparing]', { timeout: 5_000 }).then(() => shot(page, 'A6-preparing-light'), () => {});
+    if (await page.locator('[data-approval-preparing]').count()) { await page.emulateMedia({ colorScheme: 'dark' }); await sleep(150); await shot(page, 'A6-preparing-dark'); await page.emulateMedia({ colorScheme: 'light' }); }
+    const seen = await page.evaluate(() => window.__apSeen);
+    check('A6 Approve -> "Ana is being prepared by your agent. Please wait…" with a spinner, no buttons', seen.some((x) => x.text === 'Ana is being prepared by your agent. Please wait…' && x.spinner && x.buttons === 0), { seen: seen.slice(-2) });
+    const gone = await page.waitForSelector('[data-approval]', { state: 'detached', timeout: 90_000 }).then(() => true, () => false);
+    const server = (await call(`${base}/v1/account/approvals/${id}`, { sub: 'user_gene' })).data?.approval;
+    check('A7 the card closes itself once the body is ready', gone && server?.status === 'ready' && /^s_/.test(server?.soulId ?? ''), { gone, status: server?.status, soulId: server?.soulId });
+    const following = await page.waitForFunction((sid) => document.querySelector('[data-camera="follow"]')?.getAttribute('data-follow-soul') === sid, server?.soulId, { timeout: 30_000, polling: 250 }).then(() => true, () => false);
+    const chip = await page.evaluate(() => { const c = document.querySelector('[data-camera]'); return { mode: c?.getAttribute('data-camera'), soul: c?.getAttribute('data-follow-soul'), text: c?.textContent }; });
+    check('A8 the camera follows the new Soul (follow target = its id)', following && chip.soul === server?.soulId && /Ana/.test(chip.text ?? ''), chip);
+    await sleep(1500); await shot(page, 'A8-following-ana');
     const done = await waiting;
     report.waitA = done;
     const status = json(await agent(folder, ['status']).catch((e) => e.message));
-    check('A8 the agent is paired', done.paired === true && done.soul?.name === 'Ana' && status.paired === true && status.soul === done.soul?.id, { done: JSON.stringify(done).slice(0, 200), status: JSON.stringify(status).slice(0, 200) });
+    check('A8b the agent is paired', done.paired === true && done.soul?.name === 'Ana' && status.paired === true && status.soul === done.soul?.id && done.soul?.id === server?.soulId, { done: JSON.stringify(done).slice(0, 200), status: JSON.stringify(status).slice(0, 200) });
     await sleep(6000);
     check('A9 the card does not come back', (await page.locator('[data-approval]').count()) === 0);
     await ctx.close();
@@ -193,7 +208,7 @@ try {
     check('B4 Ask again -> pending, same request', (await call(`${base}/v1/account/approvals/${id}`, { sub: 'user_ana' })).data?.approval?.status === 'pending');
     const waiting = agent(folder, ['approval', 'wait'], 300_000).then(json, (e) => ({ error: e.message }));
     await page.locator('[data-approve-agent]').click();
-    await waitStatus(page, 'ready', 90_000);
+    await page.waitForSelector('[data-approval]', { state: 'detached', timeout: 90_000 });
     const done = await waiting;
     const status = json(await agent(folder, ['status']).catch((e) => e.message));
     check('B5 Approve after Ask again -> paired', done.paired === true && done.soul?.name === 'Bea' && status.paired === true, { done: JSON.stringify(done).slice(0, 200) });
@@ -218,6 +233,8 @@ try {
     await waitStatus(page, 'cancelled', 15_000);
     check('C2 Refuse -> Refused; the request is cancelled', /Refused/.test(await page.locator('[data-approval]').innerText()) && (await call(`${base}/v1/account/approvals/${id}`, { sub: 'user_cy' })).data?.approval?.status === 'cancelled');
     await shot(page, 'C2-refused-phone');
+    await page.locator('[data-approval-done]').click();
+    check('C3 Close closes the refused card', await page.waitForSelector('[data-approval]', { state: 'detached', timeout: 5_000 }).then(() => true, () => false));
     await ctx.close();
   }
 

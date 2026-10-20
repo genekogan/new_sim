@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Approval } from './join-api.ts';
 (globalThis as { location?: unknown }).location ??= { href: 'http://127.0.0.1/w/test', pathname: '/w/test', hash: '', origin: 'http://127.0.0.1' };
-const { approvalLine, closeApproval, closedApprovals, pickWindowApproval, safePhoto } = await import('./window-approvals.ts');
+const { approvalLine, preparingLine, closeApproval, closedApprovals, pickWindowApproval, safePhoto } = await import('./window-approvals.ts');
 
 const memory = () => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v) }; };
 const ap = (status: Approval['status'], extra: Partial<Approval> = {}): Approval => ({ id: 'ap_' + 'a'.repeat(32), worldId: 'w', agentLabel: 'Claude Code', name: 'Ana', description: '', mode: 'create', status, soulId: null, expiresAt: 0, ...extra });
@@ -30,13 +30,15 @@ test('a closed request stays closed in this tab, and the list stays short', () =
 test('the card says little: one short line per state, the arrival refusal says why', () => {
   assert.equal(approvalLine(null, false), null);
   assert.equal(approvalLine(ap('pending'), false), null);
-  assert.equal(approvalLine(ap('creating'), false), 'Making the body…');
-  assert.equal(approvalLine(ap('ready'), false), 'Connected');
+  assert.equal(approvalLine(ap('creating'), false), null);
+  assert.equal(approvalLine(ap('ready'), false), null);
   assert.equal(approvalLine(ap('cancelled'), true), 'Refused');
   assert.equal(approvalLine(ap('cancelled'), false), 'Withdrawn by the agent');
   assert.equal(approvalLine(ap('expired'), false), 'Timed out');
-  assert.match(approvalLine(ap('refused', { reason: { code: 'arrival-unavailable', message: 'Approved, but the Soul could not arrive: x' } }), false)!, /could not arrive: x/);
-  assert.match(approvalLine(ap('refused'), false)!, /could not arrive/);
+  assert.equal(approvalLine(ap('refused', { reason: { code: 'arrival-unavailable', message: 'Approved, but the Soul could not arrive: a long text for the agent' } }), false), 'No clear ground at the arrival point. Nothing was created.');
+  assert.equal(approvalLine(ap('refused'), false), 'The body could not be made. Nothing was created.');
+  assert.equal(preparingLine({ name: 'Mira', mode: 'create' }), 'Mira is being prepared by your agent. Please wait…');
+  for (const s of ['pending', 'creating', 'ready', 'cancelled', 'expired', 'refused'] as const) assert.doesNotMatch(approvalLine(ap(s), false) ?? '', /Connected|folder|approval wait|label/);
 });
 
 test('the Soul picture comes only from this site or https', () => {

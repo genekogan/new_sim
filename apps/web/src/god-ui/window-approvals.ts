@@ -24,19 +24,24 @@ function safeSession(): Storage | null { try { return typeof sessionStorage === 
 
 /** The Soul's picture only from this site or https (the server builds it; never a script URL). */
 export const safePhoto = (url: string | null | undefined) => typeof url === 'string' && (/^https:\/\//.test(url) || /^\/(?!\/)/.test(url)) ? url : null;
-/** What the card says under the name, per status (short on purpose: Gene, "avoid verbosity"). */
+/** Gene 2026-10-20c: after Approve the card says only that the Soul is being prepared, with a spinner, until its body is
+ *  in the world; then the card closes and the camera follows the Soul. */
+export function preparingLine(a: Pick<J.Approval, 'name' | 'mode'>): string {
+  return a.mode === 'repair' ? `${a.name} is being reconnected by your agent. Please wait…` : `${a.name} is being prepared by your agent. Please wait…`;
+}
+/** One short line per refusal reason (the server's own message is written for the agent and runs long). */
+const REFUSED: Record<string, string> = { 'arrival-unavailable': 'No clear ground at the arrival point. Nothing was created.' };
+/** What the card says under the name, per status (short on purpose: Gene, "avoid verbosity"). `creating` is the spinner
+ *  line and `ready` closes the card, so neither has a line here. */
 export function approvalLine(a: J.Approval | null, refusedHere: boolean): string | null {
   if (!a) return null;
   switch (a.status) {
-    case 'creating': return 'Making the body…';
-    case 'ready': return 'Connected';
     case 'cancelled': return refusedHere ? 'Refused' : 'Withdrawn by the agent';
     case 'expired': return 'Timed out';
-    case 'refused': return typeof a.reason?.message === 'string' ? a.reason.message : 'Approved, but the Soul could not arrive. Nothing was created; ask your agent to try again.';
+    case 'refused': return REFUSED[a.reason?.code ?? ''] ?? 'The body could not be made. Nothing was created.';
     default: return null;
   }
 }
-export const CONNECTED_CLOSE_MS = 5000;
 
 /** Requests waiting for the signed-in account; polls only while `enabled` and the tab is visible; stops for good when the
  *  world has no such list (an older server). */

@@ -8,8 +8,10 @@
 // Clerk mode as production, no network, no keys: the launcher verifies a synthetic issuer (apps/server/test/clerk-fixture.ts)
 // and the browser runs a test-only stand-in for clerk-js (window.Clerk before the app loads, signed in as user_gene,
 // loading asynchronously like the real one). The approval is a real pending request made with the agent's own call
-// (POST /v1/agent/approval/start, what `eden-agent.mjs create-soul` sends). Chrome lease, real GPU. Never clicks Approve
-// or Refuse; the last scenario closes the card and checks the request is still pending.
+// (POST /v1/agent/approval/start, what `eden-agent.mjs create-soul` sends). Chrome lease, real GPU. The fourth scenario
+// closes the card and checks the request is still pending; the last (lane PUX, Gene 2026-10-20c: the link path older
+// agents still print shows the same top-right card) presses Approve: "Ana is being prepared by your agent. Please wait…"
+// with a spinner, the card closes once the body is ready, and the camera follows Ana.
 //
 //   node tools/god-skill/e2e/approve-on-top.mjs --web <vite build --base /worlds/> [--mars-web <dir>] [--port 6650]
 //        [--range 6651-6655] [--out <dir>]
@@ -86,10 +88,10 @@ const probe = () => {
   const visible = r.width > 20 && r.height > 20 && cs.visibility !== 'hidden' && +cs.opacity > 0.5 && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth;
   const pts = [[r.left + r.width / 2, r.top + Math.min(r.height / 2, 40)], [r.left + 12, r.top + 12], [r.right - 12, r.top + 12]];
   const onTop = visible && pts.every(([x, y]) => { const e = document.elementFromPoint(x, y); return !!e && card.contains(e); });
-  return { present: true, visible, onTop, godOpen, loaded, status: card.getAttribute('data-approval-status') || '', box: [r.left, r.top, r.width, r.height].map(Math.round) };
+  return { present: true, visible, onTop, godOpen, loaded, status: card.getAttribute('data-approval-status') || '', box: [r.left, r.top, r.width, r.height].map(Math.round), rightGap: Math.round(innerWidth - r.right), vw: innerWidth };
 };
 
-async function scenario(browser, { name, viewport, dpr, mobile, introSeen, dismiss }, base, slug, id) {
+async function scenario(browser, { name, viewport, dpr, mobile, introSeen, dismiss, approve }, base, slug, id) {
   const ctx = await browser.newContext({ viewport, deviceScaleFactor: dpr, isMobile: !!mobile, hasTouch: !!mobile });
   await ctx.exposeFunction('__stubClerkMint', (sub) => keys.sign(sub));
   await ctx.addInitScript(({ slug, introSeen }) => { try { localStorage.setItem('stubClerk.user', 'user_gene'); if (introSeen) localStorage.setItem(`sim.godIntro:${slug}`, '1'); } catch { /* storage off */ } }, { slug, introSeen });
@@ -126,8 +128,21 @@ async function scenario(browser, { name, viewport, dpr, mobile, introSeen, dismi
     await page.screenshot({ path: join(out, `${name}-3-closed.png`) });
     result.ok = result.dismiss.gone && result.dismiss.stillPending;
   }
+  if (approve && result.ok) {
+    const topRight = end.rightGap <= 40 && end.box[1] <= 170 && end.box[0] > end.vw / 2;
+    await page.evaluate(() => { const seen = window.__apSeen = []; new MutationObserver(() => { const p = document.querySelector('[data-approval-preparing]'); if (p) { const sp = p.querySelector('.ap-spinner'); seen.push({ text: p.textContent, spinner: !!sp && sp.getBoundingClientRect().width > 0 && getComputedStyle(sp).animationName === 'ap-spin' }); } }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true }); });
+    await page.locator('[data-approve-agent]').click();
+    await page.waitForSelector('[data-approval-preparing]', { timeout: 5_000 }).then(() => page.screenshot({ path: join(out, `${name}-3-preparing.png`) }), () => {});
+    const gone = await page.waitForSelector('[data-approval]', { state: 'detached', timeout: 90_000 }).then(() => true, () => false);
+    const server = (await call(`${base}/v1/account/approvals/${id}`, { sub: 'user_gene' })).data?.approval;
+    const following = await page.waitForFunction((sid) => document.querySelector('[data-camera="follow"]')?.getAttribute('data-follow-soul') === sid, server?.soulId, { timeout: 30_000, polling: 250 }).then(() => true, () => false);
+    await sleep(1500); await page.screenshot({ path: join(out, `${name}-4-following.png`) });
+    const seen = await page.evaluate(() => window.__apSeen);
+    result.approve = { topRight, preparing: seen.some((x) => x.text === 'Ana is being prepared by your agent. Please wait…' && x.spinner), gone, status: server?.status, soulId: server?.soulId, following, hash: await page.evaluate(() => location.hash) };
+    result.ok = topRight && result.approve.preparing && gone && server?.status === 'ready' && following && !/^#approve/.test(result.approve.hash);
+  }
   await ctx.close();
-  console.log(`${result.ok ? '✔' : '✖'} ${name}: first seen ${firstAt} ms, world drawn ${loadedAt} ms, lapses ${lapses.length}/${after.length}, end ${JSON.stringify({ present: end.present, onTop: end.onTop, status: end.status, godOpen: end.godOpen })}, owner UI ${owner}${result.dismiss ? ', closed ' + JSON.stringify(result.dismiss) : ''}`);
+  console.log(`${result.ok ? '✔' : '✖'} ${name}${result.approve ? ' ' + JSON.stringify(result.approve) : ''}: first seen ${firstAt} ms, world drawn ${loadedAt} ms, lapses ${lapses.length}/${after.length}, end ${JSON.stringify({ present: end.present, onTop: end.onTop, status: end.status, godOpen: end.godOpen })}, owner UI ${owner}${result.dismiss ? ', closed ' + JSON.stringify(result.dismiss) : ''}`);
   return result;
 }
 
@@ -155,6 +170,7 @@ try {
     { name: 'desktop-dpr2-new-god-intro', viewport: desk, dpr: 2, introSeen: false },
     { name: 'phone-dpr3-returning-god', viewport: phone, dpr: 3, mobile: true, introSeen: true },
     { name: 'desktop-dpr1-close', viewport: desk, dpr: 1, introSeen: true, dismiss: true },
+    { name: 'desktop-dpr1-link-approve', viewport: desk, dpr: 1, introSeen: true, approve: true },
   ]) {
     const r = await scenario(browser, sc, base, slug, id); report.scenarios.push(r);
     if (!r.ok) report.failures.push(r.name);

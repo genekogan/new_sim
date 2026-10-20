@@ -34,6 +34,7 @@ import {BringAgent} from './BringAgent.tsx';
 import {AccountApproval} from './AccountApproval.tsx';
 import {approvalFromHash} from './account-approval.ts';
 import {useApprovalFollow} from './useApprovalFollow.ts';
+import {FOLLOW_SOUL_WAIT_MS,onFollowSoulRequest} from './follow-soul-request.ts';
 import {worldClockAt,worldTimeText} from './world-clock.ts';
 import type { WorldViewerHandle, WorldViewerState } from './WorldViewer.ts';
 import { worldKey } from './world-path.ts';
@@ -128,6 +129,12 @@ export function Shell({ cfg, auth: providerAuth, arrivalEnabled=false,humanPrese
   const receiveState = useCallback((state: WorldViewerState) => setViewerState(state), []);
   const [initialProgress, setInitialProgress] = useState<InitialWorldProgress | null>(null);
   useApprovalFollow(approvalFollow,approvalScope,auth.authed,viewerHandle,viewerState,followed=>{setApprovalFollow(null);if(followed)setApprovalId(null);});
+  // Gene 2026-10-20c: the god panel's approval card closed because the new Soul's body is ready: follow that Soul as
+  // Explore -> a Soul does, as soon as it reaches this window's picture (up to a minute; a manual drag outranks it)
+  const [cardFollow,setCardFollow]=useState<{soulId:string;scope:string}|null>(null);
+  useEffect(()=>onFollowSoulRequest(soulId=>setCardFollow({soulId,scope:'card'})),[]);
+  useEffect(()=>{if(!cardFollow)return;const t=setTimeout(()=>setCardFollow(null),FOLLOW_SOUL_WAIT_MS);return()=>clearTimeout(t);},[cardFollow]);
+  useApprovalFollow(cardFollow,'card',true,viewerHandle,viewerState,()=>setCardFollow(null));
   const placePreview=useCallback((place:EdenTourPlace)=>viewerHandle?.locationPreview?.(place)??Promise.resolve(null),[viewerHandle]);
   const openNavigation = useCallback(() => setPanelOpen(false), []);
   const viewportInsets = useViewerInsets(frame, !advanced && panelOpen, `${advanced}:${navigationOpen}:${tab}:${selected}`);

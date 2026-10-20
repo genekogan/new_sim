@@ -3,10 +3,10 @@
 import {readFileSync,writeFileSync,existsSync} from 'node:fs';import {execFileSync} from 'node:child_process';import {resolve} from 'node:path';
 // approve = lane HF's approval-link walk (tools/god-skill/e2e/approve-on-top.mjs, <outDir>/approve/report.json): the god opens
 // #approve/<id> in Clerk mode and the approval stays on top through the whole load; every scenario must be there and pass.
-export const APPROVE_SCENARIOS=['desktop-dpr1-returning-god','desktop-dpr2-new-god-intro','phone-dpr3-returning-god','desktop-dpr1-close'];
+export const APPROVE_SCENARIOS=['desktop-dpr1-returning-god','desktop-dpr2-new-god-intro','phone-dpr3-returning-god','desktop-dpr1-close','desktop-dpr1-link-approve'];
 // window = lane PUX's in-window walk (tools/god-skill/e2e/approve-in-window.mjs, <outDir>/window/report.json): the agent's request
 // (create-soul --for CODE) comes up top right in the open window; Approve, Ask again, Refuse, one sounding tab.
-export const WINDOW_CHECKS=['A1','A2','A3','A4','A5','A6','A7','A8','A9','B1','B2','B3','B4','B5','C1','C2','D1'];
+export const WINDOW_CHECKS=['A1','A2','A3','A4','A5a','A5','A6','A7','A8','A8b','A9','B1','B2','B3','B4','B5','C1','C2','C3','D1'];
 export const GOD_CHECKS=['A1','A2','A3','A4','B1','C1','D1','D2','E1','F1','G1','G2','G3','G4','G5','H1','Z'];
 export function judge({old,fresh,god,approve,window:win,rcOld=0,rcNew=0,rcGod=0,rcApprove=0,rcWindow=0}){
   const checks=[];const add=(id,ok,detail)=>checks.push({id,ok:!!ok,detail});
