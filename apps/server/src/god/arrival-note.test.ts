@@ -50,3 +50,19 @@ test('an edit that leaves the arrival point clear adds no note', async t => {
   const r: any = w.god.act({ ops: [{ op: 'define', def: slab }, { op: 'place', def: 'slab@1', name: 'slab', p: [40, 0] }] });
   assert.equal(r.accepted, true); assert.equal(r.warnings.some((x: string) => x.startsWith('Arrival point')), false);
 });
+
+test('an arrival point walled in by the god: the new Soul is born outside the walls, never in the sealed courtyard', async t => {
+  const w = world(t); await w.settle(1);
+  const wall = { ...slab, name: 'wall', size: { box: [13, 3, 1] }, make: { kind: 'gen', gen: 'kit/2', args: { shapes: [{ kind: 'box', at: [0, 1.5, 0], size: [13, 3, 1] }] } } };
+  // north/south walls stop 5 cm short of the east/west ones: no gap a body (0.56 m) fits through
+  const short = { ...wall, name: 'short', size: { box: [10.9, 3, 1] }, make: { kind: 'gen', gen: 'kit/2', args: { shapes: [{ kind: 'box', at: [0, 1.5, 0], size: [10.9, 3, 1] }] } } };
+  const r: any = w.god.act({ ops: [{ op: 'define', def: wall }, { op: 'define', def: short },
+    { op: 'place', def: 'short@1', name: 'n', p: [0, 6] }, { op: 'place', def: 'short@1', name: 's', p: [0, -6] },
+    { op: 'place', def: 'wall@1', name: 'e', p: [6, 0], r: Math.PI / 2 }, { op: 'place', def: 'wall@1', name: 'w', p: [-6, 0], r: Math.PI / 2 }] });
+  assert.equal(r.accepted, true, JSON.stringify(r.failures));
+  assert.ok(r.warnings.some((x: string) => NOTE.test(x)), JSON.stringify(r.warnings));
+  await invite(w, 'ana'); const row: any = await accept(w.host, w.souls.create('dev:ana', { name: 'Ana', description: 'curious' })); await w.settle();
+  const p = w.host.engine.world.entities[row.entity_id]!.pose.p;
+  assert.ok(Math.max(Math.abs(p[0]), Math.abs(p[2])) > 6.5, `outside the walls: ${p}`);
+  assert.equal((w.host.engine as any).arrivalPocketV1([p[0], p[2]]).open, true);
+});

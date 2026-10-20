@@ -41,15 +41,12 @@ export function planNativeBirth(host: WorldHost, who: BirthIdentity): BirthPlan 
   return { probe: probeNativeHumanBirth(host.engine, host.factory, { ...who, near: near satisfies BirthNearV1 }), near };
 }
 
-/** The god's arrival note (null when the arrival point is clear): where the next Soul would really be born. Read-only. */
+/** The god's arrival note (null when the arrival point is clear): the spot the arrival search names. Read-only and cheap
+ *  (no detached birth probe: on bench-hamlet that probe alone took ~4 s, too slow for every god edit near the arrival). When
+ *  the default rings still find room beside a small blocker, the Soul is born there instead, within a few metres of it. */
 export function arrivalNote(host: WorldHost): string | null {
-  const e = engineOf(host); if (!e.arrivalBlockedV1?.()) return null;
-  let at: [number, number] | null | undefined;
-  try {
-    const plan = planNativeBirth(host, { id: 'h_arrival_note', label: 'Newcomer', soul: 's_arrival_note' });
-    at = plan.near?.at ?? (plan.probe.outcome === 'ready' ? [plan.probe.position[0], plan.probe.position[2]] : plan.probe.outcome === 'unavailable' ? null : undefined);
-  } catch { at = undefined; }
-  if (at === undefined) at = e.arrivalSearchV1?.()?.at ?? null; // no exact checkpoint now: the search alone
-  if (!at) return 'Arrival point is blocked and this world has no free ground left; new Souls cannot arrive until some is cleared.';
-  return `Arrival point is blocked; new Souls will arrive nearby at ${at[0].toFixed(1)}, ${at[1].toFixed(1)}.`;
+  const e = engineOf(host); if (!e.arrivalBlockedV1?.() || !e.arrivalSearchV1) return null;
+  const s = e.arrivalSearchV1();
+  if (!s) return 'Arrival point is blocked and this world has no free ground left; new Souls cannot arrive until some is cleared.';
+  return `Arrival point is blocked; new Souls will arrive nearby at ${s.at[0].toFixed(1)}, ${s.at[1].toFixed(1)}.`;
 }
