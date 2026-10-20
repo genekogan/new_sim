@@ -34,15 +34,18 @@ import {readFileSync} from 'node:fs';
 import {installBirthLooks} from './god/birth-look.ts';
 import { setKitViewerContract } from '@sim/generators';
 import { rehearseRestore, standby } from './standby.ts';
+import { coreLibrary } from '@sim/world-compiler';
 
 // Lane P5: when the boot's phases end (ms since the process started; the first is this release's code load)
 const bootAt: Record<string, number> = { code: performance.now() };
 // Release pre-warm (SIM_STANDBY=1, launcher handover): all code is loaded here; the database and port open only after SIGUSR2.
-// G9 (lane Z1): it also builds the engine factory and rehearses the snapshot restore read-only (standby.ts rehearseRestore).
+// G9 (lane Z1): it also builds the engine factory and the god's core library, and rehearses the snapshot restore read-only
+// (standby.ts rehearseRestore).
 let warmFactory: Awaited<ReturnType<typeof plainFactory>> | undefined;
 await standby(async () => {
   if (config.engine === 'mars') await import('@sim/engine-mars');
   await import('./edge/body/migrate-looks.ts');
+  if (config.worldEngine) coreLibrary();   // the god's shared core library (built once per process, ~0.1 s)
   if (!edenCoreRequested(config, process.env)) { warmFactory = await plainFactory(); rehearseRestore(join(config.dataDir, 'sim.db'), config.worldId, warmFactory as never, (ro) => { if (config.worldEngine && ro.prepare("SELECT 1 FROM sqlite_master WHERE name='world_ground_recipes_v1'").get()) registerGroundRecipes(ro, config.worldId); }); }
 });
 bootAt.go = performance.now();
