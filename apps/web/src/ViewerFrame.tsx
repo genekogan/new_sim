@@ -93,7 +93,7 @@ export function ViewerFrame({ handle, state, dt, navigationOpen, onNavigationCha
   const early = useSyncExternalStore(earlyArrival.subscribe, earlyArrival.shown, earlyArrival.shown);
   if (early) drawnOnce.current = true;
   const card = ((!early && (arriving || preparing)) || assetsNear) && initial?.stage !== 'failed';
-  const [arrivalShown, setArrivalShown] = useState(true);
+  const [arrivalShown, setArrivalShown] = useState(() => !earlyArrival.shown());   // P7d: a world already drawn before this page part came shows no card
   useEffect(() => { if (card) { setArrivalShown(true); return; } arrivalMark('card-done'); const id = setTimeout(() => setArrivalShown(false), 300); /* lane W1: the .25 s fade (world-chrome.css), then gone */ return () => clearTimeout(id); }, [card]);
   // The bar counts bytes (asset-bytes.ts: every asset fetch, total known up front), never files; it only moves forward
   // and is full once the world is ready. Without a byte total yet, the older measures stand in.

@@ -76,7 +76,7 @@ import { sceneOwner, type SceneOwnerMemory } from './scene-owner.ts';
 import { marsFork } from './mars-fork.ts';
 import type { ForkLand } from './WorldMarsForkLand.ts';
 import { WorldEntityLayer } from './WorldEntityLayer.ts';
-import { takeEarlyLayer } from './early-layer.ts';
+import { earlyPosterShown, removeEarlyPoster, takeEarlyLayer, takeEarlyRender } from './early-layer.ts';
 import { WorldWaterDetail, markHeight } from './WorldWaterDetail.ts';
 import { findSeats, surveySeats } from './WorldSeatSurvey.ts';
 import { visitorPreviewHour } from './visitor-hour.ts';
@@ -261,7 +261,10 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const problem = (text: string) => setProblems((p) => (p.includes(text) ? p : [...p, text]));
     let navigation: WorldNavigation | null=null;
     let renderer: THREE.WebGLRenderer;
-    try { renderer = new THREE.WebGLRenderer({ antialias: true }); } catch {
+    // P7d: a phone's new world may have been drawn by the page's first phase (early-render.ts): adopt its renderer, scene,
+    // camera, daylight and atmosphere (no second GL context; its programs are linked); its poster stays until this draws
+    const adopted=newWorld?takeEarlyRender():null;
+    try { renderer = adopted ? adopted.renderer as THREE.WebGLRenderer : new THREE.WebGLRenderer({ antialias: true }); } catch {
       setGraphicsUnavailable('This browser could not start 3D graphics.');
       problem('This browser could not start 3D graphics, so the world view is unavailable here.');
       return () => abort.abort();
@@ -302,13 +305,13 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     Object.assign(labels2d.domElement.style, { position: 'absolute', top: '0', left: '0', pointerEvents: 'none', zIndex: '1' });
     host.appendChild(labels2d.domElement);
 
-    const scene = new THREE.Scene();
+    const scene = (adopted?.scene as THREE.Scene|undefined) ?? new THREE.Scene();
     const farStandIns=quality.tier==='phone'&&quality.detail&&!phoneOff.has('cards')?new WorldFarStandIns(PHONE_STAND_INS,rendererSnapshotter(renderer)):null;if(farStandIns)scene.add(farStandIns.group);  // lane phones: flat cards for far scattered things
     const staticBatches=new StaticBatchOwner(scene),batchEnabled=new URLSearchParams(location.search).get('staticBatches')!=='0';
     let batchGeometry:WorldGeometry|null=null,batchRevision=-1,batchGeneration=0;
     // Far plane covers the whole ±900 m terrain from anywhere in Eden: a nearer far plane slices the distant
     // ranges and the slice moves with the camera (ridges seemed to rise and recede). Depth precision is set by near.
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 2400);
+    const camera = (adopted?.camera as THREE.PerspectiveCamera|undefined) ?? new THREE.PerspectiveCamera(45, 1, 0.1, 2400);
     let down: { x: number; y: number } | null = null;
     const newControls = (target?: THREE.Vector3) => createWorldOrbitControls(camera,renderer.domElement,target,{
       mode:context.current.cameraMode,navigation:context.current.manualNavigation,lifecycle:'',
@@ -341,14 +344,14 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     // E2 #3: shy animals in a god world run from where the Souls' figures are now
     if(newWorld)setFleeSources(()=>{const out:[number,number][]=[];for(const soul of context.current.sim.conn.replica.souls.values()){const e=shown.current.entities[soul.entityId];if(e?.p)out.push([e.p[0],e.p[2]]);}return out;});
     const godLiving=newWorld?new GodWorldLiving(entityLayer,renderer,{radius:look.enabled?1.45:1,gain:look.poolGain}):null;if(godLiving){scene.add(godLiving.group);(window as unknown as {__simLiving?:unknown}).__simLiving={get lights(){return godLiving.lights;},atmosphere:()=>atmosphere.inspect(),broadcastViews:()=>godTourViews(entityLayer,entityLayer.groundAt).length,lightning:()=>godLightning?.inspect()??null,holdLightning:(ms:number)=>{if(godLightning)godLightning.holdUntil=performance.now()+ms;}};}  // R4-LIVE: lamps at dusk, the god's weather, rain kept out of rooms
-    const godLightning=newWorld?new WorldLightning(entityLayer):null;if(godLightning)scene.add(godLightning.group);  // GOD-ENV: bolts, flash, thunder (new worlds only)
+    const godLightning=newWorld?new WorldLightning(entityLayer):null;if(godLightning)scene.add(godLightning.group);for(const o of adopted?.standIns??[])o.removeFromParent();  // GOD-ENV: bolts, flash, thunder (new worlds only)
     // Entity worlds have no Souls to broadcast at first: frame what the god built (or ?eye=x,y,z&at=x,y,z for stable shots),
     // once, on first arrival (after the snapshot loads; never from the render loop), at a human distance (entity-arrival.ts).
     const frameEntityWorld=()=>{if(!entityLayer.active||entityWorldFramed)return;entityWorldFramed=true;const q=new URLSearchParams(location.search),pin=shotMode?shotPin():null,eye=pin?.eye??q.get('eye')?.split(',').map(Number),at=pin?.at??q.get('at')?.split(',').map(Number);  // lookrace: a re-mounted shot page keeps the look's pinned camera
       if(eye?.length===3&&at?.length===3&&eye.every(Number.isFinite)&&at.every(Number.isFinite)){controls.target.set(at[0],at[1],at[2]);camera.position.set(eye[0],eye[1],eye[2]);}
       else if(entityView.current){controls.target.fromArray(entityView.current.target);camera.position.fromArray(entityView.current.eye);if(entityView.current.pending){camera.lookAt(controls.target);arrivalPending={eye:entityView.current.eye,target:entityView.current.target};return;}}  // a re-mount (welcome, reconnect) keeps the person's camera (and an undecided arrival stays undecided)
       else{  // the orbit target is the centre of the screen and of what was built: no panel-dependent shift (Gene: off-centre pivot on small screens)
-        const pose=entityArrivalPose(entityLayer.viewBounds(),entityLayer.entityCount,entityLayer.groundAt,camera.fov,camera.aspect,1,entityLayer.arrivalAt());controls.target.fromArray(pose.target);camera.position.fromArray(pose.eye);
+        const pose=adopted?.target&&adopted.eye?{target:adopted.target,eye:adopted.eye}:entityArrivalPose(entityLayer.viewBounds(),entityLayer.entityCount,entityLayer.groundAt,camera.fov,camera.aspect,1,entityLayer.arrivalAt());controls.target.fromArray(pose.target);camera.position.fromArray(pose.eye);
         camera.lookAt(controls.target);arrivalPending={eye:camera.position.toArray(),target:controls.target.toArray()};return;}  // R4-LIVE: broadcast if Souls live here (decided once the welcome lists them), as on /w/eden
       camera.lookAt(controls.target);context.current.cameraMode='manual';context.current.setCameraMode('manual');};  // lane W1: at once, not at React's next render: the socket's takes now arrive during the build, and a broadcast frame in between moved a ?shot's eye/at camera
     let arrivalPending:{eye:[number,number,number];target:[number,number,number]}|null=null,arrivalWelcome:number|null=null;
@@ -402,11 +405,11 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const fading=new WorldFadingLayer();scene.add(fading.group);let fadedOut=new Set<string>();const fadeOverride=parseFadeOverride(location.search),fadeSince=new Map<string,number>();
     // Balloon ride: Core's ride state (edge frames) or a native carrier; ?ride=Alice,Bob previews a flight locally.
     const balloonRide=new WorldBalloonRide();scene.add(balloonRide.group);const rideOverride=parseRideOverride(location.search),rideStart=performance.now();
-    const atmosphere=createWorldAtmosphere(scene);
+    const atmosphere=(adopted?.atmosphere as ReturnType<typeof createWorldAtmosphere>|undefined)??createWorldAtmosphere(scene);
     // MARSLAND-FORK: the Mars fork (/worlds/w/mars) draws the mars-two template's drone surroundings and its desert sky (lazy: only the fork loads the kit)
     let forkLand:ForkLand|null=null,forkLandLoad:Promise<void>|null=null;
     const dressForkLand=(camp:THREE.Object3D)=>{if(!marsFork)return;forkLandLoad??=import('./WorldMarsForkLand.ts').then(m=>{if(abort.signal.aborted)return;forkLand=m.createForkLand(0);scene.add(forkLand.group);(window as unknown as {__simForkLand?:unknown}).__simForkLand=forkLand.stats;},e=>console.warn('mars fork land could not be drawn',e));void forkLandLoad.then(()=>forkLand?.dress(camp));};let atmosphereSeconds=0;const reducedMotionQuery=typeof matchMedia==='function'?matchMedia('(prefers-reduced-motion: reduce)'):null;
-    const light = new Daylight(scene);if(quality.shadowMapSize!==light.sun.shadow.mapSize.x)light.sun.shadow.mapSize.set(quality.shadowMapSize,quality.shadowMapSize);
+    const light = (adopted?.light as Daylight|undefined) ?? new Daylight(scene);if(quality.shadowMapSize!==light.sun.shadow.mapSize.x)light.sun.shadow.mapSize.set(quality.shadowMapSize,quality.shadowMapSize);
     const broadcast = new WorldBroadcast();
     broadcast.hints=()=>({soulEntity:id=>context.current.sim.conn.replica.souls.get(id)?.entityId??null,eden:!!expansion&&!past.current,daylight:light.daylight,carriers:rideCarriers,...(entityLayer.active&&!expansion?{views:godTourViews(entityLayer,entityLayer.groundAt)}:{})});  // R4-LIVE: a god world's own landmarks  // VF1/VF5: who speaks; Eden town views; time of day
     const followView=new WorldFollow();
@@ -666,7 +669,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const eyes=WorldEyes.fromSearch(location.search,{renderer,camera,scene,body:id=>people?.bodyObject(id)??floaters.object(id)??standIns.getObjectByName(id)??null,souls:()=>[...context.current.sim.conn.replica.souls.values()].map(x=>x.entityId),overlays:()=>[speechLayer.group,ring,orbitPivot.group,fading.group,hover.marker],tick:()=>shown.current.tick,ready:()=>sceneSettled&&drawnTick.current!==null});
     const officeGuardFrom=new THREE.Vector3(),authoredBoundaries=new WorldAuthoredBoundaries();
     let shadowFrame=0;  // P1 phones
-    let programsPending=false,arrivedOnce=false,earlyPending=0,buildingFrameAt=-Infinity,layerStarted=false,afterNextDraw:(()=>void)|null=null;  // afterNextDraw: ?shot waits for a frame drawn after the build  // lane W1: the built world's shaders are still linking in parallel: no frame yet
+    let posterFrames=0,programsPending=false,arrivedOnce=false,earlyPending=0,buildingFrameAt=-Infinity,layerStarted=false,afterNextDraw:(()=>void)|null=null;  // afterNextDraw: ?shot waits for a frame drawn after the build  // lane W1: the built world's shaders are still linking in parallel: no frame yet
     const animate = () => {
       officeGuardFrom.copy(camera.position);
       if (abort.signal.aborted) return;
@@ -973,7 +976,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(look.enabled&&entityLayer.active&&!expansion){if(look.follow)light.follow(controls.target,camera.position);renderer.toneMappingExposure=lookExposure(light.daylight,look.nightExposure);}
       if(adaptive&&entityLayer.active&&!eyes)adaptive.frame(now);const draw=()=>{diagnostics.beginRender(renderer);if(!eyes)entityLayer.cull(camera,renderer.domElement.clientHeight,renderer.shadowMap.autoUpdate||renderer.shadowMap.needsUpdate);if(distanceDetail&&!eyes)distanceDetail.apply(scene,camera,renderer.domElement.clientHeight);if(meshLod&&!eyes)meshLod.apply(scene,camera,renderer.domElement.clientHeight);if(farStandIns&&!eyes)farStandIns.apply(scene,camera,renderer.domElement.clientHeight);try{if(!eyes?.render()){if(post&&entityLayer.active)post.render(renderer,scene,camera);else renderer.render(scene,camera);}}finally{farStandIns?.restore();meshLod?.restore();distanceDetail?.restore();entityLayer.uncull();diagnostics.endRender();}};
       if(quality.shadowEvery>1&&!eyes){renderer.shadowMap.autoUpdate=false;if(shadowFrame++%quality.shadowEvery===0)renderer.shadowMap.needsUpdate=true;}  // P1 phones: the shadow map every n-th frame
-      if(holdDraw){/* nothing to show yet */}else{if(batchEnabled)staticBatches.withRender(draw);else draw();if(afterNextDraw){const f=afterNextDraw;afterNextDraw=null;f();}if(earlyPending&&mount.current?.style.visibility==='visible'&&!mount.current.parentElement?.querySelector('.world-initial-loading')&&--earlyPending===0)requestAnimationFrame(()=>{if(!abort.signal.aborted)earlyArrival.mark();});}  // P7 fix: two frames drawn with nothing covering the canvas, then the next frame (the second is on screen) lifts the card
+      if(holdDraw){/* nothing to show yet */}else{if(batchEnabled)staticBatches.withRender(draw);else draw();if(afterNextDraw){const f=afterNextDraw;afterNextDraw=null;f();}if(posterFrames<2&&earlyPosterShown()&&mount.current?.style.visibility==='visible'&&!mount.current.parentElement?.querySelector('.world-initial-loading')&&++posterFrames===2)requestAnimationFrame(removeEarlyPoster);/* P7d: the early renderer's poster goes once two frames of ours are on screen under it */if(earlyPending&&mount.current?.style.visibility==='visible'&&!mount.current.parentElement?.querySelector('.world-initial-loading')&&--earlyPending===0)requestAnimationFrame(()=>{if(!abort.signal.aborted)earlyArrival.mark();});}  // P7 fix: two frames drawn with nothing covering the canvas, then the next frame (the second is on screen) lifts the card
       shadowDetail?.restore();
       idleLife.restore();
       fading.restore();
@@ -1073,7 +1076,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       placeActivity.dispose();
       try{nativeSocialDraw?.dispose(people);}catch{problem('Some fixture scenery could not be released.');}
       clearConnectedDressing();
-      abort.abort();manager.abort();
+      abort.abort();manager.abort();removeEarlyPoster();
       speechVisibility.reset();
       cancelAnimationFrame(frame);
       resize.disconnect();

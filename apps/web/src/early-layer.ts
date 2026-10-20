@@ -33,3 +33,24 @@ export function takeEarlyLayer(): EarlyLayer | null {
   const e = early; early = null;
   return e;
 }
+
+/** The started early layer without claiming it (early-render.ts draws it before LiveWorld exists). */
+export function peekEarlyLayer(): EarlyLayer | null { return claimed ? null : early; }
+
+// P7d (team/lanes/t4-p7.md "P7d design"): the early renderer's hand-over. early-render.ts (a chunk of its own, asked for
+// when the snapshot is in) makes the renderer, scene, camera, daylight and atmosphere for the early layer and draws the
+// arrival into a poster; LiveWorld adopts them (no second GL context, the programs already linked) and removes the
+// poster once it has drawn the world itself. Kept here (phase one, no imports) so LiveWorld never loads the renderer's code.
+/** What LiveWorld adopts. Typed loosely here (this module stays free of three's code); LiveWorld knows the types. */
+export type EarlyRenderHandOver = { renderer: unknown; scene: unknown; camera: unknown; light: unknown; atmosphere: unknown; standIns: { removeFromParent(): unknown }[]; target?: [number, number, number]; eye?: [number, number, number] };
+let hand: EarlyRenderHandOver | null = null, renderClaimed = false, poster: HTMLElement | null = null;
+/** early-render.ts: offer the made renderer (false when LiveWorld already made its own). */
+export function offerEarlyRender(h: EarlyRenderHandOver): boolean { if (renderClaimed) return false; hand = h; return true; }
+/** Whether LiveWorld has come (it then owns the renderer it took, or made its own): the early renderer stops drawing. */
+export const earlyRenderClaimed = (): boolean => renderClaimed;
+/** LiveWorld: the early renderer's objects, at most once per page; afterwards no early renderer draws. */
+export function takeEarlyRender(): EarlyRenderHandOver | null { renderClaimed = true; const h = hand; hand = null; return h; }
+/** The arrival's poster (a still of the early renderer's first frame, over the page) until LiveWorld has drawn. */
+export function setEarlyPoster(el: HTMLElement): void { poster = el; }
+export function removeEarlyPoster(): void { const p = poster; poster = null; p?.remove(); }
+export const earlyPosterShown = (): boolean => !!poster;
