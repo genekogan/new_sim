@@ -43,7 +43,7 @@ export function ApprovalCard({ id, signedIn, signIn, onDone }: { id: string; sig
           <b className="ap-name" data-approval-name="1">{a?.name ?? (signedIn ? '…' : 'Your agent is asking')}</b>
           {a && <span className="ap-agent">
             {a.agentLabel}
-            <button type="button" className="ap-info" aria-expanded={about} aria-label="About this agent" data-approval-about="1" onClick={() => setAbout((v) => !v)}>i</button>
+            <button type="button" className="ap-info" aria-expanded={about} aria-label="About this agent" data-approval-about="1" onClick={() => setAbout((v) => !v)}><span>i</span></button>
           </span>}
         </div>
       </div>

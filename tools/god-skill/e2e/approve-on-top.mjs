@@ -118,7 +118,7 @@ async function scenario(browser, { name, viewport, dpr, mobile, introSeen, dismi
   const result = { name, viewport, dpr, mobile: !!mobile, introSeen: !!introSeen, firstAt, loadedAt, samples: samples.length, lapses: lapses.length, firstLapses: lapses.slice(0, 5), end, owner, godOpenedDuring: samples.some((s) => s.godOpen), errors };
   result.ok = firstAt !== null && lapses.length === 0 && end.present && end.onTop && end.status === 'pending' && owner > 0 && !/^BUTTON/.test(end.focus) && loadedAt !== null;
   if (dismiss && result.ok) {
-    await page.locator('[data-approval] .gp-mini').click();
+    await page.locator('[data-approval-close]').click();
     await sleep(3000);
     const gone = await page.locator('[data-approval]').count();
     const server = await call(`${base}/v1/account/approvals/${id}`, { sub: 'user_gene' });
