@@ -186,8 +186,12 @@
  .human-world:not(.has-advanced) .world-hud.slim>.hud-status{grid-column:1;grid-row:1}
  .human-world:not(.has-advanced) .world-hud.slim>.hud-actions{grid-column:2;grid-row:1}
  .human-world:not(.has-advanced) .world-hud.slim>.hud-camera-row{grid-column:1/-1;grid-row:2}
- .human-world:not(.has-advanced) .world-hud.slim>.hud-explore-group{grid-column:1/-1;grid-row:3;justify-content:flex-start;max-width:100%;gap:5px}
+ .human-world:not(.has-advanced) .world-hud.slim>.hud-explore-group{grid-column:1/-1;grid-row:3;justify-content:center;max-width:100%;gap:5px}
 }
+/* Lane U2 (Gene 2026-10-20: "center-justified to the center"): on one-row desktops the Explore group spans the whole
+   header row and sits on the page's centre line, whatever the left (status, camera) and right (account) sides measure;
+   the empty third column keeps them apart. Narrower desktops (row 2) and phones (row 3) already centre it on its own row. */
+@media(min-width:1051px){.human-world:not(.has-advanced) .world-hud.slim>.hud-explore-group{grid-column:1/-1;grid-row:1;justify-self:center;width:max-content}}
 .invite-link-dialog::backdrop{background:#0008}
 .gp-copy-control{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:6px;min-width:0;max-width:100%}
 .gp-copy-control>[role=status]{font:12px/1.4 system-ui,sans-serif;white-space:normal}
@@ -228,7 +232,7 @@
 .time-preview .dim{opacity:.7;font-size:12px}
 /* Lane P6 (2026-10-19): small screens only (HudMore.tsx sets html.phone-tidy there, never on desktop). Secondary controls
    leave the world view and are offered from the HUD's one "More" button; watch mode keeps only the primary chrome. */
-html.phone-tidy .human-world:not(.has-advanced) .account-sign-in,html.phone-tidy .human-world:not(.has-advanced) [data-god-panel-toggle],html.phone-tidy .human-world:not(.has-advanced) .cn-chip,html.phone-tidy .human-world:not(.has-advanced) .visitor-controls,html.phone-tidy .eden-sound-toggle{display:none!important}
+html.phone-tidy .human-world:not(.has-advanced) .account-sign-in,html.phone-tidy .human-world:not(.has-advanced) [data-god-panel-toggle],html.phone-tidy .human-world:not(.has-advanced) .cn-chip,html.phone-tidy .human-world:not(.has-advanced) .visitor-controls,html.phone-tidy .human-world:not(.has-advanced) .account-more,html.phone-tidy .eden-sound-toggle{display:none!important}
 .hud-more-wrap{position:relative;display:inline-flex;flex:none}
 .human-world:not(.has-advanced) .world-hud.slim .hud-more{flex:none;padding:0}
 .hud-more-menu{position:absolute;top:calc(100% + 8px);right:0;z-index:20;display:flex;flex-direction:column;gap:2px;min-width:200px;max-width:calc(100vw - 16px - var(--sa-l) - var(--sa-r));padding:6px;border-radius:14px;border:1px solid var(--glass-line,var(--line));background:var(--glass,var(--panel));-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:var(--glass-shadow)}

@@ -2,7 +2,7 @@
 //   node --test apps/web/src/gen-mesh/label-scale.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { labelScale, LABEL_MAX_PX } from './basic.mesh.ts';
+import { labelScale, LABEL_MAX_PX, flagScale, FLAG_MIN_PX } from './basic.mesh.ts';
 
 test('a label keeps its size far away and is capped on screen up close', () => {
   const px = 900 / (2 * Math.tan((45 * Math.PI) / 360));   // 1440x900, fov 45: ~1086 px per metre at 1 m
@@ -11,4 +11,13 @@ test('a label keeps its size far away and is capped on screen up close', () => {
   assert.ok(Math.abs((1.2 * near * px) / 2 - LABEL_MAX_PX) < 1e-9, 'exactly the cap');
   assert.ok(labelScale(2, px, 2) < near, 'a scaled-up flag shrinks its label more');
   assert.ok(Number.isFinite(labelScale(0, px)));
+});
+
+test('a flag is true to scale up close and never shorter than FLAG_MIN_PX far away (U2)', () => {
+  const px = 900 / (2 * Math.tan((45 * Math.PI) / 360));
+  assert.equal(flagScale(10, px, 3), 1, 'near: true size (~326 px tall)');
+  const far = flagScale(800, px, 3); assert.ok(far > 1, `far: grown x${far}`);
+  assert.ok(Math.abs((3 * far * px) / 800 - FLAG_MIN_PX) < 1e-9, 'exactly the floor');
+  assert.ok(flagScale(1600, px, 3) > far, 'farther grows more');
+  assert.ok(Number.isFinite(flagScale(0, px, 3)));
 });

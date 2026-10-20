@@ -42,13 +42,14 @@ test('menu items are the existing controls on the page; choosing one clicks that
     '.account-sign-in': [el('signin', { text: 'Sign in' })],
     '[data-god-panel-toggle]': [el('god', { text: '✦ Claim this world' })],
     '.cn-chip': [el('cn', { text: '§ Constitutionv1' })],
-    '.visitor-controls button': [el('feedback', { text: 'Feedback' }), el('away', { text: 'Since your last visit' })],
+    '[data-feedback-open]': [el('feedback', { text: 'Send feedback' })],
+    '.visitor-controls button': [el('away', { text: 'Since your last visit' })],
     '.eden-sound-toggle [data-sound]': [el('mute', { aria: 'Sound is on: mute' }), el('music', { aria: 'Music is off: turn on', hidden: true })],
   };
   assert.deepEqual(Object.keys(page), MORE_TARGETS.map((t) => t.selector));
   const items = collectMoreItems({ querySelectorAll: (s) => page[s] ?? [] });
   assert.deepEqual(items.map((i) => i.label), ['Sign in', 'Claim this world', 'Constitution', 'Feedback', 'Since your last visit', 'Sound is on: mute']);
-  assert.deepEqual(items.map((i) => i.key), ['sign-in', 'god', 'constitution', 'visitor', 'visitor-1', 'sound']);
+  assert.deepEqual(items.map((i) => i.key), ['sign-in', 'god', 'constitution', 'feedback', 'visitor', 'sound']);
   items[3].target.click(); items[5].target.click();
   assert.deepEqual(clicked, ['feedback', 'mute']);
   assert.deepEqual(collectMoreItems({ querySelectorAll: () => [] }), []);

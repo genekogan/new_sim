@@ -2,11 +2,15 @@ import {useEffect,useId,useRef,useState} from 'react';
 import type {WorldViewerHandle,WorldViewerState} from './WorldViewer.ts';
 import {feedbackMoment,awayHasUpdates,type FeedbackMoment,type AwayReport} from './visitor-context.ts';
 import {discoverVisitorWorlds} from './visitor-worlds.ts';
+import {onFeedbackRequest} from './feedback-request.ts';
 import './visitor-welcome.css';
 type Api=(path:string,body?:unknown,method?:string)=>Promise<{status:number;data:any}>;
 type Props={api:Api;siteApi:Api;worldPath:string;ownerId:string|null;worldId:string;worldName:string;build?:string;handle:WorldViewerHandle|null;state:WorldViewerState|null};
 /** Owner|world pairs whose return card this page already offered automatically. */
 const autoOpened=new Set<string>();
+/** Lane U2 (Gene 2026-10-20: "Hide 'Since your last visit' section and button. We dont need this section"): one switch.
+ * Off: no button, no panel and no return-history or visit requests. true brings all of it back unchanged. */
+export const RETURN_HISTORY:boolean=false;
 type Window={path:string;name:string;report:AwayReport};
 export function VisitorWelcome({api,siteApi,worldPath,ownerId,worldId,worldName,build,handle,state}:Props){
  const [moment,setMoment]=useState<FeedbackMoment|null>(null),[windows,setWindows]=useState<Window[]|null>(null),[showAway,setShowAway]=useState(false),[awayError,setAwayError]=useState(''),[missing,setMissing]=useState<string[]>([]),[visitWarning,setVisitWarning]=useState(false);
@@ -31,7 +35,11 @@ export function VisitorWelcome({api,siteApi,worldPath,ownerId,worldId,worldName,
   // Acknowledge only source cutoffs actually loaded into this owner's panel.
   setVisitWarning(false);for(const w of results){if(!current())return;const ack=await siteApi(w.path+'/v1/me/visit',{through:w.report.through});if(current()&&ack.status!==200)setVisitWarning(true);}
  }
+ // The Feedback form opens from the account menu (signed in), the signed-out More menu or the phone More menu.
+ const view=useRef({handle,state});view.current={handle,state};
+ useEffect(()=>onFeedbackRequest(()=>{const v=view.current;v.handle?.releaseInput?.();setShowAway(false);setMoment(feedbackMoment(v.handle,v.state));}),[]);
  useEffect(()=>{
+  if(!RETURN_HISTORY)return;
   // A reconnect (a release handover, a network blip) remounts this panel with a new authority generation: that is not a
   // return, so only the page's first automatic load per owner and world may open the card (a hidden tab coming back still does).
   const key=`${ownerId}|${worldPath}`,first=!autoOpened.has(key);if(ownerId)autoOpened.add(key);
@@ -43,12 +51,11 @@ export function VisitorWelcome({api,siteApi,worldPath,ownerId,worldId,worldName,
   return()=>{epoch.current++;clearInterval(timer);document.removeEventListener('visibilitychange',visibility);};
  },[api,siteApi,ownerId,worldId,worldPath]);
  return <>
-  <div className="visitor-controls" aria-label="Feedback and return history">
-   <button onClick={()=>{handle?.releaseInput?.();setShowAway(false);setMoment(feedbackMoment(handle,state));}}>Feedback</button>
-   {ownerId&&<button onClick={()=>{handle?.releaseInput?.();if(windows)setShowAway(v=>!v);else{setShowAway(true);void loadReturn();}}}>Since your last visit</button>}
-  </div>
+  {RETURN_HISTORY&&ownerId&&<div className="visitor-controls" aria-label="Return history">
+   <button onClick={()=>{handle?.releaseInput?.();if(windows)setShowAway(v=>!v);else{setShowAway(true);void loadReturn();}}}>Since your last visit</button>
+  </div>}
   {moment&&<FeedbackForm {...{api,moment,worldId,worldName,build}} close={()=>setMoment(null)}/>}
-  {showAway&&ownerId&&<section className="visitor-return" aria-label="While you were away">
+  {RETURN_HISTORY&&showAway&&ownerId&&<section className="visitor-return" aria-label="While you were away">
    <div className="visitor-heading"><div><span className="visitor-eyebrow">Welcome back</span><h2>While you were away</h2></div><button aria-label="Close return history" onClick={()=>setShowAway(false)}>×</button></div>
    {awayError?<p role="status">{awayError} <button onClick={()=>void loadReturn()}>Retry</button></p>:windows?windows.map(w=><div className="visitor-world-return" key={w.path}><h3>{w.name}</h3><ReturnHistory report={w.report}/></div>):<p role="status">Loading your return history…</p>}
    {visitWarning&&<p className="visitor-history-note">This visit could not be saved. Some updates may repeat next time.</p>}

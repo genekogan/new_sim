@@ -54,19 +54,38 @@ registerMesh({
   },
 });
 
-/** Flags: pole + pennant + floating label (any def tagged `flag`). */
+/** Flags: pole + pennant + floating label (any def tagged `flag`). Lane U2 (Gene 2026-10-20: "flags do not need to be
+ *  drawn to scale -- they should be visible zoomed out too"): up close a flag is its true 3 m; farther out it grows so it
+ *  never looks shorter than FLAG_MIN_PX CSS pixels on screen (pole, pennant and label together, from the pole's foot). */
 registerMesh({
   gen: 'tag:flag',
   build(ctx) {
     const h = num(ctx.params.h, 3);
-    const holder = new THREE.Group();
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, h, 6), ctx.materials.get('wood', '#e8c547')); pole.position.y = h / 2; holder.add(pole);
-    const pennant = new THREE.Mesh(box(), ctx.materials.get('fabric', '#d9534f', { side: THREE.DoubleSide })); pennant.scale.set(0.9, 0.5, 0.02); pennant.position.set(0.45, h - 0.3, 0); holder.add(pennant);
+    const holder = new THREE.Group(), flag = new THREE.Group(); holder.add(flag);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, h, 6), ctx.materials.get('wood', '#e8c547')); pole.position.y = h / 2; flag.add(pole);
+    const pennant = new THREE.Mesh(box(), ctx.materials.get('fabric', '#d9534f', { side: THREE.DoubleSide })); pennant.scale.set(0.9, 0.5, 0.02); pennant.position.set(0.45, h - 0.3, 0); flag.add(pennant);
     const label = typeof ctx.entity.state?.label === 'string' && ctx.entity.state.label ? ctx.entity.state.label : (ctx.entity.name ?? ctx.entity.id);
-    const sprite = labelSprite(label); sprite.position.y = h + 0.6; holder.add(sprite);
+    const sprite = labelSprite(label); sprite.position.y = h + 0.6; flag.add(sprite);
+    // One distance check per drawn part per frame (two meshes; whichever draws first applies it for both).
+    const size = new THREE.Vector2(), at = new THREE.Vector3();
+    const grow = (renderer: THREE.WebGLRenderer, _s: THREE.Scene, camera: THREE.Camera) => {
+      const cam = camera as THREE.PerspectiveCamera; if (!cam.isPerspectiveCamera) return;
+      const e = holder.matrixWorld.elements, d = at.setFromMatrixPosition(holder.matrixWorld).distanceTo(cam.position);
+      const px = (renderer.getSize(size).y / (2 * Math.tan((cam.fov * Math.PI) / 360))) * (cam.zoom || 1);
+      const k = flagScale(d, px, h * (Math.hypot(e[4], e[5], e[6]) || 1));
+      if (Math.abs(flag.scale.y - k) > 1e-3 * k) { flag.scale.setScalar(k); flag.updateMatrix(); flag.updateMatrixWorld(true); }
+    };
+    for (const m of [pole, pennant]) { m.onBeforeRender = grow; m.userData.keepDetail = true; }  // the phone tier's tiny-mesh cull keeps flags
     return holder;
   },
 });
+/** A flag's on-screen floor (CSS px from foot to pennant top) and its scale factor (>= 1) at distance `d`, for a flag
+ *  `tall` metres high in the world and `px` pixels per metre at 1 m. */
+export const FLAG_MIN_PX = 40;
+export function flagScale(d: number, px: number, tall: number): number {
+  const shown = (tall * px) / Math.max(0.05, d);
+  return shown < FLAG_MIN_PX ? FLAG_MIN_PX / shown : 1;
+}
 
 export function labelSprite(text: string): THREE.Sprite {
   const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d')!;
