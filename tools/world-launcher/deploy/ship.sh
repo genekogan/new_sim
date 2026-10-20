@@ -129,7 +129,8 @@ if step preflight "local checks (nothing on eden2)"; then
   [ "$PROBE" = 0 ] || [ -d "$PROBE_CLI" ] || pf "no probe god folder $PROBE_CLI (or --no-probe)"
   [ -d "$(dirname "$LEGACY_FILE")" ] || pf "no folder for $LEGACY_FILE"
   if [ -e "$OUT/STEPS.txt" ] && [ -z "$FROM" ]; then pf "$OUT already holds a run: resume it with --from <step>, or pass another --out"; fi
-  if [ -f "$LOCK_FILE" ]; then say "   lease: $(grep -m1 '^HELD\|^FREE\|^RELEASED' "$LOCK_FILE" | cut -c1-140)"; else say "   lease: no $LOCK_FILE"; fi
+  if [ -f "$LOCK_FILE" ]; then say "   lease: $(grep -m1 '^HELD\|^FREE\|^RELEASED' "$LOCK_FILE" | cut -c1-140)"; say "   lease, latest entry: $(grep -v '^[[:space:]]*$' "$LOCK_FILE" | tail -1 | cut -c1-140)"
+  else say "   lease: no $LOCK_FILE"; fi
   [ "$DRY" = 1 ] || { mkdir -p "$OUT" && echo "$BUILD label $LABEL from $ROOT started $(date -u +%FT%TZ)" >> "$OUT/STEPS.txt"; }
   done_step
 fi
