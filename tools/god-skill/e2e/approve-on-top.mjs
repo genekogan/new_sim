@@ -97,7 +97,8 @@ async function scenario(browser, { name, viewport, dpr, mobile, introSeen, dismi
   await ctx.route(/clerk\.example\.test/, (r) => r.abort());
   const page = await ctx.newPage(); const errors = []; page.on('pageerror', (e) => errors.push(String(e.message).slice(0, 200)));
   const t0 = Date.now(), samples = []; let firstAt = null, loadedAt = null, firstShot = false;
-  await page.goto(`${base}/#approve/${id}`, { waitUntil: 'commit' });
+  // the link exactly as the server handed it to the agent (lane AU: never rebuilt here, so a lost /worlds/w/<slug> base fails)
+  await page.goto(report.approvalURL, { waitUntil: 'commit' });
   // watch the whole load: every 300 ms until the world has drawn and the arrival card has gone, then 10 s more (cap 75 s)
   while (Date.now() - t0 < 75_000) {
     const s = await page.evaluate(probe).catch(() => ({ present: false, error: true })); s.t = Date.now() - t0; samples.push(s);
@@ -144,6 +145,8 @@ try {
   const id = start.data?.approval?.id;
   if (start.status !== 200 || !/^ap_[a-f0-9]{32}$/.test(id ?? '')) throw new Error(`approval start: ${start.status} ${JSON.stringify(start.data).slice(0, 300)}`);
   report.world = base; report.approval = id; report.approvalURL = start.data.approvalURL;
+  // lane AU (hotfix 2026-10-20): 3.57 handed <origin>/#approve/<id> (the site root's world) for a /worlds/w/<slug> world
+  if (report.approvalURL !== `${base}/#approve/${id}`) throw new Error(`approvalURL lost the world's base: ${report.approvalURL} (want ${base}/#approve/${id})`);
   release = await chromeLease('approve-on-top');
   browser = await chromium.launch({ channel: 'chrome', headless: !args.headed, args: ['--ignore-gpu-blocklist'] });
   const desk = { width: 1352, height: 780 }, phone = { width: 390, height: 844 };
