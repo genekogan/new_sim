@@ -21,7 +21,7 @@ import type {createWorldEdenExpansion} from './WorldEdenExpansion.ts';
 import type {LocalClassroomPresentation} from './WorldClassroomPresentation.ts';
 import {WorldFollow} from './WorldFollow.ts';
 import {worldCameraRenderRoots} from './WorldCameraRenderRoots.ts';
-import {WorldOrbitPivot} from './WorldOrbitPivot.ts';import {WorldRtsCamera,EDEN_TERRAIN_EXTENT} from './WorldRtsCamera.ts';import {FramePacer} from './frame-pacing.ts';
+import {WorldOrbitPivot} from './WorldOrbitPivot.ts';import {WorldRtsCamera,EDEN_TERRAIN_EXTENT,forwardWheel} from './WorldRtsCamera.ts';import {FramePacer} from './frame-pacing.ts';
 import {createWorldAtmosphere} from './WorldAtmosphere.ts';
 import {SpectatorSpeechLayer,speechFromTalk,speechFromEdge,channelChip,type SpectatorSpeech,type EdgeSpectatorMessage} from './WorldSpectatorSpeech.ts';
 import {WorldFadingLayer,parseFadeOverride,fadingFromEdge,beamedOut,type FadingState} from './WorldFading.ts';
@@ -304,7 +304,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const labelScene = new THREE.Scene();
     // zIndex 1 contains CSS2DRenderer's per-label depth z-indices, so speech bubbles (z 3) read above name tags.
     Object.assign(labels2d.domElement.style, { position: 'absolute', top: '0', left: '0', pointerEvents: 'none', zIndex: '1' });
-    host.appendChild(labels2d.domElement);
+    host.appendChild(labels2d.domElement);forwardWheel(labels2d.domElement,renderer.domElement);  // C1: the wheel zooms over a name tag too
 
     const scene = (adopted?.scene as THREE.Scene|undefined) ?? new THREE.Scene();
     const farStandIns=quality.tier==='phone'&&quality.detail&&!phoneOff.has('cards')?new WorldFarStandIns(PHONE_STAND_INS,rendererSnapshotter(renderer)):null;if(farStandIns)scene.add(farStandIns.group);  // lane phones: flat cards for far scattered things

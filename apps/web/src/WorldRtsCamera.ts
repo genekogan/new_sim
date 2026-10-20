@@ -60,6 +60,18 @@ export function centreGround(camera: THREE.Camera, scene: THREE.Object3D | null,
 
 /** Old Eden's terrain (±900 m; the far plane is set for it in LiveWorld). */
 export const EDEN_TERRAIN_EXTENT = [-900, -900, 900, 900] as const;
+/** C1: a wheel over HTML laid on the world (name tags, speech) zooms as it would over the canvas: re-dispatched there,
+ * where your camera (or Follow's OrbitControls) reads it. Before, a Soul's tag drifting under the cursor ate every notch. */
+export function forwardWheel(from: HTMLElement, canvas: HTMLElement): void {
+  from.addEventListener('wheel', (e: WheelEvent) => {
+    if (e.target === canvas) return;
+    e.preventDefault(); e.stopPropagation();
+    canvas.dispatchEvent(new WheelEvent('wheel', { deltaX: e.deltaX, deltaY: e.deltaY, deltaZ: e.deltaZ, deltaMode: e.deltaMode,
+      clientX: e.clientX, clientY: e.clientY, screenX: e.screenX, screenY: e.screenY,
+      ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey, metaKey: e.metaKey, bubbles: true, cancelable: true }));
+  }, { passive: false });
+}
+
 /** C1: how far the eye may zoom out from its pivot for a world whose ground spans `extent`. */
 export function farLimit(extent: readonly [number, number, number, number] | null | undefined): number {
   const r = extent ? Math.max(extent[2] - extent[0], extent[3] - extent[1]) / 2 : 0;
