@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { splitSnapshot } from '../../server/src/god/snapshot-wire.ts';
-import { expandSnapshot } from './snapshot-wire.ts';
+import { ENTRY_HEDGE_MS, expandSnapshot, loadSnapshot } from './snapshot-wire.ts';
+import { entryWireUrl } from './snapshot-prefetch.ts';
 
 const sample = {
   contract: 'world/1', worldId: 'w', seq: 7, counter: 3, seed: 's', tick: 42, constants: {}, state: {},
@@ -18,4 +19,29 @@ const roundTrip = (snap: Record<string, unknown>) => { const s = splitSnapshot(s
 
 test('split on the server then expand on the client gives the plain snapshot back', () => {
   assert.deepEqual(roundTrip(sample), sample);
+});
+
+test('PF2: a stalled page-entry snapshot or part is asked for again after ENTRY_HEDGE_MS instead of holding the arrival', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const g = globalThis as unknown as Record<string, unknown>, saved = { window: g.window, fetch: g.fetch };
+  t.after(() => { g.window = saved.window; g.fetch = saved.fetch; });
+  const s = splitSnapshot(structuredClone(sample)), plain = '/worlds/w/x/v1/world/snapshot', never = new Promise<Response>(() => {});
+  g.window = {}; const url = entryWireUrl(plain);
+  // the page-entry prefetches of the snapshot and of the defs part never answer (a stalled request)
+  g.window = { __simSnapshotPrefetch: { url, response: never, parts: { [s.refs.defs]: never } } };
+  const asked: string[] = [], json = (x: unknown, headers: Record<string, string> = {}) => new Response(JSON.stringify(x), { headers });
+  g.fetch = async (u: string) => { asked.push(u);
+    if (u === url) return json(s.body, { 'x-defs-ref': s.refs.defs, 'x-ground-ref': s.refs.ground });
+    if (u.endsWith(`/part/${s.refs.defs}`)) return json(s.parts.defs);
+    if (u.endsWith(`/part/${s.refs.ground}`)) return json(s.parts.ground);
+    throw Error(`unexpected ${u}`); };
+  let got: Awaited<ReturnType<typeof loadSnapshot>> | undefined;
+  void loadSnapshot(plain, new AbortController().signal, true).then((x) => { got = x; });
+  const settle = () => new Promise((r) => setImmediate(r));
+  await settle(); assert.equal(got, undefined, 'waits for the prefetch first');
+  t.mock.timers.tick(ENTRY_HEDGE_MS - 1); await settle(); assert.equal(got, undefined);
+  for (let i = 0; i < 4 && got === undefined; i++) { t.mock.timers.tick(ENTRY_HEDGE_MS); await settle(); await settle(); }
+  assert.ok(got, 'arrives once the stalled requests are asked for again');
+  assert.deepEqual(got.snap, sample);
+  assert.deepEqual(asked.map((u) => u.replace(/.*\/v1\/world\//, '')), ['snapshot?defs=ref', `part/${s.refs.ground}`, `part/${s.refs.defs}`]);
 });

@@ -4,15 +4,19 @@
 // world's entity layer needs, beside the snapshot the head script already asked for; the layer then builds the terrain
 // and the near ring while phase two (main.tsx, React, the Shell, the rest of the UI, the socket) downloads. Phase two
 // starts when the snapshot is in (early-entry.ts calls window.__simPhase2), after at most PHASE2_FALLBACK_MS, or at once
-// if the early entry fails to load. P7d: `__simPhase2(true)` starts only its downloads and the socket; the main entry
+// if the early entry fails to load; its socket opens after at most SOCKET_FALLBACK_MS (PF2). P7d: `__simPhase2(true)` starts only its downloads and the socket; the main entry
 // itself runs at the next call (early-entry.ts: once the early renderer's poster is up), so it never competes with it. Pages that are not two-phase (the head script's phasedEntryWanted: desktops, old
 // worlds, pictures, ?phased=0) load both at once, main first, as before.
 // No imports: vite.config.ts loads this file in node.
 
 /** The window function that starts phase two (idempotent; `(true)`: its downloads and the socket, not yet its entry). */
 export const PHASE2_GLOBAL = '__simPhase2';
-/** Phase two starts by itself this long after phase one, whatever happened to the early entry. */
-export const PHASE2_FALLBACK_MS = 15_000;
+/** Phase two starts by itself this long after phase one, whatever happened to the early entry. PF2: was 15 s. */
+export const PHASE2_FALLBACK_MS = 8_000;
+/** PF2 (2026-10-20): the socket opens by itself this long after phase one when the snapshot is late (it opens with phase
+ *  two, at the snapshot, when that comes first). Before, a late snapshot held the socket too, so its join started only after
+ *  the snapshot; on live the snapshot is in by ~0.3-0.6 s, so this only acts when it is late. */
+export const SOCKET_FALLBACK_MS = 2_500;
 
 export type Phase = { entry: string; preloads: readonly string[] };
 
@@ -21,9 +25,10 @@ export type Phase = { entry: string; preloads: readonly string[] };
 export function phasedLoaderScript(early: Phase, main: Phase): string {
   return `(function(){var d=document,W=window,E=${JSON.stringify(early)},M=${JSON.stringify(main)},done=false,pre=false,sock=false,`
     + `add=function(u,entry){var l=d.createElement(entry?'script':'link');if(entry){l.type='module';l.src=u;}else{l.rel='modulepreload';l.href=u;}l.crossOrigin='';d.head.appendChild(l);return l;},`
-    + `two=function(hold){if(!pre){pre=true;M.preloads.forEach(function(u){add(u);});}if(hold!==true&&!done){done=true;add(M.entry,true);}if(!sock){sock=true;try{var o=W.__simOpenSocket;if(typeof o==='function')o();}catch(e){}}};`
+    + `so=function(){if(!sock){sock=true;try{var o=W.__simOpenSocket;if(typeof o==='function')o();}catch(e){}}},`
+    + `two=function(hold){if(!pre){pre=true;M.preloads.forEach(function(u){add(u);});}if(hold!==true&&!done){done=true;add(M.entry,true);}so();};`
     + `W[${JSON.stringify(PHASE2_GLOBAL)}]=two;var ph=W.__simPhased===true;if(!ph)two();`
-    + `E.preloads.forEach(function(u){add(u);});add(E.entry,true).onerror=two;if(ph)setTimeout(two,${PHASE2_FALLBACK_MS});})();`;
+    + `E.preloads.forEach(function(u){add(u);});add(E.entry,true).onerror=two;if(ph){setTimeout(so,${SOCKET_FALLBACK_MS});setTimeout(two,${PHASE2_FALLBACK_MS});}})();`;
 }
 
 const MODULE_SCRIPT = /[ \t]*<script type="module" crossorigin src="([^"]+)"><\/script>\n?/g;

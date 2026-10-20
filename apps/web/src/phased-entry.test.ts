@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import { PHASE2_GLOBAL, phasedLoaderScript, rewritePhasedHtml } from './phased-entry.ts';
+import { PHASE2_FALLBACK_MS, PHASE2_GLOBAL, SOCKET_FALLBACK_MS, phasedLoaderScript, rewritePhasedHtml } from './phased-entry.ts';
 import { phasedEntryWanted } from './snapshot-prefetch.ts';
 import { pickQualityTier } from './quality-tier.ts';
 import { earlyArrivalWanted } from './early-arrival.ts';
@@ -49,7 +49,23 @@ test('rewritePhasedHtml: one loader in place of the module script and preloads; 
   const fail = runLoader(js, true); (fail.added[1].el.onerror as () => void)();
   assert.equal(fail.added.filter((a) => a.tag === 'entry').length, 2);
   assert.throws(() => rewritePhasedHtml(HTML.replace('main-A', 'other-A'), 'assets/main-A.js', 'assets/early-E.js', []), /expected one module script/);
-  assert.match(phasedLoaderScript({ entry: 'e', preloads: [] }, { entry: 'm', preloads: [] }), /setTimeout\(two,15000\)/);
+  assert.match(phasedLoaderScript({ entry: 'e', preloads: [] }, { entry: 'm', preloads: [] }), new RegExp(`setTimeout\\(two,${PHASE2_FALLBACK_MS}\\)`));
+});
+
+test('PF2: a late snapshot no longer holds the socket: it opens by itself within 2.5 s, phase two by 8 s', () => {
+  const added: string[] = [], timers: { f: () => void; ms: number }[] = [];
+  const win: Record<string, unknown> = { __simPhased: true, __simOpenSocket: () => { added.push('socket'); } };
+  const document = { createElement: (tag: string) => ({ tag }), head: { appendChild: (el: Record<string, unknown>) => { added.push(`${el.type === 'module' ? 'entry' : el.rel} ${el.src ?? el.href}`); } } };
+  vm.runInNewContext(phasedLoaderScript({ entry: '/e.js', preloads: [] }, { entry: '/m.js', preloads: ['/r.js'] }), { window: win, document, setTimeout: (f: () => void, ms: number) => { timers.push({ f, ms }); } });
+  const until = (ms: number) => timers.filter((t) => t.ms <= ms).forEach((t) => t.f());
+  // the snapshot never reports in (__simPhase2 is not called): live answers in ~0.3-0.6 s, a stalled one held it 15 s
+  assert.ok(SOCKET_FALLBACK_MS <= 2_500 && PHASE2_FALLBACK_MS <= 8_000);
+  until(2_500);
+  assert.deepEqual(added, ['entry /e.js', 'socket'], 'the socket alone, phase two\'s downloads and entry still wait');
+  until(8_000);
+  assert.deepEqual(added, ['entry /e.js', 'socket', 'modulepreload /r.js', 'entry /m.js'], 'phase two by the fallback, the socket once');
+  (win[PHASE2_GLOBAL] as () => void)();
+  assert.equal(added.length, 4, 'the snapshot coming later changes nothing');
 });
 
 test('phasedEntryWanted = the early layer\'s gate (lever D on the page\'s tier) for a new world', () => {

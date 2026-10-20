@@ -24,6 +24,22 @@ export function expandSnapshot(body: WireBody, defs: Def[], ground: unknown): Re
   return { ...rest, ground, defs, entities: full };
 }
 
+/** PF2 (2026-10-20): a page-entry request (the snapshot, its parts) that has not answered in this long is asked for again
+ *  beside it and the first answer wins. Nothing else bounds them: one stalled request held the arrival until it ended
+ *  (live phone Eden 2026 with the snapshot held 20 s / 45 s arrived at 20.9 s / 45.9 s). Live answers in ~0.1-0.4 s. */
+export const ENTRY_HEDGE_MS = 4_000;
+
+/** `first`, or, when it has not answered within `ms`, whichever of it and `again()` answers first; fails when both have. */
+export function hedged(first: Promise<Response>, again: () => Promise<Response>, ms = ENTRY_HEDGE_MS): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    let settled = false, out = 1;
+    const win = (r: Response) => { if (!settled) { settled = true; clearTimeout(timer); resolve(r); } };
+    const lose = (e: unknown) => { if (--out === 0 && !settled) { settled = true; clearTimeout(timer); reject(e); } };
+    const timer = setTimeout(() => { if (settled) return; out++; try { again().then(win, lose); } catch (e) { lose(e); } }, ms);
+    first.then(win, lose);
+  });
+}
+
 export type Loaded = { snap: Record<string, unknown>; response: Response };
 /** The world snapshot for a viewer: the wire form when the server speaks it, else the plain one. `first` takes the
  *  page-entry prefetch (snapshot-prefetch.ts) and its edge-cacheable key. `response` is the snapshot's own (headers:
@@ -32,11 +48,13 @@ export async function loadSnapshot(plainUrl: string, signal: AbortSignal, first 
   const plain = async (): Promise<Loaded | null> => { const r = await fetch(plainUrl, { signal }); return r.ok ? { snap: await r.json() as Record<string, unknown>, response: r } : null; };
   try {
     const url = first ? entryWireUrl(plainUrl) : `${plainUrl}?defs=ref`;
-    const r = await ((first ? takeSnapshotPrefetch(url) : null) ?? fetch(url, { signal }));
+    const again = () => fetch(url, { signal });
+    const r = await (first ? hedged(takeSnapshotPrefetch(url) ?? again(), again) : again());
     if (!r.ok) return plain();
     const defsRef = r.headers.get('x-defs-ref'), groundRef = r.headers.get('x-ground-ref');
     if (!defsRef || !groundRef) { const snap = await r.json() as Record<string, unknown>; return 'defsRef' in snap ? plain() : { snap, response: r }; } // an older server answers plainly; a wire body without its part headers is asked for again plainly
-    const part = async (ref: string) => { const p = await (takePartPrefetch(ref) ?? fetch(plainUrl.replace(/\/v1\/world\/snapshot$/, `/v1/world/part/${ref}`), { signal })); if (!p.ok) throw Error(`part ${p.status}`); return p.json(); };
+    const part = async (ref: string) => { const get = () => fetch(plainUrl.replace(/\/v1\/world\/snapshot$/, `/v1/world/part/${ref}`), { signal });
+      const pre = takePartPrefetch(ref), p = await (first ? hedged(pre ?? get(), get) : pre ?? get()); if (!p.ok) throw Error(`part ${p.status}`); return p.json(); };
     const [body, defs, ground] = await Promise.all([r.json() as Promise<WireBody>, part(defsRef), part(groundRef)]);
     if (body.defsRef !== defsRef || body.groundRef !== groundRef || !Array.isArray(defs)) return plain();
     return { snap: expandSnapshot(body, defs, ground), response: r };
