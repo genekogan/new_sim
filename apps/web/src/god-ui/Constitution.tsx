@@ -1,5 +1,5 @@
-// GOVERN (lane C17): the world's constitution on the world page, for everyone. A small chip ("§ Constitution · v3",
-// "changed since your last visit"); open, it shows the text (markdown), what changed since this browser last opened it,
+// GOVERN (lane C17): the world's constitution on the world page, for everyone. G4 (Gene 2026-10-20): it lives in the
+// God modal now (its own section; the chip is gone). It shows the text (markdown), what changed since this browser last opened it,
 // the residents' amendments with their support and the god's decisions, and how many prayers were answered. The owner
 // (the world's god in this browser) also decides amendments, answers prayers and sets the residents-decide switch —
 // the same calls the god's agent makes (`amendments`, `decide`, `answer`).
@@ -9,18 +9,17 @@ import * as G from './god-api.ts';
 import * as V from './governance-api.ts';
 import './constitution.css';
 
-const shotMode = typeof location !== 'undefined' && new URLSearchParams(location.search).get('shot') === '1';
 const ago = (t: number | null) => { if (!t) return ''; const s = Math.max(0, Math.round((Date.now() - t) / 1000)); return s < 60 ? 'just now' : s < 3600 ? `${Math.round(s / 60)} min ago` : s < 86400 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} d ago`; };
 /** Supporters other than the proposer (who always supports their own). */
 const others = (a: V.Amendment) => a.supporters.filter((n) => n !== a.by.name);
 const STATUS_WORD: Record<V.Amendment['status'], string> = { open: 'open', accepted: 'accepted', declined: 'declined', withdrawn: 'withdrawn' };
 
-export function ConstitutionCard() {
+/** The Constitution section of the God modal: mounted while it is shown (showing it is reading it). */
+export function ConstitutionBody() {
   const [g, setG] = useState<V.Governance | null>(null);
   const [status, setStatus] = useState<G.Status | null>(null);
-  const [open, setOpen] = useState(false);
   // the version this browser had opened before this page load ("changed since your last visit"); null = first visit
-  const [seen, setSeen] = useState<number | null>(() => V.seenVersion());
+  const [seen] = useState<number | null>(() => V.seenVersion());
   const [before, setBefore] = useState<{ version: number; text: string } | null>(null);
   const [showChange, setShowChange] = useState(true);
   const [prayers, setPrayers] = useState<V.Prayer[] | null>(null);
@@ -39,22 +38,19 @@ export function ConstitutionCard() {
   useEffect(() => { void refresh(); const t = setInterval(() => void refresh(), 10_000); return () => clearInterval(t); }, [refresh]);
   const version = g?.constitution.version ?? 0;
   const changed = seen !== null && version > seen;
-  // opening the card is reading it: remember the version (the badge clears when the card closes)
-  useEffect(() => { if (open && version > 0) V.markSeen(version); }, [open, version]);
+  // showing it is reading it: remember the version
+  useEffect(() => { if (version > 0) V.markSeen(version); }, [version]);
   useEffect(() => {
-    if (!open || !changed || seen === null || before?.version === seen) return;
+    if (!changed || seen === null || before?.version === seen) return;
     if (seen === 0) { setBefore({ version: 0, text: '' }); return; }
     void V.versionText(seen).then((text) => { if (text !== null) setBefore({ version: seen, text }); });
-  }, [open, changed, seen, before]);
-  useEffect(() => { if (!open || !owner) return; const go = () => void V.prayers().then(setPrayers).catch(() => setPrayers(null)); go(); const t = setInterval(go, 10_000); return () => clearInterval(t); }, [open, owner]);
+  }, [changed, seen, before]);
+  useEffect(() => { if (!owner) return; const go = () => void V.prayers().then(setPrayers).catch(() => setPrayers(null)); go(); const t = setInterval(go, 10_000); return () => clearInterval(t); }, [owner]);
 
   const diff = useMemo(() => (before && g ? V.changedOnly(V.lineDiff(before.text, g.constitution.text)) : null), [before, g]);
-  if (shotMode || !g) return null;
+  if (!g) return <p className="cn-dim">Loading the Constitution…</p>;
   const openAmendments = g.amendments.filter((a) => a.status === 'open');
   const decided = g.amendments.filter((a) => a.status !== 'open');
-  if (!owner && version === 0 && !g.amendments.length) return null;
-
-  const close = () => { setOpen(false); setSeen(V.seenVersion()); setBefore(null); setDeclining(null); setAnswering(null); };
   const run = async (key: string, fn: () => Promise<unknown>, ok: string) => {
     setBusy(key); setNote(null);
     try { await fn(); setNote({ text: ok }); await refresh(); if (owner) setPrayers(await V.prayers().catch(() => null)); }
@@ -66,20 +62,11 @@ export function ConstitutionCard() {
   const sendAnswer = (p: V.Prayer) => run('p:' + p.id, async () => { await V.answer(p.id, answerText.trim()); setAnswering(null); setAnswerText(''); }, `Answered ${p.soul_name}.`);
   const waiting = (prayers ?? []).filter((p) => p.answer === null), answered = (prayers ?? []).filter((p) => p.answer !== null).slice(0, 5);
 
-  if (!open) return (
-    <button className="cn-chip" data-constitution-chip="1" data-version={version} data-changed={changed ? '1' : '0'} onClick={() => setOpen(true)} title="This world's constitution: the customs its god wrote, and the residents' amendments">
-      <span className="cn-mark" aria-hidden="true">§</span> Constitution{version ? <span className="cn-v">v{version}</span> : <span className="cn-v">none yet</span>}
-      {changed && <span className="cn-new" data-changed-badge="1">changed since your last visit</span>}
-      {openAmendments.length > 0 && <span className="cn-pill">{openAmendments.length} proposal{openAmendments.length === 1 ? '' : 's'}</span>}
-    </button>
-  );
-
   return (
     <div className="cn-card" data-constitution="1" data-version={version}>
       <div className="cn-head">
         <b><span className="cn-mark" aria-hidden="true">§</span> Constitution</b>
         <span className="cn-dim">{version ? <>version {version}{g.constitution.at ? <> · {ago(g.constitution.at)}</> : null}{g.history[0]?.by === 'residents' ? ' · by the residents' : ''}</> : 'not written yet'}</span>
-        <button className="cn-x" onClick={close} aria-label="close" title="Close">×</button>
       </div>
 
       {changed && before && (

@@ -1,0 +1,52 @@
+// G4 (Gene 2026-10-20): the God button right of Explore, styled like it ("God ⌘G"), on new worlds. It opens the one God
+// modal (GodModal, rendered by GodPanel in the world view): everything for the world's god, and for everyone else a
+// read-only page (the Constitution, how to become a god). For the owner a dot says whether their agent is connected
+// (green) or not (red), and a badge counts pairing requests waiting for approval. Replaces GODUI's lightning-bolt popover
+// and the separate Constitution chip.
+import { useEffect, useRef, useState } from 'react';
+import * as G from './god-api.ts';
+import { openGod, toggleGod, useGod, watchInbox } from './god-store.ts';
+
+/** ⌘G / Ctrl+G opens God (see team/lanes/t4-g4.md "Key"): browsers let a page take it (it is only find-next), unlike ⌘L. */
+export const GOD_KEY = 'g';
+export const isMac = () => typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+export const godKeyLabel = () => (isMac() ? '⌘G' : 'Ctrl+G');
+export const isGodKey = (e: Pick<KeyboardEvent, 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey' | 'key'>) => (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === GOD_KEY;
+
+const BOLT = <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M11.5 2 4.5 11.2h4.6L8 18l7.5-9.6h-4.7z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/></svg>;
+
+export function GodButton() {
+  const [status, setStatus] = useState<G.Status | null>(null);
+  const { open, inbox } = useGod();
+  const owner = status?.you === 'owner' || status?.you === 'god';
+  const pendingSeen = useRef(0);
+  useEffect(() => G.watchStatus(setStatus), []);
+  useEffect(() => { if (owner) return watchInbox(); }, [owner]);
+  // #godpair/<code> (the link a god agent prints) and a new pairing request open God on the agent section
+  useEffect(() => { if (location.hash.startsWith('#godpair/')) openGod('agent'); }, []);
+  useEffect(() => { const n = status?.pending.length ?? 0; if (owner && n > pendingSeen.current) openGod('agent'); pendingSeen.current = n; }, [status, owner]);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (!isGodKey(e)) return;
+      // another modal (Explore) is open: leave it alone
+      if (document.querySelector('dialog[open]:not([data-god-modal]), [role="dialog"][aria-modal="true"]:not([data-god-modal])')) return;
+      e.preventDefault(); toggleGod();
+    };
+    addEventListener('keydown', key); return () => removeEventListener('keydown', key);
+  }, []);
+  if (!status) return null;
+  const paired = (status.agents ?? 0) > 0;
+  const live = owner && paired && inbox ? (inbox.connected ? 'on' : 'off') : null;
+  const title = owner ? `God: your agent, this world's edits, flags and Constitution (${godKeyLabel()})` : `God: this world's Constitution, and how to become a god (${godKeyLabel()})`;
+  return (
+    <span className="god-control">
+      <button type="button" className="explore-open god-open" data-god-bolt="1" data-god-open={owner ? 'owner' : 'visitor'} data-agent={live ?? undefined}
+        aria-haspopup="dialog" aria-expanded={open} title={title} onClick={() => toggleGod()}>
+        {BOLT}<span>God</span>
+        {live && <i className={'god-dot ' + live} aria-label={live === 'on' ? 'agent connected' : 'agent not connected'} />}
+        <kbd>{godKeyLabel()}</kbd>
+        {owner && status.pending.length ? <span className="gp-badge" aria-label={`${status.pending.length} pairing request`}>{status.pending.length}</span> : null}
+      </button>
+    </span>
+  );
+}

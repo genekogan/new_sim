@@ -40,16 +40,16 @@ test('menu items are the existing controls on the page; choosing one clicks that
   const el = (name: string, o: { text?: string; aria?: string; hidden?: boolean } = {}) => ({ click: () => clicked.push(name), textContent: o.text ?? '', hidden: o.hidden ?? false, getAttribute: (a: string) => (a === 'aria-label' ? o.aria ?? null : null) });
   const page: Record<string, ReturnType<typeof el>[]> = {
     '.account-sign-in': [el('signin', { text: 'Sign in' })],
-    '[data-god-panel-toggle]': [el('god', { text: '✦ Claim this world' })],
-    '.cn-chip': [el('cn', { text: '§ Constitutionv1' })],
+    '[data-god-panel-toggle]': [el('claim', { text: '✦ Claim this world' })],
+    '[data-god-open="visitor"]': [el('god', { text: 'God⌘G' })],
     '[data-feedback-open]': [el('feedback', { text: 'Send feedback' })],
     '.visitor-controls button': [el('away', { text: 'Since your last visit' })],
     '.eden-sound-toggle [data-sound]': [el('mute', { aria: 'Sound is on: mute' }), el('music', { aria: 'Music is off: turn on', hidden: true })],
   };
   assert.deepEqual(Object.keys(page), MORE_TARGETS.map((t) => t.selector));
   const items = collectMoreItems({ querySelectorAll: (s) => page[s] ?? [] });
-  assert.deepEqual(items.map((i) => i.label), ['Sign in', 'Claim this world', 'Constitution', 'Feedback', 'Since your last visit', 'Sound is on: mute']);
-  assert.deepEqual(items.map((i) => i.key), ['sign-in', 'god', 'constitution', 'feedback', 'visitor', 'sound']);
+  assert.deepEqual(items.map((i) => i.label), ['Sign in', 'Claim this world', 'God', 'Feedback', 'Since your last visit', 'Sound is on: mute']);
+  assert.deepEqual(items.map((i) => i.key), ['sign-in', 'claim', 'god', 'feedback', 'visitor', 'sound']);
   items[3].target.click(); items[5].target.click();
   assert.deepEqual(clicked, ['feedback', 'mute']);
   assert.deepEqual(collectMoreItems({ querySelectorAll: () => [] }), []);

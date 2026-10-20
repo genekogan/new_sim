@@ -12,8 +12,9 @@ export const TIDY_CLASS = 'phone-tidy';
 /** The secondary controls the menu offers, in menu order. The selectors are the existing controls' own. */
 export const MORE_TARGETS: readonly { key: string; selector: string; label?: string }[] = [
   { key: 'sign-in', selector: '.account-sign-in', label: 'Sign in' },
-  { key: 'god', selector: '[data-god-panel-toggle]' },
-  { key: 'constitution', selector: '.cn-chip', label: 'Constitution' },
+  { key: 'claim', selector: '[data-god-panel-toggle]' },
+  // G4: the God button (the Constitution lives in it now); a visitor's is hidden on small screens and offered here
+  { key: 'god', selector: '[data-god-open="visitor"]', label: 'God' },
   { key: 'feedback', selector: '[data-feedback-open]', label: 'Feedback' },  // U2: in the account / signed-out menu now
   { key: 'visitor', selector: '.visitor-controls button' },  // Since your last visit, when VisitorWelcome.RETURN_HISTORY is on
   { key: 'sound', selector: '.eden-sound-toggle [data-sound]' },

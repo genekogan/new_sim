@@ -174,7 +174,7 @@
 .hud-explore-group .explore-control{min-width:0;flex:0 1 auto}
 .hud-explore-group .explore-open{max-width:100%;min-width:0}
 .hud-explore-group .explore-open>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hud-explore-group .explore-open svg,.hud-explore-group .explore-open kbd,.hud-explore-group .my-souls,.hud-explore-group .god-bolt{flex-shrink:0}
+.hud-explore-group .explore-open svg,.hud-explore-group .explore-open kbd,.hud-explore-group .my-souls,.hud-explore-group .god-control{flex-shrink:0}
 @media(min-width:701px) and (max-width:1050px){
  .human-world:not(.has-advanced) .world-hud.slim{grid-template-columns:max-content minmax(0,1fr) max-content}
  .human-world:not(.has-advanced) .world-hud.slim>.hud-camera-row{justify-self:start}
@@ -199,7 +199,6 @@
 .soul-list .soul-choice-context>b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* Keep the existing panels below a header that can now occupy several rows. */
 .human-world:not(.has-advanced) .world-viewer>.gp-card{top:calc(var(--app-hud-bottom,50px) + 12px);max-width:calc(100% - 24px);max-height:calc(100% - var(--app-hud-bottom,50px) - 88px)}
-@media(max-width:700px){.human-world:not(.has-advanced) .gp-card.god-bolt-panel{top:calc(var(--app-hud-bottom,50px) + 8px);max-height:calc(100dvh - var(--app-hud-bottom,50px) - 24px)}}
 
 /* Touch devices: every interactive control is at least 44x44 CSS px (desktop mouse layouts stay as designed). */
 @media (pointer:coarse){
@@ -209,12 +208,11 @@
  .human-world:not(.has-advanced) .world-hud.slim .bring-agent-open,
  .human-world:not(.has-advanced) .world-hud.slim .eden-tour select,
  .human-world:not(.has-advanced) .world-hud.slim .hud-explore-group .explore-open,
- .human-world .world-hud .god-bolt-open,
+ .human-world:not(.has-advanced) .world-hud.slim .hud-explore-group .god-open,
  .human-world .account-sign-in{min-height:44px;box-sizing:border-box}
  .human-world:not(.has-advanced) .world-hud.slim .hud-camera,
  .human-world .account-avatar,
  .human-world .my-souls>button{width:44px;height:44px;min-height:44px;flex:0 0 44px}
- .human-world .god-bolt-open{min-width:44px}
  .human-world:not(.has-advanced) .viewer-following button{width:44px;height:44px;min-height:44px;margin:-3px -4px -3px 0}
  .human-world .my-souls{gap:4px}
  .human-world .my-souls-more>button,.human-world .my-souls-more summary{min-height:44px;min-width:44px}
@@ -232,7 +230,7 @@
 .time-preview .dim{opacity:.7;font-size:12px}
 /* Lane P6 (2026-10-19): small screens only (HudMore.tsx sets html.phone-tidy there, never on desktop). Secondary controls
    leave the world view and are offered from the HUD's one "More" button; watch mode keeps only the primary chrome. */
-html.phone-tidy .human-world:not(.has-advanced) .account-sign-in,html.phone-tidy .human-world:not(.has-advanced) [data-god-panel-toggle],html.phone-tidy .human-world:not(.has-advanced) .cn-chip,html.phone-tidy .human-world:not(.has-advanced) .visitor-controls,html.phone-tidy .human-world:not(.has-advanced) .account-more,html.phone-tidy .eden-sound-toggle{display:none!important}
+html.phone-tidy .human-world:not(.has-advanced) .account-sign-in,html.phone-tidy .human-world:not(.has-advanced) [data-god-panel-toggle],html.phone-tidy .human-world:not(.has-advanced) [data-god-open="visitor"],html.phone-tidy .human-world:not(.has-advanced) .visitor-controls,html.phone-tidy .human-world:not(.has-advanced) .account-more,html.phone-tidy .eden-sound-toggle{display:none!important}
 .hud-more-wrap{position:relative;display:inline-flex;flex:none}
 .human-world:not(.has-advanced) .world-hud.slim .hud-more{flex:none;padding:0}
 .hud-more-menu{position:absolute;top:calc(100% + 8px);right:0;z-index:20;display:flex;flex-direction:column;gap:2px;min-width:200px;max-width:calc(100vw - 16px - var(--sa-l) - var(--sa-r));padding:6px;border-radius:14px;border:1px solid var(--glass-line,var(--line));background:var(--glass,var(--panel));-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:var(--glass-shadow)}

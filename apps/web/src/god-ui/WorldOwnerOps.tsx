@@ -1,4 +1,4 @@
-// The owner's world housekeeping, a small folded section of the god popover (GodBolt), backed by the launcher
+// The owner's world housekeeping, the God modal's "Weather & world" section (GodPanel), backed by the launcher
 // (tools/world-launcher/handoff.mjs, worldops.mjs; docs/god/WORLD-OWNER-API.md): offer the world to someone, archive it.
 // Co-builders (invite/remove) show only when the site turns them on (`enabled`); Gene 2026-10-16: one god per world, so
 // they are off by default and the rows stay hidden (an old co-builder still shows, so the owner can remove them). Nothing here deletes a world: archiving moves it aside, and the site admin can restore it.

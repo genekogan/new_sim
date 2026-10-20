@@ -1,10 +1,14 @@
 // The god panel on an entity world (spec <eden4>/29 WP6): sign in, claim,
 // the authored welcome (rendered, with copy buttons), first steps ticked live,
 // pairing approvals, undo/redo and the recent edits (undo a whole group), flags
-// (click to fly there), and the god's previews drawn as ghosts. Compact (380 px)
-// and collapsible. Owner-only controls; visitors see the world and its name.
+// (click to fly there), and the god's previews drawn as ghosts.
+// G4 (Gene 2026-10-20): for the world's god all of it lives in the one God modal (GodModal.tsx) under the God button,
+// with the agent's command log, weather, the world's housekeeping and the Constitution; the floating "God mode x/6"
+// card is gone. Everyone else gets the same modal read-only (Constitution, how to become a god). The claim card of a
+// godless world, the approval link (#approve/<id>) and the offer links keep their small floating card.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiPath, worldKey } from './world-path.ts';
+import { BASE } from './base-path.ts';
 import { Markdown } from './god-ui/markdown.tsx';
 import * as G from './god-ui/god-api.ts';
 import { describeEdit, steps, type Step } from './god-ui/checklist.ts';
@@ -13,12 +17,14 @@ import { SMALL_SCREEN } from './HudMore.tsx';
 import { previewGhost, takePreviewKey, type GhostSummary } from './WorldPreviewGhost.ts';
 import { useSession } from './auth-session.ts';
 import { ApprovalCard, JoinPanel } from './god-ui/JoinPanel.tsx';
-import { GodAgentMessageBox } from './AgentMessageBox.tsx';
+import { OwnerGod, VisitorGod, ago as since, type NavItem } from './god-ui/GodModal.tsx';
+import { closeGod, openGod, useGod, watchInbox } from './god-ui/god-store.ts';
+import { ConstitutionBody } from './god-ui/Constitution.tsx';
+import { WorldOwnerOps } from './god-ui/WorldOwnerOps.tsx';
 import { approvalFromHash, landingHash } from './god-ui/join-api.ts';
 import { OfferCard, offerFromHash } from './god-ui/OfferCard.tsx';
 import './god-ui/god-panel.css';
 
-type Tab = 'start' | 'edits' | 'flags' | 'previews' | 'souls';
 const query = new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
 const shotMode = query.get('shot') === '1';
 // Read at module load: Shell rewrites the landing fragment to its tab (#watch) before the scene is ready.
@@ -28,6 +34,10 @@ const PAIRED_KEY = `sim.godPaired:${worldKey}`;
 const PHONE = () => typeof matchMedia === 'function' && matchMedia(SMALL_SCREEN).matches;  // P6: landscape phones (coarse pointer) too
 // Phones keep their own remembered choice and start compact: the open panel covers most of a small screen.
 const openKey = () => 'sim.godPanel.open' + (PHONE() ? '.phone' : '');
+const INTRO_KEY = `sim.godIntro:${worldKey}`;   // G4: God opens by itself once, for a new owner whose agent is not connected
+type Sim = { controls?: { target: { x: number; z: number } } };
+/** Where the camera looks (the orbit target), for a strike near the view's centre. */
+const viewCentre = (): [number, number] | null => { const t = (window as unknown as { __simEntity?: Sim }).__simEntity?.controls?.target; return t ? [Math.round(t.x * 10) / 10, Math.round(t.z * 10) / 10] : null; };
 const ago = (t: number) => { const s = Math.max(0, Math.round((Date.now() - t) / 1000)); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`; };
 
 export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boolean; onFlagMode: (v: boolean) => void; entitiesAt?: (seq: number) => Iterable<G.FlagSource> | null }) {
@@ -39,7 +49,8 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
   // #worldoffer/<code>, #cobuildpair/<code> (the launcher's co-builder and handoff links): that card first
   const [offerLink, setOfferLink] = useState(() => offerFromHash(landingHash));
   const [open, setOpen] = useState<boolean>(() => joinHash || !!approvalId || (PHONE() ? localStorage.getItem(openKey()) === '1' : localStorage.getItem(openKey()) !== '0'));
-  const [tab, setTab] = useState<Tab>(joinHash ? 'souls' : 'start');
+  const god = useGod();
+  const hashCode = landingHash.startsWith('#godpair/') ? decodeURIComponent(landingHash.slice('#godpair/'.length)) : null;
   const [welcome, setWelcome] = useState<string | null>(null);
   const [edits, setEdits] = useState<G.EditRow[] | null>(null);
   const [flags, setFlags] = useState<G.FlagRef[]>([]);
@@ -48,7 +59,7 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ text: string; bad?: boolean } | null>(null);
   const [ghost, setGhost] = useState<GhostSummary | null>(null);
-  const approvedHere = localStorage.getItem(PAIRED_KEY) === '1';   // GODUI: the bolt panel (GodBolt) approves now
+  const approvedHere = localStorage.getItem(PAIRED_KEY) === '1';   // the God modal's agent section approves pairings
   const owner = status?.you === 'owner' || status?.you === 'god';
   const seq = status?.seq;
   // who is signed in on this page (Clerk in production, a local name in dev): auth-session.ts
@@ -136,13 +147,21 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
   const signedIn = session.authed && !!status && status.you !== 'anonymous';
   const checklist: Step[] = useMemo(() => steps({ status, signedIn, edits, flags: flags.length, approvedHere, agentSeen: !!launcher?.seen.agentSeenAt, looks: launcher?.seen.looks ?? 0 }), [status, signedIn, edits, flags.length, approvedHere, launcher]);
   const done = checklist.filter((s) => s.done).length;
-  const paired = !!checklist.find((s) => s.id === 'pair')?.done;
   const recent = useMemo(() => (edits ?? []).slice().sort((a, b) => b.seq - a.seq).slice(0, 8), [edits]);
   const canUndo = (edits ?? []).some((e) => !e.undone && e.kind !== 'undo' && e.ops.length > 0);
   // one "undo group" per group, on its newest row that undo would still revert
   const groupRow = useMemo(() => { const m = new Map<string, number>(); for (const e of (edits ?? []).slice().sort((a, b) => b.seq - a.seq)) if (e.grp && !e.undone && e.kind !== 'undo' && !m.has(e.grp)) m.set(e.grp, e.seq); return m; }, [edits]);
-  const firstTab = useRef(false);
-  useEffect(() => { if (!firstTab.current && owner && edits && done === checklist.length) { firstTab.current = true; if (!joinHash) setTab('edits'); } }, [owner, edits, done, checklist.length, joinHash]);
+  // a new owner whose agent is not connected yet: God opens by itself once (the agent section shows the line to paste);
+  // #join opens it on Souls
+  useEffect(() => {
+    if (!owner || !status || shotMode) return;
+    if (joinHash) { openGod('souls'); return; }
+    if ((status.agents ?? 0) > 0) return;
+    try { if (localStorage.getItem(INTRO_KEY) === '1') return; localStorage.setItem(INTRO_KEY, '1'); } catch { return; }
+    openGod('agent');
+  }, [owner, status?.agents, joinHash]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // the owner's agent inbox: the God button watches it; the modal keeps it fresh while open
+  useEffect(() => { if (owner && god.open) return watchInbox(); }, [owner, god.open]);
 
   if (shotMode) return null;
   const ghostBar = ghost && (
@@ -163,126 +182,178 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
   const name = launcher?.world.name ?? status.name;
   const isNew = query.has('new');
 
-  // A visitor on a world that has a god sees no card, as on the old worlds (e8): the header's New Soul is the way to
-  // join. Only the approval link their agent printed (#approve/<id>) opens one, to approve it.
-  // A world the site admin marked not claimable (and still godless) offers no claim card at all.
-  if (!status.hasOwner && !owner && launcher?.world.claimable === false) return ghostBar || null;
-  if (status.hasOwner && !owner) return <>{ghostBar}{approvalId && (
-    <div data-god-panel="1" className="gp-card">
-      <ApprovalCard id={approvalId} signedIn={signedIn} onDone={() => setApprovalId(null)} />
-      {!signedIn && <div className="gp-block">{signInButton}{signInForm}</div>}
-    </div>
-  )}</>;
-  if (!open) return <>{ghostBar}<button data-god-panel-toggle="1" className="gp-card gp-collapsed" onClick={() => setOpen(true)}>✦ {owner ? <>God mode · {done}/{checklist.length}{status.pending.length ? <span className="gp-badge">{status.pending.length}</span> : null}</> : 'Claim this world'}</button></>;
-  return (
-    <>
-      {ghostBar}
-      <div data-god-panel="1" className="gp-card">
-        <div className="gp-head">
-          <b className="gp-title" title={status.worldId}>✦ {name}</b>
-          <span className="gp-dim">{status.entities} things · edit {status.seq}</span>
-          <button className="gp-icon" onClick={() => setOpen(false)} title="Collapse the panel" aria-label="collapse">–</button>
-        </div>
-        {launcher?.world.templateName && <div className="gp-dim gp-sub">from <i>{launcher.world.templateName}</i>{launcher.world.createdAt ? <> · made {ago(launcher.world.createdAt)}</> : null}</div>}
-
-        {approvalId && <ApprovalCard id={approvalId} signedIn={signedIn} onDone={() => setApprovalId(null)} />}
-        {!status.hasOwner && !owner && (
-          <div className="gp-block gp-next">
-            {isNew && status.you !== 'claimant' && <p className="gp-hello">Your new world is ready. Whoever claims it first becomes its god, so sign in and claim it now.</p>}
-            {status.you === 'claimant'
-              ? <><p>Signed in as <b>{who}</b>. Nobody owns this world yet: claim it, and your agent builds it.</p>
-                <button className="gp-btn gp-primary" data-claim="1" disabled={busy === 'claim'} onClick={claim}>{busy === 'claim' ? 'Claiming…' : 'Become its god'}</button></>
-              : <>{!isNew && <p>This world has no god yet. Sign in to claim it; your agent will build it.</p>}{signInButton}{signInForm}</>}
-          </div>
-        )}
-        {owner && (
-          <>
-            <GodAgentMessageBox />
-            {paired && <div className="gp-tools">
-              <button className="gp-btn" data-undo="1" disabled={!canUndo || busy === 'undo'} onClick={() => undoRedo('undo')} title="Undo the newest edit">↶ Undo</button>
-              <button className="gp-btn" data-redo="1" disabled={busy === 'redo'} onClick={() => undoRedo('redo')} title="Redo the newest undone edit">↷ Redo</button>
-              <button className={'gp-btn' + (flagMode ? ' gp-armed' : '')} data-flag-button="1" aria-pressed={flagMode} onClick={() => onFlagMode(!flagMode)} title="Drop a labelled flag: a reference point your agent can build around (or Alt+click the ground)">⚑ {flagMode ? 'click the ground…' : 'Drop a flag'}</button>
-            </div>}
-            <div className="gp-tabs" role="tablist">
-              {(['start', 'edits', 'flags', 'previews', 'souls'] as Tab[]).map((t) => (
-                <button key={t} role="tab" aria-selected={tab === t} data-tab={t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>
-                  {t === 'start' ? <>Start <span className="gp-count">{done}/{checklist.length}</span></> : t === 'edits' ? <>Edits</> : t === 'flags' ? <>Flags <span className="gp-count">{flags.length}</span></> : t === 'souls' ? <>Souls</> : <>Previews{previews.length ? <span className="gp-count">{previews.length}</span> : null}</>}
-                </button>
-              ))}
-            </div>
-
-            {tab === 'start' && (
-              <div className="gp-pane">
-                <ol className="gp-steps" data-checklist="1">
-                  {checklist.map((s) => <li key={s.id} data-step={s.id} data-done={s.done ? '1' : '0'} className={s.done ? 'done' : ''}><span className="gp-tick" aria-hidden="true">{s.done ? '✓' : ''}</span><span><b>{s.label}</b>{!s.done && <span className="gp-hint">{s.hint}</span>}</span></li>)}
-                </ol>
-                <details className="gp-more"><summary>More about god mode</summary>{welcome ? <Markdown source={welcome} skipFirstHeading /> : <p className="gp-dim">Loading…</p>}</details>
-                <div className="gp-files">
-                  <a className="gp-btn" href={apiPath('/SKILL.md')} target="_blank" rel="noreferrer" title="This world's one skill: God mode and Soul mode">SKILL.md</a>
-                  <a className="gp-btn" href={apiPath('/god/eden-god.mjs')} download>eden-god.mjs</a>
-                </div>
-              </div>
-            )}
-
-            {tab === 'souls' && <div className="gp-pane" data-souls-tab="1"><JoinPanel signedIn={signedIn} worldName={name} base={status.base} /></div>}
-
-            {tab === 'edits' && (
-              <div className="gp-pane" data-edits="1">
-                {!recent.length && <p className="gp-dim">No edits yet. Everything your agent changes appears here, newest first, and can be undone.</p>}
-                <ul className="gp-list">
-                  {recent.map((e) => (
-                    <li key={e.seq} data-edit={e.seq} className={'gp-edit' + (e.undone ? ' undone' : '')}>
-                      <span className="gp-seq">#{e.seq}</span>
-                      <span className="gp-what" title={e.ops.map((o) => o.op + (o.name ? ' ' + o.name : '')).join(', ')}>{describeEdit(e)}</span>
-                      <span className="gp-meta">
-                        {e.grp && <span className="gp-group" title={`group ${e.grp}`}>{e.grp}</span>}
-                        {e.kind === 'edit' && <span className="gp-dim">{e.ops.length} op{e.ops.length === 1 ? '' : 's'}</span>}
-                        {e.undone ? <span className="gp-dim">undone</span> : null}
-                        <span className="gp-dim">{ago(e.at)}</span>
-                        {e.grp && e.grp !== 'genesis' && groupRow.get(e.grp) === e.seq && <button className="gp-mini" data-undo-group={e.grp} disabled={busy === 'g:' + e.grp} onClick={() => undoGroup(e.grp!)} title={`Undo every edit in group ${e.grp}`}>undo group</button>}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {tab === 'flags' && (
-              <div className="gp-pane" data-flags="1">
-                {!flags.length && <p className="gp-dim">No flags yet. Drop one and your agent can say <code>place cottage --at flag:camp</code>.</p>}
-                <ul className="gp-list">
-                  {flags.map((f) => (
-                    <li key={f.id}>
-                      <button className="gp-link" data-fly={f.name} onClick={() => flyTo(f.p[0], f.p[1], f.p[2], { distance: 35, aside: 0.3 })} title="Fly the camera here">⚑ {f.label}</button>
-                      <code className="gp-dim">flag:{f.name}</code>
-                      <span className="gp-dim gp-when">{Math.round(f.p[0])}, {Math.round(f.p[2])}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {tab === 'previews' && (
-              <div className="gp-pane" data-previews="1">
-                {!previews.length && <p className="gp-dim">When your agent runs <code>preview</code> (a dry run), its proposal appears here; show it as a ghost before it is built.</p>}
-                <ul className="gp-list">
-                  {previews.map((p) => (
-                    <li key={p.id}>
-                      <code>{p.id}</code>
-                      <span className="gp-what">{p.accepted ? summaryText(p.summary) : <span className="gp-bad">would be refused</span>}</span>
-                      <span className="gp-dim gp-when">{ago(p.at)}</span>
-                      {p.accepted && <button className="gp-btn gp-small" data-show-preview={p.id} onClick={() => void showPreview(p.id)}>{ghost?.id === p.id ? 'shown' : 'show'}</button>}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </>
-        )}
-        {note && <p className={note.bad ? 'gp-bad' : 'gp-ok'}>{note.text}</p>}
+  // The claim card of a godless world (anyone not its owner): a small floating card, as before.
+  const claimCard = !status.hasOwner && !owner && launcher?.world.claimable !== false && (open
+    ? <div data-god-panel="1" className="gp-card">
+      <div className="gp-head">
+        <b className="gp-title" title={status.worldId}>✦ {name}</b>
+        <span className="gp-dim">{status.entities} things</span>
+        <button className="gp-icon" onClick={() => setOpen(false)} title="Collapse the panel" aria-label="collapse">–</button>
       </div>
-    </>
-  );
+      {launcher?.world.templateName && <div className="gp-dim gp-sub">from <i>{launcher.world.templateName}</i>{launcher.world.createdAt ? <> · made {ago(launcher.world.createdAt)}</> : null}</div>}
+      {approvalId && <ApprovalCard id={approvalId} signedIn={signedIn} onDone={() => setApprovalId(null)} />}
+      <div className="gp-block gp-next">
+        {isNew && status.you !== 'claimant' && <p className="gp-hello">Your new world is ready. Whoever claims it first becomes its god, so sign in and claim it now.</p>}
+        {status.you === 'claimant'
+          ? <><p>Signed in as <b>{who}</b>. Nobody owns this world yet: claim it, and your agent builds it.</p>
+            <button className="gp-btn gp-primary" data-claim="1" disabled={busy === 'claim'} onClick={claim}>{busy === 'claim' ? 'Claiming…' : 'Become its god'}</button></>
+          : <>{!isNew && <p>This world has no god yet. Sign in to claim it; your agent will build it.</p>}{signInButton}{signInForm}</>}
+      </div>
+      {note && <p className={note.bad ? 'gp-bad' : 'gp-ok'}>{note.text}</p>}
+    </div>
+    : <button data-god-panel-toggle="1" className="gp-card gp-collapsed" onClick={() => setOpen(true)}>✦ Claim this world</button>);
+
+  if (!owner) {
+    // Visitors (and a godless world's claimant): only the approval link their agent printed (#approve/<id>) opens a card
+    // on a world with a god; the God button opens the read-only God.
+    const become = <>
+      <h3>Become a god</h3>
+      {!status.hasOwner && launcher?.world.claimable !== false
+        ? <p>Nobody is this world's god yet. Whoever claims it first becomes its god, and their coding agent builds it.</p>
+        : <p>Each world has one god: the person whose coding agent (Claude Code, Codex, Cursor…) builds it. To be one, make a world of your own; you send its agent commands from this window and watch them happen.</p>}
+      <div className="gm-actions">
+        {!status.hasOwner && launcher?.world.claimable !== false
+          ? (status.you === 'claimant' ? <button type="button" className="gm-primary" data-claim="1" disabled={busy === 'claim'} onClick={() => void claim()}>{busy === 'claim' ? 'Claiming…' : 'Become its god'}</button> : <>{signInButton}{signInForm}</>)
+          : BASE && <a className="gm-primary" href={`${BASE}/`} data-make-world="1">Make a world</a>}
+        <button type="button" className="gm-secondary" data-new-soul-from-god="1" onClick={() => { closeGod(); setTimeout(() => document.querySelector<HTMLElement>('.bring-agent-open')?.click(), 0); }}>New Soul</button>
+      </div>
+      <p className="gm-fine">Or live here: <b>New Soul</b> brings your agent into {name} as a resident.</p>
+    </>;
+    return <>{ghostBar}
+      {claimCard}
+      {status.hasOwner && approvalId && (
+        <div data-god-panel="1" className="gp-card">
+          <ApprovalCard id={approvalId} signedIn={signedIn} onDone={() => setApprovalId(null)} />
+          {!signedIn && <div className="gp-block">{signInButton}{signInForm}</div>}
+        </div>
+      )}
+      {god.open && <VisitorGod world={name} become={become}><ConstitutionBody /></VisitorGod>}
+    </>;
+  }
+
+  // ---- the world's god: everything in the God modal ----
+  const env = (body: unknown) => G.god('/v1/god/env', { method: 'POST', body: JSON.stringify(body) });
+  const weather = (kind: 'rain' | 'lightning' | 'haze') => run(kind, async () => {
+    if (kind === 'rain') return env({ weather: { kind: 'rain', intensity: 0.8 }, note: 'weather' });
+    if (kind === 'haze') return env({ weather: { kind: 'fog', intensity: 0.6 }, note: 'weather' });
+    await env({ weather: { kind: 'storm', intensity: 0.8 }, note: 'weather' });
+    const at = viewCentre(); await G.god('/v1/god/strike', { method: 'POST', body: JSON.stringify(at ? { at } : {}) });
+  }, () => (kind === 'rain' ? 'Rain.' : kind === 'haze' ? 'Haze.' : 'Lightning.'));
+  const approve = (code: string) => run(code, async () => {
+    await G.approve(code); try { localStorage.setItem(PAIRED_KEY, '1'); } catch { /* storage disabled */ }
+    if (hashCode === code) history.replaceState(null, '', location.pathname + location.search);
+  }, () => `Approved. Your agent is now this world's god.`);
+  const agentsPaired = (status.agents ?? 0) > 0;
+  const fly = (x: number, y: number, z: number, distance: number) => { closeGod(); flyTo(x, y, z, { distance }); };
+  const nav: NavItem[] = [
+    { id: 'agent', label: 'Agent', count: status.pending.length || (god.inbox?.queued ? god.inbox.queued : null), alert: status.pending.length > 0 },
+    { id: 'start', label: 'Start', count: done < checklist.length ? `${done}/${checklist.length}` : null },
+    { id: 'edits', label: 'Edits', count: status.seq || null },
+    { id: 'flags', label: 'Flags', count: flags.length || null },
+    { id: 'previews', label: 'Previews', count: previews.length || null },
+    { id: 'souls', label: 'Souls' },
+    { id: 'constitution', label: 'Constitution' },
+    { id: 'world', label: 'Weather & world' },
+  ];
+  const banner = <>
+    {approvalId && <div className="gm-banner"><ApprovalCard id={approvalId} signedIn={signedIn} onDone={() => setApprovalId(null)} /></div>}
+    {hashCode && !status.pending.some((p) => p.code === hashCode) && <p className="gm-banner gp-bad">Pairing request <code>{hashCode}</code> is not pending (expired, or already approved).</p>}
+    {status.pending.length > 0 && (
+      <div className="gm-banner gp-pairs" data-pairing="1">
+        <b>Your agent asks to be this world's god</b><span className="gp-dim">Check the code matches what your agent shows, then approve.</span>
+        {status.pending.map((p) => (
+          <div key={p.code} className="gp-row">
+            <span><code className="gp-code-big">{p.code}</code> {p.agent} <span className="gp-dim">({Math.max(1, Math.round(p.expiresIn / 60))} min)</span></span>
+            <button data-approve={p.code} className="gp-btn gp-primary" disabled={busy === p.code} onClick={() => approve(p.code)}>Approve</button>
+          </div>
+        ))}
+      </div>
+    )}
+    {note && <p className={'gm-banner gm-note ' + (note.bad ? 'gp-bad' : 'gp-ok')} role="status">{note.text}</p>}
+  </>;
+  const prompt = `Read ${location.origin + apiPath('')}/SKILL.md and resume God mode for this world. Run node eden-god.mjs listen in the background and acknowledge each owner message with ack.`;
+  const section = (s: string) => {
+    if (s === 'agent') return !agentsPaired && <div className="gp-next gm-pair" data-next-step="pair">
+      <b>Connect your agent</b><p className="gp-dim">Paste this line to Claude Code, Codex or any coding agent. It sets itself up and shows a code here: press Approve.</p>
+      <Markdown source={'```paste-to-your-agent\n' + G.godPrompt(status.base) + '\n```'} />
+    </div>;
+    if (s === 'start') return <div data-start="1">
+      <ol className="gp-steps" data-checklist="1">
+        {checklist.map((c) => <li key={c.id} data-step={c.id} data-done={c.done ? '1' : '0'} className={c.done ? 'done' : ''}><span className="gp-tick" aria-hidden="true">{c.done ? '✓' : ''}</span><span><b>{c.label}</b>{!c.done && <span className="gp-hint">{c.hint}</span>}</span></li>)}
+      </ol>
+      <details className="gp-more"><summary>More about god mode</summary>{welcome ? <Markdown source={welcome} skipFirstHeading /> : <p className="gp-dim">Loading…</p>}</details>
+      <div className="gp-files">
+        <a className="gp-btn" href={apiPath('/SKILL.md')} target="_blank" rel="noreferrer" title="This world's one skill: God mode and Soul mode">SKILL.md</a>
+        <a className="gp-btn" href={apiPath('/god/eden-god.mjs')} download>eden-god.mjs</a>
+      </div>
+    </div>;
+    if (s === 'edits') return <div data-edits="1">
+      <div className="gp-tools">
+        <button className="gp-btn" data-undo="1" disabled={!canUndo || busy === 'undo'} onClick={() => undoRedo('undo')} title="Undo the newest edit">↶ Undo</button>
+        <button className="gp-btn" data-redo="1" disabled={busy === 'redo'} onClick={() => undoRedo('redo')} title="Redo the newest undone edit">↷ Redo</button>
+      </div>
+      {!recent.length && <p className="gp-dim">No edits yet. Everything your agent changes appears here, newest first, and can be undone.</p>}
+      <ul className="gp-list">
+        {recent.map((e) => (
+          <li key={e.seq} data-edit={e.seq} className={'gp-edit' + (e.undone ? ' undone' : '')}>
+            <span className="gp-seq">#{e.seq}</span>
+            <span className="gp-what" title={e.ops.map((o) => o.op + (o.name ? ' ' + o.name : '')).join(', ')}>{describeEdit(e)}</span>
+            <span className="gp-meta">
+              {e.grp && <span className="gp-group" title={`group ${e.grp}`}>{e.grp}</span>}
+              {e.kind === 'edit' && <span className="gp-dim">{e.ops.length} op{e.ops.length === 1 ? '' : 's'}</span>}
+              {e.undone ? <span className="gp-dim">undone</span> : null}
+              <span className="gp-dim">{since(e.at)}</span>
+              {e.grp && e.grp !== 'genesis' && groupRow.get(e.grp) === e.seq && <button className="gp-mini" data-undo-group={e.grp} disabled={busy === 'g:' + e.grp} onClick={() => undoGroup(e.grp!)} title={`Undo every edit in group ${e.grp}`}>undo group</button>}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>;
+    if (s === 'flags') return <div data-flags="1">
+      <div className="gp-tools"><button className={'gp-btn' + (flagMode ? ' gp-armed' : '')} data-flag-button="1" aria-pressed={flagMode} onClick={() => { onFlagMode(!flagMode); if (!flagMode) closeGod(); }} title="Drop a labelled flag: a reference point your agent can build around (or Alt+click the ground)">⚑ {flagMode ? 'click the ground…' : 'Drop a flag'}</button></div>
+      {!flags.length && <p className="gp-dim">No flags yet. Drop one and your agent can say <code>place cottage --at flag:camp</code>.</p>}
+      <ul className="gp-list">
+        {flags.map((f) => (
+          <li key={f.id}>
+            <button className="gp-link" data-fly={f.name} onClick={() => fly(f.p[0], f.p[1], f.p[2], 35)} title="Fly the camera here">⚑ {f.label}</button>
+            <code className="gp-dim">flag:{f.name}</code>
+            <span className="gp-dim gp-when">{Math.round(f.p[0])}, {Math.round(f.p[2])}</span>
+          </li>
+        ))}
+      </ul>
+    </div>;
+    if (s === 'previews') return <div data-previews="1">
+      {!previews.length && <p className="gp-dim">When your agent runs <code>preview</code> (a dry run), its proposal appears here; show it as a ghost before it is built.</p>}
+      <ul className="gp-list">
+        {previews.map((p) => (
+          <li key={p.id}>
+            <code>{p.id}</code>
+            <span className="gp-what">{p.accepted ? summaryText(p.summary) : <span className="gp-bad">would be refused</span>}</span>
+            <span className="gp-dim gp-when">{since(p.at)}</span>
+            {p.accepted && <button className="gp-btn gp-small" data-show-preview={p.id} onClick={() => { closeGod(); void showPreview(p.id); }}>{ghost?.id === p.id ? 'shown' : 'show'}</button>}
+          </li>
+        ))}
+      </ul>
+    </div>;
+    if (s === 'souls') return <div data-souls-tab="1"><JoinPanel signedIn={signedIn} worldName={name} base={status.base} /></div>;
+    if (s === 'constitution') return <ConstitutionBody />;
+    if (s === 'world') return <div data-world-section="1">
+      <h3 className="gm-h">Weather</h3>
+      <p className="gp-dim">The same as your agent's <code>weather</code> and <code>strike</code>: each press is one edit in the world's history.</p>
+      <div className="god-bolt-weather" data-weather="1">
+        <button className="gp-btn" data-weather-kind="rain" disabled={!!busy} onClick={() => weather('rain')}>Rain</button>
+        <button className="gp-btn" data-weather-kind="lightning" disabled={!!busy} onClick={() => weather('lightning')}>Lightning</button>
+        <button className="gp-btn" data-weather-kind="haze" disabled={!!busy} onClick={() => weather('haze')}>Haze</button>
+      </div>
+      {status.you === 'owner' && <><h3 className="gm-h">This world</h3><WorldOwnerOps /></>}
+    </div>;
+    return null;
+  };
+  return <>
+    {ghostBar}
+    {god.open && <OwnerGod world={name} meta={<>{status.entities === 1 ? '1 thing' : `${status.entities} things`} · edit {status.seq}{launcher?.world.templateName ? <> · from <i>{launcher.world.templateName}</i></> : null}</>}
+      nav={nav} banner={banner} prompt={prompt} paired={agentsPaired}>{section}</OwnerGod>}
+  </>;
 }
 
 function summaryText(s: Record<string, unknown> | null) {

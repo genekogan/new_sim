@@ -88,7 +88,6 @@ import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { worldResolut
 // P1 phones: the god panel and the constitution card are lazy chunks, mounted once the arrival card has gone (20 s cap), or
 // at once when the landing URL carries something for the panel (#join, #approve/…, an offer or pairing link, a preview)
 const GodPanel=lazy(()=>import('./GodPanel.tsx').then(m=>({default:m.GodPanel})));
-const ConstitutionCard=lazy(()=>import('./god-ui/Constitution.tsx').then(m=>({default:m.ConstitutionCard})));
 const godUiAtOnce=typeof location!=='undefined'&&(!['','#','#watch'].includes(location.hash)||new URLSearchParams(location.search).has('preview'));
 import { ensureToken as ensureGodToken } from './god-ui/god-api.ts';
 import { WorldPreviewGhost } from './WorldPreviewGhost.ts';
@@ -1211,7 +1210,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   const cards = cardsAt(sim.plays, s.tick);
   return (
     <section className="wide world-viewer" data-world-viewer="1" style={embedded ? { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, ...(entityWorld ? { position: 'relative' as const } : {}) } : (entityWorld ? { position: 'relative' } : undefined)}>
-      {entityWorld && godUi && <Suspense fallback={null}><GodPanel flagMode={flagMode} onFlagMode={setFlagMode} entitiesAt={entitiesAt} /><ConstitutionCard /></Suspense>}
+      {entityWorld && godUi && <Suspense fallback={null}><GodPanel flagMode={flagMode} onFlagMode={setFlagMode} entitiesAt={entitiesAt} /></Suspense>}
       {!hideControls && <div className="row">
         <h2 style={{ margin: 0 }}>World</h2>
         {mode === 'live' && !status ? <span className="ok"><b>● Live</b></span> : null}
