@@ -230,7 +230,7 @@ const shutdown = async (sig: string) => {
   host.stop(); takes.stop();
   const saveAt = performance.now();
   try { host.saveSnapshot(true); } catch (e) { console.error('[world] snapshot failed', e); }
-  console.log(`[world] ${sig}: snapshot saved in ${Math.round(performance.now() - saveAt)} ms`);
+  console.log(`[world] ${sig}: snapshot saved in ${Math.round(performance.now() - saveAt)} ms (capture ${Math.round(host.snapshotMs.capture)}, write ${Math.round(host.snapshotMs.persist)})`);
   server.close(); for (const c of hub.clients) c.ws.close(1001, 'server restarting');
   auth.close();db.close(); process.exit(0);
 };
