@@ -1,4 +1,5 @@
-// The owner's world housekeeping, the God modal's "Weather & world" section (GodPanel), backed by the launcher
+// The owner's world housekeeping. G5 (Gene 2026-10-20b): "Forsake world", the danger zone that takes the God Mode modal over
+// (GodModal OwnerGod, section 'forsake'), with explicit confirmations. Backed by the launcher
 // (tools/world-launcher/handoff.mjs, worldops.mjs; docs/god/WORLD-OWNER-API.md): offer the world to someone, archive it.
 // Co-builders (invite/remove) show only when the site turns them on (`enabled`); Gene 2026-10-16: one god per world, so
 // they are off by default and the rows stay hidden (an old co-builder still shows, so the owner can remove them). Nothing here deletes a world: archiving moves it aside, and the site admin can restore it.
@@ -19,53 +20,65 @@ async function call<T>(sub: string, body?: unknown): Promise<T> {
 }
 const short = (a: string) => a.replace(/^dev:/, '');
 
-export function WorldOwnerOps() {
-  const [open, setOpen] = useState(false);
+export function ForsakeWorld({ name }: { name: string }) {
   const [state, setState] = useState<{ enabled?: boolean; cobuilders: Cobuilder[]; offers: Offer[] } | null>(null);
   const [link, setLink] = useState<{ kind: 'cobuild' | 'transfer'; url: string } | null>(null);
+  const [handing, setHanding] = useState(false);   // the hand-on confirmation is showing
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ text: string; bad?: boolean } | null>(null);
   const load = useCallback(async () => { try { setState(await call('cobuilders')); } catch (e) { setNote({ text: (e as Error).message, bad: true }); } }, []);
-  useEffect(() => { if (open) void load(); }, [open, load]);
+  useEffect(() => { void load(); }, [load]);
   const run = async (key: string, fn: () => Promise<void>) => {
     setBusy(key); setNote(null);
     try { await fn(); } catch (e) { setNote({ text: (e as Error).message, bad: true }); } finally { setBusy(null); }
   };
   const invite = (kind: 'cobuild' | 'transfer') => run(kind, async () => {
     const d = await call<{ url: string }>(kind === 'cobuild' ? 'cobuilders/invite' : 'transfer', {});
-    setLink({ kind, url: d.url }); await load();
+    setLink({ kind, url: d.url }); setHanding(false); await load();
   });
-  const cancel = () => run('cancel', async () => { await call('offers/cancel', {}); setLink(null); await load(); setNote({ text: 'Open invitations cancelled.' }); });
+  const cancel = () => run('cancel', async () => { await call('offers/cancel', {}); setLink(null); await load(); setNote({ text: 'Open links cancelled. Nobody can accept them now.' }); });
   const remove = (account: string) => run(account, async () => { const d = await call<{ tokensRevoked: number }>('cobuilders/remove', { account }); await load(); setNote({ text: `${short(account)} removed; ${d.tokensRevoked} agent token${d.tokensRevoked === 1 ? '' : 's'} revoked.` }); });
   const archive = () => run('archive', async () => { await call('archive', { confirm }); location.assign(`${BASE}/`); });
   const pending = state?.offers.length ?? 0;
   const cobuild = !!state?.enabled, oldCobuilders = state?.cobuilders.length ?? 0;
 
   return (
-    <details className="gp-owner-ops" data-owner-ops="1" open={open} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
-      <summary>{cobuild ? 'Co-builders, hand on, archive' : 'Hand on or archive'}{pending ? <span className="gp-count">{pending}</span> : null}</summary>
-      {(cobuild || oldCobuilders > 0) && <div className="gp-ops-block" data-ops="cobuilders">
-        <div className="gp-row"><b>Co-builders</b>{cobuild && <button className="gp-btn" data-ops-invite="1" disabled={!!busy} onClick={() => void invite('cobuild')}>Invite</button>}</div>
+    <div className="gm-forsake" data-owner-ops="1">
+      <p className="gm-forsake-lead">Both of these take <b>{name}</b> out of your hands. Your agent stops being its god.</p>
+      <section className="gm-danger" data-ops="transfer">
+        <h3>Hand it on</h3>
+        <p>Make a one-use link (valid 7 days). Whoever opens it and accepts becomes this world's god, and your agent loses access.</p>
+        {link?.kind === 'transfer'
+          ? <div className="gm-danger-link" data-ops-link="transfer"><span>Send this only to them:</span><div className="gm-danger-row"><code>{link.url}</code><CopyButton text={link.url} /></div></div>
+          : handing
+            ? <div className="gm-danger-confirm" role="group" aria-label="Confirm the handoff link">
+              <p>Create the link? Anyone who has it can take this world until you cancel it.</p>
+              <div className="gm-danger-row">
+                <button type="button" className="gm-danger-btn" data-ops-transfer-confirm="1" disabled={!!busy} onClick={() => void invite('transfer')}>{busy === 'transfer' ? 'Creating…' : 'Yes, create the link'}</button>
+                <button type="button" className="gm-quiet" onClick={() => setHanding(false)}>Cancel</button>
+              </div>
+            </div>
+            : <button type="button" className="gm-danger-ghost" data-ops-transfer="1" disabled={!!busy} onClick={() => setHanding(true)}>Create a handoff link…</button>}
+        {pending > 0 && <div className="gm-danger-row gm-danger-pending"><span>{pending === 1 ? '1 open link' : `${pending} open links`}</span><button type="button" className="gm-quiet" data-ops-cancel="1" disabled={!!busy} onClick={() => void cancel()}>Cancel {pending === 1 ? 'it' : 'them'}</button></div>}
+      </section>
+      <section className="gm-danger" data-ops="archive">
+        <h3>Archive</h3>
+        <p>Stops the world and takes it off the list. Nothing is deleted; the site admin can restore it.</p>
+        <label className="gm-danger-label" htmlFor="gm-archive-confirm">Type <code>{worldKey}</code> to confirm</label>
+        <div className="gm-danger-row">
+          <input id="gm-archive-confirm" data-ops-confirm="1" value={confirm} autoComplete="off" spellCheck={false} onChange={(e) => setConfirm(e.target.value.trim())} placeholder={worldKey} />
+          <button type="button" className="gm-danger-btn" data-ops-archive="1" disabled={confirm !== worldKey || !!busy} onClick={() => void archive()}>{busy === 'archive' ? 'Archiving…' : 'Archive world'}</button>
+        </div>
+      </section>
+      {(cobuild || oldCobuilders > 0) && <section className="gm-danger gm-danger-soft" data-ops="cobuilders">
+        <div className="gm-danger-row"><h3>Co-builders</h3>{cobuild && <button type="button" className="gm-quiet" data-ops-invite="1" disabled={!!busy} onClick={() => void invite('cobuild')}>Invite</button>}</div>
         {state && (state.cobuilders.length
-          ? state.cobuilders.map((c) => <div key={c.account} className="gp-row"><span>{short(c.account)}</span><button className="gp-mini" data-ops-remove={c.account} disabled={!!busy} onClick={() => void remove(c.account)}>remove</button></div>)
-          : <p className="gp-dim">None yet. Each co-builder pairs their own agent; you can remove them any time.</p>)}
-      </div>}
-      <div className="gp-ops-block" data-ops="transfer">
-        <div className="gp-row"><b>Hand it on</b><button className="gp-btn" data-ops-transfer="1" disabled={!!busy} onClick={() => void invite('transfer')}>Offer</button></div>
-        <p className="gp-dim">Whoever opens the link and accepts becomes its god, and your agents lose access.</p>
-      </div>
-      {link && <div className="gp-ops-link" data-ops-link={link.kind}>
-        <span className="gp-dim">{link.kind === 'cobuild' ? 'Co-builder invitation' : 'Handoff offer'} (one use, 7 days). Send it only to them:</span>
-        <div className="gp-row"><code>{link.url}</code><CopyButton text={link.url} /></div>
-      </div>}
-      {pending > 0 && <div className="gp-row"><span className="gp-dim">{pending} open invitation{pending === 1 ? '' : 's'}</span><button className="gp-mini" data-ops-cancel="1" disabled={!!busy} onClick={() => void cancel()}>cancel all</button></div>}
-      <div className="gp-ops-block" data-ops="archive">
-        <b>Archive</b>
-        <p className="gp-dim">Stops it and takes it off the list. Nothing is deleted; the site admin can restore it. Type <code>{worldKey}</code> to confirm.</p>
-        <div className="gp-row"><input aria-label="Type the world's address to confirm" data-ops-confirm="1" value={confirm} onChange={(e) => setConfirm(e.target.value.trim())} placeholder={worldKey} /><button className="gp-btn gp-danger" data-ops-archive="1" disabled={confirm !== worldKey || !!busy} onClick={() => void archive()}>{busy === 'archive' ? 'Archiving…' : 'Archive'}</button></div>
-      </div>
-      {note && <p className={note.bad ? 'gp-bad' : 'gp-ok'}>{note.text}</p>}
-    </details>
+          ? state.cobuilders.map((c) => <div key={c.account} className="gm-danger-row"><span>{short(c.account)}</span><button type="button" className="gm-quiet" data-ops-remove={c.account} disabled={!!busy} onClick={() => void remove(c.account)}>Remove</button></div>)
+          : <p>None yet. Each co-builder pairs their own agent; you can remove them any time.</p>)}
+        {link?.kind === 'cobuild' && <div className="gm-danger-link" data-ops-link="cobuild"><span>Co-builder invitation (one use, 7 days). Send it only to them:</span><div className="gm-danger-row"><code>{link.url}</code><CopyButton text={link.url} /></div></div>}
+      </section>}
+      {note && <p className={'gm-danger-note' + (note.bad ? ' bad' : '')} role="status">{note.text}</p>}
+    </div>
   );
 }

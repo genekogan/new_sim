@@ -4,6 +4,7 @@
 // `{type:'edge', kind:'world-diff'}`; new or moved things ease in over ~2.5 s.
 // Inactive (and invisible) on worlds that have no entity layer.
 import { noteModeration, noteSnapshotVersion } from './moderation-hidden.ts';
+import { godFeature, isFlagDef } from './god-ui/features.ts';
 import { loadSnapshot } from './snapshot-wire.ts';
 import * as THREE from 'three';
 import { TILE_M, TILE_N, Terrain, groundForTile, heightAt, waterLevelAt, type Ground } from '@sim/ground';
@@ -664,6 +665,7 @@ export class WorldEntityLayer {
   private build(e: Entity, def: StoredDef): THREE.Object3D | null {
     const m = this.model!;
     if (def.make.kind === 'none' || def.make.kind === 'parts') return null;
+    if (!godFeature('flags') && isFlagDef((def as { ref?: string }).ref ?? e.def)) return null;   // G5: flags are switched off; their poles are not drawn
     const builder = meshFor(def);
     if (!builder) return null;
     const params = paramsOf(e, def);

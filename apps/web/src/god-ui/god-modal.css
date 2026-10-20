@@ -1,5 +1,6 @@
 /* G4 (Gene 2026-10-20): the God button and the God modal (GodButton.tsx, GodModal.tsx). The modal is Explore's frosted
-   sheet at Explore's size; inside, a section list on the left and one pane. The command log is the signature: a thread
+   sheet at Explore's size. G5: one column, no tabs (connect, command box with undo/redo and weather, prayers, log, Forsake
+   world at the bottom; Forsake takes the sheet over as a red danger zone). The command log is the signature: a thread
    of status marks (ring = pending, turning arc = in progress, green tick = done, red cross = failed, dashed = withdrawn)
    so the state of every command reads at a glance, newest at the top. */
 .god-modal {
@@ -12,7 +13,7 @@
   display: flex; flex-direction: column;
 }
 .god-modal:not([open]) { display: none; }
-.god-modal-owner { height: min(660px, calc(100dvh - 48px)); } /* one size for every section: switching sections never resizes the sheet */
+.god-modal-owner { height: min(680px, calc(100dvh - 48px)); } /* one size: the log arriving or Forsake opening never resizes the sheet */
 .god-modal::backdrop { background: #10151445; }
 @media (prefers-color-scheme: dark) { .god-modal { --gm-on: #5fd08a; --gm-off: #ff7b72; --gm-prog: #e8b64c; } }
 .god-modal code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--gm-soft); padding: 0 3px; border-radius: 3px; }
@@ -20,14 +21,12 @@
 .god-modal section { background: transparent; border: 0; border-radius: 0; padding: 0; min-width: 0; }
 .god-modal :is(button, a, textarea, input):focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
 
-/* header: the bolt, "God", the world; the agent pill; close */
+/* header: the bolt, "God Mode"; the agent pill; close (Forsake: a back chevron and a red title) */
 .god-modal .gm-head { position: static; z-index: auto; background: transparent; flex-wrap: nowrap; display: flex; align-items: center; gap: 12px; padding: 18px 18px 14px 20px; border-bottom: 1px solid var(--gm-line); }
 .gm-mark { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; background: var(--fg); color: var(--bg); }
 .gm-mark svg { width: 20px; height: 20px; }
 .gm-titles { flex: 1; min-width: 0; }
 .gm-titles h2 { margin: 0; text-transform: none; font: 650 21px/1.15 system-ui, sans-serif; letter-spacing: -.02em; color: var(--fg); }
-.gm-titles p { margin: 2px 0 0; font-size: 12.5px; color: var(--gm-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.gm-titles p > .gm-meta { color: var(--gm-dim); }
 .god-modal .gm-x { min-height: 0; flex: none; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--fg); font-size: 24px; line-height: 1; cursor: pointer; }
 .god-modal .gm-x:hover { background: var(--gm-soft); }
 .gm-pill { flex: none; display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px 5px 9px; border-radius: 999px; font-size: 12.5px; font-weight: 600; white-space: nowrap;
@@ -43,18 +42,77 @@
 .gm-banner.gp-pairs { padding: 10px 12px; }
 .gm-note { font-size: 13px; }
 
-/* body: sections left, pane right */
-.gm-body { display: grid; grid-template-columns: 158px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); min-height: 0; flex: 1; }
-.gm-nav { display: flex; flex-direction: column; gap: 1px; padding: 12px 8px 14px 12px; border-right: 1px solid var(--gm-line); overflow: auto; }
-.god-modal .gm-nav button { min-height: 0; display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; padding: 7px 10px; border: 0; border-radius: 9px; background: transparent;
-  color: var(--gm-dim); font: 500 13.5px/1.25 system-ui, sans-serif; text-align: left; cursor: pointer; }
-.god-modal .gm-nav button:hover { background: var(--gm-soft); color: var(--fg); }
-.god-modal .gm-nav button.on { background: color-mix(in srgb, var(--fg) 9%, transparent); color: var(--fg); font-weight: 650; }
-.gm-count { font: 600 11px/1 system-ui, sans-serif; font-variant-numeric: tabular-nums; color: var(--gm-dim); padding: 3px 6px; border-radius: 999px; background: var(--gm-soft); }
-.gm-count.alert { background: #d7a316; color: #1c1c1a; }
-.gm-pane { min-width: 0; overflow: auto; overscroll-behavior: contain; padding: 16px 20px 20px; max-height: calc(min(720px, 100dvh - 48px) - 72px); box-sizing: border-box; }
-.gm-h { font: 650 12px/1.3 system-ui, sans-serif; text-transform: uppercase; letter-spacing: .08em; color: var(--gm-dim); margin: 18px 0 6px; }
-.gm-pane > div > .gm-h:first-child { margin-top: 2px; }
+/* one column that scrolls; the header stays */
+.gm-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 16px 20px 0; box-sizing: border-box; display: flex; flex-direction: column; }
+.god-modal .gm-scroll > .gm-banner { margin: 0 0 12px; }
+.gm-h { font: 650 11.5px/1.3 system-ui, sans-serif; text-transform: uppercase; letter-spacing: .08em; color: var(--gm-dim); margin: 0 0 8px; }
+
+/* connect your agent: the one line, as a slip to hand over, with its Copy; the skill opens in a new tab */
+.gm-connect { margin: 0 0 16px; padding: 14px 14px 14px 16px; border-radius: 14px; background: color-mix(in srgb, var(--gm-off) 6%, var(--gm-soft)); border: 1px solid color-mix(in srgb, var(--gm-off) 22%, var(--gm-line)); }
+.god-modal .gm-connect h3 { margin: 0 0 10px; font: 650 15.5px/1.25 system-ui, sans-serif; letter-spacing: -.01em; color: var(--fg); text-transform: none; }
+.gm-connect-line { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 13px; border-radius: 10px; border: 1px dashed color-mix(in srgb, var(--fg) 30%, transparent); background: color-mix(in srgb, var(--bg) 62%, transparent); }
+.gm-connect-line p { flex: 1; min-width: 0; margin: 0; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--fg); overflow-wrap: anywhere; }
+.gm-connect-line a { color: var(--fg); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--fg) 40%, transparent); text-underline-offset: 3px; }
+.gm-connect-line a:hover { text-decoration-color: var(--fg); }
+.gm-out svg { width: 12px; height: 12px; margin-left: 3px; vertical-align: -1px; opacity: .7; }
+.god-modal .gm-copy { flex: none; min-height: 0; padding: 8px 16px; border: 0; border-radius: 999px; background: var(--fg); color: var(--bg); font: 650 13px system-ui, sans-serif; cursor: pointer; }
+.gm-connect .gm-prompt { margin-top: 8px; }
+
+/* undo/redo and the weather: two small groups under the command box */
+.gm-tools { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin: 12px 0 0; }
+.gm-tool-group { display: inline-flex; border: 1px solid color-mix(in srgb, var(--fg) 16%, transparent); border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--bg) 45%, transparent); }
+.god-modal .gm-tool { min-height: 0; padding: 6px 13px; border: 0; border-radius: 0; background: transparent; color: var(--fg); font: 550 12.5px/1.2 system-ui, sans-serif; cursor: pointer; white-space: nowrap; }
+.god-modal .gm-tool + .gm-tool { border-left: 1px solid color-mix(in srgb, var(--fg) 12%, transparent); }
+.god-modal .gm-tool:hover:not(:disabled) { background: var(--gm-soft); }
+.god-modal .gm-tool:disabled { color: color-mix(in srgb, var(--fg) 38%, transparent); cursor: default; }
+
+/* prayers waiting: notifications above the log (none, nothing) */
+.gm-prayers { margin: 18px 0 0; }
+.gm-prayers ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.gm-prayers li { padding: 9px 12px; border-radius: 10px; background: color-mix(in srgb, var(--gm-prog) 9%, transparent); border-left: 3px solid var(--gm-prog); }
+.gm-pray-text { margin: 0; font-size: 14px; overflow-wrap: anywhere; }
+.gm-pray-text b { font-weight: 650; margin-right: 4px; }
+.gm-pray-meta { display: flex; gap: 12px; align-items: baseline; margin-top: 3px; font-size: 12px; color: var(--gm-dim); }
+.gm-answer { display: flex; gap: 8px; align-items: center; margin-top: 7px; }
+.gm-answer input { flex: 1; min-width: 0; padding: 7px 10px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--fg) 22%, transparent); background: color-mix(in srgb, var(--bg) 60%, transparent); color: var(--fg); font: 14px system-ui, sans-serif; }
+.god-modal .gm-small { min-height: 0; padding: 6px 13px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--fg) 25%, transparent); background: transparent; color: var(--fg); font: 600 12.5px system-ui, sans-serif; cursor: pointer; }
+.god-modal .gm-small-primary { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.god-modal .gm-small:disabled { opacity: .4; cursor: default; }
+.gm-more { margin-top: 20px; }
+
+/* the bottom: Forsake world, quiet until wanted */
+.gm-foot { margin-top: auto; padding: 22px 0 18px; display: flex; justify-content: flex-start; }
+.god-modal .gm-forsake-open { min-height: 0; padding: 7px 14px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--gm-off) 38%, transparent); background: transparent; color: var(--gm-off); font: 600 12.5px system-ui, sans-serif; cursor: pointer; }
+.god-modal .gm-forsake-open:hover { background: color-mix(in srgb, var(--gm-off) 9%, transparent); border-color: var(--gm-off); }
+
+/* Forsake world: the danger zone over the whole sheet */
+.gm-head-danger { border-bottom-color: color-mix(in srgb, var(--gm-off) 35%, transparent) !important; }
+.gm-head-danger h2 { color: var(--gm-off) !important; }
+.god-modal .gm-back { flex: none; display: grid; place-items: center; width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: 11px; border: 1px solid var(--gm-line); background: transparent; color: var(--fg); cursor: pointer; }
+.god-modal .gm-back:hover { background: var(--gm-soft); }
+.gm-back svg { width: 20px; height: 20px; }
+.gm-forsake-pane { padding-bottom: 20px; }
+.gm-forsake-lead { margin: 0 0 14px; color: color-mix(in srgb, var(--fg) 85%, transparent); }
+.god-modal .gm-danger { margin: 0 0 12px; padding: 14px 16px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--gm-off) 34%, transparent); background: color-mix(in srgb, var(--gm-off) 5%, transparent); }
+.gm-danger h3 { margin: 0 0 4px; font: 650 15px/1.25 system-ui, sans-serif; color: var(--fg); text-transform: none; letter-spacing: -.01em; }
+.gm-danger p { margin: 0 0 10px; font-size: 13.5px; color: color-mix(in srgb, var(--fg) 80%, transparent); }
+.gm-danger-soft { border-color: var(--gm-line); background: var(--gm-soft); }
+.gm-danger-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.gm-danger-row code { flex: 1; min-width: 0; overflow-wrap: anywhere; padding: 6px 8px !important; }
+.gm-danger-row input { flex: 1; min-width: 140px; padding: 8px 10px; border-radius: 9px; border: 1px solid color-mix(in srgb, var(--gm-off) 40%, transparent); background: color-mix(in srgb, var(--bg) 70%, transparent); color: var(--fg); font: 14px ui-monospace, Menlo, monospace; }
+.gm-danger-label { display: block; margin: 0 0 6px; font-size: 12.5px; font-weight: 600; color: var(--fg); }
+.gm-danger-confirm { padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--gm-off) 8%, transparent); }
+.gm-danger-confirm p { margin-bottom: 8px; color: var(--fg); font-weight: 550; }
+.gm-danger-link > span { display: block; margin-bottom: 6px; font-size: 12.5px; color: var(--gm-dim); }
+.gm-danger-pending { margin-top: 10px; font-size: 12.5px; color: var(--gm-dim); }
+.god-modal .gm-danger-btn { min-height: 0; padding: 8px 16px; border-radius: 999px; border: 1px solid var(--gm-off); background: var(--gm-off); color: #fff; font: 650 13px system-ui, sans-serif; cursor: pointer; }
+.god-modal .gm-danger-btn:disabled { opacity: .35; cursor: default; }
+.god-modal .gm-danger-ghost { min-height: 0; padding: 8px 16px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--gm-off) 50%, transparent); background: transparent; color: var(--gm-off); font: 650 13px system-ui, sans-serif; cursor: pointer; }
+.god-modal .gm-danger-ghost:hover:not(:disabled) { background: color-mix(in srgb, var(--gm-off) 9%, transparent); }
+.god-modal .gm-quiet { min-height: 0; padding: 6px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--fg); font: 600 12.5px system-ui, sans-serif; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.gm-danger-note { margin: 4px 2px 0; font-size: 13px; color: var(--gm-on); }
+.gm-danger-note.bad { color: var(--gm-off); }
+.gm-danger .copy-btn, .gm-danger [data-copy] { flex: none; }
 
 /* the agent: composer */
 .gm-console { display: flex; flex-direction: column; }
@@ -71,7 +129,6 @@
 .gm-error { margin: 8px 2px 0; font-size: 12.5px; color: var(--gm-off); }
 .gm-prompt { margin-top: 6px; width: 100%; box-sizing: border-box; font: 12px ui-monospace, Menlo, monospace; color: var(--fg); background: transparent; border: 1px solid var(--gm-line); border-radius: 8px; padding: 6px 8px; }
 .gm-empty { margin: 18px 2px 4px; color: var(--gm-dim); font-size: 13px; }
-.gm-pair { margin: 0 0 14px; }
 
 /* the agent: the command log (newest first), a thread of status marks */
 .gm-log { list-style: none; margin: 16px 0 0; padding: 0; position: relative; }
@@ -153,22 +210,21 @@
 @media (prefers-color-scheme: dark) { .god-dot.on { background: #5fd08a; } .god-dot.off { background: #ff7b72; } }
 .god-open .gp-badge { position: absolute; top: -5px; right: -6px; margin: 0; }
 
-@media (pointer: coarse) { .god-modal.god-modal :is(.gm-nav button, .gm-x, .gm-send, .gm-go, .gm-primary, .gm-secondary, .gp-btn) { min-height: 44px; } .god-modal.god-modal .gm-textbtn { min-height: 32px; } }
-/* phones and narrow windows: sections become a strip under the header */
+@media (pointer: coarse) { .god-modal.god-modal :is(.gm-x, .gm-send, .gm-go, .gm-primary, .gm-secondary, .gp-btn, .gm-copy, .gm-tool, .gm-forsake-open, .gm-back, .gm-danger-btn, .gm-danger-ghost, .gm-small) { min-height: 44px; } .god-modal.god-modal :is(.gm-textbtn, .gm-quiet) { min-height: 32px; } }
+/* phones and narrow windows */
 @media (max-width: 700px) {
   .god-modal { width: calc(100vw - 16px); max-height: calc(100dvh - 24px); border-radius: 16px; }
   .god-modal-owner { height: calc(100dvh - 24px); }
   .god-modal .gm-head { flex-wrap: wrap; padding: 14px 12px 10px 14px; gap: 10px; }
-  .gm-mark { width: 32px; height: 32px; }
+  .gm-mark, .god-modal .gm-back { width: 32px; height: 32px; }
   .gm-pill { order: 3; flex-basis: auto; margin-left: 42px; font-size: 12px; }
-  .gm-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
-  .god-modal .gm-nav { flex-direction: row; flex-wrap: nowrap; gap: 4px; padding: 8px 10px; border-right: 0; border-bottom: 1px solid var(--gm-line); overflow-x: auto; scrollbar-width: none; }
-  .gm-nav::-webkit-scrollbar { display: none; }
-  .god-modal .gm-nav button { width: auto; flex: none; white-space: nowrap; padding: 7px 11px; }
-  .gm-pane { padding: 14px 14px 18px; max-height: none; }
+  .gm-scroll { padding: 14px 14px 0; }
   .gm-visitor { padding: 2px 14px 18px; max-height: none; }
-  .god-modal .gm-banner { margin: 10px 12px 0; }
+  .gm-connect-line { flex-direction: column; align-items: stretch; }
+  .god-modal .gm-copy { align-self: flex-start; }
   .gm-compose textarea { font-size: 16px; }
+  .gm-answer input, .gm-danger-row input { font-size: 16px; }
+  .gm-tools { justify-content: flex-start; }
   .god-modal .gm-withdraw { margin-left: 0; }
   .god-open kbd { display: none; }
 }

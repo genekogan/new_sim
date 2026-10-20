@@ -104,6 +104,7 @@ import {WorldPlatforms} from './WorldPlatforms.ts';
 import {cameraGround,cameraGroundSampler,clearShotEye} from './WorldCameraGround.ts';
 import {WorldRenderedVisibility} from './WorldRenderedVisibility.ts';
 import {WorldFollowMotion} from './WorldFollowMotion.ts';
+import { godFeature } from './god-ui/features.ts';
 import { WorldBroadcast, type WorldCameraMode, type CarrierPose } from './WorldBroadcast.ts';
 // P1 phones: old worlds' captured-scene content is a lazy chunk (old-scene-kit.ts); an old world's page fetches it at once
 type OldSceneKit=typeof import('./old-scene-kit.ts');
@@ -377,7 +378,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const godMint=()=>ensureGodToken().catch(()=>null);
     const flagRay=new THREE.Raycaster(),flagNdc=new THREE.Vector2();
     const onFlagClick=async(ev:MouseEvent)=>{
-      if(!(ev.altKey||flagModeRef.current)||!entityLayer.active)return;
+      if(!godFeature('flags')||!(ev.altKey||flagModeRef.current)||!entityLayer.active)return;  // G5: flags are switched off (god-ui/features.ts)
       setFlagMode(false);
       const rect=renderer.domElement.getBoundingClientRect();flagNdc.set(((ev.clientX-rect.left)/rect.width)*2-1,-((ev.clientY-rect.top)/rect.height)*2+1);
       flagRay.setFromCamera(flagNdc,camera);const hit=flagRay.intersectObjects(entityLayer.terrainMeshes(),false)[0];if(!hit)return;
@@ -1051,7 +1052,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const onUp = (e: PointerEvent) => {
       if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) { down = null; return; }
       down = null;
-      if (entityLayer.active && (e.altKey || flagModeRef.current)) return;  // a flag drop (onFlagClick), not a selection: no place card over the god panel
+      if (entityLayer.active && godFeature('flags') && (e.altKey || flagModeRef.current)) return;  // a flag drop (onFlagClick), not a selection: no place card over the god panel
       const target=hover.pick(e.clientX,e.clientY);if(target)inspectHover(target);else{setPlaceCard(null);context.current.setThing(null);}
 
     };

@@ -1,7 +1,8 @@
 // First steps for a new god, ticked from what the world says (pure; tested).
 import type { EditRow, Op, Status } from './god-api.ts';
 
-export const isFlagDef = (def: string) => /^core[-/]flag@/.test(def);
+import { isFlagDef } from './features.ts';
+export { isFlagDef };
 
 export type Step = { id: 'signin' | 'claim' | 'pair' | 'flag' | 'build' | 'look'; label: string; done: boolean; hint: string };
 export type Evidence = {

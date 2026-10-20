@@ -1,26 +1,26 @@
-// The god panel on an entity world (spec <eden4>/29 WP6): sign in, claim,
-// the authored welcome (rendered, with copy buttons), first steps ticked live,
-// pairing approvals, undo/redo and the recent edits (undo a whole group), flags
-// (click to fly there), and the god's previews drawn as ghosts.
-// G4 (Gene 2026-10-20): for the world's god all of it lives in the one God modal (GodModal.tsx) under the God button,
-// with the agent's command log, weather, the world's housekeeping and the Constitution; the floating "God mode x/6"
-// card is gone. Everyone else gets the same modal read-only (Constitution, how to become a god). The claim card of a
-// godless world, the approval link (#approve/<id>) and the offer links keep their small floating card.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+// The god panel on an entity world (spec <eden4>/29 WP6): sign in, claim, pairing approvals, undo/redo, weather,
+// prayers, and (switched off) flags and the god's previews drawn as ghosts.
+// G4 (Gene 2026-10-20): for the world's god all of it lives in the one God modal (GodModal.tsx) under the God button.
+// G5 (Gene 2026-10-20b): one view, no tabs: connect the agent (until it is connected), the command box with undo/redo
+// and weather, prayers waiting (only if any), the log, and Forsake world (hand on or archive). Start, Edits, Souls (in
+// Explore) are gone; flags, previews and the Constitution are switched off (god-ui/features.ts) but their code stays.
+// Everyone else gets "Become a god". The claim card of a godless world, the approval link (#approve/<id>) and the offer
+// links keep their small floating card.
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiPath, worldKey } from './world-path.ts';
 import { BASE } from './base-path.ts';
-import { Markdown } from './god-ui/markdown.tsx';
 import * as G from './god-ui/god-api.ts';
-import { describeEdit, steps, type Step } from './god-ui/checklist.ts';
 import { flyTo } from './god-ui/camera.ts';
 import { SMALL_SCREEN } from './HudMore.tsx';
 import { previewGhost, takePreviewKey, type GhostSummary } from './WorldPreviewGhost.ts';
 import { useSession } from './auth-session.ts';
-import { ApprovalCard, JoinPanel } from './god-ui/JoinPanel.tsx';
-import { OwnerGod, VisitorGod, ago as since, type NavItem } from './god-ui/GodModal.tsx';
+import { ApprovalCard } from './god-ui/JoinPanel.tsx';
+import { OwnerGod, VisitorGod, ago as since } from './god-ui/GodModal.tsx';
 import { closeGod, openGod, useGod, watchInbox } from './god-ui/god-store.ts';
 import { ConstitutionBody } from './god-ui/Constitution.tsx';
-import { WorldOwnerOps } from './god-ui/WorldOwnerOps.tsx';
+import { ForsakeWorld } from './god-ui/WorldOwnerOps.tsx';
+import { PrayersWaiting } from './god-ui/Prayers.tsx';
+import { godFeature } from './god-ui/features.ts';
 import { approvalFromHash, landingHash } from './god-ui/join-api.ts';
 import { OfferCard, offerFromHash } from './god-ui/OfferCard.tsx';
 import './god-ui/god-panel.css';
@@ -51,7 +51,6 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
   const [open, setOpen] = useState<boolean>(() => joinHash || !!approvalId || (PHONE() ? localStorage.getItem(openKey()) === '1' : localStorage.getItem(openKey()) !== '0'));
   const god = useGod();
   const hashCode = landingHash.startsWith('#godpair/') ? decodeURIComponent(landingHash.slice('#godpair/'.length)) : null;
-  const [welcome, setWelcome] = useState<string | null>(null);
   const [edits, setEdits] = useState<G.EditRow[] | null>(null);
   const [flags, setFlags] = useState<G.FlagRef[]>([]);
   const [previews, setPreviews] = useState<G.PreviewRow[]>([]);
@@ -59,7 +58,6 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ text: string; bad?: boolean } | null>(null);
   const [ghost, setGhost] = useState<GhostSummary | null>(null);
-  const approvedHere = localStorage.getItem(PAIRED_KEY) === '1';   // the God modal's agent section approves pairings
   const owner = status?.you === 'owner' || status?.you === 'god';
   const seq = status?.seq;
   // who is signed in on this page (Clerk in production, a local name in dev): auth-session.ts
@@ -73,11 +71,11 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
   useEffect(() => G.watchStatus(setStatus), []);
   useEffect(() => { void refresh(); }, [refresh, session.authed, session.label]);
   useEffect(() => { localStorage.setItem(openKey(), open ? '1' : '0'); }, [open]);
-  useEffect(() => { if (!owner) { setWelcome(null); return; } void G.getWelcome().then(setWelcome); }, [owner]);
   // journal, flags: whenever the world's edit counter moves
   useEffect(() => {
     if (seq === undefined) return;
     if (owner) void G.edits(30).then(setEdits).catch(() => setEdits(null));
+    if (!godFeature('flags')) return;   // G5: flags are switched off
     // lane L3h: the entity layer already holds the public snapshot plus its diffs; read the flags there once it has reached
     // this edit (a diff can land just after the status), and download the whole snapshot only when it never does
     let live = true, tries = 0, timer: ReturnType<typeof setTimeout> | undefined;
@@ -93,7 +91,7 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
   }, [seq, owner, entitiesAt]);
   // what the launcher saw (looks, an agent's calls) and the god's previews: a slower poll
   useEffect(() => {
-    const go = () => { void G.launcherWorld().then(setLauncher); if (owner) void G.previews().then(setPreviews); };
+    const go = () => { void G.launcherWorld().then(setLauncher); if (owner && godFeature('previews')) void G.previews().then(setPreviews); };
     go(); const t = setInterval(go, 8000); return () => clearInterval(t);
   }, [owner]);
 
@@ -109,7 +107,7 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
     if (fly && s.ok && s.bounds) { const [x0, z0, x1, z1] = s.bounds; const span = Math.max(20, x1 - x0, z1 - z0); flyTo((x0 + x1) / 2, 0, (z0 + z1) / 2, { distance: span * 1.6, aside: 0.3 }); }
   }, []);
   const hideGhost = () => { previewGhost(apiPath)?.clear(); setGhost(null); const q = new URLSearchParams(location.search); if (q.has('preview')) { q.delete('preview'); history.replaceState(null, '', `${location.pathname}${q.size ? '?' + q : ''}${location.hash}`); } };
-  useEffect(() => { const id = query.get('preview'); if (id) void showPreview(id); }, [showPreview]);
+  useEffect(() => { const id = query.get('preview'); if (id && godFeature('previews')) void showPreview(id); }, [showPreview]);   // G5: switched off by default
 
   const run = async (key: string, fn: () => Promise<unknown>, ok?: (r: unknown) => string | null) => {
     setBusy(key); setNote(null);
@@ -142,20 +140,12 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
   const who = (session.label ?? 'you').replace(/^dev:/, '');
   const claim = () => run('claim', G.claim, () => 'This world is yours.');
   const undoRedo = (which: 'undo' | 'redo') => run(which, () => (which === 'undo' ? G.undo() : G.redo()), (r) => { const x = r as G.UndoResult; return x.accepted ? `${which === 'undo' ? 'Undid' : 'Redid'} edit ${x.reverted}.` : (x.failures?.[0]?.detail ?? `nothing to ${which}`); });
-  const undoGroup = (group: string) => run('g:' + group, () => G.undoGroup(group), (r) => { const x = r as G.UndoResult; return x.accepted ? `Undid group “${group}” (${Array.isArray(x.reverted) ? x.reverted.length : 1} edits).` : (x.failures?.[0]?.detail ?? 'nothing undone'); });
 
   const signedIn = session.authed && !!status && status.you !== 'anonymous';
-  const checklist: Step[] = useMemo(() => steps({ status, signedIn, edits, flags: flags.length, approvedHere, agentSeen: !!launcher?.seen.agentSeenAt, looks: launcher?.seen.looks ?? 0 }), [status, signedIn, edits, flags.length, approvedHere, launcher]);
-  const done = checklist.filter((s) => s.done).length;
-  const recent = useMemo(() => (edits ?? []).slice().sort((a, b) => b.seq - a.seq).slice(0, 8), [edits]);
   const canUndo = (edits ?? []).some((e) => !e.undone && e.kind !== 'undo' && e.ops.length > 0);
-  // one "undo group" per group, on its newest row that undo would still revert
-  const groupRow = useMemo(() => { const m = new Map<string, number>(); for (const e of (edits ?? []).slice().sort((a, b) => b.seq - a.seq)) if (e.grp && !e.undone && e.kind !== 'undo' && !m.has(e.grp)) m.set(e.grp, e.seq); return m; }, [edits]);
-  // a new owner whose agent is not connected yet: God opens by itself once (the agent section shows the line to paste);
-  // #join opens it on Souls
+  // a new owner whose agent is not connected yet: God opens by itself once (it shows the line to give the agent)
   useEffect(() => {
-    if (!owner || !status || shotMode) return;
-    if (joinHash) { openGod('souls'); return; }
+    if (!owner || !status || shotMode || joinHash) return;
     if ((status.agents ?? 0) > 0) return;
     try { if (localStorage.getItem(INTRO_KEY) === '1') return; localStorage.setItem(INTRO_KEY, '1'); } catch { return; }
     openGod('agent');
@@ -227,11 +217,11 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
           {!signedIn && <div className="gp-block">{signInButton}{signInForm}</div>}
         </div>
       )}
-      {god.open && <VisitorGod world={name} become={become}><ConstitutionBody /></VisitorGod>}
+      {god.open && <VisitorGod become={become}>{godFeature('constitution') ? <ConstitutionBody /> : null}</VisitorGod>}
     </>;
   }
 
-  // ---- the world's god: everything in the God modal ----
+  // ---- the world's god: everything in the one God Mode view ----
   const env = (body: unknown) => G.god('/v1/god/env', { method: 'POST', body: JSON.stringify(body) });
   const weather = (kind: 'rain' | 'lightning' | 'haze') => run(kind, async () => {
     if (kind === 'rain') return env({ weather: { kind: 'rain', intensity: 0.8 }, note: 'weather' });
@@ -245,16 +235,6 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
   }, () => `Approved. Your agent is now this world's god.`);
   const agentsPaired = (status.agents ?? 0) > 0;
   const fly = (x: number, y: number, z: number, distance: number) => { closeGod(); flyTo(x, y, z, { distance }); };
-  const nav: NavItem[] = [
-    { id: 'agent', label: 'Agent', count: status.pending.length || (god.inbox?.queued ? god.inbox.queued : null), alert: status.pending.length > 0 },
-    { id: 'start', label: 'Start', count: done < checklist.length ? `${done}/${checklist.length}` : null },
-    { id: 'edits', label: 'Edits', count: status.seq || null },
-    { id: 'flags', label: 'Flags', count: flags.length || null },
-    { id: 'previews', label: 'Previews', count: previews.length || null },
-    { id: 'souls', label: 'Souls' },
-    { id: 'constitution', label: 'Constitution' },
-    { id: 'world', label: 'Weather & world' },
-  ];
   const banner = <>
     {approvalId && <div className="gm-banner"><ApprovalCard id={approvalId} signedIn={signedIn} onDone={() => setApprovalId(null)} /></div>}
     {hashCode && !status.pending.some((p) => p.code === hashCode) && <p className="gm-banner gp-bad">Pairing request <code>{hashCode}</code> is not pending (expired, or already approved).</p>}
@@ -271,59 +251,36 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
     )}
     {note && <p className={'gm-banner gm-note ' + (note.bad ? 'gp-bad' : 'gp-ok')} role="status">{note.text}</p>}
   </>;
-  const prompt = `Read ${location.origin + apiPath('')}/SKILL.md and resume God mode for this world. Run node eden-god.mjs listen in the background and acknowledge each owner message with ack.`;
-  const section = (s: string) => {
-    if (s === 'agent') return !agentsPaired && <div className="gp-next gm-pair" data-next-step="pair">
-      <b>Connect your agent</b><p className="gp-dim">Paste this line to Claude Code, Codex or any coding agent. It sets itself up and shows a code here: press Approve.</p>
-      <Markdown source={'```paste-to-your-agent\n' + G.godPrompt(status.base) + '\n```'} />
-    </div>;
-    if (s === 'start') return <div data-start="1">
-      <ol className="gp-steps" data-checklist="1">
-        {checklist.map((c) => <li key={c.id} data-step={c.id} data-done={c.done ? '1' : '0'} className={c.done ? 'done' : ''}><span className="gp-tick" aria-hidden="true">{c.done ? '✓' : ''}</span><span><b>{c.label}</b>{!c.done && <span className="gp-hint">{c.hint}</span>}</span></li>)}
-      </ol>
-      <details className="gp-more"><summary>More about god mode</summary>{welcome ? <Markdown source={welcome} skipFirstHeading /> : <p className="gp-dim">Loading…</p>}</details>
-      <div className="gp-files">
-        <a className="gp-btn" href={apiPath('/SKILL.md')} target="_blank" rel="noreferrer" title="This world's one skill: God mode and Soul mode">SKILL.md</a>
-        <a className="gp-btn" href={apiPath('/god/eden-god.mjs')} download>eden-god.mjs</a>
-      </div>
-    </div>;
-    if (s === 'edits') return <div data-edits="1">
-      <div className="gp-tools">
-        <button className="gp-btn" data-undo="1" disabled={!canUndo || busy === 'undo'} onClick={() => undoRedo('undo')} title="Undo the newest edit">↶ Undo</button>
-        <button className="gp-btn" data-redo="1" disabled={busy === 'redo'} onClick={() => undoRedo('redo')} title="Redo the newest undone edit">↷ Redo</button>
-      </div>
-      {!recent.length && <p className="gp-dim">No edits yet. Everything your agent changes appears here, newest first, and can be undone.</p>}
-      <ul className="gp-list">
-        {recent.map((e) => (
-          <li key={e.seq} data-edit={e.seq} className={'gp-edit' + (e.undone ? ' undone' : '')}>
-            <span className="gp-seq">#{e.seq}</span>
-            <span className="gp-what" title={e.ops.map((o) => o.op + (o.name ? ' ' + o.name : '')).join(', ')}>{describeEdit(e)}</span>
-            <span className="gp-meta">
-              {e.grp && <span className="gp-group" title={`group ${e.grp}`}>{e.grp}</span>}
-              {e.kind === 'edit' && <span className="gp-dim">{e.ops.length} op{e.ops.length === 1 ? '' : 's'}</span>}
-              {e.undone ? <span className="gp-dim">undone</span> : null}
-              <span className="gp-dim">{since(e.at)}</span>
-              {e.grp && e.grp !== 'genesis' && groupRow.get(e.grp) === e.seq && <button className="gp-mini" data-undo-group={e.grp} disabled={busy === 'g:' + e.grp} onClick={() => undoGroup(e.grp!)} title={`Undo every edit in group ${e.grp}`}>undo group</button>}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>;
-    if (s === 'flags') return <div data-flags="1">
+  // until the agent is connected (never paired, or paired and away): the one line to give it, naming this world's skill
+  const connected = !!god.inbox?.connected;
+  const connectUrl = !agentsPaired || (god.inbox && !connected) ? `${status.base || location.origin + apiPath('')}/SKILL.md` : null;
+  const tools = <>
+    <div className="gm-tool-group" role="group" aria-label="Undo and redo">
+      <button type="button" className="gm-tool" data-undo="1" disabled={!canUndo || !!busy} onClick={() => undoRedo('undo')} title="Undo the newest edit">↶ Undo</button>
+      <button type="button" className="gm-tool" data-redo="1" disabled={!!busy} onClick={() => undoRedo('redo')} title="Redo the newest undone edit">↷ Redo</button>
+    </div>
+    <div className="gm-tool-group" role="group" aria-label="Weather" data-weather="1" title="The same as your agent's weather and strike: each press is one edit">
+      <button type="button" className="gm-tool" data-weather-kind="rain" disabled={!!busy} onClick={() => weather('rain')}>Rain</button>
+      <button type="button" className="gm-tool" data-weather-kind="lightning" disabled={!!busy} onClick={() => weather('lightning')}>Lightning</button>
+      <button type="button" className="gm-tool" data-weather-kind="haze" disabled={!!busy} onClick={() => weather('haze')}>Haze</button>
+    </div>
+  </>;
+  // switched off by default (god-ui/features.ts); shown under the log when turned back on
+  const more = <>
+    {godFeature('flags') && <section className="gm-more" data-flags="1">
+      <h3 className="gm-h">Flags</h3>
       <div className="gp-tools"><button className={'gp-btn' + (flagMode ? ' gp-armed' : '')} data-flag-button="1" aria-pressed={flagMode} onClick={() => { onFlagMode(!flagMode); if (!flagMode) closeGod(); }} title="Drop a labelled flag: a reference point your agent can build around (or Alt+click the ground)">⚑ {flagMode ? 'click the ground…' : 'Drop a flag'}</button></div>
-      {!flags.length && <p className="gp-dim">No flags yet. Drop one and your agent can say <code>place cottage --at flag:camp</code>.</p>}
       <ul className="gp-list">
         {flags.map((f) => (
           <li key={f.id}>
             <button className="gp-link" data-fly={f.name} onClick={() => fly(f.p[0], f.p[1], f.p[2], 35)} title="Fly the camera here">⚑ {f.label}</button>
             <code className="gp-dim">flag:{f.name}</code>
-            <span className="gp-dim gp-when">{Math.round(f.p[0])}, {Math.round(f.p[2])}</span>
           </li>
         ))}
       </ul>
-    </div>;
-    if (s === 'previews') return <div data-previews="1">
-      {!previews.length && <p className="gp-dim">When your agent runs <code>preview</code> (a dry run), its proposal appears here; show it as a ghost before it is built.</p>}
+    </section>}
+    {godFeature('previews') && previews.length > 0 && <section className="gm-more" data-previews="1">
+      <h3 className="gm-h">Previews</h3>
       <ul className="gp-list">
         {previews.map((p) => (
           <li key={p.id}>
@@ -334,25 +291,13 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
           </li>
         ))}
       </ul>
-    </div>;
-    if (s === 'souls') return <div data-souls-tab="1"><JoinPanel signedIn={signedIn} worldName={name} base={status.base} /></div>;
-    if (s === 'constitution') return <ConstitutionBody />;
-    if (s === 'world') return <div data-world-section="1">
-      <h3 className="gm-h">Weather</h3>
-      <p className="gp-dim">The same as your agent's <code>weather</code> and <code>strike</code>: each press is one edit in the world's history.</p>
-      <div className="gm-weather" data-weather="1">
-        <button className="gp-btn" data-weather-kind="rain" disabled={!!busy} onClick={() => weather('rain')}>Rain</button>
-        <button className="gp-btn" data-weather-kind="lightning" disabled={!!busy} onClick={() => weather('lightning')}>Lightning</button>
-        <button className="gp-btn" data-weather-kind="haze" disabled={!!busy} onClick={() => weather('haze')}>Haze</button>
-      </div>
-      {status.you === 'owner' && <><h3 className="gm-h">This world</h3><WorldOwnerOps /></>}
-    </div>;
-    return null;
-  };
+    </section>}
+    {godFeature('constitution') && <section className="gm-more"><ConstitutionBody /></section>}
+  </>;
   return <>
     {ghostBar}
-    {god.open && <OwnerGod world={name} meta={<>{status.entities === 1 ? '1 thing' : `${status.entities} things`} · edit {status.seq}{launcher?.world.templateName ? <> · from <i>{launcher.world.templateName}</i></> : null}</>}
-      nav={nav} banner={banner} prompt={prompt} paired={agentsPaired}>{section}</OwnerGod>}
+    {god.open && <OwnerGod banner={banner} connectUrl={connectUrl} paired={agentsPaired} tools={tools} prayers={<PrayersWaiting />} more={more}
+      forsake={status.you === 'owner' ? <ForsakeWorld name={name} /> : null} />}
   </>;
 }
 

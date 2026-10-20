@@ -1,4 +1,4 @@
-// G4 (Gene 2026-10-20): one God modal under the God button. The button lives in Shell's top bar, the modal in LiveWorld
+// G4 (Gene 2026-10-20): one God modal under the God button (G5: one view, no tabs). The button lives in Shell's top bar, the modal in LiveWorld
 // (GodPanel owns flags and the entity layer), so a tiny store joins them: whether the modal is open, which section, and
 // the owner's agent inbox (presence for the button's dot, the ticket log for the modal), polled every 2 s while the modal
 // is open and every 6 s while it is closed. Visitors never poll the inbox.
@@ -6,7 +6,8 @@ import { useSyncExternalStore } from 'react';
 import { apiPath } from '../world-path.ts';
 import { userAuthHeaders } from '../auth-session.ts';
 
-export type Section = 'agent' | 'start' | 'edits' | 'flags' | 'previews' | 'souls' | 'constitution' | 'world';
+/** G5: one view ('agent'); 'forsake' is the danger zone that takes the modal over (hand the world on, or archive it). */
+export type Section = 'agent' | 'forsake';
 export type Outcome = 'done' | 'failed' | 'withdrawn';
 export type Presence = 'listening' | 'working' | 'recent' | 'away';
 export type TicketFocus = { x: number; y: number; z: number; span: number; label?: string; count: number };
@@ -23,7 +24,7 @@ export function useGod(): State { return useSyncExternalStore(subscribe, () => s
 export const godState = () => state;
 
 export function openGod(section?: Section) { set({ open: true, ...(section ? { section } : {}) }); void pollNow(); }
-export function closeGod() { set({ open: false }); }
+export function closeGod() { set({ open: false, section: 'agent' }); }
 export function toggleGod() { if (state.open) closeGod(); else openGod(); }
 export function showSection(section: Section) { set({ section }); }
 
