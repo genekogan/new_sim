@@ -116,3 +116,14 @@
   .gp-owner-ops input { background: #2a2b28; color: #ebeae3; border-color: rgba(255, 255, 255, .2); }
   .gp-btn.gp-danger:not(:disabled) { border-color: #e88; color: #f2a0a0; }
 }
+/* Lane HF: the approval link's card (god-ui/ApprovalDialog.tsx), a modal in the top layer, centred, until it is answered */
+.gp-approval-dialog { width: min(420px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); overflow: auto; box-sizing: border-box; margin: auto; padding: 6px 16px 14px; border: 0; border-radius: 14px; background: rgba(252, 251, 247, .98); color: #1c1c1a; box-shadow: 0 10px 40px rgba(0, 0, 0, .28), 0 0 0 1px rgba(0, 0, 0, .05); font: 14px/1.45 system-ui, -apple-system, sans-serif; }
+.gp-approval-dialog:focus { outline: none; }
+.gp-approval-dialog::backdrop { background: rgba(16, 21, 20, .35); }
+.gp-approval-dialog .gp-pairs { margin: 10px 0 0; padding: 10px 12px; }
+.gp-approval-dialog .gp-block { margin-top: 10px; }
+.gp-approval-dialog .gp-btn, .gp-approval-dialog .gp-mini { min-height: 36px; }
+@media (pointer: coarse) { .gp-approval-dialog .gp-btn, .gp-approval-dialog .gp-mini { min-height: 44px; min-width: 44px; } }
+@media (prefers-color-scheme: dark) {
+  .gp-approval-dialog { background: rgba(28, 29, 27, .97); color: #ebeae3; box-shadow: 0 10px 40px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .06); }
+}

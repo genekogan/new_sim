@@ -4,8 +4,8 @@
 // G5 (Gene 2026-10-20b): one view, no tabs: connect the agent (until it is connected), the command box with undo/redo
 // and weather, prayers waiting (only if any), the log, and Forsake world (hand on or archive). Start, Edits, Souls (in
 // Explore) are gone; flags, previews and the Constitution are switched off (god-ui/features.ts) but their code stays.
-// Everyone else has no God Mode (U3: the God button is the god's only): the claim card of a godless world, the approval
-// link (#approve/<id>) and the offer links keep their small floating card.
+// Everyone else has no God Mode (U3: the God button is the god's only): the claim card of a godless world and the offer
+// links keep their small floating card. The approval link (#approve/<id>) is a modal on top for everyone (lane HF).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiPath, worldKey } from './world-path.ts';
 import * as G from './god-ui/god-api.ts';
@@ -13,7 +13,7 @@ import { flyTo } from './god-ui/camera.ts';
 import { SMALL_SCREEN } from './HudMore.tsx';
 import { previewGhost, takePreviewKey, type GhostSummary } from './WorldPreviewGhost.ts';
 import { useSession } from './auth-session.ts';
-import { ApprovalCard } from './god-ui/JoinPanel.tsx';
+import { ApprovalDialog } from './god-ui/ApprovalDialog.tsx';
 import { OwnerGod, ago as since } from './god-ui/GodModal.tsx';
 import { closeGod, openGod, useGod, watchInbox } from './god-ui/god-store.ts';
 import { ConstitutionBody } from './god-ui/Constitution.tsx';
@@ -33,7 +33,9 @@ const PAIRED_KEY = `sim.godPaired:${worldKey}`;
 const PHONE = () => typeof matchMedia === 'function' && matchMedia(SMALL_SCREEN).matches;  // P6: landscape phones (coarse pointer) too
 // Phones keep their own remembered choice and start compact: the open panel covers most of a small screen.
 const openKey = () => 'sim.godPanel.open' + (PHONE() ? '.phone' : '');
-const INTRO_KEY = `sim.godIntro:${worldKey}`;   // G4: God opens by itself once, for a new owner whose agent is not connected
+const INTRO_KEY = `sim.godIntro:${worldKey}`;
+/** Lane HF: the approval link's dialog was closed on this page (the panel can remount; it must not come back). */
+let approvalClosed = false;   // G4: God opens by itself once, for a new owner whose agent is not connected
 type Sim = { controls?: { target: { x: number; z: number } } };
 /** Where the camera looks (the orbit target), for a strike near the view's centre. */
 const viewCentre = (): [number, number] | null => { const t = (window as unknown as { __simEntity?: Sim }).__simEntity?.controls?.target; return t ? [Math.round(t.x * 10) / 10, Math.round(t.z * 10) / 10] : null; };
@@ -45,8 +47,8 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
   const [status, setStatus] = useState<G.Status | null>(null);
   // #join (the link a god shares): open the panel on the Join section / the Souls tab
   const joinHash = landingHash === '#join';
-  // #approve/<id> (the link the Soul CLI prints for its human): the approval card, panel open
-  const [approvalId, setApprovalId] = useState(() => approvalFromHash(landingHash));
+  // #approve/<id> (the link the Soul CLI prints for its human): the approval card, a modal on top of everything (lane HF)
+  const [approvalId, setApprovalId] = useState(() => (approvalClosed ? null : approvalFromHash(landingHash)));
   // #worldoffer/<code>, #cobuildpair/<code> (the launcher's co-builder and handoff links): that card first
   const [offerLink, setOfferLink] = useState(() => offerFromHash(landingHash));
   const [open, setOpen] = useState<boolean>(() => joinHash || !!approvalId || (PHONE() ? localStorage.getItem(openKey()) === '1' : localStorage.getItem(openKey()) !== '0'));
@@ -143,6 +145,10 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
   const undoRedo = (which: 'undo' | 'redo') => run(which, () => (which === 'undo' ? G.undo() : G.redo()), (r) => { const x = r as G.UndoResult; return x.accepted ? `${which === 'undo' ? 'Undid' : 'Redid'} edit ${x.reverted}.` : (x.failures?.[0]?.detail ?? `nothing to ${which}`); });
 
   const signedIn = session.authed && !!status && status.you !== 'anonymous';
+  // Lane HF (Gene 2026-10-20): the approval stays on screen and on top for everyone, the god included, whatever loads or
+  // settles later (Clerk, the god's status, God Mode, the arrival), until approved, refused or closed. Closing drops the link.
+  const approvalDone = () => { approvalClosed = true; setApprovalId(null); if (approvalFromHash(location.hash)) history.replaceState(null, '', location.pathname + location.search); };
+  const approvalModal = approvalId && <ApprovalDialog id={approvalId} signedIn={signedIn} onDone={approvalDone} signIn={!signedIn && <>{signInButton}{signInForm}</>} />;
   const canUndo = (edits ?? []).some((e) => !e.undone && e.kind !== 'undo' && e.ops.length > 0);
   // a new owner whose agent is not connected yet: God opens by itself once (it shows the line to give the agent)
   useEffect(() => {
@@ -165,11 +171,11 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
       <button className="gp-btn" onClick={hideGhost}>hide</button>
     </div>
   );
-  if (offerLink) return <>{ghostBar}<div data-god-panel="1" className="gp-card">
+  if (offerLink) return <>{approvalModal}{ghostBar}<div data-god-panel="1" className="gp-card">
     <OfferCard link={offerLink} signedIn={signedIn} onDone={() => { setOfferLink(null); history.replaceState(null, '', location.pathname + location.search); void refresh(); }} />
     {!signedIn && <div className="gp-block">{signInButton}{signInForm}</div>}
   </div></>;
-  if (!status) return ghostBar || null;
+  if (!status) return <>{approvalModal}{ghostBar}</>;
   const name = launcher?.world.name ?? status.name;
   const isNew = query.has('new');
 
@@ -182,7 +188,6 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
         <button className="gp-icon" onClick={() => setOpen(false)} title="Collapse the panel" aria-label="collapse">–</button>
       </div>
       {launcher?.world.templateName && <div className="gp-dim gp-sub">from <i>{launcher.world.templateName}</i>{launcher.world.createdAt ? <> · made {ago(launcher.world.createdAt)}</> : null}</div>}
-      {approvalId && <ApprovalCard id={approvalId} signedIn={signedIn} onDone={() => setApprovalId(null)} />}
       <div className="gp-block gp-next">
         {isNew && status.you !== 'claimant' && <p className="gp-hello">Your new world is ready. Whoever claims it first becomes its god, so sign in and claim it now.</p>}
         {status.you === 'claimant'
@@ -195,16 +200,10 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
     : <button data-god-panel-toggle="1" className="gp-card gp-collapsed" onClick={() => setOpen(true)}>✦ Claim this world</button>);
 
   if (!owner) {
-    // Everyone not this world's god (U3: no God button, no Cmd+G): the claim card of a godless world, and on a world with a
-    // god only the approval link their agent printed (#approve/<id>) opens a card.
-    return <>{ghostBar}
+    // Everyone not this world's god (U3: no God button, no Cmd+G): the claim card of a godless world, and the approval
+    // link their agent printed (#approve/<id>, its own dialog).
+    return <>{approvalModal}{ghostBar}
       {claimCard}
-      {status.hasOwner && approvalId && (
-        <div data-god-panel="1" className="gp-card">
-          <ApprovalCard id={approvalId} signedIn={signedIn} onDone={() => setApprovalId(null)} />
-          {!signedIn && <div className="gp-block">{signInButton}{signInForm}</div>}
-        </div>
-      )}
     </>;
   }
 
@@ -223,7 +222,6 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
   const agentsPaired = (status.agents ?? 0) > 0;
   const fly = (x: number, y: number, z: number, distance: number) => { closeGod(); flyTo(x, y, z, { distance }); };
   const banner = <>
-    {approvalId && <div className="gm-banner"><ApprovalCard id={approvalId} signedIn={signedIn} onDone={() => setApprovalId(null)} /></div>}
     {hashCode && !status.pending.some((p) => p.code === hashCode) && <p className="gm-banner gp-bad">Pairing request <code>{hashCode}</code> is not pending (expired, or already approved).</p>}
     {status.pending.length > 0 && (
       <div className="gm-banner gp-pairs" data-pairing="1">
@@ -283,6 +281,7 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
   </>;
   // the owner here is 'owner' (signed in) or 'god' (the owner's own god token in this browser): both may forsake
   return <>
+    {approvalModal}
     {ghostBar}
     {god.open && <OwnerGod banner={banner} connectUrl={connectUrl} paired={agentsPaired} tools={tools} prayers={<PrayersWaiting />} more={more}
       forsake={<ForsakeWorld name={name} />} />}
