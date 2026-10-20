@@ -39,6 +39,7 @@ import { standby } from './standby.ts';
 const bootAt: Record<string, number> = { code: performance.now() };
 // Release pre-warm (SIM_STANDBY=1, launcher handover): all code is loaded here; the database and port open only after SIGUSR2.
 await standby(async () => { if (config.engine === 'mars') await import('@sim/engine-mars'); await import('./edge/body/migrate-looks.ts'); });
+bootAt.go = performance.now();
 
 // K1 / NT5: new kit fields are admitted only with the viewer that can draw them.
 try { setKitViewerContract(JSON.parse(readFileSync(join(config.webDir, 'kit-contract.json'), 'utf8'))); }
@@ -56,6 +57,7 @@ const NATIVES: { name: string; description: string }[] = [
 
 const db = new Db(join(config.dataDir, 'sim.db'));
 const definition = worldDefinition(config.worldKey);
+bootAt.db = performance.now();
 if (db.migrated.length) console.log(`[db] applied migrations ${db.migrated.join(', ')}`);
 // Each process owns one world and imports its engine from this release.
 const mars = config.engine==='mars'?await import('@sim/engine-mars'):null;
@@ -189,6 +191,7 @@ server.listen(config.port, config.host, () => {
   console.log(`[http] listening on http://${config.host}:${config.port} (public ${config.publicUrl}), build ${config.build}, brain ${brain.mode}, budget $${brain.budget}/day, invites ${config.inviteRequired ? 'required' : 'open'}`);
   const s = (ms: number) => (ms / 1000).toFixed(2);
   console.log(`[boot] listening ${s(performance.now())} s after start: code ${s(bootAt.code)}, engine ${s(bootAt.engine - bootAt.open)}, the rest ${s(performance.now() - bootAt.engine)}`);
+  if (process.env.SIM_STANDBY === '1') console.log(`[boot] listening ${s(performance.now() - bootAt.go)} s after the standby go: database ${s(bootAt.db - bootAt.go)}, factory ${s(bootAt.open - bootAt.db)}, engine ${s(bootAt.engine - bootAt.open)}, the rest ${s(performance.now() - bootAt.engine)}`);
 });
 
 let closing = false;
@@ -211,7 +214,9 @@ const shutdown = async (sig: string) => {
   }
   console.log(`[world] ${sig}: saving snapshot at tick ${host.engine.world.tick}`);
   host.stop(); takes.stop();
+  const saveAt = performance.now();
   try { host.saveSnapshot(true); } catch (e) { console.error('[world] snapshot failed', e); }
+  console.log(`[world] ${sig}: snapshot saved in ${Math.round(performance.now() - saveAt)} ms`);
   server.close(); for (const c of hub.clients) c.ws.close(1001, 'server restarting');
   auth.close();db.close(); process.exit(0);
 };

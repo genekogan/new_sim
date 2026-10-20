@@ -775,7 +775,7 @@ export async function openLauncher(cfg = {}) {
           const k = pool.state(slug);
           // ms: the world's visible pause (old process stopping + new one opening); totalMs adds the pre-warm before it
           const total = Math.round(performance.now() - t0);
-          out[slug] = { ok: true, ms: k?.pauseStart ? Date.now() - k.pauseStart : total, totalMs: total, port: p, ...(k?.lastWarm ? { warm: k.lastWarm } : {}) }; log(`took over ${slug} on :${p} in ${out[slug].ms} ms${k?.lastWarm?.ok ? ` (pre-warmed ${k.lastWarm.ms} ms before)` : ''}`);
+          out[slug] = { ok: true, ms: k?.pauseStart ? Date.now() - k.pauseStart : total, totalMs: total, port: p, ...(k?.lastWarm ? { warm: k.lastWarm } : {}) }; log(`took over ${slug} on :${p} in ${out[slug].ms} ms${k?.releaseMs != null ? ` (previous process stopped in ${k.releaseMs} ms)` : ''}${k?.lastWarm?.ok ? ` (pre-warmed ${k.lastWarm.ms} ms before)` : ''}`);
         } catch (e) { out[slug] = { ok: false, ms: Math.round(performance.now() - t0), error: e.message }; log(`could not take over ${slug}: ${e.message}`); }
       };
       // canary: one world moves first and must also answer its config (as the release's boot smoke asks); if it cannot,

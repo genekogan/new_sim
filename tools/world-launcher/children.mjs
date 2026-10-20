@@ -65,7 +65,7 @@ export class ChildPool {
     k.status = 'handover'; this.o.onChange?.(slug);
     k.ready = (async () => {
       k.pauseStart = Date.now();   // from here the world does not answer until the new process does
-      try { await release(slug); }
+      try { await release(slug); k.releaseMs = Date.now() - k.pauseStart; }
       catch (e) { warm?.child.kill('SIGTERM'); k.status = 'failed'; k.lastError = `handover: ${e.message}`; this.o.onChange?.(slug); throw e; }
       k.adopted = null; this.savePids();
       if (this.closing || this.fenced) { warm?.child.kill('SIGTERM'); k.status = 'stopped'; throw new Error(`world ${slug}: this launcher is closing`); }
