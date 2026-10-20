@@ -7,7 +7,8 @@ import { cgroupHeadroomMb, prewarmBlocked, PREWARM_MB } from './production.mjs';
 
 const MB = 2 ** 20;
 const fs = (files) => (f) => { if (!(f in files)) throw Object.assign(new Error(`ENOENT ${f}`), { code: 'ENOENT' }); return files[f]; };
-const unit = (current, high = 'max', max = 'max', meminfo = 16_000) => fs({
+const unit = (current, high = 'max', max = 'max', meminfo = 16_000, stat) => fs({
+  ...(stat ? { '/sys/fs/cgroup/system.slice/system-sim\\x2dworlds.slice/sim-worlds@production.service/memory.stat': stat } : {}),
   '/proc/self/cgroup': '0::/system.slice/system-sim\\x2dworlds.slice/sim-worlds@production.service\n',
   '/sys/fs/cgroup/system.slice/system-sim\\x2dworlds.slice/sim-worlds@production.service/memory.current': `${current * MB}\n`,
   '/sys/fs/cgroup/system.slice/system-sim\\x2dworlds.slice/sim-worlds@production.service/memory.high': `${high === 'max' ? 'max' : high * MB}\n`,
@@ -28,4 +29,13 @@ test('pre-warm goes ahead with room under the unit limit and on the host, and is
   assert.match(prewarmBlocked(1000, { read: unit(1000, 5120, 6144, 1500) }), /1500 MB available; pre-warm needs 1768/);
   assert.equal(prewarmBlocked(0, { read: fs({}) }), null, 'macOS: no limits known, pre-warm as configured');
   assert.equal(PREWARM_MB, 768);
+});
+test('the inactive page cache in memory.current (memory.stat inactive_file, reclaimed first) counts as room', () => {
+  // eden2's legacy unit at the 3.48 release: MemoryHigh 2 GB, current ~1283 MB of which 219 MB inactive file cache
+  const stat = `anon ${994 * MB}\nfile ${220 * MB}\nactive_file ${1 * MB}\ninactive_file ${219 * MB}\nslab ${40 * MB}\n`;
+  assert.equal(cgroupHeadroomMb(unit(1283, 2048, 2560)), 765, 'without memory.stat: as before');
+  assert.equal(cgroupHeadroomMb(unit(1283, 2048, 2560, 16_000, stat)), 984);
+  assert.equal(prewarmBlocked(0, { read: unit(1283, 2048, 2560, 16_000, stat) }), null, 'eden and mars pre-warm');
+  assert.match(prewarmBlocked(0, { read: unit(1283, 2048, 2560) }), /765 MB under its memory limit/);
+  assert.equal(cgroupHeadroomMb(unit(1283, 2048, 2560, 16_000, 'anon 1\n')), 765, 'no inactive_file line: nothing reclaimable');
 });

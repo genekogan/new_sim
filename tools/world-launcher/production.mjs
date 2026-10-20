@@ -41,7 +41,10 @@ export function memAvailableMb() {
  *  for the eden/mars forks (Node 22, code loaded, nothing opened), plus margin for the launcher's own overlap. */
 export const PREWARM_MB = 768;
 /** MB left under this process's cgroup v2 memory.high/memory.max (systemd MemoryHigh/MemoryMax of the unit), or null
- *  when there is no such limit (not Linux, cgroup v1, unlimited). The world processes share the unit's cgroup. */
+ *  when there is no such limit (not Linux, cgroup v1, unlimited). The world processes share the unit's cgroup.
+ *  memory.current also counts the page cache of the files the unit read (its SQLite databases, its code); the inactive
+ *  part of it (memory.stat inactive_file) is what the kernel reclaims first when the unit nears its limit, so it is room
+ *  (G9 lane Z1b: on eden2 the legacy unit's ~220 MB of it put eden and mars 3-5 MB short of a pre-warm, boot cold). */
 export function cgroupHeadroomMb(read = (f) => readFileSync(f, 'utf8')) {
   try {
     const line = read('/proc/self/cgroup').split('\n').find((l) => l.startsWith('0::'));
@@ -50,7 +53,9 @@ export function cgroupHeadroomMb(read = (f) => readFileSync(f, 'utf8')) {
     let limit = Infinity;
     for (const f of ['memory.high', 'memory.max']) { const v = read(`${dir}/${f}`).trim(); if (v !== 'max' && Number(v) > 0) limit = Math.min(limit, Number(v)); }
     if (limit === Infinity) return null;
-    return Math.round((limit - Number(read(`${dir}/memory.current`).trim())) / 2 ** 20);
+    let reclaimable = 0;
+    try { reclaimable = Number(read(`${dir}/memory.stat`).match(/^inactive_file (\d+)$/m)?.[1] ?? 0); } catch { /* no stat: count it all */ }
+    return Math.round((limit - Number(read(`${dir}/memory.current`).trim()) + reclaimable) / 2 ** 20);
   } catch { return null; }
 }
 /** Why a release handover must not pre-warm a world now (null: it may). A second process of the world beside the first
