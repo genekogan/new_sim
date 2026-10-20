@@ -22,7 +22,7 @@
 // CLI loop (optional; a god folder per world, as `eden-god.mjs register` + `pair`/`mint` leave it): `place barrel
 // --free --name z1-<run>-<n>`, one call started per --cli-every seconds (default 1, under the edit rate limit). A call that fails is retried up to 3 times (as an agent would); a retry
 // that finds the name already taken counts as landed. At the end `export` lists the world: lost = a name the CLI said it
-// placed that is missing, duplicate = a name placed twice. Every placed barrel is then removed (`clear` by name) unless
+// placed that is missing, duplicate = a name placed twice. Every placed barrel is then removed (`select --name z1-<run>-* --remove`, bulk) unless
 // --keep-edits. Unclean = a CLI failure whose output is not the CLI's own sentence (an HTML page, a stack trace).
 //
 // Builds: every world socket records the build its welcome names. --expect-build (the release id; a legacy root's
@@ -174,7 +174,8 @@ async function arrive(ctx, device, path) {
 // ---------- CLI loop
 const run = (dir, args, timeout = 240_000) => new Promise((yes) => {
   const s = Date.now();
-  execFile(process.execPath, [cliBin, ...args], { cwd: dir, timeout, maxBuffer: 64 << 20 }, (err, stdout, stderr) => yes({ code: err ? (err.code ?? 1) : 0, ms: Date.now() - s, out: `${stdout}${stderr}`.trim() }));
+  // EDEN_GOD_TRACE: every HTTP request of the call on stderr (method, path, status, ms, retries), kept for slow calls
+  execFile(process.execPath, [cliBin, ...args], { cwd: dir, timeout, maxBuffer: 64 << 20, env: { ...process.env, EDEN_GOD_TRACE: '1' } }, (err, stdout, stderr) => yes({ code: err ? (err.code ?? 1) : 0, ms: Date.now() - s, out: `${stdout}${stderr}`.trim() }));
 });
 async function cliLoop(dir, runId, stopped) {
   const c = { dir, calls: 0, placed: [], failures: [], retries: 0, slowestMs: 0, unclean: 0 };
@@ -188,10 +189,10 @@ async function cliLoop(dir, runId, stopped) {
       lastStart = Date.now();
       const startAt = at(), r = await run(dir, ['place', 'barrel', '--free', '--name', name]); c.calls++;
       c.slowestMs = Math.max(c.slowestMs, r.ms);
-      if (r.ms > 5000) (c.slow ??= []).push({ name, startAt, ms: r.ms, code: r.code, out: r.out.slice(-400) });
+      if (r.ms > 5000) (c.slow ??= []).push({ name, startAt, at: new Date(t0 + startAt).toISOString(), ms: r.ms, code: r.code, out: r.out.slice(-1500) });
       if (r.code === 0 && /placed /.test(r.out)) { landed = true; c.placed.push({ name, at: at(), ms: r.ms, attempt }); break; }
       if (attempt && /already|taken|exists|duplicate/i.test(r.out)) { landed = true; c.placed.push({ name, at: at(), ms: r.ms, attempt, byRetry: true }); break; }
-      const clean = !/<html|<!doctype|\n\s+at .*\(|Error: |TypeError/i.test(r.out);
+      const clean = !/<html|<!doctype|\n\s+at .*\(|Error: |TypeError/i.test(r.out.replace(/^\[trace\] .*$/gm, ''));
       if (!clean) c.unclean++;
       c.failures.push({ name, at: at(), ms: r.ms, code: r.code, clean, out: r.out.slice(-300) });
     }
@@ -206,7 +207,19 @@ async function cliLoop(dir, runId, stopped) {
   c.lost = c.placed.filter((p) => !count.has(p.name)).map((p) => p.name);
   c.duplicates = [...count].filter(([, k]) => k > 1).map(([n]) => n);
   c.inWorld = count.size;
-  if (!keepEdits) { for (const p of c.placed) await run(dir, ['clear', p.name]); }
+  // remove what this run placed (names z1-<run>-<n>, nothing else): one bulk batch per pass (`select --name --remove`,
+  // up to 256 things), until none is left; then export again and count what remains. (`clear` only reads, so before
+  // this the barrels stayed; a multi-name `remove` is one batch and is refused whole when any one name is missing.)
+  if (!keepEdits && (c.placed.length || c.inWorld)) {
+    c.cleanup = { passes: 0, out: [] };
+    for (let i = 0; i < 8; i++) {
+      const r = await run(dir, ['select', '--name', `z1-${runId}-*`, '--remove', '--note', `release probe ${runId} cleanup`]); c.cleanup.passes++;
+      c.cleanup.out.push(r.out.slice(-200));
+      if (r.code !== 0 || !/^removed /m.test(r.out) || !/first 256 only/.test(r.out)) break;
+    }
+    const after = await run(dir, ['export', file]);
+    try { c.cleanup.left = new Set(JSON.stringify(JSON.parse(readFileSync(file, 'utf8'))).match(new RegExp(`z1-${runId}-\\d+`, 'g')) ?? []).size; } catch (e) { c.cleanup.error = `${after.out.slice(-200)} ${e.message}`; }
+  }
   return c;
 }
 
@@ -265,7 +278,7 @@ report.bar = {
   cliCalls: report.cli.reduce((n, c) => n + c.calls, 0), cliPlaced: report.cli.reduce((n, c) => n + c.placed.length, 0),
   cliFailures: report.cli.reduce((n, c) => n + c.failures.length, 0), cliRetries: report.cli.reduce((n, c) => n + c.retries, 0),
   lost: report.cli.reduce((n, c) => n + (c.lost?.length ?? 0), 0), duplicates: report.cli.reduce((n, c) => n + (c.duplicates?.length ?? 0), 0),
-  unclean: report.cli.reduce((n, c) => n + c.unclean, 0), cliSlowestMs: Math.max(0, ...report.cli.map((c) => c.slowestMs)),
+  unclean: report.cli.reduce((n, c) => n + c.unclean, 0), cliLeftAfterCleanup: report.cli.reduce((n, c) => n + (c.cleanup?.left ?? 0), 0), cliSlowestMs: Math.max(0, ...report.cli.map((c) => c.slowestMs)),
   pageStallMaxMs: Math.max(0, ...report.watchers.flatMap((w) => (w.stalls ?? []).map(([x, y]) => y - x))),
   watchedAfterReleaseMs: releasedAt === null ? null : stoppedAt - releasedAt,
   builds: Object.fromEntries(report.watchers.map((w) => [`${w.device} ${w.path}`, `${w.buildAtMark} -> ${w.buildAtEnd}`])),

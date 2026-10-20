@@ -134,11 +134,13 @@ export async function call(path, { body, method, as = 'god', noBuild = false, ti
     // Each 429 retry gets its own attemptMs signal (as release 1's recursive send did), capped by the
     // command's one deadline and cancelled with it (the look deadline runs through withDeadline).
     const store = context.getStore();
-    const r = await fetchWithRetry(world + requestPath, { method: requestMethod, headers, body: requestBody, timeoutMs: attemptMs, deadlineAt: store?.deadlineAt, signal: store?.signal }, { fetch: wireFetch }, retryBudget);
+    let r;
+    try { r = await fetchWithRetry(world + requestPath, { method: requestMethod, headers, body: requestBody, timeoutMs: attemptMs, deadlineAt: store?.deadlineAt, signal: store?.signal }, { fetch: wireFetch }, retryBudget); }
+    catch (e) { if (process.env.EDEN_GOD_TRACE) console.error(`[trace] ${requestMethod} ${requestPath} FAILED ${Date.now() - t0} ms after ${retryBudget.retries} retries (${retryBudget.waited} ms waited): ${e?.cause?.code ?? e?.name ?? ''} ${e?.message ?? e}`); throw e; }
     if (headers.authorization && !requestPath.startsWith('/v1/god/inbox/')) noticeInboxHeader(r.headers);
     // Reading a response can also lose the connection after the edit committed.
     const text = await r.text(); let data;
-    if (process.env.EDEN_GOD_TRACE) console.error(`[trace] ${requestMethod} ${requestPath} ${r.status} ${Date.now() - t0} ms ${requestBody?.slice(0, 160) ?? ''}`);
+    if (process.env.EDEN_GOD_TRACE) console.error(`[trace] ${requestMethod} ${requestPath} ${r.status} ${Date.now() - t0} ms${retryBudget.retries ? ` (${retryBudget.retries} retries so far, ${retryBudget.waited} ms waited)` : ''} ${requestBody?.slice(0, 160) ?? ''}`);
     try { data = JSON.parse(text); } catch { data = { raw: text.slice(0, 400) }; }
     // P2: a refusal the CLI already waited out says so, and ok() prints it as a sentence
     return { status: r.status, data, ...((r.status === 429 || r.status === 503) && retryBudget.retries ? { retried: { retries: retryBudget.retries, waitedMs: retryBudget.waited } } : {}) };

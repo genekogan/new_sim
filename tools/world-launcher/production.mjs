@@ -45,7 +45,10 @@ export const PREWARM_MB = 768;
  *  memory.current also counts the page cache of the files the unit read (its SQLite databases, its code); the inactive
  *  part of it (memory.stat inactive_file) is what the kernel reclaims first when the unit nears its limit, so it is room
  *  (G9 lane Z1b: on eden2 the legacy unit's ~220 MB of it put eden and mars 3-5 MB short of a pre-warm, boot cold). */
-export function cgroupHeadroomMb(read = (f) => readFileSync(f, 'utf8')) {
+/** Reads /proc and /sys files; SIM_PROC_ROOT=<dir> reads them under <dir> instead (a rig's fake cgroup: Z1b proved the
+ *  pre-warm gate on a laptop with it). */
+const sysRead = (f) => readFileSync(`${process.env.SIM_PROC_ROOT ?? ''}${f}`, 'utf8');
+export function cgroupHeadroomMb(read = sysRead) {
   try {
     const line = read('/proc/self/cgroup').split('\n').find((l) => l.startsWith('0::'));
     if (!line) return null;
@@ -65,7 +68,7 @@ export function prewarmBlocked(minFreeMb = 0, { needMb = Number(process.env.SIM_
   const room = cgroupHeadroomMb(read);
   if (room !== null && room < needMb) return `the unit is ${room} MB under its memory limit; pre-warm needs ${needMb}`;
   let free = null;
-  try { const m = (read ?? ((f) => readFileSync(f, 'utf8')))('/proc/meminfo').match(/^MemAvailable:\s+(\d+)\s+kB/m); if (m) free = Math.round(Number(m[1]) / 1024); } catch { /* not Linux: no host check (macOS free memory excludes its cache) */ }
+  try { const m = (read ?? sysRead)('/proc/meminfo').match(/^MemAvailable:\s+(\d+)\s+kB/m); if (m) free = Math.round(Number(m[1]) / 1024); } catch { /* not Linux: no host check (macOS free memory excludes its cache) */ }
   if (free !== null && free < minFreeMb + needMb) return `the server has ${free} MB available; pre-warm needs ${minFreeMb + needMb}`;
   return null;
 }
