@@ -3,7 +3,7 @@
 //   node backup.mjs <dataDir> <backupRoot>
 // Writes <backupRoot>/<YYYYMMDD>/{accounts.sqlite, worlds.json, worlds/<slug>.db} with SQLite's online backup API
 // (consistent while the launcher and its worlds keep writing). Retention: the newest 14 nightly sets keep the small
-// files; world databases are kept only in the newest 2 sets (each world also keeps its own hourly/daily backups in
+// files; world databases are kept only in the newest 3 sets (each world also keeps its own hourly/daily backups in
 // its data dir). Prints one summary line; exits non-zero if any copy failed.
 import { backup, DatabaseSync } from 'node:sqlite';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
@@ -35,7 +35,7 @@ for (const slug of existsSync(worldsDir) ? readdirSync(worldsDir) : []) await co
 
 const sets = readdirSync(root).filter((d) => /^\d{8}$/.test(d)).sort().reverse();
 for (const d of sets.slice(14)) rmSync(join(root, d), { recursive: true, force: true });
-for (const d of sets.slice(2, 14)) rmSync(join(root, d, 'worlds'), { recursive: true, force: true });
+for (const d of sets.slice(3, 14)) rmSync(join(root, d, 'worlds'), { recursive: true, force: true });
 const mb = (p) => Math.round(readdirSync(p, { recursive: true }).reduce((n, f) => { const s = statSync(join(p, f)); return n + (s.isFile() ? s.size : 0); }, 0) / 2 ** 20);
 console.log(`backup ${day}: ${ok} copied, ${failed} failed, ${mb(out)} MB in ${out}; ${Math.min(sets.length, 14)} nightly sets kept`);
 if (failed) process.exitCode = 1;
