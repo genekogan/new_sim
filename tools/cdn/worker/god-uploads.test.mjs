@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { MAX_BYTES, IMMUTABLE, handle, parsePath } from './god-uploads.js';
+import { FakeR2 } from './fake-r2.mjs';
 
 const sha = (b) => createHash('sha256').update(b).digest('hex');
 const GLB = new TextEncoder().encode('glTF fake upload bytes ' + 'x'.repeat(5000));
@@ -11,18 +12,6 @@ const SHA = sha(GLB);
 const url = (path) => `https://assets.eden.art${path}`;
 const PATH = `/w/bench-hamlet/assets/${SHA}.glb`;
 
-class FakeR2 {
-  constructor() { this.objects = new Map(); this.puts = []; this.gets = 0; }
-  async head(key) { const o = this.objects.get(key); return o ? { size: o.bytes.byteLength, httpMetadata: o.httpMetadata, customMetadata: o.customMetadata } : null; }
-  async get(key) {
-    this.gets++; const o = this.objects.get(key); if (!o) return null;
-    return { size: o.bytes.byteLength, httpMetadata: o.httpMetadata, customMetadata: o.customMetadata, body: new Response(o.bytes).body, arrayBuffer: async () => o.bytes.slice().buffer };
-  }
-  async put(key, bytes, opts) {
-    if (opts.sha256 && sha(bytes) !== opts.sha256) throw Error('R2: sha256 mismatch');   // R2 verifies the sha256 option
-    this.puts.push({ key, opts }); this.objects.set(key, { bytes: new Uint8Array(bytes), httpMetadata: opts.httpMetadata, customMetadata: opts.customMetadata });
-  }
-}
 class FakeCache {
   constructor() { this.map = new Map(); }
   async match(req) { const r = this.map.get(req.url); return r ? r.clone() : undefined; }
@@ -38,11 +27,15 @@ function origin(routes) {
   };
   return { fetch, calls };
 }
-function rig(routes = {}) {
-  const env = { ASSETS: new FakeR2() }, o = origin(routes), cache = new FakeCache(), waits = [];
+// `call` returns as soon as the handler answers, like a client: work the Worker left in ctx.waitUntil is still running
+// (a real isolate keeps it going after the response). `settle()` waits for it. The R2 fake's puts take 40 ms to land, so
+// anything a test reads from R2 right after `call` was written before the answer, not in the background.
+function rig(routes = {}, r2 = {}) {
+  const env = { ASSETS: new FakeR2(r2) }, o = origin(routes), cache = new FakeCache(), waits = [];
   const ctx = { waitUntil: (p) => waits.push(p) };
-  const call = async (path, init = {}) => { const r = await handle(new Request(url(path), init), env, ctx, { fetch: o.fetch, caches: cache }); await Promise.all(waits.splice(0)); return r; };
-  return { env, o, cache, call };
+  const call = (path, init = {}) => handle(new Request(url(path), init), env, ctx, { fetch: o.fetch, caches: cache });
+  const settle = () => Promise.all(waits.splice(0));
+  return { env, o, cache, call, settle };
 }
 const SRC = `https://sim.eden.art/worlds/w/bench-hamlet/assets/${SHA}.glb`;
 const body = async (r) => new Uint8Array(await r.arrayBuffer());
@@ -71,6 +64,7 @@ test('miss with a good hash: pulls the god world route, returns the bytes, store
   assert.deepEqual(await body(r), GLB);
   assert.equal(o.calls.length, 1); assert.equal(o.calls[0].url, SRC); assert.equal(o.calls[0].init.redirect, 'manual');
   assert.equal(env.ASSETS.puts.length, 1);
+  assert.ok(env.ASSETS.objects.has(`w/bench-hamlet/assets/${SHA}.glb`), 'stored in R2 before the 200 (not left in waitUntil)');
   const put = env.ASSETS.puts[0];
   assert.equal(put.key, `w/bench-hamlet/assets/${SHA}.glb`);
   assert.equal(put.opts.sha256, SHA);
@@ -87,19 +81,19 @@ test('the origin may send brotli: the Worker hashes the decoded bytes it reads (
 });
 
 test('hit: served from R2 (no origin request), then from the edge cache (no R2 read)', async () => {
-  const { env, o, call } = rig({ [SRC]: { body: GLB } });
-  await call(PATH);                                  // miss -> stored
+  const { env, o, call, settle } = rig({ [SRC]: { body: GLB } });
+  await call(PATH); await settle();                  // miss -> stored; the edge-cache fill finishes in the background
   const r1 = await call(PATH);
   assert.equal(r1.status, 200); assert.equal(r1.headers.get('x-eden-cdn'), 'edge');   // the miss also filled the edge cache
   assert.deepEqual(await body(r1), GLB);
   assert.equal(o.calls.length, 1);
-  const { env: env2, o: o2, cache: c2, call: call2 } = rig({});
+  const { env: env2, o: o2, cache: c2, call: call2, settle: settle2 } = rig({});
   env2.ASSETS.objects = env.ASSETS.objects;          // R2 already holds it, edge cache empty
   const r2 = await call2(PATH);
   assert.equal(r2.status, 200); assert.equal(r2.headers.get('x-eden-cdn'), 'hit');
   assert.equal(r2.headers.get('cache-control'), IMMUTABLE); assert.equal(r2.headers.get('content-type'), 'model/gltf-binary');
   assert.equal(r2.headers.get('access-control-allow-origin'), 'https://sim.eden.art');
-  assert.deepEqual(await body(r2), GLB);
+  assert.deepEqual(await body(r2), GLB); await settle2();
   assert.equal(o2.calls.length, 0); assert.equal(env2.ASSETS.gets, 1); assert.equal(c2.map.size, 1);
   const r3 = await call2(PATH);
   assert.equal(r3.headers.get('x-eden-cdn'), 'edge'); assert.equal(env2.ASSETS.gets, 1); assert.deepEqual(await body(r3), GLB);
@@ -114,8 +108,8 @@ test('hit on an object stored precompressed: Content-Encoding br, the stored byt
 });
 
 test('bad hash: 502, nothing stored, nothing cached, the next request asks the origin again', async () => {
-  const { env, o, cache, call } = rig({ [SRC]: () => new Response(new TextEncoder().encode('not the bytes the sha names')) });
-  const r = await call(PATH);
+  const { env, o, cache, call, settle } = rig({ [SRC]: () => new Response(new TextEncoder().encode('not the bytes the sha names')) });
+  const r = await call(PATH); await settle();
   assert.equal(r.status, 502); assert.equal(r.headers.get('x-eden-cdn'), 'refused:sha-mismatch'); assert.equal(r.headers.get('cache-control'), 'no-store');
   assert.equal(env.ASSETS.puts.length, 0); assert.equal(cache.map.size, 0);
   await call(PATH); assert.equal(o.calls.length, 2);
@@ -185,4 +179,46 @@ test('no binding: 500, never an origin pull', async () => {
   const o = origin({ [SRC]: { body: GLB } });
   const r = await handle(new Request(url(PATH)), {}, {}, { fetch: o.fetch, caches: null });
   assert.equal(r.status, 500); assert.equal(o.calls.length, 0);
+});
+
+test('HEAD right after the miss answers 200 hit: the write landed before the miss answered (the live 2026-10-20 race)', async () => {
+  const { call } = rig({ [SRC]: { body: GLB } }, { latencyMs: 150 });
+  const t0 = Date.now();
+  const m = await call(PATH);
+  assert.equal(m.headers.get('x-eden-cdn'), 'miss'); assert.ok(Date.now() - t0 >= 140, 'the miss waited for the R2 write');
+  const h = await call(PATH, { method: 'HEAD' });     // no settle(): nothing left in the background may be needed
+  assert.equal(h.status, 200); assert.equal(h.headers.get('x-eden-cdn'), 'hit');
+});
+
+test('R2 write fails: the verified bytes still answer (miss-unstored), the error is logged, the next request pulls again', async () => {
+  const { env, o, cache, call, settle } = rig({ [SRC]: { body: GLB } }, { failPuts: true });
+  const logged = [], was = console.error; console.error = (...a) => logged.push(a.join(' '));
+  try {
+    const r = await call(PATH); await settle();
+    assert.equal(r.status, 200); assert.equal(r.headers.get('x-eden-cdn'), 'miss-unstored'); assert.deepEqual(await body(r), GLB);
+    assert.equal(env.ASSETS.objects.size, 0);
+    assert.ok(logged.some((l) => l.includes('R2 put failed') && l.includes(`w/bench-hamlet/assets/${SHA}.glb`)), logged.join('\n'));
+    const h = await call(PATH, { method: 'HEAD' }); assert.equal(h.status, 404);
+    cache.map.clear(); await call(PATH); assert.equal(o.calls.length, 2);
+  } finally { console.error = was; }
+});
+
+test('edge cache put failure is logged, not swallowed', async () => {
+  const { call, settle, cache } = rig({ [SRC]: { body: GLB } });
+  cache.put = async () => { throw Error('cache quota'); };
+  const logged = [], was = console.error; console.error = (...a) => logged.push(a.join(' '));
+  try { const r = await call(PATH); await settle(); assert.equal(r.status, 200); } finally { console.error = was; }
+  assert.ok(logged.some((l) => l.includes('edge cache put failed')), logged.join('\n'));
+});
+
+test('the R2 fake is as strict as the R2 Workers API: unknown options, two hashes, bad metadata and a wrong hash reject', async () => {
+  const r2 = new FakeR2({ latencyMs: 0 }), b = new Uint8Array([1, 2, 3]), h = sha(b);
+  await assert.rejects(r2.put('k', b, { sha256: h, md5: createHash('md5').update(b).digest('hex') }), /single hashing/);
+  await assert.rejects(r2.put('k', b, { checksum: h }), /unknown option checksum/);
+  await assert.rejects(r2.put('k', b, { httpMetadata: { contentLength: '3' } }), /unknown httpMetadata/);
+  await assert.rejects(r2.put('k', b, { customMetadata: { n: 3 } }), /must be a string/);
+  await assert.rejects(r2.put('k', b, { customMetadata: { big: 'x'.repeat(2048) } }), /limit 2048/);
+  await assert.rejects(r2.put('k', b, { sha256: sha(new Uint8Array([9])) }), /sha256 mismatch/);
+  assert.equal(r2.objects.size, 0);
+  assert.equal((await r2.put('k', b, { sha256: h, httpMetadata: { contentType: 'x/y', cacheControl: IMMUTABLE }, customMetadata: { sha256: h } })).size, 3);
 });

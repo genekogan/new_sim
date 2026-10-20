@@ -8,8 +8,11 @@
 // scratch god world with the folder's own god session (the session file is read by path and never printed), then:
 //   1. origin   GET <world>/assets/<sha>.glb is 200 and hashes to <sha>;
 //   2. absent   HEAD https://assets.eden.art/w/<slug>/assets/<sha>.glb is 404 (HEAD never pulls);
-//   3. miss     GET  same URL: 200, x-eden-cdn miss, immutable, model/gltf-binary, CORS sim.eden.art, body hashes to <sha>;
-//   4. stored   GET  again (up to 10 s for the R2 write): x-eden-cdn hit or edge, same bytes; HEAD 200 hit;
+//   3. miss     GET  same URL: 200, x-eden-cdn miss, immutable, model/gltf-binary, CORS sim.eden.art, ETag "<sha>" (or
+//               W/"<sha>" when Cloudflare compressed it on the way out: Content-Encoding br/gzip/zstd is transport only),
+//               the DECODED body hashes to <sha> with the upload's byte count;
+//   4. stored   HEAD at once: 200 hit (the Worker awaits its R2 write before the miss answers, so no wait is allowed);
+//               GET again: x-eden-cdn hit or edge, same decoded bytes;
 //   5. refusals a malformed path is 400, an unknown sha is 404, a core sha whose origin route sends a rendition (a body
 //               that does not hash to the URL's sha) is 502 sha-mismatch twice (never stored), a query is 400;
 //   6. no collision: a published core key (assets/...) still answers 200 from R2, not from the Worker.
@@ -17,6 +20,8 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { brotliCompressSync } from 'node:zlib';
+import { FakeR2 } from './fake-r2.mjs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -59,7 +64,7 @@ function coreKey() {
   return Object.values(m.assets).find((a) => /^assets\/[0-9a-f]{2}\//.test(a.key) && a.bytes < 200_000)?.key ?? null;
 }
 
-export async function verify({ cdn, world, token, slug, fetch: f = fetch, settleMs = 10_000 }) {
+export async function verify({ cdn, world, token, slug, fetch: f = fetch }) {
   const checks = [], note = (name, ok, detail = {}) => { checks.push({ name, ok: !!ok, ...detail }); return !!ok; };
   const get = async (url, init = {}) => {
     const r = await f(url, { ...init, headers: { origin: APP, ...(init.headers ?? {}) } });
@@ -80,16 +85,17 @@ export async function verify({ cdn, world, token, slug, fetch: f = fetch, settle
   // 2. absent (HEAD never pulls)
   const h0 = await get(url, { method: 'HEAD' });
   note('HEAD before any GET: 404 (no pull)', h0.status === 404, { status: h0.status, worker: h0.h['x-eden-cdn'] });
-  // 3. miss
+  // 3. miss (fetch decodes any transfer compression; bytes/sha below are the decoded body's)
+  const etagOk = (e) => e === `"${s}"` || e === `W/"${s}"`, encodingOk = (e) => e === null || ['br', 'gzip', 'zstd'].includes(e);
   const m = await get(url, { headers: { 'accept-encoding': 'br' } });
   note('miss: pulled, verified, returned', m.status === 200 && m.h['x-eden-cdn'] === 'miss' && m.sha === s && m.bytes === asset.bytes &&
-    m.h['cache-control'] === 'public, max-age=31536000, immutable' && m.h['content-type'] === 'model/gltf-binary' && m.h['access-control-allow-origin'] === APP && m.h.etag === `"${s}"`, { status: m.status, ...m.h, bytes: m.bytes });
-  // 4. stored: hit (R2) or edge (cache) within settleMs
-  let hit, t0 = Date.now();
-  do { hit = await get(url, { headers: { 'accept-encoding': 'br' } }); if (hit.h['x-eden-cdn'] !== 'miss') break; await new Promise((r) => setTimeout(r, 1000)); } while (Date.now() - t0 < settleMs);
-  note('second GET: from R2 or the edge cache, same bytes', hit.status === 200 && ['hit', 'edge'].includes(hit.h['x-eden-cdn']) && hit.sha === s && hit.h['access-control-allow-origin'] === APP, { status: hit.status, ...hit.h, waitedMs: Date.now() - t0 });
+    m.h['cache-control'] === 'public, max-age=31536000, immutable' && m.h['content-type'] === 'model/gltf-binary' && m.h['access-control-allow-origin'] === APP &&
+    etagOk(m.h.etag) && encodingOk(m.h['content-encoding']), { status: m.status, ...m.h, bytes: m.bytes });
+  // 4. stored: the miss answered only after its R2 write, so HEAD (never the edge cache) sees it at once; then a GET
   const h1 = await get(url, { method: 'HEAD' });
-  note('HEAD after: 200 hit', h1.status === 200 && h1.h['x-eden-cdn'] === 'hit', { status: h1.status, worker: h1.h['x-eden-cdn'] });
+  note('HEAD right after the miss: 200 hit (stored in R2)', h1.status === 200 && h1.h['x-eden-cdn'] === 'hit', { status: h1.status, worker: h1.h['x-eden-cdn'] });
+  const hit = await get(url, { headers: { 'accept-encoding': 'br' } });
+  note('second GET: from R2 or the edge cache, same bytes', hit.status === 200 && ['hit', 'edge'].includes(hit.h['x-eden-cdn']) && hit.sha === s && hit.bytes === asset.bytes && hit.h['access-control-allow-origin'] === APP && etagOk(hit.h.etag), { status: hit.status, ...hit.h });
   const plain = await get(url, { headers: { 'accept-encoding': 'identity' } });
   note('identity client gets the same decoded bytes', plain.status === 200 && plain.sha === s, { status: plain.status, encoding: plain.h['content-encoding'] });
   // 5. refusals
@@ -110,10 +116,12 @@ export async function verify({ cdn, world, token, slug, fetch: f = fetch, settle
   return { sha: s, bytes: asset.bytes, url, checks };
 }
 
-/** Loopback stand-ins: a god world (upload + /assets route, a rendition-style mismatch) and the Worker with an in-memory R2. */
+/** Loopback stand-ins: a god world (upload + /assets route, a rendition-style mismatch) and the Worker with the strict
+ *  in-memory R2 (fake-r2.mjs: writes land 40 ms after the call). Like Cloudflare in front of a Worker, the stand-in
+ *  brotli-compresses uncompressed 200s for a client that accepts br and weakens their ETag. */
 async function selfTest() {
   const { handle } = await import('./god-uploads.js');
-  const store = new Map(), r2 = new Map();
+  const store = new Map();
   const ren = renditionSha(), key = coreKey();
   const listen = (fn) => new Promise((ok) => { const srv = createServer(fn); srv.listen(0, '127.0.0.1', () => ok(srv)); });
   const world = await listen(async (req, res) => {
@@ -129,11 +137,7 @@ async function selfTest() {
     res.writeHead(404, { 'content-type': 'application/json' }).end('{"error":"not-found"}');
   });
   const wport = world.address().port;
-  const env = { ASSETS: {
-    head: async (k) => (r2.get(k) ? { size: r2.get(k).bytes.length, httpMetadata: r2.get(k).httpMetadata, customMetadata: r2.get(k).customMetadata } : null),
-    get: async (k) => { const o = r2.get(k); return o ? { size: o.bytes.length, httpMetadata: o.httpMetadata, customMetadata: o.customMetadata, body: new Response(o.bytes).body, arrayBuffer: async () => Uint8Array.from(o.bytes).buffer } : null; },
-    put: async (k, bytes, opts) => { if (sha(bytes) !== opts.sha256) throw Error('sha256'); r2.set(k, { bytes: Buffer.from(bytes), httpMetadata: opts.httpMetadata, customMetadata: opts.customMetadata }); },
-  } };
+  const env = { ASSETS: new FakeR2() };
   const coreBytes = Buffer.from('a published core object');
   const worker = await listen(async (req, res) => {
     const u = new URL(req.url, 'http://x');
@@ -143,11 +147,17 @@ async function selfTest() {
     }
     const waits = [];
     const r = await handle(new Request(`https://assets.eden.art${req.url}`, { method: req.method, headers: req.headers }), env, { waitUntil: (p) => waits.push(p) }, { origin: `http://127.0.0.1:${wport}`, caches: null });
-    res.writeHead(r.status, Object.fromEntries(r.headers)); res.end(req.method === 'HEAD' ? undefined : Buffer.from(await r.arrayBuffer()));
+    const headers = Object.fromEntries(r.headers);
+    let out = req.method === 'HEAD' ? undefined : Buffer.from(await r.arrayBuffer());
+    if (out && r.status === 200 && !headers['content-encoding'] && /\bbr\b/.test(req.headers['accept-encoding'] ?? '')) {
+      out = brotliCompressSync(out); headers['content-encoding'] = 'br'; delete headers['content-length'];
+      if (headers.etag && !headers.etag.startsWith('W/')) headers.etag = `W/${headers.etag}`;
+    }
+    res.writeHead(r.status, headers); res.end(out);
     await Promise.all(waits);
   });
   try {
-    return await verify({ cdn: `http://127.0.0.1:${worker.address().port}`, world: `http://127.0.0.1:${wport}/worlds/w/bench-hamlet/`, token: 'self-test', slug: 'bench-hamlet', settleMs: 3000 });
+    return await verify({ cdn: `http://127.0.0.1:${worker.address().port}`, world: `http://127.0.0.1:${wport}/worlds/w/bench-hamlet/`, token: 'self-test', slug: 'bench-hamlet' });
   } finally { world.close(); worker.close(); }
 }
 

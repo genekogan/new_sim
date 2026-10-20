@@ -26,6 +26,7 @@ import { startWorld } from '../../god-skill/dev-world.mjs';
 import { findPlaywright } from '../../god-skill/lib/look.mjs';
 import { chromeLease } from '../../god-skill/lib/chrome-lease.mjs';
 import { handle } from './god-uploads.js';
+import { FakeR2 } from './fake-r2.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const args = process.argv.slice(2), mode = args[0];
@@ -58,14 +59,14 @@ if (mode === 'serve') {
   process.env.WEB_DIR = webDir; process.env.WORLD_PATH = `${prefix}/w/${slug}`;
   const { child } = await startWorld({ slug, port: WORLD, data: resolve(out, 'world-data'), genesis, fresh: true, log: resolve(out, 'world.log') });
   let cdn, proxy, mode = 'up';
-  const r2 = new Map(), stats = { pulls: 0, served: [] };
+  const r2 = new FakeR2(), stats = { pulls: 0, served: [] };
   try {
     const upstreamPath = (path) => path.startsWith(prefix + '/') && !path.startsWith(prefix + '/w/') ? path.slice(prefix.length) : path;
     proxy = createServer(async (req, res) => {
       try {
         const m = /^\/__fixture\/cdn\/(up|down|corrupt)$/.exec(req.url ?? '');
         if (m) { mode = m[1]; if (mode === 'down') { cdn.closeAllConnections(); await new Promise((y) => cdn.close(y)); } else if (!cdn.listening) await new Promise((y, n) => cdn.once('error', n).listen(CDN, '127.0.0.1', y)); res.end(mode); return; }
-        if (req.url === '/__fixture/cdn/stats') { res.end(JSON.stringify({ ...stats, stored: [...r2.keys()] })); return; }
+        if (req.url === '/__fixture/cdn/stats') { res.end(JSON.stringify({ ...stats, stored: [...r2.objects.keys()] })); return; }
         const response = await fetch(`http://127.0.0.1:${WORLD}${upstreamPath(req.url)}`, { method: req.method, headers: { ...(req.headers.authorization ? { authorization: req.headers.authorization } : {}), ...(req.headers['content-type'] ? { 'content-type': req.headers['content-type'] } : {}) }, body: ['GET', 'HEAD'].includes(req.method) ? undefined : req, duplex: 'half', signal: AbortSignal.timeout(30_000) });
         const headers = Object.fromEntries(response.headers); delete headers['content-encoding']; delete headers['content-length'];
         res.writeHead(response.status, headers);
@@ -82,11 +83,7 @@ if (mode === 'serve') {
       upstream.on('error', () => socket.destroy()); socket.on('error', () => upstream.destroy()); socket.on('close', () => upstream.destroy());
     });
     await new Promise((y, n) => proxy.once('error', n).listen(PAGE, '127.0.0.1', y));
-    const env = { ASSETS: {
-      head: async (k) => (r2.get(k) ? { size: r2.get(k).bytes.length, httpMetadata: r2.get(k).httpMetadata, customMetadata: r2.get(k).customMetadata } : null),
-      get: async (k) => { const o = r2.get(k); return o ? { size: o.bytes.length, httpMetadata: o.httpMetadata, customMetadata: o.customMetadata, body: new Response(o.bytes).body, arrayBuffer: async () => Uint8Array.from(o.bytes).buffer } : null; },
-      put: async (k, bytes, o) => { if (sha(bytes) !== o.sha256) throw Error('sha256'); r2.set(k, { bytes: Buffer.from(bytes), httpMetadata: o.httpMetadata, customMetadata: o.customMetadata }); },
-    } };
+    const env = { ASSETS: r2 };   // the strict R2 stand-in (fake-r2.mjs)
     cdn = createServer(async (req, res) => {
       const waits = [];
       const r = await handle(new Request(`https://assets.eden.art${req.url}`, { method: req.method }), env, { waitUntil: (p) => waits.push(p) },

@@ -13,7 +13,12 @@
 //              root worlds /w/<slug> serve no uploads: their /assets/ path answers the SPA page). The body is read as a
 //              stream, counted against MAX_BYTES and hashed; only bytes whose SHA-256 equals the sha in the path are
 //              returned (200) and stored, so the bucket cannot be poisoned. Mismatch -> 502, origin 404 -> 404, any other
-//              origin status or a redirect -> 502, too large -> 502; none of these is stored or cached (no-store).
+//              origin status or a redirect -> 502, too large -> 502; none of these is stored or cached (no-store). The R2 write is
+//              awaited before the 200, so `x-eden-cdn: miss` means stored; a failed write answers `miss-unstored` and logs.
+//
+// Cloudflare may compress the Worker's uncompressed answers on the way out (seen live: GLB misses sent as
+// Content-Encoding br with ETag W/"<sha>"). That is left on: it is transport only, browsers and fetch decode it, and the
+// client's checks (byte count and SHA-256 of the decoded body, cdn-assets.ts) run on what the loaders get.
 //
 // The Worker holds no secrets: R2 is an object binding (env.ASSETS, bucket eden-assets). Deployment: DEPLOY.md here.
 // Tests: god-uploads.test.mjs (fake R2, fake origin, fake edge cache). Post-deploy proof: verify-worker.mjs.
@@ -42,6 +47,8 @@ function objectHeaders(p, obj, state) {
   if (enc) h.set('content-encoding', enc); else if (obj && Number.isSafeInteger(obj.size)) h.set('content-length', String(obj.size));
   return h;
 }
+/** Failures the client never sees (it gets verified bytes either way) go to the Worker's logs: dashboard > Logs. */
+function logError(what, p, e) { console.error(`god-uploads: ${what} failed for ${p.key}: ${e?.stack ?? e?.message ?? e}`); }
 const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 const notModified = (request, p) => (request.headers.get('if-none-match') ?? '').split(',').some((t) => t.trim().replace(/^W\//, '') === `"${p.sha}"`);
 
@@ -94,7 +101,7 @@ export async function handle(request, env, ctx, deps = {}) {
     const headers = objectHeaders(p, obj, 'hit');
     if (headers.has('content-encoding')) return new Response(obj.body, { status: 200, headers, encodeBody: 'manual' });
     const bytes = new Uint8Array(await obj.arrayBuffer());
-    if (edge) ctx?.waitUntil?.(edge.put(cacheKey, new Response(bytes, { headers })).catch(() => {}));
+    if (edge) ctx?.waitUntil?.(edge.put(cacheKey, new Response(bytes, { headers })).catch((e) => logError('edge cache put', p, e)));
     return new Response(bytes, { status: 200, headers });
   }
   if (obj) await obj.arrayBuffer().catch(() => {});   // a stray object without our metadata is never served; re-pulled below
@@ -113,11 +120,16 @@ export async function handle(request, env, ctx, deps = {}) {
   if (!bytes.byteLength) return refuse(502, 'empty', method);
   if (hex(await subtle.digest('SHA-256', bytes)) !== p.sha) return refuse(502, 'sha-mismatch', method);
 
+  // The R2 write is awaited before answering: a put left in waitUntil was still in flight when the live HEAD came
+  // (2026-10-20, 404 absent; the object landed seconds later), and its errors were swallowed. One upload's write latency
+  // on the first request is the price of "200 miss" meaning "stored". A failed write still answers the verified bytes,
+  // marked `miss-unstored`, and is logged (dashboard Logs); the next request pulls again.
   const meta = { contentType: TYPES[p.ext], cacheControl: IMMUTABLE };
-  const store = env.ASSETS.put(p.key, bytes, { httpMetadata: meta, sha256: p.sha, customMetadata: { sha256: p.sha, bytes: String(bytes.byteLength), world: p.slug, licence: 'god-upload', source } });
-  ctx?.waitUntil?.(Promise.resolve(store).catch(() => {}));
-  const headers = objectHeaders(p, { httpMetadata: meta, size: bytes.byteLength }, 'miss');
-  if (edge) ctx?.waitUntil?.(edge.put(cacheKey, new Response(bytes, { headers: { ...Object.fromEntries(headers), 'x-eden-cdn': 'hit' } })).catch(() => {}));
+  let state = 'miss';
+  try { await env.ASSETS.put(p.key, bytes, { httpMetadata: meta, sha256: p.sha, customMetadata: { sha256: p.sha, bytes: String(bytes.byteLength), world: p.slug, licence: 'god-upload', source } }); }
+  catch (e) { state = 'miss-unstored'; logError('R2 put', p, e); }
+  const headers = objectHeaders(p, { httpMetadata: meta, size: bytes.byteLength }, state);
+  if (edge) ctx?.waitUntil?.(edge.put(cacheKey, new Response(bytes, { headers: { ...Object.fromEntries(headers), 'x-eden-cdn': 'hit' } })).catch((e) => logError('edge cache put', p, e)));
   return new Response(bytes, { status: 200, headers });
 }
 

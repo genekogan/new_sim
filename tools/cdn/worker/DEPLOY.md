@@ -10,7 +10,7 @@ the Cloudflare dashboard, then runs the verification, then tells R to ship the c
 |---|---|
 | Worker name | `eden-god-uploads` |
 | Script | `tools/cdn/worker/god-uploads.js` (ES module, one file, no imports, no secrets) |
-| Compatibility date | `2026-10-01` (no compatibility flags) |
+| Compatibility date | `2026-10-01` or later, no compatibility flags (deployed 2026-10-20 with the dashboard default `2026-10-20`; nothing depends on it) |
 | R2 binding | variable name **`ASSETS`** -> bucket **`eden-assets`** (the bucket `assets.eden.art` serves) |
 | Route | **`assets.eden.art/w/*`**, zone `eden.art`, failure mode **Fail open** |
 | workers.dev / preview URLs | **disabled** (the route is the only entry point) |
@@ -52,8 +52,10 @@ node <worktrees>/t4-cdn4/tools/cdn/worker/verify-worker.mjs \
 ```
 
 PASS means: the upload's origin route serves it; HEAD before any GET is 404 (HEAD never pulls); the first GET is
-`x-eden-cdn: miss` with the right bytes, immutable cache, `model/gltf-binary` and CORS for sim.eden.art; a following GET is
-`hit` (R2) or `edge` (edge cache) with the same bytes; malformed path 400, query 400, unknown sha 404; a core sha whose origin
+`x-eden-cdn: miss` with the right decoded bytes, immutable cache, `model/gltf-binary`, CORS for sim.eden.art and ETag `"<sha>"`
+(Cloudflare's GLB compression rule may send it as `content-encoding: br` with `W/"<sha>"`: transport only, accepted); a HEAD
+at once is `200 hit` (the Worker awaits its R2 write before a miss answers, so no wait is allowed); a following GET is `hit`
+(R2) or `edge` (edge cache) with the same bytes; malformed path 400, query 400, unknown sha 404; a core sha whose origin
 sends a rendition (bytes that do not hash to the URL) is 502 `refused:sha-mismatch` twice, so nothing was stored; a
 published `assets/...` object still answers from R2 without the Worker. The upload is not placed or defined (no world edit).
 
@@ -71,7 +73,8 @@ curl -s -o /dev/null -D - https://assets.eden.art/w/<slug>/assets/<sha>.glb -H '
 | every `/w/` request 404 `text/html` without `x-eden-cdn` | the route is missing or did not attach: step 5 |
 | `x-eden-cdn: refused:binding` (500) | the `ASSETS` binding is missing or misnamed: step 3 |
 | miss is `refused:origin-403` / `origin-503` | Cloudflare security on sim.eden.art refused the Worker's subrequest (WAF/Bot rule): allow the user agent `eden-assets-pull/1` or skip that rule for `/worlds/w/*/assets/*` |
-| second GET still `miss` after 10 s | the R2 write failed: check the Worker's logs (Workers -> eden-god-uploads -> Logs) |
+| miss answers `x-eden-cdn: miss-unstored` | the R2 write failed (the client still got verified bytes): the Worker logs `god-uploads: R2 put failed for <key>: ...` (Workers -> eden-god-uploads -> Logs) |
+| HEAD right after the miss is 404 `refused:absent` | a Worker older than 2026-10-20 18:xx (its R2 write ran in waitUntil): redeploy `god-uploads.js` |
 
 ## Rollback
 
