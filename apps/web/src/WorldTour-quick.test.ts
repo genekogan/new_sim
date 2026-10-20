@@ -20,9 +20,14 @@ test('lane W1: an arriving page takes the authored push without any ray check; l
   assert.ok(checks > 0, 'the next move (after the arrival) is checked');
 });
 
-test('WorldBroadcast asks for the quick move only while the arrival is not over, or for the arrival camera\'s opening view', () => {
+test('WorldBroadcast asks for the quick move only while the arrival is not over', () => {
   const src = readFileSync(new URL('./WorldBroadcast.ts', import.meta.url), 'utf8');
   assert.match(src, /tour\.pose\(wallSeconds, \{ daylight, prefer, quick: opening \|\| !arrivalOver\(\),/);
+});
+
+test('P7f: WorldBroadcast also asks for the quick move for the arrival camera\'s opening view, once the arrival is over', () => {
+  const src = readFileSync(new URL('./WorldBroadcast.ts', import.meta.url), 'utf8');
+  assert.match(src, /quick: opening \|\| /);
 });
 
 test('P7f: the opening move is the authored view itself at k = 0 (the arrival poster\'s camera), then a gentle push', () => {
