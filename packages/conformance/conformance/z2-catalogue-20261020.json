@@ -1,0 +1,3162 @@
+{
+  "schema": "catalog-conformance-supplement/1",
+  "note": "Tranche 2026-10-20 lane Z2 (catalogue repairs). Exact re-pins, reviewed against origin/main 62876c57c with the same --k 2 run (team/scratch/t4/z2/ef4/cmp.py): (1) 918 findings identical but for the def hash: 145 mesh defs now carry make.lod1 (a distant version; the EF4 budget stage still measures the unchanged near model) and the placement-fix revisions changed other hashes; (2) 42 gallery-budget findings on building-class kit defs are new or larger (e.g. core-hotel params.w.max 8438 -> 12454 triangles, cap 6000) because the salvaged placement fixes (ba0300658) resize authored room layouts with the building instead of clipping them (building-plan.ts) and raise minimum sizes, which also moves the seeded random samples; 9 of these points were refused placements on main. In exchange 71 placement findings (place/architecture, place/architecture.sealed) are gone and 71 more samples place; core-mine-cart construction view drops 9 -> 5 draws. No qualification gaps changed.",
+  "findings": [
+    {
+      "def": "core-apartment-block@1",
+      "hash": "fc05f52b2fcfda7e3afac94bd0cef3c6afc0d350e30498d2f23df1f7ddb187eb",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "10598 > 6000",
+      "fields": [
+        "params.d.max",
+        "params.w.max"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "fc05f52b2fcfda7e3afac94bd0cef3c6afc0d350e30498d2f23df1f7ddb187eb",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6094 > 6000",
+      "fields": [
+        "params.floorHeight.min",
+        "params.roof=none"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "fc05f52b2fcfda7e3afac94bd0cef3c6afc0d350e30498d2f23df1f7ddb187eb",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6134 > 6000",
+      "fields": [
+        "params.roof=shed"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "fc05f52b2fcfda7e3afac94bd0cef3c6afc0d350e30498d2f23df1f7ddb187eb",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6178 > 6000",
+      "fields": [
+        "params.hood=false"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "fc05f52b2fcfda7e3afac94bd0cef3c6afc0d350e30498d2f23df1f7ddb187eb",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6194 > 6000",
+      "fields": [
+        "params.roof=hip"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "fc05f52b2fcfda7e3afac94bd0cef3c6afc0d350e30498d2f23df1f7ddb187eb",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6214 > 6000",
+      "fields": [
+        "defaults",
+        "params.balcony=false",
+        "params.balcony=true",
+        "params.chimney=false",
+        "params.chimney=true",
+        "params.d.min",
+        "params.doorLamp=false",
+        "params.doorLamp=true",
+        "params.floors.max",
+        "params.floors.min",
+        "params.flowerBoxes=false",
+        "params.flowerBoxes=true",
+        "params.front=e",
+        "params.front=n",
+        "params.front=s",
+        "params.front=w",
+        "params.hood=true",
+        "params.material=brick",
+        "params.material=metal",
+        "params.material=plaster",
+        "params.material=stone",
+        "params.material=wood",
+        "params.porch.min",
+        "params.quoins=false",
+        "params.quoins=true",
+        "params.roof=flat",
+        "params.roofPitch.max",
+        "params.roofPitch.min",
+        "params.shutters=false",
+        "params.shutters=true",
+        "params.style=barn",
+        "params.style=chapel",
+        "params.style=cottage",
+        "params.style=greenhouse",
+        "params.style=hall",
+        "params.style=pavilion",
+        "params.style=shed",
+        "params.style=shop",
+        "params.style=tower",
+        "params.style=townhouse",
+        "params.wallThickness.max",
+        "params.wallThickness.min",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "fc05f52b2fcfda7e3afac94bd0cef3c6afc0d350e30498d2f23df1f7ddb187eb",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6250 > 6000",
+      "fields": [
+        "params.roof=gable"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "fc05f52b2fcfda7e3afac94bd0cef3c6afc0d350e30498d2f23df1f7ddb187eb",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6422 > 6000",
+      "fields": [
+        "params.roof=dome"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "fc05f52b2fcfda7e3afac94bd0cef3c6afc0d350e30498d2f23df1f7ddb187eb",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6510 > 6000",
+      "fields": [
+        "params.floorHeight.max"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "fc05f52b2fcfda7e3afac94bd0cef3c6afc0d350e30498d2f23df1f7ddb187eb",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6730 > 6000",
+      "fields": [
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "fc05f52b2fcfda7e3afac94bd0cef3c6afc0d350e30498d2f23df1f7ddb187eb",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6782 > 6000",
+      "fields": [
+        "params.porch.max"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "fc05f52b2fcfda7e3afac94bd0cef3c6afc0d350e30498d2f23df1f7ddb187eb",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7696 > 6000",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "fc05f52b2fcfda7e3afac94bd0cef3c6afc0d350e30498d2f23df1f7ddb187eb",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "8406 > 6000",
+      "fields": [
+        "params.windows.max"
+      ]
+    },
+    {
+      "def": "core-autumn-tree-1-pack@1",
+      "hash": "5f7d4939365432f321cc4ad214babeac8f304c177932d5b66678adeb61754b3f",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "2888 > 1500",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-autumn-tree-2-pack@1",
+      "hash": "fc4e4df831abb1f3fa50bbf85454d34513d450c17db922cb2bd4e6b98fa0e47d",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "2952 > 1500",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-bank@1",
+      "hash": "1791871506707cc23101ab4b5117138b2c053ac62144579362618a5a08f67c72",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6830 > 6000",
+      "fields": [
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-bicycle-pack@1",
+      "hash": "8566638f82583e88daa1ae83d5f308c110af64e839f76cc441e6f10481925964",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "2967 > 1200",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-bicycle-simple-pack@1",
+      "hash": "c93ef6c8ad89ddc17e2262b20c17b966eec56fda02af9e84f88dab981b64a1ac",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "1307 > 1200",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-birch-tree-1-pack@1",
+      "hash": "01e58803e2d6bdf78ebaf6874b36c6d9641d2d206358db3d7039c9cc8bfbaba1",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "1704 > 1500",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-birch-tree-2-pack@1",
+      "hash": "a09c9df449a17112da23f7af5349194cecf5b4eaca21679d6ea6fd7de0376ce7",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "1566 > 1500",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-birch-tree-autumn-pack@1",
+      "hash": "4dd960b6ba20744380495b165b166c16e82d11fa995ccf2c548c0805228ddb73",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "1704 > 1500",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-cabin@1",
+      "hash": "9f9142af1082c797fff0208a3a566aee5002ce386a2627b4016bad4556a77758",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6428 > 6000",
+      "fields": [
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-cat-pack@1",
+      "hash": "bca223076dea8d0eaeac93258b23fe3f590a066232a7dcf4725ed0f7c7ae78cf",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "807 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-ceramic-tower@1",
+      "hash": "98f66c4a7f1d4c41e3039b277ea712c95b0d88e1b55f9d256fc47c9c51e1d743",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "25148 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-church@1",
+      "hash": "6f776f4db64160132c3cd6d1671b162c1e5edc7da345263308497cf8561b3632",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7284 > 6000",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-compost-heap@1",
+      "hash": "14c35d7443c1dd0df63361729cacf219e0d1fefc3dfa764430faf40618f53442",
+      "stage": "gallery-budget",
+      "code": "draws",
+      "detail": "12 > 4",
+      "fields": [
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-compost-heap@1",
+      "hash": "14c35d7443c1dd0df63361729cacf219e0d1fefc3dfa764430faf40618f53442",
+      "stage": "gallery-budget",
+      "code": "draws",
+      "detail": "8 > 4",
+      "fields": [
+        "params.condition=construction"
+      ]
+    },
+    {
+      "def": "core-cow-pack@1",
+      "hash": "c465916d5bacb1b9302667f3046ad7d1560d6838843123fa7e8b9ab458daa951",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "796 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-dog-pack@1",
+      "hash": "8807ac2dcdaa783c18f740d8f82105782201a61b5873b1790f8b288d875553fb",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "602 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-dormitory@1",
+      "hash": "1600142998b605cdb3e3b6e030ab74435b556c2bb9f0f1af1a24b4875ff7e535",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6776 > 6000",
+      "fields": [
+        "params.w.max"
+      ]
+    },
+    {
+      "def": "core-dormitory@1",
+      "hash": "1600142998b605cdb3e3b6e030ab74435b556c2bb9f0f1af1a24b4875ff7e535",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7332 > 6000",
+      "fields": [
+        "params.d.max"
+      ]
+    },
+    {
+      "def": "core-factory@1",
+      "hash": "6baa358d881c10beae70b4ebb89649e1bbd74d04b95c2d9f4015090dd523ce3f",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6028 > 6000",
+      "fields": [
+        "params.w.max"
+      ]
+    },
+    {
+      "def": "core-factory@1",
+      "hash": "6baa358d881c10beae70b4ebb89649e1bbd74d04b95c2d9f4015090dd523ce3f",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6674 > 6000",
+      "fields": [
+        "params.d.max"
+      ]
+    },
+    {
+      "def": "core-factory@1",
+      "hash": "6baa358d881c10beae70b4ebb89649e1bbd74d04b95c2d9f4015090dd523ce3f",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6772 > 6000",
+      "fields": [
+        "params.windows.max"
+      ]
+    },
+    {
+      "def": "core-factory@1",
+      "hash": "6baa358d881c10beae70b4ebb89649e1bbd74d04b95c2d9f4015090dd523ce3f",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7478 > 6000",
+      "fields": [
+        "params.floors.max"
+      ]
+    },
+    {
+      "def": "core-family-car@1",
+      "hash": "017eb06eb30e84c1a8b3470fcbb912fcfa57be0a6b7459dce11af1a37b9e3c2c",
+      "stage": "gallery-budget",
+      "code": "draws",
+      "detail": "15 > 4",
+      "fields": [
+        "params.condition=construction"
+      ]
+    },
+    {
+      "def": "core-fire-station@1",
+      "hash": "74500f7cfb0738f78f0a39be061f77e77d585828875c2191d0546c87d4261c99",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6032 > 6000",
+      "fields": [
+        "params.windows.max"
+      ]
+    },
+    {
+      "def": "core-fire-station@1",
+      "hash": "74500f7cfb0738f78f0a39be061f77e77d585828875c2191d0546c87d4261c99",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6768 > 6000",
+      "fields": [
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-fire-station@1",
+      "hash": "74500f7cfb0738f78f0a39be061f77e77d585828875c2191d0546c87d4261c99",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7594 > 6000",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-horse-pack@1",
+      "hash": "54463e23fb808d0bb745f2a1a63a4581fe3b47f7ecd46c7fe85809b1dfdfeda8",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "690 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-hospital@1",
+      "hash": "8f4486a452dc112ff0de22a002bee399568a8c26881239f2392b5116ceadb583",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7198 > 6000",
+      "fields": [
+        "params.windows.max"
+      ]
+    },
+    {
+      "def": "core-hospital@1",
+      "hash": "8f4486a452dc112ff0de22a002bee399568a8c26881239f2392b5116ceadb583",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "8380 > 6000",
+      "fields": [
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-hospital@1",
+      "hash": "8f4486a452dc112ff0de22a002bee399568a8c26881239f2392b5116ceadb583",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "8830 > 6000",
+      "fields": [
+        "params.w.max"
+      ]
+    },
+    {
+      "def": "core-hospital@1",
+      "hash": "8f4486a452dc112ff0de22a002bee399568a8c26881239f2392b5116ceadb583",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "9136 > 6000",
+      "fields": [
+        "params.d.max"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "12454 > 6000",
+      "fields": [
+        "params.w.max"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "12750 > 6000",
+      "fields": [
+        "params.d.max"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "18858 > 6000",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6546 > 6000",
+      "fields": [
+        "params.material=glass"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6646 > 6000",
+      "fields": [
+        "params.w.min"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6730 > 6000",
+      "fields": [
+        "params.porch.min"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7082 > 6000",
+      "fields": [
+        "params.wallThickness.max"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7282 > 6000",
+      "fields": [
+        "params.floorHeight.min"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7350 > 6000",
+      "fields": [
+        "params.roof=none"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7390 > 6000",
+      "fields": [
+        "params.roof=shed"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7414 > 6000",
+      "fields": [
+        "params.hood=false"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7450 > 6000",
+      "fields": [
+        "defaults",
+        "params.balcony=false",
+        "params.balcony=true",
+        "params.chimney=false",
+        "params.chimney=true",
+        "params.d.min",
+        "params.doorLamp=false",
+        "params.doorLamp=true",
+        "params.floors.max",
+        "params.floors.min",
+        "params.flowerBoxes=false",
+        "params.flowerBoxes=true",
+        "params.front=e",
+        "params.front=n",
+        "params.front=s",
+        "params.front=w",
+        "params.hood=true",
+        "params.material=brick",
+        "params.material=metal",
+        "params.material=plaster",
+        "params.material=stone",
+        "params.material=wood",
+        "params.porch.max",
+        "params.quoins=false",
+        "params.quoins=true",
+        "params.roof=hip",
+        "params.roofPitch.max",
+        "params.roofPitch.min",
+        "params.shutters=false",
+        "params.shutters=true",
+        "params.style=barn",
+        "params.style=chapel",
+        "params.style=cottage",
+        "params.style=greenhouse",
+        "params.style=hall",
+        "params.style=pavilion",
+        "params.style=shed",
+        "params.style=shop",
+        "params.style=tower",
+        "params.style=townhouse",
+        "params.wallThickness.min",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7470 > 6000",
+      "fields": [
+        "params.roof=flat"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7506 > 6000",
+      "fields": [
+        "params.roof=gable"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7678 > 6000",
+      "fields": [
+        "params.roof=dome"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7930 > 6000",
+      "fields": [
+        "params.floorHeight.max"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "8746 > 6000",
+      "fields": [
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "bb155428d9574cb5860501194c83276b8ba8a73f4b87c87bd6a0df8d42a78a76",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "9732 > 6000",
+      "fields": [
+        "params.windows.max"
+      ]
+    },
+    {
+      "def": "core-house@1",
+      "hash": "8830e3e7a7c0161559fa5aa1c6c29865bc4fe1d3b5c1a88a41b659675a0b62f1",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6244 > 6000",
+      "fields": [
+        "params.w.max"
+      ]
+    },
+    {
+      "def": "core-house@1",
+      "hash": "8830e3e7a7c0161559fa5aa1c6c29865bc4fe1d3b5c1a88a41b659675a0b62f1",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7816 > 6000",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-house@1",
+      "hash": "8830e3e7a7c0161559fa5aa1c6c29865bc4fe1d3b5c1a88a41b659675a0b62f1",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "8582 > 6000",
+      "fields": [
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-kin-chebel@1",
+      "hash": "7e3de85265f925b41d295e3e44203f2987fab3b0e14e065c43560d92609f6e82",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29324 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-kin-colors-lemuet@1",
+      "hash": "33f2471dd5ee4e23dc42591a34ad810d2248c3e0e9ee48eb4dcdce419e007e38",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "48320 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-kin-crystal-freeman@1",
+      "hash": "0bebda016832ac837ee550d905d6ba4bfb634ddd05fe1e71e02c6c1b7df5c05d",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "39214 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-kin-dark-blue@1",
+      "hash": "812f0deceef23a4a3fc93c051a00694521e2e3773f1ad75537df003bb7afd56d",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "34038 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-kin-green-brains-out@1",
+      "hash": "476aff62a6be83fbb9f0144dec1221fe7b840dabe626f9c28bb7a6ebcd26515b",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "38206 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-kin-green-patterns-blue@1",
+      "hash": "d547c360460a21c069c29b6797382604e741233abafd15e130c3067758fd03a2",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "32160 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-kite@1",
+      "hash": "f48188c7e976a944da3d1b7eafd57476384dd7cb4c91e7170efa95f168a4581d",
+      "stage": "gallery-budget",
+      "code": "draws",
+      "detail": "9 > 4",
+      "fields": [
+        "params.condition=construction",
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-letter@1",
+      "hash": "ce9f595b0da92e7ca536032b2d0894788f58b5238969ba67142b07c109970a4d",
+      "stage": "gallery-budget",
+      "code": "draws",
+      "detail": "5 > 4",
+      "fields": [
+        "params.condition=construction"
+      ]
+    },
+    {
+      "def": "core-lighthouse@1",
+      "hash": "4db3efa2a1d2c61128af191a80aa33d3ca55ee7d08a4a41e046e0269b5635764",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6178 > 6000",
+      "fields": [
+        "params.material=glass"
+      ]
+    },
+    {
+      "def": "core-lighthouse@1",
+      "hash": "4db3efa2a1d2c61128af191a80aa33d3ca55ee7d08a4a41e046e0269b5635764",
+      "stage": "place",
+      "code": "architecture",
+      "detail": " building.no-entrance: no door to the outside; room.unreachable: entrance (floor 0) cannot be reached from a door to the outside; room.unreachable: room (floor 1) cannot be reached from a door to the outside; room.unreachable: room-2 (floor 2) cannot be reached from a door to the outside; room.unreachable: room-3 (floor 3) cannot be reached from a door to the outside; room.unreachable: lantern (floor 4) cannot be reached from a door to the outside",
+      "fields": [
+        "params.wallThickness.max"
+      ]
+    },
+    {
+      "def": "core-llama-pack@1",
+      "hash": "6a4cd9e46d7fd54cca5134d320232507fdc202adc7d8b5dc87dd6496861144f1",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "662 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-ada@1",
+      "hash": "0213bb11d6a6ba7d5fdbc106021200af44b995c12b75f1157f0f08dfd1873629",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "26816 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-celadon-beacon@1",
+      "hash": "e4e0af5fe4fb57f370cef80957dda9b9bfecdc0e7f3e7766df3e93c2b41d8015",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "76000 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-ceramic-verdelis-longplant@1",
+      "hash": "28b485c35c8150378dc5676a378c15be29fd4adc06604fd2c737ea20849206a7",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-astraflora@1",
+      "hash": "714ca196912603fb66775f3eb198dba17002e3126876e283dafbe63d053738df",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29795 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-bichroma@1",
+      "hash": "1662b3500ef4547895326abb684a23bf59fdd5bad99011d3ce8a24dc8e1a192f",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-eclip@1",
+      "hash": "2decfcb9354f9be7bdd1952825c4aac41263bd2207a64bdeed00a33a97d7a566",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29899 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-pillan@1",
+      "hash": "a066bf5a0c5c8798f2b8c4829150703ea191fa43bc19572e508eefa417a90796",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29974 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-poly10@1",
+      "hash": "44dc44ff37b527fd5a12792371229d6e5c64c775519d94d09e157d737edd863a",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29998 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-poly12@1",
+      "hash": "fe16b79b519c3f3b518e34d675dc6a97d3799fbaa1eac959d153afe7d3c7bac1",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-poly13@1",
+      "hash": "9b033d517ca119675c5277ef2c5417de2a068dc79244e1cd60d4208ea8906ab8",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-poly14@1",
+      "hash": "92d1d75cf6eb67452907c638e8859648363178f90b76052afb69adc5d9299806",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-poly15@1",
+      "hash": "1f3f827f3effaefbfeec3c6c6408ad93a06973805211a8c19c9653391f62cfdb",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-poly16@1",
+      "hash": "6bc36b1b48648b6cbe016cd0deafe752f47a25fcb13387fa812b9ccc2770c51e",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-poly3@1",
+      "hash": "32401bc553682fca9350ea59fc597d29ba17f64ee722b09d29e1ceeccc2afde1",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-poly4@1",
+      "hash": "0c7bda8f8b78f7ea7cbd04cf6f6c1c74e5c607da74eb820f7b417adfaa8f99f4",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-poly5@1",
+      "hash": "e8901939e9e2f10acbcf907cb5816ac58e3ecf4120a069e997e6cfbf98065f24",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-poly6@1",
+      "hash": "397df272f48a209a00e9b5ecee90cb046f649f93658adbf9f9b6fc1b707b5cc0",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-poly7@1",
+      "hash": "850f51bbcc9d17ff9a122aea25115f561a4b1ff3b22bebd66a543db128f12930",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-poly8@1",
+      "hash": "ba4ae0f6287e97c07255be5a9fa8ab976f7be6edb8c6c652a45ddd32020669bd",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-poly9@1",
+      "hash": "c11fd5b94098122c932d13ce9977ef6b3bf707ed95ef438aedc650ee4cddb868",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-pyrogeode@1",
+      "hash": "b239a17a33c84d3c793d707f93d6d4a979aae8a56fb6d2dbdbed436cc1e249f6",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29780 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-solara@1",
+      "hash": "1d93df62b4cde4059bbb04efcf162bdfc9ffea38423dd3a162339804503bd1b9",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-terraqua@1",
+      "hash": "b53ce907c520ba6a56bd0330054f7e489427a6f85434da63a3771a4d924ad49d",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29984 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-thaloc@1",
+      "hash": "5aeb96e552e184949dfaa8ba0b3828428768700b0c1d438ba0f814c57e120de1",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29962 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-glitch-vestige@1",
+      "hash": "2dac31a3a9ffb6a7fabd095be2fcde5c0f8b5a9268eaaad19623df199d5b5266",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29744 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-kalama@1",
+      "hash": "85f828e963a503845bead7d9157b6ba64a9778497b39c40f7d7341b84f33aa86",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "17230 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-kweku@1",
+      "hash": "659574b20c77f102cb95efe23071c8ef992595a721200a004dfc536883f469f7",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30815 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-madmaraca@1",
+      "hash": "322159b692c067429f4b58364e24dec254b60b260c5968e3f50ca695759dba89",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "76000 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-minarete@1",
+      "hash": "9e260a8467ea3a00977d75305d796c036aa779456bcb6f2e70dcc599fe742f95",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "76000 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-minarete@1",
+      "hash": "9e260a8467ea3a00977d75305d796c036aa779456bcb6f2e70dcc599fe742f95",
+      "stage": "place",
+      "code": "size.range",
+      "detail": " 57.9\u00d7128.0\u00d750.7 exceeds 400\u00d7120\u00d7400",
+      "fields": [
+        "size.scale.max"
+      ]
+    },
+    {
+      "def": "core-lm-museum-africa-basket@1",
+      "hash": "c8b906498b9b93f219d04d0ba47e25f75dff011f1403ef6d722af8c7d784b442",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-museum-dragon-vase@1",
+      "hash": "f6bb8829cf53d1cc219631c94f27ca86a9f494eb2c854bc98931bc8358116e8d",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-museum-ganesha-small@1",
+      "hash": "b572dcb936d20723074fa0d07d4ba86aec6bd3979c957a349bca8690d3247020",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-museum-goldentower@1",
+      "hash": "fbbae375d2e8214df45cef2b89a64ab14c65757c9a75a73675b479eef117da3d",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-museum-greece-vase@1",
+      "hash": "01c17bacaf9ae35bc87e44a09bb5c45509cbb3e755b2d7b08691c383d1a0d8ab",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-museum-guanyin5@1",
+      "hash": "3a5b271f7afeb23d62b5a636ea1c707419356290fbeb4604b46c8ee2e9cb9231",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-museum-guardian-colorful@1",
+      "hash": "68f66227291bd85e2b20e670c788b8620a22c28641f3be11129710390de7027c",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-museum-laughting-fatman@1",
+      "hash": "629a320e5b5cf695e8b94a8a900b91aa8befd3d8885da07f292c04a55087b465",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29999 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-museum-orange-vase@1",
+      "hash": "68bea4e77796fc650d1b2cdbe0512d5a580964930a08675a65b9390603c2a698",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29999 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-museum-rhino@1",
+      "hash": "9e1f8a55fe0b17ec2180f88c38717fbdebb21453bde440f746955271adaffb3b",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29998 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-museum-tower-wine@1",
+      "hash": "4e01037d7c99cf5f75a06b9bd0109b246f918bff96e1267ef86cda34dcd6c63e",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-museum-tower2@1",
+      "hash": "bd6bcaca3d2ff104d674e56f3bd1243d4429267401c31af3eb994266f01d2546",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-mycos@1",
+      "hash": "4a36200a7793641c37412c83f4ea7b45681c9753442954c879554472bce1fc29",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "28820 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-nyx@1",
+      "hash": "5f6d3db66b7e7610245e809d445670ca84e3c8e184c075b9b7f422d341440cba",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "40000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-regency-caboclus@1",
+      "hash": "475237c17b1f9f84f6a9d7a6de65918e6c51b14091ee39958c4edf9f6e89ae3c",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-regency-colorful@1",
+      "hash": "191a10f91d77654e95c645073acccb07d15bb4ce92dd1c51941b5a62f9623121",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-regency-conga@1",
+      "hash": "52dc1399068e1963d4e3c871cd76322f0ed97481cad509944bb56a5409bc064a",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-regency-femina@1",
+      "hash": "e01d121c4f11451898da07c95a5c0e107de7a357ebb96cc4669ef7d8d8927550",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-regency-flower@1",
+      "hash": "1f1a72ada4651bb57d80021dc7e2ef7fe908b1984813ab2c364c95c052825394",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-regency-mycologus@1",
+      "hash": "c0af62e3f96196a3caf362da44d2e0025e11436913dd8d03b69abd3247de4f18",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-regency-open-mouth@1",
+      "hash": "7b89a62e6a3b36da1d8b98c71a9de49d54aff77ad65644a26293f68f8adf79a3",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-regency-serpent@1",
+      "hash": "e6d24193e8cc0abb5908bb1d7c170bca31ad7e31c1e394c646d3d8b01b4a6d27",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-regency-xenanthro@1",
+      "hash": "a87e5d28b665933bfe52f680d6fa6406e47814afa4574d6b08043643886e536f",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-american-base-old@1",
+      "hash": "07a703339db20bba6e9009a2f10206ef0806c05c127d1e38658f45e54afe6447",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29998 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-china-buddha@1",
+      "hash": "53723e90b61f74f326340ad52a2e11739d96732262e1cf331da715788993bb45",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29705 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-forte-sao-filipe-chapel@1",
+      "hash": "8a7470352327b28bc93c6ea9e6831ee649ed5ce8571920a19f15f8d6577df32f",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29973 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-forte-sao-filipe-corner3@1",
+      "hash": "03e8ea3135ec629277d023dfeff591055329790842d51cc7bd109edb9ab9e31a",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29998 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-forte-sao-filipe-corner@1",
+      "hash": "f5971dbb6fcadc9aca262b1a9f363ddc0fedb045dee85ae3f69262c04e2aaf45",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29984 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-forte-sao-filipe-corridor@1",
+      "hash": "486660e7427387782a78836e1ffb1c0902140c4175567b4dd35b24585e36ade1",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29997 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-forte-sao-filipe-open@1",
+      "hash": "2117acfbc52fa8fdf06792adb24f6a8e32e7aee62b52864000dbb12496532e00",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29980 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-gold-rust-buddha@1",
+      "hash": "0d93665c56e93bbf235e20cb242cfa04936e587d4275e7a0f0e471c5f2247b83",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29769 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-golden-gate-park-tree@1",
+      "hash": "0150cc5a5da429b6d67f0442d49447de1fd2fd783237aa35aa0f43867040397e",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29414 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-graffiti-abandoned-room@1",
+      "hash": "d3c0f8d7c4e28973b78e706d8313878b73d503e85e9a5fd647014bde44cc6390",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29985 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-greenman-altar@1",
+      "hash": "5e9969042001ab1351d6bb3c03d543c808d13402608fdaae361ed7f13c0ae63b",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29821 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-gruta-m-republica@1",
+      "hash": "0369aedb176a9d9bdf314cd855f30b56c0220add81de01b63f1745e5748f41e5",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29936 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-lisbon-archways-corridor@1",
+      "hash": "816e535b6cddf8fedb03131aea72773b64aed9810a7a55a2e4093b9103383eb5",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29990 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-met-greek-mural@1",
+      "hash": "3599b4c9477144d4b21e20ef322510359cced0c1922a4f0b5519676ff20a7c84",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29355 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-minarete-portal@1",
+      "hash": "7322f7a3f5d3119dde515bb25b1b980a5ba75ecb462f4434e36a7f7b1528a492",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29999 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-moorish-castle-top@1",
+      "hash": "29e929a1261969956c43cd745ded4e1ee46a8370e36ba99470c22b4c58180dc4",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-moorish-entrance@1",
+      "hash": "acf2d1452880cf038f32522994af4144a2bdb7863f047a001404a215b8a9fc55",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29997 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-museu-azulejo-corridor@1",
+      "hash": "caa617eb3171dfea0a7a326bd5d4739466b7502efb528660d3150ccbdf818fe2",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29997 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-museu-azulejo-main@1",
+      "hash": "8b2d148b52babf50b72ff8ae581a46fd63ee6b13f68ded9f39c81e7f2037c51d",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29997 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-museu-azulejo-quad@1",
+      "hash": "6c005123375a0a01a132886a68a579f3bc34f59d7772dfc41e066c5b12201fb8",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29955 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-poly-01@1",
+      "hash": "992977acfe8134ce53b633c858eeb602a8ba409f0c7a09259c138ecac5424b91",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "8743 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-poly-02@1",
+      "hash": "757038c5d6c2d513d36c822cd1dc73e07e931a5c5516166c646f79a1e27a2bb9",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-poly-05@1",
+      "hash": "bfe37c8ec0c4a12e0152706a345d22156f4cac36f1e090bb3480dadce4c2300b",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29999 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-poly-06@1",
+      "hash": "c9f521cc4b0a5706c11e9535a4f27338b48f0bbf3ab4a261a889e73cbdaf6844",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "3052 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-poly-08@1",
+      "hash": "966cc46175bafac5a7d1f70db6720ebd739c878593c986151fa4ff029eeded71",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29997 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-poly-09@1",
+      "hash": "163977401d35c5e17c70f3a9de6f5a7d52036b212ec7860e35a6ac8e464304c9",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29959 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-poly-10@1",
+      "hash": "5d639078a4e5f425f81927487acf73185ec38056afefbdf89e2672e616f500a7",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29999 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-poly-12@1",
+      "hash": "b0b39632299fce9e94892a456855b4e0a06435a1e72ff8c54d7d4d6d01520d9b",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29989 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-poly-13@1",
+      "hash": "ea8c2eb3cef78ed9549d652708e0a792d1b700b08fe71b35682b2ae1e85ed178",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30000 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-poly-14@1",
+      "hash": "f51106393aeb8bd4c0f302c574aada6287521c9754c340eaedfd9676feea6d4e",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29998 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-poly-15@1",
+      "hash": "8c858fb9e0d393aabd8016b52e783d169de0539817db6710ede48fc1b3a546bc",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29989 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-poly-17@1",
+      "hash": "feb275ca63bee8729049c4afefeaba995ca07fd7d764c6a94b19b0978eaa2af0",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "5341 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-poly-18@1",
+      "hash": "b404e2370ef77594e3d39e9c4b143d1a332b6f8f51fd131693136ad081f7ab68",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29999 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-poly-19@1",
+      "hash": "c5698ab1a57bc93a3cecf153d5440f76074754e63ceb78d8ff5e3768cc9c7a3e",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29990 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-quinta-corredor-escada@1",
+      "hash": "9c79d531b0068b890826c218999d264b5b0541b883d69ced681427ec31a89666",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29958 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-quinta-fonte@1",
+      "hash": "f672b4a03901c2bb6be4802ceea28aa22b0cce7876abdb4ae9506546f073cabd",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29994 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-quinta-palacio-interior@1",
+      "hash": "e3c06c98ba8eacf0a7f60d50a5b6436560b0796b2af15d0bfe366be7160d7ff8",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29945 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-quinta-poco@1",
+      "hash": "1bb666ecf9d18b2d356cdb9dd5354b75d8986ba73ef5ca0eacdf003502505ac6",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29988 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-quinta-tower-curly@1",
+      "hash": "409f96d195a59d2252202772b30a859e04c3c30c62d7c46bec0111be744f1515",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29943 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-rua-fado@1",
+      "hash": "03654b37125e0b6834437e30e6b5a74c23043931a3d01d0ad481ea6f32c17980",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29863 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-scan-se-entrada@1",
+      "hash": "2e1287892a4aceef393d39a3f8303dd6524a4242b3c9f482b6f17ddeffecdc46",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "29997 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-shuijing@1",
+      "hash": "e5d739590b0d8b062d239d1e6ea367e3519a69cf3b638181ee9d942d862235fa",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "31642 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-lm-verdelis@1",
+      "hash": "f02fe6613d73ce656a23bf35d57685211779384f6a07085fa2c6b6edb76ae932",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "19479 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-locomotive@1",
+      "hash": "ebaabd4d7d5e9dc0b4daaf44d16fec0dc2560c48f8a4f19e9f07c92ffffe0c34",
+      "stage": "gallery-budget",
+      "code": "draws",
+      "detail": "26 > 4",
+      "fields": [
+        "params.condition=construction"
+      ]
+    },
+    {
+      "def": "core-mall@1",
+      "hash": "c3259a7abecffcb3541f0f53e57b189a6d47dada45ef379629a64ac3a531377e",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6890 > 6000",
+      "fields": [
+        "params.windows.max"
+      ]
+    },
+    {
+      "def": "core-mansion@1",
+      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "10724 > 6000",
+      "fields": [
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-mansion@1",
+      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6088 > 6000",
+      "fields": [
+        "params.floorHeight.min"
+      ]
+    },
+    {
+      "def": "core-mansion@1",
+      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6096 > 6000",
+      "fields": [
+        "params.roof=none"
+      ]
+    },
+    {
+      "def": "core-mansion@1",
+      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6136 > 6000",
+      "fields": [
+        "params.roof=shed"
+      ]
+    },
+    {
+      "def": "core-mansion@1",
+      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6160 > 6000",
+      "fields": [
+        "params.hood=false"
+      ]
+    },
+    {
+      "def": "core-mansion@1",
+      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6196 > 6000",
+      "fields": [
+        "defaults",
+        "params.balcony=false",
+        "params.balcony=true",
+        "params.chimney=false",
+        "params.chimney=true",
+        "params.doorLamp=false",
+        "params.doorLamp=true",
+        "params.floors.max",
+        "params.floors.min",
+        "params.flowerBoxes=false",
+        "params.flowerBoxes=true",
+        "params.front=e",
+        "params.front=n",
+        "params.front=s",
+        "params.front=w",
+        "params.hood=true",
+        "params.material=brick",
+        "params.material=metal",
+        "params.material=plaster",
+        "params.material=stone",
+        "params.material=wood",
+        "params.porch.max",
+        "params.quoins=false",
+        "params.quoins=true",
+        "params.roof=hip",
+        "params.roofPitch.max",
+        "params.roofPitch.min",
+        "params.shutters=false",
+        "params.shutters=true",
+        "params.style=barn",
+        "params.style=chapel",
+        "params.style=cottage",
+        "params.style=greenhouse",
+        "params.style=hall",
+        "params.style=pavilion",
+        "params.style=shed",
+        "params.style=shop",
+        "params.style=tower",
+        "params.style=townhouse",
+        "params.wallThickness.max",
+        "params.wallThickness.min",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mansion@1",
+      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6216 > 6000",
+      "fields": [
+        "params.roof=flat"
+      ]
+    },
+    {
+      "def": "core-mansion@1",
+      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6252 > 6000",
+      "fields": [
+        "params.roof=gable"
+      ]
+    },
+    {
+      "def": "core-mansion@1",
+      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6412 > 6000",
+      "fields": [
+        "params.floorHeight.max"
+      ]
+    },
+    {
+      "def": "core-mansion@1",
+      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6424 > 6000",
+      "fields": [
+        "params.roof=dome"
+      ]
+    },
+    {
+      "def": "core-mansion@1",
+      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "8036 > 6000",
+      "fields": [
+        "params.windows.max"
+      ]
+    },
+    {
+      "def": "core-mansion@1",
+      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "9140 > 6000",
+      "fields": [
+        "params.d.max"
+      ]
+    },
+    {
+      "def": "core-mansion@1",
+      "hash": "b8f2d22cdca56fc343ac3ffb27671b004e7f6a972f3e7e2501689b98f7995f25",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "9300 > 6000",
+      "fields": [
+        "params.w.max"
+      ]
+    },
+    {
+      "def": "core-mars-chiba@2",
+      "hash": "81494caa71a1ab0f1ab8ae3ddd1980defccf46bff943d0f7ae64c24495bdedde",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "64520 > 6000",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mars-dry-goods-long-shelf@2",
+      "hash": "0e5c2503623fd7aaf3d3447ba0675964d2c1ae04268b92dc02fada72b53f32ae",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "2316 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mars-forklift-1@2",
+      "hash": "4bfdf67ff633e18937a89f75b42cee7dc4f4abdec62ecbeebf0916b0b102f51b",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "1356 > 1200",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mars-freeside-hydro-cart-chrome@2",
+      "hash": "4ee33ac8b2cee7832c7a50682a39f134738a3301ab4431659b1e1c7b508d7b3e",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "1952 > 1200",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mars-freeside@2",
+      "hash": "d5b46383dd222d58c5db690ea87ed3cda38253493f1d5d15f98f03e559fd5023",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "152802 > 6000",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mars-kitchen@2",
+      "hash": "e5277b099c2c934d4b8d56fc44e57cd523826b0fa2dcf973e226df86043570a5",
+      "stage": "furnish",
+      "code": "slot.outside",
+      "detail": " (-5.36, -1.69) is 1.62 m outside working-kitchen; p in a slot is relative to the slot's origin",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mars-og-clubhouse-1@2",
+      "hash": "41b54b2344a41ae67279a89453300f90be3f6d04f9d1905036d6e3ed235aad6b",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "824 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mars-papasan@2",
+      "hash": "a355a198184fbe13628c87b5b8de5f83e0a6b728cfb9a46b4718e57ad593213a",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "1152 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mars-shelter-2@1",
+      "hash": "db795e92fa48747b47912aef69c765824f87cb4a59c7a3a3f2fb63d541d96650",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "11145 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mars-shelter-3@1",
+      "hash": "c3059d5d3c54c9505885ccdd84783f815220f5e894553357999a352a7d7202fe",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "696 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mars-shelter-4@1",
+      "hash": "2bf62d2e416ddb524f6cfa71627dd34acd89513dd89ac7b4b82d485a8005efac",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "2192 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mars-site-object-2@1",
+      "hash": "aa7e5a35d5bd176aa7d18fcdcaffbdffdc64883ee7a915225eaf6383b9d33ae9",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "11458 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mars-toilet-1@2",
+      "hash": "e9af9e041c292c7a9260e16ebb8e54b9371ba3154e943eb05db84899a8807235",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "3333 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mars-tool-camp@2",
+      "hash": "f2a505598f87374c4197ee6162de90ca1da920eec7f0f46dcf99fdc44bbe6cb1",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "109110 > 6000",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mars-vehicle-10@2",
+      "hash": "f2beaf6407037989508b265b6384d691c6e3d557889c99cbe1a1ee9ba15adc12",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "30508 > 1200",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mars-vehicle-11@1",
+      "hash": "bdbe5109dad22319bf8566068ca9918e84290624eea1a35cffd0435bfab3cc37",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "22391 > 1200",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mars-vehicle-1@1",
+      "hash": "b028e96ec8b021bd966b5fde38bd7c45a773a9f04803b0c5037f55170c5e4e1a",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "3403 > 1200",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mars-vehicle-3@1",
+      "hash": "f6d328c09ea55e2550822f76090b5473845fd6a964b3461806984688f0e3835f",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "12841 > 1200",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mars-vehicle-4@1",
+      "hash": "9a6bf65c9a8306154a991940ac9f1be5add19333ff6a8b95bf5fd12b2779a1f3",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "5527 > 1200",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mars-vehicle-6@1",
+      "hash": "308e0e6170eee64de8adb9ad3d31c45e92e5d7af09636ce571f664899602208f",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "12838 > 1200",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mars-vehicle-8@1",
+      "hash": "d66956aa2c50f25fdf57149f740db55c69d2d8162f3f36e9dcd8923a939bceec",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "13801 > 1200",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mars-vehicle-9@1",
+      "hash": "54c982979a26b8c1bd244afd07235f27e3477da9283d339a8f9c46ce65447554",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "38117 > 1200",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-minaret-temple@1",
+      "hash": "4e4cb87f7e1849022f13ae858f8d50fb11643dce96be2c75d0d8158a9d67d09c",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "17928 > 400",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-mine-cart@1",
+      "hash": "326ffd0918d4160824ed6440c6fb6789328ee479f76b0ba759a443b56f0db0df",
+      "stage": "gallery-budget",
+      "code": "draws",
+      "detail": "5 > 4",
+      "fields": [
+        "params.condition=construction"
+      ]
+    },
+    {
+      "def": "core-oak-tree-1-pack@1",
+      "hash": "e686d32c315229ceeb8dad981e4b7e3545ce6ae52c6b40b229ebd08ad3f3656d",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "2888 > 1500",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-oak-tree-2-pack@1",
+      "hash": "d7d07244fdb58e26e0ba1f311b18f69e15f175caa0f60f902c1180404c1978f8",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "2952 > 1500",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-oak-tree-3-pack@1",
+      "hash": "816aa1db96eec80a1f904d2c6608e7f8fe48d277c619351e259ca154c0333954",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "1584 > 1500",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-office-block@1",
+      "hash": "279ac3dc8615244f23a12eeb7d402cadaca3a5e255effb99a99913e88a0491b9",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "12902 > 6000",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-office-block@1",
+      "hash": "279ac3dc8615244f23a12eeb7d402cadaca3a5e255effb99a99913e88a0491b9",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6918 > 6000",
+      "fields": [
+        "params.material=brick",
+        "params.material=metal",
+        "params.material=plaster",
+        "params.material=stone",
+        "params.material=wood"
+      ]
+    },
+    {
+      "def": "core-office-block@1",
+      "hash": "279ac3dc8615244f23a12eeb7d402cadaca3a5e255effb99a99913e88a0491b9",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7470 > 6000",
+      "fields": [
+        "params.w.max"
+      ]
+    },
+    {
+      "def": "core-office-block@1",
+      "hash": "279ac3dc8615244f23a12eeb7d402cadaca3a5e255effb99a99913e88a0491b9",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7754 > 6000",
+      "fields": [
+        "params.d.max"
+      ]
+    },
+    {
+      "def": "core-office-block@1",
+      "hash": "279ac3dc8615244f23a12eeb7d402cadaca3a5e255effb99a99913e88a0491b9",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "9658 > 6000",
+      "fields": [
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-prison@1",
+      "hash": "f7a1af93f7377cb38d1cd6efe9ac9a65bb2c2078cbc2f032588da69dcc66890e",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6222 > 6000",
+      "fields": [
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-pug-pack@1",
+      "hash": "e6510828b6bf8f36ee4c2d9c1db2e4a12e35903438acabde0d1ace7e708c58f1",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "644 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-pumpkin-crop-pack@1",
+      "hash": "68835ddbf7fa7ddb32212fb6bc4be04b63676d161ff35141aabfcaf3e48bbc1b",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "1523 > 1500",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-rake@1",
+      "hash": "00c93e7c099b710895796744e8c39115bce408864cbc81291a5511b9dfd64885",
+      "stage": "gallery-budget",
+      "code": "draws",
+      "detail": "9 > 4",
+      "fields": [
+        "params.condition=construction",
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-school@1",
+      "hash": "f0adfdbcc2b202a56f8471556a0c49ba53a26f64a470bc566dbfe15d9a779811",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6050 > 6000",
+      "fields": [
+        "params.roof=dome"
+      ]
+    },
+    {
+      "def": "core-school@1",
+      "hash": "f0adfdbcc2b202a56f8471556a0c49ba53a26f64a470bc566dbfe15d9a779811",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6070 > 6000",
+      "fields": [
+        "params.floorHeight.max"
+      ]
+    },
+    {
+      "def": "core-school@1",
+      "hash": "f0adfdbcc2b202a56f8471556a0c49ba53a26f64a470bc566dbfe15d9a779811",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6746 > 6000",
+      "fields": [
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-school@1",
+      "hash": "f0adfdbcc2b202a56f8471556a0c49ba53a26f64a470bc566dbfe15d9a779811",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6794 > 6000",
+      "fields": [
+        "params.porch.max"
+      ]
+    },
+    {
+      "def": "core-school@1",
+      "hash": "f0adfdbcc2b202a56f8471556a0c49ba53a26f64a470bc566dbfe15d9a779811",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7076 > 6000",
+      "fields": [
+        "params.windows.max"
+      ]
+    },
+    {
+      "def": "core-school@1",
+      "hash": "f0adfdbcc2b202a56f8471556a0c49ba53a26f64a470bc566dbfe15d9a779811",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7552 > 6000",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-school@1",
+      "hash": "f0adfdbcc2b202a56f8471556a0c49ba53a26f64a470bc566dbfe15d9a779811",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "8544 > 6000",
+      "fields": [
+        "params.w.max"
+      ]
+    },
+    {
+      "def": "core-school@1",
+      "hash": "f0adfdbcc2b202a56f8471556a0c49ba53a26f64a470bc566dbfe15d9a779811",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "9378 > 6000",
+      "fields": [
+        "params.d.max"
+      ]
+    },
+    {
+      "def": "core-sheep-pack@1",
+      "hash": "03c0e11ef5492c44a276fa0f2a4e566597c060ef31f3548d04264dc53210f0d3",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "612 > 600",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-townhouse-row@1",
+      "hash": "cebd5fc43046373d0621ed6860ec47c42aad5b628ff23517fc2b5a332e1f738d",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "11080 > 6000",
+      "fields": [
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-townhouse-row@1",
+      "hash": "cebd5fc43046373d0621ed6860ec47c42aad5b628ff23517fc2b5a332e1f738d",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "11306 > 6000",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-townhouse-row@1",
+      "hash": "cebd5fc43046373d0621ed6860ec47c42aad5b628ff23517fc2b5a332e1f738d",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6100 > 6000",
+      "fields": [
+        "params.floorHeight.max"
+      ]
+    },
+    {
+      "def": "core-townhouse-row@1",
+      "hash": "cebd5fc43046373d0621ed6860ec47c42aad5b628ff23517fc2b5a332e1f738d",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6336 > 6000",
+      "fields": [
+        "params.porch.max"
+      ]
+    },
+    {
+      "def": "core-townhouse-row@1",
+      "hash": "cebd5fc43046373d0621ed6860ec47c42aad5b628ff23517fc2b5a332e1f738d",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6420 > 6000",
+      "fields": [
+        "params.windows.max"
+      ]
+    },
+    {
+      "def": "core-townhouse-row@1",
+      "hash": "cebd5fc43046373d0621ed6860ec47c42aad5b628ff23517fc2b5a332e1f738d",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "8284 > 6000",
+      "fields": [
+        "params.w.max"
+      ]
+    },
+    {
+      "def": "core-townhouse-row@1",
+      "hash": "cebd5fc43046373d0621ed6860ec47c42aad5b628ff23517fc2b5a332e1f738d",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "8800 > 6000",
+      "fields": [
+        "params.d.max"
+      ]
+    },
+    {
+      "def": "core-townhouse@1",
+      "hash": "eedc36c2d37fdeb3607cd9959ffecfa8c2240ab1ba5a0527882a6d313f5af2fa",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6618 > 6000",
+      "fields": [
+        "params.d.max"
+      ]
+    },
+    {
+      "def": "core-townhouse@1",
+      "hash": "eedc36c2d37fdeb3607cd9959ffecfa8c2240ab1ba5a0527882a6d313f5af2fa",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7166 > 6000",
+      "fields": [
+        "params.w.max"
+      ]
+    },
+    {
+      "def": "core-wall-board@1",
+      "hash": "25acb5c86a8814870d4a20d2ac324a5ee8859088d31f7ad16ec2534b3f4969e9",
+      "stage": "gallery-budget",
+      "code": "draws",
+      "detail": "11 > 4",
+      "fields": [
+        "params.condition=construction",
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-willow-tree-1-pack@1",
+      "hash": "3c418bca10595b008fbaf55fd96a9b85c189b6eb438a9aa3bc589e247e835f9c",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "1946 > 1500",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-willow-tree-2-pack@1",
+      "hash": "aaf6fdab08bd5fe6b345605ceee2beab793b08d42be9c4c1e600ffc436d8c7f2",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "2752 > 1500",
+      "fields": [
+        "defaults",
+        "random[0]",
+        "random[1]",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    }
+  ]
+}
