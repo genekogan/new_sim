@@ -1,6 +1,6 @@
 // G4 (Gene 2026-10-20): the God button right of Explore, styled like it ("God ⌘G"), on new worlds. It opens the one God
-// modal (GodModal, rendered by GodPanel in the world view): everything for the world's god, and for everyone else a
-// read-only page (the Constitution, how to become a god). For the owner a dot says whether their agent is connected
+// modal (GodModal, rendered by GodPanel in the world view). Only the world's god has it (U3); nobody else gets a God
+// view. A dot says whether their agent is connected
 // (green) or not (red), and a badge counts pairing requests waiting for approval. Replaces GODUI's lightning-bolt popover
 // and the separate Constitution chip.
 import { useEffect, useRef, useState } from 'react';
