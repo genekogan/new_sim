@@ -188,6 +188,10 @@ test('checks.mjs walks: arrivals, errors, resync, picks and the entry count', ()
   const r = checkWalks([{ name: 'walk', entries: [{ ...good, arrivalMs: null }, { ...good, errors: ['boom'] }, { ...good, resync: 1 }, { ...good, picks: [{ pick: 'x', ok: false }] }] }], 5);
   assert.equal(r.problems.length, 5, r.problems.join('\n'));
   assert.match(r.lines[0], /orbit 2in\/0out d=30 h=15/);
+  // PF2: a slow arrival is noted with the laptop's load at the walk (busy -> re-walk), never a problem
+  const slow = checkWalks([{ name: 'walk-phone', entries: [{ ...good, arrivalMs: 21300, load1: 27.4 }, { ...good, arrivalMs: 9000, load1: 4.1 }, { ...good, load1: 30 }] }], 3);
+  assert.equal(slow.ok, true); assert.match(slow.lines[0], / load 27.4 /);
+  assert.deepEqual(slow.notes, ['walk-phone eden dpr 1: arrival 21.3 s at laptop load 27.4: the laptop was busy; re-walk it when load1 < 10', 'walk-phone eden dpr 1: arrival 9.0 s at laptop load 4.1: slow at normal load: look at it']);
 });
 
 test('checks.mjs poster: a world frame every run, never blank after it', () => {

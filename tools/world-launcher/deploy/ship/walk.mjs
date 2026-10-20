@@ -16,7 +16,7 @@ export function zoomStep(d, h, zin) {
   if (zin < MAX_IN && open(d * NOTCH_FACTOR, h == null ? null : h * NOTCH_FACTOR)) return 'in';
   return open(d, h) ? null : 'out';
 }
-import { mkdirSync, writeFileSync } from 'node:fs'; import { fileURLToPath } from 'node:url';
+import { mkdirSync, writeFileSync } from 'node:fs'; import { fileURLToPath } from 'node:url'; import { loadavg } from 'node:os';
 import { chromium as playwrightChromium, lease } from './browser.mjs';
 const eye = (p) => p.evaluate(() => { const c = globalThis.__simCamera, g = globalThis.__simCameraGround; if (!c?.p || !c.pivot) return null;
   return { d: +Math.hypot(c.p[0] - c.pivot[0], c.p[1] - c.pivot[1], c.p[2] - c.pivot[2]).toFixed(1), h: g?.ground == null ? null : +(c.p[1] - g.ground).toFixed(1) }; }).catch(() => null);
@@ -53,6 +53,7 @@ try {
       entry.worldmeta = []; p.on('request', (q) => { if (q.url().includes('/v1/worldmeta')) entry.worldmeta.push(q.url().slice(0, 140)); });
       p.on('websocket', (ws) => ws.on('framereceived', (f) => { if (typeof f.payload === 'string' && f.payload.includes('"welcome"') && !entry.welcome) entry.welcome = f.payload.slice(0, 300);
         if (typeof f.payload === 'string') { const m = f.payload.match(/^\{"t":"([a-z-]+)"/); if (m) { entry.types ??= {}; entry.types[m[1]] = (entry.types[m[1]] ?? 0) + 1; } } }));
+      entry.load1 = +loadavg()[0].toFixed(1);   // PF2: this laptop's 1-min load at the walk (checks.mjs notes slow arrivals under load)
       const t0 = Date.now(); await p.goto(url, { waitUntil: 'domcontentloaded' });
       try {
         await p.waitForSelector('.world-viewport canvas', { timeout: 120000 });

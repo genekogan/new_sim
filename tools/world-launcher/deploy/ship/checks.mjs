@@ -17,23 +17,29 @@ export function checkQuickCheck(text) {
   return { ok: !problems.length, lines: Object.entries(counts).map(([r, n]) => `${String(n).padStart(7)} ${r}`), problems };
 }
 
+/** PF2 (2026-10-20): a walk arrival slower than this is noted with the laptop's load at the walk. Every >6 s cold load in
+ *  team/lanes/t4-pf2.md came while the walking laptop itself was saturated (load1 26-30: restic + Spotlight), with the server
+ *  and CDN on time; re-walk such an arrival with load1 < LOAD_QUIET before blaming the release. Notes never fail the step. */
+export const SLOW_ARRIVAL_MS = 8000, LOAD_QUIET = 10;
+
 /** walk.json entries (walk.mjs). */
 export function checkWalks(logs, expected) {
-  const lines = [], problems = []; let n = 0;
+  const lines = [], problems = [], notes = []; let n = 0;
   for (const { name, entries } of logs) for (const x of entries) {
     n++;
     const errs = x.errors ?? [];
-    lines.push(`${name} ${x.slug} dpr ${x.dpr} arr ${x.arrivalMs ?? null} errs ${errs.length} ${JSON.stringify(errs.slice(0, 2))} sockets ${x.sockets?.length ?? 0} resync ${x.resync ?? 0}` +
+    lines.push(`${name} ${x.slug} dpr ${x.dpr} arr ${x.arrivalMs ?? null} load ${x.load1 ?? '?'} errs ${errs.length} ${JSON.stringify(errs.slice(0, 2))} sockets ${x.sockets?.length ?? 0} resync ${x.resync ?? 0}` +
       ` picks ${JSON.stringify((x.picks ?? []).map((p) => `${p.pick}:${p.ok ? 'ok' : 'FAIL'}`))}` +
       (x.orbit ? ` orbit ${x.orbit.blind ? 'blind ' : ''}${x.orbit.in}in/${x.orbit.out}out d=${x.orbit.end?.d ?? '?'} h=${x.orbit.end?.h ?? '?'}${x.orbit.open === false ? ' NOT-OPEN' : ''}` : ''));
     const where = `${name} ${x.slug} dpr ${x.dpr}`;
     if (x.arrivalMs == null) problems.push(`${where}: never arrived (${x.arrivalErr ?? 'no arrival time'})`);
+    if (x.arrivalMs > SLOW_ARRIVAL_MS) notes.push(`${where}: arrival ${(x.arrivalMs / 1000).toFixed(1)} s at laptop load ${x.load1 ?? '?'}: ${x.load1 > LOAD_QUIET ? `the laptop was busy; re-walk it when load1 < ${LOAD_QUIET}` : 'slow at normal load: look at it'}`);
     if (errs.length) problems.push(`${where}: ${errs.length} error(s): ${errs.slice(0, 2).join(' | ')}`);
     if (x.resync) problems.push(`${where}: ${x.resync} resync`);
     for (const p of x.picks ?? []) if (!p.ok) problems.push(`${where}: Explore pick ${p.pick} failed (${p.err ?? '?'})`);
   }
   if (n !== expected) problems.push(`${n} walk entries, expected ${expected}`);
-  return { ok: !problems.length, lines, problems, entries: n };
+  return { ok: !problems.length, lines, problems, notes, entries: n };
 }
 
 /** poster.log: one JSON line per run (poster.mjs); poster-count.txt: "<k> firstWorld <ms|None> frames <n> blank-after-world <0|[..]> ..." */
@@ -77,6 +83,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   else { console.error('usage: checks.mjs quick-check|walks|poster|stall …'); process.exit(2); }
   for (const l of r.lines) console.log(l);
   for (const p of r.problems) console.log(`PROBLEM ${p}`);
+  for (const x of r.notes ?? []) console.log(`NOTE ${x}`);
   console.log(r.ok ? `PASS ${kind}` : `FAIL ${kind}: ${r.problems.length} problem(s)`);
   process.exit(r.ok ? 0 : 1);
 }
