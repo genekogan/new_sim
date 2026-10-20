@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { MaterialLib } from './materials.ts';
 import { applyBuildingFinish } from '../WorldEdenRealism.ts';
+import { nightWindows } from './building-windows.ts';
 
 /** wall: walls, partitions · floor: slabs, boards, decks · roof · trim: frames, sills, rails, details · glass · glow (lamps, lit lantern). */
 export type Layer = 'wall' | 'floor' | 'roof' | 'trim' | 'glass' | 'glow';
@@ -31,13 +32,21 @@ class F32 {
   view() { return this.a.subarray(0, this.n); }
 }
 /** W2b: vertex ranges [from, to) of a buffer that are a building's outer face (its finish pattern goes there). */
-type Buf = { p: F32; n: F32; c: F32; face?: number[] };
+type Buf = { p: F32; n: F32; c: F32; face?: number[]; pane?: Float32Array };
+/** E2C: a glass buffer's per-vertex window pane (u, v metres from the pane's lower left, signed width (sign = which side of the
+ *  face is outdoors, 0 = not a window pane), sill height above its storey floor), padded with zeros to the vertex count. */
+function paneOf(b: Buf, verts: number): Float32Array {
+  const need = verts * 4; let a = b.pane ?? new Float32Array(0);
+  if (a.length < need) { const g = new Float32Array(Math.max(need, a.length * 2, 96)); g.set(a); a = g; }
+  return (b.pane = a);
+}
+const paneView = (b: { p: F32; pane?: Float32Array }) => { const n = (b.p.length / 3) * 4, a = b.pane ?? new Float32Array(0); if (a.length >= n) return a.subarray(0, n); const g = new Float32Array(n); g.set(a); return g; };
 /** Old Eden's building identity for one building: wall 0 running brick, 1 Flemish, 2 ashlar, 3 clapboard, 4 limewash;
  *  roof 0 clay tile, 1 slate, 2 shingle. */
 export type Finish = { wall: number; roof: number };
 const WALLS = ['running brick', 'Flemish brick', 'ashlar', 'clapboard', 'limewash'], ROOFS = ['clay tile', 'slate', 'shingle'];
 /** One (group|layer) soup: positions, normals, colours (and W2b's outer-face vertex ranges). */
-export type RawSoup = { k: string; p: Float32Array; n: Float32Array; c: Float32Array; face?: number[] };
+export type RawSoup = { k: string; p: Float32Array; n: Float32Array; c: Float32Array; face?: number[]; pane?: Float32Array };
 export class Builder {
   readonly buf = new Map<string, Buf>();
   group = 'level-0';
@@ -52,6 +61,9 @@ export class Builder {
   /** Draw `f` as the building's outer face (marked for the finish pattern; only the wall layer keeps the mark). */
   outer(f: () => void) { const was = this.facade; this.facade = true; try { f(); } finally { this.facade = was; } return this; }
   private mark(b: Buf, layer: Layer, from: number) { if (this.facade && layer === 'wall') { const to = b.p.length / 3, f = (b.face ??= []); if (f.length && f[f.length - 1] === from) f[f.length - 1] = to; else f.push(from, to); } }
+  /** E2C: the window pane the next glass face() is (width, height, sill above the storey floor, outdoor side: +1 the face's
+   *  front, -1 its back); null = plain glass. Read by the night-windows glass (rooms behind lit windows). */
+  pane: { w: number; h: number; sill: number; out: number } | null = null;
   anchor(x: number, y: number, z: number) { if (this.enabled) { const v = new THREE.Vector3(x, y, z).applyMatrix4(this.m); this.anchors.push([v.x, v.y, v.z]); } }
   private m = new THREE.Matrix4(); private stack: THREE.Matrix4[] = [];
   private l = new THREE.Matrix4(); private nm = new THREE.Matrix3(); private v = new THREE.Vector3(); private q = new THREE.Quaternion(); private s = new THREE.Vector3(); private t = new THREE.Vector3(); private e = new THREE.Euler();
@@ -107,6 +119,11 @@ export class Builder {
     const from = buf.p.length / 3;
     for (const i of [0, 1, 2, 0, 2, 3]) { buf.p.push3(X[i], Y[i], Z[i]); buf.n.push3(nx, ny, nz); buf.c.push3(cr, cg, cb); }
     this.mark(buf, layer, from);
+    if (layer === 'glass' && this.pane) {
+      // corners a, b, c, d = lower left, lower right, upper right, upper left of the pane seen from the face's front
+      const P = this.pane, a = paneOf(buf, from + 6), U = [0, P.w, P.w, 0], V = [0, 0, P.h, P.h], sw = P.w * (P.out < 0 ? -1 : 1);
+      [0, 1, 2, 0, 2, 3].forEach((i, k) => { a.set([U[i], V[i], sw, P.sill], (from + k) * 4); });
+    }
     return this;
   }
   /**
@@ -163,11 +180,11 @@ export class Builder {
   quad(a: THREE.Vector3Tuple, b: THREE.Vector3Tuple, c: THREE.Vector3Tuple, d: THREE.Vector3Tuple, col: Col, layer: Layer = 'roof') { this.tri(a, b, c, col, layer); this.tri(a, c, d, col, layer); return this; }
   tris(): number { let n = 0; for (const b of this.buf.values()) n += b.p.length / 9; return n; }
   /** Lane W1: the accumulated soups as plain arrays (to cross to or from a worker), in the order emit takes them. */
-  raw(): RawSoup[] { return [...this.buf].map(([k, b]) => ({ k, p: b.p.view().slice(), n: b.n.view().slice(), c: b.c.view().slice(), ...(b.face ? { face: b.face.slice() } : {}) })); }
+  raw(): RawSoup[] { return [...this.buf].map(([k, b]) => ({ k, p: b.p.view().slice(), n: b.n.view().slice(), c: b.c.view().slice(), ...(b.face ? { face: b.face.slice() } : {}), ...(b.pane ? { pane: paneView(b).slice() } : {}) })); }
   /** A builder holding soups made elsewhere (raw()), ready to emit exactly as the builder that made them would. */
   static fromRaw(raw: readonly RawSoup[]): Builder {
     const b = new Builder(), f = (a: Float32Array) => { const x = new F32(); x.a = a as Float32Array<ArrayBuffer>; x.n = a.length; return x; };
-    for (const r of raw) b.buf.set(r.k, { p: f(r.p), n: f(r.n), c: f(r.c), ...(r.face ? { face: r.face.slice() } : {}) });
+    for (const r of raw) b.buf.set(r.k, { p: f(r.p), n: f(r.n), c: f(r.c), ...(r.face ? { face: r.face.slice() } : {}), ...(r.pane ? { pane: r.pane.slice() } : {}) });
     return b;
   }
   /** One mesh per (group, layer) under one THREE.Group per group. */
@@ -179,6 +196,7 @@ export class Builder {
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(b.p.view(), 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n.view(), 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(b.c.view(), 3));
       if (b.face && this.finish) { const f = new Float32Array(b.p.length / 3); for (let i = 0; i < b.face.length; i += 2) f.fill(1, b.face[i], b.face[i + 1]); g.setAttribute('edenFace', new THREE.Float32BufferAttribute(f, 1)); }
+      if (b.pane && layer === 'glass') g.setAttribute('edenPane', new THREE.Float32BufferAttribute(paneView(b), 4));
       g.computeBoundingBox(); g.computeBoundingSphere();
       const mesh = new THREE.Mesh(g, materialFor(materials, layer, this.finish)); mesh.name = `${gname} ${layer}`;
       mesh.castShadow = layer !== 'glow' && layer !== 'glass'; mesh.receiveShadow = layer !== 'glow';
@@ -207,7 +225,7 @@ function materialFor(lib: MaterialLib, layer: Layer, finish: Finish | null): THR
     case 'floor': return finished(lib, 'wood', 'floor', finish);
     case 'roof': return finished(lib, 'tile', 'roof', finish);
     case 'trim': return lib.get('paint', undefined, { vertexColors: true });
-    case 'glass': return lib.get('glass', undefined, { vertexColors: true, side: THREE.DoubleSide });
+    case 'glass': return nightWindows(lib.get('glass', undefined, { vertexColors: true, side: THREE.DoubleSide, buildingFinish: 'night-windows' }));
     case 'glow': return (glow ??= new THREE.MeshBasicMaterial({ vertexColors: true }));
   }
 }

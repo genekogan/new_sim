@@ -321,7 +321,10 @@ function dressOpening(b: Builder, L: BuildingLayout, w: Wall, op: Opening, o: Wa
   const sill = o.base + op.sill, top = sill + op.height, cx = op.s, hw = op.width / 2;
   const r = o.r, framed = !o.glassWalls || !w.exterior;
   if (op.kind === 'window') {
+    // E2C: an outside window's pane carries its size and outdoor side, so at night a room shows behind it (building-windows.ts)
+    b.pane = w.exterior && framed ? { w: op.width, h: op.height, sill: op.sill, out: sOut } : null;
     b.face([cx - hw, sill, 0], [cx + hw, sill, 0], [cx + hw, top, 0], [cx - hw, top, 0], '#bcd6e0', 'glass');
+    b.pane = null;
     if (!framed) return;
     const fc = w.exterior ? o.trim : '#f4efe6', ft = 0.07;
     b.box(cx - hw + ft / 2, sill, face * 0.6, ft, op.height, T * 0.5, fc);
