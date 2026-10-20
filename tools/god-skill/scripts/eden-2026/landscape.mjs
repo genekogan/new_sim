@@ -40,6 +40,7 @@ const terrain = [
   point('hill', 'east-rolling-shoulder', [366,-40], { height: 28, radius: 96, peak: 1.4 }),
   point('hill', 'northeast-ridge', [320,-224], { height: 45, radius: 132, peak: 1.7 }),
   point('mountain', 'alpine-backdrop', [-7,-365], { height: 74, radius: 165, peak: 1.25 }), // V8: a softer, forested backdrop like old Eden's hills
+  // northwest/northeast backdrops: replaced in the template by the hills ring (worlds/patches/eden-2026-hills-ring-20261020)
   point('mountain', 'northwest-backdrop', [-321,-367], { height: 96, radius: 160, peak: 1.4 }),
   point('mountain', 'northeast-backdrop', [305,-394], { height: 104, radius: 155, peak: 1.5 }),
   point('hill', 'western-hills', [-385,-65], { height: 45, radius: 125, peak: 1.6 }),

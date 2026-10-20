@@ -159,29 +159,163 @@
         {
           "op": "place",
           "def": "core/mountain@1",
-          "name": "land-northwest-backdrop",
-          "p": [
-            -321,
-            -367
-          ],
+          "name": "land-ring-west-range",
+          "shape": {
+            "path": [
+              [
+                -445,
+                30
+              ],
+              [
+                -450,
+                -120
+              ]
+            ]
+          },
           "params": {
-            "height": 96,
-            "radius": 160,
-            "peak": 1.4
+            "height": 50,
+            "radius": 100,
+            "peak": 1.2
           }
         },
         {
           "op": "place",
           "def": "core/mountain@1",
-          "name": "land-northeast-backdrop",
-          "p": [
-            305,
-            -394
-          ],
+          "name": "land-ring-northwest-range",
+          "shape": {
+            "path": [
+              [
+                -420,
+                -200
+              ],
+              [
+                -395,
+                -325
+              ],
+              [
+                -325,
+                -405
+              ]
+            ]
+          },
           "params": {
-            "height": 104,
-            "radius": 155,
-            "peak": 1.5
+            "height": 95,
+            "radius": 140,
+            "peak": 1.1
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/mountain@1",
+          "name": "land-ring-north-west-range",
+          "shape": {
+            "path": [
+              [
+                -230,
+                -430
+              ],
+              [
+                -120,
+                -438
+              ]
+            ]
+          },
+          "params": {
+            "height": 85,
+            "radius": 110,
+            "peak": 1.1
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/mountain@1",
+          "name": "land-ring-north-range",
+          "shape": {
+            "path": [
+              [
+                -20,
+                -455
+              ],
+              [
+                60,
+                -455
+              ]
+            ]
+          },
+          "params": {
+            "height": 60,
+            "radius": 85,
+            "peak": 1.2
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/mountain@1",
+          "name": "land-ring-north-east-range",
+          "shape": {
+            "path": [
+              [
+                160,
+                -430
+              ],
+              [
+                260,
+                -425
+              ]
+            ]
+          },
+          "params": {
+            "height": 95,
+            "radius": 115,
+            "peak": 1.1
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/mountain@1",
+          "name": "land-ring-northeast-range",
+          "shape": {
+            "path": [
+              [
+                370,
+                -400
+              ],
+              [
+                420,
+                -320
+              ],
+              [
+                420,
+                -210
+              ]
+            ]
+          },
+          "params": {
+            "height": 100,
+            "radius": 120,
+            "peak": 1.1
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/mountain@1",
+          "name": "land-ring-east-range",
+          "shape": {
+            "path": [
+              [
+                470,
+                -90
+              ],
+              [
+                470,
+                20
+              ]
+            ]
+          },
+          "params": {
+            "height": 45,
+            "radius": 70,
+            "peak": 1.2
           }
         },
         {
