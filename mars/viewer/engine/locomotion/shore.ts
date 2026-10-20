@@ -71,7 +71,11 @@ function obstruction(rt: Runtime, actor: string, a: V3, b: V3, supportedIds: Rea
       const t=n===0?0:Math.max(0,Math.min(1,((e.pose.p[0]-a[0])*dx+(e.pose.p[2]-a[2])*dz)/n));
       const radius=e.body?.family==='floater'?(e.body.radius??.28):SHORE_POLICY.radius;
       if (Math.max(a[1],b[1])+SHORE_POLICY.height<=e.pose.p[1] || Math.min(a[1],b[1])>=e.pose.p[1]+SHORE_POLICY.height) continue;
-      if (hypot(a[0]+dx*t-e.pose.p[0],a[2]+dz*t-e.pose.p[2]) < SHORE_POLICY.radius+radius+.02)
+      const near=hypot(a[0]+dx*t-e.pose.p[0],a[2]+dz*t-e.pose.p[2]);
+      // shoreDepartV1: a body already within reach of the mover's start blocks only a segment that comes closer to it.
+      // Without it, two bodies that stopped touching (one waiting for the gate the other stands on) block each other's
+      // every step away for good: the swims wait out their budget and fail with occupied-route.
+      if (near < SHORE_POLICY.radius+radius+.02 && !(rt.services.shoreDepartV1===true && near >= hypot(a[0]-e.pose.p[0],a[2]-e.pose.p[2])-1e-9))
         return fail('occupied-route', `${actor} must wait for ${e.id}`, [actor,e.id]);
     } else {
       try { if (boxHit(a,b,e)) return fail('occupied-route', `${actor}'s swept capsule meets ${e.id}`, [actor,e.id]); }

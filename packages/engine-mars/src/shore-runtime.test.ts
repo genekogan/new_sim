@@ -99,6 +99,21 @@ test('current human and object capsules block a direct route; newly arrived huma
   assert.deepEqual(rt.violations,[]);delete rt.world.entities.other;until(rt,a.id);assert.deepEqual(rt.violations,[]);
 });
 
+test('shoreDepartV1: a body already touching the mover blocks only steps toward it, never a step away',async()=>{
+  // Gate deadlock (Modal r13 a34d4b8d9): two Souls stopped touching a third at the dry gate; every step away from them was
+  // "occupied" for good, so all waited out their budget and failed. Off by default: recorded histories replay unchanged.
+  for(const policy of [false,true]){
+    const {f,rt}=await setup();if(policy)rt.services.shoreDepartV1=true;
+    rt.world.entities.behind=f.human('behind',2.55,-6);
+    const away=rt.submit('shore_travel',{actor:'h',x:-8,z:-6});
+    if(!policy){assert.equal(away.diagnostic?.code,'shore.occupied-route');continue;}
+    until(rt,away.id);assert.equal(rt.world.entities.h.human!.activity,'tread');assert.deepEqual(rt.violations,[]);
+    const back=rt.submit('shore_travel',{actor:'h',x:2,z:-6});assert.equal(back.diagnostic?.code,'shore.occupied-route');
+  }
+  const {f,rt}=await setup();rt.services.shoreDepartV1=true;rt.world.entities.ahead=f.human('ahead',1.45,-6);
+  assert.equal(rt.submit('shore_travel',{actor:'h',x:-8,z:-6}).diagnostic?.code,'shore.occupied-route');
+});
+
 test('two actual native swimmers keep separate body occupancy and another swimmer can clear the route',async()=>{
   const {f,rt}=await setup();rt.world.entities.other=f.human('other',2,-4);
   const first=rt.submit('shore_travel',{actor:'other',x:-8,z:-4});until(rt,first.id);

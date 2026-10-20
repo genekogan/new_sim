@@ -13,7 +13,7 @@ async function fourSwims(t:any,birthIds?:string[]){
  const f=fixture(':memory:',nativeSleepSnapshotFactoryV1(await retainedCommonsShoreFactory()),{durableClockV1:true});f.souls.enableLifecycle();f.brain.quiesce();t.after(()=>{f.host.stop();f.db.close();});
  await accept<unknown>(f.host,new LivingWorld(f.host).install(['Owners drive their Souls.']));for(let i=0;i<4;i++)f.host.tickOnce();
  await accept(f.host,f.host.installCommonsProvisionsV1());await accept(f.host,f.host.installRetainedCommonsShoreV1());
- await accept<unknown>(f.host,f.host.enableQuietStallReleaseV1());await accept<unknown>(f.host,f.host.enableYieldTimeoutV1());
+ await accept<unknown>(f.host,f.host.enableQuietStallReleaseV1());await accept<unknown>(f.host,f.host.enableYieldTimeoutV1());await accept<unknown>(f.host,f.host.enableShoreDepartV1());
  const rows:any[]=[];for(const [i,n]of ['ana','ben','cy','di'].entries()){await invite(f,n);if(!birthIds){rows.push(await accept(f.host,f.souls.create('dev:'+n,{name:n,description:'edge swimmer'})));continue;}
   // Reproduce the ACTUAL failed tuple through normal Souls.create/birth. Only
   // five-byte Soul ID randomness is pinned; all motion/collision checks remain.
@@ -39,3 +39,6 @@ test('captured connected-gate failure tuple completes all four real swim receipt
 test('captured connected-water child failure tuple completes all four real swim receipts',{timeout:300000},async t=>fourSwims(t,['s_15651a5250','s_deb97f53b3','s_7cfa396701','s_6bafe7feea']));
 test('captured dry-child current wait evidence',{timeout:300000},async t=>fourSwims(t,['s_cfab80d090','s_a4e2f51728','s_6997c43e88','s_fa16b5dfe1']));
 test('captured occupied-route failure tuple (Modal n2 5ac841e9) completes all four real swim receipts',{timeout:300000},async t=>fourSwims(t,['s_9a2b2272bf','s_52c1e0a87c','s_b659127058','s_2e5d8ae1bf']));
+// Two swimmers stopped touching a third on the dry gate; without shoreDepartV1 each step away was occupied for good and
+// three receipts failed shore.occupied-route (deterministic with these IDs before the policy).
+test('captured gate-departure failure tuple (Modal r13 a34d4b8d9) completes all four real swim receipts',{timeout:300000},async t=>fourSwims(t,['s_94b5b3be42','s_c53217e44c','s_cc9df835c7','s_01c1f66bdf']));

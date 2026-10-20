@@ -118,6 +118,7 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
     if(host.enableReflexTimeoutV1)await drive(host.enableReflexTimeoutV1());
     if(host.enableContinuousDayV1)await drive(host.enableContinuousDayV1());
     if(host.enableEdgeMotionV1)await drive(host.enableEdgeMotionV1());
+    if(shore&&host.enableShoreDepartV1)await drive(host.enableShoreDepartV1());
     // nav/1: enclosed buildings, water and World's scenery solids become solid to walking; admitted interiors get walls with doors;
     // descriptor nav.ground widens walkable ground (e.g. south to the park). One logged rules fact; a no-op when unchanged.
     const spotsRaw=activitySpots?JSON.parse(readFileSync(resolve(activitySpots),'utf8')):undefined;
