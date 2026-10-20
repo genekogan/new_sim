@@ -6,6 +6,7 @@
 // itself; people arrive after, as with lever D. If LiveWorld comes first (a fast link), this draws nothing.
 import * as THREE from 'three';
 import { Daylight } from './daylight.ts';
+import { installNightLighting } from './WorldNightLights.ts';
 import { createWorldAtmosphere } from './WorldAtmosphere.ts';
 import { installLookToneCurve, installMaterialDetail, lookExposure, lookSettings, setMaterialDetail } from './rendering/WorldLook.ts';
 import { browserQuality } from './quality-tier.ts';
@@ -42,7 +43,9 @@ function setUp(early: EarlyLayer) {
   const layer = early.layer;
   arrivalMark('early-render-start');
   const quality = browserQuality(), look = lookSettings(location.search, quality.tier, true);
-  installLookToneCurve(); installMaterialDetail(); setMaterialDetail(look.detail);   // as LiveWorld, before any program
+  // as LiveWorld, before any program: the night-light chunk declares the world-position varying the detail chunk reads
+  // (without it every lit program failed to compile: no ground, trees or buildings in the poster or after the swap)
+  installNightLighting(); installLookToneCurve(); installMaterialDetail(); setMaterialDetail(look.detail);
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, quality.maxPixelRatio, 2));
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
