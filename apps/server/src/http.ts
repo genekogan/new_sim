@@ -2,6 +2,7 @@ import {AutoPortraits} from './portrait/auto-portraits.ts';
 import {SoulProfiles} from './soul-profile.ts';
 import {WorldAccounts} from './accounts/service.ts';
 import {mountAccountRoutes} from './accounts/routes.ts';
+import {fillInstructions} from './accounts/instructions.ts';
 import {mountWelcomeRoutes} from './welcome.ts';
 import { bodyLimit } from 'hono/body-limit';
 import { existsSync, readFileSync, statSync } from 'node:fs';
@@ -221,7 +222,8 @@ export function buildApp(d: Deps) {
   const skill = (c: Context) => c.text(skillText(baseOf(c)), 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'public, max-age=60' });
   app.get('/skill.md', skill);
   app.get('/instructions.md',c=>{if(!d.cfg.instructionsFile)return c.json({ok:false,code:'instructions-unavailable'},503);
-    try{const text=readFileSync(d.cfg.instructionsFile,'utf8').replaceAll('{{BASE}}',baseOf(c)).replaceAll('{{WORLD}}',displayWorldName);return c.text(text,200,{'content-type':'text/markdown; charset=utf-8','cache-control':'public, max-age=60'});}
+    // lane PUX: ?for=<window code> (the signed-in page's New Soul prompt) names the code in the guide; never cached shared
+    try{const code=c.req.query('for')??null,text=fillInstructions(readFileSync(d.cfg.instructionsFile,'utf8'),baseOf(c),displayWorldName,code);return c.text(text,200,{'content-type':'text/markdown; charset=utf-8','cache-control':code?'no-store':'public, max-age=60'});}
     catch{return c.json({ok:false,code:'instructions-unavailable'},503);}
   });
   app.get('/eden-agent.mjs', c => { if (!d.cfg.cliFile) throw new ApiError(404, 'not-found', 'no agent CLI is published on this world'); let js: string; try { js = readFileSync(d.cfg.cliFile, 'utf8'); } catch { throw new ApiError(404, 'not-found', 'agent CLI unavailable'); } return c.body(js, 200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=60' }); });

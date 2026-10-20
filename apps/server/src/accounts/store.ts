@@ -9,10 +9,15 @@ export type AccountsDb = Pick<Db, 'db'> & { tx<T>(operation: () => T): T };
 /** Only construct this from server-verified provider identity, never request JSON. */
 export type AccountIdentity = { id: string; issuer: string; subject: string; verifiedEmail?: string; verifiedAt: number; expiresAt: number };
 export type ApprovalStatus = 'pending' | 'creating' | 'ready' | 'refused' | 'cancelled' | 'expired';
-export type ApprovalDTO = { id: string; worldId: string; agentLabel: string; name: string; description: string; mode: 'create' | 'repair'; status: ApprovalStatus; soulId: string | null; createdAt: number; expiresAt: number; reason?: { code: 'arrival-unavailable'; message: string } };
+/** `inWindow`: lane PUX, the request was addressed (with a window code) to one account, whose open world window shows it. */
+export type ApprovalDTO = { id: string; worldId: string; agentLabel: string; name: string; description: string; mode: 'create' | 'repair'; status: ApprovalStatus; soulId: string | null; createdAt: number; expiresAt: number; inWindow: boolean; reason?: { code: 'arrival-unavailable'; message: string } };
 /** Lane PB: 'refused' only ever follows an approval whose Soul then could not arrive; say so, for the person and the agent. */
 export const ARRIVAL_REFUSAL = { code: 'arrival-unavailable', message: 'Approved, but the Soul could not arrive: there is no clear ground to stand on near this world\'s arrival point. Nothing was created. The world\'s god can clear the arrival point; then ask your agent to try again.' } as const;
-export type StartApprovalInput = { agentLabel: string; name: string; description?: string; idempotencyKey: string; pollSecret?: string };
+/** `forCode`: a window code the human's signed-in page gave them for their agent (lane PUX); never part of the request's identity. */
+export type StartApprovalInput = { agentLabel: string; name: string; description?: string; idempotencyKey: string; pollSecret?: string; forCode?: string };
+/** Lane PUX: a short code a signed-in page shows its person, for their agent's request to reach that page. */
+export const WINDOW_CODE = /^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/;
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', CODE_TTL_MS = 24 * 60 * 60_000;
 export type AllocationInput = { approvalId: string; worldId: string; accountId: string; requestId: string; requestNonce: string; name: string; description: string; mode: 'create' | 'repair'; soulId: string | null };
 export type Allocation = { worldId: string; accountId: string; requestId: string; soulId: string };
 /** Trusted actual lifecycle/body projection, never an agent or browser assertion.
@@ -30,6 +35,7 @@ type ApprovalRow = {
   mode: 'create' | 'repair'; status: ApprovalStatus; repair_soul_id: string | null;
   account_id: string | null; soul_id: string | null; request_id: string | null;
   request_nonce: string; poll_hash: string; client_poll_secret: number; input_hash: string; created_at: number; expires_at: number;
+  target_account_id: string | null;
 };
 type GrantRow = { id: string; world_id: string; soul_id: string; account_id: string; approval_id: string; request_id: string; nonce: string; token_hash: string | null; created_at: number; revoked_at: number | null };
 type MemberRow = { world_id: string; soul_id: string; account_id: string; attribution: string; evidence_hash: string; created_at: number; current_grant_id: string | null };
@@ -97,7 +103,18 @@ export class AccountStore {
         captured_at INTEGER NOT NULL,revoked_at INTEGER,revoked_reason TEXT,
         PRIMARY KEY(world_id,soul_id)
       ) WITHOUT ROWID;
+      CREATE TABLE IF NOT EXISTS account_window_codes_v1 (
+        world_id TEXT NOT NULL, code TEXT NOT NULL, account_id TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL,
+        PRIMARY KEY(world_id,code)
+      ) WITHOUT ROWID;
+      CREATE INDEX IF NOT EXISTS account_window_codes_owner_v1 ON account_window_codes_v1(world_id,account_id);
     `));
+    // Lane PUX: an approval may be addressed to one account (its window code); older databases gain the column.
+    this.db.tx(() => {
+      const cols = this.db.db.prepare('PRAGMA table_info(account_approvals_v1)').all() as { name: string }[];
+      if (!cols.some(c => c.name === 'target_account_id')) this.db.db.exec('ALTER TABLE account_approvals_v1 ADD COLUMN target_account_id TEXT');
+      this.db.db.exec('CREATE INDEX IF NOT EXISTS account_approvals_target_v1 ON account_approvals_v1(world_id,target_account_id,status)');
+    });
   }
   private time(): number {
     const now = this.now();
@@ -131,7 +148,7 @@ export class AccountStore {
     return row;
   }
   private dto(row: ApprovalRow): ApprovalDTO {
-    return { id: row.id, worldId: row.world_id, agentLabel: row.agent_label, name: row.name, description: row.description, mode: row.mode, status: row.status, soulId: row.soul_id ?? row.repair_soul_id, createdAt: row.created_at, expiresAt: row.expires_at, ...(row.status === 'refused' ? { reason: { ...ARRIVAL_REFUSAL } } : {}) };
+    return { id: row.id, worldId: row.world_id, agentLabel: row.agent_label, name: row.name, description: row.description, mode: row.mode, status: row.status, soulId: row.soul_id ?? row.repair_soul_id, createdAt: row.created_at, expiresAt: row.expires_at, inWindow: !!row.target_account_id, ...(row.status === 'refused' ? { reason: { ...ARRIVAL_REFUSAL } } : {}) };
   }
   private member(soulId: string): MemberRow | undefined {
     text(soulId, 'Soul');
@@ -191,7 +208,9 @@ export class AccountStore {
         return this.dto(this.fresh(previous));
       }
       const id = nonce('ap_'), pollSecret = input.pollSecret ?? randomBytes(32).toString('base64url'), now = this.time();
-      this.db.db.prepare("INSERT INTO account_approvals_v1(id,world_id,agent_label,name,description,mode,status,repair_soul_id,request_nonce,poll_hash,client_poll_secret,input_hash,idempotency_hash,created_at,expires_at) VALUES (?,?,?,?,?,?,'pending',?,?,?,?,?,?,?,?)").run(id, this.worldId, agentLabel, name, description, mode, repairSoulId, nonce('rq_'), sha(pollSecret), input.pollSecret === undefined ? 0 : 1, inputHash, idempotencyHash, now, now + this.approvalTtlMs);
+      // Lane PUX: a live window code addresses the request to its account; an unknown or stale code leaves the link only
+      const target = this.codeAccount(input.forCode);
+      this.db.db.prepare("INSERT INTO account_approvals_v1(id,world_id,agent_label,name,description,mode,status,repair_soul_id,request_nonce,poll_hash,client_poll_secret,input_hash,idempotency_hash,created_at,expires_at,target_account_id) VALUES (?,?,?,?,?,?,'pending',?,?,?,?,?,?,?,?,?)").run(id, this.worldId, agentLabel, name, description, mode, repairSoulId, nonce('rq_'), sha(pollSecret), input.pollSecret === undefined ? 0 : 1, inputHash, idempotencyHash, now, now + this.approvalTtlMs, target);
       // Client-generated credentials are already durable in its own secure
       // storage before POST; never echo them into a response or regenerate them.
       return { ...this.dto(this.required(id)), ...(input.pollSecret === undefined ? { pollSecret } : {}) };
@@ -212,6 +231,7 @@ export class AccountStore {
         this.identity(identity);
         if (row.account_id !== identity.id) fail('forbidden', 'Approval belongs to another account');
       }
+      if (identity) this.addressedTo(row, identity);
       return this.dto(this.fresh(row));
     });
   }
@@ -227,6 +247,7 @@ export class AccountStore {
       this.identity(identity);
       const row = this.fresh(this.required(id));
       if (row.account_id && row.account_id !== identity.id) fail('forbidden', 'Approval belongs to another account');
+      this.addressedTo(row, identity);
       if (row.status !== 'pending') {
         if (row.account_id === identity.id && (row.status === 'creating' || row.status === 'ready' || row.status === 'refused')) return this.dto(row);
         // Expiry is durable, so return it instead of throwing inside this transaction.
@@ -249,6 +270,53 @@ export class AccountStore {
       return this.dto(this.required(id));
     });
   }
+  /** Lane PUX: a request addressed to one account is that account's alone to see and answer. */
+  private addressedTo(row: ApprovalRow, identity: AccountIdentity): void {
+    if (row.target_account_id && row.target_account_id !== identity.id) fail('forbidden', 'This request is for another account');
+  }
+  private codeAccount(code: unknown): string | null {
+    if (typeof code !== 'string' || !WINDOW_CODE.test(code)) return null;
+    const row = this.db.db.prepare('SELECT account_id FROM account_window_codes_v1 WHERE world_id=? AND code=? AND expires_at>?').get(this.worldId, code, this.time()) as { account_id: string } | undefined;
+    return row?.account_id ?? null;
+  }
+  /** Lane PUX: the signed-in person's window code (reused while it has over an hour left), for their agent's request. */
+  windowCode(identity: AccountIdentity): { code: string; expiresAt: number } {
+    return this.db.tx(() => {
+      this.capture(identity);
+      const now = this.time();
+      const kept = this.db.db.prepare('SELECT code,expires_at FROM account_window_codes_v1 WHERE world_id=? AND account_id=? AND expires_at>? ORDER BY expires_at DESC LIMIT 1').get(this.worldId, identity.id, now + 60 * 60_000) as { code: string; expires_at: number } | undefined;
+      if (kept) return { code: kept.code, expiresAt: kept.expires_at };
+      this.db.db.prepare('DELETE FROM account_window_codes_v1 WHERE world_id=? AND expires_at<=?').run(this.worldId, now);
+      for (;;) {
+        const bytes = randomBytes(8), code = [...bytes].map((b, i) => (i === 4 ? '-' : '') + CODE_ALPHABET[b % CODE_ALPHABET.length]).join('');
+        if (this.db.db.prepare('SELECT 1 FROM account_window_codes_v1 WHERE world_id=? AND code=?').get(this.worldId, code)) continue;
+        this.db.db.prepare('INSERT INTO account_window_codes_v1(world_id,code,account_id,created_at,expires_at) VALUES (?,?,?,?,?)').run(this.worldId, code, identity.id, now, now + CODE_TTL_MS);
+        return { code, expiresAt: now + CODE_TTL_MS };
+      }
+    });
+  }
+  /** Lane PUX: requests addressed to this account that still wait for an answer (newest first), for its open window. */
+  waiting(identity: AccountIdentity): ApprovalDTO[] {
+    return this.db.tx(() => {
+      this.identity(identity);
+      const rows = this.db.db.prepare("SELECT * FROM account_approvals_v1 WHERE world_id=? AND target_account_id=? AND status='pending' ORDER BY created_at DESC LIMIT 5").all(this.worldId, identity.id) as ApprovalRow[];
+      return rows.map(row => this.fresh(row)).filter(row => row.status === 'pending').map(row => this.dto(row));
+    });
+  }
+  /** Lane PUX ("Ask again"): an expired request becomes pending again, the same request with the same agent credential,
+   * so the agent still waiting on it picks it up. It is then addressed to the person who asked again. */
+  renew(identity: AccountIdentity, id: string): ApprovalDTO {
+    return this.db.tx(() => {
+      this.identity(identity);
+      const row = this.fresh(this.required(id));
+      if (row.account_id && row.account_id !== identity.id) fail('forbidden', 'Approval belongs to another account');
+      this.addressedTo(row, identity);
+      if (row.status !== 'expired') return this.dto(row);
+      this.capture(identity);
+      this.db.db.prepare("UPDATE account_approvals_v1 SET status='pending',expires_at=?,target_account_id=COALESCE(target_account_id,?) WHERE world_id=? AND id=? AND status='expired'").run(this.time() + this.approvalTtlMs, identity.id, this.worldId, id);
+      return this.dto(this.required(id));
+    });
+  }
   cancel(identity: AccountIdentity | null, id: string, pollSecret?: string): ApprovalDTO {
     return this.db.tx(() => {
       const row = this.required(id);
@@ -256,8 +324,10 @@ export class AccountStore {
       else {
         if (!identity) fail('identity', 'Verified account identity required');
         this.identity(identity);
-        if (!row.account_id) fail('cancel-authority', 'Pending cancellation requires the approval credential');
-        if (row.account_id !== identity.id) fail('forbidden', 'Approval belongs to another account');
+        this.addressedTo(row, identity);
+        // Lane PUX: the account a request was addressed to may refuse it; anyone else needs the agent's credential
+        if (!row.account_id && row.target_account_id !== identity.id) fail('cancel-authority', 'Pending cancellation requires the approval credential');
+        if (row.account_id && row.account_id !== identity.id) fail('forbidden', 'Approval belongs to another account');
       }
       const current = this.fresh(row);
       if (current.status === 'cancelled' || current.status === 'expired') return this.dto(current);
@@ -292,7 +362,10 @@ export class AccountStore {
     return this.db.tx(() => {
       const existing = this.row(id);
       if (!existing || !hashMatches(pollSecret, existing.poll_hash)) fail('poll-secret', 'Approval credential invalid');
-      const row = this.fresh(existing), dto = this.dto(row), grant = this.currentGrant(row);
+      let row = this.fresh(existing);
+      // Lane PUX: a request does not expire while its agent is still asking; it lapses approvalTtl after the last poll
+      if (row.status === 'pending') { this.db.db.prepare("UPDATE account_approvals_v1 SET expires_at=MAX(expires_at,?) WHERE world_id=? AND id=? AND status='pending'").run(this.time() + this.approvalTtlMs, this.worldId, id); row = this.required(id); }
+      const dto = this.dto(row), grant = this.currentGrant(row);
       if (!grant) return dto;
       const digest = createHmac('sha256', pollSecret).update(JSON.stringify(['eden-account-soul-grant/1', this.worldId, grant.soul_id, grant.request_id, grant.nonce])).digest('hex');
       const token = `sim_${grant.soul_id}_${digest}`, hash = sha(token);

@@ -153,11 +153,16 @@ async function pair(soul){
  const t=ok(await call(OWNER.exchange,{as:'none',body:{code,agent:'eden-agent '+SKILL_VERSION}}),'pair');
  save({token:t.token,soul});return true;
 }
+/** 1.9.3 (lane PUX): `--for <CODE>` anywhere in the arguments: the window code from the human's New Soul prompt. */
+export function forOption(argv){const rest=[],codes=[];for(let i=0;i<argv.length;i++){if(argv[i]==='--for'){codes.push(argv[++i]);continue;}const m=/^--for=(.*)$/.exec(argv[i]??'');if(m){codes.push(m[1]);continue;}rest.push(argv[i]);}
+ const code=codes.at(-1);if(codes.length&&!/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/.test(String(code??'').trim().toUpperCase()))throw Error('--for takes the window code your human was given, like K7QX-M2PA');
+ return {rest,forCode:code===undefined?undefined:String(code).trim().toUpperCase()};}
 /** create-soul: your one Soul in this world (waits for arrival), then pairs this folder with it. */
-export async function createSoul(name,description){
+export async function createSoul(...argv){
+ const {rest:[name,description],forCode}=forOption(argv);
  if(liveRunning())throw Error('Stop this folder’s mind before changing its selected Soul, or use a fresh agent folder.');
  if(!name||(description!==undefined&&!description))throw new Error('usage: create-soul "<Name>" ["<one-line character>"]');
- if(load().accountAuth){const s=load();if(s.soul&&s.token){const own=await call('/v1/agent/me');if(own.status===200&&own.data?.soul?.id===s.soul&&own.data.soul.name===name)return {created:false,soul:{id:s.soul,name},paired:true,reason:'The exact selected Soul is already ready and granted; no new birth was requested.'};}return startApproval({name,description,...(s.reconnectSoul?.world===s.world&&s.reconnectSoul.name===name?{soulId:s.reconnectSoul.id}:{})});}
+ if(load().accountAuth){const s=load();if(s.soul&&s.token){const own=await call('/v1/agent/me');if(own.status===200&&own.data?.soul?.id===s.soul&&own.data.soul.name===name)return {created:false,soul:{id:s.soul,name},paired:true,reason:'The exact selected Soul is already ready and granted; no new birth was requested.'};}return startApproval({name,description,forCode,...(s.reconnectSoul?.world===s.world&&s.reconnectSoul.name===name?{soulId:s.reconnectSoul.id}:{})});}
  const me=ok(await call(OWNER.me,{as:'owner'}),'create-soul');
  const existing=me.souls.filter(s=>s.name===name);if(existing.length===1){const id=existing[0].id;if(load().soul!==id||!load().token)await pair(id);return {created:false,reason:'This exact named Soul already belongs to this owner.',soul:{id,name}};}
  const r=await call(OWNER.souls,{as:'owner',body:{name,description}});
@@ -166,20 +171,22 @@ export async function createSoul(name,description){
  const id=d.soul?.id??d.lifecycle?.soulId;if(!id)return {created:false,detail:d};
  await pair(id);accepted();folderGuide(d.soul?.name??name);return {created:true,soul:{id,name:d.soul?.name??name},paired:true,wrote:'AGENTS.md + CLAUDE.md (so a later agent session here knows how to relay your requests)'};
 }
-async function startApproval({name,description,soulId}){
+async function startApproval({name,description,soulId,forCode}){
  let s=load();if(!s.accountAuth)throw Error('This world does not advertise account approvals.');
- if(s.pendingApproval?.approvalId){const p=s.pendingApproval,r=await approvalCall('/v1/agent/approval/poll',{approvalId:p.approvalId,pollSecret:p.input.pollSecret},'check previous approval',Date.now()+60_000);if(['refused','cancelled','expired'].includes(r.status)||r.status==='ready'&&!r.token){finishApproval(r,p,s.world,r.status==='ready'?'unavailable':'terminal');s=load();}}
+ if(s.pendingApproval?.approvalId){const p=s.pendingApproval,r=await approvalCall('/v1/agent/approval/poll',{approvalId:p.approvalId,pollSecret:p.input.pollSecret},'check previous approval',Date.now()+60_000);if(['refused','cancelled','expired'].includes(r.status)||r.status==='ready'&&!r.token){finishApproval(r,p,s.world,r.status==='ready'?'unavailable':'terminal',{release:true});s=load();}}
  if(!soulId&&s.reconnectSoul?.world===s.world&&s.reconnectSoul.name===name)soulId=s.reconnectSoul.id;
  let pending=s.pendingApproval;if(pending&&(pending.world!==s.world||pending.input.name!==name||pending.input.description!==description||pending.input.soulId!==soulId))throw Error('A different approval is pending. Check it with approval status or cancel it before creating another.');
  if(!pending){pending={world:s.world,worldId:s.worldId,input:{name,...(description===undefined?{}:{description}),...(soulId?{soulId}:{}),agentLabel:'eden-agent '+SKILL_VERSION,idempotencyKey:randomUUID(),pollSecret:randomBytes(32).toString('base64url')}};save({pendingApproval:pending});}
- const data=await approvalCall('/v1/agent/approval/start',pending.input,'approval start',Date.now()+60_000);if(data.approval.worldId!==pending.worldId)throw Error('Approval world differs from registration.');pending.approvalId=data.approval.id;save({pendingApproval:pending});return approvalPublic(data,s.world);
+ // the window code addresses only a new request (the server ignores it on a retry of the same one); never stored
+ const data=await approvalCall('/v1/agent/approval/start',{...pending.input,...(forCode?{for:forCode}:{})},'approval start',Date.now()+60_000);if(data.approval.worldId!==pending.worldId)throw Error('Approval world differs from registration.');pending.approvalId=data.approval.id;save({pendingApproval:pending});return approvalPublic(data,s.world);
 }
-function finishApproval(dto,pending,world,connection){
+function finishApproval(dto,pending,world,connection,{release=false}={}){
  if(dto.id!==pending.approvalId||dto.worldId!==pending.worldId||pending.world!==world)throw Error('Approval receipt scope differs; no pending request was discarded.');if(dto.status==='ready')acceptDelegation(dto,pending,world);
  const receipt={...approvalPublic(dto,world),connection,worldId:pending.worldId,recordedAt:now()};
  const file='approval-'+dto.id+'-'+dto.status+'-'+connection+'.json';try{writeFileSync(file,JSON.stringify(receipt)+'\n',{flag:'wx',mode:0o600});}catch(error){if(error.code!=='EEXIST')throw error;const stat=lstatSync(file);if(!stat.isFile()||stat.isSymbolicLink()||stat.nlink!==1)throw Error('Public approval receipt path is linked or nonregular.');}
  if(connection==='delegated'){const delegate=acceptDelegation(dto,pending,world);if(!delegate)throw Error('Ready delegation unavailable; pending recovery was retained.');const current=load(),grants={...(current.delegations??{}),[delegate.soul]:{world:delegate.world,token:delegate.token}};save({...delegate,delegations:grants,pendingApproval:undefined,reconnectSoul:undefined,mode:undefined,lastAcceptedAt:now()});}
- else save({pendingApproval:undefined,...(connection==='unavailable'?{reconnectSoul:{id:dto.soulId,name:dto.name,world}}:{})});return receipt;
+ // 1.9.3: an expired request stays this folder's pending one (the human can Ask again on it) until a fresh request replaces it
+ else if(dto.status!=='expired'||release)save({pendingApproval:undefined,...(connection==='unavailable'?{reconnectSoul:{id:dto.soulId,name:dto.name,world}}:{})});return receipt;
 }
 export async function approval(action='status'){
  if(liveRunning())throw Error('Stop this folder’s mind before selecting a newly approved Soul, or use a fresh folder.');
@@ -188,15 +195,16 @@ export async function approval(action='status'){
  const pending=need(s,'pendingApproval','Run create-soul or pair-soul first.');if(pending.world!==s.world||pending.worldId!==s.worldId)throw Error('Approval belongs to another world.');if(!pending.approvalId)return startApproval(pending.input);
  const body={approvalId:pending.approvalId,pollSecret:pending.input.pollSecret},deadline=Date.now()+(action==='wait'?15*60000:30_000);
  for(;;){let data=await approvalCall('/v1/agent/approval/poll',body,'approval '+action,deadline),dto=data.approval??data;
-  if(['refused','cancelled','expired'].includes(dto.status))return finishApproval(dto,pending,s.world,'terminal');
+  // 1.9.3: while waiting, an expired request may come back (the human pressed Ask again): keep polling until the deadline
+  if(['refused','cancelled'].includes(dto.status)||dto.status==='expired'&&(action!=='wait'||Date.now()>=deadline))return finishApproval(dto,pending,s.world,'terminal',{release:action==='cancel'});
   if(dto.status==='ready'&&!data.token){const receipt=finishApproval(dto,pending,s.world,'unavailable');return {...receipt,next:'The body exists but this agent grant is unavailable. Run pair-soul '+dto.soulId+' "'+dto.name+'" for fresh human approval; do not create a replacement Soul.'};}
   if(action==='cancel'){data=await approvalCall('/v1/agent/approval/cancel',body,'approval cancel',Date.now()+30_000);dto=data.approval??data;return finishApproval(dto,pending,s.world,'terminal');}
   const delegate=acceptDelegation(data,pending,s.world);if(delegate){finishApproval(dto,pending,s.world,'delegated');folderGuide(dto.name);return {approvalId:dto.id,status:'ready',soul:{id:delegate.soul,name:dto.name},paired:true,next:'Run status. Manual control and dashboard/live now use this Soul grant; signing out of the browser does not stop it.'};}
-  if(action!=='wait'||['refused','cancelled','expired'].includes(dto.status)||Date.now()>=deadline)return approvalPublic(dto,s.world);
+  if(action!=='wait'||['refused','cancelled'].includes(dto.status)||Date.now()>=deadline)return approvalPublic(dto,s.world);
   await sleep(3000);
  }
 }
-export async function pairSoul(id,name){if(liveRunning())throw Error('Stop this folder’s mind before changing its selected Soul.');if(!/^s_[A-Za-z0-9_-]+$/.test(id??''))throw Error('usage: pair-soul <immutable Soul ID> "<current name>"');if(load().accountAuth){if(!name)throw Error('Include the current Soul name for the approval preview.');return startApproval({name,soulId:id});}const me=ok(await call(OWNER.me,{as:'owner'}),'pair-soul');if(!me.souls.some(s=>s.id===id))throw Error('That Soul is not owned by this identity.');await pair(id);return {paired:true,soulId:id};}
+export async function pairSoul(...argv){const {rest:[id,name],forCode}=forOption(argv);if(liveRunning())throw Error('Stop this folder’s mind before changing its selected Soul.');if(!/^s_[A-Za-z0-9_-]+$/.test(id??''))throw Error('usage: pair-soul <immutable Soul ID> "<current name>"');if(load().accountAuth){if(!name)throw Error('Include the current Soul name for the approval preview.');return startApproval({name,soulId:id,forCode});}const me=ok(await call(OWNER.me,{as:'owner'}),'pair-soul');if(!me.souls.some(s=>s.id===id))throw Error('That Soul is not owned by this identity.');await pair(id);return {paired:true,soulId:id};}
 export async function selectSoul(id){if(liveRunning())throw Error('Stop this folder’s mind before changing its selected Soul.');const s=load();if(s.accountAuth){const grant=s.delegations?.[id];if(!grant||grant.world!==s.world)throw Error('No delegated grant for that exact Soul and world. Run pair-soul to request approval.');save({soul:id,token:grant.token,mode:undefined});ok(await call('/v1/agent/me'),'select-soul');return {selected:id};}return pairSoul(id);}
 /** 1.7.1: a short guide for any later agent session opened in this folder (Claude Code reads CLAUDE.md, Codex AGENTS.md). Never overwrites. */
 function folderGuide(name){

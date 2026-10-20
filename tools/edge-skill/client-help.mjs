@@ -2,7 +2,7 @@
 export function clientHelp(version,contract){return `eden-agent ${version} (${contract})
 Usage: node eden-agent.mjs <command> [args]
 
-Start: register <world URL> · create-soul "Name" ["Character"] · approval wait
+Start: register <world URL> · create-soul "Name" ["Character"] [--for CODE] · approval wait
 Reconnect an existing Soul: pair-soul <Soul ID> · select-soul <Soul ID>
 See: status · here · look around (explore) · observe · capabilities · map · view --alt-only
 Find: capabilities --search "<ID, verb or label>" · capabilities --verb "<exact verb>"

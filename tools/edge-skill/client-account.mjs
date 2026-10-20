@@ -11,7 +11,9 @@ export function delegatedOwnerPath(path,soulId){
 export function approvalPublic(data,world){
  const a=data?.approval??data;if(!a||!/^ap_[a-f0-9]{32}$/.test(a.id??'')||!['pending','creating','ready','refused','cancelled','expired'].includes(a.status))throw Error('Canonical account approval response unavailable.');
  const approvalURL=world+'/#approve/'+a.id;
- return {approvalId:a.id,status:a.status,name:a.name,soulId:a.soulId??null,approvalURL,...(a.status==='refused'&&typeof a.reason?.message==='string'?{reason:a.reason.message,reasonCode:a.reason.code}:{}),...(a.status==='pending'?{next:'Ask your human to open the approval link, sign in, and approve the intended world, Soul and agent. Then run: approval wait.'}:a.status==='creating'?{next:'Creation is accepted but its body is not ready. Run: approval wait.'}:{})};
+ // 1.9.3 (lane PUX): a request addressed with a window code (`--for`) shows in the human's open Sim window; the link is the backup
+ const inWindow=a.inWindow===true;
+ return {approvalId:a.id,status:a.status,name:a.name,soulId:a.soulId??null,approvalURL,...(inWindow?{delivery:'window'}:{}),...(a.status==='refused'&&typeof a.reason?.message==='string'?{reason:a.reason.message,reasonCode:a.reason.code}:{}),...(a.status==='pending'?{next:inWindow?'Tell your human: approve it in your open Sim window (backup: the approval link). Then run: approval wait.':'Ask your human to open the approval link, sign in, and approve the intended world, Soul and agent. Then run: approval wait.'}:a.status==='creating'?{next:'Creation is accepted but its body is not ready. Run: approval wait.'}:a.status==='expired'?{next:'The request timed out. Your human can press Ask again on it (their open window or the link); run approval wait to pick it up, or create-soul again for a fresh request.'}:{})};
 }
 export function acceptDelegation(data,pending,world){
  if(data?.status!=='ready')return null;
