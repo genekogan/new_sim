@@ -6,8 +6,27 @@ import './AgentMessageBox.css';
 export type AgentInbox = {
   connected: boolean;
   lastSeenAt: number | null;
-  latest: {id: string; text: string; state: 'sent' | 'delivered' | 'acknowledged'; reply?: string | null} | null;
+  latest: {id: string; text: string; state: 'sent' | 'delivered' | 'acknowledged'; sentAt?: number; reply?: string | null; result?: string | null; outcome?: 'done' | 'failed' | 'withdrawn'} | null;
+  /** Messages waiting for the agent (the shown one included), and whether a listener is waiting right now. */
+  queued?: number;
+  presence?: 'listening' | 'working' | 'recent' | 'away';
 };
+/** A message still unread after this long says so, with its age. */
+export const NOT_PICKED_UP_MS = 10_000;
+const ago = (ms: number) => ms < 60_000 ? `${Math.max(0, Math.round(ms / 1000))} s` : ms < 3_600_000 ? `${Math.round(ms / 60_000)} min` : `${Math.round(ms / 3_600_000)} h`;
+/** MSG: what the owner can rely on: a listener waiting now, an agent seen recently (handling messages), or away. */
+export function presenceLine(inbox: AgentInbox, now: number) {
+  const p = inbox.presence ?? (inbox.connected ? 'recent' : 'away');
+  if (p === 'listening') return {away: false, text: 'Your agent is listening now'};
+  if (p === 'away') return {away: true, text: 'Your agent is away — messages will wait'};
+  return {away: false, text: `Your agent was seen recently${inbox.lastSeenAt ? ` (${ago(now - inbox.lastSeenAt)} ago)` : ''}`};
+}
+export function receiptState(latest: NonNullable<AgentInbox['latest']>, queued: number, now: number) {
+  const age = latest.sentAt === undefined ? 0 : now - latest.sentAt;
+  const base = latest.state === 'sent' ? age > NOT_PICKED_UP_MS ? `Not picked up yet (${ago(age)})` : 'Sent'
+    : latest.state === 'delivered' ? 'Picked up' : latest.outcome === 'failed' ? 'Could not do it' : latest.result ? 'Done' : 'Acknowledged';
+  return queued > 1 ? `${base} · ${queued} waiting` : base;
+}
 type Transport = (text?: string) => Promise<AgentInbox>;
 
 /** A single private note and receipt, deliberately without a conversation history. */
@@ -44,17 +63,19 @@ export function AgentMessageBox({request, prompt, kind}: {request: Transport; pr
     }}/>;
 }
 
-export function AgentMessageBoxView({kind, inbox, prompt, text, sending = false, error = '', copied = false, onText, onSend, onCopy}: {
-  kind: 'god' | 'soul'; inbox: AgentInbox | null; prompt: string; text: string; sending?: boolean; error?: string; copied?: boolean;
+export function AgentMessageBoxView({kind, inbox, prompt, text, sending = false, error = '', copied = false, now = Date.now(), onText, onSend, onCopy}: {
+  kind: 'god' | 'soul'; inbox: AgentInbox | null; prompt: string; text: string; sending?: boolean; error?: string; copied?: boolean; now?: number;
   onText(text: string): void; onSend(event: React.FormEvent): void; onCopy(): void;
 }) {
-  const latest = inbox?.latest;
-  const state = latest?.state === 'sent' ? 'Sent · waiting' : latest?.state === 'delivered' ? 'Delivered' : 'Acknowledged';
-  const receipt = latest ? `${state} · ${latest.text}${latest.reply ? ` · ${latest.reply}` : ''}` : '';
+  const latest = inbox?.latest, presence = inbox ? presenceLine(inbox, now) : null;
+  // the owner's newest message; `queued` counts what still waits (the agent works oldest first)
+  const state = latest ? receiptState(latest, inbox?.queued ?? 0, now) : '';
+  const answers = latest ? [latest.reply, latest.result].filter((x): x is string => !!x) : [];
+  const receipt = latest ? [state, latest.text, ...answers].join(' · ') : '';
   return <div className="agent-message" data-agent-message={kind}>
-    <div className="agent-message-presence">
-      <span>{inbox ? inbox.connected ? 'Your agent is connected' : 'Not running — this will wait' : 'Agent status unavailable'}</span>
-      {inbox && !inbox.connected && <button type="button" onClick={onCopy} title={prompt}>{copied ? 'Copied' : 'Copy start prompt'}</button>}
+    <div className="agent-message-presence" data-agent-presence={inbox?.presence ?? (inbox ? inbox.connected ? 'recent' : 'away' : 'unknown')}>
+      <span>{presence ? presence.text : 'Agent status unavailable'}</span>
+      {presence?.away && <button type="button" onClick={onCopy} title={prompt}>{copied ? 'Copied' : 'Copy start prompt'}</button>}
     </div>
     <form className="agent-message-form" onSubmit={onSend}>
       <input aria-label="Message your agent" placeholder="Message your agent…" value={text} onChange={e => onText(e.target.value)} maxLength={1000} disabled={sending} autoComplete="off"/>
@@ -62,7 +83,7 @@ export function AgentMessageBoxView({kind, inbox, prompt, text, sending = false,
     </form>
     {latest && <p className="agent-message-receipt" role="status" title={receipt} data-message-state={latest.state}>
       <span className="agent-message-state">{state}</span><span aria-hidden="true"> · </span><span className="agent-message-text">{latest.text}</span>
-      {latest.reply && <><span aria-hidden="true"> · </span><span className="agent-message-reply">{latest.reply}</span></>}
+      {answers.map((a, i) => <span key={i} className="agent-message-answer"><span aria-hidden="true"> · </span><span className="agent-message-reply">{a}</span></span>)}
     </p>}
     {error && <p className="agent-message-error" role="alert">{error}</p>}
     {error.startsWith('Copy unavailable') && <input className="agent-message-prompt" aria-label="Agent start prompt" value={prompt} readOnly onFocus={e => e.target.select()}/>}
@@ -77,5 +98,5 @@ export function SoulAgentMessageBox({api, soulId}: {api: Api; soulId: string}) {
   }, [api, soulId]);
   const base = location.origin + apiPath('');
   return <AgentMessageBox key={soulId} kind="soul" request={request}
-    prompt={`Read ${base}/SKILL.md and resume the existing Soul ${JSON.stringify(soulId)}. Run node eden-agent.mjs listen in the background and acknowledge each owner message with ack. Do not create another Soul.`}/>;
+    prompt={`Read ${base}/SKILL.md and resume the existing Soul ${JSON.stringify(soulId)}. Always listen: run node eden-agent.mjs listen in the background (Claude Code: Bash run_in_background; Codex: as the last command of every turn), never filter its output, ack each message, then result, and run listen again after each batch. Do not create another Soul.`}/>;
 }
