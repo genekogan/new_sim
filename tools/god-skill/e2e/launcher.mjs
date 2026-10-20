@@ -80,6 +80,16 @@ async function shot(name) { const file = join(out, `${name}.png`); await page.sc
 const folder = mkdtempSync(join(tmpdir(), 'god-agent-'));
 const cli = (...a) => run(process.execPath, ['eden-god.mjs', ...a], { cwd: folder, timeout: 120_000 }).then((r) => r.stdout.trim());
 const panel = () => page.locator('[data-god-panel]');
+// G4: the owner's God controls live in one God modal (the God button right of Explore, ⌘G); open it if it is not, then go to a section
+const god = async (section) => {
+  // (God may open by itself a moment later, as it does once for a new owner: the button toggles, so check again before each press)
+  for (let i = 0; i < 3 && !(await page.locator('[data-god-modal][open]').count()); i++) {
+    await page.locator('[data-god-open]').click({ timeout: 2000 }).catch(() => {});
+    await page.locator('[data-god-modal][open]').waitFor({ timeout: 2000 }).catch(() => {});
+  }
+  await page.locator('[data-god-modal][open]').waitFor({ timeout: 5000 });
+  if (section) { await page.locator(`[data-god-modal] [data-tab="${section}"]`).click(); await page.locator(`[data-god-modal] [data-section="${section}"]`).waitFor(); }
+};
 let slug = '', base = '', worldName = `Meetup Hollow ${stamp.slice(11, 16).replace('-', '')}`;
 
 try {
@@ -125,14 +135,16 @@ try {
 
   await step('claim → god mode: welcome rendered with copy buttons, checklist ticks sign-in and claim', async () => {
     await page.locator('[data-claim]').click();
-    await page.locator('[data-checklist]').waitFor();
-    await page.locator('[data-god-bolt]').click();   // GODUI: the pairing line lives in the bolt panel right of Explore
-    await page.locator('[data-god-bolt-panel] .gp-md .gp-code').first().waitFor();
-    const ticks = await page.locator('[data-step]').evaluateAll((els) => Object.fromEntries(els.map((e) => [e.getAttribute('data-step'), e.getAttribute('data-done') === '1'])));
-    const copies = await page.locator('.gp-copy').count();
+    // G4: the pairing line is in the God modal's Agent section (God opens there by itself once for a new owner)
+    await god('agent');
+    await page.locator('[data-god-modal] .gp-md .gp-code').first().waitFor();
+    const copies = await page.locator('[data-god-modal] .gp-copy').count();
     // the copy button puts the commands (without the comments) on the clipboard
-    await page.locator('[data-god-bolt-panel] .gp-copy').first().click();
+    await page.locator('[data-god-modal] .gp-copy').first().click();
     const clip = await page.evaluate(() => navigator.clipboard.readText().catch(() => null));
+    await god('start');
+    await page.locator('[data-checklist]').waitFor();
+    const ticks = await page.locator('[data-step]').evaluateAll((els) => Object.fromEntries(els.map((e) => [e.getAttribute('data-step'), e.getAttribute('data-done') === '1'])));
     await shot('04-claimed');
     return { ticks, copies, clip };
   }, (r) => r.ticks.signin && r.ticks.claim && !r.ticks.pair && !r.ticks.build && r.copies >= 1 && /eden-god\.mjs|SKILL\.md/.test(r.clip ?? 'eden-god.mjs'));
@@ -159,6 +171,7 @@ try {
     await page.locator('[data-approve]').first().click();
     const done = await Promise.race([pairing.done, sleep(30_000).then(() => ({ code: 'timeout' }))]);
     const state = JSON.parse(readFileSync(join(folder, '.eden-god.json'), 'utf8'));
+    await god('start');   // a pairing request opened God on its Agent section
     await page.locator('[data-step="pair"][data-done="1"]').waitFor({ timeout: 15_000 });
     return { code, exit: done.code, token: state.token?.slice(0, slug.length + 8) };
   }, (r) => r.exit === 0 && r.token?.startsWith(`god_${slug}-1_`));
@@ -169,6 +182,7 @@ try {
     barnId = r.ids?.barn ?? Object.values(r.ids ?? {})[0] ?? null;
     if (!barnId) { const s = await (await fetch(`${base}/v1/world/snapshot`)).json(); barnId = s.entities.find((e) => e.name === 'barn')?.id ?? null; }
     const drawn = await page.waitForFunction((id) => window.__simEntity?.layer?.drawn?.has(id) === true, barnId, { timeout: 60_000 }).then(() => true, () => false);
+    await god('start');
     await page.locator('[data-step="build"][data-done="1"]').waitFor({ timeout: 15_000 });
     await page.evaluate(() => { const w = window.__simEntity; w.controls.target.set(-26, 1, -30); w.camera.position.set(-60, 26, 6); w.camera.lookAt(w.controls.target); });
     await sleep(3500);
@@ -177,10 +191,7 @@ try {
   }, (r) => r.accepted && r.drawn);
 
   await step('the Edits tab lists it with its note and group; undo and redo from the panel', async () => {
-    // Pairing leaves God controls open over the Edits tab. Dismiss it as a person would before clicking behind it.
-    await page.keyboard.press('Escape');
-    await page.locator('[data-god-bolt-panel]').waitFor({ state: 'hidden', timeout: 5000 });
-    await page.locator('[data-tab="edits"]').click();
+    await god('edits');
     await page.locator('[data-edits] li', { hasText: 'a red barn by the orchard' }).waitFor();
     await shot('07-edits');
     await page.locator('[data-undo]').click();
@@ -200,16 +211,17 @@ try {
     await page.evaluate(() => { const w = window.__simEntity; w.controls.target.set(20, 0, -10); w.camera.position.set(20, 90, 40); w.camera.lookAt(w.controls.target); });
     await sleep(1500);
     answer = 'market';
-    await page.locator('[data-flag-button]').click();
+    await god('flags');
+    await page.locator('[data-flag-button]').click();   // arming the flag closes God so the ground can be clicked
     await page.locator('canvas').first().click({ position: { x: 500, y: 420 } });
     const flag = await until('the flag', async () => (await (await fetch(`${base}/v1/world/snapshot`)).json()).entities.find((e) => e.name === 'market'), 30_000);
-    await page.locator('[data-tab="start"]').click();
+    await god('start');
     await page.locator('[data-step="flag"][data-done="1"]').waitFor({ timeout: 20_000 });
     return { at: flag.p, label: flag.state?.label };
   }, (r) => r.label === 'market');
 
   await step('flags: the template’s flags are listed; clicking one flies the camera there', async () => {
-    await page.locator('[data-tab="flags"]').click();
+    await god('flags');
     await page.locator('[data-fly="orchard"]').waitFor();
     await page.locator('[data-fly="orchard"]').click();
     // the flight is animated per frame; on a loaded machine frames are rare, so wait for it to land
@@ -237,7 +249,7 @@ try {
     await sleep(3000);
     await shot('09-preview-ghost');
     const after = (await (await fetch(`${base}/v1/world/snapshot`)).json()).entities.length;
-    await page.locator('[data-tab="previews"]').click();
+    await god('previews');
     const listed = await page.locator(`[data-show-preview="${pv.id}"]`).waitFor({ timeout: 20_000 }).then(() => true, () => false);
     await shot('10-previews-tab');
     return { id: pv.id, summary: pv.summary, ghost, uncommitted: before === after, listed };
@@ -260,7 +272,7 @@ try {
     await lookPage.close();
     // the look is the last step: when it ticks, the panel moves itself once to the Edits tab (GodPanel), so keep reopening Start
     for (const t0 = Date.now(); ; await sleep(1000)) {
-      await page.locator('[data-tab="start"]').click();
+      await god('start');
       if (await page.locator('[data-step="look"][data-done="1"]').count()) break;
       if (Date.now() - t0 > 30_000) throw new Error('the look step did not tick within 30 s');
     }

@@ -36,11 +36,12 @@ export function GodButton() {
   }, []);
   if (!status) return null;
   const paired = (status.agents ?? 0) > 0;
-  const live = owner && paired && inbox ? (inbox.connected ? 'on' : 'off') : null;
+  // the owner's agent: green when connected, red when not (or not paired yet: connecting it is the first thing to do)
+  const live = !owner ? null : !paired ? 'off' : inbox ? (inbox.connected ? 'on' : 'off') : null;
   const title = owner ? `God: your agent, this world's edits, flags and Constitution (${godKeyLabel()})` : `God: this world's Constitution, and how to become a god (${godKeyLabel()})`;
   return (
     <span className="god-control">
-      <button type="button" className="explore-open god-open" data-god-bolt="1" data-god-open={owner ? 'owner' : 'visitor'} data-agent={live ?? undefined}
+      <button type="button" className="explore-open god-open" data-god-open={owner ? 'owner' : 'visitor'} data-agent={live ?? undefined}
         aria-haspopup="dialog" aria-expanded={open} title={title} onClick={() => toggleGod()}>
         {BOLT}<span>God</span>
         {live && <i className={'god-dot ' + live} aria-label={live === 'on' ? 'agent connected' : 'agent not connected'} />}

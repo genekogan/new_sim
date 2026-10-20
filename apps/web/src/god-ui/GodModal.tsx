@@ -24,7 +24,7 @@ function Frame({ label, children, wide }: { label: string; children: ReactNode; 
     node.addEventListener('pointerdown', outside);
     return () => { node.removeEventListener('pointerdown', outside); if (node.open) node.close(); opener?.focus?.(); };
   }, []);
-  return <dialog ref={dialog} className={'frosted-modal god-modal' + (wide ? ' god-modal-owner' : '')} aria-modal="true" aria-label={label} data-god-modal="1" data-god-bolt-panel="1"
+  return <dialog ref={dialog} className={'frosted-modal god-modal' + (wide ? ' god-modal-owner' : '')} aria-modal="true" aria-label={label} data-god-modal="1"
     onCancel={(e) => { e.preventDefault(); closeGod(); }}>{children}</dialog>;
 }
 
@@ -57,8 +57,8 @@ export function OwnerGod({ world, meta, nav, banner, children, prompt, paired }:
         </button>)}
       </nav>
       <div className="gm-pane" role="tabpanel" data-section={shown}>
+        {children(shown)}{/* the agent section: how to connect it (until paired) above the command box */}
         {shown === 'agent' ? <GodConsole prompt={prompt} paired={paired} /> : null}
-        {children(shown)}
       </div>
     </div>
   </Frame>;

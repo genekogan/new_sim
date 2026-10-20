@@ -1,7 +1,6 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import type {Api} from './useSim.ts';
 import {apiPath} from './world-path.ts';
-import {useSession, userAuthHeaders} from './auth-session.ts';
 import './AgentMessageBox.css';
 
 export type AgentInbox = {
@@ -68,21 +67,6 @@ export function AgentMessageBoxView({kind, inbox, prompt, text, sending = false,
     {error && <p className="agent-message-error" role="alert">{error}</p>}
     {error.startsWith('Copy unavailable') && <input className="agent-message-prompt" aria-label="Agent start prompt" value={prompt} readOnly onFocus={e => e.target.select()}/>}
   </div>;
-}
-
-async function godInbox(text?: string): Promise<AgentInbox> {
-  const r = await fetch(apiPath('/v1/god/inbox'), {method: text === undefined ? 'GET' : 'POST', headers: {...await userAuthHeaders(), 'content-type': 'application/json'}, cache: 'no-store', ...(text === undefined ? {} : {body: JSON.stringify({text})})});
-  const d = await r.json();
-  if (!r.ok || !d.inbox) throw new Error(d.message ?? d.error?.message ?? 'Message could not be sent. Try again.');
-  return d.inbox;
-}
-
-export function GodAgentMessageBox() {
-  const session = useSession();
-  if (!session.authed) return null;
-  const base = location.origin + apiPath('');
-  return <AgentMessageBox key={JSON.stringify([session.mode, session.authed, session.label])} kind="god" request={godInbox}
-    prompt={`Read ${base}/SKILL.md and resume God mode for this world. Run node eden-god.mjs listen in the background and acknowledge each owner message with ack.`}/>;
 }
 
 export function SoulAgentMessageBox({api, soulId}: {api: Api; soulId: string}) {

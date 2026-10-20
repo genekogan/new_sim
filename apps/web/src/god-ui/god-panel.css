@@ -23,11 +23,7 @@
 .gp-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
 .gp-code-big { font-size: 13px !important; font-weight: 700; letter-spacing: .06em; }
 .gp-tools { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 8px; }
-.gp-tabs { display: flex; gap: 2px; border-bottom: 1px solid rgba(0, 0, 0, .1); margin: 0 -2px; }
-.gp-tabs button { border: 0; background: transparent; padding: 5px 8px 6px; cursor: pointer; font: inherit; color: #75756d; border-bottom: 2px solid transparent; margin-bottom: -1px; }
-.gp-tabs button.on { color: #1c1c1a; border-bottom-color: #1c1c1a; font-weight: 600; }
 .gp-count { margin-left: 4px; font-size: 11px; color: #75756d; font-weight: 400; }
-.gp-pane { padding-top: 8px; }
 .gp-steps { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 4px; }
 .gp-steps li { display: grid; grid-template-columns: 20px 1fr; align-items: start; gap: 6px; }
 .gp-tick { width: 16px; height: 16px; margin-top: 1px; border-radius: 50%; border: 1.5px solid #b9b9b0; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; }
@@ -73,12 +69,10 @@
 @media (prefers-color-scheme: dark) {
   .gp-card { background: rgba(28, 29, 27, .94); color: #ebeae3; box-shadow: 0 6px 28px rgba(0, 0, 0, .5), 0 0 0 1px rgba(255, 255, 255, .06); }
   .gp-card code { background: rgba(255, 255, 255, .08); }
-  .gp-dim, .gp-hint, .gp-count, .gp-seq, .gp-icon, .gp-tabs button { color: #9b9b92; }
+  .gp-dim, .gp-hint, .gp-count, .gp-seq, .gp-icon { color: #9b9b92; }
   .gp-btn { background: #2a2b28; color: #ebeae3; border-color: rgba(255, 255, 255, .2); }
   .gp-primary { background: #ebeae3; color: #1c1c1a; border-color: #ebeae3; }
   .gp-primary:hover:not(:disabled) { background: #fff; }
-  .gp-tabs { border-bottom-color: rgba(255, 255, 255, .12); }
-  .gp-tabs button.on { color: #ebeae3; border-bottom-color: #ebeae3; }
   .gp-pairs { background: #3b3216; border-color: #8a7425; }
   .gp-hello { background: #1f3326; }
   .gp-link { color: #ebeae3; }
@@ -91,7 +85,6 @@
 .gp-ghostbar .gp-ghostmsg { white-space: normal; } .gp-ghostbar i { color: #c9c8bf; }
 /* P6: one obvious next step */
 .gp-next { margin: 2px 0 10px; }
-.gp-pane .gp-next { background: #eef6ef; border-left: 3px solid #2d8a4e; padding: 7px 10px 2px; border-radius: 0 8px 8px 0; }
 .gp-next > b { display: block; font-size: 13.5px; }
 .gp-next p { margin: 3px 0 4px; }
 .gp-next .gp-md { border-top: 0; padding-top: 0; }
@@ -100,19 +93,8 @@
 .gp-more > summary { cursor: pointer; color: #75756d; font-size: 12.5px; }
 .gp-more[open] > summary { margin-bottom: 4px; }
 @media (prefers-color-scheme: dark) {
-  .gp-pane .gp-next { background: #1f3326; }
   .gp-more > summary { color: #9b9b92; }
 }
-/* GODUI: the owner's bolt right of the Explore bar (styled as the header's round glass buttons) and its panel */
-.god-bolt { position: relative; display: inline-flex; }
-.god-bolt-open { position: relative; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border-radius: 50%; border: 1px solid var(--glass-line, var(--line)); background: var(--glass, var(--panel)); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); color: var(--fg); cursor: pointer; }
-.god-bolt-open[aria-expanded="true"] { background: var(--fg); color: var(--bg); }
-.god-bolt-open svg { width: 18px; height: 18px; }
-.god-bolt-open .gp-badge { position: absolute; top: -4px; right: -6px; margin: 0; }
-.gp-card.god-bolt-panel { position: absolute; top: calc(100% + 8px); left: 0; right: auto; transform: none; width: 340px; max-width: calc(100vw - 24px); max-height: calc(100vh - 120px); z-index: 16; text-align: left; }
-.god-bolt-weather { display: flex; gap: 6px; margin-top: 10px; }
-.god-bolt-weather .gp-btn { flex: 1; justify-content: center; }
-@media (max-width: 700px) { .god-bolt-open { width: 32px; height: 32px; } .gp-card.god-bolt-panel { position: fixed; top: calc(96px + var(--sa-t)); left: calc(12px + var(--sa-l)); right: calc(12px + var(--sa-r)); transform: none; width: auto; } }
 /* WORLDOPS: the owner's folded world section in the god popover (WorldOwnerOps) */
 .gp-owner-ops { margin-top: 10px; border-top: 1px solid rgba(0, 0, 0, .1); padding-top: 8px; }
 .gp-owner-ops > summary { cursor: pointer; font-size: 12px; color: #75756d; list-style: none; }

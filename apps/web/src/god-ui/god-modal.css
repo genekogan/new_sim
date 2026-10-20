@@ -39,7 +39,7 @@
 @keyframes gm-breathe { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--gm-on) 6%, transparent); } }
 
 /* banners: pairing requests, notes */
-.gm-banner { margin: 12px 18px 0 20px; }
+.god-modal .gm-banner { margin: 12px 18px 0 20px; }
 .gm-banner.gp-pairs { padding: 10px 12px; }
 .gm-note { font-size: 13px; }
 
@@ -122,11 +122,11 @@
 .god-modal .gp-steps { gap: 8px; }
 .god-modal .gp-next { background: color-mix(in srgb, var(--gm-on) 9%, transparent); border-left: 3px solid var(--gm-on); padding: 10px 12px 4px; border-radius: 0 10px 10px 0; }
 .god-modal .gp-md { border-top-color: var(--gm-line); }
-.god-modal .god-bolt-weather { margin-top: 10px; }
+.gm-weather { display: flex; gap: 6px; margin-top: 10px; }
+.gm-weather .gp-btn { flex: 1; justify-content: center; }
 .god-modal .gp-owner-ops { margin-top: 0; border-top: 0; padding-top: 0; }
 .god-modal .gp-owner-ops > summary { color: var(--fg); font-size: 13.5px; font-weight: 600; }
-/* the Constitution inside the sheet: no card of its own */
-.god-modal .cn-card { position: static; width: auto; max-width: none; max-height: none; overflow: visible; margin: 0; padding: 0; background: none; box-shadow: none; backdrop-filter: none; border: 0; color: var(--fg); font-size: 13.5px; }
+/* the Constitution inside the sheet */
 .god-modal .cn-head > b { font-size: 16px; }
 .god-modal .cn-sec, .god-modal .cn-changed { border-color: var(--gm-line); }
 
@@ -167,7 +167,7 @@
   .god-modal .gm-nav button { width: auto; flex: none; white-space: nowrap; padding: 7px 11px; }
   .gm-pane { padding: 14px 14px 18px; max-height: none; }
   .gm-visitor { padding: 2px 14px 18px; max-height: none; }
-  .gm-banner { margin: 10px 12px 0; }
+  .god-modal .gm-banner { margin: 10px 12px 0; }
   .gm-compose textarea { font-size: 16px; }
   .god-modal .gm-withdraw { margin-left: 0; }
   .god-open kbd { display: none; }

@@ -20,7 +20,7 @@ try{
   else if(!(await page.locator('.viewer-broadcast').innerText()).includes('Back to broadcast'))await page.locator('.viewer-broadcast').click();
   await page.waitForFunction(()=>{const hud=document.querySelector('.world-hud'),panel=document.querySelector('[data-god-panel]');return hud&&panel&&panel.getBoundingClientRect().top>=hud.getBoundingClientRect().bottom;});
   const panel=await page.locator('[data-god-panel]').boundingBox();assert.ok(panel&&panel.x>=0&&panel.x+panel.width<=width);
-  const boxes=await page.locator('.viewer-status,.viewer-broadcast,.viewer-following,.hud-camera,.explore-open,.god-bolt-open,.my-souls>button,.account-avatar').evaluateAll(els=>els.map(e=>{const b=e.getBoundingClientRect();return{name:e.className,x:b.x,y:b.y,right:b.right,bottom:b.bottom};}));
+  const boxes=await page.locator('.viewer-status,.viewer-broadcast,.viewer-following,.hud-camera,.explore-open,.god-open,.my-souls>button,.account-avatar').evaluateAll(els=>els.map(e=>{const b=e.getBoundingClientRect();return{name:e.className,x:b.x,y:b.y,right:b.right,bottom:b.bottom};}));
   assert.ok(boxes.every(b=>b.x>=0&&b.right<=width),JSON.stringify(boxes));
   for(let i=0;i<boxes.length;i++)for(const b of boxes.slice(i+1)){const a=boxes[i];assert.ok(Math.min(a.right,b.right)-Math.max(a.x,b.x)<=1||Math.min(a.bottom,b.bottom)-Math.max(a.y,b.y)<=1,JSON.stringify({a,b}));}
   await page.screenshot({path:`${out}/after-${width}-dpr${dpr}${follow?'-follow':''}.png`});

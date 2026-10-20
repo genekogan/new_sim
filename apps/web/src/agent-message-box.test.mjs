@@ -9,8 +9,8 @@ const {build} = createRequire(require.resolve('vite/package.json'))('esbuild');
 const dir = await mkdtemp(join(tmpdir(), 'sim-inbox-render-'));
 Object.assign(globalThis, {location: {origin: 'http://localhost:5960', pathname: '/w/inbox/', search: '', hash: ''}, sessionStorage: {getItem: () => null}});
 const outfile = join(dir, 'render.cjs');
-await build({stdin: {contents: `export {AgentMessageBoxView,GodAgentMessageBox} from './AgentMessageBox.tsx';export {publishSession} from './auth-session.ts';export {SoulFocus} from './SoulFocus.tsx';export {createElement} from 'react';export {renderToStaticMarkup} from 'react-dom/server';`, resolveDir: new URL('.', import.meta.url).pathname, loader: 'tsx'}, outfile, bundle: true, format: 'cjs', platform: 'node', jsx: 'automatic', loader: {'.css': 'empty'}, logLevel: 'silent'});
-const {AgentMessageBoxView, GodAgentMessageBox, publishSession, SoulFocus, createElement: h, renderToStaticMarkup: render} = require(outfile);
+await build({stdin: {contents: `export {AgentMessageBoxView} from './AgentMessageBox.tsx';export {publishSession} from './auth-session.ts';export {SoulFocus} from './SoulFocus.tsx';export {createElement} from 'react';export {renderToStaticMarkup} from 'react-dom/server';`, resolveDir: new URL('.', import.meta.url).pathname, loader: 'tsx'}, outfile, bundle: true, format: 'cjs', platform: 'node', jsx: 'automatic', loader: {'.css': 'empty'}, logLevel: 'silent'});
+const {AgentMessageBoxView, publishSession, SoulFocus, createElement: h, renderToStaticMarkup: render} = require(outfile);
 const props = {kind: 'god', prompt: 'Resume the existing agent and listen.', text: '', onText() {}, onSend() {}, onCopy() {}};
 test('absent and unknown agent presence make no delivery claim; start prompt is copyable', () => {
   const absent = render(h(AgentMessageBoxView, {...props, inbox: {connected: false, lastSeenAt: null, latest: null}}));
@@ -39,10 +39,5 @@ test('Soul card inbox belongs only to its authenticated owner, including account
     const html = render(h(SoulFocus, {sim, auth, api: async () => {throw Error('Rendering must not request');}, selected: 's_A', select() {}, manage() {}}));
     assert.equal(html.includes('data-agent-message="soul"'), identity === 'acct_A');
   }
-});
-test('God box disappears on sign-out even if the provider retains the same label', () => {
-  const session = {mode: 'dev', ready: true, authed: true, label: 'same-label', getToken: async () => null, login() {}, logout() {}};
-  publishSession(session); assert.match(render(h(GodAgentMessageBox)), /data-agent-message="god"/);
-  publishSession({...session, authed: false}); assert.equal(render(h(GodAgentMessageBox)), '');
 });
 test.after(() => rm(dir, {recursive: true, force: true}));

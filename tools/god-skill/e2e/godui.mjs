@@ -63,14 +63,23 @@ try {
       await owner.addInitScript(() => { localStorage.setItem('sim.dev', 'gene'); });
       const page = await owner.newPage(); const errors = []; page.on('pageerror', (e) => errors.push(String(e.message).slice(0, 200)));
       await page.goto(`${base}/?dev=1`, { waitUntil: 'domcontentloaded' });
+      // G4 (2026-10-20): the bolt is now the God button (data-god-open) and its controls are sections of one God modal
+      const godSection = async (section) => {
+        for (let i = 0; i < 3 && !(await page.locator('[data-god-modal][open]').count()); i++) {
+          await page.locator('[data-god-open]').click({ timeout: 2000 }).catch(() => {});
+          await page.locator('[data-god-modal][open]').waitFor({ timeout: 2000 }).catch(() => {});
+        }
+        await page.locator(`[data-god-modal] [data-tab="${section}"]`).click();
+        await page.locator(`[data-god-modal] [data-section="${section}"]`).waitFor();
+        return page.locator('[data-god-modal]').innerText();
+      };
       await step(`B1[${d}] the owner sees the bolt right of Explore and opens its panel (pairing line + Rain/Lightning/Haze)`, async () => {
-        await page.locator('[data-god-bolt]').waitFor({ timeout: 90_000 });
+        await page.locator('[data-god-open="owner"]').waitFor({ timeout: 90_000 });
         await page.waitForFunction(() => window.__simEntity?.layer?.active === true, null, { timeout: 90_000 }); await sleep(2500);
-        const ex = await page.locator('.explore-open').boundingBox(), bolt = await page.locator('[data-god-bolt]').boundingBox();
+        const ex = await page.locator('.explore-open').boundingBox(), bolt = await page.locator('[data-god-open]').boundingBox();
         await page.locator('button[aria-label="collapse"]').first().click().catch(() => {});
-        await page.locator('[data-god-bolt]').click();
-        const text = await page.locator('[data-god-bolt-panel]').innerText();
-        const startTab = await page.locator('[data-god-panel]').innerText().catch(() => '');
+        const text = (await godSection('agent')) + (await godSection('world'));
+        const startTab = await godSection('start');
         await snap(page, `b1-owner-panel-${d}`);
         return { right: Math.round(bolt.x - (ex.x + ex.width)), sameRow: Math.abs((bolt.y + bolt.height / 2) - (ex.y + ex.height / 2)) < 4, line: /SKILL\.md and follow its God mode section/.test(text), buttons: ['Rain', 'Lightning', 'Haze'].every((b) => text.includes(b)), lineInGodPanel: /follow its God mode section/.test(startTab) };
       }, (r) => r.right >= 0 && r.right < 24 && r.sameRow && r.line && r.buttons && !r.lineInGodPanel);
@@ -81,15 +90,15 @@ try {
         await cli('register', base);
         await page.keyboard.press('Escape');   // panel closed: a new request opens it by itself
         const pairing = cli('pair', 'godui-agent');
-        await page.locator('[data-god-bolt-panel] [data-approve]').first().waitFor({ timeout: 30_000 });
+        await page.locator('[data-god-modal][open] [data-approve]').first().waitFor({ timeout: 30_000 });
         await snap(page, `b2-pairing-code-${d}`);
-        await page.locator('[data-god-bolt-panel] [data-approve]').first().click();
+        await page.locator('[data-god-modal] [data-approve]').first().click();
         const done = await Promise.race([pairing, sleep(30_000).then(() => ({ code: 'timeout' }))]);
         const state = JSON.parse(readFileSync(resolve(folder, '.eden-god.json'), 'utf8'));
-        await page.locator('[data-god-bolt-panel] [data-next-step="build"]').waitFor({ timeout: 15_000 });
+        await page.locator('[data-god-modal] [data-next-step="pair"]').waitFor({ state: 'detached', timeout: 15_000 });
         return { exit: done.code, token: state.token?.slice(0, 12) };
       }, (r) => r.exit === 0 && r.token?.startsWith('god_godui'));
-      const press = async (kind) => { const s0 = (await (await fetch(`${base}/v1/world/seq`)).json()).seq; await page.locator(`[data-weather-kind="${kind}"]`).click(); await page.locator('[data-god-bolt-panel] .gp-ok').waitFor({ timeout: 10_000 }); return s0; };
+      const press = async (kind) => { const s0 = (await (await fetch(`${base}/v1/world/seq`)).json()).seq; await godSection('world'); await page.locator(`[data-weather-kind="${kind}"]`).click(); await page.locator('[data-god-modal] .gp-ok').waitFor({ timeout: 10_000 }); return s0; };
       const look = () => page.evaluate(() => { const s = window.__simEntity; s.controls.target.set(0, 4, 0); s.camera.position.set(55, 28, 55); s.controls.update?.(); });
       await step(`W1[${d}] Rain: the sky rains (one ledger edit, like the CLI's)`, async () => {
         await look(); const s0 = await press('rain');
@@ -121,7 +130,7 @@ try {
       await step(`V1[${d}] a signed-in visitor sees Explore and no bolt`, async () => {
         await vp.locator('.explore-open').waitFor({ timeout: 90_000 }); await sleep(6000);
         await snap(vp, `v1-visitor-${d}`);
-        return { bolt: await vp.locator('[data-god-bolt]').count() };
+        return { bolt: await vp.locator('[data-god-open="owner"]').count() };
       }, (r) => r.bolt === 0);
       await visitor.close(); await owner.close();
     } finally { await browser.close().catch(() => {}); release(); }
@@ -137,7 +146,7 @@ try {
     await step('E1 /w/eden: no bolt', async () => {
       await page.locator('.explore-open').waitFor({ timeout: 120_000 }); await sleep(5000);
       await snap(page, 'e1-eden');
-      return { bolt: await page.locator('[data-god-bolt]').count(), godPanel: await page.locator('[data-god-panel]').count() };
+      return { bolt: await page.locator('[data-god-open]').count(), godPanel: await page.locator('[data-god-panel]').count() };
     }, (r) => r.bolt === 0 && r.godPanel === 0);
   } finally { await browser.close().catch(() => {}); release(); }
 } catch (e) { report.failures.push({ name: 'harness', error: String(e?.stack ?? e) }); log('✖ harness', e); }

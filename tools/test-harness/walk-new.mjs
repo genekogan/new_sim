@@ -18,7 +18,7 @@ try{for(const dpr of [1,2]){const browser=await chromium.launch({channel:'chrome
    await page.screenshot({path:resolve(out,`home-new-world-dpr${dpr}.png`)});await page.locator('[data-create]').click();
    await page.waitForURL(/\/worlds\/w\/[a-z0-9-]+/,{timeout:120000});worldUrl=page.url().split('#')[0];run.created=worldUrl;}
   else await page.goto(worldUrl,{waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>!!window.__simEntity&&!!document.querySelector('[data-god-panel],[data-god-panel-toggle]'),null,{timeout:120000});
+  await page.waitForFunction(()=>!!window.__simEntity&&!!document.querySelector('[data-god-panel],[data-god-panel-toggle],[data-god-open]'),null,{timeout:120000});
   await page.waitForTimeout(3000);run.geometry=await page.evaluate(geometry);
   run.header=await page.evaluate(()=>[...document.querySelectorAll('.hud-actions button, .hud-actions a, .hud-actions summary')].map(e=>(e.getAttribute('aria-label')||e.textContent||'').trim().slice(0,30)));
   await page.screenshot({path:resolve(out,`world-arrived-dpr${dpr}.png`)});
@@ -30,6 +30,8 @@ try{for(const dpr of [1,2]){const browser=await chromium.launch({channel:'chrome
   run.input={drag:moved(a,d,'p'),wheel:moved(d,wh,'p'),wasd:moved(wh,k,'p'),doubleClick:moved(k,dc,'p'),viewOffset:dc?.view};
   // Join as a Soul (God panel → Join section), real typing and click
   const toggle=page.locator('[data-god-panel-toggle]');if(await toggle.isVisible().catch(()=>false))await toggle.click();
+  // G4: the owner's God controls are one God modal (the God button right of Explore); open it unless it opened by itself
+  const godBtn=page.locator('[data-god-open="owner"]');if(await godBtn.isVisible().catch(()=>false)&&!(await page.locator('[data-god-modal][open]').count()))await godBtn.click();
   const joinTab=page.locator('[data-tab="souls"], [data-tab="join"]').first();if(await joinTab.isVisible().catch(()=>false))await joinTab.click();
   const live=page.locator('summary', {hasText:/Live here yourself/}).first();await live.waitFor({state:'visible',timeout:15000}).catch(()=>{});if(await live.isVisible().catch(()=>false))await live.click();
   const nameBox=page.locator('[data-soul-name]').first();

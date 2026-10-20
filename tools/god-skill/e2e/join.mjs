@@ -245,6 +245,15 @@ try {
         if (page.newSoulDialog) { await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'detached' }); }
         return page;
       };
+      // G4: open the God modal if it is not (God may open by itself a moment later: the button toggles, so check before each press), then a section
+      const godSection = async (page, section) => {
+        for (let i = 0; i < 3 && !(await page.locator('[data-god-modal][open]').count()); i++) {
+          await page.locator('[data-god-open]').click({ timeout: 2000 }).catch(() => {});
+          await page.locator('[data-god-modal][open]').waitFor({ timeout: 2000 }).catch(() => {});
+        }
+        await page.locator(`[data-god-modal] [data-tab="${section}"]`).click();
+        await page.locator(`[data-god-modal] [data-section="${section}"]`).waitFor();
+      };
       await step('P0 a stranger (not signed in) on #join gets e8\'s New Soul dialog and no god-panel card (lane UXFIX2)', async () => {
         const page = await open(null, '#join');
         await sleep(2500);
@@ -287,13 +296,15 @@ try {
       }, (r) => r.link === `${base}/#join` && r.souls.includes('Ana') && r.souls.includes('Ben') && !r.errors.length);
       await step('P4 the god\'s start tab points to the one skill (SKILL.md link and the welcome\'s paste line)', async () => {
         const page = await open('gaia');
-        await page.locator('[data-tab="start"]').click();
+        await godSection(page, 'start');   // G4: the owner's God controls are one God modal (the God button right of Explore)
         await page.locator('.gp-files a', { hasText: 'SKILL.md' }).waitFor();
         const href = await page.locator('.gp-files a', { hasText: 'SKILL.md' }).getAttribute('href');
-        await page.locator('[data-god-bolt]').click();   // GODUI: the paste line moved to the bolt panel
-        const text = await page.locator('[data-god-bolt-panel]').innerText();
+        // the Agent section: the paste line until an agent is paired; after, while it is away, "Copy the line that restarts it"
+        await godSection(page, 'agent');
+        const text = await page.locator('[data-god-modal]').innerText();
+        const restart = await page.locator('[data-god-modal] .gm-textbtn[title]').first().getAttribute('title', { timeout: 15_000 }).catch(() => '');
         await shot(page, '06-god-start-one-skill'); await page.context().close();
-        return { href, paste: text.includes(`Read ${base}/SKILL.md and follow its God mode section`) };
+        return { href, paste: text.includes(`Read ${base}/SKILL.md and follow its God mode section`) || !!restart?.startsWith(`Read ${base}/SKILL.md and resume God mode`) };
       }, (r) => r.href === `${BASE}/w/${slug}/SKILL.md` && r.paste);
       await step('P5 an approval link opens the approval card (signed out: it asks to sign in; the request stays pending)', async () => {
         const page = await open(null, '#approve/ap_' + '0'.repeat(32));

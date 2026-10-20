@@ -340,7 +340,7 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
     if (s === 'world') return <div data-world-section="1">
       <h3 className="gm-h">Weather</h3>
       <p className="gp-dim">The same as your agent's <code>weather</code> and <code>strike</code>: each press is one edit in the world's history.</p>
-      <div className="god-bolt-weather" data-weather="1">
+      <div className="gm-weather" data-weather="1">
         <button className="gp-btn" data-weather-kind="rain" disabled={!!busy} onClick={() => weather('rain')}>Rain</button>
         <button className="gp-btn" data-weather-kind="lightning" disabled={!!busy} onClick={() => weather('lightning')}>Lightning</button>
         <button className="gp-btn" data-weather-kind="haze" disabled={!!busy} onClick={() => weather('haze')}>Haze</button>
