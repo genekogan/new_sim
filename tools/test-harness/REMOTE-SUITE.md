@@ -24,6 +24,9 @@ V7 real-Chrome GPU checks (including optional V6 screenshots/S8 browser flag-dro
 checks remain separate release proofs. The launcher e2e left the CPU gate (Z3); rewritten against the one-view God modal (GT, B8), it runs in V7 as `god-modal`.
 V7 also runs `approve-on-top` (lane HF hotfix, tools/god-skill/e2e/approve-on-top.mjs): in Clerk mode the god opens an agent's
 approval link (#approve/<id>) at desktop dpr 1/2 and phone, and the approval must stay on top through the whole load.
+V7 also runs `approve-in-window` (lane PUX, tools/god-skill/e2e/approve-in-window.mjs): the agent's request made with the
+window code (`create-soul --for CODE`) comes up top right in the open window with no navigation; Approve, Timed out ->
+Ask again, Refuse on a phone, and one sounding tab across two tabs.
 
 Every retained test failure, skip and TODO has one exact entry, reason and owner in **quarantine.json**.
 The gate rejects new failures even if pre-added to that list; missing steps/logs, cancellations, timeouts,

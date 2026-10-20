@@ -4,7 +4,7 @@
 # Old worlds (eden/mars/littlemartians, root path) 5870-5872; launcher + new-world walk 5873 (children 5874-5876);
 # the God modal e2e (tools/god-skill/e2e/launcher.mjs: Connect, pairing, a command acked, undo/redo, weather, Forsake) runs
 # its own launcher on 5877 (children 5878-5879); then the approval-link walk (tools/god-skill/e2e/approve-on-top.mjs, Clerk mode)
-# reuses 5873-5876.
+# reuses 5873-5876, and so does the in-window approval walk (tools/god-skill/e2e/approve-in-window.mjs, lane PUX).
 # Writes <outDir>/v7-receipt.json (status pass|fail, per-check results, source sha) and prints one RELEASE_GATE_V7 line.
 # Only processes this script starts are ever stopped. Never touches 4930-4970 / 4986 / 4987.
 set -u
@@ -40,4 +40,6 @@ perl -e 'alarm 1200; exec @ARGV' node tools/god-skill/e2e/launcher.mjs --port 58
 # lane HF: the god opens an agent's approval link (#approve/<id>) in Clerk mode; it must stay on top through the whole
 # load (own launcher on 5873, children 5874-5876, free again after walk-new)
 perl -e 'alarm 900; exec @ARGV' node tools/god-skill/e2e/approve-on-top.mjs --port 5873 --range 5874-5876 --web "$OUT/web-worlds" --mars-web "$MARS_WEB" --out "$OUT/approve" > "$OUT/approve-on-top.log" 2>&1; RC_APPROVE=$?
-node tools/test-harness/v7-receipt.mjs "$OUT" "$ROOT" "$RC_OLD" "$RC_NEW" "$RC_GOD" "$RC_APPROVE"
+# lane PUX: the agent's request (create-soul --for <window code>) comes up top right in the open window; same ports again
+perl -e 'alarm 900; exec @ARGV' node tools/god-skill/e2e/approve-in-window.mjs --port 5873 --range 5874-5876 --web "$OUT/web-worlds" --out "$OUT/window" > "$OUT/approve-in-window.log" 2>&1; RC_WINDOW=$?
+node tools/test-harness/v7-receipt.mjs "$OUT" "$ROOT" "$RC_OLD" "$RC_NEW" "$RC_GOD" "$RC_APPROVE" "$RC_WINDOW"
