@@ -70,6 +70,8 @@ rm -rf "$OUT/mars-web/modular"; ln -s ../mars/viewer/public/modular "$OUT/mars-w
 # legacy: every file's sha256 (FILES.sha256), so the kit's preflight proves eden2 runs exactly this tree (sha256sum -c)
 [ "$STAGE" != legacy ] || (cd "$OUT" && find . -type f ! -name FILES.sha256 -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256 > FILES.sha256)
 du -sh "$OUT" | sed 's/^/   size /'
+# keep-last-3 for the laptop builds next to this one (SIM_RELEASE_KEEP=<n> to change, 0 keeps all; never fails the release)
+"$ROOT/tools/world-launcher/deploy/prune-local.sh" "$(dirname "$OUT")" "${SIM_RELEASE_KEEP:-3}" || echo "   (local prune failed; the release is unaffected)"
 if [ -n "$LOCAL" ]; then
   echo "assembled $BUILD in $OUT (run pnpm install --offline --frozen-lockfile --filter @sim/server... there; command in team/lanes/deploy.md)"; exit 0
 fi
