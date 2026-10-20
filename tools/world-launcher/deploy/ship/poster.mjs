@@ -1,10 +1,10 @@
 // poster.mjs <outDir> <url> [runs=3] : phone 390x844 dpr3 (CPU env = throttle). From navigation, css-scale screenshots for WIN ms (default 7000);
 // records page errors, console warnings count, sim:* performance marks, and when .viewer-arrival-stage was ever seen.
-import { createRequire } from 'node:module'; import { mkdirSync } from 'node:fs';
-import { chromeLease } from '<team>/ops/chrome-lease.mjs';
-const { chromium } = createRequire('<repo>/mars/viewer/package.json')('@playwright/test');
+import { mkdirSync } from 'node:fs';
+import { chromium as playwrightChromium, lease } from './browser.mjs';
+const chromium = playwrightChromium();
 const [out, url, runs = '3'] = process.argv.slice(2); mkdirSync(out, { recursive: true });
-const release = await chromeLease('t4-r6-poster'); let b;
+const release = await lease('ship-poster'); let b;
 try {
   b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });
   for (let k = 1; k <= Number(runs); k++) {

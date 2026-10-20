@@ -1,11 +1,40 @@
 // Release 3.8 stranger walk (from r37 walk.mjs; adds a still pair 8 s apart for sky/weather motion) (+ WS frame sizes) on the LIVE site (lane R, evening run): real Chrome (lease, Metal GPU), real mouse/wheel/keys,
 // dpr 1 and 2, no ?shot. Per world: time to arrival, drag-orbit, wheel-zoom, arrow keys, then Explore picks (typed search).
-//   node walk.mjs <outDir> <worldUrl>=<pick1|pick2|...> ...
-import { createRequire } from 'node:module'; import { mkdirSync, writeFileSync } from 'node:fs';
-import { chromeLease } from '<team>/ops/chrome-lease.mjs';
-const { chromium } = createRequire('<repo>/mars/viewer/package.json')('@playwright/test');
-const [out, ...specs] = process.argv.slice(2); mkdirSync(out, { recursive: true });
-const release = await chromeLease('t4-r-walk'); let b; const log = [];
+//   node walk.mjs <outDir> <worldUrl>=<pick1|pick2|...> ...      (PHONE=1: 390x844 touch; DPRS=1,2 default; PICK2=1: a second pick shot)
+// Run by ship.sh after every release (was team/scratch/t4/r/walk319.mjs).
+// The wheel step keeps the eye in open space (lane RR, 2026-10-20): five blind notches in took the eye to the 2 m near limit
+// whenever the broadcast camera arrived close (/w/eden: 13 m from the pivot -> 3.2 m, 2.4 m above the ground), and the
+// orbit shot showed a wall or a roof (walks 3.46, 3.47, 3.51, 3.53). Now it zooms in a notch at a time only while the eye
+// stays ORBIT_MIN_DIST from the pivot and ORBIT_MIN_HEIGHT above the ground (window.__simCamera / __simCameraGround), and
+// zooms out when it arrived closer than that (one notch out and back when it is already right); a page without those
+// diagnostics keeps the five notches. entry.orbit records it.
+export const ORBIT_MIN_DIST = 25, ORBIT_MIN_HEIGHT = 10, NOTCH = 240, MAX_IN = 5, MAX_OUT = 8;
+export const NOTCH_FACTOR = Math.exp(-NOTCH * .0012);   // the camera's ZOOM_PER_PIXEL (apps/web/src/WorldRtsCamera.ts): 0.75 per notch
+/** Next wheel notch for an eye d m from its pivot, h m above the ground (h null: unknown): 'in', 'out' or null (stop). */
+export function zoomStep(d, h, zin) {
+  const open = (dd, hh) => dd >= ORBIT_MIN_DIST && (hh == null || hh >= ORBIT_MIN_HEIGHT);
+  if (zin < MAX_IN && open(d * NOTCH_FACTOR, h == null ? null : h * NOTCH_FACTOR)) return 'in';
+  return open(d, h) ? null : 'out';
+}
+import { mkdirSync, writeFileSync } from 'node:fs'; import { fileURLToPath } from 'node:url';
+import { chromium as playwrightChromium, lease } from './browser.mjs';
+const eye = (p) => p.evaluate(() => { const c = globalThis.__simCamera, g = globalThis.__simCameraGround; if (!c?.p || !c.pivot) return null;
+  return { d: +Math.hypot(c.p[0] - c.pivot[0], c.p[1] - c.pivot[1], c.p[2] - c.pivot[2]).toFixed(1), h: g?.ground == null ? null : +(c.p[1] - g.ground).toFixed(1) }; }).catch(() => null);
+async function zoomOpen(p) {
+  const o = { start: await eye(p), in: 0, out: 0 };
+  if (!o.start) { for (let i = 0; i < 5; i++) { await p.mouse.wheel(0, -NOTCH); await p.waitForTimeout(120); } o.in = 5; o.blind = true; return o; }
+  let s = o.start;
+  for (let step; s && (step = zoomStep(s.d, s.h, o.in)) && o.out < MAX_OUT;) {
+    if (step === 'in') o.in++; else o.out++;
+    await p.mouse.wheel(0, step === 'in' ? -NOTCH : NOTCH); await p.waitForTimeout(400); s = await eye(p);
+  }
+  // already at the right distance: still turn the wheel (one notch out, one back in), as a stranger would
+  if (s && !o.in && !o.out) { for (const dy of [NOTCH, -NOTCH]) { await p.mouse.wheel(0, dy); await p.waitForTimeout(400); } o.in = o.out = 1; s = await eye(p); }
+  o.end = s; o.open = !!s && s.d >= ORBIT_MIN_DIST && (s.h == null || s.h >= ORBIT_MIN_HEIGHT); return o;
+}
+if (process.argv[1] !== fileURLToPath(import.meta.url)) { /* imported (tests): no walk */ } else {
+const [out, ...specs] = process.argv.slice(2); mkdirSync(out, { recursive: true }); const chromium = playwrightChromium();
+const release = await lease('ship-walk'); let b; const log = [];
 const slugOf = (u) => { const x = new URL(u); return (x.pathname.split('/').filter(Boolean).pop() ?? 'root') + (x.search ? '-' + x.search.replace(/\W+/g, '') : ''); };
 try {
   b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });
@@ -37,7 +66,7 @@ try {
       if (c) {
         const cx = c.x + c.width / 2, cy = c.y + c.height / 2;
         await p.mouse.move(cx, cy); await p.mouse.down(); await p.mouse.move(cx + 260, cy + 40, { steps: 20 }); await p.mouse.up(); await p.waitForTimeout(1200);
-        for (let i = 0; i < 5; i++) { await p.mouse.wheel(0, -240); await p.waitForTimeout(120); }
+        entry.orbit = await zoomOpen(p);
         await p.mouse.click(cx, cy); for (const k of ['ArrowUp', 'ArrowUp', 'ArrowLeft']) { await p.keyboard.down(k); await p.waitForTimeout(400); await p.keyboard.up(k); }
         await p.waitForTimeout(2000); await p.screenshot({ path: `${out}/${slug}-2-orbit-zoom-keys-dpr${dpr}.png` });
       }
@@ -59,7 +88,8 @@ try {
           win10s: { frames: win.length, bytes: win.reduce((s, f) => s + f.n, 0), maxFrame: bigW?.n, maxFrameHead: bigW?.h } }; }
       entry.errors = [...new Set(errs)].slice(0, 15);
       await ctx.close();
-      console.log(JSON.stringify({ slug, dpr, worldmeta: entry.worldmeta.length, chunks: /take-chunk-ref/.test(entry.welcome ?? ''), types: entry.types, arrivalMs: entry.arrivalMs, arrivalErr: entry.arrivalErr, picks: entry.picks.map((x) => `${x.pick}:${x.ok ? 'ok' : 'FAIL'}`), errors: entry.errors.length, errList: entry.errors.slice(0, 4), sockets: entry.sockets.length, resync: entry.resync, snap: entry.snap, ws: { total: entry.ws?.framesTotal, max: entry.ws?.maxFrame, maxHead: entry.ws?.maxFrameHead } }));
+      console.log(JSON.stringify({ slug, dpr, worldmeta: entry.worldmeta.length, chunks: /take-chunk-ref/.test(entry.welcome ?? ''), types: entry.types, arrivalMs: entry.arrivalMs, arrivalErr: entry.arrivalErr, picks: entry.picks.map((x) => `${x.pick}:${x.ok ? 'ok' : 'FAIL'}`), errors: entry.errors.length, errList: entry.errors.slice(0, 4), sockets: entry.sockets.length, resync: entry.resync, orbit: entry.orbit && `${entry.orbit.blind ? 'blind ' : ''}${entry.orbit.in} in/${entry.orbit.out} out, eye ${entry.orbit.end?.d ?? '?'} m from pivot, ${entry.orbit.end?.h ?? '?'} m up`, snap: entry.snap, ws: { total: entry.ws?.framesTotal, max: entry.ws?.maxFrame, maxHead: entry.ws?.maxFrameHead } }));
     }
   }
 } finally { await b?.close(); release(); writeFileSync(`${out}/walk.json`, JSON.stringify(log, null, 1)); }
+}
