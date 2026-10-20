@@ -120,11 +120,11 @@ const fixtures = [
     shapes: [cbox([0, 0.72, 0], [0.7, 0.03, 0.5], 'top'), ...legs4(0.62, 0.42, 0.71, 'iron', 0.015), box([0, 0.5, 0], [0.62, 0.02, 0.42], 'iron')],
     palette: { top: C.pine, iron: '#5a5f62' }, slots: [surface('top', [0, 0.74, 0], 3, [0.4, 0.3, 0.3])], components: { surface: { height: 0.74 } } }),
   vocabDef({ category: 'furniture.work', tags: ['furniture', 'school'], name: 'wall-board', synonyms: ['whiteboard', 'blackboard', 'chalkboard', 'pinboard', 'corkboard', 'notice board'],
-    description: 'A board on the wall (2.4 × 1.2 m, 0.9–2.1 m up) with a tray: a whiteboard, a blackboard or a corkboard for a classroom, an office or a meeting room. Stand at it to write. Variants: whiteboard, blackboard, corkboard.',
+    description: 'A board on a slim metal floor stand (2.4 × 1.2 m, 0.9–2.1 m up) with a tray: a whiteboard, a blackboard or a corkboard for a classroom, an office or a meeting room. Stand at it to write. Variants: whiteboard, blackboard, corkboard.',
     variants: ['whiteboard', 'blackboard', 'corkboard'], ranges: { sx: [0.5, 2], sy: [0.7, 1.4], sz: [1, 1] },
     shapes: [box([0, 1.5, 0], [2.46, 1.26, 0.04], 'frame'), ...when('variant=whiteboard', [box([0, 1.5, 0.022], [2.36, 1.16, 0.01], 'white')]), ...when('variant=blackboard', [box([0, 1.5, 0.022], [2.36, 1.16, 0.01], 'black'), box([-0.5, 1.6, 0.03], [0.6, 0.02, 0.003], 'chalk'), box([0.3, 1.4, 0.03], [0.8, 0.02, 0.003], 'chalk')]),
       ...when('variant=corkboard', [box([0, 1.5, 0.022], [2.36, 1.16, 0.01], 'cork'), ...[[-0.8, 1.7], [-0.3, 1.45], [0.4, 1.75], [0.85, 1.35], [0.1, 1.25]].map(([x, y], i) => box([x, y, 0.03], [0.3, 0.22, 0.003], i % 2 ? 'paper' : 'note'))]),
-      box([0, 0.86, 0.05], [2.0, 0.03, 0.08], 'frame')],
+      box([0, 0.86, 0.05], [2.0, 0.03, 0.08], 'frame'), ...[-1.05, 1.05].flatMap((x) => [box([x, 0.7, -0.04], [0.035, 1.4, 0.035], 'frame'), box([x, 0.025, 0], [0.35, 0.05, 0.5], 'frame')])],
     palette: { frame: '#9aa0a0', white: '#f6f7f6', black: '#2a3a32', chalk: '#e8e8e0', cork: '#b8875a', paper: C.cream, note: '#f2d86a' }, layer: 'solid',
     slots: [stand('writer', [0, 0, 0.6], PI)], components: { sign: { lines: [] } } }),
 ];
@@ -199,7 +199,7 @@ fixtures.push(
     description: 'Aluminium bleachers (6 × 2.6 m, 1.5 m high): three stepped benches for 18 spectators, with a back rail; line a pitch, a court or a parade route with them.',
     ranges: { sx: [0.5, 3], sy: [0.8, 1.2], sz: [0.8, 1.2] },
     shapes: [...[0, 1, 2].flatMap((k) => [box([0, 0.45 + k * 0.45, 0.85 - k * 0.8], [6.0, 0.05, 0.32], 'bench'), box([0, 0.2 + k * 0.45, 1.05 - k * 0.8], [6.0, 0.04, 0.4], 'step')]),
-      ...[-2.95, -1, 1, 2.95].flatMap((x) => [limb([x, 0, 1.2], [x, 1.4, -0.9], 0.04, 'iron', { kind: 'cyl', seg: 4 }), box([x, 0.75, -0.9], [0.06, 1.5, 0.06], 'iron')]), box([0, 1.85, -1.1], [6.0, 0.05, 0.05], 'iron')],
+      ...[-2.95, -1, 1, 2.95].flatMap((x) => [limb([x, 0.04, 1.2], [x, 1.4, -0.9], 0.04, 'iron', { kind: 'cyl', seg: 4 }), box([x, 0.75, -0.9], [0.06, 1.5, 0.06], 'iron')]), box([0, 1.85, -1.1], [6.0, 0.05, 0.05], 'iron')],
     palette: { bench: '#c9ccd0', step: '#9aa0a4', iron: '#5a5f62' },
     slots: [0, 1, 2].flatMap((k) => [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5].map((x, i) => seat(`seat-${k + 1}-${i + 1}`, [x, 0.5 + k * 0.45, 0.85 - k * 0.8]))), components: { seat: {} } }),
   vocabDef({ category: 'public.monument', tags: ['public', 'cemetery'], name: 'gravestone', synonyms: ['headstone', 'tombstone', 'grave', 'grave marker', 'tomb', 'burial stone'],
@@ -337,11 +337,13 @@ function layOut(name, def, params, recipe) {
 const report = [];
 /** A furnished building type: building/1 with an explicit plan, its recipe and LAYERS defaults. */
 function furnished({ name, category, synonyms, description, params: p0, plan, recipe, layers, outside = [], tags = [] }) {
+  // These plans preserve their room proportions when the creator resizes the footprint.
+  plan = { ...plan, size: [p0.w, p0.d] };
   const params = buildingDefaults({ ...p0, plan });
   const genParams = GENERATORS['building/1'].params;
   const def = { schema: 'def/1', name: `core-${name}`, version: 1, description, tags: [...new Set([...category.split('.'), 'furnished', ...tags])], category, synonyms,
     form: 'point', make: { kind: 'gen', gen: 'building/1', args: { style: 'plan', furnish: name } },
-    params: Object.fromEntries(Object.entries({ ...p0, plan }).map(([k, v]) => [k, { ...genParams[k], default: v }])) };
+    params: Object.fromEntries(Object.entries({ ...p0, plan }).map(([k, v]) => [k, { ...genParams[k], ...(['w', 'd'].includes(k) ? { min: Math.round(v * 0.85 * 100) / 100 } : {}), ...(name === 'townhouse-row' && k === 'floorHeight' ? { max: 4.6 } : {}), default: v }])) };
   const rec = { schema: 'furnish/1', style: name, rooms: recipe };
   const L = layOut(name, def, params, rec);
   def.contents = [...L.parts, ...outside];
@@ -368,15 +370,15 @@ fixtures.push(
     description: 'A painted hard court (28 × 15 m) with its lines: basketball (centre circle, keys), tennis (a net across the middle) or five-a-side; put hoops, goals and bleachers round it. Souls walk and play on it. Variants: basketball, tennis, five-a-side.',
     variants: ['basketball', 'tennis', 'five-a-side'], conventions: ['stretch', 'paint', 'wear'], ranges: { sx: [0.4, 1.6], sy: [1, 1], sz: [0.4, 1.6] }, layer: 'surface',
     shapes: [box([0, 0.015, 0], [30, 0.03, 17], 'apron'), box([0, 0.025, 0], [28, 0.02, 15], 'court'), ...lines(28, 15, 'line'),
-      ...when('variant=basketball', [tor([0, 0.035, 0], 1.8, 0.04, 'line', { seg: 16 }), ...[-1, 1].flatMap((sx) => [box([sx * 11.1, 0.034, 0], [5.8, 0.012, 4.9], 'key'), tor([sx * 8.2, 0.035, 0], 1.8, 0.04, 'line', { seg: 12 })])]),
+      ...when('variant=basketball', [tor([0, 0.035, 0], 1.8, 0.04, 'line', { pitch: PI / 2, seg: 16 }), ...[-1, 1].flatMap((sx) => [box([sx * 11.1, 0.034, 0], [5.8, 0.012, 4.9], 'key'), tor([sx * 8.2, 0.035, 0], 1.8, 0.04, 'line', { pitch: PI / 2, seg: 12 })])]),
       ...when('variant=tennis', [box([0, 0.5, 0], [0.04, 1.0, 12.8], 'net'), ...[-6.4, 6.4].map((z) => cyl([0, 0.55, z], 0.04, 1.1, 'post', { seg: 5 })), box([0, 0.035, 0], [12.8, 0.01, 0.06], 'line'), ...[-5.5, 5.5].map((z) => box([0, 0.035, z], [28, 0.01, 0.06], 'line'))]),
-      ...when('variant=five-a-side', [tor([0, 0.035, 0], 2.5, 0.05, 'line', { seg: 16 }), ...[-1, 1].flatMap((sx) => [box([sx * 13.2, 1.0, 0], [0.1, 2.0, 3.0], 'post'), box([sx * 12.0, 0.034, 0], [3.8, 0.012, 7.0], 'key')])])],
+      ...when('variant=five-a-side', [tor([0, 0.035, 0], 2.5, 0.05, 'line', { pitch: PI / 2, seg: 16 }), ...[-1, 1].flatMap((sx) => [box([sx * 13.2, 1.0, 0], [0.1, 2.0, 3.0], 'post'), box([sx * 12.0, 0.034, 0], [3.8, 0.012, 7.0], 'key')])])],
     palette: { apron: '#7a8a6a', court: '#3f6b8a', key: '#b0583a', line: '#f4f2ec', net: '#2b2d30', post: '#d8dcdc' },
     slots: [stand('centre', [0, 0.03, 0], 0, 10)], components: { place: { kind: 'court', enclosed: false, capacity: 20 } } }),
   vocabDef({ category: 'public.sport', tags: ['public', 'sport'], name: 'sports-field', synonyms: ['football field', 'soccer pitch', 'playing field', 'rugby pitch', 'pitch markings'],
     description: 'A grass playing field (64 × 40 m) marked for football with goals at both ends; the middle of a stadium, a school field or a park. Souls walk and play on it.',
     conventions: ['stretch', 'paint', 'wear'], ranges: { sx: [0.4, 1.4], sy: [1, 1], sz: [0.4, 1.4] }, layer: 'surface',
-    shapes: [box([0, 0.015, 0], [66, 0.03, 42], 'grass'), ...[-24, -8, 8, 24].map((x) => box([x, 0.022, 0], [8, 0.01, 40], 'stripe')), ...lines(64, 40, 'line', 0.12), tor([0, 0.032, 0], 9, 0.08, 'line', { seg: 20 }),
+    shapes: [box([0, 0.015, 0], [66, 0.03, 42], 'grass'), ...[-24, -8, 8, 24].map((x) => box([x, 0.022, 0], [8, 0.01, 40], 'stripe')), ...lines(64, 40, 'line', 0.12), tor([0, 0.08, 0], 9, 0.08, 'line', { pitch: PI / 2, seg: 20 }),
       ...[-1, 1].flatMap((sx) => [box([sx * 24.5, 0.03, 0], [15, 0.01, 0.12], 'line'), box([sx * 24.5 - sx * 7.5, 0.03, 0], [0.12, 0.01, 0.12], 'line'), box([sx * 25, 0.03, -10], [14, 0.01, 0.12], 'line'), box([sx * 25, 0.03, 10], [14, 0.01, 0.12], 'line'),
         box([sx * 18, 0.03, 0], [0.12, 0.01, 20], 'line'), box([sx * 32, 1.22, 0], [0.12, 0.12, 7.3], 'post'), ...[-3.65, 3.65].map((z) => box([sx * 32, 1.22, z], [0.12, 2.44, 0.12], 'post')), box([sx * 32.8, 1.2, 0], [1.6, 2.3, 7.2], 'net')])],
     palette: { grass: '#5f8f45', stripe: '#6a9a4e', line: '#f4f2ec', post: '#f4f2ec', net: '#dfe4e4' },

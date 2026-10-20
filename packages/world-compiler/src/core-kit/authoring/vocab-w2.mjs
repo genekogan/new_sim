@@ -196,15 +196,15 @@ const rail = [
         extrude([0, 0.55, 3.85], [[-0.9, 0], [0.9, 0], [0, 0.55]], 0.25, 'iron', { pitch: -PI / 2 }), sph([0, 1.95, 3.72], 0.16, 'lamp', { seg: 5, glow: 0.8 }),
         ...withRole('light', [0, 3.6, 2.7], [sph([0, 3.9, 2.7], 0.4, 'smoke', { seg: 6, when: '@on' }), sph([0.1, 4.6, 2.3], 0.55, 'smoke', { seg: 6, when: '@on' }), sph([0.2, 5.4, 1.7], 0.7, 'smoke', { seg: 6, when: '@on' })])]),
       ...when('variant=diesel', [cbox([0, 1.85, 0.9], [1.6, 1.5, 5.0], 'paint'), cbox([0, 2.2, -2.5], [2.2, 2.2, 2.4], 'paint'), glassBox([0, 2.7, -1.29], [1.8, 0.6, 0.03]), glassBox([0, 2.7, -3.71], [1.8, 0.6, 0.03]),
-        box([0, 1.3, 0], [2.0, 0.2, 7.4], 'stripe'), cbox([0, 3.35, -2.5], [2.3, 0.12, 2.6], 'roof'), sph([0, 2.0, 3.42], 0.16, 'lamp', { seg: 5, glow: 0.8 }), cyl([0.3, 2.75, 1.5], 0.1, 0.3, 'iron', { seg: 6 })])],
+        box([0, 1.3, 0], [2.0, 0.2, 7.4], 'stripe'), cbox([0, 3.35, -2.5], [2.3, 0.12, 2.6], 'roof'), sph([0, 2.0, 3.42], 0.16, 'lamp', { seg: 5, glow: 0.8 }), cyl([0.3, 2.75, 1.5], 0.1, 0.3, 'iron', { seg: 6 })])].map((s) => ({ ...s, at: [s.at[0], s.at[1] - 0.42, s.at[2]], ...(s.pivot ? { pivot: [s.pivot[0], s.pivot[1] - 0.42, s.pivot[2]] } : {}) })),
     palette: { frame: '#2a2725', iron: '#3a3c3e', paint: '#2f5a4a', brass: C.brass, roof: '#2a2725', glass: C.glass, lamp: C.lamp, smoke: '#d8d6d2', stripe: C.mustard },
-    slots: [seat('driver', [0.5, 1.4, -2.4], 0), seat('fireman', [-0.5, 1.4, -2.4], 0)], components: { carrier: { seats: 2 }, sound: sound('engine', { when: 'on', radius: 40, volume: 0.5 }) } }),
+    slots: [seat('driver', [0.5, 0.98, -2.4], 0), seat('fireman', [-0.5, 0.98, -2.4], 0)], components: { carrier: { seats: 2 }, sound: sound('engine', { when: 'on', radius: 40, volume: 0.5 }) } }),
   vocabDef({ ...RAILV, name: 'mine-cart', synonyms: ['minecart', 'tub', 'ore cart', 'mine car', 'wagon tub', 'rail cart'],
     description: 'A small iron mine cart (1.6 m long, 1.2 m tall) on four flanged wheels that sit on rail-track; a riveted tub that holds ore or coal.',
     ranges: { sx: [0.8, 1.3], sy: [0.8, 1.3], sz: [0.8, 1.3] }, conventions: ['stretch', 'paint', 'wear'],
     shapes: [extrude([0, 0.55, 0], [[-0.65, -0.75], [0.65, -0.75], [0.65, 0.75], [-0.65, 0.75]], 0.06, 'iron'), ...[[0, -0.78, 1.5, 0.06], [0, 0.78, 1.5, 0.06], [-0.72, 0, 0.06, 1.6], [0.72, 0, 0.06, 1.6]].map(([x, z, w, d]) => box([x, 0.88, z], [w, 0.65, d], 'tub', { roll: x ? -Math.sign(x) * 0.15 : 0, pitch: z ? Math.sign(z) * 0.15 : 0 })),
       sph([0, 1.05, 0], 0.5, 'ore', { scale: [1.2, 0.35, 1.3], seg: 6 }), box([0, 1.2, 0.83], [1.6, 0.05, 0.05], 'band'), box([0, 1.2, -0.83], [1.6, 0.05, 0.05], 'band'),
-      ...[-0.5, 0.5].flatMap((z) => [wheel(-0.72, 0.62, z, 0.2, 0.08, 'iron', 8), wheel(0.72, 0.62, z, 0.2, 0.08, 'iron', 8)])],
+      ...[-0.5, 0.5].flatMap((z) => [wheel(-0.72, 0.62, z, 0.2, 0.08, 'iron', 8), wheel(0.72, 0.62, z, 0.2, 0.08, 'iron', 8)])].map((s) => ({ ...s, at: [s.at[0], s.at[1] - 0.42, s.at[2]] })),
     palette: { iron: '#3a3c3e', tub: '#7a5a48', band: '#2f3133', ore: '#4a4440' }, components: { container: { capacity: 12 } } }),
 ];
 const crane = vocabDef({ category: 'layer.construction', tags: ['construction', 'crane'], name: 'crane', synonyms: ['tower crane', 'building crane', 'construction crane', 'jib crane', 'derrick', 'luffing crane'],
@@ -510,7 +510,7 @@ const waste = [
     description: 'A three-bay timber compost heap (3 m wide, 1 m tall) with slatted sides, full of rotting greens and straw; garden waste goes in, compost comes out. Fill and empty it.',
     actuators: [['fill', { default: 0.7 }]], label: 'the compost heap', conventions: ['stretch', 'paint', 'wear', 'warp'], ranges: { sx: [0.5, 1.6], sy: [0.7, 1.4], sz: [0.6, 1.5] },
     shapes: [...[-1.5, -0.5, 0.5, 1.5].map((x) => cbox([x, 0.5, 0], [0.06, 1.0, 1.0], 'wood')), cbox([0, 0.5, -0.5], [3.0, 1.0, 0.06], 'wood'), ...[0.2, 0.5, 0.8].map((y) => box([0, y, 0.5], [3.0, 0.12, 0.03], 'wood')),
-      ...withRole('fill', [0, 0, 0], [-1, 0, 1].map((x, i) => sph([x, 0.35, 0], 0.5, ['compost', 'greens', 'straw'][i], { scale: [0.9, 0.8, 0.9], seg: 6 })))],
+      ...withRole('fill', [0, 0, 0], [-1, 0, 1].map((x, i) => sph([x, 0.4, 0], 0.5, ['compost', 'greens', 'straw'][i], { scale: [0.9, 0.8, 0.9], seg: 6 })))],
     palette: { wood: '#8a6a48', compost: '#4a3a2a', greens: '#5f7a35', straw: '#c9a85a' }, components: { container: { capacity: 30 } } }),
 ];
 

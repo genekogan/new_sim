@@ -182,7 +182,9 @@ export function realize(p: Plan): Layout {
     const score = (x: LWall) => (x.out ? x.out[0] * sn[0] + x.out[1] * sn[1] : 0) * 100 + len2(x.a, x.b);
     const { w, i } = cands.reduce((m, c) => (score(c.w) > score(m.w) + 1e-9 ? c : m));
     const door = e.kind === 'door';
-    const width = Math.max(0.6, Math.min(6, e.width ?? (door ? EXT_DOOR_W : p.windowStyle.width)));
+    const wanted = Math.max(0.6, Math.min(6, e.width ?? (door ? EXT_DOOR_W : p.windowStyle.width)));
+    // A polygonal tower's doorway must fit its chord while retaining the human-clear minimum.
+    const width = door && p.round ? Math.min(wanted, Math.max(0.75, len2(w.a, w.b) - p.t - 0.305)) : wanted;
     const sill = door ? 0 : e.sill ?? p.windowStyle.sill;
     const height = door ? Math.min(e.height ?? doorH(p.fh), p.fh - SLAB - 0.05) : Math.min(e.height ?? p.windowStyle.top - sill, p.fh - SLAB - 0.15 - sill);
     // the room's own span on this wall (exterior runs are extended over corners)

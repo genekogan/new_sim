@@ -167,3 +167,28 @@ test('explicit plan: an upper-floor balcony opens off the named room through its
   assert.equal(none.balcony, undefined, 'no ground-floor balcony');
   assert.equal(buildingPhysics({ w: 12, d: 8, plan }).notes?.filter((n) => n.startsWith('violation: ')).length ?? 0, 0);
 });
+
+test('authored plans resize their room coordinates and keep their front entrance', () => {
+  const plan = { size: [10, 8], floors: [{ rooms: [{ id: 'store', rect: [0, 0, 10, 3] }, { id: 'shop', rect: [0, 3, 10, 8] }], exterior: [{ room: 'shop', wall: 's', kind: 'door' }] }] };
+  const b = buildingPhysics({ w: 8.5, d: 4, plan });
+  assert.equal(violations(b).length, 0, violations(b).join('; '));
+  assert.deepEqual(b.rooms!.map((r) => r.id), ['store', 'shop']);
+  assert.ok(b.openings!.some((o) => o.id === 'front-door' && o.at[1] > 1.8));
+  // Plans without an authored footprint retain their original metre coordinates.
+  const fixed = buildingLayout({ w: 10, d: 10, plan: { ...plan, size: undefined } });
+  const resized = buildingLayout({ w: 10, d: 10, plan });
+  assert.notDeepEqual(fixed.rooms[0].poly, resized.rooms[0].poly);
+});
+
+test('small round entrances and tower stairs retain human clearance; low chapels keep a full-height door', () => {
+  for (const [params, args] of [
+    [{ style: 'tower', w: 5.1, d: 6, floors: 5, floorHeight: 3 }, { round: true, lantern: true }],
+    [{ style: 'tower', w: 4, d: 5, floors: 3, floorHeight: 3 }, { round: false }],
+    [{ style: 'chapel', w: 8, d: 14, floorHeight: 2.4 }, {}],
+  ] as [Record<string, unknown>, Record<string, unknown>][]) {
+    const b = buildingPhysics(params, args);
+    assert.equal(violations(b).length, 0, `${JSON.stringify(params)}: ${violations(b).join('; ')}`);
+    assert.ok(b.openings!.some((o) => o.id === 'front-door' && o.width >= 0.75 && o.height >= 2));
+    assert.ok(b.links!.every((l) => l.width >= 0.75));
+  }
+});

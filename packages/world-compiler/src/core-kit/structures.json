@@ -330,14 +330,14 @@
   "params": {
    "w": {
     "type": "number",
-    "min": 3,
+    "min": 5.6,
     "max": 24,
     "default": 6,
     "doc": "width (x) in metres"
    },
    "d": {
     "type": "number",
-    "min": 3,
+    "min": 6,
     "max": 24,
     "default": 10,
     "doc": "depth (z) in metres"
@@ -477,14 +477,14 @@
   "params": {
    "w": {
     "type": "number",
-    "min": 3,
+    "min": 5,
     "max": 24,
     "default": 8,
     "doc": "width (x) in metres"
    },
    "d": {
     "type": "number",
-    "min": 3,
+    "min": 6,
     "max": 24,
     "default": 9,
     "doc": "depth (z) in metres"
@@ -624,7 +624,7 @@
   "params": {
    "w": {
     "type": "number",
-    "min": 3,
+    "min": 5,
     "max": 30,
     "default": 14,
     "doc": "width (x) in metres"
@@ -1657,14 +1657,14 @@
   "params": {
    "w": {
     "type": "number",
-    "min": 4,
+    "min": 5.1,
     "max": 10,
     "default": 6,
     "doc": "width (x) in metres"
    },
    "d": {
     "type": "number",
-    "min": 4,
+    "min": 5.1,
     "max": 10,
     "default": 6,
     "doc": "depth (z) in metres"

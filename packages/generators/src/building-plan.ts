@@ -184,7 +184,7 @@ function hallPlan(c: Ctx): Plan {
     p.doors.push({ floor: 0, a: back, b: mainId, at: 0.8 });
   }
   const big = c.style === 'barn' ? Math.min(3.4, (X1 - X0) * 0.42) : c.style === 'chapel' || c.style === 'hall' ? 1.6 : 1.0;
-  p.ext.push({ floor: 0, room: mainId, side: 's', kind: 'door', width: big, height: c.style === 'barn' ? Math.min(3.4, c.fh - 0.4) : c.style === 'chapel' ? Math.min(2.8, c.fh - 0.6) : 2.1, to: c.porch > 0 ? 'porch' : 'outside' });
+  p.ext.push({ floor: 0, room: mainId, side: 's', kind: 'door', width: big, height: c.style === 'barn' ? Math.min(3.4, c.fh - 0.4) : c.style === 'chapel' ? Math.min(2.8, c.fh - 0.23) : 2.1, to: c.porch > 0 ? 'porch' : 'outside' });
   if (c.style === 'chapel') p.windowStyle = { sill: 1.1, top: Math.min(c.fh - 0.5, 3.6), width: 0.9, spacing: 2.4 / Math.max(0.05, c.density) };
   if (c.style === 'barn') p.windowStyle = { sill: 1.6, top: Math.min(c.fh - 0.5, 2.4), width: 0.8, spacing: 3.2 / Math.max(0.05, c.density) };
   if (c.style === 'greenhouse') { p.windowStyle = { sill: 0.55, top: c.fh - 0.25, width: 1.3, spacing: 1.5 }; p.autoWindows = true; }
@@ -226,7 +226,7 @@ function towerPlan(c: Ctx): Plan {
   p.ext.push({ floor: 0, room: p.rooms[0].id, side: 's', kind: 'door', to: 'outside' });
   p.windowStyle = { sill: 1.0, top: Math.min(2.1, c.fh - 0.4), width: 0.75, spacing: 2.2 / Math.max(0.05, c.density) };
   // a continuous helix up the inside of the wall: each flight sweeps 320°, starting just past the door
-  const inner = R - c.t / 2, sw = Math.min(0.9, inner * 0.36), rm = inner - sw / 2;
+  const inner = R - c.t / 2, sw = Math.max(0.75, Math.min(0.9, inner * 0.36)), rm = inner - sw / 2;
   const a0 = 0.5;
   const sweep = (320 * Math.PI) / 180;
   const risers = Math.ceil(c.fh / MAX_RISE - 1e-9);
@@ -257,6 +257,8 @@ export function autoPlan(params: { W: number; D: number; t: number; fh: number; 
 // ---------------------------------------------------------------- explicit plans (the `plan` json param)
 
 type JPlan = {
+  /** Optional authored footprint: room coordinates resize with the building instead of being clipped. */
+  size?: number[];
   floors?: { rooms?: { id?: string; name?: string; rect?: number[]; kind?: string }[]; doors?: { between?: string[]; at?: number; width?: number }[]; exterior?: { room?: string; wall?: string; at?: number; kind?: string; width?: number; sill?: number; height?: number }[] }[];
   stairs?: { from?: number; to?: number; room?: string; wall?: string; at?: number }[];
   /** One balcony on the front (south) wall of a room above the ground floor, reached by a door at `at` along that wall. */
@@ -273,7 +275,8 @@ export function explicitPlan(json: unknown, c0: { W: number; D: number; t: numbe
   const c: Ctx = { ...c0, style: 'plan', args: {} };
   const p = base(c);
   const { X0, X1, Z0, Z1 } = extents(c);
-  const clampX = (x: number) => Math.min(X1, Math.max(X0, x - c.W / 2)), clampZ = (z: number) => Math.min(Z1, Math.max(Z0, z - c.D / 2));
+  const sx = j.size?.[0] && j.size[0] > 0 ? c.W / j.size[0] : 1, sz = j.size?.[1] && j.size[1] > 0 ? c.D / j.size[1] : 1;
+  const clampX = (x: number) => Math.min(X1, Math.max(X0, x * sx - c.W / 2)), clampZ = (z: number) => Math.min(Z1, Math.max(Z0, z * sz - c.D / 2));
   const floors = Array.isArray(j.floors) ? j.floors.slice(0, 6) : [];
   p.floors = Math.max(1, floors.length || c.floors);
   const ids = new Ids();
@@ -312,7 +315,7 @@ export function explicitPlan(json: unknown, c0: { W: number; D: number; t: numbe
       p.ext.push({ floor, room: room.id, side: 's', kind: 'door', to: 'balcony', ...(typeof b.at === 'number' ? { at: Math.min(1, Math.max(0, b.at)) } : {}) });
     }
   }
-  const { risers, run } = stairGeometry(c.fh);
+  const { risers } = stairGeometry(c.fh);
   for (const s of (j.stairs ?? []).slice(0, 8)) {
     const from = typeof s.from === 'number' ? Math.round(s.from) : 0, to = typeof s.to === 'number' ? Math.round(s.to) : from + 1;
     const room = p.rooms.find((r) => r.floor === from && r.id === slug(s.room ?? '')) ?? p.rooms.find((r) => r.floor === from);
@@ -321,6 +324,8 @@ export function explicitPlan(json: unknown, c0: { W: number; D: number; t: numbe
     const inset = (v: number, bound: number) => (Math.abs(v - bound) < 1e-6 ? c.t / 2 : TI / 2);
     const along = wall === 'n' || wall === 's' ? 'x' : 'z';
     const lo = along === 'x' ? x0 + inset(x0, X0) : z0 + inset(z0, Z0), hi = along === 'x' ? x1 - inset(x1, X1) : z1 - inset(z1, Z1);
+    // Keep the legal tread going while fitting resized rooms; leave a half metre for the landings.
+    const going = Math.max(0.2, Math.min(GOING, (hi - lo - 0.5) / (risers - 1))), run = going * (risers - 1);
     const at = typeof s.at === 'number' ? Math.min(1, Math.max(0, s.at)) : 0.5;
     // approach the bottom straight over >= 0.9 m (a 0.34 m body 0.35 m before the first tread clears the wall) and
     // arrive onto >= 1 m of landing when the wall has room; `at` places the flight in what is left
@@ -328,7 +333,7 @@ export function explicitPlan(json: unknown, c0: { W: number; D: number; t: numbe
     const s0 = lo + mB + (free - mB - mT) * at, s1 = s0 + run;
     const b0 = wall === 'n' ? z0 + inset(z0, Z0) : wall === 's' ? z1 - inset(z1, Z1) - STAIR_W : wall === 'w' ? x0 + inset(x0, X0) : x1 - inset(x1, X1) - STAIR_W;
     const rect: Rect = along === 'x' ? [s0, b0, s1, b0 + STAIR_W] : [b0, s0, b0 + STAIR_W, s1];
-    p.stairs.push({ id: ids.take('stairs'), from, to, room: room.id, rect, axis: along, dir: 1, width: STAIR_W, risers, going: GOING, away: wall === 'n' || wall === 'w' ? 1 : -1 });
+    p.stairs.push({ id: ids.take('stairs'), from, to, room: room.id, rect, axis: along, dir: 1, width: STAIR_W, risers, going, away: wall === 'n' || wall === 'w' ? 1 : -1 });
   }
   return p;
 }

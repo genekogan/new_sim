@@ -8,7 +8,7 @@ const play = (name, description, tags, shapes, palette, extra = {}) => kitDef({ 
 const wheelR = 7, hubY = 8.6;
 const ferris = [
   // A-frame supports (static)
-  ...[-0.7, 0.7].flatMap((z) => [limb([-3.2, 0, z], [0, hubY, z * 0.4], 0.14, 'frame', { kind: 'cyl', seg: 6 }), limb([3.2, 0, z], [0, hubY, z * 0.4], 0.14, 'frame', { kind: 'cyl', seg: 6 })]),
+  ...[-0.7, 0.7].flatMap((z) => [limb([-3.2, 0.06, z], [0, hubY, z * 0.4], 0.14, 'frame', { kind: 'cyl', seg: 6 }), limb([3.2, 0.06, z], [0, hubY, z * 0.4], 0.14, 'frame', { kind: 'cyl', seg: 6 })]),
   cbox([0, 0.25, 0], [8, 0.5, 2.4], 'base'), cbox([0, 0.9, 3.2], [2.4, 0.4, 1.2], 'base'),
   // the wheel: rim, spokes and round pods, all on role wheel about the hub (spins about z)
   ...withRole('wheel', [0, hubY, 0], [
@@ -33,7 +33,7 @@ const carousel = [
 
 export default [
   play('swings', 'A swing set: an A-frame with two swings.', ['swings', 'playground', 'seat'],
-    [...[-1.6, 1.6].flatMap((x) => [limb([x, 0, -0.9], [x, 2.4, 0], 0.07, 'frame', { kind: 'cyl', seg: 6 }), limb([x, 0, 0.9], [x, 2.4, 0], 0.07, 'frame', { kind: 'cyl', seg: 6 })]), cyl([0, 2.4, 0], 0.07, 3.4, 'frame', { roll: Math.PI / 2, seg: 6 }),
+    [...[-1.6, 1.6].flatMap((x) => [limb([x, 0.03, -0.9], [x, 2.4, 0], 0.07, 'frame', { kind: 'cyl', seg: 6 }), limb([x, 0.03, 0.9], [x, 2.4, 0], 0.07, 'frame', { kind: 'cyl', seg: 6 })]), cyl([0, 2.4, 0], 0.07, 3.4, 'frame', { roll: Math.PI / 2, seg: 6 }),
       ...[-0.7, 0.7].flatMap((x) => [box([x - 0.2, 1.5, 0], [0.02, 1.8, 0.02], 'rope'), box([x + 0.2, 1.5, 0], [0.02, 1.8, 0.02], 'rope'), cbox([x, 0.55, 0], [0.5, 0.05, 0.22], x < 0 ? 'seat1' : 'seat2')])],
     { frame: STEEL, rope: '#d8d4c8', seat1: RED, seat2: BLUE }, { slots: [seat('swing-1', [-0.7, 0.58, 0]), seat('swing-2', [0.7, 0.58, 0])], components: { seat: { height: 0.58 } } }),
   play('slide', 'A playground slide with a ladder and a platform.', ['slide', 'playground'],
