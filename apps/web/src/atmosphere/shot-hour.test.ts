@@ -76,7 +76,8 @@ test('LiveWorld sends the shot clock to lighting/atmosphere and the real clock t
   const source = readFileSync(new URL('../LiveWorld.tsx', import.meta.url), 'utf8');
   assert.match(source, /light\.update\(shotClockAt\(/);
   // 3.2: a visitor's time-of-day preview (visitor-hour.ts, view only) stands in for the shot hour when no shot hour is set
-  assert.match(source, /clock:shotClockAt\(shown\.current\?\.datetime\?\?null,shotHour\?\?visitorPreviewHour\(\)\)/);
+  // P7d: before its first take, an adopted early renderer's clock (the page's HTML clock, early-render.ts) stands in
+  assert.match(source, /clock:shotClockAt\(shown\.current\?\.datetime\?\?adopted\?\.clock\?\?null,shotHour\?\?visitorPreviewHour\(\)\)/);
   assert.match(source, /sites\.setWorldClock\(datetime,dayTicks\?86400\/\(dayTicks\*dt\):1\)/);
   assert.match(source, /shown\.current = \{ tick: depictedTick, datetime, take, entities: sampled\.entities \}/);
 });
