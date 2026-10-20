@@ -42,6 +42,12 @@ const carve = carveBase.refine(areaOrPath, { message: 'carve needs area, or path
 const pad = z.object({
   id: z.string(), kind: z.literal('pad'),
   area: poly, level: finite, edge: finite.positive().default(1.5),
+  /** pad/2 (lane RT, 2026-10-20): graded banks. Outside the flat (area and aprons) the ground is held within `grade`
+   *  (rise/run) of the level, so every bank of the terrace is walkable; the last 2 m of `edge` ease back to the natural
+   *  ground where a bank has not met it. Absent: the pad/1 smoothstep blend over `edge`, as before. */
+  grade: finite.positive().optional(),
+  /** pad/2: extra flat areas at the level, e.g. a landing in front of each exterior door. */
+  aprons: z.array(poly).optional(),
 });
 
 // Tranche-2 kinds (L3, forms.ts): cliff, terrace, channel, brush. Additive: the five originals fold exactly as before.

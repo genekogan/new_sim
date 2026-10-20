@@ -2,7 +2,7 @@
 // committed change with its inverse (spec §5). Two phases: `plan` simulates on
 // a scratch copy and never touches the model; `commit` applies a plan. The god
 // skill runs `plan` locally (dry runs); the server runs both.
-import { footprintOf, padFor, settle, waterLevelAt, SKIRT_MAX_M as SKIRT_MAX, type Landform } from '@sim/ground';
+import { footprintOf, padFor, settle, waterLevelAt, SKIRT_MAX_M as SKIRT_MAX, type Landform, type PadDoor } from '@sim/ground';
 import { CREATION_LIMITS, GENERATORS, kitFootprintIssues, prepareFor, queryOf } from '@sim/generators';
 import { z } from 'zod';
 import { hashOf } from './hash.ts';
@@ -805,14 +805,14 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
       e.p = [p[0], st.y, p[1]];
       if (anchor === 'conform' && st.pitch !== undefined) e.r = [yaw, st.pitch, st.roll ?? 0];
       if (anchor === 'base' && st.needsPad && (def.components.foundation?.kind ?? 'pad') === 'pad') {
-        (e as Entity & { _pad?: Landform })._pad = padFor(`${e.id}:pad`, fp, st.y);
+        (e as Entity & { _pad?: Landform })._pad = padFor(`${e.id}:pad`, fp, st.y, padGrading(w, baked, p[0], p[1], yaw, s));
       }
     } else if (p.length === 3 && (e.anchor ?? def.anchor) === 'base' && def.layer !== 'volume' && !baked.landform && (def.components.foundation?.kind ?? 'pad') === 'pad') {
       // a pre-settled pose (restore after undo, or an explicit y): keep y, but a building on a slope still needs its terrace
       const yaw = typeof e.r === 'number' ? e.r : Array.isArray(e.r) ? e.r[0] : 0;
       const fp = footprintOf(p[0], p[2], (baked.box[0] * s) / 2, (baked.box[2] * s) / 2, yaw);
       const st = settle(w.terrain, fp, 'base');
-      if (st.needsPad || Math.abs(st.y - p[1]) > SKIRT_MAX) (e as Entity & { _pad?: Landform })._pad = padFor(`${e.id}:pad`, fp, p[1]);
+      if (st.needsPad || Math.abs(st.y - p[1]) > SKIRT_MAX) (e as Entity & { _pad?: Landform })._pad = padFor(`${e.id}:pad`, fp, p[1], padGrading(w, baked, p[0], p[2], yaw, s));
     }
   }
   // facing: turn the entity's front (+z) toward the ref
@@ -991,6 +991,16 @@ function clearGround(w: WorldModel, e: Entity, diff: Diff) {
   for (const c of w.setLandform(null, `${e.id}:pad`)) for (const t of w.terrain.invalidate(c)) diff.tiles.push(t);
   w.setWater(null, e.id);
 }
+/** pad/2 (lane RT): what a new foundation pad grades against: the ground as it is now, and the thing's ground-floor
+ *  exterior doors in world metres (each gets a flat landing; settle.ts padFor). */
+function padGrading(w: WorldModel, baked: ReturnType<WorldModel['bake']>, x: number, z: number, yaw: number, s: number): { sample(x: number, z: number): number; doors: PadDoor[] } {
+  const c = Math.cos(yaw), sn = Math.sin(yaw);
+  const doors = (baked.openings ?? []).filter((o) => o.exterior && o.kind !== 'window' && !o.level && o.to !== 'balcony').map((o): PadDoor => {
+    const nx = Math.sin(o.yaw), nz = Math.cos(o.yaw);
+    return { at: [x + (o.at[0] * c + o.at[1] * sn) * s, z + (-o.at[0] * sn + o.at[1] * c) * s], out: [nx * c + nz * sn, -nx * sn + nz * c], width: o.width * s };
+  });
+  return { sample: (px, pz) => w.terrain.sample(px, pz), doors };
+}
 /** E2 #5: a def-carried landform, authored in the def frame: area/path points turn and move with the entity, widths scale,
  *  and levels (carve bed, pad level) are relative to the entity's own height. */
 function placeDefLandform(lf: NonNullable<ReturnType<WorldModel['bake']>['landform']>, wp: { x: number; y: number; z: number; yaw: number; s: number }, id: string): Landform {
@@ -1002,6 +1012,7 @@ function placeDefLandform(lf: NonNullable<ReturnType<WorldModel['bake']>['landfo
   if (typeof o.w === 'number') o.w *= wp.s;
   if (o.kind === 'carve') o.bed = wp.y + (o.bed ?? 0) * wp.s;
   if (o.kind === 'pad') o.level = wp.y + (o.level ?? 0) * wp.s;
+  if (o.kind === 'pad' && o.aprons) o.aprons = o.aprons.map((q) => q.map(at));
   if (o.kind === 'bump' || o.kind === 'brush') return placeLandform(lf, wp, id);
   return o;
 }

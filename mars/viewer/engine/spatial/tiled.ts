@@ -54,7 +54,7 @@ const unionRect = (p: TileRect | null, q: TileRect): TileRect => (p ? [Math.min(
 const rectBounds = (r: TileRect): [number, number, number, number] => [r[0] * GROUND_TILE_M, r[1] * GROUND_TILE_M, (r[2] + 1) * GROUND_TILE_M, (r[3] + 1) * GROUND_TILE_M];
 
 /** Grid-relevant identity of an obstacle (as grid.ts obstacleKey). */
-const obstacleKey = (o: Obstacle) => `${o.id}|${o.obb.c[0]},${o.obb.c[1]},${o.obb.half[0]},${o.obb.half[1]},${o.obb.yaw}|${o.y0},${o.y1}`;
+const obstacleKey = (o: Obstacle) => `${o.id}|${o.obb.c[0]},${o.obb.c[1]},${o.obb.half[0]},${o.obb.half[1]},${o.obb.yaw}|${o.y0},${o.y1}${o.raster ? `|${o.raster}` : ''}`;
 function fnv(s: string, h = 0x811c9dc5): number { for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619) >>> 0; return h; }
 
 /**
@@ -306,7 +306,7 @@ export class GroundNav {
         if (o.y1 <= h + STEP || o.y0 >= h + BODY_HEIGHT) return;
         if (blk && ids) { if (idx < 0) { idx = ids.length; ids.push(o.id); if (idx > 32000) throw new Error('ground: too many obstacles in one tile'); } blk[k] = idx; }
         free[k] = 0;
-      }, true, clip);
+      }, o.raster !== 'centre', clip);
     }
     return free;
   }

@@ -192,7 +192,7 @@ export class StaticRaster {
     const cover = new Int32Array(nx * nz).fill(-1);
     this.obstacles.forEach((o, k) => {
       if (o.y1 <= y + STEP || o.y0 >= y + BODY_HEIGHT) return;
-      rasterObb(o.obb, ox, oz, cell, nx, nz, (i) => { if (cover[i] < 0) cover[i] = k; }, true);
+      rasterObb(o.obb, ox, oz, cell, nx, nz, (i) => { if (cover[i] < 0) cover[i] = k; }, o.raster !== 'centre');
     });
     if (this.byY.size >= 8) this.byY.delete(this.byY.keys().next().value!);
     this.byY.set(y, cover);
@@ -460,7 +460,7 @@ function stampLevel(scene: SpatialScene, lv: Level, cell: number, lat: Lattice, 
     rasterObb(o.obb, ox, oz, cell, nx, nz, (i) => {
       if (free[i]) blockers.set(i, o.id);
       free[i] = 0;
-    }, true, clip);
+    }, o.raster !== 'centre', clip);
   }
 }
 
@@ -475,7 +475,7 @@ function columnsFor(g: LevelGrid): Float64Array | undefined {
 }
 
 /** Grid-relevant identity of an obstacle / surface (what the raster reads). */
-const obstacleKey = (o: Obstacle) => `${o.id}|${o.obb.c[0]},${o.obb.c[1]},${o.obb.half[0]},${o.obb.half[1]},${o.obb.yaw}|${o.y0},${o.y1}`;
+const obstacleKey = (o: Obstacle) => `${o.id}|${o.obb.c[0]},${o.obb.c[1]},${o.obb.half[0]},${o.obb.half[1]},${o.obb.yaw}|${o.y0},${o.y1}${o.raster ? `|${o.raster}` : ''}`;
 const surfaceKey = (s: Surface) => `${s.id}|${s.level}|${s.obb.c[0]},${s.obb.c[1]},${s.obb.half[0]},${s.obb.half[1]},${s.obb.yaw}`;
 
 /** Items only in `a` or only in `b` by key; null when keys repeat or the shared items changed relative order. */
@@ -619,7 +619,7 @@ export function gridsWithObstacles(base: GridSet, extra: Obstacle[]): GridSet {
         free[i] = 0;
         const ci = i % g.nx, cj = (i - ci) / g.nx;
         if (ci < ci0) ci0 = ci; if (ci > ci1) ci1 = ci; if (cj < cj0) cj0 = cj; if (cj > cj1) cj1 = cj;
-      }, true);
+      }, o.raster !== 'centre');
     }
     if (!free) { levels.set(id, g); continue; }
     const cols = columnsFor(g);

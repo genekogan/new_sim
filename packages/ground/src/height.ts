@@ -18,7 +18,7 @@ function landformBoundsRaw(l: Landform): [number, number, number, number] {
     case 'ridge': return polyBounds(l.path, l.w);
     case 'plateau': return polyBounds(l.area, 0);
     case 'carve': return l.area ? polyBounds(l.area, 0) : polyBounds(l.path!, l.w!);
-    case 'pad': return polyBounds(l.area, 0);
+    case 'pad': return l.aprons?.length ? unionBounds([l.area, ...l.aprons]) : polyBounds(l.area, 0);
     case 'cliff': return polyBounds(l.path, cliffReach(l));
     case 'terrace': return polyBounds(l.area, 0);
     case 'channel': return polyBounds(l.path, l.w + l.edge);
@@ -26,6 +26,11 @@ function landformBoundsRaw(l: Landform): [number, number, number, number] {
   }
 }
 const inBounds = (b: [number, number, number, number], x: number, z: number) => x >= b[0] && x <= b[2] && z >= b[1] && z <= b[3];
+function unionBounds(polys: Vec2[][]): [number, number, number, number] {
+  const b: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const p of polys) { const q = polyBounds(p, 0); b[0] = Math.min(b[0], q[0]); b[1] = Math.min(b[1], q[1]); b[2] = Math.max(b[2], q[2]); b[3] = Math.max(b[3], q[3]); }
+  return b;
+}
 
 /** Raw height at (x, z). Prefer Terrain.sample() (tile-interpolated) for anything that must match the browser. */
 /** Landforms in canonical fold order (class, then id), so a reloaded world sums in the same order to the bit. */
@@ -63,6 +68,7 @@ export function heightAt(g: Ground, x: number, z: number): number {
   for (const l of forms) {
     if (l.kind !== 'pad') continue;
     const b = influenceBounds(l); if (!inBounds(b, x, z)) continue;
+    if (l.grade !== undefined) { h = padGraded(h, x, z, l as PadLandform & { grade: number }); continue; }
     const m = padMask(x, z, l.area, l.edge);
     if (m > 0) h += (l.level - h) * m;
   }
@@ -105,6 +111,26 @@ function naturalAndCarve(g: Ground, forms: Landform[], x: number, z: number): nu
     if (m > 0 && l.bed < h) h += (l.bed - h) * m;
   }
   return h;
+}
+
+type PadLandform = Extract<Landform, { kind: 'pad' }>;
+/** pad/2: the last metres of `edge` over which a bank that has not met the natural ground eases back to it. */
+export const PAD_EASE_M = 2;
+/** Distance from (x, z) to a pad/2's flat (its area and aprons); 0 on it. */
+export function padFlatDist(x: number, z: number, l: PadLandform): number {
+  let d = pointInPoly(x, z, l.area) ? 0 : distPolyEdge(x, z, l.area);
+  for (const a of l.aprons ?? []) { if (d === 0) break; d = Math.min(d, pointInPoly(x, z, a) ? 0 : distPolyEdge(x, z, a)); }
+  return d;
+}
+/** pad/2: level on the flat; outside it the ground is clamped to within `grade` x distance of the level (a walkable
+ *  cut or fill bank), easing back to the natural ground over the last PAD_EASE_M of `edge`. */
+function padGraded(h: number, x: number, z: number, l: PadLandform & { grade: number }): number {
+  const d = padFlatDist(x, z, l);
+  if (d >= l.edge) return h;
+  const lo = l.level - l.grade * d, hi = l.level + l.grade * d, c = h < lo ? lo : h > hi ? hi : h;
+  if (c === h) return h;
+  const rest = l.edge - d;
+  return rest >= PAD_EASE_M ? c : h + (c - h) * smooth(rest / PAD_EASE_M);
 }
 
 /** Pads flatten fully inside and blend across `edge` metres OUTSIDE the footprint, so the terrace reaches the walls. */

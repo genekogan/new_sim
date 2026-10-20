@@ -4,7 +4,14 @@
 import type { OBB2, Vec2 } from '../core/math.ts';
 
 /** A solid prism: ground footprint + vertical extent (world y). */
-export type Obstacle = { id: string; obb: OBB2; y0: number; y1: number; label?: string; kind?: 'wall' | 'solid' | 'glass' | 'component' | 'vehicle' | 'fixture' };
+/**
+ * `raster: 'centre'` (door-raster/1, lane RT 2026-10-20): the walk raster blocks only the cells whose centre lies inside the
+ * box, not every cell the box touches. For wall pieces at least a cell thick (a god building's walls): the conservative
+ * raster grows a turned wall by up to half a cell diagonal on each face, so a 1 m doorway at an odd yaw kept 0.35 m of
+ * clearance and a 0.9 m interior door less than the 0.34 m a body plans with. Absent: the conservative raster, as before
+ * (old world-edit logs carry no field and replay unchanged).
+ */
+export type Obstacle = { id: string; obb: OBB2; y0: number; y1: number; label?: string; kind?: 'wall' | 'solid' | 'glass' | 'component' | 'vehicle' | 'fixture'; raster?: 'centre' };
 
 /** A horizontal walkable surface (ground patch, deck, landing). */
 export type Surface = { id: string; level: number; y: number; obb: OBB2; label?: string };
