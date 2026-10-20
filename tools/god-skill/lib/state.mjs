@@ -184,8 +184,17 @@ export async function call(path, { body, method, as = 'god', noBuild = false, ti
     const advice = recoverable ? ` Check \`request ${clientRef}\` before issuing a new edit; its outcome is unresolved.` : clientRef ? ' This endpoint has no receipt recovery; verify the world before issuing it again.' : '';
     return { status: 0, data: { ok: false, code: slow ? 'slow' : 'unreachable', ...(clientRef ? { clientRef } : {}), message: detail + advice } };
   };
+  // G9 (lane Z1): a gateway's 502/504 on a write (the launcher's world.unavailable, or a proxy's own non-JSON page) means
+  // the world was lost mid-request, as in a release: the edit may or may not have landed. It is handled like a lost
+  // connection (receipt lookup, then at most one resend for /act), never returned as the world's answer.
+  const gatewayLost = (r) => clientRef && (r.status === 502 || r.status === 504) && (r.data?.code === 'world.unavailable' || r.data?.raw !== undefined);
+  const attempt = async () => {
+    const r = await send(path, verb, payload);
+    if (gatewayLost(r)) throw new Error(`the world was unreachable for a moment (HTTP ${r.status}${r.data?.code ? ` ${r.data.code}` : ''}).`);
+    return r;
+  };
   let failure, response;
-  try { response = await send(path, verb, payload); } catch (e) { failure = e; }
+  try { response = await attempt(); } catch (e) { failure = e; }
   if (response) return finish(response);
   if (!recoverable) return lost(failure);
 
@@ -198,7 +207,7 @@ export async function call(path, { body, method, as = 'god', noBuild = false, ti
   const recovered = receiptResult(receipt);
   if (recovered) return finish(recovered);
   if (receipt.status !== 404) return lost(failure);
-  try { response = await send(path, verb, payload); } catch (e) { failure = e; }
+  try { response = await attempt(); } catch (e) { failure = e; }
   if (response) return finish(response);
   // If the one resend also lost its response, a final read may still resolve it.
   try { receipt = await lookup(); } catch { return lost(failure); }

@@ -132,3 +132,30 @@ test('other write endpoints carry fresh refs but are never automatically repeate
   assert.equal(calls.length, paths.length);
   assert.equal(new Set(calls.map((c) => JSON.parse(c.body).clientRef)).size, paths.length);
 });
+
+// G9 (lane Z1): a release stops the world under a write; the launcher answers 502 world.unavailable, a proxy its own page
+test('a gateway 502/504 on an act is a lost connection: its receipt is found, nothing is sent twice', async (t) => {
+  const calls = fixture(t, [json({ ok: false, code: 'world.unavailable' }, 502), () => receipt(JSON.parse(calls[0].body).clientRef)]);
+  assert.deepEqual(await call('/v1/god/act', { body: { ops: [] } }), { status: 200, data: { ...accepted, replayed: true } });
+  assert.equal(calls.length, 2); assert.equal(calls.filter((c) => c.method === 'POST').length, 1);
+});
+
+test('a proxy 502 page on an act with no receipt resends the identical payload once', async (t) => {
+  const page = new Response('<html><body>502 Bad Gateway</body></html>', { status: 502, headers: { 'content-type': 'text/html' } });
+  const calls = fixture(t, [page, json({}, 404), json(accepted)]);
+  const result = await call('/v1/god/act', { body: { ops: [] } });
+  assert.equal(result.data.accepted, true);
+  assert.equal(calls.length, 3); assert.equal(calls[0].body, calls[2].body);
+});
+
+test('a gateway 504 on a write without recovery is reported as a sentence, not as the world\'s answer', async (t) => {
+  fixture(t, [json({ ok: false, code: 'world.unavailable' }, 504)]);
+  const result = await call('/v1/god/env', { method: 'POST', body: { value: 1 } });
+  assert.equal(result.status, 0);
+  assert.match(result.data.message, /unreachable for a moment \(HTTP 504 world\.unavailable\)\..*no receipt recovery/);
+});
+
+test('a world\'s own 502 JSON answer (not world.unavailable) is returned as before', async (t) => {
+  fixture(t, [json({ ok: false, code: 'render.upstream' }, 502)]);
+  assert.equal((await call('/v1/god/act', { body: { ops: [] } })).status, 502);
+});
