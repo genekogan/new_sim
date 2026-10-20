@@ -115,3 +115,30 @@ Tone startup delay/refusal qualify only this consumer lifetime. Actual startup,
 mute/unmute, piece stop, old graph disposal, pending cancellation, retained viewer
 canvas and loading-headline caller assertion pass; no native world routing,
 real owners, mobile/device load, full AudioContext leak or shared-radio claim.
+
+## World playlist
+
+Lane S3 (2026-10-20). Gene: "music sucks. didn't we make better music? check the tone.js task for some of the music we
+made and put those on a playlist." The music in every world page (new worlds and the old `/w/eden`, `/w/mars`, ...) is
+now a playlist of Sim Score pieces, replacing the sound layer's own generative `music` bed.
+
+- **Source.** Gene's Sim Score repository `<sim-score-repo>` (HEAD `3b806f2`, 64 Tone.js pieces composed in the
+  browser, no samples). `tools/score/import-playlist.mjs` copies the engine files and the chosen pieces unchanged into
+  `playlist-runtime.mjs` (one function that takes Tone explicitly; `Sim` stays private, nothing plays on import) and
+  writes `PLAYLIST-PROVENANCE.json` (source revision, per-file sha256). Rerun it to change the playlist.
+- **Why these 12.** Gene's last word on Sim Score (Oct 4) asked for "more adventurous music and a bit more percussion"
+  and named SimCity, Tetris, Brian Eno, F-Zero, Karate Kid, Knight Rider, disco subgenres and vaporwave; there is no
+  later per-piece verdict, so the playlist is one round-three piece per named influence, in this order:
+  Pixel Town (SimCity town theme), Downtown Rush (city-sim jazz funk), Neon Shibuya (future funk), Departure Lounge
+  (Eno ambient), Line Clear (Tetris chiptune), Mirror Ball (Philly disco), Night Drive (synthwave), Plaza Mall (mallsoft),
+  Grand Prix (F-Zero racing fusion), Magic Orbit (space disco), Montage (80s synth rock), Night Patrol (80s TV synth).
+- **Player.** `apps/web/src/gen-mesh/music.ts`. The first piece is random per visit, then playlist order; each plays
+  240 s, fades 4 s, and the next starts. Mute or music off (the speaker and note buttons bottom right; on a phone, in the
+  HUD's More menu) stops it; on again restarts the current piece. A world's own `music` things stay quiet under it.
+  Nothing in it follows the camera, so moving the camera never restarts a piece.
+- **Cost.** Nothing at arrival: `tone` (about 341 KB) and `playlist-runtime` (about 239 KB, 80 KB gzipped) are lazy
+  chunks, not in `index.html`'s preloads, loaded only after the arrival is over, after the first gesture, with music on
+  and sound unmuted, in idle time. Tone owns its own AudioContext (its worklets); a gesture resumes it where a browser
+  insists (iOS).
+- **Proof.** `window.__edenMusic.state() / log() / level() / next() / trackSeconds(s)`; `score/playlist.test.ts` (all 12
+  pieces register and compose); `tools/sound/camera-restarts.mjs` (60 s of camera drags: sound and music restarts).
