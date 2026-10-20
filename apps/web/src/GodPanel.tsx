@@ -4,18 +4,17 @@
 // G5 (Gene 2026-10-20b): one view, no tabs: connect the agent (until it is connected), the command box with undo/redo
 // and weather, prayers waiting (only if any), the log, and Forsake world (hand on or archive). Start, Edits, Souls (in
 // Explore) are gone; flags, previews and the Constitution are switched off (god-ui/features.ts) but their code stays.
-// Everyone else gets "Become a god". The claim card of a godless world, the approval link (#approve/<id>) and the offer
-// links keep their small floating card.
+// Everyone else has no God Mode (U3: the God button is the god's only): the claim card of a godless world, the approval
+// link (#approve/<id>) and the offer links keep their small floating card.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiPath, worldKey } from './world-path.ts';
-import { BASE } from './base-path.ts';
 import * as G from './god-ui/god-api.ts';
 import { flyTo } from './god-ui/camera.ts';
 import { SMALL_SCREEN } from './HudMore.tsx';
 import { previewGhost, takePreviewKey, type GhostSummary } from './WorldPreviewGhost.ts';
 import { useSession } from './auth-session.ts';
 import { ApprovalCard } from './god-ui/JoinPanel.tsx';
-import { OwnerGod, VisitorGod, ago as since } from './god-ui/GodModal.tsx';
+import { OwnerGod, ago as since } from './god-ui/GodModal.tsx';
 import { closeGod, openGod, useGod, watchInbox } from './god-ui/god-store.ts';
 import { ConstitutionBody } from './god-ui/Constitution.tsx';
 import { ForsakeWorld } from './god-ui/WorldOwnerOps.tsx';
@@ -196,21 +195,8 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
     : <button data-god-panel-toggle="1" className="gp-card gp-collapsed" onClick={() => setOpen(true)}>✦ Claim this world</button>);
 
   if (!owner) {
-    // Visitors (and a godless world's claimant): only the approval link their agent printed (#approve/<id>) opens a card
-    // on a world with a god; the God button opens the read-only God.
-    const become = <>
-      <h3>Become a god</h3>
-      {!status.hasOwner && launcher?.world.claimable !== false
-        ? <p>Nobody is this world's god yet. Whoever claims it first becomes its god, and their coding agent builds it.</p>
-        : <p>Each world has one god: the person whose coding agent (Claude Code, Codex, Cursor…) builds it. To be one, make a world of your own; you send its agent commands from this window and watch them happen.</p>}
-      <div className="gm-actions">
-        {!status.hasOwner && launcher?.world.claimable !== false
-          ? (status.you === 'claimant' ? <button type="button" className="gm-primary" data-claim="1" disabled={busy === 'claim'} onClick={() => void claim()}>{busy === 'claim' ? 'Claiming…' : 'Become its god'}</button> : <>{signInButton}{signInForm}</>)
-          : BASE && <a className="gm-primary" href={`${BASE}/`} data-make-world="1">Make a world</a>}
-        <button type="button" className="gm-secondary" data-new-soul-from-god="1" onClick={() => { closeGod(); setTimeout(() => document.querySelector<HTMLElement>('.bring-agent-open')?.click(), 0); }}>New Soul</button>
-      </div>
-      <p className="gm-fine">Or live here: <b>New Soul</b> brings your agent into {name} as a resident.</p>
-    </>;
+    // Everyone not this world's god (U3: no God button, no Cmd+G): the claim card of a godless world, and on a world with a
+    // god only the approval link their agent printed (#approve/<id>) opens a card.
     return <>{ghostBar}
       {claimCard}
       {status.hasOwner && approvalId && (
@@ -219,7 +205,6 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
           {!signedIn && <div className="gp-block">{signInButton}{signInForm}</div>}
         </div>
       )}
-      {god.open && <VisitorGod become={become}>{godFeature('constitution') ? <ConstitutionBody /> : null}</VisitorGod>}
     </>;
   }
 

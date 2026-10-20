@@ -2,8 +2,8 @@
 // world's god: how to connect their agent (only while it is not connected), the command box with undo/redo and the
 // weather beside it, prayers waiting for an answer (only when there are any), and the ticket log of every command, newest
 // first (pending -> in progress -> done or failed, the agent's reply, and once done a link that flies the camera to what
-// it built). At the bottom "Forsake world" takes the modal over: hand the world on, or archive it. For everyone else:
-// how to become a god. GodPanel (in the world view) owns the data and renders this.
+// it built). At the bottom "Forsake world" takes the modal over: hand the world on, or archive it. Nobody else
+// opens it (U3: only the god has the God button). GodPanel (in the world view) owns the data and renders this.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { closeGod, presenceWord, sendCommand, showSection, ticketStatus, useGod, withdrawCommand, type Ticket } from './god-store.ts';
 import { flyTo } from './camera.ts';
@@ -80,17 +80,6 @@ function Connect({ url }: { url: string }) {
     </div>
     {manual && <input className="gm-prompt" aria-label="Line for your agent" value={line} readOnly autoFocus onFocus={(e) => e.target.select()} />}
   </section>;
-}
-
-/** Everyone who is not this world's god: how to become one. No owner controls. */
-export function VisitorGod({ become, children }: { become: ReactNode; children?: ReactNode }) {
-  return <Frame label="God Mode">
-    <Head />
-    <div className="gm-visitor" data-god-visitor="1">
-      <section className="gm-become" data-become-god="1">{become}</section>
-      {children && <section className="gm-const"><h3>Constitution</h3>{children}</section>}
-    </div>
-  </Frame>;
 }
 
 /** The command box (undo/redo and weather under it), prayers waiting, and the ticket log, newest first. */

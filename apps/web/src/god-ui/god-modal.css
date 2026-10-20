@@ -190,20 +190,6 @@
 .god-modal .cn-head > b { font-size: 16px; }
 .god-modal .cn-sec, .god-modal .cn-changed { border-color: var(--gm-line); }
 
-/* visitors: one column, read-only */
-.gm-visitor { overflow: auto; overscroll-behavior: contain; padding: 4px 22px 22px; max-height: calc(min(720px, 100dvh - 48px) - 72px); box-sizing: border-box; }
-.god-modal .gm-become { margin: 14px 0 6px; padding: 16px 18px; border-radius: 14px; background: var(--gm-soft); border: 1px solid var(--gm-line); }
-.gm-become h3, .gm-const > h3 { margin: 0 0 6px; font: 650 16px/1.25 system-ui, sans-serif; color: var(--fg); letter-spacing: -.01em; }
-.gm-become p { margin: 0 0 12px; color: color-mix(in srgb, var(--fg) 82%, transparent); }
-.gm-become .gm-fine { margin: 10px 0 0; font-size: 12.5px; color: var(--gm-dim); }
-.gm-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.god-modal .gm-primary, .god-modal .gm-secondary { display: inline-flex; align-items: center; min-height: 36px; padding: 0 16px; border-radius: 999px; font: 650 13.5px system-ui, sans-serif; text-decoration: none; cursor: pointer; box-sizing: border-box; }
-.god-modal .gm-primary { background: var(--fg); color: var(--bg); border: 1px solid var(--fg); }
-.god-modal .gm-secondary { background: transparent; color: var(--fg); border: 1px solid color-mix(in srgb, var(--fg) 28%, transparent); }
-.gm-become .gp-btn { min-height: 36px; }
-.god-modal .gm-const { margin-top: 18px; }
-.gm-const .cn-head { display: none; }
-
 /* the God button (Shell's top bar, right of Explore): Explore's pill, plus the agent's dot and a pairing badge */
 .god-control { position: relative; display: inline-flex; flex: none; }
 .explore-open.god-open { position: relative; }
@@ -213,7 +199,7 @@
 @media (prefers-color-scheme: dark) { .god-dot.on { background: #5fd08a; } .god-dot.off { background: #ff7b72; } }
 .god-open .gp-badge { position: absolute; top: -5px; right: -6px; margin: 0; }
 
-@media (pointer: coarse) { .god-modal.god-modal :is(.gm-x, .gm-send, .gm-go, .gm-primary, .gm-secondary, .gp-btn, .gm-copy, .gm-tool, .gm-forsake-open, .gm-back, .gm-danger-btn, .gm-danger-ghost, .gm-small) { min-height: 44px; } .god-modal.god-modal :is(.gm-textbtn, .gm-quiet) { min-height: 32px; } }
+@media (pointer: coarse) { .god-modal.god-modal :is(.gm-x, .gm-send, .gm-go, .gp-btn, .gm-copy, .gm-tool, .gm-forsake-open, .gm-back, .gm-danger-btn, .gm-danger-ghost, .gm-small) { min-height: 44px; } .god-modal.god-modal :is(.gm-textbtn, .gm-quiet) { min-height: 32px; } }
 /* phones and narrow windows */
 @media (max-width: 700px) {
   .god-modal { width: calc(100vw - 16px); max-height: calc(100dvh - 24px); border-radius: 16px; }
@@ -223,7 +209,6 @@
   .gm-pill { order: 3; flex-basis: auto; margin-left: 42px; font-size: 12px; }
   .god-modal .gm-titles { min-width: max-content; }   /* the title never squeezes onto two lines: the agent pill wraps below it */
   .gm-scroll { padding: 14px 14px 0; }
-  .gm-visitor { padding: 2px 14px 18px; max-height: none; }
   .gm-connect-line { flex-direction: column; align-items: stretch; }
   .god-modal .gm-copy { align-self: flex-start; }
   .gm-compose textarea { font-size: 16px; }
