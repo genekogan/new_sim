@@ -34,7 +34,7 @@ import {publishCompletedOwnerQueue} from './client-owner-result.mjs';
 import {openClientMemory} from './client-memory.mjs';
 import {travelCommand} from './client-travel.mjs';
 
-export const SKILL_VERSION='1.9.2';
+export const SKILL_VERSION='1.9.3';
 export const CONTRACT='eden-edge/1';
 export const API_CONTRACT='eden-edge/1.1'; // Additive support; preserve legacy wire contract.
 const STATE='.eden-agent.json';
@@ -118,6 +118,12 @@ const fromEnvelope=env=>({...(env.data??{}),kind:env.raw??env.kind,id:env.id,tic
 let EVENTS_V1=null;
 async function eventsV1(){if(EVENTS_V1!==null)return EVENTS_V1;const r=await call(EDGE.schema,{as:'none',timeoutMs:15_000});EVENTS_V1=r.status===200&&!!r.data?.events?.kinds;return EVENTS_V1;}
 const ok=(r,what)=>{if(r.status<200||r.status>=300)throw new Error(`${what}: HTTP ${r.status} ${JSON.stringify(r.data).slice(0,300)}`);return r.data;};
+/** 1.9.3 (lane PB): a world that is restarting (or a proxy in front of it) answers nothing, 429 or 5xx for a while. An approval
+ *  call retries those with backoff until its deadline instead of failing the request it already made; any other answer is final. */
+async function approvalCall(path,body,what,deadline){
+ for(let pause=1000;;pause=Math.min(pause*2,10_000)){const r=await call(path,{as:'none',body,timeoutMs:30_000});
+  if(!(r.status===0||r.status===429||r.status>=500)||Date.now()+pause>=deadline)return ok(r,what);await sleep(pause);}
+}
 /** Edge if the world serves /v1/edge, else legacy. Cached per folder; re-detected by `status`. */
 async function mode(fresh=false){
  const s=load();if(s.mode&&!fresh)return s.mode;
@@ -162,11 +168,11 @@ export async function createSoul(name,description){
 }
 async function startApproval({name,description,soulId}){
  let s=load();if(!s.accountAuth)throw Error('This world does not advertise account approvals.');
- if(s.pendingApproval?.approvalId){const p=s.pendingApproval,r=ok(await call('/v1/agent/approval/poll',{as:'none',body:{approvalId:p.approvalId,pollSecret:p.input.pollSecret}}),'check previous approval');if(['refused','cancelled','expired'].includes(r.status)||r.status==='ready'&&!r.token){finishApproval(r,p,s.world,r.status==='ready'?'unavailable':'terminal');s=load();}}
+ if(s.pendingApproval?.approvalId){const p=s.pendingApproval,r=await approvalCall('/v1/agent/approval/poll',{approvalId:p.approvalId,pollSecret:p.input.pollSecret},'check previous approval',Date.now()+60_000);if(['refused','cancelled','expired'].includes(r.status)||r.status==='ready'&&!r.token){finishApproval(r,p,s.world,r.status==='ready'?'unavailable':'terminal');s=load();}}
  if(!soulId&&s.reconnectSoul?.world===s.world&&s.reconnectSoul.name===name)soulId=s.reconnectSoul.id;
  let pending=s.pendingApproval;if(pending&&(pending.world!==s.world||pending.input.name!==name||pending.input.description!==description||pending.input.soulId!==soulId))throw Error('A different approval is pending. Check it with approval status or cancel it before creating another.');
  if(!pending){pending={world:s.world,worldId:s.worldId,input:{name,...(description===undefined?{}:{description}),...(soulId?{soulId}:{}),agentLabel:'eden-agent '+SKILL_VERSION,idempotencyKey:randomUUID(),pollSecret:randomBytes(32).toString('base64url')}};save({pendingApproval:pending});}
- const data=ok(await call('/v1/agent/approval/start',{as:'none',body:pending.input}),'approval start');if(data.approval.worldId!==pending.worldId)throw Error('Approval world differs from registration.');pending.approvalId=data.approval.id;save({pendingApproval:pending});return approvalPublic(data,s.world);
+ const data=await approvalCall('/v1/agent/approval/start',pending.input,'approval start',Date.now()+60_000);if(data.approval.worldId!==pending.worldId)throw Error('Approval world differs from registration.');pending.approvalId=data.approval.id;save({pendingApproval:pending});return approvalPublic(data,s.world);
 }
 function finishApproval(dto,pending,world,connection){
  if(dto.id!==pending.approvalId||dto.worldId!==pending.worldId||pending.world!==world)throw Error('Approval receipt scope differs; no pending request was discarded.');if(dto.status==='ready')acceptDelegation(dto,pending,world);
@@ -180,11 +186,11 @@ export async function approval(action='status'){
  if(!['status','wait','cancel'].includes(action))throw Error('usage: approval [status|wait|cancel]');const s=load();
  if(!s.pendingApproval&&action!=='cancel'&&s.accountAuth&&s.soul&&s.token){const data=ok(await call('/v1/agent/me'),'check selected Soul grant');if(data.soul?.id!==s.soul)throw Error('Selected Soul grant differs; no ready approval was reported.');return {status:'ready',soul:{id:s.soul,name:data.soul.name},paired:true,next:'Run status. The selected Soul is already ready and granted; no new approval was requested.'};}
  const pending=need(s,'pendingApproval','Run create-soul or pair-soul first.');if(pending.world!==s.world||pending.worldId!==s.worldId)throw Error('Approval belongs to another world.');if(!pending.approvalId)return startApproval(pending.input);
- const body={approvalId:pending.approvalId,pollSecret:pending.input.pollSecret},deadline=Date.now()+15*60000;
- for(;;){let data=ok(await call('/v1/agent/approval/poll',{as:'none',body}),'approval '+action),dto=data.approval??data;
+ const body={approvalId:pending.approvalId,pollSecret:pending.input.pollSecret},deadline=Date.now()+(action==='wait'?15*60000:30_000);
+ for(;;){let data=await approvalCall('/v1/agent/approval/poll',body,'approval '+action,deadline),dto=data.approval??data;
   if(['refused','cancelled','expired'].includes(dto.status))return finishApproval(dto,pending,s.world,'terminal');
   if(dto.status==='ready'&&!data.token){const receipt=finishApproval(dto,pending,s.world,'unavailable');return {...receipt,next:'The body exists but this agent grant is unavailable. Run pair-soul '+dto.soulId+' "'+dto.name+'" for fresh human approval; do not create a replacement Soul.'};}
-  if(action==='cancel'){data=ok(await call('/v1/agent/approval/cancel',{as:'none',body}),'approval cancel');dto=data.approval??data;return finishApproval(dto,pending,s.world,'terminal');}
+  if(action==='cancel'){data=await approvalCall('/v1/agent/approval/cancel',body,'approval cancel',Date.now()+30_000);dto=data.approval??data;return finishApproval(dto,pending,s.world,'terminal');}
   const delegate=acceptDelegation(data,pending,s.world);if(delegate){finishApproval(dto,pending,s.world,'delegated');folderGuide(dto.name);return {approvalId:dto.id,status:'ready',soul:{id:delegate.soul,name:dto.name},paired:true,next:'Run status. Manual control and dashboard/live now use this Soul grant; signing out of the browser does not stop it.'};}
   if(action!=='wait'||['refused','cancelled','expired'].includes(dto.status)||Date.now()>=deadline)return approvalPublic(dto,s.world);
   await sleep(3000);
