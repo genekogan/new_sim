@@ -108,8 +108,8 @@ step V6-party 1500 node tools/god-skill/e2e/party.mjs --no-shots --port 5421
 step V6-souls-r2 1500 node tools/god-skill/e2e/souls-r2.mjs --no-shots --port 5422
 step V6-join-clerk 900 node tools/god-skill/e2e/join.mjs --mode clerk --base /worlds --port 5425 --range 5426-5429
 step V6-join-dev 900 node tools/god-skill/e2e/join.mjs --mode dev --no-shots --port 5430 --range 5431-5434
-# V6-launcher drives real Chrome through claim, pair and build. It is not a CPU gate step (Z3, 2026-10-20: 3 of 3 Modal
-# runs on SwiftShader failed the same 8 of 14 steps, see release-gate.mjs); it runs in V7 (v7-walks.sh), and here on a laptop.
+# V6-launcher is not a gate step (Z3, 2026-10-20): stale since G5 removed the God modal's tabs, it fails the same 8 of 14
+# steps on a laptop GPU and on Modal (release-gate.mjs). A laptop run still runs it, as a reminder until it is rewritten.
 if [ "${REMOTE_SUITE_CPU:-}" != 1 ]; then
   step V6-launcher 900 node tools/god-skill/e2e/launcher.mjs --port 5435 --range 5436-5440
 fi

@@ -9,5 +9,4 @@ test('fails on page error, missing run, bad dpr, dead input',()=>{
   assert.equal(judge({old:old.map(r=>({...r,geometry:{canvasCss:[1352,780],buffer:[1352,780]}})),fresh}).status,'fail');
   assert.equal(judge({old:old.map(r=>({...r,input:{}})),fresh}).status,'fail');
   assert.equal(judge({old,fresh,rcNew:1}).status,'fail');
-  assert.equal(judge({old,fresh,rcLauncher:1}).status,'fail'); assert.equal(judge({old,fresh,rcLauncher:NaN}).status,'fail');
 });
