@@ -34,10 +34,11 @@ const baseDef = (ref) => {
   const name = ref.replace(/^core\//, 'core-').replace(/@\d+$/, ''), d = baseDefs.find((x) => x.name === name);
   if (!d) throw new Error(`preset base ${ref} not found in core-kit/*.json`); return d;
 };
-/** `defaults` = { param: newDefault } (the base's field spec is kept, only its default changes); `size` defaults to the base's. */
-export function presetDef({ name, base, category, synonyms = [], description, tags = [], defaults = {}, size, components, slots }) {
+/** `defaults` = { param: newDefault } (the base's field spec is kept, only its default changes); `ranges` = { param: { min?, max? } }
+ *  narrows a preset's own range (a two-floor preset whose stairs need more width than its one-floor base); `size` defaults to the base's. */
+export function presetDef({ name, base, category, synonyms = [], description, tags = [], defaults = {}, ranges = {}, size, components, slots }) {
   const b = baseDef(base), params = {};
-  for (const [k, v] of Object.entries(defaults)) { if (!b.params?.[k]) throw new Error(`${name}: ${base} has no param ${k}`); params[k] = { ...b.params[k], default: v }; }
+  for (const [k, v] of Object.entries(defaults)) { if (!b.params?.[k]) throw new Error(`${name}: ${base} has no param ${k}`); params[k] = { ...b.params[k], ...(ranges[k] ?? {}), default: v }; }
   return { schema: 'def/1', name: `core-${name}`, version: 1, extends: base, description, tags: [...new Set([...category.split('.'), ...tags])], category, ...(synonyms.length ? { synonyms } : {}),
     form: b.form ?? 'point', make: { kind: 'none' }, params, ...(components ? { components } : {}), ...(slots ? { slots } : {}), size: size ?? b.size };
 }

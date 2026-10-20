@@ -23,7 +23,8 @@ const industrialPresets = [
     defaults: { w: 16, d: 24, floorHeight: 5, roof: 'gable', roofPitch: 16, material: 'metal', wall: '#8a9590', trim: '#d9a63a', roofColor: '#5d6466', windows: 0.12 } }),
   presetDef({ ...IND, name: 'factory', base: 'core/hall@1', synonyms: ['works', 'plant', 'mill building', 'manufactory', 'industrial building', 'foundry'],
     description: 'A two-floor brick factory (18 × 14 m) with a saw-tooth-like shed roof and rows of tall windows; workshop floors inside. Pair it with a factory-chimney. Size, floors and colours are params.',
-    defaults: { w: 18, d: 14, floors: 2, floorHeight: 4.5, roof: 'shed', roofPitch: 14, material: 'brick', wall: C.brick, trim: '#e8dcc4', roofColor: '#4a4a48', windows: 0.65 } }),
+    defaults: { w: 18, d: 14, floors: 2, floorHeight: 4.5, roof: 'shed', roofPitch: 14, material: 'brick', wall: C.brick, trim: '#e8dcc4', roofColor: '#4a4a48', windows: 0.65 },
+    ranges: { w: { min: 5 } } }),   // Z2: its two floors' stairs need 5 m (core-hall keeps 3 m for one-floor rooms)
   presetDef({ ...IND, name: 'workshop', base: 'core/barn@1', synonyms: ['work shed', 'garage workshop', 'maker space', 'carpentry shop', 'repair shop', 'atelier'],
     description: 'A timber workshop (8 × 6 m) with a lean-to roof and a wide front porch to work under; benches and tools go inside. Size and colours are params.',
     defaults: { w: 8, d: 6, floorHeight: 3.6, roof: 'shed', roofPitch: 18, material: 'wood', wall: '#7a8a6a', trim: C.cream, roofColor: '#4f5559', porch: 1.5, windows: 0.4 } }),

@@ -330,7 +330,7 @@
   "params": {
    "w": {
     "type": "number",
-    "min": 5.6,
+    "min": 5.2,
     "max": 24,
     "default": 6,
     "doc": "width (x) in metres"
@@ -484,7 +484,7 @@
    },
    "d": {
     "type": "number",
-    "min": 6,
+    "min": 5,
     "max": 24,
     "default": 9,
     "doc": "depth (z) in metres"
@@ -624,7 +624,7 @@
   "params": {
    "w": {
     "type": "number",
-    "min": 5,
+    "min": 3,
     "max": 30,
     "default": 14,
     "doc": "width (x) in metres"
