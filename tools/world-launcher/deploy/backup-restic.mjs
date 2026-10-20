@@ -25,6 +25,7 @@
 //   RESTIC_REPOSITORY      /srv/sim-worlds-backups/restic        RESTIC_PASSWORD_FILE  /etc/sim-worlds/restic.pass
 //   RESTIC_CACHE_DIR       /srv/sim-worlds-backups/.cache        SIM_BACKUP_DATA_ROOT  /srv/sim-worlds-data
 //   SIM_BACKUP_STAGING     /srv/sim-worlds-backups/staging       SIM_BACKUP_KEEP       "--keep-daily 7 --keep-weekly 4 --keep-monthly 6"
+//                                                                (off = never forget/prune: nothing is ever deleted)
 //   SIM_BACKUP_OFFSITE     (unset = local only)                  RESTIC_BIN            restic
 //   SIM_BACKUP_TIME        (tests only: the snapshot's time, "YYYY-MM-DD HH:MM:SS")
 import { backup as sqliteBackup, DatabaseSync } from 'node:sqlite';
@@ -133,7 +134,7 @@ async function runBackup(stage) {
     .map((l) => { try { return JSON.parse(l); } catch { return null; } }).find((m) => m?.message_type === 'summary');
   if (!summary?.snapshot_id) throw new Error('restic backup: no snapshot id in its summary');
   const forget = ['forget', '--host', HOST, '--tag', stage, ...KEEP, '--prune'];
-  restic(forget, { quiet: true });
+  if (KEEP[0] !== 'off') restic(forget, { quiet: true });
   const day = Number(new Date().getUTCDay());
   restic(['check', '--read-data-subset', `${day + 1}/7`], { quiet: true });
   const kept = JSON.parse(restic(['snapshots', '--json', '--host', HOST, '--tag', stage], { quiet: true }) || '[]').length;
@@ -147,14 +148,14 @@ async function runBackup(stage) {
       const inited = spawnSync(BIN, ['-r', off, 'cat', 'config'], { env, encoding: 'utf8' }).status === 0;
       if (!inited) restic(['init', ...from, '--copy-chunker-params'], { repo: off, quiet: true });
       restic(['copy', ...from, '--host', HOST, '--tag', stage], { repo: off, quiet: true });
-      restic(forget, { repo: off, quiet: true });
+      if (KEEP[0] !== 'off') restic(forget, { repo: off, quiet: true });
       offsite = `; offsite ${inited ? 'copied' : 'initialised + copied'}`;
     } catch (e) { failed.push(`offsite: ${e.message}`); offsite = '; offsite FAILED'; }
   }
 
   const growth = before != null && after != null ? `, repo ${mb(after)} MB (${after >= before ? '+' : ''}${mb(after - before)} MB)` : '';
   console.log(`backup ${stage}: snapshot ${summary.snapshot_id.slice(0, 8)}, ${ok}/${dbs.length} databases ok (quick_check), ${files.length} files, ` +
-    `${assets} new assets, ${mb(summary.total_bytes_processed ?? 0)} MB staged${growth}; ${kept} snapshots kept${offsite}`);
+    `${assets} new assets, ${mb(summary.total_bytes_processed ?? 0)} MB staged${growth}; ${kept} snapshots kept${KEEP[0] === 'off' ? ' (retention off)' : ''}${offsite}`);
   for (const f of failed) console.error(`FAILED ${f}`);
   if (failed.length) process.exitCode = 1;
 }

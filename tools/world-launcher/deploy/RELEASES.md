@@ -121,7 +121,7 @@ from ship.sh's compact backup, which a release still takes first. Each night it:
    only files that are new or changed into the mirror at `/srv/sim-worlds-backups/staging/<stage>`;
 3. takes one restic snapshot of that mirror into `/srv/sim-worlds-backups/restic`, tagged `<stage>`;
 4. **deletes** old snapshots: `forget --prune` keeps 7 daily, 4 weekly and 6 monthly snapshots per stage
-   (`SIM_BACKUP_KEEP`). Then `check` reads a seventh of the data, so all of it is read once a week;
+   (`SIM_BACKUP_KEEP`; `off` skips this step, so nothing is deleted). Then `check` reads a seventh of the data, so all of it is read once a week;
 5. copies the snapshots off the box to `SIM_BACKUP_OFFSITE` (an R2 bucket) and applies the same retention there.
    This step runs only when that setting is present.
 

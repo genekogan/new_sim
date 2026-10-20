@@ -55,6 +55,11 @@ test('backup, version history, restore by night, retention, off-box copy', { ski
   const growth = Number(/\(\+(\d+\.\d) MB\)/.exec(r.stdout)[1]);
   assert.ok(growth < 0.2, `second night adds only the change (${growth} MB)`);
 
+  // SIM_BACKUP_KEEP=off: snapshot only, nothing forgotten (the first live nights run this way until retention is approved)
+  const before = snaps('production').length;
+  r = run(['backup', 'production'], { SIM_BACKUP_TIME: '2026-01-02 04:30:00', SIM_BACKUP_KEEP: 'off' });
+  assert.equal(r.status, 0, r.stderr); assert.match(r.stdout, /3 snapshots kept \(retention off\)/); assert.equal(snaps('production').length, before + 1);
+
   // restore night 1 and latest
   r = run(['restore', 'production', '2026-01-01', join(T, 'r1')]);
   assert.equal(r.status, 0, r.stderr); assert.match(r.stdout, /3\/3 databases ok/);
