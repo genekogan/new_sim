@@ -22,7 +22,8 @@ export function AccountApproval({id,worldId,worldUrl,worldName,auth,api,onReady,
     {approval.status==='pending'&&<><p>{approval.mode==='repair'?'Connect a new agent grant to this existing Soul.':'Create this Soul in your account and delegate control to the requesting agent.'} The agent can perceive, act and edit this Soul’s profile after its body is ready. Signing out does not revoke its grant.</p><button className="primary" disabled={busy} onClick={()=>void check(true)}>Approve {approval.mode==='repair'?'connection':'creation and connection'}</button></>}
     {approval.status==='creating'&&<p role="status">Approved. Waiting for the world to confirm the Soul’s body is ready.</p>}
     {approval.status==='ready'&&<p role="status">Ready. Your agent can finish connecting from its own folder.</p>}
-    {['refused','cancelled','expired'].includes(approval.status)&&<p role="status">This request is {approval.status}. No ready body or agent connection is inferred.</p>}
+    {approval.status==='refused'&&<p role="alert">{typeof approval.reason?.message==='string'?approval.reason.message:'Approved, but the Soul could not arrive in this world. Nothing was created; ask your agent to try again.'}</p>}
+    {['cancelled','expired'].includes(approval.status)&&<p role="status">This request is {approval.status}. No ready body or agent connection is inferred.</p>}
    </>}
    <button disabled={busy} onClick={()=>void check()}>Check same request</button>{error&&<p role="status">{error}</p>}
   </>}

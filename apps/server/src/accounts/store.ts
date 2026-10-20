@@ -9,7 +9,9 @@ export type AccountsDb = Pick<Db, 'db'> & { tx<T>(operation: () => T): T };
 /** Only construct this from server-verified provider identity, never request JSON. */
 export type AccountIdentity = { id: string; issuer: string; subject: string; verifiedEmail?: string; verifiedAt: number; expiresAt: number };
 export type ApprovalStatus = 'pending' | 'creating' | 'ready' | 'refused' | 'cancelled' | 'expired';
-export type ApprovalDTO = { id: string; worldId: string; agentLabel: string; name: string; description: string; mode: 'create' | 'repair'; status: ApprovalStatus; soulId: string | null; createdAt: number; expiresAt: number };
+export type ApprovalDTO = { id: string; worldId: string; agentLabel: string; name: string; description: string; mode: 'create' | 'repair'; status: ApprovalStatus; soulId: string | null; createdAt: number; expiresAt: number; reason?: { code: 'arrival-unavailable'; message: string } };
+/** Lane PB: 'refused' only ever follows an approval whose Soul then could not arrive; say so, for the person and the agent. */
+export const ARRIVAL_REFUSAL = { code: 'arrival-unavailable', message: 'Approved, but the Soul could not arrive: there is no clear ground to stand on near this world\'s arrival point. Nothing was created. The world\'s god can clear the arrival point; then ask your agent to try again.' } as const;
 export type StartApprovalInput = { agentLabel: string; name: string; description?: string; idempotencyKey: string; pollSecret?: string };
 export type AllocationInput = { approvalId: string; worldId: string; accountId: string; requestId: string; requestNonce: string; name: string; description: string; mode: 'create' | 'repair'; soulId: string | null };
 export type Allocation = { worldId: string; accountId: string; requestId: string; soulId: string };
@@ -129,7 +131,7 @@ export class AccountStore {
     return row;
   }
   private dto(row: ApprovalRow): ApprovalDTO {
-    return { id: row.id, worldId: row.world_id, agentLabel: row.agent_label, name: row.name, description: row.description, mode: row.mode, status: row.status, soulId: row.soul_id ?? row.repair_soul_id, createdAt: row.created_at, expiresAt: row.expires_at };
+    return { id: row.id, worldId: row.world_id, agentLabel: row.agent_label, name: row.name, description: row.description, mode: row.mode, status: row.status, soulId: row.soul_id ?? row.repair_soul_id, createdAt: row.created_at, expiresAt: row.expires_at, ...(row.status === 'refused' ? { reason: { ...ARRIVAL_REFUSAL } } : {}) };
   }
   private member(soulId: string): MemberRow | undefined {
     text(soulId, 'Soul');

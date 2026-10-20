@@ -243,7 +243,7 @@ test('legacy repair uses actual body readiness with association handle, never cr
 
 test('actual refusal remains terminal, records no ready claim and invalidates delegated grants', t => {
   const f = accepted(t), refusal = { ...f.actual, lifecycleState: 'refused' as const, ready: false };
-  assert.equal(f.store.reconcile(f.start.id, refusal).status, 'refused');
+  const refused = f.store.reconcile(f.start.id, refusal); assert.equal(refused.status, 'refused'); assert.equal(refused.reason?.code, 'arrival-unavailable', 'lane PB: the person and the agent learn why');
   assert.equal(f.store.poll(f.start.id, f.start.pollSecret!).token, undefined);
   assert.throws(() => f.store.reconcile(f.start.id, f.actual), error('projection-conflict'));
   assert.equal(f.store.approve(f.owner, f.start.id, () => { throw Error('duplicate'); }).status, 'refused');

@@ -108,7 +108,8 @@ export function ApprovalCard({ id, signedIn, onDone }: { id: string; signedIn: b
       </>}
       {a?.status === 'creating' && <p role="status">Approved. Waiting for the world to confirm the body is ready…</p>}
       {a?.status === 'ready' && <p role="status" className="gp-ok">Connected. Your agent finishes from its own folder (<code>approval wait</code>).</p>}
-      {a && ['refused', 'cancelled', 'expired'].includes(a.status) && <p role="status">This request is {a.status}.</p>}
+      {a?.status === 'refused' && <p role="alert" className="gp-bad" data-approval-reason={a.reason?.code ?? 'refused'}>{typeof a.reason?.message === 'string' ? a.reason.message : 'Approved, but the Soul could not arrive in this world. Nothing was created; ask your agent to try again.'}</p>}
+      {a && ['cancelled', 'expired'].includes(a.status) && <p role="status">This request is {a.status}.</p>}
       {err && <p className="gp-bad">{err}</p>}
       <div className="gp-row"><span /><button className="gp-mini" onClick={onDone}>close</button></div>
     </div>

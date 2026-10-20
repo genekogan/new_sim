@@ -8,7 +8,7 @@ import { userAuthHeaders } from '../auth-session.ts';
 
 export type MySoul = { id: string; name: string; entityId: string; hasToken: boolean };
 export type SoulHere = { id: string; entityId: string; name: string; since: number; active: boolean; p?: [number, number, number] };
-export type Approval = { id: string; worldId: string; agentLabel: string; name: string; description: string; mode: 'create' | 'repair'; status: 'pending' | 'creating' | 'ready' | 'refused' | 'cancelled' | 'expired'; soulId: string | null; expiresAt: number };
+export type Approval = { id: string; worldId: string; agentLabel: string; name: string; description: string; mode: 'create' | 'repair'; status: 'pending' | 'creating' | 'ready' | 'refused' | 'cancelled' | 'expired'; soulId: string | null; expiresAt: number; reason?: { code: string; message: string } };
 
 /** The signed-in person's Souls in this world; null when nobody is signed in (or the world refuses them). */
 export async function mySouls(): Promise<MySoul[] | null> {
