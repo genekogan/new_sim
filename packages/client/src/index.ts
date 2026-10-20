@@ -272,7 +272,7 @@ export class Connection {
       }catch{this.handlers.onError?.('takes.transport-invalid','The take transport cannot be restored exactly.');try{ws.close();}catch{/* closing */}return;}
       this.onMessage(m,receivedAtMs);
     };
-    ws.onclose = () => {
+    ws.onclose = (ev?: { code?: number }) => {
       if (this.ws !== ws) return;
       active=false;this.clearTransport();
       clearInterval(this.pingTimer); this.stats.state = 'closed'; this.handlers.onChange?.();
@@ -280,7 +280,12 @@ export class Connection {
       this.stats.reconnects++;
       // exponential backoff with jitter, so a restart does not bring every client back on the same millisecond.
       // (`retry` is reset only once the server has actually welcomed us: a server that accepts and then closes must not be hammered.)
-      this.reconnectTimer = setTimeout(() => this.open(), Math.min(15_000, 500 * 2 ** this.retry++) * (0.5 + Math.random()));
+      // G9 (lane Z1): a welcomed socket the server closed because it is restarting (1001, a release handover) comes back
+      // after 50-150 ms: the launcher holds the new upgrade until the world is up again, so waiting longer only adds to
+      // the visible pause. Only the first try: a server that closes again before welcoming us gets the backoff above.
+      const restarting = ev?.code === 1001 && this.retry === 0;
+      this.reconnectTimer = setTimeout(() => this.open(), restarting ? 50 + 100 * Math.random() : Math.min(15_000, 500 * 2 ** this.retry) * (0.5 + Math.random()));
+      this.retry++;
     };
     ws.onerror = () => { try { ws.close(); } catch { /* already closed */ } };
     if (adopted) {
