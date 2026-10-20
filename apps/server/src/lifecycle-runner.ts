@@ -17,8 +17,10 @@ function refers(value:unknown,id:string):boolean {
  * Character text can change canonically; the immutable birth description is
  * evidence of admission, not the current row/Mind/kernel character value.
  * The caller still checks current user/invitation/control authority separately. */
-/** The world's arrival point (its first anchor) as a birth-near/1 hint, or none when the engine names no such point. */
+/** The world's arrival point (its first anchor) as a birth-near/1 hint, only when a solid is built over it (a crowd on a
+ * clear arrival point still refuses, as before); none when the engine names no such point. */
 function arrivalNear(host:WorldHost):{at:[number,number]}|undefined{
+  if(!(host.engine as {arrivalBuiltOverV1?():boolean}).arrivalBuiltOverV1?.())return undefined;
   const p=host.engine.anchors?.()[0]?.point as unknown;
   return Array.isArray(p)&&p.length===2&&p.every(v=>typeof v==='number'&&Number.isFinite(v))?{at:[p[0],p[1]]}:undefined;
 }

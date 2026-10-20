@@ -1176,6 +1176,14 @@ export class MarsEngine implements Engine {
     this.out.changes.push([this.rt.tick, id, 'present', e]);
     return id;
   }
+  /** birth-near/1 (lane PB): is a solid built over the arrival point's own standing disc? Read-only. The server offers
+   * a birth the nearest clear ground only then, so a crowd standing on a clear arrival point still refuses as before. */
+  arrivalBuiltOverV1(): boolean {
+    const [ax, az] = this.rt.world.groundV1 ? groundArrival(this.rt, this.cfg.arrival) : this.cfg.arrival;
+    const spatial = this.rt.services.spatial as Spatial; spatial.sync(this.rt.world);
+    const grid = spatial.levelAt(0, [ax, az]);
+    return !!grid && clearanceAt(grid, [ax, az]) < HUMAN_RADIUS;
+  }
   /** birth-near/1: the nearest ground point (rings of 0.25 m out to 12 m) with a clear standing disc, nobody within
    * 0.8 m and no deep water. Walkability from there is proved by the caller's own physical walk, never assumed. */
   private freeStandingNearV1(at: [number, number], radius: number): [number, number] | null {
