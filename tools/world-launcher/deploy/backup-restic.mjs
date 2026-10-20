@@ -68,7 +68,7 @@ function mirror(src, dst) {
     if (st.isDirectory()) { copied += mirror(s, d); continue; }
     if (!st.isFile()) continue;
     const dt = existsSync(d) ? statSync(d) : null;
-    if (dt && dt.size === st.size && dt.mtimeMs === st.mtimeMs) continue;
+    if (dt && dt.size === st.size && Math.abs(dt.mtimeMs - st.mtimeMs) < 1) continue;   // utimes(Date) keeps whole ms only
     copyFileSync(s, `${d}.tmp`); utimesSync(`${d}.tmp`, st.atime, st.mtime); renameSync(`${d}.tmp`, d); copied++;
   }
   return copied;
