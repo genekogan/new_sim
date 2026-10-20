@@ -21,7 +21,7 @@ import type {createWorldEdenExpansion} from './WorldEdenExpansion.ts';
 import type {LocalClassroomPresentation} from './WorldClassroomPresentation.ts';
 import {WorldFollow} from './WorldFollow.ts';
 import {worldCameraRenderRoots} from './WorldCameraRenderRoots.ts';
-import {WorldOrbitPivot} from './WorldOrbitPivot.ts';import {WorldRtsCamera} from './WorldRtsCamera.ts';import {FramePacer} from './frame-pacing.ts';
+import {WorldOrbitPivot} from './WorldOrbitPivot.ts';import {WorldRtsCamera,EDEN_TERRAIN_EXTENT} from './WorldRtsCamera.ts';import {FramePacer} from './frame-pacing.ts';
 import {createWorldAtmosphere} from './WorldAtmosphere.ts';
 import {SpectatorSpeechLayer,speechFromTalk,speechFromEdge,channelChip,type SpectatorSpeech,type EdgeSpectatorMessage} from './WorldSpectatorSpeech.ts';
 import {WorldFadingLayer,parseFadeOverride,fadingFromEdge,beamedOut,type FadingState} from './WorldFading.ts';
@@ -326,7 +326,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       const target=controls.target.clone();controls.dispose();controls=newControls(target);
     },owned=>{if(latestViewerState.current)emitState({...latestViewerState.current,inputOwned:owned});});
     const orbitPivot=new WorldOrbitPivot();scene.add(orbitPivot.group);
-    const rts=new WorldRtsCamera(renderer.domElement,camera,{controls:()=>controls,mode:()=>context.current.cameraMode,takeOver:()=>{context.current.manualNavigation='orbit';context.current.cameraMode='manual';context.current.follow=false;if(!navigation?.sync(true))navigation?.release(false);context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');},scene:()=>scene,pickRoots:()=>[floaters.root,kin.view.root,standIns,...(people?.pickingRoots()??[]),...visualObstructionRoots()],focusAt:(x,y)=>{const target=hover.pick(x,y);if(target){inspectHover(target);return {center:target.point,radius:target.radius};}return null;},enabled:()=>!(context.current.cameraMode==='manual'&&context.current.manualNavigation==='free')});scene.add(rts.marker);  // VF2: your camera (keys, pivot, double-click)
+    const rts=new WorldRtsCamera(renderer.domElement,camera,{controls:()=>controls,mode:()=>context.current.cameraMode,takeOver:()=>{context.current.manualNavigation='orbit';context.current.cameraMode='manual';context.current.follow=false;if(!navigation?.sync(true))navigation?.release(false);context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');},scene:()=>scene,pickRoots:()=>[floaters.root,kin.view.root,standIns,...(people?.pickingRoots()??[]),...visualObstructionRoots()],focusAt:(x,y)=>{const target=hover.pick(x,y);if(target){inspectHover(target);return {center:target.point,radius:target.radius};}return null;},enabled:()=>!(context.current.cameraMode==='manual'&&context.current.manualNavigation==='free'),
+      extent:()=>(entityLayer.active?entityLayer.groundExtent():null)??(expansion?EDEN_TERRAIN_EXTENT:geometry.bounds),home:()=>{context.current.setCameraMode('manual');controlsApi.current?.overview();}});scene.add(rts.marker);  // VF2: your camera (keys, pivot, double-click)
     const speechLayer=new SpectatorSpeechLayer();scene.add(speechLayer.group);let speeches:SpectatorSpeech[]=[];const speechHead=new THREE.Vector3();
     // W3 fading visuals: Core C9 state when it ships; meanwhile a ?fade= preview override.
     // W2/W5 preview: ?snapshots=1 exposes on-demand low-res JPEG eyes/overhead/map frames (steward queue C10 will call these).
@@ -1053,7 +1054,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) { down = null; return; }
       down = null;
       if (entityLayer.active && godFeature('flags') && (e.altKey || flagModeRef.current)) return;  // a flag drop (onFlagClick), not a selection: no place card over the god panel
-      const target=hover.pick(e.clientX,e.clientY);if(target)inspectHover(target);else{setPlaceCard(null);context.current.setThing(null);}
+      const target=hover.pick(e.clientX,e.clientY);if(target)inspectHover(target);else{setPlaceCard(null);context.current.setThing(null);rts.clickPivot(e);}  // C1: open ground: pivot there
 
     };
     renderer.domElement.addEventListener('pointerdown', onDown);

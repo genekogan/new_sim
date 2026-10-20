@@ -13,6 +13,7 @@ import { WORLD_PLACE_VIEWS, REGION_PLACE_VIEWS } from './WorldPlaces.ts';
 import { WorldTour, type TourView } from './WorldTour.ts';
 import { speakingNow } from './dialogue-speaking.ts';
 import { BALLOON } from './WorldBalloonRide.ts';
+import { liftHorizon } from './broadcast-horizon.ts';
 
 export type WorldCameraMode = 'broadcast' | 'manual' | 'follow';
 export type CarrierPose = { p: readonly number[]; yaw: number };
@@ -118,7 +119,13 @@ export class WorldBroadcast {
     this.picker.reset(); this.tour.reset(); this.godViews?.tour.reset(); this.choice = null; this.lastPick = -Infinity; this.emptySince = null; this.ride = null;
   }
 
+  /** The shot for this frame, its aim lifted toward the horizon (C1, broadcast-horizon.ts). */
   sample(frame: Record<string, SampledEntity>, records: Record<string, Entity>, scene: SpatialScene | null,
+    tick: number, dt: number, aspect: number, wallSeconds: number, movementDt: number,renderRoots:readonly THREE.Object3D[]=[] ) {
+    const shot = this.direct(frame, records, scene, tick, dt, aspect, wallSeconds, movementDt, renderRoots);
+    return shot?.pose ? { ...shot, pose: { ...shot.pose, target: liftHorizon(shot.pose.position, shot.pose.target) } } : shot;
+  }
+  private direct(frame: Record<string, SampledEntity>, records: Record<string, Entity>, scene: SpatialScene | null,
     tick: number, dt: number, aspect: number, wallSeconds: number, movementDt: number,renderRoots:readonly THREE.Object3D[]=[] ) {
     if (!scene || !Number.isFinite(tick) || !Number.isFinite(dt) || dt <= 0) return null;
     if (tick < this.lastTick) this.reset(); // seek/epoch, never blend old and new scenes

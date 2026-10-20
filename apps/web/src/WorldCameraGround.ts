@@ -65,6 +65,23 @@ export class CameraGroundClamp{
   return y;
  }
 
+ /** C1: where a ray first meets the drawn ground or water (the selected provider: a march refined by bisection;
+  * else one ray against the wide ground meshes), within `maxDistance`; null when it never does. */
+ along(scene:THREE.Object3D,origin:THREE.Vector3,dir:THREE.Vector3,maxDistance=600,now=performance.now()):THREE.Vector3|null{
+  if(!this.provider){
+   const meshes=this.groundMeshes(scene,now);if(!meshes.length)return null;
+   const ray=new THREE.Raycaster(origin,dir.clone().normalize(),0,maxDistance);
+   for(const h of ray.intersectObjects(meshes,false))if(h.point.y<MAX_GROUND_Y)return h.point.clone();
+   return null;
+  }
+  const d=dir.clone().normalize(),below=(t:number)=>{const x=origin.x+d.x*t,z=origin.z+d.z*t,g=this.heightAt(scene,x,z,now);return g!==null&&origin.y+d.y*t<=g;};
+  let prev=0,step=1.5;
+  for(let t=step;t<=maxDistance;t+=step){
+   if(below(t)){let lo=prev,hi=t;for(let i=0;i<10;i++){const m=(lo+hi)/2;if(below(m))hi=m;else lo=m;}return origin.clone().addScaledVector(d,hi);}
+   prev=t;step=Math.min(12,step*1.15);
+  }
+  return null;
+ }
  /** Lift the camera above the ground under it (and just ahead of it). Never moves it down or sideways. */
  apply(camera:THREE.Camera,scene:THREE.Object3D,now=performance.now()){
   const p=camera.position;

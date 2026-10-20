@@ -2,15 +2,19 @@ import { Vector3, type PerspectiveCamera } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { WorldCameraMode } from './WorldBroadcast.ts';
 export type ManualNavigation = 'orbit' | 'free';
+/** C1: the farthest your camera's eye may be from its pivot (metres). The wheel stops sooner on a small world
+ * (WorldRtsCamera.farLimit); this bounds OrbitControls (touch pinch) and keeps the 2400 m far plane beyond the map. */
+export const MANUAL_FAR_LIMIT=1400;
 /** Metres for forward/right/up; radians for yaw (+ turns right) and pitch (+ tilts up). */
 export type CameraMove = { forward?: number; right?: number; up?: number; yaw?: number; pitch?: number };
 export type NavigationContext = { mode: WorldCameraMode; navigation: ManualNavigation; lifecycle: string };
 // Shared controls in either manual camera: horizontal walking, independent head rotation and elevation.
 export const manualCameraKeys = new Set(['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','KeyR','KeyF','PageUp','PageDown','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','ShiftLeft','ShiftRight','AltLeft','AltRight']);
-export function manualCameraStep(keys:ReadonlySet<string>,seconds:number):CameraMove {
+/** `scale` multiplies the metre speeds only (C1: your camera moves faster the higher it is; turning is unchanged). */
+export function manualCameraStep(keys:ReadonlySet<string>,seconds:number,scale=1):CameraMove {
   const held=(code:string)=>Number(keys.has(code)),dt=Number.isFinite(seconds)?Math.min(.1,Math.max(0,seconds)):0;
   const precision=held('AltLeft')||held('AltRight'),boost=held('ShiftLeft')||held('ShiftRight');
-  const speed=3*(precision?.2:boost?3:1),angular=precision?.35:1;
+  const speed=3*(precision?.2:boost?3:1)*(Number.isFinite(scale)?Math.max(1,scale):1),angular=precision?.35:1;
   const forward=held('KeyW')-held('KeyS'),right=held('KeyD')-held('KeyA');
   const up=Number(!!(held('KeyE')||held('KeyR')||held('PageUp')))-Number(!!(held('KeyQ')||held('KeyF')||held('PageDown')));
   const n=Math.hypot(forward,right,up)||1;
@@ -39,7 +43,7 @@ export function editableEvent(event: KeyboardEvent): boolean {
 export function createWorldOrbitControls(camera: PerspectiveCamera,canvas: HTMLCanvasElement,target: Vector3 | undefined,context:NavigationContext): OrbitControls {
   const position=camera.position.clone(),rotation=camera.quaternion.clone();
   const controls=new OrbitControls(camera,canvas);
-  controls.enableDamping=true;controls.maxPolarAngle=context.mode==='follow'?Math.PI*.48:Math.PI*.99;controls.minDistance=2;controls.maxDistance=320;
+  controls.enableDamping=true;controls.maxPolarAngle=context.mode==='follow'?Math.PI*.48:Math.PI*.99;controls.minDistance=2;controls.maxDistance=MANUAL_FAR_LIMIT;
   controls.enabled=!(context.mode==='manual'&&context.navigation==='free');controls.enablePan=context.mode!=='follow';
   // VF2 (Gene): your camera pans along the ground and zooms toward the point under the cursor; Follow keeps its Soul centred.
   controls.mouseButtons.RIGHT=null; // RMB is owned by look-in-place, never OrbitControls pan.

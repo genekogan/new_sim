@@ -461,6 +461,9 @@ export class WorldEntityLayer {
   /** Terrain meshes, for picking a ground point with a ray (flags). */
   terrainMeshes(): THREE.Object3D[] { return [...this.sectors.values()]; }
 
+  /** C1: the world's ground rectangle [x0, z0, x1, z1] (camera zoom limit and bounds), or null before the model. */
+  groundExtent(): readonly [number, number, number, number] | null { return this.model ? this.model.ground().extent : null; }
+
   /** Height for the camera clamp and anything else that asks; null outside the extent. */
   groundAt = (x: number, z: number): number | null => {
     if (!this.model) return null;
