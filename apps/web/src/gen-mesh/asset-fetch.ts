@@ -35,44 +35,69 @@ async function decodeImages(buf, n) {
 // CDN2 (2026-10-20): a GLB the CDN manifest lists comes from assets.eden.art (cdn-assets.ts cdnRoute, resolved on the page
 // before the job is posted). Its bytes must be exactly cdn.bytes long and hash to cdn.sha256; otherwise (HTTP, CORS,
 // network, a 12 s stall, length or hash) the worker downloads the original URL, as the page's transport does.
-async function fromCdn(id, cdn) {
-  const stall = new AbortController(); let timer;
-  const arm = () => { clearTimeout(timer); timer = setTimeout(() => stall.abort(), 12000); };
+// PF2 (2026-10-20), as the page-entry snapshot (snapshot-wire.ts hedged): a GLB request that has not answered in HEDGE_MS
+// is asked for again beside it (the original URL beside the CDN, the original again beside itself) and the first answer
+// wins, the other is cancelled; an original body that sends nothing for STALL_MS is asked for once more. Before, nothing
+// bounded the original request at all, and a stalled CDN request held its GLB for the full 12 s before the fallback.
+const HEDGE_MS = 4000, STALL_MS = 12000;
+function hedged(a, b) {
+  return new Promise((resolve, reject) => {
+    const ctl = [new AbortController(), null]; let settled = false, out = 1, timer;
+    const win = (i) => (r) => { if (settled) { ctl[i].abort(); return; } settled = true; clearTimeout(timer); if (ctl[1 - i]) ctl[1 - i].abort(); resolve({ r, ctl: ctl[i], cdn: i === 0 && a.cdn === true }); };
+    const lose = (e) => { if (--out === 0 && !settled) { settled = true; clearTimeout(timer); reject(e); } };
+    a(ctl[0].signal).then(win(0), lose);
+    timer = setTimeout(() => { if (settled) return; out++; ctl[1] = new AbortController(); try { b(ctl[1].signal).then(win(1), lose); } catch (e) { lose(e); } }, HEDGE_MS);
+  });
+}
+// The body of a response, or null when it sends nothing for STALL_MS (the request is then cancelled) or more than max bytes.
+async function body(id, got, max) {
+  let timer; const arm = () => { clearTimeout(timer); timer = setTimeout(() => got.ctl.abort(), STALL_MS); };
   try {
-    arm();
-    const r = await fetch(cdn.url, { mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer', signal: stall.signal });
-    if (!r.ok || !r.body) return null;
-    self.postMessage({ id, total: cdn.bytes });
-    const reader = r.body.getReader(), out = new Uint8Array(cdn.bytes); let loaded = 0, last = 0;
+    if (!got.r.body) return null;
+    const reader = got.r.body.getReader(), parts = []; let loaded = 0, last = 0;
     for (arm(); ; arm()) {
       const { done, value } = await reader.read(); if (done) break;
-      if (loaded + value.byteLength > cdn.bytes) { reader.cancel().catch(() => {}); return null; }
-      out.set(value, loaded); loaded += value.byteLength;
+      loaded += value.byteLength; if (loaded > max) { reader.cancel().catch(() => {}); return null; }
+      parts.push(value);
       const now = Date.now(); if (now - last > 100) { last = now; self.postMessage({ id, loaded }); }
     }
-    if (loaded !== cdn.bytes) return null;
-    const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', out)), (b) => b.toString(16).padStart(2, '0')).join('');
-    return hash === cdn.sha256 ? out : null;
+    const out = new Uint8Array(loaded); let o = 0; for (const p of parts) { out.set(p, o); o += p.byteLength; }
+    return out;
   } catch (e) { return null; } finally { clearTimeout(timer); }
+}
+async function fromCdn(id, cdn, got) {
+  if (!got.r.ok) return null;
+  self.postMessage({ id, total: cdn.bytes });
+  const out = await body(id, got, cdn.bytes);
+  if (!out || out.byteLength !== cdn.bytes) return null;
+  const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', out)), (b) => b.toString(16).padStart(2, '0')).join('');
+  return hash === cdn.sha256 ? out : null;
 }
 self.onmessage = async (ev) => {
   const { id, url, cdn, images: decode } = ev.data;
+  const send = async (out, viaCdn) => {
+    const images = decode ? await decodeImages(out.buffer, out.byteLength) : [];
+    self.postMessage({ id, loaded: out.byteLength, buffer: out.buffer, images, ...(viaCdn ? { cdn: true } : {}) }, [out.buffer, ...images.map((x) => x[1])]);
+  };
   try {
-    const verified = cdn ? await fromCdn(id, cdn) : null;
-    if (verified) {
-      const images = decode ? await decodeImages(verified.buffer, verified.byteLength) : [];
-      self.postMessage({ id, loaded: verified.byteLength, buffer: verified.buffer, images, cdn: true }, [verified.buffer, ...images.map((x) => x[1])]);
-      return;
+    const original = (signal) => fetch(url, { credentials: 'same-origin', signal });
+    let got = null;
+    if (cdn) {
+      const fromEdge = Object.assign((signal) => fetch(cdn.url, { mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer', signal }), { cdn: true });
+      got = await hedged(fromEdge, original).catch(() => null);
+      if (got && got.cdn) { const verified = await fromCdn(id, cdn, got); if (verified) return await send(verified, true); got = null; }
     }
-    const r = await fetch(url, { credentials: 'same-origin' });
-    if (!r.ok) { self.postMessage({ id, error: 'HTTP ' + r.status, status: r.status }); return; }
-    const enc = r.headers.get('content-encoding'), len = Number(r.headers.get('content-length'));
-    self.postMessage({ id, total: !enc && Number.isFinite(len) && len > 0 ? len : null });
-    const reader = r.body.getReader(), parts = []; let loaded = 0, last = 0;
-    for (;;) { const { done, value } = await reader.read(); if (done) break; parts.push(value); loaded += value.byteLength; const now = Date.now(); if (now - last > 100) { last = now; self.postMessage({ id, loaded }); } }
-    const out = new Uint8Array(loaded); let o = 0; for (const p of parts) { out.set(p, o); o += p.byteLength; }
-    const images = decode ? await decodeImages(out.buffer, loaded) : [];
-    self.postMessage({ id, loaded, buffer: out.buffer, images }, [out.buffer, ...images.map((x) => x[1])]);
+    for (let attempt = 0; ; attempt++) {
+      if (!got) got = await hedged(original, original);
+      const r = got.r;
+      if (!r.ok) { self.postMessage({ id, error: 'HTTP ' + r.status, status: r.status }); return; }
+      const enc = r.headers.get('content-encoding'), len = Number(r.headers.get('content-length'));
+      self.postMessage({ id, total: !enc && Number.isFinite(len) && len > 0 ? len : null });
+      const out = await body(id, got, Infinity);
+      if (out) return await send(out, false);
+      if (attempt) throw new Error('stalled for ' + STALL_MS / 1000 + ' s');
+      got = null;
+    }
   } catch (e) { self.postMessage({ id, error: String(e && e.message || e) }); }
 };`;
 
