@@ -19,6 +19,7 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "three": "^0.185.1",
+    "tone": "15.1.22",
     "@sim/generators": "workspace:*",
     "meshoptimizer": "^1.1.1"
   },

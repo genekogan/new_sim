@@ -36,16 +36,17 @@ test('emittersOf: each spec of a multi-sound def is its own emitter with its own
   assert.ok(em.every((e) => e.source === 'object' && e.state.on === true));
 });
 
-test('ambience: wind always, birds by day, crickets by night, waves near water, muffled indoors', () => {
+test('ambience: no wind bed (lane S3), birds by day, crickets by night, waves near water, muffled indoors', () => {
   const base = { x: 10, y: 1.7, z: 10, ground: 0, night: 0, covered: false, waters: [] as never[] };
   const day = ambienceAt(base), night = ambienceAt({ ...base, night: 1 });
-  assert.ok(day.some((e) => e.spec.kind === 'wind'));
+  assert.ok(!day.some((e) => e.spec.kind === 'wind') && !ambienceAt({ ...base, y: 60, exposure: 1 }).some((e) => e.spec.kind === 'wind'));
   assert.ok(day.some((e) => e.spec.kind === 'birds') && !day.some((e) => e.spec.kind === 'crickets'));
   assert.ok(night.some((e) => e.spec.kind === 'crickets') && !night.some((e) => e.spec.kind === 'birds'));
   const lake = ambienceAt({ ...base, waters: [{ area: [[0, 0], [5, 0], [5, 5], [0, 5]], level: 0 }] });
   assert.ok(lake.some((e) => e.spec.kind === 'waves' && e.area));
   const inside = ambienceAt({ ...base, covered: true });
-  assert.ok(inside.find((e) => e.spec.kind === 'wind')!.spec.volume < day.find((e) => e.spec.kind === 'wind')!.spec.volume);
+  const birds = (a: ReturnType<typeof ambienceAt>) => a.filter((e) => e.spec.kind === 'birds').reduce((v, e) => v + e.spec.volume, 0);
+  assert.ok(birds(inside) < birds(day));
   // deterministic: the same place gives the same singers
   assert.deepEqual(ambienceAt(base).map((e) => e.id), day.map((e) => e.id));
 });
@@ -61,9 +62,9 @@ test('residents: footsteps where they walk, chatter where two or more stand toge
   assert.ok(!high.some((e) => e.id === 'me:steps'), 'no footsteps from an overhead camera');
 });
 
-test('settings: quiet by default, music opt-in, remembered, robust to junk and to storage failures', () => {
+test('settings: quiet by default, music on (the playlist, lane S3), remembered, robust to junk and to storage failures', () => {
   assert.deepEqual(loadSettings(null), { ...DEFAULT_SETTINGS });
-  assert.ok(MASTER_DEFAULT <= 0.35 && DEFAULT_SETTINGS.music === false && DEFAULT_SETTINGS.muted === false);
+  assert.ok(MASTER_DEFAULT <= 0.35 && DEFAULT_SETTINGS.music === true && DEFAULT_SETTINGS.muted === false);
   const mem = new Map<string, string>(), store = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v) };
   saveSettings(store, { muted: true, volume: 0.2, music: true });
   assert.deepEqual(loadSettings(store), { muted: true, volume: 0.2, music: true });
@@ -116,15 +117,12 @@ test('a wood rustles as one voice per cluster, louder than a single tree; the di
   assert.ok(far.every((e) => e.spec.volume <= 0.1 + 1e-9), 'beside a wooded world, open ground has only rare quiet birds');
 });
 
-test('wind rises on open, high ground and gusts when exposed; sheltered ground is calm', () => {
+test('exposure still measures open, high ground (reported in state); the sea follows the listener', () => {
   const crowd: [number, number, number][] = Array.from({ length: 10 }, (_, i) => [i, 2, 0] as [number, number, number]);
   const sheltered = exposureAt(0, 0, 0, 0, crowd), open = exposureAt(0, 0, 0, 0, []), hill = exposureAt(0, 0, 14, 0, []);
   assert.ok(sheltered < open && open < hill && hill === 1, `${sheltered} ${open} ${hill}`);
-  const base = { x: 0, y: 1.7, z: 0, ground: 0, night: 0, covered: false, waters: [] as never[] };
-  const calm = ambienceAt({ ...base, exposure: sheltered }), windy = ambienceAt({ ...base, exposure: hill });
-  const vol = (a: ReturnType<typeof ambienceAt>, id: string) => a.find((e) => e.id === id)?.spec.volume ?? 0;
-  assert.ok(vol(windy, 'amb:wind') > vol(calm, 'amb:wind'));
-  assert.ok(vol(windy, 'amb:gusts') > 0 && vol(calm, 'amb:gusts') === 0);
+  const shore = ambienceAt({ x: 0, y: 1.7, z: 0, ground: 0.5, night: 0, covered: false, waters: [] as never[], seaLevel: 0 });
+  assert.ok(shore.find((e) => e.id === 'amb:sea')?.follow === true);
 });
 
 test('day/night conditions follow the world clock; frogs at ponds by night, gulls over the sea by day', () => {

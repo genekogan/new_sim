@@ -10,13 +10,21 @@
 //
 // New worlds only: it starts when the page publishes `window.__simEntity` (LiveWorld does that only for world-engine
 // worlds), and the AudioContext is created on the first pointer/key gesture (browsers refuse audio before one).
-// Quiet by default; a small speaker button (bottom right) mutes it and toggles ambient music, remembered per browser.
-// `window.__edenSound.state()` reports emitters and voices; `.log()` lists which sources started where (tests, proof).
+// Quiet by default; a small speaker button (bottom right) mutes it and toggles the music, remembered per browser.
+// `window.__edenSound.state()` reports emitters and voices; `.log()` lists which sources started where, `.events()` every
+// start and stop with its reason (tests, proof).
+//
+// Lane S3 (2026-10-20, Gene): no wind bed (ambience is incidental: things that are there and what happens); the music is
+// a playlist of Sim Score pieces in music.ts, on every world page, with nothing tied to the camera; and a camera move no
+// longer restarts sounds: a source that drops out of hearing keeps its voice, silent, for LINGER_MS and picks up where it
+// was if it is heard again, a source that follows the listener (the sea) is heard wherever the camera is, and a voice's
+// event clock never fires a backlog of notes when it comes back.
 import type { WorldModel } from '@sim/world-compiler';
 import { ambienceAt, condition, DEFAULT_SETTINGS, distanceTo, emittersOf, exposureAt, falloff, loadSettings, Movement, saveSettings, treeIndex, treesOf, type Emitter, type Resident, type SoundKind, type SoundSettings, type Source, type TreeIndex } from './sound-plan.ts';
 import { nightOf } from './motion.ts';
 import { sharedCoverProbe, type CoverProbe } from '../world-env.ts';
 import { arrivalOver } from '../arrival-marks.ts';
+import { musicGesture, musicLevel, musicLog, musicPlaying, musicState, musicTrackSeconds, nextPiece, syncMusic } from './music.ts';
 import type * as THREE from 'three';
 
 export { condition, distanceTo, falloff, emittersOf } from './sound-plan.ts';
@@ -26,10 +34,12 @@ type Cam = { position: { x: number; y: number; z: number } };
 type Host = { layer: { model?: WorldModel | null; group?: THREE.Object3D; groundAt?(x: number, z: number): number | null }; camera: Cam; residents?: () => Resident[] };
 
 const MAX_VOICES = 12, TICK_MS = 100;
+/** A voice no longer heard stays alive (silent) this long before it stops, so a camera move does not restart it. */
+const LINGER_MS = 8000, MAX_LIVE = MAX_VOICES + 8;
 
 // ------------------------------------------------------------------ synthesis (procedural, no files)
 
-type Voice = { kind: SoundKind; variant: number; source: Source; out: GainNode; stop: () => void; tick: (t: number, e: Emitter) => void; gain: number };
+type Voice = { kind: SoundKind; variant: number; source: Source; out: GainNode; stop: () => void; tick: (t: number, e: Emitter) => void; gain: number; quietSince: number };
 let ctx: AudioContext | null = null, master: GainNode | null = null, noiseBuf: AudioBuffer | null = null;
 let settings: SoundSettings = { ...DEFAULT_SETTINGS };
 
@@ -71,7 +81,7 @@ function makeVoice(c: AudioContext, kind: SoundKind, variant: number, source: So
   const nodes: (AudioScheduledSourceNode)[] = [];
   let next = c.currentTime + Math.random() * 0.5;
   let tick: (t: number, e: Emitter) => void = () => {};
-  const every = (fn: (at: number, e: Emitter) => number) => { tick = (t, e) => { let guard = 0; while (next < t + 0.3 && guard++ < 32) next += fn(next, e); }; };
+  const every = (fn: (at: number, e: Emitter) => number) => { tick = (t, e) => { if (next < t - 0.25) next = t + Math.random() * 0.2; let guard = 0; while (next < t + 0.3 && guard++ < 32) next += fn(next, e); }; };   // after a silent spell: no backlog of notes
   const bed = (type: BiquadFilterType, f: number, q: number, level: number) => { const n = noise(c), b = filt(c, type, f, q), g = c.createGain(); g.gain.value = level; n.connect(b).connect(g).connect(out); nodes.push(n); return { b, g }; };
   const r = Math.random;
   switch (kind) {
@@ -126,13 +136,13 @@ function makeVoice(c: AudioContext, kind: SoundKind, variant: number, source: So
         return a - at + 0.15 + r() * (variant === 1 ? 0.3 : 0.7); });
       break; }
     case 'leaves':
-      if (variant === 1) { const a = bed('bandpass', 1300, 0.5, 0.45); nodes.push(lfo(c, 0.06, 0.25, a.g.gain)); }   // pine whisper (and reeds)
-      else { const a = bed('highpass', 2600, 0.6, 0.35); nodes.push(lfo(c, 0.09, 0.3, a.g.gain)); nodes.push(lfo(c, 0.23, 900, a.b.frequency));   // broadleaf rustle, gusting
-        every((at) => { burst(c, out, at, 0.12 + r() * 0.25, 0.12 + r() * 0.16, 3200 + r() * 1800); return 0.25 + r() * 1.4; }); }
+      // lane S3: no continuous whoosh, only now-and-then rustles (Gene: the wind-like beds were annoying)
+      if (variant === 1) every((at) => { burst(c, out, at, 0.4 + r() * 0.5, 0.1 + r() * 0.08, 1300, 'bandpass'); return 2.5 + r() * 5; });   // pine whisper (and reeds)
+      else every((at) => { burst(c, out, at, 0.12 + r() * 0.25, 0.12 + r() * 0.16, 3200 + r() * 1800); return 0.6 + r() * 2.4; });   // broadleaf rustle
       break;
     case 'flag': {
-      // cloth flapping: a fast flutter riding slow gusts; variant 1 adds the halyard tapping the pole
-      const a = bed('bandpass', variant ? 650 : 850, 1.1, 0.3); nodes.push(lfo(c, 9 + r() * 4, 0.22, a.g.gain)); nodes.push(lfo(c, 0.12, 0.15, a.g.gain));
+      // cloth flapping now and then; variant 1 adds the halyard tapping the pole
+      // lane S3: the flaps only, no continuous flutter bed
       every((at) => { burst(c, out, at, 0.05, 0.35, 1400, 'bandpass'); if (variant === 1 && r() < 0.35) tone(c, out, at + 0.1, 2300 + r() * 200, 2250, 0.12, 0.08, 'triangle'); return 0.8 + r() * 2.4; });
       break; }
     case 'waterfowl':
@@ -149,7 +159,7 @@ function makeVoice(c: AudioContext, kind: SoundKind, variant: number, source: So
       if (variant === 1) { burst(c, out, at, 0.07, 0.5, 2400); burst(c, out, at + 0.015, 0.05, 0.3, 4200); } else { burst(c, out, at, 0.09, 0.9, 260, 'lowpass'); tone(c, out, at, 90, 60, 0.07, 0.25); }
       return Math.max(0.28, 0.75 / Math.sqrt(sp)); }); break;
   }
-  return { kind, variant, source, out, gain: 0, tick: (t, e) => tick(t, e), stop: () => { for (const n of nodes) { try { n.stop(); } catch { /* stopped */ } } setTimeout(() => out.disconnect(), 200); } };
+  return { kind, variant, source, out, gain: 0, quietSince: 0, tick: (t, e) => tick(t, e), stop: () => { for (const n of nodes) { try { n.stop(); } catch { /* stopped */ } } setTimeout(() => out.disconnect(), 200); } };
 }
 /** A one-shot for `mode: 'change'` (a door creak, a bell ringing, a splash). */
 function oneShot(c: AudioContext, kind: SoundKind, gain: number) {
@@ -167,6 +177,7 @@ function oneShot(c: AudioContext, kind: SoundKind, gain: number) {
 
 type Heard = { id: string; kind: SoundKind; variant: number; source: Source; gain: number; d: number; e: Emitter };
 type LogRow = { t: number; id: string; kind: SoundKind; variant: number; source: Source; gain: number; d: number; at: [number, number, number] };
+type EventRow = { t: number; id: string; kind: SoundKind; ev: 'start' | 'stop'; reason: string };
 const voices = new Map<string, Voice>();
 const movement = new Movement();
 let objects: Emitter[] = [], ambient: Emitter[] = [], people: Emitter[] = [], lastScan = 0, lastSeq = -1, lastAmb = 0, lastHeard: Heard[] = [];
@@ -188,15 +199,15 @@ function scanWorld(model: WorldModel) {
 const lastValue = new Map<string, unknown>();
 let meter: AnalyserNode | null = null;
 const log: LogRow[] = [];
+const events: EventRow[] = [];
+const started = new Set<string>();
+function event(id: string, kind: SoundKind, ev: EventRow['ev'], reason: string) { events.push({ t: Math.round(performance.now()), id, kind, ev, reason }); if (events.length > 600) events.splice(0, events.length - 600); }
+function stopVoice(id: string, v: Voice, reason: string) { v.stop(); voices.delete(id); event(id, v.kind, 'stop', reason); }
 
 function applyMaster() { if (master) master.gain.value = settings.muted ? 0 : settings.volume; }
 function unlock() {
   if (ctx || typeof AudioContext === 'undefined') return;
   try { ctx = new AudioContext(); master = ctx.createGain(); applyMaster(); master.connect(ctx.destination); meter = ctx.createAnalyser(); meter.fftSize = 2048; master.connect(meter); noise(ctx).stop(); } catch { ctx = null; }
-}
-/** The opt-in ambient piece: a slow pad that follows the listener (off unless the visitor turns music on). */
-function musicBed(x: number, y: number, z: number): Emitter[] {
-  return settings.music ? [{ id: 'amb:music', source: 'ambient', state: {}, area: false, pts: [[x, y, z]], spec: { kind: 'music', radius: 10, volume: 0.35, variant: 1 } }] : [];
 }
 function step(host: Host) {
   const model = host.layer.model; if (!model) return;
@@ -212,12 +223,13 @@ function step(host: Host) {
     try { const g = model.ground() as { waters?: typeof waters; seaLevel?: number }; waters = g.waters ?? []; seaLevel = g.seaLevel; } catch { /* no ground yet */ }
     night = nightOf(model);
     exposure = ground === null ? 0 : exposureAt(x, z, ground, typicalGround, obstacles);
-    ambient = [...ambienceAt({ x, y, z, ground, night, covered, waters, seaLevel, trees, exposure }), ...musicBed(x, y, z)];
+    ambient = ambienceAt({ x, y, z, ground, night, covered, waters, seaLevel, trees, exposure });
   }
   people = movement.emitters(host.residents?.() ?? [], { x, y, z, ground }, now / 1000);
-  const heard: Heard[] = [];
+  const heard: Heard[] = [], playlist = musicPlaying();
   for (const e of [...objects, ...ambient, ...people]) {
-    const d = distanceTo(e, x, y, z);
+    if (playlist && e.spec.kind === 'music') continue;   // a world's own music things stay quiet under the playlist
+    const d = e.follow ? 0 : distanceTo(e, x, y, z);
     if (e.spec.mode === 'change') {
       const k = (e.spec.when ?? '').replace(/^!/, ''), v = e.state[k], prev = lastValue.get(e.id);
       lastValue.set(e.id, v);
@@ -236,15 +248,21 @@ function step(host: Host) {
   const live = new Set(heard.map((h) => h.id)), t = ctx.currentTime;
   for (const h of heard) {
     let v = voices.get(h.id);
-    if (v && (v.kind !== h.kind || v.variant !== h.variant)) { v.stop(); voices.delete(h.id); v = undefined; }
+    if (v && (v.kind !== h.kind || v.variant !== h.variant)) { stopVoice(h.id, v, 'changed'); v = undefined; }
     if (!v) {
       v = makeVoice(ctx, h.kind, h.variant, h.source); voices.set(h.id, v);
+      event(h.id, h.kind, 'start', started.has(h.id) ? 'again' : 'new'); started.add(h.id);
       const p = h.e.pts[0];
       log.push({ t: Math.round(now), id: h.id, kind: h.kind, variant: h.variant, source: h.source, gain: +h.gain.toFixed(3), d: +h.d.toFixed(1), at: [+p[0].toFixed(1), +p[1].toFixed(1), +p[2].toFixed(1)] }); if (log.length > 400) log.splice(0, log.length - 400);
     }
-    v.gain = h.gain; v.out.gain.setTargetAtTime(h.gain, t, 0.25); v.tick(t, h.e);
+    v.gain = h.gain; v.quietSince = 0; v.out.gain.setTargetAtTime(h.gain, t, 0.25); v.tick(t, h.e);
   }
-  for (const [id, v] of voices) if (!live.has(id)) { v.out.gain.setTargetAtTime(0, t, 0.2); v.stop(); voices.delete(id); }
+  // out of hearing: fade, keep the voice LINGER_MS (a camera move brings it straight back, not from the start), then stop
+  for (const [id, v] of voices) if (!live.has(id)) {
+    if (!v.quietSince) { v.quietSince = now; v.gain = 0; v.out.gain.setTargetAtTime(0, t, 0.3); }
+    else if (now - v.quietSince > LINGER_MS) stopVoice(id, v, 'out of hearing');
+  }
+  if (voices.size > MAX_LIVE) for (const [id, v] of [...voices].filter(([, v]) => v.quietSince).sort((a, b) => a[1].quietSince - b[1].quietSince)) { if (voices.size <= MAX_LIVE) break; stopVoice(id, v, 'too many'); }
 }
 
 // ------------------------------------------------------------------ the speaker button
@@ -287,14 +305,23 @@ export function startSoundLayer() {
       heard: lastHeard.map(({ e: _e, ...h }) => ({ ...h, gain: +h.gain.toFixed(3), d: +h.d.toFixed(1) })),
       voices: [...voices.entries()].map(([id, v]) => ({ id, kind: v.kind, variant: v.variant, source: v.source, gain: +v.gain.toFixed(3) })) }),
     log: () => log.slice(),
+    events: () => events.slice(),
     /** RMS of what is actually coming out (after the master gain), for proof that sound plays and that mute silences it. */
     level: () => { if (!ctx || !master) return 0; if (!meter) { meter = ctx.createAnalyser(); meter.fftSize = 2048; master.connect(meter); } const d = new Float32Array(meter.fftSize); meter.getFloatTimeDomainData(d); let q = 0; for (const v of d) q += v * v; return +Math.sqrt(q / d.length).toFixed(5); },
     mute: (m: boolean) => setSettings({ muted: m }),
     music: (m: boolean) => setSettings({ music: m }),
     unlock,
   };
-  for (const ev of ['pointerdown', 'keydown', 'touchstart'] as const) window.addEventListener(ev, unlock, { capture: true, passive: true });
-  // lane W1: the first scan of the world's sound sources (~0.2 s at 2x CPU on Eden 2026) waits until the arrival is over
-  setInterval(() => { const host = w.__simEntity; if (host?.camera && host.layer && arrivalOver()) { mountUi(); try { step(host); } catch { /* a world mid-reload */ } } }, TICK_MS);
+  (window as unknown as { __edenMusic?: unknown }).__edenMusic = { state: musicState, log: musicLog, level: musicLevel, next: nextPiece, trackSeconds: musicTrackSeconds };
+  const gesture = () => { unlock(); musicGesture(); };
+  for (const ev of ['pointerdown', 'keydown', 'touchstart', 'touchend', 'click'] as const) window.addEventListener(ev, gesture, { capture: true, passive: true });
+  // lane W1: the first scan of the world's sound sources (~0.2 s at 2x CPU on Eden 2026) waits until the arrival is over.
+  // Lane S3: the speaker and the music on every world page (old worlds too); the soundscape where a world has entities.
+  setInterval(() => {
+    if (!arrivalOver() || !document.querySelector('.world-scene canvas')) return;
+    mountUi();
+    syncMusic({ on: settings.music && !settings.muted, volume: settings.volume, unlocked: !!ctx && ctx.state === 'running' });
+    const host = w.__simEntity; if (host?.camera && host.layer) { try { step(host); } catch { /* a world mid-reload */ } }
+  }, TICK_MS);
 }
 startSoundLayer();

@@ -22,7 +22,9 @@ export type SoundKind =
 export type SoundSpec = { kind: SoundKind; radius: number; volume: number; when?: string; mode?: 'loop' | 'change'; variant?: number };
 export type Source = 'object' | 'ambient' | 'resident' | 'visitor';
 /** `cloud`: pts is a set of separate points (a cluster of trees); the distance is to the nearest one. */
-export type Emitter = { id: string; spec: SoundSpec; pts: [number, number, number][]; area: boolean; cloud?: boolean; state: Record<string, unknown>; source: Source };
+/** `follow`: an ambience that goes where the listener goes (the sea along a shore): heard at its level wherever the
+ *  camera is, so a fast camera move never drops it out of range and restarts it (lane S3). */
+export type Emitter = { id: string; spec: SoundSpec; pts: [number, number, number][]; area: boolean; cloud?: boolean; follow?: boolean; state: Record<string, unknown>; source: Source };
 
 export const KINDS: readonly SoundKind[] = ['water', 'stream', 'fire', 'wind', 'creak', 'birds', 'bell', 'hum', 'engine', 'chime', 'frogs', 'music', 'waves', 'crickets', 'chatter', 'footsteps', 'leaves', 'flag', 'waterfowl', 'bees'];
 const KIND_SET = new Set<string>(KINDS);
@@ -193,8 +195,8 @@ function placeOf(model: WorldModel, e: Entity, def: StoredDef): Pick<Emitter, 'p
 // ---------------------------------------------------------------- ambience
 
 export type Water = { area?: [number, number][]; path?: [number, number][]; w?: number; level: number };
-/** `trees` (tops, from treesOf) puts birds in the world's trees; `exposure` (exposureAt) raises the wind on open and
- *  high ground. Both optional: without them birds scatter on the grid and wind follows height above ground only. */
+/** `trees` (tops, from treesOf) puts birds in the world's trees; without them birds scatter on the grid. `exposure`
+ *  (exposureAt) used to raise a wind bed; since lane S3 there is none and it is only reported in state. */
 export type Listener = { x: number; y: number; z: number; ground: number | null; night: number; covered: boolean; waters: readonly Water[]; seaLevel?: number; trees?: TreeIndex; exposure?: number };
 const CELL = 40;
 /** Trees bucketed by 40 m cell, built once per scan. */
@@ -212,10 +214,8 @@ export function treeIndex(trees: readonly [number, number, number][]): TreeIndex
 export function ambienceAt(L: Listener): Emitter[] {
   const out: Emitter[] = [], indoor = L.covered ? 0.25 : 1, hy = L.ground ?? L.y;
   const at = (x: number, z: number, y = hy) => [[x, y, z]] as [number, number, number][];
-  // a wind bed that follows the listener, louder high up and on open, high ground; gusts on top when exposed
-  const lift = Math.max(0, Math.min(1, (L.y - hy) / 40)), exp = L.exposure ?? 0, blow = Math.max(lift, exp);
-  out.push({ id: 'amb:wind', source: 'ambient', state: { exposure: +exp.toFixed(2) }, area: false, pts: at(L.x, L.z, L.y), spec: { kind: 'wind', radius: 10, volume: (0.06 + 0.06 * exp + 0.1 * lift) * indoor, variant: lift > 0.5 ? 1 : 0 } });
-  if (blow > 0.45) out.push({ id: 'amb:gusts', source: 'ambient', state: { exposure: +exp.toFixed(2) }, area: false, pts: at(L.x, L.z, L.y), spec: { kind: 'wind', radius: 10, volume: 0.12 * (blow - 0.35) * indoor, variant: 1 } });
+  // lane S3 (2026-10-20, Gene: "the whooshing wind sound is kind of annoying. turn it off. sounds should just be
+  // incidental ones"): no wind bed or gusts around the listener any more; what sounds is tied to what is there
   // creatures on a 40 m grid: each cell may hold one singer; day birds and night crickets crossfade at dusk
   const day = 1 - L.night, cx = Math.floor(L.x / CELL), cz = Math.floor(L.z / CELL), wooded = !!L.trees && L.trees.count > 0;
   for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
@@ -246,8 +246,8 @@ export function ambienceAt(L: Listener): Emitter[] {
   }
   if (L.seaLevel !== undefined && hy - L.seaLevel < 3) {
     const near = Math.max(0, 1 - (hy - L.seaLevel) / 3);
-    out.push({ id: 'amb:sea', source: 'ambient', state: {}, area: false, pts: at(L.x, L.z, L.seaLevel), spec: { kind: 'waves', radius: 10, volume: 0.22 * indoor * near, variant: 0 } });
-    if (day > 0.3) out.push({ id: 'amb:gulls', source: 'ambient', state: {}, area: false, pts: at(L.x + 14, L.z + 14, L.seaLevel + 10), spec: { kind: 'waterfowl', radius: 40, volume: 0.12 * day * indoor * near, variant: 0 } });
+    out.push({ id: 'amb:sea', source: 'ambient', state: {}, area: false, follow: true, pts: at(L.x, L.z, L.seaLevel), spec: { kind: 'waves', radius: 10, volume: 0.22 * indoor * near, variant: 0 } });
+    if (day > 0.3) out.push({ id: 'amb:gulls', source: 'ambient', state: {}, area: false, follow: true, pts: at(L.x + 14, L.z + 14, L.seaLevel + 10), spec: { kind: 'waterfowl', radius: 40, volume: 0.12 * day * indoor * near, variant: 0 } });
   }
   return out;
 }
@@ -300,7 +300,8 @@ export class Movement {
 
 export type SoundSettings = { muted: boolean; volume: number; music: boolean };
 export const SETTINGS_KEY = 'sim.sound.v1';
-export const DEFAULT_SETTINGS: SoundSettings = Object.freeze({ muted: false, volume: MASTER_DEFAULT, music: false });
+// lane S3: music on by default: the world plays its playlist (gen-mesh/music.ts) once the visitor's first gesture allows sound
+export const DEFAULT_SETTINGS: SoundSettings = Object.freeze({ muted: false, volume: MASTER_DEFAULT, music: true });
 type Store = { getItem(k: string): string | null; setItem(k: string, v: string): void } | null | undefined;
 export function loadSettings(store: Store): SoundSettings {
   try {
