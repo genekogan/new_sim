@@ -48,8 +48,10 @@ export function mountAgentInbox(app: Hono, d: Deps) {
     const contract = /\/intent-v2(\/|$)/.test(c.req.path);
     // G4: a successful ack answers with the command it acknowledged; it does not hand over the next queued one (the next
     // listen does). Any other private answer carries, and so delivers, the command the agent should see.
-    const acked = c.res.status >= 200 && c.res.status < 300 && /\/v1\/(god|edge)\/inbox\/[^/]+\/ack$/.test(c.req.path);
-    const carry = (own?: unknown) => acked && own ? own : inbox.deliver(current.scope);
+    const acked = c.res.status >= 200 && c.res.status < 300 && /\/v1\/(god|edge)\/inbox\/[^/]+\/(ack|result)$/.test(c.req.path);
+    // MSG: a Soul's messages have one consumer, its listen (which hands over the whole backlog). Other answers carry a
+    // private notice of the oldest waiting message but do not mark it received, so a listen never misses its wake-up.
+    const carry = (own?: unknown) => acked && own ? own : current.kind === 'god' ? inbox.deliver(current.scope) : inbox.view(current.scope);
     if (contract || !c.res.headers.get('content-type')?.includes('application/json')) {
       if (c.res.status < 200 || c.res.status >= 300) return;
       inbox.touch(current.scope);
@@ -114,7 +116,8 @@ export function mountAgentInbox(app: Hono, d: Deps) {
         await inbox.listen(s, after, timeout, c.req.raw.signal);
         const current = requireAgent(c, kind);
         if (current.owner !== s.owner || current.scope !== s.scope) throw new ApiError(401, 'unauthorized', 'agent authority changed');
-        return c.json({inbox: inbox.view(s)});
+        // MSG: a Soul's listen hands over every waiting message at once, oldest first (the agent works through them all).
+        return c.json(kind === 'soul' ? {inbox: inbox.view(s), backlog: inbox.takeBacklog(s)} : {inbox: inbox.view(s)});
       } finally { end(); }
     });
     app.post(`${path}/:id/ack`, async c => {
@@ -126,6 +129,13 @@ export function mountAgentInbox(app: Hono, d: Deps) {
   };
   if (d.god) agentRoutes('/v1/god/inbox', 'god');
   agentRoutes('/v1/edge/inbox', 'soul');
+  // MSG: a Soul's second answer, when its work ends ("Arrived" / "Couldn't: ..."); the first is the ack's reply.
+  app.post('/v1/edge/inbox/:id/result', async c => {
+    const s = requireAgent(c, 'soul'), b = await json(c); limit(`inbox-ack:soul:${JSON.stringify(s)}`, 120);
+    const current = requireAgent(c, 'soul');
+    if (current.owner !== s.owner || current.scope !== s.scope) throw new ApiError(401, 'unauthorized', 'agent authority changed');
+    return c.json({inbox: inbox.result(s, c.req.param('id')!, b.text, b.outcome)});
+  });
   return inbox;
 }
 

@@ -1,4 +1,7 @@
-// Private owner -> agent mailbox. A Soul's box is one replaceable message, no conversation log.
+// Private owner -> agent mailbox. Every box is a queue (a Soul's since lane MSG 2026-10-20, the god's since G4).
+// MSG (Gene, 2026-10-20: "it should always work through its backlog"): a Soul's messages no longer overwrite one another;
+// they wait oldest first (at most 50), each is acknowledged by its id, and a Soul's `listen` hands over the whole backlog
+// at once (`backlog`, oldest first) so its agent can work through it. `presence` says whether a listener is waiting now.
 // G4 (Gene, 2026-10-20): the god's box is a queue. Commands typed while the agent is away wait in order (none overwrites
 // another); the agent still sees exactly one message at a time (`latest`, the oldest one it has not acknowledged), so an
 // older CLI's listen/ack loop works unchanged and receives them in order. Each command is a ticket whose status comes
@@ -6,27 +9,31 @@
 // acknowledged = complete, or failed when its ack says so. While a ticket is in progress, the edits that commit are
 // recorded against it; its ack freezes where they are (`focus`), so the owner's log can fly the camera there.
 import {randomUUID} from 'node:crypto';
+import type {SQLInputValue} from 'node:sqlite';
 import type {Db} from './db.ts';
 import {ApiError} from './souls.ts';
 
 export type InboxScope = {scope: string; owner: string};
 export type Outcome = 'done' | 'failed' | 'withdrawn';
-export type InboxMessage = {id: string; text: string; state: 'sent' | 'delivered' | 'acknowledged'; sentAt: number; deliveredAt?: number; acknowledgedAt?: number; reply?: string; outcome?: Outcome};
+/** `reply` = the agent's first answer ("Got it: walking to the cottage"); a Soul's `result` = its second, the outcome
+ *  ("Arrived" / "Couldn't: ..."), with `outcome` done or failed. */
+export type InboxMessage = {id: string; text: string; state: 'sent' | 'delivered' | 'acknowledged'; sentAt: number; deliveredAt?: number; acknowledgedAt?: number; reply?: string; outcome?: Outcome; result?: string; resultAt?: number};
 /** Where a finished command's edits are: the camera's target and the span to frame. */
 export type TicketFocus = {x: number; y: number; z: number; span: number; label?: string; count: number};
 export type Ticket = InboxMessage & {focus?: TicketFocus; touched?: number};
-/** God only: listening = a listener is waiting now; working = it holds a command and called recently; recent = it called
- *  within the last half minute; away = none of these. */
+/** listening = a listener is waiting now; working = it holds a message and called recently; recent = it called within the
+ *  last half minute; away = none of these. */
 export type Presence = 'listening' | 'working' | 'recent' | 'away';
 export type InboxView = {connected: boolean; lastSeenAt: number | null; latest: InboxMessage | null; queued?: number; presence?: Presence; log?: Ticket[]};
-type Row = {id: string | null; text: string | null; sent_at: number | null; delivered_at: number | null; acknowledged_at: number | null; reply: string | null; last_seen_at: number | null};
-type QRow = {n: number; id: string; text: string; sent_at: number; delivered_at: number | null; acknowledged_at: number | null; reply: string | null; outcome: Outcome | null; touched: string | null; focus: string | null};
+type QRow = {n: number; id: string; text: string; sent_at: number; delivered_at: number | null; acknowledged_at: number | null; reply: string | null; outcome: Outcome | null; touched: string | null; focus: string | null; result: string | null; result_at: number | null};
 export const INBOX_CONNECTED_MS = 120_000;
 export const INBOX_TEXT_MAX = 1000;
 /** God presence: a call within this long counts as connected; a god holding a command, within WORKING_MS. */
 export const GOD_RECENT_MS = 30_000, GOD_WORKING_MS = 600_000;
 /** At most this many commands wait at once; the owner's log keeps the newest LOG_KEEP. */
 export const GOD_QUEUE_MAX = 50, GOD_LOG_KEEP = 200, GOD_LOG_VIEW = 50, GOD_TOUCHED_MAX = 300;
+/** A Soul's box: at most this many wait; the newest SOUL_KEEP (finished included) are kept. */
+export const SOUL_QUEUE_MAX = 50, SOUL_KEEP = 100;
 const QCOLS = 'n,id,text,sent_at,delivered_at,acknowledged_at,reply,outcome,touched,focus';
 
 export class AgentInbox {
@@ -48,25 +55,49 @@ export class AgentInbox {
       PRIMARY KEY(world_id,owner,n)
     ) WITHOUT ROWID;
     CREATE UNIQUE INDEX IF NOT EXISTS god_inbox_queue_v1_id ON god_inbox_queue_v1(world_id,owner,id);
-    CREATE INDEX IF NOT EXISTS god_inbox_queue_v1_open ON god_inbox_queue_v1(world_id,owner,n) WHERE acknowledged_at IS NULL;`);
-    // A god message that was waiting in the one-message box before the queue existed becomes the queue's first command.
-    for (const r of db.db.prepare(`SELECT owner,id,text,sent_at,delivered_at FROM agent_inbox_v1 WHERE world_id=? AND scope='god' AND id IS NOT NULL AND acknowledged_at IS NULL`).all(worldId) as {owner: string; id: string; text: string; sent_at: number; delivered_at: number | null}[]) {
-      if (db.db.prepare('SELECT 1 FROM god_inbox_queue_v1 WHERE world_id=? AND owner=? AND id=?').get(worldId, r.owner, r.id)) continue;
-      db.db.prepare('INSERT INTO god_inbox_queue_v1(world_id,owner,n,id,text,sent_at,delivered_at) VALUES(?,?,?,?,?,?,?)').run(worldId, r.owner, this.nextN(r.owner), r.id, r.text, r.sent_at, r.delivered_at);
-    }
+    CREATE INDEX IF NOT EXISTS god_inbox_queue_v1_open ON god_inbox_queue_v1(world_id,owner,n) WHERE acknowledged_at IS NULL;
+    CREATE TABLE IF NOT EXISTS soul_inbox_queue_v1 (
+      world_id TEXT NOT NULL, scope TEXT NOT NULL, owner TEXT NOT NULL, n INTEGER NOT NULL, id TEXT NOT NULL, text TEXT NOT NULL, sent_at INTEGER NOT NULL,
+      delivered_at INTEGER, acknowledged_at INTEGER, reply TEXT, outcome TEXT, touched TEXT, focus TEXT, result TEXT, result_at INTEGER,
+      PRIMARY KEY(world_id,scope,owner,n)
+    ) WITHOUT ROWID;
+    CREATE UNIQUE INDEX IF NOT EXISTS soul_inbox_queue_v1_id ON soul_inbox_queue_v1(world_id,scope,owner,id);
+    CREATE INDEX IF NOT EXISTS soul_inbox_queue_v1_open ON soul_inbox_queue_v1(world_id,scope,owner,n) WHERE acknowledged_at IS NULL;`);
+    // A message still waiting in the old one-message box becomes the first of its queue; the old slot is then emptied
+    // (only last_seen_at stays there), so a later boot never moves it again.
+    db.db.exec('BEGIN');
+    try {
+      for (const r of db.db.prepare(`SELECT scope,owner,id,text,sent_at,delivered_at FROM agent_inbox_v1 WHERE world_id=? AND id IS NOT NULL AND acknowledged_at IS NULL`).all(worldId) as {scope: string; owner: string; id: string; text: string; sent_at: number; delivered_at: number | null}[]) {
+        const s = {scope: r.scope, owner: r.owner}, q = this.q(s);
+        if (!db.db.prepare(`SELECT 1 FROM ${q.t} WHERE ${q.k} AND id=?`).get(...q.a, r.id))
+          db.db.prepare(`INSERT INTO ${q.t}(${q.cols},n,id,text,sent_at,delivered_at) VALUES(${q.a.map(() => '?').join(',')},?,?,?,?,?)`).run(...q.a, this.nextN(s), r.id, r.text, r.sent_at, r.delivered_at);
+        db.db.prepare('UPDATE agent_inbox_v1 SET id=NULL,text=NULL,sent_at=NULL,delivered_at=NULL,acknowledged_at=NULL,reply=NULL WHERE world_id=? AND scope=? AND owner=?').run(worldId, r.scope, r.owner);
+      }
+      db.db.exec('COMMIT');
+    } catch (e) { db.db.exec('ROLLBACK'); throw e; }
   }
+  /** Which queue holds this box: the god's (one per owner) or a Soul's (one per Soul and owner). */
+  private q(s: InboxScope) {
+    return s.scope === 'god'
+      ? {t: 'god_inbox_queue_v1', k: 'world_id=? AND owner=?', cols: 'world_id,owner', a: [this.worldId, s.owner], sel: QCOLS + ',NULL AS result,NULL AS result_at'}
+      : {t: 'soul_inbox_queue_v1', k: 'world_id=? AND scope=? AND owner=?', cols: 'world_id,scope,owner', a: [this.worldId, s.scope, s.owner], sel: QCOLS + ',result,result_at'};
+  }
+  private get(s: InboxScope, where: string, ...args: SQLInputValue[]) { const q = this.q(s); return this.db.db.prepare(`SELECT ${q.sel} FROM ${q.t} WHERE ${q.k} ${where}`).get(...q.a, ...args) as QRow | undefined; }
+  private all(s: InboxScope, where: string, ...args: SQLInputValue[]) { const q = this.q(s); return this.db.db.prepare(`SELECT ${q.sel} FROM ${q.t} WHERE ${q.k} ${where}`).all(...q.a, ...args) as QRow[]; }
+  private set(s: InboxScope, sets: string, n: number, ...args: SQLInputValue[]) { const q = this.q(s); this.db.db.prepare(`UPDATE ${q.t} SET ${sets} WHERE ${q.k} AND n=?`).run(...args, ...q.a, n); }
   private key(s: InboxScope) { return JSON.stringify([this.worldId, s.scope, s.owner]); }
-  private queued(s: InboxScope) { return s.scope === 'god'; }
-  private row(s: InboxScope) { return this.db.db.prepare('SELECT id,text,sent_at,delivered_at,acknowledged_at,reply,last_seen_at FROM agent_inbox_v1 WHERE world_id=? AND scope=? AND owner=?').get(this.worldId, s.scope, s.owner) as Row | undefined; }
-  private nextN(owner: string) { return ((this.db.db.prepare('SELECT MAX(n) m FROM god_inbox_queue_v1 WHERE world_id=? AND owner=?').get(this.worldId, owner) as {m: number | null}).m ?? 0) + 1; }
-  /** The command the agent sees: the oldest one not acknowledged. */
-  private head(s: InboxScope) { return this.db.db.prepare(`SELECT ${QCOLS} FROM god_inbox_queue_v1 WHERE world_id=? AND owner=? AND acknowledged_at IS NULL ORDER BY n LIMIT 1`).get(this.worldId, s.owner) as QRow | undefined; }
-  private newest(s: InboxScope) { return this.db.db.prepare(`SELECT ${QCOLS} FROM god_inbox_queue_v1 WHERE world_id=? AND owner=? ORDER BY n DESC LIMIT 1`).get(this.worldId, s.owner) as QRow | undefined; }
-  private waiting(s: InboxScope) { return (this.db.db.prepare('SELECT COUNT(*) c FROM god_inbox_queue_v1 WHERE world_id=? AND owner=? AND acknowledged_at IS NULL').get(this.worldId, s.owner) as {c: number}).c; }
+  private god(s: InboxScope) { return s.scope === 'god'; }
+  private lastSeen(s: InboxScope) { return (this.db.db.prepare('SELECT last_seen_at FROM agent_inbox_v1 WHERE world_id=? AND scope=? AND owner=?').get(this.worldId, s.scope, s.owner) as {last_seen_at: number | null} | undefined)?.last_seen_at ?? null; }
+  private nextN(s: InboxScope) { const q = this.q(s); return ((this.db.db.prepare(`SELECT MAX(n) m FROM ${q.t} WHERE ${q.k}`).get(...q.a) as {m: number | null}).m ?? 0) + 1; }
+  /** The message the agent sees: the oldest one not acknowledged. */
+  private head(s: InboxScope) { return this.get(s, 'AND acknowledged_at IS NULL ORDER BY n LIMIT 1'); }
+  private newest(s: InboxScope) { return this.get(s, 'ORDER BY n DESC LIMIT 1'); }
+  private waiting(s: InboxScope) { const q = this.q(s); return (this.db.db.prepare(`SELECT COUNT(*) c FROM ${q.t} WHERE ${q.k} AND acknowledged_at IS NULL`).get(...q.a) as {c: number}).c; }
   private message(r: QRow): InboxMessage {
     return {id: r.id, text: r.text, state: r.acknowledged_at !== null ? 'acknowledged' : r.delivered_at !== null ? 'delivered' : 'sent', sentAt: r.sent_at,
       ...(r.delivered_at !== null ? {deliveredAt: r.delivered_at} : {}), ...(r.acknowledged_at !== null ? {acknowledgedAt: r.acknowledged_at} : {}),
-      ...(r.reply !== null ? {reply: r.reply} : {}), ...(r.acknowledged_at !== null && r.outcome ? {outcome: r.outcome} : {})};
+      ...(r.reply !== null ? {reply: r.reply} : {}), ...(r.acknowledged_at !== null && r.outcome ? {outcome: r.outcome} : {}),
+      ...(r.result != null ? {result: r.result} : {}), ...(r.result_at != null ? {resultAt: r.result_at} : {})};
   }
   private ticket(r: QRow): Ticket {
     const touched = r.touched ? (JSON.parse(r.touched) as string[]).length : 0;
@@ -79,37 +110,37 @@ export class AgentInbox {
     if (head?.delivered_at != null && age <= GOD_WORKING_MS) return 'working';
     return age <= GOD_RECENT_MS ? 'recent' : 'away';
   }
-  /** What the agent sees (and every generic caller): one message. The god's adds `queued` (commands waiting, this one included). */
+  /** What the agent sees (and every generic caller): one message, the oldest not acknowledged (else the newest), with
+   *  `queued` = how many wait, this one included. */
   view(s: InboxScope): InboxView {
-    const r = this.row(s), lastSeenAt = r?.last_seen_at ?? null;
-    if (this.queued(s)) {
-      const head = this.head(s), shown = head ?? this.newest(s), presence = this.presence(s, lastSeenAt, head);
-      return {connected: presence !== 'away', lastSeenAt, latest: shown ? this.message(shown) : null, queued: head ? this.waiting(s) : 0, presence};
-    }
-    return {connected: lastSeenAt !== null && this.now() - lastSeenAt >= 0 && this.now() - lastSeenAt <= INBOX_CONNECTED_MS, lastSeenAt,
-      latest: r?.id ? {id: r.id, text: r.text!, state: r.acknowledged_at !== null ? 'acknowledged' : r.delivered_at !== null ? 'delivered' : 'sent', sentAt: r.sent_at!,
-        ...(r.delivered_at !== null ? {deliveredAt: r.delivered_at} : {}), ...(r.acknowledged_at !== null ? {acknowledgedAt: r.acknowledged_at} : {}), ...(r.reply !== null ? {reply: r.reply} : {})} : null};
+    const lastSeenAt = this.lastSeen(s), head = this.head(s), shown = head ?? this.newest(s), presence = this.presence(s, lastSeenAt, head);
+    return {connected: presence !== 'away', lastSeenAt, latest: shown ? this.message(shown) : null, queued: head ? this.waiting(s) : 0, presence};
   }
-  /** What the owner sees: the god's whole recent log, newest first (`latest` = the newest command). A Soul's box: view(). */
+  /** What the owner sees: `latest` = the newest message (its state and reply); the god's adds its recent log, newest first. */
   ownerView(s: InboxScope): InboxView {
-    if (!this.queued(s)) return this.view(s);
     const v = this.view(s), newest = this.newest(s);
-    const log = (this.db.db.prepare(`SELECT ${QCOLS} FROM god_inbox_queue_v1 WHERE world_id=? AND owner=? ORDER BY n DESC LIMIT ?`).all(this.worldId, s.owner, GOD_LOG_VIEW) as QRow[]).map(r => this.ticket(r));
+    if (!this.god(s)) return {...v, latest: newest ? this.message(newest) : null};
+    const log = this.all(s, 'ORDER BY n DESC LIMIT ?', GOD_LOG_VIEW).map(r => this.ticket(r));
     return {...v, latest: newest ? this.message(newest) : null, log};
+  }
+  /** A Soul's listen: every message not acknowledged, oldest first; each is now delivered (the agent holds them all). */
+  takeBacklog(s: InboxScope): InboxMessage[] {
+    const rows = this.all(s, 'AND acknowledged_at IS NULL ORDER BY n LIMIT ?', SOUL_QUEUE_MAX), now = this.now();
+    for (const r of rows) if (r.delivered_at === null) { this.set(s, 'delivered_at=?', r.n, now); r.delivered_at = now; }
+    return rows.map(r => this.message(r));
   }
   send(s: InboxScope, text: unknown) {
     if (typeof text !== 'string' || !text.trim() || text.trim().length > INBOX_TEXT_MAX) throw new ApiError(400, 'invalid', `text is required (1–${INBOX_TEXT_MAX} characters)`);
     // Keep private response headers bounded even for non-JSON commands. Normal
     // whitespace is allowed; C0 controls would expand to six-byte JSON escapes.
     if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(text)) throw new ApiError(400, 'invalid', 'text must not contain control characters');
-    const id = 'msg_' + randomUUID();
-    if (this.queued(s)) {
-      if (this.waiting(s) >= GOD_QUEUE_MAX) throw new ApiError(429, 'queue-full', `${GOD_QUEUE_MAX} commands are already waiting for your agent; withdraw some or let it catch up`);
-      const n = this.nextN(s.owner);
-      this.db.db.prepare('INSERT INTO god_inbox_queue_v1(world_id,owner,n,id,text,sent_at) VALUES(?,?,?,?,?,?)').run(this.worldId, s.owner, n, id, text.trim(), this.now());
-      this.db.db.prepare('DELETE FROM god_inbox_queue_v1 WHERE world_id=? AND owner=? AND n<=? AND acknowledged_at IS NOT NULL').run(this.worldId, s.owner, n - GOD_LOG_KEEP);
-    } else this.db.db.prepare(`INSERT INTO agent_inbox_v1(world_id,scope,owner,id,text,sent_at) VALUES(?,?,?,?,?,?)
-      ON CONFLICT(world_id,scope,owner) DO UPDATE SET id=excluded.id,text=excluded.text,sent_at=excluded.sent_at,delivered_at=NULL,acknowledged_at=NULL,reply=NULL`).run(this.worldId, s.scope, s.owner, id, text.trim(), this.now());
+    const id = 'msg_' + randomUUID(), god = this.god(s), q = this.q(s);
+    if (this.waiting(s) >= (god ? GOD_QUEUE_MAX : SOUL_QUEUE_MAX)) throw new ApiError(429, 'queue-full', god
+      ? `${GOD_QUEUE_MAX} commands are already waiting for your agent; withdraw some or let it catch up`
+      : `${SOUL_QUEUE_MAX} messages are already waiting for your agent; let it catch up`);
+    const n = this.nextN(s);
+    this.db.db.prepare(`INSERT INTO ${q.t}(${q.cols},n,id,text,sent_at) VALUES(${q.a.map(() => '?').join(',')},?,?,?,?)`).run(...q.a, n, id, text.trim(), this.now());
+    this.db.db.prepare(`DELETE FROM ${q.t} WHERE ${q.k} AND n<=? AND acknowledged_at IS NOT NULL`).run(...q.a, n - (god ? GOD_LOG_KEEP : SOUL_KEEP));
     for (const wake of [...(this.waiters.get(this.key(s)) ?? [])]) wake();
     return this.ownerView(s);
   }
@@ -119,58 +150,65 @@ export class AgentInbox {
   }
   /** Called only when a private agent response actually includes this message. */
   deliver(s: InboxScope) {
-    if (this.queued(s)) {
-      const head = this.head(s);
-      if (head && head.delivered_at === null) this.db.db.prepare('UPDATE god_inbox_queue_v1 SET delivered_at=? WHERE world_id=? AND owner=? AND n=?').run(this.now(), this.worldId, s.owner, head.n);
-      return this.view(s);
-    }
-    this.db.db.prepare('UPDATE agent_inbox_v1 SET delivered_at=COALESCE(delivered_at,?) WHERE world_id=? AND scope=? AND owner=? AND id IS NOT NULL').run(this.now(), this.worldId, s.scope, s.owner);
+    const head = this.head(s);
+    if (head && head.delivered_at === null) this.set(s, 'delivered_at=?', head.n, this.now());
     return this.view(s);
   }
   acknowledge(s: InboxScope, id: string, reply: unknown, outcome?: unknown) {
     if (reply !== undefined && (typeof reply !== 'string' || reply.length > 140 || /[\r\n]/.test(reply))) throw new ApiError(400, 'invalid', 'reply must be one line of at most 140 characters');
     if (outcome !== undefined && outcome !== 'done' && outcome !== 'failed') throw new ApiError(400, 'invalid', 'outcome is done or failed');
-    if (this.queued(s)) {
-      const r = this.db.db.prepare(`SELECT ${QCOLS} FROM god_inbox_queue_v1 WHERE world_id=? AND owner=? AND id=?`).get(this.worldId, s.owner, id) as QRow | undefined;
-      // An ack retry is idempotent until the agent has received a later command; then the old one is gone, as before.
-      if (r?.acknowledged_at != null) {
-        if (this.db.db.prepare('SELECT 1 FROM god_inbox_queue_v1 WHERE world_id=? AND owner=? AND n>? AND delivered_at IS NOT NULL').get(this.worldId, s.owner, r.n)) throw new ApiError(404, 'not-found', 'this is no longer the latest message');
-        return {...this.view(s), latest: this.message(r)};
-      }
-      if (!r) throw new ApiError(404, 'not-found', 'this is no longer the latest message');
-      if (r.delivered_at === null) throw new ApiError(409, 'not-delivered', 'receive the message before acknowledging it');
-      const ids = r.touched ? JSON.parse(r.touched) as string[] : [];
-      let focus: TicketFocus | null = null; try { focus = ids.length ? this.focusOf(ids) : null; } catch { /* the ack stands without a link */ }
-      this.db.db.prepare('UPDATE god_inbox_queue_v1 SET acknowledged_at=?,reply=?,outcome=?,focus=? WHERE world_id=? AND owner=? AND n=?')
-        .run(this.now(), typeof reply === 'string' ? reply.trim() || null : null, outcome === 'failed' ? 'failed' : 'done', focus ? JSON.stringify(focus) : null, this.worldId, s.owner, r.n);
-      // the answer shows the acknowledged command (and how many wait); the next one is handed over by the next listen
-      return {...this.view(s), latest: this.message(this.db.db.prepare(`SELECT ${QCOLS} FROM god_inbox_queue_v1 WHERE world_id=? AND owner=? AND n=?`).get(this.worldId, s.owner, r.n) as QRow)};
+    const r = this.get(s, 'AND id=?', id);
+    // An ack retry is idempotent (it cannot rewrite the reply). The god's is refused once the agent has received a later
+    // command, as before; a Soul's agent holds its whole backlog at once, so its retries stay idempotent.
+    if (r?.acknowledged_at != null) {
+      if (this.god(s) && this.get(s, 'AND n>? AND delivered_at IS NOT NULL', r.n)) throw new ApiError(404, 'not-found', 'this is no longer the latest message');
+      return {...this.view(s), latest: this.message(r)};
     }
-    const r = this.row(s);
-    if (!r?.id || r.id !== id) throw new ApiError(404, 'not-found', 'this is no longer the latest message');
-    if (r.delivered_at === null) throw new ApiError(409, 'not-delivered', 'receive the message before acknowledging it');
-    // An ack retry is idempotent; it cannot rewrite a previous short reply.
-    if (r.acknowledged_at === null) this.db.db.prepare('UPDATE agent_inbox_v1 SET acknowledged_at=?,reply=? WHERE world_id=? AND scope=? AND owner=? AND id=?').run(this.now(), typeof reply === 'string' ? reply.trim() || null : null, this.worldId, s.scope, s.owner, id);
-    return this.view(s);
+    if (!r) throw new ApiError(404, 'not-found', 'no such message (it may be too old)');
+    // The god's command must be received first. A Soul's id reaches only its agent (listen, or the private notice on any
+    // answer), so acknowledging it also marks it received: listen is the one consumer, nothing else delivers.
+    if (r.delivered_at === null && this.god(s)) throw new ApiError(409, 'not-delivered', 'receive the message before acknowledging it');
+    const ids = r.touched ? JSON.parse(r.touched) as string[] : [];
+    let focus: TicketFocus | null = null; try { focus = ids.length ? this.focusOf(ids) : null; } catch { /* the ack stands without a link */ }
+    this.set(s, 'delivered_at=COALESCE(delivered_at,?),acknowledged_at=?,reply=?,outcome=?,focus=?', r.n, this.now(), this.now(), typeof reply === 'string' ? reply.trim() || null : null,
+      outcome === 'failed' ? 'failed' : outcome === 'done' || this.god(s) ? 'done' : null, focus ? JSON.stringify(focus) : null);
+    // the answer shows the acknowledged message (and how many wait); the next one is handed over by the next listen
+    return {...this.view(s), latest: this.message(this.get(s, 'AND n=?', r.n)!)};
+  }
+  /** A Soul's second answer, once its work ends: `done` ("Arrived at the cottage") or `failed` ("Couldn't: ..., options: ...").
+   *  It acknowledges the message too if the agent skipped that. One result per message; a retry with the same words is fine. */
+  result(s: InboxScope, id: string, text: unknown, outcome: unknown) {
+    if (this.god(s)) throw new ApiError(404, 'not-found', 'god commands finish with their ack');
+    if (typeof text !== 'string' || !text.trim() || text.length > 140 || /[\r\n]/.test(text)) throw new ApiError(400, 'invalid', 'result must be one line of 1–140 characters');
+    if (outcome !== 'done' && outcome !== 'failed') throw new ApiError(400, 'invalid', 'outcome is done or failed');
+    let r = this.get(s, 'AND id=?', id);
+    if (!r) throw new ApiError(404, 'not-found', 'no such message (it may be too old)');
+    if (r.result_at !== null) {
+      if (r.result === text.trim() && r.outcome === outcome) return {...this.view(s), latest: this.message(r)};
+      throw new ApiError(409, 'finished', 'this message already has its result');
+    }
+    if (r.acknowledged_at === null) { this.acknowledge(s, id, undefined); r = this.get(s, 'AND id=?', id)!; }
+    this.set(s, 'result=?,result_at=?,outcome=?', r.n, text.trim(), this.now(), outcome);
+    return {...this.view(s), latest: this.message(this.get(s, 'AND n=?', r.n)!)};
   }
   /** The owner takes back a command that is not finished (waiting, or one the agent holds and never finished). */
   withdraw(s: InboxScope, id: string) {
-    if (!this.queued(s)) throw new ApiError(404, 'not-found', 'only god commands can be withdrawn');
-    const r = this.db.db.prepare(`SELECT ${QCOLS} FROM god_inbox_queue_v1 WHERE world_id=? AND owner=? AND id=?`).get(this.worldId, s.owner, id) as QRow | undefined;
+    if (!this.god(s)) throw new ApiError(404, 'not-found', 'only god commands can be withdrawn');
+    const r = this.get(s, 'AND id=?', id);
     if (!r) throw new ApiError(404, 'not-found', 'no such command');
     if (r.acknowledged_at !== null) throw new ApiError(409, 'finished', 'this command is already finished');
-    this.db.db.prepare("UPDATE god_inbox_queue_v1 SET acknowledged_at=?,outcome='withdrawn' WHERE world_id=? AND owner=? AND n=?").run(this.now(), this.worldId, s.owner, r.n);
+    this.set(s, "acknowledged_at=?,outcome='withdrawn'", r.n, this.now());
     // a listener waiting behind it gets the next command now
     for (const wake of [...(this.waiters.get(this.key(s)) ?? [])]) wake();
     return this.ownerView(s);
   }
   /** Edits that committed while the god holds a command (delivered, not acknowledged) are that command's. */
   recordTouched(s: InboxScope, ids: Iterable<string>) {
-    if (!this.queued(s)) return;
+    if (!this.god(s)) return;
     const head = this.head(s); if (!head || head.delivered_at === null) return;
     const have = head.touched ? JSON.parse(head.touched) as string[] : [], seen = new Set(have), before = have.length;
     for (const id of ids) { if (have.length >= GOD_TOUCHED_MAX) break; if (!seen.has(id)) { seen.add(id); have.push(id); } }
-    if (have.length !== before) this.db.db.prepare('UPDATE god_inbox_queue_v1 SET touched=? WHERE world_id=? AND owner=? AND n=?').run(JSON.stringify(have), this.worldId, s.owner, head.n);
+    if (have.length !== before) this.set(s, 'touched=?', head.n, JSON.stringify(have));
   }
   /** A listener is waiting for this scope (presence); the returned function ends it. */
   listening(s: InboxScope) {

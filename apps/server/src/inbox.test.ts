@@ -13,28 +13,67 @@ import {coreRef} from '@sim/world-compiler';
 import {EdgeLedger} from './edge/ledger/ledger.ts';
 import {streamSSE} from 'hono/streaming';
 
-test('one durable latest message: truthful transitions, replacement, isolation, expiry and restart', t => {
+test('soul queue: nothing overwrites, the oldest waits first, listen takes the whole backlog, ack and result per id, restart', t => {
   const dir = mkdtempSync(join(tmpdir(), 'sim-inbox-')); t.after(() => rmSync(dir, {recursive: true, force: true}));
   let db = new Db(join(dir, 'fixture.db')), now = 1000, inbox = new AgentInbox(db, 'w1', () => now);
   const a = {scope: 'soul:a', owner: 'alice'}, b = {scope: 'soul:a', owner: 'bob'}, other = new AgentInbox(db, 'w2', () => now);
-  assert.deepEqual(inbox.view(a), {connected: false, lastSeenAt: null, latest: null});
-  const first = inbox.send(a, 'A private request').latest!;
+  assert.deepEqual(inbox.view(a), {connected: false, lastSeenAt: null, latest: null, queued: 0, presence: 'away'});
+  const first = inbox.send(a, 'go find the horses').latest!; now++;
   assert.throws(() => inbox.send(a, '\u0000'.repeat(1000)), /control characters/);
-  assert.equal(first.state, 'sent'); assert.equal(inbox.view(a).connected, false);
+  const second = inbox.send(a, 'hello?').latest!; now++;
+  const third = inbox.send(a, 'can you ride the horse?').latest!; now++;
+  assert.equal(inbox.ownerView(a).latest!.id, third.id, 'the owner card shows the newest message');
+  assert.equal(inbox.view(a).latest!.id, first.id, 'the agent sees the oldest waiting'); assert.equal(inbox.view(a).queued, 3);
   assert.equal(inbox.view(b).latest, null); assert.equal(other.view(a).latest, null);
-  assert.throws(() => inbox.acknowledge(a, first.id, 'Premature'), /receive/);
-  inbox.touch(a); assert.equal(inbox.view(a).connected, true); assert.equal(inbox.view(a).latest!.state, 'sent');
-  now++; assert.equal(inbox.deliver(a).latest!.state, 'delivered');
+  // a private notice on any other answer does not consume it (listen is the one consumer)
+  inbox.touch(a); assert.equal(inbox.view(a).latest!.state, 'sent'); assert.equal(inbox.view(a).presence, 'recent');
+  const backlog = inbox.takeBacklog(a);
+  assert.deepEqual(backlog.map(m => m.text), ['go find the horses', 'hello?', 'can you ride the horse?']);
+  assert.deepEqual(backlog.map(m => m.state), ['delivered', 'delivered', 'delivered']);
+  assert.equal(inbox.view(a).presence, 'working');
   assert.throws(() => inbox.acknowledge(a, first.id, 'x'.repeat(141)), /140/);
   assert.throws(() => inbox.acknowledge(a, first.id, 'two\nlines'), /one line/);
-  assert.equal(inbox.acknowledge(a, first.id, 'Received; I will check.').latest!.state, 'acknowledged');
-  assert.equal(inbox.acknowledge(a, first.id, 'Changed reply').latest!.reply, 'Received; I will check.');
-  const second = inbox.send(a, 'Replace the old request').latest!; assert.notEqual(second.id, first.id); assert.equal(second.state, 'sent'); assert.equal(second.reply, undefined);
-  assert.throws(() => inbox.acknowledge(a, first.id, undefined), /latest/);
+  // ack in any order, by id; nothing is "no longer the latest"
+  assert.equal(inbox.acknowledge(a, second.id, 'Hello! I am here.').latest!.state, 'acknowledged');
+  const ack1 = inbox.acknowledge(a, first.id, 'Got it: walking to the horses.');
+  assert.equal(ack1.latest!.reply, 'Got it: walking to the horses.'); assert.equal(ack1.latest!.outcome, undefined, 'the ack is not the outcome'); assert.equal(ack1.queued, 1);
+  assert.equal(inbox.acknowledge(a, first.id, 'Changed reply').latest!.reply, 'Got it: walking to the horses.', 'an ack retry is idempotent');
+  assert.throws(() => inbox.result(a, first.id, 'Arrived', 'maybe'), /done or failed/);
+  assert.throws(() => inbox.result(a, first.id, '', 'done'), /1–140/);
+  const res = inbox.result(a, first.id, 'Arrived at the horses.', 'done').latest!;
+  assert.equal(res.result, 'Arrived at the horses.'); assert.equal(res.outcome, 'done'); assert.equal(res.reply, 'Got it: walking to the horses.');
+  assert.equal(inbox.result(a, first.id, 'Arrived at the horses.', 'done').latest!.result, 'Arrived at the horses.', 'a result retry is idempotent');
+  assert.throws(() => inbox.result(a, first.id, 'Something else', 'failed'), /already has its result/);
+  // a result without an ack acknowledges it too
+  const r3 = inbox.result(a, third.id, "Couldn't: no saddle here. Options: walk beside it.", 'failed').latest!;
+  assert.equal(r3.state, 'acknowledged'); assert.equal(r3.outcome, 'failed');
+  assert.equal(inbox.view(a).queued, 0); assert.equal(inbox.view(a).latest!.id, third.id);
+  // a Soul's id reaches only its agent: acknowledging one it saw in a private notice marks it received too
+  const fourth = inbox.send(a, 'sit down on the grass').latest!;
+  assert.equal(inbox.acknowledge(a, fourth.id, 'Sitting.').latest!.state, 'acknowledged');
+  assert.throws(() => inbox.acknowledge(a, 'msg_none', 'x'), /no such message/);
+  assert.throws(() => inbox.result({scope: 'god', owner: 'alice'}, first.id, 'x', 'done'), /god commands/);
+  // bounded: 50 wait at most
+  for (let i = 0; i < 50; i++) inbox.send(a, `msg ${i}`);
+  assert.throws(() => inbox.send(a, 'one too many'), (e: {status?: number; code?: string}) => e.status === 429 && e.code === 'queue-full');
   now += INBOX_CONNECTED_MS + 1; assert.equal(inbox.view(a).connected, false);
   db.close(); db = new Db(join(dir, 'fixture.db')); inbox = new AgentInbox(db, 'w1', () => now); t.after(() => db.close());
-  assert.equal(inbox.view(a).latest!.id, second.id); assert.equal(inbox.view(a).latest!.state, 'sent'); assert.equal(inbox.view(a).connected, false);
-  assert.equal(db.db.prepare('SELECT COUNT(*) n FROM agent_inbox_v1').get()!.n, 1, 'replacement retains one row without a chat log');
+  assert.equal(inbox.view(a).latest!.text, 'msg 0'); assert.equal(inbox.view(a).queued, 50); assert.equal(inbox.takeBacklog(a).length, 50);
+  assert.equal(db.db.prepare('SELECT COUNT(*) n FROM agent_inbox_v1').get()!.n, 1, 'the old slot keeps only presence');
+});
+
+test('soul queue: a message waiting in the old one-message box moves into the queue at boot, once', t => {
+  const db = new Db(':memory:'); t.after(() => db.close());
+  db.db.exec(`CREATE TABLE agent_inbox_v1 (world_id TEXT NOT NULL, scope TEXT NOT NULL, owner TEXT NOT NULL, id TEXT, text TEXT, sent_at INTEGER, delivered_at INTEGER, acknowledged_at INTEGER, reply TEXT, last_seen_at INTEGER, PRIMARY KEY(world_id,scope,owner)) WITHOUT ROWID`);
+  db.db.prepare('INSERT INTO agent_inbox_v1 VALUES(?,?,?,?,?,?,?,?,?,?)').run('w', 'soul:s1', 'alice', 'msg_old', 'the house!!!!', 5, 6, null, null, 7);
+  db.db.prepare('INSERT INTO agent_inbox_v1 VALUES(?,?,?,?,?,?,?,?,?,?)').run('w', 'soul:s2', 'alice', 'msg_done', 'Finished', 5, 6, 8, 'ok', 7);
+  const inbox = new AgentInbox(db, 'w', () => 100), s1 = {scope: 'soul:s1', owner: 'alice'};
+  const v = inbox.view(s1); assert.equal(v.latest!.id, 'msg_old'); assert.equal(v.latest!.text, 'the house!!!!'); assert.equal(v.queued, 1); assert.equal(v.lastSeenAt, 7, 'presence stays');
+  assert.equal(inbox.view({scope: 'soul:s2', owner: 'alice'}).latest, null, 'a finished message is not replayed');
+  inbox.acknowledge(s1, 'msg_old', 'Going home.');
+  new AgentInbox(db, 'w', () => 100);
+  assert.equal(db.db.prepare('SELECT COUNT(*) n FROM soul_inbox_queue_v1').get()!.n, 1, 'a second boot moves nothing again');
+  assert.equal(inbox.view(s1).queued, 0);
 });
 
 test('listen wakes on a new request and cleans up on timeout and abort', async t => {
@@ -69,7 +108,6 @@ test('real owner and paired HTTP flows: absent, browser, command polling, listen
   };
   for (const [path, token, polling] of [
     ['/v1/god/inbox', godToken, '/v1/god/status'],
-    [`/v1/edge/owner/${a.id}/inbox`, tokenA, '/v1/edge/observe'],
   ] as const) {
     const agentPath = path.startsWith('/v1/god') ? '/v1/god/inbox' : '/v1/edge/inbox';
     assert.equal((await req(path)).status, 401);
@@ -90,12 +128,41 @@ test('real owner and paired HTTP flows: absent, browser, command polling, listen
     assert.equal((await req(`${agentPath}/${id}/ack`, token, {reply: 'Old request'})).status, 404);
     assert.equal((await req(`${agentPath}/${next.data.inbox.latest.id}/ack`, token, {reply: 'Done listening.'})).status, 200);
   }
+  {
+    // MSG: a Soul's box over HTTP. Three messages typed while the agent is busy all wait; another command carries a private
+    // notice without consuming them; one listen hands over the whole backlog oldest first; ack and result per id.
+    const path = `/v1/edge/owner/${a.id}/inbox`;
+    assert.equal((await req(path)).status, 401); assert.equal((await req(path, 'dev:bob')).status, 403);
+    const texts = ['go find the horses', 'hello?', 'can you ride the horse?'], ids: string[] = [];
+    for (const text of texts) { const r = await req(path, 'dev:alice', {text}); assert.equal(r.status, 200); ids.push(r.data.inbox.latest.id); }
+    let box = (await req(path, 'dev:alice')).data.inbox; assert.equal(box.latest.id, ids[2]); assert.equal(box.queued, 3); assert.equal(box.presence, 'away');
+    const busy = await req('/v1/edge/observe', tokenA); assert.equal(busy.data.inbox.latest.id, ids[0]); assert.equal(busy.data.inbox.latest.state, 'sent', 'a notice is not a delivery');
+    assert.equal(busy.headers.get('cache-control'), 'no-store');
+    const got = await req('/v1/edge/inbox/listen?timeoutMs=25000', tokenA);
+    assert.deepEqual(got.data.backlog.map((m: any) => m.text), texts); assert.deepEqual(got.data.backlog.map((m: any) => m.state), ['delivered', 'delivered', 'delivered']);
+    box = (await req(path, 'dev:alice')).data.inbox; assert.equal(box.presence, 'working'); assert.equal(box.latest.state, 'delivered');
+    assert.equal((await req(`/v1/edge/inbox/${ids[0]}/ack`, tokenA, {reply: 'Got it: walking to the horses.'})).data.inbox.latest.reply, 'Got it: walking to the horses.');
+    assert.equal((await req(`/v1/edge/inbox/${ids[1]}/ack`, tokenA, {reply: 'Hello!'})).status, 200);
+    assert.equal((await req(`/v1/edge/inbox/${ids[0]}/ack`, tokenA, {reply: 'retry'})).status, 200, 'an ack retry stays idempotent');
+    const res = await req(`/v1/edge/inbox/${ids[2]}/result`, tokenA, {text: "Couldn't: no saddle. Options: walk beside it.", outcome: 'failed'});
+    assert.equal(res.status, 200); assert.equal(res.data.inbox.latest.outcome, 'failed'); assert.equal(res.data.inbox.latest.state, 'acknowledged');
+    assert.equal((await req(`/v1/edge/inbox/${ids[0]}/result`, tokenA, {text: 'Arrived at the horses.', outcome: 'done'})).data.inbox.latest.result, 'Arrived at the horses.');
+    assert.equal((await req(`/v1/edge/inbox/${ids[0]}/result`, godToken, {text: 'x', outcome: 'done'})).status, 401, 'the god token is not this Soul\'s agent');
+    box = (await req(path, 'dev:alice')).data.inbox; assert.equal(box.queued, 0); assert.equal(box.latest.result, "Couldn't: no saddle. Options: walk beside it.");
+    // a waiting listen wakes at once on the next message and reports listening meanwhile
+    const begun = performance.now(), listening = req('/v1/edge/inbox/listen?timeoutMs=25000', tokenA);
+    await new Promise(r => setTimeout(r, 20)); assert.equal((await req(path, 'dev:alice')).data.inbox.presence, 'listening');
+    const next = await req(path, 'dev:alice', {text: 'the house!!!!'});
+    const woke = await listening; assert.deepEqual(woke.data.backlog.map((m: any) => m.id), [next.data.inbox.latest.id]); assert.ok(performance.now() - begun < 10_000);
+    assert.equal((await req(`/v1/edge/inbox/${next.data.inbox.latest.id}/ack`, tokenA, {reply: 'Going to the house.'})).status, 200);
+  }
   const foreign = await req('/v1/edge/observe', tokenB); assert.equal(foreign.data.inbox.latest, null);
   const callsBefore = f.db.brainCalls(100).length, eventsBefore = f.host.seq;
   const command = await req(`/v1/souls/${a.id}/command`, 'dev:alice', {text: 'Owner command uses the same inbox'});
   assert.equal(command.status, 200); assert.equal(command.data.ok, true); assert.equal(command.data.inbox.latest.state, 'sent');
   assert.equal((await req(`/v1/edge/owner/${a.id}/inbox`, 'dev:alice')).data.inbox.latest.id, command.data.inbox.latest.id);
   assert.equal((await req('/v1/edge/observe', tokenA)).data.inbox.latest.text, 'Owner command uses the same inbox');
+  assert.equal((await req(`/v1/edge/inbox/${command.data.inbox.latest.id}/ack`, tokenA, {})).status, 200);
   assert.equal(f.db.brainCalls(100).length, callsBefore); assert.equal(f.host.seq, eventsBefore, 'delivery does not translate or execute a body command');
   const publicRead = await req('/v1/world/snapshot'); assert.equal(publicRead.data.inbox, undefined);
   assert.equal((await req('/v1/god/inbox/listen?timeoutMs=0', browserToken)).status, 401);
@@ -110,7 +177,7 @@ test('real owner and paired HTTP flows: absent, browser, command polling, listen
     const response = await app.request(path, {headers: {authorization: `Bearer ${token}`}});
     const encoded = response.headers.get('X-Sim-Agent-Inbox')!; assert.ok(encoded);
     const delivered = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8')).inbox;
-    assert.equal(delivered.latest.id, sent.data.inbox.latest.id); assert.equal(delivered.latest.state, 'delivered'); assert.equal(delivered.connected, true);
+    assert.equal(delivered.latest.id, sent.data.inbox.latest.id); assert.equal(delivered.latest.state, token === godToken ? 'delivered' : 'sent', 'a Soul notice does not consume'); assert.equal(delivered.connected, true);
     assert.equal(response.headers.get('Cache-Control'), 'no-store'); assert.equal(response.headers.get('ETag'), null);
     assert.deepEqual(new Uint8Array(await response.arrayBuffer()), expected, 'private header leaves original binary/SSE bytes unchanged');
   }
