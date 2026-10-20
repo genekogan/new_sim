@@ -3,7 +3,7 @@
     "schema": "def/1",
     "name": "core-twinkle-lights",
     "version": 1,
-    "description": "Eight warm twinkle bulbs on an 8 m cord. Gentle one-third Hz light pools follow each bulb; reduced-motion viewers see steady light. Served authoring example: god/examples/light-motion.mjs.",
+    "description": "Eight warm twinkle bulbs on an 8 m cord between two slim posts. Gentle one-third Hz light pools follow each bulb; reduced-motion viewers see steady light. Served authoring example: god/examples/light-motion.mjs.",
     "category": "utility.lighting",
     "synonyms": [
       "twinkle",
@@ -37,6 +37,32 @@
               0.035,
               0.035
             ],
+            "color": "#524638",
+            "collide": false
+          },
+          {
+            "kind": "cyl",
+            "at": [
+              -3.96,
+              1.42,
+              0
+            ],
+            "r": 0.035,
+            "h": 2.84,
+            "segments": 5,
+            "color": "#524638",
+            "collide": false
+          },
+          {
+            "kind": "cyl",
+            "at": [
+              3.96,
+              1.42,
+              0
+            ],
+            "r": 0.035,
+            "h": 2.84,
+            "segments": 5,
             "color": "#524638",
             "collide": false
           },
