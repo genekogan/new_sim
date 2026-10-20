@@ -146,8 +146,16 @@ if (god) console.log(`[god] entity world ready: ${god.model.entities.size} entit
 const app = buildApp({ cfg: config, db, host, auth, hub, brain, souls, takes, intentV2, edge, god });
 if(edge)installPuntActivities(host,edge,m=>console.log(`[activities] ${m}`));
 const listener = getRequestListener(app.fetch);
+// G9 (lane Z1): a write in flight when the world is told to stop (a release hands it over, the launcher puts it to sleep)
+// is answered before the snapshot is saved and the process exits, instead of dying with its connection (the god's CLI
+// saw a 502 and could not tell whether its edit landed). Reads are not waited for: a GET cut here is asked again by
+// the launcher, and long-polls would hold the stop. Bounded by WRITE_DRAIN_MS; still one writer, as the next process
+// opens the database only after this one has exited.
+const writesInFlight = new Set<Promise<void>>();
+const WRITE_DRAIN_MS = Number(process.env.WRITE_DRAIN_MS ?? 2000);
 server.on('request', (req, res) => {
   if(edenCore&&closing){res.writeHead(503,{'Cache-Control':'no-store'}).end('Server restarting.');return;}
+  if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') { const done = new Promise<void>((r) => res.once('close', r)); writesInFlight.add(done); void done.then(() => writesInFlight.delete(done)); }
   req.url = stripWorldPath(req.url);
   if (req.url?.startsWith('/mcp')) { handleMcp(req, res, souls, intentV2, edge ? (method: 'GET'|'POST', path: string, token: string, body?: unknown)=>Promise.resolve(app.request(path,{method,headers:{authorization:'Bearer '+token,'content-type':'application/json'},...(body!==undefined?{body:JSON.stringify(body)}:{})})).then(r=>r.json()) : undefined).catch((e) => { console.error('[mcp]', e); if (!res.headersSent) res.writeHead(500).end(); }); return; }
   void listener(req, res);
@@ -186,6 +194,11 @@ server.listen(config.port, config.host, () => {
 let closing = false;
 const shutdown = async (sig: string) => {
   if (closing) return; closing = true;
+  if (writesInFlight.size) {
+    const n = writesInFlight.size, t = performance.now();
+    await Promise.race([Promise.all(writesInFlight), new Promise((r) => setTimeout(r, WRITE_DRAIN_MS))]);
+    console.log(`[world] ${sig}: ${n - writesInFlight.size} of ${n} write request(s) in flight answered in ${Math.round(performance.now() - t)} ms`);
+  }
   // Edge worlds have no thought to drain: freeze the clock before the port is released so no successor
   // process can boot while this one still advances the durable clock frontier.
   if (config.mindDriver === 'edge') { host.stop(); edge?.comms?.close(); }
