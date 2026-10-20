@@ -1,0 +1,10 @@
+{
+ "version": 1,
+ "rule": "Gene, 2026-10-20: anything that loads faster from cdn should be on cdn (tools/cdn/README.md). Coordinator, 2026-10-20: put the /blobs/ files the client loads on the CDN.",
+ "note": "BLOBS files (eden2 /srv/sim-blobs, served publicly and immutably at /blobs/assets/<sha[0:2]>/<sha>.<ext>) that the web client requests. file = a local copy of the exact bytes for the publisher (outside the repo; publish rehashes it). Every /blobs/assets/ literal in apps/web/src must appear here (cdn.test.mjs).",
+ "objects": [
+  { "blob": "/blobs/assets/ab/abad8cfc1353cc29f93273e31245f0d96bc75b43074850e6329c529f0433eace.glb", "sha256": "abad8cfc1353cc29f93273e31245f0d96bc75b43074850e6329c529f0433eace", "bytes": 4585464, "path": "<team>/scratch/t4/w3/t2/blobs/abad8cfc1353cc29f93273e31245f0d96bc75b43074850e6329c529f0433eace.glb", "rights": "Mars College (Gene Kogan); campus CAD and the 2026 recipe, private to this project", "referencedBy": "apps/web/src/backdrop-prefetch.ts BACKDROP_BLOBS (Mars campus base tier)" },
+  { "blob": "/blobs/assets/26/26fa3fc8797f10a3588f8c08a0c097e5f4ba3deb12a8712bb64186dfef0b1bda.glb", "sha256": "26fa3fc8797f10a3588f8c08a0c097e5f4ba3deb12a8712bb64186dfef0b1bda", "bytes": 5422428, "path": "<team>/scratch/t4/w3/t2/blobs/26fa3fc8797f10a3588f8c08a0c097e5f4ba3deb12a8712bb64186dfef0b1bda.glb", "rights": "Mars College (Gene Kogan); campus CAD and the 2026 recipe, private to this project", "referencedBy": "apps/web/src/backdrop-prefetch.ts BACKDROP_DETAIL (Mars campus detail tier)" },
+  { "blob": "/blobs/assets/90/909504a44dc358530fd5b426e6068100a65b6bad7686caefa2e73c77af844976.glb", "sha256": "909504a44dc358530fd5b426e6068100a65b6bad7686caefa2e73c77af844976", "bytes": 41912564, "path": "<team>/runtime/forks-data/artifacts/mars-fork-backdrop/909504a44dc358530fd5b426e6068100a65b6bad7686caefa2e73c77af844976.glb", "rights": "Mars College (Gene Kogan); campus CAD and the 2026 recipe, private to this project", "referencedBy": "apps/web/src/mars-fork.ts (Mars fork corrected campus)" }
+ ]
+}

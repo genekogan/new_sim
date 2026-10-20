@@ -161,15 +161,33 @@ declare const __SIM_ASSETS_CDN_ORIGIN__: string;
 /** Fail open to today's origin transport, including a missing or invalid publication manifest.
  *  Lane W1: installed at once (the page no longer waits for the manifest GET before it starts); only asset-file
  *  fetches wait for the manifest, everything else goes straight to the original fetch. */
+/** A CDN copy of an asset URL for a fetch that does not go through the page's window.fetch (the GLB download worker,
+ *  asset-fetch.ts): the remote URL plus the bytes it must hash to. The caller verifies them and falls back to `url`. */
+export type CdnRoute = { url: string; sha256: string; bytes: number };
+let published: Promise<{ manifest: CdnManifest; origin: string } | null> = Promise.resolve(null);
+export function cdnRoute(url: string): Promise<CdnRoute | null> {
+  return published.then((p) => {
+    if (!p) return null;
+    const asset = manifestAsset(p.manifest, url, location.href);
+    return asset ? { url: p.origin + '/' + asset.key, sha256: asset.sha256, bytes: asset.bytes } : null;
+  }, () => null);
+}
+/** Tests: install a parsed manifest for cdnRoute without the build-time switch. */
+export function setCdnRouteForTest(manifest: CdnManifest | null, origin = 'https://assets.eden.art') { published = Promise.resolve(manifest ? { manifest, origin: cdnOrigin(origin) } : null); }
+
 export function installCdnAssets(manifestPath: string, onProgress?: CdnProgress): void {
   if (typeof __SIM_ASSETS_CDN_ENABLED__ === 'undefined' || !__SIM_ASSETS_CDN_ENABLED__) return;
   const original = window.fetch.bind(window);
+  let found: (v: { manifest: CdnManifest; origin: string } | null) => void = () => {};
+  published = new Promise((r) => { found = r; });
   const transport: Promise<Fetch | null> = original(manifestPath, { signal: AbortSignal.timeout(3000) }).then(async (response) => {
     if (!response.ok) return null;
     const manifest = readCdnManifest(await response.json());
+    found({ manifest, origin: cdnOrigin(__SIM_ASSETS_CDN_ORIGIN__) });
     installCdnImages(manifest);
     return cdnFetch(original, manifest, __SIM_ASSETS_CDN_ORIGIN__, location.href, undefined, onProgress);
   }).catch(() => null);
+  void transport.then((t) => { if (!t) found(null); });
   window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     let path = '';
     try { path = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.href).pathname; } catch { /* not a URL: origin */ }

@@ -13978,6 +13978,24 @@
       "sha256": "ff5aaaabba8d9d086bf08ecf8443cc6bf4146110a7505a8025f8b37fe2a95271",
       "bytes": 146992,
       "licence": "served-public"
+    },
+    "/blobs/assets/ab/abad8cfc1353cc29f93273e31245f0d96bc75b43074850e6329c529f0433eace.glb": {
+      "key": "assets/ab/abad8cfc1353cc29f93273e31245f0d96bc75b43074850e6329c529f0433eace.glb",
+      "sha256": "abad8cfc1353cc29f93273e31245f0d96bc75b43074850e6329c529f0433eace",
+      "bytes": 4585464,
+      "licence": "served-public"
+    },
+    "/blobs/assets/26/26fa3fc8797f10a3588f8c08a0c097e5f4ba3deb12a8712bb64186dfef0b1bda.glb": {
+      "key": "assets/26/26fa3fc8797f10a3588f8c08a0c097e5f4ba3deb12a8712bb64186dfef0b1bda.glb",
+      "sha256": "26fa3fc8797f10a3588f8c08a0c097e5f4ba3deb12a8712bb64186dfef0b1bda",
+      "bytes": 5422428,
+      "licence": "served-public"
+    },
+    "/blobs/assets/90/909504a44dc358530fd5b426e6068100a65b6bad7686caefa2e73c77af844976.glb": {
+      "key": "assets/90/909504a44dc358530fd5b426e6068100a65b6bad7686caefa2e73c77af844976.glb",
+      "sha256": "909504a44dc358530fd5b426e6068100a65b6bad7686caefa2e73c77af844976",
+      "bytes": 41912564,
+      "licence": "served-public"
     }
   },
   "worlds": {

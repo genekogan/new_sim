@@ -58,6 +58,10 @@ export function licenceEvidence(rows, sha256, bytes, reviewed = { derivatives: [
 }
 export async function readReviewed() { return JSON.parse(await readFile(new URL('./approved-derivatives.json', import.meta.url), 'utf8')); }
 export async function readServed() { return JSON.parse(await readFile(new URL('./served-public.json', import.meta.url), 'utf8')); }
+/** BLOBS files the client loads (/blobs/assets/<aa>/<sha>.<ext>; reviewed list, local copies outside the repo). */
+export async function readBlobs() { return JSON.parse(await readFile(new URL('./served-blobs.json', import.meta.url), 'utf8')); }
+/** Served-public evidence: the generated core-set records plus the reviewed BLOBS records. */
+export async function readServedAll() { const [a, b] = await Promise.all([readServed(), readBlobs()]); return { ...a, objects: [...a.objects, ...b.objects] }; }
 async function filesUnder(dir) {
   let entries; try { entries = await readdir(dir, { withFileTypes: true }); } catch (e) { if (e.code === 'ENOENT') return []; throw e; }
   const files = [];
@@ -80,9 +84,12 @@ export function defaultRoots(root) {
     { dir: join(root, 'apps/web/public'), prefixes: ['/', '/worlds/'], pages: ['/w/eden', '/w/mars', '/w/littlemartians', '/worlds'] },
   ];
 }
-export async function inventory({ root = ROOT, sources = DEFAULT_SOURCES, roots = defaultRoots(root), now = new Date(), reviewed, served } = {}) {
+export async function inventory({ root = ROOT, sources = DEFAULT_SOURCES, roots = defaultRoots(root), now = new Date(), reviewed, served, blobs } = {}) {
   const rows = parseCsv(await readFile(sources, 'utf8')), byPath = new Map(), missingRoots = [];
-  reviewed ??= await readReviewed(); served ??= await readServed();
+  reviewed ??= await readReviewed();
+  // The BLOBS list names this repo's client files; an inventory of another root (a test fixture) has none by default.
+  blobs ??= resolve(root) === ROOT ? await readBlobs() : { objects: [] };
+  if (!served) { const generated = await readServed(); served = { ...generated, objects: [...generated.objects, ...blobs.objects] }; }
   // The immutable release overlay takes precedence over source-public fallbacks.
   for (const spec of roots) {
     try { if (!(await stat(spec.dir)).isDirectory()) throw Error('Asset root is not a directory'); } catch (e) { if (e.code === 'ENOENT') { missingRoots.push(spec.dir); continue; } throw e; }
@@ -124,12 +131,26 @@ export async function inventory({ root = ROOT, sources = DEFAULT_SOURCES, roots 
       if (!object.paths.includes(path)) object.paths.push(path);
     }
   }
+  // BLOBS the client requests by their content-addressed path (served-blobs.json). A missing local copy is listed, not guessed.
+  const missingBlobs = [];
+  for (const b of blobs.objects) {
+    const ext = extname(b.blob).toLowerCase(), m = /^\/blobs\/assets\/([0-9a-f]{2})\/([0-9a-f]{64})\.[a-z0-9]+$/.exec(b.blob);
+    if (!m || m[2] !== b.sha256 || m[1] !== b.sha256.slice(0, 2) || !CLIENT_EXTENSIONS.has(ext)) throw Error(`Invalid BLOBS record ${b.blob}`);
+    let digest; try { digest = await shaFile(b.path); } catch (e) { if (e.code === 'ENOENT') { missingBlobs.push(b.path); continue; } throw e; }
+    if (digest.sha256 !== b.sha256 || digest.bytes !== b.bytes) throw Error(`${b.path}: bytes differ from its BLOBS record`);
+    hashes.set(b.path, digest);
+    const evidence = licenceEvidence(rows, digest.sha256, digest.bytes, reviewed, served), key = keyFor(digest.sha256, ext);
+    if (evidence.reason) { excluded.push({ file: b.path, path: b.blob, ...digest, licence: evidence.licence, reason: evidence.reason }); continue; }
+    assets[b.blob] = { key, ...digest, licence: evidence.licence };
+    if (!objects.has(key)) objects.set(key, { key, file: b.path, ...digest, licence: evidence.licence, source: evidence.source, contentType: TYPES[ext], cacheControl: CACHE, paths: [] });
+    objects.get(key).paths.push(b.blob);
+  }
   const files = [...hashes].map(([file, digest]) => ({ file, ...digest }));
   return {
     version: 1, generatedAt: now.toISOString(), root: resolve(root), sources: resolve(sources), bucket: 'eden-assets',
     coverage: ['/w/eden', '/w/mars', '/w/littlemartians', '/worlds'],
     note: 'Local public-asset inventory, not a live traffic capture. Missing roots and unlicensed files are explicit. No network or credentials used.',
-    manifest: { version: 1, assets }, objects: [...objects.values()].sort((a, b) => a.key.localeCompare(b.key)), excluded, missingRoots,
+    manifest: { version: 1, assets }, objects: [...objects.values()].sort((a, b) => a.key.localeCompare(b.key)), excluded, missingRoots, missingBlobs,
     totals: { candidateFiles: files.length, candidateBytes: files.reduce((n, f) => n + f.bytes, 0), candidatePaths: candidates.length, publishableObjects: objects.size, publishableBytes: [...objects.values()].reduce((n, f) => n + f.bytes, 0), publishablePaths: Object.keys(assets).length, excludedPaths: excluded.length },
     largestFiles: files.sort((a, b) => b.bytes - a.bytes).slice(0, 20),
   };

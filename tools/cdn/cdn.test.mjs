@@ -123,6 +123,22 @@ test('CDN2: served-public.json is current and holds the 125 private lods, each p
   assert.equal(licenceEvidence([], records[0].sha256, records[0].bytes + 1, reviewed, served).licence, 'unknown');
 });
 
+test('CDN2: every /blobs/assets/ file the web client names has a BLOBS record and a manifest alias', async () => {
+  const { readdir } = await import('node:fs/promises');
+  const src = new URL('../../apps/web/src/', import.meta.url), named = new Set();
+  for (const f of (await readdir(src, { recursive: true })).filter(f => /\.(ts|tsx)$/.test(f) && !/\.test\.tsx?$/.test(f))) {
+    for (const m of (await readFile(new URL(f, src), 'utf8')).matchAll(/\/blobs\/assets\/[0-9a-f]{2}\/[0-9a-f]{64}\.[a-z0-9]+/g)) named.add(m[0]);
+  }
+  const blobs = JSON.parse(await readFile(new URL('./served-blobs.json', import.meta.url), 'utf8')).objects;
+  const manifest = JSON.parse(await readFile(new URL('../../apps/web/src/cdn-manifest.json', import.meta.url), 'utf8')).assets;
+  assert.ok(named.size >= 3);
+  for (const path of named) {
+    const r = blobs.find(b => b.blob === path);
+    assert.ok(r, `${path}: add it to served-blobs.json`);
+    assert.deepEqual(manifest[path], { key: keyFor(r.sha256, '.glb'), sha256: r.sha256, bytes: r.bytes, licence: 'served-public' });
+  }
+});
+
 test('hash aliases carry the bytes the origin route sends: a rendition under its source sha, marked `of`', async () => fixture(async ({ dir, sources }) => {
   const src = Buffer.from('source mesh'), ren = Buffer.from('smaller rendition'), plain = Buffer.from('plain mesh');
   const [s, r, p] = [src, ren, plain].map(hash);

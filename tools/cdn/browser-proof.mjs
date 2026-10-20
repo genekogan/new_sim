@@ -25,6 +25,11 @@ const bytes = readFileSync(resolve(root, record.path));
 assert.equal(createHash('sha256').update(bytes).digest('hex'), sha);
 const assetPath = `${prefix}/w/cdn-proof/assets/${sha}.glb`;
 const key = `assets/${sha.slice(0, 2)}/${sha}.glb`;
+// Z2 (2026-10-20): a far cow loads its lod1 first (make.lod1), by its own sha; the proof accepts and serves either.
+const lods = JSON.parse(readFileSync(resolve(root, 'worlds/core-assets/lods.index.json'), 'utf8')).assets;
+const [lodSha, lodRecord] = Object.entries(lods).find(([, a]) => a.source?.includes(sha)) ?? [];
+const lodBytes = lodRecord ? readFileSync(resolve(root, lodRecord.path)) : null;
+const lodKey = lodSha ? `assets/${lodSha.slice(0, 2)}/${lodSha}.glb` : null, lodPath = lodSha ? `${prefix}/w/cdn-proof/assets/${lodSha}.glb` : null;
 // Original checkerboard texture: no external asset or licence dependency.
 const chunk = (type, data) => { const tag = Buffer.from(type); const size = Buffer.alloc(4); size.writeUInt32BE(data.length); const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(Buffer.concat([tag, data]))); return Buffer.concat([size, tag, data, crc]); };
 const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(8, 0); ihdr.writeUInt32BE(8, 4); ihdr[8] = 8; ihdr[9] = 2;
@@ -51,7 +56,7 @@ if (mode === 'serve') {
     { op: 'place', def: 'core/cow-pack@1', name: 'cdn-cow', p: [0, 0] },
     { op: 'place', def: 'core/cottage@1', name: 'cottage', p: [10, 8] },
     { op: 'place', def: 'core/flag@1', name: 'arrival', p: [0, 4], state: { label: 'CDN proof' } },
-    { op: 'place', def: 'core/screen@1', name: 'cdn-texture', p: [4, 0], state: { media: pngPath } },
+    { op: 'place', def: 'core/screen@1', name: 'cdn-texture', p: [4, 0], state: { media: origin + pngPath } },
   ] }] }));
   process.env.WEB_DIR = webDir;
   process.env.WORLD_PATH = prefix + '/w/cdn-proof';
@@ -64,10 +69,10 @@ if (mode === 'serve') {
   const startCdn = async () => {
     if (cdn?.listening) return;
     cdn = createServer((req, res) => {
-      const source = req.url === '/' + key ? bytes : req.url === '/' + pngKey ? png : null;
+      const source = req.url === '/' + key ? bytes : req.url === '/' + pngKey ? png : lodKey && req.url === '/' + lodKey ? lodBytes : null;
       if (!source) { res.writeHead(404).end(); return; }
       const body = corrupt ? Buffer.alloc(source.length, 0) : source;
-      res.writeHead(200, { 'content-type': source === bytes ? 'model/gltf-binary' : 'image/png', 'content-length': body.length, 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
+      res.writeHead(200, { 'content-type': source === png ? 'image/png' : 'model/gltf-binary', 'content-length': body.length, 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
       res.end(body);
     });
     await new Promise((yes, no) => cdn.once('error', no).listen(5811, '127.0.0.1', yes));
@@ -131,13 +136,13 @@ if (mode === 'serve') {
       const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: dpr });
       const page = await context.newPage(), requests = [], responses = [], failed = [], errors = [];
       await page.route('**/*', route => { const u = new URL(route.request().url()); return ['blob:', 'data:'].includes(u.protocol) || ['127.0.0.1', 'localhost'].includes(u.hostname) ? route.continue() : route.abort(); });
-      const tracked = url => url.includes(sha) || url.includes(pngSha) || url.endsWith('/cdn-proof.png');
+      const tracked = url => url.includes(sha) || (lodSha && url.includes(lodSha)) || url.includes(pngSha) || url.endsWith('/cdn-proof.png');
       page.on('request', req => { if (tracked(req.url())) requests.push(req.url()); });
       page.on('response', res => { if (tracked(res.url())) responses.push({ url: res.url(), status: res.status() }); });
       page.on('requestfailed', req => { if (tracked(req.url())) failed.push({ url: req.url(), error: req.failure()?.errorText }); });
       page.on('pageerror', error => errors.push(error.message));
       await page.goto(`${origin}${prefix}/w/cdn-proof?dev=1&weather=clear`, { waitUntil: 'domcontentloaded' });
-      await page.waitForFunction(sha => globalThis.__assetStages?.[sha] === 'done', sha, { timeout: 90_000 });
+      await page.waitForFunction(shas => shas.some(s => globalThis.__assetStages?.[s] === 'done'), [sha, lodSha].filter(Boolean), { timeout: 90_000 });
       const renderer = await page.evaluate(() => { const canvas = document.querySelector('canvas'); const gl = canvas?.getContext('webgl2'); const ext = gl?.getExtension('WEBGL_debug_renderer_info'); return ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : ''; });
       assert.ok(renderer && !/swiftshader|llvmpipe|software/i.test(renderer), renderer);
       // Real input: focus the canvas, drag the camera, and use the walk keys before the screenshot.
@@ -147,21 +152,29 @@ if (mode === 'serve') {
       await page.keyboard.down('ArrowUp'); await page.waitForTimeout(350); await page.keyboard.up('ArrowUp');
       // Frame an authored landmark through the real Explore UI, so the screenshot shows the fixture
       // rather than whichever empty horizon the manual camera gesture happened to face.
-      await page.getByRole('button', { name: /^Explore Cdn Proof/ }).click();
-      await page.getByRole('searchbox', { name: 'Search locations and Souls' }).fill('cottage');
-      await page.getByRole('button', { name: 'cottage', exact: true }).click();
+      // Best effort (the Explore UI changes between releases): the assertions below do not depend on it.
+      await (async () => {
+        await page.getByRole('button', { name: /^Explore/ }).first().click({ timeout: 5000 });
+        await page.getByRole('searchbox').first().fill('cottage', { timeout: 5000 });
+        await page.getByRole('button', { name: 'cottage', exact: true }).click({ timeout: 5000 });
+      })().catch(() => page.keyboard.press('Escape'));
       await page.waitForTimeout(1500);
-      assert.ok(requests.some(url => url === 'http://127.0.0.1:5811/' + key), 'CDN was attempted');
-      const originLoaded = responses.some(row => row.url === origin + assetPath && row.status === 200);
+      assert.ok(requests.some(url => url === 'http://127.0.0.1:5811/' + key || (lodKey && url === 'http://127.0.0.1:5811/' + lodKey)), 'CDN was attempted');
+      // CDN2: GLBs are downloaded in the asset worker (asset-fetch.ts); its requests count like the page's.
+      const originLoaded = responses.some(row => (row.url === origin + assetPath || (lodPath && row.url === origin + lodPath)) && row.status === 200);
       assert.equal(originLoaded, scenario !== 'cdn', 'only failure scenarios fetch origin');
       assert.ok(requests.includes('http://127.0.0.1:5811/' + pngKey), 'standalone TextureLoader uses CDN too');
       assert.equal(responses.some(row => row.url === origin + pngPath && row.status === 200), scenario !== 'cdn', 'standalone texture falls back to origin');
+      // CDN2: the GLB came through the download worker (3.50's bypass): it delivered, and from the CDN when it is up.
+      const worker = await page.evaluate(() => globalThis.__assetWorker);
+      assert.ok(worker?.delivered > 0 && !worker.failed, `asset worker used: ${JSON.stringify(worker)}`);
+      assert.equal(worker.cdn > 0, scenario === 'cdn', `worker CDN deliveries: ${JSON.stringify(worker)}`);
       if (scenario === 'unreachable') assert.ok(failed.some(row => row.url.startsWith('http://127.0.0.1:5811/')), 'CDN connection refused');
       assert.deepEqual(errors, []);
       const shot = resolve(out, `${scenario}-dpr${dpr}.png`);
       await page.screenshot({ path: shot });
-      report.runs.push({ scenario, dpr, renderer, requests, responses, failed, errors, modelStage: 'done', shot });
-      console.log(JSON.stringify({ scenario, dpr, renderer, originLoaded, result: 'PASS' }));
+      report.runs.push({ scenario, dpr, renderer, requests, responses, failed, errors, modelStage: 'done', worker, shot });
+      console.log(JSON.stringify({ scenario, dpr, renderer, originLoaded, worker, result: 'PASS' }));
       await context.close();
     }
   } catch (error) {

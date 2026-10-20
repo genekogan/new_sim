@@ -6,7 +6,7 @@ import { constants } from 'node:fs';
 import { lstat, open, readFile, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { ALLOWED_LICENCES, CACHE, DEFAULT_SOURCES, ROOT, TYPES, inventory, licenceEvidence, parseCsv, readReviewed, readServed, shaFile, validKey } from './inventory.mjs';
+import { ALLOWED_LICENCES, CACHE, DEFAULT_SOURCES, ROOT, TYPES, inventory, licenceEvidence, parseCsv, readReviewed, readServedAll, shaFile, validKey } from './inventory.mjs';
 import { withNewReceipt } from './receipt.mjs';
 
 export const ENDPOINT = 'https://<cf-account-id>.r2.cloudflarestorage.com';
@@ -65,7 +65,7 @@ export async function publish(plan, { sources = DEFAULT_SOURCES, credentials, fe
   if (plan.version !== 1 || plan.bucket !== BUCKET || !Array.isArray(plan.objects) || !plan.objects.length) throw Error('No approved immutable objects in this plan');
   // A plan is untrusted input. Only direct function callers (tests) can override the trusted licence source.
   const sourceBytes = await readFile(sources), sourcesSha256 = sha(sourceBytes);
-  const rows = parseCsv(sourceBytes.toString('utf8')), reviewed = await readReviewed(), served = await readServed(), results = [], seen = new Set();
+  const rows = parseCsv(sourceBytes.toString('utf8')), reviewed = await readReviewed(), served = await readServedAll(), results = [], seen = new Set();
   // Validate every object before making the first network request.
   for (const object of plan.objects) {
     const ext = '.' + object.key.split('.').at(-1);

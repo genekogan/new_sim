@@ -72,10 +72,15 @@ and 477 served-public. These stay on origin because the origin is as fast or fas
 
 | Asset | Why it stays on origin |
 |---|---|
-| `/blobs/assets/<sha>` (Mars backdrop tiers, Mars fork campus) | The origin sends precompressed brotli at quality 11; `assets.eden.art` compresses on the fly at about quality 4: backdrop base tier 1,407,181 B on origin vs 1,554,144 B (+10%) from the CDN. |
 | `/modular/environment/*` (character models, clips, Eden packs; every world) | Same: origin q11 brotli, the CDN 18-45% larger (environment set 1,661,713 vs 2,022,329 B). |
 | Vite bundles (`/assets/*.js`, css) | Same edge, origin q11 brotli, and a second host adds 31-51 ms of connection setup on the boot path. |
 | Mars campus `/browser/campus.glb?v=20260922b` | Already on the CDN, world-scoped (below). |
+
+The `/blobs/assets/<sha>` files the client names (Mars backdrop base and detail tiers, the Mars fork campus) ARE on the CDN
+(coordinator, 2026-10-20: /w/mars loads its campus from them): `served-blobs.json` records them (exact sha/bytes, a local
+copy of the bytes for the publisher, which file names them), and a test fails when a `/blobs/assets/` literal in
+`apps/web/src` has no record. Measured trade-off: the origin sends them as quality-11 brotli (base tier 1,407,181 B) and the
+CDN at about quality 4 (1,554,144 B, +10%), so precompressed upload (below) is what makes them strictly faster.
 
 A precompressed upload (objects stored with `Content-Encoding: br` at quality 11) would make the CDN at least as small as
 the origin for all of these; the design and its open check are in `docs/god/CDN.md`.
@@ -209,6 +214,22 @@ Protocol references: [AWS SigV4 signed payloads](https://docs.aws.amazon.com/Ama
 [R2 atomic conditional writes](https://developers.cloudflare.com/r2/api/s3/api/).
 
 ## Web switch and local browser proof
+
+GLB downloads run in a worker (`apps/web/src/gen-mesh/asset-fetch.ts`), outside the page's `window.fetch` transport; 3.50
+shipped with every core GLB bypassing the CDN that way. Since CDN2 the page resolves each job through the manifest
+(`cdnRoute` in `cdn-assets.ts`) and the worker fetches the CDN copy, checks its exact length and SHA-256, and falls back to
+the original URL on any failure (`asset-fetch-cdn.test.ts` runs the worker's own source against fake fetches).
+`window.__assetWorker.cdn` counts the worker's CDN deliveries.
+
+**Runtime check for every release walk** (release.sh only proves the build contains the CDN code):
+
+```sh
+node tools/cdn/cdn-walk.mjs <team>/scratch/<run>/cdn-walk https://sim.eden.art/worlds/w/eden-2026/ https://sim.eden.art/w/mars https://sim.eden.art/worlds/w/little-martians-arium
+```
+
+Real Chrome, desktop and phone at dpr 1 and 2, worker on. It exits 1 when the origin answers any asset the shipped
+manifest maps, when an `assets.eden.art` request is not 200, or when the worker delivered GLBs but none from the CDN.
+Against live 3.50 it FAILS on /worlds/w/eden-2026 (6 listed core GLBs from the origin) and passes with `?assetworker=0`.
 
 The site switch is build-time `SIM_ASSETS_CDN_ENABLED=1`, **off when absent** in a plain vite build. `release.sh` (production,
 staging, legacy, `--local`) defaults it **on** since CDN1 (3.20-3.49 shipped without it) and fails a build that lacks the
