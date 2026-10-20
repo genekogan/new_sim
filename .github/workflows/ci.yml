@@ -1,8 +1,10 @@
 # Complete application checks on isolated runners; preserve every acceptance target.
+# Manual only (OPS B5, 2026-10-20): the GitHub account's Actions billing failed, so every push showed a red run that never
+# started. Releases are qualified by the Modal gate (tools/test-harness/release-gate.sh). Restore the push/pull_request
+# triggers once billing is fixed (Gene's), or run this by hand: gh workflow run ci.yml --ref <branch>.
 name: ci
 on:
-  push: { branches: [main] }
-  pull_request:
+  workflow_dispatch:
 jobs:
   qualify:
     name: ${{ matrix.name }}
