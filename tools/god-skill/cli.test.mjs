@@ -100,10 +100,10 @@ test('request looks up an escaped receipt ref without writing', async (t) => {
 });
 
 test('status exposes the local skill and server version tuple', async (t) => {
-  fixture(t, { you: 'god', entities: 3, seq: 8, versions: { protocol: 'god/1', schema: 'god-schema/1', skill: '1.6', source: 'abc123' } });
-  assert.equal(SKILL_VERSION, '1.6');
+  fixture(t, { you: 'god', entities: 3, seq: 8, versions: { protocol: 'god/1', schema: 'god-schema/1', skill: '1.7', source: 'abc123' } });
+  assert.equal(SKILL_VERSION, '1.7');
   const text = await status();
-  for (const part of ['skill 1.6', 'protocol god/1', 'schema god-schema/1', 'source abc123']) assert.ok(text.includes(part), part);
+  for (const part of ['skill 1.7', 'protocol god/1', 'schema god-schema/1', 'source abc123']) assert.ok(text.includes(part), part);
 });
 
 test('answer and layer commands use receipt-protected acts with fresh refs', async (t) => {
@@ -1223,9 +1223,25 @@ test('EF2: build start prints its server site report without an extra request', 
 });
 
 test('preview preserves the server capability fragment in the human link', async t => {
+  process.env.SIM_GOD_FEATURES = 'previews'; t.after(() => { delete process.env.SIM_GOD_FEATURES; });   // G5: the page's ghost is switched off by default
   fixture(t, { accepted: true, id: 'pv_view', url: '?preview=pv_view#previewKey=unguessable-read-key', summary: {} });
   const result = await preview({ ops: [{ op: 'remove', id: 'bench' }] });
   assert.equal(result.url, 'https://world.invalid?preview=pv_view#previewKey=unguessable-read-key'); assert.ok(result.tell.includes(result.url));
+});
+
+test('G5: with the page ghost off, preview prints only the commit; flag and Constitution verbs refuse cleanly and leave help', async t => {
+  const calls = fixture(t, { accepted: true, id: 'pv_off', url: '?preview=pv_off#previewKey=k', viewKey: 'k', summary: {} });
+  const r = await preview({ ops: [{ op: 'remove', id: 'bench' }] });
+  assert.equal(r.url, undefined); assert.equal(r.viewKey, undefined); assert.equal(r.commit, 'node eden-god.mjs commit pv_off');
+  assert.doesNotMatch(r.tell, /ghost|\?preview=/); assert.match(r.tell, /commit pv_off/);
+  const sent = calls.length;
+  for (const [verb, args] of [['flag', ['camp']], ['flags', []], ['constitution', ['# Rules']], ['amendments', []], ['decide', ['a_1', 'accept']], ['governance', []]]) {
+    const out = await COMMANDS[verb](args, {});
+    assert.match(out, /^REFUSED: (flags are|the Constitution is) turned off/, verb);
+  }
+  assert.equal(calls.length, sent, 'a switched-off verb never reaches the world');
+  const help = COMMANDS.help();
+  assert.doesNotMatch(help, /flag <label>|constitution <md>|amendments \[--all\]/); assert.match(help, /prayers \[--all\]/);
 });
 
 test('dryrun, preview, query, env, land, strike and asset GET/POST calls back off on 429', async t => {

@@ -3469,7 +3469,12 @@ var GOV_POS = { amendments: 0, decide: 2, governance: 0 };
 var GOV_HELP = `govern: amendments [--all] \xB7 decide <id> accept [--text <md|file>] [--reason r] \xB7 decide <id> decline --reason "<why>" \xB7 governance [--residents-decide on|off] (off by default)`;
 
 // lib/version.mjs
-var SKILL_VERSION = "1.6";
+var SKILL_VERSION = "1.7";
+
+// lib/features.mjs
+var GOD_FEATURES = Object.freeze({ flags: false, previews: false, constitution: false });
+var on = () => (typeof process === "undefined" ? "" : process.env.SIM_GOD_FEATURES ?? "").split(",").map((s) => s.trim());
+var godFeature = (name) => GOD_FEATURES[name] === true || on().includes(name);
 
 // cli.mjs
 var SELF = (() => {
@@ -3593,7 +3598,7 @@ async function map(opts = {}) {
     }
   }
   const fl = v.rows.filter((r) => isFlagDef(v.def(r.def)?.ref ?? r.def));
-  if (fl.length) {
+  if (fl.length && godFeature("flags")) {
     lines.push("## flags (refer to them as flag:<name>)");
     for (const r of fl) lines.push(`- flag:${r.name} "${v.entity(r.id)?.state?.label ?? ""}" at (${r.pose[0]}, ${r.pose[2]})`);
   }
@@ -3872,7 +3877,13 @@ async function dryrun(batch) {
 }
 async function preview(batch) {
   const r = ok(await call("/v1/god/preview", { body: typeof batch === "string" ? JSON.parse(batch) : batch }), "preview");
-  return r.accepted ? { ...r, url: `${load().world}${r.url ?? `?preview=${r.id}`}`, commit: `node eden-god.mjs commit ${r.id}`, tell: `Preview ${r.id}: open ${load().world}${r.url ?? `?preview=${r.id}`} to see the ghost; run \`node eden-god.mjs commit ${r.id}\` to build it.` } : r;
+  if (!r.accepted) return r;
+  const commit2 = `node eden-god.mjs commit ${r.id}`;
+  if (!godFeature("previews")) {
+    const { url: _url, viewKey: _key, ...rest } = r;
+    return { ...rest, commit: commit2, tell: `Preview ${r.id}: run \`${commit2}\` to build it.` };
+  }
+  return { ...r, url: `${load().world}${r.url ?? `?preview=${r.id}`}`, commit: commit2, tell: `Preview ${r.id}: open ${load().world}${r.url ?? `?preview=${r.id}`} to see the ghost; run \`${commit2}\` to build it.` };
 }
 async function commit(id) {
   if (!id) throw new Error("usage: commit <preview-id>");
@@ -5366,6 +5377,12 @@ var COMMANDS = {
   governance: (r, f) => governance(f),
   help: () => HELP
 };
+var OFF_VERBS = { flags: ["flag", "flags"], constitution: ["constitution", "amendments", "decide", "governance"] };
+var OFF_TEXT = { flags: "flags are turned off in this world. Name a thing instead (place \u2026 --name camp) and use --at camp.", constitution: "the Constitution is turned off in this world." };
+for (const [feature, verbs] of Object.entries(OFF_VERBS)) for (const verb of verbs) {
+  const run = COMMANDS[verb];
+  COMMANDS[verb] = (r, f) => godFeature(feature) ? run(r, f) : `REFUSED: ${OFF_TEXT[feature]}`;
+}
 for (const [name, fn] of Object.entries(COMMANDS)) COMMANDS[name] = (r = [], f = {}) => withBuildOptions(f, () => ["build", "group"].includes(name) ? withStateLock(() => fn(r, f)) : fn(r, f));
 var HELP = `eden-god ${SKILL_VERSION} \u2014 god mode for one Eden world. Read SKILL.md.
 locks:  doctor [--fix] [--local] [--json] (holders, stale locks; --fix breaks only stale ownership)
@@ -5382,16 +5399,15 @@ site:   build start <id> --title "\u2026" --steps "shell,roof,interior" --at ref
 resume: omit id to resume the only paused build or active build with a dead lead; several open builds or an unknown id list the choices.
 mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' \xB7 preview '<batch>' \xB7 commit <preview-id> \xB7 act '<batch>' \xB7 dryrun '<batch>' \xB7 request <clientRef>
-world:  sky [--palette p --sun s] \xB7 time [19:30|7pm] [--speed h/h] [--pause|--resume] \xB7 weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] \xB7 strike [--at x,z|thing] \xB7 constitution <md> \xB7 expand <m> \xB7 export [file] \xB7 import <genesis.json> \xB7 define <def.json> \xB7 define-kit <kit.json> \xB7 furnish <house>[/room]
+world:  sky [--palette p --sun s] \xB7 time [19:30|7pm] [--speed h/h] [--pause|--resume] \xB7 weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] \xB7 strike [--at x,z|thing] ${godFeature("constitution") ? "\xB7 constitution <md> " : ""}\xB7 expand <m> \xB7 export [file] \xB7 import <genesis.json> \xB7 define <def.json> \xB7 define-kit <kit.json> \xB7 furnish <house>[/room]
 inbox:  listen [--after message-id] [--timeout 25] [--once|--follow] \xB7 ack <message-id> [reply] [--failed] (a reply of up to 140 characters; --failed when it could not be done)
-pair:   register <world-url> \xB7 pair \xB7 flags \xB7 flag <label> --at x,z \xB7 prayers [--all] (answered too) \xB7 answer <id> <text> \xB7 status
+pair:   register <world-url> \xB7 pair \xB7 ${godFeature("flags") ? "flags \xB7 flag <label> --at x,z \xB7 " : ""}prayers [--all] (answered too) \xB7 answer <id> <text> \xB7 status
 ${LAND_HELP}
 find:   catalog [--category c] [--has slot:sit|actuator:door|comp:light] [--page n] (every def, one line each) \xB7 find <words> [--category c] [--has \u2026] \xB7 recommend <what you want> \xB7 taxonomy (categories, counts, param conventions, actuators)
 parts:  parts [words] [--json] (parts kept by finished builds, checks and pinned place sha:<hash> --at \u2026 hints; also shown at build start)
 ${LAYERS_HELP}
 ${SECRET_HELP}
-${GOV_HELP}
-learn:  examples [name] \xB7 defs <name|core/x@1> (one def in full) \xB7 sky (palettes) \xB7 a row named stall = the set "stall"`;
+${godFeature("constitution") ? GOV_HELP + "\n" : ""}learn:  examples [name] \xB7 defs <name|core/x@1> (one def in full) \xB7 sky (palettes) \xB7 a row named stall = the set "stall"`;
 var NO_WARM = /* @__PURE__ */ new Set(["help", "register", "mint", "pair", "doctor", "look", "look-shot", "look-keeper"]);
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("eden-god.mjs")) {
   const [cmd, ...argv] = process.argv.slice(2);

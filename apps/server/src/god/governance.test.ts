@@ -8,6 +8,7 @@ import { ApiError } from '../souls.ts';
 import { GodMode } from './god.ts';
 import { mountGodRoutes } from './routes.ts';
 import { governanceOf } from './governance.ts';
+process.env.SIM_GOD_FEATURES = 'constitution';   // G5: switched off by default (tools/god-skill/lib/features.mjs); this file tests it
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const SOULS: Record<string, { id: string; name: string }> = { 'sim_ada': { id: 's_ada', name: 'Ada' }, 'sim_ben': { id: 's_ben', name: 'Ben' }, 'sim_cy': { id: 's_cy', name: 'Cy' } };

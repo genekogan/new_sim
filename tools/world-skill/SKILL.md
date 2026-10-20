@@ -77,8 +77,7 @@ It covers the ontology, the library and the solver's relations. The loop, in sho
 4. `node eden-god.mjs look` after every few edits, then open the PNG. Fix what looks wrong.
 5. `node eden-god.mjs undo` (or `undo --group <g>`) when something went wrong.
 
-Build in small batches the audience can watch arrive. Your human can drop **flags** on the page. Refer to them as
-`flag:<name>`.
+Build in small batches the audience can watch arrive.
 
 ### 4. Souls and prayers
 

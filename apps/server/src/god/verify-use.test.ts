@@ -16,6 +16,7 @@ import {PROBE_OWNER, isVerificationProbe} from '../verification-probe.ts';
 import {installBirthLooks} from './birth-look.ts';
 import {seatProviders} from './query.ts';
 import {GroundHost} from './ground-host.ts';
+process.env.SIM_GOD_FEATURES = 'flags';   // G5: switched off by default (tools/god-skill/lib/features.mjs); this file tests it
 
 function world(t: TestContext, options: {durableClockV1?: boolean; district?: boolean; beforeVerify?: (w: ReturnType<typeof fixture>) => void} = {}) {
   const w = fixture(':memory:', factory, {durableClockV1: options.durableClockV1 ?? true});

@@ -17,6 +17,7 @@ import { ApiError } from '../souls.ts';
 import { GodMode } from './god.ts';
 import { mountGodRoutes } from './routes.ts';
 import { governanceOf } from './governance.ts';
+process.env.SIM_GOD_FEATURES = 'constitution';   // G5: switched off by default (tools/god-skill/lib/features.mjs); this file tests it
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const CLI = fileURLToPath(new URL('../../../../tools/god-skill/eden-god.mjs', import.meta.url));

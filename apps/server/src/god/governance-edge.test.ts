@@ -10,6 +10,7 @@ import { EdgeLedger } from '../edge/ledger/ledger.ts';
 import { GodMode } from './god.ts';
 import { installEngineBridge } from './engine-bridge.ts';
 import { installGovernance } from './governance-edge.ts';
+process.env.SIM_GOD_FEATURES = 'constitution';   // G5: switched off by default (tools/god-skill/lib/features.mjs); this file tests it
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 test('residents propose and support amendments on the edge; the god decides; arrivals hear the constitution changed', { timeout: 600000 }, async (t) => {

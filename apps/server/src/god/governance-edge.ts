@@ -11,6 +11,7 @@ import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import { config, KNOWN_WORLD_KEYS } from '../config.ts';
 import type { GodMode } from './god.ts';
 import { governanceOf, MAX_CLAUSE, type Governance } from './governance.ts';
+import { godFeature } from '../../../../tools/god-skill/lib/features.mjs';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const WALKS = ['walk', 'stroll', 'go', 'go-near', 'hang-out', 'wander', 'swim'];
@@ -23,7 +24,8 @@ export function installGovernance(god: GodMode, o: { host: WorldHost; edge?: Edg
     residents: () => [...host.minds.values()].filter((m) => !edge?.faded.has(m.soulId)).map((m) => ({ id: m.soulId, name: m.name })),
     deliver: (soulId, kind, body) => { (edge?.comms as any)?.streams?.deliver?.(soulId, kind, host.engine.world.tick, body); },
   });
-  if (edge && (o.edgeHooks ?? !(KNOWN_WORLD_KEYS as readonly string[]).includes(config.worldKey))) hookEdge(edge, gov);
+  // G5: the Constitution is switched off (tools/god-skill/lib/features.mjs): Souls are not offered amendments; the data stays
+  if (edge && (o.edgeHooks ?? (godFeature('constitution') && !(KNOWN_WORLD_KEYS as readonly string[]).includes(config.worldKey)))) hookEdge(edge, gov);
   return gov;
 }
 

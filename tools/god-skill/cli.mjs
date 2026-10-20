@@ -32,6 +32,7 @@ import { amendments, decide, governance, GOV_FLAGS, GOV_POS, GOV_HELP } from './
 export { schemaMarkdown };
 
 import { SKILL_VERSION } from './lib/version.mjs';
+import { godFeature } from './lib/features.mjs';
 export { SKILL_VERSION };
 
 // ---------------------------------------------------------------- pairing
@@ -136,7 +137,7 @@ export async function map(opts = {}) {
     }
   }
   const fl = v.rows.filter((r) => isFlagDef(v.def(r.def)?.ref ?? r.def));
-  if (fl.length) { lines.push('## flags (refer to them as flag:<name>)'); for (const r of fl) lines.push(`- flag:${r.name} "${v.entity(r.id)?.state?.label ?? ''}" at (${r.pose[0]}, ${r.pose[2]})`); }
+  if (fl.length && godFeature('flags')) { lines.push('## flags (refer to them as flag:<name>)'); for (const r of fl) lines.push(`- flag:${r.name} "${v.entity(r.id)?.state?.label ?? ''}" at (${r.pose[0]}, ${r.pose[2]})`); }
   if (s.prayers.length) { lines.push('## prayers'); for (const p of s.prayers) lines.push(`- ${p.id} from ${p.soul_name}: ${p.text}`); }
   return opts.json ? { text: lines.join('\n'), snapshot: s } : lines.join('\n');
 }
@@ -361,7 +362,11 @@ export async function act(batch, note) {
 export async function dryrun(batch) { return ok(await call('/v1/god/dryrun', { body: batch }), 'dryrun'); }
 export async function preview(batch) {
   const r = ok(await call('/v1/god/preview', { body: typeof batch === 'string' ? JSON.parse(batch) : batch }), 'preview');
-  return r.accepted ? { ...r, url: `${load().world}${r.url ?? `?preview=${r.id}`}`, commit: `node eden-god.mjs commit ${r.id}`, tell: `Preview ${r.id}: open ${load().world}${r.url ?? `?preview=${r.id}`} to see the ghost; run \`node eden-god.mjs commit ${r.id}\` to build it.` } : r;
+  if (!r.accepted) return r;
+  const commit = `node eden-god.mjs commit ${r.id}`;
+  // G5: the page's ghost of a preview is switched off (lib/features.mjs): no link to it, only the commit
+  if (!godFeature('previews')) { const { url: _url, viewKey: _key, ...rest } = r; return { ...rest, commit, tell: `Preview ${r.id}: run \`${commit}\` to build it.` }; }
+  return { ...r, url: `${load().world}${r.url ?? `?preview=${r.id}`}`, commit, tell: `Preview ${r.id}: open ${load().world}${r.url ?? `?preview=${r.id}`} to see the ghost; run \`${commit}\` to build it.` };
 }
 export async function commit(id) { if (!id) throw new Error('usage: commit <preview-id>'); const r = ok(await call('/v1/god/act', { body: { preview: id } }), 'commit'); invalidate(); return r; }
 export async function request(clientRef) { if (!clientRef) throw new Error('usage: request <clientRef>'); return ok(await call(`/v1/god/requests/${encodeURIComponent(clientRef)}`), 'request'); }
@@ -1445,6 +1450,11 @@ export const COMMANDS = { doctor: (r, f) => doctor(f), trace: (r, f) => trace(f)
   amendments: (r, f) => amendments(f), decide: (r, f) => decide(r[0], r[1], f), governance: (r, f) => governance(f),
   help: () => HELP,
 };
+// G5: a switched-off feature's verbs answer with a clean refusal instead of acting (lib/features.mjs)
+const OFF_VERBS = { flags: ['flag', 'flags'], constitution: ['constitution', 'amendments', 'decide', 'governance'] };
+const OFF_TEXT = { flags: 'flags are turned off in this world. Name a thing instead (place … --name camp) and use --at camp.', constitution: 'the Constitution is turned off in this world.' };
+for (const [feature, verbs] of Object.entries(OFF_VERBS)) for (const verb of verbs) { const run = COMMANDS[verb]; COMMANDS[verb] = (r, f) => (godFeature(feature) ? run(r, f) : `REFUSED: ${OFF_TEXT[feature]}`); }
+
 for (const [name, fn] of Object.entries(COMMANDS)) COMMANDS[name] = (r = [], f = {}) => withBuildOptions(f, () => ['build', 'group'].includes(name) ? withStateLock(() => fn(r, f)) : fn(r, f));
 const HELP = `eden-god ${SKILL_VERSION} — god mode for one Eden world. Read SKILL.md.
 locks:  doctor [--fix] [--local] [--json] (holders, stale locks; --fix breaks only stale ownership)
@@ -1460,16 +1470,15 @@ site:   build start <id> --title "…" --steps "shell,roof,interior" --at ref|x,
 resume: omit id to resume the only paused build or active build with a dead lead; several open builds or an unknown id list the choices.
 mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' · preview '<batch>' · commit <preview-id> · act '<batch>' · dryrun '<batch>' · request <clientRef>
-world:  sky [--palette p --sun s] · time [19:30|7pm] [--speed h/h] [--pause|--resume] · weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] · strike [--at x,z|thing] · constitution <md> · expand <m> · export [file] · import <genesis.json> · define <def.json> · define-kit <kit.json> · furnish <house>[/room]
+world:  sky [--palette p --sun s] · time [19:30|7pm] [--speed h/h] [--pause|--resume] · weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] · strike [--at x,z|thing] ${godFeature('constitution') ? '· constitution <md> ' : ''}· expand <m> · export [file] · import <genesis.json> · define <def.json> · define-kit <kit.json> · furnish <house>[/room]
 inbox:  listen [--after message-id] [--timeout 25] [--once|--follow] · ack <message-id> [reply] [--failed] (a reply of up to 140 characters; --failed when it could not be done)
-pair:   register <world-url> · pair · flags · flag <label> --at x,z · prayers [--all] (answered too) · answer <id> <text> · status
+pair:   register <world-url> · pair · ${godFeature('flags') ? 'flags · flag <label> --at x,z · ' : ''}prayers [--all] (answered too) · answer <id> <text> · status
 ${LAND_HELP}
 find:   catalog [--category c] [--has slot:sit|actuator:door|comp:light] [--page n] (every def, one line each) · find <words> [--category c] [--has …] · recommend <what you want> · taxonomy (categories, counts, param conventions, actuators)
 parts:  parts [words] [--json] (parts kept by finished builds, checks and pinned place sha:<hash> --at … hints; also shown at build start)
 ${LAYERS_HELP}
 ${SECRET_HELP}
-${GOV_HELP}
-learn:  examples [name] · defs <name|core/x@1> (one def in full) · sky (palettes) · a row named stall = the set "stall"`;
+${godFeature('constitution') ? GOV_HELP + '\n' : ''}learn:  examples [name] · defs <name|core/x@1> (one def in full) · sky (palettes) · a row named stall = the set "stall"`;
 
 const NO_WARM = new Set(['help', 'register', 'mint', 'pair', 'doctor', 'look', 'look-shot', 'look-keeper']);
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('eden-god.mjs')) {

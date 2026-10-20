@@ -7,7 +7,7 @@ contract god-schema/1. Regenerate: `node eden-god.mjs schema --md > SCHEMA.md`.
 - **yaw**: rotation about +y; a thing's front faces +z at yaw 0 (buildings: the `front` side); facing a point (dx, dz) is yaw = atan2(dx, dz)
 - **position**: p: [x, z] rests on whatever is below (ground, floor, water for anchor float); [x, y, z] keeps y (local to the parent frame)
 - **forms**: point defs take p; path defs take shape.path (+ width); area defs take shape.area
-- **addressing**: ids (e_…), paths of names (cottage/kitchen/chair-1), flag:<name>; in a batch, tmp ids ($c) refer to things placed earlier in it
+- **addressing**: ids (e_…), paths of names (cottage/kitchen/chair-1); in a batch, tmp ids ($c) refer to things placed earlier in it
 - **layers**: solid collides with solid and bodies; surface drapes (roads, lawns); volume is inside-able (water); decor never collides
 - **rooms**: buildings expose each room as a slot of kind room: in: {parent: house, slot: "kitchen"}, p local to the room origin
 - **library**: search the library first (GET /v1/god/defs?q=duck); define only what is missing; prefer params and presets over new kinds

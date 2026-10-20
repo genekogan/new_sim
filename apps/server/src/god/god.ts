@@ -14,6 +14,7 @@ import { HelperTokens, HELPER_LIMITS, helperFailure, helperMintSchema, helperSco
 import { accountKey, cobuilderFailure, cobuilderOf, cobuilderOpFailure, COBUILDER_PREFIX, whose } from './cobuilders.ts';
 import { AssetStore, defaultAssetDir } from './assets.ts';
 import { deferredOp } from './layers.ts';
+import { godFeature } from '../../../../tools/god-skill/lib/features.mjs';
 import { submissionSchema, type Expectations } from './submission.ts';
 import { GodBuilds, buildFieldSchema, type BuildBody, type BuildField, type BuildCaller, type BuildNotice, type BuildEcho, type Identity, type SiteDelta, type WorldBuildMessage } from './builds.ts';
 import { Parts } from './parts.ts';
@@ -275,14 +276,14 @@ node eden-god.mjs pair        # prints a code; approve it on this page (or open 
 \`\`\`
 
 Then talk to your agent: *"put mountains in the east and a lake in the west"*, *"a cottage on the
-knoll, door facing the lake"*, *"undo that"*. Friends join as Souls from this page's **Souls** tab link.
+knoll, door facing the lake"*, *"undo that"*. Friends join as Souls with this page's **New Soul**.
 
-## Reference points
+${godFeature('flags') ? `## Reference points
 
 Press **⚑ flag** on this page, click the ground, name it. Your agent refers to it as \`flag:<name>\`
 (\`place cottage --at flag:camp --offset 8,0\`). \`node eden-god.mjs flags\` lists them.
 
-## What the world keeps
+` : ''}## What the world keeps
 
 Every accepted edit is journaled with its inverse (undo/redo). The world runs while you are away.
 Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <text>\`.
@@ -307,6 +308,13 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   // ---------- edits ----------
 
   // W1: history is durable even after undo/removal; compiler checks live dependencies too.
+  /** G5: switched-off features (tools/god-skill/lib/features.mjs). Flags: a new labelled flag (core/flag@1) is refused;
+   *  the world's own genesis (trusted) and the flags a world already has are kept. */
+  private switchedOff(ops: readonly Op[], trusted = false): Failure | null {
+    if (trusted || godFeature('flags')) return null;
+    const i = ops.findIndex((op) => op.op === 'place' && typeof (op as { def?: unknown }).def === 'string' && /^core[-/]flag@/.test((op as { def: string }).def));
+    return i < 0 ? null : { op: i, code: 'feature.off', field: 'def', detail: 'Flags are turned off in this world.', fix: 'Name a thing instead (place … --name camp) and refer to it as camp.' };
+  }
   private retirementFailure(ops: readonly Op[]): Failure | null {
     if (!ops.some(op => op.op === 'undefine')) return null;
     const used = definitionUseClosure(this.model, this.store.placedDefRefs());
@@ -322,7 +330,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const kit = correctKitDefines(batch); batch = kit.batch; // harvest fix kitlenient
     const parsed = previewBatchSchema.safeParse(batch); if (!parsed.success) return { accepted: false as const, failures: parsed.error.issues.map(i => ({ op: -1, code: 'schema', field: i.path.join('.'), detail: i.message })) };
     const gate = this.helperGate(this.callerField(parsed.data.build), parsed.data.ops); if (gate) return { accepted: false as const, failures: [gate] };
-    const retirement = this.retirementFailure(parsed.data.ops); if (retirement) return { accepted: false as const, failures: [retirement] };
+    const retirement = this.retirementFailure(parsed.data.ops) ?? this.switchedOff(parsed.data.ops as Op[]); if (retirement) return { accepted: false as const, failures: [retirement] };
     const off = deferredOp(parsed.data); if (off) return { accepted: false as const, failures: [off] };
     const admission = this.builds.admit(this.callerField(parsed.data.build), parsed.data, this.caller.identity); if (admission.failures) return { accepted: false as const, failures: admission.failures };
     let scratch: WorldModel | undefined;
@@ -361,7 +369,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     } else normalized = batchSchema.parse(input);
     const field = preview ? preview.build : this.callerField(input.build);
     const gate = this.helperGate(field, normalized.ops); if (gate) return { accepted: false, failures: [gate] };
-    const retirement = this.retirementFailure(normalized.ops); if (retirement) return { accepted: false, failures: [retirement] };
+    const retirement = this.retirementFailure(normalized.ops) ?? this.switchedOff(normalized.ops, trusted); if (retirement) return { accepted: false, failures: [retirement] };
     const stale = [...this.stale(preview?.expect ?? {}), ...this.staleSubtrees(preview), ...this.stale(input.expect ?? {})];
     if (stale.length) return { accepted: false, failures: [...new Map(stale.map(f => [f.entity, f])).values()] };
     for (const [i, op] of normalized.ops.entries()) if (op.op === 'answer' && !this.store.prayer(op.prayer)) return { accepted: false, failures: [{ op: i, code: 'params.invalid', field: 'prayer', detail: `Unknown prayer ${op.prayer}.`, fix: 'Use an id from GET /v1/god/prayers.' }] };
@@ -621,7 +629,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const parsed = previewBatchSchema.safeParse(batch);
     if (!parsed.success) return { id: null, accepted: false as const, failures: [{ op: -1, code: 'schema', field: parsed.error.issues[0]?.path.join('.'), detail: parsed.error.issues.map(i => i.message).join('; '), fix: 'Use a valid edit batch from GET /v1/god/schema.' }] };
     const gate = this.helperGate(this.callerField(parsed.data.build), parsed.data.ops); if (gate) return { id: null, accepted: false as const, failures: [gate] };
-    const retirement = this.retirementFailure(parsed.data.ops); if (retirement) return { id: null, accepted: false as const, failures: [retirement] };
+    const retirement = this.retirementFailure(parsed.data.ops) ?? this.switchedOff(parsed.data.ops as Op[]); if (retirement) return { id: null, accepted: false as const, failures: [retirement] };
     const off = deferredOp(parsed.data); if (off) return { id: null, accepted: false as const, failures: [off] };
     const build = this.callerField(parsed.data.build), admission = this.builds.admit(build, parsed.data, this.caller.identity);
     if (admission.failures) return { id: null, accepted: false as const, failures: admission.failures };

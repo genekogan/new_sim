@@ -19,6 +19,7 @@ import type { Context, Hono } from 'hono';
 import { z } from 'zod';
 import { ApiError } from '../souls.ts';
 import type { GodMode } from './god.ts';
+import { godFeature } from '../../../../tools/god-skill/lib/features.mjs';
 
 export type Resident = { id: string; name: string };
 export type VersionRow = { version: number; text: string; at: number; by: 'god' | 'residents'; note: string | null; amendment: string | null };
@@ -301,6 +302,9 @@ export function mountGovernanceRoutes(app: Hono, d: { god: GodMode; requireGod: 
   app.get('/v1/world/constitution/versions/:n', (c) => { const v = gov().version(Number(c.req.param('n'))); if (!v) throw new ApiError(404, 'not-found', 'no such version'); return c.json(v, 200, { 'cache-control': 'public, max-age=300' }); });
   // a resident: its view (marks the constitution read), proposals, support
   app.get('/v1/world/governance/me', (c) => c.json(gov().soulView(soul(c)), 200, noStore));
+  // G5: the Constitution is switched off (tools/god-skill/lib/features.mjs): its writes answer 404 feature.off; reads and data stay
+  const writes = ['/v1/world/amendments', '/v1/world/amendments/*', '/v1/god/amendments/*', '/v1/god/governance'];
+  for (const path of writes) app.post(path, async (c, next) => { if (!godFeature('constitution')) throw new ApiError(404, 'feature.off', 'the Constitution is turned off in this world'); await next(); });
   app.post('/v1/world/amendments', async (c) => { const s = soul(c); const p = proposeSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', `body must be { text, title?, full? } (text at most ${MAX_CLAUSE} characters)`); return c.json({ ok: true, amendment: gov().propose(s, p.data) }, 200, noStore); });
   app.post('/v1/world/amendments/:id/support', (c) => c.json({ ok: true, amendment: gov().support(soul(c), c.req.param('id'), true) }, 200, noStore));
   app.delete('/v1/world/amendments/:id/support', (c) => c.json({ ok: true, amendment: gov().support(soul(c), c.req.param('id'), false) }, 200, noStore));

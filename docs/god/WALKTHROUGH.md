@@ -1,5 +1,9 @@
 # God mode in ten minutes — the meetup script
 
+> **Historical (2026-10-20):** God Mode is now one view (the God button: connect your agent, command box and log,
+> undo/redo, weather, prayers, Forsake world). Flags, preview ghosts, the Constitution and the old tabs (Start,
+> Edits, Flags, Previews, Souls) are switched off; beats that use them no longer apply.
+
 A world from nothing, on one laptop, in front of an audience: create it from the
 homepage, claim it, pair an agent, and let the agent build while people watch.
 Everything runs locally with fake Soul minds; nothing costs model money except
@@ -68,13 +72,6 @@ node eden-god.mjs pair
 seconds the same code appears in the panel in a yellow box, *Your agent asks to
 be this world's god*. Click **Approve**. The terminal prints `"paired": true`;
 the checklist ticks *Pair your agent*.
-
-## 3:00 — flags
-
-**Do:** **⚑ Drop a flag**, click the ground east of the cottage, label it `market`.
-**They see:** a flag drops in; the **Flags** tab lists `market`, `plaza`,
-`orchard`; clicking one flies the camera there. Your agent can now say
-`--at flag:market`.
 
 ## 3:30 — the agent builds (start the agent here)
 
