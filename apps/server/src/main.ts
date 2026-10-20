@@ -33,12 +33,18 @@ import {installPuntActivities} from './punt-install.ts';
 import {readFileSync} from 'node:fs';
 import {installBirthLooks} from './god/birth-look.ts';
 import { setKitViewerContract } from '@sim/generators';
-import { standby } from './standby.ts';
+import { rehearseRestore, standby } from './standby.ts';
 
 // Lane P5: when the boot's phases end (ms since the process started; the first is this release's code load)
 const bootAt: Record<string, number> = { code: performance.now() };
 // Release pre-warm (SIM_STANDBY=1, launcher handover): all code is loaded here; the database and port open only after SIGUSR2.
-await standby(async () => { if (config.engine === 'mars') await import('@sim/engine-mars'); await import('./edge/body/migrate-looks.ts'); });
+// G9 (lane Z1): it also builds the engine factory and rehearses the snapshot restore read-only (standby.ts rehearseRestore).
+let warmFactory: Awaited<ReturnType<typeof plainFactory>> | undefined;
+await standby(async () => {
+  if (config.engine === 'mars') await import('@sim/engine-mars');
+  await import('./edge/body/migrate-looks.ts');
+  if (!edenCoreRequested(config, process.env)) { warmFactory = await plainFactory(); rehearseRestore(join(config.dataDir, 'sim.db'), config.worldId, warmFactory as never); }
+});
 bootAt.go = performance.now();
 
 // K1 / NT5: new kit fields are admitted only with the viewer that can draw them.
@@ -59,8 +65,6 @@ const db = new Db(join(config.dataDir, 'sim.db'));
 const definition = worldDefinition(config.worldKey);
 bootAt.db = performance.now();
 if (db.migrated.length) console.log(`[db] applied migrations ${db.migrated.join(', ')}`);
-// Each process owns one world and imports its engine from this release.
-const mars = config.engine==='mars'?await import('@sim/engine-mars'):null;
 const edenCore=edenCoreRequested(config,process.env);
 const edenLife=edenCore&&process.env.ENABLE_EDEN_LIFE==='1';
 const steeringMode=edenSteeringModeV1(edenLife,process.env);
@@ -76,7 +80,14 @@ const applyExpansion=process.env.APPLY_EDEN_EXPANSION_CHECKPOINT==='1';
 if(applyExpansion&&(!edenLife||!newcomerResources||!sleepSnapshot||!lecture||!expansionGround||process.env.EDEN_CORE_RETAIN_READER==='1'))throw Error('eden-bootstrap.expansion-requires-complete-explicit-readers-and-install-mode');
 // Launcher (entity) worlds opt into native Soul arrivals and removal (SOUL_LIFECYCLE=1), so account approvals create Souls as live does. Lane P2.
 const accountLifecycle=config.worldEngine&&!edenCore&&process.env.SOUL_LIFECYCLE==='1';
-const factory=edenCore?await edenHistoryFactory(db,config.worldId,{lifeV1:edenLife,newcomerResourcesV1:newcomerResources,sleepSnapshotV1:sleepSnapshot,lectureV1:lecture,groundV1:expansionGround}):mars?await mars.marsFactory(config.worldKey==='littlemartians'?mars.LITTLE_MARTIANS_WORLD:config.worldKey==='eden'||!KNOWN_WORLD_KEYS.includes(config.worldKey as never)?(accountLifecycle?{...mars.GREEN_FIELD_WORLD,safeCrewRemoval:true}:mars.GREEN_FIELD_WORLD):undefined):recordedToyFactory;
+const factory=edenCore?await edenHistoryFactory(db,config.worldId,{lifeV1:edenLife,newcomerResourcesV1:newcomerResources,sleepSnapshotV1:sleepSnapshot,lectureV1:lecture,groundV1:expansionGround}):warmFactory??await plainFactory();
+/** A world's engine factory when it is not Eden core (that one reads its history from the database). Each process owns
+ *  one world and imports its engine from this release. */
+async function plainFactory() {
+  const mars = config.engine === 'mars' ? await import('@sim/engine-mars') : null;
+  const accountLifecycle = config.worldEngine && !edenCoreRequested(config, process.env) && process.env.SOUL_LIFECYCLE === '1';
+  return mars?await mars.marsFactory(config.worldKey==='littlemartians'?mars.LITTLE_MARTIANS_WORLD:config.worldKey==='eden'||!KNOWN_WORLD_KEYS.includes(config.worldKey as never)?(accountLifecycle?{...mars.GREEN_FIELD_WORLD,safeCrewRemoval:true}:mars.GREEN_FIELD_WORLD):undefined):recordedToyFactory;
+}
 // ground/1 (lane L8): every terrain recipe this entity world logged resolves by hash before the engine replays
 if (config.worldEngine) loadGroundRecipes(db, config.worldId);
 const host = new WorldHost(db, factory, config.worldSeed, config.snapshotEveryTicks, config.worldId,edenCore?{durableClockV1:true}:undefined);
