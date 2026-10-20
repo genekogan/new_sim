@@ -391,10 +391,15 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
           if (scratch.names.has(`${prev.in.parent}/${op.name}`)) { failures.push(fail(i, 'name.taken', op.name)); return; }
           inv.name = prev.name; next.name = op.name;
         }
+        // B12: furniture keeps its place in its room when the building is resized, so a resize that pushes a piece through
+        // a wall is refused (pieces already poking before the edit, in an older world, are left alone)
+        const pokedBefore = op.params && !opts.trusted && scratch.children.get(id)?.size ? pokingPieces(scratch, id, scratch.slotsOf(prev)) : null;
         scratch.delete(id); clearGround(scratch, prev, diff);
         if (op.params) prepareEntity(scratch, def, next, op.params);
         if (op.params || op.constraints) { const problem = admit(scratch, next, def, i, 'strict', false, world); if (problem) { failures.push(problem); return; } }
-        scratch.insert(next); indexAndGround(scratch, next, def, diff);
+        scratch.insert(next);
+        if (pokedBefore) { const problem = furnitureFit(scratch, prev, next, def, pokedBefore, i); if (problem) { failures.push(problem); return; } }
+        indexAndGround(scratch, next, def, diff);
         upsert(next);
         // children in slots the new params no longer have (a room that went away) move to the ground floor
         const orphans: Op[] = [];
@@ -860,6 +865,49 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
     }
   }
   return null;
+}
+
+/** B12: the pieces inside a building (children in a room or floor slot with a polygon) whose footprint crosses the walls of
+ *  their room by more than 0.15 m, given the building's slots at some size. p in a slot is relative to the slot's origin. */
+function pokingPieces(w: WorldModel, parentId: string, slots: ReturnType<WorldModel['slotsOf']>): Set<string> {
+  const out = new Set<string>();
+  for (const cid of w.children.get(parentId) ?? []) {
+    const c = w.entities.get(cid), slot = c?.in.slot ? slots.find((x) => x.id === c.in.slot) : undefined;
+    if (!c || !slot?.polygon || slot.polygon.length < 3) continue;
+    const box = w.resolvedDef(c.def)?.size.box; if (!box) continue;
+    const lp = c.p ?? [0, 0], x = lp[0], z = lp[lp.length - 1], s = c.s ?? 1, yaw = typeof c.r === 'number' ? c.r : Array.isArray(c.r) ? c.r[0] : 0;
+    const co = Math.cos(yaw), si = Math.sin(yaw), hx = (box[0] * s) / 2, hz = (box[2] * s) / 2;
+    for (const [a, b] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const lx = a * hx, lz = b * hz;
+      if (outsideBy(x + lx * co + lz * si, z - lx * si + lz * co, slot.polygon) > 0.15) { out.add(cid); break; }
+    }
+  }
+  return out;
+}
+
+/** B12: refuse a resize (`set` params) of a furnished building that would push its furniture through its walls. Names the
+ *  smallest w / d the furniture still fits (each on its own, from the current size, in 0.1 m steps). */
+function furnitureFit(w: WorldModel, prev: Entity, next: Entity, def: StoredDef, before: Set<string>, i: number): Failure | null {
+  const poking = (params: Record<string, Value>) => [...pokingPieces(w, prev.id, w.bake(def, params, next.seed ?? 0, next.shape).slots)].filter((c) => !before.has(c));
+  const now = poking(next.params ?? {});
+  if (!now.length) return null;
+  const cur = (k: string) => (prev.params?.[k] ?? def.params[k]?.default) as number | undefined;
+  const mins: Record<string, number> = {};
+  for (const k of ['w', 'd']) {
+    const from = cur(k), to = next.params?.[k];
+    if (typeof from !== 'number' || typeof to !== 'number' || to >= from) continue;
+    const step = Math.max(0.1, (from - to) / 40);
+    let ok = from;
+    for (let v = from - step; v > to; v -= step) { if (poking({ ...(prev.params ?? {}), [k]: Math.round(v * 100) / 100 }).length) break; ok = v; }
+    mins[k] = Math.ceil(ok * 10 - 1e-9) / 10;
+  }
+  const path = w.pathOf(prev.id), names = now.slice(0, 3).map((c) => w.pathOf(c).split('/').pop()).join(', ') + (now.length > 3 ? ` and ${now.length - 3} more` : '');
+  const fits = Object.entries(mins).map(([k, v]) => `${k} ${v} m`).join(' and '), keep = Object.entries(mins).map(([k, v]) => `${k} ≥ ${v}`).join(' and ');
+  return {
+    ...fail(i, 'size.furnished', `${path} is furnished: ${now.length} piece${now.length > 1 ? 's' : ''} (${names}) would poke through its walls at that size${fits ? `; its furniture fits down to ${fits}` : ''}`),
+    entity: prev.id, field: 'params', ...(keep ? { limit: mins } : {}), measured: now.length,
+    fix: `${keep ? `Keep ${keep}. ` : ''}To make it smaller, take its furniture out first (\`select --in ${path} --remove\`), resize, then \`furnish ${path}\` lays its rooms out again.`,
+  };
 }
 
 /** How far a point lies outside a polygon (0 inside). */

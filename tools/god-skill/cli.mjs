@@ -402,6 +402,7 @@ const HINTS = {
   'slot.full': 'the slot is full; pick another slot or room',
   'slot.incompatible': 'the slot does not accept this kind/size',
   'slot.outside': 'the point is not inside that room; use --inside <house>/<room> or a world point inside it',
+  'size.furnished': 'its furniture would poke through the walls at that size; the refusal names the smallest w/d it fits',
   'size.range': 'that scale or size is outside what the def allows: `defs <name>` shows its --scale range (fixed size = no --scale); use params (w, d, height, radius) or a bigger def instead',
   'float.no-water': 'there is no water there; use --float --at <lake|pond|river>',
   'def.in-use': 'cleanup only removes never-placed trials without dependent definitions; keep this def',

@@ -163,7 +163,7 @@ remove <ref> [<ref>…]                                    # and everything insi
 select --def bench --near square --radius 30 [--remove | --by dx,dz | --yaw r | --recolor #hex | --set-state '{…}' | --set-param k=v]
 ```
 To **resize** a placed thing: `remove` it and place it again with `--scale` (`set` and `move` take no `--scale`), or
-change size params (`w`, `d`, `height`). Convention params (`sx sy sz`, `tint`, `vary`, `taper bend skew`,
+change size params (`w`, `d`, `height`); a furnished building refuses a smaller `w`/`d` its furniture no longer fits (`size.furnished`). Convention params (`sx sy sz`, `tint`, `vary`, `taper bend skew`,
 `condition=new|worn|damaged|construction`, `variant`) exist **only where `defs <name>` lists them**. Positions are always
 world coordinates, also inside a house; where a moved thing lands decides its parent.
 
@@ -305,6 +305,7 @@ JSON or quoted text; an empty loop variable leaves `--at` without a value.
 | `params.invalid` | `defs <name>` lists the params with ranges and choices; a def's prose may name more than its param takes (footpath `material`: gravel dirt cobble stone wood, no boardwalk; plaza: cobble stone tile brick gravel asphalt) |
 | `state.invalid` · `entity.unknown` | `describe <thing>` shows its state fields (sign text ≤ 400 characters); a child is `parent/name`, `map --all` lists paths |
 | `size.range` | outside the def's `--scale` range: use size params or another def |
+| `size.furnished` | a furnished building's furniture would poke through its walls: keep the w/d it names, or `select --in <it> --remove`, resize, `furnish <it>` |
 | `slot.*` · "through a wall" · "no room for W×D" · "no room left on X" | `describe <parent>` for slots and rooms; inside rooms use `--wall`/`--corner`/`--grid`, a smaller thing, or another room; a full `--on` target: `--near X` or the ground |
 | `name.taken` | the name exists: `remove` it (or the set) first, or another `--name` |
 | `build.site` · site size | site 1–200 m a side; massing wholly inside it |

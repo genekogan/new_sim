@@ -357,7 +357,7 @@ export type Result = Accepted | Refused;
 export const refusalCodes = [
   'schema', 'def.unknown', 'def.budget', 'def.expansion', 'def.invalid', 'def.in-use',
   'parent.unknown', 'slot.unknown', 'slot.incompatible', 'slot.full', 'slot.outside',
-  'size.range', 'extent.outside', 'overlap.solid', 'support.none', 'body.protected',
+  'size.range', 'size.furnished', 'extent.outside', 'overlap.solid', 'support.none', 'body.protected',
   'constant.immutable', 'float.no-water', 'constraint.unsatisfied', 'architecture', 'architecture.sealed', 'architecture.unreachable', 'architecture.headroom', 'entity.unknown', 'entity.limit', 'name.taken', 'params.invalid', 'state.invalid', 'undo.conflict',
   'wallet.insufficient', 'relation.invalid',
   'request.conflict', 'request.budget', 'revision.stale', 'asset.invalid', 'asset.budget', 'budget.world', 'budget.region',

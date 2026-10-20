@@ -640,11 +640,17 @@ async function call(path, { body, method, as = "god", noBuild = false, timeoutMs
   async function send(requestPath, requestMethod, requestBody, attemptMs = timeoutMs) {
     const t0 = Date.now();
     const store = context.getStore();
-    const r = await fetchWithRetry(world + requestPath, { method: requestMethod, headers, body: requestBody, timeoutMs: attemptMs, deadlineAt: store?.deadlineAt, signal: store?.signal }, { fetch: wireFetch }, retryBudget);
+    let r;
+    try {
+      r = await fetchWithRetry(world + requestPath, { method: requestMethod, headers, body: requestBody, timeoutMs: attemptMs, deadlineAt: store?.deadlineAt, signal: store?.signal }, { fetch: wireFetch }, retryBudget);
+    } catch (e) {
+      if (process.env.EDEN_GOD_TRACE) console.error(`[trace] ${requestMethod} ${requestPath} FAILED ${Date.now() - t0} ms after ${retryBudget.retries} retries (${retryBudget.waited} ms waited): ${e?.cause?.code ?? e?.name ?? ""} ${e?.message ?? e}`);
+      throw e;
+    }
     if (headers.authorization && !requestPath.startsWith("/v1/god/inbox/")) noticeInboxHeader(r.headers);
     const text = await r.text();
     let data;
-    if (process.env.EDEN_GOD_TRACE) console.error(`[trace] ${requestMethod} ${requestPath} ${r.status} ${Date.now() - t0} ms ${requestBody?.slice(0, 160) ?? ""}`);
+    if (process.env.EDEN_GOD_TRACE) console.error(`[trace] ${requestMethod} ${requestPath} ${r.status} ${Date.now() - t0} ms${retryBudget.retries ? ` (${retryBudget.retries} retries so far, ${retryBudget.waited} ms waited)` : ""} ${requestBody?.slice(0, 160) ?? ""}`);
     try {
       data = JSON.parse(text);
     } catch {
@@ -689,9 +695,15 @@ async function call(path, { body, method, as = "god", noBuild = false, timeoutMs
     const advice = recoverable ? ` Check \`request ${clientRef}\` before issuing a new edit; its outcome is unresolved.` : clientRef ? " This endpoint has no receipt recovery; verify the world before issuing it again." : "";
     return { status: 0, data: { ok: false, code: slow ? "slow" : "unreachable", ...clientRef ? { clientRef } : {}, message: detail + advice } };
   };
+  const gatewayLost = (r) => clientRef && (r.status === 502 || r.status === 504) && (r.data?.code === "world.unavailable" || r.data?.raw !== void 0);
+  const attempt = async () => {
+    const r = await send(path, verb, payload);
+    if (gatewayLost(r)) throw new Error(`the world was unreachable for a moment (HTTP ${r.status}${r.data?.code ? ` ${r.data.code}` : ""}).`);
+    return r;
+  };
   let failure, response;
   try {
-    response = await send(path, verb, payload);
+    response = await attempt();
   } catch (e) {
     failure = e;
   }
@@ -709,7 +721,7 @@ async function call(path, { body, method, as = "god", noBuild = false, timeoutMs
   if (recovered) return finish(recovered);
   if (receipt.status !== 404) return lost(failure);
   try {
-    response = await send(path, verb, payload);
+    response = await attempt();
   } catch (e) {
     failure = e;
   }
@@ -3926,6 +3938,7 @@ var HINTS = {
   "slot.full": "the slot is full; pick another slot or room",
   "slot.incompatible": "the slot does not accept this kind/size",
   "slot.outside": "the point is not inside that room; use --inside <house>/<room> or a world point inside it",
+  "size.furnished": "its furniture would poke through the walls at that size; the refusal names the smallest w/d it fits",
   "size.range": "that scale or size is outside what the def allows: `defs <name>` shows its --scale range (fixed size = no --scale); use params (w, d, height, radius) or a bigger def instead",
   "float.no-water": "there is no water there; use --float --at <lake|pond|river>",
   "def.in-use": "cleanup only removes never-placed trials without dependent definitions; keep this def",
