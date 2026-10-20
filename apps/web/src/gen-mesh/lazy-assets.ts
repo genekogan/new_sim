@@ -9,6 +9,7 @@
 // Content-addressed URLs stay immutable (/assets/<sha>.glb): each GLB is fetched once per browser, whenever it is.
 import * as THREE from 'three';
 import type { Entity, StoredDef } from '@sim/world-compiler';
+import { meshLodAsset, type LodMake } from './mesh-lod.ts';
 import { browserQuality, progressiveNearM } from '../quality-tier.ts';
 
 const qs = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');
@@ -75,7 +76,8 @@ let background: ReturnType<typeof setTimeout> | null = null, running = 0;
 
 // only the GLB the mesh half loads (make.asset): a mesh def also names its server-side `footprint` sha, which the viewer
 // never fetches; counting it held the arrival card for nothing and put phantom MB on the loading bar (lane PERF)
-const shasOf = (d: StoredDef | undefined) => { const a = d && d.make.kind === 'mesh' ? (d.make as { asset?: unknown }).asset : null; return typeof a === 'string' && /^[0-9a-f]{64}$/.test(a) ? [a] : []; };
+// Z2: a def with a distant version (make.lod1) counts the one GLB the renderer will draw at that distance (mesh-lod.ts)
+const shasOf = (d: StoredDef | undefined, distance = 0, scale = 1) => { const a = d && d.make.kind === 'mesh' ? meshLodAsset(d.make as LodMake, d.size.box, distance, scale) : null; return typeof a === 'string' && /^[0-9a-f]{64}$/.test(a) ? [a] : []; };
 
 /** Choose the eager GLBs for a snapshot: nearest-first to `centre` until EAGER_BYTES. Returns the loading bar's sizes. */
 export function planEager(snap: { entities: Entity[]; assetBytes?: Record<string, number> }, defOf: (ref: string) => StoredDef | undefined, posOf: (e: Entity) => [number, number] | null, centre: [number, number] = [0, 0], eye?: [number, number]): Record<string, number> {
@@ -92,14 +94,17 @@ export function planEager(snap: { entities: Entity[]; assetBytes?: Record<string
     return d < 15 || (dx * fx + dz * fz) / (d * fl) > 0.5 ? d : d + 1000;
   };
   const sizes = snap.assetBytes ?? {};
-  if (!LAZY) { eager = null; return sizes; }
+  // the alternate GLB of a two-model def is in the bar only when it is the one drawn from here
+  const lodOnly = new Set(snap.entities.flatMap((e) => { const m = defOf(e.def)?.make as LodMake & { kind?: string } | undefined; return m?.kind === 'mesh' && m.lod1 ? [m.asset, m.lod1] : []; }));
+  const from = eye ?? centre, shaFor = (e: Entity) => { const p = posOf(e); return shasOf(defOf(e.def), p ? Math.hypot(p[0] - from[0], p[1] - from[1]) : Infinity, e.s ?? 1); };
+  if (!LAZY) { eager = null; const used = new Set(snap.entities.flatMap(shaFor)); return Object.fromEntries(Object.entries(sizes).filter(([sha]) => used.has(sha) || !lodOnly.has(sha))); }
   // P1 phones: the first build draws only what is within `near` of the eye or centre before the card (WorldEntityLayer),
   // so the eager set (whose things the card waits to see drawn) stays inside that radius too
   const near = progressiveNearM(), ndist = new Map<string, number>();
   const dist = new Map<string, number>(), rank = new Map<string, number>();
   for (const e of snap.entities) {
-    const def = defOf(e.def), shas = shasOf(def); if (!shas.length) continue;
-    const p = posOf(e), d = p ? score(p[0], p[1]) : 1e9, size = Math.max(1, ...((def?.size?.box as number[] | undefined) ?? [1]).map((v) => v * (e.s ?? 1)));
+    const def = defOf(e.def), p = posOf(e), shas = shaFor(e); if (!shas.length) continue;
+    const d = p ? score(p[0], p[1]) : 1e9, size = Math.max(1, ...((def?.size?.box as number[] | undefined) ?? [1]).map((v) => v * (e.s ?? 1)));
     const nd = p ? Math.min(Math.hypot(p[0] - centre[0], p[1] - centre[1]), eye ? Math.hypot(p[0] - eye[0], p[1] - eye[1]) : Infinity) : 0;
     for (const sha of shas) { ndist.set(sha, Math.min(ndist.get(sha) ?? Infinity, nd)); dist.set(sha, Math.min(dist.get(sha) ?? Infinity, d)); rank.set(sha, Math.min(rank.get(sha) ?? Infinity, eye ? d / size : d)); }
   }

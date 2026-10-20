@@ -36,6 +36,12 @@ import lightMotion from './light-motion.json' with { type: 'json' };
 // harvest fix 'figures': people as scenery (core/figure@1, no body component: never a Soul, never a resident). Placing a
 // body def is refused as body.protected, and that refusal points here (apps/server/src/god/engine-bridge.ts).
 import figures from './figures.json' with { type: 'json' };
+// Z2: distant versions (lod1) of over-budget core meshes, keyed by the source GLB sha: the original stays the near model
+// (tools/core-lods/build-lod1.mjs writes the files and worlds/core-assets/lods.index.json; the viewer switch is mesh-lod.ts)
+import meshLods from '../core-mesh-lods.json' with { type: 'json' };
 import type { DefInput } from '../schemas.ts';
 
-export const FAMILY_KITS: DefInput[] = /* @__PURE__ */ [creatures, furniture, props, structures, plants, transport, civic, play, kitchen, work, signage, mesh, terrain, mars, littlemartians, vocab, vocab2, vocabW1, vocabW2, vocabW3, layers, desert, scenery, lightMotion, figures].flat() as unknown as DefInput[];
+export const FAMILY_KITS: DefInput[] = /* @__PURE__ */ ([creatures, furniture, props, structures, plants, transport, civic, play, kitchen, work, signage, mesh, terrain, mars, littlemartians, vocab, vocab2, vocabW1, vocabW2, vocabW3, layers, desert, scenery, lightMotion, figures].flat() as unknown as DefInput[]).map((def) => {
+  const lod = def.make.kind === 'mesh' ? (meshLods as Record<string, { lod1: string }>)[def.make.asset] : undefined;
+  return lod ? { ...def, make: { ...def.make, ...lod } } as DefInput : def;
+});
