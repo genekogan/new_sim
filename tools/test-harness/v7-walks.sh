@@ -1,7 +1,8 @@
 #!/bin/bash
 # V7 gate step: real-input walks in real Chrome (Metal GPU, shared lease) of THIS checkout, on safe ports 5870-5879.
-#   tools/test-harness/v7-walks.sh <outDir>      (run from the candidate checkout; builds web into <outDir>, ~10 min)
-# Old worlds (eden/mars/littlemartians, root path) 5870-5872; launcher + new-world walk 5873 (children 5874-5876).
+#   tools/test-harness/v7-walks.sh <outDir>      (run from the candidate checkout; builds web into <outDir>, ~13 min)
+# Old worlds (eden/mars/littlemartians, root path) 5870-5872; launcher + new-world walk 5873 (children 5874-5876);
+# then the launcher e2e, 5873 (children 5874-5878).
 # Writes <outDir>/v7-receipt.json (status pass|fail, per-check results, source sha) and prints one RELEASE_GATE_V7 line.
 # Only processes this script starts are ever stopped. Never touches 4930-4970 / 4986 / 4987.
 set -u
@@ -26,4 +27,7 @@ node tools/world-launcher/launcher.mjs --port 5873 --range 5874-5876 --data "$OU
 for i in $(seq 1 30); do curl -s -m 2 http://127.0.0.1:5873/worlds/__sim/worlds.json >/dev/null && break; sleep 1; done
 perl -e 'alarm 1800; exec @ARGV' node tools/test-harness/walk-new.mjs http://127.0.0.1:5873 "$OUT/new" > "$OUT/walk-new.log" 2>&1; RC_NEW=$?
 cleanup; PIDS=()
-node tools/test-harness/v7-receipt.mjs "$OUT" "$ROOT" "$RC_OLD" "$RC_NEW"
+# The launcher e2e (claim, pair, build, undo/redo, flags, preview, restart, look) in real Chrome: it left the CPU gate (Z3,
+# 2026-10-20: SwiftShader on Modal failed 3 of 3) and is judged here. Its own launcher on 5873, worlds on 5874-5878.
+perl -e 'alarm 900; exec @ARGV' node tools/god-skill/e2e/launcher.mjs --port 5873 --range 5874-5878 > "$OUT/launcher-e2e.log" 2>&1; RC_LAUNCHER=$?
+node tools/test-harness/v7-receipt.mjs "$OUT" "$ROOT" "$RC_OLD" "$RC_NEW" "$RC_LAUNCHER"

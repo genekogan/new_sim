@@ -221,12 +221,12 @@ test('zero process exit cannot hide failed TAP assertions', t => {
   const dir = fixture(t, { log: tap([{ name: 'bad', status: 'fail' }]) });
   assert.match(readRun(dir, expected, manifest(), ['V4-web']).errors.join('\n'), /hidden by zero exit/);
 });
-test('only the explicit GPU step exception may be excluded; it remains quarantined', t => {
+test('no step may be excluded whole: V6-launcher left the CPU gate for V7, and a row for it is unexpected', t => {
   const reason = 'Metal GPU proof belongs to the V7 owner';
-  const m = manifest([{ step: 'V6-launcher', kind: 'step', id: '*', owner: 'L1', reason }]);
+  assert.equal(REQUIRED_STEPS.includes('V6-launcher'), false);
+  assert.throws(() => validateQuarantine(manifest([{ step: 'V6-launcher', kind: 'step', id: '*', owner: 'L1', reason }])));
   const dir = fixture(t, { step: 'V6-launcher', exit: 'QUARANTINE', log: reason });
-  const r = readRun(dir, expected, m, ['V6-launcher']);
-  assert.deepEqual(r.errors, []); assert.equal(compareRuns(r, r, m).status, 'quarantined');
+  assert.match(readRun(dir, expected, manifest(), ['V4-web']).errors.join('\n'), /unexpected\/duplicate step: V6-launcher/);
   assert.throws(() => validateQuarantine(manifest([{ ...entry('*'), kind: 'step' }])));
   assert.throws(() => validateQuarantine(manifest([entry('*')])));
 });

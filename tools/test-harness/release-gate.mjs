@@ -10,14 +10,17 @@ export const REQUIRED_STEPS = [
   'V1-types', 'V2-build-root', 'V2-build-worlds', 'V3-packages',
   'V3-mars-engine', 'V3-client-cli', 'V3-launcher-unit', 'V3-harness', 'V4-web',
   'V5-server-full', 'V6-scenarios', 'V6-party', 'V6-souls-r2',
-  'V6-join-clerk', 'V6-join-dev', 'V6-launcher', 'V6-mars-two', 'V6-lm-two',
+  'V6-join-clerk', 'V6-join-dev', 'V6-mars-two', 'V6-lm-two',
 ];
+// V6-launcher (tools/god-skill/e2e/launcher.mjs) is not a CPU gate step (Z3, 2026-10-20): it drives real Chrome through the
+// claim/pair/build flow, and 3 of 3 Modal runs with Playwright's Chrome on SwiftShader failed the same 8 of 14 steps
+// (team/scratch/t4/z3/probe-out1). It runs in V7 (v7-walks.sh) on the laptop's GPU instead.
 const TAP_STEPS = new Set(['V3-packages', 'V3-mars-engine', 'V3-client-cli', 'V3-launcher-unit', 'V3-harness', 'V4-web', 'V5-server-full']);
 const REQUIRED_PACKAGES = ['engine-mars', 'world-compiler', 'generators', 'ground', 'kernel', 'brain', 'engine-toy', 'engine-contract', 'protocol', 'engine-native', 'conformance'];
 /** Runs made before 2026-10-16 name the EF4 conformance package by its old directory, packages/catalog. */
 const PACKAGE_ALIASES = { catalog: 'conformance' };
-const STEP_EXCLUSIONS = new Set(['V6-launcher']); // Real Chrome/Metal proof belongs to V7.
-const CASE_STEPS = new Set(REQUIRED_STEPS.filter(step => step.startsWith('V6-') && step !== 'V6-launcher'));
+const STEP_EXCLUSIONS = new Set(); // No step is excluded whole any more (V6-launcher left the CPU gate, see above).
+const CASE_STEPS = new Set(REQUIRED_STEPS.filter(step => step.startsWith('V6-')));
 const EXPECTED_SKIP = ['V7', 'V8'];
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const sha256 = value => createHash('sha256').update(value).digest('hex');

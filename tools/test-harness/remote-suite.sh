@@ -21,6 +21,20 @@ HARNESS="$(git -C "$ROOT" rev-parse --verify "$HARNESS^{commit}")"
 [ "$BASE" = none ] || BASE="$(git -C "$ROOT" rev-parse --verify "$BASE^{commit}")"
 git -C "$ROOT" archive --format=tar.gz -o "$STAGE/head.tgz" "$REF"
 git -C "$ROOT" archive --format=tar.gz -o "$STAGE/harness.tgz" "$HARNESS" tools/test-harness
+# Z3: the gitignored inputs of the full campus re-extraction (V3-mars-engine, CAMPUS_FULL=1), as the exact bytes the
+# harness pins in campus-assets.json; one-validation.sh copies them into each tree. Missing or different bytes stop here.
+if CAMPUS_PINS="$(git -C "$ROOT" show "$HARNESS:tools/test-harness/campus-assets.json" 2>/dev/null)"; then
+  mkdir -p "$STAGE/campus"; printf '%s\n' "$CAMPUS_PINS" > "$STAGE/campus/campus-assets.json"
+  node --input-type=module - "$STAGE/campus" <<'JS' || { echo "campus assets: missing or not the pinned bytes (tools/test-harness/campus-assets.json; CAMPUS_ASSETS_SRC overrides the source dir)"; exit 2; }
+import { createHash } from 'node:crypto'; import { constants, copyFileSync, readFileSync } from 'node:fs'; import { join } from 'node:path';
+const dir = process.argv[2], pins = JSON.parse(readFileSync(join(dir, 'campus-assets.json'), 'utf8')), src = process.env.CAMPUS_ASSETS_SRC || pins.source;
+for (const [name, f] of Object.entries(pins.files)) {
+  copyFileSync(join(src, name), join(dir, name), constants.COPYFILE_FICLONE);
+  const bytes = readFileSync(join(dir, name)), sha = createHash('sha256').update(bytes).digest('hex');
+  if (bytes.length !== f.bytes || sha !== f.sha256) throw Error(`${name}: ${bytes.length} bytes, sha256 ${sha}`);
+}
+JS
+fi
 (cd "$ROOT" && node tools/test-harness/historical-inputs.mjs "$REF" "$STAGE/historical-inputs.pack")
 { echo "head $REF $(git -C "$ROOT" rev-parse "$REF")"; } > "$STAGE/REFS.txt"
 if [ "$BASE" != none ]; then git -C "$ROOT" archive --format=tar.gz -o "$STAGE/base.tgz" "$BASE"; echo "baseline $BASE $(git -C "$ROOT" rev-parse "$BASE")" >> "$STAGE/REFS.txt"; fi

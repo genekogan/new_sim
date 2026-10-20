@@ -20,8 +20,8 @@ The contract covers V1 workspace types, both V2 web builds, V3 the eleven tested
 protocol and engine-native), native Mars engine, client CLI, all seven launcher test files and harness self-tests,
 V4 all tracked web unit tests including TSX, V5 recursive server tests, and V6 fake-mind API scenarios.
 Other standalone tools/browser/scientific experiments are outside this frozen CPU contract.
-V7 real-Chrome GPU checks (including optional V6 screenshots/S8 browser flag-drop) and V8 local production-history
-checks remain separate release proofs. The GPU-only V6 launcher walk is a named exclusion in `quarantine.json`.
+V7 real-Chrome GPU checks (including optional V6 screenshots/S8 browser flag-drop, and since Z3 the launcher e2e) and V8 local production-history
+checks remain separate release proofs. The launcher e2e (V6-launcher) left the CPU gate for V7 (Z3, `quarantine.json` "retired").
 
 Every retained test failure, skip and TODO has one exact entry, reason and owner in **quarantine.json**.
 The gate rejects new failures even if pre-added to that list; missing steps/logs, cancellations, timeouts,

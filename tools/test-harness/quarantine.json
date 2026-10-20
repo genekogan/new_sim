@@ -2,34 +2,12 @@
   "schemaVersion": 1,
   "entries": [
     {
-      "kind": "step",
-      "step": "V6-launcher",
-      "id": "*",
-      "reason": "Real Chrome Metal GPU walk cannot run in CPU-only Modal; the separately owned V7 browser gate must qualify it before release.",
-      "owner": "release-owner (L1)"
-    },
-    {
-      "step": "V3-mars-engine",
-      "id": "full re-extraction reproduces the committed contentHash (CAMPUS_FULL=1)",
-      "status": "skip",
-      "reason": "Opt-in full campus re-extraction requires CAMPUS_FULL=1; default CPU release gate runs the committed extraction tests.",
-      "owner": "World campus content owner"
-    },
-    {
       "step": "V3-mars-engine",
       "id": "year build 2022 east-house A+B: plan — material rules, bill of materials, yard, what is left unplaced and why, deterministic; the skeleton steps unchanged",
       "status": "todo",
       "reason": "W51 re-seed + engine gap: no stringer/tread/handrail/post/panel parts (stair unplaced), deck-piece 54 (was 81), wall-panel 18 (was 25). Not a re-pin: pinning now would bless the missing stair.",
       "owner": "World / Core historical Mars construction owners (L3 reviewed 2026-10-17)",
       "exit": "RECONCILIATION_2022 §b engine stair rule (stringerRule/treadRule/catalog flight for the W51 parallel stair; today every stair part is unplaced); then re-pin, checking the deck/wall deltas"
-    },
-    {
-      "step": "V3-mars-engine",
-      "id": "year build 2022 east-house, first bay + its first ground-floor deck strip (3 pieces cut from 4x8s, notched, offcuts stacked, pushed in over the edge beams, screwed): 0 violations, at target, pinned",
-      "status": "todo",
-      "reason": "Baseline-only (fixed on lane/d3c-yearbuild-20261017): not an engine bug; the test's literal strip < -9.5 filter was pre-W51 (strips now -2.65..7.11, 0 of 54 matched); now uses the shared firstGroundStrip rule, re-pinned 51205 / 73f54d61. The gate needs this entry while the baseline still has the todo.",
-      "owner": "World / Core historical Mars construction owners (L3 reviewed 2026-10-17)",
-      "exit": "drop this entry once the gate baseline contains the d3c fix"
     },
     {
       "step": "V3-mars-engine",
@@ -57,14 +35,6 @@
     },
     {
       "step": "V3-mars-engine",
-      "id": "year build 2022 chiba, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned",
-      "status": "todo",
-      "reason": "Baseline-only (fixed on lane/d3c-yearbuild-20261017): W51 parked rv-6's slide-out 2.6 m off chiba's -u end, where s0208's end-holding givers stand (passup.giver-blocked); sequence-b D0 now checks the givers' own ground and holds that sheet by its sides; re-pinned 62867 / 5e4f4d42. The gate needs this entry while the baseline still has the todo.",
-      "owner": "World / Core historical Mars construction owners (L3 reviewed 2026-10-17)",
-      "exit": "drop this entry once the gate baseline contains the d3c fix"
-    },
-    {
-      "step": "V3-mars-engine",
       "id": "year build 2022 chiba A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, pinned (YEAR_BUILD_FULL=1)",
       "status": "skip",
       "reason": "content parked (W51 re-seeded the 2022 scene after this run was pinned on the pre-W51 scene, 0ee1da11 @564548): re-run and re-pin with the content agent — see HISTORICAL_CONTENT.md",
@@ -89,14 +59,6 @@
     },
     {
       "step": "V3-mars-engine",
-      "id": "year build 2022 east-house, phase A: plan — 12 frames + 54 beams sequenced, everything else reported (not faked), deterministic",
-      "status": "todo",
-      "reason": "Baseline-only: re-pinned on the W51 scene by L3 (year-build.test.ts; skeleton unchanged, new roof/fixture/solar-frame content reported unplaced, 552 -> 555 steps); passes on this head.",
-      "owner": "World / Core historical Mars construction owners (L3 reviewed 2026-10-17)",
-      "exit": "drop when the gate baseline contains the re-pin"
-    },
-    {
-      "step": "V3-mars-engine",
       "id": "year build 2022 east-house, phase A, whole skeleton (12 frames + 54 beams) from the piles: 0 violations, all at the canonical pose, pinned (YEAR_BUILD_FULL=1)",
       "status": "skip",
       "reason": "Opt-in (YEAR_BUILD_FULL=1). Re-pinned on the W51 scene by L3: 123818 ticks, 8c57862e..., 0 violations, 66/66 (was 117277 / d382e461); the skip directive text is kept verbatim for the gate.",
@@ -115,69 +77,97 @@
       "step": "V3-packages",
       "id": "world-compiler > 40 furnished library buildings + church replay: plan latency",
       "status": "skip",
-      "reason": "Opt-in performance bench (BUILD_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH env and similar); timing benches stay out of the CPU correctness gate on shared Modal CPUs.",
-      "owner": "Godmode build/perf owners"
+      "reason": "Baseline-only (Z3, 2026-10-20): before Z3 this bench was a wall-clock timing test that skipped unless its env var (BUILD_BENCH / CLAIM_BENCH / PARTS_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH) was set. From Z3 on it counts work (@sim/world-compiler/work-meter), always runs and passes on a candidate that contains Z3; a baseline without Z3 still skips it, and every baseline skip needs an entry. Drop this entry once the live release (the gate baseline) contains Z3.",
+      "owner": "Godmode build/perf owners",
+      "exit": "drop this entry once the gate baseline (live) contains Z3"
     },
     {
       "step": "V5-server-full",
       "id": "bench: capabilities for 20 Souls, idle evacuation with 8 sites",
       "status": "skip",
-      "reason": "Opt-in performance bench (BUILD_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH env and similar); timing benches stay out of the CPU correctness gate on shared Modal CPUs.",
-      "owner": "Godmode build/perf owners"
+      "reason": "Baseline-only (Z3, 2026-10-20): before Z3 this bench was a wall-clock timing test that skipped unless its env var (BUILD_BENCH / CLAIM_BENCH / PARTS_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH) was set. From Z3 on it counts work (@sim/world-compiler/work-meter), always runs and passes on a candidate that contains Z3; a baseline without Z3 still skips it, and every baseline skip needs an entry. Drop this entry once the live release (the gate baseline) contains Z3.",
+      "owner": "Godmode build/perf owners",
+      "exit": "drop this entry once the gate baseline (live) contains Z3"
     },
     {
       "step": "V5-server-full",
       "id": "bench: commitBatch 300 five-place batches with/without build plus 300 undos",
       "status": "skip",
-      "reason": "Opt-in performance bench (BUILD_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH env and similar); timing benches stay out of the CPU correctness gate on shared Modal CPUs.",
-      "owner": "Godmode build/perf owners"
+      "reason": "Baseline-only (Z3, 2026-10-20): before Z3 this bench was a wall-clock timing test that skipped unless its env var (BUILD_BENCH / CLAIM_BENCH / PARTS_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH) was set. From Z3 on it counts work (@sim/world-compiler/work-meter), always runs and passes on a candidate that contains Z3; a baseline without Z3 still skips it, and every baseline skip needs an entry. Drop this entry once the live release (the gate baseline) contains Z3.",
+      "owner": "Godmode build/perf owners",
+      "exit": "drop this entry once the gate baseline (live) contains Z3"
     },
     {
       "step": "V5-server-full",
       "id": "bench: 300 five-place build commits with two live claims versus none; 200-upsert check",
       "status": "skip",
-      "reason": "Opt-in performance bench (BUILD_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH env and similar); timing benches stay out of the CPU correctness gate on shared Modal CPUs.",
-      "owner": "Godmode build/perf owners"
+      "reason": "Baseline-only (Z3, 2026-10-20): before Z3 this bench was a wall-clock timing test that skipped unless its env var (BUILD_BENCH / CLAIM_BENCH / PARTS_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH) was set. From Z3 on it counts work (@sim/world-compiler/work-meter), always runs and passes on a candidate that contains Z3; a baseline without Z3 still skips it, and every baseline skip needs an entry. Drop this entry once the live release (the gate baseline) contains Z3.",
+      "owner": "Godmode build/perf owners",
+      "exit": "drop this entry once the gate baseline (live) contains Z3"
     },
     {
       "step": "V5-server-full",
       "id": "bench: onDone with 256 roots and 5000 entities stays below 20ms",
       "status": "skip",
-      "reason": "Opt-in performance bench (BUILD_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH env and similar); timing benches stay out of the CPU correctness gate on shared Modal CPUs.",
-      "owner": "Godmode build/perf owners"
+      "reason": "Baseline-only (Z3, 2026-10-20): before Z3 this bench was a wall-clock timing test that skipped unless its env var (BUILD_BENCH / CLAIM_BENCH / PARTS_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH) was set. From Z3 on it counts work (@sim/world-compiler/work-meter), always runs and passes on a candidate that contains Z3; a baseline without Z3 still skips it, and every baseline skip needs an entry. Drop this entry once the live release (the gate baseline) contains Z3.",
+      "owner": "Godmode build/perf owners",
+      "exit": "drop this entry once the gate baseline (live) contains Z3"
     },
     {
       "step": "V5-server-full",
       "id": "bench: median act overhead with origins versus without origins is below 2%",
       "status": "skip",
-      "reason": "Opt-in performance bench (BUILD_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH env and similar); timing benches stay out of the CPU correctness gate on shared Modal CPUs.",
-      "owner": "Godmode build/perf owners"
+      "reason": "Baseline-only (Z3, 2026-10-20): before Z3 this bench was a wall-clock timing test that skipped unless its env var (BUILD_BENCH / CLAIM_BENCH / PARTS_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH) was set. From Z3 on it counts work (@sim/world-compiler/work-meter), always runs and passes on a candidate that contains Z3; a baseline without Z3 still skips it, and every baseline skip needs an entry. Drop this entry once the live release (the gate baseline) contains Z3.",
+      "owner": "Godmode build/perf owners",
+      "exit": "drop this entry once the gate baseline (live) contains Z3"
     },
     {
       "step": "V5-server-full",
       "id": "bench: a real-engine walk-out of 16 residents among many entities",
       "status": "skip",
-      "reason": "Opt-in performance bench (BUILD_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH env and similar); timing benches stay out of the CPU correctness gate on shared Modal CPUs.",
-      "owner": "Godmode build/perf owners"
+      "reason": "Baseline-only (Z3, 2026-10-20): before Z3 this bench was a wall-clock timing test that skipped unless its env var (BUILD_BENCH / CLAIM_BENCH / PARTS_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH) was set. From Z3 on it counts work (@sim/world-compiler/work-meter), always runs and passes on a candidate that contains Z3; a baseline without Z3 still skips it, and every baseline skip needs an entry. Drop this entry once the live release (the gate baseline) contains Z3.",
+      "owner": "Godmode build/perf owners",
+      "exit": "drop this entry once the gate baseline (live) contains Z3"
     },
     {
       "step": "V5-server-full",
       "id": "bench: walk-out planning for N residents among M entities stays fast",
       "status": "skip",
-      "reason": "Opt-in performance bench (BUILD_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH env and similar); timing benches stay out of the CPU correctness gate on shared Modal CPUs.",
-      "owner": "Godmode build/perf owners"
+      "reason": "Baseline-only (Z3, 2026-10-20): before Z3 this bench was a wall-clock timing test that skipped unless its env var (BUILD_BENCH / CLAIM_BENCH / PARTS_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH) was set. From Z3 on it counts work (@sim/world-compiler/work-meter), always runs and passes on a candidate that contains Z3; a baseline without Z3 still skips it, and every baseline skip needs an entry. Drop this entry once the live release (the gate baseline) contains Z3.",
+      "owner": "Godmode build/perf owners",
+      "exit": "drop this entry once the gate baseline (live) contains Z3"
     }
   ],
   "scopeExclusions": [
     {
       "step": "V7",
-      "reason": "Real Chrome GPU walks and V6 browser-only S8 flag-drop/screenshots require the separate local hardware gate. This receipt qualifies CPU/API paths only.",
+      "reason": "Real Chrome GPU walks (old worlds, the new-world walk and, since Z3, the launcher e2e that left V6), and V6 browser-only S8 flag-drop/screenshots require the separate local hardware gate. This receipt qualifies CPU/API paths only.",
       "owner": "release-owner (L1)"
     },
     {
       "step": "V8",
       "reason": "Production-history preservation checks require separately authorized local sealed inputs; no production databases leave the laptop.",
       "owner": "release-owner (L1)"
+    }
+  ],
+  "retired": [
+    {
+      "entry": "V6-launcher (kind step, id *)",
+      "at": "2026-10-20",
+      "by": "Z3",
+      "why": "Not a CPU gate step any more. A Modal probe with Playwright 1.63 Google Chrome (SwiftShader) failed 3 of 3 runs identically: 6 of 14 steps, the claim click and every later panel click timing out at 30 s (team/scratch/t4/z3/probe-out1). It passes on the laptop GPU, so it runs in V7 (v7-walks.sh, judged in v7-receipt.json)."
+    },
+    {
+      "entry": "V3-mars-engine / full re-extraction reproduces the committed contentHash (CAMPUS_FULL=1)",
+      "at": "2026-10-20",
+      "by": "Z3",
+      "why": "Now runs in the gate: remote-suite.sh stages the pinned campus GLB and components.json (campus-assets.json) and one-validation.sh sets CAMPUS_FULL=1 for baseline and candidate."
+    },
+    {
+      "entry": "V3-mars-engine / three year-build 'Baseline-only' todos (east-house first bay + deck strip; chiba first bay + deck strip; east-house phase A plan)",
+      "at": "2026-10-20",
+      "by": "Z3",
+      "why": "Stale: those tests pass on every gate baseline since lane/d3c-yearbuild-20261017 landed, so the entries matched nothing (receipt team/scratch/t4/g5/gate/run-9131d053c)."
     }
   ]
 }

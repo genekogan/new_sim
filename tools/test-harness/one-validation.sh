@@ -55,7 +55,19 @@ step V2-build-worlds 900 bash -c "cd apps/web && npx vite build --base /worlds/ 
 # V3 package and engine suites (no ports)
 step V3-harness 1200 node --test --test-reporter=tap --test-concurrency=1 tools/test-harness/*.test.mjs
 step V3-packages 2400 bash tools/test-harness/package-suite.sh
-step V3-mars-engine 2400 bash -c 'cd mars/viewer && node --test --test-reporter=tap --test-concurrency=4 engine/test/*.test.ts'
+# Z3: with the pinned campus inputs staged (remote-suite.sh -> /in/campus), the full campus re-extraction runs too.
+CAMPUS_FULL=0; CAMPUS_IN="${CAMPUS_ASSETS_DIR:-/in/campus}"
+if want V3-mars-engine && [ -f "$CAMPUS_IN/campus-assets.json" ]; then
+  node --input-type=module - "$CAMPUS_IN" "$ROOT" <<'JS' && CAMPUS_FULL=1 || echo "campus assets: staging failed; the full re-extraction stays skipped"
+import { createHash } from 'node:crypto'; import { copyFileSync, mkdirSync, readFileSync } from 'node:fs'; import { dirname, join } from 'node:path';
+const [dir, root] = process.argv.slice(2), pins = JSON.parse(readFileSync(join(dir, 'campus-assets.json'), 'utf8'));
+for (const [name, f] of Object.entries(pins.files)) {
+  const to = join(root, f.to); mkdirSync(dirname(to), { recursive: true }); copyFileSync(join(dir, name), to);
+  if (createHash('sha256').update(readFileSync(to)).digest('hex') !== f.sha256) throw Error(`${name}: not the pinned bytes`);
+}
+JS
+fi
+step V3-mars-engine 2400 env CAMPUS_FULL=$CAMPUS_FULL bash -c 'cd mars/viewer && node --test --test-reporter=tap --test-concurrency=4 engine/test/*.test.ts'
 step V3-client-cli 1800 node --test --test-reporter=tap --test-concurrency=1 tools/edge-skill/*.test.mjs tools/client-eval/*.test.mjs
 step V3-launcher-unit 1200 node --test --test-reporter=tap --test-concurrency=1 tools/world-launcher/*.test.mjs   # includes keeper.test (lane ports 5210-5259, keeper 6017-6019)
 # V4 web tests: node runner (compare the failure set with the baseline's, F6) and bundled .tsx tests
@@ -96,16 +108,9 @@ step V6-party 1500 node tools/god-skill/e2e/party.mjs --no-shots --port 5421
 step V6-souls-r2 1500 node tools/god-skill/e2e/souls-r2.mjs --no-shots --port 5422
 step V6-join-clerk 900 node tools/god-skill/e2e/join.mjs --mode clerk --base /worlds --port 5425 --range 5426-5429
 step V6-join-dev 900 node tools/god-skill/e2e/join.mjs --mode dev --no-shots --port 5430 --range 5431-5434
-if ! want V6-launcher; then
-  :
-elif skipped V6 || skipped V6-launcher; then
-  echo -e "V6-launcher\tSKIP\t0\t-" >> "$SUM"
-elif [ "${REMOTE_SUITE_CPU:-}" = 1 ]; then
-  # A named exclusion, never a green browser claim. The release gate validates the owner/reason.
-  reason=$(node -e 'const q=require("./tools/test-harness/quarantine.json").entries.find(e=>e.kind==="step"&&e.step==="V6-launcher");if(!q?.owner||!q.reason)process.exit(1);console.log(q.reason)') || exit 1
-  echo "$reason" > "$OUT/V6-launcher.log"
-  echo -e "V6-launcher\tQUARANTINE\t0\t$OUT/V6-launcher.log" >> "$SUM"
-else
+# V6-launcher drives real Chrome through claim, pair and build. It is not a CPU gate step (Z3, 2026-10-20: 3 of 3 Modal
+# runs on SwiftShader failed the same 8 of 14 steps, see release-gate.mjs); it runs in V7 (v7-walks.sh), and here on a laptop.
+if [ "${REMOTE_SUITE_CPU:-}" != 1 ]; then
   step V6-launcher 900 node tools/god-skill/e2e/launcher.mjs --port 5435 --range 5436-5440
 fi
 for e in souls-ux mars-two lm-two; do [ -f tools/god-skill/e2e/$e.mjs ] && step V6-$e 1500 node tools/god-skill/e2e/$e.mjs --no-shots --port 5423; done

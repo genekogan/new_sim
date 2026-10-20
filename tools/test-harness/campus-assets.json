@@ -1,0 +1,8 @@
+{
+  "why": "Z3 (2026-10-20): the full campus re-extraction (mars/viewer/engine/test/campus-extract.test.ts, CAMPUS_FULL=1) needs the gitignored campus GLB and its component manifest. remote-suite.sh stages these exact bytes into the Modal input; one-validation.sh copies them into mars/viewer/public and runs V3-mars-engine with CAMPUS_FULL=1, for the baseline and the candidate alike.",
+  "source": "<team>/ops/gate-assets/campus",
+  "files": {
+    "campus.glb": { "to": "mars/viewer/public/browser/campus.glb", "bytes": 70772556, "sha256": "675f4bebed89d73fb579493e708476f0dfd4c44c0106958a1aad1a92c932a8c4", "origin": "team/pm-integration/release-assets-20261008/mars-static/browser/campus.glb (hard link)" },
+    "components.json": { "to": "mars/viewer/public/modular/components.json", "bytes": 6244238, "sha256": "f2b2ec5572004f48f9bd23c7f060406ecac84b4e266c1105f7c78e651a016505", "origin": "<mars-campus-repo>/viewer/public/modular/components.json (copy)" }
+  }
+}
