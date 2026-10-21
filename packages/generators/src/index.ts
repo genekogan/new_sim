@@ -3,6 +3,7 @@ export * from './types.ts';
 export * from './geom.ts';
 export { CREATION_LIMITS } from './creation-limits.ts';
 export { reachableFromOutside } from './reachability.ts';
+export * from './clearance.ts';  // lane BS1: the one clearance rule (plans, stairs, doors, furnishing)
 export { scatterPoints } from './basic.ts';
 export { kitArgs, kitPhysics, kitWhen, setKitViewerContract, KIT_PATTERNS, KIT_PRIMITIVES, KIT_ROLES, type KitArgs, type KitShape } from './kit.ts';
 export { correctKitArgs, isKitProgram, type KitCorrection } from './kit-lenient.ts'; // harvest fix kitlenient

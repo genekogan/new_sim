@@ -65,6 +65,7 @@ function furnishedShop(recipe?: any) {
   assert.equal(r.accepted, true, JSON.stringify(r));
   const baked = w.bake(w.resolvedDef(b.def)!, b.params ?? {}, b.seed ?? 0, b.shape) as any;
   const doors = baked.openings.filter((o: any) => o.kind === 'door' || o.kind === 'arch');
+  const wp = w.worldPose(b), way = { pose: { x: wp.x, z: wp.z, yaw: wp.yaw, s: wp.s } };   // on the walk raster where it stands (BS1)
   for (const room of baked.rooms.filter((x: any) => x.floor === 0)) {
     const keys = roomKeys(room, doors, baked.links ?? []), walls = baked.colliders.filter((o: any) => o.y0 < room.y + 1.6 && o.y1 > room.y + 0.15);
     const pieces = [...w.children.get(b.id)!].map((id) => w.entities.get(id)!).filter((e: any) => e.in.slot === room.id).map((e: any) => {
@@ -73,10 +74,10 @@ function furnishedShop(recipe?: any) {
       return { name: e.name, c, half: [bb.box[0] / 2, bb.box[2] / 2], yaw, y0: room.y, y1: room.y + bb.box[1], solid: d.layer === 'solid' && bb.box[1] > 0.06, approach: approachOf(bb, c, yaw) };
     }).filter((x) => x.solid);
     const all = (keys.length * (keys.length - 1)) / 2;
-    assert.equal(connectedPairs(room, keys, walls), all, `${room.id}: walls alone`);
-    assert.equal(connectedPairs(room, keys, [...walls, ...pieces]), all, `${room.id}: furnished, ${keys.length} doors/stair ends`);
+    assert.equal(connectedPairs(room, keys, walls, way), all, `${room.id}: walls alone`);
+    assert.equal(connectedPairs(room, keys, [...walls, ...pieces], way), all, `${room.id}: furnished, ${keys.length} doors/stair ends`);
     // ... and where a Soul sent to each piece stands is reached from the doors (the display may not stand at a shelf's front)
-    const labels = wayLabels(room, [...keys, ...pieces.map((x) => x.approach)], [...walls, ...pieces]);
+    const labels = wayLabels(room, [...keys, ...pieces.map((x) => x.approach)], [...walls, ...pieces], way);
     for (const [i, x] of pieces.entries()) assert.ok(labels[keys.length + i] === labels[0], `${room.id}: ${x.name} is reached from the door`);
   }
   return f;

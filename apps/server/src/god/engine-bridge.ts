@@ -7,7 +7,7 @@
 // The derived physics is plain data in the logged event, so the engine's replay never reads the entity model.
 // Fastest working path on the engine's existing structures (nav/1-style static scene re-base, CATALOG fixtures);
 // the per-tile patch follows L8's tiled Spatial.
-import { deckRaised, railGaps } from '@sim/generators';
+import { deckRaised, railGaps, rasterOf } from '@sim/generators';
 import { applyBatch, obbOverlap, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type ResidentMove, type WorldModel } from '@sim/world-compiler';
 import { assetFromDef, assetIdFor, isFixtureDef, isFloatingDef, nearestSurfaceSlot, nextEntityPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
 import type { WorldHost } from '../world.ts';
@@ -60,8 +60,6 @@ export const PEOPLE_AS_SCENERY = 'for people as scenery (a crowd, waiters, stall
 type Vec2 = [number, number];
 type Level = { id: number; y: number; label: string };
 type Part = NonNullable<WorldEditV1['set'][string]>;
-/** door-raster/1: wall pieces at least this thick (m, one 0.1 m raster cell) raster by cell centres (never lost between them). */
-const WALL_RASTER_MIN = 0.1;
 /** What the engine side of a MarsEngine offers the bridge (world-edit/1 methods; packages/engine-mars/src/engine.ts). */
 type EngineV1 = {
   world: { tick: number; entities: Record<string, any>; entityPhysicsV1?: EntityPhysicsV1 };
@@ -373,7 +371,7 @@ export class EngineBridge {
       // door-raster/1 (lane RT): a building/1 wall piece at least a raster cell thick rasters by its cell centres, so its
       // doorways keep their width on the walk raster at any yaw (spatial/types.ts Obstacle.raster)
       if (solids.length && !nativeRide) part.solids = solids.map(({ o, local }, i) => ({ id: `${e.id}#c${i}`, obb: { c: [r3(o.c[0]), r3(o.c[1])] as Vec2, half: [r3(o.half[0]), r3(o.half[1])] as Vec2, yaw: r3(-o.yaw) }, y0: r3(o.y0), y1: r3(o.y1), kind: 'fixture' as const, label: `${this.model.pathOf(e.id)}${local.tag ? ' ' + local.tag : ''}`.slice(0, 100),
-        ...(/^wall:f\d/.test(local.tag ?? '') && 2 * Math.min(o.half[0], o.half[1]) >= WALL_RASTER_MIN ? { raster: 'centre' as const } : {}) }));
+        ...(rasterOf({ tag: local.tag, half: o.half }) === 'centre' ? { raster: 'centre' as const } : {}) }));   // the shared rule (@sim/generators clearance.ts)
     }
     // closed doors block their gap; a free-standing door (no doorway of its own) blocks its own width (doorblock)
     const doorState = (e.state?.doors ?? {}) as Record<string, unknown>;
