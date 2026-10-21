@@ -1,0 +1,120 @@
+{
+ "schema": "catalog-conformance-supplement/1",
+ "note": "Tranche 2026-10-22 lane SEATDEF (core seat heights from the model geometry). Exact re-pins only: 15 findings identical to the previous revisions' documented tuples but for the def hash (--k 2 --filter per def; team/scratch/t4/seatdef/conf). core-mars-papasan@2 -> @3 d0eaf5dd546b (seat 1.361 -> 0.70 m, the model's seat surface; same mesh), core-tractor@1 -> 65bc0b3d4e68, core-truck@1 -> 73cd1f03a986, core-fire-engine@1 -> 915bbc8c72c3, core-excavator@1 -> 7979b7dcf772, core-crane@1 -> a8fda7e3b633 (each seat slot's height is above its cab floor; p[1] unchanged). The four Mars bus seats (@3) and core-bleachers@1 (bench heights above their footboard) have no finding. No new failure code or detail; nothing relaxed.",
+ "findings": [
+  {
+   "def": "core-crane@1",
+   "hash": "a8fda7e3b633f15ae0a42f1270f8455c083bff7401ab5b7a7a4a2e4725c8203b",
+   "stage": "gallery-budget",
+   "code": "draws",
+   "detail": "88 > 4",
+   "fields": [
+    "params.condition=construction"
+   ]
+  },
+  {
+   "def": "core-crane@1",
+   "hash": "a8fda7e3b633f15ae0a42f1270f8455c083bff7401ab5b7a7a4a2e4725c8203b",
+   "stage": "gallery-budget",
+   "code": "draws",
+   "detail": "90 > 4",
+   "fields": [
+    "random[0]"
+   ]
+  },
+  {
+   "def": "core-crane@1",
+   "hash": "a8fda7e3b633f15ae0a42f1270f8455c083bff7401ab5b7a7a4a2e4725c8203b",
+   "stage": "gallery-budget",
+   "code": "triangles",
+   "detail": "1780 > 400",
+   "fields": [
+    "params.condition=construction"
+   ]
+  },
+  {
+   "def": "core-crane@1",
+   "hash": "a8fda7e3b633f15ae0a42f1270f8455c083bff7401ab5b7a7a4a2e4725c8203b",
+   "stage": "gallery-budget",
+   "code": "triangles",
+   "detail": "1828 > 400",
+   "fields": [
+    "random[0]"
+   ]
+  },
+  {
+   "def": "core-excavator@1",
+   "hash": "7979b7dcf77223ab851f98b20bceb13239c5f1fa1d8a35902e33894f3c0b95ac",
+   "stage": "gallery-budget",
+   "code": "draws",
+   "detail": "20 > 4",
+   "fields": [
+    "params.condition=construction"
+   ]
+  },
+  {
+   "def": "core-excavator@1",
+   "hash": "7979b7dcf77223ab851f98b20bceb13239c5f1fa1d8a35902e33894f3c0b95ac",
+   "stage": "gallery-budget",
+   "code": "draws",
+   "detail": "22 > 4",
+   "fields": [
+    "random[1]"
+   ]
+  },
+  {
+   "def": "core-fire-engine@1",
+   "hash": "915bbc8c72c314cb604e84ba20f47b7cc0ad1285cc45ca297a65a559880e89e5",
+   "stage": "gallery-budget",
+   "code": "draws",
+   "detail": "19 > 4",
+   "fields": [
+    "params.condition=construction"
+   ]
+  },
+  {
+   "def": "core-mars-papasan@3",
+   "hash": "d0eaf5dd546baf1e2555b5048c81ace4a71827e6b938fe2c16553bf40770db3f",
+   "stage": "budget",
+   "code": "triangles",
+   "detail": "1152 > 600",
+   "fields": [
+    "defaults",
+    "random[0]",
+    "random[1]",
+    "size.scale.max",
+    "size.scale.min"
+   ]
+  },
+  {
+   "def": "core-tractor@1",
+   "hash": "65bc0b3d4e68825c783b9e51ffe521da749a2d3c174ccbc1e47cc9ea15e6dd35",
+   "stage": "gallery-budget",
+   "code": "draws",
+   "detail": "11 > 4",
+   "fields": [
+    "params.condition=construction"
+   ]
+  },
+  {
+   "def": "core-tractor@1",
+   "hash": "65bc0b3d4e68825c783b9e51ffe521da749a2d3c174ccbc1e47cc9ea15e6dd35",
+   "stage": "gallery-budget",
+   "code": "draws",
+   "detail": "17 > 4",
+   "fields": [
+    "random[1]"
+   ]
+  },
+  {
+   "def": "core-truck@1",
+   "hash": "73cd1f03a986b20a78def8266bbf620a2fa3ef44deebe3db7650e12bb20ca79e",
+   "stage": "gallery-budget",
+   "code": "draws",
+   "detail": "25 > 4",
+   "fields": [
+    "params.condition=construction"
+   ]
+  }
+ ]
+}
