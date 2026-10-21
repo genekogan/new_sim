@@ -44,7 +44,7 @@ try {
   const cliText = await download.text(); writeFileSync(resolve(dir, 'eden-agent.mjs'), cliText);
   const fetchLog = resolve(out, 'fetches.jsonl'); rmSync(fetchLog, {force: true});
   // Count every request the CLI makes (path and time only).
-  writeFileSync(resolve(dir, 'count-fetch.mjs'), `import {appendFileSync} from 'node:fs';const f=globalThis.fetch;globalThis.fetch=(u,o)=>{appendFileSync(${JSON.stringify(fetchLog)},JSON.stringify({t:Date.now(),pid:process.pid,path:String(u).replace(/^https?:\\/\\/[^/]+\\/w\\/[^/]+/,'')})+'\\n');return f(u,o);};\n`);
+  writeFileSync(resolve(dir, 'count-fetch.mjs'), `import {appendFileSync} from 'node:fs';const f=globalThis.fetch;globalThis.fetch=(u,o)=>{appendFileSync(${JSON.stringify(fetchLog)},JSON.stringify({t:Date.now(),pid:process.pid,path:String(u).replace(/^https?:\\/\\/[^/]+\\/w\\/[^/]+/,'')})+'\\n');const t=Date.now(),p=f(u,o);p.then(r=>appendFileSync(${JSON.stringify(fetchLog + '.status')},JSON.stringify({t,ms:Date.now()-t,pid:process.pid,status:r.status})+'\\n'),e=>appendFileSync(${JSON.stringify(fetchLog + '.status')},JSON.stringify({t,ms:Date.now()-t,pid:process.pid,error:String(e?.cause?.code??e)})+'\\n'));return p;};\n`);
   const env = {...process.env, NODE_OPTIONS: `--import=${resolve(dir, 'count-fetch.mjs')}`};
   const run = (cliArgs) => new Promise((ok, fail) => {
     const child = spawn(process.execPath, ['eden-agent.mjs', ...cliArgs], {cwd: dir, env, stdio: ['ignore', 'pipe', 'pipe']}); owned.add(child);
@@ -116,11 +116,12 @@ try {
   // S6 (opt-in): real idle. One listen waits N real minutes; presence sampled each minute; requests and memory counted.
   if (idleMinutes > 0) {
     const before = readFileSync(fetchLog, 'utf8').trim().split('\n').length, t0 = Date.now();
-    const listening = run(['listen']); await untilListening(); const samples = [];
+    const listening = run(['listen']); let early = null; listening.then(r => { early = r; }); await untilListening(); const samples = [];
     const pid = () => { const out = execFileSync('pgrep', ['-f', `eden-agent.mjs listen$`], {encoding: 'utf8'}).trim().split('\n')[0]; return Number(out); };
     for (let m = 1; m <= idleMinutes; m++) {
       await sleep(60_000); const b = await box(); let rssKb = null; try { rssKb = Number(execFileSync('ps', ['-o', 'rss=', '-p', String(pid())], {encoding: 'utf8'}).trim()); } catch {}
       samples.push({minute: m, presence: b.presence, rssKb}); report.scenarios.S6 = {samples}; save();
+      if (early) { report.scenarios.S6 = {samples, listenExitedEarly: {minute: m, code: early.code, stdout: early.stdout.slice(0, 500), stderr: early.stderr.slice(-1500), exitAt: new Date(early.exitAt).toISOString()}}; save(); throw Error(`listen exited during the idle wait (code ${early.code}): ${early.stderr.slice(-300)}`); }
     }
     const sent = await send('are you still listening after all this time?'), r = await listening, got = JSON.parse(r.stdout);
     assert.deepEqual(got.messages.map(m => m.text), ['are you still listening after all this time?']); await handle(got.messages);
