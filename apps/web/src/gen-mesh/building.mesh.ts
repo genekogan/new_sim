@@ -151,9 +151,10 @@ export function buildingJob(ctx: Pick<MeshCtx, 'def' | 'params' | 'args'>, L: Bu
   // New switch defaults must not reshuffle the legacy random facade details; nor may decals (XP8 hook: a sign edit
   // must leave the shutters, flower boxes and chimney where they were).
   const legacyParams = Object.fromEntries(Object.entries(ctx.params).filter(([k]) => !ORNAMENTS.has(k) && k !== 'decals'));
-  // Nor may an authored plan's footprint annotation (plan.size: rooms resize with the building).
+  // Nor may an authored plan's footprint annotation (plan.size: rooms resize with the building) or its landing strip
+  // (plan.landing: two facing flights narrow, lane BSGEN 2026-10-21).
   const plan = legacyParams.plan as Record<string, unknown> | undefined;
-  if (plan && typeof plan === 'object' && 'size' in plan) { const { size: _size, ...rest } = plan; legacyParams.plan = rest as Value; }
+  if (plan && typeof plan === 'object' && ('size' in plan || 'landing' in plan)) { const { size: _size, landing: _landing, ...rest } = plan; legacyParams.plan = rest as Value; }
   const look = (buildingLooks as Record<string, string>)[ctx.def.hash] ?? ctx.def.hash;
   const seed = hashStr(`${look}|${JSON.stringify(legacyParams)}|${paint}|${JSON.stringify(ctx.args)}`);
   // Keep the library's original sill palette at its preset trim (drawBuilding)

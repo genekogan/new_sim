@@ -36,8 +36,10 @@ test('EF4 small-K gate: every library def places, bakes, furnishes and builds ga
   const w2 = JSON.parse(readFileSync(new URL('../conformance/w2-effects-20261019.json', import.meta.url), 'utf8')) as Pick<typeof known, 'findings'>;
   // Tranche 2026-10-20 Z2: lod1 on 145 mesh defs and the placement fixes re-hash defs; building layouts resize; see the record's note.
   const z2 = JSON.parse(readFileSync(new URL('../conformance/z2-catalogue-20261020.json', import.meta.url), 'utf8')) as Pick<typeof known, 'findings'>;
+  // Tranche 2026-10-21 BSGEN: apartment block plan.landing and three furnished defs' contents re-hash defs; exact re-pins.
+  const bsgen = JSON.parse(readFileSync(new URL('../conformance/bsgen-20261021.json', import.meta.url), 'utf8')) as Pick<typeof known, 'findings'>;
   const signature = (f: Finding) => JSON.stringify([f.def, f.hash, f.field, f.stage, f.code, f.detail]);
-  const allowed = new Set([...known.findings, ...integration.findings, ...trunk3.findings, ...trunk32.findings, ...w2.findings, ...z2.findings].flatMap(f => f.fields.map(field => signature({ ...f, field }))));
+  const allowed = new Set([...known.findings, ...integration.findings, ...trunk3.findings, ...trunk32.findings, ...w2.findings, ...z2.findings, ...bsgen.findings].flatMap(f => f.fields.map(field => signature({ ...f, field }))));
   const newFindings = report.findings.filter(f => !allowed.has(signature(f)));
   assert.deepEqual(newFindings, [], `Undocumented conformance failures: ${JSON.stringify(newFindings.slice(0, 12))}`);
   assert.deepEqual(report.qualificationGaps, known.qualificationGaps, 'rendering gaps changed: qualify them or document the exact gap');

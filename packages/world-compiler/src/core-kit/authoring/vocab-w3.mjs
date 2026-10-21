@@ -408,8 +408,9 @@ const types = [
   furnished({ ...RES, name: 'apartment-block', synonyms: ['apartments', 'block of flats', 'flats', 'tenement', 'condo', 'apartment building'],
     description: 'A three-storey block of twelve furnished studio flats (12 × 11 m): a stair hall up the middle, four flats a floor, each with a bed, a sofa, a table, a kitchenette and a toilet. Owner placeholder.',
     params: { w: 12, d: 11, floors: 3, floorHeight: 2.8, roof: 'flat', roofPitch: 0, material: 'brick', wall: '#b5704f', trim: '#f0e6d0', roofColor: '#5d6466', windows: 0.6 },
-    plan: plan([0, 1, 2].map((k) => ({ rooms: [[k ? `landing-${k}` : 'hall', 4.5, 4, 7.5, 11], [`flat-${4 * k + 1}`, 0, 4, 4.5, 11], [`flat-${4 * k + 2}`, 7.5, 4, 12, 11], [`flat-${4 * k + 3}`, 0, 0, 6, 4], [`flat-${4 * k + 4}`, 6, 0, 12, 4]],
-      doors: [1, 2, 3, 4].map((i) => [k ? `landing-${k}` : 'hall', `flat-${4 * k + i}`]), ...(k ? {} : { ext: [['hall', 's', 0.5, 1.2]] }) })), [[0, 'hall', 'w', 1], [1, 'landing-1', 'e', 1]]),
+    // plan.landing (lane BSGEN, 2026-10-21): the stair hall's two facing flights narrow to keep a 1.2 m landing strip
+    plan: { ...plan([0, 1, 2].map((k) => ({ rooms: [[k ? `landing-${k}` : 'hall', 4.5, 4, 7.5, 11], [`flat-${4 * k + 1}`, 0, 4, 4.5, 11], [`flat-${4 * k + 2}`, 7.5, 4, 12, 11], [`flat-${4 * k + 3}`, 0, 0, 6, 4], [`flat-${4 * k + 4}`, 6, 0, 12, 4]],
+      doors: [1, 2, 3, 4].map((i) => [k ? `landing-${k}` : 'hall', `flat-${4 * k + i}`]), ...(k ? {} : { ext: [['hall', 's', 0.5, 1.2]] }) })), [[0, 'hall', 'w', 1], [1, 'landing-1', 'e', 1]]), landing: 1.2 },
     recipe: { flat: [it('bed', 'bed', '0,0,e 1,0,w 0,1,e'), it('sofa', 'sofa', '1,0.6,w 0,0.6,e 0.5,1,n'), it('table', 'round-table', '0.5,0.5,s'), it('chair-1', 'chair', '0.3,0.5,e 0.5,0.3,s'), it('chair-2', 'chair', '0.7,0.5,w 0.5,0.7,n'),
       it('stove', 'stove', '1,1,n 0,1,n 1,0,s'), it('sink', 'sink', '0.75,1,n 0.25,1,n 0.7,0,s'), it('fridge', 'fridge', '0.55,1,n 0.5,0,s'), it('toilet', 'toilet', '0,1,e 1,1,w 0,0.3,e'), it('wardrobe', 'wardrobe', '0.3,0,s 0.6,0,s 1,0.3,w')],
       hall: [it('mailboxes', 'filing-cabinet', '1,0.8,w'), it('plant', ['potted-plant', 'flower-pot'], '0,1,e 1,1,w')], landing: [it('plant', ['potted-plant', 'flower-pot'], '1,0.9,w 0,0.9,e')] }, layers: OWNED }),
