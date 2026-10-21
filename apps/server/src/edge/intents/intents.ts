@@ -181,11 +181,14 @@ export class Intents {
     const walkTo = (c: EdgeCapability) => {const p = this.L.places.byId.get(c.target!.id); return {ok: true as const, kind: 'capability' as const, capability: c.id, ...(Object.keys({...via, ...withP}).length ? {params: {...via, ...withP}} : {}), chosen: {...(c.target!.kind==='place'?{place:c.target!.id}:{target:c.target!.id,kind:c.target!.kind}), name: p?.name ?? c.label, ...(p ? this.eta(P, centroid(p.polygon)) : {})}};};
     // Preserve exact non-place destinations such as a carrier boarding object.
     const exact = caps.find(c => c.verb==='walk'&&(c.id===asked||c.id === `walk:${asked}`));
-    if (exact?.target?.kind === 'object') {if (!exact.available && exact.blocked) return no(exact.blocked.code, exact.blocked.reason);return walkTo(exact);}
-    const object=offeredWalkObject(this.L,P.soul,asked);if(object){if(!object.ok)return object;const out=walkTo(object.cap);return {...out,chosen:{...out.chosen,matchedBy:object.matchedBy}};}
+    // RT: a walk the body cannot make from here is refused with the engine's route code, not resolved and then refused at act
+    const dead = (c: EdgeCapability) => {const d = this.L.routeProblem(P.soul, c.id); return d ? no(d.code, d.reason) : null;};
+    if (exact?.target?.kind === 'object') {if (!exact.available && exact.blocked) return no(exact.blocked.code, exact.blocked.reason);return dead(exact) ?? walkTo(exact);}
+    const object=offeredWalkObject(this.L,P.soul,asked);if(object){if(!object.ok)return object;const d=dead(object.cap);if(d)return d;const out=walkTo(object.cap);return {...out,chosen:{...out.chosen,matchedBy:object.matchedBy}};}
     const r=resolvePlaceForVerb(this.L,P.soul,exact?.target?.kind==='place'?exact.target.id:asked);
     if(!r.ok)return r;
     const cap=caps.find(c=>c.id===r.chosen.capability)!;
+    const d=dead(cap);if(d)return d;
     const out=walkTo(cap);return {...out,chosen:{...out.chosen,...r.chosen}};
   }
 

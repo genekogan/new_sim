@@ -229,7 +229,10 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
   const exits = P.pos ? ledger.capabilities(soul).filter(c => c.verb === 'walk' && c.available && c.target?.kind === 'place' && !inside.has(c.target.id) && !/(^|-)mat-\d+$/.test(c.target.id))
     .map(c => {const p = ledger.places.byId.get(c.target!.id), at = p ? centroid(p.polygon) : null; return at ? {c, p: p!, at, d: dist2(P.pos!, at)} : null;})
     .filter((x): x is NonNullable<typeof x> => !!x && x.d <= 150).sort((a, b) => a.d - b.d || a.c.id.localeCompare(b.c.id)).slice(0, LIMITS.exits)
-    .map(x => ({to: x.p.id, name: x.p.name, dir: compassPoint(compassOf(x.at[0] - P.pos![0], x.at[1] - P.pos![1])), walk: x.c.id, eta: '~' + durationWord(walkSeconds(x.d * 1.25))})) : [];
+    .map(x => {const base = {to: x.p.id, name: x.p.name, dir: compassPoint(compassOf(x.at[0] - P.pos![0], x.at[1] - P.pos![1])), walk: x.c.id};
+      // RT: an exit the body cannot walk from here says so (no eta), instead of an eta for a walk that is refused
+      const problem = ledger.routeProblem(soul, x.c.id);
+      return problem ? {...base, reachable: false, why: problem.code} : {...base, eta: '~' + durationWord(walkSeconds(x.d * 1.25))};}) : [];
   const frame = {
     tick, ...(c ? {clock: `${String(c.hour).padStart(2, '0')}:${String(c.minute).padStart(2, '0')}`, day: WEEKDAYS[new Date(c.datetime).getUTCDay()], light: lightOf(c.hour, c.minute)} : {}),
     ...(weather ? {weather: (() => {const l = P.pos ? ledger.lightningNear?.(P.pos[0], P.pos[1]) : null; return l ? {...weather, lightning: l} : weather;})()} : {}),

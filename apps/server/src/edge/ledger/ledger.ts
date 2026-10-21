@@ -11,6 +11,8 @@ import type {WorldHost, Mind} from '../../world.ts';
 import type {Db} from '../../db.ts';
 import {readHumanCapabilitiesV1, type HumanBindingV1} from '../../human-capabilities.ts';
 import {humanBlockedExplanationV1} from '../../human-wait-condition.ts';
+/** RT: route refusals that hold until the world itself changes (not a crowd, a search limit or a start a step clears). */
+const ROUTE_DEAD = new Set(['route.unreachable', 'route.goal-blocked', 'route.link-unusable', 'route.unknown-level']);
 import {EdgeError, type EdgeCapability, type EdgeLedgerHooks, type EdgeReceipt, type EdgeSoul, type NearbyBody, type PlaceRef,type ObjectBodyAdmission} from '../contract.ts';
 import {CATALOG} from '../../../../../mars/viewer/engine/world/catalog.ts';
 import {PlaceIndex, centroid, derivePlaceData, happenings, validatePlaceData, type PlaceData,type Place} from './places.ts';
@@ -369,6 +371,24 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
   /** @internal ambient helper: the capability plans near this Soul (cached per tick). */
   ambientPlans(soul: EdgeSoul) {return this.binds(soul);}
+  /**
+   * RT (2026-10-20): why this Soul cannot walk an offered capability from where its body stands: the engine's own route
+   * refusal (route.unreachable, …) for the plan's walk, or null when the walk can start (or the answer depends on
+   * something passing: asleep, mid-step, a crowd). Cached per navigation epoch, 0.5 m position bucket and capability,
+   * so `here` exits and `go` can ask on every frame.
+   */
+  routeProblem(soul: EdgeSoul, capId: string): {code: string; reason: string} | null {
+    const b = this.body(soul.entityId), engine = this.host.engine as unknown as {navEpochV1?(): number};
+    const plan = b ? this.binds(soul).plans.get(capId) : undefined;
+    if (!b || !plan?.steps.some(s => s.verb === 'walk_to') || !engine.navEpochV1) return null;
+    const [x, y, z] = b.pose.p, key = `${engine.navEpochV1()}|${Math.round(x * 2)},${Math.round(y * 2)},${Math.round(z * 2)}|${capId}`;
+    const hit = this.routeMemo.get(key); if (hit !== undefined) return hit;
+    const issue = this.host.engine.canPerform({actor: soul.entityId, label: plan.label, steps: plan.steps});
+    const out = issue && ROUTE_DEAD.has(issue.code) ? {code: issue.code, reason: humanBlockedExplanationV1(issue.code, plan.label)} : null;
+    this.routeMemo.set(key, out); if (this.routeMemo.size > 4096) this.routeMemo.delete(this.routeMemo.keys().next().value!);
+    return out;
+  }
+  private routeMemo = new Map<string, {code: string; reason: string} | null>();
   private arm(p: Pending) {
     this.pending.set(p.soul.soulId, p);
     this.db.db.prepare('UPDATE edge_receipts_v1 SET plan=? WHERE world_id=? AND receipt_id=?').run(JSON.stringify({label: p.label, steps: p.steps}), this.host.worldId, p.receipt);
