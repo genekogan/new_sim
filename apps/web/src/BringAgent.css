@@ -15,3 +15,4 @@
 .bring-agent-open{display:inline-flex;align-items:center;justify-content:center;gap:7px}.bring-agent-open svg{width:18px;height:18px;flex:none}
 
 .bring-agent-prompt{overflow-wrap:anywhere}.bring-agent-prompt a{text-decoration:underline;text-underline-offset:2px}
+.bring-agent-later{padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--fg);font:600 14px system-ui,sans-serif;cursor:pointer}
