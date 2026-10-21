@@ -34,7 +34,7 @@ import {publishCompletedOwnerQueue} from './client-owner-result.mjs';
 import {openClientMemory} from './client-memory.mjs';
 import {travelCommand} from './client-travel.mjs';
 
-export const SKILL_VERSION='1.9.7';
+export const SKILL_VERSION='1.9.8';
 export const CONTRACT='eden-edge/1';
 export const API_CONTRACT='eden-edge/1.1'; // Additive support; preserve legacy wire contract.
 const STATE='.eden-agent.json';
@@ -186,7 +186,13 @@ function finishApproval(dto,pending,world,connection,{release=false}={}){
  const file='approval-'+dto.id+'-'+dto.status+'-'+connection+'.json';try{writeFileSync(file,JSON.stringify(receipt)+'\n',{flag:'wx',mode:0o600});}catch(error){if(error.code!=='EEXIST')throw error;const stat=lstatSync(file);if(!stat.isFile()||stat.isSymbolicLink()||stat.nlink!==1)throw Error('Public approval receipt path is linked or nonregular.');}
  if(connection==='delegated'){const delegate=acceptDelegation(dto,pending,world);if(!delegate)throw Error('Ready delegation unavailable; pending recovery was retained.');const current=load(),grants={...(current.delegations??{}),[delegate.soul]:{world:delegate.world,token:delegate.token}};save({...delegate,delegations:grants,pendingApproval:undefined,reconnectSoul:undefined,mode:undefined,lastAcceptedAt:now()});}
  // 1.9.4: an expired request stays this folder's pending one (the human can Ask again on it) until a fresh request replaces it
- else if(dto.status!=='expired'||release)save({pendingApproval:undefined,...(connection==='unavailable'?{reconnectSoul:{id:dto.soulId,name:dto.name,world}}:{})});return receipt;
+ // 1.9.8 (SOULSIM-E CLI-1): only when it is still this folder's pending request; an older wait never clears a newer one
+ else if((dto.status!=='expired'||release)&&(({pendingApproval:cur})=>!cur||cur.approvalId===dto.id)(load()))save({pendingApproval:undefined,...(connection==='unavailable'?{reconnectSoul:{id:dto.soulId,name:dto.name,world}}:{})});return receipt;
+}
+function supersededApproval(pending){
+ const cur=load().pendingApproval;if(cur?.approvalId===pending.approvalId)return null;
+ return {approvalId:pending.approvalId,name:pending.input.name,status:'superseded',...(cur?{newer:{name:cur.input.name,...(cur.approvalId?{approvalId:cur.approvalId}:{})}}:{}),
+  next:cur?'This folder now has a newer request ("'+cur.input.name+'"); this wait stopped and changed nothing. Run approval wait (in the background) for the newer one.':'This request is no longer this folder\'s pending one (cancelled or finished by another command); nothing was changed. Run status.'};
 }
 export async function approval(action='status'){
  if(liveRunning())throw Error('Stop this folder’s mind before selecting a newly approved Soul, or use a fresh folder.');
@@ -195,6 +201,9 @@ export async function approval(action='status'){
  const pending=need(s,'pendingApproval','Run create-soul or pair-soul first.');if(pending.world!==s.world||pending.worldId!==s.worldId)throw Error('Approval belongs to another world.');if(!pending.approvalId)return startApproval(pending.input);
  const body={approvalId:pending.approvalId,pollSecret:pending.input.pollSecret},deadline=Date.now()+(action==='wait'?15*60000:30_000);
  for(;;){let data=await approvalCall('/v1/agent/approval/poll',body,'approval '+action,deadline),dto=data.approval??data;
+  // 1.9.8 (SOULSIM-E CLI-1): a cancel + create-soul made a newer request (or another command finished this one): this wait ends
+  // at once and leaves the folder alone (a stale Wren wait used to wipe the new Sorrel request, orphaning the approved Soul)
+  const stale=supersededApproval(pending);if(stale)return stale;
   // 1.9.4: while waiting, an expired request may come back (the human pressed Ask again): keep polling until the deadline
   if(['refused','cancelled'].includes(dto.status)||dto.status==='expired'&&(action!=='wait'||Date.now()>=deadline))return finishApproval(dto,pending,s.world,'terminal',{release:action==='cancel'});
   if(dto.status==='ready'&&!data.token){const receipt=finishApproval(dto,pending,s.world,'unavailable');return {...receipt,next:'The body exists but this agent grant is unavailable. Run pair-soul '+dto.soulId+' "'+dto.name+'" for fresh human approval; do not create a replacement Soul.'};}
