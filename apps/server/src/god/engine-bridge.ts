@@ -84,6 +84,7 @@ const GROUND_BAND = 0.35;      // a floor within this of the ground is level 0 (
 const LEVEL_MATCH = 0.12;      // floors this close in height share an engine level
 const FLOOR_NEAR = 0.6;        // levelAt: a level counts at a point within this of one of its floors (thresholds, stair heads)
 const NEAR = 60;               // capabilities: god things within this many metres
+const FAR_SEAT = 250, FAR_SEATS = 6; // F2: and the nearest FAR_SEATS seats out to FAR_SEAT m (sit only)
 const BODY_DEF = 'core/humanoid@1';
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
 
@@ -1228,6 +1229,11 @@ export class EngineBridge {
     const levelOf = (x: any) => { let s = x; for (let i = 0; i < 4 && s.support?.kind === 'resting-on' && ents[s.support.on]; i++) s = ents[s.support.on]; return this.levelOfY(s.pose.p[1]); };
     const near = Object.values(ents).filter((x: any) => x.tags?.includes('entity-world') && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) <= NEAR) as any[];
     near.sort((a, b) => Math.hypot(a.pose.p[0] - here[0], a.pose.p[2] - here[1]) - Math.hypot(b.pose.p[0] - here[0], b.pose.p[2] - here[1]) || (a.id < b.id ? -1 : 1));
+    // SOULSIM-H F2: "sit on the bench" from 77 m sat on the ground (the bench was past NEAR, so only sit:here was offered).
+    // The nearest few seats beyond NEAR are offered too (sit only), so a named seat resolves to its own walk-and-sit.
+    const seatAsset = (x: any) => !!(this.physics?.assets[x.def] as { slots?: { kind: string }[] } | undefined)?.slots?.some((sl) => sl.kind === 'seat');
+    near.push(...(Object.values(ents).filter((x: any) => x.tags?.includes('entity-world') && x.support?.kind !== 'in-hand' && seatAsset(x) && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) > NEAR && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) <= FAR_SEAT) as any[])
+      .sort((a, b) => Math.hypot(a.pose.p[0] - here[0], a.pose.p[2] - here[1]) - Math.hypot(b.pose.p[0] - here[0], b.pose.p[2] - here[1]) || (a.id < b.id ? -1 : 1)).slice(0, FAR_SEATS));
     const approach = (x: any): { verb: string; params: Record<string, unknown> }[] => {
       const level = levelOf(x); if (level === (me.human.level ?? 0) && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) < 3) return [];
       const at = this.engine.standableNearV1([x.pose.p[0], x.pose.p[2]], level, soul.entityId, 0.4, 16);
@@ -1254,6 +1260,7 @@ export class EngineBridge {
         caps.push({ id, verb: 'sit', label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: 60 } } });
         plans.set(id, { label, steps: [{ verb: 'sit', params: { on: x.id, seconds: 60 } }], seconds: true });
       }
+      if (d > NEAR) continue; // F2: a far seat is offered for sitting only
       // beds/1: a bed with native berths is lain on through the engine's take_slot (walk to its side, lie down on the
       // mattress, rest, get up); a bed no adult fits on is not offered at all (bedUseRefusal names it if asked by id)
       const berths = x.support?.kind !== 'in-hand' && this.isBed(x.id) ? this.berthsOf(x.id) : 0;
