@@ -627,7 +627,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
       // BODY refusals precede place/alias diagnostics, as in the original actOnce path.
       const bodyIssue=this.bodyVerbProblem(soul,input.capability.split(/[:\s]/)[0]!);
       const place=bodyIssue?null:explicitPlaceCapability(this,soul,input.capability.trim());
-      if(place){
+      // SOULSIM-E (real-agent run on 3.60, 2026-10-21): resolve offers a far place's walk on demand and the agent acts on
+      // that id, as the skill says; the id was refused place.unwalkable here. actOnce below walks it on demand, as words.
+      const onDemand=!!place&&!place.ok&&place.code==='place.unwalkable'&&(()=>{const b=this.binds(soul);const od=this.resolveOnDemand(soul,input.capability.trim(),b.caps,b.plans);return od.caps!==b.caps&&od.v.kind!=='unknown';})();
+      if(place&&!onDemand){
         if(!place.ok){this.recordRefusal(soul.soulId,'act',input.capability,place.code);const {ok:_ok,...refusal}=place;return this.withInPlaceAlternative(soul,{accepted:false as const,capability:input.capability,...refusal});}
         const out=await this.act(soul,{...input,capability:place.chosen.capability});
         if(!out.accepted)return out;
@@ -665,7 +668,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (!caps.some(c => c.id === asked)) {const cls = classWords(asked, this.places.byId.values()); if (cls) return this.intents.act(soul, {...cls, ...(clientRef ? {clientRef} : {})});}
     if (asked.startsWith('face:') && caps.some(c => c.id === asked && c.target?.kind === 'soul')) return this.intents.act(soul, {verb: 'turn', face: caps.find(c => c.id === asked)!.target!.id, ...(clientRef ? {clientRef} : {})});
     // strict/1: an id-shaped target that names nothing in this world is refused, never swapped for something else
-    {const strict = strictCheck(this, soul, asked, caps); if (strict) return {...refuse(strict.code, strict.reason), did_you_mean: strict.did_you_mean};}
+    // (SOULSIM-E: unless it is a far place's walk the listing leaves out, which resolveOnDemand below offers: the agent
+    // resolved "go to the horse" to walk:land-park-lawns-west and acting on that id was refused, on Eden 2026 / 3.60)
+    {const strict = strictCheck(this, soul, asked, caps); if (strict && !(od => od.caps !== caps && od.v.kind !== 'unknown')(this.resolveOnDemand(soul, asked, caps, plans))) return {...refuse(strict.code, strict.reason), did_you_mean: strict.did_you_mean};}
     // together/1: social phrasing first (accept/decline, "hug Tamsin", "give her the book", "dance with Roger", "invite X to …")
     let social: {note: string} | null = null, text = asked;
     if (!caps.some(c => c.id === asked)) {
