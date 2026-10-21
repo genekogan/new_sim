@@ -82,10 +82,14 @@ test('a world visit sends one page view, then one enter event when the card goes
 
 test('wired: the page, the two pairings and the god approval count; the build default is simeden; the CSP stays open to it', () => {
   assert.match(src('./main.tsx'), /countPage\(BASE\);[^\n]*\ncreateRoot\(/);
-  // older worlds' approval card (LAP B replaced AccountApproval.tsx): counted once a request seen waiting turns ready
-  assert.match(src('./OldWorldApprovals.tsx'), /onPaired=\{\(\) => countEvent\('soul paired'\)\}/);
-  assert.match(src('./god-ui/ApprovalDialog.tsx'), /if \(waited\.current\) paired\.current\?\.\(\);/);
-  assert.match(src('./PairApprove.tsx'), /setOk\(true\); countEvent\('soul paired'\);/);
+  // the approval card counts its own pairing (fixup 2026-10-21; behaviour in visitor-counts-pairing.test.ts), the same
+  // card on the new worlds (GodPanel) and the older ones (OldWorldApprovals); the older pair-code page by its code
+  assert.match(src('./god-ui/ApprovalDialog.tsx'), /useEffect\(\(\) => \{ if \(pairingTaken\(pressed\.current, a\?\.status\)\) countPairing\(id\); \}, \[a\?\.status, id\]\);/);
+  assert.match(src('./god-ui/ApprovalDialog.tsx'), /if \(action === 'approve'\) \{ setApproving\(true\); pressed\.current = true; \}/);
+  assert.match(src('./GodPanel.tsx'), /<ApprovalDialog id=\{shownId\}/);
+  assert.match(src('./OldWorldApprovals.tsx'), /<ApprovalDialog id=\{shownId\}/);
+  for (const f of ['./GodPanel.tsx', './OldWorldApprovals.tsx', './god-ui/ApprovalDialog.tsx']) assert.doesNotMatch(src(f), /countEvent\('soul paired'\)|onPaired/, f);
+  assert.match(src('./PairApprove.tsx'), /setOk\(true\); countPairing\('pair:'\+code\);/);
   assert.match(src('./GodPanel.tsx'), /await G\.approve\(code\); countEvent\('god connected'\);/);
   assert.match(src('../vite.config.ts'), /__SIM_GOATCOUNTER__: JSON\.stringify\(process\.env\.SIM_GOATCOUNTER \?\? 'simeden'\)/);
   // The world pages' only CSP is frame-ancestors (http.ts). A connect-src/img-src/default-src added there must allow

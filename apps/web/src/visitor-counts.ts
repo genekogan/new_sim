@@ -4,7 +4,7 @@
 // the page grows by well under 1 KB and runs no third-party code. Cookieless and nothing personal: a world page counts as
 // /w/<slug> (never a query string, hash, Soul id, code or token), the world list as /, a referrer as its origin only,
 // the screen as its width (GoatCounter's phone/tablet/desktop split). Three events, counts only: "enter world <slug>"
-// (the arrival card went), "soul paired" (a Soul approved for an agent), "god connected" (a world's god approved).
+// (the arrival card went), "soul paired" (a Soul approved for an agent, once per approval), "god connected" (a world's god approved).
 // Off: on local and private hosts (dev, tests, e2e), under automation (navigator.webdriver: every Playwright walk, the
 // release probe, poster, stall and cdn-walk of ship.sh), on ?shot looks, in a browser that set localStorage
 // skipgc=t (GoatCounter's own opt-out), and in a build with SIM_GOATCOUNTER=off (vite.config.ts; a code or a full
@@ -87,7 +87,20 @@ export function countEvent(name: CountedEvent | `enter world ${string}`) {
   const at = counting(); if (at) send(countUrl(at, { path: name, title: name, width, event: true }));
 }
 
-/** Count this page view once, and its world entry once the arrival card has gone. */
+/** "soul paired" exactly once per approval (`key`: an approval id, or pair:<code> for the older pair-code page). Counted by
+ *  the card where Approve was pressed, once the server took it (creating or ready): the same on new and old worlds, from
+ *  the card, an #approve link or a window code. Fixup 2026-10-21: the new worlds' card never counted, and a card that only
+ *  watched another window's approval counted it again. */
+const pairings = new Set<string>();
+/** Whether a card counts its pairing now: Approve was pressed in it and the server took it (creating or ready). */
+export const pairingTaken = (pressed: boolean, status: string | undefined) => pressed && (status === 'creating' || status === 'ready');
+export function countPairing(key: string) {
+  if (!key || pairings.has(key)) return; pairings.add(key); countEvent('soul paired');
+}
+
+/** Count this page view once, and its world entry once the arrival is over: the arrival card went, or (no card: the
+ *  #advanced view) the first live frame was drawn. A tab hidden during the arrival draws nothing, so it counts on the first
+ *  visible frame. */
 let counted = false;
 export function countPage(base: string) {
   if (counted) return; counted = true;
@@ -95,5 +108,5 @@ export function countPage(base: string) {
   const path = countedPath(location.pathname, base); if (!path) return;
   const slug = path.startsWith('/w/') ? path.slice(3) : null;
   send(countUrl(at, { path, title: slug ?? 'worlds', referrer: countedReferrer(document.referrer, location.origin, base), width }));
-  if (slug) void whenMarked('card-done').then(() => countEvent(`enter world ${slug}`));
+  if (slug) void Promise.race([whenMarked('card-done'), whenMarked('first-live-frame')]).then(() => countEvent(`enter world ${slug}`));
 }
