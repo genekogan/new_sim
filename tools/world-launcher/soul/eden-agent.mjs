@@ -830,7 +830,7 @@ function resolveSoulReferences(values, { worldId, rosters, constraints: constrai
   const byId = /* @__PURE__ */ new Map();
   for (const source2 of rosters) {
     if (!plain(source2) || source2.worldId !== worldId) return refuse("soul.scope-mismatch", "Roster belongs to another or unknown world; nothing was chosen.", requested);
-    if (!["perceived", "public-directory", "conversation-participants"].includes(source2.kind) || !Array.isArray(source2.rows) || source2.rows.length > 512) return refuse("soul.roster-invalid", "Only bounded perceived, entitled conversation-participant or public-directory Soul rows are accepted.", requested);
+    if (!["perceived", "public-directory", "conversation-participants"].includes(source2.kind) || !Array.isArray(source2.rows) || source2.rows.length > 1e5) return refuse("soul.roster-invalid", "Only bounded perceived, entitled conversation-participant or public-directory Soul rows are accepted.", requested);
     for (const row of source2.rows) {
       if (!plain(row) || row.worldId !== void 0 && row.worldId !== worldId) return refuse("soul.scope-mismatch", "Row belongs to another or unknown world; nothing was chosen.", requested);
       const id3 = row.soulId ?? row.id;
@@ -1930,8 +1930,9 @@ import { join as join5, resolve as resolve5 } from "node:path";
 
 // tools/edge-skill/client-place-arrivals.mjs
 var ID2 = /^[A-Za-z0-9][A-Za-z0-9:._-]{0,159}$/;
+var PLACE_LIMIT = 1e5;
 function placeHierarchy(places) {
-  if (!Array.isArray(places) || places.length > 1e3) throw Error("invalid place hierarchy");
+  if (!Array.isArray(places) || places.length > PLACE_LIMIT) throw Error("invalid place hierarchy");
   const rows = {};
   for (const p of places) {
     if (!p || !ID2.test(p.id) || Object.hasOwn(rows, p.id) || p.parent !== void 0 && p.parent !== null && !ID2.test(p.parent)) throw Error("invalid place hierarchy");
@@ -1945,7 +1946,7 @@ function currentPlaceAncestors(place, rows = {}) {
   const result2 = [], seen = /* @__PURE__ */ new Set();
   let id3 = place;
   while (id3 !== null && id3 !== void 0) {
-    if (!ID2.test(id3) || seen.has(id3) || result2.length >= 1e3) throw Error("invalid place hierarchy");
+    if (!ID2.test(id3) || seen.has(id3) || result2.length >= PLACE_LIMIT) throw Error("invalid place hierarchy");
     seen.add(id3);
     result2.push(id3);
     if (!Object.hasOwn(rows, id3)) break;
@@ -1992,7 +1993,7 @@ function openClientPerception(directory, { call: call2, scope, onBoot = () => {
   async function catalogue(data) {
     const stat = data.static ?? {}, pages = stat.destinationPages ?? data.destinationPages ?? [];
     let places = stat.places ?? data.places ?? [];
-    if (!Array.isArray(places) || !Array.isArray(pages) || pages.length > 100 || pages.length && typeof stat.completeStaticEtag !== "string") throw Error("invalid boot catalogue");
+    if (!Array.isArray(places) || !Array.isArray(pages) || pages.length > 1e4 || pages.length && typeof stat.completeStaticEtag !== "string") throw Error("invalid boot catalogue");
     for (const page2 of pages) {
       const r = await call2(relative(page2.url), {});
       if (r.status !== 200) throw Error("complete boot destination page unavailable");
@@ -2012,7 +2013,12 @@ function openClientPerception(directory, { call: call2, scope, onBoot = () => {
       known = r.data.places;
     }
     cache.references = [...data.worldId ?? stat.worldId ? [{ id: data.worldId ?? stat.worldId, kind: "world", name: data.worldId ?? stat.worldId, source: "boot-world" }] : [], ...known.map((p) => ({ id: p.id, kind: "place", name: p.name, source: "boot-public-catalogue:" + String(fullRef?.etag ?? data.staticEtag ?? "edge1") }))];
-    cache.hierarchy = placeHierarchy(known);
+    try {
+      cache.hierarchy = placeHierarchy(known);
+    } catch (error) {
+      cache.hierarchy = {};
+      console.error("eden-agent: place arrivals off for this catalogue (" + error.message + ", " + (Array.isArray(known) ? known.length : "?") + " places); the mind goes on.");
+    }
     cache.places = copy2(places);
     cache.etag = data.staticEtag ?? null;
     cache.rules = copy2(stat.rules ?? {});
@@ -2047,7 +2053,13 @@ function openClientPerception(directory, { call: call2, scope, onBoot = () => {
       const c = await call2("/v1/edge/capabilities");
       if (c.status === 200) cache.caps = c.data.capabilities ?? [];
     }
-    for (const id3 of currentPlaceAncestors(place, cache.hierarchy)) if ((id3 === place || cache.places.some((p) => p.id === id3 && p.walkable && p.kind !== "world" && p.kind !== "sleeping-mat")) && !cache.visited.includes(id3)) cache.visited.push(id3);
+    let chain = [];
+    try {
+      chain = currentPlaceAncestors(place, cache.hierarchy);
+    } catch {
+      chain = typeof place === "string" ? [place] : [];
+    }
+    for (const id3 of chain) if ((id3 === place || cache.places.some((p) => p.id === id3 && p.walkable && p.kind !== "world" && p.kind !== "sleeping-mat")) && !cache.visited.includes(id3)) cache.visited.push(id3);
     if (place && place !== cache.lastPlace) {
       onHere(copy2(frame), { arrival: true, previous: cache.lastPlace });
     } else onHere(copy2(frame), { arrival: false, previous: cache.lastPlace });
@@ -3664,7 +3676,7 @@ async function travelCommand(args, { load: load2, save: save2, live: live2 = () 
 }
 
 // tools/edge-skill/eden-agent.mjs
-var SKILL_VERSION = "1.9.7";
+var SKILL_VERSION = "1.9.8";
 var CONTRACT = "eden-edge/1";
 var API_CONTRACT = "eden-edge/1.1";
 var STATE = ".eden-agent.json";
@@ -3936,8 +3948,19 @@ function finishApproval(dto2, pending, world, connection, { release = false } = 
     if (!delegate) throw Error("Ready delegation unavailable; pending recovery was retained.");
     const current = load(), grants = { ...current.delegations ?? {}, [delegate.soul]: { world: delegate.world, token: delegate.token } };
     save({ ...delegate, delegations: grants, pendingApproval: void 0, reconnectSoul: void 0, mode: void 0, lastAcceptedAt: now() });
-  } else if (dto2.status !== "expired" || release) save({ pendingApproval: void 0, ...connection === "unavailable" ? { reconnectSoul: { id: dto2.soulId, name: dto2.name, world } } : {} });
+  } else if ((dto2.status !== "expired" || release) && (({ pendingApproval: cur }) => !cur || cur.approvalId === dto2.id)(load())) save({ pendingApproval: void 0, ...connection === "unavailable" ? { reconnectSoul: { id: dto2.soulId, name: dto2.name, world } } : {} });
   return receipt2;
+}
+function supersededApproval(pending) {
+  const cur = load().pendingApproval;
+  if (cur?.approvalId === pending.approvalId) return null;
+  return {
+    approvalId: pending.approvalId,
+    name: pending.input.name,
+    status: "superseded",
+    ...cur ? { newer: { name: cur.input.name, ...cur.approvalId ? { approvalId: cur.approvalId } : {} } } : {},
+    next: cur ? 'This folder now has a newer request ("' + cur.input.name + '"); this wait stopped and changed nothing. Run approval wait (in the background) for the newer one.' : "This request is no longer this folder's pending one (cancelled or finished by another command); nothing was changed. Run status."
+  };
 }
 async function approval(action = "status") {
   if (liveRunning()) throw Error("Stop this folder\u2019s mind before selecting a newly approved Soul, or use a fresh folder.");
@@ -3954,6 +3977,8 @@ async function approval(action = "status") {
   const body2 = { approvalId: pending.approvalId, pollSecret: pending.input.pollSecret }, deadline = Date.now() + (action === "wait" ? 15 * 6e4 : 3e4);
   for (; ; ) {
     let data = await approvalCall("/v1/agent/approval/poll", body2, "approval " + action, deadline), dto2 = data.approval ?? data;
+    const stale = supersededApproval(pending);
+    if (stale) return stale;
     if (["refused", "cancelled"].includes(dto2.status) || dto2.status === "expired" && (action !== "wait" || Date.now() >= deadline)) return finishApproval(dto2, pending, s.world, "terminal", { release: action === "cancel" });
     if (dto2.status === "ready" && !data.token) {
       const receipt2 = finishApproval(dto2, pending, s.world, "unavailable");
