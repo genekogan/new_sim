@@ -154,7 +154,7 @@ export function buildApp(d: Deps) {
   // ---- public
   mountWelcomeRoutes(app,d);
   // lane OPS2: operator commands for TEST Souls (the launcher only, with the site key: op-souls.ts)
-  mountOperatorSouls(app,{db:d.db,worldId:d.host.worldId,souls:d.souls,inbox:agentInbox,siteKey:process.env.SIM_SITE_KEY});
+  mountOperatorSouls(app,{db:d.db,worldId:d.host.worldId,souls:d.souls,inbox:agentInbox,god:d.god,siteKey:process.env.SIM_SITE_KEY});
   if(d.souls.accounts)mountAccountRoutes(app,{accounts:d.souls.accounts,auth:d.auth,baseOf:d.cfg.authProvider==='clerk'?()=>publicWorldBase(d.cfg):baseOf,limit:limitIp});
   mountStationRoutesV2(app,d.stationV2);
   app.get('/healthz', (c) => c.json({ ok: true, tick: d.host.engine.world.tick, clients: d.hub.clients.size, paused: d.host.paused, build: d.cfg.build, worldId: d.host.worldId }));

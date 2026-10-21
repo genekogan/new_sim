@@ -7,6 +7,8 @@
 //   POST /v1/op/souls/message   {soulId, name, text}  an owner message into the Soul's inbox, the browser card's path
 //   POST /v1/op/souls/inbox     {soulId, name}  the owner's view of that inbox (latest, its ack/result, queued, presence)
 //   POST /v1/op/souls/delete    {soulId, name}  retire it (Souls.operatorRetire, the journaled retire an owner's DELETE does)
+//   POST /v1/op/god/pending     god pairing requests waiting for the owner;  POST /v1/op/god/approve {code}: approve one for
+//                               the world's existing owner (the release probe's own god folder, so no signed-in step)
 // Hard guards here (the launcher repeats the deny list): only a request no person was addressed in (no window code), for
 // a create (never a repair of an existing Soul), whose name is a TEST name and not on the deny list; message/inbox/delete
 // only reach Souls the operator's test account owns (so never Gene's Souls, which his own account owns). Every use prints
@@ -15,6 +17,7 @@ import type {Context, Hono} from 'hono';
 import type {Db, SoulRow} from './db.ts';
 import {ApiError, type Souls} from './souls.ts';
 import type {AgentInbox} from './inbox.ts';
+import type {GodMode} from './god/god.ts';
 import {AccountStoreError, type AccountIdentity} from './accounts/store.ts';
 import {siteRequestOk} from './travel/travel.ts';
 
@@ -29,7 +32,7 @@ export const isTestName = (name: string) => TEST_NAME.test(name);
 export const deniedSoul = (id: string | null | undefined, name: string | null | undefined) =>
   (!!id && DENY_SOUL_IDS.includes(id)) || (!!name && DENY_SOUL_NAMES.some(r => r.test(name)));
 
-type Deps = {db: Db; worldId: string; souls: Souls; inbox: AgentInbox; siteKey: string | undefined; log?: (line: string) => void};
+type Deps = {db: Db; worldId: string; souls: Souls; inbox: AgentInbox; god?: GodMode; siteKey: string | undefined; log?: (line: string) => void};
 type PendingRow = {id: string; name: string; agent_label: string; mode: string; status: string; account_id: string | null; target_account_id: string | null; created_at: number; expires_at: number};
 
 export function mountOperatorSouls(app: Hono, d: Deps) {
@@ -115,5 +118,20 @@ export function mountOperatorSouls(app: Hono, d: Deps) {
     await d.souls.operatorRetire(row.id);
     journal('delete', {soulId: row.id, name: row.name});
     return c.json({ok: true, soulId: row.id, name: row.name, retired: true});
+  });
+
+  app.post('/v1/op/god/pending', async c => {
+    if (!await gate(c)) return c.json({ok: false, code: 'not-found'}, 404);
+    return c.json({ok: true, pending: d.god?.pendingPairings() ?? [], owned: !!d.god?.owner});
+  });
+  app.post('/v1/op/god/approve', async c => {
+    const b = await gate(c); if (!b) return c.json({ok: false, code: 'not-found'}, 404);
+    const god = d.god ?? refuse('op.no-god', 'this world has no god mode', 409), code = str(b, 'code');
+    // never a first claim: the god pairs for the owner the world already has, exactly as their own approval would
+    if (!god.owner) refuse('op.unowned', 'this world has no owner yet: an operator never claims a world');
+    const agent = god.pendingPairings().find(p => p.code.replace(/[^A-Z0-9]/gi, '').toUpperCase() === code.replace(/[^A-Z0-9]/gi, '').toUpperCase())?.agent;
+    god.pairApprove({id: god.owner!, role: 'user'}, code);
+    journal('god-approve', {agent: agent ?? null});
+    return c.json({ok: true, approved: true});
   });
 }
