@@ -50,7 +50,7 @@ function crossesRay(w: ViewWedge, rx: number, rz: number, a: P2, b: P2): boolean
   const t = cross(qx, qz, ex, ez) / den, u = cross(qx, qz, rx, rz) / den;
   return t >= 0 && u >= 0 && u <= 1;
 }
-function segmentDistance(w: ViewWedge, a: P2, b: P2): number {
+export function segmentDistance(w: ViewWedge, a: P2, b: P2): number {
   const da = wedgeDistance(w, a[0], a[1]), db = wedgeDistance(w, b[0], b[1]);
   if (da === 0 || db === 0) return 0;
   // the two edge rays: forward rotated by +-half
@@ -73,15 +73,27 @@ export function shapeWedgeDistance(w: ViewWedge, pts: readonly P2[], closed: boo
 }
 
 type ViewKey = readonly [number, number] | { path: readonly P2[] } | { area: readonly P2[] } | null;
-/** Of the first `n` things of `list` (the near ones), those within their margin of the wedge come first; then the other
- *  near things, then the rest, each part in its old order. `first` = how many are in view. A thing with no key counts as
- *  in view. */
-export function viewFirst<T>(list: readonly T[], n: number, keyOf: (e: T) => ViewKey, marginOf: (e: T) => number, w: ViewWedge): { list: T[]; first: number } {
-  const seen: T[] = [], hidden: T[] = [];
-  for (let i = 0; i < n; i++) {
-    const e = list[i], k = keyOf(e);
-    const d = k === null ? 0 : 'path' in k ? shapeWedgeDistance(w, k.path, false) : 'area' in k ? shapeWedgeDistance(w, k.area, true) : wedgeDistance(w, (k as readonly number[])[0], (k as readonly number[])[1]);
-    (d <= (d === 0 ? 0 : marginOf(e)) ? seen : hidden).push(e);
+/** Is a thing at `key` (a point, a path or an area on the ground) within `r` of the wedge, or its shadow? `shadow` is the
+ *  ground offset of the shadow of its top (the sun's direction times its height): a point's shadow is the segment to
+ *  there, a shape's is the shape swept along it (checked at five steps, each widened by the gap between them). */
+export function keySeen(w: ViewWedge, key: ViewKey, r: number, shadow: readonly [number, number] = [0, 0]): boolean {
+  if (key === null) return true;
+  const [sx, sz] = shadow;
+  if (!('path' in key) && !('area' in key)) {
+    const p = key as readonly number[];
+    return wedgeDistance(w, p[0], p[1]) <= r || ((sx || sz) ? segmentDistance(w, [p[0], p[1]], [p[0] + sx, p[1] + sz]) <= r : false);
   }
-  return { list: [...seen, ...hidden, ...list.slice(n)], first: seen.length };
+  const pts = 'path' in key ? key.path : key.area, closed = 'area' in key, gap = Math.hypot(sx, sz) / 8;
+  for (const t of sx || sz ? [0, 0.25, 0.5, 0.75, 1] : [0]) {
+    const moved = t ? pts.map((q) => [q[0] + t * sx, q[1] + t * sz] as const) : pts;
+    if (shapeWedgeDistance(w, moved, closed) <= r + (t ? gap : 0)) return true;
+  }
+  return false;
+}
+/** The first `n` things of `list` (the near ones) that `seen` keeps come first; then the other near things, then the
+ *  rest, each part in its old order. `first` = how many are seen. */
+export function viewFirst<T>(list: readonly T[], n: number, seen: (e: T) => boolean): { list: T[]; first: number } {
+  const shown: T[] = [], hidden: T[] = [];
+  for (let i = 0; i < n; i++) (seen(list[i]) ? shown : hidden).push(list[i]);
+  return { list: [...shown, ...hidden, ...list.slice(n)], first: shown.length };
 }
