@@ -17,7 +17,9 @@ export function noticeInboxHeader(headers) {
 }
 
 /** What `listen` tells the agent to do with what it prints. */
-export const LISTEN_NEXT = 'From your human, oldest first. For each: ack <id> "Got it: <what you will do>" at once, do it, then result <id> done|failed "<what happened>". Then run listen again right away (it waits as long as needed).';
+export const LISTEN_NEXT = 'From your human, oldest first. 1) Ack them all now, one command: ack <id> "Got it: <what you will do>" && ack <next id> "…". 2) Start listen --after <last id> again right away, before the work (it waits as long as needed). 3) Do them in order (a newer one that replaces an older wins), waiting on actions with wait 60 (it returns when your human writes). 4) result <id> done|failed "<what happened>" for each.';
+/** 1.9.6: LISTEN_NEXT with the id the next listen starts after. */
+export const listenNext = lastId => LISTEN_NEXT.replace('<last id>', lastId);
 const transient = r => r.status === 0 || r.status === 429 || r.status >= 500;
 /** The messages one listen answer hands over: a 1.9.5 world's whole backlog, else (older world) its one latest. */
 function handed(data, after) {
@@ -57,7 +59,7 @@ export async function clientListen(args, { call, sleep = ms => new Promise(resol
     if (transient(r)) { delay = Math.min(30_000, delay ? delay * 2 : 1000); await sleep(delay); continue; }
     delay = 0;
     const messages = handed(inboxResult(r, 'listen'), after);
-    if (messages.length) { const at = new Date(now()).toISOString(); return { messages: messages.map(m => line(m, at)), waiting: messages.length, next: LISTEN_NEXT }; }
+    if (messages.length) { const at = new Date(now()).toISOString(); return { messages: messages.map(m => line(m, at)), waiting: messages.length, next: listenNext(messages.at(-1).id) }; }
     await sleep(50);
   }
 }

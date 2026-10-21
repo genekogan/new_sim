@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { clientListen, clientAck, clientResult, noticeOwnerInbox, noticeInboxHeader, LISTEN_NEXT } from './client-inbox.mjs';
+import { clientListen, clientAck, clientResult, noticeOwnerInbox, noticeInboxHeader, listenNext } from './client-inbox.mjs';
 import { listen, ack, here } from './eden-agent.mjs';
 import { clientHelp } from './client-help.mjs';
 import { readClientStream } from './client-stream.mjs';
@@ -18,7 +18,7 @@ test('Soul inbox listen keeps long-polling until a newer unacknowledged message 
   const fresh = envelope(latest('new'));
   const ctx = context([envelope(null), envelope(latest('read', 'acknowledged')), envelope(latest('old')), fresh]);
   ctx.now = () => Date.UTC(2026, 9, 20, 23, 0, 0);
-  assert.deepEqual(await clientListen(['--after', 'old', '--timeout', '5'], ctx), { messages: [{ id: 'new', text: 'Please visit the library.', sentAt: 1, emittedAt: '2026-10-20T23:00:00.000Z' }], waiting: 1, next: LISTEN_NEXT });
+  assert.deepEqual(await clientListen(['--after', 'old', '--timeout', '5'], ctx), { messages: [{ id: 'new', text: 'Please visit the library.', sentAt: 1, emittedAt: '2026-10-20T23:00:00.000Z' }], waiting: 1, next: listenNext('new') });
   assert.equal(ctx.calls.length, 4);
   assert.ok(ctx.calls.every(c => c.path === '/v1/edge/inbox/listen?timeoutMs=5000&after=old' && c.options.timeoutMs === 15000));
   assert.equal(ctx.sleeps.length, 3);
@@ -31,7 +31,7 @@ test('Soul inbox listen (1.9.5) blocks with no time limit, rides out outages, th
   const out = await clientListen([], { call: async (path, options) => { calls.push([path, options.timeoutMs]); return answers.shift(); }, sleep: async ms => sleeps.push(ms), now: () => 0 });
   assert.deepEqual(out.messages.map(m => m.text), ['go find the horses', 'hello?', 'can you ride the horse?']);
   assert.deepEqual(Object.keys(out), ['messages', 'waiting', 'next']); assert.deepEqual(Object.keys(out.messages[0]), ['id', 'text', 'sentAt', 'emittedAt']);
-  assert.equal(out.waiting, 3); assert.match(out.next, /ack <id>.*result <id>.*listen again/);
+  assert.equal(out.waiting, 3); assert.match(out.next, /Ack them all now.*ack <id>.*listen --after \S+ again right away, before the work.*result <id>/); assert.ok(out.next.includes(`--after ${out.messages.at(-1).id} `));
   assert.deepEqual(sleeps, [1000, 2000, 4000, 50], 'outages back off; an empty answer re-polls at once');
   assert.ok(calls.every(([path, ms]) => path === '/v1/edge/inbox/listen?timeoutMs=50000' && ms === 60000), 'default: 50 s long-polls, no cursor');
   await assert.rejects(clientListen([], { call: async () => ({ status: 401, data: { error: 'revoked' } }), sleep: async () => {} }), /HTTP 401/, 'a revoked credential is final');

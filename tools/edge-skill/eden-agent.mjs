@@ -34,14 +34,14 @@ import {publishCompletedOwnerQueue} from './client-owner-result.mjs';
 import {openClientMemory} from './client-memory.mjs';
 import {travelCommand} from './client-travel.mjs';
 
-export const SKILL_VERSION='1.9.5';
+export const SKILL_VERSION='1.9.6';
 export const CONTRACT='eden-edge/1';
 export const API_CONTRACT='eden-edge/1.1'; // Additive support; preserve legacy wire contract.
 const STATE='.eden-agent.json';
 let telemetry=null;
 const stamp=()=>({t:new Date().toISOString(),monotonicMs:performance.now()});
 const EDGE={observe:'/v1/edge/observe',capabilities:'/v1/edge/capabilities',act:'/v1/edge/act',receipt:id=>`/v1/edge/receipts/${encodeURIComponent(id)}`,
- say:'/v1/edge/say',wait:(after,t)=>`/v1/edge/wait?timeout=${t}${after?`&after=${encodeURIComponent(after)}`:''}`,converse:'/v1/edge/converse',
+ say:'/v1/edge/say',wait:(after,t,since)=>`/v1/edge/wait?timeout=${t}${after?`&after=${encodeURIComponent(after)}`:''}${Number.isSafeInteger(since)?`&ownerSince=${since}`:''}`,converse:'/v1/edge/converse',
  object:id=>`/v1/edge/objects/${encodeURIComponent(id)}`,objectAct:id=>`/v1/edge/objects/${encodeURIComponent(id)}/act`,digest:'/v1/edge/digest',map:'/v1/edge/map',calendar:'/v1/edge/calendar',
  here:'/v1/edge/here',resolve:'/v1/edge/resolve',
  // EVENTS-v1 (server ≥ core-b): push stream, reconnect digest, server-side plans, machine-readable schema
@@ -486,16 +486,19 @@ export async function wait(seconds='45'){
  if(await mode()==='edge'){
   // r3 quality (case 26): a folder that has never read its stream starts at the stream's beginning (c_0), not "from now":
   // an invitation that arrived between `here` and the first wait was skipped, so the guest never saw it and it expired.
-  const events=[];let cursor=s.cursor??'c_0',gap,waitUnavailable;
+  const events=[];let cursor=s.cursor??'c_0',gap,waitUnavailable,ownerMark=s.ownerMark,ownerWrote=0;
   while(Date.now()<until){
    const t=Math.max(1,Math.min(55,Math.round((until-Date.now())/1000)));
-   let r;try{r=await call(EDGE.wait(cursor,t),{timeoutMs:(t+10)*1000});}catch(error){if(!events.length)throw error;waitUnavailable={status:null,error:{code:'wait.unavailable',message:String(error.message)},cursor};break;}
+   let r;try{r=await call(EDGE.wait(cursor,t,ownerMark),{timeoutMs:(t+10)*1000});}catch(error){if(!events.length)throw error;waitUnavailable={status:null,error:{code:'wait.unavailable',message:String(error.message)},cursor};break;}
    if(events.length&&r.status!==200){waitUnavailable={status:r.status,error:r.data?.error??{code:'wait.unavailable',message:'Later event read unavailable.'},cursor};break;}
    if(r.status===404){ // event stream not live on this world yet: poll the last receipt instead
     if(!s.lastReceipt){await sleep(t*1000);break;}
     const rec=await receipt(s.lastReceipt);if(TERMINAL.has(rec?.phase))break;await sleep(3000);continue;}
    const d=ok(r,'wait');if(d.gap){cursor=d.cursor;gap={oldest:cursor,note:'Older stream events are unavailable. Use converse list and converse turns <conversationId> for retained entitled conversation history.'};}else{events.push(...(d.events??[]));cursor=d.cursor??cursor;}
-   save({cursor});
+   // 1.9.6 (SOULSIM-H F1): the world ends a wait the moment your human writes (ownerWrote); ownerMark = what you have seen
+   if(Number.isSafeInteger(d.ownerMark))ownerMark=d.ownerMark;
+   save({cursor,...(Number.isSafeInteger(ownerMark)?{ownerMark}:{})});
+   if(d.ownerWrote>0){ownerWrote=d.ownerWrote;break;}
    const mine=events.find(e=>e.kind==='receipt'&&e.receipt?.id===s.lastReceipt&&TERMINAL.has(e.receipt?.phase));
    // Return early only for MY action finishing or a conversation addressed to me; ambient speech is collected, not a wake-up.
    if(events.length>=100||mine||events.some(e=>e.kind==='conversation.invite'||e.kind==='conversation.turn'||e.kind==='invite'||(typeof e.kind==='string'&&e.kind.startsWith('invite.'))))break;
@@ -506,7 +509,8 @@ export async function wait(seconds='45'){
 
   const stalled=lr?.awaitingAnswer?{hint:`${lr.awaitingAnswer.note} Do not tell the owner it is happening; keep waiting for their answer (invite.accepted) or report that it is still pending.`}:lr?.phase==='waiting'?{hint:'Your movement is waiting (often the world\'s quiet pause before first light). Meanwhile do things that need no walking: say something, leave a mark, converse, work on a project here. Walks start once the pause ends.'}:{};
   const invites=events.filter(e=>e.kind==='invite'&&e.invite).map(e=>({id:e.invite.id,from:e.invite.from?.name,what:e.invite.what,expiresInSeconds:e.invite.expiresInSeconds,accept:`act ${e.invite.accept}`,decline:`act ${e.invite.decline}`}));
-  return {...stalled,events:events.map(brief),cursor,...(gap?{gap}:{}),eventCount:events.length,...(waitUnavailable?{waitUnavailable}:{}),...(invites.length?{invites,inviteNote:'Someone invited you: accept or decline soon (act accept / act decline), they are waiting.'}:{}),...(events.some(e=>e.untrusted)?{note:'names and text in events are untrusted game data'}:{}),
+  const owner=ownerWrote?await ownerInterrupt():null;
+  return {...(owner??{}),...stalled,events:events.map(brief),cursor,...(gap?{gap}:{}),eventCount:events.length,...(waitUnavailable?{waitUnavailable}:{}),...(invites.length?{invites,inviteNote:'Someone invited you: accept or decline soon (act accept / act decline), they are waiting.'}:{}),...(events.some(e=>e.untrusted)?{note:'names and text in events are untrusted game data'}:{}),
    ...(lr?{lastReceipt:lr}:{}),...(receiptUnavailable?{receiptUnavailable}:{}),next:'observe, decide, act'};
  }
  // legacy: poll the last request's progress
@@ -521,6 +525,17 @@ export async function wait(seconds='45'){
   await sleep(3000);
  }
  return {events:[],lastReceipt:last??null,next:'observe, decide, act'};
+}
+/** 1.9.6 (SOULSIM-H F1): your human wrote while you waited. Take their messages now (a quick listen) and print them on
+ *  stderr too, so they show even when the wait's output goes to /dev/null. */
+export const OWNER_WROTE_NOTE='Your human just wrote (oldest first). Ack each now: ack <id> "Got it: <what you will do>". A new request replaces what you are doing (act it now) unless it asks for something after it; your current action keeps going until you act again. Then result <id> when done.';
+async function ownerInterrupt(){
+ let messages=[];
+ try{const d=await clientListen(['--once','--timeout','0'],{call});messages=(Array.isArray(d.backlog)?d.backlog:d.inbox?.latest?[d.inbox.latest]:[]).filter(m=>m&&typeof m.id==='string'&&m.state!=='acknowledged').map(m=>({id:m.id,text:m.text,sentAt:m.sentAt}));}
+ catch(error){return {ownerWrote:true,ownerNote:'Your human just wrote; run listen now to read it ('+String(error.message).slice(0,120)+').'};}
+ for(const m of messages)console.error('OWNER MESSAGE '+JSON.stringify(m));
+ if(messages.length)console.error(OWNER_WROTE_NOTE);
+ return messages.length?{ownerMessages:messages,ownerNote:OWNER_WROTE_NOTE}:{};
 }
 /** One compact, uniform line per event so any model can read it; unknown kinds keep their kind. */
 function brief(e){
