@@ -15,7 +15,7 @@
 //    just that hop's tiles, so a route never depends on how far the window has grown.
 import { datan2, hypot, obbCorners, pointInObb, type Vec2 } from '../core/math.ts';
 import { BODY_HEIGHT, STEP, buildGrids, buildGridsOverFloors, edt, gridContentKeys, latticeCentre, latticeIndex, latticeOf, obbRange, rasterObb, type GridSet, type LevelGrid } from './grid.ts';
-import { findRoute, type Leg, type Place, type RouteOpts, type RouteResult, type WalkLeg } from './path.ts';
+import { findRoute, linkApproach, type Leg, type Place, type RouteOpts, type RouteResult, type WalkLeg } from './path.ts';
 import type { AgentProfile, Obstacle, SpatialScene, Surface } from './types.ts';
 import { GROUND_TILE_M, G_OUTSIDE, G_STEEP, G_SWIM, G_WADE, G_WALK, MEDIUM_NAMES, coarseMedium, type GroundField } from './ground.ts';
 
@@ -697,6 +697,8 @@ export function groundRoute(nav: GroundNav, scene: SpatialScene, profile: AgentP
   // the coarse search looks 48 m around the straight line first, then wider (a way round a long cliff)
   const path = nav.coarsePath(start.p, goal.p, WALK_COST) ?? nav.coarsePath(start.p, goal.p, WALK_COST, 160, 2_000_000);
   if (!path) {
+    const d = groundLinkDetour(nav, scene, profile, start, goal, opts, (r) => (include(r) ? windowGrids() : null), false);
+    if (d) return d;
     const alt = nav.coarsePath(start.p, goal.p, EXPLAIN_COST, 96);
     if (alt) for (const q of alt) {
       const m = coarseMedium(f, q[0], q[1]);
@@ -730,6 +732,50 @@ export function groundRoute(nav: GroundNav, scene: SpatialScene, profile: AgentP
   return { ok: true, route: { legs, length, expanded } };
 }
 
+/** A same-level flight's ends this close (m) to the start or the goal are tried when the coarse ground search finds no way. */
+export const LINK_DETOUR_M = 60;
+/**
+ * door-stairs/1 (lane SW): the coarse ground search walks no links, so a goal (or a start) on a hillside pocket that only a
+ * level-0 -> level-0 flight joins to the paths (a door landing above a bank, a terrace) had no route although the fine
+ * planner walks that flight. Only when the coarse search found nothing: the nearest usable ground flights (both ends on
+ * level 0, an end within LINK_DETOUR_M of the start or the goal) whose near approach the coarse search reaches from the
+ * start and whose far approach reaches the goal. Close enough, one fine route over a window holding both and the flight
+ * (links kept); farther, paged: walk toward the flight (the route carries `rest`, the real goal, so the walker plans on
+ * through the flight); unpaged: the whole window when it may grow that far. Null: no flight helps (the old diagnostic).
+ */
+function groundLinkDetour(nav: GroundNav, scene: SpatialScene, profile: AgentProfile, start: Place, goal: Place, opts: RouteOpts, gridsFor: (r: TileRect) => GridSet | null, paged: boolean): RouteResult | null {
+  const near = (p: Vec2) => Math.min(hypot(p[0] - start.p[0], p[1] - start.p[1]), hypot(p[0] - goal.p[0], p[1] - goal.p[1]));
+  const cands = scene.links
+    .filter((l) => l.usable && l.from.level === 0 && l.to.level === 0 && Math.min(near(l.from.p), near(l.to.p)) <= LINK_DETOUR_M)
+    .sort((a, b) => Math.min(near(a.from.p), near(a.to.p)) - Math.min(near(b.from.p), near(b.to.p)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .slice(0, 4);
+  for (const link of cands) for (const ascending of [true, false]) {
+    const p = linkApproach(link, ascending).approach, q = linkApproach(link, !ascending).approach;
+    if (!nav.coarsePath(start.p, p, WALK_COST) || !nav.coarsePath(q, goal.p, WALK_COST)) continue;
+    const pts = [start.p, goal.p, p, q];
+    if (hypot(goal.p[0] - start.p[0], goal.p[1] - start.p[1]) <= PAGED_DIRECT_M || !paged) {
+      const r = rectOf(pts), grids = gridsFor(r);
+      if (!grids) continue;
+      const res = findRoute(grids, paged ? { ...scene, bounds: rectBounds(r) } : scene, profile, start, goal, opts);
+      if (res.ok) return res;
+      continue;
+    }
+    // far, standing by the flight: up (or down) it to its far approach, then on to the goal
+    if (hypot(p[0] - start.p[0], p[1] - start.p[1]) <= PAGED_DIRECT_M) {
+      const r = rectOf([start.p, p, q]), grids = gridsFor(r);
+      if (!grids) continue;
+      const res = findRoute(grids, { ...scene, bounds: rectBounds(r) }, profile, start, { level: 0, p: q }, { ...opts, goalTolerance: 2.5 });
+      if (res.ok) return { ok: true, route: { ...res.route, length: res.route.length + hypot(goal.p[0] - q[0], goal.p[1] - q[1]), rest: goal } };
+      continue;
+    }
+    // far: the first chunk toward the flight's near approach; the walker follows on to the goal (through the flight)
+    const res = pagedRoute(nav, scene, profile, start, { level: 0, p }, { ...opts, goalTolerance: 2.5 }, true);
+    if (!res.ok) continue;
+    return { ok: true, route: { ...res.route, length: res.route.length + hypot(goal.p[0] - p[0], goal.p[1] - p[1]), rest: goal } };
+  }
+  return null;
+}
+
 /** Paged: start and goal this close (m) are routed in one go (any levels); farther, a chunk at a time on level 0. */
 export const PAGED_DIRECT_M = 72;
 
@@ -738,7 +784,7 @@ export const PAGED_DIRECT_M = 72;
  * its first hop is planned fine; the route then carries `rest` (the real goal) and the walker plans the next chunk before
  * it reaches the end of this one. A goal on another level is approached on level 0 until it is within PAGED_DIRECT_M.
  */
-export function pagedRoute(nav: GroundNav, scene: SpatialScene, profile: AgentProfile, start: Place, goal: Place, opts: RouteOpts): RouteResult {
+export function pagedRoute(nav: GroundNav, scene: SpatialScene, profile: AgentProfile, start: Place, goal: Place, opts: RouteOpts, detouring = false): RouteResult {
   const f = nav.field, direct = hypot(goal.p[0] - start.p[0], goal.p[1] - start.p[1]) <= PAGED_DIRECT_M;
   if (start.level !== 0 || goal.level !== 0) {
     if (direct) { const r = rectOf([start.p, goal.p]); return findRoute(nav.gridsOver(r, scene), { ...scene, bounds: rectBounds(r) }, profile, start, goal, opts); }
@@ -751,6 +797,10 @@ export function pagedRoute(nav: GroundNav, scene: SpatialScene, profile: AgentPr
   if (sm === G_SWIM) return failR('ground.in-water', `you are swimming (${fmt(start.p)}); swim to the shore before walking`, start);
   const path = nav.coarsePath(start.p, goal.p, WALK_COST) ?? nav.coarsePath(start.p, goal.p, WALK_COST, 160, 2_000_000);
   if (!path) {
+    if (start.level === 0 && goal.level === 0 && !detouring) {
+      const d = groundLinkDetour(nav, scene, profile, start, goal, opts, (r) => nav.gridsOver(r, scene), true);
+      if (d) return d;
+    }
     const alt = nav.coarsePath(start.p, goal.p, EXPLAIN_COST, 96);
     if (alt) for (const q of alt) {
       const m = coarseMedium(f, q[0], q[1]);
