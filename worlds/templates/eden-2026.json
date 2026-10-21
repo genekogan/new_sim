@@ -8910,7 +8910,7 @@
             -60.915,
             -81.575
           ],
-          "r": -2.469,
+          "r": -2.72,
           "params": {
             "wall": "#3d8ab0",
             "trim": "#f3eee2",
@@ -8952,7 +8952,7 @@
             -87.904,
             -82.262
           ],
-          "r": 2.418,
+          "r": 2.72,
           "params": {
             "wall": "#5aa070",
             "trim": "#f3eee2",
@@ -9152,7 +9152,7 @@
             "trim": "#1f5fa8",
             "roofColor": "#8a3b2a",
             "w": 4.525,
-            "d": 4.014,
+            "d": 4.5,
             "floors": 2,
             "floorHeight": 2.7,
             "material": "plaster",
@@ -9311,7 +9311,7 @@
             "trim": "#16508f",
             "roofColor": "#8a3b2a",
             "w": 6.423,
-            "d": 4.126,
+            "d": 4.5,
             "floors": 2,
             "floorHeight": 2.7,
             "material": "plaster",
@@ -9490,7 +9490,7 @@
             "trim": "#1f5fa8",
             "roofColor": "#8a3b2a",
             "w": 5.65,
-            "d": 4.699,
+            "d": 5.0,
             "floors": 2,
             "floorHeight": 2.7,
             "material": "plaster",
@@ -13353,9 +13353,9 @@
             "slot": "parlour"
           },
           "p": [
-            -0.658,
+            -0.98,
             0,
-            -1.476
+            -1.6
           ],
           "r": 1.571
         },
