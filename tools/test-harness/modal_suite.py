@@ -23,6 +23,12 @@ NODE = os.environ.get("REMOTE_SUITE_NODE", "22")
 image = (
     modal.Image.from_registry(f"node:{NODE}-bookworm", add_python="3.12")
     .apt_install("git", "perl", "bsdextrautils", "lsof", "procps", "curl", "build-essential")
+    # restic 0.16.4 = eden2's apt version (Ubuntu 24.04), so backup-restic.test.mjs runs against the flags production has
+    # (bookworm's apt restic is 0.14). Upstream release binary, pinned by its published sha256 (lane BK, 2026-10-20).
+    .run_commands("curl -fsSL -o /tmp/restic.bz2 https://github.com/restic/restic/releases/download/v0.16.4/restic_0.16.4_linux_amd64.bz2"
+                  " && echo '3d4d43c169a9e28ea76303b1e8b810f0dcede7478555fdaa8959971ad499e324  /tmp/restic.bz2' | sha256sum -c -"
+                  " && bunzip2 -c /tmp/restic.bz2 > /usr/local/bin/restic && chmod 755 /usr/local/bin/restic && rm /tmp/restic.bz2"
+                  " && restic version")
     # Node 25+ images ship no corepack: install the same pnpm with npm there (the Node 22 image command is unchanged)
     .run_commands("corepack enable && corepack prepare pnpm@10.27.0 --activate && pnpm --version" if int(NODE.split(".")[0]) < 25
                   else "npm install -g pnpm@10.27.0 && pnpm --version")

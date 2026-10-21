@@ -1,5 +1,5 @@
 // Lane BK: versioned nightly backups (deploy/backup-restic.mjs) against a real local restic repository.
-// Skips when restic is not installed (eden2 gets it from apt; the laptop from Homebrew).
+// Skips when restic is not installed (eden2: apt 0.16.4; the Modal gate image pins the same 0.16.4; the laptop: Homebrew).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
