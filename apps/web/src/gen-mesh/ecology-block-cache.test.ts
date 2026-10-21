@@ -79,3 +79,21 @@ test('a building or kit thing is added only within its own reach of a scatter, a
   assert.ok(seen.includes('next-door') && seen.includes('hall') && seen.includes('bench-by') && !seen.includes('down-the-road') && !seen.includes('bench-over'), seen.join());
   for (let x = -2; x <= 32; x += 0.25) for (let z = -2; z <= 32; z += 0.25) assert.equal(regional(x, z), whole(x, z), `${x},${z}`);
 });
+
+// t4-phone: furniture in a house's rooms is inside the floor plan the house blocks whole: no pose or bake of its own, and the
+// index blocks exactly the same ground
+test('things in a building room add no blocks of their own; the building still blocks them', async () => {
+  const { blockCellsOf, BLOCK_CELL } = await import('./ecology.mesh.ts');
+  const { blockTest } = await import('./block-test.ts');
+  const ops = [{ op: 'place', def: 'core/house@1', name: 'house', p: [15, 15], params: { w: 9, d: 8, style: 'cottage' } },
+    { op: 'place', def: 'core/woodland@1', name: 'wood', shape: { area: [[0, 0], [30, 0], [30, 30], [0, 30]] } }];
+  const w = world(); const r = applyBatch(w, { ops } as never, 'god', 0) as { result: { accepted: boolean } }; assert.equal(r.result.accepted, true, JSON.stringify(r.result));
+  const house = w.get('house')!, room = w.slotsOf(house).find((s) => s.kind === 'room');
+  assert.ok(room, 'the cottage has rooms');
+  const r2 = applyBatch(w, { ops: [{ op: 'place', def: 'core/chair@1', name: 'chair', in: { parent: house.id, slot: room.id } }] } as never, 'god', 0) as { result: { accepted: boolean } };
+  assert.equal(r2.result.accepted, true, JSON.stringify(r2.result));
+  const seen: string[] = []; const fp = w.footprint.bind(w); w.footprint = ((e: { name?: string }, ...x: unknown[]) => { seen.push(e.name ?? ''); return (fp as (...y: unknown[]) => never)(e, ...x); }) as never;
+  const test = blockTest(blockCellsOf(w), BLOCK_CELL, w.get('wood')!.id);
+  assert.ok(seen.includes('house') && !seen.includes('chair'), seen.join());
+  assert.equal(test(15, 15), true);
+});

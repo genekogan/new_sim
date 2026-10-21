@@ -84,9 +84,15 @@ export function blockedBy(model: WorldModel, self: Entity, pad = 0.6): (x: numbe
   if (area?.length) { region = [Infinity, Infinity, -Infinity, -Infinity]; for (const [x, z] of area) { region[0] = Math.min(region[0], x); region[1] = Math.min(region[1], z); region[2] = Math.max(region[2], x); region[3] = Math.max(region[3], z); } }
   return blockTest(blockCellsOf(model, pad, region), BLOCK_CELL, self.id);
 }
+const OUTSIDE_SLOTS = new Set(['front', 'porch', 'balcony']);
 function addBlocks(model: WorldModel, e: Entity, pad: number, cells: BlockCells, C = BLOCK_CELL): void {
   const put = (x0: number, z0: number, x1: number, z1: number, s: BlockShape) => { for (let gz = Math.floor(z0 / C); gz <= Math.floor(z1 / C); gz++) for (let gx = Math.floor(x0 / C); gx <= Math.floor(x1 / C); gx++) { const k = `${gx},${gz}`; const l = cells.get(k); if (l) l.push(s); else cells.set(k, [s]); } };
   {
+    // t4-phone: a thing in a building's room or floor stands inside its floor plan, which the building blocks whole (below):
+    // no slot pose or bake for it (Eden 2026: ~3,200 pieces of furniture; their poses bake every house's layout). The
+    // front stand, porch, balcony and wall hang points are outside that plan and keep their own.
+    const slot = e.in.slot;
+    if (slot && !OUTSIDE_SLOTS.has(slot) && !slot.startsWith('wall-') && e.in.parent !== 'world') { const up = model.get(e.in.parent), ud = up && model.resolvedDef(up.def); if (ud && ud.make.kind === 'gen' && ud.make.gen === 'building/1') return; }
     const d = model.resolvedDef(e.def); if (!d) return;
     const gen = d.make.kind === 'gen' ? d.make.gen : '';
     if (gen === 'scatter/1' || gen === 'scatter/2' || gen === 'landform/1' || gen === 'lake/1' || gen === 'river/1' || gen.startsWith('cliff') || gen.startsWith('terrace') || gen.startsWith('brush') || gen.startsWith('channel') || gen === 'lawn/1' || gen === 'shore/1') return;
