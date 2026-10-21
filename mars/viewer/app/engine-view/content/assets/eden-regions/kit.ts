@@ -52,6 +52,10 @@ const col=(c:Col)=>{if(c instanceof THREE.Color)return c;let v=COLS.get(c);if(!v
 /** Thin/flat dressing that never blocks a camera sightline (walls/roofs/stone/timber stay opaque). */
 export const SEE_THROUGH:readonly MatKey[]=['glass','path','flower','cloth','metal','soil','water','foliage'];
 /** Per-material triangle soup with a transform stack. */
+type Buf={p:number[];n:number[];c:number[]};
+/** Appends triangle t (9 floats each of position, normal, colour) of A to B. */
+function moveTri(A:Buf,B:Buf,t:number){const p=A.p,n=A.n,c=A.c;
+ B.p.push(p[t],p[t+1],p[t+2],p[t+3],p[t+4],p[t+5],p[t+6],p[t+7],p[t+8]);B.n.push(n[t],n[t+1],n[t+2],n[t+3],n[t+4],n[t+5],n[t+6],n[t+7],n[t+8]);B.c.push(c[t],c[t+1],c[t+2],c[t+3],c[t+4],c[t+5],c[t+6],c[t+7],c[t+8]);}
 export class Builder{
  readonly authoring:'authored'|'legacy'|'decorative';
  private drawingAuthored=false;
@@ -82,7 +86,7 @@ export class Builder{
  b(k:MatKey){let b=this.buf.get(k);if(!b)this.buf.set(k,b={p:[],n:[],c:[]});return b;}
  tri(k:MatKey,a:number[],b:number[],c:number[],color:Col){if(this.authoring==='authored'&&!this.drawingAuthored)throw Error('authored-geometry.requires-authoredBox-or-explicit-legacy/decorative');const B=this.b(k),C=col(color);_a.fromArray(a).applyMatrix4(this.m);_b.fromArray(b).applyMatrix4(this.m);_c.fromArray(c).applyMatrix4(this.m);
   _e1.subVectors(_b,_a);_e2.subVectors(_c,_a);_n.crossVectors(_e1,_e2);if(_n.lengthSq()<1e-14)return;_n.normalize();
-  B.p.push(_a.x,_a.y,_a.z,_b.x,_b.y,_b.z,_c.x,_c.y,_c.z);for(let i=0;i<3;i++){B.n.push(_n.x,_n.y,_n.z);B.c.push(C.r,C.g,C.b);}}
+  B.p.push(_a.x,_a.y,_a.z,_b.x,_b.y,_b.z,_c.x,_c.y,_c.z);const nx=_n.x,ny=_n.y,nz=_n.z,r=C.r,g=C.g,bl=C.b;B.n.push(nx,ny,nz,nx,ny,nz,nx,ny,nz);B.c.push(r,g,bl,r,g,bl,r,g,bl);}
  quad(k:MatKey,a:number[],b:number[],c:number[],d:number[],color:Col){this.tri(k,a,b,c,color);this.tri(k,a,c,d,color);}
  /** Axis-aligned (local) box from min corner extents. bottom=false skips the underside. */
  box(k:MatKey,cx:number,y0:number,cz:number,sx:number,sy:number,sz:number,color:Col,bottom=false){const x0=cx-sx/2,x1=cx+sx/2,z0=cz-sz/2,z1=cz+sz/2,y1=y0+sy;
@@ -110,7 +114,7 @@ export class Builder{
  disc(k:MatKey,cx:number,y:number,cz:number,r:number,seg:number,color:Col){for(let i=0;i<seg;i++){const a=i/seg*Math.PI*2,b=(i+1)/seg*Math.PI*2;this.tri(k,[cx,y,cz],[cx+Math.cos(b)*r,y,cz+Math.sin(b)*r],[cx+Math.cos(a)*r,y,cz+Math.sin(a)*r],color);}}
  /** Moves every triangle to the builder chosen by its centroid (glass to the windows sink, far parts to the
   * distant sink, the rest to its sector) so many small districts share a few draws and ray objects. */
-  drain(route:(cx:number,cz:number,k:MatKey)=>Builder){for(const [k,B] of this.buf){for(let t=0;t<B.p.length;t+=9){const T=route((B.p[t]+B.p[t+3]+B.p[t+6])/3,(B.p[t+2]+B.p[t+5]+B.p[t+8])/3,k).b(k);for(let i=t;i<t+9;i++){T.p.push(B.p[i]);T.n.push(B.n[i]);T.c.push(B.c[i]);}}}this.buf.clear();for(const b of this.boundaries)route(b.c[0],b.c[2],b.kind==='guard'?'metal':'stone').boundaries.push(b);this.boundaries.length=0;}
+  drain(route:(cx:number,cz:number,k:MatKey)=>Builder){for(const [k,B] of this.buf){const p=B.p;for(let t=0;t<p.length;t+=9){const T=route((p[t]+p[t+3]+p[t+6])/3,(p[t+2]+p[t+5]+p[t+8])/3,k).b(k);moveTri(B,T,t);}}this.buf.clear();for(const b of this.boundaries)route(b.c[0],b.c[2],b.kind==='guard'?'metal':'stone').boundaries.push(b);this.boundaries.length=0;}
  /** Emits one mesh per material into group; returns triangle count. */
  emit(group:THREE.Group,mats:Materials,name:string,geos:THREE.BufferGeometry[],opts:{transparent?:MatKey[];splitX?:number;far?:(x:number,z:number)=>boolean;farSink?:Builder;allClear?:boolean;glassSink?:Builder}={}){let tris=0;
   group.userData.edenAuthoredBoundaries=[...(group.userData.edenAuthoredBoundaries??[]),...this.boundaries.map(b=>({...b,c:[...b.c],half:[...b.half]}))];
@@ -120,14 +124,14 @@ export class Builder{
   // Far triangles (that can never stand between a Broadcast camera and a subject) move to a shared sink that is
   // emitted once for all districts, camera-transparent; the rest may split by x to keep bounding spheres local.
   if(opts.far&&opts.farSink){for(const [k,B] of this.buf){if(k==='water')continue;const keep={p:[] as number[],n:[] as number[],c:[] as number[]},F=opts.farSink.b(k);
-    for(let t=0;t<B.p.length;t+=9){const cx=(B.p[t]+B.p[t+3]+B.p[t+6])/3,cz=(B.p[t+2]+B.p[t+5]+B.p[t+8])/3,T=opts.far(cx,cz)?F:keep;for(let i=t;i<t+9;i++){T.p.push(B.p[i]);T.n.push(B.n[i]);T.c.push(B.c[i]);}}
+    for(let t=0;t<B.p.length;t+=9){const cx=(B.p[t]+B.p[t+3]+B.p[t+6])/3,cz=(B.p[t+2]+B.p[t+5]+B.p[t+8])/3,T=opts.far(cx,cz)?F:keep;moveTri(B,T,t);}
     this.buf.set(k,keep);}}
   // Small see-through dressing (glass, metal, cloth, flowers, beds, paths) shares one draw: it never gets realism finishes anyway.
   const d=this.buf.get('dressing')??{p:[] as number[],n:[] as number[],c:[] as number[]};for(const k of SEE_THROUGH){if(k==='water')continue;const B=this.buf.get(k);if(!B)continue;for(let i=0;i<B.p.length;i++){d.p.push(B.p[i]);d.n.push(B.n[i]);d.c.push(B.c[i]);}this.buf.delete(k);}
   if(d.p.length)this.buf.set('dressing',d);
   const parts:[MatKey,{p:number[];n:number[];c:number[]},string][]=[];
   for(const [k,B] of this.buf){if(opts.splitX===undefined||k==='dressing'||k==='water'){parts.push([k,B,'']);continue;}const A={p:[] as number[],n:[] as number[],c:[] as number[]},C={p:[] as number[],n:[] as number[],c:[] as number[]};
-   for(let t=0;t<B.p.length;t+=9){const T=(B.p[t]+B.p[t+3]+B.p[t+6])/3<opts.splitX?A:C;for(let i=t;i<t+9;i++){T.p.push(B.p[i]);T.n.push(B.n[i]);T.c.push(B.c[i]);}}parts.push([k,A,' west'],[k,C,' east']);}
+   for(let t=0;t<B.p.length;t+=9){const T=(B.p[t]+B.p[t+3]+B.p[t+6])/3<opts.splitX?A:C;moveTri(B,T,t);}parts.push([k,A,' west'],[k,C,' east']);}
   for(const [k,B,suffix] of parts){if(!B.p.length)continue;const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(B.p,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(B.n,3));g.setAttribute('color',new THREE.Float32BufferAttribute(B.c,3));g.computeBoundingBox();g.computeBoundingSphere();geos.push(g);
    const mesh=new THREE.Mesh(g,mats.get(k));mesh.name=name+' / '+mats.get(k).name.replace('Regions ','')+suffix;mesh.receiveShadow=k!=='glass'&&k!=='water';mesh.castShadow=false;mesh.userData.edenWindRooted=false;
    if(opts.allClear||k==='dressing'||(opts.transparent??SEE_THROUGH).includes(k))mesh.userData.cameraTransparent=true;

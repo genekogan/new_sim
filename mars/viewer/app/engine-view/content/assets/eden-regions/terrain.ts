@@ -81,6 +81,9 @@ export class Terrain{
  private grid:Map<number,number[]>|null=null;private gridN=0;private boxes=new WeakMap<object,number[]>();
  private padCell(x:number,z:number){if(!this.grid||this.gridN!==this.pads.length){const g=new Map<number,number[]>();this.pads.forEach((p,i)=>{for(let cx=Math.floor((p.x0-p.m)/24);cx<=Math.floor((p.x1+p.m)/24);cx++)for(let cz=Math.floor((p.z0-p.m)/24);cz<=Math.floor((p.z1+p.m)/24);cz++){const k=cx*4096+cz;let l=g.get(k);if(!l)g.set(k,l=[]);l.push(i);}});this.grid=g;this.gridN=this.pads.length;}
   return this.grid.get(Math.floor(x/24)*4096+Math.floor(z/24));}
+ // Each road's bbox grown by its half width and fall (the same sums the test used), rebuilt when roads are added.
+ private roadBox=new Float64Array(0);private roadBoxN=-1;
+ private roadBounds(){if(this.roadBoxN!==this.roads.length){const a=new Float64Array(this.roads.length*4);this.roads.forEach((rd,i)=>{const bb=this.bbox(rd);a[i*4]=bb[0]-rd.half-rd.fall;a[i*4+1]=bb[1]-rd.half-rd.fall;a[i*4+2]=bb[2]+rd.half+rd.fall;a[i*4+3]=bb[3]+rd.half+rd.fall;});this.roadBox=a;this.roadBoxN=this.roads.length;}return this.roadBox;}
  private bbox(o:{pts:[number,number][]}){let b=this.boxes.get(o);if(!b){b=[Infinity,Infinity,-Infinity,-Infinity];for(const [x,z] of o.pts){b[0]=Math.min(b[0],x);b[1]=Math.min(b[1],z);b[2]=Math.max(b[2],x);b[3]=Math.max(b[3],z);}this.boxes.set(o,b);}return b;}
  /** Basins cut after pads (ponds): each returns a depth <0 or 0. */
  cuts:((x:number,z:number)=>number)[]=[];
@@ -103,7 +106,7 @@ export class Terrain{
  /** Final visual height. */
  height(x:number,z:number){const d=outside(x,z);if(d<=0)return this.edge(x,z);
   let h=relief(x,z);const cell=this.padCell(x,z);if(cell)for(const i of cell){const p=this.pads[i];const dx=Math.max(p.x0-x,0,x-p.x1),dz=Math.max(p.z0-z,0,z-p.z1),w=1-sm(0,p.m,Math.hypot(dx,dz));if(w>0)h=h+(p.y-h)*w;}
-  for(const rd of this.roads){const bb=this.bbox(rd);if(x<bb[0]-rd.half-rd.fall||x>bb[2]+rd.half+rd.fall||z<bb[1]-rd.half-rd.fall||z>bb[3]+rd.half+rd.fall)continue;let best=1e9,bx=0,bz=0;const P=rd.pts;for(let i=1;i<P.length;i++){const [ax,az]=P[i-1],[cx,cz]=P[i],dx=cx-ax,dz=cz-az,L2=dx*dx+dz*dz,u=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/L2)),qx=ax+dx*u,qz=az+dz*u,dd=Math.hypot(x-qx,z-qz);if(dd<best){best=dd;bx=qx;bz=qz;}}
+  const RB=this.roadBounds();for(let ri=0;ri<this.roads.length;ri++){const q=ri*4;if(x<RB[q]||x>RB[q+2]||z<RB[q+1]||z>RB[q+3])continue;const rd=this.roads[ri];let best=1e9,bx=0,bz=0;const P=rd.pts;for(let i=1;i<P.length;i++){const [ax,az]=P[i-1],[cx,cz]=P[i],dx=cx-ax,dz=cz-az,L2=dx*dx+dz*dz,u=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/L2)),qx=ax+dx*u,qz=az+dz*u,dd=Math.hypot(x-qx,z-qz);if(dd<best){best=dd;bx=qx;bz=qz;}}
    if(best<rd.half+rd.fall){const w=1-sm(rd.half,rd.half+rd.fall,best);h=h+((rd.padded?this.paddedAt(bx,bz):this.natural(bx,bz))-h)*w;}}
   for(const c of this.cuts){const d=c(x,z);if(d<0)h=Math.min(h,d);}
   if(this.rivers.length){const rv=this.riverAt(x,z,14);if(rv){const bed=rv.level-1.1*(1-sm(rv.half*.6,rv.half+.4,rv.d)),bank=rv.level+.25+Math.max(0,rv.d-rv.half)*.8;h=Math.min(h,rv.d<rv.half+.4?bed:Math.max(bed,bank));}}
