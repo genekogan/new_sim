@@ -183,9 +183,12 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
           const spotR = way.pose ? SPOT_R : SPOT_R + RASTER_SLOP.conservative, spots = seats.flat().map((q) => ({ pts: [q], r: spotR }));
           const { keys, was } = w, now = w.grid.plus(bx).labels([...keys, ...own, ...spots], { cells: w.at.cells });
           const doorLabel = new Set(keysOf(room).map((_, i) => now[i]));
-          // a seat or a bed is reached at its standing spots (below), where the use-check stands a body; any other piece at
-          // its approach (the free spot nearest it)
-          const doorsReach = sits(ib) || now.slice(keys.length, keys.length + own.length).every((l) => doorLabel.has(l));
+          // a piece is reached at its approach (the free spot nearest its front), where the walk audit sends a Soul; laid out
+          // with no world pose (library contents, vocab-w3 layOut) a seat or a bed is reached at its standing spots (below)
+          // instead: the exact-clearance grid's front key there dropped every dining and school chair. (Placed in the world,
+          // the relaxed rule put 166 more pieces in the fuzz walk world, 65 of them bad: chapel pews, office and townhouse
+          // seats and beds whose front stands in a pocket; the engine's seatApproach stands a body at the first clear spot.)
+          const doorsReach = (sits(ib) && !way.pose) || now.slice(keys.length, keys.length + own.length).every((l) => doorLabel.has(l));
           if (pairsOf(now, keys.length) < pairsOf(was) || !doorsReach) { why = doorsReach ? 'would cut the way to its doors or another piece' : 'no way to it from the doors'; continue; }
           const owner = [...slides.map(() => null), ...held.flatMap((h) => h.slides.map(() => h.t.name))];
           let k = keys.length + own.length;
