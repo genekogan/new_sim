@@ -24,7 +24,9 @@ const RECIPES = resolve(here, '../recipes/furnish');
 const FRONT_YAW = { s: 0, e: Math.PI / 2, n: Math.PI, w: -Math.PI / 2 };
 const FACE_YAW = { s: 0, e: Math.PI / 2, n: Math.PI, w: -Math.PI / 2 };
 const r3 = (v) => Math.round(v * 1000) / 1000;
-const SLIDE_KEY_R = 0.15;   // a seat's slide spot counts as reached when a walk-raster cell within this of it is (lane FUZZ2)
+// a seat's or bed's standing spot (lane FUZZ2) is where the use-check stands a body: the walk-raster cell it is in must be free
+const SPOT_R = 0.071;
+const sits = (b) => (b.slots ?? []).some((x) => x.kind === 'seat' || x.kind === 'bed' || x.kind === 'berth');
 const itemBoxes = (baked, p, y, yaw) => {
   const c = Math.cos(yaw), s = Math.sin(yaw);
   const boxes = baked.colliders ?? [{ c: [0, 0], half: [baked.box[0] / 2, baked.box[2] / 2], yaw: 0, y0: 0, y1: baked.box[1] }];
@@ -94,7 +96,7 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
     const cb = model.bake(cd, ch.params ?? {}, ch.seed ?? 0), lp = ch.p ?? [0, 0], lx = lp[0], lz = lp[lp.length - 1];
     const yaw = typeof ch.r === 'number' ? ch.r : Array.isArray(ch.r) ? ch.r[0] : 0;
     const at0 = [room.origin[0] + lx, room.origin[1] + lz], y0 = room.y + (lp.length === 3 ? lp[1] : 0);
-    taken.push({ floor: room.floor, solid: cb.box[1] > 0.06, boxes: itemBoxes(cb, at0, y0, yaw), foot: { c: at0, half: [cb.box[0] / 2, cb.box[2] / 2], yaw, y0, y1: y0 + cb.box[1] }, approach: approachKeys(cb, at0, yaw, SEAT_FAR) });
+    taken.push({ floor: room.floor, solid: cb.box[1] > 0.06, boxes: itemBoxes(cb, at0, y0, yaw), foot: { c: at0, half: [cb.box[0] / 2, cb.box[2] / 2], yaw, y0, y1: y0 + cb.box[1] }, approach: approachKeys(cb, at0, yaw, SEAT_FAR), sit: sits(cb) ? { ib: cb, at: at0, yaw, y: room.y } : null, room: room.id, name: ch.name });
   }
   for (const room of baked.rooms) {
     if (want && !want.has(room.id)) continue;
@@ -122,7 +124,7 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
       const ax0 = cxm - ((cxm - x0) * k), ax1 = cxm + ((x1 - cxm) * k), az0 = czm - ((czm - z0) * k), az1 = czm + ((z1 - czm) * k);
       // candidate poses: `try` lists [fx, fz, face] in order of preference; the first clear one wins
       const tries = it.try ?? [[...(it.at ?? [0.5, 0.5]), it.face ?? 's']];
-      let why = 'no pose fits', box = null, boxes = [], at = null, yaw = 0;
+      let why = 'no pose fits', box = null, boxes = [], at = null, yaw = 0, placedSlides = null;
       for (const [fx, fz, face = 's'] of tries) {
         const fyaw = FACE_YAW[face] ?? 0, turned = face === 'e' || face === 'w';
         const hx = (turned ? ib.box[2] : ib.box[0]) / 2 + 0.04, hz = (turned ? ib.box[0] : ib.box[2]) / 2 + 0.04;
@@ -142,13 +144,26 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
         if (solid && doors.some((d) => d.level === room.floor && obbOverlap(bx, zone(d)))) { why = 'in a doorway'; continue; }
         if (ends.some((e) => e.level === room.floor && obbOverlap(bx, { c: e.p, half: [0.9, 0.9], yaw: 0, y0: room.y, y1: room.y + 2 }))) { why = 'at the foot or head of the stairs'; continue; }
         if (solid && taken.some((t) => t.floor === room.floor && t.solid && candidate.some(a => t.boxes.some(b => obbOverlap(a, b))))) { why = 'overlaps another piece'; continue; }
-        // each seat must be got on and off as the use-check does it: some standing spot beside it slides onto it clear of
-        // the walls, rails, stairs and the pieces standing (lane FUZZ2); those spots are its keys in the ways check below
-        let slides = [];
-        if (solid && (ib.slots ?? []).some((x) => x.kind === 'seat')) {
-          const blockers = [...baked.colliders, ...taken.filter((t) => t.floor === room.floor && t.solid).flatMap((t) => t.boxes)];
-          slides = seatSlides(ib, pose, r3(fyaw + th), room.y, blockers);
-          if (slides.some((pts) => !pts.length)) { why = 'no way on or off its seat'; continue; }
+        // each seat and bed must be got on and off as the use-check does it (lane FUZZ2): from a standing spot beside it, on a
+        // free cell of the walk raster reached from a door, a body slides onto it clear of the walls, rails, stairs and other
+        // pieces. That holds for this piece and still for every seat and bed already placed (a chest at a cabin bed's only
+        // free side, a chair at a stairwell rail facing it).
+        let slides = [], held = [];
+        if (solid) {
+          const others = (except) => taken.filter((t) => t.floor === room.floor && t.solid && t !== except).flatMap((t) => t.boxes);
+          if (sits(ib)) slides = seatSlides(ib, pose, r3(fyaw + th), room.y, [...baked.colliders, ...others(null)]);
+          if (slides.some((pts) => !pts.length)) { why = 'no way on or off its seat or bed'; continue; }
+          // a placed seat's spots only ever shrink as pieces are added: keep those this pose leaves (the same candidates,
+          // tested against its boxes alone), for the seats near enough to be touched
+          const near = (t) => Math.hypot(t.sit.at[0] - pose[0], t.sit.at[1] - pose[1]) < Math.hypot(hx, hz) + Math.hypot(t.sit.ib.box[0], t.sit.ib.box[2]) / 2 + 1.2;
+          held = taken.filter((t) => t.room === room.id && t.sit).map((t) => {
+            t.sit.slides ??= seatSlides(t.sit.ib, t.sit.at, t.sit.yaw, t.sit.y, [...baked.colliders, ...others(t)]);
+            if (!near(t)) return { t, slides: t.sit.slides };
+            const left = seatSlides(t.sit.ib, t.sit.at, t.sit.yaw, t.sit.y, actual).map((pts) => new Set(pts.map((q) => q.join())));
+            return { t, slides: t.sit.slides.map((pts, i) => pts.filter((q) => left[i].has(q.join()))) };
+          });
+          const shut = held.find((h) => h.slides.some((pts) => !pts.length));
+          if (shut) { why = `would shut the way on or off ${shut.t.name}`; continue; }
         }
         if (solid && keysOf(room).length) {
           // the doors, stair ends and standing pieces' approaches keep every way they had, and this piece's own approach
@@ -162,14 +177,23 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
             for (const t of standing.slice(w.n)) w.grid = w.grid.plus(t.foot);
             w.n = standing.length; w.keys = [...keysOf(room), ...standing.flatMap((t) => t.approach)]; w.was = w.grid.labels(w.keys, w.at = { cells: [] });
           }
-          const { keys, was } = w, now = w.grid.plus(bx).labels([...keys, ...approachKeys(ib, pose, r3(fyaw + th)), ...slides.map((pts) => ({ pts, r: SLIDE_KEY_R }))], { cells: w.at.cells });
-          const doorsReach = now.slice(keys.length).every((own) => keysOf(room).some((_, i) => now[i] === own));
+          const own = approachKeys(ib, pose, r3(fyaw + th)), seats = [...slides, ...held.flatMap((h) => h.slides)];
+          const spots = seats.flat().map((q) => ({ pts: [q], r: SPOT_R }));
+          const { keys, was } = w, now = w.grid.plus(bx).labels([...keys, ...own, ...spots], { cells: w.at.cells });
+          const doorLabel = new Set(keysOf(room).map((_, i) => now[i]));
+          const doorsReach = now.slice(keys.length, keys.length + own.length).every((l) => doorLabel.has(l));
           if (pairsOf(now, keys.length) < pairsOf(was) || !doorsReach) { why = doorsReach ? 'would cut the way to its doors or another piece' : 'no way to it from the doors'; continue; }
+          const owner = [...slides.map(() => null), ...held.flatMap((h) => h.slides.map(() => h.t.name))];
+          let k = keys.length + own.length;
+          const stranded = seats.findIndex((pts) => { const ok = pts.some((_, j) => doorLabel.has(now[k + j])); k += pts.length; return !ok; });
+          if (stranded >= 0) { why = owner[stranded] ? `would shut the way on or off ${owner[stranded]}` : 'no way on or off its seat or bed'; continue; }
         }
-        box = bx; boxes = candidate; at = p; yaw = fyaw + th; break;
+        for (const h of held) h.t.sit.slides = h.slides;
+        box = bx; boxes = candidate; at = p; yaw = fyaw + th; placedSlides = slides; break;
       }
       if (!box) { dropped.push({ name, why }); continue; }
-      taken.push({ floor: room.floor, boxes, solid: ib.box[1] > 0.06, foot: box, approach: approachKeys(ib, [room.origin[0] + r3(at[0] - room.origin[0]), room.origin[1] + r3(at[1] - room.origin[1])], r3(yaw), SEAT_FAR) });
+      const at1 = [room.origin[0] + r3(at[0] - room.origin[0]), room.origin[1] + r3(at[1] - room.origin[1])];
+      taken.push({ floor: room.floor, boxes, solid: ib.box[1] > 0.06, foot: box, approach: approachKeys(ib, at1, r3(yaw), SEAT_FAR), sit: sits(ib) && ib.box[1] > 0.06 ? { ib, at: at1, yaw: r3(yaw), y: room.y, slides: placedSlides ?? undefined } : null, room: room.id, name });
       const tmp = `$f${ops.length}`.slice(0, 25);
       named[it.name ?? 'item'] = { tmp };
       ops.push({ op: 'place', tmp, def: ref, name, in: { parent: b.id, slot: room.id }, p: [r3(at[0] - room.origin[0]), 0, r3(at[1] - room.origin[1])], r: r3(yaw), ...(it.params ? { params: it.params } : {}), ...(it.price ? { price: it.price } : {}) });

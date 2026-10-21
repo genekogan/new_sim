@@ -122,7 +122,7 @@ const boxDist = (b: SlideBlocker, x: number, z: number) => {
   const c = Math.cos(b.yaw), s = Math.sin(b.yaw), dx = x - b.c[0], dz = z - b.c[1];
   return Math.hypot(Math.max(0, Math.abs(dx * c - dz * s) - b.half[0]), Math.max(0, Math.abs(dx * s + dz * c) - b.half[1]));
 };
-/** For each seat of a piece at `at`/`yaw` (room frame) on a floor at height `y`: the approach points (room frame) a body
+/** For each seat and berth of a piece at `at`/`yaw` (room frame) on a floor at height `y`: the approach points (room frame) a body
  *  standing PLAN_R clear of `blockers` slides from onto the seat without crossing one, in the engine's order. A seat with
  *  none cannot be got on or off whatever the walk raster says. Blockers are the room's walls, rails and stairs and the
  *  pieces standing (never the piece itself); a blocker the seat itself is tucked inside (a seat under its table) is its
@@ -131,12 +131,15 @@ export function seatSlides(baked: { slots?: { kind: string; p: readonly number[]
   const c = Math.cos(yaw), s = Math.sin(yaw), w = ([x, z]: readonly number[]): Vec2 => [at[0] + x * c + z * s, at[1] - x * s + z * c];
   const half = [baked.box[0] / 2, baked.box[2] / 2], lo = y + SLIDE_STEP, hi = y + SLIDE_HEIGHT;
   const near = blockers.filter((b) => b.y1 > lo && b.y0 < hi);
-  return (baked.slots ?? []).filter((x) => x.kind === 'seat').map((seat) => {
+  return (baked.slots ?? []).filter((x) => x.kind === 'seat' || x.kind === 'bed' || x.kind === 'berth').map((seat) => {
     const sl: Vec2 = [seat.p[0], seat.p[2]], sp = w(sl);
     const own = near.filter((b) => !(Math.min(b.half[0], b.half[1]) >= 0.2 && boxDist({ ...b, half: [b.half[0] + 0.1, b.half[1] + 0.1] }, sp[0], sp[1]) === 0));
     const edge = (u: Vec2) => { let t = Infinity; for (const k of [0, 1]) if (Math.abs(u[k]) > 1e-9) t = Math.min(t, ((u[k] > 0 ? half[k] : -half[k]) - sl[k]) / u[k]); return t; };
-    const tries: [number, readonly number[]][] = [[0, SLIDE_FRONT], [Math.PI, SLIDE_FRONT]];
-    for (let k = 1; k < 16; k++) if (k % 4) tries.push([k * Math.PI / 8, SLIDE_SIDE]);
+    // a berth (a bed) is got into from either side, its foot or its head (engine berthApproach); a seat from its front or
+    // back, then the angular search
+    const tries: [number, readonly number[]][] = seat.kind !== 'seat' ? [Math.PI / 2, -Math.PI / 2, 0, Math.PI].map((t) => [t, SLIDE_FRONT])
+      : [[0, SLIDE_FRONT], [Math.PI, SLIDE_FRONT]];
+    if (seat.kind === 'seat') for (let k = 1; k < 16; k++) if (k % 4) tries.push([k * Math.PI / 8, SLIDE_SIDE]);
     const out: Vec2[] = [];
     for (const [turn, gaps] of tries) {
       const a = seat.yaw + turn, u: Vec2 = [Math.sin(a), Math.cos(a)], e = edge(u);
