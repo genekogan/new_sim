@@ -82,3 +82,56 @@ test('a wall ring of plain blocks round a bench: never refused; one actionable l
     assert.equal(reach(w, [0, -12], 'shut-bench').reachable, true, 'the suggested op opens the way');
   }
 });
+
+// A cottage's living room furnished in one batch, as a furnish pass would: a table and its chairs, a bench on the east
+// wall, and a piece just inside each of its three doors (front, kitchen, bedroom).
+const LIVING = (home: string) => [
+  { op: 'place', def: coreRef('table'), name: 'table', in: { parent: home, slot: 'living' }, p: [0.2, 0, -0.3] },
+  ...[[-0.85, 0], [1.25, 0], [0.2, -1.0], [0.2, 0.4]].map(([x, z], i) => ({ op: 'place', def: coreRef('chair'), name: `chair-${i}`, in: { parent: home, slot: 'living' }, p: [x, 0, z - 0.3], r: [Math.PI / 2, -Math.PI / 2, 0, Math.PI][i] })),
+  { op: 'place', def: coreRef('bench'), name: 'east-bench', in: { parent: home, slot: 'living' }, p: [2.25, 0, 0], r: -Math.PI / 2 },
+  { op: 'place', def: coreRef('crate'), name: 'front-crate', in: { parent: home, slot: 'living' }, p: [0, 0, 2.4] },
+  { op: 'place', def: coreRef('crate'), name: 'kitchen-crate', in: { parent: home, slot: 'living' }, p: [-2.2, 0, 1.445] },
+  { op: 'place', def: coreRef('stool'), name: 'bedroom-stool', in: { parent: home, slot: 'living' }, p: [-2.25, 0, -1.445] },
+];
+async function cottage(t: any) {
+  const w = await world(t);
+  ok(w.god.act({ ops: [
+    { op: 'place', tmp: '$h', def: coreRef('cottage'), name: 'home', p: [0, 0] },
+    { op: 'place', def: coreRef('bench'), name: 'bed-bench', in: { parent: '$h', slot: 'bedroom' }, p: [-0.6, 0, 0], r: Math.PI / 2 },
+    { op: 'place', def: coreRef('chair'), name: 'cook-chair', in: { parent: '$h', slot: 'kitchen' }, p: [-0.4, 0, 0.3] },
+  ] }));
+  await w.settle();
+  for (const to of ['home/bed-bench', 'home/cook-chair']) assert.equal(reach(w, [1.2, 8], to).reachable, true, `${to} is walked to before`);
+  return { w, home: w.god.model.get('home')!.id };
+}
+const buildsafeLines = (r: any) => (r.warnings ?? []).filter((x: string) => /buildsafe\/1|architecture\.sealed/.test(x)).sort();
+
+test('a packed room (table, chairs, bench, a piece in each doorway) in one batch: every room and piece is walked to; nothing dropped', { timeout: 120000 }, async (t) => {
+  const { w, home } = await cottage(t);
+  const ops = LIVING(home);
+  const r = ok(w.god.act({ ops }, 'furnish the living room'));
+  assert.ok(kept(r).length >= 1, JSON.stringify(r.warnings));
+  assert.equal(r.warnings.some((x: string) => /No walk reaches/.test(x)), false, JSON.stringify(r.warnings));
+  for (const o of ops) assert.ok(w.god.model.get(`home/${o.name}`), `home/${o.name} stands`);
+  await w.settle();
+  for (const to of ['home/bed-bench', 'home/cook-chair', 'home/east-bench', 'home/chair-0', 'home/front-crate']) { const q = reach(w, [1.2, 8], to); assert.equal(q.reachable, true, `${to} is walked to: ${JSON.stringify(q).slice(0, 400)}`); }
+});
+
+test('dry run and preview answer as the commit does: the same repair lines; the preview commits to the same poses', { timeout: 120000 }, async (t) => {
+  const { w, home } = await cottage(t);
+  const ops = [...LIVING(home), { op: 'place', def: coreRef('crate'), name: 'step-crate', p: [1.175, 3.25] }];
+  const dry: any = w.god.dryrun({ ops });
+  assert.equal(dry.accepted, true, JSON.stringify(dry.failures));
+  assert.ok(buildsafeLines(dry).length >= 1, JSON.stringify(dry.warnings));
+  assert.equal(Object.keys(dry.ids ?? {}).some((k) => k.startsWith('$bs-')), false, 'no repair tags in the ids');
+  const pv: any = w.god.preview({ ops });
+  assert.equal(pv.accepted, true, JSON.stringify(pv.failures)); assert.deepEqual(buildsafeLines(pv), buildsafeLines(dry));
+  assert.equal(w.god.model.get('step-crate'), undefined, 'a preview changes nothing');
+  const r = ok(w.god.act({ preview: pv.id, ops }));
+  assert.deepEqual(buildsafeLines(r), buildsafeLines(dry), 'the commit says what the dry run said');
+  // a sealed front door is no refusal in a dry run either: repaired as the commit repairs it
+  ok(w.god.undo());
+  const sealed: any = w.god.dryrun({ ops: [{ op: 'place', def: coreRef('crate'), name: 'step-crate', p: [1.175, 3.25] }] });
+  assert.equal(sealed.accepted, true, JSON.stringify(sealed.failures));
+  assert.match(buildsafeLines(sealed).join('\n'), /Kept a way open \(buildsafe\/1\): step-crate moved/);
+});
