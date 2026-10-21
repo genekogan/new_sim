@@ -226,6 +226,11 @@ function track(prev:Track|undefined,x:number,z:number,t:number):Track{
 const inScene=(o:THREE.Object3D,scene:THREE.Object3D)=>{let p:THREE.Object3D|null=o;while(p){if(!p.visible)return false;if(p===scene)return true;p=p.parent;}return false;};
 
 /** Per-view driver. Call `update` once per frame before rendering. */
+/** Underwater fog by amount f: exp2 density toward .16 (about 10 m visibility), linear fog closing to 0..26 m. */
+const thicken=(fog:THREE.Fog&THREE.FogExp2,f:number)=>{
+ if(fog.isFogExp2)fog.density=Math.max(fog.density,fog.density+(.16-fog.density)*f);
+ else{fog.near=fog.near*(1-f);fog.far=Math.min(fog.far,fog.far+(26-fog.far)*f);}};
+
 export class WorldWaterDetail{
  regions:WaterRegion[]=[];
  /** Boats drawn afloat (gen-mesh/motion.ts AFLOAT): rings while they bob, a wake while they move. */
@@ -310,19 +315,26 @@ export class WorldWaterDetail{
   if(f<=0)return 0;
   const tint=WATER_DETAIL.uWaterTint.value,fog=scene.fog as (THREE.Fog&THREE.FogExp2)|null,bg=(scene.background as THREE.Color|null)?.isColor?scene.background as THREE.Color:null;
   this.saved={fog,color:fog?fog.color.clone():new THREE.Color(),a:fog?((fog as THREE.FogExp2).isFogExp2?fog.density:fog.near):0,b:fog&&!(fog as THREE.FogExp2).isFogExp2?fog.far:0,bg,bgColor:bg?bg.clone():new THREE.Color()};
-  if(fog){fog.color.lerp(tint,f);
-   if((fog as THREE.FogExp2).isFogExp2)fog.density=Math.max(fog.density,fog.density+(.16-fog.density)*f);
-   else{fog.near=fog.near*(1-f);fog.far=Math.min(fog.far,fog.far+(26-fog.far)*f);}}
+  if(fog){fog.color.lerp(tint,f);thicken(fog,f);this.under=f;this.hook(scene);}
   if(bg)bg.lerp(tint,f);
   if(canvas&&typeof document!=='undefined'&&!this.tint&&canvas.parentElement){const d=document.createElement('div');d.className='world-underwater-tint';d.setAttribute('aria-hidden','true');
    d.style.cssText='position:absolute;inset:0;pointer-events:none;transition:opacity .25s linear;opacity:0';canvas.after(d);this.tint=d;}
   if(this.tint){this.tint.style.background=`#${tint.getHexString(THREE.SRGBColorSpace)}`;this.tint.style.opacity=String(+(f*.32).toFixed(3));}
   return f;
  }
+ private under=0;private hooked:{scene:THREE.Scene;fn:THREE.Object3D['onBeforeRender'];prev:THREE.Object3D['onBeforeRender']}|null=null;
+ /** The atmosphere sets the fog density per camera in the scene's onBeforeRender (inside the render call), so the
+  * thicker underwater fog is applied again after it, from a hook chained behind whatever handler the scene has. */
+ private hook(scene:THREE.Scene){
+  if(this.hooked?.scene===scene&&scene.onBeforeRender===this.hooked.fn)return;
+  const prev=scene.onBeforeRender,self=this;
+  const fn:THREE.Object3D['onBeforeRender']=function(this:THREE.Object3D,...a){prev.apply(this,a);if(self.saved&&self.under>0&&scene.fog)thicken(scene.fog as THREE.Fog&THREE.FogExp2,self.under);};
+  scene.onBeforeRender=fn;this.hooked={scene,fn,prev};
+ }
  restoreUnderwater(){
-  const s=this.saved;if(!s)return;this.saved=null;
+  const s=this.saved;if(!s)return;this.saved=null;this.under=0;
   if(s.fog){s.fog.color.copy(s.color);if((s.fog as THREE.FogExp2).isFogExp2)(s.fog as THREE.FogExp2).density=s.a;else{(s.fog as THREE.Fog).near=s.a;(s.fog as THREE.Fog).far=s.b;}}
   if(s.bg)s.bg.copy(s.bgColor);
  }
- dispose(){this.tint?.remove();this.tint=null;}
+ dispose(){this.tint?.remove();this.tint=null;const h=this.hooked;if(h&&h.scene.onBeforeRender===h.fn)h.scene.onBeforeRender=h.prev;this.hooked=null;}
 }

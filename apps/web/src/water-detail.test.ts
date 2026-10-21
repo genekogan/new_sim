@@ -129,7 +129,11 @@ void test('underwater fade: none above the surface, smooth ramp to full at UNDER
  assert.equal(w.applyUnderwater(scene,camera),0);w.restoreUnderwater();assert.equal(scene.fog.density,.01);
  camera.position.y=-5;camera.updateMatrixWorld();assert.equal(w.cameraDepth(camera),3);
  assert.equal(w.applyUnderwater(scene,camera),1);assert.ok(scene.fog.density>.1);assert.notEqual(scene.background.getHex(),0x88aaff);
- w.restoreUnderwater();assert.equal(scene.fog.density,.01);assert.equal(scene.fog.color.getHex(),0xaabbcc);assert.equal(scene.background.getHex(),0x88aaff);
+ // the atmosphere resets the density per camera inside the render (scene.onBeforeRender): the hook thickens it again
+ scene.fog.density=.01;scene.onBeforeRender(null as never,scene,camera,null as never,null as never,null as never);assert.ok(scene.fog.density>.1);
+ w.restoreUnderwater();assert.equal(scene.fog.density,.01);assert.equal(scene.fog.color.getHex(),0xaabbcc);
+ scene.onBeforeRender(null as never,scene,camera,null as never,null as never,null as never);assert.equal(scene.fog.density,.01,'above water again: untouched');
+ const before=scene.onBeforeRender;w.dispose();assert.notEqual(scene.onBeforeRender,before);assert.equal(scene.background.getHex(),0x88aaff);
  o.dispose();
 });
 
