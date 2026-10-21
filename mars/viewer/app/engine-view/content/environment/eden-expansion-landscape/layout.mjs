@@ -89,8 +89,26 @@ const data={
 export function edenExpansionLayout(){return structuredClone(data);}
 export function inside(x,z,b,margin=0){return x>=b[0]-margin&&x<=b[2]+margin&&z>=b[1]-margin&&z<=b[3]+margin;}
 export function pathDistance(x,z,points){let out=Infinity;for(let i=1;i<points.length;i++){const a=points[i-1],b=points[i],dx=b[0]-a[0],dz=b[1]-a[1],u=Math.max(0,Math.min(1,((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz||1)));out=Math.min(out,Math.hypot(x-a[0]-u*dx,z-a[1]-u*dz));}return out;}
+// Per-path [minX,minZ,maxX,maxZ]: a point farther than the threshold outside a path's box cannot be within it, so
+// reserved() skips the segment walk there (same answers; the 1e-6 slack covers rounding in the projected point).
+const PATH_BOXES=data.paths.map(p=>p.points.reduce((b,q)=>[Math.min(b[0],q[0]),Math.min(b[1],q[1]),Math.max(b[2],q[0]),Math.max(b[3],q[1])],[Infinity,Infinity,-Infinity,-Infinity]));
+function nearPath(x,z,p,b,t){const m=t+1e-6;if(x<b[0]-m||x>b[2]+m||z<b[1]-m||z>b[3]+m)return false;return pathDistance(x,z,p.points)<=t;}
 export function inNative(x,z,margin=0){return data.preserved.some(p=>inside(x,z,p.bounds,margin));}
-export function reserved(x,z,r=0){return inNative(x,z,r)||data.regions.some(p=>['volcanic-periphery','outlook-grove-accent'].includes(p.id)&&inside(x,z,p.bounds,r))||data.places.some(p=>inside(x,z,p.bounds,r+.6))||data.paths.some(p=>pathDistance(x,z,p.points)<=p.width/2+r+.35)||data.stops.some(p=>Math.hypot(x-p.p[0],z-p.p[1])<=p.radius+r);}
+// reserved(x,z,0) (every bank vertex asks it) looks only at the shapes whose reach box covers the point's 4 m cell; the
+// predicate is a pure OR of per-shape tests, so testing the covering subset gives the same answer.
+let RESERVED0=null;
+function reserved0Cell(x,z){if(!RESERVED0){const e=1e-6,shapes=[];
+  for(const p of data.preserved)shapes.push([p.bounds[0]-e,p.bounds[1]-e,p.bounds[2]+e,p.bounds[3]+e,(x,z)=>inside(x,z,p.bounds,0)]);
+  for(const p of data.regions)if(['volcanic-periphery','outlook-grove-accent'].includes(p.id))shapes.push([p.bounds[0]-e,p.bounds[1]-e,p.bounds[2]+e,p.bounds[3]+e,(x,z)=>inside(x,z,p.bounds,0)]);
+  for(const p of data.places){const m=.6+e;shapes.push([p.bounds[0]-m,p.bounds[1]-m,p.bounds[2]+m,p.bounds[3]+m,(x,z)=>inside(x,z,p.bounds,.6)]);}
+  data.paths.forEach((p,i)=>{const b=PATH_BOXES[i],t=p.width/2+.35,m=t+1e-6;shapes.push([b[0]-m,b[1]-m,b[2]+m,b[3]+m,(x,z)=>pathDistance(x,z,p.points)<=t]);});
+  for(const p of data.stops){const m=p.radius+e;shapes.push([p.p[0]-m,p.p[1]-m,p.p[0]+m,p.p[1]+m,(x,z)=>Math.hypot(x-p.p[0],z-p.p[1])<=p.radius]);}
+  const S=4,x0=Math.min(...shapes.map(q=>q[0])),z0=Math.min(...shapes.map(q=>q[1])),x1=Math.max(...shapes.map(q=>q[2])),z1=Math.max(...shapes.map(q=>q[3])),nx=Math.floor((x1-x0)/S)+1,nz=Math.floor((z1-z0)/S)+1,cells=Array.from({length:nx*nz},()=>[]);
+  for(const q of shapes)for(let cz=Math.floor((q[1]-z0)/S);cz<=Math.floor((q[3]-z0)/S);cz++)for(let cx=Math.floor((q[0]-x0)/S);cx<=Math.floor((q[2]-x0)/S);cx++)cells[cz*nx+cx].push(q[4]);
+  RESERVED0={S,x0,z0,x1,z1,nx,cells};}
+ const g=RESERVED0;if(!(x>=g.x0&&x<=g.x1&&z>=g.z0&&z<=g.z1))return null;return g.cells[Math.floor((z-g.z0)/g.S)*g.nx+Math.floor((x-g.x0)/g.S)];}
+export function reserved(x,z,r=0){if(r===0&&Number.isFinite(x)&&Number.isFinite(z)){const cell=reserved0Cell(x,z);if(!cell)return false;for(const test of cell)if(test(x,z))return true;return false;}
+ return inNative(x,z,r)||data.regions.some(p=>['volcanic-periphery','outlook-grove-accent'].includes(p.id)&&inside(x,z,p.bounds,r))||data.places.some(p=>inside(x,z,p.bounds,r+.6))||data.paths.some((p,i)=>nearPath(x,z,p,PATH_BOXES[i],p.width/2+r+.35))||data.stops.some(p=>Math.hypot(x-p.p[0],z-p.p[1])<=p.radius+r);}
 export function inWater(x,z){return data.water.some(w=>w.wetEllipse?((x-w.p[0])/w.wetEllipse[0])**2+((z-w.p[2])/w.wetEllipse[1])**2<=1:inside(x,z,w.wetBounds));}
 export function waterBedReserved(x,z,margin=0){return data.water.some(w=>inside(x,z,w.outerBounds,margin));}
 /** Cosmetic new expansion ground only. Never sample it as native support. */

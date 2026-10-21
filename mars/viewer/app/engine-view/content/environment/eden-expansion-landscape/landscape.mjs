@@ -71,11 +71,23 @@ export function createEdenExpansionLandscape(enabled=false){
   for(const p of planting.special.meadow){const o=own(createMeadowFamily('square'));o.group.position.fromArray(p.p);o.group.rotation.y=-p.yaw;group.add(o.group);}
   for(const w of layout.water){if(w.kind==='connection'){const m=mesh('Proposed lake to original-shore water connection',[-65,-2,0,-68,-2,-2,-62,-2,-2,-62,-2,2,-68,-2,2],null,[0,2,1,0,3,2,0,4,3,0,1,4],simpleMaterial({color:'#286a8d',roughness:.32,transparent:true,opacity:.88,depthWrite:false,side:THREE.DoubleSide,forceSinglePass:true,emissive:'#101c27',emissiveIntensity:.12}));m.userData.cameraTransparent=true;group.remove(m);const connection=new THREE.Group();connection.add(m);group.add(connection);waterOwners.push({owner:{group:connection},w});continue;}const o=own(createWaterLandscape(w.kind));o.group.position.fromArray(w.p);o.group.rotation.y=-w.yaw;for(const m of o.group.children)if(m.userData.cameraTransparent){m.material.color.set('#286a8d');m.material.opacity=.88;m.material.side=THREE.DoubleSide;m.material.forceSinglePass=true;m.material.emissive.set('#101c27');m.material.emissiveIntensity=.12;}group.add(o.group);waterOwners.push({owner:o,w});}
   const waterJoin=joinExpansionWater(waterOwners,group,g=>resources.push(g),m=>resources.push(m));
+  // Bed triangles by 2 m cell (box widened 1e-3, far beyond the 1e-7 barycentric slack); slivers are always tried.
+  // sampleVisibleBank runs the same exact triangle test on the same triangles as a full scan would accept.
+  const bedIndex=new Map();
+  function bedCandidates(p,x,z){let g=bedIndex.get(p);if(!g){const S=2,E=1e-3,tri=[],always=[];let x0=Infinity,z0=Infinity,x1=-Infinity,z1=-Infinity;
+    for(let i=0;i<p.length;i+=9){const dx=p[i+3]-p[i],dz=p[i+5]-p[i+2],ex=p[i+6]-p[i],ez=p[i+8]-p[i+2],det=dx*ez-dz*ex;if(Math.abs(det)<1e-12)continue;
+     const a=Math.min(p[i],p[i+3],p[i+6])-E,b=Math.min(p[i+2],p[i+5],p[i+8])-E,c=Math.max(p[i],p[i+3],p[i+6])+E,d=Math.max(p[i+2],p[i+5],p[i+8])+E;
+     if(!(Math.abs(det)>=1e-3&&a<=c&&b<=d)){always.push(i);continue;}tri.push([i,a,b,c,d]);x0=Math.min(x0,a);z0=Math.min(z0,b);x1=Math.max(x1,c);z1=Math.max(z1,d);}
+    const nx=tri.length?Math.floor((x1-x0)/S)+1:0,nz=tri.length?Math.floor((z1-z0)/S)+1:0,cells=Array.from({length:nx*nz},()=>[]);
+    for(const [i,a,b,c,d]of tri)for(let cz=Math.floor((b-z0)/S);cz<=Math.floor((d-z0)/S);cz++)for(let cx=Math.floor((a-x0)/S);cx<=Math.floor((c-x0)/S);cx++)cells[cz*nx+cx].push(i);
+    g={S,x0,z0,x1,z1,nx,nz,cells,always,empty:[]};bedIndex.set(p,g);}
+   const inBox=x>=g.x0&&x<=g.x1&&z>=g.z0&&z<=g.z1,hit=inBox?g.cells[Math.min(g.nz-1,Math.floor((z-g.z0)/g.S))*g.nx+Math.min(g.nx-1,Math.floor((x-g.x0)/g.S))]:g.empty;
+   return g.always.length?[...hit,...g.always]:hit;}
   function sampleVisibleBank(x,z){
    if(inNative(x,z)||!Number.isFinite(x)||!Number.isFinite(z))return null;
    let y=sampleVisualGround(x,z);
    for(const bed of group.children.filter(m=>m.name?.endsWith(' bed'))){const p=bed.geometry.attributes.position.array;
-    for(let i=0;i<p.length;i+=9){const dx=p[i+3]-p[i],dz=p[i+5]-p[i+2],ex=p[i+6]-p[i],ez=p[i+8]-p[i+2],det=dx*ez-dz*ex;if(Math.abs(det)<1e-12)continue;const u=((x-p[i])*ez-(z-p[i+2])*ex)/det,v=(dx*(z-p[i+2])-dz*(x-p[i]))/det;if(u>=-1e-7&&v>=-1e-7&&u+v<=1+1e-7){const top=p[i+1]+u*(p[i+4]-p[i+1])+v*(p[i+7]-p[i+1]);y=y===null?top:Math.max(y,top);}}}
+    for(const i of bedCandidates(p,x,z)){const dx=p[i+3]-p[i],dz=p[i+5]-p[i+2],ex=p[i+6]-p[i],ez=p[i+8]-p[i+2],det=dx*ez-dz*ex;if(Math.abs(det)<1e-12)continue;const u=((x-p[i])*ez-(z-p[i+2])*ex)/det,v=(dx*(z-p[i+2])-dz*(x-p[i]))/det;if(u>=-1e-7&&v>=-1e-7&&u+v<=1+1e-7){const top=p[i+1]+u*(p[i+4]-p[i+1])+v*(p[i+7]-p[i+1]);y=y===null?top:Math.max(y,top);}}}
    return y;
   }
   const dockPath=layout.paths.find(p=>p.dryBankAppearance),dp=[],di=[];

@@ -35,11 +35,11 @@ import {installNightLighting,setNightLightStrength,nightLightStrength} from './W
 import type {createEdenHouseWindows} from '../../../mars/viewer/app/engine-view/content/assets/eden-expansion-assets/eden-house-windows.ts';
 // P1 phones: the old Eden expansion is its own chunk (old-eden.ts), fetched only by a world that shows it
 let oldEden:typeof import('./old-eden.ts')|null=null,oldEdenLoad:Promise<typeof import('./old-eden.ts')>|null=null;
-const loadOldEden=()=>oldEdenLoad??=import('./old-eden.ts').then(m=>oldEden=m,e=>{oldEdenLoad=null;throw e;});
+const loadOldEden=()=>oldEdenLoad??=import('./old-eden.ts').then(m=>{setTimeout(()=>{try{m.prebuildEdenLandscape();}catch{}},0);return oldEden=m;},e=>{oldEdenLoad=null;throw e;});
 // Patch shared lit-shader chunks before any program compiles (strength stays 0 outside Eden).
 installNightLighting();
 installLookToneCurve();installMaterialDetail();  // look pass (rendering/WorldLook.ts): tone curve + material detail chunks, before any program compiles
-import {arrivalMark,arrivalOver,whenArrivalCardGone} from './arrival-marks.ts';import {earlyArrival,earlyArrivalWanted} from './early-arrival.ts';import {connectionLost} from './viewer-arrival.ts';import {activityWords,doingText} from './place-names.ts';
+import {arrivalMark,arrivalOver,whenArrivalCardGone,whenMarked} from './arrival-marks.ts';import {earlyArrival,earlyArrivalWanted} from './early-arrival.ts';import {connectionLost} from './viewer-arrival.ts';import {activityWords,doingText} from './place-names.ts';
 import {worldDepictionBeat,type WorldBeatSampler} from './WorldDepiction.ts';
 import {RecordedGaitContinuity} from '../../../mars/viewer/app/engine-view/recorded-gait-continuity.ts';
 import { Suspense, lazy, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
@@ -54,6 +54,8 @@ import {PEOPLE,templateNameFor} from '../../../mars/viewer/app/engine-view/peopl
 import {WorldLightPeople} from './WorldLightPeople.ts';
 // P1 phones: the people renderer is a lazy chunk (people-kit.ts). Old worlds and desktops fetch it at once and wait for it
 // before their first frame; a phone's new world draws its first frames with WorldLightPeople and fetches it after arrival.
+/** F12: whether this page's arrival card has gone (speech anchors wait for it). */
+let arrivalCardDone=false;void whenMarked('card-done').then(()=>{arrivalCardDone=true;});
 let peopleKit:typeof import('./people-kit.ts')|null=null,peopleKitLoad:Promise<typeof import('./people-kit.ts')>|null=null;
 const loadPeopleKit=()=>peopleKitLoad??=import('./people-kit.ts').then(m=>peopleKit=m,e=>{peopleKitLoad=null;throw e;});
 if(!newWorld)void loadPeopleKit().catch(()=>{});
@@ -84,6 +86,7 @@ import { GodWorldLiving, calendarClock, entityWorldState, godRoomViews, godTourV
 import { setFleeSources, AFLOAT } from './gen-mesh/motion.ts';
 import { WorldLightning } from './WorldLightning.ts';
 import { worldArrivalPose } from './arrival-shot.ts';
+import { anyPersonInView } from './people-in-view.ts';
 import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { worldResolution } from './adaptive-resolution.ts';import { browserQuality } from './quality-tier.ts';import { WorldDistanceDetail } from './WorldDistanceDetail.ts';import { WorldMeshLod, PHONE_MESH_LOD, DESKTOP_MESH_LOD, workerSimplifier, type Simplifier } from './WorldMeshLod.ts';import { WorldFarStandIns, PHONE_STAND_INS, rendererSnapshotter } from './WorldFarStandIns.ts';import { compileSceneAsync, setTextureRenderer } from './gen-mesh/texture-budget.ts';
 // P1 phones: the god panel and the constitution card are lazy chunks, mounted once the arrival card has gone (20 s cap), or
 // at once when the landing URL carries something for the panel (#join, #approve/…, an offer or pairing link, a preview)
@@ -167,7 +170,7 @@ const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…`
 type ShotPin = { eye: number[]; at: number[]; lifted: number; closer: number; raised: number };
 const shotPin = (): ShotPin | null => { const p = (window as unknown as { __shotCamera?: ShotPin }).__shotCamera; return p && p.eye?.length === 3 && p.at?.length === 3 && [...p.eye, ...p.at].every(Number.isFinite) ? p : null; };
 
-export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerState, onInitialProgress, hideControls = false, embedded = false, hideSoulInfo = false, publishSpeechAnchors = false, humanPresets = false, viewportInsets, depictionBeatAt, edenExpansion = false, localClassroomPresentation, bootWorldId }: {
+export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerState, onInitialProgress, hideControls = false, embedded = false, hideSoulInfo = false, publishSpeechAnchors = false, humanPresets = false, viewportInsets, depictionBeatAt, edenExpansion = false, edenExpected = false, localClassroomPresentation, bootWorldId }: {
   sim: Sim; selected: string | null; onSelect(id: string | null): void;
   onViewerHandle?(handle: WorldViewerHandle | null): void;
   onViewerState?(state: WorldViewerState): void;
@@ -187,6 +190,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   depictionBeatAt?: WorldBeatSampler;
   /** Optional current-world composition; new scenery has no native authority. */
   edenExpansion?:boolean;
+  /** The configured world will show the old Eden town once its welcome confirms it: fetch that chunk now. */
+  edenExpected?:boolean;
   localClassroomPresentation?:LocalClassroomPresentation;
   /** Lane W1: a new world's page world id; the scene then starts before the socket's welcome (scene-owner.ts). */
   bootWorldId?:string;
@@ -241,6 +246,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
 
   // a Soul picked elsewhere (the table, my Soul) replaces a picked thing
   useEffect(() => { if (selected) setThing(null); }, [selected]);
+  useEffect(() => { if (edenExpected) void loadOldEden().catch(() => {}); }, [edenExpected]);
 
   useEffect(() => {
     // The first welcome supplies the world/epoch that owns this scene; a new world's page starts it from its own world
@@ -280,7 +286,10 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     // building worker's code waited behind them) and held the card ~12 s; until they land, a simple figure stands in.
     // Desktop, old worlds and pictures load them at once and wait for them as before. `?people=wait|later` overrides.
     const earlyWanted=earlyArrivalWanted(quality.tier,newWorld,location.search,shotMode);
-    const peopleLater=((q:string|null)=>q==='wait'?false:q==='later'?true:quality.tier==='phone'&&!shotMode)(new URLSearchParams(location.search).get('people'))&&newWorld;
+    // Old worlds on phones (F12): undecided until the first snapshot, held meanwhile; the people wait for the arrival
+    // only when none of them stands in the arrival camera's view (otherwise the card waits for them as before).
+    const peopleAsk=new URLSearchParams(location.search).get('people'),peopleRule=((q:string|null)=>q==='wait'?false:q==='later'?true:quality.tier==='phone'&&!shotMode)(peopleAsk);
+    let peopleLater=peopleRule&&(newWorld||peopleAsk!=='wait');const peopleByView=peopleLater&&!newWorld&&peopleAsk!=='later';
     const adaptive=worldResolution(renderer,Math.min(devicePixelRatio,quality.maxPixelRatio),newWorld,shotMode);if(adaptive)(window as unknown as {__simAdaptive?:unknown}).__simAdaptive=adaptive;  // W2b: shot mode stays at pixel ratio 1; phones cap the ratio (quality tier); ordinary worlds retain adaptive resolution
     renderer.shadowMap.enabled = true;
     // look pass for entity worlds: occlusion, highlight roll-off + night exposure, material detail (rendering/WorldLook.ts)
@@ -513,6 +522,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const placePreviews=new WorldPlacePreviews(renderer,()=>[geometry.group,...(expansion?[expansion.group]:[]),...(entityLayer.active?[entityLayer.group]:[])]);  // E2 #7: a god world's landmarks are drawn by its entity layer
     const loader = new GLTFLoader(manager).setDRACOLoader(draco).setMeshoptDecoder(MeshoptDecoder);
     setAssetLoader(loader);if(newWorld){setTextureRenderer(renderer,scene,camera);MeshoptDecoder.useWorkers?.(2);renderer.debug.checkShaderErrors=false;}  // lane PERF: paced GLB texture uploads, meshopt decoding in 2 workers, no sync link-status reads (new worlds only)
+    else if(quality.tier==='phone'&&!import.meta.env.DEV)renderer.debug.checkShaderErrors=false;  // F12: an old world on a phone skips the sync link-status/info-log reads too (~0.2 s of /w/eden's first compile at 4x)
     const floaters = new FloaterView(scene, { baseUrl: '/world-assets/littlemartians/characters/', loader });
     const bodyModels=new WorldBodyModels(loader,problem);bodyModels.held=peopleLater;
     let capturedPlatforms:readonly PlatformFloor[]|null=null;
@@ -530,7 +540,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     // lane W1: a new world loads (and parses, ~0.1 s of main thread) its character templates once it has arrived, or as
     // soon as an initial body needs one; old worlds load them at once, as before
     let templatesStarted=false;const startTemplates=()=>{if(templatesStarted)return;templatesStarted=true;void loadPeopleKit().then(kit=>kit.loadTemplates(abort.signal,resources,templateOptions)).catch(()=>{});};
-    if(!newWorld||shotMode)startTemplates();
+    if((!newWorld&&!peopleLater)||shotMode)startTemplates();
     const requireTemplate=async(name:string)=>{startTemplates();if(templates.some(t=>t.name===name))return;if(templateLoads.get(name)?.failed){beginTemplate(name);void loadPeopleKit().then(kit=>kit.loadTemplates(abort.signal,resources,{...templateOptions,names:[name]})).catch(()=>{});}await templateLoads.get(name)!.promise;};
 
     // Current unbound live viewers retain their observed layout. Historical
@@ -777,7 +787,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           bodyModels.sync(records,sampled.entities);
           const sampledFloaters=new Map(Object.entries(sampled.entities).flatMap(([id,e])=>{const body=recordedBody(records[id]?.body,e.state);if(body?.family!=='floater')return [];const url=admittedBodyUrl(body.modelUrl,apiPath('').replace(/\/$/,''));return [[id,{...body,...(url?{modelUrl:url}:{})} as NonNullable<Entity['body']>]] as [string,NonNullable<Entity['body']>][];}));
           floaters.sync(sampledFloaters);
-          if(initialGate&&!initialSnapshot){const gate=initialGate;initialSnapshot=true;const initialRecords=structuredClone(records),initialEntities=structuredClone(sampled.entities),floaterIds=[...sampledFloaters.keys()];initialBodyIds=Object.keys(initialEntities).filter(id=>initialRecords[id]?.kind==='human');const names=new Set<string>();for(const [id,e]of Object.entries(initialEntities)){if(initialRecords[id]?.kind!=='human')continue;const body=recordedBody(initialRecords[id]?.body,e.state);if(body?.family==='floater'||body?.modelUrl)continue;names.add(templateNameFor(id,PEOPLE));}if(!peopleLater){for(const name of names)gate.require('Person '+name,()=>requireTemplate(name));gate.require('Initial Soul bodies',()=>bodyModels.readyInitial(initialRecords,initialEntities));}if(floaterIds.length)gate.require('Initial ceramic bodies',async()=>{floaters.retryInitial(floaterIds);await floaters.readyInitial(floaterIds);});gate.seal();}
+          if(initialGate&&!initialSnapshot){const gate=initialGate;initialSnapshot=true;const initialRecords=structuredClone(records),initialEntities=structuredClone(sampled.entities),floaterIds=[...sampledFloaters.keys()];initialBodyIds=Object.keys(initialEntities).filter(id=>initialRecords[id]?.kind==='human');if(peopleByView){peopleLater=!anyPersonInView(camera,initialBodyIds.map(id=>initialEntities[id]!.p));arrivalMark(peopleLater?'people-later':'people-wait');if(!peopleLater){bodyModels.held=false;startTemplates();}}const names=new Set<string>();for(const [id,e]of Object.entries(initialEntities)){if(initialRecords[id]?.kind!=='human')continue;const body=recordedBody(initialRecords[id]?.body,e.state);if(body?.family==='floater'||body?.modelUrl)continue;names.add(templateNameFor(id,PEOPLE));}if(!peopleLater){for(const name of names)gate.require('Person '+name,()=>requireTemplate(name));gate.require('Initial Soul bodies',()=>bodyModels.readyInitial(initialRecords,initialEntities));}if(floaterIds.length)gate.require('Initial ceramic bodies',async()=>{floaters.retryInitial(floaterIds);await floaters.readyInitial(floaterIds);});gate.seal();}
 
           if(publication&&oldKit)nativeSocialDraw??=new oldKit.WorldNativeSocialDraw();
           if(nativeSocialDraw)nativeSocialDraw.update(people,publication,take,records,sampled,appearanceProfiles.nativeSocial);else people.setFixtureDrawReplacement(null);
@@ -1034,7 +1044,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           return [{soulId:soul.id,point:label.obj.position.toArray() as [number,number,number],rendered}];
         }):[];
         let speechAnchors:ReturnType<typeof projectSpeechAnchors>|undefined;
-        if(context.current.publishSpeechAnchors&&!points.length)speechAnchors=[];  // P1: nobody to place: skip the visibility pass over every mesh (~1 ms a frame on Eden 2026)
+        if(context.current.publishSpeechAnchors&&(!points.length||(initialGate&&(['waiting','downloading','preparing','first-frame'].includes(initialGate.snapshot().stage)||(!arrivalCardDone&&performance.now()<20_000)))))speechAnchors=[];  // F12: none under the arrival card, its ready frame included (that pass held /w/eden's card ~0.15 s at 4x after initial-ready) (the visibility pass cost /w/eden ~0.3 s at 4x before its card). P1: nobody to place: skip the visibility pass over every mesh (~1 ms a frame on Eden 2026)
         else if(context.current.publishSpeechAnchors)try{
           speechVisibility.prepareFresh(visualObstructionRoots());
           speechAnchors=projectSpeechAnchors(points,camera,host.clientWidth,host.clientHeight,area,p=>speechVisibility.score({position:camera.position.toArray(),target:[...p],fov:camera.fov},['anchor'],{anchor:{p:[...p],yaw:0,points:[[...p]]}})===1);
