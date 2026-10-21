@@ -14,7 +14,7 @@ import {singleLocalPreview} from './local-navigation.ts';
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import type { LogEvent } from '@sim/protocol';
 import { describeIntent } from '@sim/protocol';
-import { makeApi, useSim, type Sim } from './useSim.ts';
+import { makeApi, refreshMe, useSim, type Sim } from './useSim.ts';
 import {WorldAccountControls} from './AccountMenu.tsx';
 import {SoulAccount} from './SoulAccount.tsx';
 import {useSignOutAtOnce} from './sign-out-now.ts';
@@ -132,7 +132,9 @@ export function Shell({ cfg, auth: providerAuth, arrivalEnabled=false,humanPrese
   // Gene 2026-10-20c: the god panel's approval card closed because the new Soul's body is ready: follow that Soul as
   // Explore -> a Soul does, as soon as it reaches this window's picture (up to a minute; a manual drag outranks it)
   const [cardFollow,setCardFollow]=useState<{soulId:string;scope:string}|null>(null);
-  useEffect(()=>onFollowSoulRequest(soulId=>setCardFollow({soulId,scope:'card'})),[]);
+  const meRef=useRef(sim.me);meRef.current=sim.me;
+  // the card reports the approved Soul ready: follow it, and re-read Me when it is not ours yet (the owner box needs it)
+  useEffect(()=>onFollowSoulRequest(soulId=>{setCardFollow({soulId,scope:'card'});if(!meRef.current?.souls.includes(soulId))refreshMe(sim);}),[]);
   useEffect(()=>{if(!cardFollow)return;const t=setTimeout(()=>setCardFollow(null),FOLLOW_SOUL_WAIT_MS);return()=>clearTimeout(t);},[cardFollow]);
   useApprovalFollow(cardFollow,'card',true,viewerHandle,viewerState,()=>setCardFollow(null));
   const placePreview=useCallback((place:EdenTourPlace)=>viewerHandle?.locationPreview?.(place)??Promise.resolve(null),[viewerHandle]);

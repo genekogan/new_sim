@@ -9,6 +9,7 @@
 //   B  ana: the request times out (its expiry is moved into the past in the test world's own DB: the server would take
 //      15 min) -> "Timed out" + Ask again -> pending -> Approve -> the agent (approval wait through expiry) ends paired.
 //   C  cy, phone dpr 3: the card on a phone, light and dark; Refuse -> "Refused"; the agent's request is cancelled.
+//   A10 (R20 bug, 2026-10-21): after Approve, the new Soul's owner message box is there with no reload.
 //   D  two tabs of the world: only the last one opened or touched holds the sound (audio-focus.ts).
 // Shots of the pending card at desktop dpr 1 and 2 and phone, light and dark.
 //
@@ -175,6 +176,12 @@ try {
     const chip = await page.evaluate(() => { const c = document.querySelector('[data-camera]'); return { mode: c?.getAttribute('data-camera'), soul: c?.getAttribute('data-follow-soul'), text: c?.textContent }; });
     check('A8 the camera follows the new Soul (follow target = its id)', following && chip.soul === server?.soulId && /Ana/.test(chip.text ?? ''), chip);
     await sleep(1500); await shot(page, 'A8-following-ana');
+    // R20 bug (2026-10-21): the owner's message box must be there for the new Soul with no reload
+    const urlA10 = page.url();
+    await page.evaluate((sid) => { location.hash = '#soul/' + sid; }, server?.soulId);
+    const ownerBox = await page.waitForSelector('[data-agent-message="soul"]', { timeout: 20_000 }).then(() => true, () => false);
+    check('A10 the owner message box appears for the new Soul without a reload', ownerBox && page.url().split('#')[0] === urlA10.split('#')[0], { ownerBox });
+    await shot(page, 'A10-owner-box');
     const done = await waiting;
     report.waitA = done;
     const status = json(await agent(folder, ['status']).catch((e) => e.message));

@@ -121,6 +121,10 @@ export function useSim(getToken: () => Promise<string | null>, authed: boolean,i
   return s.current as Sim;
 }
 
+/** Re-read who we are (the welcome's Me) without a reload: a reconnect, as signing in does. New worlds' hub never pushes
+ *  an updated Me (no live private authority), so a Soul just approved in this window is not "own" until this runs. */
+export function refreshMe(sim: Sim) { retirePrivateAuthority(sim); sim.conn.rehello(); }
+
 export function makeApi(getToken: () => Promise<string | null>,session?:()=>number) {
   return createApiRequest(getToken,{path:apiPath,session});
 }
