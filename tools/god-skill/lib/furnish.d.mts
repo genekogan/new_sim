@@ -8,9 +8,5 @@ type Room = { id: string; floor: number; polygon: Vec2[] };
 export type WayKey = Vec2 | { pts: Vec2[]; r: number };
 export function roomKeys(room: Room, doors: unknown[], links: unknown[]): Vec2[];
 export function approachOf(baked: unknown, at: Vec2, yaw: number): WayKey;
-export interface WayGrid { x0: number; z0: number; nx: number; nz: number; free: Uint8Array }
-export function wayGrid(room: Room, blockers: Box[]): WayGrid;
-export function gridWith(grid: WayGrid, ...blockers: Box[]): WayGrid;
-export function gridLabels(grid: WayGrid, keys: WayKey[], cells?: number[]): number[];
 export function wayLabels(room: Room, keys: WayKey[], blockers: Box[]): number[];
 export function connectedPairs(room: Room, keys: WayKey[], blockers: Box[]): number;

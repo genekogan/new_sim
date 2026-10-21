@@ -38,12 +38,9 @@ function world(t: TestContext, options: {durableClockV1?: boolean; district?: bo
       ...(blocked ? [{op: 'place', def: coreRef('wall'), name: 'door-blocker', p: [10, 3.75], params: {w: 5, h: 3, d: 1}}] : []),
     ]});
     if (blocked) {
-      // buildsafe/1: a god edit that seals a room is accepted with one line naming it (a wall is never moved
-      // for the god). Undo it, then keep the verifier's negative coverage by explicitly seeding a legacy
-      // sealed world (no production bypass).
-      assert.equal(r.accepted, true, JSON.stringify(r));
-      if (r.accepted) assert.equal(r.warnings.filter(l => /^No walk reaches .*\(architecture\.sealed\)/.test(l)).length, 1, JSON.stringify(r.warnings));
-      assert.equal(god.undo().accepted, true);
+      // New construction must fail admission. Keep the verifier's negative coverage by explicitly
+      // seeding a legacy sealed world after checking the new refusal (no production bypass).
+      assert.equal(r.accepted, false); if (!r.accepted) assert.equal(r.failures[0].code, 'architecture.sealed');
       await build(seat, false);
       const e = { id: 'e_legacywall', def: coreRef('wall'), name: 'door-blocker', in: { parent: 'world' }, p: [10, 0, 3.75] as [number, number, number], params: { w: 5, h: 3, d: 1 }, by: 'legacy-fixture', born: 0, v: 1 };
       god.model.insert(e); god.model.index(e.id, god.model.footprint(e)); bridge.reconcile();

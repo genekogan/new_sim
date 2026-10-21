@@ -29,9 +29,7 @@ export type UsesHook = (id: string) => { code: 'body.protected'; detail: string 
  *  With the hook set, `uses` refusals are held back until it has run (it is called even when one was found), so its
  *  refusal wins as when it planned on a fork first; failing that, the earliest held-back one refuses the batch. */
 export type RefuseHook = (scratch: WorldModel, diff: Diff, ops: Op[]) => Failure | null;
-/** `sealed: false` skips the sealed-room refusal: the god server's commit repairs or reports a sealed room instead
- *  (buildsafe/1, apps/server/src/god/buildsafe.ts), never refusing the edit. */
-export type PlanOptions = { trusted?: boolean; uses?: UsesHook; refuse?: RefuseHook; sealed?: false };
+export type PlanOptions = { trusted?: boolean; uses?: UsesHook; refuse?: RefuseHook };
 
 export type Plan = { ok: true; apply: () => { seq: number; undoId: string; diff: Diff; inverse: Op[] }; ids: Record<string, string>; warnings: string[]; diff: Diff } | { ok: false; failures: Failure[] };
 
@@ -609,7 +607,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   diff.tiles = [...new Set(diff.tiles)];
   if (layersTouched) diff.layers = true;
   let refused: Failure | null | undefined;
-  try { refused = worldBudgetFailure(world, scratch, diff, ops.length - 1) ?? (opts.sealed === false ? null : sealedRouteFailure(world, scratch, diff, ops.length - 1)) ?? opts.refuse?.(scratch, diff, ops); }
+  try { refused = worldBudgetFailure(world, scratch, diff, ops.length - 1) ?? sealedRouteFailure(world, scratch, diff, ops.length - 1) ?? opts.refuse?.(scratch, diff, ops); }
   catch (error) {
     if (!(error instanceof BakeError)) throw error;
     const entity = [...scratch.entities.values()].find((e) => scratch.def(e.def)?.hash === error.def.hash);
