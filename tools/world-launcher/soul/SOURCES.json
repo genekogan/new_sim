@@ -4,14 +4,14 @@
     "file": "eden-agent.mjs",
     "version": "1.9",
     "sha256": "4f975bf549b9e3a9b8c693bcd0bf53041165e570a6d8ea95bf580e70b41955d9",
-    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-24f4755d.manifest.json)",
-    "source": "24f4755d83d301c03b13248016ec91b4df515b91",
+    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-5ccd99e4.manifest.json)",
+    "source": "5ccd99e477d1005919c712aa0ebfdbcf6a298994",
     "note": "trunk release 3: 1.9 + owner inbox listen/ack, look around (knowledge), travel, stroll in place, owner queue protection, speech truth, first wait reads from c_0, profile photo auto / body photo, looks v2 (accessories, outfits, shape); body-shape numbers parsed; 1.9.3: approval start/poll/cancel retry a restarting world (no answer, 429, 5xx) until their deadline, refused approvals print their reason; 1.9.4: create-soul/pair-soul --for <window code> puts the request in the human's open Sim window; approval wait keeps polling through a timed-out request (the human can Ask again) until its 15-min deadline; 1.9.5 (lane MSG): listen blocks with no time limit and prints every waiting owner message oldest first (no credential, emittedAt), outages (and connections dropped mid-answer) retried; --follow prints a whole backlog; result <id> done|failed \"...\""
   },
   "skill": {
     "file": "skill.md",
     "sha256": "444d97822d6d335f47d31ae4652ff273a84a40c6335da13b2ae72cbefbd5409c",
-    "from": "git show 24f4755d:tools/edge-skill/SKILL.md",
+    "from": "git show 5ccd99e4:tools/edge-skill/SKILL.md",
     "note": "template; the world fills {{BASE}}. Includes owner inbox, knowledge at scales, travel, creature guidance and looks v2 / portraits. 1.9.5 (lane MSG): always listen from the moment the Soul is ready, every mode; never filter listen; ack then result; work through a backlog; if listen ends without messages, start it again."
   },
   "instructions": {
