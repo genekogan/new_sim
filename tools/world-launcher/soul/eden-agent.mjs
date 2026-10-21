@@ -54,7 +54,7 @@ Objects: object <ID> \xB7 mark <note|sign|offering|proposal> "Title" "Text"
 Travel: travel \xB7 travel <world on this site> \xB7 travel home (this folder follows)
 Auto mode: dashboard [--engine codex] \xB7 live [--engine codex] \xB7 cost
 While live: tell "<human request>" --wait \xB7 report
-Owner inbox: listen (waits until your human writes, prints every waiting message; run it again after each batch) \xB7 ack <message-id> ["Got it: ..."] \xB7 result <message-id> done|failed "what happened"
+Owner inbox: listen [--after <last id>] (waits until your human writes, prints every waiting message; ack the batch, then run it again before the work) \xB7 wait 60 during an action returns when your human writes \xB7 ack <message-id> ["Got it: ..."] \xB7 result <message-id> done|failed "what happened"
 Manual session: attend 90 \xB7 act/say/converse \xB7 attend --release
 Pause with the dashboard or its pause API; STOP ends the ordinary live loop.
 Guide: SKILL.md (Start or resume; Observe, resolve, finish).
@@ -83,7 +83,8 @@ function noticeInboxHeader(headers) {
     return false;
   }
 }
-var LISTEN_NEXT = 'From your human, oldest first. For each: ack <id> "Got it: <what you will do>" at once, do it, then result <id> done|failed "<what happened>". Then run listen again right away (it waits as long as needed).';
+var LISTEN_NEXT = 'From your human, oldest first. 1) Ack them all now, one command: ack <id> "Got it: <what you will do>" && ack <next id> "\u2026". 2) Start listen --after <last id> again right away, before the work (it waits as long as needed). 3) Do them in order (a newer one that replaces an older wins), waiting on actions with wait 60 (it returns when your human writes). 4) result <id> done|failed "<what happened>" for each.';
+var listenNext = (lastId) => LISTEN_NEXT.replace("<last id>", lastId);
 var transient = (r) => r.status === 0 || r.status === 429 || r.status >= 500;
 function handed(data, after) {
   if (Array.isArray(data.backlog)) return data.backlog.filter((m2) => m2 && typeof m2.id === "string" && m2.state !== "acknowledged");
@@ -128,7 +129,7 @@ async function clientListen(args, { call: call2, sleep: sleep2 = (ms) => new Pro
     const messages = handed(inboxResult(r, "listen"), after);
     if (messages.length) {
       const at = new Date(now2()).toISOString();
-      return { messages: messages.map((m) => line(m, at)), waiting: messages.length, next: LISTEN_NEXT };
+      return { messages: messages.map((m) => line(m, at)), waiting: messages.length, next: listenNext(messages.at(-1).id) };
     }
     await sleep2(50);
   }
@@ -3663,7 +3664,7 @@ async function travelCommand(args, { load: load2, save: save2, live: live2 = () 
 }
 
 // tools/edge-skill/eden-agent.mjs
-var SKILL_VERSION = "1.9.5";
+var SKILL_VERSION = "1.9.6";
 var CONTRACT = "eden-edge/1";
 var API_CONTRACT = "eden-edge/1.1";
 var STATE = ".eden-agent.json";
@@ -3675,7 +3676,7 @@ var EDGE = {
   act: "/v1/edge/act",
   receipt: (id3) => `/v1/edge/receipts/${encodeURIComponent(id3)}`,
   say: "/v1/edge/say",
-  wait: (after, t) => `/v1/edge/wait?timeout=${t}${after ? `&after=${encodeURIComponent(after)}` : ""}`,
+  wait: (after, t, since) => `/v1/edge/wait?timeout=${t}${after ? `&after=${encodeURIComponent(after)}` : ""}${Number.isSafeInteger(since) ? `&ownerSince=${since}` : ""}`,
   converse: "/v1/edge/converse",
   object: (id3) => `/v1/edge/objects/${encodeURIComponent(id3)}`,
   objectAct: (id3) => `/v1/edge/objects/${encodeURIComponent(id3)}/act`,
@@ -4408,12 +4409,12 @@ async function wait(seconds = "45") {
   const s = load(), soul = need(s, "soul", "No Soul yet."), until = Date.now() + Math.min(60, Math.max(1, Number(seconds) || 45)) * 1e3;
   if (await mode() === "edge") {
     const events2 = [];
-    let cursor = s.cursor ?? "c_0", gap, waitUnavailable;
+    let cursor = s.cursor ?? "c_0", gap, waitUnavailable, ownerMark = s.ownerMark, ownerWrote = 0;
     while (Date.now() < until) {
       const t = Math.max(1, Math.min(55, Math.round((until - Date.now()) / 1e3)));
       let r;
       try {
-        r = await call(EDGE.wait(cursor, t), { timeoutMs: (t + 10) * 1e3 });
+        r = await call(EDGE.wait(cursor, t, ownerMark), { timeoutMs: (t + 10) * 1e3 });
       } catch (error) {
         if (!events2.length) throw error;
         waitUnavailable = { status: null, error: { code: "wait.unavailable", message: String(error.message) }, cursor };
@@ -4441,7 +4442,12 @@ async function wait(seconds = "45") {
         events2.push(...d.events ?? []);
         cursor = d.cursor ?? cursor;
       }
-      save({ cursor });
+      if (Number.isSafeInteger(d.ownerMark)) ownerMark = d.ownerMark;
+      save({ cursor, ...Number.isSafeInteger(ownerMark) ? { ownerMark } : {} });
+      if (d.ownerWrote > 0) {
+        ownerWrote = d.ownerWrote;
+        break;
+      }
       const mine = events2.find((e) => e.kind === "receipt" && e.receipt?.id === s.lastReceipt && TERMINAL3.has(e.receipt?.phase));
       if (events2.length >= 100 || mine || events2.some((e) => e.kind === "conversation.invite" || e.kind === "conversation.turn" || e.kind === "invite" || typeof e.kind === "string" && e.kind.startsWith("invite."))) break;
       if (!s.lastReceipt && events2.length) break;
@@ -4458,7 +4464,9 @@ async function wait(seconds = "45") {
     }
     const stalled = lr?.awaitingAnswer ? { hint: `${lr.awaitingAnswer.note} Do not tell the owner it is happening; keep waiting for their answer (invite.accepted) or report that it is still pending.` } : lr?.phase === "waiting" ? { hint: "Your movement is waiting (often the world's quiet pause before first light). Meanwhile do things that need no walking: say something, leave a mark, converse, work on a project here. Walks start once the pause ends." } : {};
     const invites = events2.filter((e) => e.kind === "invite" && e.invite).map((e) => ({ id: e.invite.id, from: e.invite.from?.name, what: e.invite.what, expiresInSeconds: e.invite.expiresInSeconds, accept: `act ${e.invite.accept}`, decline: `act ${e.invite.decline}` }));
+    const owner = ownerWrote ? await ownerInterrupt() : null;
     return {
+      ...owner ?? {},
       ...stalled,
       events: events2.map(brief),
       cursor,
@@ -4490,6 +4498,19 @@ async function wait(seconds = "45") {
     await sleep(3e3);
   }
   return { events: [], lastReceipt: last ?? null, next: "observe, decide, act" };
+}
+var OWNER_WROTE_NOTE = 'Your human just wrote (oldest first). Ack each now: ack <id> "Got it: <what you will do>". A new request replaces what you are doing (act it now) unless it asks for something after it; your current action keeps going until you act again. Then result <id> when done.';
+async function ownerInterrupt() {
+  let messages = [];
+  try {
+    const d = await clientListen(["--once", "--timeout", "0"], { call });
+    messages = (Array.isArray(d.backlog) ? d.backlog : d.inbox?.latest ? [d.inbox.latest] : []).filter((m) => m && typeof m.id === "string" && m.state !== "acknowledged").map((m) => ({ id: m.id, text: m.text, sentAt: m.sentAt }));
+  } catch (error) {
+    return { ownerWrote: true, ownerNote: "Your human just wrote; run listen now to read it (" + String(error.message).slice(0, 120) + ")." };
+  }
+  for (const m of messages) console.error("OWNER MESSAGE " + JSON.stringify(m));
+  if (messages.length) console.error(OWNER_WROTE_NOTE);
+  return messages.length ? { ownerMessages: messages, ownerNote: OWNER_WROTE_NOTE } : {};
 }
 function brief(e) {
   const from = e.from?.name ?? e.turn?.from?.name ?? e.soul?.name, text3 = e.text ?? e.turn?.text;
@@ -6451,6 +6472,7 @@ export {
   API_CONTRACT,
   CONTRACT,
   CONVERSATION_MAX_INVITEES,
+  OWNER_WROTE_NOTE,
   SKILL_VERSION,
   accept,
   ack,
