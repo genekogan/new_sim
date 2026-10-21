@@ -15,10 +15,18 @@ function rig(t: import('node:test').TestContext) {
 }
 
 test('a 1001 close (server restarting) reconnects within 150 ms', (t) => {
-  const { made } = rig(t);
-  made[0].onclose({ code: 1001 });
-  t.mock.timers.tick(149);
-  assert.equal(made.length, 2, 'a second socket is opened within 150 ms');
+  // The retry waits 50 + 100 * Math.random() ms. t4-quar (2026-10-21): pin both ends of the jitter; ticking 149 ms with a
+  // live Math.random failed whenever it drew above 0.99 (V5-server-full, gate run-6b0abdefd).
+  for (const r of [0, 0.999999]) {
+    const random = t.mock.method(Math, 'random', () => r);
+    const { made, c } = rig(t);
+    made[0].onclose({ code: 1001 });
+    t.mock.timers.tick(49);
+    assert.equal(made.length, 1, `random ${r}: no retry before 50 ms`);
+    t.mock.timers.tick(101);
+    assert.equal(made.length, 2, `random ${r}: a second socket is opened within 150 ms`);
+    c.close(); random.mock.restore(); t.mock.timers.reset();
+  }
 });
 
 test('another close, or a second 1001 before a welcome, waits the backoff', (t) => {
