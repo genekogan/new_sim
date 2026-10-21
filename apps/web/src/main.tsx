@@ -3,6 +3,7 @@ import {discoverWorlds,readWorldBootstrap,WorldBootstrapError} from './world-dis
 import { apiPath, worldPath, worldKey } from './world-path.ts';
 import {singleLocalPreview} from './local-navigation.ts';
 import {BASE} from './base-path.ts';
+import {pageRoute} from './page-route.ts';
 import {installAssetTransport} from './boot-assets.ts';
 import {takeConfigPrefetch} from './snapshot-prefetch.ts';
 import {takeInlineConfig} from './inline-config.ts';
@@ -96,7 +97,11 @@ function WorldRoot() {
 // (boot-assets.ts: installed once, here or earlier by P7b's early-entry.ts)
 installAssetTransport(); // the CDN transport, then the meter of the original asset URL, including its CDN attempt and origin fallback
 if(!newWorld&&worldKey==='mars'&&!marsFork&&!(location.pathname===BASE+'/'&&!location.hash))prefetchBackdrop(BACKDROP_BLOBS[MARS_CAMPUS_URL]!); // W3: campus starts with the page
-createRoot(document.getElementById('root')!).render(<StrictMode>{location.pathname===BASE+'/'&&!location.hash?<WorldList/>:<WorldRoot/>}</StrictMode>);
+const route=pageRoute(location.pathname,BASE,location.hash);if(route==='missing')document.title='No page here';
+createRoot(document.getElementById('root')!).render(<StrictMode>{route==='list'?<WorldList/>:route==='world'?<WorldRoot/>:<NoPage/>}</StrictMode>);
+
+/** lane QA: an unknown path (sim.eden.art/nope, a retired lab link) says so and links home, instead of a world error. */
+function NoPage(){return <main className="world-list"><h1>No page here</h1><p>There is nothing at <code>{location.pathname}</code>.</p><p><a href={BASE+'/'}>See the worlds</a></p></main>;}
 
 function WorldList(){
  const local=singleLocalPreview(location.hostname);
@@ -110,5 +115,5 @@ function WorldList(){
  })();return()=>{active=false;};},[local]);
  if(launcher)return <Suspense fallback={<pre>loading…</pre>}><LauncherRoot list={launcher}/></Suspense>;
  const card=(key:string,name:string,description:string)=>served?.has(key)?<a href={'/w/'+key}><h2>{name}</h2><p>{description}</p><span>enter world →</span></a>:<article aria-disabled="true" style={{border:'1px solid var(--line)',borderRadius:12,padding:18}}><h2>{name}</h2><p>{description}</p><span className="dim">{served?'Not connected to this site':'Checking connection…'}</span></article>;
- return <main className="world-list"><h1>Sim</h1><p>Persistent worlds. Open one to watch, meet its Souls, or give yours direction.</p><div className="world-cards">{card('eden','Eden','Our shared playground. Meet its Souls and see what develops.')}{card('mars','Mars','The 2026 camp, shared places and pallet-rack construction.')}{card('littlemartians','Little Martians','Floating ceramic characters and enterable glazed buildings.')}</div>{!local&&<p><a href="/worlds/">New world</a> · <a href="/l/mars">Mars Lab</a> · <a href="/l/littlemartians">Little Martians snapshot</a> · <a href="/l/eden">Eden snapshot</a></p>}</main>;
+ return <main className="world-list"><h1>Sim</h1><p>Persistent worlds. Open one to watch, meet its Souls, or give yours direction.</p><div className="world-cards">{card('eden','Eden','Our shared playground. Meet its Souls and see what develops.')}{card('mars','Mars','The 2026 camp, shared places and pallet-rack construction.')}{card('littlemartians','Little Martians','Floating ceramic characters and enterable glazed buildings.')}</div>{!local&&<p><a href="/worlds/">More worlds, or make your own →</a></p>}</main>;
 }
