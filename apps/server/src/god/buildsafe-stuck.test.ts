@@ -98,7 +98,7 @@ async function frozenWalk(t: TestContext, stubInside: boolean) {
   const out = await w.go('walk:far-lawn'); assert.equal(out.accepted, true, JSON.stringify(out));
   let frozen = true, ticks = 0, relocations = 0, first: any;
   const origEnqueue = w.host.enqueue.bind(w.host);
-  w.host.enqueue = (kind: string, ...rest: any[]) => {if (kind === 'edge-relocate') {relocations++; frozen = false;} return origEnqueue(kind, ...rest);};
+  w.host.enqueue = (kind: string, ...rest: any[]) => {if (kind === 'edge-relocate') {relocations++; frozen = false;} return (origEnqueue as any)(kind, ...rest);};
   for (let i = 0; i < 4000; i++) {
     const ex = execOf(w); if (ex && frozen) {ex.speed = 0; first ??= ex.id;}
     w.host.tickOnce(); ticks++;
@@ -154,7 +154,7 @@ test('seated start-blocked: a Soul on a bench whose walk cannot start where it s
   // slot is stubbed: the ledger sees the Soul held by its seat while it sits
   const seatOf = () => w.body().human.activity === 'sit' ? 'slot-0' : null; (w.edge as any).seatOf = seatOf;
   const kinds: any[] = []; const origEnqueue = w.host.enqueue.bind(w.host);
-  w.host.enqueue = (kind: string, ...rest: any[]) => {if (kind === 'edge-relocate') kinds.push(rest[1]); return origEnqueue(kind, ...rest);};
+  w.host.enqueue = (kind: string, ...rest: any[]) => {if (kind === 'edge-relocate') kinds.push(rest[1]); return (origEnqueue as any)(kind, ...rest);};
   w.extra.set('walk:lawn', {label: 'Walk to the lawn', steps: [{verb: 'walk_to', params: {to}}]});
   // the live shape (finding c): where the body sits no walk can start; once standing clear it can
   const real = w.host.engine.canPerform.bind(w.host.engine);
