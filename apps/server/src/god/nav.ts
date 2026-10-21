@@ -417,11 +417,20 @@ export class GodNav {
   walkOnDemand(soul: EdgeSoul, placeId: string, caps: EdgeCapability[], plans: Plans): boolean {
     const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human || !this.h.placeOf) return false;
     const here: Vec2 = [me.pose.p[0], me.pose.p[2]], myLevel = me.human.level ?? 0;
-    const all = this.things(), mine = all.filter((t) => this.h.placeOf!(t.ref) === placeId && (t.kind !== 'room' || t.level === 0));
-    const t = mine.find((x) => x.kind !== 'room') ?? mine[0]; if (!t) return false;
+    const all = this.things(), mine = all.filter((t) => this.h.placeOf!(t.ref) === placeId && (t.kind !== 'room' || t.level === 0 || (t.rise ?? 0) < LOW_RISE_M));
+    // F6: a room's own place is that room (not a piece of furniture standing in it)
+    const room = mine.some((x) => x.kind === 'building') ? undefined : mine.find((x) => x.kind === 'room');
+    const t = room ?? mine.find((x) => x.kind !== 'room') ?? mine[0]; if (!t) return false;
     const exit = myLevel === 0 ? null : all.find((r) => r.kind === 'room' && r.level === myLevel && r.poly && inPoly(here[0], here[1], r.poly) && r.entry && r.entry.level === 0)?.entry ?? null;
     const seated = me.human.activity === 'sit' || me.human.baseActivity === 'sit', n = caps.length;
     this.offerWalk(soul, t, this.distance(t, here), { here, myLevel, seated, exit }, caps, plans);
+    // F6 (SOULSIM-H): a room of a far building is walked to in at its front door, in one walk: to the door's approach
+    // outside, then onto the room's floor (it was refused, so the Soul walked to the building first, then in: ~10 s more)
+    const id = `walk:${t.ref}`, plan = plans.get(id), door = t.kind === 'room' ? t.entry : undefined;
+    if (plan && door && door.level === 0 && myLevel === 0 && Math.hypot(door.p[0] - here[0], door.p[1] - here[1]) > 3) {
+      const stand = plan.steps.filter((s) => s.verb === 'stand'), rest = plan.steps.filter((s) => s.verb !== 'stand');
+      plans.set(id, { ...plan, steps: [...stand, { verb: 'walk_to', params: { to: door.p, standoff: 0 } }, ...rest] });
+    }
     return caps.length > n;
   }
 
@@ -532,7 +541,7 @@ export class GodNav {
     const far = !!door && door.level === 0 && (me.human.level ?? 0) === 0 && Math.hypot(door.p[0] - here[0], door.p[1] - here[1]) > 3;
     const fast = (s: Step): Step => (s.verb === 'walk_to' ? { ...s, params: { ...s.params, gait } } : structuredClone(s));
     const steps: Step[] = far
-      ? [...base.steps.filter((s) => s.verb === 'stand'), { verb: 'walk_to', params: { to: door!.p, gait, standoff: 0 } }, ...base.steps.filter((s) => s.verb !== 'stand')]
+      ? [...base.steps.filter((s) => s.verb === 'stand'), { verb: 'walk_to', params: { to: door!.p, gait, standoff: 0 } }, ...base.steps.filter((s) => s.verb !== 'stand' && !(s.verb === 'walk_to' && String(s.params.to) === String(door!.p)))]
       : base.steps.map(fast);
     const name = t?.ref ?? placeId, label = far ? `${gait === 'jog' ? 'Jog' : 'Run'} to the door of ${name.split('/')[0]}, then walk inside${t?.kind === 'room' ? ` to ${name}` : ''}` : `${gait === 'jog' ? 'Jog' : 'Run'} to ${name}`;
     caps.push({ ...walk, id, verb: gait, label });

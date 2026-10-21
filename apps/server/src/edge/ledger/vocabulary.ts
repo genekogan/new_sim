@@ -37,7 +37,10 @@ export type VocabResult =
   | {kind: 'alias'; cap: EdgeCapability; note: string; params?: Record<string, unknown>;
     /** RESOLVE (2026-10-21): the target words named no offered thing by its own name, only a place whose description lists
      *  them ("go to the horse": a lawn "with ... a horse"): a host may offer a walk to the nearest thing so named instead. */
-    seek?: string[]}
+    seek?: string[];
+    /** F6: the words named a place with no offer of its own (a far building's room), so the walk to the place containing
+     *  it was chosen; the named place (a host may offer its own walk on demand and resolve again). */
+    inside?: string}
   | {kind: 'unknown'; reason: string; didYouMean: {id: string; label: string}[]; seek?: string[];
     /** Refusal code when it is not capability.unknown (place.unreachable: a named place exists but cannot be reached). */
     code?: string;
@@ -446,7 +449,7 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       const byId = new Map(ctx.places.map(p => [p.id, p]));
       for (let q = place.parent ? byId.get(place.parent) : undefined, n = 0; q && n < 20; q = q.parent ? byId.get(q.parent) : undefined, n++) {
         const c = capOf.get(q.id);
-        if (c?.available) return {kind: 'alias', cap: c, ...(seek ? {seek} : {}), note: `${place.name} itself is not a ${verb} target; ${c.id} (${c.label}) contains it.`};
+        if (c?.available) return {kind: 'alias', cap: c, inside: place.id, ...(seek ? {seek} : {}), note: `${place.name} itself is not a ${verb} target; ${c.id} (${c.label}) contains it.`};
       }
       const reachable = pool.filter(c => c.available && info.get(c.id)!.t.at), wholes = reachable.filter(c => c.target?.kind === 'place');
       const ranked = (wholes.length ? wholes : reachable).map(c => ({c, d: dist(info.get(c.id)!.t.at, place.center)})).sort((a, b) => a.d - b.d || a.c.id.localeCompare(b.c.id));

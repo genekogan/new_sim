@@ -24,7 +24,13 @@ export function destinationOffers(caps:readonly EdgeCapability[],verb:string):De
 export function resolvePlaceForVerb(L:EdgeLedger,soul:EdgeSoul,input:unknown,verb='walk'){
  const caps=L.coreA.binds(soul).caps,offers=destinationOffers(caps,verb);
  const places=knownBootPlaces(L,soul.soulId);
- const resolved=resolveBootPlace(input,places,offers);
+ let resolved=resolveBootPlace(input,places,offers);
+ // F6 (SOULSIM-H): a known place the listing leaves out for distance only (a far building's room: rooms are listed within
+ // 80 m) gets its one walk on demand, as words do: the capability it names is then acted as offered (see explicitPlaceCapability)
+ if(!resolved.ok&&verb==='walk'&&resolved.code==='place.unwalkable'&&L.walkOnDemand){
+  const named=resolveBootPlace(input,places,places.map(p=>({placeId:p.id,id:p.id,available:true}))),more=[...caps];
+  if(named.ok&&places.find(p=>p.id===named.chosen.place)?.access==='admitted'&&L.walkOnDemand(soul,named.chosen.place,more,new Map())){const again=resolveBootPlace(input,places,destinationOffers(more,verb));if(again.ok)resolved=again;}
+ }
  if(!resolved.ok&&verb==='walk'&&resolved.code==='place.unwalkable')return {...resolved,reason:resolved.reason+' no walk reaches it in the current offered destinations.'};
  return resolved;
 }
@@ -55,5 +61,7 @@ export function explicitPlaceCapability(L:EdgeLedger,soul:EdgeSoul,asked:string)
  // Preserve strict/1 unknown-ID diagnostics without blocking declared idlike aliases.
  if(!named){const strict=strictCheck(L,soul,asked,caps);if(strict)return {ok:false as const,...strict};}
  if(!named&&verb!=='walk'&&verb!=='stroll'&&verb!=='gather'&&verb!=='hang-out')return null;
- return resolvePlaceForVerb(L,soul,target,verb);
+ const r=resolvePlaceForVerb(L,soul,target,verb);
+ // F6: the asked ID is itself the walk offered on demand: act/resolve read it as an offered ID (it is not in the listing)
+ return r.ok&&r.chosen.capability===asked?null:r;
 }
