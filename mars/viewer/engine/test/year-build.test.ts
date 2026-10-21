@@ -3,7 +3,7 @@
 // compared with the checkpoint's own geometry: every sequenced frame and beam installed within 1 cm / 1°.
 // The run is the year scene cropped to 35 m around the house, the house itself removed, ground at the Kit
 // datum y = 0 (not an open-ground fork). HYPOTHETICAL order / piles / crew. The default suite runs the first
-// bay (a tranche, ≈ 15 s); the whole house (≈ 40–55 s) runs with YEAR_BUILD_FULL=1.
+// bay (a tranche, ≈ 15 s) and the whole skeleton (≈ 60 s).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadCampusFile } from '../campus/history-node.ts';
@@ -82,15 +82,12 @@ function runAndCompare(bays?: number) {
 /** Re-pinned 2026-10-17 on the W51 re-seeded mars-2022 (was 41317, 251a44c5…): 24/24 at the canonical pose, 42 reported outside
  *  the tranche, plywood untouched, 0 violations. */
 const PIN_BAY1 = { ticks: 39347, hash: '462a2f4a9feefec238d3cbbca1e99b90194ca0d9e6b0bf4162182448b747f645' };
-/** Pinned: the whole east-house skeleton (YEAR_BUILD_FULL=1; ≈ 40–55 s wall). Re-pinned (was 116477 ticks, 14d5c768…c89a):
+/** Pinned: the whole east-house skeleton (default suite; ≈ 60 s wall). Re-pinned (was 116477 ticks, 14d5c768…c89a):
  *  walker fallback + hypot + encounters on the smoothed path, 2026-09-28; re-pinned (was 117125 ticks, 35d12886…11da):
  *  no walker jumps: snaps walked, teleport 0.15 m, overspeed invariant, 2026-09-28; re-pinned (was 117277 ticks, d382e461…0617):
  *  the W51 re-seeded scene (yard and neighbours moved, 3 more walk_to steps), L3 2026-10-17; 0 violations, 66/66 at the
  *  canonical pose (max 0.94 mm). */
 const PIN_FULL = { ticks: 123818, hash: '8c57862eaeb66bc13000329475329db24639ec549bf6b036ca9cb8d2f0b2ee68' };
-/** The opt-in skip's TAP directive, kept verbatim from before the re-pin: the release gate matches a documented skip by its
- *  directive text against the baseline (tools/test-harness/quarantine.json carries the current reason). */
-const OPT_IN_SKIP = '2022 reconciliation W51; re-pin by W52';
 
 test('year build 2022 east-house, phase A, first bay (6 frames + 18 beams): 0 violations, every sequenced part at its canonical pose (≤ 1 cm / 1°), pinned', () => {
   const { s, reh, cmp, E } = runAndCompare(1);
@@ -101,7 +98,9 @@ test('year build 2022 east-house, phase A, first bay (6 frames + 18 beams): 0 vi
   assert.equal(reh.report.finalStateHash, PIN_BAY1.hash);
 });
 
-test('year build 2022 east-house, phase A, whole skeleton (12 frames + 54 beams) from the piles: 0 violations, all at the canonical pose, pinned (YEAR_BUILD_FULL=1)', { skip: process.env.YEAR_BUILD_FULL !== '1' && OPT_IN_SKIP }, () => {
+test('year build 2022 east-house, phase A, whole skeleton (12 frames + 54 beams) from the piles: 0 violations, all at the canonical pose, pinned (YEAR_BUILD_FULL=1)', () => {
+  // Runs in the default suite since t4-quar (2026-10-21: green on the W51 scene, ≈ 60 s). The title keeps its old
+  // "(YEAR_BUILD_FULL=1)" because the release gate tracks a test by its exact title; the flag no longer gates it.
   const { reh, cmp, E } = runAndCompare();
   assert.equal(cmp.length, 66);
   for (const id of ['pile-upright-16ft-kit-1', 'pile-upright-16ft-kit-2', 'pile-beam-12ft-1', 'pile-beam-12ft-2', 'pile-beam-12ft-3']) assert.equal(E[id], undefined, `${id} emptied`);
