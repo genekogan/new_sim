@@ -151,6 +151,9 @@ function viewOf(m: WorldModel, rect: [number, number, number, number], extra: It
     const seats = (baked.slots ?? []).some((x) => x.kind === 'seat');
     if (!e.name && !seats) continue;
     if (wallLike(baked.box, e.s ?? 1)) continue;   // a wall is walked past, not to
+    // a bowl on a table: walked to as its holder is (the holder's own spot is its key; walk fuzz, 2026-10-21)
+    const holder = e.in?.parent ? m.entities.get(e.in.parent) : undefined, hd = holder && m.resolvedDef(holder.def);
+    if (hd && hd.form === 'point' && !m.bake(hd, holder!.params ?? {}, holder!.seed ?? 0, holder!.shape).rooms?.length) continue;
     if (wp.y - groundAt(m, wp.x, wp.z) > 1.2 || !inRect(rect, wp.x, wp.z)) continue;   // upstairs, on a shelf: not this raster's
     keys.push({ id, owner: id, label: path, key: approachOf(baked, [wp.x, wp.z], wp.yaw) });
   }
@@ -197,6 +200,11 @@ function wallLike(box: number[], s: number) { const a = Math.max(box[0], box[2])
 function* poses() { for (const t of [0, ...TURNS.slice(1)]) for (const d of [0, ...OFFSETS]) for (let k = 0; k < (d ? DIRS.length : 1); k++) { if (!t && !d) continue; yield { off: [DIRS[k][0] * d, DIRS[k][1] * d] as Vec2, dyaw: t, d, k }; } }
 
 /** Repairs for `ops` applied to `before` giving `after` (`ids`: the batch's tmp → id). null: nothing to repair. */
+/** A piece standing in a building's room (its parent has rooms). */
+function inRoom(m: WorldModel, id: string): boolean {
+  const e = m.entities.get(id), p = e?.in?.parent ? m.entities.get(e.in.parent) : undefined, d = p && m.resolvedDef(p.def);
+  return !!d && !!m.bake(d, p!.params ?? {}, p!.seed ?? 0, p!.shape).rooms?.length;
+}
 export function repairBatch(before: WorldModel, after: WorldModel, diff: Diff, ids: Record<string, string>, budgetMs = 400): Repair | null {
   const t0 = performance.now();
   const refOf = new Map<string, string>(); for (const [k, v] of Object.entries(ids)) if (k.startsWith('$')) refOf.set(v, k);
@@ -229,7 +237,11 @@ export function repairBatch(before: WorldModel, after: WorldModel, diff: Diff, i
     let grid = gridOf(w.r, v);
     // newly cut off: joined to the surroundings before (or new with this edit), not now
     // doorways and stair feet first: opening one rejoins what stands behind it
-    const cut = () => v.keys.filter((k) => { const was = wasOk.get(k.id); return (was === undefined || was === true) && grid.ok(k.key) !== true; }).sort((a, b) => Number(!!a.owner) - Number(!!b.owner));
+    // a piece set into a room by this edit is not a key: the furnish ways rule places room pieces, and this raster (real
+    // collider boxes, nearest free cell) is the coarser judge there; its nudges made the walk worse (walk fuzz kitchens,
+    // 2026-10-21). The room's doors and stair feet stay keys.
+    const newInRoom = new Set(v.keys.filter((k) => k.owner && !wasOk.has(k.id) && inRoom(after, k.owner)).map((k) => k.id));
+    const cut = () => v.keys.filter((k) => { const was = wasOk.get(k.id); return !newInRoom.has(k.id) && (was === undefined || was === true) && grid.ok(k.key) !== true; }).sort((a, b) => Number(!!a.owner) - Number(!!b.owner));
     let bad = cut(); if (!bad.length) continue;
     const done = new Set<string>(), left_: { label: string; line: string }[] = [];
     // the edit's things that cut a key off: without them it is joined again

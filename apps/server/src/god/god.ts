@@ -480,34 +480,36 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const go = (ops: B['ops'], o: PlanOptions) => { const next = this.model.fork(); lifted.length = 0; return { next, r: applyBatch(next, { ...batch, ops }, 'god', tick, o) }; };
     if (trusted) { const a = go(batch.ops, opts); return { ...a, batch, repair: null }; }
     const tagged = tagPlaces(batch.ops);
-    let first = go(tagged, opts), sealedFail: Failure | null = null;
+    const asSent = () => ({ ...go(batch.ops, opts), batch, repair: null });   // a refusal, as sent (no tmp tags)
+    let first = go(tagged, opts), refused = false;
     if (!first.r.result.accepted) {
       const f = first.r.result.failures;
       if (!f.length || f.some(x => x.code !== 'architecture.sealed')) return { ...first, batch, repair: null };
-      sealedFail = f[0]; first = go(tagged, { ...opts, sealed: false });
-      if (!first.r.result.accepted) return { ...first, batch, repair: null };
+      // a sealed room is accepted only once the repair has opened it again: else the refusal stands (a building
+      // left with no way in is worse than an edit refused with its fix; walk fuzz pair-townhouse, 2026-10-21)
+      first = go(tagged, { ...opts, sealed: false });
+      if (!first.r.result.accepted) return asSent();
+      refused = true;
     }
     let repair: Repair | null = null;
     try { repair = repairBatch(this.model, first.next, first.r.diff!, first.r.result.ids ?? {}); } catch { repair = null; }
-    const sealedLine = (f: Failure) => { const m = f.measured as { building?: string; room?: string; openings?: string[] } | undefined;
-      return `No walk reaches ${m?.building ?? f.entity}/${m?.room ?? 'a room'} after this edit (architecture.sealed): its last way out (${m?.openings?.join(', ') ?? 'its door'}) is blocked; fix: ${f.fix ?? 'move what stands in front of the door'}.`; };
-    const finish = (a: { next: WorldModel; r: ReturnType<typeof applyBatch> }, ops: B['ops'], rep: Repair | null, sealed: Failure | null) => {
-      const lines = [...(rep?.lines ?? []), ...(sealed ? [sealedLine(sealed)] : [])];
+    const finish = (a: { next: WorldModel; r: ReturnType<typeof applyBatch> }, ops: B['ops'], rep: Repair | null) => {
+      const lines = rep?.lines ?? [];
       const ids = a.r.result.accepted ? a.r.result.ids : undefined; if (ids) for (const k of Object.keys(ids)) if (k.startsWith('$bs-')) delete ids[k];
-      return { ...a, batch: { ...batch, ops }, repair: rep || sealed ? { ops: rep?.ops ?? [], lines, named: rep?.named ?? [], ms: rep?.ms ?? 0 } : null };
+      return { ...a, batch: { ...batch, ops }, repair: rep ? { ops: rep?.ops ?? [], lines, named: rep?.named ?? [], ms: rep?.ms ?? 0 } : null };
     };
     if (repair?.ops.length) {
       const ops = [...untagPlaces(tagged, repair.ops), ...repair.ops] as B['ops'];
       const again = go(ops, opts);
-      if (again.r.result.accepted) return finish(again, ops, repair, null);
-      const f = again.r.result.failures;
-      if (f.length && f.every(x => x.code === 'architecture.sealed')) { const open = go(ops, { ...opts, sealed: false }); if (open.r.result.accepted) return finish(open, ops, repair, f[0]); }
+      if (again.r.result.accepted) return finish(again, ops, repair);
+      if (refused) return asSent();
       repair = { ...repair, ops: [], lines: repair.lines.filter(l => !l.startsWith('Kept a way open')) };
       // the repaired batch did not apply (it never should): the batch as sent stands, re-applied so its hooks' results are its own
-      return finish(go(batch.ops, sealedFail ? { ...opts, sealed: false } : opts), batch.ops, repair, sealedFail);
+      return finish(go(batch.ops, opts), batch.ops, repair);
     }
+    if (refused) return asSent();
     // nothing to repair: the first application stands; the journal keeps the ops as sent (the tags change nothing)
-    return finish(first, batch.ops, repair, sealedFail);
+    return finish(first, batch.ops, repair);
   }
   undo(): Result & { reverted?: number } {
     const target = this.store.undoable();
