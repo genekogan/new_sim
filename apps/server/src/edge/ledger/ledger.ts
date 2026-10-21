@@ -24,7 +24,7 @@ const bboxDistance = (p: [number, number][], at: [number, number]) => {let x0 = 
 const LOOP_SPAN = 160;
 const bboxSpan = (p: [number, number][]) => {const xs = p.map(q => q[0]), zs = p.map(q => q[1]); return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs));};
 const area = (p: [number, number][]) => Math.abs(p.reduce((s, [x, z], i) => {const [x2, z2] = p[(i + 1) % p.length]; return s + x * z2 - x2 * z;}, 0)) / 2;
-import {resolveCapability, tokens, placeMatch, type VocabContext, type VocabResult} from './vocabulary.ts';
+import {resolveCapability, tokens, placeMatch, typoFix, type VocabContext, type VocabResult} from './vocabulary.ts';
 import {isCampfire} from './fire.ts';
 import {activityCapabilities, loadSpots, ACTIVITY_SECONDS_MAX, SPOT_ACTIVITIES, type SpotsData} from './activities.ts';
 import {Together, PAIRED, type TogetherPlan} from './together.ts';
@@ -79,6 +79,16 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** RT: a jog or run to a named place the listing offers no gait for (a building or a room: those are walk-only in the
    *  listing): jog/run to its front door, then walk inside. Adds `<gait>:<placeId>` to copies; true when added. */
   gaitOnDemand?: (soul: EdgeSoul, placeId: string, gait: 'jog' | 'run', caps: EdgeCapability[], plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>) => boolean;
+  /** World-engine worlds only (god/nav.ts), RESOLVE: a walk to standing room next to the nearest named thing whose own name
+   *  or kind is all of `ask` (the horse, not the lawn whose description lists one), added to copies; its id, or null. */
+  thingOnDemand?: (soul: EdgeSoul, ask: string[], caps: EdgeCapability[], plans: Plans) => {id: string; count: number} | null;
+  /** World-engine worlds only, RESOLVE: a building's floor as its main room ("go upstairs", "go inside the cottage and go
+   *  upstairs"), added to copies, or why not. Null when it could not be worked out. */
+  floorOnDemand?: (soul: EdgeSoul, q: {ask: string[]; prefer?: string; floor: 'up' | 'down' | 'top' | number}, caps: EdgeCapability[], plans: Plans) => {id: string; note: string} | {code: string; reason: string} | null;
+  /** World-engine worlds only, RESOLVE: where a named thing that is not an engine body stands ([x, z]), by entity id. */
+  thingAt?: (id: string) => [number, number] | null;
+  /** World-engine worlds only, RESOLVE: the words of named things (beyond the listing), for reading a misspelt name. */
+  thingWords?: () => string[];
   /** World-engine worlds only: called before the map is read, so a god's edit shows on the next `map`. Unset elsewhere. */
   beforeMap?: () => void;
   private pending = new Map<string, Pending>();           // soulId → waiting act
@@ -1104,6 +1114,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
         const place = this.places.byId.get(t.id); if (place) return {names: [place.name], around: [], at: centroid(place.polygon)};
         const e = w.entities[t.id]; if (e) return {names: [], around: around(e.pose.p[0], e.pose.p[2]), at: [e.pose.p[0], e.pose.p[2]]};
         const o = objects.get(t.id), op = o ? this.places.byId.get(o.placeId) : undefined; if (op) return {names: [], around: [op.id, op.name], at: centroid(op.polygon)};
+        // RESOLVE: a named thing that is no engine body (a horse, a duck: decor), where nav says it stands
+        const nt = this.thingAt?.(t.id); if (nt) return {names: [], around: around(nt[0], nt[1]), at: nt};
         const r = (w.regions as Record<string, {polygon: [number, number][]}> | undefined)?.[t.id]; return {names: [], around: [], at: r ? centroid(r.polygon) : null};
       }};
   }
@@ -1296,9 +1308,26 @@ export class EdgeLedger implements EdgeLedgerHooks {
    *  SOULSIM-E (2026-10-21): resolve (the dry run) goes through here as act does. It did not, so "go to the lighthouse"
    *  and "go to the horse" on Eden 2026 were answered "not walkable ground yet" by resolve while act would walk there,
    *  and a Soul that resolves first (as the skill says) told its human it could not go. */
-  resolveOnDemand(soul: EdgeSoul, text: string, caps: EdgeCapability[], plans: Plans): {v: VocabResult; caps: EdgeCapability[]; plans: Plans} {
+  resolveOnDemand(soul: EdgeSoul, text: string, caps: EdgeCapability[], plans: Plans, typos = true): {v: VocabResult; caps: EdgeCapability[]; plans: Plans} {
     const exact = caps.find(c => c.id === text);
+    // RESOLVE: a building's floor ("go upstairs", "go inside the cottage and go upstairs", "the top floor of the tower")
+    const fl = exact || !this.floorOnDemand ? null : floorWords(text);
+    if (fl) {
+      const near = fl.ask.length ? this.resolveOnDemand(soul, `walk to ${fl.ask.join(' ')}`, caps, plans, typos) : null;
+      const prefer = near && near.v.kind !== 'unknown' && near.v.cap.verb === 'walk' && near.v.cap.target?.kind === 'place' && !(near.v.kind === 'alias' && near.v.params) ? near.v.cap.target.id : undefined;
+      const more = [...(near?.caps ?? caps)], morePlans = new Map(near?.plans ?? plans), f = this.floorOnDemand!(soul, {ask: fl.ask, prefer, floor: fl.floor}, more, morePlans);
+      if (f && 'code' in f) return {v: {kind: 'unknown', code: f.code, reason: `${text}: ${f.reason}`, didYouMean: []}, caps, plans};
+      const cap = f ? more.find(c => c.id === f.id) : undefined;
+      if (f && cap && !this.secretOffer(soul, cap)) return {v: {kind: 'alias', cap, note: `${text} is ${cap.id} (${cap.label})${f.note}.`}, caps: more, plans: morePlans};
+    }
     let v: VocabResult = exact ? {kind: 'exact', cap: exact} : resolveCapability(text, this.vocabulary(soul, caps));
+    // RESOLVE (SOULSIM-E "go to the horse" ended at the west lawn's centre, ~10 m from the horse): words that named only a place
+    // whose description lists them name a thing: the nearest one so named, next to it
+    if (v.kind !== 'exact' && v.seek?.length && this.thingOnDemand) {
+      const more = [...caps], morePlans = new Map(plans), got = this.thingOnDemand(soul, v.seek, more, morePlans), cap = got ? more.find(c => c.id === got.id) : undefined;
+      // knowledge/1: never a secret place this Soul does not know, under its thing name
+      if (got && cap && !this.secretOffer(soul, cap)) return {v: {kind: 'alias', cap, note: `${text} is ${cap.id} (${cap.label}): the nearest ${v.seek.join(' ')} you can stand next to${got.count > 1 ? ` (of ${got.count} in this world)` : ''}.`}, caps: more, plans: morePlans};
+    }
     if (v.kind === 'unknown' && v.code === 'place.unreachable' && v.place && this.walkOnDemand) {
       const more = [...caps], morePlans = new Map(plans);
       if (this.walkOnDemand(soul, v.place, more, morePlans)) {caps = more; plans = morePlans; v = resolveCapability(text, this.vocabulary(soul, caps));}
@@ -1320,7 +1349,22 @@ export class EdgeLedger implements EdgeLedgerHooks {
         if (cap) return {v: {kind: 'alias', cap, note: `${text} is ${cap.id} (${cap.label}).`}, caps: more, plans: morePlans};
       }
     }
+    // RESOLVE (SOULSIM-E "go to the lighthuose", "walk to the cotage"): only when the words as written name nothing, a
+    // misspelt word is read as the closest name this world knows, and the reply says so
+    if (typos && v.kind === 'unknown' && (!v.code || v.code === 'capability.unknown')) {
+      const fix = typoFix(text, this.vocabulary(soul, caps), this.thingWords?.() ?? []);
+      const r = fix ? this.resolveOnDemand(soul, fix.text, caps, plans, false) : null;
+      if (fix && r && r.v.kind !== 'unknown') {
+        const read = fix.fixes.map(([a, b]) => `"${a}" as "${b}"`).join(', ');
+        return {...r, v: {kind: 'alias', cap: r.v.cap, ...(r.v.kind === 'alias' && r.v.params ? {params: r.v.params} : {}), note: `read ${read}: ${r.v.kind === 'alias' ? r.v.note : `${fix.text} is ${r.v.cap.id} (${r.v.cap.label}).`}`}};
+      }
+    }
     return {v, caps, plans};
+  }
+  /** knowledge/1 (as the listing filters its offers): an on-demand offer that leads to a secret place this Soul has not been
+   *  to or found (or into one: knows() reads the secret ancestor), is not offered either. */
+  private secretOffer(soul: EdgeSoul, cap: EdgeCapability): boolean {
+    return !!this.knowledge.marked().size && cap.target?.kind === 'place' && !this.knowledge.knows(soul.soulId, cap.target.id);
   }
   /** @internal for edge/perception and edge/intents (Core-A modules): read access and two narrow write paths. */
   get coreA() {
@@ -1417,3 +1461,15 @@ export function stateOf(host: WorldHost, entityId: string): string {
 /** Verbs whose resting posture is a chosen activity (fade-by-abandonment holds the Soul while the body keeps it). */
 const POSTURE_VERBS = new Set(['sit', 'sit-ground', 'lie', 'nap', 'read', 'rest', 'warm-by-fire', 'gather', 'swim', 'accept', 'object', 'paint', 'play-piano', 'play-music', 'write', 'play-game', 'craft', 'eat', 'drink', 'cook', 'dance-with']);
 export function timeLabel(phase: number) {return phase < .2 ? 'morning' : phase < .45 ? 'day' : phase < .55 ? 'evening' : phase < .75 ? 'dusk' : 'night';}
+
+/** RESOLVE: a floor of a building named in plain words ("go upstairs", "go inside the cottage and go upstairs", "the top floor
+ *  of the tower", "go downstairs"): which floor, and the words left that name the building (none: the one the Soul is in). */
+export function floorWords(text: string): {floor: 'up' | 'down' | 'top' | number; ask: string[]} | null {
+  if (text.includes(':')) return null;
+  const t = text.toLowerCase(), m = /\b(?:(up)stairs|(down)stairs|(?:go(?:ing)?|walk|climb|head|run|get)\s+(up|down)(?:\s+the)?\s+(?:stairs|staircase|steps)|climb(?:\s+up)?\s+the\s+(?:stairs|staircase)|(?:the\s+)?(upper|top|first|second|third|1st|2nd|3rd|ground|bottom|next)\s+(?:floor|storey|story|level))\b/.exec(t);
+  if (!m) return null;
+  const w = m[1] ?? m[2] ?? m[3] ?? m[4] ?? 'up';
+  const floor = ({up: 'up', upper: 'up', next: 'up', down: 'down', top: 'top', ground: 0, bottom: 0, first: 1, '1st': 1, second: 2, '2nd': 2, third: 3, '3rd': 3} as Record<string, 'up' | 'down' | 'top' | number>)[w] ?? 'up';
+  const ask = tokens(t.replace(m[0], ' ')).filter(x => !['go', 'going', 'walk', 'head', 'climb', 'run', 'get', 'take', 'me', 'please', 'inside', 'enter', 'up', 'down', 'floor', 'stairs', 'now', 'can', 'you', 'let', 'lets', 'us', 'i', 'want'].includes(x));
+  return {floor, ask};
+}

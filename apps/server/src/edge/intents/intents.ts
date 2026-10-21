@@ -379,6 +379,8 @@ const intentOf = (input: IntentInput): IntentInput => {const out: IntentInput = 
 
 /** Plain words for the attention channel: "look at the fire", "turn to Bill", "face the campfire", "look left", "turn around". */
 export function attentionWords(text: string): IntentInput | null {
+  // RESOLVE: "look for X" / "look around for X" is finding X (a walk to the nearest), not a look
+  if (/^\s*(?:look|glance)\s+(?:around\s+|round\s+)?for\b/i.test(text)) return null;
   const m = /^\s*(look|glance|turn|face)(?:\s+(?:at|to|towards|toward|round|over at))?\s+(.+?)\s*$/i.exec(text); if (!m || text.includes(':')) return null;
   const verb = m[1].toLowerCase(), rest = m[2].replace(/^(?:the|a|an)\s+/i, '').trim(); if (!rest) return null;
   if (verb === 'look' || verb === 'glance') return {verb: 'look', target: rest};
