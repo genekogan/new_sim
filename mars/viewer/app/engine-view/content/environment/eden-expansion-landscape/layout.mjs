@@ -89,8 +89,12 @@ const data={
 export function edenExpansionLayout(){return structuredClone(data);}
 export function inside(x,z,b,margin=0){return x>=b[0]-margin&&x<=b[2]+margin&&z>=b[1]-margin&&z<=b[3]+margin;}
 export function pathDistance(x,z,points){let out=Infinity;for(let i=1;i<points.length;i++){const a=points[i-1],b=points[i],dx=b[0]-a[0],dz=b[1]-a[1],u=Math.max(0,Math.min(1,((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz||1)));out=Math.min(out,Math.hypot(x-a[0]-u*dx,z-a[1]-u*dz));}return out;}
+// Per-path [minX,minZ,maxX,maxZ]: a point farther than the threshold outside a path's box cannot be within it, so
+// reserved() skips the segment walk there (same answers; the 1e-6 slack covers rounding in the projected point).
+const PATH_BOXES=data.paths.map(p=>p.points.reduce((b,q)=>[Math.min(b[0],q[0]),Math.min(b[1],q[1]),Math.max(b[2],q[0]),Math.max(b[3],q[1])],[Infinity,Infinity,-Infinity,-Infinity]));
+function nearPath(x,z,p,b,t){const m=t+1e-6;if(x<b[0]-m||x>b[2]+m||z<b[1]-m||z>b[3]+m)return false;return pathDistance(x,z,p.points)<=t;}
 export function inNative(x,z,margin=0){return data.preserved.some(p=>inside(x,z,p.bounds,margin));}
-export function reserved(x,z,r=0){return inNative(x,z,r)||data.regions.some(p=>['volcanic-periphery','outlook-grove-accent'].includes(p.id)&&inside(x,z,p.bounds,r))||data.places.some(p=>inside(x,z,p.bounds,r+.6))||data.paths.some(p=>pathDistance(x,z,p.points)<=p.width/2+r+.35)||data.stops.some(p=>Math.hypot(x-p.p[0],z-p.p[1])<=p.radius+r);}
+export function reserved(x,z,r=0){return inNative(x,z,r)||data.regions.some(p=>['volcanic-periphery','outlook-grove-accent'].includes(p.id)&&inside(x,z,p.bounds,r))||data.places.some(p=>inside(x,z,p.bounds,r+.6))||data.paths.some((p,i)=>nearPath(x,z,p,PATH_BOXES[i],p.width/2+r+.35))||data.stops.some(p=>Math.hypot(x-p.p[0],z-p.p[1])<=p.radius+r);}
 export function inWater(x,z){return data.water.some(w=>w.wetEllipse?((x-w.p[0])/w.wetEllipse[0])**2+((z-w.p[2])/w.wetEllipse[1])**2<=1:inside(x,z,w.wetBounds));}
 export function waterBedReserved(x,z,margin=0){return data.water.some(w=>inside(x,z,w.outerBounds,margin));}
 /** Cosmetic new expansion ground only. Never sample it as native support. */
