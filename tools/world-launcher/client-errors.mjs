@@ -21,8 +21,14 @@ import { TokenBuckets } from './flood.mjs';
 export const CLIENT_ERROR_LIMITS = Object.freeze({
   bodyBytes: 8192, eventsPerBody: 10, ipPerS: 0.2, ipBurst: 10, sitePerS: 10, siteBurst: 300,
   maxKinds: 500, maxKeys: 16, logBytes: 256 * 1024, maxVisitorsPerDay: 64, flushMs: 5000,
+  arrivalsKept: 3000, arrPerS: 20, arrBurst: 600,   // lane DASH: successful arrivals (a time sample, not an error)
 });
 const KINDS = new Set(['js', 'rej', 'gl', 'asset', 'res', 'ws', 'storm', 'arrival', 'boot']);   // boot: the world's config/bootstrap failed
+// lane DASH: `arrived` {ms} = one page's arrival finished (card gone / first live frame), ms since navigation. Not an error:
+// it never enters the table of kinds, the event log or newSinceRelease; it feeds a bounded 24 h sample (summary().arrivals)
+// with exact per-hour counts, under its own per-address and site-wide buckets (a busy hour's arrivals never crowd out errors).
+const DAY_MS = 86_400_000;
+const pct = (sorted, q) => (sorted.length ? sorted[Math.max(0, Math.ceil(q * sorted.length) - 1)] : null);   // nearest rank
 
 /** Text a page sent, made safe to keep: no query strings, quoted text, tokens/ids, emails, addresses or control chars. */
 export function scrub(t, max = 160) {
@@ -67,15 +73,22 @@ export function clientErrors({ dir, build = 'dev', limits = {}, now = Date.now, 
   mkdirSync(dir, { recursive: true });
   const aggFile = join(dir, 'agg.json'), logFile = join(dir, 'events.jsonl');
   // The table is re-read when another launcher generation (a release's handover) wrote it since and nothing is unsaved here.
-  let agg = { builds: {}, kinds: {} }, seenMtime = -1;
+  let agg = { builds: {}, kinds: {}, arrivals: [], arrivalHours: {} }, seenMtime = -1;
   const mtime = () => { try { return statSync(aggFile).mtimeMs; } catch { return 0; } };
   const load = () => {
     const m = mtime(); if (m === seenMtime || dirty) return; seenMtime = m;
-    try { const a = JSON.parse(readFileSync(aggFile, 'utf8')); if (a && typeof a.kinds === 'object') agg = { builds: a.builds ?? {}, kinds: a.kinds }; } catch { /* first run */ }
+    try { const a = JSON.parse(readFileSync(aggFile, 'utf8')); if (a && typeof a.kinds === 'object') agg = { builds: a.builds ?? {}, kinds: a.kinds, arrivals: Array.isArray(a.arrivals) ? a.arrivals : [], arrivalHours: a.arrivalHours ?? {} }; } catch { /* first run */ }
     if (!agg.builds[build]) { agg.builds[build] = now(); later(); }
     for (const b of Object.keys(agg.builds).sort((x, y) => agg.builds[x] - agg.builds[y]).slice(0, -20)) delete agg.builds[b];
   };
   const ips = new TokenBuckets(L.ipPerS, L.ipBurst, now), site = new TokenBuckets(L.sitePerS, L.siteBurst, now);
+  const arrIps = new TokenBuckets(L.ipPerS, L.ipBurst, now), arrSite = new TokenBuckets(L.arrPerS, L.arrBurst, now);
+  const hourOf = (t) => new Date(t - (t % 3_600_000)).toISOString().slice(0, 13);
+  const trimArrivals = (t) => {
+    const from = t - DAY_MS; let i = 0; while (i < agg.arrivals.length && agg.arrivals[i][0] < from) i++;
+    if (i || agg.arrivals.length > L.arrivalsKept) agg.arrivals = agg.arrivals.slice(Math.max(i, agg.arrivals.length - L.arrivalsKept));
+    const keep = hourOf(from - 3_600_000); for (const h of Object.keys(agg.arrivalHours)) if (h < keep) delete agg.arrivalHours[h];
+  };
   const stats = { accepted: 0, rate: 0, size: 0, bad: 0 };
   let salt = { day: '', key: Buffer.alloc(0) }, timer = null, dirty = false, logSize = -1;
   const visitor = (ip, ua, day) => {
@@ -103,14 +116,21 @@ export function clientErrors({ dir, build = 'dev', limits = {}, now = Date.now, 
 
   function ingest(ip, ua, body) {
     if (!body || body.length > L.bodyBytes) { stats.size++; return [413, { ok: false, code: 'too-large' }]; }
-    if (ips.take(`ip:${ip}`)) { stats.rate++; return [429, { ok: false, code: 'slow-down' }]; }
-    load();
     let d; try { d = JSON.parse(body.toString('utf8')); } catch { stats.bad++; return [400, { ok: false, code: 'bad-json' }]; }
-    const events = Array.isArray(d?.e) ? d.e.slice(0, L.eventsPerBody) : [];
+    const all = Array.isArray(d?.e) ? d.e.slice(0, L.eventsPerBody) : [];
+    const arrived = all.filter((e) => e?.k === 'arrived'), events = all.filter((e) => e?.k !== 'arrived');
+    const onlyArrived = arrived.length > 0 && events.length === 0;
+    if ((onlyArrived ? arrIps : ips).take(`ip:${ip}`)) { stats.rate++; return [429, { ok: false, code: 'slow-down' }]; }
+    load();
     const b = typeof d?.b === 'string' && /^[\w.-]{1,40}$/.test(d.b) ? d.b : '?';
     const w = typeof d?.w === 'string' && /^[a-z][a-z0-9-]{0,31}$/.test(d.w) ? d.w : 'home';
     const c = browserOf(String(ua ?? '')), t = now(), day = new Date(t).toISOString().slice(0, 10), v = visitor(ip, String(ua ?? ''), day);
     let took = 0;
+    const ms = Math.round(Number(arrived[0]?.ms));
+    if (arrived.length && ms > 0 && ms <= 600_000 && !arrSite.take('site')) {   // one per page: the first counts
+      trimArrivals(t); agg.arrivals.push([t, ms, w]); const h = hourOf(t); agg.arrivalHours[h] = (agg.arrivalHours[h] ?? 0) + 1;
+      stats.arrived = (stats.arrived ?? 0) + 1; took++;
+    } else if (arrived.length) stats.bad++;
     for (const e of events) {
       const k = typeof e?.k === 'string' && KINDS.has(e.k) ? e.k : null;
       if (!k) { stats.bad++; continue; }
@@ -138,7 +158,18 @@ export function clientErrors({ dir, build = 'dev', limits = {}, now = Date.now, 
       .sort(([, a], [, b]) => b.count - a.count).slice(0, Math.max(1, Math.min(500, Number(limit) || 50)))
       .map(([fp, a]) => ({ fp, kind: a.k, message: a.m, source: a.s, count: a.count, visitors: a.visitorDays, first: new Date(a.first).toISOString(), last: new Date(a.last).toISOString(),
         firstBuild: a.firstBuild, new: a.first >= since(), builds: a.builds, worlds: a.worlds, browsers: a.browsers }));
-    return { ok: true, build, since: new Date(since()).toISOString(), kinds: Object.keys(agg.kinds).length, newSinceRelease: newSinceRelease(), stats: { ...stats }, top: rows };
+    return { ok: true, build, since: new Date(since()).toISOString(), kinds: Object.keys(agg.kinds).length, newSinceRelease: newSinceRelease(), stats: { ...stats }, top: rows, arrivals: arrivals(world) };
+  }
+  /** The last 24 h of successful arrivals: n = exact count (per-hour counters), p50/p90 ms over the kept sample, per world. */
+  function arrivals(world) {
+    const t = now(), from = t - DAY_MS, rows = agg.arrivals.filter((r) => r[0] >= from && (!world || r[2] === world));
+    const fromHour = hourOf(from);
+    const n = world ? rows.length : Object.entries(agg.arrivalHours).reduce((s, [h, c]) => s + (h >= fromHour ? c : 0), 0);
+    const sorted = rows.map((r) => r[1]).sort((a, b) => a - b), byWorld = {};
+    for (const r of rows) (byWorld[r[2]] ??= []).push(r[1]);
+    const worlds = Object.entries(byWorld).sort((a, b) => b[1].length - a[1].length).slice(0, 12)
+      .map(([w, v]) => { v.sort((a, b) => a - b); return { world: w, n: v.length, p50: pct(v, 0.5), p90: pct(v, 0.9) }; });
+    return { n: Math.max(n, rows.length), sampled: rows.length, p50: pct(sorted, 0.5), p90: pct(sorted, 0.9), worlds };
   }
   function newSinceRelease() { load(); const s = since(); let n = 0; for (const a of Object.values(agg.kinds)) if (a.first >= s) n++; return n; }
   return { ingest, summary, newSinceRelease, flush };

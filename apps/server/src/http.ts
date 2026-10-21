@@ -154,7 +154,10 @@ export function buildApp(d: Deps) {
   mountWelcomeRoutes(app,d);
   if(d.souls.accounts)mountAccountRoutes(app,{accounts:d.souls.accounts,auth:d.auth,baseOf:d.cfg.authProvider==='clerk'?()=>publicWorldBase(d.cfg):baseOf,limit:limitIp});
   mountStationRoutesV2(app,d.stationV2);
-  app.get('/healthz', (c) => c.json({ ok: true, tick: d.host.engine.world.tick, clients: d.hub.clients.size, paused: d.host.paused, build: d.cfg.build, worldId: d.host.worldId }));
+  // lane DASH: tickMs = the last ~20 s of ticks (avg/max ms against the 50 ms budget); clockRate < 1 = the clock is dilated (behind)
+  app.get('/healthz', (c) => { const ms = d.host.tickMs, n = ms.length; let sum = 0, max = 0; for (const x of ms) { sum += x; if (x > max) max = x; }
+    return c.json({ ok: true, tick: d.host.engine.world.tick, clients: d.hub.clients.size, paused: d.host.paused, build: d.cfg.build, worldId: d.host.worldId,
+      tickMs: { avg: n ? Math.round(10 * sum / n) / 10 : 0, max: Math.round(10 * max) / 10, n }, clockRate: d.host.clockRate }); });
   // lane W1: the same config goes into the world page's <head> (inline-config.ts)
   const configOf = (c: Context) => ({ authProvider:d.cfg.authProvider, authenticationOrigin:d.cfg.authProvider==='clerk'&&d.auth.ready?new URL(d.cfg.publicUrl).origin:'', clerkPublishableKey:d.cfg.authProvider==='clerk'?d.cfg.clerkPublishableKey:'', clerkIssuer:d.cfg.authProvider==='clerk'?d.cfg.clerkIssuer:'', privyAppId:d.cfg.authProvider==='privy'?d.cfg.privyAppId:'', publicUrl: baseOf(c), worldURL:baseOf(c), instructionsURL:baseOf(c)+'/instructions.md', accountAuthRequired:d.cfg.accountAuthRequired, accountApproval:d.souls.accounts?{contract:'account-soul-approval/1',start:'/v1/agent/approval/start',poll:'/v1/agent/approval/poll',cancel:'/v1/agent/approval/cancel'}:null, soulProfile:{contract:'soul-profile/1',auth:'owner',edit:'PATCH /v1/souls/:id/profile',photo:'POST /v1/souls/:id/photo',resetPhoto:'DELETE /v1/souls/:id/photo',autoPortrait:portraits.enabled,photoFormat:'PNG RGB/RGBA8',maxPhotoBytes:262144,maxPhotoDimension:512}, worldId: d.host.worldId, worldKey: d.cfg.worldKey, worldName: displayWorldName, worldPath: d.cfg.worldPath, authReady: d.auth.ready, devAuth: d.auth.devAuth, inviteRequired: d.cfg.inviteRequired, build: d.cfg.build });
   app.get('/v1/config', (c) => c.json(configOf(c)));

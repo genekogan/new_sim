@@ -49,7 +49,7 @@ export function evaluate({ diskTotalBytes, diskFreeBytes, memMb, units = {}, pre
   for (const [stage, b] of Object.entries(backups)) {
     if (b.enabled && b.result && b.result !== 'success') flag(`backup:${stage}`, `sim-worlds-backup@${stage} last run: ${b.result}`);
   }
-  return { ok: problems.length === 0, diskFreeGb, diskFreePct, memAvailableMb: memMb, problems, codes: [...codes], units: unitStatus,
+  return { ok: problems.length === 0, diskFreeGb, diskFreePct, memAvailableMb: memMb, problems, codes: [...codes], units: unitStatus, backups,
     thresholds: { minFreePct: minPct, minFreeGb: minGb, minMemMb: minMem, capPct } };
 }
 
@@ -72,7 +72,10 @@ function readBackups(stages) {
     try {
       const timer = show(`sim-worlds-backup@${stage}.timer`, 'UnitFileState');
       if (timer.UnitFileState !== 'enabled') { backups[stage] = { enabled: false }; continue; }
-      backups[stage] = { enabled: true, result: show(`sim-worlds-backup@${stage}.service`, 'Result').Result };
+      // lane DASH: when the last run started and ended (the owner's health page shows them; '' = never ran)
+      const s = show(`sim-worlds-backup@${stage}.service`, 'Result,ExecMainStartTimestamp,ExecMainExitTimestamp,ExecMainStatus');
+      const iso = (v) => { const t = Date.parse(v ?? ''); return Number.isFinite(t) ? new Date(t).toISOString() : null; };
+      backups[stage] = { enabled: true, result: s.Result, startedAt: iso(s.ExecMainStartTimestamp), endedAt: iso(s.ExecMainExitTimestamp), exitStatus: s.ExecMainStatus === undefined ? null : Number(s.ExecMainStatus) };
     } catch {}
   }
   return backups;

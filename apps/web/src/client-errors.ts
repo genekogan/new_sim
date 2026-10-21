@@ -7,7 +7,7 @@
 import { BASE } from './base-path.ts';
 
 declare const __BUILD__: string;
-type Ev = { k: string; m: string; s: string; n: number };
+type Ev = { k: string; m: string; s: string; n: number; ms?: number };
 const MAX = 12, STUCK_MS = 60_000, STORM = 6, SAMPLE = 1;
 const pending = new Map<string, Ev>(), sent = new Map<string, Ev>();
 let build = 'dev', reports = 0, timer: ReturnType<typeof setTimeout> | undefined, on = false, hidden = false, sockets: number[] = [];
@@ -53,6 +53,21 @@ export function watchSocket<T extends WebSocket>(ws: T): T {
   return ws;
 }
 
+/** Lane DASH: one `arrived` sample per world page (ms since navigation to its card going / first live frame), sent with the
+ *  next flush (3 s later), only for a page shown the whole time (a background tab's arrival time says nothing). */
+function watchArrival() {
+  let done = false;
+  const take = (name: string, at: number) => {
+    if (done || (name !== 'sim:card-done' && name !== 'sim:first-live-frame')) return;
+    done = true; if (hidden) return;
+    pending.set('arrived', { k: 'arrived', m: '', s: '', n: 1, ms: Math.round(at) }); timer ??= setTimeout(flush, 3000);
+  };
+  try {
+    for (const m of performance.getEntriesByType('mark')) take(m.name, m.startTime);
+    if (!done) { const o = new PerformanceObserver((l) => { for (const m of l.getEntries()) take(m.name, m.startTime); if (done) o.disconnect(); }); o.observe({ type: 'mark' }); }
+  } catch { /* no User Timing: no sample */ }
+}
+
 export function installClientErrors() {
   if (on || typeof window === 'undefined' || typeof navigator?.sendBeacon !== 'function') return;
   build = typeof __BUILD__ === 'string' ? __BUILD__ : 'dev';
@@ -72,6 +87,7 @@ export function installClientErrors() {
   addEventListener('pagehide', bye);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { hidden = true; bye(); } });
   if (document.visibilityState === 'hidden') hidden = true;
+  if (/\/w\//.test(location.pathname)) watchArrival();
   if (/\/w\//.test(location.pathname)) setTimeout(() => {
     const marks = performance.getEntriesByType('mark').map((x) => x.name).filter((x) => x.startsWith('sim:'));
     if (!hidden && !marks.includes('sim:card-done') && !marks.includes('sim:first-live-frame')) report('arrival', `not done in ${STUCK_MS / 1000} s`, marks.at(-1)?.slice(4) ?? 'no mark');

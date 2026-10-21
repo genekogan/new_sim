@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -50,6 +50,9 @@ test('backup, version history, restore by night, retention, off-box copy', { ski
   // night 1
   r = run(['backup', 'production'], { SIM_BACKUP_TIME: '2026-01-01 03:30:00' });
   assert.equal(r.status, 0, r.stderr); assert.match(r.stdout, /3\/3 databases ok \(quick_check\), 1 files, 2 new assets/);
+  // lane DASH: the night's result for the owner's health page
+  const last = () => JSON.parse(readFileSync(join(T, 'data/production/backup-last.json'), 'utf8'));
+  { const l = last(); assert.equal(l.ok, true); assert.equal(l.stage, 'production'); assert.equal(l.dbsOk, 3); assert.equal(l.dbs, 3); assert.match(l.snapshot, /^[0-9a-f]{8}$/); assert.equal(typeof l.addedMb, 'number'); assert.deepEqual(l.failed, []); }
   // night 2: alpha grows, beta is deleted, an asset arrives
   const ins = a.prepare('INSERT INTO events (payload) VALUES (?)'); for (let i = 0; i < 5; i++) ins.run(`night two ${i}`);
   b.close(); renameSync(join(T, 'data/production/worlds/beta'), join(T, 'gone-beta'));
@@ -67,6 +70,7 @@ test('backup, version history, restore by night, retention, off-box copy', { ski
   // restore night 1 and latest
   r = run(['restore', 'production', '2026-01-01', join(T, 'r1')]);
   assert.equal(r.status, 0, r.stderr); assert.match(r.stdout, /3\/3 databases ok/);
+  { const d = JSON.parse(readFileSync(join(T, 'r1/RESTORED.json'), 'utf8')); assert.equal(d.ok, true); assert.equal(d.dbsOk, 3); assert.match(d.snapshotTime, /^2026-01-01T03:30/); }
   assert.equal(count(join(T, 'r1/worlds/alpha/sim.db')), 200); assert.equal(count(join(T, 'r1/worlds/beta/sim.db')), 50);
   assert.ok(existsSync(join(T, 'r1/worlds.json')) && existsSync(join(T, 'r1/worlds/assets/wire/aa.glb.br')) && !existsSync(join(T, 'r1/worlds/assets/bb.png')));
   r = run(['restore', 'production', 'latest', join(T, 'r2')]);
@@ -81,6 +85,7 @@ test('backup, version history, restore by night, retention, off-box copy', { ski
   writeFileSync(join(T, 'data/production/worlds/broken/sim.db'), 'this is not a database'.repeat(300));
   r = run(['backup', 'production'], { SIM_BACKUP_TIME: '2026-01-03 03:30:00' });
   assert.equal(r.status, 1); assert.match(r.stdout, /2\/3 databases ok/); assert.match(r.stderr, /FAILED worlds\/broken\/sim\.db/);
+  { const l = last(); assert.equal(l.ok, false); assert.equal(l.dbsOk, 2); assert.match(l.failed[0], /^worlds\/broken\/sim\.db: /); }
   renameSync(join(T, 'data/production/worlds/broken'), join(T, 'gone-broken'));
 
   // retention: 200 earlier nights (made directly with restic) + another stage's snapshot; one scripted night applies 7/4/6

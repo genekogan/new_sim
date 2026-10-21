@@ -31,7 +31,7 @@
 //   SIM_BACKUP_TIME        (tests only: the snapshot's time, "YYYY-MM-DD HH:MM:SS")
 import { backup as sqliteBackup, DatabaseSync } from 'node:sqlite';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync, utimesSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -96,8 +96,15 @@ function setupMissing() {
   return '';
 }
 
+/** Lane DASH: the last night's result for the owner's health page, <data dir>/backup-last.json (no paths outside the stage,
+ *  no secrets): written after every restic run, ok or not. */
+function writeLast(stage, rec) {
+  const file = join(DATA_ROOT, stage, 'backup-last.json');
+  try { writeFileSync(`${file}.tmp`, `${JSON.stringify({ stage, at: new Date().toISOString(), ...rec })}\n`); renameSync(`${file}.tmp`, file); } catch { /* the backup itself matters more */ }
+}
+
 async function runBackup(stage) {
-  const data = join(DATA_ROOT, stage), out = join(STAGING, stage);
+  const data = join(DATA_ROOT, stage), out = join(STAGING, stage), t0 = Date.now();
   if (!existsSync(data)) throw new Error(`no data dir ${data}`);
   // Not set up yet (no restic, no password file, or no repository): take the old dated copy (backup.mjs, newest 3 nights)
   // instead, so shipping this before the one-time setup never costs a night. Never inits a repository on its own.
@@ -180,6 +187,9 @@ async function runBackup(stage) {
     `${assets} new assets, ${mb(summary.total_bytes_processed ?? 0)} MB staged${growth}; ${kept} snapshots kept${KEEP[0] === 'off' ? ' (retention off)' : ''}${offsite}`);
   for (const f of failed) console.error(`FAILED ${f}`);
   if (failed.length) process.exitCode = 1;
+  writeLast(stage, { ok: failed.length === 0, snapshot: summary.snapshot_id.slice(0, 8), dbsOk: ok, dbs: dbs.length, files: files.length, newAssets: assets,
+    stagedMb: +mb(summary.total_bytes_processed ?? 0), addedMb: +mb(summary.data_added ?? 0), repoMb: after == null ? null : +mb(after), kept,
+    offsite: env.SIM_BACKUP_OFFSITE ? !offsite.includes('FAILED') : null, seconds: Math.round((Date.now() - t0) / 1000), failed: failed.map((f) => f.slice(0, 160)) });
 }
 
 function snapshots(stage) {
@@ -203,6 +213,8 @@ function runRestore(stage, when, dir) {
   console.log(`restore ${stage} ${pick.short_id} (${new Date(pick.time).toISOString()}) -> ${dir}: ${dbs.length - bad}/${dbs.length} databases ok` +
     `; boot one world: ENABLE_WORLD_ENGINE=1 SOUL_LIFECYCLE=1 node tools/god-skill/dev-world.mjs <slug> <port> --data ${join(dir, 'worlds', '<slug>')}`);
   if (bad || !dbs.length) process.exitCode = 1;
+  // lane DASH: the drill's own receipt in the restored dir (the owner's health page lists drill-* dirs)
+  try { writeFileSync(join(dir, 'RESTORED.json'), `${JSON.stringify({ stage, at: new Date().toISOString(), snapshot: pick.short_id, snapshotTime: new Date(pick.time).toISOString(), dbs: dbs.length, dbsOk: dbs.length - bad, ok: !bad && dbs.length > 0 })}\n`); } catch { /* read-only target */ }
 }
 
 const [cmd, stage, ...rest] = process.argv.slice(2);
@@ -213,4 +225,4 @@ try {
   else if (cmd === 'restore' && stage && rest.length === 2) runRestore(stage, rest[0], rest[1]);
   else if (cmd === 'list') for (const s of snapshots(stage)) console.log(`${s.short_id}  ${new Date(s.time).toISOString().slice(0, 16)}Z  ${s.hostname}  ${(s.tags ?? []).join(',')}  ${s.paths.join(' ')}`);
   else usage();
-} catch (e) { console.error(`${cmd} ${stage ?? ''}: ${e.message}`); process.exitCode = 1; }
+} catch (e) { console.error(`${cmd} ${stage ?? ''}: ${e.message}`); process.exitCode = 1; if (cmd === 'backup' && stage) writeLast(stage, { ok: false, error: e.message.slice(0, 200) }); }
