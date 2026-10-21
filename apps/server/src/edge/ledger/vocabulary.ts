@@ -338,7 +338,9 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
     }
   }
   const pool = ctx.caps.filter(c => c.verb === verb || (c.verb === 'object' && c.action === verb && /^e_/.test(c.object ?? '')));
-  const info = new Map(pool.map(c => {const t = ctx.target(c), own = [c.target?.id ?? '', c.id.slice(c.id.indexOf(':') + 1), c.label, ...t.names].filter(Boolean); return [c.id, {t, own, ownTokens: own.flatMap(tokens)}];}));
+  // RESOLVE: a world-engine label's ", by <neighbours> (16 m)" names the neighbours, not the thing ("go to the pond" was a tree
+  // by the pond reeds): own names stop before it
+  const info = new Map(pool.map(c => {const t = ctx.target(c), own = [c.target?.id ?? '', c.id.slice(c.id.indexOf(':') + 1), c.label.replace(/,\s*by\s.*$/, ''), ...t.names].filter(Boolean); return [c.id, {t, own, ownTokens: own.flatMap(tokens)}];}));
   const unknown = (reason: string, prefer: EdgeCapability[] = []) => ({kind: 'unknown' as const, reason, didYouMean: suggest(input, verb, rest, ctx, prefer)});
   const dme = (c: EdgeCapability) => dist(info.get(c.id)?.t.at ?? null, ctx.me);
   const placeOf = (c: EdgeCapability) => ctx.places.find(p => p.id === c.target?.id);
@@ -363,6 +365,18 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
     return {kind: 'alias', cap: n, note: note(n) + ` (the nearest of ${list.length}; also ${ranked.slice(1, 4).map(c => c.id).join(', ')})`};
   };
   const one = one0;
+  // RESOLVE (Ada "go to the pond" went to twinkle lights "lights-pond-2", Wren "go to the market" to string lights by the
+  // kiosks): of the walk targets whose names hold the words, those that are what the words say (", a pond") come first;
+  // else the places, before the things named after the place they stand in
+  const ownFirst = (cs: EdgeCapability[], words: string[]) => {
+    if (cs.length < 2 || !PLACE_VERBS.has(verb)) return cs;
+    const kindOf = (c: EdgeCapability) => /,\s+an?\s+([^,:(]+?)(?=\s*[,:(]|\s+(?:by|in|of)\s|$)/.exec(c.label)?.[1] ?? /^Go into (.+?) of /.exec(c.label)?.[1];
+    const kinded = cs.filter(c => {const k = kindOf(c); return !!k && words.every(w => tokenHit(w, tokens(k)));});
+    // ... with the building a matching room is in, when the building matches too (the cafe: in at its front door)
+    if (kinded.length) return cs.filter(c => kinded.includes(c) || (c.target?.kind === 'place' && kinded.some(k => isAncestor(ctx, c.target!.id, k.target?.id))));
+    const places = cs.filter(c => c.target?.kind === 'place');
+    return places.length ? places : cs;
+  };
   if (pool.length) {
     const q = tokens(rest).filter(t => !FILLER.has(t) || !PLACE_VERBS.has(verb) ? true : false), qs = q.join(' '), byOwn = (want: string) => pool.filter(c => info.get(c.id)!.own.some(n => norm(n) === want));
     const here = pool.find(c => c.id === `${verb}:here`);
@@ -399,7 +413,7 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       // 2. The place an object stands in (sit:commons-deck, warm-by-fire:social-eden-fire-circle).
       const r2 = also(one(pool.filter(c => info.get(c.id)!.t.around.some(n => norm(n) === s)), c => `${input}: ${c.id} (${c.label}) is there.`)); if (r2) return r2;
       // 3. Every word appears in the target's own names (walk:pond → the pond).
-      const r3 = also(one(pool.filter(c => words.every(w => tokenHit(w, info.get(c.id)!.ownTokens))), c => `${input} is ${c.id} (${c.label}).`)); if (r3) return r3;
+      const r3 = also(one(ownFirst(pool.filter(c => words.every(w => tokenHit(w, info.get(c.id)!.ownTokens))), words), c => `${input} is ${c.id} (${c.label}).`)); if (r3) return r3;
     }
     // 3c (SOULSIM-E): a thing's everyday synonyms, after its exact words fail, for verbs at things (places have 3b): Mars's
     // "sit by the campfire" was capability.unknown while "sit by the fire" sat on a fire bench (its benches are "Fire
