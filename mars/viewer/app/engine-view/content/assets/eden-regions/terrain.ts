@@ -56,11 +56,12 @@ function relief(x:number,z:number){
  // North: terraced orchard/vineyard slope rising away from the edge (x 20..110).
  if(z<-65){const t=sm(-70,-150,z)*sm(5,30,x)*sm(125,105,x);const raw=Math.min(-65-z,100)*.13;const step=Math.floor(raw/1.4)*1.4+sm(.75,1,(raw/1.4)%1)*1.4;h+=t*step;}
  // Far ring: mountains/hills beyond the districts, not toward the southern sea.
- const d=outside(x,z),ring=sm(150,240,d)*((d-150)*.32+fbm(x/45,z/45)*26),undulate=sm(60,140,d)*(fbm(x/28,z/28)-.45)*5;
- const c=coastAt(x);
+ // ring/undulate/coast are skipped where their weight is 0 (they would add ±0 to h >= +0: same heights, no noise calls).
+ const d=outside(x,z),sr=sm(150,240,d),su=sm(60,140,d),ring=sr>0?sr*((d-150)*.32+fbm(x/45,z/45)*26):0,undulate=su>0?su*(fbm(x/28,z/28)-.45)*5:0;
+ const c=sm(300,390,Math.abs(x))>0?coastAt(x):null;
  // Districts (w=0): the original straight bay edge. Outer coast (w=1): mountains meet a natural coast.
  let old=h+ring*(1-sm(118,146,z))+undulate;if(z>130){const s=sm(132,160,z);old=old*(1-s)-3.2*s;}
- if(c.w>0){const u=c.zc-z,cap=coastCap(u,c.head,x),land=h+ring+undulate;
+ if(c){const u=c.zc-z,cap=coastCap(u,c.head,x),land=h+ring+undulate;
   // smooth minimum (polynomial, dips at most k/4): the range never stands taller than the coastal slope allows
   const k=1+7*sm(4,40,u),q=Math.max(k-Math.abs(land-cap),0)/k,nat=u<=0?cap:Math.min(land,cap)-q*q*k/4;
   h=old*(1-c.w)+(nat+stacks(x,u,c.head))*c.w;}
@@ -96,7 +97,7 @@ export class Terrain{
  /** padded: the road follows the padded ground (relief + level pads) instead of the bare relief. */
  road(pts:[number,number][],width:number,fall=3,padded=false){this.roads.push({pts,half:width/2+.4,fall,padded});}
  private paddedAt(x:number,z:number){let h=relief(x,z);for(const i of this.padCell(x,z)??[]){const P=this.pads[i];const dx=Math.max(P.x0-x,0,x-P.x1),dz=Math.max(P.z0-z,0,z-P.z1),w=1-sm(0,P.m,Math.hypot(dx,dz));if(w>0)h=h+(P.y-h)*w;}
-  const d=outside(x,z),ex=clamp(x,INNER[0],INNER[2]),ez=clamp(z,INNER[1],INNER[3]),s=sm(0,12,d);return this.edge(ex,ez)*(1-s)+h*s;}
+  const d=outside(x,z),s=sm(0,12,d);if(s===1)return h;const ex=clamp(x,INNER[0],INNER[2]),ez=clamp(z,INNER[1],INNER[3]);return this.edge(ex,ez)*(1-s)+h*s;}
  readonly edge:Edge;
  constructor(edge:Edge){this.edge=edge;}
  /** Final visual height. */
@@ -108,9 +109,9 @@ export class Terrain{
   if(this.rivers.length){const rv=this.riverAt(x,z,14);if(rv){const bed=rv.level-1.1*(1-sm(rv.half*.6,rv.half+.4,rv.d)),bank=rv.level+.25+Math.max(0,rv.d-rv.half)*.8;h=Math.min(h,rv.d<rv.half+.4?bed:Math.max(bed,bank));}}
   // Canal bed (east quarter): a crisp cut between quay walls, after the pads.
   if(x>132.5&&x<140.5&&z>-31&&z<51)h=Math.min(h,-1.9);
-  const ex=clamp(x,INNER[0],INNER[2]),ez=clamp(z,INNER[1],INNER[3]),s=sm(0,12,d);return this.edge(ex,ez)*(1-s)+h*s;}
+  const s=sm(0,12,d);if(s===1)return h;const ex=clamp(x,INNER[0],INNER[2]),ez=clamp(z,INNER[1],INNER[3]);return this.edge(ex,ez)*(1-s)+h*s;}
  /** Height of the un-padded relief (to choose pad levels). */
- natural(x:number,z:number){const d=outside(x,z),ex=clamp(x,INNER[0],INNER[2]),ez=clamp(z,INNER[1],INNER[3]),s=sm(0,12,d);return this.edge(ex,ez)*(1-s)+relief(x,z)*s;}
+ natural(x:number,z:number){const d=outside(x,z),s=sm(0,12,d);if(s===1)return relief(x,z);const ex=clamp(x,INNER[0],INNER[2]),ez=clamp(z,INNER[1],INNER[3]);return this.edge(ex,ez)*(1-s)+relief(x,z)*s;}
  /** Flatten a level pad; returns its y. */
  pad(x0:number,z0:number,x1:number,z1:number,y?:number,m=3){const yy=y??Math.round(this.natural((x0+x1)/2,(z0+z1)/2)*2)/2;this.pads.push({x0,z0,x1,z1,y:yy,m});return yy;}
  build(group:THREE.Group,mats:Materials,geos:THREE.BufferGeometry[]){

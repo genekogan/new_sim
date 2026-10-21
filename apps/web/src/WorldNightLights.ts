@@ -119,12 +119,21 @@ class SharedDataTexture extends THREE.DataTexture{override clone(){return this a
  * brighter without blowing out (diffuse pooling rather than spotlights). Alpha
  * carries the light-weighted ground height under the pools. */
 function paintInto(data:Uint8Array,sources:readonly NightSource[],paths:readonly (readonly [number,number])[][],bounds:NightBounds=NIGHT_MAP_BOUNDS){
- const [w,h]=SIZE,{x0,z0,x1,z1}=bounds,sx=(x1-x0)/w,sz=(z1-z0)/h,acc=new Float32Array(w*h*4),wsum=new Float32Array(w*h),c=new THREE.Color();
+ const [w,h]=SIZE,{x0,z0,x1,z1}=bounds,sx=(x1-x0)/w,sz=(z1-z0)/h,acc=new Float32Array(w*h*4),wsum=new Float32Array(w*h),cols=new Map<string,THREE.Color>();
+ // F12: the gaussians are separable, exp(-(dx²+dz²)/r²) = exp(-dx²/r²)·exp(-dz²/r²): one exp per column and per row
+ // instead of two per texel (the old /w/eden paint took ~0.3 s at 4x). The painted bytes are unchanged on the Eden
+ // map (world-night-lights test compares them with the per-texel form).
+ let ex1=new Float64Array(64),ex2=new Float64Array(64);
  const splat=(x:number,z:number,radius:number,intensity:number,color:string,halo:number,base:number)=>{
-  c.set(color);const reach=Math.max(radius,halo)*2.2,i0=Math.max(0,Math.floor((x-reach-x0)/sx)),i1=Math.min(w-1,Math.ceil((x+reach-x0)/sx)),j0=Math.max(0,Math.floor((z-reach-z0)/sz)),j1=Math.min(h-1,Math.ceil((z+reach-z0)/sz));
-  const r2=radius*radius,h2=halo*halo;
-  for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const dx=x0+(i+.5)*sx-x,dz=z0+(j+.5)*sz-z,d2=dx*dx+dz*dz;
-   const v=intensity*(Math.exp(-d2/r2)+.18*Math.exp(-d2/h2));if(v<1e-4)continue;const k=(j*w+i)*4;acc[k]+=v*c.r;acc[k+1]+=v*c.g;acc[k+2]+=v*c.b;acc[k+3]+=v*base;wsum[k>>2]+=v;}
+  let c=cols.get(color);if(!c)cols.set(color,c=new THREE.Color(color));
+  const reach=Math.max(radius,halo)*2.2,i0=Math.max(0,Math.floor((x-reach-x0)/sx)),i1=Math.min(w-1,Math.ceil((x+reach-x0)/sx)),j0=Math.max(0,Math.floor((z-reach-z0)/sz)),j1=Math.min(h-1,Math.ceil((z+reach-z0)/sz));
+  const r2=radius*radius,h2=halo*halo,n=i1-i0+1;if(n<=0)return;
+  if(ex1.length<n){ex1=new Float64Array(n);ex2=new Float64Array(n);}
+  for(let i=i0;i<=i1;i++){const dx=x0+(i+.5)*sx-x,q=dx*dx;ex1[i-i0]=Math.exp(-q/r2);ex2[i-i0]=.18*Math.exp(-q/h2);}
+  const cr=c.r,cg=c.g,cb=c.b;
+  for(let j=j0;j<=j1;j++){const dz=z0+(j+.5)*sz-z,q=dz*dz,ez1=intensity*Math.exp(-q/r2),ez2=intensity*Math.exp(-q/h2);
+   if(ez1+.18*ez2<1e-4)continue;
+   for(let i=i0;i<=i1;i++){const v=ex1[i-i0]*ez1+ex2[i-i0]*ez2;if(v<1e-4)continue;const k=(j*w+i)*4;acc[k]+=v*cr;acc[k+1]+=v*cg;acc[k+2]+=v*cb;acc[k+3]+=v*base;wsum[k>>2]+=v;}}
  };
  for(const s of sources)splat(s.x,s.z,s.radius,s.intensity,s.color,s.halo??s.radius*2.5,s.base??0);
  for(const p of paths)for(let i=1;i<p.length;i++){const [a,b]=[p[i-1],p[i]],len=Math.hypot(b[0]-a[0],b[1]-a[1]);for(let t=0;t<=len;t+=1.5)splat(a[0]+(b[0]-a[0])*t/len,a[1]+(b[1]-a[1])*t/len,1.3,.07,PATH,3,0);}

@@ -46,7 +46,9 @@ export class Materials{
 }
 const _a=new THREE.Vector3(),_b=new THREE.Vector3(),_c=new THREE.Vector3(),_n=new THREE.Vector3(),_e1=new THREE.Vector3(),_e2=new THREE.Vector3();
 export type Col=THREE.Color|string|number;
-const col=(c:Col)=>c instanceof THREE.Color?c:new THREE.Color(c);
+// One parsed Color per string/number (tri() only reads r,g,b): a district parsed the same CSS colour for every triangle.
+const COLS=new Map<string|number,THREE.Color>();
+const col=(c:Col)=>{if(c instanceof THREE.Color)return c;let v=COLS.get(c);if(!v)COLS.set(c,v=new THREE.Color(c));return v;};
 /** Thin/flat dressing that never blocks a camera sightline (walls/roofs/stone/timber stay opaque). */
 export const SEE_THROUGH:readonly MatKey[]=['glass','path','flower','cloth','metal','soil','water','foliage'];
 /** Per-material triangle soup with a transform stack. */
