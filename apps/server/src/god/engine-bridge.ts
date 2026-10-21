@@ -591,15 +591,19 @@ export class EngineBridge {
    *  the engine's own step-clear of buried bodies still applies. `dry` (dry run, preview): plan only, nothing rewritten. */
   /** nav-connect/1 (lane NAV): nothing a god edit does leaves a Soul unable to walk. The connectivity labels warm up after
    *  boot in ~20 ms slices every 5 ticks (eden-2026: ~8 s of labelling spread over a few minutes), then every Soul is
-   *  checked once (Souls stranded before this release step out too). After an edit that changes geometry, the request
-   *  brings the engine up to date and checks every Soul (only the edited tiles are relabelled: tens of ms); a Soul cut
+   *  checked once (Souls stranded before this release step out too). After an edit that changes geometry within 30 m of a
+   *  Soul, the request brings the engine up to date and checks every Soul (only the edited tiles are relabelled: tens of ms); a Soul cut
    *  off in a small area (or upstairs) steps to the nearest open spot of the main area as a logged edge-relocate
    *  (replay folds the recorded spot), and the things within 25 m of the edit that no walk reaches are named to the
-   *  god in one line. Labels not ready yet: the check runs from the tick loop as soon as they are. */
+   *  god in one line. Labels not ready yet, or no Soul near the edit: the check runs from the tick loop and its line
+   *  rides on the god's next reply. */
   private navWarm = false;
   private navPending = true;
   private navShaped: Set<string> | null = null;
   private navBefore: Vec2[] = [];
+  /** Spots of edits checked later from the tick loop, and the lines that check produced for the god's next reply. */
+  private navDeferred: Vec2[] = [];
+  private navLater: string[] = [];
   /** Things already named as cut off (said once, again only after they were reachable). */
   private navBadKnown = new Set<string>();
   private navSpots(m: WorldModel, ids: string[]): Vec2[] {
@@ -612,7 +616,10 @@ export class EngineBridge {
       const E = this.engine as unknown as { navWarmV1?: (ms: number) => boolean };
       if (!E.navWarmV1) { this.navWarm = true; this.navPending = false; return; }
       this.navWarm = E.navWarmV1(20);
-      if (this.navWarm && this.navPending) { this.navPending = false; this.navRescueSouls(); }
+      if (this.navWarm && this.navPending) {
+        this.navPending = false; const spots = this.navDeferred; this.navDeferred = [];
+        const lines = this.navLines(spots, this.navRescueSouls()); if (lines.length) this.navLater = [...this.navLater, ...lines].slice(-4);
+      }
     } catch (e) { this.navWarm = true; this.navPending = false; this.log(`nav warm: ${(e as Error).message}`); }
   }
   /** Step every Soul cut off from the main walkable area to open ground (logged). Returns how many were moved. */
@@ -631,26 +638,37 @@ export class EngineBridge {
   }
   private navNoteFor(diff: Diff): string[] {
     const shaped = this.navShaped, before = this.navBefore; this.navShaped = null; this.navBefore = [];
+    const later = this.navLater; this.navLater = [];
     try {
       const moved = diff.upserts.filter(e => !shaped || shaped.has(e.id));
-      if (!moved.length && !diff.removes.length && !diff.tiles.length) return [];
+      if (!moved.length && !diff.removes.length && !diff.tiles.length) return later;
       this.navPending = true;
-      const E = this.engine as unknown as { navWarmV1?: (ms: number) => boolean; navCheckV1?: (pts: { id: string; p: Vec2; level?: number; tol?: number }[]) => { id: string; ok: boolean; code?: string }[] };
-      if (!E.navWarmV1 || !E.navCheckV1 || !this.navWarm) return [];
+      const spots = [...before, ...this.navSpots(this.model, moved.map(e => e.id))];
+      // Checked inside the request only when the edit's geometry is within 30 m of a Soul (the Soul is moved and the god
+      // told in this reply); any other edit is checked from the tick loop and its note rides on the god's next reply, so
+      // edits far from Souls cost nothing here and leave the engine "pending" as before.
+      const souls = [...this.host.minds.values()].map(m => this.engine.world.entities[m.entityId]?.pose.p).filter((p): p is NonNullable<typeof p> => !!p);
+      const nearSoul = (diff.tiles.length && souls.length > 0) || spots.some(q => souls.some(p => Math.hypot(p[0] - q[0], p[2] - q[1]) <= 30));
+      const E = this.engine as unknown as { navWarmV1?: (ms: number) => boolean };
+      if (!nearSoul || !E.navWarmV1 || !this.navWarm) { this.navDeferred = [...this.navDeferred, ...spots].slice(-400); return later; }
       this.flush(); this.host.drainInputs();
-      if (!E.navWarmV1(250)) return [];
+      if (!E.navWarmV1(250)) { this.navDeferred = [...this.navDeferred, ...spots].slice(-400); return later; }
       this.navPending = false;
       const stepped = this.navRescueSouls();
-      const spots = [...before, ...this.navSpots(this.model, moved.map(e => e.id))];
-      const near = spots.length ? this.nav.things().filter(t => t.kind !== 'water' && t.kind !== 'area' && t.kind !== 'path' && spots.some(q => Math.hypot(t.at[0] - q[0], t.at[1] - q[1]) <= 25)).slice(0, 400) : [];
-      const v = near.length ? E.navCheckV1(near.map(t => ({ id: t.ref, p: t.at, level: t.level ?? 0, tol: 1.5 }))) : [];
-      const fresh: string[] = [];
-      for (const x of v) { if (x.ok) this.navBadKnown.delete(x.id); else if (!this.navBadKnown.has(x.id)) { this.navBadKnown.add(x.id); fresh.push(x.id); } }
-      const lines: string[] = [];
-      if (fresh.length) lines.push(`No walk reaches ${fresh.slice(0, 4).join(', ')}${fresh.length > 4 ? ` and ${fresh.length - 4} more` : ''} now (nav-connect/1): Souls are not offered ${fresh.length > 1 ? 'them' : 'it'}; open a way in (a door, a gap of 0.7 m, a ramp) to fix.`);
-      if (stepped) lines.push(`${stepped} Soul${stepped > 1 ? 's' : ''} cut off by this edit stepped to open ground nearby.`);
-      return lines;
-    } catch (e) { this.log(`nav note: ${(e as Error).message}`); return []; }
+      return [...later, ...this.navLines([...this.navDeferred.splice(0), ...spots], stepped)];
+    } catch (e) { this.log(`nav note: ${(e as Error).message}`); return later; }
+  }
+  /** The god's lines: things within 25 m of `spots` that no walk reaches (named once) and Souls stepped out. */
+  private navLines(spots: Vec2[], stepped: number): string[] {
+    const E = this.engine as unknown as { navCheckV1?: (pts: { id: string; p: Vec2; level?: number; tol?: number }[]) => { id: string; ok: boolean; code?: string }[] };
+    const near = spots.length && E.navCheckV1 ? this.nav.things().filter(t => t.kind !== 'water' && t.kind !== 'area' && t.kind !== 'path' && spots.some(q => Math.hypot(t.at[0] - q[0], t.at[1] - q[1]) <= 25)).slice(0, 400) : [];
+    const v = near.length ? E.navCheckV1!(near.map(t => ({ id: t.ref, p: t.at, level: t.level ?? 0, tol: 1.5 }))) : [];
+    const fresh: string[] = [];
+    for (const x of v) { if (x.ok) this.navBadKnown.delete(x.id); else if (!this.navBadKnown.has(x.id)) { this.navBadKnown.add(x.id); fresh.push(x.id); } }
+    const lines: string[] = [];
+    if (fresh.length) lines.push(`No walk reaches ${fresh.slice(0, 4).join(', ')}${fresh.length > 4 ? ` and ${fresh.length - 4} more` : ''} now (nav-connect/1): Souls are not offered ${fresh.length > 1 ? 'them' : 'it'}; open a way in (a door, a gap of 0.7 m, a ramp) to fix.`);
+    if (stepped) lines.push(`${stepped} Soul${stepped > 1 ? 's' : ''} cut off by this edit stepped to open ground nearby.`);
+    return lines;
   }
   /** arrival-search/1: the god's note when an edit blocks the arrival point ("new Souls will arrive nearby at x, z"),
    *  said again only when it changes. Checked (which brings the engine up to date inside the request) only when an

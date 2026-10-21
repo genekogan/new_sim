@@ -55,12 +55,29 @@ test('walls built round a Soul: it steps to open ground (logged, nav-connect/1) 
   assert.equal(again.warnings.some((x: string) => x.startsWith('No walk reaches') || /Soul/.test(x)), false, JSON.stringify(again.warnings));
 });
 
+test('walls round a thing far from any Soul: the reply stays fast ("pending"), the note rides on the next reply, once', async t => {
+  const w = world(t); await w.settle(1);
+  for (let i = 0; i < 40; i++) { w.host.tickOnce(); await setImmediate(); } // labels warm
+  const c: [number, number] = [20, 20];
+  assert.equal((w.god.act({ ops: [{ op: 'define', def: box('chest', 0.6, 0.6) }, { op: 'place', def: 'chest@1', name: 'chest', p: c }] }) as any).accepted, true); await w.settle(6);
+  const r: any = w.god.act({ ops: ring(c, 5, 'q') }); assert.equal(r.accepted, true, JSON.stringify(r.failures));
+  assert.equal(r.warnings.some((x: string) => x.startsWith('No walk reaches')), false, JSON.stringify(r.warnings));
+  await w.settle(12);
+  const next: any = w.god.act({ ops: [{ op: 'place', def: 'chest@1', name: 'chest2', p: [-20, -20] }] });
+  const named = next.warnings.filter((x: string) => x.startsWith('No walk reaches'));
+  assert.equal(named.length, 1, JSON.stringify(next.warnings)); assert.match(named[0], /\bchest\b/);
+  await w.settle(12);
+  const third: any = w.god.act({ ops: [{ op: 'place', def: 'chest@1', name: 'chest3', p: [-24, -20] }] });
+  assert.equal(third.warnings.some((x: string) => x.startsWith('No walk reaches')), false, JSON.stringify(third.warnings));
+});
+
 test('the engine rescue target: a pocket gets one; open ground and an area above the size limit do not', async t => {
   const w = world(t); await w.settle(1);
   await invite(w, 'ben'); const row: any = await accept(w.host, w.souls.create('dev:ben', { name: 'Ben', description: 'calm' })); await w.settle(8);
   // away from the arrival point (the main area is the one holding it); the fixture world is 60 m across
   const b0 = w.host.engine.world.entities[row.entity_id]!; assert.equal(w.E.relocateHumanV1(row.entity_id, [b0.pose.p[0] + 15, b0.pose.p[2]]), true); await w.settle(2);
   const b = w.host.engine.world.entities[row.entity_id]!, at: [number, number] = [b.pose.p[0], b.pose.p[2]];
+  console.log("BOUNDS", JSON.stringify(w.E.groundBoundsV1()), JSON.stringify(b0.pose.p));
   assert.equal(w.E.navRescueV1(row.entity_id), null, 'connected: no rescue');
   // the hook off, so the engine read alone is under test (as when the edit came from elsewhere)
   (w.god as any).bodies.navNote = undefined;
