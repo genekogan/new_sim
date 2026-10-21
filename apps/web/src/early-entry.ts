@@ -14,16 +14,14 @@ let started = false;
 try {
   // P7d: when the snapshot is in, the early renderer's chunk is asked for first (ahead of phase two on the link); phase
   // two downloads (and its socket opens) meanwhile, but its entry (React, the Shell, LiveWorld: ~1 s of a phone's CPU)
-  // runs once the poster is up or the early renderer gave up, so LiveWorld never takes the renderer before the poster.
-  // t4-phone-new: phase two's downloads start once the early renderer's chunks are in (they shared a Slow 4G phone's
-  // link with them: ~60 KB, ~0.3 s of Eden 2026's poster), while the renderer builds on the CPU
+  // runs once the poster is up or the early renderer gave up, so LiveWorld never takes the renderer before the poster
   let asked = false;
   const onSnapshot = () => {
     if (asked) return; asked = true;
     if (new URLSearchParams(location.search).get('earlyRender') === '0') return phase2();
     let released = false; const release = () => { if (!released) { released = true; startCdnManifest(); phase2(); } };
-    setTimeout(release, POSTER_WAIT_MS);
-    try { void import('./early-render.ts').then((m) => { phase2(true); m.startEarlyRender(release); }, release); } catch { release(); }
+    phase2(true); setTimeout(release, POSTER_WAIT_MS);
+    try { void import('./early-render.ts').then((m) => m.startEarlyRender(release), release); } catch { release(); }
   };
   if (earlyLayerWanted()) { installAssetTransport(true); started = startEarlyLayer(onSnapshot); }
 } catch { /* LiveWorld makes its own layer */ }
