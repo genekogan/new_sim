@@ -46,6 +46,7 @@ test('no PII is stored: names in quotes, tokens, Clerk ids, emails, addresses, q
   for (const r of rows) assert.deepEqual(Object.keys(r).sort(), ['b', 'c', 'fp', 'k', 'n', 't', 'v', 'w'], 'an event row holds no text at all');
   assert.equal(scrub('Unexpected token \'<\', "<!DOCTYPE "... is not valid JSON'), 'Unexpected token \'<\', "…"... is not valid JSON');
   assert.equal(scrubPath('https://assets.eden.art/assets/36/3621c4510692b73cd6654b209ad977caa771c4a50b80b09cf27c332db67d5831.glb?x=1'), 'https://assets.eden.art/assets/36/3621c4510692b73cd6654b209ad977caa771c4a50b80b09cf27c332db67d5831.glb', 'content hashes name the asset');
+  assert.equal(scrubPath('data:image/png;base64,iVBORw0KGgo'), 'data:'); assert.equal(scrubPath('blob:https://sim.eden.art/1234'), 'blob:');
   assert.equal(browserOf(UA_PHONE), 'safari/phone');
 });
 

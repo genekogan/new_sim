@@ -44,6 +44,7 @@ const CODE_WORDS = /^(?:Error|Uncaught|Cannot|Can|Failed|Unexpected|Invalid|Ille
 /** An asset/script URL: origin + path only (content hashes kept: they name the file), no query, fragment or ids. */
 export function scrubPath(t, max = 160) {
   const s = String(t ?? '').split(/[?#\s]/)[0];
+  if (/^(?:data|blob):/i.test(s)) return s.slice(0, 5).toLowerCase();   // an inline or local object: its kind, never its content
   return s.replace(/[\w%.+-]+@(?:[\w-]+\.)+[\w-]+/g, '‹email›').replace(/\buser_\w{6,}|\beyJ[\w.-]+/g, '‹id›')
     .replace(/[^\w./:@%+~-]/g, '').slice(0, max);
 }

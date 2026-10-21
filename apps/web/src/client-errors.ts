@@ -34,7 +34,7 @@ function bye() {
 export function report(k: string, m: unknown, s: unknown = '') {
   if (!on) return;
   try {
-    const ev: Ev = { k, m: scrubText(m), s: k === 'asset' || k === 'res' ? String(s ?? '').split(/[?#]/)[0]!.slice(0, 160) : scrubText(s, 80), n: 1 };
+    const ev: Ev = { k, m: scrubText(m), s: k === 'asset' || k === 'res' ? String(s ?? '').replace(/^(data|blob):.*/s, '$1:').split(/[?#]/)[0]!.slice(0, 160) : scrubText(s, 80), n: 1 };
     const key = ev.k + ev.m + ev.s, p = pending.get(key) ?? sent.get(key);
     if (p) { p.n++; return; }
     if (reports >= MAX) return;
