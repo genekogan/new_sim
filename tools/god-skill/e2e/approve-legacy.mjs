@@ -1,0 +1,278 @@
+#!/usr/bin/env node
+// Lane LAP (2026-10-21): the older worlds (/w/eden, mars, littlemartians, toy) show the same approval card as the new
+// worlds (god-ui/ApprovalDialog.tsx via OldWorldApprovals.tsx), replacing the full-screen AccountApproval view. One old
+// Eden world (apps/server main.ts, WORLD_KEY=eden, eden core on, served at /w/eden) in Clerk mode with the synthetic
+// issuer, the Soul CLI from source, Chrome lease, real GPU.
+//   A  gene: New Soul's prompt carries this window's code; `create-soul "Ana" --for CODE` -> the card top right in the
+//      same page; Approve -> preparing -> the card closes, the camera follows Ana, and her owner message box is there
+//      with no reload (A10); the agent ends paired.
+//   B  ana, dpr 2 dark: the request times out -> Ask again -> Approve -> paired.
+//   C  cy, phone dpr 3: Refuse -> Refused; the request is cancelled.
+//   E  dee: an older agent's link (#approve/<id>) opens the same card; Approve -> closes, the link leaves the address.
+//
+//   node tools/god-skill/e2e/approve-legacy.mjs --web <vite build, base /> --mars-web <dir> [--port 6866] [--out <dir>]
+import { execFile, spawn } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { DatabaseSync } from 'node:sqlite';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : []).filter(Boolean));
+const { chromeLease } = await import(process.env.CHROME_LEASE_MODULE ?? '../lib/chrome-lease.mjs');
+const { chromium } = createRequire(`${root}/mars/viewer/package.json`)('@playwright/test');
+const port = Number(args.port ?? 6866);
+const origin = `http://127.0.0.1:${port}`, base = `${origin}/w/eden`;
+const out = resolve(typeof args.out === 'string' ? args.out : `${root}/.lane/e2e-approve-legacy/${new Date().toISOString().replace(/[:.]/g, '-')}`);
+mkdirSync(out, { recursive: true });
+if (typeof args.web !== 'string' || typeof args['mars-web'] !== 'string') { console.error('--web <vite build, base /> and --mars-web <dir> are required'); process.exit(2); }
+const CLI = resolve(root, 'tools/edge-skill/eden-agent.mjs');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const report = { origin, steps: [], failures: [] };
+const check = (name, ok, detail = {}) => { report.steps.push({ name, ok: !!ok, ...detail }); if (!ok) report.failures.push(name); console.log(`${ok ? '✔' : '✖'} ${name} ${JSON.stringify(detail).slice(0, 400)}`); return !!ok; };
+
+// ---------- the launcher in Clerk mode (synthetic issuer)
+const { clerkKeys, ISSUER, PUBLISHABLE_KEY } = await import('../../../apps/server/test/clerk-fixture.ts');
+const keys = await clerkKeys(origin);
+const dir = mkdtempSync(join(tmpdir(), 'approve-legacy-'));
+writeFileSync(join(dir, 'jwks.json'), JSON.stringify({ keys: [keys.jwk] }));
+const dataDir = join(out, 'data'); mkdirSync(dataDir, { recursive: true });
+const env = { ...process.env, WORLD_KEY: 'eden', WORLD_ID: 'eden-lap-1', ENGINE: 'mars', ENABLE_EDEN_CORE: '1', PORT: String(port), HOST: '127.0.0.1',
+  BRAIN_MODE: 'fake', SEED_NATIVES: '0', MAX_SOULS_PER_USER: '50', INVITE_REQUIRED: '0', WORLD_OWNER_ID: 'user_owner', DATA_DIR: dataDir, PUBLIC_URL: base,
+  WEB_DIR: resolve(args.web), MARS_WEB_DIR: resolve(args['mars-web']),
+  AUTH_PROVIDER: 'clerk', ACCOUNT_AUTH_REQUIRED: '1', ACCOUNT_REGISTRY_PATH: join(dataDir, 'accounts.sqlite'),
+  CLERK_PUBLISHABLE_KEY: PUBLISHABLE_KEY, CLERK_ISSUER_URL: ISSUER, CLERK_AUTHORIZED_PARTIES: origin,
+  SIM_TEST_JWKS_FILE: join(dir, 'jwks.json'), NODE_OPTIONS: `--import=${resolve(root, 'apps/server/test/clerk-jwks-preload.mjs')}` };
+delete env.DEV_AUTH;
+const launcher = spawn(process.execPath, ['apps/server/src/main.ts'], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
+let launcherLog = ''; launcher.stdout.on('data', (d) => { launcherLog += d; }); launcher.stderr.on('data', (d) => { launcherLog += d; });
+const stop = () => { try { launcher.kill('SIGTERM'); } catch { /* gone */ } };
+process.on('exit', stop); for (const s of ['SIGINT', 'SIGTERM']) process.on(s, () => { stop(); process.exit(130); });
+
+async function call(url, { sub, body } = {}) {
+  const r = await fetch(url, { method: body ? 'POST' : 'GET', headers: { 'content-type': 'application/json', ...(sub ? { authorization: `Bearer ${await keys.sign(sub)}` } : {}) }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(20_000) });
+  const text = await r.text(); let data; try { data = JSON.parse(text); } catch { data = text; } return { status: r.status, data };
+}
+/** The Soul CLI in its own folder, as an agent runs it. */
+const agent = (folder, argv, timeout = 120_000) => new Promise((ok, bad) => execFile(process.execPath, [CLI, ...argv], { cwd: folder, timeout, maxBuffer: 4 << 20 }, (e, stdout, stderr) => e ? bad(new Error(`${argv[0]}: ${String(stderr || e.message).slice(0, 400)}`)) : ok(stdout)));
+const json = (s) => { try { return JSON.parse(s); } catch { const m = String(s).match(/\{[\s\S]*\}\s*$/); return m ? JSON.parse(m[0]) : { raw: String(s).slice(0, 400) }; } };
+
+// ---------- Clerk in the browser: the stand-in of approve-on-top.mjs, signed in as the context's account
+const STUB = `(() => {
+  const KEY = 'stubClerk.user', listeners = new Set();
+  const make = () => { const sub = window.Clerk && window.Clerk.loaded ? localStorage.getItem(KEY) : null;
+    if (!sub) return { client: { sessions: [], signedInSessions: [], activeSessions: [], lastActiveSessionId: null }, session: null, user: null, organization: null };
+    const user = { id: sub, firstName: sub.slice(5), primaryEmailAddress: { emailAddress: sub + '@example.test' }, emailAddresses: [], organizationMemberships: [] };
+    const sid = 'sess_' + sub.replace(/[^A-Za-z0-9]/g, '');
+    const session = { id: sid, status: 'active', user, actor: null, lastActiveToken: { jwt: { claims: { sub, sid, iss: 'https://clerk.example.test' } } }, factorVerificationAge: null,
+      getToken: async () => window.__stubClerkMint(sub), checkAuthorization: () => true };
+    return { client: { sessions: [session], signedInSessions: [session], activeSessions: [session], lastActiveSessionId: sid }, session, user, organization: null }; };
+  let state = make();
+  const emit = () => { state = make(); for (const l of listeners) l({ ...state }); };
+  window.Clerk = { loaded: false, status: 'loading', version: 'stub', sdkMetadata: {}, instanceType: 'production', frontendApi: 'clerk.example.test', isSatellite: false,
+    get client() { return state.client; }, get session() { return state.session; }, get user() { return state.user; }, get organization() { return null; },
+    async load() { await new Promise((r) => setTimeout(r, 600)); this.loaded = true; this.status = 'ready'; emit(); },
+    addListener(l) { listeners.add(l); l({ ...state }); return () => listeners.delete(l); },
+    on(event, handler) { if (event === 'status' && typeof handler === 'function') setTimeout(() => handler(this.status), 0); }, off() {}, __internal_getOption() {}, __internal_updateProps() {}, telemetry: { record() {} },
+    openSignIn() {}, openSignUp() {}, closeSignIn() {}, async signOut() { localStorage.removeItem(KEY); emit(); },
+    async setActive() {}, buildSignInUrl() { return location.href; }, buildSignUpUrl() { return location.href; }, redirectToSignIn() {} };
+})();`;
+
+async function context(browser, sub, { viewport, dpr, mobile, colorScheme } = {}) {
+  const ctx = await browser.newContext({ viewport: viewport ?? { width: 1352, height: 780 }, deviceScaleFactor: dpr ?? 1, isMobile: !!mobile, hasTouch: !!mobile, colorScheme: colorScheme ?? 'light' });
+  await ctx.exposeFunction('__stubClerkMint', (s) => keys.sign(s));
+  await ctx.addInitScript((sub) => { try { localStorage.setItem('stubClerk.user', sub); } catch { /* storage off */ } }, sub);
+  await ctx.addInitScript(STUB);
+  await ctx.route(/clerk\.example\.test/, (r) => r.abort());
+  return ctx;
+}
+const loaded = () => document.querySelector('.world-canvas-host')?.getAttribute('data-initial-revealed') === 'true' && !document.querySelector('.viewer-arrival:not([data-done="true"])');
+async function openWorld(ctx, base, errors) {
+  const page = await ctx.newPage(); page.on('pageerror', (e) => errors.push(String(e.message).slice(0, 200)));
+  await page.goto(base + '/', { waitUntil: 'commit' });
+  await page.waitForFunction(loaded, null, { timeout: 90_000, polling: 300 });
+  return page;
+}
+/** The card, where it is, and whether it is the topmost thing at its corners. */
+const where = () => {
+  const card = document.querySelector('[data-approval]'); if (!card) return { present: false };
+  const r = card.closest('dialog')?.getBoundingClientRect() ?? card.getBoundingClientRect();
+  const pts = [[r.left + 14, r.top + 14], [r.right - 50, r.top + 14], [r.left + r.width / 2, r.bottom - 14]];
+  const onTop = pts.every(([x, y]) => { const e = document.elementFromPoint(x, y); return !!e && (card.closest('dialog') ?? card).contains(e); });
+  return { present: true, status: card.getAttribute('data-approval-status'), box: [r.left, r.top, r.width, r.height].map(Math.round), vw: innerWidth, onTop, hash: location.hash,
+    rightGap: Math.round(innerWidth - r.right), name: card.querySelector('[data-approval-name]')?.textContent ?? '', avatar: !!card.querySelector('.ap-avatar') };
+};
+const topRight = (w) => w.present && w.onTop && w.rightGap <= 40 && w.box[1] <= 170 && (w.vw < 600 || w.box[0] > w.vw / 2);
+async function windowCode(page) {
+  await page.locator('button.bring-agent-open').first().click();
+  const link = page.locator('.bring-agent-prompt a');
+  await page.waitForFunction(() => /\?for=[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(document.querySelector('.bring-agent-prompt a')?.getAttribute('href') ?? ''), null, { timeout: 20_000 });
+  const href = await link.getAttribute('href');
+  return { href, code: href.match(/\?for=([A-Z2-9]{4}-[A-Z2-9]{4})$/)[1] };
+}
+async function waitStatus(page, status, timeout = 60_000) { await page.waitForFunction((s) => document.querySelector('[data-approval]')?.getAttribute('data-approval-status') === s, status, { timeout, polling: 250 }); }
+async function newAgent(base, name) { const folder = mkdtempSync(join(tmpdir(), `soul-${name}-`)); await agent(folder, ['register', base]); return folder; }
+/** Move a pending request's expiry into the past in whichever of this world's DBs holds it (sim.db or accounts.sqlite). */
+function expire(id) {
+  const found = []; const walk = (d) => { for (const f of readdirSync(d)) { const p = join(d, f); const st = statSync(p); if (st.isDirectory()) walk(p); else if (/\.(db|sqlite)$/.test(f)) found.push(p); } };
+  walk(dataDir); let changed = 0;
+  for (const p of found) { try { const db = new DatabaseSync(p); db.exec('PRAGMA busy_timeout=5000'); if (db.prepare("SELECT name FROM sqlite_master WHERE name='account_approvals_v1'").get()) changed += db.prepare("UPDATE account_approvals_v1 SET expires_at=? WHERE id=? AND status='pending'").run(Date.now() - 1000, id).changes; db.close(); } catch { /* not ours */ } }
+  return changed;
+}
+const shot = (page, name) => page.screenshot({ path: join(out, name + '.png') }).catch(() => {});
+
+let release = null, browser = null; const errors = [];
+try {
+  report.world = base;
+  for (let i = 0; i < 180; i++) { if (launcher.exitCode !== null) throw new Error('the world server exited: ' + launcherLog.slice(-400)); if (await fetch(`${base}/v1/world/souls`).then((r) => r.ok, () => false)) break; await sleep(1000); }
+  release = await chromeLease('approve-legacy');
+  browser = await chromium.launch({ channel: 'chrome', headless: !args.headed, args: ['--ignore-gpu-blocklist'] });
+
+  // ---------- A: gene, desktop dpr 1 — in-window delivery, Approve -> Connected -> closes itself -> paired
+  {
+    const ctx = await context(browser, 'user_gene', { dpr: 1 });
+    const page = await openWorld(ctx, base, errors);
+    const { href, code } = await windowCode(page);
+    check('A1 New Soul prompt links instructions.md?for=<this window code>', href === `${base}/instructions.md?for=${code}`, { href });
+    await shot(page, 'A1-new-soul-prompt');
+    const guide = await fetch(href).then((r) => r.text());
+    check('A2 the instructions name create-soul --for CODE', guide.includes(`--for ${code}`), { has: guide.includes(code) });
+    await page.keyboard.press('Escape');
+    const urlBefore = page.url(), pagesBefore = ctx.pages().length;
+    const folder = await newAgent(base, 'ana');
+    const made = json(await agent(folder, ['create-soul', 'Ana', '--for', code]));
+    report.createA = made;
+    check('A3 the agent\'s request is delivered to the window', JSON.stringify(made).includes('window'), { made: JSON.stringify(made).slice(0, 300) });
+    const waiting = agent(folder, ['approval', 'wait'], 300_000).then(json, (e) => ({ error: e.message }));
+    const t0 = Date.now();
+    await page.waitForSelector('[data-approval]', { timeout: 30_000 });
+    const w = await page.evaluate(where);
+    check('A4 the card appears top right in the same page, no navigation', topRight(w) && page.url() === urlBefore && ctx.pages().length === pagesBefore && w.status === 'pending' && w.name === 'Ana' && w.avatar, { ms: Date.now() - t0, ...w });
+    await shot(page, 'A4-card-desktop-dpr1-light');
+    await page.emulateMedia({ colorScheme: 'dark' }); await sleep(300); await shot(page, 'A4-card-desktop-dpr1-dark'); await page.emulateMedia({ colorScheme: 'light' });
+    const id = JSON.stringify(made).match(/ap_[a-f0-9]{32}/)?.[0];
+    const label = (await call(`${base}/v1/account/approvals/${id}`, { sub: 'user_gene' })).data?.approval?.agentLabel;
+    const plain = await page.locator('[data-approval]').innerText();
+    check('A5a no agent label, folder or approval-wait talk on the card', !!label && !plain.includes(label) && !/label|folder|approval wait|Connected|s_[A-Za-z0-9]/.test(plain), { plain, label });
+    await page.locator('[data-approval-about]').click(); await sleep(200);
+    check('A5 the (i) note holds the agent name', (await page.locator('[data-approval-note]').innerText()).startsWith(`Asked by ${label}.`));
+    await shot(page, 'A5-card-info-open');
+    await page.locator('[data-approval-about]').click();
+    // what the card shows between Approve and the body (it can be short): recorded by an observer, not by polling
+    await page.evaluate(() => { const seen = window.__apSeen = []; new MutationObserver(() => { const p = document.querySelector('[data-approval-preparing]'); if (p) { const sp = p.querySelector('.ap-spinner'); const r = sp?.getBoundingClientRect(); seen.push({ text: p.textContent, spinner: !!sp && r.width > 0 && getComputedStyle(sp).animationName === 'ap-spin', buttons: document.querySelectorAll('[data-approve-agent],[data-refuse-agent]').length }); } }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true }); });
+    await page.locator('[data-approve-agent]').click();
+    await page.waitForSelector('[data-approval-preparing]', { timeout: 5_000 }).then(() => shot(page, 'A6-preparing-light'), () => {});
+    if (await page.locator('[data-approval-preparing]').count()) { await page.emulateMedia({ colorScheme: 'dark' }); await sleep(150); await shot(page, 'A6-preparing-dark'); await page.emulateMedia({ colorScheme: 'light' }); }
+    const seen = await page.evaluate(() => window.__apSeen);
+    check('A6 Approve -> "Ana is being prepared by your agent. Please wait…" with a spinner, no buttons', seen.some((x) => x.text === 'Ana is being prepared by your agent. Please wait…' && x.spinner && x.buttons === 0), { seen: seen.slice(-2) });
+    const gone = await page.waitForSelector('[data-approval]', { state: 'detached', timeout: 90_000 }).then(() => true, () => false);
+    const server = (await call(`${base}/v1/account/approvals/${id}`, { sub: 'user_gene' })).data?.approval;
+    check('A7 the card closes itself once the body is ready', gone && server?.status === 'ready' && /^s_/.test(server?.soulId ?? ''), { gone, status: server?.status, soulId: server?.soulId });
+    const following = await page.waitForFunction((sid) => document.querySelector('[data-camera="follow"]')?.getAttribute('data-follow-soul') === sid, server?.soulId, { timeout: 30_000, polling: 250 }).then(() => true, () => false);
+    const chip = await page.evaluate(() => { const c = document.querySelector('[data-camera]'); return { mode: c?.getAttribute('data-camera'), soul: c?.getAttribute('data-follow-soul'), text: c?.textContent }; });
+    check('A8 the camera follows the new Soul (follow target = its id)', following && chip.soul === server?.soulId && /Ana/.test(chip.text ?? ''), chip);
+    await sleep(1500); await shot(page, 'A8-following-ana');
+    // R20 bug (2026-10-21): the owner's message box must be there for the new Soul with no reload
+    const urlA10 = page.url();
+    await page.evaluate((sid) => { location.hash = '#soul/' + sid; }, server?.soulId);
+    const ownerBox = await page.waitForSelector('[data-agent-message="soul"]', { timeout: 20_000 }).then(() => true, () => false);
+    check('A10 the owner message box appears for the new Soul without a reload', ownerBox && page.url().split('#')[0] === urlA10.split('#')[0], { ownerBox });
+    await shot(page, 'A10-owner-box');
+    const done = await waiting;
+    report.waitA = done;
+    const status = json(await agent(folder, ['status']).catch((e) => e.message));
+    check('A8b the agent is paired', done.paired === true && done.soul?.name === 'Ana' && status.paired === true && status.soul === done.soul?.id && done.soul?.id === server?.soulId, { done: JSON.stringify(done).slice(0, 200), status: JSON.stringify(status).slice(0, 200) });
+    await sleep(6000);
+    check('A9 the card does not come back', (await page.locator('[data-approval]').count()) === 0);
+    await ctx.close();
+  }
+
+  // ---------- B: ana, desktop dpr 2, dark — timed out -> Ask again -> Approve -> paired
+  {
+    const ctx = await context(browser, 'user_ana', { dpr: 2, colorScheme: 'dark' });
+    const page = await openWorld(ctx, base, errors);
+    const { code } = await windowCode(page); await page.keyboard.press('Escape');
+    const folder = await newAgent(base, 'bea');
+    const made = json(await agent(folder, ['create-soul', 'Bea', '--for', code]));
+    const id = JSON.stringify(made).match(/ap_[a-f0-9]{32}/)?.[0];
+    await page.waitForSelector('[data-approval]', { timeout: 30_000 });
+    const w = await page.evaluate(where);
+    check('B1 the card appears top right (dpr 2, dark)', topRight(w) && w.status === 'pending', w);
+    await shot(page, 'B1-card-desktop-dpr2-dark');
+    await page.emulateMedia({ colorScheme: 'light' }); await sleep(300); await shot(page, 'B1-card-desktop-dpr2-light'); await page.emulateMedia({ colorScheme: 'dark' });
+    // the agent stopped polling 15 min ago: move the expiry into the past in this test world's DB
+    const changed = expire(id);
+    check('B2 test: the request\'s expiry moved into the past', changed === 1, { id });
+    await waitStatus(page, 'expired', 20_000);
+    check('B3 Timed out + Ask again', /Timed out/.test(await page.locator('[data-approval]').innerText()) && (await page.locator('[data-approval-renew]').count()) === 1);
+    await shot(page, 'B3-timed-out');
+    await page.locator('[data-approval-renew]').click();
+    await waitStatus(page, 'pending', 15_000);
+    check('B4 Ask again -> pending, same request', (await call(`${base}/v1/account/approvals/${id}`, { sub: 'user_ana' })).data?.approval?.status === 'pending');
+    const waiting = agent(folder, ['approval', 'wait'], 300_000).then(json, (e) => ({ error: e.message }));
+    await page.locator('[data-approve-agent]').click();
+    await page.waitForSelector('[data-approval]', { state: 'detached', timeout: 90_000 });
+    const done = await waiting;
+    const status = json(await agent(folder, ['status']).catch((e) => e.message));
+    check('B5 Approve after Ask again -> paired', done.paired === true && done.soul?.name === 'Bea' && status.paired === true, { done: JSON.stringify(done).slice(0, 200) });
+    await ctx.close();
+  }
+
+  // ---------- C: cy, phone dpr 3 — the card on a phone; Refuse -> Refused, the request is cancelled
+  {
+    const ctx = await context(browser, 'user_cy', { viewport: { width: 390, height: 844 }, dpr: 3, mobile: true });
+    const page = await openWorld(ctx, base, errors);
+    const { code } = await windowCode(page); await page.keyboard.press('Escape');
+    const folder = await newAgent(base, 'cy');
+    const made = json(await agent(folder, ['create-soul', 'Cy', '--for', code]));
+    const id = JSON.stringify(made).match(/ap_[a-f0-9]{32}/)?.[0];
+    await page.waitForSelector('[data-approval]', { timeout: 30_000 });
+    const w = await page.evaluate(where);
+    const targets = await page.evaluate(() => [...document.querySelectorAll('[data-approval] button')].map((b) => { const r = b.getBoundingClientRect(); return [b.textContent, Math.round(r.width), Math.round(r.height)]; }));
+    check('C1 the card on a phone: at the top, on top, 44 px targets', topRight(w) && targets.every(([, wd, h]) => wd >= 44 && h >= 44), { ...w, targets });
+    await shot(page, 'C1-card-phone-light');
+    await page.emulateMedia({ colorScheme: 'dark' }); await sleep(300); await shot(page, 'C1-card-phone-dark'); await page.emulateMedia({ colorScheme: 'light' });
+    await page.locator('[data-refuse-agent]').click();
+    await waitStatus(page, 'cancelled', 15_000);
+    check('C2 Refuse -> Refused; the request is cancelled', /Refused/.test(await page.locator('[data-approval]').innerText()) && (await call(`${base}/v1/account/approvals/${id}`, { sub: 'user_cy' })).data?.approval?.status === 'cancelled');
+    await shot(page, 'C2-refused-phone');
+    await page.locator('[data-approval-done]').click();
+    check('C3 Close closes the refused card', await page.waitForSelector('[data-approval]', { state: 'detached', timeout: 5_000 }).then(() => true, () => false));
+    await ctx.close();
+  }
+
+  // ---------- E: dee, an older agent's link: #approve/<id> opens the same card; Approve -> closes, the link is dropped
+  {
+    const ctx = await context(browser, 'user_dee', { dpr: 1 });
+    const folder = await newAgent(base, 'dee');
+    const made = json(await agent(folder, ['create-soul', 'Dee']));
+    const id = JSON.stringify(made).match(/ap_[a-f0-9]{32}/)?.[0];
+    const page = await ctx.newPage(); page.on('pageerror', (e) => errors.push(String(e.message).slice(0, 200)));
+    await page.goto(`${base}/#approve/${id}`, { waitUntil: 'commit' });
+    await page.waitForSelector('[data-approval]', { timeout: 60_000 });
+    await waitStatus(page, 'pending', 30_000);
+    const w = await page.evaluate(where);
+    check('E1 the #approve link opens the same card top right (no full-screen view)', topRight(w) && w.name === 'Dee' && (await page.locator('.bring-agent-scrim').count()) === 0, w);
+    await shot(page, 'E1-link-card');
+    const waiting = agent(folder, ['approval', 'wait'], 300_000).then(json, (e) => ({ error: e.message }));
+    await page.locator('[data-approve-agent]').click();
+    const gone = await page.waitForSelector('[data-approval]', { state: 'detached', timeout: 90_000 }).then(() => true, () => false);
+    const done = await waiting;
+    check('E2 Approve -> the card closes, the link leaves the address, the agent is paired', gone && !/#approve\//.test(page.url()) && done.paired === true, { url: page.url(), done: JSON.stringify(done).slice(0, 160) });
+    await ctx.close();
+  }
+  check('no page errors', errors.length === 0, { errors: errors.slice(0, 5) });
+} catch (e) {
+  report.failures.push('harness: ' + String(e?.stack ?? e).split('\n').slice(0, 3).join(' | '));
+  console.log('harness error', e);
+} finally {
+  if (browser) await browser.close().catch(() => {});
+  release?.();
+  writeFileSync(join(out, 'report.json'), JSON.stringify(report, null, 1));
+  writeFileSync(join(out, 'launcher.log'), launcherLog);
+  console.log(`\n${report.failures.length ? '✖ ' + report.failures.join(', ') : '✔ all steps'} — ${join(out, 'report.json')}`);
+  stop();
+  process.exit(report.failures.length ? 1 : 0);
+}
