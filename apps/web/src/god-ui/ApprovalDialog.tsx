@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import * as J from './join-api.ts';
 import { approvalLine, preparingLine, safePhoto } from './window-approvals.ts';
 import { requestFollowSoul } from '../follow-soul-request.ts';
+import './approval-card.css';
 
 const AVATAR = <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="15" r="7" fill="currentColor" opacity=".55" /><path d="M6 36a14 14 0 0 1 28 0" fill="currentColor" opacity=".55" /></svg>;
 
