@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { CORE_KIT, WorldModel, applyBatch, obbOverlap, type Refused } from './index.ts';
-import { furnishBatch, roomKeys, connectedPairs, wayLabels, approachOf } from '../../../tools/god-skill/lib/furnish.mjs';
+import { furnishBatch, roomKeys, connectedPairs, wayLabels, approachOf, gridSlack } from '../../../tools/god-skill/lib/furnish.mjs';
 
 function fresh() {
   const w = new WorldModel({ constants: { ground: 'land' }, seed: 'furnishing' });
@@ -96,4 +96,15 @@ test('a piece may not stand where a Soul sent to another piece would stand (the 
   const f = furnishedShop(recipe);
   const d: any = f.ops.find((o: any) => o.name === 'shop-display');
   assert.ok(d && d.p[0] < 0, `display goes to its next pose, not shelf-2's front: ${JSON.stringify(d?.p)} ${JSON.stringify(f.dropped)}`);
+});
+
+test('the ways check keeps the walk grid\'s slack, more in a building turned off the grid (hillside-home-4, lane WALK2)', () => {
+  assert.equal(gridSlack(0), 0.1); assert.equal(+gridSlack(Math.PI / 4).toFixed(6), 0.15); assert.equal(+gridSlack(Math.PI).toFixed(6), 0.1);
+  // a 4 x 4 m room split by a wall with a 0.95 m gap: square to the grid the body passes, turned 45 deg it does not (on the
+  // walk grid a 0.96 m gap in hillside-home-4, turned 39 deg, had 0.31 m of room where 0.34 is needed)
+  const room = { id: 'r', floor: 0, polygon: [[0, 0], [4, 0], [4, 4], [0, 4]] } as never;
+  const wall = (x0: number, x1: number) => ({ c: [(x0 + x1) / 2, 2], half: [(x1 - x0) / 2, 0.05], yaw: 0, y0: 0, y1: 2 });
+  const keys: [number, number][] = [[2, 0.5], [2, 3.5]], blockers = [wall(0, 1.5), wall(2.45, 4)];
+  assert.equal(connectedPairs(room, keys, blockers, gridSlack(0)), 1, 'square to the grid');
+  assert.equal(connectedPairs(room, keys, blockers, gridSlack(Math.PI / 4)), 0, 'turned 45 deg');
 });

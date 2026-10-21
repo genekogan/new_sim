@@ -35,7 +35,13 @@ const itemBoxes = (baked, p, y, yaw) => {
 // (a stool in the gap between a counter and a shelf that leaves the storeroom door in a nook) tries its next pose or is
 // dropped. 0.1 m grid over the room; keys are 0.45 m inside each doorway and the planner's step-off point 0.7 m beyond
 // each stair end.
+// The walk grid marks every 0.1 m world-aligned cell a piece or wall touches and measures room from cell centres, so a box
+// reads up to a cell bigger there than it is, more in a building turned off the grid (a cell's reach across a box edge at
+// angle a is 0.05 (|cos a| + |sin a|)): the check keeps that slack, 0.1 m square to the grid up to 0.15 m at 45 deg
+// (lane WALK2, 2026-10-21: a 0.96 m gap between a table and a sofa in hillside-home-4, turned 39 deg, passed here with
+// one cell to spare but had 0.31 m of room on the walk grid, where 0.34 is needed, and sealed half the living room).
 const BODY_R = 0.34, CELL = 0.1;
+export const gridSlack = (yaw = 0) => { const a = Math.abs(yaw) % (Math.PI / 2); return 0.1 + (0.05 * (Math.cos(a) + Math.sin(a) - 1)) / (Math.SQRT2 - 1); };
 const inPoly = (poly, x, z) => { let k = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) k = !k; } return k; };
 const inBox = (b, x, z, r) => { const c = Math.cos(b.yaw), s = Math.sin(b.yaw), dx = x - b.c[0], dz = z - b.c[1]; return Math.abs(dx * c - dz * s) < b.half[0] + r && Math.abs(dx * s + dz * c) < b.half[1] + r; };
 export function roomKeys(room, doors, links) {
@@ -65,12 +71,13 @@ export function approachOf(baked, at, yaw) {
   return { pts: [at], r: Math.hypot(baked.box[0], baked.box[2]) / 2 + 1.5 };
 }
 /** The group each key falls in (a body BODY_R round walking inside `room` past `blockers`); a key with no room is in none. */
-export function wayLabels(room, keys, blockers) {
+export function wayLabels(room, keys, blockers, slack = gridSlack(0)) {
+  const R = BODY_R + slack;
   const xs = room.polygon.map((p) => p[0]), zs = room.polygon.map((p) => p[1]);
   const x0 = Math.min(...xs), z0 = Math.min(...zs), nx = Math.ceil((Math.max(...xs) - x0) / CELL), nz = Math.ceil((Math.max(...zs) - z0) / CELL);
-  const near = blockers.filter((b) => b.c[0] + Math.hypot(...b.half) + BODY_R > x0 && b.c[0] - Math.hypot(...b.half) - BODY_R < x0 + nx * CELL && b.c[1] + Math.hypot(...b.half) + BODY_R > z0 && b.c[1] - Math.hypot(...b.half) - BODY_R < z0 + nz * CELL);
+  const near = blockers.filter((b) => b.c[0] + Math.hypot(...b.half) + R > x0 && b.c[0] - Math.hypot(...b.half) - R < x0 + nx * CELL && b.c[1] + Math.hypot(...b.half) + R > z0 && b.c[1] - Math.hypot(...b.half) - R < z0 + nz * CELL);
   const free = new Uint8Array(nx * nz), lab = new Int32Array(nx * nz).fill(-1);
-  for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) { const x = x0 + (i + 0.5) * CELL, z = z0 + (j + 0.5) * CELL; free[i * nz + j] = inPoly(room.polygon, x, z) && !near.some((b) => inBox(b, x, z, BODY_R)) ? 1 : 0; }
+  for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) { const x = x0 + (i + 0.5) * CELL, z = z0 + (j + 0.5) * CELL; free[i * nz + j] = inPoly(room.polygon, x, z) && !near.some((b) => inBox(b, x, z, R)) ? 1 : 0; }
   const cellOf = (key) => {   // the free cell nearest the key
     const { pts, r } = Array.isArray(key) ? { pts: [key], r: 0.3 } : key;
     let best = -1, bd = Infinity;
@@ -90,7 +97,7 @@ export function wayLabels(room, keys, blockers) {
 }
 const pairsOf = (labels, n = labels.length) => { let k = 0; for (let a = 0; a < n; a++) for (let b = a + 1; b < n; b++) if (labels[a] === labels[b]) k++; return k; };
 /** How many pairs of `keys` a body can walk between inside `room` past `blockers` (OBBs, room frame = def frame). */
-export function connectedPairs(room, keys, blockers) { return keys.length < 2 ? 0 : pairsOf(wayLabels(room, keys, blockers)); }
+export function connectedPairs(room, keys, blockers, slack) { return keys.length < 2 ? 0 : pairsOf(wayLabels(room, keys, blockers, slack)); }
 
 /** The furnish styles (recipe files), sorted. */
 export const furnishStyles = () => readdirSync(RECIPES).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)).sort();
@@ -123,6 +130,7 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
   const recipe = opts.recipe ?? loadRecipe(st, { strict: style != null });
   const th = def.make?.kind === 'gen' && def.make.gen === 'building/1' && !(b.params?.plan) ? FRONT_YAW[b.params?.front ?? def.params?.front?.default ?? 's'] ?? 0 : 0;
   const c = Math.cos(th), s = Math.sin(th);
+  const slack = gridSlack(model.worldPose?.(b)?.yaw ?? (typeof b.r === 'number' ? b.r : 0));   // the building's turn off the walk grid
   const R = ([x, z]) => [x * c + z * s, -x * s + z * c];         // canonical → def frame
   const Ri = ([x, z]) => [x * c - z * s, x * s + z * c];         // def frame → canonical
   const existing = new Set([...(model.children.get(b.id) ?? [])].map((id) => model.entities.get(id)?.name).filter(Boolean));
@@ -198,7 +206,7 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
           const walls = baked.colliders.filter((o) => o.y0 < room.y + 1.6 && o.y1 > room.y + 0.15);
           const standing = taken.filter((t) => t.floor === room.floor && t.solid);
           const keys = [...keysOf(room), ...standing.map((t) => t.approach)], blockers = [...walls, ...standing.map((t) => t.foot)];   // footprints, as the walk grid sees them
-          const was = wayLabels(room, keys, blockers), now = wayLabels(room, [...keys, approachOf(ib, pose, r3(fyaw + th))], [...blockers, bx]);
+          const was = wayLabels(room, keys, blockers, slack), now = wayLabels(room, [...keys, approachOf(ib, pose, r3(fyaw + th))], [...blockers, bx], slack);
           const own = now[now.length - 1], doorsReach = keysOf(room).some((_, i) => now[i] === own);
           if (pairsOf(now, keys.length) < pairsOf(was) || !doorsReach) { why = doorsReach ? 'would cut the way to its doors or another piece' : 'no way to it from the doors'; continue; }
         }
