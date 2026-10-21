@@ -1,4 +1,5 @@
 import { Attention, unwatchedPace } from './attention.ts';
+import { ClockCatchUp } from './clock-catchup.ts';
 import {edenSteeringModeV1,installEdenSteeringModeV1} from './eden-steering-mode.ts';
 import {TakeArchive,r2Store} from './take-archive.ts';
 import { createServer } from 'node:http';
@@ -178,8 +179,13 @@ server.on('request', (req, res) => {
 });
 
 // Unwatched worlds run their clock at a slower wall pace (attention.ts; on when SIM_UNWATCHED_PACE is set: the launcher sets it)
-if (process.env.SIM_UNWATCHED_PACE) new Attention((watched) => host.setPace(watched ? 1 : unwatchedPace())).watch(server);
+// ...and when somebody comes back, the world's time of day jumps to now (clock-catchup.ts; lane SLEEP): also after the
+// launcher let the world exit while asleep, so this boot may itself be the return. Not in LivingWorld worlds (their
+// dayConfig also restarts the day's events), which the launcher never runs.
+const catchUp = process.env.SIM_UNWATCHED_PACE && !living ? new ClockCatchUp(host, config.dataDir, { log: (m) => console.log(m) }) : null;
+if (process.env.SIM_UNWATCHED_PACE) new Attention((watched) => { host.setPace(watched ? 1 : unwatchedPace()); if (watched) void catchUp?.watched()?.catch(() => {}); else catchUp?.unwatched(); }).watch(server);
 host.start();
+void catchUp?.watched()?.catch(() => {});
 if (config.seedNatives && db.liveSouls(host.worldId).length === 0) {
   if (config.worldKey === 'toy') {
     for (const n of NATIVES) await souls.create('system', n, true);

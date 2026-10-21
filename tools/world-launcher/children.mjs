@@ -36,6 +36,7 @@ export class ChildPool {
    * boot is refused (error.code 'capacity'). busy(slug): a world with live viewers is never put to sleep.
    * stopGraceMs: how long stop() waits after SIGTERM before SIGKILL (10 s; tests shorten it).
    * sleepMs (lane P3): freezeIdle() freezes a world nobody asked anything for that long (see there); 0/absent: never.
+   * exitMs (lane SLEEP): releaseIdle() lets a world frozen that long more exit, giving its memory back (see there).
    */
   constructor(o) {
     this.o = o;
@@ -176,6 +177,28 @@ export class ChildPool {
     }
     return frozen;
   }
+  /** Give memory back (lane SLEEP, 2026-10-21): a world asleep (frozen) for `exitMs` more after it fell asleep (nobody
+   *  asked anything for sleepMs + exitMs), still with no viewer and nothing in flight, is stopped: it saves its snapshot
+   *  and its process exits, so its memory and its slot under maxRunning are free. Its next request cold-boots it from that
+   *  snapshot (the same state), as for a world evicted under memory pressure. A world booted only for a passive read
+   *  (a health check) falls asleep and exits again at once, its last use unchanged. Old-engine forks never exit here
+   *  (their boot is far slower and monitors read them every 5 min) unless exitForks is set. */
+  async releaseIdle(now = Date.now()) {
+    const ms = this.o.exitMs ?? 0, sleepMs = this.o.sleepMs ?? 0;
+    if (!(ms > 0) || !(sleepMs > 0) || this.closing || this.fenced || this.gate) return [];
+    const due = [...this.kids.values()].filter((k) => k.frozen && k.status === 'running' && k.child && !k.adopted && !k.ready && !k.stopped && !k.stopping
+      && (this.o.exitForks || !k.world?.fork) && now - (k.lastUsed ?? 0) >= sleepMs + ms && !this.o.busy?.(k.slug));
+    const released = [];
+    for (const k of due) {
+      if (this.closing || this.fenced || this.gate || !k.frozen || this.o.busy?.(k.slug)) continue;
+      const c = k.child;
+      await this.stop(k.slug);
+      if (c.exitCode === null && c.signalCode === null) continue;
+      released.push(k.slug);
+      if (k.status === 'stopped') { k.asleep = true; this.o.onChange?.(k.slug); }   // (else a request already woke it again)
+    }
+    return released;
+  }
   /** Wake a frozen world (SIGCONT); it counts as just used unless `use` is false (a passive read: it may sleep again soon). */
   thaw(k, { use = true } = {}) {
     if (!k?.frozen) return;
@@ -203,6 +226,8 @@ export class ChildPool {
     if (this.fenced) { const e = new Error(`world ${world.slug} is served by a newer launcher`); e.code = 'handed-over'; return Promise.reject(e); }
     let k = this.kids.get(world.slug);
     if (k?.handedBack) { const e = new Error(`world ${world.slug} is going back to the previous launcher`); e.code = 'handed-back'; return Promise.reject(e); }
+    // being stopped (put to sleep, its memory given back): boot it again only once that process is gone (one writer)
+    if (k?.stopping) return k.stopping.then(() => { if (this.closing) { const e = new Error(`world ${world.slug} is stopping`); e.code = 'stopping'; throw e; } return this.ensure(world, { timeoutMs, passive }); });
     if (k && !passive) k.lastUsed = Date.now();
     if (k?.frozen) this.thaw(k, { use: !passive });
     if (k && (k.status === 'running')) return Promise.resolve(k.port);
@@ -311,9 +336,14 @@ export class ChildPool {
   async stop(slug) {
     const k = this.kids.get(slug); if (!k) return;
     if (k.adopted) return;   // the previous launcher's child: only it stops it (handover release)
+    if (k.stopping) return k.stopping;
     k.stopped = true; if (k.timer) clearTimeout(k.timer);
     const c = k.child; if (!c) { k.status = 'stopped'; return; }
-    this.thaw(k);   // a frozen world handles SIGTERM (saves its snapshot) only once it runs again
+    k.stopping = this.stopChild(k, c).finally(() => { k.stopping = null; });
+    return k.stopping;
+  }
+  async stopChild(k, c) {
+    this.thaw(k, { use: false });   // a frozen world handles SIGTERM (saves its snapshot) only once it runs again; not a use
     c.kill('SIGTERM');
     const exited = () => c.exitCode !== null || c.signalCode !== null;
     const exit = exited() ? Promise.resolve() : new Promise((r) => c.once('exit', r));
