@@ -21,20 +21,27 @@ const WHY: Record<string, string> = {
   'nav.no-standing-room': 'where a body stands to use it has no room to stand',
 };
 
+/** The baked seat tops (m above the entity's base) of a placed entity, by slot id: the def's baked seat p[1] at the
+ *  entity's scale. Engine seat slots carry no height (the catalog adapter keeps only their footprint), so this is where a
+ *  seat's height is read. Empty when unknown. Not used for the edge sit capability: 32 of 180 core seat tops are the
+ *  model's box top, not the seat (Mars bus seats 1.22 m, bleacher tiers, cab seats, floor cushions), and the engine sits a
+ *  body on them; blocking those sits on the baked top would refuse seats Souls use today (Mars-two S10). */
+export function seatTopsOf(model: WorldModel, of: string): Map<string, number> {
+  const m = new Map<string, number>(), e = model.entities.get(of), def = e && model.resolvedDef(e.def);
+  if (e && def) {
+    const s = model.worldPose(e).s;
+    for (const slot of model.bake(def, e.params ?? {}, e.seed ?? 0, e.shape).slots) if (slot.kind === 'seat') m.set(slot.id, slot.p[1] * s);
+  }
+  return m;
+}
+
 /** Every seat and berth of `ids` (all fixtures when omitted). With the world `model`, seat heights are checked (the def's
  *  baked seat top at the entity's scale) and lines name things by their path. Pure read. */
 export function useCheck(engine: UseEngine, ids?: readonly string[], model?: WorldModel): UseVerdict[] {
   const tops = new Map<string, Map<string, number>>();
   const seatTop = model ? ({ id, of }: { id: string; of: string }) => {
     let m = tops.get(of);
-    if (!m) {
-      m = new Map(); tops.set(of, m);
-      const e = model.entities.get(of), def = e && model.resolvedDef(e.def);
-      if (e && def) {
-        const s = model.worldPose(e).s;
-        for (const slot of model.bake(def, e.params ?? {}, e.seed ?? 0, e.shape).slots) if (slot.kind === 'seat') m.set(slot.id, slot.p[1] * s);
-      }
-    }
+    if (!m) { m = seatTopsOf(model, of); tops.set(of, m); }
     return m.get(id.slice(id.indexOf('#') + 1));
   } : undefined;
   const name = (of: string) => (model?.entities.has(of) ? model.pathOf(of) : of);

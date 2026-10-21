@@ -80,7 +80,7 @@ import type {NativeBoatControlsV1} from '@sim/engine-contract';
 import type {BodyLocationV1} from '@sim/engine-contract';
 import {bodyProblem} from '../../../mars/viewer/engine/bodies/body.ts';
 import {humanRadius,seatFitProblem} from '../../../mars/viewer/engine/bodies/humanoid.ts';
-import {slotTransitionIssue} from '../../../mars/viewer/engine/social/actions.ts';
+import {slotTransitionIssue,obstacleIndex,type ObstacleIndex} from '../../../mars/viewer/engine/social/actions.ts';
 import {PLAN_MARGIN} from '../../../mars/viewer/engine/spatial/path.ts';
 import {creatureOf} from '../../../mars/viewer/engine/bodies/creatures.ts';
 import type {Body} from '../../../mars/viewer/engine/world/types.ts';
@@ -1905,16 +1905,22 @@ export class MarsEngine implements Engine {
    *  body sits on. Unlike navTargetsV1 a slot with no standing room at all is counted (use.no-approach), not skipped.
    *  `of` limits it to these fixtures; `keep` skips fixtures whose position it rejects. Pure read. */
   useCheckV1(opts:{of?:string[];keep?:(at:[number,number])=>boolean;seatTop?:(slot:{id:string;of:string})=>number|undefined}={}):UseCheckV1[]{
-    const out:UseCheckV1[]=[],w=this.rt.world,c=this.connectivityV1(),body=HUMAN_PROFILE_V1;
+    const w=this.rt.world,c=this.connectivityV1(),body=HUMAN_PROFILE_V1;
     const ids=opts.of?[...new Set(opts.of)].filter(id=>w.entities[id]).sort():Object.keys(w.entities).sort();
-    const verb=(k:string)=>k==='berth'?'lain on':'sat on';
-    for(const id of ids){const e=w.entities[id];if(e.kind!=='fixture')continue;if(opts.keep&&!opts.keep([e.pose.p[0],e.pose.p[2]]))continue;
+    const verb=(k:string)=>k==='berth'?'lain on':'sat on',spatial=this.rt.services.spatial as Spatial;
+    // one obstacle index for every slide tested (rebuilt if the scene's list changes), and the fixtures walked in spatial
+    // order (32 m cells) so neighbours share the fine nav tiles (a small LRU); the verdicts are the same, listed by id
+    let idx:ObstacleIndex|undefined;const index=()=>(idx&&idx.obstacles===spatial.scene.obstacles?idx:(idx=obstacleIndex(spatial.scene.obstacles)));
+    const cell=(v:number)=>Math.floor(v/32),todo=ids.filter(id=>{const e=w.entities[id];return e.kind==='fixture'&&!(opts.keep&&!opts.keep([e.pose.p[0],e.pose.p[2]]));});
+    const order=todo.map((id,k)=>({id,k,p:w.entities[id].pose.p})).sort((a,b)=>cell(a.p[2])-cell(b.p[2])||cell(a.p[0])-cell(b.p[0])||a.k-b.k);
+    const per:UseCheckV1[][]=todo.map(()=>[]);
+    for(const {id,k} of order){const e=w.entities[id],out=per[k];
       for(const slot of fixtureSlots(this.rt,e)){if(slot.kind!=='seat'&&slot.kind!=='berth')continue;
         const base={id:slot.id,of:id,kind:slot.kind as 'seat'|'berth',level:slot.level??0};
         let navIssue:(ConnVerdict&{p:[number,number]})|undefined,slide:{code:string;message:string}|undefined;
         const joined=(p:[number,number])=>{const v=c.check([{id:slot.id,p,level:base.level,tol:.5}])[0];if(v.ok)return true;navIssue??={...v,p};return false;};
         const a=slot.approachPolicy==='reachable/1'?seatApproach(this.rt,slot,{minClearance:body.radius+PLAN_MARGIN,anyAngle:true,accept:(p)=>{
-          const issue=slotTransitionIssue(this.rt,slot,p,body);if(issue){if(issue.code!=='slot.no-floor')slide??=issue;return false;}
+          const issue=slotTransitionIssue(this.rt,slot,p,body,index());if(issue){if(issue.code!=='slot.no-floor')slide??=issue;return false;}
           return joined([p[0],p[1]]);}}):seatApproach(this.rt,slot);
         if(!Array.isArray(a)){
           if(navIssue){const where=navIssue.code==='nav.no-standing-room'?'has no standing room on the walk raster':navIssue.code==='nav.one-way'?'is joined to the main ground one way only':'is cut off from the main ground';
@@ -1927,7 +1933,7 @@ export class MarsEngine implements Engine {
         const top=slot.kind==='seat'?opts.seatTop?.({id:slot.id,of:id}):undefined,fit=top!==undefined?seatFitProblem(undefined,top):null;
         if(fit){out.push({...base,ok:false,code:'use.seat-fit',message:`${slot.id}: ${fit.message}`,at});continue;}
         out.push({...base,ok:true,at});}}
-    return out;
+    return per.flat();
   }
   /** lane NAV: the audit's policy id and passable clearance (reports). */
   navPolicyV1(){return {policy:NAV_CONNECT_POLICY,clear:CONNECT_CLEAR};}
