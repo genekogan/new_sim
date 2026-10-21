@@ -2,14 +2,15 @@
 // exactly a `wait` response; `X-Eden-Signature` is the lowercase hex HMAC-SHA256 of the
 // raw body under the subscriber's secret. The subscription keeps its own cursor and
 // advances it only on a 2xx response; failures back off up to five minutes.
-// Only https URLs to public-looking hosts are accepted (no loopback/private literals).
+// Only https URLs to public-looking hosts are accepted (no loopback/private literals), and a redirect is a failed
+// delivery (SEC2: following one would let a public URL bounce the POST to a loopback or metadata address).
 import {createHmac} from 'node:crypto';
 import type {EdgeSoul} from '../contract.ts';
 import {EDGE_CONTRACT, EdgeError} from '../contract.ts';
 import type {CommsCore} from './core.ts';
 import {cursorOf} from './stream.ts';
 
-export type Fetch = (url: string, init: {method: string; headers: Record<string, string>; body: string; signal?: AbortSignal}) => Promise<{ok: boolean; status: number}>;
+export type Fetch = (url: string, init: {method: string; headers: Record<string, string>; body: string; redirect?: 'manual'; signal?: AbortSignal}) => Promise<{ok: boolean; status: number}>;
 type Sub = {soul_id: string; url: string; secret: string; cursor: number; failures: number};
 
 const PRIVATE_HOST = /^(localhost|.*\.localhost|.*\.local|.*\.internal|0\.0\.0\.0|127\..*|10\..*|192\.168\..*|169\.254\..*|172\.(1[6-9]|2[0-9]|3[01])\..*|\[.*\]|::1?)$/i;
@@ -63,7 +64,7 @@ export class Webhooks {
         const body = JSON.stringify({contract: EDGE_CONTRACT, ...page});
         let ok = false;
         try {
-          const res = await this.fetcher(s.url, {method: 'POST', headers: {'content-type': 'application/json', 'x-eden-signature': signature(s.secret, body), 'x-eden-contract': EDGE_CONTRACT}, body, signal: AbortSignal.timeout(5000)});
+          const res = await this.fetcher(s.url, {method: 'POST', headers: {'content-type': 'application/json', 'x-eden-signature': signature(s.secret, body), 'x-eden-contract': EDGE_CONTRACT}, body, redirect: 'manual', signal: AbortSignal.timeout(5000)});
           ok = res.ok;
         } catch { ok = false; }
         const next = Number(page.cursor.slice(2));

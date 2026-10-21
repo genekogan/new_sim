@@ -5,6 +5,8 @@ import {mountAccountRoutes} from './accounts/routes.ts';
 import {fillInstructions} from './accounts/instructions.ts';
 import {mountWelcomeRoutes} from './welcome.ts';
 import { bodyLimit } from 'hono/body-limit';
+/** SEC2: the absolute request-body ceiling for a non-god route (uploads 17 MB, everything else 1 MB). */
+export const bodyCeiling=(path:string)=>/\/v1\/(?:edge\/body\/uploads|art\/media)$/.test(path)?17*1024*1024:1024*1024;
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { Hono, type Context } from 'hono';
@@ -69,6 +71,11 @@ export function buildApp(d: Deps) {
   // (SIM_FLOOD=0 turns it off for a local experiment)
   const refusals = new RefusalLog();   // every 429/413 this world answers, in its log without flooding it
   if (process.env.SIM_FLOOD !== '0') app.use('*', floodGuard({ log: refusals, godPool: (t) => { const who = d.god?.godIdentity(t); return who ? poolOf(who) : hashToken(t); } }));
+  // SEC2 2026-10-21: a ceiling on every request body before any route reads one. Routes mounted above the /v1/* 64 KB
+  // limit below (edge, travel, art, moderation) otherwise read a chunked body (no content-length) without bound: one
+  // anonymous 200 MB POST to /v1/edge/say grew a world by ~90-500 MB. Tighter route limits still apply; god routes keep
+  // their own budget-sized limit. 1 MB is ~15x the largest normal JSON body; uploads (16 MB) get 16 MB + 1 MB.
+  app.use('*',async(c,next)=>c.req.method==='GET'||c.req.method==='HEAD'||/\/v1\/god\//.test(c.req.path)?next():bodyLimit({maxSize:bodyCeiling(c.req.path),onError:(c)=>{refusals.note('size','too-large',`${c.req.method} ${c.req.path}`);return c.json({ok:false,code:'too-large',message:'request body is too large'},413);}})(c,next));
   // G8 moderation: first, so its veto checks run before the asset, body and world routes answer
   const moderation = mountModeration(app, { db: d.db.db, worldId: d.host.worldId, bearer, requireUser: (c) => requireUser(c), god: d.god, ownerId: d.cfg.ownerId });
   // lane O2: the first snapshot is edge-cacheable when the page asks for it by the current key (edge-snapshot.ts)
