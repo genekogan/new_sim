@@ -36,6 +36,25 @@ const cookie = (req, name) => {
 };
 
 /**
+ * A stage's last backup. backup-last.json (written by deploy/backup-restic.mjs) is the record; until its first nightly run
+ * after a release has written one (fixup 2026-10-21: the 3.60 page alerted "no backup in its record" on both stages while
+ * their backups were fine), fall back read-only to the newest success host-health saw (the backup unit's last successful
+ * run) or the newest dated copy under <backupRoot>/<stage>/YYYYMMDD (deploy/backup.mjs), whichever is later.
+ * `source` says which: 'record' | 'unit' | 'dated'. null when there is nothing at all.
+ */
+export function lastBackup(dir, stage, timer, backupRoot) {
+  const rec = readJson(join(dir, 'backup-last.json'));
+  if (rec) return { ...rec, source: 'record' };
+  const seen = [];
+  if (timer?.result === 'success' && Number.isFinite(Date.parse(timer.endedAt))) seen.push({ at: timer.endedAt, ok: true, source: 'unit' });
+  try {
+    const n = readdirSync(join(backupRoot, stage)).filter((x) => /^\d{8}$/.test(x)).sort().at(-1);
+    if (n) seen.push({ at: statSync(join(backupRoot, stage, n)).mtime.toISOString(), ok: true, source: 'dated', name: n });
+  } catch { /* no dated copies */ }
+  return seen.sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0] ?? null;
+}
+
+/**
  * @param {{ dataDir: string, build: string, base: string, registry: any, pool: any, live: Map<string, number>,
  *           stats: Map<string, any>, refreshStats: (w: any) => Promise<void>, errors: any, hostHealth: () => any,
  *           auth: any, verify: (authorization: string) => Promise<string|null>, worldOwner: (slug: string) => string|null,
@@ -243,7 +262,7 @@ export function healthDash(o) {
     const st = stages().map((s) => {
       const k = s.self ? keeper : readJson(join(s.dir, 'keeper.json'));
       return { stage: s.stage, self: s.self, build: s.self ? o.build : k?.active?.build ?? null, since: k?.active?.since ?? null,
-        backup: readJson(join(s.dir, 'backup-last.json')), timer: host?.backups?.[s.stage] ?? null };
+        backup: lastBackup(s.dir, s.stage, host?.backups?.[s.stage], backupRoot), timer: host?.backups?.[s.stage] ?? null };
     });
     const mem = memory();
     const errs = o.errors.summary({ limit: 20 });
@@ -277,7 +296,8 @@ export function healthDash(o) {
     }
     for (const s of d.stages) {
       if (s.backup && s.backup.ok === false) bad(`${s.stage} backup failed${s.backup.error ? `: ${String(s.backup.error).slice(0, 120)}` : ''}`);
-      if (s.timer?.enabled && ago(s.backup?.at) > 26) warn(`${s.stage}: no backup in ${Number.isFinite(ago(s.backup?.at)) ? `${Math.round(ago(s.backup.at))} h` : 'its record'}`);
+      // No backup seen at all (a new stage before its first night) is not an alert: the page says when the first record comes.
+      if (s.timer?.enabled && s.backup?.at && ago(s.backup.at) > 26) warn(`${s.stage}: no backup in ${Number.isFinite(ago(s.backup.at)) ? `${Math.round(ago(s.backup.at))} h` : 'its record'}`);
     }
     if (d.drill && d.drill.ok === false) bad(`restore drill ${d.drill.name} failed`);
     if (d.errors.newSinceRelease > 0) warn(`${d.errors.newSinceRelease} new client error kind${d.errors.newSinceRelease === 1 ? '' : 's'} since this release`);
@@ -361,7 +381,7 @@ function render(d){
       return '<tr><td title="'+esc(w.slug)+'">'+esc(w.name)+'</td><td><span class="'+sc+'">'+esc(w.status)+'</span></td><td class="n">'+(w.viewers||'<span class="muted">0</span>')+'</td><td>'+esc(ago(w.lastVisit))+'</td><td class="n">'+fmt(w.souls)+'</td>'
       +'<td class="n '+(tk&&tk.avg>50?'warn':'')+'">'+(tk?tk.avg+' <span class="muted">/ '+tk.max+'</span>':'—')+'</td><td class="n '+(w.clockRate!=null&&w.clockRate<0.9?'warn':'')+'">'+(w.clockRate==null?'—':Math.round(w.clockRate*100)+'%')+'</td><td class="n hide-s">'+fmt(w.rssMb,' MB')+'</td><td>'+esc(ago(w.lastEdit))+'</td><td class="n hide-s">'+w.restarts+'</td></tr>'}).join('')+'</tbody></table></div>';
   s+='<h2>Releases and backups</h2><div class="wrap"><table><thead><tr><th>Stage</th><th>Build</th><th>Live since</th><th>Last backup</th><th class="n">Size added</th><th>Timer</th></tr></thead><tbody>'
-    +d.stages.map(x=>{const b=x.backup;return '<tr><td>'+esc(x.stage)+(x.self?' <span class="chip">this</span>':'')+'</td><td class="mono">'+esc(x.build??'—')+'</td><td>'+esc(ago(x.since))+'</td><td>'+(b?(b.ok?'<span class="ok">ok</span>':'<span class="bad">failed</span>')+' '+esc(ago(b.at))+(b.ok?' <span class="muted">'+b.dbsOk+'/'+b.dbs+' dbs</span>':''):'<span class="muted">none</span>')+'</td><td class="n">'+(b&&b.addedMb!=null?b.addedMb+' MB':'—')+'</td><td>'+(x.timer?(x.timer.enabled?esc(x.timer.result||'enabled'):'<span class="muted">off</span>'):'—')+'</td></tr>'}).join('')+'</tbody></table></div>'
+    +d.stages.map(x=>{const b=x.backup;return '<tr><td>'+esc(x.stage)+(x.self?' <span class="chip">this</span>':'')+'</td><td class="mono">'+esc(x.build??'—')+'</td><td>'+esc(ago(x.since))+'</td><td>'+(b?(b.ok?'<span class="ok">ok</span>':'<span class="bad">failed</span>')+' '+esc(ago(b.at))+(b.source!=='record'?' <span class="muted">('+(b.source==='unit'?'backup unit':'dated copy')+'; first record after tonight’s backup)</span>':b.ok&&b.dbs!=null?' <span class="muted">'+b.dbsOk+'/'+b.dbs+' dbs</span>':''):'<span class="muted">'+(x.timer&&x.timer.enabled?'first record after tonight’s backup':'none')+'</span>')+'</td><td class="n">'+(b&&b.addedMb!=null?b.addedMb+' MB':'—')+'</td><td>'+(x.timer?(x.timer.enabled?esc(x.timer.result||'enabled'):'<span class="muted">off</span>'):'—')+'</td></tr>'}).join('')+'</tbody></table></div>'
     +'<p class="muted">Restore drill: '+(d.drill?esc(d.drill.name)+' · '+(d.drill.ok===true?'<span class="ok">ok</span> '+d.drill.dbsOk+'/'+d.drill.dbs+' dbs':d.drill.ok===false?'<span class="bad">failed</span>':'result unknown')+' · '+esc(ago(d.drill.at)):'none yet')+'</p>';
   const ar=d.arrivals||{};
   s+='<h2>Arrivals, last 24 h</h2><div class="grid">'+tile('Arrivals',fmt(ar.n))+tile('Median',ar.p50==null?'—':(ar.p50/1000).toFixed(1)+' s')+tile('Slowest 10%',ar.p90==null?'—':(ar.p90/1000).toFixed(1)+' s',ar.p90>10000?'warn':'')+'</div>'
