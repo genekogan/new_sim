@@ -433,6 +433,13 @@ function capAhead(ex: Exec): number {
   }
   return v;
 }
+/** BS3 (a): arc length from ex.s to the first shallow-water point of the corridor within a faster gait's braking horizon
+ *  down to walking pace (0: underfoot), or Infinity. Sampled every 0.25 m on the smoothed path. */
+function wadeAhead(ex: Exec, f: { medium(x: number, z: number): number }): number {
+  const horizon = Math.min(ex.total - ex.s, (ex.speed * ex.speed - WALK_SPEED_CAP * WALK_SPEED_CAP) / (2 * ACCEL) + 0.5);
+  for (let d = 0; d <= horizon + 1e-9; d += 0.25) { const q = pointAt(ex, ex.s + d); if (f.medium(q[0], q[1]) === G_WADE) return d; }
+  return Infinity;
+}
 /** Heading the walker aims for at arc length s: along the chord to the path point FACE_LOOK ahead. */
 function faceAt(ex: Exec, s: number): number {
   const p = pointAt(ex, s), q = pointAt(ex, Math.min(ex.total, s + FACE_LOOK));
@@ -757,6 +764,13 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   if (hz) vmax = Math.min(vmax, Math.sqrt(2 * ACCEL * Math.max(0, hz.d - STOP_GAP)));
   // stopped by it already: hold, do not creep up to it, until the decision (or until it moves off)
   if (hz && ex.block?.at[hz.id]) vmax = 0;
+  // BS3 (a): a faster gait is a dry-ground activity on every chunk and replan, not only the first one walk_to.plan checks:
+  // shallow water ahead (or underfoot) brings a jogger or runner down to walking pace before it steps in (wading is walking)
+  const wadeF = ex.gait && g.level === 0 ? sp.ground?.field : undefined;
+  if (wadeF && !arrived && ex.speed > WALK_SPEED_CAP) {
+    const d = wadeAhead(ex, wadeF);
+    if (d < Infinity) vmax = Math.min(vmax, Math.sqrt(WALK_SPEED_CAP * WALK_SPEED_CAP + 2 * ACCEL * Math.max(0, d - 0.1)));
+  }
   const prevS = ex.s;
   ex.v += clamp(vmax - ex.v, -BRAKE * dt, ACCEL * dt);
   if (ex.v < 0) ex.v = 0;
@@ -892,6 +906,16 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     if (stoppedFor.kind === 'person') personBlock ??= stoppedFor.id;
     else if (stoppedFor.kind === 'load') loadBlock ??= stoppedFor.id;
     else geoBlock = stoppedFor.id;
+  }
+  // BS3 (a) hard guard: a step that ends in shallow water is a wading step, at most walking pace (motion.overspeed's
+  // 'wade' cap); the look-ahead above normally slowed it already (a lateral offset or a chunk boundary can surprise it)
+  if (wadeF && p !== cur && dist2(cur, p) > WALK_SPEED_CAP * dt + 1e-9 && wadeF.medium(p[0], p[1]) === G_WADE) {
+    const k = (WALK_SPEED_CAP * dt) / dist2(cur, p);
+    ex.s = prevS + (ex.s - prevS) * k;
+    const q = place(ex.s, ex.offset);
+    p = dist2(cur, q.p) <= WALK_SPEED_CAP * dt + 1e-9 ? q.p : add2(cur, scale2(sub2(q.p, cur), (WALK_SPEED_CAP * dt) / dist2(cur, q.p)));
+    ex.offset = q.off;
+    ex.v = Math.min(ex.v, WALK_SPEED_CAP);
   }
   // hard static layer (W38): never step to where the body would overlap static geometry by the invariant's measure
   // (runtime/invariants.ts humanStaticClearance: clearance < r − 3 cm) unless it already stands worse. A route planned
