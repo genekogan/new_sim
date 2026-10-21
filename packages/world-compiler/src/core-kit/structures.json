@@ -1775,5 +1775,64 @@
    }
   },
   "material": "plaster"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-stairs",
+  "version": 1,
+  "description": "An outdoor flight of stairs from the ground up to a roof terrace, deck or upper landing: `rise` m up over `run` m, `width` wide; its top tread arrives on a 0.5 m landing beyond the flight. Stand it with its top end against the wall (the flight's -z end is the top).",
+  "tags": [
+   "stairs",
+   "access",
+   "structure",
+   "roof"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "gen",
+   "gen": "stairs/1"
+  },
+  "params": {
+   "rise": {
+    "type": "number",
+    "min": 0.3,
+    "max": 12,
+    "default": 2.8
+   },
+   "run": {
+    "type": "number",
+    "min": 0.5,
+    "max": 20,
+    "default": 4
+   },
+   "width": {
+    "type": "number",
+    "min": 0.6,
+    "max": 6,
+    "default": 1.1
+   },
+   "material": {
+    "type": "enum",
+    "values": [
+     "wood",
+     "stone",
+     "metal"
+    ],
+    "default": "stone"
+   },
+   "rail": {
+    "type": "bool",
+    "default": true
+   }
+  },
+  "size": {
+   "box": [
+    1.1,
+    2.8,
+    4
+   ]
+  },
+  "layer": "solid",
+  "category": "component.access"
  }
 ]
