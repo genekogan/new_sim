@@ -10,5 +10,5 @@ export function roomKeys(room: Room, doors: unknown[], links: unknown[]): Vec2[]
 export function approachOf(baked: unknown, at: Vec2, yaw: number): WayKey;
 export function wayLabels(room: Room, keys: WayKey[], blockers: Box[], slack?: number): number[];
 export function connectedPairs(room: Room, keys: WayKey[], blockers: Box[], slack?: number): number;
-/** The walk grid's extra reach round a box in a building turned `yaw` off the grid: 0.1 m square to it, 0.15 m at 45 deg. */
+/** The walk grid's extra reach round a box in a building turned `yaw` off the grid: 0.05 m square to it, 0.15 m at 45 deg. */
 export function gridSlack(yaw?: number): number;

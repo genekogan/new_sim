@@ -36,12 +36,13 @@ const itemBoxes = (baked, p, y, yaw) => {
 // dropped. 0.1 m grid over the room; keys are 0.45 m inside each doorway and the planner's step-off point 0.7 m beyond
 // each stair end.
 // The walk grid marks every 0.1 m world-aligned cell a piece or wall touches and measures room from cell centres, so a box
-// reads up to a cell bigger there than it is, more in a building turned off the grid (a cell's reach across a box edge at
-// angle a is 0.05 (|cos a| + |sin a|)): the check keeps that slack, 0.1 m square to the grid up to 0.15 m at 45 deg
+// reads bigger there than it is, half a cell on average square to the grid and more in a building turned off it (a cell's
+// reach across a box edge at angle a grows with |cos a| + |sin a|): the check keeps that slack, 0.05 m square to the grid
+// (the arcade shops' 0.91 m diagonal between display and counter walks) up to 0.15 m at 45 deg
 // (lane WALK2, 2026-10-21: a 0.96 m gap between a table and a sofa in hillside-home-4, turned 39 deg, passed here with
 // one cell to spare but had 0.31 m of room on the walk grid, where 0.34 is needed, and sealed half the living room).
 const BODY_R = 0.34, CELL = 0.1;
-export const gridSlack = (yaw = 0) => { const a = Math.abs(yaw) % (Math.PI / 2); return 0.1 + (0.05 * (Math.cos(a) + Math.sin(a) - 1)) / (Math.SQRT2 - 1); };
+export const gridSlack = (yaw = 0) => { const a = Math.abs(yaw) % (Math.PI / 2); return 0.05 + (0.1 * (Math.cos(a) + Math.sin(a) - 1)) / (Math.SQRT2 - 1); };
 const inPoly = (poly, x, z) => { let k = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) k = !k; } return k; };
 const inBox = (b, x, z, r) => { const c = Math.cos(b.yaw), s = Math.sin(b.yaw), dx = x - b.c[0], dz = z - b.c[1]; return Math.abs(dx * c - dz * s) < b.half[0] + r && Math.abs(dx * s + dz * c) < b.half[1] + r; };
 export function roomKeys(room, doors, links) {
