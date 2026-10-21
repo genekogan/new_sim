@@ -5,7 +5,7 @@
 // viewers (hub) and to gods (SSE).
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { TILE_M, tileOf } from '@sim/ground';
-import { WorldModel, correctKitDefines, creationInputFailure, definitionRefs, coreLibrary, libraryRef, applyBatch, padResettle, plan, batchSchema, hashOf, type Batch, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type UsesHook, type ResidentMove } from '@sim/world-compiler';
+import { WorldModel, correctKitDefines, type PlanOptions, creationInputFailure, definitionRefs, coreLibrary, libraryRef, applyBatch, padResettle, plan, batchSchema, hashOf, type Batch, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type UsesHook, type ResidentMove } from '@sim/world-compiler';
 import { hashToken } from '../auth.ts';
 import type { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
@@ -23,6 +23,7 @@ import { buildReceipt } from './build-integrity.ts';
 import { definitionUseClosure } from './unused-defs.ts';
 import { rewindChanges, rewindDependents } from './rewind.ts';
 import { GodTrace } from './trace.ts';
+import { repairBatch, tagPlaces, untagPlaces, type Repair } from './buildsafe.ts';
 export type { WorldBuildMessage } from './builds.ts';
 const previewBatchSchema = batchSchema.extend({ build: buildFieldSchema.optional() });
 
@@ -107,7 +108,7 @@ export class GodMode {
    *  G1 "god rules": `prepare` plans, on the would-be world, the residents an accepted edit/undo/redo walks out of its
    *  way (listed as `moved` in the durable receipt), and `apply` moves them after the SQL commit in the same request.
    *  Null in worlds without the engine. */
-  bodies: { uses: UsesHook; lifted?: (ids: string[], after?: WorldModel) => string[]; refuse?: (after: WorldModel, diff: Diff, ops: Op[], o?: { undo?: boolean }) => Failure | null; prepare?: (before: WorldModel, after: WorldModel, diff: Diff, ops: Op[], o?: { dry?: boolean }) => WalkoutPrep; apply?: (moved: ResidentMove[], o?: ApplyContext) => string[] | void; arrivalNote?: (diff: Diff) => string[]; navNote?: (diff: Diff) => string[] } | null = null;
+  bodies: { uses: UsesHook; lifted?: (ids: string[], after?: WorldModel) => string[]; refuse?: (after: WorldModel, diff: Diff, ops: Op[], o?: { undo?: boolean }) => Failure | null; prepare?: (before: WorldModel, after: WorldModel, diff: Diff, ops: Op[], o?: { dry?: boolean }) => WalkoutPrep; apply?: (moved: ResidentMove[], o?: ApplyContext) => string[] | void; arrivalNote?: (diff: Diff) => string[]; navNote?: (diff: Diff, said?: string[]) => string[] } | null = null;
   /** Bridge admission/decoration must run before the accepted receipt is persisted, and never on replay. */
   actGuard: ((batch: unknown) => Result | null) | null = null;
   finalizeAct: ((result: Result, after: WorldModel) => Result) | null = null;
@@ -355,11 +356,16 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const retirement = this.retirementFailure(parsed.data.ops); if (retirement) return { accepted: false as const, failures: [retirement] };
     const off = deferredOp(parsed.data); if (off) return { accepted: false as const, failures: [off] };
     const admission = this.builds.admit(this.callerField(parsed.data.build), parsed.data, this.caller.identity); if (admission.failures) return { accepted: false as const, failures: admission.failures };
-    let scratch: WorldModel | undefined;
-    const p = plan(this.model, { ...parsed.data, group: admission.group }, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: (after, diff, ops) => { scratch = after; const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused; const check = this.builds.check(admission, this.model, after, diff, ops); return 'failure' in check ? check.failure : null; } });
-    if (!p.ok) return { accepted: false as const, failures: p.failures };
-    const moving = scratch ? (this.bodies?.prepare?.(this.model, scratch, p.diff, parsed.data.ops as Op[], { dry: true }) ?? NO_WALKOUTS) : NO_WALKOUTS;
-    return { accepted: true as const, ids: p.ids, warnings: [...kit.warnings, ...p.warnings, ...moving.warnings], diff: summarize(p.diff), ...(moving.moved.length ? { wouldMove: wouldMove(moving.moved) } : {}) };
+    // buildsafe/1: a dry run answers as the commit would (the same repair ops, lines and diff; a sealed room repaired or named)
+    const safe = this.applySafe({ ...parsed.data, group: admission.group } as Batch, this.opts.tick(), false, this.dryOpts(admission), []);
+    if (!safe.r.result.accepted) return { accepted: false as const, failures: safe.r.result.failures };
+    const diff = safe.r.diff!;
+    const moving = this.bodies?.prepare?.(this.model, safe.next, diff, safe.batch.ops as Op[], { dry: true }) ?? NO_WALKOUTS;
+    return { accepted: true as const, ids: safe.r.result.ids, warnings: [...kit.warnings, ...safe.r.result.warnings, ...(safe.repair?.lines ?? []), ...moving.warnings], diff: summarize(diff), ...(moving.moved.length ? { wouldMove: wouldMove(moving.moved) } : {}) };
+  }
+  /** Plan options of a dry run or preview: the bridge's refusals and build admission, as a commit checks them. */
+  private dryOpts(admission: ReturnType<GodBuilds['admit']>): PlanOptions {
+    return { uses: this.bodies?.uses, refuse: (after, diff, ops) => { const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused; const check = this.builds.check(admission, this.model, after, diff, ops); return 'failure' in check ? check.failure : null; } };
   }
   act(batch: unknown, note?: string): Result {
     const result = this.commitBatch(batch, note);
@@ -403,22 +409,27 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const off = deferredOp(normalized); if (off) return { accepted: false, failures: [off] } as Result;
     const tick = this.opts.tick();
     // Keep public state untouched until SQL succeeds. No SQL write lock is held while planning or baking.
-    const next = this.model.fork();
+    let next = this.model.fork();
     const lifted: string[] = [];
     let made: string[] = [];
-    const r = applyBatch(next, normalized, 'god', tick, { trusted, uses: this.bodies?.uses, refuse: (after, diff, ops) => {
+    const planOpts = { trusted, uses: this.bodies?.uses, refuse: (after: WorldModel, diff: Diff, ops: Op[]) => {
       const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused;
       const check = this.builds.check(admission, this.model, after, diff, ops); if ('failure' in check) return check.failure; made = check.made;
       // Warning geometry uses the same typed bake boundary as admission, before any live/SQL mutation.
       if (this.bodies?.lifted) lifted.push(...this.bodies.lifted(diff.upserts.map(e => e.id), after));
       return null;
-    } });
+    } };
+    // buildsafe/1 (lane BS2): what the edit newly cuts off at ground level is repaired in this same batch (a piece nudged
+    // clear, a gate opened in a wall built round something); a god edit is never refused for it (nor for sealing a
+    // room: that is repaired or named too); what is left is one line each to the god.
+    const safe = this.applySafe(normalized, tick, trusted, planOpts, lifted);
+    const r = safe.r; normalized = safe.batch; next = safe.next; const repair = safe.repair;
     if (preview && r.result.accepted) {
       const affected = new Set(preview.affected);
       const added = [...new Set([...r.diff!.upserts.map(e => e.id), ...r.diff!.removes])].filter(id => this.model.entities.has(id) && !affected.has(id));
       if (added.length) return { accepted: false, failures: added.map(id => ({ op: -1, code: 'revision.stale', entity: id, field: 'preview.affected', detail: `${this.model.pathOf(id)} would now be changed by this batch but was absent from the preview.`, measured: { id, v: this.model.entities.get(id)!.v }, fix: 'Create a new preview including the newly affected entities.' })) };
     }
-    if (r.result.accepted) r.result.warnings.push(...lifted);
+    if (r.result.accepted) r.result.warnings.push(...lifted, ...(repair?.lines ?? []));
     const result = this.finalizeAct?.(r.result, next) ?? r.result;
     if (!result.accepted) return result;
     const walkouts = this.bodies?.prepare?.(this.model, next, r.diff!, normalized.ops) ?? NO_WALKOUTS, moved = walkouts.moved;
@@ -459,9 +470,44 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const arrival = this.bodies?.arrivalNote?.(r.diff!) ?? [];
     // nav-connect/1 (lane NAV): an edit that cuts Souls off from the walkable world steps them to open ground (logged);
     // things it leaves with no walk to them are named in one line
-    const nav = this.bodies?.navNote?.(r.diff!) ?? [];
+    const nav = this.bodies?.navNote?.(r.diff!, repair?.named) ?? [];
     if (arrival.length || nav.length) { result.warnings.push(...arrival, ...nav); if (clientRef !== undefined) this.store.amendReceipt(clientRef, result); }
     return result;
+  }
+  /** buildsafe/1: apply a god batch, repair what it newly cuts off (buildsafe.ts) as extra ops of the same batch, and
+   *  turn a sealed-room refusal into a repair or one line. Trusted (genesis) batches apply as before. */
+  private applySafe<B extends Batch>(batch: B, tick: number, trusted: boolean, opts: PlanOptions, lifted: string[]): { r: ReturnType<typeof applyBatch>; next: WorldModel; batch: B; repair: Repair | null } {
+    const go = (ops: B['ops'], o: PlanOptions) => { const next = this.model.fork(); lifted.length = 0; return { next, r: applyBatch(next, { ...batch, ops }, 'god', tick, o) }; };
+    if (trusted) { const a = go(batch.ops, opts); return { ...a, batch, repair: null }; }
+    const tagged = tagPlaces(batch.ops);
+    let first = go(tagged, opts), sealedFail: Failure | null = null;
+    if (!first.r.result.accepted) {
+      const f = first.r.result.failures;
+      if (!f.length || f.some(x => x.code !== 'architecture.sealed')) return { ...first, batch, repair: null };
+      sealedFail = f[0]; first = go(tagged, { ...opts, sealed: false });
+      if (!first.r.result.accepted) return { ...first, batch, repair: null };
+    }
+    let repair: Repair | null = null;
+    try { repair = repairBatch(this.model, first.next, first.r.diff!, first.r.result.ids ?? {}); } catch { repair = null; }
+    const sealedLine = (f: Failure) => { const m = f.measured as { building?: string; room?: string; openings?: string[] } | undefined;
+      return `No walk reaches ${m?.building ?? f.entity}/${m?.room ?? 'a room'} after this edit (architecture.sealed): its last way out (${m?.openings?.join(', ') ?? 'its door'}) is blocked; fix: ${f.fix ?? 'move what stands in front of the door'}.`; };
+    const finish = (a: { next: WorldModel; r: ReturnType<typeof applyBatch> }, ops: B['ops'], rep: Repair | null, sealed: Failure | null) => {
+      const lines = [...(rep?.lines ?? []), ...(sealed ? [sealedLine(sealed)] : [])];
+      const ids = a.r.result.accepted ? a.r.result.ids : undefined; if (ids) for (const k of Object.keys(ids)) if (k.startsWith('$bs-')) delete ids[k];
+      return { ...a, batch: { ...batch, ops }, repair: rep || sealed ? { ops: rep?.ops ?? [], lines, named: rep?.named ?? [], ms: rep?.ms ?? 0 } : null };
+    };
+    if (repair?.ops.length) {
+      const ops = [...untagPlaces(tagged, repair.ops), ...repair.ops] as B['ops'];
+      const again = go(ops, opts);
+      if (again.r.result.accepted) return finish(again, ops, repair, null);
+      const f = again.r.result.failures;
+      if (f.length && f.every(x => x.code === 'architecture.sealed')) { const open = go(ops, { ...opts, sealed: false }); if (open.r.result.accepted) return finish(open, ops, repair, f[0]); }
+      repair = { ...repair, ops: [], lines: repair.lines.filter(l => !l.startsWith('Kept a way open')) };
+      // the repaired batch did not apply (it never should): the batch as sent stands, re-applied so its hooks' results are its own
+      return finish(go(batch.ops, sealedFail ? { ...opts, sealed: false } : opts), batch.ops, repair, sealedFail);
+    }
+    // nothing to repair: the first application stands; the journal keeps the ops as sent (the tags change nothing)
+    return finish(first, batch.ops, repair, sealedFail);
   }
   undo(): Result & { reverted?: number } {
     const target = this.store.undoable();
@@ -661,8 +707,9 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const off = deferredOp(parsed.data); if (off) return { id: null, accepted: false as const, failures: [off] };
     const build = this.callerField(parsed.data.build), admission = this.builds.admit(build, parsed.data, this.caller.identity);
     if (admission.failures) return { id: null, accepted: false as const, failures: admission.failures };
-    let scratch: WorldModel | undefined;
-    const p = plan(this.model, { ...parsed.data, group: admission.group }, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: (after, diff, ops) => { scratch = after; const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused; const check = this.builds.check(admission, this.model, after, diff, ops); return 'failure' in check ? check.failure : null; } });
+    // buildsafe/1: the preview shows the batch as the commit will apply it (repairs included); its ops stay as sent
+    const safe = this.applySafe({ ...parsed.data, group: admission.group } as Batch, this.opts.tick(), false, this.dryOpts(admission), []);
+    const p = safe.r.result.accepted ? { ok: true as const, diff: safe.r.diff! } : { ok: false as const, failures: safe.r.result.failures };
     const id = 'pv_' + randomBytes(6).toString('hex'), viewKey = randomBytes(32).toString('base64url');
     for (const [k, v] of this.previews) if (this.now() - v.at >= 600_000) this.previews.delete(k);
     while (this.previews.size >= 100) this.previews.delete(this.previews.keys().next().value!);
@@ -672,8 +719,9 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const affected = [...new Set([...diff.upserts.map(e => e.id), ...diff.removes])].filter(id => this.model.entities.has(id));
     this.previews.set(id, { viewKeyHash: hashToken(viewKey), at: this.now(), baseEditSeq, expect, subtrees, affected, diff, ops: batchSchema.parse(parsed.data), build: structuredClone(build), ...(!p.ok ? { failures: p.failures } : {}) });
     if (!p.ok) return { id, accepted: false as const, failures: p.failures };
-    const moving = scratch ? (this.bodies?.prepare?.(this.model, scratch, p.diff, parsed.data.ops as Op[], { dry: true }) ?? NO_WALKOUTS) : NO_WALKOUTS;
-    return { id, accepted: true as const, baseEditSeq, expect, subtrees, summary: summarize(p.diff), viewKey, expiresAt: this.now() + 600_000, url: `?preview=${id}#previewKey=${viewKey}`, ...(kit.warnings.length ? { warnings: kit.warnings } : {}), ...(moving.moved.length ? { wouldMove: wouldMove(moving.moved) } : {}) };
+    const moving = this.bodies?.prepare?.(this.model, safe.next, p.diff, safe.batch.ops as Op[], { dry: true }) ?? NO_WALKOUTS;
+    const warnings = [...kit.warnings, ...(safe.repair?.lines ?? [])];
+    return { id, accepted: true as const, baseEditSeq, expect, subtrees, summary: summarize(p.diff), viewKey, expiresAt: this.now() + 600_000, url: `?preview=${id}#previewKey=${viewKey}`, ...(warnings.length ? { warnings } : {}), ...(moving.moved.length ? { wouldMove: wouldMove(moving.moved) } : {}) };
   }
   getPreview(id: string) { const v = this.previews.get(id); if (!v || this.now() - v.at >= 600_000) return null; return v; }
   /** A read-only capability for exactly one retained preview; expires with its payload. */

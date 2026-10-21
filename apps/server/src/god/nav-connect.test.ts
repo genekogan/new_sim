@@ -43,8 +43,9 @@ test('walls built round a Soul: it steps to open ground (logged, nav-connect/1) 
   const r: any = w.god.act({ ops: ring(at, 7, 'r') });
   assert.equal(r.accepted, true, JSON.stringify(r.failures));
   assert.ok(r.warnings.some((x: string) => /^1 Soul cut off by this edit stepped to open ground nearby\.$/.test(x)), JSON.stringify(r.warnings));
-  const named = r.warnings.filter((x: string) => x.startsWith('No walk reaches'));
-  assert.equal(named.length, 1, JSON.stringify(r.warnings)); assert.match(named[0], /\bcrate\b/);
+  // buildsafe/1 names the crate at once, with a tested fix op; nav-connect/1 does not name it again
+  const named = r.warnings.filter((x: string) => /\bcrate\b/.test(x) && x.startsWith('No walk reaches'));
+  assert.equal(named.length, 1, JSON.stringify(r.warnings)); assert.match(named[0], /\(buildsafe\/1\).*fix: \{"op":"move"/);
   await w.settle(3);
   const p = w.host.engine.world.entities[row.entity_id]!.pose.p;
   assert.ok(Math.max(Math.abs(p[0] - at[0]), Math.abs(p[2] - at[1])) > 4.5, `outside the walls: ${p}`);
@@ -135,12 +136,14 @@ test('walls round a thing far from any Soul: the reply stays fast ("pending"), t
   for (let i = 0; i < 40; i++) { w.host.tickOnce(); await setImmediate(); } // labels warm
   const c: [number, number] = [20, 20];
   assert.equal((w.god.act({ ops: [{ op: 'define', def: box('chest', 0.6, 0.6) }, { op: 'place', def: 'chest@1', name: 'chest', p: c }] }) as any).accepted, true); await w.settle(6);
+  // buildsafe/1 sees the chest cut off on the edit's own raster and names it in this reply; nav-connect/1's pending
+  // note on the next reply leaves it out (said once)
   const r: any = w.god.act({ ops: ring(c, 5, 'q') }); assert.equal(r.accepted, true, JSON.stringify(r.failures));
-  assert.equal(r.warnings.some((x: string) => x.startsWith('No walk reaches')), false, JSON.stringify(r.warnings));
+  const named = r.warnings.filter((x: string) => x.startsWith('No walk reaches'));
+  assert.equal(named.length, 1, JSON.stringify(r.warnings)); assert.match(named[0], /\bchest\b.*\(buildsafe\/1\)/);
   await w.settle(12);
   const next: any = w.god.act({ ops: [{ op: 'place', def: 'chest@1', name: 'chest2', p: [-20, -20] }] });
-  const named = next.warnings.filter((x: string) => x.startsWith('No walk reaches'));
-  assert.equal(named.length, 1, JSON.stringify(next.warnings)); assert.match(named[0], /\bchest\b/);
+  assert.equal(next.warnings.some((x: string) => x.startsWith('No walk reaches') && /\bchest\b/.test(x)), false, JSON.stringify(next.warnings));
   await w.settle(12);
   const third: any = w.god.act({ ops: [{ op: 'place', def: 'chest@1', name: 'chest3', p: [-24, -20] }] });
   assert.equal(third.warnings.some((x: string) => x.startsWith('No walk reaches')), false, JSON.stringify(third.warnings));
