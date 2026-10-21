@@ -14,7 +14,7 @@
 //   GET  /__sim/launcher         children, ports, pids, restarts (diagnostics; direct local requests only)
 //   GET  /__sim/healthz          {ok, build, worlds, running, caps, memAvailableMb} (also /healthz)
 //   POST /__sim/op/create-world  operator only (direct loopback requests; anything through a reverse proxy is refused):
-//                                {name, template, owner | ownerOf, godName?, slug?} → a world born owned by an existing account
+//                                {name, template, owner | ownerOf, godName?, slug?, unlisted?} → a world born owned by an existing account
 //                                (`owner` = account id, or `ownerOf` = the slug of a world whose god it is). CLI: op.mjs
 //   POST /__sim/op/register-fork operator only: {slug: eden|mars|littlemartians, descriptor, accounts?} → serve a copy of an
 //                                old world (already in <data>/worlds/<slug>/sim.db) under <base>/w/<slug> (fork-world.mjs)
@@ -288,7 +288,7 @@ export async function openLauncher(cfg = {}) {
     if (chosen && (taken.has(chosen) || existsSync(registry.worldDir(chosen))))
       return [409, { ok: false, code: 'exists', message: `slug ${chosen} is in use, archived, or has data on disk` }];
     const slug = chosen ?? slugFor(name, taken);
-    const entry = { slug, name, template: t.id, port: null, createdAt: Date.now(), ...(typeof body?.creator === 'string' && body.creator ? { createdBy: body.creator.slice(0, 40) } : {}) };
+    const entry = { slug, name, template: t.id, port: null, createdAt: Date.now(), ...(typeof body?.creator === 'string' && body.creator ? { createdBy: body.creator.slice(0, 40) } : {}), ...(op && typeof body?.unlisted === 'boolean' ? { unlisted: body.unlisted } : {}) };
     rmSync(registry.worldDir(slug), { recursive: true, force: true });
     mkdirSync(registry.worldDir(slug), { recursive: true });
     registry.add(entry);

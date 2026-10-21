@@ -3,7 +3,7 @@
 // reverse proxy: only direct loopback requests are accepted). No credentials are involved or read.
 //
 //   node tools/world-launcher/op.mjs create-world --port 4620 [--base /worlds] --name "Little Martians (Arium)"
-//        --template littlemartians-two (--owner <account id> | --owner-of <slug of a world that account owns>) [--god-name <shown name>] [--slug <slug>]
+//        --template littlemartians-two (--owner <account id> | --owner-of <slug of a world that account owns>) [--god-name <shown name>] [--slug <slug>] [--unlisted]
 //   node tools/world-launcher/op.mjs register-fork --port 4620 [--base /worlds] --slug eden|mars|littlemartians
 //        --descriptor <abs fork.json> [--accounts <abs accounts.sqlite>] [--name <shown name>]
 //   node tools/world-launcher/op.mjs remove-fork --port 4620 [--base /worlds] --slug <slug>      (its data stays)
@@ -23,7 +23,7 @@ const argv = process.argv.slice(2);
 const flag = (k) => { const i = argv.indexOf(`--${k}`); return i >= 0 ? argv[i + 1] : undefined; };
 const cmd = argv[0];
 const usage = () => {
-  console.error('usage: op.mjs create-world --port <launcher port> [--base /worlds] --name <name> --template <id> (--owner <account id> | --owner-of <slug>) [--god-name <name>] [--slug <slug>]\n'
+  console.error('usage: op.mjs create-world --port <launcher port> [--base /worlds] --name <name> --template <id> (--owner <account id> | --owner-of <slug>) [--god-name <name>] [--slug <slug>] [--unlisted]\n'
     + '       op.mjs register-fork --port <launcher port> [--base /worlds] --slug <eden|mars|littlemartians> --descriptor <abs path> [--accounts <abs path>] [--name <name>]\n'
     + '       op.mjs remove-fork --port <launcher port> [--base /worlds] --slug <slug>\n'
     + '       op.mjs set-claimable --port <launcher port> [--base /worlds] --slug <slug> --claimable true|false\n'
@@ -37,7 +37,7 @@ const usage = () => {
 let body;
 if (cmd === 'create-world') {
   if (!flag('port') || !flag('name') || !flag('template') || !(flag('owner') || flag('owner-of'))) usage();
-  body = { name: flag('name'), template: flag('template'), ...(flag('owner') ? { owner: flag('owner') } : { ownerOf: flag('owner-of') }), ...(flag('god-name') ? { godName: flag('god-name') } : {}), ...(flag('slug') ? { slug: flag('slug') } : {}) };
+  body = { name: flag('name'), template: flag('template'), ...(flag('owner') ? { owner: flag('owner') } : { ownerOf: flag('owner-of') }), ...(flag('god-name') ? { godName: flag('god-name') } : {}), ...(flag('slug') ? { slug: flag('slug') } : {}), ...(argv.includes('--unlisted') ? { unlisted: true } : {}) };
 } else if (cmd === 'register-fork') {
   if (!flag('port') || !flag('slug') || !flag('descriptor')) usage();
   body = { slug: flag('slug'), descriptor: flag('descriptor'), ...(flag('accounts') ? { accounts: flag('accounts') } : {}), ...(flag('name') ? { name: flag('name') } : {}) };

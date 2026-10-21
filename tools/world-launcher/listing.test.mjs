@@ -64,4 +64,9 @@ test('unlisted worlds (QA2 F4): bench slugs and "(scratch)" names stay off the p
   assert.equal(r.status, 200); assert.deepEqual(await r.json(), { ok: true, slug: 'later', unlisted: false });
   assert.ok((await list()).some((x) => x.slug === 'later'));
   assert.equal((await api('/__sim/worlds/later/unlisted')).status, 405);
+  // the operator may create a world unlisted from birth (release-probe worlds); the public create ignores the field
+  assert.equal((await post('/__sim/op/create-world', { name: 'Probe', template: 'plain', owner: 'dev:gene', unlisted: true })).status, 201);
+  assert.ok(!(await list()).some((x) => x.slug === 'probe'));
+  assert.equal((await post('/__sim/worlds', { name: 'Public', template: 'plain', unlisted: true })).status, 201);
+  assert.ok((await list()).some((x) => x.slug === 'public'));
 });
