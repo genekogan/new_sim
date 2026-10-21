@@ -17,6 +17,9 @@ export type FixtureSpecV1 = {
   def: string; kind: 'fixture' | 'item'; label: string;
   p: [number, number, number]; yaw: number;
   support?: { kind: 'ground' } | { kind: 'resting-on'; on: string; slot: string };
+  /** The engine level of the floor it stands on. Hosts send it for a fixture on an upper floor since lane LEVELS
+   *  (2026-10-21); absent (earlier journals, the ground), the engine takes the level nearest its height. */
+  level?: number;
 };
 export type WorldEditV1 = {
   contract: 'world-edit/1';
@@ -24,7 +27,7 @@ export type WorldEditV1 = {
   seq: number;
   /** hashOf the resulting entity-physics (levels, byEntity, assets): replay checks it re-derived the same. */
   hash: string;
-  /** Upper-floor levels (ids 1..20) the parts stand on; the full list after this edit. */
+  /** Upper-floor levels (ids 1..MAX_LEVEL_ID, spatial/types.ts) the parts stand on; the full list after this edit. */
   levels: Level[];
   /** Changed entities: their physics and fixture, or null when removed. */
   set: Record<string, (EntityPartV1 & { fixture?: FixtureSpecV1 }) | null>;
@@ -100,6 +103,7 @@ export function applyWorldEdit(world: WorldState, e: WorldEditV1): { physics: En
       pose: { p: [f.p[0], f.p[1], f.p[2]], yaw: f.yaw },
       provenance: { origin: 'design-edit', confidence: 'hypothetical', note: 'placed by the world\'s god (entity world, world-edit/1)' },
       ...(f.support ? { support: structuredClone(f.support) } : {}),
+      ...(f.kind !== 'item' && typeof f.level === 'number' ? { level: f.level } : {}),
       ...(f.kind === 'item' && f.support?.kind === 'ground' ? { phase: 'staged' as const } : {}),
       ...(cur?.contents ? { contents: cur.contents } : {}),
     };
@@ -168,7 +172,16 @@ export function withLinkApproaches(part: EntityPartV1): EntityPartV1 {
     // beside the flight, the end wall 0.5 m ahead; a head between the rail's end and the end wall with the heading
     // skewed) takes the fallback (lane RAIL: the default 0.7 m ahead lay in the end wall, so the descent was refused
     // and the upstairs one-way). Only when nothing else is clear, so every end that had an approach keeps it.
-    const to = (ht && (pick(l.to, ht, true, 0.12) || pick(l.to, ht, true))) || pick(l.to, dir) || fallback(l.to, dir);
+    // A head whose straight 0.7 m runs into the end wall of a 0.9 m landing corridor (the rail on one side, a room wall on
+    // the other) is stood on nearer, straight along the corridor's middle, before any turned place: a turned place 0.7 m
+    // out passes these point tests but lands by the corridor's corner where the planner's grid reads ~0.3 m and the descent
+    // was refused (lane LEVELS: cliff-house-8, the upstairs one-way once its floor had its own level).
+    const near = (end: { level: number; p: Vec2; y: number }, out: Vec2): Vec2 | null => {
+      if (clear(end.p, [r3(end.p[0] + out[0] * 0.7), r3(end.p[1] + out[1] * 0.7)], end.y, end.level)) return null;
+      for (const d of [0.5, 0.4]) { const q: Vec2 = [r3(end.p[0] + out[0] * d), r3(end.p[1] + out[1] * d)]; if (clear(end.p, q, end.y, end.level, 0.06)) return q; }
+      return null;
+    };
+    const to = (ht && (pick(l.to, ht, true, 0.12) || pick(l.to, ht, true))) || near(l.to, dir) || pick(l.to, dir) || fallback(l.to, dir);
     if (from || to) l.approach = { ...(from ? { from } : {}), ...(to ? { to } : {}) };
     else delete l.approach;
   }

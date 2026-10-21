@@ -22,7 +22,7 @@ import { entityFootprint, narrowIdOf, type AroundPerson } from '../spatial/servi
 import { cellOf, clearanceAt, nearestBlocker, segmentClearance, type LevelGrid } from '../spatial/grid.ts';
 import { PLAN_MARGIN, type Leg, type LinkLeg, type Route, type WalkLeg } from '../spatial/path.ts';
 import { smoothPolyline, type PathSeg } from './spline.ts';
-import { type AgentProfile } from '../spatial/types.ts';
+import { type AgentProfile, MAX_LEVEL_ID } from '../spatial/types.ts';
 import { gapToSleep, SLEEP_BODY_MARGIN } from '../activities/sleep.ts';
 import { G_WADE } from '../spatial/ground.ts';
 
@@ -157,7 +157,7 @@ const walkSchemaWithin = (reach: number) => z.strictObject({
   actor: z.string().max(80),
   x: z.number().min(-reach).max(reach),
   z: z.number().min(-reach).max(reach),
-  level: z.number().int().min(0).max(20).optional(),
+  level: z.number().int().min(0).max(MAX_LEVEL_ID).optional(),
   face: z.number().min(-7).max(7).optional(),
   speed: z.number().min(0.3).max(CYCLE_SPEED_CAP).optional(),
   gait: z.enum(['walk', 'jog', 'run', 'cycle']).optional(),

@@ -13,7 +13,7 @@ import type { ActionDef, Diagnostic } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose, WorldState } from '../world/types.ts';
 import type { Link, Surface } from '../spatial/types.ts';
-import { HUMAN_PROFILE } from '../spatial/types.ts';
+import { HUMAN_PROFILE, MAX_LEVEL_ID } from '../spatial/types.ts';
 import { clearanceAt, nearestBlocker } from '../spatial/grid.ts';
 import { def } from '../world/catalog.ts';
 import { isBeam } from './rules.ts';
@@ -205,7 +205,7 @@ export const installStairFlight: ActionDef<SP, SProg, SExec> = {
     x: z.number().min(-1e4).max(1e4),
     z: z.number().min(-1e4).max(1e4),
     heading: z.number().min(-10).max(10),
-    level: z.number().int().min(0).max(20).optional(),
+    level: z.number().int().min(0).max(MAX_LEVEL_ID).optional(),
   }),
   reservations: (_w, p) => [...p.crew.map((c) => ({ resource: `actor:${c}`, mode: 'exclusive' as const })), { resource: `entity:${p.stair}`, mode: 'exclusive' }],
   plan: planStairFlight,

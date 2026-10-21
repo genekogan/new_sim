@@ -453,4 +453,8 @@ test('E2: furniture on the ground floor of a house on raised ground is logged on
   assert.ok(Math.abs(w.god.model.worldPose(w.god.model.get('house')!).y - 3) < 0.2, 'the house stands on the shelf');
   assert.equal(E.world.entities[id('house/hall-chair')]?.support?.kind, 'ground', 'ground-floor chair: on the ground');
   assert.notEqual(E.world.entities[id('house/chair')]?.support?.kind, 'ground', 'upstairs chair: on its floor');
+  // lane LEVELS: an upstairs fixture names its floor's level (its seat is on that level, not the one nearest its height)
+  const lvl = E.world.entities[id('house/chair')]?.level;
+  assert.ok(lvl > 0 && E.world.entityPhysicsV1.byEntity[id('house')].surfaces.some((s: any) => s.level === lvl), `upstairs chair on level ${lvl}`);
+  assert.equal(E.world.entities[id('house/hall-chair')]?.level, undefined, 'ground-floor chair: no level');
 });

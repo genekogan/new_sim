@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import { templateSchema } from '../sequence/types.ts';
 import { cameraDirectionSchema } from '../camera/direct.ts';
+import { MAX_LEVEL_ID } from '../spatial/types.ts';
 
 const id = z.string().min(1).max(120);
 const wsId = z.string().regex(/^[A-Za-z0-9][\w.-]{0,63}$/, 'workspace ids: letters, digits, _ . - (≤ 64)');
@@ -11,7 +12,7 @@ const coord = z.number().min(-500).max(500);
 const vec3 = z.tuple([coord, z.number().min(-50).max(300), coord]);
 const vec2 = z.tuple([coord, coord]);
 const angle = z.number().min(-7).max(7);
-const levelId = z.number().int().min(0).max(20);
+const levelId = z.number().int().min(0).max(MAX_LEVEL_ID);
 const newId = z.string().regex(/^[A-Za-z][\w.-]{0,63}$/, 'entity/region ids: a letter, then letters, digits, _ . - (≤ 64)');
 
 const poseSchema = z.strictObject({ p: vec3, yaw: angle, pitch: angle.optional(), roll: angle.optional() }).describe('explicit pose: base-centre p [x, y, z] (m), yaw/pitch/roll (rad)');
@@ -102,9 +103,9 @@ export const opSchemas = {
     label: z.string().max(80).describe('case-insensitive substring of id, label or def').optional(),
     region: z.strictObject({ min: vec2, max: vec2 }).describe('ground-plane box [x, z]').optional(),
     include: z.array(z.enum(['regions', 'levels', 'stability', 'links', 'obstacles'])).max(5).optional(),
-    route: z.strictObject({ actor: id, x: coord, z: coord, level: z.number().int().min(0).max(20).optional() }).describe('route preview for an actor → point (same planner walk_to uses)').optional(),
+    route: z.strictObject({ actor: id, x: coord, z: coord, level: z.number().int().min(0).max(MAX_LEVEL_ID).optional() }).describe('route preview for an actor → point (same planner walk_to uses)').optional(),
     carry: z
-      .strictObject({ crew: z.array(id).min(1).max(8), item: id, to: z.strictObject({ x: coord, z: coord, yaw: z.number().min(-7).max(7), level: z.number().int().min(0).max(20).optional() }) })
+      .strictObject({ crew: z.array(id).min(1).max(8), item: id, to: z.strictObject({ x: coord, z: coord, yaw: z.number().min(-7).max(7), level: z.number().int().min(0).max(MAX_LEVEL_ID).optional() }) })
       .describe('carry preview (same validation + SE(2) planner the carry verb uses)')
       .optional(),
     limit: z.number().int().min(1).max(500).optional(),

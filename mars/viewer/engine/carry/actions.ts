@@ -19,6 +19,7 @@ import { poseHit } from './sweep.ts';
 import { labelOf, laidIssue, planCarryAction, type CarryParams, type CarryProgram } from './validate.ts';
 import { planCarry } from './planner.ts';
 import { relevantEntities } from '../world/relevant.ts';
+import { MAX_LEVEL_ID } from '../spatial/types.ts';
 
 export const CARRY_SPEED = 0.9; // m/s of the fastest-moving formation point (centre + load tips under rotation)
 const ACCEL = 0.5; // m/s²
@@ -54,7 +55,7 @@ export type CarryExec = {
 export const carrySchema = z.strictObject({
   crew: z.array(z.string().max(80)).min(1).max(8).refine((a) => new Set(a).size === a.length, 'crew members must be distinct'),
   item: z.string().max(80),
-  to: z.strictObject({ x: z.number().min(-500).max(500), z: z.number().min(-500).max(500), yaw: z.number().min(-7).max(7), level: z.number().int().min(0).max(20).optional() }),
+  to: z.strictObject({ x: z.number().min(-500).max(500), z: z.number().min(-500).max(500), yaw: z.number().min(-7).max(7), level: z.number().int().min(0).max(MAX_LEVEL_ID).optional() }),
   place: z.literal('lay').optional(),
   via: z.string().max(80).optional(),
 });

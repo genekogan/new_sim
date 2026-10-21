@@ -125,3 +125,39 @@ test('world-edit: removing a solid entity removes its physics; a world without e
   b.applyWorldEditV1(edit(2, { e_wall001: null }, phys(b)));
   assert.equal(Object.keys(phys(b)!.byEntity).length, 0);
 });
+
+test('world-edit: a fixture that names its floor\'s level sits there, not on the level nearest its height (lane LEVELS)', async () => {
+  // one engine level per floor height: the house's floor (2.92 m) matched level 1 (first seen at 2.85 m) and another
+  // building's floor made level 2 at 2.95 m, nearer the chair's 2.92 m. Without a level the chair's seat took level 2
+  // (no floor there: no standing room); named, it stays on its floor. Old journals (no level) keep the nearest rule.
+  const make = async (level?: number) => {
+    const f = await marsFactory(GREEN_FIELD_WORLD), e = f.create(f.genesis('entity-physics-level')) as unknown as MarsEngine & Engine;
+    const chairId = assetIdFor(chairFacts, '{}'), h = house()!;
+    h.surfaces = h.surfaces!.map((s) => (s.level === 1 ? { ...s, y: 2.92 } : s));
+    h.links = h.links!.map((l) => ({ ...l, to: { ...l.to, y: 2.92 } }));
+    const set: WorldEditV1['set'] = {
+      e_house1: h,
+      e_shed01: { surfaces: [{ id: 'shed:floor-1', level: 2, y: 2.95, obb: { c: [40, 0], half: [2, 2], yaw: 0 } }] },
+      e_chair1: { fixture: { def: chairId, kind: 'fixture', label: 'chair', p: [8, 2.92, -1], yaw: 0, ...(level ? { level } : {}) } },
+    };
+    const levels = [{ id: 1, y: 2.85, label: 'floor at 2.85 m' }, { id: 2, y: 2.95, label: 'floor at 2.95 m' }];
+    const ev: WorldEditV1 = { contract: 'world-edit/1', seq: 1, hash: '', levels, set, assets: { [chairId]: assetFromDef(chairId, chairFacts) } };
+    ev.hash = nextEntityPhysics(undefined, ev).hash;
+    assert.equal(e.applyWorldEditV1(ev).hash, ev.hash);
+    e.spawnHuman({ id: 'h_walker0001', label: 'Walker', soul: 's_walker0001' });
+    return e;
+  };
+  const old = await make();
+  assert.equal((old.world.entities.e_chair1 as { level?: number }).level, undefined);
+  assert.equal(old.freeSeatSlotsV1('e_chair1', 'h_walker0001')[0]?.level, 2, 'no level: the nearest height (unchanged replay)');
+  const e = await make(1);
+  assert.equal((e.world.entities.e_chair1 as { level?: number }).level, 1);
+  const slots = e.freeSeatSlotsV1('e_chair1', 'h_walker0001');
+  assert.equal(slots.length, 1); assert.equal(slots[0].level, 1); assert.ok(slots[0].approach);
+  const r = e.perform({ actor: 'h_walker0001', label: 'sit upstairs', steps: [{ verb: 'sit', params: { on: 'e_chair1', seconds: 30 } }] });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  run(e, 2400, () => e.world.entities.h_walker0001.human?.activity === 'sit');
+  assert.equal(e.world.entities.h_walker0001.human?.activity, 'sit');
+  assert.equal(e.world.entities.h_walker0001.human?.level, 1);
+  assert.deepEqual(e.runtime.violations, []);
+});

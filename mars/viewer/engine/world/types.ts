@@ -159,6 +159,9 @@ export type Entity = {
   /** Components */
   phase?: ComponentPhase;
   support?: Support;
+  /** Fixtures of an entity world: the engine level of the floor it stands on (world-edit/1 FixtureSpecV1.level); absent:
+   *  the level nearest its height (social/slots.ts). */
+  level?: number;
   connections?: Connection[];
   assembly?: string;
   /** Humans */

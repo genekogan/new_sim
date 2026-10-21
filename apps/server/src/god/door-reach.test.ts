@@ -14,12 +14,12 @@ import vocabW3 from '../../../../packages/world-compiler/src/core-kit/vocab-w3.j
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
-function world(t: TestContext) {
+function world(t: TestContext, maxLevel?: number) {
   const w = fixture(':memory:', factory, { durableClockV1: true });
   w.brain.quiesce();
   const god = new GodMode(w.db, { worldId: w.host.worldId, ownerId: 'owner', tick: () => w.host.engine.world.tick, emit() {} });
   new GroundHost(w.db, w.host, god);
-  const edge = new EdgeLedger(w.host, w.db), bridge = installEngineBridge({ host: w.host, god, edge, log() {}, worldClock: false, worldLore: false });
+  const edge = new EdgeLedger(w.host, w.db), bridge = installEngineBridge({ host: w.host, god, edge, log() {}, worldClock: false, worldLore: false, maxLevel });
   t.after(() => { w.brain.quiesce(); w.host.stop(); edge.comms?.close(); w.db.close(); });
   const settle = async (n = 4) => { for (let i = 0; i < n; i++) { w.host.tickOnce(); await setImmediate(); w.host.drainInputs(); } };
   const act = (ops: any[]) => { const r = god.act({ ops }) as any; assert.equal(r.accepted, true, JSON.stringify(r)); return r; };
@@ -95,8 +95,9 @@ test('bench-hamlet: an old pad/1 cottage pad is re-cut at boot and the cottage b
 
 test('levels: a removed building\'s storeys free their level ids, so a world that rebuilt on a hill keeps room for new floors', { timeout: 300_000 }, async (t) => {
   // lane STACK (2026-10-21): engine level ids (1..20) are per floor height and were never freed, so after a few multi-storey
-  // buildings came and went on a slope a new upper floor shared a level at another height and its rooms had no standing room
-  const w = world(t); await w.settle(2);
+  // buildings came and went on a slope a new upper floor shared a level at another height and its rooms had no standing room.
+  // Lane LEVELS raised the id space to MAX_LEVEL_ID (255); the bridge is capped at the old 20 here to keep the reuse path tested.
+  const w = world(t, 20); await w.settle(2);
   w.act([{ op: 'place', def: coreRef('knoll'), name: 'hill', p: [0, 0], params: { height: 12, radius: 60, peak: 1, edge: 8 } }]);
   await w.settle(2);
   const levels = () => (w.bridge as any).levels as { id: number; y: number }[];
@@ -120,6 +121,38 @@ test('levels: a removed building\'s storeys free their level ids, so a world tha
   assert.ok((baked.rooms ?? []).length >= 10, 'the apartment block has its rooms');
   assert.deepEqual(bad, [], 'every room of the new building has standing room its front door reaches');
   assert.ok(levels().length <= 20);
+});
+
+test('levels: a world with more than 20 floor heights gives each its own level, and the rooms up there have reachable goals', { timeout: 300_000 }, async (t) => {
+  // lane LEVELS (2026-10-21): level ids were capped at 20 (walk_to's schema); Eden 2026 has 51 floor heights, so upper
+  // floors past the 20th shared a level at another height: their rooms had no goal (no standing room) or none reachable
+  const w = world(t); await w.settle(2);
+  w.act([{ op: 'place', def: coreRef('knoll'), name: 'hill', p: [0, 0], params: { height: 12, radius: 60, peak: 1, edge: 8 } }]);
+  await w.settle(2);
+  const placed: { name: string; p: Vec2 }[] = [];
+  for (let k = 0; k < 14; k++) {
+    const r = 16 + 3 * k, a = (k * 137.5 * Math.PI) / 180, p: Vec2 = [Math.round(r * Math.cos(a) * 10) / 10, Math.round(r * Math.sin(a) * 10) / 10];
+    w.act([{ op: 'place', def: coreRef(k % 2 ? 'lighthouse' : 'house'), name: `b${k}`, p, r: a }]);
+    placed.push({ name: `b${k}`, p });
+  }
+  await w.settle(3);
+  const levels = (w.bridge as any).levels as { id: number; y: number }[];
+  assert.ok(levels.length > 20, `more than 20 floor heights (${levels.length})`);
+  const bad: string[] = []; let high = 0;
+  for (const b of placed) {
+    const e = w.god.model.get(b.name)!, baked = w.god.model.bake(w.god.model.resolvedDef(e.def)!, e.params ?? {}, e.seed ?? 0, e.shape) as any;
+    for (const rm of baked.rooms ?? []) {
+      const th = w.bridge.nav.thing(`${b.name}/${rm.id}`), goal = th ? w.bridge.nav.goal(th, th.at) : null;
+      if (!goal) { bad.push(`${b.name}/${rm.id}:no-goal`); continue; }
+      if (goal.level <= 20) continue;
+      high++;
+      const d = Math.hypot(...b.p) || 1, out: Vec2 = [b.p[0] + (b.p[0] / d) * (Math.hypot(baked.box[0], baked.box[2]) / 2 + 5), b.p[1] + (b.p[1] / d) * (Math.hypot(baked.box[0], baked.box[2]) / 2 + 5)];
+      const r = w.E.reachV1({ p: out, level: 0 }, goal);
+      if (!r.ok) bad.push(`${b.name}/${rm.id}:${r.code}`);
+    }
+  }
+  assert.ok(high > 0, 'some rooms stand on levels above 20');
+  assert.deepEqual(bad, [], 'every room has a goal, and those above level 20 are reached from outside');
 });
 
 /** Every building/1 type in the catalogue (structures.json + vocab-w3.json: 40 types). */

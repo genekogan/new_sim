@@ -19,6 +19,7 @@ import { makeWay, takeReplan } from '../locomotion/walk.ts';
 import { turnRadiusAt, vehicleProfile, type VehicleProfile } from './profiles.ts';
 import { blockersNear, planCurve, vehicleGrids, type Curve } from './curve.ts';
 import { boxGap, describe, dropLane, footprintOf, outranks, othersOnLevel, pathConflict, place, publishLane, pullOverSpot, bandGap, vehicleAround, V_ON_PATH, V_STOP_GAP, YIELD_GAP, type Lane, type Other } from './traffic.ts';
+import { MAX_LEVEL_ID } from '../spatial/types.ts';
 
 /** Max distance (m) from a person to a parked vehicle's centre to mount it. */
 export const MOUNT_REACH = 1.2;
@@ -710,7 +711,7 @@ export const rideTo: ActionDef<RideParams, RideProgram, RideExec> = {
     actor: z.string().max(80),
     x: z.number().min(-500).max(500),
     z: z.number().min(-500).max(500),
-    level: z.number().int().min(0).max(20).optional(),
+    level: z.number().int().min(0).max(MAX_LEVEL_ID).optional(),
     speed: z.number().min(0.3).max(8).optional(),
   }),
   reservations: (w, p) => riderReservations(w, p.actor),

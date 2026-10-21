@@ -52,6 +52,10 @@ function levelOf(rt: Runtime, e: Entity): number {
   // ground is: a parasol table on an alpine terrace 35 m up took the upper floor nearest its height (no standing room
   // round its chairs). Hosts log that support only since E2 (2026-10-19), so earlier journals replay unchanged.
   if (sp?.ground && e.kind === 'fixture' && e.support?.kind === 'ground') return 0;
+  // An entity world's host names the floor's level (lane LEVELS, 2026-10-21): the level nearest a fixture's height can be
+  // another building's floor at a neighbouring height (one level per floor height; the floor itself matched an older level
+  // up to 0.12 m off), and its seats and beds had no standing room. Journals before it carry no level and replay unchanged.
+  if (e.kind === 'fixture' && typeof e.level === 'number' && levels.some((l) => l.id === e.level)) return e.level;
   let best = levels[0].id, bd = Infinity;
   for (const l of levels) {
     const d = Math.abs(l.y - e.pose.p[1]);

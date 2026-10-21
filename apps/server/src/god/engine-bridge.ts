@@ -24,6 +24,7 @@ import { GodActivitySpots } from './activity-spots.ts';
 import { GodMeals } from './meals.ts';
 import { installGodRides } from './rides.ts';
 import { releaseBigScratch } from '../../../../mars/viewer/engine/spatial/path.ts';
+import { MAX_LEVEL_ID } from '../../../../mars/viewer/engine/spatial/types.ts';
 import { installWorldLore } from './world-lore.ts';
 import { installHeld } from './held.ts';
 import { installWorldClock } from './world-clock.ts';
@@ -80,7 +81,6 @@ const EVACUATE_RETRY_TICKS = 400; // a closure walk-out the engine could not lan
 const RELEASED = '"released"';
 const GROUND_BAND = 0.35;      // a floor within this of the ground is level 0 (the engine's ground is flat at y 0 until L8's tiles)
 const LEVEL_MATCH = 0.12;      // floors this close in height share an engine level
-const MAX_LEVEL = 20;          // walk_to's level schema
 const NEAR = 60;               // capabilities: god things within this many metres
 const BODY_DEF = 'core/humanoid@1';
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
@@ -102,7 +102,7 @@ export function helixEnds(path: Vec2[]): { foot: Vec2; head: Vec2; stepFrom: Vec
   return { foot, head, stepFrom: into(path[1], foot, HELIX_STAND), stepTo: into(path[n - 2], head, HELIX_STAND) };
 }
 
-export type BridgeOptions = { host: WorldHost; god: GodMode; edge?: EdgeLedger; log?: (m: string) => void; /** F3: new-world lore (default: any world key but eden/mars/littlemartians/toy) */ worldLore?: boolean; /** F3: the world clock from the god's time.dayTicks (default: a god world without ENABLE_LIVING_WORLD) */ worldClock?: boolean };
+export type BridgeOptions = { host: WorldHost; god: GodMode; edge?: EdgeLedger; log?: (m: string) => void; /** Highest level id levelFor hands out (default and most: MAX_LEVEL_ID; tests use fewer to reach the reuse path) */ maxLevel?: number; /** F3: new-world lore (default: any world key but eden/mars/littlemartians/toy) */ worldLore?: boolean; /** F3: the world clock from the god's time.dayTicks (default: a god world without ENABLE_LIVING_WORLD) */ worldClock?: boolean };
 
 export const engineBridges = new WeakMap<WorldModel, EngineBridge>();
 
@@ -115,6 +115,7 @@ export class EngineBridge {
   private sent = new Map<string, string>();
   private physics: EntityPhysicsV1 | undefined;
   private levels: Level[] = [];
+  private readonly maxLevel: number;
   /** Level ids levelFor handed out during the current send (their parts are not in `sent` yet). */
   private levelsNow = new Set<number>();
   private reconciled = false;
@@ -148,7 +149,7 @@ export class EngineBridge {
   private describeEpoch = 0;
 
   constructor(o: BridgeOptions) {
-    this.host = o.host; this.god = o.god; this.edge = o.edge; this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
+    this.host = o.host; this.god = o.god; this.edge = o.edge; this.maxLevel = Math.min(o.maxLevel ?? MAX_LEVEL_ID, MAX_LEVEL_ID); this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
     engineBridges.set(this.god.model, this);
     this.nav = new GodNav({ model: this.god.model, version: () => this.version, staticVersion: () => this.godEdits, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e), placeOf: (ref) => (this.edge ? this.places.forRef(ref)?.id : undefined), describeStamp: () => `${this.describeEpoch}:${this.levels.length}` });
     this.layers = new GodLayers({ model: this.god.model, edge: this.edge, get engine() { return o.host.engine as never; }, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), building: id => this.god.builds.closing(id, this.model), buildingActive: () => this.god.builds.hasClosure(), closingSites: () => this.god.builds.closingSites(), log: (m) => this.log(m) });
@@ -254,7 +255,11 @@ export class EngineBridge {
     const set: WorldEditV1['set'] = {}, assets: Record<string, unknown> = {};
     const known = this.physics?.assets ?? {};
     let linksMoved = false;
-    for (const id of [...ids].sort()) {
+    // fixtures after everything else: a fixture names its floor's level (fixtureSpec), which a building placed in the
+    // same edit allocates when its floors are derived (lane LEVELS)
+    const isFixture = (id: string) => { const e = this.model.entities.get(id), d = e && this.model.resolvedDef(e.def); return !!d && isFixtureDef(d); };
+    const sorted = [...ids].sort(), order = [...sorted.filter((id) => !isFixture(id)), ...sorted.filter(isFixture)];
+    for (const id of order) {
       const e = this.model.entities.get(id);
       if (e && this.engineOwned(e)) continue;            // bodies and what they carry belong to the engine
       const part = e ? this.derive(e, assets, known) : null;
@@ -298,7 +303,7 @@ export class EngineBridge {
     const hit = this.levels.find((l) => Math.abs(l.y - y) <= LEVEL_MATCH);
     if (hit) { this.levelsNow.add(hit.id); return hit.id; }
     const used = new Set(this.levels.map((l) => l.id));
-    let id = 1; while (used.has(id) && id < MAX_LEVEL) id++;
+    let id = 1; while (used.has(id) && id < this.maxLevel) id++;
     const level = { id, y: r3(y), label: `floor at ${r3(y)} m` };
     if (used.has(id)) {
       // out of level ids: reuse one nothing stands on any more (its floors, stairs and Souls all gone: a removed building's
@@ -511,7 +516,10 @@ export class EngineBridge {
       // takes the floor level nearest its height: the alpine station's benches got an upper floor elsewhere and no
       // resident could reach them). Only those: fixtures on the y-0 plain, and upper floors, keep their spec byte for byte.
       if (Math.abs(wp.y) > GROUND_BAND && Math.abs(wp.y - this.model.terrain.sample(wp.x, wp.z)) <= GROUND_BAND) return { ...spec, support: { kind: 'ground' } };
-      return spec;
+      // lane LEVELS (2026-10-21): a fixture on an upper floor names that floor's level, the one levelFor gave the floor (the
+      // engine otherwise takes the level nearest its height, which can be another building's floor 0.03 m nearer)
+      const level = Math.abs(wp.y - this.model.terrain.sample(wp.x, wp.z)) > GROUND_BAND ? this.levels.find((l) => Math.abs(l.y - wp.y) <= LEVEL_MATCH)?.id : undefined;
+      return level ? { ...spec, level } : spec;
     }
     const parent = e.in.parent !== 'world' ? this.model.entities.get(e.in.parent) : undefined;
     const pdef = parent ? this.model.resolvedDef(parent.def) : undefined;
@@ -1329,7 +1337,7 @@ export function rectOf(poly: Vec2[]): { c: Vec2; half: Vec2; yaw: number } {
 }
 
 function normPart(p: Part): Part { const o: Part = {}; if (p.surfaces?.length) o.surfaces = p.surfaces; if (p.solids?.length) o.solids = p.solids; if (p.links?.length) o.links = p.links; if (p.fixture) o.fixture = p.fixture; return o; }
-function fixtureOfEngine(e: any): FixtureSpecV1 { return { def: e.def, kind: e.kind === 'component' ? 'item' : 'fixture', label: e.label, p: [e.pose.p[0], e.pose.p[1], e.pose.p[2]], yaw: e.pose.yaw, ...(e.support ? { support: e.support } : {}) }; }
+function fixtureOfEngine(e: any): FixtureSpecV1 { return { def: e.def, kind: e.kind === 'component' ? 'item' : 'fixture', label: e.label, p: [e.pose.p[0], e.pose.p[1], e.pose.p[2]], yaw: e.pose.yaw, ...(e.support ? { support: e.support } : {}), ...(e.kind !== 'component' && typeof e.level === 'number' ? { level: e.level } : {}) }; }
 function describeOp(op: Op, w: WorldModel): string {
   const o = op as { op: string; id?: string; in?: { parent: string; slot?: string } };
   const who = o.id ? w.pathOf(o.id) || o.id : '';

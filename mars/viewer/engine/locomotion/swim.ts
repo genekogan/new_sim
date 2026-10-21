@@ -15,6 +15,7 @@ import { angleDelta, heading, hypot, wrapAngle, type Vec2 } from '../core/math.t
 import { HUMAN_RADIUS } from '../world/catalog.ts';
 import { creatureOf } from '../bodies/creatures.ts';
 import type { Body } from '../world/types.ts';
+import { MAX_LEVEL_ID } from '../spatial/types.ts';
 
 /** m/s while swimming (the shallows: wading pace). */
 export const SWIM_SPEED = 0.8;
@@ -182,7 +183,7 @@ export function inDeepWater(rt: Runtime, actor: string): boolean {
 export const groundTravel: ActionDef<TravelParams, TravelOp[], TravelExec> = {
   verb: 'ground_travel',
   description: 'Go to (x, z) on a terrain world from wherever the body is: from deep water it swims to the shore toward the destination, then walks.',
-  schema: z.object({ actor: z.string().min(1).max(80), x: z.number().min(-10000).max(10000), z: z.number().min(-10000).max(10000), level: z.number().int().min(0).max(20).optional() }).strict(),
+  schema: z.object({ actor: z.string().min(1).max(80), x: z.number().min(-10000).max(10000), z: z.number().min(-10000).max(10000), level: z.number().int().min(0).max(MAX_LEVEL_ID).optional() }).strict(),
   resumable: true,
   reservations: (_w, p) => [{ resource: `actor:${p.actor}`, mode: 'exclusive' }],
   plan(rt, p) {

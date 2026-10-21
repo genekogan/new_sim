@@ -60,6 +60,12 @@ export type Link = {
   faceAlong?: boolean;
 };
 
+/** Highest engine level id walk_to and every other level-taking action address (0 = the ground). Entity-world floors get
+ *  one id per floor height (apps/server god/engine-bridge.ts levelFor): a big hillside world has ~50 distinct heights, so
+ *  20 (the old cap) left its upper floors on a level at another height (lane LEVELS, 2026-10-21). Level grids are cropped
+ *  to their own floors (grid.ts buildGridsOverFloors), so an id costs its floors' area, not the campus's. */
+export const MAX_LEVEL_ID = 255;
+
 export type Level = {
   id: number; y: number; label: string;
   /**
