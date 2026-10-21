@@ -24,7 +24,7 @@ const bboxDistance = (p: [number, number][], at: [number, number]) => {let x0 = 
 const LOOP_SPAN = 160;
 const bboxSpan = (p: [number, number][]) => {const xs = p.map(q => q[0]), zs = p.map(q => q[1]); return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs));};
 const area = (p: [number, number][]) => Math.abs(p.reduce((s, [x, z], i) => {const [x2, z2] = p[(i + 1) % p.length]; return s + x * z2 - x2 * z;}, 0)) / 2;
-import {resolveCapability, tokens, placeMatch, type VocabContext} from './vocabulary.ts';
+import {resolveCapability, tokens, placeMatch, type VocabContext, type VocabResult} from './vocabulary.ts';
 import {isCampfire} from './fire.ts';
 import {activityCapabilities, loadSpots, ACTIVITY_SECONDS_MAX, SPOT_ACTIVITIES, type SpotsData} from './activities.ts';
 import {Together, PAIRED, type TogetherPlan} from './together.ts';
@@ -51,6 +51,9 @@ const WITH_PARAM = {type: 'array', items: 'Soul id or name', optional: true, des
 type Row = {created_at: number; receipt_id: string; soul_id: string; capability: string; phase: EdgeReceipt['phase']; accepted_tick: number; started_tick: number | null; ended_tick: number | null; code: string | null; reason: string | null; program_id: string | null; client_ref: string | null; plan?: string | null; detail?: string | null};
 type Pending = {receipt: string; soul: EdgeSoul; steps: Program['steps']; label: string; deadline: number; capability: string};
 type StandReleaseV1={actor:string;owner:string;seats:{action:string;slot:string}[]};
+
+/** The body plans behind a Soul's offered capabilities, by capability id. */
+type Plans = Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>;
 
 export class EdgeLedger implements EdgeLedgerHooks {
   places: PlaceIndex;
@@ -672,18 +675,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
     }
     // PM-R057: exact ids first; an unambiguous natural name is accepted and reported back as `resolved`;
     // anything else is refused with the closest offered capabilities.
-    let v = caps.some(c => c.id === text) ? {kind: 'exact' as const, cap: caps.find(c => c.id === text)!} : resolveCapability(text, this.vocabulary(soul, caps));
-    // a named place the listing leaves out for distance only (residents could not "go to the big top" across town while
-    // visitors reach it): offer that one walk for this act (copies; the listing cache is untouched) and resolve again
-    if (v.kind === 'unknown' && v.code === 'place.unreachable' && v.place && this.walkOnDemand) {
-      const more = [...caps], morePlans = new Map(plans);
-      if (this.walkOnDemand(soul, v.place, more, morePlans)) {caps = more; plans = morePlans; v = resolveCapability(text, this.vocabulary(soul, caps));}
-    }
-    // RT: "run to the cottage": a building or room has no gait offer in the listing; offer run-to-the-door-then-walk-in
-    if (v.kind === 'unknown' && v.code === 'gait.unavailable' && v.place && this.gaitOnDemand) {
-      const gait = text.trim().toLowerCase().startsWith('jog') ? 'jog' as const : 'run' as const, more = [...caps], morePlans = new Map(plans);
-      if (/^(?:jog|run)(?:[\s:]|$)/i.test(text.trim()) && this.gaitOnDemand(soul, v.place, gait, more, morePlans)) {caps = more; plans = morePlans; v = resolveCapability(text, this.vocabulary(soul, caps));}
-    }
+    let v: VocabResult;
+    ({v, caps, plans} = this.resolveOnDemand(soul, text, caps, plans));
     if (v.kind === 'unknown') return {...refuse(v.code ?? 'capability.unknown', v.reason), did_you_mean: v.didYouMean};
     let cap = v.cap; capability = cap.id;
     const bodyIssue=bodyCapabilityProblem(this.body(soul.entityId),cap,plans.get(capability)?.steps);if(bodyIssue)return refuse(bodyIssue.code,bodyIssue.reason);
@@ -1296,13 +1289,46 @@ export class EdgeLedger implements EdgeLedgerHooks {
     this.db.db.prepare('UPDATE edge_receipts_v1 SET detail=? WHERE world_id=? AND receipt_id=?').run(next, this.host.worldId, id);
     return next;
   }
+  /** PM-R057 words -> one capability, with the offers the listing leaves out added on demand. A named place the listing
+   *  leaves out for distance only (residents could not "go to the big top" across town while visitors reach it): that
+   *  one walk is offered for this resolution (copies; the listing cache is untouched) and the words resolve again; RT:
+   *  "run to the cottage": a building or room has no gait offer in the listing, so run-to-the-door-then-walk-in is.
+   *  SOULSIM-E (2026-10-21): resolve (the dry run) goes through here as act does. It did not, so "go to the lighthouse"
+   *  and "go to the horse" on Eden 2026 were answered "not walkable ground yet" by resolve while act would walk there,
+   *  and a Soul that resolves first (as the skill says) told its human it could not go. */
+  resolveOnDemand(soul: EdgeSoul, text: string, caps: EdgeCapability[], plans: Plans): {v: VocabResult; caps: EdgeCapability[]; plans: Plans} {
+    const exact = caps.find(c => c.id === text);
+    let v: VocabResult = exact ? {kind: 'exact', cap: exact} : resolveCapability(text, this.vocabulary(soul, caps));
+    if (v.kind === 'unknown' && v.code === 'place.unreachable' && v.place && this.walkOnDemand) {
+      const more = [...caps], morePlans = new Map(plans);
+      if (this.walkOnDemand(soul, v.place, more, morePlans)) {caps = more; plans = morePlans; v = resolveCapability(text, this.vocabulary(soul, caps));}
+    }
+    // (a far place's run: "run to the lighthouse" was place.unreachable, its walk offered above, then the gait for it)
+    if (v.kind === 'unknown' && (v.code === 'gait.unavailable' || v.code === 'place.unreachable') && v.place && this.gaitOnDemand && /^(?:jog|run)(?:[\s:]|$)/i.test(text.trim())) {
+      const gait = text.trim().toLowerCase().startsWith('jog') ? 'jog' as const : 'run' as const, more = [...caps], morePlans = new Map(plans);
+      if (this.gaitOnDemand(soul, v.place, gait, more, morePlans)) {caps = more; plans = morePlans; v = resolveCapability(text, this.vocabulary(soul, caps));}
+    }
+    // SOULSIM-E: "run to the cottage" ran to a woodland whose description lists a cottage (the listing offers gaits to
+    // open places only, so the gait words matched the wrong place): the place the same words walk to, at that gait
+    const g = /^(jog|run)\s+(?!a?round\b)(?:(?:over\s+)?to(?:wards?)?\s+|into\s+|up\s+to\s+)?(.+)$/i.exec(text.trim());
+    if (g && !exact && this.gaitOnDemand) {
+      const walk = this.resolveOnDemand(soul, `walk to ${g[2]}`, caps, plans), w = walk.v;
+      const place = w.kind !== 'unknown' && w.cap.verb === 'walk' && w.cap.available && w.cap.target?.kind === 'place' && !(w.kind === 'alias' && w.params) ? w.cap.target.id : undefined;
+      if (place && !(v.kind !== 'unknown' && v.cap.target?.id === place)) {
+        const gait = g[1].toLowerCase() as 'jog' | 'run', id = `${gait}:${place}`, more = [...walk.caps], morePlans = new Map(walk.plans);
+        const cap = more.find(c => c.id === id) ?? (this.gaitOnDemand(soul, place, gait, more, morePlans) ? more.find(c => c.id === id) : undefined);
+        if (cap) return {v: {kind: 'alias', cap, note: `${text} is ${cap.id} (${cap.label}).`}, caps: more, plans: morePlans};
+      }
+    }
+    return {v, caps, plans};
+  }
   /** @internal for edge/perception and edge/intents (Core-A modules): read access and two narrow write paths. */
   get coreA() {
     const self = this;
     return {
       binds: (s: EdgeSoul) => self.binds(s),
       body: (entityId: string) => self.body(entityId),
-      resolveText: (s: EdgeSoul, text: string, caps: EdgeCapability[]) => caps.some(c => c.id === text) ? {kind: 'exact' as const, cap: caps.find(c => c.id === text)!} : resolveCapability(text, self.vocabulary(s, caps)),
+      resolveText: (s: EdgeSoul, text: string, caps: EdgeCapability[]) => self.resolveOnDemand(s, text, caps, self.binds(s).plans).v,
       isAncestor: (ancestor: string, id: string) => {for (let p = self.places.byId.get(id), n = 0; p?.parent && n < 20; p = self.places.byId.get(p.parent), n++) if (p.parent === ancestor) return true; return false;},
       targetPoint: (s: EdgeSoul, c: EdgeCapability) => self.vocabulary(s, [c]).target(c).at,
       detail: (id: string): Record<string, unknown> | null => {const r = self.rows('receipt_id=?', id)[0]; try {return r?.detail ? JSON.parse(r.detail) : null;} catch {return null;}},
