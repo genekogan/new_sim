@@ -336,6 +336,9 @@ Fixed in the first merge commit:
   God panel's `#approve` card serves.
 - One system eventually needs one Join flow. Converge on e8's `BringAgent` + `AccountApproval` when the God panel's
   Join matches it. Both drive the same `/v1/account/approvals` routes.
+- Done 2026-10-21 (lane LAP): `AccountApproval` is gone. Every world shows the one card, `god-ui/ApprovalDialog.tsx`
+  (new worlds from the God panel, older worlds from `OldWorldApprovals.tsx` in the Shell), from `#approve/<id>` or from a
+  request addressed to the window's code.
 
 **F3. Explore, MySouls and the world name on new worlds**
 - e8's Explore button labels a new world by its slug ("Explore Hello-world-2"), not its `WORLD_NAME`. Cosmetic; R4 or

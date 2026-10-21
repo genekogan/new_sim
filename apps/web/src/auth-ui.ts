@@ -1,5 +1,5 @@
 import {worldTitle} from './world-title.ts';
-import {approvalFromHash} from './account-approval.ts';
+import {approvalFromHash} from './approval-link.ts';
 import {soulFromFragment,soulFragment} from './soul-link.ts';
 /** Sign-in is part of the shared world chrome; public viewing remains unsigned. */
 export const AUTH_UI=true;

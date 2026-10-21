@@ -26,7 +26,7 @@ export async function soulsHere(): Promise<SoulHere[]> {
  *  own tab once it renders, so `#join` and `#approve/<id>` must be caught before that. */
 export const landingHash = typeof location === 'undefined' ? '' : location.hash;
 /** `#approve/ap_…` — the link the Soul CLI prints for its human (main's format). */
-export const approvalFromHash = (hash: string) => /^#approve\/(ap_[a-f0-9]{32})$/.exec(hash)?.[1] ?? null;
+export { approvalFromHash } from '../approval-link.ts';
 const valid = (a: Approval | undefined, id: string): a is Approval => !!a && a.id === id && ['create', 'repair'].includes(a.mode) && ['pending', 'creating', 'ready', 'refused', 'cancelled', 'expired'].includes(a.status) && typeof a.name === 'string' && typeof a.agentLabel === 'string' && (a.soulId === null || /^s_[A-Za-z0-9_-]+$/.test(a.soulId));
 /** Read (or act on) one approval as the signed-in person. */
 export async function approval(id: string, action?: 'approve' | 'cancel' | 'renew'): Promise<Approval> {

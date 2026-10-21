@@ -31,8 +31,8 @@ import { useViewerInsets, ViewerFrame } from './ViewerFrame.tsx';
 import type { InitialWorldProgress } from './InitialWorldReadiness.ts';
 import {connectionLost} from './viewer-arrival.ts';
 import {BringAgent} from './BringAgent.tsx';
-import {AccountApproval} from './AccountApproval.tsx';
-import {approvalFromHash} from './account-approval.ts';
+import {OldWorldApprovals} from './OldWorldApprovals.tsx';
+import {approvalFromHash} from './approval-link.ts';
 import {useApprovalFollow} from './useApprovalFollow.ts';
 import {FOLLOW_SOUL_WAIT_MS,onFollowSoulRequest} from './follow-soul-request.ts';
 import {worldClockAt,worldTimeText} from './world-clock.ts';
@@ -78,7 +78,7 @@ export function Shell({ cfg, auth: providerAuth, arrivalEnabled=false,humanPrese
   const tokenReader = useRef(auth.getToken);
   tokenReader.current = auth.getToken;
   // the god panel and the Join flow act as this same person (auth-session.ts)
-  useEffect(()=>{if(!launcherWorld)return;publishSession({mode:auth.mode??(cfg.authProvider==='clerk'?'clerk':'none'),ready:auth.ready,authed:auth.authed,scope:authIdentity(auth),label:auth.label,signInUrl:auth.signInUrl,getToken:()=>tokenReader.current(),login:auth.login,logout:auth.logout});});
+  useEffect(()=>{publishSession({mode:auth.mode??(cfg.authProvider==='clerk'?'clerk':'none'),ready:auth.ready,authed:auth.authed,scope:authIdentity(auth),label:auth.label,signInUrl:auth.signInUrl,getToken:()=>tokenReader.current(),login:auth.login,logout:auth.logout});});
   const getToken = useCallback(() => tokenReader.current(), []);
   const sim = useSim(getToken, auth.authed,authIdentity(auth),cfg.worldId);
   const apiGeneration=useRef(0);
@@ -98,7 +98,6 @@ export function Shell({ cfg, auth: providerAuth, arrivalEnabled=false,humanPrese
   const [tab, setTab] = useState<Tab>(() => hashTab().tab);
   const [pairCode, setPairCode] = useState<string | null>(() => hashTab().pair);
   const [approvalId,setApprovalId]=useState(()=>approvalFromHash(location.hash));
-  const [approvalFollow,setApprovalFollow]=useState<{soulId:string;scope:string}|null>(null);
   const approvalScope=JSON.stringify([cfg.worldId,authIdentity(auth)]);
   const [selected, setSelected] = useState<string | null>(()=>hashTab().soul??null); // public selection only
   // New worlds: the display name their server was given ("Little Martians (Arium)"), not the slug.
@@ -109,7 +108,7 @@ export function Shell({ cfg, auth: providerAuth, arrivalEnabled=false,humanPrese
   useEffect(() => { if (!pairCode&&!approvalId){if(location.hash==='#join'||tab==='watch'&&!selected&&location.hash==='#advanced')return;const next=tab==='watch'&&selected?soulFragment(selected):tab;if(location.hash!=='#'+next){if(location.hash===''||location.hash==='#')history.replaceState(history.state,'',location.pathname+location.search+'#'+next);else location.hash=next;}} }, [tab, pairCode,selected,approvalId]);
   // lane QA: the landing's own '#watch' replaces the bare URL instead of pushing a second entry: one Back now leaves the
   // world (a stranger pressed Back and stayed on the same view).
-  useEffect(()=>{const changed=()=>{setApprovalId(approvalFromHash(location.hash));setApprovalFollow(null);};addEventListener('hashchange',changed);return()=>removeEventListener('hashchange',changed);},[]);
+  useEffect(()=>{const changed=()=>{setApprovalId(approvalFromHash(location.hash));};addEventListener('hashchange',changed);return()=>removeEventListener('hashchange',changed);},[]);
   useEffect(() => { const f = () => { if(location.hash==='#advanced'){setAdvanced(true);setPanelOpen(false);setTab('watch');return;} const h = hashTab(); setTab(h.tab); if (!['watch', 'my soul'].includes(h.tab)) setAdvanced(true); else if(h.soul){setAdvanced(false);setPanelOpen(true);setNavigationOpen(false);} if(h.tab==='watch')setSelected(h.soul??null); if (h.pair) setPairCode(h.pair); else if(h.tab==='watch')setPairCode(null); }; addEventListener('hashchange', f); return () => removeEventListener('hashchange', f); }, []);
   const [lessonIndex,setLessonIndex]=useState(0);
   const [lessonOpen,setLessonOpen]=useState(false);
@@ -130,7 +129,6 @@ export function Shell({ cfg, auth: providerAuth, arrivalEnabled=false,humanPrese
   const receiveHandle = useCallback((handle: WorldViewerHandle | null) => setViewerHandle(handle), []);
   const receiveState = useCallback((state: WorldViewerState) => setViewerState(state), []);
   const [initialProgress, setInitialProgress] = useState<InitialWorldProgress | null>(null);
-  useApprovalFollow(approvalFollow,approvalScope,auth.authed,viewerHandle,viewerState,followed=>{setApprovalFollow(null);if(followed)setApprovalId(null);});
   // Gene 2026-10-20c: the god panel's approval card closed because the new Soul's body is ready: follow that Soul as
   // Explore -> a Soul does, as soon as it reaches this window's picture (up to a minute; a manual drag outranks it)
   const [cardFollow,setCardFollow]=useState<{soulId:string;scope:string}|null>(null);
@@ -174,7 +172,7 @@ export function Shell({ cfg, auth: providerAuth, arrivalEnabled=false,humanPrese
   const openAccount = () => { setAdvanced(false); setPairCode(null); setTab('my soul'); revealPanel(); };
   return (
     <div ref={frame} className={`human-world ${advanced ? 'has-advanced' : ''}`}>
-      {!launcherWorld&&approvalId&&!approvalFollow&&<AccountApproval key={JSON.stringify([privatePanelKey,approvalId])} id={approvalId} worldId={cfg.worldId} worldUrl={location.origin+worldPath} worldName={worldName} auth={auth} api={api} onClose={()=>{setApprovalId(null);history.replaceState(null,'',location.pathname+location.search+'#watch');}} onReady={id=>{setSelected(id);setApprovalFollow({soulId:id,scope:approvalScope});setAdvanced(false);setTab('watch');setPanelOpen(true);}}/>}
+      {!launcherWorld&&<OldWorldApprovals linkId={approvalId} auth={auth} accountAuthRequired={cfg.accountAuthRequired===true} onLinkDone={()=>{setApprovalId(null);history.replaceState(null,'',location.pathname+location.search+'#watch');}}/>}
       <div className="world-scene"><LiveWorld sim={sim} selected={selected} onSelect={inspect} embedded bootWorldId={launcherWorld?cfg.worldId:undefined} {...{edenExpansion,localClassroomPresentation,publishSpeechAnchors:!advanced,humanPresets:humanPresetsEnabled&&edenExpansion}} hideControls={!advanced} hideSoulInfo={!advanced} viewportInsets={viewportInsets} onViewerHandle={receiveHandle} onViewerState={receiveState} onInitialProgress={advanced ? undefined : setInitialProgress} /></div>
       <VisitorWelcome key={privatePanelKey} api={api} siteApi={siteApi} worldPath={worldPath} ownerId={currentMe?.userId??null} worldId={cfg.worldId} worldName={worldName} build={cfg.build} handle={viewerHandle} state={viewerState}/>
       <WorldSpeechOverlay root={frame} sim={sim} state={viewerState} active={!advanced} handle={viewerHandle}/>
