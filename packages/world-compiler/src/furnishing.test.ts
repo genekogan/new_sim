@@ -137,3 +137,22 @@ test('built-in contents are what the type\'s furnish recipe lays out (theatre, o
   const gone = { 'office-block': ['meeting-2-chair-n-2', 'meeting-2-chair-s-1', 'meeting-3-chair-s-2'], hospital: ['ward-1-bed-4', 'ward-2-bed-4', 'ward-3-bed-4'] };
   for (const [type, names] of Object.entries(gone)) { const k = contents(type).kids; for (const n of names) assert.ok(!k.includes(n), `${type}: ${n}`); }
 });
+
+test('a seat is furnished only where a body can get on and off it as the use-check does (tower chair by the stairwell rail; lane FUZZ2)', async () => {
+  // fuzz f-tower-*: the room-chair stood 0.3 m from the stairwell rail facing it; its way key (0.75 m in front, past the rail)
+  // was reached, but every sit/stand slide crossed the rail: use.transition-blocked in all eight towers
+  const { seatSlides } = await import('../../generators/src/clearance.ts');
+  const w = new WorldModel({ constants: { ground: 'land' }, seed: 'furnishing' });
+  for (const d of CORE_KIT) w.defineDef(d, 'core', 0);
+  const chair = w.bake(w.resolvedDef('core/chair@1')!, {}, 0);
+  const rail = { c: [0, 0.55], half: [0.72, 0.03], yaw: 0, y0: 0, y1: 1 };
+  const wall = (x: number, z: number, hx: number, hz: number) => ({ c: [x, z], half: [hx, hz], yaw: 0, y0: 0, y1: 2.5 });
+  const free = seatSlides(chair, [0, 0], 0, 0, [rail])[0];
+  assert.ok(free.length > 0 && free.every(([, z]) => z < 0.55), 'facing a rail, it is got on from the back or the side, never across the rail');
+  assert.equal(seatSlides(chair, [0, 0], 0, 0, [rail, wall(0, -0.6, 2, 0.1), wall(-0.6, 0, 0.1, 2), wall(0.6, 0, 0.1, 2)])[0].length, 0, 'shut in: no way on or off');
+  const r = applyBatch(w, { ops: [{ op: 'place', def: 'core/tower@1', name: 'tower', r: Math.PI / 2 }] }, 'god', 1);
+  assert.equal(r.result.accepted, true, JSON.stringify(r.result));
+  const f = furnishBatch(w, 'tower');
+  assert.ok(!f.placed.some((p: any) => p.name === 'room-chair'), 'the stairwell landing has no chair pose with a way on and off');
+  assert.ok(f.dropped.some((p: any) => p.name === 'room-chair'), JSON.stringify(f.dropped));
+});

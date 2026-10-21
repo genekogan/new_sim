@@ -24,6 +24,7 @@ const RECIPES = resolve(here, '../recipes/furnish');
 const FRONT_YAW = { s: 0, e: Math.PI / 2, n: Math.PI, w: -Math.PI / 2 };
 const FACE_YAW = { s: 0, e: Math.PI / 2, n: Math.PI, w: -Math.PI / 2 };
 const r3 = (v) => Math.round(v * 1000) / 1000;
+const SLIDE_KEY_R = 0.15;   // a seat's slide spot counts as reached when a walk-raster cell within this of it is (lane FUZZ2)
 const itemBoxes = (baked, p, y, yaw) => {
   const c = Math.cos(yaw), s = Math.sin(yaw);
   const boxes = baked.colliders ?? [{ c: [0, 0], half: [baked.box[0] / 2, baked.box[2] / 2], yaw: 0, y0: 0, y1: baked.box[1] }];
@@ -36,7 +37,7 @@ const itemBoxes = (baked, p, y, yaw) => {
 // next pose or is dropped. The rule (how much room a body needs past a wall or a piece, as the walk raster sees it) is the
 // shared one in packages/generators/src/clearance.ts (lane BS1): 0.43 m from a wall piece, 0.50 m from a piece of furniture.
 export { roomKeys, approachOf, approachKeys, wayLabels, connectedPairs } from '../../../packages/generators/src/clearance.ts';
-import { roomKeys, approachKeys, wayGrid, pairsOf, SEAT_FAR } from '../../../packages/generators/src/clearance.ts';
+import { roomKeys, approachKeys, wayGrid, pairsOf, seatSlides, SEAT_FAR } from '../../../packages/generators/src/clearance.ts';
 
 /** The furnish styles (recipe files), sorted. */
 export const furnishStyles = () => readdirSync(RECIPES).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)).sort();
@@ -141,6 +142,14 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
         if (solid && doors.some((d) => d.level === room.floor && obbOverlap(bx, zone(d)))) { why = 'in a doorway'; continue; }
         if (ends.some((e) => e.level === room.floor && obbOverlap(bx, { c: e.p, half: [0.9, 0.9], yaw: 0, y0: room.y, y1: room.y + 2 }))) { why = 'at the foot or head of the stairs'; continue; }
         if (solid && taken.some((t) => t.floor === room.floor && t.solid && candidate.some(a => t.boxes.some(b => obbOverlap(a, b))))) { why = 'overlaps another piece'; continue; }
+        // each seat must be got on and off as the use-check does it: some standing spot beside it slides onto it clear of
+        // the walls, rails, stairs and the pieces standing (lane FUZZ2); those spots are its keys in the ways check below
+        let slides = [];
+        if (solid && (ib.slots ?? []).some((x) => x.kind === 'seat')) {
+          const blockers = [...baked.colliders, ...taken.filter((t) => t.floor === room.floor && t.solid).flatMap((t) => t.boxes)];
+          slides = seatSlides(ib, pose, r3(fyaw + th), room.y, blockers);
+          if (slides.some((pts) => !pts.length)) { why = 'no way on or off its seat'; continue; }
+        }
         if (solid && keysOf(room).length) {
           // the doors, stair ends and standing pieces' approaches keep every way they had, and this piece's own approach
           // is reached from a door
@@ -153,7 +162,7 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
             for (const t of standing.slice(w.n)) w.grid = w.grid.plus(t.foot);
             w.n = standing.length; w.keys = [...keysOf(room), ...standing.flatMap((t) => t.approach)]; w.was = w.grid.labels(w.keys, w.at = { cells: [] });
           }
-          const { keys, was } = w, now = w.grid.plus(bx).labels([...keys, ...approachKeys(ib, pose, r3(fyaw + th))], { cells: w.at.cells });
+          const { keys, was } = w, now = w.grid.plus(bx).labels([...keys, ...approachKeys(ib, pose, r3(fyaw + th)), ...slides.map((pts) => ({ pts, r: SLIDE_KEY_R }))], { cells: w.at.cells });
           const doorsReach = now.slice(keys.length).every((own) => keysOf(room).some((_, i) => now[i] === own));
           if (pairsOf(now, keys.length) < pairsOf(was) || !doorsReach) { why = doorsReach ? 'would cut the way to its doors or another piece' : 'no way to it from the doors'; continue; }
         }
