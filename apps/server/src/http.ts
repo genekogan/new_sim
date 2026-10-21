@@ -49,6 +49,7 @@ import {Travel,TravelError,launcherSite,TRAVEL_CONTRACT} from './travel/travel.t
 import {mountTravelRoutes} from './travel/routes.ts';
 import { intentArrivalReadError,intentHistoryReadError,intentTransportError, intentLookupError, type IntentControlV2, type IntentIdentityV2 } from './intent-control.ts';
 import {mountAgentInbox} from './inbox-routes.ts';
+import {mountOperatorSouls} from './op-souls.ts';
 import { strandedMetrics } from '../../../mars/viewer/engine/spatial/path.ts';
 
 type Deps = { cfg: Config; db: Db; host: WorldHost; auth: Auth; hub: Hub; brain: Brain; souls: Souls; takes?: TakeArchive; station?:CandidateStationV1; stationV2?:CandidateStationV2; intentV2?:IntentControlV2; edge?:EdgeLedger; god?: GodMode };
@@ -74,7 +75,7 @@ export function buildApp(d: Deps) {
   // lane O2: the first snapshot is edge-cacheable when the page asks for it by the current key (edge-snapshot.ts)
   const godForKey = d.god, currentSnapshotKey = godForKey ? () => snapshotKey({ editSeq: godForKey.model.editSeq, buildsRev: godForKey.store.buildsRev(), moderation: moderation.version() }) : null;
   if (currentSnapshotKey) mountEdgeSnapshot(app, currentSnapshotKey);
-  mountAgentInbox(app, {db: d.db, worldId: d.host.worldId, souls: d.souls, god: d.god, edge: !!d.edge, requireUser: c => requireUser(c), ownerSoul: async (c, id) => { const u = await requireUser(c); d.souls.requireInvited(u); const s = ownSoul(u, id); if (!d.souls.owns(u.id, s)) throw new ApiError(403, 'forbidden', 'not your soul'); return s; }}); // invite gate as on the central /v1/souls/:id/command
+  const agentInbox = mountAgentInbox(app, {db: d.db, worldId: d.host.worldId, souls: d.souls, god: d.god, edge: !!d.edge, requireUser: c => requireUser(c), ownerSoul: async (c, id) => { const u = await requireUser(c); d.souls.requireInvited(u); const s = ownSoul(u, id); if (!d.souls.owns(u.id, s)) throw new ApiError(403, 'forbidden', 'not your soul'); return s; }}); // invite gate as on the central /v1/souls/:id/command
   // Travel (M3, travel/): a Soul whose body is in another world acts there; here only its travel calls answer.
   let travel: Travel | undefined;
   const travelGate = (resolve: ReturnType<typeof edgeSoulResolver>) => (c: Context) => { const s = resolve(c), t = travel?.inc(s.soulId); if (t && (t.state === 'away' || t.state === 'departing')) throw new EdgeError(409, t.state === 'away' ? 'travel.away' : 'travel.departing', `${s.name} is ${t.state === 'away' ? 'in' : 'on the way to'} ${t.at}: act there, or travel home (POST /v1/edge/travel {"to":"home"})`); return s; };
@@ -152,6 +153,8 @@ export function buildApp(d: Deps) {
 
   // ---- public
   mountWelcomeRoutes(app,d);
+  // lane OPS2: operator commands for TEST Souls (the launcher only, with the site key: op-souls.ts)
+  mountOperatorSouls(app,{db:d.db,worldId:d.host.worldId,souls:d.souls,inbox:agentInbox,siteKey:process.env.SIM_SITE_KEY});
   if(d.souls.accounts)mountAccountRoutes(app,{accounts:d.souls.accounts,auth:d.auth,baseOf:d.cfg.authProvider==='clerk'?()=>publicWorldBase(d.cfg):baseOf,limit:limitIp});
   mountStationRoutesV2(app,d.stationV2);
   app.get('/healthz', (c) => c.json({ ok: true, tick: d.host.engine.world.tick, clients: d.hub.clients.size, paused: d.host.paused, build: d.cfg.build, worldId: d.host.worldId }));
