@@ -105,7 +105,7 @@ export async function runAudits(outDir, { root = ROOT, worlds = WORLDS, log = ()
   const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;   // the audits are plain processes, not node:test children
   const one = ({ w, k }) => new Promise(done => {
     const out = join(outDir, `${w.name}.${k}-${w.shards}.json`), t0 = Date.now();
-    const src = w.db ? ['--db', join(HERE, w.db)] : ['--genesis', join(root, w.genesis)];
+    const src = w.db ? ['--db', resolve(HERE, w.db)] : ['--genesis', join(root, w.genesis)];
     const child = spawn(process.execPath, ['--max-old-space-size=6000', join(root, AUDIT), ...src, '--name', w.name, '--shard', `${k}/${w.shards}`, '--out', out], { cwd: root, stdio: ['ignore', 'ignore', 'pipe'], env });
     let err = ''; child.stderr.on('data', b => { err = (err + b).slice(-4000); });
     child.on('close', code => { log(`${w.name} ${k}/${w.shards} exit ${code} ${Math.round((Date.now() - t0) / 1000)} s ${err.trim().split('\n').at(-1) ?? ''}`); if (code !== 0) errors.push(`${w.name} ${k}/${w.shards} exit ${code}: ${err.slice(-1500)}`); done(); });
