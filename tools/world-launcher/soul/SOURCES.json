@@ -3,21 +3,21 @@
   "cli": {
     "file": "eden-agent.mjs",
     "version": "1.9",
-    "sha256": "f59849857146ce6d3be2148fe96dac9c9447a6f24aa7dc2810bb99c4c03d92e2",
-    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-f5bc9c57.manifest.json)",
-    "source": "f5bc9c57e925096ca4cd1311a059d781d372bb0c",
-    "note": "trunk release 3: 1.9 + owner inbox listen/ack, look around (knowledge), travel, stroll in place, owner queue protection, speech truth, first wait reads from c_0, profile photo auto / body photo, looks v2 (accessories, outfits, shape); body-shape numbers parsed; 1.9.3: approval start/poll/cancel retry a restarting world (no answer, 429, 5xx) until their deadline, refused approvals print their reason; 1.9.4: create-soul/pair-soul --for <window code> puts the request in the human's open Sim window; approval wait keeps polling through a timed-out request (the human can Ask again) until its 15-min deadline; 1.9.5 (lane MSG): listen blocks with no time limit and prints every waiting owner message oldest first (no credential, emittedAt), outages (and connections dropped mid-answer) retried; --follow prints a whole backlog; result <id> done|failed \"...\"; 1.9.6 (lane SOULSIM-H): wait ends the moment the owner writes (world ownerWrote/ownerMark) and prints their messages (ownerMessages + stderr OWNER MESSAGE); listen's next line: ack the batch at once, listen --after <last id> before the work"
+    "sha256": "697d52b05fbd904fc757091d43886515578e55b1e210b26b43b7772f53dfea1e",
+    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-3991e552.manifest.json)",
+    "source": "3991e55252c35ed510c9c652b829f466185dce54",
+    "note": "trunk release 3: 1.9 + owner inbox listen/ack, look around (knowledge), travel, stroll in place, owner queue protection, speech truth, first wait reads from c_0, profile photo auto / body photo, looks v2 (accessories, outfits, shape); body-shape numbers parsed; 1.9.3: approval start/poll/cancel retry a restarting world (no answer, 429, 5xx) until their deadline, refused approvals print their reason; 1.9.4: create-soul/pair-soul --for <window code> puts the request in the human's open Sim window; approval wait keeps polling through a timed-out request (the human can Ask again) until its 15-min deadline; 1.9.5 (lane MSG): listen blocks with no time limit and prints every waiting owner message oldest first (no credential, emittedAt), outages (and connections dropped mid-answer) retried; --follow prints a whole backlog; result <id> done|failed \"...\"; 1.9.6 (lane SOULSIM-H): wait ends the moment the owner writes (world ownerWrote/ownerMark) and prints their messages (ownerMessages + stderr OWNER MESSAGE); listen's next line: ack the batch at once, listen --after <last id> before the work; 1.9.7 (lane SOULSIM-H F5): a message the agent acked after its walk began lifts the in-progress guard, so a plain act replaces the walk"
   },
   "skill": {
     "file": "skill.md",
-    "sha256": "4dd68551357042e963bdcf9d8849254000e77e03a1fd77bcd1169b3953b73cd9",
-    "from": "git show f5bc9c57:tools/edge-skill/SKILL.md",
-    "note": "template; the world fills {{BASE}}. Includes owner inbox, knowledge at scales, travel, creature guidance and looks v2 / portraits. 1.9.5 (lane MSG): always listen from the moment the Soul is ready, every mode; never filter listen; ack then result; work through a backlog; if listen ends without messages, start it again. 1.9.6 (lane SOULSIM-H): ack a whole batch at once, restart listen --after <last id> before the work, wait 60 (never sleep) during actions, act a replacing message at once, ignore ids already acked."
+    "sha256": "4211850beae0960dd84313e1ab75ed0b0c087ede0d0beca62c6ab450f4975d2d",
+    "from": "git show 3991e552:tools/edge-skill/SKILL.md",
+    "note": "template; the world fills {{BASE}}. Includes owner inbox, knowledge at scales, travel, creature guidance and looks v2 / portraits. 1.9.5 (lane MSG): always listen from the moment the Soul is ready, every mode; never filter listen; ack then result; work through a backlog; if listen ends without messages, start it again. 1.9.6 (lane SOULSIM-H): ack a whole batch at once, restart listen --after <last id> before the work, wait 60 (never sleep) during actions, act a replacing message at once, ignore ids already acked. 1.9.7: ack first, then a plain act replaces the walk."
   },
   "instructions": {
     "file": "instructions.md",
     "sha256": "88c3ff215a3533af0a8301cbf579bf7185e954269dab443b057812ea5840a468",
-    "from": "git show f5bc9c57:tools/edge-skill/INSTRUCTIONS.md",
+    "from": "git show 3991e552:tools/edge-skill/INSTRUCTIONS.md",
     "note": "template; the world fills {{BASE}} and {{WORLD}}. Release 3 adds one \"Your resident's look\" paragraph (lane D); otherwise as publication-20be-001. 1.9.4 (lane PUX): the New Soul prompt fills --for <window code> (instructions.md?for=CODE). 1.9.5 (lane MSG): step 4 starts listening at once, without asking; the mode question is step 5. 1.9.6 (lane SOULSIM-H + QA2 F9): step 3 names the CLI URL (curl -fsSo eden-agent.mjs {{BASE}}/eden-agent.mjs); step 4 follows the batch/wait order."
   },
   "appendix": "The per-world entry skill (/SKILL.md: God mode + Soul mode) stays tools/world-skill/SKILL.md; its Soul mode points here."
