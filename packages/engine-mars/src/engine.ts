@@ -1882,7 +1882,9 @@ export class MarsEngine implements Engine {
   /** `keep` (lane WALK: the gate's walk audit runs in spatial shards) skips fixtures / regions whose position it rejects. */
   navTargetsV1(keep?:(at:[number,number])=>boolean):(ConnPoint&{kind:'seat'|'berth'|'region';of:string})[]{
     const out:(ConnPoint&{kind:'seat'|'berth'|'region';of:string})[]=[],w=this.rt.world,c=this.connectivityV1();
-    for(const id of Object.keys(w.entities).sort()){const e=w.entities[id];if(e.kind!=='fixture')continue;if(keep&&!keep([e.pose.p[0],e.pose.p[2]]))continue;
+    // lane BS3F: fixtures in spatial order (32 m cells), so each seat's approach reads fine tiles still in the 24-tile LRU
+    // (id order thrashed it: a furnished town rebuilt most tiles once per seat)
+    for(const id of spatialFixtureIdsV1(w.entities)){const e=w.entities[id];if(keep&&!keep([e.pose.p[0],e.pose.p[2]]))continue;
       for(const slot of fixtureSlots(this.rt,e)){if(slot.kind!=='seat'&&slot.kind!=='berth')continue;const a=seatApproach(this.rt,slot);if(!Array.isArray(a))continue;out.push({id:slot.id,of:id,kind:slot.kind,p:[a[0],a[1]],level:slot.level??0,tol:.5});}}
     for(const id of Object.keys(w.regions).sort()){const r=w.regions[id];if(r.kind==='no-go'||!r.polygon?.length)continue;
       if(keep&&!keep(centroid(r.polygon) as [number,number]))continue;
@@ -2237,4 +2239,11 @@ export async function marsCommonsTransitionFactory(cfg:MarsWorldConfig=GREEN_FIE
     },
     validateHistoryHead(engine,recorded){if(engine.rulesVersion!==recorded)throw new Error('commons-transition.history-head-differs');},
   };
+}
+
+/** Fixture ids ordered by 32 m cell (z, then x), then id: the walk audits' seat/bed sweeps read neighbouring seats together. */
+export function spatialFixtureIdsV1(entities:Record<string,any>):string[]{
+  const cell=(v:number)=>Math.floor(v/32),ids=Object.keys(entities).filter(id=>entities[id].kind==='fixture');
+  const k=new Map(ids.map(id=>{const p=entities[id].pose.p;return [id,[cell(p[2]),cell(p[0])]] as const;}));
+  return ids.sort((a,b)=>{const x=k.get(a)!,y=k.get(b)!;return x[0]-y[0]||x[1]-y[1]||(a<b?-1:a>b?1:0);});
 }

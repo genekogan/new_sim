@@ -9,6 +9,7 @@
 //   node tools/test-harness/walk/walk.mjs                 audit this tree, print the comparison (about 1 min on the laptop)
 //   node tools/test-harness/walk/walk.mjs --write         ... and write the results as the new baseline
 //   node tools/test-harness/walk/walk.mjs --from <dir>    compare / --write from a gate's reports (out/suite/walk)
+//   ... --world fuzz,bench-hamlet                         only these worlds
 // "Worse" per place (the top segment of a thing's path, e.g. hillside-home-7): more bad destinations (not walkable both
 // ways: nav.disconnected / nav.one-way / nav.no-standing-room), more one-ways, more goalless things (no walk goal at all),
 // more floating root things, or a float that rose by more than FLOAT_RISE_M.
@@ -22,13 +23,15 @@ export const HERE = fileURLToPath(new URL('.', import.meta.url));
 export const ROOT = resolve(HERE, '../../..');
 export const AUDIT = 'apps/server/src/god/walk-audit.ts';
 export const FLOAT_RISE_M = 0.3;
-export const METRICS = ['bad', 'oneWay', 'goalless', 'float'];
+export const METRICS = ['bad', 'oneWay', 'goalless', 'float', 'unusable'];
 /** The worlds the gate walks: a fixture copy (fixtures/<name>.db.gz) or a genesis template, and its spatial shards. */
 export const WORLDS = [
   { name: 'eden-2026', db: 'fixtures/eden-2026.db.gz', shards: 3 },
   { name: 'bench-eden', db: 'fixtures/bench-eden.db.gz', shards: 3 },
   { name: 'eden-2026-genesis', genesis: 'worlds/templates/eden-2026.json', shards: 3 },
   { name: 'bench-hamlet', db: 'fixtures/bench-hamlet.db.gz', shards: 1 },
+  // lane BS3F: the generated BUILDSAFE world (fuzz-world.mjs), also scored for seats and beds a Soul cannot use
+  { name: 'fuzz', fuzz: 'tools/test-harness/walk/fuzz-world.mjs', use: true, shards: 3 },
 ];
 const SHARD_RSS_GB = 2.6;   // measured 2.1 GB peak for an eden-2026 shard
 
@@ -38,15 +41,17 @@ export function merge(name, parts) {
   const n = parts[0].shard[1], seen = new Set(parts.map(p => p.shard[0]));
   if (parts.some(p => p.shard[1] !== n || p.name !== name) || seen.size !== n || parts.length !== n) throw Error(`${name}: incomplete or mixed shard parts`);
   const bad = parts.flatMap(p => p.bad).sort(cmp), goalless = parts.flatMap(p => p.goalless).sort(cmp), floats = parts.flatMap(p => p.floats).sort(cmp);
+  const unusable = parts.some(p => p.unusable) ? parts.flatMap(p => p.unusable ?? []).sort(cmp) : null;
   const places = {}, bump = (place, k) => { const o = (places[place] ??= {}); o[k] = (o[k] ?? 0) + 1; };
   for (const [code, , place] of bad) { bump(place, 'bad'); if (code === 'nav.one-way') bump(place, 'oneWay'); }
   for (const [, place] of goalless) bump(place, 'goalless');
   for (const [, , place] of floats) bump(place, 'float');
+  for (const [, , place] of unusable ?? []) bump(place, 'unusable');
   const code = c => bad.filter(b => b[0] === c).length;
   return {
     schemaVersion: 1, name, worldId: parts[0].worldId, auditVersion: parts[0].version,
-    totals: { dests: sum(parts, 'dests'), bad: bad.length, disconnected: code('nav.disconnected'), oneWay: code('nav.one-way'), noRoom: code('nav.no-standing-room'), goalless: goalless.length, roots: sum(parts, 'roots'), floats: floats.length },
-    places: Object.fromEntries(Object.keys(places).sort().map(k => [k, places[k]])), bad, goalless, floats,
+    totals: { dests: sum(parts, 'dests'), bad: bad.length, disconnected: code('nav.disconnected'), oneWay: code('nav.one-way'), noRoom: code('nav.no-standing-room'), goalless: goalless.length, roots: sum(parts, 'roots'), floats: floats.length, ...(unusable ? { unusable: unusable.length } : {}) },
+    places: Object.fromEntries(Object.keys(places).sort().map(k => [k, places[k]])), bad, goalless, floats, ...(unusable ? { unusable } : {}),
   };
 }
 const sum = (a, k) => a.reduce((s, x) => s + x[k], 0);
@@ -57,6 +62,7 @@ export function compare(base, cand) {
   const regressions = [], improved = [];
   const items = (r, metric, place) => metric === 'goalless' ? r.goalless.filter(g => g[1] === place).map(g => `goalless ${g[0]}`)
     : metric === 'float' ? r.floats.filter(f => f[2] === place).map(f => `float ${f[0]}`)
+    : metric === 'unusable' ? (r.unusable ?? []).filter(u => u[2] === place).map(u => `${u[0]} ${u[1]}`)
     : r.bad.filter(b => b[2] === place && (metric === 'bad' || b[0] === 'nav.one-way')).map(b => `${b[0]} ${b[1]}`);
   for (const place of new Set([...Object.keys(base.places), ...Object.keys(cand.places)])) {
     for (const metric of METRICS) {
@@ -77,7 +83,7 @@ export function compare(base, cand) {
 /** Plain lines for a failure message / log: the per-place diff. */
 export function describe(name, c) {
   const t = c.totals, row = k => `${k} ${t.was[k]} -> ${t.now[k]}`;
-  const lines = [`${name}: ${['bad', 'oneWay', 'goalless', 'floats', 'dests'].map(row).join(', ')}`];
+  const lines = [`${name}: ${['bad', 'oneWay', 'goalless', 'floats', ...(t.now.unusable !== undefined ? ['unusable'] : []), 'dests'].map(row).join(', ')}`];
   for (const r of c.regressions) lines.push(`  WORSE ${r.place} ${r.metric} ${r.was} -> ${r.now}${r.added.length ? ': ' + r.added.slice(0, 12).join('; ') + (r.added.length > 12 ? `; ... +${r.added.length - 12} more` : '') : ''}`);
   if (c.improved.length) lines.push(`  better in ${c.improved.length} place/metric(s) (lower the baseline: walk.mjs --write): ${c.improved.slice(0, 8).map(i => `${i.place} ${i.metric} ${i.was}->${i.now}`).join(', ')}`);
   return lines.join('\n');
@@ -86,11 +92,11 @@ export function describe(name, c) {
 export function readBaseline(name) { return JSON.parse(readFileSync(join(HERE, 'baseline', `${name}.json`), 'utf8')); }
 /** One item per line, so a baseline change reads as a per-destination diff in review. */
 export function writeBaseline(report) {
-  const { bad, goalless, floats, places, ...head } = report;
+  const { bad, goalless, floats, unusable, places, ...head } = report;
   const list = a => a.length ? '[\n' + a.map(x => '    ' + JSON.stringify(x)).join(',\n') + '\n  ]' : '[]';
   const text = '{\n' + Object.entries(head).map(([k, v]) => `  ${JSON.stringify(k)}: ${JSON.stringify(v)},`).join('\n') + '\n'
     + `  "places": {\n${Object.entries(places).map(([k, v]) => `    ${JSON.stringify(k)}: ${JSON.stringify(v)}`).join(',\n')}\n  },\n`
-    + `  "bad": ${list(bad)},\n  "goalless": ${list(goalless)},\n  "floats": ${list(floats)}\n}\n`;
+    + `  "bad": ${list(bad)},\n  "goalless": ${list(goalless)},\n  "floats": ${list(floats)}${unusable ? `,\n  "unusable": ${list(unusable)}` : ''}\n}\n`;
   mkdirSync(join(HERE, 'baseline'), { recursive: true });
   writeFileSync(join(HERE, 'baseline', `${report.name}.json`), text);
 }
@@ -105,7 +111,7 @@ export async function runAudits(outDir, { root = ROOT, worlds = WORLDS, log = ()
   const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;   // the audits are plain processes, not node:test children
   const one = ({ w, k }) => new Promise(done => {
     const out = join(outDir, `${w.name}.${k}-${w.shards}.json`), t0 = Date.now();
-    const src = w.db ? ['--db', resolve(HERE, w.db)] : ['--genesis', join(root, w.genesis)];
+    const src = [...(w.db ? ['--db', resolve(HERE, w.db)] : w.fuzz ? ['--fuzz', join(root, w.fuzz)] : ['--genesis', join(root, w.genesis)]), ...(w.use ? ['--use'] : [])];
     const child = spawn(process.execPath, ['--max-old-space-size=6000', join(root, AUDIT), ...src, '--name', w.name, '--shard', `${k}/${w.shards}`, '--out', out], { cwd: root, stdio: ['ignore', 'ignore', 'pipe'], env });
     let err = ''; child.stderr.on('data', b => { err = (err + b).slice(-4000); });
     child.on('close', code => { log(`${w.name} ${k}/${w.shards} exit ${code} ${Math.round((Date.now() - t0) / 1000)} s ${err.trim().split('\n').at(-1) ?? ''}`); if (code !== 0) errors.push(`${w.name} ${k}/${w.shards} exit ${code}: ${err.slice(-1500)}`); done(); });
@@ -122,8 +128,9 @@ export function readReports(dir, worlds = WORLDS) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const a = process.argv.slice(2), from = a.includes('--from') ? resolve(a[a.indexOf('--from') + 1]) : null;
   const dir = from ?? join(ROOT, '.lane/walk', new Date().toISOString().replace(/[:.]/g, '-'));
-  if (!from) { const r = await runAudits(dir, { log: m => console.log(m) }); if (r.errors.length) { console.error(r.errors.join('\n')); process.exit(1); } }
-  const reports = readReports(dir);
+  const only = a.includes('--world') ? a[a.indexOf('--world') + 1].split(',') : null, worlds = only ? WORLDS.filter(w => only.includes(w.name)) : WORLDS;
+  if (!from) { const r = await runAudits(dir, { worlds, log: m => console.log(m) }); if (r.errors.length) { console.error(r.errors.join('\n')); process.exit(1); } }
+  const reports = readReports(dir, worlds);
   let worse = false;
   for (const [name, rep] of Object.entries(reports)) {
     if (a.includes('--write')) { writeBaseline(rep); console.log(`wrote baseline/${name}.json: ${JSON.stringify(rep.totals)}`); continue; }
