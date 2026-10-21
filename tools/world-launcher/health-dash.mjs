@@ -12,9 +12,16 @@ import { existsSync, readdirSync, readFileSync, statSync, statfsSync } from 'nod
 import { cpus, freemem, loadavg, totalmem, uptime } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { CGROUP_SLICE, readCgroup } from './deploy/host-health.mjs';
 
 const LINUX = process.platform === 'linux';
+// As deploy/host-health.mjs reads them (not imported: a launcher runs without its deploy/ dir, e.g. keeper.test.mjs's releases).
+const CGROUP_SLICE = '/sys/fs/cgroup/system.slice/system-sim\\x2dworlds.slice';
+function readCgroup(dir) {
+  const num = (f) => { const v = readFileSync(join(dir, f), 'utf8').trim(); return v === 'max' ? null : Number(v); };
+  const stat = readFileSync(join(dir, 'memory.stat'), 'utf8'), events = readFileSync(join(dir, 'memory.events'), 'utf8');
+  const field = (text, k) => Number(new RegExp(`^${k} (\\d+)$`, 'm').exec(text)?.[1] ?? 0);
+  return { workingBytes: num('memory.current') - field(stat, 'inactive_file'), maxBytes: num('memory.max'), oomKills: field(events, 'oom_kill') };
+}
 const WORLD_BUDGET_MS = 200, EDIT_CHUNK = 20_000, FLAGSHIP = 'eden-2026';
 const readJson = (f) => { try { return JSON.parse(readFileSync(f, 'utf8')); } catch { return null; } };
 const iso = (t) => (Number.isFinite(t) && t > 0 ? new Date(t).toISOString() : null);
