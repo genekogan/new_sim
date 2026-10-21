@@ -65,6 +65,8 @@ export type Thing = {
   level: number;
   /** A room's floor height above its building's base (m): a low raised floor (a deck reached by a few risers) is not an upper storey. */
   rise?: number;
+  /** Rooms: the storey (0 the ground floor, 1 the first floor above it). */
+  floor?: number;
   /** Area things: their outline; path things: their centre line + width. */
   area?: Vec2[];
   path?: Vec2[];
@@ -101,6 +103,7 @@ const PLACE_M2 = 300;       // ... at least this big (a court or a garden, not a
 const PLACES_MAX = 6;          // ... the nearest this many of them
 const PLACES_WITHIN = 400;   // an open area that is one of the world's places (a court, a garden) stays offered within this many metres
 const BIG_THING_M2 = 200;    // a root thing whose solids spread over at least this much ground is offered like a building
+const THING_REACH_M = 3.5;  // RESOLVE: a walk to a named thing ends this close to it (next to the horse, not its lawn's middle)
 const STROLL_AREA = 150;     // m²: an open area this big offers a stroll through it (the ledger strolls places ≥ 250 m²)     // rooms of buildings within this many metres are offered too
 const STOP = new Set(['the', 'a', 'an', 'to', 'of', 'in', 'at', 'on']);
 const words = (s: string) => s.toLowerCase().replace(/[’']/g, '').split(/[^a-z0-9]+/).filter((w) => w && !STOP.has(w));
@@ -249,7 +252,7 @@ export class GodNav {
         const rname = r.name ?? r.id, floor = r.floor ?? 0;
         roomRefs.push(rref);
         out.push({ id: e.id, room: r.id, ref: rref, name: `${e.name}/${r.id}`, kind: 'room', what: `${rname} of ${e.name}${floor ? `, floor ${floor}` : ''}`,
-          words: [...new Set([...words(r.id), ...words(rname), ...base.words, 'room', 'inside'])], at, level: this.h.levelAt(at[0], at[1], ry), rise: r3((r.y ?? 0) * wp.s), poly, roomFrame, ...(stands[0] ? { entry: { p: stands[0], level } } : {}) });
+          words: [...new Set([...words(r.id), ...words(rname), ...base.words, 'room', 'inside'])], at, level: this.h.levelAt(at[0], at[1], ry), rise: r3((r.y ?? 0) * wp.s), floor, poly, roomFrame, ...(stands[0] ? { entry: { p: stands[0], level } } : {}) });
       }
       // the room the front door opens into goes first (the entrance)
       if (front) { const fa = toWorld(front.at[0], front.at[1]); roomRefs.sort((a, b) => { const A = out.find((t) => t.ref === a)!, B = out.find((t) => t.ref === b)!; return (A.level - B.level) || (polyDist(A.poly!, fa) - polyDist(B.poly!, fa)); }); }
@@ -420,6 +423,98 @@ export class GodNav {
     const seated = me.human.activity === 'sit' || me.human.baseActivity === 'sit', n = caps.length;
     this.offerWalk(soul, t, this.distance(t, here), { here, myLevel, seated, exit }, caps, plans);
     return caps.length > n;
+  }
+
+  /** RESOLVE (2026-10-21, SOULSIM-E "go to the horse" ended at the west lawn's centre ~10 m from the horse): the words name
+   *  a thing (an animal, a boat, a bench) by its own name or kind, not a place: a walk to standing room next to the nearest
+   *  such thing, added for this resolution. Rooms are left to their buildings. Null when no such thing has standing room
+   *  within reach of it. */
+  thingOnDemand(soul: EdgeSoul, ask: string[], caps: EdgeCapability[], plans: Plans, hit: (w: string, set: string[]) => boolean): { id: string; count: number } | null {
+    const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human || !ask.length) return null;
+    const here: Vec2 = [me.pose.p[0], me.pose.p[2]], myLevel = me.human.level ?? 0;
+    // its own name and kind, the last word of the asked words naming the head of either ("go to the school" is not a school-desk)
+    const own = (t: Thing) => [...words(t.name.split('/').pop()!), ...words(t.what.replace(/\s+in\s+\S+$/, ''))];
+    const heads = (t: Thing) => [words(t.name.split('/').pop()!).filter((w) => !/^\d+$/.test(w)).at(-1) ?? '', words(t.what.replace(/\s+in\s+\S+$/, '')).at(-1) ?? ''];
+    const all = this.things(), named = all.filter((t) => t.kind !== 'room' && ask.every((w) => hit(w, own(t))) && hit(ask.at(-1)!, heads(t)))
+      .map((t) => ({ t, d: this.distance(t, here) })).sort((a, b) => a.d - b.d || (a.t.ref < b.t.ref ? -1 : 1));
+    const exit = myLevel === 0 ? null : all.find((r) => r.kind === 'room' && r.level === myLevel && r.poly && inPoly(here[0], here[1], r.poly) && r.entry && r.entry.level === 0)?.entry ?? null;
+    const seated = me.human.activity === 'sit' || me.human.baseActivity === 'sit';
+    for (const { t, d } of named.slice(0, 6)) {
+      const goal = this.goal(t, here, soul.entityId);
+      if (!goal || (['thing', 'seat'].includes(t.kind) && Math.hypot(goal.p[0] - t.at[0], goal.p[1] - t.at[1]) > THING_REACH_M)) continue;
+      const id = `walk:${t.ref}`;
+      if (!caps.some((c) => c.id === id)) this.offerWalk(soul, t, d, { here, myLevel, seated, exit }, caps, plans);
+      if (caps.find((c) => c.id === id)?.available) return { id, count: named.length };
+    }
+    return null;
+  }
+  /** A named thing by its entity id (not a room): where the decor and creatures that are not engine bodies stand. */
+  thingById(id: string): Thing | undefined {
+    const key = this.cache?.key; if (!this.byIdMemo || this.byIdMemo.key !== key) { this.things(); this.byIdMemo = { key: this.cache?.key, m: new Map(this.things().filter((t) => t.kind !== 'room').map((t) => [t.id, t])) }; }
+    return this.byIdMemo.m.get(id);
+  }
+  private byIdMemo: { key: string | undefined; m: Map<string, Thing> } | null = null;
+  /** Words of every named thing (its own name and kind), for reading a misspelt name (RESOLVE typo fallback). */
+  thingWords(): string[] {
+    const key = this.cache?.key; if (this.wordsMemo && this.wordsMemo.key === key) return this.wordsMemo.words;
+    const out = new Set<string>(); for (const t of this.things()) for (const w of [...words(t.name.split('/').pop()!), ...words(t.what)]) out.add(w);
+    this.wordsMemo = { key: this.cache?.key, words: [...out] }; return this.wordsMemo.words;
+  }
+  private wordsMemo: { key: string | undefined; words: string[] } | null = null;
+
+  /** RESOLVE (SOULSIM-E "go inside the cottage and go upstairs" was capability.unknown): a floor of a building, as its main
+   *  room (the largest that is not a landing, stair or bathroom). The building: `prefer` (the place the building words walk
+   *  to), else the nearest whose name or kind is `ask`, else the one the Soul stands in or at the door of. With building
+   *  words, a building without that floor gives way to the nearest so named that has it (said in the note). From the
+   *  ground it walks to the front door first, then up. */
+  floorOnDemand(soul: EdgeSoul, q: { ask: string[]; prefer?: string; floor: 'up' | 'down' | 'top' | number }, caps: EdgeCapability[], plans: Plans, hit: (w: string, set: string[]) => boolean): { id: string; note: string } | { code: string; reason: string } {
+    const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human) return { code: 'floor.no-body', reason: 'This Soul has no body to walk with.' };
+    const here: Vec2 = [me.pose.p[0], me.pose.p[2]], myLevel = me.human.level ?? 0, all = this.things();
+    const roomsOf = (b: Thing) => (b.rooms ?? []).map((r) => this.thing(r)).filter((r): r is Thing => !!r && !!r.poly);
+    const inRoom = all.find((r) => r.kind === 'room' && r.level === myLevel && !!r.poly && inPoly(here[0], here[1], r.poly));
+    const buildingOf = (t: Thing | undefined) => t?.kind === 'building' ? t : t?.kind === 'room' ? this.thing(t.ref.slice(0, t.ref.lastIndexOf('/'))) : undefined;
+    const curFloor = (b: Thing) => (inRoom && b.rooms?.includes(inRoom.ref) ? inRoom.floor ?? 0 : 0);
+    const want = (b: Thing): number | null => {
+      const floors = [...new Set(roomsOf(b).map((r) => r.floor ?? 0))].sort((x, y) => x - y), cur = curFloor(b);
+      const f = q.floor === 'up' ? floors.find((x) => x > cur) : q.floor === 'down' ? [...floors].reverse().find((x) => x < cur) : q.floor === 'top' ? floors.at(-1) : q.floor;
+      return f !== undefined && floors.includes(f) && (q.floor === 'top' ? f > 0 || cur > 0 : true) ? f : null;
+    };
+    const own = (t: Thing) => [...words(t.name), ...words(t.what)];
+    const near = (cands: Thing[]) => cands.map((t) => ({ t, d: this.distance(t, here) })).sort((a, b) => a.d - b.d || (a.t.ref < b.t.ref ? -1 : 1));
+    const preferred = q.prefer ? buildingOf(all.find((t) => this.h.placeOf?.(t.ref) === q.prefer)) : undefined;
+    const atDoor = all.find((b) => b.kind === 'building' && (b.stands ?? []).some((s) => Math.hypot(s[0] - here[0], s[1] - here[1]) <= 4));
+    const first = preferred ?? (q.ask.length ? near(all.filter((t) => t.kind === 'building' && q.ask.every((w) => hit(w, own(t)))))[0]?.t : buildingOf(inRoom) ?? atDoor);
+    const which = q.floor === 'up' ? 'an upper floor' : q.floor === 'down' ? 'a floor below' : q.floor === 'top' ? 'an upper floor' : q.floor === 0 ? 'a ground floor' : `a floor ${q.floor}`;
+    const withFloor = (b: Thing) => b.kind === 'building' && want(b) !== null;
+    if (!first) {
+      const n = near(all.filter(withFloor))[0];
+      return { code: 'floor.no-building', reason: `${q.ask.length ? `No building called "${q.ask.join(' ')}" is here` : 'You are not in a building, so there is no upstairs here'}; nothing else was chosen in its place.${n ? ` The nearest building with ${which} is ${n.t.ref} (${n.t.what}, ${Math.round(n.d)} m): say "go upstairs in ${n.t.ref}".` : ''}` };
+    }
+    // the building, else (building words given) the nearest so named that has that floor and whose floor can be reached
+    const tries = withFloor(first) ? [first] : [];
+    if (q.ask.length) for (const { t } of near(all.filter((t) => t !== first && withFloor(t) && q.ask.every((w) => hit(w, own(t))))).slice(0, 4)) tries.push(t);
+    const nearestWith = () => { const n = near(all.filter(withFloor))[0]; return n ? ` The nearest building with ${which} is ${n.t.ref} (${n.t.what}, ${Math.round(n.d)} m): say "go upstairs in ${n.t.ref}".` : ''; };
+    if (!tries.length) return { code: 'floor.none', reason: `${first.ref} (${first.what}) has no ${q.floor === 'down' ? 'floor below this one' : q.floor === 0 ? 'ground floor room' : 'upper floor'} to go to; nothing else was chosen in its place.${q.ask.length ? '' : nearestWith()}` };
+    const seated = me.human.activity === 'sit' || me.human.baseActivity === 'sit';
+    const exit = myLevel === 0 ? null : inRoom?.entry && inRoom.entry.level === 0 ? inRoom.entry : null;
+    const main = (r: Thing) => polyArea(r.poly!) * (/landing|stair|corridor|bath|wc|toilet|closet|cupboard|hallway/.test(r.room ?? '') ? 0.3 : 1);
+    const skipped: string[] = []; let why: string | undefined;
+    for (const b of tries) {
+      const f = want(b)!, rooms = roomsOf(b).filter((r) => (r.floor ?? 0) === f).sort((x, y) => main(y) - main(x) || (x.ref < y.ref ? -1 : 1));
+      for (const r of rooms) {
+        const id = `walk:${r.ref}`;
+        if (!caps.some((c) => c.id === id)) this.offerWalk(soul, r, this.distance(r, here), { here, myLevel, seated, exit }, caps, plans);
+        const cap = caps.find((c) => c.id === id); if (!cap?.available) { why ??= cap?.blocked?.reason; continue; }
+        // from the ground outside: to the front door's stand on the ground first (the long walk), then up inside
+        const plan = plans.get(id), door = r.entry;
+        if (plan && door && myLevel === 0 && door.level === 0 && Math.hypot(door.p[0] - here[0], door.p[1] - here[1]) > 3 && !plan.steps.some((s) => s.verb === 'walk_to'))
+          plans.set(id, { ...plan, steps: [...plan.steps.filter((s) => s.verb === 'stand'), { verb: 'walk_to', params: { to: door.p, standoff: 0 } }, ...plan.steps.filter((s) => s.verb !== 'stand')] });
+        const other = b !== first ? `; ${first.ref}, the nearest ${q.ask.join(' ')}, has no ${q.floor === 'down' ? 'lower' : 'upper'} floor${withFloor(first) ? ' that can be reached' : ''}${skipped.length ? `, nor can ${skipped.join(', ')}'s be reached` : ''}` : '';
+        return { id, note: ` (floor ${f} of ${b.ref}, ${b.what}${other})` };
+      }
+      if (b !== first) skipped.push(b.ref);
+    }
+    return { code: 'route.unreachable', reason: `${tries.length > 1 ? `The ${which.replace(/^an? /, '')} of ${tries.map((b) => b.ref).join(', ')}` : `Floor ${want(first)} of ${first.ref}`} cannot be reached right now${why ? ` (${why.replace(/[.\s]+$/, '')})` : ''}; nothing else was chosen in its place.` };
   }
 
   /** RT (2026-10-20): `run:<building>` / `jog:<room>`: the listing offers walks only to buildings and rooms (a gait per

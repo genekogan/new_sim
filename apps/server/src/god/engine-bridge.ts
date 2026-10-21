@@ -16,6 +16,7 @@ import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { GodMode } from './god.ts';
 import { reachProviders, seatProviders, syncProviders, usesProviders, type ReachEnd, type ReachEndpoint } from './query.ts';
 import { GodNav } from './nav.ts';
+import { tokenHit } from '../edge/ledger/vocabulary.ts';
 import { doorInGap, freeDoorOpening, isDoorDef, isShut } from './doors.ts';
 import { GodPerceive } from './perceive.ts';
 import { GodPlaces, inPoly } from './places.ts';
@@ -1145,6 +1146,13 @@ export class EngineBridge {
     // a far named place asked for by name ("go to the big top" from across town): its walk, offered for that act only
     L.gaitOnDemand = (soul, id, gait, caps, plans) => { let added = false; try { const go = () => { added = this.nav.gaitOnDemand(soul, id, gait, caps, plans); }, eng = this.engine as unknown as { readPassV1?: (f: () => void) => void }; if (eng.readPassV1) eng.readPassV1(go); else go(); } catch (e) { this.log(`gait on demand: ${(e as Error).message}`); } releaseBigScratch(); return added; };
     L.walkOnDemand = (soul, id, caps, plans) => { let added = false; try { const go = () => { added = this.nav.walkOnDemand(soul, id, caps, plans); }, eng = this.engine as unknown as { readPassV1?: (f: () => void) => void }; if (eng.readPassV1) eng.readPassV1(go); else go(); } catch (e) { this.log(`walk on demand: ${(e as Error).message}`); } releaseBigScratch(); return added; };
+    // RESOLVE: a named thing beyond the listing (the horse, a boat), a building's floor ("go upstairs"), and the words of
+    // named things for reading a misspelt name; offered for that resolution only, like walkOnDemand
+    const pass = <T>(what: string, f: () => T, none: T): T => { let out = none; try { const go = () => { out = f(); }, eng = this.engine as unknown as { readPassV1?: (f: () => void) => void }; if (eng.readPassV1) eng.readPassV1(go); else go(); } catch (e) { this.log(`${what}: ${(e as Error).message}`); } releaseBigScratch(); return out; };
+    L.thingOnDemand = (soul, ask, caps, plans) => pass('thing on demand', () => this.nav.thingOnDemand(soul, ask, caps, plans, tokenHit), null);
+    L.floorOnDemand = (soul, q, caps, plans) => pass('floor on demand', () => this.nav.floorOnDemand(soul, q, caps, plans, tokenHit), null);
+    L.thingAt = (id) => { const t = this.nav.thingById(id); return t ? [t.at[0], t.at[1]] : null; };
+    L.thingWords = () => pass('thing words', () => this.nav.thingWords(), [] as string[]);
     L.beforeMap = () => { this.flush(); this.perceiveSync(); };
     const prev = L.worldProfile;
     L.worldProfile = (soul, caps, plans) => { prev?.(soul, caps, plans); try { this.capabilities(soul, caps, plans as never); } catch (e) { this.log(`capabilities: ${(e as Error).message}`); } };
