@@ -33,6 +33,8 @@ export type WalkPart = {
   goalless: [string, string][];
   /** [path, metres above the ground, place] */
   floats: [string, number, string][];
+  /** [code, use:<slot id>, place]: seats and beds a Soul cannot use (walk-use.ts; only worlds audited with --use) */
+  unusable?: [string, string, string][];
   ms: Record<string, number>;
 };
 export const SHARD_CELL_M = 64;
@@ -42,7 +44,7 @@ export function shardOf(at: readonly number[], n: number): number {
   return (((i * 73856093) ^ (j * 19349663)) >>> 0) % n;
 }
 
-type Booted = { name: string; worldId: string; host: any; god: any; bridge: any; engine: any; stop(): void };
+type Booted = { name: string; worldId: string; host: any; god: any; bridge: any; engine: any; refused: [string, string, string][]; stop(): void };
 
 /** Env as main.ts sees it on a production entity world with fake minds; set before the server modules load. */
 function env(key: string, worldId: string, dir: string) {
@@ -50,7 +52,7 @@ function env(key: string, worldId: string, dir: string) {
     ENABLE_WORLD_ENGINE: '1', SOUL_LIFECYCLE: '1', MIND_DRIVER: 'edge' });
 }
 
-export async function bootForWalk(o: { db?: string; genesis?: string; name?: string }): Promise<Booted> {
+export async function bootForWalk(o: { db?: string; genesis?: string; fuzz?: string; name?: string }): Promise<Booted> {
   const dir = mkdtempSync(join(tmpdir(), 'walk-audit-')), file = join(dir, 'sim.db');
   let worldId: string, seed: string;
   if (o.db) {
@@ -58,7 +60,7 @@ export async function bootForWalk(o: { db?: string; genesis?: string; name?: str
     else new DatabaseSync(o.db, { readOnly: true }).exec(`VACUUM INTO '${file.replace(/'/g, "''")}'`);
     const head = new DatabaseSync(file, { readOnly: true }).prepare('SELECT id, seed FROM worlds LIMIT 1').get() as { id: string; seed: string };
     worldId = head.id; seed = head.seed;
-  } else { worldId = 'walk-genesis-1'; seed = 'walk-genesis'; }
+  } else { worldId = o.fuzz ? 'walk-fuzz-1' : 'walk-genesis-1'; seed = o.fuzz ? 'walk-fuzz' : 'walk-genesis'; }
   env(worldId.replace(/-\d+$/, ''), worldId, dir);
   const { Db } = await import('../db.ts'), { WorldHost } = await import('../world.ts'), mars = await import('@sim/engine-mars');
   const { loadGroundRecipes, GroundHost } = await import('./ground-host.ts'), { GodMode } = await import('./god.ts');
@@ -68,19 +70,50 @@ export async function bootForWalk(o: { db?: string; genesis?: string; name?: str
   const factory = await mars.marsFactory({ ...mars.GREEN_FIELD_WORLD, safeCrewRemoval: true });
   const host = new WorldHost(db, factory, seed, 600, worldId); host.boot();
   const edge = new EdgeLedger(host, db);
-  const genesis = o.genesis ? JSON.parse(readFileSync(o.genesis, 'utf8')) : undefined;
+  const fuzz = o.fuzz ? (await import(o.fuzz)).fuzzWorld() as FuzzWorld : undefined;
+  const genesis = fuzz ? fuzz.genesis : o.genesis ? JSON.parse(readFileSync(o.genesis, 'utf8')) : undefined;
   const god = new GodMode(db, { genesis, worldId, ownerId: null, tick: () => host.engine.world.tick, emit: () => {} });
   new GroundHost(db, host, god); host.drainInputs();
   const bridge = installEngineBridge({ host, god, edge, log: () => {} });
   bridge.reconcile(); host.drainInputs();
-  const name = o.name ?? (o.db ? basename(o.db).replace(/\.db(\.gz)?$/, '') : basename(o.genesis!).replace(/\.json$/, '') + '-genesis');
+  const refused = fuzz ? await buildFuzz(fuzz, god, host, bridge) : [];
+  const name = o.name ?? (o.db ? basename(o.db).replace(/\.db(\.gz)?$/, '') : o.fuzz ? 'fuzz' : basename(o.genesis!).replace(/\.json$/, '') + '-genesis');
   // the copy is scratch: on the laptop it goes to the cleanup trash (lane rule: no rm), elsewhere the OS reaps tmp
   const trash = join(homedir(), '.Trash', 'eden-cleanup-20261020');
   const stop = () => { host.stop(); if (existsSync(trash)) try { renameSync(dir, join(trash, basename(dir))); } catch { /* left in tmp */ } };
-  return { name, worldId, host, god, bridge, engine: host.engine as any, stop };
+  return { name, worldId, host, god, bridge, engine: host.engine as any, refused, stop };
 }
 
-export async function walkAudit(w: Booted, shard: [number, number] = [0, 1]): Promise<WalkPart> {
+/** tools/test-harness/walk/fuzz-world.mjs: a genesis for the terrain plus god batches, one per place, and the buildings to furnish. */
+type FuzzWorld = { seed: string; genesis: unknown; build: { place: string; ops: unknown[] }[]; furnish: string[] };
+/** Build the fuzz world as a god does after the world exists: each place's batch, then `furnish <building>` (furnish.mjs) for
+ *  each building, all through god.act with the engine bridge live (so commit-time checks and repairs run). A refused batch is
+ *  scored as a bad destination of its place (`build.refused` / `furnish.refused`), never fatal, so one refusal cannot hide the rest. */
+async function buildFuzz(f: FuzzWorld, god: any, host: any, bridge: any): Promise<[string, string, string][]> {
+  const { furnishBatch } = await import('../../../../tools/god-skill/lib/furnish.mjs');
+  const out: [string, string, string][] = [], placed = new Set<string>(), t0 = performance.now();
+  const code = (r: any) => String(r.failures?.[0]?.code ?? 'unknown');
+  for (const b of f.build) {
+    const r = god.act({ ops: b.ops }, `fuzz ${b.place}`);
+    if (r.accepted) placed.add(b.place); else out.push([`build.refused.${code(r)}`, `build:${b.place}`, b.place]);
+    host.drainInputs();
+  }
+  const t1 = performance.now();
+  for (const place of f.furnish) {
+    if (!placed.has(place)) continue;
+    const fb = furnishBatch(god.model, place);
+    if (!fb.ops.length) continue;
+    const r = god.act({ ops: fb.ops }, `furnish ${place}`);
+    if (!r.accepted) out.push([`furnish.refused.${code(r)}`, `furnish:${place}`, place]);
+    host.drainInputs();
+  }
+  const t2 = performance.now();
+  bridge.reconcile(); host.drainInputs();
+  if (process.env.WALK_FUZZ_TIMES) console.error(`fuzz build ${Math.round(t1 - t0)} ms, furnish ${Math.round(t2 - t1)} ms, reconcile ${Math.round(performance.now() - t2)} ms`);
+  return out;
+}
+
+export async function walkAudit(w: Booted, shard: [number, number] = [0, 1], o: { use?: boolean } = {}): Promise<WalkPart> {
   const { heightAt } = await import('@sim/ground');
   const ms: Record<string, number> = {}, lap = (k: string, t: number) => { ms[k] = Math.round(performance.now() - t); };
   const m = w.god.model, e = w.engine, [k, n] = shard, mine = (at: readonly number[]) => shardOf(at, n) === k;
@@ -102,7 +135,14 @@ export async function walkAudit(w: Booted, shard: [number, number] = [0, 1]): Pr
   lap('targets', t); t = performance.now();
   const bad: [string, string, string][] = [];
   for (const v of e.navCheckV1(dests) as { id: string; ok: boolean; code?: string }[]) if (!v.ok) bad.push([v.code ?? 'nav.unknown', v.id, placeOf(v.id)]);
+  if (k === 0) bad.push(...w.refused);   // fuzz world: a refused build or furnish batch is a bad destination of its place
   lap('check', t); t = performance.now();
+  let unusable: [string, string, string][] | undefined;
+  if (o.use) {
+    const { useCheckFor } = await import('./walk-use.ts');
+    unusable = useCheckFor(e, mine).filter((v) => !v.ok).map((v) => [v.code ?? 'use.unknown', `use:${v.id}`, placeOf(`use:${v.id}`)] as [string, string, string]);
+    lap('use', t); t = performance.now();
+  }
   const floats: [string, number, string][] = []; let roots = 0;
   if (k === 0) {
     const ground = m.ground();
@@ -117,21 +157,21 @@ export async function walkAudit(w: Booted, shard: [number, number] = [0, 1]): Pr
   lap('floats', t);
   const by = (a: string[], b: string[]) => (a.join('\t') < b.join('\t') ? -1 : 1);
   return { schemaVersion: 1, version: WALK_AUDIT_VERSION, name: w.name, worldId: w.worldId, shard, dests: dests.length, roots,
-    bad: bad.sort(by), goalless: goalless.sort(by), floats: floats.sort((a, b) => (a[0] < b[0] ? -1 : 1)), ms };
+    bad: bad.sort(by), goalless: goalless.sort(by), floats: floats.sort((a, b) => (a[0] < b[0] ? -1 : 1)), ...(unusable ? { unusable: unusable.sort(by) } : {}), ms };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const a = process.argv.slice(2), arg = (k: string) => { const i = a.indexOf(`--${k}`); return i < 0 ? undefined : a[i + 1]; };
-  const db = arg('db'), genesis = arg('genesis'), out = arg('out'), sh = (arg('shard') ?? '0/1').split('/').map(Number) as [number, number];
+  const db = arg('db'), genesis = arg('genesis'), fuzz = arg('fuzz'), out = arg('out'), sh = (arg('shard') ?? '0/1').split('/').map(Number) as [number, number];
   if (!(sh[1] >= 1 && sh[0] >= 0 && sh[0] < sh[1])) { console.error('--shard k/n with 0 <= k < n'); process.exit(2); }
-  if (!db === !genesis) { console.error('usage: walk-audit.ts --db <copy.db|.db.gz> | --genesis <template.json> [--name n] [--shard k/n] [--out file]'); process.exit(2); }
+  if ([db, genesis, fuzz].filter(Boolean).length !== 1) { console.error('usage: walk-audit.ts --db <copy.db|.db.gz> | --genesis <template.json> | --fuzz <fuzz-world.mjs> [--use] [--name n] [--shard k/n] [--out file]'); process.exit(2); }
   const t0 = performance.now();
-  const w = await bootForWalk({ db: db && resolve(db), genesis: genesis && resolve(ROOT, genesis), name: arg('name') });
+  const w = await bootForWalk({ db: db && resolve(db), genesis: genesis && resolve(ROOT, genesis), fuzz: fuzz && resolve(ROOT, fuzz), name: arg('name') });
   const boot = Math.round(performance.now() - t0);
-  const r = await walkAudit(w, sh); r.ms = { boot, ...r.ms, total: Math.round(performance.now() - t0) };
+  const r = await walkAudit(w, sh, { use: a.includes('--use') }); r.ms = { boot, ...r.ms, total: Math.round(performance.now() - t0) };
   const text = JSON.stringify(r);
   if (out) { if (!existsSync(resolve(out, '..'))) mkdirSync(resolve(out, '..'), { recursive: true }); writeFileSync(out, text + '\n'); }
   else console.log(text);
-  console.error(`walk-audit ${r.name} ${sh.join('/')}: dests ${r.dests} bad ${r.bad.length} goalless ${r.goalless.length} floats ${r.floats.length} ms ${JSON.stringify(r.ms)}`);
+  console.error(`walk-audit ${r.name} ${sh.join('/')}: dests ${r.dests} bad ${r.bad.length} goalless ${r.goalless.length} floats ${r.floats.length}${r.unusable ? ` unusable ${r.unusable.length}` : ''} ms ${JSON.stringify(r.ms)}`);
   w.stop(); process.exit(0);
 }
