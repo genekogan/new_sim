@@ -75,7 +75,6 @@ test('the engine rescue target: a pocket gets one; open ground and an area above
 
 test('a Soul already cut off (an edit the hook did not see) steps out when its walk is refused, then walks', async t => {
   const w = world(t); await w.settle(1);
-  const edge = (w.god as any).bodies && (w as any).edge;
   await invite(w, 'cy'); const row: any = await accept(w.host, w.souls.create('dev:cy', { name: 'Cy', description: 'calm' })); await w.settle(8);
   const s = { soulId: row.id, entityId: row.entity_id, name: row.name, owner: row.owner };
   const b0 = w.host.engine.world.entities[row.entity_id]!; assert.equal(w.E.relocateHumanV1(row.entity_id, [b0.pose.p[0] + 15, b0.pose.p[2]]), true); await w.settle(2);
@@ -88,5 +87,4 @@ test('a Soul already cut off (an edit the hook did not see) steps out when its w
   assert.equal(out.accepted, true, JSON.stringify(out));
   const ev = w.db.events(w.host.worldId).filter((e: any) => e.kind === 'edge-relocate' && e.payload.policy === 'nav-connect/1');
   assert.equal(ev.length, 1, 'one logged step out'); assert.match(ev[0].payload.why, /nav-connect\/1: stood cut off \(nav\.disconnected\)/);
-  void edge;
 });
