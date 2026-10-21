@@ -155,7 +155,10 @@ export function linkEdgeTest(link: Link, ascending: boolean, ge: LevelGrid, gx: 
   // one cell wide, so a point on the corridor's centre line can fall on a cell beside it (hillside-home-1: 0.31 m where
   // 0.34 is needed) and the way down was refused while arriving, which snaps within 0.4 m, was not: one-way upstairs.
   // A cell with room keeps its point, so every link that passed before is read exactly as before.
-  if (ca >= 0 && ge.clearance[ca] < r) { const s = snap(ge, approach, r, ge.cell * 1.5); if (s >= 0) { ca = s; approach = centreOf(ge, s); } }
+  // The same goes for a stair foot in an alcove (lane WALK2): the point 0.7 m back from eden-house-3/4's kitchen stairs
+  // falls 0.2 m off the stove beside the flight (0.15 m of room) while the alcove's middle has 0.7 m, so the stairs were
+  // never climbed. Departure searches within 0.4 m, as arrival snaps (cx); the approach-to-entry segment test still holds.
+  if (ca >= 0 && ge.clearance[ca] < r) { const s = snap(ge, approach, r, 0.4); if (s >= 0) { ca = s; approach = centreOf(ge, s); } }
   // Leaving a level by a link: the approach-to-entry segment needs room for the body itself. Arriving by the same link
   // only snaps to standing room near the far approach (cx), so a stricter departure test (0.9 x the planning radius)
   // let wider bodies climb past furniture beside a stair top and then strand them up there (Eden 2026 tower: top-entry

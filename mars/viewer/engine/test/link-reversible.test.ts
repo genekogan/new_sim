@@ -57,3 +57,21 @@ test('a stair top whose approach point falls on a cell one short of room departs
   }
   assert.ok(exercised > 0, 'the fixture puts the approach on a cell short of room with room beside it');
 });
+
+test('a stair foot whose approach point falls by a stove departs from the room within 0.4 m, as arriving does (lane WALK2)', () => {
+  // eden-house-3/4 kitchens: the point 0.7 m back from the foot lay 0.2 m off the stove beside the flight (0.15 m of room)
+  // while the alcove's middle had 0.7 m, so the stairs were never climbed (arriving down snaps within 0.4 m and worked).
+  const p = body(HUMAN_PROFILE.radius), r = p.radius + 0.06;
+  let exercised = 0;
+  for (let gap = 0.1; gap <= 0.3; gap += 0.01) {
+    const s = scene(0), link = s.links[0];
+    s.obstacles = [{ id: 'stove', obb: obb([gap + 0.4, -3.0], [0.4, 0.3]), y0: 0, y1: 1.2, kind: 'component' }] as SpatialScene['obstacles'];
+    const grids = buildGrids(s), g0 = grids.levels.get(0)!, up = linkApproach(link, true);
+    if (snap(g0, up.approach, r, 0.15) >= 0 || snap(g0, up.approach, r, 0.4) < 0) continue;
+    exercised++;
+    const climb = findRoute(grids, s, p, { level: 0, p: [-2, -4] }, { level: 1, p: [-2, 3] });
+    assert.equal(climb.ok, true, `it climbs up (gap ${gap.toFixed(2)}, approach cell ${clearanceAt(g0, up.approach).toFixed(3)} m): ${climb.ok ? '' : climb.diagnostic.message}`);
+    assert.equal(findRoute(grids, s, p, { level: 1, p: [-2, 3] }, { level: 0, p: [-2, -4] }).ok, true, `it comes back down (gap ${gap.toFixed(2)})`);
+  }
+  assert.ok(exercised > 0, 'the fixture puts the foot approach by the stove with room within 0.4 m only');
+});
