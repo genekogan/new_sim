@@ -1836,14 +1836,15 @@ export class MarsEngine implements Engine {
   /** lane NAV (nav-connect/1, connectivity.ts): the world's level-0 connectivity, relabelled for what changed since the last
    *  read (only the edited ground tiles on a ground world). The main area is the one holding the arrival point. Pure read. */
   private conn?:NavConnectivity;
-  connectivityV1():NavConnectivity{
-    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);
-    if(!this.conn||this.conn.spatial!==spatial)this.conn=new NavConnectivity(spatial,{anchors:()=>[this.rt.world.groundV1?groundArrival(this.rt,this.cfg.arrival):this.cfg.arrival]});
-    this.conn.update();return this.conn;
-  }
+  connectivityV1():NavConnectivity{this.navWarmV1(Infinity);return this.conn!;}
   /** lane NAV: is each standing point connected to the main walkable area (levels and stairs as the planner sees them)?
    *  Points off the main component, and upper floors, are settled by the planner (reachV1 to the nearest main point). */
-  navCheckV1(points:ConnPoint[]):ConnVerdict[]{const c=this.connectivityV1();return this.readPassV1(()=>c.check(points,(a,b)=>this.reachV1(a,b).ok));}
+  navCheckV1(points:ConnPoint[]):ConnVerdict[]{return this.connectivityV1().check(points);}
+  /** lane NAV: label up to `budgetMs` of the world's still-unlabelled tiles (a background warm-up after boot or an edit, so
+   *  a later check costs only what changed). True when the labels are complete. */
+  navWarmV1(budgetMs:number):boolean{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);
+    if(!this.conn||this.conn.spatial!==spatial)this.conn=new NavConnectivity(spatial,{anchors:()=>[this.rt.world.groundV1?groundArrival(this.rt,this.cfg.arrival):this.cfg.arrival]});
+    return this.conn.update(budgetMs);}
   /** lane NAV: the nearest point of the main walkable area to p with room to stand, away from other bodies (rescue target). */
   navNearestMainV1(p:[number,number],except?:string,maxR=40):[number,number]|null{
     const c=this.connectivityV1(),people=listEntities(this.ents).filter((o:any)=>o.kind==='human'&&o.id!==except&&(o.human?.level??0)===0).map((o:any)=>[o.pose.p[0],o.pose.p[2]] as [number,number]);
@@ -1857,7 +1858,7 @@ export class MarsEngine implements Engine {
       for(const slot of fixtureSlots(this.rt,e)){if(slot.kind!=='seat'&&slot.kind!=='berth')continue;const a=seatApproach(this.rt,slot);if(!Array.isArray(a))continue;out.push({id:slot.id,of:id,kind:slot.kind,p:[a[0],a[1]],level:slot.level??0,tol:.5});}}
     for(const id of Object.keys(w.regions).sort()){const r=w.regions[id];if(r.kind==='no-go'||!r.polygon?.length)continue;
       const xs=r.polygon.map((v:any)=>v[0]),zs=r.polygon.map((v:any)=>v[1]),ctr=centroid(r.polygon) as [number,number];let best:[number,number]|null=null,bd=Infinity;
-      for(let x=Math.min(...xs)+.5;x<Math.max(...xs);x+=1)for(let z=Math.min(...zs)+.5;z<Math.max(...zs);z+=1){if(!inPoly(x,z,r.polygon))continue;const d=hypot(x-ctr[0],z-ctr[1]);if(d<bd&&c.rootAt([x,z])===c.main){best=[x,z];bd=d;}}
+      for(let x=Math.min(...xs)+.5;x<Math.max(...xs);x+=1)for(let z=Math.min(...zs)+.5;z<Math.max(...zs);z+=1){if(!inPoly(x,z,r.polygon))continue;const d=hypot(x-ctr[0],z-ctr[1]);if(d<bd&&c.connectedRoot(c.rootAt([x,z]))){best=[x,z];bd=d;}}
       out.push({id,of:id,kind:'region',p:best??ctr,level:0,tol:.5});}
     return out;
   }

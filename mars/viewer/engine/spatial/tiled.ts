@@ -312,7 +312,7 @@ export class GroundNav {
   }
 
   /** One tile's fine level-0 raster: ground media, then obstacles in the body band above the ground there, then the exact EDT. */
-  fineTile(tx: number, tz: number, rel: Obstacle[], key = this.keyOf(tx, tz, rel)): FineTile {
+  fineTile(tx: number, tz: number, rel: Obstacle[], key = this.keyOf(tx, tz, rel), keep = true): FineTile {
     const hit = this.fine.get(key);
     if (hit) { this.fine.delete(key); this.fine.set(key, hit); this.stats.fineHits++; return hit; }
     this.stats.fineBuilds++;
@@ -329,6 +329,9 @@ export class GroundNav {
       t.clearance.set(clear.subarray(src, src + per), j * per);
       t.blk.set(blk.subarray(src, src + per), j * per);
     }
+    // keep = false (the connectivity audit labelling every tile once): a miss is built and handed back without evicting the
+    // tiles the engine's windows are using
+    if (!keep) return t;
     this.fine.set(key, t);
     while (this.fine.size > this.fineMax) this.fine.delete(this.fine.keys().next().value!);
     return t;
@@ -621,7 +624,8 @@ function floorKey(scene: SpatialScene, same: SpatialScene['levels'], id: number,
   return out.join(';');
 }
 
-function boxesOf(obstacles: Obstacle[]): Float64Array {
+/** Per obstacle its world AABB [minX, minZ, maxX, maxZ] (4 floats each), memoised per (never mutated) list. */
+export function boxesOf(obstacles: Obstacle[]): Float64Array {
   const hit = boxesMemo.get(obstacles);
   if (hit && hit.n === obstacles.length) return hit.b;
   const b = new Float64Array(obstacles.length * 4);

@@ -140,6 +140,23 @@ export function findRoute(grids: GridSet, scene: SpatialScene, profile: AgentPro
   return assemble(grids, prep, start, goal, found, found.expanded);
 }
 
+/**
+ * The planner's test for one link edge (prepare): may a body (planning radius r, body radius `radius`) leave grid `ge` by
+ * this link end and arrive on grid `gx`? `ca` = the approach cell on ge, `cx` = the standing cell it lands on (snapped
+ * within 0.4 m of the far end's approach). Shared with the connectivity audit (connectivity.ts): both read links alike.
+ */
+export function linkEdgeTest(link: Link, ascending: boolean, ge: LevelGrid, gx: LevelGrid, r: number, radius: number): { ok: boolean; ca: number; cx: number; approach: Vec2; far: Vec2 } {
+  const { entry, approach } = linkApproach(link, ascending);
+  const far = linkApproach(link, !ascending).approach;
+  const ca = cellOf(ge, approach), cx = snap(gx, far, r, 0.4);
+  // Leaving a level by a link: the approach-to-entry segment needs room for the body itself. Arriving by the same link
+  // only snaps to standing room near the far approach (cx), so a stricter departure test (0.9 x the planning radius)
+  // let wider bodies climb past furniture beside a stair top and then strand them up there (Eden 2026 tower: top-entry
+  // clearance 0.311 m, a 0.289 m body needed 0.314). Body radius on both sides keeps every link reversible.
+  const ok = ca >= 0 && ge.clearance[ca] >= r && cx >= 0 && segmentClearance(ge, approach, entry.p) >= Math.min(r * 0.9, radius);
+  return { ok, ca, cx, approach, far };
+}
+
 /** Snap start/goal and build the contextual link edges; a failure is the final diagnostic. */
 function prepare(grids: GridSet, scene: SpatialScene, profile: AgentProfile, start: Place, goal: Place, opts: RouteOpts): Prep | RouteResult {
   // plan with a margin above the body radius: corridor clearance is sampled at cell centres, and
@@ -150,7 +167,6 @@ function prepare(grids: GridSet, scene: SpatialScene, profile: AgentProfile, sta
   const L = layoutOf(grids, lvIds);
   const gs = grids.levels.get(start.level), gg = grids.levels.get(goal.level);
   if (!gs || !gg) return fail('route.unknown-level', `level ${!gs ? start.level : goal.level} does not exist`);
-  const passable = (g: LevelGrid, c: number) => c >= 0 && g.clearance[c] >= r;
   const s = snap(gs, start.p, r, opts.startTolerance ?? 0.5);
   const near = (g: LevelGrid, p: Vec2, tol: number) => (opts.nameObstacles ? obstaclesNear(scene, g, p, r + tol + grids.cell, opts.nameObstacles) : undefined);
   if (s < 0)
@@ -169,13 +185,8 @@ function prepare(grids: GridSet, scene: SpatialScene, profile: AgentProfile, sta
       const { entry, approach, exit } = linkApproach(link, ascending);
       const ge = grids.levels.get(entry.level), gx = grids.levels.get(exit.level);
       if (!ge || !gx) continue;
-      const far = linkApproach(link, !ascending).approach;
-      const ca = cellOf(ge, approach), cx = snap(gx, far, r, 0.4);
-      // Leaving a level by a link: the approach-to-entry segment needs room for the body itself. Arriving by the same link
-      // only snaps to standing room near the far approach (cx), so a stricter departure test (0.9 x the planning radius)
-      // let wider bodies climb past furniture beside a stair top and then strand them up there (Eden 2026 tower: top-entry
-      // clearance 0.311 m, a 0.289 m body needed 0.314). Body radius on both sides keeps every link reversible.
-      if (!passable(ge, ca) || cx < 0 || segmentClearance(ge, approach, entry.p) < Math.min(r * 0.9, profile.radius)) {
+      const { ok, ca, cx, far } = linkEdgeTest(link, ascending, ge, gx, r, profile.radius);
+      if (!ok) {
         dropped?.push({ level: entry.level, at: [approach, entry.p], farLevel: exit.level, far });
         continue;
       }
@@ -593,7 +604,8 @@ function walkLeg(g: LevelGrid, raw: Vec2[], r: number, _final = false): WalkLeg 
   return { kind: 'walk', level: g.level, points: out, minClearance };
 }
 
-function snap(g: LevelGrid, p: Vec2, r: number, tol: number): number {
+/** The planner's snap: the cell at p when its clearance is >= r, else the nearest such cell within tol (-1: none). */
+export function snap(g: LevelGrid, p: Vec2, r: number, tol: number): number {
   const c = cellOf(g, p);
   if (c >= 0 && g.clearance[c] >= r) return c;
   if (c < 0) return -1;
