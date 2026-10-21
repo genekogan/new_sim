@@ -168,7 +168,7 @@ const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…`
 type ShotPin = { eye: number[]; at: number[]; lifted: number; closer: number; raised: number };
 const shotPin = (): ShotPin | null => { const p = (window as unknown as { __shotCamera?: ShotPin }).__shotCamera; return p && p.eye?.length === 3 && p.at?.length === 3 && [...p.eye, ...p.at].every(Number.isFinite) ? p : null; };
 
-export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerState, onInitialProgress, hideControls = false, embedded = false, hideSoulInfo = false, publishSpeechAnchors = false, humanPresets = false, viewportInsets, depictionBeatAt, edenExpansion = false, localClassroomPresentation, bootWorldId }: {
+export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerState, onInitialProgress, hideControls = false, embedded = false, hideSoulInfo = false, publishSpeechAnchors = false, humanPresets = false, viewportInsets, depictionBeatAt, edenExpansion = false, edenExpected = false, localClassroomPresentation, bootWorldId }: {
   sim: Sim; selected: string | null; onSelect(id: string | null): void;
   onViewerHandle?(handle: WorldViewerHandle | null): void;
   onViewerState?(state: WorldViewerState): void;
@@ -188,6 +188,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   depictionBeatAt?: WorldBeatSampler;
   /** Optional current-world composition; new scenery has no native authority. */
   edenExpansion?:boolean;
+  /** The configured world will show the old Eden town once its welcome confirms it: fetch that chunk now. */
+  edenExpected?:boolean;
   localClassroomPresentation?:LocalClassroomPresentation;
   /** Lane W1: a new world's page world id; the scene then starts before the socket's welcome (scene-owner.ts). */
   bootWorldId?:string;
@@ -242,6 +244,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
 
   // a Soul picked elsewhere (the table, my Soul) replaces a picked thing
   useEffect(() => { if (selected) setThing(null); }, [selected]);
+  useEffect(() => { if (edenExpected) void loadOldEden().catch(() => {}); }, [edenExpected]);
 
   useEffect(() => {
     // The first welcome supplies the world/epoch that owns this scene; a new world's page starts it from its own world

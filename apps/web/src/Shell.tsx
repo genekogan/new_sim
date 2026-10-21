@@ -164,6 +164,8 @@ export function Shell({ cfg, auth: providerAuth, arrivalEnabled=false,humanPrese
   const mine = new Set(currentMe?.souls ?? []);
   const inspect = (id: string | null) => { setSelected(id); if (id) revealPanel(); };
   const edenExpansion=edenExperienceEnabled(location.hostname,worldPath,cfg.worldId,sim.conn.welcome?.worldId,qualifiedEdenWorlds);
+  // P1 phones (F12): the page that will show the old Eden town asks for its chunk before the welcome (it came ~1.3 s late)
+  const edenExpected=edenExperienceEnabled(location.hostname,worldPath,cfg.worldId,cfg.worldId,qualifiedEdenWorlds);
   const tourHandle=viewerHandle;
   const exploreSeen=useRef(false),exploreOn=exploreAvailable(exploreSeen.current,viewerState);exploreSeen.current=exploreOn;  // V1: a viewer blip no longer unmounts Explore
   const exploreLocations=arrivalOver()?viewerHandle?.locations?.()??[]:[];  // P7b: the first scan of the world's views (~0.12 s on a 4x phone) waits for the card
@@ -173,7 +175,7 @@ export function Shell({ cfg, auth: providerAuth, arrivalEnabled=false,humanPrese
   return (
     <div ref={frame} className={`human-world ${advanced ? 'has-advanced' : ''}`}>
       {!launcherWorld&&<OldWorldApprovals linkId={approvalId} auth={auth} accountAuthRequired={cfg.accountAuthRequired===true} onLinkDone={()=>{setApprovalId(null);history.replaceState(null,'',location.pathname+location.search+'#watch');}}/>}
-      <div className="world-scene"><LiveWorld sim={sim} selected={selected} onSelect={inspect} embedded bootWorldId={launcherWorld?cfg.worldId:undefined} {...{edenExpansion,localClassroomPresentation,publishSpeechAnchors:!advanced,humanPresets:humanPresetsEnabled&&edenExpansion}} hideControls={!advanced} hideSoulInfo={!advanced} viewportInsets={viewportInsets} onViewerHandle={receiveHandle} onViewerState={receiveState} onInitialProgress={advanced ? undefined : setInitialProgress} /></div>
+      <div className="world-scene"><LiveWorld sim={sim} selected={selected} onSelect={inspect} embedded bootWorldId={launcherWorld?cfg.worldId:undefined} {...{edenExpansion,edenExpected,localClassroomPresentation,publishSpeechAnchors:!advanced,humanPresets:humanPresetsEnabled&&edenExpansion}} hideControls={!advanced} hideSoulInfo={!advanced} viewportInsets={viewportInsets} onViewerHandle={receiveHandle} onViewerState={receiveState} onInitialProgress={advanced ? undefined : setInitialProgress} /></div>
       <VisitorWelcome key={privatePanelKey} api={api} siteApi={siteApi} worldPath={worldPath} ownerId={currentMe?.userId??null} worldId={cfg.worldId} worldName={worldName} build={cfg.build} handle={viewerHandle} state={viewerState}/>
       <WorldSpeechOverlay root={frame} sim={sim} state={viewerState} active={!advanced} handle={viewerHandle}/>
       {!advanced && <ViewerFrame handle={viewerHandle} state={viewerState} dt={sim.conn.welcome?.dt ?? 0.05} navigationOpen={navigationOpen} onNavigationChange={setNavigationOpen} onNavigationOpen={openNavigation} worldTime={worldTimeText(worldClockAt((sim as Sim&{takes?:{chunks?:unknown[]}|null}).takes?.chunks,viewerState?.shownTick))} connected={!connectionLost(sim.conn)} connecting={!sim.conn.welcome} worldName={worldName} followName={viewerState?.cameraMode === 'follow' ? r.souls.get(viewerState.selection.soulId ?? '')?.name ?? null : null} slots={{ status: statusSlot, camera: cameraSlot }} initial={initialProgress} />}
