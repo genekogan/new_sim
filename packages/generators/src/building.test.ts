@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildingLayout, buildingPhysics } from './building.ts';
+import { LANDING_W, MIN_STAIR_W } from './building-plan.ts';
 import { pointInPoly } from './geom.ts';
 import type { Baked, LocalOBB } from './types.ts';
 
@@ -211,4 +212,18 @@ test('narrow townhouse (Eden 2026 canal homes, 5.2 m): the upper flights narrow 
   }
   // a townhouse wide enough for full flights is unchanged
   for (const s of buildingLayout({ style: 'townhouse', w: 6, d: 10, floors: 3 }).stairs) assert.equal(s.width, 0.95);
+});
+
+test('two flights facing across a stair hall narrow to keep a landing strip a turned building\'s walk grid passes (apartment block, lane BSGEN)', () => {
+  // core/apartment-block: the ground flight on the hall's west wall arrives on landing-1, whose flight leaves from the east
+  // wall; at full width (0.95 m) the strip between them was 0.98 m, which the walk grid of a turned block cuts (the upper
+  // flats sealed off: fuzz walk world 573 -> 173 bad over four turned blocks). Both narrow, keep their wall side and the doors.
+  const plan = {"floors":[{"rooms":[{"id":"hall","rect":[4.5,4,7.5,11]},{"id":"flat-1","rect":[0,4,4.5,11]},{"id":"flat-2","rect":[7.5,4,12,11]},{"id":"flat-3","rect":[0,0,6,4]},{"id":"flat-4","rect":[6,0,12,4]}],"doors":[{"between":["hall","flat-1"]},{"between":["hall","flat-2"]},{"between":["hall","flat-3"]},{"between":["hall","flat-4"]}],"exterior":[{"room":"hall","wall":"s","kind":"door","at":0.5,"width":1.2}]},{"rooms":[{"id":"landing-1","rect":[4.5,4,7.5,11]},{"id":"flat-5","rect":[0,4,4.5,11]},{"id":"flat-6","rect":[7.5,4,12,11]},{"id":"flat-7","rect":[0,0,6,4]},{"id":"flat-8","rect":[6,0,12,4]}],"doors":[{"between":["landing-1","flat-5"]},{"between":["landing-1","flat-6"]},{"between":["landing-1","flat-7"]},{"between":["landing-1","flat-8"]}],"exterior":[]},{"rooms":[{"id":"landing-2","rect":[4.5,4,7.5,11]},{"id":"flat-9","rect":[0,4,4.5,11]},{"id":"flat-10","rect":[7.5,4,12,11]},{"id":"flat-11","rect":[0,0,6,4]},{"id":"flat-12","rect":[6,0,12,4]}],"doors":[{"between":["landing-2","flat-9"]},{"between":["landing-2","flat-10"]},{"between":["landing-2","flat-11"]},{"between":["landing-2","flat-12"]}],"exterior":[]}],"stairs":[{"from":0,"to":1,"room":"hall","wall":"w","at":1},{"from":1,"to":2,"room":"landing-1","wall":"e","at":1}],"size":[12,11]};
+  const L: any = buildingLayout({ w: 12, d: 11, floors: 3, floorHeight: 2.8, roof: 'flat', plan });
+  const [a, b] = L.stairs.map((s: any) => s.rect);
+  assert.ok(b[0] - a[2] >= LANDING_W - 1e-6, `landing strip ${(b[0] - a[2]).toFixed(2)} m`);
+  for (const r of [a, b]) assert.ok(r[2] - r[0] >= MIN_STAIR_W - 1e-6, `flight width ${(r[2] - r[0]).toFixed(2)}`);
+  assert.ok(Math.abs(a[0] + 1.44) < 0.02 && Math.abs(b[2] - 1.44) < 0.02, 'each keeps its wall side');
+  const doors = L.openings.filter((o: any) => o.kind === 'door' && o.from === 'landing-1').map((o: any) => o.at.map((x: number) => +x.toFixed(2)));
+  assert.deepEqual(doors, [[-1.5, 0.09], [1.5, 0.09], [-0.75, -1.5], [0.75, -1.5]], 'doors stay where the full-width flights put them');
 });
