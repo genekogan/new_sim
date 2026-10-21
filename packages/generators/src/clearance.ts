@@ -55,6 +55,19 @@ export type WayKey = Vec2 | { pts: Vec2[]; r: number };
 export type WayRoom = { polygon: Vec2[]; floor: number; id: string };
 
 const inPoly = (poly: Vec2[], x: number, z: number) => { let k = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) k = !k; } return k; };
+/** inPoly for many points: the same crossing test on flat arrays, a point off the polygon's bounds outside without one
+ *  (no edge straddles a z beyond them; every straddling edge crosses right of a point left of them, an even count; x
+ *  keeps 1e-6 m of slack for rounding in the crossing). */
+const insideOf = (poly: Vec2[]) => {
+  const n = poly.length, px = Float64Array.from(poly, (p) => p[0]), pz = Float64Array.from(poly, (p) => p[1]);
+  const xa = Math.min(...px) - 1e-6, xb = Math.max(...px) + 1e-6, za = Math.min(...pz), zb = Math.max(...pz);
+  return (x: number, z: number) => {
+    if (z < za || z >= zb || x < xa || x > xb) return false;
+    let k = false;
+    for (let i = 0, j = n - 1; i < n; j = i++) { const xi = px[i], zi = pz[i], xj = px[j], zj = pz[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) k = !k; }
+    return k;
+  };
+};
 const inBox = (b: WayBlocker, x: number, z: number, r: number) => { const c = Math.cos(b.yaw), s = Math.sin(b.yaw), dx = x - b.c[0], dz = z - b.c[1]; return Math.abs(dx * c - dz * s) < b.half[0] + r && Math.abs(dx * s + dz * c) < b.half[1] + r; };
 
 /** The keys of a room: 0.45 m inside each of its doorways, and each stair end's step-off point on its floor. */
@@ -92,36 +105,111 @@ export type WayPose = { x: number; z: number; yaw: number; s?: number };
 /** The group each key falls in (a body walking inside `room` past `blockers`); a key with no room to stand is in none
  *  (a negative label of its own). `r` overrides every blocker's clearance (m, exact rule only). */
 export function wayLabels(room: { polygon: Vec2[] }, keys: WayKey[], blockers: WayBlocker[], o: { r?: number; pose?: WayPose } = {}): number[] {
+  return wayGrid(room, blockers, o).labels(keys);
+}
+/** A room's walk grid past some blockers: label keys on it, or add one more blocker. Adding redoes only the cells near the
+ *  new blocker (a blocker only ever takes cells away), so furnishing tries pose after pose on one grid per room. */
+export type WayGrid = { labels(keys: WayKey[], hint?: WayHint): number[]; plus(b: WayBlocker): WayGrid };
+/** Where each key stood on a grid (filled by labels): on a grid with more blockers a key whose cell is still free stands
+ *  there again (the nearest free cell of fewer free cells, when it is still free, is the same one). */
+export type WayHint = { cells: number[] };
+export function wayGrid(room: { polygon: Vec2[] }, blockers: WayBlocker[], o: { r?: number; pose?: WayPose } = {}): WayGrid {
   const g = o.pose && o.r === undefined ? rasterFree(room, blockers, o.pose) : exactFree(room, blockers, o.r);
-  const { nx, nz, free, cellOf } = g, lab = new Int32Array(nx * nz).fill(-1);
-  let next = 0;
-  return keys.map((k) => {
+  const of = (g: FreeGrid): WayGrid => ({ labels: (keys, hint) => labelsOn(g, keys, hint), plus: (b) => of(g.plus(b)) });
+  return of(g);
+}
+// labelsOn's work arrays, kept between calls (furnishing labels thousands of grids): lab -1 and keyCell 0 on [0, n)
+let buf = { lab: new Int32Array(0), st: new Int32Array(0), keyCell: new Uint8Array(0) };
+const scratch = (n: number) => {
+  if (buf.lab.length < n) buf = { lab: new Int32Array(n), st: new Int32Array(n), keyCell: new Uint8Array(n) };
+  buf.lab.fill(-1, 0, n); buf.keyCell.fill(0, 0, n);
+  return buf;
+};
+function labelsOn({ nx, nz, free, cellOf }: FreeGrid, keys: WayKey[], hint?: WayHint): number[] {
+  const was = hint?.cells, cells = keys.map((k, n) => {
+    const h = was?.[n]; if (h !== undefined && h >= 0 && free[h]) return h;
     const { pts, r } = Array.isArray(k) ? { pts: [k as Vec2], r: 0.3 } : k as { pts: Vec2[]; r: number };
-    const c0 = cellOf(pts, r); if (c0 < 0) return -1 - next++;
-    if (lab[c0] < 0) { const L = next++, st = [c0]; lab[c0] = L; while (st.length) { const c = st.pop()!, i = c % nx, j = Math.floor(c / nx); for (const [a, b] of [[i + 1, j], [i - 1, j], [i, j + 1], [i, j - 1]]) { if (a < 0 || b < 0 || a >= nx || b >= nz) continue; const q = b * nx + a; if (free[q] && lab[q] < 0) { lab[q] = L; st.push(q); } } } }
+    return cellOf(pts, r);
+  });
+  if (hint) hint.cells = cells;
+  // 4-connected floods from each key's cell in turn (a cell is labelled when pushed); a flood stops once every key's cell
+  // is labelled, as no later key then reads an unlabelled cell
+  const { lab, st, keyCell } = scratch(nx * nz);
+  let pending = 0;
+  for (const c of cells) if (c >= 0 && !keyCell[c]) { keyCell[c] = 1; pending++; }
+  let next = 0;
+  return cells.map((c0) => {
+    if (c0 < 0) return -1 - next++;
+    if (lab[c0] < 0) {
+      const L = next++; let n = 0; lab[c0] = L; st[n++] = c0; pending--;
+      while (n && pending) {
+        const c = st[--n], i = c % nx;
+        let q = c + 1; if (i + 1 < nx && free[q] && lab[q] < 0) { lab[q] = L; st[n++] = q; pending -= keyCell[q]; }
+        q = c - 1; if (i > 0 && free[q] && lab[q] < 0) { lab[q] = L; st[n++] = q; pending -= keyCell[q]; }
+        q = c + nx; if (q < nx * nz && free[q] && lab[q] < 0) { lab[q] = L; st[n++] = q; pending -= keyCell[q]; }
+        q = c - nx; if (q >= 0 && free[q] && lab[q] < 0) { lab[q] = L; st[n++] = q; pending -= keyCell[q]; }
+      }
+    }
     return lab[c0];
   });
 }
-type FreeGrid = { nx: number; nz: number; free: Uint8Array; cellOf(pts: Vec2[], r: number): number; world(i: number, j: number): Vec2 };
-/** The free cell nearest any of `pts` within r (room frame), on a grid whose cell centres are `centre(i, j)`. */
-function nearest(nx: number, nz: number, free: Uint8Array, centre: (i: number, j: number) => Vec2, pts: Vec2[], r: number): number {
-  let best = -1, bd = Infinity;
-  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
-    const q = j * nx + i; if (!free[q]) continue;
-    const c = centre(i, j);
-    for (const [x, z] of pts) { const d = Math.hypot(c[0] - x, c[1] - z); if (d <= r && d < bd) { bd = d; best = q; } }
-  }
-  return best;
+type FreeGrid = { nx: number; nz: number; free: Uint8Array; cellOf(pts: Vec2[], r: number): number; world(i: number, j: number): Vec2; plus(b: WayBlocker): FreeGrid };
+/** The free cell nearest any of `pts` within r (room frame), on a grid whose cell centres (room frame) are (cx[q], cz[q]),
+ *  as a whole-grid scan finds it (the first of equals in scan order). `at` are the pts in grid index coordinates and f the
+ *  grid cells per room-frame metre: only cells that can be within r are read, and once a near window finds a cell only those
+ *  as near as it. */
+function nearest(nx: number, nz: number, free: Uint8Array, cx: Float64Array, cz: Float64Array, pts: Vec2[], r: number, at: Vec2[], f: number): number {
+  const r2 = r * r * (1 + 1e-9) + 1e-12;
+  const scan = ([ia, ib, ja, jb]: [number, number, number, number]): [number, number] => {
+    let best = -1, bd = Infinity;
+    for (let j = ja; j <= jb; j++) for (let i = ia; i <= ib; i++) {
+      const q = j * nx + i; if (!free[q]) continue;
+      for (const [x, z] of pts) {
+        // squares first: a cell surely beyond r or the best so far skips the exact hypot (1e-9 relative slack for rounding)
+        const dx = cx[q] - x, dz = cz[q] - z, d2 = dx * dx + dz * dz;
+        if (d2 > r2 || d2 > bd * bd * (1 + 1e-9) + 1e-12) continue;
+        const d = Math.hypot(dx, dz); if (d <= r && d < bd) { bd = d; best = q; }
+      }
+    }
+    return [best, bd];
+  };
+  const [b1, d1] = scan(windowOf(nx, nz, at, Math.min(r, 0.8) * f));
+  return scan(windowOf(nx, nz, at, (b1 >= 0 ? d1 : r) * f))[0];
+}
+/** The cell centres of an nx by nz grid, as coordinate arrays. */
+function centresOf(nx: number, nz: number, centre: (i: number, j: number) => Vec2): [Float64Array, Float64Array] {
+  const cx = new Float64Array(nx * nz), cz = new Float64Array(nx * nz);
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const [x, z] = centre(i, j); cx[j * nx + i] = x; cz[j * nx + i] = z; }
+  return [cx, cz];
+}
+/** Index bounds (clamped) of the cells whose centres can lie within `reach` of the points (grid coordinates u = i, v = j). */
+function windowOf(nx: number, nz: number, at: Vec2[], reach: number): [number, number, number, number] {
+  const us = at.map((p) => p[0]), vs = at.map((p) => p[1]);
+  return [Math.max(0, Math.floor(Math.min(...us) - reach) - 1), Math.min(nx - 1, Math.ceil(Math.max(...us) + reach) + 1),
+    Math.max(0, Math.floor(Math.min(...vs) - reach) - 1), Math.min(nz - 1, Math.ceil(Math.max(...vs) + reach) + 1)];
 }
 function exactFree(room: { polygon: Vec2[] }, blockers: WayBlocker[], rAll?: number): FreeGrid {
   const CELL = NAV_CELL, xs = room.polygon.map((p) => p[0]), zs = room.polygon.map((p) => p[1]);
   const x0 = Math.min(...xs), z0 = Math.min(...zs), nx = Math.ceil((Math.max(...xs) - x0) / CELL), nz = Math.ceil((Math.max(...zs) - z0) / CELL);
   const rOf = (b: WayBlocker) => rAll ?? clearR(rasterOf(b));
-  const near = blockers.map((b) => ({ b, r: rOf(b), reach: Math.hypot(b.half[0], b.half[1]) + rOf(b) }))
-    .filter(({ b, reach }) => b.c[0] + reach > x0 && b.c[0] - reach < x0 + nx * CELL && b.c[1] + reach > z0 && b.c[1] - reach < z0 + nz * CELL);
-  const free = new Uint8Array(nx * nz), centre = (i: number, j: number): Vec2 => [x0 + (i + 0.5) * CELL, z0 + (j + 0.5) * CELL];
-  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const [x, z] = centre(i, j); free[j * nx + i] = inPoly(room.polygon, x, z) && !near.some(({ b, r }) => inBox(b, x, z, r)) ? 1 : 0; }
-  return { nx, nz, free, cellOf: (pts, r) => nearest(nx, nz, free, centre, pts, r), world: centre };
+  const nearOf = (b: WayBlocker) => { const r = rOf(b), reach = Math.hypot(b.half[0], b.half[1]) + r; return b.c[0] + reach > x0 && b.c[0] - reach < x0 + nx * CELL && b.c[1] + reach > z0 && b.c[1] - reach < z0 + nz * CELL ? { b, r } : null; };
+  const near = blockers.map(nearOf).filter((x) => x !== null);
+  const centre = (i: number, j: number): Vec2 => [x0 + (i + 0.5) * CELL, z0 + (j + 0.5) * CELL], [cx, cz] = centresOf(nx, nz, centre);
+  const grid = (free: Uint8Array): FreeGrid => ({
+    nx, nz, free, world: centre,
+    cellOf: (pts, r) => nearest(nx, nz, free, cx, cz, pts, r, pts.map(([x, z]): Vec2 => [(x - x0) / CELL - 0.5, (z - z0) / CELL - 0.5]), 1 / CELL),
+    plus(b) {
+      const n = nearOf(b); if (!n) return grid(free);
+      const out = free.slice(), e = (b.half[0] + b.half[1] + 2 * n.r) / CELL;
+      const [ia, ib, ja, jb] = windowOf(nx, nz, [[(b.c[0] - x0) / CELL - 0.5, (b.c[1] - z0) / CELL - 0.5]], e);
+      for (let j = ja; j <= jb; j++) for (let i = ia; i <= ib; i++) { const q = j * nx + i; if (out[q] && inBox(b, cx[q], cz[q], n.r)) out[q] = 0; }
+      return grid(out);
+    },
+  });
+  const free = new Uint8Array(nx * nz);
+  const inside = insideOf(room.polygon);
+  for (let q = 0; q < nx * nz; q++) free[q] = inside(cx[q], cz[q]) && !near.some(({ b, r }) => inBox(b, cx[q], cz[q], r)) ? 1 : 0;
+  return grid(free);
 }
 /** The walk raster over the room at `pose`: a blocker blocks every cell it touches (conservative) or whose centre it covers
  *  (centre); a cell inside the room is walked when its centre is PLAN_R + half a cell or more from every blocked centre
@@ -135,13 +223,13 @@ function rasterFree(room: { polygon: Vec2[] }, blockers: WayBlocker[], pose: Way
   const i0 = Math.floor((Math.min(...poly.map((p) => p[0])) - reach) / CELL), j0 = Math.floor((Math.min(...poly.map((p) => p[1])) - reach) / CELL);
   const nx = Math.floor((Math.max(...poly.map((p) => p[0])) + reach) / CELL) - i0 + 1, nz = Math.floor((Math.max(...poly.map((p) => p[1])) + reach) / CELL) - j0 + 1;
   const centre = (i: number, j: number): Vec2 => [(i0 + i + 0.5) * CELL, (j0 + j + 0.5) * CELL];
-  const blocked = new Uint8Array(nx * nz);
-  for (const b of blockers) {
-    const bc = toW(b.c), yaw = b.yaw + pose.yaw, cb = Math.cos(yaw), sb = Math.sin(yaw), hx = b.half[0] * sc, hz = b.half[1] * sc;
+  /** Block the cells `b` covers; returns those not blocked before. */
+  const stamp = (blocked: Uint8Array, b: WayBlocker): number[] => {
+    const bc = toW(b.c), yaw = b.yaw + pose.yaw, cb = Math.cos(yaw), sb = Math.sin(yaw), hx = b.half[0] * sc, hz = b.half[1] * sc, fresh: number[] = [];
     const ex = Math.abs(hx * cb) + Math.abs(hz * sb) + CELL, ez = Math.abs(hx * sb) + Math.abs(hz * cb) + CELL;
     const ia = Math.max(0, Math.floor((bc[0] - ex) / CELL) - i0), ib = Math.min(nx - 1, Math.floor((bc[0] + ex) / CELL) - i0);
     const ja = Math.max(0, Math.floor((bc[1] - ez) / CELL) - j0), jb = Math.min(nz - 1, Math.floor((bc[1] + ez) / CELL) - j0);
-    if (ia > ib || ja > jb) continue;
+    if (ia > ib || ja > jb) return fresh;
     const cons = rasterOf(b) === 'conservative', h = CELL / 2 - 1e-9;
     // box axes in the world (generator convention): u = (cb, -sb), v = (sb, cb)
     for (let j = ja; j <= jb; j++) for (let i = ia; i <= ib; i++) {
@@ -154,20 +242,37 @@ function rasterFree(room: { polygon: Vec2[] }, blockers: WayBlocker[], pose: Way
         hit = Math.abs(dx) <= h + Math.abs(hx * cb) + Math.abs(hz * sb) && Math.abs(dz) <= h + Math.abs(hx * sb) + Math.abs(hz * cb)
           && Math.abs(lu) <= hx + h * (Math.abs(cb) + Math.abs(sb)) && Math.abs(lv) <= hz + h * (Math.abs(sb) + Math.abs(cb));
       }
-      if (hit) blocked[j * nx + i] = 1;
+      if (hit && !blocked[j * nx + i]) { blocked[j * nx + i] = 1; fresh.push(j * nx + i); }
     }
-  }
-  // clearance >= PLAN_R  <=>  every blocked centre at least PLAN_R + CELL / 2 away
+    return fresh;
+  };
+  // clearance >= PLAN_R  <=>  every blocked centre at least PLAN_R + CELL / 2 away (the disc is symmetric, so a newly
+  // blocked cell un-frees exactly the cells of the disc round it)
   const need = (PLAN_R + CELL / 2) / CELL, k = Math.ceil(need), disc: [number, number][] = [];
   for (let dj = -k; dj <= k; dj++) for (let di = -k; di <= k; di++) if (Math.hypot(di, dj) < need - 1e-9) disc.push([di, dj]);
+  // Only the disc round a blocked cell with an unblocked 4-neighbour matters: the blocked cell nearest a free cell has one
+  // (a step from it toward the free cell along its longer offset is a nearer cell, so it is not blocked).
+  const unfree = (free: Uint8Array, blocked: Uint8Array, cells: number[]) => {
+    for (const q of cells) {
+      free[q] = 0;
+      const i = q % nx, j = Math.floor(q / nx);
+      if ((i + 1 >= nx || blocked[q + 1]) && (i < 1 || blocked[q - 1]) && (j + 1 >= nz || blocked[q + nx]) && (j < 1 || blocked[q - nx])) continue;
+      for (const [di, dj] of disc) { const a = i + di, b = j + dj; if (a >= 0 && b >= 0 && a < nx && b < nz) free[b * nx + a] = 0; }
+    }
+  };
+  const [lx, lz] = centresOf(nx, nz, (i, j) => toL(centre(i, j)));   // room frame
+  const grid = (blocked: Uint8Array, free: Uint8Array): FreeGrid => ({
+    nx, nz, free, world: centre,
+    cellOf: (pts, r) => nearest(nx, nz, free, lx, lz, pts, r / sc, pts.map((p) => { const w = toW(p); return [w[0] / CELL - i0 - 0.5, w[1] / CELL - j0 - 0.5]; }), sc / CELL),
+    plus(b) { const bl = blocked.slice(), fr = free.slice(); unfree(fr, bl, stamp(bl, b)); return grid(bl, fr); },
+  });
+  const blocked = new Uint8Array(nx * nz);
+  for (const b of blockers) stamp(blocked, b);
   const free = new Uint8Array(nx * nz);
-  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
-    if (blocked[j * nx + i] || !inPoly(room.polygon, ...toL(centre(i, j)))) continue;
-    let ok = true;
-    for (const [di, dj] of disc) { const a = i + di, b = j + dj; if (a >= 0 && b >= 0 && a < nx && b < nz && blocked[b * nx + a]) { ok = false; break; } }
-    if (ok) free[j * nx + i] = 1;
-  }
-  return { nx, nz, free, cellOf: (pts, r) => nearest(nx, nz, free, (i, j) => toL(centre(i, j)), pts, r / sc), world: centre };
+  const inside = insideOf(room.polygon);
+  for (let q = 0; q < nx * nz; q++) if (!blocked[q] && inside(lx[q], lz[q])) free[q] = 1;
+  unfree(free, blocked, [...blocked.keys()].filter((q) => blocked[q]));
+  return grid(blocked, free);
 }
 /** The walked cells' world centres over `room` at `pose` (what wayLabels floods; the raster agreement test reads it). */
 export function freeCellsAt(room: { polygon: Vec2[] }, blockers: WayBlocker[], pose: WayPose): Vec2[] {

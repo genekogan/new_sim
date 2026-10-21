@@ -36,7 +36,7 @@ const itemBoxes = (baked, p, y, yaw) => {
 // next pose or is dropped. The rule (how much room a body needs past a wall or a piece, as the walk raster sees it) is the
 // shared one in packages/generators/src/clearance.ts (lane BS1): 0.43 m from a wall piece, 0.50 m from a piece of furniture.
 export { roomKeys, approachOf, wayLabels, connectedPairs } from '../../../packages/generators/src/clearance.ts';
-import { roomKeys, approachOf, wayLabels, pairsOf } from '../../../packages/generators/src/clearance.ts';
+import { roomKeys, approachOf, wayGrid, pairsOf } from '../../../packages/generators/src/clearance.ts';
 
 /** The furnish styles (recipe files), sorted. */
 export const furnishStyles = () => readdirSync(RECIPES).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)).sort();
@@ -81,6 +81,7 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
   // the ends of each flight: the walk planner steps on and off 0.7 m beyond them (sideways where a flight starts against a
   // wall), so keep 0.9 m round each end clear
   const ends = (baked.links ?? []).flatMap((l) => [{ p: l.path[0], level: l.from }, { p: l.path[l.path.length - 1], level: l.to }]);
+  const ways = new Map();   // room id -> { n: standing pieces in grid, grid, keys, was: their labels, at: where they stood }
   const keyCache = new Map(), keysOf = (room) => keyCache.get(room.id) ?? keyCache.set(room.id, roomKeys(room, doors, baked.links ?? [])).get(room.id);
   const defOf = (alts) => (Array.isArray(alts) ? alts : [alts]).map((ref) => [ref, model.resolvedDef(ref)]).find(([, d]) => d);
   const want = opts.rooms ? new Set(opts.rooms) : null;
@@ -143,10 +144,16 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
         if (solid && keysOf(room).length) {
           // the doors, stair ends and standing pieces' approaches keep every way they had, and this piece's own approach
           // is reached from a door
-          const walls = baked.colliders.filter((o) => o.y0 < room.y + 1.6 && o.y1 > room.y + 0.15);
+          // one grid per room past its walls and the standing pieces' footprints (as the walk grid sees them), grown piece by
+          // piece (taken only grows); each pose adds its own box to it
           const standing = taken.filter((t) => t.floor === room.floor && t.solid);
-          const keys = [...keysOf(room), ...standing.map((t) => t.approach)], blockers = [...walls, ...standing.map((t) => t.foot)];   // footprints, as the walk grid sees them
-          const was = wayLabels(room, keys, blockers, way), now = wayLabels(room, [...keys, approachOf(ib, pose, r3(fyaw + th))], [...blockers, bx], way);
+          let w = ways.get(room.id);
+          if (!w) ways.set(room.id, w = { n: 0, grid: wayGrid(room, baked.colliders.filter((o) => o.y0 < room.y + 1.6 && o.y1 > room.y + 0.15), way) });
+          if (!w.keys || w.n !== standing.length) {
+            for (const t of standing.slice(w.n)) w.grid = w.grid.plus(t.foot);
+            w.n = standing.length; w.keys = [...keysOf(room), ...standing.map((t) => t.approach)]; w.was = w.grid.labels(w.keys, w.at = { cells: [] });
+          }
+          const { keys, was } = w, now = w.grid.plus(bx).labels([...keys, approachOf(ib, pose, r3(fyaw + th))], { cells: w.at.cells });
           const own = now[now.length - 1], doorsReach = keysOf(room).some((_, i) => now[i] === own);
           if (pairsOf(now, keys.length) < pairsOf(was) || !doorsReach) { why = doorsReach ? 'would cut the way to its doors or another piece' : 'no way to it from the doors'; continue; }
         }
