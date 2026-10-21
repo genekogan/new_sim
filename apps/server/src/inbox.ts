@@ -221,11 +221,12 @@ export class AgentInbox {
     for (const id of ids) { if (have.length >= GOD_TOUCHED_MAX) break; if (!seen.has(id)) { seen.add(id); have.push(id); } }
     if (have.length !== before) this.set(s, 'touched=?', head.n, JSON.stringify(have));
   }
-  /** A listener is waiting for this scope (presence); the returned function ends it. */
+  /** A listener is waiting for this scope (presence); the returned function ends it (`handed`: it took messages, so no
+   *  re-poll follows until the agent has worked through them). */
   listening(s: InboxScope) {
     const key = this.key(s); this.listeners.set(key, (this.listeners.get(key) ?? 0) + 1);
     let ended = false;
-    return () => { if (ended) return; ended = true; const n = (this.listeners.get(key) ?? 1) - 1; if (n > 0) this.listeners.set(key, n); else { this.listeners.delete(key); this.listenEnded.set(key, this.now()); } };
+    return (handed = false) => { if (ended) return; ended = true; const n = (this.listeners.get(key) ?? 1) - 1; if (n > 0) this.listeners.set(key, n); else { this.listeners.delete(key); if (handed) this.listenEnded.delete(key); else this.listenEnded.set(key, this.now()); } };
   }
   listenerCount(s: InboxScope) { return this.listeners.get(this.key(s)) ?? 0; }
   async listen(s: InboxScope, after: string | undefined, timeoutMs: number, signal: AbortSignal) {

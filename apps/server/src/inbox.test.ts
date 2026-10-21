@@ -95,8 +95,10 @@ test('presence stays listening across the gap between two long-polls, not after 
   inbox.touch(a); const end = inbox.listening(a); assert.equal(inbox.view(a).presence, 'listening');
   end(); now += 60; assert.equal(inbox.view(a).presence, 'listening', 're-polling');
   now += LISTEN_GAP_MS; assert.equal(inbox.view(a).presence, 'recent', 'gone');
-  inbox.send(a, 'go to the cottage'); const end2 = inbox.listening(a); inbox.takeBacklog(a); end2(); now += 10;
+  inbox.send(a, 'go to the cottage'); const end2 = inbox.listening(a); const [m] = inbox.takeBacklog(a); end2(true); now += 10;
   assert.equal(inbox.view(a).presence, 'working', 'it took a message: working, not listening');
+  inbox.result(a, m.id, 'Arrived.', 'done'); inbox.send(a, 'now the garden'); now += 100;
+  assert.notEqual(inbox.view(a).presence, 'listening', 'after handing messages nobody listens until the agent runs listen again');
 });
 
 test('soul queue: a message waiting in the old one-message box moves into the queue at boot, once', t => {

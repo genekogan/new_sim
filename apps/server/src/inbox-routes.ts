@@ -113,15 +113,16 @@ export function mountAgentInbox(app: Hono, d: Deps) {
       const key = JSON.stringify(s); limit(`inbox-listen:${kind}:${key}`, 120);
       if (inbox.listenerCount(s) >= 2) throw new ApiError(429, 'rate-limited', 'at most two inbox listeners per agent');
       const end = inbox.listening(s);   // G4: the owner's "connected" is a listener waiting now
+      let handed = false;               // MSG: an empty answer means the CLI re-polls at once (presence keeps 'listening')
       try {
         await inbox.listen(s, after, timeout, c.req.raw.signal);
         const current = requireAgent(c, kind);
         if (current.owner !== s.owner || current.scope !== s.scope) throw new ApiError(401, 'unauthorized', 'agent authority changed');
         // MSG: a Soul's listen hands over every waiting message at once, oldest first (the agent works through them all).
         // An older CLI reads `latest`: the first one after its cursor, so its listen/follow loop walks the queue in order.
-        if (kind === 'soul') { const backlog = inbox.takeBacklog(s, after), v = inbox.view(s); return c.json({inbox: {...v, latest: backlog[0] ?? v.latest}, backlog}); }
+        if (kind === 'soul') { const backlog = inbox.takeBacklog(s, after), v = inbox.view(s); handed = backlog.length > 0; return c.json({inbox: {...v, latest: backlog[0] ?? v.latest}, backlog}); }
         return c.json({inbox: inbox.view(s)});
-      } finally { end(); }
+      } finally { end(handed); }
     });
     app.post(`${path}/:id/ack`, async c => {
       const s = requireAgent(c, kind), b = await json(c); limit(`inbox-ack:${kind}:${JSON.stringify(s)}`, 120);
