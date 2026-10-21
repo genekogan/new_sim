@@ -40,7 +40,7 @@ export function mountMarsStatic(app: Hono, root: string) {
   }
   // lane QA: a root without the lab's index.html (the eden2 legacy forks' mars-web has none) answered these pages with a
   // 500 "res.body.getReader is not a function" (serveStatic found no file and the route returned nothing): a plain 404.
-  const labGone = () => new Response('<!doctype html><meta charset="utf-8"><title>No page here</title><body style="font:16px system-ui;max-width:640px;margin:12vh auto;padding:0 20px"><h1>This page is not here any more</h1><p><a href="/">See the worlds</a></p>', { status: 404, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+  const labGone = () => new Response('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>No page here</title><body style="font:16px system-ui;max-width:640px;margin:12vh auto;padding:0 20px"><h1>This page is not here any more</h1><p><a href="/">See the worlds</a></p>', { status: 404, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
   for (const route of ['/l/mars', '/l/mars/', '/l/littlemartians', '/l/littlemartians/', '/l/eden', '/l/eden/', '/w/mars/:year']) {
     app.get(route, async (c) => {
       if (c.req.param('year') && !/^202[0-7]$/.test(c.req.param('year')!)) return c.notFound();

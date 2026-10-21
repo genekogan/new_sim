@@ -493,7 +493,7 @@ export async function openLauncher(cfg = {}) {
     const w = registry.get(slug);
     if (w && closing.has(slug)) { json(res, 503, { ok: false, code: 'world.closing', slug }, { 'retry-after': '5' }); return; }
     if (!w) {
-      if ((req.headers.accept ?? '').includes('text/html')) { res.writeHead(404, { 'content-type': 'text/html; charset=utf-8' }).end(`<!doctype html><meta charset="utf-8"><title>No such world</title><body style="font:16px system-ui;max-width:640px;margin:12vh auto;padding:0 20px"><h1>No world called “${slug.replace(/[<>&"]/g, '')}” here</h1><p><a href="${B}/">See the worlds here</a>, or make a new one.</p>`); return; }
+      if ((req.headers.accept ?? '').includes('text/html')) { res.writeHead(404, { 'content-type': 'text/html; charset=utf-8' }).end(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>No such world</title><body style="font:16px system-ui;max-width:640px;margin:12vh auto;padding:0 20px"><h1>No world called “${slug.replace(/[<>&"]/g, '')}” here</h1><p><a href="${B}/">See the worlds here</a>, or make a new one.</p>`); return; }
       json(res, 404, { ok: false, code: 'world.not-served', slug }); return;
     }
     // P2: one flooding visitor or agent is refused here (every world shares this loop), before its world is contacted: a
