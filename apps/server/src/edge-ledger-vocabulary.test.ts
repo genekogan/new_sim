@@ -207,3 +207,23 @@ test('todo an authored world-engine Pond name still resolves its offered natural
  const loop=P('jog-around',pond.id,'Jog around Pond'),c:VocabContext={...ctx(),caps:[loop],places:[pond],target:()=>({names:['Pond'],around:[],at:pond.center})};
  const r=resolveCapability('go for a jog around the pond',c);assert.notEqual(r.kind,'unknown');if(r.kind!=='unknown')assert.equal(r.cap.id,loop.id);
 });
+
+test('vocabulary (SOULSIM-E): a thing answers to its everyday synonyms after its own words fail (Mars: sit by the campfire)', () => {
+ // Mars's fire circle: benches "Fire bench (north/south)" in the place "Fire circle"; "sit by the fire" already sat on one
+ const mp: VocabPlace[] = [{id: 'fire-circle', name: 'Fire circle', center: [0, 0]}, {id: 'kitchen', name: 'Kitchen', center: [30, 0]}];
+ const mcaps: EdgeCapability[] = [O('sit', 'fire-bench-north', 'Fire bench (north)'), O('sit', 'fire-bench-south', 'Fire bench (south)'), O('sit', 'reading-chair', 'Reading chair'),
+  {id: 'sit:here', verb: 'sit', label: 'Sit down on the nearest free seat', available: true}, P('walk', 'fire-circle', 'Fire circle'), P('walk', 'kitchen', 'Kitchen')];
+ const mat = new Map<string, [number, number]>([['fire-bench-north', [0, 3]], ['fire-bench-south', [0, -3]], ['reading-chair', [9, 0]], ['fire-circle', [0, 0]], ['kitchen', [30, 0]]]);
+ const mctx: VocabContext = {caps: mcaps, places: mp, root: ['mars'], me: [1, 4], target: c => {
+  const t = c.target; if (!t) return {names: [], around: [], at: null};
+  const p = mp.find(x => x.id === t.id), w = t.id.startsWith('fire-bench') ? mp[0] : undefined;
+  return {names: p ? [p.name] : [], around: w ? [w.id, w.name] : [], at: mat.get(t.id) ?? null};
+ }};
+ const go = (input: string) => {const r = resolveCapability(input, mctx); return r.kind === 'unknown' ? `unknown:${r.code ?? ''}` : r.cap.id;};
+ assert.equal(go('sit by the fire'), 'sit:fire-bench-north', 'unchanged: the exact word');
+ assert.equal(go('sit by the campfire'), 'sit:fire-bench-north', 'campfire is the fire (nearest bench)');
+ assert.equal(go('sit by the bonfire'), 'sit:fire-bench-north');
+ assert.equal(go('sit in the reading chair'), 'sit:reading-chair', 'unchanged');
+ assert.equal(go('walk to the campfire'), 'walk:fire-circle', 'places keep their own path (3b)');
+ assert.match(go('sit by the waterfall'), /^unknown/, 'no synonym, no swap');
+});

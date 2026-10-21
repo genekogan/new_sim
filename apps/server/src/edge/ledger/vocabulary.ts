@@ -373,6 +373,16 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       // 3. Every word appears in the target's own names (walk:pond → the pond).
       const r3 = also(one(pool.filter(c => words.every(w => tokenHit(w, info.get(c.id)!.ownTokens))), c => `${input} is ${c.id} (${c.label}).`)); if (r3) return r3;
     }
+    // 3c (SOULSIM-E): a thing's everyday synonyms, after its exact words fail, for verbs at things (places have 3b): Mars's
+    // "sit by the campfire" was capability.unknown while "sit by the fire" sat on a fire bench (its benches are "Fire
+    // bench", the place "Fire circle"). By the thing's own names, else by the place it stands in.
+    if (!PLACE_VERBS.has(verb)) for (const words of passes) {
+      const syn = (w: string, set: string[]) => tokenHit(w, set) || (SYNONYMS[w] ?? []).some(x => tokenHit(x, set));
+      if (!words.some(w => SYNONYMS[w])) continue;
+      const r = one(pool.filter(c => words.every(w => syn(w, info.get(c.id)!.ownTokens))), c => `${input} is ${c.id} (${c.label}).`)
+        ?? one(pool.filter(c => {const a = info.get(c.id)!.t.around.flatMap(tokens); return a.length > 0 && words.every(w => syn(w, a));}), c => `${input}: ${c.id} (${c.label}) is there.`);
+      if (r) return r;
+    }
     // 3b. Places by name/description words and everyday synonyms (the park, the woods, the lake, the campfire).
     // CN5 (Gene: "walk to the harbour" went to the park): a named place resolves only to itself, a place inside it, or the
     // place that contains it. A named place that cannot be reached is refused honestly (place.unreachable), never swapped
