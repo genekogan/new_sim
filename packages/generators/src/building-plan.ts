@@ -37,6 +37,10 @@ export const MAX_RISE = 0.2;       // riser height limit (m)
 export const TI = 0.12;            // interior wall thickness (m)
 
 export const floorY = (k: number, fh: number) => k * fh + FLOOR0;
+/** Landing/hall width beyond the flights (m). 1.0 left 0.83 m clear beside a flight (walls and rails take the rest), which
+ *  a 0.68 m walker (radius .28 + margin .06) loses at some yaws on the 0.1 m walk raster. A def opts into the 1.2 m
+ *  layout with make.args.corridor (nav-connect/1, 2026-10-20): stored defs keep 1.0, so a building never changes shape. */
+export const corridorOf = (args: Record<string, unknown>) => { const v = Number(args.corridor); return Number.isFinite(v) ? Math.max(1.0, Math.min(2.0, v)) : 1.0; };
 export function stairGeometry(fh: number) { const risers = Math.ceil(fh / MAX_RISE - 1e-9); return { risers, run: (risers - 1) * GOING }; }
 
 class Ids { private used = new Set<string>(); take(base: string): string { let id = base, k = 2; while (this.used.has(id)) id = `${base}-${k++}`; this.used.add(id); return id; } }
@@ -113,7 +117,7 @@ function upperFloors(c: Ctx, p: Plan, ids: Ids, stairLo: number, groundStairRoom
   const { X0, X1, Z0, Z1 } = extents(c), Wc = X1 - X0;
   const inner = Z0 + c.t / 2;
   const landingIds: string[] = [];
-  const strip = (c.floors > 2 ? 2 : 1) * STAIR_W + 1.0;
+  const strip = (c.floors > 2 ? 2 : 1) * STAIR_W + corridorOf(c.args);
   const zL = Math.min(Z1 - 2.2, inner + strip);
   for (let k = 1; k < c.floors; k++) {
     const landing = ids.take('landing'); landingIds[k] = landing;
@@ -151,7 +155,7 @@ function townhousePlan(c: Ctx, shop = false): Plan {
     return p;
   }
   // townhouse: a hall down the west side with the stairs along the west wall; rooms to the east
-  const hw = (c.floors > 2 ? 2 : 1) * STAIR_W + 1.0, xh = Math.min(X0 + hw, X1 - 2.4), innerW = X0 + c.t / 2;
+  const hw = (c.floors > 2 ? 2 : 1) * STAIR_W + corridorOf(c.args), xh = Math.min(X0 + hw, X1 - 2.4), innerW = X0 + c.t / 2;
   const zSplit = (Z0 + Z1) / 2;
   const halls: string[] = [];
   for (let k = 0; k < c.floors; k++) {

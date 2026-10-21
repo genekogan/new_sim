@@ -14,7 +14,8 @@
    "kind": "gen",
    "gen": "building/1",
    "args": {
-    "style": "cottage"
+    "style": "cottage",
+    "corridor": 1.2
    }
   },
   "size": {
@@ -317,7 +318,8 @@
    "kind": "gen",
    "gen": "building/1",
    "args": {
-    "style": "townhouse"
+    "style": "townhouse",
+    "corridor": 1.2
    }
   },
   "size": {
@@ -464,7 +466,8 @@
    "kind": "gen",
    "gen": "building/1",
    "args": {
-    "style": "shop"
+    "style": "shop",
+    "corridor": 1.2
    }
   },
   "size": {
