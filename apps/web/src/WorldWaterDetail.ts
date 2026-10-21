@@ -140,7 +140,7 @@ const SURFACE_KEY='w11-surface-v2';
 /** Sky sheen (standard water): the lit normal (waves, shimmer, ripples) reflects the atmosphere's sky colour at
  * grazing angles, so the surface glints and darkens as it moves; day and night come with the sky colour. */
 const SHEEN_GLSL=`if(uWaterShimmer>.5){vec3 edenV=normalize(vViewPosition);float edenFr=pow(1.-clamp(dot(normal,edenV),0.,1.),4.);
-gl_FragColor.rgb=mix(gl_FragColor.rgb,uEdenWaterSky.xyz*(.55+.45*uWaterDay),clamp(edenFr,0.,1.)*.45);}
+gl_FragColor.rgb=mix(gl_FragColor.rgb,uEdenWaterSky.xyz*(.55+.45*uWaterDay),clamp(edenFr,0.,1.)*.35);}
 `;
 const surfaces=new WeakSet<THREE.Material>();
 const SURFACE_VERTEX=`#include <project_vertex>
