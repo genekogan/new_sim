@@ -73,27 +73,18 @@ export function shapeWedgeDistance(w: ViewWedge, pts: readonly P2[], closed: boo
 }
 
 type ViewKey = readonly [number, number] | { path: readonly P2[] } | { area: readonly P2[] } | null;
-/** Is a thing at `key` (a point, a path or an area on the ground) within `r` of the wedge, or its shadow? `shadow` is the
- *  ground offset of the shadow of its top (the sun's direction times its height): a point's shadow is the segment to
- *  there, a shape's is the shape swept along it (checked at five steps, each widened by the gap between them). */
-export function keySeen(w: ViewWedge, key: ViewKey, r: number, shadow: readonly [number, number] = [0, 0]): boolean {
+/** Is a thing at `key` (a point, a path or an area on the ground; null = unknown, always seen) within `r` of the wedge? */
+export function keySeen(w: ViewWedge, key: ViewKey, r: number): boolean {
   if (key === null) return true;
-  const [sx, sz] = shadow;
-  if (!('path' in key) && !('area' in key)) {
-    const p = key as readonly number[];
-    return wedgeDistance(w, p[0], p[1]) <= r || ((sx || sz) ? segmentDistance(w, [p[0], p[1]], [p[0] + sx, p[1] + sz]) <= r : false);
-  }
-  const pts = 'path' in key ? key.path : key.area, closed = 'area' in key, gap = Math.hypot(sx, sz) / 8;
-  for (const t of sx || sz ? [0, 0.25, 0.5, 0.75, 1] : [0]) {
-    const moved = t ? pts.map((q) => [q[0] + t * sx, q[1] + t * sz] as const) : pts;
-    if (shapeWedgeDistance(w, moved, closed) <= r + (t ? gap : 0)) return true;
-  }
-  return false;
+  if ('path' in key) return shapeWedgeDistance(w, key.path, false) <= r;
+  if ('area' in key) return shapeWedgeDistance(w, key.area, true) <= r;
+  return wedgeDistance(w, key[0], key[1]) <= r;
 }
-/** The first `n` things of `list` (the near ones) that `seen` keeps come first; then the other near things, then the
- *  rest, each part in its old order. `first` = how many are seen. */
-export function viewFirst<T>(list: readonly T[], n: number, seen: (e: T) => boolean): { list: T[]; first: number } {
-  const shown: T[] = [], hidden: T[] = [];
-  for (let i = 0; i < n; i++) (seen(list[i]) ? shown : hidden).push(list[i]);
-  return { list: [...shown, ...hidden, ...list.slice(n)], first: shown.length };
+/** The first `n` things of `list` (the near ones) that `seen` keeps come first (`first` = how many); then the seen ones of
+ *  the next `ahead` things (the fill draws what the camera sees before what is behind it), then the unseen near ones, the
+ *  unseen of those `ahead`, and the rest, each part in its old order. */
+export function viewFirst<T>(list: readonly T[], n: number, seen: (e: T) => boolean, ahead = 0): { list: T[]; first: number } {
+  const shown: T[] = [], hidden: T[] = [], next: T[] = [], later: T[] = [], m = Math.min(list.length, n + ahead);
+  for (let i = 0; i < m; i++) (seen(list[i]) ? i < n ? shown : next : i < n ? hidden : later).push(list[i]);
+  return { list: [...shown, ...next, ...hidden, ...later, ...list.slice(m)], first: shown.length };
 }

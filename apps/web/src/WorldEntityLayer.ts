@@ -29,10 +29,6 @@ import { arrivalOver } from './arrival-marks.ts';
 import { computeVertexNormals } from './gen-mesh/fast-geometry.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
 import { keySeen, shapeWedgeDistance, viewFirst, viewWedge, type ViewWedge } from './arrival-view.ts';
-import { calendarClock, entryWorldClock, shotClockAt } from './world-env.ts';
-import { visitorPreviewHour } from './visitor-hour.ts';
-import { solarPosition } from '../../../mars/viewer/engine/env/sun.ts';
-import { siteNorthOffset } from './site-north.ts';
 import { WorldBuildSites, SITE_REFINEMENT, type PublicSite } from './WorldBuildSites.ts';
 import { GroundCover, coverSetting } from './gen-mesh/ground-cover.ts';
 
@@ -142,7 +138,8 @@ export class WorldEntityLayer {
     const pose = at?.length === 3 && eyeQ?.length === 3 && [...at, ...eyeQ].every(Number.isFinite) ? { target: at, eye: eyeQ } : entityArrivalPose(this.viewBounds(), this.entityCount, this.groundAt, 45, innerWidth / Math.max(1, innerHeight), 1, this.arrivalAt());
     // t4-phone-new: on a phone, what the arrival camera sees (arrival-view.ts): the poster waits only for the GLBs in view
     const view = progressiveNearM() === null ? null : arrivalViewWedge(pose), byId0 = view ? new Map(snap.entities.flatMap((e) => e.name ? [[e.name, e], [e.id, e]] as [string, Entity][] : [[e.id, e]] as [string, Entity][])) : null;
-    const keyOf0 = byId0 && nearKeyOf(byId0), seen = view && keyOf0 && byId0 ? arrivalSeen(m0, view, keyOf0, byId0) : undefined;
+    // the poster waits for the models whose bodies it shows; the first build also draws what casts a shadow into view
+    const keyOf0 = byId0 && nearKeyOf(byId0), seen = view && keyOf0 && byId0 ? arrivalSeen(m0, view, keyOf0, byId0, false) : undefined;
     const eagerSizes = m0.readPass(() => planEager(snap, (r) => m0.resolvedDef(r), (e) => { try { const p = m0.worldPose(e); return [p.x, p.z]; } catch { return null; } }, [pose.target[0], pose.target[2]], [pose.eye[0], pose.eye[2]], seen));   // t4-phone: slots remembered per parent
     assetBytes.expect(Object.fromEntries(Object.entries(eagerSizes).map(([sha, n]) => [assetUrl(sha), n])));
     // Phone arrival (lane d3): start the eager GLBs now, nearest first, so they download while the terrain and every
@@ -178,8 +175,8 @@ export class WorldEntityLayer {
       const sorted: readonly Entity[] & { dist?: number[] } = !keyOf ? snap.entities : byDistance(snap.entities, keyOf, [pose.target[0], pose.target[2]], [pose.eye[0], pose.eye[2]]);  // P7: shapes by their nearest point; furniture with its building
       const far = near === null ? -1 : sorted.dist!.findIndex((d) => d > near);
       // t4-phone-new: of the near things, those the arrival camera can see (or whose shadow can reach its view) are drawn
-      // before the poster; the near things behind or beside it join the fill first (arrival-view.ts)
-      const { list: all, first: nearCount } = view && keyOf && byId ? viewFirst(sorted, far < 0 ? sorted.length : far, seen ?? arrivalSeen(m, view, keyOf, byId)) : { list: sorted, first: far < 0 ? sorted.length : far };
+      // before the poster; the fill then draws the next things in view, then the near ones behind or beside it (arrival-view.ts)
+      const { list: all, first: nearCount } = view && keyOf && byId ? viewFirst(sorted, far < 0 ? sorted.length : far, arrivalSeen(m, view, keyOf, byId, true), FILL_AHEAD) : { list: sorted, first: far < 0 ? sorted.length : far };
       (window as unknown as { __simViewFirst?: unknown }).__simViewFirst = { near: far < 0 ? sorted.length : far, seen: nearCount, wedge: view, eager: eagerShas().length, eagerKB: Math.round(Object.values(eagerSizes).reduce((a, b) => a + b, 0) / 1e3) };   // probes
       for (let i = 0; i < all.length;) {
         if (i >= nearCount && !this.filling) { this.active = true; this.building = false; this.filling = true; this.fill = this.fillRest(m, all, i, pending, signal, workersLater); return; }
@@ -780,34 +777,30 @@ function arrivalViewWedge(pose: { target: readonly number[]; eye: readonly numbe
   if (typeof souls === 'number' && souls > 0) return null;
   return viewWedge(pose.eye, pose.target, 45, innerWidth / Math.max(1, innerHeight));
 }
-/** t4-phone-new: does the arrival camera see a thing (by its root: a building's furniture goes with it), or the shadow it
- *  casts? Its reach: half its footprint's diagonal (its declared size, a building's plan) and 4 m (a porch, an awning,
- *  a verge); its shadow: its height along the poster's sun (arrivalShadow). A shaped thing (a road, a wood) is its
- *  shape plus 4 m and its declared height's shadow. Unknown sizes: 40 m around it, a 20 m high shadow. */
-function arrivalSeen(m: WorldModel, view: ViewWedge, keyOf: (e: Entity) => NearKey, byId: ReadonlyMap<string, Entity>): (e: Entity) => boolean {
-  const sun = arrivalShadow(m), memo = new Map<string, boolean>();
+/** t4-phone-new: does the arrival camera see a thing (by its root: a building's furniture goes with it)? Its body: its
+ *  footprint rectangle, turned with it (its declared size, a building's plan), and up to 4 m of a building's porch, steps
+ *  and awnings; a shaped thing (a road, a wood) is its shape plus 4 m. With `shadow`, also the shadow it may cast into
+ *  view: ARRIVAL_SHADOW_PER_M of its height every way (the sun's direction is not known before the poster's lights are
+ *  set; the sun code stays out of a phone's first scripts). Unknown sizes: 40 m around it, a 20 m high shadow. */
+function arrivalSeen(m: WorldModel, view: ViewWedge, keyOf: (e: Entity) => NearKey, byId: ReadonlyMap<string, Entity>, shadow: boolean): (e: Entity) => boolean {
+  const memo = new Map<string, boolean>();
   return (e) => {
     const r = rootOf(byId, e); let v = memo.get(r.id);
     if (v === undefined) {
-      const { reach, height, half } = viewSize(m, r), k = Math.min(height, 200), shadow: [number, number] = [sun[0] * k, sun[1] * k];
+      const { reach, height, half } = viewSize(m, r);
       let key = keyOf(r);
-      // a sized thing at a point: its footprint rectangle, turned with it
       if (half && Array.isArray(key)) { let yaw = 0; try { yaw = m.worldPose(r).yaw; } catch { /* unturned */ } const [x, z] = key, c = Math.cos(yaw), sn = Math.sin(yaw), [a, b] = half;
         key = { area: [[-a, -b], [a, -b], [a, b], [-a, b]].map(([u, w]) => [x + u * c + w * sn, z - u * sn + w * c]) }; }
-      v = keySeen(view, key, reach, shadow); memo.set(r.id, v);
+      v = keySeen(view, key, reach + (shadow ? Math.min(ARRIVAL_SHADOW_MAX_M, ARRIVAL_SHADOW_PER_M * height) : 0)); memo.set(r.id, v);
     }
     return v;
   };
 }
-/** The ground offset of a 1 m post's shadow in the poster (early-render.ts: the world's clock as the page gave it, the
- *  visitor's preview hour; no clock: the soft midday Daylight draws), at most 4 m (a sun under ~14 degrees). */
-function arrivalShadow(m: WorldModel): [number, number] {
-  let d: readonly number[] = [20, 35, 15];
-  const clock = shotClockAt(calendarClock(entryWorldClock(), m.state), visitorPreviewHour());
-  if (clock) { try { const p = solarPosition(clock, undefined, undefined, siteNorthOffset()); if (p.direction.every(Number.isFinite)) d = p.direction; } catch { /* midday */ } }
-  const y = Math.max(0.05, d[1]), x = -d[0] / y, z = -d[2] / y, l = Math.hypot(x, z);
-  return l > 4 ? [(4 * x) / l, (4 * z) / l] : [x, z];
-}
+/** The shadow reach per metre of height: a sun at 27 degrees or higher (mid-morning to mid-afternoon; a lower sun's long
+ *  shadow is faint at its tip), at most 40 m. */
+const ARRIVAL_SHADOW_PER_M = 2, ARRIVAL_SHADOW_MAX_M = 40;
+/** How many things past the near ones the fill orders view-first too (the poster may come while the fill runs). */
+const FILL_AHEAD = 400;
 function viewSize(m: WorldModel, r: Entity): { reach: number; height: number; half: [number, number] | null } {
   const d = m.resolvedDef(r.def), box = (d as { size?: { box?: unknown } } | undefined)?.size?.box, shaped = !!(r as { shape?: unknown }).shape;
   if (!Array.isArray(box) || box.length !== 3 || !box.every((v) => typeof v === 'number' && Number.isFinite(v))) return { reach: shaped ? 4 : 40, height: 20, half: null };
