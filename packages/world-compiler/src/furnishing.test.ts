@@ -115,3 +115,15 @@ test('the ways check judges a gap on the walk raster where the building stands, 
   assert.equal(gap(0.96, Math.PI / 4), 0, 'a 0.96 m gap is sealed turned 45 deg');
   for (const yaw of [0, 39 * Math.PI / 180, Math.PI / 4]) assert.equal(gap(1.04, yaw), 1, `a 1.04 m gap walks at yaw ${yaw.toFixed(2)}`);
 });
+
+test('the theatre\'s built-in contents are what its furnish recipe lays out (no back-row seats in front of the auditorium door; lane BSGEN)', () => {
+  // core/theatre@1's contents were laid out by an older furnish: row 4-1 stood ~0.7 m inside the foyer door and, on a turned
+  // theatre's walk grid, cut the whole auditorium off (fuzz walk world: 4 turned theatres, 61 bad each); furnish drops it now
+  const w = new WorldModel({ constants: { ground: 'land' }, seed: 'theatre' });
+  for (const d of CORE_KIT) w.defineDef(d, 'core', 0);
+  assert.equal(applyBatch(w, { ops: [{ op: 'place', def: 'core/theatre@1', name: 'theatre' }] }, 'god', 1).result.accepted, true);
+  const b = w.get('theatre')!, kids = [...w.children.get(b.id) ?? []].map((id) => w.entities.get(id)!.name);
+  for (const id of [...w.children.get(b.id) ?? []]) w.delete(id);
+  const f = furnishBatch(w, b.id);
+  assert.deepEqual(kids.sort(), f.ops.filter((o: any) => o.op === 'place').map((o: any) => o.name).sort(), JSON.stringify(f.dropped));
+});
