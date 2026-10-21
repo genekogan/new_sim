@@ -1,3 +1,4 @@
+import './client-errors.ts';   // lane ERR: first, so errors from here on are reported
 import {discoverWorlds,readWorldBootstrap,WorldBootstrapError} from './world-discovery.ts';
 import { apiPath, worldPath, worldKey } from './world-path.ts';
 import {singleLocalPreview} from './local-navigation.ts';

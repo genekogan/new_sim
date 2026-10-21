@@ -12,7 +12,10 @@
 //   POST /__sim/worlds           {name, template} → creates, waits for /healthz → {slug, url}
 //   GET  /__sim/worlds/<slug>    one world + what the launcher has seen (looks, agent, previews)
 //   GET  /__sim/launcher         children, ports, pids, restarts (diagnostics; direct local requests only)
-//   GET  /__sim/healthz          {ok, build, worlds, running, caps, memAvailableMb} (also /healthz)
+//   GET  /__sim/healthz          {ok, build, worlds, running, caps, memAvailableMb} (also /healthz); clientErrorsNew = error kinds
+//                                pages first reported since this build went live (client-errors.mjs)
+//   POST /__sim/client-errors    a page's error beacon (apps/web/src/client-errors.ts); GET: the operator's summary (direct
+//                                loopback only; op.mjs client-errors): top errors by count, world, browser, first/last seen, build
 //   POST /__sim/op/create-world  operator only (direct loopback requests; anything through a reverse proxy is refused):
 //                                {name, template, owner | ownerOf, godName?, slug?} → a world born owned by an existing account
 //                                (`owner` = account id, or `ownerOf` = the slug of a world whose god it is). CLI: op.mjs
@@ -66,6 +69,7 @@
 import { execFileSync } from 'node:child_process';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer, request } from 'node:http';
+import { clientErrors } from './client-errors.mjs';
 import { connect } from 'node:net';
 import { createReadStream, existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { brotliCompressSync, gzipSync, constants as zlibConstants } from 'node:zlib';
@@ -127,6 +131,7 @@ export async function openLauncher(cfg = {}) {
   const marsWebDir = cfg.marsWebDir ?? (existsSync(join(root, '.lane/mars-web')) ? join(root, '.lane/mars-web') : undefined);
   const log = cfg.log ?? ((s) => console.log(`[launcher] ${s}`));
   const flood = process.env.SIM_FLOOD === '0' ? () => null : launcherFlood({ log, limits: cfg.floodLimits });   // P2 coarse ceiling, see flood.mjs
+  const errors = clientErrors({ dir: join(dataDir, 'client-errors'), build: BUILD, log, limits: cfg.clientErrorLimits });   // lane ERR, client-errors.mjs
   const origin = `http://127.0.0.1:${port}`;
   const publicOrigin = (cfg.publicOrigin ?? origin).replace(/\/$/, '');
   const authEnvFile = cfg.authEnvFile ?? process.env.SIM_AUTH_ENV_FILE;
@@ -542,6 +547,18 @@ export async function openLauncher(cfg = {}) {
         if (p) { proxyHttp(req, res, p); return; }
         json(res, 404, { ok: false, code: 'not-found', message: `this server answers under ${B}/` }); return;
       }
+      if (path === '/__sim/client-errors') {
+        // lane ERR: a page's error beacon (anyone; body-capped, per-address and site-wide limits) and the operator's summary
+        if (req.method === 'POST') {
+          const chunks = []; let n = 0;
+          for await (const c of req) { n += c.length; if (n > 8192) { json(res, 413, { ok: false, code: 'too-large' }); return; } chunks.push(c); }
+          const who = String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? '').split(',')[0].trim();
+          const [st, out] = errors.ingest(who, req.headers['user-agent'], Buffer.concat(chunks));
+          if (out) json(res, st, out); else res.writeHead(st, { 'cache-control': 'no-store' }).end(); return;
+        }
+        if (req.method === 'GET' && direct(req)) { json(res, 200, errors.summary({ limit: url.searchParams.get('limit'), world: url.searchParams.get('world') || undefined })); return; }
+        json(res, 404, { ok: false, code: 'not-found' }); return;
+      }
       if (path === '/__sim/worlds.json' && req.method === 'GET') { json(res, 200, await worldsJson()); return; }
       if (path === '/__sim/templates.json' && req.method === 'GET') { json(res, 200, { templates: templateList().map(({ file: _f, ...t }) => t) }); return; }
       if (oldRoot && req.method === 'POST' && (path === '/__sim/worlds' || path === '/__sim/op/create-world')) {
@@ -634,7 +651,7 @@ export async function openLauncher(cfg = {}) {
       if ((path === '/__sim/healthz' || path === '/healthz') && (req.method === 'GET' || req.method === 'HEAD')) {
         const running = registry.worlds.filter((w) => pool.status(w.slug).status === 'running').length;
         const host = hostHealth(dataDir); // deploy/host-health.mjs (timer): `hostOk` (+ short `hostCodes` when not ok) public, the numbers loopback-only
-        json(res, 200, { ok: true, service: 'world-launcher', build: BUILD, auth: auth ? 'clerk' : 'dev', worlds: registry.worlds.length, running, maxWorlds: MAX_WORLDS, maxRunning: prod.maxRunning, ...(host ? { hostOk: host.ok, ...(host.ok ? {} : { hostCodes: host.codes ?? [] }) } : {}), ...(direct(req) ? { memAvailableMb: memAvailableMb(), ...(host ? { host } : {}) } : {}) }); return;
+        json(res, 200, { ok: true, service: 'world-launcher', build: BUILD, auth: auth ? 'clerk' : 'dev', worlds: registry.worlds.length, running, maxWorlds: MAX_WORLDS, maxRunning: prod.maxRunning, ...(host ? { hostOk: host.ok, ...(host.ok ? {} : { hostCodes: host.codes ?? [] }) } : {}), clientErrorsNew: errors.newSinceRelease(), ...(direct(req) ? { memAvailableMb: memAvailableMb(), ...(host ? { host } : {}) } : {}) }); return;
       }
       const to = redirects?.target(req, path, url);
       if (to) { res.writeHead(302, { location: to, 'cache-control': 'no-store' }).end(); return; }
@@ -751,7 +768,7 @@ export async function openLauncher(cfg = {}) {
      *  measured 4 in ~9800 requests at one switch). Each connection instead closes cleanly after its next response
      *  (forward() answers with Connection: close), and whatever is still idle closes at exit. */
     retire() {
-      phase = 'retired'; retiredTo = port; pool.fence(); retiredPidFile = gate?.pidFile ?? retiredPidFile;
+      phase = 'retired'; retiredTo = port; pool.fence(); errors.flush(); retiredPidFile = gate?.pidFile ?? retiredPidFile;
       const g = gate; gate = null; g?.open(); handBack?.open();
     },
     /** Keeper, canary failed (the next launcher could not run its first world and has stopped it): serve again as
@@ -806,7 +823,7 @@ export async function openLauncher(cfg = {}) {
      *  a held port every moment here is refused connections, so it stops at once, as before. After a handover (`gentle`)
      *  the keeper's port is served by the next launcher, so that exit is gentle too. */
     close: async ({ drainMs = 3_000, idleMs = 1_500, gentle = process.env.SIM_PORT_HELD === '1' } = {}) => {
-      if (closed) return; closed = true; clearInterval(sweep);
+      if (closed) return; closed = true; clearInterval(sweep); errors.flush();
       const live = () => [...sockets].filter((s) => !s.simUpgraded);
       if (gentle) for (const t0 = Date.now(); live().length && Date.now() - t0 < drainMs && (Date.now() - t0 < idleMs || live().some((s) => s.simBusy));) await new Promise((r) => setTimeout(r, 20));
       const done = new Promise((r) => server.close(() => r()));   // (Node's close() also cuts idle connections: only now)

@@ -6,6 +6,8 @@
 //   - new worlds: the world snapshot's `assetBytes` (the server's asset index: every GLB the world's things load),
 // and otherwise from each response's Content-Length as soon as its headers arrive.
 
+import { report } from './client-errors.ts';   // lane ERR: an asset that failed to load (its final answer, after any CDN fallback)
+
 type Row = { loaded: number; total: number | null; done: boolean };
 /** `known`: a total was declared up front (manifest or snapshot); until then the sum covers only what has started. */
 export type ByteProgress = { loaded: number; total: number; known: boolean };
@@ -71,12 +73,12 @@ export function installAssetMeter() {
     if (method !== 'GET' || !ASSET.test(keyOf(url))) return original(input, init);
     assetBytes.start(url);
     let response: Response;
-    try { response = await original(input, init); } catch (e) { assetBytes.done(url, false); throw e; }
+    try { response = await original(input, init); } catch (e) { assetBytes.done(url, false); if ((e as Error)?.name !== 'AbortError') report('asset', 'network', url); throw e; }
     // a compressed body streams more bytes than its Content-Length says: then only the expected size (if any) counts
     const length = Number(response.headers.get('content-length'));
     assetBytes.headers(url, response.headers.get('content-encoding') ? null : Number.isFinite(length) && length > 0 ? length : null);
     if (response.ok && response.body) { try { void count(response.clone().body!, url); } catch { assetBytes.done(url, false); } }
-    else assetBytes.done(url, false);
+    else { assetBytes.done(url, false); if (!response.ok) report('asset', String(response.status), url); }
     return response;
   };
 }

@@ -14,6 +14,8 @@
 //   node tools/world-launcher/op.mjs restore-world --port 4620 [--base /worlds] --id <id from list-archive>
 //   node tools/world-launcher/op.mjs list-archive --port 4620 [--base /worlds]
 //   node tools/world-launcher/op.mjs audit --port 4620 [--base /worlds] [--slug <slug>]
+//   node tools/world-launcher/op.mjs client-errors --port 4620 [--base /worlds] [--world <slug>] [--limit N]
+//        (what visitors' pages reported: top errors by count, world, browser, first/last seen, build; client-errors.mjs)
 //
 // create-world: the world is born owned by that existing account (its god), exactly as if that person had created it signed in.
 // register-fork: serve the copy of an old world already in <data>/worlds/<slug>/sim.db under <base>/w/<slug> (lane FORKS).
@@ -31,6 +33,11 @@ const usage = () => {
     + '       op.mjs audit --port <launcher port> [--base /worlds] [--slug <slug>]');
   process.exit(2);
 };
+if (cmd === 'client-errors' && flag('port')) {
+  const q = new URLSearchParams({ ...(flag('world') ? { world: flag('world') } : {}), ...(flag('limit') ? { limit: flag('limit') } : {}) });
+  const r = await fetch(`http://127.0.0.1:${Number(flag('port'))}${(flag('base') ?? '').replace(/\/$/, '')}/__sim/client-errors?${q}`, { signal: AbortSignal.timeout(30_000) });
+  console.log(JSON.stringify(await r.json().catch(() => ({ status: r.status })), null, 2)); process.exit(r.ok ? 0 : 1);
+}
 let body;
 if (cmd === 'create-world') {
   if (!flag('port') || !flag('name') || !flag('template') || !(flag('owner') || flag('owner-of'))) usage();

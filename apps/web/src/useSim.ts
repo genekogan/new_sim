@@ -5,6 +5,7 @@ import {acceptPrivateAuthority,acceptLivePrivateAuthority,retirePrivateAuthority
 import { apiPath, worldPath } from './world-path.ts';
 import { takeBootSocket } from './snapshot-prefetch.ts';
 import { arrivalMark } from './arrival-marks.ts';
+import { watchSocket } from './client-errors.ts';
 import { useEffect, useRef, useState } from 'react';
 import { Connection } from '@sim/client';
 import {createStationConnection,type StationConnection} from './score/station-connection.mjs';
@@ -95,7 +96,7 @@ export function useSim(getToken: () => Promise<string | null>, authed: boolean,i
       onTalk: (l) => { const seen = new Set(st.talk.map((x) => x.id)); st.talk = [...st.talk, ...l.filter((x) => !seen.has(x.id))].slice(-300); },
       // Spread so this compiles before and after the client declares onEdge; re-render comes from the 200 ms tick.
       ...({ onEdge: (m: EdgeMsg) => { st.edge = [...st.edge, m].slice(-300); } } as { onEdge(m: EdgeMsg): void }),
-    }, (u) => new WebSocket(u) as never,undefined,undefined,stationCapabilities,true);
+    }, (u) => watchSocket(new WebSocket(u)) as never,undefined,undefined,stationCapabilities,true);
     // lane W1: the socket index.html opened at page entry (snapshot-prefetch.ts), with what it has received so far
     const boot = takeBootSocket(st.conn.url); if (boot) st.conn.adopt(boot as never);
   }
