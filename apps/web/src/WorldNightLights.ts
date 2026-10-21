@@ -137,7 +137,11 @@ function paintInto(data:Uint8Array,sources:readonly NightSource[],paths:readonly
  };
  for(const s of sources)splat(s.x,s.z,s.radius,s.intensity,s.color,s.halo??s.radius*2.5,s.base??0);
  for(const p of paths)for(let i=1;i<p.length;i++){const [a,b]=[p[i-1],p[i]],len=Math.hypot(b[0]-a[0],b[1]-a[1]);for(let t=0;t<=len;t+=1.5)splat(a[0]+(b[0]-a[0])*t/len,a[1]+(b[1]-a[1])*t/len,1.3,.07,PATH,3,0);}
+ // Unlit texels (no splat reached them: wsum is exactly 0 and acc is all 0) get the bytes the full form gives them;
+ // on Eden's map ~93% of texels are unlit.
+ const unlitA=Math.round(255*Math.min(1,Math.max(0,(0-BASE_MIN)/BASE_RANGE)));
  for(let k=0;k<acc.length;k+=4){const wt=wsum[k>>2];
+  if(wt===0){data[k]=data[k+1]=data[k+2]=0;data[k+3]=unlitA;continue;}
   for(let ch=0;ch<3;ch++){const v=acc[k+ch];data[k+ch]=Math.round(255*Math.min(1,1.25*v/(1+v)));}
   // Light-weighted mean ground height (0 where there is no light).
   const base=wt>1e-4?acc[k+3]/wt:0;data[k+3]=Math.round(255*Math.min(1,Math.max(0,(base-BASE_MIN)/BASE_RANGE)));}
