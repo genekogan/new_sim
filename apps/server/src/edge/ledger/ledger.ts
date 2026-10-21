@@ -32,7 +32,7 @@ import {Intents,walkWithDestinationWords,walkWithFallback, attentionWords, type 
 import {classWords} from '../intents/class-words.ts';
 import {strictCheck} from '../intents/strict.ts';
 import {bodyEnd} from '../perception/here.ts';
-import {bootAliases,explicitPlaceCapability,resolvePlaceForVerb} from '../boot/world-places.ts';
+import {bootAliases,explicitPlaceCapability,lookupPlaceIdentity,resolvePlaceForVerb} from '../boot/world-places.ts';
 import {ActionOutcomes,outcomeParams,type ConfirmedEffects} from '../outcomes/store.ts';
 import {holdingFact,receiptItemOp,confirmedTogetherEffects,confirmedObjectEffects} from '../outcomes/effects.ts';
 import {resolveMailRecipient} from '../outcomes/recipients.ts';
@@ -1302,6 +1302,15 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (v.kind === 'unknown' && v.code === 'place.unreachable' && v.place && this.walkOnDemand) {
       const more = [...caps], morePlans = new Map(plans);
       if (this.walkOnDemand(soul, v.place, more, morePlans)) {caps = more; plans = morePlans; v = resolveCapability(text, this.vocabulary(soul, caps));}
+    }
+    // F6 (SOULSIM-H): a far building's room, by its walk ID (`walk:cottage/bedroom`, refused place.unwalkable) or by name
+    // ("walk to the cottage bedroom" chose walk:cottage, "contains it"): its own walk on demand, in at the front door
+    const far = exact || !this.walkOnDemand ? undefined : v.kind === 'alias' && v.inside && v.cap.verb === 'walk' ? v.inside : text.startsWith('walk:') ? lookupPlaceIdentity(this, text.slice(5), soul.soulId) : undefined;
+    const farId = typeof far === 'string' ? far : far?.ok && far.chosen.matchedBy !== 'fuzzy' ? far.chosen.place : undefined;
+    if (farId) {
+      const more = [...caps], morePlans = new Map(plans);
+      const cap = this.walkOnDemand!(soul, farId, more, morePlans) ? more.find(c => c.verb === 'walk' && c.target?.kind === 'place' && c.target.id === farId && c.available) : undefined;
+      if (cap) {caps = more; plans = morePlans; v = cap.id === text ? {kind: 'exact', cap} : {kind: 'alias', cap, note: `${text} is ${cap.id} (${cap.label}).`};}
     }
     // (a far place's run: "run to the lighthouse" was place.unreachable, its walk offered above, then the gait for it)
     if (v.kind === 'unknown' && (v.code === 'gait.unavailable' || v.code === 'place.unreachable') && v.place && this.gaitOnDemand && /^(?:jog|run)(?:[\s:]|$)/i.test(text.trim())) {
