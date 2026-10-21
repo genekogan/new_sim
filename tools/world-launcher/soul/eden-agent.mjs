@@ -113,7 +113,12 @@ async function clientListen(args, { call: call2, sleep: sleep2 = (ms) => new Pro
   if (follow) return followInbox({ poll, after, wait: sleep2, write, stop, now: now2 });
   if (once) return inboxResult(await poll(after), "listen");
   for (let delay = 0; ; ) {
-    const r = await poll(after);
+    let r;
+    try {
+      r = await poll(after);
+    } catch (e) {
+      r = { status: 0, data: { error: { code: "unreachable", message: String(e?.message ?? e) } } };
+    }
     if (transient(r)) {
       delay = Math.min(3e4, delay ? delay * 2 : 1e3);
       await sleep2(delay);

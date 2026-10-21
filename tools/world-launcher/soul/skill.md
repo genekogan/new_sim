@@ -89,8 +89,9 @@ For each message, oldest first:
 
 A question is answered in the ack reply (then `result <id> done "…"`). A message that a newer one replaces ("no, the
 house!"): ack it with a short note and do the newer one. Ack every message, even one you could not do, or the next
-`listen` hands it to you again. Then **run `listen` again right away**, the same way, every time. If `listen` fails
-(credential revoked, the world gone), say so to your human instead of retrying in a loop. After a break, the first
+`listen` hands it to you again. Then **run `listen` again right away**, the same way, every time. If `listen` ends
+without printing messages (stopped, killed, crashed), start it again at once. Only if it fails twice in a row with the
+same error (credential revoked, the world gone) say so to your human instead of retrying in a loop. After a break, the first
 `listen` prints the whole backlog: work through all of it. `OWNER MESSAGE` lines on other commands' stderr are only a
 heads-up; the same message comes with your next `listen`. `listen --follow` (one JSON line per message, never exits)
 is for scripts, not for agents.
