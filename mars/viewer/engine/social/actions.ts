@@ -26,7 +26,7 @@ import { clearanceAt, nearestBlocker, STEP } from '../spatial/grid.ts';
 import { PLAN_MARGIN } from '../spatial/path.ts';
 import { planWalk } from '../locomotion/walk.ts';
 import { bodyProfile } from '../bodies/navigation.ts';
-import { HUMAN_PROFILE } from '../spatial/types.ts';
+import { HUMAN_PROFILE, type Obstacle } from '../spatial/types.ts';
 import { checkStations, childrenState, walkCrew, type Children } from '../construction/children.ts';
 import { holdingDiagnostic } from '../construction/rules.ts';
 import { assignNearest, isFree, needsApproach, seatApproach, slotById, whyTaken, slotResource, slotsOf, SLOT_CLEARANCE, type Slot, type SlotKind } from './slots.ts';
@@ -421,15 +421,48 @@ const TRANSITION_BODY = 0.5;
  * never turn into a shortcut through it), and no floor under the point is no way on. The sit plan's reachable/1 test and
  * the use-check (BS1 useCheckV1) share it.
  */
-export function slotTransitionIssue(rt: Runtime, slot: Slot, point: Vec2, profile: { radius: number; height: number }): Diagnostic | null {
+/** The scene's obstacles bucketed by 4 m cell (each under every cell its bounding circle's box covers), for a caller that
+ *  tests many slides against one scene (BS1 useCheckV1): `near` answers, in scene order, every obstacle whose bounding
+ *  circle's box meets the box [x0, z0, x1, z1]. Built for one obstacle list; pass it only while that list is the scene's. */
+export type ObstacleIndex = { obstacles: readonly Obstacle[]; near(x0: number, z0: number, x1: number, z1: number): Obstacle[] };
+const OBSTACLE_CELL = 4;
+export function obstacleIndex(obstacles: readonly Obstacle[]): ObstacleIndex {
+  const cells = new Map<number, number[]>(), key = (i: number, j: number) => i * 1048576 + j;
+  const span = (lo: number, hi: number): [number, number] => [Math.floor(lo / OBSTACLE_CELL), Math.floor(hi / OBSTACLE_CELL)];
+  obstacles.forEach((o, k) => {
+    const r = hypot(o.obb.half[0], o.obb.half[1]), [i0, i1] = span(o.obb.c[0] - r, o.obb.c[0] + r), [j0, j1] = span(o.obb.c[1] - r, o.obb.c[1] + r);
+    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const c = cells.get(key(i, j)); if (c) c.push(k); else cells.set(key(i, j), [k]); }
+  });
+  return {
+    obstacles,
+    near(x0, z0, x1, z1) {
+      const [i0, i1] = span(x0, x1), [j0, j1] = span(z0, z1), got = new Set<number>();
+      for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) for (const k of cells.get(key(i, j)) ?? []) got.add(k);
+      return [...got].sort((a, b) => a - b).map((k) => obstacles[k]);
+    },
+  };
+}
+export function slotTransitionIssue(rt: Runtime, slot: Slot, point: Vec2, profile: { radius: number; height: number }, index?: ObstacleIndex): Diagnostic | null {
   const sp = rt.services.spatial as Spatial, n = Math.max(1, Math.ceil(dist2(point, slot.p) / 0.025));
   const pad = dist2(point, slot.p) / n / 2, floor = sp.levelAt(slot.level, point);
   if (!floor) return { code: 'slot.no-floor', message: `${slot.id}: no floor at its sit/stand approach`, subjects: [slot.id] };
+  // Only obstacles whose bounding circle comes within reach of the slide can block it (the box is inside that circle, so
+  // its distance from any sample is at least the centre's distance less the circle's radius): the same answer, in the
+  // same order, without testing every sample against every obstacle of the world (BS1: the use-check calls this per try).
+  const reach = profile.radius * TRANSITION_BODY + pad + 1e-6, near: Obstacle[] = [];
+  const dx = slot.p[0] - point[0], dz = slot.p[1] - point[1], len2 = dx * dx + dz * dz;
+  const pool = index && index.obstacles === sp.scene.obstacles
+    ? index.near(Math.min(point[0], slot.p[0]) - reach, Math.min(point[1], slot.p[1]) - reach, Math.max(point[0], slot.p[0]) + reach, Math.max(point[1], slot.p[1]) + reach)
+    : sp.scene.obstacles;
+  for (const o of pool) {
+    const cx = o.obb.c[0] - point[0], cz = o.obb.c[1] - point[1], t = len2 > 0 ? Math.min(1, Math.max(0, (cx * dx + cz * dz) / len2)) : 0;
+    if (hypot(cx - t * dx, cz - t * dz) - hypot(o.obb.half[0], o.obb.half[1]) < reach) near.push(o);
+  }
   for (let i = 0; i <= n; i++) {
     const k = i / n, p: Vec2 = [point[0] + (slot.p[0] - point[0]) * k, point[1] + (slot.p[1] - point[1]) * k];
     // The actor may still be downstairs. The transition happens after the walk, on the seat's floor.
     const y = slot.level === 0 && sp.ground ? sp.ground.standY(p[0], p[1]) : floor.y;
-    for (const o of sp.scene.obstacles) {
+    for (const o of near) {
       if (o.id === slot.owner || o.y1 <= y + STEP || o.y0 >= y + profile.height) continue;
       // A seat tucked under a table (a bus seat 5 cm inside its table's footprint): that table is the seat's own
       // workspace, so the slide may end inside it. Thin walls never qualify.
