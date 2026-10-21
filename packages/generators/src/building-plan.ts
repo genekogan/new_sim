@@ -11,7 +11,9 @@ export type PRoom = { id: string; name: string; floor: number; kind: string; rec
 export type PDoor = { floor: number; a: string; b: string; at?: number; width?: number; height?: number };
 export type PExt = { floor: number; room: string; side: Side; at?: number; kind: 'door' | 'window'; width?: number; height?: number; sill?: number; to?: 'outside' | 'balcony' | 'porch' };
 /** A straight flight in a band along a wall: `rect` is the flight's footprint, it rises along `axis` in direction `dir`. */
-export type PStair = { id: string; from: number; to: number; room: string; rect: Rect; axis: 'x' | 'z'; dir: 1 | -1; width: number; risers: number; going: number; /** Sign of the room side across the band (away from its wall). */ away: 1 | -1 };
+export type PStair = { id: string; from: number; to: number; room: string; rect: Rect; axis: 'x' | 'z'; dir: 1 | -1; width: number; risers: number; going: number; /** Sign of the room side across the band (away from its wall). */ away: 1 | -1;
+  /** A flight narrowed to keep its corridor (bandWidth): the full-width band it replaces. Doors are placed round this one, so
+   *  narrowing a flight never moves a door (furniture stored beside a door stays clear of it). */ band?: Rect };
 /** A helix along the inside of a round (or square) tower wall: centre, mid radius, start angle (rad, 0 = +z, ccw seen from above toward +x), sweep. */
 export type PSpiral = { id: string; from: number; to: number; c: Vec2; r: number; width: number; a0: number; sweep: number; risers: number };
 export type Plan = {
@@ -41,6 +43,18 @@ export const floorY = (k: number, fh: number) => k * fh + FLOOR0;
  *  a 0.68 m walker (radius .28 + margin .06) loses at some yaws on the 0.1 m walk raster. A def opts into the 1.2 m
  *  layout with make.args.corridor (nav-connect/1, 2026-10-20): stored defs keep 1.0, so a building never changes shape. */
 export const corridorOf = (args: Record<string, unknown>) => { const v = Number(args.corridor); return Number.isFinite(v) ? Math.max(1.0, Math.min(2.0, v)) : 1.0; };
+/**
+ * Flight width for a stair strip `avail` m deep (from the wall the bands start at) holding `bands` flights side by side and a
+ * corridor of `corr` beside them (upper-walk/1, lane t4-upper 2026-10-21). A strip the plan had to clamp (a narrow
+ * townhouse's hall: rooms keep their 2.4 m) used to keep full 0.95 m flights and leave the corridor short: Eden 2026's
+ * 5.2 m canal townhouses had 0.51 m clear beside the upper flight, so no one could walk from the stair top to the bedroom
+ * doors. The flights narrow instead (down to MIN_STAIR_W) so the corridor keeps its width. An unclamped strip is unchanged.
+ */
+export const MIN_STAIR_W = 0.75; // the compiler's stairs.narrow floor
+export function bandWidth(avail: number, bands: number, corr: number): number {
+  if (avail >= bands * STAIR_W + corr - 1e-6) return STAIR_W;
+  return Math.max(MIN_STAIR_W, Math.min(STAIR_W, (avail - corr) / bands));
+}
 export function stairGeometry(fh: number) { const risers = Math.ceil(fh / MAX_RISE - 1e-9); return { risers, run: (risers - 1) * GOING }; }
 
 class Ids { private used = new Set<string>(); take(base: string): string { let id = base, k = 2; while (this.used.has(id)) id = `${base}-${k++}`; this.used.add(id); return id; } }
@@ -61,7 +75,7 @@ function base(c: Ctx): Plan {
  * Flight k uses band k % 2 and alternates direction (a switchback), so every floor is reachable.
  * Returns the flights and how deep the strip must be.
  */
-function bandStairs(c: Ctx, axis: 'x' | 'z', lo: number, hi: number, wallInner: number, rooms: (k: number) => string, ids: Ids, plan: Plan): PStair[] {
+function bandStairs(c: Ctx, axis: 'x' | 'z', lo: number, hi: number, wallInner: number, rooms: (k: number) => string, ids: Ids, plan: Plan, width = STAIR_W): PStair[] {
   const { risers, run: run0 } = stairGeometry(c.fh);
   const out: PStair[] = [];
   const span = hi - lo;
@@ -76,10 +90,11 @@ function bandStairs(c: Ctx, axis: 'x' | 'z', lo: number, hi: number, wallInner: 
   const rise0: 1 | -1 = axis === 'x' ? 1 : -1;
   const s0 = lo + (rise0 === 1 ? atBottom : atTop), s1 = s0 + run;
   for (let k = 0; k < c.floors - 1; k++) {
-    const band = k % 2, b0 = wallInner + band * STAIR_W, b1 = b0 + STAIR_W;
+    const band = k % 2, b0 = wallInner + band * width, b1 = b0 + width;
     const dir = (band === 0 ? rise0 : -rise0) as 1 | -1;
     const rect: Rect = axis === 'x' ? [s0, b0, s1, b1] : [b0, s0, b1, s1];
-    out.push({ id: ids.take('stairs'), from: k, to: k + 1, room: rooms(k), rect, axis, dir, width: STAIR_W, risers, going, away: 1 });
+    const n0 = wallInner + band * STAIR_W, n1 = n0 + STAIR_W, band0: Rect = axis === 'x' ? [s0, n0, s1, n1] : [n0, s0, n1, s1];
+    out.push({ id: ids.take('stairs'), from: k, to: k + 1, room: rooms(k), rect, axis, dir, width, risers, going, away: 1, ...(width < STAIR_W ? { band: band0 } : {}) });
   }
   return out;
 }
@@ -117,8 +132,8 @@ function upperFloors(c: Ctx, p: Plan, ids: Ids, stairLo: number, groundStairRoom
   const { X0, X1, Z0, Z1 } = extents(c), Wc = X1 - X0;
   const inner = Z0 + c.t / 2;
   const landingIds: string[] = [];
-  const strip = (c.floors > 2 ? 2 : 1) * STAIR_W + corridorOf(c.args);
-  const zL = Math.min(Z1 - 2.2, inner + strip);
+  const bands = c.floors > 2 ? 2 : 1, strip = bands * STAIR_W + corridorOf(c.args);
+  const zL = Math.min(Z1 - 2.2, inner + strip), width = bandWidth(zL - inner, bands, corridorOf(c.args));
   for (let k = 1; k < c.floors; k++) {
     const landing = ids.take('landing'); landingIds[k] = landing;
     p.rooms.push({ id: landing, name: k === 1 ? 'Landing' : `Landing ${k}`, floor: k, kind: 'landing', rect: [X0, Z0, X1, zL] });
@@ -132,7 +147,7 @@ function upperFloors(c: Ctx, p: Plan, ids: Ids, stairLo: number, groundStairRoom
       if (k === 1 && i === 0 && c.balcony) p.balcony = { floor: 1, room: id, width: Math.min(3.2, xs[1] - xs[0] - 0.4), depth: 1.2 };
     }
   }
-  p.stairs = bandStairs(c, 'x', stairLo, X1 - c.t / 2, inner, (k) => (k === 0 ? groundStairRoom : landingIds[k]), ids, p);
+  p.stairs = bandStairs(c, 'x', stairLo, X1 - c.t / 2, inner, (k) => (k === 0 ? groundStairRoom : landingIds[k]), ids, p, width);
   if (p.balcony) p.ext.push({ floor: 1, room: p.balcony.room, side: 's', kind: 'door', to: 'balcony' });
 }
 
@@ -155,7 +170,8 @@ function townhousePlan(c: Ctx, shop = false): Plan {
     return p;
   }
   // townhouse: a hall down the west side with the stairs along the west wall; rooms to the east
-  const hw = (c.floors > 2 ? 2 : 1) * STAIR_W + corridorOf(c.args), xh = Math.min(X0 + hw, X1 - 2.4), innerW = X0 + c.t / 2;
+  const bands = c.floors > 2 ? 2 : 1, hw = bands * STAIR_W + corridorOf(c.args), xh = Math.min(X0 + hw, X1 - 2.4), innerW = X0 + c.t / 2;
+  const width = bandWidth(xh - X0, bands, corridorOf(c.args));
   const zSplit = (Z0 + Z1) / 2;
   const halls: string[] = [];
   for (let k = 0; k < c.floors; k++) {
@@ -170,7 +186,7 @@ function townhousePlan(c: Ctx, shop = false): Plan {
   p.ext.push({ floor: 0, room: halls[0], side: 's', kind: 'door', to: c.porch > 0 ? 'porch' : 'outside' });
   if (p.balcony) p.ext.push({ floor: 1, room: p.balcony.room, side: 's', kind: 'door', to: 'balcony' });
   // flights along the west wall, rising toward the back; arrive at the back, landing 1 m before the back wall
-  p.stairs = bandStairs(c, 'z', Z0 + c.t / 2, Z1 - c.t / 2 - 1.2, innerW, (k) => halls[k], ids, p);
+  p.stairs = bandStairs(c, 'z', Z0 + c.t / 2, Z1 - c.t / 2 - 1.2, innerW, (k) => halls[k], ids, p, width);
   return p;
 }
 

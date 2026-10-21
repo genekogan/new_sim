@@ -192,3 +192,23 @@ test('small round entrances and tower stairs retain human clearance; low chapels
     assert.ok(b.links!.every((l) => l.width >= 0.75));
   }
 });
+
+test('narrow townhouse (Eden 2026 canal homes, 5.2 m): the upper flights narrow so the corridor beside them stays walkable; no door moves', () => {
+  for (const floors of [3, 4]) {
+    const L = buildingLayout({ style: 'townhouse', w: 5.2, d: 8.2, floors, floorHeight: 2.9 });
+    // full-width flights left 0.51 m clear between the second flight and the room wall: no walk from the stair top to the bedrooms
+    const hallWall = L.walls.find((w) => w.floor === 1 && !w.exterior && w.axis === 'z')!;
+    for (const s of L.stairs) {
+      assert.ok(s.width >= 0.75 && s.width < 0.95, `${s.id} width ${s.width}`);
+      const clear = Math.abs(hallWall.a[0] - s.rect![2]) - 0.06;
+      assert.ok(clear >= 0.8, `${s.id}: ${clear.toFixed(2)} m clear beside the flight`);
+    }
+    // doors sit where full-width flights put them (furniture stored beside a door stays clear of it)
+    const at = (id: string) => L.openings.find((o) => o.id === id)!.at.map((v) => +v.toFixed(3));
+    assert.deepEqual(at('door-bedroom-landing'), [0.09, 2.095]);
+    assert.deepEqual(at('door-bath-landing'), [0.09, -3.295]);
+    assert.deepEqual(at('door-bedroom-3-landing-2'), [0.09, -3.295]);
+  }
+  // a townhouse wide enough for full flights is unchanged
+  for (const s of buildingLayout({ style: 'townhouse', w: 6, d: 10, floors: 3 }).stairs) assert.equal(s.width, 0.95);
+});

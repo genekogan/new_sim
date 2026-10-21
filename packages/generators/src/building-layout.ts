@@ -329,9 +329,10 @@ export function realize(p: Plan): Layout {
       // stairs running along this wall on this floor (flight) or arriving through it (stairwell)
       for (const s of L.stairs) {
         if (!s.rect || (s.from !== w.floor && s.to !== w.floor)) continue;
-        const d = distRectToWall(s.rect, w);
+        const r = p.stairs.find((q) => q.id === s.id)?.band ?? s.rect; // a narrowed flight keeps its band's windows
+        const d = distRectToWall(r, w);
         if (d > 0.4) continue;
-        const along = w.axis === 'x' ? [s.rect[0], s.rect[2]] : [s.rect[1], s.rect[3]];
+        const along = w.axis === 'x' ? [r[0], r[2]] : [r[1], r[3]];
         const a = sOf(w, along[0]), b = sOf(w, along[1]);
         blocked.push([Math.min(a, b) - 0.2, Math.max(a, b) + 0.2]);
       }
@@ -375,7 +376,7 @@ function stairClear(p: Plan, floor: number, e: { axis: 'x' | 'z'; c: number }, w
   const bad: [number, number][] = [];
   for (const st of p.stairs) {
     if (st.from !== floor && st.to !== floor) continue;
-    const [x0, z0, x1, z1] = st.rect, [a0, a1, b0, b1] = e.axis === 'x' ? [x0, x1, z0, z1] : [z0, z1, x0, x1];
+    const [x0, z0, x1, z1] = st.band ?? st.rect, [a0, a1, b0, b1] = e.axis === 'x' ? [x0, x1, z0, z1] : [z0, z1, x0, x1];
     if (Math.max(b0 - e.c, e.c - b1, 0) >= 0.85) continue;
     bad.push([a0 - w / 2 - 0.45, a1 + w / 2 + 0.45]);
   }
