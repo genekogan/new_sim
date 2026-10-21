@@ -73,6 +73,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** World-engine worlds only (god/nav.ts): a walk to a named place beyond the listing's radius (a far big top), added to
    *  this act's capabilities on demand; true when one was added. Unset elsewhere. */
   walkOnDemand?: (soul: EdgeSoul, placeId: string, caps: EdgeCapability[], plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>) => boolean;
+  /** RT: a jog or run to a named place the listing offers no gait for (a building or a room: those are walk-only in the
+   *  listing): jog/run to its front door, then walk inside. Adds `<gait>:<placeId>` to copies; true when added. */
+  gaitOnDemand?: (soul: EdgeSoul, placeId: string, gait: 'jog' | 'run', caps: EdgeCapability[], plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>) => boolean;
   /** World-engine worlds only: called before the map is read, so a god's edit shows on the next `map`. Unset elsewhere. */
   beforeMap?: () => void;
   private pending = new Map<string, Pending>();           // soulId → waiting act
@@ -674,6 +677,11 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (v.kind === 'unknown' && v.code === 'place.unreachable' && v.place && this.walkOnDemand) {
       const more = [...caps], morePlans = new Map(plans);
       if (this.walkOnDemand(soul, v.place, more, morePlans)) {caps = more; plans = morePlans; v = resolveCapability(text, this.vocabulary(soul, caps));}
+    }
+    // RT: "run to the cottage": a building or room has no gait offer in the listing; offer run-to-the-door-then-walk-in
+    if (v.kind === 'unknown' && v.code === 'gait.unavailable' && v.place && this.gaitOnDemand) {
+      const gait = text.trim().toLowerCase().startsWith('jog') ? 'jog' as const : 'run' as const, more = [...caps], morePlans = new Map(plans);
+      if (/^(?:jog|run)(?:[\s:]|$)/i.test(text.trim()) && this.gaitOnDemand(soul, v.place, gait, more, morePlans)) {caps = more; plans = morePlans; v = resolveCapability(text, this.vocabulary(soul, caps));}
     }
     if (v.kind === 'unknown') return {...refuse(v.code ?? 'capability.unknown', v.reason), did_you_mean: v.didYouMean};
     let cap = v.cap; capability = cap.id;

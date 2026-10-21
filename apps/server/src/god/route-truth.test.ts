@@ -53,3 +53,35 @@ test('route truth: a sealed yard is listed unreachable and go refuses; opened, i
   assert.ok(open && open.reachable === undefined && /^~/.test(open.eta), JSON.stringify(open));
   assert.equal((edge.intents.resolve(soul, { verb: 'go', target: { place: 'yard' } } as any) as any).ok, true);
 });
+
+test('run to a building: run to its front door, then walk inside', { timeout: 300_000 }, async (t) => {
+  const f = fixture(':memory:', factory, { durableClockV1: true });
+  const god = new GodMode(f.db, { worldId: f.host.worldId, ownerId: 'dev:admin', tick: () => f.host.engine.world.tick, emit: () => {} });
+  const edge = new EdgeLedger(f.host, f.db);
+  const bridge = installEngineBridge({ host: f.host, god, edge, log: () => {} });
+  const settle = async (n = 4) => { for (let i = 0; i < n; i++) { f.host.tickOnce(); await setImmediate(); f.host.drainInputs(); } };
+  f.brain.quiesce();
+  t.after(() => { f.brain.quiesce(); f.host.stop(); edge.comms?.close(); f.db.close(); });
+  await settle(2);
+  const r: any = god.act({ ops: [{ op: 'place', def: coreRef('cottage'), name: 'cottage', p: [24, 10], r: -1.0685826404927201 }] });
+  assert.equal(r.accepted, true, JSON.stringify(r).slice(0, 600));
+  await settle(4);
+  bridge.perceive.sync(true);
+  await invite(f, 'ana');
+  const row: any = await accept(f.host, f.souls.create('dev:ana', { name: 'Ana', description: 'curious' }));
+  await settle(3);
+  const soul = { soulId: row.id, entityId: row.entity_id, name: row.name, owner: row.owner };
+  assert.equal(edge.capabilities(soul).some((c) => c.id === 'run:g-cottage'), false, 'the listing offers no gait to a building');
+  const a: any = await accept(f.host, edge.act(soul, { capability: 'run:g-cottage' }));
+  assert.equal(a.accepted, true, JSON.stringify(a));
+  // the plan offered on demand: at a run to the stand outside the front door, then the walk inside as offered
+  const b = edge.coreA.binds(soul), caps = [...b.caps], plans = new Map<string, any>(b.plans);
+  assert.equal(bridge.nav.gaitOnDemand(soul, 'g-cottage', 'run', caps, plans), true);
+  const steps = plans.get('run:g-cottage').steps, door = bridge.nav.thing('cottage')!.stands![0];
+  assert.deepEqual(steps[0].params, { to: door, gait: 'run', standoff: 0 }); assert.equal(steps.at(-1).verb, 'walk_to'); assert.equal(steps.at(-1).params.gait, undefined);
+  assert.match(plans.get('run:g-cottage').label, /^Run to the door of cottage, then walk inside/);
+  for (let i = 0; i < 4000; i++) { f.host.tickOnce(); if (i % 20 === 0) { await setImmediate(); f.host.drainInputs(); const o: any = edge.observe(soul, new Set()); if (i > 40 && !o.self.receipts.length) break; } }
+  await settle(2);
+  const rc: any = edge.observe(soul, new Set());
+  assert.ok(edge.placePathOf(soul.soulId).some((x) => x.id === 'g-cottage'), `inside the cottage: ${JSON.stringify(f.host.engine.world.entities[row.entity_id].pose.p)} ${JSON.stringify(rc.self).slice(0, 400)}`);
+});

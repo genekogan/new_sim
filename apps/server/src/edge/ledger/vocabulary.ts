@@ -38,7 +38,8 @@ export type VocabResult =
   | {kind: 'unknown'; reason: string; didYouMean: {id: string; label: string}[];
     /** Refusal code when it is not capability.unknown (place.unreachable: a named place exists but cannot be reached). */
     code?: string;
-    /** place.unreachable: the named place (a host may offer a walk to it on demand and resolve again). */
+    /** place.unreachable: the named place (a host may offer a walk to it on demand and resolve again). gait.unavailable:
+     *  the named place with no faster-gait offer (a host may offer that gait on demand: lane RT, run to a building's door). */
     place?: string};
 
 const STOP = new Set(['the', 'a', 'an', 'to', 'of', 'in', 'at', 'by', 'on', 'into', 'near', 'with', 'my', 'some', 'through', 'thru', 'around', 'across', 'over', 'back', 'please', 'little', 'bit', 'for', 'while', 'and', 'then', 'there']);
@@ -307,7 +308,7 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       const place = named[0], offered = ctx.caps.filter(c => c.verb === verb && c.target?.id === place.id).sort((a,b) => Number(b.available)-Number(a.available) || a.id.localeCompare(b.id));
       if (offered[0]) return {kind:'alias',cap:offered[0],note:`${input} is ${offered[0].id} (${offered[0].label}).`};
       const bank = verb.endsWith('-around') && place.kind === 'water';
-      return {kind:'unknown',code:bank?'gait.no-bank-loop':'gait.unavailable',reason:bank?`${place.name} has no full loop on reachable dry ground; nothing else was chosen.`:`No ${verb} capability is offered for ${place.name}; nothing else was chosen in its place.`,didYouMean:[]};
+      return {kind:'unknown',code:bank?'gait.no-bank-loop':'gait.unavailable',reason:bank?`${place.name} has no full loop on reachable dry ground; nothing else was chosen.`:`No ${verb} capability is offered for ${place.name}; nothing else was chosen in its place.`,didYouMean:[],...(bank?{}:{place:place.id})};
     }
   }
   // A named pond means its bank loop, never an unrelated park that mentions ponds in its description.

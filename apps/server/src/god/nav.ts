@@ -418,6 +418,29 @@ export class GodNav {
     return caps.length > n;
   }
 
+  /** RT (2026-10-20): `run:<building>` / `jog:<room>`: the listing offers walks only to buildings and rooms (a gait per
+   *  room bloated Eden 2026's list), so a named one gets its gait on demand: at that gait to the front door's stand
+   *  outside, then the walk inside as offered. A thing with no door stand, or a Soul already at the door or upstairs, gets
+   *  the walk at that gait as it is. True when `<gait>:<placeId>` was added. */
+  gaitOnDemand(soul: EdgeSoul, placeId: string, gait: 'jog' | 'run', caps: EdgeCapability[], plans: Plans): boolean {
+    const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human || !this.h.placeOf) return false;
+    const id = `${gait}:${placeId}`; if (caps.some((c) => c.id === id)) return false;
+    let walk = caps.find((c) => c.verb === 'walk' && c.target?.kind === 'place' && c.target.id === placeId);
+    if (!walk && this.walkOnDemand(soul, placeId, caps, plans)) walk = caps.find((c) => c.verb === 'walk' && c.target?.kind === 'place' && c.target.id === placeId);
+    const base = walk?.available ? plans.get(walk.id) : undefined; if (!walk || !base) return false;
+    const t = this.thing(walk.id.slice('walk:'.length)), here: Vec2 = [me.pose.p[0], me.pose.p[2]];
+    const door = t?.kind === 'building' && t.stands?.[0] ? { p: t.stands[0], level: t.level } : t?.kind === 'room' ? t.entry ?? null : null;
+    const far = !!door && door.level === 0 && (me.human.level ?? 0) === 0 && Math.hypot(door.p[0] - here[0], door.p[1] - here[1]) > 3;
+    const fast = (s: Step): Step => (s.verb === 'walk_to' ? { ...s, params: { ...s.params, gait } } : structuredClone(s));
+    const steps: Step[] = far
+      ? [...base.steps.filter((s) => s.verb === 'stand'), { verb: 'walk_to', params: { to: door!.p, gait, standoff: 0 } }, ...base.steps.filter((s) => s.verb !== 'stand')]
+      : base.steps.map(fast);
+    const name = t?.ref ?? placeId, label = far ? `${gait === 'jog' ? 'Jog' : 'Run'} to the door of ${name.split('/')[0]}, then walk inside${t?.kind === 'room' ? ` to ${name}` : ''}` : `${gait === 'jog' ? 'Jog' : 'Run'} to ${name}`;
+    caps.push({ ...walk, id, verb: gait, label });
+    plans.set(id, { label, steps });
+    return true;
+  }
+
   private offerWalk(soul: EdgeSoul, t: Thing, d: number, at: { here: Vec2; myLevel: number; seated: boolean; exit: { p: Vec2; level: number } | null }, caps: EdgeCapability[], plans: Plans) {
     const { here, myLevel, seated, exit } = at;
     const id = `walk:${t.ref}`; if (caps.some((c) => c.id === id)) return;
