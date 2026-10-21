@@ -84,6 +84,7 @@ import { GodWorldLiving, calendarClock, entityWorldState, godRoomViews, godTourV
 import { setFleeSources } from './gen-mesh/motion.ts';
 import { WorldLightning } from './WorldLightning.ts';
 import { worldArrivalPose } from './arrival-shot.ts';
+import { anyPersonInView } from './people-in-view.ts';
 import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { worldResolution } from './adaptive-resolution.ts';import { browserQuality } from './quality-tier.ts';import { WorldDistanceDetail } from './WorldDistanceDetail.ts';import { WorldMeshLod, PHONE_MESH_LOD, DESKTOP_MESH_LOD, workerSimplifier, type Simplifier } from './WorldMeshLod.ts';import { WorldFarStandIns, PHONE_STAND_INS, rendererSnapshotter } from './WorldFarStandIns.ts';import { compileSceneAsync, setTextureRenderer } from './gen-mesh/texture-budget.ts';
 // P1 phones: the god panel and the constitution card are lazy chunks, mounted once the arrival card has gone (20 s cap), or
 // at once when the landing URL carries something for the panel (#join, #approve/…, an offer or pairing link, a preview)
@@ -280,7 +281,10 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     // building worker's code waited behind them) and held the card ~12 s; until they land, a simple figure stands in.
     // Desktop, old worlds and pictures load them at once and wait for them as before. `?people=wait|later` overrides.
     const earlyWanted=earlyArrivalWanted(quality.tier,newWorld,location.search,shotMode);
-    const peopleLater=((q:string|null)=>q==='wait'?false:q==='later'?true:quality.tier==='phone'&&!shotMode)(new URLSearchParams(location.search).get('people'))&&newWorld;
+    // Old worlds on phones (F12): undecided until the first snapshot, held meanwhile; the people wait for the arrival
+    // only when none of them stands in the arrival camera's view (otherwise the card waits for them as before).
+    const peopleAsk=new URLSearchParams(location.search).get('people'),peopleRule=((q:string|null)=>q==='wait'?false:q==='later'?true:quality.tier==='phone'&&!shotMode)(peopleAsk);
+    let peopleLater=peopleRule&&(newWorld||peopleAsk!=='wait');const peopleByView=peopleLater&&!newWorld&&peopleAsk!=='later';
     const adaptive=worldResolution(renderer,Math.min(devicePixelRatio,quality.maxPixelRatio),newWorld,shotMode);if(adaptive)(window as unknown as {__simAdaptive?:unknown}).__simAdaptive=adaptive;  // W2b: shot mode stays at pixel ratio 1; phones cap the ratio (quality tier); ordinary worlds retain adaptive resolution
     renderer.shadowMap.enabled = true;
     // look pass for entity worlds: occlusion, highlight roll-off + night exposure, material detail (rendering/WorldLook.ts)
@@ -530,7 +534,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     // lane W1: a new world loads (and parses, ~0.1 s of main thread) its character templates once it has arrived, or as
     // soon as an initial body needs one; old worlds load them at once, as before
     let templatesStarted=false;const startTemplates=()=>{if(templatesStarted)return;templatesStarted=true;void loadPeopleKit().then(kit=>kit.loadTemplates(abort.signal,resources,templateOptions)).catch(()=>{});};
-    if(!newWorld||shotMode)startTemplates();
+    if((!newWorld&&!peopleLater)||shotMode)startTemplates();
     const requireTemplate=async(name:string)=>{startTemplates();if(templates.some(t=>t.name===name))return;if(templateLoads.get(name)?.failed){beginTemplate(name);void loadPeopleKit().then(kit=>kit.loadTemplates(abort.signal,resources,{...templateOptions,names:[name]})).catch(()=>{});}await templateLoads.get(name)!.promise;};
 
     // Current unbound live viewers retain their observed layout. Historical
@@ -777,7 +781,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           bodyModels.sync(records,sampled.entities);
           const sampledFloaters=new Map(Object.entries(sampled.entities).flatMap(([id,e])=>{const body=recordedBody(records[id]?.body,e.state);if(body?.family!=='floater')return [];const url=admittedBodyUrl(body.modelUrl,apiPath('').replace(/\/$/,''));return [[id,{...body,...(url?{modelUrl:url}:{})} as NonNullable<Entity['body']>]] as [string,NonNullable<Entity['body']>][];}));
           floaters.sync(sampledFloaters);
-          if(initialGate&&!initialSnapshot){const gate=initialGate;initialSnapshot=true;const initialRecords=structuredClone(records),initialEntities=structuredClone(sampled.entities),floaterIds=[...sampledFloaters.keys()];initialBodyIds=Object.keys(initialEntities).filter(id=>initialRecords[id]?.kind==='human');const names=new Set<string>();for(const [id,e]of Object.entries(initialEntities)){if(initialRecords[id]?.kind!=='human')continue;const body=recordedBody(initialRecords[id]?.body,e.state);if(body?.family==='floater'||body?.modelUrl)continue;names.add(templateNameFor(id,PEOPLE));}if(!peopleLater){for(const name of names)gate.require('Person '+name,()=>requireTemplate(name));gate.require('Initial Soul bodies',()=>bodyModels.readyInitial(initialRecords,initialEntities));}if(floaterIds.length)gate.require('Initial ceramic bodies',async()=>{floaters.retryInitial(floaterIds);await floaters.readyInitial(floaterIds);});gate.seal();}
+          if(initialGate&&!initialSnapshot){const gate=initialGate;initialSnapshot=true;const initialRecords=structuredClone(records),initialEntities=structuredClone(sampled.entities),floaterIds=[...sampledFloaters.keys()];initialBodyIds=Object.keys(initialEntities).filter(id=>initialRecords[id]?.kind==='human');if(peopleByView){peopleLater=!anyPersonInView(camera,initialBodyIds.map(id=>initialEntities[id]!.p));arrivalMark(peopleLater?'people-later':'people-wait');if(!peopleLater){bodyModels.held=false;startTemplates();}}const names=new Set<string>();for(const [id,e]of Object.entries(initialEntities)){if(initialRecords[id]?.kind!=='human')continue;const body=recordedBody(initialRecords[id]?.body,e.state);if(body?.family==='floater'||body?.modelUrl)continue;names.add(templateNameFor(id,PEOPLE));}if(!peopleLater){for(const name of names)gate.require('Person '+name,()=>requireTemplate(name));gate.require('Initial Soul bodies',()=>bodyModels.readyInitial(initialRecords,initialEntities));}if(floaterIds.length)gate.require('Initial ceramic bodies',async()=>{floaters.retryInitial(floaterIds);await floaters.readyInitial(floaterIds);});gate.seal();}
 
           if(publication&&oldKit)nativeSocialDraw??=new oldKit.WorldNativeSocialDraw();
           if(nativeSocialDraw)nativeSocialDraw.update(people,publication,take,records,sampled,appearanceProfiles.nativeSocial);else people.setFixtureDrawReplacement(null);
