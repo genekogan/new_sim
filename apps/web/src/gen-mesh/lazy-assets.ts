@@ -14,10 +14,13 @@ import { browserQuality, progressiveNearM } from '../quality-tier.ts';
 
 const qs = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');
 export const LAZY = !qs.has('shot') && qs.get('assets') !== 'eager';
-// P1 phones: a phone (quality tier) holds the arrival card for at most ~1 MB of the nearest GLBs and 3 s; the rest fills in
-// after the card. On a Slow 4G link (~180 KB/s) 24 MB / 30 s kept a phone on the card for the full 30 s. ?eagerMB still wins.
+// P1 phones: a phone (quality tier) holds the arrival card for at most ~0.5 MB of the nearest GLBs and 3 s; the rest fills
+// in after the card. On a Slow 4G link (~180 KB/s) 24 MB / 30 s kept a phone on the card for the full 30 s. t4-phone-new: a
+// 4x phone's first GLB byte comes ~1 s into the 3 s gate and wire4g brings ~200 KB/s, so ~0.5 MB at most arrives inside it;
+// with 1 MB Mars College 2026 gated chiba (766 KB), which never arrived in time, and every poster waited the full 3 s.
+// ?eagerMB still wins.
 const PHONE = browserQuality().tier === 'phone';
-export const EAGER_BYTES = Math.max(1, Number(qs.get('eagerMB') ?? (PHONE ? 1 : 24))) * 1e6;
+export const EAGER_BYTES = Math.max(0.1, Number(qs.get('eagerMB') ?? (PHONE ? 0.5 : 24))) * 1e6;
 export const NEAR_M = 120;
 const BACKGROUND_DELAY_MS = 6000, BACKGROUND_PARALLEL = 2;
 const QUEUED = qs.get('loadqueue') !== '0'; // same-bundle A/B against the legacy near-camera burst
@@ -113,8 +116,9 @@ export function planEager(snap: { entities: Entity[]; assetBytes?: Record<string
     for (const sha of shas) { ndist.set(sha, Math.min(ndist.get(sha) ?? Infinity, nd)); dist.set(sha, Math.min(dist.get(sha) ?? Infinity, d)); rank.set(sha, Math.min(rank.get(sha) ?? Infinity, eye ? d / size : d)); }
   }
   const order = [...rank.keys()].sort((a, b) => rank.get(a)! - rank.get(b)!);
+  // a desktop always takes its first model; on a phone a model bigger than the budget left never holds the gate (t4-phone-new)
   const pick = new Set<string>(); let bytes = 0;
-  for (const sha of order) { const n = sizes[sha] ?? 0; if (near !== null && ndist.get(sha)! > near) continue; if (pick.size && (bytes + n > EAGER_BYTES || dist.get(sha)! > NEAR_M * 2)) continue; pick.add(sha); bytes += n; }
+  for (const sha of order) { const n = sizes[sha] ?? 0; if (near !== null && ndist.get(sha)! > near) continue; if ((pick.size || PHONE) && (bytes + n > EAGER_BYTES || dist.get(sha)! > NEAR_M * 2)) continue; pick.add(sha); bytes += n; }
   eager = pick; plannedEye = eye ?? centre;
   // lane PERF: the arrival card waits for these (or GATE_MS), so a new world opens with what is in front of you drawn
   eagerLeft.clear(); for (const sha of pick) eagerLeft.add(sha);
