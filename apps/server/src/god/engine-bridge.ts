@@ -195,7 +195,7 @@ export class EngineBridge {
       prepare: (before, after, diff, _ops, o) => { if (o?.dry !== true) { try { this.arrivalShaped = shapedIds(before, diff); } catch { this.arrivalShaped = null; } this.navShaped = this.arrivalShaped && navDoorFlips(before, diff, this.arrivalShaped); this.navBefore = this.navSpots(before, [...diff.removes, ...(this.navShaped ?? diff.upserts.map(e => e.id))]); } return this.prepareWalkouts(before, after, diff, o?.dry === true); },
       apply: (moved, o) => { const late = this.applyWalkouts(moved, this.stuckPlanned.splice(0)); this.stageMapNotices(o); return late; },
       arrivalNote: diff => this.arrivalNoteFor(diff),
-      navNote: diff => this.navNoteFor(diff),
+      navNote: (diff, said) => this.navNoteFor(diff, said),
     };
     // R8: residents near a visible map change hear of it once per request; a build near them, at start and at done.
     this.mapNotices = new MapNotices((soulId, text, place) => this.notices.notify(soulId, { text, tick: this.engine.world.tick, native: true, ...(place ? { place } : {}) }), () => this.god.now());
@@ -692,7 +692,9 @@ export class EngineBridge {
     }
     return n;
   }
-  private navNoteFor(diff: Diff): string[] {
+  private navNoteFor(diff: Diff, said?: string[]): string[] {
+    // buildsafe/1 already gave the god one line for these: not named twice
+    for (const ref of said ?? []) this.navBadKnown.add(ref);
     const shaped = this.navShaped, before = this.navBefore; this.navShaped = null; this.navBefore = [];
     const later = this.navLater; this.navLater = [];
     try {
