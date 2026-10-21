@@ -36,7 +36,8 @@ before(async () => {
     `SIM_TEST_JWKS_FILE=${join(dir, 'jwks.json')}`, `NODE_OPTIONS=--import=${preload}`, 'DEV_AUTH=1', ''].join('\n'));
   L = await openLauncher({ port: PORT, range: RANGE, dataDir: join(dir, 'data'), templatesDir, authEnvFile: envFile, publicOrigin: ORIGIN, eager: 0, log: () => {} });
 });
-after(async () => { await L?.close(); rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); });
+// world processes may still be flushing their compile cache into <data> after close: a leftover tmp dir is not a failure
+after(async () => { await L?.close(); try { rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch {} });
 
 test('guards without a world process: test flag or allowlist, never product worlds or forks, Gene\'s Souls by id and name', () => {
   const d = mkdtempSync(join(tmpdir(), 'op-souls-guard-'));
