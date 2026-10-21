@@ -9,7 +9,7 @@
 // SQLite's online backup API in ONE step (consistent while the worlds write; the copy keeps the live file's page layout, so pages
 // that did not change are byte-identical night to night and deduplicate: measured 13 MB/night against 24-29 MB for VACUUM INTO
 // copies, whose page renumbering defeats dedup), each copy gets PRAGMA quick_check, plus worlds.json, audit.jsonl and the
-// uploaded assets (worlds/assets, content-addressed, copied only when new). The copies sit in a staging mirror of the data dir
+// uploaded assets (worlds/assets, content-addressed, copied only when new) and the fork inputs (forks/descriptors, forks/artifacts). The copies sit in a staging mirror of the data dir
 // (<staging>/<stage>/...), restic snapshots that mirror (tag <stage>), then forget+prune keeps SIM_BACKUP_KEEP (default 7 daily,
 // 4 weekly, 6 monthly = at most 17 snapshots) and check reads a seventh of the data (all of it once a week).
 // Off-box copy: set SIM_BACKUP_OFFSITE (e.g. an R2 bucket, s3:https://<account>.r2.cloudflarestorage.com/<bucket>) and its
@@ -137,9 +137,15 @@ async function runBackup(stage) {
   const files = ['worlds.json', 'audit.jsonl'].filter((f) => existsSync(join(data, f)));
   for (const f of files) { copyFileSync(join(data, f), `${join(out, f)}.tmp`); renameSync(`${join(out, f)}.tmp`, join(out, f)); }
   const assets = existsSync(join(worldsDir, 'assets')) ? mirror(join(worldsDir, 'assets'), join(out, 'worlds', 'assets')) : 0;
+  // the fork inputs the old-world forks boot from (descriptors + their sealed artifacts: Mars web, places, region
+  // boundaries, upper-floor facts). No release carries them and the laptop copy is older (lane DR, 2026-10-21); static,
+  // so after the first night they cost restic nothing.
+  const trees = [join('forks', 'descriptors'), join('forks', 'artifacts')].filter((t) => existsSync(join(data, t)));
+  let forkFiles = 0;
+  for (const t of trees) forkFiles += mirror(join(data, t), join(out, t));
   // 3. drop what the stage no longer has (a deleted world stays in older snapshots, not in the mirror)
-  const keep = new Set([...dbs, ...files]);
-  const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? (relative(out, join(d, e.name)) === join('worlds', 'assets') ? [] : walk(join(d, e.name))) : [join(d, e.name)]);
+  const keep = new Set([...dbs, ...files]), mirrored = new Set([join('worlds', 'assets'), ...trees]);
+  const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? (mirrored.has(relative(out, join(d, e.name))) ? [] : walk(join(d, e.name))) : [join(d, e.name)]);
   for (const f of walk(out)) {
     const rel = relative(out, f);
     if (!keep.has(rel) && !failed.some((x) => x.startsWith(`${rel}:`))) rmSync(f, { force: true });
@@ -177,7 +183,7 @@ async function runBackup(stage) {
 
   const growth = before != null && after != null ? `, repo ${mb(after)} MB (${after >= before ? '+' : ''}${mb(after - before)} MB)` : '';
   console.log(`backup ${stage}: snapshot ${summary.snapshot_id.slice(0, 8)}, ${ok}/${dbs.length} databases ok (quick_check), ${files.length} files, ` +
-    `${assets} new assets, ${mb(summary.total_bytes_processed ?? 0)} MB staged${growth}; ${kept} snapshots kept${KEEP[0] === 'off' ? ' (retention off)' : ''}${offsite}`);
+    `${assets} new assets, ${forkFiles} new fork files, ${mb(summary.total_bytes_processed ?? 0)} MB staged${growth}; ${kept} snapshots kept${KEEP[0] === 'off' ? ' (retention off)' : ''}${offsite}`);
   for (const f of failed) console.error(`FAILED ${f}`);
   if (failed.length) process.exitCode = 1;
 }

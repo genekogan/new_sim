@@ -39,6 +39,9 @@ test('backup, version history, restore by night, retention, off-box copy', { ski
   writeFileSync(join(T, 'data/production/worlds.json'), '[{"slug":"alpha"},{"slug":"beta"}]\n');
   mkdirSync(join(T, 'data/production/worlds/assets/wire'), { recursive: true });
   writeFileSync(join(T, 'data/production/worlds/assets/aa.glb'), 'glb-a'); writeFileSync(join(T, 'data/production/worlds/assets/wire/aa.glb.br'), 'br-a');
+  // the fork inputs (lane DR): descriptors and nested artifacts are backed up beside the databases
+  mkdirSync(join(T, 'data/production/forks/descriptors'), { recursive: true }); mkdirSync(join(T, 'data/production/forks/artifacts/mars-web'), { recursive: true });
+  writeFileSync(join(T, 'data/production/forks/descriptors/mars.json'), '{"key":"mars"}\n'); writeFileSync(join(T, 'data/production/forks/artifacts/mars-web/a.bin'), 'art');
   // not set up yet (shipped before the one-time setup): the old dated copy runs instead, and no repository is created
   let r = run(['backup', 'production']);
   assert.equal(r.status, 0, r.stderr); assert.match(r.stdout, /restic not set up \(no repository at .*\); ran backup\.mjs/);
@@ -49,13 +52,13 @@ test('backup, version history, restore by night, retention, off-box copy', { ski
 
   // night 1
   r = run(['backup', 'production'], { SIM_BACKUP_TIME: '2026-01-01 03:30:00' });
-  assert.equal(r.status, 0, r.stderr); assert.match(r.stdout, /3\/3 databases ok \(quick_check\), 1 files, 2 new assets/);
+  assert.equal(r.status, 0, r.stderr); assert.match(r.stdout, /3\/3 databases ok \(quick_check\), 1 files, 2 new assets, 2 new fork files/);
   // night 2: alpha grows, beta is deleted, an asset arrives
   const ins = a.prepare('INSERT INTO events (payload) VALUES (?)'); for (let i = 0; i < 5; i++) ins.run(`night two ${i}`);
   b.close(); renameSync(join(T, 'data/production/worlds/beta'), join(T, 'gone-beta'));
   writeFileSync(join(T, 'data/production/worlds/assets/bb.png'), 'png-b');
   r = run(['backup', 'production'], { SIM_BACKUP_TIME: '2026-01-02 03:30:00' });
-  assert.equal(r.status, 0, r.stderr); assert.match(r.stdout, /2\/2 databases ok.*1 new assets.*\(\+\d+\.\d MB\); 2 snapshots kept/);
+  assert.equal(r.status, 0, r.stderr); assert.match(r.stdout, /2\/2 databases ok.*1 new assets, 0 new fork files.*\(\+\d+\.\d MB\); 2 snapshots kept/);
   const growth = Number(/\(\+(\d+\.\d) MB\)/.exec(r.stdout)[1]);
   assert.ok(growth < 0.2, `second night adds only the change (${growth} MB)`);
 
@@ -69,6 +72,7 @@ test('backup, version history, restore by night, retention, off-box copy', { ski
   assert.equal(r.status, 0, r.stderr); assert.match(r.stdout, /3\/3 databases ok/);
   assert.equal(count(join(T, 'r1/worlds/alpha/sim.db')), 200); assert.equal(count(join(T, 'r1/worlds/beta/sim.db')), 50);
   assert.ok(existsSync(join(T, 'r1/worlds.json')) && existsSync(join(T, 'r1/worlds/assets/wire/aa.glb.br')) && !existsSync(join(T, 'r1/worlds/assets/bb.png')));
+  assert.ok(existsSync(join(T, 'r1/forks/descriptors/mars.json')) && existsSync(join(T, 'r1/forks/artifacts/mars-web/a.bin')), 'fork inputs restored');
   r = run(['restore', 'production', 'latest', join(T, 'r2')]);
   assert.equal(r.status, 0, r.stderr);
   assert.equal(count(join(T, 'r2/worlds/alpha/sim.db')), 205); assert.ok(!existsSync(join(T, 'r2/worlds/beta')) && existsSync(join(T, 'r2/worlds/assets/bb.png')));
