@@ -512,8 +512,11 @@ export class WorldEntityLayer {
         if (!touched) continue;
       }
       const coarse = !!fineNear && !fineNear.at.some(([x, z]) => rectDistance(x, z, sx * SECTOR_TILES * TILE_M, sz * SECTOR_TILES * TILE_M, (sx + 1) * SECTOR_TILES * TILE_M, (sz + 1) * SECTOR_TILES * TILE_M) <= fineNear.r);
-      this.placeSector(key, this.sectorMesh(sx, sz, [tx0, tz0, tx1, tz1], deferMottle, coarse ? COARSE_STEP : TERRAIN_STEP));
-      if (coarse) this.coarse.add(key); else this.coarse.delete(key);
+      // t4-phone: the near sectors too from the recipe directly, at full step: the same heights at every vertex (a tile holds
+      // the same recipe's heights on its 1 m grid) for a quarter of the samples and no tile bakes (Eden 2026: ~0.3 s of 4x
+      // CPU before the poster); their slope colour by 2 m differences until the fill refines them from the tiles
+      this.placeSector(key, this.sectorMesh(sx, sz, [tx0, tz0, tx1, tz1], deferMottle, coarse ? COARSE_STEP : TERRAIN_STEP, !!fineNear));
+      if (coarse || fineNear) this.coarse.add(key); else this.coarse.delete(key);
     }
     for (const [key, mesh] of this.sectors) if (!wanted.has(key)) { this.terrainGroup.remove(mesh); mesh.geometry.dispose(); this.sectors.delete(key); this.coarse.delete(key); }
     // things settle on the new ground: refresh poses of root entities (no easing)
@@ -536,14 +539,14 @@ export class WorldEntityLayer {
     if (this.sectors.has(best)) this.placeSector(best, this.sectorMesh(sx, sz, t, true));
     return true;
   }
-  private sectorMesh(sx: number, sz: number, t: [number, number, number, number], deferMottle = false, step = TERRAIN_STEP): THREE.Mesh {
+  private sectorMesh(sx: number, sz: number, t: [number, number, number, number], deferMottle = false, step = TERRAIN_STEP, direct = false): THREE.Mesh {
     const m = this.model!;
     const tx0 = Math.max(t[0], sx * SECTOR_TILES), tz0 = Math.max(t[1], sz * SECTOR_TILES);
     const tx1 = Math.min(t[2], sx * SECTOR_TILES + SECTOR_TILES - 1), tz1 = Math.min(t[3], sz * SECTOR_TILES + SECTOR_TILES - 1);
     const x0 = tx0 * TILE_M, z0 = tz0 * TILE_M, w = (tx1 - tx0 + 1) * TILE_M, d = (tz1 - tz0 + 1) * TILE_M;
     const nx = w / step, nz = d / step;
     // P7 coarse (phone arrival, far sectors): heights straight from the ground recipe at `step` m, no tile bakes
-    const coarse = step !== TERRAIN_STEP ? coarseHeights(m.terrain.ground, x0, z0, nx, nz, step) : null;
+    const coarse = step !== TERRAIN_STEP || direct ? coarseHeights(m.terrain.ground, x0, z0, nx, nz, step) : null;
     const pos = new Float32Array((nx + 1) * (nz + 1) * 3), col = new Float32Array((nx + 1) * (nz + 1) * 3);
     const c = new THREE.Color();
     const palette = (m.state as { ground?: { palette?: string } }).ground?.palette;

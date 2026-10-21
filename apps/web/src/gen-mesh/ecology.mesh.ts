@@ -58,15 +58,24 @@ function blockAnchors(model: WorldModel): Anchor[] {
 /** t4-phone: a building's floor plan, porch and furniture stay within its own size of its pose (the layout is centred on
  *  it: half the diagonal, a porch or balcony a few metres more), so a building and everything in it reaches twice its
  *  diagonal plus 12 m at most; the town around a phone's first trees then bakes no far footprints (Eden 2026: ~0.4 s of
- *  4x CPU before the poster). Anything else, or a building without a numeric size: BLOCK_REACH. */
+ *  4x CPU before the poster). Anything else, or one without a numeric size: BLOCK_REACH. */
 function rootReach(model: WorldModel, r: Entity): number {
-  const d = model.resolvedDef(r.def); if (!d || d.make.kind !== 'gen' || d.make.gen !== 'building/1') return BLOCK_REACH;
-  const pr = (r.params ?? {}) as Record<string, unknown>;
+  const d = model.resolvedDef(r.def); if (!d || d.make.kind !== 'gen') return BLOCK_REACH;
+  const pr = (r.params ?? {}) as Record<string, unknown>, scale = Math.max(1, Math.abs(num((r as { s?: unknown }).s, 1)));
+  // a kit thing (a tree, a lamp, a stall) within three times its declared box (its def's size, which its build is held
+  // to), stretched by its own sx / sz and scale, plus 8 m
+  if (d.make.gen === 'kit/2') {
+    const box = (d as { size?: { box?: unknown } }).size?.box;
+    if (!Array.isArray(box) || box.length !== 3 || !box.every((v) => Number.isFinite(v))) return BLOCK_REACH;
+    const stretch = Math.max(1, Math.abs(num(pr.sx, 1)), Math.abs(num(pr.sz, 1)));
+    return Math.min(BLOCK_REACH, 3 * Math.hypot(box[0] as number, box[2] as number) * stretch * scale + 8);
+  }
+  if (d.make.gen !== 'building/1') return BLOCK_REACH;
   let w = num(pr.w, NaN), dd = num(pr.d, NaN);
   const plan = pr.plan as { floors?: { rooms?: { rect?: unknown }[] }[] } | undefined;
   for (const f of plan?.floors ?? []) for (const room of f?.rooms ?? []) { const rc = room?.rect; if (Array.isArray(rc) && rc.length === 4 && rc.every(Number.isFinite)) { w = Math.max(Number.isFinite(w) ? w : 0, Math.abs(rc[0]), Math.abs(rc[2]), Math.abs(rc[2] - rc[0])); dd = Math.max(Number.isFinite(dd) ? dd : 0, Math.abs(rc[1]), Math.abs(rc[3]), Math.abs(rc[3] - rc[1])); } }
   if (!(w > 0) || !(dd > 0)) return BLOCK_REACH;
-  return Math.min(BLOCK_REACH, (2 * Math.hypot(w, dd) + 12) * Math.max(1, Math.abs(num((r as { s?: unknown }).s, 1))));
+  return Math.min(BLOCK_REACH, (2 * Math.hypot(w, dd) + 12) * scale);
 }
 /** A spatial test for "something is already here": solid footprints and paved / road surfaces (block-test.ts). */
 export function blockedBy(model: WorldModel, self: Entity, pad = 0.6): (x: number, z: number) => boolean {

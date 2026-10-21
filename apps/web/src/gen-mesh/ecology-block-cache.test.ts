@@ -61,19 +61,21 @@ test('a scatter adds only the things that can reach its area, and blocks as the 
   for (let x = -2; x <= 32; x += 0.25) for (let z = -2; z <= 32; z += 0.25) assert.equal(regional(x, z), whole(x, z), `${x},${z}`);
 });
 
-// t4-phone: a building reaches about its own size (twice its diagonal + 12 m), not BLOCK_REACH, so a phone's first trees in
+// t4-phone: a building reaches about its own size (twice its diagonal + 12 m), a kit thing three times its declared box
+// + 8 m, not BLOCK_REACH, so a phone's first trees in
 // a town bake no footprints of the houses well beyond them; one that does reach the scatter (a big hall) still blocks
-test('a building is added only within its own reach of a scatter, and blocks as the whole index does', async () => {
+test('a building or kit thing is added only within its own reach of a scatter, and blocks as the whole index does', async () => {
   const { blockCellsOf, BLOCK_CELL } = await import('./ecology.mesh.ts');
   const { blockTest } = await import('./block-test.ts');
   const ops = [{ op: 'place', def: 'core/house@1', name: 'next-door', p: [32, 12], params: { w: 9, d: 8 } },
     { op: 'place', def: 'core/house@1', name: 'down-the-road', p: [100, 12], params: { w: 9, d: 8 } },
     { op: 'place', def: 'core/house@1', name: 'hall', p: [-60, 15], params: { w: 30, d: 24 } },
+    { op: 'place', def: 'core/bench@1', name: 'bench-by', p: [31, 20] }, { op: 'place', def: 'core/bench@1', name: 'bench-over', p: [55, 20] },
     { op: 'place', def: 'core/woodland@1', name: 'wood', shape: { area: [[0, 0], [30, 0], [30, 30], [0, 30]] } }];
   const a = world(), b = world();
   for (const w of [a, b]) { const r = applyBatch(w, { ops } as never, 'god', 0) as { result: { accepted: boolean } }; assert.equal(r.result.accepted, true, JSON.stringify(r.result)); }
   const seen: string[] = []; const fp = a.footprint.bind(a); a.footprint = ((e: { name?: string }, ...r: unknown[]) => { seen.push(e.name ?? ''); return (fp as (...x: unknown[]) => never)(e, ...r); }) as never;
   const regional = blockedBy(a, a.get('wood')!), whole = blockTest(blockCellsOf(b), BLOCK_CELL, b.get('wood')!.id);
-  assert.ok(seen.includes('next-door') && seen.includes('hall') && !seen.includes('down-the-road'), seen.join());
+  assert.ok(seen.includes('next-door') && seen.includes('hall') && seen.includes('bench-by') && !seen.includes('down-the-road') && !seen.includes('bench-over'), seen.join());
   for (let x = -2; x <= 32; x += 0.25) for (let z = -2; z <= 32; z += 0.25) assert.equal(regional(x, z), whole(x, z), `${x},${z}`);
 });
