@@ -1898,6 +1898,25 @@ export class MarsEngine implements Engine {
   /** nav read (L1): clearanceAtV1 capped at `cap` — the same value below it, `cap` at or above it — answered off the paged
    *  windows without building fine nav tiles. For the many "is there standing room here (≥ t ≤ cap)?" reads. */
   clearanceUpToV1(x:number,z:number,cap=1,level=0):number{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const read=spatial.clearanceCapped(level,[x,z],cap);return read?read([x,z]):0;}
+  /** BS3 closest approach (pure): for a plan's first walk_to whose destination no walk reaches, the nearest point to that
+   * destination a walk from where the body stands (a seat's standing approach for a seated body) does reach, on the body's
+   * own level: rings of 1.5-36 m round the destination, nearest ring first, each starting on the side facing the body.
+   * At most `maxTries` route proofs within about `budgetMs`. Null: no walk_to, a destination it cannot name, or no point found. */
+  walkApproachV1(actor:string,steps:{verb:string;params?:Record<string,unknown>}[],budgetMs=250,maxTries=40):{to:[number,number];goal:[number,number];short:number;level:number}|null{
+    const step=steps.find(s=>s.verb==='walk_to'),e=this.ents[actor];if(!step||!e?.human)return null;
+    const t=this.pointOf(step.params?.to);if(!t)return null;
+    const start=this.godWalkoutStartV1(actor);if(!start)return null;
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);
+    const level=e.human.level??0,clear=spatial.clearanceCapped(level,[t[0],t[1]],1),t0=performance.now();
+    const a0=Math.atan2(start.p[1]-t[1],start.p[0]-t[0]);let tries=0;
+    for(const r of [1.5,3,5,8,12,18,26,36]){const n=r<5?8:12;
+      for(let k=0;k<n;k++){const turn=(k%2?-1:1)*Math.ceil(k/2)*(2*Math.PI/n),q:[number,number]=[r3(t[0]+dcos(a0+turn)*r),r3(t[1]+dsin(a0+turn)*r)];
+        const c=spatial.clearanceCapped(level,q,1)??clear;if(!c||c(q)<HUMAN_RADIUS+.05)continue;
+        if(++tries>maxTries||performance.now()-t0>budgetMs)return null;
+        const res=spatial.route(this.rt.world,HUMAN_PROFILE_V1,start,{level,p:q},{proveUnreachable:true});
+        if(res.ok)return {to:q,goal:[t[0],t[1]],short:Math.round(hypot(q[0]-t[0],q[1]-t[1])*10)/10,level};}}
+    return null;
+  }
   nearestStandableV1(at:[number,number],except?:string,minClear=HUMAN_RADIUS+.15,maxRing=80):[number,number]|null{
     const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const clear=spatial.clearTester(0,at,minClear);if(!clear)return null;
     const people=listEntities(this.ents).filter((o:any)=>o.kind==='human'&&o.id!==except).map((o:any)=>[o.pose.p[0],o.pose.p[2]] as [number,number]);

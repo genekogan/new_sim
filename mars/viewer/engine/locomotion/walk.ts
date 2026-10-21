@@ -150,6 +150,8 @@ type Exec = {
   detour?: { spot: Vec2; level: number; by: string; blockers?: string[]; clearOf?: (q: Vec2) => boolean; landing?: {y:number;radius:number}; stage: 'pending' | 'going' | 'waiting'; faceoff?: boolean };
   /** Entity worlds: the walker this one has stood face to face with (each blocked by the other) since `since`, as of `tick`. */
   faceoff?: { id: string; since: number; tick: number };
+  /** BS3 watchdog: where (and on which level) the walk last made progress, its own ticks since, and whether it replanned. */
+  watch?: { at: Vec2; level: number; n: number; replanned: boolean };
 };
 
 const walkSchemaWithin = (reach: number) => z.strictObject({
@@ -272,6 +274,7 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
     } finally {
       stepScope = outer;
     }
+    r = watchdog(rt, ex, h, r);
     if (r.status === 'completed' || r.status === 'failed') {
       walkExecs(rt).delete(ex.id);
       delete h.human!.speed;
@@ -305,6 +308,35 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
     return { ok: true };
   },
 };
+
+/** BS3 watchdog: ticks of a walk's own steps with no progress (≤ WATCH_M from where it last made some) before one forced
+ *  replan from where it stands (15 s), and before it ends honestly as walk.stuck (15 s more). */
+export const WATCH_REPLAN_TICKS = 300, WATCH_FAIL_TICKS = 600;
+const WATCH_M = 0.5;
+/** Waits that name someone moving (or an occupied goal): they have their own decisions and deadlock recovery, and the
+ *  watchdog's clock pauses while they last. A walker stopped by geometry (walk.obstacle) or walking on the spot counts. */
+const WATCH_PAUSE = new Set(['traffic.person', 'traffic.load', 'traffic.yield', 'traffic.stepped-aside', 'walk.goal-occupied']);
+/**
+ * BS3 (Souls never stuck): driven only by the walk's own ticks (its exec state, so a snapshot or replay resumes it exactly).
+ * Progress is the body leaving a 0.5 m disc round where it last made progress (or changing level). Climbing a flight,
+ * cancelling and named waits for people pause it. After WATCH_REPLAN_TICKS without progress the walk replans once from
+ * where it stands (the corridor-construction path, whatever the budget); after WATCH_FAIL_TICKS it fails `walk.stuck`.
+ */
+function watchdog(rt: Runtime, ex: Exec, h: Entity, r: StepResult): StepResult {
+  if (r.status === 'completed' || r.status === 'failed') return r;
+  if (ex.cancelTo || ex.phase === 'climb' || ex.phase === 'align' || ex.route.legs[ex.leg]?.kind === 'link') return r;
+  if (r.status === 'blocked' && WATCH_PAUSE.has(r.diagnostic?.code ?? '')) return r;
+  const p: Vec2 = [h.pose.p[0], h.pose.p[2]], level = h.human!.level;
+  const w = (ex.watch ??= { at: p, level, n: 0, replanned: false });
+  if (dist2(p, w.at) > WATCH_M || level !== w.level) { ex.watch = { at: p, level, n: 0, replanned: false }; return r; }
+  w.n++;
+  if (w.n >= WATCH_FAIL_TICKS) {
+    releaseAll(rt, ex);
+    return { status: 'failed', diagnostic: { code: 'walk.stuck', message: `${ex.actor} made no headway for ${Math.round((w.n * DT))} s at (${p[0].toFixed(1)}, ${p[1].toFixed(1)}), even after planning again from there`, subjects: [ex.actor], at: [...h.pose.p] as [number, number, number] } };
+  }
+  if (w.n >= WATCH_REPLAN_TICKS && !w.replanned) { w.replanned = true; ex.replanWait = REPLAN_MAX_WAIT; }
+  return r;
+}
 
 function enterLeg(rt: Runtime, ex: Exec) {
   const leg = ex.route.legs[ex.leg];

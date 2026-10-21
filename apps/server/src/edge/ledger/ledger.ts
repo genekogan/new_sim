@@ -13,6 +13,10 @@ import {readHumanCapabilitiesV1, type HumanBindingV1} from '../../human-capabili
 import {humanBlockedExplanationV1} from '../../human-wait-condition.ts';
 /** RT: route refusals that hold until the world itself changes (not a crowd, a search limit or a start a step clears). */
 const ROUTE_DEAD = new Set(['route.unreachable', 'route.goal-blocked', 'route.link-unusable', 'route.unknown-level']);
+/** BS3: refusals a plain walk answers with its closest approach (the fine planner's; ground.* keep their named refusals). */
+const APPROACH_CODES = new Set(['route.unreachable', 'route.goal-blocked']);
+const STUCK_RADIUS = 0.34;
+const STUCK_REASON = 'The walk made no headway for 30 seconds, even after looking for another way from where it stood; choose another way or somewhere else.';
 import {EdgeError, type EdgeCapability, type EdgeLedgerHooks, type EdgeReceipt, type EdgeSoul, type NearbyBody, type PlaceRef,type ObjectBodyAdmission} from '../contract.ts';
 import {CATALOG} from '../../../../../mars/viewer/engine/world/catalog.ts';
 import {PlaceIndex, centroid, derivePlaceData, happenings, validatePlaceData, type PlaceData,type Place} from './places.ts';
@@ -296,6 +300,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     // 'replaced' means only "a newer act from this Soul superseded it", and that is recorded at act time (insert),
     // before the old programme is cancelled. A receipt still open here was ended by something else: report it failed.
     else if (ev.kind === 'cancelled' && (ev.code === 'program.replaced' || ev.code === 'program.stopped')) this.update(r.receipt_id, {phase: 'failed', code: 'action.interrupted', reason: 'Something else in the world interrupted this before it finished; choose again.'});
+    else if (ev.code === 'walk.stuck') {if (!this.relaunchStuck(r)) this.update(r.receipt_id, {phase: 'failed', code: 'walk.stuck', reason: STUCK_REASON});}
     else this.update(r.receipt_id, {phase: 'failed', code: ev.code ?? 'action.failed', reason: ev.message ?? humanBlockedExplanationV1(ev.code, 'That action')});
   }
   private afterTick(tick: number) {
@@ -835,7 +840,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
       const engine = this.host.engine as unknown as {nearestStandableV1?: (at: [number, number], except?: string, min?: number, rings?: number) => [number, number] | null}, b = this.body(soul.entityId);
       const to = b && engine.nearestStandableV1 ? engine.nearestStandableV1([b.pose.p[0], b.pose.p[2]], soul.entityId, 0.33, 8) : null;
       if (to && b && Math.hypot(to[0] - b.pose.p[0], to[1] - b.pose.p[2]) <= 4) {
-        await this.host.enqueue('edge-relocate', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, to, why: 'stepped clear to start'});
+        // BS3 (c): a plain relocate refuses a body its seat holds, so a seated Soul rises with the god walk-out (as nav-connect/1)
+        const seated = !!this.seatOf(soul.entityId) || this.lyingOnBerth(soul.entityId);
+        await this.host.enqueue('edge-relocate', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, to, why: seated ? 'stood up and stepped clear to start' : 'stepped clear to start', ...(seated ? {godWalkout: true, released: [], level: b.human?.level ?? 0} : {})});
         issue = this.host.engine.canPerform({actor: soul.entityId, label, steps});
       }
     }
@@ -852,18 +859,72 @@ export class EdgeLedger implements EdgeLedgerHooks {
         issue = this.host.engine.canPerform({actor: soul.entityId, label, steps});
       }
     }
+    // BS3 (a): a jog or run the water refuses (the way runs through the shallows, or the body stands in them) walks instead
+    let note: string | undefined, approach: Record<string, unknown> | undefined;
+    if (issue?.code === 'gait.dry-ground-required' && steps.some(s => s.verb === 'walk_to' && s.params?.gait && s.params.gait !== 'walk')) {
+      const walked = steps.map(s => s.verb === 'walk_to' && s.params?.gait ? {...s, params: Object.fromEntries(Object.entries(s.params).filter(([k]) => k !== 'gait'))} : s);
+      const again = this.host.engine.canPerform({actor: soul.entityId, label, steps: walked});
+      if (!again || WAIT_CODES.has(again.code) || APPROACH_CODES.has(again.code)) {steps = walked; issue = again; note = 'Walking, not running: the way goes through shallow water (or starts in it), where only walking is possible.';}
+    }
+    // BS3 (4) closest approach: a walk whose destination no walk reaches (a closed room, a shut door) goes as near as a walk
+    // does and says by how much, instead of refusing outright. Plain walks only (a seat or a use there still refuses).
+    if (issue && APPROACH_CODES.has(issue.code) && steps.every(s => s.verb === 'walk_to' || s.verb === 'stand') && !isVerificationProbe(soul.soulId)) {
+      const engine = this.host.engine as unknown as {walkApproachV1?: (id: string, steps: Program['steps']) => {to: [number, number]; goal: [number, number]; short: number; level: number} | null};
+      const ap = engine.walkApproachV1?.(soul.entityId, steps);
+      if (ap) {
+        const near = steps.map(s => s.verb === 'walk_to' ? {...s, params: {...Object.fromEntries(Object.entries(s.params ?? {}).filter(([k]) => k !== 'standoff' && k !== 'spread')), to: ap.to}} : s);
+        const again = this.host.engine.canPerform({actor: soul.entityId, label, steps: near});
+        if (!again || WAIT_CODES.has(again.code)) {
+          const what = label.replace(/^(walk|run|jog|go|head|stroll|cycle|wander)( over| back| down| up)? (to|into|onto|towards?) /i, '').replace(/^the /i, 'the ') || 'there';
+          approach = {code: issue.code, goal: ap.goal, to: ap.to, short: ap.short};
+          note = `Got within ${ap.short} m of ${what}: no walkable route reaches it from here (${issue.code}), so this walk goes to the nearest point one does.${note ? ' ' + note : ''}`;
+          steps = near; issue = again;
+        }
+      }
+    }
     // The verifier probe reports the engine's own diagnostic (what blocks the seat, how much room it needs) to the builder.
     if (issue && !WAIT_CODES.has(issue.code)) return {...refuse(issue.code, issue.code.startsWith('carrier.') || isVerificationProbe(soul.soulId) ? issue.message : humanBlockedExplanationV1(issue.code, label)), ...resolved};
+    const remember = (id: string) => {
+      if (note) this.update(id, {reason: note});
+      if (approach) this.setDetail(id, {approach});
+      this.launched.set(id, {soul, capability, label, steps}); if (this.launched.size > 512) this.launched.delete(this.launched.keys().next().value!);
+    };
     if (issue) {
       // Asleep or mid-step: stop safely first, then start (receipt `waiting`).
-      const r = this.insert(soul, capability, 'waiting', clientRef,false,{},contentParams); commit?.(r.id);
+      const r = this.insert(soul, capability, 'waiting', clientRef,false,{},contentParams); commit?.(r.id); remember(r.id);
       this.arm({receipt: r.id, soul, steps, label, deadline: this.host.engine.world.tick + WAIT_LIMIT_TICKS, capability});
       if (issue.code === 'program.safe-stop-required') await this.host.enqueue('edge-stop', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, receipt: r.id});
       return {accepted: true as const, receipt: this.receipt(soul.soulId, r.id)!, ...resolved};
     }
-    const r = this.insert(soul, capability, 'waiting', clientRef,false,{},contentParams); commit?.(r.id);
+    const r = this.insert(soul, capability, 'waiting', clientRef,false,{},contentParams); commit?.(r.id); remember(r.id);
     await this.decide(soul, r.id, capability, label, steps);
     return {accepted: true as const, receipt: this.receipt(soul.soulId, r.id)!, ...resolved};
+  }
+  /** BS3: the plans `launch` started, by receipt, so a stuck walk can be relaunched once under the same receipt. */
+  private launched = new Map<string, {soul: EdgeSoul; capability: string; label: string; steps: Program['steps']; relaunched?: true}>();
+  /**
+   * BS3 (Souls never stuck): a walk the engine's watchdog ended as walk.stuck (no headway for 30 s, a replan included). A
+   * body standing inside geometry (clearance below its radius) steps out to the nearest clear spot within 4 m (a logged
+   * edge-relocate) and the same plan is relaunched once under the same receipt; otherwise the receipt ends with an honest
+   * reason. True: relaunching (the receipt stays open).
+   */
+  private relaunchStuck(r: Row): boolean {
+    const plan = this.launched.get(r.receipt_id), m = this.host.minds.get(r.soul_id);
+    if (!plan || plan.relaunched || !m || m.entityId !== plan.soul.entityId) return false;
+    const engine = this.host.engine as unknown as {clearanceAtV1?: (x: number, z: number, level?: number) => number; nearestStandableV1?: (at: [number, number], except?: string, min?: number, rings?: number) => [number, number] | null};
+    const b = this.body(m.entityId); if (!b?.human || !engine.clearanceAtV1 || !engine.nearestStandableV1 || (b.human.level ?? 0) !== 0) return false;
+    if (engine.clearanceAtV1(b.pose.p[0], b.pose.p[2]) >= STUCK_RADIUS) return false;
+    const to = engine.nearestStandableV1([b.pose.p[0], b.pose.p[2]], m.entityId, 0.33, 8);
+    if (!to || Math.hypot(to[0] - b.pose.p[0], to[1] - b.pose.p[2]) > 4) return false;
+    plan.relaunched = true;
+    const soul = plan.soul, id = r.receipt_id;
+    void (async () => {
+      await this.host.enqueue('edge-relocate', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, to, why: 'walk.stuck: stepped out of the geometry it was caught in, then walked on'});
+      const issue = this.host.engine.canPerform({actor: soul.entityId, label: plan.label, steps: plan.steps});
+      if (issue && !WAIT_CODES.has(issue.code)) {this.update(id, {phase: 'failed', code: issue.code, reason: humanBlockedExplanationV1(issue.code, plan.label)}); return;}
+      await this.decide(soul, id, plan.capability, plan.label, plan.steps);
+    })().catch(() => this.update(id, {phase: 'failed', code: 'walk.stuck', reason: STUCK_REASON}));
+    return true;
   }
   /** together/1: accept:<invite> — join the host (its own plan, or the ride with the kept place). */
   private async acceptInvite(soul: EdgeSoul, cap: EdgeCapability, plans: Map<string, {label: string; steps: Program['steps']}>, caps: EdgeCapability[], clientRef: string | undefined, resolved: {resolved?: Resolved}, refuse: (code: string, reason: string) => {accepted: false; code: string; reason: string; capability: string}) {
@@ -1363,9 +1424,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
 }
 
 /** Receipt detail (Core-A): channel (body | attention | none), chosen (what an intent picked), endedAt (terminal). */
-function detailOf(r: Row): {channel?: string; chosen?: unknown; endedAt?: unknown; alternatives?: unknown; meal?: unknown} {
+function detailOf(r: Row): {channel?: string; chosen?: unknown; endedAt?: unknown; alternatives?: unknown; meal?: unknown; approach?: unknown} {
   if (!r.detail) return {};
-  try {const d = JSON.parse(r.detail) as {channel?: string; chosen?: unknown; endedAt?: unknown; alternatives?: unknown; meal?: unknown}; return {...(d.channel ? {channel: d.channel} : {}), ...(d.chosen ? {chosen: d.chosen} : {}), ...(d.endedAt ? {endedAt: d.endedAt} : {}), ...(d.alternatives ? {alternatives: d.alternatives} : {}), ...(d.meal ? {meal: d.meal} : {})};}
+  try {const d = JSON.parse(r.detail) as {channel?: string; chosen?: unknown; endedAt?: unknown; alternatives?: unknown; meal?: unknown; approach?: unknown}; return {...(d.channel ? {channel: d.channel} : {}), ...(d.chosen ? {chosen: d.chosen} : {}), ...(d.endedAt ? {endedAt: d.endedAt} : {}), ...(d.alternatives ? {alternatives: d.alternatives} : {}), ...(d.meal ? {meal: d.meal} : {}), ...(d.approach ? {approach: d.approach} : {})};}
   catch {return {};}
 }
 
