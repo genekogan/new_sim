@@ -95,16 +95,16 @@ test('a furnished shop keeps the way from its front door to the storeroom door (
   assert.ok(f.placed.some((p: any) => p.name === 'shop-counter') && f.placed.some((p: any) => p.name === 'shop-display'), JSON.stringify(f.dropped));
 });
 
-test('a seat whose own front is shut in is dropped (the shop stool behind the counter); a piece may not stand at another piece\'s front', () => {
+test('a seat whose front is shut in is placed when a body gets on it from another side (the shop stool behind the counter); a piece may not stand at another piece\'s front', () => {
   // SEALED 2026-10-21 put the display on the east side (fx 0.78) and saw shelf-2 go bad, but only because the stool's key (any
-  // free cell within 1.5 m of its front) let it stand behind the counter with its front shut in. BSGEN 2026-10-21: a seat's key
-  // is within 0.5 m of its front, one key per seat; the stool is dropped and, in the fuzz walk world with the display first at
-  // 0.78, no shop has a bad or unusable piece (at 1.5 m: 5 shops with the stool use.no-approach). furnishedShop checks that
-  // every placed piece's front is reached from the door.
+  // free cell within 1.5 m of its front) let it stand behind the counter. BSGEN 2026-10-21 cut the key to 0.5 m in front, which
+  // dropped the stool. FUZZ2 2026-10-22: a seat is reached at the spots the use-check stands a body to get on it (seatSlides:
+  // front, back, sides), so the stool facing the counter is placed and got on from its back; furnishedShop checks that each
+  // placed piece's spot (the stool's seatSlides spots) is reached from the door, and the display still keeps off shelf-2's front.
   const recipe = JSON.parse(readFileSync(new URL('../../../tools/god-skill/recipes/furnish/shop.json', import.meta.url), 'utf8'));
   recipe.rooms.shop.find((x: any) => x.name === 'display').try = [[0.78, 0.7, 's'], [0.3, 0.7, 's']];
   const f = furnishedShop(recipe);
-  assert.ok(!f.placed.some((p: any) => p.name === 'shop-stool') && f.dropped.some((p: any) => p.name === 'shop-stool'), JSON.stringify(f.dropped));
+  assert.ok(f.placed.some((p: any) => p.name === 'shop-stool') && !f.dropped.some((p: any) => p.name === 'shop-stool'), JSON.stringify(f.dropped));
   assert.ok(f.placed.some((p: any) => p.name === 'shop-display') && f.placed.some((p: any) => p.name === 'shop-shelf-2'), JSON.stringify(f.dropped));
 });
 
