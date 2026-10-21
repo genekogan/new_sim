@@ -146,3 +146,55 @@ test('door sweep: every catalogue building is enterable through its front door a
   assert.deepEqual(fails, [], 'every placed building is enterable through its front door');
   assert.ok(n >= cases.length * 0.9, `most placements are accepted (${n}/${cases.length})`);
 });
+
+/**
+ * Steep-hill sweep (lane RT2, 2026-10-21): every catalogue building with its front door facing straight uphill, on a knoll
+ * side as steep as the steepest real house site on walkable ground (eden-2026's packed hillside homes stand on ~0.52
+ * rise/run; team/scratch/t4/rt2/slope.ts) and at the pad grade (0.45). The landing is cut into the hill and the bank
+ * above it must stay walkable: a Soul uphill of the door and one downhill of the building both reach the goal inside.
+ */
+test('steep-hill sweep: every catalogue building is enterable with its front door facing uphill, up to the steepest real site', { timeout: 1_800_000 }, async (t) => {
+  const w = world(t); await w.settle(2);
+  w.act([{ op: 'place', def: coreRef('knoll'), name: 'hill', p: [0, 0], params: { height: 15, radius: 45, peak: 1, edge: 8 } }]);
+  await w.settle(2);
+  const terrain = w.god.model.terrain;
+  const siteAt = (target: number) => {
+    let best = 0, bs = Infinity;
+    // the outer flank, so the slope above the door rises on to the summit
+    for (let d = 20; d <= 60; d += 0.5) { const s = terrain.slope(d, 0); if (Math.abs(s - target) < Math.abs(bs - target)) { best = d; bs = s; } }
+    assert.ok(Math.abs(bs - target) < 0.03, `the knoll has a ${target} site (best ${bs.toFixed(3)} at ${best} m)`);
+    return best;
+  };
+  const sites = [0.45, 0.52].map((s) => [s, siteAt(s)] as const);
+  const defs: string[] = process.env.RT_TYPES ? process.env.RT_TYPES.split(',').map((x) => x.includes('@') ? x : coreRef(x)) : BUILDING_TYPES;
+  const fails: string[] = [], refused: string[] = []; let n = 0;
+  for (const def of defs) for (const [slope, dist] of sites) {
+    const at: Vec2 = [dist, 0];
+    // the front door's yaw in the def frame (the first exterior ground-floor door, as padGrading lists them)
+    const rd = w.god.model.resolvedDef(def)!, baked = w.god.model.bake(rd, {}, 0) as any;
+    const door = (baked.openings ?? []).find((o: any) => o.exterior && o.kind !== 'window' && !o.level && o.to !== 'balcony');
+    if (!door) { refused.push(`${def}: no exterior door`); continue; }
+    const r = -Math.PI / 2 - door.yaw;   // world out = (sin(door.yaw + r), cos(door.yaw + r)) = (-1, 0): towards the summit
+    const res: any = w.god.act({ ops: [{ op: 'place', def, name: 'b', p: at, r }] });
+    if (!res.accepted) { refused.push(`${def} s${slope}: refused ${res.failures?.[0]?.code ?? JSON.stringify(res).slice(0, 120)}`); continue; }
+    await w.settle(3);
+    const e = w.god.model.get('b')!, box = w.god.model.bake(w.god.model.resolvedDef(e.def)!, e.params ?? {}, e.seed ?? 0, e.shape).box;
+    const pad = w.god.model.ground().landforms.find((l: any) => l.id === `${e.id}:pad`) as any;
+    const up = (pad?.aprons ?? []).some((a: Vec2[]) => (a[2][0] + a[3][0]) - (a[0][0] + a[1][0]) < -0.9 * 2 * Math.hypot(a[2][0] - a[1][0], a[2][1] - a[1][1]));
+    assert.ok(up, `${def}: a door landing faces uphill`);
+    const reach = Math.hypot(box[0], box[2]) / 2 + 5;
+    const th = w.bridge.nav.thing('b');
+    for (const [side, start] of [['uphill', [at[0] - reach, at[1]]], ['downhill', [at[0] + reach, at[1]]]] as const) {
+      const goal = th ? w.bridge.nav.goal(th, start as Vec2) : null;
+      const rr = goal ? w.E.reachV1({ p: start, level: 0 }, goal) : null;
+      if (!rr?.ok) fails.push(`${def} s${slope} from ${side} (ground ${terrain.slope(start[0], start[1]).toFixed(2)}): ${goal ? rr.code : 'no-goal'}`);
+    }
+    n++;
+    w.act([{ op: 'remove', id: 'b' }]);
+    await w.settle(1);
+  }
+  console.log(`steep-hill sweep: ${n} placements (sites ${sites.map(([s, d]) => `${s}@${d}m`).join(', ')}), ${fails.length} failures, ${refused.length} refused`);
+  for (const f of [...fails, ...refused]) console.log('  ' + f);
+  assert.deepEqual(fails, [], 'every building is enterable with its front door facing uphill');
+  assert.ok(n >= defs.length * 2 * 0.9, `most placements are accepted (${n}/${defs.length * 2})`);
+});
