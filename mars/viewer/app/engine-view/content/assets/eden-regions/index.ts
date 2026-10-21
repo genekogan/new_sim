@@ -41,12 +41,7 @@ export {REGION_PLACES} from './places.ts';
 export {REGION_EXPLORE} from './explore.ts';
 export const FAR_CLEAR=35;
 const inDistrict=(x:number,z:number,m=0)=>REGION_DISTRICTS.some(d=>x>d.bounds[0]-m&&x<d.bounds[2]+m&&z>d.bounds[1]-m&&z<d.bounds[3]+m);
-export type EdenRegions={group:THREE.Group;dispose():void;stats:{draws:number;triangles:number};sampleVisualGround:Ground;authoredBoundaries:AuthoredBoundaryBox[]};
-/** createEdenRegions in steps (a district or so per step), so a caller can spread it over idle tasks (P1 phones, F12);
- * run to the end it is createEdenRegions. Global outputs (FOOTPRINTS, CHIMNEYS, LIGHTS, the shore bake) are those of the last
- * run started, as before. */
-export function createEdenRegions(ground:Ground):EdenRegions|null{const steps=edenRegionSteps(ground);for(;;){const r=steps.next();if(r.done)return r.value;}}
-export function* edenRegionSteps(ground:Ground):Generator<void,EdenRegions|null,void>{
+export function createEdenRegions(ground:Ground):{group:THREE.Group;dispose():void;stats:{draws:number;triangles:number};sampleVisualGround:Ground;authoredBoundaries:AuthoredBoundaryBox[]}|null{
  if(typeof ground!=='function')return null;
  FOOTPRINTS.length=0;CHIMNEYS.length=0;LIGHTS.length=0;
  const edge=(x:number,z:number)=>{const y=ground(Math.min(Math.max(x,INNER[0]+.01),INNER[2]-.01),Math.min(Math.max(z,INNER[1]+.01),INNER[3]-.01));return typeof y==='number'&&Number.isFinite(y)?y:0;};
@@ -59,7 +54,7 @@ export function* edenRegionSteps(ground:Ground):Generator<void,EdenRegions|null,
   // Distant parts never stop the camera (cheaper rays), except enterable buildings: Follow goes into the seafront hotels'
   // lobbies, stairs and rooms, and walls it cannot see stop the camera only when they are in its rays.
   const farB=new Builder('legacy'),winB=new Builder('legacy'),isFar=(x:number,z:number)=>outside(x,z)>FAR_CLEAR+6&&!inSeafrontHotel(x,z,.5);
-  canalPads(t);countryPads(t);hillPads(t);southPads(t);northPads(t);resortPads(t);abbeyPads(t);suburbPads(t);botanicPads(t);riverPads(t);cliffPads(t);crossPads(t);golfPads(t);fairPads(t);alpinePads(t);yield;
+  canalPads(t);countryPads(t);hillPads(t);southPads(t);northPads(t);resortPads(t);abbeyPads(t);suburbPads(t);botanicPads(t);riverPads(t);cliffPads(t);crossPads(t);golfPads(t);fairPads(t);alpinePads(t);
   // Districts are authored separately but drawn per SECTOR (north/south/east/west of the inhabited rectangle):
   // a few shared draws and ray objects instead of a dozen per district. Distant parts and window glass go to
   // their own shared sinks.
@@ -67,43 +62,43 @@ export function* edenRegionSteps(ground:Ground):Generator<void,EdenRegions|null,
   const sectorOf=(x:number,z:number):keyof typeof sectors=>z<INNER[1]?(x<0?'northWest':'north'):z>INNER[3]?(x<0?'southWest':'south'):x>INNER[2]?(x<136.5?(z<10?'eastEdgeNorth':z<60?'eastEdge':'eastEdgeSouth'):'east'):'west';
   const district=(name:string,fn:(b:Builder,tr:Trees)=>void)=>{const b=new Builder('legacy'),tr=new Trees();fn(b,tr);b.drain((x,z,k)=>k==='glass'?winB:isFar(x,z)?farB:sectors[sectorOf(x,z)]);
    for(const tt of tr.list)(isFar(tt.x,tt.z)?trees:sectorTrees[sectorOf(tt.x,tt.z)]).list.push(tt);void name;};
-  district('Canal quarter (scenery only)',(b,tr)=>buildCanalQuarter(b,t,tr));yield;
-  district('Old town plaza and market street (scenery only)',(b,tr)=>buildOldTown(b,t,tr));yield;
-  district('Hillside village and lookout temple (scenery only)',(b,tr)=>buildHillVillage(b,t,tr));yield;
-  district('South avenue (scenery only)',(b,tr)=>buildSouthAvenue(b,t,tr));yield;
-  district('Park with pond, gazebo and playground (scenery only)',(b,tr)=>buildPark(b,t,tr,motion.sink));yield;
-  district('Sports ground and courts (scenery only)',(b,tr)=>buildSports(b,t,tr));yield;
-  district('Farm hamlet with silos (scenery only)',(b,tr)=>buildFarm(b,t,tr));yield;
-  district('Harbour boardwalk, beach and lighthouse (scenery only)',(b,tr)=>buildHarbour(b,t,tr));yield;
-  district('North avenue (scenery only)',(b,tr)=>buildNorthAvenue(b,t,tr));yield;
-  district('Vineyard and orchard terraces with hill villa (scenery only)',(b,tr)=>buildVineyard(b,t,tr));yield;
-  district('Campus quad and library annex (scenery only)',(b,tr)=>buildCampus(b,t,tr));yield;
-  district('Artists village (scenery only)',(b,tr)=>buildArtists(b,t,tr));yield;
-  district('Seaside resort, ferris wheel and marina (scenery only)',(b,tr)=>buildResort(b,t,tr,motion.sink));yield;
-  district('West lake shore hamlet and boathouses (scenery only)',(b,tr)=>buildLakeShore(b,t,tr));yield;
-  district('Forest campsite and lodge (scenery only)',(b,tr)=>buildCampsite(b,t,tr));yield;
-  district('Railway, station and parked train (scenery only)',(b,tr)=>buildRailway(b,t,tr));yield;
-  district('Country roads, farmsteads and wind turbines (scenery only)',(b,tr)=>buildCountry(b,t,tr,(x,z)=>!inDistrict(x,z,12)));yield;
-  district('Old town cafe tables, bikes and planters (scenery only)',(b,tr)=>buildTownLife(b,t,tr));yield;
-  district('Abbey on the knoll with cloister and lavender (scenery only)',(b,tr)=>buildAbbey(b,t,tr));yield;
-  district('Courtyard-house quarter (scenery only)',(b,tr)=>buildCourtyards(b,t,tr));yield;
-  district('Makers yard, water tower and greenhouses (scenery only)',(b,tr)=>buildMakersYard(b,t,tr));yield;
-  district('Suburb with lawns, pools and a cul-de-sac (scenery only)',(b,tr)=>buildSuburb(b,t,tr));yield;
-  district('Castle ruin on the north-west crag (scenery only)',(b,tr)=>buildCastle(b,t,tr));yield;
-  district('Botanic garden: Japanese garden, pagoda, tea house, palm house (scenery only)',(b,tr)=>buildBotanic(b,t,tr));yield;
-  district('Observatory above the vineyard (scenery only)',(b,tr)=>buildObservatory(b,t,tr));yield;
-  district('Bunting, laundry, parked cars and boats at sea (scenery only)',b=>buildLife(b,t,motion.sink));yield;
-  district('West river, watermill, stone bridge and fishing hamlet (scenery only)',(b,tr)=>buildRiver(b,t,tr));yield;
-  district('Whitewashed cliff village, chapel, windmills and harbour (scenery only)',(b,tr)=>buildCliffVillage(b,t,tr));yield;
-  district('East crossroads: petrol station, pub, bus stop (scenery only)',(b,tr)=>buildCrossroads(b,t,tr));yield;
-  district('Golf course and clubhouse (scenery only)',(b,tr)=>buildGolf(b,t,tr));yield;
-  district('Festival meadow: big top, helter-skelter, balloons (scenery only)',(b,tr)=>buildFairground(b,t,tr));yield;
-  district('Alpine chalets and cable car (scenery only)',(b,tr)=>buildAlpine(b,t,tr));yield;
+  district('Canal quarter (scenery only)',(b,tr)=>buildCanalQuarter(b,t,tr));
+  district('Old town plaza and market street (scenery only)',(b,tr)=>buildOldTown(b,t,tr));
+  district('Hillside village and lookout temple (scenery only)',(b,tr)=>buildHillVillage(b,t,tr));
+  district('South avenue (scenery only)',(b,tr)=>buildSouthAvenue(b,t,tr));
+  district('Park with pond, gazebo and playground (scenery only)',(b,tr)=>buildPark(b,t,tr,motion.sink));
+  district('Sports ground and courts (scenery only)',(b,tr)=>buildSports(b,t,tr));
+  district('Farm hamlet with silos (scenery only)',(b,tr)=>buildFarm(b,t,tr));
+  district('Harbour boardwalk, beach and lighthouse (scenery only)',(b,tr)=>buildHarbour(b,t,tr));
+  district('North avenue (scenery only)',(b,tr)=>buildNorthAvenue(b,t,tr));
+  district('Vineyard and orchard terraces with hill villa (scenery only)',(b,tr)=>buildVineyard(b,t,tr));
+  district('Campus quad and library annex (scenery only)',(b,tr)=>buildCampus(b,t,tr));
+  district('Artists village (scenery only)',(b,tr)=>buildArtists(b,t,tr));
+  district('Seaside resort, ferris wheel and marina (scenery only)',(b,tr)=>buildResort(b,t,tr,motion.sink));
+  district('West lake shore hamlet and boathouses (scenery only)',(b,tr)=>buildLakeShore(b,t,tr));
+  district('Forest campsite and lodge (scenery only)',(b,tr)=>buildCampsite(b,t,tr));
+  district('Railway, station and parked train (scenery only)',(b,tr)=>buildRailway(b,t,tr));
+  district('Country roads, farmsteads and wind turbines (scenery only)',(b,tr)=>buildCountry(b,t,tr,(x,z)=>!inDistrict(x,z,12)));
+  district('Old town cafe tables, bikes and planters (scenery only)',(b,tr)=>buildTownLife(b,t,tr));
+  district('Abbey on the knoll with cloister and lavender (scenery only)',(b,tr)=>buildAbbey(b,t,tr));
+  district('Courtyard-house quarter (scenery only)',(b,tr)=>buildCourtyards(b,t,tr));
+  district('Makers yard, water tower and greenhouses (scenery only)',(b,tr)=>buildMakersYard(b,t,tr));
+  district('Suburb with lawns, pools and a cul-de-sac (scenery only)',(b,tr)=>buildSuburb(b,t,tr));
+  district('Castle ruin on the north-west crag (scenery only)',(b,tr)=>buildCastle(b,t,tr));
+  district('Botanic garden: Japanese garden, pagoda, tea house, palm house (scenery only)',(b,tr)=>buildBotanic(b,t,tr));
+  district('Observatory above the vineyard (scenery only)',(b,tr)=>buildObservatory(b,t,tr));
+  district('Bunting, laundry, parked cars and boats at sea (scenery only)',b=>buildLife(b,t,motion.sink));
+  district('West river, watermill, stone bridge and fishing hamlet (scenery only)',(b,tr)=>buildRiver(b,t,tr));
+  district('Whitewashed cliff village, chapel, windmills and harbour (scenery only)',(b,tr)=>buildCliffVillage(b,t,tr));
+  district('East crossroads: petrol station, pub, bus stop (scenery only)',(b,tr)=>buildCrossroads(b,t,tr));
+  district('Golf course and clubhouse (scenery only)',(b,tr)=>buildGolf(b,t,tr));
+  district('Festival meadow: big top, helter-skelter, balloons (scenery only)',(b,tr)=>buildFairground(b,t,tr));
+  district('Alpine chalets and cable car (scenery only)',(b,tr)=>buildAlpine(b,t,tr));
   // Countryside and far forests outside the districts.
   const r=rng(424242);
   for(let i=0;i<5200&&trees.list.length<850;i++){const x=-330+r()*700,z=-300+r()*560,d=outside(x,z);if(d<14||inDistrict(x,z,6))continue;const h=t.height(x,z);if(h<.2||h>58)continue;
    const dens=fbm(x/60,z/60);if(dens<.5-(d>150?.08:0))continue;const conifer=h>14||d>170||r()<.25;trees.add(x,h,z,(conifer?1.1:1)*(.8+r()*.8)*(d>150?1.6:1),conifer?'conifer':pick(r,['round','round','poplar'] as const),conifer?pick(r,['#3f6a3c','#4a7a44','#365e38']):pick(r,['#6f9a4e','#5f8a46','#7fa84f','#8aa850']),r()*6);}
-  for(const k of Object.keys(sectors) as (keyof typeof sectors)[]){const g=new THREE.Group();g.name='Regions '+k+' districts (scenery only)';group.add(g);tris+=sectors[k].emit(g,mats,'Regions '+k+' districts',geos,{glassSink:winB});tris+=sectorTrees[k].emit(g,mats,geos);}yield;
+  for(const k of Object.keys(sectors) as (keyof typeof sectors)[]){const g=new THREE.Group();g.name='Regions '+k+' districts (scenery only)';group.add(g);tris+=sectors[k].emit(g,mats,'Regions '+k+' districts',geos,{glassSink:winB});tris+=sectorTrees[k].emit(g,mats,geos);}
   const fg=new THREE.Group();fg.name='Regions distant district parts (scenery only; never in camera rays)';group.add(fg);tris+=farB.emit(fg,mats,'Regions distant districts',geos,{allClear:true,glassSink:winB});
   {const W=winB.b('glass');if(W.p.length){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(W.p,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(W.n,3));g.setAttribute('color',new THREE.Float32BufferAttribute(W.c,3));g.computeBoundingBox();g.computeBoundingSphere();geos.push(g);
    const m=new THREE.Mesh(g,mats.windows());m.name='Regions window glass and lamp heads (night-lit)';m.userData.cameraTransparent=true;m.matrixAutoUpdate=false;fg.add(m);tris+=W.p.length/9;}}
@@ -112,7 +107,7 @@ export function* edenRegionSteps(ground:Ground):Generator<void,EdenRegions|null,
   tris+=trees.emit(tg,mats,geos,true);
   // Terrain and open water last (largest meshes).
   const land=new THREE.Group();land.name='Regions terrain and open water (scenery only)';group.add(land);
-  tris+=t.build(land,mats,geos);yield;
+  tris+=t.build(land,mats,geos);
   const wb=new Builder('legacy');
   // Open sea to the horizon (the camera sees ~2 km); beyond the districts it reaches into the coves of the outer coast.
   wb.quad('water',[-300,WATER.bay,138],[300,WATER.bay,138],[300,WATER.bay,4000],[-300,WATER.bay,4000],'#4d7f93');
@@ -123,7 +118,7 @@ export function* edenRegionSteps(ground:Ground):Generator<void,EdenRegions|null,
   tidePools(wb,(x,z)=>t.height(x,z),WATER.bay);
   tris+=wb.emit(land,mats,'Regions open water',geos);
   // Coast: swell, surf lines, beach wash and cliff foam on the sea surface, from a shore map baked once.
-  {bakeShore((x,z)=>t.height(x,z),WATER.bay);const water=mats.get('water');water.onBeforeCompile=seaSurfPatch(WATER.bay);water.customProgramCacheKey=()=>'eden-regions-sea-surf-v1';}yield;
+  {bakeShore((x,z)=>t.height(x,z),WATER.bay);const water=mats.get('water');water.onBeforeCompile=seaSurfPatch(WATER.bay);water.customProgramCacheKey=()=>'eden-regions-sea-surf-v1';}
   // Meshes lying wholly > FAR_CLEAR m outside the inhabited rectangle can never stand between a Broadcast
   // camera and a subject: keep them out of the per-ray object set (materials are shared with near districts,
   // so their realism finish is unchanged).

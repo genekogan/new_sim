@@ -24,7 +24,7 @@ import {createEdenExpansionLandscape} from '../../../mars/viewer/app/engine-view
 import {createEdenPublicQuarter} from '../../../mars/viewer/app/engine-view/content/assets/eden-expansion-assets/public-quarter.ts';
 import {expansionHeight} from '../../../mars/viewer/app/engine-view/content/environment/eden-expansion-landscape/layout.mjs';
 import {createEdenGardensYard} from '../../../mars/viewer/app/engine-view/content/assets/eden-expansion-assets/gardens-yard.ts';
-import {createEdenRegions,edenRegionSteps,FOOTPRINTS,type EdenRegions} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/index.ts';
+import {createEdenRegions,FOOTPRINTS} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/index.ts';
 import {createEdenStreetProps} from '../../../mars/viewer/app/engine-view/content/assets/eden-street-props/index.ts';
 import {createEdenInteriors} from '../../../mars/viewer/app/engine-view/content/assets/eden-interiors/index.ts';
 import {createEdenWayfinding} from '../../../mars/viewer/app/engine-view/content/assets/eden-wayfinding/index.ts';
@@ -51,24 +51,7 @@ const WARM_CAP_MS=10_000;
 /** P1 phones (F12): the landscape needs nothing from the world, so the old Eden page builds it while it still waits for
  * the scene publication; the first expansion takes it. Only before the first expansion (never a spare one after). */
 let prebuiltLandscape:ReturnType<typeof createEdenExpansionLandscape>|null=null,expansionMade=false;
-export function prebuildEdenLandscape(){if(prebuiltLandscape||expansionMade)return;prebuiltLandscape=createEdenExpansionLandscape(true);if(prebuiltLandscape)prebuildRegions(prebuiltLandscape.sampleVisualGround);}
-/** F12 too: the regions read the world's ground only along the inhabited rectangle's edge (~2.5k points). After the landscape
- * the old Eden page builds them in idle slices (a district per task) against the ground the expansion will have when the scene
- * publishes no ground there, recording every answer. The first expansion takes them only if its real ground gives the same
- * answer at every recorded point (the same input, so the same regions); otherwise it builds them as before. */
-let prebuiltRegions:{steps:Generator<void,EdenRegions|null,void>;asked:(number|null)[];result?:EdenRegions|null;failed?:boolean}|null=null;
-function prebuildRegions(visual:(x:number,z:number)=>number|null){
- const asked:(number|null)[]=[],ground=(x:number,z:number)=>{const y=(x>=-30&&x<=30&&z>=-30&&z<=30?0:visual(x,z))??null;asked.push(x,z,y);return y;};
- const entry:NonNullable<typeof prebuiltRegions>={steps:edenRegionSteps(ground),asked};prebuiltRegions=entry;
- const channel=new MessageChannel(),next=()=>channel.port2.postMessage(0);
- channel.port1.onmessage=()=>{if(prebuiltRegions!==entry||entry.result!==undefined||entry.failed){channel.port1.close();return;}
-  try{const r=entry.steps.next();if(r.done){entry.result=r.value;channel.port1.close();return;}}catch{entry.failed=true;channel.port1.close();return;}next();};
- next();}
-function takePrebuiltRegions(ground:(x:number,z:number)=>number|null):EdenRegions|null{const e=prebuiltRegions;prebuiltRegions=null;if(!e)return null;
- try{while(e.result===undefined&&!e.failed){const r=e.steps.next();if(r.done)e.result=r.value;}}catch{e.failed=true;}
- if(e.failed||!e.result)return null;
- const a=e.asked;for(let i=0;i<a.length;i+=3)if(!Object.is(ground(a[i] as number,a[i+1] as number),a[i+2])){try{e.result.dispose();}catch{}arrivalMark('regions-prebuild-miss');return null;}
- arrivalMark('regions-prebuilt');return e.result;}
+export function prebuildEdenLandscape(){if(prebuiltLandscape||expansionMade)return;prebuiltLandscape=createEdenExpansionLandscape(true);}
 export function createWorldEdenExpansion(officeGuards:readonly OfficeGuardBox[]=[],groundPublication?:Pick<SceneInfo,'scene'|'shore'>){
  const group=new THREE.Group(),owners:{group:THREE.Group;dispose():void}[]=[],hidden:THREE.Object3D[]=[];
  group.name='Eden — connected growing world';
@@ -98,7 +81,7 @@ export function createWorldEdenExpansion(officeGuards:readonly OfficeGuardBox[]=
   const streetDetails=createEdenStreetDetails(proposedGround);if(streetDetails){owners.push(streetDetails);group.add(streetDetails.group);}
   const artistRow=createEdenArtistRow(proposedGround);if(artistRow){owners.push(artistRow);group.add(artistRow.group);}
   // Edge lanes (each owns its module): new regions, street props, interiors, commons wayfinding.
-  try{const regions=takePrebuiltRegions(proposedGround)??createEdenRegions(proposedGround);if(regions){owners.push(regions);group.add(regions.group);regionalGround=regions.sampleVisualGround;authoredBoundaries=regions.authoredBoundaries;}}catch(error){console.warn('Eden regional scenery unavailable; unsupported decorative roots are omitted',error);}
+  try{const regions=createEdenRegions(proposedGround);if(regions){owners.push(regions);group.add(regions.group);regionalGround=regions.sampleVisualGround;authoredBoundaries=regions.authoredBoundaries;}}catch(error){console.warn('Eden regional scenery unavailable; unsupported decorative roots are omitted',error);}
   for(const make of [createEdenStreetProps,createEdenInteriors,createEdenWayfinding,createEdenFacades,createEdenEventKit,createEdenComputers,createEdenSportsKit,createEdenDistricts,createEdenImports]){try{const lane=make(proposedGround);if(lane){owners.push(lane);group.add(lane.group);}}catch(error){console.warn('Eden lane scenery unavailable',error);}}
   // Ground details: near-camera grass tufts and wildflowers, worn path edges, field stones, fallen leaves.
   try{const decorationGround=highestDrawnDecorationSoil(groundPublication,visualGround,(x,z)=>regionalGround?.(x,z)??null);const details=createWorldGroundDetails(decorationGround,(x,z)=>{const water=groundPublication?.shore?.metadata.water;if(!water)return false;const b=water.wetBoundsXZ,y=nativeGround(x,z);return x>=b[0]&&x<=b[2]&&z>=b[1]&&z<=b[3]&&y!==null&&y<water.datumY;});owners.push(details);group.add(details.group);}catch(error){console.warn('Eden ground details unavailable',error);}
