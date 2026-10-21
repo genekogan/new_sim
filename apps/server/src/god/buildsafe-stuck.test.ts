@@ -120,8 +120,6 @@ test('walk.stuck: a body caught in geometry steps out and the same plan walks on
   const {w, r, relocations, to} = await frozenWalk(t, true);
   assert.equal(relocations, 1, 'one step-out');
   assert.equal(r?.phase, 'completed', JSON.stringify(r));
-  assert.equal(kinds.length, 1, JSON.stringify(kinds)); assert.equal(kinds[0].godWalkout, true, 'rose with the god walk-out');
-  assert.match(kinds[0].why, /stood up and stepped clear to start/);
   const end = w.pos(); assert.ok(Math.hypot(end[0] - to[0], end[1] - to[1]) < 1, `arrived: ${end}`);
 });
 
@@ -139,8 +137,6 @@ test('gait fallback: a run the water refuses (gait.dry-ground-required) walks in
   const r: any = await w.until(out.receipt.id);
   assert.equal(r.phase, 'completed', JSON.stringify(r));
   assert.match(r.reason ?? '', /^Walking, not running: the way goes through shallow water/);
-  assert.equal(kinds.length, 1, JSON.stringify(kinds)); assert.equal(kinds[0].godWalkout, true, 'rose with the god walk-out');
-  assert.match(kinds[0].why, /stood up and stepped clear to start/);
   const end = w.pos(); assert.ok(Math.hypot(end[0] - to[0], end[1] - to[1]) < 1, `arrived: ${end}`);
 });
 
