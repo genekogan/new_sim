@@ -3,7 +3,6 @@
 // socket) start when the snapshot is in; elsewhere it lets it start at once and does nothing else.
 import './client-errors.ts';   // lane ERR: first, so errors from here on are reported
 import { installAssetTransport } from './boot-assets.ts';
-import { startCdnManifest } from './cdn-assets.ts';
 import { earlyLayerWanted, startEarlyLayer } from './early-layer.ts';
 import { callPhase2 } from './phased-entry.ts';
 
@@ -19,10 +18,10 @@ try {
   const onSnapshot = () => {
     if (asked) return; asked = true;
     if (new URLSearchParams(location.search).get('earlyRender') === '0') return phase2();
-    let released = false; const release = () => { if (!released) { released = true; startCdnManifest(); phase2(); } };
+    let released = false; const release = () => { if (!released) { released = true; phase2(); } };
     phase2(true); setTimeout(release, POSTER_WAIT_MS);
     try { void import('./early-render.ts').then((m) => m.startEarlyRender(release), release); } catch { release(); }
   };
-  if (earlyLayerWanted()) { installAssetTransport(true); started = startEarlyLayer(onSnapshot); }
+  if (earlyLayerWanted()) { installAssetTransport(); started = startEarlyLayer(onSnapshot); }
 } catch { /* LiveWorld makes its own layer */ }
 if (!started) phase2();

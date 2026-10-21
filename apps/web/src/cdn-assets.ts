@@ -209,7 +209,6 @@ declare const __SIM_ASSETS_CDN_ORIGIN__: string;
 export type CdnRoute = { url: string; sha256: string; bytes: number };
 let published: Promise<{ manifest: CdnManifest; origin: string } | null> = Promise.resolve(null);
 export function cdnRoute(url: string): Promise<CdnRoute | null> {
-  startCdnManifest();
   return published.then((p) => {
     if (!p) return null;
     const asset = manifestAsset(p.manifest, url, location.href);
@@ -219,20 +218,12 @@ export function cdnRoute(url: string): Promise<CdnRoute | null> {
 /** Tests: install a parsed manifest for cdnRoute without the build-time switch. */
 export function setCdnRouteForTest(manifest: CdnManifest | null, origin = 'https://assets.eden.art') { published = Promise.resolve(manifest ? { manifest, origin: cdnOrigin(origin) } : null); }
 
-let kick = () => {};
-/** Start the manifest GET of a deferred install (no-op otherwise, or once started). An asset-file fetch, a cdnRoute and
- *  an ImageLoader load start it too. */
-export function startCdnManifest(): void { kick(); }
-/** `deferred` (t4-phone-new, the early layer's pages): the manifest GET (~50 KB) waits for startCdnManifest or the first
- *  asset that needs it; on a Slow 4G phone it used to share the link with the poster's own scripts (Eden 2026 has no
- *  CDN asset before its poster: ~0.25 s of a 4x phone's arrival). */
-export function installCdnAssets(manifestPath: string, onProgress?: CdnProgress, deferred = false): void {
+export function installCdnAssets(manifestPath: string, onProgress?: CdnProgress): void {
   if (typeof __SIM_ASSETS_CDN_ENABLED__ === 'undefined' || !__SIM_ASSETS_CDN_ENABLED__) return;
   const original = window.fetch.bind(window);
   let found: (v: { manifest: CdnManifest; origin: string } | null) => void = () => {};
   published = new Promise((r) => { found = r; });
-  let begin: () => void = () => {};
-  const transport: Promise<Fetch | null> = new Promise<void>((r) => { begin = r; }).then(() => original(manifestPath, { signal: AbortSignal.timeout(3000) })).then(async (response) => {
+  const transport: Promise<Fetch | null> = original(manifestPath, { signal: AbortSignal.timeout(3000) }).then(async (response) => {
     if (!response.ok) return null;
     const manifest = readCdnManifest(await response.json());
     found({ manifest, origin: cdnOrigin(__SIM_ASSETS_CDN_ORIGIN__) });
@@ -240,17 +231,10 @@ export function installCdnAssets(manifestPath: string, onProgress?: CdnProgress,
     return cdnFetch(original, manifest, __SIM_ASSETS_CDN_ORIGIN__, location.href, undefined, onProgress);
   }).catch(() => null);
   void transport.then((t) => { if (!t) found(null); });
-  kick = () => { kick = () => {}; begin(); };
-  if (!deferred) kick();
-  else {
-    const load = ImageLoader.prototype.load;
-    ImageLoader.prototype.load = function (...a) { kick(); return load.apply(this, a); };
-  }
   window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     let path = '';
     try { path = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.href).pathname; } catch { /* not a URL: origin */ }
     if (!FILE.test(path)) return original(input, init);
-    kick();
     return transport.then((t) => (t ?? original)(input, init));
   }) as Fetch;
 }
