@@ -25,6 +25,7 @@ import { GodMeals } from './meals.ts';
 import { installGodRides } from './rides.ts';
 import { releaseBigScratch } from '../../../../mars/viewer/engine/spatial/path.ts';
 import { MAX_LEVEL_ID } from '../../../../mars/viewer/engine/spatial/types.ts';
+import { pointInObb, type OBB2 } from '../../../../mars/viewer/engine/core/math.ts';
 import { installWorldLore } from './world-lore.ts';
 import { installHeld } from './held.ts';
 import { installWorldClock } from './world-clock.ts';
@@ -81,6 +82,7 @@ const EVACUATE_RETRY_TICKS = 400; // a closure walk-out the engine could not lan
 const RELEASED = '"released"';
 const GROUND_BAND = 0.35;      // a floor within this of the ground is level 0 (the engine's ground is flat at y 0 until L8's tiles)
 const LEVEL_MATCH = 0.12;      // floors this close in height share an engine level
+const FLOOR_NEAR = 0.6;        // levelAt: a level counts at a point within this of one of its floors (thresholds, stair heads)
 const NEAR = 60;               // capabilities: god things within this many metres
 const BODY_DEF = 'core/humanoid@1';
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
@@ -251,7 +253,7 @@ export class EngineBridge {
   private send(ids: Set<string>, seq: number, why: string) {
     const t0 = performance.now();
     this.doorSpotsCache = null;
-    this.levelsNow.clear();
+    this.levelsNow.clear(); this.sendFloors = new Map(); this.sendIds = ids;
     const set: WorldEditV1['set'] = {}, assets: Record<string, unknown> = {};
     const known = this.physics?.assets ?? {};
     let linksMoved = false;
@@ -263,6 +265,7 @@ export class EngineBridge {
       const e = this.model.entities.get(id);
       if (e && this.engineOwned(e)) continue;            // bodies and what they carry belong to the engine
       const part = e ? this.derive(e, assets, known) : null;
+      for (const f of part?.surfaces ?? []) if (f.level) { const a = this.sendFloors.get(f.level) ?? []; a.push(f.obb); this.sendFloors.set(f.level, a); }
       const key = part ? JSON.stringify(normPart(part)) : null;
       // A removed thing the engine still has (one a Soul held when it went: `sent` forgot it) is removed there too.
       const lingering = !e && (this.engine.world.entities[id]?.tags?.includes('entity-world') || !!this.physics?.byEntity[id]);
@@ -280,6 +283,7 @@ export class EngineBridge {
       set[e.id] = part;
       if (key) this.sent.set(e.id, key); else this.sent.delete(e.id);
     }
+    this.sendIds = null;
     if (!Object.keys(set).length) return;
     const draft: WorldEditV1 = { contract: 'world-edit/1', seq, hash: '', levels: structuredClone(this.levels), set, ...(Object.keys(assets).length ? { assets } : {}) };
     this.physics = nextEntityPhysics(this.physics, draft);
@@ -392,12 +396,19 @@ export class EngineBridge {
     // ground cover (roads, lawns, plazas: ground-relative level-0 surfaces of world-frame shapes) is the ground itself
     const floors = surfaces.filter((x) => !(worldFrame && !(x as { abs?: boolean }).abs && x.level === 0));
     const raisedDeck = this.isRaisedDeck(e, def);
+    // a building's ground storey is the ground's level when it lies within the generous band of the terrain (as levelAt
+    // reads the things in it), its stair feet with it: one sunk 0.37 m below a hillside's terrain (cliff-house-4/-18 in a
+    // fresh Eden 2026) was an upper level of its own that no door or stair reached (lane LEVELS)
+    const g0 = !worldFrame && def.make.kind === 'gen' && def.make.gen === 'building/1' ? surfaces.find((x) => x.level === 0) : undefined;
+    const c0 = g0 ? (() => { const r = rectOf(g0.polygon); return toWorld(r.c[0], r.c[1]); })() : undefined;
+    const groundY = g0 && c0 && Math.abs(heightAt(g0.y, c0) - this.model.terrain.sample(c0[0], c0[1])) <= GROUND_BAND + 0.5 ? heightAt(g0.y, c0) : undefined;
+    const levelOn = (y: number, at: Vec2) => (groundY !== undefined && Math.abs(y - groundY) <= LEVEL_MATCH ? 0 : this.levelFor(y, at));
     if (floors.length) part.surfaces = floors.map((s, i) => {
       const r = rectOf(s.polygon), abs = (s as { abs?: boolean }).abs;
       const c = toWorld(r.c[0], r.c[1]), y = heightAt(s.y, c, abs);
       // decks and bridges of world-frame shapes are walked from the ground: level 0 at their own height (L8 slabs); a
       // raised deck (deck/1 with rails, DECK_RAISED up) is an upper floor of its own that stairs, ramps and ladders reach
-      const level = worldFrame && abs && s.level === 0 && !raisedDeck ? 0 : this.levelFor(y, c);
+      const level = worldFrame && abs && s.level === 0 && !raisedDeck ? 0 : levelOn(y, c);
       const sc = worldFrame ? 1 : wp.s, yaw = worldFrame ? r.yaw : wp.yaw + r.yaw;
       return { id: `${e.id}#f${i}`, level, y: level === 0 && Math.abs(y) <= GROUND_BAND ? 0 : y, obb: { c, half: [r3(r.half[0] * sc), r3(r.half[1] * sc)] as Vec2, yaw: r3(-yaw) }, label: `${this.model.pathOf(e.id)} ${s.tag ?? 'floor'}`.slice(0, 100) };
     });
@@ -406,7 +417,7 @@ export class EngineBridge {
       if (o.kind === 'window' || worldFrame) continue;
       const storey = surfaces.filter((x) => x.level === o.level);
       if (!o.level || !storey.length) continue;
-      const c = toWorld(o.at[0], o.at[1]), y = heightAt(storey[0].y, c), level = this.levelFor(y, c);
+      const c = toWorld(o.at[0], o.at[1]), y = heightAt(storey[0].y, c), level = levelOn(y, c);
       if (level === 0) continue;
       (part.surfaces ??= []).push({ id: `${e.id}#t:${o.id}`, level, y, obb: { c, half: [r3((o.width / 2) * wp.s), r3(0.3 * wp.s)], yaw: r3(-(wp.yaw + o.yaw)) }, label: `${this.model.pathOf(e.id)} ${o.id} threshold`.slice(0, 100) });
     }
@@ -418,7 +429,7 @@ export class EngineBridge {
       const n = Math.max(2, Math.ceil(Math.abs(yb - ya) / 0.18) + 1), path: [number, number, number][] = [];
       for (let k = 0; k < n; k++) { const t = k / (n - 1); path.push([r3(a[0] + (b[0] - a[0]) * t), r3(ya + (yb - ya) * t), r3(a[1] + (b[1] - a[1]) * t)]); }
       const kind = l.kind === 'float' ? 'climb' : l.kind;
-      const la = this.levelFor(ya, a), lb = this.levelFor(yb, b);
+      const la = levelOn(ya, a), lb = levelOn(yb, b);
       return { id: `${e.id}#${l.id}`, kind: kind as 'stairs' | 'ramp' | 'ladder' | 'climb', from: { level: la, p: a, y: la === 0 && Math.abs(ya) <= GROUND_BAND ? 0 : ya }, to: { level: lb, p: b, y: lb === 0 && Math.abs(yb) <= GROUND_BAND ? 0 : yb }, width: r3(l.width * wp.s), heading: r3(Math.atan2(b[1] - a[1], b[0] - a[0])), path, usable: true,
         ...(helix ? { approach: { from: toWorld(...helix.stepFrom), to: toWorld(...helix.stepTo) } } : {}) };
     });
@@ -518,8 +529,9 @@ export class EngineBridge {
       if (Math.abs(wp.y) > GROUND_BAND && Math.abs(wp.y - this.model.terrain.sample(wp.x, wp.z)) <= GROUND_BAND) return { ...spec, support: { kind: 'ground' } };
       // lane LEVELS (2026-10-21): a fixture on an upper floor names that floor's level, the one levelFor gave the floor (the
       // engine otherwise takes the level nearest its height, which can be another building's floor 0.03 m nearer)
-      const level = Math.abs(wp.y - this.model.terrain.sample(wp.x, wp.z)) > GROUND_BAND ? this.levels.find((l) => Math.abs(l.y - wp.y) <= LEVEL_MATCH)?.id : undefined;
-      return level ? { ...spec, level } : spec;
+      // no floor of its height here: the ground's level, said so when the nearest-height rule could pick another
+      const level = this.levels.find((l) => Math.abs(l.y - wp.y) <= LEVEL_MATCH && this.hasFloorAt(l.id, wp.x, wp.z))?.id ?? (Math.abs(wp.y) > GROUND_BAND ? 0 : undefined);
+      return level !== undefined ? { ...spec, level } : spec;
     }
     const parent = e.in.parent !== 'world' ? this.model.entities.get(e.in.parent) : undefined;
     const pdef = parent ? this.model.resolvedDef(parent.def) : undefined;
@@ -1078,13 +1090,31 @@ export class EngineBridge {
   /** Engine level of a standing height at (x, z): 0 within reach of the terrain there (hills too), else a floor's level. */
   levelAt(x: number, z: number, y: number): number {
     // a registered floor at this height wins over the generous ground band: a raised floor 0.35–0.85 m up (the Mars
-    // bays' 0.53 m plywood, lane MARS) is its own level, not the ground under it
-    const g = this.model.terrain.sample(x, z);
-    if (Math.abs(y - g) > GROUND_BAND) { const exact = this.levels.find((l) => Math.abs(l.y - y) <= LEVEL_MATCH); if (exact) return exact.id; }
+    // bays' 0.53 m plywood, lane MARS) is its own level, not the ground under it. Only a level with a floor here counts
+    // (lane LEVELS): levels are shared by height across the world, and with one per floor height (~50 on a hillside
+    // world) a shelf or a sunk ground floor elsewhere matched another building's level and had no standing room.
+    const g = this.model.terrain.sample(x, z), here = (l: Level) => this.hasFloorAt(l.id, x, z);
+    if (Math.abs(y - g) > GROUND_BAND) { const exact = this.levels.find((l) => Math.abs(l.y - y) <= LEVEL_MATCH && here(l)); if (exact) return exact.id; }
     if (Math.abs(y - g) <= GROUND_BAND + 0.5) return 0;
-    const hit = this.levels.find((l) => Math.abs(l.y - y) <= 0.6); if (hit) return hit.id;
-    const below = this.levels.filter((l) => l.y <= y + 0.5).sort((a, b) => b.y - a.y)[0];
+    const hit = this.levels.find((l) => Math.abs(l.y - y) <= 0.6 && here(l)); if (hit) return hit.id;
+    const below = this.levels.filter((l) => l.y <= y + 0.5 && here(l)).sort((a, b) => b.y - a.y)[0];
     return below?.id ?? 0;
+  }
+  /** Floors per upper level: the engine's (cached per physics hash) and those derived in the current send. */
+  private floorIndex: { hash: string; by: Map<number, { id: string; obb: OBB2 }[]> } | null = null;
+  /** During a send: the floors derived so far, and the entities it re-derives (their engine floors are being replaced). */
+  private sendFloors = new Map<number, OBB2[]>();
+  private sendIds: Set<string> | null = null;
+  private hasFloorAt(level: number, x: number, z: number): boolean {
+    const hash = this.physics?.hash ?? '';
+    if (this.floorIndex?.hash !== hash) {
+      const by = new Map<number, { id: string; obb: OBB2 }[]>();
+      for (const [id, part] of Object.entries(this.physics?.byEntity ?? {}) as [string, Part][]) for (const f of part.surfaces ?? []) if (f.level) { const a = by.get(f.level) ?? []; a.push({ id, obb: f.obb }); by.set(f.level, a); }
+      this.floorIndex = { hash, by };
+    }
+    const at: Vec2 = [x, z], near = (o: OBB2) => pointInObb(at, o, FLOOR_NEAR);
+    const send = this.sendIds;
+    return !!(this.floorIndex.by.get(level)?.some((f) => !send?.has(f.id) && near(f.obb)) || (send && this.sendFloors.get(level)?.some(near)));
   }
   private levelOfY(y: number) { if (Math.abs(y) > GROUND_BAND) { const exact = this.levels.find((l) => Math.abs(l.y - y) <= LEVEL_MATCH); if (exact) return exact.id; } if (Math.abs(y) <= GROUND_BAND + 0.5) return 0; const l = this.levels.reduce<Level | null>((b, l) => (l.y <= y + 0.5 && (!b || l.y > b.y) ? l : b), null); return l?.id ?? 0; }
   reach(from: ReachEnd, to: ReachEnd) {
