@@ -67729,23 +67729,28 @@
             "gates": [
               {
                 "at": 0.6,
-                "width": 3
+                "width": 3,
+                "state": "open"
               },
               {
                 "at": 18.763,
-                "width": 1.8
+                "width": 1.8,
+                "state": "open"
               },
               {
                 "at": 37.526,
-                "width": 1.8
+                "width": 1.8,
+                "state": "open"
               },
               {
                 "at": 56.288,
-                "width": 1.8
+                "width": 1.8,
+                "state": "open"
               },
               {
                 "at": 74.451,
-                "width": 3
+                "width": 3,
+                "state": "open"
               }
             ]
           }

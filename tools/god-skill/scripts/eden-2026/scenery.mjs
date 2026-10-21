@@ -174,11 +174,13 @@ group('scenery: park pond lilies and stall', put => {
   put('market-stall', 'park-ice-cream-stall', [-27, 104], { r: Math.PI / 2, params: { awning: '#e88aa0' } });
 });
 // V7: the park pond's stone kerb (old Eden: a stepped stone basin), with gaps at the jetty and three swimming steps.
+// CONTENT (2026-10-21): the gaps are open gates; a wall/1 gate is 'closed' unless it says otherwise (doorblock), which
+// sealed the pond loop, jetty and boat (19 places) inside the kerb.
 {
   const pts = Array.from({ length: 41 }, (_, i) => { const a = i / 40 * Math.PI * 2; return [r3(-6 + Math.cos(a) * 14.1), r3(112 + Math.sin(a) * 9.6)]; });
   const len = pts.slice(1).reduce((L, p, i) => L + Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]), 0);
   groups.push({ label: 'scenery: park pond kerb', ops: [{ op: 'place', def: 'core/garden-wall@1', name: 'park-pond-stone-kerb', shape: { path: pts },
-    params: { height: 0.42, thickness: 0.7, material: 'stone', color: '#b9b2a4', cap: true, gates: [{ at: 0.6, width: 3 }, { at: r3(len * 0.25), width: 1.8 }, { at: r3(len * 0.5), width: 1.8 }, { at: r3(len * 0.75), width: 1.8 }, { at: r3(len - 0.6), width: 3 }] } }] });
+    params: { height: 0.42, thickness: 0.7, material: 'stone', color: '#b9b2a4', cap: true, gates: [{ at: 0.6, width: 3 }, { at: r3(len * 0.25), width: 1.8 }, { at: r3(len * 0.5), width: 1.8 }, { at: r3(len * 0.75), width: 1.8 }, { at: r3(len - 0.6), width: 3 }].map((g) => ({ ...g, state: 'open' })) } }] });
 }
 
 // (library and café interiors: interiors.mjs)
