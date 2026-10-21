@@ -1,0 +1,275 @@
+{
+  "schema": "catalog-conformance-supplement/1",
+  "note": "Tranche 2026-10-21 lane BSGEN (furnish/plan fixes from the fuzz walk world). Exact re-pins only: 71 findings identical to the previous revision's documented tuples but for the def hash (--k 2 --filter per def, team/scratch/t4/bsgen/repin.py). core-apartment-block@1 fc05f52b2fcf -> 8ab1b6bba3c0 (plan.landing 1.2: the stair hall's two facing flights narrow to keep a 1.2 m landing strip; same triangle counts), core-office-block@1 29a725ec5cd6 -> 899ac1ca6a35 and core-hospital@1 3e67ee37ae4d -> a2000d8cd01a (built-in contents re-laid out by today's furnish). core-theatre@1 2553bc9fda2d -> dbd55b0c9916 (contents) has no finding. No new failure code or detail; nothing relaxed.",
+  "findings": [
+    {
+      "def": "core-apartment-block@1",
+      "hash": "8ab1b6bba3c0532bec66cceebfff76d80c85b26c1881244dc1ce91976b600836",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "10598 > 6000",
+      "fields": [
+        "params.d.max",
+        "params.w.max"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "8ab1b6bba3c0532bec66cceebfff76d80c85b26c1881244dc1ce91976b600836",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6094 > 6000",
+      "fields": [
+        "params.floorHeight.min",
+        "params.roof=none"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "8ab1b6bba3c0532bec66cceebfff76d80c85b26c1881244dc1ce91976b600836",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6134 > 6000",
+      "fields": [
+        "params.roof=shed"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "8ab1b6bba3c0532bec66cceebfff76d80c85b26c1881244dc1ce91976b600836",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6178 > 6000",
+      "fields": [
+        "params.hood=false"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "8ab1b6bba3c0532bec66cceebfff76d80c85b26c1881244dc1ce91976b600836",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6194 > 6000",
+      "fields": [
+        "params.roof=hip"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "8ab1b6bba3c0532bec66cceebfff76d80c85b26c1881244dc1ce91976b600836",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6214 > 6000",
+      "fields": [
+        "defaults",
+        "params.balcony=false",
+        "params.balcony=true",
+        "params.chimney=false",
+        "params.chimney=true",
+        "params.d.min",
+        "params.doorLamp=false",
+        "params.doorLamp=true",
+        "params.floors.max",
+        "params.floors.min",
+        "params.flowerBoxes=false",
+        "params.flowerBoxes=true",
+        "params.front=e",
+        "params.front=n",
+        "params.front=s",
+        "params.front=w",
+        "params.hood=true",
+        "params.material=brick",
+        "params.material=metal",
+        "params.material=plaster",
+        "params.material=stone",
+        "params.material=wood",
+        "params.porch.min",
+        "params.quoins=false",
+        "params.quoins=true",
+        "params.roof=flat",
+        "params.roofPitch.max",
+        "params.roofPitch.min",
+        "params.shutters=false",
+        "params.shutters=true",
+        "params.style=barn",
+        "params.style=chapel",
+        "params.style=cottage",
+        "params.style=greenhouse",
+        "params.style=hall",
+        "params.style=pavilion",
+        "params.style=shed",
+        "params.style=shop",
+        "params.style=tower",
+        "params.style=townhouse",
+        "params.wallThickness.max",
+        "params.wallThickness.min",
+        "size.scale.max",
+        "size.scale.min"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "8ab1b6bba3c0532bec66cceebfff76d80c85b26c1881244dc1ce91976b600836",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6250 > 6000",
+      "fields": [
+        "params.roof=gable"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "8ab1b6bba3c0532bec66cceebfff76d80c85b26c1881244dc1ce91976b600836",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6422 > 6000",
+      "fields": [
+        "params.roof=dome"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "8ab1b6bba3c0532bec66cceebfff76d80c85b26c1881244dc1ce91976b600836",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6510 > 6000",
+      "fields": [
+        "params.floorHeight.max"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "8ab1b6bba3c0532bec66cceebfff76d80c85b26c1881244dc1ce91976b600836",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6730 > 6000",
+      "fields": [
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "8ab1b6bba3c0532bec66cceebfff76d80c85b26c1881244dc1ce91976b600836",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6782 > 6000",
+      "fields": [
+        "params.porch.max"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "8ab1b6bba3c0532bec66cceebfff76d80c85b26c1881244dc1ce91976b600836",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7696 > 6000",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "8ab1b6bba3c0532bec66cceebfff76d80c85b26c1881244dc1ce91976b600836",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "8406 > 6000",
+      "fields": [
+        "params.windows.max"
+      ]
+    },
+    {
+      "def": "core-hospital@1",
+      "hash": "a2000d8cd01afae53e84f717a27bb7dc1b2edd21fd06dbff35bd96d3e2f7ccf0",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7198 > 6000",
+      "fields": [
+        "params.windows.max"
+      ]
+    },
+    {
+      "def": "core-hospital@1",
+      "hash": "a2000d8cd01afae53e84f717a27bb7dc1b2edd21fd06dbff35bd96d3e2f7ccf0",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "8352 > 6000",
+      "fields": [
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-hospital@1",
+      "hash": "a2000d8cd01afae53e84f717a27bb7dc1b2edd21fd06dbff35bd96d3e2f7ccf0",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "8830 > 6000",
+      "fields": [
+        "params.w.max"
+      ]
+    },
+    {
+      "def": "core-hospital@1",
+      "hash": "a2000d8cd01afae53e84f717a27bb7dc1b2edd21fd06dbff35bd96d3e2f7ccf0",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "9136 > 6000",
+      "fields": [
+        "params.d.max"
+      ]
+    },
+    {
+      "def": "core-office-block@1",
+      "hash": "899ac1ca6a359e0759e01212ba7c8ac49562a66f637d938707ae735deb942ed2",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "12204 > 6000",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-office-block@1",
+      "hash": "899ac1ca6a359e0759e01212ba7c8ac49562a66f637d938707ae735deb942ed2",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6918 > 6000",
+      "fields": [
+        "params.material=brick",
+        "params.material=metal",
+        "params.material=plaster",
+        "params.material=stone",
+        "params.material=wood"
+      ]
+    },
+    {
+      "def": "core-office-block@1",
+      "hash": "899ac1ca6a359e0759e01212ba7c8ac49562a66f637d938707ae735deb942ed2",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7470 > 6000",
+      "fields": [
+        "params.w.max"
+      ]
+    },
+    {
+      "def": "core-office-block@1",
+      "hash": "899ac1ca6a359e0759e01212ba7c8ac49562a66f637d938707ae735deb942ed2",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7754 > 6000",
+      "fields": [
+        "params.d.max"
+      ]
+    },
+    {
+      "def": "core-office-block@1",
+      "hash": "899ac1ca6a359e0759e01212ba7c8ac49562a66f637d938707ae735deb942ed2",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "9646 > 6000",
+      "fields": [
+        "random[0]"
+      ]
+    }
+  ]
+}

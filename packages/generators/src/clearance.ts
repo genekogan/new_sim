@@ -50,8 +50,8 @@ export const LINK_STEP_M = 0.7;
 
 /** A blocker: an OBB in the room's frame; `raster`/`tag` pick its clearance (default conservative). */
 export type WayBlocker = { c: readonly number[]; half: readonly number[]; yaw: number; tag?: string; raster?: Raster };
-/** A key: a point (the free cell within 0.3 m), or { pts, r }: the free cell nearest any of pts within r. */
-export type WayKey = Vec2 | { pts: Vec2[]; r: number };
+/** A point (the free cell within 0.3 m), or the free cell nearest any of pts within r (else within `far`, when given). */
+export type WayKey = Vec2 | { pts: Vec2[]; r: number; far?: number };
 export type WayRoom = { polygon: Vec2[]; floor: number; id: string };
 
 const inPoly = (poly: Vec2[], x: number, z: number) => { let k = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) k = !k; } return k; };
@@ -88,12 +88,25 @@ export function roomKeys(room: WayRoom, doors: { level: number; from?: string; t
   return keys;
 }
 
-/** Where a Soul sent to a piece stands: 0.75 m in front of each seat (searched 1.5 m round), else the free spot nearest it. */
+/** Where a Soul sent to a piece stands: 0.75 m in front of each seat (searched SEAT_R round), else the free spot nearest it. */
+// SEAT_R 0.5 m (lane BSGEN, 2026-10-21; was 1.5 m, which let a seat keep its key across the room while its own front was shut
+// in: the shop stool behind the counter, a townhouse sofa; 0.75 m left eight fuzz townhouse places worse in the walk).
+export const SEAT_R = 0.5, SEAT_FAR = 1.5;
 export function approachOf(baked: { slots?: { kind: string; p: readonly number[]; yaw: number }[]; box: readonly number[] }, at: readonly number[], yaw: number): WayKey {
   const c = Math.cos(yaw), s = Math.sin(yaw), w = ([x, z]: readonly number[]): Vec2 => [at[0] + x * c + z * s, at[1] - x * s + z * c];
   const seats = (baked.slots ?? []).filter((x) => x.kind === 'seat');
-  if (seats.length) return { pts: seats.map((x) => w([x.p[0] + Math.sin(x.yaw) * 0.75, x.p[2] + Math.cos(x.yaw) * 0.75])), r: 1.5 };
+  if (seats.length) return { pts: seats.map((x) => w([x.p[0] + Math.sin(x.yaw) * 0.75, x.p[2] + Math.cos(x.yaw) * 0.75])), r: SEAT_R };
   return { pts: [[at[0], at[1]]], r: Math.hypot(baked.box[0], baked.box[2]) / 2 + 1.5 };
+}
+/** The keys a piece adds to the ways check: one per seat (a Soul is sent to each seat on its own), else approachOf's one. */
+// A piece being placed needs each seat's own front (within SEAT_R) reached from the doors. A piece already standing keeps
+// SEAT_FAR as a fallback for a seat with no free cell within SEAT_R (`far`): it then still holds the room's ways round it as
+// before rather than dropping out of the check (lane BSGEN: without it, fuzz f-townhouse-270-s45's kitchen table took the
+// middle of the room and its walk goal ended in a pocket).
+export function approachKeys(baked: Parameters<typeof approachOf>[0], at: readonly number[], yaw: number, far?: number): WayKey[] {
+  const a = approachOf(baked, at, yaw);
+  if (Array.isArray(a)) return [a];
+  return a.pts.length > 1 || far ? a.pts.map((p) => ({ pts: [p], r: a.r, ...(far && a.r === SEAT_R ? { far } : {}) })) : [a];
 }
 
 /** Where the room's frame sits in the world (a building's world pose: x, z, yaw, scale): the ways are then labelled on the
@@ -128,8 +141,9 @@ const scratch = (n: number) => {
 function labelsOn({ nx, nz, free, cellOf }: FreeGrid, keys: WayKey[], hint?: WayHint): number[] {
   const was = hint?.cells, cells = keys.map((k, n) => {
     const h = was?.[n]; if (h !== undefined && h >= 0 && free[h]) return h;
-    const { pts, r } = Array.isArray(k) ? { pts: [k as Vec2], r: 0.3 } : k as { pts: Vec2[]; r: number };
-    return cellOf(pts, r);
+    const { pts, r, far } = Array.isArray(k) ? { pts: [k as Vec2], r: 0.3, far: undefined } : k as { pts: Vec2[]; r: number; far?: number };
+    const c = cellOf(pts, r);
+    return c < 0 && far ? cellOf(pts, far) : c;
   });
   if (hint) hint.cells = cells;
   // 4-connected floods from each key's cell in turn (a cell is labelled when pushed); a flood stops once every key's cell

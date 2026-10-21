@@ -90,13 +90,17 @@ test('a furnished shop keeps the way from its front door to the storeroom door (
   assert.ok(f.placed.some((p: any) => p.name === 'shop-counter') && f.placed.some((p: any) => p.name === 'shop-display'), JSON.stringify(f.dropped));
 });
 
-test('a piece may not stand where a Soul sent to another piece would stand (the display at shelf-2\'s front)', () => {
-  // SEALED 2026-10-21: moved to the east side (fx 0.78) the display took shelf-2's approach: every shop's shelf-2 went bad
+test('a seat whose own front is shut in is dropped (the shop stool behind the counter); a piece may not stand at another piece\'s front', () => {
+  // SEALED 2026-10-21 put the display on the east side (fx 0.78) and saw shelf-2 go bad, but only because the stool's key (any
+  // free cell within 1.5 m of its front) let it stand behind the counter with its front shut in. BSGEN 2026-10-21: a seat's key
+  // is within 0.5 m of its front, one key per seat; the stool is dropped and, in the fuzz walk world with the display first at
+  // 0.78, no shop has a bad or unusable piece (at 1.5 m: 5 shops with the stool use.no-approach). furnishedShop checks that
+  // every placed piece's front is reached from the door.
   const recipe = JSON.parse(readFileSync(new URL('../../../tools/god-skill/recipes/furnish/shop.json', import.meta.url), 'utf8'));
   recipe.rooms.shop.find((x: any) => x.name === 'display').try = [[0.78, 0.7, 's'], [0.3, 0.7, 's']];
   const f = furnishedShop(recipe);
-  const d: any = f.ops.find((o: any) => o.name === 'shop-display');
-  assert.ok(d && d.p[0] < 0, `display goes to its next pose, not shelf-2's front: ${JSON.stringify(d?.p)} ${JSON.stringify(f.dropped)}`);
+  assert.ok(!f.placed.some((p: any) => p.name === 'shop-stool') && f.dropped.some((p: any) => p.name === 'shop-stool'), JSON.stringify(f.dropped));
+  assert.ok(f.placed.some((p: any) => p.name === 'shop-display') && f.placed.some((p: any) => p.name === 'shop-shelf-2'), JSON.stringify(f.dropped));
 });
 
 test('the ways check judges a gap on the walk raster where the building stands, turned or not (hillside-home-4, lane WALK2; BS1 rule)', () => {
@@ -110,4 +114,26 @@ test('the ways check judges a gap on the walk raster where the building stands, 
   assert.equal(gap(0.88, 39 * Math.PI / 180), 0, 'the same gap is sealed turned 39 deg');
   assert.equal(gap(0.96, Math.PI / 4), 0, 'a 0.96 m gap is sealed turned 45 deg');
   for (const yaw of [0, 39 * Math.PI / 180, Math.PI / 4]) assert.equal(gap(1.04, yaw), 1, `a 1.04 m gap walks at yaw ${yaw.toFixed(2)}`);
+});
+
+test('built-in contents are what the type\'s furnish recipe lays out (theatre, office block, hospital; lane BSGEN)', () => {
+  // these types' contents were laid out by an older furnish (vocab-w3.mjs layOut). core/theatre@1's back row 4-1 stood ~0.7 m
+  // inside the foyer door and, on a turned theatre's walk grid, cut the whole auditorium off (fuzz walk world: 4 turned
+  // theatres, 61 bad each); the office block's meeting-room chairs and the hospital wards' fourth beds shut in their rooms'
+  // ways (fuzz: office blocks 136 -> 61 bad, hospitals 117 -> 6). Today's furnish drops them.
+  const contents = (type: string) => {
+    const w = new WorldModel({ constants: { ground: 'land' }, seed: type });
+    for (const d of CORE_KIT) w.defineDef(d, 'core', 0);
+    assert.equal(applyBatch(w, { ops: [{ op: 'place', def: `core/${type}@1`, name: 'b' }] }, 'god', 1).result.accepted, true);
+    const b = w.get('b')!;
+    return { w, b, kids: [...w.children.get(b.id) ?? []].map((id) => w.entities.get(id)!.name) };
+  };
+  const t = contents('theatre');
+  for (const id of [...t.w.children.get(t.b.id) ?? []]) t.w.delete(id);
+  // contents are laid out at build time with no world pose (the exact clearance rule, which holds at any yaw and offset),
+  // so compare with furnish on the same terms: the placed theatre's own pose would use the axis-aligned walk raster instead
+  const f = furnishBatch(Object.create(t.w, { worldPose: { value: undefined } }), t.b.id);
+  assert.deepEqual(t.kids.sort(), f.ops.filter((o: any) => o.op === 'place').map((o: any) => o.name).sort(), JSON.stringify(f.dropped));
+  const gone = { 'office-block': ['meeting-2-chair-n-2', 'meeting-2-chair-s-1', 'meeting-3-chair-s-2'], hospital: ['ward-1-bed-4', 'ward-2-bed-4', 'ward-3-bed-4'] };
+  for (const [type, names] of Object.entries(gone)) { const k = contents(type).kids; for (const n of names) assert.ok(!k.includes(n), `${type}: ${n}`); }
 });

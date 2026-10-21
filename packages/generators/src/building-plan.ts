@@ -283,6 +283,11 @@ type JPlan = {
   stairs?: { from?: number; to?: number; room?: string; wall?: string; at?: number }[];
   /** One balcony on the front (south) wall of a room above the ground floor, reached by a door at `at` along that wall. */
   balcony?: { floor?: number; room?: string; at?: number; width?: number; depth?: number };
+  /**
+   * Optional landing strip (metres, LANDING_W for the library) a floor keeps between the stairwell of the flight arriving
+   * on it and a parallel flight leaving it (narrowLandings). Opt-in per plan, so a revision placed before it draws as it did.
+   */
+  landing?: number;
 };
 
 /**
@@ -355,6 +360,40 @@ export function explicitPlan(json: unknown, c0: { W: number; D: number; t: numbe
     const rect: Rect = along === 'x' ? [s0, b0, s1, b0 + STAIR_W] : [b0, s0, b0 + STAIR_W, s1];
     p.stairs.push({ id: ids.take('stairs'), from, to, room: room.id, rect, axis: along, dir: 1, width: STAIR_W, risers, going, away: wall === 'n' || wall === 'w' ? 1 : -1 });
   }
+  const landing = Number(j.landing);
+  if (Number.isFinite(landing) && landing > 0) narrowLandings(p.stairs, Math.min(landing, 2));
   return p;
+}
+
+/** The landing strip the library's plans ask for (plan.landing) between an arriving stairwell and a parallel flight leaving. */
+export const LANDING_W = 1.2;
+/**
+ * (lane BSGEN, 2026-10-21) Two parallel flights a floor shares (one arriving through its stairwell, one leaving from it),
+ * facing across a strip under `landing` (plan.landing, LANDING_W in the library), both narrow (to >= MIN_STAIR_W, each keeping its wall side) so the strip widens:
+ * the apartment block's 3 m stair hall left 0.98 m between the hole's rail and the next flight, which a turned building's
+ * walk grid cuts, sealing the upper flats off. Doors and windows stay placed round the full-width band (PStair.band), as
+ * bandWidth's narrowed flights do. Flights already apart by `landing` are unchanged. Only plans that set plan.landing
+ * (core/apartment-block's revision of 2026-10-21) narrow: an apartment block placed before keeps its pinned def hash and
+ * its exact stairs.
+ */
+function narrowLandings(stairs: PStair[], landing: number): void {
+  for (const a of stairs) for (const b of stairs) {
+    if (b.from !== a.to || a.axis !== b.axis) continue;
+    const ra = a.band ?? a.rect, rb = b.band ?? b.rect;
+    const [a0, a1, b0, b1] = a.axis === 'x' ? [ra[1], ra[3], rb[1], rb[3]] : [ra[0], ra[2], rb[0], rb[2]];   // across the flights
+    const [s0, s1, t0, t1] = a.axis === 'x' ? [ra[0], ra[2], rb[0], rb[2]] : [ra[1], ra[3], rb[1], rb[3]];   // along them
+    if (Math.min(s1, t1) - Math.max(s0, t0) <= 0) continue;   // side by side only
+    const gap = Math.max(b0 - a1, a0 - b1), wa = a1 - a0, wb = b1 - b0;
+    if (gap <= 0 || gap >= landing - 1e-6) continue;
+    const need = landing - gap, w = Math.max(MIN_STAIR_W, Math.min(STAIR_W, (wa + wb - need) / 2));
+    for (const [s, r, lo] of [[a, ra, b0 > a1], [b, rb, a0 > b1]] as const) {
+      const cur = s.axis === 'x' ? s.rect[3] - s.rect[1] : s.rect[2] - s.rect[0];
+      if (w >= cur - 1e-6) continue;
+      // keep the wall side (the side away from the other flight); the facing edge moves back
+      const n: Rect = [...s.rect];
+      if (s.axis === 'x') { if (lo) n[3] = n[1] + w; else n[1] = n[3] - w; } else { if (lo) n[2] = n[0] + w; else n[0] = n[2] - w; }
+      s.band = s.band ?? r; s.rect = n; s.width = w;
+    }
+  }
 }
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'room';

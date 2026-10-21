@@ -62,11 +62,25 @@ test('all 40 library buildings retain exact pre-XP3 positions, normals, colours 
     assert.deepEqual(rest, expected, name);
     if (EXACT) assert.equal(actual, hash, `${name}: exact bytes on the authoring platform`);
   }
+  // Retired revisions a world may have pinned draw exactly as before. core/apartment-block's revision fc05f52b2fcf (before
+  // plan.landing, lane BSGEN 2026-10-21) keeps its full-width stair flights: its plan without `landing`, same facade look.
+  for (const { name, strip, ...expected } of RETIRED) {
+    const def = w.def(`core/${name.replace(/^core-/, '')}@1`)!, plan = { ...(def.params.plan as { default: Record<string, unknown> }).default };
+    for (const k of strip) delete plan[k];
+    const { hash: actual, ...rest } = stats(draw(name.replace(/^core-/, ''), { plan }));
+    const { hash, ...pinned } = expected;
+    assert.deepEqual(rest, pinned, `${name} (retired revision)`);
+    if (EXACT) assert.equal(actual, hash, `${name} (retired revision): exact bytes on the authoring platform`);
+  }
 });
+const RETIRED = [{ name: 'core-apartment-block', strip: ['landing'], hash: '1f87b26ffb48961b558f927ce7af0f5d4f8da809c2f6c49507d54706db6e7a32', grid: '3b572cdf448732c983240c673336a8f35d5b59ce14496f93842e4eeaf51345d8', tris: 6214, draws: 19 }];
 
 test('every facade-seed alias (building-looks.json) names a current library building revision', () => {
   const current = new Set(CORE_KIT.map((d) => w.resolvedDef(`${d.name}@${d.version ?? 1}`)!).filter((d) => d.make.kind === 'gen' && d.make.gen === 'building/1').map((d) => d.hash));
-  for (const [hash, was] of Object.entries(looks)) { assert.ok(current.has(hash), `stale alias ${hash.slice(0, 12)} (was ${was.slice(0, 12)})`); assert.notEqual(hash, was); }
+  // A revision a world pinned before the current one keeps its alias (the world keeps its facade), so a key may be a retired
+  // revision, but only of a look some current revision still carries: an edited def whose alias was not carried forward fails.
+  const carried = new Set(Object.entries(looks).filter(([hash]) => current.has(hash)).map(([, was]) => was));
+  for (const [hash, was] of Object.entries(looks)) { assert.ok(current.has(hash) || carried.has(was), `stale alias ${hash.slice(0, 12)} (was ${was.slice(0, 12)})`); assert.notEqual(hash, was); }
 });
 
 test('each ornament switch removes only its own triangles, without changing the remaining seeded facade', () => {
