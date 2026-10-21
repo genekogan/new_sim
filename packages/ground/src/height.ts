@@ -168,11 +168,26 @@ function padsFlatsWin(h: number, x: number, z: number, pads: FlatsPad[], inOldFl
       if (!n.up && a > v) { n.up = true; const b = v + (a - v) * w; if (b > lo) { lo = b; dLo = d; moved = true; } }
       if (!n.down && c < v) { n.down = true; const b = v + (c - v) * w; if (b < hi) { hi = b; dHi = d; moved = true; } }
     }
-    if (lo > hi) return (lo * dHi + hi * dLo) / (dLo + dHi);
+    if (lo > hi) return conflictBlend(lo, hi, dLo, dHi);
     if (!moved) break;
     v = v < lo ? lo : v > hi ? hi : v;
   }
   return v;
+}
+
+/** pad/2b shoulder (lane SEALED, 2026-10-21): where two cones do not meet, each flat keeps a walkable shoulder up to this
+ *  wide on its own cone (grade PAD_GRADE) before the ground drops (or rises) to the other flat. Before, the ground ran
+ *  between the two flats by distance from the flats' edges, so a terrace 1-3 m above a neighbour lost the margin along
+ *  its wall (the 1 m tile grid put the next sample down the drop: a ledge too narrow to stand on). A narrow gap is shared
+ *  evenly (a shoulder for the upper flat alone took the lower flat's door landing: cliff-house-19 below cliff-house-23). */
+export const PAD_SHOULDER_M = 1.0;
+/** Two conflicting cones at (x, z): the upper flat's fill bound `lo` (dLo from its flat), the lower flat's cut bound `hi`
+ *  (dHi from its flat). Within the upper shoulder: lo; within the lower one: hi; between: from one to the other by distance. */
+function conflictBlend(lo: number, hi: number, dLo: number, dHi: number): number {
+  const gap = dLo + dHi, s = Math.min(PAD_SHOULDER_M, Math.max(0, (gap - 0.3) / 2));
+  if (dLo <= s) return lo;
+  if (dHi <= s) return hi;
+  return lo + (hi - lo) * (dLo - s) / (gap - 2 * s);
 }
 
 /** pad/2b: is (x, z) on an older pad's flat (a pad/1 area, a pad/2 area or landing)? Only asked near a pad/2b pad. */
