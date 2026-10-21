@@ -16,15 +16,17 @@ export { roadGen, footpathGen };
 
 type Gate = { at: number; width: number; state?: 'open' | 'closed' };
 export function gatesOf(v: unknown): Gate[] { return Array.isArray(v) ? (v as Gate[]).filter((g) => g && typeof g.at === 'number' && typeof g.width === 'number' && g.width > 0) : []; }
-/** Gates as openings (Stage B: walkable when open) at their arc-length positions. */
+/** Gates as openings at their arc-length positions. A gate is an open gap unless it says `state: 'closed'` (SEALED
+ *  2026-10-21: doorblock made a bare gate 'closed' by default, so every god-built wall or fence with gates trapped
+ *  whoever was inside); a door or gate entity standing in the gap takes it over (god/doors.ts doorInGap). */
 function gateOpenings(path: Vec2[], gates: Gate[], h: number): Opening[] {
   let total = 0; for (let i = 1; i < path.length; i++) total += Math.sqrt((path[i][0] - path[i - 1][0]) ** 2 + (path[i][1] - path[i - 1][1]) ** 2);
-  return gates.map((g, i) => { const { p, dir } = pointAlong(path, total ? g.at / total : 0); return { id: `gate-${i + 1}`, kind: 'gate' as const, at: p, yaw: Math.atan2(-dir[1], dir[0]), width: g.width, height: h, level: 0, state: g.state ?? 'closed' }; });
+  return gates.map((g, i) => { const { p, dir } = pointAlong(path, total ? g.at / total : 0); return { id: `gate-${i + 1}`, kind: 'gate' as const, at: p, yaw: Math.atan2(-dir[1], dir[0]), width: g.width, height: h, level: 0, state: g.state === 'closed' ? 'closed' : 'open' }; });
 }
 
 export const wallGen: Generator = {
   id: 'wall/1', form: 'path', owner: 'L3', doc: 'A freestanding wall along a path (garden wall, partition, rampart) with optional gates at arc-length positions.',
-  params: { height: { type: 'number', min: 0.3, max: 12, default: 1.8 }, thickness: { type: 'number', min: 0.08, max: 3, default: 0.3 }, material: { type: 'enum', values: ['stone', 'brick', 'plaster', 'wood', 'hedge', 'glass'], default: 'stone' }, color: { type: 'color', default: '#c9c1b2' }, gates: { type: 'json', doc: '[{at: metres along, width}]' }, cap: { type: 'bool', default: true } },
+  params: { height: { type: 'number', min: 0.3, max: 12, default: 1.8 }, thickness: { type: 'number', min: 0.08, max: 3, default: 0.3 }, material: { type: 'enum', values: ['stone', 'brick', 'plaster', 'wood', 'hedge', 'glass'], default: 'stone' }, color: { type: 'color', default: '#c9c1b2' }, gates: { type: 'json', doc: "[{at: metres along, width, state?}] gaps, open unless state 'closed'; a door placed in a gap takes it over" }, cap: { type: 'bool', default: true } },
   physics({ params, shape }) {
     const path = pathOf(shape), h = n(params.height, 1.8), t = n(params.thickness, 0.3);
     const g = gatesOf(params.gates), gaps = g.map((x) => ({ from: x.at - x.width / 2, to: x.at + x.width / 2 }));
@@ -33,7 +35,7 @@ export const wallGen: Generator = {
 };
 export const fenceGen: Generator = {
   id: 'fence/1', form: 'path', owner: 'L3', doc: 'A fence of posts and rails (picket, rail, wire). Blocks walking, not sight.',
-  params: { height: { type: 'number', min: 0.4, max: 3, default: 1.1 }, style: { type: 'enum', values: ['picket', 'rail', 'wire', 'iron'], default: 'picket' }, color: { type: 'color', default: '#e9e2d0' }, postSpacing: { type: 'number', min: 0.5, max: 6, default: 2 }, gates: { type: 'json' } },
+  params: { height: { type: 'number', min: 0.4, max: 3, default: 1.1 }, style: { type: 'enum', values: ['picket', 'rail', 'wire', 'iron'], default: 'picket' }, color: { type: 'color', default: '#e9e2d0' }, postSpacing: { type: 'number', min: 0.5, max: 6, default: 2 }, gates: { type: 'json', doc: "[{at: metres along, width, state?}] gaps, open unless state 'closed'; a door placed in a gap takes it over" } },
   physics({ params, shape }) {
     const path = pathOf(shape), h = n(params.height, 1.1);
     const g = gatesOf(params.gates), gaps = g.map((x) => ({ from: x.at - x.width / 2, to: x.at + x.width / 2 }));

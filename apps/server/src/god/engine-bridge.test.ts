@@ -353,9 +353,10 @@ test('L3 shapes in the engine: a garden wall makes Souls go round, a deck is wal
   const onDeck = runQuery(w.god.model, { reach: { from: [0, 0], to: 'deck' } }).reach as any;
   assert.equal(onDeck.reachable, true, JSON.stringify(onDeck));
   assert.ok(onDeck.to.level > 0 && onDeck.to.p[1] < -12, `on the deck's own floor: ${JSON.stringify(onDeck.to)}`);
-  // a fence across the south field with one closed gate: Souls go round it; opening the gate lets them through
+  // a fence across the south field with one gate set closed (a bare gate is an open gap, SEALED): Souls go round it;
+  // opening the gate lets them through
   const r2: any = w.god.act({ ops: [
-    { op: 'place', def: coreRef('fence'), name: 'fence', shape: { path: [[-40, -22], [40, -22]] }, params: { gates: [{ at: 40, width: 1.6 }] } },
+    { op: 'place', def: coreRef('fence'), name: 'fence', shape: { path: [[-40, -22], [40, -22]] }, params: { gates: [{ at: 40, width: 1.6, state: 'closed' }] } },
     { op: 'place', def: coreRef('footbridge'), name: 'span', shape: { path: [[20, -8], [20, 8]] } },
   ] });
   assert.equal(r2.accepted, true, JSON.stringify(r2).slice(0, 600));

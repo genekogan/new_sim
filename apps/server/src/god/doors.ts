@@ -4,7 +4,8 @@
 // the gap it stands in; open, it lets walkers through. A def that bakes its own doorway (a footprint portal, a
 // building's door) is blocked across that doorway; one that bakes none (a free-standing kit door in its frame) is
 // blocked across its own width at its own spot. A wall or fence gate (`gates` param) with a door standing in it yields
-// to that door: the door, not the wall's built-in gate, decides whether the gap passes.
+// to that door: the door, not the wall's built-in gate, decides whether the gap passes. A bare gate (no door in it) is
+// an open gap unless its params say `state: 'closed'` (SEALED 2026-10-21; packages/generators paths.ts gateOpenings).
 import type { Entity, StoredDef } from '@sim/world-compiler';
 
 type Vec2 = [number, number];
