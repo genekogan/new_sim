@@ -17,6 +17,9 @@ type Key = { id: string; label: string; owner?: string; key: ApproachKey };
 export type Repair = { ops: Op[]; lines: string[]; named: string[]; ms: number };
 
 const MARGIN = 4, MAX_SIDE = 60, GATE_W = 1;
+/** A nudged piece is judged 0.15 m wider than it is: a way it leaves is never a hair's breadth (the engine's walk
+ *  is stricter than this raster in a 0.9 m doorway). */
+const SLACK = 0.15;
 const OFFSETS = [0.15, 0.3, 0.45, 0.6, 0.8, 1, 1.25, 1.5];
 const DIRS: Vec2[] = Array.from({ length: 8 }, (_, i) => [Math.cos((i * Math.PI) / 4), Math.sin((i * Math.PI) / 4)] as Vec2);
 const TURNS = [0, Math.PI / 2, -Math.PI / 2, Math.PI];
@@ -98,6 +101,21 @@ function rectOf(boxes: OBB[]): [number, number, number, number] {
   return [x0, z0, x1, z1];
 }
 const inRect = (r: number[], x: number, z: number) => x >= r[0] && x <= r[2] && z >= r[1] && z <= r[3];
+/** `r` grown to hold every building (a thing with rooms) it touches, whole and 1 m round: a window edge through a
+ *  building's floor would join its rooms to the surroundings and hide a blocked door. */
+function withRooms(ms: WorldModel[], r0: [number, number, number, number]): [number, number, number, number] {
+  // one pass over what the window itself touches (no cascade: a street of buildings would grow it to the town)
+  let r = r0;
+  const win = { c: [(r0[0] + r0[2]) / 2, (r0[1] + r0[3]) / 2] as Vec2, half: [(r0[2] - r0[0]) / 2, (r0[3] - r0[1]) / 2], yaw: 0, y0: -1e4, y1: 1e4 };
+  for (const m of ms) for (const id of m.near([win as never])) {
+    const e = m.entities.get(id), def = e && m.resolvedDef(e.def); if (!e || !def || def.form !== 'point') continue;
+    if (!m.bake(def, e.params ?? {}, e.seed ?? 0, e.shape).rooms?.length) continue;
+    const fp = m.footprint(e, def) as OBB[]; if (!fp.length) continue;
+    const b = rectOf(fp); if (b[2] - b[0] > MAX_SIDE || b[3] - b[1] > MAX_SIDE) continue;
+    r = [Math.min(r[0], b[0] - 1), Math.min(r[1], b[1] - 1), Math.max(r[2], b[2] + 1), Math.max(r[3], b[3] + 1)];
+  }
+  return r;
+}
 
 /** Everything at ground level in the window: blockers by entity, and the keys (door sides, stair feet, the standing
  *  spots of named things and seats) Souls are sent to. */
@@ -138,9 +156,9 @@ function viewOf(m: WorldModel, rect: [number, number, number, number], extra: It
   }
   return { m, blockers, keys };
 }
-function gridOf(rect: [number, number, number, number], v: View, except?: string): Grid {
-  const g = new Grid(rect);
-  for (const [id, b] of v.blockers) if (id !== except) g.mark(b, 1);
+function gridOf(rect: [number, number, number, number], v: View, except?: string | string[]): Grid {
+  const g = new Grid(rect), ex = new Set(typeof except === 'string' ? [except] : except ?? []);
+  for (const [id, b] of v.blockers) if (!ex.has(id)) g.mark(b, 1);
   return g;
 }
 
@@ -198,7 +216,7 @@ export function repairBatch(before: WorldModel, after: WorldModel, diff: Diff, i
     const fp = after.footprint(e) as OBB[];
     if (fp.length) r = rectOf(fp); else { try { const p = after.worldPose(e); r = [p.x - 0.5, p.z - 0.5, p.x + 0.5, p.z + 0.5]; } catch { continue; } }
     if (r[2] - r[0] > MAX_SIDE - 2 * MARGIN || r[3] - r[1] > MAX_SIDE - 2 * MARGIN) continue;   // a quarter-sized wall: a place, not a trap
-    r = [r[0] - MARGIN, r[1] - MARGIN, r[2] + MARGIN, r[3] + MARGIN];
+    r = withRooms([before, after], [r[0] - MARGIN, r[1] - MARGIN, r[2] + MARGIN, r[3] + MARGIN]);
     const hit = rects.find((x) => { const u = [Math.min(x.r[0], r[0]), Math.min(x.r[1], r[1]), Math.max(x.r[2], r[2]), Math.max(x.r[3], r[3])]; return !(r[0] > x.r[2] || r[2] < x.r[0] || r[1] > x.r[3] || r[3] < x.r[1]) && u[2] - u[0] <= MAX_SIDE && u[3] - u[1] <= MAX_SIDE; });
     if (hit) { hit.r = [Math.min(hit.r[0], r[0]), Math.min(hit.r[1], r[1]), Math.max(hit.r[2], r[2]), Math.max(hit.r[3], r[3])]; hit.ids.push(id); } else rects.push({ r, ids: [id] });
   }
@@ -210,23 +228,48 @@ export function repairBatch(before: WorldModel, after: WorldModel, diff: Diff, i
     const v = viewOf(after, w.r, w.ids);
     let grid = gridOf(w.r, v);
     // newly cut off: joined to the surroundings before (or new with this edit), not now
-    const cut = () => v.keys.filter((k) => { const was = wasOk.get(k.id); return (was === undefined || was === true) && grid.ok(k.key) === false; });
+    // doorways and stair feet first: opening one rejoins what stands behind it
+    const cut = () => v.keys.filter((k) => { const was = wasOk.get(k.id); return (was === undefined || was === true) && grid.ok(k.key) !== true; }).sort((a, b) => Number(!!a.owner) - Number(!!b.owner));
     let bad = cut(); if (!bad.length) continue;
-    const done = new Set<string>();
+    const done = new Set<string>(), left_: { label: string; line: string }[] = [];
     // the edit's things that cut a key off: without them it is joined again
     const culprits = (k: Key) => w.ids.filter((id) => !done.has(id) && v.blockers.has(id) && gridOf(w.r, v, id).ok(k.key) === true);
-    for (let pass = 0; pass < 6 && bad.length && performance.now() - t0 < budgetMs; pass++) {
+    // several of the edit's pieces that cut a key off only together (a packed room): the fewest of them, nearest first
+    const jointCulprits = (k: Key) => {
+      const at = k.key.pts[0], cand = w.ids.filter((id) => !done.has(id) && v.blockers.has(id) && nudgeable(after, id))
+        .map((id) => { const p = after.worldPose(after.entities.get(id)!); return [id, Math.hypot(p.x - at[0], p.z - at[1])] as const; })
+        .filter(([, d]) => d < 8).sort((a, b) => a[1] - b[1]).slice(0, 8).map(([id]) => id);
+      const out: string[] = [];
+      for (const id of cand) {
+        out.push(id); if (gridOf(w.r, v, out).ok(k.key) !== true) continue;
+        for (const x of [...out]) { const less = out.filter((y) => y !== x); if (less.length && gridOf(w.r, v, less).ok(k.key) === true) out.splice(out.indexOf(x), 1); }
+        return out;
+      }
+      return [];
+    };
+    for (let pass = 0; pass < 12 && bad.length && performance.now() - t0 < budgetMs; pass++) {
       const k = bad[0], blame = culprits(k);
       // a piece set down where no way reaches (nothing of the edit blocks it): the piece itself moves
       if (!blame.length && k.owner && w.ids.includes(k.owner) && nudgeable(after, k.owner) && !done.has(k.owner)) blame.push(k.owner);
+      // pieces that cut it off together move in turn, each clear of the way with the ones still to move set aside; all or none
+      const group = blame.length ? [] : jointCulprits(k), order = blame.length ? blame : group;
+      const snap = group.length ? { ops: ops.length, lines: lines.length, grid, blockers: new Map(group.map((id) => [id, v.blockers.get(id)!])), keys: v.keys.map((x) => x.key), done: [...done] } : null;
       let fixed = false;
-      for (const id of blame) {
+      for (const [gi, id] of order.entries()) {
         const e = after.entities.get(id)!, def = after.resolvedDef(e.def)!, ref = refOf.get(id) ?? id, path = after.pathOf(id);
-        const base = gridOf(w.r, v, id), okNow = new Set(v.keys.filter((x) => grid.ok(x.key)).map((x) => x.id));
-        const tryBoxes = (boxes: OBB[]) => { const g = base.clone(); g.mark(blocking(after, id, boxes), 1); return g; };
-        // k is joined again and nothing joined now is cut (the moved piece's own spot judged where it goes)
-        const passes = (g: Grid, moved?: Map<string, ApproachKey>) => (moved?.get(k.id) ? g.ok(moved.get(k.id)!) : g.ok(k.key)) === true
-          && v.keys.every((x) => { const kk = moved?.get(x.id) ?? x.key; return !okNow.has(x.id) && !moved?.has(x.id) ? true : g.ok(kk) === true; });
+        const rest = group.slice(gi + 1);
+        const base = gridOf(w.r, v, id), kBase = rest.length ? gridOf(w.r, v, [id, ...rest]) : null, okNow = new Set(v.keys.filter((x) => grid.ok(x.key)).map((x) => x.id));
+        const tryBoxes = (boxes: OBB[], slack = 0) => { const b = blocking(after, id, boxes).map((x) => (slack ? { ...x, half: [x.half[0] + slack, x.half[1] + slack] } : x)), g = base.clone(); g.mark(b, 1); const gk = kBase ? kBase.clone() : g; if (kBase) gk.mark(b, 1); return { g, gk }; };
+        // k is joined again (with the group's pieces still to move set aside) and nothing joined now is cut (the moved
+        // piece's own spot judged where it goes)
+        // a doorway is open when both its sides are (the way through it, not only to it)
+        // (when this piece alone stands in the way of both: a side another piece blocks is that piece's pass)
+        const twin = /#.+[+-]$/.test(k.id) ? v.keys.find((x) => x.id === k.id.slice(0, -1) + (k.id.endsWith('+') ? '-' : '+')) : undefined;
+        const twinNeeded = !!twin && wasOk.get(twin.id) !== false && (kBase ?? base).ok(twin.key) === true;
+        const passes = (t: { g: Grid; gk: Grid }, moved?: Map<string, ApproachKey>) => (moved?.get(k.id) ? t.gk.ok(moved.get(k.id)!) : t.gk.ok(k.key)) === true
+          && (!twinNeeded || t.gk.ok(twin!.key) === true)
+          && v.keys.every((x) => { const kk = moved?.get(x.id) ?? x.key; return !okNow.has(x.id) && !moved?.has(x.id) ? true : t.g.ok(kk) === true; });
+        let one = false;
         if (nudgeable(after, id)) {
           const own = after.footprint(e, def) as OBB[], wp = after.worldPose(e), ownKeys = v.keys.filter((x) => x.owner === id);
           for (const c of poses()) {
@@ -236,10 +279,11 @@ export function repairBatch(before: WorldModel, after: WorldModel, diff: Diff, i
             // the moved piece's own standing spot moves with it
             const cc = Math.cos(c.dyaw), ss = Math.sin(c.dyaw);
             const moved = new Map(ownKeys.map((x) => [x.id, { ...x.key, pts: x.key.pts.map(([a, b]) => { const dx = a - wp.x, dz = b - wp.z; return [wp.x + dx * cc + dz * ss + c.off[0], wp.z - dx * ss + dz * cc + c.off[1]] as Vec2; }) }]));
-            const g = tryBoxes(pz.boxes); if (!passes(g, moved)) continue;
+            const t = tryBoxes(pz.boxes, SLACK); if (!passes(t, moved)) continue;
+            const g = t.g;
             for (const x of ownKeys) x.key = moved.get(x.id)!;
-            const label = freed(v, grid, g, [wp.x, wp.z], id) ?? k.label;
-            ops.push(pz.op); v.blockers.set(id, blocking(after, id, pz.boxes)); grid = g; done.add(id); fixed = true;
+            const label = group.length ? k.label : freed(v, grid, g, [wp.x, wp.z], id) ?? k.label;
+            ops.push(pz.op); v.blockers.set(id, blocking(after, id, pz.boxes)); grid = g; done.add(id); one = true;
             lines.push(`Kept a way open (buildsafe/1): ${path} moved ${c.d ? `${c.d} m ${DIR_NAMES[c.k]}` : 'in place'}${c.dyaw ? ` and turned ${Math.round(Math.abs(c.dyaw) * 180 / Math.PI)}°` : ''} so ${label} can be walked to.`);
             break;
           }
@@ -255,26 +299,33 @@ export function repairBatch(before: WorldModel, after: WorldModel, diff: Diff, i
           for (const s of cand.slice(0, 40)) {
             if (performance.now() - t0 > budgetMs) break;
             const params = { ...(e.params ?? {}), gates: [...gates, { at: s, width: GATE_W }] };
-            const g = tryBoxes(after.footprint({ ...e, params } as Entity, def) as OBB[]); if (!passes(g)) continue;
-            ops.push({ op: 'set', id: ref, params: { gates: params.gates } } as Op); v.blockers.set(id, blocking(after, id, after.footprint({ ...e, params } as Entity, def) as OBB[])); grid = g; done.add(id); fixed = true;
+            const t = tryBoxes(after.footprint({ ...e, params } as Entity, def) as OBB[]); if (!passes(t)) continue;
+            ops.push({ op: 'set', id: ref, params: { gates: params.gates } } as Op); v.blockers.set(id, blocking(after, id, after.footprint({ ...e, params } as Entity, def) as OBB[])); grid = t.g; done.add(id); one = true;
             lines.push(`Kept a way open (buildsafe/1): ${path} has a ${GATE_W} m gate ${s} m along it so ${k.label} can be walked to.`);
             break;
           }
         }
-        if (fixed) break;
+        if (!group.length) { if (one) { fixed = true; break; } continue; }
+        if (!one) {   // the group could not all move: undo its moves
+          ops.length = snap!.ops; lines.length = snap!.lines; grid = snap!.grid; for (const [x, b] of snap!.blockers) v.blockers.set(x, b);
+          v.keys.forEach((x, i) => { x.key = snap!.keys[i]; }); done.clear(); for (const x of snap!.done) done.add(x);
+          break;
+        }
+        if (!rest.length) fixed = true;
       }
       bad = cut();
       if (!fixed) {
         // one line for what is left: what, why, and an op that fixes it (tested on this raster when one is found)
         const left = bad.length ? bad[0] : k; bad = bad.filter((x) => x.label !== left.label && x.id !== left.id);
-        const why = blame.length ? `cut off by ${blame.slice(0, 2).map((id) => after.pathOf(id)).join(' and ')}` : 'it stands where no way reaches';
+        const why = order.length ? `cut off by ${order.slice(0, 2).map((id) => after.pathOf(id)).join(' and ')}${order.length > 2 ? ` and ${order.length - 2} more` : ''}` : 'it stands where no way reaches';
         const fix = suggestion(after, v, w.r, left, blame, refOf);
-        lines.push(`No walk reaches ${left.label} after this edit (buildsafe/1): ${why}; fix: ${fix}.`);
-        named.push(left.label);
+        left_.push({ label: left.label, line: `No walk reaches ${left.label} after this edit (buildsafe/1): ${why}; fix: ${fix}.` });
         for (const x of v.keys) if (x.label === left.label) wasOk.set(x.id, false);
       }
       bad = cut();
     }
+    // a thing named while its way was still shut by a later repair is not named: only what is cut off at the end
+    for (const x of left_) if (v.keys.some((y) => y.label === x.label && grid.ok(y.key) !== true)) { lines.push(x.line); named.push(x.label); }
   }
   return ops.length || lines.length ? { ops, lines: dedupe(lines), named, ms: Math.round(performance.now() - t0) } : null;
 }
