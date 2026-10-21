@@ -127,6 +127,10 @@ from ship.sh's compact backup, which a release still takes first. Each night it:
 
 The script exits 1 if any database fails its check; the other databases are still snapshotted. host-health flags it.
 
+Until restic is set up (no `restic` binary, no password file, or no repository), each run takes the old dated copy
+instead (`backup.mjs`, newest 3 nights in `/srv/sim-worlds-backups/<stage>/YYYYMMDD`) and says so on its first line, so
+shipping this before the one-time setup never costs a night.
+
 Restic stores only the chunks it has not seen before, compressed. The copies keep the live file's page layout, so
 unchanged pages are byte-identical from night to night. Measured on 15 real eden2 backups (lane BK, 2026-10-20):
 ~13 MB a night for production + legacy, against ~260 MB for a dated full copy. Retention caps the repository at ~240 MB

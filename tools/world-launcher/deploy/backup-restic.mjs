@@ -27,12 +27,14 @@
 //   SIM_BACKUP_STAGING     /srv/sim-worlds-backups/staging       SIM_BACKUP_KEEP       "--keep-daily 7 --keep-weekly 4 --keep-monthly 6"
 //                                                                (off = never forget/prune: nothing is ever deleted)
 //   SIM_BACKUP_OFFSITE     (unset = local only)                  RESTIC_BIN            restic
+//   SIM_BACKUP_DATED_ROOT  /srv/sim-worlds-backups (backup.mjs fallback until restic is set up)
 //   SIM_BACKUP_TIME        (tests only: the snapshot's time, "YYYY-MM-DD HH:MM:SS")
 import { backup as sqliteBackup, DatabaseSync } from 'node:sqlite';
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync, utimesSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { dirname, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const env = {
   RESTIC_REPOSITORY: '/srv/sim-worlds-backups/restic', RESTIC_PASSWORD_FILE: '/etc/sim-worlds/restic.pass',
@@ -43,6 +45,7 @@ const DATA_ROOT = env.SIM_BACKUP_DATA_ROOT || '/srv/sim-worlds-data';
 const STAGING = env.SIM_BACKUP_STAGING || '/srv/sim-worlds-backups/staging';
 const KEEP = (env.SIM_BACKUP_KEEP || '--keep-daily 7 --keep-weekly 4 --keep-monthly 6').split(/\s+/).filter(Boolean);
 const HOST = hostname().split('.')[0];
+const HERE = dirname(fileURLToPath(import.meta.url));
 const STAGE_RE = /^[a-z][a-z0-9-]{0,31}$/;
 
 /** Run restic; returns stdout. Throws with restic's stderr on failure unless `ok` lists acceptable exit codes. Every command but
@@ -84,10 +87,29 @@ const repoBytes = (repo) => {
 };
 const mb = (b) => (b / 2 ** 20).toFixed(1);
 
+/** Why restic cannot run yet, or '' when it can. */
+function setupMissing() {
+  if (spawnSync(BIN, ['version'], { env }).error) return `no ${BIN} binary`;
+  if (!existsSync(env.RESTIC_PASSWORD_FILE)) return `no password file ${env.RESTIC_PASSWORD_FILE}`;
+  const repo = env.RESTIC_REPOSITORY;
+  if (!/^[a-z0-9]+:/i.test(repo) && !existsSync(join(repo, 'config'))) return `no repository at ${repo}`;
+  return '';
+}
+
 async function runBackup(stage) {
   const data = join(DATA_ROOT, stage), out = join(STAGING, stage);
   if (!existsSync(data)) throw new Error(`no data dir ${data}`);
-  restic(['cat', 'config'], { quiet: true });   // the repository must exist (init is a deliberate step: a missing mount must not start a new empty repo)
+  // Not set up yet (no restic, no password file, or no repository): take the old dated copy (backup.mjs, newest 3 nights)
+  // instead, so shipping this before the one-time setup never costs a night. Never inits a repository on its own.
+  const notReady = setupMissing();
+  if (notReady) {
+    const dated = join(env.SIM_BACKUP_DATED_ROOT || '/srv/sim-worlds-backups', stage);
+    console.log(`backup ${stage}: restic not set up (${notReady}); ran backup.mjs (dated copies in ${dated}) instead`);
+    const r = spawnSync(process.execPath, ['--no-warnings', join(HERE, 'backup.mjs'), data, dated], { env, stdio: 'inherit' });
+    process.exitCode = r.status ?? 1;
+    return;
+  }
+  restic(['cat', 'config'], { quiet: true });   // the repository must open (wrong password, unreadable files: fail loudly)
   restic(['unlock'], { quiet: true });          // only removes stale locks (a killed run); live locks stay
   mkdirSync(out, { recursive: true });
 

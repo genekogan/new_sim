@@ -14,7 +14,7 @@ const hasRestic = spawnSync('restic', ['version']).status === 0;
 const T = mkdtempSync(join(tmpdir(), 'backup-restic-'));
 const env = {
   ...process.env, TZ: 'UTC', RESTIC_REPOSITORY: join(T, 'repo'), RESTIC_PASSWORD_FILE: join(T, 'pass'), RESTIC_CACHE_DIR: join(T, 'cache'),
-  SIM_BACKUP_DATA_ROOT: join(T, 'data'), SIM_BACKUP_STAGING: join(T, 'staging'), SIM_BACKUP_OFFSITE: '',
+  SIM_BACKUP_DATA_ROOT: join(T, 'data'), SIM_BACKUP_STAGING: join(T, 'staging'), SIM_BACKUP_OFFSITE: '', SIM_BACKUP_DATED_ROOT: join(T, 'dated'),
 };
 const run = (args, extra = {}) => spawnSync(process.execPath, ['--no-warnings', SCRIPT, ...args], { env: { ...env, ...extra }, encoding: 'utf8' });
 const restic = (args, extra = {}) => spawnSync('restic', args, { env: { ...env, ...extra }, encoding: 'utf8' });
@@ -39,8 +39,12 @@ test('backup, version history, restore by night, retention, off-box copy', { ski
   writeFileSync(join(T, 'data/production/worlds.json'), '[{"slug":"alpha"},{"slug":"beta"}]\n');
   mkdirSync(join(T, 'data/production/worlds/assets/wire'), { recursive: true });
   writeFileSync(join(T, 'data/production/worlds/assets/aa.glb'), 'glb-a'); writeFileSync(join(T, 'data/production/worlds/assets/wire/aa.glb.br'), 'br-a');
+  // not set up yet (shipped before the one-time setup): the old dated copy runs instead, and no repository is created
   let r = run(['backup', 'production']);
-  assert.equal(r.status, 1); assert.match(r.stderr, /restic cat exited/, 'no repository: fails, never inits on its own');
+  assert.equal(r.status, 0, r.stderr); assert.match(r.stdout, /restic not set up \(no repository at .*\); ran backup\.mjs/);
+  assert.equal(readdirSync(join(T, 'dated/production')).length, 1, 'one dated set'); assert.ok(!existsSync(join(env.RESTIC_REPOSITORY, 'config')));
+  r = run(['backup', 'production'], { RESTIC_BIN: 'restic-not-installed' });
+  assert.equal(r.status, 0, r.stderr); assert.match(r.stdout, /restic not set up \(no restic-not-installed binary\)/);
   assert.equal(restic(['init']).status, 0);
 
   // night 1
