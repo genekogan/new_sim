@@ -24,7 +24,8 @@
 //                                unregister it (never deletes; worldops.mjs). restore-world {id} puts it back; list-archive;
 //                                audit {slug?} reads <data>/audit.jsonl
 //   POST /__sim/op/soul-pending|soul-approve|soul-message|soul-inbox|soul-delete, /__sim/op/set-test  operator only: TEST Souls
-//                                on worlds flagged test (op-souls.mjs, apps/server/src/op-souls.ts)
+//                                on worlds flagged test (op-souls.mjs, apps/server/src/op-souls.ts); /__sim/op/god-pending|
+//                                god-approve: the owner's god pairing on a scratch test world (the release probe's god folder)
 //   POST /__sim/worlds/<slug>/archive  the world's owner (signed in, or their own agent's god token): {confirm: <slug>, reason?}
 //   co-builders and handoff (handoff.mjs), under /__sim/worlds/<slug>/ (co-builders OFF unless --cobuilders or
 //   SIM_COBUILDERS=1; one god per world, Gene 2026-10-16): owner: GET cobuilders, POST cobuilders/invite {to?},
@@ -581,13 +582,13 @@ export async function openLauncher(cfg = {}) {
           'audit': (b) => [200, { ok: true, audit: readAudit(dataDir, typeof b?.slug === 'string' ? b.slug : undefined) }] })[forkOp](body); json(res, out[0], out[1]); return;
       }
       // lane OPS2: the operator's TEST-Soul commands and the test-world flag (op-souls.mjs), direct loopback only
-      const soulOp = path.match(/^\/__sim\/op\/(?:soul-(pending|approve|message|inbox|delete)|(set-test))$/);
+      const soulOp = path.match(/^\/__sim\/op\/(?:soul-(pending|approve|message|inbox|delete)|(set-test)|(god-pending|god-approve))$/);
       if (soulOp && req.method === 'POST') {
         if (!direct(req)) { json(res, 403, { ok: false, code: 'local-only', message: 'operator commands are accepted only from this machine' }); return; }
         const chunks = []; let n = 0;
         for await (const c of req) { n += c.length; if (n > 16_384) { json(res, 413, { ok: false, code: 'too-large' }); return; } chunks.push(c); }
         let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { json(res, 400, { ok: false, code: 'bad-json' }); return; }
-        const out = soulOp[2] ? opSetTest({ body, registry, dataDir, log }) : await opSoul({ verb: soulOp[1], body, registry, dataDir, log,
+        const out = soulOp[2] ? opSetTest({ body, registry, dataDir, log }) : await opSoul({ verb: soulOp[1] ?? soulOp[3], body, registry, dataDir, log,
           ensure: (w) => pool.ensure(worldEnv(w)),
           call: async (w, p, sub, b) => { const r = await fetch(`http://127.0.0.1:${p}${wp(w.slug)}${sub}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-sim-site-key': siteKey }, body: JSON.stringify(b), signal: AbortSignal.timeout(30_000) }); return [r.status, await r.json().catch(() => ({ ok: false, code: 'bad-reply' }))]; } });
         json(res, out[0], out[1]); return;

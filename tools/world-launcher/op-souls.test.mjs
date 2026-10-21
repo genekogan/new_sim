@@ -10,7 +10,7 @@ import { randomBytes } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { openLauncher } from './launcher.mjs';
-import { notTestWorld, deniedSoul, NEVER_TEST_SLUGS } from './op-souls.mjs';
+import { notTestWorld, deniedSoul, opSoul, NEVER_TEST_SLUGS } from './op-souls.mjs';
 import { clerkKeys, ISSUER, PUBLISHABLE_KEY } from '../../apps/server/test/clerk-fixture.ts';
 
 const PORT = Number(process.env.OPSOULS_TEST_PORT ?? 7050), RANGE = [PORT + 1, PORT + 8], ORIGIN = `http://127.0.0.1:${PORT}`;
@@ -115,4 +115,58 @@ test('op.mjs soul-*: approve a TEST Soul on a test world, message it as the card
   assert.deepEqual(rows.filter((r) => r.op === 'soul-approve' && r.status === 200).map((r) => [r.name, r.soulId]), [['TestProbe', soulId]]);
   assert.equal(JSON.stringify(rows).includes('walk to the well'), false);
   assert.equal(rows.find((r) => r.op === 'soul-message' && r.status === 200).chars, 16);
+});
+
+test('god-approve guards without a world process: product worlds and unflagged worlds are refused before the world is called', async () => {
+  const d = mkdtempSync(join(tmpdir(), 'op-god-guard-'));
+  try {
+    let called = 0; const call = async () => { called++; return [200, { ok: true }]; };
+    const run = (w, body) => opSoul({ verb: 'god-approve', body: { slug: w.slug, code: 'ABCD-EFGH', ...body }, registry: { get: () => w }, dataDir: d, ensure: async () => 1, call });
+    for (const slug of NEVER_TEST_SLUGS) assert.equal((await run({ slug, test: true }))[1].code, 'op.not-test-world', slug);
+    assert.equal((await run({ slug: 'bench-hamlet' }))[1].code, 'op.not-test-world', 'bench-hamlet is not flagged test');
+    assert.equal((await run({ slug: 'release-probe', test: true }, { code: '' }))[1].code, 'invalid', 'the code is required');
+    assert.equal(called, 0);
+    assert.equal((await run({ slug: 'release-probe', test: true }))[0], 200); assert.equal(called, 1);
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test('op.mjs god-pending/god-approve: the owner\'s god pairing approved unattended on a scratch test world; refused once a person\'s Soul lives there', { timeout: 300_000 }, async () => {
+  const gene = await sign('user_godprobe'), auth = { authorization: `Bearer ${gene}` };
+  const made = await post('/__sim/worlds', { name: 'God probe', template: 'empty' }, auth);
+  assert.equal(made.status, 201, JSON.stringify(made.data));
+  const slug = made.data.slug, base = `/w/${slug}`;
+  const pair = async (agent) => { const r = await post(`${base}/v1/god/pair/start`, { agent }); assert.equal(r.status, 200, JSON.stringify(r.data)); return r.data; };
+  const first = await pair('release-probe');
+  // not flagged: refused before the world is asked
+  assert.equal((await op('god-pending', '--slug', slug)).code, 'op.not-test-world');
+  assert.equal((await op('god-approve', '--slug', slug, '--code', first.user_code)).code, 'op.not-test-world');
+  assert.equal((await op('god-approve', '--slug', slug)).code, 2, 'usage: the code is required');
+  assert.equal((await post('/__sim/op/god-approve', { slug, code: first.user_code }, { 'x-forwarded-for': '203.0.113.7' })).status, 403);
+  assert.equal((await post(`${base}/v1/op/god/approve`, { code: first.user_code })).status, 404, 'the world answers only the launcher');
+  assert.equal((await op('set-test', '--slug', slug, '--test', 'true')).status, 200);
+  const pending = await op('god-pending', '--slug', slug);
+  assert.equal(pending.status, 200, JSON.stringify(pending)); assert.equal(pending.owned, true);
+  assert.deepEqual(pending.pending.map((p) => p.agent), ['release-probe']);
+  assert.equal((await op('god-approve', '--slug', slug, '--code', 'ZZZZ-ZZZZ')).code, 'pair-invalid');
+  const ok = await op('god-approve', '--slug', slug, '--code', first.user_code.toLowerCase());
+  assert.equal(ok.status, 200, JSON.stringify(ok));
+  const polled = (await post(`${base}/v1/god/pair/poll`, { poll_token: first.poll_token })).data;
+  assert.equal(polled.status, 'approved', JSON.stringify(polled)); assert.ok(polled.token);
+  const status = await (await api(`${base}/v1/god/status`, { headers: { authorization: `Bearer ${polled.token}` } })).json();
+  assert.equal(status.you, 'god', JSON.stringify(status));
+  // a person's Soul arrives (bench-hamlet holds Kwyjibo): from then on the operator never approves a god here
+  const pollSecret = randomBytes(32).toString('base64url');
+  const asked = await post(`${base}/v1/agent/approval/start`, { agentLabel: 'eden-agent test', name: 'Kwyjibo', idempotencyKey: 'op-god-e2e-' + randomBytes(4).toString('hex'), pollSecret });
+  assert.equal(asked.status, 200, JSON.stringify(asked.data));
+  const yes = await post(`${base}/v1/account/approvals/${asked.data.approval.id}/approve`, {}, auth);
+  assert.equal(yes.status, 200, JSON.stringify(yes.data));
+  let soul; for (let i = 0; i < 100; i++) { soul = (await post(`${base}/v1/agent/approval/poll`, { approvalId: asked.data.approval.id, pollSecret })).data; if (soul.token) break; await new Promise((r) => setTimeout(r, 100)); }
+  assert.equal(soul.status, 'ready', JSON.stringify(soul));
+  const second = await pair('release-probe-2');
+  const refused = await op('god-approve', '--slug', slug, '--code', second.user_code);
+  assert.equal(refused.status, 409, JSON.stringify(refused)); assert.equal(refused.code, 'op.foreign-souls');
+  assert.equal((await post(`${base}/v1/god/pair/poll`, { poll_token: second.poll_token })).data.status, 'pending');
+  const rows = auditRows().filter((r) => r.slug === slug && r.op.startsWith('god-'));
+  assert.ok(rows.every((r) => r.by === 'operator')); assert.equal(rows.filter((r) => r.op === 'god-approve' && r.status === 200).length, 1);
+  assert.equal(JSON.stringify(rows).includes(first.user_code), false, 'pairing codes are never journaled');
 });

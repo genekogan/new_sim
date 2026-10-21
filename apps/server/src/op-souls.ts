@@ -8,7 +8,8 @@
 //   POST /v1/op/souls/inbox     {soulId, name}  the owner's view of that inbox (latest, its ack/result, queued, presence)
 //   POST /v1/op/souls/delete    {soulId, name}  retire it (Souls.operatorRetire, the journaled retire an owner's DELETE does)
 //   POST /v1/op/god/pending     god pairing requests waiting for the owner;  POST /v1/op/god/approve {code}: approve one for
-//                               the world's existing owner (the release probe's own god folder, so no signed-in step)
+//                               the world's existing owner (the release probe's own god folder, so no signed-in step);
+//                               refused while any live Soul here is not the operator's test account's (a scratch world only)
 // Hard guards here (the launcher repeats the deny list): only a request no person was addressed in (no window code), for
 // a create (never a repair of an existing Soul), whose name is a TEST name and not on the deny list; message/inbox/delete
 // only reach Souls the operator's test account owns (so never Gene's Souls, which his own account owns). Every use prints
@@ -129,6 +130,9 @@ export function mountOperatorSouls(app: Hono, d: Deps) {
     const god = d.god ?? refuse('op.no-god', 'this world has no god mode', 409), code = str(b, 'code');
     // never a first claim: the god pairs for the owner the world already has, exactly as their own approval would
     if (!god.owner) refuse('op.unowned', 'this world has no owner yet: an operator never claims a world');
+    // a scratch world only: never one holding a live Soul a person owns (bench-hamlet holds Kwyjibo; product worlds hold many)
+    const foreign = d.db.liveSouls(d.worldId).filter(s => s.owner !== OPERATOR_ACCOUNT || deniedSoul(s.id, s.name));
+    if (foreign.length) refuse('op.foreign-souls', `this world holds ${foreign.length} live Soul(s) not owned by the operator's test account: god-approve is for a scratch world only`, 409);
     const agent = god.pendingPairings().find(p => p.code.replace(/[^A-Z0-9]/gi, '').toUpperCase() === code.replace(/[^A-Z0-9]/gi, '').toUpperCase())?.agent;
     god.pairApprove({id: god.owner!, role: 'user'}, code);
     journal('god-approve', {agent: agent ?? null});

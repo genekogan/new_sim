@@ -6,6 +6,9 @@
 //   POST /__sim/op/soul-inbox    {slug, soulId, name}         that inbox as its owner sees it (latest, ack, result)
 //   POST /__sim/op/soul-delete   {slug, soulId, name}         retire a TEST Soul (by name + id)
 //   POST /__sim/op/set-test      {slug, test}                 flag a scratch world as a test world (or unflag it)
+//   POST /__sim/op/god-pending   {slug}                       god pairing requests waiting for the world's owner
+//   POST /__sim/op/god-approve   {slug, code}                 approve one for the world's existing owner (the release probe's
+//                                own god folder): a test world only, never one holding a Soul a person owns (the world checks)
 // Guards, here and again in the world: direct loopback requests only (launcher.mjs `direct`); the world must be flagged
 // test (registry `test: true`, op set-test) or listed in <data>/op-test-worlds.json (a JSON array of slugs), and never one
 // of the product worlds below or a fork of an old world; Gene's Souls are refused by id and name (Kwyjibo, plus any in
@@ -20,6 +23,7 @@ export const NEVER_TEST_SLUGS = ['eden-2026', 'godmode-lab', 'my-mars-college-20
 export const DENY_SOUL_IDS = ['s_c8520a0a76'];
 export const DENY_SOUL_NAMES = [/kwyjibo/i];
 export const SOUL_VERBS = ['pending', 'approve', 'message', 'inbox', 'delete'];
+export const GOD_VERBS = ['god-pending', 'god-approve'];
 
 const readJson = (file, fallback) => { try { return JSON.parse(readFileSync(file, 'utf8')); } catch { return fallback; } };
 /** The slugs <data>/op-test-worlds.json allows (a JSON array; anything else allows none). */
@@ -46,19 +50,21 @@ export function deniedSoul(dataDir, id, name) {
  */
 export async function opSoul({ verb, body, registry, dataDir, ensure, call, log = () => {} }) {
   const slug = typeof body?.slug === 'string' ? body.slug : '';
-  const row = { op: `soul-${verb}`, slug, by: 'operator', ...(typeof body?.approvalId === 'string' ? { approvalId: body.approvalId.slice(0, 40) } : {}), ...(typeof body?.soulId === 'string' ? { soulId: body.soulId.slice(0, 40) } : {}), ...(typeof body?.name === 'string' ? { name: body.name.slice(0, 40) } : {}), ...(typeof body?.text === 'string' ? { chars: body.text.length } : {}) };
-  const done = (status, out) => { audit(dataDir, { ...row, status, ...(out.code ? { code: out.code } : {}), ...(out.approval?.soulId ? { soulId: out.approval.soulId } : {}) }); log(`operator soul-${verb} ${slug}${row.name ? ` ${row.name}` : ''}: ${status}${out.code ? ` ${out.code}` : ''}`); return [status, out]; };
-  if (!SOUL_VERBS.includes(verb)) return done(404, { ok: false, code: 'not-found' });
+  const god = GOD_VERBS.includes(verb), name = god ? verb : `soul-${verb}`;
+  const row = { op: name, slug, by: 'operator', ...(typeof body?.approvalId === 'string' ? { approvalId: body.approvalId.slice(0, 40) } : {}), ...(typeof body?.soulId === 'string' ? { soulId: body.soulId.slice(0, 40) } : {}), ...(typeof body?.name === 'string' ? { name: body.name.slice(0, 40) } : {}), ...(typeof body?.text === 'string' ? { chars: body.text.length } : {}) };
+  const done = (status, out) => { audit(dataDir, { ...row, status, ...(out.code ? { code: out.code } : {}), ...(out.approval?.soulId ? { soulId: out.approval.soulId } : {}) }); log(`operator ${name} ${slug}${row.name ? ` ${row.name}` : ''}: ${status}${out.code ? ` ${out.code}` : ''}`); return [status, out]; };
+  if (!god && !SOUL_VERBS.includes(verb)) return done(404, { ok: false, code: 'not-found' });
   const w = registry.get(slug), why = notTestWorld(w, dataDir);
   if (why) return done(why[0], { ok: false, code: why[1], message: why[2] });
-  if (verb !== 'pending') {
+  if (verb === 'god-approve' && (typeof body?.code !== 'string' || !body.code)) return done(400, { ok: false, code: 'invalid', message: 'code is required (the pairing code eden-god.mjs pair printed)' });
+  if (!god && verb !== 'pending') {
     if (typeof body?.name !== 'string' || !body.name) return done(400, { ok: false, code: 'invalid', message: 'name is required (the TEST Soul’s exact name)' });
     if (verb === 'approve' ? typeof body?.approvalId !== 'string' : typeof body?.soulId !== 'string') return done(400, { ok: false, code: 'invalid', message: verb === 'approve' ? 'approvalId is required (ap_…, from soul-pending)' : 'soulId is required (s_…)' });
     if (deniedSoul(dataDir, body.soulId, body.name)) return done(403, { ok: false, code: 'op.denied-soul', message: 'that Soul is on the deny list (Gene’s own Souls)' });
   }
   let port; try { port = await ensure(w); } catch (e) { return done(503, { ok: false, code: 'unavailable', message: `${w.name} could not start: ${e.message}` }); }
   const { slug: _s, ...rest } = body;
-  try { const [status, out] = await call(w, port, `/v1/op/souls/${verb}`, rest); return done(status, { ...out, slug }); }
+  try { const [status, out] = await call(w, port, god ? `/v1/op/god/${verb.slice(4)}` : `/v1/op/souls/${verb}`, rest); return done(status, { ...out, slug }); }
   catch (e) { return done(504, { ok: false, code: 'unreachable', message: `${w.name} did not answer: ${e.message}` }); }
 }
 
