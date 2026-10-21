@@ -48,6 +48,17 @@ writes to eden2 and pushes. A lane hands R `branch@sha` + a gate receipt; R ship
   first; see `tools/world-launcher/deploy/RELEASES.md`); R still does lane checks, main + push, SHIP-LOG.
 - Do not replay passing checks without a source change or unresolved finding that warrants it.
 
+## Visitor analytics
+
+GoatCounter site `simeden`, dashboard **https://simeden.goatcounter.com** (Gene's account; the `site-analytics` skill
+covers it beside genekogan.com and mars.college). `apps/web/src/visitor-counts.ts` sends the counts itself (no GoatCounter
+script): page views as `/w/<slug>` (or `/` for the world list; never a query, hash, Soul id or token), referrer origin,
+screen width (the dashboard's phone/desktop split), and events `enter world <slug>` (arrival card gone), `soul paired`,
+`god connected`. Cookieless. Not counted: local/private/tailnet hosts, `navigator.webdriver` (all ship.sh walks, probe,
+poster, stall, cdn-walk), `?shot`, a browser with `localStorage.skipgc = 't'`. Build env `SIM_GOATCOUNTER` = a code or a
+full count URL (default `simeden`; `off` disables). The world pages' only CSP is `frame-ancestors 'none'`; a fetch
+directive added there must allow `https://simeden.goatcounter.com`.
+
 Imported `mars/AGENTS.md` carries original-checkout history; its prohibitions
 on authorized Eden fork work are superseded by Gene's kickoff, while engine
 determinism, geometric and evidence safeguards remain useful.

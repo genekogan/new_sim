@@ -105,6 +105,9 @@ owner, world key/id/path, engine, port and data. No DEV_AUTH on a public host.
 No original Mars checkout or MARS_ENGINE_DIR is needed. Root is shared with a second admin;
 keep credentials out of logs, diffs and proof artifacts.
 
+Visitor analytics (2026-10-21): GoatCounter dashboard https://simeden.goatcounter.com (site `simeden`); what is
+counted and what is not: `AGENTS.md` "Visitor analytics" and `apps/web/src/visitor-counts.ts`.
+
 ## Stage, promote and roll back
 
 Review the diff and run secret scans before staging/committing/pushing. Use a clean
