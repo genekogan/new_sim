@@ -25,6 +25,11 @@ writes to eden2 and pushes. A lane hands R `branch@sha` + a gate receipt; R ship
   --out <dir>`. Clean = 0 new failures, 0 blockers, 0 unexpected skips; the standing quarantine
   (`tools/test-harness/quarantine.json`) has **9 entries** (11 retired). GitHub Actions runs fail at start (account
   billing, Gene's); the Modal gate is the release check.
+- **Walkability is gated (V3-walk):** the gate audits fixed copies of eden-2026, bench-eden, bench-hamlet and a fresh Eden 2026
+  genesis (`apps/server/src/god/walk-audit.ts`: bad destinations, one-ways, goalless things, floats per place) and fails when any
+  place is worse than `tools/test-harness/walk/baseline/`. Check locally in ~1 min: `node tools/test-harness/walk/walk.mjs`. A
+  deliberate change (better or worse) updates the baseline as a reviewed file change: `walk.mjs --write`, or
+  `walk.mjs --from <gate out>/candidate/out/suite/walk --write`.
 - **Build:** `tools/world-launcher/deploy/release.sh production --reload` (exactly HEAD of a clean tree). The asset CDN is
   ON by default (`SIM_ASSETS_CDN_ENABLED=0` opts out for one release; other values refused); the build fails without the CDN
   origin + `cdn-manifest-*.json` in dist, or without the Eden experience pin call. It keeps the stage links + 3 newest
