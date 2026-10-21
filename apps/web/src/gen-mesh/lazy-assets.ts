@@ -114,7 +114,7 @@ export function planEager(snap: { entities: Entity[]; assetBytes?: Record<string
   const order = [...rank.keys()].sort((a, b) => rank.get(a)! - rank.get(b)!);
   const pick = new Set<string>(); let bytes = 0;
   for (const sha of order) { const n = sizes[sha] ?? 0; if (near !== null && ndist.get(sha)! > near) continue; if (pick.size && (bytes + n > EAGER_BYTES || dist.get(sha)! > NEAR_M * 2)) continue; pick.add(sha); bytes += n; }
-  eager = pick;
+  eager = pick; plannedEye = eye ?? centre;
   // lane PERF: the arrival card waits for these (or GATE_MS), so a new world opens with what is in front of you drawn
   eagerLeft.clear(); for (const sha of pick) eagerLeft.add(sha);
   gateUntil = performance.now() + GATE_MS; setTimeout(notifyGate, GATE_MS + 50); notifyGate();
@@ -136,6 +136,11 @@ if (typeof window !== 'undefined') (window as unknown as { __arrivalGate?: unkno
 /** A model is in the scene (or its placeholder, when it failed): it no longer holds the arrival card. */
 export function assetShown(sha: string) { if (eagerLeft.delete(sha) && !eagerLeft.size) notifyGate(); }
 export const isEager = (sha: string) => !LAZY || !eager || eager.has(sha) || started.has(sha);
+let plannedEye: [number, number] | null = null;
+/** t4-phone-new: where the eager plan measured distances from (the arrival eye), or null without a plan. A two-model def
+ *  (make.lod1) starts the model the plan chose from there at once (mesh.mesh.ts): it used to wait for the first drawn frame,
+ *  which a phone's early poster only draws after the gate, so its eager GLB held the poster for the whole GATE_MS. */
+export const plannedArrivalEye = (): [number, number] | null => (LAZY && eager ? plannedEye : null);
 /** The planned eager GLBs, nearest the arrival first (empty without a plan: then every load starts as its thing draws). */
 export const eagerShas = (): string[] => (LAZY && eager ? [...eager] : []);
 

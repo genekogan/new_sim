@@ -9,7 +9,7 @@
 // move the legs), so motion.ts walks, grazes, flies or swims it like a kit creature.
 import * as THREE from 'three';
 import { frameHook, instantiate, loadAsset, type ModelInstance } from './gltf-assets.ts';
-import { assetShown, deferLoad, isEager, noteDeferred } from './lazy-assets.ts';
+import { assetShown, deferLoad, isEager, noteDeferred, plannedArrivalEye } from './lazy-assets.ts';
 import { registerMesh, type MeshBuilder } from './registry.ts';
 import { assetHidden } from '../moderation-hidden.ts';
 import { bindMotionModel, makeRig, type Gait } from './motion.ts';
@@ -105,6 +105,10 @@ const meshBuilder: MeshBuilder = {
         if (!variants.has(sha)) { const root = new THREE.Group(); root.name = sha === make.asset ? 'lod0' : 'lod1'; root.visible = false; variants.set(sha, { root }); holder.add(root); start(sha, root); }
         show();
       };
+      // t4-phone-new: with an arrival plan, the model the plan chose from the arrival eye starts now (lazy-assets.ts
+      // plannedArrivalEye); the frame check below then follows the camera as before
+      const eye = plannedArrivalEye();
+      if (eye) { let p: { x: number; z: number } | null = null; try { p = ctx.model.worldPose(ctx.entity); } catch { /* the frame check decides */ } if (p) want(meshLodAsset(make, ctx.def.size.box, Math.hypot(p.x - eye[0], p.z - eye[1]), ctx.entity.s ?? 1)); }
       // distance check every 8th frame (staggered per thing); the first one runs on the first drawn frame
       holder.add(frameHook((cam) => {
         if (variants.size && (tick++ & 7)) return;
