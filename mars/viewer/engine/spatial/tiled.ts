@@ -742,7 +742,7 @@ export function groundRoute(nav: GroundNav, scene: SpatialScene, profile: AgentP
     for (const leg of res.route.legs) appendLeg(legs, leg);
     length += res.route.length; expanded += res.route.expanded;
     const end = (res.route.legs.at(-1) as WalkLeg | undefined)?.points.at(-1);
-    from = { level: 0, p: end ?? target.p };
+    from = { level: 0, p: end ?? (ends[h] >= path.length ? goal.p : path[ends[h]]) };
   }
   return { ok: true, route: { legs, length, expanded } };
 }
