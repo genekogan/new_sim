@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "name": "bench-hamlet",
+  "worldId": "bench-hamlet-1",
+  "auditVersion": 1,
+  "totals": {"dests":246,"bad":0,"disconnected":0,"oneWay":0,"noRoom":0,"goalless":1,"roots":242,"floats":0},
+  "places": {
+    "knoll": {"goalless":1}
+  },
+  "bad": [],
+  "goalless": [
+    ["knoll","knoll"]
+  ],
+  "floats": []
+}

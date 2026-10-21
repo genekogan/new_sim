@@ -1879,11 +1879,13 @@ export class MarsEngine implements Engine {
   }
   /** lane NAV: what the engine itself offers as destinations — every seat and berth's standing approach, and a standing
    *  spot inside each place region (the one nearest its centre that is on the main area, else its centre) — for the audit. */
-  navTargetsV1():(ConnPoint&{kind:'seat'|'berth'|'region';of:string})[]{
+  /** `keep` (lane WALK: the gate's walk audit runs in spatial shards) skips fixtures / regions whose position it rejects. */
+  navTargetsV1(keep?:(at:[number,number])=>boolean):(ConnPoint&{kind:'seat'|'berth'|'region';of:string})[]{
     const out:(ConnPoint&{kind:'seat'|'berth'|'region';of:string})[]=[],w=this.rt.world,c=this.connectivityV1();
-    for(const id of Object.keys(w.entities).sort()){const e=w.entities[id];if(e.kind!=='fixture')continue;
+    for(const id of Object.keys(w.entities).sort()){const e=w.entities[id];if(e.kind!=='fixture')continue;if(keep&&!keep([e.pose.p[0],e.pose.p[2]]))continue;
       for(const slot of fixtureSlots(this.rt,e)){if(slot.kind!=='seat'&&slot.kind!=='berth')continue;const a=seatApproach(this.rt,slot);if(!Array.isArray(a))continue;out.push({id:slot.id,of:id,kind:slot.kind,p:[a[0],a[1]],level:slot.level??0,tol:.5});}}
     for(const id of Object.keys(w.regions).sort()){const r=w.regions[id];if(r.kind==='no-go'||!r.polygon?.length)continue;
+      if(keep&&!keep(centroid(r.polygon) as [number,number]))continue;
       const xs=r.polygon.map((v:any)=>v[0]),zs=r.polygon.map((v:any)=>v[1]),ctr=centroid(r.polygon) as [number,number];let best:[number,number]|null=null,bd=Infinity;
       for(let x=Math.min(...xs)+.5;x<Math.max(...xs);x+=1)for(let z=Math.min(...zs)+.5;z<Math.max(...zs);z+=1){if(!inPoly(x,z,r.polygon))continue;const d=hypot(x-ctr[0],z-ctr[1]);if(d<bd&&c.connectedRoot(c.rootAt([x,z]))){best=[x,z];bd=d;}}
       out.push({id,of:id,kind:'region',p:best??ctr,level:0,tol:.5});}

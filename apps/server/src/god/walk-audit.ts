@@ -1,0 +1,137 @@
+// Lane WALK (2026-10-21): the walkability audit the release gate runs (tools/test-harness/walk/walk-gate.test.mjs).
+// It boots a world in-process exactly as main.ts does for the parts walkability reads (engine host, ground host, god model
+// with its boot re-cut, edge ledger, engine bridge), then reports, per place (the top segment of a thing's path):
+//   bad       walk goals, seats, berths and regions the engine's connectivity (lane NAV, connectivityV1/navCheckV1) calls
+//             not walkable both ways from the main ground: nav.disconnected + nav.one-way + nav.no-standing-room
+//   oneWay    the nav.one-way subset (reachable one way only)
+//   goalless  named things GodNav finds no walk goal for at all (no standing room near them)
+//   float     root things standing more than FLOAT_M above the ground under their origin
+// Nothing here decides walkability itself: it only calls the code the server ships, so the gate measures what Souls get.
+//
+//   node apps/server/src/god/walk-audit.ts --db <world copy .db or .db.gz> [--name n] [--shard k/n] [--out part.json]
+//   node apps/server/src/god/walk-audit.ts --genesis worlds/templates/eden-2026.json [--name n] [--shard k/n] [--out part.json]
+// The world copy is never written: it is copied (or gunzipped) into a temporary directory first.
+import { DatabaseSync } from 'node:sqlite';
+import { mkdtempSync, readFileSync, renameSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
+import { tmpdir, homedir } from 'node:os';
+import { basename, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+export const WALK_AUDIT_VERSION = 1;
+export const FLOAT_M = 0.3;
+const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
+
+/** One audit process's findings. A world is audited in `n` spatial shards (64 m cells, see shardOf) by separate processes
+ *  so the gate step stays short; tools/test-harness/walk merges the parts. Shard 0 also measures floats. */
+export type WalkPart = {
+  schemaVersion: 1; version: number; name: string; worldId: string; shard: [number, number];
+  dests: number; roots: number;
+  /** [code, destination id, place] for every destination not walkable both ways */
+  bad: [string, string, string][];
+  /** [thing path, place]: named things GodNav finds no walk goal for */
+  goalless: [string, string][];
+  /** [path, metres above the ground, place] */
+  floats: [string, number, string][];
+  ms: Record<string, number>;
+};
+export const SHARD_CELL_M = 64;
+export function shardOf(at: readonly number[], n: number): number {
+  if (n <= 1) return 0;
+  const i = Math.floor(at[0] / SHARD_CELL_M), j = Math.floor(at[1] / SHARD_CELL_M);
+  return (((i * 73856093) ^ (j * 19349663)) >>> 0) % n;
+}
+
+type Booted = { name: string; worldId: string; host: any; god: any; bridge: any; engine: any; stop(): void };
+
+/** Env as main.ts sees it on a production entity world with fake minds; set before the server modules load. */
+function env(key: string, worldId: string, dir: string) {
+  Object.assign(process.env, { WORLD_KEY: key, WORLD_ID: worldId, ENGINE: 'mars', BRAIN_MODE: 'fake', DEV_AUTH: '1', DATA_DIR: dir,
+    ENABLE_WORLD_ENGINE: '1', SOUL_LIFECYCLE: '1', MIND_DRIVER: 'edge' });
+}
+
+export async function bootForWalk(o: { db?: string; genesis?: string; name?: string }): Promise<Booted> {
+  const dir = mkdtempSync(join(tmpdir(), 'walk-audit-')), file = join(dir, 'sim.db');
+  let worldId: string, seed: string;
+  if (o.db) {
+    if (o.db.endsWith('.gz')) writeFileSync(file, gunzipSync(readFileSync(o.db)));
+    else new DatabaseSync(o.db, { readOnly: true }).exec(`VACUUM INTO '${file.replace(/'/g, "''")}'`);
+    const head = new DatabaseSync(file, { readOnly: true }).prepare('SELECT id, seed FROM worlds LIMIT 1').get() as { id: string; seed: string };
+    worldId = head.id; seed = head.seed;
+  } else { worldId = 'walk-genesis-1'; seed = 'walk-genesis'; }
+  env(worldId.replace(/-\d+$/, ''), worldId, dir);
+  const { Db } = await import('../db.ts'), { WorldHost } = await import('../world.ts'), mars = await import('@sim/engine-mars');
+  const { loadGroundRecipes, GroundHost } = await import('./ground-host.ts'), { GodMode } = await import('./god.ts');
+  const { EdgeLedger } = await import('../edge/ledger/ledger.ts'), { installEngineBridge } = await import('./engine-bridge.ts');
+  const db = new Db(file);
+  loadGroundRecipes(db, worldId);
+  const factory = await mars.marsFactory({ ...mars.GREEN_FIELD_WORLD, safeCrewRemoval: true });
+  const host = new WorldHost(db, factory, seed, 600, worldId); host.boot();
+  const edge = new EdgeLedger(host, db);
+  const genesis = o.genesis ? JSON.parse(readFileSync(o.genesis, 'utf8')) : undefined;
+  const god = new GodMode(db, { genesis, worldId, ownerId: null, tick: () => host.engine.world.tick, emit: () => {} });
+  new GroundHost(db, host, god); host.drainInputs();
+  const bridge = installEngineBridge({ host, god, edge, log: () => {} });
+  bridge.reconcile(); host.drainInputs();
+  const name = o.name ?? (o.db ? basename(o.db).replace(/\.db(\.gz)?$/, '') : basename(o.genesis!).replace(/\.json$/, '') + '-genesis');
+  // the copy is scratch: on the laptop it goes to the cleanup trash (lane rule: no rm), elsewhere the OS reaps tmp
+  const trash = join(homedir(), '.Trash', 'eden-cleanup-20261020');
+  const stop = () => { host.stop(); if (existsSync(trash)) try { renameSync(dir, join(trash, basename(dir))); } catch { /* left in tmp */ } };
+  return { name, worldId, host, god, bridge, engine: host.engine as any, stop };
+}
+
+export async function walkAudit(w: Booted, shard: [number, number] = [0, 1]): Promise<WalkPart> {
+  const { heightAt } = await import('@sim/ground');
+  const ms: Record<string, number> = {}, lap = (k: string, t: number) => { ms[k] = Math.round(performance.now() - t); };
+  const m = w.god.model, e = w.engine, [k, n] = shard, mine = (at: readonly number[]) => shardOf(at, n) === k;
+  const top = (path: string) => path.split('/')[0];
+  const placeOf = (id: string) => {   // `walk:<path>`, `seat:<entity>#seat-1`, `berth:…`, `region:<id>`
+    const ref = id.slice(id.indexOf(':') + 1), ent = ref.split('#')[0];
+    return top(m.entities.has(ent) ? m.pathOf(ent) : ref);
+  };
+  let t = performance.now(); e.connectivityV1(); lap('labels', t);
+  const dests: { id: string; p: [number, number]; level: number; tol?: number }[] = [], goalless: [string, string][] = [];
+  t = performance.now();
+  for (const th of w.bridge.nav.things()) {
+    if (!mine(th.at)) continue;
+    const g = w.bridge.nav.goal(th, th.at);
+    if (!g) goalless.push([th.ref, placeOf(`walk:${th.ref}`)]); else dests.push({ id: `walk:${th.ref}`, p: g.p, level: g.level });
+  }
+  lap('goals', t); t = performance.now();
+  for (const x of e.navTargetsV1(mine)) dests.push({ id: `${x.kind}:${x.id}`, p: x.p, level: x.level, tol: x.tol });
+  lap('targets', t); t = performance.now();
+  const bad: [string, string, string][] = [];
+  for (const v of e.navCheckV1(dests) as { id: string; ok: boolean; code?: string }[]) if (!v.ok) bad.push([v.code ?? 'nav.unknown', v.id, placeOf(v.id)]);
+  lap('check', t); t = performance.now();
+  const floats: [string, number, string][] = []; let roots = 0;
+  if (k === 0) {
+    const ground = m.ground();
+    for (const ent of m.entities.values()) {
+      if (ent.in?.parent !== 'world') continue;
+      const def = m.resolvedDef(ent.def); if (!def || def.components?.landform || def.layer === 'volume') continue;
+      roots++;
+      const p = m.worldPose(ent), gap = p.y - heightAt(ground, p.x, p.z);
+      if (gap > FLOAT_M) { const path = m.pathOf(ent.id); floats.push([path, Math.round(gap * 10) / 10, top(path)]); }
+    }
+  }
+  lap('floats', t);
+  const by = (a: string[], b: string[]) => (a.join('\t') < b.join('\t') ? -1 : 1);
+  return { schemaVersion: 1, version: WALK_AUDIT_VERSION, name: w.name, worldId: w.worldId, shard, dests: dests.length, roots,
+    bad: bad.sort(by), goalless: goalless.sort(by), floats: floats.sort((a, b) => (a[0] < b[0] ? -1 : 1)), ms };
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const a = process.argv.slice(2), arg = (k: string) => { const i = a.indexOf(`--${k}`); return i < 0 ? undefined : a[i + 1]; };
+  const db = arg('db'), genesis = arg('genesis'), out = arg('out'), sh = (arg('shard') ?? '0/1').split('/').map(Number) as [number, number];
+  if (!(sh[1] >= 1 && sh[0] >= 0 && sh[0] < sh[1])) { console.error('--shard k/n with 0 <= k < n'); process.exit(2); }
+  if (!db === !genesis) { console.error('usage: walk-audit.ts --db <copy.db|.db.gz> | --genesis <template.json> [--name n] [--shard k/n] [--out file]'); process.exit(2); }
+  const t0 = performance.now();
+  const w = await bootForWalk({ db: db && resolve(db), genesis: genesis && resolve(ROOT, genesis), name: arg('name') });
+  const boot = Math.round(performance.now() - t0);
+  const r = await walkAudit(w, sh); r.ms = { boot, ...r.ms, total: Math.round(performance.now() - t0) };
+  const text = JSON.stringify(r);
+  if (out) { if (!existsSync(resolve(out, '..'))) mkdirSync(resolve(out, '..'), { recursive: true }); writeFileSync(out, text + '\n'); }
+  else console.log(text);
+  console.error(`walk-audit ${r.name} ${sh.join('/')}: dests ${r.dests} bad ${r.bad.length} goalless ${r.goalless.length} floats ${r.floats.length} ms ${JSON.stringify(r.ms)}`);
+  w.stop(); process.exit(0);
+}
