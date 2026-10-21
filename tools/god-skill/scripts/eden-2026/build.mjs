@@ -63,11 +63,20 @@ const DOOR_TURNS=process.env.DOOR_TURNS_JSON?JSON.parse(process.env.DOOR_TURNS_J
  'hillside-home-13':2,'hillside-home-14':-1,'hillside-home-15':1,'hillside-home-16':1};
 const doorTurn=op=>{const q=op.op==='place'?DOOR_TURNS[op.name]:0;if(!q)return op;const r=+((op.r??0)+q*Math.PI/2).toFixed(3);doorTurns.push({name:op.name,from:op.r??0,to:r});return{...op,r};};
 const doorTurns=[];
-for(const b of BUILDING_BATCHES)apply(b.label,b.ops.map(op=>op.name==='region-harbour-lighthouse'?{...op,p:[op.p[0],.1,op.p[1]]}:doorTurn(op)));
+// CONTENT (2026-10-21, NAV audit4 on the live worlds): places Souls could not walk into, fixed as content. The west-river
+// watermill stood half in the river, its door over the water: 4 m up the bank. The eden-house-3/4 kitchens' court door
+// (n, at 0.5) opened into their stair flight (n, at 0.5), which also pinched the dining end off: the door moves to that end.
+// The cottage living rooms (artists-studio-1/5/9, hillside-home-2) were split front/back by the armchair beside the round
+// table: the armchair goes behind the table facing it and the table 0.4 m off the sofa (FURNISH_FIXES, after furnishing).
+const PLACE_FIXES={'region-west-river-watermill':op=>({...op,p:[-222,op.p[1]]}),
+ ...Object.fromEntries(['eden-house-3-kitchen','eden-house-4-kitchen'].map(n=>[n,op=>{const plan=structuredClone(op.params.plan);for(const x of plan.floors[0].exterior)if(x.wall==='n')x.at=0.88;return{...op,params:{...op.params,plan}};}]))};
+const FURNISH_FIXES=Object.fromEntries([['artists-studio-1',.508,-1],['artists-studio-5',.508,-1],['artists-studio-9',.508,-1],['hillside-home-2',.643,-1.25]].map(([n,tz,az])=>[n,{'living-armchair':{p:[-0.2,0,az],r:0},'living-table':{p:[-0.4,0,tz],r:0}}]));
+const contentFix=op=>op.op==='place'&&PLACE_FIXES[op.name]?PLACE_FIXES[op.name](op):op;
+for(const b of BUILDING_BATCHES)apply(b.label,b.ops.map(op=>op.name==='region-harbour-lighthouse'?{...op,p:[op.p[0],.1,op.p[1]]}:contentFix(doorTurn(op))));
 console.log('door turns',doorTurns.length,JSON.stringify(doorTurns));
 for(const b of COMMONS_BATCHES)apply(b.label,b.ops);
 const furniture=[];
-for(const b of BUILDINGS){if(b.autoFurnished||!b.furnishStyle||b.circulation)continue;const f=furnishBatch(god.model,b.name,b.furnishStyle);const rootNames=new Map([...god.model.entities.values()].filter(e=>e.in?.parent==='world'||!e.in).map(e=>[e.id,e.name]));for(const op of f.ops){if(rootNames.has(op.in?.parent))op.in.parent=rootNames.get(op.in.parent);if(op.price){delete op.price;f.notes.push('Public service is free; this template does not enable an economy.');}}apply(`furnish ${b.name}`,f.ops,true);furniture.push({building:b.name,placed:f.ops.length,dropped:f.dropped,notes:f.notes});}
+for(const b of BUILDINGS){if(b.autoFurnished||!b.furnishStyle||b.circulation)continue;const f=furnishBatch(god.model,b.name,b.furnishStyle);const rootNames=new Map([...god.model.entities.values()].filter(e=>e.in?.parent==='world'||!e.in).map(e=>[e.id,e.name]));for(const op of f.ops){if(rootNames.has(op.in?.parent))op.in.parent=rootNames.get(op.in.parent);const fx=FURNISH_FIXES[b.name]?.[op.name];if(fx&&op.in?.parent===b.name)Object.assign(op,fx);if(op.price){delete op.price;f.notes.push('Public service is free; this template does not enable an economy.');}}apply(`furnish ${b.name}`,f.ops,true);furniture.push({building:b.name,placed:f.ops.length,dropped:f.dropped,notes:f.notes});}
 for(const [label,list] of [['interiors: library',LIBRARY],['interiors: library tops',LIBRARY_TOPS],['interiors: cafe',CAFE],['interiors: cafe tops',CAFE_TOPS],['interiors: office',OFFICE],['interiors: office tops',OFFICE_TOPS],['interiors: courtyard houses',HOUSES],['interiors: barn',BARN],['interiors: small houses',SMALL_HOUSES],['interiors: barn tops',BARN_TOPS],['interiors: hotels',HOTELS]])for(let i=0;i<list.length;i+=14)apply(`${label} ${i/14+1}`,list.slice(i,i+14),'any');
 // V3: old Eden's town roofs were gardens too: planters (and on bigger roofs a bench or a parasol table) on the flat roofs
 // of the canal, old-town, seaside and cliff houses; deterministic by name, optional (droppable)
