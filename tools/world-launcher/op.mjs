@@ -18,6 +18,20 @@
 //   node tools/world-launcher/op.mjs audit --port 4620 [--base /worlds] [--slug <slug>]
 //   node tools/world-launcher/op.mjs client-errors --port 4620 [--base /worlds] [--world <slug>] [--limit N]
 //        (what visitors' pages reported: top errors by count, world, browser, first/last seen, build; client-errors.mjs)
+//   node tools/world-launcher/op.mjs set-test --port 4620 [--base /worlds] --slug <slug> --test true|false
+//        (a scratch world operator TEST-Soul commands may use; product worlds and old-world forks are refused)
+//   node tools/world-launcher/op.mjs soul-pending --port 4620 [--base /worlds] --slug <test world>
+//   node tools/world-launcher/op.mjs soul-approve --port 4620 [--base /worlds] --slug <test world> --request <ap_…> --name <TestName>
+//   node tools/world-launcher/op.mjs soul-message --port 4620 [--base /worlds] --slug <test world> --soul <s_…> --name <TestName> --text <text>
+//   node tools/world-launcher/op.mjs soul-inbox   --port 4620 [--base /worlds] --slug <test world> --soul <s_…> --name <TestName>
+//   node tools/world-launcher/op.mjs soul-delete  --port 4620 [--base /worlds] --slug <test world> --soul <s_…> --name <TestName>
+//   node tools/world-launcher/op.mjs god-pending  --port 4620 [--base /worlds] --slug <test world>
+//   node tools/world-launcher/op.mjs god-approve  --port 4620 [--base /worlds] --slug <test world> --code <pairing code>
+//     (the owner's god pairing on a scratch test world with no Souls a person owns: the release probe's own god folder)
+//        (lane OPS2: TEST Souls only, so lanes can test Soul flows unattended: a TEST name is "Test" + a capital, digit or
+//        separator, or "test-…"; approve refuses a request sent to a person's window, a repair, or a deny-listed name
+//        (Kwyjibo); message/inbox/delete reach only Souls an operator approved (owner op:test-operator), by name + id.
+//        The message goes into the inbox exactly as the browser card sends it. Every use is an audit row, by operator.)
 //
 // create-world: the world is born owned by that existing account (its god), exactly as if that person had created it signed in.
 // register-fork: serve the copy of an old world already in <data>/worlds/<slug>/sim.db under <base>/w/<slug> (lane FORKS).
@@ -33,7 +47,13 @@ const usage = () => {
     + '       op.mjs archive-world --port <launcher port> [--base /worlds] --slug <slug> [--reason <text>]\n'
     + '       op.mjs restore-world --port <launcher port> [--base /worlds] --id <archive id>\n'
     + '       op.mjs list-archive --port <launcher port> [--base /worlds]\n'
-    + '       op.mjs audit --port <launcher port> [--base /worlds] [--slug <slug>]');
+    + '       op.mjs audit --port <launcher port> [--base /worlds] [--slug <slug>]\n'
+    + '       op.mjs set-test --port <launcher port> [--base /worlds] --slug <slug> --test true|false\n'
+    + '       op.mjs soul-pending --port <launcher port> [--base /worlds] --slug <test world>\n'
+    + '       op.mjs soul-approve --port <launcher port> [--base /worlds] --slug <test world> --request <ap_id> --name <TestName>\n'
+    + '       op.mjs soul-message|soul-inbox|soul-delete --port <launcher port> [--base /worlds] --slug <test world> --soul <s_id> --name <TestName> [--text <text> (soul-message)]\n'
+    + '       op.mjs god-pending --port <launcher port> [--base /worlds] --slug <test world>\n'
+    + '       op.mjs god-approve --port <launcher port> [--base /worlds] --slug <test world> --code <pairing code>');
   process.exit(2);
 };
 if (cmd === 'client-errors' && flag('port')) {
@@ -69,6 +89,24 @@ if (cmd === 'create-world') {
 } else if (cmd === 'remove-fork') {
   if (!flag('port') || !flag('slug')) usage();
   body = { slug: flag('slug') };
+} else if (cmd === 'set-test') {
+  if (!flag('port') || !flag('slug') || !['true', 'false'].includes(flag('test'))) usage();
+  body = { slug: flag('slug'), test: flag('test') === 'true' };
+} else if (cmd === 'soul-pending') {
+  if (!flag('port') || !flag('slug')) usage();
+  body = { slug: flag('slug') };
+} else if (cmd === 'soul-approve') {
+  if (!flag('port') || !flag('slug') || !flag('request') || !flag('name')) usage();
+  body = { slug: flag('slug'), approvalId: flag('request'), name: flag('name') };
+} else if (['soul-message', 'soul-inbox', 'soul-delete'].includes(cmd)) {
+  if (!flag('port') || !flag('slug') || !flag('soul') || !flag('name') || (cmd === 'soul-message' && !flag('text'))) usage();
+  body = { slug: flag('slug'), soulId: flag('soul'), name: flag('name'), ...(cmd === 'soul-message' ? { text: flag('text') } : {}) };
+} else if (cmd === 'god-pending') {
+  if (!flag('port') || !flag('slug')) usage();
+  body = { slug: flag('slug') };
+} else if (cmd === 'god-approve') {
+  if (!flag('port') || !flag('slug') || !flag('code')) usage();
+  body = { slug: flag('slug'), code: flag('code') };
 } else usage();
 const base = (flag('base') ?? '').replace(/\/$/, '');
 const r = await fetch(`http://127.0.0.1:${Number(flag('port'))}${base}/__sim/op/${cmd}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(240_000) });

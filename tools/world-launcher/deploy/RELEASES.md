@@ -11,7 +11,7 @@ the gated head, with `node_modules` and `.lane/mars-web` in place. `<n>` is the 
 
 | step | what it does | its bar |
 |---|---|---|
-| preflight | local checks: clean tree, tools, Mars web assets, probe god folder; prints the deploy lease | nothing missing |
+| preflight | local checks: clean tree, tools, Mars web assets, probe god folder (release-probe; bench-hamlet until it exists); prints the deploy lease | nothing missing |
 | backup | `ship/compact-backup.sh` (VACUUM INTO) of every production + legacy db, then `PRAGMA quick_check` on each copy | every db `ok` |
 | legacy-upload | `release.sh legacy` builds and uploads `we-<sha12>-root` without activating it | exit 0 |
 | probe-start | `release-probe.mjs` in the background (desktop + phone, CLI edits, `--expect-build`); waits for `probe/ready` | ready within 10 min |
@@ -37,6 +37,34 @@ handover, and the probe's exit 3 says it happened.
 - The release owner still does the lane-specific live checks, the fast-forward of main and the push, the SHIP-LOG entry and RESUME.
 - Tests: `node --test tools/world-launcher/ship.test.mjs` stubs every command (`SHIP_TEST=1`, `SHIP_SSH`, `SHIP_SCP`,
   `SHIP_NODE`, `SHIP_PYTHON`, `SHIP_RELEASE_SH`).
+
+## Release-probe world (one-time setup, then every release)
+The probe's CLI edits go to its own world, **release-probe**: an unlisted scratch world, flagged test, with no Soul a person
+owns. Releases never write to bench-hamlet again (it holds Kwyjibo). ship.sh's god folder is
+`<team>/runtime/t4-bench/release-probe` (`SHIP_PROBE_CLI` overrides it). Until that folder exists, ship.sh
+falls back to the old bench-hamlet folder and preflight prints a NOTE, so a release never blocks on this setup.
+
+R does the setup once, on eden2, after a release that carries `op.mjs god-approve` (lane OPS2) is live:
+1. `node tools/world-launcher/op.mjs create-world --port 4620 --base /worlds --name "Release probe (scratch)" --template hello-hamlet --owner-of bench-hamlet --slug release-probe --unlisted`
+   (`--unlisted` and `set-unlisted` come from lane QA2. If the live op.mjs does not have them yet, leave `--unlisted` off,
+   and once QA2 is live run `op.mjs set-unlisted --port 4620 --base /worlds --slug release-probe --unlisted true`.)
+2. `node tools/world-launcher/op.mjs set-test --port 4620 --base /worlds --slug release-probe --test true`
+3. On the laptop: make the folder, then in it `node <repo>/tools/god-skill/eden-god.mjs register https://sim.eden.art/worlds/w/release-probe/`
+   and `node <repo>/tools/god-skill/eden-god.mjs pair` (it prints a `#godpair/<code>` link and waits). On eden2:
+   `op.mjs god-pending --port 4620 --base /worlds --slug release-probe` lists it, and
+   `op.mjs god-approve --port 4620 --base /worlds --slug release-probe --code <code>` approves it for the world's owner;
+   `pair` then exits holding the god token. No signed-in step. Never open the folder's `.eden-god.json`.
+4. Live check of the operator TEST-Soul commands: a test agent asks to join release-probe as `TestProbe` (no window code);
+   `op.mjs soul-pending --slug release-probe` lists it with `test: true`; `soul-approve --request <ap_…> --name TestProbe`;
+   the agent's poll holds a Soul token; `soul-message --soul <s_…> --name TestProbe --text "walk to the well"`, the agent
+   acks it, `soul-inbox` shows `acknowledged`; `soul-delete --soul <s_…> --name TestProbe`. `op.mjs audit --slug release-probe`
+   shows every call `by: operator`, never the message text.
+
+Guards (op-souls.mjs, apps/server/src/op-souls.ts): operator Soul and god commands are loopback only, on worlds flagged
+test (registry `test: true` or `<data>/op-test-worlds.json`), never a product world or an old-world fork. Souls are
+approved only for TEST names (`Test…`/`test-…`) as the synthetic account `op:test-operator`. Kwyjibo is refused by id and
+name, plus anything in `<data>/op-deny-souls.json`. `god-approve` is also refused while any live Soul in the world belongs
+to anyone but `op:test-operator`, and it never claims an unowned world.
 
 ## What a release does
 1. `activate.sh` points the stage link at the new release, keeping the old one as `<stage>.previous`.
