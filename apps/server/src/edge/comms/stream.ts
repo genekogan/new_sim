@@ -102,12 +102,15 @@ export class EventStreams {
     });
   }
 
-  async wait(soulId: string, after: number | null, timeoutMs: number, signal?: AbortSignal): Promise<ReadResult> {
+  /** Wake this Soul's waits without an event (SOULSIM-H F1: its owner wrote); each wait re-checks its `interrupt`. */
+  poke(soulId: string) { const waiting = this.waiters.get(soulId); if (waiting) { this.waiters.delete(soulId); for (const wake of waiting) wake(); } }
+
+  async wait(soulId: string, after: number | null, timeoutMs: number, signal?: AbortSignal, interrupt?: () => boolean): Promise<ReadResult> {
     const start = after === null ? this.head(soulId) : after;
     const deadline = Date.now() + timeoutMs;
     for (;;) {
       const r = this.read(soulId, start);
-      if (r.gap || r.events.length) return r;
+      if (r.gap || r.events.length || interrupt?.()) return r;
       const left = deadline - Date.now();
       if (left <= 0 || signal?.aborted) return r;
       await this.waitForEvent(soulId, left, signal);

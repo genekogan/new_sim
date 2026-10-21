@@ -46,6 +46,8 @@ export class AgentInbox {
   private listeners = new Map<string, number>();
   /** When the last listener of a scope ended: a CLI re-polls within ~50 ms, so the card must not flicker away. */
   private listenEnded = new Map<string, number>();
+  /** SOULSIM-H F1: told the Soul id whenever its owner writes, so its `/v1/edge/wait` wakes too (not only its listen). */
+  private soulSends: ((soulId: string) => void)[] = [];
   constructor(db: Db, worldId: string, now = Date.now) {
     this.db = db; this.worldId = worldId; this.now = now;
     db.db.exec(`CREATE TABLE IF NOT EXISTS agent_inbox_v1 (
@@ -153,7 +155,15 @@ export class AgentInbox {
     this.db.db.prepare(`INSERT INTO ${q.t}(${q.cols},n,id,text,sent_at) VALUES(${q.a.map(() => '?').join(',')},?,?,?,?)`).run(...q.a, n, id, text.trim(), this.now());
     this.db.db.prepare(`DELETE FROM ${q.t} WHERE ${q.k} AND n<=? AND acknowledged_at IS NOT NULL`).run(...q.a, n - (god ? GOD_LOG_KEEP : SOUL_KEEP));
     for (const wake of [...(this.waiters.get(this.key(s)) ?? [])]) wake();
+    if (!god && s.scope.startsWith('soul:')) for (const l of this.soulSends) try { l(s.scope.slice(5)); } catch { /* a waker never breaks a send */ }
     return this.ownerView(s);
+  }
+  onSoulSend(listener: (soulId: string) => void) { this.soulSends.push(listener); }
+  /** SOULSIM-H F1: what interrupts a Soul's `wait`: messages not acknowledged that no listen has handed over yet, or that
+   *  were sent at or after `since` (the agent's last look). null = nothing new. */
+  ownerWrote(s: InboxScope, since: number): {waiting: number; newestAt: number} | null {
+    const q = this.q(s), r = this.db.db.prepare(`SELECT COUNT(*) AS n, MAX(sent_at) AS at FROM ${q.t} WHERE ${q.k} AND acknowledged_at IS NULL AND (sent_at>=? OR delivered_at IS NULL)`).get(...q.a, since) as {n: number; at: number | null};
+    return r.n ? {waiting: r.n, newestAt: r.at ?? since} : null;
   }
   touch(s: InboxScope) {
     this.db.db.prepare(`INSERT INTO agent_inbox_v1(world_id,scope,owner,last_seen_at) VALUES(?,?,?,?)

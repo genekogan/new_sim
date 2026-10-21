@@ -69,6 +69,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   ensureCommsSchema(db);
   const now = options.now ?? Date.now;
   const streams = new EventStreams(db, worldId, {now, retainEvents: options.retainEvents ?? 1000, retainMs: options.retainMs ?? 24 * 3600_000});
+  deps.ownerInbox?.onSoulSend(soulId => streams.poke(soulId));
   const spectators: ((m: SpectatorEdgeMessage) => void)[] = [];
   const core: CommsCore = {
     deps, db, worldId, streams, now,
@@ -134,7 +135,16 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
     const rawTimeout = c.req.query('timeout');
     const seconds = rawTimeout === undefined ? DEFAULT_WAIT_SECONDS : Number(rawTimeout);
     if (!Number.isFinite(seconds) || seconds < 1 || seconds > 55) throw new EdgeError(400, 'invalid', 'timeout must be 1..55 seconds');
-    return streams.wait(soul.soulId, after, seconds * 1000, c.req.raw.signal);
+    const box = deps.ownerInbox;
+    if (!box) return streams.wait(soul.soulId, after, seconds * 1000, c.req.raw.signal);
+    // SOULSIM-H F1: a wait also ends when the owner writes (a message no listen has handed over, or one sent after
+    // `ownerSince`, the `ownerMark` of the agent's previous wait), so a Soul busy walking sees "sit on the bench" at once.
+    const rawSince = c.req.query('ownerSince'), since = rawSince === undefined ? now() : Number(rawSince);
+    if (!Number.isSafeInteger(since) || since < 0) throw new EdgeError(400, 'invalid', 'ownerSince must be an ownerMark from wait');
+    const scope = {scope: `soul:${soul.soulId}`, owner: soul.owner};
+    const r = await streams.wait(soul.soulId, after, seconds * 1000, c.req.raw.signal, () => !!box.ownerWrote(scope, since));
+    const wrote = box.ownerWrote(scope, since);
+    return wrote ? {...r, ownerWrote: wrote.waiting, ownerMark: Math.max(since, wrote.newestAt + 1)} : {...r, ownerMark: Math.max(since, now())};
   }));
   app.post('/v1/edge/say', route(async (c, soul) => { const out = say(core, soul, await json(c), id => objects.addressees(id)); fading.touch(soul.soulId); return out; }));
   app.post('/v1/edge/subscribe', route(async (c, soul) => webhooks.subscribe(soul, await json(c))));
