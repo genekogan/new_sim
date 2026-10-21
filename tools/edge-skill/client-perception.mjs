@@ -11,11 +11,13 @@ export function openClientPerception(directory,{call,scope,onBoot=()=>{},onHere=
  const save=()=>{safe(path);safe(path+'.tmp');writeFileSync(path+'.tmp',JSON.stringify(cache)+'\n',{mode:0o600});renameSync(path+'.tmp',path);};
  async function catalogue(data){
   const stat=data.static??{},pages=stat.destinationPages??data.destinationPages??[];let places=stat.places??data.places??[];
-  if(!Array.isArray(places)||!Array.isArray(pages)||pages.length>100||(pages.length&&typeof stat.completeStaticEtag!=='string'))throw Error('invalid boot catalogue');
+  if(!Array.isArray(places)||!Array.isArray(pages)||pages.length>10_000||(pages.length&&typeof stat.completeStaticEtag!=='string'))throw Error('invalid boot catalogue');
   for(const page of pages){const r=await call(relative(page.url),{});if(r.status!==200)throw Error('complete boot destination page unavailable');if(r.data.catalogueEtag!==stat.completeStaticEtag)throw Error('boot catalogue changed while paging');places=[...places,...(r.data.places??[])];}
   const ids=new Set();for(const p of places){if(typeof p.id!=='string'||typeof p.name!=='string'||ids.has(p.id))throw Error('duplicate/invalid boot place');ids.add(p.id);}
   const fullRef=data.fullMap??stat.fullMap;let known=places;if(fullRef?.url){const r=await call(relative(fullRef.url));if(r.status!==200||!Array.isArray(r.data.places))throw Error('full public knowledge catalogue unavailable');known=r.data.places;}cache.references=[...(data.worldId??stat.worldId?[{id:data.worldId??stat.worldId,kind:'world',name:data.worldId??stat.worldId,source:'boot-world'}]:[]),...known.map(p=>({id:p.id,kind:'place',name:p.name,source:'boot-public-catalogue:'+String(fullRef?.etag??data.staticEtag??'edge1')}))];
-  cache.hierarchy=placeHierarchy(known);cache.places=copy(places);cache.etag=data.staticEtag??null;cache.rules=copy(stat.rules??{});cache.verbs=copy(stat.verbs??[]);save();onBoot(copy(cache));
+  // 1.9.8: a hierarchy the client cannot use only turns off ancestor arrivals (a warning); it never stops the mind
+  try{cache.hierarchy=placeHierarchy(known);}catch(error){cache.hierarchy={};console.error('eden-agent: place arrivals off for this catalogue ('+error.message+', '+(Array.isArray(known)?known.length:'?')+' places); the mind goes on.');}
+  cache.places=copy(places);cache.etag=data.staticEtag??null;cache.rules=copy(stat.rules??{});cache.verbs=copy(stat.verbs??[]);save();onBoot(copy(cache));
  }
  async function boot(){
   const r=await call('/v1/edge/boot');
@@ -28,7 +30,8 @@ export function openClientPerception(directory,{call,scope,onBoot=()=>{},onHere=
   const r=await call('/v1/edge/here'+(cache.modern?'?include=doHere':''));if(r.status!==200)return {fallback:true};const frame=r.data.here??r.data,place=frame.me?.place??null;
   if(cache.modern){cache.caps=[...(frame.doHere??[]).map(c=>typeof c==='string'?{id:c,verb:c.split(':')[0],label:c}:c),...(frame.exits??[]).map(e=>({id:e.walk,verb:'walk',label:e.name}))];}
   else if(place!==cache.lastPlace||cache.caps===null){const c=await call('/v1/edge/capabilities');if(c.status===200)cache.caps=c.data.capabilities??[];}
-  for(const id of currentPlaceAncestors(place,cache.hierarchy))if((id===place||cache.places.some(p=>p.id===id&&p.walkable&&p.kind!=='world'&&p.kind!=='sleeping-mat'))&&!cache.visited.includes(id))cache.visited.push(id);
+  let chain=[];try{chain=currentPlaceAncestors(place,cache.hierarchy);}catch{chain=typeof place==='string'?[place]:[];}
+  for(const id of chain)if((id===place||cache.places.some(p=>p.id===id&&p.walkable&&p.kind!=='world'&&p.kind!=='sleeping-mat'))&&!cache.visited.includes(id))cache.visited.push(id);
   if(place&&place!==cache.lastPlace){onHere(copy(frame),{arrival:true,previous:cache.lastPlace});}
   else onHere(copy(frame),{arrival:false,previous:cache.lastPlace});
   cache.lastPlace=place;save();const clock=copy(cache.clock);if(clock&&Number.isFinite(clock.absoluteWorldMinutes)&&Number.isFinite(cache.sampleTick)&&Number.isFinite(frame.tick)&&clock.ticksPerWorldMinute>0)clock.absoluteWorldMinutes+=(frame.tick-cache.sampleTick)/clock.ticksPerWorldMinute;return {frame,capabilities:copy(cache.caps??[]),clock};

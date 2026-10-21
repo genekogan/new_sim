@@ -18,7 +18,7 @@ export function resolveSoulReferences(values,{worldId,rosters,constraints}={}){
  const byId=new Map();
  for(const source of rosters){
   if(!plain(source)||source.worldId!==worldId)return refuse('soul.scope-mismatch','Roster belongs to another or unknown world; nothing was chosen.',requested);
-  if(!['perceived','public-directory','conversation-participants'].includes(source.kind)||!Array.isArray(source.rows)||source.rows.length>512)return refuse('soul.roster-invalid','Only bounded perceived, entitled conversation-participant or public-directory Soul rows are accepted.',requested);
+  if(!['perceived','public-directory','conversation-participants'].includes(source.kind)||!Array.isArray(source.rows)||source.rows.length>100_000)return refuse('soul.roster-invalid','Only bounded perceived, entitled conversation-participant or public-directory Soul rows are accepted.',requested);
   for(const row of source.rows){
    if(!plain(row)||row.worldId!==undefined&&row.worldId!==worldId)return refuse('soul.scope-mismatch','Row belongs to another or unknown world; nothing was chosen.',requested);
    const id=row.soulId??row.id;if(!ID.test(id??'')||row.soulId!==undefined&&row.id!==undefined&&row.soulId!==row.id||!validName(row.name))return refuse('soul.roster-invalid','Public roster must give canonical Soul IDs with exact full names; entity IDs are not converted.',requested);
