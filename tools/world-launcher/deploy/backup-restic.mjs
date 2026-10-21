@@ -9,7 +9,8 @@
 // SQLite's online backup API in ONE step (consistent while the worlds write; the copy keeps the live file's page layout, so pages
 // that did not change are byte-identical night to night and deduplicate: measured 13 MB/night against 24-29 MB for VACUUM INTO
 // copies, whose page renumbering defeats dedup), each copy gets PRAGMA quick_check, plus worlds.json, audit.jsonl and the
-// uploaded assets (worlds/assets, content-addressed, copied only when new) and the fork inputs (forks/descriptors, forks/artifacts). The copies sit in a staging mirror of the data dir
+// uploaded assets (worlds/assets, content-addressed, copied only when new) and the fork inputs (forks/descriptors, forks/artifacts), and the stage's non-secret host settings (host-config/: its
+// /etc/sim-worlds/<stage>.conf, memory drop-in, the Caddy site + blobs snippet). The copies sit in a staging mirror of the data dir
 // (<staging>/<stage>/...), restic snapshots that mirror (tag <stage>), then forget+prune keeps SIM_BACKUP_KEEP (default 7 daily,
 // 4 weekly, 6 monthly = at most 17 snapshots) and check reads a seventh of the data (all of it once a week).
 // Off-box copy: set SIM_BACKUP_OFFSITE (e.g. an R2 bucket, s3:https://<account>.r2.cloudflarestorage.com/<bucket>) and its
@@ -29,6 +30,7 @@
 //   SIM_BACKUP_OFFSITE     (unset = local only)                  RESTIC_BIN            restic
 //   SIM_BACKUP_DATED_ROOT  /srv/sim-worlds-backups (backup.mjs fallback until restic is set up)
 //   SIM_BACKUP_TIME        (tests only: the snapshot's time, "YYYY-MM-DD HH:MM:SS")
+//   SIM_BACKUP_HOST_FILES  (tests only: colon-separated host settings to carry instead of the default allowlist)
 import { backup as sqliteBackup, DatabaseSync } from 'node:sqlite';
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync, utimesSync } from 'node:fs';
@@ -63,6 +65,12 @@ const quickCheck = (file) => {
   const db = new DatabaseSync(file, { readOnly: true });
   try { return String(Object.values(db.prepare('PRAGMA quick_check').get())[0]); } finally { db.close(); }
 };
+
+/** The host settings each stage's snapshot carries under host-config/ (exact paths; SIM_BACKUP_HOST_FILES=a:b:c replaces them, tests). */
+const HOST_DIR = 'host-config';
+const hostConfigFiles = (stage) => env.SIM_BACKUP_HOST_FILES !== undefined ? env.SIM_BACKUP_HOST_FILES.split(':').filter(Boolean) : [
+  `/etc/sim-worlds/${stage}.conf`, `/etc/systemd/system/sim-worlds@${stage}.service.d/10-memory.conf`,
+  '/etc/caddy/sites/sim.caddy', '/etc/caddy/sim-blobs.snippet'];
 
 /** Mirror src into dst, copying only files whose size or mtime differ, deleting what src no longer has. Returns files copied. */
 function mirror(src, dst) {
@@ -143,8 +151,17 @@ async function runBackup(stage) {
   const trees = [join('forks', 'descriptors'), join('forks', 'artifacts')].filter((t) => existsSync(join(data, t)));
   let forkFiles = 0;
   for (const t of trees) forkFiles += mirror(join(data, t), join(out, t));
+  // the host settings a rebuild needs that no release carries (lane DR, 2026-10-21; deploy/DR.md): an exact allowlist of
+  // non-secret files, copied to <mirror>/host-config/<path without the leading />. Never production-auth.env, restic.pass
+  // or backup.env (secrets are re-provisioned by name), never the stale 20-catalog.conf drop-in. Unreadable ones are skipped.
+  const hostOut = join(out, HOST_DIR), hostFiles = hostConfigFiles(stage);
+  rmSync(hostOut, { recursive: true, force: true });
+  let hostCopied = 0;
+  for (const f of hostFiles) {
+    try { const d = join(hostOut, f.replace(/^\/+/, '')); mkdirSync(dirname(d), { recursive: true }); copyFileSync(f, d); hostCopied++; } catch { /* absent or unreadable */ }
+  }
   // 3. drop what the stage no longer has (a deleted world stays in older snapshots, not in the mirror)
-  const keep = new Set([...dbs, ...files]), mirrored = new Set([join('worlds', 'assets'), ...trees]);
+  const keep = new Set([...dbs, ...files]), mirrored = new Set([join('worlds', 'assets'), ...trees, HOST_DIR]);
   const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? (mirrored.has(relative(out, join(d, e.name))) ? [] : walk(join(d, e.name))) : [join(d, e.name)]);
   for (const f of walk(out)) {
     const rel = relative(out, f);
@@ -183,7 +200,7 @@ async function runBackup(stage) {
 
   const growth = before != null && after != null ? `, repo ${mb(after)} MB (${after >= before ? '+' : ''}${mb(after - before)} MB)` : '';
   console.log(`backup ${stage}: snapshot ${summary.snapshot_id.slice(0, 8)}, ${ok}/${dbs.length} databases ok (quick_check), ${files.length} files, ` +
-    `${assets} new assets, ${forkFiles} new fork files, ${mb(summary.total_bytes_processed ?? 0)} MB staged${growth}; ${kept} snapshots kept${KEEP[0] === 'off' ? ' (retention off)' : ''}${offsite}`);
+    `${assets} new assets, ${forkFiles} new fork files, ${hostCopied}/${hostFiles.length} host settings, ${mb(summary.total_bytes_processed ?? 0)} MB staged${growth}; ${kept} snapshots kept${KEEP[0] === 'off' ? ' (retention off)' : ''}${offsite}`);
   for (const f of failed) console.error(`FAILED ${f}`);
   if (failed.length) process.exitCode = 1;
 }
@@ -206,6 +223,7 @@ function runRestore(stage, when, dir) {
   const dbs = readdirSync(dir, { recursive: true }).filter((f) => /\.(db|sqlite)$/.test(f)).sort();
   let bad = 0;
   for (const f of dbs) { const r = quickCheck(join(dir, f)); if (r !== 'ok') bad++; console.log(`${r === 'ok' ? 'ok  ' : 'BAD '} ${f}${r === 'ok' ? '' : ` ${r.slice(0, 200)}`}`); }
+  if (existsSync(join(dir, HOST_DIR))) console.log(`host settings in ${join(dir, HOST_DIR)} (compare, then move out of the data dir before booting; deploy/DR.md)`);
   console.log(`restore ${stage} ${pick.short_id} (${new Date(pick.time).toISOString()}) -> ${dir}: ${dbs.length - bad}/${dbs.length} databases ok` +
     `; boot one world: ENABLE_WORLD_ENGINE=1 SOUL_LIFECYCLE=1 node tools/god-skill/dev-world.mjs <slug> <port> --data ${join(dir, 'worlds', '<slug>')}`);
   if (bad || !dbs.length) process.exitCode = 1;
