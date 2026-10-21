@@ -303,7 +303,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     // ~9,000 objects each frame: CSS2DRenderer.render was ~20% of an Eden 2026 frame. Tags are placed in world coordinates.
     const labelScene = new THREE.Scene();
     // zIndex 1 contains CSS2DRenderer's per-label depth z-indices, so speech bubbles (z 3) read above name tags.
-    Object.assign(labels2d.domElement.style, { position: 'absolute', top: '0', left: '0', pointerEvents: 'none', zIndex: '1' });
+    Object.assign(labels2d.domElement.style, { position: 'absolute', top: '0', left: '0', pointerEvents: 'none', zIndex: '1' });labels2d.domElement.classList.add('world-labels');  // QA2 F13: hidden while the arrival card shows (world-chrome.css)
     host.appendChild(labels2d.domElement);forwardWheel(labels2d.domElement,renderer.domElement);  // C1: the wheel zooms over a name tag too
 
     const scene = (adopted?.scene as THREE.Scene|undefined) ?? new THREE.Scene();
@@ -357,6 +357,10 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         camera.lookAt(controls.target);arrivalPending={eye:camera.position.toArray(),target:controls.target.toArray()};return;}  // R4-LIVE: broadcast if Souls live here (decided once the welcome lists them), as on /w/eden
       camera.lookAt(controls.target);context.current.cameraMode='manual';context.current.setCameraMode('manual');};  // lane W1: at once, not at React's next render: the socket's takes now arrive during the build, and a broadcast frame in between moved a ?shot's eye/at camera
     let arrivalPending:{eye:[number,number,number];target:[number,number,number]}|null=null,arrivalWelcome:number|null=null;
+    // QA2 F10: the arrival framing of a world with no Souls takes the camera off Broadcast by itself; until the visitor moves
+    // it (or picks a mode) that is not "your camera", so the chip offers no "Back to broadcast". The pose is read one frame
+    // after the framing (controls settle it) and any later move beyond a few cm counts as the visitor's.
+    let autoFrame:{eye:THREE.Vector3;target:THREE.Vector3}|null|'pending'=null;
     // ?shot=1: a clean picture for `god look` (canvas over every overlay, camera from eye/at, title 'ready' once drawn).
     const shotHour=parseShotHour(location.search);
     if(shotMode){const c=renderer.domElement;Object.assign(c.style,{position:'fixed',inset:'0',width:'100vw',height:'100vh',zIndex:'2147483000'});document.title='loading';}
@@ -904,7 +908,10 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         }
       }
       if(viewing==='follow' && at.take && !focus&&initialGate?.snapshot().stage==='ready'){navigation?.release();context.current.setCameraMode('manual');followed=null;}
-      if(arrivalPending&&s.conn.welcome&&(s.conn.replica.souls.size||(arrivalWelcome??=now)<now-4000)){const framed=arrivalPending;arrivalPending=null;if(!s.conn.replica.souls.size&&context.current.cameraMode==='broadcast'){controls.target.fromArray(framed.target);camera.position.fromArray(framed.eye);camera.lookAt(controls.target);context.current.cameraMode='manual';context.current.setCameraMode('manual');}}
+      if(arrivalPending&&s.conn.welcome&&(s.conn.replica.souls.size||(arrivalWelcome??=now)<now-4000)){const framed=arrivalPending;arrivalPending=null;if(!s.conn.replica.souls.size&&context.current.cameraMode==='broadcast'){controls.target.fromArray(framed.target);camera.position.fromArray(framed.eye);camera.lookAt(controls.target);context.current.cameraMode='manual';context.current.setCameraMode('manual');autoFrame='pending';}}
+      if(autoFrame&&context.current.cameraMode!=='manual')autoFrame=null;
+      else if(autoFrame==='pending')autoFrame={eye:camera.position.clone(),target:controls.target.clone()};
+      else if(autoFrame&&(autoFrame.eye.distanceToSquared(camera.position)>0.0025||autoFrame.target.distanceToSquared(controls.target)>0.0025))autoFrame=null;
       // lane W1: a new world's arrival card covers the view until its first complete frame: no full frames before that,
       // nor the per-frame work only a drawn frame needs (motion, atmosphere, labels): each costs the page 50-150 ms while
       // the socket's join set and the preparation wait for the main thread (also before the first take has opened the
@@ -1033,7 +1040,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         else speechVisibility.reset();
         emitState(viewerPresentation({room:context.current.edenExpansion?exploreRoom(camera.position.toArray(),EDEN_VIEWER_PLACES,s.conn.replica.souls,at.entities):null,assetDownloads:downloads.snapshot(),soulIds:[...groupSelection],
           drawnTick: drawnTick.current, history: !!past.current, playing: past.current?.playing ?? false,
-          cameraMode: viewing, manualNavigation: context.current.manualNavigation, inputOwned: navigation?.inputOwned ?? false, soulId, entityId: soulId ? s.conn.replica.souls.get(soulId)?.entityId ?? null : thingId,
+          cameraMode: viewing, cameraAuto: !!autoFrame&&viewing==='manual', manualNavigation: context.current.manualNavigation, inputOwned: navigation?.inputOwned ?? false, soulId, entityId: soulId ? s.conn.replica.souls.get(soulId)?.entityId ?? null : thingId,
           loading: initialGate?.snapshot().stage!=='ready'||context.current.loading || (!at.take && renderer.domElement.dataset.sceneBinding!=='unavailable'),
           unavailableReason: context.current.graphicsUnavailable ?? sceneReason ?? (!area ? 'The world view is covered by controls or has no visible area.' : brokenTake ? 'A recorded moment could not be drawn.' : frameGap ? 'No recording covers that moment; displaying the nearest recorded frame.' : !at.take ? 'Waiting for a recorded world frame.' : connectionLost(s.conn) && !past.current ? 'Reconnecting; displaying the last recorded frame.' : null),
           speechAnchors,

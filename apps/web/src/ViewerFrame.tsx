@@ -158,7 +158,8 @@ export function ViewerFrame({ handle, state, dt, navigationOpen, onNavigationCha
         </>}
       </div>
     </div>;
-  const cameraBlock = !arriving && state?.presentation !== 'history' ? <div className="viewer-camera-chip" data-camera={kind} data-follow-soul={kind === 'follow' ? state?.selection.soulId ?? '' : undefined}>
+  // QA2 F10: no "Back to broadcast" for a camera the visitor never touched (the world framed itself on arrival)
+  const cameraBlock = !arriving && state?.presentation !== 'history' && !(kind === 'yours' && state?.cameraAuto) ? <div className="viewer-camera-chip" data-camera={kind} data-follow-soul={kind === 'follow' ? state?.selection.soulId ?? '' : undefined}>
         {kind === 'follow'
           ? <span className="viewer-following"><span className="viewer-following-label" title={followName ?? 'a Soul'}>Following <b>{followName ?? 'a Soul'}</b></span><button type="button" aria-label="Stop following" title="Stop following" onClick={yourCamera}><span aria-hidden="true">×</span></button></span>
           : <button type="button" className="viewer-broadcast" aria-pressed={kind === 'broadcast'} title={kind === 'broadcast' ? 'Broadcast is directing the camera. Turn off to take it yourself.' : 'Let Broadcast direct the camera again'}
