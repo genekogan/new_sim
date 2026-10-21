@@ -130,7 +130,9 @@ test('built-in contents are what the type\'s furnish recipe lays out (theatre, o
   };
   const t = contents('theatre');
   for (const id of [...t.w.children.get(t.b.id) ?? []]) t.w.delete(id);
-  const f = furnishBatch(t.w, t.b.id);
+  // contents are laid out at build time with no world pose (the exact clearance rule, which holds at any yaw and offset),
+  // so compare with furnish on the same terms: the placed theatre's own pose would use the axis-aligned walk raster instead
+  const f = furnishBatch(Object.create(t.w, { worldPose: { value: undefined } }), t.b.id);
   assert.deepEqual(t.kids.sort(), f.ops.filter((o: any) => o.op === 'place').map((o: any) => o.name).sort(), JSON.stringify(f.dropped));
   const gone = { 'office-block': ['meeting-2-chair-n-2', 'meeting-2-chair-s-1', 'meeting-3-chair-s-2'], hospital: ['ward-1-bed-4', 'ward-2-bed-4', 'ward-3-bed-4'] };
   for (const [type, names] of Object.entries(gone)) { const k = contents(type).kids; for (const n of names) assert.ok(!k.includes(n), `${type}: ${n}`); }
