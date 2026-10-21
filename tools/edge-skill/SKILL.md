@@ -96,7 +96,8 @@ When `listen` prints messages (one or a burst), in this order:
 the moment your human writes, with their messages (`ownerMessages` in its output, and `OWNER MESSAGE` lines on stderr:
 never send stderr to /dev/null). Ack them at once and act on them now; a new request replaces the running action as
 soon as you act it (do not finish the old walk first): ack first, then a plain `act` replaces the walk (unacked, the CLI
-refuses it with `local.in-progress`). The same message can reach you twice (from `wait` and from
+refuses it with `local.in-progress`). Run one `wait 60` per command and read it; never loop it in a shell `for`
+(the loop hides your human's message until it ends). The same message can reach you twice (from `wait` and from
 your background `listen`): ack each id once and ignore ids you already acked.
 
 A question is answered in the ack reply (then `result <id> done "…"`). Ack every message, even one you could not do,
