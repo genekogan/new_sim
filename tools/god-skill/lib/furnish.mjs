@@ -24,7 +24,9 @@ const RECIPES = resolve(here, '../recipes/furnish');
 const FRONT_YAW = { s: 0, e: Math.PI / 2, n: Math.PI, w: -Math.PI / 2 };
 const FACE_YAW = { s: 0, e: Math.PI / 2, n: Math.PI, w: -Math.PI / 2 };
 const r3 = (v) => Math.round(v * 1000) / 1000;
-// a seat's or bed's standing spot (lane FUZZ2) is where the use-check stands a body: the walk-raster cell it is in must be free
+// a seat's or bed's standing spot (lane FUZZ2) is where the use-check stands a body: on the walk raster where the building
+// stands, the cell it is in must be free; laid out in the def frame (no world pose: library contents), a free cell of the
+// exact-clearance grid within the conservative raster's slop of it (the spot has a body's room, PLAN_R, beside it)
 const SPOT_R = 0.071;
 const sits = (b) => (b.slots ?? []).some((x) => x.kind === 'seat' || x.kind === 'bed' || x.kind === 'berth');
 const itemBoxes = (baked, p, y, yaw) => {
@@ -39,7 +41,7 @@ const itemBoxes = (baked, p, y, yaw) => {
 // next pose or is dropped. The rule (how much room a body needs past a wall or a piece, as the walk raster sees it) is the
 // shared one in packages/generators/src/clearance.ts (lane BS1): 0.43 m from a wall piece, 0.50 m from a piece of furniture.
 export { roomKeys, approachOf, approachKeys, wayLabels, connectedPairs } from '../../../packages/generators/src/clearance.ts';
-import { roomKeys, approachKeys, wayGrid, pairsOf, seatSlides, SEAT_FAR } from '../../../packages/generators/src/clearance.ts';
+import { roomKeys, approachKeys, wayGrid, pairsOf, seatSlides, SEAT_FAR, RASTER_SLOP } from '../../../packages/generators/src/clearance.ts';
 
 /** The furnish styles (recipe files), sorted. */
 export const furnishStyles = () => readdirSync(RECIPES).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)).sort();
@@ -178,10 +180,12 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
             w.n = standing.length; w.keys = [...keysOf(room), ...standing.flatMap((t) => t.approach)]; w.was = w.grid.labels(w.keys, w.at = { cells: [] });
           }
           const own = approachKeys(ib, pose, r3(fyaw + th)), seats = [...slides, ...held.flatMap((h) => h.slides)];
-          const spots = seats.flat().map((q) => ({ pts: [q], r: SPOT_R }));
+          const spotR = way.pose ? SPOT_R : SPOT_R + RASTER_SLOP.conservative, spots = seats.flat().map((q) => ({ pts: [q], r: spotR }));
           const { keys, was } = w, now = w.grid.plus(bx).labels([...keys, ...own, ...spots], { cells: w.at.cells });
           const doorLabel = new Set(keysOf(room).map((_, i) => now[i]));
-          const doorsReach = now.slice(keys.length, keys.length + own.length).every((l) => doorLabel.has(l));
+          // a seat or a bed is reached at its standing spots (below), where the use-check stands a body; any other piece at
+          // its approach (the free spot nearest it)
+          const doorsReach = sits(ib) || now.slice(keys.length, keys.length + own.length).every((l) => doorLabel.has(l));
           if (pairsOf(now, keys.length) < pairsOf(was) || !doorsReach) { why = doorsReach ? 'would cut the way to its doors or another piece' : 'no way to it from the doors'; continue; }
           const owner = [...slides.map(() => null), ...held.flatMap((h) => h.slides.map(() => h.t.name))];
           let k = keys.length + own.length;

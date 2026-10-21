@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { CORE_KIT, WorldModel, applyBatch, obbOverlap, type Refused } from './index.ts';
 import { furnishBatch, roomKeys, connectedPairs, wayLabels, approachOf } from '../../../tools/god-skill/lib/furnish.mjs';
+import { seatSlides } from '../../generators/src/clearance.ts';
 
 function fresh() {
   const w = new WorldModel({ constants: { ground: 'land' }, seed: 'furnishing' });
@@ -71,14 +72,18 @@ function furnishedShop(recipe?: any) {
     const pieces = [...w.children.get(b.id)!].map((id) => w.entities.get(id)!).filter((e: any) => e.in.slot === room.id).map((e: any) => {
       const d = w.resolvedDef(e.def)!, bb = w.bake(d, e.params ?? {}, e.seed ?? 0) as any, p = e.p ?? [0, 0, 0];
       const c = [room.origin[0] + p[0], room.origin[1] + p[p.length - 1]], yaw = typeof e.r === 'number' ? e.r : 0;
-      return { name: e.name, c, half: [bb.box[0] / 2, bb.box[2] / 2], yaw, y0: room.y, y1: room.y + bb.box[1], solid: d.layer === 'solid' && bb.box[1] > 0.06, approach: approachOf(bb, c, yaw) };
+      return { name: e.name, c, half: [bb.box[0] / 2, bb.box[2] / 2], yaw, y0: room.y, y1: room.y + bb.box[1], solid: d.layer === 'solid' && bb.box[1] > 0.06, approach: approachOf(bb, c, yaw), bb };
     }).filter((x) => x.solid);
     const all = (keys.length * (keys.length - 1)) / 2;
     assert.equal(connectedPairs(room, keys, walls, way), all, `${room.id}: walls alone`);
     assert.equal(connectedPairs(room, keys, [...walls, ...pieces], way), all, `${room.id}: furnished, ${keys.length} doors/stair ends`);
     // ... and where a Soul sent to each piece stands is reached from the doors (the display may not stand at a shelf's front)
-    const labels = wayLabels(room, [...keys, ...pieces.map((x) => x.approach)], [...walls, ...pieces], way);
-    for (const [i, x] of pieces.entries()) assert.ok(labels[keys.length + i] === labels[0], `${room.id}: ${x.name} is reached from the door`);
+    // (a seat at one of the spots the use-check stands a body to get on it, lane FUZZ2: a stool facing the counter is got on
+    // from its back)
+    const spots = pieces.map((x) => seatSlides(x.bb, x.c, x.yaw, room.y, [...baked.colliders, ...pieces.filter((o) => o !== x)]));
+    const flat = spots.flatMap((sp, i) => sp.length ? sp.flat().map((q) => ({ i, key: { pts: [q], r: 0.071 } })) : [{ i, key: pieces[i].approach }]);
+    const labels = wayLabels(room, [...keys, ...flat.map((x) => x.key)], [...walls, ...pieces], way);
+    for (const [i, x] of pieces.entries()) assert.ok(flat.some((f, k) => f.i === i && labels[keys.length + k] === labels[0]), `${room.id}: ${x.name} is reached from the door`);
   }
   return f;
 }

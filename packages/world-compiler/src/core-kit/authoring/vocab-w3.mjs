@@ -319,7 +319,10 @@ function layOut(name, def, params, recipe) {
   const bakeItem = (d, values = {}) => {
     const g = d.make?.kind === 'gen' && GENERATORS[d.make.gen];
     const defaults = Object.fromEntries(Object.entries({ ...g?.params, ...d.params }).filter(([, f]) => f.default !== undefined).map(([k, f]) => [k, f.default]));
-    return g ? g.physics({ params: { ...defaults, ...values }, args: d.make.args ?? {}, seed: 0 }) : { box: d.size.box };
+    // as WorldModel.bake: the def's own slots win over the generator's (lane FUZZ2: without them furnish saw no seat or bed
+    // on a kit/2 chair or bed and laid out pieces nobody could sit on or lie in)
+    const b = g ? g.physics({ params: { ...defaults, ...values }, args: d.make.args ?? {}, seed: 0 }) : { box: d.size.box };
+    return d.slots?.length ? { ...b, slots: d.slots } : b;
   };
   const model = { get: (id) => (id === 'B' ? ent : undefined), resolvedDef: (r) => (r === ref ? def : KIT.get(r)), bake: (d, values) => (d === def ? baked : bakeItem(d, values)),
     children: new Map(), entities: new Map(), pathOf: () => name };
