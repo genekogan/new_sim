@@ -43,9 +43,12 @@ async function watch(slugs, during) {
   const out = await during(); stop = true; await Promise.all(loops);
   return { out, bad, slowest: Math.max(0, ...slow) };
 }
+// B's code load. A world's pause (old process stops, new one opens: ~0.2 s idle, ~1.1 s seen with six gates sharing
+// a host) must stay under it, so it is long enough that contention cannot close the gap.
+const LOAD_MS = 2500;
 let keeper, A, B;
 before(async () => {
-  A = release('a'); B = release('b', { loadMs: 800 });
+  A = release('a'); B = release('b', { loadMs: LOAD_MS });
   point(A);
   keeper = spawn(process.execPath, [join(A, 'tools/world-launcher/keeper.mjs'), '--link', link, '--port', String(PORT), '--range', RANGE, '--data', data, '--base', '/worlds', '--eager', '0'], { stdio: ['ignore', 'pipe', 'pipe'] });
   let logs = ''; keeper.stdout.on('data', (d) => { logs += d; }); keeper.stderr.on('data', (d) => { logs += d; }); keeper.logs = () => logs;
@@ -65,9 +68,12 @@ test('reload hands every world to the new release with no refused connection and
   const { out: h, bad, slowest } = await watch(['one', 'two'], () => handover(B));
   assert.equal(h.state, 'done', JSON.stringify(h)); assert.equal(h.from, 'we-a'); assert.equal(h.to, 'we-b');
   assert.deepEqual(Object.keys(h.worlds).sort(), ['one', 'two']); assert.ok(Object.values(h.worlds).every((w) => w.ok));
-  // canary first, then the rest; every new process was pre-warmed, so a world's pause is shorter than B's 800 ms code load
+  // canary first, then the rest; every new process was pre-warmed, so a world's pause is shorter than B's code load
   assert.equal(Object.values(h.worlds).filter((w) => w.canary).length, 1, JSON.stringify(h.worlds));
-  for (const [s, w] of Object.entries(h.worlds)) { assert.equal(w.warm?.ok, true, `${s} pre-warmed`); assert.ok(w.warm.ms >= 700, `${s} loaded its code in standby (${w.warm.ms} ms)`); assert.ok(w.ms < 700, `${s} paused ${w.ms} ms, under the code load`); }
+  for (const [s, w] of Object.entries(h.worlds)) { assert.equal(w.warm?.ok, true, `${s} pre-warmed`); assert.ok(w.warm.ms >= LOAD_MS - 100, `${s} loaded its code in standby (${w.warm.ms} ms)`);
+    // the load ended before the pause began (an ordering, not a bar: pre-warm + pause fit inside the take-over, 1 ms rounding each)
+    assert.ok(w.warm.ms + w.ms <= w.totalMs + 3, `${s}: code load ${w.warm.ms} ms + pause ${w.ms} ms exceed the take-over ${w.totalMs} ms`);
+    assert.ok(w.ms < LOAD_MS - 100, `${s} paused ${w.ms} ms, under the code load`); }
   assert.deepEqual(bad, [], 'a visitor saw an error');
   assert.ok(slowest < 5000, `a request waited ${slowest} ms`);
   assert.equal((await (await api('/__sim/healthz')).json()).build, 'we-b');
