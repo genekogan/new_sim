@@ -64,30 +64,63 @@ export function approachOf(baked, at, yaw) {
   if (seats.length) return { pts: seats.map((x) => w([x.p[0] + Math.sin(x.yaw) * 0.75, x.p[2] + Math.cos(x.yaw) * 0.75])), r: 1.5 };
   return { pts: [at], r: Math.hypot(baked.box[0], baked.box[2]) / 2 + 1.5 };
 }
-/** The group each key falls in (a body BODY_R round walking inside `room` past `blockers`); a key with no room is in none. */
-export function wayLabels(room, keys, blockers) {
+/** The walk grid of `room` past `blockers`: 0.1 m cells, free where a body BODY_R round fits inside the room. */
+export function wayGrid(room, blockers) {
   const xs = room.polygon.map((p) => p[0]), zs = room.polygon.map((p) => p[1]);
   const x0 = Math.min(...xs), z0 = Math.min(...zs), nx = Math.ceil((Math.max(...xs) - x0) / CELL), nz = Math.ceil((Math.max(...zs) - z0) / CELL);
-  const near = blockers.filter((b) => b.c[0] + Math.hypot(...b.half) + BODY_R > x0 && b.c[0] - Math.hypot(...b.half) - BODY_R < x0 + nx * CELL && b.c[1] + Math.hypot(...b.half) + BODY_R > z0 && b.c[1] - Math.hypot(...b.half) - BODY_R < z0 + nz * CELL);
-  const free = new Uint8Array(nx * nz), lab = new Int32Array(nx * nz).fill(-1);
-  for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) { const x = x0 + (i + 0.5) * CELL, z = z0 + (j + 0.5) * CELL; free[i * nz + j] = inPoly(room.polygon, x, z) && !near.some((b) => inBox(b, x, z, BODY_R)) ? 1 : 0; }
-  const cellOf = (key) => {   // the free cell nearest the key
+  const free = new Uint8Array(nx * nz);
+  // inPoly per cell, a row at a time: the same edge crossings, worked out once per z
+  const poly = room.polygon;
+  for (let j = 0; j < nz; j++) {
+    const z = z0 + (j + 0.5) * CELL, cross = [];
+    for (let a = 0, b = poly.length - 1; a < poly.length; b = a++) { const [xi, zi] = poly[a], [xj, zj] = poly[b]; if ((zi > z) !== (zj > z)) cross.push(((xj - xi) * (z - zi)) / (zj - zi) + xi); }
+    for (let i = 0; i < nx; i++) { const x = x0 + (i + 0.5) * CELL; let k = 0; for (const c of cross) if (x < c) k ^= 1; free[i * nz + j] = k; }
+  }
+  const grid = { x0, z0, nx, nz, free };
+  for (const b of blockers) block(grid, b);
+  return grid;
+}
+// Clear the cells `b` covers (only those round it are tested); a blocker clear of the grid's box is skipped.
+function block(grid, b) {
+  const { x0, z0, nx, nz, free } = grid, h = Math.hypot(...b.half) + BODY_R;
+  if (!(b.c[0] + h > x0 && b.c[0] - h < x0 + nx * CELL && b.c[1] + h > z0 && b.c[1] - h < z0 + nz * CELL)) return;
+  const R = Math.hypot(b.half[0] + BODY_R, b.half[1] + BODY_R) + CELL;   // the expanded box's corner
+  for (let i = Math.max(0, Math.floor((b.c[0] - R - x0) / CELL)); i <= Math.min(nx - 1, Math.ceil((b.c[0] + R - x0) / CELL)); i++)
+    for (let j = Math.max(0, Math.floor((b.c[1] - R - z0) / CELL)); j <= Math.min(nz - 1, Math.ceil((b.c[1] + R - z0) / CELL)); j++)
+      if (free[i * nz + j] && inBox(b, x0 + (i + 0.5) * CELL, z0 + (j + 0.5) * CELL, BODY_R)) free[i * nz + j] = 0;
+}
+/** `grid` with more blockers (a copy). */
+export function gridWith(grid, ...bs) { const g = { ...grid, free: grid.free.slice() }; for (const b of bs) block(g, b); return g; }
+/** The group each key falls in on a walk grid; a key with no room is in none. */
+// `cells[i]`, when given, is key i's cell on a grid this one only shrinks (gridWith): still the nearest while still free,
+// and a key that had no cell there has none here.
+export function gridLabels(grid, keys, cells = []) {
+  const { x0, z0, nx, nz, free } = grid, lab = new Int32Array(nx * nz).fill(-1);
+  const cellOf = (key, i) => {   // the free cell nearest the key
+    const hint = cells[i]; if (hint === -1 || (hint >= 0 && free[hint])) return hint;
     const { pts, r } = Array.isArray(key) ? { pts: [key], r: 0.3 } : key;
     let best = -1, bd = Infinity;
     for (const [x, z] of pts)
       for (let i = Math.max(0, Math.floor((x - x0 - r) / CELL)); i <= Math.min(nx - 1, Math.floor((x - x0 + r) / CELL)); i++)
         for (let j = Math.max(0, Math.floor((z - z0 - r) / CELL)); j <= Math.min(nz - 1, Math.floor((z - z0 + r) / CELL)); j++) {
-          const d = Math.hypot(x0 + (i + 0.5) * CELL - x, z0 + (j + 0.5) * CELL - z); if (free[i * nz + j] && d <= r && d < bd) { bd = d; best = i * nz + j; }
+          if (!free[i * nz + j]) continue;
+          const d = Math.hypot(x0 + (i + 0.5) * CELL - x, z0 + (j + 0.5) * CELL - z); if (d <= r && d < bd) { bd = d; best = i * nz + j; }
         }
     return best;
   };
-  let next = 0; const labels = keys.map((k) => {
-    const c0 = cellOf(k); if (c0 < 0) return -1 - next++;   // a key with no room to stand: in no group
-    if (lab[c0] < 0) { const L = next++, st = [c0]; lab[c0] = L; while (st.length) { const c = st.pop(), i = Math.floor(c / nz), j = c % nz; for (const [a, b] of [[i + 1, j], [i - 1, j], [i, j + 1], [i, j - 1]]) { if (a < 0 || b < 0 || a >= nx || b >= nz) continue; const q = a * nz + b; if (free[q] && lab[q] < 0) { lab[q] = L; st.push(q); } } } }
+  let next = 0, st = null; const labels = keys.map((k, ki) => {
+    const c0 = cellOf(k, ki); cells[ki] ??= c0; if (c0 < 0) return -1 - next++;   // a key with no room to stand: in no group
+    if (lab[c0] < 0) {   // flood the 4-neighbour component (each cell is pushed once, so the stack never outgrows the grid)
+      const L = next++; st ??= new Int32Array(nx * nz); let top = 0; st[top++] = c0; lab[c0] = L;
+      const go = (q) => { if (free[q] && lab[q] < 0) { lab[q] = L; st[top++] = q; } };
+      while (top) { const c = st[--top], i = (c / nz) | 0, j = c - i * nz; if (i + 1 < nx) go(c + nz); if (i > 0) go(c - nz); if (j + 1 < nz) go(c + 1); if (j > 0) go(c - 1); }
+    }
     return lab[c0];
   });
   return labels;
 }
+/** The group each key falls in (a body BODY_R round walking inside `room` past `blockers`); a key with no room is in none. */
+export function wayLabels(room, keys, blockers) { return gridLabels(wayGrid(room, blockers), keys); }
 const pairsOf = (labels, n = labels.length) => { let k = 0; for (let a = 0; a < n; a++) for (let b = a + 1; b < n; b++) if (labels[a] === labels[b]) k++; return k; };
 /** How many pairs of `keys` a body can walk between inside `room` past `blockers` (OBBs, room frame = def frame). */
 export function connectedPairs(room, keys, blockers) { return keys.length < 2 ? 0 : pairsOf(wayLabels(room, keys, blockers)); }
@@ -133,7 +166,7 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
   // the ends of each flight: the walk planner steps on and off 0.7 m beyond them (sideways where a flight starts against a
   // wall), so keep 0.9 m round each end clear
   const ends = (baked.links ?? []).flatMap((l) => [{ p: l.path[0], level: l.from }, { p: l.path[l.path.length - 1], level: l.to }]);
-  const keyCache = new Map(), keysOf = (room) => keyCache.get(room.id) ?? keyCache.set(room.id, roomKeys(room, doors, baked.links ?? [])).get(room.id);
+  const wayCache = new Map(), keyCache = new Map(), keysOf = (room) => keyCache.get(room.id) ?? keyCache.set(room.id, roomKeys(room, doors, baked.links ?? [])).get(room.id);
   const defOf = (alts) => (Array.isArray(alts) ? alts : [alts]).map((ref) => [ref, model.resolvedDef(ref)]).find(([, d]) => d);
   const want = opts.rooms ? new Set(opts.rooms) : null;
   // pieces already in the building's rooms are obstacles too
@@ -195,12 +228,18 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
         if (solid && keysOf(room).length) {
           // the doors, stair ends and standing pieces' approaches keep every way they had, and this piece's own approach
           // is reached from a door
-          const walls = baked.colliders.filter((o) => o.y0 < room.y + 1.6 && o.y1 > room.y + 0.15);
+          // the grid of the walls and standing pieces and its labels are the same for every pose tried until a piece is placed
           const standing = taken.filter((t) => t.floor === room.floor && t.solid);
-          const keys = [...keysOf(room), ...standing.map((t) => t.approach)], blockers = [...walls, ...standing.map((t) => t.foot)];   // footprints, as the walk grid sees them
-          const was = wayLabels(room, keys, blockers), now = wayLabels(room, [...keys, approachOf(ib, pose, r3(fyaw + th))], [...blockers, bx]);
+          let w = wayCache.get(room.id);
+          if (!w || w.n !== standing.length) {
+            // footprints, as the walk grid sees them; the pieces placed since the last grid are added to it
+            const grid = w ? gridWith(w.grid, ...standing.slice(w.n).map((t) => t.foot)) : wayGrid(room, [...baked.colliders.filter((o) => o.y0 < room.y + 1.6 && o.y1 > room.y + 0.15), ...standing.map((t) => t.foot)]);
+            const keys = [...keysOf(room), ...standing.map((t) => t.approach)];
+            const cells = []; w = { n: standing.length, keys, grid, cells, wasPairs: pairsOf(gridLabels(grid, keys, cells)) }; wayCache.set(room.id, w);
+          }
+          const keys = w.keys, now = gridLabels(gridWith(w.grid, bx), [...keys, approachOf(ib, pose, r3(fyaw + th))], w.cells.slice());
           const own = now[now.length - 1], doorsReach = keysOf(room).some((_, i) => now[i] === own);
-          if (pairsOf(now, keys.length) < pairsOf(was) || !doorsReach) { why = doorsReach ? 'would cut the way to its doors or another piece' : 'no way to it from the doors'; continue; }
+          if (pairsOf(now, keys.length) < w.wasPairs || !doorsReach) { why = doorsReach ? 'would cut the way to its doors or another piece' : 'no way to it from the doors'; continue; }
         }
         box = bx; boxes = candidate; at = p; yaw = fyaw + th; break;
       }
