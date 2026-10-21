@@ -34,6 +34,9 @@ import { HUMAN_PROFILE, type Link, type Surface } from './types.ts';
 export const NAV_CONNECT_POLICY = 'nav-connect/1';
 /** The planner's passable test for the default body (path.ts prepare: radius + PLAN_MARGIN). */
 export const CONNECT_CLEAR = HUMAN_PROFILE.radius + PLAN_MARGIN;
+/** A body cut off in a separate area at most this big (m², level 0) is stepped to the main area; a larger one (an island, a
+ *  walled quarter) is a place it can live in and walk about, so it stays (the god hears of it). */
+export const NAV_RESCUE_MAX_POCKET = 2500;
 /** Clearance a rescue spot keeps (m): room to stand and turn, not a cell squeezed between two walls. */
 export const RESCUE_CLEAR = CONNECT_CLEAR + 0.16;
 /** Upper surfaces closer than this (m) are one building (rasterised together). */

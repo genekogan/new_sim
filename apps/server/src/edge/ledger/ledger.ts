@@ -357,6 +357,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     }
   }
   private unstuckAt = new Map<string, number>();
+  private navRescuedAt = new Map<string, number>();
   /** nav/1: an idle body standing inside a solid (e.g. it was mid-walk through a house when the footprints were admitted)
    *  steps out to the nearest clear spot, as a logged edge-relocate (deterministic in replay). At most once a minute each. */
   private unstick(tick: number) {
@@ -842,6 +843,18 @@ export class EdgeLedger implements EdgeLedgerHooks {
       const to = b && engine.nearestStandableV1 ? engine.nearestStandableV1([b.pose.p[0], b.pose.p[2]], soul.entityId, 0.33, 8) : null;
       if (to && b && Math.hypot(to[0] - b.pose.p[0], to[1] - b.pose.p[2]) <= 4) {
         await this.host.enqueue('edge-relocate', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, to, why: 'stepped clear to start'});
+        issue = this.host.engine.canPerform({actor: soul.entityId, label, steps});
+      }
+    }
+    // nav-connect/1 (lane NAV): no walk from where it stands, because it stands cut off from the walkable world (an edit
+    // closed a pocket round it, a floor lost its stairs): it steps to the nearest open ground of the main area first (a
+    // logged edge-relocate, at most once a minute each), then starts. A destination no walk reaches still refuses.
+    if (issue?.code === 'route.unreachable' && (this.navRescuedAt.get(soul.soulId) ?? -1e9) <= this.host.engine.world.tick - 1200) {
+      const engine = this.host.engine as unknown as {navRescueV1?: (id: string, budgetMs?: number) => {to: [number, number]; code: string; level: number} | null};
+      const r = engine.navRescueV1 ? engine.navRescueV1(soul.entityId, 100) : null;
+      if (r) {
+        this.navRescuedAt.set(soul.soulId, this.host.engine.world.tick);
+        await this.host.enqueue('edge-relocate', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, to: r.to, why: `nav-connect/1: stood cut off (${r.code}${r.level ? `, floor ${r.level}` : ''}), no walk out: stepped to the nearest open ground`, policy: 'nav-connect/1'});
         issue = this.host.engine.canPerform({actor: soul.entityId, label, steps});
       }
     }

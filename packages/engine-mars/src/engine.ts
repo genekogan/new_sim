@@ -71,7 +71,7 @@ import { listTable, stableIndices, withEntityList, type EntityTable } from '../.
 import { CATALOG, HUMAN_RADIUS } from '../../../mars/viewer/engine/world/catalog.ts';
 import { HUMAN_PROFILE as HUMAN_PROFILE_V1 } from '../../../mars/viewer/engine/spatial/types.ts';
 import type { Spatial } from '../../../mars/viewer/engine/spatial/service.ts';
-import { NavConnectivity, NAV_CONNECT_POLICY, CONNECT_CLEAR, type ConnPoint, type ConnVerdict } from '../../../mars/viewer/engine/spatial/connectivity.ts';
+import { NavConnectivity, NAV_CONNECT_POLICY, NAV_RESCUE_MAX_POCKET, CONNECT_CLEAR, type ConnPoint, type ConnVerdict } from '../../../mars/viewer/engine/spatial/connectivity.ts';
 // L1: Object.values(entities)'s list, ~2.7x cheaper on a big world's dictionary-mode object (fresh array each call)
 import { listEntities } from '../../../mars/viewer/engine/world/entity-list.ts';
 import type {NativeBoatControlsV1} from '@sim/engine-contract';
@@ -1849,6 +1849,18 @@ export class MarsEngine implements Engine {
   navNearestMainV1(p:[number,number],except?:string,maxR=40):[number,number]|null{
     const c=this.connectivityV1(),people=listEntities(this.ents).filter((o:any)=>o.kind==='human'&&o.id!==except&&(o.human?.level??0)===0).map((o:any)=>[o.pose.p[0],o.pose.p[2]] as [number,number]);
     return c.nearestMain(p,maxR,undefined,(q)=>people.some(([x,z])=>hypot(x-q[0],z-q[1])<.8));
+  }
+  /** lane NAV (nav-connect/1): where a body cut off from the main walkable area should step to — the nearest open spot
+   *  of the main area — or null when it is connected, busy (held, seated aboard, asleep, riding), stands in a separate
+   *  area larger than `maxPocket` m² (an island or a walled quarter is a place to live, not a trap), or the labels are
+   *  not ready within `budgetMs` (a later call finishes them). Pure read; the caller logs the move (edge-relocate). */
+  navRescueV1(id:string,budgetMs=50,maxPocket=NAV_RESCUE_MAX_POCKET):{to:[number,number];code:string;pocket?:number;level:number}|null{
+    const e=this.ents[id],h=e?.human;if(!h||this.byActor.has(id)||h.sleepPose||h.on||h.riding||h.carrier)return null;
+    if(!this.navWarmV1(budgetMs))return null;
+    const p:[number,number]=[e.pose.p[0],e.pose.p[2]],level=h.level??0,v=this.conn!.check([{id,p,level,tol:.6}])[0];
+    if(!v||v.ok)return null;
+    if(level===0&&v.code!=='nav.no-standing-room'&&(v.pocket??0)>maxPocket)return null;
+    const to=this.navNearestMainV1(p,id);return to?{to,code:v.code??'nav.disconnected',...(v.pocket!==undefined?{pocket:v.pocket}:{}),level}:null;
   }
   /** lane NAV: what the engine itself offers as destinations — every seat and berth's standing approach, and a standing
    *  spot inside each place region (the one nearest its centre that is on the main area, else its centre) — for the audit. */
