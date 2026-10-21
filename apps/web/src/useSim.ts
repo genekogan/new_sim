@@ -98,7 +98,7 @@ export function useSim(getToken: () => Promise<string | null>, authed: boolean,i
       ...({ onEdge: (m: EdgeMsg) => { st.edge = [...st.edge, m].slice(-300); } } as { onEdge(m: EdgeMsg): void }),
     }, (u) => watchSocket(new WebSocket(u)) as never,undefined,undefined,stationCapabilities,true);
     // lane W1: the socket index.html opened at page entry (snapshot-prefetch.ts), with what it has received so far
-    const boot = takeBootSocket(st.conn.url); if (boot) st.conn.adopt(boot as never);
+    const boot = takeBootSocket(st.conn.url); if (boot) { watchSocket(boot.ws as unknown as WebSocket); st.conn.adopt(boot as never); }
   }
   useEffect(() => {
     const st = s.current; st.conn!.connect();
