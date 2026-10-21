@@ -9,6 +9,8 @@ import { GodMode } from './god.ts';
 import { installEngineBridge } from './engine-bridge.ts';
 import { GroundHost } from './ground-host.ts';
 import { runQuery } from './query.ts';
+import structures from '../../../../packages/world-compiler/src/core-kit/structures.json' with { type: 'json' };
+import vocabW3 from '../../../../packages/world-compiler/src/core-kit/vocab-w3.json' with { type: 'json' };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -47,6 +49,7 @@ test('bench-hamlet: the cottage on the knoll is enterable from the arrival point
       out.push(`${room}:${goal ? (r2.ok ? 'ok' : r2.code) : 'no-goal'}`);
     }
     console.log(out.join(' '));
+    assert.deepEqual(out.slice(2).filter((x) => !x.endsWith(':ok')), [], out.join(' '));
     w.act([{ op: 'remove', id: 'cottage' }]);
     await w.settle(2);
   }
@@ -90,28 +93,43 @@ test('bench-hamlet: an old pad/1 cottage pad is re-cut at boot and the cottage b
   }
 });
 
-/** Every building/1 type in the catalogue, at yaws 0–360° in 7.5° steps, on flat ground and on the flank of a knoll. */
+/** Every building/1 type in the catalogue (structures.json + vocab-w3.json: 40 types). */
+const BUILDING_TYPES = [...structures, ...vocabW3].filter((d: any) => d?.make?.gen === 'building/1').map((d: any) => coreRef(String(d.name).replace(/^core-/, '')));
+const YAWS = Array.from({ length: 48 }, (_, i) => i * 7.5);
+/**
+ * Door sweep: each building placed on flat ground and on two slopes of a knoll (h 12, r 60: ~0.24 at 40 m, ~0.34 at 25 m
+ * out), and a Soul 5 m outside reaches the building's goal inside through its front door. The gate runs a fixed subset
+ * (every type once per terrain, at a yaw that differs by type and terrain: 120 placements); the full sweep (40 types x 48
+ * yaws x 3 terrains = 5,760, ~20 min) is `RT_SWEEP=full node --test --test-name-pattern="door sweep" src/god/door-reach.test.ts`
+ * (RT_TYPES=a,b / RT_STEP / RT_DISTS narrow it; RT_ROOMS=1 also lists unreachable rooms, reported but not asserted).
+ */
 test('door sweep: every catalogue building is enterable through its front door at any yaw and slope', { timeout: 3_600_000 }, async (t) => {
   const w = world(t); await w.settle(2);
   const KNOLL: Vec2 = [0, 0];
   w.act([{ op: 'place', def: coreRef('knoll'), name: 'hill', p: KNOLL, params: { height: 12, radius: 60, peak: 1, edge: 8 } }]);
   await w.settle(2);
-  const defs: string[] = (process.env.RT_TYPES ?? '').split(',').filter(Boolean);
-  const steps = Number(process.env.RT_STEP ?? 7.5);
+  const full = process.env.RT_SWEEP === 'full' || !!process.env.RT_TYPES;
+  const defs: string[] = process.env.RT_TYPES ? process.env.RT_TYPES.split(',').map((x) => x.includes('@') ? x : coreRef(x)) : BUILDING_TYPES;
+  assert.equal(BUILDING_TYPES.length, 40, 'the catalogue has 40 building/1 types');
+  const yaws = process.env.RT_STEP ? Array.from({ length: Math.ceil(360 / Number(process.env.RT_STEP)) }, (_, i) => i * Number(process.env.RT_STEP)) : YAWS;
   const dists = (process.env.RT_DISTS ?? '200,40,25').split(',').map(Number);
-  const fails: string[] = [], roomFails: string[] = []; let n = 0;
-  for (const def of defs) for (const dist of dists) for (let deg = 0; deg < 360; deg += steps) {
+  const cases: [string, number, number][] = [];
+  defs.forEach((def, i) => dists.forEach((dist, j) => { if (full) for (const deg of yaws) cases.push([def, dist, deg]); else cases.push([def, dist, YAWS[(i * 7 + j * 17 + 3) % YAWS.length]]); }));
+  const fails: string[] = [], refused: string[] = [], roomFails: string[] = []; let n = 0;
+  const table = new Map<string, { n: number; fail: number; refused: number }>();
+  const row = (dist: number) => { const k = dist >= 100 ? 'flat' : `knoll d${dist}`; if (!table.has(k)) table.set(k, { n: 0, fail: 0, refused: 0 }); return table.get(k)!; };
+  for (const [def, dist, deg] of cases) {
     const at: Vec2 = [KNOLL[0] + dist, KNOLL[1]];
     const slope = w.god.model.terrain.slope(at[0], at[1]);
     const r: any = w.god.act({ ops: [{ op: 'place', def, name: 'b', p: at, r: deg * Math.PI / 180 }] });
-    if (!r.accepted) { fails.push(`${def} d${dist} ${deg}: refused ${r.failures?.[0]?.code ?? JSON.stringify(r).slice(0, 120)}`); continue; }
+    if (!r.accepted) { refused.push(`${def} d${dist} ${deg}: refused ${r.failures?.[0]?.code ?? JSON.stringify(r).slice(0, 120)}`); row(dist).refused++; continue; }
     await w.settle(3);
     const e = w.god.model.get('b')!, box = w.god.model.bake(w.god.model.resolvedDef(e.def)!, e.params ?? {}, e.seed ?? 0, e.shape).box;
     const start: Vec2 = [at[0] + Math.hypot(box[0], box[2]) / 2 + 5, at[1]];
     const th = w.bridge.nav.thing('b'), goal = th ? w.bridge.nav.goal(th, start) : null;
     const reach = goal ? w.E.reachV1({ p: start, level: 0 }, goal) : null;
-    n++;
-    if (!reach?.ok) fails.push(`${def} d${dist} s${slope.toFixed(2)} ${deg}: ${goal ? reach.code : 'no-goal'}`);
+    n++; row(dist).n++;
+    if (!reach?.ok) { fails.push(`${def} d${dist} s${slope.toFixed(2)} ${deg}: ${goal ? reach.code : 'no-goal'}`); row(dist).fail++; }
     else if (process.env.RT_ROOMS) {
       const rooms = (w.god.model.bake(w.god.model.resolvedDef(e.def)!, e.params ?? {}, e.seed ?? 0, e.shape) as any).rooms ?? [];
       const bad: string[] = [];
@@ -121,8 +139,10 @@ test('door sweep: every catalogue building is enterable through its front door a
     w.act([{ op: 'remove', id: 'b' }]);
     await w.settle(1);
   }
-  console.log(`sweep: ${n} placements, ${fails.length} failures`);
-  for (const f of fails) console.log('  ' + f);
-  console.log(`rooms: ${roomFails.length} placements with an unreachable room`);
-  for (const f of roomFails) console.log('  ' + f);
+  console.log(`door sweep (${full ? 'full' : 'gate subset'}): ${n} placements, ${fails.length} front-door failures, ${refused.length} refused placements`);
+  for (const [k, v] of table) console.log(`  ${k}: ${v.n} placed, ${v.fail} failed, ${v.refused} refused`);
+  for (const f of [...fails, ...refused]) console.log('  ' + f);
+  if (process.env.RT_ROOMS) { console.log(`rooms: ${roomFails.length} placements with an unreachable room`); for (const f of roomFails) console.log('  ' + f); }
+  assert.deepEqual(fails, [], 'every placed building is enterable through its front door');
+  assert.ok(n >= cases.length * 0.9, `most placements are accepted (${n}/${cases.length})`);
 });
