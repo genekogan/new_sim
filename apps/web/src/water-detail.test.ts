@@ -5,7 +5,7 @@ import {createConnectedNativeShore} from '../../../mars/viewer/app/engine-view/c
 import {waterMaterial,waterMesh} from './gen-mesh/water.ts';
 import {fallingWaterMaterial} from './fx/water.ts';
 import {installAtmosphereChunks,MIST} from './atmosphere/chunks.ts';
-import {WorldWaterDetail,WATER_DETAIL,SWIMMERS,findWaterRegions,patchUnderwaterBody,patchWaterSurface,waterUnder,markHeight} from './WorldWaterDetail.ts';
+import {WorldWaterDetail,WATER_DETAIL,SWIMMERS,PHONE_SOURCES,underwaterAmount,findWaterRegions,patchUnderwaterBody,patchWaterSurface,waterUnder,markHeight} from './WorldWaterDetail.ts';
 
 const row=[-3.5,-3.5,-3.5,-3.5,-3.5,-3.5,-3.5,-3.5,-3.5,-3.5,-3.5,-3.5,-3.2,-2.9,-2.6,-2.3,-2,-1.87,-1.74,-1.6099999999999999,-1.48,-1.35,-1.22,-1.0899999999999999,-0.96,-0.8300000000000001,-0.7,-0.5700000000000001,-0.43999999999999995,-0.31000000000000005,-0.17999999999999994,-0.050000000000000044,0,0,0];
 const shore=()=>createConnectedNativeShore({id:'commons-shore-terrain/1',diagonal:'min-min/max-max',originXZ:[-62,-12],spacingMetres:1,columns:35,rows:25,heightMetres:Array.from({length:25},()=>[...row])},{id:'commons-shore-water/1',datumY:-2,wetBoundsXZ:[-62,-12,-46,12]});
@@ -23,7 +23,7 @@ void test('old Eden shore water: one flat region at the exact datum, ripples and
  assert.match(s.fragmentShader,/vec3 waterSwim\(vec3 w\)/);assert.match(s.fragmentShader,/slope\+=edenSw\.xy;vec3 normal=/);assert.match(s.fragmentShader,/waterGlitter\(vWorld,normal,eye,uSwimTime\)/);
  assert.match(s.fragmentShader,/colour\*=mix/);assert.equal(s.uniforms.uSwim,WATER_DETAIL.uSwim);
  assert.deepEqual([...mesh.geometry.getAttribute('position').array],[...before]);assert.equal(mesh.material.uniforms.uBaseAlpha.value>0,true);
- assert.match(mesh.material.customProgramCacheKey(),/w11-surface-v1/);o.dispose();
+ assert.match(mesh.material.customProgramCacheKey(),/w11-surface-v2/);o.dispose();
 });
 
 void test('new-engine water material: ripples perturb the lit normal after its own waves, glitter before tone mapping',()=>{
@@ -70,7 +70,7 @@ void test('swimmers: only recorded contact makes ripples; fixed slots; same disp
  // a wider, higher lake whose box covers the pond (as an Eden expansion lake's does): must not tint pond bodies
  const lake=new THREE.RingGeometry(25,60,32);lake.rotateX(-Math.PI/2);lake.translate(-54,0,0);const lakeMesh=new THREE.Mesh(lake,new THREE.MeshStandardMaterial({transparent:true}));lakeMesh.name='lake surface';scene.add(lakeMesh);
  scene.updateMatrixWorld(true);
- const camera=new THREE.PerspectiveCamera();camera.position.set(-40,4,0);
+ const camera=new THREE.PerspectiveCamera();camera.position.set(-40,4,0);camera.lookAt(-52,-2,0); // update() culls offscreen sources
  const body=()=>{const g=new THREE.Group();g.add(new THREE.Mesh(new THREE.BoxGeometry(),new THREE.MeshStandardMaterial()));return g;};
  const souls=[
   {id:'tread',root:body(),p:[-55,-2.4,0] as const,activity:'tread'},
@@ -93,6 +93,47 @@ void test('swimmers: only recorded contact makes ripples; fixed slots; same disp
  assert.equal(w.stats.swimmers,SWIMMERS);assert.ok(WATER_DETAIL.uWaterTint.value.b<new THREE.Color('#1d5674').b);
  // nobody in the water: every slot empty
  w.update(scene,camera,[souls[1]],103,1,4);assert.equal(w.stats.swimmers,0);assert.ok(meta.every(v=>v.z===0));
+ o.dispose();
+});
+
+void test('ripple cost cap: boats afloat ripple too; phone keeps 3 sources and no shimmer; offscreen sources are culled',()=>{
+ const o=shore();const scene=new THREE.Scene();scene.add(o.group);scene.updateMatrixWorld(true);
+ const camera=new THREE.PerspectiveCamera();camera.position.set(-40,4,0);camera.lookAt(-52,-2,0);
+ const boat=(x:number,z:number)=>{const g=new THREE.Group();g.position.set(x,-2,z);g.userData.boat={size:3};scene.add(g);return g;};
+ const b1=boat(-56,4);scene.updateMatrixWorld(true);const afloat=new Set([b1]);
+ const souls=Array.from({length:2},(_,i)=>({id:'s'+i,root:null,p:[-55+i,-2.5,-2] as const,activity:'swim'}));
+ const w=new WorldWaterDetail();w.boats=afloat;w.update(scene,camera,souls,10,1,0);
+ assert.equal(w.stats.swimmers,2);assert.equal(w.stats.boats,1);assert.equal(w.stats.culled,0);assert.equal(WATER_DETAIL.uSwimN.value,3);
+ assert.equal(WATER_DETAIL.uWaterShimmer.value,1);assert.equal(WATER_DETAIL.uSwimMeta.value[2].z,.35,'a boat at rest only bobs');
+ // looking away from the water: every source is culled, the loop runs no slot
+ const away=new THREE.PerspectiveCamera();away.position.set(-40,4,0);away.lookAt(-20,4,0);w.update(scene,away,souls,10.5,1,.5);
+ assert.equal(w.stats.culled,3);assert.equal(w.stats.swimmers+w.stats.boats,0);assert.equal(WATER_DETAIL.uSwimN.value,0);
+ b1.position.x+=1;b1.updateMatrixWorld();w.update(scene,camera,souls,11,1,1);assert.equal(WATER_DETAIL.uSwimMeta.value[2].z,.8,'under way: stronger rings and a wake');
+ // a crowd fills the desktop slots before any boat
+ const crowd=Array.from({length:20},(_,i)=>({id:'c'+i,root:null,p:[-60+i*.5,-2.5,0] as const,activity:'swim'}));
+ w.update(scene,camera,crowd,12,1,2);assert.equal(w.stats.swimmers,SWIMMERS);assert.equal(w.stats.boats,0);assert.equal(WATER_DETAIL.uSwimN.value,SWIMMERS);
+ // phone tier: at most PHONE_SOURCES sources, Souls and boats together, and no shimmer/sheen/glitter
+ const p=new WorldWaterDetail(()=>false,()=>true);p.boats=afloat;p.update(scene,camera,crowd,13,1,0);
+ assert.equal(PHONE_SOURCES,3);assert.equal(WATER_DETAIL.uSwimN.value,3);assert.equal(p.stats.swimmers+p.stats.boats,3);
+ assert.ok(WATER_DETAIL.uSwimMeta.value.slice(3).every(v=>v.z===0));assert.equal(WATER_DETAIL.uWaterShimmer.value,0);
+ p.update(scene,camera,souls.slice(0,1),14,1,1);assert.equal(p.stats.swimmers,1);assert.equal(p.stats.boats,1);assert.equal(WATER_DETAIL.uSwimN.value,2);
+ o.dispose();
+});
+
+void test('underwater fade: none above the surface, smooth ramp to full at UNDER_FULL metres, camera depth from the drawn water',()=>{
+ assert.equal(underwaterAmount(0),0);assert.equal(underwaterAmount(-1),0);assert.equal(underwaterAmount(NaN),0);
+ assert.ok(underwaterAmount(.3)>0&&underwaterAmount(.3)<underwaterAmount(1));assert.equal(underwaterAmount(2.2),1);assert.equal(underwaterAmount(9),1);
+ const o=shore();const scene=new THREE.Scene();scene.add(o.group);scene.fog=new THREE.FogExp2(0xaabbcc,.01);scene.background=new THREE.Color(0x88aaff);scene.updateMatrixWorld(true);
+ const camera=new THREE.PerspectiveCamera();camera.position.set(-55,-1,0);camera.lookAt(-50,-1,0);
+ const w=new WorldWaterDetail();w.update(scene,camera,[],10,1,0);
+ assert.equal(w.applyUnderwater(scene,camera),0);w.restoreUnderwater();assert.equal(scene.fog.density,.01);
+ camera.position.y=-5;camera.updateMatrixWorld();assert.equal(w.cameraDepth(camera),3);
+ assert.equal(w.applyUnderwater(scene,camera),1);assert.ok(scene.fog.density>.1);assert.notEqual(scene.background.getHex(),0x88aaff);
+ // the atmosphere resets the density per camera inside the render (scene.onBeforeRender): the hook thickens it again
+ scene.fog.density=.01;scene.onBeforeRender(null as never,scene,camera,null as never,null as never,null as never);assert.ok(scene.fog.density>.1);
+ w.restoreUnderwater();assert.equal(scene.fog.density,.01);assert.equal(scene.fog.color.getHex(),0xaabbcc);
+ scene.onBeforeRender(null as never,scene,camera,null as never,null as never,null as never);assert.equal(scene.fog.density,.01,'above water again: untouched');
+ const before=scene.onBeforeRender;w.dispose();assert.notEqual(scene.onBeforeRender,before);assert.equal(scene.background.getHex(),0x88aaff);
  o.dispose();
 });
 

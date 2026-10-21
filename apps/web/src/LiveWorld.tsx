@@ -81,7 +81,7 @@ import { WorldWaterDetail, markHeight } from './WorldWaterDetail.ts';
 import { findSeats, surveySeats } from './WorldSeatSurvey.ts';
 import { visitorPreviewHour } from './visitor-hour.ts';
 import { GodWorldLiving, calendarClock, entityWorldState, godRoomViews, godTourViews, parseShotHour, shotClockAt, whenShotClock } from './world-env.ts';
-import { setFleeSources } from './gen-mesh/motion.ts';
+import { setFleeSources, AFLOAT } from './gen-mesh/motion.ts';
 import { WorldLightning } from './WorldLightning.ts';
 import { worldArrivalPose } from './arrival-shot.ts';
 import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { worldResolution } from './adaptive-resolution.ts';import { browserQuality } from './quality-tier.ts';import { WorldDistanceDetail } from './WorldDistanceDetail.ts';import { WorldMeshLod, PHONE_MESH_LOD, DESKTOP_MESH_LOD, workerSimplifier, type Simplifier } from './WorldMeshLod.ts';import { WorldFarStandIns, PHONE_STAND_INS, rendererSnapshotter } from './WorldFarStandIns.ts';import { compileSceneAsync, setTextureRenderer } from './gen-mesh/texture-budget.ts';
@@ -338,8 +338,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         overhead:(name:string)=>{const a=soulAt(name);return a?renderOverhead(renderer,scene,[a.p[0],a.p[1],a.p[2]]):null;}};}
     const portraits=new WorldSoulAvatars(renderer);
     const seatSurvey=new URLSearchParams(location.search).get('survey')==='seats'?{done:false,since:null as number|null}:null;
-    const waterDetail=new WorldWaterDetail(()=>!!reducedMotionQuery?.matches),waterDetailOff=new URLSearchParams(location.search).get('water')==='0';  // ?water=0: before/after comparisons
-    (window as unknown as {__simWater?:unknown}).__simWater=waterDetail.stats;    const idleLife=new WorldIdleLife();const idleSouls:IdleSoul[]=[];let attentionTargets=new Map<string,readonly string[]>();
+    const waterDetail=new WorldWaterDetail(()=>!!reducedMotionQuery?.matches,()=>quality.tier==='phone'),waterDetailOff=new URLSearchParams(location.search).get('water')==='0';  // ?water=0: before/after comparisons
+    waterDetail.boats=AFLOAT;(window as unknown as {__simWater?:unknown}).__simWater=waterDetail.stats;    const idleLife=new WorldIdleLife();const idleSouls:IdleSoul[]=[];let attentionTargets=new Map<string,readonly string[]>();
     const edgeItems=new WorldEdgeItems(apiPath('/v1/edge/items'));scene.add(edgeItems.group);edgeItems.start(abort.signal);  // things lying around (together/1)
     const early=newWorld?takeEarlyLayer():null;if(early)abort.signal.addEventListener('abort',()=>early.abort.abort());const entityLayer=early?.layer??new WorldEntityLayer(apiPath);entityLayerRef.current=entityLayer;  // P7b: a phone's layer may have started before this page's code was in (early-layer.ts)
     scene.add(entityLayer.group);let entityWorldFramed=false,rideNames:string[]|null=null,rideCarriers:CarrierPose[]=[];
@@ -986,8 +986,10 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(look.enabled&&entityLayer.active&&!expansion){if(look.follow)light.follow(controls.target,camera.position);renderer.toneMappingExposure=lookExposure(light.daylight,look.nightExposure);}
       if(adaptive&&entityLayer.active&&!eyes)adaptive.frame(now);const draw=()=>{diagnostics.beginRender(renderer);if(!eyes)entityLayer.cull(camera,renderer.domElement.clientHeight,renderer.shadowMap.autoUpdate||renderer.shadowMap.needsUpdate);if(distanceDetail&&!eyes)distanceDetail.apply(scene,camera,renderer.domElement.clientHeight);if(meshLod&&!eyes)meshLod.apply(scene,camera,renderer.domElement.clientHeight);if(farStandIns&&!eyes)farStandIns.apply(scene,camera,renderer.domElement.clientHeight);try{if(!eyes?.render()){if(post&&entityLayer.active)post.render(renderer,scene,camera);else renderer.render(scene,camera);}}finally{farStandIns?.restore();meshLod?.restore();distanceDetail?.restore();entityLayer.uncull();diagnostics.endRender();}};
       if(quality.shadowEvery>1&&!eyes){renderer.shadowMap.autoUpdate=false;if(shadowFrame++%quality.shadowEvery===0)renderer.shadowMap.needsUpdate=true;}  // P1 phones: the shadow map every n-th frame
+      if(!waterDetailOff&&!holdDraw)try{waterDetail.applyUnderwater(scene,camera,renderer.domElement);}catch{}  // a camera under the water: gradual fog and tint (restored after the draw)
       if(holdDraw){/* nothing to show yet */}else{if(batchEnabled)staticBatches.withRender(draw);else draw();if(afterNextDraw){const f=afterNextDraw;afterNextDraw=null;f();}if(posterFrames<2&&earlyPosterShown()&&mount.current?.style.visibility==='visible'&&!mount.current.parentElement?.querySelector('.world-initial-loading')&&++posterFrames===2)requestAnimationFrame(removeEarlyPoster);/* P7d: the early renderer's poster goes once two frames of ours are on screen under it */if(earlyPending&&mount.current?.style.visibility==='visible'&&!mount.current.parentElement?.querySelector('.world-initial-loading')&&--earlyPending===0)requestAnimationFrame(()=>{if(!abort.signal.aborted)earlyArrival.mark();});}  // P7 fix: two frames drawn with nothing covering the canvas, then the next frame (the second is on screen) lifts the card
       shadowDetail?.restore();
+      waterDetail.restoreUnderwater();
       idleLife.restore();
       fading.restore();
       balloonRide.restore();
@@ -1073,6 +1075,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
 
     return () => {
       eyes?.dispose();
+      waterDetail.dispose();
       games.dispose();
       platformDraw.dispose();
       hover.dispose();
