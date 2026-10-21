@@ -28,7 +28,7 @@ import { GROUND_TILE_M, G_OUTSIDE, G_STEEP, G_WALK, type GroundField } from './g
 import { linkApproach, linkEdgeTest, PLAN_MARGIN, snap as snapCell } from './path.ts';
 import type { Spatial } from './service.ts';
 import { boxesOf } from './tiled.ts';
-import { HUMAN_PROFILE, type Surface } from './types.ts';
+import { HUMAN_PROFILE, type Link, type Surface } from './types.ts';
 
 /** Policy id of the audit's rules (what counts as connected, what a rescue picks): bump when they change. */
 export const NAV_CONNECT_POLICY = 'nav-connect/1';
@@ -142,7 +142,7 @@ export class NavConnectivity {
   version = '';
   /** False while a budgeted update has tiles left to label (check/nearestMain need a complete one). */
   ready = false;
-  stats = { updates: 0, relabelled: 0, reused: 0, uniform: 0, lastMs: 0, lastRelabelled: 0, graphMs: 0, links: 0, edges: 0, clusters: 0, clusterBuilds: 0 };
+  stats = { updates: 0, relabelled: 0, reused: 0, uniform: 0, lastMs: 0, lastRelabelled: 0, graphMs: 0, clusterMs: 0, links: 0, edges: 0, clusters: 0, clusterBuilds: 0 };
 
   constructor(spatial: Spatial, opts: { anchors: () => Vec2[]; clear?: number }) {
     this.spatial = spatial; this.anchors = opts.anchors; this.t = opts.clear ?? CONNECT_CLEAR;
@@ -379,24 +379,26 @@ export class NavConnectivity {
   private graph() {
     const t0 = performance.now(), sp = this.spatial, r = this.t, radius = HUMAN_PROFILE.radius;
     if (sp.ground) this.buildClusters(); else this.clusters = [];
+    this.stats.clusterMs = performance.now() - t0;
     const fwdAdj = new Map<string, string[]>(), bwdAdj = new Map<string, string[]>();
     const at = (level: number, p: Vec2, half: number) => (level === 0 ? this.patch0(p, half) : this.upperAt(level, p, half));
-    let links = 0, edges = 0;
-    for (const link of sp.scene.links) {
-      if (!link.usable || link.width < 2 * r) continue;
-      links++;
-      for (const ascending of [true, false]) {
-        const { entry, approach, exit } = linkApproach(link, ascending), far = linkApproach(link, !ascending).approach;
-        const ge = at(entry.level, approach, Math.hypot(entry.p[0] - approach[0], entry.p[1] - approach[1]) + 0.3), gx = at(exit.level, far, 0.6);
-        if (!ge || !gx) continue;
-        const t = linkEdgeTest(link, ascending, ge.g, gx.g, r, radius);
-        if (!t.ok) continue;
-        const a = ge.node(t.ca), b = gx.node(t.cx);
-        if (!a || !b || a === b) continue;
-        edges++;
-        (fwdAdj.get(a) ?? fwdAdj.set(a, []).get(a)!).push(b);
-        (bwdAdj.get(b) ?? bwdAdj.set(b, []).get(b)!).push(a);
-      }
+    let edges = 0;
+    const tasks: { link: Link; ascending: boolean }[] = [];
+    for (const link of sp.scene.links) if (link.usable && link.width >= 2 * r) tasks.push({ link, ascending: true }, { link, ascending: false });
+    // tile by tile, as check
+    const order = this.byTile(tasks.map((x) => linkApproach(x.link, x.ascending).approach));
+    for (const k of order) {
+      const { link, ascending } = tasks[k];
+      const { entry, approach, exit } = linkApproach(link, ascending), far = linkApproach(link, !ascending).approach;
+      const ge = at(entry.level, approach, Math.hypot(entry.p[0] - approach[0], entry.p[1] - approach[1]) + 0.3), gx = at(exit.level, far, 0.6);
+      if (!ge || !gx) continue;
+      const t = linkEdgeTest(link, ascending, ge.g, gx.g, r, radius);
+      if (!t.ok) continue;
+      const a = ge.node(t.ca), b = gx.node(t.cx);
+      if (!a || !b || a === b) continue;
+      edges++;
+      (fwdAdj.get(a) ?? fwdAdj.set(a, []).get(a)!).push(b);
+      (bwdAdj.get(b) ?? bwdAdj.set(b, []).get(b)!).push(a);
     }
     const reach = (adj: Map<string, string[]>, from: string) => {
       const seen = new Set<string>([from]), q = [from];
@@ -409,7 +411,7 @@ export class NavConnectivity {
       this.fwd = reach(fwdAdj, m); this.bwd = reach(bwdAdj, m);
       for (const n of this.fwd) if (this.bwd.has(n)) this.good.add(n);
     } else { this.fwd = new Set(); this.bwd = new Set(); }
-    this.stats.links = links; this.stats.edges = edges; this.stats.graphMs = performance.now() - t0;
+    this.stats.links = tasks.length / 2; this.stats.edges = edges; this.stats.graphMs = performance.now() - t0;
   }
 
   /**
@@ -438,19 +440,28 @@ export class NavConnectivity {
 
   /** Verdicts for standing points, one per component (`area`): joined to the main area both ways, or not. */
   check(points: ConnPoint[]): ConnVerdict[] {
-    return points.map(({ id, p, level = 0, tol = 0.35 }): ConnVerdict => {
-      let node: string | null = null, pocket: number | undefined, floor: string | undefined;
-      if (level === 0) {
-        const s = this.snap(p, tol);
-        if (s) { node = `0:${s.root}`; pocket = this.areaOf(s.root); }
-      } else {
-        const u = this.upperAt(level, p, tol), c = u ? snapCell(u.g, p, this.t, tol) : -1;
-        if (u && c >= 0) { node = u.node(c); floor = u.floor; }
-      }
-      if (!node) return { id, level, ok: false, code: 'nav.no-standing-room' };
-      if (this.good.has(node)) return { id, level, ok: true, area: node };
-      const code = this.fwd.has(node) || this.bwd.has(node) ? 'nav.one-way' : 'nav.disconnected';
-      return { id, level, ok: false, code, area: node, ...(level === 0 ? { pocket } : { floor }) };
-    });
+    // tile by tile (a tile's full labels are rebuilt when they have left the small LRU), answers in the callers' order
+    const out = new Array<ConnVerdict>(points.length);
+    for (const k of this.byTile(points.map((q) => q.p))) out[k] = this.verdict(points[k]);
+    return out;
+  }
+  /** Indices of points ordered by the 64 m tile they lie in (stable). */
+  private byTile(ps: Vec2[]): number[] {
+    const key = (p: Vec2) => Math.floor(p[0] / GROUND_TILE_M) * 100003 + Math.floor(p[1] / GROUND_TILE_M);
+    return ps.map((_, i) => i).sort((a, b) => key(ps[a]) - key(ps[b]) || a - b);
+  }
+  private verdict({ id, p, level = 0, tol = 0.35 }: ConnPoint): ConnVerdict {
+    let node: string | null = null, pocket: number | undefined, floor: string | undefined;
+    if (level === 0) {
+      const s = this.snap(p, tol);
+      if (s) { node = `0:${s.root}`; pocket = this.areaOf(s.root); }
+    } else {
+      const u = this.upperAt(level, p, tol), c = u ? snapCell(u.g, p, this.t, tol) : -1;
+      if (u && c >= 0) { node = u.node(c); floor = u.floor; }
+    }
+    if (!node) return { id, level, ok: false, code: 'nav.no-standing-room' };
+    if (this.good.has(node)) return { id, level, ok: true, area: node };
+    const code = this.fwd.has(node) || this.bwd.has(node) ? 'nav.one-way' : 'nav.disconnected';
+    return { id, level, ok: false, code, area: node, ...(level === 0 ? { pocket } : { floor }) };
   }
 }
