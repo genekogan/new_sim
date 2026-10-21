@@ -9,16 +9,28 @@
 // worlds, pictures, ?phased=0) load both at once, main first, as before.
 // No imports: vite.config.ts loads this file in node.
 
-/** The window function that starts phase two (idempotent; `(true)`: its downloads and the socket, not yet its entry). */
+/** The window function that starts phase two (idempotent; `(true)`: its downloads, not yet its entry; `('fill')`: its
+ *  downloads, its entry's download and the socket; `()`: everything, the entry run). */
 export const PHASE2_GLOBAL = '__simPhase2';
 /** Phase two starts by itself this long after phase one, whatever happened to the early entry. PF2: was 15 s. */
 export const PHASE2_FALLBACK_MS = 8_000;
-/** PF2 (2026-10-20): the socket opens by itself this long after phase one when the snapshot is late (it opens with phase
- *  two, at the snapshot, when that comes first). Before, a late snapshot held the socket too, so its join started only after
- *  the snapshot; on live the snapshot is in by ~0.3-0.6 s, so this only acts when it is late. */
+/** PF2 (2026-10-20): the socket opens by itself this long after phase one when the snapshot has not answered by then.
+ *  Before, a late snapshot held the socket too, so its join started only after the snapshot; on live the snapshot answers
+ *  in ~0.3-0.6 s, so this only acts when it is late. t4-phone (2026-10-21): when the snapshot has answered, the socket waits
+ *  for the early renderer's fill (below) or phase two's entry: its join (~165 KB on the wire) no longer shares a phone's
+ *  link with the poster's own bytes (it opened here at 2.5 s on every phone page and came in before the poster). */
 export const SOCKET_FALLBACK_MS = 2_500;
+/** t4-phone: `__simPhase2(FILL)`: the poster's bytes are in (the early renderer's nearest models too), so phase two's entry
+ *  is fetched (not run) and the socket opens while the phone links and draws the poster; the entry runs at the next plain
+ *  call, as before. */
+export const PHASE2_FILL = 'fill';
 
 export type Phase = { entry: string; preloads: readonly string[] };
+
+/** Call the page's phase-two function (the loader below defines it; the loader's own fallbacks run it if this fails). */
+export function callPhase2(mode?: true | typeof PHASE2_FILL): void {
+  try { (window as unknown as Record<string, ((mode?: true | string) => void) | undefined>)[PHASE2_GLOBAL]?.(mode); } catch { /* the loader's fallbacks */ }
+}
 
 /** The inline loader that replaces Vite's module script and modulepreload tags. Reads window.__simPhased (snapshot-prefetch.ts
  *  head script) and opens the deferred entry socket (window.__simOpenSocket) with phase two. */
@@ -26,9 +38,11 @@ export function phasedLoaderScript(early: Phase, main: Phase): string {
   return `(function(){var d=document,W=window,E=${JSON.stringify(early)},M=${JSON.stringify(main)},done=false,pre=false,sock=false,`
     + `add=function(u,entry){var l=d.createElement(entry?'script':'link');if(entry){l.type='module';l.src=u;}else{l.rel='modulepreload';l.href=u;}l.crossOrigin='';d.head.appendChild(l);return l;},`
     + `so=function(){if(!sock){sock=true;try{var o=W.__simOpenSocket;if(typeof o==='function')o();}catch(e){}}},`
-    + `two=function(hold){if(!pre){pre=true;M.preloads.forEach(function(u){add(u);});}if(hold!==true&&!done){done=true;add(M.entry,true);}so();};`
+    + `si=false,fe=false,`
+    + `two=function(hold){if(!pre){pre=true;M.preloads.forEach(function(u){add(u);});}if(hold===${JSON.stringify(PHASE2_FILL)}&&!done&&!fe){fe=true;add(M.entry);}if(hold!==true&&hold!==${JSON.stringify(PHASE2_FILL)}&&!done){done=true;add(M.entry,true);}if(hold!==true)so();};`
     + `W[${JSON.stringify(PHASE2_GLOBAL)}]=two;var ph=W.__simPhased===true;if(!ph)two();`
-    + `E.preloads.forEach(function(u){add(u);});add(E.entry,true).onerror=two;if(ph){setTimeout(so,${SOCKET_FALLBACK_MS});setTimeout(two,${PHASE2_FALLBACK_MS});}})();`;
+    + `try{W.__simSnapshotPrefetch.response.then(function(){si=true;},function(){});}catch(e){}`
+    + `E.preloads.forEach(function(u){add(u);});add(E.entry,true).onerror=two;if(ph){setTimeout(function(){if(!si)so();},${SOCKET_FALLBACK_MS});setTimeout(two,${PHASE2_FALLBACK_MS});}})();`;
 }
 
 const MODULE_SCRIPT = /[ \t]*<script type="module" crossorigin src="([^"]+)"><\/script>\n?/g;
