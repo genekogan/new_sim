@@ -1,7 +1,7 @@
 {
-  "source": "5ccd99e477d1005919c712aa0ebfdbcf6a298994",
+  "source": "618c91791c982c57664e2196ea08effede0cbc42",
   "esbuild": "0.28.1",
-  "artifact": "<team>/scratch/t4/msg/cli-5ccd99e4/eden-agent.mjs",
+  "artifact": "<team>/scratch/t4/msg/cli-618c9179/eden-agent.mjs",
   "bytes": 396008,
   "sha256": "4f975bf549b9e3a9b8c693bcd0bf53041165e570a6d8ea95bf580e70b41955d9",
   "inputs": [
