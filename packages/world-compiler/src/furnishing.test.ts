@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { CORE_KIT, WorldModel, applyBatch, obbOverlap, type Refused } from './index.ts';
-import { furnishBatch } from '../../../tools/god-skill/lib/furnish.mjs';
+import { furnishBatch, roomKeys, connectedPairs, wayLabels, approachOf } from '../../../tools/god-skill/lib/furnish.mjs';
 
 function fresh() {
   const w = new WorldModel({ constants: { ground: 'land' }, seed: 'furnishing' });
@@ -51,4 +52,48 @@ test('legacy overlapping pair: unchanged footprint and reduced penetration pass,
   assert.equal(applyBatch(w, { ops: [{ op: 'set', id: 'a', params: { color: '#123456' } }] }, 'god', 1).result.accepted, true);
   assert.equal(applyBatch(w, { ops: [{ op: 'move', id: 'b', p: [0.9, 0, 0] }] }, 'god', 2).result.accepted, true);
   for (const [id, x] of [['b', 0.4], ['c', -0.8]] as const) assert.equal((applyBatch(w, { ops: [{ op: 'move', id, p: [x, 0, 0] }] }, 'god', 3).result as Refused).failures?.[0].code, 'overlap.solid');
+});
+
+function furnishedShop(recipe?: any) {
+  const w = new WorldModel({ constants: { ground: 'land' }, seed: 'furnishing' });
+  for (const d of CORE_KIT) w.defineDef(d, 'core', 0);
+  assert.equal(applyBatch(w, { ops: [{ op: 'place', def: 'core/shop@1', name: 'shop', params: { w: 5.7, d: 8, floors: 3, balcony: true } }] }, 'god', 1).result.accepted, true);
+  const b = w.get('shop')!;
+  for (const id of [...w.children.get(b.id) ?? []]) w.delete(id);
+  const f = furnishBatch(w, b.id, 'shop', recipe ? { recipe } : {});
+  const r = applyBatch(w, { ops: f.ops }, 'god', 2).result;
+  assert.equal(r.accepted, true, JSON.stringify(r));
+  const baked = w.bake(w.resolvedDef(b.def)!, b.params ?? {}, b.seed ?? 0, b.shape) as any;
+  const doors = baked.openings.filter((o: any) => o.kind === 'door' || o.kind === 'arch');
+  for (const room of baked.rooms.filter((x: any) => x.floor === 0)) {
+    const keys = roomKeys(room, doors, baked.links ?? []), walls = baked.colliders.filter((o: any) => o.y0 < room.y + 1.6 && o.y1 > room.y + 0.15);
+    const pieces = [...w.children.get(b.id)!].map((id) => w.entities.get(id)!).filter((e: any) => e.in.slot === room.id).map((e: any) => {
+      const d = w.resolvedDef(e.def)!, bb = w.bake(d, e.params ?? {}, e.seed ?? 0) as any, p = e.p ?? [0, 0, 0];
+      const c = [room.origin[0] + p[0], room.origin[1] + p[p.length - 1]], yaw = typeof e.r === 'number' ? e.r : 0;
+      return { name: e.name, c, half: [bb.box[0] / 2, bb.box[2] / 2], yaw, y0: room.y, y1: room.y + bb.box[1], solid: d.layer === 'solid' && bb.box[1] > 0.06, approach: approachOf(bb, c, yaw) };
+    }).filter((x) => x.solid);
+    const all = (keys.length * (keys.length - 1)) / 2;
+    assert.equal(connectedPairs(room, keys, walls), all, `${room.id}: walls alone`);
+    assert.equal(connectedPairs(room, keys, [...walls, ...pieces]), all, `${room.id}: furnished, ${keys.length} doors/stair ends`);
+    // ... and where a Soul sent to each piece stands is reached from the doors (the display may not stand at a shelf's front)
+    const labels = wayLabels(room, [...keys, ...pieces.map((x) => x.approach)], [...walls, ...pieces]);
+    for (const [i, x] of pieces.entries()) assert.ok(labels[keys.length + i] === labels[0], `${room.id}: ${x.name} is reached from the door`);
+  }
+  return f;
+}
+
+test('a furnished shop keeps the way from its front door to the storeroom door (no piece seals the counter nook)', () => {
+  // SEALED 2026-10-21: the shop recipe put the stool behind the counter and the display 0.62 m off shelf-1, so the storeroom,
+  // the stair foot and both upper floors were one pocket Souls could not reach (9 market-street shops, ~14 dests each)
+  const f = furnishedShop();
+  assert.ok(f.placed.some((p: any) => p.name === 'shop-counter') && f.placed.some((p: any) => p.name === 'shop-display'), JSON.stringify(f.dropped));
+});
+
+test('a piece may not stand where a Soul sent to another piece would stand (the display at shelf-2\'s front)', () => {
+  // SEALED 2026-10-21: moved to the east side (fx 0.78) the display took shelf-2's approach: every shop's shelf-2 went bad
+  const recipe = JSON.parse(readFileSync(new URL('../../../tools/god-skill/recipes/furnish/shop.json', import.meta.url), 'utf8'));
+  recipe.rooms.shop.find((x: any) => x.name === 'display').try = [[0.78, 0.7, 's'], [0.3, 0.7, 's']];
+  const f = furnishedShop(recipe);
+  const d: any = f.ops.find((o: any) => o.name === 'shop-display');
+  assert.ok(d && d.p[0] < 0, `display goes to its next pose, not shelf-2's front: ${JSON.stringify(d?.p)} ${JSON.stringify(f.dropped)}`);
 });
