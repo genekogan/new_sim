@@ -54,6 +54,62 @@ test('walls built round a Soul: it steps to open ground (logged, nav-connect/1) 
   // an edit near the same pocket names the crate no more (said once), and moves nobody
   const again: any = w.god.act({ ops: [{ op: 'place', def: 'crate@1', name: 'crate2', p: [at[0] + 6, at[1] + 6] }] });
   assert.equal(again.warnings.some((x: string) => x.startsWith('No walk reaches') || /Soul/.test(x)), false, JSON.stringify(again.warnings));
+  // ... and more edits round it never move it again (it stands on open ground; at most once a minute in any case)
+  for (let i = 0; i < 5; i++) assert.equal((w.god.act({ ops: [{ op: 'place', def: 'crate@1', name: `crate-x${i}`, p: [at[0] - 8, at[1] - 6 + 2 * i] }] }) as any).warnings.some((x: string) => /Soul/.test(x)), false);
+  assert.equal(w.db.events(w.host.worldId).filter((e: any) => e.kind === 'edge-relocate' && e.payload.policy === 'nav-connect/1').length, 1, 'still one logged step');
+});
+
+/** A Soul sat on a core bench 2 m from `at` (it walks to the seat and sits). Returns the bench's engine id. */
+async function seat(w: ReturnType<typeof world>, entityId: string, at: [number, number], name = 'bench') {
+  const r: any = w.god.act({ ops: [{ op: 'place', def: coreRef('bench'), name, p: [at[0] + 2, at[1]] }] }); assert.equal(r.accepted, true, JSON.stringify(r.failures)); await w.settle(3);
+  const id = w.god.model.get(name)!.id; assert.ok(w.host.engine.world.entities[id], 'the bench is an engine fixture');
+  const s = w.E.submit('sit', { actor: entityId, fixture: id }); assert.notEqual(s.status, 'failed', JSON.stringify(s));
+  for (let i = 0; i < 400 && w.host.engine.world.entities[entityId]!.human!.activity !== 'sit'; i++) w.host.tickOnce();
+  await w.settle(2); assert.equal(w.host.engine.world.entities[entityId]!.human!.activity, 'sit', 'seated');
+  return id;
+}
+const navSteps = (w: ReturnType<typeof world>) => w.db.events(w.host.worldId).filter((e: any) => e.kind === 'edge-relocate' && e.payload.policy === 'nav-connect/1');
+
+test('a Soul seated on a bench beside open ground: 20 edits round it move nobody and tell the god nothing (R21, 3.59.4)', async t => {
+  const w = world(t); await w.settle(1);
+  await invite(w, 'dee'); const row: any = await accept(w.host, w.souls.create('dev:dee', { name: 'Dee', description: 'calm' })); await w.settle(8);
+  const b0 = w.host.engine.world.entities[row.entity_id]!; assert.equal(w.E.relocateHumanV1(row.entity_id, [b0.pose.p[0] + 15, b0.pose.p[2]]), true); await w.settle(2);
+  const b = w.host.engine.world.entities[row.entity_id]!, at: [number, number] = [b.pose.p[0], b.pose.p[2]];
+  await seat(w, row.entity_id, at);
+  const sat = [...w.host.engine.world.entities[row.entity_id]!.pose.p];
+  assert.equal(w.E.navRescueV1(row.entity_id, Infinity), null, 'judged at its seat\'s standing approach: connected');
+  assert.equal((w.god.act({ ops: [{ op: 'define', def: box('crate', 0.6, 0.6) }] }) as any).accepted, true);
+  for (let i = 0; i < 20; i++) {
+    const r: any = w.god.act({ ops: [{ op: 'place', def: 'crate@1', name: `c${i}`, p: [at[0] - 6 + (i % 5) * 1.5, at[1] - 8 + Math.floor(i / 5) * 1.5] }] });
+    assert.equal(r.accepted, true, JSON.stringify(r.failures));
+    assert.equal(r.warnings.some((x: string) => /Soul/.test(x)), false, `edit ${i}: ${JSON.stringify(r.warnings)}`);
+    w.host.tickOnce(); await setImmediate(); w.host.drainInputs();
+  }
+  await w.settle(6);
+  assert.equal(navSteps(w).length, 0, 'no edge-relocate');
+  const h = w.host.engine.world.entities[row.entity_id]!; assert.equal(h.human!.activity, 'sit', 'still seated'); assert.deepEqual(h.pose.p, sat);
+});
+
+// Decided: a seated Soul whose seat is walled in stands up and steps to open ground once (a god walk-out, as when a god
+// edit lands on it), with one line to the god; staying seated would leave it shut in, since every later walk from the
+// seat's approach is refused.
+test('a seated Soul whose bench gets walled in stands up and steps to open ground, once, with one note', async t => {
+  const w = world(t); await w.settle(1);
+  await invite(w, 'eve'); const row: any = await accept(w.host, w.souls.create('dev:eve', { name: 'Eve', description: 'calm' })); await w.settle(8);
+  const b0 = w.host.engine.world.entities[row.entity_id]!; assert.equal(w.E.relocateHumanV1(row.entity_id, [b0.pose.p[0] + 15, b0.pose.p[2]]), true); await w.settle(2);
+  const b = w.host.engine.world.entities[row.entity_id]!, at: [number, number] = [b.pose.p[0], b.pose.p[2]];
+  await seat(w, row.entity_id, at);
+  const c: [number, number] = [at[0] + 2, at[1]];
+  const r: any = w.god.act({ ops: ring(c, 7, 'w') }); assert.equal(r.accepted, true, JSON.stringify(r.failures));
+  assert.equal(r.warnings.filter((x: string) => /^1 Soul cut off by this edit stepped to open ground nearby\.$/.test(x)).length, 1, JSON.stringify(r.warnings));
+  await w.settle(4);
+  const ev = navSteps(w); assert.equal(ev.length, 1, 'one logged step'); assert.equal(ev[0].payload.godWalkout, true); assert.match(ev[0].payload.why, /sat in a closed-off .*stood up and stepped/);
+  const h = w.host.engine.world.entities[row.entity_id]!, p = h.pose.p;
+  assert.notEqual(h.human!.activity, 'sit', 'stood up');
+  assert.ok(Math.max(Math.abs(p[0] - c[0]), Math.abs(p[2] - c[1])) > 4.5, `outside the walls: ${p}`);
+  assert.equal(w.E.navCheckV1([{ id: 'eve', p: [p[0], p[2]], level: 0 }])[0].ok, true, 'on the main area now');
+  for (let i = 0; i < 5; i++) assert.equal((w.god.act({ ops: [{ op: 'place', def: coreRef('bench'), name: `b${i}`, p: [c[0] - 9, c[1] - 6 + 2.5 * i] }] }) as any).warnings.some((x: string) => /Soul/.test(x)), false);
+  await w.settle(2); assert.equal(navSteps(w).length, 1, 'still one');
 });
 
 test('a door shut on a Soul in a walled yard: it steps out, as for a wall (a door state edit is checked too)', async t => {
@@ -96,7 +152,6 @@ test('the engine rescue target: a pocket gets one; open ground and an area above
   // away from the arrival point (the main area is the one holding it); the fixture world is 60 m across
   const b0 = w.host.engine.world.entities[row.entity_id]!; assert.equal(w.E.relocateHumanV1(row.entity_id, [b0.pose.p[0] + 15, b0.pose.p[2]]), true); await w.settle(2);
   const b = w.host.engine.world.entities[row.entity_id]!, at: [number, number] = [b.pose.p[0], b.pose.p[2]];
-  console.log("BOUNDS", JSON.stringify(w.E.groundBoundsV1()), JSON.stringify(b0.pose.p));
   assert.equal(w.E.navRescueV1(row.entity_id), null, 'connected: no rescue');
   // the hook off, so the engine read alone is under test (as when the edit came from elsewhere)
   (w.god as any).bodies.navNote = undefined;

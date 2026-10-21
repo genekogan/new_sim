@@ -649,17 +649,25 @@ export class EngineBridge {
       }
     } catch (e) { this.navWarm = true; this.navPending = false; this.log(`nav warm: ${(e as Error).message}`); }
   }
-  /** Step every Soul cut off from the main walkable area to open ground (logged). Returns how many were moved. */
+  /** Last tick each Soul was stepped out (nav-connect/1): at most once a minute each, as the ledger's walk rescue. */
+  private navRescuedAt = new Map<string, number>();
+  /** Step every Soul cut off from the main walkable area to open ground (logged). Returns how many were moved. A seated
+   *  Soul is judged where it would stand up (its seat's approach): connected there, it stays seated and nothing is
+   *  logged; when that spot is closed off it rises and lands on open ground once (a god walk-out, which a plain
+   *  relocate cannot do to a held body). Only moves that change where a Soul is are logged or counted. */
   private navRescueSouls(budgetMs = 0): number {
-    const E = this.engine as unknown as { navRescueV1?: (id: string, budgetMs?: number) => { to: Vec2; code: string; pocket?: number; level: number } | null };
+    const E = this.engine as unknown as { navRescueV1?: (id: string, budgetMs?: number) => { to: Vec2; code: string; pocket?: number; level: number; seated?: true } | null };
     if (!E.navRescueV1) return 0;
+    const tick = this.engine.world.tick;
     let n = 0;
     for (const m of this.host.minds.values()) {
       if (isVerificationProbe(m.soulId) || this.engine.programOf(m.entityId)) continue;
+      if ((this.navRescuedAt.get(m.soulId) ?? -1e9) > tick - 1200) continue;
       const r = E.navRescueV1(m.entityId, budgetMs); if (!r) continue;
-      const where = r.level ? `upstairs (floor ${r.level}) with no way down` : `in a closed-off ${r.pocket !== undefined ? `${Math.round(r.pocket)} m² ` : ''}pocket`;
-      this.log(`${m.name} stood ${where} (${r.code}): steps to open ground at (${r.to.join(', ')})`);
-      try { void this.host.enqueue('edge-relocate', `edge:${m.soulId}`, { soulId: m.soulId, entityId: m.entityId, to: r.to, why: `nav-connect/1: stood ${where}, no walk out: stepped to the nearest open ground`, policy: 'nav-connect/1' }).catch(() => { /* best effort */ }); n++; } catch { /* clock not ready */ }
+      const where = `${r.seated ? 'sat' : 'stood'} ${r.level ? `upstairs (floor ${r.level}) with no way down` : `in a closed-off ${r.pocket !== undefined ? `${Math.round(r.pocket)} m² ` : ''}pocket`}`;
+      this.log(`${m.name} ${where} (${r.code}): steps to open ground at (${r.to.join(', ')})`);
+      const payload = { soulId: m.soulId, entityId: m.entityId, to: r.to, why: `nav-connect/1: ${where}, no walk out: ${r.seated ? 'stood up and ' : ''}stepped to the nearest open ground`, policy: 'nav-connect/1', ...(r.seated ? { godWalkout: true, released: [], level: 0 } : {}) };
+      try { void this.host.enqueue('edge-relocate', `edge:${m.soulId}`, payload).catch(() => { /* best effort */ }); this.navRescuedAt.set(m.soulId, tick); n++; } catch { /* clock not ready */ }
     }
     return n;
   }

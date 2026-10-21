@@ -72,6 +72,8 @@ import { CATALOG, HUMAN_RADIUS } from '../../../mars/viewer/engine/world/catalog
 import { HUMAN_PROFILE as HUMAN_PROFILE_V1 } from '../../../mars/viewer/engine/spatial/types.ts';
 import type { Spatial } from '../../../mars/viewer/engine/spatial/service.ts';
 import { NavConnectivity, NAV_CONNECT_POLICY, NAV_RESCUE_MAX_POCKET, CONNECT_CLEAR, type ConnPoint, type ConnVerdict } from '../../../mars/viewer/engine/spatial/connectivity.ts';
+/** lane NAV: a body in one of these activities is anchored to furniture (seat, bed, berth): never relocated as cut off. */
+const NAV_ANCHORED=new Set<unknown>(['sit','lie','nap','sleep']);
 // L1: Object.values(entities)'s list, ~2.7x cheaper on a big world's dictionary-mode object (fresh array each call)
 import { listEntities } from '../../../mars/viewer/engine/world/entity-list.ts';
 import type {NativeBoatControlsV1} from '@sim/engine-contract';
@@ -956,6 +958,10 @@ export class MarsEngine implements Engine {
   /** The native seat controller's standing approach, before its animation is compressed by a god edit. */
   private godWalkoutStartV1(id:string):{level:number;p:[number,number]}|null {
     const e=this.ents[id];if(!e?.human)return null;
+    return this.seatStand(id)??{level:e.human.level??0,p:[e.pose.p[0],e.pose.p[2]]};
+  }
+  /** Where a body held by a seat (sitting down, seated or rising) stands when it gets up: the seat's standing approach. */
+  private seatStand(id:string):{level:number;p:[number,number]}|null {
     const live=this.rt.internals().live as Map<string,any>;
     for(const action of this.holders(id)){
       const seat=live.get(action);
@@ -964,7 +970,7 @@ export class MarsEngine implements Engine {
         if(Array.isArray(approach))return {level:seat.exec.slot.level,p:[...approach] as [number,number]};
       }
     }
-    return {level:e.human.level??0,p:[e.pose.p[0],e.pose.p[2]]};
+    return null;
   }
   /** The landing check a god walk-out folds with (pure): standing room for this body at `to` on `level`, walkable
    * ground there on level 0 (not deep water, steep or outside), and no other body in the way. The planner uses the same
@@ -1853,14 +1859,23 @@ export class MarsEngine implements Engine {
   /** lane NAV (nav-connect/1): where a body cut off from the main walkable area should step to — the nearest open spot
    *  of the main area — or null when it is connected, busy (held, seated aboard, asleep, riding), stands in a separate
    *  area larger than `maxPocket` m² (an island or a walled quarter is a place to live, not a trap), or the labels are
-   *  not ready within `budgetMs` (a later call finishes them). Pure read; the caller logs the move (edge-relocate). */
-  navRescueV1(id:string,budgetMs=50,maxPocket=NAV_RESCUE_MAX_POCKET):{to:[number,number];code:string;pocket?:number;level:number}|null{
+   *  not ready within `budgetMs` (a later call finishes them). A body on a seat counts as standing where it gets up (the
+   *  seat's standing approach): connected there, it is never moved; when that spot is cut off the answer says `seated`
+   *  and the caller logs a god walk-out (the body rises and lands at `to`), since a plain relocate refuses a held body.
+   *  Any other held body (a berth, mid-action) is never answered: a relocate refuses it. A body sitting or lying with no
+   *  hold is judged where it is. Seated or resting, no standing room (under it, or at a tight approach) is not a pocket:
+   *  only a closed-off area moves it.
+   *  Pure read; the caller logs the move (edge-relocate). */
+  navRescueV1(id:string,budgetMs=50,maxPocket=NAV_RESCUE_MAX_POCKET):{to:[number,number];code:string;pocket?:number;level:number;seated?:true}|null{
     const e=this.ents[id],h=e?.human;if(!h||this.byActor.has(id)||h.sleepPose||h.on||h.riding||h.carrier)return null;
+    const seat=this.seatStand(id);if(!seat&&this.holders(id).length)return null;
+    const anchored=!seat&&(NAV_ANCHORED.has(h.activity)||NAV_ANCHORED.has(h.baseActivity));
     if(!this.navWarmV1(budgetMs))return null;
-    const p:[number,number]=[e.pose.p[0],e.pose.p[2]],level=h.level??0,v=this.conn!.check([{id,p,level,tol:.6}])[0];
-    if(!v||v.ok)return null;
+    const p:[number,number]=seat?seat.p:[e.pose.p[0],e.pose.p[2]],level=seat?seat.level:h.level??0,v=this.conn!.check([{id,p,level,tol:.6}])[0];
+    if(!v||v.ok||(seat||anchored)&&v.code==='nav.no-standing-room')return null;
     if(level===0&&v.code!=='nav.no-standing-room'&&(v.pocket??0)>maxPocket)return null;
-    const to=this.navNearestMainV1(p,id);return to?{to,code:v.code??'nav.disconnected',...(v.pocket!==undefined?{pocket:v.pocket}:{}),level}:null;
+    const to=this.navNearestMainV1(p,id);if(!to||hypot(to[0]-e.pose.p[0],to[1]-e.pose.p[2])<.05)return null;
+    return {to,code:v.code??'nav.disconnected',...(v.pocket!==undefined?{pocket:v.pocket}:{}),level,...(seat?{seated:true as const}:{})};
   }
   /** lane NAV: what the engine itself offers as destinations — every seat and berth's standing approach, and a standing
    *  spot inside each place region (the one nearest its centre that is on the main area, else its centre) — for the audit. */
