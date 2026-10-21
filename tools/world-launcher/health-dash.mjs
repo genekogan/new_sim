@@ -243,7 +243,7 @@ export function healthDash(o) {
     const out = {
       ok: true, at: iso(t),
       build: { build: o.build, since: keeper?.active?.since ?? null, generation: keeper?.active?.gen ?? null },
-      host: { load: loadavg().map((x) => Math.round(100 * x) / 100), cpus: cpus().length, cpuPct: cpuPct(), memory: mem, units: units(host), disk: disk(),
+      host: { load: loadavg().map((x) => Math.round(10 * x) / 10), cpus: cpus().length, cpuPct: cpuPct(), memory: mem, units: units(host), disk: disk(),
         uptimeH: Math.round(uptime() / 360) / 10, caddy: caddyNow, check: host ? { ok: host.ok, at: host.at ?? null, stale: !!host.stale, problems: host.problems ?? [], codes: host.codes ?? [] } : null },
       stages: st, drill: drill(),
       worlds: rows, totals: { worlds: rows.length, running: rows.filter((r) => r.status === 'running').length, viewers: rows.reduce((n, r) => n + r.viewers, 0) },
@@ -286,7 +286,7 @@ export function healthDash(o) {
 function shell(pub) {
   const cfg = JSON.stringify({ provider: pub.provider, key: pub.clerkPublishableKey ?? null }).replace(/</g, '\\u003c');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex"><meta name="color-scheme" content="light dark"><title>Sim health</title>
+<meta name="robots" content="noindex"><link rel="icon" href="data:,"><meta name="color-scheme" content="light dark"><title>Sim health</title>
 <style>
 :root{--bg:#f6f5f1;--fg:#1d1c1a;--mute:#6b6862;--line:#dedbd3;--card:#fff;--ok:#2f7d4f;--warn:#a26200;--bad:#b3261e;--chip:#efede7}
 @media (prefers-color-scheme:dark){:root{--bg:#141413;--fg:#e9e7e1;--mute:#9a968e;--line:#2c2b28;--card:#1c1b19;--ok:#5fbf86;--warn:#e0a03a;--bad:#ef6b62;--chip:#262522}}
@@ -300,7 +300,8 @@ header .sub{color:var(--mute)}#state{margin-left:auto;color:var(--mute)}
 .ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
 ul.alerts{list-style:none;margin:0;padding:0}ul.alerts li{padding:6px 0;border-bottom:1px solid var(--line)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
-.tile{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px}.tile .k{color:var(--mute);font-size:12px}.tile .v{font-size:17px;margin-top:2px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px}.tile .k{color:var(--mute);font-size:12px}.tile .v{font-size:15px;margin-top:2px}.tile .v .muted{font-size:12px}
+h2 .muted{text-transform:none;letter-spacing:0;font-weight:400;margin-left:6px}
 .wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--card)}
 table{border-collapse:collapse;width:100%}th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
 th{font-weight:500;color:var(--mute);font-size:12px}tr:last-child td{border-bottom:0}td.n,th.n{text-align:right}
@@ -342,16 +343,16 @@ function render(d){
   $('#state').innerHTML='<span class="dot '+lvl+'"></span>'+(lvl==='ok'?'all clear':d.alerts.length+' alert'+(d.alerts.length>1?'s':''))+' · <span class="mono">'+d.ms+' ms</span> · '+esc(ago(d.at));
   const h=d.host,mem=h.memory||{},dk=h.disk||{};let s='';
   s+='<h2>Alerts</h2>'+(d.alerts.length?'<ul class="alerts">'+d.alerts.map(a=>'<li><span class="dot '+a.level+'"></span>'+esc(a.text)+'</li>').join('')+'</ul>':'<p class="ok">Nothing needs you.</p>');
-  s+='<h2>Host</h2><div class="grid">'+tile('CPU',fmt(h.cpuPct,'%')+' <span class="muted">· '+h.cpus+' cores</span>')+tile('Load 1/5/15',h.load.join(' / '))
+  s+='<h2>Host</h2><div class="grid">'+tile('CPU',fmt(h.cpuPct,'%')+' <span class="muted">'+h.cpus+' cores</span>')+tile('Load 1/5/15',h.load.join(' / '))
     +tile('Memory free',fmt(mem.availableMb==null?null:(mem.availableMb/1024).toFixed(1),' GB')+' <span class="muted">of '+fmt(mem.totalMb==null?null:Math.round(mem.totalMb/1024),' GB')+'</span>',mem.availableMb<1536?'bad':'')
-    +tile('Disk free',fmt(dk.freeGb,' GB')+' <span class="muted">'+fmt(dk.freePct,'%')+'</span>',dk.freePct<15?'bad':'')
+    +tile('Disk free',fmt(dk.freePct,'%')+' <span class="muted">'+fmt(dk.freeGb,' GB')+'</span>',dk.freePct<15?'bad':'')
     +Object.entries(h.units||{}).map(([k,u])=>tile('Worlds '+k,fmt(u.workingMb,' MB')+(u.maxMb?' <span class="muted">/ '+u.maxMb+' MB</span>':'')+(u.oomKills?' <span class="bad">'+u.oomKills+' OOM</span>':''),u.pct>=90?'bad':'')).join('')
     +tile('Caddy',esc(h.caddy??'—'),h.caddy&&h.caddy!=='active'?'bad':'')+tile('Up',fmt(h.uptimeH,' h'))
     +tile('Host check',h.check?(h.check.ok?'ok':'<span class="bad">'+esc(h.check.codes.join(', ')||'failed')+'</span>')+' <span class="muted">'+esc(ago(h.check.at))+'</span>':'—')+'</div>';
-  s+='<h2>Worlds <span class="muted">'+d.totals.running+' running of '+d.totals.worlds+' · '+d.totals.viewers+' watching</span></h2><div class="wrap"><table><thead><tr><th>World</th><th>State</th><th class="n">Now</th><th>Last visit</th><th class="n">Souls</th><th class="n">Tick ms</th><th class="n">Clock</th><th class="n">RSS</th><th>Last god edit</th><th class="n hide-s">Restarts</th></tr></thead><tbody>'
+  s+='<h2>Worlds <span class="muted">'+d.totals.running+' running of '+d.totals.worlds+' · '+d.totals.viewers+' watching</span></h2><div class="wrap"><table><thead><tr><th>World</th><th>State</th><th class="n">Now</th><th>Last visit</th><th class="n">Souls</th><th class="n">Tick ms</th><th class="n">Clock</th><th class="n hide-s">RSS</th><th>Last god edit</th><th class="n hide-s">Restarts</th></tr></thead><tbody>'
     +d.worlds.map(w=>{const sc=w.status==='running'?'ok':w.status==='failed'||w.status==='restarting'?'bad':'muted',tk=w.tickMs;
       return '<tr><td title="'+esc(w.slug)+'">'+esc(w.name)+'</td><td><span class="'+sc+'">'+esc(w.status)+'</span></td><td class="n">'+(w.viewers||'<span class="muted">0</span>')+'</td><td>'+esc(ago(w.lastVisit))+'</td><td class="n">'+fmt(w.souls)+'</td>'
-      +'<td class="n '+(tk&&tk.avg>50?'warn':'')+'">'+(tk?tk.avg+' <span class="muted">/ '+tk.max+'</span>':'—')+'</td><td class="n '+(w.clockRate!=null&&w.clockRate<0.9?'warn':'')+'">'+(w.clockRate==null?'—':Math.round(w.clockRate*100)+'%')+'</td><td class="n">'+fmt(w.rssMb,' MB')+'</td><td>'+esc(ago(w.lastEdit))+'</td><td class="n hide-s">'+w.restarts+'</td></tr>'}).join('')+'</tbody></table></div>';
+      +'<td class="n '+(tk&&tk.avg>50?'warn':'')+'">'+(tk?tk.avg+' <span class="muted">/ '+tk.max+'</span>':'—')+'</td><td class="n '+(w.clockRate!=null&&w.clockRate<0.9?'warn':'')+'">'+(w.clockRate==null?'—':Math.round(w.clockRate*100)+'%')+'</td><td class="n hide-s">'+fmt(w.rssMb,' MB')+'</td><td>'+esc(ago(w.lastEdit))+'</td><td class="n hide-s">'+w.restarts+'</td></tr>'}).join('')+'</tbody></table></div>';
   s+='<h2>Releases and backups</h2><div class="wrap"><table><thead><tr><th>Stage</th><th>Build</th><th>Live since</th><th>Last backup</th><th class="n">Size added</th><th>Timer</th></tr></thead><tbody>'
     +d.stages.map(x=>{const b=x.backup;return '<tr><td>'+esc(x.stage)+(x.self?' <span class="chip">this</span>':'')+'</td><td class="mono">'+esc(x.build??'—')+'</td><td>'+esc(ago(x.since))+'</td><td>'+(b?(b.ok?'<span class="ok">ok</span>':'<span class="bad">failed</span>')+' '+esc(ago(b.at))+(b.ok?' <span class="muted">'+b.dbsOk+'/'+b.dbs+' dbs</span>':''):'<span class="muted">none</span>')+'</td><td class="n">'+(b&&b.addedMb!=null?b.addedMb+' MB':'—')+'</td><td>'+(x.timer?(x.timer.enabled?esc(x.timer.result||'enabled'):'<span class="muted">off</span>'):'—')+'</td></tr>'}).join('')+'</tbody></table></div>'
     +'<p class="muted">Restore drill: '+(d.drill?esc(d.drill.name)+' · '+(d.drill.ok===true?'<span class="ok">ok</span> '+d.drill.dbsOk+'/'+d.drill.dbs+' dbs':d.drill.ok===false?'<span class="bad">failed</span>':'result unknown')+' · '+esc(ago(d.drill.at)):'none yet')+'</p>';
@@ -359,7 +360,7 @@ function render(d){
   s+='<h2>Arrivals, last 24 h</h2><div class="grid">'+tile('Arrivals',fmt(ar.n))+tile('Median',ar.p50==null?'—':(ar.p50/1000).toFixed(1)+' s')+tile('Slowest 10%',ar.p90==null?'—':(ar.p90/1000).toFixed(1)+' s',ar.p90>10000?'warn':'')+'</div>'
     +(ar.worlds&&ar.worlds.length?'<div class="wrap" style="margin-top:8px"><table><thead><tr><th>World</th><th class="n">Arrivals</th><th class="n">Median</th><th class="n">p90</th></tr></thead><tbody>'+ar.worlds.map(w=>'<tr><td>'+esc(w.world)+'</td><td class="n">'+w.n+'</td><td class="n">'+(w.p50/1000).toFixed(1)+' s</td><td class="n">'+(w.p90/1000).toFixed(1)+' s</td></tr>').join('')+'</tbody></table></div>':'');
   const e=d.errors;
-  s+='<h2>New errors since this release <span class="muted">'+e.newSinceRelease+' kinds</span></h2>'+(e.top.length?'<div class="wrap"><table><thead><tr><th>Kind</th><th>Message</th><th class="n">Count</th><th class="n">People</th><th>Last</th><th class="hide-s">Worlds</th></tr></thead><tbody>'+e.top.map(x=>'<tr><td><span class="chip">'+esc(x.kind)+'</span></td><td class="msg mono">'+esc(x.message)+(x.source?' <span class="muted">'+esc(x.source)+'</span>':'')+'</td><td class="n">'+x.count+'</td><td class="n">'+x.visitors+'</td><td>'+esc(ago(x.last))+'</td><td class="hide-s">'+esc(x.worlds.join(', '))+'</td></tr>').join('')+'</tbody></table></div>':'<p class="ok">None.</p>');
+  s+='<h2>New errors since this release <span class="muted">'+e.newSinceRelease+' kind'+(e.newSinceRelease===1?'':'s')+'</span></h2>'+(e.top.length?'<div class="wrap"><table><thead><tr><th>Kind</th><th>Message</th><th class="n">Count</th><th class="n">People</th><th>Last</th><th class="hide-s">Worlds</th></tr></thead><tbody>'+e.top.map(x=>'<tr><td><span class="chip">'+esc(x.kind)+'</span></td><td class="msg mono">'+esc(x.message)+(x.source?' <span class="muted">'+esc(x.source)+'</span>':'')+'</td><td class="n">'+x.count+'</td><td class="n">'+x.visitors+'</td><td>'+esc(ago(x.last))+'</td><td class="hide-s">'+esc(x.worlds.join(', '))+'</td></tr>').join('')+'</tbody></table></div>':'<p class="ok">None.</p>');
   s+='<p class="muted">sim-watch: '+(d.watch?'last check '+esc(ago(d.watch.at))+(d.watch.down?' · <span class="bad">down: '+esc(d.watch.down)+'</span>':''):'not seen since this launcher started')+'</p>';
   m.innerHTML=s}
 load();timer=setInterval(()=>{if(!document.hidden)load()},30000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});
