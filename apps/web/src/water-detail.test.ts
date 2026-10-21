@@ -23,7 +23,7 @@ void test('old Eden shore water: one flat region at the exact datum, ripples and
  assert.match(s.fragmentShader,/vec3 waterSwim\(vec3 w\)/);assert.match(s.fragmentShader,/slope\+=edenSw\.xy;vec3 normal=/);assert.match(s.fragmentShader,/waterGlitter\(vWorld,normal,eye,uSwimTime\)/);
  assert.match(s.fragmentShader,/colour\*=mix/);assert.equal(s.uniforms.uSwim,WATER_DETAIL.uSwim);
  assert.deepEqual([...mesh.geometry.getAttribute('position').array],[...before]);assert.equal(mesh.material.uniforms.uBaseAlpha.value>0,true);
- assert.match(mesh.material.customProgramCacheKey(),/w11-surface-v1/);o.dispose();
+ assert.match(mesh.material.customProgramCacheKey(),/w11-surface-v2/);o.dispose();
 });
 
 void test('new-engine water material: ripples perturb the lit normal after its own waves, glitter before tone mapping',()=>{
