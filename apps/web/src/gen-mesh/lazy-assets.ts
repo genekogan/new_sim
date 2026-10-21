@@ -80,7 +80,7 @@ let background: ReturnType<typeof setTimeout> | null = null, running = 0;
 const shasOf = (d: StoredDef | undefined, distance = 0, scale = 1) => { const a = d && d.make.kind === 'mesh' ? meshLodAsset(d.make as LodMake, d.size.box, distance, scale) : null; return typeof a === 'string' && /^[0-9a-f]{64}$/.test(a) ? [a] : []; };
 
 /** Choose the eager GLBs for a snapshot: nearest-first to `centre` until EAGER_BYTES. Returns the loading bar's sizes. */
-export function planEager(snap: { entities: Entity[]; assetBytes?: Record<string, number> }, defOf: (ref: string) => StoredDef | undefined, posOf: (e: Entity) => [number, number] | null, centre: [number, number] = [0, 0], eye?: [number, number]): Record<string, number> {
+export function planEager(snap: { entities: Entity[]; assetBytes?: Record<string, number> }, defOf: (ref: string) => StoredDef | undefined, posOf: (e: Entity) => [number, number] | null, centre: [number, number] = [0, 0], eye?: [number, number], seen?: (e: Entity) => boolean): Record<string, number> {
   // Called once by a new entity layer, before its holders are built. Old loader/worker promises do not own its slots.
   loadQueue.reset(); waiting.clear(); inFlight.clear(); started.clear(); backgroundReady = false;
   if (background) { clearTimeout(background); background = null; }
@@ -106,6 +106,7 @@ export function planEager(snap: { entities: Entity[]; assetBytes?: Record<string
   const dist = new Map<string, number>(), rank = new Map<string, number>();
   for (const e of snap.entities) {
     const def = defOf(e.def); if (!def || def.make.kind !== 'mesh') continue;
+    if (seen && !seen(e)) continue;   // t4-phone-new: out of the arrival camera's view (WorldEntityLayer, arrival-view.ts)
     const p = posOf(e), shas = shaFor(e, p); if (!shas.length) continue;
     const d = p ? score(p[0], p[1]) : 1e9, size = Math.max(1, ...((def?.size?.box as number[] | undefined) ?? [1]).map((v) => v * (e.s ?? 1)));
     const nd = p ? Math.min(Math.hypot(p[0] - centre[0], p[1] - centre[1]), eye ? Math.hypot(p[0] - eye[0], p[1] - eye[1]) : Infinity) : 0;
