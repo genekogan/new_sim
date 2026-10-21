@@ -27,13 +27,15 @@ export async function soulsHere(): Promise<SoulHere[]> {
 export const landingHash = typeof location === 'undefined' ? '' : location.hash;
 /** `#approve/ap_…` — the link the Soul CLI prints for its human (main's format). */
 export { approvalFromHash } from '../approval-link.ts';
-const valid = (a: Approval | undefined, id: string): a is Approval => !!a && a.id === id && ['create', 'repair'].includes(a.mode) && ['pending', 'creating', 'ready', 'refused', 'cancelled', 'expired'].includes(a.status) && typeof a.name === 'string' && typeof a.agentLabel === 'string' && (a.soulId === null || /^s_[A-Za-z0-9_-]+$/.test(a.soulId));
+import { validApproval } from '../approval-link.ts';
+const valid = (a: Approval | undefined, id: string, worldId?: string): a is Approval => validApproval(a, id, worldId);
 /** Read (or act on) one approval as the signed-in person. */
 export async function approval(id: string, action?: 'approve' | 'cancel' | 'renew'): Promise<Approval> {
   const headers = await userAuthHeaders(); if (!headers.authorization) throw new Error('Sign in first.');
   const r = await fetch(apiPath(`/v1/account/approvals/${id}${action ? '/' + action : ''}`), { method: action ? 'POST' : 'GET', headers: { ...headers, ...(action ? { 'content-type': 'application/json' } : {}) }, ...(action ? { body: '{}' } : {}), cache: 'no-store' });
-  const d = await r.json().catch(() => ({})) as { approval?: Approval; message?: string };
-  if (!r.ok || !valid(d.approval, id)) throw new Error(r.status === 403 ? 'This approval belongs to another account.' : d.message ?? 'This approval is unavailable. Sign in with the intended account and check again.');
+  const d = await r.json().catch(() => ({})) as { approval?: Approval; message?: string; world?: { id?: string } };
+  if (r.ok && valid(d.approval, id) && !valid(d.approval, id, d.world?.id ?? '')) throw new Error('This request is for another world.');
+  if (!r.ok || !valid(d.approval, id, d.world?.id ?? '')) throw new Error(r.status === 403 ? 'This approval belongs to another account.' : d.message ?? 'This approval is unavailable. Sign in with the intended account and check again.');
   return d.approval;
 }
 /** Lane PUX: the requests waiting for this account in this world (addressed to it with a window code), newest first.
