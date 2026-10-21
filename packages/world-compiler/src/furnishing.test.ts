@@ -90,13 +90,17 @@ test('a furnished shop keeps the way from its front door to the storeroom door (
   assert.ok(f.placed.some((p: any) => p.name === 'shop-counter') && f.placed.some((p: any) => p.name === 'shop-display'), JSON.stringify(f.dropped));
 });
 
-test('a piece may not stand where a Soul sent to another piece would stand (the display at shelf-2\'s front)', () => {
-  // SEALED 2026-10-21: moved to the east side (fx 0.78) the display took shelf-2's approach: every shop's shelf-2 went bad
+test('a seat whose own front is shut in is dropped (the shop stool behind the counter); a piece may not stand at another piece\'s front', () => {
+  // SEALED 2026-10-21 put the display on the east side (fx 0.78) and saw shelf-2 go bad, but only because the stool's key (any
+  // free cell within 1.5 m of its front) let it stand behind the counter with its front shut in. BSGEN 2026-10-21: a seat's key
+  // is within 0.5 m of its front, one key per seat; the stool is dropped and, in the fuzz walk world with the display first at
+  // 0.78, no shop has a bad or unusable piece (at 1.5 m: 5 shops with the stool use.no-approach). furnishedShop checks that
+  // every placed piece's front is reached from the door.
   const recipe = JSON.parse(readFileSync(new URL('../../../tools/god-skill/recipes/furnish/shop.json', import.meta.url), 'utf8'));
   recipe.rooms.shop.find((x: any) => x.name === 'display').try = [[0.78, 0.7, 's'], [0.3, 0.7, 's']];
   const f = furnishedShop(recipe);
-  const d: any = f.ops.find((o: any) => o.name === 'shop-display');
-  assert.ok(d && d.p[0] < 0, `display goes to its next pose, not shelf-2's front: ${JSON.stringify(d?.p)} ${JSON.stringify(f.dropped)}`);
+  assert.ok(!f.placed.some((p: any) => p.name === 'shop-stool') && f.dropped.some((p: any) => p.name === 'shop-stool'), JSON.stringify(f.dropped));
+  assert.ok(f.placed.some((p: any) => p.name === 'shop-display') && f.placed.some((p: any) => p.name === 'shop-shelf-2'), JSON.stringify(f.dropped));
 });
 
 test('the ways check judges a gap on the walk raster where the building stands, turned or not (hillside-home-4, lane WALK2; BS1 rule)', () => {

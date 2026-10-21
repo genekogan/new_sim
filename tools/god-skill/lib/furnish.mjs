@@ -35,8 +35,8 @@ const itemBoxes = (baked, p, y, yaw) => {
 // pose cuts them apart (a stool in the gap between a counter and a shelf that leaves the storeroom door in a nook) tries its
 // next pose or is dropped. The rule (how much room a body needs past a wall or a piece, as the walk raster sees it) is the
 // shared one in packages/generators/src/clearance.ts (lane BS1): 0.43 m from a wall piece, 0.50 m from a piece of furniture.
-export { roomKeys, approachOf, wayLabels, connectedPairs } from '../../../packages/generators/src/clearance.ts';
-import { roomKeys, approachOf, wayGrid, pairsOf } from '../../../packages/generators/src/clearance.ts';
+export { roomKeys, approachOf, approachKeys, wayLabels, connectedPairs } from '../../../packages/generators/src/clearance.ts';
+import { roomKeys, approachKeys, wayGrid, pairsOf } from '../../../packages/generators/src/clearance.ts';
 
 /** The furnish styles (recipe files), sorted. */
 export const furnishStyles = () => readdirSync(RECIPES).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)).sort();
@@ -93,7 +93,7 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
     const cb = model.bake(cd, ch.params ?? {}, ch.seed ?? 0), lp = ch.p ?? [0, 0], lx = lp[0], lz = lp[lp.length - 1];
     const yaw = typeof ch.r === 'number' ? ch.r : Array.isArray(ch.r) ? ch.r[0] : 0;
     const at0 = [room.origin[0] + lx, room.origin[1] + lz], y0 = room.y + (lp.length === 3 ? lp[1] : 0);
-    taken.push({ floor: room.floor, solid: cb.box[1] > 0.06, boxes: itemBoxes(cb, at0, y0, yaw), foot: { c: at0, half: [cb.box[0] / 2, cb.box[2] / 2], yaw, y0, y1: y0 + cb.box[1] }, approach: approachOf(cb, at0, yaw) });
+    taken.push({ floor: room.floor, solid: cb.box[1] > 0.06, boxes: itemBoxes(cb, at0, y0, yaw), foot: { c: at0, half: [cb.box[0] / 2, cb.box[2] / 2], yaw, y0, y1: y0 + cb.box[1] }, approach: approachKeys(cb, at0, yaw) });
   }
   for (const room of baked.rooms) {
     if (want && !want.has(room.id)) continue;
@@ -151,16 +151,16 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
           if (!w) ways.set(room.id, w = { n: 0, grid: wayGrid(room, baked.colliders.filter((o) => o.y0 < room.y + 1.6 && o.y1 > room.y + 0.15), way) });
           if (!w.keys || w.n !== standing.length) {
             for (const t of standing.slice(w.n)) w.grid = w.grid.plus(t.foot);
-            w.n = standing.length; w.keys = [...keysOf(room), ...standing.map((t) => t.approach)]; w.was = w.grid.labels(w.keys, w.at = { cells: [] });
+            w.n = standing.length; w.keys = [...keysOf(room), ...standing.flatMap((t) => t.approach)]; w.was = w.grid.labels(w.keys, w.at = { cells: [] });
           }
-          const { keys, was } = w, now = w.grid.plus(bx).labels([...keys, approachOf(ib, pose, r3(fyaw + th))], { cells: w.at.cells });
-          const own = now[now.length - 1], doorsReach = keysOf(room).some((_, i) => now[i] === own);
+          const { keys, was } = w, now = w.grid.plus(bx).labels([...keys, ...approachKeys(ib, pose, r3(fyaw + th))], { cells: w.at.cells });
+          const doorsReach = now.slice(keys.length).every((own) => keysOf(room).some((_, i) => now[i] === own));
           if (pairsOf(now, keys.length) < pairsOf(was) || !doorsReach) { why = doorsReach ? 'would cut the way to its doors or another piece' : 'no way to it from the doors'; continue; }
         }
         box = bx; boxes = candidate; at = p; yaw = fyaw + th; break;
       }
       if (!box) { dropped.push({ name, why }); continue; }
-      taken.push({ floor: room.floor, boxes, solid: ib.box[1] > 0.06, foot: box, approach: approachOf(ib, [room.origin[0] + r3(at[0] - room.origin[0]), room.origin[1] + r3(at[1] - room.origin[1])], r3(yaw)) });
+      taken.push({ floor: room.floor, boxes, solid: ib.box[1] > 0.06, foot: box, approach: approachKeys(ib, [room.origin[0] + r3(at[0] - room.origin[0]), room.origin[1] + r3(at[1] - room.origin[1])], r3(yaw)) });
       const tmp = `$f${ops.length}`.slice(0, 25);
       named[it.name ?? 'item'] = { tmp };
       ops.push({ op: 'place', tmp, def: ref, name, in: { parent: b.id, slot: room.id }, p: [r3(at[0] - room.origin[0]), 0, r3(at[1] - room.origin[1])], r: r3(yaw), ...(it.params ? { params: it.params } : {}), ...(it.price ? { price: it.price } : {}) });

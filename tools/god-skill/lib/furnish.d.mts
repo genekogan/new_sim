@@ -10,5 +10,7 @@ type Room = { id: string; floor: number; polygon: Vec2[] };
 export type WayKey = Vec2 | { pts: Vec2[]; r: number };
 export function roomKeys(room: Room, doors: unknown[], links: unknown[]): Vec2[];
 export function approachOf(baked: unknown, at: Vec2, yaw: number): WayKey;
+/** The keys a piece adds to the ways check: one per seat (a Soul is sent to each seat on its own), else approachOf's one. */
+export function approachKeys(baked: unknown, at: Vec2, yaw: number): WayKey[];
 export function wayLabels(room: Room, keys: WayKey[], blockers: Box[], o?: WayOpts): number[];
 export function connectedPairs(room: Room, keys: WayKey[], blockers: Box[], o?: WayOpts): number;

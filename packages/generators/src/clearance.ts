@@ -88,12 +88,20 @@ export function roomKeys(room: WayRoom, doors: { level: number; from?: string; t
   return keys;
 }
 
-/** Where a Soul sent to a piece stands: 0.75 m in front of each seat (searched 1.5 m round), else the free spot nearest it. */
+/** Where a Soul sent to a piece stands: 0.75 m in front of each seat (searched SEAT_R round), else the free spot nearest it. */
+// SEAT_R 0.5 m (lane BSGEN, 2026-10-21; was 1.5 m, which let a seat keep its key across the room while its own front was shut
+// in: the shop stool behind the counter, a townhouse sofa; 0.75 m left eight fuzz townhouse places worse in the walk).
+export const SEAT_R = 0.5;
 export function approachOf(baked: { slots?: { kind: string; p: readonly number[]; yaw: number }[]; box: readonly number[] }, at: readonly number[], yaw: number): WayKey {
   const c = Math.cos(yaw), s = Math.sin(yaw), w = ([x, z]: readonly number[]): Vec2 => [at[0] + x * c + z * s, at[1] - x * s + z * c];
   const seats = (baked.slots ?? []).filter((x) => x.kind === 'seat');
-  if (seats.length) return { pts: seats.map((x) => w([x.p[0] + Math.sin(x.yaw) * 0.75, x.p[2] + Math.cos(x.yaw) * 0.75])), r: 1.5 };
+  if (seats.length) return { pts: seats.map((x) => w([x.p[0] + Math.sin(x.yaw) * 0.75, x.p[2] + Math.cos(x.yaw) * 0.75])), r: SEAT_R };
   return { pts: [[at[0], at[1]]], r: Math.hypot(baked.box[0], baked.box[2]) / 2 + 1.5 };
+}
+/** The keys a piece adds to the ways check: one per seat (a Soul is sent to each seat on its own), else approachOf's one. */
+export function approachKeys(baked: Parameters<typeof approachOf>[0], at: readonly number[], yaw: number): WayKey[] {
+  const a = approachOf(baked, at, yaw);
+  return !Array.isArray(a) && a.pts.length > 1 ? a.pts.map((p) => ({ pts: [p], r: a.r })) : [a];
 }
 
 /** Where the room's frame sits in the world (a building's world pose: x, z, yaw, scale): the ways are then labelled on the
