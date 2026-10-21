@@ -106,7 +106,7 @@ A freestanding wall along a path (garden wall, partition, rampart) with optional
 - `thickness` number 0.08…3 = 0.3
 - `material` enum stone|brick|plaster|wood|hedge|glass = stone
 - `color` color = #c9c1b2
-- `gates` json — [{at: metres along, width}]
+- `gates` json — [{at: metres along, width, state?}] gaps, open unless state 'closed'; a door placed in a gap takes it over
 - `cap` bool = true
 
 ### fence/1 (path, L3)
@@ -115,7 +115,7 @@ A fence of posts and rails (picket, rail, wire). Blocks walking, not sight.
 - `style` enum picket|rail|wire|iron = picket
 - `color` color = #e9e2d0
 - `postSpacing` number 0.5…6 = 2
-- `gates` json
+- `gates` json — [{at: metres along, width, state?}] gaps, open unless state 'closed'; a door placed in a gap takes it over
 
 ### hedge/1 (path, L3)
 A clipped hedge along a path.

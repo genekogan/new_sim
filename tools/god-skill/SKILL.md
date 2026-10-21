@@ -284,8 +284,8 @@ shapes, 80 000 triangles (props a few hundred), size 0.05–400 m, height ≤ 12
 
 Souls walk a building def's rooms, doors and stairs (the `walk:` line); sit on `seat` slots (library seats or a
 declared one); put things on `surface` slots; open, switch, light, fill or play what has an actuator state
-(`defs <thing>`; start it with `--state '{"open":true}'`). A shut door or gate blocks walks and `reach`; a door set in a
-wall's `gates` gap takes that gap over. They do not lie in beds reliably, ride moving things, or climb
+(`defs <thing>`; start it with `--state '{"open":true}'`). A shut door or gate blocks walks and `reach`; a wall's or fence's
+`gates` gap is open unless you give it `"state":"closed"`, and a door set in the gap takes it over. They do not lie in beds reliably, ride moving things, or climb
 roofs, kit tops or slopes without a floor or slot. Name any asked use that is only decorative.
 
 ## When the world says no

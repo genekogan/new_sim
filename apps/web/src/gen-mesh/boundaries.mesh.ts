@@ -53,16 +53,16 @@ registerMesh({
       soup.box([x, y + h + 0.45, z], [0.62, 0.12, 0.62], Math.atan2(-gp.d[1], gp.d[0]), scale(base, 1.12), 0.04);
       soup.blob([x, y + h + 0.62, z], [0.16, 0.14, 0.16], scale(base, 1.15), 0, 0.05, 3);
     }
-    for (const gp of gatePoints(path, gates)) {
+    gatePoints(path, gates).forEach((gp, gi) => {
       const leaf = mat === 'plaster' ? rgb('#2b2e31') : rgb('#7a5636'), y = g(gp.c[0], gp.c[1]);
       const a: [number, number] = [gp.c[0] - gp.d[0] * gp.w / 2, gp.c[1] - gp.d[1] * gp.w / 2];
-      // the leaf stands ajar, hinged at one pillar
-      const ang = 0.6, dx = Math.cos(ang) * gp.d[0] - Math.sin(ang) * gp.d[1], dz = Math.sin(ang) * gp.d[0] + Math.cos(ang) * gp.d[1];
+      // the leaf stands ajar, hinged at one pillar (an open gap, the default); a gate set `state: 'closed'` is shut across it
+      const ang = gates[gi].state === 'closed' ? 0 : 0.6, dx = Math.cos(ang) * gp.d[0] - Math.sin(ang) * gp.d[1], dz = Math.sin(ang) * gp.d[0] + Math.cos(ang) * gp.d[1];
       const b: [number, number] = [a[0] + dx * gp.w * 0.95, a[1] + dz * gp.w * 0.95];
       const n = Math.max(3, Math.round(gp.w / 0.18));
       for (let k = 0; k <= n; k++) { const x = a[0] + (b[0] - a[0]) * k / n, z = a[1] + (b[1] - a[1]) * k / n; soup.box([x, y + 0.65, z], [0.06, 1.1, 0.06], Math.atan2(-dz, dx), leaf, 0.01); }
       for (const yy of [0.25, 1.1]) soup.beam([a[0], y + yy, a[1]], [b[0], y + yy, b[1]], 0.08, 0.08, leaf);
-    }
+    });
     return soupMesh(soup, `wall ${ctx.entity.name ?? ctx.entity.id}`);
   },
 });
@@ -92,6 +92,13 @@ registerMesh({
         }
       }
     }
+    // a fence gate is an open gap; one set `state: 'closed'` gets a shut leaf (two rails and staves) across it
+    gatePoints(path, gates.filter((x) => x.state === 'closed')).forEach((gp) => {
+      const a: V3 = [gp.c[0] - gp.d[0] * gp.w / 2, 0, gp.c[1] - gp.d[1] * gp.w / 2], b: V3 = [gp.c[0] + gp.d[0] * gp.w / 2, 0, gp.c[1] + gp.d[1] * gp.w / 2];
+      const y = g(gp.c[0], gp.c[1]), n = Math.max(3, Math.round(gp.w / 0.16));
+      for (const yy of [0.3, h - 0.25]) soup.beam([a[0], y + yy, a[2]], [b[0], y + yy, b[2]], 0.05, 0.07, c);
+      for (let k = 0; k <= n; k++) soup.box([a[0] + (b[0] - a[0]) * k / n, y + (h - 0.12) / 2 + 0.02, a[2] + (b[2] - a[2]) * k / n], [0.07, h - 0.12, 0.03], Math.atan2(-gp.d[1], gp.d[0]), scale(c, 0.94));
+    });
     return soupMesh(soup, `fence ${ctx.entity.name ?? ctx.entity.id}`);
   },
 });
