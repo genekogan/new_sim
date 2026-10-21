@@ -35,11 +35,7 @@ import {installNightLighting,setNightLightStrength,nightLightStrength} from './W
 import type {createEdenHouseWindows} from '../../../mars/viewer/app/engine-view/content/assets/eden-expansion-assets/eden-house-windows.ts';
 // P1 phones: the old Eden expansion is its own chunk (old-eden.ts), fetched only by a world that shows it
 let oldEden:typeof import('./old-eden.ts')|null=null,oldEdenLoad:Promise<typeof import('./old-eden.ts')>|null=null;
-// F12: the town's landscape (no world inputs) is built while the scene publication downloads, a wait the town needs
-// anyway; earlier it held the socket's handshake and the takes (the main thread is the phone's bottleneck then too)
-let landscapeWanted=false;const prebuildLandscape=()=>{if(oldEden&&landscapeWanted){const m=oldEden;setTimeout(()=>{try{m.prebuildEdenLandscape();}catch{}},0);}};
-const wantLandscape=()=>{if(!landscapeWanted){landscapeWanted=true;prebuildLandscape();}};
-const loadOldEden=()=>oldEdenLoad??=import('./old-eden.ts').then(m=>{oldEden=m;prebuildLandscape();return m;},e=>{oldEdenLoad=null;throw e;});
+const loadOldEden=()=>oldEdenLoad??=import('./old-eden.ts').then(m=>{setTimeout(()=>{try{m.prebuildEdenLandscape();}catch{}},0);return oldEden=m;},e=>{oldEdenLoad=null;throw e;});
 // Patch shared lit-shader chunks before any program compiles (strength stays 0 outside Eden).
 installNightLighting();
 installLookToneCurve();installMaterialDetail();  // look pass (rendering/WorldLook.ts): tone curve + material detail chunks, before any program compiles
@@ -571,7 +567,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
 
     const sceneryStatus=(reason:string|null)=>{sceneReason=reason;setSceneryNotice(reason);};
     const sceneHistory=new WorldSceneHistory(owner.worldId,async(hash,signal)=>{
-      const request=fetch(apiPath('/v1/scenes/'+hash)+'?world='+encodeURIComponent(owner.worldId),{signal});if(context.current.edenExpansion)wantLandscape();const response=await request;  // lane W1: browser-cached per world (http.ts)
+      const response=await fetch(apiPath('/v1/scenes/'+hash)+'?world='+encodeURIComponent(owner.worldId),{signal});  // lane W1: browser-cached per world (http.ts)
       if(!response.ok)throw Error('Recorded scenery unavailable');return response.json();
     },decodeSceneCapturePublication);
     const installScene=(info:ReturnType<typeof parseSceneInfo>,verifiedPublication?:unknown,profiles:OptionalAppearanceProfiles=ALL_OPTIONAL_APPEARANCE_PROFILES)=>{
