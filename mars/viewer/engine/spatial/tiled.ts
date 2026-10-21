@@ -708,26 +708,41 @@ export function groundRoute(nav: GroundNav, scene: SpatialScene, profile: AgentP
     return failR('ground.unreachable', `no way on foot from (${fmt(start.p)}) to (${fmt(goal.p)})`, goal);
   }
   // hops along the coarse path, each planned by the fine planner on just its own tiles
-  const hops: { to: Vec2; via: Vec2[] }[] = [];
-  let acc = 0, via: Vec2[] = [];
+  // hop ends as coarse path indices (path.length = the goal itself)
+  const ends: number[] = [];
+  let acc = 0;
   for (let k = 1; k < path.length; k++) {
-    acc += hypot(path[k][0] - path[k - 1][0], path[k][1] - path[k - 1][1]); via.push(path[k]);
-    if (acc >= HOP_M && k < path.length - 4) { hops.push({ to: path[k], via }); acc = 0; via = []; }
+    acc += hypot(path[k][0] - path[k - 1][0], path[k][1] - path[k - 1][1]);
+    if (acc >= HOP_M && k < path.length - 4) { ends.push(k); acc = 0; }
   }
-  hops.push({ to: goal.p, via });
+  ends.push(path.length);
   const legs: Leg[] = [];
-  let from: Place = start, length = 0, expanded = 0;
-  for (let h = 0; h < hops.length; h++) {
-    const last = h === hops.length - 1, target: Place = { level: 0, p: hops[h].to };
-    const r = rectOf([from.p, target.p, ...hops[h].via]);
-    if (!include(r)) return failR('ground.too-far', `(${fmt(goal.p)}) is too far to walk to in one go; walk part of the way first`, goal);
-    const grids: GridSet = { cell: nav.cell, levels: new Map([[0, nav.compose(r, scene.obstacles)]]) };
-    const res = findRoute(grids, { ...scene, bounds: rectBounds(r), links: [] }, profile, from, target, last ? opts : { ...opts, goalTolerance: 2.5 });
+  let from: Place = start, length = 0, expanded = 0, prev = 0;
+  for (let h = 0; h < ends.length; h++) {
+    const hop = (k: number): RouteResult | 'too-far' => {
+      const last = k >= path.length, target: Place = { level: 0, p: last ? goal.p : path[k] };
+      const r = rectOf([from.p, target.p, ...path.slice(prev + 1, Math.min(k, path.length - 1) + 1)]);
+      if (!include(r)) return 'too-far';
+      const grids: GridSet = { cell: nav.cell, levels: new Map([[0, nav.compose(r, scene.obstacles)]]) };
+      return findRoute(grids, { ...scene, bounds: rectBounds(r), links: [] }, profile, from, target, last ? opts : { ...opts, goalTolerance: 2.5 });
+    };
+    let res = hop(ends[h]);
+    // BS3 (b): an intermediate waypoint no fine route reaches (inside an enterable building the coarse path runs through):
+    // retry waypoints along the coarse path between this hop's start and the next hop's end, first that plans wins
+    if (res !== 'too-far' && !res.ok && ends[h] < path.length) {
+      for (const kk of hopRetries(ends[h], path.length, res.diagnostic.code, true, prev + 1)) {
+        if (kk >= (ends[h + 1] ?? path.length) && kk < path.length) continue;
+        const t = hop(kk);
+        if (t !== 'too-far' && t.ok) { res = t; ends[h] = kk; if (kk >= path.length) ends.length = h + 1; break; }
+      }
+    }
+    if (res === 'too-far') return failR('ground.too-far', `(${fmt(goal.p)}) is too far to walk to in one go; walk part of the way first`, goal);
     if (!res.ok) return res;
+    prev = Math.min(ends[h], path.length - 1);
     for (const leg of res.route.legs) appendLeg(legs, leg);
     length += res.route.length; expanded += res.route.expanded;
     const end = (res.route.legs.at(-1) as WalkLeg | undefined)?.points.at(-1);
-    from = { level: 0, p: end ?? target.p };
+    from = { level: 0, p: end ?? (ends[h] >= path.length ? goal.p : path[ends[h]]) };
   }
   return { ok: true, route: { legs, length, expanded } };
 }
@@ -810,17 +825,41 @@ export function pagedRoute(nav: GroundNav, scene: SpatialScene, profile: AgentPr
     return failR('ground.unreachable', `no way on foot from (${fmt(start.p)}) to (${fmt(goal.p)})`, goal);
   }
   // the first hop (as groundRoute cuts them); the last one ends at the goal itself
-  let acc = 0, k = 1;
-  for (; k < path.length; k++) { acc += hypot(path[k][0] - path[k - 1][0], path[k][1] - path[k - 1][1]); if (acc >= HOP_M && k < path.length - 4) break; }
-  const last = k >= path.length && goal.level === 0, target: Vec2 = last ? goal.p : path[Math.min(k, path.length - 1)];
-  const r = rectOf([start.p, target, ...path.slice(1, k + 1)]);
-  const grids: GridSet = { cell: nav.cell, levels: new Map([[0, nav.compose(r, scene.obstacles)]]) };
-  const res = findRoute(grids, { ...scene, bounds: rectBounds(r), links: [] }, profile, start, { level: 0, p: target }, last ? opts : { ...opts, goalTolerance: 2.5 });
+  let acc = 0, k0 = 1;
+  for (; k0 < path.length; k0++) { acc += hypot(path[k0][0] - path[k0 - 1][0], path[k0][1] - path[k0 - 1][1]); if (acc >= HOP_M && k0 < path.length - 4) break; }
+  const hop = (k: number) => {
+    const last = k >= path.length && goal.level === 0, target: Vec2 = last ? goal.p : path[Math.min(k, path.length - 1)];
+    const r = rectOf([start.p, target, ...path.slice(1, k + 1)]);
+    const grids: GridSet = { cell: nav.cell, levels: new Map([[0, nav.compose(r, scene.obstacles)]]) };
+    return { k, last, res: findRoute(grids, { ...scene, bounds: rectBounds(r), links: [] }, profile, start, { level: 0, p: target }, last ? opts : { ...opts, goalTolerance: 2.5 }) };
+  };
+  let h = hop(k0);
+  // BS3 (b): the coarse path runs through enterable buildings (only big solids are coarse-solid), so the hop's waypoint can
+  // lie in a shop where no fine route ends (eden-2026: the jetty -> chapel walk stopped in old-town-north-arcade-1); a few
+  // waypoints further along or back along the same coarse path are tried before the walk fails
+  if (!h.res.ok && !h.last) for (const kk of hopRetries(k0, path.length, h.res.diagnostic.code, goal.level === 0)) { const t = hop(kk); if (t.res.ok) { h = t; break; } }
+  const { k, last, res } = h;
   if (!res.ok || last) return res;
   // length: this chunk's, plus the coarse path's remainder (an estimate of the whole walk, e.g. routeEstimateV1)
   let more = 0;
   for (let j = Math.min(k, path.length - 1) + 1; j < path.length; j++) more += hypot(path[j][0] - path[j - 1][0], path[j][1] - path[j - 1][1]);
   return { ok: true, route: { ...res.route, length: res.route.length + more, rest: goal } };
+}
+
+/** BS3 (b): a fine hop to coarse waypoint `k` failed with `code`: the other waypoint indices to try, nearest first (one
+ *  past the end = the goal itself when `goalOk`). Only for an unreachable waypoint, never a blocked start. */
+const HOP_RETRY = [12, 24, -12, -24];
+const HOP_RETRY_CODES = new Set(['route.unreachable', 'route.goal-blocked', 'route.search-limit']);
+export function hopRetries(k: number, n: number, code: string, goalOk: boolean, lo = 1): number[] {
+  if (!HOP_RETRY_CODES.has(code)) return [];
+  const out: number[] = [];
+  for (const d of HOP_RETRY) {
+    let kk = k + d;
+    if (kk >= n - 1) kk = goalOk ? n : n - 1;
+    if (kk < lo || kk === k || out.includes(kk)) continue;
+    out.push(kk);
+  }
+  return out;
 }
 
 function appendLeg(legs: Leg[], leg: Leg) {
