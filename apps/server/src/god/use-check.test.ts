@@ -19,7 +19,7 @@ async function setup(t: TestContext) {
   t.after(() => { f.brain.quiesce(); f.host.stop(); f.db.close(); });
   const god = new GodMode(f.db, { worldId: f.host.worldId, ownerId: 'dev:admin', tick: () => f.host.engine.world.tick, emit: () => {} });
   const edge = new EdgeLedger(f.host, f.db);
-  installEngineBridge({ host: f.host, god, edge, log: () => {} });
+  const bridge = installEngineBridge({ host: f.host, god, edge, log: () => {} });
   const settle = async (n = 3) => { for (let i = 0; i < n; i++) { f.host.tickOnce(); await setImmediate(); f.host.drainInputs(); } };
   await settle();
   await invite(f, 'rowan');
@@ -29,7 +29,7 @@ async function setup(t: TestContext) {
   const act = (ops: any[]) => { const r = god.act({ ops }) as any; assert.equal(r.accepted, true, JSON.stringify(r)); return r; };
   const until = async (ok: () => boolean, max = 1500) => { for (let i = 0; i < max && !ok(); i++) await settle(1); return ok(); };
   const human = () => f.host.engine.world.entities[soul.entityId].human as { activity: string; berth?: string };
-  return { ...f, god, edge, soul, settle, act, until, human, E: f.host.engine as any };
+  return { ...f, god, edge, bridge, soul, settle, act, until, human, E: f.host.engine as any };
 }
 
 // core-bench-seat: 1.37 × 0.31 m, two seats facing +z at x = ±0.35. Walls are core walls (w ≥ 0.5 m along x, d along z; turned a quarter for the ends).
@@ -41,7 +41,7 @@ const ring = (name: string, c: [number, number], hx: number, hz: number, d: numb
 
 test('use-check: a seat or bed is usable exactly when a body can sit or lie on it', { timeout: 300_000 }, async (t) => {
   const w = await setup(t);
-  w.act([
+  const placed = w.act([
     { op: 'place', def: coreRef('bench-seat'), name: 'free-bench', p: [10, 10] },
     { op: 'place', def: coreRef('bed'), name: 'free-bed', p: [16, 10] },
     // hemmed in: 0.2 m of floor round the bench, then 1 m thick walls (every candidate stand point has < 0.34 m clear)
@@ -51,6 +51,11 @@ test('use-check: a seat or bed is usable exactly when a body can sit or lie on i
     // sealed: a free bench in the middle of a 6 m walled yard with no way in
     { op: 'place', def: coreRef('bench-seat'), name: 'sealed', p: [20, -20] }, ...ring('yard', [20, -20], 3, 3, 0.3),
   ]);
+  // buildsafe/1 (BS2) repairs a god edit that hems a bench in (it nudges hem-n clear); keep the use-check's no-approach
+  // coverage by putting hem-n back where it was sent as a legacy wall (as verify-use.test seeds its legacy sealed world).
+  assert.ok(placed.warnings.some((l: string) => /buildsafe\/1\): hem-n moved .* so hemmed can be walked to/.test(l)), JSON.stringify(placed.warnings));
+  const hn = w.god.model.get('hem-n')!, back = { ...hn, p: [-20, 0, 10 + 0.155 + 0.2 + 0.5] as [number, number, number] };
+  w.god.model.delete(hn.id); w.god.model.insert(back); w.god.model.index(back.id, w.god.model.footprint(back)); w.bridge.reconcile();
   await w.settle(4);
   const id = (n: string) => w.god.model.get(n)!.id;
   const names = ['free-bench', 'free-bed', 'hemmed', 'ringed', 'sealed'];
