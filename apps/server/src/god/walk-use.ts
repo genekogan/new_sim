@@ -4,6 +4,7 @@
 // there has nowhere to stand; navTargetsV1 skips such slots, so the walk audit never saw them) or an approach not walkable
 // both ways from the main ground (connectivityV1, as the walk audit's seat:/berth: destinations).
 import { fixtureSlots, seatApproach } from '../../../../mars/viewer/engine/social/slots.ts';
+import { spatialFixtureIdsV1 } from '@sim/engine-mars';
 
 /** BS1's useCheckV1 row (t4-bs1.md "API"). */
 export type UseVerdict = { id: string; of: string; kind: 'seat' | 'berth'; level: number; ok: boolean; code?: string; message?: string; at?: [number, number] };
@@ -16,9 +17,9 @@ export function useCheckFor(engine: any, keep?: (xz: [number, number]) => boolea
 
 function stubUseCheck(engine: any, keep?: (xz: [number, number]) => boolean): UseVerdict[] {
   const rt = engine.rt, w = rt.world, out: UseVerdict[] = [], pending: { v: UseVerdict; p: [number, number] }[] = [];
-  for (const id of Object.keys(w.entities).sort()) {
+  for (const id of spatialFixtureIdsV1(w.entities)) {
     const e = w.entities[id];
-    if (e.kind !== 'fixture' || (keep && !keep([e.pose.p[0], e.pose.p[2]]))) continue;
+    if ((keep && !keep([e.pose.p[0], e.pose.p[2]]))) continue;
     for (const slot of fixtureSlots(rt, e)) {
       if (slot.kind !== 'seat' && slot.kind !== 'berth') continue;
       const v: UseVerdict = { id: slot.id, of: id, kind: slot.kind, level: slot.level ?? 0, ok: true };

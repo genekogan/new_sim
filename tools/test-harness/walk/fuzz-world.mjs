@@ -37,7 +37,8 @@ export const BUILDING_TYPES = [...structures, ...vocabW3].filter((d) => d?.make?
 export function fuzzWorld(seed = FUZZ_SEED) {
   const rand = rng(seed);
   const terrain = [], build = [], furnish = [];
-  const add = (place, ops, opts = {}) => { build.push({ place, ops }); if (opts.furnish) furnish.push(place); };
+  // group: the section a place belongs to; the audit commits a group's places together (a refused group is retried place by place)
+  const add = (place, ops, opts = {}) => { build.push({ place, group: opts.group ?? place.split('-')[0], ops }); if (opts.furnish) furnish.push(place); };
   const ref = (type) => `core/${type}@1`;
 
   // knolls: a 4 x 7 lattice east of x = 0 (140 m apart); rings are filled in order, a new knoll when one is full

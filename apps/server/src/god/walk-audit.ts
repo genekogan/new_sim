@@ -85,7 +85,8 @@ export async function bootForWalk(o: { db?: string; genesis?: string; fuzz?: str
 }
 
 /** tools/test-harness/walk/fuzz-world.mjs: a genesis for the terrain plus god batches, one per place, and the buildings to furnish. */
-type FuzzWorld = { seed: string; genesis: unknown; build: { place: string; ops: unknown[] }[]; furnish: string[] };
+const FUZZ_CHUNK_OPS = 120;   // ops per commit
+type FuzzWorld = { seed: string; genesis: unknown; build: { place: string; group?: string; ops: unknown[] }[]; furnish: string[] };
 /** Build the fuzz world as a god does after the world exists: each place's batch, then `furnish <building>` (furnish.mjs) for
  *  each building, all through god.act with the engine bridge live (so commit-time checks and repairs run). A refused batch is
  *  scored as a bad destination of its place (`build.refused` / `furnish.refused`), never fatal, so one refusal cannot hide the rest. */
@@ -93,10 +94,19 @@ async function buildFuzz(f: FuzzWorld, god: any, host: any, bridge: any): Promis
   const { furnishBatch } = await import('../../../../tools/god-skill/lib/furnish.mjs');
   const out: [string, string, string][] = [], placed = new Set<string>(), t0 = performance.now();
   const code = (r: any) => String(r.failures?.[0]?.code ?? 'unknown');
-  for (const b of f.build) {
-    const r = god.act({ ops: b.ops }, `fuzz ${b.place}`);
-    if (r.accepted) placed.add(b.place); else out.push([`build.refused.${code(r)}`, `build:${b.place}`, b.place]);
-    host.drainInputs();
+  // places go in chunks of whole places (each commit re-installs the ground, so one commit per place costs ~0.2 s each);
+  // a refused chunk is retried place by place, so a refusal is scored against its own place only
+  const chunks: FuzzWorld['build'][] = [];
+  for (const b of f.build) { const c = chunks.at(-1); if (c && c[0].group === b.group && c.reduce((n, x) => n + x.ops.length, 0) + b.ops.length <= FUZZ_CHUNK_OPS) c.push(b); else chunks.push([b]); }
+  for (const c of chunks) {
+    const r = c.length > 1 ? god.act({ ops: c.flatMap((b) => b.ops) }, `fuzz ${c[0].place}..${c.at(-1)!.place}`) : null;
+    if (process.env.WALK_FUZZ_TIMES && r && !r.accepted) console.error(`fuzz chunk ${c[0].place}: refused ${code(r)}`);
+    if (r?.accepted) { for (const b of c) placed.add(b.place); host.drainInputs(); continue; }
+    for (const b of c) {
+      const r1 = god.act({ ops: b.ops }, `fuzz ${b.place}`);
+      if (r1.accepted) placed.add(b.place); else out.push([`build.refused.${code(r1)}`, `build:${b.place}`, b.place]);
+      host.drainInputs();
+    }
   }
   const t1 = performance.now();
   for (const place of f.furnish) {
@@ -125,8 +135,11 @@ export async function walkAudit(w: Booted, shard: [number, number] = [0, 1], o: 
   let t = performance.now(); e.connectivityV1(); lap('labels', t);
   const dests: { id: string; p: [number, number]; level: number; tol?: number }[] = [], goalless: [string, string][] = [];
   t = performance.now();
-  for (const th of w.bridge.nav.things()) {
-    if (!mine(th.at)) continue;
+  // in spatial order (32 m cells), so neighbouring goals share the engine's small fine-tile LRU (same answers, ~5x faster)
+  const cell = (v: number) => Math.floor(v / 32);
+  const things = [...w.bridge.nav.things()].filter((th: any) => mine(th.at))
+    .sort((a: any, b: any) => cell(a.at[1]) - cell(b.at[1]) || cell(a.at[0]) - cell(b.at[0]) || (a.ref < b.ref ? -1 : a.ref > b.ref ? 1 : 0));
+  for (const th of things) {
     const g = w.bridge.nav.goal(th, th.at);
     if (!g) goalless.push([th.ref, placeOf(`walk:${th.ref}`)]); else dests.push({ id: `walk:${th.ref}`, p: g.p, level: g.level });
   }
