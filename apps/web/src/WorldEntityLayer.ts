@@ -616,10 +616,13 @@ export class WorldEntityLayer {
     const pos: number[] = [], col: number[] = [], idx: number[] = [];
     const c = new THREE.Color();
     const seed = hashSeed(m.seed);
+    // t4-phone: the inner ring's heights from the ground recipe at each point (no bake of every tile along the world's edge:
+    // ~0.1 s of 4x CPU before a phone's poster); the same heights as the tiles' within their 1 m interpolation
+    const edgeHeight = (x: number, z: number) => heightAt(groundForTile(m.terrain.ground, Math.floor(x / TILE_M), Math.floor(z / TILE_M)), x, z);
     for (let r = 0; r <= rings; r++) for (let s = 0; s <= segs; s++) {
       const a = (s / segs) * Math.PI * 2, d = edge(a), inner = d + half * 0.02, outer = d + half * 2.2, radius = inner + (outer - inner) * (r / rings);
       const f = r / rings, bump = Math.sin(a * 7 + seed) * 0.5 + Math.sin(a * 13 + seed * 1.7) * 0.3 + Math.sin(a * 29 + seed * 0.3) * 0.2;
-      const h = r === 0 ? m.terrain.sample(cx + Math.cos(a) * (d - 1), cz + Math.sin(a) * (d - 1)) : m.constants.base + Math.max(0, bump) * half * 0.25 * Math.sin(Math.PI * f) + f * 8;
+      const h = r === 0 ? edgeHeight(cx + Math.cos(a) * (d - 1), cz + Math.sin(a) * (d - 1)) : m.constants.base + Math.max(0, bump) * half * 0.25 * Math.sin(Math.PI * f) + f * 8;
       pos.push(cx + Math.cos(a) * radius, h, cz + Math.sin(a) * radius);
       c.set(0x6f8f6a).lerp(new THREE.Color(0x9fb3c8), f * 0.9); col.push(c.r, c.g, c.b);
     }
