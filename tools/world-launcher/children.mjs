@@ -382,6 +382,8 @@ export function defaultCommand(world, port, o) {
     EDGE_FADING: '1',
     // Nobody watching or acting here for 30 s: the clock runs at a quarter of its wall pace (apps/server/src/attention.ts)
     SIM_UNWATCHED_PACE: process.env.SIM_UNWATCHED_PACE ?? '0.25',
+    // measurement only (lane SLEEP): log the engine state hash at boot and at stop
+    ...(process.env.SIM_BOOT_HASH === '1' ? { SIM_BOOT_HASH: '1' } : {}),
     // Soul mode of the world's one skill (/SKILL.md) points at Codex's Soul skill (/skill.md) and CLI (/eden-agent.mjs),
     // served as is from the published files when the launcher is given them (--soul-skill, --soul-cli).
     ...(o.soulSkillFile && existsSync(o.soulSkillFile) ? { EDGE_SKILL_FILE: resolve(o.soulSkillFile) } : {}),

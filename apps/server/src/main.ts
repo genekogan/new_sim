@@ -184,6 +184,8 @@ server.on('request', (req, res) => {
 // dayConfig also restarts the day's events), which the launcher never runs.
 const catchUp = process.env.SIM_UNWATCHED_PACE && !living ? new ClockCatchUp(host, config.dataDir, { log: (m) => console.log(m) }) : null;
 if (process.env.SIM_UNWATCHED_PACE) new Attention((watched) => { host.setPace(watched ? 1 : unwatchedPace()); if (watched) void catchUp?.watched()?.catch(() => {}); else catchUp?.unwatched(); }).watch(server);
+// SIM_BOOT_HASH=1 (measurement only): the engine state this boot restored, to compare with the one its last stop saved
+if (process.env.SIM_BOOT_HASH === '1') console.log(`[boot] state at tick ${host.engine.world.tick}: ${host.engine.stateHash()}`);
 host.start();
 void catchUp?.watched()?.catch(() => {});
 if (config.seedNatives && db.liveSouls(host.worldId).length === 0) {
@@ -236,6 +238,7 @@ const shutdown = async (sig: string) => {
   host.stop(); takes.stop();
   const saveAt = performance.now();
   try { host.saveSnapshot(true); } catch (e) { console.error('[world] snapshot failed', e); }
+  if (process.env.SIM_BOOT_HASH === '1') console.log(`[world] ${sig}: state at tick ${host.engine.world.tick}: ${host.engine.stateHash()}`);
   console.log(`[world] ${sig}: snapshot saved in ${Math.round(performance.now() - saveAt)} ms (capture ${Math.round(host.snapshotMs.capture)}, write ${Math.round(host.snapshotMs.persist)})`);
   server.close(); void hub.closeClients('server restarting');
   auth.close();db.close(); process.exit(0);
