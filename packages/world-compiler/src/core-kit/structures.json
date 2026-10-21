@@ -1778,7 +1778,7 @@
  },
  {
   "schema": "def/1",
-  "name": "core-stairs",
+  "name": "core-stair-flight",
   "version": 1,
   "description": "An outdoor flight of stairs from the ground up to a roof terrace, deck or upper landing: `rise` m up over `run` m, `width` wide; its top tread arrives on a 0.5 m landing beyond the flight. Stand it with its top end against the wall (the flight's -z end is the top).",
   "tags": [
