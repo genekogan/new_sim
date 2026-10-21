@@ -500,15 +500,13 @@ export function typoFix(input: string, ctx: VocabContext, extra: Iterable<string
   if (input.includes(':')) return null;
   const verbs = new Set(ctx.caps.map(c => c.verb)), {verb, rest} = parseCapability(input, verbs);
   if (!verbs.has(verb)) return null;
-  const known = new Map<string, number>(), add = (s: string | undefined) => {if (s) for (const t of tokens(s)) if (t.length >= 3 && !/\d/.test(t)) known.set(t, (known.get(t) ?? 0) + 1);};
-  for (const c of ctx.caps) {add(c.id.slice(c.id.indexOf(':') + 1)); add(c.label.replace(/,\s*by\s.*$/, ''));}
-  for (const p of ctx.places) {add(p.name); add(p.id); add(p.description); for (const a of p.aliases ?? []) add(a);}
-  for (const [k, v] of Object.entries(SYNONYMS)) {add(k); for (const x of v) add(x);}
-  for (const w of extra) add(w);
   const plain = (w: string) => STOP.has(w) || FILLER.has(w) || w in VERBS || /\d/.test(w) || w.length < 4;
+  const ask = [...new Set(rest.toLowerCase().split(/[^a-z0-9]+/).filter(w => w && !plain(w) && !LEXICON.has(w)))];
+  if (!ask.length) return null;
+  const known = knownWords(ctx, extra);
   const fixes: [string, string][] = [];
-  for (const w of new Set(rest.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean))) {
-    if (plain(w) || LEXICON.has(w) || known.has(w)) continue;
+  for (const w of ask) {
+    if (known.has(w)) continue;
     const max = w.length >= 5 ? 2 : 1;
     let best: {k: string; d: number; n: number} | null = null;
     const rank = (x: {k: string; d: number; n: number}) => [x.d, Number(x.k[0] !== w[0]), Number(x.k.length !== w.length), -x.n];
@@ -527,6 +525,23 @@ export function typoFix(input: string, ctx: VocabContext, extra: Iterable<string
   let text = input;
   for (const [w, k] of fixes) text = text.replace(new RegExp(`\\b${w}\\b`, 'gi'), k);
   return {text, fixes};
+}
+/** The words this world knows for typoFix, with how often each occurs. Rebuilt only when the offered ids, the known places or
+ *  the extra names change (a dry run reads it once per refusal; building it each time was most of a refusal's cost). */
+let knownMemo: {key: string; extra: unknown; known: Map<string, number>} | null = null;
+let synonymWords: [string, number][] | null = null;
+function knownWords(ctx: VocabContext, extra: Iterable<string>): Map<string, number> {
+  const key = ctx.caps.map(c => c.id).join('\n') + '\0' + ctx.places.map(p => `${p.id}|${p.name}|${p.description?.length ?? 0}|${p.aliases?.length ?? 0}`).join('\n');
+  const same = (a: unknown, b: unknown) => a === b || (Array.isArray(a) && Array.isArray(b) && !a.length && !b.length);
+  if (knownMemo && knownMemo.key === key && Array.isArray(extra) && same(knownMemo.extra, extra)) return knownMemo.known;
+  const count = (into: Map<string, number>, s: string | undefined) => {if (s) for (const t of tokens(s)) if (t.length >= 3 && !/\d/.test(t)) into.set(t, (into.get(t) ?? 0) + 1);};
+  if (!synonymWords) {const m = new Map<string, number>(); for (const [k, v] of Object.entries(SYNONYMS)) {count(m, k); for (const x of v) count(m, x);} synonymWords = [...m];}
+  const known = new Map<string, number>(synonymWords), add = (s: string | undefined) => count(known, s);
+  for (const c of ctx.caps) {add(c.id.slice(c.id.indexOf(':') + 1)); add(c.label.replace(/,\s*by\s.*$/, ''));}
+  for (const p of ctx.places) {add(p.name); add(p.id); add(p.description); for (const a of p.aliases ?? []) add(a);}
+  for (const w of extra) add(w);
+  knownMemo = {key, extra, known};
+  return known;
 }
 /** Everyday words for things and places that are spelt right: never read as another word (Mars has no horse: "go to the
  *  horse" is not the bunk house; "stable" is not a table, "couch" not the south). Only guards the typo fallback. */
