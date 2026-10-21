@@ -39,7 +39,7 @@ const loadOldEden=()=>oldEdenLoad??=import('./old-eden.ts').then(m=>{setTimeout(
 // Patch shared lit-shader chunks before any program compiles (strength stays 0 outside Eden).
 installNightLighting();
 installLookToneCurve();installMaterialDetail();  // look pass (rendering/WorldLook.ts): tone curve + material detail chunks, before any program compiles
-import {arrivalMark,arrivalOver,whenArrivalCardGone} from './arrival-marks.ts';import {earlyArrival,earlyArrivalWanted} from './early-arrival.ts';import {connectionLost} from './viewer-arrival.ts';import {activityWords,doingText} from './place-names.ts';
+import {arrivalMark,arrivalOver,whenArrivalCardGone,whenMarked} from './arrival-marks.ts';import {earlyArrival,earlyArrivalWanted} from './early-arrival.ts';import {connectionLost} from './viewer-arrival.ts';import {activityWords,doingText} from './place-names.ts';
 import {worldDepictionBeat,type WorldBeatSampler} from './WorldDepiction.ts';
 import {RecordedGaitContinuity} from '../../../mars/viewer/app/engine-view/recorded-gait-continuity.ts';
 import { Suspense, lazy, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
@@ -54,6 +54,8 @@ import {PEOPLE,templateNameFor} from '../../../mars/viewer/app/engine-view/peopl
 import {WorldLightPeople} from './WorldLightPeople.ts';
 // P1 phones: the people renderer is a lazy chunk (people-kit.ts). Old worlds and desktops fetch it at once and wait for it
 // before their first frame; a phone's new world draws its first frames with WorldLightPeople and fetches it after arrival.
+/** F12: whether this page's arrival card has gone (speech anchors wait for it). */
+let arrivalCardDone=false;void whenMarked('card-done').then(()=>{arrivalCardDone=true;});
 let peopleKit:typeof import('./people-kit.ts')|null=null,peopleKitLoad:Promise<typeof import('./people-kit.ts')>|null=null;
 const loadPeopleKit=()=>peopleKitLoad??=import('./people-kit.ts').then(m=>peopleKit=m,e=>{peopleKitLoad=null;throw e;});
 if(!newWorld)void loadPeopleKit().catch(()=>{});
@@ -1040,7 +1042,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           return [{soulId:soul.id,point:label.obj.position.toArray() as [number,number,number],rendered}];
         }):[];
         let speechAnchors:ReturnType<typeof projectSpeechAnchors>|undefined;
-        if(context.current.publishSpeechAnchors&&(!points.length||(initialGate&&['waiting','downloading','preparing','first-frame'].includes(initialGate.snapshot().stage))))speechAnchors=[];  // F12: none under the arrival card (the visibility pass cost /w/eden ~0.3 s at 4x before its card). P1: nobody to place: skip the visibility pass over every mesh (~1 ms a frame on Eden 2026)
+        if(context.current.publishSpeechAnchors&&(!points.length||(initialGate&&(['waiting','downloading','preparing','first-frame'].includes(initialGate.snapshot().stage)||(!arrivalCardDone&&performance.now()<20_000)))))speechAnchors=[];  // F12: none under the arrival card, its ready frame included (that pass held /w/eden's card ~0.15 s at 4x after initial-ready) (the visibility pass cost /w/eden ~0.3 s at 4x before its card). P1: nobody to place: skip the visibility pass over every mesh (~1 ms a frame on Eden 2026)
         else if(context.current.publishSpeechAnchors)try{
           speechVisibility.prepareFresh(visualObstructionRoots());
           speechAnchors=projectSpeechAnchors(points,camera,host.clientWidth,host.clientHeight,area,p=>speechVisibility.score({position:camera.position.toArray(),target:[...p],fov:camera.fov},['anchor'],{anchor:{p:[...p],yaw:0,points:[[...p]]}})===1);
