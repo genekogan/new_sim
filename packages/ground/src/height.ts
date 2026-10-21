@@ -175,20 +175,19 @@ function padsFlatsWin(h: number, x: number, z: number, pads: FlatsPad[], inOldFl
   return v;
 }
 
-/** pad/2b shoulder (lane SEALED, 2026-10-21): where two cones do not meet, each flat keeps a walkable shoulder this wide
- *  on its own cone (grade PAD_GRADE) before the ground drops (or rises) to the other flat, the upper flat first: before,
- *  the ground ran between the two flats by distance from the flat's edge, so a terrace 1-3 m above a neighbour lost the
- *  margin along its wall (the 1 m tile grid put the next sample down the drop: a ledge too narrow to stand on). */
+/** pad/2b shoulder (lane SEALED, 2026-10-21): where two cones do not meet, each flat keeps a walkable shoulder up to this
+ *  wide on its own cone (grade PAD_GRADE) before the ground drops (or rises) to the other flat. Before, the ground ran
+ *  between the two flats by distance from the flats' edges, so a terrace 1-3 m above a neighbour lost the margin along
+ *  its wall (the 1 m tile grid put the next sample down the drop: a ledge too narrow to stand on). A narrow gap is shared
+ *  evenly (a shoulder for the upper flat alone took the lower flat's door landing: cliff-house-19 below cliff-house-23). */
 export const PAD_SHOULDER_M = 1.0;
 /** Two conflicting cones at (x, z): the upper flat's fill bound `lo` (dLo from its flat), the lower flat's cut bound `hi`
  *  (dHi from its flat). Within the upper shoulder: lo; within the lower one: hi; between: from one to the other by distance. */
 function conflictBlend(lo: number, hi: number, dLo: number, dHi: number): number {
-  const gap = dLo + dHi;
-  const sUp = Math.min(PAD_SHOULDER_M, Math.max(0, gap - 0.3)), sLo = Math.min(PAD_SHOULDER_M, Math.max(0, gap - sUp - 0.3));
-  if (dLo <= sUp) return lo;
-  if (dHi <= sLo) return hi;
-  const t = (dLo - sUp) / (gap - sUp - sLo);
-  return lo + (hi - lo) * t;
+  const gap = dLo + dHi, s = Math.min(PAD_SHOULDER_M, Math.max(0, (gap - 0.3) / 2));
+  if (dLo <= s) return lo;
+  if (dHi <= s) return hi;
+  return lo + (hi - lo) * (dLo - s) / (gap - 2 * s);
 }
 
 /** pad/2b: is (x, z) on an older pad's flat (a pad/1 area, a pad/2 area or landing)? Only asked near a pad/2b pad. */

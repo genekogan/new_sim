@@ -148,10 +148,13 @@ test('pad/2b: no cliff at a landing edge where a neighbour cut cone digs below t
   const g = flatsWorld(A, B);
   assert.ok(Math.abs(heightAt(g, 2.01, 0)) < 0.05, `just off the landing: ${heightAt(g, 2.01, 0)}`);
   assert.ok(Math.abs(heightAt(g, 3.49, 0) + 3) < 0.05, `just off B's flat: ${heightAt(g, 3.49, 0)}`);
+  // the 1.5 m gap is shared (SEALED shoulder): each flat keeps a 0.6 m shoulder on its own cone (grade 0.5, walkable),
+  // then the ground falls from one level to the other, never rising and never outside the two levels
+  for (const [x0, x1] of [[2.01, 2.6], [2.9, 3.49]]) assert.ok(Math.abs(heightAt(g, x1, 0) - heightAt(g, x0, 0)) <= 0.5 * (x1 - x0) + 1e-6, `shoulder ${x0}-${x1}`);
   let prev = heightAt(g, 1.95, 0);
   for (let x = 2; x <= 3.6; x += 0.05) {
     const h = heightAt(g, x, 0);
-    assert.ok(Math.abs(h - prev) <= 0.15, `step at x=${x.toFixed(2)}: ${prev.toFixed(2)} -> ${h.toFixed(2)}`);
+    assert.ok(h <= prev + 1e-9, `rises at x=${x.toFixed(2)}: ${prev.toFixed(2)} -> ${h.toFixed(2)}`);
     assert.ok(h <= 0 + 1e-9 && h >= -3 - 1e-9, `between the levels at x=${x.toFixed(2)}`);
     prev = h;
   }
