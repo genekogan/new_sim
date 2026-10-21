@@ -43,6 +43,13 @@ function shapedIds(before: WorldModel, diff: Diff): Set<string> {
   for (const e of diff.upserts) { const b = before.entities.get(e.id); if (!b || geometryOf(b) !== geometryOf(e)) out.add(e.id); }
   return out;
 }
+/** nav-connect/1: the shaped ids plus every door whose open/shut state the edit changed (a shut door blocks its gap, so
+ *  closing one can cut a Soul off just as a wall can; opening one can make a named thing reachable again). */
+function navDoorFlips(before: WorldModel, diff: Diff, shaped: Set<string>): Set<string> {
+  const out = new Set(shaped), key = (e: Entity) => JSON.stringify([e.state?.open ?? null, e.state?.doors ?? null]);
+  for (const e of diff.upserts) { const b = before.entities.get(e.id); if (b && key(b) !== key(e)) out.add(e.id); }
+  return out;
+}
 /** Where a refused body placement points: people as scenery (harvest fix 'figures'). core/figure@1 has no body component,
  *  so it is never a Soul, never simulated or counted as a resident; it places like any prop. */
 export const PEOPLE_AS_SCENERY = 'for people as scenery (a crowd, waiters, stallholders, a choir) place core/figure@1 instead: `place figure --at x,z --param pose=stand|walk|sit|carry|serve|wave --param hat=none|cap|sunhat|chef|scarf --param top=#hex` (one figure per placement; children --scale 0.6); it is a prop, never a resident';
@@ -179,7 +186,7 @@ export class EngineBridge {
     this.god.bodies = {
       uses: id => this.usesOne(id),
       refuse: (after, diff, ops, o) => this.protectedBody(after, diff, ops, o?.undo === true),
-      prepare: (before, after, diff, _ops, o) => { if (o?.dry !== true) { try { this.arrivalShaped = shapedIds(before, diff); } catch { this.arrivalShaped = null; } this.navShaped = this.arrivalShaped; this.navBefore = this.navSpots(before, [...diff.removes, ...(this.navShaped ?? diff.upserts.map(e => e.id))]); } return this.prepareWalkouts(before, after, diff, o?.dry === true); },
+      prepare: (before, after, diff, _ops, o) => { if (o?.dry !== true) { try { this.arrivalShaped = shapedIds(before, diff); } catch { this.arrivalShaped = null; } this.navShaped = this.arrivalShaped && navDoorFlips(before, diff, this.arrivalShaped); this.navBefore = this.navSpots(before, [...diff.removes, ...(this.navShaped ?? diff.upserts.map(e => e.id))]); } return this.prepareWalkouts(before, after, diff, o?.dry === true); },
       apply: (moved, o) => { const late = this.applyWalkouts(moved, this.stuckPlanned.splice(0)); this.stageMapNotices(o); return late; },
       arrivalNote: diff => this.arrivalNoteFor(diff),
       navNote: diff => this.navNoteFor(diff),

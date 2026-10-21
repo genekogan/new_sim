@@ -8,6 +8,7 @@ import { fixture, invite, accept, factory } from '../../test/native-owner-fixtur
 import { EdgeLedger } from '../edge/ledger/ledger.ts';
 import { GodMode } from './god.ts';
 import { installEngineBridge } from './engine-bridge.ts';
+import { coreRef } from '@sim/world-compiler';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function world(t: TestContext) {
@@ -53,6 +54,24 @@ test('walls built round a Soul: it steps to open ground (logged, nav-connect/1) 
   // an edit near the same pocket names the crate no more (said once), and moves nobody
   const again: any = w.god.act({ ops: [{ op: 'place', def: 'crate@1', name: 'crate2', p: [at[0] + 6, at[1] + 6] }] });
   assert.equal(again.warnings.some((x: string) => x.startsWith('No walk reaches') || /Soul/.test(x)), false, JSON.stringify(again.warnings));
+});
+
+test('a door shut on a Soul in a walled yard: it steps out, as for a wall (a door state edit is checked too)', async t => {
+  const w = world(t); await w.settle(1);
+  await invite(w, 'bo'); const row: any = await accept(w.host, w.souls.create('dev:bo', { name: 'Bo', description: 'quiet' })); await w.settle(8);
+  const b0 = w.host.engine.world.entities[row.entity_id]!; assert.equal(w.E.relocateHumanV1(row.entity_id, [b0.pose.p[0] + 20, b0.pose.p[2]]), true); await w.settle(2);
+  const b = w.host.engine.world.entities[row.entity_id]!, [x, z] = [b.pose.p[0], b.pose.p[2]];
+  const yard: any = w.god.act({ ops: [
+    { op: 'place', def: coreRef('garden-wall'), name: 'yard', shape: { path: [[x - 0.6, z - 3], [x - 4, z - 3], [x - 4, z + 3], [x + 4, z + 3], [x + 4, z - 3], [x + 0.6, z - 3]] } },
+    { op: 'place', def: coreRef('door'), name: 'yard-door', p: [x, z - 3], state: { open: true } }] });
+  assert.equal(yard.accepted, true, JSON.stringify(yard.failures)); await w.settle(3);
+  assert.equal(w.E.navCheckV1([{ id: 'bo', p: [x, z], level: 0 }])[0].ok, true, 'door open: Bo can walk out');
+  const shut: any = w.god.act({ ops: [{ op: 'set', id: w.god.model.get('yard-door')!.id, state: { open: false } }] });
+  assert.equal(shut.accepted, true, JSON.stringify(shut.failures));
+  assert.ok(shut.warnings.some((x: string) => /^1 Soul cut off by this edit stepped to open ground nearby\.$/.test(x)), JSON.stringify(shut.warnings));
+  await w.settle(3);
+  const p = w.host.engine.world.entities[row.entity_id]!.pose.p;
+  assert.equal(w.E.navCheckV1([{ id: 'bo', p: [p[0], p[2]], level: 0 }])[0].ok, true, 'out on the main area');
 });
 
 test('walls round a thing far from any Soul: the reply stays fast ("pending"), the note rides on the next reply, once', async t => {
