@@ -210,8 +210,12 @@ export class GodNav {
     if (rooms.length) {
       const out: Thing[] = [];
       const doors = (baked.openings ?? []).filter((o) => o.kind === 'door' && (o.level ?? 0) === 0);
-      // the front door: named so, else the ground-floor door farthest from the building's centre (an outer wall)
-      const front = doors.find((o) => /front|main|entr/.test(o.id)) ?? [...doors].sort((a, b) => Math.hypot(b.at[0], b.at[1]) - Math.hypot(a.at[0], a.at[1]))[0];
+      // the front door: named so, else the ground-floor door farthest from the building's centre (an outer wall); an
+      // exterior door first when the openings say which are (the police station's interior "door-front-room-office"
+      // matched the name and put every room's entry behind its front desk)
+      const named = (o: { id: string }) => /front|main|entr/.test(o.id), outer = doors.filter((o) => o.exterior);
+      const pool = outer.length ? outer : doors;
+      const front = pool.find(named) ?? [...pool].sort((a, b) => Math.hypot(b.at[0], b.at[1]) - Math.hypot(a.at[0], a.at[1]))[0];
       const stands: Vec2[] = [];
       const frontSlot = baked.slots.find((x) => x.kind === 'stand' && /front|door|entr/.test(x.id));
       let inside: Vec2 | undefined, doorOpen = false;
