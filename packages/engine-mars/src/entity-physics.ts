@@ -143,20 +143,32 @@ export function withLinkApproaches(part: EntityPartV1): EntityPartV1 {
     // `toward`: the builder knows the way on or off this end (a helix flight is entered straight in from the stair well's
     // axis, not along the chord of its heading). A clear approach that way is then recorded, with the nearer places and
     // the sides tried when it is not; without it the default 0.7 m back along the heading stays.
-    const pick = (end: { level: number; p: Vec2; y: number }, out: Vec2, toward = false, pad = 0): Vec2 | null => {
+    const pick = (end: { level: number; p: Vec2; y: number }, out: Vec2, toward = false, pad = 0, degs = [30, -30, 60, -60, 90, -90, 120, -120]): Vec2 | null => {
       const straight: Vec2 = [r3(end.p[0] + out[0] * 0.7), r3(end.p[1] + out[1] * 0.7)];
       if (clear(end.p, straight, end.y, end.level, pad)) return toward ? straight : null;
-      for (const d of toward ? [0.7, 0.5, 0.9, 1.1] : [0.7, 0.9, 1.1]) for (const deg of [30, -30, 60, -60, 90, -90, 120, -120]) {
+      for (const d of toward ? [0.7, 0.5, 0.9, 1.1] : [0.7, 0.9, 1.1]) for (const deg of degs) {
         const a = (deg * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a);
         const q: Vec2 = [r3(end.p[0] + (out[0] * c - out[1] * s) * d), r3(end.p[1] + (out[0] * s + out[1] * c) * d)];
         if (clear(end.p, q, end.y, end.level, pad)) return q;
       }
       return null;
     };
+    // Last resort for an end none of the above clears: finer turns (the heading runs from the foot's approach to the
+    // head, so a flight entered from the side has it skewed ~15 deg off the flight's own axis) and the way back, first
+    // with room to spare (the planner's grid reads ~0.07 m tighter than these point tests), then without.
+    const FINE = [75, -75, 105, -105, 90, -90, 180, 165, -165, 150, -150, 135, -135, 120, -120, 60, -60, 45, -45];
+    const fallback = (end: { level: number; p: Vec2; y: number }, out: Vec2): Vec2 | null => {
+      if (clear(end.p, [r3(end.p[0] + out[0] * 0.7), r3(end.p[1] + out[1] * 0.7)], end.y, end.level)) return null;
+      return pick(end, out, false, 0.06, FINE) || pick(end, out, false, 0, FINE);
+    };
     const towards = (end: { p: Vec2 }, at?: Vec2): Vec2 | null => { if (!at) return null; const dx = at[0] - end.p[0], dz = at[1] - end.p[1], n = Math.hypot(dx, dz); return n > 0.05 ? [dx / n, dz / n] : null; };
     const hint = l.approach, hf = towards(l.from, hint?.from), ht = towards(l.to, hint?.to);
     const from = (hf && (pick(l.from, hf, true, 0.12) || pick(l.from, hf, true))) || pick(l.from, [-dir[0], -dir[1]]);
-    const to = (ht && (pick(l.to, ht, true, 0.12) || pick(l.to, ht, true))) || pick(l.to, dir);
+    // An upper end with no clear way on along or beside its heading (a cottage head set sideways into the corridor
+    // beside the flight, the end wall 0.5 m ahead; a head between the rail's end and the end wall with the heading
+    // skewed) takes the fallback (lane RAIL: the default 0.7 m ahead lay in the end wall, so the descent was refused
+    // and the upstairs one-way). Only when nothing else is clear, so every end that had an approach keeps it.
+    const to = (ht && (pick(l.to, ht, true, 0.12) || pick(l.to, ht, true))) || pick(l.to, dir) || fallback(l.to, dir);
     if (from || to) l.approach = { ...(from ? { from } : {}), ...(to ? { to } : {}) };
     else delete l.approach;
   }

@@ -56,6 +56,7 @@ function innerRect(r: Rect, p: Plan): Rect {
   const h = (v: number, bound: number) => (Math.abs(v - bound) < 1e-6 ? p.t / 2 : p.ti / 2);
   return [r[0] + h(r[0], X0), r[1] + h(r[1], Z0), r[2] - h(r[2], X1), r[3] - h(r[3], Z1)];
 }
+const pointInRect = (q: Vec2, r: Rect) => q[0] >= Math.min(r[0], r[2]) && q[0] <= Math.max(r[0], r[2]) && q[1] >= Math.min(r[1], r[3]) && q[1] <= Math.max(r[1], r[3]);
 export const rectPolyOf = (r: Rect): Vec2[] => [[r[0], r[1]], [r[2], r[1]], [r[2], r[3]], [r[0], r[3]]];
 /** Rect minus rect → up to four rects (stairwells always touch at least one side, usually leaving two or three). */
 function subtract(a: Rect, h: Rect): Rect[] {
@@ -214,7 +215,19 @@ export function realize(p: Plan): Layout {
     const side = (s.width / 2 + 0.45) * s.away;
     // a sideways step on or off stays >= 0.55 m from the end wall, so a body (0.34 m) fits there
     const approach = room0 >= 0.8 ? pt(bottom - dir * 0.35) : pt(bottom + dir * Math.max(0.3, 0.55 - room0), side);
-    const arrive = roomTop >= 0.8 ? pt(top + dir * 0.35) : pt(top - dir * Math.max(0.3, 0.55 - roomTop), side);
+    // The head is left by stepping through a gap beside the stairwell rail, so it sits in the middle of that gap (lane
+    // RAIL): with < 1.4 m of floor beyond the top, a body turns off sideways between the rail's end (at the top) and the
+    // end wall, so the head sits halfway along that floor (it sat 0.35 m out, 0.25 m clear of the rail's end on the
+    // planner's grid: the descent was refused, the stairs one-way up). A sideways head (< 0.8 m beyond the top) sits in
+    // the middle of the corridor beside the flight, between the rail and the arrival room's wall (it sat 0.45 m out from
+    // the rail line, off-centre toward the wall in a narrow corridor).
+    const beyond = roomTop < 1.4 ? Math.min(0.6, Math.max(0.35, (roomTop + 0.03) / 2)) : 0.35;
+    const upRoom = p.rooms.find((r) => r.floor === s.to && r.rect && pointInRect(pt(top - dir * 0.3, side), r.rect));
+    const upIr = upRoom?.rect ? innerRect(upRoom.rect, p) : null;
+    const wallOff = upIr ? (axis === 'x' ? (s.away === 1 ? upIr[3] - mid : mid - upIr[1]) : (s.away === 1 ? upIr[2] - mid : mid - upIr[0])) : 0;
+    const corridorMid = (s.width / 2 + 0.03 + wallOff) / 2;
+    const sideTop = upIr && corridorMid > s.width / 2 + 0.3 && corridorMid < s.width / 2 + 0.9 ? corridorMid * s.away : side;
+    const arrive = roomTop >= 0.8 ? pt(top + dir * beyond) : pt(top - dir * Math.max(0.3, 0.55 - roomTop), sideTop);
     const path = [approach, pt(bottom), pt(top), arrive];
     const sideways = roomTop < 0.8;
     L.stairs.push({ id: s.id, kind: 'straight', from: s.from, to: s.to, room: s.room, width: s.width, risers: s.risers, y0, y1, rect: s.rect, axis, dir, path, hole: rectPolyOf([x0 - 0.02, z0 - 0.02, x1 + 0.02, z1 + 0.02]) });
