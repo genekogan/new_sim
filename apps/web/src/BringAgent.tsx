@@ -18,11 +18,17 @@ export function BringAgent({auth,requireAuth=false,showButton=true,worldName}:{a
  useEffect(()=>{if(!open)return;const prior=document.activeElement as HTMLElement|null;modal.current?.querySelector<HTMLButtonElement>('.primary')?.focus();const k=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.preventDefault();close();}if(e.key==='Tab'){const nodes=[...modal.current?.querySelectorAll<HTMLElement>('button,a[href]')??[]];const first=nodes[0],last=nodes.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}};addEventListener('keydown',k);return()=>{removeEventListener('keydown',k);if(prior?.isConnected&&prior.getClientRects().length)prior.focus();else document.querySelector<HTMLElement>('.account-avatar,.account-sign-in')?.focus();};},[open]);
  useEffect(()=>{if(!open||!auth.authed||code)return;let live=true;void windowCode().then(c=>{if(live&&c)setCode(c);});return()=>{live=false;};},[open,auth.authed,code]);
  const close=()=>{setPending(false);setOpen(false);setNote('');dismissNewSoul(worldUrl,port);};
+ // QA2 F8: signed out, New Soul says why before the sign-in sheet (which only says "Welcome back"); a shared #join link too
+ const [explain,setExplain]=useState(false),explained=useRef(false);
+ const signIn=()=>{setExplain(false);if(requestNewSoul(auth,requireAuth,worldUrl,port))setOpen(true);else setPending(true);};
+ useEffect(()=>{if(auth.ready&&requireAuth&&!auth.authed&&location.hash==='#join'&&!explained.current){explained.current=true;setExplain(true);}},[auth.ready,auth.authed,requireAuth]);
+ useEffect(()=>{if(!explain)return;modal.current?.querySelector<HTMLButtonElement>('.primary')?.focus();const k=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.preventDefault();setExplain(false);}};addEventListener('keydown',k);return()=>removeEventListener('keydown',k);},[explain]);
  const copy=async()=>{if(await copyText(text)){setNote('Copied.');return;}if(prompt.current){const range=document.createRange();range.selectNodeContents(prompt.current);const selection=getSelection();selection?.removeAllRanges();selection?.addRange(range);}setNote(manualCopyHint);};
  const canonicalJoin=auth.signInUrl?new URL(auth.signInUrl):null;if(canonicalJoin)canonicalJoin.hash='join';
  if(canonicalJoin)return showButton?<a className="bring-agent-open" href={canonicalJoin.href} title={`Bring a new Soul to ${world}`} aria-label="New Soul">{NEW_SOUL_ICON}<span>New Soul</span></a>:null;
- const button=<button type="button" className="bring-agent-open" aria-haspopup="dialog" aria-expanded={open} title={`Bring a new Soul to ${world}`} aria-label="New Soul" onClick={()=>{if(requestNewSoul(auth,requireAuth,worldUrl,port))setOpen(true);else setPending(true);}}>{NEW_SOUL_ICON}<span>New Soul</span></button>;
+ const button=<button type="button" className="bring-agent-open" aria-haspopup="dialog" aria-expanded={open} title={`Bring a new Soul to ${world}`} aria-label="New Soul" onClick={()=>{if(requireAuth&&!auth.authed){explained.current=true;setExplain(true);}else signIn();}}>{NEW_SOUL_ICON}<span>New Soul</span></button>;
  const entry=showButton?button:null;
+ if(explain&&requireAuth&&!auth.authed)return <>{entry}{createPortal(<NewSoulExplain world={world} modal={modal} onSignIn={signIn} onClose={()=>setExplain(false)}/>,document.body)}</>;
  if(!open||requireAuth&&!auth.authed)return entry;
  return <>{entry}{createPortal(<div className="bring-agent-scrim" role="presentation" onPointerDown={e=>{if(e.target===e.currentTarget)close();}}>
   <section ref={modal} className="bring-agent" role="dialog" aria-modal="true" aria-labelledby="bring-agent-title">
@@ -36,3 +42,16 @@ export function BringAgent({auth,requireAuth=false,showButton=true,worldName}:{a
 
 /** Secondary entry has no onboarding state or portal; the header owns #join. */
 export function NewSoulLink({auth}:{auth:{signInUrl?:string}}){const target=auth.signInUrl?new URL(auth.signInUrl):null;if(target)target.hash='join';return <a className="bring-agent-open" href={target?.href??'#join'}>New Soul</a>;}
+
+/** QA2 F8: the one step before sign-in, so a stranger knows why New Soul asks them to sign in. */
+export function NewSoulExplain({world,modal,onSignIn,onClose}:{world:string;modal?:React.RefObject<HTMLElement|null>;onSignIn():void;onClose():void}){
+ return <div className="bring-agent-scrim" role="presentation" onPointerDown={e=>{if(e.target===e.currentTarget)onClose();}}>
+  <section ref={modal} className="bring-agent bring-agent-explain" role="dialog" aria-modal="true" aria-labelledby="bring-agent-explain-title" data-new-soul-explain="1">
+   <button type="button" className="bring-agent-close" aria-label="Close" onClick={onClose}>×</button>
+   <h2 id="bring-agent-explain-title">New Soul</h2>
+   <p>Sign in to bring your own agent's Soul into {world}.</p>
+   <p className="bring-agent-fine">Your own agent (Claude Code, Codex or another) makes and plays the Soul. First time here? Signing in makes your account.</p>
+   <div className="bring-agent-row"><button type="button" className="primary" onClick={onSignIn}>Sign in</button><button type="button" className="bring-agent-later" onClick={onClose}>Not now</button></div>
+  </section>
+ </div>;
+}

@@ -13,7 +13,7 @@ export class WorldFollow {
   private instances=new WorldVisibilityInstances();
   private objects:THREE.Object3D[]=[];
   private hits:THREE.Intersection[]=[];
-  reset(){this.requested=this.rendered=this.chosen=this.previousTarget=null;this.userOrbited=false;this.lastSearch=-Infinity;this.chosenClear=false;this.velocity.set(0,0,0);this.userAt=-Infinity;this.instances.reset();}
+  reset(){this.opening=this.pulled=null;this.requested=this.rendered=this.chosen=this.previousTarget=null;this.userOrbited=false;this.lastSearch=-Infinity;this.chosenClear=false;this.velocity.set(0,0,0);this.userAt=-Infinity;this.instances.reset();}
   /** Same candidates as recursive intersectObjects, minus objects whose hits
    * opaque() always rejects: hidden ancestry or own cameraTransparent. */
   private collect(roots:readonly THREE.Object3D[]){
@@ -61,6 +61,47 @@ export class WorldFollow {
     }
     return allowed;
   }
+  /** QA2 F11: a camera that sees the Soul only through an opening (a doorway, a window) in a wall across the view
+   * frames that wall, not the Soul. Two rays a frame-width apart (left and right of the sightline, at torso and head
+   * height, cast both ways for one-sided walls) that both meet a face turned along the view mean the camera stands
+   * beyond such a wall: the length along `offset` up to it (minus a margin, at least NEAR), else Infinity. Walls along the view (a
+   * corridor, a house beside the Soul) do not count, nor a post on one side only, nor anything outdoors. */
+  private throughOpening(target:THREE.Vector3,offset:THREE.Vector3):number{
+    const length=offset.length(),dir=offset.clone().normalize(),right=new THREE.Vector3(dir.z,0,-dir.x);
+    if(right.lengthSq()<1e-6||length<NEAR+.5)return Infinity;right.normalize();
+    const normal=new THREE.Vector3(),instance=new THREE.Matrix4(),world=new THREE.Matrix4();
+    const crossing=(h:THREE.Intersection)=>{if(!h.face||!this.opaque(h.object))return false;normal.copy(h.face.normal);
+      const mesh=h.object as THREE.InstancedMesh;
+      if(mesh.isInstancedMesh&&h.instanceId!==undefined){mesh.getMatrixAt(h.instanceId,instance);world.multiplyMatrices(mesh.matrixWorld,instance);}else world.copy(h.object.matrixWorld);
+      return Math.abs(normal.transformDirection(world).dot(dir))>.7;};
+    // Indoors only: something overhead (a ceiling, a roof; cast both ways for one-sided ones) within 8 m. Outdoors a
+    // gap between two houses is left to the sightline search (it rises over them).
+    const head=target.clone().add(new THREE.Vector3(0,.6,0)),up=new THREE.Vector3(0,1,0);let roofed=false;
+    for(const [origin,direction] of [[head,up],[head.clone().addScaledVector(up,8),up.clone().negate()]] as const){
+      this.ray.set(origin,direction);this.ray.near=0;this.ray.far=8;this.hits.length=0;
+      for(let o=0;o<this.objects.length;o++)this.instances.intersect(this.objects[o],this.ray,this.hits,o);
+      roofed||=this.hits.some(h=>this.opaque(h.object));this.hits.length=0;
+    }
+    if(!roofed)return Infinity;
+    let nearest=Infinity;
+    for(const side of [-1,1]){let sideHit=Infinity;
+      for(const height of [0,.6]){
+        const from=target.clone().add(new THREE.Vector3(0,height,0)),to=target.clone().addScaledVector(offset,1).addScaledVector(right,side*length*.45);
+        const ray=to.clone().sub(from),far=ray.length();ray.normalize();
+        for(const [origin,direction,flip] of [[from,ray,false],[to,ray.clone().negate(),true]] as const){
+          this.ray.set(origin,direction);this.ray.near=0;this.ray.far=far;this.hits.length=0;
+          for(let o=0;o<this.objects.length;o++)this.instances.intersect(this.objects[o],this.ray,this.hits,o);
+          for(const h of this.hits)if(crossing(h)){const along=(flip?far-h.distance:h.distance)*ray.dot(dir);if(along>.3)sideHit=Math.min(sideHit,along);}
+          this.hits.length=0;
+        }
+      }
+      if(sideHit===Infinity)return Infinity;nearest=Math.min(nearest,sideHit);
+    }
+    // A Soul in the doorway itself (the wall nearer than NEAR) is left to the sightline search.
+    return nearest-.25>=NEAR?nearest-.25:Infinity;
+  }
+  private opening:{at:number;cap:number}|null=null;
+  private pulled:number|null=null;
   /** Length for an offset whose sight reaches only `reach`: in to the nearest wall (the camera never sits behind
    * one), not nearer than NEAR to the body; a Soul pressed into a solid keeps a readable FOLLOW_MIN instead. */
   private fit(length:number,reach:number){return reach>=NEAR?Math.min(length,reach):Math.min(length,FOLLOW_MIN);}
@@ -125,6 +166,22 @@ export class WorldFollow {
       const v=Math.min(5,this.limit(target,c,roots,-Infinity,true))-.4*want.angleTo(c.clone().normalize());if(v>score){score=v;open=c;}}
     return open.clone().setLength(this.fit(open.length(),this.limit(target,open,roots)));
   }
+  /** QA2 F11: come in through an opening (throughOpening), measured at the asked-for length every .2 s (so the
+   * pulled-in camera does not stop seeing the wall and swing back out), gliding in quickly and holding there. */
+  private inOpening(target:THREE.Vector3,dt:number):THREE.Vector3{
+    const r=this.rendered!;
+    if(!this.opening||this.clock-this.opening.at>=.2){
+      const asked=r.clone().setLength(Math.max(r.length(),this.chosen?.length()??0,this.requested?.length()??0));
+      this.opening={at:this.clock,cap:this.throughOpening(target,asked)};
+    }
+    const cap=this.opening.cap;
+    if(cap===Infinity){this.pulled=null;return r;}
+    // the glide outward (toward the asked-for length) keeps pushing; the pulled length moves only inward, to the cap
+    const from=Math.min(r.length(),this.pulled??Infinity);
+    this.pulled=from<=cap?from:dt>0?from-Math.min((from-cap)*-Math.expm1(-dt/.18),8*dt):cap;  // quick, never a jump (<= 8 m/s)
+    r.setLength(Math.min(r.length(),Math.max(this.pulled,cap)));
+    return r;
+  }
   private resolveCollected(target:THREE.Vector3,roots:readonly THREE.Object3D[],seconds:number):THREE.Vector3 {
     const dt=Number.isFinite(seconds)?Math.max(0,Math.min(.1,seconds)):0;this.clock+=dt;
     if(this.previousTarget&&dt>0){const v=target.clone().sub(this.previousTarget).divideScalar(dt);if(v.length()<20)this.velocity.lerp(v,-Math.expm1(-dt/.6));}
@@ -141,7 +198,7 @@ export class WorldFollow {
     if(this.userActive&&this.rendered){
       const reach=this.limit(target,this.rendered,roots);
       this.rendered.setLength(this.fit(this.rendered.length(),reach));
-      return this.rendered.clone();
+      return this.inOpening(target,dt).clone();
     }
     // Search again every .2 s, or at once when a clear viewpoint is cut (one with no clear view waits for the next search).
     if(!this.chosen||this.clock-this.lastSearch>=.2||this.chosenClear&&!this.clear(target,this.chosen,roots)){
@@ -161,6 +218,6 @@ export class WorldFollow {
       if(!blocked){const length=this.rendered.length(),fitted=this.fit(length,this.limit(target,this.rendered,roots));
         if(fitted<length&&length-fitted<=.2)this.rendered.setLength(fitted);}
     }
-    return this.rendered.clone();
+    return this.inOpening(target,dt).clone();
   }
 }

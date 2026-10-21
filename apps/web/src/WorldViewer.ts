@@ -41,6 +41,8 @@ export interface WorldViewerState {
   shownTick: number | null;
   presentation: 'live' | 'history';
   cameraMode: WorldCameraMode;
+  /** QA2 F10: the camera left Broadcast by itself (a Soul-less world's arrival framing), not by the visitor's hand. */
+  cameraAuto?: boolean;
   /** Canonical selection only. Decorative kin inspection stays inside the viewer. */
   selection: { soulId: string | null; entityId: string | null; soulIds?:readonly string[] };
   playback: 'live' | 'playing' | 'paused';
@@ -114,7 +116,7 @@ export function createWorldViewerHandle(current: () => WorldViewerPort): WorldVi
 }
 export function viewerPresentation(input: {
   drawnTick: number | null; history: boolean; playing: boolean;
-  cameraMode: WorldCameraMode; soulId: string | null; entityId: string | null;
+  cameraMode: WorldCameraMode; cameraAuto?: boolean; soulId: string | null; entityId: string | null;
   loading: boolean; unavailableReason: string | null;
   assetDownloads?:AssetDownloadProgress;
   room?:{id:string;name:string;soulIds:readonly string[]}|null;
@@ -123,7 +125,7 @@ export function viewerPresentation(input: {
 }): WorldViewerState {
   return {
     shownTick: input.drawnTick !== null && Number.isFinite(input.drawnTick) ? input.drawnTick : null,
-    presentation: input.history ? 'history' : 'live', cameraMode: input.cameraMode,
+    presentation: input.history ? 'history' : 'live', cameraMode: input.cameraMode, ...(input.cameraAuto ? { cameraAuto: true } : {}),
     selection: { ...(input.soulIds?.length?{soulIds:[...input.soulIds]}:{}),soulId: input.soulId, entityId: !input.soulId && input.entityId?.startsWith('kin:') ? null : input.entityId },
     playback: input.history ? input.playing ? 'playing' : 'paused' : 'live',
     loading: input.loading, unavailableReason: input.unavailableReason,
