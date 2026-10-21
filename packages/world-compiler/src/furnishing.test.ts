@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { CORE_KIT, WorldModel, applyBatch, obbOverlap, type Refused } from './index.ts';
-import { furnishBatch, roomKeys, connectedPairs, wayLabels, approachOf, gridSlack } from '../../../tools/god-skill/lib/furnish.mjs';
+import { furnishBatch, roomKeys, connectedPairs, wayLabels, approachOf } from '../../../tools/god-skill/lib/furnish.mjs';
 
 function fresh() {
   const w = new WorldModel({ constants: { ground: 'land' }, seed: 'furnishing' });
@@ -65,6 +65,7 @@ function furnishedShop(recipe?: any) {
   assert.equal(r.accepted, true, JSON.stringify(r));
   const baked = w.bake(w.resolvedDef(b.def)!, b.params ?? {}, b.seed ?? 0, b.shape) as any;
   const doors = baked.openings.filter((o: any) => o.kind === 'door' || o.kind === 'arch');
+  const wp = w.worldPose(b), way = { pose: { x: wp.x, z: wp.z, yaw: wp.yaw, s: wp.s } };   // on the walk raster where it stands (BS1)
   for (const room of baked.rooms.filter((x: any) => x.floor === 0)) {
     const keys = roomKeys(room, doors, baked.links ?? []), walls = baked.colliders.filter((o: any) => o.y0 < room.y + 1.6 && o.y1 > room.y + 0.15);
     const pieces = [...w.children.get(b.id)!].map((id) => w.entities.get(id)!).filter((e: any) => e.in.slot === room.id).map((e: any) => {
@@ -73,10 +74,10 @@ function furnishedShop(recipe?: any) {
       return { name: e.name, c, half: [bb.box[0] / 2, bb.box[2] / 2], yaw, y0: room.y, y1: room.y + bb.box[1], solid: d.layer === 'solid' && bb.box[1] > 0.06, approach: approachOf(bb, c, yaw) };
     }).filter((x) => x.solid);
     const all = (keys.length * (keys.length - 1)) / 2;
-    assert.equal(connectedPairs(room, keys, walls), all, `${room.id}: walls alone`);
-    assert.equal(connectedPairs(room, keys, [...walls, ...pieces]), all, `${room.id}: furnished, ${keys.length} doors/stair ends`);
+    assert.equal(connectedPairs(room, keys, walls, way), all, `${room.id}: walls alone`);
+    assert.equal(connectedPairs(room, keys, [...walls, ...pieces], way), all, `${room.id}: furnished, ${keys.length} doors/stair ends`);
     // ... and where a Soul sent to each piece stands is reached from the doors (the display may not stand at a shelf's front)
-    const labels = wayLabels(room, [...keys, ...pieces.map((x) => x.approach)], [...walls, ...pieces]);
+    const labels = wayLabels(room, [...keys, ...pieces.map((x) => x.approach)], [...walls, ...pieces], way);
     for (const [i, x] of pieces.entries()) assert.ok(labels[keys.length + i] === labels[0], `${room.id}: ${x.name} is reached from the door`);
   }
   return f;
@@ -98,13 +99,15 @@ test('a piece may not stand where a Soul sent to another piece would stand (the 
   assert.ok(d && d.p[0] < 0, `display goes to its next pose, not shelf-2's front: ${JSON.stringify(d?.p)} ${JSON.stringify(f.dropped)}`);
 });
 
-test('the ways check keeps the walk grid\'s slack, more in a building turned off the grid (hillside-home-4, lane WALK2)', () => {
-  assert.equal(gridSlack(0), 0.05); assert.equal(+gridSlack(Math.PI / 4).toFixed(6), 0.15); assert.equal(+gridSlack(Math.PI).toFixed(6), 0.05);
-  // a 4 x 4 m room split by a wall with a 0.85 m gap: square to the grid the body passes, turned 45 deg it does not (on the
-  // walk grid a 0.96 m gap in hillside-home-4, turned 39 deg, had 0.31 m of room where 0.34 is needed)
+test('the ways check judges a gap on the walk raster where the building stands, turned or not (hillside-home-4, lane WALK2; BS1 rule)', () => {
+  // a 4 x 4 m room split by a wall with a gap: on the raster of a building square to the grid and of one turned 39 deg
+  // (hillside-home-4: a 0.96 m gap between a table and a sofa had 0.31 m of room on the walk grid where 0.34 is needed)
   const room = { id: 'r', floor: 0, polygon: [[0, 0], [4, 0], [4, 4], [0, 4]] } as never;
   const wall = (x0: number, x1: number) => ({ c: [(x0 + x1) / 2, 2], half: [(x1 - x0) / 2, 0.05], yaw: 0, y0: 0, y1: 2 });
-  const keys: [number, number][] = [[2, 0.5], [2, 3.5]], blockers = [wall(0, 1.5), wall(2.35, 4)];
-  assert.equal(connectedPairs(room, keys, blockers, gridSlack(0)), 1, 'square to the grid');
-  assert.equal(connectedPairs(room, keys, blockers, gridSlack(Math.PI / 4)), 0, 'turned 45 deg');
+  const keys: [number, number][] = [[2, 0.5], [2, 3.5]];
+  const gap = (w: number, yaw: number) => connectedPairs(room, keys, [wall(0, 2 - w / 2), wall(2 + w / 2, 4)], { pose: { x: 10.03, z: 20.07, yaw } });
+  assert.equal(gap(0.88, 0), 1, 'a 0.88 m gap walks square to the grid');
+  assert.equal(gap(0.88, 39 * Math.PI / 180), 0, 'the same gap is sealed turned 39 deg');
+  assert.equal(gap(0.96, Math.PI / 4), 0, 'a 0.96 m gap is sealed turned 45 deg');
+  for (const yaw of [0, 39 * Math.PI / 180, Math.PI / 4]) assert.equal(gap(1.04, yaw), 1, `a 1.04 m gap walks at yaw ${yaw.toFixed(2)}`);
 });

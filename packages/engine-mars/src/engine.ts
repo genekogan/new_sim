@@ -79,13 +79,17 @@ import { listEntities } from '../../../mars/viewer/engine/world/entity-list.ts';
 import type {NativeBoatControlsV1} from '@sim/engine-contract';
 import type {BodyLocationV1} from '@sim/engine-contract';
 import {bodyProblem} from '../../../mars/viewer/engine/bodies/body.ts';
-import {humanRadius} from '../../../mars/viewer/engine/bodies/humanoid.ts';
+import {humanRadius,seatFitProblem} from '../../../mars/viewer/engine/bodies/humanoid.ts';
+import {slotTransitionIssue} from '../../../mars/viewer/engine/social/actions.ts';
+import {PLAN_MARGIN} from '../../../mars/viewer/engine/spatial/path.ts';
 import {creatureOf} from '../../../mars/viewer/engine/bodies/creatures.ts';
 import type {Body} from '../../../mars/viewer/engine/world/types.ts';
 import {renderPlatformsV1Schema,type RenderPlatformsV1} from '@sim/engine-contract';
 import {officeStairGuardsV1Schema,type OfficeStairGuardsV1} from '@sim/engine-contract';
 import {authoredBoundariesV1Schema,authoredBoundariesDeclarationV1Schema,type AuthoredBoundariesV1,type AuthoredBoundariesDeclarationV1} from '@sim/engine-contract';
 import {placeOnGround} from '../../../mars/viewer/engine/items/model.ts';
+/** One fixture slot's verdict from useCheckV1 (lane BS1). */
+export type UseCheckV1={id:string;of:string;kind:'seat'|'berth';level:number;ok:boolean;code?:string;message?:string;at?:[number,number]};
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /** Make the next Spatial.sync rebuild (incrementally, from the previous grids): the world's scene contribution changed
@@ -1891,6 +1895,38 @@ export class MarsEngine implements Engine {
       const xs=r.polygon.map((v:any)=>v[0]),zs=r.polygon.map((v:any)=>v[1]),ctr=centroid(r.polygon) as [number,number];let best:[number,number]|null=null,bd=Infinity;
       for(let x=Math.min(...xs)+.5;x<Math.max(...xs);x+=1)for(let z=Math.min(...zs)+.5;z<Math.max(...zs);z+=1){if(!inPoly(x,z,r.polygon))continue;const d=hypot(x-ctr[0],z-ctr[1]);if(d<bd&&c.connectedRoot(c.rootAt([x,z]))){best=[x,z];bd=d;}}
       out.push({id,of:id,kind:'region',p:best??ctr,level:0,tol:.5});}
+    return out;
+  }
+  /** BUILDSAFE use-check (lane BS1): can a standard body actually sit on each seat and lie on each berth, judged the way the
+   *  sit plan (social/actions.ts take_slot) does it, with the main walkable ground standing in for the walker: a standing
+   *  approach with room for the body (reachable/1 assets: radius + plan margin, any angle), the straight sit/stand slide
+   *  from it onto the slot crossing nothing (slotTransitionIssue), that approach joined to the main ground both ways
+   *  (connectivity, as the walk audit reads it), and, for seats whose top `seatTop` names, a seat height the standard
+   *  body sits on. Unlike navTargetsV1 a slot with no standing room at all is counted (use.no-approach), not skipped.
+   *  `of` limits it to these fixtures; `keep` skips fixtures whose position it rejects. Pure read. */
+  useCheckV1(opts:{of?:string[];keep?:(at:[number,number])=>boolean;seatTop?:(slot:{id:string;of:string})=>number|undefined}={}):UseCheckV1[]{
+    const out:UseCheckV1[]=[],w=this.rt.world,c=this.connectivityV1(),body=HUMAN_PROFILE_V1;
+    const ids=opts.of?[...new Set(opts.of)].filter(id=>w.entities[id]).sort():Object.keys(w.entities).sort();
+    const verb=(k:string)=>k==='berth'?'lain on':'sat on';
+    for(const id of ids){const e=w.entities[id];if(e.kind!=='fixture')continue;if(opts.keep&&!opts.keep([e.pose.p[0],e.pose.p[2]]))continue;
+      for(const slot of fixtureSlots(this.rt,e)){if(slot.kind!=='seat'&&slot.kind!=='berth')continue;
+        const base={id:slot.id,of:id,kind:slot.kind as 'seat'|'berth',level:slot.level??0};
+        let navIssue:(ConnVerdict&{p:[number,number]})|undefined,slide:{code:string;message:string}|undefined;
+        const joined=(p:[number,number])=>{const v=c.check([{id:slot.id,p,level:base.level,tol:.5}])[0];if(v.ok)return true;navIssue??={...v,p};return false;};
+        const a=slot.approachPolicy==='reachable/1'?seatApproach(this.rt,slot,{minClearance:body.radius+PLAN_MARGIN,anyAngle:true,accept:(p)=>{
+          const issue=slotTransitionIssue(this.rt,slot,p,body);if(issue){if(issue.code!=='slot.no-floor')slide??=issue;return false;}
+          return joined([p[0],p[1]]);}}):seatApproach(this.rt,slot);
+        if(!Array.isArray(a)){
+          if(navIssue){const where=navIssue.code==='nav.no-standing-room'?'has no standing room on the walk raster':navIssue.code==='nav.one-way'?'is joined to the main ground one way only':'is cut off from the main ground';
+            out.push({...base,ok:false,code:navIssue.code??'nav.disconnected',message:`${slot.id} cannot be ${verb(slot.kind)}: where a body stands to get on it (${navIssue.p[0].toFixed(2)}, ${navIssue.p[1].toFixed(2)}) ${where}`,at:navIssue.p});}
+          else if(slide)out.push({...base,ok:false,code:'use.transition-blocked',message:slide.message,at:[slot.p[0],slot.p[1]]});
+          else out.push({...base,ok:false,code:'use.no-approach',message:a.message,at:Array.isArray(a.at)?[a.at[0],a.at[2]]:[slot.p[0],slot.p[1]]});
+          continue;}
+        const at:[number,number]=[a[0],a[1]];
+        if(slot.approachPolicy!=='reachable/1'&&!joined(at)){const v=navIssue!;out.push({...base,ok:false,code:v.code??'nav.disconnected',message:`${slot.id} cannot be ${verb(slot.kind)}: where a body stands to get on it (${at[0].toFixed(2)}, ${at[1].toFixed(2)}) ${v.code==='nav.no-standing-room'?'has no standing room on the walk raster':v.code==='nav.one-way'?'is joined to the main ground one way only':'is cut off from the main ground'}`,at});continue;}
+        const top=slot.kind==='seat'?opts.seatTop?.({id:slot.id,of:id}):undefined,fit=top!==undefined?seatFitProblem(undefined,top):null;
+        if(fit){out.push({...base,ok:false,code:'use.seat-fit',message:`${slot.id}: ${fit.message}`,at});continue;}
+        out.push({...base,ok:true,at});}}
     return out;
   }
   /** lane NAV: the audit's policy id and passable clearance (reports). */
