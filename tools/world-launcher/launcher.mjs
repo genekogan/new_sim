@@ -14,6 +14,8 @@
 //   GET  /__sim/launcher         children, ports, pids, restarts (diagnostics; direct local requests only)
 //   GET  /__sim/healthz          {ok, build, worlds, running, caps, memAvailableMb} (also /healthz); clientErrorsNew = error kinds
 //                                pages first reported since this build went live (client-errors.mjs)
+//   GET  /__sim/health           the site owner's health page (health-dash.mjs): a data-free shell; ?json=1 = build, host, every
+//                                world, backups, arrivals, new errors, alerts, for loopback or a site owner's Clerk session
 //   POST /__sim/client-errors    a page's error beacon (apps/web/src/client-errors.ts); GET: the operator's summary (direct
 //                                loopback only; op.mjs client-errors): top errors by count, world, browser, first/last seen, build
 //   POST /__sim/op/create-world  operator only (direct loopback requests; anything through a reverse proxy is refused):
@@ -70,6 +72,7 @@ import { execFileSync } from 'node:child_process';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer, request } from 'node:http';
 import { clientErrors } from './client-errors.mjs';
+import { healthDash } from './health-dash.mjs';
 import { connect } from 'node:net';
 import { createReadStream, existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { brotliCompressSync, gzipSync, constants as zlibConstants } from 'node:zlib';
@@ -244,6 +247,9 @@ export async function openLauncher(cfg = {}) {
   }
   // Gene 2026-10-16: one god per world; co-builders are off unless asked for (--cobuilders or SIM_COBUILDERS=1).
   const cobuilders = cfg.cobuilders ?? process.env.SIM_COBUILDERS === '1';
+  // lane DASH: the site owner's health page (health-dash.mjs)
+  const dash = healthDash({ dataDir, build: BUILD, base: B, registry, pool, live, stats, refreshStats, errors, hostHealth: () => hostHealth(dataDir), auth, wp,
+    verify: (a) => (auth ? verifiedCreator(a, auth.child, publicOrigin, root) : Promise.resolve(null)), worldOwner: safeOwner });
   const handoff = makeHandoff({ registry, pool, dataDir, wp, publicOrigin, actorOf, isOwner, closing, log, cobuilders });
   async function ownerArchive(w, body, authorization) {
     const a = await actorOf(w, authorization);
@@ -546,6 +552,7 @@ export async function openLauncher(cfg = {}) {
       if (path === B) { res.writeHead(308, { location: `${B}/${url.search}` }).end(); return; }
       if (path.startsWith(`${B}/`)) path = path.slice(B.length); else outside = true;
     }
+    dash.noteWatch(req);   // lane DASH: sim-watch's last check (and what it saw down)
     try {
       if (outside) {
         if (path === '/healthz' && direct(req)) { json(res, 200, { ok: true, service: 'world-launcher', base: B, build: BUILD }); return; }
@@ -564,6 +571,13 @@ export async function openLauncher(cfg = {}) {
         }
         if (req.method === 'GET' && direct(req)) { json(res, 200, errors.summary({ limit: url.searchParams.get('limit'), world: url.searchParams.get('world') || undefined })); return; }
         json(res, 404, { ok: false, code: 'not-found' }); return;
+      }
+      if (path === '/__sim/health' && (req.method === 'GET' || req.method === 'HEAD')) {
+        // lane DASH: the page shell for anyone (no data in it); ?json=1 for the operator on loopback or a site owner's session
+        if (!url.searchParams.has('json')) { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex', 'referrer-policy': 'no-referrer' }).end(req.method === 'HEAD' ? undefined : dash.shell()); return; }
+        const t0 = performance.now(), may = await dash.allowed(req, direct(req));
+        if (may !== 200) { json(res, may, { ok: false, code: may === 401 ? 'sign-in' : may === 403 ? 'not-owner' : 'busy' }); return; }
+        const d = await dash.json(); json(res, 200, d, { 'server-timing': `dash;dur=${(performance.now() - t0).toFixed(1)}` }); return;
       }
       if (path === '/__sim/worlds.json' && req.method === 'GET') { json(res, 200, await worldsJson()); return; }
       if (path === '/__sim/templates.json' && req.method === 'GET') { json(res, 200, { templates: templateList().map(({ file: _f, ...t }) => t) }); return; }
