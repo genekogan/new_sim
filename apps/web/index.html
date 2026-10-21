@@ -14,6 +14,9 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- t4-phone (QA F12): a world page shows the arrival card from its first paint (main.css is already in), not a blank
+         page until its JavaScript is in (old /w/eden on a 4G phone: ~4 s); React replaces it on its first render -->
+    <script>(function(){try{if(!/\/w\/[a-z][a-z0-9-]{0,31}(\/|$)/.test(location.pathname)||/[?&]shot=/.test(location.search))return;var r=document.getElementById('root');if(!r||r.firstChild)return;r.innerHTML='<div class="viewer-arrival" style="position:fixed" role="status" aria-live="polite"><div class="viewer-arrival-card"><span class="viewer-arrival-spinner" aria-hidden="true"></span><div><p class="viewer-arrival-title">Arriving</p><p class="viewer-arrival-stage">Loading the world\u2026</p></div></div></div>'}catch(e){}})()</script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
