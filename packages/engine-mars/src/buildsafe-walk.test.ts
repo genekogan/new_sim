@@ -42,3 +42,47 @@ for (const gait of ['run', 'jog'] as const) test(`paged: a ${gait} across a ford
   assert.ok(fast > 0 && fastAfter > 0, `ran before and after the ford (${fast}, ${fastAfter})`);
   assert.ok(Math.hypot(b.pose.p[0] - from[0] - 260, b.pose.p[2] - from[2]) < 0.5, `arrived: ${b.pose.p}`);
 });
+
+/** Admit a ~30 m walk from the arrival to the first open spot among a few directions (the Green field has buildings). */
+function walk30(e: Eng, from: number[]) {
+  for (const [dx, dz] of [[30, 0], [-30, 0], [0, 30], [0, -30], [21, 21], [-21, 21], [21, -21], [-21, -21], [25, 5], [5, 25]]) {
+    const adm = e.perform({ actor: 'h', label: 'walk', steps: [{ verb: 'walk_to', params: { to: [from[0] + dx, from[2] + dz] } }] });
+    if (adm.ok) return adm;
+  }
+  assert.fail('no open spot 30 m from the arrival');
+}
+
+// BUILDSAFE (lane BS3) watchdog: a walk that makes no headway (here: its exec's pace forced to 0, so it stands 'running'
+// for ever, the shape of every live "walking on the spot" report) replans once from where it stands after 15 s and ends
+// honestly as walk.stuck after 30 s, instead of holding the Soul's receipt open for ever.
+test('a walk with no headway replans once at 15 s and fails walk.stuck at 30 s', () => {
+  const e = factory.create(factory.genesis('watchdog')) as never as Eng & { runtime: { services: { walkExecs?: Map<string, { speed: number; replans: number; watch?: { n: number; replanned: boolean } }> } } };
+  e.spawnHuman({ id: 'h', label: 'Walker', soul: 's_h' });
+  const b = e.world.entities.h, from = [...b.pose.p];
+  const adm = walk30(e, from);
+  e.step();
+  const ex = [...(e as never as { rt: { services: { walkExecs?: Map<string, any> } } }).rt.services.walkExecs!.values()][0];
+  assert.ok(ex, 'the walk has an exec');
+  let end, n = 0, replannedAt = -1;
+  for (; n < 900 && !end; n++) {
+    ex.speed = 0;
+    end = done(e, adm.id);
+    if (replannedAt < 0 && ex.watch?.replanned) replannedAt = n;
+  }
+  assert.equal(end?.kind, 'failed', JSON.stringify(end));
+  assert.equal(end?.code, 'walk.stuck', JSON.stringify(end));
+  assert.match(end?.message ?? '', /made no headway for 30 s/);
+  assert.ok(replannedAt >= 295 && replannedAt <= 310, `one forced replan near 15 s (tick ${replannedAt})`);
+  assert.ok(n >= 595 && n <= 615, `ended near 30 s (tick ${n})`);
+  assert.ok(Math.hypot(b.pose.p[0] - from[0], b.pose.p[2] - from[2]) < 0.5, 'it never moved');
+  assert.equal((e as never as { rt: { services: { walkExecs?: Map<string, any> } } }).rt.services.walkExecs!.size, 0, 'the exec is gone');
+});
+
+test('a normal 30 m walk is never touched by the watchdog', () => {
+  const e = factory.create(factory.genesis('watchdog-ok')) as never as Eng;
+  e.spawnHuman({ id: 'h', label: 'Walker', soul: 's_h' });
+  const from = [...e.world.entities.h.pose.p];
+  const adm = walk30(e, from);
+  let end; for (let n = 0; n < 2000 && !end; n++) end = done(e, adm.id);
+  assert.equal(end?.kind, 'completed', JSON.stringify(end));
+});
