@@ -1040,7 +1040,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           return [{soulId:soul.id,point:label.obj.position.toArray() as [number,number,number],rendered}];
         }):[];
         let speechAnchors:ReturnType<typeof projectSpeechAnchors>|undefined;
-        if(context.current.publishSpeechAnchors&&!points.length)speechAnchors=[];  // P1: nobody to place: skip the visibility pass over every mesh (~1 ms a frame on Eden 2026)
+        if(context.current.publishSpeechAnchors&&(!points.length||(initialGate&&['waiting','downloading','preparing','first-frame'].includes(initialGate.snapshot().stage))))speechAnchors=[];  // F12: none under the arrival card (the visibility pass cost /w/eden ~0.3 s at 4x before its card). P1: nobody to place: skip the visibility pass over every mesh (~1 ms a frame on Eden 2026)
         else if(context.current.publishSpeechAnchors)try{
           speechVisibility.prepareFresh(visualObstructionRoots());
           speechAnchors=projectSpeechAnchors(points,camera,host.clientWidth,host.clientHeight,area,p=>speechVisibility.score({position:camera.position.toArray(),target:[...p],fov:camera.fov},['anchor'],{anchor:{p:[...p],yaw:0,points:[[...p]]}})===1);
