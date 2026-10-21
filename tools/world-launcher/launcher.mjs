@@ -23,6 +23,8 @@
 //   POST /__sim/op/archive-world operator only: {slug, reason?} → stop it, move <data>/worlds/<slug> to <data>/archive/<id>/world,
 //                                unregister it (never deletes; worldops.mjs). restore-world {id} puts it back; list-archive;
 //                                audit {slug?} reads <data>/audit.jsonl
+//   POST /__sim/op/soul-pending|soul-approve|soul-message|soul-inbox|soul-delete, /__sim/op/set-test  operator only: TEST Souls
+//                                on worlds flagged test (op-souls.mjs, apps/server/src/op-souls.ts)
 //   POST /__sim/worlds/<slug>/archive  the world's owner (signed in, or their own agent's god token): {confirm: <slug>, reason?}
 //   co-builders and handoff (handoff.mjs), under /__sim/worlds/<slug>/ (co-builders OFF unless --cobuilders or
 //   SIM_COBUILDERS=1; one god per world, Gene 2026-10-16): owner: GET cobuilders, POST cobuilders/invite {to?},
@@ -81,6 +83,7 @@ import { EXISTING_WORLDS, decorateCommand, memAvailableMb, productionSettings } 
 import { makeHandoff } from './handoff.mjs';
 import { launcherFlood } from './flood.mjs';
 import { archiveWorld, archivedSlugs, listArchive, readAudit, restoreWorld, tokenLabel } from './worldops.mjs';
+import { opSoul, opSetTest } from './op-souls.mjs';
 // The host check's last result, if the sim-worlds-health timer runs; stale (>30 min) counts as not ok.
 function hostHealth(dataDir) {
   try { const h = JSON.parse(readFileSync(join(dataDir, 'host-health.json'), 'utf8')); const stale = Date.now() - Date.parse(h.at) > 30 * 60e3; return stale ? { ...h, ok: false, stale: true, codes: ['stale'] } : h; } catch { return null; }
@@ -576,6 +579,18 @@ export async function openLauncher(cfg = {}) {
           'restore-world': (b) => { const r = restoreWorld({ registry, dataDir }, b?.id, 'operator'); if (r[0] === 200) log(`restored ${r[1].slug} from ${r[1].id} (operator)`); return r; },
           'list-archive': () => [200, { ok: true, archive: listArchive(dataDir) }],
           'audit': (b) => [200, { ok: true, audit: readAudit(dataDir, typeof b?.slug === 'string' ? b.slug : undefined) }] })[forkOp](body); json(res, out[0], out[1]); return;
+      }
+      // lane OPS2: the operator's TEST-Soul commands and the test-world flag (op-souls.mjs), direct loopback only
+      const soulOp = path.match(/^\/__sim\/op\/(?:soul-(pending|approve|message|inbox|delete)|(set-test))$/);
+      if (soulOp && req.method === 'POST') {
+        if (!direct(req)) { json(res, 403, { ok: false, code: 'local-only', message: 'operator commands are accepted only from this machine' }); return; }
+        const chunks = []; let n = 0;
+        for await (const c of req) { n += c.length; if (n > 16_384) { json(res, 413, { ok: false, code: 'too-large' }); return; } chunks.push(c); }
+        let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { json(res, 400, { ok: false, code: 'bad-json' }); return; }
+        const out = soulOp[2] ? opSetTest({ body, registry, dataDir, log }) : await opSoul({ verb: soulOp[1], body, registry, dataDir, log,
+          ensure: (w) => pool.ensure(worldEnv(w)),
+          call: async (w, p, sub, b) => { const r = await fetch(`http://127.0.0.1:${p}${wp(w.slug)}${sub}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-sim-site-key': siteKey }, body: JSON.stringify(b), signal: AbortSignal.timeout(30_000) }); return [r.status, await r.json().catch(() => ({ ok: false, code: 'bad-reply' }))]; } });
+        json(res, out[0], out[1]); return;
       }
       const own = path.match(/^\/__sim\/worlds\/([a-z][a-z0-9-]{0,31})\/(archive|offer|offer\/accept|offers\/cancel|transfer|cobuilders|cobuilders\/(?:invite|remove)|cobuild\/pair\/(?:start|poll|approve))$/);
       if (own && (req.method === 'POST' || req.method === 'GET')) {
