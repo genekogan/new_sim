@@ -314,7 +314,8 @@ export class GroundNav {
   /** One tile's fine level-0 raster: ground media, then obstacles in the body band above the ground there, then the exact EDT. */
   fineTile(tx: number, tz: number, rel: Obstacle[], key = this.keyOf(tx, tz, rel), keep = true): FineTile {
     const hit = this.fine.get(key);
-    if (hit) { this.fine.delete(key); this.fine.set(key, hit); this.stats.fineHits++; return hit; }
+    // keep = false reads a hit without refreshing it: the audit's sweep must not age the tiles the engine's windows use
+    if (hit) { if (keep) { this.fine.delete(key); this.fine.set(key, hit); } this.stats.fineHits++; return hit; }
     this.stats.fineBuilds++;
     const { per, apron: A, cell } = this;
     const M = per + 2 * A, ox = tx * per - A, oz = tz * per - A;

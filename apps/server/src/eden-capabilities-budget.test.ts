@@ -22,10 +22,11 @@ const FIRST_BUDGET_REFS = 400, LATER_BUDGET_REFS = 200;
 test('Eden 2026: a new Soul\'s capabilities stay within budget, first and after a walk', { timeout: 600_000, skip: NO_EDEN }, async (t) => {
   const w = await bootEden();
   t.after(() => w.close());
-  const nav = (w.host.engine as unknown as { rt: { services: { spatial: { ground: { stats: Record<string, number>; fineMax: number; fine: Map<string, unknown>; keyOf(tx: number, tz: number, rel: unknown): string; fineTile(tx: number, tz: number, rel: unknown, key?: string): unknown } } } } }).rt.services.spatial.ground;
+  const nav = (w.host.engine as unknown as { rt: { services: { spatial: { ground: { stats: Record<string, number>; fineMax: number; fine: Map<string, unknown>; keyOf(tx: number, tz: number, rel: unknown): string; fineTile(tx: number, tz: number, rel: unknown, key?: string, keep?: boolean): unknown } } } } }).rt.services.spatial.ground;
   // which fine tiles each sweep builds (a build of a tile an earlier sweep already built is a rebuild: LRU thrash)
   const built: string[] = [], fineTile = nav.fineTile.bind(nav);
-  nav.fineTile = (tx, tz, rel, key = nav.keyOf(tx, tz, rel)) => { if (!nav.fine.has(key)) built.push(key); return fineTile(tx, tz, rel, key); };
+  // (keep = false is the connectivity audit's read-through, never cached: forwarded as is and not an engine build)
+  nav.fineTile = (tx, tz, rel, key = nav.keyOf(tx, tz, rel), keep = true) => { if (keep && !nav.fine.has(key)) built.push(key); return fineTile(tx, tz, rel, key, keep); };
   const ref = referenceMs(), FIRST_BUDGET_MS = FIRST_BUDGET_REFS * ref, LATER_BUDGET_MS = LATER_BUDGET_REFS * ref;
   const s0 = { ...nav.stats }, h0 = strandedMetrics().hits;
   const first = timed(() => w.edge.capabilities(w.soul));

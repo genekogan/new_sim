@@ -598,10 +598,7 @@ types.push(
     params: { w: 14, d: 10, floors: 1, floorHeight: 3.2, roof: 'flat', roofPitch: 0, material: 'brick', wall: '#7a8a9a', trim: '#2f4a6b', roofColor: '#5d6466', porch: 1.5, windows: 0.5 },
     plan: plan([{ rooms: [['front', 0, 5, 9, 10], ['office', 0, 0, 9, 5], ['cell-1', 9, 0, 14, 3.33], ['cell-2', 9, 3.33, 14, 6.67], ['cell-3', 9, 6.67, 14, 10]],
       doors: [['front', 'office', 0.8], ['office', 'cell-1'], ['front', 'cell-3'], ['office', 'cell-2', 0.75]], ext: [['front', 's', 0.4, 1.4]] }]),
-    recipe: { front: [counter('desk', 'reception', '0.5,0.2,s'), it('bench', 'bench-seat', '0,0.8,e'), it('board', 'notice-board', '1,0.12,w'), it('plant', ['potted-plant', 'flower-pot'], '0,1,s')],
-      // nav-connect/1 (2026-10-20): the east-wall cabinet beside desk 2 closed cell 1's door off (no 0.68 m way between
-      // them); it stands against the south wall between desks 3 and 4 instead
-      office: OFFICE(4).map((x) => x.name === 'cabinet-1' ? it('cabinet-1', 'filing-cabinet', '0.5,1,n 0.3,1,n 0,1,e') : x),
+    recipe: { front: [counter('desk', 'reception', '0.5,0.2,s'), it('bench', 'bench-seat', '0,0.8,e'), it('board', 'notice-board', '1,0.12,w'), it('plant', ['potted-plant', 'flower-pot'], '0,1,s')], office: OFFICE(4),
       cell: [it('bars', 'cell-bars', '0.25,0.5,w'), it('cot', 'cot', '1,0.5,w 0.8,0.5,s'), it('toilet', 'toilet', '0.8,0,s 0.8,1,n')] },
     layers: { owner: 'god', schedule: HOURS('00:00', '24:00') } }),
   furnished({ ...CIV, name: 'fire-station', synonyms: ['fire station', 'firehouse', 'fire hall', 'engine house', 'fire brigade', 'firefighters'],

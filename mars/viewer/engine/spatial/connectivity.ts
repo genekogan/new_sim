@@ -22,7 +22,7 @@
 //    Points in one component share one verdict (`area`), so a sealed room is one finding, however many things are in it.
 //
 // Pure derived data over the planner's grids: nothing here is logged, and nothing changes the world.
-import type { Vec2 } from '../core/math.ts';
+import { dcos, dsin, hypot, type Vec2 } from '../core/math.ts';
 import { buildGridsOverFloors, latticeIndex, latticeCentre, type LevelGrid } from './grid.ts';
 import { GROUND_TILE_M, G_OUTSIDE, G_STEEP, G_WALK, type GroundField } from './ground.ts';
 import { linkApproach, linkEdgeTest, PLAN_MARGIN, snap as snapCell } from './path.ts';
@@ -104,7 +104,7 @@ export function mediaClass(f: GroundField, tx: number, tz: number): 0 | 1 | 2 {
 
 /** World AABB of an oriented box. */
 function aabb(o: { c: Vec2; half: Vec2; yaw: number }, grow = 0): [number, number, number, number] {
-  const c = Math.abs(Math.cos(o.yaw)), s = Math.abs(Math.sin(o.yaw)), hx = c * o.half[0] + s * o.half[1] + grow, hz = s * o.half[0] + c * o.half[1] + grow;
+  const c = Math.abs(dcos(o.yaw)), s = Math.abs(dsin(o.yaw)), hx = c * o.half[0] + s * o.half[1] + grow, hz = s * o.half[0] + c * o.half[1] + grow;
   return [o.c[0] - hx, o.c[1] - hz, o.c[0] + hx, o.c[1] + hz];
 }
 function fnv(s: string, h = 0x811c9dc5): number { for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619) >>> 0; return h; }
@@ -287,7 +287,7 @@ export class NavConnectivity {
     const c = this.cell, I = latticeIndex(p[0], c), J = latticeIndex(p[1], c), R = Math.ceil(tol / c);
     let best: { root: number; at: Vec2 } | null = null, bd = Infinity;
     for (let dj = -R; dj <= R; dj++) for (let di = -R; di <= R; di++) {
-      const x = latticeCentre(I + di, c), z = latticeCentre(J + dj, c), d = Math.hypot(x - p[0], z - p[1]);
+      const x = latticeCentre(I + di, c), z = latticeCentre(J + dj, c), d = hypot(x - p[0], z - p[1]);
       if (d > tol + 1e-9 || d >= bd) continue;
       const v = this.cellAt(I + di, J + dj); if (v.root < 0) continue;
       best = { root: v.root, at: [x, z] }; bd = d;
@@ -419,7 +419,7 @@ export class NavConnectivity {
     for (const k of order) {
       const { link, ascending } = tasks[k];
       const { entry, approach, exit } = linkApproach(link, ascending), far = linkApproach(link, !ascending).approach;
-      const he = Math.hypot(entry.p[0] - approach[0], entry.p[1] - approach[1]) + 0.3;
+      const he = hypot(entry.p[0] - approach[0], entry.p[1] - approach[1]) + 0.3;
       let mk = '';
       if (ground) {
         const side = (level: number, p: Vec2, half: number) => (level === 0 ? this.patch0Key(p, half) : this.upperAt(level, p, half)?.ck ?? '-');
@@ -475,7 +475,7 @@ export class NavConnectivity {
       for (let dj = -r; dj <= r; dj++) {
         const edgeRow = dj === -r || dj === r;
         for (let di = -r; di <= r; di += edgeRow ? 1 : 2 * r || 1) {
-          const x = latticeCentre(I + di, c), z = latticeCentre(J + dj, c), d = Math.hypot(x - p[0], z - p[1]);
+          const x = latticeCentre(I + di, c), z = latticeCentre(J + dj, c), d = hypot(x - p[0], z - p[1]);
           if (d >= bd || d > maxR) continue;
           const v = this.cellAt(I + di, J + dj);
           if (v.clear < minClear || !this.connectedRoot(v.root) || avoid([x, z])) continue;
