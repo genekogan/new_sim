@@ -14,10 +14,13 @@ import { browserQuality, progressiveNearM } from '../quality-tier.ts';
 
 const qs = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');
 export const LAZY = !qs.has('shot') && qs.get('assets') !== 'eager';
-// P1 phones: a phone (quality tier) holds the arrival card for at most ~1 MB of the nearest GLBs and 3 s; the rest fills in
-// after the card. On a Slow 4G link (~180 KB/s) 24 MB / 30 s kept a phone on the card for the full 30 s. ?eagerMB still wins.
+// P1 phones: a phone (quality tier) holds the arrival card for at most ~0.2 MB of the nearest GLBs and 3 s; the rest fills
+// in after the card. On a Slow 4G link (~180 KB/s) 24 MB / 30 s kept a phone on the card for the full 30 s. t4-phone-new:
+// each 0.2 MB a phone's poster waits for is ~1 s on Slow 4G (wire4g ~200 KB/s, after the page's own scripts). With 1 MB,
+// Mars College 2026 gated chiba (766 KB), which never arrived inside the gate, and every poster waited the full 3 s;
+// 0.5 MB (no chiba) 5.8 s, 0.2 MB 4.95 s with the same poster as 1 MB (pinned-clock diff). ?eagerMB still wins.
 const PHONE = browserQuality().tier === 'phone';
-export const EAGER_BYTES = Math.max(1, Number(qs.get('eagerMB') ?? (PHONE ? 1 : 24))) * 1e6;
+export const EAGER_BYTES = Math.max(0.1, Number(qs.get('eagerMB') ?? (PHONE ? 0.2 : 24))) * 1e6;
 export const NEAR_M = 120;
 const BACKGROUND_DELAY_MS = 6000, BACKGROUND_PARALLEL = 2;
 const QUEUED = qs.get('loadqueue') !== '0'; // same-bundle A/B against the legacy near-camera burst
@@ -80,7 +83,7 @@ let background: ReturnType<typeof setTimeout> | null = null, running = 0;
 const shasOf = (d: StoredDef | undefined, distance = 0, scale = 1) => { const a = d && d.make.kind === 'mesh' ? meshLodAsset(d.make as LodMake, d.size.box, distance, scale) : null; return typeof a === 'string' && /^[0-9a-f]{64}$/.test(a) ? [a] : []; };
 
 /** Choose the eager GLBs for a snapshot: nearest-first to `centre` until EAGER_BYTES. Returns the loading bar's sizes. */
-export function planEager(snap: { entities: Entity[]; assetBytes?: Record<string, number> }, defOf: (ref: string) => StoredDef | undefined, posOf: (e: Entity) => [number, number] | null, centre: [number, number] = [0, 0], eye?: [number, number]): Record<string, number> {
+export function planEager(snap: { entities: Entity[]; assetBytes?: Record<string, number> }, defOf: (ref: string) => StoredDef | undefined, posOf: (e: Entity) => [number, number] | null, centre: [number, number] = [0, 0], eye?: [number, number], seen?: (e: Entity) => boolean): Record<string, number> {
   // Called once by a new entity layer, before its holders are built. Old loader/worker promises do not own its slots.
   loadQueue.reset(); waiting.clear(); inFlight.clear(); started.clear(); backgroundReady = false;
   if (background) { clearTimeout(background); background = null; }
@@ -106,15 +109,17 @@ export function planEager(snap: { entities: Entity[]; assetBytes?: Record<string
   const dist = new Map<string, number>(), rank = new Map<string, number>();
   for (const e of snap.entities) {
     const def = defOf(e.def); if (!def || def.make.kind !== 'mesh') continue;
+    if (seen && !seen(e)) continue;   // t4-phone-new: out of the arrival camera's view (WorldEntityLayer, arrival-view.ts)
     const p = posOf(e), shas = shaFor(e, p); if (!shas.length) continue;
     const d = p ? score(p[0], p[1]) : 1e9, size = Math.max(1, ...((def?.size?.box as number[] | undefined) ?? [1]).map((v) => v * (e.s ?? 1)));
     const nd = p ? Math.min(Math.hypot(p[0] - centre[0], p[1] - centre[1]), eye ? Math.hypot(p[0] - eye[0], p[1] - eye[1]) : Infinity) : 0;
     for (const sha of shas) { ndist.set(sha, Math.min(ndist.get(sha) ?? Infinity, nd)); dist.set(sha, Math.min(dist.get(sha) ?? Infinity, d)); rank.set(sha, Math.min(rank.get(sha) ?? Infinity, eye ? d / size : d)); }
   }
   const order = [...rank.keys()].sort((a, b) => rank.get(a)! - rank.get(b)!);
+  // a desktop always takes its first model; on a phone a model bigger than the budget left never holds the gate (t4-phone-new)
   const pick = new Set<string>(); let bytes = 0;
-  for (const sha of order) { const n = sizes[sha] ?? 0; if (near !== null && ndist.get(sha)! > near) continue; if (pick.size && (bytes + n > EAGER_BYTES || dist.get(sha)! > NEAR_M * 2)) continue; pick.add(sha); bytes += n; }
-  eager = pick;
+  for (const sha of order) { const n = sizes[sha] ?? 0; if (near !== null && ndist.get(sha)! > near) continue; if ((pick.size || PHONE) && (bytes + n > EAGER_BYTES || dist.get(sha)! > NEAR_M * 2)) continue; pick.add(sha); bytes += n; }
+  eager = pick; plannedEye = eye ?? centre;
   // lane PERF: the arrival card waits for these (or GATE_MS), so a new world opens with what is in front of you drawn
   eagerLeft.clear(); for (const sha of pick) eagerLeft.add(sha);
   gateUntil = performance.now() + GATE_MS; setTimeout(notifyGate, GATE_MS + 50); notifyGate();
@@ -136,6 +141,11 @@ if (typeof window !== 'undefined') (window as unknown as { __arrivalGate?: unkno
 /** A model is in the scene (or its placeholder, when it failed): it no longer holds the arrival card. */
 export function assetShown(sha: string) { if (eagerLeft.delete(sha) && !eagerLeft.size) notifyGate(); }
 export const isEager = (sha: string) => !LAZY || !eager || eager.has(sha) || started.has(sha);
+let plannedEye: [number, number] | null = null;
+/** t4-phone-new: where the eager plan measured distances from (the arrival eye), or null without a plan. A two-model def
+ *  (make.lod1) starts the model the plan chose from there at once (mesh.mesh.ts): it used to wait for the first drawn frame,
+ *  which a phone's early poster only draws after the gate, so its eager GLB held the poster for the whole GATE_MS. */
+export const plannedArrivalEye = (): [number, number] | null => (LAZY && eager ? plannedEye : null);
 /** The planned eager GLBs, nearest the arrival first (empty without a plan: then every load starts as its thing draws). */
 export const eagerShas = (): string[] => (LAZY && eager ? [...eager] : []);
 

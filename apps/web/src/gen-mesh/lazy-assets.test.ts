@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { DeferredLoadQueue, deferLoad, planEager } from './lazy-assets.ts';
+import { DeferredLoadQueue, deferLoad, planEager, plannedArrivalEye } from './lazy-assets.ts';
 
 const turn = () => new Promise<void>((resolve) => setImmediate(resolve));
 const deferred = () => { let resolve!: () => void; const promise = new Promise<void>((r) => { resolve = r; }); return { promise, resolve }; };
@@ -77,4 +77,12 @@ test('a remount releases stuck slots and old completions cannot release a new jo
   queue.pump(); await turn(); assert.deepEqual(started, ['old', 'new']);
   old.resolve(); await turn(); assert.deepEqual(started, ['old', 'new']); assert.deepEqual(queue.stats(), { pending: 1, active: 1 });
   current.resolve(); await turn(); assert.deepEqual(started, ['old', 'new', 'next']); assert.deepEqual(queue.stats(), { pending: 0, active: 0 });
+});
+
+test('an arrival plan records the eye a two-model def chooses its first model from (centre when no eye is given)', async (t) => {
+  t.after(() => planEager({ entities: [] }, () => undefined, () => null));
+  planEager({ entities: [] }, () => undefined, () => null, [3, 4], [10, -2]);
+  assert.deepEqual(plannedArrivalEye(), [10, -2]);
+  planEager({ entities: [] }, () => undefined, () => null, [3, 4]);
+  assert.deepEqual(plannedArrivalEye(), [3, 4]);
 });

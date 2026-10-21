@@ -28,6 +28,7 @@ import { progressiveNearM } from './quality-tier.ts';
 import { arrivalOver } from './arrival-marks.ts';
 import { computeVertexNormals } from './gen-mesh/fast-geometry.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
+import { keySeen, shapeWedgeDistance, viewFirst, viewWedge, type ViewWedge } from './arrival-view.ts';
 import { WorldBuildSites, SITE_REFINEMENT, type PublicSite } from './WorldBuildSites.ts';
 import { GroundCover, coverSetting } from './gen-mesh/ground-cover.ts';
 
@@ -135,7 +136,11 @@ export class WorldEntityLayer {
     // lane PERF: nearest the arrival target (entity-arrival.ts frames the centre of what was built; ?at= for shots), not the origin
     const m0 = this.model, q = new URLSearchParams(location.search), at = q.get('at')?.split(',').map(Number), eyeQ = q.get('eye')?.split(',').map(Number);
     const pose = at?.length === 3 && eyeQ?.length === 3 && [...at, ...eyeQ].every(Number.isFinite) ? { target: at, eye: eyeQ } : entityArrivalPose(this.viewBounds(), this.entityCount, this.groundAt, 45, innerWidth / Math.max(1, innerHeight), 1, this.arrivalAt());
-    const eagerSizes = m0.readPass(() => planEager(snap, (r) => m0.resolvedDef(r), (e) => { try { const p = m0.worldPose(e); return [p.x, p.z]; } catch { return null; } }, [pose.target[0], pose.target[2]], [pose.eye[0], pose.eye[2]]));   // t4-phone: slots remembered per parent
+    // t4-phone-new: on a phone, what the arrival camera sees (arrival-view.ts): the poster waits only for the GLBs in view
+    const view = progressiveNearM() === null ? null : arrivalViewWedge(pose), byId0 = view ? new Map(snap.entities.flatMap((e) => e.name ? [[e.name, e], [e.id, e]] as [string, Entity][] : [[e.id, e]] as [string, Entity][])) : null;
+    // the poster waits for the models whose bodies it shows; the first build also draws what casts a shadow into view
+    const keyOf0 = byId0 && nearKeyOf(byId0), seen = view && keyOf0 && byId0 ? arrivalSeen(m0, view, keyOf0, byId0, false) : undefined;
+    const eagerSizes = m0.readPass(() => planEager(snap, (r) => m0.resolvedDef(r), (e) => { try { const p = m0.worldPose(e); return [p.x, p.z]; } catch { return null; } }, [pose.target[0], pose.target[2]], [pose.eye[0], pose.eye[2]], seen));   // t4-phone: slots remembered per parent
     assetBytes.expect(Object.fromEntries(Object.entries(eagerSizes).map(([sha, n]) => [assetUrl(sha), n])));
     // Phone arrival (lane d3): start the eager GLBs now, nearest first, so they download while the terrain and every
     // thing's holder are built (~2 s of main thread on a 4x phone) instead of after; each thing's own loadAsset(sha)
@@ -159,15 +164,20 @@ export class WorldEntityLayer {
       if (!workersLater) this.prefetchBuildings(m, snap.entities, pending);
       // P7 (phone): only the sectors near the arrival are baked at full detail before the card; the rest are drawn from a
       // coarse direct sample (no tile bakes, ~1/16 of the height samples) and refined during the fill
-      this.rebuildTerrain(undefined, true, progressiveNearM() === null ? undefined : { at: [[pose.target[0], pose.target[2]], [pose.eye[0], pose.eye[2]]], r: COARSE_BEYOND_M });   // lane L3: the first build's playa mottling runs in a worker (terrain-mottle.ts)
+      this.rebuildTerrain(undefined, true, progressiveNearM() === null ? undefined : { at: [[pose.target[0], pose.target[2]], [pose.eye[0], pose.eye[2]]], r: COARSE_BEYOND_M, view });   // lane L3: the first build's playa mottling runs in a worker (terrain-mottle.ts)
       await nextTask(); if (signal.aborted || this.model !== m) return;
       this.rebuildWater();
       this.buildHorizon();
       // P1 phones: nearest the arrival first; start() returns once everything within `near` metres of its eye or target is
       // drawn (the card then goes), and the rest follows between frames (fill). Elsewhere: everything, in snapshot order.
       const near = progressiveNearM();
-      const all: readonly Entity[] & { dist?: number[] } = near === null ? snap.entities : byDistance(snap.entities, nearKeyOf(new Map(snap.entities.flatMap((e) => e.name ? [[e.name, e], [e.id, e]] as [string, Entity][] : [[e.id, e]] as [string, Entity][]))), [pose.target[0], pose.target[2]], [pose.eye[0], pose.eye[2]]);  // P7: shapes by their nearest point; furniture with its building
-      const far = near === null ? -1 : all.dist!.findIndex((d) => d > near), nearCount = far < 0 ? all.length : far;
+      const byId = near === null ? null : byId0 ?? new Map(snap.entities.flatMap((e) => e.name ? [[e.name, e], [e.id, e]] as [string, Entity][] : [[e.id, e]] as [string, Entity][])), keyOf = byId && (keyOf0 ?? nearKeyOf(byId));
+      const sorted: readonly Entity[] & { dist?: number[] } = !keyOf ? snap.entities : byDistance(snap.entities, keyOf, [pose.target[0], pose.target[2]], [pose.eye[0], pose.eye[2]]);  // P7: shapes by their nearest point; furniture with its building
+      const far = near === null ? -1 : sorted.dist!.findIndex((d) => d > near);
+      // t4-phone-new: of the near things, those the arrival camera can see (or whose shadow can reach its view) are drawn
+      // before the poster; the fill then draws the next things in view, then the near ones behind or beside it (arrival-view.ts)
+      const { list: all, first: nearCount } = view && keyOf && byId ? viewFirst(sorted, far < 0 ? sorted.length : far, arrivalSeen(m, view, keyOf, byId, true), FILL_AHEAD) : { list: sorted, first: far < 0 ? sorted.length : far };
+      (window as unknown as { __simViewFirst?: unknown }).__simViewFirst = { near: far < 0 ? sorted.length : far, seen: nearCount, wedge: view, eager: eagerShas().length, eagerKB: Math.round(Object.values(eagerSizes).reduce((a, b) => a + b, 0) / 1e3) };   // probes
       for (let i = 0; i < all.length;) {
         if (i >= nearCount && !this.filling) { this.active = true; this.building = false; this.filling = true; this.fill = this.fillRest(m, all, i, pending, signal, workersLater); return; }
         const until = performance.now() + BUILD_SLICE_MS;
@@ -499,7 +509,7 @@ export class WorldEntityLayer {
 
   /** P7: sectors drawn coarse at the arrival, still to be refined (keys `sx,sz`). */
   private coarse = new Set<string>();
-  private rebuildTerrain(onlyTiles?: Set<string>, deferMottle = false, fineNear?: { at: [number, number][]; r: number }) {
+  private rebuildTerrain(onlyTiles?: Set<string>, deferMottle = false, fineNear?: { at: [number, number][]; r: number; view?: ViewWedge | null }) {
     const m = this.model!; const [bx0, bz0, bx1, bz1] = m.ground().extent;   // GOD-ENV: bounds, a rectangle once extended
     const tx0 = Math.floor(bx0 / TILE_M), tx1 = Math.ceil(bx1 / TILE_M) - 1, tz0 = Math.floor(bz0 / TILE_M), tz1 = Math.ceil(bz1 / TILE_M) - 1;
     const sx0 = Math.floor(tx0 / SECTOR_TILES), sx1 = Math.floor(tx1 / SECTOR_TILES), sz0 = Math.floor(tz0 / SECTOR_TILES), sz1 = Math.floor(tz1 / SECTOR_TILES);
@@ -515,6 +525,10 @@ export class WorldEntityLayer {
       // t4-phone: the near sectors too from the recipe directly, at full step: the same heights at every vertex (a tile holds
       // the same recipe's heights on its 1 m grid) for a quarter of the samples and no tile bakes (Eden 2026: ~0.3 s of 4x
       // CPU before the poster); their slope colour by 2 m differences until the fill refines them from the tiles
+      // t4-phone-new: a sector the arrival camera cannot see is not drawn before the poster at all; the fill draws it with
+      // the coarse ones (refineCoarseSector), nearest first (Eden 2026: most of a portrait phone's ground lies behind it)
+      const X0 = sx * SECTOR_TILES * TILE_M, Z0 = sz * SECTOR_TILES * TILE_M, X1 = X0 + SECTOR_TILES * TILE_M, Z1 = Z0 + SECTOR_TILES * TILE_M;
+      if (fineNear?.view && !onlyTiles && shapeWedgeDistance(fineNear.view, [[X0, Z0], [X1, Z0], [X1, Z1], [X0, Z1]], true) > 0) { const old = this.sectors.get(key); if (old) { this.terrainGroup.remove(old); old.geometry.dispose(); this.sectors.delete(key); } this.coarse.add(key); continue; }
       this.placeSector(key, this.sectorMesh(sx, sz, [tx0, tz0, tx1, tz1], deferMottle, coarse ? COARSE_STEP : TERRAIN_STEP, !!fineNear));
       if (coarse || fineNear) this.coarse.add(key); else this.coarse.delete(key);
     }
@@ -523,6 +537,11 @@ export class WorldEntityLayer {
     // lane PERF2: world builders (roads, areas, scatters that drape on the ground) are rebuilt only when their shape reaches a
     // re-baked tile; a hill raised in one corner no longer rebuilds every forest and road in the world
     if (onlyTiles) for (const e of m.entities.values()) if (e.in.parent === 'world') { const world = !!this.drawn.get(e.id)?.world; this.draw(e, false, world && reachesTiles(e, onlyTiles)); }
+  }
+  /** A sector inside the ground's extent (t4-phone-new: the fill draws the ones the arrival skipped). */
+  private wantedSector(sx: number, sz: number): boolean {
+    const [bx0, bz0, bx1, bz1] = this.model!.ground().extent, s = SECTOR_TILES;
+    return sx >= Math.floor(Math.floor(bx0 / TILE_M) / s) && sx <= Math.floor((Math.ceil(bx1 / TILE_M) - 1) / s) && sz >= Math.floor(Math.floor(bz0 / TILE_M) / s) && sz <= Math.floor((Math.ceil(bz1 / TILE_M) - 1) / s);
   }
   private placeSector(key: string, mesh: THREE.Mesh) {
     const old = this.sectors.get(key); if (old) { this.terrainGroup.remove(old); old.geometry.dispose(); }
@@ -536,7 +555,7 @@ export class WorldEntityLayer {
     this.coarse.delete(best);
     const [bx0, bz0, bx1, bz1] = m.ground().extent, [sx, sz] = best.split(',').map(Number);
     const t: [number, number, number, number] = [Math.floor(bx0 / TILE_M), Math.floor(bz0 / TILE_M), Math.ceil(bx1 / TILE_M) - 1, Math.ceil(bz1 / TILE_M) - 1];
-    if (this.sectors.has(best)) this.placeSector(best, this.sectorMesh(sx, sz, t, true));
+    if (this.sectors.has(best) || this.wantedSector(sx, sz)) this.placeSector(best, this.sectorMesh(sx, sz, t, true));   // t4-phone-new: or one not drawn yet
     return true;
   }
   private sectorMesh(sx: number, sz: number, t: [number, number, number, number], deferMottle = false, step = TERRAIN_STEP, direct = false): THREE.Mesh {
@@ -741,15 +760,64 @@ function shapeDistance(s: { path: readonly (readonly number[])[] } | { area: rea
 }
 /** P7: the near-first sort key of a snapshot's things: a shaped thing's own shape, else its root ancestor's stored pose
  *  (no slot bakes: a building's furniture sorts with its building); things with neither come first. */
+const rootOf = (byId: ReadonlyMap<string, Entity>, e: Entity): Entity => { let r = e; for (let depth = 0; r.in.parent !== 'world' && depth < 8; depth++) { const up = byId.get(r.in.parent); if (!up) break; r = up; } return r; };
 export function nearKeyOf(byId: ReadonlyMap<string, Entity>): (e: Entity) => NearKey {
-  const rootOf = (e: Entity): Entity => { let r = e; for (let depth = 0; r.in.parent !== 'world' && depth < 8; depth++) { const up = byId.get(r.in.parent); if (!up) break; r = up; } return r; };
   return (e) => {
-    const r = rootOf(e), shape = (r as { shape?: { path?: unknown; area?: unknown } }).shape;
+    const r = rootOf(byId, e), shape = (r as { shape?: { path?: unknown; area?: unknown } }).shape;
     if (shape && Array.isArray(shape.path) && shape.path.length) return { path: shape.path as number[][] };
     if (shape && Array.isArray(shape.area) && shape.area.length) return { area: shape.area as number[][] };
     const p = (r as { p?: unknown }).p;
     return Array.isArray(p) && p.length >= 3 && Number.isFinite(p[0]) && Number.isFinite(p[2]) ? [p[0] as number, p[2] as number] : null;
   };
+}
+/** t4-phone-new: the arrival camera's ground wedge (arrival-view.ts), when the poster frames this pose: a world with Souls
+ *  opens on its tour's first view instead (arrival-shot.ts worldArrivalPose), so there every near thing still counts. */
+function arrivalViewWedge(pose: { target: readonly number[]; eye: readonly number[] }): ViewWedge | null {
+  const souls = (window as unknown as { __simWorldSouls?: unknown }).__simWorldSouls;
+  if (typeof souls === 'number' && souls > 0) return null;
+  return viewWedge(pose.eye, pose.target, 45, innerWidth / Math.max(1, innerHeight));
+}
+/** t4-phone-new: does the arrival camera see a thing (by its root: a building's furniture goes with it)? Its body: its
+ *  footprint rectangle, turned with it (its declared size, a building's plan), and up to 4 m of a building's porch, steps
+ *  and awnings; a shaped thing (a road, a wood) is its shape plus 4 m. With `shadow`, also the shadow it may cast into
+ *  view: ARRIVAL_SHADOW_PER_M of its height every way (the sun's direction is not known before the poster's lights are
+ *  set; the sun code stays out of a phone's first scripts). Unknown sizes: 40 m around it, a 20 m high shadow. */
+function arrivalSeen(m: WorldModel, view: ViewWedge, keyOf: (e: Entity) => NearKey, byId: ReadonlyMap<string, Entity>, shadow: boolean): (e: Entity) => boolean {
+  const memo = new Map<string, boolean>();
+  return (e) => {
+    const r = rootOf(byId, e); let v = memo.get(r.id);
+    if (v === undefined) {
+      const { reach, height, half } = viewSize(m, r);
+      let key = keyOf(r);
+      if (half && Array.isArray(key)) { let yaw = 0; try { yaw = m.worldPose(r).yaw; } catch { /* unturned */ } const [x, z] = key, c = Math.cos(yaw), sn = Math.sin(yaw), [a, b] = half;
+        key = { area: [[-a, -b], [a, -b], [a, b], [-a, b]].map(([u, w]) => [x + u * c + w * sn, z - u * sn + w * c]) }; }
+      v = keySeen(view, key, reach + (shadow ? Math.min(ARRIVAL_SHADOW_MAX_M, ARRIVAL_SHADOW_PER_M * height) : 0)); memo.set(r.id, v);
+    }
+    return v;
+  };
+}
+/** The shadow reach per metre of height: a sun at 27 degrees or higher (mid-morning to mid-afternoon; a lower sun's long
+ *  shadow is faint at its tip), at most 40 m. */
+const ARRIVAL_SHADOW_PER_M = 2, ARRIVAL_SHADOW_MAX_M = 40;
+/** How many things past the near ones the fill orders view-first too (the poster may come while the fill runs). */
+const FILL_AHEAD = 400;
+function viewSize(m: WorldModel, r: Entity): { reach: number; height: number; half: [number, number] | null } {
+  const d = m.resolvedDef(r.def), box = (d as { size?: { box?: unknown } } | undefined)?.size?.box, shaped = !!(r as { shape?: unknown }).shape;
+  if (!Array.isArray(box) || box.length !== 3 || !box.every((v) => typeof v === 'number' && Number.isFinite(v))) return { reach: shaped ? 4 : 40, height: 20, half: null };
+  const pr = (r.params ?? {}) as Record<string, unknown>, n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.abs(v) : 0);
+  const s = Math.max(1, n((r as { s?: unknown }).s));
+  let w = box[0] as number, dd = box[2] as number, h = box[1] as number;
+  if (shaped) return { reach: 4 * s, height: h * s, half: null };
+  const building = !!d && d.make.kind === 'gen' && d.make.gen === 'building/1';
+  if (building) {
+    w = Math.max(w, n(pr.w)); dd = Math.max(dd, n(pr.d)); h = Math.max(h, n(pr.h));
+    const plan = pr.plan as { floors?: { rooms?: { rect?: unknown }[] }[] } | undefined;
+    if (plan?.floors?.length) h = Math.max(h, 3.5 * plan.floors.length + 4);
+    for (const f of plan?.floors ?? []) for (const room of f?.rooms ?? []) { const rc = room?.rect; if (Array.isArray(rc) && rc.length === 4) { w = Math.max(w, 2 * n(rc[0]), 2 * n(rc[2])); dd = Math.max(dd, 2 * n(rc[1]), 2 * n(rc[3])); } }
+  }
+  // the rectangle of its declared size; a building's porch, steps and awnings, and a generated thing's parts, up to 4 m
+  // beyond it (a model is drawn inside its box: 1 m)
+  return { reach: d && d.make.kind === 'mesh' ? 1 : 4 * s, height: h * s * Math.max(1, n(pr.sy)), half: [0.5 * w * s * Math.max(1, n(pr.sx)), 0.5 * dd * s * Math.max(1, n(pr.sz))] as [number, number] };
 }
 /** An entity's mesh params: its generator's and def's defaults under its own params. */
 function paramsOf(e: Entity, def: StoredDef): MeshCtx['params'] {
