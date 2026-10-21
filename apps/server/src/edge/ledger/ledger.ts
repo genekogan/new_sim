@@ -637,7 +637,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
       // BODY refusals precede place/alias diagnostics, as in the original actOnce path.
       const bodyIssue=this.bodyVerbProblem(soul,input.capability.split(/[:\s]/)[0]!);
       const place=bodyIssue?null:explicitPlaceCapability(this,soul,input.capability.trim());
-      if(place){
+      // SOULSIM-E (real-agent run on 3.60, 2026-10-21): resolve offers a far place's walk on demand and the agent acts on
+      // that id, as the skill says; the id was refused place.unwalkable here. actOnce below walks it on demand, as words.
+      const onDemand=!!place&&!place.ok&&place.code==='place.unwalkable'&&this.onDemandId(soul,input.capability.trim());
+      if(place&&!onDemand){
         if(!place.ok){this.recordRefusal(soul.soulId,'act',input.capability,place.code);const {ok:_ok,...refusal}=place;return this.withInPlaceAlternative(soul,{accepted:false as const,capability:input.capability,...refusal});}
         const out=await this.act(soul,{...input,capability:place.chosen.capability});
         if(!out.accepted)return out;
@@ -675,7 +678,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (!caps.some(c => c.id === asked)) {const cls = classWords(asked, this.places.byId.values()); if (cls) return this.intents.act(soul, {...cls, ...(clientRef ? {clientRef} : {})});}
     if (asked.startsWith('face:') && caps.some(c => c.id === asked && c.target?.kind === 'soul')) return this.intents.act(soul, {verb: 'turn', face: caps.find(c => c.id === asked)!.target!.id, ...(clientRef ? {clientRef} : {})});
     // strict/1: an id-shaped target that names nothing in this world is refused, never swapped for something else
-    {const strict = strictCheck(this, soul, asked, caps); if (strict) return {...refuse(strict.code, strict.reason), did_you_mean: strict.did_you_mean};}
+    // (SOULSIM-E: unless it is a far place's walk the listing leaves out, which resolveOnDemand below offers: the agent
+    // resolved "go to the horse" to walk:land-park-lawns-west and acting on that id was refused, on Eden 2026 / 3.60)
+    {const strict = strictCheck(this, soul, asked, caps); if (strict && !this.onDemandId(soul, asked, caps, plans)) return {...refuse(strict.code, strict.reason), did_you_mean: strict.did_you_mean};}
     // together/1: social phrasing first (accept/decline, "hug Tamsin", "give her the book", "dance with Roger", "invite X to …")
     let social: {note: string} | null = null, text = asked;
     if (!caps.some(c => c.id === asked)) {
@@ -1320,6 +1325,19 @@ export class EdgeLedger implements EdgeLedgerHooks {
       const cap = f ? more.find(c => c.id === f.id) : undefined;
       if (f && cap && !this.secretOffer(soul, cap)) return {v: {kind: 'alias', cap, note: `${text} is ${cap.id} (${cap.label})${f.note}.`}, caps: more, plans: morePlans};
     }
+    // SOULSIM-E: an id-shaped walk/run/jog (`walk:land-botanic-koi-pond`, as resolve answers) to a place the listing
+    // leaves out gets the same on-demand offer as its words; the words reach it through the vocabulary, the id may not
+    const byId = exact ? null : /^(walk|jog|run):([^\s:/]+)$/.exec(text.trim());
+    const placeId = byId ? [byId[2], 'g-' + byId[2]].find(id => this.places.byId.has(id)) : undefined;
+    if (byId && placeId && this.walkOnDemand) {
+      const verb = byId[1] as 'walk' | 'jog' | 'run', more = [...caps], morePlans = new Map(plans);
+      // (a pond's walk goes to its shore, g-<pond>.shore-bank: the place itself, else its sub-places, as the words' walk does)
+      const offer = (id: string) => verb === 'walk' ? this.walkOnDemand!(soul, id, more, morePlans) : !!this.gaitOnDemand?.(soul, id, verb, more, morePlans);
+      const sub = (id: string) => id.startsWith(placeId + '.') || this.places.byId.get(id)?.parent === placeId;
+      const added = offer(placeId) || [...this.places.byId.keys()].some(id => sub(id) && offer(id));
+      const cap = added ? more.find(c => c.id === text.trim()) ?? more.find(c => c.verb === verb && c.target?.kind === 'place' && (c.target.id === placeId || sub(c.target.id))) : undefined;
+      if (cap && !this.secretOffer(soul, cap)) return {v: cap.id === text.trim() ? {kind: 'exact', cap} : {kind: 'alias', cap, note: `${text} is ${cap.id} (${cap.label}).`}, caps: more, plans: morePlans};
+    }
     let v: VocabResult = exact ? {kind: 'exact', cap: exact} : resolveCapability(text, this.vocabulary(soul, caps));
     // RESOLVE (SOULSIM-E "go to the horse" ended at the west lawn's centre, ~10 m from the horse): words that named only a place
     // whose description lists them name a thing: the nearest one so named, next to it
@@ -1374,6 +1392,13 @@ export class EdgeLedger implements EdgeLedgerHooks {
    *  to or found (or into one: knows() reads the secret ancestor), is not offered either. */
   private secretOffer(soul: EdgeSoul, cap: EdgeCapability): boolean {
     return !!this.knowledge.marked().size && cap.target?.kind === 'place' && !this.knowledge.knows(soul.soulId, cap.target.id);
+  }
+  /** SOULSIM-E: true when `asked` is an id the listing leaves out that resolveOnDemand offers (a far place's walk/run). Act
+   *  and resolve let such an id through their place and strict/1 checks, which read the listing only. */
+  onDemandId(soul: EdgeSoul, asked: string, caps?: EdgeCapability[], plans?: Plans): boolean {
+    if (!/^(?:walk|jog|run):/.test(asked)) return false;
+    const b = caps && plans ? {caps, plans} : this.binds(soul); if (b.caps.some(c => c.id === asked)) return false;
+    const od = this.resolveOnDemand(soul, asked, b.caps, b.plans); return od.caps !== b.caps && od.v.kind !== 'unknown';
   }
   /** @internal for edge/perception and edge/intents (Core-A modules): read access and two narrow write paths. */
   get coreA() {

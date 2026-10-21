@@ -12,7 +12,7 @@ export class WorldAccounts {
  private approving=new Set<string>();
  constructor(host:WorldHost,souls:Souls){
   if(host.db!==souls.db||host!==souls.host)throw Error('Account authority requires the same world and database');
-  this.host=host;this.souls=souls;this.store=new AccountStore({db:host.db.db,tx:fn=>tx(host.db.db,fn,{immediate:!host.db.db.isTransaction})},host.worldId);
+  this.host=host;this.souls=souls;this.store=new AccountStore({db:host.db.db,tx:fn=>tx(host.db.db,fn,{immediate:!host.db.db.isTransaction})},host.worldId,{nameTaken:name=>!!host.db.soulByName(host.worldId,name)});
   for(const row of host.db.liveSouls(host.worldId))if(row.token_hash)this.store.captureLegacyAuthority(row.id,row.owner);
  }
  owns(accountId:string,row:SoulRow){if(row.world_id!==this.host.worldId)return false;const member=this.host.db.db.prepare('SELECT account_id FROM account_soul_memberships_v1 WHERE world_id=? AND soul_id=?').get(this.host.worldId,row.id) as {account_id:string}|undefined;const validLegacyOwner=row.owner===accountId&&row.token_hash!==null&&this.store.legacyAuthority(row.id,accountId);return member?member.account_id===accountId||validLegacyOwner:row.owner===accountId&&(!accountId.startsWith('dev:')||validLegacyOwner);}

@@ -63,8 +63,10 @@ export class AccountStore {
   readonly worldId: string;
   private now: () => number;
   private approvalTtlMs: number;
-  constructor(db: AccountsDb, worldId: string, options: { now?: () => number; approvalTtlMs?: number } = {}) {
+  private nameTaken: (name: string) => boolean;
+  constructor(db: AccountsDb, worldId: string, options: { now?: () => number; approvalTtlMs?: number; nameTaken?: (name: string) => boolean } = {}) {
     this.db = db;
+    this.nameTaken = options.nameTaken ?? (() => false);
     this.worldId = text(worldId, 'worldId');
     this.now = options.now ?? Date.now;
     this.approvalTtlMs = options.approvalTtlMs ?? 15 * 60_000;
@@ -207,6 +209,10 @@ export class AccountStore {
         // Stored hashes cannot recover the secret. Never regenerate it on retry.
         return this.dto(this.fresh(previous));
       }
+      // Lane SOULSIM-E (real-agent run 2026-10-21): a new Soul under a name already taken in this world was accepted here and
+      // refused only when the person approved it, while the agent sat in `approval wait` for its full ten minutes. Refuse
+      // it now, when the agent can still ask its person for another name. (A retry of a request made earlier is answered above.)
+      if (mode === 'create' && this.nameTaken(name)) fail('name-taken', `a soul named ${name} already exists in this world; ask your person for another name`);
       const id = nonce('ap_'), pollSecret = input.pollSecret ?? randomBytes(32).toString('base64url'), now = this.time();
       // Lane PUX: a live window code addresses the request to its account; an unknown or stale code leaves the link only
       const target = this.codeAccount(input.forCode);
