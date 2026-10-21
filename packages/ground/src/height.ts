@@ -74,7 +74,18 @@ export function heightAt(g: Ground, x: number, z: number): number {
     const m = padMask(x, z, l.area, l.edge);
     if (m > 0) h += (l.level - h) * m;
   }
-  return flats ? padsFlatsWin(h, x, z, flats, onOldFlat(forms, x, z)) : h;
+  if (flats) h = padsFlatsWin(h, x, z, flats, onOldFlat(forms, x, z));
+  // HILL: channels that hold over pads (a graded footpath through a packed hillside) fold once more, last: over the pads'
+  // banks, never over a building's own flat or door landing (so no standing thing's ground moves)
+  let onFlat: boolean | undefined;
+  for (const l of forms) {
+    if (l.kind !== 'channel' || !l.overPads) continue;
+    const b = landformBounds(l); if (!inBounds(b, x, z)) continue;
+    onFlat ??= forms.some((p) => p.kind === 'pad' && inBounds(influenceBounds(p), x, z) && padFlatDist(x, z, p) === 0);
+    if (onFlat) break;
+    h = channelApply(l, h, x, z);
+  }
+  return h;
 }
 
 /** Base, noise, natural forms and carves: the part of the fold a smooth brush samples around a point. */

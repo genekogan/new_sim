@@ -42,13 +42,14 @@ export const channelGen: Generator = {
     width: { type: 'number', min: 0.5, max: 200, default: 4, doc: 'flat bottom width' }, edge: { type: 'number', min: 0.5, max: 60, default: 3 },
     from: { type: 'number', min: -200, max: 400, default: -1 }, to: { type: 'number', min: -200, max: 400, default: -1 },
     levels: { type: 'json', doc: 'absolute levels per path point (overrides from/to)' }, mode: { type: 'enum', values: ['cut', 'fill', 'set'], default: 'cut' },
+    overPads: { type: 'bool', default: false, doc: 'hold these levels over building pads too (folded after them): a graded way past packed buildings' },
   },
   physics({ params, shape }) {
     const path = shape?.path ?? [[-20, 0], [20, 0]], s = arcLengths(path), total = s[s.length - 1] || 1;
     const given = Array.isArray(params.levels) && params.levels.length === path.length && params.levels.every((v) => typeof v === 'number') ? (params.levels as number[]) : null;
     const levels = given ?? s.map((q) => n(params.from, -1) + (n(params.to, -1) - n(params.from, -1)) * (q / total));
     const w = n(params.width, 4);
-    return { box: boxOfBounds(bounds2(path, w / 2 + n(params.edge, 3)), 2), colliders: [], slots: [], tris: 0, landform: { kind: 'channel', path, levels, w: w / 2, edge: n(params.edge, 3), mode: (String(params.mode ?? 'cut')) as 'cut' | 'fill' | 'set' } };
+    return { box: boxOfBounds(bounds2(path, w / 2 + n(params.edge, 3)), 2), colliders: [], slots: [], tris: 0, landform: { kind: 'channel', path, levels, w: w / 2, edge: n(params.edge, 3), mode: (String(params.mode ?? 'cut')) as 'cut' | 'fill' | 'set', ...(params.overPads === true ? { overPads: true } : {}) } };
   },
 };
 

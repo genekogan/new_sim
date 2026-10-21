@@ -38,6 +38,9 @@ const channelRaw = z.object({
   mode: z.enum(['cut', 'fill', 'set']).default('cut'),
   /** Per-vertex 0..1 (0 = leave the ground alone there, e.g. under a bridge span). */
   strength: z.array(finite.min(0).max(1)).max(512).optional(),
+  /** HILL: hold these levels over building pads' banks too (folded again after the pads), so a graded footpath that
+   *  passes close to buildings keeps its walkable profile instead of being clamped to each pad's 0.45 bank. */
+  overPads: z.boolean().optional(),
 });
 const channelOk = (c: { path: unknown[]; levels: unknown[]; strength?: unknown[] }) => c.levels.length === c.path.length && (!c.strength || c.strength.length === c.path.length);
 export const channelBody = channelRaw.refine(channelOk, { message: 'channel levels/strength need one value per path point' });

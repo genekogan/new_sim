@@ -1853,6 +1853,11 @@
      "set"
     ],
     "default": "cut"
+   },
+   "overPads": {
+    "type": "bool",
+    "default": false,
+    "doc": "hold these levels over building pads too (folded after them): a graded way past packed buildings"
    }
   }
  },

@@ -98,3 +98,16 @@ test('a river (cut channel) carves through a road embankment (set channel) whate
     assert.equal(heightAt(g, 20, 0), 2, 'embankment elsewhere');
   }
 });
+
+test('HILL: a channel with overPads holds its levels over a pad bank, never over the pad flat', () => {
+  const sq = (x0: number, z0: number, x1: number, z1: number): [number, number][] => [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
+  const pad: Landform = { id: 'p:pad', kind: 'pad', area: sq(-5, -5, 5, 5), level: 0, edge: 16, grade: 0.45, fold: 'flats' } as Landform;
+  const road = (overPads: boolean) => ({ id: 'r', kind: 'channel', path: [[-40, 8], [40, 8]], levels: [9, 9], w: 1.5, edge: 2, mode: 'set', ...(overPads ? { overPads } : {}) }) as Landform;
+  const before = g0([pad, road(false)]), after = g0([pad, road(true)]);
+  assert.ok(heightAt(before, 0, 8) < 9 - 1, `the pad bank clamps an ordinary graded way (${heightAt(before, 0, 8)})`);
+  assert.equal(heightAt(after, 0, 8), 9, 'overPads: the way keeps its level on the bank');
+  assert.equal(heightAt(after, 30, 8), heightAt(before, 30, 8), 'beyond the bank both agree');
+  const across = g0([pad, { id: 'r', kind: 'channel', path: [[-40, 0], [40, 0]], levels: [3, 3], w: 1.5, edge: 2, mode: 'set', overPads: true } as Landform]);
+  assert.equal(heightAt(across, 0, 0), 0, 'the pad flat stays at its level');
+  assert.equal(heightAt(across, 20, 0), 3, 'off the flat the way holds');
+});
