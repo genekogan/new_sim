@@ -141,9 +141,12 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
     // `ownerSince`, the `ownerMark` of the agent's previous wait), so a Soul busy walking sees "sit on the bench" at once.
     const rawSince = c.req.query('ownerSince'), since = rawSince === undefined ? now() : Number(rawSince);
     if (!Number.isSafeInteger(since) || since < 0) throw new EdgeError(400, 'invalid', 'ownerSince must be an ownerMark from wait');
-    const scope = {scope: `soul:${soul.soulId}`, owner: soul.owner};
-    const r = await streams.wait(soul.soulId, after, seconds * 1000, c.req.raw.signal, () => !!box.ownerWrote(scope, since));
-    const wrote = box.ownerWrote(scope, since);
+    // SOULSIM-H F7: for a client that sends ownerSince (CLI 1.9.6+, which prints the messages), EVERY message not yet
+    // acknowledged ends the wait: an agent looping `wait 60` before acking "stop" slept 20 s through it. Older clients
+    // (no ownerSince, e.g. the live poll) keep the since-now rule, so a held message never spins them.
+    const scope = {scope: `soul:${soul.soulId}`, owner: soul.owner}, from = rawSince === undefined ? since : 0;
+    const r = await streams.wait(soul.soulId, after, seconds * 1000, c.req.raw.signal, () => !!box.ownerWrote(scope, from));
+    const wrote = box.ownerWrote(scope, from);
     return wrote ? {...r, ownerWrote: wrote.waiting, ownerMark: Math.max(since, wrote.newestAt + 1)} : {...r, ownerMark: Math.max(since, now())};
   }));
   app.post('/v1/edge/say', route(async (c, soul) => { const out = say(core, soul, await json(c), id => objects.addressees(id)); fading.touch(soul.soulId); return out; }));

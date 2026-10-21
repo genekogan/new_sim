@@ -7,7 +7,7 @@ import {buildApp} from './http.ts';
 import {config} from './config.ts';
 import {EdgeLedger} from './edge/ledger/ledger.ts';
 
-test('wait wakes on an owner message: unseen or newer than ownerSince; not for one already handed over and older', async t => {
+test('wait wakes on an owner message: any not yet acked for an ownerSince client; acked ones never', async t => {
   const f = fixture(':memory:'); f.brain.quiesce(); t.after(() => { f.host.stop(); f.db.close(); });
   await invite(f, 'alice');
   const a = await accept(f.host, f.souls.create('dev:alice', {name: 'Avery', description: 'Wait fixture'}));
@@ -34,15 +34,19 @@ test('wait wakes on an owner message: unseen or newer than ownerSince; not for o
   // 2. a message no listen has handed over still interrupts the next wait (the agent has not seen it) …
   const again = (await req(`/v1/edge/wait?after=${cursor}&timeout=20&ownerSince=${mark}`, token)).data;
   assert.equal(again.ownerWrote, 1);
-  // … until a listen takes it; then a wait sleeps through it (held, not new) to its timeout
+  // … and so does one a listen handed over but the agent has not acked (F7: a `for i in 1 2; do wait 60` loop slept
+  // 20 s through "stop"); a client without ownerSince (the live poll) is not woken by a held message
   const listened = (await req('/v1/edge/inbox/listen?timeoutMs=0', token)).data;
   assert.equal(listened.backlog.length, 1);
   begun = performance.now();
-  const quiet = (await req(`/v1/edge/wait?after=${cursor}&timeout=1&ownerSince=${mark}`, token)).data;
-  assert.equal(quiet.ownerWrote, undefined); assert.ok(performance.now() - begun >= 900, 'slept its full second');
-  mark = quiet.ownerMark;
+  const held = (await req(`/v1/edge/wait?after=${cursor}&timeout=20&ownerSince=${mark}`, token)).data;
+  assert.equal(held.ownerWrote, 1); assert.ok(performance.now() - begun < 5_000, 'a held, unacked message ends the wait at once');
+  const old = (await req(`/v1/edge/wait?after=${cursor}&timeout=1`, token)).data;
+  assert.equal(old.ownerWrote, undefined); assert.ok(performance.now() - begun >= 900, 'the old client slept its full second');
+  mark = held.ownerMark;
 
-  // 3. a background listen takes the next message first: the wait still ends (it is newer than the mark)
+  // 3. once the first is acked, a background listen takes the next message first: the wait still ends
+  assert.equal((await req(`/v1/edge/inbox/${listened.backlog[0].id}/ack`, token, {reply: 'Got it'})).status, 200);
   const bg = req(`/v1/edge/inbox/listen?timeoutMs=20000&after=${listened.backlog[0].id}`, token);
   const fg = req(`/v1/edge/wait?after=${cursor}&timeout=20&ownerSince=${mark}`, token);
   await tick(); begun = performance.now();
@@ -50,10 +54,10 @@ test('wait wakes on an owner message: unseen or newer than ownerSince; not for o
   const [l, w] = await Promise.all([bg, fg]);
   assert.ok(performance.now() - begun < 5_000);
   assert.ok(l.data.backlog.some((m: any) => m.text === 'and wave'));
-  assert.equal(w.data.ownerWrote, 1, 'only the new one counts (the first is held)');
+  assert.equal(w.data.ownerWrote, 1, 'only the unacked one counts (the first is acked)');
 
   // 4. acknowledged messages never wake a wait; a malformed ownerSince is refused
-  for (const m of [...listened.backlog, ...l.data.backlog]) assert.equal((await req(`/v1/edge/inbox/${m.id}/ack`, token, {reply: 'Got it'})).status, 200);
+  for (const m of l.data.backlog) assert.equal((await req(`/v1/edge/inbox/${m.id}/ack`, token, {reply: 'Got it'})).status, 200);
   const acked = (await req(`/v1/edge/wait?after=${cursor}&timeout=1&ownerSince=0`, token)).data;
   assert.equal(acked.ownerWrote, undefined);
   assert.equal((await req(`/v1/edge/wait?after=${cursor}&timeout=1&ownerSince=soon`, token)).status, 400);
