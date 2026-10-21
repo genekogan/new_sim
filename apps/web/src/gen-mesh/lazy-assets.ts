@@ -14,13 +14,13 @@ import { browserQuality, progressiveNearM } from '../quality-tier.ts';
 
 const qs = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');
 export const LAZY = !qs.has('shot') && qs.get('assets') !== 'eager';
-// P1 phones: a phone (quality tier) holds the arrival card for at most ~0.5 MB of the nearest GLBs and 3 s; the rest fills
-// in after the card. On a Slow 4G link (~180 KB/s) 24 MB / 30 s kept a phone on the card for the full 30 s. t4-phone-new: a
-// 4x phone's first GLB byte comes ~1 s into the 3 s gate and wire4g brings ~200 KB/s, so ~0.5 MB at most arrives inside it;
-// with 1 MB Mars College 2026 gated chiba (766 KB), which never arrived in time, and every poster waited the full 3 s.
-// ?eagerMB still wins.
+// P1 phones: a phone (quality tier) holds the arrival card for at most ~0.2 MB of the nearest GLBs and 3 s; the rest fills
+// in after the card. On a Slow 4G link (~180 KB/s) 24 MB / 30 s kept a phone on the card for the full 30 s. t4-phone-new:
+// each 0.2 MB a phone's poster waits for is ~1 s on Slow 4G (wire4g ~200 KB/s, after the page's own scripts). With 1 MB,
+// Mars College 2026 gated chiba (766 KB), which never arrived inside the gate, and every poster waited the full 3 s;
+// 0.5 MB (no chiba) 5.8 s, 0.2 MB 4.95 s with the same poster as 1 MB (pinned-clock diff). ?eagerMB still wins.
 const PHONE = browserQuality().tier === 'phone';
-export const EAGER_BYTES = Math.max(0.1, Number(qs.get('eagerMB') ?? (PHONE ? 0.5 : 24))) * 1e6;
+export const EAGER_BYTES = Math.max(0.1, Number(qs.get('eagerMB') ?? (PHONE ? 0.2 : 24))) * 1e6;
 export const NEAR_M = 120;
 const BACKGROUND_DELAY_MS = 6000, BACKGROUND_PARALLEL = 2;
 const QUEUED = qs.get('loadqueue') !== '0'; // same-bundle A/B against the legacy near-camera burst
