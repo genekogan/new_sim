@@ -15,7 +15,8 @@
 #   backup           compact (VACUUM INTO) copies of every production + legacy world db on eden2; quick_check each = ok
 #   legacy-upload    release.sh legacy: build + upload the root build we-<sha12>-root (never activates)
 #   probe-start      release-probe.mjs in the background (desktop + phone /worlds/w/eden-2026/ and /w/eden/, CLI edits in
-#                    bench-hamlet, --expect-build we-<sha12>); waits for <out>/probe/ready
+#                    the release-probe world (its own god folder; bench-hamlet only until that folder exists: RELEASES.md
+#                    "Release-probe world"), --expect-build we-<sha12>); waits for <out>/probe/ready
 #   release          release.sh production --reload (activate.sh hands over and rolls back by itself on a failed handover)
 #   legacy-activate  sha256sum -c FILES.sha256, activate.sh legacy --reload, then LEGACY-RELEASE = we-<sha12>-root
 #   released         touch <out>/probe/released (the probe watches 60 s more, then exits)
@@ -34,7 +35,15 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; SHIPD="$HERE/ship"; ROOT="$(cd "$HERE/../../.." && pwd)"
 HOST="${SIM_WORLDS_HOST:-root@eden2}"
 ORIGIN="${SHIP_ORIGIN:-https://sim.eden.art}"
-PROBE_CLI="${SHIP_PROBE_CLI:-<team>/runtime/t4-bench/bench-hamlet}"
+# lane OPS2: the probe's CLI edits go to the dedicated release-probe world (an unlisted scratch test world, RELEASES.md
+# "Release-probe world"), so releases never write to bench-hamlet (Kwyjibo's world). Until R's one-time setup has made its
+# god folder, the old bench-hamlet folder is used and preflight says so.
+PROBE_CLI_DEFAULT="<team>/runtime/t4-bench/release-probe"; PROBE_CLI_OLD="<team>/runtime/t4-bench/bench-hamlet"
+PROBE_CLI="${SHIP_PROBE_CLI:-$PROBE_CLI_DEFAULT}"
+PROBE_NOTE=""
+if [ -z "${SHIP_PROBE_CLI:-}" ] && [ ! -d "$PROBE_CLI" ] && [ -d "$PROBE_CLI_OLD" ]; then
+  PROBE_CLI="$PROBE_CLI_OLD"; PROBE_NOTE="no release-probe god folder yet ($PROBE_CLI_DEFAULT): the probe edits bench-hamlet this time; do the one-time setup (RELEASES.md \"Release-probe world\")"
+fi
 LEGACY_FILE="${SHIP_LEGACY_RELEASE_FILE:-<team>/runtime/sim-old-cloud/bin/LEGACY-RELEASE}"
 LOCK_FILE="${SHIP_DEPLOY_LOCK:-<team>/lanes/DEPLOY.lock}"
 OUT_ROOT="${SHIP_OUT_ROOT:-<team>/scratch/ship}"
@@ -126,7 +135,9 @@ if step preflight "local checks (nothing on eden2)"; then
   [ -d "${MARS_WEB_SRC:-$ROOT/.lane/mars-web}" ] || pf "no Mars web assets at ${MARS_WEB_SRC:-$ROOT/.lane/mars-web} (release.sh needs them)"
   for f in "$RELEASE" "$HERE/release-probe.mjs" "$ROOT/tools/cdn/cdn-walk.mjs" "$SHIPD/compact-backup.sh" "$SHIPD/quick-check.mjs" "$SHIPD/walk.mjs" "$SHIPD/poster.mjs" "$SHIPD/poster-count.py" "$SHIPD/stall.mjs" "$SHIPD/checks.mjs"; do
     [ -e "$f" ] || pf "missing $f"; done
+  [ -z "$PROBE_NOTE" ] || [ "$PROBE" = 0 ] || say "   NOTE: $PROBE_NOTE"
   [ "$PROBE" = 0 ] || [ -d "$PROBE_CLI" ] || pf "no probe god folder $PROBE_CLI (or --no-probe)"
+  [ "$PROBE" = 0 ] || say "   probe god folder $PROBE_CLI"
   [ -d "$(dirname "$LEGACY_FILE")" ] || pf "no folder for $LEGACY_FILE"
   if [ -e "$OUT/STEPS.txt" ] && [ -z "$FROM" ]; then pf "$OUT already holds a run: resume it with --from <step>, or pass another --out"; fi
   if [ -f "$LOCK_FILE" ]; then say "   lease: $(grep -m1 '^HELD\|^FREE\|^RELEASED' "$LOCK_FILE" | cut -c1-140)"; say "   lease, latest entry: $(grep -v '^[[:space:]]*$' "$LOCK_FILE" | tail -1 | cut -c1-140)"
