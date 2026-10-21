@@ -146,9 +146,16 @@ export function findRoute(grids: GridSet, scene: SpatialScene, profile: AgentPro
  * within 0.4 m of the far end's approach). Shared with the connectivity audit (connectivity.ts): both read links alike.
  */
 export function linkEdgeTest(link: Link, ascending: boolean, ge: LevelGrid, gx: LevelGrid, r: number, radius: number): { ok: boolean; ca: number; cx: number; approach: Vec2; far: Vec2 } {
-  const { entry, approach } = linkApproach(link, ascending);
+  const own = linkApproach(link, ascending), entry = own.entry;
   const far = linkApproach(link, !ascending).approach;
-  const ca = cellOf(ge, approach), cx = snap(gx, far, r, 0.4);
+  let approach = own.approach, ca = cellOf(ge, approach);
+  const cx = snap(gx, far, r, 0.4);
+  // An approach point whose own cell is short of room departs from the roomiest-nearest standing cell next to it (one
+  // cell, 0.15 m) instead (lane RAIL): a stair head in a corridor at 45 deg to the grid has a ridge of cells with room
+  // one cell wide, so a point on the corridor's centre line can fall on a cell beside it (hillside-home-1: 0.31 m where
+  // 0.34 is needed) and the way down was refused while arriving, which snaps within 0.4 m, was not: one-way upstairs.
+  // A cell with room keeps its point, so every link that passed before is read exactly as before.
+  if (ca >= 0 && ge.clearance[ca] < r) { const s = snap(ge, approach, r, ge.cell * 1.5); if (s >= 0) { ca = s; approach = centreOf(ge, s); } }
   // Leaving a level by a link: the approach-to-entry segment needs room for the body itself. Arriving by the same link
   // only snaps to standing room near the far approach (cx), so a stricter departure test (0.9 x the planning radius)
   // let wider bodies climb past furniture beside a stair top and then strand them up there (Eden 2026 tower: top-entry
@@ -185,15 +192,15 @@ function prepare(grids: GridSet, scene: SpatialScene, profile: AgentProfile, sta
       const { entry, approach, exit } = linkApproach(link, ascending);
       const ge = grids.levels.get(entry.level), gx = grids.levels.get(exit.level);
       if (!ge || !gx) continue;
-      const { ok, ca, cx, far } = linkEdgeTest(link, ascending, ge, gx, r, profile.radius);
+      const { ok, ca, cx, far, approach: from } = linkEdgeTest(link, ascending, ge, gx, r, profile.radius);
       if (!ok) {
         dropped?.push({ level: entry.level, at: [approach, entry.p], farLevel: exit.level, far });
         continue;
       }
-      const len = dist2(approach, entry.p) + pathLen(link.path) + dist2(exit.p, centreOf(gx, cx));
+      const len = dist2(from, entry.p) + pathLen(link.path) + dist2(exit.p, centreOf(gx, cx));
       const id = L.B[idxOf.get(entry.level)!] + ca;
       const list = edges.get(id) ?? [];
-      list.push({ link, ascending, toLevel: exit.level, toCell: cx, cost: len * 1.25, approach });
+      list.push({ link, ascending, toLevel: exit.level, toCell: cx, cost: len * 1.25, approach: from });
       edges.set(id, list);
     }
   }
