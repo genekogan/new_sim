@@ -30,6 +30,8 @@ export const INBOX_CONNECTED_MS = 120_000;
 export const INBOX_TEXT_MAX = 1000;
 /** God presence: a call within this long counts as connected; a god holding a command, within WORKING_MS. */
 export const GOD_RECENT_MS = 30_000, GOD_WORKING_MS = 600_000;
+/** Between two long-polls of a Soul's `listen` (the CLI re-polls within ~50 ms) presence stays 'listening' this long. */
+export const LISTEN_GAP_MS = 2_000;
 /** At most this many commands wait at once; the owner's log keeps the newest LOG_KEEP. */
 export const GOD_QUEUE_MAX = 50, GOD_LOG_KEEP = 200, GOD_LOG_VIEW = 50, GOD_TOUCHED_MAX = 300;
 /** A Soul's box: at most this many wait; the newest SOUL_KEEP (finished included) are kept. */
@@ -42,6 +44,8 @@ export class AgentInbox {
   focusOf: (ids: string[]) => TicketFocus | null = () => null;
   private waiters = new Map<string, Set<() => void>>();
   private listeners = new Map<string, number>();
+  /** When the last listener of a scope ended: a CLI re-polls within ~50 ms, so the card must not flicker away. */
+  private listenEnded = new Map<string, number>();
   constructor(db: Db, worldId: string, now = Date.now) {
     this.db = db; this.worldId = worldId; this.now = now;
     db.db.exec(`CREATE TABLE IF NOT EXISTS agent_inbox_v1 (
@@ -105,6 +109,8 @@ export class AgentInbox {
   }
   private presence(s: InboxScope, lastSeenAt: number | null, head: QRow | undefined): Presence {
     if ((this.listeners.get(this.key(s)) ?? 0) > 0) return 'listening';
+    const ended = this.listenEnded.get(this.key(s));
+    if (ended !== undefined && !this.god(s) && head?.delivered_at == null && this.now() - ended <= LISTEN_GAP_MS) return 'listening';
     const age = lastSeenAt === null ? Infinity : this.now() - lastSeenAt;
     if (age < 0) return 'away';
     if (head?.delivered_at != null && age <= GOD_WORKING_MS) return 'working';
@@ -219,7 +225,7 @@ export class AgentInbox {
   listening(s: InboxScope) {
     const key = this.key(s); this.listeners.set(key, (this.listeners.get(key) ?? 0) + 1);
     let ended = false;
-    return () => { if (ended) return; ended = true; const n = (this.listeners.get(key) ?? 1) - 1; if (n > 0) this.listeners.set(key, n); else this.listeners.delete(key); };
+    return () => { if (ended) return; ended = true; const n = (this.listeners.get(key) ?? 1) - 1; if (n > 0) this.listeners.set(key, n); else { this.listeners.delete(key); this.listenEnded.set(key, this.now()); } };
   }
   listenerCount(s: InboxScope) { return this.listeners.get(this.key(s)) ?? 0; }
   async listen(s: InboxScope, after: string | undefined, timeoutMs: number, signal: AbortSignal) {

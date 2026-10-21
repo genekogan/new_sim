@@ -4,7 +4,7 @@ import {mkdtempSync, rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {Db} from './db.ts';
-import {AgentInbox, INBOX_CONNECTED_MS} from './inbox.ts';
+import {AgentInbox, INBOX_CONNECTED_MS, LISTEN_GAP_MS} from './inbox.ts';
 import {fixture, invite, accept} from '../test/native-owner-fixture.ts';
 import {buildApp} from './http.ts';
 import {config} from './config.ts';
@@ -86,6 +86,17 @@ test('one durable latest message: truthful transitions, replacement, isolation, 
   db.close(); db = new Db(join(dir, 'fixture.db')); inbox = new AgentInbox(db, 'w1', () => now); t.after(() => db.close());
   assert.equal(inbox.view(a).latest!.id, second.id); assert.equal(inbox.view(a).latest!.state, 'sent'); assert.equal(inbox.view(a).connected, false);
   assert.equal(inbox.view(a).queued, 1);
+});
+
+test('presence stays listening across the gap between two long-polls, not after the listener is gone or once it holds a message', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'sim-inbox-')); t.after(() => rmSync(dir, {recursive: true, force: true}));
+  const db = new Db(join(dir, 'fixture.db')); t.after(() => db.close());
+  let now = 1000; const inbox = new AgentInbox(db, 'w1', () => now), a = {scope: 'soul:a', owner: 'alice'};
+  inbox.touch(a); const end = inbox.listening(a); assert.equal(inbox.view(a).presence, 'listening');
+  end(); now += 60; assert.equal(inbox.view(a).presence, 'listening', 're-polling');
+  now += LISTEN_GAP_MS; assert.equal(inbox.view(a).presence, 'recent', 'gone');
+  inbox.send(a, 'go to the cottage'); const end2 = inbox.listening(a); inbox.takeBacklog(a); end2(); now += 10;
+  assert.equal(inbox.view(a).presence, 'working', 'it took a message: working, not listening');
 });
 
 test('soul queue: a message waiting in the old one-message box moves into the queue at boot, once', t => {
