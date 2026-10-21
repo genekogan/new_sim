@@ -1,4 +1,4 @@
-import './client-errors.ts';   // lane ERR: first, so errors from here on are reported
+import {report} from './client-errors.ts';   // lane ERR: first, so errors from here on are reported
 import {discoverWorlds,readWorldBootstrap,WorldBootstrapError} from './world-discovery.ts';
 import { apiPath, worldPath, worldKey } from './world-path.ts';
 import {singleLocalPreview} from './local-navigation.ts';
@@ -74,8 +74,9 @@ function WorldRoot() {
   useEffect(()=>{const changed=()=>setHash(location.hash);addEventListener('hashchange',changed);return()=>removeEventListener('hashchange',changed);},[]);
   const [cfg, setCfg] = useState<Cfg | null>(null);
   const [err, setErr] = useState('');
-  useEffect(() => { let tries = 0; const go = () => { ((tries === 0 ? takeInlineConfig() ?? takeConfigPrefetch(apiPath('/v1/config')) : null) ?? fetch(apiPath('/v1/config'))).then(r=>readWorldBootstrap(r,worldKey,worldPath)).then(raw=>setCfg(raw as Cfg)).catch((e) => { if (!(e instanceof WorldBootstrapError)&&++tries < 20) setTimeout(go, 3000); else setErr(String(e)); }); }; go(); }, []);
-  if (err) return <pre>cannot reach the server: {err}</pre>;
+  useEffect(() => { let tries = 0; const go = () => { ((tries === 0 ? takeInlineConfig() ?? takeConfigPrefetch(apiPath('/v1/config')) : null) ?? fetch(apiPath('/v1/config'))).then(r=>readWorldBootstrap(r,worldKey,worldPath)).then(raw=>setCfg(raw as Cfg)).catch((e) => { if (!(e instanceof WorldBootstrapError)&&++tries < 20) setTimeout(go, 3000); else { report('boot', e instanceof Error ? e.message : typeof e); setErr(String(e)); } }); }; go(); }, []);
+  // lane ERR (QA F2): a stranger sees a sentence, a retry and the way home, never the raw error (it is reported instead)
+  if (err) return <main className="world-list"><h1>This world cannot open right now</h1><p>{/does not match|not found|unknown world|404/i.test(err)?'There is no world at this address.':'The server did not answer. It may be restarting: try again in a minute.'}</p><p><button type="button" onClick={()=>location.reload()}>Try again</button> <a href={BASE+'/'}>All worlds</a></p></main>;
   if (!cfg) return <pre>connecting…</pre>;
   const useDev = cfg.authProvider!=='clerk'&&!cfg.accountAuthRequired&&cfg.devAuth && new URLSearchParams(location.search).has('dev');
   if (useDev || (cfg.authProvider!=='clerk'&&!cfg.accountAuthRequired&&!cfg.privyAppId && cfg.devAuth)) return <WithDev cfg={cfg} />;

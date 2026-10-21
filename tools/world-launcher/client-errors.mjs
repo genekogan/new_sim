@@ -1,6 +1,7 @@
 // Client error + arrival-failure reports (lane ERR, 2026-10-21). First-party only: the page's tiny beacon
 // (apps/web/src/client-errors.ts) posts what a real visitor hit (a JS exception, an unhandled rejection, a lost WebGL
-// context, an asset that failed to load, a socket that dropped or kept reconnecting, an arrival that never finished) to
+// context, an asset that failed to load, a socket that dropped or kept reconnecting, an arrival that never finished, a
+// world page whose bootstrap failed) to
 // POST <base>/__sim/client-errors; the operator reads the summary (GET <base>/__sim/client-errors, direct loopback only,
 // or `op.mjs client-errors`), and the public healthz carries one number, `clientErrorsNew` = error kinds first seen since
 // this build went live (sim-watch DMs Gene when it grows).
@@ -21,7 +22,7 @@ export const CLIENT_ERROR_LIMITS = Object.freeze({
   bodyBytes: 8192, eventsPerBody: 10, ipPerS: 0.2, ipBurst: 10, sitePerS: 10, siteBurst: 300,
   maxKinds: 500, maxKeys: 16, logBytes: 256 * 1024, maxVisitorsPerDay: 64, flushMs: 5000,
 });
-const KINDS = new Set(['js', 'rej', 'gl', 'asset', 'res', 'ws', 'storm', 'arrival']);
+const KINDS = new Set(['js', 'rej', 'gl', 'asset', 'res', 'ws', 'storm', 'arrival', 'boot']);   // boot: the world's config/bootstrap failed
 
 /** Text a page sent, made safe to keep: no query strings, quoted text, tokens/ids, emails, addresses or control chars. */
 export function scrub(t, max = 160) {
