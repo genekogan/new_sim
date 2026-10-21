@@ -27,6 +27,22 @@ function snapshotPrefetch(): Plugin {
   };
 }
 
+// t4-phone: with the asset CDN on, index.html opens the CDN's connection at once (DNS, TCP, TLS: ~4 round trips, ~0.6 s
+// on a phone's 4G) instead of when the first GLB is asked for, which on a world with models at the arrival is on the
+// poster's critical path. Build only; the GLB worker's fetches share the page's connection pool.
+function cdnPreconnect(): Plugin {
+  return {
+    name: 'sim-cdn-preconnect',
+    apply: 'build',
+    transformIndexHtml(html, ctx) {
+      if (!/(^|\/)index\.html$/.test(ctx.path) || process.env.SIM_ASSETS_CDN_ENABLED !== '1') return;
+      const origin = new URL(process.env.SIM_ASSETS_CDN_ORIGIN ?? 'https://assets.eden.art').origin;
+      if (!html.includes('</title>')) throw Error('index.html: no </title> to place the CDN preconnect after');
+      return html.replace('</title>', `</title>\n    <link rel="preconnect" href="${origin}" crossorigin>`);
+    },
+  };
+}
+
 // P7b: index.html loads a world page in two phases where that helps (src/phased-entry.ts): early-entry.ts is its own entry
 // (rollupOptions.input `early`); this replaces Vite's module script and modulepreload tags with the loader. Build only.
 function phasedEntry(): Plugin {
@@ -76,7 +92,7 @@ function pwa(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [snapshotPrefetch(), pwa(), phasedEntry(), react()],
+  plugins: [snapshotPrefetch(), cdnPreconnect(), pwa(), phasedEntry(), react()],
   define: { __BUILD__: JSON.stringify(process.env.BUILD_ID ?? 'dev'), __SIM_ARRIVAL_ENABLED__: process.env.SIM_ARRIVAL_UI_ENABLED==='1', __SIM_GOATCOUNTER__: JSON.stringify(process.env.SIM_GOATCOUNTER ?? 'simeden'),
     __SIM_ASSETS_CDN_ENABLED__: process.env.SIM_ASSETS_CDN_ENABLED==='1',
     // CDN4: god uploads via the pull-through Worker on assets.eden.art/w/* (default on; needs the CDN switch above)

@@ -96,14 +96,17 @@ export function planEager(snap: { entities: Entity[]; assetBytes?: Record<string
   const sizes = snap.assetBytes ?? {};
   // the alternate GLB of a two-model def is in the bar only when it is the one drawn from here
   const lodOnly = new Set(snap.entities.flatMap((e) => { const m = defOf(e.def)?.make as LodMake & { kind?: string } | undefined; return m?.kind === 'mesh' && m.lod1 ? [m.asset, m.lod1] : []; }));
-  const from = eye ?? centre, shaFor = (e: Entity) => { const p = posOf(e); return shasOf(defOf(e.def), p ? Math.hypot(p[0] - from[0], p[1] - from[1]) : Infinity, e.s ?? 1); };
-  if (!LAZY) { eager = null; const used = new Set(snap.entities.flatMap(shaFor)); return Object.fromEntries(Object.entries(sizes).filter(([sha]) => used.has(sha) || !lodOnly.has(sha))); }
+  // t4-phone: only mesh defs carry GLBs, so nothing else is posed (a world pose walks the parent chain and slots; on Eden
+  // 2026 posing all ~4,900 things twice was ~0.3 s of a 4x phone's arrival)
+  const from = eye ?? centre, shaFor = (e: Entity, p: [number, number] | null | undefined = undefined) => { const d = defOf(e.def); if (!d || d.make.kind !== 'mesh') return []; if (p === undefined) p = posOf(e); return shasOf(d, p ? Math.hypot(p[0] - from[0], p[1] - from[1]) : Infinity, e.s ?? 1); };
+  if (!LAZY) { eager = null; const used = new Set(snap.entities.flatMap((e) => shaFor(e))); return Object.fromEntries(Object.entries(sizes).filter(([sha]) => used.has(sha) || !lodOnly.has(sha))); }
   // P1 phones: the first build draws only what is within `near` of the eye or centre before the card (WorldEntityLayer),
   // so the eager set (whose things the card waits to see drawn) stays inside that radius too
   const near = progressiveNearM(), ndist = new Map<string, number>();
   const dist = new Map<string, number>(), rank = new Map<string, number>();
   for (const e of snap.entities) {
-    const def = defOf(e.def), p = posOf(e), shas = shaFor(e); if (!shas.length) continue;
+    const def = defOf(e.def); if (!def || def.make.kind !== 'mesh') continue;
+    const p = posOf(e), shas = shaFor(e, p); if (!shas.length) continue;
     const d = p ? score(p[0], p[1]) : 1e9, size = Math.max(1, ...((def?.size?.box as number[] | undefined) ?? [1]).map((v) => v * (e.s ?? 1)));
     const nd = p ? Math.min(Math.hypot(p[0] - centre[0], p[1] - centre[1]), eye ? Math.hypot(p[0] - eye[0], p[1] - eye[1]) : Infinity) : 0;
     for (const sha of shas) { ndist.set(sha, Math.min(ndist.get(sha) ?? Infinity, nd)); dist.set(sha, Math.min(dist.get(sha) ?? Infinity, d)); rank.set(sha, Math.min(rank.get(sha) ?? Infinity, eye ? d / size : d)); }

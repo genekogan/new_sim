@@ -18,7 +18,6 @@ import { compileSceneAsync } from './gen-mesh/texture-budget.ts';
 import { arrivalMark } from './arrival-marks.ts';
 import { earlyArrival } from './early-arrival.ts';
 import { callPhase2, PHASE2_FILL } from './phased-entry.ts';
-import { startCdnManifest } from './cdn-assets.ts';
 import { earlyRenderClaimed, offerEarlyRender, peekEarlyLayer, removeEarlyPoster, setEarlyPoster, type EarlyLayer, type EarlyRenderHandOver } from './early-layer.ts';
 
 /** The one switch. `?earlyRender=0` turns it off for a page (the early layer and lever D stay). */
@@ -111,7 +110,7 @@ function arrive(early: EarlyLayer, made: NonNullable<Made>, done: () => void) {
   const safeDraw = () => { try { draw(); } catch (e) { console.warn('early renderer', e); done(); } };
   // the nearest models first (the card waited for them too), then the programs linked in parallel, then one frame
   const gate = new Promise<void>((resolve) => { if (!arrivalGate.pending()) return resolve(); const off = arrivalGate.subscribe(() => { if (!arrivalGate.pending()) { off(); resolve(); } }); setTimeout(resolve, 3_000); });
-  // t4-phone: the poster's bytes are all in: phase two's entry downloads, the socket opens and the CDN manifest comes
-  // while this links and draws (the entry still runs only once the poster is up)
-  void gate.then(() => { if (earlyRenderClaimed()) return; arrivalMark('early-render-gate'); callPhase2(PHASE2_FILL); startCdnManifest(); prepare(); return compileSceneAsync(renderer, scene, camera).then(() => arrivalMark('early-render-linked')); }).then(() => requestAnimationFrame(safeDraw), () => requestAnimationFrame(safeDraw));
+  // t4-phone: the poster's bytes are all in: phase two's entry downloads and the socket opens while this links and draws
+  // (the entry still runs only once the poster is up)
+  void gate.then(() => { if (earlyRenderClaimed()) return; arrivalMark('early-render-gate'); callPhase2(PHASE2_FILL); prepare(); return compileSceneAsync(renderer, scene, camera).then(() => arrivalMark('early-render-linked')); }).then(() => requestAnimationFrame(safeDraw), () => requestAnimationFrame(safeDraw));
 }

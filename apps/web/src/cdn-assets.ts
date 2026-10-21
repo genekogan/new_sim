@@ -208,12 +208,7 @@ declare const __SIM_ASSETS_CDN_ORIGIN__: string;
  *  asset-fetch.ts): the remote URL plus the bytes it must hash to. The caller verifies them and falls back to `url`. */
 export type CdnRoute = { url: string; sha256: string; bytes: number };
 let published: Promise<{ manifest: CdnManifest; origin: string } | null> = Promise.resolve(null);
-let startManifest: () => void = () => {};
-/** t4-phone: a lazily installed transport (installCdnAssets `lazy`) GETs its manifest now (it does at the first asset
- *  fetch or cdnRoute by itself). Idempotent; nothing without a lazy transport. */
-export function startCdnManifest(): void { startManifest(); }
 export function cdnRoute(url: string): Promise<CdnRoute | null> {
-  startManifest();
   return published.then((p) => {
     if (!p) return null;
     const asset = manifestAsset(p.manifest, url, location.href);
@@ -223,32 +218,23 @@ export function cdnRoute(url: string): Promise<CdnRoute | null> {
 /** Tests: install a parsed manifest for cdnRoute without the build-time switch. */
 export function setCdnRouteForTest(manifest: CdnManifest | null, origin = 'https://assets.eden.art') { published = Promise.resolve(manifest ? { manifest, origin: cdnOrigin(origin) } : null); }
 
-/** `lazy` (t4-phone, a phone's early entry): the manifest (~51 KB on the wire) is not fetched until the first asset fetch,
- *  cdnRoute or startCdnManifest(), so it stays off the arrival poster's link when the poster needs no asset file. */
-export function installCdnAssets(manifestPath: string, onProgress?: CdnProgress, lazy = false): void {
+export function installCdnAssets(manifestPath: string, onProgress?: CdnProgress): void {
   if (typeof __SIM_ASSETS_CDN_ENABLED__ === 'undefined' || !__SIM_ASSETS_CDN_ENABLED__) return;
   const original = window.fetch.bind(window);
   let found: (v: { manifest: CdnManifest; origin: string } | null) => void = () => {};
   published = new Promise((r) => { found = r; });
-  let transport: Promise<Fetch | null> | null = null;
-  const start = (): Promise<Fetch | null> => {
-    if (transport) return transport;
-    transport = original(manifestPath, { signal: AbortSignal.timeout(3000) }).then(async (response) => {
-      if (!response.ok) return null;
-      const manifest = readCdnManifest(await response.json());
-      found({ manifest, origin: cdnOrigin(__SIM_ASSETS_CDN_ORIGIN__) });
-      installCdnImages(manifest);
-      return cdnFetch(original, manifest, __SIM_ASSETS_CDN_ORIGIN__, location.href, undefined, onProgress);
-    }).catch(() => null);
-    void transport.then((t) => { if (!t) found(null); });
-    return transport;
-  };
-  startManifest = () => { void start(); };
-  if (!lazy) start();
+  const transport: Promise<Fetch | null> = original(manifestPath, { signal: AbortSignal.timeout(3000) }).then(async (response) => {
+    if (!response.ok) return null;
+    const manifest = readCdnManifest(await response.json());
+    found({ manifest, origin: cdnOrigin(__SIM_ASSETS_CDN_ORIGIN__) });
+    installCdnImages(manifest);
+    return cdnFetch(original, manifest, __SIM_ASSETS_CDN_ORIGIN__, location.href, undefined, onProgress);
+  }).catch(() => null);
+  void transport.then((t) => { if (!t) found(null); });
   window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     let path = '';
     try { path = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.href).pathname; } catch { /* not a URL: origin */ }
     if (!FILE.test(path)) return original(input, init);
-    return start().then((t) => (t ?? original)(input, init));
+    return transport.then((t) => (t ?? original)(input, init));
   }) as Fetch;
 }

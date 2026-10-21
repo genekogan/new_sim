@@ -22,6 +22,6 @@ try {
     phase2(true); setTimeout(release, POSTER_WAIT_MS);
     try { void import('./early-render.ts').then((m) => m.startEarlyRender(release), release); } catch { release(); }
   };
-  if (earlyLayerWanted()) { installAssetTransport(true); started = startEarlyLayer(onSnapshot); }
+  if (earlyLayerWanted()) { installAssetTransport(); started = startEarlyLayer(onSnapshot); }
 } catch { /* LiveWorld makes its own layer */ }
 if (!started) phase2();
