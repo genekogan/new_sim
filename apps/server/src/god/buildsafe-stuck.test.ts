@@ -51,3 +51,123 @@ for (const paged of [true, false]) {
     assert.equal(w.E.reachV1({p: [97, 20.5]}, {p: [0.5, 20.5]}).ok, true, 'west round the room');
   });
 }
+
+// ---- the ledger side: a Soul on the same harness, plans injected through the world-profile hook ----
+import {invite, accept} from '../../test/native-owner-fixture.ts';
+type Plans = Map<string, {label: string; steps: any[]}>;
+async function soulIn(t: TestContext, paged = false) {
+  const w = world(t, paged); await w.settle(2);
+  await invite(w as any, 'ada'); const row: any = await accept(w.host, w.souls.create('dev:ada', {name: 'Ada', description: 'curious'})); await w.settle(3);
+  const soul = {soulId: row.id, entityId: row.entity_id, name: row.name, owner: row.owner};
+  const extra = new Map<string, {label: string; steps: any[]}>();
+  w.edge.worldProfile = (_s, caps, plans) => {for (const [id, p] of extra) {caps.push({id, verb: id.split(':')[0]!, label: p.label, available: true, target: {id: id.split(':')[1]!, kind: 'place'}} as any); (plans as Plans).set(id, p);}};
+  const body = () => w.E.world.entities[soul.entityId], pos = (): Vec2 => {const p = body().pose.p; return [p[0], p[2]];};
+  const go = (capability: string) => accept(w.host, w.edge.act(soul, {capability})) as Promise<any>;
+  const until = async (id: string, max = 6000) => {
+    for (let i = 0; i < max; i++) {w.host.tickOnce(); if (i % 10 === 0) {await setImmediate(); w.host.drainInputs(); const r = w.edge.receipt(soul.soulId, id); if (r && !['waiting', 'started', 'running'].includes(r.phase)) return r;}}
+    return w.edge.receipt(soul.soulId, id);
+  };
+  return {...w, soul, extra, body, pos, go, until};
+}
+
+test('closest approach: a walk to a closed room goes as near as a walk does and says by how much', {timeout: 300_000}, async t => {
+  const w = await soulIn(t);
+  const at = w.pos(), c: Vec2 = [Math.round(at[0]) + 20.5, Math.round(at[1]) + 0.5];
+  w.act(ring(c, 7, 'q')); await w.settle(3);
+  assert.equal(w.E.reachV1({p: at}, {p: c}).ok, false, 'the room is closed');
+  w.extra.set('walk:closed-room', {label: 'Walk to the closed room', steps: [{verb: 'walk_to', params: {to: c}}]});
+  const out = await w.go('walk:closed-room');
+  assert.equal(out.accepted, true, JSON.stringify(out));
+  const r: any = await w.until(out.receipt.id);
+  t.diagnostic(JSON.stringify(r));
+  assert.equal(r.phase, 'completed', JSON.stringify(r));
+  assert.match(r.reason ?? '', /^Got within [\d.]+ m of the closed room: no walkable route reaches it from here \(route\.(unreachable|goal-blocked)\)/);
+  assert.ok(r.approach && r.approach.short > 3 && r.approach.short < 9, JSON.stringify(r.approach));
+  assert.deepEqual(r.approach.goal, c);
+  const end = w.pos(), d = Math.hypot(end[0] - c[0], end[1] - c[1]);
+  assert.ok(Math.abs(d - r.approach.short) < 1.0, `stands ${d.toFixed(2)} m from the room's middle (said ${r.approach.short})`);
+});
+
+/** The engine's walk exec for this walker (test only): its pace forced to 0 stands it 'running' with no headway. */
+const execOf = (w: any) => [...((w.E.rt.services.walkExecs ?? new Map()) as Map<string, any>).values()].find(x => x.actor === w.soul.entityId);
+async function frozenWalk(t: TestContext, stubInside: boolean) {
+  const w = await soulIn(t);
+  const at = w.pos(), to: Vec2 = [Math.round(at[0]) + 25.5, Math.round(at[1]) + 0.5];
+  w.extra.set('walk:far-lawn', {label: 'Walk to the far lawn', steps: [{verb: 'walk_to', params: {to}}]});
+  if (stubInside) {const real = w.E.clearanceAtV1.bind(w.E); let once = true; w.E.clearanceAtV1 = (x: number, z: number, l?: number) => (once ? (once = false, 0.1) : real(x, z, l));}
+  const out = await w.go('walk:far-lawn'); assert.equal(out.accepted, true, JSON.stringify(out));
+  let frozen = true, ticks = 0, relocations = 0, first: any;
+  const origEnqueue = w.host.enqueue.bind(w.host);
+  w.host.enqueue = (kind: string, ...rest: any[]) => {if (kind === 'edge-relocate') {relocations++; frozen = false;} return origEnqueue(kind, ...rest);};
+  for (let i = 0; i < 4000; i++) {
+    const ex = execOf(w); if (ex && frozen) {ex.speed = 0; first ??= ex.id;}
+    w.host.tickOnce(); ticks++;
+    if (i % 10 === 0) {await setImmediate(); w.host.drainInputs(); const r = w.edge.receipt(w.soul.soulId, out.receipt.id); if (r && !['waiting', 'started', 'running'].includes(r.phase)) return {w, r, ticks, relocations, to};}
+  }
+  return {w, r: w.edge.receipt(w.soul.soulId, out.receipt.id), ticks, relocations, to};
+}
+
+test('walk.stuck: a walk with no headway ends its receipt honestly after 30 s (no step-out when the body has room)', {timeout: 300_000}, async t => {
+  const {r, ticks, relocations} = await frozenWalk(t, false);
+  assert.equal(r?.phase, 'failed', JSON.stringify(r));
+  assert.equal(r?.code, 'walk.stuck', JSON.stringify(r));
+  assert.match(r?.reason ?? '', /made no headway for 30 seconds/);
+  assert.equal(relocations, 0);
+  assert.ok(ticks >= 590 && ticks <= 700, `ended at tick ${ticks}`);
+});
+
+test('walk.stuck: a body caught in geometry steps out and the same plan walks on under the same receipt', {timeout: 300_000}, async t => {
+  const {w, r, relocations, to} = await frozenWalk(t, true);
+  assert.equal(relocations, 1, 'one step-out');
+  assert.equal(r?.phase, 'completed', JSON.stringify(r));
+  assert.equal(kinds.length, 1, JSON.stringify(kinds)); assert.equal(kinds[0].godWalkout, true, 'rose with the god walk-out');
+  assert.match(kinds[0].why, /stood up and stepped clear to start/);
+  const end = w.pos(); assert.ok(Math.hypot(end[0] - to[0], end[1] - to[1]) < 1, `arrived: ${end}`);
+});
+
+test('gait fallback: a run the water refuses (gait.dry-ground-required) walks instead, and the receipt says why', {timeout: 300_000}, async t => {
+  const w = await soulIn(t);
+  const at = w.pos(), to: Vec2 = [Math.round(at[0]) + 20.5, Math.round(at[1]) + 0.5];
+  w.extra.set('run:shore', {label: 'Run to the shore', steps: [{verb: 'walk_to', params: {to, gait: 'run'}}]});
+  // the engine's refusal for a run whose way goes through the shallows (engine.ts walk_to gait check; the engine side of
+  // wading at walking pace is buildsafe-walk.test.ts); a plain walk on the same way is admitted
+  const real = w.host.engine.canPerform.bind(w.host.engine), seen: string[] = [];
+  (w.host.engine as any).canPerform = (p: any) => {const g = p.steps.find((s: any) => s.verb === 'walk_to')?.params?.gait; seen.push(g ?? 'walk'); return g && g !== 'walk' ? {code: 'gait.dry-ground-required', message: 'This shore or water route does not support jogging or running; return to dry ground first.'} : real(p);};
+  const out = await w.go('run:shore');
+  assert.equal(out.accepted, true, JSON.stringify(out));
+  assert.ok(seen.includes('run') && seen.includes('walk'), seen.join());
+  const r: any = await w.until(out.receipt.id);
+  assert.equal(r.phase, 'completed', JSON.stringify(r));
+  assert.match(r.reason ?? '', /^Walking, not running: the way goes through shallow water/);
+  assert.equal(kinds.length, 1, JSON.stringify(kinds)); assert.equal(kinds[0].godWalkout, true, 'rose with the god walk-out');
+  assert.match(kinds[0].why, /stood up and stepped clear to start/);
+  const end = w.pos(); assert.ok(Math.hypot(end[0] - to[0], end[1] - to[1]) < 1, `arrived: ${end}`);
+});
+
+test('seated start-blocked: a Soul on a bench whose walk cannot start where it sits rises with the walk-out and walks', {timeout: 300_000}, async t => {
+  const w = await soulIn(t);
+  const at = w.pos(), bench: Vec2 = [Math.round(at[0]) + 4.5, Math.round(at[1]) + 0.5], to: Vec2 = [bench[0] + 20, bench[1]];
+  w.act([{op: 'place', def: 'core/bench@1', name: 'bench', p: bench}]); await w.settle(3);
+  const seatId = Object.values(w.E.world.entities as Record<string, any>).find((e: any) => e.label === 'bench' && Math.hypot(e.pose.p[0] - bench[0], e.pose.p[2] - bench[1]) < 2)?.id;
+  assert.ok(seatId, 'the bench is in the world');
+  w.extra.set('sit:the-bench', {label: 'Sit on the bench', steps: [{verb: 'sit', params: {on: seatId, seconds: 600}}]});
+  const s1 = await w.go('sit:the-bench'); assert.equal(s1.accepted, true, JSON.stringify(s1));
+  for (let i = 0; i < 1500 && w.body().human.activity !== 'sit'; i++) {w.host.tickOnce(); if (i % 10 === 0) {await setImmediate(); w.host.drainInputs();}}
+  assert.equal(w.body().human.activity, 'sit', 'sits on the bench');
+  // a seat-slot hold (seatOf) is what makes a plain relocate refuse a seated body; this bench is a fixture seat, so the
+  // slot is stubbed: the ledger sees the Soul held by its seat while it sits
+  const seatOf = () => w.body().human.activity === 'sit' ? 'slot-0' : null; (w.edge as any).seatOf = seatOf;
+  const kinds: any[] = []; const origEnqueue = w.host.enqueue.bind(w.host);
+  w.host.enqueue = (kind: string, ...rest: any[]) => {if (kind === 'edge-relocate') kinds.push(rest[1]); return origEnqueue(kind, ...rest);};
+  w.extra.set('walk:lawn', {label: 'Walk to the lawn', steps: [{verb: 'walk_to', params: {to}}]});
+  // the live shape (finding c): where the body sits no walk can start; once standing clear it can
+  const real = w.host.engine.canPerform.bind(w.host.engine);
+  (w.host.engine as any).canPerform = (p: any) => seatOf() ? {code: 'route.start-blocked', message: 'no walk starts where it sits'} : real(p);
+  const out = await w.go('walk:lawn');
+  assert.equal(out.accepted, true, JSON.stringify(out));
+  const r: any = await w.until(out.receipt.id);
+  assert.equal(r.phase, 'completed', JSON.stringify(r));
+  assert.equal(kinds.length, 1, JSON.stringify(kinds)); assert.equal(kinds[0].godWalkout, true, 'rose with the god walk-out');
+  assert.match(kinds[0].why, /stood up and stepped clear to start/);
+  const end = w.pos(); assert.ok(Math.hypot(end[0] - to[0], end[1] - to[1]) < 1, `arrived: ${end}`);
+});
