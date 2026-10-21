@@ -5,12 +5,13 @@
 import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { setImmediate } from 'node:timers/promises';
-import { coreRef } from '@sim/world-compiler';
+import { coreLibrary, coreRef } from '@sim/world-compiler';
+import { seatFitProblem } from '../../../../mars/viewer/engine/bodies/humanoid.ts';
 import { fixture, invite, accept, factory } from '../../test/native-owner-fixture.ts';
 import { EdgeLedger } from '../edge/ledger/ledger.ts';
 import { GodMode } from './god.ts';
 import { installEngineBridge } from './engine-bridge.ts';
-import { useCheck } from './use-check.ts';
+import { SEAT_HEIGHTS, useCheck } from './use-check.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 async function setup(t: TestContext) {
@@ -90,4 +91,85 @@ test('use-check: a seat or bed is usable exactly when a body can sit or lie on i
     if (r.accepted) { await w.until(() => (sat ||= w.human().activity === 'sit') || ['completed', 'failed', 'cancelled'].includes(w.edge.receipt(w.soul.soulId, r.receipt.id)?.phase ?? ''), 3000); }
     assert.equal(sat, false, `${n}: the body never sits (${JSON.stringify(r.accepted ? w.edge.receipt(w.soul.soulId, r.receipt.id) : r)})`);
   }
+});
+
+// The edge sit capability reads the same baked seat tops (seatTopsOf): engine seat slots carry no height, so it used to read
+// none and offered every seat to every body, which then failed at the seat. A 1.16 m stool top suits the standard 1.75 m
+// body (seats up to 1.2 m) but not the shortest look (1.65 m: up to 1.13 m), and the use-check reads the same top.
+test('use-check: the sit capability is blocked on a seat too high for the body, from the baked seat top', { timeout: 120_000 }, async (t) => {
+  const w = await setup(t);
+  const me = w.host.engine.world.entities[w.soul.entityId] as any, at: [number, number] = [me.pose.p[0] + 4, me.pose.p[2]];
+  const stool = { schema: 'def/1', name: 'tall-stool', version: 1, tags: ['furniture', 'seat'], form: 'point', size: { box: [0.5, 1.16, 0.5] },
+    make: { kind: 'gen', gen: 'kit/2', args: { shapes: [{ kind: 'box', at: [0, 0.58, 0], size: [0.5, 1.16, 0.5] }] } },
+    slots: [{ id: 'seat', kind: 'seat', p: [0, 1.16, 0], yaw: 0, height: 1.16, accepts: { tags: ['body'] }, capacity: 1 }], components: { seat: { height: 1.16 } } };
+  w.act([{ op: 'define', def: stool }, { op: 'place', def: 'tall-stool@1', name: 'stool', p: at }]);
+  await w.settle(4);
+  const id = w.god.model.get('stool')!.id, cap = () => w.edge.capabilities(w.soul).find((c: any) => c.id === `sit:${id}`) as any;
+  assert.deepEqual(useCheck(w.E, [id], w.god.model).map((v) => [v.kind, v.ok]), [['seat', true]], 'the standard body sits on it');
+  assert.equal(cap()?.available, true, `the standard body may sit on a 1.16 m seat: ${JSON.stringify(cap())}`);
+  me.body = { family: 'humanoid', model: 'short', params: { height: 1.65 } };
+  await w.settle(1);   // capabilities are cached per tick
+  const c = cap();
+  assert.equal(c?.available, false, JSON.stringify(c));
+  assert.equal(c?.blocked?.code, 'seat.too-high');
+  assert.match(c.blocked.reason, /the seat is 1\.16 m high; a 1\.65 m body sits on seats up to 1\.13 m/);
+});
+
+// SEATDEF (2026-10-22): 32 of the library's 180 seat slots stored a seat height no body sits at (the Mars bus seats' and
+// papasan's box top, cab seats' and bleacher benches' height above the ground) or a true floor-seat top (cushions,
+// tiers, mattresses). The library revisions now carry the measured heights, SEAT_HEIGHTS carries them to the revisions
+// worlds already placed, and no core seat is too high for the shortest look.
+const SHORT = { family: 'humanoid', model: 'short', params: { height: 1.65 } } as const;
+test('use-check: every core seat suits the shortest look, and SEAT_HEIGHTS is what the library revisions store', () => {
+  const lib = coreLibrary(), high: string[] = [];
+  for (const d of lib.all()) {
+    if (!lib.get(d.ref) || lib.get(d.ref)!.hash !== d.hash) continue;   // current revisions only
+    for (const s of d.slots.filter((x) => x.kind === 'seat')) {
+      const h = SEAT_HEIGHTS[d.name] ?? s.height ?? s.p[1];
+      if (seatFitProblem(SHORT as any, h)?.code === 'seat.too-high') high.push(`${d.ref} ${s.id} ${h}`);
+      if (SEAT_HEIGHTS[d.name] !== undefined) assert.equal(s.height, SEAT_HEIGHTS[d.name], `${d.ref} ${s.id} stores the measured height`);
+    }
+  }
+  assert.deepEqual(high, []);
+  for (const n of Object.keys(SEAT_HEIGHTS)) assert.ok(lib.all().some((d) => d.name === n), `${n} is a library def`);
+  // the Mars seats' top is the seat surface too (the slot sits a body there); vehicle and bleacher seats keep their place
+  for (const r of ['core/mars-bus-seat@3', 'core/mars-papasan@3']) for (const s of lib.get(r)!.slots) assert.equal(s.p[1], SEAT_HEIGHTS[lib.get(r)!.name], r);
+  assert.equal(lib.get('core/tractor@1')!.slots[0].p[1], 1.5);
+});
+
+// The retired bus seat revision (box top 1.22 m as seat height, def hash 0fdaaed90c23…) stays what worlds that placed it
+// store, byte for byte; its seat reads the measured 0.51 m, so the shortest look may sit on it and does, as Souls sit on
+// the Mars diner bus seats today (mars-two e2e S10). Likewise the bleachers (top bench 1.4 m up), the papasan and a floor
+// cushion (too low for a chair sit, sat on all the same). (Vehicles carry no seat component, so they offer no sit.)
+test('use-check: seats Souls sit on today stay sittable for every look, retired revisions included', { timeout: 300_000 }, async (t) => {
+  const w = await setup(t);
+  const cur = coreLibrary().get('core/mars-bus-seat@3')!;
+  const { hash: _h, ref: _r, by: _b, born: _n, budget: _u, ...input } = cur as any;
+  const old = JSON.parse(JSON.stringify({ ...input, version: 2, description: input.description.replace('at 0.51 m', 'at 1.22 m') }));
+  for (const s of old.slots) { s.p[1] = 1.22; s.height = 1.22; }
+  old.components.seat.height = 1.22;
+  const pinned = w.god.model.defineDef(old, 'core', 0);
+  assert.equal(pinned.hash.slice(0, 12), '0fdaaed90c23', 'the retired revision, byte for byte');
+  const me = w.host.engine.world.entities[w.soul.entityId] as any, [x0, z0] = [me.pose.p[0], me.pose.p[2]];
+  w.act([
+    { op: 'place', def: 'core/mars-bus-seat@2', name: 'old-bus-seat', p: [x0 + 4, z0] },
+    { op: 'place', def: coreRef('mars-bus-seat', 3), name: 'bus-seat', p: [x0 - 4, z0] },
+    { op: 'place', def: coreRef('mars-papasan', 3), name: 'papasan', p: [x0, z0 + 5] },
+    { op: 'place', def: coreRef('bleachers'), name: 'bleachers', p: [x0 - 12, z0 + 10] },
+    { op: 'place', def: coreRef('mars-tool-library-floor-cushion', 2), name: 'cushion', p: [x0, z0 - 5] },
+  ]);
+  await w.settle(4);
+  assert.equal(w.god.model.resolvedDef(w.god.model.get('old-bus-seat')!.def)!.hash, pinned.hash, 'the placed seat is the retired revision');
+  me.body = SHORT;
+  await w.settle(1);
+  const id = (n: string) => w.god.model.get(n)!.id;
+  for (const n of ['old-bus-seat', 'bus-seat', 'papasan', 'bleachers', 'cushion']) {
+    const c = w.edge.capabilities(w.soul).find((x: any) => x.id === `sit:${id(n)}`) as any;
+    assert.equal(c?.available, true, `${n}: ${JSON.stringify(c)}`);
+  }
+  const fit = useCheck(w.E, ['old-bus-seat', 'bus-seat', 'papasan', 'bleachers'].map(id), w.god.model).filter((v) => v.code === 'use.seat-fit');
+  assert.deepEqual(fit.map((v) => v.line), [], 'no seat-fit finding on them');
+  const r = await accept(w.host, w.edge.act(w.soul, { capability: `sit:${id('old-bus-seat')}`, params: { seconds: 2 } })) as any;
+  assert.equal(r.accepted, true, JSON.stringify(r));
+  assert.ok(await w.until(() => w.human().activity === 'sit'), 'the shortest look sits on the retired bus seat');
 });

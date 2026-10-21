@@ -879,7 +879,7 @@
    "floorY": 0.53
   },
   {
-   "def": "core/mars-bus-seat@2",
+   "def": "core/mars-bus-seat@3",
    "cat": "seat",
    "building": "kitchen",
    "nums": [
@@ -902,7 +902,7 @@
    "floorY": 0.53
   },
   {
-   "def": "core/mars-bus-seat-2@2",
+   "def": "core/mars-bus-seat-2@3",
    "cat": "seat",
    "building": "kitchen",
    "nums": [
@@ -932,7 +932,7 @@
    "floorY": 0.53
   },
   {
-   "def": "core/mars-bus-seat-3@2",
+   "def": "core/mars-bus-seat-3@3",
    "cat": "seat",
    "building": "kitchen",
    "nums": [
@@ -962,7 +962,7 @@
    "floorY": 0.53
   },
   {
-   "def": "core/mars-bus-seat-4@2",
+   "def": "core/mars-bus-seat-4@3",
    "cat": "seat",
    "building": "kitchen",
    "nums": [
@@ -1459,7 +1459,7 @@
    "floorY": 1.29
   },
   {
-   "def": "core/mars-papasan@2",
+   "def": "core/mars-papasan@3",
    "cat": "seat",
    "building": "mimos",
    "nums": [

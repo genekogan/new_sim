@@ -3,7 +3,8 @@
  "note": "releases: commits whose mars-two worlds may be live (e6613f11 made my-mars-college-2026; 7eca0acc is main). Their assets stay resolvable (legacy/) and their def contents keep their versions; a def whose content differs from all of them gets a new version. Add a commit here when a release that carries this build reaches production, and mark its versions released.",
  "releases": [
   "e6613f11",
-  "7eca0acc"
+  "7eca0acc",
+  "ee0ebbea9"
  ],
  "defs": {
   "core-mars-mimos-coffee-table": [
@@ -15,7 +16,9 @@
    },
    {
     "v": 2,
-    "hash": "31b9bba3d6198f253fa82d7825b63766c9cb94b9b48d43f673f725cc3970295c"
+    "hash": "31b9bba3d6198f253fa82d7825b63766c9cb94b9b48d43f673f725cc3970295c",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-coffee-table-ceramic-cup": [
@@ -27,7 +30,9 @@
    },
    {
     "v": 2,
-    "hash": "0fb8b508858daa618d4a64fe29624761f64b8c13444e9691edf4df57ea7a7164"
+    "hash": "0fb8b508858daa618d4a64fe29624761f64b8c13444e9691edf4df57ea7a7164",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-tool-library-bookshelf-timber": [
@@ -39,7 +44,9 @@
    },
    {
     "v": 2,
-    "hash": "9e9f7703c6fa69d95c3adddc61098548d076f977c3c06b4cf51d94ce0eb782cd"
+    "hash": "9e9f7703c6fa69d95c3adddc61098548d076f977c3c06b4cf51d94ce0eb782cd",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-tool-library-low-table": [
@@ -51,7 +58,9 @@
    },
    {
     "v": 2,
-    "hash": "c77532bfbf1d15f6362391a3e34a4b85a91642b394a96f0404e4db892d3022d0"
+    "hash": "c77532bfbf1d15f6362391a3e34a4b85a91642b394a96f0404e4db892d3022d0",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-tool-library-floor-cushion": [
@@ -63,7 +72,9 @@
    },
    {
     "v": 2,
-    "hash": "1f9a92bceb6160da94bf56bb294234c328c7be1db2797d99f550d0ff231b7413"
+    "hash": "1f9a92bceb6160da94bf56bb294234c328c7be1db2797d99f550d0ff231b7413",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-tool-library-floor-cushion-2": [
@@ -75,7 +86,9 @@
    },
    {
     "v": 2,
-    "hash": "4a82363e67a13a5c7df4d3d15d19c7b4315943ac7c5e798666ca474d6e022bf1"
+    "hash": "4a82363e67a13a5c7df4d3d15d19c7b4315943ac7c5e798666ca474d6e022bf1",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-tool-library-floor-cushion-3": [
@@ -87,7 +100,9 @@
    },
    {
     "v": 2,
-    "hash": "386b32cc2c2c98040084881b57a199f53f91e435a14aa0dca03583142a20e68a"
+    "hash": "386b32cc2c2c98040084881b57a199f53f91e435a14aa0dca03583142a20e68a",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-tool-library-floor-cushion-4": [
@@ -99,7 +114,9 @@
    },
    {
     "v": 2,
-    "hash": "cc0f390c82bc0d14e82dbd82a8c0400ff04ec9fe24553412867a0b805c83f2e2"
+    "hash": "cc0f390c82bc0d14e82dbd82a8c0400ff04ec9fe24553412867a0b805c83f2e2",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-tool-ground-bench-lower": [
@@ -111,7 +128,9 @@
    },
    {
     "v": 2,
-    "hash": "eaadc1cc8de53219678e1da208d44e96de30f69627c1722d2944cae3203f906c"
+    "hash": "eaadc1cc8de53219678e1da208d44e96de30f69627c1722d2944cae3203f906c",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-tool-bench-vise": [
@@ -123,7 +142,9 @@
    },
    {
     "v": 2,
-    "hash": "4db4617fb384bbc0aaffc98096bd06844df76091f7656b30b6025c80d17f6a29"
+    "hash": "4db4617fb384bbc0aaffc98096bd06844df76091f7656b30b6025c80d17f6a29",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-tool-workshop-folding-table": [
@@ -135,7 +156,9 @@
    },
    {
     "v": 2,
-    "hash": "0800845fa74a96fccb32343f4d3182ea5a77af1c6267dc5b07a4f1bc18663947"
+    "hash": "0800845fa74a96fccb32343f4d3182ea5a77af1c6267dc5b07a4f1bc18663947",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-freeside-hydro-cart-chrome": [
@@ -147,7 +170,9 @@
    },
    {
     "v": 2,
-    "hash": "dcb9f67e55ff71e551beaf437f0f93e06934b13234513c207c6aae8fa0550839"
+    "hash": "dcb9f67e55ff71e551beaf437f0f93e06934b13234513c207c6aae8fa0550839",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-freeside-lime-sofa": [
@@ -159,7 +184,9 @@
    },
    {
     "v": 2,
-    "hash": "466a0bd2e6c6bf5fb37d5beca061631d8fb6e40031d628bb268dea6e057635d1"
+    "hash": "466a0bd2e6c6bf5fb37d5beca061631d8fb6e40031d628bb268dea6e057635d1",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-freeside-mattress": [
@@ -171,7 +198,9 @@
    },
    {
     "v": 2,
-    "hash": "7ffb3a9e16814d9c3d843b9c46b9ab7d3b65ef10dacd8291b2f8aa25189000b4"
+    "hash": "7ffb3a9e16814d9c3d843b9c46b9ab7d3b65ef10dacd8291b2f8aa25189000b4",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-freeside-mattress-2": [
@@ -183,7 +212,9 @@
    },
    {
     "v": 2,
-    "hash": "ed81a7f12b4c52f9d7b4f718335c62f8ddf39ac80700937865b8590e7e16dc51"
+    "hash": "ed81a7f12b4c52f9d7b4f718335c62f8ddf39ac80700937865b8590e7e16dc51",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-freeside-speaker": [
@@ -195,7 +226,9 @@
    },
    {
     "v": 2,
-    "hash": "a7bf115fd785cc35995c7b30e2a6732d04545ff6037eae52f7ed758d10efe7b6"
+    "hash": "a7bf115fd785cc35995c7b30e2a6732d04545ff6037eae52f7ed758d10efe7b6",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-freeside-speaker-2": [
@@ -207,7 +240,9 @@
    },
    {
     "v": 2,
-    "hash": "527702247eb68bbd57fca0a9434c91b1021ebb0493579423b43e91a9e9df930e"
+    "hash": "527702247eb68bbd57fca0a9434c91b1021ebb0493579423b43e91a9e9df930e",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-dj-table": [
@@ -219,7 +254,9 @@
    },
    {
     "v": 2,
-    "hash": "57c69dc787b317b9581aa78bc89f271da13e9a46c1c34385ab5286ac181189f9"
+    "hash": "57c69dc787b317b9581aa78bc89f271da13e9a46c1c34385ab5286ac181189f9",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-folding-chair": [
@@ -231,7 +268,9 @@
    },
    {
     "v": 2,
-    "hash": "5998077813569e50e8aa95f1725d86cc5f6a4c08b977eb82931af75021aaf3e3"
+    "hash": "5998077813569e50e8aa95f1725d86cc5f6a4c08b977eb82931af75021aaf3e3",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-folding-table": [
@@ -243,7 +282,9 @@
    },
    {
     "v": 2,
-    "hash": "c79e9b768909136ae8d9dd0c26f6700106a24b63aa3ef299a7658eea738d9dcf"
+    "hash": "c79e9b768909136ae8d9dd0c26f6700106a24b63aa3ef299a7658eea738d9dcf",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-colab-taupe-sofa": [
@@ -255,7 +296,9 @@
    },
    {
     "v": 2,
-    "hash": "039859d72d0de1090fa88bd65af15021516c4534d39199748464583362afafc3"
+    "hash": "039859d72d0de1090fa88bd65af15021516c4534d39199748464583362afafc3",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-colab-drawer-coffee": [
@@ -267,7 +310,9 @@
    },
    {
     "v": 2,
-    "hash": "b72a7875ef034a810f2e9f06cdbcecaca6b74694a984b6b49993e2e9fd8830f4"
+    "hash": "b72a7875ef034a810f2e9f06cdbcecaca6b74694a984b6b49993e2e9fd8830f4",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-colab-floor-lamp": [
@@ -279,7 +324,9 @@
    },
    {
     "v": 2,
-    "hash": "1ee657e9540e32c66bcbfa9ad720f4fcda8797c4c11d130bf6e39b9485d2ff06"
+    "hash": "1ee657e9540e32c66bcbfa9ad720f4fcda8797c4c11d130bf6e39b9485d2ff06",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-griddle-cart": [
@@ -291,7 +338,9 @@
    },
    {
     "v": 2,
-    "hash": "7b89c462f70388df6a07a579b23698dc90ab48517f9976c760fc109df7fbe42d"
+    "hash": "7b89c462f70388df6a07a579b23698dc90ab48517f9976c760fc109df7fbe42d",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-clubhouse-sofa": [
@@ -303,7 +352,9 @@
    },
    {
     "v": 2,
-    "hash": "ed8d0172e3b495916afd55cecab0a34d6026f9805e3bb765d4609aa5ab62a8d5"
+    "hash": "ed8d0172e3b495916afd55cecab0a34d6026f9805e3bb765d4609aa5ab62a8d5",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-clubhouse-low-blue-table": [
@@ -315,7 +366,9 @@
    },
    {
     "v": 2,
-    "hash": "c919bbaa25c71daff492d9ab667e30337011d38d0da6007bc5f4585dc5b8524b"
+    "hash": "c919bbaa25c71daff492d9ab667e30337011d38d0da6007bc5f4585dc5b8524b",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-og-worktop": [
@@ -327,7 +380,9 @@
    },
    {
     "v": 2,
-    "hash": "acde1e61bb00e265a5b6b34e9f13bb868c49c6479c3b6e9d45f86f51fcbc2df1"
+    "hash": "acde1e61bb00e265a5b6b34e9f13bb868c49c6479c3b6e9d45f86f51fcbc2df1",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-og-east-folding-chair": [
@@ -339,7 +394,9 @@
    },
    {
     "v": 2,
-    "hash": "b40d80c812409525d6495df99346c5e7716ecf95a79d57b5573f6ca1ddc9d07e"
+    "hash": "b40d80c812409525d6495df99346c5e7716ecf95a79d57b5573f6ca1ddc9d07e",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-og-east-folding-dinner-table": [
@@ -351,7 +408,9 @@
    },
    {
     "v": 2,
-    "hash": "13e779a3f603a8d13cdbc0108d4737c0756bc158fadb6163d3e424b2281c9a84"
+    "hash": "13e779a3f603a8d13cdbc0108d4737c0756bc158fadb6163d3e424b2281c9a84",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-og-east-folding-chair-2": [
@@ -363,7 +422,9 @@
    },
    {
     "v": 2,
-    "hash": "63f5feb1346dad858b0bb0e03c2b2176de165ba5c83b74d2f42d069db13a46ce"
+    "hash": "63f5feb1346dad858b0bb0e03c2b2176de165ba5c83b74d2f42d069db13a46ce",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-prep-table": [
@@ -375,7 +436,9 @@
    },
    {
     "v": 2,
-    "hash": "397477c6aba9e9e085f2ed85c3e198854fbca99d09ff748007debe2e53ec0b99"
+    "hash": "397477c6aba9e9e085f2ed85c3e198854fbca99d09ff748007debe2e53ec0b99",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-sink-counter-lip": [
@@ -387,7 +450,9 @@
    },
    {
     "v": 2,
-    "hash": "d9e24de0bf28b45ed87ff3ba68a21c9f19706a3cd71f45abbbbc49080808b278"
+    "hash": "d9e24de0bf28b45ed87ff3ba68a21c9f19706a3cd71f45abbbbc49080808b278",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-sink-counter-lip-2": [
@@ -399,7 +464,9 @@
    },
    {
     "v": 2,
-    "hash": "911d7e9648f2fe45085fb132db9b069e9bc102543aac9539dc17cf51488b855f"
+    "hash": "911d7e9648f2fe45085fb132db9b069e9bc102543aac9539dc17cf51488b855f",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-exterior-serving-shelf": [
@@ -411,7 +478,9 @@
    },
    {
     "v": 2,
-    "hash": "2030dc7ac26c5f5650dbcf3b8cee54a52dd53b1400f4ba857950e386316531a6"
+    "hash": "2030dc7ac26c5f5650dbcf3b8cee54a52dd53b1400f4ba857950e386316531a6",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-perimeter-counter": [
@@ -423,7 +492,9 @@
    },
    {
     "v": 2,
-    "hash": "61d1eb5c3cfb81a312523eedf9c8acf702144b9278e95b7ab9c7834173f01a39"
+    "hash": "61d1eb5c3cfb81a312523eedf9c8acf702144b9278e95b7ab9c7834173f01a39",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-serving-inside-counter-return": [
@@ -443,7 +514,9 @@
    },
    {
     "v": 2,
-    "hash": "be5ec2f30d24896aa56e12b2c0466705f82976c10ea4163fb0b58ad70283c578"
+    "hash": "be5ec2f30d24896aa56e12b2c0466705f82976c10ea4163fb0b58ad70283c578",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-stored-stock-pot": [
@@ -455,7 +528,9 @@
    },
    {
     "v": 2,
-    "hash": "7e75a274a37555af2bf8fe5469c7a0c2a6690817117a75f2183ba99876d297de"
+    "hash": "7e75a274a37555af2bf8fe5469c7a0c2a6690817117a75f2183ba99876d297de",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-commercial-fridge": [
@@ -467,7 +542,9 @@
    },
    {
     "v": 2,
-    "hash": "44a0392980bb89b371cc1077dcfd081706d56952baa7cdad497d948aacc6e06c"
+    "hash": "44a0392980bb89b371cc1077dcfd081706d56952baa7cdad497d948aacc6e06c",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-chest-freezer": [
@@ -479,7 +556,9 @@
    },
    {
     "v": 2,
-    "hash": "bebea73c99a71685686f6497156ab767eff6a3a38a467eaf6f1489810d89bcce"
+    "hash": "bebea73c99a71685686f6497156ab767eff6a3a38a467eaf6f1489810d89bcce",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-bus-seat": [
@@ -491,7 +570,13 @@
    },
    {
     "v": 2,
-    "hash": "0ee72b8bae3765ea6b99c6c9643afa8ea767692d85470abd39eab3141091fdbd"
+    "hash": "0ee72b8bae3765ea6b99c6c9643afa8ea767692d85470abd39eab3141091fdbd",
+    "released": true,
+    "from": "ee0ebbea9"
+   },
+   {
+    "v": 3,
+    "hash": "c8386b8259f76b23a3db67fc3a9549330c785886b044b24fbb7dde04d297a02e"
    }
   ],
   "core-mars-bus-seat-2": [
@@ -503,7 +588,13 @@
    },
    {
     "v": 2,
-    "hash": "d9ff7467374c2cd2db78e7cd87232bbec68c8492994c9f99e9684c8338ef27bc"
+    "hash": "d9ff7467374c2cd2db78e7cd87232bbec68c8492994c9f99e9684c8338ef27bc",
+    "released": true,
+    "from": "ee0ebbea9"
+   },
+   {
+    "v": 3,
+    "hash": "1892b3085b08a1a55dd385327d28d6a42215f95c99254a7ce7245237fc9f042a"
    }
   ],
   "core-mars-bus-seat-3": [
@@ -515,7 +606,13 @@
    },
    {
     "v": 2,
-    "hash": "e58d5e4b297cb4ae769184c77a43800bd701d59dda68fe8587dbc9ac0564a125"
+    "hash": "e58d5e4b297cb4ae769184c77a43800bd701d59dda68fe8587dbc9ac0564a125",
+    "released": true,
+    "from": "ee0ebbea9"
+   },
+   {
+    "v": 3,
+    "hash": "166589bdeae53271a70167bab4d9ee4ddaf8862ff324c0f69123f4c24e087066"
    }
   ],
   "core-mars-bus-seat-4": [
@@ -527,7 +624,13 @@
    },
    {
     "v": 2,
-    "hash": "a3ecc46cc789a2f6f8bd2492fe25ad704487997cdb8384a2778fa18a78b7a81e"
+    "hash": "a3ecc46cc789a2f6f8bd2492fe25ad704487997cdb8384a2778fa18a78b7a81e",
+    "released": true,
+    "from": "ee0ebbea9"
+   },
+   {
+    "v": 3,
+    "hash": "01359e9f0083eb913873f0b49db538e3818f38870b9db8336d87420454a5fae1"
    }
   ],
   "core-mars-diner-table": [
@@ -539,7 +642,9 @@
    },
    {
     "v": 2,
-    "hash": "ea8b9ad1f1e27a0fa7e3e9b03e5f72af55ceaa2a0192ac12986994dd45188c3b"
+    "hash": "ea8b9ad1f1e27a0fa7e3e9b03e5f72af55ceaa2a0192ac12986994dd45188c3b",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-white-fridge": [
@@ -551,7 +656,9 @@
    },
    {
     "v": 2,
-    "hash": "d45531ac72142d9fd067d5249dbe17ec46fe230ab01bd86e9c92f3dcf8e6d07a"
+    "hash": "d45531ac72142d9fd067d5249dbe17ec46fe230ab01bd86e9c92f3dcf8e6d07a",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-fridge-top-electric-kettle": [
@@ -563,7 +670,9 @@
    },
    {
     "v": 2,
-    "hash": "d6ffe52469a202fbe6ad7b1cd323400d94e1e5d69506f0730da58a7bb855d61d"
+    "hash": "d6ffe52469a202fbe6ad7b1cd323400d94e1e5d69506f0730da58a7bb855d61d",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-dry-goods-long-shelf": [
@@ -575,7 +684,9 @@
    },
    {
     "v": 2,
-    "hash": "63d84a8e7b0cb6986723caf2f3a2721d01067d16c5a85a4ec7e7843d43b3ee69"
+    "hash": "63d84a8e7b0cb6986723caf2f3a2721d01067d16c5a85a4ec7e7843d43b3ee69",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-prep-mixing-bowl": [
@@ -587,7 +698,9 @@
    },
    {
     "v": 2,
-    "hash": "b31085d91ba674479e42a100b5f0bc116ff2ba37b2035315856fbdc655b3de4b"
+    "hash": "b31085d91ba674479e42a100b5f0bc116ff2ba37b2035315856fbdc655b3de4b",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-prep-mixing-bowl-2": [
@@ -599,7 +712,9 @@
    },
    {
     "v": 2,
-    "hash": "741461b8b7db98e0e01cd667d4683ed2a893f5d1cb990f81cb47b699f8201d0b"
+    "hash": "741461b8b7db98e0e01cd667d4683ed2a893f5d1cb990f81cb47b699f8201d0b",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-coffee-counter": [
@@ -611,7 +726,9 @@
    },
    {
     "v": 2,
-    "hash": "876eb5f460aacc146b1ee433e79d659c94939bde7c88464542b3deea28a37924"
+    "hash": "876eb5f460aacc146b1ee433e79d659c94939bde7c88464542b3deea28a37924",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-red-mini-refrigerator": [
@@ -623,7 +740,9 @@
    },
    {
     "v": 2,
-    "hash": "f1e7637fa931b8ac88116a5e2dc9c8f94092855c118dd65707adb09e89636765"
+    "hash": "f1e7637fa931b8ac88116a5e2dc9c8f94092855c118dd65707adb09e89636765",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-tea-table": [
@@ -635,7 +754,9 @@
    },
    {
     "v": 2,
-    "hash": "93cd1090435c034336c93f8632b8e5d28e66dacb7befe5904c74fa525436199e"
+    "hash": "93cd1090435c034336c93f8632b8e5d28e66dacb7befe5904c74fa525436199e",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-table-kettle": [
@@ -647,7 +768,9 @@
    },
    {
     "v": 2,
-    "hash": "3fd085ad1b80929b65c94e506913de6bf694e968e641804d2529378cd27eb8b9"
+    "hash": "3fd085ad1b80929b65c94e506913de6bf694e968e641804d2529378cd27eb8b9",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-table-cup": [
@@ -659,7 +782,9 @@
    },
    {
     "v": 2,
-    "hash": "7bcca769495056d3c91ccbd3f893a7d54df2e0637f17b72f73572692b5403b2b"
+    "hash": "7bcca769495056d3c91ccbd3f893a7d54df2e0637f17b72f73572692b5403b2b",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-study-chair": [
@@ -671,7 +796,9 @@
    },
    {
     "v": 2,
-    "hash": "d60d65adc9d0f2b6bcd2931dc2b5af3bed6d107d4b8f1bdb447888bb79b86740"
+    "hash": "d60d65adc9d0f2b6bcd2931dc2b5af3bed6d107d4b8f1bdb447888bb79b86740",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-study-table": [
@@ -683,7 +810,9 @@
    },
    {
     "v": 2,
-    "hash": "6e4d4eb21094d4ac64611ef717069d14647fc035f6a335538381cda37de3a512"
+    "hash": "6e4d4eb21094d4ac64611ef717069d14647fc035f6a335538381cda37de3a512",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-study-chair-2": [
@@ -695,7 +824,9 @@
    },
    {
     "v": 2,
-    "hash": "e0218619db24be685cc038df6e93daa4c1eaa7890edab00aacc02980d62f0631"
+    "hash": "e0218619db24be685cc038df6e93daa4c1eaa7890edab00aacc02980d62f0631",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-study-chair-3": [
@@ -707,7 +838,9 @@
    },
    {
     "v": 2,
-    "hash": "f286c48c306764cf6584d09ae4c9126e47d2334d853b5e547ac421d20cb4322b"
+    "hash": "f286c48c306764cf6584d09ae4c9126e47d2334d853b5e547ac421d20cb4322b",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-ceramic-mug": [
@@ -719,7 +852,9 @@
    },
    {
     "v": 2,
-    "hash": "2669814258731457863709e2abc470429cc0bf8cd1fab39d04c31b897b7a44fd"
+    "hash": "2669814258731457863709e2abc470429cc0bf8cd1fab39d04c31b897b7a44fd",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-papasan": [
@@ -731,7 +866,13 @@
    },
    {
     "v": 2,
-    "hash": "16540ec7285154d8ec0e8e552e268b1e10f2ece1815ff849c87b4a62a5737aba"
+    "hash": "16540ec7285154d8ec0e8e552e268b1e10f2ece1815ff849c87b4a62a5737aba",
+    "released": true,
+    "from": "ee0ebbea9"
+   },
+   {
+    "v": 3,
+    "hash": "d4ce184bf8ccc08c49a21f21130ff08c5f8407b1b611a3f7c3caa378c207d992"
    }
   ],
   "core-mars-tea-stool": [
@@ -743,7 +884,9 @@
    },
    {
     "v": 2,
-    "hash": "6fa45d1a64b20221356c0cff2d6722a6ae7b4a944aa22f4459311982acb3388d"
+    "hash": "6fa45d1a64b20221356c0cff2d6722a6ae7b4a944aa22f4459311982acb3388d",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-tea-stool-2": [
@@ -755,7 +898,9 @@
    },
    {
     "v": 2,
-    "hash": "e84bf19a46b036522f2bce50f8cc3e43506d19b0013096e2002c4591c5702c35"
+    "hash": "e84bf19a46b036522f2bce50f8cc3e43506d19b0013096e2002c4591c5702c35",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-tea-stool-3": [
@@ -767,7 +912,9 @@
    },
    {
     "v": 2,
-    "hash": "0aa2404f846e83c94dcdb401866b28f0efe8dc7ae92adc6b5c1d6660fe001b7e"
+    "hash": "0aa2404f846e83c94dcdb401866b28f0efe8dc7ae92adc6b5c1d6660fe001b7e",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-red-sofa": [
@@ -779,7 +926,9 @@
    },
    {
     "v": 2,
-    "hash": "c05f25279dc4f714664efa1945a8099a4c01f8e33d44b132121c1bdd5f4d8e8b"
+    "hash": "c05f25279dc4f714664efa1945a8099a4c01f8e33d44b132121c1bdd5f4d8e8b",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-honey-sofa": [
@@ -791,7 +940,9 @@
    },
    {
     "v": 2,
-    "hash": "8d0d036f059f3e16e6f57b0c7639d1f7116d49ac5a110b85ec203de2f2434ddb"
+    "hash": "8d0d036f059f3e16e6f57b0c7639d1f7116d49ac5a110b85ec203de2f2434ddb",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-cream-recliner": [
@@ -803,7 +954,9 @@
    },
    {
     "v": 2,
-    "hash": "99181500bcbf5e2bcff653d83f4681fdc62a1faee2c40803e58e4114bba86405"
+    "hash": "99181500bcbf5e2bcff653d83f4681fdc62a1faee2c40803e58e4114bba86405",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-folding-chair-2": [
@@ -815,7 +968,9 @@
    },
    {
     "v": 2,
-    "hash": "95a1d502c4c1b973f0a8d1a416cf5a08f6f2894b435d6bc566621224fa055e76"
+    "hash": "95a1d502c4c1b973f0a8d1a416cf5a08f6f2894b435d6bc566621224fa055e76",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-folding-chair-3": [
@@ -827,7 +982,9 @@
    },
    {
     "v": 2,
-    "hash": "f7dd39b677cad94dc562639832a7c097b6fd75b677a464e9bf31a896e81c20dd"
+    "hash": "f7dd39b677cad94dc562639832a7c097b6fd75b677a464e9bf31a896e81c20dd",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-folding-chair-4": [
@@ -839,7 +996,9 @@
    },
    {
     "v": 2,
-    "hash": "54210cea575374107d4b5b369b6e062a77827bceb6a88a8c8496b95b71be6ea9"
+    "hash": "54210cea575374107d4b5b369b6e062a77827bceb6a88a8c8496b95b71be6ea9",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-tier": [
@@ -851,7 +1010,9 @@
    },
    {
     "v": 2,
-    "hash": "f24f916555466bb79bfa82bcb5efe20ec29ebf504127a567d36e9a92641b14cc"
+    "hash": "f24f916555466bb79bfa82bcb5efe20ec29ebf504127a567d36e9a92641b14cc",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-tier-2": [
@@ -863,7 +1024,9 @@
    },
    {
     "v": 2,
-    "hash": "eb589a5c65b57c5b91d0b9298b06d0706602a2e3fb9977db2e1bace5077027f6"
+    "hash": "eb589a5c65b57c5b91d0b9298b06d0706602a2e3fb9977db2e1bace5077027f6",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-tier-3": [
@@ -875,7 +1038,9 @@
    },
    {
     "v": 2,
-    "hash": "64adce049737782edacbf4aee78023f13d7685f73b2c7c62e90fb4b217ff3869"
+    "hash": "64adce049737782edacbf4aee78023f13d7685f73b2c7c62e90fb4b217ff3869",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-tier-4": [
@@ -887,7 +1052,9 @@
    },
    {
     "v": 2,
-    "hash": "3e73813aa79e7e94e6cf02ae16711c0a75680bd0dcde8f1055b9d86b2317f6c2"
+    "hash": "3e73813aa79e7e94e6cf02ae16711c0a75680bd0dcde8f1055b9d86b2317f6c2",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-navy-sofa": [
@@ -899,7 +1066,9 @@
    },
    {
     "v": 2,
-    "hash": "f224caa6b227a529663c6eacca4cd7222ba84429837bcd5bf10ca82fff020d6b"
+    "hash": "f224caa6b227a529663c6eacca4cd7222ba84429837bcd5bf10ca82fff020d6b",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-cream-tablecloth": [
@@ -919,7 +1088,9 @@
    },
    {
     "v": 2,
-    "hash": "deb8cdf7650c2d9b2a675ac746bd4b5aa67c095e4db54048261355864a00f052"
+    "hash": "deb8cdf7650c2d9b2a675ac746bd4b5aa67c095e4db54048261355864a00f052",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-classroom-folding-table": [
@@ -931,7 +1102,9 @@
    },
    {
     "v": 2,
-    "hash": "b6119bb6d260c615f22840f02855d141211369eebc1f03e4074b34a790b95117"
+    "hash": "b6119bb6d260c615f22840f02855d141211369eebc1f03e4074b34a790b95117",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-marzipan-desk-laptop": [
@@ -943,7 +1116,9 @@
    },
    {
     "v": 2,
-    "hash": "8dec4b8a542a83234fa98215465f8897fc4512fe15ef56d7d367e306b162b291"
+    "hash": "8dec4b8a542a83234fa98215465f8897fc4512fe15ef56d7d367e306b162b291",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-field-chair": [
@@ -955,7 +1130,9 @@
    },
    {
     "v": 2,
-    "hash": "0f08dd8db31c925843677d329cd1b677c47049567c9a5003f448447276b93e53"
+    "hash": "0f08dd8db31c925843677d329cd1b677c47049567c9a5003f448447276b93e53",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-field-chair-2": [
@@ -967,7 +1144,9 @@
    },
    {
     "v": 2,
-    "hash": "f5de44d3b6e59e863643b937ec2c8394c1e76bc96fd4870841b632afcb38f7a3"
+    "hash": "f5de44d3b6e59e863643b937ec2c8394c1e76bc96fd4870841b632afcb38f7a3",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-field-chair-3": [
@@ -979,7 +1158,9 @@
    },
    {
     "v": 2,
-    "hash": "4976997d752216f90e044c847d78403b482863afe68466c5998c9d6ab8cea56d"
+    "hash": "4976997d752216f90e044c847d78403b482863afe68466c5998c9d6ab8cea56d",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-field-chair-4": [
@@ -991,7 +1172,9 @@
    },
    {
     "v": 2,
-    "hash": "461071baddf46b124b88eed62d7315f5a8ca216c40153308f84789af8afa8150"
+    "hash": "461071baddf46b124b88eed62d7315f5a8ca216c40153308f84789af8afa8150",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-field-teal-sofa": [
@@ -1003,7 +1186,9 @@
    },
    {
     "v": 2,
-    "hash": "8db3905eaf76394bddd3f9bb85370b2671dd0facac1b39184ecc30ec2cb0619e"
+    "hash": "8db3905eaf76394bddd3f9bb85370b2671dd0facac1b39184ecc30ec2cb0619e",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-chiba": [
@@ -1015,7 +1200,9 @@
    },
    {
     "v": 2,
-    "hash": "58b5be5e3fdbeef62d25a68be967c41a61d9e99b270c613b48a27ab4c1b0ca48"
+    "hash": "58b5be5e3fdbeef62d25a68be967c41a61d9e99b270c613b48a27ab4c1b0ca48",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-mimos": [
@@ -1033,7 +1220,9 @@
    },
    {
     "v": 2,
-    "hash": "6f41cf10632a4bfce5e8e2e77191d1e5ed0e05e1924bb13a8f88e20449a980dc"
+    "hash": "6f41cf10632a4bfce5e8e2e77191d1e5ed0e05e1924bb13a8f88e20449a980dc",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-kitchen": [
@@ -1051,7 +1240,9 @@
    },
    {
     "v": 2,
-    "hash": "68faa46435b239156115ba37d9ad780e5a69602ea86038f61b4e26877fd87401"
+    "hash": "68faa46435b239156115ba37d9ad780e5a69602ea86038f61b4e26877fd87401",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-showers": [
@@ -1063,7 +1254,9 @@
    },
    {
     "v": 2,
-    "hash": "ce50d880d5ea104fdb8206ed1830bc9e3dfff17f505586e1ea3b89a35ad7dd39"
+    "hash": "ce50d880d5ea104fdb8206ed1830bc9e3dfff17f505586e1ea3b89a35ad7dd39",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-dojo": [
@@ -1075,7 +1268,9 @@
    },
    {
     "v": 2,
-    "hash": "9515e641dec8b4e48e465c115abf9be62caf5d604b0348178675d362f3249243"
+    "hash": "9515e641dec8b4e48e465c115abf9be62caf5d604b0348178675d362f3249243",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-tool-camp": [
@@ -1093,7 +1288,9 @@
    },
    {
     "v": 2,
-    "hash": "88770e345ea19b84138dc4bdfea3b8373ac00339530714cfa518c2b73ced3067"
+    "hash": "88770e345ea19b84138dc4bdfea3b8373ac00339530714cfa518c2b73ced3067",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-freeside": [
@@ -1105,7 +1302,9 @@
    },
    {
     "v": 2,
-    "hash": "f062fedb33d59d54cce0ccc8cff2cbb009f8c40011b381e5e6afa9955e1338b6"
+    "hash": "f062fedb33d59d54cce0ccc8cff2cbb009f8c40011b381e5e6afa9955e1338b6",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-west-racks": [
@@ -1237,7 +1436,9 @@
    },
    {
     "v": 2,
-    "hash": "34b4ea3d442512fd2b1cda8dafddda3a0fce3edf8696582299784c7d602f3f6f"
+    "hash": "34b4ea3d442512fd2b1cda8dafddda3a0fce3edf8696582299784c7d602f3f6f",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-shelter-4": [
@@ -1265,7 +1466,9 @@
    },
    {
     "v": 2,
-    "hash": "79b3bda9fc72d376f207a9cdff94e480fd4c2d8dccdbac61a513740a50ae2abd"
+    "hash": "79b3bda9fc72d376f207a9cdff94e480fd4c2d8dccdbac61a513740a50ae2abd",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-boat-1": [
@@ -1277,7 +1480,9 @@
    },
    {
     "v": 2,
-    "hash": "0fe1c34f42f14b46383c77e26c613c420b8b709849c785d6832e726f1faf0f59"
+    "hash": "0fe1c34f42f14b46383c77e26c613c420b8b709849c785d6832e726f1faf0f59",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-site-object-2": [
@@ -1305,7 +1510,9 @@
    },
    {
     "v": 2,
-    "hash": "a229a160816b53e505d4ad9d4a360ce7b020a0694c72364478b67f8547da7923"
+    "hash": "a229a160816b53e505d4ad9d4a360ce7b020a0694c72364478b67f8547da7923",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-shelter-7": [
@@ -1325,7 +1532,9 @@
    },
    {
     "v": 2,
-    "hash": "89c05dfede69aa5504c6aa971e7e848b39d7235bd40e104d8363b4f6d84efdb3"
+    "hash": "89c05dfede69aa5504c6aa971e7e848b39d7235bd40e104d8363b4f6d84efdb3",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-colab-hut-2": [
@@ -1337,7 +1546,9 @@
    },
    {
     "v": 2,
-    "hash": "95814c6c8c62c6b6f72e6565c14efa5a267aa9831c78128b9981660f894ac220"
+    "hash": "95814c6c8c62c6b6f72e6565c14efa5a267aa9831c78128b9981660f894ac220",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-boat-2": [
@@ -1349,7 +1560,9 @@
    },
    {
     "v": 2,
-    "hash": "1eeea8906c94034829f5297e9ac4d49bbd96ef53884aeae6943b524ac7582d38"
+    "hash": "1eeea8906c94034829f5297e9ac4d49bbd96ef53884aeae6943b524ac7582d38",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-og-ground-1": [
@@ -1361,7 +1574,9 @@
    },
    {
     "v": 2,
-    "hash": "b73394420502656088de1b5469cb1e1a0db81716682099f53135ce0ed6022b97"
+    "hash": "b73394420502656088de1b5469cb1e1a0db81716682099f53135ce0ed6022b97",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-og-clubhouse-1": [
@@ -1373,7 +1588,9 @@
    },
    {
     "v": 2,
-    "hash": "4a13169e1da16dd3b608d3085424b300d3994ebc9cbbbdaefa194dadf5aa9eb5"
+    "hash": "4a13169e1da16dd3b608d3085424b300d3994ebc9cbbbdaefa194dadf5aa9eb5",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-og-clubhouse-2": [
@@ -1385,7 +1602,9 @@
    },
    {
     "v": 2,
-    "hash": "7ce6bcc755727dc99ff468f36c90b63f121ebf6b63b0dacb5c07307466e2536e"
+    "hash": "7ce6bcc755727dc99ff468f36c90b63f121ebf6b63b0dacb5c07307466e2536e",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-og-kitchen-1": [
@@ -1397,7 +1616,9 @@
    },
    {
     "v": 2,
-    "hash": "4595c3f474fbfeb08d4641b97eb235085c3ec19dc103a05c6f644b15be6863fc"
+    "hash": "4595c3f474fbfeb08d4641b97eb235085c3ec19dc103a05c6f644b15be6863fc",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-og-kitchen-2": [
@@ -1409,7 +1630,9 @@
    },
    {
     "v": 2,
-    "hash": "72934a06c0a9f290183c458fd2bd18b7fb8c8269d60bb18a29e53d74aa9d56a8"
+    "hash": "72934a06c0a9f290183c458fd2bd18b7fb8c8269d60bb18a29e53d74aa9d56a8",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-og-kitchen-3": [
@@ -1421,7 +1644,9 @@
    },
    {
     "v": 2,
-    "hash": "12ae164baddd4858100c1b4fb636f6fd2372a47fec35c8453dba399203462fae"
+    "hash": "12ae164baddd4858100c1b4fb636f6fd2372a47fec35c8453dba399203462fae",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-forklift-1": [
@@ -1433,7 +1658,9 @@
    },
    {
     "v": 2,
-    "hash": "1f3638e3d711c9b0676e43cf750fe7e802231597f435ab9f2d73c7d25a6978f9"
+    "hash": "1f3638e3d711c9b0676e43cf750fe7e802231597f435ab9f2d73c7d25a6978f9",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-forklift-2": [
@@ -1445,7 +1672,9 @@
    },
    {
     "v": 2,
-    "hash": "f82e578ad79addc1339d94c9843e842899b6b3f969fe446b594a6ea7d0c83cc5"
+    "hash": "f82e578ad79addc1339d94c9843e842899b6b3f969fe446b594a6ea7d0c83cc5",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-og-east-life-1": [
@@ -1457,7 +1686,9 @@
    },
    {
     "v": 2,
-    "hash": "bf17707807bd13b619d54a91e2b4c52d10b2dcc6440636a42e18f8240e61c4ac"
+    "hash": "bf17707807bd13b619d54a91e2b4c52d10b2dcc6440636a42e18f8240e61c4ac",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-tool-library-stair": [
@@ -1479,7 +1710,9 @@
   "core-mars-projector-table": [
    {
     "v": 1,
-    "hash": "5bf511dac298e36884ffa7a979de23b991e2999673f42e8818f9b159fbac8233"
+    "hash": "5bf511dac298e36884ffa7a979de23b991e2999673f42e8818f9b159fbac8233",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-mimos-rug": [
@@ -1491,13 +1724,17 @@
   "core-mars-rice-cooker": [
    {
     "v": 1,
-    "hash": "6696933f91554f74122466ee3bb2209ac4640a96650188f7fe0eb23e71bb451a"
+    "hash": "6696933f91554f74122466ee3bb2209ac4640a96650188f7fe0eb23e71bb451a",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ],
   "core-mars-water-urn": [
    {
     "v": 1,
-    "hash": "d189af5499447f382b522adfebf9f0949825d28449e1d110ae7882699ed46a8b"
+    "hash": "d189af5499447f382b522adfebf9f0949825d28449e1d110ae7882699ed46a8b",
+    "released": true,
+    "from": "ee0ebbea9"
    }
   ]
  }

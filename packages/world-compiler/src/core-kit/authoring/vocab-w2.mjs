@@ -60,7 +60,7 @@ const vehicles = [
       ...[3.0, -2.2, -3.4].flatMap((z) => [wheel(-1.05, 0.52, z, 0.52, 0.34), wheel(1.05, 0.52, z, 0.52, 0.34)]),
       ...withRole('door', [1.21, 1.6, 4.1], [cbox([1.22, 1.6, 3.5], [0.04, 1.3, 1.2], 'cab'), glassBox([1.23, 2.1, 3.5], [0.02, 0.5, 0.9])])],
     palette: { cab: '#3f6b8b', glass: C.glass, trim: '#3a3c3e', lamp: C.lamp, chassis: '#2f3133', load: '#e8e4dc', stripe: '#c46a43', crate: C.pine, tyre: C.tyre },
-    slots: [seat('driver', [0.55, 1.4, 3.3], 0), seat('passenger', [-0.55, 1.4, 3.3], 0)], components: { container: { capacity: 40 }, carrier: { seats: 2 } } }),
+    slots: [seat('driver', [0.55, 1.4, 3.3], 0, 0.8), seat('passenger', [-0.55, 1.4, 3.3], 0, 0.8)], components: { container: { capacity: 40 }, carrier: { seats: 2 } } }),  // SEATDEF: seat height over the cab's floor (the cab box's bottom; no cab interior is drawn), p[1] stays the seat
   vocabDef({ ...VEH, name: 'motorbike', synonyms: ['motorcycle', 'motorbike', 'scooter', 'moped', 'vespa', 'bike', 'dirt bike'],
     description: 'A motorbike (2.1 m long along z) with a fuel tank, a long seat for a rider and a pillion, handlebars and an exhaust; parked on its stand. Variants: motorbike, scooter (step-through with a front shield and small wheels).',
     variants: ['motorbike', 'scooter'], ranges: { sx: [0.8, 1.2], sy: [0.8, 1.2], sz: [0.8, 1.2] },
@@ -83,7 +83,7 @@ const vehicles = [
       ...withRole('boom', [-0.3, 1.8, 0.5], [limb([-0.3, 1.8, 0.5], [-0.3, 3.4, 2.3], 0.22, 'paint', { kind: 'cyl', seg: 6 }), limb([-0.3, 3.4, 2.3], [-0.3, 1.2, 3.7], 0.17, 'paint', { kind: 'cyl', seg: 6 }),
         cbox([-0.3, 0.75, 3.85], [0.9, 0.7, 0.6], 'bucket', { roll: 0, pitch: 0.4 }), ...[-0.6, -0.3, 0].map((x) => cone([x, 0.35, 4.05], 0.06, 0.2, 'iron', { pitch: PI, seg: 4 }))])],
     palette: { track: '#2f3133', iron: '#4a4c4e', paint: '#e2a72e', glass: C.glass, weight: '#3a3c3e', bucket: '#5a5c5e' },
-    slots: [seat('operator', [0.55, 1.95, -0.15], 0)], components: { carrier: { seats: 1 }, swing: { parts: [{ role: 'boom', kind: 'rotate', axis: 'x', amount: -0.45, period: 7, phase: 0, when: 'on' }] }, sound: sound('engine', { when: 'on', radius: 26, volume: 0.45 }) } }),
+    slots: [seat('operator', [0.55, 1.95, -0.15], 0, 0.3)], components: { carrier: { seats: 1 }, swing: { parts: [{ role: 'boom', kind: 'rotate', axis: 'x', amount: -0.45, period: 7, phase: 0, when: 'on' }] }, sound: sound('engine', { when: 'on', radius: 26, volume: 0.45 }) } }),  // SEATDEF: seat height over the cab's floor (the cab box's bottom; no cab interior is drawn), p[1] stays the seat
   vocabDef({ ...VEH, name: 'fire-engine', synonyms: ['fire truck', 'fire appliance', 'fire tender', 'ladder truck', 'pumper', 'fire brigade'],
     description: 'A red fire engine (8 m long along z, 3 m tall) with a crew cab, a ladder on the roof, lockers along the sides and blue beacons; switch the sirens on and the beacons flash and the bell rings. The cab door on +x opens.',
     actuators: [['power', { default: false, label: 'the sirens' }], ['door', { default: false, label: 'the cab door' }]], label: 'the fire engine', ranges: { sx: [0.85, 1.15], sy: [0.85, 1.2], sz: [0.7, 1.3] },
@@ -94,7 +94,7 @@ const vehicles = [
       ...[2.8, -2.2, -3.4].flatMap((z) => [wheel(-1.05, 0.5, z, 0.5, 0.34), wheel(1.05, 0.5, z, 0.5, 0.34)]),
       ...withRole('door', [1.21, 1.5, 3.9], [cbox([1.22, 1.5, 3.3], [0.04, 1.3, 1.1], 'paint'), glassBox([1.23, 2.0, 3.3], [0.02, 0.5, 0.8])])],
     palette: { paint: '#c23a2b', glass: C.glass, stripe: '#f2ead8', locker: '#a8321f', ladder: '#c0c4c8', beacon: '#3a7aff', trim: '#3a3c3e', lamp: C.lamp, tyre: C.tyre },
-    slots: [seat('driver', [0.55, 1.3, 3.0], 0), seat('crew', [-0.55, 1.3, 3.0], 0)], components: { carrier: { seats: 2 }, sound: sound('bell', { when: 'on', radius: 40, volume: 0.5 }) } }),
+    slots: [seat('driver', [0.55, 1.3, 3.0], 0, 0.7), seat('crew', [-0.55, 1.3, 3.0], 0, 0.7)], components: { carrier: { seats: 2 }, sound: sound('bell', { when: 'on', radius: 40, volume: 0.5 }) } }),  // SEATDEF: seat height over the cab's floor (the cab box's bottom; no cab interior is drawn), p[1] stays the seat
   vocabDef({ ...VEH, name: 'caravan', synonyms: ['camper', 'trailer', 'travel trailer', 'mobile home', 'tourer', 'caravan trailer'],
     description: 'A rounded touring caravan (5 m long along z with its tow bar, 2.6 m tall) on two wheels: a cream shell with a stripe, windows, a door on +x that opens, a bed and a seat inside.',
     actuators: [['door', { default: false }]], label: 'the caravan door', ranges: { sx: [0.85, 1.2], sy: [0.85, 1.2], sz: [0.7, 1.4] },
@@ -218,7 +218,7 @@ const crane = vocabDef({ category: 'layer.construction', tags: ['construction', 
       cbox([0, 21.4, -7.2], [1.6, 1.4, 1.8], 'weight'), limb([0, 21.6, 0], [0, 25.5, 0], 0.18, 'paint', { kind: 'cyl', seg: 4 }), limb([0, 25.5, 0], [0, 22.25, 15], 0.04, 'cable', { kind: 'cyl', seg: 3 }), limb([0, 25.5, 0], [0, 22.25, -7], 0.04, 'cable', { kind: 'cyl', seg: 3 }),
       cbox([0, 21.6, 12], [0.9, 0.3, 0.8], 'cab'), box([0, 15.2, 12], [0.04, 12.6, 0.04], 'cable'), cbox([0, 8.8, 12], [0.4, 0.3, 0.3], 'hook')])],
   palette: { base: C.concrete, paint: '#e6b23a', cab: '#e8e4dc', weight: C.concrete, cable: '#2f3133', hook: C.red },
-  slots: [seat('operator', [0.6, 21.0, 1.2], 0)], components: { spin: { axis: 'y', rpm: 0.6, role: 'blade' }, sound: sound('hum', { when: 'on', radius: 20, volume: 0.3 }) } });
+  slots: [seat('operator', [0.6, 21.0, 1.2], 0, 0.2)], components: { spin: { axis: 'y', rpm: 0.6, role: 'blade' }, sound: sound('hum', { when: 'on', radius: 20, volume: 0.3 }) } });  // SEATDEF: seat height over the cab's floor (the cab box's bottom; no cab interior is drawn), p[1] stays the seat
 
 // ======================================================================= living things (creature machinery: gaits + behaviours)
 const BEHAVIOURS = ['wander', 'graze', 'swim', 'perch', 'sleep', 'fly', 'follow', 'idle'];

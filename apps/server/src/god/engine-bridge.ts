@@ -39,6 +39,7 @@ import { MapNotices, mapChanges, mapNoticeText, nearSite, planMapNotices, type M
 import type { ApplyContext, WalkoutPrep } from './god.ts';
 import type { BuildNotice } from './builds.ts';
 import { arrivalNote } from '../arrival-placement.ts';
+import { seatTopsOf } from './use-check.ts';
 /** arrival-search/1: the upserts whose geometry (def, place, size, shape, params) differs from the before-model. */
 const geometryOf = (e: Entity) => JSON.stringify([e.def, e.in, e.p, e.r, e.s, e.shape, e.anchor, e.params, e.seed]);
 function shapedIds(before: WorldModel, diff: Diff): Set<string> {
@@ -1261,9 +1262,11 @@ export class EngineBridge {
         const id = `sit:${x.id}`, label = `${name(x.id)} (${kind && !name(x.id).split('/').pop()!.includes(kind) ? `a ${kind}, ` : ''}${by.length ? `by ${by.join(' and ')}; ` : ''}${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
         // F1: a bench for two stays free while one of its seats is; the seat a Soul sits on is not free to itself
         const full = others.length >= seats || (!!u && !mine && seats <= 1);
-        // seat fit (engine bodies/humanoid.ts): a body whose look sets its height sits only on seats whose top suits it
-        const tops = (asset.slots as { kind: string; p?: number[] }[]).filter((s) => s.kind === 'seat').map((s) => s.p?.[1]).filter((y): y is number => typeof y === 'number' && Number.isFinite(y));
-        const misfit = tops.length && tops.every((y) => seatFitProblem(me.body, y)) ? seatFitProblem(me.body, tops[0]) : null;
+        // seat fit (engine bodies/humanoid.ts): a body whose look sets its height cannot get onto a seat too high for it.
+        // SEATDEF: the heights are the def's seat heights as the use-check reads them (seatTopsOf: engine seat slots carry
+        // none, so this read nothing before). Only too-high blocks: a seat lower than a body likes (a floor cushion) is sat on.
+        const tops = [...seatTopsOf(this.model, x.id).values()].filter((y) => Number.isFinite(y));
+        const misfit = tops.length && tops.every((y) => seatFitProblem(me.body, y)?.code === 'seat.too-high') ? seatFitProblem(me.body, Math.min(...tops)) : null;
         const block = mine ? { code: 'seat.yours', reason: `You are sitting on ${name(x.id)} already; stand:here to get up.` } : full ? { code: 'seat.taken', reason: `${(others.length ? others : [u!.body]).map((b) => this.soulName(b)).join(' and ')} ${others.length > 1 ? 'are' : 'is'} sitting there.` } : misfit ? { code: misfit.code, reason: `${name(x.id)} does not fit your body: ${misfit.message}.` } : null;
         caps.push({ id, verb: 'sit', label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: 60 } } });
         plans.set(id, { label, steps: [{ verb: 'sit', params: { on: x.id, seconds: 60 } }], seconds: true });

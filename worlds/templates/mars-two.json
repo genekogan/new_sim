@@ -268,7 +268,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-papasan@2",
+     "def": "core/mars-papasan@3",
      "name": "papasan-8",
      "in": {
       "parent": "mimos",
@@ -467,7 +467,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-bus-seat@2",
+     "def": "core/mars-bus-seat@3",
      "name": "bus-seat-20",
      "in": {
       "parent": "kitchen",
@@ -481,7 +481,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-bus-seat-2@2",
+     "def": "core/mars-bus-seat-2@3",
      "name": "bus-seat-21",
      "in": {
       "parent": "kitchen",
@@ -495,7 +495,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-bus-seat-3@2",
+     "def": "core/mars-bus-seat-3@3",
      "name": "bus-seat-23",
      "in": {
       "parent": "kitchen",
@@ -509,7 +509,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-bus-seat-4@2",
+     "def": "core/mars-bus-seat-4@3",
      "name": "bus-seat-25",
      "in": {
       "parent": "kitchen",
