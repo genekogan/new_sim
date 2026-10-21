@@ -89,3 +89,25 @@ test('bad input is refused without storing anything', () => {
   assert.deepEqual(ce.ingest('1.2.3.5', UA_DESK, body({ b: '<script>', w: '../etc', e: [{ k: 'evil', m: 'x' }, 'str', null] })), [204, null]);
   assert.equal(ce.summary().kinds, 0);
 });
+
+test('lane DASH: arrivals are a 24 h time sample (p50/p90 per world, exact count), never an error kind', () => {
+  let t = 1_800_000_000_000;
+  const { ce } = fresh({}, () => t);
+  const arrive = (w, ms, ip = '5.5.5.5') => ce.ingest(ip, UA_DESK, body({ b: 'we-bbbbbbbbbbbb', w, e: [{ k: 'arrived', ms }] }));
+  for (let i = 1; i <= 10; i++) assert.deepEqual(arrive('eden-2026', i * 100, `5.5.5.${i}`), [204, null]);
+  arrive('mars-college', 4000);
+  assert.deepEqual(arrive('mars-college', 0), [204, null]); assert.deepEqual(arrive('mars-college', 900_000), [204, null]);   // out of range: dropped
+  let s = ce.summary();
+  assert.equal(s.kinds, 0, 'an arrival is not an error kind'); assert.equal(s.newSinceRelease, 0); assert.equal(s.top.length, 0);
+  assert.equal(s.arrivals.n, 11); assert.equal(s.arrivals.sampled, 11);
+  const eden = s.arrivals.worlds.find((r) => r.world === 'eden-2026');
+  assert.equal(eden.n, 10); assert.ok(eden.p50 >= 500 && eden.p50 <= 600, `p50 ${eden.p50}`); assert.ok(eden.p90 >= 900 && eden.p90 <= 1000, `p90 ${eden.p90}`);
+  assert.deepEqual(s.arrivals.worlds.find((r) => r.world === 'mars-college'), { world: 'mars-college', n: 1, p50: 4000, p90: 4000 });
+  assert.equal(ce.summary({ world: 'mars-college' }).arrivals.n, 1);
+  // an arrival riding along with an error: the error counts and the arrival is sampled once
+  ce.ingest('6.6.6.6', UA_DESK, body({ b: 'we-b', w: 'eden-2026', e: [{ k: 'arrived', ms: 700 }, { k: 'arrived', ms: 9 }, { k: 'js', m: 'boom' }] }));
+  s = ce.summary(); assert.equal(s.kinds, 1); assert.equal(s.arrivals.n, 12);
+  // 25 h later the sample is empty
+  t += 25 * 3_600_000; s = ce.summary();
+  assert.equal(s.arrivals.n, 0); assert.equal(s.arrivals.sampled, 0); assert.deepEqual(s.arrivals.worlds, []);
+});
