@@ -35,7 +35,7 @@ import {installNightLighting,setNightLightStrength,nightLightStrength} from './W
 import type {createEdenHouseWindows} from '../../../mars/viewer/app/engine-view/content/assets/eden-expansion-assets/eden-house-windows.ts';
 // P1 phones: the old Eden expansion is its own chunk (old-eden.ts), fetched only by a world that shows it
 let oldEden:typeof import('./old-eden.ts')|null=null,oldEdenLoad:Promise<typeof import('./old-eden.ts')>|null=null;
-const loadOldEden=()=>oldEdenLoad??=import('./old-eden.ts').then(m=>oldEden=m,e=>{oldEdenLoad=null;throw e;});
+const loadOldEden=()=>oldEdenLoad??=import('./old-eden.ts').then(m=>{setTimeout(()=>{try{m.prebuildEdenLandscape();}catch{}},0);return oldEden=m;},e=>{oldEdenLoad=null;throw e;});
 // Patch shared lit-shader chunks before any program compiles (strength stays 0 outside Eden).
 installNightLighting();
 installLookToneCurve();installMaterialDetail();  // look pass (rendering/WorldLook.ts): tone curve + material detail chunks, before any program compiles

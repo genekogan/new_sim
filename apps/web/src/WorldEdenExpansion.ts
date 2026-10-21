@@ -48,6 +48,10 @@ import {currentClassroomPresentation,type LocalClassroomPresentation} from './Wo
  * support, claims or participation. Existing published fixture draws win. */
 /** The longest the expansion stays hidden waiting for its programs (P1: was 4 s, under a 4x phone's link time). */
 const WARM_CAP_MS=10_000;
+/** P1 phones (F12): the landscape needs nothing from the world, so the old Eden page builds it while it still waits for
+ * the scene publication; the first expansion takes it. Only before the first expansion (never a spare one after). */
+let prebuiltLandscape:ReturnType<typeof createEdenExpansionLandscape>|null=null,expansionMade=false;
+export function prebuildEdenLandscape(){if(prebuiltLandscape||expansionMade)return;prebuiltLandscape=createEdenExpansionLandscape(true);}
 export function createWorldEdenExpansion(officeGuards:readonly OfficeGuardBox[]=[],groundPublication?:Pick<SceneInfo,'scene'|'shore'>){
  const group=new THREE.Group(),owners:{group:THREE.Group;dispose():void}[]=[],hidden:THREE.Object3D[]=[];
  group.name='Eden — connected growing world';
@@ -65,7 +69,7 @@ export function createWorldEdenExpansion(officeGuards:readonly OfficeGuardBox[]=
  let venue:ReturnType<typeof createAcademicVenueScenery>,scenery:FixtureViews,closed=false;
  const textures=new Set<THREE.Texture>();let generation=0,slideKey='';
  try{
-  const landscape=createEdenExpansionLandscape(true);if(!landscape)throw Error('Landscape unavailable');owners.push(landscape);group.add(landscape.group);visualGround=landscape.sampleVisualGround;windInput={group:landscape.group,plants:landscape.planting.plants};surfaceGroup=landscape.group;
+  const landscape=prebuiltLandscape??createEdenExpansionLandscape(true);prebuiltLandscape=null;expansionMade=true;if(!landscape)throw Error('Landscape unavailable');owners.push(landscape);group.add(landscape.group);visualGround=landscape.sampleVisualGround;windInput={group:landscape.group,plants:landscape.planting.plants};surfaceGroup=landscape.group;
   venue=createAcademicVenueScenery(proposedGround);if(!venue)throw Error('Venue unavailable');owners.push(venue);group.add(venue.group);
   const neighborhood=createEdenNeighborhood(proposedGround,{houseOne:'direct-courtyard',houseThree:'lower-roof-route'});if(!neighborhood)throw Error('Neighborhood unavailable');owners.push(neighborhood);group.add(neighborhood.group);
   const publicQuarter=createEdenPublicQuarter(proposedGround,officeGuards);if(!publicQuarter)throw Error('Public quarter unavailable');owners.push(publicQuarter);group.add(publicQuarter.group);
