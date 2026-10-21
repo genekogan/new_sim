@@ -35,7 +35,10 @@ export function detachedData(value:unknown,ancestors=new Set<object>(),budget={n
   if(array&&key==='length')continue;if(typeof key!=='string')throw Error('Live chunk symbol');
   const property=Object.getOwnPropertyDescriptor(value,key);if(!property||!Object.hasOwn(property,'value'))throw Error('Live chunk accessor');
   const child=value===entities?detachedEntity(property.value,ancestors,budget,depth+1):detachedData(property.value,ancestors,budget,depth+1,entities);
-  Object.defineProperty(out,key,{value:child,enumerable:property.enumerable,writable:true,configurable:true});
+  // F12: a plain assignment makes the same writable, configurable property (and keeps the copy a fast object); only a
+  // hidden key or an own __proto__ needs defineProperty.
+  if(property.enumerable&&key!=='__proto__')(out as Record<string,unknown>)[key]=child;
+  else Object.defineProperty(out,key,{value:child,enumerable:property.enumerable,writable:true,configurable:true});
  }}finally{ancestors.delete(value);}
  return out;
 }
