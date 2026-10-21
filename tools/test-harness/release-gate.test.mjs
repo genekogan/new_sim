@@ -274,5 +274,5 @@ test('receipt evidence hashes change when returned log contents change', t => {
   assert.notEqual(before.evidence[path], after.evidence[path]);
 });
 test('the fixed release contract includes every package/server/web/harness step', () => {
-  for (const s of ['V3-packages', 'V3-harness', 'V4-web', 'V5-server-full', 'V6-mars-two', 'V6-lm-two']) assert.ok(REQUIRED_STEPS.includes(s));
+  for (const s of ['V3-packages', 'V3-harness', 'V3-walk', 'V4-web', 'V5-server-full', 'V6-mars-two', 'V6-lm-two']) assert.ok(REQUIRED_STEPS.includes(s));
 });

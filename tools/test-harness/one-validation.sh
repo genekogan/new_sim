@@ -54,6 +54,8 @@ step V2-build-root 900 pnpm --filter @sim/web build
 step V2-build-worlds 900 bash -c "cd apps/web && npx vite build --base /worlds/ --outDir $ROOT/.lane/web-worlds --emptyOutDir"
 # V3 package and engine suites (no ports)
 step V3-harness 1200 node --test --test-reporter=tap --test-concurrency=1 tools/test-harness/*.test.mjs
+# lane WALK: no place of the fixed world fixtures / a fresh Eden 2026 genesis less walkable than tools/test-harness/walk/baseline
+step V3-walk 900 node --test --test-reporter=tap --test-concurrency=1 tools/test-harness/walk/walk-gate.test.mjs
 step V3-packages 2400 bash tools/test-harness/package-suite.sh
 # Z3: with the pinned campus inputs staged (remote-suite.sh -> /in/campus), the full campus re-extraction runs too.
 CAMPUS_FULL=0; CAMPUS_IN="${CAMPUS_ASSETS_DIR:-/in/campus}"

@@ -77,7 +77,7 @@ PY
 
 
 # Serial step order (one-validation.sh); merge() writes SUMMARY rows in this order. Unknown rows follow, in group order.
-ORDER = ["V1-types", "V2-build-root", "V2-build-worlds", "V3-harness", "V3-packages", "V3-mars-engine", "V3-client-cli",
+ORDER = ["V1-types", "V2-build-root", "V2-build-worlds", "V3-harness", "V3-walk", "V3-packages", "V3-mars-engine", "V3-client-cli",
          "V3-launcher-unit", "V4-web", "V4-web-baseline", "V5-server-full", "V5-server-baseline", "V6-scenarios", "V6-party",
          "V6-souls-r2", "V6-join-clerk", "V6-join-dev", "V6-souls-ux", "V6-mars-two", "V6-lm-two",
          "V7-old-worlds", "V7-new-world", "V7-camera-dpr2", "V7-god-modal", "V8-history-boot"]
@@ -93,6 +93,8 @@ GROUPS = {
     "d": ["V3-launcher-unit", "V6-party", "V6-mars-two"],
     "e": ["V6-souls-r2", "V6-souls-ux"],
     "f": ["V6-lm-two"],
+    # lane WALK (2026-10-21): the walkability audit runs ~10 shard processes at once, so it gets a container of its own
+    "w": ["V3-walk"],
 }
 V5_SHARDS = 8
 assert sorted(s for g in GROUPS.values() for s in g) == sorted(set(ORDER) - {"V5-server-full", "V5-server-baseline"})

@@ -8,13 +8,14 @@ import { fileURLToPath } from 'node:url';
 // This is the CPU-only contract, not a discovery list supplied by a candidate.
 export const REQUIRED_STEPS = [
   'V1-types', 'V2-build-root', 'V2-build-worlds', 'V3-packages',
-  'V3-mars-engine', 'V3-client-cli', 'V3-launcher-unit', 'V3-harness', 'V4-web',
+  'V3-mars-engine', 'V3-client-cli', 'V3-launcher-unit', 'V3-harness', 'V3-walk', 'V4-web',
   'V5-server-full', 'V6-scenarios', 'V6-party', 'V6-souls-r2',
   'V6-join-clerk', 'V6-join-dev', 'V6-mars-two', 'V6-lm-two',
 ];
 // The launcher e2e (tools/god-skill/e2e/launcher.mjs) is not a CPU gate step: Z3 (2026-10-20) took the stale V6-launcher out;
 // GT (B8, 2026-10-20) rewrote it against the one-view God modal and it runs in V7 (v7-walks.sh), in real Chrome.
-const TAP_STEPS = new Set(['V3-packages', 'V3-mars-engine', 'V3-client-cli', 'V3-launcher-unit', 'V3-harness', 'V4-web', 'V5-server-full']);
+// V3-walk (lane WALK, 2026-10-21): walkability of fixed world fixtures + a fresh Eden 2026 genesis against tools/test-harness/walk/baseline.
+const TAP_STEPS = new Set(['V3-packages', 'V3-mars-engine', 'V3-client-cli', 'V3-launcher-unit', 'V3-harness', 'V3-walk', 'V4-web', 'V5-server-full']);
 const REQUIRED_PACKAGES = ['engine-mars', 'world-compiler', 'generators', 'ground', 'kernel', 'brain', 'engine-toy', 'engine-contract', 'protocol', 'engine-native', 'conformance'];
 /** Runs made before 2026-10-16 name the EF4 conformance package by its old directory, packages/catalog. */
 const PACKAGE_ALIASES = { catalog: 'conformance' };
