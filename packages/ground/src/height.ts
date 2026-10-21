@@ -64,15 +64,17 @@ export function heightAt(g: Ground, x: number, z: number): number {
       if (f > 0) h += (l.level! - h) * f * (l.amount > 1 ? 1 : l.amount);
     }
   }
-  // pad
+  // pad (pad/1 blends and pad/2 banks fold one after another, in order; pad/2b pads fold together, last)
+  let flats: FlatsPad[] | null = null;
   for (const l of forms) {
     if (l.kind !== 'pad') continue;
     const b = influenceBounds(l); if (!inBounds(b, x, z)) continue;
+    if (l.fold === 'flats' && l.grade !== undefined) { (flats ??= []).push(l as FlatsPad); continue; }
     if (l.grade !== undefined) { h = padGraded(h, x, z, l as PadLandform & { grade: number }); continue; }
     const m = padMask(x, z, l.area, l.edge);
     if (m > 0) h += (l.level - h) * m;
   }
-  return h;
+  return flats ? padsFlatsWin(h, x, z, flats, onOldFlat(forms, x, z)) : h;
 }
 
 /** Base, noise, natural forms and carves: the part of the fold a smooth brush samples around a point. */
@@ -131,6 +133,42 @@ function padGraded(h: number, x: number, z: number, l: PadLandform & { grade: nu
   if (c === h) return h;
   const rest = l.edge - d;
   return rest >= PAD_EASE_M ? c : h + (c - h) * smooth(rest / PAD_EASE_M);
+}
+
+type FlatsPad = PadLandform & { grade: number; fold: 'flats' };
+/**
+ * pad/2b (lane PADFIX, 2026-10-21; the "flats win" part of RT2's pad/3): the pad/2b pads round (x, z) fold together, after
+ * every older pad, so no bank cuts a standing building's flat. On a pad/2b flat (area or door landing) the ground is that
+ * pad's level (the last in fold order where flats overlap). On an older pad's flat (pad/1 area, pad/2 area or landing) a
+ * pad/2b bank leaves the ground as the older fold made it. Off every flat each pad/2b pad bounds the ground to its cone,
+ * level +- grade x distance (eased back over the last PAD_EASE_M of its edge, as pad/2), and the ground is held between the
+ * highest lower bound and the lowest upper one; where two cones do not meet (a terrace above another, closer than the grade
+ * allows) the ground runs between the two binding bounds by distance to their flats, so it meets each flat at its level.
+ */
+function padsFlatsWin(h: number, x: number, z: number, pads: FlatsPad[], inOldFlat: boolean): number {
+  let flat: number | undefined, lo = -Infinity, hi = Infinity, dLo = 0, dHi = 0;
+  for (const l of pads) {
+    const d = padFlatDist(x, z, l);
+    if (d === 0) { flat = l.level; continue; }
+    if (d >= l.edge || flat !== undefined || inOldFlat) continue;
+    const rest = l.edge - d, w = rest >= PAD_EASE_M ? 1 : smooth(rest / PAD_EASE_M);
+    const a = l.level - l.grade * d, c = l.level + l.grade * d;
+    if (a > h) { const v = h + (a - h) * w; if (v > lo) { lo = v; dLo = d; } }
+    if (c < h) { const v = h + (c - h) * w; if (v < hi) { hi = v; dHi = d; } }
+  }
+  if (flat !== undefined) return flat;
+  if (inOldFlat) return h;
+  if (lo <= hi) return h < lo ? lo : h > hi ? hi : h;
+  return (lo * dHi + hi * dLo) / (dLo + dHi);
+}
+
+/** pad/2b: is (x, z) on an older pad's flat (a pad/1 area, a pad/2 area or landing)? Only asked near a pad/2b pad. */
+function onOldFlat(forms: Landform[], x: number, z: number): boolean {
+  for (const l of forms) {
+    if (l.kind !== 'pad' || l.fold === 'flats' || !inBounds(landformBounds(l), x, z)) continue;
+    if (l.grade !== undefined ? padFlatDist(x, z, l) === 0 : pointInPoly(x, z, l.area)) return true;
+  }
+  return false;
 }
 
 /** Pads flatten fully inside and blend across `edge` metres OUTSIDE the footprint, so the terrace reaches the walls. */

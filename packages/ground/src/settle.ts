@@ -97,7 +97,8 @@ export type PadDoor = { at: Vec2; out: Vec2; width: number };
  * The pad a `base`-anchored footprint needs on a slope: flatten to the lowest corner. pad/1 (no `grading`): blend 1.5 m
  * outside. pad/2 (`grading`, lane RT): a flat landing in front of every exterior door, and banks no steeper than
  * PAD_GRADE out to where they meet the ground as it is now (`grading.sample`), so the front of each door connects to open
- * ground at any yaw on any walkable slope.
+ * ground at any yaw on any walkable slope. Every graded pad is pad/2b (lane PADFIX): it folds with `fold: 'flats'`, so its
+ * banks never cut a neighbour's flat and no neighbour's bank cuts its own (height.ts padsFlatsWin).
  */
 export function padFor(id: string, fp: Footprint, level: number, grading?: { sample(x: number, z: number): number; doors?: PadDoor[] }) {
   const [cx, cz] = fp.center;
@@ -114,7 +115,7 @@ export function padFor(id: string, fp: Footprint, level: number, grading?: { sam
       .map(([x, z]) => [r4(x), r4(z)] as Vec2);
   });
   const edge = gradedEdge(level, [area, ...aprons], grading.sample);
-  return { id, kind: 'pad' as const, area, level, edge, grade: PAD_GRADE, ...(aprons.length ? { aprons } : {}) };
+  return { id, kind: 'pad' as const, area, level, edge, grade: PAD_GRADE, ...(aprons.length ? { aprons } : {}), fold: 'flats' as const };
 }
 
 /** pad/2: how far the banks reach: the first offset (0.5 m steps) at which the ground all round the flat lies within

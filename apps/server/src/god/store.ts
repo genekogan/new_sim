@@ -94,6 +94,11 @@ export class WorldStore {
   readonly db: Db; readonly worldId: string;
   partsOriginsV1: boolean;
   private originInsert?: ReturnType<Db['db']['prepare']>;
+  /** PADFIX: the ids an engine edit whose note starts with `notePrefix` moved (e.g. the pad/2 boot re-cut). */
+  engineMoveIds(notePrefix: string): string[] {
+    const rows = this.db.db.prepare("SELECT ops FROM world_edits_v1 WHERE world_id=? AND kind='engine' AND by='engine' AND substr(note, 1, ?)=?").all(this.worldId, notePrefix.length, notePrefix) as { ops: string }[];
+    return rows.flatMap((r) => { try { return (JSON.parse(r.ops) as { op?: string; id?: string }[]).filter((o) => o.op === 'move' && typeof o.id === 'string').map((o) => o.id!); } catch { return []; } });
+  }
   constructor(db: Db, worldId: string) { this.db = db; this.worldId = worldId; ensureWorldSchema(db); this.partsOriginsV1 = !!this.meta()?.partsOriginsV1; }
 
   meta(): Meta | null {

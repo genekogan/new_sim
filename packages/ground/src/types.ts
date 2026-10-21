@@ -48,6 +48,10 @@ const pad = z.object({
   grade: finite.positive().optional(),
   /** pad/2: extra flat areas at the level, e.g. a landing in front of each exterior door. */
   aprons: z.array(poly).optional(),
+  /** pad/2b (lane PADFIX, 2026-10-21): 'flats': this pad folds together with every other pad/2b near it, after the older
+   *  pads (height.ts padsFlatsWin), so its flat is never cut by a bank and its banks never cut a flat. Absent: pad/1 or
+   *  pad/2, folded one after another as before (old histories replay the same ground). */
+  fold: z.literal('flats').optional(),
 });
 
 // Tranche-2 kinds (L3, forms.ts): cliff, terrace, channel, brush. Additive: the five originals fold exactly as before.

@@ -5,7 +5,7 @@
 // viewers (hub) and to gods (SSE).
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { TILE_M, tileOf } from '@sim/ground';
-import { WorldModel, correctKitDefines, creationInputFailure, definitionRefs, coreLibrary, libraryRef, applyBatch, plan, batchSchema, hashOf, type Batch, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type UsesHook, type ResidentMove } from '@sim/world-compiler';
+import { WorldModel, correctKitDefines, creationInputFailure, definitionRefs, coreLibrary, libraryRef, applyBatch, padResettle, plan, batchSchema, hashOf, type Batch, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type UsesHook, type ResidentMove } from '@sim/world-compiler';
 import { hashToken } from '../auth.ts';
 import type { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
@@ -154,22 +154,31 @@ export class GodMode {
     if (!loaded && opts.genesis) this.applyGenesis(opts.genesis);
     if (loaded) this.regraded = this.regradePads();
   }
-  /** pad/2 at boot (lane RT): ids of standing buildings whose stored foundation pad was re-cut this boot. */
+  /** pad/2 and pad/2b at boot (lanes RT, PADFIX): ids of standing things whose foundation was re-cut this boot. */
   regraded: string[] = [];
   /**
    * pad/2 (lane RT, 2026-10-20): a foundation pad stored before pad/2 (no `grade`: a 1.5 m smoothstep blend that can cut an
-   * unwalkable bank across a door on a slope) is re-cut once, at boot, as a graded pad with door landings. It is a trusted
-   * engine self-move of the standing building to its own pose (compile.ts `move`: clear the old pad, re-admit the stored
-   * pose, padFor with grading), journaled by 'engine' like any other engine edit, so the new ground is a durable recorded
-   * fact (the GroundHost built next logs it as a new groundV1) and earlier history replays unchanged. Idempotent: a graded
-   * pad is never touched again. A refused move leaves that building as it was.
+   * unwalkable bank across a door on a slope) is re-cut once, at boot, as a graded pad with door landings.
+   * pad/2b (lane PADFIX, 2026-10-21): pad/2 banks folded one after another, so the 3.59.1 re-cut let a later building's
+   * bank (up to 16 m) cut the ground under a neighbour's flat (the alpine mountain station hung 6.6 m in the air) and a
+   * re-cut that found a neighbour's bank within the skirt dropped its pad. Every pad cut now is pad/2b ("flats win",
+   * ground height.ts padsFlatsWin), and once, at boot, the pads whose flat is off its level, the pad-less buildings left
+   * off their pose, and every older pad whose bank or flat reaches them (world-compiler padResettle) are re-cut in place
+   * under pad/2b, so each building's flat is back at its own level and nothing standing on it moves.
+   * Both are a trusted engine move of each thing to its own pose (compile.ts `move` in place: clear the old pad, re-admit
+   * the stored pose, a pad at its own level), journaled by 'engine' like any other engine edit, so the new ground is a
+   * durable recorded fact (the GroundHost built next logs it as a new groundV1) and earlier history replays unchanged
+   * (pad/1 and pad/2 pads fold exactly as before). Idempotent: a pad/2b pad is never re-cut. A refused move leaves that
+   * thing as it was.
    */
   private regradePads(): string[] {
-    const ids = this.model.ground().landforms
+    const ungraded = this.model.ground().landforms
       .filter((lf) => lf.kind === 'pad' && (lf as { grade?: number }).grade === undefined && lf.id.endsWith(':pad'))
       .map((lf) => lf.id.slice(0, -':pad'.length)).filter((id) => this.model.entities.has(id));
+    const ids = [...new Set([...ungraded, ...padResettle(this.model, new Set(this.store.engineMoveIds('pad/2: re-cut')))])];
     if (!ids.length) return [];
-    const note = 'pad/2: re-cut an old foundation pad as graded banks with door landings (lane RT)';
+    const note = ungraded.length === ids.length ? 'pad/2b: re-cut an old foundation pad as graded banks with door landings, flats win (lanes RT, PADFIX)'
+      : 'pad/2b: re-cut foundation pads in place so no bank cuts a neighbour\'s flat and every building stands at its own level (lane PADFIX)';
     if (this.engineAct(ids.map((id): Op => ({ op: 'move', id, mode: 'strict' })), note).accepted) return ids;
     return ids.filter((id) => this.engineAct([{ op: 'move', id, mode: 'strict' }], note).accepted);
   }

@@ -1,5 +1,5 @@
 export * from './types.ts';
-export { heightAt, landformBounds, influenceBounds } from './height.ts';
+export { heightAt, landformBounds, influenceBounds, padFlatDist } from './height.ts';
 export { Terrain, bakeTile, groundForTile, tileHash, tileKey, tileOf, tilesTouched, type TileKey } from './tiles.ts';
 export { settle, footprintOf, padFor, waterLevelAt, waterDepthAt, mediumAt, MEDIA_EPS, SKIRT_MAX_M, PAD_MARGIN_M, PAD_GRADE, PAD_EDGE_MAX_M, WALK_MAX_SLOPE, WADE_MAX_M, type Footprint, type Settled, type Medium, type PadDoor } from './settle.ts';
 export { valueNoise, pointInPoly, distPolyline, areaMask, pathMask } from './geom.ts';

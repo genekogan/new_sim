@@ -12,6 +12,7 @@ import { batchSchema, trustedBatchSchema, type Batch, type Entity, type Failure,
 import { layersStateSchema, type LayersState, type Schedule } from './layers.ts';
 import { sealedRouteFailure } from './architecture.ts';
 import { overlapNotWorse } from './overlap.ts';
+import { RESETTLE_TOL_M } from './pad-resettle.ts';
 import { worldBudgetFailure } from './budgets.ts';
 import { creationInputFailure } from './input.ts';
 import { signMediaFailure } from './sign-media.ts';
@@ -352,9 +353,15 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         if (op.constraints) next.constraints = op.constraints;
         // a thing already in a retired slot moves within it freely; moving something new into one is refused (undo/redo, trusted, may)
         if (!opts.trusted && (next.in.parent !== prev.in.parent || next.in.slot !== prev.in.slot)) { const retired = retiredSlot(scratch, next.in.parent, next.in.slot, i); if (retired) { failures.push(retired); return; } }
+        // PADFIX: a move in place (no new pose, parent or shape) re-settles a thing on its own pose: it keeps (or gets) a
+        // foundation pad at its own level wherever it had one or the ground under it is not at that level, even when that
+        // ground lies within the skirt (a neighbour's bank there would otherwise leave it sunk or hanging).
+        const inPlace = !op.in && !op.p && op.r === undefined && op.s === undefined && !op.shape;
+        if (inPlace) (next as Entity & { _resettle?: 'pad' | 'check' })._resettle = scratch.ground().landforms.some((l) => l.id === `${id}:pad`) ? 'pad' : 'check';
         scratch.delete(id); clearGround(scratch, prev, diff);
         if (op.shape) prepareEntity(scratch, def, next, undefined);
         const problem = admit(scratch, next, def, i, op.mode, false, world);
+        delete (next as Entity & { _resettle?: 'pad' | 'check' })._resettle;
         if (problem) { failures.push(problem); return; }
         scratch.insert(next); indexAndGround(scratch, next, def, diff);
         reindexDescendants(scratch, id);
@@ -811,8 +818,9 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
       // a pre-settled pose (restore after undo, or an explicit y): keep y, but a building on a slope still needs its terrace
       const yaw = typeof e.r === 'number' ? e.r : Array.isArray(e.r) ? e.r[0] : 0;
       const fp = footprintOf(p[0], p[2], (baked.box[0] * s) / 2, (baked.box[2] * s) / 2, yaw);
-      const st = settle(w.terrain, fp, 'base');
-      if (st.needsPad || Math.abs(st.y - p[1]) > SKIRT_MAX) (e as Entity & { _pad?: Landform })._pad = padFor(`${e.id}:pad`, fp, p[1], padGrading(w, baked, p[0], p[2], yaw, s));
+      const st = settle(w.terrain, fp, 'base'), re = (e as Entity & { _resettle?: 'pad' | 'check' })._resettle;
+      const keep = re === 'pad' || (re === 'check' && (st.gap > RESETTLE_TOL_M || Math.abs(st.y - p[1]) > RESETTLE_TOL_M));
+      if (keep || st.needsPad || Math.abs(st.y - p[1]) > SKIRT_MAX) (e as Entity & { _pad?: Landform })._pad = padFor(`${e.id}:pad`, fp, p[1], padGrading(w, baked, p[0], p[2], yaw, s));
     }
   }
   // facing: turn the entity's front (+z) toward the ref
