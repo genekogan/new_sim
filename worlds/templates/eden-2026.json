@@ -90200,6 +90200,97 @@
           "mode": "strict"
         }
       ]
+    },
+    {
+      "note": "HILL roof-terrace stairs 2026-10-22",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/stair-flight@1",
+          "name": "seafront-hotel-2-roof-stairs",
+          "p": [
+            131.0,
+            0,
+            132.5
+          ],
+          "r": 0,
+          "params": {
+            "rise": 9.32,
+            "run": 13,
+            "width": 1.1,
+            "material": "stone"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/stair-flight@1",
+          "name": "seafront-hotel-1-roof-stairs",
+          "p": [
+            116.3,
+            0,
+            132.5
+          ],
+          "r": 0,
+          "params": {
+            "rise": 9.32,
+            "run": 13,
+            "width": 1.1,
+            "material": "stone"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/stair-flight@1",
+          "name": "eden-office-1-roof-stairs",
+          "p": [
+            79.68,
+            0,
+            15.0
+          ],
+          "r": -1.5708,
+          "params": {
+            "rise": 9.02,
+            "run": 12.6,
+            "width": 1.1,
+            "material": "stone"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/stair-flight@1",
+          "name": "seafront-hotel-4-roof-stairs",
+          "p": [
+            176.28,
+            0,
+            118.8
+          ],
+          "r": 1.5708,
+          "params": {
+            "rise": 9.32,
+            "run": 13,
+            "width": 1.1,
+            "material": "stone"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/stair-flight@1",
+          "name": "market-street-shop-6-roof-stairs",
+          "p": [
+            142.9,
+            0,
+            97.57
+          ],
+          "r": 3.1416,
+          "params": {
+            "rise": 5.62,
+            "run": 7.8,
+            "width": 1.1,
+            "material": "wood"
+          }
+        }
+      ]
     }
   ]
 }
