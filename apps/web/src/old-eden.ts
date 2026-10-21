@@ -2,4 +2,3 @@
 // for a world that shows it. LiveWorld imports this module dynamically (loadOldEden); nothing else may import it statically.
 export {createWorldEdenExpansion} from './WorldEdenExpansion.ts';
 export {createEdenHouseWindows} from '../../../mars/viewer/app/engine-view/content/assets/eden-expansion-assets/eden-house-windows.ts';
-export {prefetchEdenImports} from '../../../mars/viewer/app/engine-view/content/assets/eden-imports/index.ts';
