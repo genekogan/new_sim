@@ -115,6 +115,8 @@ export class EngineBridge {
   private sent = new Map<string, string>();
   private physics: EntityPhysicsV1 | undefined;
   private levels: Level[] = [];
+  /** Level ids levelFor handed out during the current send (their parts are not in `sent` yet). */
+  private levelsNow = new Set<number>();
   private reconciled = false;
   private writeBackBusy = false;
   private refusedPose = new Set<string>();
@@ -248,6 +250,7 @@ export class EngineBridge {
   private send(ids: Set<string>, seq: number, why: string) {
     const t0 = performance.now();
     this.doorSpotsCache = null;
+    this.levelsNow.clear();
     const set: WorldEditV1['set'] = {}, assets: Record<string, unknown> = {};
     const known = this.physics?.assets ?? {};
     let linksMoved = false;
@@ -293,12 +296,29 @@ export class EngineBridge {
     const ground = at ? this.model.terrain.sample(at[0], at[1]) : 0;
     if (Math.abs(y - ground) <= GROUND_BAND) return 0;
     const hit = this.levels.find((l) => Math.abs(l.y - y) <= LEVEL_MATCH);
-    if (hit) return hit.id;
+    if (hit) { this.levelsNow.add(hit.id); return hit.id; }
     const used = new Set(this.levels.map((l) => l.id));
     let id = 1; while (used.has(id) && id < MAX_LEVEL) id++;
-    if (used.has(id)) return this.levels.reduce((b, l) => (Math.abs(l.y - y) < Math.abs(b.y - y) ? l : b)).id; // out of level ids: nearest
-    this.levels.push({ id, y: r3(y), label: `floor at ${r3(y)} m` });
-    return id;
+    const level = { id, y: r3(y), label: `floor at ${r3(y)} m` };
+    if (used.has(id)) {
+      // out of level ids: reuse one nothing stands on any more (its floors, stairs and Souls all gone: a removed building's
+      // storeys), else the nearest. Levels are never dropped otherwise, so without this a world that rebuilt a few
+      // multi-storey houses on a hill ran out of ids and a new upper floor shared a level at another height: its rooms
+      // got no standing room (lane STACK, 2026-10-21: the door sweep's apartment-block after a lighthouse and a house).
+      const live = this.levelsInUse(), i = this.levels.findIndex((l) => !live.has(l.id));
+      if (i < 0) return this.levels.reduce((b, l) => (Math.abs(l.y - y) < Math.abs(b.y - y) ? l : b)).id;
+      level.id = this.levels[i].id; this.levels.splice(i, 1);
+      this.describeEpoch++;   // a description that placed something on the old level by height is stale
+    }
+    this.levels.push(level); this.levelsNow.add(level.id);
+    return level.id;
+  }
+  /** Level ids still in use: by a part the engine holds (surfaces, link ends), one derived in this send, or a Soul. */
+  private levelsInUse(): Set<number> {
+    const live = new Set(this.levelsNow);
+    for (const key of this.sent.values()) for (const m of key.matchAll(/"level":(\d+)/g)) live.add(Number(m[1]));
+    for (const e of Object.values(this.engine.world.entities) as { human?: { level?: number } }[]) if (e.human?.level) live.add(e.human.level);
+    return live;
   }
 
   /** doorblock: door entities (ids), walls/fences with gates (re-derived when a door comes or goes), door spots per send. */

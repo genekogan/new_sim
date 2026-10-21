@@ -93,6 +93,35 @@ test('bench-hamlet: an old pad/1 cottage pad is re-cut at boot and the cottage b
   }
 });
 
+test('levels: a removed building\'s storeys free their level ids, so a world that rebuilt on a hill keeps room for new floors', { timeout: 300_000 }, async (t) => {
+  // lane STACK (2026-10-21): engine level ids (1..20) are per floor height and were never freed, so after a few multi-storey
+  // buildings came and went on a slope a new upper floor shared a level at another height and its rooms had no standing room
+  const w = world(t); await w.settle(2);
+  w.act([{ op: 'place', def: coreRef('knoll'), name: 'hill', p: [0, 0], params: { height: 12, radius: 60, peak: 1, edge: 8 } }]);
+  await w.settle(2);
+  const levels = () => (w.bridge as any).levels as { id: number; y: number }[];
+  for (const [def, dist, deg] of [['house', 40, 0], ['house', 25, 90], ['house', 40, 180], ['house', 25, 270], ['lighthouse', 200, 0], ['lighthouse', 40, 90], ['lighthouse', 25, 180], ['lighthouse', 40, 270], ['lighthouse', 25, 0], ['lighthouse', 32, 45], ['lighthouse', 48, 135], ['lighthouse', 36, 225], ['lighthouse', 28, 315], ['lighthouse', 44, 60]] as const) {
+    w.act([{ op: 'place', def: coreRef(def), name: 'b', p: [dist, 0], r: deg * Math.PI / 180 }]);
+    await w.settle(2);
+    w.act([{ op: 'remove', id: 'b' }]);
+    await w.settle(1);
+  }
+  assert.equal(levels().length, 20, `the removed storeys used up every level id (${levels().length})`);
+  w.act([{ op: 'place', def: coreRef('apartment-block'), name: 'b', p: [25, 0], r: Math.PI / 2 }]);
+  await w.settle(3);
+  const e = w.god.model.get('b')!, baked = w.god.model.bake(w.god.model.resolvedDef(e.def)!, e.params ?? {}, e.seed ?? 0, e.shape) as any;
+  const start: Vec2 = [25 + Math.hypot(baked.box[0], baked.box[2]) / 2 + 5, 0];
+  const bad: string[] = [];
+  for (const rm of baked.rooms ?? []) {
+    const th = w.bridge.nav.thing(`b/${rm.id}`), goal = th ? w.bridge.nav.goal(th, start) : null;
+    const r = goal ? w.E.reachV1({ p: start, level: 0 }, goal) : null;
+    if (!r?.ok) bad.push(`${rm.id}:${goal ? r.code : 'no-goal'}`);
+  }
+  assert.ok((baked.rooms ?? []).length >= 10, 'the apartment block has its rooms');
+  assert.deepEqual(bad, [], 'every room of the new building has standing room its front door reaches');
+  assert.ok(levels().length <= 20);
+});
+
 /** Every building/1 type in the catalogue (structures.json + vocab-w3.json: 40 types). */
 const BUILDING_TYPES = [...structures, ...vocabW3].filter((d: any) => d?.make?.gen === 'building/1').map((d: any) => coreRef(String(d.name).replace(/^core-/, '')));
 const YAWS = Array.from({ length: 48 }, (_, i) => i * 7.5);
