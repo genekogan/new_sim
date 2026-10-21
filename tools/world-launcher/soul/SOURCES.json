@@ -10,9 +10,9 @@
   },
   "skill": {
     "file": "skill.md",
-    "sha256": "4211850beae0960dd84313e1ab75ed0b0c087ede0d0beca62c6ab450f4975d2d",
-    "from": "git show 3991e552:tools/edge-skill/SKILL.md",
-    "note": "template; the world fills {{BASE}}. Includes owner inbox, knowledge at scales, travel, creature guidance and looks v2 / portraits. 1.9.5 (lane MSG): always listen from the moment the Soul is ready, every mode; never filter listen; ack then result; work through a backlog; if listen ends without messages, start it again. 1.9.6 (lane SOULSIM-H): ack a whole batch at once, restart listen --after <last id> before the work, wait 60 (never sleep) during actions, act a replacing message at once, ignore ids already acked. 1.9.7: ack first, then a plain act replaces the walk."
+    "sha256": "dd2ece4fdf78a0921cd58b3ae9a686f70a721039656c72721514ac40d500722c",
+    "from": "git show d950930d:tools/edge-skill/SKILL.md",
+    "note": "template; the world fills {{BASE}}. Includes owner inbox, knowledge at scales, travel, creature guidance and looks v2 / portraits. 1.9.5 (lane MSG): always listen from the moment the Soul is ready, every mode; never filter listen; ack then result; work through a backlog; if listen ends without messages, start it again. 1.9.6 (lane SOULSIM-H): ack a whole batch at once, restart listen --after <last id> before the work, wait 60 (never sleep) during actions, act a replacing message at once, ignore ids already acked. 1.9.7: ack first, then a plain act replaces the walk. One wait 60 per command, never a for-loop of waits."
   },
   "instructions": {
     "file": "instructions.md",
