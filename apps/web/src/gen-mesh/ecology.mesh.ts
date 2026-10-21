@@ -19,7 +19,8 @@ const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite
  * thing's root pose or shape box: no footprint bakes for the rest), so a phone's near-first build pays for the things near
  * the arrival only (Eden 2026: 0.37 s of 4x CPU for every footprint before the card); the whole index when asked without a
  * region. Each thing is added once; shapes in a cell are tested as a set, so the order they were added in is immaterial. */
-type BlockState = { pad: number; cells: BlockCells; done: Set<string>; all: boolean; anchors?: { e: Entity; box: [number, number, number, number] }[] };
+type Anchor = { e: Entity; box: [number, number, number, number]; reach: number };
+type BlockState = { pad: number; cells: BlockCells; done: Set<string>; all: boolean; anchors?: Anchor[] };
 const blockIndex = new WeakMap<object, BlockState>();
 export const BLOCK_CELL = 16;
 /** No thing's blocked ground reaches farther than this from its root's stored pose (a building's floor plan, its furniture). */
@@ -34,24 +35,38 @@ export function blockCellsOf(model: WorldModel, pad = 0.6, region?: readonly [nu
   model.readPass(() => {
     if (!region) { for (const e of model.entities.values()) if (!s.done.has(e.id)) { s.done.add(e.id); addBlocks(model, e, pad, s.cells); } s.all = true; return; }
     s.anchors ??= blockAnchors(model);
-    const x0 = region[0] - BLOCK_REACH, z0 = region[1] - BLOCK_REACH, x1 = region[2] + BLOCK_REACH, z1 = region[3] + BLOCK_REACH;
-    for (const a of s.anchors) if (a.box[0] <= x1 && a.box[2] >= x0 && a.box[1] <= z1 && a.box[3] >= z0 && !s.done.has(a.e.id)) { s.done.add(a.e.id); addBlocks(model, a.e, pad, s.cells); }
+    for (const a of s.anchors) if (a.box[0] <= region[2] + a.reach && a.box[2] >= region[0] - a.reach && a.box[1] <= region[3] + a.reach && a.box[3] >= region[1] - a.reach && !s.done.has(a.e.id)) { s.done.add(a.e.id); addBlocks(model, a.e, pad, s.cells); }
     if (s.done.size >= model.entities.size) s.all = true;
   });
   return st.cells;
 }
-/** Where each thing is, without a bake: its shape's box, else its root ancestor's stored pose (a point box). */
-function blockAnchors(model: WorldModel): { e: Entity; box: [number, number, number, number] }[] {
-  const out: { e: Entity; box: [number, number, number, number] }[] = [];
+/** Where each thing is, without a bake: its shape's box, else its root ancestor's stored pose (a point box), and how far
+ *  its blocked ground can reach beyond that box. */
+function blockAnchors(model: WorldModel): Anchor[] {
+  const out: Anchor[] = [], reachOf = new Map<string, number>();
   for (const e of model.entities.values()) {
     let r: Entity = e; for (let depth = 0; r.in.parent !== 'world' && depth < 8; depth++) { const up = model.get(r.in.parent); if (!up) break; r = up; }
     const pts = r.shape && 'area' in r.shape ? r.shape.area as number[][] : r.shape && 'path' in r.shape ? r.shape.path as number[][] : null;
-    if (pts?.length) { let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity; for (const [x, z] of pts) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); } out.push({ e, box: [x0, z0, x1, z1] }); continue; }
+    if (pts?.length) { let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity; for (const [x, z] of pts) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); } out.push({ e, box: [x0, z0, x1, z1], reach: BLOCK_REACH }); continue; }
     const p = (r as { p?: number[] }).p;
+    let reach = reachOf.get(r.id); if (reach === undefined) { reach = rootReach(model, r); reachOf.set(r.id, reach); }
     // no stored pose: everywhere (always added)
-    out.push({ e, box: p && Number.isFinite(p[0]) && Number.isFinite(p[2]) ? [p[0], p[2], p[0], p[2]] : [-Infinity, -Infinity, Infinity, Infinity] });
+    out.push({ e, box: p && Number.isFinite(p[0]) && Number.isFinite(p[2]) ? [p[0], p[2], p[0], p[2]] : [-Infinity, -Infinity, Infinity, Infinity], reach });
   }
   return out;
+}
+/** t4-phone: a building's floor plan, porch and furniture stay within its own size of its pose (the layout is centred on
+ *  it: half the diagonal, a porch or balcony a few metres more), so a building and everything in it reaches twice its
+ *  diagonal plus 12 m at most; the town around a phone's first trees then bakes no far footprints (Eden 2026: ~0.4 s of
+ *  4x CPU before the poster). Anything else, or a building without a numeric size: BLOCK_REACH. */
+function rootReach(model: WorldModel, r: Entity): number {
+  const d = model.resolvedDef(r.def); if (!d || d.make.kind !== 'gen' || d.make.gen !== 'building/1') return BLOCK_REACH;
+  const pr = (r.params ?? {}) as Record<string, unknown>;
+  let w = num(pr.w, NaN), dd = num(pr.d, NaN);
+  const plan = pr.plan as { floors?: { rooms?: { rect?: unknown }[] }[] } | undefined;
+  for (const f of plan?.floors ?? []) for (const room of f?.rooms ?? []) { const rc = room?.rect; if (Array.isArray(rc) && rc.length === 4 && rc.every(Number.isFinite)) { w = Math.max(Number.isFinite(w) ? w : 0, Math.abs(rc[0]), Math.abs(rc[2]), Math.abs(rc[2] - rc[0])); dd = Math.max(Number.isFinite(dd) ? dd : 0, Math.abs(rc[1]), Math.abs(rc[3]), Math.abs(rc[3] - rc[1])); } }
+  if (!(w > 0) || !(dd > 0)) return BLOCK_REACH;
+  return Math.min(BLOCK_REACH, (2 * Math.hypot(w, dd) + 12) * Math.max(1, Math.abs(num((r as { s?: unknown }).s, 1))));
 }
 /** A spatial test for "something is already here": solid footprints and paved / road surfaces (block-test.ts). */
 export function blockedBy(model: WorldModel, self: Entity, pad = 0.6): (x: number, z: number) => boolean {
