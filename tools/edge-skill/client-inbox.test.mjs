@@ -14,7 +14,7 @@ function context(responses) {
   return { calls, sleeps, call: async (path, options) => { calls.push({ path, options }); return { status: 200, data: responses.shift() }; }, sleep: async ms => sleeps.push(ms) };
 }
 
-test('Soul inbox listen keeps long-polling until a newer unacknowledged message then returns without ack (older world: latest only)', async () => {
+test('Soul inbox listen keeps long-polling until a newer unacknowledged message then returns without ack', async () => {
   const fresh = envelope(latest('new'));
   const ctx = context([envelope(null), envelope(latest('read', 'acknowledged')), envelope(latest('old')), fresh]);
   ctx.now = () => Date.UTC(2026, 9, 20, 23, 0, 0);
