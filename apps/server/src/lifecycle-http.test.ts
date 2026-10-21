@@ -79,6 +79,8 @@ test('retirement acceptance and actual removal refresh preserve the saved birth 
 
 test('actual native refusal returns409/no birth, releases logical reservation and keeps private operation readable',async t=>{
   const bad=await marsFactory({...GREEN_FIELD_WORLD,safeCrewRemoval:true,arrival:[500,500],reference:[501,500]}),f=fixture(':memory:',bad);f.souls.enableLifecycle();t.after(()=>f.db.close());await invite(f,'alice');
+  // arrival-search/1 admits an off-world arrival nearby; hold the search to "no ground" so this stays a genuine refusal
+  (f.host.engine as unknown as {arrivalSearchV1():null}).arrivalSearchV1=()=>null;
   const response=await request(f,'/v1/souls',{name:'Unavailable',description:'local'},'alice','POST',true);assert.equal(response.status,409);const op=await receipt(response);assert.equal(op.state,'refused');assert.equal(f.db.events(f.host.worldId).some(e=>e.kind==='birth'),false);assert.equal(f.db.soulsOf('dev:alice').length,0);
   assert.deepEqual(await receipt(await request(f,`/v1/lifecycle/${op.requestId}`)),op);for(let i=0;i<40;i++)f.host.tickOnce();assert.equal(f.host.engine.world.tick,40);assert.equal(f.db.paidCost(),0);
 });

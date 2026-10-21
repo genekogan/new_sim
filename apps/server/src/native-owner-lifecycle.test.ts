@@ -116,6 +116,9 @@ test('genuine native arrival refusal after durable birth remains an unattributab
   // This exercises the real placer, not population capacity or a mocked spawn throw.
   const bad=await marsFactory({...GREEN_FIELD_WORLD,arrival:[500,500],reference:[501,500]});
   const f=fixture(':memory:',bad);t.after(()=>f.db.close());await invite(f,'alice');
+  // arrival-search/1 would name a spot nearby; hold it to "no ground" so the birth carries no hint and the placer refuses.
+  // The restarted host needs no stub: replay never searches, it re-runs the recorded (hint-free) birth.
+  (f.host.engine as unknown as {arrivalSearchV1():null}).arrivalSearchV1=()=>null;
   const creating=f.souls.create('dev:alice',{name:'Alice',description:'isolated refused arrival'});void creating;
   assert.throws(()=>f.host.drainInputs(),/Engine fault has no attributable card:.*no free standing room/);
   assert.equal(f.db.events(worldId).filter(e=>e.kind==='birth').length,1);assert.equal(bodyIds(f.host).length,0);

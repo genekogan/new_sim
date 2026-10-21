@@ -60,7 +60,9 @@ test('an arrival point walled in by the god: the new Soul is born outside the wa
     { op: 'place', def: 'short@1', name: 'n', p: [0, 6] }, { op: 'place', def: 'short@1', name: 's', p: [0, -6] },
     { op: 'place', def: 'wall@1', name: 'e', p: [6, 0], r: Math.PI / 2 }, { op: 'place', def: 'wall@1', name: 'w', p: [-6, 0], r: Math.PI / 2 }] });
   assert.equal(r.accepted, true, JSON.stringify(r.failures));
-  assert.ok(r.warnings.some((x: string) => NOTE.test(x)), JSON.stringify(r.warnings));
+  // no note asserted here: the walls stand clear of the arrival point, so the edit is not checked in the request (the
+  // engine takes it in on the next tick, as every edit away from the arrival point does); the birth below is what counts
+  await w.settle();
   await invite(w, 'ana'); const row: any = await accept(w.host, w.souls.create('dev:ana', { name: 'Ana', description: 'curious' })); await w.settle();
   const p = w.host.engine.world.entities[row.entity_id]!.pose.p;
   assert.ok(Math.max(Math.abs(p[0]), Math.abs(p[2])) > 6.5, `outside the walls: ${p}`);

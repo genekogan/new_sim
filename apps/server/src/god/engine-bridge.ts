@@ -8,7 +8,7 @@
 // Fastest working path on the engine's existing structures (nav/1-style static scene re-base, CATALOG fixtures);
 // the per-tile patch follows L8's tiled Spatial.
 import { deckRaised, railGaps } from '@sim/generators';
-import { applyBatch, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type ResidentMove, type WorldModel } from '@sim/world-compiler';
+import { applyBatch, obbOverlap, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type ResidentMove, type WorldModel } from '@sim/world-compiler';
 import { assetFromDef, assetIdFor, isFixtureDef, isFloatingDef, nearestSurfaceSlot, nextEntityPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
 import type { WorldHost } from '../world.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
@@ -36,6 +36,13 @@ import { MapNotices, mapChanges, mapNoticeText, nearSite, planMapNotices, type M
 import type { ApplyContext, WalkoutPrep } from './god.ts';
 import type { BuildNotice } from './builds.ts';
 import { arrivalNote } from '../arrival-placement.ts';
+/** arrival-search/1: the upserts whose geometry (def, place, size, shape, params) differs from the before-model. */
+const geometryOf = (e: Entity) => JSON.stringify([e.def, e.in, e.p, e.r, e.s, e.shape, e.anchor, e.params, e.seed]);
+function shapedIds(before: WorldModel, diff: Diff): Set<string> {
+  const out = new Set<string>();
+  for (const e of diff.upserts) { const b = before.entities.get(e.id); if (!b || geometryOf(b) !== geometryOf(e)) out.add(e.id); }
+  return out;
+}
 /** Where a refused body placement points: people as scenery (harvest fix 'figures'). core/figure@1 has no body component,
  *  so it is never a Soul, never simulated or counted as a resident; it places like any prop. */
 export const PEOPLE_AS_SCENERY = 'for people as scenery (a crowd, waiters, stallholders, a choir) place core/figure@1 instead: `place figure --at x,z --param pose=stand|walk|sit|carry|serve|wave --param hat=none|cap|sunhat|chef|scarf --param top=#hex` (one figure per placement; children --scale 0.6); it is a prop, never a resident';
@@ -172,7 +179,7 @@ export class EngineBridge {
     this.god.bodies = {
       uses: id => this.usesOne(id),
       refuse: (after, diff, ops, o) => this.protectedBody(after, diff, ops, o?.undo === true),
-      prepare: (before, after, diff, _ops, o) => this.prepareWalkouts(before, after, diff, o?.dry === true),
+      prepare: (before, after, diff, _ops, o) => { if (o?.dry !== true) try { this.arrivalShaped = shapedIds(before, diff); } catch { this.arrivalShaped = null; } return this.prepareWalkouts(before, after, diff, o?.dry === true); },
       apply: (moved, o) => { const late = this.applyWalkouts(moved, this.stuckPlanned.splice(0)); this.stageMapNotices(o); return late; },
       arrivalNote: diff => this.arrivalNoteFor(diff),
     };
@@ -582,14 +589,27 @@ export class EngineBridge {
   /** Plan who walks out of an accepted edit's way (pure). A planning fault never refuses the edit: it is logged, and
    *  the engine's own step-clear of buried bodies still applies. `dry` (dry run, preview): plan only, nothing rewritten. */
   /** arrival-search/1: the god's note when an edit blocks the arrival point ("new Souls will arrive nearby at x, z"),
-   *  checked only for edits near it (80 m), ground edits, or while a note stands; said again only when it changes. */
+   *  said again only when it changes. Checked (which brings the engine up to date inside the request) only when an
+   *  edit places, moves, resizes or reshapes something whose footprint covers the arrival point within 1 m (or a
+   *  footprint-less ground edit, a lake or landform, within 80 m), or a note already stands and the edit touches within
+   *  80 m. A state-only change (a door opened) is never checked; every unchecked edit stays "pending" in the engine until
+   *  the next tick, as before. */
   private arrivalNoted: string | null = null;
+  /** Ids whose geometry the edit being applied changed (set by `prepare` from the before-model); null = unknown, all. */
+  private arrivalShaped: Set<string> | null = null;
   private arrivalNoteFor(diff: Diff): string[] {
     try {
       const a = this.host.engine.anchors?.()[0]?.point as unknown;
       const at = Array.isArray(a) && a.length === 2 && a.every(v => typeof v === 'number') ? a as [number, number] : null;
-      const near = (e: Parameters<WorldModel['worldPose']>[0]) => { if (!at) return true; const p = this.model.worldPose(e); return Math.hypot(p.x - at[0], p.z - at[1]) <= 80; };
-      if (!this.arrivalNoted && !diff.tiles.length && !diff.upserts.some(near)) return [];
+      const near = (e: Entity) => { if (!at) return true; const p = this.model.worldPose(e); return Math.hypot(p.x - at[0], p.z - at[1]) <= 80; };
+      const spot = at ? { c: at, half: [1, 1] as [number, number], yaw: 0, y0: -1e3, y1: 1e3 } : null;
+      const covers = (e: Entity) => {
+        if (!spot) return true;
+        const fs = e.in.parent === 'world' ? this.model.footprintsOf(e.id) : this.model.footprint(e);
+        return fs.length ? fs.some(f => obbOverlap(f, spot)) : diff.tiles.length > 0 && near(e);
+      };
+      const shaped = this.arrivalShaped, moved = diff.upserts.filter(e => !shaped || shaped.has(e.id)); this.arrivalShaped = null;
+      if (this.arrivalNoted ? !diff.tiles.length && !diff.removes.length && !moved.some(near) : !moved.some(covers)) return [];
       this.flush(); this.host.drainInputs();
       const text = arrivalNote(this.host);
       if (text === this.arrivalNoted) return [];

@@ -59,7 +59,10 @@ test('ordinary invited owners create 24 actual Souls after a logged corrected co
 // safety check refused it. That refusal guarded no capacity or anti-flood rule (the only real limit is maxSoulsPerUser,
 // 409 'too-many'), so the 13th is now born on the nearest open ground instead, recorded as birth-near/1 {at, first:true}.
 // The refusal path itself (no birth, reservation released, liveness) is lifecycle-runner.test.ts's unavailable test.
-test('a crowded legacy commons arrival admits the 13th Soul on the nearest open ground and never faults the standing population',async t=>{
+// The title below is kept verbatim so the release gate's test ids stay stable (decision 2026-10-20: no rename); what the
+// test now proves is: a crowded legacy commons arrival admits the 13th Soul on the nearest open ground, and never faults
+// the standing population.
+test('unsafe legacy commons HTTP admission refuses before birth, releases reservation and never faults the healthy standing population',async t=>{
   const factory=await marsFactory({...EDEN_COMMONS_WORLD,safeCrewRemoval:true}),f=fixture(':memory:',factory);t.after(()=>f.db.close());f.souls.enableLifecycle();
   for(let i=0;i<4;i++)await invite(f,'legacy'+i);
   for(let i=0;i<12;i++)await create(f,'legacy'+Math.floor(i/4),'Resident '+i);

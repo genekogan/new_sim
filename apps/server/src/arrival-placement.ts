@@ -41,6 +41,14 @@ export function planNativeBirth(host: WorldHost, who: BirthIdentity): BirthPlan 
   return { probe: probeNativeHumanBirth(host.engine, host.factory, { ...who, near: near satisfies BirthNearV1 }), near };
 }
 
+/** The cheap form for a direct (non-lifecycle) Soul create: the search's spot only when the world itself blocks the
+ *  arrival point (built over, deep water, walled off), else nothing. No detached birth probe, so a create stays as cheap
+ *  as it was; a crowd on a clear arrival point is left to the birth's own rings, as before. */
+export function blockedArrivalNear(host: WorldHost): { at: [number, number]; first: true } | undefined {
+  const e = engineOf(host); if (!e.arrivalBlockedV1?.() || !e.arrivalSearchV1) return undefined;
+  const s = e.arrivalSearchV1(); return s ? { at: s.at, first: true } : undefined;
+}
+
 /** The god's arrival note (null when the arrival point is clear): the spot the arrival search names. Read-only and cheap
  *  (no detached birth probe: on bench-hamlet that probe alone took ~4 s, too slow for every god edit near the arrival). When
  *  the default rings still find room beside a small blocker, the Soul is born there instead, within a few metres of it. */
