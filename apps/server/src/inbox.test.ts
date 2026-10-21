@@ -62,6 +62,32 @@ test('soul queue: nothing overwrites, the oldest waits first, listen takes the w
   assert.equal(db.db.prepare('SELECT COUNT(*) n FROM agent_inbox_v1').get()!.n, 1, 'the old slot keeps only presence');
 });
 
+// Baseline id kept for the release gate. The Soul box became a queue (MSG 1.9.5): a newer message no longer replaces
+// the older one; the rest of the old contract (transitions, validation, isolation, presence expiry, restart) holds.
+test('one durable latest message: truthful transitions, replacement, isolation, expiry and restart', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'sim-inbox-')); t.after(() => rmSync(dir, {recursive: true, force: true}));
+  let db = new Db(join(dir, 'fixture.db')), now = 1000, inbox = new AgentInbox(db, 'w1', () => now);
+  const a = {scope: 'soul:a', owner: 'alice'}, b = {scope: 'soul:a', owner: 'bob'}, other = new AgentInbox(db, 'w2', () => now);
+  assert.equal(inbox.view(a).latest, null);
+  const first = inbox.send(a, 'A private request').latest!;
+  assert.throws(() => inbox.send(a, '\u0000'.repeat(1000)), /control characters/);
+  assert.equal(first.state, 'sent'); assert.equal(inbox.view(a).connected, false);
+  assert.equal(inbox.view(b).latest, null); assert.equal(other.view(a).latest, null);
+  inbox.touch(a); assert.equal(inbox.view(a).connected, true); assert.equal(inbox.view(a).latest!.state, 'sent');
+  now++; assert.equal(inbox.deliver(a).latest!.state, 'delivered');
+  assert.throws(() => inbox.acknowledge(a, first.id, 'x'.repeat(141)), /140/);
+  assert.throws(() => inbox.acknowledge(a, first.id, 'two\nlines'), /one line/);
+  assert.equal(inbox.acknowledge(a, first.id, 'Received; I will check.').latest!.state, 'acknowledged');
+  assert.equal(inbox.acknowledge(a, first.id, 'Changed reply').latest!.reply, 'Received; I will check.');
+  const second = inbox.send(a, 'A newer request').latest!; assert.notEqual(second.id, first.id); assert.equal(second.state, 'sent'); assert.equal(second.reply, undefined);
+  // no replacement any more: the older message keeps its ack, the newer one waits
+  assert.equal(inbox.acknowledge(a, first.id, 'Again').latest!.reply, 'Received; I will check.');
+  now += INBOX_CONNECTED_MS + 1; assert.equal(inbox.view(a).connected, false);
+  db.close(); db = new Db(join(dir, 'fixture.db')); inbox = new AgentInbox(db, 'w1', () => now); t.after(() => db.close());
+  assert.equal(inbox.view(a).latest!.id, second.id); assert.equal(inbox.view(a).latest!.state, 'sent'); assert.equal(inbox.view(a).connected, false);
+  assert.equal(inbox.view(a).queued, 1);
+});
+
 test('soul queue: a message waiting in the old one-message box moves into the queue at boot, once', t => {
   const db = new Db(':memory:'); t.after(() => db.close());
   db.db.exec(`CREATE TABLE agent_inbox_v1 (world_id TEXT NOT NULL, scope TEXT NOT NULL, owner TEXT NOT NULL, id TEXT, text TEXT, sent_at INTEGER, delivered_at INTEGER, acknowledged_at INTEGER, reply TEXT, last_seen_at INTEGER, PRIMARY KEY(world_id,scope,owner)) WITHOUT ROWID`);
