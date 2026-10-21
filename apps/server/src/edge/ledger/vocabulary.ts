@@ -339,8 +339,9 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   }
   const pool = ctx.caps.filter(c => c.verb === verb || (c.verb === 'object' && c.action === verb && /^e_/.test(c.object ?? '')));
   // RESOLVE: a world-engine label's ", by <neighbours> (16 m)" names the neighbours, not the thing ("go to the pond" was a tree
-  // by the pond reeds): own names stop before it
-  const info = new Map(pool.map(c => {const t = ctx.target(c), own = [c.target?.id ?? '', c.id.slice(c.id.indexOf(':') + 1), c.label.replace(/,\s*by\s.*$/, ''), ...t.names].filter(Boolean); return [c.id, {t, own, ownTokens: own.flatMap(tokens)}];}));
+  // by the pond reeds): step 3 tries the names before it first (strict), then the whole label ("the bench by the pond")
+  const info = new Map(pool.map(c => {const t = ctx.target(c), own = [c.target?.id ?? '', c.id.slice(c.id.indexOf(':') + 1), c.label, ...t.names].filter(Boolean);
+    return [c.id, {t, own, ownTokens: own.flatMap(tokens), strictTokens: [own[0], own[1], c.label.replace(/,\s*by\s.*$/, ''), ...t.names].filter(Boolean).flatMap(tokens)}];}));
   const unknown = (reason: string, prefer: EdgeCapability[] = []) => ({kind: 'unknown' as const, reason, didYouMean: suggest(input, verb, rest, ctx, prefer)});
   const dme = (c: EdgeCapability) => dist(info.get(c.id)?.t.at ?? null, ctx.me);
   const placeOf = (c: EdgeCapability) => ctx.places.find(p => p.id === c.target?.id);
@@ -413,7 +414,8 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       // 2. The place an object stands in (sit:commons-deck, warm-by-fire:social-eden-fire-circle).
       const r2 = also(one(pool.filter(c => info.get(c.id)!.t.around.some(n => norm(n) === s)), c => `${input}: ${c.id} (${c.label}) is there.`)); if (r2) return r2;
       // 3. Every word appears in the target's own names (walk:pond → the pond).
-      const r3 = also(one(ownFirst(pool.filter(c => words.every(w => tokenHit(w, info.get(c.id)!.ownTokens))), words), c => `${input} is ${c.id} (${c.label}).`)); if (r3) return r3;
+      const strict = pool.filter(c => words.every(w => tokenHit(w, info.get(c.id)!.strictTokens)));
+      const r3 = also(one(ownFirst(strict.length ? strict : pool.filter(c => words.every(w => tokenHit(w, info.get(c.id)!.ownTokens))), words), c => `${input} is ${c.id} (${c.label}).`)); if (r3) return r3;
     }
     // 3c (SOULSIM-E): a thing's everyday synonyms, after its exact words fail, for verbs at things (places have 3b): Mars's
     // "sit by the campfire" was capability.unknown while "sit by the fire" sat on a fire bench (its benches are "Fire
@@ -455,7 +457,8 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   }
   if (!pool.length) return unknown(`No "${verb}" capability is offered to this Soul right now. Things you can do: ${ctx.caps.filter(c => c.id.endsWith(':here')).map(c => c.id).slice(0, 12).join(', ')} (and walk:<place>, stroll:<place>, read:<place>); read capabilities again.`, ctx.caps.filter(c => c.id.endsWith(':here')));
   const left = tokens(rest).filter(t => !FILLER.has(t) && !ctx.root.includes(t));
-  return {...unknown(`Nothing offered matches "${input}"; read capabilities again.`), ...(PLACE_VERBS.has(verb) && left.length ? {seek: left} : {})};
+  // knowledge/1: words that name a place this Soul does not know seek nothing (the secret grove is no thing to walk to either)
+  return {...unknown(`Nothing offered matches "${input}"; read capabilities again.`), ...(PLACE_VERBS.has(verb) && left.length && !ctx.withheld?.includes(left.join(' ')) ? {seek: left} : {})};
 }
 
 function isAncestor(ctx: VocabContext, ancestor: string, id: string | undefined): boolean {

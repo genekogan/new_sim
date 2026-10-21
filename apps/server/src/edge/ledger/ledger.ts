@@ -1318,14 +1318,15 @@ export class EdgeLedger implements EdgeLedgerHooks {
       const more = [...(near?.caps ?? caps)], morePlans = new Map(near?.plans ?? plans), f = this.floorOnDemand!(soul, {ask: fl.ask, prefer, floor: fl.floor}, more, morePlans);
       if (f && 'code' in f) return {v: {kind: 'unknown', code: f.code, reason: `${text}: ${f.reason}`, didYouMean: []}, caps, plans};
       const cap = f ? more.find(c => c.id === f.id) : undefined;
-      if (f && cap) return {v: {kind: 'alias', cap, note: `${text} is ${cap.id} (${cap.label})${f.note}.`}, caps: more, plans: morePlans};
+      if (f && cap && !this.secretOffer(soul, cap)) return {v: {kind: 'alias', cap, note: `${text} is ${cap.id} (${cap.label})${f.note}.`}, caps: more, plans: morePlans};
     }
     let v: VocabResult = exact ? {kind: 'exact', cap: exact} : resolveCapability(text, this.vocabulary(soul, caps));
     // RESOLVE (SOULSIM-E "go to the horse" ended at the west lawn's centre, ~10 m from the horse): words that named only a place
     // whose description lists them name a thing: the nearest one so named, next to it
     if (v.kind !== 'exact' && v.seek?.length && this.thingOnDemand) {
       const more = [...caps], morePlans = new Map(plans), got = this.thingOnDemand(soul, v.seek, more, morePlans), cap = got ? more.find(c => c.id === got.id) : undefined;
-      if (got && cap) return {v: {kind: 'alias', cap, note: `${text} is ${cap.id} (${cap.label}): the nearest ${v.seek.join(' ')} you can stand next to${got.count > 1 ? ` (of ${got.count} in this world)` : ''}.`}, caps: more, plans: morePlans};
+      // knowledge/1: never a secret place this Soul does not know, under its thing name
+      if (got && cap && !this.secretOffer(soul, cap)) return {v: {kind: 'alias', cap, note: `${text} is ${cap.id} (${cap.label}): the nearest ${v.seek.join(' ')} you can stand next to${got.count > 1 ? ` (of ${got.count} in this world)` : ''}.`}, caps: more, plans: morePlans};
     }
     if (v.kind === 'unknown' && v.code === 'place.unreachable' && v.place && this.walkOnDemand) {
       const more = [...caps], morePlans = new Map(plans);
@@ -1359,6 +1360,11 @@ export class EdgeLedger implements EdgeLedgerHooks {
       }
     }
     return {v, caps, plans};
+  }
+  /** knowledge/1 (as the listing filters its offers): an on-demand offer that leads to a secret place this Soul has not been
+   *  to or found (or into one: knows() reads the secret ancestor), is not offered either. */
+  private secretOffer(soul: EdgeSoul, cap: EdgeCapability): boolean {
+    return !!this.knowledge.marked().size && cap.target?.kind === 'place' && !this.knowledge.knows(soul.soulId, cap.target.id);
   }
   /** @internal for edge/perception and edge/intents (Core-A modules): read access and two narrow write paths. */
   get coreA() {
