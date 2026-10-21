@@ -136,13 +136,15 @@ export class NavConnectivity {
   private fwd = new Set<string>();
   private bwd = new Set<string>();
   private graphVer = '';
+  /** Each stair verdict by what it read (see graph()). */
+  private linkMemo = new Map<string, { a: string; b: string } | null>();
   /** The main component's root (-1: no walkable ground at all). */
   main = -1;
   /** What the labels were last built from (changes exactly when the static world does). */
   version = '';
   /** False while a budgeted update has tiles left to label (check/nearestMain need a complete one). */
   ready = false;
-  stats = { updates: 0, relabelled: 0, reused: 0, uniform: 0, lastMs: 0, lastRelabelled: 0, graphMs: 0, clusterMs: 0, links: 0, edges: 0, clusters: 0, clusterBuilds: 0 };
+  stats = { updates: 0, relabelled: 0, reused: 0, uniform: 0, lastMs: 0, lastRelabelled: 0, graphMs: 0, clusterMs: 0, links: 0, edges: 0, clusters: 0, clusterBuilds: 0, linkHits: 0 };
 
   constructor(spatial: Spatial, opts: { anchors: () => Vec2[]; clear?: number }) {
     this.spatial = spatial; this.anchors = opts.anchors; this.t = opts.clear ?? CONNECT_CLEAR;
@@ -246,27 +248,33 @@ export class NavConnectivity {
 
   /** The component root and clearance of the level-0 lattice cell (I, J), or root -1 when it is not passable. */
   private cellAt(I: number, J: number): { root: number; clear: number } {
+    const v = this.cellLocal(I, J);
+    return { root: v.label < 0 ? -1 : this.find(v.b + v.label), clear: v.clear };
+  }
+  /** The level-0 cell (I, J) as its tile's own label (b: the tile's base in the union-find; flat worlds: tile ''). */
+  private cellLocal(I: number, J: number): { tile: string; b: number; label: number; clear: number } {
+    const OFF = { tile: '', b: 0, label: -1, clear: 0 };
     if (this.flat) {
       const g = this.flat.g, i = I - g.ox, j = J - g.oz;
-      if (i < 0 || j < 0 || i >= g.nx || j >= g.nz) return { root: -1, clear: 0 };
-      const k = j * g.nx + i, l = this.flat.labels[k];
-      return { root: l < 0 ? -1 : this.find(l), clear: g.clearance[k] };
+      if (i < 0 || j < 0 || i >= g.nx || j >= g.nz) return OFF;
+      const k = j * g.nx + i;
+      return { tile: '', b: 0, label: this.flat.labels[k], clear: g.clearance[k] };
     }
-    const per = this.per; if (!per) return { root: -1, clear: 0 };
+    const per = this.per; if (!per) return OFF;
     const tx = Math.floor(I / per), tz = Math.floor(J / per), id = `${tx},${tz}`, t = this.tiles.get(id);
-    if (!t || t.uniform === 2) return { root: -1, clear: 0 };
+    if (!t || t.uniform === 2) return OFF;
     const b = this.base.get(id)!;
-    if (t.uniform === 1) return { root: this.find(b), clear: 9 };
+    if (t.uniform === 1) return { tile: id, b, label: 0, clear: 9 };
     let hit = this.lru.get(t.key);
     if (!hit) {
       const g = this.spatial.ground!, te = g.tileEntry(tx, tz, this.spatial.scene.obstacles);
-      if (te.key !== t.key) return { root: -1, clear: 0 };   // the world changed since update(): unlabelled
+      if (te.key !== t.key) return OFF;   // the world changed since update(): unlabelled
       const ft = g.fineTile(tx, tz, te.rel, te.key, false);
       hit = { labels: labelComponents(ft.clearance, per, per, this.t).labels, clearance: ft.clearance };
       this.lru.set(t.key, hit); this.trimLru();
     } else { this.lru.delete(t.key); this.lru.set(t.key, hit); }
-    const k = (J - tz * per) * per + (I - tx * per), l = hit.labels[k];
-    return { root: l < 0 ? -1 : this.find(b + l), clear: hit.clearance[k] };
+    const k = (J - tz * per) * per + (I - tx * per);
+    return { tile: id, b, label: hit.labels[k], clear: hit.clearance[k] };
   }
 
   private get cell(): number { return this.flat?.g.cell ?? this.spatial.ground?.cell ?? this.spatial.cell; }
@@ -298,31 +306,46 @@ export class NavConnectivity {
    * A level-0 grid patch (the planner's cells: the engine's fine tiles) round p, half-size `half` m, with each cell's
    * component root: what the link test reads at a stair's foot. Flat worlds: the level-0 grid itself.
    */
-  private patch0(p: Vec2, half: number): { g: LevelGrid; node: (c: number) => string | null } | null {
-    if (this.flat) { const f = this.flat; return { g: f.g, node: (c) => (f.labels[c] < 0 ? null : `0:${this.find(f.labels[c])}`) }; }
+  private patch0(p: Vec2, half: number): { g: LevelGrid; node: (c: number) => string | null; ref: (c: number) => string | null } | null {
+    if (this.flat) { const f = this.flat; return { g: f.g, node: (c) => (f.labels[c] < 0 ? null : `0:${this.find(f.labels[c])}`), ref: () => null }; }
     const c = this.cell, I0 = latticeIndex(p[0] - half, c), J0 = latticeIndex(p[1] - half, c), nx = latticeIndex(p[0] + half, c) - I0 + 1, nz = latticeIndex(p[1] + half, c) - J0 + 1;
-    const clearance = new Float32Array(nx * nz), roots = new Int32Array(nx * nz);
-    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const v = this.cellAt(I0 + i, J0 + j); clearance[j * nx + i] = v.clear; roots[j * nx + i] = v.root; }
+    const clearance = new Float32Array(nx * nz), cells: { tile: string; b: number; label: number }[] = new Array(nx * nz);
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const v = this.cellLocal(I0 + i, J0 + j); clearance[j * nx + i] = v.clear; cells[j * nx + i] = v; }
     const g: LevelGrid = { level: 0, y: 0, cell: c, nx, nz, ox: I0, oz: J0, x0: I0 * c, z0: J0 * c, free: new Uint8Array(0), clearance, blockers: new Map() };
-    return { g, node: (k) => (roots[k] < 0 ? null : `0:${roots[k]}`) };
+    return { g, node: (k) => (cells[k].label < 0 ? null : `0:${this.find(cells[k].b + cells[k].label)}`), ref: (k) => (cells[k].label < 0 ? null : `T${cells[k].tile}#${cells[k].label}`) };
+  }
+  /** What a level-0 patch round p (half-size `half`) reads: the content keys of the tiles under it (ground worlds). */
+  private patch0Key(p: Vec2, half: number): string {
+    const c = this.cell, per = this.per;
+    const tx0 = Math.floor(latticeIndex(p[0] - half, c) / per), tx1 = Math.floor(latticeIndex(p[0] + half, c) / per);
+    const tz0 = Math.floor(latticeIndex(p[1] - half, c) / per), tz1 = Math.floor(latticeIndex(p[1] + half, c) / per);
+    let k = '';
+    for (let tz = tz0; tz <= tz1; tz++) for (let tx = tx0; tx <= tx1; tx++) k += `${tx},${tz}=${this.tiles.get(`${tx},${tz}`)?.key ?? '-'};`;
+    return k;
+  }
+  /** A memoised node ref back to a node id: level-0 refs are tile-local ("T<tile>#<label>"), upper ones content-keyed already. */
+  private resolve(ref: string): string | null {
+    if (ref[0] !== 'T') return ref;
+    const h = ref.indexOf('#'), b = this.base.get(ref.slice(1, h));
+    return b === undefined ? null : `0:${this.find(b + Number(ref.slice(h + 1)))}`;
   }
 
   /** The upper-level grid holding p (a building's floor; flat worlds: the level grid) and its component node ids. */
-  private upperAt(level: number, p: Vec2, tol: number): { g: LevelGrid; node: (c: number) => string | null; floor?: string } | null {
+  private upperAt(level: number, p: Vec2, tol: number): { g: LevelGrid; node: (c: number) => string | null; floor?: string; ck: string } | null {
     const sp = this.spatial;
     if (!sp.ground) {
       const g = sp.grids.levels.get(level); if (!g) return null;
       let labels = this.flatUpper.get(g);
       if (!labels) { labels = labelComponents(g.clearance, g.nx, g.nz, this.t).labels; this.flatUpper.set(g, labels); }
       const L = labels;
-      return { g, node: (c) => (L[c] < 0 ? null : `f${level}:${L[c]}`) };
+      return { g, node: (c) => (L[c] < 0 ? null : `f${level}:${L[c]}`), ck: '' };
     }
-    let fallback: { g: LevelGrid; node: (c: number) => string | null; floor?: string } | null = null;
+    let fallback: { g: LevelGrid; node: (c: number) => string | null; floor?: string; ck: string } | null = null;
     for (let ci = 0; ci < this.clusters.length; ci++) {
       const cl = this.clusters[ci], b = cl.box;
       if (p[0] < b[0] - tol || p[0] > b[2] + tol || p[1] < b[1] - tol || p[1] > b[3] + tol) continue;
       const lv = cl.levels.get(level); if (!lv) continue;
-      const L = lv.labels, hit = { g: lv.g, node: (c: number) => (L[c] < 0 ? null : `u${cl.key}:${level}:${L[c]}`), floor: cl.members.find((s) => s.level === level)?.id };
+      const L = lv.labels, hit = { g: lv.g, node: (c: number) => (L[c] < 0 ? null : `u${cl.key}:${level}:${L[c]}`), floor: cl.members.find((s) => s.level === level)?.id, ck: `${cl.key}:${level}` };
       if (snapCell(lv.g, p, this.t, tol) >= 0) return hit;
       fallback ??= hit;
     }
@@ -387,12 +410,33 @@ export class NavConnectivity {
     for (const link of sp.scene.links) if (link.usable && link.width >= 2 * r) tasks.push({ link, ascending: true }, { link, ascending: false });
     // tile by tile, as check
     const order = this.byTile(tasks.map((x) => linkApproach(x.link, x.ascending).approach));
+    // each verdict memoised by what it reads: the link, and the tiles (level 0) or the floor cluster (upper) at both feet;
+    // a level-0 foot's component is kept tile-local, so a far-away edit that renumbers the roots costs nothing here
+    const memo = new Map<string, { a: string; b: string } | null>(), ground = !!sp.ground;
     for (const k of order) {
       const { link, ascending } = tasks[k];
       const { entry, approach, exit } = linkApproach(link, ascending), far = linkApproach(link, !ascending).approach;
-      const ge = at(entry.level, approach, Math.hypot(entry.p[0] - approach[0], entry.p[1] - approach[1]) + 0.3), gx = at(exit.level, far, 0.6);
-      if (!ge || !gx) continue;
+      const he = Math.hypot(entry.p[0] - approach[0], entry.p[1] - approach[1]) + 0.3;
+      let mk = '';
+      if (ground) {
+        const side = (level: number, p: Vec2, half: number) => (level === 0 ? this.patch0Key(p, half) : this.upperAt(level, p, half)?.ck ?? '-');
+        mk = `${link.id}|${ascending}|${JSON.stringify([link.from, link.to, link.heading, link.approach, link.width])}|${side(entry.level, approach, he)}|${side(exit.level, far, 0.6)}`;
+        const was = this.linkMemo.get(mk);
+        if (was !== undefined) {
+          memo.set(mk, was); this.stats.linkHits++;
+          const a = was && this.resolve(was.a), b = was && this.resolve(was.b);
+          if (!a || !b || a === b) continue;
+          edges++;
+          (fwdAdj.get(a) ?? fwdAdj.set(a, []).get(a)!).push(b);
+          (bwdAdj.get(b) ?? bwdAdj.set(b, []).get(b)!).push(a);
+          continue;
+        }
+      }
+      const ge = at(entry.level, approach, he), gx = at(exit.level, far, 0.6);
+      if (!ge || !gx) { if (ground) memo.set(mk, null); continue; }
       const t = linkEdgeTest(link, ascending, ge.g, gx.g, r, radius);
+      const ref = (side: typeof ge, c: number) => ('ref' in side ? side.ref(c) : side.node(c));
+      if (ground) { const ra = t.ok ? ref(ge, t.ca) : null, rb = t.ok ? ref(gx, t.cx) : null; memo.set(mk, ra && rb ? { a: ra, b: rb } : null); }
       if (!t.ok) continue;
       const a = ge.node(t.ca), b = gx.node(t.cx);
       if (!a || !b || a === b) continue;
@@ -411,6 +455,7 @@ export class NavConnectivity {
       this.fwd = reach(fwdAdj, m); this.bwd = reach(bwdAdj, m);
       for (const n of this.fwd) if (this.bwd.has(n)) this.good.add(n);
     } else { this.fwd = new Set(); this.bwd = new Set(); }
+    this.linkMemo = memo;
     this.stats.links = tasks.length / 2; this.stats.edges = edges; this.stats.graphMs = performance.now() - t0;
   }
 
