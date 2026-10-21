@@ -48074,7 +48074,7 @@
             "slot": "living"
           },
           "p": [
-            0,
+            -0.35,
             0,
             0.553
           ],
@@ -48386,7 +48386,7 @@
             "slot": "living"
           },
           "p": [
-            0,
+            -0.35,
             0,
             0.618
           ],
@@ -50370,22 +50370,6 @@
         },
         {
           "op": "place",
-          "tmp": "$f8",
-          "def": "core/stool@1",
-          "name": "kitchen-stool",
-          "in": {
-            "parent": "hillside-home-12",
-            "slot": "kitchen"
-          },
-          "p": [
-            -0.895,
-            0,
-            -1.104
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
           "tmp": "$f9",
           "def": "core/rug@1",
           "name": "bath-rug",
@@ -50397,22 +50381,6 @@
             0,
             0,
             -0.001
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f10",
-          "def": "core/stool@1",
-          "name": "bath-stool",
-          "in": {
-            "parent": "hillside-home-12",
-            "slot": "bath"
-          },
-          "p": [
-            -0.895,
-            0,
-            -1.105
           ],
           "r": 0
         },
