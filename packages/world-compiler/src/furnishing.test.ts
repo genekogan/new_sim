@@ -116,14 +116,22 @@ test('the ways check judges a gap on the walk raster where the building stands, 
   for (const yaw of [0, 39 * Math.PI / 180, Math.PI / 4]) assert.equal(gap(1.04, yaw), 1, `a 1.04 m gap walks at yaw ${yaw.toFixed(2)}`);
 });
 
-test('the theatre\'s built-in contents are what its furnish recipe lays out (no back-row seats in front of the auditorium door; lane BSGEN)', () => {
-  // core/theatre@1's contents were laid out by an older furnish: row 4-1 stood ~0.7 m inside the foyer door and, on a turned
-  // theatre's walk grid, cut the whole auditorium off (fuzz walk world: 4 turned theatres, 61 bad each); furnish drops it now
-  const w = new WorldModel({ constants: { ground: 'land' }, seed: 'theatre' });
-  for (const d of CORE_KIT) w.defineDef(d, 'core', 0);
-  assert.equal(applyBatch(w, { ops: [{ op: 'place', def: 'core/theatre@1', name: 'theatre' }] }, 'god', 1).result.accepted, true);
-  const b = w.get('theatre')!, kids = [...w.children.get(b.id) ?? []].map((id) => w.entities.get(id)!.name);
-  for (const id of [...w.children.get(b.id) ?? []]) w.delete(id);
-  const f = furnishBatch(w, b.id);
-  assert.deepEqual(kids.sort(), f.ops.filter((o: any) => o.op === 'place').map((o: any) => o.name).sort(), JSON.stringify(f.dropped));
+test('built-in contents are what the type\'s furnish recipe lays out (theatre, office block, hospital; lane BSGEN)', () => {
+  // these types' contents were laid out by an older furnish (vocab-w3.mjs layOut). core/theatre@1's back row 4-1 stood ~0.7 m
+  // inside the foyer door and, on a turned theatre's walk grid, cut the whole auditorium off (fuzz walk world: 4 turned
+  // theatres, 61 bad each); the office block's meeting-room chairs and the hospital wards' fourth beds shut in their rooms'
+  // ways (fuzz: office blocks 136 -> 61 bad, hospitals 117 -> 6). Today's furnish drops them.
+  const contents = (type: string) => {
+    const w = new WorldModel({ constants: { ground: 'land' }, seed: type });
+    for (const d of CORE_KIT) w.defineDef(d, 'core', 0);
+    assert.equal(applyBatch(w, { ops: [{ op: 'place', def: `core/${type}@1`, name: 'b' }] }, 'god', 1).result.accepted, true);
+    const b = w.get('b')!;
+    return { w, b, kids: [...w.children.get(b.id) ?? []].map((id) => w.entities.get(id)!.name) };
+  };
+  const t = contents('theatre');
+  for (const id of [...t.w.children.get(t.b.id) ?? []]) t.w.delete(id);
+  const f = furnishBatch(t.w, t.b.id);
+  assert.deepEqual(t.kids.sort(), f.ops.filter((o: any) => o.op === 'place').map((o: any) => o.name).sort(), JSON.stringify(f.dropped));
+  const gone = { 'office-block': ['meeting-2-chair-n-2', 'meeting-2-chair-s-1', 'meeting-3-chair-s-2'], hospital: ['ward-1-bed-4', 'ward-2-bed-4', 'ward-3-bed-4'] };
+  for (const [type, names] of Object.entries(gone)) { const k = contents(type).kids; for (const n of names) assert.ok(!k.includes(n), `${type}: ${n}`); }
 });
