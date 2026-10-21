@@ -52,7 +52,8 @@ export async function clientListen(args, { call, sleep = ms => new Promise(resol
   if (follow) return followInbox({ poll, after, wait: sleep, write, stop, now });
   if (once) return inboxResult(await poll(after), 'listen');
   for (let delay = 0; ;) {
-    const r = await poll(after);
+    // A connection dropped mid-answer throws instead of returning status 0: an outage too, never the end of listen.
+    let r; try { r = await poll(after); } catch (e) { r = { status: 0, data: { error: { code: 'unreachable', message: String(e?.message ?? e) } } }; }
     if (transient(r)) { delay = Math.min(30_000, delay ? delay * 2 : 1000); await sleep(delay); continue; }
     delay = 0;
     const messages = handed(inboxResult(r, 'listen'), after);

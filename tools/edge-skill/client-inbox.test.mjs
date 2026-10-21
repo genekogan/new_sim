@@ -37,6 +37,15 @@ test('Soul inbox listen (1.9.5) blocks with no time limit, rides out outages, th
   await assert.rejects(clientListen([], { call: async () => ({ status: 401, data: { error: 'revoked' } }), sleep: async () => {} }), /HTTP 401/, 'a revoked credential is final');
 });
 
+test('Soul inbox listen (1.9.5) treats a connection dropped mid-answer as an outage, never as the end of listening', async () => {
+  const message = { id: 'm1', text: 'are you still there?', state: 'sent', sentAt: 1 };
+  const answers = [() => { throw new TypeError('terminated'); }, () => { throw new Error('other side closed'); }, () => ({ status: 200, data: { ...envelope(message), backlog: [message] } })];
+  const sleeps = [];
+  const out = await clientListen([], { call: async () => answers.shift()(), sleep: async ms => sleeps.push(ms), now: () => 0 });
+  assert.deepEqual(out.messages.map(m => m.text), ['are you still there?']);
+  assert.deepEqual(sleeps, [1000, 2000]);
+});
+
 test('Soul inbox result: the second answer (done|failed), validated before the network', async () => {
   const done = envelope({ ...latest('m/1', 'acknowledged'), outcome: 'done', result: 'Arrived.' }), ctx = context([done]);
   assert.deepEqual(await clientResult(['m/1', 'done', 'Arrived.'], ctx), done);
