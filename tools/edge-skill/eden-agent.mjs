@@ -34,7 +34,7 @@ import {publishCompletedOwnerQueue} from './client-owner-result.mjs';
 import {openClientMemory} from './client-memory.mjs';
 import {travelCommand} from './client-travel.mjs';
 
-export const SKILL_VERSION='1.9.6';
+export const SKILL_VERSION='1.9.7';
 export const CONTRACT='eden-edge/1';
 export const API_CONTRACT='eden-edge/1.1'; // Additive support; preserve legacy wire contract.
 const STATE='.eden-agent.json';
@@ -319,10 +319,12 @@ export async function act(first,...rest){
  // Only journeys are protected: a timed activity (sitting, reading, lying, dancing…) is a state the next act may replace, and stand/stop always goes through.
  const words0=[first,...rest].join(' ').toLowerCase(),stopping=/^(stand|stop|get up|stand up|wake)/.test(words0)||first.startsWith('stand:')||ATTENTION.test(intent?.verb??words0)||first.startsWith('face:'); // 1.8: look/turn/face never cancel the body
  const JOURNEY=/^(walk|stroll|go-near|hang-out|gather|object|wave):/;
- if(!force&&!stopping&&m==='edge'&&s.lastReceipt&&!s.lastReceipt.startsWith('legacy:')&&s.lastActAt&&Date.now()-Date.parse(s.lastActAt)<120_000){
+ // 1.9.7 (SOULSIM-H F5): a message your human sent (and you acked) after this walk began is their replacement: act it now.
+ const ownerReplaces=!!s.lastOwnerAckAt&&!!s.lastActAt&&Date.parse(s.lastOwnerAckAt)>=Date.parse(s.lastActAt);
+ if(!force&&!stopping&&!ownerReplaces&&m==='edge'&&s.lastReceipt&&!s.lastReceipt.startsWith('legacy:')&&s.lastActAt&&Date.now()-Date.parse(s.lastActAt)<120_000){
   const r=await receipt(s.lastReceipt);
   if(r&&(r.phase==='started'||r.phase==='waiting')&&JOURNEY.test(r.capability??''))return {accepted:false,code:'local.in-progress',receipt:{id:r.id,capability:r.capability,phase:r.phase},
-   hint:'Your last action is still under way. Run "wait 60" until it completes (or observe/say/converse meanwhile). Add --force only if you really mean to cancel it.',next:'wait'};
+   hint:'Your last action is still under way. Run "wait 60" until it completes (or observe/say/converse meanwhile). If your human asked for something else, ack their message, then act it (a plain act replaces the walk after that ack), or add --force.',next:'wait'};
  }
  if(intent&&m==='edge'){
   const d=ok(await call(EDGE.act,{body:{...intent,clientRef:randomUUID()}}),'act');
@@ -1197,7 +1199,7 @@ export async function dashboard(...args){
  await new Promise(resolve=>{let closing=false;const close=async()=>{if(closing)return;closing=true;await service.close();resolve();};process.once('SIGINT',close);process.once('SIGTERM',close);});return {dashboard:'closed'};
 }
 export async function listen(...args){return clientListen(args,{call});}
-export async function ack(...args){return clientAck(args,{call});}
+export async function ack(...args){const r=await clientAck(args,{call});save({lastOwnerAckAt:now()});return r;}
 /** 1.9.5 (lane MSG): the second answer on the owner's card, when the work ends: result <id> done|failed "what happened". */
 export async function result(...args){return clientResult(args,{call});}
 /** look around — the same as explore. */

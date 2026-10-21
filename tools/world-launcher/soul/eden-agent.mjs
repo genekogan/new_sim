@@ -3664,7 +3664,7 @@ async function travelCommand(args, { load: load2, save: save2, live: live2 = () 
 }
 
 // tools/edge-skill/eden-agent.mjs
-var SKILL_VERSION = "1.9.6";
+var SKILL_VERSION = "1.9.7";
 var CONTRACT = "eden-edge/1";
 var API_CONTRACT = "eden-edge/1.1";
 var STATE = ".eden-agent.json";
@@ -4176,13 +4176,14 @@ async function act(first, ...rest) {
   const s = load(), soul = need(s, "soul", "Create one with create-soul."), m = await mode();
   const words0 = [first, ...rest].join(" ").toLowerCase(), stopping = /^(stand|stop|get up|stand up|wake)/.test(words0) || first.startsWith("stand:") || ATTENTION2.test(intent?.verb ?? words0) || first.startsWith("face:");
   const JOURNEY = /^(walk|stroll|go-near|hang-out|gather|object|wave):/;
-  if (!force && !stopping && m === "edge" && s.lastReceipt && !s.lastReceipt.startsWith("legacy:") && s.lastActAt && Date.now() - Date.parse(s.lastActAt) < 12e4) {
+  const ownerReplaces = !!s.lastOwnerAckAt && !!s.lastActAt && Date.parse(s.lastOwnerAckAt) >= Date.parse(s.lastActAt);
+  if (!force && !stopping && !ownerReplaces && m === "edge" && s.lastReceipt && !s.lastReceipt.startsWith("legacy:") && s.lastActAt && Date.now() - Date.parse(s.lastActAt) < 12e4) {
     const r = await receipt(s.lastReceipt);
     if (r && (r.phase === "started" || r.phase === "waiting") && JOURNEY.test(r.capability ?? "")) return {
       accepted: false,
       code: "local.in-progress",
       receipt: { id: r.id, capability: r.capability, phase: r.phase },
-      hint: 'Your last action is still under way. Run "wait 60" until it completes (or observe/say/converse meanwhile). Add --force only if you really mean to cancel it.',
+      hint: 'Your last action is still under way. Run "wait 60" until it completes (or observe/say/converse meanwhile). If your human asked for something else, ack their message, then act it (a plain act replaces the walk after that ack), or add --force.',
       next: "wait"
     };
   }
@@ -6438,7 +6439,9 @@ async function listen(...args) {
   return clientListen(args, { call });
 }
 async function ack(...args) {
-  return clientAck(args, { call });
+  const r = await clientAck(args, { call });
+  save({ lastOwnerAckAt: now() });
+  return r;
 }
 async function result(...args) {
   return clientResult(args, { call });
