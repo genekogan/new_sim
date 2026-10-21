@@ -119,3 +119,43 @@ test('the last-tile cache answers like the map and forgets a tile an edit invali
   t.update(g2, [g2.landforms.at(-1)!]);
   assert.notEqual(t.sample(2, 3), before); assert.equal(t.sample(2, 3), new Terrain(g2).sample(2, 3));
 });
+
+// pad/2b (lane PADFIX): graded pads fold together after older pads, so flats win over banks
+const sq = (x0: number, z0: number, x1: number, z1: number): [number, number][] => [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
+function flatsWorld(...pads: Landform[]): Ground {
+  const g = emptyGround(200, 0);
+  g.landforms.push(...pads);
+  return groundSchema.parse(g);
+}
+
+test('pad/2b: a neighbour bank never cuts a flat; its cut cone meets the flat at the flat level', () => {
+  // A at 0 (house x -10..0, door landing x 0..2); B cut 3 m down 1.5 m beyond A's landing
+  const A: Landform = { id: 'a', kind: 'pad', area: sq(-10, -5, 0, 5), aprons: [sq(0, -1, 2, 1)], level: 0, edge: 16, grade: 0.5, fold: 'flats' };
+  const B: Landform = { id: 'b', kind: 'pad', area: sq(3.5, -5, 12, 5), level: -3, edge: 16, grade: 0.5, fold: 'flats' };
+  for (const order of [[A, B], [B, A]]) {
+    const g = flatsWorld(...order);
+    for (const x of [-9, -1, 0.5, 1.9]) assert.equal(heightAt(g, x, 0), 0, `A's flat at x=${x}`);
+    for (const x of [4, 8, 11]) assert.equal(heightAt(g, x, 0), -3, `B's flat at x=${x}`);
+  }
+});
+
+test('pad/2b: no cliff at a landing edge where a neighbour cut cone digs below the landing pad fill cone (padfix2)', () => {
+  // the natural ground (0) lies inside both cones; old fold: B's cut bound alone held the ground at the landing edge
+  // (-3 + 0.5 x 1.5 = -2.25 m against a landing at 0: a 2.25 m cliff at the door). Now A's fill bound binds against the
+  // ground as B clamped it, and the ground ramps between the two levels by distance to their flats.
+  const A: Landform = { id: 'a', kind: 'pad', area: sq(-10, -5, 0, 5), aprons: [sq(0, -1, 2, 1)], level: 0, edge: 16, grade: 0.5, fold: 'flats' };
+  const B: Landform = { id: 'b', kind: 'pad', area: sq(3.5, -5, 12, 5), level: -3, edge: 16, grade: 0.5, fold: 'flats' };
+  const g = flatsWorld(A, B);
+  assert.ok(Math.abs(heightAt(g, 2.01, 0)) < 0.05, `just off the landing: ${heightAt(g, 2.01, 0)}`);
+  assert.ok(Math.abs(heightAt(g, 3.49, 0) + 3) < 0.05, `just off B's flat: ${heightAt(g, 3.49, 0)}`);
+  let prev = heightAt(g, 1.95, 0);
+  for (let x = 2; x <= 3.6; x += 0.05) {
+    const h = heightAt(g, x, 0);
+    assert.ok(Math.abs(h - prev) <= 0.15, `step at x=${x.toFixed(2)}: ${prev.toFixed(2)} -> ${h.toFixed(2)}`);
+    assert.ok(h <= 0 + 1e-9 && h >= -3 - 1e-9, `between the levels at x=${x.toFixed(2)}`);
+    prev = h;
+  }
+  // where the cones meet with room to spare the ground is unchanged (natural ground inside both cones, nothing binds)
+  const C: Landform = { id: 'c', kind: 'pad', area: sq(20, -5, 30, 5), level: -1, edge: 16, grade: 0.5, fold: 'flats' };
+  assert.equal(heightAt(flatsWorld(A, C), 10.5, 20), heightAt(emptyGround(200, 0), 10.5, 20));
+});

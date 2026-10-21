@@ -146,20 +146,33 @@ type FlatsPad = PadLandform & { grade: number; fold: 'flats' };
  * allows) the ground runs between the two binding bounds by distance to their flats, so it meets each flat at its level.
  */
 function padsFlatsWin(h: number, x: number, z: number, pads: FlatsPad[], inOldFlat: boolean): number {
-  let flat: number | undefined, lo = -Infinity, hi = Infinity, dLo = 0, dHi = 0;
+  let flat: number | undefined;
+  const near: { l: FlatsPad; d: number; w: number; up?: true; down?: true }[] = [];
   for (const l of pads) {
     const d = padFlatDist(x, z, l);
     if (d === 0) { flat = l.level; continue; }
     if (d >= l.edge || flat !== undefined || inOldFlat) continue;
-    const rest = l.edge - d, w = rest >= PAD_EASE_M ? 1 : smooth(rest / PAD_EASE_M);
-    const a = l.level - l.grade * d, c = l.level + l.grade * d;
-    if (a > h) { const v = h + (a - h) * w; if (v > lo) { lo = v; dLo = d; } }
-    if (c < h) { const v = h + (c - h) * w; if (v < hi) { hi = v; dHi = d; } }
+    const rest = l.edge - d;
+    near.push({ l, d, w: rest >= PAD_EASE_M ? 1 : smooth(rest / PAD_EASE_M) });
   }
   if (flat !== undefined) return flat;
-  if (inOldFlat) return h;
-  if (lo <= hi) return h < lo ? lo : h > hi ? hi : h;
-  return (lo * dHi + hi * dLo) / (dLo + dHi);
+  if (inOldFlat || !near.length) return h;
+  // a bound binds when it lies beyond the ground as clamped so far: a neighbour's cut cone that digs the ground below
+  // this pad's fill cone (or a fill above its cut) is a conflict even where the natural ground lay inside both (padfix2)
+  let v = h, lo = -Infinity, hi = Infinity, dLo = 0, dHi = 0;
+  for (let pass = 0; pass < 4; pass++) {
+    let moved = false;
+    for (const n of near) {
+      const { l, d, w } = n, a = l.level - l.grade * d, c = l.level + l.grade * d;
+      // each pad's fill (cut) bound is taken once, eased from the ground as it stood when it first bound
+      if (!n.up && a > v) { n.up = true; const b = v + (a - v) * w; if (b > lo) { lo = b; dLo = d; moved = true; } }
+      if (!n.down && c < v) { n.down = true; const b = v + (c - v) * w; if (b < hi) { hi = b; dHi = d; moved = true; } }
+    }
+    if (lo > hi) return (lo * dHi + hi * dLo) / (dLo + dHi);
+    if (!moved) break;
+    v = v < lo ? lo : v > hi ? hi : v;
+  }
+  return v;
 }
 
 /** pad/2b: is (x, z) on an older pad's flat (a pad/1 area, a pad/2 area or landing)? Only asked near a pad/2b pad. */
