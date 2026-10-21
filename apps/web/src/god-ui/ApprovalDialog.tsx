@@ -15,7 +15,7 @@ import './approval-card.css';
 
 const AVATAR = <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="15" r="7" fill="currentColor" opacity=".55" /><path d="M6 36a14 14 0 0 1 28 0" fill="currentColor" opacity=".55" /></svg>;
 
-export function ApprovalCard({ id, signedIn, signIn, onDone }: { id: string; signedIn: boolean; signIn?: ReactNode; onDone: () => void }) {
+export function ApprovalCard({ id, signedIn, signIn, onDone, onPaired }: { id: string; signedIn: boolean; signIn?: ReactNode; onDone: () => void; onPaired?: () => void }) {
   const [a, setA] = useState<J.Approval | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -36,9 +36,14 @@ export function ApprovalCard({ id, signedIn, signIn, onDone }: { id: string; sig
   useEffect(() => { if (!live) return; const t = setInterval(() => void check(), a?.status === 'creating' ? 2000 : 4000); return () => clearInterval(t); }, [live, a?.status, check]);
   const done = useRef(onDone); done.current = onDone;   // the parent re-renders often; closing must happen once
   const closed = useRef(false);
+  // seen waiting (pending/creating) here: a link opened on an already-ready request is not a pairing done in this window
+  const waited = useRef(false);
+  if (a?.status === 'pending' || a?.status === 'creating') waited.current = true;
+  const paired = useRef(onPaired); paired.current = onPaired;
   useEffect(() => {
     if (a?.status !== 'ready' || closed.current) return;
     closed.current = true;
+    if (waited.current) paired.current?.();
     if (a.soulId) requestFollowSoul(a.soulId);
     done.current();
   }, [a?.status, a?.soulId]);
@@ -78,7 +83,7 @@ export function ApprovalCard({ id, signedIn, signIn, onDone }: { id: string; sig
   );
 }
 
-export function ApprovalDialog({ id, signedIn, signIn, onDone }: { id: string; signedIn: boolean; signIn?: ReactNode; onDone: () => void }) {
+export function ApprovalDialog({ id, signedIn, signIn, onDone, onPaired }: { id: string; signedIn: boolean; signIn?: ReactNode; onDone: () => void; onPaired?: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const node = ref.current;
@@ -96,6 +101,6 @@ export function ApprovalDialog({ id, signedIn, signIn, onDone }: { id: string; s
   // dialog itself, not on a button (Enter must not approve, refuse or close by accident)
   return <dialog ref={ref} className="ap-dialog" data-approval-dialog={id} aria-label="Approve your agent" tabIndex={-1}
     onCancel={(e) => { e.preventDefault(); onDone(); }}>
-    <ApprovalCard key={id} id={id} signedIn={signedIn} signIn={signIn} onDone={onDone} />
+    <ApprovalCard key={id} id={id} signedIn={signedIn} signIn={signIn} onDone={onDone} onPaired={onPaired} />
   </dialog>;
 }

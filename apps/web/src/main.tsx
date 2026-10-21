@@ -18,6 +18,7 @@ import {clerkNow,clerkOriginRoute,unsignedPreviewAuth} from './auth-ui.ts';
 // loads once its arrival is over (ClerkWorld below).
 import type { LauncherList } from './god-ui/LauncherHome.tsx';
 import {whenArrivalCardGone} from './arrival-marks.ts';
+import {countPage} from './visitor-counts.ts';
 const LauncherRoot=lazy(()=>import('./LauncherRoot.tsx'));
 const ClerkBridge=lazy(()=>import('./ClerkBridge.tsx'));
 // The arrival card's bar counts bytes: meter every asset fetch from the start; old worlds know their total up front.
@@ -98,6 +99,7 @@ function WorldRoot() {
 installAssetTransport(); // the CDN transport, then the meter of the original asset URL, including its CDN attempt and origin fallback
 if(!newWorld&&worldKey==='mars'&&!marsFork&&!(location.pathname===BASE+'/'&&!location.hash))prefetchBackdrop(BACKDROP_BLOBS[MARS_CAMPUS_URL]!); // W3: campus starts with the page
 const route=pageRoute(location.pathname,BASE,location.hash);if(route==='missing')document.title='No page here';
+if(route!=='missing')countPage(BASE);  // lane t4-analytics: GoatCounter (visitor-counts.ts), off locally and under automation
 createRoot(document.getElementById('root')!).render(<StrictMode>{route==='list'?<WorldList/>:route==='world'?<WorldRoot/>:<NoPage/>}</StrictMode>);
 
 /** lane QA: an unknown path (sim.eden.art/nope, a retired lab link) says so and links home, instead of a world error. */

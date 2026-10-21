@@ -23,6 +23,7 @@ import { godFeature } from './god-ui/features.ts';
 import { approvalFromHash, landingHash } from './god-ui/join-api.ts';
 import { closeApproval, closedApprovals, pickWindowApproval, useWindowApprovals } from './god-ui/window-approvals.ts';
 import { OfferCard, offerFromHash } from './god-ui/OfferCard.tsx';
+import { countEvent } from './visitor-counts.ts';
 import './god-ui/god-panel.css';
 
 const query = new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
@@ -226,7 +227,7 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
     const at = viewCentre(); await G.god('/v1/god/strike', { method: 'POST', body: JSON.stringify(at ? { at } : {}) });
   }, () => (kind === 'rain' ? 'Rain.' : kind === 'haze' ? 'Haze.' : 'Lightning.'));
   const approve = (code: string) => run(code, async () => {
-    await G.approve(code); try { localStorage.setItem(PAIRED_KEY, '1'); } catch { /* storage disabled */ }
+    await G.approve(code); countEvent('god connected'); try { localStorage.setItem(PAIRED_KEY, '1'); } catch { /* storage disabled */ }
     if (hashCode === code) history.replaceState(null, '', location.pathname + location.search);
   }, () => `Approved. Your agent is now this world's god.`);
   const agentsPaired = (status.agents ?? 0) > 0;

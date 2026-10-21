@@ -1,10 +1,16 @@
 // Lane W1: User Timing marks along a page's arrival (sim:<name>, the first time each happens), for the speed probes
 // (performance.getEntriesByType('mark')). One mark per name per page; never throws.
-const marked = new Set<string>(), markedAt = new Map<string, number>();
+const marked = new Set<string>(), markedAt = new Map<string, number>(), waiting = new Map<string, Array<() => void>>();
 export function arrivalMark(name: string) {
   if (marked.has(name)) return; marked.add(name);
   try { markedAt.set(name, performance.now()); } catch { /* no clock */ }
   try { performance.mark('sim:' + name); } catch { /* no User Timing */ }
+  const w = waiting.get(name); waiting.delete(name); for (const fn of w ?? []) { try { fn(); } catch { /* a listener never breaks the arrival */ } }
+}
+/** Resolves the first time `name` is marked (at once if it already was). No timer: nothing polls while it waits. */
+export function whenMarked(name: string): Promise<void> {
+  if (marked.has(name)) return Promise.resolve();
+  return new Promise((resolve) => { const w = waiting.get(name) ?? []; w.push(resolve); waiting.set(name, w); });
 }
 /** Whether this page's arrival is over: its card went away or its first live frame was drawn (or `fallbackMs` passed,
  *  for pages that never show either, e.g. a shot). Work nobody sees during the arrival waits for this. */
