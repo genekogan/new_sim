@@ -3,7 +3,8 @@
 // tests and runs without it. Copies the files of one sim-score commit byte for byte (site/: engine, pieces, catalog, the
 // browser page; the Node lint harness tools/load.mjs + lint.mjs + score.mjs; README.md, COMPOSING.md), removes vendored
 // files the commit no longer has, rewrites vendor/sim-score/PROVENANCE.json (source commit, sha256 per file) and prints
-// which pieces, engine modules and other files were added, changed or removed.
+// which pieces, engine modules and other files were added, changed or removed. Then it rebuilds the world playlist
+// (tools/score/build-playlist.mjs) from the new copy.
 //
 //   node tools/score/sync-sim-score.mjs <path-to-sim-score> [commit]     (commit defaults to HEAD)
 //
@@ -93,6 +94,8 @@ async function main() {
     const lines = ['added', 'changed', 'removed'].map((c) => [c, changes[c].filter((p) => kind(p) === k).map(label)]).filter(([, xs]) => xs.length);
     console.log(`  ${k}: ${lines.length ? lines.map(([c, xs]) => `${c} ${xs.length} (${xs.join(', ')})`).join('; ') : 'unchanged'}`);
   }
+  const { buildPlaylist } = await import('./build-playlist.mjs');
+  buildPlaylist({ write: true, log: console.log });
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();

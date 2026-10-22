@@ -122,10 +122,14 @@ Lane S3 (2026-10-20). Gene: "music sucks. didn't we make better music? check the
 made and put those on a playlist." The music in every world page (new worlds and the old `/w/eden`) is
 now a playlist of Sim Score pieces, replacing the sound layer's own generative `music` bed.
 
-- **Source.** Gene's Sim Score repository `<sim-score-repo>` (HEAD `3b806f2`, 64 Tone.js pieces composed in the
-  browser, no samples). `tools/score/import-playlist.mjs` copies the engine files and the chosen pieces unchanged into
-  `playlist-runtime.mjs` (one function that takes Tone explicitly; `Sim` stays private, nothing plays on import) and
-  writes `PLAYLIST-PROVENANCE.json` (source revision, per-file sha256). Rerun it to change the playlist.
+- **Source.** The vendored Sim Score in `vendor/sim-score/` (see "Vendored Sim Score" below; Tone.js pieces composed in
+  the browser, no samples). `tools/score/build-playlist.mjs` builds `playlist/` from it: `engine.mjs` holds the nine engine
+  files (theory, compose, instruments, more-instruments, conductor, then the optional phrasing, spc, dialogue, groove, in
+  sim-score's `index.html` order) unchanged inside one function that takes Tone explicitly (`Sim` stays private, nothing
+  plays on import), the playlist and `loadPiece(id)`; `pieces/<id>.mjs` holds each piece unchanged inside
+  `register(Sim, Tone)`; `BUILD.json` records the source commit and a sha256 per generated file. Edit `PLAYLIST` in the
+  builder and rerun it to change the playlist (sync reruns it too). Until 2026-10-22 an importer read `<sim-score-repo>`
+  directly and bundled everything into one `playlist-runtime.mjs`.
 - **Why these 12.** Gene's last word on Sim Score (Oct 4) asked for "more adventurous music and a bit more percussion"
   and named SimCity, Tetris, Brian Eno, F-Zero, Karate Kid, Knight Rider, disco subgenres and vaporwave; there is no
   later per-piece verdict, so the playlist is one round-three piece per named influence, in this order:
@@ -136,9 +140,11 @@ now a playlist of Sim Score pieces, replacing the sound layer's own generative `
   240 s, fades 4 s, and the next starts. Mute or music off (the speaker and note buttons bottom right; on a phone, in the
   HUD's More menu) stops it; on again restarts the current piece. A world's own `music` things stay quiet under it.
   Nothing in it follows the camera, so moving the camera never restarts a piece.
-- **Cost.** Nothing at arrival: `tone` (about 341 KB) and `playlist-runtime` (about 239 KB, 80 KB gzipped) are lazy
-  chunks, not in `index.html`'s preloads, loaded only after the arrival is over, after the first gesture, with music on
-  and sound unmuted, in idle time. Tone owns its own AudioContext (its worklets); a gesture resumes it where a browser
+- **Cost.** Nothing at arrival: `tone` (about 341 KB) and the score `engine` are lazy chunks, not in `index.html`'s
+  preloads, loaded only after the arrival is over, after the first gesture, with music on and sound unmuted, in idle
+  time. Each piece is its own chunk (about 18 KB, 7 KB gzipped), fetched just before it plays; the next piece's chunk is
+  fetched when the current one starts its 4 s fade (`__edenMusic.log()` shows `load`/`loaded` with the piece and
+  `play` or `prefetch`). Tone owns its own AudioContext (its worklets); a gesture resumes it where a browser
   insists (iOS).
 - **Proof.** `window.__edenMusic.state() / log() / level() / next() / trackSeconds(s)`; `score/playlist.test.ts` (all 12
   pieces register and compose); `tools/sound/camera-restarts.mjs` (60 s of camera drags: sound and music restarts).

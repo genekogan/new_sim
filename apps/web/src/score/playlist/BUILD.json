@@ -1,0 +1,48 @@
+{
+  "generator": "tools/score/build-playlist.mjs",
+  "source": {
+    "vendored": "vendor/sim-score",
+    "commit": "8cf5c0542bb06f2e042870c67f1010f3d8f7eb95"
+  },
+  "tone": "15.1.22",
+  "engine": [
+    "theory",
+    "compose",
+    "instruments",
+    "more-instruments",
+    "conductor",
+    "phrasing",
+    "spc",
+    "dialogue",
+    "groove"
+  ],
+  "playlist": [
+    "pixel-town",
+    "downtown-rush",
+    "neon-shibuya",
+    "departure-lounge",
+    "line-clear",
+    "mirror-ball",
+    "night-drive",
+    "plaza-mall",
+    "grand-prix",
+    "magic-orbit",
+    "montage",
+    "night-patrol"
+  ],
+  "outputs": {
+    "engine.mjs": "6a122251eaa8af1de531c96b58ee4d0b963bae227dbe33f19ec179874fb9f2ed",
+    "pieces/pixel-town.mjs": "ef6b19cf83c8a344b133eea1f1e918be2d09d4b72e49badab15ae56e44606515",
+    "pieces/downtown-rush.mjs": "513a46a864be2c07c2accbd655d8c9126e6a129f95e42a95901a183b525efd02",
+    "pieces/neon-shibuya.mjs": "eb4d63aca8d12caf51eb4ebc19f9edf68d71362b983c1ddf6cb6e55b6e96d7fc",
+    "pieces/departure-lounge.mjs": "347544998934c0a5cb8d48653ebf6407087eae3fa8083d4bf72d8a22f790c5b0",
+    "pieces/line-clear.mjs": "4db84c2e610b4287e2f229c9b0038cefb72cdcb3449890ad26d52ed4f7190f46",
+    "pieces/mirror-ball.mjs": "0b4ecc500791bc6ac20afd35ed0f8d941597d3a2c35571d3d8fd618fa0ec849f",
+    "pieces/night-drive.mjs": "167c8a1d01ca0fc92cc0ad56b58714bfc2299a92ee76c5ebc1915ed6dc4c110d",
+    "pieces/plaza-mall.mjs": "8642167893563f88bedff43a42710522161ac970b3891eba76fdab84b4799c9e",
+    "pieces/grand-prix.mjs": "f37146f119834235dc3f23262e3fd3385f1d035c445630230a05d583394b3d23",
+    "pieces/magic-orbit.mjs": "5c04cf45b5dd1abc979ec2b3d6be107f35a4035010c0cb922a570b4d56b3a45c",
+    "pieces/montage.mjs": "6f661d8670eddb51e7fcec17f5b5b618dc7dfa4f7541fd10717df0b4878b8d6d",
+    "pieces/night-patrol.mjs": "70d91de4f16866e83996db78573522617473ffb8e0f52ad8e0536a76bee332d8"
+  }
+}

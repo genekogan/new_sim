@@ -3,13 +3,14 @@
 // the browser a few bars ahead, no samples). It replaces the old generative 'music' bed that sat at the listener and
 // restarted whenever the camera moved: this player has nothing to do with the camera, so a piece plays through.
 //
-// Cost: nothing at arrival. Tone and the pieces (separate chunks) load only once the arrival is over, after the first
-// gesture, with music on and sound unmuted, in idle time. Tone owns its own AudioContext (its PluckSynth / BitCrusher need
+// Cost: nothing at arrival. Tone and the score engine (separate chunks) load only once the arrival is over, after the first
+// gesture, with music on and sound unmuted, in idle time; each piece is its own chunk, fetched just before it plays, and
+// the next one is fetched during the fade (lane SCORE, 2026-10-22: 40 pieces in one chunk would be ~900 KB). Tone owns its own AudioContext (its PluckSynth / BitCrusher need
 // its worklets); a gesture resumes it where a browser insists (iOS). Each piece plays TRACK_S, fades, and the next one
 // starts; the first piece is picked at random, then in playlist order. Mute or music off stops it; on again restarts
 // the current piece. `window.__edenMusic` reports state and a start/stop/advance log (proof, tests).
 import { arrivalOver } from '../arrival-marks.ts';
-import type { ScoreConductor, ScoreNamespace } from '../score/playlist-runtime.d.mts';
+import type { ScoreConductor, ScoreNamespace, ScorePieceModule } from '../score/playlist/engine.d.mts';
 
 export const TRACK_S = 240, FADE_S = 4, GAP_S = 1.5;
 let trackS = TRACK_S;
@@ -21,6 +22,8 @@ export type MusicEvent = { t: number; ev: 'load' | 'loaded' | 'start' | 'fade' |
 
 let want = false, volume = 0.3;
 let Tone: ToneLike | null = null, Sim: ScoreNamespace | null = null, order: readonly string[] = [], loading = false, failed = false;
+let loadPiece: ((id: string) => Promise<ScorePieceModule>) | null = null;
+const pieceReady = new Map<string, Promise<void>>();
 let conductor: ScoreConductor | null = null, index = -1, playing: string | null = null, starting = false, gen = 0;
 let endsAt = 0, fading = false, gapUntil = 0, resumeAt = 0;
 const events: MusicEvent[] = [];
@@ -37,26 +40,42 @@ function load() {
   if (loading || Sim || failed) return;
   loading = true; note({ ev: 'load' });
   idle(() => {
-    Promise.all([import('tone'), import('../score/playlist-runtime.mjs')]).then(([tone, score]) => {
-      Tone = tone as unknown as ToneLike; Sim = score.createPlaylistScore(tone); order = score.PLAYLIST;
-      conductor = new Sim.Conductor(); loading = false; note({ ev: 'loaded', reason: `${order.length} pieces` });
+    Promise.all([import('tone'), import('../score/playlist/engine.mjs')]).then(([tone, score]) => {
+      Tone = tone as unknown as ToneLike; Sim = score.createPlaylistScore(tone); order = score.PLAYLIST; loadPiece = score.loadPiece;
+      conductor = new Sim.Conductor(); loading = false; note({ ev: 'loaded', reason: `engine, ${order.length} pieces` });
     }, (e) => { loading = false; failed = true; note({ ev: 'error', reason: String(e).slice(0, 200) }); });
   });
 }
 /** A gesture resumes Tone's context where the browser did not let it start on its own (iOS). */
 export function musicGesture() { if (Tone && want && Tone.getContext().state !== 'running') void Tone.start().catch(() => {}); }
 
+/** A piece's own chunk, fetched and registered once: just before it plays, or during the previous piece's fade. */
+function fetchPiece(id: string, why: string) {
+  let p = pieceReady.get(id);
+  if (!p) {
+    note({ ev: 'load', piece: id, reason: why });
+    p = loadPiece!(id).then((m) => { m.default(Sim!, Tone); note({ ev: 'loaded', piece: id }); });
+    p.catch(() => pieceReady.delete(id));   // a failed fetch is tried again the next time round
+    pieceReady.set(id, p);
+  }
+  return p;
+}
+
 function start(i: number, reason: string) {
   if (!Sim || !conductor || !order.length) return;
   const my = ++gen; index = ((i % order.length) + order.length) % order.length;
-  const id = order[index], piece = Sim.pieces.find((p) => p.id === id);
-  if (!piece) { note({ ev: 'error', piece: id, reason: 'missing piece' }); index++; return; }
+  const id = order[index];
   starting = true; fading = false;
-  Tone!.getDestination().volume.value = musicDb(volume);
-  conductor.play(piece, { seed: (Math.random() * 2 ** 31) >>> 0 }).then(() => {
-    if (my !== gen) return;   // stopped or superseded while it was building its instruments
-    starting = false; playing = id; endsAt = performance.now() + trackS * 1000; note({ ev: 'start', piece: id, reason });
-  }, (e) => { if (my !== gen) return; starting = false; note({ ev: 'error', piece: id, reason: String(e).slice(0, 200) }); gapUntil = performance.now() + 5000; index++; });
+  fetchPiece(id, 'play').then(() => {
+    if (my !== gen) return;   // stopped or superseded while its chunk loaded
+    const piece = Sim!.pieces.find((p) => p.id === id);
+    if (!piece) throw Error('missing piece');
+    Tone!.getDestination().volume.value = musicDb(volume);
+    return conductor!.play(piece, { seed: (Math.random() * 2 ** 31) >>> 0 }).then(() => {
+      if (my !== gen) return;   // stopped or superseded while it was building its instruments
+      starting = false; playing = id; endsAt = performance.now() + trackS * 1000; note({ ev: 'start', piece: id, reason });
+    });
+  }).catch((e) => { if (my !== gen) return; starting = false; note({ ev: 'error', piece: id, reason: String(e).slice(0, 200) }); gapUntil = performance.now() + 5000; index++; });
 }
 function stop(reason: string) {
   gen++;
@@ -74,7 +93,10 @@ export function syncMusic(o: { on: boolean; volume: number; unlocked: boolean })
   const now = performance.now();
   if (Tone!.getContext().state !== 'running') { if (now >= resumeAt) { resumeAt = now + 2000; void Tone!.start().catch(() => {}); } if (!playing) return; }
   if (!playing && !starting) { if (now >= gapUntil) start(index < 0 ? Math.floor(Math.random() * order.length) : index, index < 0 ? 'first' : 'resume'); return; }
-  if (playing && !fading && now >= endsAt - FADE_S * 1000) { fading = true; try { conductor?.out?.gain.rampTo(0, FADE_S); } catch { /* gone */ } note({ ev: 'fade', piece: playing }); }
+  if (playing && !fading && now >= endsAt - FADE_S * 1000) {
+    fading = true; try { conductor?.out?.gain.rampTo(0, FADE_S); } catch { /* gone */ } note({ ev: 'fade', piece: playing });
+    fetchPiece(order[(index + 1) % order.length], 'prefetch').catch(() => {});   // start() reports a failure
+  }
   if (playing && now >= endsAt) { stop('end'); gapUntil = now + GAP_S * 1000; index++; }
 }
 
@@ -82,7 +104,7 @@ export function syncMusic(o: { on: boolean; volume: number; unlocked: boolean })
 export function nextPiece() { if (!Sim) return; stop('next'); index++; gapUntil = 0; }
 
 export function musicState() {
-  return { want, loaded: !!Sim, loading, failed, playing, starting, index, piece: order[index] ?? null, playlist: order.slice(),
+  return { want, loaded: !!Sim, loading, failed, fetched: [...pieceReady.keys()], playing, starting, index, piece: order[index] ?? null, playlist: order.slice(),
     endsInS: playing ? Math.max(0, Math.round((endsAt - performance.now()) / 1000)) : null, toneCtx: Tone?.getContext().state ?? 'none', db: +musicDb(volume).toFixed(1) };
 }
 export const musicLog = () => events.slice();
