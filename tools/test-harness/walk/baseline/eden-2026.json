@@ -3,7 +3,7 @@
   "name": "eden-2026",
   "worldId": "eden-2026-1",
   "auditVersion": 1,
-  "totals": {"dests":7561,"bad":13,"disconnected":13,"oneWay":0,"noRoom":0,"goalless":8,"roots":1453,"floats":87},
+  "totals": {"dests":7561,"bad":12,"disconnected":12,"oneWay":0,"noRoom":0,"goalless":8,"roots":1453,"floats":87},
   "places": {
     "botanic-koi-1": {"float":1},
     "botanic-koi-2": {"float":1},
@@ -63,7 +63,6 @@
     "land-canal-canoe-north": {"float":1},
     "land-harbour-sailboat": {"float":1},
     "land-northeast-ridge": {"bad":1},
-    "land-northeast-slope-pines": {"bad":1},
     "land-northwest-slope-pines": {"goalless":1},
     "land-west-lake-rowboat": {"float":1},
     "land-western-hills": {"bad":1},
@@ -118,7 +117,6 @@
     ["nav.disconnected","walk:hillside-home-12/landing-lamp","hillside-home-12"],
     ["nav.disconnected","walk:land-alpine-backdrop","land-alpine-backdrop"],
     ["nav.disconnected","walk:land-northeast-ridge","land-northeast-ridge"],
-    ["nav.disconnected","walk:land-northeast-slope-pines","land-northeast-slope-pines"],
     ["nav.disconnected","walk:land-western-hills","land-western-hills"]
   ],
   "goalless": [
