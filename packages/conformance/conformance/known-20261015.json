@@ -1240,22 +1240,22 @@
       "reason": "GPU/async asset rendering requires lead browser qualification"
     },
     {
-      "def": "core-mars-bus-seat-2@2",
+      "def": "core-mars-bus-seat-2@3",
       "kind": "mesh",
       "reason": "GPU/async asset rendering requires lead browser qualification"
     },
     {
-      "def": "core-mars-bus-seat-3@2",
+      "def": "core-mars-bus-seat-3@3",
       "kind": "mesh",
       "reason": "GPU/async asset rendering requires lead browser qualification"
     },
     {
-      "def": "core-mars-bus-seat-4@2",
+      "def": "core-mars-bus-seat-4@3",
       "kind": "mesh",
       "reason": "GPU/async asset rendering requires lead browser qualification"
     },
     {
-      "def": "core-mars-bus-seat@2",
+      "def": "core-mars-bus-seat@3",
       "kind": "mesh",
       "reason": "GPU/async asset rendering requires lead browser qualification"
     },
@@ -1555,7 +1555,7 @@
       "reason": "GPU/async asset rendering requires lead browser qualification"
     },
     {
-      "def": "core-mars-papasan@2",
+      "def": "core-mars-papasan@3",
       "kind": "mesh",
       "reason": "GPU/async asset rendering requires lead browser qualification"
     },
