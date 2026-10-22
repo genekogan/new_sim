@@ -3,7 +3,7 @@
 // Build web first; node tools/test-harness/eyes-cpu.mjs <outDir>. Fresh fake world; no credentials or paid models.
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
-import {mkdirSync, writeFileSync, openSync} from 'node:fs';
+import {mkdirSync, writeFileSync, openSync, readdirSync, readFileSync} from 'node:fs';
 import {resolve, dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {EyesWorker} from '../../apps/server/src/edge/eyes/worker.ts';
@@ -18,6 +18,16 @@ const server=spawn(process.execPath,['apps/server/src/main.ts'],{cwd:root,stdio:
   WORLD_KEY:'eyes-cpu',WORLD_ID:'eyes-cpu-1',WORLD_PATH:'/w/eyes-cpu',ENABLE_WORLD_ENGINE:'1',ENGINE:'mars',PORT:String(port),HOST:'127.0.0.1',PUBLIC_URL:origin,
   DEV_AUTH:'1',AUTH_PROVIDER:'none',BRAIN_MODE:'fake',BRAIN_BUDGET_USD_PER_DAY:'0',MIND_DRIVER:'edge',INVITE_REQUIRED:'0',SOUL_LIFECYCLE:'1',SEED_NATIVES:'0',
   DATA_DIR:join(out,'data'),MARS_WEB_DIR:join(out,'empty-assets'),WEB_DIR:join(root,'apps/web/dist'),GENESIS_FILE:join(root,'worlds/templates/hello-hamlet.json'),EDGE_EYES:'off'}});
+// every process under this one except the world server's subtree = the Eyes worker and its Chromium
+function procs(){const all=new Map();for(const d of readdirSync('/proc')){if(!/^\d+$/.test(d))continue;try{const st=readFileSync(`/proc/${d}/stat`,'utf8'),f=st.slice(st.lastIndexOf(')')+2).split(' ');
+  all.set(Number(d),{ppid:Number(f[1]),ticks:Number(f[11])+Number(f[12]),nice:Number(f[16]),comm:st.slice(st.indexOf('(')+1,st.lastIndexOf(')'))});}catch{}}return all;}
+function under(all,root,skip){const out=[];for(const [pid] of all){let p=pid,ok=false;while(p&&all.has(p)){if(p===skip)break;if(all.get(p).ppid===root){ok=p!==skip;break;}p=all.get(p).ppid;}if(ok)out.push(pid);}return out;}
+async function idleCpu(ms,serverPid){const hz=100,a=procs(),pids=under(a,process.pid,serverPid),t0=performance.now();
+  const sum=(m,ids)=>ids.reduce((n,id)=>n+(m.get(id)?.ticks??0),0),s0=sum(a,pids),w0=sum(a,under(a,process.pid,-1).filter(p=>!pids.includes(p)));
+  await sleep(ms);const b=procs(),secs=(performance.now()-t0)/1000;
+  return {seconds:Math.round(secs),workerProcesses:pids.length,workerCpuPercentOfOneCore:+((sum(b,pids)-s0)/hz/secs*100).toFixed(2),
+    worldServerCpuPercentOfOneCore:+((sum(b,under(b,process.pid,-1).filter(p=>!pids.includes(p)))-w0)/hz/secs*100).toFixed(2),
+    nice:[...new Set(pids.map(p=>a.get(p)?.nice))],names:[...new Set(pids.map(p=>a.get(p)?.comm))].slice(0,8),barPercent:2};}
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function until(fn,ms=180000){const end=Date.now()+ms;while(Date.now()<end){try{const result=await fn();if(result)return result;}catch{}await sleep(250);}throw new Error('CPU benchmark timed out');}
 let worker;
@@ -40,6 +50,8 @@ try {
     const sorted=[...samples].sort((a,b)=>a-b),p50=sorted[4],p95=sorted[7];
     report.samples.push({mode,w,h,n:samples.length,ms:samples,p50,p95,estimatedFramesPerMinuteAtP95:Math.floor(60000/p95),withinWorldBudget:p95*12<60000});
   }
+  // lane soul-eyes-on: the worker's idle CPU (bar <= 2% of one core over 60 s) and its nice level, from /proc
+  report.idle=await idleCpu(60_000,server.pid);
   report.status=worker.status();assert.ok(report.samples.every(s=>s.withinWorldBudget),'fixture must sustain the 12/minute budget');
   report.ok=true;
 }catch(error){report.ok=false;report.error=String(error.stack||error);process.exitCode=1;}
