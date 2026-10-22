@@ -135,10 +135,15 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
     if (s.seat || s.level) return s.at;   // a seat fixture is approached by the engine's own sit; upstairs ground is not ours to probe
     if (!standAt.has(s.id)) {
       let at: V2 | null = s.at;
-      // only a spot inside an obstacle (no clearance at all) moves; seats and benches close to furniture are as World placed them
-      if (!(s.activity in GAME_ACTIVITIES) && w.clearance(s.at[0], s.at[1]) < 0.05 && w.clearance(w.me[0], w.me[1]) > 0) {
+      // a standing spot with less than standing room (inside an obstacle, or wedged between a table and the wall: the walk's goal then has
+      // no room within its 0.35 m snap, route.goal-blocked) steps straight back to clear ground; seats are as World placed them.
+      // SPOTS 2026-10-23: was `< 0.05` only, and skipped when the Soul itself stood on 0-clearance ground (an easel in a corner)
+      const here = s.activity in GAME_ACTIVITIES ? 1 : w.clearance(s.at[0], s.at[1]);
+      if (here < (s.base === 'idle' ? STAND_CLEAR : 0.05)) {   // lying or sitting on furniture (a gym bench): only from inside an obstacle
         const f = s.faceTo ?? s.at, L = Math.hypot(s.at[0] - f[0], s.at[1] - f[1]), back: V2 = L > 1e-6 ? [(s.at[0] - f[0]) / L, (s.at[1] - f[1]) / L] : [0, 0];
-        at = null; for (let t = 0.1; t <= 0.9 + 1e-9 && L > 1e-6; t += 0.1) {const p: V2 = [Math.round((s.at[0] + back[0] * t) * 100) / 100, Math.round((s.at[1] + back[1] * t) * 100) / 100]; if (w.clearance(p[0], p[1]) >= STAND_CLEAR) {at = p; break;}}
+        at = null; let seen = here > 0 || w.clearance(w.me[0], w.me[1]) > 0;
+        for (let t = 0.1; t <= 0.9 + 1e-9 && L > 1e-6; t += 0.1) {const p: V2 = [Math.round((s.at[0] + back[0] * t) * 100) / 100, Math.round((s.at[1] + back[1] * t) * 100) / 100], c = w.clearance(p[0], p[1]); if (c > 0) seen = true; if (c >= STAND_CLEAR) {at = p; break;}}
+        if (!at && (here >= 0.05 || !seen)) at = s.at;   // nothing clearer behind it: as before (ground with room enough, or no ground data)
       }
       standAt.set(s.id, at);
     }

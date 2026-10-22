@@ -143,3 +143,19 @@ test('upper-floors/1: a level-0 spot inside a building (a hotel lobby sofa) is w
   assert.deepEqual(reach(18), {verb: 'mars:walk_to', params: {x: 10, z: 10, level: 0}}, 'from the first floor: down the stairs, not across the floor above');
   assert.deepEqual(reach(0), {verb: 'walk_to', params: {to: [10, 10]}}, 'from the ground: unchanged');
 });
+
+test('SPOTS: a stand spot wedged against furniture walks to clear ground behind it; one with none near is not offered, wherever the Soul stands', () => {
+  const spots = [{id: 'easel-a', place: 'studio', activity: 'paint', base: 'idle', at: [0, 0], faceTo: [0, -1], label: 'Easel A'},
+    {id: 'easel-b', place: 'studio', activity: 'paint', base: 'idle', at: [20, 0], faceTo: [20, -1], label: 'Easel B'}];
+  const data = loadSpots({contract: 'activity-spots/1', spots}).data;
+  // easel A: 0.15 m of room at the spot (a table edge; no standing room within the walk's 0.35 m goal snap), open floor from 0.4 m back
+  // easel B: in a corner, 0 at the spot and at most 0.15 m anywhere behind it
+  const clearance = (x: number, z: number) => x < 10 ? (z >= 0.4 - 1e-9 ? 0.5 : 0.15) : (Math.abs(z - 0.4) < 0.25 ? 0.15 : 0);
+  const w = (me: [number, number]) => ({me, seated: false, clearance, open: () => null, taken: () => false, enterable: () => true, seat: () => null,
+    placeName: () => null, ancestors: () => [], groupSize: () => 0, clock: null});
+  for (const me of [[5, 3], [20.5, 0]] as [number, number][]) {
+    const {plans} = activityCapabilities(data, w(me));
+    assert.deepEqual(plans.get('paint:easel-a')?.steps.find(s => /walk_to/.test(s.verb)), {verb: 'walk_to', params: {to: [0, 0.4]}}, `easel A from ${me}: from clear ground`);
+    assert.equal(plans.has('paint:easel-b'), false, `easel B from ${me}: not offered (route.goal-blocked)`);
+  }
+});
