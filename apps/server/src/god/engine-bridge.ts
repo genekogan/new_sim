@@ -87,7 +87,7 @@ const FLOOR_NEAR = 0.6;        // levelAt: a level counts at a point within this
  *  circle touches), so a point checks only the floors near it, not every floor of the level (GODLIST: levelAt per thing
  *  in the activity-spots derive). Same answer as a scan of all floors: a candidate set that contains every match. */
 const FLOOR_CELL = 8;
-class FloorCells {
+export class FloorCells {
   private cells = new Map<string, { id: string; obb: OBB2 }[]>();
   private always: { id: string; obb: OBB2 }[] = [];
   add(id: string, obb: OBB2) {
