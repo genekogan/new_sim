@@ -160,6 +160,6 @@ test('actual Hub: columns/1 peers get the join snapshot table in the column form
    if(m.t==='takes')takes.push(JSON.stringify(m));}
   out.push({snap,raw:size,takes});
  }
- for(let i=1;i<offers.length;i++){assert.equal(out[i].snap,out[0].snap,'decoded snapshot '+i);if(offers[i].takeEntities)assert.deepEqual(out[i].takes,out[0].takes,'decoded takes '+i);}
+ for(let i=1;i<offers.length;i++){assert.equal(out[i].snap,out[0].snap,'decoded snapshot '+i);if((offers[i] as {takeEntities?:string}).takeEntities)assert.deepEqual(out[i].takes,out[0].takes,'decoded takes '+i);}
  assert.ok(out[1].raw<out[0].raw,`the column form is smaller (${out[1].raw} vs ${out[0].raw})`);
 });
