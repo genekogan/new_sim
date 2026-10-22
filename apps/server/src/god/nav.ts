@@ -330,7 +330,9 @@ export class GodNav {
       const myLevel = (except ? E.world.entities[except]?.human?.level : undefined) ?? 0;
       if (goal && goal.level > 0 && goal.level !== myLevel && E.reachV1) {
         const ground = near(t.at, 0, 40);
-        const ok = !!ground && E.reachV1({ p: ground.p, level: 0 }, goal).ok && (myLevel !== 0 || E.reachV1({ p: me, level: 0 }, { p: ground.p, level: 0 }).ok);
+        // where I stand, snapped to standing room (the walk audit asks from the thing's own point, inside a wall or a bed)
+        const from = myLevel === 0 ? near(me, 0, 4) : null;
+        const ok = !!ground && E.reachV1({ p: ground.p, level: 0 }, goal).ok && (myLevel !== 0 || !from || E.reachV1({ p: from.p, level: 0 }, { p: ground.p, level: 0 }).ok);
         if (!ok) { goal = null; this.blocked.set(t.ref, `No walkable route reaches ${t.ref} from here: no stair or way in leads up to it.`); }
       }
     }
