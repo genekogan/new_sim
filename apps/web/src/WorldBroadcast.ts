@@ -145,7 +145,8 @@ export class WorldBroadcast {
       const hints = this.hints?.(), speaking = new Map<string, { thread: string; at: number }>();
       if (hints) for (const [soulId, sp] of speakingNow) { const id = hints.soulEntity(soulId); if (id && frame[id]) speaking.set(id, { thread: sp.thread, at: sp.since / 1000 }); }
       const before = this.choice?.key;
-      this.choice = this.picker.choose({ bodies: people.map(id => ({ id, p: frame[id].p, activity: frame[id].activity })), speaking, now: wallSeconds, landmarks: this.viewsOf(hints)?.landmarks ?? [] });
+      const carriers = hints?.carriers ?? [];
+      this.choice = this.picker.choose({ bodies: people.map(id => ({ id, p: frame[id].p, activity: frame[id].activity, riding: records[id]?.body?.family !== 'floater' && !!ridingCarrier(frame[id].p, carriers) })), speaking, now: wallSeconds, landmarks: this.viewsOf(hints)?.landmarks ?? [] });
       if (this.choice?.key !== before) { this.emptySince = null; if (this.choice?.kind === 'landmark' || before?.startsWith('landmark:')) this.director.reset('live-world'); }
     }
     const choice = this.choice;
