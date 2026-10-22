@@ -67,7 +67,7 @@ test('GODLIST: activity spots derived in a tick after a caught-up god edit equal
     ['a bench placed', [{ op: 'place', def: coreRef('bench'), name: 'bench', p: [2, -4] }]],
     ['a second bench by the fire', [{ op: 'place', def: coreRef('bench'), name: 'bench-2', p: [-6, 2.5] }]],
   ] as const) {
-    const n = S.stats.derives;
+    const n: number = S.stats.derives;
     act(ops as unknown as unknown[]);
     await caughtUp();
     assert.equal(S.stats.derives, n + 1, `${label}: derived once in a tick, before any read`);
