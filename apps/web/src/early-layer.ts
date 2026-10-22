@@ -15,6 +15,8 @@ let early: EarlyLayer | null = null, claimed = false;
 /** The early layer's gate: lever D's (phone tier, new world, not a picture), unless `?earlyLayer=0`. */
 export function earlyLayerWanted(search = location.search): boolean {
   const q = new URLSearchParams(search);
+  // lane PAIR-UI: an #approve link may be handed to an open tab of this world (Shell.tsx); never draw a world before that
+  if (/^#approve\//.test(globalThis.location?.hash ?? '')) return false;
   return q.get('earlyLayer') !== '0' && earlyArrivalWanted(browserQuality().tier, newWorld, search, q.has('shot'));
 }
 

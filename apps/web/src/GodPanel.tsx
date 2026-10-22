@@ -51,6 +51,9 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
   const joinHash = landingHash === '#join';
   // #approve/<id> (the link the Soul CLI prints for its human): the approval card, a modal on top of everything (lane HF)
   const [approvalId, setApprovalId] = useState(() => (approvalClosed ? null : approvalFromHash(landingHash)));
+  // lane PAIR-UI (Gene's review #1 item 3; PAIR-INWINDOW's draft): an #approve link opened in another tab of this world
+  // hands its request here (Shell.tsx sets #approve/<id>); the card opens over this world, no second world starts
+  useEffect(() => { const changed = () => { const id = approvalFromHash(location.hash); if (id) { approvalClosed = false; setApprovalId(id); } }; addEventListener('hashchange', changed); return () => removeEventListener('hashchange', changed); }, []);
   // #worldoffer/<code>, #cobuildpair/<code> (the launcher's co-builder and handoff links): that card first
   const [offerLink, setOfferLink] = useState(() => offerFromHash(landingHash));
   const [open, setOpen] = useState<boolean>(() => joinHash || !!approvalId || (PHONE() ? localStorage.getItem(openKey()) === '1' : localStorage.getItem(openKey()) !== '0'));
