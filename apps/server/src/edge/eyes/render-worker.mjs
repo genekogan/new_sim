@@ -8,7 +8,8 @@
 // PLAYWRIGHT_BROWSERS_PATH, EDGE_EYES_RELOAD_HOURS (default 6), EDGE_EYES_HEADLESS_SHELL=1 (old headless shell).
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
-import {eyesBrowserLaunch, eyesBrowserModes} from './browser-config.mjs';
+import {setPriority} from 'node:os';
+import {EYES_UA_TAG, eyesBrowserLaunch, eyesBrowserModes, eyesNice} from './browser-config.mjs';
 
 const viewer = process.env.EDGE_EYES_URL;
 const from = process.env.EDGE_EYES_PLAYWRIGHT || fileURLToPath(new URL('../../../../../mars/viewer/package.json', import.meta.url));
@@ -17,6 +18,8 @@ const log = (...a) => console.error(new Date().toISOString(), ...a);
 if (!viewer || !process.send) {log('eyes worker needs EDGE_EYES_URL and an IPC parent'); process.exit(2);}
 const {chromium} = createRequire(from)('@playwright/test');
 
+// below the world's own priority (the browser processes inherit it): renders never delay a tick
+try {setPriority(0, eyesNice());} catch (e) {log('could not lower priority:', e.message);}
 const order = eyesBrowserModes();
 let browser = null, page = null, renderer = null, ready = false, closing = false, loadedAt = 0, busy = false;
 const queue = [];
@@ -25,7 +28,8 @@ async function launch() {
   for (const mode of order) {
     try {
       const b = await chromium.launch(eyesBrowserLaunch(mode));
-      const p = await b.newPage({viewport: {width: 512, height: 320}, deviceScaleFactor: 1});
+      const probe = await b.newPage(), ua = await probe.evaluate(() => navigator.userAgent); await probe.close();
+      const p = await b.newPage({viewport: {width: 512, height: 320}, deviceScaleFactor: 1, userAgent: `${ua} ${EYES_UA_TAG}`});
       const gl = await p.evaluate(() => {const c = document.createElement('canvas').getContext('webgl2'); if (!c) return null; const x = c.getExtension('WEBGL_debug_renderer_info'); return x ? c.getParameter(x.UNMASKED_RENDERER_WEBGL) : c.getParameter(c.RENDERER);});
       if (!gl) {await b.close(); log('no WebGL with', mode); continue;}
       if (mode === 'metal' && /swiftshader|llvmpipe|software/i.test(gl)) {await b.close(); log('Metal hardware required, got', gl); continue;}

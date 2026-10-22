@@ -1,3 +1,10 @@
+// The worker's browser says who it is in its user agent, so the world (attention.ts) and the launcher's proxy do not
+// count its long-lived viewer socket as somebody watching: a world with Eyes on still slows down and sleeps unwatched.
+// Spoofing it only makes the spoofer's own visit count as passive (pace/sleep), nothing else.
+export const EYES_UA_TAG = 'EdenEyes/1';
+export const isEyesAgent = ua => typeof ua === 'string' && ua.includes(EYES_UA_TAG);
+/** Niceness of the worker and its browser (EDGE_EYES_NICE, 0..19, default 10): world ticks always win the CPU. */
+export function eyesNice(env = process.env) {const n = Number(env.EDGE_EYES_NICE ?? 10); return Number.isInteger(n) && n >= 0 && n <= 19 ? n : 10;}
 // Separate pure launch policy so CPU portability and the laptop's hardware-only boundary are testable without Chrome.
 export function eyesWorkerProblem(platform = process.platform) {
   return platform === 'darwin' ? 'persistent Eyes service is disabled on the shared Mac; qualify captures on a remote CPU host' : null;
