@@ -205,9 +205,12 @@ export class GodActivitySpots {
       const at = this.standAt(t, t.slots.find(s => s.kind === 'stand')?.id); if (!at) continue;
       const place = this.place(at, t.level), id = `lecture.${t.id}`.toLowerCase(), face: V2 = this.world(t, [0, t.size[2] / 2 + 6]);
       add({ id, activity: 'lecture', base: 'idle', at, faceTo: is(t, 'podium', 'lectern') ? this.world(t, [0, 6]) : face, label: this.label(t, place), ...(place ? { place } : {}), ...(t.level ? { level: t.level } : {}) });
+      // no seats through walls: a podium in a building room seats only that room; one in the open seats only the open
+      // (a place id with a dot is a room of a building, e.g. g-cliff-house-15.kitchen; 2026-10-22 chapel lectern found 11 there)
+      const sameSide = (p?: string, q?: string) => p === q || (!p?.includes('.') && !q?.includes('.'));
       const room = place && /classroom|lecture|school|hall/i.test(`${place} ${this.h.placeName(place) ?? ''}`) ? place : undefined;
       const fp = this.world(t, [0, 1]), fwd: V2 = [fp[0] - t.at[0], fp[1] - t.at[1]];
-      const audience = seats.filter(s => s.level === t.level && (room ? this.place(s.at, s.level) === room : d2(s.at, t.at) <= AUDIENCE_RADIUS && ((s.at[0] - t.at[0]) * fwd[0] + (s.at[1] - t.at[1]) * fwd[1]) > 1))
+      const audience = seats.filter(s => s.level === t.level && (room ? this.place(s.at, s.level) === room : sameSide(this.place(s.at, s.level), place) && d2(s.at, t.at) <= AUDIENCE_RADIUS && ((s.at[0] - t.at[0]) * fwd[0] + (s.at[1] - t.at[1]) * fwd[1]) > 1))
         .sort((a, b) => d2(a.at, t.at) - d2(b.at, t.at) || (a.id < b.id ? -1 : 1)).slice(0, 12);
       for (const s of audience) seatSpot(s, 'attend', [r2(at[0]), r2(at[1])], { requires: id, label: `a seat at ${this.label(t, place)}` });
     }
