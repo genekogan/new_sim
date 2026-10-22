@@ -25,6 +25,11 @@ type Engine = {
   reachV1?(from: { p: Vec2; level?: number }, to: { p: Vec2; level?: number }): { ok: boolean };
   /** The navigation epoch: moves exactly when the static world the planner sees does (spatial navChanged). */
   navEpochV1?(): number;
+  /** Nav labels: label up to `budgetMs` more, true when complete; then whether points are on the main walkable ground and
+   *  the nearest open spot of it to a point. */
+  navWarmV1?(budgetMs: number): boolean;
+  navCheckV1?(points: { id: string; p: Vec2; level?: number }[]): { ok: boolean }[];
+  navNearestMainV1?(p: Vec2, except?: string, maxR?: number): Vec2 | null;
 };
 export type NavHost = {
   model: WorldModel;
@@ -293,6 +298,15 @@ export class GodNav {
     const key = `${t.ref}|${mine ? `${Math.round(me[0])},${Math.round(me[1])}` : ''}`;
     const hit = this.goals.get(key); if (hit && tick - hit.tick < 50) return hit.goal;
     const near = (at: Vec2, level: number, ring = 24) => { const p = E.standableNearV1(at, level, except, 0.4, ring); return p ? { p: [r2(p[0]), r2(p[1])] as Vec2, level } : null; };
+    // WALK3: a ground goal off the main walkable ground (a fenced court, a dense wood, a mountain band, a hill) moves to the
+    // nearest open spot of the main ground within r of it, else of `alt`; only once the engine's labels are ready (a
+    // listing never waits for them)
+    const toMain = (g: { p: Vec2; level: number } | null, r: number, ...alts: Vec2[]) => {
+      if (!g || g.level || !E.navCheckV1 || !E.navNearestMainV1 || !E.navWarmV1?.(0) || E.navCheckV1([{ id: t.ref, p: g.p, level: 0 }])[0]?.ok) return g;
+      let q = E.navNearestMainV1(g.p, except, r);
+      for (const a of alts) q ??= E.navNearestMainV1(a, except, r);
+      return q ? { p: [r2(q[0]), r2(q[1])] as Vec2, level: 0 } : g;
+    };
     let goal: { p: Vec2; level: number } | null = null;
     if (t.kind === 'water') {
       // the nearest shore to me, a little outside the water's edge
@@ -304,9 +318,14 @@ export class GodNav {
     } else if (t.deck?.length) {
       for (const d of t.deck) { goal = near(d, t.level, 6); if (goal) break; }
     } else if (t.kind === 'path') {
-      goal = near(nearestOn(t.path!, me, false).q, 0, 16);
+      goal = toMain(near(nearestOn(t.path!, me, false).q, 0, 16), 40);
     } else if (t.kind === 'area') {
-      goal = inPoly(me[0], me[1], t.area!) ? near(me, 0, 8) : near(t.at, 0, 40);
+      // WALK3: standing room near me when I am inside it; a pond, a tree or a wheel at that spot widens the search, and an
+      // area whose middle has none (a lake with its shore, a dense forest) is reached at its edge
+      goal = inPoly(me[0], me[1], t.area!) ? (near(me, 0, 8) ?? near(me, 0, 40)) : near(t.at, 0, 40);
+      goal ??= near(nearestOn(t.area!, me, true).q, 0, 16);
+      // its edge spot can be a pocket (a slope wood) while open main ground lies nearer its middle: try both
+      goal = toMain(goal, 80, nearestOn(t.area!, me, true).q, t.at);
     } else if (t.kind === 'room') {
       // the room's reachable standing point, moved aside when another body already stands on it (two Souls told to go
       // into the tea room do not queue for one spot)
@@ -324,6 +343,15 @@ export class GodNav {
       const stands = [...(t.stands ?? [])].sort((a, b) => Math.hypot(a[0] - me[0], a[1] - me[1]) - Math.hypot(b[0] - me[0], b[1] - me[1]));
       for (const s of stands) { goal = near(s, t.level, 6); if (goal) break; }
       goal ??= near(t.at, t.level, 40);
+      // a thing with no approach of its own: the main ground nearest it when the spot beside it is a pocket (a lamp behind
+      // a fence, a shelf with a gap behind it), and a big structure from the main ground near it
+      if (!t.stands?.length) goal = toMain(goal, t.big ? 80 : 3);
+      // WALK3: a duck on the lake, a boat in the harbour: the shore of the water it floats on, nearest to it
+      if (!goal && !t.level) for (const w of this.things()) {
+        if (w.kind !== 'water' || !w.area || !inPoly(t.at[0], t.at[1], w.area)) continue;
+        const edge = nearestOn(w.area, t.at, true), c = centroid(w.area), dx = edge.q[0] - c[0], dz = edge.q[1] - c[1], n = Math.hypot(dx, dz) || 1;
+        goal = near([edge.q[0] + (dx / n) * 1.5, edge.q[1] + (dz / n) * 1.5], 0, 16); if (goal) break;
+      }
       // RESOLVE2: a thing on a raised floor (a roof bench, an upstairs lamp) must be reached from the ground: no stair to
       // it -> no goal (offered as unavailable), not a walk that 'completes' on the ground below it
       // (and that ground from where I stand: the watermill's door opens onto its river, so its stair is reached from nowhere)
