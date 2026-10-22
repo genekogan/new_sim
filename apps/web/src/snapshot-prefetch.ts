@@ -50,7 +50,7 @@ export function entryPrefetchScript(base: string, oldKeys: readonly string[] = O
     + `if(${JSON.stringify(oldKeys)}.indexOf(k)>=0||typeof fetch!=='function')return;`
     + `var w=b+'/w/'+k,g=function(n,u){var p=fetch(u);p.catch(function(){});window[n]={url:u,response:p};};`
     // W3: the wire form (snapshot-wire.ts); its defs/ground part fetches start as soon as the response headers name them
-    + `var x=window.__simSnapshotKey,n=w+'/v1/world/snapshot?defs=ref';g(${JSON.stringify(PREFETCH_GLOBAL)},typeof x==='string'&&x?n+'&v='+encodeURIComponent(x):n);g(${JSON.stringify(CONFIG_GLOBAL)},w+'/v1/config');`
+    + `var x=window.__simSnapshotKey,n=w+'/v1/world/snapshot?defs=ref&cols=1';g(${JSON.stringify(PREFETCH_GLOBAL)},typeof x==='string'&&x?n+'&v='+encodeURIComponent(x):n);g(${JSON.stringify(CONFIG_GLOBAL)},w+'/v1/config');`
     // P7: the parts the HTML names (window.__simSnapshotParts) leave at once; any other the snapshot's headers name, then
     + `var sp=window[${JSON.stringify(PREFETCH_GLOBAL)}],pp=sp.parts={},pf=function(f){if(typeof f==='string'&&/^[0-9a-f]{32}$/.test(f)&&!pp[f]){pp[f]=fetch(w+'/v1/world/part/'+f);pp[f].catch(function(){});}},hp=window.__simSnapshotParts;if(hp&&hp.forEach)hp.forEach(pf);`
     + `sp.response.then(function(r){['x-defs-ref','x-ground-ref'].forEach(function(h){pf(r.headers.get(h));});},function(){});`
@@ -71,7 +71,7 @@ export function entryPrefetchScript(base: string, oldKeys: readonly string[] = O
  *  the plain no-store URL. */
 export function entryWireUrl(plain: string): string {
   const x = typeof window === 'undefined' ? undefined : (window as unknown as { __simSnapshotKey?: unknown }).__simSnapshotKey;
-  return `${plain}?defs=ref` + (typeof x === 'string' && x ? `&v=${encodeURIComponent(x)}` : '');
+  return `${plain}?defs=ref&cols=1` + (typeof x === 'string' && x ? `&v=${encodeURIComponent(x)}` : '');
 }
 export function entrySnapshotUrl(plain: string): string {
   const x = typeof window === 'undefined' ? undefined : (window as unknown as { __simSnapshotKey?: unknown }).__simSnapshotKey;
