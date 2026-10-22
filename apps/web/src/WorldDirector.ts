@@ -186,7 +186,8 @@ export class WorldDirector {
   choose(input: DirectorInput): DirectorChoice | null {
     const now = input.now;
     // The opening starts when the town views are available (the Eden scenery may arrive a moment after people).
-    if (input.landmarks.length) this.started ??= now;
+    // A placeholder framing before the scenery loads does not count against cut discipline: the opening is the real first cut.
+    if (input.landmarks.length && this.started === null) { this.started = now; this.lastCut = -Infinity; }
     for (const [k, until] of this.banned) if (until <= now) this.banned.delete(k);
     for (const [k, until] of this.cooling) if (until <= now) this.cooling.delete(k);
     const all = candidates({ ...input, arrivals: input.arrivals ?? this.arrivals(input) }).filter(c => !this.banned.has(c.key));
