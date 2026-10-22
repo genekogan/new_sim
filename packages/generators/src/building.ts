@@ -297,6 +297,6 @@ export const stairsGen: Generator = {
   params: { rise: { type: 'number', min: 0.3, max: 12, default: 2.8 }, run: { type: 'number', min: 0.5, max: 20, default: 4 }, width: { type: 'number', min: 0.6, max: 6, default: 1.1 }, material: { type: 'enum', values: ['wood', 'stone', 'metal'], default: 'wood' }, rail: { type: 'bool', default: true } },
   physics({ params }) {
     const rise = n(params.rise, 2.8), run = n(params.run, 4), width = n(params.width, 1.1);
-    return { box: [width, rise, run], colliders: [{ c: [0, 0], half: [width / 2, run / 2], yaw: 0, y0: 0, y1: Math.min(rise, 0.3) }], links: [{ id: 'flight', kind: 'stairs', from: 0, to: 1, path: [[0, run / 2], [0, -run / 2]], width, y0: 0, y1: rise }], surfaces: [{ level: 1, y: rise, polygon: rectPoly(-width / 2, -run / 2 - 0.5, width / 2, -run / 2), tag: 'landing' }], slots: [], tris: 24 * Math.ceil(rise / 0.18) };
+    return { box: [width, rise, run], colliders: [{ c: [0, 0], half: [width / 2, run / 2], yaw: 0, y0: 0, y1: Math.min(rise, 0.3) }], links: [{ id: 'flight', kind: 'stairs', from: 0, to: 1, path: [[0, run / 2], [0, -run / 2]], width, y0: 0, y1: rise }], surfaces: [{ level: 1, y: rise, polygon: rectPoly(-width / 2, -run / 2 - 0.5, width / 2, -run / 2), tag: 'landing' }], slots: [], tris: 8 * Math.ceil(rise / 0.18) + 100 };
   },
 };

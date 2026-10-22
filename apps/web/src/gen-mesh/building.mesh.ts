@@ -627,7 +627,17 @@ registerMesh({
   build(ctx) {
     const b = new Builder(), rise = Number(ctx.params.rise ?? 2.8), run = Number(ctx.params.run ?? 4), width = Number(ctx.params.width ?? 1.1);
     const n = Math.max(2, Math.round(rise / 0.18)), going = run / n, stone = ctx.params.material === 'stone', wood = stone ? '#b9b3a6' : ctx.params.material === 'metal' ? '#8c9196' : '#9a6b43';
-    for (let i = 0; i < n; i++) b.rbox(0, 0, run / 2 - going * (i + 0.5), width, (rise / n) * (i + 1), going + 0.02, wood, 'floor');
+    // One solid flight drawn as faces only (riser, tread and the two side faces per step, the back face once; the
+    // underside sits on the ground): 8 tris a step, so a 12 m flight stays well inside the access budget.
+    const hw = width / 2, top = -run / 2;
+    for (let i = 0; i < n; i++) {
+      const zf = run / 2 - going * i, zb = run / 2 - going * (i + 1), y0 = (rise / n) * i, y1 = (rise / n) * (i + 1);
+      b.face([-hw, y0, zf], [hw, y0, zf], [hw, y1, zf], [-hw, y1, zf], wood, 'floor');
+      b.face([-hw, y1, zf], [hw, y1, zf], [hw, y1, zb], [-hw, y1, zb], wood, 'floor');
+      b.face([hw, 0, zf], [hw, 0, zb], [hw, y1, zb], [hw, y1, zf], wood, 'floor');
+      b.face([-hw, 0, zb], [-hw, 0, zf], [-hw, y1, zf], [-hw, y1, zb], wood, 'floor');
+    }
+    b.face([hw, 0, top], [-hw, 0, top], [-hw, rise, top], [hw, rise, top], wood, 'floor');
     if (ctx.params.rail !== false) for (const sx of [-1, 1]) {
       beam(b, [sx * (width / 2 + 0.03), 0.95, run / 2], [sx * (width / 2 + 0.03), rise + 0.95, -run / 2], 0.05, '#5e412b');
       for (const t of [0, 0.5, 1]) b.box(sx * (width / 2 + 0.03), rise * t, run / 2 - run * t, 0.06, 0.95, 0.06, '#5e412b');

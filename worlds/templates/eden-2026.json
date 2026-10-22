@@ -48074,7 +48074,7 @@
             "slot": "living"
           },
           "p": [
-            0,
+            -0.35,
             0,
             0.553
           ],
@@ -48386,7 +48386,7 @@
             "slot": "living"
           },
           "p": [
-            0,
+            -0.35,
             0,
             0.618
           ],
@@ -50370,22 +50370,6 @@
         },
         {
           "op": "place",
-          "tmp": "$f8",
-          "def": "core/stool@1",
-          "name": "kitchen-stool",
-          "in": {
-            "parent": "hillside-home-12",
-            "slot": "kitchen"
-          },
-          "p": [
-            -0.895,
-            0,
-            -1.104
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
           "tmp": "$f9",
           "def": "core/rug@1",
           "name": "bath-rug",
@@ -50397,22 +50381,6 @@
             0,
             0,
             -0.001
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f10",
-          "def": "core/stool@1",
-          "name": "bath-stool",
-          "in": {
-            "parent": "hillside-home-12",
-            "slot": "bath"
-          },
-          "p": [
-            -0.895,
-            0,
-            -1.105
           ],
           "r": 0
         },
@@ -90198,6 +90166,97 @@
           "op": "move",
           "id": "region-alpine-mountain-restaurant",
           "mode": "strict"
+        }
+      ]
+    },
+    {
+      "note": "HILL roof-terrace stairs 2026-10-22",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/stair-flight@1",
+          "name": "seafront-hotel-2-roof-stairs",
+          "p": [
+            131.0,
+            0,
+            132.5
+          ],
+          "r": 0,
+          "params": {
+            "rise": 9.32,
+            "run": 13,
+            "width": 1.1,
+            "material": "stone"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/stair-flight@1",
+          "name": "seafront-hotel-1-roof-stairs",
+          "p": [
+            116.3,
+            0,
+            132.5
+          ],
+          "r": 0,
+          "params": {
+            "rise": 9.32,
+            "run": 13,
+            "width": 1.1,
+            "material": "stone"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/stair-flight@1",
+          "name": "eden-office-1-roof-stairs",
+          "p": [
+            79.68,
+            0,
+            15.0
+          ],
+          "r": -1.5708,
+          "params": {
+            "rise": 9.02,
+            "run": 12.6,
+            "width": 1.1,
+            "material": "stone"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/stair-flight@1",
+          "name": "seafront-hotel-4-roof-stairs",
+          "p": [
+            176.28,
+            0,
+            118.8
+          ],
+          "r": 1.5708,
+          "params": {
+            "rise": 9.32,
+            "run": 13,
+            "width": 1.1,
+            "material": "stone"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/stair-flight@1",
+          "name": "market-street-shop-6-roof-stairs",
+          "p": [
+            142.9,
+            0,
+            97.57
+          ],
+          "r": 3.1416,
+          "params": {
+            "rise": 5.62,
+            "run": 7.8,
+            "width": 1.1,
+            "material": "wood"
+          }
         }
       ]
     }
