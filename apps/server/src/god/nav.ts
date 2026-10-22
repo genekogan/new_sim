@@ -148,14 +148,24 @@ export class GodNav {
 
   /** Every named thing (and room) in the entity world, rebuilt when the world changes. */
   things(): Thing[] { return this.index().things; }
+  /** BOOT2: the things, deriving them (when stale) in steps that yield every few dozen entities, so a sliced caller
+   *  (the places' catch-up) never runs the whole ~5,000-entity describe in one go. Same result as `things()`. */
+  *thingsGen(): Generator<void, Thing[], void> { const key = this.indexKey(); return (this.cache?.key === key ? this.cache : yield* this.indexGen(key)).things; }
   thing(ref: string): Thing | undefined { return this.index().byRef.get(ref); }
+  private indexKey() { const m = this.h.model; return `${this.h.version?.() ?? m.editSeq}:${m.entities.size}`; }
   private index() {
-    const m = this.h.model, key = `${this.h.version?.() ?? m.editSeq}:${m.entities.size}`;
+    const key = this.indexKey();
     if (this.cache?.key === key) return this.cache;
+    const it = this.indexGen(key); for (;;) { const r = it.next(); if (r.done) return r.value; }
+  }
+  private *indexGen(key: string): Generator<void, NonNullable<GodNav['cache']>, void> {
+    const m = this.h.model;
     const things: Thing[] = [], waters = new Map(m.ground().waters.map((w: any) => [w.id, w])), stamp = this.h.describeStamp?.();
     if (stamp === undefined || stamp !== this.memoStamp) { this.memo.clear(); this.memoStamp = stamp; }
     const seen = new Set<string>();
-    for (const e of m.entities.values()) {
+    let n = 0;
+    for (const e of [...m.entities.values()]) {
+      if (++n % 64 === 0) yield;
       if (!e.name) continue;
       const def = m.resolvedDef(e.def); if (!def || def.components.body || /^core[-/]flag@/.test(def.ref) || this.h.engineOwned(e)) continue;
       seen.add(e.id);
