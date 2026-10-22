@@ -5,12 +5,14 @@
 //
 // Env: EDGE_EYES_URL (viewer URL, e.g. http://127.0.0.1:4970/w/eden/), EDGE_EYES_GPU=auto|metal|gl|swiftshader,
 // EDGE_EYES_PLAYWRIGHT (a package.json whose node_modules has @playwright/test; default <repo>/mars/viewer),
-// PLAYWRIGHT_BROWSERS_PATH, EDGE_EYES_RELOAD_HOURS (default 6), EDGE_EYES_HEADLESS_SHELL=1 (old headless shell).
+// PLAYWRIGHT_BROWSERS_PATH, EDGE_EYES_RELOAD_HOURS (default 6), EDGE_EYES_HEADLESS_SHELL=1 (old headless shell),
+// EDGE_EYES_NICE (default 10), EDGE_EYES_CPUS (taskset CPU list), EDGE_EYES_CHROME_ARGS (extra --switches).
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import {setPriority} from 'node:os';
 import {readdirSync, readFileSync} from 'node:fs';
-import {EYES_UA_TAG, eyesBrowserLaunch, eyesBrowserModes, eyesNice} from './browser-config.mjs';
+import {execFileSync} from 'node:child_process';
+import {EYES_UA_TAG, eyesBrowserLaunch, eyesBrowserModes, eyesCpus, eyesNice} from './browser-config.mjs';
 
 const viewer = process.env.EDGE_EYES_URL;
 const from = process.env.EDGE_EYES_PLAYWRIGHT || fileURLToPath(new URL('../../../../../mars/viewer/package.json', import.meta.url));
@@ -21,6 +23,10 @@ const {chromium} = createRequire(from)('@playwright/test');
 
 // below the world's own priority (the browser processes inherit it): renders never delay a tick
 try {setPriority(0, eyesNice());} catch (e) {log('could not lower priority:', e.message);}
+// Optional CPU pinning (EDGE_EYES_CPUS): the browser inherits it, and SwiftShader sizes its worker pool from the CPUs it may
+// use, so pinning also shrinks the pool of threads that wake on every scene update. Linux (taskset) only.
+const cpus = eyesCpus();
+if (cpus && process.platform === 'linux') {try {execFileSync('taskset', ['-p', '-c', cpus, String(process.pid)], {stdio: 'ignore'}); log('pinned to CPUs', cpus);} catch (e) {log('could not pin CPUs:', e.message);}}
 // Chromium re-prioritises its own processes and threads (Modal as root saw nice -8, 0 and 5 under a nice-10 worker), so
 // put every thread of the browser's process tree back to at least the worker's niceness after launch and every 30 s.
 // Raising a nice value never needs a privilege; Linux only (/proc).

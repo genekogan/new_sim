@@ -29,9 +29,9 @@ async function idleCpu(ms,serverPid){const hz=100,a=procs(),pids=under(a,process
     worldServerCpuPercentOfOneCore:+((sum(b,under(b,process.pid,-1).filter(p=>!pids.includes(p)))-w0)/hz/secs*100).toFixed(2),
     nice:[...new Set(pids.map(p=>a.get(p)?.nice))],names:[...new Set(pids.map(p=>a.get(p)?.comm))].slice(0,8),barPercent:2,
     // where the idle CPU goes: per process (node / chrome --type=...) and the busiest threads
-    byProcess:pids.map(p=>({pid:p,type:kind(p),pct:+(((b.get(p)?.ticks??0)-(a.get(p)?.ticks??0))/hz/secs*100).toFixed(2)})).sort((x,y)=>y.pct-x.pct),
+    byProcess:pids.map(p=>({pid:p,type:kind(p),threads:t0s.get(p)?.size??0,pct:+(((b.get(p)?.ticks??0)-(a.get(p)?.ticks??0))/hz/secs*100).toFixed(2)})).sort((x,y)=>y.pct-x.pct),
     topThreads:pids.flatMap(p=>[...(t0s.get(p)??new Map())].map(([tid,t])=>({type:kind(p),thread:t.comm,pct:+(((threads(p).get(tid)?.ticks??t.ticks)-t.ticks)/hz/secs*100).toFixed(2)}))).sort((x,y)=>y.pct-x.pct).slice(0,12)};}
-function kind(p){try{const c=readFileSync(`/proc/${p}/cmdline`,'utf8').split('\0');const t=c.find(x=>x.startsWith('--type='));return t?t.slice(7):c[0].split('/').pop();}catch{return '?';}}
+function kind(p){try{const c=readFileSync(`/proc/${p}/cmdline`,'utf8').split(/[\0 ]+/).filter(Boolean);const t=c.find(x=>x.startsWith('--type='));return t?t.slice(7):c[0].split('/').pop();}catch{return '?';}}
 function threads(p){const m=new Map();try{for(const t of readdirSync(`/proc/${p}/task`)){try{const st=readFileSync(`/proc/${p}/task/${t}/stat`,'utf8'),f=st.slice(st.lastIndexOf(')')+2).split(' ');m.set(t,{ticks:Number(f[11])+Number(f[12]),comm:st.slice(st.indexOf('(')+1,st.lastIndexOf(')'))});}catch{}}}catch{}return m;}
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function until(fn,ms=180000){const end=Date.now()+ms;while(Date.now()<end){try{const result=await fn();if(result)return result;}catch{}await sleep(250);}throw new Error('CPU benchmark timed out');}
@@ -41,7 +41,7 @@ try {
   await until(async()=>(await fetch(base+'/healthz')).ok);
   report.worldBootMs=Math.round(performance.now()-start);
   const off=await (await fetch(base+'/v1/edge/view/status')).json();assert.equal(off.eyes.state,'off');
-  worker=new EyesWorker({viewerUrl:base+'/'+(process.env.EYES_CPU_QUERY?'?'+process.env.EYES_CPU_QUERY:''),env:{EDGE_EYES_GPU:'swiftshader'},timeoutMs:90000});
+  worker=new EyesWorker({viewerUrl:base+'/'+(process.env.EYES_CPU_QUERY?'?'+process.env.EYES_CPU_QUERY:''),env:{EDGE_EYES_GPU:'swiftshader',EDGE_EYES_CPUS:process.env.EDGE_EYES_CPUS??'',EDGE_EYES_CHROME_ARGS:process.env.EDGE_EYES_CHROME_ARGS??''},timeoutMs:90000});
   await until(()=>worker.status().state==='ready',300000);
   report.workerReadyMs=Math.round(performance.now()-start)-report.worldBootMs;
   report.renderer=worker.status().renderer;assert.match(report.renderer,/swiftshader/i);
@@ -56,7 +56,7 @@ try {
     report.samples.push({mode,w,h,n:samples.length,ms:samples,p50,p95,estimatedFramesPerMinuteAtP95:Math.floor(60000/p95),withinWorldBudget:p95*12<60000});
   }
   // lane soul-eyes-on: the worker's idle CPU (bar <= 2% of one core over 60 s) and its nice level, from /proc
-  report.idle=await idleCpu(60_000,server.pid);report.query=process.env.EYES_CPU_QUERY||null;
+  report.idle=await idleCpu(60_000,server.pid);report.query=process.env.EYES_CPU_QUERY||null;report.cpus=process.env.EDGE_EYES_CPUS||null;report.chromeArgs=process.env.EDGE_EYES_CHROME_ARGS||null;
   // render on demand: the first views after the idle minute wake a sleeping page (bar: p95 <= 5 s)
   const after=[];for(let i=0;i<3;i++){const t=performance.now();await worker.render({mode:'eyes',w:512,h:320,quality:.7,pose:{p:[0,1.62,0],yaw:i,pitch:-.14,vfov:1},self:'',show:[]});after.push(Math.round(performance.now()-t));if(i<2)await new Promise(r=>setTimeout(r,5000));}
   report.afterIdleMs=after;
