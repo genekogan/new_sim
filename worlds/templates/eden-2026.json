@@ -47364,11 +47364,11 @@
             "slot": "kitchen"
           },
           "p": [
+            -0.08,
             0,
-            0,
-            1.085
+            0
           ],
-          "r": 3.142
+          "r": -1.571
         },
         {
           "op": "place",
@@ -54054,9 +54054,9 @@
             "slot": "bedroom"
           },
           "p": [
-            -0.45,
+            0.8,
             0,
-            -0.75
+            0.4
           ],
           "params": {
             "border": "#d19c3c",
@@ -54484,9 +54484,9 @@
             "slot": "bedroom"
           },
           "p": [
-            -0.45,
+            0.8,
             0,
-            -0.75
+            0.4
           ],
           "params": {
             "border": "#2f6b6b",
@@ -66891,21 +66891,6 @@
         },
         {
           "op": "place",
-          "def": "core/bench@1",
-          "name": "eden-house-3-roof-bench",
-          "in": {
-            "parent": "eden-house-3",
-            "slot": "roof"
-          },
-          "p": [
-            0,
-            0,
-            0.7
-          ],
-          "r": 3.141592653589793
-        },
-        {
-          "op": "place",
           "def": "core/flower-pot@1",
           "name": "eden-house-3-roof-pot",
           "in": {
@@ -66987,21 +66972,6 @@
             0,
             0.6
           ]
-        },
-        {
-          "op": "place",
-          "def": "core/bench@1",
-          "name": "eden-house-4-roof-bench",
-          "in": {
-            "parent": "eden-house-4",
-            "slot": "roof"
-          },
-          "p": [
-            0,
-            0,
-            0.7
-          ],
-          "r": 3.141592653589793
         },
         {
           "op": "place",
