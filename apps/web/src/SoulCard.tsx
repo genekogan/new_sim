@@ -64,7 +64,7 @@ export function SoulCard({api,soul,doing,energy,plays,talk,camera,pin,ownerActio
    {energy&&<span className="soul-energy">{energy}</span>}
    <VisitorFrom soulId={soul.id}/>
   </p>
-  {ownerAction&&<SoulAgentMessageBox api={api} soulId={soul.id}/>}
+  {ownerAction&&<SoulAgentMessageBox api={api} soulId={soul.id} name={soul.name}/>}
   <div className="soul-actions">
    <button onClick={()=>requestSoulConversations(soul.id)}>Conversations</button>
    {ownerAction&&<button onClick={ownerAction}>This mind</button>}
