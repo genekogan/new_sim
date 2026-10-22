@@ -147,7 +147,7 @@ export class WorldBroadcast {
       const before = this.choice?.key;
       const carriers = hints?.carriers ?? [];
       this.choice = this.picker.choose({ bodies: people.map(id => ({ id, p: frame[id].p, activity: frame[id].activity, riding: records[id]?.body?.family !== 'floater' && !!ridingCarrier(frame[id].p, carriers) })), speaking, now: wallSeconds, landmarks: this.viewsOf(hints)?.landmarks ?? [] });
-      if (this.choice?.key !== before) { this.emptySince = null; if (this.choice?.kind === 'landmark' || before?.startsWith('landmark:')) this.director.reset('live-world'); }
+      if (this.choice?.key !== before) { const cuts = ((globalThis as unknown as { __simBroadcastCuts?: { t: number; key: string; label: string }[] }).__simBroadcastCuts ??= []); cuts.push({ t: Date.now() / 1000, key: this.choice?.key ?? '', label: this.choice?.label ?? '' }); if (cuts.length > 400) cuts.shift(); this.emptySince = null; if (this.choice?.kind === 'landmark' || before?.startsWith('landmark:')) this.director.reset('live-world'); }
     }
     const choice = this.choice;
     if (!choice) return null;
