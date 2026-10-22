@@ -23,11 +23,16 @@ function procs(){const all=new Map();for(const d of readdirSync('/proc')){if(!/^
   all.set(Number(d),{ppid:Number(f[1]),ticks:Number(f[11])+Number(f[12]),nice:Number(f[16]),comm:st.slice(st.indexOf('(')+1,st.lastIndexOf(')'))});}catch{}}return all;}
 function under(all,root,skip){const out=[];for(const [pid] of all){let p=pid,ok=false;while(p&&all.has(p)){if(p===skip)break;if(all.get(p).ppid===root){ok=p!==skip;break;}p=all.get(p).ppid;}if(ok)out.push(pid);}return out;}
 async function idleCpu(ms,serverPid){const hz=100,a=procs(),pids=under(a,process.pid,serverPid),t0=performance.now();
-  const sum=(m,ids)=>ids.reduce((n,id)=>n+(m.get(id)?.ticks??0),0),s0=sum(a,pids),w0=sum(a,under(a,process.pid,-1).filter(p=>!pids.includes(p)));
+  const t0s=new Map(pids.map(p=>[p,threads(p)])),sum=(m,ids)=>ids.reduce((n,id)=>n+(m.get(id)?.ticks??0),0),s0=sum(a,pids),w0=sum(a,under(a,process.pid,-1).filter(p=>!pids.includes(p)));
   await sleep(ms);const b=procs(),secs=(performance.now()-t0)/1000;
   return {seconds:Math.round(secs),workerProcesses:pids.length,workerCpuPercentOfOneCore:+((sum(b,pids)-s0)/hz/secs*100).toFixed(2),
     worldServerCpuPercentOfOneCore:+((sum(b,under(b,process.pid,-1).filter(p=>!pids.includes(p)))-w0)/hz/secs*100).toFixed(2),
-    nice:[...new Set(pids.map(p=>a.get(p)?.nice))],names:[...new Set(pids.map(p=>a.get(p)?.comm))].slice(0,8),barPercent:2};}
+    nice:[...new Set(pids.map(p=>a.get(p)?.nice))],names:[...new Set(pids.map(p=>a.get(p)?.comm))].slice(0,8),barPercent:2,
+    // where the idle CPU goes: per process (node / chrome --type=...) and the busiest threads
+    byProcess:pids.map(p=>({pid:p,type:kind(p),pct:+(((b.get(p)?.ticks??0)-(a.get(p)?.ticks??0))/hz/secs*100).toFixed(2)})).sort((x,y)=>y.pct-x.pct),
+    topThreads:pids.flatMap(p=>[...(t0s.get(p)??new Map())].map(([tid,t])=>({type:kind(p),thread:t.comm,pct:+(((threads(p).get(tid)?.ticks??t.ticks)-t.ticks)/hz/secs*100).toFixed(2)}))).sort((x,y)=>y.pct-x.pct).slice(0,12)};}
+function kind(p){try{const c=readFileSync(`/proc/${p}/cmdline`,'utf8').split('\0');const t=c.find(x=>x.startsWith('--type='));return t?t.slice(7):c[0].split('/').pop();}catch{return '?';}}
+function threads(p){const m=new Map();try{for(const t of readdirSync(`/proc/${p}/task`)){try{const st=readFileSync(`/proc/${p}/task/${t}/stat`,'utf8'),f=st.slice(st.lastIndexOf(')')+2).split(' ');m.set(t,{ticks:Number(f[11])+Number(f[12]),comm:st.slice(st.indexOf('(')+1,st.lastIndexOf(')'))});}catch{}}}catch{}return m;}
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function until(fn,ms=180000){const end=Date.now()+ms;while(Date.now()<end){try{const result=await fn();if(result)return result;}catch{}await sleep(250);}throw new Error('CPU benchmark timed out');}
 let worker;
