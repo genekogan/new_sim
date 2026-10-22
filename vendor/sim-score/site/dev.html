@@ -1,0 +1,19 @@
+<title>Sim Score</title>
+<p>dev harness: Sim.measure(id), Sim.renderOffline(piece)</p>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/15.1.22/Tone.js"></script>
+<script src="engine/theory.js"></script>
+<script src="engine/compose.js"></script>
+<script src="engine/instruments.js"></script>
+<script src="engine/more-instruments.js"></script>
+<script src="engine/conductor.js"></script>
+<script src="engine/phrasing.js" charset="utf-8"></script>
+<script src="engine/spc.js" charset="utf-8"></script>
+<script src="engine/dialogue.js" charset="utf-8"></script>
+<script src="engine/groove.js" charset="utf-8"></script>
+<script src="engine/band.js"></script>
+<script src="catalog.js"></script>
+<script>
+// load every catalogued piece; window.ready resolves when they are in
+window.ready = Promise.all(Sim.catalog.ids().map((id) => new Promise((res) => { const s = document.createElement("script"); s.src = `pieces/${id}.js`; s.onload = s.onerror = res; document.head.append(s); })));
+</script>
+<script src="engine/measure.js"></script>

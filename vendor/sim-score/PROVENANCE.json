@@ -1,0 +1,583 @@
+{
+  "source": {
+    "repository": "sim-score",
+    "path": "<sim-score-repo>",
+    "commit": "8cf5c0542bb06f2e042870c67f1010f3d8f7eb95",
+    "date": "2026-10-22T10:52:50-04:00",
+    "subject": "Round 4: 32 new pieces, four engine modules, sticky player with seek"
+  },
+  "syncedBy": "tools/score/sync-sim-score.mjs",
+  "note": "Byte-for-byte copy of the listed files at source.commit. Do not edit here: fix in sim-score, commit there, then sync.",
+  "files": [
+    {
+      "path": "COMPOSING.md",
+      "sha256": "c8a4c41c4f06ceca9d87fefa248a2aa0aa1c721fab6cf030db55ce86586e9126",
+      "bytes": 15771
+    },
+    {
+      "path": "README.md",
+      "sha256": "4296f2b854ae0951072d924ec4ea865c7249ea5dbf4996554908832ec5ef4b23",
+      "bytes": 16501
+    },
+    {
+      "path": "site/app.js",
+      "sha256": "eca9e3eb55c0b014e6c2d97b2fd3c7a0909e283b7a278112e8fd4d812ebe1475",
+      "bytes": 15099
+    },
+    {
+      "path": "site/catalog.js",
+      "sha256": "e065490ac817cc53e4bb446c91c53706e6fe7ab66a97e075308cc854bfe21190",
+      "bytes": 5321
+    },
+    {
+      "path": "site/dev.html",
+      "sha256": "ad2495ea85706b93bada7838be45bbc5cc2bf897d8e1a20f18bea10f045ff8d7",
+      "bytes": 1040
+    },
+    {
+      "path": "site/engine/band.js",
+      "sha256": "19d5879325f28dd744b75b08ab95abc62efe3f32f4d3ce121b0be8dc1a9d84d4",
+      "bytes": 3901
+    },
+    {
+      "path": "site/engine/compose.js",
+      "sha256": "5ac04c4ec7dbf1bec99bff85d34e4fa834ee36a610948156c84c87fbf48db8ee",
+      "bytes": 6661
+    },
+    {
+      "path": "site/engine/conductor.js",
+      "sha256": "d35587499718d0a20d2bd5dd1aecc77b9c31248197d0f8d49424ef7daa620075",
+      "bytes": 10386
+    },
+    {
+      "path": "site/engine/dialogue.js",
+      "sha256": "c2d54db4dc1fe9e7f6ba01946056392eb1f50b6e2c2ad3587c430b0fc24ab3d1",
+      "bytes": 24617
+    },
+    {
+      "path": "site/engine/groove.js",
+      "sha256": "06beee9c04aa8230db986ce7df6647e434ed9a7fcfa7b5a373b75b0ccea7ca57",
+      "bytes": 23977
+    },
+    {
+      "path": "site/engine/instruments.js",
+      "sha256": "4ba58973d79f0cbf8ad0adf1699e69c4acc4d03bca5afa2735325b78795427bd",
+      "bytes": 29596
+    },
+    {
+      "path": "site/engine/measure.js",
+      "sha256": "32b2e719350f4e98aeb8aa948be9116784f3d9417e067d564b51336d256b20d8",
+      "bytes": 4255
+    },
+    {
+      "path": "site/engine/more-instruments.js",
+      "sha256": "414845748105d0faff7ff02ff5e7ac8155f5646fb28659e69481ed54ff09a20c",
+      "bytes": 39390
+    },
+    {
+      "path": "site/engine/phrasing.js",
+      "sha256": "ee653bd07de5eefa095176deb3dbc1b0a5de28d62967abaadcad7afc71a6bead",
+      "bytes": 19411
+    },
+    {
+      "path": "site/engine/spc.js",
+      "sha256": "b59bd095e95e064227c2d19f0fc99b1e2a9afa611cdbfa20dce16be47b23a61f",
+      "bytes": 20163
+    },
+    {
+      "path": "site/engine/theory.js",
+      "sha256": "06799a78479a5ad660ecc46e44519f4387d482fbc669652fe2fa83df12166610",
+      "bytes": 15773
+    },
+    {
+      "path": "site/index.html",
+      "sha256": "f56bea4e575520c2b6c7b4eff69e51d742a0797fe944cda5d21b29b67910328c",
+      "bytes": 13704
+    },
+    {
+      "path": "site/pieces/aerial-causeway.js",
+      "sha256": "0dd65f54253c804283f65a59fb8b3cce1b725474c80ad72eaf938ee22fac4f31",
+      "bytes": 31470
+    },
+    {
+      "path": "site/pieces/afrobeat.js",
+      "sha256": "ed625a3888c501fe488f60f764036eec3fda7052878751aec3a05332ddc280a1",
+      "bytes": 27424
+    },
+    {
+      "path": "site/pieces/after-the-fireworks.js",
+      "sha256": "b975d6b95b63998703599a34076bb2fec499d40a8ab6b50dd5585970880786ae",
+      "bytes": 31995
+    },
+    {
+      "path": "site/pieces/arena.js",
+      "sha256": "a2961fce4f4f4cad3c3368f01360e03edcc561dd9006bfddef5f3709d8a6ce65",
+      "bytes": 28385
+    },
+    {
+      "path": "site/pieces/branch-line.js",
+      "sha256": "2c9abd5518fcf2207dfead63c34cf415fa9d216f2a64e0abd3011940fcfb51af",
+      "bytes": 32799
+    },
+    {
+      "path": "site/pieces/budget-surplus.js",
+      "sha256": "817f28e534674f4e4392277c3233e02f9b2501dedbd56cd5d97377e006e8e737",
+      "bytes": 24163
+    },
+    {
+      "path": "site/pieces/build-mode.js",
+      "sha256": "5216bd52ff8b19646b0cac884204a5afc47da3db32daa422a477031e556479d3",
+      "bytes": 26323
+    },
+    {
+      "path": "site/pieces/buy-mode.js",
+      "sha256": "89d8a652bf56421ab5b7d9cfe30bc0f8cd3814991285320a1dff7ebfc496d809",
+      "bytes": 33005
+    },
+    {
+      "path": "site/pieces/campfire.js",
+      "sha256": "82269d40f83f6f46c0faa5953d980723c8c9fff6d2a3dc8c131a7e67d5f6190f",
+      "bytes": 34677
+    },
+    {
+      "path": "site/pieces/caravan.js",
+      "sha256": "f9c0f17929338597013078aa5ae4fd5b0aac5035db82eda45947a5a62c9ecacd",
+      "bytes": 29504
+    },
+    {
+      "path": "site/pieces/carnival-samba.js",
+      "sha256": "952b31c09fea1bc4a65d096eea5ca713e2fd7851627bc6c8c571522acbc9a411",
+      "bytes": 28498
+    },
+    {
+      "path": "site/pieces/cheese-stall.js",
+      "sha256": "8e7f19bc17f34e24116d054065d6e3a33364048d1ca87fcb7f6f075796fb56fa",
+      "bytes": 30960
+    },
+    {
+      "path": "site/pieces/citronella.js",
+      "sha256": "0b57a7f96c41367fa31c82f160635d651bc3f423d5556f6c0cf7a710d3c99d11",
+      "bytes": 29846
+    },
+    {
+      "path": "site/pieces/cloud-street.js",
+      "sha256": "2d26e163603c8dedf6a156d8dc7f86264d1db1a93a7b4d1311c9161ea4e4653c",
+      "bytes": 37151
+    },
+    {
+      "path": "site/pieces/coin-laundry.js",
+      "sha256": "9d8253fa060267e5e9a40136f74721faaab551b07b9a59770fdced8ca8542246",
+      "bytes": 29260
+    },
+    {
+      "path": "site/pieces/creature-lab.js",
+      "sha256": "7b8fd82796c9f83ad69b7a81c14291023443cd176257c857d92a4300f8bd04b5",
+      "bytes": 31631
+    },
+    {
+      "path": "site/pieces/cumbia.js",
+      "sha256": "2d222af75ea83beb074b820b54cec632d8e3f0d4ea6814bf3368b6829e139b06",
+      "bytes": 26757
+    },
+    {
+      "path": "site/pieces/departure-lounge.js",
+      "sha256": "e84daedfd12d091faccf569db41992ce8d392d3bbd12650c2512348f49d5d066",
+      "bytes": 17761
+    },
+    {
+      "path": "site/pieces/dojo-garden.js",
+      "sha256": "34f40afefdd396d4e025193deb74da51c10c7faf7d27edd3ae890e3143d88344",
+      "bytes": 29214
+    },
+    {
+      "path": "site/pieces/downtown-rush.js",
+      "sha256": "aba2b072db49c4c77a2f513c9ed9de3228c76b3fca72074aa9e37b1ed108175c",
+      "bytes": 34187
+    },
+    {
+      "path": "site/pieces/evening-rounds.js",
+      "sha256": "9a47d55bf876c77aa00f3b4ab3c23666036764594afba1ec9468d9988ea6d9e0",
+      "bytes": 33177
+    },
+    {
+      "path": "site/pieces/filter-house.js",
+      "sha256": "2df9e9e6ad8cac1285802420b284deecfed23616f28afa42dd8efb81141ff708",
+      "bytes": 28319
+    },
+    {
+      "path": "site/pieces/final-round.js",
+      "sha256": "52bc5ffaf223c08f8cc000bb6c29e9fbb71d73eea9162d56d6df5d903d6c27a0",
+      "bytes": 29725
+    },
+    {
+      "path": "site/pieces/firn-light.js",
+      "sha256": "ab2d2f91e736d06f3fc17ffabfc0f57bdb66cf1ac7663b4e27f164d69ec27f86",
+      "bytes": 36955
+    },
+    {
+      "path": "site/pieces/flying-junction.js",
+      "sha256": "a4af7040003b7e58b4ba43747a18e8cd588dc4b03e4b61ce1a634ce402138f58",
+      "bytes": 34759
+    },
+    {
+      "path": "site/pieces/frost-fair.js",
+      "sha256": "e67492043399a6cfe0a73200c69109b6a7166c6acc4756fd0f639ce98a5d394b",
+      "bytes": 24738
+    },
+    {
+      "path": "site/pieces/grand-prix.js",
+      "sha256": "7ab548a21067334e4da87a270521cb22c8eb68126f3c1d5e93cdf0e0f19b9a1c",
+      "bytes": 29774
+    },
+    {
+      "path": "site/pieces/green-world.js",
+      "sha256": "9e7923e70b5ae74f75a0bb5fea22184cd79f6973353ce156a13c6b458191aa94",
+      "bytes": 30816
+    },
+    {
+      "path": "site/pieces/grid-runner.js",
+      "sha256": "e9f0f8dfe60a0d1931d232e86fbb5eff7a9158a63ac6f2fcd000b94e3307c44b",
+      "bytes": 27237
+    },
+    {
+      "path": "site/pieces/halogen.js",
+      "sha256": "12722dc90b1581cb214e3a5588bf0b4e90f94463b747a47707a6a0f675ed55f5",
+      "bytes": 30741
+    },
+    {
+      "path": "site/pieces/harbour-mouth.js",
+      "sha256": "14c64c3b9f4687fd0f52b3751ace349c76736a4e868b61a96add1bc444b11c24",
+      "bytes": 35098
+    },
+    {
+      "path": "site/pieces/headland.js",
+      "sha256": "b1a6e5e8a45aba3ae852c982fda648544b2f326c0561837e925d96f213e55f0e",
+      "bytes": 24981
+    },
+    {
+      "path": "site/pieces/heat-lightning.js",
+      "sha256": "2ffc951d72835ec6d2494cbd353388d4a203c3a80ee19a5616dc38e149af2cdf",
+      "bytes": 30093
+    },
+    {
+      "path": "site/pieces/heron-causeway.js",
+      "sha256": "7264c44fcbfd1ea933c77cb743ac078b4221244815ac03686aa35de293cae0ef",
+      "bytes": 27865
+    },
+    {
+      "path": "site/pieces/hi-nrg.js",
+      "sha256": "70c39dac8ff999a9ca710f13b25db938eec38cebe6c945458726f1dfcf202f5a",
+      "bytes": 27265
+    },
+    {
+      "path": "site/pieces/hill-farm.js",
+      "sha256": "59d56477b58eb364d6c85826e8fa3ba57e08a16daf9cbb8eb1f23c422c9506c9",
+      "bytes": 41589
+    },
+    {
+      "path": "site/pieces/home-movies.js",
+      "sha256": "803dae9bce0fdf1977f4bb7f08a87c7dfe123bb38da0a84ff3ef81ebc0123e14",
+      "bytes": 31463
+    },
+    {
+      "path": "site/pieces/hydroponics-deck.js",
+      "sha256": "a1a3f70901fcf176f9c3db236a8ce8a2b4c3cc72ada297b3482044f6a873d1db",
+      "bytes": 25101
+    },
+    {
+      "path": "site/pieces/island-resort.js",
+      "sha256": "4249c4a33dbee8096a2dc5f0fd44c9c25404eb904829871e5b2333d477c884fe",
+      "bytes": 41699
+    },
+    {
+      "path": "site/pieces/italo-nights.js",
+      "sha256": "ee14de27b4ec5a875549e87895de8eec881c9748c5c167c929d2bd2c8b5164c2",
+      "bytes": 25918
+    },
+    {
+      "path": "site/pieces/keynote.js",
+      "sha256": "2d134cf4833c07110896ab224d45ea8e4b3a00b5a7c4c0542d658e600a27a7da",
+      "bytes": 35877
+    },
+    {
+      "path": "site/pieces/lamplighter.js",
+      "sha256": "bb4fc58e11dd5283877686550ff7329963ef2588af2321aa6016b8a69596b05e",
+      "bytes": 35055
+    },
+    {
+      "path": "site/pieces/lantern-square.js",
+      "sha256": "c39ce0bb7f75a5710076e7133632b88069d047fa55aaec7c1d46d9ff4cd542d3",
+      "bytes": 33155
+    },
+    {
+      "path": "site/pieces/last-train.js",
+      "sha256": "feb78ab41ac79aea55cd112051516f0a6821589d186609004420a5f7284af44e",
+      "bytes": 39941
+    },
+    {
+      "path": "site/pieces/line-clear.js",
+      "sha256": "1cd46732a56a860224f03699f31dc8faea37a676beeb37aa38c226b33d13ebc8",
+      "bytes": 30447
+    },
+    {
+      "path": "site/pieces/local-forecast.js",
+      "sha256": "fe6b674b55d48523145c08e6a05a960a19e8dd3b7cf1ebab1be5bb6c7b937ee3",
+      "bytes": 29437
+    },
+    {
+      "path": "site/pieces/lofi-study.js",
+      "sha256": "caabbe6feb2b4a15a36b66550dbaecaffa0b98c12a77f7a87ab1b5e843395d84",
+      "bytes": 29448
+    },
+    {
+      "path": "site/pieces/lullaby.js",
+      "sha256": "963f98be8d7d3d28cfc6032fb6bb750d9490f3b285516cd2cdc81332251146b8",
+      "bytes": 20170
+    },
+    {
+      "path": "site/pieces/magic-orbit.js",
+      "sha256": "0a4488d1d816f2ea990b0fca9e34b28991f33ff73d538cad54d5c1d46b50e2b5",
+      "bytes": 27748
+    },
+    {
+      "path": "site/pieces/mambo.js",
+      "sha256": "4a6e6e6cf9fe49edf14916e526a9d33a014003b1e755f7b30832b5339c3c5362",
+      "bytes": 39593
+    },
+    {
+      "path": "site/pieces/marina-district.js",
+      "sha256": "6371230224955e0ec7f0e56fbdf0876316cc61ed1b7a995ced45bfb132c88b4b",
+      "bytes": 39835
+    },
+    {
+      "path": "site/pieces/midway.js",
+      "sha256": "269a98f29670f1d44b9e8bcf1d85108778c24129dd44c4501612cfb427ec0012",
+      "bytes": 35735
+    },
+    {
+      "path": "site/pieces/mirror-ball.js",
+      "sha256": "7762ea80e51421fc48e491f7b74833e7e75d882d2be52930778206d8ad1875aa",
+      "bytes": 36162
+    },
+    {
+      "path": "site/pieces/montage.js",
+      "sha256": "9cedfcc9dfeca69b495126914adc5b254425ca1df8a4b13faba172bfe1e72552",
+      "bytes": 34008
+    },
+    {
+      "path": "site/pieces/neon-shibuya.js",
+      "sha256": "5adf9fbd1a5df5de01cd70e80b4687dab56ec4f50cf70c2690296a8081ab9882",
+      "bytes": 30340
+    },
+    {
+      "path": "site/pieces/night-approach.js",
+      "sha256": "8732f5b0246caffde091711ccc621ef6958a46a3771a960b1819c3e0f0daaaea",
+      "bytes": 29754
+    },
+    {
+      "path": "site/pieces/night-drive.js",
+      "sha256": "a54a42cecf188bf0065a528ecc29e6a3e9214f5c47717498f3b77f80e017010d",
+      "bytes": 27388
+    },
+    {
+      "path": "site/pieces/night-patrol.js",
+      "sha256": "e1efb1877f0be2fd204b6ab753833114e156531e458dbc38e8c4378f45c0ec35",
+      "bytes": 23261
+    },
+    {
+      "path": "site/pieces/night-shift.js",
+      "sha256": "6e0c7e6edc03043e8848e2414b373012a9b6fefc68329696eedb062d16ab645b",
+      "bytes": 30082
+    },
+    {
+      "path": "site/pieces/night-watch.js",
+      "sha256": "69e72459f1cb5b9e27a37f390c0eaf2ea7d113ee74ffd85d686f9d1b7b242443",
+      "bytes": 32397
+    },
+    {
+      "path": "site/pieces/nightside-pass.js",
+      "sha256": "4fe6945745da39040a10ca087b463557025dde565ddb1a0c24065995f09824b5",
+      "bytes": 26980
+    },
+    {
+      "path": "site/pieces/noir.js",
+      "sha256": "821ff20cf637105a819a794d05881a6f70067d2f4885df4c6c470cd583b28d90",
+      "bytes": 28904
+    },
+    {
+      "path": "site/pieces/orbital-survey.js",
+      "sha256": "788278328a5e326afcaee87745c9cff541d80b374945a6de986a7741bfbf2c9e",
+      "bytes": 23572
+    },
+    {
+      "path": "site/pieces/overtime.js",
+      "sha256": "9115e9c84a121f5dc873d83fef66a038bb86b5a48af6b17ace8d8dc649d0b22b",
+      "bytes": 32895
+    },
+    {
+      "path": "site/pieces/petri-dish.js",
+      "sha256": "2f0796c05ddfa97a73d71c4465422ac4758c7c789819d7b1f9ead64e6967a2f6",
+      "bytes": 34232
+    },
+    {
+      "path": "site/pieces/pixel-town.js",
+      "sha256": "5b855e96cd392c450bf6c0af7b229cb244c9910c10ea2da28398ca8cae05571e",
+      "bytes": 34651
+    },
+    {
+      "path": "site/pieces/plaza-mall.js",
+      "sha256": "30037b83120c352aff43c085f7023d70c0bbd4aa06ddb2e3be06a3385e1118ed",
+      "bytes": 26819
+    },
+    {
+      "path": "site/pieces/public-works.js",
+      "sha256": "3983a6c7941f5b263a536fff59f27a9134496889fc00efaeb7fceee765b8d4f1",
+      "bytes": 18640
+    },
+    {
+      "path": "site/pieces/quarterly-report.js",
+      "sha256": "167297e736f497cdabf25c0564f2ec42e33fe5d10bfecec3837a338dd87f875e",
+      "bytes": 29076
+    },
+    {
+      "path": "site/pieces/reggae.js",
+      "sha256": "c0eced642fb36f8efcea9ac4e527d5c921c39ba4bd5963722917ae0af380836a",
+      "bytes": 33013
+    },
+    {
+      "path": "site/pieces/rice-terraces.js",
+      "sha256": "ccf079b4263c389e53c5c3de6f1a73c09231809696c19dbfd32e5e0f99167769",
+      "bytes": 39280
+    },
+    {
+      "path": "site/pieces/roller-rink.js",
+      "sha256": "eadbf07266ccfc2ff827b72787c838417cd11a287903940d6cccc7ce4332d987",
+      "bytes": 33067
+    },
+    {
+      "path": "site/pieces/royal-charter.js",
+      "sha256": "a58ebd0d4737e8984aae6d290d06fd1b01ca7525d9864b704188821dbd955d1a",
+      "bytes": 36180
+    },
+    {
+      "path": "site/pieces/second-line.js",
+      "sha256": "d263168c2061fa2c51b0a2b57157a49013b3ebb9096db1431fbc74b5d924bf8b",
+      "bytes": 31871
+    },
+    {
+      "path": "site/pieces/second-ring-road.js",
+      "sha256": "435fe22a034741896e2f2d66fc295a5b11d2936afe96d29375cf948c22bf2643",
+      "bytes": 27362
+    },
+    {
+      "path": "site/pieces/section-lines.js",
+      "sha256": "93009947440320d7b28fd942001195f72515c9f0e689a101893675f61a060fcf",
+      "bytes": 31084
+    },
+    {
+      "path": "site/pieces/service-corridor.js",
+      "sha256": "8216f78062ec5379877e8ddbddba36dbb510e12d4207633760a74af412dda4c3",
+      "bytes": 31460
+    },
+    {
+      "path": "site/pieces/skylight-rain.js",
+      "sha256": "0ae37445683795ed440f3df19497ae8a5d65962d7f1e83eee91fdffcd3cc50e9",
+      "bytes": 28355
+    },
+    {
+      "path": "site/pieces/slow-jam.js",
+      "sha256": "ec57186f0b67d2c31848ea7cb519022b4816c97aee5b86eff2e8b79bc0b6dfe1",
+      "bytes": 27608
+    },
+    {
+      "path": "site/pieces/spy-surf.js",
+      "sha256": "e93a852b2757046d749aeb1a1ecfc8951d7d58f518dd16e9200dc3e9314c95f7",
+      "bytes": 28543
+    },
+    {
+      "path": "site/pieces/starfield.js",
+      "sha256": "5ee4f5665ab2f84f9a27f5a109ffe763d00ee1692036ecd798e839e177cad0e4",
+      "bytes": 22271
+    },
+    {
+      "path": "site/pieces/sunken-causeway.js",
+      "sha256": "569b8940f1a0ed54c09e2ffbeb06f5a752a7522b87990d60932862c34d87e0d2",
+      "bytes": 30613
+    },
+    {
+      "path": "site/pieces/taiko-clash.js",
+      "sha256": "357af5ec745d1009599ac52fad1a7cd4a85ba73ed30db60ec55962f3b8f897de",
+      "bytes": 29989
+    },
+    {
+      "path": "site/pieces/tax-holiday.js",
+      "sha256": "855db8b986057dd514145aa32803782d7e75779a044179af190604a6c41355ff",
+      "bytes": 30750
+    },
+    {
+      "path": "site/pieces/terraform.js",
+      "sha256": "fad3e100953134fa73258bbefefc05b333d51f6011e30eca782d721c9e88647f",
+      "bytes": 31651
+    },
+    {
+      "path": "site/pieces/tidepool.js",
+      "sha256": "259f240abce15fd03e17f3f33aa49baca15122424d8f822b26a3f5d580149340",
+      "bytes": 20144
+    },
+    {
+      "path": "site/pieces/traffic-grid.js",
+      "sha256": "711f36f3e4c33f9c9b5f3d9a6d56f1224070646af366f7884aa08f0a2022f994",
+      "bytes": 21642
+    },
+    {
+      "path": "site/pieces/tribal-stage.js",
+      "sha256": "489e71ec40515857579b79d25d05aa00da5d998d53ab0f114443d1c3e4464ec8",
+      "bytes": 32365
+    },
+    {
+      "path": "site/pieces/under-glass.js",
+      "sha256": "ec35ff4ddb5ae7c8f1096f01729c3689909fadab36ef4b9adce12e78522887cb",
+      "bytes": 29436
+    },
+    {
+      "path": "site/pieces/velour.js",
+      "sha256": "db5811cf6b60dbd57e5fed906c7fa2ce42c72efa589ab5540ce10c38df27447d",
+      "bytes": 30191
+    },
+    {
+      "path": "site/pieces/warehouse.js",
+      "sha256": "7ce108de00249024544fb55dae620228f3af7fe9223ec586911e542f07056ebe",
+      "bytes": 18568
+    },
+    {
+      "path": "site/pieces/zoning-board.js",
+      "sha256": "08c962581d39ec1770b1967c107a58f1c3407c2d020b5e9eb37777800bc238ea",
+      "bytes": 9666
+    },
+    {
+      "path": "site/render.html",
+      "sha256": "7baa91e191aba2cbe6fd17c38950f1a971f247c0465afc6facb5545d5ecdc11b",
+      "bytes": 2014
+    },
+    {
+      "path": "tools/lint.mjs",
+      "sha256": "9735bd53365e60db7dee7d241771b7b52243f34ac919f38b253bf52cbb7c5881",
+      "bytes": 8336
+    },
+    {
+      "path": "tools/load.mjs",
+      "sha256": "c65be34601ee3bbab8bea07b18465318a1622292ac79f6537ec716235b303751",
+      "bytes": 3614
+    },
+    {
+      "path": "tools/score.mjs",
+      "sha256": "a7c46a0fd10ba92a16cd1d0f1110141fabea38c9e7259b780c254a6cf9258b40",
+      "bytes": 2190
+    },
+    {
+      "path": "tools/serve.py",
+      "sha256": "1eee25b3700d9cf699a40b70d3e615913f6c950d0322f357ac3f624a4abf20fd",
+      "bytes": 1925
+    }
+  ]
+}

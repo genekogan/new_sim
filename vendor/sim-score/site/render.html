@@ -1,0 +1,32 @@
+<title>Sim Score</title>
+<p>batch renderer</p>
+<script>
+// Batch renderer, driven by tools/render.sh: ?ids=a,b,c&tag=worker&seconds=180.
+// Scripts load one at a time with retries (many workers hit the dev server at once), and only the pieces asked for.
+const q = new URLSearchParams(location.search), tag = q.get("tag") || "x";
+const ids = (q.get("ids") || "").split(",").filter(Boolean);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const load = (src) => new Promise((res, rej) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = () => { s.remove(); rej(new Error(`could not load ${src}`)); }; document.head.append(s); });
+async function loadRetry(src) { for (let k = 0; ; k++) { try { return await load(src); } catch (e) { if (k >= 5) throw e; await sleep(300 * (k + 1)); } } }
+const post = (name, body) => fetch(`/save/${name}`, { method: "POST", body }).catch(() => {});
+(async () => {
+  try {
+    for (const src of ["https://cdnjs.cloudflare.com/ajax/libs/tone/15.1.22/Tone.js", "engine/theory.js", "engine/compose.js", "engine/instruments.js",
+      "engine/more-instruments.js", "engine/conductor.js", "engine/phrasing.js", "engine/spc.js", "engine/dialogue.js", "engine/groove.js", "engine/band.js", "catalog.js", ...ids.map((id) => `pieces/${id}.js`), "engine/measure.js"]) await loadRetry(src);
+  } catch (e) {
+    for (const id of ids) await post(`err-${id}.json`, JSON.stringify(String(e)));
+    return post(`done-${tag}.json`, "{}");
+  }
+  for (const id of ids) {
+    let err = null;
+    for (let k = 0; k < 2; k++) {
+      try {
+        if (!Sim.pieces.find((p) => p.id === id)) throw new Error(`${id} did not register`);
+        await Sim.exportPiece(id, { seconds: Number(q.get("seconds") || 180), seed: 1 }); err = null; break;
+      } catch (e) { err = e; await sleep(500); }
+    }
+    if (err) await post(`err-${id}.json`, JSON.stringify(String(err) + "\n" + (err.stack || "")));
+  }
+  await post(`done-${tag}.json`, "{}");
+})();
+</script>

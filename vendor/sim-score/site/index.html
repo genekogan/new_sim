@@ -1,0 +1,204 @@
+<title>Sim Score</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a municipal music office. One "now playing" console on top, a zoning-map list of stations below.
+   Layer colors borrow zoning: commercial blue = melody, residential green = harmony, industrial ochre = bass,
+   civic violet = drums, water teal = texture. */
+:root {
+  --bg: #edf0ec;
+  --panel: #f8faf7;
+  --ink: #1a2530;
+  --muted: #5d6b72;
+  --line: #d2d9d3;
+  --accent: #1f5f8b;
+  --melody: #2f6fbf;
+  --harmony: #3b8a4a;
+  --bass: #b9831a;
+  --drums: #7b68a6;
+  --texture: #2a98a0;
+  --grid: rgba(26, 37, 48, .06);
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f151b; --panel: #162029; --ink: #e2e8ec; --muted: #93a3ad; --line: #26333e; --accent: #6eaedc;
+    --melody: #6aa4ec; --harmony: #6cc07c; --bass: #e1ae4b; --drums: #a996d6; --texture: #5ccbd2; --grid: rgba(226, 232, 236, .06);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f151b; --panel: #162029; --ink: #e2e8ec; --muted: #93a3ad; --line: #26333e; --accent: #6eaedc;
+  --melody: #6aa4ec; --harmony: #6cc07c; --bass: #e1ae4b; --drums: #a996d6; --texture: #5ccbd2; --grid: rgba(226, 232, 236, .06);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15.5px; line-height: 1.55; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-inline: 16px; padding-block: 36px 80px; display: grid; gap: 40px; }
+header { display: grid; gap: 10px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(40px, 7vw, 72px); line-height: .95; letter-spacing: -.02em; margin: 0; }
+.lede { margin: 0; max-width: 62ch; color: var(--muted); font-size: 17px; }
+
+/* console */
+.console { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; display: grid; overflow: hidden;
+  position: sticky; top: 8px; z-index: 5; box-shadow: 0 6px 24px rgba(0, 0, 0, .12); }
+/* timeline: where the performance is, and a handle to jump ahead */
+.timeline { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 20px 0; font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.timeline input { width: 100%; accent-color: var(--accent); margin: 0; }
+.np { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 24px; padding: 20px 20px 14px; align-items: end; }
+.np-title { font-family: var(--display); font-weight: 600; font-size: clamp(24px, 3.6vw, 34px); line-height: 1.05; margin: 0; text-wrap: balance; }
+.np-sub { color: var(--muted); font-size: 14px; margin-top: 4px; }
+.np-chord { text-align: right; min-width: 0; }
+.chord { font-family: var(--display); font-weight: 600; font-size: clamp(30px, 5vw, 48px); line-height: 1; white-space: nowrap; }
+.acc { font-family: "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols 2", serif; font-weight: 400; font-size: .82em; margin: 0 .02em; }
+.pos { font-family: var(--mono); font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; margin-top: 6px; }
+.ribbon { position: relative; height: 110px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  background: repeating-linear-gradient(0deg, var(--grid) 0 1px, transparent 1px 12px); }
+.ribbon canvas { width: 100%; height: 100%; display: block; }
+[hidden] { display: none !important; }
+.ribbon .hint { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 14px; pointer-events: none; }
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 12px 20px 16px; }
+button { font: 700 14px var(--body); color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 8px 14px; cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.play { background: var(--ink); border-color: var(--ink); color: var(--panel); min-width: 92px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 7px; font-weight: 400; font-size: 13px; padding: 5px 10px; border-radius: 999px; }
+.chip i { width: 10px; height: 10px; border-radius: 3px; background: var(--c); }
+.chip[aria-pressed="false"] { color: var(--muted); }
+.chip[aria-pressed="false"] i { background: transparent; box-shadow: inset 0 0 0 1.5px var(--c); }
+.spacer { flex: 1; }
+.vol { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.vol input { width: 110px; accent-color: var(--accent); }
+.tour { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.tour input { accent-color: var(--accent); }
+
+/* stations */
+.stations { display: grid; gap: 14px; }
+.stations h2 { font-family: var(--display); font-weight: 600; font-size: 22px; margin: 0; }
+.directory { display: grid; border-top: 1px solid var(--line); }
+.genre { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 12px 20px; padding-block: 14px; border-bottom: 1px solid var(--line); }
+.genre-name { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding-top: 4px; }
+.genre-name b { display: block; font-family: var(--display); font-size: 17px; letter-spacing: 0; text-transform: none; color: var(--ink); font-weight: 600; margin-bottom: 2px; }
+.pieces { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 10px; }
+.station { text-align: left; display: grid; gap: 6px; align-content: start; padding: 12px 14px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); font-weight: 400; min-width: 0; }
+.station:hover { border-color: var(--muted); }
+.station[aria-current="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.st-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.st-title { font-family: var(--display); font-weight: 600; font-size: 18px; line-height: 1.15; }
+.st-meta { font-family: var(--mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.st-about { color: var(--muted); font-size: 13.5px; line-height: 1.45; }
+
+.notes { display: grid; gap: 10px; max-width: 70ch; color: var(--muted); }
+.notes h2 { font-family: var(--display); font-weight: 600; font-size: 22px; margin: 0; color: var(--ink); }
+.notes p { margin: 0; }
+
+/* houseband */
+.band { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px 16px; display: grid; gap: 14px; }
+.band-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
+.band h2 { font-family: var(--display); font-weight: 600; font-size: 22px; margin: 0; }
+.band-status { font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+.sits { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 8px; }
+.sit { text-align: left; display: grid; gap: 1px; padding: 9px 12px; font-weight: 400; border-radius: 8px; background: var(--bg); }
+.sit b { font-family: var(--display); font-weight: 600; font-size: 16px; }
+.sit span { font-size: 12px; color: var(--muted); line-height: 1.3; }
+.sit small { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+.sit[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--panel); }
+.sit[aria-pressed="true"] span, .sit[aria-pressed="true"] small { color: var(--panel); opacity: .78; }
+.band-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.energy { display: inline-flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+.energy input { width: min(260px, 52vw); accent-color: var(--accent); }
+.st-tags { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.meter { display: inline-flex; gap: 2px; }
+.meter i { width: 6px; height: 9px; border-radius: 1px; background: var(--line); }
+.meter i.on { background: var(--drums); }
+.station.fits { border-color: var(--drums); }
+.station.dim { opacity: .45; }
+@media (max-width: 720px) {
+  .genre { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .np { grid-template-columns: 1fr; }
+  .np-chord { text-align: left; }
+  .ribbon { height: 90px; }
+  .console { position: static; box-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Department of Background Music</div>
+    <h1>Sim Score</h1>
+    <p class="lede" id="lede">Pieces of music written as code, in the spirit of SimCity, Spore, The Sims and their neighbours, and a houseband that plays whatever fits what is happening. Nothing is recorded. Every note is composed in your browser a few bars before it plays, so each performance is new and none of them ends.</p>
+  </header>
+
+  <section class="band" aria-label="Houseband">
+    <div class="band-head">
+      <h2>What's happening?</h2>
+      <div class="band-status" id="band-status">Pick a situation and the band will play something that fits.</div>
+    </div>
+    <div class="sits" id="sits"></div>
+    <div class="band-bar">
+      <label class="energy" for="energy">Calm <input type="range" id="energy" min="0" max="100" step="1" value="50"> Wild</label>
+      <button id="another">Another tune</button>
+    </div>
+  </section>
+
+  <section class="console" aria-label="Now playing">
+    <div class="np">
+      <div style="min-width:0">
+        <h2 class="np-title" id="np-title">Pick a station</h2>
+        <div class="np-sub" id="np-sub">Loading the band&hellip;</div>
+      </div>
+      <div class="np-chord">
+        <div class="chord" id="np-chord">&nbsp;</div>
+        <div class="pos" id="np-pos">bar &ndash; &middot; beat &ndash;</div>
+      </div>
+    </div>
+    <div class="ribbon"><canvas id="ribbon"></canvas><div class="hint" id="ribbon-hint">Notes will scroll here as they play</div></div>
+    <div class="timeline">
+      <span id="np-time">0:00</span>
+      <input type="range" id="seek" min="0" max="300" step="1" value="0" aria-label="Position in the performance" title="Drag to jump ahead in this performance">
+      <span id="np-cycle">cycle &ndash;</span>
+    </div>
+    <div class="bar">
+      <button class="play" id="play">Play</button>
+      <button id="next">Next station</button>
+      <button id="reseed" title="Start a new performance of this piece">New performance</button>
+      <div class="chips" id="layers"></div>
+      <span class="spacer"></span>
+      <label class="tour"><input type="checkbox" id="tour"> Change tune every 4 min</label>
+      <label class="vol" for="volume">Volume <input type="range" id="volume" min="-30" max="0" step="1" value="-6"></label>
+    </div>
+  </section>
+
+  <section class="stations">
+    <h2>Stations</h2>
+    <div class="directory" id="stations"></div>
+  </section>
+
+  <section class="notes">
+    <h2>How it works</h2>
+    <p>Each piece is a function that composes a few bars at a time, just before they play. A small theory engine parses chord symbols, picks voicings that lead smoothly from the last chord, and writes melodic lines that land chord tones on strong beats. Each piece carries its own memory of form, motifs and loop phases, so the music develops over minutes instead of looping.</p>
+    <p>Every instrument is synthesized live with Tone.js: FM for electric pianos, bells and basses, Karplus&ndash;Strong for guitars and koto, filtered noise and tuned membranes for a drum room that runs from brushes and congas to 808s, gated snares, surdos and taiko. There are no samples.</p>
+    <p>The houseband reads two things about every piece: the situations it suits and its energy. Pick a situation and it chooses a tune that fits, avoiding what it just played; pull the energy down and the drummer lays out, then the bass player, the way a real band would bring it down for a quiet moment.</p>
+  </section>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/15.1.22/Tone.js"></script>
+<script src="engine/theory.js" charset="utf-8"></script>
+<script src="engine/compose.js" charset="utf-8"></script>
+<script src="engine/instruments.js" charset="utf-8"></script>
+<script src="engine/more-instruments.js" charset="utf-8"></script>
+<script src="engine/conductor.js" charset="utf-8"></script>
+<script src="engine/phrasing.js" charset="utf-8"></script>
+<script src="engine/spc.js" charset="utf-8"></script>
+<script src="engine/dialogue.js" charset="utf-8"></script>
+<script src="engine/groove.js" charset="utf-8"></script>
+<script src="engine/band.js" charset="utf-8"></script>
+<script src="catalog.js" charset="utf-8"></script>
+<script src="app.js" charset="utf-8"></script>
