@@ -81,7 +81,7 @@ function furnishedShop(recipe?: any) {
     // (a seat at one of the spots the use-check stands a body to get on it, lane FUZZ2: a stool facing the counter is got on
     // from its back)
     const spots = pieces.map((x) => seatSlides(x.bb, x.c, x.yaw, room.y, [...baked.colliders, ...pieces.filter((o) => o !== x)]));
-    const flat = spots.flatMap((sp, i) => sp.length ? sp.flat().map((q) => ({ i, key: { pts: [q], r: 0.071 } })) : [{ i, key: pieces[i].approach }]);
+    const flat: { i: number; key: any }[] = spots.flatMap<{ i: number; key: any }>((sp, i) => sp.length ? sp.flat().map((q) => ({ i, key: { pts: [q], r: 0.071 } })) : [{ i, key: pieces[i].approach }]);
     const labels = wayLabels(room, [...keys, ...flat.map((x) => x.key)], [...walls, ...pieces], way);
     for (const [i, x] of pieces.entries()) assert.ok(flat.some((f, k) => f.i === i && labels[keys.length + k] === labels[0]), `${room.id}: ${x.name} is reached from the door`);
   }
