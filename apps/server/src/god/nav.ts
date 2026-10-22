@@ -300,9 +300,10 @@ export class GodNav {
     // WALK3: a ground goal off the main walkable ground (a fenced court, a dense wood, a mountain band, a hill) moves to the
     // nearest open spot of the main ground within r of it, else of `alt`; only once the engine's labels are ready (a
     // listing never waits for them)
-    const toMain = (g: { p: Vec2; level: number } | null, r: number, alt?: Vec2) => {
+    const toMain = (g: { p: Vec2; level: number } | null, r: number, ...alts: Vec2[]) => {
       if (!g || g.level || !E.navCheckV1 || !E.navNearestMainV1 || !E.navWarmV1?.(0) || E.navCheckV1([{ id: t.ref, p: g.p, level: 0 }])[0]?.ok) return g;
-      const q = E.navNearestMainV1(g.p, except, r) ?? (alt ? E.navNearestMainV1(alt, except, r) : null);
+      let q = E.navNearestMainV1(g.p, except, r);
+      for (const a of alts) q ??= E.navNearestMainV1(a, except, r);
       return q ? { p: [r2(q[0]), r2(q[1])] as Vec2, level: 0 } : g;
     };
     let goal: { p: Vec2; level: number } | null = null;
@@ -322,7 +323,8 @@ export class GodNav {
       // area whose middle has none (a lake with its shore, a dense forest) is reached at its edge
       goal = inPoly(me[0], me[1], t.area!) ? (near(me, 0, 8) ?? near(me, 0, 40)) : near(t.at, 0, 40);
       goal ??= near(nearestOn(t.area!, me, true).q, 0, 16);
-      goal = toMain(goal, 80, nearestOn(t.area!, me, true).q);
+      // its edge spot can be a pocket (a slope wood) while open main ground lies nearer its middle: try both
+      goal = toMain(goal, 80, nearestOn(t.area!, me, true).q, t.at);
     } else if (t.kind === 'room') {
       // the room's reachable standing point, moved aside when another body already stands on it (two Souls told to go
       // into the tea room do not queue for one spot)
