@@ -51,12 +51,16 @@ test('rewritePhasedHtml: one loader in place of the module script and preloads; 
   assert.deepEqual(held.added.slice(5).map((a) => `${a.tag} ${a.url}`), ['socket ']);
   held.timers.forEach((f) => f()); call();
   assert.deepEqual(held.added.slice(6).map((a) => `${a.tag} ${a.url}`), ['entry /worlds/assets/main-A.js']);
-  // t4-phone3: phase two's entry downloads by itself once its other downloads are in (no wait for the fill)
+  // t4-phone3: phase two's entry downloads once its other downloads are in and the arrival gate (nearest models) is clear
   const auto = runLoader(js, true), go = auto.win[PHASE2_GLOBAL] as (h?: true | string) => void; go(true);
+  let pending = true; const subs: (() => void)[] = [];
+  auto.win.__arrivalGate = { pending: () => pending, subscribe: (f: () => void) => { subs.push(f); return () => { subs.length = 0; }; } };
   (auto.added[2].el.onload as () => void)();
   assert.equal(auto.added.length, 4, 'one of two preloads in: nothing more');
   (auto.added[3].el.onerror as () => void)();
-  assert.deepEqual(auto.added.slice(4).map((a) => `${a.tag} ${a.url}`), ['modulepreload /worlds/assets/main-A.js'], 'all in (or failed): the entry downloads');
+  assert.equal(auto.added.length, 4, 'all in, near models still coming: nothing more');
+  pending = false; subs.forEach((f) => f());
+  assert.deepEqual(auto.added.slice(4).map((a) => `${a.tag} ${a.url}`), ['modulepreload /worlds/assets/main-A.js'], 'gate clear: the entry downloads');
   go(PHASE2_FILL); go();
   assert.deepEqual(auto.added.slice(5).map((a) => `${a.tag} ${a.url}`), ['entry /worlds/assets/main-A.js'], 'the run waits for the download; still no socket');
   (auto.added[5].el.onload as () => void)(); (auto.added[4].el.onload as () => void)();
@@ -110,7 +114,7 @@ test('t4-phone: once the snapshot has answered, the socket waits for the fill (o
   vm.runInNewContext(phasedLoaderScript({ entry: '/e.js', preloads: [] }, { entry: '/m.js', preloads: [] }), { window: w2, document: { createElement: (tag: string) => ({ tag }), head: { appendChild: (el: Record<string, unknown>) => { a2.push(`${el.type === 'module' ? 'entry' : el.rel} ${el.src ?? el.href}`); } } }, setTimeout: (f: () => void, ms: number) => { t2.push({ f, ms }); } });
   await new Promise((r) => setImmediate(r));
   (w2[PHASE2_GLOBAL] as (h?: true) => void)(true); (w2[PHASE2_GLOBAL] as () => void)();
-  // t4-phone3: no other downloads, so the entry downloads at the held call; the socket waits for it to be in
+  // t4-phone3: no other downloads and no arrival gate, so the entry downloads at the held call; the socket waits for it
   assert.deepEqual(a2, ['entry /e.js', 'modulepreload /m.js', 'entry /m.js']);
 });
 

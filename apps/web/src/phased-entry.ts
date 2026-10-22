@@ -24,8 +24,10 @@ export const SOCKET_FALLBACK_MS = 2_500;
 // snapshot's answer waits behind phase one's ~400 KB of code, so at 2.5 s it had "not answered" on every phone page
 // and the join (~165 KB) shared the link with the poster's scripts and phase two's entry. And the socket opens once
 // phase two's entry has downloaded (not with its download): the join no longer delays the entry, so the card (which
-// waits for the entry, not for the join) comes ~1 s sooner. Phase two's entry downloads as soon as its other
-// downloads are in (it waited for the early renderer's fill, leaving the link idle while the phone built the world).
+// waits for the entry, not for the join) comes ~1 s sooner. Phase two's entry downloads once its other downloads are in
+// and the poster's nearest models are in (the arrival gate), not at the early renderer's fill: on Eden 2026 the gate is
+// clear seconds before the fill (the phone is building the world, the link idle). Without the gate check it took the link
+// from Mars College's near models (poster +23%).
 /** t4-phone: `__simPhase2(FILL)`: the poster's bytes are in (the early renderer's nearest models too), so phase two's entry
  *  is fetched (not run) and the socket opens while the phone links and draws the poster; the entry runs at the next plain
  *  call, as before. */
@@ -46,8 +48,10 @@ export function phasedLoaderScript(early: Phase, main: Phase): string {
     + `so=function(){if(!sock){sock=true;try{var o=W.__simOpenSocket;if(typeof o==='function')o();}catch(e){}}},`
     // t4-phone3: the entry's download (fe) and its end (ml): the socket opens once it is in, its join after it on the link
     + `si=false,fe=false,ml=false,`
+    // t4-phone3: B' = phase two's other downloads in and the poster's nearest models in (window.__arrivalGate): fill
+    + `near=function(){var g=W.__arrivalGate;if(g&&g.pending()){var off=g.subscribe(function(){if(!g.pending()){off();fill();}});}else fill();},`
     + `fill=function(){if(!done&&!fe){fe=true;var l=add(M.entry);l.onload=l.onerror=function(){ml=true;so();};}},`
-    + `two=function(hold){if(!pre){pre=true;var left=M.preloads.length,got=function(){if(--left===0&&hold===true)fill();};M.preloads.forEach(function(u){var l=add(u);l.onload=l.onerror=got;});if(!left&&hold===true)fill();}`
+    + `two=function(hold){if(!pre){pre=true;var left=M.preloads.length,got=function(){if(--left===0&&hold===true)near();};M.preloads.forEach(function(u){var l=add(u);l.onload=l.onerror=got;});if(!left&&hold===true)near();}`
     + `if(hold===${JSON.stringify(PHASE2_FILL)})fill();if(hold!==true&&hold!==${JSON.stringify(PHASE2_FILL)}&&!done){done=true;var e=add(M.entry,true);if(!fe||ml)so();else e.onload=e.onerror=so;}};`
     + `W[${JSON.stringify(PHASE2_GLOBAL)}]=two;var ph=W.__simPhased===true;if(!ph)two();`
     + `try{W.__simSnapshotPrefetch.response.then(function(){si=true;},function(){});}catch(e){}`
