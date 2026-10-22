@@ -160,11 +160,15 @@ function slideFree(sp: Vec2, own: SlideBlocker[], pts: readonly Vec2[]): Vec2[] 
   if (!pts.length) return [];
   let reach = 0;
   for (const p of pts) reach = Math.max(reach, Math.hypot(sp[0] - p[0], sp[1] - p[1]));
-  const ds = own.filter((b) => boxDist(b, sp[0], sp[1]) < reach + SLIDE_REACH).map(distOf);
+  const ds = own.filter((b) => boxDist(b, sp[0], sp[1]) < reach + SLIDE_REACH).map(distOf), atSeat = ds.map((d) => d(sp[0], sp[1]));
+  const path: ((x: number, z: number) => number)[] = [];
   return pts.filter((p) => {
-    for (const d of ds) if (d(p[0], p[1]) < PLAN_R) return false;
     const len = Math.hypot(sp[0] - p[0], sp[1] - p[1]), n = Math.max(1, Math.ceil(len / 0.025)), pad = len / n / 2, r = SLIDE_BODY + pad;
-    for (let i = 0; i <= n; i++) { const qx = p[0] + (sp[0] - p[0]) * i / n, qz = p[1] + (sp[1] - p[1]) * i / n; for (const d of ds) if (d(qx, qz) < r) return false; }
+    // a box nearer the path than r somewhere is within reach of both ends: (its distance at the spot + at the seat - len) / 2
+    // bounds its distance from every point of the path, so a box past that bound cannot refuse the slide
+    path.length = 0;
+    for (let k = 0; k < ds.length; k++) { const at = ds[k](p[0], p[1]); if (at < PLAN_R) return false; if ((at + atSeat[k] - len) / 2 < r + 1e-6) path.push(ds[k]); }
+    for (let i = 0; i <= n; i++) { const qx = p[0] + (sp[0] - p[0]) * i / n, qz = p[1] + (sp[1] - p[1]) * i / n; for (const d of path) if (d(qx, qz) < r) return false; }
     return true;
   });
 }
