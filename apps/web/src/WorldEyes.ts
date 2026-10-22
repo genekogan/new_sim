@@ -62,7 +62,7 @@ export class WorldEyes {
     clearTimeout(this.idleTimer); this.idleTimer = null; this.idleCb = null; requestAnimationFrame(cb);
   }
   /** Run this animation frame? While idle only every idleMs (the scene keeps up; nothing is drawn). */
-  wake(now: number): boolean {if (this.queue.length) return true; if (now - this.lastWake >= this.idleMs * 0.9) {this.lastWake = now; return true;} return false;}
+  wake(now: number): boolean {if (this.queue.length || !this.host.ready()) return true; if (now - this.lastWake >= this.idleMs * 0.9) {this.lastWake = now; return true;} return false;}
   /** Before view-dependent passes: put the main camera at the Soul's eyes so culling, shadows and LOD follow it. */
   aim(): void {
     const p = this.queue[0]; if (!p || p.job.mode !== 'eyes') return;
