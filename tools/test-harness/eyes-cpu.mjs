@@ -36,7 +36,7 @@ try {
   await until(async()=>(await fetch(base+'/healthz')).ok);
   report.worldBootMs=Math.round(performance.now()-start);
   const off=await (await fetch(base+'/v1/edge/view/status')).json();assert.equal(off.eyes.state,'off');
-  worker=new EyesWorker({viewerUrl:base+'/',env:{EDGE_EYES_GPU:'swiftshader'},timeoutMs:90000});
+  worker=new EyesWorker({viewerUrl:base+'/'+(process.env.EYES_CPU_QUERY?'?'+process.env.EYES_CPU_QUERY:''),env:{EDGE_EYES_GPU:'swiftshader'},timeoutMs:90000});
   await until(()=>worker.status().state==='ready',300000);
   report.workerReadyMs=Math.round(performance.now()-start)-report.worldBootMs;
   report.renderer=worker.status().renderer;assert.match(report.renderer,/swiftshader/i);
@@ -51,7 +51,10 @@ try {
     report.samples.push({mode,w,h,n:samples.length,ms:samples,p50,p95,estimatedFramesPerMinuteAtP95:Math.floor(60000/p95),withinWorldBudget:p95*12<60000});
   }
   // lane soul-eyes-on: the worker's idle CPU (bar <= 2% of one core over 60 s) and its nice level, from /proc
-  report.idle=await idleCpu(60_000,server.pid);
+  report.idle=await idleCpu(60_000,server.pid);report.query=process.env.EYES_CPU_QUERY||null;
+  // render on demand: the first views after the idle minute wake a sleeping page (bar: p95 <= 5 s)
+  const after=[];for(let i=0;i<3;i++){const t=performance.now();await worker.render({mode:'eyes',w:512,h:320,quality:.7,pose:{p:[0,1.62,0],yaw:i,pitch:-.14,vfov:1},self:'',show:[]});after.push(Math.round(performance.now()-t));if(i<2)await new Promise(r=>setTimeout(r,5000));}
+  report.afterIdleMs=after;
   report.status=worker.status();assert.ok(report.samples.every(s=>s.withinWorldBudget),'fixture must sustain the 12/minute budget');
   report.ok=true;
 }catch(error){report.ok=false;report.error=String(error.stack||error);process.exitCode=1;}

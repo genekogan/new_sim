@@ -4,7 +4,7 @@ import { compileSceneAsync } from './gen-mesh/texture-budget.ts';
  * worker (one headless browser, one page) calls `window.edenEyes.capture(job)`; this module poses the camera at the
  * Soul's eyes (or overhead for map mode), hides every Soul body the server did not list as seen (and the Soul's own
  * body), hides spectator overlays (speech bubbles, selection ring, pivot), draws one frame at the requested size and
- * returns it as a JPEG. Between jobs it draws nothing and the scene updates at a few Hz. Never touches simulation;
+ * returns it as a JPEG. Between jobs it draws nothing and the scene updates once a second. Never touches simulation;
  * without `?eyes=1` it does nothing. */
 export type EyesJob = {mode: 'eyes' | 'map'; w: number; h: number; quality?: number; pose: {p: [number, number, number]; yaw: number; pitch: number; vfov: number}; self: string; show: string[]; span?: number};
 export type EyesResult = {ok: true; b64: string; frameTick: number | null; frames: number; ms: number} | {ok: false; error: string};
@@ -19,16 +19,22 @@ export type EyesHost = {
   tick(): number | null; ready(): boolean;
 };
 type Pending = {job: EyesJob; resolve(r: EyesResult): void; frames: number; started: number};
-const WARM_FRAMES = 2, IDLE_MS = 100;   // 10 Hz idle updates keep the viewer's own clock (weather easing, motion) at real time
+// Render on demand (lane soul-eyes-on): between jobs the page asks for NO animation frames; one scene update every
+// IDLE_MS (default 1 s, `?eyes=1&eyesIdle=<ms>`) keeps the replica, buffers and builds current at near-zero CPU, and a job
+// wakes the loop at once. 10 Hz idle updates on a 60 Hz rAF cost 17.7% of a core on Modal (bar 2%).
+export const WARM_FRAMES = 2, IDLE_MS = 1000;
+export function eyesIdleMs(search: string): number {const n = Number(new URLSearchParams(search).get('eyesIdle')); return Number.isFinite(n) && n >= 50 && n <= 60_000 ? n : IDLE_MS;}
 
 export class WorldEyes {
   private queue: Pending[] = []; private lastWake = 0; private disposed = false;
+  private idleTimer: ReturnType<typeof setTimeout> | null = null; private idleCb: FrameRequestCallback | null = null;
+  private readonly idleMs: number;
   private compiled: Promise<unknown> | undefined;
   private readonly ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 500);
   private readonly host: EyesHost;
-  static fromSearch(search: string, host: EyesHost): WorldEyes | null {return new URLSearchParams(search).get('eyes') === '1' ? new WorldEyes(host) : null;}
-  constructor(host: EyesHost) {
-    this.host = host; host.renderer.setPixelRatio(1);
+  static fromSearch(search: string, host: EyesHost): WorldEyes | null {return new URLSearchParams(search).get('eyes') === '1' ? new WorldEyes(host, eyesIdleMs(search)) : null;}
+  constructor(host: EyesHost, idleMs = IDLE_MS) {
+    this.host = host; this.idleMs = idleMs; host.renderer.setPixelRatio(1);
     (window as unknown as {edenEyes?: unknown}).edenEyes = {
       ready: () => !this.disposed && host.ready(),
       capture: (job: EyesJob) => this.capture(job),
@@ -40,10 +46,23 @@ export class WorldEyes {
     // first job: compile every material in the scene once (software GL otherwise stalls for seconds on new shaders)
     this.compiled ??= compileSceneAsync(this.host.renderer, this.host.scene, this.host.camera, 30_000);
     const started = performance.now();
-    return this.compiled.then(() => new Promise<EyesResult>(resolve => this.queue.push({job, resolve, frames: 0, started})));
+    return this.compiled.then(() => new Promise<EyesResult>(resolve => {this.queue.push({job, resolve, frames: 0, started}); this.wakeNow();}));
   }
-  /** Run this animation frame? While idle only every IDLE_MS (the scene keeps up; nothing is drawn). */
-  wake(now: number): boolean {if (this.queue.length) return true; if (now - this.lastWake >= IDLE_MS) {this.lastWake = now; return true;} return false;}
+  /** Schedule the viewer's next frame (replaces its pacer in eyes mode): frames back to back while a job is queued,
+   * otherwise one frame after idleMs. Returns a timer or rAF id (the viewer's loop checks its abort signal first). */
+  schedule(cb: FrameRequestCallback, next: (cb: FrameRequestCallback) => number): number {
+    if (this.queue.length || this.disposed || !this.host.ready()) return next(cb);   // loading: full pace until the scene settles
+    this.idleCb = cb;
+    const t = setTimeout(() => {if (this.idleTimer !== t) return; this.idleTimer = null; this.idleCb = null; requestAnimationFrame(cb);}, this.idleMs);
+    this.idleTimer = t; return t as unknown as number;
+  }
+  /** A job arrived while the loop sleeps: run its frame now instead of after the idle wait. */
+  private wakeNow(): void {
+    const cb = this.idleCb; if (!this.idleTimer || !cb) return;
+    clearTimeout(this.idleTimer); this.idleTimer = null; this.idleCb = null; requestAnimationFrame(cb);
+  }
+  /** Run this animation frame? While idle only every idleMs (the scene keeps up; nothing is drawn). */
+  wake(now: number): boolean {if (this.queue.length) return true; if (now - this.lastWake >= this.idleMs * 0.9) {this.lastWake = now; return true;} return false;}
   /** Before view-dependent passes: put the main camera at the Soul's eyes so culling, shadows and LOD follow it. */
   aim(): void {
     const p = this.queue[0]; if (!p || p.job.mode !== 'eyes') return;
@@ -88,7 +107,8 @@ export class WorldEyes {
     return true;
   }
   dispose(): void {
-    this.disposed = true; for (const p of this.queue.splice(0)) p.resolve({ok: false, error: 'viewer closed'});
+    this.disposed = true; if (this.idleTimer) clearTimeout(this.idleTimer); this.idleTimer = null; this.idleCb = null;
+    for (const p of this.queue.splice(0)) p.resolve({ok: false, error: 'viewer closed'});
     delete (window as unknown as {edenEyes?: unknown}).edenEyes;
   }
 }

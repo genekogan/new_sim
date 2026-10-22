@@ -9,6 +9,7 @@
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import {setPriority} from 'node:os';
+import {readdirSync, readFileSync} from 'node:fs';
 import {EYES_UA_TAG, eyesBrowserLaunch, eyesBrowserModes, eyesNice} from './browser-config.mjs';
 
 const viewer = process.env.EDGE_EYES_URL;
@@ -20,6 +21,28 @@ const {chromium} = createRequire(from)('@playwright/test');
 
 // below the world's own priority (the browser processes inherit it): renders never delay a tick
 try {setPriority(0, eyesNice());} catch (e) {log('could not lower priority:', e.message);}
+// Chromium re-prioritises its own processes and threads (Modal as root saw nice -8, 0 and 5 under a nice-10 worker), so
+// put every thread of the browser's process tree back to at least the worker's niceness after launch and every 30 s.
+// Raising a nice value never needs a privilege; Linux only (/proc).
+function reniceTree(root = process.pid, nice = eyesNice()) {
+  if (process.platform !== 'linux') return 0;
+  const kids = new Map();
+  for (const d of readdirSync('/proc')) {
+    if (!/^\d+$/.test(d)) continue;
+    try {const st = readFileSync(`/proc/${d}/stat`, 'utf8'), f = st.slice(st.lastIndexOf(')') + 2).split(' '); const pp = Number(f[1]); (kids.get(pp) ?? kids.set(pp, []).get(pp)).push(Number(d));} catch {/* gone */}
+  }
+  let changed = 0;
+  for (const stack = [...(kids.get(root) ?? [])]; stack.length;) {
+    const pid = stack.pop(); stack.push(...(kids.get(pid) ?? []));
+    let tids = []; try {tids = readdirSync(`/proc/${pid}/task`).map(Number);} catch {continue;}
+    for (const tid of tids) {
+      try {const st = readFileSync(`/proc/${pid}/task/${tid}/stat`, 'utf8'), n = Number(st.slice(st.lastIndexOf(')') + 2).split(' ')[16]); if (n < nice) {setPriority(tid, nice); changed++;}} catch {/* gone or not ours */}
+    }
+  }
+  return changed;
+}
+let reniced = 0;
+const renice = () => {try {const n = reniceTree(); if (n && !reniced++) log('reniced', n, 'browser threads to', eyesNice(), '(logged once)');} catch (e) {log('renice failed', e.message);}};
 const order = eyesBrowserModes();
 let browser = null, page = null, renderer = null, ready = false, closing = false, loadedAt = 0, busy = false;
 const queue = [];
@@ -54,7 +77,7 @@ async function load() {
   }
   // one throwaway frame compiles the shaders before the first real request
   try {await page.evaluate(() => window.edenEyes.capture({mode: 'eyes', w: 320, h: 180, quality: 0.5, pose: {p: [9, 1.6, 12], yaw: -Math.PI / 2, pitch: -0.06, vfov: 1}, self: '', show: []}));} catch (e) {log('warm-up frame failed', e.message.split('\n')[0]);}
-  loadedAt = Date.now(); ready = true; send({t: 'status', ready: true, renderer, detail: null}); log('viewer ready');
+  renice(); loadedAt = Date.now(); ready = true; send({t: 'status', ready: true, renderer, detail: null}); log('viewer ready');
 }
 let failing = false;
 async function fail(why) {
@@ -88,6 +111,7 @@ process.on('message', msg => {
 async function shutdown(code) {closing = true; try {await browser?.close();} catch {/* gone */} process.exit(code);}
 process.on('disconnect', () => void shutdown(0));
 process.on('SIGTERM', () => void shutdown(0));
+setInterval(renice, 30_000).unref();
 // liveness: if the page stops answering, start it again
 setInterval(async () => {
   if (!ready || busy || !page) return;
