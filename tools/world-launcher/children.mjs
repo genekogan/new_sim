@@ -400,7 +400,8 @@ export function defaultCommand(world, port, o) {
     // Lane P5: V8's compile cache for this release's code (compileCacheDir): a world boots with ~0.4 s less CPU
     ...(o.compileCache ? { NODE_COMPILE_CACHE: o.compileCache } : {}),
   };
-  return { cmd: process.execPath, args: [...(clerk ? [`--env-file=${resolve(clerk.envFile)}`] : []), 'apps/server/src/main.ts'], env };
+  // Lane BOOT2: with the compile cache, the server's TypeScript is stripped once per build, not on every boot (strip-cache.mjs)
+  return { cmd: process.execPath, args: [...(clerk ? [`--env-file=${resolve(clerk.envFile)}`] : []), ...(o.compileCache ? ['--import', './apps/server/src/strip-cache.mjs'] : []), 'apps/server/src/main.ts'], env };
 }
 
 /** A fork of an old world (launcher op register-fork; tools/world-launcher/fork-world.mjs): main's old-world entry points
