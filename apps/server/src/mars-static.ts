@@ -5,6 +5,7 @@ import { compress } from 'hono/compress';
 import { serveStatic } from '@hono/node-server/serve-static';
 
 const PUBLIC_ORIGIN = 'https://sim.mars.college';
+export const MARS_STATIC_CACHE = 'public, max-age=86400, stale-while-revalidate=604800';
 // Public, already-published derivatives only. Never source photos, Blender
 // projects, capabilities, private room APIs or arbitrary upstream URLs.
 export function publicMarsAsset(path: string): boolean {
@@ -17,12 +18,17 @@ export function mountMarsStatic(app: Hono, root: string) {
   // Copied GLBs have no precompressed sidecars. Stream gzip for browsers that
   // accept it, keeping range responses and already encoded bodies untouched.
   const compressGlb = compress({ encoding: 'gzip', contentTypeFilter: /^model\/gltf-binary(?:;|$)/i });
-  app.get('/mars-assets/*', compressGlb, serveStatic({ root, rewriteRequestPath: p => p.replace(/^\/mars-assets/, '') }));
+  // lane CACHE (2026-10-22): /mars-assets (the Draco decoder, character parts) had no Cache-Control, so Cloudflare answered
+  // /worlds/mars-assets/draco/* DYNAMIC from the origin on every load. Same day + SWR policy as the published routes below.
+  app.get('/mars-assets/*', compressGlb, async (c, next) => {
+    const r = await serveStatic({ root, rewriteRequestPath: p => p.replace(/^\/mars-assets/, '') })(c, next); const out = r ?? c.res;
+    if (out.status === 200 && !out.headers.has('cache-control')) out.headers.set('cache-control', MARS_STATIC_CACHE); return r;
+  });
   for (const pattern of ['/engine/*', '/modular/*', '/models/*', '/history/*', '/2020/*', '/browser/*', '/data/manifest.json']) {
     app.get(pattern, compressGlb, async (c, next) => {
       if (!publicMarsAsset(c.req.path)) return c.notFound();
       // lane W1: published files on disk had no Cache-Control (the 1.8 MB character GLBs were cached by heuristics only)
-      if (existsSync(join(root, c.req.path))) { const r = await serveStatic({ root })(c, next); const out = r ?? c.res; if (out.status === 200 && !out.headers.has('cache-control')) out.headers.set('cache-control', 'public, max-age=86400, stale-while-revalidate=604800'); return r; }
+      if (existsSync(join(root, c.req.path))) { const r = await serveStatic({ root })(c, next); const out = r ?? c.res; if (out.status === 200 && !out.headers.has('cache-control')) out.headers.set('cache-control', MARS_STATIC_CACHE); return r; }
       const headers = new Headers();
       for (const name of ['range', 'if-none-match', 'if-modified-since']) {
         const value = c.req.header(name); if (value) headers.set(name, value);
