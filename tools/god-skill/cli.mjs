@@ -9,7 +9,7 @@ import { catalog, line as catalogLine, recommend, taxonomy } from './lib/catalog
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { activeClaim, atomicWrite, attention, buildHeader, call, claimFile, decorate, helperFile, load, num, ok, OUTPUT_SUFFIX, r2, save, sleep, withBuildOptions, withDeadline, withStateLock, withoutBuild } from './lib/state.mjs';
-import { mirror, view, normDef, resolveDef, follow, invalidate, mirrorState, adoptMirror, speaksMirror, wasTrusted } from './lib/mirror.mjs';
+import { mirror, view, normDef, resolveDef, follow, invalidate, mirrorState, adoptMirror, heldMirror, speaksMirror, wasTrusted } from './lib/mirror.mjs';
 import { normalizeArgv } from './lib/args.mjs';
 import { exportGenesis } from './lib/export.mjs';
 import { solve, refPoint, centreOf, compassOfYaw, rectArea, circleArea, compassKey, COMPASS, setOf, relocate, frameOf, slotTarget, isFlagDef } from './lib/solver.mjs';
@@ -353,10 +353,10 @@ export async function freePlots(size, flags = {}) {
 
 // ---------------------------------------------------------------- writing
 export async function act(batch, note) {
-  const want = mirrorState(); // G2: the answer carries the mirror delta, so the read after an edit costs nothing
+  const want = mirrorState(), held = want ? heldMirror() : null; // G2: the answer carries the mirror delta, so the read after an edit costs nothing
   const r = ok(await call('/v1/god/act', { body: { ...batch, ...(note ? { note } : {}), ...(want ? { mirror: want } : {}) } }), 'act');
   invalidate();
-  if (r.mirror) { adoptMirror(r.mirror); delete r.mirror; }
+  if (r.mirror) { adoptMirror(r.mirror, held); delete r.mirror; }
   return r;
 }
 export async function dryrun(batch) { return ok(await call('/v1/god/dryrun', { body: batch }), 'dryrun'); }
