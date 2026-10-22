@@ -373,7 +373,8 @@ export async function act(first,...rest){
 }
 /** 1.7.1: everyday phrasings the world does not resolve yet, rewritten to ones it does (the world still decides).
  *  "X, then Y": a walk through X then to Y becomes one walk with via; anything else does X now and returns `then`. */
-const ITEM=/^(?:pick|grab|fetch|take|collect|get me|find)\s+(?:up\s+)?(a|an|some|the)\s+((?:flower|book|letter|tool|frisbee|cup|snack|apple|bread|tea|coffee)s?\b.*)$/;
+// 'take'/'grab' stay with the server: it reads them as accepting a pending give first, else a pick-up (GEST-LIVE 2026-10-23)
+const ITEM=/^(?:pick|fetch|collect|get me|find)\s+(?:up\s+)?(a|an|some|the)\s+((?:flower|book|letter|tool|frisbee|cup|snack|apple|bread|tea|coffee)s?\b.*)$/;
 const EXERCISE=/^(?:let'?s\s+)?(?:do|get|have|go)?\s*(?:some|a|an)?\s*(?:exercise|exercises|workout|work ?out|working out|fitness|calisthenics|training)\b(.*)$/;
 const LEG=/^(?:(?:take|go for|have)\s+(?:a\s+)?(?:little\s+)?(?:walk|stroll|wander)\s+(?:through|around|in|across|to|round)|(?:walk|stroll|wander|go|head|pass)\s+(?:through|around|across|round|to|over to|via))\s+(.+)$/;
 export function rewrite(text){
