@@ -202,7 +202,8 @@ test('together: pick up, carry, give (accepted), put down, pick up again, eat; h
   // a gives it to b ("give her the book" → the only one near)
   const gv = await w.act(a, `give ${b.name} the book`); assert.equal(gv.resolved?.to, 'give:' + b.soulId, JSON.stringify(gv));
   for (let i = 0; i < 20; i++) w.f.host.tickOnce();
-  const tk = await w.act(b, 'accept'); let both = false;
+  // GEST-LIVE: "take the book" beside the library shelves accepts the offered book (it used to pick one off a shelf)
+  const tk = await w.act(b, 'take the book'); assert.match(String(tk.resolved?.to), /^accept:inv_/, JSON.stringify(tk)); let both = false;
   await w.run([{soulId: a.soulId, id: gv.receipt.id}, {soulId: b.soulId, id: tk.receipt.id}], 3000, () => {both ||= w.body(a).human.activity === 'give' && w.body(b).human.activity === 'take';});
   assert.ok(both, 'hand-over seen'); assert.equal(w.phase(a, gv).phase, 'completed'); assert.equal(w.phase(b, tk).phase, 'completed');
   assert.equal((w.ledger.observe(b, new Set()) as any).self.holding?.kind, 'book'); assert.equal((w.ledger.observe(a, new Set()) as any).self.holding, null);
