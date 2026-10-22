@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { CORE_KIT, WorldModel, applyBatch, obbOverlap, type Refused } from './index.ts';
 import { furnishBatch, roomKeys, connectedPairs, wayLabels, approachOf } from '../../../tools/god-skill/lib/furnish.mjs';
+import { seatSlides } from '../../generators/src/clearance.ts';
 
 function fresh() {
   const w = new WorldModel({ constants: { ground: 'land' }, seed: 'furnishing' });
@@ -71,14 +72,18 @@ function furnishedShop(recipe?: any) {
     const pieces = [...w.children.get(b.id)!].map((id) => w.entities.get(id)!).filter((e: any) => e.in.slot === room.id).map((e: any) => {
       const d = w.resolvedDef(e.def)!, bb = w.bake(d, e.params ?? {}, e.seed ?? 0) as any, p = e.p ?? [0, 0, 0];
       const c = [room.origin[0] + p[0], room.origin[1] + p[p.length - 1]], yaw = typeof e.r === 'number' ? e.r : 0;
-      return { name: e.name, c, half: [bb.box[0] / 2, bb.box[2] / 2], yaw, y0: room.y, y1: room.y + bb.box[1], solid: d.layer === 'solid' && bb.box[1] > 0.06, approach: approachOf(bb, c, yaw) };
+      return { name: e.name, c, half: [bb.box[0] / 2, bb.box[2] / 2], yaw, y0: room.y, y1: room.y + bb.box[1], solid: d.layer === 'solid' && bb.box[1] > 0.06, approach: approachOf(bb, c, yaw), bb };
     }).filter((x) => x.solid);
     const all = (keys.length * (keys.length - 1)) / 2;
     assert.equal(connectedPairs(room, keys, walls, way), all, `${room.id}: walls alone`);
     assert.equal(connectedPairs(room, keys, [...walls, ...pieces], way), all, `${room.id}: furnished, ${keys.length} doors/stair ends`);
     // ... and where a Soul sent to each piece stands is reached from the doors (the display may not stand at a shelf's front)
-    const labels = wayLabels(room, [...keys, ...pieces.map((x) => x.approach)], [...walls, ...pieces], way);
-    for (const [i, x] of pieces.entries()) assert.ok(labels[keys.length + i] === labels[0], `${room.id}: ${x.name} is reached from the door`);
+    // (a seat at one of the spots the use-check stands a body to get on it, lane FUZZ2: a stool facing the counter is got on
+    // from its back)
+    const spots = pieces.map((x) => seatSlides(x.bb, x.c, x.yaw, room.y, [...baked.colliders, ...pieces.filter((o) => o !== x)]));
+    const flat: { i: number; key: any }[] = spots.flatMap<{ i: number; key: any }>((sp, i) => sp.length ? sp.flat().map((q) => ({ i, key: { pts: [q], r: 0.071 } })) : [{ i, key: pieces[i].approach }]);
+    const labels = wayLabels(room, [...keys, ...flat.map((x) => x.key)], [...walls, ...pieces], way);
+    for (const [i, x] of pieces.entries()) assert.ok(flat.some((f, k) => f.i === i && labels[keys.length + k] === labels[0]), `${room.id}: ${x.name} is reached from the door`);
   }
   return f;
 }
@@ -93,9 +98,9 @@ test('a furnished shop keeps the way from its front door to the storeroom door (
 test('a seat whose own front is shut in is dropped (the shop stool behind the counter); a piece may not stand at another piece\'s front', () => {
   // SEALED 2026-10-21 put the display on the east side (fx 0.78) and saw shelf-2 go bad, but only because the stool's key (any
   // free cell within 1.5 m of its front) let it stand behind the counter with its front shut in. BSGEN 2026-10-21: a seat's key
-  // is within 0.5 m of its front, one key per seat; the stool is dropped and, in the fuzz walk world with the display first at
-  // 0.78, no shop has a bad or unusable piece (at 1.5 m: 5 shops with the stool use.no-approach). furnishedShop checks that
-  // every placed piece's front is reached from the door.
+  // is within 0.5 m of its front, one key per seat; the stool is dropped. FUZZ2 2026-10-22 tried reaching a placed seat at any
+  // of its use-check standing spots (the stool got on from its back): the walk audit still sends a Soul to the first clear
+  // spot (engine seatApproach, its front), so the fuzz walk world went 925 -> 990 bad; in the world a seat keeps the front key.
   const recipe = JSON.parse(readFileSync(new URL('../../../tools/god-skill/recipes/furnish/shop.json', import.meta.url), 'utf8'));
   recipe.rooms.shop.find((x: any) => x.name === 'display').try = [[0.78, 0.7, 's'], [0.3, 0.7, 's']];
   const f = furnishedShop(recipe);
@@ -136,4 +141,23 @@ test('built-in contents are what the type\'s furnish recipe lays out (theatre, o
   assert.deepEqual(t.kids.sort(), f.ops.filter((o: any) => o.op === 'place').map((o: any) => o.name).sort(), JSON.stringify(f.dropped));
   const gone = { 'office-block': ['meeting-2-chair-n-2', 'meeting-2-chair-s-1', 'meeting-3-chair-s-2'], hospital: ['ward-1-bed-4', 'ward-2-bed-4', 'ward-3-bed-4'] };
   for (const [type, names] of Object.entries(gone)) { const k = contents(type).kids; for (const n of names) assert.ok(!k.includes(n), `${type}: ${n}`); }
+});
+
+test('a seat is furnished only where a body can get on and off it as the use-check does (tower chair by the stairwell rail; lane FUZZ2)', async () => {
+  // fuzz f-tower-*: the room-chair stood 0.3 m from the stairwell rail facing it; its way key (0.75 m in front, past the rail)
+  // was reached, but every sit/stand slide crossed the rail: use.transition-blocked in all eight towers
+  const { seatSlides } = await import('../../generators/src/clearance.ts');
+  const w = new WorldModel({ constants: { ground: 'land' }, seed: 'furnishing' });
+  for (const d of CORE_KIT) w.defineDef(d, 'core', 0);
+  const chair = w.bake(w.resolvedDef('core/chair@1')!, {}, 0);
+  const rail = { c: [0, 0.55], half: [0.72, 0.03], yaw: 0, y0: 0, y1: 1 };
+  const wall = (x: number, z: number, hx: number, hz: number) => ({ c: [x, z], half: [hx, hz], yaw: 0, y0: 0, y1: 2.5 });
+  const free = seatSlides(chair, [0, 0], 0, 0, [rail])[0];
+  assert.ok(free.length > 0 && free.every(([, z]) => z < 0.55), 'facing a rail, it is got on from the back or the side, never across the rail');
+  assert.equal(seatSlides(chair, [0, 0], 0, 0, [rail, wall(0, -0.6, 2, 0.1), wall(-0.6, 0, 0.1, 2), wall(0.6, 0, 0.1, 2)])[0].length, 0, 'shut in: no way on or off');
+  const r = applyBatch(w, { ops: [{ op: 'place', def: 'core/tower@1', name: 'tower', r: Math.PI / 2 }] }, 'god', 1);
+  assert.equal(r.result.accepted, true, JSON.stringify(r.result));
+  const f = furnishBatch(w, 'tower');
+  assert.ok(!f.placed.some((p: any) => p.name === 'room-chair'), 'the stairwell landing has no chair pose with a way on and off');
+  assert.ok(f.dropped.some((p: any) => p.name === 'room-chair'), JSON.stringify(f.dropped));
 });

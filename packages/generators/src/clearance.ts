@@ -109,6 +109,83 @@ export function approachKeys(baked: Parameters<typeof approachOf>[0], at: readon
   return a.pts.length > 1 || far ? a.pts.map((p) => ({ pts: [p], r: a.r, ...(far && a.r === SEAT_R ? { far } : {}) })) : [a];
 }
 
+// Getting on and off a seat (lane FUZZ2, 2026-10-22): the use-check (engine useCheckV1, reachable/1 seats) stands a body at
+// the seat's front or back (0.35-0.5 m past the piece's edge) or, in a turned room, at one of 12 more angles (0.35-0.9 m),
+// and slides it to the seat; a slide that comes within half a body of a wall, rail or another piece is refused
+// (mars social/actions.ts slotTransitionIssue). A chair furnished 0.3 m from a stairwell rail and facing it kept a way key
+// in front of it (past the rail, on the stair) while every slide crossed the rail: eight fuzz towers, use.transition-blocked.
+/** The engine's sit/stand approach candidates (front and back gaps, then the bounded angular search). */
+export const SLIDE_FRONT = [0.35, 0.4, 0.45, 0.5] as const, SLIDE_SIDE = [0.35, 0.5, 0.7, 0.9] as const;
+export const SLIDE_BODY = BODY_R * 0.5, SLIDE_STEP = 0.22, SLIDE_HEIGHT = 1.8;
+export type SlideBlocker = { c: readonly number[]; half: readonly number[]; yaw: number; y0: number; y1: number };
+const boxDist = (b: SlideBlocker, x: number, z: number) => {
+  const c = Math.cos(b.yaw), s = Math.sin(b.yaw), dx = x - b.c[0], dz = z - b.c[1];
+  return Math.hypot(Math.max(0, Math.abs(dx * c - dz * s) - b.half[0]), Math.max(0, Math.abs(dx * s + dz * c) - b.half[1]));
+};
+type SlotLike = { kind: string; p: readonly number[]; yaw: number };
+type Sitter = { slots?: SlotLike[]; box: readonly number[] };
+// a blocker's distance with its turn worked out once (the same arithmetic as boxDist)
+const distOf = (b: SlideBlocker) => {
+  const c = Math.cos(b.yaw), s = Math.sin(b.yaw), cx = b.c[0], cz = b.c[1], hx = b.half[0], hz = b.half[1];
+  return (x: number, z: number) => { const dx = x - cx, dz = z - cz; return Math.hypot(Math.max(0, Math.abs(dx * c - dz * s) - hx), Math.max(0, Math.abs(dx * s + dz * c) - hz)); };
+};
+// the farthest a slide test reaches past its path (PLAN_R at the standing spot, half a body plus a step's half along it)
+const SLIDE_REACH = Math.max(PLAN_R, SLIDE_BODY + 0.0125) + 0.01;
+/** Each seat and berth of a piece: where it is (room frame), the blockers that can refuse its slides (not its workspace), and
+ *  the engine's standing spots for it in order. */
+function seatsOf(baked: Sitter, at: readonly number[], yaw: number, y: number, blockers: SlideBlocker[]) {
+  const c = Math.cos(yaw), s = Math.sin(yaw), w = ([x, z]: readonly number[]): Vec2 => [at[0] + x * c + z * s, at[1] - x * s + z * c];
+  const half = [baked.box[0] / 2, baked.box[2] / 2], lo = y + SLIDE_STEP, hi = y + SLIDE_HEIGHT;
+  const near = blockers.filter((b) => b.y1 > lo && b.y0 < hi);
+  return (baked.slots ?? []).filter((x) => x.kind === 'seat' || x.kind === 'bed' || x.kind === 'berth').map((seat) => {
+    const sl: Vec2 = [seat.p[0], seat.p[2]], sp = w(sl);
+    const own = near.filter((b) => !(Math.min(b.half[0], b.half[1]) >= 0.2 && boxDist({ ...b, half: [b.half[0] + 0.1, b.half[1] + 0.1] }, sp[0], sp[1]) === 0));
+    const edge = (u: Vec2) => { let t = Infinity; for (const k of [0, 1]) if (Math.abs(u[k]) > 1e-9) t = Math.min(t, ((u[k] > 0 ? half[k] : -half[k]) - sl[k]) / u[k]); return t; };
+    // a berth (a bed) is got into from either side, its foot or its head (engine berthApproach); a seat from its front or
+    // back, then the angular search
+    const tries: [number, readonly number[]][] = seat.kind !== 'seat' ? [Math.PI / 2, -Math.PI / 2, 0, Math.PI].map((t) => [t, SLIDE_FRONT])
+      : [[0, SLIDE_FRONT], [Math.PI, SLIDE_FRONT]];
+    if (seat.kind === 'seat') for (let k = 1; k < 16; k++) if (k % 4) tries.push([k * Math.PI / 8, SLIDE_SIDE]);
+    const spots: Vec2[] = [];
+    for (const [turn, gaps] of tries) {
+      const a = seat.yaw + turn, u: Vec2 = [Math.sin(a), Math.cos(a)], e = edge(u);
+      for (const gap of gaps) spots.push(w([sl[0] + u[0] * (e + gap), sl[1] + u[1] * (e + gap)]));
+    }
+    return { sp, own, spots };
+  });
+}
+/** The spots of `pts` a body slides from onto the seat at `sp` clear of `own` (only blockers within reach of a path are
+ *  tested: a box farther than the longest path plus the slide's clearance cannot refuse one). */
+function slideFree(sp: Vec2, own: SlideBlocker[], pts: readonly Vec2[]): Vec2[] {
+  if (!pts.length) return [];
+  let reach = 0;
+  for (const p of pts) reach = Math.max(reach, Math.hypot(sp[0] - p[0], sp[1] - p[1]));
+  const ds = own.filter((b) => boxDist(b, sp[0], sp[1]) < reach + SLIDE_REACH).map(distOf), atSeat = ds.map((d) => d(sp[0], sp[1]));
+  const path: ((x: number, z: number) => number)[] = [];
+  return pts.filter((p) => {
+    const len = Math.hypot(sp[0] - p[0], sp[1] - p[1]), n = Math.max(1, Math.ceil(len / 0.025)), pad = len / n / 2, r = SLIDE_BODY + pad;
+    // a box nearer the path than r somewhere is within reach of both ends: (its distance at the spot + at the seat - len) / 2
+    // bounds its distance from every point of the path, so a box past that bound cannot refuse the slide
+    path.length = 0;
+    for (let k = 0; k < ds.length; k++) { const at = ds[k](p[0], p[1]); if (at < PLAN_R) return false; if ((at + atSeat[k] - len) / 2 < r + 1e-6) path.push(ds[k]); }
+    for (let i = 0; i <= n; i++) { const qx = p[0] + (sp[0] - p[0]) * i / n, qz = p[1] + (sp[1] - p[1]) * i / n; for (const d of path) if (d(qx, qz) < r) return false; }
+    return true;
+  });
+}
+/** For each seat and berth of a piece at `at`/`yaw` (room frame) on a floor at height `y`: the approach points (room frame) a body
+ *  standing PLAN_R clear of `blockers` slides from onto the seat without crossing one, in the engine's order. A seat with
+ *  none cannot be got on or off whatever the walk raster says. Blockers are the room's walls, rails and stairs and the
+ *  pieces standing (never the piece itself); a blocker the seat itself is tucked inside (a seat under its table) is its
+ *  workspace and does not refuse the slide, as in the engine. */
+export function seatSlides(baked: Sitter, at: readonly number[], yaw: number, y: number, blockers: SlideBlocker[]): Vec2[][] {
+  return seatsOf(baked, at, yaw, y, blockers).map((x) => slideFree(x.sp, x.own, x.spots));
+}
+/** `slides` (seatSlides of the same piece and pose) less the spots `blockers` also refuse: seatSlides against the union of
+ *  both blocker sets, without testing again the spots already refused. */
+export function seatSlidesLeft(baked: Sitter, at: readonly number[], yaw: number, y: number, blockers: SlideBlocker[], slides: readonly (readonly Vec2[])[]): Vec2[][] {
+  return seatsOf(baked, at, yaw, y, blockers).map((x, i) => slideFree(x.sp, x.own, slides[i] ?? []));
+}
+
 /** Where the room's frame sits in the world (a building's world pose: x, z, yaw, scale): the ways are then labelled on the
  *  walk raster itself (world 0.1 m lattice, each blocker rasterised as the planner does it, clearance from cell centres),
  *  so the answer is the planner's for this placement. Without a pose, the exact-geometry rule (clearR per side) holds at
