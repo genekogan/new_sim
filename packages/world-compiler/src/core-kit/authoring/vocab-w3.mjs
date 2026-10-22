@@ -201,7 +201,7 @@ fixtures.push(
     shapes: [...[0, 1, 2].flatMap((k) => [box([0, 0.45 + k * 0.45, 0.85 - k * 0.8], [6.0, 0.05, 0.32], 'bench'), box([0, 0.2 + k * 0.45, 1.05 - k * 0.8], [6.0, 0.04, 0.4], 'step')]),
       ...[-2.95, -1, 1, 2.95].flatMap((x) => [limb([x, 0.04, 1.2], [x, 1.4, -0.9], 0.04, 'iron', { kind: 'cyl', seg: 4 }), box([x, 0.75, -0.9], [0.06, 1.5, 0.06], 'iron')]), box([0, 1.85, -1.1], [6.0, 0.05, 0.05], 'iron')],
     palette: { bench: '#c9ccd0', step: '#9aa0a4', iron: '#5a5f62' },
-    slots: [0, 1, 2].flatMap((k) => [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5].map((x, i) => seat(`seat-${k + 1}-${i + 1}`, [x, 0.5 + k * 0.45, 0.85 - k * 0.8]))), components: { seat: {} } }),
+    slots: [0, 1, 2].flatMap((k) => [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5].map((x, i) => seat(`seat-${k + 1}-${i + 1}`, [x, 0.5 + k * 0.45, 0.85 - k * 0.8], 0, 0.28))), components: { seat: {} } }),  // SEATDEF: height = over the bench's own footboard (0.22 m lower)
   vocabDef({ category: 'public.monument', tags: ['public', 'cemetery'], name: 'gravestone', synonyms: ['headstone', 'tombstone', 'grave', 'grave marker', 'tomb', 'burial stone'],
     description: 'A gravestone (0.6 × 0.9 m) with its grave: a rounded headstone, a stone cross, a flat slab or a little obelisk, with flowers; rows of them make a cemetery or a churchyard. Variants: headstone, cross, slab, obelisk.',
     variants: ['headstone', 'cross', 'slab', 'obelisk'], conventions: ['stretch', 'paint', 'wear', 'warp'], ranges: { sx: [0.7, 1.5], sy: [0.6, 1.6], sz: [0.7, 1.4] },

@@ -2407,8 +2407,8 @@
  {
   "schema": "def/1",
   "name": "core-mars-bus-seat",
-  "version": 2,
-  "description": "bus seat from the Mars 2026 campus: 2 seats at 1.22 m. Mars number #20 (handover stable ids). Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass).",
+  "version": 3,
+  "description": "bus seat from the Mars 2026 campus: 2 seats at 0.51 m. Mars number #20 (handover stable ids). Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass).",
   "tags": [
    "mars",
    "mars-campus",
@@ -2444,11 +2444,11 @@
     "kind": "seat",
     "p": [
      -0.313,
-     1.22,
+     0.51,
      0.1
     ],
     "yaw": 0,
-    "height": 1.22,
+    "height": 0.51,
     "accepts": {
      "tags": [
       "body"
@@ -2461,11 +2461,11 @@
     "kind": "seat",
     "p": [
      0.313,
-     1.22,
+     0.51,
      0.1
     ],
     "yaw": 0,
-    "height": 1.22,
+    "height": 0.51,
     "accepts": {
      "tags": [
       "body"
@@ -2476,7 +2476,7 @@
   ],
   "components": {
    "seat": {
-    "height": 1.22
+    "height": 0.51
    },
    "foundation": {
     "kind": "none"
@@ -2489,8 +2489,8 @@
  {
   "schema": "def/1",
   "name": "core-mars-bus-seat-2",
-  "version": 2,
-  "description": "bus seat 2 from the Mars 2026 campus: 2 seats at 1.22 m. Mars number #21, #22 (handover stable ids). Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass).",
+  "version": 3,
+  "description": "bus seat 2 from the Mars 2026 campus: 2 seats at 0.51 m. Mars number #21, #22 (handover stable ids). Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass).",
   "tags": [
    "mars",
    "mars-campus",
@@ -2526,11 +2526,11 @@
     "kind": "seat",
     "p": [
      -0.293,
-     1.22,
+     0.51,
      0.1
     ],
     "yaw": 0,
-    "height": 1.22,
+    "height": 0.51,
     "accepts": {
      "tags": [
       "body"
@@ -2543,11 +2543,11 @@
     "kind": "seat",
     "p": [
      0.293,
-     1.22,
+     0.51,
      0.1
     ],
     "yaw": 0,
-    "height": 1.22,
+    "height": 0.51,
     "accepts": {
      "tags": [
       "body"
@@ -2558,7 +2558,7 @@
   ],
   "components": {
    "seat": {
-    "height": 1.22
+    "height": 0.51
    },
    "foundation": {
     "kind": "none"
@@ -2571,8 +2571,8 @@
  {
   "schema": "def/1",
   "name": "core-mars-bus-seat-3",
-  "version": 2,
-  "description": "bus seat 3 from the Mars 2026 campus: 2 seats at 1.22 m. Mars number #23, #24 (handover stable ids). Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass).",
+  "version": 3,
+  "description": "bus seat 3 from the Mars 2026 campus: 2 seats at 0.51 m. Mars number #23, #24 (handover stable ids). Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass).",
   "tags": [
    "mars",
    "mars-campus",
@@ -2608,11 +2608,11 @@
     "kind": "seat",
     "p": [
      -0.293,
-     1.22,
+     0.51,
      0.1
     ],
     "yaw": 0,
-    "height": 1.22,
+    "height": 0.51,
     "accepts": {
      "tags": [
       "body"
@@ -2625,11 +2625,11 @@
     "kind": "seat",
     "p": [
      0.293,
-     1.22,
+     0.51,
      0.1
     ],
     "yaw": 0,
-    "height": 1.22,
+    "height": 0.51,
     "accepts": {
      "tags": [
       "body"
@@ -2640,7 +2640,7 @@
   ],
   "components": {
    "seat": {
-    "height": 1.22
+    "height": 0.51
    },
    "foundation": {
     "kind": "none"
@@ -2653,8 +2653,8 @@
  {
   "schema": "def/1",
   "name": "core-mars-bus-seat-4",
-  "version": 2,
-  "description": "bus seat 4 from the Mars 2026 campus: 2 seats at 1.22 m. Mars number #25 (handover stable ids). Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass).",
+  "version": 3,
+  "description": "bus seat 4 from the Mars 2026 campus: 2 seats at 0.51 m. Mars number #25 (handover stable ids). Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass).",
   "tags": [
    "mars",
    "mars-campus",
@@ -2690,11 +2690,11 @@
     "kind": "seat",
     "p": [
      -0.313,
-     1.22,
+     0.51,
      0.1
     ],
     "yaw": 0,
-    "height": 1.22,
+    "height": 0.51,
     "accepts": {
      "tags": [
       "body"
@@ -2707,11 +2707,11 @@
     "kind": "seat",
     "p": [
      0.313,
-     1.22,
+     0.51,
      0.1
     ],
     "yaw": 0,
-    "height": 1.22,
+    "height": 0.51,
     "accepts": {
      "tags": [
       "body"
@@ -2722,7 +2722,7 @@
   ],
   "components": {
    "seat": {
-    "height": 1.22
+    "height": 0.51
    },
    "foundation": {
     "kind": "none"
@@ -3686,8 +3686,8 @@
  {
   "schema": "def/1",
   "name": "core-mars-papasan",
-  "version": 2,
-  "description": "papasan from the Mars 2026 campus: 1 seat at 1.361 m. Mars number #8 (handover stable ids). Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass).",
+  "version": 3,
+  "description": "papasan from the Mars 2026 campus: 1 seat at 0.7 m. Mars number #8 (handover stable ids). Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass).",
   "tags": [
    "mars",
    "mars-campus",
@@ -3721,11 +3721,11 @@
     "kind": "seat",
     "p": [
      0,
-     1.361,
+     0.7,
      0.1
     ],
     "yaw": 0,
-    "height": 1.361,
+    "height": 0.7,
     "accepts": {
      "tags": [
       "body"
@@ -3736,7 +3736,7 @@
   ],
   "components": {
    "seat": {
-    "height": 1.361
+    "height": 0.7
    },
    "foundation": {
     "kind": "none"

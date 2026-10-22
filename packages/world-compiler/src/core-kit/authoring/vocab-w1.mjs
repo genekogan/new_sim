@@ -722,7 +722,7 @@ const vehicleKit = [
       ...[-0.8, 0.8].map((x) => cyl([x, 0.75, -0.7], 0.75, 0.4, 'tyre', { roll: PI / 2, seg: 12 })), ...[-0.8, 0.8].map((x) => cyl([x, 0.75, -0.7], 0.42, 0.42, 'hub', { roll: PI / 2, seg: 8 })),
       ...[-0.6, 0.6].map((x) => cyl([x, 0.42, 1.3], 0.42, 0.25, 'tyre', { roll: PI / 2, seg: 10 })), cyl([0.3, 2.0, 1.1], 0.05, 1.2, 'iron', { seg: 5 }),
       ...[-0.75, 0.75].map((x) => box([x, 1.9, -0.9], [0.06, 1.8, 0.06], 'iron')), box([0, 2.8, -0.9], [1.56, 0.06, 0.06], 'iron'), box([0, 1.15, 1.62], [0.8, 0.5, 0.04], 'grille')],
-    palette: { paint: '#3f8a3a', seat: C.soot, tyre: '#2b2b2b', hub: '#e6c23a', iron: '#3b3d40', grille: '#2b2b2b' }, slots: [seat('driver', [0, 1.5, -0.6], 0)] }),
+    palette: { paint: '#3f8a3a', seat: C.soot, tyre: '#2b2b2b', hub: '#e6c23a', iron: '#3b3d40', grille: '#2b2b2b' }, slots: [seat('driver', [0, 1.5, -0.6], 0, 0.2)] }),  // SEATDEF: height = over the body top (1.3) the driver's feet rest on
 ];
 const parkPresets = [
   presetDef({ category: 'public.park', tags: ['garden', 'park'], name: 'allotments', base: 'core/garden-bed@1', synonyms: ['allotment', 'vegetable plots', 'community garden', 'kitchen garden', 'veg patch'],

@@ -247,6 +247,8 @@ const def = (name, d) => ({
 const taken = new Set(), furnBoxes = [];
 const furn = furnitureRows();
 const SEATF = /chair|stool|sofa|recliner|papasan|bus seat|bus cushion|seat|tier cushion|throw cushion|floor cushion|mattress|box seat/i;
+/** Measured seat tops (m) of the seat kinds whose parts' tops are not the seat (see the seat rule below). */
+const SEAT_TOPS = { 'bus-seat': 0.51, 'bus-seat-2': 0.51, 'bus-seat-3': 0.51, 'bus-seat-4': 0.51, papasan: 0.7 };
 const TOPF = /table ?top|tabletop|counter top|counter return|counter lip|prep top|desk$|long shelf|serving shelf|inside counter/i;
 const groups = [];
 // the rest of the campus's furniture: parts of one object (a folding chair's seat, back and crossed legs; a table's legs,
@@ -315,7 +317,11 @@ for (const g of groups) {
       let slots, components, tags = [], description, layer = 'solid';
       const numbered = c.nums.length ? ` Mars number #${c.nums.join(', #')} (handover stable ids).` : '';
       if (c.cat === 'seat') {
-        const sh = r3(Math.min(h, Math.max(0.3, seatTop(/seat|cushion|plinth|base|pedestal|rim/i) || 0.45)));
+        // SEATDEF (2026-10-22): the bus seats' and the papasan's matching parts include the back, so the rule read the box
+        // top (1.22 / 1.36 m); their seat surface, measured on the cut model at the slot (rays down:
+        // team/scratch/t4/seatdef/probe/glbtop.mjs), is the top they keep. Low floor seats (cushions 0.09, tiers 0.18,
+        // mattresses 0.14) are their true tops.
+        const sh = SEAT_TOPS[dname] ?? r3(Math.min(h, Math.max(0.3, seatTop(/seat|cushion|plinth|base|pedestal|rim/i) || 0.45)));
         const n = /sofa|bench|bus/i.test(c.kinds) ? Math.max(1, Math.min(4, Math.round(w / 0.65))) : 1;
         slots = Array.from({ length: n }, (_, i) => ({ id: n === 1 ? 'seat' : `seat-${i + 1}`, kind: 'seat', p: [r3((i - (n - 1) / 2) * (w / n)), sh, r3(Math.min(0.1, d / 4))], yaw: 0, height: sh, accepts: { tags: ['body'] }, capacity: 1 }));
         components = { seat: { height: sh } }; tags = ['furniture', 'seat', ...(/sofa/i.test(c.kinds) ? ['sofa', 'couch'] : /stool/i.test(c.kinds) ? ['stool'] : /bus/i.test(c.kinds) ? ['bench', 'booth', 'diner'] : ['chair'])];
