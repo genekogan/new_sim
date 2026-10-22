@@ -437,8 +437,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
     caps.push({id: 'stand:here', verb: 'stand', label: 'Stand up / stop what I am doing', available: true});
     plans.set('stand:here', {label: 'Stand up', steps: [], stop: true});
     // CN5 (acceptance): go near anyone in sight within 60 m (a gesture to someone farther off offers this first)
+    const myHuman = this.body(soul.entityId)?.human, sitting = !!myHuman && (myHuman.activity === 'sit' || myHuman.baseActivity === 'sit');
     for (const o of this.perceivedBodies(soul.soulId, GO_NEAR_RADIUS)) {
-      const id = 'go-near:' + o.soulId, steps: Program['steps'] = [{verb: 'walk_to', params: {to: o.entityId, standoff: 1.3}}];
+      // GEST-LIVE: a seated Soul rises first (from a classroom seat the bare walk was refused route.start-blocked, no did_you_mean)
+      const id = 'go-near:' + o.soulId, steps: Program['steps'] = [...(sitting ? [{verb: 'stand', params: {}}] : []), {verb: 'walk_to', params: {to: o.entityId, standoff: 1.3}}];
       caps.push({id, verb: 'go-near', label: `Go near ${o.name}`, target: {id: o.soulId, kind: 'soul'}, available: true});   // route checked at act time
       plans.set(id, {label: `Go near ${o.name}`, steps});
     }
@@ -821,7 +823,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     }
     // together/1: invitations (params.with), paired gestures, gifts, follows and items check and adjust their plan here
     const prep = this.together.prepare(soul, cap, plan, params, steps);
-    if ('code' in prep) return {...refuse(prep.code, prep.reason), ...resolved};
+    if ('code' in prep) return {...refuse(prep.code, prep.reason), ...(prep.did_you_mean ? {did_you_mean: prep.did_you_mean} : {}), ...resolved};
     steps = prep.steps;
     if (prep.noBody) {
       // answering someone (decline, ask to stop following) never interrupts what the body is doing

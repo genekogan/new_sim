@@ -151,6 +151,15 @@ export class Together {
   /** Where to stand to meet someone face to face: within 1.1 m of them with a clear line between (nearest to `from`),
    *  so a hug or a hand-over never reaches across a fire, a bench or a wall. Null when they are already in reach.
    *  `otherAt`: where the other body is going to stand (a host still walking to its meet spot), instead of where it is. */
+  /** A hand-over needs no clear gesture ring (GEST-LIVE 2026-10-22: a give to a Soul on a bench or beside a bystander was
+   *  refused gesture.no-room with no way forward): the strict meet spot when there is one, else arm's length on my side. */
+  handSteps(me: string, other: string, otherAt?: V2): Steps | null {
+    const strict = this.meetSteps(me, other, 1.1, 0.8, otherAt); if (strict) return strict;
+    const mb = this.p.body(me), ob = this.p.body(other); if (!mb || !ob) return null;
+    const at: V2 = otherAt ?? [ob.pose.p[0], ob.pose.p[2]], L = Math.hypot(mb.pose.p[0] - at[0], mb.pose.p[2] - at[1]) || 1;
+    const p: V2 = [r2(at[0] + (mb.pose.p[0] - at[0]) / L * 1.1), r2(at[1] + (mb.pose.p[2] - at[1]) / L * 1.1)];
+    return [{verb: 'walk_to', params: {to: p, standoff: 0}}, {verb: 'wave', params: {at: other, seconds: 0.2}}];
+  }
   meetSteps(me: string, other: string, standoff = 1.1, gap = 0.8, otherAt?: V2): Steps | null {
     const mb = this.p.body(me), ob = this.p.body(other); if (!mb || !ob) return [{verb: 'walk_to', params: {to: other, standoff}}];
     const from: V2 = [mb.pose.p[0], mb.pose.p[2]], at: V2 = otherAt ?? [ob.pose.p[0], ob.pose.p[2]], d = Math.hypot(at[0] - from[0], at[1] - from[1]);
@@ -322,7 +331,7 @@ export class Together {
 
   /** Before an act is accepted: validate what it adds, adjust its steps, and say what to record once its receipt exists.
    *  No side effects here (a refusal later in act leaves nothing behind). */
-  prepare(soul: EdgeSoul, cap: EdgeCapability, plan: TogetherPlan, params: Record<string, unknown>, steps: Steps): {code: string; reason: string} | {steps: Steps; label?: string; commit?: (receipt: string) => void; noBody?: boolean} {
+  prepare(soul: EdgeSoul, cap: EdgeCapability, plan: TogetherPlan, params: Record<string, unknown>, steps: Steps): {code: string; reason: string; did_you_mean?: {id: string; label: string}[]} | {steps: Steps; label?: string; commit?: (receipt: string) => void; noBody?: boolean} {
     const tag = plan.together;
     // an earlier invitation of mine that this act replaces is withdrawn when its receipt ends (onReceipt)
     if (tag?.kind === 'paired' || tag?.kind === 'give') {
@@ -336,8 +345,8 @@ export class Together {
       const id = 'inv_' + randomUUID().slice(0, 12), def = tag.kind === 'paired' ? PAIRED[tag.what] : null;
       const seconds = tag.kind === 'paired' && tag.what === 'dance-with' && Number.isInteger(params.seconds) ? params.seconds as number : def?.seconds ?? 2.5;
       // walk to a spot facing them with nothing between (never across a fire or a bench)
-      const meet = this.meetSteps(soul.entityId, g.entityId, 1.1, def?.gap ?? 0.8);
-      if (!meet) return {code: 'gesture.no-room', reason: `There is no clear spot beside ${g.name} right now (someone else is standing too close); try again in a moment or somewhere roomier.`};
+      const meet = tag.kind === 'give' ? this.handSteps(soul.entityId, g.entityId) : this.meetSteps(soul.entityId, g.entityId, 1.1, def?.gap ?? 0.8);
+      if (!meet) return {code: 'gesture.no-room', reason: `There is no clear spot beside ${g.name} right now (someone else is standing too close); try again in a moment or somewhere roomier.`, did_you_mean: [{id: 'go-near:' + g.soulId, label: `Go near ${g.name}`}]};
       const out = structuredClone(steps).flatMap(s => s.verb === 'walk_to' && s.params.to === g.entityId ? meet : [s]);
       const meetAt: V2 = meet[0].verb === 'walk_to' ? meet[0].params.to as V2 : [r2(me.pose.p[0]), r2(me.pose.p[2])];
       for (const s of out) if (s.verb === 'mars:pose_v1') {s.params.group = id; s.params.seconds = seconds;if(tag.kind==='paired')s.params.pairedPolicy='ready-v1';}
@@ -444,7 +453,7 @@ export class Together {
       // F1: until the host has reached its own meet spot (its grouped pose not yet begun), meet it there; planning against
       // the still-walking body sent the guest across the host's path and could leave a bystander standing between them
       const hostAt = inv.meetAt && hb.human?.together?.group !== inv.id ? inv.meetAt : undefined;
-      const meet = seatedTake ? [] : this.meetSteps(soul.entityId, host.entityId, 1.1, inv.gap ?? 0.8, hostAt);
+      const meet = seatedTake ? [] : inv.kind === 'give' ? this.handSteps(soul.entityId, host.entityId, hostAt) : this.meetSteps(soul.entityId, host.entityId, 1.1, inv.gap ?? 0.8, hostAt);
       if (!meet) return {code: 'gesture.no-room', reason: `There is no clear spot beside ${inv.host.name} right now (someone else is standing too close); try again in a moment.`};
       const steps: Steps = [...(seatedTake ? [] : [...this.standFirst(soul.entityId), ...meet]),
         pose(inv.activity!, inv.seconds!, {group: inv.id, gap: inv.gap, ...(inv.pairedPolicy?{pairedPolicy:inv.pairedPolicy}:{}), waitSeconds: 30, alone: 'fail', clear: true, ...(inv.kind === 'give' ? {prop: inv.item!.kind, hold: inv.item!.kind} : {})})];
@@ -655,6 +664,13 @@ export class Together {
     if (!mine.length && /^(?:accept|decline|yes|no thanks|no thank you|accept (?:the |their )?(?:invitation|invite|offer)|decline (?:the |their )?(?:invitation|invite|offer))$/.test(t)) return {code: 'invite.none', reason: 'Nobody has invited you to anything right now (observe → invites).', did_you_mean: []};
     const acc = /^(?:accept|join)\s+(.+?)(?:['’]s)?(?:\s+(?:invitation|invite|offer|hug|dance))?$/.exec(t);
     if (acc && mine.length) {const o = who(acc[1]); const i = o ? mine.filter(x => x.host.soulId === o.soulId).at(-1) : undefined; if (i) return {capability: 'accept:' + i.id, note: `accepting ${i.host.name}'s invitation (${i.what})`};}
+    // "take the book" / "take it" / "take X's flower" while someone offers me an item: accept that hand-over (never a pick-up elsewhere)
+    const tk = /^(?:take|accept|receive|grab|get)\s+(?:it|that|this|(?:(.+?)['’]s\s+|the\s+|their\s+|his\s+|her\s+|an?\s+)?(.+?))(?:\s+from\s+(.+))?$/.exec(t);
+    if (tk && mine.some(x => x.kind === 'give')) {
+      const from = tk[1] ?? tk[3], o = from ? who(from) : undefined, what = tk[2]?.replace(/^(?:the|a|an)\s+/, '');
+      const i = mine.filter(x => x.kind === 'give' && (!o || x.host.soulId === o.soulId) && (!what || x.item?.kind === what || x.item?.name.toLowerCase().includes(what) || what === 'gift' || what === 'offer')).at(-1);
+      if (i) return {capability: 'accept:' + i.id, note: `taking ${i.item?.name ?? 'the item'} ${i.host.name} offers you`};
+    }
     // gestures
     const G: [RegExp, string][] = [[/^(?:give\s+(.+?)\s+a\s+hug|hug|embrace|cuddle)\s*(.*)$/, 'hug'], [/^(?:give\s+(.+?)\s+a\s+high[- ]?five|high[- ]?five|hi[- ]?five)\s*(.*)$/, 'high-five'],
       [/^(?:shake\s+hands\s+with|shake\s+(.+?)['’]s\s+hand|handshake(?:\s+with)?|shake\s+hands)\s*(.*)$/, 'handshake'], [/^(?:dance\s+with|ask\s+(.+?)\s+to\s+dance|have\s+a\s+dance\s+with)\s*(.*)$/, 'dance-with']];
