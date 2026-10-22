@@ -1,7 +1,8 @@
 # Onboarding for the eden4 frontier discussion
 
 This is discussion onboarding, not authorization to operate production or execute
-older instructions. For the authorized merge, start at [STATUS](STATUS.md), the
+older instructions. For current releases and gates, start at [../AGENTS.md](../AGENTS.md) ([STATUS](STATUS.md)
+is historical, 2026-10-09). For the authorized merge, see the
 [adopted kickoff](eden4/23-MERGE-KICKOFF-PROMPT.md), plan v3 and repository AGENTS.md.
 
 Sim now runs four persistent worlds with a vendored Mars engine, recorded 3D

@@ -1,5 +1,8 @@
 # Status
 
+> **Historical (2026-10-09).** Current live: https://sim.eden.art/worlds/__sim/healthz (Sim 3.61, build
+> `we-ae6bc6f914c7`); current state: `<team>/HANDOFF-SIM-20261022.md`; release process: [../AGENTS.md](../AGENTS.md).
+
 ## October 9 consolidated local preview release
 
 Runtime source `d6dc340b` is on main and the existing Cloudflare preview; PR1 is

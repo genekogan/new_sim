@@ -23,13 +23,27 @@ Only the release owner (R, id on the top line of `<team>/lanes/ROSTER.md`, holdi
 writes to eden2 and pushes. A lane hands R `branch@sha` + a gate receipt; R ships it on current main.
 - **Gate (Modal; never full suites on the laptop):** `tools/test-harness/release-gate.sh <head> --baseline <main sha>
   --out <dir>`. Clean = 0 new failures, 0 blockers, 0 unexpected skips; the standing quarantine
-  (`tools/test-harness/quarantine.json`) has **9 entries** (11 retired). GitHub Actions runs fail at start (account
-  billing, Gene's); the Modal gate is the release check.
-- **Walkability is gated (V3-walk):** the gate audits fixed copies of eden-2026, bench-eden, bench-hamlet and a fresh Eden 2026
-  genesis (`apps/server/src/god/walk-audit.ts`: bad destinations, one-ways, goalless things, floats per place) and fails when any
-  place is worse than `tools/test-harness/walk/baseline/`. Check locally in ~1 min: `node tools/test-harness/walk/walk.mjs`. A
-  deliberate change (better or worse) updates the baseline as a reviewed file change: `walk.mjs --write`, or
+  (`tools/test-harness/quarantine.json`) has **9 entries** (10 retired); a clean gate reports `quarantined 8`, because the
+  east-house phase A whole-skeleton entry now runs and passes (kept only for older baselines; see the file's 2026-10-21
+  note). GitHub Actions runs fail at start (account billing, Gene's); the Modal gate is the release check.
+- **Conformance re-pins:** known library failures are pinned by exact def hash, so a changed def revision fails
+  `conformance` until a reviewed supplement `packages/conformance/conformance/<lane>-<date>.json` re-pins its documented
+  tuples hash for hash (e.g. `bsgen-20261021.json`, `seatdef-20261022.json`), listed with a note in that folder's
+  README. A re-pin made to pass a gate needs Gene's OK in chat and that record note; never edit older supplements.
+- **Walkability is gated (V3-walk):** the gate audits fixed copies of eden-2026, bench-eden, bench-hamlet, a fresh Eden 2026
+  genesis and the generated fuzz world (`tools/test-harness/walk/fuzz-world.mjs`, `walk-audit.ts --fuzz`: every building type
+  x 5 yaws x 3 grounds, packed rows, furnished, stacked, nested; also scores seats and beds a Soul cannot use) with
+  `apps/server/src/god/walk-audit.ts` (bad destinations, one-ways, goalless things, floats per place), and fails when any
+  place is worse than `tools/test-harness/walk/baseline/` (incl. `fuzz.json`). Check locally in ~1 min:
+  `node tools/test-harness/walk/walk.mjs` (`--world fuzz,bench-hamlet` for a subset). A deliberate change (better or worse)
+  updates the baseline as a reviewed file change, in its own commit before the final gate: `walk.mjs --write`, or
   `walk.mjs --from <gate out>/candidate/out/suite/walk --write`.
+- **Godmode build safety (BUILDSAFE, `buildsafe/1`):** god `commitBatch` repairs at commit time what an edit newly cuts off
+  (a 1 m gate or a nudge, in the same batch, on the shared clearance rule); leftovers come back as one actionable line plus
+  a tested op, and a sealed refusal stands unless the repair reopens it. Never add a separate post-hoc walk fix for a
+  fence or wall that cuts off a way.
+- **Seats (SEATDEF):** core seat heights come from the def's model geometry (a change is a new def revision; old revisions
+  keep their bytes). The edge sit capability refuses only `seat.too-high`; a low seat is sat on.
 - **Build:** `tools/world-launcher/deploy/release.sh production --reload` (exactly HEAD of a clean tree). The asset CDN is
   ON by default (`SIM_ASSETS_CDN_ENABLED=0` opts out for one release; other values refused); the build fails without the CDN
   origin + `cdn-manifest-*.json` in dist, or without the Eden experience pin call. It keeps the stage links + 3 newest

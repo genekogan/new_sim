@@ -1,6 +1,8 @@
 # Documentation map
 
 Reviewed against the delivered merge code and receipts on **2026-10-03**.
+Releases, the release gate and walkability (V3-walk): [../AGENTS.md](../AGENTS.md); conformance pins:
+[packages/conformance/conformance/README.md](../packages/conformance/conformance/README.md). Live version: `https://sim.eden.art/worlds/__sim/healthz`.
 Sim runs four persistent worlds; the Mars engine is vendored under `mars/`.
 The canonical checkout is `<repo>`. Original `<old-sim-repo>`, `~/Mars` and
 `~/Dev/littlemartians` are read-only references for this tranche.
