@@ -193,7 +193,7 @@ export class EngineBridge {
     // LAYERS: "under construction (step)" is part of what an owned or scheduled thing is seen as
     this.god.onBuild(() => { if (this.layers.active()) this.notePerceive([], true); });
     this.host.listeners.push({
-      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); this.perceiveStep(tick); if (tick % 40 === 7) this.layersStep(); if (tick % 20 === 13) this.flushMapNotices(); if (tick % 5 === 2 && (!this.navWarm || this.navPending)) this.navStep(); if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); } if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); } } },
+      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); this.perceiveStep(tick); if (tick % 5 === 4) this.spotsStep(); if (tick % 40 === 7) this.layersStep(); if (tick % 20 === 13) this.flushMapNotices(); if (tick % 5 === 2 && (!this.navWarm || this.navPending)) this.navStep(); if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); } if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); } } },
       onApplied: (e) => { if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
     });
     reachProviders.set(this.god.model, (from, to) => this.reach(from, to));
@@ -221,7 +221,7 @@ export class EngineBridge {
     this.god.onBuild(e => this.buildNotice(e));
     this.activitySpots = new GodActivitySpots({ model: this.god.model, engine: this.host.engine as never, version: () => `${this.godEdits}|${this.engine.world.entityPhysicsV1?.hash ?? ''}`, levelAt: (x, z, y) => this.levelAt(x, z, y),
       placeAt: (at, level) => this.places.placeAt(at, level), placeLocator: () => this.places.placeLocator(), prepare: () => this.places.sync(true), catchingUp: () => this.perceiveRunning || !!this.perceive?.pending(), placeName: (id) => this.edge?.places.byId.get(id)?.name ?? null });
-    if (this.edge) this.edge.spotsProvider = () => { if (!this.reconciled) return null; this.flush(); const n = this.activitySpots.stats.derives, d = this.activitySpots.data(); if (this.activitySpots.stats.derives !== n) this.log(`activity spots: ${d.spots.length} spots, ${d.shelves.length} shelves in ${this.activitySpots.stats.ms} ms`); return d; };
+    if (this.edge) this.edge.spotsProvider = () => { if (!this.reconciled) return null; this.flush(); const n = this.activitySpots.stats.derives, d = this.activitySpots.data(); if (this.activitySpots.stats.derives !== n) this.logSpots(); return d; };
     if (this.edge) {
       const edge = this.edge;
       this.meals = new GodMeals({ db: this.god.db, worldId: this.host.worldId, spots: () => edge.spots, place: (id) => edge.places.byId.get(id) as never, day: () => this.layers.dayKey() });
@@ -677,6 +677,13 @@ export class EngineBridge {
     const out: Vec2[] = [];
     for (const id of ids.slice(0, 200)) { const e = m.entities.get(id); if (!e) continue; try { const p = m.worldPose(e); out.push([p.x, p.z]); } catch { /* unplaced */ } }
     return out;
+  }
+  private logSpots() { const st = this.activitySpots.stats; this.log(`activity spots: ${st.spots} spots, ${st.shelves} shelves in ${st.ms} ms`); }
+  /** GODLIST: once a god edit is caught up with (perceive done), derive the activity spots in a tick instead of in the next
+   *  Soul's listing (only when a listing has read them since the last such derive). */
+  private spotsStep() {
+    if (!this.edge || this.perceiveRunning || this.perceive.pending()) return;
+    try { if (this.activitySpots.warm()) this.logSpots(); } catch (e) { this.log(`activity spots: ${(e as Error).message}`); }
   }
   private navStep() {
     try {

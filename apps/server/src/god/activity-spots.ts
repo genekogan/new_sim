@@ -57,15 +57,25 @@ export class GodActivitySpots {
   stats = { ms: 0, spots: 0, shelves: 0, derives: 0, kept: 0 };
   constructor(h: SpotsHost) { this.h = h; }
 
-  data(): SpotsData {
-    const key = `${this.h.version()}:${this.h.model.entities.size}`;
+  /** A reader asked for the spots since the last warm(): worth deriving them ahead of the next read. */
+  private wanted = false;
+  data(): SpotsData { this.wanted = true; return this.get(); }
+  /** Derive now, off a Soul's listing, if the spots are stale and someone reads them (the host calls it once a god
+   *  edit has been caught up with). Same derive and cache as data(): the next read finds them. True when it derived. */
+  warm(): boolean {
+    if (!this.wanted || this.cache?.key === this.key() || this.h.catchingUp?.()) return false;
+    this.wanted = false; this.get(); return true;
+  }
+  private key() { return `${this.h.version()}:${this.h.model.entities.size}`; }
+  private get(): SpotsData {
+    const key = this.key();
     if (this.cache?.key === key) return this.cache.value;
     if (this.cache && this.h.catchingUp?.()) { this.stats.kept++; return this.cache.value; }
     this.h.prepare?.();
     const t0 = performance.now();
     let value: SpotsData;
     this.locate = this.h.placeLocator?.() ?? null;
-    this.placeMemo = new Map();
+    this.placeMemo = new WeakMap();
     try { value = this.derive(); } finally { this.locate = null; this.placeMemo = null; }
     this.stats = { ms: Math.round(performance.now() - t0), spots: value.spots.length, shelves: value.shelves.length, derives: this.stats.derives + 1, kept: this.stats.kept };
     this.cache = { key, value };
@@ -99,12 +109,11 @@ export class GodActivitySpots {
   /** During a derive: the places as they were when it began (placeLocator), asked many times. */
   private locate: ((at: V2, level: number) => string | null) | null = null;
   /** During a derive: place() answers by point (the same point is asked for one thing by several passes). */
-  private placeMemo: Map<string, string | undefined> | null = null;
+  private placeMemo: WeakMap<V2, { level: number; v: string | undefined }> | null = null;
   private place(at: V2, level: number) {
-    const k = this.placeMemo && `${at[0]},${at[1]},${level}`;
-    if (k && this.placeMemo!.has(k)) return this.placeMemo!.get(k);
+    const m = this.placeMemo?.get(at); if (m && m.level === level) return m.v;
     const v = (this.locate ? this.locate(at, level) : this.h.placeAt(at, level)) ?? undefined;
-    if (k) this.placeMemo!.set(k, v);
+    this.placeMemo?.set(at, { level, v });
     return v;
   }
   private label(t: Thing, place?: string) { const p = place ? this.h.placeName(place) : null; return `${t.name}${p && p.toLowerCase() !== t.name.toLowerCase() ? ` in ${p}` : ''}`.slice(0, 80); }
