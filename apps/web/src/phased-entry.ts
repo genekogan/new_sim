@@ -20,6 +20,12 @@ export const PHASE2_FALLBACK_MS = 8_000;
  *  for the early renderer's fill (below) or phase two's entry: its join (~165 KB on the wire) no longer shares a phone's
  *  link with the poster's own bytes (it opened here at 2.5 s on every phone page and came in before the poster). */
 export const SOCKET_FALLBACK_MS = 2_500;
+// t4-phone3 (2026-10-22): that 2.5 s now counts from the early entry's load, not the page's start: on a phone's link the
+// snapshot's answer waits behind phase one's ~400 KB of code, so at 2.5 s it had "not answered" on every phone page
+// and the join (~165 KB) shared the link with the poster's scripts and phase two's entry. And the socket opens once
+// phase two's entry has downloaded (not with its download): the join no longer delays the entry, so the card (which
+// waits for the entry, not for the join) comes ~1 s sooner. Phase two's entry downloads as soon as its other
+// downloads are in (it waited for the early renderer's fill, leaving the link idle while the phone built the world).
 /** t4-phone: `__simPhase2(FILL)`: the poster's bytes are in (the early renderer's nearest models too), so phase two's entry
  *  is fetched (not run) and the socket opens while the phone links and draws the poster; the entry runs at the next plain
  *  call, as before. */
@@ -38,11 +44,14 @@ export function phasedLoaderScript(early: Phase, main: Phase): string {
   return `(function(){var d=document,W=window,E=${JSON.stringify(early)},M=${JSON.stringify(main)},done=false,pre=false,sock=false,`
     + `add=function(u,entry){var l=d.createElement(entry?'script':'link');if(entry){l.type='module';l.src=u;}else{l.rel='modulepreload';l.href=u;}l.crossOrigin='';d.head.appendChild(l);return l;},`
     + `so=function(){if(!sock){sock=true;try{var o=W.__simOpenSocket;if(typeof o==='function')o();}catch(e){}}},`
-    + `si=false,fe=false,`
-    + `two=function(hold){if(!pre){pre=true;M.preloads.forEach(function(u){add(u);});}if(hold===${JSON.stringify(PHASE2_FILL)}&&!done&&!fe){fe=true;add(M.entry);}if(hold!==true&&hold!==${JSON.stringify(PHASE2_FILL)}&&!done){done=true;add(M.entry,true);}if(hold!==true)so();};`
+    // t4-phone3: the entry's download (fe) and its end (ml): the socket opens once it is in, its join after it on the link
+    + `si=false,fe=false,ml=false,`
+    + `fill=function(){if(!done&&!fe){fe=true;var l=add(M.entry);l.onload=l.onerror=function(){ml=true;so();};}},`
+    + `two=function(hold){if(!pre){pre=true;var left=M.preloads.length,got=function(){if(--left===0&&hold===true)fill();};M.preloads.forEach(function(u){var l=add(u);l.onload=l.onerror=got;});if(!left&&hold===true)fill();}`
+    + `if(hold===${JSON.stringify(PHASE2_FILL)})fill();if(hold!==true&&hold!==${JSON.stringify(PHASE2_FILL)}&&!done){done=true;var e=add(M.entry,true);if(!fe||ml)so();else e.onload=e.onerror=so;}};`
     + `W[${JSON.stringify(PHASE2_GLOBAL)}]=two;var ph=W.__simPhased===true;if(!ph)two();`
     + `try{W.__simSnapshotPrefetch.response.then(function(){si=true;},function(){});}catch(e){}`
-    + `E.preloads.forEach(function(u){add(u);});add(E.entry,true).onerror=two;if(ph){setTimeout(function(){if(!si)so();},${SOCKET_FALLBACK_MS});setTimeout(two,${PHASE2_FALLBACK_MS});}})();`;
+    + `E.preloads.forEach(function(u){add(u);});var ee=add(E.entry,true);ee.onerror=two;if(ph){ee.onload=function(){setTimeout(function(){if(!si)so();},${SOCKET_FALLBACK_MS});};setTimeout(two,${PHASE2_FALLBACK_MS});}})();`;
 }
 
 const MODULE_SCRIPT = /[ \t]*<script type="module" crossorigin src="([^"]+)"><\/script>\n?/g;
