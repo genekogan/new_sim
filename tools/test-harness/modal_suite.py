@@ -77,7 +77,7 @@ PY
 
 
 # Serial step order (one-validation.sh); merge() writes SUMMARY rows in this order. Unknown rows follow, in group order.
-ORDER = ["V1-types", "V2-build-root", "V2-build-worlds", "V3-harness", "V3-walk", "V3-packages", "V3-mars-engine", "V3-client-cli",
+ORDER = ["V1-types", "V2-build-root", "V2-build-worlds", "V3-harness", "V3-walk", "V3-bundle", "V3-packages", "V3-mars-engine", "V3-client-cli",
          "V3-launcher-unit", "V4-web", "V4-web-baseline", "V5-server-full", "V5-server-baseline", "V6-scenarios", "V6-party",
          "V6-souls-r2", "V6-join-clerk", "V6-join-dev", "V6-souls-ux", "V6-mars-two", "V6-lm-two",
          "V7-old-worlds", "V7-new-world", "V7-camera-dpr2", "V7-god-modal", "V8-history-boot"]
@@ -85,7 +85,7 @@ ORDER = ["V1-types", "V2-build-root", "V2-build-worlds", "V3-harness", "V3-walk"
 # V6-lm-two 191, V3-packages 164, V6-party 148, V4-web 143, V6-mars-two 126, V3-launcher-unit 115, V1-types 68).
 # Every step of ORDER is in exactly one group. Ports differ per V6 step, but each group still runs its steps serially.
 GROUPS = {
-    "a": ["V1-types", "V2-build-root", "V2-build-worlds", "V3-harness", "V3-packages", "V4-web", "V4-web-baseline",
+    "a": ["V1-types", "V2-build-root", "V2-build-worlds", "V3-harness", "V3-bundle", "V3-packages", "V4-web", "V4-web-baseline",
           "V6-scenarios", "V6-join-clerk", "V6-join-dev", "V7-old-worlds", "V7-new-world",
           "V7-camera-dpr2", "V7-god-modal", "V8-history-boot"],
     "b": ["V3-mars-engine"],
