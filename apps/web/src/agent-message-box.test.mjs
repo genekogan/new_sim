@@ -85,11 +85,12 @@ test.after(() => rm(dir, {recursive: true, force: true}));
 // Lane PAIR-INWINDOW (Gene's review 2026-10-22 #1): the card's start prompt carries the window code like the New Soul prompt
 test('Soul card start prompt names pair-soul with the window code; without a code it still names the command', () => {
   const withCode = soulStartPrompt('http://localhost:5960/w/inbox', 's_abc', 'Ada', 'K7QX-M2PA');
-  assert.match(withCode, /pair-soul "s_abc" "Ada" --for K7QX-M2PA/);
+  assert.match(withCode, /pair-soul "s_abc" --for K7QX-M2PA/);
+  assert.match(withCode, /Soul "Ada" \(ID "s_abc"\)/);
   assert.match(withCode, /open Sim window/);
   assert.match(withCode, /approval wait/);
   assert.match(withCode, /Do not create another Soul/);
   const plain = soulStartPrompt('http://localhost:5960/w/inbox', 's_abc', 'Ada', null);
-  assert.match(plain, /pair-soul "s_abc" "Ada" \(/);
+  assert.match(plain, /pair-soul "s_abc" \(/);
   assert.doesNotMatch(plain, /--for/);
 });

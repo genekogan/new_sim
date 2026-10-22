@@ -5,7 +5,7 @@ import type {Auth} from '../auth.ts';
 import {AccountStoreError,type ApprovalDTO} from './store.ts';
 import type {WorldAccounts} from './service.ts';
 
-const startSchema=z.object({agentLabel:z.string().min(1).max(120),name:z.string().min(2).max(32),description:z.string().max(1200).optional(),idempotencyKey:z.string().min(16).max(256),pollSecret:z.string().regex(/^[A-Za-z0-9_-]{43}$/),soulId:z.string().regex(/^s_[a-zA-Z0-9_-]+$/).optional(),for:z.string().max(16).optional()}).strict();
+const startSchema=z.object({agentLabel:z.string().min(1).max(120),name:z.string().min(2).max(32).optional(),description:z.string().max(1200).optional(),idempotencyKey:z.string().min(16).max(256),pollSecret:z.string().regex(/^[A-Za-z0-9_-]{43}$/),soulId:z.string().regex(/^s_[a-zA-Z0-9_-]+$/).optional(),for:z.string().max(16).optional()}).strict();
 const pollSchema=z.object({approvalId:z.string().regex(/^ap_[a-f0-9]{32}$/),pollSecret:z.string().regex(/^[A-Za-z0-9_-]{43}$/)}).strict();
 export function mountAccountRoutes(app:Hono,deps:{accounts:WorldAccounts;auth:Auth;baseOf:(c:Context)=>string;limit:(c:Context,key:string,max:number,ms:number)=>void}){
  const {accounts,auth}=deps;
@@ -16,8 +16,13 @@ export function mountAccountRoutes(app:Hono,deps:{accounts:WorldAccounts;auth:Au
  const world=(c:Context)=>({id:accounts.host.worldId,name:accounts.souls.cfg.worldKey,url:deps.baseOf(c)});
  // Lane PUX: what the person's card shows: the Soul's profile picture once the Soul exists (a reconnect, or after creation)
  const shown=(a:ApprovalDTO)=>({...a,photo:a.soulId?accounts.host.profilePhoto(a.soulId)?.url??null:null});
- app.post('/v1/agent/approval/start',c=>wrap(c,async()=>{deps.limit(c,'account-start',6,60000);const p=parse(startSchema,await json(c)),{soulId,for:forCode,...input}=p;
-  const approval=soulId?accounts.store.startRepairRequest(soulId,{...input,forCode}):accounts.store.start({...input,forCode});
+ app.post('/v1/agent/approval/start',c=>wrap(c,async()=>{deps.limit(c,'account-start',6,60000);const p=parse(startSchema,await json(c)),{soulId,for:forCode,name:asked,...input}=p;
+  // Lane PAIR-INWINDOW (Gene's review #2): a reconnect names its Soul by ID only. The request carries the Soul's REAL current
+  // name (the card's title; the agent's guess is ignored), so a pressed Approve never fails on a name.
+  const soul=soulId?accounts.host.db.soul(soulId):undefined;
+  if(soulId&&(!soul||soul.world_id!==accounts.host.worldId||soul.retired_at!==null))throw new ApiError(404,'soul-not-found',`No Soul ${soulId} lives in this world. Check the ID on the Soul's card (Copy start prompt).`);
+  if(!soulId&&!asked)throw new ApiError(400,'invalid','A new Soul needs a name.');
+  const approval=soulId?accounts.store.startRepairRequest(soulId,{...input,name:soul!.name,forCode}):accounts.store.start({...input,name:asked!,forCode});
   // delivery 'window': the person's open, signed-in world page shows the request (lane PUX); the link stays as a backup
   return {approval,world:world(c),approvalURL:`${deps.baseOf(c)}/#approve/${approval.id}`,delivery:approval.inWindow?'window':'link',intervalSeconds:3};}));
  app.post('/v1/agent/approval/poll',c=>wrap(c,async()=>{deps.limit(c,'account-poll',60,60000);const p=parse(pollSchema,await json(c));return {...accounts.poll(p.approvalId,p.pollSecret),world:world(c)};}));

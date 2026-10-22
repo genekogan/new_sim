@@ -175,8 +175,8 @@ async function startApproval({name,description,soulId,forCode}){
  let s=load();if(!s.accountAuth)throw Error('This world does not advertise account approvals.');
  if(s.pendingApproval?.approvalId){const p=s.pendingApproval,r=await approvalCall('/v1/agent/approval/poll',{approvalId:p.approvalId,pollSecret:p.input.pollSecret},'check previous approval',Date.now()+60_000);if(['refused','cancelled','expired'].includes(r.status)||r.status==='ready'&&!r.token){finishApproval(r,p,s.world,r.status==='ready'?'unavailable':'terminal',{release:true});s=load();}}
  if(!soulId&&s.reconnectSoul?.world===s.world&&s.reconnectSoul.name===name)soulId=s.reconnectSoul.id;
- let pending=s.pendingApproval;if(pending&&(pending.world!==s.world||pending.input.name!==name||pending.input.description!==description||pending.input.soulId!==soulId))throw Error('A different approval is pending. Check it with approval status or cancel it before creating another.');
- if(!pending){pending={world:s.world,worldId:s.worldId,input:{name,...(description===undefined?{}:{description}),...(soulId?{soulId}:{}),agentLabel:'eden-agent '+SKILL_VERSION,idempotencyKey:randomUUID(),pollSecret:randomBytes(32).toString('base64url')}};save({pendingApproval:pending});}
+ let pending=s.pendingApproval;if(pending&&(pending.world!==s.world||(soulId?false:pending.input.name!==name)||pending.input.description!==description||pending.input.soulId!==soulId))throw Error('A different approval is pending. Check it with approval status or cancel it before creating another.');
+ if(!pending){pending={world:s.world,worldId:s.worldId,input:{...(soulId?{}:{name}),...(description===undefined?{}:{description}),...(soulId?{soulId}:{}),agentLabel:'eden-agent '+SKILL_VERSION,idempotencyKey:randomUUID(),pollSecret:randomBytes(32).toString('base64url')}};save({pendingApproval:pending});}
  // the window code addresses only a new request (the server ignores it on a retry of the same one); never stored
  const data=await approvalCall('/v1/agent/approval/start',{...pending.input,...(forCode?{for:forCode}:{})},'approval start',Date.now()+60_000);if(data.approval.worldId!==pending.worldId)throw Error('Approval world differs from registration.');pending.approvalId=data.approval.id;save({pendingApproval:pending});return approvalPublic(data,s.world);
 }
@@ -191,8 +191,8 @@ function finishApproval(dto,pending,world,connection,{release=false}={}){
 }
 function supersededApproval(pending){
  const cur=load().pendingApproval;if(cur?.approvalId===pending.approvalId)return null;
- return {approvalId:pending.approvalId,name:pending.input.name,status:'superseded',...(cur?{newer:{name:cur.input.name,...(cur.approvalId?{approvalId:cur.approvalId}:{})}}:{}),
-  next:cur?'This folder now has a newer request ("'+cur.input.name+'"); this wait stopped and changed nothing. Run approval wait (in the background) for the newer one.':'This request is no longer this folder\'s pending one (cancelled or finished by another command); nothing was changed. Run status.'};
+ return {approvalId:pending.approvalId,name:pending.input.name??pending.input.soulId,status:'superseded',...(cur?{newer:{name:cur.input.name??cur.input.soulId,...(cur.approvalId?{approvalId:cur.approvalId}:{})}}:{}),
+  next:cur?'This folder now has a newer request ("'+(cur.input.name??cur.input.soulId)+'"); this wait stopped and changed nothing. Run approval wait (in the background) for the newer one.':'This request is no longer this folder\'s pending one (cancelled or finished by another command); nothing was changed. Run status.'};
 }
 export async function approval(action='status'){
  if(liveRunning())throw Error('Stop this folder’s mind before selecting a newly approved Soul, or use a fresh folder.');
@@ -213,7 +213,7 @@ export async function approval(action='status'){
   await sleep(3000);
  }
 }
-export async function pairSoul(...argv){const {rest:[id,name],forCode}=forOption(argv);if(liveRunning())throw Error('Stop this folder’s mind before changing its selected Soul.');if(!/^s_[A-Za-z0-9_-]+$/.test(id??''))throw Error('usage: pair-soul <immutable Soul ID> "<current name>"');if(load().accountAuth){if(!name)throw Error('Include the current Soul name for the approval preview.');return startApproval({name,soulId:id,forCode});}const me=ok(await call(OWNER.me,{as:'owner'}),'pair-soul');if(!me.souls.some(s=>s.id===id))throw Error('That Soul is not owned by this identity.');await pair(id);return {paired:true,soulId:id};}
+export async function pairSoul(...argv){const {rest:[id,name],forCode}=forOption(argv);if(liveRunning())throw Error('Stop this folder’s mind before changing its selected Soul.');if(!/^s_[A-Za-z0-9_-]+$/.test(id??''))throw Error('usage: pair-soul <immutable Soul ID> [--for <CODE>]');if(load().accountAuth)return startApproval({soulId:id,forCode}); /* lane PAIR-INWINDOW: the world titles the request with the Soul's real name; a name given here is ignored */const me=ok(await call(OWNER.me,{as:'owner'}),'pair-soul');if(!me.souls.some(s=>s.id===id))throw Error('That Soul is not owned by this identity.');await pair(id);return {paired:true,soulId:id};}
 export async function selectSoul(id){if(liveRunning())throw Error('Stop this folder’s mind before changing its selected Soul.');const s=load();if(s.accountAuth){const grant=s.delegations?.[id];if(!grant||grant.world!==s.world)throw Error('No delegated grant for that exact Soul and world. Run pair-soul to request approval.');save({soul:id,token:grant.token,mode:undefined});ok(await call('/v1/agent/me'),'select-soul');return {selected:id};}return pairSoul(id);}
 /** 1.7.1: a short guide for any later agent session opened in this folder (Claude Code reads CLAUDE.md, Codex AGENTS.md). Never overwrites. */
 function folderGuide(name){
