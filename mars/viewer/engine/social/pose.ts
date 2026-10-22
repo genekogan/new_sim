@@ -91,7 +91,8 @@ function admission(rt: Runtime, p: Params): Diagnostic | null {
   if (!h || a.kind !== 'human') return issue('not-human', `${p.actor} is not a person`, [p.actor]);
   if (h.grip || h.riding || h.on || h.shore || h.carrier || h.sleepPose || (h as { boatPassenger?: unknown }).boatPassenger) return issue('occupied-support', 'Leave the climb, load, water, ride or mat first.', [p.actor]);
   // seat fit (bodies/humanoid.ts): a scenery seat's top must suit the body's height (today's body: 0.2–1.2 m, the schema's range)
-  if (p.seatHeight !== undefined && !LYING.has(p.activity)) { const fit = seatFitProblem(a.body, p.seatHeight); if (fit) return issue(fit.code.replace('.', '-'), `This seat does not fit your body: ${fit.message}.`, [p.actor]); }
+  // a picnic sits on the blanket, i.e. on the ground: any body fits (SPOTS 2026-10-22: a tall Soul was refused seat-too-low)
+  if (p.seatHeight !== undefined && !LYING.has(p.activity) && p.activity !== 'picnic') { const fit = seatFitProblem(a.body, p.seatHeight); if (fit) return issue(fit.code.replace('.', '-'), `This seat does not fit your body: ${fit.message}.`, [p.actor]); }
   // together/1: a grouped pose may start while someone's make-way nudge steps this body aside (it settles first)
   if (rt.holder('actor:' + p.actor).some((id) => rt.records.get(id)?.verb === 'walk_to' && !(p.group && nudge(id)))) return issue('not-still', 'Finish walking first.', [p.actor]);
   const seated = h.activity === 'sit' || (h.baseActivity === 'sit' && OVERLAY.has(h.activity));
