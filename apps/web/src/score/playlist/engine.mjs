@@ -4,8 +4,36 @@
 // and registers it with register(Sim, Tone).
 /* eslint-disable */
 // @ts-nocheck
-export const PLAYLIST = ["pixel-town","downtown-rush","neon-shibuya","departure-lounge","line-clear","mirror-ball","night-drive","plaza-mall","grand-prix","magic-orbit","montage","night-patrol"];
+export const PLAYLIST = ["skylight-rain","harbour-mouth","branch-line","lantern-square","nightside-pass","hydroponics-deck","section-lines","citronella","heron-causeway","second-ring-road","sunken-causeway","cheese-stall","firn-light","aerial-causeway","service-corridor","after-the-fireworks","night-approach","headland","evening-rounds","velour","halogen","cloud-street","lamplighter","frost-fair","heat-lightning","under-glass","flying-junction","coin-laundry","pixel-town","downtown-rush","neon-shibuya","departure-lounge","line-clear","mirror-ball","night-drive","plaza-mall","grand-prix","magic-orbit","montage","night-patrol"];
 const PIECES = {
+  "skylight-rain": () => import("./pieces/skylight-rain.mjs"),
+  "harbour-mouth": () => import("./pieces/harbour-mouth.mjs"),
+  "branch-line": () => import("./pieces/branch-line.mjs"),
+  "lantern-square": () => import("./pieces/lantern-square.mjs"),
+  "nightside-pass": () => import("./pieces/nightside-pass.mjs"),
+  "hydroponics-deck": () => import("./pieces/hydroponics-deck.mjs"),
+  "section-lines": () => import("./pieces/section-lines.mjs"),
+  "citronella": () => import("./pieces/citronella.mjs"),
+  "heron-causeway": () => import("./pieces/heron-causeway.mjs"),
+  "second-ring-road": () => import("./pieces/second-ring-road.mjs"),
+  "sunken-causeway": () => import("./pieces/sunken-causeway.mjs"),
+  "cheese-stall": () => import("./pieces/cheese-stall.mjs"),
+  "firn-light": () => import("./pieces/firn-light.mjs"),
+  "aerial-causeway": () => import("./pieces/aerial-causeway.mjs"),
+  "service-corridor": () => import("./pieces/service-corridor.mjs"),
+  "after-the-fireworks": () => import("./pieces/after-the-fireworks.mjs"),
+  "night-approach": () => import("./pieces/night-approach.mjs"),
+  "headland": () => import("./pieces/headland.mjs"),
+  "evening-rounds": () => import("./pieces/evening-rounds.mjs"),
+  "velour": () => import("./pieces/velour.mjs"),
+  "halogen": () => import("./pieces/halogen.mjs"),
+  "cloud-street": () => import("./pieces/cloud-street.mjs"),
+  "lamplighter": () => import("./pieces/lamplighter.mjs"),
+  "frost-fair": () => import("./pieces/frost-fair.mjs"),
+  "heat-lightning": () => import("./pieces/heat-lightning.mjs"),
+  "under-glass": () => import("./pieces/under-glass.mjs"),
+  "flying-junction": () => import("./pieces/flying-junction.mjs"),
+  "coin-laundry": () => import("./pieces/coin-laundry.mjs"),
   "pixel-town": () => import("./pieces/pixel-town.mjs"),
   "downtown-rush": () => import("./pieces/downtown-rush.mjs"),
   "neon-shibuya": () => import("./pieces/neon-shibuya.mjs"),
