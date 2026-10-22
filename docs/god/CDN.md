@@ -141,7 +141,7 @@ Gene or the internet session are listed at the end, in order.
 | Stage | Who serves blobs | Caching | Mars campus on the wire |
 |---|---|---|---|
 | Before (until 20:41 UTC Oct 11) | the laptop, through the SSH tunnel (~3.9 MB/s) | none (only Last-Modified) | 70.8 MB, uncompressed |
-| Now (Caddy on eden2) | `/srv/sim-blobs` on eden2, Caddy `file_server` | hashed: `max-age=31536000, immutable`; legacy names: `max-age=600` + ETag | 34.1 MB br (legacy name) |
+| Now (Caddy on eden2) | `/srv/sim-blobs` on eden2, Caddy `file_server` | hashed: `max-age=31536000, immutable`; legacy names: `max-age=86400, stale-while-revalidate=604800` + ETag (CACHE, was 600) | 34.1 MB br (legacy name) |
 | After 004 + /worlds release | same | same | **17.8 MB br** (`/blobs/assets/64/64b8838c….glb`, quantized + WebP + meshopt filters) |
 | CDN (this plan) | Cloudflare edge in front of R2 | same headers, served from the visitor's nearest PoP | 17.8 MB, no eden2 or laptop in the path |
 

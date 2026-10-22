@@ -28,9 +28,11 @@
       root /srv/sim-blobs/legacy
     }
   }
+  # lane CACHE (2026-10-22): these staged bytes are verified and never edited in place, so Cloudflare keeps them a day and
+  # serves stale for a week while it revalidates (was max-age=600: the old-world Draco decoder REVALIDATED every 10 min).
   handle @blobs_legacy {
     root * /srv/sim-blobs/legacy
-    header Cache-Control "public, max-age=600"
+    header Cache-Control "public, max-age=86400, stale-while-revalidate=604800"
     file_server {
       precompressed br zstd gzip
     }
