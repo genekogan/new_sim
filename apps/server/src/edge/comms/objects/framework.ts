@@ -97,9 +97,9 @@ export class Objects {
     return {soul, roles: kind.rolesOf(o.state, soul.soulId), tick: this.core.tick(), now: this.core.now(), nameOf: this.core.nameOf, inPlace: inPlace(o.placeId), carrier: this.carrierRead};
   }
   /** Apply time-driven transitions and persist them (with their events). */
-  private advanced(o: ObjectRecord,persist=true): ObjectRecord {
+  private advanced(o: ObjectRecord,persist=true,pre?:ReturnType<NonNullable<ObjectKind['advance']>>): ObjectRecord {
     const kind = this.kinds.get(o.kind);
-    const step = kind?.advance?.(structuredClone(o.state), this.timeCtx());
+    const step = pre ?? kind?.advance?.(structuredClone(o.state), this.timeCtx());
     if (!kind || !step) return o;
     checkState(kind, step.state);
     const next = {...o, state: step.state, version: o.version + 1};
@@ -107,7 +107,23 @@ export class Objects {
     return next;
   }
   /** Every object with its time-driven transitions applied (also the sweep timer). */
-  fresh(): ObjectRecord[] { return this.all().map(o => tx(this.core.db, () => { const cur = this.row(o.id); return cur ? this.advanced(cur) : o; })); }
+  fresh(): ObjectRecord[] {
+    // GODPERF: one read of every object, and a transaction only round an object that advances. Until something is written
+    // here the rows are exactly what all() read (nothing else runs in between), so an object whose kind does not advance
+    // is returned as read and a step computed on it is the step its own re-read would give; after the first write the rest
+    // go the old way (one transaction each: re-read, then advance), as an emit may have changed them. Was one savepoint,
+    // re-read and parse per object: 3,292 on Eden 2026, ~47 ms of every listing.
+    let wrote = false;
+    return this.all().map(o => {
+      if (!wrote) {
+        const kind = this.kinds.get(o.kind), step = kind?.advance?.(structuredClone(o.state), this.timeCtx());
+        if (!kind || !step) return o;
+        wrote = true;
+        return tx(this.core.db, () => this.advanced(o, true, step));
+      }
+      return tx(this.core.db, () => { const cur = this.row(o.id); return cur ? this.advanced(cur) : o; });
+    });
+  }
   /** fresh() for just these objects (their kind's wanted state changed): no read of every object. */
   refresh(ids: Iterable<string>): void { for (const id of ids) tx(this.core.db, () => { const cur = this.row(id); if (cur) this.advanced(cur); }); }
   sweep() { this.fresh(); }
