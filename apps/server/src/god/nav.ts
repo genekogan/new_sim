@@ -305,7 +305,10 @@ export class GodNav {
     } else if (t.kind === 'path') {
       goal = near(nearestOn(t.path!, me, false).q, 0, 16);
     } else if (t.kind === 'area') {
-      goal = inPoly(me[0], me[1], t.area!) ? near(me, 0, 8) : near(t.at, 0, 40);
+      // WALK3: standing room near me when I am inside it; a pond, a tree or a wheel at that spot widens the search, and an
+      // area whose middle has none (a lake with its shore, a dense forest) is reached at its edge
+      goal = inPoly(me[0], me[1], t.area!) ? (near(me, 0, 8) ?? near(me, 0, 40)) : near(t.at, 0, 40);
+      goal ??= near(nearestOn(t.area!, me, true).q, 0, 16);
     } else if (t.kind === 'room') {
       // the room's reachable standing point, moved aside when another body already stands on it (two Souls told to go
       // into the tea room do not queue for one spot)
@@ -323,6 +326,12 @@ export class GodNav {
       const stands = [...(t.stands ?? [])].sort((a, b) => Math.hypot(a[0] - me[0], a[1] - me[1]) - Math.hypot(b[0] - me[0], b[1] - me[1]));
       for (const s of stands) { goal = near(s, t.level, 6); if (goal) break; }
       goal ??= near(t.at, t.level, 40);
+      // WALK3: a duck on the lake, a boat in the harbour: the shore of the water it floats on, nearest to it
+      if (!goal && !t.level) for (const w of this.things()) {
+        if (w.kind !== 'water' || !w.area || !inPoly(t.at[0], t.at[1], w.area)) continue;
+        const edge = nearestOn(w.area, t.at, true), c = centroid(w.area), dx = edge.q[0] - c[0], dz = edge.q[1] - c[1], n = Math.hypot(dx, dz) || 1;
+        goal = near([edge.q[0] + (dx / n) * 1.5, edge.q[1] + (dz / n) * 1.5], 0, 16); if (goal) break;
+      }
     }
     this.goals.set(key, { tick, key, goal });
     return goal;
