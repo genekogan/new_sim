@@ -76,7 +76,9 @@ export const besideEachOther = (a: readonly number[], b: readonly number[]) => M
 const INVITABLE = new Set(['walk', 'stroll', 'wander', 'hang-out', 'gather', 'warm-by-fire', 'sit', 'sit-ground', 'lie', 'nap', 'read', 'write', 'swim', 'rest',
   'dance', 'jump', 'stretch', 'jumping-jacks', 'yoga', 'pushups', 'situps', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'object',
   // CN5
-  'use-computer', 'sing', 'listen', 'lift-weights', 'bench-press', 'pull-ups', 'dips', 'play-frisbee', 'play-petanque', 'play-volleyball']);
+  'use-computer', 'sing', 'listen', 'lift-weights', 'bench-press', 'pull-ups', 'dips', 'play-frisbee', 'play-petanque', 'play-volleyball',
+  // GEST-LIVE: the shared spots are what an invitation is for ("invite Ada to cook together")
+  'cook-together', 'tell-story', 'hear-story', 'book-club', 'social-dance', 'yoga-class']);
 
 export type Invite = {id: string; what: string; host: {soulId: string; name: string}; guests: {soulId: string; name: string}[]; capability: string; label: string;
   kind: 'paired' | 'give' | 'activity' | 'ride'; pairedPolicy?: 'ready-v1';
@@ -671,13 +673,24 @@ export class Together {
       if (!target) return {capability: verb + ':here', note: `${raw} is ${verb}:here`};
       return {capability: verb + ':here', params: verb === 'point' ? {at: target} : {to: target}, note: `${raw} is ${verb}:here (${verb === 'point' ? 'at' : 'to'} ${target})`};
     }
+    // stop / unfollow: stand:here ends whatever the body is doing, a follow or walk-with included
+    if (/^(?:stop|halt|stand still|unfollow(?:\s+.+)?|stop\s+(?:that|it|everything|moving|walking|what\s+(?:i\s+am|i'm|you\s+are|you're)\s+doing)|(?:stop|quit)\s+(?:following|walking\s+with|tagging\s+along\s+with|going\s+with|accompanying)(?:\s+.+)?)$/.test(t) && caps.some(c => c.id === 'stand:here'))
+      return {capability: 'stand:here', note: `${raw} is stand:here (stops what you are doing, a follow included)`};
+    // "go to <Soul>", "find <Soul>": walk over to a Soul by name (a place of the same words is left to the place resolver)
+    const goto = /^(?:(?:(?:go|walk|run|head|come|get|wander)\s+)?(?:over\s+|back\s+)?(?:to|near|towards?|up\s+to|next\s+to)|find|approach|meet|join|catch\s+up\s+with)\s+(.+)$/.exec(t);
+    if (goto) {
+      const w = goto[1].trim().replace(/^the\s+/, ''), named = (n: string) => n.toLowerCase() === w || (tokens(n).length > 0 && tokens(n).every(x => tokens(w).includes(x)));
+      const o = near.find(o => o.soulId === w || named(o.name));
+      if (o) {const c = caps.find(c => c.id === 'go-near:' + o.soulId); if (c) return {capability: c.id, note: `${raw} is ${c.id}`};}
+      else if ([...this.p.host.minds.values()].some(x => x.soulId !== soul.soulId && (x.soulId === w || named(x.name)))) return notHere('meet them', goto[1]);
+    }
     // follow / walk with
     const fol = /^(?:follow|walk\s+with|go\s+with|accompany|tag\s+along\s+with|come\s+with)\s+(.+)$/.exec(t);
     if (fol && !/^(?:me|us)$/.test(fol[1].trim())) {
       if(/\s+to\s+\S/.test(fol[1])&&!near.some(o=>o.name.toLowerCase()===fol[1].trim()))return {code:'follow.destination',reason:'Following only tracks the named Soul. To reach a place, walk with them to that place and invite them.',did_you_mean:[]};
       const o = who(fol[1]); if (!o) return /^(?:him|her|them|they|she|he)$/.test(fol[1].trim()) ? null : notHere('follow', fol[1]);
-      const back = this.invitesFor(soul.soulId).find(i => i.host.soulId === o.soulId); if (back) return {capability: 'accept:' + back.id, note: `joining ${o.name}'s ${back.what}`};
-      const c = capFor('follow', o); if (!c) return {code: 'follow.unavailable', reason: `${o.name} is too far away to walk with (${o.distance} m).`, did_you_mean: []};
+      const back = this.invitesFor(soul.soulId).find(i => i.host.soulId === o.soulId && i.kind !== 'paired' && i.kind !== 'give'); if (back) return {capability: 'accept:' + back.id, note: `joining ${o.name}'s ${back.what}`};
+      const c = capFor('follow', o); if (!c) return {code: 'follow.unavailable', reason: `${o.name} is too far away to walk with (${o.distance} m); go near them first.`, did_you_mean: caps.filter(c => c.id === 'go-near:' + o.soulId).map(c => ({id: c.id, label: c.label}))};
       return {capability: c.id, note: `${raw} is ${c.id}`};
     }
     // items
