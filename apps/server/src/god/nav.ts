@@ -118,6 +118,7 @@ export function supportY(m: { entities: Map<string, Entity>; slotsOf(e: Entity):
     const p = m.entities.get(x.in.parent); if (!p) break;
     const kind = m.slotsOf(p).find((s) => s.id === x.in.slot)?.kind;
     if (!kind || kind === 'room' || kind === 'floor' || kind === 'stand') break;   // in a building's room: on its floor
+    if (kind === 'roof') return m.worldPose(e).y;   // RESOLVE2: on a roof: reached from the roof, not the ground below it
     x = p;
   }
   return m.worldPose(x).y;
@@ -323,6 +324,12 @@ export class GodNav {
       const stands = [...(t.stands ?? [])].sort((a, b) => Math.hypot(a[0] - me[0], a[1] - me[1]) - Math.hypot(b[0] - me[0], b[1] - me[1]));
       for (const s of stands) { goal = near(s, t.level, 6); if (goal) break; }
       goal ??= near(t.at, t.level, 40);
+      // RESOLVE2: a thing on a raised floor (a roof bench, an upstairs lamp) must be reached from the ground: no stair to
+      // it -> no goal (offered as unavailable), not a walk that 'completes' on the ground below it
+      if (goal && goal.level > 0 && E.reachV1) {
+        const ground = near(t.at, 0, 40);
+        if (ground && !E.reachV1({ p: ground.p, level: 0 }, goal).ok) { goal = null; this.blocked.set(t.ref, `${t.ref} is up where no stair or ramp reaches it from the ground.`); }
+      }
     }
     this.goals.set(key, { tick, key, goal });
     return goal;
@@ -416,13 +423,28 @@ export class GodNav {
    *  multi-floor reach check; walk to the building first). True when a capability was added. */
   walkOnDemand(soul: EdgeSoul, placeId: string, caps: EdgeCapability[], plans: Plans): boolean {
     const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human || !this.h.placeOf) return false;
-    const here: Vec2 = [me.pose.p[0], me.pose.p[2]], myLevel = me.human.level ?? 0;
-    const all = this.things(), mine = all.filter((t) => this.h.placeOf!(t.ref) === placeId && (t.kind !== 'room' || t.level === 0 || (t.rise ?? 0) < LOW_RISE_M));
+    // RESOLVE2: an upstairs room is walked to as well (in at the front door, up its stair): ground-floor rooms first
+    const low = (t: Thing) => t.kind !== 'room' || t.level === 0 || (t.rise ?? 0) < LOW_RISE_M;
+    const all = this.things(), mine = all.filter((t) => this.h.placeOf!(t.ref) === placeId).sort((a, b) => +low(b) - +low(a));
     // F6: a room's own place is that room (not a piece of furniture standing in it)
     const room = mine.some((x) => x.kind === 'building') ? undefined : mine.find((x) => x.kind === 'room');
     const t = room ?? mine.find((x) => x.kind !== 'room') ?? mine[0]; if (!t) return false;
+    return this.offerOnDemand(soul, t, caps, plans);
+  }
+
+  /** RESOLVE2: a re-sent walk id of a named thing or room (`walk:seafront-hotel-4/seafront-hotel-4-roof-bench`, offered by
+   *  thingOnDemand for one resolution) offered again by its ref: it was refused capability.unknown. */
+  walkRefOnDemand(soul: EdgeSoul, ref: string, caps: EdgeCapability[], plans: Plans): boolean {
+    const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human) return false;
+    const t = this.things().find((x) => x.ref === ref); if (!t) return false;
+    return this.offerOnDemand(soul, t, caps, plans);
+  }
+
+  private offerOnDemand(soul: EdgeSoul, t: Thing, caps: EdgeCapability[], plans: Plans): boolean {
+    const me = this.h.engine.world.entities[soul.entityId]!, all = this.things();
+    const here: Vec2 = [me.pose.p[0], me.pose.p[2]], myLevel = me.human!.level ?? 0;
     const exit = myLevel === 0 ? null : all.find((r) => r.kind === 'room' && r.level === myLevel && r.poly && inPoly(here[0], here[1], r.poly) && r.entry && r.entry.level === 0)?.entry ?? null;
-    const seated = me.human.activity === 'sit' || me.human.baseActivity === 'sit', n = caps.length;
+    const seated = me.human!.activity === 'sit' || me.human!.baseActivity === 'sit', n = caps.length;
     this.offerWalk(soul, t, this.distance(t, here), { here, myLevel, seated, exit }, caps, plans);
     // F6 (SOULSIM-H): a room of a far building is walked to in at its front door, in one walk: to the door's approach
     // outside, then onto the room's floor (it was refused, so the Soul walked to the building first, then in: ~10 s more)
