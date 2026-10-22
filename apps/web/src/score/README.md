@@ -142,3 +142,19 @@ now a playlist of Sim Score pieces, replacing the sound layer's own generative `
   insists (iOS).
 - **Proof.** `window.__edenMusic.state() / log() / level() / next() / trackSeconds(s)`; `score/playlist.test.ts` (all 12
   pieces register and compose); `tools/sound/camera-restarts.mjs` (60 s of camera drags: sound and music restarts).
+
+### Vendored Sim Score (lane SCORE, 2026-10-22)
+
+Sim Score stays Gene's own project (`<sim-score-repo>`, its own git repository); Sim keeps a checked-in copy so it builds,
+tests and runs without it. `vendor/sim-score/` holds sim-score's `site/` (engine, pieces, catalog, the browser page) and
+its Node lint harness (`tools/load.mjs`, `lint.mjs`, `score.mjs`), byte for byte, with `PROVENANCE.json` (source commit
+and a sha256 per file). Never edit it: fix a piece in sim-score, commit there, and sync. To absorb a newer sim-score:
+
+```
+node tools/score/sync-sim-score.mjs <sim-score-repo> [commit]
+```
+
+It refuses a source with uncommitted changes and a vendored copy edited by hand, copies that commit's files, removes
+the ones it dropped, rewrites `PROVENANCE.json`, and prints the pieces, engine modules and other files it added,
+changed or removed. Lint the vendored pieces in place: `node vendor/sim-score/tools/lint.mjs <id ...> --cycles 32 --seed 7`.
+The browser page runs from the copy too (`python3 vendor/sim-score/tools/serve.py 4802`; Tone comes from cdnjs).
