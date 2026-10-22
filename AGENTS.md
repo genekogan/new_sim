@@ -26,6 +26,8 @@ writes to eden2 and pushes. A lane hands R `branch@sha` + a gate receipt; R ship
   (`tools/test-harness/quarantine.json`) has **9 entries** (10 retired); a clean gate reports `quarantined 8`, because the
   east-house phase A whole-skeleton entry now runs and passes (kept only for older baselines; see the file's 2026-10-21
   note). GitHub Actions runs fail at start (account billing, Gene's); the Modal gate is the release check.
+  At most 3 gates in flight across tranches (Modal workspace limit is 100 containers; one gate = 15); ledger
+  `team/lanes/GATES.inflight` (append a line before you start, remove it when receipt.json exists).
 - **Conformance re-pins:** known library failures are pinned by exact def hash, so a changed def revision fails
   `conformance` until a reviewed supplement `packages/conformance/conformance/<lane>-<date>.json` re-pins its documented
   tuples hash for hash (e.g. `bsgen-20261021.json`, `seatdef-20261022.json`), listed with a note in that folder's
