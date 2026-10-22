@@ -1402,7 +1402,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       if (cap && !this.secretOffer(soul, cap)) return {v: cap.id === text.trim() ? {kind: 'exact', cap} : {kind: 'alias', cap, note: `${text} is ${cap.id} (${cap.label}).`}, caps: more, plans: morePlans};
     }
     // RESOLVE2: a named thing's or room's walk id, re-sent as resolve answered it (`walk:hotel/hotel-roof-bench`): offered again
-    const byRef = exact || !this.walkRefOnDemand ? null : /^walk:(\S+\/\S+)$/.exec(text.trim());
+    const byRef = exact || !this.walkRefOnDemand ? null : /^walk:([^\s:]+)$/.exec(text.trim());
     if (byRef) {
       const more = [...caps], morePlans = new Map(plans), cap = this.walkRefOnDemand!(soul, byRef[1]!, more, morePlans) ? more.find(c => c.id === text.trim()) : undefined;
       if (cap && !this.secretOffer(soul, cap)) return {v: {kind: 'exact', cap}, caps: more, plans: morePlans};

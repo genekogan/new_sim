@@ -289,7 +289,7 @@ export class GodNav {
     const E = this.h.engine, tick = E.world.tick;
     // a Soul-dependent goal (the shore nearest me, the nearest point of a road) is never cached
     // MARSLIVED: a room's goal is refined live round whoever already stands there (roomGoal itself is cached per version)
-    const mine = t.kind === 'water' || t.kind === 'room' || (t.kind === 'path' && !t.deck?.length) || (t.stands?.length ?? 0) > 1;
+    const mine = t.kind === 'water' || t.kind === 'room' || (t.kind === 'path' && !t.deck?.length) || (t.stands?.length ?? 0) > 1 || t.level > 0;
     const key = `${t.ref}|${mine ? `${Math.round(me[0])},${Math.round(me[1])}` : ''}`;
     const hit = this.goals.get(key); if (hit && tick - hit.tick < 50) return hit.goal;
     const near = (at: Vec2, level: number, ring = 24) => { const p = E.standableNearV1(at, level, except, 0.4, ring); return p ? { p: [r2(p[0]), r2(p[1])] as Vec2, level } : null; };
@@ -326,9 +326,12 @@ export class GodNav {
       goal ??= near(t.at, t.level, 40);
       // RESOLVE2: a thing on a raised floor (a roof bench, an upstairs lamp) must be reached from the ground: no stair to
       // it -> no goal (offered as unavailable), not a walk that 'completes' on the ground below it
-      if (goal && goal.level > 0 && E.reachV1) {
+      // (and that ground from where I stand: the watermill's door opens onto its river, so its stair is reached from nowhere)
+      const myLevel = (except ? E.world.entities[except]?.human?.level : undefined) ?? 0;
+      if (goal && goal.level > 0 && goal.level !== myLevel && E.reachV1) {
         const ground = near(t.at, 0, 40);
-        if (ground && !E.reachV1({ p: ground.p, level: 0 }, goal).ok) { goal = null; this.blocked.set(t.ref, `${t.ref} is up where no stair or ramp reaches it from the ground.`); }
+        const ok = !!ground && E.reachV1({ p: ground.p, level: 0 }, goal).ok && (myLevel !== 0 || E.reachV1({ p: me, level: 0 }, { p: ground.p, level: 0 }).ok);
+        if (!ok) { goal = null; this.blocked.set(t.ref, `No walkable route reaches ${t.ref} from here: no stair or way in leads up to it.`); }
       }
     }
     this.goals.set(key, { tick, key, goal });
