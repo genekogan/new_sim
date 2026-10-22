@@ -41,7 +41,7 @@ const itemBoxes = (baked, p, y, yaw) => {
 // next pose or is dropped. The rule (how much room a body needs past a wall or a piece, as the walk raster sees it) is the
 // shared one in packages/generators/src/clearance.ts (lane BS1): 0.43 m from a wall piece, 0.50 m from a piece of furniture.
 export { roomKeys, approachOf, approachKeys, wayLabels, connectedPairs } from '../../../packages/generators/src/clearance.ts';
-import { roomKeys, approachKeys, wayGrid, pairsOf, seatSlides, SEAT_FAR, RASTER_SLOP } from '../../../packages/generators/src/clearance.ts';
+import { roomKeys, approachKeys, wayGrid, pairsOf, seatSlides, seatSlidesLeft, SEAT_FAR, RASTER_SLOP } from '../../../packages/generators/src/clearance.ts';
 
 /** The furnish styles (recipe files), sorted. */
 export const furnishStyles = () => readdirSync(RECIPES).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)).sort();
@@ -161,8 +161,7 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
           held = taken.filter((t) => t.room === room.id && t.sit).map((t) => {
             t.sit.slides ??= seatSlides(t.sit.ib, t.sit.at, t.sit.yaw, t.sit.y, [...baked.colliders, ...others(t)]);
             if (!near(t)) return { t, slides: t.sit.slides };
-            const left = seatSlides(t.sit.ib, t.sit.at, t.sit.yaw, t.sit.y, actual).map((pts) => new Set(pts.map((q) => q.join())));
-            return { t, slides: t.sit.slides.map((pts, i) => pts.filter((q) => left[i].has(q.join()))) };
+            return { t, slides: seatSlidesLeft(t.sit.ib, t.sit.at, t.sit.yaw, t.sit.y, actual, t.sit.slides) };
           });
           const shut = held.find((h) => h.slides.some((pts) => !pts.length));
           if (shut) { why = `would shut the way on or off ${shut.t.name}`; continue; }
