@@ -203,3 +203,12 @@ test('P7 entry script: parts the HTML names leave before the snapshot answers, o
   await new Promise((r) => setTimeout(r, 10));
   assert.deepEqual(calls.filter((u) => /part/.test(u)).map((u) => u.slice(-32)), ['a'.repeat(32), 'c'.repeat(32), 'b'.repeat(32)]);
 });
+
+// lane PAIR-UI: an #approve link may be handed to an open tab of the world, so its page opens no world socket at entry
+test('entry socket: an #approve link opens no world socket (a full boot opens its own)', () => {
+  const loc = { pathname: '/worlds/w/eden-2026/', protocol: 'https:', host: 'sim.test' };
+  runEntryWithSocket(loc.pathname, anonymousHello(true), { location: { ...loc, hash: '#approve/ap_0123456789abcdef' } });
+  assert.equal(FakeWS.made.length, 0);
+  runEntryWithSocket(loc.pathname, anonymousHello(true), { location: { ...loc, hash: '#soul/s_1' } });
+  assert.equal(FakeWS.made.length, 1);
+});

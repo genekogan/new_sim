@@ -64,7 +64,7 @@ export function SoulCard({api,soul,doing,energy,plays,talk,camera,pin,ownerActio
    <VisitorFrom soulId={soul.id}/>
   </p>
   <div className="soul-card-thread" data-soul-thread={soul.id}/>
-  {ownerAction&&<SoulAgentMessageBox api={api} soulId={soul.id}/>}
+  {ownerAction&&<SoulAgentMessageBox api={api} soulId={soul.id} name={soul.name}/>}
   <div className="soul-actions">
    {ownerAction&&<button onClick={ownerAction}>This mind</button>}
    {pin&&<button aria-pressed={pin.pinned} aria-label={pin.pinned?'Pinned favourite; unpin this Soul':'Pin this Soul as a favourite'} title={pin.pinned?'Unpin favourite':'Pin favourite'} onClick={pin.toggle}>{pin.pinned?'Pinned':'Pin'}</button>}
