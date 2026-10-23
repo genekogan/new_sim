@@ -25,6 +25,8 @@ function from(state: RideState, v: CarrierView | null): RideState {
     stepping: v.riders.filter(r => r.soulId && r.phase === 'leaving').map(r => ({soulId: r.soulId!, name: r.name ?? 'someone'})),
     steeredBy: ((v as {steer?: {by: SoulRef | null}}).steer?.by) ?? null};
 }
+/** VERBS (accept2 brief 10): the refusal for a ride the world would not board today; join offers it as unavailable. */
+const blockedRefusal = (s: RideState, b: {code: string; message: string}) => ({code: 'ride.blocked', reason: `This ${s.rowing ? 'punt' : 'ride'} cannot be boarded right now: ${b.message} (${b.code}).`});
 const minutes = (s: number) => s >= 90 ? `about ${Math.round(s / 60)} minutes` : `${Math.round(s)} seconds`;
 
 export const rideKind: ObjectKind<RideState> = {
@@ -79,6 +81,8 @@ export const rideKind: ObjectKind<RideState> = {
         : s.phase === 'aloft' ? {code: 'ride.departed', reason: s.rowing ? 'It is out on the water; it returns to this bank.' : 'It is in the air; it lands where it started.'}
         : s.phase === 'landed' ? {code: 'ride.landing', reason: 'It has just returned; its riders are stepping out.'}
         : s.phase === 'closed' ? {code: 'ride.closed', reason: 'This ride is not running.'}
+        // VERBS (accept2 brief 10): the world would refuse a new boarding today (a punt whose bank or water no longer qualifies)
+        : view(ctx, s.carrier)?.blocked ? blockedRefusal(s, view(ctx, s.carrier)!.blocked!)
         : s.seatsFree < 1 && !(s.keptFor ?? []).some(r => r.soulId === ctx.soul.soulId) ? {code: 'ride.full', reason: (s.keptFor ?? []).length ? `The last place is kept for ${(s.keptFor ?? []).map(r => r.name).join(', ')}.` : 'Every place in this ride is taken.'} : null,
       validate(s, _p, ctx) { return rideKind.actions.join.available!(s, ctx); },
       apply(s, _p, _ctx) {

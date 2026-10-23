@@ -1119,7 +1119,21 @@ export class EdgeLedger implements EdgeLedgerHooks {
       route: {id: c.state.route.id, seconds: end, elapsedSeconds: Math.round(c.state.elapsed / 2) / 10, keys: c.state.route.keys, interpolation: 'eden-rides/1 hermite'},
       ...((c.state as {steer?: {by: string | null; land?: number[]; to: number[]; ret?: true}}).steer ? (() => {const st = (c.state as unknown as {steer: {by: string | null; land?: number[]; to: number[]; ret?: true}}).steer, m = st.by ? this.host.mindByEntity?.get(st.by) ?? [...this.host.minds.values()].find(x => x.entityId === st.by) : undefined;
         return {steer: {by: m ? {soulId: m.soulId, name: m.name} : null, returning: !!st.ret, to: [st.to[0], st.to[2]], ...(st.land ? {landAt: [st.land[0], st.land[2]]} : {})}};})() : {}),
-      flights: c.state.flights, phaseTick: c.state.phaseTick, tick, waitSeconds: Math.round(((c.state as {waitTicks?: number}).waitTicks ?? 900) / 20)};
+      flights: c.state.flights, phaseTick: c.state.phaseTick, tick, waitSeconds: Math.round(((c.state as {waitTicks?: number}).waitTicks ?? 900) / 20),
+      ...((b: {code: string; message: string} | null) => b ? {blocked: b} : {})(this.boardingIssue(c.id, tick, c.state.route.id))};
+  }
+  /** VERBS (accept2 brief 10): a punt whose bank or water no longer qualifies (a later ground edit) was offered and then refused
+   *  by the world (punt.unsupported-water). The engine's own boarding check, cached for 30 s (it costs ~10 ms a punt). */
+  /*  Keyed by the route too: a steered trip flies a 'steer' route in place of the ride's own, and an answer cached then
+   *  must not refuse the next boarding once its own loop is back (STACK merge of VEHICLE-STEER + VERBS). */
+  private boardingChecks = new Map<string, {tick: number; route: string; issue: {code: string; message: string} | null}>();
+  private boardingIssue(id: string, tick: number, route: string): {code: string; message: string} | null {
+    const was = this.boardingChecks.get(id);
+    if (was && was.route === route && tick >= was.tick && tick - was.tick < 600) return was.issue;
+    const check = (this.host.engine as unknown as {carrierBoardingIssueV1?: (id: string) => {code: string; message: string} | null}).carrierBoardingIssueV1;
+    const issue = check ? check.call(this.host.engine, id) ?? null : null;
+    this.boardingChecks.set(id, {tick, route, issue});
+    return issue;
   }
   /** VEHICLE-STEER: where a rider asks a ride to go, as ground (x, z): a place the Soul knows (its centre), or a compass
    *  direction + distance from the ride's position. Validation of the spot itself (water, landing, bounds) is the engine's. */
@@ -1254,6 +1268,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
         : verb === 'punt' ? this.carriersNative().filter(c => c.def === 'rowing-punt').map(c => ({at: [c.pose.p[0], c.pose.p[2]] as [number, number], label: c.label, place: undefined as string | undefined})) : null;
       if (rideMarks && !rideMarks.length) return verb === 'punt' ? null : undefined;
       const marks = rideMarks ?? (verb === 'cycle' ? (this.spots.docks ?? []).map(k => ({at: k.at, label: k.label ?? 'a bicycle dock', place: k.place}))
+        // VERBS: ducks or swans to feed (a feed spot whose title or label names birds), for "feed the ducks"
+        : verb === 'feed-birds' ? this.spots.spots.filter(x => x.activity === 'feed' && /\b(?:ducks?|swans?|geese|goose|birds?)\b/i.test(`${x.title ?? ''} ${x.label ?? ''}`)).map(x => ({at: x.at, label: x.label ?? 'a duck-feeding bank', place: x.place}))
         : verb in SPOT_ACTIVITIES ? this.spots.spots.filter(x => x.activity === verb || x.also?.includes(verb)).map(x => ({at: x.at, label: x.label ?? `a ${verb} spot`, place: x.place})) : undefined);
       if (!marks) return undefined;
       const best = marks.map(m => {const placeId = m.place ?? around(m.at[0], m.at[1])[0], pl = placeId ? this.places.byId.get(placeId) : undefined;
