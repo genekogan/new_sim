@@ -330,11 +330,12 @@ export async function act(first,...rest){
  // Only journeys are protected: a timed activity (sitting, reading, lying, dancing…) is a state the next act may replace, and stand/stop always goes through.
  const words0=[first,...rest].join(' ').toLowerCase(),stopping=/^(stand|stop|get up|stand up|wake)/.test(words0)||first.startsWith('stand:')||ATTENTION.test(intent?.verb??words0)||first.startsWith('face:'); // 1.8: look/turn/face never cancel the body
  const JOURNEY=/^(walk|stroll|go-near|hang-out|gather|object|wave):/;
+ const RIDE_JOIN=/^object:ride-[^:]+:join$/; // 1.9.10 (VEHICLE-STEER): a ride join stays 'started' while seated; steering it ("row to X") is the point, not a replacement
  // 1.9.7 (SOULSIM-H F5): a message your human sent (and you acked) after this walk began is their replacement: act it now.
  const ownerReplaces=!!s.lastOwnerAckAt&&!!s.lastActAt&&Date.parse(s.lastOwnerAckAt)>=Date.parse(s.lastActAt);
  if(!force&&!stopping&&!ownerReplaces&&m==='edge'&&s.lastReceipt&&!s.lastReceipt.startsWith('legacy:')&&s.lastActAt&&Date.now()-Date.parse(s.lastActAt)<120_000){
   const r=await receipt(s.lastReceipt);
-  if(r&&(r.phase==='started'||r.phase==='waiting')&&JOURNEY.test(r.capability??''))return {accepted:false,code:'local.in-progress',receipt:{id:r.id,capability:r.capability,phase:r.phase},
+  if(r&&(r.phase==='started'||r.phase==='waiting')&&JOURNEY.test(r.capability??'')&&!RIDE_JOIN.test(r.capability??''))return {accepted:false,code:'local.in-progress',receipt:{id:r.id,capability:r.capability,phase:r.phase},
    hint:'Your last action is still under way. Run "wait 60" until it completes (or observe/say/converse meanwhile). If your human asked for something else, ack their message, then act it (a plain act replaces the walk after that ack), or add --force.',next:'wait'};
  }
  if(intent&&m==='edge'){
