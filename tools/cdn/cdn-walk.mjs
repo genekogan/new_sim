@@ -21,6 +21,7 @@ import { findPlaywright } from '../god-skill/lib/look.mjs';
 import { chromeLease } from '../god-skill/lib/chrome-lease.mjs';
 import { manifestAsset, readCdnManifest } from '../../apps/web/src/cdn-assets.ts';
 import { originCacheClass, originCacheProblem } from './origin-cache.mjs';
+import { recordWorldSockets } from '../world-launcher/deploy/socket-observer.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const args = process.argv.slice(2), opt = (k, d) => { const i = args.indexOf('--' + k); if (i < 0) return d; const v = args[i + 1]; args.splice(i, 2); return v; };
@@ -41,12 +42,13 @@ try {
   for (const url of urls) for (const dev of DEVICES) {
     const phone = dev.startsWith('phone'), dpr = Number(dev.slice(-1));
     const ctx = await browser.newContext(phone ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: dpr, isMobile: true, hasTouch: true } : { viewport: { width: 1280, height: 800 }, deviceScaleFactor: dpr });
+    await ctx.addInitScript(recordWorldSockets);
     const page = await ctx.newPage(), reqs = [], errors = [], originCache = [];
     const site = new URL(url).host;
     page.on('response', (r) => {   // CACHE: every same-origin immutable response, any type (bundles, parts, wasm, json)
       const u = new URL(r.url()); if (u.host !== site || !originCacheClass(u.pathname)) return;
       const problem = originCacheProblem({ path: u.pathname + u.search, status: r.status(), headers: r.headers() });
-      originCache.push({ path: u.pathname + u.search, status: r.status(), cf: r.headers()['cf-cache-status'] ?? null, ...(problem ? { problem } : {}) });
+      originCache.push({ path: u.pathname + u.search, class: originCacheClass(u.pathname), status: r.status(), cacheControl: r.headers()['cache-control'] ?? null, cf: r.headers()['cf-cache-status'] ?? null, ...(problem ? { problem } : {}) });
     });
     page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
     page.on('response', (r) => {   // includes the dedicated asset worker's fetches
@@ -56,9 +58,10 @@ try {
       const upload = cdn ? /^\/w\/[a-z][a-z0-9-]{0,31}\/assets\/([0-9a-f]{64})\./.exec(u.pathname)?.[1] : !listed ? /^\/worlds\/w\/[a-z][a-z0-9-]{0,31}\/assets\/([0-9a-f]{64})\.glb$/.exec(u.pathname)?.[1] : undefined;
       reqs.push({ host: u.host, path: u.pathname + u.search, status: r.status(), encoding: h['content-encoding'] ?? null, listed, ...(upload ? { upload, worker: h['x-eden-cdn'] ?? null } : {}) });
     });
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch((e) => errors.push('goto ' + e.message.slice(0, 120)));
+    const navigationStatus = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 }).then(r => r?.status() ?? null).catch((e) => { errors.push('goto ' + e.message.slice(0, 120)); return null; });
     await page.waitForTimeout(WAIT);
     const worker = await page.evaluate(() => globalThis.__assetWorker ?? null).catch(() => null);
+    const sockets = await page.evaluate(() => globalThis.__z1ws ?? []).catch(() => []);
     const tag = `${new URL(url).pathname.replace(/\W+/g, '-')}${dev}`;
     await page.screenshot({ path: `${out}/${tag}.png` }).catch(() => {});
     const cdn = reqs.filter((r) => r.host === 'assets.eden.art');
@@ -75,9 +78,9 @@ try {
       ...originUploads.filter((r) => !tried.has(r.upload)).map((r) => `god upload from the origin without a CDN attempt: ${r.path}`),
       ...[...new Set(originCache.filter((r) => r.problem).map((r) => r.problem))],
     ];
-    const row = { url, dev, total: reqs.length, cdn: cdn.length, cdnBr: cdn.filter((r) => r.encoding === 'br' && r.path.startsWith('/assets/br/')).length,
-      cdnUploads: cdnUploads.length, cdnUploadStates: Object.fromEntries(['miss', 'hit', 'edge'].map((k) => [k, cdnUploads.filter((r) => r.worker === k).length])), originUploads: originUploads.length, originImmutable: originCache.length, originCacheCf: Object.fromEntries([...new Set(originCache.map((r) => r.cf ?? '-'))].map((k) => [k, originCache.filter((r) => (r.cf ?? '-') === k).length])), originListed, worker, problems, errors, pass: problems.length === 0, reqs };
-    rows.push(row); console.log(JSON.stringify({ ...row, reqs: undefined, originListed: originListed.slice(0, 5) }));
+    const row = { url, dev, sockets, navigationStatus, finalUrl: page.url(), total: reqs.length, cdn: cdn.length, cdnBr: cdn.filter((r) => r.encoding === 'br' && r.path.startsWith('/assets/br/')).length,
+      cdnUploads: cdnUploads.length, cdnUploadStates: Object.fromEntries(['miss', 'hit', 'edge'].map((k) => [k, cdnUploads.filter((r) => r.worker === k).length])), originUploads: originUploads.length, originImmutable: originCache.length, originCache, originCacheCf: Object.fromEntries([...new Set(originCache.map((r) => r.cf ?? '-'))].map((k) => [k, originCache.filter((r) => (r.cf ?? '-') === k).length])), originListed, worker, problems, errors, pass: problems.length === 0, reqs };
+    rows.push(row); console.log(JSON.stringify({ ...row, reqs: undefined, originCache: undefined, sockets: undefined, originListed: originListed.slice(0, 5) }));
     await ctx.close();
   }
 } finally { await browser?.close(); release(); writeFileSync(`${out}/cdn-walk.json`, JSON.stringify(rows, null, 1)); }

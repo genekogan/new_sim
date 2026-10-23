@@ -33,6 +33,7 @@
 // Bar (G9): errorPages 0, every arrival loaded (document 2xx/3xx within 30 s), lost 0, unclean 0, every reconnect <= 5000 ms,
 // no page reloaded, watched >= --after-s after the release ended.
 import { createRequire } from 'node:module';
+import { recordWorldSockets } from './socket-observer.mjs';
 import { execFile } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -63,25 +64,7 @@ const say = (s) => console.log(`[probe +${(at() / 1000).toFixed(1)}s] ${s}`);
 const ERROR_TEXT = /Bad Gateway|Service Unavailable|Gateway Time-?out|"code":\s*"world\.|world\.unavailable|Internal Server Error|This site can.t be reached|ERR_CONNECTION|No world called|Application error/i;
 
 // ---------- in-page recorder: every WebSocket, plus an arrival mark
-const RECORDER = () => {
-  const W = window.WebSocket, log = (window.__z1ws = []);
-  const Z = function (url, protocols) {
-    const ws = protocols === undefined ? new W(url) : new W(url, protocols);
-    const rec = { url: String(url), made: Date.now(), open: null, first: null, last: null, close: null, code: null };
-    log.push(rec);
-    ws.addEventListener('open', () => { rec.open = Date.now(); });
-    ws.addEventListener('message', (e) => {
-      const n = Date.now(); rec.first ??= n; rec.last = n;
-      if (rec.build === undefined && typeof e.data === 'string' && e.data.startsWith('{"t":"welcome"')) rec.build = e.data.match(/"build":"([^"]*)"/)?.[1] ?? null;
-    });
-    ws.addEventListener('close', (e) => { rec.close = Date.now(); rec.code = e.code; });
-    return ws;
-  };
-  Z.prototype = W.prototype; Object.assign(Z, { CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3 });
-  window.WebSocket = Z;
-  // main-thread stalls: a 100 ms timer that fired more than 1 s late
-  if (window === window.top) { const st = (window.__z1stalls = []); let last = Date.now(); setInterval(() => { const n = Date.now(); if (n - last > 1000) st.push([last, n]); last = n; }, 100); }
-};
+const RECORDER = recordWorldSockets;
 const isWorldSocket = (u) => /\/ws(\?|$)/.test(u);
 
 const report = { origin, startedAt: iso(), pages, phonePages, watchers: [], arrivals: [], cli: [], bar: null };
@@ -133,12 +116,12 @@ async function finish(w) {
   w.stalls = ((await w.page.evaluate(() => window.__z1stalls).catch(() => null)) ?? []).map(([a, b]) => [a - t0, b - t0]);
   const stallIn = (a, b) => w.stalls.reduce((n, [x, y]) => n + Math.max(0, Math.min(b, y) - Math.max(a, x)), 0);
   // a drop during the watch: close → first message on the next socket of the same world
-  w.sockets = socks.map((s) => ({ ...s, made: s.made - t0, open: s.open && s.open - t0, first: s.first && s.first - t0, last: s.last && s.last - t0, close: s.close && s.close - t0 }));
+  w.sockets = socks.map((s) => ({ ...s, sent: (s.sent ?? []).map(x => ({ ...x, at: x.at - t0 })), made: s.made - t0, open: s.open && s.open - t0, first: s.first && s.first - t0, last: s.last && s.last - t0, close: s.close && s.close - t0 }));
   w.drops = [];
   for (let i = 0; i < w.sockets.length; i++) {
     const s = w.sockets[i]; if (s.close === null || s.close < w.markAt || s.close > stoppedAt) continue;   // a close while collecting is not watched
     const next = w.sockets.slice(i + 1).find((n) => n.first !== null && n.first >= s.close);
-    w.drops.push({ closeAt: s.close, code: s.code, resumedAt: next?.first ?? null, reconnectMs: next ? next.first - s.close : null,
+    w.drops.push({ closeAt: s.close, code: s.code, reason: s.reason ?? null, sentLast10s: (s.sent ?? []).filter(x => x.at >= s.close - 10000 && x.at <= s.close), resumedAt: next?.first ?? null, reconnectMs: next ? next.first - s.close : null,
       pageStallMs: stallIn(s.close - 1000, next?.first ?? at()) });
   }
   // the build each page saw when it was marked, and at the end (the welcome of its last socket that had one)
