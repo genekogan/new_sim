@@ -247,6 +247,14 @@ export class Together {
     this.sourceCache = {key, list: out}; return out;
   }
 
+  /** GEST-LIVE: the other sources of an item kind within reach, nearest first (the nearest one may have no walkable route). */
+  pickUpAlternatives(entityId: string, kind: string): {id: string; at: V2; face?: V2}[] {
+    const b = this.p.body(entityId); if (!b) return [];
+    const here: V2 = [b.pose.p[0], b.pose.p[2]];
+    return this.sources().filter(s => s.kind === kind).map(s => ({s, d: Math.hypot(s.at[0] - here[0], s.at[1] - here[1])}))
+      .filter(x => x.d <= ITEM_LIMITS.pickReach).sort((a, b) => a.d - b.d).slice(0, 6).map(({s}) => ({id: s.id, at: s.at, ...(s.face ? {face: s.face} : {})}));
+  }
+
   // ---------------------------------------------------------------- capabilities
   /** Gestures, invitations, follows and items for one Soul (added to the ledger's capability list and plans). */
   capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Map<string, TogetherPlan>) {

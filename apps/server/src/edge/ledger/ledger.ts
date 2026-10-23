@@ -876,6 +876,29 @@ export class EdgeLedger implements EdgeLedgerHooks {
         issue = this.host.engine.canPerform({actor: soul.entityId, label, steps});
       }
     }
+    // GEST-LIVE: the nearest source of an item that no walk reaches (a postbox behind a fence) gives way to the next one a walk does
+    const kind = /^pick-up:([a-z]+)$/.exec(capability)?.[1];
+    if (issue && ROUTE_DEAD.has(issue.code) && kind) {
+      for (const s of this.together.pickUpAlternatives(soul.entityId, kind)) {
+        const alt = steps.map(x => x.verb === 'walk_to' ? {...x, params: {...x.params, to: s.at}} : x.verb === 'mars:pose_v1' ? {...x, params: {...Object.fromEntries(Object.entries(x.params ?? {}).filter(([k]) => k !== 'face')), ...(s.face ? {face: s.face} : {})}} : x);
+        const again = this.host.engine.canPerform({actor: soul.entityId, label, steps: alt});
+        if (!again || WAIT_CODES.has(again.code)) {steps = alt; issue = again; break;}
+      }
+    }
+    // GEST-LIVE: a standing spot whose exact point no walk reaches (the barn table's cook-together places sat 0.45 m into the
+    // table's solid) is taken from the nearest standable point within 1 m of it; seats and berths keep their exact slot
+    if (issue?.code === 'route.goal-blocked' && !/^(?:sit|sit-ground|lie|nap|read|rest):/.test(capability)) {
+      const eng = this.host.engine as unknown as {nearestStandableV1?: (at: [number, number], except?: string, min?: number, rings?: number) => [number, number] | null};
+      let moved = false;
+      const alt = steps.map(x => {
+        const to = x.verb === 'walk_to' ? (x.params as {to?: unknown})?.to : undefined;
+        if (!Array.isArray(to) || to.length !== 2 || !eng.nearestStandableV1) return x;
+        const p = eng.nearestStandableV1(to as [number, number], soul.entityId, 0.33, 6);
+        if (!p || Math.hypot(p[0] - (to[0] as number), p[1] - (to[1] as number)) > 1) return x;
+        moved = true; return {...x, params: {...x.params, to: p}};
+      });
+      if (moved) {const again = this.host.engine.canPerform({actor: soul.entityId, label, steps: alt}); if (!again || WAIT_CODES.has(again.code)) {steps = alt; issue = again;}}
+    }
     // BS3 (a): a jog or run the water refuses (the way runs through the shallows, or the body stands in them) walks instead
     let note: string | undefined, approach: Record<string, unknown> | undefined;
     if (issue?.code === 'gait.dry-ground-required' && steps.some(s => s.verb === 'walk_to' && s.params?.gait && s.params.gait !== 'walk')) {
