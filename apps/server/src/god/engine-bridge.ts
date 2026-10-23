@@ -16,6 +16,7 @@ import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { GodMode } from './god.ts';
 import { reachProviders, seatProviders, syncProviders, usesProviders, type ReachEnd, type ReachEndpoint } from './query.ts';
 import { GodNav } from './nav.ts';
+import { hasStraightLandings, railRaster } from './rail-raster.ts';
 import { tokenHit } from '../edge/ledger/vocabulary.ts';
 import { doorInGap, freeDoorOpening, isDoorDef, isShut } from './doors.ts';
 import { GodPerceive } from './perceive.ts';
@@ -391,8 +392,13 @@ export class EngineBridge {
       const nativeRide = !!(def.components as Record<string, unknown>).carrier && def.tags.includes('balloon');
       // door-raster/1 (lane RT): a building/1 wall piece at least a raster cell thick rasters by its cell centres, so its
       // doorways keep their width on the walk raster at any yaw (spatial/types.ts Obstacle.raster)
-      if (solids.length && !nativeRide) part.solids = solids.map(({ o, local }, i) => ({ id: `${e.id}#c${i}`, obb: { c: [r3(o.c[0]), r3(o.c[1])] as Vec2, half: [r3(o.half[0]), r3(o.half[1])] as Vec2, yaw: r3(-o.yaw) }, y0: r3(o.y0), y1: r3(o.y1), kind: 'fixture' as const, label: `${this.model.pathOf(e.id)}${local.tag ? ' ' + local.tag : ''}`.slice(0, 100),
-        ...(rasterOf({ tag: local.tag, half: o.half }) === 'centre' ? { raster: 'centre' as const } : {}) }));   // the shared rule (@sim/generators clearance.ts)
+      if (solids.length && !nativeRide) part.solids = solids.flatMap(({ o, local }, i) => {
+        const obb: OBB2 = { c: [r3(o.c[0]), r3(o.c[1])], half: [r3(o.half[0]), r3(o.half[1])], yaw: r3(-o.yaw) };
+        // YAW: the rail's middle uses a cell-thick padded solid; original end caps keep conservative corner safety.
+        const rails = local.tag === 'rail' && hasStraightLandings(baked.links) && local.y0 > 0.5 ? railRaster(obb) : null;
+        const pieces = rails ?? [{ obb, ...(rasterOf({ tag: local.tag, half: o.half }) === 'centre' ? { raster: 'centre' as const } : {}) }];
+        return pieces.map((piece, k) => ({ id: `${e.id}#c${i}${k ? `-end${k}` : ''}`, ...piece, y0: r3(o.y0), y1: r3(o.y1), kind: 'fixture' as const, label: `${this.model.pathOf(e.id)}${local.tag ? ' ' + local.tag : ''}`.slice(0, 100) }));
+      });
     }
     // closed doors block their gap; a free-standing door (no doorway of its own) blocks its own width (doorblock)
     const doorState = (e.state?.doors ?? {}) as Record<string, unknown>;
