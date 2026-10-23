@@ -200,6 +200,8 @@ test('together: pick up, carry, give (accepted), put down, pick up again, eat; h
   const wk = await w.act(a, 'wander:here', {seconds: 5}); await w.run([{soulId: a.soulId, id: wk.receipt.id}], 2000); assert.equal(w.body(a).human.prop, 'book', 'still in hand after a stroll');
   if (w.gap(a, b) > 6) {const g = await w.act(b, 'go-near:' + a.soulId); await w.run([{soulId: b.soulId, id: g.receipt.id}], 3000);}
   // a gives it to b ("give her the book" → the only one near)
+  // GEST-LIVE: naming a different item than the one in hand is refused, and the suggestion gives what is held
+  const wrong: any = await w.act(a, `give ${b.name} the frisbee`, undefined, false); assert.equal(wrong.code, 'item.not-held', JSON.stringify(wrong)); assert.equal(wrong.did_you_mean?.[0]?.id, 'give:' + b.soulId);
   const gv = await w.act(a, `give ${b.name} the book`); assert.equal(gv.resolved?.to, 'give:' + b.soulId, JSON.stringify(gv));
   for (let i = 0; i < 20; i++) w.f.host.tickOnce();
   // GEST-LIVE: "take the book" beside the library shelves accepts the offered book (it used to pick one off a shelf)

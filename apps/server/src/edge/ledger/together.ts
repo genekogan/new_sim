@@ -229,7 +229,7 @@ export class Together {
   private sourceCache: {key: string; list: {id: string; kind: ItemKind; label: string; at: V2; face?: V2; place: string | null}[]} | null = null;
   /** Deterministic item sources: shelves (books), writing desks (letters) and walkable places by kind (gardens → flowers…). */
   sources() {
-    const nav = (this.w as {navV1?: {solids?: unknown[]; ground?: unknown[]}}).navV1, key = Object.keys(this.w.regions).length + ':' + (nav?.solids?.length ?? -1) + ':' + (nav?.ground?.length ?? -1);
+    const nav = (this.w as {navV1?: {solids?: unknown[]; ground?: unknown[]}}).navV1, key = Object.keys(this.w.regions).length + ':' + this.p.places.byId.size + ':' + (nav?.solids?.length ?? -1) + ':' + (nav?.ground?.length ?? -1);
     if (this.sourceCache?.key === key) return this.sourceCache.list;
     const out: {id: string; kind: ItemKind; label: string; at: V2; face?: V2; place: string | null}[] = [];
     const nameOf = (id?: string) => (id ? this.p.places.byId.get(id)?.name : undefined) ?? 'the shelf';
@@ -237,7 +237,8 @@ export class Together {
     for (const s of this.p.spots().spots) if (s.activity === 'write' || s.activity === 'post-letter') out.push({id: 'spot:' + s.id, kind: 'letter', label: s.label ?? 'a writing desk', at: s.at, ...(s.faceTo ? {face: s.faceTo} : {}), place: s.place ?? null});
     const engine = this.p.host.engine as unknown as {nearestStandableV1?: (at: V2, except?: string, min?: number, rings?: number) => V2 | null};
     for (const place of [...this.p.places.byId.values()].sort((a, b) => a.id.localeCompare(b.id))) {
-      if (!this.w.regions[place.id] || place.kind === 'water' || place.carrier) continue;
+      // places come from the place registry (a mars-engine world keeps its places there, not in world.regions)
+      if (!place.polygon?.length || place.kind === 'water' || place.carrier) continue;
       const text = (place.id + ' ' + place.name).toLowerCase(), kinds = SOURCE_WORDS.filter(([, re]) => re.test(text)).map(([k]) => k);
       if (!kinds.length) continue;
       const at = engine.nearestStandableV1?.(centroid(place.polygon), undefined, 0.6, 24) ?? null; if (!at) continue;
@@ -670,6 +671,9 @@ export class Together {
       const from = tk[1] ?? tk[3], o = from ? who(from) : undefined, what = tk[2]?.replace(/^(?:the|a|an)\s+/, '');
       const i = mine.filter(x => x.kind === 'give' && (!o || x.host.soulId === o.soulId) && (!what || x.item?.kind === what || x.item?.name.toLowerCase().includes(what) || what === 'gift' || what === 'offer')).at(-1);
       if (i) return {capability: 'accept:' + i.id, note: `taking ${i.item?.name ?? 'the item'} ${i.host.name} offers you`};
+      const askedKind = what ? ITEM_WORDS.find(([, re]) => re.test(' ' + what + ' '))?.[0] : undefined, offered = mine.filter(x => x.kind === 'give' && (!o || x.host.soulId === o.soulId)).at(-1);
+      if (!i && offered && askedKind && !caps.some(c => c.verb === 'pick-up' && (c.id === 'pick-up:' + askedKind || this.item(c.target?.id ?? '')?.kind === askedKind)))
+        return {code: 'give.other-item', reason: `${offered.host.name} offers you ${offered.item?.name ?? 'something'}, not ${ITEM_NAMES[askedKind]}.`, did_you_mean: [{id: 'accept:' + offered.id, label: `Accept: take ${offered.item?.name ?? 'it'} from ${offered.host.name}`}, {id: 'decline:' + offered.id, label: 'Decline'}]};
     }
     // gestures
     const G: [RegExp, string][] = [[/^(?:give\s+(.+?)\s+a\s+hug|hug|embrace|cuddle)\s*(.*)$/, 'hug'], [/^(?:give\s+(.+?)\s+a\s+high[- ]?five|high[- ]?five|hi[- ]?five)\s*(.*)$/, 'high-five'],
@@ -716,6 +720,8 @@ export class Together {
       // a world may offer its own give for what is in the hand (a god-built thing: god/held.ts)
       if (!held && !caps.some(c => c.verb === 'give')) return {code: 'hands.empty', reason: 'You are not holding anything to give; pick something up first.', did_you_mean: caps.filter(c => c.verb === 'pick-up').slice(0, 5).map(c => ({id: c.id, label: c.label}))};
       const o = who(give[1]); if (!o) return notHere('give', give[1]);
+      const said = ITEM_WORDS.find(([, re]) => re.test(' ' + t + ' '))?.[0];
+      if (held && said && said !== held.kind) {const g = capFor('give', o); return {code: 'item.not-held', reason: `You are holding ${held.name}, not ${ITEM_NAMES[said]}; you can give ${held.name}, or put it down and pick up ${ITEM_NAMES[said]} first.`, did_you_mean: [...(g ? [g] : []), ...caps.filter(c => c.id === 'put-down:here')].map(c => ({id: c.id, label: c.label}))};}
       const c = capFor('give', o); if (!c) return tooFar('give', o);
       return {capability: c.id, note: `${raw} is ${c.id}${held ? ` (${held.name})` : ''}`};
     }
@@ -732,7 +738,11 @@ export class Together {
         if (held) return {code: 'hands.full', reason: `You are holding ${held.name}; put it down or give it away first.`, did_you_mean: caps.filter(c => c.id === 'put-down:here' || c.verb === 'give').slice(0, 4).map(c => ({id: c.id, label: c.label}))};
         const lying = caps.filter(c => c.verb === 'pick-up' && c.target?.kind === 'item' && this.item(c.target.id)?.kind === kind)[0];
         const c = lying ?? caps.find(c => c.id === 'pick-up:' + kind);
-        if (!c) return {code: 'item.none-near', reason: `There is no ${kind} to pick up within ${ITEM_LIMITS.pickReach} m.`, did_you_mean: caps.filter(c => c.verb === 'pick-up').slice(0, 5).map(c => ({id: c.id, label: c.label}))};
+        if (!c) {
+          const me = this.posOf(soul.soulId), far = me ? this.sources().filter(s => s.kind === kind && s.place).map(s => ({s, d: Math.hypot(s.at[0] - me[0], s.at[1] - me[1])})).sort((a, b) => a.d - b.d) : [];
+          const hit = far.map(f => ({f, w: caps.find(c => c.verb === 'walk' && c.target && (c.target.id === f.s.place || this.p.places.byId.get(f.s.place!)?.parent === c.target.id))})).find(x => x.w), walk = hit?.w;
+          return {code: 'item.none-near', reason: `There is no ${kind} to pick up within ${ITEM_LIMITS.pickReach} m${hit ? `; the nearest is ${hit.f.s.label}, ${Math.round(hit.f.d)} m away: walk there first` : ''}.`, did_you_mean: [...(walk ? [walk] : []), ...caps.filter(c => c.verb === 'pick-up').slice(0, walk ? 3 : 5)].map(c => ({id: c.id, label: c.label}))};
+        }
         return {capability: c.id, note: `${raw} is ${c.id} (${c.label})`};
       }
     }
