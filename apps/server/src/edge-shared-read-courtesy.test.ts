@@ -55,7 +55,7 @@ for (const [label, at] of [['host browse would start inside a nudge', [70.5, -5.
     assert.ok(together.maxGap <= 4, `both readers within 4 m of each other throughout (max ${together.maxGap.toFixed(2)} m)`);
   });
 
-test('shared read guest spot: own free spot beside the host destination (same room, 0.5-4 m), never the host\'s own, unavailable, far or other-room spots', async t => {
+test('shared read guest spot: own free spot beside the host destination (same room, 0.5-4 m), never the host\'s own, unavailable, far, other-room, other-level, level-aware or unknown-room spots', async t => {
   const w = await coreAWorld(3), [a, b, c] = w.souls; t.after(w.close);
   const host = await w.http(a, 'POST', '/v1/edge/act', {verb: 'read', target: {place: 'eden-library-1', seconds: 60, with: b.name}});
   assert.equal(host.body.accepted, true, JSON.stringify(host.body));
@@ -81,6 +81,23 @@ test('shared read guest spot: own free spot beside the host destination (same ro
   assert.deepEqual(pick([['read:beside', beside, false]]), fallback, 'an unavailable (taken) spot is never chosen: the place plan as before');
   assert.deepEqual(pick([['read:far', far], ['read:host-own', own]]), fallback, 'only far or host-own spots: the place plan as before');
   if (other) assert.deepEqual(pick([['read:other-room', other]]), fallback, 'a near spot in another room is never chosen');
+  // fail closed (scope: ground-level plain walk_to plans only): a level-aware or levelled plan, a level-aware default place
+  // plan, an upper-floor host or guest, or a host destination in no known room never wins; the place plan as before
+  const levelled = (to: [number, number], mars: boolean) => {const pl = plan(to); pl.steps[2] = mars ? {verb: 'mars:walk_to', params: {x: to[0], z: to[1], level: 0}} as never : {verb: 'walk_to', params: {to, level: 0}} as never; return pl;};
+  for (const mars of [true, false]) {
+    const caps = [placeCap, spot('read:beside')], plans = new Map([[placeCap.id, plan([at[0] + 5, at[1]])], ['read:beside', levelled(beside, mars)]]);
+    const r = w.ledger.together.acceptPlan(b, inv.id, caps, plans) as {steps: {verb: string; params: Record<string, unknown>}[]};
+    assert.deepEqual(r.steps.find(s => s.verb === 'walk_to' && Array.isArray(s.params.to) && (s.params.to as number[])[0] === at[0] + 5)?.params.to, [at[0] + 5, at[1]], `a ${mars ? 'mars:walk_to' : 'levelled walk_to'} spot plan does not win`);
+  }
+  const sb = (w.ledger.together as unknown as {spotBeside: (...a: unknown[]) => unknown}).spotBeside.bind(w.ledger.together);
+  const caps = [placeCap, spot('read:beside')], plans = (home = plan([at[0] + 5, at[1]])) => new Map([[placeCap.id, home], ['read:beside', plan(beside)]]);
+  assert.ok(sb(at, 0, 0, 'read', placeCap.id, caps, plans()), 'ground case: the beside spot (direct)');
+  assert.equal(sb(at, 1, 0, 'read', placeCap.id, caps, plans()), undefined, 'host on another level: no override');
+  assert.equal(sb(at, 0, 1, 'read', placeCap.id, caps, plans()), undefined, 'guest on another level: no override');
+  assert.equal(sb(at, 0, 0, 'read', placeCap.id, caps, plans(levelled([at[0] + 5, at[1]], true))), undefined, 'level-aware default place plan: no override');
+  const nowhere: [number, number] = [at[0] + 5000, at[1] + 5000];
+  assert.equal(w.ledger.places.containing(nowhere[0], nowhere[1], 0).filter(p => p.parent !== null).length, 0, 'probe point lies in no room');
+  assert.equal(sb(nowhere, 0, 0, 'read', placeCap.id, [placeCap, spot('read:n')], new Map([[placeCap.id, plan([nowhere[0] + 5, nowhere[1]])], ['read:n', plan([nowhere[0] + 1.7, nowhere[1]])]])), undefined, 'unknown room (world root only): no override');
   t.diagnostic(JSON.stringify({at, hostRoom, beside, far, other: other ? [other, room(other)] : null}));
   assert.equal((pick([['read:beside', beside]], c) as {code: string}).code, 'invite.gone', 'an uninvited soul still cannot accept');
 });
