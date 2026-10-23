@@ -23,6 +23,7 @@ import { angleDelta, heading, hypot, rot2, wrapAngle, type Vec2, type Vec3 } fro
 import { CATALOG } from '../world/catalog.ts';
 import { entityList, stableIndices, type EntityTable } from '../world/entity-list.ts';
 import { relevantEntities } from '../world/relevant.ts';
+import { acknowledgeRelocation } from '../runtime/invariants.ts';
 
 export type CarrierSeatDef = { id: string; local: Vec2; yaw: number; exit: Vec2 };
 export type CarrierDef = { seats: CarrierSeatDef[]; door: Vec2; floorY: number; transferSpeed: number; landingClear: number };
@@ -47,7 +48,8 @@ export type CarrierState = {
   /** together/1: places kept for invited companions (`seats`), how many of them have boarded, until when. Absent otherwise. */
   hold?: { by: string; seats: number; filled: number; untilTick: number };
 };
-export type CarriedBody = { id: string; slot: string; phase: 'boarding' | 'seated' | 'leaving' };
+/** `outBy` (leaving only): the tick by which the rider is on the ground; a step-out still held up then is set down at its exit. */
+export type CarriedBody = { id: string; slot: string; phase: 'boarding' | 'seated' | 'leaving'; outBy?: number };
 
 const TPS = 20;
 /** Clearance of the landing spot: no other person within this distance of the home centre below this height. */
@@ -56,6 +58,23 @@ const LANDING_HEIGHT = 3;
 const BOARD_REACH = 3.2;
 const BLOCK_GAP = 0.56;
 const BOARD_TIMEOUT = 15 * TPS;
+/** Stepping out never holds a body for long (Gene's review 2026-10-23: a landed rider stayed "riding" behind a busy door/exit):
+ *  a rider whose step-out has made no progress this long (busy door, someone on the exit) is set down at its seat exit (the
+ *  nearest clear spot there). Walking out, or waiting for a rider ahead who is itself stepping out, renews the limit. */
+export const LEAVE_LIMIT = 12 * TPS;
+/** Seconds until a leaving rider is on the ground at the latest (LEAVE_LIMIT; the full limit while it has not begun). */
+export function stepOutSeconds(body: CarriedBody | undefined, tick: number): number {
+  return Math.max(1, Math.ceil(((body?.phase === 'leaving' && body.outBy !== undefined ? body.outBy : tick + LEAVE_LIMIT) - tick) / TPS));
+}
+/** The exit itself when clear, else the first clear spot a little further out from the carrier or to either side. */
+function setDownSpot(rt: Runtime, me: string, e: Entity, exit: Vec3): Vec3 {
+  const ax = exit[0] - e.pose.p[0], az = exit[2] - e.pose.p[2], n = hypot(ax, az) || 1, ux = ax / n, uz = az / n;
+  for (const [f, s] of [[0, 0], [0.8, 0], [1.6, 0], [0.8, 0.8], [0.8, -0.8], [0, 1.2], [0, -1.2], [2.4, 0]] as const) {
+    const p: Vec3 = [r4(exit[0] + ux * f - uz * s), exit[1], r4(exit[2] + uz * f + ux * s)];
+    if (!blockerAt(rt, me, p)) return p;
+  }
+  return exit;
+}
 
 /** Named routes (World data; deterministic in route time). Positions are world metres, t seconds from lift-off. */
 export const CARRIER_ROUTES: Record<string, CarrierRoute> = {
@@ -214,7 +233,7 @@ const ride: ActionDef<RideParams, { slot: string }, RideExec> = {
     const e = rt.world.entities[ex.carrier], c = state(e), d = carrierDef(e), a = rt.world.entities[ex.actor];
     if (!e || !c || !d || !a?.human) return { status: 'failed', diagnostic: diag('gone', 'the carrier or rider is gone') };
     const h = a.human, body = (h as { carrier?: CarriedBody }).carrier!, seat = seatPose(e, ex.slot)!, def = d.seats.find(s => s.id === ex.slot)!;
-    const leave = () => { ex.phase = 'leaving'; ex.leg = 0; body.phase = 'leaving'; h.activity = 'alight'; };
+    const leave = () => { ex.phase = 'leaving'; ex.leg = 0; body.phase = 'leaving'; body.outBy = rt.tick + LEAVE_LIMIT; h.activity = 'alight'; };
     if (ex.phase === 'boarding') {
       const abandon = (d2: Diagnostic | null) => { freeDoor(c, ex.actor); c.seats[ex.slot] = null; delete (h as { carrier?: CarriedBody }).carrier; delete h.task; h.activity = 'idle';
         return d2 ? { status: 'failed' as const, diagnostic: d2 } : { status: 'completed' as const, outputs: { carrier: e.id, phase: 'ashore' } }; };
@@ -250,10 +269,15 @@ const ride: ActionDef<RideParams, { slot: string }, RideExec> = {
     const path=bypass?[at(e,[def.local[0],-.65],d.floorY),at(e,[1.6,-.65],d.floorY),door,exit]:[door,exit];
     // The punt's thwarts are in line. At the shared return, the rider nearest the plank gets out first,
     // so the rear rider never walks through the one still seated at the front thwart.
-    if (c.bank && c.phase === 'landed' && ex.leg === 0) {
+    // A step-out held up past its limit (busy door, someone standing on the exit, a rider ahead) ends here: set down at the exit.
+    // (A body already leaving from an older state gets its limit from now.)
+    body.outBy ??= rt.tick + LEAVE_LIMIT;
+    const setDown = rt.tick >= body.outBy && c.phase !== 'aloft';
+    if (setDown) { const p = setDownSpot(rt, ex.actor, e, exit); a.pose.p = [p[0], a.pose.p[1], p[2]]; acknowledgeRelocation(rt, ex.actor); ex.leg = path.length; }
+    if (!setDown && c.bank && c.phase === 'landed' && ex.leg === 0) {
       const mine=hypot(seat.p[0]-door[0],seat.p[2]-door[2]);
       if (Object.entries(c.seats).some(([slot,actor])=>actor&&actor!==ex.actor&&(()=>{const p=seatPose(e,slot)!.p;return hypot(p[0]-door[0],p[2]-door[2])<mine-.01;})()))
-        return {status:'running',phase:'leaving-wait'};
+        { body.outBy = rt.tick + LEAVE_LIMIT; return {status:'running',phase:'leaving-wait'}; }
     }
     if (ex.leg >= path.length) {
       freeDoor(c, ex.actor); c.seats[ex.slot] = null; delete (h as { carrier?: CarriedBody }).carrier; delete h.task; h.activity = 'idle';
@@ -261,10 +285,11 @@ const ride: ActionDef<RideParams, { slot: string }, RideExec> = {
       a.pose.p = [a.pose.p[0], c.bank ? exit[1] : c.home[1], a.pose.p[2]];
       const contact = rt.services.carrierBankContact as ((rt: Runtime, actor: string) => void) | undefined;
       if (c.bank) { delete h.shore; contact?.(rt, ex.actor); }
-      return { status: 'completed', outputs: { carrier: e.id, slot: ex.slot, phase: 'ashore', position: [...a.pose.p] } };
+      return { status: 'completed', outputs: { carrier: e.id, slot: ex.slot, phase: 'ashore', position: [...a.pose.p], ...(setDown ? { setDown: true } : {}) } };
     }
     const to = path[ex.leg];
     if (!takeDoor(c, ex.actor) || blockerAt(rt, ex.actor, to)) return { status: 'running', phase: 'leaving-wait' };
+    body.outBy = rt.tick + LEAVE_LIMIT;
     if (moveToward(a, to, d.transferSpeed, dt)) ex.leg++;
     return { status: 'running', phase: 'leaving' };
   },
@@ -329,7 +354,21 @@ export function stepCarriers(rt: Runtime, table?: EntityTable | null): void {
       }
       continue;
     }
-    if (c.phase === 'landed') { if (!riders.length) { c.phase = 'parked'; c.phaseTick = tick; } continue; }
+    if (c.phase === 'landed') {
+      // A rider whose ride step is gone (no action holds its seat) would keep the carrier landed and the body "riding" for
+      // ever: once the step-out limit has passed since landing, the world sets that body down at its exit.
+      if (tick - c.phaseTick > LEAVE_LIMIT) for (const [slot, actor] of Object.entries(c.seats)) {
+        const a = actor ? rt.world.entities[actor] : undefined;
+        if (!actor || rt.holder(`carrier-seat:${e.id}#${slot}`).length) continue;
+        c.seats[slot] = null; freeDoor(c, actor); if (!a?.human || carried(a)?.id !== e.id) continue;
+        const h = a.human, def = d.seats.find(s => s.id === slot), exit = c.bank?.exits[slot] ?? (def ? at(e, def.exit) : doorPoint(e)!), p = setDownSpot(rt, actor, e, exit);
+        delete (h as { carrier?: CarriedBody }).carrier; delete h.task; delete h.baseActivity; delete h.seatHeight; delete h.speed; h.activity = 'idle';
+        a.pose.p = [p[0], c.bank ? exit[1] : c.home[1], p[2]]; acknowledgeRelocation(rt, actor);
+        if (c.bank) { delete h.shore; (rt.services.carrierBankContact as ((rt: Runtime, actor: string) => void) | undefined)?.(rt, actor); }
+      }
+      if (!Object.values(c.seats).some(Boolean)) { c.phase = 'parked'; c.phaseTick = tick; }
+      continue;
+    }
     if (c.phase !== 'aloft') continue;
     const end = routeTicks(c.route), next = routePosition(c.route, c.elapsed + 1);
     c.holding = next[1] - c.home[1] < LANDING_HEIGHT && c.elapsed + 1 > (e.def === 'rowing-punt' ? end - TPS : end / 2) && !landingClear(rt, e, c, d);

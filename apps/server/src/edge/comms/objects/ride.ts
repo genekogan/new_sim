@@ -8,14 +8,19 @@ import type {ActionCtx, CarrierView, ObjectEvent, ObjectKind, SoulRef, TimeCtx} 
 
 export type RideState = {carrier: string; capacity: number; phase: string; riders: SoulRef[]; seatsFree: number; departsInSeconds: number | null; holding: boolean; flights: number; routeSeconds: number; door: [number, number] | null;
   /** together/1: invited companions the basket keeps a place for and waits for (absent on older objects). */
-  keptFor?: SoulRef[]; rowing?: boolean};
+  keptFor?: SoulRef[]; rowing?: boolean;
+  /** RIDE-EXIT: riders back on the ground who are still stepping out (their body is in the basket/punt until the engine sets it down). */
+  stepping?: SoulRef[];
+  /** seconds a boarding ride waits for more riders before it departs by itself */
+  waitSeconds?: number};
 
 const view = (ctx: TimeCtx | ActionCtx, id: string): CarrierView | null => ctx.carrier?.(id) ?? null;
 function from(state: RideState, v: CarrierView | null): RideState {
   if (!v) return {...state, phase: 'closed', riders: [], seatsFree: 0, departsInSeconds: null};
   return {carrier: state.carrier, rowing: v.def === 'rowing-punt', capacity: v.capacity, phase: v.phase, holding: v.holding, flights: v.flights, seatsFree: v.seatsFree, routeSeconds: v.route.seconds,
-    door: v.door as [number, number] | null, departsInSeconds: v.departsInSeconds, keptFor: (v as {hold?: {for: SoulRef[]}}).hold?.for ?? [],
-    riders: v.riders.filter(r => r.soulId && r.phase !== 'leaving').map(r => ({soulId: r.soulId!, name: r.name ?? 'someone'}))};
+    door: v.door as [number, number] | null, departsInSeconds: v.departsInSeconds, waitSeconds: (v as {waitSeconds?: number}).waitSeconds ?? 45, keptFor: (v as {hold?: {for: SoulRef[]}}).hold?.for ?? [],
+    riders: v.riders.filter(r => r.soulId && r.phase !== 'leaving').map(r => ({soulId: r.soulId!, name: r.name ?? 'someone'})),
+    stepping: v.riders.filter(r => r.soulId && r.phase === 'leaving').map(r => ({soulId: r.soulId!, name: r.name ?? 'someone'}))};
 }
 const minutes = (s: number) => s >= 90 ? `about ${Math.round(s / 60)} minutes` : `${Math.round(s)} seconds`;
 
@@ -30,13 +35,15 @@ export const rideKind: ObjectKind<RideState> = {
     riders: {type: 'soul[]', visibility: 'public'}, seatsFree: {type: 'integer', visibility: 'public'}, departsInSeconds: {type: 'json', visibility: 'public'},
     holding: {type: 'boolean', visibility: 'public'}, flights: {type: 'integer', visibility: 'public'}, routeSeconds: {type: 'integer', visibility: 'public'}, door: {type: 'json', visibility: 'public'},
     keptFor: {type: 'json', visibility: 'public', description: 'invited companions the basket keeps a place for and waits for'},
+    stepping: {type: 'soul[]', visibility: 'public', description: 'riders back on the ground who are stepping out now'},
+    waitSeconds: {type: 'integer', visibility: 'public', description: 'seconds it waits at boarding before it departs by itself'},
   },
   initial(params, ctx) {
     const carrier = String(params.carrier ?? '');
     if (!/^[a-z0-9][a-z0-9._-]{0,99}$/.test(carrier)) throw new Error('ride needs params.carrier (a native carrier entity id)');
     return from({carrier, capacity: 0, phase: 'closed', riders: [], seatsFree: 0, departsInSeconds: null, holding: false, flights: 0, routeSeconds: 0, door: null, keptFor: []}, view(ctx, carrier));
   },
-  rolesOf: (s, soulId) => s.riders.some(r => r.soulId === soulId) ? ['rider'] : [],
+  rolesOf: (s, soulId) => s.riders.some(r => r.soulId === soulId) || (s.stepping ?? []).some(r => r.soulId === soulId) ? ['rider'] : [],
   personal: (s, soulId) => ({riding: s.riders.some(r => r.soulId === soulId)}),
   advance(state, ctx) {
     const next = from(state, view(ctx, state.carrier));
@@ -49,6 +56,10 @@ export const rideKind: ObjectKind<RideState> = {
     if (next.phase === 'boarding' && next.riders.length > state.riders.length) for (const r of next.riders.filter(r => !state.riders.some(o => o.soulId === r.soulId)))
       events.push({to: to.filter(id => id !== r.soulId), text: `${r.name} climbs into ${next.rowing ? 'the punt' : 'the basket'} with you.`, untrusted: true}, {to: [r.soulId], text: (next.keptFor ?? []).length
         ? `You are in ${next.rowing ? 'the punt' : 'the basket'}. It waits for ${(next.keptFor ?? []).map(k => k.name).join(', ')} before departing, and lifts off by itself once they are aboard.` : `You are in ${next.rowing ? 'the punt' : 'the basket'}. It departs in about ${next.departsInSeconds ?? 0} seconds, or now if a rider says start.`, untrusted: true});
+    // RIDE-EXIT: the owner-readable end of a ride: the body is out and standing on the ground.
+    const inside = (x: RideState) => [...x.riders, ...(x.stepping ?? [])];
+    if (state.phase === 'aloft' || state.phase === 'landed') for (const r of inside(state).filter(r => !inside(next).some(o => o.soulId === r.soulId)))
+      events.push({to: [r.soulId], text: next.rowing ? 'You are ashore, standing on the bank by the punt; you can go anywhere now.' : 'You are out of the balloon, standing on the ground by its basket; you can go anywhere now.'});
     if (!state.holding && next.holding && to.length) events.push({to, text: next.rowing ? 'The punt waits at the bank until its disembarkation point is clear.' : 'The balloon hovers above its landing spot until the ground below is clear.'});
     return {state: next, events};
   },
@@ -56,6 +67,10 @@ export const rideKind: ObjectKind<RideState> = {
     join: {
       movesBody:true,
       label: 'Join the ride: board, travel and return (punt receipt includes disembarkation)', roles: 'anyone', reach: 'anywhere', params: {},
+      // RIDE-EXIT (A): the offer states the commitment so an agent can tell its owner before joining.
+      labelFor: s => s.rowing
+        ? `Board the punt: it pushes off by itself ${s.departsInSeconds != null ? `in ~${s.departsInSeconds} s` : `~${s.waitSeconds ?? 45} s after you are aboard`}, rows ${minutes(s.routeSeconds)} on the water and returns to this bank, where you step ashore`
+        : `Board the balloon: it lifts off by itself ${s.departsInSeconds != null ? `in ~${s.departsInSeconds} s` : `~${s.waitSeconds ?? 45} s after you are seated`}, flies ${minutes(s.routeSeconds)} and lands where it started; you cannot get off in the air`,
       available: (s, ctx) => s.riders.some(r => r.soulId === ctx.soul.soulId) ? {code: 'ride.already-aboard', reason: 'You are already in it.'}
         : s.phase === 'aloft' ? {code: 'ride.departed', reason: s.rowing ? 'It is out on the water; it returns to this bank.' : 'It is in the air; it lands where it started.'}
         : s.phase === 'landed' ? {code: 'ride.landing', reason: 'It has just returned; its riders are stepping out.'}
@@ -70,9 +85,11 @@ export const rideKind: ObjectKind<RideState> = {
     leave: {
       movesBody:true,
       label: 'Disembark at the boarding point (only while parked)', roles: ['rider'], reach: 'anywhere', params: {},
-      available: s => s.phase === 'aloft' ? {code: 'ride.aloft', reason: s.rowing ? 'You are on the water; finish the loop and disembark at the bank.' : 'You are in the air; it lands by itself and you step out then.'} : null,
+      available: (s, ctx) => (s.stepping ?? []).some(r => r.soulId === ctx.soul.soulId) ? null : s.phase === 'aloft' ? {code: 'ride.aloft', reason: s.rowing ? 'You are on the water; finish the loop and disembark at the bank.' : 'You are in the air; it lands by itself and you step out then.'} : null,
       validate(s, _p, ctx) { return rideKind.actions.leave.available!(s, ctx); },
       apply(s, _p, ctx) {
+        // Already stepping out (the ride is back on the ground): the engine is moving the body out; nothing new to start.
+        if ((s.stepping ?? []).some(r => r.soulId === ctx.soul.soulId)) return {state: s, result: {steppingOut: s.carrier, onGroundWithinSeconds: 12}};
         const exit = ctx.carrier?.(s.carrier)?.riders.find(r => r.soulId === ctx.soul.soulId)?.exit ?? s.door;
         return {state: s, result: {leaving: s.carrier}, bodies: [{label: s.rowing ? 'Disembark the punt' : 'Step out of the balloon', steps: [{verb: 'walk_to', params: {to: exit, standoff: 0}}]}]};
       },

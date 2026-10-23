@@ -1998,9 +1998,11 @@ export class MarsEngine implements Engine {
     return out;
   }
   /** carrier/1: the carrier this body is boarding, seated in or leaving, if any. */
-  carrierOf(actor:string):{id:string;slot:string;riderPhase:string;phase:string;label:string}|null{
+  carrierOf(actor:string):{id:string;slot:string;riderPhase:string;phase:string;label:string;outInSeconds?:number}|null{
     const b=this.ents[actor]?.human?.carrier,e=b?this.ents[b.id]:undefined;if(!b||!e?.carrier)return null;
-    return {id:e.id,slot:b.slot,riderPhase:b.phase,phase:e.carrier.phase,label:e.label??e.id};
+    // On the ground (landed, or stepping out): seconds until the body is out at the latest (carrier.ts LEAVE_LIMIT, 12 s).
+    const out=b.phase==='leaving'||e.carrier.phase==='landed'?Math.max(1,Math.ceil(((b.phase==='leaving'&&b.outBy!==undefined?b.outBy:this.world.tick+240)-this.world.tick)/20)):undefined;
+    return {id:e.id,slot:b.slot,riderPhase:b.phase,phase:e.carrier.phase,label:e.label??e.id,...(out!==undefined?{outInSeconds:out}:{})};
   }
   /** carrier/1: every carrier entity's public state (riders by entity id). */
   carriers(){return listEntities(this.ents).filter((e:any)=>e.carrier).map((e:any)=>({id:e.id as string,def:e.def as string,label:(e.label??e.id) as string,pose:structuredClone(e.pose),state:structuredClone(e.carrier)}));}
