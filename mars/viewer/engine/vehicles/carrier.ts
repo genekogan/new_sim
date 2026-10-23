@@ -195,7 +195,7 @@ type RideExec = { actor: string; carrier: string; slot: string; phase: 'boarding
 /** The doorway's points in world space, inside first. */
 const inside = (e: Entity, d: CarrierDef) => (d.doorway ?? []).map(q => at(e, q, d.floorY));
 /** From where the boarder stands, round the basket (never through it) to the boarding step, through the door, then to its seat. */
-function boardingPath(e: Entity, from: Vec3, seat: Vec3, d: CarrierDef): Vec3[] {
+export function boardingPath(e: Entity, from: Vec3, seat: Vec3, d: CarrierDef): Vec3[] {
   if (state(e)?.bank) return [doorPoint(e)!, seat];
   const l = rot2([from[0] - e.pose.p[0], from[2] - e.pose.p[2]], -e.pose.yaw), hz = CATALOG[e.def].size[2] / 2 + 0.6;
   const side = l[1] >= 0 ? 1 : -1, out = d.door[0] >= 0 ? 1 : -1, pts: Vec2[] = [];

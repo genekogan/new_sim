@@ -143,9 +143,10 @@ export function buildGate(){
  b.box(WICKER,-.02,0,-w/2,.04,H-.04,w);for(const y of [.28,.56,.84])b.box(WICKER_DARK,-.045,y,-w/2,.01,.05,w);b.box(LEATHER,-.02,H-.06,-w/2,.09,.09,w);
  return b.geometry();
 }
-export function buildBalloon(){
- const b=new Builder(),L=BALLOON.basket.length,W=BALLOON.basket.width,H=BALLOON.basket.height;
- for(let j=0;j<PROFILE.length-1;j++){const [h0,r0]=PROFILE[j],[h1,r1]=PROFILE[j+1];
+/** `basketOnly`: the cabin without the envelope (a god's balloon keeps its own envelope; its load tapes reach `mouthY`). */
+export function buildBalloon(o:{basketOnly?:boolean;mouthY?:number}={}){
+ const b=new Builder(),L=BALLOON.basket.length,W=BALLOON.basket.width,H=BALLOON.basket.height,mouthY=o.mouthY??PROFILE[0][0];
+ if(!o.basketOnly)for(let j=0;j<PROFILE.length-1;j++){const [h0,r0]=PROFILE[j],[h1,r1]=PROFILE[j+1];
   // smooth normals across gores from the profile slope
   const nrm=(k:number):[number,number]=>{const [ha,ra]=PROFILE[Math.max(0,k-1)],[hb,rb]=PROFILE[Math.min(PROFILE.length-1,k+1)],dh=hb-ha,dr=rb-ra,l=Math.hypot(dh,dr)||1;return [dh/l,-dr/l];};
   const [n0h,n0y]=nrm(j),[n1h,n1y]=nrm(j+1);
@@ -169,7 +170,7 @@ export function buildBalloon(){
  // wicker weave bands so the basket reads as woven, not as a crate
  for(const y of [.28,.56,.84])for(const [x,z,w,d] of [[0,z1+.006,L,.01],[0,z0-.006,L,.01],[x1+.006,0,.01,W],[x0-.006,-mid,.01,side],[x0-.006,mid,.01,side]] as const)b.box(WICKER_DARK,x,y,z,w,.05,d);
  // burner frame: four uprights, a square, the twin burner, load tapes to the mouth
- const fy=FRAME_Y;for(const [sx,sz] of [[-1,-1],[1,-1],[1,1],[-1,1]] as const){b.rope(STEEL,[sx*(L/2-.03),CANOPY_Y,sz*(W/2-.03)],[sx*.45,fy,sz*.4],.035);b.rope(ROPE,[sx*.45,fy,sz*.4],[sx*.62,PROFILE[0][0]+.05,sz*.62],.025);}
+ const fy=FRAME_Y;for(const [sx,sz] of [[-1,-1],[1,-1],[1,1],[-1,1]] as const){b.rope(STEEL,[sx*(L/2-.03),CANOPY_Y,sz*(W/2-.03)],[sx*.45,fy,sz*.4],.035);b.rope(ROPE,[sx*.45,fy,sz*.4],[sx*.62,mouthY+.05,sz*.62],.025);}
  for(const [a,c] of [[[-.45,-.4],[.45,-.4]],[[.45,-.4],[.45,.4]],[[.45,.4],[-.45,.4]],[[-.45,.4],[-.45,-.4]]] as const)b.rope(STEEL,[a[0],fy,a[1]],[c[0],fy,c[1]],.04);
  b.box(STEEL,0,fy-.18,0,.42,.28,.3);b.box('#2e2e30',-.1,fy+.1,0,.14,.12,.14);b.box('#2e2e30',.1,fy+.1,0,.14,.12,.14);
  // fuel tanks in the back corners, below the rim, clear of the door

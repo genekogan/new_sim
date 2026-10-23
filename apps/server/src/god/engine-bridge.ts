@@ -83,6 +83,25 @@ const RELEASED = '"released"';
 const GROUND_BAND = 0.35;      // a floor within this of the ground is level 0 (the engine's ground is flat at y 0 until L8's tiles)
 const LEVEL_MATCH = 0.12;      // floors this close in height share an engine level
 const FLOOR_NEAR = 0.6;        // levelAt: a level counts at a point within this of one of its floors (thresholds, stair heads)
+/** hasFloorAt's floors of one level, bucketed by FLOOR_CELL squares (a floor in every cell its FLOOR_NEAR-grown bounding
+ *  circle touches), so a point checks only the floors near it, not every floor of the level (GODLIST: levelAt per thing
+ *  in the activity-spots derive). Same answer as a scan of all floors: a candidate set that contains every match. */
+const FLOOR_CELL = 8;
+export class FloorCells {
+  private cells = new Map<string, { id: string; obb: OBB2 }[]>();
+  private always: { id: string; obb: OBB2 }[] = [];
+  add(id: string, obb: OBB2) {
+    const f = { id, obb }, r = Math.hypot(Math.abs(obb.half[0]) + FLOOR_NEAR, Math.abs(obb.half[1]) + FLOOR_NEAR) + 1e-6;
+    const x0 = Math.floor((obb.c[0] - r) / FLOOR_CELL), x1 = Math.floor((obb.c[0] + r) / FLOOR_CELL), z0 = Math.floor((obb.c[1] - r) / FLOOR_CELL), z1 = Math.floor((obb.c[1] + r) / FLOOR_CELL);
+    if (![x0, x1, z0, z1].every(Number.isFinite) || (x1 - x0 + 1) * (z1 - z0 + 1) > 256) { this.always.push(f); return; }
+    for (let i = x0; i <= x1; i++) for (let k = z0; k <= z1; k++) { const key = `${i}|${k}`, l = this.cells.get(key); if (l) l.push(f); else this.cells.set(key, [f]); }
+  }
+  some(x: number, z: number, ok: (f: { id: string; obb: OBB2 }) => boolean): boolean {
+    if (this.always.some(ok)) return true;
+    if (!Number.isFinite(x) || !Number.isFinite(z)) { for (const l of this.cells.values()) if (l.some(ok)) return true; return false; }
+    return this.cells.get(`${Math.floor(x / FLOOR_CELL)}|${Math.floor(z / FLOOR_CELL)}`)?.some(ok) ?? false;
+  }
+}
 const NEAR = 60;               // capabilities: god things within this many metres
 const FAR_SEAT = 250, FAR_SEATS = 6; // F2: and the nearest FAR_SEATS seats out to FAR_SEAT m (sit only)
 const BODY_DEF = 'core/humanoid@1';
@@ -174,7 +193,7 @@ export class EngineBridge {
     // LAYERS: "under construction (step)" is part of what an owned or scheduled thing is seen as
     this.god.onBuild(() => { if (this.layers.active()) this.notePerceive([], true); });
     this.host.listeners.push({
-      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); this.perceiveStep(tick); if (tick % 40 === 7) this.layersStep(); if (tick % 20 === 13) this.flushMapNotices(); if (tick % 5 === 2 && (!this.navWarm || this.navPending)) this.navStep(); if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); } if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); } } },
+      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); this.perceiveStep(tick); if (tick % 5 === 4) this.spotsStep(); if (tick % 40 === 7) this.layersStep(); if (tick % 20 === 13) this.flushMapNotices(); if (tick % 5 === 2 && (!this.navWarm || this.navPending)) this.navStep(); if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); } if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); } } },
       onApplied: (e) => { if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
     });
     reachProviders.set(this.god.model, (from, to) => this.reach(from, to));
@@ -202,7 +221,7 @@ export class EngineBridge {
     this.god.onBuild(e => this.buildNotice(e));
     this.activitySpots = new GodActivitySpots({ model: this.god.model, engine: this.host.engine as never, version: () => `${this.godEdits}|${this.engine.world.entityPhysicsV1?.hash ?? ''}`, levelAt: (x, z, y) => this.levelAt(x, z, y),
       placeAt: (at, level) => this.places.placeAt(at, level), placeLocator: () => this.places.placeLocator(), prepare: () => this.places.sync(true), catchingUp: () => this.perceiveRunning || !!this.perceive?.pending(), placeName: (id) => this.edge?.places.byId.get(id)?.name ?? null });
-    if (this.edge) this.edge.spotsProvider = () => { if (!this.reconciled) return null; this.flush(); const n = this.activitySpots.stats.derives, d = this.activitySpots.data(); if (this.activitySpots.stats.derives !== n) this.log(`activity spots: ${d.spots.length} spots, ${d.shelves.length} shelves in ${this.activitySpots.stats.ms} ms`); return d; };
+    if (this.edge) this.edge.spotsProvider = () => { if (!this.reconciled) return null; this.flush(); const n = this.activitySpots.stats.derives, d = this.activitySpots.data(); if (this.activitySpots.stats.derives !== n) this.logSpots(); return d; };
     if (this.edge) {
       const edge = this.edge;
       this.meals = new GodMeals({ db: this.god.db, worldId: this.host.worldId, spots: () => edge.spots, place: (id) => edge.places.byId.get(id) as never, day: () => this.layers.dayKey() });
@@ -659,6 +678,13 @@ export class EngineBridge {
     for (const id of ids.slice(0, 200)) { const e = m.entities.get(id); if (!e) continue; try { const p = m.worldPose(e); out.push([p.x, p.z]); } catch { /* unplaced */ } }
     return out;
   }
+  private logSpots() { const st = this.activitySpots.stats; this.log(`activity spots: ${st.spots} spots, ${st.shelves} shelves in ${st.ms} ms`); }
+  /** GODLIST: once a god edit is caught up with (perceive done), derive the activity spots in a tick instead of in the next
+   *  Soul's listing (only when a listing has read them since the last such derive). */
+  private spotsStep() {
+    if (!this.edge || this.perceiveRunning || this.perceive.pending()) return;
+    try { if (this.activitySpots.warm()) this.logSpots(); } catch (e) { this.log(`activity spots: ${(e as Error).message}`); }
+  }
   private navStep() {
     try {
       const E = this.engine as unknown as { navWarmV1?: (ms: number) => boolean };
@@ -1104,20 +1130,20 @@ export class EngineBridge {
     return below?.id ?? 0;
   }
   /** Floors per upper level: the engine's (cached per physics hash) and those derived in the current send. */
-  private floorIndex: { hash: string; by: Map<number, { id: string; obb: OBB2 }[]> } | null = null;
+  private floorIndex: { hash: string; by: Map<number, FloorCells> } | null = null;
   /** During a send: the floors derived so far, and the entities it re-derives (their engine floors are being replaced). */
   private sendFloors = new Map<number, OBB2[]>();
   private sendIds: Set<string> | null = null;
   private hasFloorAt(level: number, x: number, z: number): boolean {
     const hash = this.physics?.hash ?? '';
     if (this.floorIndex?.hash !== hash) {
-      const by = new Map<number, { id: string; obb: OBB2 }[]>();
-      for (const [id, part] of Object.entries(this.physics?.byEntity ?? {}) as [string, Part][]) for (const f of part.surfaces ?? []) if (f.level) { const a = by.get(f.level) ?? []; a.push({ id, obb: f.obb }); by.set(f.level, a); }
+      const by = new Map<number, FloorCells>();
+      for (const [id, part] of Object.entries(this.physics?.byEntity ?? {}) as [string, Part][]) for (const f of part.surfaces ?? []) if (f.level) { let a = by.get(f.level); if (!a) by.set(f.level, (a = new FloorCells())); a.add(id, f.obb); }
       this.floorIndex = { hash, by };
     }
     const at: Vec2 = [x, z], near = (o: OBB2) => pointInObb(at, o, FLOOR_NEAR);
     const send = this.sendIds;
-    return !!(this.floorIndex.by.get(level)?.some((f) => !send?.has(f.id) && near(f.obb)) || (send && this.sendFloors.get(level)?.some(near)));
+    return !!(this.floorIndex.by.get(level)?.some(x, z, (f) => !send?.has(f.id) && near(f.obb)) || (send && this.sendFloors.get(level)?.some(near)));
   }
   private levelOfY(y: number) { if (Math.abs(y) > GROUND_BAND) { const exact = this.levels.find((l) => Math.abs(l.y - y) <= LEVEL_MATCH); if (exact) return exact.id; } if (Math.abs(y) <= GROUND_BAND + 0.5) return 0; const l = this.levels.reduce<Level | null>((b, l) => (l.y <= y + 0.5 && (!b || l.y > b.y) ? l : b), null); return l?.id ?? 0; }
   reach(from: ReachEnd, to: ReachEnd) {

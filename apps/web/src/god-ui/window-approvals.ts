@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { worldKey } from '../world-path.ts';
 import * as J from './join-api.ts';
 
-export const WINDOW_POLL_MS = 4500;
+export const WINDOW_POLL_MS = 2000; // PAIR: worst case 2 s + one request, under the 3 s bar (was 4500: the modal took 0-4.5 s, walked 4.3 s)
 const KEY = `sim.approvalsClosed:${worldKey}`;
 
 /** The request to show: the newest waiting one this tab has not closed (the server lists newest first). */

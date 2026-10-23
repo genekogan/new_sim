@@ -351,7 +351,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     waterDetail.boats=AFLOAT;(window as unknown as {__simWater?:unknown}).__simWater=waterDetail.stats;    const idleLife=new WorldIdleLife();const idleSouls:IdleSoul[]=[];let attentionTargets=new Map<string,readonly string[]>();
     const edgeItems=new WorldEdgeItems(apiPath('/v1/edge/items'));scene.add(edgeItems.group);edgeItems.start(abort.signal);  // things lying around (together/1)
     const early=newWorld?takeEarlyLayer():null;if(early)abort.signal.addEventListener('abort',()=>early.abort.abort());const entityLayer=early?.layer??new WorldEntityLayer(apiPath);entityLayerRef.current=entityLayer;  // P7b: a phone's layer may have started before this page's code was in (early-layer.ts)
-    scene.add(entityLayer.group);let entityWorldFramed=false,rideNames:string[]|null=null,rideCarriers:CarrierPose[]=[];
+    scene.add(entityLayer.group);let entityWorldFramed=false,rideNames:string[]|null=null,rideNamesAt=0,rideCarriers:CarrierPose[]=[];
     // E2 #3: shy animals in a god world run from where the Souls' figures are now; ANI: every animal (god worlds and old Eden) gives way to them
     setFleeSources(()=>{const out:[number,number][]=[];for(const soul of context.current.sim.conn.replica.souls.values()){const e=shown.current.entities[soul.entityId];if(e?.p)out.push([e.p[0],e.p[2]]);}return out;});
     const godLiving=newWorld?new GodWorldLiving(entityLayer,renderer,{radius:look.enabled?1.45:1,gain:look.poolGain}):null;if(godLiving){scene.add(godLiving.group);(window as unknown as {__simLiving?:unknown}).__simLiving={get lights(){return godLiving.lights;},atmosphere:()=>atmosphere.inspect(),broadcastViews:()=>godTourViews(entityLayer,entityLayer.groundAt).length,lightning:()=>godLightning?.inspect()??null,holdLightning:(ms:number)=>{if(godLightning)godLightning.holdUntil=performance.now()+ms;}};}  // R4-LIVE: lamps at dusk, the god's weather, rain kept out of rooms
@@ -689,7 +689,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const animate = () => {
       officeGuardFrom.copy(camera.position);
       if (abort.signal.aborted) return;
-      frame = pacer.next(animate);
+      frame = eyes && !entityLayer.building ? eyes.schedule(animate, cb => pacer.next(cb)) : pacer.next(animate);  // eyes: render on demand (builds keep their pace)
       // lane W1: while a new world's first build runs in slices nothing is drawn: look at the takes 4 times a second, no more
       if(entityLayer.building){const t=performance.now();if(t-buildingFrameAt<250)return;buildingFrameAt=t;}
       if(eyes&&!eyes.wake(performance.now()))return;  // VF1b: a slow frame leaves room for socket messages
@@ -844,7 +844,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       const at = balloonRide.update(shown.current,{dt,seconds:atmosphereSeconds,eden:!!expansion,history:!!past.current,soulEntity:id=>s.conn.replica.souls.get(id)?.entityId??null,preview:ridePreview});
       // E-life B7: a god's balloon flies with its native ride (the recorded carrier entity of the same name)
       rideCarriers=expansion?[{p:balloonRide.basket.p,yaw:balloonRide.basket.yaw}]:[];  // V1: Broadcast frames a rider with its carrier
-      if(entityLayer.active&&!expansion){if(refresh||!rideNames)rideNames=entityLayer.rideNames();for(const n of rideNames){const e=at.entities[n] as {p?:readonly[number,number,number];yaw?:number}|undefined;entityLayer.poseOverride(n,e?.p??null);if(e?.p)rideCarriers.push({p:e.p,yaw:e.yaw??0});}}
+      if(entityLayer.active&&!expansion){if(refresh||!rideNames||(!rideNames.length&&performance.now()-rideNamesAt>2000)){rideNames=entityLayer.rideNames();rideNamesAt=performance.now();}/* BALLOON-BODY: an empty list (asked before the world's things arrived) is asked again */for(const n of rideNames){const e=at.entities[n] as {p?:readonly[number,number,number];yaw?:number}|undefined;entityLayer.poseOverride(n,e?.p??null,e?.yaw);if(e?.p)rideCarriers.push({p:e.p,yaw:e.yaw??0});}}
       const cards = refresh ? cardsAt(s.plays, at.tick) : null;
       const alive = new Set<string>();
       let focus: THREE.Vector3 | null = null;

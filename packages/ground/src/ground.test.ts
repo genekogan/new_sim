@@ -120,6 +120,16 @@ test('the last-tile cache answers like the map and forgets a tile an edit invali
   assert.notEqual(t.sample(2, 3), before); assert.equal(t.sample(2, 3), new Terrain(g2).sample(2, 3));
 });
 
+test('t4-phone3: peek answers exactly as sample without baking an unbaked tile, and follows an edit', () => {
+  const g = world(), t = new Terrain(g), pts: [number, number][] = [[1, 2], [3.3, 4.7], [-200, 10], [63.9, 0.2], [64, 64], [-0.5, -0.5], [130.25, -77.75]];
+  for (const [x, z] of pts) assert.equal(t.peek(x, z), new Terrain(g).sample(x, z), `${x},${z}`);
+  assert.equal(t.cachedTiles, 0, 'nothing baked');
+  t.sample(1, 2); assert.equal(t.peek(1.5, 2.5), t.sample(1.5, 2.5));
+  const g2 = groundSchema.parse({ ...g, landforms: [...g.landforms, { id: 'pile', kind: 'bump', c: [70, 3], r: 8, h: 4, peak: 1 }] });
+  const before = t.peek(70, 3); t.update(g2, [g2.landforms.at(-1)!]);
+  assert.notEqual(t.peek(70, 3), before); assert.equal(t.peek(70, 3), new Terrain(g2).sample(70, 3));
+});
+
 // pad/2b (lane PADFIX): graded pads fold together after older pads, so flats win over banks
 const sq = (x0: number, z0: number, x1: number, z1: number): [number, number][] => [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
 function flatsWorld(...pads: Landform[]): Ground {
