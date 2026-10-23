@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { BED_URLS, bedMix, createBeds, DUCK, LAYERS, LEVEL, MAX_PAN, STOP_AFTER_MS, type BedHeard } from './ambient-beds.ts';
+import { BED_URLS, bedMix, createBeds, DUCK, LAYERS, LEVEL, MAX_PAN, presence, STOP_AFTER_MS, type BedHeard } from './ambient-beds.ts';
 
 const at = (kind: string, gain: number, p: [number, number, number], source = 'ambient', d = 20, follow = false): BedHeard => ({ kind, source, gain, d, e: { pts: [p], follow } });
 const L = { x: 0, z: 0, right: [1, 0] as [number, number] };
@@ -12,8 +12,8 @@ const calm = { exposure: 0, covered: false, music: false };
 
 test('each layer follows the strongest procedural emitter of its kind, never stacking two', () => {
   const m = bedMix([at('birds', 0.1, [-10, 0, 0]), at('birds', 0.2, [10, 0, 0]), at('crickets', 0.05, [0, 0, 10])], L, calm);
-  assert.equal(m.birds.gain, LEVEL.birds * 0.2);
-  assert.equal(m.crickets.gain, LEVEL.crickets * 0.05);
+  assert.equal(m.birds.gain, LEVEL.birds * presence(0.2)); assert.equal(presence(0.2), 1); assert.equal(presence(0.004), 0);
+  assert.equal(m.crickets.gain, LEVEL.crickets * presence(0.05)); assert.ok(m.crickets.gain > 0.3 * LEVEL.crickets && m.crickets.gain < LEVEL.crickets);
   assert.equal(m.water.gain, 0); assert.equal(m.chatter.gain, 0); assert.equal(m.wind.gain, 0);
 });
 

@@ -201,7 +201,9 @@ function scanWorld(model: WorldModel) {
   ys.sort((a, b) => a - b); typicalGround = ys.length ? ys[Math.floor(ys.length / 2)] : 0;
 }
 const lastValue = new Map<string, unknown>();
-let meter: AnalyserNode | null = null;
+let meter: AnalyserNode | null = null, bedsMeter: AnalyserNode | null = null;
+/** Main-thread time spent in the sound tick and in its ambient-bed part (ms, since load), for frame-cost checks. */
+const cost = { ticks: 0, tickMs: 0, bedsMs: 0 };
 // lane AMBIENT: recorded beds under the procedural voices (lazy chunk after the first unlock; see ambient-beds.ts)
 let bedsMod: typeof import('./ambient-beds.ts') | null = null, beds: import('./ambient-beds.ts').Beds | null = null, bedsLoading = false, bedsOn = true;
 const log: LogRow[] = [];
@@ -254,14 +256,18 @@ function step(host: Host) {
     if (g > 0.001) heard.push({ id: e.id, kind: e.spec.kind, variant: e.spec.variant ?? 0, source: e.source, gain: g, d, e });
   }
   const m = host.camera.matrixWorld?.elements;
+  const tb0 = performance.now();
   const bedTargets = bedsMod && ctx ? bedsMod.bedMix(heard, { x, z, right: m ? [m[0], m[2]] : undefined }, { exposure, covered, music: playlist }) : null;
+  let bedsMs = performance.now() - tb0;
   heard.sort((a, b) => b.gain - a.gain); heard.length = Math.min(heard.length, MAX_VOICES);
   lastHeard = heard;
   if (!ctx) return;
   if (!audible()) { applyMaster(); return; }
   if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
   if (!bedsLoading) { bedsLoading = true; void import('./ambient-beds.ts').then((mod) => { bedsMod = mod; if (ctx && master) beds = mod.createBeds(ctx, master); }, () => {}); }
+  const tb1 = performance.now();
   if (beds && bedTargets) beds.update(bedsOn ? bedTargets : bedsMod!.bedMix([], { x, z }, { exposure: 0, covered: true, music: false }), now);
+  bedsMs += performance.now() - tb1; cost.bedsMs += bedsMs;
   const live = new Set(heard.map((h) => h.id)), t = ctx.currentTime;
   for (const h of heard) {
     let v = voices.get(h.id);
@@ -332,6 +338,10 @@ export function startSoundLayer() {
     events: () => events.slice(),
     /** RMS of what is actually coming out (after the master gain), for proof that sound plays and that mute silences it. */
     level: () => { if (!ctx || !master) return 0; if (!meter) { meter = ctx.createAnalyser(); meter.fftSize = 2048; master.connect(meter); } const d = new Float32Array(meter.fftSize); meter.getFloatTimeDomainData(d); let q = 0; for (const v of d) q += v * v; return +Math.sqrt(q / d.length).toFixed(5); },
+    /** RMS of the recorded ambient beds alone (their bus, after bed gains, before the master gain). */
+    bedsLevel: () => { if (!ctx || !beds) return 0; if (!bedsMeter) { bedsMeter = ctx.createAnalyser(); bedsMeter.fftSize = 2048; beds.bus.connect(bedsMeter); } const d = new Float32Array(bedsMeter.fftSize); bedsMeter.getFloatTimeDomainData(d); let q = 0; for (const v of d) q += v * v; return Math.sqrt(q / d.length); },
+    /** Cumulative main-thread ms of the sound tick and its bed part (diff two reads over a counted span of frames). */
+    cost: () => ({ ...cost }),
     mute: (m: boolean) => setSettings({ muted: m }),
     music: (m: boolean) => setSettings({ music: m }),
     unlock,
@@ -351,7 +361,7 @@ export function startSoundLayer() {
     if (!arrivalOver() || !document.querySelector('.world-scene canvas')) return;
     mountUi();
     syncMusic({ on: musicOn(), volume: settings.volume, unlocked: !!ctx && ctx.state === 'running' });
-    const host = w.__simEntity; if (host?.camera && host.layer) { try { step(host); } catch { /* a world mid-reload */ } }
+    const host = w.__simEntity; if (host?.camera && host.layer) { const t0 = performance.now(); try { step(host); } catch { /* a world mid-reload */ } cost.ticks++; cost.tickMs += performance.now() - t0; }
   }, TICK_MS);
 }
 startSoundLayer();

@@ -11,12 +11,18 @@ export type BedLayer = 'birds' | 'crickets' | 'water' | 'wind' | 'chatter';
 export const LAYERS: readonly BedLayer[] = ['birds', 'crickets', 'water', 'wind', 'chatter'];
 /** Procedural sound kinds whose presence sets a bed (sound-plan.ts SoundKind). */
 const KIND_LAYER: Record<string, BedLayer> = { birds: 'birds', crickets: 'crickets', waves: 'water', chatter: 'chatter' };
-/** Bed level per unit of the strongest heard emitter gain (procedural voices peak near 0.2); wind is an absolute ceiling. */
-export const LEVEL: Record<BedLayer, number> = { birds: 0.9, crickets: 0.8, water: 0.9, wind: 0.07, chatter: 0.7 };
+/** Bed level at full presence. Presence = sqrt(min(1, strongest heard emitter gain / NEAR)): the procedural voices are quiet
+ *  (0.05-0.1 a few metres from a shore or a hedge, 0.2 at the source), so a linear map left the beds ~20 dB under them, inaudible
+ *  (walker A/B 2026-10-23). The loops are normalised to -26 dBFS mean; at full presence a bed sits a few dB above the procedural
+ *  voices, under the Sim Score (ducked). Wind is an absolute ceiling on exposure alone. */
+export const LEVEL: Record<BedLayer, number> = { birds: 0.6, crickets: 0.6, water: 0.7, wind: 0.2, chatter: 0.5 };
+/** Emitter gain at which a bed reaches full presence, and below which it is silent (far emitters do not fill the world). */
+export const NEAR = 0.1, FAR = 0.005;
+export const presence = (g: number) => Math.sqrt(Math.max(0, Math.min(1, (g - FAR) / (NEAR - FAR))));
 /** Exposure (sound-plan exposureAt, 0..1) where wind starts; full at 1. Gene turned the old wind bed off (S3): keep it rare and quiet. */
 export const WIND_FROM = 0.6;
 /** Multiplier on every bed while the Sim Score plays: the music stays on top. */
-export const DUCK = 0.5;
+export const DUCK = 0.6;
 export const MAX_PAN = 0.7, SILENT = 0.002, STOP_AFTER_MS = 20000, LOOP_START = 0.1, LOOP_S = 24;
 
 export const BED_URLS: Record<BedLayer, string> = {
@@ -50,7 +56,7 @@ export function bedMix(heard: readonly BedHeard[], L: BedListener, o: { exposure
     const l = KIND_LAYER[h.kind]; if (!l || (l === 'chatter' && h.source !== 'resident')) continue;
     if (!strongest[l] || h.gain > strongest[l]!.gain) strongest[l] = h;
   }
-  for (const l of LAYERS) { const h = strongest[l]; if (h) mix[l] = { gain: LEVEL[l] * h.gain, pan: panToward(L, h) }; }
+  for (const l of LAYERS) { const h = strongest[l]; if (h) mix[l] = { gain: LEVEL[l] * presence(h.gain), pan: panToward(L, h) }; }
   const w = o.covered ? 0 : Math.max(0, Math.min(1, (o.exposure - WIND_FROM) / (1 - WIND_FROM)));
   mix.wind = { gain: LEVEL.wind * w, pan: 0 };
   if (o.music) for (const l of LAYERS) mix[l].gain *= DUCK;
@@ -64,14 +70,17 @@ const fetchAndDecode: BedLoader = async (ctx, url) => ctx.decodeAudioData(await 
 /** The audio graph: per layer source(loop) -> gain -> stereo pan -> out. Created once per AudioContext. */
 export function createBeds(ctx: BaseAudioContext, out: AudioNode, urls: Record<BedLayer, string> = BED_URLS, load: BedLoader = fetchAndDecode, rand: () => number = Math.random) {
   const beds = {} as Record<BedLayer, Bed>;
+  /** All beds sum here before `out`, so a probe can meter the beds alone. */
+  const bus = ctx.createGain(); bus.connect(out);
   for (const l of LAYERS) {
     const gain = ctx.createGain(); gain.gain.value = 0;
     const pan = typeof ctx.createStereoPanner === 'function' ? ctx.createStereoPanner() : null;
-    if (pan) gain.connect(pan).connect(out); else gain.connect(out);
+    if (pan) gain.connect(pan).connect(bus); else gain.connect(bus);
     beds[l] = { gain, pan, buf: null, loading: false, failedAt: -Infinity, src: null, quietSince: 0, target: 0 };
   }
   function stopSrc(b: Bed) { try { b.src!.stop(); } catch { /* already stopped */ } b.src!.disconnect(); b.src = null; }
   return {
+    bus,
     update(mix: BedMix, nowMs: number) {
       const t = ctx.currentTime;
       for (const l of LAYERS) {
