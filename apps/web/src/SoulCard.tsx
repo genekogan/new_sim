@@ -11,6 +11,7 @@ import {BASE} from './base-path.ts';
 import './SoulCard.css';
 import {SoulAgentMessageBox} from './AgentMessageBox.tsx';
 import {SoulTravel,VisitorFrom} from './SoulTravel.tsx';
+import {useAgentPresence} from './agent-presence.ts';
 
 /** UI2 (Gene: "it looks like a markdown file"): the selected Soul as a compact card. Name, character, a status
  * dot, what it is doing, Share. Everything else (last action, recent actions/events, public activity) sits in a
@@ -44,6 +45,8 @@ function usePublicRecord(api:Api,soulId:string):Rec{
 
 export function SoulCard({api,soul,doing,energy,plays,talk,camera,pin,ownerAction}:{api:Api;soul:PublicSoul;doing:string;energy:string|null;plays:readonly PlayView[];talk:readonly TalkLine[];camera?:{following:boolean;follow():void;stop():void};pin?:{pinned:boolean;toggle():void};ownerAction?:()=>void}){
  const rec=usePublicRecord(api,soul.id);
+ // AWAY-UI: the owner's card drops Follow while the agent is away (still offered to stop a follow already on)
+ const agentAway=!!useAgentPresence(ownerAction?soul.id:null)?.away;
  const [view,setView]=useState<'card'|'activity'>('card');
  const [copied,setCopied]=useState<''|'ok'|'failed'>('');
  const title=useRef<HTMLHeadingElement>(null),alive=useRef(true);
@@ -54,7 +57,7 @@ export function SoulCard({api,soul,doing,energy,plays,talk,camera,pin,ownerActio
  const share=async()=>{try{await navigator.clipboard.writeText(publicSoulLink(location.origin,worldPath,soul.id,BASE));if(alive.current)setCopied('ok');}catch{if(alive.current)setCopied('failed');}};
  const fade=rec!=='loading'&&rec!=='unavailable'&&rec.fade?FADE[rec.fade.colour]??null:null;
  if(view==='activity')return <SoulActivity soul={soul} rec={rec} plays={plays} talk={talk} back={()=>setView('card')}/>;
- return <article className="soul-card" aria-labelledby="soul-card-name">
+ return <article className="soul-card" aria-labelledby="soul-card-name" data-agent-away={agentAway?'1':undefined}>
   <div className="soul-card-portrait"><SoulAvatar soul={soul}/></div>
   <h1 id="soul-card-name" ref={title} tabIndex={-1} title={soul.name}>{soul.name}</h1>
   {soul.description&&<p className="soul-character">{soul.description}</p>}
@@ -69,7 +72,7 @@ export function SoulCard({api,soul,doing,energy,plays,talk,camera,pin,ownerActio
    <button onClick={()=>requestSoulConversations(soul.id)}>Conversations</button>
    {ownerAction&&<button onClick={ownerAction}>This mind</button>}
    {pin&&<button aria-pressed={pin.pinned} aria-label={pin.pinned?'Pinned favourite; unpin this Soul':'Pin this Soul as a favourite'} title={pin.pinned?'Unpin favourite':'Pin favourite'} onClick={pin.toggle}>{pin.pinned?'Pinned':'Pin'}</button>}
-   {camera&&<button className={camera.following?'soul-follow on':'soul-follow'} aria-pressed={camera.following} title={camera.following?'Stop following':'Keep the camera on this Soul'} onClick={camera.following?camera.stop:camera.follow}><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.6" fill="currentColor"/><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.4"/></svg>{camera.following?'Following':'Follow'}</button>}
+   {camera&&(!agentAway||camera.following)&&<button className={camera.following?'soul-follow on':'soul-follow'} aria-pressed={camera.following} title={camera.following?'Stop following':'Keep the camera on this Soul'} onClick={camera.following?camera.stop:camera.follow}><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.6" fill="currentColor"/><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.4"/></svg>{camera.following?'Following':'Follow'}</button>}
    <button className="soul-share" onClick={()=>void share()}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 9.5l3-3M7 4.5l1.3-1.3a2.6 2.6 0 013.6 3.6L10.5 8.2M9 11.5l-1.3 1.3a2.6 2.6 0 01-3.6-3.6l1.4-1.4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>Share</button>
    <span className="soul-copied" role="status" aria-live="polite">{copied==='ok'?'Link copied':copied==='failed'?'Copy unavailable':''}</span>
    <button className="soul-more" onClick={()=>setView('activity')}>Activity<span aria-hidden="true">›</span></button>
