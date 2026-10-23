@@ -295,7 +295,7 @@ test('group life: a see-saw for two, a story by the campfire (listeners only whi
   // at 60 s both ends of the park see-saw failed partner-absent while the second Soul was still on its way
   const ends = w.edge.spots.spots.filter((s: any) => s.activity === 'seesaw');
   assert.equal(ends.length, 2); assert.equal(new Set(ends.map((s: any) => s.together?.group)).size, 1);
-  for (const e of ends) assert.ok(e.together.wait >= SPOT_REACH / 1.35, `see-saw waits ${e.together.wait} s`);
+  for (const e of ends) assert.ok(e.together!.wait >= SPOT_REACH / 1.35, `see-saw waits ${e.together!.wait} s`);
   // see-saw: Ana waits on one end, Bo takes the other, both ride (the second end's approach was behind the first rider)
   const a1 = caps(ana).find((c: any) => c.id.startsWith('seesaw:'))!;
   const r1: any = await accept(w.host, w.edge.act(ana, { capability: a1.id, params: { seconds: 20 } }));
