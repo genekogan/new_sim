@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { isPackedColumnsV1, packColumnsV1, worldEntityOrderV1 } from '@sim/protocol';
 import { splitSnapshot } from '../../server/src/god/snapshot-wire.ts';
 import { ENTRY_HEDGE_MS, expandSnapshot, loadSnapshot } from './snapshot-wire.ts';
 import { entryWireUrl } from './snapshot-prefetch.ts';
@@ -19,6 +20,14 @@ const roundTrip = (snap: Record<string, unknown>) => { const s = splitSnapshot(s
 
 test('split on the server then expand on the client gives the plain snapshot back', () => {
   assert.deepEqual(roundTrip(sample), sample);
+});
+
+test('JOINSET cols=1: the entities in the column form expand to the same plain snapshot (JSON.stringify identical)', () => {
+  const s = splitSnapshot(structuredClone(sample)), body = { ...s.body, entities: packColumnsV1(s.body.entities, worldEntityOrderV1) };
+  assert.ok(isPackedColumnsV1(body.entities));
+  const back = expandSnapshot(JSON.parse(JSON.stringify(body)), s.parts.defs as never, s.parts.ground);
+  assert.equal(JSON.stringify(back), JSON.stringify(roundTrip(sample)));
+  assert.equal(JSON.stringify(back), JSON.stringify(expandSnapshot(JSON.parse(JSON.stringify(s.body)), s.parts.defs as never, s.parts.ground)));
 });
 
 test('PF2: a stalled page-entry snapshot or part is asked for again after ENTRY_HEDGE_MS instead of holding the arrival', async (t) => {
@@ -43,5 +52,5 @@ test('PF2: a stalled page-entry snapshot or part is asked for again after ENTRY_
   for (let i = 0; i < 4 && got === undefined; i++) { t.mock.timers.tick(ENTRY_HEDGE_MS); await settle(); await settle(); }
   assert.ok(got, 'arrives once the stalled requests are asked for again');
   assert.deepEqual(got.snap, sample);
-  assert.deepEqual(asked.map((u) => u.replace(/.*\/v1\/world\//, '')), ['snapshot?defs=ref', `part/${s.refs.ground}`, `part/${s.refs.defs}`]);
+  assert.deepEqual(asked.map((u) => u.replace(/.*\/v1\/world\//, '')), ['snapshot?defs=ref&cols=1', `part/${s.refs.ground}`, `part/${s.refs.defs}`]);
 });

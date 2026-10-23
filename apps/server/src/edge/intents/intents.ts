@@ -313,18 +313,24 @@ export class Intents {
     return {accepted: true as const, receipt, chosen: done, channel: 'attention'};
   }
   /** Auto-face (default on): when someone speaks in a conversation, the other members within 12 m turn their heads to
-   *  them for a few seconds, unless their own look or turn still holds, or they turned auto-face off. Logged events. */
+   *  them for a few seconds, unless their own look or turn still holds, or they turned auto-face off. Logged events.
+   *  CONV-UI (Gene 10-08 "frames them facing"): a free standing body (no act, not seated) also turns to the group's
+   *  centre, the speaker included, so a talking group stands facing each other (a pair faces each other). */
   onTurn(conversation: string, speaker: string, members: string[]) {
+    type Ents = {entities: Record<string, {pose: {p: number[]}}>};
+    const ents = (this.L.host.engine.world as Ents).entities, bodyOf = (id: string) => {const m = this.L.host.minds.get(id); return m ? {m, b: ents[m.entityId]} : null;};
     const sm = this.L.host.minds.get(speaker); if (!sm) return;
-    const sb = (this.L.host.engine.world as {entities: Record<string, {pose: {p: number[]}}>}).entities[sm.entityId]; if (!sb) return;
+    const sb = ents[sm.entityId]; if (!sb) return;
     const tick = this.L.host.engine.world.tick;
-    for (const id of members) {
-      if (id === speaker || this.L.faded.has(id)) continue;
-      if (this.autoFace.get(`${id}|${conversation}`) === false || (this.autoFace.get(`${id}|${conversation}`) === undefined && this.autoFace.get(`${id}|*`) === false)) continue;
-      if ((this.explicitUntil.get(id) ?? -1) > tick) continue;
-      const m = this.L.host.minds.get(id), b = m ? (this.L.host.engine.world as {entities: Record<string, {pose: {p: number[]}}>}).entities[m.entityId] : undefined;
-      if (!m || !b || Math.hypot(b.pose.p[0] - sb.pose.p[0], b.pose.p[2] - sb.pose.p[2]) > 12) continue;
-      try {void this.L.host.enqueue('edge-attention' as never, `edge:${id}`, {soulId: id, entityId: m.entityId, gaze: {target: sm.entityId, until: tick + AUTO_FACE_SECONDS * 20, kind: 'auto'}}).catch(() => {/* best effort */});} catch {/* clock not ready */}
+    const auto = (id: string) => !(this.autoFace.get(`${id}|${conversation}`) === false || (this.autoFace.get(`${id}|${conversation}`) === undefined && this.autoFace.get(`${id}|*`) === false)) && (this.explicitUntil.get(id) ?? -1) <= tick;
+    const group = [...new Set([speaker, ...members])].flatMap(id => {const x = bodyOf(id); return x?.b && !this.L.faded.has(id) && Math.hypot(x.b.pose.p[0] - sb.pose.p[0], x.b.pose.p[2] - sb.pose.p[2]) <= 12 ? [{id, ...x, b: x.b}] : [];});
+    const centre: V2 | null = group.length >= 2 ? [group.reduce((a, g) => a + g.b.pose.p[0], 0) / group.length, group.reduce((a, g) => a + g.b.pose.p[2], 0) / group.length] : null;
+    const yawOf = (p: number[]) => centre && Math.hypot(centre[0] - p[0], centre[1] - p[2]) > 0.05 ? {yaw: yawTowards([p[0], p[2]], centre)} : {};
+    for (const {id, m, b} of group) {
+      if (!auto(id)) continue;
+      const gaze = id === speaker ? (centre ? {at: centre, until: tick + AUTO_FACE_SECONDS * 20, kind: 'auto'} : null) : {target: sm.entityId, until: tick + AUTO_FACE_SECONDS * 20, kind: 'auto'};
+      if (!gaze) continue;
+      try {void this.L.host.enqueue('edge-attention' as never, `edge:${id}`, {soulId: id, entityId: m.entityId, gaze, ...yawOf(b.pose.p)}).catch(() => {/* best effort */});} catch {/* clock not ready */}
     }
   }
 

@@ -6,6 +6,7 @@ import { createServer } from 'node:net';
 import { createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { cgroupHeadroomMb, memAvailableMb, PREWARM_MB, prewarmBlocked, rotateLog } from './production.mjs';
+const STRIP_HOOK = 'apps/server/src/strip-cache.mjs'; // lane BOOT2 (defaultCommand)
 
 /** Printed by a world process started with SIM_STANDBY=1 once its code is loaded (apps/server/src/standby.ts). */
 export const STANDBY_MARK = '[standby] ready';
@@ -355,6 +356,8 @@ export class ChildPool {
   async closeAll() { this.closing = true; await Promise.all([...this.kids.keys()].map((s) => this.stop(s))); }
 }
 
+export const EYES_ENV = ['EDGE_EYES', 'EDGE_EYES_GPU', 'EDGE_EYES_SOUL_SECONDS', 'EDGE_EYES_GLOBAL_PER_MINUTE', 'EDGE_EYES_TIMEOUT_SECONDS', 'EDGE_EYES_RELOAD_HOURS', 'EDGE_EYES_NICE', 'EDGE_EYES_CPUS', 'EDGE_EYES_CHROME_ARGS', 'PLAYWRIGHT_BROWSERS_PATH'];
+
 /** The Sim server for one entity world (same env as tools/god-skill/dev-world.mjs).
  *  With `o.auth.envFile` (Clerk, production sign-in) the child reads its Clerk settings from that file by path
  *  (`node --env-file`); dev auth is off and every world shares one account registry, so a person is the same
@@ -382,6 +385,9 @@ export function defaultCommand(world, port, o) {
     EDGE_FADING: '1',
     // Nobody watching or acting here for 30 s: the clock runs at a quarter of its wall pace (apps/server/src/attention.ts)
     SIM_UNWATCHED_PACE: process.env.SIM_UNWATCHED_PACE ?? '0.25',
+    // Eyes (apps/server/src/edge/eyes): a Soul's first-person picture. Off unless the launcher's own environment sets EDGE_EYES
+    // (`world` = each world renders its own public page); the browser path, GPU mode, budgets and nice level come with it.
+    ...Object.fromEntries(EYES_ENV.filter((k) => process.env[k] !== undefined).map((k) => [k, process.env[k]])),
     // measurement only (lane SLEEP): log the engine state hash at boot and at stop
     ...(process.env.SIM_BOOT_HASH === '1' ? { SIM_BOOT_HASH: '1' } : {}),
     // Soul mode of the world's one skill (/SKILL.md) points at Codex's Soul skill (/skill.md) and CLI (/eden-agent.mjs),
@@ -400,7 +406,10 @@ export function defaultCommand(world, port, o) {
     // Lane P5: V8's compile cache for this release's code (compileCacheDir): a world boots with ~0.4 s less CPU
     ...(o.compileCache ? { NODE_COMPILE_CACHE: o.compileCache } : {}),
   };
-  return { cmd: process.execPath, args: [...(clerk ? [`--env-file=${resolve(clerk.envFile)}`] : []), 'apps/server/src/main.ts'], env };
+  // Lane BOOT2: with the compile cache, the server's TypeScript is stripped once per build, not on every boot (strip-cache.mjs).
+  // The hook is imported only when the release the world runs from (its cwd, o.root) ships it, so a release without it still boots.
+  const strip = o.compileCache && existsSync(join(o.root ?? '.', STRIP_HOOK));
+  return { cmd: process.execPath, args: [...(clerk ? [`--env-file=${resolve(clerk.envFile)}`] : []), ...(strip ? ['--import', `./${STRIP_HOOK}`] : []), 'apps/server/src/main.ts'], env };
 }
 
 /** A fork of an old world (launcher op register-fork; tools/world-launcher/fork-world.mjs): main's old-world entry points

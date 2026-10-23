@@ -1,5 +1,6 @@
 // HTTP for the entity world: public reads for viewers, god writes behind a god
 // token, pairing, prayers. Mounted like the edge routes (plain app.get/post).
+import { packColumnsV1, worldEntityOrderV1 } from '@sim/protocol';
 import type { Context, Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { z } from 'zod';
@@ -164,9 +165,13 @@ export function mountGodRoutes(app: Hono, d: GodDeps): { partRefs: () => { defs:
   const parts = new SnapshotParts();
   const wireSnapshots = new SnapshotCache({ key: () => `${d.god.model.editSeq}.${d.god.model.seq}.${d.god.store.buildsRev()}.${moderation.version()}`,
     build: () => { const snap = d.god.publicSnapshot(), hidden = moderation.hidden(); return parts.cut((hidden.length ? withoutHidden(snap as Parameters<typeof withoutHidden>[0], new Set(hidden)) : snap) as Record<string, unknown>, moderation.version()); } });
+  // lane JOINSET: `?defs=ref&cols=1`, the wire form with its entities in the column form (columns/1, packages/protocol)
+  const colsSnapshots = new SnapshotCache({ key: () => `${d.god.model.editSeq}.${d.god.model.seq}.${d.god.store.buildsRev()}.${moderation.version()}`,
+    build: () => { const snap = d.god.publicSnapshot(), hidden = moderation.hidden(), body = parts.cut((hidden.length ? withoutHidden(snap as Parameters<typeof withoutHidden>[0], new Set(hidden)) : snap) as Record<string, unknown>, moderation.version());
+      return { ...body, entities: packColumnsV1(body.entities, worldEntityOrderV1) ?? body.entities }; } });
   mountSnapshotParts(app, parts, () => wireSnapshots.respond(undefined));
   app.get('/v1/world/snapshot', async (c) => {
-    const wire = c.req.query('defs') === 'ref', r = await (wire ? wireSnapshots : snapshots).respond(c.req.header('accept-encoding'));
+    const wire = c.req.query('defs') === 'ref', cols = wire && c.req.query('cols') === '1', r = await (cols ? colsSnapshots : wire ? wireSnapshots : snapshots).respond(c.req.header('accept-encoding'));
     return c.body(new Uint8Array(r.body), 200, { 'content-type': 'application/json; charset=UTF-8', ...noStore, vary: 'Accept-Encoding', [SNAPSHOT_FILTERED_HEADER]: '1',
       ...(wire && parts.current ? { 'x-defs-ref': parts.current.defs, 'x-ground-ref': parts.current.ground } : {}),
       ...(r.encoding ? { 'content-encoding': r.encoding } : {}), ...(r.ageSeconds > 0 ? { age: String(r.ageSeconds) } : {}) });

@@ -87,3 +87,19 @@ test('a pond with a wide shallow shelf boards its punt where a stretch of bank d
   assert.equal(e.installCarrierV1(spec),true);
   assert.deepEqual(e.puntCandidatesV1().filter(s=>s.id!==spec.id),[],'installed: no second punt for that water');
 });
+
+test('a landed punt rider whose step-out is held up (plank taken) is set down on dry bank within the step-out limit (RIDE-EXIT)',async()=>{
+  const fixture=await connectedCommonsShoreFixture(),world=fixture.genesis('stalled-exit'),rt=fixture.create(world),spec=puntCandidates(rt,fixture.renderScene())[0];
+  const boat=carrierEntity(spec,0);assert.ok(!('code'in boat));world.entities[boat.id]=boat;
+  world.entities.a=fixture.human('a',spec.bank!.door[0],spec.bank!.door[2]);world.entities.a.pose.p=[...spec.bank!.door];(rt.services.carrierBankContact as (rt:unknown,actor:string)=>void)(rt,'a');
+  const ride=rt.submit('carrier_ride',{actor:'a',carrier:boat.id,throughReturn:true}),step=()=>{stepCarriers(rt);rt.step();};
+  for(let i=0;i<300&&world.entities.a.human!.carrier?.phase!=='seated';i++)step();
+  assert.equal(world.entities.a.human!.carrier?.phase,'seated');
+  const c=(boat as any).carrier;c.phase='landed';c.phaseTick=rt.tick;c.doorBy='someone-else';const landed=rt.tick;
+  for(let i=0;i<40;i++)step();
+  assert.equal(world.entities.a.human!.carrier?.phase,'leaving','held at the taken plank');
+  for(let i=0;i<12*20+200&&world.entities.a.human!.carrier;i++)step();
+  assert.equal(world.entities.a.human!.carrier,undefined,'set down');assert.ok((rt.tick-landed)/20<=30,`out ${(rt.tick-landed)/20} s after landing`);
+  assert.equal(rt.isActive(ride.id),false);assert.equal(world.entities.a.human!.shore?.depthMetres,0,'on dry bank, not in the water');
+  assert.equal(world.entities.a.human!.activity,'idle');assert.deepEqual(rt.violations,[]);
+});
