@@ -101,6 +101,25 @@ test('presence stays listening across the gap between two long-polls, not after 
   assert.notEqual(inbox.view(a).presence, 'listening', 'after handing messages nobody listens until the agent runs listen again');
 });
 
+test('LISTEN-LEAK: a newer listen supersedes only the same agent (same Soul, same owner, same world), never another Soul, owner, god box or world', t => {
+  const db = new Db(':memory:'); t.after(() => db.close());
+  const inbox = new AgentInbox(db, 'w1'), otherWorld = new AgentInbox(db, 'w2');
+  const soulA = {scope: 'soul:a', owner: 'alice'}, soulB = {scope: 'soul:b', owner: 'alice'}, soulAbob = {scope: 'soul:a', owner: 'bob'};
+  const godAlice = {scope: 'god', owner: 'alice'}, godBob = {scope: 'god', owner: 'bob'};
+  const first = inbox.claimListen(soulA);
+  const others = [inbox.claimListen(soulB), inbox.claimListen(soulAbob), inbox.claimListen(godAlice), inbox.claimListen(godBob), otherWorld.claimListen(soulA)];
+  assert.equal(first.signal.aborted, false, 'other Souls, owners, god boxes and worlds leave the listen alone');
+  assert.ok(others.every(o => !o.signal.aborted), 'and it leaves theirs alone');
+  const newer = inbox.claimListen(soulA);
+  assert.equal(first.signal.aborted, true, 'the same Soul listening again supersedes its older listen');
+  assert.ok(others.every(o => !o.signal.aborted), 'and nobody else\'s');
+  assert.equal(newer.signal.aborted, false);
+  first.release(); assert.equal(newer.signal.aborted, false, 'releasing the superseded one does not touch the newer');
+  const godNewer = inbox.claimListen(godAlice);
+  assert.equal(others[2].signal.aborted, true, 'the god box supersedes its own older listen'); assert.equal(others[3].signal.aborted, false, 'not another owner\'s god box');
+  assert.equal(newer.signal.aborted, false); assert.equal(godNewer.signal.aborted, false);
+});
+
 test('soul queue: a message waiting in the old one-message box moves into the queue at boot, once', t => {
   const db = new Db(':memory:'); t.after(() => db.close());
   db.db.exec(`CREATE TABLE agent_inbox_v1 (world_id TEXT NOT NULL, scope TEXT NOT NULL, owner TEXT NOT NULL, id TEXT, text TEXT, sent_at INTEGER, delivered_at INTEGER, acknowledged_at INTEGER, reply TEXT, last_seen_at INTEGER, PRIMARY KEY(world_id,scope,owner)) WITHOUT ROWID`);
