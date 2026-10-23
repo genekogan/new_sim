@@ -15,7 +15,8 @@ export function guardStaleOwnerSteps(steps,ownerText,prior=[]){
  const out=steps.map(step=>{
   if(typeof step?.act!=='string'||!seen.has(norm(step.act))||norm(step.act)===norm(ownerText))return step;
   if(words(step.act).some(w=>mine.has(w)))return step;
-  replaced.push(step.act);return {...step,act:String(ownerText).trim(),params:{},staleReplaced:step.act};
+  // The new request must not inherit an old peer, duration, guard, protection or fixes binding.
+  replaced.push(step.act);return {act:String(ownerText).trim(),params:{},staleReplaced:step.act};
  });
  return {steps:out,replaced,line:replaced.length?`Dropped ${replaced.length===1?'a step':replaced.length+' steps'} carried over from an earlier request (${replaced.map(a=>`"${a}"`).join(', ')}); acting on your owner's own words instead.`:null};
 }

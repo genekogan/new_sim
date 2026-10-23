@@ -28,3 +28,12 @@ test('every owner-answer write in the CLI goes through the plain-words seam',()=
  const src=readFileSync(new URL('./eden-agent.mjs',import.meta.url),'utf8');
  assert.match(src,/answer:ownerPlainLine\(own\.answer\?\?null\)/);assert.match(src,/\?ownerPlainLine\(ownerAnswerText\(plan\.owner\)\):null/);assert.match(src,/answer:ownerPlainLine\(r\.answer\)/);
 });
+
+test('canonical waiting refusal failure and cancellation never claim an action started',()=>{
+ for(const phase of ['waiting','refused','failed','cancelled','replaced']){
+  const line=ownerPlainLine(retained.replace('is started','is '+phase));
+  assert.doesNotMatch(line,/I(?:'ve| have)? started|I started/i,phase+': '+line);
+  assert.doesNotMatch(line,/\breceipt\b|\bretained\b.*\bsteps?\b|\bqueue|\breq-|\br_[A-Za-z0-9]/i);
+  assert.match(line,phase==='waiting'?/waiting|not begun/:new RegExp(phase==='refused'?'refused|couldn.t':phase));
+ }
+});
