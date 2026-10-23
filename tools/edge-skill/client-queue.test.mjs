@@ -51,7 +51,8 @@ test('until uses qualified native renewals and observed owned release, never an 
 });
 
 // Gene's OK 2026-10-23 (OWNER-FIRST): a newer owner request replaces a protected step.
-test('owner-protected read yields to a newer non-force owner replacement; the replan waits for native safe-stop',async t=>{
+// Stable historical gate identifier retained; OWNER-FIRST now admits newer owner replacement and unique first names.
+test('owner-protected read refuses non-force owner replacement; nonprotected replan waits for native safe-stop',async t=>{
  const root=folder(t),receipts=new Map(),sent=[];let physical='reading',unsafe=true;
  const adapter={send:async body=>{sent.push(body);const r={id:'r'+sent.length,capability:body.capability,phase:sent.length===1?'started':'waiting'};receipts.set(r.id,r);return {accepted:true,receipt:r};},readReceipt:async id=>receipts.get(id)};
  const q=openClientQueue(root,{adapter});t.after(()=>q.close());q.enqueue([{act:'read:library',protected:true}],{id:'original',source:'owner'});await q.pump();
