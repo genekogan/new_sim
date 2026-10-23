@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./scene-capture": "./src/scene-capture.ts"
+    "./scene-capture": "./src/scene-capture.ts",
+    "./columns-v1": "./src/columns-v1.ts"
   },
   "dependencies": {
     "@sim/engine-contract": "workspace:*",

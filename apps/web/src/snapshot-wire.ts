@@ -3,16 +3,19 @@
 // content-addressed, immutable parts (/v1/world/part/<ref>: one download per browser, shared by every world and visit
 // with the same set). expandSnapshot puts it back together exactly as the plain snapshot, so WorldModel.fromSnapshot
 // and everything after it see no difference. Any failure falls back to the plain snapshot.
+import { isPackedColumnsV1, unpackColumnsV1 } from '@sim/protocol/columns-v1';
 import { entryWireUrl, takeSnapshotPrefetch, takePartPrefetch } from './snapshot-prefetch.ts';
 
 type Spec = Record<string, { default?: unknown } | undefined>;
 type Def = { name?: string; version?: number; params?: Spec };
 type Entity = { def?: string; params?: Record<string, unknown> };
-export type WireBody = Record<string, unknown> & { defsRef?: string; groundRef?: string; paramsDefaulted?: boolean; entities?: Entity[] };
+export type WireBody = Record<string, unknown> & { defsRef?: string; groundRef?: string; paramsDefaulted?: boolean; entities?: Entity[] | { $columnsV1: unknown } };
 
 /** The plain snapshot from its wire pieces (params back in their def's order, as the server writes them). */
 export function expandSnapshot(body: WireBody, defs: Def[], ground: unknown): Record<string, unknown> {
-  const { defsRef: _d, groundRef: _g, paramsDefaulted, entities = [], ...rest } = body;
+  const { defsRef: _d, groundRef: _g, paramsDefaulted, entities: wired = [], ...rest } = body;
+  // columns/1 (lane JOINSET, `cols=1`): the entities in the column form, put back exactly first
+  const entities = (isPackedColumnsV1(wired) ? unpackColumnsV1(wired) : wired) as Entity[];
   const specs = new Map(defs.map((d) => [`${d.name}@${d.version}`, d.params ?? {}]));
   const full = !paramsDefaulted ? entities : entities.map((e) => {
     const spec = e.def ? specs.get(e.def) : undefined; if (!e.params || !spec) return e;
@@ -47,7 +50,7 @@ export type Loaded = { snap: Record<string, unknown>; response: Response };
 export async function loadSnapshot(plainUrl: string, signal: AbortSignal, first = false): Promise<Loaded | null> {
   const plain = async (): Promise<Loaded | null> => { const r = await fetch(plainUrl, { signal }); return r.ok ? { snap: await r.json() as Record<string, unknown>, response: r } : null; };
   try {
-    const url = first ? entryWireUrl(plainUrl) : `${plainUrl}?defs=ref`;
+    const url = first ? entryWireUrl(plainUrl) : `${plainUrl}?defs=ref&cols=1`;
     const again = () => fetch(url, { signal });
     const r = await (first ? hedged(takeSnapshotPrefetch(url) ?? again(), again) : again());
     if (!r.ok) return plain();
