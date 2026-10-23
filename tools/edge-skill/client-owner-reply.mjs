@@ -37,3 +37,18 @@ export function ownerReplyWithLocalResults({answer,source,results=[],localResult
  const prefix=warnings.length?warnings.join('; ')+' Model report (unverified): ':'';
  return {answer:ownerAnswerText(prefix+report),source:'model-unverified'};
 }
+/** 1.9.10 (ACCEPT2 brief 8): owner-facing words never carry queue bookkeeping (queue ids
+ * "req-…", receipt ids "r_…", the word "queue"). The mind still sees the raw result lines;
+ * only what the owner reads is turned into plain words from the same receipt facts. */
+const PHASE_WORDS={started:'under way',running:'under way',waiting:'waiting to start',completed:'done',ended:'done',refused:'refused',replaced:'replaced by something newer',cancelled:'cancelled',failed:'failed'};
+export function ownerPlainLine(line){
+ if(typeof line!=='string')return line;
+ let text=line.replace(/Retained (\d+) ordered steps? in queue \S+?; (?:actual receipt \S+ is (\w+)|physical admission not yet confirmed)\. Future steps are pending, not already accepted or completed\./g,(_,n,phase)=>{
+  const steps=Number(n),what=steps===1?'it':`the first of ${steps} steps`;
+  return phase?`I've started ${what}; it is ${PHASE_WORDS[phase]??phase}.${steps>1?' The rest follow in order.':''}`:`I've asked to start ${what}; it has not begun yet.${steps>1?' The rest follow in order.':''}`;
+ });
+ text=text.replace(/(^|[.;!?]\s+)queue:? req-[A-Za-z0-9_-]+/gi,'$1Your request');
+ text=text.replace(/\s*\(?\b(?:actual |final )?receipt:? r_[A-Za-z0-9_-]+\)?/gi,'').replace(/\s*\b(?:in |from |of )?(?:the )?queue:? req-[A-Za-z0-9_-]+/gi,'').replace(/\breq-[A-Za-z0-9_-]+/g,'your request').replace(/\br_[A-Za-z0-9_-]+/g,'it')
+  .replace(/\bqueued\b/gi,'lined up').replace(/\bqueues?\b/gi,'plan');
+ return text.replace(/\s+([;,.])/g,'$1').replace(/\s{2,}/g,' ').trim();
+}

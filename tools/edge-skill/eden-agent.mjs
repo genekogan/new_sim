@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import {ownerReplyWithLocalResults,ownerAnswerText,routeOwnerReport} from './client-owner-reply.mjs';
+import {ownerReplyWithLocalResults,ownerAnswerText,routeOwnerReport,ownerPlainLine} from './client-owner-reply.mjs';
 import {clientHelp} from './client-help.mjs';
 import {clientListen,clientAck,clientResult,noticeOwnerInbox,noticeInboxHeader,folderListenClaim} from './client-inbox.mjs';
 // Eden edge agent CLI — skill 1.0.0 for contract eden-edge/1 (team/CONTRACTS/EDGE-CONTRACT-v1.md).
@@ -976,7 +976,7 @@ export async function live(...argv){
   if(typeof plan.notes==='string'&&plan.notes.trim())try{clientMemory.remember({self:plan.notes.trim().split('\n').slice(0,20).map(line=>line.slice(0,200))});}catch(error){logLive({memoryProblem:error.message});}
   if(typeof plan.notes==='string'&&plan.notes.trim())writeFileSync(LIVE.notes,plan.notes.trim().slice(0,2500)+'\n');
   if(own){own.results.push(...results);if(typeof plan.owner==='string'&&plan.owner.trim()){own.answer=ownerAnswerText(plan.owner);own.answerSource=ownerAnswerSource;}}
-  if(later&&(steps.length||plan.owner)){const r={id:later.id,t:now(),text:later.text,continued:true,answer:typeof plan.owner==='string'?ownerAnswerText(plan.owner):null,answerSource:ownerAnswerSource,results,receipt:steps.some(x=>x.act)?lastReceipt:null};
+  if(later&&(steps.length||plan.owner)){const r={id:later.id,t:now(),text:later.text,continued:true,answer:typeof plan.owner==='string'?ownerPlainLine(ownerAnswerText(plan.owner)):null,answerSource:ownerAnswerSource,results,receipt:steps.some(x=>x.act)?lastReceipt:null};
    appendFileSync(LIVE.replies,JSON.stringify(r)+'\n');logLive({owner:{...r,continued:true}});}
   const hm=(ob.clock??'')+' ';
   S.history.push(clip(`${hm}${reason}${evText.length?' ('+clip(evText.filter(l=>!l.startsWith('receipt')).join('; '),140)+')':''}: ${results.length?results.join('; '):'nothing'}`,330));S.history=S.history.slice(-12);
@@ -990,7 +990,7 @@ export async function live(...argv){
  }
  /** Write the outcome of an owner request where `tell --wait` and `report` read it; results are the world's answers, not the model's claim. */
  function finishOwner(own,error){
-  const r={id:own.id,t:now(),text:own.text,answer:own.answer??null,answerSource:own.answerSource??'model-unverified',results:own.results,...(own.localResults?{localResults:own.localResults}:{}),receipt:own.receipt,queue:bodyQueue.snapshot(),latencySeconds:Math.round((Date.now()-Date.parse(own.t))/1000),...(error?{error}:{})};
+  const r={id:own.id,t:now(),text:own.text,answer:ownerPlainLine(own.answer??null),answerSource:own.answerSource??'model-unverified',results:own.results,...(own.localResults?{localResults:own.localResults}:{}),receipt:own.receipt,queue:bodyQueue.snapshot(),latencySeconds:Math.round((Date.now()-Date.parse(own.t))/1000),...(error?{error}:{})};
   appendFileSync(LIVE.replies,JSON.stringify(r)+'\n');answered.add(own.id);if(ownerActive?.id===own.id)ownerActive=null;
   const qs=bodyQueue.snapshot(),open=qs.steps.some(s=>!['completed','cancelled','skipped'].includes(s.status));
   if(!error&&(!open||qs.id===own.id))ownerLater={id:own.id,text:own.text,results:own.results,until:Date.now()+(open?6*3600_000:10*60_000),...(open?{afterQueue:qs.id}:{})}; // a next step ("…and give it to Mira") or the report is taken at the next wake after the owner's own queue finishes
@@ -1115,7 +1115,7 @@ export async function tell(...args){
  while(Date.now()<until){
   const r=readJSONL(LIVE.replies).filter(x=>x.id===id).at(-1);
   if(r){const q=readJSON('.client-queue.json',{});if(q.id===id&&!q.steps?.some(s=>['failed','interrupted','blocked'].includes(s.status))&&q.steps?.some(s=>['pending','running','waiting','dispatching','stopping'].includes(s.status))){await sleep(500);continue;}if(q.id===id)r.queue=q;const latest=readJSONL(LIVE.replies).filter(x=>x.id===id).at(-1);if(latest?.queueComplete)Object.assign(r,latest);let rec=null;if(r.receipt){await sleep(2500);rec=await receipt(r.receipt).catch(()=>null);} // the body's real state, not the mind's claim
-   return {delivered:true,id,request:r.text,answer:r.answer,answerSource:r.answerSource??'unverified-legacy-answer',did:r.results,...(r.queue?{queue:r.queue}:{}),...(r.initialAnswer?{initialAnswer:r.initialAnswer,finalObservation:r.finalObservation,completed:r.queueComplete===true}:{}),...(rec&&rec.capability?{receipt:{id:rec.id,capability:rec.capability,phase:rec.phase,...(rec.code?{code:rec.code}:{})}}:{}),...(r.error?{error:r.error}:{}),seconds:r.latencySeconds};}
+   return {delivered:true,id,request:r.text,answer:ownerPlainLine(r.answer),answerSource:r.answerSource??'unverified-legacy-answer',did:r.results,...(r.queue?{queue:r.queue}:{}),...(r.initialAnswer?{initialAnswer:r.initialAnswer,finalObservation:r.finalObservation,completed:r.queueComplete===true}:{}),...(rec&&rec.capability?{receipt:{id:rec.id,capability:rec.capability,phase:rec.phase,...(rec.code?{code:rec.code}:{})}}:{}),...(r.error?{error:r.error}:{}),seconds:r.latencySeconds};}
   if(!liveRunning())return {delivered:true,id,outcome:null,reason:'live stopped before answering'};
   await sleep(1500);
  }
