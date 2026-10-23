@@ -337,6 +337,8 @@ export function startSoundLayer() {
     unlock,
     /** Recorded ambient beds on/off (A/B listening and level checks); the speaker's mute is the user control. */
     beds: (on: boolean) => { bedsOn = on; },
+    /** The soundscape's output as a MediaStream (recordings for review); null before the first unlock. */
+    tap: () => { if (!ctx || !master) return null; const d = ctx.createMediaStreamDestination(); master.connect(d); return d.stream; },
   };
   (window as unknown as { __edenMusic?: unknown }).__edenMusic = { state: musicState, log: musicLog, level: musicLevel, next: nextPiece, trackSeconds: musicTrackSeconds };
   // another tab took the sound, or this one came back: act now, not on the next (throttled, when hidden) tick
