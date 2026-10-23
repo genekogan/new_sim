@@ -709,7 +709,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
     // together/1: social phrasing first (accept/decline, "hug Tamsin", "give her the book", "dance with Roger", "invite X to …")
     let social: {note: string} | null = null, text = asked;
     if (!caps.some(c => c.id === asked)) {
-      const r = this.together.resolve(soul, asked, caps);
+      const more = [...caps], morePlans = new Map(plans), r = this.together.resolve(soul, asked, more, morePlans as Map<string, TogetherPlan>);
+      if (more.length !== caps.length) {caps = more; plans = morePlans;}   // SOCIAL-APPROACH: a walk-over act toward a Soul out of sight
       if (r && 'code' in r) return {...refuse(r.code, r.reason), did_you_mean: r.did_you_mean};
       if (r) {social = {note: r.note}; params = {...params, ...(r.params ?? {})}; text = r.capability || r.rest || asked;}
     }
