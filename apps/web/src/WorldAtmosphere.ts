@@ -66,6 +66,9 @@ function setKind(w:SetWeather):WeatherKind{
 const pulse=(u:number,c:number,w:number)=>{const x=(u-c)/w;return Math.exp(-x*x);};
 const smooth=(a:number,b:number,x:number)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t);};
 export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:AtmosphereFrame):void;dispose():void;inspect():AtmosphereInspection;
+ /** Explore place shots (Gene #13): pose the atmosphere as a clear, dry, still day at `clock` for one offscreen render;
+  * returns the undo, which puts back the live weather exactly (no easing, no flicker in the main view). */
+ photo(clock:string|null,daylight:number|null):()=>void;
  /** R4-LIVE hook (GOD-ENV: thunder sound, a bolt): called when a lightning flash starts, with its strength and sky direction. */
  onLightning:((strength:number,dir:THREE.Vector3)=>void)|null}{
  const override:WeatherOverride=typeof location!=='undefined'?parseWeatherOverride(location.search):null;
@@ -237,9 +240,11 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
   const day=Math.floor(ms/86_400_000),a=hash01(day,313)*Math.PI*2+Math.sin(seconds/420)*.35;
   WIND.value.z=Math.cos(a);WIND.value.w=Math.sin(a);
  }
+ let lastFrame:AtmosphereFrame|null=null,photoFrame=false;
  const api={
   update(frame:AtmosphereFrame){
    if(closed)return;
+   if(!photoFrame)lastFrame=frame;
    if(!frame.eden||override?.kind==='off'){deactivate();return;}
    const seconds=frame.seconds;
    profile=frame.profile??'eden';setWeather=frame.weather??null;indoorsOf=frame.indoors;
@@ -248,14 +253,15 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    if(seconds>=nextScan)scan(seconds);
    // Any world can opt in using its admitted sky palette; no Mars identity special case.
    // Explicit owner weather wins over auto, unless a dust review override was requested.
-   dustScheduled=desert&&!!(dustOverride||(!override&&!setWeather));
+   dustScheduled=!photoFrame&&desert&&!!(dustOverride||(!override&&!setWeather));
    if(dustScheduled){
     const worldMs=clockMs(frame.clock)??0;desertDustAt(worldMs,DESERT_DUST_SEED,dustOverride,dustSample);
     frameDustDrift=frame.reducedMotion?0:((worldMs/3_600_000)%8+8)%8;
    }else{dustSample.kind='clear';dustSample.intensity=0;}
    // Weather target from the world clock (or the review override), eased over minutes.
    // (Re)read the clock about once a second: the schedule is coarse, and this keeps frames allocation-free.
-   if(!initialised||Math.abs(seconds-clockAt)>=1){clockAt=seconds;clockNow=clockMs(frame.clock)??Date.now();const hour=frame.daylight===null?null:hourOf(clockNow);
+   if(photoFrame){clockNow=clockMs(frame.clock)??clockNow;kind='clear';targetFor('clear',frame.daylight===null?null:hourOf(clockNow),target);target.mist=target.wet=0;}
+   else if(!initialised||Math.abs(seconds-clockAt)>=1){clockAt=seconds;clockNow=clockMs(frame.clock)??Date.now();const hour=frame.daylight===null?null:hourOf(clockNow);
     kind=override?.kind==='cycle'?cycleKind(seconds):override?override.kind as WeatherKind:setWeather?setKind(setWeather):weatherKindAt(clockNow);targetFor(kind,hour,target);
     // a god's set weather: its channels exactly (morning mist kept from the kind; wet follows rain)
     if(setWeather&&!override){target.cloud=setWeather.clouds;target.rain=setWeather.rain;target.wind=setWeather.wind;target.fog=setWeather.fog;target.wet=setWeather.rain>.1?Math.min(1,setWeather.rain*1.2):0;}
@@ -264,12 +270,13 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    const ms=clockNow;
    // a god's change shows in about 10–25 s (not the schedule's minutes): the god is watching it happen
    // ... and keeps that pace for a while after the god clears it back to the schedule (E2 #8: rain lingered for minutes)
-   if(setWeatherChanged(lastSet,setWeather)){if(initialised)godChangeAt=seconds;lastSet=setWeather?{...setWeather}:null;}
+   if(!photoFrame&&setWeatherChanged(lastSet,setWeather)){if(initialised)godChangeAt=seconds;lastSet=setWeather?{...setWeather}:null;}
    if(dustScheduled){
     // Clock-derived channels have no browser-session easing and never inherit dawn mist/rain/wetness.
     kind=dustSample.kind==='heavy'?'wind':'clear';
     state.cloud=state.rain=state.fog=state.mist=state.wet=0;state.wind=.16+dustSample.intensity*1.6;initialised=true;
-   }else if(!initialised){if(!override?.from)copyWeather(state,target);initialised=true;}else easeWeather(state,target,frame.dt*weatherEaseRate(!!setWeather,seconds-godChangeAt,override?.kind==='cycle'));
+   }else if(photoFrame)copyWeather(state,target);
+   else if(!initialised){if(!override?.from)copyWeather(state,target);initialised=true;}else easeWeather(state,target,frame.dt*weatherEaseRate(!!setWeather,seconds-godChangeAt,override?.kind==='cycle'));
    windDirection(dustScheduled?dustSample.worldMs/1000:seconds,ms);
    // Rooms behind lit windows switch on and off with the hour of the world clock.
    setWindowLife(frame.daylight===null?null:hourOf(ms),frame.reducedMotion?0:seconds);
@@ -311,6 +318,13 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    // ... and in a real wind the same particles become fine dust skimming low over the ground (desert setting); dry ground only.
    const dust=still?0:smooth(.65,.95,state.wind)*(1-smooth(.15,.4,state.wet));
    rain.update2(dustScheduled?dustSample.worldMs/1000:seconds,still?0:state.rain*spell,desert?0:leaves,day,frame.camera,WIND.value.z,WIND.value.w,visualWind,desert?(still?0:dustSample.intensity):Math.max(motes,dust),desert?1:dust>motes?1:0);rainWanted=rain.lines.visible;
+  },
+  photo(clock:string|null,daylight:number|null){
+   if(closed||!active||!lastFrame||photoFrame)return ()=>{};
+   const real=lastFrame,saved={...state},savedTarget={...target},was={kind,clockAt,clockNow,sailAngle,ferrisAngle,driftX,driftZ,lastFlash};
+   photoFrame=true;try{api.update({...real,dt:0,reducedMotion:true,clock,daylight});}catch{/* the live frame below restores */}finally{photoFrame=false;}
+   return ()=>{copyWeather(state,saved);copyWeather(target,savedTarget);({kind,clockAt,clockNow,sailAngle,ferrisAngle,driftX,driftZ}=was);bodiesAt=-Infinity;bodiesClock='';
+    try{api.update({...real,dt:0});}catch{/* next frame */}lastFlash=was.lastFlash;};
   },
   onLightning:null as ((strength:number,dir:THREE.Vector3)=>void)|null,
   inspect(){return {profile,dust:desert?{profile:'mars-desert' as const,seed:DESERT_DUST_SEED,...dustSample}:null,set:!!setWeather,lightning:lastFlash,active,kind,state:{...state},rotor:motion.rotorFound,fountainWater:motion.waterFound,skyClouds:motion.skyClouds,windMaterials:wind.count,windModes:wind.modes(),smokeSources:smoke.sourceCount,flowers:lastFound.flowers,meadow:lastFound.meadow,roofs:lastFound.roofs,water:lastFound.water,harbour:lastFound.harbour,scans,drawCalls:root.children.filter(o=>o.visible).length};},

@@ -2,7 +2,7 @@ import {GRADE_A} from './atmosphere/grade.ts';
 import {cdnRoute} from './cdn-assets.ts';
 import * as THREE from 'three';
 import type {WorldLocation} from './WorldLocations.ts';
-import {worldPlaceView,type WorldPlaceId} from './WorldPlaces.ts';
+import {INTERIOR_PLACE_VIEWS,worldPlaceView,type WorldPlaceId} from './WorldPlaces.ts';
 const PREVIEW_OWNERS:Readonly<Record<string,string>>={gallery:'eden-library-1',library:'eden-library-1',libraryroom:'eden-library-1','int-library':'eden-library-1',roofseating:'eden-house-3','int-house-3-kitchen':'eden-house-3','int-house-3-living':'eden-house-3','int-house-2':'eden-house-2','int-office-studio':'eden-office-1','int-office-upper-lounge':'eden-office-1','int-office-post-room':'eden-office-1',market:'eden-market-1','int-barn-workshop':'eden-barn-1'};
 /** Fit the selected geometry in camera space, including its depth, rather than using a tour distance. */
 export function fitPlacePreviewCamera(box:THREE.Box3,direction:THREE.Vector3,aspect=160/112){
@@ -17,8 +17,10 @@ export function fitPlacePreviewCamera(box:THREE.Box3,direction:THREE.Vector3,asp
  * (the place not drawn yet, e.g. a god world still streaming its things in) is not cached: the next opening retries. */
 export class WorldPlacePreviews{
  private images=new Map<string,string|null>();private pending=new Map<string,Promise<string|null>>();private closed=false;private revision=0;private tail:Promise<unknown>=Promise.resolve();
- private renderer:THREE.WebGLRenderer;private live:()=>THREE.Scene|null;private roots:()=>readonly THREE.Object3D[];
- constructor(renderer:THREE.WebGLRenderer,roots:()=>readonly THREE.Object3D[],live:()=>THREE.Scene|null=()=>null){this.renderer=renderer;this.roots=roots;this.live=live;}
+ private renderer:THREE.WebGLRenderer;private live:()=>THREE.Scene|null;private roots:()=>readonly THREE.Object3D[];private pose:()=>()=>void;
+ /** `pose` puts the live world in the shot light (PLACE_SHOT_MINUTES, clear, dry, still) and returns the undo; it wraps only
+  * the one offscreen render, so the main view never draws it. */
+ constructor(renderer:THREE.WebGLRenderer,roots:()=>readonly THREE.Object3D[],live:()=>THREE.Scene|null=()=>null,pose:()=>()=>void=()=>()=>{}){this.renderer=renderer;this.roots=roots;this.live=live;this.pose=pose;}
  capture(id:WorldPlaceId):Promise<string|null>{return this.request(id,()=>this.render(id,id));}
  captureLocation(location:WorldLocation,sceneKey:string):Promise<string|null>{const key=sceneKey+':'+location.id;return this.request(key,()=>this.render(location.id,key,location));}
  invalidate(){this.revision++;this.images.clear();this.pending.clear();}
@@ -52,14 +54,15 @@ export class WorldPlacePreviews{
    });}
    const bare=!scene.children.length;if(bare&&!this.live())return null;  // nothing of the place drawn: with a live world it is still pictured (a lake that is only water), never kept
    scene.updateMatrixWorld(true);
-   const shot=this.shoot(scene,center,radius,view.p,key);if(shot&&!bare)keep(key,shot);return shot;
+   const shot=this.shoot(scene,center,radius,view,key,id.startsWith('room:')||Object.hasOwn(INTERIOR_PLACE_VIEWS,id));if(shot&&!bare)keep(key,shot);return shot;
   }finally{target.dispose();for(const mesh of instances)mesh.dispose();for(const g of geometries)g.dispose();for(const m of materials.values())m.dispose();scene.clear();}
  }
  /** Gene 2026-10-23 (#13): a full photogenic shot of the place in the real world (terrain, water, sky, neighbours), not a
   * cut-out of its assets. Rule: frame the place's geometry plus its region at a 35° elevated 3/4 view from its tour side;
   * occlusion check: draw the place alone (white), then the world in black with the place on top, and count how much of the
   * place stays visible; above 40 % hidden, turn 45° and retry, keeping the clearest of the 8 views. */
- private shoot(mask:THREE.Scene,center:THREE.Vector3,radius:number,from:readonly number[],key:string):string|null{
+ private shoot(mask:THREE.Scene,center:THREE.Vector3,radius:number,view:{readonly p:readonly number[];readonly target:readonly number[]},key:string,interior=false):string|null{
+  const from=view.p;
   const world=this.live(),live=world??mask;  // no live world (tests, a bare viewer): the place's own geometry
   const t0=performance.now(),bare=!mask.children.length,box=new THREE.Box3().setFromObject(mask),r=world?radius*.8:0,extent=r<=0?box.clone():box.clone().union(new THREE.Box3(new THREE.Vector3(center.x-r,center.y,center.z-r),new THREE.Vector3(center.x+r,center.y,center.z+r))),aim=extent.getCenter(new THREE.Vector3());
   const az0=Math.atan2(from[0]-aim.x,from[2]-aim.z),el=35*Math.PI/180,W=SHOT_W,H=SHOT_H,CW=80,CH=56;
@@ -71,6 +74,8 @@ export class WorldPlacePreviews{
   const background=live.background,override=live.overrideMaterial;
   try{
    renderer.setScissorTest(false);mask.overrideMaterial=white;let best:THREE.PerspectiveCamera|null=null,bestHidden=2,turn=0;
+   // a room ("Inside: …") is pictured from its own tour eye, standing inside it: from above it would be the roof
+   if(interior&&world){best=new THREE.PerspectiveCamera(64,W/H,.05,3000);best.position.fromArray(from);best.lookAt(new THREE.Vector3().fromArray(view.target));best.updateMatrixWorld(true);bestHidden=0;turn=-1;}
    for(let k=0;k<8&&bestHidden>.4;k++){
     const az=az0+k*Math.PI/4,camera=fitPlacePreviewCamera(extent,new THREE.Vector3(Math.sin(az)*Math.cos(el),Math.sin(el),Math.cos(az)*Math.cos(el)),W/H);
     const d=camera.position.distanceTo(aim);camera.near=Math.max(.05,d/400);camera.far=Math.max(3000,d*20);camera.updateProjectionMatrix();
@@ -81,7 +86,11 @@ export class WorldPlacePreviews{
    }
    if(!best)return null;
    STATS.set(key,{turn,hidden:Math.round(bestHidden*100)/100,ms:Math.round(performance.now()-t0),bare});
-   const pixels=new Uint8Array(W*H*4);renderer.setRenderTarget(target);renderer.setClearColor(clear,alpha);if(!world)GRADE_A.x=0;renderer.render(live,best);GRADE_A.x=gradeStrength;  // the bare place-only picture stays ungraded (the live world's own time-of-day grade is kept)renderer.readRenderTargetPixels(target,0,0,W,H,pixels);
+   const pixels=new Uint8Array(W*H*4);renderer.setRenderTarget(target);renderer.setClearColor(clear,alpha);if(!world)GRADE_A.x=0;  // the bare place-only picture stays ungraded
+   // the live world in the shot light (Gene #13: never the visitor's night or storm); the shadow map is the main view's, left as it is
+   const undo=world?this.pose():null,shadows=renderer.shadowMap.autoUpdate,shadowsDue=renderer.shadowMap.needsUpdate;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=false;
+   try{renderer.render(live,best);}finally{renderer.shadowMap.autoUpdate=shadows;renderer.shadowMap.needsUpdate=shadowsDue;undo?.();GRADE_A.x=gradeStrength;}
+   renderer.readRenderTargetPixels(target,0,0,W,H,pixels);
    const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d');if(!ctx)return null;const image=ctx.createImageData(W,H);for(let y=0;y<H;y++)image.data.set(pixels.subarray((H-1-y)*W*4,(H-y)*W*4),y*W*4);ctx.putImageData(image,0,0);
    const webp=canvas.toDataURL('image/webp',.82);return webp.startsWith('data:image/webp')?webp:canvas.toDataURL('image/jpeg',.85);
   }finally{for(const o of hidden)o.visible=true;mask.overrideMaterial=null;renderer.setRenderTarget(previous);renderer.setViewport(viewport);renderer.setScissor(scissor);renderer.setScissorTest(scissorTest);renderer.setClearColor(clear,alpha);renderer.autoClear=autoClear;GRADE_A.x=gradeStrength;check.dispose();target.dispose();white.dispose();black.dispose();}
@@ -89,6 +98,8 @@ export class WorldPlacePreviews{
  dispose(){this.closed=true;this.invalidate();}
 }
 declare const __BUILD__:string;
+/** Minutes after midnight of the light every place shot is taken in: late morning. */
+export const PLACE_SHOT_MINUTES=10*60+30;
 const BUILD=typeof __BUILD__==='string'?__BUILD__:'dev',SHOT_W=320,SHOT_H=224,KEPT='sim.placeShot.';
 /** The last framing per place (turns of 45° from the tour side, share of the place hidden): read by the shot export script. */
 export const STATS=new Map<string,{turn:number;hidden:number;ms:number;bare:boolean}>();
