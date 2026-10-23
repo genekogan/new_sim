@@ -978,7 +978,7 @@ function resolveSoulReferences(values, { worldId, rosters, constraints: constrai
     const hits = [...byId.values()].filter((row) => normalizedSoulName(row.name) === normalizedSoulName(ref.name));
     if (!hits.length && !/\s/u.test(normalizedSoulName(ref.name))) {
       const first = [...byId.values()].filter((row) => normalizedSoulName(row.name).split(" ")[0] === normalizedSoulName(ref.name));
-      if (first.length === 1) return pick({ id: first[0].id });
+      if (first.length === 1) return pick({ name: first[0].name });
       if (first.length > 1) return { ...refuse("soul.name-ambiguous", `Several Souls are called ${ref.name.trim()}: ${first.slice(0, 6).map((row) => row.name).join(", ")}. Ask which one (full name).`, ref), ambiguous: first.map((row) => ({ id: row.id, name: row.name })), did_you_mean: first.slice(0, 6).map((row) => ({ id: row.id, label: row.name })) };
     }
     if (!hits.length) return refuse("soul.reference-unavailable", "That exact full name is absent from supplied current same-world public evidence; wait/clarify instead of using a similar or nearby name.", ref);
