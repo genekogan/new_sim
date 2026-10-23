@@ -1,3 +1,4 @@
+import {GRADE_A} from './atmosphere/grade.ts';
 import {cdnRoute} from './cdn-assets.ts';
 import * as THREE from 'three';
 import type {WorldLocation} from './WorldLocations.ts';
@@ -62,7 +63,7 @@ export class WorldPlacePreviews{
   const world=this.live(),live=world??mask;  // no live world (tests, a bare viewer): the place's own geometry
   const t0=performance.now(),bare=!mask.children.length,box=new THREE.Box3().setFromObject(mask),r=world?radius*.8:0,extent=r<=0?box.clone():box.clone().union(new THREE.Box3(new THREE.Vector3(center.x-r,center.y,center.z-r),new THREE.Vector3(center.x+r,center.y,center.z+r))),aim=extent.getCenter(new THREE.Vector3());
   const az0=Math.atan2(from[0]-aim.x,from[2]-aim.z),el=35*Math.PI/180,W=SHOT_W,H=SHOT_H,CW=80,CH=56;
-  const renderer=this.renderer,previous=renderer.getRenderTarget(),viewport=renderer.getViewport(new THREE.Vector4()),scissor=renderer.getScissor(new THREE.Vector4()),scissorTest=renderer.getScissorTest(),clear=renderer.getClearColor(new THREE.Color()),alpha=renderer.getClearAlpha(),autoClear=renderer.autoClear;
+  const renderer=this.renderer,previous=renderer.getRenderTarget(),viewport=renderer.getViewport(new THREE.Vector4()),scissor=renderer.getScissor(new THREE.Vector4()),scissorTest=renderer.getScissorTest(),clear=renderer.getClearColor(new THREE.Color()),alpha=renderer.getClearAlpha(),autoClear=renderer.autoClear,gradeStrength=GRADE_A.x;
   const white=new THREE.MeshBasicMaterial({color:0xffffff,fog:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-8}),black=new THREE.MeshBasicMaterial({color:0,fog:false});
   const check=new THREE.WebGLRenderTarget(CW,CH,{depthBuffer:true}),target=new THREE.WebGLRenderTarget(W,H,{depthBuffer:true});target.texture.colorSpace=THREE.SRGBColorSpace;
   const small=new Uint8Array(CW*CH*4),count=()=>{renderer.readRenderTargetPixels(check,0,0,CW,CH,small);let n=0;for(let i=0;i<small.length;i+=4)if(small[i]>127)n++;return n;};
@@ -80,10 +81,10 @@ export class WorldPlacePreviews{
    }
    if(!best)return null;
    STATS.set(key,{turn,hidden:Math.round(bestHidden*100)/100,ms:Math.round(performance.now()-t0),bare});
-   const pixels=new Uint8Array(W*H*4);renderer.setRenderTarget(target);renderer.setClearColor(clear,alpha);renderer.render(live,best);renderer.readRenderTargetPixels(target,0,0,W,H,pixels);
+   const pixels=new Uint8Array(W*H*4);renderer.setRenderTarget(target);renderer.setClearColor(clear,alpha);if(!world)GRADE_A.x=0;renderer.render(live,best);GRADE_A.x=gradeStrength;  // the bare place-only picture stays ungraded (the live world's own time-of-day grade is kept)renderer.readRenderTargetPixels(target,0,0,W,H,pixels);
    const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d');if(!ctx)return null;const image=ctx.createImageData(W,H);for(let y=0;y<H;y++)image.data.set(pixels.subarray((H-1-y)*W*4,(H-y)*W*4),y*W*4);ctx.putImageData(image,0,0);
    const webp=canvas.toDataURL('image/webp',.82);return webp.startsWith('data:image/webp')?webp:canvas.toDataURL('image/jpeg',.85);
-  }finally{for(const o of hidden)o.visible=true;mask.overrideMaterial=null;renderer.setRenderTarget(previous);renderer.setViewport(viewport);renderer.setScissor(scissor);renderer.setScissorTest(scissorTest);renderer.setClearColor(clear,alpha);renderer.autoClear=autoClear;check.dispose();target.dispose();white.dispose();black.dispose();}
+  }finally{for(const o of hidden)o.visible=true;mask.overrideMaterial=null;renderer.setRenderTarget(previous);renderer.setViewport(viewport);renderer.setScissor(scissor);renderer.setScissorTest(scissorTest);renderer.setClearColor(clear,alpha);renderer.autoClear=autoClear;GRADE_A.x=gradeStrength;check.dispose();target.dispose();white.dispose();black.dispose();}
  }
  dispose(){this.closed=true;this.invalidate();}
 }
