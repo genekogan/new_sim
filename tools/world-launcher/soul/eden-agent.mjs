@@ -3893,7 +3893,7 @@ async function travelCommand(args, { load: load2, save: save2, live: live2 = () 
 }
 
 // tools/edge-skill/eden-agent.mjs
-var SKILL_VERSION = "1.9.15";
+var SKILL_VERSION = "1.9.16";
 var CONTRACT = "eden-edge/1";
 var API_CONTRACT = "eden-edge/1.1";
 var STATE = ".eden-agent.json";
@@ -6498,7 +6498,18 @@ async function hereRaw() {
 }
 async function resolveAct(first, ...rest) {
   if (!first) throw new Error("usage: resolve <same arguments as act>   e.g. resolve sit --in eden-classroom-1 --row front");
-  const intent = intentOf(first, rest) ?? (first.trim().startsWith("{") ? JSON.parse(first) : null), body2 = intent ?? { capability: [first, ...rest].join(" ") };
+  rest = rest.filter((x) => x !== "--force");
+  const intent = intentOf(first, rest) ?? (first.trim().startsWith("{") ? JSON.parse(first) : null);
+  let body2 = intent;
+  if (!body2) {
+    let params;
+    const wordsRest = [...rest];
+    if (wordsRest.length && wordsRest.at(-1).trim().startsWith("{")) {
+      params = JSON.parse(wordsRest.pop());
+      if (!params || typeof params !== "object" || Array.isArray(params)) throw new Error("act params must be a JSON object");
+    }
+    body2 = { capability: [first, ...wordsRest].join(" "), ...params !== void 0 ? { params } : {} };
+  }
   return ok(await call(EDGE.resolve, { body: body2 }), "resolve").resolve;
 }
 async function report() {
