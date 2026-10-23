@@ -30,6 +30,12 @@ export function resolveSoulReferences(values,{worldId,rosters,constraints}={}){
  function pick(ref){
   if(ref.id){const row=byId.get(ref.id);if(!row)return refuse('soul.reference-unavailable','That Soul ID is absent from supplied current same-world public evidence; refresh or wait, never substitute.',ref);if(ref.name&&normalizedSoulName(ref.name)!==normalizedSoulName(row.name))return refuse('soul.id-name-mismatch','Requested full name and canonical ID identify different people; nothing was chosen.',ref);if(row.available===false)return refuse('soul.reference-unavailable','That exact Soul is currently reported unavailable; nothing was substituted.',ref);return {ok:true,chosen:{id:row.id,name:row.name,...(row.nameAmbiguous?{nameAmbiguous:true}:{}),matchedBy:ref.name?'id+name':'id',availability:'identity-observed; action admission remains server-owned',provenance:structuredClone(row.provenance)}};}
   const hits=[...byId.values()].filter(row=>normalizedSoulName(row.name)===normalizedSoulName(ref.name));
+  if(!hits.length&&!/\s/u.test(normalizedSoulName(ref.name))){
+   // ACCEPT2 class 2: a bare first name ("Wren") finds the one Soul whose full name starts with it; several ask by full name.
+   const first=[...byId.values()].filter(row=>normalizedSoulName(row.name).split(' ')[0]===normalizedSoulName(ref.name));
+   if(first.length===1)return pick({id:first[0].id});
+   if(first.length>1)return {...refuse('soul.name-ambiguous',`Several Souls are called ${ref.name.trim()}: ${first.slice(0,6).map(row=>row.name).join(', ')}. Ask which one (full name).`,ref),ambiguous:first.map(row=>({id:row.id,name:row.name})),did_you_mean:first.slice(0,6).map(row=>({id:row.id,label:row.name}))};
+  }
   if(!hits.length)return refuse('soul.reference-unavailable','That exact full name is absent from supplied current same-world public evidence; wait/clarify instead of using a similar or nearby name.',ref);
   if(hits.length===1&&hits[0].nameAmbiguous)return refuse('soul.name-ambiguous','This full name was reassigned from another immutable Soul identity. Ask for an explicit canonical ID; no earlier person was inferred.',ref);
   if(hits.length>1)return {...refuse('soul.name-ambiguous','Several public Souls have that exact normalized full name; an explicit canonical ID is required.',ref),ambiguous:hits.map(row=>({id:row.id,name:row.name}))};

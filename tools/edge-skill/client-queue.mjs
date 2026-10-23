@@ -128,7 +128,9 @@ export function openClientQueue(directory,{adapter,scope=null,now=Date.now,onWak
    if(result?.requestNotSent&&result.acceptedMembership!==true){if(result.accepted===false){step.status=before;save();return snapshot();}step.status='blocked';step.reason=result.reason??'Prior effects are unconfirmed';notify('public-step-outcome-uncertain',step);return snapshot();}
    if(result?.receipt?.id){step.receiptId=result.receipt.id;step.receipt=result.receipt;step.status='running';save();return snapshot();}step.status=result?.again?'failed':'completed';save();if(result?.again){notify('public-step-refusal',step);return snapshot();}return drive(context,paused);
   }
-  if(context.busy&&context.busy.id!==step.receiptId&&context.busy.id!==state.replaceReceiptId){step.status='blocked';notify('protected-action',step);return snapshot();}
+  // ACCEPT2 class 1: owner > self. An owner queue goes over whatever the body is doing (an owner-asked nap or stroll, the
+  // Soul's own read/sit/lift): the world replaces it, or refuses a hard physical hold (balloon flight, mid-swim) honestly.
+  if(context.busy&&state.source!=='owner'&&context.busy.id!==step.receiptId&&context.busy.id!==state.replaceReceiptId){step.status='blocked';notify('protected-action',step);return snapshot();}
   if(step.if?.place&&step.if.place!==context.placeId){step.status='blocked';notify('guard-place',step);return snapshot();}
   if(step.if?.nobodyNear&&(context.nearCount??0)>0){step.status='blocked';notify('guard-near',step);return snapshot();}
   if(step.until){
@@ -160,10 +162,9 @@ export function openClientQueue(directory,{adapter,scope=null,now=Date.now,onWak
    const active=current();if(active&&!replace)fail('queue already has pending work');
    if(active&&state.source==='owner'&&source==='mind'&&replace)fail('an unfinished owner queue needs an explicit current fixes continuation, not an implicit mind replacement');
    if(['dispatching','stopping'].includes(active?.status)&&replace)fail('transport outcome uncertain; reconcile before replacement');
-   // Protection the Soul set on its own autonomous step (mind, routine, commitment) guards against its own later
-   // whims, never against its owner (Cleo 03:58). Protection the owner set still needs the owner's --force.
-   const selfProtected=active?.protected&&state.source!=='owner';
-   if(active?.protected&&replace&&!force&&!(selfProtected&&source==='owner'))fail('local protected step requires explicit owner force/attended takeover');
+   // Protection guards a step against the Soul's own later whims, never against its owner (Cleo 03:58): the owner's
+   // newest request is their current wish, so it also replaces an earlier owner-asked protected step (ACCEPT2 A15).
+   if(active?.protected&&replace&&!force&&source!=='owner')fail('local protected step requires explicit owner force/attended takeover');
    const previous=[...(state.previous??[])];if(active?.receiptId)previous.push({...active,status:'superseded'});
    state={version:1,scope,id,source,at:now(),notice:null,events:[],eventSequence:0,previous:previous.slice(-50),replaceReceiptId:active?.receiptId??null,steps:normalized.map((s,i)=>({...s,...(!s.act?{publicStep:structuredClone(s.publicStep??s),act:s.say?'say':s.converse?'converse':s.publicStep?.act??'public-step'}:{}),id:`step-${i}-${randomUUID()}`,status:'pending',attempts:0}))};save();return snapshot();
  }
