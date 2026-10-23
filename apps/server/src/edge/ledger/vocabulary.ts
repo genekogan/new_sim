@@ -437,7 +437,10 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       const named3 = strict.length ? strict : pool.filter(c => words.every(w => tokenHit(w, info.get(c.id)!.ownTokens)));
       // ROUTE-RECHECK: a spot verb's places ("read a book in the library") are chosen by 3b below, best name first and offered
       // on demand when far, not as the nearest offer whose name has the word (the library annex next to the quad)
-      const byPlace3 = SPOT_PLACE_VERBS.has(verb) && named3.some(c => c.target?.kind === 'place') && placeMatch(words, ctx.places, ctx.withheld).length > 0;
+      // ... and a place verb's words that only an offer's "by <neighbours>" names ("go to the south lawn": the quad lawn "by
+      // land-campus-south-gate") go to the place whose own name has them (the south lawn, offered on demand when far)
+      const byPlace3 = (SPOT_PLACE_VERBS.has(verb) && named3.some(c => c.target?.kind === 'place') && placeMatch(words, ctx.places, ctx.withheld).length > 0)
+        || (PLACE_VERBS.has(verb) && !strict.length && named3.length > 0 && [0, 1].includes(placeMatchTier(words, ctx.places, ctx.withheld).tier));
       const r3 = byPlace3 ? null : also(one(ownFirst(named3, words), c => `${input} is ${c.id} (${c.label}).`)); if (r3) return r3;
     }
     // 3c (SOULSIM-E): a thing's everyday synonyms, after its exact words fail, for verbs at things (places have 3b): Mars's

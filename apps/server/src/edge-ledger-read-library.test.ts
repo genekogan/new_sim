@@ -40,3 +40,17 @@ test('Eden 2026: "go for a swim" swims in the nearest water', { timeout: 600_000
   assert.equal(r.ok, true, `${r.code ?? ''} ${r.reason ?? ''}`);
   assert.equal(r.would!.capability, 'swim:land-park-pond');
 });
+
+// ROUTE-RECHECK: "go to the south lawn" from the campus quad walked to the quad lawn, whose offer reads "by
+// land-campus-south-gate": a neighbour's name is no reason to choose a place when another place's own name has the words
+test('Eden 2026: "go to the south lawn" goes to the south lawn, not a lawn by the south gate', { timeout: 600_000, skip: NO_EDEN }, async (t) => {
+  const w = await bootEden();
+  t.after(() => w.close());
+  const e = () => (w.host.engine.world.entities as Record<string, { pose: { p: number[] } }>)[w.soul.entityId];
+  for (const [x, z] of [[-15, -100], [0, 98], [-50, -110]] as const) {
+    e().pose.p = [x, e().pose.p[1], z]; await w.settle(2);
+    const r = w.edge.intents.dryRun(w.soul, { capability: 'go to the south lawn' }) as Would;
+    assert.equal(r.ok, true, `${r.code ?? ''} ${r.reason ?? ''}`);
+    assert.equal(r.would!.capability, 'walk:place-eden-south-lawn', `from ${x},${z}`);
+  }
+});
