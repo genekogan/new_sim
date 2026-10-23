@@ -1,0 +1,137 @@
+{
+  "source": "5ac0a7b5e571bd6ac64c55a131de19388bf0f064",
+  "esbuild": "0.28.1",
+  "artifact": "<team>/scratch/soul2/guide/bundle-1913-final/eden-agent.mjs",
+  "bytes": 413518,
+  "sha256": "d3d3b0299bc759592f2e82c3e805d807f1db775ca26d0a67831b553c4abce5e8",
+  "inputs": [
+    {
+      "path": "tools/edge-skill/client-owner-reply.mjs",
+      "sha256": "11836877cf60b39934146ac2d9716376ba5a6d83f8620111322d7e0acaa09b12"
+    },
+    {
+      "path": "tools/edge-skill/client-owner-stale.mjs",
+      "sha256": "527ea958baf4390b0b77f9e5d074dc8dc0447679847f7dfa5a1034155ee757b4"
+    },
+    {
+      "path": "tools/edge-skill/client-help.mjs",
+      "sha256": "3ea7e13b404816b49cc606c518335248983bd471027a3cf3f7bc00eed102b73b"
+    },
+    {
+      "path": "tools/edge-skill/client-folder-guide.mjs",
+      "sha256": "936fe1cdd15ba3d555cbaf793b5454e1260ce34340d188882064907c74195d7b"
+    },
+    {
+      "path": "tools/edge-skill/client-inbox.mjs",
+      "sha256": "4e18abf2d8888762f0fa4622209c4cd9723a72f2a4a44bf1675d0d0037c3e01a"
+    },
+    {
+      "path": "tools/edge-skill/client-json-file.mjs",
+      "sha256": "1ddfc61814b2aaf3137e1f2c8b201094b8b667dbff50e4d759510abe9f395f60"
+    },
+    {
+      "path": "tools/edge-skill/client-awareness.mjs",
+      "sha256": "2884f291c39ec7881cb2b4cfbbf2527b61e5bac520e5702d2a065c96da664903"
+    },
+    {
+      "path": "tools/edge-skill/client-account.mjs",
+      "sha256": "e241ffa616694ac03e5cb5abfc068076356810afa1b65696d11a3de9d9eb4829"
+    },
+    {
+      "path": "tools/edge-skill/client-operation-feedback.mjs",
+      "sha256": "9890f96bd8d07575c358e845e0de83a3af0db9eb8aa651a9bbea2f0bbbd769f9"
+    },
+    {
+      "path": "tools/edge-skill/client-dashboard.mjs",
+      "sha256": "1595d0f877db0e0a5e47fa47e6b50a4043c4bf87a1de649af0a44808ab27ae8f"
+    },
+    {
+      "path": "tools/edge-skill/client-profile.mjs",
+      "sha256": "926a4c09840430f85035eb8ebed723abdb49cbe0af1e9055ebfb6de6c566e98d"
+    },
+    {
+      "path": "tools/edge-skill/client-receipts.mjs",
+      "sha256": "3b8655fb8df03c23d94514086447e2473b43967aba30c71909a4226d07c04c00"
+    },
+    {
+      "path": "tools/edge-skill/client-soul-references.mjs",
+      "sha256": "68c775d17b6e3032a1122d05aa1100fa51056225a856fc7a12b04d25af659695"
+    },
+    {
+      "path": "tools/edge-skill/client-live-identity.mjs",
+      "sha256": "c04c9709e6dd3db161db64b56fb4204682ef297644fddecf4a2a0889e3399cf1"
+    },
+    {
+      "path": "tools/edge-skill/client-conversations.mjs",
+      "sha256": "489a8aba6dc58bebb02a661905a003832bd66db76ea1514a7404a9962109cd31"
+    },
+    {
+      "path": "tools/edge-skill/client-execution.mjs",
+      "sha256": "2e534add67dccd198211292f0f0299264ddfd1f31ce66c37fab390f08a380746"
+    },
+    {
+      "path": "tools/edge-skill/client-dispatch-authority.mjs",
+      "sha256": "95229b723d49f4618f837446460b36c16df3549996741caefeb77799eae4cd8c"
+    },
+    {
+      "path": "tools/edge-skill/client-conversation-step.mjs",
+      "sha256": "d95ca331881dc681810a202e4c06233b51bb0f56a38041d1420ecdf2d61f6aaa"
+    },
+    {
+      "path": "tools/edge-skill/client-queue.mjs",
+      "sha256": "d363683d83ba3fa18f31702f48eb0e331d97c0437693272c9550a5077500d750"
+    },
+    {
+      "path": "tools/edge-skill/client-stream.mjs",
+      "sha256": "c4628d98af43037952eb499903c04ce737c24cc048f66888a9650baa5d30ab6e"
+    },
+    {
+      "path": "tools/edge-skill/client-place-arrivals.mjs",
+      "sha256": "ad393b415f72d0b0f45c7ec9cbf8ac39e435b64a559300bfa90772f338dba41f"
+    },
+    {
+      "path": "tools/edge-skill/client-perception.mjs",
+      "sha256": "88c6a73c92f12ff7b44805190012ee467e0e43947eb760976d41b4b44af34fc5"
+    },
+    {
+      "path": "tools/edge-skill/client-poll-cadence.mjs",
+      "sha256": "dae7a287d7c6a59bd18d01743100de5e54b209808070188ac0ea370a0308a312"
+    },
+    {
+      "path": "tools/edge-skill/client-codex-brain.mjs",
+      "sha256": "30b79b8fc1762096f027f2b5d480c22e11d07103fd20f86b4b1af578ab86ce80"
+    },
+    {
+      "path": "tools/edge-skill/client-cadence.mjs",
+      "sha256": "b4d13539b3973424b5a981cb5a5221ad339a67d761aad94a5da6dbea93bec918"
+    },
+    {
+      "path": "tools/edge-skill/client-schedule.mjs",
+      "sha256": "21c39dbdcba28a9392245d300442327182e89e88bded0d101f1385a950d68042"
+    },
+    {
+      "path": "tools/edge-skill/client-living.mjs",
+      "sha256": "620f9a0a7e98ed7666d94666f3eabeb0f691244a813fb26ca576d0e882dfd90c"
+    },
+    {
+      "path": "tools/edge-skill/client-owner-result.mjs",
+      "sha256": "d6c059833c8174768c38db36a5bd00a1e6bd6411d51e091a38caa42d5fa0fbc3"
+    },
+    {
+      "path": "tools/edge-skill/memory-folder.mjs",
+      "sha256": "1492ba280a0a3f173585f806745eaed233cbb9eb28b5d41a19f845034b1ff945"
+    },
+    {
+      "path": "tools/edge-skill/client-memory.mjs",
+      "sha256": "75f39dee2ae01e1d42406713537a7713d0b761be1c64675bc51dcdcc377d3ffa"
+    },
+    {
+      "path": "tools/edge-skill/client-travel.mjs",
+      "sha256": "1c324ce1d8ce61d5dc6a2c7274a55f4a383bea8eafe41d8d13822206223a21fd"
+    },
+    {
+      "path": "tools/edge-skill/eden-agent.mjs",
+      "sha256": "090b259c7f44cfad22efb6ea372456afd7008172ca809c5c180b72bd3fba90c8"
+    }
+  ]
+}
