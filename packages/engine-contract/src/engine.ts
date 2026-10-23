@@ -97,6 +97,10 @@ export interface Engine {
   programAction?(programId:string): ProgramAction | null;
   /** Actual native actor+seat claims, including fixture-selected and cancelling seats. Read only. */
   nativeSeatHoldsV1?(actor:string):{action:string;slot:string}[];
+  /** stall-guard/1 (packages/engine-mars/src/stall.ts): what holds a body; read-only. */
+  stallProbeV1?(actor:string):StallProbeV1|null;
+  /** stall-guard/1: the world releases a stalled body and stands it at the nearest free spot (folded from the log). */
+  stallReleaseV1?(actor:string,reason:{code:string;message:string}):{released:string[];markers:string[];at:[number,number,number]}|null;
   /** Native ordinary standing support/clearance after releasing a seat. Null means supported. */
   standingSupportProblemV1?(actor:string,originalSeats?:{action:string;slot:string}[]):{code:string;message:string}|null;
   /** Candidate read-only public physical evidence. Native settled gather slots
@@ -203,3 +207,7 @@ export interface EngineFactory {
 
 /** birth-near/1: a journaled birth hint. `at` is the requested start; `first` searches it before the arrival point. */
 export type BirthNearV1 = { at: [number, number]; first?: boolean };
+
+/** stall-guard/1: a body's hold, as the edge's stall guard reads it (see packages/engine-mars/src/stall.ts). */
+export type StallProbeV1 = { held: boolean; holders: { id: string; verb: string; phase: string; state: 'orphan' | 'cancelling' | 'transfer' | 'steady' }[];
+  markers: string[]; candidate: boolean; exempt: string | null; signature: string; verbs: string[]; pos: [number, number, number]; pending: boolean };

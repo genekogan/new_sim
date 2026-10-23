@@ -1,5 +1,6 @@
 // Core-Ledger: capabilities v2, direct act with durable receipts, Tier 1 observe, map,
 // and the read-only hooks Core-Comms routes events and speech with. No model calls.
+import {StallGuard} from './stall-guard.ts';
 import {randomUUID} from 'node:crypto';
 import {bodyCapabilityProblem,bodyVerbProblem,isRigidBody,shapeRigidCapabilities} from '../body/actions.ts';
 import {interiorShellPolygon} from './nav.ts';
@@ -169,6 +170,14 @@ export class EdgeLedger implements EdgeLedgerHooks {
     return this.mergedSpots.value;
   }
   readonly outcomes:ActionOutcomes;
+  /** stall-guard/1 (stall-guard.ts): no body stays held by an activity that stopped making progress. */
+  readonly stallGuard = new StallGuard({
+    tick: () => this.host.engine.world.tick,
+    souls: () => [...this.host.minds.values()].filter(m => !!m.owner).map(m => ({soulId: m.soulId, entityId: m.entityId, name: m.name, owner: m.owner})),
+    probe: id => this.host.engine.stallProbeV1?.(id) ?? null,
+    release: (soul, reason) => this.host.enqueue('edge-stop', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, stallReleaseV1: reason}),
+    record: (soul, reason, detail) => {const r = this.insert(soul, 'stall:released', 'started', undefined, true, detail); this.update(r.id, {phase: 'completed', code: 'stall.released', reason});},
+  });
   readonly spotsRefused: string[];
   constructor(host: WorldHost, db: Db, placeData?: unknown, options: {ambient?: boolean; spots?: unknown;now?:()=>number} = {}) {
     this.host = host; this.db = db; this.ambient = options.ambient === true;
@@ -218,7 +227,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       onApplied: e => {this.onRecovery(e);if(e.kind==='body-assignment-v1'&&typeof e.payload?.soulId==='string')this.ownerControlGrace(e.payload.soulId);},
       onDecision: (e, r) => this.onDecision(e, r),
       onProgram: ev => this.onProgram(ev),
-      afterTick: tick => this.afterTick(tick),
+      afterTick: tick => {this.afterTick(tick);this.stallGuard.afterTick(tick);},
     });
   }
   private loadPlaces(raw: unknown): PlaceData {
@@ -801,6 +810,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       return {accepted: true, receipt: {...this.receipt(soul.soulId, r.id)!, object: id} as EdgeReceipt, ...resolved};
     }
     if (plan.stop) {
+      await this.stallGuard.ownerStand(soul);   // stall-guard/1 (b): the owner's stand always wins over a stalled holder
       const program = this.host.engine.programOf(soul.entityId), h = this.body(soul.entityId)?.human;
       // A finite sit timer does not own the lasting native seat. Release the real claim,
       // including fixture-param seats, through a strict tracked action rather than edge-stop.
