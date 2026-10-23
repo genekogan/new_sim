@@ -17,6 +17,7 @@ import { worldBudgetFailure } from './budgets.ts';
 import { creationInputFailure } from './input.ts';
 import { signMediaFailure } from './sign-media.ts';
 import { decalFailure, kitFaceFailure } from './faces.ts'; // XP8 hook
+import { isWetSetting, showerUntil } from './weather-rules.ts';
 
 export type Diff = { upserts: Entity[]; removes: string[]; defs: StoredDef[]; world?: Partial<WorldModel['state']>; constants?: WorldModel['constants']; tiles: string[]; answers: { prayer: string; text: string }[]; /** LAYERS: state.layers changed (wallets, relations, currency; never sent to viewers) */ layers?: true };
 /** Body-aware edits: an entity the god may not edit as a thing (a resident's body; G1 "god rules" walks residents out
@@ -470,6 +471,12 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         const cur = scratch.state as Record<string, unknown>, next: Record<string, unknown> = { ...cur };
         for (const [k, v] of Object.entries(op.state)) if (v !== undefined) next[k] = v !== null && typeof v === 'object' ? { ...(cur[k] as object | undefined), ...v } : v;
         const merged = worldStateSchema.parse(next);
+        // WEATHER-RULES: a set rain/storm gets its end tick now (a strike alone leaves the shower as it is)
+        const wp = op.state.weather as Record<string, unknown> | undefined;
+        if (wp && ['kind', 'intensity', 'rain', 'minutes'].some((f) => wp[f] !== undefined)) {
+          const mw = merged.weather as typeof merged.weather & { until?: number | null };
+          mw.until = isWetSetting(mw) ? showerUntil(mw, tick, Number(merged.time.dayTicks)) : null;
+        }
         const prevPatch: Record<string, unknown> = {}, changed: Record<string, unknown> = {};
         for (const k of Object.keys(op.state)) {
           prevPatch[k] = cur[k]; changed[k] = (merged as Record<string, unknown>)[k];

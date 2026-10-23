@@ -251,7 +251,9 @@ export const worldStateSchema = z.object({
   weather: z.object({ clouds: num.min(0).max(1).default(0.1), wind: num.min(0).max(1).default(0.1), rain: num.min(0).max(1).default(0),
     fog: num.min(0).max(1).default(0), kind: z.enum(WEATHER_KINDS).default('auto'), intensity: num.min(0).max(1).default(1),
     /** GOD-ENV: the god's last lightning strike (x, z at `tick`; `n` counts strikes). Viewers draw it, Souls see and hear it. */
-    strike: strikeSchema.nullable().optional() }).prefault({}),
+    strike: strikeSchema.nullable().optional(),
+    /** WEATHER-RULES: a set rain/storm's length in world minutes (5…360) and its end tick (stamped by the `world` op). */
+    minutes: num.min(5).max(360).nullable().optional(), until: z.number().int().nullable().optional() }).prefault({}),
   constitution: z.string().max(20000).default(''),
   /** What the bare ground is made of (L3): the terrain colouring reads it. */
   ground: z.object({ palette: z.enum(['grass', 'desert', 'dust', 'sand', 'snow', 'rock', 'garden', 'playa', 'meadow']).default('grass') }).prefault({}),
@@ -263,7 +265,7 @@ export type WorldState = z.infer<typeof worldStateSchema>;
 export const worldPatchSchema = z.object({
   sky: z.object({ palette: z.string(), sun: num.min(0).max(1) }).partial(),
   time: z.object({ dayTicks: z.number().int(), startTick: z.number().int(), set: z.object({ hour: num.min(0).max(24), n: z.number().int().min(1) }).nullable(), paused: z.boolean(), calendar: z.string().regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/) }).partial(),
-  weather: z.object({ clouds: num.min(0).max(1), wind: num.min(0).max(1), rain: num.min(0).max(1), fog: num.min(0).max(1), kind: z.enum(WEATHER_KINDS), intensity: num.min(0).max(1), strike: strikeSchema.nullable() }).partial(),
+  weather: z.object({ clouds: num.min(0).max(1), wind: num.min(0).max(1), rain: num.min(0).max(1), fog: num.min(0).max(1), kind: z.enum(WEATHER_KINDS), intensity: num.min(0).max(1), strike: strikeSchema.nullable(), minutes: num.min(5).max(360).nullable() }).partial(),
   constitution: z.string().max(20000),
   ground: z.object({ palette: worldStateSchema.shape.ground.unwrap().shape.palette.unwrap() }).partial(),
 }).partial();
