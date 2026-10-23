@@ -363,7 +363,7 @@ export class Intents {
     if (!r.ok) return {...r};
     if (r.kind === 'capability') {
       // the concrete capability must itself be offered (or resolve) right now
-      const {caps} = this.L.coreA.binds(soul), strict = strictCheck(this.L, soul, r.capability, caps); if (strict) return {ok: false, ...strict};
+      const {caps} = this.L.coreA.binds(soul), strict = strictCheck(this.L, soul, r.capability, caps); if (strict && !this.L.onDemandId(soul, r.capability, caps)) return {ok: false, ...strict};
       const v = this.L.coreA.resolveText(soul, r.capability, caps);
       if (v.kind === 'unknown') return {ok: false, code: (v as {code?: string}).code ?? 'capability.unknown', reason: v.reason, did_you_mean: v.didYouMean};
       if (!v.cap.available && v.cap.blocked) return {ok: false, code: v.cap.blocked.code, reason: v.cap.blocked.reason};

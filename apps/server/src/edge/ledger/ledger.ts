@@ -87,6 +87,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** World-engine worlds only (god/nav.ts), RESOLVE: a walk to standing room next to the nearest named thing whose own name
    *  or kind is all of `ask` (the horse, not the lawn whose description lists one), added to copies; its id, or null. */
   thingOnDemand?: (soul: EdgeSoul, ask: string[], caps: EdgeCapability[], plans: Plans) => {id: string; count: number} | null;
+  /** World-engine worlds only, RESOLVE2: a re-sent `walk:<thing or room ref>` id (thingOnDemand's offer) offered again; true when added. */
+  walkRefOnDemand?: (soul: EdgeSoul, ref: string, caps: EdgeCapability[], plans: Plans) => boolean;
   /** World-engine worlds only, RESOLVE: a building's floor as its main room ("go upstairs", "go inside the cottage and go
    *  upstairs"), added to copies, or why not. Null when it could not be worked out. */
   floorOnDemand?: (soul: EdgeSoul, q: {ask: string[]; prefer?: string; floor: 'up' | 'down' | 'top' | number}, caps: EdgeCapability[], plans: Plans) => {id: string; note: string} | {code: string; reason: string} | null;
@@ -1514,6 +1516,12 @@ export class EdgeLedger implements EdgeLedgerHooks {
       const added = offer(placeId) || [...this.places.byId.keys()].some(id => sub(id) && offer(id));
       const cap = added ? more.find(c => c.id === text.trim()) ?? more.find(c => c.verb === verb && c.target?.kind === 'place' && (c.target.id === placeId || sub(c.target.id))) : undefined;
       if (cap && !this.secretOffer(soul, cap)) return {v: cap.id === text.trim() ? {kind: 'exact', cap} : {kind: 'alias', cap, note: `${text} is ${cap.id} (${cap.label}).`}, caps: more, plans: morePlans};
+    }
+    // RESOLVE2: a named thing's or room's walk id, re-sent as resolve answered it (`walk:hotel/hotel-roof-bench`): offered again
+    const byRef = exact || !this.walkRefOnDemand ? null : /^walk:([^\s:]+)$/.exec(text.trim());
+    if (byRef) {
+      const more = [...caps], morePlans = new Map(plans), cap = this.walkRefOnDemand!(soul, byRef[1]!, more, morePlans) ? more.find(c => c.id === text.trim()) : undefined;
+      if (cap && !this.secretOffer(soul, cap)) return {v: {kind: 'exact', cap}, caps: more, plans: morePlans};
     }
     let v: VocabResult = exact ? {kind: 'exact', cap: exact} : resolveCapability(text, this.vocabulary(soul, caps));
     // RESOLVE (SOULSIM-E "go to the horse" ended at the west lawn's centre, ~10 m from the horse): words that named only a place
