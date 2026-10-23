@@ -297,6 +297,19 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   // RIDE-EXIT (A, Gene's review): "get inside the hot air balloon", "board the punt", "climb into the boat" are the join too.
   const boardWords = /\b(?:board|boarding|embark|(?:get|getting|climb|climbing|hop|step|jump)\s+(?:in|into|inside|aboard|onto|on\s+board))\b/.test(text);
   const rideIntent = boardWords || /\b(?:row|rowing|boating|ride|rides|fly|flight|flying|leave|disembark|alight|start|depart)\b/.test(text) || /^(?:punt|boat|balloon)(?::|$)/.test(text);
+  // SOUL2: attractions use the same join/leave actions as carriers, but must never resolve to a nearby balloon.
+  const attraction = /\b(?:carousel|merry[- ]go[- ]round)\b/.test(text) ? 'carousel'
+    : /\b(?:ferris[- ]wheel|big wheel)\b/.test(text) ? 'ferris' : null;
+  if (rideIntent && attraction && ctx.caps.some(c => c.verb === 'object' && /ferris|carousel/i.test(c.id)) && (colon < 0 || ['ride', 'board', 'leave', 'start'].includes(head))) {
+    const action = /\b(?:leave|disembark|alight)\b/.test(text) ? 'leave' : /\b(?:start|depart)\b/.test(text) ? 'start' : 'join';
+    const words = tokens(text.replace(/\bmerry[- ]go[- ]round\b/g, 'carousel').replace(/\bbig wheel\b/g, 'ferris wheel'))
+      .filter(w => !/^(?:please|ride|rides|board|boarding|embark|leave|disembark|alight|start|depart|get|getting|climb|climbing|hop|step|jump|in|into|inside|aboard|onto|on|the|a|an)$/.test(w));
+    const rides = ctx.caps.filter(c => c.verb === 'object' && c.action === action && c.id.includes(attraction));
+    const pick = rides.filter(c => {const t = ctx.target(c); return words.every(w => tokenHit(w, tokens([c.id, c.label, ...t.names, ...t.around].join(' '))));})
+      .sort((a, b) => Number(b.available) - Number(a.available) || dist(ctx.target(a).at, ctx.me) - dist(ctx.target(b).at, ctx.me) || a.id.localeCompare(b.id))[0];
+    if (pick) return {kind: 'alias', cap: pick, note: `${input} is ${pick.id} (${pick.label}).`};
+    return {kind: 'unknown', code: 'ride.unavailable', reason: 'No matching attraction ride is offered here; nothing else was chosen.', didYouMean: []};
+  }
   // Rowing always means a punt, and an explicit balloon always means a balloon.
   if ((colon < 0 || ['ride', 'fly', 'balloon', 'row', 'punt', 'boat'].includes(head)) && rideIntent && RIDE_WORDS.test(text) && !/\b(?:bike|bicycle|horse|see[- ]?saw|teeter[- ]?totter|swings?|ferris|big wheel|carousel|merry[- ]go[- ]round)\b/.test(text)) {
     const water = /\b(?:row|rowing|punt|boat|boating)\b/.test(text), air = /\b(?:balloon|fly|flight|flying|hot[- ]air)\b/.test(text);
