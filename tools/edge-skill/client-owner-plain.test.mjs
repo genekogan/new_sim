@@ -12,6 +12,7 @@ test('the retained-queue line becomes plain words that keep the receipt phase',(
 });
 test('stray ids and the word queue never reach the owner; ordinary text is untouched',()=>{
  for(const l of ['walk:place_bakery: completed (receipt r_77)','Queue req-5 was replaced; queued 2 steps','I asked the queue for a nap (final receipt: r_ab12).'])assert.doesNotMatch(ownerPlainLine(l),JARGON,l);
+ assert.equal(ownerPlainLine('Queue req-d8527a5d retained, but go play on the swings blocked: protected-action. Dependent public steps have not run.'),"I couldn't go play on the swings (protected action). Nothing after it ran.");
  assert.equal(ownerPlainLine('I sat on the bench by the pond.'),'I sat on the bench by the pond.');
  assert.equal(ownerPlainLine(null),null);
 });

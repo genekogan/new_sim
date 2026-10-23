@@ -47,6 +47,7 @@ export function ownerPlainLine(line){
   const steps=Number(n),what=steps===1?'it':`the first of ${steps} steps`;
   return phase?`I've started ${what}; it is ${PHASE_WORDS[phase]??phase}.${steps>1?' The rest follow in order.':''}`:`I've asked to start ${what}; it has not begun yet.${steps>1?' The rest follow in order.':''}`;
  });
+ text=text.replace(/\bQueue req-[A-Za-z0-9_-]+ retained, but (.+?) (?:failed|blocked): ([A-Za-z0-9_.-]+)\. Dependent public steps have not run\./g,(_,what,code)=>`I couldn't ${what.replace(/^(?:[a-z-]+):/,'')} (${code.replace(/[._-]+/g,' ')}). Nothing after it ran.`);
  text=text.replace(/(^|[.;!?]\s+)queue:? req-[A-Za-z0-9_-]+/gi,'$1Your request');
  text=text.replace(/\s*\(?\b(?:actual |final )?receipt:? r_[A-Za-z0-9_-]+\)?/gi,'').replace(/\s*\b(?:in |from |of )?(?:the )?queue:? req-[A-Za-z0-9_-]+/gi,'').replace(/\breq-[A-Za-z0-9_-]+/g,'your request').replace(/\br_[A-Za-z0-9_-]+/g,'it')
   .replace(/\bqueued\b/gi,'lined up').replace(/\bqueues?\b/gi,'plan');
