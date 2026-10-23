@@ -449,8 +449,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
     caps.push({id: 'stand:here', verb: 'stand', label: 'Stand up / stop what I am doing', available: true});
     plans.set('stand:here', {label: 'Stand up', steps: [], stop: true});
     // CN5 (acceptance): go near anyone in sight within 60 m (a gesture to someone farther off offers this first)
+    const myHuman = this.body(soul.entityId)?.human, sitting = !!myHuman && (myHuman.activity === 'sit' || myHuman.baseActivity === 'sit');
     for (const o of this.perceivedBodies(soul.soulId, GO_NEAR_RADIUS)) {
-      const id = 'go-near:' + o.soulId, steps: Program['steps'] = [{verb: 'walk_to', params: {to: o.entityId, standoff: 1.3}}];
+      // GEST-LIVE: a seated Soul rises first (from a classroom seat the bare walk was refused route.start-blocked, no did_you_mean)
+      const id = 'go-near:' + o.soulId, steps: Program['steps'] = [...(sitting ? [{verb: 'stand', params: {}}] : []), {verb: 'walk_to', params: {to: o.entityId, standoff: 1.3}}];
       caps.push({id, verb: 'go-near', label: `Go near ${o.name}`, target: {id: o.soulId, kind: 'soul'}, available: true});   // route checked at act time
       plans.set(id, {label: `Go near ${o.name}`, steps});
     }
@@ -840,7 +842,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     }
     // together/1: invitations (params.with), paired gestures, gifts, follows and items check and adjust their plan here
     const prep = this.together.prepare(soul, cap, plan, params, steps);
-    if ('code' in prep) return {...refuse(prep.code, prep.reason), ...resolved};
+    if ('code' in prep) return {...refuse(prep.code, prep.reason), ...(prep.did_you_mean ? {did_you_mean: prep.did_you_mean} : {}), ...resolved};
     steps = prep.steps;
     if (prep.noBody) {
       // answering someone (decline, ask to stop following) never interrupts what the body is doing
@@ -893,6 +895,29 @@ export class EdgeLedger implements EdgeLedgerHooks {
         await this.host.enqueue('edge-relocate', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, to: r.to, why: `nav-connect/1: ${r.seated ? 'sat' : 'stood'} cut off (${r.code}${r.level ? `, floor ${r.level}` : ''}), no walk out: ${r.seated ? 'stood up and ' : ''}stepped to the nearest open ground`, policy: 'nav-connect/1', ...(r.seated ? {godWalkout: true, released: [], level: 0} : {})});
         issue = this.host.engine.canPerform({actor: soul.entityId, label, steps});
       }
+    }
+    // GEST-LIVE: the nearest source of an item that no walk reaches (a postbox behind a fence) gives way to the next one a walk does
+    const kind = /^pick-up:([a-z]+)$/.exec(capability)?.[1];
+    if (issue && ROUTE_DEAD.has(issue.code) && kind) {
+      for (const s of this.together.pickUpAlternatives(soul.entityId, kind)) {
+        const alt = steps.map(x => x.verb === 'walk_to' ? {...x, params: {...x.params, to: s.at}} : x.verb === 'mars:pose_v1' ? {...x, params: {...Object.fromEntries(Object.entries(x.params ?? {}).filter(([k]) => k !== 'face')), ...(s.face ? {face: s.face} : {})}} : x);
+        const again = this.host.engine.canPerform({actor: soul.entityId, label, steps: alt});
+        if (!again || WAIT_CODES.has(again.code)) {steps = alt; issue = again; break;}
+      }
+    }
+    // GEST-LIVE: a standing spot whose exact point no walk reaches (the barn table's cook-together places sat 0.45 m into the
+    // table's solid) is taken from the nearest standable point within 1 m of it; seats and berths keep their exact slot
+    if (issue?.code === 'route.goal-blocked' && !/^(?:sit|sit-ground|lie|nap|read|rest):/.test(capability)) {
+      const eng = this.host.engine as unknown as {nearestStandableV1?: (at: [number, number], except?: string, min?: number, rings?: number) => [number, number] | null};
+      let moved = false;
+      const alt = steps.map(x => {
+        const to = x.verb === 'walk_to' ? (x.params as {to?: unknown})?.to : undefined;
+        if (!Array.isArray(to) || to.length !== 2 || !eng.nearestStandableV1) return x;
+        const p = eng.nearestStandableV1(to as [number, number], soul.entityId, 0.33, 6);
+        if (!p || Math.hypot(p[0] - (to[0] as number), p[1] - (to[1] as number)) > 1) return x;
+        moved = true; return {...x, params: {...x.params, to: p}};
+      });
+      if (moved) {const again = this.host.engine.canPerform({actor: soul.entityId, label, steps: alt}); if (!again || WAIT_CODES.has(again.code)) {steps = alt; issue = again;}}
     }
     // BS3 (a): a jog or run the water refuses (the way runs through the shallows, or the body stands in them) walks instead
     let note: string | undefined, approach: Record<string, unknown> | undefined;
