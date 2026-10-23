@@ -25,3 +25,7 @@ test('look-at carries the spot to the Shell and ignores junk',()=>{
  assert.equal(requestLookAt({x:3,z:-7},target),true);assert.equal(requestLookAt({x:NaN,z:1},target),false);off();requestLookAt({x:1,z:1},target);
  assert.deepEqual(got,[{x:3,z:-7}]);
 });
+test('an act cut short reads "cut short", not "done"',()=>{
+ const html=renderToStaticMarkup(<DayList name="Bo" entries={[{at:t0,kind:'did',text:'watched the stars (cut short)',cut:true,where:{x:9,z:-1},place:'commons deck'},{at:t0+1,kind:'did',text:'did a stretch',where:{x:9,z:-1},place:'commons deck'}]}/>);
+ assert.equal((html.match(/>cut short</g)??[]).length,1,html);assert.equal((html.match(/>done</g)??[]).length,1,html);
+});
