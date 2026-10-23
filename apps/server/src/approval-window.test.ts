@@ -153,4 +153,50 @@ test('HTTP: the signed-in page gets a code, the agent request with it lands in t
   // once the Soul exists the card can show its picture (when the world has one for it)
   const after = (await call(`/v1/account/approvals/${id}`, undefined, 'gene')).data.approval;
   assert.ok(after.photo === null || /\/v1\/souls\/s_[^/]+\/profile-photo\//.test(after.photo));
+  // Lane PAIR-INWINDOW (Gene's review #1 + #2): a fresh folder reconnects by ID alone; with no code the request goes to the
+  // owner's window, titled with the Soul's REAL name; the agent's wrong name (Gene's agent sent the ID) is ignored, and the
+  // pressed Approve succeeds instead of failing with soul-name-changed.
+  const sid = after.soulId as string, real = f.db.soul(sid)!.name;
+  const bare = input('http-0003'); delete (bare as any).name;
+  const byId = await call('/v1/agent/approval/start', { ...bare, soulId: sid });
+  assert.equal(byId.status, 200, JSON.stringify(byId.data)); assert.equal(byId.data.delivery, 'window'); assert.equal(byId.data.approval.name, real);
+  const guessed = await call('/v1/agent/approval/start', { ...input('http-0004'), name: sid.slice(0, 32), soulId: sid });
+  assert.equal(guessed.status, 200); assert.equal(guessed.data.approval.name, real, 'the agent-supplied name is ignored for a reconnect');
+  const mine = (await call('/v1/account/approvals', undefined, 'gene')).data.approvals;
+  assert.deepEqual(mine.map((a: any) => [a.id, a.name, a.soulId]).sort(), [[byId.data.approval.id, real, sid], [guessed.data.approval.id, real, sid]].sort());
+  assert.ok(mine.every((a: any) => 'photo' in a));
+  assert.deepEqual((await call('/v1/account/approvals', undefined, 'other')).data.approvals, [], 'never shown to another account');
+  assert.equal((await call(`/v1/account/approvals/${guessed.data.approval.id}/approve`, {}, 'other')).status, 403);
+  const repaired = await call(`/v1/account/approvals/${guessed.data.approval.id}/approve`, {}, 'gene');
+  assert.equal(repaired.status, 200, JSON.stringify(repaired.data)); assert.ok(['creating', 'ready'].includes(repaired.data.approval.status));
+  const unknown = await call('/v1/agent/approval/start', { ...input('http-0005'), soulId: 's_nobodyhere' });
+  assert.equal(unknown.status, 404); assert.match(JSON.stringify(unknown.data), /soul-not-found/);
+  const nameless = input('http-0006'); delete (nameless as any).name;
+  assert.equal((await call('/v1/agent/approval/start', nameless)).status, 400, 'a new Soul still needs a name');
+});
+
+// Lane PAIR-INWINDOW (Gene's review 2026-10-22 #1): re-pairing a Soul from a fresh folder printed only a link, which opened a
+// second copy of the world. For a repair the owner is already known (the Soul's membership), so with no code the request goes
+// to the owner's open window. That conveys no control: approve() still requires that exact membership.
+test('a repair with no code goes to the Soul owner\'s window only; nobody else can see or approve it; a create stays a link', t => {
+  const f = fixture(t);
+  const made = f.store.start(input('0101'));
+  assert.equal(made.inWindow, false, 'an anonymous create with no code is a link request');
+  f.store.approve(f.gene, made.id, f.allocate);
+  const repair = f.store.startRepairRequest('s_qwyjibo', input('0102', { mode: 'repair' }));
+  assert.equal(repair.inWindow, true, 'the owner is known: delivered to their window');
+  assert.deepEqual(f.store.waiting(f.gene).map(a => a.id), [repair.id]);
+  assert.deepEqual(f.store.waiting(f.other), [], 'never shown to another account');
+  assert.throws(() => f.store.view(repair.id, f.other), error('forbidden'));
+  assert.throws(() => f.store.approve(f.other, repair.id, f.allocate), error('forbidden'));
+  // a code minted by another account cannot redirect a repair away from the owner
+  const stray = f.store.startRepairRequest('s_qwyjibo', input('0103', { mode: 'repair', forCode: f.store.windowCode(f.other).code }));
+  assert.equal(stray.inWindow, true);
+  assert.deepEqual(f.store.waiting(f.other), []);
+  assert.throws(() => f.store.approve(f.other, stray.id, f.allocate), error('forbidden'));
+  // an unknown Soul has no owner: link only, shown to nobody
+  const unknown = f.store.startRepairRequest('s_nobody', input('0104', { mode: 'repair' }));
+  assert.equal(unknown.inWindow, false);
+  // the owner approves in the window; that still runs the exact membership check
+  assert.equal(f.store.approve(f.gene, repair.id, f.allocate).status, 'creating');
 });

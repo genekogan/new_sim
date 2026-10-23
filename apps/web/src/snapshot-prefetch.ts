@@ -58,10 +58,11 @@ export function entryPrefetchScript(base: string, oldKeys: readonly string[] = O
     // for the page's main thread, busy building the world, and the join with it (~1 s on a phone)
     // P7b: a two-phase page (phasedEntryWanted) opens it with its second phase
     + `var ph=false;try{ph=(${phasedEntryWanted.toString()})(location.search||'',typeof matchMedia==='function'&&matchMedia('(pointer: coarse)').matches,screen.width,screen.height,navigator.deviceMemory)===true;}catch(e){}window[${JSON.stringify(PHASED_GLOBAL)}]=ph;`
+    // lane PAIR-UI: an #approve link may be handed to an open tab (Shell.tsx), so it opens no world socket; a full boot opens its own
     + (hello ? `if(typeof WebSocket!=='function')return;var os=function(){var h=${JSON.stringify(hello)},u=(location.protocol==='https:'?'wss':'ws')+'://'+location.host+w+'/ws',s=new WebSocket(u+'?hello='+encodeURIComponent(h)),o={url:u,ws:s,queue:[],hello:h,sent:true};`
       + `s.onmessage=function(e){o.queue.push(e.data);};`
       + `setTimeout(function(){if(!o.adopted)try{s.close();}catch(e){}},20000);window[${JSON.stringify(SOCKET_GLOBAL)}]=o;};`
-      + `if(ph)window[${JSON.stringify(OPEN_SOCKET_GLOBAL)}]=function(){delete window[${JSON.stringify(OPEN_SOCKET_GLOBAL)}];os();};else os();` : '')
+      + `if(ph)window[${JSON.stringify(OPEN_SOCKET_GLOBAL)}]=function(){delete window[${JSON.stringify(OPEN_SOCKET_GLOBAL)}];os();};else if(!/^#approve\\//.test(location.hash||''))os();` : '')
     + `}catch(e){}})();`;
 }
 
