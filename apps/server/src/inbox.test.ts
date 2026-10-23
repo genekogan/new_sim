@@ -200,6 +200,7 @@ test('real owner and paired HTTP flows: absent, browser, command polling, listen
     const l1 = req('/v1/edge/inbox/listen?timeoutMs=25000', tokenA); await tick();
     const l2 = req('/v1/edge/inbox/listen?timeoutMs=25000', tokenA); await tick();
     const l3 = req('/v1/edge/inbox/listen?timeoutMs=25000', tokenA); await tick();
+    assert.equal((await req('/v1/edge/inbox/listen?timeoutMs=0', tokenA)).status, 200, 'a peek (the CLI wait interrupt) supersedes nothing');
     for (const old of await Promise.all([l1, l2])) { assert.equal(old.status, 409); assert.equal(old.data.code, 'superseded'); assert.equal(old.data.backlog, undefined); }
     assert.equal((await req(path, 'dev:alice')).data.inbox.presence, 'listening');
     const only = (await req(path, 'dev:alice', {text: 'just once'})).data.inbox.latest.id;

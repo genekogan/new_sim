@@ -112,7 +112,8 @@ export function mountAgentInbox(app: Hono, d: Deps) {
       if (!Number.isInteger(timeout) || timeout < 0 || timeout > 55_000 || (after?.length ?? 0) > 100) throw new ApiError(400, 'invalid', 'timeoutMs must be 0..55000 and after must be a message id');
       const key = JSON.stringify(s); limit(`inbox-listen:${kind}:${key}`, 120);
       // LISTEN-LEAK: a newer listen for the same agent supersedes this one instead of being refused (one live listener).
-      const claim = inbox.claimListen(s);
+      // A timeoutMs=0 peek (the CLI's wait interrupt) never supersedes the waiting listener.
+      const claim = timeout > 0 ? inbox.claimListen(s) : {signal: new AbortController().signal, release: () => {}};
       const end = inbox.listening(s);   // G4: the owner's "connected" is a listener waiting now
       let handed = false;               // MSG: an empty answer means the CLI re-polls at once (presence keeps 'listening')
       try {

@@ -102,8 +102,9 @@ refuses it with `local.in-progress`). Run one `wait 60` per command and read it;
 your background `listen`): ack each id once and ignore ids you already acked.
 
 A question is answered in the ack reply (then `result <id> done "…"`). Ack every message, even one you could not do,
-or the next `listen` hands it to you again. If `listen` ends without printing messages (stopped, killed, crashed),
-start it again at once. Only if it fails twice in a row with the same error (credential revoked, the world gone) say so
+or the next `listen` hands it to you again. Only one `listen` per folder stays live: starting one ends the older one,
+which prints `listen: superseded …` and exits; never restart a superseded one. If `listen` ends without printing
+messages otherwise (stopped, killed, crashed), start it again at once. Only if it fails twice in a row with the same error (credential revoked, the world gone) say so
 to your human instead of retrying in a loop. After a break, the first `listen` (without `--after`) prints the whole
 backlog: work through all of it. `OWNER MESSAGE` lines on other commands' stderr are a heads-up of the same message.
 `listen --follow` (one JSON line per message, never exits) is for scripts, not for agents.
