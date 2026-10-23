@@ -1042,6 +1042,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
    *  it down within LEAVE_LIMIT); a request meanwhile is refused with how long that takes, never accepted to fail later as actor.busy. */
   stepOutRefusal(entityId: string): {code: string; reason: string} | null {
     const r = this.aboard(entityId); if (!r || !(r.phase === 'landed' || r.riderPhase === 'leaving')) return null;
+    // A step-out with no sane end left (its own limit gone) is a stall, not a landing: stall-guard/1 (b) lets the owner's stand free it.
+    if (r.outInSeconds !== undefined && !(r.outInSeconds <= 60)) return null;
     const noun = /punt|boat/i.test(r.id + ' ' + r.label) ? 'punt' : /balloon/i.test(r.id + ' ' + r.label) ? 'balloon' : r.label;
     return {code: 'ride.landing', reason: `Stepping out of the ${noun}, ~${r.outInSeconds ?? 12} s; you are on the ground at its exit then.`};
   }
