@@ -32,6 +32,12 @@ test('balloon ride: board, lift off, private speech + converse, no leaving aloft
  const run=async(n:number,until:()=>boolean)=>{for(let i=0;i<n&&!until();i++){try{f.host.tickOnce();}catch(e){console.error(dump());throw e;}if(i%20===0){await setImmediate();f.host.drainInputs();}}return until();};
  const W=f.host.engine.world as any,balloon=()=>W.entities['eden-balloon'],ent=(i:number)=>W.entities[rows[i].entity_id];
  const phase=(i:number,id:string)=>ledger.receipt(rows[i].id,id)!;
+ // BALLOON-BODY (Gene 2026-10-23: "they walk through the walls"): a body (radius ~0.2 m) near the back wall is in its door gap
+ // (0.56 m wide, so the centre within 0.08 m of the door line), and never near the other three walls while on the ground.
+ const walls:string[]=[],watch=()=>{const b=balloon();if(b.pose.p[1]>.05)return;const c=Math.cos(b.pose.yaw),s=Math.sin(b.pose.yaw);
+  for(const i of [0,1]){const p=ent(i).pose.p,dx=p[0]-b.pose.p[0],dz=p[2]-b.pose.p[2],lx=dx*c+dz*s,lz=-dx*s+dz*c,R=.2;
+   const nearBack=Math.abs(lx+.75)<R&&Math.abs(lz)<.6+R,nearOther=(Math.abs(lx-.75)<R&&Math.abs(lz)<.6+R)||(Math.abs(Math.abs(lz)-.6)<R&&Math.abs(lx)<.75+R);
+   if((nearBack&&Math.abs(lz)>.28-R)||nearOther)walls.push(`${i}@tick ${f.host.engine.world.tick} local ${lx.toFixed(2)},${lz.toFixed(2)}`);}};
 
  // the derived basket place, the public ride view, the capability
  assert.ok(ledger.places.byId.get('eden-balloon-basket')?.enclosed,'derived enclosed basket place');
@@ -44,7 +50,7 @@ test('balloon ride: board, lift off, private speech + converse, no leaving aloft
  // two Souls join: each walks to the step and climbs in; the receipt completes when seated
  const ja=await call(0,'POST','/v1/edge/act',{capability:'object:ride-eden-balloon:join'});assert.equal(ja.accepted,true,JSON.stringify(ja));
  const jb=await call(1,'POST','/v1/edge/objects/ride-eden-balloon/act',{action:'join'});assert.equal(jb.accepted,true,JSON.stringify(jb));assert.ok(jb.receipt?.id,'object route returns a receipt');
- assert.ok(await run(3000,()=>phase(0,ja.receipt.id).phase==='completed'&&phase(1,jb.receipt.id).phase==='completed'),`both seated: ${JSON.stringify([phase(0,ja.receipt.id),phase(1,jb.receipt.id)])}`);
+ assert.ok(await run(3000,()=>(watch(),phase(0,ja.receipt.id).phase==='completed'&&phase(1,jb.receipt.id).phase==='completed')),`both seated: ${JSON.stringify([phase(0,ja.receipt.id),phase(1,jb.receipt.id)])}`);
  assert.match(String(phase(0,ja.receipt.id).outcome?.summary),/Boarded.*not left the ground yet and is not finished/,'a boarding receipt never reads as a finished ride: '+JSON.stringify(phase(0,ja.receipt.id).outcome));
  assert.equal(balloon().carrier.phase,'boarding');assert.equal(ent(0).human.carrier.phase,'seated');
  const path=ledger.placePathOf(rows[0].id).map(p=>p.id);assert.deepEqual(path.slice(0,2),['eden-balloon-'+ent(0).human.carrier.slot,'eden-balloon-basket'],JSON.stringify(path));
@@ -68,7 +74,8 @@ test('balloon ride: board, lift off, private speech + converse, no leaving aloft
  const top=Math.max(...CARRIER_ROUTES['commons-hop'].keys.map(k=>k.p[1]));let peak=0;
  assert.ok(await run(4000,()=>{peak=Math.max(peak,balloon().pose.p[1]);return balloon().carrier.phase!=='aloft';}),'landed');
  assert.ok(peak>top-1,'flew its route');
- assert.ok(await run(600,()=>!ent(0).human.carrier&&!ent(1).human.carrier),'both stepped out');
+ assert.ok(await run(600,()=>(watch(),!ent(0).human.carrier&&!ent(1).human.carrier)),'both stepped out');
+ assert.deepEqual(walls.slice(0,6),[],'boarding and stepping out go through the basket door, never through a wall');
  for(const i of [0,1]){const p=ent(i).pose.p;assert.ok(Math.abs(p[1])<1e-6&&Math.hypot(p[0]+20,p[2]+9)<3,`rider ${i} on the ground beside it: ${p}`);}
  assert.ok(await run(40,()=>balloon().carrier.phase==='parked'),'parked again');
  const stream=f.db.db.prepare("SELECT body FROM edge_comms_stream WHERE soul_id=? AND kind='object'").all(rows[0].id).map((r:any)=>JSON.parse(r.body).text);

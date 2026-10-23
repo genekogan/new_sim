@@ -110,11 +110,11 @@ test('riders not yet carried natively are seated at render time (step up, then f
   ride.dispose(); r2.dispose();
 });
 
-test('the ride asset is cheap: four meshes, culled normally, never a camera or pick target', () => {
+test('the ride asset is cheap: five meshes (BALLOON-BODY added the swinging gate), culled normally, never a camera or pick target', () => {
   const ride = new WorldBalloonRide(); let meshes = 0, tris = 0;
   ride.group.traverse(o => { const m = o as unknown as {isMesh?: boolean; geometry: {attributes: {position: {count: number}}; index: null | {count: number}}; userData: Record<string, unknown>; frustumCulled: boolean};
     if (!m.isMesh) return; meshes++; tris += (m.geometry.index?.count ?? m.geometry.attributes.position.count) / 3;
     assert.equal(m.userData.cameraTransparent, true); assert.equal(m.frustumCulled, true); });
-  assert.equal(meshes, 4); assert.ok(tris < 3000, String(tris));
+  assert.equal(meshes, 5); assert.ok(tris < 3000, String(tris));
   ride.dispose();
 });

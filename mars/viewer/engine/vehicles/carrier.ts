@@ -26,7 +26,9 @@ import { relevantEntities } from '../world/relevant.ts';
 import { acknowledgeRelocation } from '../runtime/invariants.ts';
 
 export type CarrierSeatDef = { id: string; local: Vec2; yaw: number; exit: Vec2 };
-export type CarrierDef = { seats: CarrierSeatDef[]; door: Vec2; floorY: number; transferSpeed: number; landingClear: number };
+/** `doorway`: local floor points between the seats and the door, inside first (a basket's door opening): boarding walks
+ *  door → doorway (reversed) → seat and stepping out seat → doorway → door, so a body never crosses a wall. */
+export type CarrierDef = { seats: CarrierSeatDef[]; door: Vec2; floorY: number; transferSpeed: number; landingClear: number; doorway?: Vec2[] };
 export type RouteKey = { t: number; p: Vec3 };
 export type CarrierRoute = { id: string; keys: RouteKey[] };
 /** A water ride transfers over a short boarding plank to dry bank points. Absolute world positions,
@@ -179,13 +181,15 @@ function turnToward(e: Entity, yaw: number, dt: number) { const t = angleDelta(e
 const takeDoor = (c: CarrierState, actor: string) => { if (c.doorBy && c.doorBy !== actor) return false; c.doorBy = actor; return true; };
 const freeDoor = (c: CarrierState, actor: string) => { if (c.doorBy === actor) c.doorBy = null; };
 type RideExec = { actor: string; carrier: string; slot: string; phase: 'boarding' | 'seated' | 'leaving'; leg: number; stopping: boolean; waited: number; id: string; path: Vec3[]; throughReturn?: boolean };
-/** From where the boarder stands, round the basket (never through it) to the boarding step, then in to its seat. */
+/** The doorway's points in world space, inside first. */
+const inside = (e: Entity, d: CarrierDef) => (d.doorway ?? []).map(q => at(e, q, d.floorY));
+/** From where the boarder stands, round the basket (never through it) to the boarding step, through the door, then to its seat. */
 function boardingPath(e: Entity, from: Vec3, seat: Vec3, d: CarrierDef): Vec3[] {
   if (state(e)?.bank) return [doorPoint(e)!, seat];
   const l = rot2([from[0] - e.pose.p[0], from[2] - e.pose.p[2]], -e.pose.yaw), hz = CATALOG[e.def].size[2] / 2 + 0.6;
   const side = l[1] >= 0 ? 1 : -1, out = d.door[0] >= 0 ? 1 : -1, pts: Vec2[] = [];
   if (l[0] * out < Math.abs(d.door[0]) - 0.05) { if (Math.abs(l[1]) < hz) pts.push([l[0], side * hz]); pts.push([d.door[0], side * hz]); }
-  return [...pts.map(q => at(e, q)), doorPoint(e)!, seat];
+  return [...pts.map(q => at(e, q)), doorPoint(e)!, ...inside(e, d).reverse(), seat];
 }
 /** together/1: places kept for companions who have not boarded yet. */
 const keptSeats = (c: CarrierState) => c.hold ? Math.max(0, c.hold.seats - c.hold.filled) : 0;
@@ -266,7 +270,7 @@ const ride: ActionDef<RideParams, { slot: string }, RideExec> = {
     // Before departure a rear rider may stop while the front rider stays aboard. Sidestep along the
     // gunwale to the bow before taking the plank; do not walk through the other occupied thwart.
     const bypass=c.bank&&c.phase!=='landed'&&d.seats.some(s=>s.local[0]>def.local[0]&&c.seats[s.id]);
-    const path=bypass?[at(e,[def.local[0],-.65],d.floorY),at(e,[1.6,-.65],d.floorY),door,exit]:[door,exit];
+    const path=bypass?[at(e,[def.local[0],-.65],d.floorY),at(e,[1.6,-.65],d.floorY),door,exit]:[...inside(e,d),door,exit];
     // The punt's thwarts are in line. At the shared return, the rider nearest the plank gets out first,
     // so the rear rider never walks through the one still seated at the front thwart.
     // A step-out held up past its limit (busy door, someone standing on the exit, a rider ahead) ends here: set down at the exit.
