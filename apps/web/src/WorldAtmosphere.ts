@@ -11,7 +11,7 @@ import {findAnchors,underCover} from './atmosphere/finder.ts';
 import {insideBuilding} from './atmosphere/indoors.ts';
 import {installAtmosphereChunks,ATMOS,MIST,SHEEN,DUST,NOISE_MAP} from './atmosphere/chunks.ts';
 import {desertDustAt,parseDustOverride,DESERT_DUST_SEED,type DustSample} from './atmosphere/desert-dust.ts';
-import {SkyDome} from './atmosphere/sky.ts';
+import {SkyDome,bowSunGate} from './atmosphere/sky.ts';
 import {skyLook,type SkyLook} from './atmosphere/palettes.ts';
 import {COVER_A,updateRainCover,rainCoverRendering,disposeRainCover} from './atmosphere/rain-cover.ts';
 import {MotionPatches,ROTOR,RIPPLE,SKY_OBJECTS} from './atmosphere/motion.ts';
@@ -174,7 +174,8 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
   MIST.value.w=state.wet;
   sky.uniforms.uCloud.value.set(dustScheduled?0:Math.min(1,.18+.82*state.cloud+state.rain*.1),driftX*2.2,driftZ*2.2,day);
   const sun=lights.sunLight;if(sun){sunDir.copy(sun.position).sub(sun.target.position).normalize();sky.uniforms.uSunDir.value.copy(sunDir);}
-  // A rainbow opposite the sun once rain passes while the ground is still wet.
+  // A rainbow opposite the sun once rain passes while the ground is still wet; with the sun above ~42 deg the whole bow
+  // sits below the horizon, so strength (and inspect().bow) is 0 there.
   // WEATHER-FX (Gene #18): only for a few world minutes after a real shower stops, and never with the sun low or down
   // (the night sun is parked just under the horizon, which used to put a full bow overhead all night).
   // Age in world seconds, or viewing seconds when the world clock is slower or held (shots).
@@ -182,7 +183,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
   if(bowFrom!==null)bowSeen+=Math.min(frame.dt,1);
   const bowAge=bowFrom===null?-1:Math.max(bowSeen,(clockNow-bowFrom)/1000);
   const bowLife=bowAge<0?0:smooth(0,20,bowAge)*(1-smooth(BOW_HOLD_S,BOW_GONE_S,bowAge));
-  sky.uniforms.uBow.value.x=bowLife*smooth(.3,.8,state.wet)*(1-smooth(.08,.35,state.rain))*(1-smooth(.5,.8,state.cloud))*smooth(.45,.8,day)*smooth(.06,.2,sunDir.y);
+  sky.uniforms.uBow.value.x=bowLife*smooth(.3,.8,state.wet)*(1-smooth(.08,.35,state.rain))*(1-smooth(.5,.8,state.cloud))*smooth(.45,.8,day)*bowSunGate(sunDir.y);
   // Stars on clear nights (clouds and fog hide them).
   sky.uniforms.uBow.value.y=(1-smooth(.05,.3,day))*(1-smooth(.3,.75,state.cloud))*(1-state.fog)*(1-state.mist*.5);sky.uniforms.uBow.value.z=frame.reducedMotion?0:frame.seconds%600;
   // Distant lightning in a storm: brief double pulses in the cloud deck only (no scene light flash), a few per minute.

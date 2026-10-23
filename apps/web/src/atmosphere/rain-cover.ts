@@ -13,6 +13,9 @@ export const COVER_B={value:{x:0,y:RANGE,z:0,w:0}};
 const target=new THREE.WebGLRenderTarget(SIZE,SIZE,{minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter,generateMipmaps:false,depthBuffer:true,format:THREE.RGBAFormat,type:THREE.UnsignedByteType});
 // Uploaded only by rendering into it (version stays 0), so it may pose as an ordinary shared texture for uniform clones.
 target.texture.isRenderTargetTexture=false;target.texture.clone=function(this:THREE.Texture){return this;} as THREE.Texture['clone'];
+// Pin version at 0: any needsUpdate (a material/uniform pass elsewhere) would otherwise make three upload its empty image
+// over the immutable render-target storage (texSubImage2D overload error + GL_INVALID_OPERATION every frame).
+Object.defineProperty(target.texture,'version',{get:()=>0,set:()=>{},configurable:true});
 export const COVER_MAP={value:target.texture as THREE.Texture};
 const material=new THREE.ShaderMaterial({side:THREE.DoubleSide,fog:false,
  uniforms:{uBox:{value:new THREE.Vector4()}},
