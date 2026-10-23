@@ -15,7 +15,20 @@ command -v modal >/dev/null || { echo "modal CLI not found: pip install modal &&
 [ -z "$(git -C "$ROOT" status --porcelain --untracked-files=no)" ] || echo "note: uncommitted changes are NOT shipped (git archive $REF)"
 mkdir -p "$OUT"
 OUT="$(cd "$OUT" && pwd)"
-STAGE="$(mktemp -d "$OUT/.stage.XXXXXX")"; trap 'rm -rf "$STAGE"' EXIT
+STAGE="$(mktemp -d "$OUT/.stage.XXXXXX")"
+# Preserve gate inputs on success and failure; never delete the local archive stage.
+retain_stage() {
+  local original_exit=$? destination=""
+  if [ -d "$STAGE" ]; then
+    if mkdir -p "$HOME/.Trash" && destination="$(mktemp -d "$HOME/.Trash/sim-gate-stage.XXXXXX")" && mv "$STAGE" "$destination/"; then
+      printf 'retained local gate stage in %s\n' "$destination" >&2
+    else
+      printf 'local gate stage retention move failed; retained paths: %s %s\n' "$STAGE" "$destination" >&2
+    fi
+  fi
+  return "$original_exit"
+}
+trap retain_stage EXIT
 REF="$(git -C "$ROOT" rev-parse --verify "$REF^{commit}")"
 HARNESS="$(git -C "$ROOT" rev-parse --verify "$HARNESS^{commit}")"
 [ "$BASE" = none ] || BASE="$(git -C "$ROOT" rev-parse --verify "$BASE^{commit}")"

@@ -56,3 +56,29 @@ test('local rebuild preserves the prior artifact in unique Trash rather than del
   assert.ok(destination.startsWith(join(homedir(),'.Trash','sim-release.')));
   assert.equal(readFileSync(join(destination,'old-build','proof'),'utf8'),'preserve me');
 });
+
+
+test('local gate stage exit trap retains archives and preserves the original exit status', t => {
+  const source=readFileSync(new URL('./remote-suite.sh',import.meta.url),'utf8');
+  assert.doesNotMatch(source,/\brm\s+-/,'local gate stage must never be deleted');
+  assert.match(source,/trap retain_stage EXIT/);
+  const helper=source.slice(source.indexOf('retain_stage() {'),source.indexOf('trap retain_stage EXIT'));
+  assert.equal(spawnSync('bash',['-n',new URL('./remote-suite.sh',import.meta.url).pathname]).status,0);
+  const destinations=[];
+  for (const [label,override,exit] of [['success','',0],['failed-gate','',7],['move-failure','mv() { return 1; }',9],['trash-unavailable','mktemp() { return 1; }',0]]) {
+    const root=fixture(t),stage=join(root,'.stage.synthetic');mkdirSync(stage);writeFileSync(join(stage,'head.tgz'),'synthetic archive');
+    const result=spawnSync('bash',['-euo','pipefail','-c',helper+'\n'+override+'\ntrap retain_stage EXIT\nexit '+exit],{encoding:'utf8',env:{...process.env,STAGE:stage}});
+    assert.equal(result.status,exit,label+': '+result.stderr);
+    if (override) {
+      assert.equal(readFileSync(join(stage,'head.tgz'),'utf8'),'synthetic archive');
+      assert.match(result.stderr,/retention move failed; retained paths:/);
+      assert.ok(result.stderr.includes(stage));
+    } else {
+      const destination=result.stderr.trim().split('retained local gate stage in ')[1];destinations.push(destination);
+      assert.ok(destination.startsWith(join(homedir(),'.Trash','sim-gate-stage.')));
+      assert.equal(existsSync(stage),false);
+      assert.equal(readFileSync(join(destination,'.stage.synthetic','head.tgz'),'utf8'),'synthetic archive');
+    }
+  }
+  assert.equal(new Set(destinations).size,2,'each successful retirement has its own destination');
+});
