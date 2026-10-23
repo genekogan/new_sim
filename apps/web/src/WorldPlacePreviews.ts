@@ -49,9 +49,9 @@ export class WorldPlacePreviews{
     }
     if(!vertices.length)return;const sliced=new THREE.BufferGeometry();geometries.push(sliced);sliced.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));if(normals.length)sliced.setAttribute('normal',new THREE.Float32BufferAttribute(normals,3));else sliced.computeVertexNormals();if(colors.length)sliced.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));if(uvs.length)sliced.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));const mesh=new THREE.Mesh(sliced,material(object.material));mesh.matrixAutoUpdate=false;mesh.matrix.copy(object.matrixWorld);mesh.matrixWorldNeedsUpdate=true;scene.add(mesh);
    });}
-   if(!scene.children.length)return null;
+   const bare=!scene.children.length;if(bare&&!this.live())return null;  // nothing of the place drawn: with a live world it is still pictured (a lake that is only water), never kept
    scene.updateMatrixWorld(true);
-   const shot=this.shoot(scene,center,radius,view.p,key);if(shot)keep(key,shot);return shot;
+   const shot=this.shoot(scene,center,radius,view.p,key);if(shot&&!bare)keep(key,shot);return shot;
   }finally{target.dispose();for(const mesh of instances)mesh.dispose();for(const g of geometries)g.dispose();for(const m of materials.values())m.dispose();scene.clear();}
  }
  /** Gene 2026-10-23 (#13): a full photogenic shot of the place in the real world (terrain, water, sky, neighbours), not a
@@ -60,7 +60,7 @@ export class WorldPlacePreviews{
   * place stays visible; above 40 % hidden, turn 45° and retry, keeping the clearest of the 8 views. */
  private shoot(mask:THREE.Scene,center:THREE.Vector3,radius:number,from:readonly number[],key:string):string|null{
   const world=this.live(),live=world??mask;  // no live world (tests, a bare viewer): the place's own geometry
-  const box=new THREE.Box3().setFromObject(mask),r=world?radius*.8:0,extent=r<=0?box.clone():box.clone().union(new THREE.Box3(new THREE.Vector3(center.x-r,center.y,center.z-r),new THREE.Vector3(center.x+r,center.y,center.z+r))),aim=extent.getCenter(new THREE.Vector3());
+  const t0=performance.now(),bare=!mask.children.length,box=new THREE.Box3().setFromObject(mask),r=world?radius*.8:0,extent=r<=0?box.clone():box.clone().union(new THREE.Box3(new THREE.Vector3(center.x-r,center.y,center.z-r),new THREE.Vector3(center.x+r,center.y,center.z+r))),aim=extent.getCenter(new THREE.Vector3());
   const az0=Math.atan2(from[0]-aim.x,from[2]-aim.z),el=35*Math.PI/180,W=SHOT_W,H=SHOT_H,CW=80,CH=56;
   const renderer=this.renderer,previous=renderer.getRenderTarget(),viewport=renderer.getViewport(new THREE.Vector4()),scissor=renderer.getScissor(new THREE.Vector4()),scissorTest=renderer.getScissorTest(),clear=renderer.getClearColor(new THREE.Color()),alpha=renderer.getClearAlpha(),autoClear=renderer.autoClear;
   const white=new THREE.MeshBasicMaterial({color:0xffffff,fog:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-8}),black=new THREE.MeshBasicMaterial({color:0,fog:false});
@@ -73,13 +73,13 @@ export class WorldPlacePreviews{
    for(let k=0;k<8&&bestHidden>.4;k++){
     const az=az0+k*Math.PI/4,camera=fitPlacePreviewCamera(extent,new THREE.Vector3(Math.sin(az)*Math.cos(el),Math.sin(el),Math.cos(az)*Math.cos(el)),W/H);
     const d=camera.position.distanceTo(aim);camera.near=Math.max(.05,d/400);camera.far=Math.max(3000,d*20);camera.updateProjectionMatrix();
-    renderer.setRenderTarget(check);renderer.setClearColor(0,1);renderer.autoClear=true;renderer.render(mask,camera);const all=count();if(!all)continue;if(!world){best=camera;bestHidden=0;break;}
+    renderer.setRenderTarget(check);renderer.setClearColor(0,1);renderer.autoClear=true;renderer.render(mask,camera);const all=count();if(!all){if(bare){best=camera;bestHidden=0;break;}continue;}if(!world){best=camera;bestHidden=0;break;}
     for(const o of seeThrough)o.visible=false;live.background=null;live.overrideMaterial=black;
     try{renderer.render(live,camera);renderer.autoClear=false;renderer.render(mask,camera);}finally{for(const o of seeThrough)o.visible=true;live.background=background;live.overrideMaterial=override;renderer.autoClear=true;}
     const blocked=1-Math.min(1,count()/all);if(blocked<bestHidden){bestHidden=blocked;best=camera;turn=k;}
    }
    if(!best)return null;
-   STATS.set(key,{turn,hidden:Math.round(bestHidden*100)/100});
+   STATS.set(key,{turn,hidden:Math.round(bestHidden*100)/100,ms:Math.round(performance.now()-t0),bare});
    const pixels=new Uint8Array(W*H*4);renderer.setRenderTarget(target);renderer.setClearColor(clear,alpha);renderer.render(live,best);renderer.readRenderTargetPixels(target,0,0,W,H,pixels);
    const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d');if(!ctx)return null;const image=ctx.createImageData(W,H);for(let y=0;y<H;y++)image.data.set(pixels.subarray((H-1-y)*W*4,(H-y)*W*4),y*W*4);ctx.putImageData(image,0,0);
    const webp=canvas.toDataURL('image/webp',.82);return webp.startsWith('data:image/webp')?webp:canvas.toDataURL('image/jpeg',.85);
@@ -90,7 +90,7 @@ export class WorldPlacePreviews{
 declare const __BUILD__:string;
 const BUILD=typeof __BUILD__==='string'?__BUILD__:'dev',SHOT_W=320,SHOT_H=224,KEPT='sim.placeShot.';
 /** The last framing per place (turns of 45° from the tour side, share of the place hidden): read by the shot export script. */
-export const STATS=new Map<string,{turn:number;hidden:number}>();
+export const STATS=new Map<string,{turn:number;hidden:number;ms:number;bare:boolean}>();
 /** Where a release publishes a place's shot (world-scoped in the CDN manifest; the query pins the build). */
 export function placeShotPath(key:string){return '/place-shots/'+encodeURIComponent(key.replace(/[^\w.:-]+/g,'_'))+'.webp?b='+encodeURIComponent(BUILD);}
 /** Shots are kept per build in this browser, so a visitor renders each place once per release. */
