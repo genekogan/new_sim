@@ -203,7 +203,7 @@ export class Connection {
   connect() {
     this.closed = false; this.open();
   }
-  private open() {
+  private open(anonymousReconnect = false) {
     if (this.closed) return;
     this.clearTransport();
     clearInterval(this.pingTimer);
@@ -213,7 +213,14 @@ export class Connection {
     const boot=this.boot;this.boot=null;
     const adopted=!!boot&&boot.ws.readyState<=1;
     if(boot&&!adopted)try{boot.ws.close();}catch{/* already closed */}
-    const ws = (this.ws = adopted?boot!.ws:this.make(this.url));
+    // A restarted anonymous viewer can say hello in the upgrade URL, as the entry socket already does.
+    // Only a freshly resolved null token enables this path; signed-in credentials never enter a URL.
+    const earlyHello=anonymousReconnect&&!adopted?JSON.stringify(helloMessage({
+      ...(this.replica.ready&&this.epoch?{since:this.replica.seq,epoch:this.epoch}:{}),
+      stationContracts:this.stationOffer,takeBoundaryTransport:this.takeBoundaryTransport})):null;
+    const reconnectUrl=earlyHello?new URL(this.url):null;
+    if(reconnectUrl)reconnectUrl.searchParams.set('hello',earlyHello!);
+    const ws = (this.ws = adopted?boot!.ws:this.make(reconnectUrl?.href??this.url));
     let active=true;
     // the last entity table this socket received (take-entities-ref/1): a new socket starts empty, as does the server's view of it
     const takeEntities:TakeEntitiesStateV1={last:null};
@@ -233,7 +240,11 @@ export class Connection {
       // (compared without since/epoch: the entry socket spoke for a page with no replica yet; its queued snapshot, replayed
       // below before the token is known, must not make that look like a different hello)
       if (adopted && boot!.sent) { if (boot!.hello !== JSON.stringify(helloMessage({ token, stationContracts: this.stationOffer, takeBoundaryTransport: this.takeBoundaryTransport }))) { this.open(); return; } }
-      else ws.send(hello);
+      else if(earlyHello){
+        // Identity may have changed while the upgrade was queued behind a handover. Reopen with the
+        // current token in a frame instead of trying a second hello the server would rate-limit.
+        if(token){this.open();return;}
+      }else ws.send(hello);
       clearInterval(this.pingTimer);
       this.pingTimer = setInterval(() => {
         if (!mine()) return;
@@ -286,7 +297,11 @@ export class Connection {
       // after 50-150 ms: the launcher holds the new upgrade until the world is up again, so waiting longer only adds to
       // the visible pause. Only the first try: a server that closes again before welcoming us gets the backoff above.
       const restarting = ev?.code === 1001 && this.retry === 0;
-      this.reconnectTimer = setTimeout(() => this.open(), restarting ? 50 + 100 * Math.random() : Math.min(15_000, 500 * 2 ** this.retry) * (0.5 + Math.random()));
+      // Resolve anonymous status during the existing jitter, never delaying the reconnect for auth.
+      // A slow/failed lookup uses the ordinary frame hello. Recheck identity again once the socket opens.
+      let anonymous=false;
+      try{void this.getToken().then(token=>{anonymous=token===null;},()=>{});}catch{/* ordinary frame hello */}
+      this.reconnectTimer = setTimeout(() => this.open(anonymous), restarting ? 50 + 100 * Math.random() : Math.min(15_000, 500 * 2 ** this.retry) * (0.5 + Math.random()));
       this.retry++;
     };
     ws.onerror = () => { try { ws.close(); } catch { /* already closed */ } };
