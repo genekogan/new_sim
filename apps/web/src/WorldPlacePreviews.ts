@@ -120,12 +120,17 @@ export class WorldPlacePreviews{
     if(seen.v.blocked<bestHidden){bestHidden=seen.v.blocked;best=camera;turn=k;}
    }
    if(!best)return null;const shotCamera=best;
-   const shot=await step('shot',()=>{
+   const rendered=await step('shot',()=>{
     const pixels=new Uint8Array(W*H*4);renderer.setRenderTarget(target);if(!world)GRADE_A.x=0;  // the bare place-only picture stays ungraded
     // the live world in the shot light (Gene #13: never the visitor's night or storm); the shadow map is the main view's, left as it is
     const undo=world?this.pose():null,shadows=renderer.shadowMap.autoUpdate,shadowsDue=renderer.shadowMap.needsUpdate;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=false;
     try{renderer.render(live,shotCamera);}finally{renderer.shadowMap.autoUpdate=shadows;renderer.shadowMap.needsUpdate=shadowsDue;undo?.();}
-    renderer.readRenderTargetPixels(target,0,0,W,H,pixels);
+    return pixels;
+   });
+   // the read-back is its own paced step: reading the shot in the task that drew it waits for the GPU, and on a cold context that
+   // blocked the main thread for 1.4 s (explore-shots2: 1 of 1 cold runs before, 0 of 4 after; every step <= 150 ms)
+   const shot=rendered&&await step('read',()=>{
+    const pixels=rendered.v;renderer.readRenderTargetPixels(target,0,0,W,H,pixels);
     const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d');if(!ctx)return null;const image=ctx.createImageData(W,H);for(let y=0;y<H;y++)image.data.set(pixels.subarray((H-1-y)*W*4,(H-y)*W*4),y*W*4);ctx.putImageData(image,0,0);
     const webp=canvas.toDataURL('image/webp',.82);return webp.startsWith('data:image/webp')?webp:canvas.toDataURL('image/jpeg',.85);
    });
