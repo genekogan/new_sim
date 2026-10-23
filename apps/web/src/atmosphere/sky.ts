@@ -108,6 +108,7 @@ void main(){
   cc+=vec3(.55,.6,.72)*uMoonLight.x*uMoonLight.y*uMoon.w*pow(max(dot(d,uMoon.xyz),0.0),10.0)*(1.0-thick)*.35;
   col=mix(col,cc,c*(.55+.45*cover));
  }
+ float bowK=0.0;vec3 bowTint=vec3(1.0),bowAdd=vec3(0.0);
  if(uBow.x>0.0&&d.y>-.02){
   // primary bow 40.5..42.5 deg around the antisolar point (violet inside, red outside), faint secondary at ~51 deg
   float ang=degrees(acos(clamp(dot(d,-uSunDir),-1.0,1.0)));
@@ -115,7 +116,9 @@ void main(){
   float hue=.78*(1.0-clamp(t,0.0,1.0));vec3 spec=clamp(abs(fract(vec3(hue)+vec3(0.0,2.0/3.0,1.0/3.0))*6.0-3.0)-1.0,0.0,1.0);
   float t2=(ang-50.2)/3.0,band2=smoothstep(0.0,.2,t2)*smoothstep(1.0,.8,t2);vec3 spec2=clamp(abs(fract(vec3(.78*clamp(t2,0.0,1.0))+vec3(0.0,2.0/3.0,1.0/3.0))*6.0-3.0)-1.0,0.0,1.0);
   float fade=smoothstep(-.02,.08,d.y);
-  col+=(spec*band*.22+spec2*band2*.04)*uBow.x*fade;
+  // tint (multiply) rather than only add: a pale, near-white after-rain sky swallowed the old additive .22 band
+  bowK=(band*.6+band2*.15)*uBow.x*fade;bowTint=mix(vec3(1.0),.45+.9*mix(spec2,spec,band/(band+band2+1e-4)),min(bowK,1.0));
+  bowAdd=(spec*band*.12+spec2*band2*.03)*uBow.x*fade;
  }
  if(uFlash.x>0.0){
   // distant lightning lights the cloud deck from within, strongest toward the strike
@@ -124,10 +127,15 @@ void main(){
  }
  // inside a fog layer the whole sky veils toward the fog colour
  col=mix(col,uHorizon,uBow.w*(1.0-.35*up));
+ // the bow is drawn over the veil (it forms in the near rain curtain), only thinned by it
+ col=mix(col,col*bowTint+bowAdd,1.0-.5*uBow.w);
  gl_FragColor=vec4(col,1.0);
  #include <colorspace_fragment>
  ${GRADE_GLSL}
 }`;
+/** Rainbow gate by sun height (sun direction y): none with the sun low/down, none with the sun above ~42 deg where the
+ * whole primary bow sits below the horizon. */
+export function bowSunGate(y:number){const s=(a:number,b:number,x:number)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t);};return s(.06,.2,y)*(1-s(.6,.68,y));}
 export class SkyDome{
  readonly mesh:THREE.Mesh<THREE.SphereGeometry,THREE.ShaderMaterial>;
  readonly uniforms={uZenith:{value:new THREE.Color()},uHorizon:{value:new THREE.Color()},uCloudLit:{value:new THREE.Color()},uCloudShade:{value:new THREE.Color()},uCloud:{value:new THREE.Vector4()},uSunDir:{value:new THREE.Vector3(0,1,0)},uBow:{value:new THREE.Vector4()},uFlash:{value:new THREE.Vector4()},uNoise:{value:null as THREE.Texture|null},

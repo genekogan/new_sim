@@ -1,5 +1,6 @@
 // Core-Ledger: capabilities v2, direct act with durable receipts, Tier 1 observe, map,
 // and the read-only hooks Core-Comms routes events and speech with. No model calls.
+import {StallGuard} from './stall-guard.ts';
 import {randomUUID} from 'node:crypto';
 import {bodyCapabilityProblem,bodyVerbProblem,isRigidBody,shapeRigidCapabilities} from '../body/actions.ts';
 import {interiorShellPolygon} from './nav.ts';
@@ -169,6 +170,14 @@ export class EdgeLedger implements EdgeLedgerHooks {
     return this.mergedSpots.value;
   }
   readonly outcomes:ActionOutcomes;
+  /** stall-guard/1 (stall-guard.ts): no body stays held by an activity that stopped making progress. */
+  readonly stallGuard = new StallGuard({
+    tick: () => this.host.engine.world.tick,
+    souls: () => [...this.host.minds.values()].filter(m => !!m.owner).map(m => ({soulId: m.soulId, entityId: m.entityId, name: m.name, owner: m.owner})),
+    probe: id => this.host.engine.stallProbeV1?.(id) ?? null,
+    release: (soul, reason) => this.host.enqueue('edge-stop', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, stallReleaseV1: reason}),
+    record: (soul, reason, detail) => {const r = this.insert(soul, 'stall:released', 'started', undefined, true, detail); this.update(r.id, {phase: 'completed', code: 'stall.released', reason});},
+  });
   readonly spotsRefused: string[];
   constructor(host: WorldHost, db: Db, placeData?: unknown, options: {ambient?: boolean; spots?: unknown;now?:()=>number} = {}) {
     this.host = host; this.db = db; this.ambient = options.ambient === true;
@@ -184,6 +193,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (!(db.db.prepare('PRAGMA table_info(edge_receipts_v1)').all() as {name: string}[]).some(c => c.name === 'plan')) db.db.exec('ALTER TABLE edge_receipts_v1 ADD COLUMN plan TEXT');
     // intents/1 + strict/1 (Core-A): receipt detail {channel, chosen, endedAt} (JSON)
     if (!(db.db.prepare('PRAGMA table_info(edge_receipts_v1)').all() as {name: string}[]).some(c => c.name === 'detail')) db.db.exec('ALTER TABLE edge_receipts_v1 ADD COLUMN detail TEXT');
+    // OWNER-DAY: refusals keep the world's reason and the body's position for the owner's timeline.
+    {const have = new Set((db.db.prepare('PRAGMA table_info(edge_refusals_v1)').all() as {name: string}[]).map(c => c.name));
+      for (const [c, t] of [['reason', 'TEXT'], ['x', 'REAL'], ['z', 'REAL']] as const) if (!have.has(c)) db.db.exec(`ALTER TABLE edge_refusals_v1 ADD COLUMN ${c} ${t}`);}
     this.intents = new Intents(this);
     this.places = new PlaceIndex(this.loadPlaces(placeData));
     this.knowledge = new PlaceKnowledge(this);
@@ -218,7 +230,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       onApplied: e => {this.onRecovery(e);if(e.kind==='body-assignment-v1'&&typeof e.payload?.soulId==='string')this.ownerControlGrace(e.payload.soulId);},
       onDecision: (e, r) => this.onDecision(e, r),
       onProgram: ev => this.onProgram(ev),
-      afterTick: tick => this.afterTick(tick),
+      afterTick: tick => {this.afterTick(tick);this.stallGuard.afterTick(tick);},
     });
   }
   private loadPlaces(raw: unknown): PlaceData {
@@ -437,8 +449,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
     caps.push({id: 'stand:here', verb: 'stand', label: 'Stand up / stop what I am doing', available: true});
     plans.set('stand:here', {label: 'Stand up', steps: [], stop: true});
     // CN5 (acceptance): go near anyone in sight within 60 m (a gesture to someone farther off offers this first)
+    const myHuman = this.body(soul.entityId)?.human, sitting = !!myHuman && (myHuman.activity === 'sit' || myHuman.baseActivity === 'sit');
     for (const o of this.perceivedBodies(soul.soulId, GO_NEAR_RADIUS)) {
-      const id = 'go-near:' + o.soulId, steps: Program['steps'] = [{verb: 'walk_to', params: {to: o.entityId, standoff: 1.3}}];
+      // GEST-LIVE: a seated Soul rises first (from a classroom seat the bare walk was refused route.start-blocked, no did_you_mean)
+      const id = 'go-near:' + o.soulId, steps: Program['steps'] = [...(sitting ? [{verb: 'stand', params: {}}] : []), {verb: 'walk_to', params: {to: o.entityId, standoff: 1.3}}];
       caps.push({id, verb: 'go-near', label: `Go near ${o.name}`, target: {id: o.soulId, kind: 'soul'}, available: true});   // route checked at act time
       plans.set(id, {label: `Go near ${o.name}`, steps});
     }
@@ -595,8 +609,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
   addCapabilityProvider(p: (soul: EdgeSoul) => EdgeCapability[]) {this.providers.push(p);}
 
-  recordRefusal(soulId: string, verb: string, capability: string, code: string) {
-    try {this.db.db.prepare('INSERT INTO edge_refusals_v1 (world_id,at,tick,soul_id,verb,capability,code) VALUES (?,?,?,?,?,?,?)').run(this.host.worldId, Date.now(), this.host.engine.world.tick, soulId, verb.slice(0, 40), capability.slice(0, 200), code.slice(0, 100));} catch {/* measurement never breaks acting */}
+  /** OWNER-DAY: the world's reason and where the body stood are kept so its owner can read the refusal on the "Today" timeline. */
+  recordRefusal(soulId: string, verb: string, capability: string, code: string, reason = '') {
+    try {const e = this.host.minds.get(soulId)?.entityId, p = e ? this.body(e)?.pose?.p : undefined, pos = p ? [p[0], p[2]] : null;
+      this.db.db.prepare('INSERT INTO edge_refusals_v1 (world_id,at,tick,soul_id,verb,capability,code,reason,x,z) VALUES (?,?,?,?,?,?,?,?,?,?)').run(this.host.worldId, Date.now(), this.host.engine.world.tick, soulId, verb.slice(0, 40), capability.slice(0, 200), code.slice(0, 100), String(reason ?? '').slice(0, 300), pos?.[0] ?? null, pos?.[1] ?? null);} catch {/* measurement never breaks acting */}
   }
   /** Counts only (no agent text): acts, receipts by phase, refusals by code, active Souls, speech/conversations when Comms is present. */
   metrics(windowMs = 3600_000) {
@@ -648,7 +664,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       // that id, as the skill says; the id was refused place.unwalkable here. actOnce below walks it on demand, as words.
       const onDemand=!!place&&!place.ok&&place.code==='place.unwalkable'&&this.onDemandId(soul,input.capability.trim());
       if(place&&!onDemand){
-        if(!place.ok){this.recordRefusal(soul.soulId,'act',input.capability,place.code);const {ok:_ok,...refusal}=place;return this.withInPlaceAlternative(soul,{accepted:false as const,capability:input.capability,...refusal});}
+        if(!place.ok){this.recordRefusal(soul.soulId,'act',input.capability,place.code,place.reason);const {ok:_ok,...refusal}=place;return this.withInPlaceAlternative(soul,{accepted:false as const,capability:input.capability,...refusal});}
         const out=await this.act(soul,{...input,capability:place.chosen.capability});
         if(!out.accepted)return out;
         const receipt=this.coreA.setDetail(out.receipt.id,{chosen:place.chosen})??out.receipt;return {...out,receipt};
@@ -668,7 +684,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     let capability = asked;
     const clientRef = typeof input.clientRef === 'string' && input.clientRef.length <= 100 ? input.clientRef : undefined;
     if (clientRef) {const old = this.rows('soul_id=? AND client_ref=?', soul.soulId, clientRef)[0]; if (old) return {accepted: true, receipt: this.view(old)};}
-    const refuse = (code: string, reason: string, extra?: {retry_after?: number}) => {this.recordRefusal(soul.soulId, 'act', capability, code); return this.withInPlaceAlternative(soul, {accepted: false as const, code, reason, capability, ...extra});};
+    const refuse = (code: string, reason: string, extra?: {retry_after?: number}) => {this.recordRefusal(soul.soulId, 'act', capability, code, reason); return this.withInPlaceAlternative(soul, {accepted: false as const, code, reason, capability, ...extra});};
     const askedVerb=asked.split(/[:\s]/)[0]!;const unsupported=askedVerb==='object'?null:this.bodyVerbProblem(soul,askedVerb);if(unsupported)return refuse(unsupported.code,unsupported.reason);
     if (this.faded.has(soul.soulId)) {
       // Reclaim: fall onto feet at a starting place, identity and history intact (C9).
@@ -805,6 +821,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     // RIDE-EXIT: a stop while stepping out of a landed ride would complete without moving the body; say how long instead.
     if (plan.stop) {const stepOut = this.stepOutRefusal(soul.entityId); if (stepOut) return {...refuse(stepOut.code, stepOut.reason), ...resolved};}
     if (plan.stop) {
+      await this.stallGuard.ownerStand(soul);   // stall-guard/1 (b): the owner's stand always wins over a stalled holder
       const program = this.host.engine.programOf(soul.entityId), h = this.body(soul.entityId)?.human;
       // A finite sit timer does not own the lasting native seat. Release the real claim,
       // including fixture-param seats, through a strict tracked action rather than edge-stop.
@@ -825,7 +842,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     }
     // together/1: invitations (params.with), paired gestures, gifts, follows and items check and adjust their plan here
     const prep = this.together.prepare(soul, cap, plan, params, steps);
-    if ('code' in prep) return {...refuse(prep.code, prep.reason), ...resolved};
+    if ('code' in prep) return {...refuse(prep.code, prep.reason), ...(prep.did_you_mean ? {did_you_mean: prep.did_you_mean} : {}), ...resolved};
     steps = prep.steps;
     if (prep.noBody) {
       // answering someone (decline, ask to stop following) never interrupts what the body is doing
@@ -878,6 +895,29 @@ export class EdgeLedger implements EdgeLedgerHooks {
         await this.host.enqueue('edge-relocate', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, to: r.to, why: `nav-connect/1: ${r.seated ? 'sat' : 'stood'} cut off (${r.code}${r.level ? `, floor ${r.level}` : ''}), no walk out: ${r.seated ? 'stood up and ' : ''}stepped to the nearest open ground`, policy: 'nav-connect/1', ...(r.seated ? {godWalkout: true, released: [], level: 0} : {})});
         issue = this.host.engine.canPerform({actor: soul.entityId, label, steps});
       }
+    }
+    // GEST-LIVE: the nearest source of an item that no walk reaches (a postbox behind a fence) gives way to the next one a walk does
+    const kind = /^pick-up:([a-z]+)$/.exec(capability)?.[1];
+    if (issue && ROUTE_DEAD.has(issue.code) && kind) {
+      for (const s of this.together.pickUpAlternatives(soul.entityId, kind)) {
+        const alt = steps.map(x => x.verb === 'walk_to' ? {...x, params: {...x.params, to: s.at}} : x.verb === 'mars:pose_v1' ? {...x, params: {...Object.fromEntries(Object.entries(x.params ?? {}).filter(([k]) => k !== 'face')), ...(s.face ? {face: s.face} : {})}} : x);
+        const again = this.host.engine.canPerform({actor: soul.entityId, label, steps: alt});
+        if (!again || WAIT_CODES.has(again.code)) {steps = alt; issue = again; break;}
+      }
+    }
+    // GEST-LIVE: a standing spot whose exact point no walk reaches (the barn table's cook-together places sat 0.45 m into the
+    // table's solid) is taken from the nearest standable point within 1 m of it; seats and berths keep their exact slot
+    if (issue?.code === 'route.goal-blocked' && !/^(?:sit|sit-ground|lie|nap|read|rest):/.test(capability)) {
+      const eng = this.host.engine as unknown as {nearestStandableV1?: (at: [number, number], except?: string, min?: number, rings?: number) => [number, number] | null};
+      let moved = false;
+      const alt = steps.map(x => {
+        const to = x.verb === 'walk_to' ? (x.params as {to?: unknown})?.to : undefined;
+        if (!Array.isArray(to) || to.length !== 2 || !eng.nearestStandableV1) return x;
+        const p = eng.nearestStandableV1(to as [number, number], soul.entityId, 0.33, 6);
+        if (!p || Math.hypot(p[0] - (to[0] as number), p[1] - (to[1] as number)) > 1) return x;
+        moved = true; return {...x, params: {...x.params, to: p}};
+      });
+      if (moved) {const again = this.host.engine.canPerform({actor: soul.entityId, label, steps: alt}); if (!again || WAIT_CODES.has(again.code)) {steps = alt; issue = again;}}
     }
     // BS3 (a): a jog or run the water refuses (the way runs through the shallows, or the body stands in them) walks instead
     let note: string | undefined, approach: Record<string, unknown> | undefined;
@@ -983,7 +1023,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
    *  accepted with a receipt (waiting → started → completed/failed) for a logged decision with trigger edge-act. */
   async performBodies(soul: EdgeSoul, capability: string, label: string, steps: Program['steps'], clientRef?: string,effects?:ConfirmedEffects,admission?:ObjectBodyAdmission): Promise<{accepted: true; receipt: EdgeReceipt} | {accepted: false; code: string; reason: string}> {
     if (clientRef) {const old = this.rows('soul_id=? AND client_ref=?', soul.soulId, clientRef)[0]; if (old) return {accepted: true, receipt: this.view(old)};}
-    const refuse = (code: string, reason: string) => {this.recordRefusal(soul.soulId, 'object', capability, code); return {accepted: false as const, code, reason};};
+    const refuse = (code: string, reason: string) => {this.recordRefusal(soul.soulId, 'object', capability, code, reason); return {accepted: false as const, code, reason};};
     const nativeUse = this.nativeUseRefusal?.(capability, steps);
     if (nativeUse) return refuse(nativeUse.code, nativeUse.reason);
     const stepOut = this.stepOutRefusal(soul.entityId); if (stepOut) return refuse(stepOut.code, stepOut.reason);
@@ -1003,7 +1043,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
 
   private async performAtomicObjectBodies(soul:EdgeSoul,capability:string,label:string,steps:Program['steps'],clientRef:string|undefined,admission:ObjectBodyAdmission){
-    const refuse=(code:string,reason:string)=>{this.recordRefusal(soul.soulId,'object',capability,code);return {accepted:false as const,code,reason};};
+    const refuse=(code:string,reason:string)=>{this.recordRefusal(soul.soulId,'object',capability,code,reason);return {accepted:false as const,code,reason};};
     const source=this.db.soul(soul.soulId),id='r_'+randomUUID();
     const authority=():true=>{const row=this.db.soul(soul.soulId),mind=this.host.minds.get(soul.soulId);if(!source||!row||row.owner!==source.owner||row.owner!==soul.owner||mind?.owner!==row.owner||row.token_hash!==source.token_hash||row.retired_at!==null||row.world_id!==this.host.worldId||row.entity_id!==soul.entityId||mind?.entityId!==soul.entityId)throw new EdgeError(401,'unauthorized','Soul authority changed before object admission.');if(this.faded.has(soul.soulId))throw new EdgeError(409,'soul.faded','This Soul has faded; act to return first.');admission.guard();return true;};
     try{
@@ -1032,6 +1072,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
    *  it down within LEAVE_LIMIT); a request meanwhile is refused with how long that takes, never accepted to fail later as actor.busy. */
   stepOutRefusal(entityId: string): {code: string; reason: string} | null {
     const r = this.aboard(entityId); if (!r || !(r.phase === 'landed' || r.riderPhase === 'leaving')) return null;
+    // A step-out with no sane end left (its own limit gone) is a stall, not a landing: stall-guard/1 (b) lets the owner's stand free it.
+    if (r.outInSeconds !== undefined && !(r.outInSeconds <= 60)) return null;
     const noun = /punt|boat/i.test(r.id + ' ' + r.label) ? 'punt' : /balloon/i.test(r.id + ' ' + r.label) ? 'balloon' : r.label;
     return {code: 'ride.landing', reason: `Stepping out of the ${noun}, ~${r.outInSeconds ?? 12} s; you are on the ground at its exit then.`};
   }
@@ -1496,7 +1538,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
         if (steps.length > 80) return {accepted: false as const, code: 'capability.params', reason: 'that plan is too long; act in shorter legs.', capability};
         if (self.aboard(s.entityId)?.phase === 'aloft') return {accepted: false as const, code: 'ride.aboard', reason: 'You are aloft; it lands by itself and you step out then.', capability};
         const stepOut = self.stepOutRefusal(s.entityId); if (stepOut) return {accepted: false as const, ...stepOut, capability};
-        const refuse = (code: string, reason: string) => {self.recordRefusal(s.soulId, 'intent', capability, code); return {accepted: false as const, code, reason, capability};};
+        const refuse = (code: string, reason: string) => {self.recordRefusal(s.soulId, 'intent', capability, code, reason); return {accepted: false as const, code, reason, capability};};
         const out = await self.launch(s, capability, label, steps, clientRef, {}, refuse,undefined,contentParams); if (out.accepted) self.capCache.clear(); return out;
       },
       /** A faded Soul's next act lands it at a starting place first (C9), as act() does. */

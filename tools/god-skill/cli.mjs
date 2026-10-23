@@ -707,7 +707,8 @@ export async function sky(flags = {}) {
   if (!SKY_PALETTES.some((p) => p.id === palette)) throw new Error(`unknown sky palette "${palette}"; palettes: ${SKY_PALETTES.map((p) => p.id).join(', ')}`);
   const sun = flags.sun !== undefined ? num(flags.sun) : st.sky?.sun ?? 0.6;
   if (!(sun >= 0 && sun <= 1)) throw new Error('--sun is 0…1 (0 = night, 1 = noon)');
-  const r = await act({ ops: [{ op: 'world', state: { sky: { ...(st.sky ?? {}), palette, sun }, ...(st.weather ? { weather: st.weather } : {}) } }] });
+  // WEATHER-RULES: the sky alone (the world op merges per key; re-sending the weather would restart an ended shower)
+  const r = await act({ ops: [{ op: 'world', state: { sky: { ...(st.sky ?? {}), palette, sun } } }] });
   return r.accepted ? `${skyText({ ...st, sky: { palette, sun } })} (seq ${r.seq})` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
 }
 export async function constitution(text) { return act({ ops: [{ op: 'world', state: { constitution: text } }] }); }
@@ -1471,7 +1472,7 @@ site:   build start <id> --title "…" --steps "shell,roof,interior" --at ref|x,
 resume: omit id to resume the only paused build or active build with a dead lead; several open builds or an unknown id list the choices.
 mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' · preview '<batch>' · commit <preview-id> · act '<batch>' · dryrun '<batch>' · request <clientRef>
-world:  sky [--palette p --sun s] · time [19:30|7pm] [--speed h/h] [--pause|--resume] · weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] · strike [--at x,z|thing] ${godFeature('constitution') ? '· constitution <md> ' : ''}· expand <m> · export [file] · import <genesis.json> · define <def.json> · define-kit <kit.json> · furnish <house>[/room]
+world:  sky [--palette p --sun s] · time [19:30|7pm] [--speed h/h] [--pause|--resume] · weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] [--minutes m] · strike [--at x,z|thing] ${godFeature('constitution') ? '· constitution <md> ' : ''}· expand <m> · export [file] · import <genesis.json> · define <def.json> · define-kit <kit.json> · furnish <house>[/room]
 inbox:  listen [--after message-id] [--timeout 25] [--once|--follow] · ack <message-id> [reply] [--failed] (a reply of up to 140 characters; --failed when it could not be done)
 pair:   register <world-url> · pair · ${godFeature('flags') ? 'flags · flag <label> --at x,z · ' : ''}prayers [--all] (answered too) · answer <id> <text> · status
 ${LAND_HELP}

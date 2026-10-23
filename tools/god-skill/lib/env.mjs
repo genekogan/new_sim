@@ -1,7 +1,8 @@
 // GOD-ENV: the god's controls over time, weather (incl. lightning) and the land, for the god CLI.
 // Thin: each verb is one call to the server, which validates, journals (undo/redo) and broadcasts.
 //   time [19:30|7pm|now] [--speed h/h] [--pause] [--resume]          → POST /v1/god/env  (GET /v1/world/env to read)
-//   weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity 0…1] [--clouds --wind --rain --fog 0…1]
+//   weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity 0…1] [--clouds --wind --rain --fog 0…1] [--minutes 5…360]
+//   (a rain or storm ends after --minutes world minutes: default rain 90, storm 45; then the scheduled weather returns)
 //   strike [--at x,z|thing]                                          → a lightning bolt there now (Souls see and hear it)
 //   land <verb> …  [--preview]                                       → POST /v1/god/land
 import { call, num, ok } from './state.mjs';
@@ -38,6 +39,7 @@ export async function weather(f) {
   const w = {};
   if (f.kind !== undefined) w.kind = String(f.kind);
   for (const k of ['intensity', 'clouds', 'wind', 'rain', 'fog']) if (f[k] !== undefined) { const x = num(f[k]); if (!(x >= 0 && x <= 1)) throw new Error(`--${k} is 0…1`); w[k] = x; }
+  if (f.minutes !== undefined) { const m = num(f.minutes); if (!(m >= 5 && m <= 360)) throw new Error('--minutes is 5…360 world minutes (how long a rain or storm lasts)'); w.minutes = m; }
   if (!Object.keys(w).length) return envText(ok(await call('/v1/world/env', { as: 'none' }), 'env'));
   if (!w.kind && ['clouds', 'wind', 'rain', 'fog'].some((k) => w[k] !== undefined)) w.kind = 'manual';
   return env({ weather: w }, 'weather');
@@ -79,5 +81,5 @@ export async function land(rest, f) {
   if (f.json) return r;
   return `${r.accepted ? '' : 'REFUSED: '}${r.says}${r.warnings?.length ? `\nwarnings: ${r.warnings.join('; ')}` : ''}`;
 }
-export const ENV_FLAGS = { time: 'speed pause resume', weather: 'kind intensity clouds wind rain fog', strike: 'at', land: LAND_FLAGS };
+export const ENV_FLAGS = { time: 'speed pause resume', weather: 'kind intensity clouds wind rain fog minutes', strike: 'at', land: LAND_FLAGS };
 export const ENV_BOOLS = ['pause', 'resume', 'preview', 'force'];

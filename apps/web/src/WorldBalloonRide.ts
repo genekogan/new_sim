@@ -18,8 +18,8 @@ export type RideSeat={slot:string;at:readonly [number,number];yaw:number;pose:st
 export const BALLOON_RIDE={
  contract:'eden-rides/1',
  vehicles:[{def:'hot-air-balloon',basket:{length:1.5,width:1.2,height:1.1},envelope:{radius:4.2,mouthHeight:3.2,crownHeight:12.9},
-  seats:[{slot:'rider-a',at:[.12,-.3],yaw:.35,pose:'stand, hands on the rim'},{slot:'rider-b',at:[.12,.3],yaw:-.35,pose:'stand, hands on the rim'}] as RideSeat[],
-  mount:{at:[-1.25,0] as const,steps:[.25,.5] as const,note:'two-step wooden block behind the basket; riders step up and in'}}],
+  seats:[{slot:'rider-a',at:[.3,-.3],yaw:.35,pose:'stand, hands on the rim'},{slot:'rider-b',at:[.3,.3],yaw:-.35,pose:'stand, hands on the rim'}] as RideSeat[],
+  door:{at:[-1.25,0] as const,width:.56,note:'an open doorway in the back wall; riders walk in and out through it, never over the rim'}}],
  routes:[{id:'eden-commons-loop',name:'Over the pond, the west lake, the coast, the harbour and back',vehicle:'hot-air-balloon',
   launch:{place:'field',at:[-20,0,-9],yaw:3.1416,clearRadius:8},minutes:18.7,
   points:[[0,-20,0,-9],[40,-28,25,-6],[120,-55,55,0],[240,-150,75,5],[360,-260,85,80],[480,-480,95,150],[600,-300,90,230],[720,60,80,215],[840,160,70,140],[960,70,50,40],[1060,0,25,-8],[1120,-20,0,-9]]}] as RideRoute[],
@@ -134,9 +134,13 @@ class Builder{
 const PROFILE:readonly [number,number][]=[[3.2,.85],[4.4,1.7],[5.8,2.9],[7.2,3.8],[8.7,4.2],[10,4.1],[11.1,3.5],[12,2.5],[12.6,1.3],[12.9,0]];
 const GORES=16,RED='#c8382c',CREAM='#f2ebdb',GOLD='#e0b040',WICKER='#b98a52',WICKER_DARK='#7c5530',LEATHER='#4a3020',ROPE='#cdbf9c',WOOD='#8b6440',STEEL='#5a5a5e',SAND='#b49c70';
 /** Balloon in basket-local space (origin = basket floor centre, +x forward). Hollow basket so riders show inside. */
-export function buildBalloon(){
- const b=new Builder(),L=BALLOON.basket.length,W=BALLOON.basket.width,H=BALLOON.basket.height;
- for(let j=0;j<PROFILE.length-1;j++){const [h0,r0]=PROFILE[j],[h1,r1]=PROFILE[j+1];
+/** Half the door gap in the back wall (BALLOON.door.width / 2); the cabin's canopy valance (its bottom edge = the door's lintel,
+ *  2.08 m) and the burner frame stand above the head of the tallest Soul at its place (Gene 2026-10-23: no head through the "ceiling"). */
+const DOOR_HALF=BALLOON.door.width/2,CANOPY_Y=2.3,FRAME_Y=2.75;
+/** `basketOnly`: the cabin without the envelope (a god's balloon keeps its own envelope; its load tapes reach `mouthY`). */
+export function buildBalloon(o:{basketOnly?:boolean;mouthY?:number}={}){
+ const b=new Builder(),L=BALLOON.basket.length,W=BALLOON.basket.width,H=BALLOON.basket.height,mouthY=o.mouthY??PROFILE[0][0];
+ if(!o.basketOnly)for(let j=0;j<PROFILE.length-1;j++){const [h0,r0]=PROFILE[j],[h1,r1]=PROFILE[j+1];
   // smooth normals across gores from the profile slope
   const nrm=(k:number):[number,number]=>{const [ha,ra]=PROFILE[Math.max(0,k-1)],[hb,rb]=PROFILE[Math.min(PROFILE.length-1,k+1)],dh=hb-ha,dr=rb-ra,l=Math.hypot(dh,dr)||1;return [dh/l,-dr/l];};
   const [n0h,n0y]=nrm(j),[n1h,n1y]=nrm(j+1);
@@ -148,25 +152,32 @@ export function buildBalloon(){
  // wicker walls (double-sided material shows the inside), floor, padded leather rim
  const x0=-L/2,x1=L/2,z0=-W/2,z1=W/2;
  b.quad(WICKER,[x0,0,z1],[x1,0,z1],[x1,H,z1],[x0,H,z1]);b.quad(WICKER,[x1,0,z0],[x0,0,z0],[x0,H,z0],[x1,H,z0]);
- b.quad(WICKER,[x1,0,z1],[x1,0,z0],[x1,H,z0],[x1,H,z1]);b.quad(WICKER,[x0,0,z0],[x0,0,z1],[x0,H,z1],[x0,H,z0]);
+ b.quad(WICKER,[x1,0,z1],[x1,0,z0],[x1,H,z0],[x1,H,z1]);
+ // the back wall (local -x) has the door: two wall pieces either side of a static open gap DOOR_HALF wide each way (no gate leaf:
+ // the doorway's posts and lintel are part of this one basket mesh, so the ride stays four meshes)
+ const g=DOOR_HALF;b.quad(WICKER,[x0,0,z0],[x0,0,-g],[x0,H,-g],[x0,H,z0]);b.quad(WICKER,[x0,0,g],[x0,0,z1],[x0,H,z1],[x0,H,g]);
+ // a cabin, not a crate: corner posts up to a canopy valance above the tallest head; the door posts carry the valance as a lintel
+ const cy=CANOPY_Y,vh=.22;for(const z of [-g,g])b.box(WOOD,x0,0,z,.07,cy-vh,.06);// door posts
+ for(const [sx,sz] of [[-1,-1],[1,-1],[1,1],[-1,1]] as const)b.box(WOOD,sx*(L/2-.03),0,sz*(W/2-.03),.06,cy,.06);
+ for(const [x,z,w,d] of [[0,z1,L+.06,.03],[0,z0,L+.06,.03],[x1,0,.03,W+.06],[x0,0,.03,W+.06]] as const){b.box(RED,x,cy-vh,z,w,vh,d);b.box(CREAM,x,cy-vh-.005,z,w+.01,.045,d+.01);}
  b.quad(WICKER_DARK,[x0,.005,z1],[x1,.005,z1],[x1,.005,z0],[x0,.005,z0]);b.box(WICKER_DARK,0,-.075,0,L+.04,.08,W+.04);// floor top at y 0 = Core's floorY
- for(const [x,z,w,d] of [[0,z1,L+.08,.09],[0,z0,L+.08,.09],[x1,0,.09,W],[x0,0,.09,W]] as const)b.box(LEATHER,x,H-.02,z,w,.09,d);
+ const side=(W/2-g),mid=(W/2+g)/2;for(const [x,z,w,d] of [[0,z1,L+.08,.09],[0,z0,L+.08,.09],[x1,0,.09,W],[x0,-mid,.09,side],[x0,mid,.09,side]] as const)b.box(LEATHER,x,H-.02,z,w,.09,d);
  // wicker weave bands so the basket reads as woven, not as a crate
- for(const y of [.28,.56,.84])for(const [x,z,w,d] of [[0,z1+.006,L,.01],[0,z0-.006,L,.01],[x1+.006,0,.01,W],[x0-.006,0,.01,W]] as const)b.box(WICKER_DARK,x,y,z,w,.05,d);
+ for(const y of [.28,.56,.84])for(const [x,z,w,d] of [[0,z1+.006,L,.01],[0,z0-.006,L,.01],[x1+.006,0,.01,W],[x0-.006,-mid,.01,side],[x0-.006,mid,.01,side]] as const)b.box(WICKER_DARK,x,y,z,w,.05,d);
  // burner frame: four uprights, a square, the twin burner, load tapes to the mouth
- const fy=2.35;for(const [sx,sz] of [[-1,-1],[1,-1],[1,1],[-1,1]] as const){b.rope(STEEL,[sx*(L/2-.06),H,sz*(W/2-.06)],[sx*.45,fy,sz*.4],.035);b.rope(ROPE,[sx*.45,fy,sz*.4],[sx*.62,PROFILE[0][0]+.05,sz*.62],.025);}
+ const fy=FRAME_Y;for(const [sx,sz] of [[-1,-1],[1,-1],[1,1],[-1,1]] as const){b.rope(STEEL,[sx*(L/2-.03),CANOPY_Y,sz*(W/2-.03)],[sx*.45,fy,sz*.4],.035);b.rope(ROPE,[sx*.45,fy,sz*.4],[sx*.62,mouthY+.05,sz*.62],.025);}
  for(const [a,c] of [[[-.45,-.4],[.45,-.4]],[[.45,-.4],[.45,.4]],[[.45,.4],[-.45,.4]],[[-.45,.4],[-.45,-.4]]] as const)b.rope(STEEL,[a[0],fy,a[1]],[c[0],fy,c[1]],.04);
  b.box(STEEL,0,fy-.18,0,.42,.28,.3);b.box('#2e2e30',-.1,fy+.1,0,.14,.12,.14);b.box('#2e2e30',.1,fy+.1,0,.14,.12,.14);
- // fuel tanks in the back corners, below the rim
- for(const z of [-.38,.38])b.box('#7a8590',-.5,.005,z,.32,.75,.3);
+ // fuel tanks in the back corners, below the rim, clear of the door
+ for(const z of [-.44,.44])b.box('#7a8590',-.5,.005,z,.3,.75,.24);
  return b.geometry();
 }
-/** Launch-site ground kit, world space: mounting block, sandbag ring, four tether stakes. */
+/** Launch-site ground kit, world space: a board at the gate, sandbag ring, four tether stakes. */
 export function buildLaunchKit(r:RideRoute=ROUTE){
  const b=new Builder(),[x,y,z]=r.launch.at,yaw=r.launch.yaw,c=Math.cos(yaw),s=Math.sin(yaw);
  const W=(f:number,rr:number):[number,number]=>[x+f*c-rr*s,z+f*s+rr*c];
- const [mx,mz]=W(BALLOON.mount.at[0],BALLOON.mount.at[1]);
- b.box(WOOD,mx,y,mz,.5,.25,.9,-yaw);{const [m2x,m2z]=W(BALLOON.mount.at[0]+.25,0);b.box(WOOD,m2x,y,m2z,.42,.5,.9,-yaw);}
+ const [mx,mz]=W(BALLOON.door.at[0]+.15,BALLOON.door.at[1]);
+ b.box(WOOD,mx,y,mz,.6,.04,.8,-yaw);// a flat board at the gate (no block to climb: the basket has a doorway)
  for(let i=0;i<11;i++){const a=i/12*Math.PI*2+Math.PI/12;if(Math.cos(a)<-.85)continue;const [sx,sz]=W(Math.cos(a)*2.3,Math.sin(a)*2.3);b.box(SAND,sx,y,sz,.55,.22,.32,-(yaw+a));}
  for(const [f,rr] of [[-1,-1],[1,-1],[1,1],[-1,1]] as const){const [sx,sz]=W(f*4.2,rr*4.2);b.box(WOOD,sx,y,sz,.08,.45,.08);}
  return b.geometry();
@@ -200,7 +211,7 @@ export class WorldBalloonRide{
   const solid=new THREE.MeshStandardMaterial({name:'balloon ride',vertexColors:true,roughness:.78,side:THREE.DoubleSide});
   this.balloon=new THREE.Mesh(buildBalloon(),solid);this.balloon.name='balloon ride: envelope and basket';this.balloon.castShadow=true;
   const fm=new THREE.MeshBasicMaterial({name:'balloon ride: burner flame',color:'#ffb347',transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false});
-  this.flame=new THREE.Mesh(new THREE.ConeGeometry(.16,1,7,1,true).translate(0,.5,0),fm);this.flame.name='balloon ride: burner flame';this.flame.position.set(0,2.47,0);
+  this.flame=new THREE.Mesh(new THREE.ConeGeometry(.16,1,7,1,true).translate(0,.5,0),fm);this.flame.name='balloon ride: burner flame';this.flame.position.set(0,FRAME_Y+.12,0);
   this.balloon.add(this.flame);
   this.kit=new THREE.Mesh(buildLaunchKit(),solid);this.kit.name='balloon ride: launch kit';this.kit.matrixAutoUpdate=false;
   this.tethers=new THREE.Mesh(buildTethers(),solid);this.tethers.name='balloon ride: tethers';this.tethers.matrixAutoUpdate=false;

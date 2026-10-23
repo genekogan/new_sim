@@ -339,7 +339,9 @@ export class TakePeople {
       if (src.kind !== 'human' || body?.family === 'floater') continue;
       const w = this.walks.get(id);
       const dist = (w ? this.walked(w, frame.tick) : 0) + (this.walkOffsets[id] ?? 0);
-      const speed = w ? (this.walked(w, frame.tick + span) - this.walked(w, frame.tick - span)) / (2 * span * dt) : 0;
+      // a body carried in a vehicle seat (balloon 'ride', punt 'row') moves with the vehicle, not on its feet: no walk, no run
+      const carriedRide = e.activity === 'ride' || e.activity === 'row';
+      const speed = w && !carriedRide ? (this.walked(w, frame.tick + span) - this.walked(w, frame.tick - span)) / (2 * span * dt) : 0;
       const climbing = !!e.activity?.startsWith('climb');
       const g = st.grip;
       const walk = climbing ? 1 : clamp01((speed - 0.06) / 0.25);

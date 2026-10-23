@@ -1,8 +1,9 @@
 /* Quiet, shared owner-to-agent note. All tones come from its existing panel. */
 .agent-message{margin:12px 0;font:inherit;color:inherit}
-.agent-message-presence{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px;font-size:11.5px;line-height:1.4}
-.agent-message-presence>span{opacity:.66}
-.agent-message .agent-message-presence button{padding:0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;white-space:nowrap;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.agent-message-presence{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:2px 8px;margin-bottom:6px;font-size:11.5px;line-height:1.4}
+.agent-message-presence>span{flex:1 1 12em;min-width:0;opacity:.66}
+/* the card's 44px tap-size rule sets min-width:44px, which let this button shrink and clip its label on a phone; keep it whole */
+.agent-message .agent-message-presence button{padding:0;border:0;border-radius:0;background:transparent;color:inherit;flex:0 0 auto;font:inherit;white-space:nowrap;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .agent-message .agent-message-form{display:flex;align-items:stretch;gap:6px;margin:0}
 .agent-message .agent-message-form input{flex:1;min-width:0;width:0;margin:0;padding:7px 9px;border:1px solid color-mix(in srgb,currentColor 22%,transparent);border-radius:7px;background:transparent;color:inherit;font:inherit;line-height:1.4}
 .agent-message .agent-message-form input::placeholder{color:inherit;opacity:.5}

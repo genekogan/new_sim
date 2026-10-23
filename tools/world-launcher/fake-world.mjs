@@ -1,13 +1,15 @@
 // A stand-in world for the launcher's tests: answers the few routes the launcher
 // touches (healthz, god status), streams SSE, and echoes a raw WebSocket-style
 // upgrade. Not a Sim server; never used outside tests.
+import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 const slug = process.env.WORLD_KEY, port = Number(process.env.PORT);
 const base = process.env.WORLD_PATH ?? `/w/${slug}`;
 const server = createServer((req, res) => {
   const path = req.url.startsWith(base) ? req.url.slice(base.length) || '/' : req.url;
+  if (process.env.FAKE_HITS) appendFileSync(process.env.FAKE_HITS, `${path}\n`);   // which requests reached the world
   if (path === '/healthz') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: true, worldId: `${slug}-1`, genesis: process.env.GENESIS_FILE ?? null, pid: process.pid, ...(process.env.FAKE_TICK_MS ? { tickMs: { avg: Number(process.env.FAKE_TICK_MS), max: 2 * Number(process.env.FAKE_TICK_MS), n: 400 }, clockRate: 1 } : {}) }));
   if (path === '/v1/config') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ worldId: `${slug}-1`, worldKey: slug }));
   if (path === '/v1/god/status') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ worldId: `${slug}-1`, hasOwner: false, you: 'anonymous', pending: [], entities: 3, seq: 1 }));
@@ -21,8 +23,12 @@ const server = createServer((req, res) => {
   if (path === '/env') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(Object.fromEntries(['MIND_DRIVER', 'DEV_AUTH', 'BRAIN_MODE', 'PUBLIC_URL', 'ANTHROPIC_API_KEY', 'NODE_OPTIONS', 'FAKE_FROM_FILE', 'WORLD_PATH'].map((k) => [k, process.env[k] ?? null]))));
   if (path.startsWith('/slow')) { setTimeout(() => res.end('ok'), Number(new URL(req.url, 'http://x').searchParams.get('ms') ?? 500)); return; }   // a long-poll stand-in
   if (path === '/crash') { res.end('bye'); setTimeout(() => process.exit(3), 10); return; }
+  // a crash whose open connections outlive the process for a while (their fds handed to a short-lived helper): the
+  // launcher sees the exit before the in-flight requests drop, as when a world restarts under a long-poll
+  if (path.startsWith('/crash-hold')) { const ms = Number(new URL(req.url, 'http://x').searchParams.get('ms') ?? 300); res.end('bye'); setTimeout(() => { spawn(process.execPath, ['-e', `setTimeout(() => {}, ${ms})`], { stdio: ['ignore', 'ignore', 'ignore', ...[...conns].filter((s) => s !== req.socket && !s.destroyed)] }); process.exit(3); }, 10); return; }
   res.writeHead(404).end('fake: no such route ' + path);
 });
+const conns = new Set(); server.on('connection', (s) => { conns.add(s); s.on('close', () => conns.delete(s)); });
 server.on('upgrade', (req, socket) => {
   socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: test\r\nConnection: Upgrade\r\n\r\n');
   socket.on('data', (d) => socket.write(Buffer.from(String(d).toUpperCase())));

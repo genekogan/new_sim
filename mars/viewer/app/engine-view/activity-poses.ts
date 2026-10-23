@@ -8,7 +8,7 @@ import {seesawAngle, swingAngle} from './play-motion.ts';
 // roots, contacts, seats and hands stay the engine's; engine hand points / grips always win over this layer.
 
 /** Overlay ids drawn on top of their base posture (sit / idle / sit-ground). */
-export const ACTIVITY_OVERLAYS: ReadonlySet<string> = new Set(['row', 'read', 'browse', 'write', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'post-letter', 'wave', 'use-computer', 'sing', 'listen', 'fish', 'feed', 'garden', 'swing', 'seesaw', 'picnic', 'tell-story', 'bow', 'clap', 'nod', 'shake-head', 'cheer', 'point', 'pick-up', 'put-down', 'hug', 'handshake', 'high-five', 'give', 'take']);
+export const ACTIVITY_OVERLAYS: ReadonlySet<string> = new Set(['row', 'ride', 'read', 'browse', 'write', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'post-letter', 'wave', 'use-computer', 'sing', 'listen', 'fish', 'feed', 'garden', 'swing', 'seesaw', 'picnic', 'tell-story', 'bow', 'clap', 'nod', 'shake-head', 'cheer', 'point', 'pick-up', 'put-down', 'hug', 'handshake', 'high-five', 'give', 'take']);
 /** Whole-body ids: the body point stays put and the viewer lays the body out from it along pose.yaw. */
 export const LYING: ReadonlySet<string> = new Set(['lie', 'nap', 'situps', 'bench-press', 'hammock', 'stargaze']);
 export const FACE_DOWN: ReadonlySet<string> = new Set(['pushups']);
@@ -89,6 +89,9 @@ export function activityFrame(activity: string, base: string, seconds: number, i
     return f;
   }
   switch (activity) {
+    // standing in a balloon basket (carrier 'ride'): both hands on the rim in front, a slow lean and look over the side
+    case 'ride': { const sway = Math.sin(t * 0.21);
+      f.hands = [[0.36, 0.06, -0.38], [0.36, 0.06, -0.38]]; f.lean = 0.1 + 0.03 * sway; f.side = 0.03 * sway; f.look = 0.18 + 0.06 * Math.sin(t * 0.13); return f; }
     case 'row': { const {pull,lift}=rowingStroke(seconds);f.hands=[[.3+.16*pull,.06,-.3+.06*lift],[.3+.16*pull,.06,-.3+.06*lift]];f.lean=.06+.12*pull;f.look=.12;return f; }
     // leisure: cast and wait, with now and then a small lift of the rod; toss bread by the handful; work the soil with a trowel
     case 'fish': { const cyc = t % 14, cast = cyc < 1.6 ? S(cyc / 1.6) : 0, bite = Math.max(0, Math.sin(t * 0.43) - 0.93) * 9;

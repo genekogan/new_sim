@@ -394,7 +394,7 @@ export class HumanViews {
       const c = v.cur;
       // Ground speed: the engine's (walk_to publishes human.speed, W4) or the position delta.
       const inst = Math.hypot(e.pose.p[0] - c.p[0], e.pose.p[2] - c.p[2]) / DT;
-      const ground = e.human.speed ?? inst;
+      const ground = act === 'ride' || act === 'row' ? 0 : e.human.speed ?? inst; // a vehicle carries a rider: no gait from its motion
       v.speed += (ground - v.speed) * 0.6;
       if (act !== v.activity) { v.prevAct = v.activity; v.prevBase = v.base; }
       v.age = act === v.activity ? v.age + 1 : 0;

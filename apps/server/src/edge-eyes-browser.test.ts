@@ -34,3 +34,13 @@ test('optional CPU pinning and extra Chromium switches are validated, never pass
   assert.deepEqual(eyesExtraArgs({EDGE_EYES_CHROME_ARGS: ' --num-raster-threads=1  junk --renderer-process-limit=1 '}), ['--num-raster-threads=1', '--renderer-process-limit=1']);
   assert.deepEqual(eyesBrowserLaunch('swiftshader', {EDGE_EYES_CHROME_ARGS: '--num-raster-threads=1'}, 'linux').args.at(-1), '--num-raster-threads=1');
 });
+
+test('Linux launch runs without the Chromium sandbox and gives Chrome a writable XDG home (unit hides $HOME)', () => {
+  const launch = eyesBrowserLaunch('swiftshader', {PATH: '/usr/bin', HOME: '/home/simworlds'}, 'linux', '/tmp/eden-eyes-x');
+  assert.ok(launch.args.includes('--no-sandbox'));
+  assert.equal(launch.env?.XDG_CONFIG_HOME, '/tmp/eden-eyes-x');
+  assert.equal(launch.env?.XDG_CACHE_HOME, '/tmp/eden-eyes-x');
+  assert.equal(launch.env?.PATH, '/usr/bin');
+  assert.equal(eyesBrowserLaunch('swiftshader', {}, 'linux').env, undefined);
+  assert.ok(!eyesBrowserLaunch('gl', {}, 'win32').args.includes('--no-sandbox'));
+});

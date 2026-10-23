@@ -110,6 +110,11 @@ export function musicState() {
 export const musicLog = () => events.slice();
 let meter: AnalyserNode | null = null;
 /** RMS of the music actually coming out (proof that it sounds; 0 when stopped). */
+/** The music's output as a MediaStream (review recordings mix it with the soundscape); null until the score has loaded. */
+export function musicTap(): MediaStream | null {
+  if (!Tone) return null;
+  try { const raw = Tone.getContext().rawContext as unknown as AudioContext, d = raw.createMediaStreamDestination(); Tone.getDestination().connect(d); return d.stream; } catch { return null; }
+}
 export function musicLevel() {
   if (!Tone) return 0;
   try {

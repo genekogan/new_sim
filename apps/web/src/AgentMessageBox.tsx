@@ -2,6 +2,7 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 import type {Api} from './useSim.ts';
 import {apiPath} from './world-path.ts';
 import {windowCode} from './god-ui/join-api.ts';
+import {awaySince,reportAgentPresence} from './agent-presence.ts';
 import './AgentMessageBox.css';
 
 export type AgentInbox = {
@@ -69,19 +70,21 @@ export function AgentMessageBoxView({kind, inbox, prompt, text, sending = false,
   onText(text: string): void; onSend(event: React.FormEvent): void; onCopy(): void;
 }) {
   const latest = inbox?.latest, presence = inbox ? presenceLine(inbox, now) : null;
+  // AWAY-UI: a Soul whose agent is away shows when it left and the start prompt, and no message box until it is back
+  const soulAway = kind === 'soul' && !!presence?.away;
   // the owner's newest message; `queued` counts what still waits (the agent works oldest first)
   const state = latest ? receiptState(latest, inbox?.queued ?? 0, now) : '';
   const answers = latest ? [latest.reply, latest.result].filter((x): x is string => !!x) : [];
   const receipt = latest ? [state, latest.text, ...answers].join(' · ') : '';
   return <div className="agent-message" data-agent-message={kind}>
     <div className="agent-message-presence" data-agent-presence={inbox?.presence ?? (inbox ? inbox.connected ? 'recent' : 'away' : 'unknown')}>
-      <span>{presence ? presence.text : 'Agent status unavailable'}</span>
+      <span>{soulAway ? `${awaySince(inbox?.lastSeenAt ?? null, now)} · copy the start prompt into your agent to bring it back` : presence ? presence.text : 'Agent status unavailable'}</span>
       {presence?.away && <button type="button" onClick={onCopy} title={prompt}>{copied ? 'Copied' : 'Copy start prompt'}</button>}
     </div>
-    <form className="agent-message-form" onSubmit={onSend}>
+    {!soulAway && <form className="agent-message-form" onSubmit={onSend}>
       <input aria-label="Message your agent" placeholder="Message your agent…" value={text} onChange={e => onText(e.target.value)} maxLength={1000} disabled={sending} autoComplete="off"/>
       <button type="submit" disabled={sending || !text.trim()}>{sending ? 'Sending…' : 'Send'}</button>
-    </form>
+    </form>}
     {latest && <p className="agent-message-receipt" role="status" title={receipt} data-message-state={latest.state}>
       <span className="agent-message-state">{state}</span><span aria-hidden="true"> · </span><span className="agent-message-text">{latest.text}</span>
       {answers.map((a, i) => <span key={i} className="agent-message-answer"><span aria-hidden="true"> · </span><span className="agent-message-reply">{a}</span></span>)}
@@ -95,13 +98,21 @@ export function AgentMessageBoxView({kind, inbox, prompt, text, sending = false,
  * window's code, like the New Soul prompt, so a fresh folder's request comes up in this window instead of only a link. */
 export function soulStartPrompt(base: string, soulId: string, name: string | undefined, code: string | null) {
   const pair = `node eden-agent.mjs pair-soul ${JSON.stringify(soulId)}${code ? ` --for ${code}` : ''}`;
-  return `Read ${base}/SKILL.md and resume my existing Soul ${name ? `${JSON.stringify(name)} (ID ${JSON.stringify(soulId)})` : JSON.stringify(soulId)}. If this folder is not yet paired with it, run ${pair}${code ? ' (the request comes up in my open Sim window; the approval link is a backup)' : ' (I approve it in my open Sim window or at the approval link)'}, then node eden-agent.mjs approval wait. Always listen: run node eden-agent.mjs listen in the background (Claude Code: Bash run_in_background; Codex: as the last command of every turn), never filter its output, ack each message, then result, and run listen again after each batch. Do not create another Soul.`;
+  // PROMPT-SHORT (Gene 2026-10-23 #16): two lines; the listen mechanics live in the skill (lane LISTEN-LEAK)
+  return `Read ${base}/SKILL.md and resume my existing Soul ${name ? `${JSON.stringify(name)} (ID ${JSON.stringify(soulId)})` : JSON.stringify(soulId)} in this folder. Do not create another Soul.\n`
+    + `If this folder is not paired with it yet, run ${pair}${code ? ' (the request comes up in my open Sim window)' : ' (I approve it in my open Sim window or at the approval link)'}, then node eden-agent.mjs approval wait; then listen as the skill says.`;
 }
 let codeOnce: Promise<string | null> | null = null;
 export function SoulAgentMessageBox({api, soulId, name}: {api: Api; soulId: string; name?: string}) {
   const request = useCallback<Transport>(async text => {
-    const r = await api(`/v1/edge/owner/${encodeURIComponent(soulId)}/inbox`, text === undefined ? undefined : {text});
-    if (r.status !== 200 || !r.data?.inbox) throw new Error(r.data?.message ?? r.data?.error?.message ?? 'Message could not be sent. Try again.');
+    let r;
+    try {r = await api(`/v1/edge/owner/${encodeURIComponent(soulId)}/inbox`, text === undefined ? undefined : {text});}
+    catch (e) {if (text === undefined) reportAgentPresence(soulId, null); throw e;}
+    if (r.status !== 200 || !r.data?.inbox) {
+      if (text === undefined) reportAgentPresence(soulId, null);
+      throw new Error(r.data?.message ?? r.data?.error?.message ?? 'Message could not be sent. Try again.');
+    }
+    reportAgentPresence(soulId, r.data.inbox);
     return r.data.inbox;
   }, [api, soulId]);
   // one window-code request per page (the server reuses a code while it has over an hour left); a failure is retried next mount

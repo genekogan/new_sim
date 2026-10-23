@@ -20,7 +20,10 @@ export function eyesBrowserModes(env = process.env, platform = process.platform)
   const problem = eyesWorkerProblem(platform); if (problem) throw new Error(problem);
   return requested === 'auto' ? ['swiftshader'] : [requested];
 }
-export function eyesBrowserLaunch(mode, env = process.env, platform = process.platform) {
+// Chrome (full, channel 'chromium') starts chrome_crashpad_handler, which needs a writable XDG config dir; under the
+// world unit's ProtectHome=true $HOME is unreadable, so the handler exits ("--database is required") and the browser closes
+// at launch. `home` is a worker-owned writable dir (under the unit's PrivateTmp) used as XDG_CONFIG_HOME/XDG_CACHE_HOME.
+export function eyesBrowserLaunch(mode, env = process.env, platform = process.platform, home = null) {
   const problem = eyesWorkerProblem(platform); if (problem) throw new Error(problem);
   const flags = {
     metal: ['--ignore-gpu-blocklist'],
@@ -29,6 +32,9 @@ export function eyesBrowserLaunch(mode, env = process.env, platform = process.pl
   };
   if (!flags[mode]) throw new Error('invalid Eyes renderer mode');
   return {headless: true, ...(env.EDGE_EYES_HEADLESS_SHELL === '1' ? {} : {channel: 'chromium'}),
-    args: [...flags[mode], '--mute-audio', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows',
+    ...(home ? {env: {...env, XDG_CONFIG_HOME: home, XDG_CACHE_HOME: home}} : {}),
+    // Playwright adds --no-sandbox by default (chromiumSandbox: false); say it explicitly on Linux, where the unit's
+    // NoNewPrivileges and no unprivileged user namespaces leave Chromium no usable sandbox.
+    args: [...flags[mode], ...(platform === 'linux' ? ['--no-sandbox'] : []), '--mute-audio', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows',
       ...eyesExtraArgs(env)]};
 }

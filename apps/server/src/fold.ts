@@ -145,7 +145,10 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
     case 'edge-stop': {
       // Edge worlds: a Soul's own agent asked its body to stop safely (rise from sleep,
       // finish the current step); the engine's ordinary stop owns the safe landing.
-      const p = e.payload as { entityId?: string };
+      const p = e.payload as { entityId?: string; stallReleaseV1?: { code: string; message: string } };
+      // stall-guard/1 (edge/ledger/stall-guard.ts): the world ends a hold that stopped making progress and stands the body
+      // at the nearest free spot (deterministic from the state at this tick; never aloft, never construction).
+      if (p.entityId && p.stallReleaseV1) { engine.stallReleaseV1?.(p.entityId, p.stallReleaseV1); return {}; }
       const id = p.entityId ? engine.programOf(p.entityId) : null;
       if (id) engine.stop(id);
       return {};

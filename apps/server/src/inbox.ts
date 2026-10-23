@@ -44,6 +44,8 @@ export class AgentInbox {
   focusOf: (ids: string[]) => TicketFocus | null = () => null;
   private waiters = new Map<string, Set<() => void>>();
   private listeners = new Map<string, number>();
+  /** LISTEN-LEAK: the live listen of each scope (the newest; older ones are aborted as superseded). */
+  private claims = new Map<string, Set<AbortController>>();
   /** When the last listener of a scope ended: a CLI re-polls within ~50 ms, so the card must not flicker away. */
   private listenEnded = new Map<string, number>();
   /** SOULSIM-H F1: told the Soul id whenever its owner writes, so its `/v1/edge/wait` wakes too (not only its listen). */
@@ -239,6 +241,14 @@ export class AgentInbox {
     return (handed = false) => { if (ended) return; ended = true; const n = (this.listeners.get(key) ?? 1) - 1; if (n > 0) this.listeners.set(key, n); else { this.listeners.delete(key); if (handed) this.listenEnded.delete(key); else this.listenEnded.set(key, this.now()); } };
   }
   listenerCount(s: InboxScope) { return this.listeners.get(this.key(s)) ?? 0; }
+  /** LISTEN-LEAK: one live listen per agent. A new listen supersedes every older one for the same scope (its signal aborts;
+   *  it answers 409 superseded and hands over nothing, so each message still goes to exactly one listener). */
+  claimListen(s: InboxScope) {
+    const key = this.key(s), ctl = new AbortController();
+    for (const old of this.claims.get(key) ?? []) old.abort();
+    this.claims.set(key, new Set([ctl]));
+    return {signal: ctl.signal, release: () => { const set = this.claims.get(key); set?.delete(ctl); if (set && !set.size) this.claims.delete(key); }};
+  }
   async listen(s: InboxScope, after: string | undefined, timeoutMs: number, signal: AbortSignal) {
     // A Soul's listen wakes for any message not acknowledged after its cursor (none = any); the god's, as before.
     const pending = this.god(s) ? () => { const m = this.view(s).latest; return !!m && m.id !== after && m.state !== 'acknowledged'; } : () => !!this.nextAfter(s, after);

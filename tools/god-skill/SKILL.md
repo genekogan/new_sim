@@ -170,7 +170,7 @@ world coordinates, also inside a house; where a moved thing lands decides its pa
 ## Sky, time, weather, land, life layers
 
 `sky --palette golden-hour --sun 0.4` (`sky` alone lists the palettes, e.g. `eden-summer`). The palette and `--sun` light the lamps; **the viewer's sky colour does not
-change with the palette today**. `weather --kind clear|cloudy|rain|wind|fog|storm|auto [--intensity 0.9]`. World state also takes `ground.palette` (meadow grass garden desert dust sand snow rock playa) and `time.calendar`
+change with the palette today**. `weather --kind clear|cloudy|rain|wind|fog|storm|auto [--intensity 0.9] [--minutes 30]` (a rain or storm is a shower: it ends after `--minutes` world minutes, default rain 90, storm 45, 5…360, then the scheduled weather returns). World state also takes `ground.palette` (meadow grass garden desert dust sand snow rock playa) and `time.calendar`
 "MM-DD" (the sky's season; clock and schedules unchanged). Each is one undoable
 edit. `time` shows the clock; leave it alone.
 
