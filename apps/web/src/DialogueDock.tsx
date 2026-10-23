@@ -1,4 +1,5 @@
 import {useEffect,useLayoutEffect,useMemo,useRef,useState,type RefObject} from 'react';
+import {createPortal} from 'react-dom';
 import type {TalkLine} from '@sim/protocol';
 import type {WorldViewerHandle,WorldViewerState} from './WorldViewer.ts';
 import {createDialogueStore,hearingLabel,ingestDialogue,joinNames,participants,threadSoulColours,type DialogueEdgeMessage,type DialogueLine,type DialogueStore,type DialogueThread} from './dialogue-threads.ts';
@@ -24,10 +25,14 @@ export function DialogueDock({root,scope,edge,talk,state,active,handle,nameOf}:P
  const [focus,setFocus]=useState<string|null>(null);
  const [soulContext,setSoulContext]=useState<string|null>(null);
  const [top,setTop]=useState(90);
+ /** Which thread is expanded inside the card: undefined = the newest (or focused), null = all collapsed. */
+ const [slot,setSlot]=useState<HTMLElement|null>(null);
+ const [cardOpen,setCardOpen]=useState<string|null|undefined>(undefined);
  const now=Date.now(),shownTick=state?.shownTick??null;
  const held=active&&shownTick!==null&&!state?.loading&&!state?.unavailableReason;
  const selected=state?.selection.soulId??null;
  useEffect(()=>{if(soulContext&&selected!==soulContext)setSoulContext(null);},[selected,soulContext]);
+ useEffect(()=>setCardOpen(undefined),[selected,focus]);
  const shown=useMemo(()=>{
   const out:Shown[]=[];
   for(const t of store.threads.values()){const lines=held?t.lines.filter(l=>l.tick<=shownTick!):t.lines;if(!lines.length)continue;out.push({t,lines,lastAt:lines.at(-1)!.at,names:participants(t),colours:threadSoulColours(t)});}
@@ -51,6 +56,14 @@ export function DialogueDock({root,scope,edge,talk,state,active,handle,nameOf}:P
  // A Soul card exposes only threads that actually involve that Soul; no public conversation directory.
  const relevant=soulContext?shown.filter(s=>s.names.includes(soulContext)):focus?shown.filter(s=>s.t.id===focus):[];
  const close=()=>{setFocus(null);setSoulContext(null);};
+ // CONV-UI (Gene 10-08 "per-Soul in its card"): the selected Soul's card holds a slot; its threads render there
+ // (the focused one first), and the floating dock is only the fallback when no card slot is on screen.
+ const cardFor=soulContext??selected;
+ // The card may mount in the same commit as this render, so the slot is looked up after each commit (state only on change).
+ useEffect(()=>{const el=active&&cardFor?document.querySelector<HTMLElement>(`.soul-card-thread[data-soul-thread="${CSS.escape(cardFor)}"]`):null;if(el!==slot)setSlot(el);});
+ const own=cardFor?shown.filter(s=>s.names.includes(cardFor)):[];
+ const inCard=!!slot?.isConnected&&(!focus||own.some(s=>s.t.id===focus));
+ const cardThreads=inCard?[...own.filter(s=>s.t.id===focus),...own.filter(s=>s.t.id!==focus)].slice(0,3):[];
  const frameGroup=(s:Shown)=>{const ids=participants(s.t);handle?.frameSouls?.(ids);setSoulContext(null);setFocus(s.t.id);};
  const anchors=new Map((held?state?.speechAnchors??[]:[]).filter(a=>a.visible&&(a.distance??Infinity)<=48).map(a=>[a.soulId,a]));
  const viewport=root.current?.querySelector('.world-viewport');const frame=root.current;
@@ -58,11 +71,20 @@ export function DialogueDock({root,scope,edge,talk,state,active,handle,nameOf}:P
  const markers=held&&state?.presentation==='live'?shown.filter(s=>!s.t.closed&&now-s.lastAt<60_000).flatMap(s=>{const ids=participants(s.t),points=ids.flatMap(id=>{const a=anchors.get(id);return a?[a]:[];});if(points.length<2)return [];return [{s,x:points.reduce((n,a)=>n+a.x,0)/points.length+offset.x,y:Math.min(...points.map(a=>a.y))+offset.y-34}];}).slice(0,6):[];
  return <>
   {active&&markers.map(({s,x,y})=><button key={s.t.id} className="conversation-marker" style={{left:x,top:y,['--thread' as string]:s.t.colour}} aria-label={`Open conversation with ${joinNames(s.names.map(nameOf))}`} title="Open live conversation and frame speakers" onClick={()=>frameGroup(s)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-8l-5 4v-4H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" fill="currentColor"/><circle cx="8" cy="11" r="1"/><circle cx="12" cy="11" r="1"/><circle cx="16" cy="11" r="1"/></svg></button>)}
-  {active&&(focus||soulContext)&&<section className="dialogue-dock open contextual" style={{top,maxHeight:`calc(100% - ${top+16}px)`,['--lines-max' as string]:'35dvh'}} aria-label={soulContext?`${nameOf(soulContext)} conversations`:'Live conversation'}>
+  {inCard&&cardThreads.length>0&&createPortal(<CardThreads list={cardThreads} now={now} nameOf={nameOf} open={cardOpen} setOpen={setCardOpen} follow={frameGroup}/>,slot!)}
+  {active&&(focus||soulContext)&&!inCard&&<section className="dialogue-dock open contextual" style={{top,maxHeight:`calc(100% - ${top+16}px)`,['--lines-max' as string]:'35dvh'}} aria-label={soulContext?`${nameOf(soulContext)} conversations`:'Live conversation'}>
    <div className="dlg-dock-head"><span>{soulContext?`${nameOf(soulContext)} · conversations`:'Live conversation'}</span><button className="dlg-icon" aria-label="Close conversation" onClick={close}>×</button></div>
    <div className="dlg-scroll">{relevant.length?relevant.map(s=><ThreadCard key={s.t.id} s={s} now={now} nameOf={nameOf} pinned={null} flash={false} onFollow={()=>frameGroup(s)} onCollapse={close}/>):<p className="dlg-empty">No conversations in this recent window.</p>}</div>
   </section>}
  </>;
+}
+
+/** The selected Soul's own threads inside its card: one expanded, the rest one line each. */
+function CardThreads({list,now,nameOf,open,setOpen,follow}:{list:Shown[];now:number;nameOf:(id:string)=>string;open:string|null|undefined;setOpen:(id:string|null)=>void;follow:(s:Shown)=>void}){
+ const expanded=open===undefined?list[0]!.t.id:open;
+ return <div className="dialogue-dock dlg-card" role="group" aria-label="Conversations">{list.map(s=>s.t.id===expanded
+  ?<ThreadCard key={s.t.id} s={s} now={now} nameOf={nameOf} pinned={null} flash={false} linesMax="22dvh" onFollow={()=>follow(s)} onCollapse={()=>setOpen(null)}/>
+  :<CollapsedRow key={s.t.id} s={s} onOpen={()=>setOpen(s.t.id)}/>)}</div>;
 }
 
 function Names({s}:{s:Shown}){

@@ -689,7 +689,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const animate = () => {
       officeGuardFrom.copy(camera.position);
       if (abort.signal.aborted) return;
-      frame = pacer.next(animate);
+      frame = eyes && !entityLayer.building ? eyes.schedule(animate, cb => pacer.next(cb)) : pacer.next(animate);  // eyes: render on demand (builds keep their pace)
       // lane W1: while a new world's first build runs in slices nothing is drawn: look at the takes 4 times a second, no more
       if(entityLayer.building){const t=performance.now();if(t-buildingFrameAt<250)return;buildingFrameAt=t;}
       if(eyes&&!eyes.wake(performance.now()))return;  // VF1b: a slow frame leaves room for socket messages

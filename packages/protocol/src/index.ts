@@ -8,6 +8,7 @@ export * from './intent-sleep-stop-v1.ts';
 // Wire protocol shared by server and clients: log events, WebSocket messages,
 // REST payloads. Everything that crosses a process boundary is defined here.
 export * from './mandate.ts';
+export * from './columns-v1.ts';
 export * from './presentation.ts';
 export * from './owner-views.ts';
 export * from './me-live.ts';
@@ -151,7 +152,7 @@ export * from './take-boundary-wire.ts';
 export * from './take-entities-wire.ts';
 export * from './take-chunk-wire.ts';
 export type ClientMsg =
-  | { t: 'hello'; proto: number; token?: string; since?: number; epoch?: string; stationContracts?:StationLiveContract[];takeTransport?:'take-boundary-facts/1';takeEntities?:'take-entities-ref/1';takeChunks?:'take-chunk-ref/1';takeEntitiesJoin?:'take-entities-join/1' }
+  | { t: 'hello'; proto: number; token?: string; since?: number; epoch?: string; stationContracts?:StationLiveContract[];takeTransport?:'take-boundary-facts/1';takeEntities?:'take-entities-ref/1';takeChunks?:'take-chunk-ref/1';takeEntitiesJoin?:'take-entities-join/1';snapshotColumns?:'columns/1' }
   | { t: 'resync'; reason: string }
   | { t: 'ping'; n: number };
 

@@ -91,8 +91,97 @@ function pwa(): Plugin {
   };
 }
 
+// Lane VENDOR: the chunk graph vendorGroups promises, checked on every build. Phase one (early's static imports) loads no
+// phase-two chunk, and no stable chunk (vendor*, app-shared) imports main, whose hash changes with every app change.
+function checkChunks(): Plugin {
+  return {
+    name: 'sim-check-chunks',
+    apply: 'build',
+    generateBundle(_o, bundle) {
+      const chunks = Object.values(bundle).flatMap((c) => (c.type === 'chunk' ? [c] : []));
+      const byFile = new Map(chunks.map((c) => [c.fileName, c]));
+      const main = chunks.find((c) => c.isEntry && c.name === 'main'), early = chunks.find((c) => c.isEntry && c.name === 'early');
+      if (!main || !early) return; // not the app build
+      const seen = new Set<string>(), walk = (f: string) => { for (const i of byFile.get(f)?.imports ?? []) if (!seen.has(i)) { seen.add(i); walk(i); } };
+      walk(early.fileName);
+      const late = [...seen].filter((f) => ['main', 'app-shared'].includes(byFile.get(f)?.name ?? ''));
+      if (late.length) throw Error(`vendor chunks: phase one would load ${late.join(', ')}`);
+      const inMain = new Set(Object.keys(main.modules));
+      for (const c of chunks) if (['vendor', 'app-shared'].includes(c.name) && c.imports.includes(main.fileName)) {
+        const edges = Object.keys(c.modules).flatMap((m) => (this.getModuleInfo(m)?.importedIds ?? []).filter((i) => inMain.has(i)).map((i) => `${m} -> ${i}`));
+        throw Error(`vendor chunks: ${c.fileName} imports main, so its hash would change with every app change (${edges.slice(0, 5).join('; ')})`);
+      }
+    },
+  };
+}
+
+// Lane VENDOR (2026-10-22): caching grain. A chunk's file name carries a hash of its bytes and of the file names it imports,
+// so before this one changed line in Shell.tsx renamed main-*.js and every lazy chunk that imports main (~2.35 MB a returning
+// visitor downloaded again after each release). Now:
+// - `vendor`: three's build, the three examples phase one surely uses, and zod: library code only phase one (early-entry.ts
+//   and the early-render.ts it imports) loads, out of give-way-*.js. Same bytes before the arrival card, one more request.
+// - `app-shared`: react/react-dom/scheduler and the app modules main shares with lazy chunks and the workbench page, so a
+//   lazy chunk imports app-shared, not main; main keeps Shell.tsx and what only it uses. It replaces phase two's former
+//   react chunk (same requests). A change to a module in it still renames it and its importers, as before.
+// What is eager vs lazy does not change. checkChunks fails the build if phase one would load a phase-two chunk.
+type ModuleGraph = { getModuleInfo(id: string): { code: string | null; importers: readonly string[]; importedIds: readonly string[]; dynamicallyImportedIds: readonly string[]; dynamicImporters: readonly string[] } | null };
+function vendorGroups() {
+  const pkg = (id: string) => id.match(/\/node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?((?:@[^/]+\/)?[^/]+)\//)?.[1];
+  const isReact = (id: string) => ['react', 'react-dom', 'scheduler'].includes(pkg(id) ?? '');
+  const src = (f: string) => fileURLToPath(new URL(`./src/${f}`, import.meta.url));
+  let graph: { vendor: (id: string) => boolean; shared: Set<string> } | undefined;
+  const sets = (ctx: ModuleGraph) => {
+    if (graph) return graph;
+    // static closure from `roots`; `follow(id)` lists dynamic imports to follow as well
+    const closure = (roots: string[], follow: (id: string, dyn: readonly string[]) => readonly string[] = () => [], stop = new Set<string>(), leaf = (_id: string) => false) => {
+      const seen = new Set<string>(), stack = [...roots];
+      while (stack.length) {
+        const m = stack.pop()!;
+        if (seen.has(m) || stop.has(m)) continue;
+        const info = ctx.getModuleInfo(m);
+        if (!info) continue;
+        seen.add(m);
+        if (!leaf(m)) stack.push(...info.importedIds, ...follow(m, info.dynamicallyImportedIds));
+      }
+      return seen;
+    };
+    const earlyEntry = src('early-entry.ts'), mainEntry = src('main.tsx'), workbench = src('gen-mesh/kits/workbench.ts');
+    const isEarlyRender = (m: string) => m.endsWith('/src/early-render.ts');
+    // zod and three's build: phase one parses kits and renders, so all of them it reaches is phase one's (the walk also
+    // reaches them through barrels); three's examples only when phase one surely imports them
+    const inVendor = (m: string) => (pkg(m) === 'zod' || (pkg(m) === 'three' && !m.includes('/examples/'))) ? phaseOne.has(m) : pkg(m) === 'three' && surely.has(m);
+    const earlyFollow = (id: string, dyn: readonly string[]) => (id === earlyEntry ? dyn.filter(isEarlyRender) : []);
+    // The module graph keeps edges the bundle's tree-shaking drops, so it over-states what phase one loads: a barrel's
+    // unused re-exports (phase one imports @sim/world-compiler's index, which re-exports core-kit.ts, which main loads), and
+    // modules something imports dynamically. `phaseOne` (walk into both) is a superset of the truth: nothing in it leaves
+    // for a phase-two chunk. `surely` (walk into neither) is what phase one certainly loads.
+    const every = closure([mainEntry, earlyEntry, workbench], (_id, dyn) => dyn);
+    const lazyRoots = [...every].filter((m) => (ctx.getModuleInfo(m)?.dynamicImporters.length ?? 0) > 0 && !isEarlyRender(m));
+    const stop = new Set(lazyRoots);
+    const barrel = (m: string) => { const c = ctx.getModuleInfo(m)?.code; return !!c && /\bfrom\b/.test(c) && c.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '').replace(/export\s[^;]*?\sfrom\s*["'][^"']+["'];?/g, '').trim() === ''; };
+    const phaseOne = closure([earlyEntry], earlyFollow);
+    const surely = closure([earlyEntry], earlyFollow, stop, barrel);
+    const main = closure([mainEntry], undefined, stop);
+    if (surely.size < 10 || main.size < 50) throw Error(`vendor chunks: entry module graphs not found (${surely.size}, ${main.size} modules)`);
+    // Shell.tsx is the app itself (most of main): the one lazy chunk that imports it (the 0.5 KB PrivyAuth stub) keeps
+    // importing main and changes with it, rather than Shell and all it imports leaving main for app-shared.
+    const lazy = closure([workbench, ...lazyRoots.filter((m) => !main.has(m) && !phaseOne.has(m))], undefined, new Set([src('Shell.tsx')]));
+    const shared = new Set([...lazy].filter((m) => main.has(m) && !phaseOne.has(m)));
+    // app-shared must not import main: a candidate that imports a module whose chunk is unsure (not app-shared, not surely
+    // phase one, not a vendor chunk) stays in main, and so do the candidates that import it.
+    const vendorPkg = (m: string) => isReact(m) || inVendor(m);
+    const out = [...shared].filter((m) => ctx.getModuleInfo(m)!.importedIds.some((i) => !shared.has(i) && !surely.has(i) && !vendorPkg(i)));
+    while (out.length) { const m = out.pop()!; if (shared.delete(m)) out.push(...ctx.getModuleInfo(m)!.importers.filter((i) => shared.has(i))); }
+    return (graph = { vendor: inVendor, shared });
+  };
+  return [
+    { name: (id: string, ctx: ModuleGraph) => (sets(ctx).vendor(id) ? 'vendor' : null), priority: 3 },
+    { name: (id: string, ctx: ModuleGraph) => (sets(ctx).shared.has(id) || isReact(id) ? 'app-shared' : null), priority: 1, includeDependenciesRecursively: false },
+  ];
+}
+
 export default defineConfig({
-  plugins: [snapshotPrefetch(), cdnPreconnect(), pwa(), phasedEntry(), react()],
+  plugins: [snapshotPrefetch(), cdnPreconnect(), pwa(), phasedEntry(), checkChunks(), react()],
   define: { __BUILD__: JSON.stringify(process.env.BUILD_ID ?? 'dev'), __SIM_ARRIVAL_ENABLED__: process.env.SIM_ARRIVAL_UI_ENABLED==='1', __SIM_GOATCOUNTER__: JSON.stringify(process.env.SIM_GOATCOUNTER ?? 'simeden'),
     __SIM_ASSETS_CDN_ENABLED__: process.env.SIM_ASSETS_CDN_ENABLED==='1',
     // CDN4: god uploads via the pull-through Worker on assets.eden.art/w/* (default on; needs the CDN switch above)
@@ -103,5 +192,6 @@ export default defineConfig({
   // chunkSizeWarningLimit (kB, lane BUDGET 2026-10-22): just above the largest legitimate chunk, core-kit (1,491 kB raw /
   // 221 kB gzip on 3.62: the shared three.js + catalogue kit every world loads), so any chunk past it warns at build time.
   // The hard limit is the release gate's V3-bundle step (tools/test-harness/bundle-budget): +10% per chunk or total fails.
-  build: { chunkSizeWarningLimit: 1600, rollupOptions: { input: { main: 'index.html', workbench: 'workbench.html', early: 'src/early-entry.ts' } } },
+  build: { chunkSizeWarningLimit: 1600, rollupOptions: { input: { main: 'index.html', workbench: 'workbench.html', early: 'src/early-entry.ts' },
+    output: { codeSplitting: { groups: vendorGroups() } } } },
 });

@@ -5,7 +5,7 @@ import type { IncomingMessage, Server } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { z } from 'zod';
 import {randomUUID} from 'node:crypto';
-import { PROTO, publicEvent,TAKE_BOUNDARY_WIRE_V1,stringifyTakeBoundaryWireV1,TAKE_ENTITIES_WIRE_V1,TAKE_ENTITIES_JOIN_V1,TakeEntitiesEncoderV1,TAKE_CHUNKS_WIRE_V1,TakeChunksEncoderV1,kernelRestV1,stationHelloCapabilitiesV1Schema,negotiateStationContractV1,meLiveDescriptorV1Schema,meLiveViewV1Schema,
+import { COLUMNS_V1,packColumnsV1,joinTableOrderV1, PROTO, publicEvent,TAKE_BOUNDARY_WIRE_V1,stringifyTakeBoundaryWireV1,TAKE_ENTITIES_WIRE_V1,TAKE_ENTITIES_JOIN_V1,TakeEntitiesEncoderV1,TAKE_CHUNKS_WIRE_V1,TakeChunksEncoderV1,kernelRestV1,stationHelloCapabilitiesV1Schema,negotiateStationContractV1,meLiveDescriptorV1Schema,meLiveViewV1Schema,
   type StationLiveContract,type BrainCall, type ClientMsg, type Me, type ServerMsg, type ServerStats } from '@sim/protocol';
 import type { Auth } from './auth.ts';
 import type { Brain } from './brain.ts';
@@ -19,7 +19,7 @@ const clientMsg = z.discriminatedUnion('t', [
   z.object({ t: z.literal('hello'), proto: z.number(), token: z.string().max(4000).optional(), since: z.number().optional(), epoch: z.string().max(40).optional(),
     stationContracts:stationHelloCapabilitiesV1Schema.shape.stationContracts,takeTransport:z.literal(TAKE_BOUNDARY_WIRE_V1).optional(),
     // an unknown later contract is not an error: the peer simply gets the full table
-    takeEntities:z.string().max(40).optional(),takeChunks:z.string().max(40).optional(),takeEntitiesJoin:z.string().max(40).optional() }),
+    takeEntities:z.string().max(40).optional(),takeChunks:z.string().max(40).optional(),takeEntitiesJoin:z.string().max(40).optional(),snapshotColumns:z.string().max(40).optional() }),
   z.object({ t: z.literal('resync'), reason: z.string().max(200) }),
   z.object({ t: z.literal('ping'), n: z.number() }),
 ]);
@@ -32,6 +32,8 @@ type Client = { ws: WebSocket; me: Me | null; ready: boolean; alive: boolean; jo
   /** take-chunk-ref/1 peers: the id of the last take this socket was sent (null: none yet) and the last kernel view sent
    *  without its tick (kernelRestV1). */
   takeChunks?:{last:number|null;kernel?:string};
+  /** columns/1 (lane JOINSET): this peer takes its snapshots' entity tables in the column form. */
+  snapshotColumns?:boolean;
   /** Set by a join until the first takes message with a chunk is written: that one is never dropped for backpressure. */
   awaitingTakes?:boolean;joinSend?:boolean;joinPending?:number };
 /** What anyone may see of the server's numbers: spend is for admins. */
@@ -181,7 +183,7 @@ export class Hub {
     if (m.t === 'resync') { c.resyncs++; return this.send(c, { t: 'snapshot', reason: `resync: ${String(m.reason).slice(0, 80)}`, ...this.host.snapshotView() }); }
     if (m.t === 'hello') {
       const generation=(c.helloGeneration??0)+1;c.helloGeneration=generation;
-      c.ready=false;c.me=null;c.authUserId=null;c.meScope=undefined;c.publishedMe=undefined;c.takeTransport=undefined;c.takeEntities=undefined;c.takeChunks=undefined;c.awaitingTakes=false;
+      c.ready=false;c.me=null;c.authUserId=null;c.meScope=undefined;c.publishedMe=undefined;c.takeTransport=undefined;c.takeEntities=undefined;c.takeChunks=undefined;c.snapshotColumns=false;c.awaitingTakes=false;
       if (m.proto !== PROTO) { this.send(c, { t: 'welcome', build: this.build, proto: PROTO, worldId: this.host.worldId, rulesVersion: this.host.engine.rulesVersion, schema: this.host.engine.schema, dt: this.host.engine.dt, clockRate: this.host.clockRate, serverTick: this.host.engine.world.tick, you: null, serverTime: Date.now(), epoch: this.epoch }); return this.send(c, { t: 'error', code: 'proto', message: `server speaks protocol ${PROTO}` }); }
       const u = await this.auth.userFromToken(m.token).catch(() => null);
       if(!this.clients.has(c)||c.helloGeneration!==generation||c.ws.readyState!==1||!this.host.clockAvailable)return;
@@ -189,7 +191,7 @@ export class Hub {
       c.me = u ? this.lifecycleSouls?this.currentMe(u.id):this.auth.me(u) : null;
       c.takeTransport=m.takeTransport===TAKE_BOUNDARY_WIRE_V1?TAKE_BOUNDARY_WIRE_V1:undefined;
       c.takeEntities=m.takeEntities===TAKE_ENTITIES_WIRE_V1?{last:null,...(m.takeEntitiesJoin===TAKE_ENTITIES_JOIN_V1?{join:true as const}:{})}:undefined;
-      c.takeChunks=m.takeChunks===TAKE_CHUNKS_WIRE_V1?{last:null}:undefined;
+      c.takeChunks=m.takeChunks===TAKE_CHUNKS_WIRE_V1?{last:null}:undefined;c.snapshotColumns=m.snapshotColumns===COLUMNS_V1;
       c.stationContract=negotiateStationContractV1(m.stationContracts?{stationContracts:m.stationContracts}:{},
         [...(this.station?['station-live/1' as const]:[]),...(this.stationV2?['station-live/2' as const]:[])]);
       const e = this.host.engine;
@@ -233,6 +235,12 @@ export class Hub {
     else if(c.stationContract==='station-live/1'&&this.station)this.send(c,{t:'station',view:this.station.view()});
   }
 
+  /** columns/1 JSON of a snapshot's entity table (the last one kept: every join of the same world state packs once). */
+  private lastColumns:{json:string;packed:string}|null=null;
+  private columnsOf(entities:unknown,json=JSON.stringify(entities)):string{
+    if(this.lastColumns?.json===json)return this.lastColumns.packed;
+    const p=packColumnsV1(entities,joinTableOrderV1),packed=p?JSON.stringify(p):json;this.lastColumns={json,packed};return packed;
+  }
   private send(c: Client, m: ServerMsg, takeStrings?:Map<ServerMsg,Record<string,string>>) {
     if(!this.host.clockAvailable){c.ready=false;c.ws.close(1013,'world unavailable');return;}
     if (c.ws.readyState !== 1) return false;
@@ -254,7 +262,7 @@ export class Hub {
       const joined=current.t==='snapshot'&&c.takeEntities?.join?this.takeEntities.register(current.entities):null;
       if(joined)nextTable=joined.id;
       s=cached[key]??(()=>{
-        if(joined){const {entities:_e,...rest}=current as Extract<ServerMsg,{t:'snapshot'}>;return JSON.stringify({...rest,entitiesTable:joined.id}).slice(0,-1)+',"entities":'+joined.json+'}';}
+        if(joined||current.t==='snapshot'&&c.snapshotColumns){const {entities,...rest}=current as Extract<ServerMsg,{t:'snapshot'}>;return JSON.stringify(joined?{...rest,entitiesTable:joined.id}:rest).slice(0,-1)+',"entities":'+(c.snapshotColumns?this.columnsOf(entities,joined?.json):joined!.json)+'}';}
         const packed=entities?JSON.stringify({t:'take-entities',contract:TAKE_ENTITIES_WIRE_V1,ids:entities.envelope.ids}).slice(0,-1)+',"payload":'+inner(entities.envelope.payload)+'}':inner(stream);
         return chunks?JSON.stringify({t:'take-chunks',contract:TAKE_CHUNKS_WIRE_V1,ids:chunks.ids,same:chunks.same}).slice(0,-1)+',"payload":'+packed+'}':packed;
       })();

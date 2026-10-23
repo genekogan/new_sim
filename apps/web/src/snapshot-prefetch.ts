@@ -50,7 +50,7 @@ export function entryPrefetchScript(base: string, oldKeys: readonly string[] = O
     + `if(${JSON.stringify(oldKeys)}.indexOf(k)>=0||typeof fetch!=='function')return;`
     + `var w=b+'/w/'+k,g=function(n,u){var p=fetch(u);p.catch(function(){});window[n]={url:u,response:p};};`
     // W3: the wire form (snapshot-wire.ts); its defs/ground part fetches start as soon as the response headers name them
-    + `var x=window.__simSnapshotKey,n=w+'/v1/world/snapshot?defs=ref';g(${JSON.stringify(PREFETCH_GLOBAL)},typeof x==='string'&&x?n+'&v='+encodeURIComponent(x):n);g(${JSON.stringify(CONFIG_GLOBAL)},w+'/v1/config');`
+    + `var x=window.__simSnapshotKey,n=w+'/v1/world/snapshot?defs=ref&cols=1';g(${JSON.stringify(PREFETCH_GLOBAL)},typeof x==='string'&&x?n+'&v='+encodeURIComponent(x):n);g(${JSON.stringify(CONFIG_GLOBAL)},w+'/v1/config');`
     // P7: the parts the HTML names (window.__simSnapshotParts) leave at once; any other the snapshot's headers name, then
     + `var sp=window[${JSON.stringify(PREFETCH_GLOBAL)}],pp=sp.parts={},pf=function(f){if(typeof f==='string'&&/^[0-9a-f]{32}$/.test(f)&&!pp[f]){pp[f]=fetch(w+'/v1/world/part/'+f);pp[f].catch(function(){});}},hp=window.__simSnapshotParts;if(hp&&hp.forEach)hp.forEach(pf);`
     + `sp.response.then(function(r){['x-defs-ref','x-ground-ref'].forEach(function(h){pf(r.headers.get(h));});},function(){});`
@@ -58,11 +58,12 @@ export function entryPrefetchScript(base: string, oldKeys: readonly string[] = O
     // for the page's main thread, busy building the world, and the join with it (~1 s on a phone)
     // P7b: a two-phase page (phasedEntryWanted) opens it with its second phase
     + `var ph=false;try{ph=(${phasedEntryWanted.toString()})(location.search||'',typeof matchMedia==='function'&&matchMedia('(pointer: coarse)').matches,screen.width,screen.height,navigator.deviceMemory)===true;}catch(e){}window[${JSON.stringify(PHASED_GLOBAL)}]=ph;`
-    // lane PAIR-UI: an #approve link may be handed to an open tab (Shell.tsx), so it opens no world socket; a full boot opens its own
-    + (hello ? `if(typeof WebSocket!=='function')return;var os=function(){var h=${JSON.stringify(hello)},u=(location.protocol==='https:'?'wss':'ws')+'://'+location.host+w+'/ws',s=new WebSocket(u+'?hello='+encodeURIComponent(h)),o={url:u,ws:s,queue:[],hello:h,sent:true};`
+    // lane PAIR-UI: an #approve link may be handed to an open tab (Shell.tsx), so it opens no world socket, not even
+    // in a phased (phone) second phase; a full boot opens its own
+    + (hello ? `if(typeof WebSocket!=='function')return;var os=function(){if(/^#approve\\//.test(location.hash||''))return;var h=${JSON.stringify(hello)},u=(location.protocol==='https:'?'wss':'ws')+'://'+location.host+w+'/ws',s=new WebSocket(u+'?hello='+encodeURIComponent(h)),o={url:u,ws:s,queue:[],hello:h,sent:true};`
       + `s.onmessage=function(e){o.queue.push(e.data);};`
       + `setTimeout(function(){if(!o.adopted)try{s.close();}catch(e){}},20000);window[${JSON.stringify(SOCKET_GLOBAL)}]=o;};`
-      + `if(ph)window[${JSON.stringify(OPEN_SOCKET_GLOBAL)}]=function(){delete window[${JSON.stringify(OPEN_SOCKET_GLOBAL)}];os();};else if(!/^#approve\\//.test(location.hash||''))os();` : '')
+      + `if(ph)window[${JSON.stringify(OPEN_SOCKET_GLOBAL)}]=function(){delete window[${JSON.stringify(OPEN_SOCKET_GLOBAL)}];os();};else os();` : '')
     + `}catch(e){}})();`;
 }
 
@@ -71,7 +72,7 @@ export function entryPrefetchScript(base: string, oldKeys: readonly string[] = O
  *  the plain no-store URL. */
 export function entryWireUrl(plain: string): string {
   const x = typeof window === 'undefined' ? undefined : (window as unknown as { __simSnapshotKey?: unknown }).__simSnapshotKey;
-  return `${plain}?defs=ref` + (typeof x === 'string' && x ? `&v=${encodeURIComponent(x)}` : '');
+  return `${plain}?defs=ref&cols=1` + (typeof x === 'string' && x ? `&v=${encodeURIComponent(x)}` : '');
 }
 export function entrySnapshotUrl(plain: string): string {
   const x = typeof window === 'undefined' ? undefined : (window as unknown as { __simSnapshotKey?: unknown }).__simSnapshotKey;
