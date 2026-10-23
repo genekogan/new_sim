@@ -15,7 +15,7 @@ export const WEATHER_RULES = {
   strikeChance: 0.3,
 } as const;
 
-type WeatherLike = { kind?: string; rain?: number; intensity?: number; until?: number | null; minutes?: number } | null | undefined;
+type WeatherLike = { kind?: string; rain?: number; intensity?: number; until?: number | null; minutes?: number | null } | null | undefined;
 
 /** A setting that rains: rain, storm, or manual channels with rain. */
 export const isWetSetting = (w: WeatherLike) => !!w && (w.kind === 'rain' || w.kind === 'storm' || (w.kind === 'manual' && (w.rain ?? 0) > 0.1));

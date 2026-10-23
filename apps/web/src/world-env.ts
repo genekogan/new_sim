@@ -59,7 +59,7 @@ export function setWeatherOf(state: WorldStateLike, tick = NaN): SetWeather | nu
   const w = state?.weather;
   if (!w || !setWeatherInForce(w, tick)) return null;
   const n = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : d);
-  return { kind: w.kind, clouds: n(w.clouds, 0.1), rain: n(w.rain, 0), wind: n(w.wind, 0.1), fog: n(w.fog, 0), intensity: n(w.intensity, 1) };
+  return { kind: w.kind!, clouds: n(w.clouds, 0.1), rain: n(w.rain, 0), wind: n(w.wind, 0.1), fog: n(w.fog, 0), intensity: n(w.intensity, 1) };
 }
 
 /** The entity layer's world state (its model is private to the layer; read-only here). */
