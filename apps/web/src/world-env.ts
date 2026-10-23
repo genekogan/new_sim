@@ -243,7 +243,10 @@ export class GodWorldLiving {
 // ---------------------------------------------------------------- broadcast: a god world's establishing views
 type TourViewLike = { id: string; label: string; p: readonly [number, number, number]; target: readonly [number, number, number];
   /** Ground radius (m) around `target` that holds the whole landmark: Explore's picture of it slices this much. */
-  radius?: number };
+  radius?: number;
+  /** A one-room building (a hall, a classroom): its picture is taken from this eye inside the room, at eye height,
+   *  like the "Inside: …" room views; travel and the broadcast still use `p`/`target`. */
+  inside?: { p: readonly [number, number, number]; target: readonly [number, number, number] } };
 type ViewModel = {
   entities: Map<string, { id: string; name?: string; def: string; in: { parent: string }; shape?: { area?: [number, number][]; path?: [number, number][] } }>;
   resolvedDef(ref: string): { layer?: string; tags?: string[]; components?: { landform?: unknown }; make?: { kind?: string } } | undefined;
@@ -282,7 +285,12 @@ export function godTourViews(layer: unknown, groundAt: (x: number, z: number) =>
     const ex = cx + Math.cos(a) * dist, ez = cz + Math.sin(a) * dist, eg = groundAt(ex, ez) ?? g;
     const ty = g + Math.min(top, 8) * 0.45;
     const box: Box = { id: e.id, x0, z0, x1, z1, top: Number.isFinite(high) ? Math.max(high, g + top) : g + top }; boxes.push(box); // top: the highest collider, not one storey's height
-    found.push({ size, dist, a, box, v: { id: `god:${e.id}`, label: placeLabel(e.name), target: [cx, ty, cz], p: [ex, Math.max(eg + 2, ty) + dist * 0.38, ez], radius: Math.min(100, Math.hypot(x1 - x0, z1 - z0) / 2 + 1.5) } });
+    const v: TourViewLike = { id: `god:${e.id}`, label: placeLabel(e.name), target: [cx, ty, cz], p: [ex, Math.max(eg + 2, ty) + dist * 0.38, ez], radius: Math.min(100, Math.hypot(x1 - x0, z1 - z0) / 2 + 1.5) };
+    // a one-room building (a classroom hall) is pictured from inside its room, like the "Inside: …" cards (R42)
+    const rm = m as ViewModel & Partial<RoomModel>;
+    if (rm.slotsOf && rm.worldPose) { try { const rooms = rm.slotsOf(e).filter((r) => r.kind === 'room' && Array.isArray(r.polygon) && r.polygon.length >= 3);
+      if (rooms.length === 1 && polygonArea(rooms[0].polygon!) >= 8) { const eye = roomEye(rm.worldPose(e), rooms[0], rooms[0].polygon!, groundAt); v.inside = { p: eye.p, target: eye.target }; } } catch { /* no slots: an outside view only */ } }
+    found.push({ size, dist, a, box, v });
   }
   // the cache keeps up to 120 (Explore lists them all, searchable; the broadcast tour asks for 12). A part named after a
   // bigger landmark ("Courtyard house 4 kitchen" beside "Courtyard house 4") is the same place: listed once.
@@ -318,25 +326,33 @@ export function godRoomViews(layer: unknown, groundAt: (x: number, z: number) =>
   const named = [...m.entities.values()].filter((e) => e.in.parent === 'world' && e.name).sort((a, b) => a.name!.localeCompare(b.name!));
   for (const e of named) {
     let slots: ReturnType<RoomModel['slotsOf']>; try { slots = m.slotsOf(e); } catch { continue; }
-    const pose = m.worldPose(e), yaw = pose.yaw ?? 0, sc = pose.s ?? 1, c = Math.cos(yaw), s = Math.sin(yaw);
-    const toWorld = (x: number, z: number): [number, number] => [pose.x + x * sc * c + z * sc * s, pose.z - x * sc * s + z * sc * c];
+    const pose = m.worldPose(e);
     for (const r of slots) {
       if (r.kind !== 'room' || !Array.isArray(r.polygon) || r.polygon.length < 3 || views.length >= 16) continue;
-      const poly = r.polygon, area = Math.abs(poly.reduce((a, [x0, z0], i) => { const [x1, z1] = poly[(i + 1) % poly.length]; return a + x0 * z1 - x1 * z0; }, 0)) / 2;
+      const poly = r.polygon, area = polygonArea(poly);
       if (area < 8) continue;
-      const xs = poly.map((q) => q[0]), zs = poly.map((q) => q[1]), cx = (Math.min(...xs) + Math.max(...xs)) / 2, cz = (Math.min(...zs) + Math.max(...zs)) / 2;
-      const alongX = Math.max(...xs) - Math.min(...xs) >= Math.max(...zs) - Math.min(...zs), half = (alongX ? Math.max(...xs) - Math.min(...xs) : Math.max(...zs) - Math.min(...zs)) / 2;
-      const at = (k: number): [number, number] => toWorld(r.p[0] + cx + (alongX ? k * half : 0), r.p[2] + cz + (alongX ? 0 : k * half));
-      // stand at the end farther from the building's origin, so the view looks in towards the building's middle
-      const far = (k: number) => { const q = at(k); return Math.hypot(q[0] - pose.x, q[1] - pose.z); }, k0 = far(-0.78) >= far(0.78) ? -1 : 1;
-      const [ex, ez] = at(0.78 * k0), [tx, tz] = at(-0.6 * k0), base = (groundAt(pose.x, pose.z) ?? pose.y) + (r.p[1] ?? 0) * sc;
+      const { p: eye, target, half } = roomEye(pose, r, poly, groundAt);
       const spoken = (t: string) => t.replace(/[-_]+/g, ' ').trim();
       const label = (r.label ? r.label.split('(')[0].trim() : '') || `${spoken(e.name!)} ${spoken(r.id)}`;
       if (views.some((v) => v.label.toLowerCase() === `inside: ${label}`.toLowerCase())) continue;
-      views.push({ id: `room:${e.id}:${r.id}`, label: `Inside: ${label}`, p: [ex, base + 1.65, ez], target: [tx, base + 1.05, tz], radius: Math.max(2, half) });
+      views.push({ id: `room:${e.id}:${r.id}`, label: `Inside: ${label}`, p: eye, target, radius: Math.max(2, half) });
     }
   }
   roomsCache = { key, views };
   return views;
 }
+type RoomSlot = ReturnType<RoomModel['slotsOf']>[number];
+/** The eye a room is seen from: near one end of its long side at eye height, looking down it towards the building's middle. */
+function roomEye(pose: ReturnType<RoomModel['worldPose']>, r: Pick<RoomSlot, 'p'>, poly: [number, number][], groundAt: (x: number, z: number) => number | null) {
+  const yaw = pose.yaw ?? 0, sc = pose.s ?? 1, c = Math.cos(yaw), s = Math.sin(yaw);
+  const toWorld = (x: number, z: number): [number, number] => [pose.x + x * sc * c + z * sc * s, pose.z - x * sc * s + z * sc * c];
+  const xs = poly.map((q) => q[0]), zs = poly.map((q) => q[1]), cx = (Math.min(...xs) + Math.max(...xs)) / 2, cz = (Math.min(...zs) + Math.max(...zs)) / 2;
+  const alongX = Math.max(...xs) - Math.min(...xs) >= Math.max(...zs) - Math.min(...zs), half = (alongX ? Math.max(...xs) - Math.min(...xs) : Math.max(...zs) - Math.min(...zs)) / 2;
+  const at = (k: number): [number, number] => toWorld(r.p[0] + cx + (alongX ? k * half : 0), r.p[2] + cz + (alongX ? 0 : k * half));
+  // stand at the end farther from the building's origin, so the view looks in towards the building's middle
+  const far = (k: number) => { const q = at(k); return Math.hypot(q[0] - pose.x, q[1] - pose.z); }, k0 = far(-0.78) >= far(0.78) ? -1 : 1;
+  const [ex, ez] = at(0.78 * k0), [tx, tz] = at(-0.6 * k0), base = (groundAt(pose.x, pose.z) ?? pose.y) + (r.p[1] ?? 0) * sc;
+  return { p: [ex, base + 1.65, ez] as const, target: [tx, base + 1.05, tz] as const, half };
+}
+function polygonArea(poly: [number, number][]) { return Math.abs(poly.reduce((a, [x0, z0], i) => { const [x1, z1] = poly[(i + 1) % poly.length]; return a + x0 * z1 - x1 * z0; }, 0)) / 2; }
 function hashStr(s: string) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }

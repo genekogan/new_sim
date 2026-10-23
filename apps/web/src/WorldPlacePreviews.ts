@@ -59,7 +59,8 @@ export class WorldPlacePreviews{
    this.pacer.done();STEPS.push(['slice',Math.round(performance.now()-sliceStart)]);
    const bare=!scene.children.length;if(bare&&!this.live())return null;  // nothing of the place drawn: with a live world it is still pictured (a lake that is only water), never kept
    scene.updateMatrixWorld(true);
-   const shot=await this.shoot(scene,center,radius,view,key,alive,id.startsWith('room:')||Object.hasOwn(INTERIOR_PLACE_VIEWS,id));if(shot&&!bare)keep(key,shot);return shot;
+   const inside=location?.inside;  // a one-room building: shot from inside its room at eye level, like the room cards
+   const shot=await this.shoot(scene,center,radius,inside??view,key,alive,!!inside||id.startsWith('room:')||Object.hasOwn(INTERIOR_PLACE_VIEWS,id));if(shot&&!bare)keep(key,shot);return shot;
   }finally{target.dispose();for(const mesh of instances)mesh.dispose();for(const g of geometries)g.dispose();for(const m of materials.values())m.dispose();scene.clear();}
  }
  /** Gene 2026-10-23 (#13): a full photogenic shot of the place in the real world (terrain, water, sky, neighbours), not a
@@ -119,12 +120,17 @@ export class WorldPlacePreviews{
     if(seen.v.blocked<bestHidden){bestHidden=seen.v.blocked;best=camera;turn=k;}
    }
    if(!best)return null;const shotCamera=best;
-   const shot=await step('shot',()=>{
+   const rendered=await step('shot',()=>{
     const pixels=new Uint8Array(W*H*4);renderer.setRenderTarget(target);if(!world)GRADE_A.x=0;  // the bare place-only picture stays ungraded
     // the live world in the shot light (Gene #13: never the visitor's night or storm); the shadow map is the main view's, left as it is
     const undo=world?this.pose():null,shadows=renderer.shadowMap.autoUpdate,shadowsDue=renderer.shadowMap.needsUpdate;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=false;
     try{renderer.render(live,shotCamera);}finally{renderer.shadowMap.autoUpdate=shadows;renderer.shadowMap.needsUpdate=shadowsDue;undo?.();}
-    renderer.readRenderTargetPixels(target,0,0,W,H,pixels);
+    return pixels;
+   });
+   // the read-back is its own paced step: reading the shot in the task that drew it waits for the GPU, and on a cold context that
+   // blocked the main thread for 1.4 s (explore-shots2: 1 of 1 cold runs before, 0 of 4 after; every step <= 150 ms)
+   const shot=rendered&&await step('read',()=>{
+    const pixels=rendered.v;renderer.readRenderTargetPixels(target,0,0,W,H,pixels);
     const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d');if(!ctx)return null;const image=ctx.createImageData(W,H);for(let y=0;y<H;y++)image.data.set(pixels.subarray((H-1-y)*W*4,(H-y)*W*4),y*W*4);ctx.putImageData(image,0,0);
     const webp=canvas.toDataURL('image/webp',.82);return webp.startsWith('data:image/webp')?webp:canvas.toDataURL('image/jpeg',.85);
    });
