@@ -108,7 +108,7 @@ type ModelLike = {
   ground?(): { extent?: readonly number[] };
   editSeq?: number;
 };
-type LayerLike = { active: boolean; groundAt(x: number, z: number): number | null; group: THREE.Object3D };
+type LayerLike = { active: boolean; groundAt(x: number, z: number): number | null; groundPeek?(x: number, z: number): number | null; group: THREE.Object3D };
 
 /** God worlds get Eden's living presentation: lamps that light at dusk with warm pools and halos, the sky, weather
  *  (scheduled, or the god's), and rain that stays out of god-built rooms. One per live view. */
@@ -204,7 +204,7 @@ export class GodWorldLiving {
         if (light.on === false) continue;
         const at = light.at, dx = (at?.[0] ?? 0) * scale, dz = (at?.[at.length - 1] ?? 0) * scale;
         const x = p.x + dx * cos + dz * sin, z = p.z - dx * sin + dz * cos;
-        const base = this.layer.groundAt(x, z) ?? 0, range = Math.max(2, Math.min(14, light.range ?? 8));
+        const base = (this.layer.groundPeek ? this.layer.groundPeek(x, z) : this.layer.groundAt(x, z)) ?? 0, range = Math.max(2, Math.min(14, light.range ?? 8));
         const pattern = light.pattern ?? (flame ? 'flicker' as const : undefined);
         const phase = lightPhase(e.id, i, lights.length, pattern);
         sources.push({ x, z, base, radius: range * (fire ? 0.4 : POOL_RADIUS) * this.pools.radius, intensity: fire ? 1.1 : POOL_LAMP, color: light.color ?? '#ffe9c4', halo: range * POOL_HALO * this.pools.radius, pattern, phase });

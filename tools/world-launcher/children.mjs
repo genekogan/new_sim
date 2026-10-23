@@ -6,6 +6,7 @@ import { createServer } from 'node:net';
 import { createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { cgroupHeadroomMb, memAvailableMb, PREWARM_MB, prewarmBlocked, rotateLog } from './production.mjs';
+const STRIP_HOOK = 'apps/server/src/strip-cache.mjs'; // lane BOOT2 (defaultCommand)
 
 /** Printed by a world process started with SIM_STANDBY=1 once its code is loaded (apps/server/src/standby.ts). */
 export const STANDBY_MARK = '[standby] ready';
@@ -405,7 +406,10 @@ export function defaultCommand(world, port, o) {
     // Lane P5: V8's compile cache for this release's code (compileCacheDir): a world boots with ~0.4 s less CPU
     ...(o.compileCache ? { NODE_COMPILE_CACHE: o.compileCache } : {}),
   };
-  return { cmd: process.execPath, args: [...(clerk ? [`--env-file=${resolve(clerk.envFile)}`] : []), 'apps/server/src/main.ts'], env };
+  // Lane BOOT2: with the compile cache, the server's TypeScript is stripped once per build, not on every boot (strip-cache.mjs).
+  // The hook is imported only when the release the world runs from (its cwd, o.root) ships it, so a release without it still boots.
+  const strip = o.compileCache && existsSync(join(o.root ?? '.', STRIP_HOOK));
+  return { cmd: process.execPath, args: [...(clerk ? [`--env-file=${resolve(clerk.envFile)}`] : []), ...(strip ? ['--import', `./${STRIP_HOOK}`] : []), 'apps/server/src/main.ts'], env };
 }
 
 /** A fork of an old world (launcher op register-fork; tools/world-launcher/fork-world.mjs): main's old-world entry points

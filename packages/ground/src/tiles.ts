@@ -50,6 +50,9 @@ export function tilesTouched(l: Landform): TileKey[] {
   return out;
 }
 
+/** peek's tile-local grounds, per Ground object (a Ground is replaced, not edited, by an edit; invalidate drops them too). */
+const LOCAL_GROUNDS = new WeakMap<Ground, Map<TileKey, Ground>>();
+
 /** A Ground plus a lazily baked tile cache. `sample` is the authoritative height for physics and picture alike. */
 export class Terrain {
   private tiles = new Map<TileKey, Float32Array>();
@@ -85,6 +88,23 @@ export class Terrain {
     const top = a + (b - a) * u, bot = c + (d - c) * u;
     return top + (bot - top) * v;
   }
+  /** `sample`'s exact height without baking the tile when it is not baked yet: the four corners of (x, z)'s cell from
+   *  the same tile-local recipe the bake would use (Float32 like the tile), so the answer is bit-identical either way.
+   *  t4-phone3: for scans of far points (the night lamps' pool bases), which baked every tile of the world at once (Eden
+   *  2026: ~0.36 s of a 4x phone before its card) only to read four of each tile's 4,225 heights. */
+  peek(x: number, z: number): number {
+    const [tx, tz] = tileOf(x, z), k = tileKey(tx, tz);
+    if (this.tiles.has(k)) return this.sample(x, z);
+    let byTile = LOCAL_GROUNDS.get(this.ground); if (!byTile) { byTile = new Map(); LOCAL_GROUNDS.set(this.ground, byTile); }
+    let local = byTile.get(k); if (!local) { local = groundForTile(this.ground, tx, tz); byTile.set(k, local); }
+    const x0 = tx * TILE_M, z0 = tz * TILE_M, fx = x - x0, fz = z - z0;
+    let i = Math.floor(fx), j = Math.floor(fz);
+    if (i >= TILE_M) i = TILE_M - 1; if (j >= TILE_M) j = TILE_M - 1;
+    const u = fx - i, v = fz - j, h = (a: number, b: number) => Math.fround(heightAt(local, x0 + a, z0 + b));
+    const a = h(i, j), b = h(i + 1, j), c = h(i, j + 1), d = h(i + 1, j + 1);
+    const top = a + (b - a) * u, bot = c + (d - c) * u;
+    return top + (bot - top) * v;
+  }
   /** Gradient magnitude (rise/run) from the tile cell containing (x, z). */
   slope(x: number, z: number): number {
     const [tx, tz] = tileOf(x, z);
@@ -98,7 +118,7 @@ export class Terrain {
   /** Drop cached tiles a landform touches; returns the keys so callers can notify viewers. */
   invalidate(l: Landform): TileKey[] {
     const keys = tilesTouched(l);
-    for (const k of keys) { this.tiles.delete(k); this.hashes.delete(k); }
+    for (const k of keys) { this.tiles.delete(k); this.hashes.delete(k); LOCAL_GROUNDS.get(this.ground)?.delete(k); }
     this.last = null;
     return keys;
   }

@@ -12,6 +12,7 @@ import {randomUUID,randomBytes} from 'node:crypto';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {writeAtomicJSON} from './client-json-file.mjs';
+import {withSince} from './client-awareness.mjs';
 import {delegatedOwnerPath,approvalPublic,acceptDelegation} from './client-account.mjs';
 import {openLocalOperationFeedback,rememberSelector,REMEMBER_FORMAT_HINT} from './client-operation-feedback.mjs';
 import {clientProfile} from './client-profile.mjs';
@@ -466,7 +467,10 @@ export function compactAround(a){
  *  and things a little farther off) and any secret place close enough to find; suggests a walk to somewhere new.
  *  Older worlds without /v1/edge/around: a walk to a place not visited yet (from what is offered now). */
 export async function explore(...args){
- if(await mode()==='edge'){const r=await call('/v1/edge/around');if(r.status===200){const a=r.data.around??{};return args.includes('--full')?a:compactAround(a);}}
+ const to=args.filter(a=>!a.startsWith('--')).join(' ').trim();
+ if(await mode()==='edge'){const r=await call('/v1/edge/around'+(to?'?to='+encodeURIComponent(to):''));if(r.status===200){const a=r.data.around??{},route=r.data.route;
+  if(to&&!route)return {route:{query:to,found:false,reason:'This world does not give directions yet (older server).'},...compactAround(a)};
+  return {...(route?{route}:{}),...(args.includes('--full')?a:compactAround(a))};}}
  const all=(await capabilities()).canDo.available.filter(c=>c.verb==='walk'),seen=new Set(load().visited??[]);
  const fresh=all.filter(c=>!seen.has(c.id));const pick=(fresh.length?fresh:all)[Math.floor(Math.random()*Math.max(1,(fresh.length?fresh:all).length))];
  if(!pick)return {suggestion:null,reason:'No walk is offered right now; observe again later.'};
@@ -477,15 +481,16 @@ export async function whatson(){
  const s=load();need(s,'soul','Create one with create-soul.');
  const o=ok(await call(EDGE.observe+'?include=capabilities'),'whatson'),now=worldMinutes(o.world?.time);
  const walks=new Map((o.capabilities??[]).filter(c=>c.verb==='walk'&&c.available!==false).map(c=>[c.target?.id??c.id.split(':').slice(1).join(':'),c.id]));
- const places=(ok(await call(EDGE.map,{as:'none'}),'map').places??[]),out=[];
+ const places=(ok(await call(EDGE.map,{as:'none'}),'map').places??[]),out=[],later=[];
  for(const p of places)for(const slot of p.schedule??[]){
   const m=/^(\d{1,2})\s+(\d{1,2})\s/.exec(slot.cron??'');if(!m||now==null)continue;
   const start=Number(m[2])*60+Number(m[1]),dur=Number(slot.durationMinutes??60),since=(now-start+1440)%1440,until=(start-now+1440)%1440;
-  const happening=since<dur;if(!happening&&until>120)continue;
+  const happening=since<dur;if(!happening&&until>120){if(start>now)later.push({what:slot.label??slot.id,where:p.name,placeId:p.id,at:hhmm(start),startsInWorldMinutes:until,go:walks.get(p.id)??`walk:${p.id}`});continue;}
   out.push({what:slot.label??slot.id,where:p.name,placeId:p.id,...(happening?{now:true,endsInWorldMinutes:dur-since}:{startsInWorldMinutes:until}),at:hhmm(start),go:walks.get(p.id)??null,about:(p.description??'').slice(0,140)});
  }
  out.sort((a,b)=>(a.now?0:a.startsInWorldMinutes)-(b.now?0:b.startsInWorldMinutes));
- return {clock:hhmm(now),items:out.slice(0,12),next:out.length?'walk to one (act <go>), then join in: gather/sit/hang-out there':'nothing scheduled soon: explore or start something'};
+ later.sort((a,b)=>a.startsInWorldMinutes-b.startsInWorldMinutes||a.where.localeCompare(b.where));
+ return {...(o.world?.date?{date:o.world.date}:{}),clock:hhmm(now),items:out.slice(0,12),laterToday:later.slice(0,40).map(({startsInWorldMinutes,...x})=>x),next:out.length?'walk to one (act <go>), then join in: gather/sit/hang-out there':'nothing scheduled soon: explore or start something'};
 }
 /** calendar — upcoming and happening gatherings (public). Use: object <itemId> interest */
 export async function calendar(){const r=await call(EDGE.calendar,{as:'none'});if(r.status===404)return {items:[],note:'This world has no calendar yet.'};return ok(r,'calendar');}
@@ -1115,7 +1120,8 @@ export async function tell(...args){
  return {delivered:true,id,outcome:null,note:`No answer within ${waitS}s. Check later: node eden-agent.mjs report`};
 }
 /** here — the compact first-person frame (1.8): what your Soul perceives right now, with bearings relative to its heading. */
-export async function here(){
+export async function here(){const h=await hereRaw();return h&&typeof h==='object'&&h.tick!==undefined?withSince(h):h;}
+async function hereRaw(){
  need(load(),'soul','Create one with create-soul.');
  if(await mode()!=='edge')return {here:null,reason:'This world does not serve here yet; use observe.'};
  const r=await call(EDGE.here);if(r.status===404)return {here:null,reason:'This world does not serve here yet (older server); use observe.'};
@@ -1129,7 +1135,7 @@ export async function resolveAct(first,...rest){
 }
 /** report — what your Soul sees and does right now, briefly (to tell your owner). Use view for pictures. */
 export async function report(){
- const o=await observe(),L=liveRunning(),m=o.me??{},h=await here().catch(()=>null),pl=await eventsV1().catch(()=>false)?(await call(EDGE.plan).catch(()=>null))?.data?.plan??null:null;
+ const o=await observe(),L=liveRunning(),m=o.me??{},h=await hereRaw().catch(()=>null),pl=await eventsV1().catch(()=>false)?(await call(EDGE.plan).catch(()=>null))?.data?.plan??null:null;
  const recent=readJSONL(LIVE.log).filter(x=>x.results?.length).slice(-5).map(x=>`${x.t.slice(11,16)}Z ${x.reason}: ${clip(x.results.join('; '),160)}`);
  return {soul:m.name,clock:o.clock,where:m.where,state:m.state,doing:m.activity,...(m.holding?{holding:m.holding.name??m.holding.kind}:{}),...(m.following?{following:m.following.name??m.following}:{}),fade:m.fade?.colour??m.fade,
   near:(o.here?.souls??[]).slice(0,8).map(x=>[x.name,x.distance!=null?Math.round(x.distance)+'m':null,x.state??x.activity].filter(Boolean).join(' · ')),
