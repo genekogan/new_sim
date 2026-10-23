@@ -319,13 +319,13 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
     const rides = ctx.caps.filter(c => c.verb === 'object' && c.action === action && (water ? /punt|rowing|boat|canoe|kayak/i.test(c.id) && !/balloon/i.test(c.id) : air ? /balloon/i.test(c.id) : /ride|balloon|carrier|punt/i.test(c.id + ' ' + c.label)));
     const target = text.replace(/\b(?:let|lets|s|go|for|take|have|a|an|the|ride|rides|row|rowing|boat|boating|punt|balloon|fly|flight|flying|in|on|at|around|start|leave|disembark|depart|out|of|to|loop|together|board|boarding|embark|get|getting|climb|climbing|hop|step|jump|into|inside|aboard|onto|hot|air)\b/g, ' ').replace(/[:.!]/g, ' ').trim();
     const words = tokens(target), named = words.length ? rides.filter(c => {const t = ctx.target(c); return words.every(w => tokenHit(w, tokens([c.id, c.label, ...t.names, ...t.around].join(' '))));}) : rides;
-    const pick = named.sort((a, b) => Number(b.available) - Number(a.available) || dist(ctx.target(a).at, ctx.me) - dist(ctx.target(b).at, ctx.me) || a.id.localeCompare(b.id))[0];
-    // VERBS (accept2 brief 10): the named ride cannot be boarded now (a punt whose bank no longer qualifies) but another one
-    // works: "the pond" in general takes it; a specific name is refused with the working one named.
+    // A named body of water anchors the nearest matching ride, even when blocked. Generic 'go rowing'
+    // can prefer availability; 'row on the pond' must not silently choose another pond or lake.
+    const pick = named.sort((a, b) => (words.length ? 0 : Number(b.available) - Number(a.available)) || dist(ctx.target(a).at, ctx.me) - dist(ctx.target(b).at, ctx.me) || a.id.localeCompare(b.id))[0];
+    // VERBS2: explain the requested ride's refusal and offer the working alternative without acting on it.
     const other = pick && !pick.available ? rides.filter(c => c.available).sort((a, b) => dist(ctx.target(a).at, ctx.me) - dist(ctx.target(b).at, ctx.me) || a.id.localeCompare(b.id))[0] : undefined;
     if (pick && other) {
       const why = pick.blocked?.reason ? ` (${pick.blocked.reason.replace(/[.\s]+$/, '')})` : '';
-      if (words.every(w => /^(?:pond|ponds|lake|water|river|boat|punt)$/.test(w))) return {kind: 'alias', cap: other, note: `${input} is ${other.id} (${other.label}): ${pick.id} cannot be boarded right now${why}.`};
       return {kind: 'unknown', code: 'ride.blocked', reason: `${pick.id} cannot be boarded right now${why}. ${other.id} (${other.label}) can; nothing else was chosen.`, didYouMean: [{id: other.id, label: other.label}]};
     }
     if (pick) return {kind: 'alias', cap: pick, note: `${input} is ${pick.id} (${pick.label}).`};
