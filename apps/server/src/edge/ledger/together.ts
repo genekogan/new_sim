@@ -529,6 +529,19 @@ export class Together {
     if (running) this.p.stop(inv.host.soulId, m.entityId, r);
   }
 
+  /** BROWSE-COURTESY: a guest joining a place-bound activity (read in the library) takes its own free spot of that activity
+   *  beside the host's destination: same room and level, 0.5-4 m away (never the host's own spot), when that is nearer
+   *  than the spot its place plan would pick (its own nearest, possibly across the room). The guest's native plan, unchanged. */
+  private spotBeside(at: V2, level: number, verb: string, hostCap: string, ownCaps: EdgeCapability[], ownPlans: Map<string, TogetherPlan>): TogetherPlan | undefined {
+    const dest = (plan: TogetherPlan | undefined) => {const st = plan?.steps ?? [], last = invitedPose(st), mv = last ? st.slice(0, st.indexOf(last)).reverse().find(s => s.verb === 'walk_to' || s.verb === 'mars:walk_to') : undefined, to = mv?.verb === 'walk_to' ? mv.params.to : undefined;
+      return Array.isArray(to) && to.length === 2 && to.every(Number.isFinite) ? to as V2 : undefined;};
+    const gap = (q: V2 | undefined) => q ? Math.hypot(q[0] - at[0], q[1] - at[1]) : Infinity, room = (q: V2) => this.p.places.containing(q[0], q[1], level)[0]?.id;
+    const hostRoom = room(at), mine = gap(dest(ownPlans.get(hostCap)));
+    const near = ownCaps.filter(c => c.verb === verb && c.available && c.target?.kind === 'spot' && ownPlans.has(c.id)).map(c => ({c, to: dest(ownPlans.get(c.id))}))
+      .filter((x): x is {c: EdgeCapability; to: V2} => !!x.to && gap(x.to) > 0.5 && gap(x.to) <= 4 && gap(x.to) < mine && room(x.to) === hostRoom)
+      .sort((a, b) => gap(a.to) - gap(b.to) || a.c.id.localeCompare(b.c.id))[0];
+    return near && ownPlans.get(near.c.id);
+  }
   /** accept:<invite> → the guest's own plan to join (computed now, from where everyone is). */
   acceptPlan(soul: EdgeSoul, inviteId: string, ownCaps: EdgeCapability[], ownPlans: Map<string, TogetherPlan>): {code: string; reason: string} | {label: string; steps: Steps; capability: string; ride?: {object: string}; commit: (receipt: string) => void} {
     const inv = this.invite(inviteId);
@@ -580,7 +593,7 @@ export class Together {
       }
     }
     if (!hostCap.endsWith(':here') && ownPlans.has(hostCap) && ownCaps.find(c => c.id === hostCap)?.available) {
-      const own = ownPlans.get(hostCap)!, steps = structuredClone(own.steps), last = invitedPose(steps);
+      const own = (inv.meetAt && this.spotBeside(inv.meetAt, hb.human?.level ?? 0, verb, hostCap, ownCaps, ownPlans)) || ownPlans.get(hostCap)!, steps = structuredClone(own.steps), last = invitedPose(steps);
       if (last) {if (Number.isFinite(inv.seconds) && inv.seconds! > 0) last.params.seconds = inv.seconds; last.params.group = inv.id; last.params.waitSeconds = 20; last.params.alone = 'start'; if (inv.windowPolicy) last.params.windowPolicy = inv.windowPolicy;}
       return {label: own.label, steps, capability: 'accept:' + inv.id, commit};
     }

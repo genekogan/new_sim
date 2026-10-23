@@ -54,3 +54,33 @@ for (const [label, at] of [['host browse would start inside a nudge', [70.5, -5.
     assert.ok(rooms.length === 1 && rooms[0] !== null && together.levels.length === 1, `both read in one actual room on one level: ${JSON.stringify(together)}`);
     assert.ok(together.maxGap <= 4, `both readers within 4 m of each other throughout (max ${together.maxGap.toFixed(2)} m)`);
   });
+
+test('shared read guest spot: own free spot beside the host destination (same room, 0.5-4 m), never the host\'s own, unavailable, far or other-room spots', async t => {
+  const w = await coreAWorld(3), [a, b, c] = w.souls; t.after(w.close);
+  const host = await w.http(a, 'POST', '/v1/edge/act', {verb: 'read', target: {place: 'eden-library-1', seconds: 60, with: b.name}});
+  assert.equal(host.body.accepted, true, JSON.stringify(host.body));
+  const inv = w.ledger.together.invitesFor(b.soulId)[0], at = inv.meetAt!; assert.ok(at, 'the read invitation carries the host destination');
+  const level = w.body(a).human.level ?? 0, room = (q: [number, number]) => w.ledger.places.containing(q[0], q[1], level)[0]?.id, hostRoom = room(at);
+  // probe points by actual room membership: one 1.7 m away in the host's room, one < 4 m away in another room
+  const ring = (r: number, same: boolean) => {for (let k = 0; k < 36; k++) {const q: [number, number] = [Math.round((at[0] + r * Math.cos(k * Math.PI / 18)) * 100) / 100, Math.round((at[1] + r * Math.sin(k * Math.PI / 18)) * 100) / 100]; if ((room(q) === hostRoom) === same) return q;} return undefined;};
+  const beside = ring(1.7, true)!, other = [1, 2, 3, 3.9].map(r => ring(r, false)).find(Boolean); assert.ok(beside);
+  const plan = (to: [number, number], seconds = 180) => ({label: 'Read', steps: [{verb: 'walk_to', params: {to: [to[0] + 2, to[1]]}}, {verb: 'mars:pose_v1', params: {activity: 'browse', seconds: 4}}, {verb: 'walk_to', params: {to}}, {verb: 'mars:pose_v1', params: {activity: 'read', seconds}}, {verb: 'mars:pose_v1', params: {activity: 'browse', seconds: 3}}]});
+  const spot = (id: string, available = true) => ({id, verb: 'read', label: id, available, target: {id, kind: 'spot' as const}});
+  const placeCap = {id: inv.capability, verb: 'read', label: 'Read in the library', available: true, target: {id: 'eden-library-1', kind: 'place' as const}};
+  const pick = (spots: [string, [number, number], boolean?][], soul = b) => {
+    const caps = [placeCap, ...spots.map(([id, , av]) => spot(id, av ?? true))], plans = new Map([[placeCap.id, plan([at[0] + 5, at[1]])], ...spots.map(([id, to]) => [id, plan(to)] as const)]);
+    const r = w.ledger.together.acceptPlan(soul, inv.id, caps, plans); if (!('steps' in r)) return r;
+    const read = r.steps.find(s => s.params.activity === 'read')!, mv = r.steps[r.steps.indexOf(read) - 1];
+    return {to: mv.params.to as [number, number], seconds: read.params.seconds, browses: r.steps.filter(s => s.params.activity === 'browse').map(s => s.params.seconds)};
+  };
+  const far: [number, number] = [beside[0] + (beside[0] - at[0]) * 1.7, beside[1] + (beside[1] - at[1]) * 1.7], own: [number, number] = [at[0] + 0.2, at[1]];
+  const chosen = pick([['read:host-own', own], ['read:far', far], ['read:beside', beside]]) as {to: [number, number]; seconds: number; browses: number[]};
+  assert.deepEqual(chosen.to, beside, 'the free spot beside the host, not its own spot or one across the room');
+  assert.equal(chosen.seconds, 60, 'the invited duration'); assert.deepEqual(chosen.browses, [4, 3], 'native browse durations kept');
+  const fallback = {to: [at[0] + 5, at[1]], seconds: 60, browses: [4, 3]};
+  assert.deepEqual(pick([['read:beside', beside, false]]), fallback, 'an unavailable (taken) spot is never chosen: the place plan as before');
+  assert.deepEqual(pick([['read:far', far], ['read:host-own', own]]), fallback, 'only far or host-own spots: the place plan as before');
+  if (other) assert.deepEqual(pick([['read:other-room', other]]), fallback, 'a near spot in another room is never chosen');
+  t.diagnostic(JSON.stringify({at, hostRoom, beside, far, other: other ? [other, room(other)] : null}));
+  assert.equal((pick([['read:beside', beside]], c) as {code: string}).code, 'invite.gone', 'an uninvited soul still cannot accept');
+});
