@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {INDOOR_RECTS} from './indoors.ts';
+import {COVER_A,COVER_B,COVER_MAP} from './rain-cover.ts';
 import {GRADE_A,GRADE_B,GRADE_PARS,GRADE_GLSL} from './grade.ts';
 /** Weather terms folded into three's shared fog chunks (installed once, before
  * the fogged programs compile). Every fogged built-in material gets:
@@ -35,6 +36,17 @@ float edenAtmosNoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
  return mix(mix(edenAtmosHash(i),edenAtmosHash(i+vec2(1.0,0.0)),f.x),mix(edenAtmosHash(i+vec2(0.0,1.0)),edenAtmosHash(i+vec2(1.0,1.0)),f.x),f.y);}
 `;
 let installed=false;
+// WEATHER-FX: rain cover (rain-cover.ts) and raindrop rings with a fresh random centre per drop (no lattice).
+const COVER=`uniform sampler2D uEdenCoverMap;uniform vec4 uEdenCoverA;uniform vec4 uEdenCoverB;
+bool edenCovered(vec3 w){if(uEdenCoverA.w<.5)return false;vec2 uv=(w.xz-uEdenCoverA.xy)*uEdenCoverA.z;
+ if(uv.x<=0.0||uv.y<=0.0||uv.x>=1.0||uv.y>=1.0)return false;vec4 c=texture2D(uEdenCoverMap,uv);if(c.a<.5)return false;
+ return w.y<uEdenCoverB.x+(c.r*65280.0+c.g*255.0)/65535.0*uEdenCoverB.y-.6;}
+float edenDropRing(vec2 q,float t,float seed){
+ vec2 cell=floor(q);float h0=edenAtmosHash(cell+seed);float tt=t*1.4+h0;float n=floor(tt),ph=tt-n;
+ float h1=edenAtmosHash(cell+vec2(n*.731+seed,n*1.37)),h2=fract(h1*41.7),h3=fract(h1*93.1);
+ vec2 l=fract(q)-.5-(vec2(h1,h2)-.5)*.56;
+ return step(.3,h3)*smoothstep(.04,.0,abs(length(l)-ph*.22))*(1.0-ph);}
+`;
 export function installAtmosphereChunks(){
  if(installed)return;installed=true;NOISE_MAP.value=makeAtmosphereNoise();
  const C=THREE.ShaderChunk;
@@ -42,7 +54,7 @@ export function installAtmosphereChunks(){
  C.fog_vertex+='\n#ifdef USE_FOG\nvEdenAtmosW=transpose(mat3(viewMatrix))*(mvPosition.xyz-viewMatrix[3].xyz);\n#endif\n';
  // Known interiors stay dry (static rectangles compiled in; evaluated only while the ground is wet).
  const f=(n:number)=>n.toFixed(2),dry='bool edenIndoor(vec3 w){'+INDOOR_RECTS.map(r=>`if(w.x>${f(r[1])}&&w.x<${f(r[3])}&&w.z>${f(r[2])}&&w.z<${f(r[4])}&&w.y<${f(r[5])})return true;`).join('')+'return false;}\n';
- C.fog_pars_fragment+='\n#ifdef USE_FOG\n'+dry+'varying vec3 vEdenAtmosW;\nuniform vec4 uEdenAtmos;\nuniform vec4 uEdenMist;\nuniform vec4 uEdenSheen;\nuniform vec4 uEdenDust;\nuniform sampler2D uEdenNoise;\n'+GRADE_PARS+NOISE+'#endif\n';
+ C.fog_pars_fragment+='\n#ifdef USE_FOG\n'+dry+'varying vec3 vEdenAtmosW;\nuniform vec4 uEdenAtmos;\nuniform vec4 uEdenMist;\nuniform vec4 uEdenSheen;\nuniform vec4 uEdenDust;\nuniform sampler2D uEdenNoise;\n'+GRADE_PARS+NOISE+COVER+'#endif\n';
  const mix='gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );';
  if(C.fog_fragment.includes(mix))C.fog_fragment=C.fog_fragment.replace(mix,`if(uEdenMist.x>0.0){
   float edenH=max(vEdenAtmosW.y-uEdenMist.z,0.0);
@@ -68,7 +80,7 @@ if(uEdenAtmos.x>0.0){
  reflectedLight.directDiffuse*=edenK;reflectedLight.directSpecular*=edenK;
 }
 #ifndef USE_SKINNING
-if(uEdenMist.w>0.0&&!edenIndoor(vEdenAtmosW)){
+if(uEdenMist.w>0.0&&!edenIndoor(vEdenAtmosW)&&!edenCovered(vEdenAtmosW)){
  float edenUp=max(dot(normal,normalize((viewMatrix*vec4(0.0,1.0,0.0,0.0)).xyz)),0.0);
  float edenWet=uEdenMist.w*smoothstep(.55,.95,edenUp);
  reflectedLight.directDiffuse*=1.0-.38*edenWet;reflectedLight.indirectDiffuse*=1.0-.3*edenWet;
@@ -82,18 +94,20 @@ if(uEdenMist.w>0.0&&!edenIndoor(vEdenAtmosW)){
  float edenRing=0.0;
  // open water (blue-dominant, flat) takes rain rings everywhere
  float edenWater=smoothstep(.03,.1,diffuseColor.b-diffuseColor.r)*smoothstep(.97,.995,edenUp);
- if(uEdenSheen.w>0.0&&(edenPud>0.0||edenWater>0.0)){
-  // raindrop rings on puddles: one ring per 40 cm cell, random phase
-  vec2 edenQ=vEdenAtmosW.xz*2.5,edenCell=floor(edenQ);float edenHr=edenAtmosHash(edenCell);
-  float edenPh=fract(uEdenMist.y*1.4+edenHr);vec2 edenL=fract(edenQ)-.5-(vec2(edenHr,fract(edenHr*7.3))-.5)*.3;
-  // fade with distance before the 40 cm cells alias into moire
-  edenRing=smoothstep(.05,.0,abs(length(edenL)-edenPh*.42))*(1.0-edenPh)*uEdenSheen.w*smoothstep(32.0,12.0,vFogDepth);
+ // drops on exposed hard surfaces (roofs, paving, stone) that hold no puddle
+ float edenHard=edenWet*edenBare*smoothstep(.6,.85,edenUp)*(1.0-smoothstep(.0,.5,edenPud));
+ if(uEdenSheen.w>0.0&&(edenPud>0.0||edenWater>0.0||edenHard>0.0)){
+  // two offset, rotated layers of ~45 cm cells; each drop lands at its own random spot in its cell, some cells skip a beat
+  vec2 edenQ=vEdenAtmosW.xz*2.2;
+  edenRing=edenDropRing(edenQ,uEdenMist.y,0.0)+edenDropRing(mat2(.799,.602,-.602,.799)*edenQ*1.31+vec2(.37,.11),uEdenMist.y*1.13,7.0);
+  // fade with distance before the cells alias into moire
+  edenRing*=uEdenSheen.w*smoothstep(32.0,12.0,vFogDepth);
  }
- reflectedLight.indirectSpecular+=uEdenSheen.rgb*(edenPud*((.08+.92*edenFr)*.35+edenRing*.22)+edenWater*edenRing*.3);
+ reflectedLight.indirectSpecular+=uEdenSheen.rgb*(edenPud*((.08+.92*edenFr)*.35+edenRing*.22)+edenWater*edenRing*.3+edenHard*edenRing*.16);
 }
 #endif
 #endif
 `;
  for(const lib of Object.values(THREE.ShaderLib)){if(!lib.uniforms||!('fogDensity' in lib.uniforms))continue;
-  lib.uniforms.uEdenAtmos=ATMOS;lib.uniforms.uEdenMist=MIST;lib.uniforms.uEdenSheen=SHEEN;lib.uniforms.uEdenDust=DUST;lib.uniforms.uEdenNoise=NOISE_MAP;lib.uniforms.uEdenGradeA={value:GRADE_A};lib.uniforms.uEdenGradeB={value:GRADE_B};}
+  lib.uniforms.uEdenAtmos=ATMOS;lib.uniforms.uEdenMist=MIST;lib.uniforms.uEdenSheen=SHEEN;lib.uniforms.uEdenDust=DUST;lib.uniforms.uEdenNoise=NOISE_MAP;lib.uniforms.uEdenCoverMap=COVER_MAP;lib.uniforms.uEdenCoverA=COVER_A;lib.uniforms.uEdenCoverB=COVER_B;lib.uniforms.uEdenGradeA={value:GRADE_A};lib.uniforms.uEdenGradeB={value:GRADE_B};}
 }
