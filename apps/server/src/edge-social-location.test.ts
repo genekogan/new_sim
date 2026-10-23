@@ -43,3 +43,26 @@ test('invited cooking while host travels reaches the same cook place and coopera
  assert.ok(together>=20,'at least one second cooking in the same place/group within4m');
  assert.ok(receipts.every(r=>r?.phase==='completed'),JSON.stringify(receipts));assert.deepEqual(w.f.host.engine.runtime.violations,[]);
 });
+
+
+test('pending invitation preserves an internal apostrophe-s in the sender current name', async t => {
+  const w = await edenNavWorld(2), [a, b] = w.souls;
+  t.after(() => {w.f.host.stop(); w.f.db.close();});
+  // Current metadata has a legitimate internal possessive; the final possessive belongs to the request.
+  a.name = "Mars's son"; w.f.host.minds.get(a.soulId)!.name = a.name;
+  const ask = await w.act(a, 'read', {with: [b.soulId], seconds: 60}) as any;
+  assert.equal(ask.accepted, true, JSON.stringify(ask));
+  const invitation = w.ledger.together.invitesFor(b.soulId)[0]; assert.ok(invitation);
+  const body = w.engine.world.entities[a.entityId], garden = w.ledger.places.byId.get('eden-gardens')!.polygon;
+  body.pose.p[0] = garden.reduce((n, p) => n + p[0], 0) / garden.length;
+  body.pose.p[2] = garden.reduce((n, p) => n + p[1], 0) / garden.length;
+  w.ledger.invalidateBodies();
+  assert.ok(!w.ledger.capabilities(b).some(c => c.id === 'go-near:' + a.soulId));
+  for (const possessive of ["'s", '’s']) {
+    const resolved = w.ledger.intents.dryRun(b, {capability: `accept ${a.name}${possessive} invitation`}) as any;
+    assert.equal(resolved.would?.capability, 'accept:' + invitation.id, JSON.stringify(resolved));
+  }
+  const accepted = await w.act(b, `accept ${a.name}’s invitation`) as any;
+  assert.equal(accepted.accepted, true, JSON.stringify(accepted));
+  assert.equal(accepted.receipt.capability, 'accept:' + invitation.id);
+});

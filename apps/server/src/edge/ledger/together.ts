@@ -773,7 +773,7 @@ export class Together {
     if (!mine.length && /^(?:accept|decline|yes|no thanks|no thank you|accept (?:the |their )?(?:invitation|invite|offer)|decline (?:the |their )?(?:invitation|invite|offer))$/.test(t)) return {code: 'invite.none', reason: 'Nobody has invited you to anything right now (observe → invites).', did_you_mean: []};
     const acc = /^(?:accept|join)\s+(.+?)(?:['’]s)?(?:\s+(?:invitation|invite|offer|hug|dance))?$/.exec(t);
     if (acc && mine.length) {
-      const name = acc[1].trim().replace(/['’]s\b.*$/, '').trim(), stale = this.p.host.soulNameRefusal(name);
+      const name = acc[1].trim(), stale = this.p.host.soulNameRefusal(name);
       if (stale) return {code: stale, reason: 'That previous Soul name is unavailable or ambiguous; use the current name and immutable Soul ID.', did_you_mean: []};
       // A personal pending invitation identifies its sender even after they leave sight. Use current metadata,
       // not an old invitation label, and never choose between two senders with the same exact name.
