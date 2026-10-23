@@ -52,7 +52,9 @@ export function probeBody(rt: Rt, actor: string): StallProbeV1 | null {
   const live = holders.filter(x => x.state !== 'orphan');
   // a carried body whose carrier no longer lists it in a seat is left over even while its ride step still runs
   const dropped = !!h.carrier && !!cs && !Object.values((cs as { seats?: Record<string, string | null> }).seats ?? {}).includes(actor);
-  const candidate = holders.some(x => x.state !== 'steady') || dropped || (!live.length && markers.length > 0) ||
+  // a live activity pose (social/pose.ts pose_v1 claims pose:<actor>, never actor:) owns the seat markers it set (seatHeight)
+  const posing = (rt.holder(`pose:${actor}`) as string[]).some(id => rt.isActive(id));
+  const candidate = holders.some(x => x.state !== 'steady') || dropped || (!live.length && !posing && markers.length > 0) ||
     (!!h.carrier && (h.carrier.phase === 'leaving' || cs?.phase === 'landed' || cs?.phase === 'parked'));
   const pos: [number, number, number] = [a.pose.p[0], a.pose.p[1], a.pose.p[2]];
   const signature = JSON.stringify([pos.map(r2), holders.map(x => [x.id, x.phase, x.state]), h.activity ?? '', h.carrier?.phase ?? '', cs?.phase ?? '']);

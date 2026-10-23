@@ -3,7 +3,9 @@
 // aside. Where the guest waits decides the race (before the fix): at [70.5,-5.5] a make-way nudge lands on the host the tick
 // its shelf walk ends, so its browse was refused pose.not-still; at [70.6,-6.2] and [71.5,-7.45] the guest's walk nudged the
 // host's first or return browse (pose.moved). Both receipts must complete with both bodies reading the requested 60 s,
-// at the same time, in one actual room (innermost place holding each body's pose and level), at most 4 m apart.
+// at the same time, in one actual room (innermost place holding each body's pose and level), at most 4 m apart. While both
+// read, the stall guard's native probe must not take a live seated pose_v1 hold (pose:<actor>, seatHeight) for a stalled one:
+// gate 1de493c48 released both readers every ~29 s and set them down 1 m away (one crossed into the reading corner).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {coreAWorld} from '../test/core-a-fixture.ts';
@@ -29,11 +31,21 @@ for (const [label, at] of [['host browse would start inside a nudge', [70.5, -5.
     const runs = [[a, host.body.receipt.id], [b, guest.body.receipt.id]] as const;
     const reading = new Map<string, number[]>(runs.map(([s]) => [s.soulId, []])), nudges = new Set<string>();
     const both: {room: (string | null)[]; level: number[]; gap: number}[] = [];
+    const falseStall: string[] = [], held = new Map<string, number>(), drift = new Map<string, number>(runs.map(([s]) => [s.soulId, 0]));
+    const at0 = new Map<string, [number, number]>();
     await w.ticks(8000, () => {
       for (const [s] of runs) if (w.body(s).human.activity === 'read') reading.get(s.soulId)!.push(w.engine.world.tick);
       // together: both bodies natively reading this tick, located by their actual pose and level (innermost place polygon)
       if (runs.every(([s]) => w.body(s).human.activity === 'read')) {
         const [pa, pb] = runs.map(([s]) => w.body(s)), room = (e: typeof pa) => w.ledger.places.containing(e.pose.p[0], e.pose.p[2], e.human.level ?? 0)[0]?.id ?? null;
+        for (const [s] of runs) {
+          const e = w.body(s), rt = (w.engine as unknown as {rt: {holder: (r: string) => string[]; isActive: (id: string) => boolean}}).rt;
+          const live = rt.holder('pose:' + s.entityId).filter(id => rt.isActive(id)), q = w.engine.stallProbeV1!(s.entityId)!;
+          if (live.length) held.set(s.soulId, (held.get(s.soulId) ?? 0) + 1);
+          if (live.length && q.candidate && falseStall.length < 3) falseStall.push(JSON.stringify({who: s.name, tick: w.engine.world.tick, markers: q.markers, holders: q.holders.length, pose: live}));
+          const p0 = at0.get(s.soulId) ?? [e.pose.p[0], e.pose.p[2]]; at0.set(s.soulId, p0);
+          drift.set(s.soulId, Math.max(drift.get(s.soulId)!, Math.hypot(e.pose.p[0] - p0[0], e.pose.p[2] - p0[1])));
+        }
         both.push({room: [room(pa), room(pb)], level: [pa.human.level ?? 0, pb.human.level ?? 0], gap: Math.hypot(pa.pose.p[0] - pb.pose.p[0], pa.pose.p[2] - pb.pose.p[2])});
       }
       for (const id of w.engine.runtime.records.keys()) if (id.includes(':make-way:') && runs.some(([s]) => id.startsWith(s.entityId + ':'))) nudges.add(id);
@@ -45,7 +57,8 @@ for (const [label, at] of [['host browse would start inside a nudge', [70.5, -5.
     });
     const rooms = [...new Set(both.flatMap(x => x.room))], gaps = both.map(x => x.gap);
     const together = {overlapSeconds: both.length / 20, rooms, levels: [...new Set(both.flatMap(x => x.level))], minGap: Math.min(...gaps), maxGap: Math.max(...gaps)};
-    t.diagnostic(JSON.stringify({out, nudges: nudges.size, together}));
+    const stall = {falseCandidates: falseStall, heldTicks: [...held.values()], maxDrift: [...drift.values()].map(d => Math.round(d * 1000) / 1000)};
+    t.diagnostic(JSON.stringify({out, nudges: nudges.size, together, stall}));
     for (const o of out) {
       assert.equal(o.phase, 'completed', `${o.who}'s shared read receipt completes (${o.code})`);
       assert.ok(o.readSeconds >= 55 && o.readSpan <= 90, `${o.who} natively reads the requested 60 s (read ${o.readSeconds}s over ${o.readSpan}s)`);
@@ -53,6 +66,9 @@ for (const [label, at] of [['host browse would start inside a nudge', [70.5, -5.
     assert.ok(together.overlapSeconds >= 55, `both bodies natively read at the same time for the requested 60 s (${together.overlapSeconds}s)`);
     assert.ok(rooms.length === 1 && rooms[0] !== null && together.levels.length === 1, `both read in one actual room on one level: ${JSON.stringify(together)}`);
     assert.ok(together.maxGap <= 4, `both readers within 4 m of each other throughout (max ${together.maxGap.toFixed(2)} m)`);
+    assert.equal(stall.heldTicks.length, 2, 'both readers hold a live pose_v1 while reading (the case under test)');
+    assert.deepEqual(falseStall, [], 'a live seated reading pose is never a stall candidate');
+    assert.ok(stall.maxDrift.every(d => d <= 0.05), `neither reader is relocated while reading (max drift ${stall.maxDrift} m)`);
   });
 
 test('shared read guest spot: own free spot beside the host destination (same room, 0.5-4 m), never the host\'s own, unavailable, far, other-room, other-level, level-aware or unknown-room spots', async t => {
