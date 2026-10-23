@@ -243,7 +243,9 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
     if ((s.base === 'lie' && (s.activity === 'lie' || s.activity === 'nap')) || s.activity in GAME_ACTIVITIES || w.taken(s.at, s.id) || d2(s.at, w.me) > SPOT_REACH) continue;
     for (const activity of [s.activity, ...(s.also ?? [])]) {
       const def = SPOT_ACTIVITIES[activity], id = `${activity}:${s.id}`; if (plans.has(id)) continue;
-      if (data.nearest) {const n = offered.get(activity) ?? 0; if (n >= data.nearest || !ok(s)) continue; offered.set(activity, n + 1);}
+      // a seat at a group someone is already waiting in ("join them") is always offered, past the nearest-N cap
+      const joinable = !!s.together && w.groupSize(s.together.group) > 0;
+      if (data.nearest) {const n = offered.get(activity) ?? 0; if ((n >= data.nearest && !joinable) || !ok(s)) continue; if (!joinable) offered.set(activity, n + 1);}
       // R5: a listener's seat is offered once someone is telling the story (its required spot is in use)
       const needs = s.requires ? data.spots.find(x => x.id === s.requires) : undefined, missing = !!needs && !w.taken(needs.at, needs.id);
       const waiting = s.together ? w.groupSize(s.together.group) : 0, withWho = s.together ? (waiting ? `; ${waiting} waiting on the other end, join them` : (s.together.alone === 'start' ? `; starts after ${s.together.wait} s, others may join` : `; waits up to ${s.together.wait} s for someone to join`)) : '';

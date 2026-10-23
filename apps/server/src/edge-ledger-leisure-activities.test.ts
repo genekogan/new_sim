@@ -159,3 +159,14 @@ test('SPOTS: a stand spot wedged against furniture walks to clear ground behind 
     assert.equal(plans.has('paint:easel-b'), false, `easel B from ${me}: not offered (route.goal-blocked)`);
   }
 });
+test('SPOTS: a seat at a group someone is waiting in is offered past the nearest-N cap ("join them")', () => {
+  const club = (id: string, x: number, group: string) => ({id, place: 'library', activity: 'book-club', base: 'sit', at: [x, 0], faceTo: [x, 1], seatHeight: 0.45, label: id,
+    together: {group, need: 1, wait: 150, alone: 'fail'}});
+  const data = {...loadSpots({contract: 'activity-spots/1', spots: [club('near', 2, 'g-near'), club('far', 40, 'g-far')]}).data, nearest: 1};   // as god/activity-spots.ts derives it
+  const w = (waiting: string | null) => ({me: [0, 0] as [number, number], seated: false, clearance: () => 2, open: () => null, taken: () => false, enterable: () => true,
+    seat: () => null, placeName: () => null, ancestors: () => [], groupSize: (g: string) => g === waiting ? 1 : 0, clock: null});
+  const ids = (waiting: string | null) => activityCapabilities(data, w(waiting)).caps.filter(c => c.verb === 'book-club').map(c => c.id).sort();
+  assert.deepEqual(ids(null), ['book-club:near'], 'nobody waiting: the nearest one only');
+  assert.deepEqual(ids('g-far'), ['book-club:far', 'book-club:near'], 'someone waits at the far table: it is offered too');
+  assert.match(activityCapabilities(data, w('g-far')).caps.find(c => c.id === 'book-club:far')!.label, /1 waiting on the other end, join them/);
+});
