@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import {ownerReplyWithLocalResults,ownerAnswerText,routeOwnerReport} from './client-owner-reply.mjs';
+import {ownerReplyWithLocalResults,ownerAnswerText,routeOwnerReport,ownerPlainLine} from './client-owner-reply.mjs';import {guardStaleOwnerSteps,priorOwnerRequests} from './client-owner-stale.mjs';
 import {clientHelp} from './client-help.mjs';
 import {clientListen,clientAck,clientResult,noticeOwnerInbox,noticeInboxHeader,folderListenClaim} from './client-inbox.mjs';
 // Eden edge agent CLI — skill 1.0.0 for contract eden-edge/1 (team/CONTRACTS/EDGE-CONTRACT-v1.md).
@@ -35,7 +35,7 @@ import {publishCompletedOwnerQueue} from './client-owner-result.mjs';
 import {openClientMemory} from './client-memory.mjs';
 import {travelCommand} from './client-travel.mjs';
 
-export const SKILL_VERSION='1.9.9';
+export const SKILL_VERSION='1.9.10';
 export const CONTRACT='eden-edge/1';
 export const API_CONTRACT='eden-edge/1.1'; // Additive support; preserve legacy wire contract.
 const STATE='.eden-agent.json';
@@ -330,11 +330,12 @@ export async function act(first,...rest){
  // Only journeys are protected: a timed activity (sitting, reading, lying, dancing…) is a state the next act may replace, and stand/stop always goes through.
  const words0=[first,...rest].join(' ').toLowerCase(),stopping=/^(stand|stop|get up|stand up|wake)/.test(words0)||first.startsWith('stand:')||ATTENTION.test(intent?.verb??words0)||first.startsWith('face:'); // 1.8: look/turn/face never cancel the body
  const JOURNEY=/^(walk|stroll|go-near|hang-out|gather|object|wave):/;
+ const RIDE_JOIN=/^object:ride-[^:]+:join$/; // 1.9.10 (VEHICLE-STEER): a ride join stays 'started' while seated; steering it ("row to X") is the point, not a replacement
  // 1.9.7 (SOULSIM-H F5): a message your human sent (and you acked) after this walk began is their replacement: act it now.
  const ownerReplaces=!!s.lastOwnerAckAt&&!!s.lastActAt&&Date.parse(s.lastOwnerAckAt)>=Date.parse(s.lastActAt);
  if(!force&&!stopping&&!ownerReplaces&&m==='edge'&&s.lastReceipt&&!s.lastReceipt.startsWith('legacy:')&&s.lastActAt&&Date.now()-Date.parse(s.lastActAt)<120_000){
   const r=await receipt(s.lastReceipt);
-  if(r&&(r.phase==='started'||r.phase==='waiting')&&JOURNEY.test(r.capability??''))return {accepted:false,code:'local.in-progress',receipt:{id:r.id,capability:r.capability,phase:r.phase},
+  if(r&&(r.phase==='started'||r.phase==='waiting')&&JOURNEY.test(r.capability??'')&&!RIDE_JOIN.test(r.capability??''))return {accepted:false,code:'local.in-progress',receipt:{id:r.id,capability:r.capability,phase:r.phase},
    hint:'Your last action is still under way. Run "wait 60" until it completes (or observe/say/converse meanwhile). If your human asked for something else, ack their message, then act it (a plain act replaces the walk after that ack), or add --force.',next:'wait'};
  }
  if(intent&&m==='edge'){
@@ -957,6 +958,7 @@ export async function live(...argv){
   let steps;try{steps=replySteps(plan).map(normaliseStep);}catch(error){steps=[];pending.push({kind:'queue.refusal',text:error.message,_rx:Date.now()});}
   const results=[],localOwnerResults=[];const localOwnerResult=(operation,accepted,line)=>{localOwnerResults.push({operation,accepted,line});results.push(line);};let follow=false;if(reviewTask?.compile&&steps.length){results.push('Compilation body steps deferred: provide compile bindings instead of do.');steps=[];}
   if(own&&Array.isArray(plan.targets)&&plan.targets.length&&plan.targets.length<=8&&plan.targets.every(n=>typeof n==='string'&&n.length<=200&&literalSoulReference(own.text,n))){S.identityGoal={...S.identityGoal,ownerRequestId:own.id,text:own.text,requestedNames:plan.targets};saveS();}
+  if(own&&steps.length){const stale=guardStaleOwnerSteps(steps,own.text,priorOwnerRequests(readJSONL(LIVE.replies),own.id));if(stale.replaced.length){steps=stale.steps;results.push(stale.line);logLive({staleOwnerSteps:{ownerRequestId:own.id,replaced:stale.replaced}});}}
   if(later){const routed=routeOwnerReport(steps,plan.owner);if(routed.routed){steps=routed.steps;plan.owner=routed.owner;results.push(routed.line);logLive({ownerReportRouted:{ownerRequestId:later.id,steps:routed.routed}});}}
   const identityOwner=own??later??S.identityGoal;const identity=await qualifyIdentitySteps(steps,identityOwner?.text??'',identityOwner?.id??identityOwner?.ownerRequestId??null);
   const execution=identity.ok?await executeReplySteps(identity.steps,{queue:bodyQueue,id:own?.id??('wake-'+randomUUID()),source:own?'owner':'mind',force:own?.force===true,replace:!!own||bodyQueue.snapshot().steps.some(s=>['failed','interrupted','blocked'].includes(s.status)),pump:()=>bodyQueue.pump(queueContext(),leaseHeld()),runPublic:runStep}):{results:[{operation:'identity-preflight',accepted:false,code:identity.code,reason:identity.reason,line:`refused ${identity.code}: ${identity.reason}`}],again:true,retained:false};
@@ -975,7 +977,7 @@ export async function live(...argv){
   if(typeof plan.notes==='string'&&plan.notes.trim())try{clientMemory.remember({self:plan.notes.trim().split('\n').slice(0,20).map(line=>line.slice(0,200))});}catch(error){logLive({memoryProblem:error.message});}
   if(typeof plan.notes==='string'&&plan.notes.trim())writeFileSync(LIVE.notes,plan.notes.trim().slice(0,2500)+'\n');
   if(own){own.results.push(...results);if(typeof plan.owner==='string'&&plan.owner.trim()){own.answer=ownerAnswerText(plan.owner);own.answerSource=ownerAnswerSource;}}
-  if(later&&(steps.length||plan.owner)){const r={id:later.id,t:now(),text:later.text,continued:true,answer:typeof plan.owner==='string'?ownerAnswerText(plan.owner):null,answerSource:ownerAnswerSource,results,receipt:steps.some(x=>x.act)?lastReceipt:null};
+  if(later&&(steps.length||plan.owner)){const r={id:later.id,t:now(),text:later.text,continued:true,answer:typeof plan.owner==='string'?ownerPlainLine(ownerAnswerText(plan.owner)):null,answerSource:ownerAnswerSource,results,receipt:steps.some(x=>x.act)?lastReceipt:null};
    appendFileSync(LIVE.replies,JSON.stringify(r)+'\n');logLive({owner:{...r,continued:true}});}
   const hm=(ob.clock??'')+' ';
   S.history.push(clip(`${hm}${reason}${evText.length?' ('+clip(evText.filter(l=>!l.startsWith('receipt')).join('; '),140)+')':''}: ${results.length?results.join('; '):'nothing'}`,330));S.history=S.history.slice(-12);
@@ -989,7 +991,7 @@ export async function live(...argv){
  }
  /** Write the outcome of an owner request where `tell --wait` and `report` read it; results are the world's answers, not the model's claim. */
  function finishOwner(own,error){
-  const r={id:own.id,t:now(),text:own.text,answer:own.answer??null,answerSource:own.answerSource??'model-unverified',results:own.results,...(own.localResults?{localResults:own.localResults}:{}),receipt:own.receipt,queue:bodyQueue.snapshot(),latencySeconds:Math.round((Date.now()-Date.parse(own.t))/1000),...(error?{error}:{})};
+  const r={id:own.id,t:now(),text:own.text,answer:ownerPlainLine(own.answer??null),answerSource:own.answerSource??'model-unverified',results:own.results,...(own.localResults?{localResults:own.localResults}:{}),receipt:own.receipt,queue:bodyQueue.snapshot(),latencySeconds:Math.round((Date.now()-Date.parse(own.t))/1000),...(error?{error}:{})};
   appendFileSync(LIVE.replies,JSON.stringify(r)+'\n');answered.add(own.id);if(ownerActive?.id===own.id)ownerActive=null;
   const qs=bodyQueue.snapshot(),open=qs.steps.some(s=>!['completed','cancelled','skipped'].includes(s.status));
   if(!error&&(!open||qs.id===own.id))ownerLater={id:own.id,text:own.text,results:own.results,until:Date.now()+(open?6*3600_000:10*60_000),...(open?{afterQueue:qs.id}:{})}; // a next step ("…and give it to Mira") or the report is taken at the next wake after the owner's own queue finishes
@@ -1114,7 +1116,7 @@ export async function tell(...args){
  while(Date.now()<until){
   const r=readJSONL(LIVE.replies).filter(x=>x.id===id).at(-1);
   if(r){const q=readJSON('.client-queue.json',{});if(q.id===id&&!q.steps?.some(s=>['failed','interrupted','blocked'].includes(s.status))&&q.steps?.some(s=>['pending','running','waiting','dispatching','stopping'].includes(s.status))){await sleep(500);continue;}if(q.id===id)r.queue=q;const latest=readJSONL(LIVE.replies).filter(x=>x.id===id).at(-1);if(latest?.queueComplete)Object.assign(r,latest);let rec=null;if(r.receipt){await sleep(2500);rec=await receipt(r.receipt).catch(()=>null);} // the body's real state, not the mind's claim
-   return {delivered:true,id,request:r.text,answer:r.answer,answerSource:r.answerSource??'unverified-legacy-answer',did:r.results,...(r.queue?{queue:r.queue}:{}),...(r.initialAnswer?{initialAnswer:r.initialAnswer,finalObservation:r.finalObservation,completed:r.queueComplete===true}:{}),...(rec&&rec.capability?{receipt:{id:rec.id,capability:rec.capability,phase:rec.phase,...(rec.code?{code:rec.code}:{})}}:{}),...(r.error?{error:r.error}:{}),seconds:r.latencySeconds};}
+   return {delivered:true,id,request:r.text,answer:ownerPlainLine(r.answer),answerSource:r.answerSource??'unverified-legacy-answer',did:r.results,...(r.queue?{queue:r.queue}:{}),...(r.initialAnswer?{initialAnswer:r.initialAnswer,finalObservation:r.finalObservation,completed:r.queueComplete===true}:{}),...(rec&&rec.capability?{receipt:{id:rec.id,capability:rec.capability,phase:rec.phase,...(rec.code?{code:rec.code}:{})}}:{}),...(r.error?{error:r.error}:{}),seconds:r.latencySeconds};}
   if(!liveRunning())return {delivered:true,id,outcome:null,reason:'live stopped before answering'};
   await sleep(1500);
  }

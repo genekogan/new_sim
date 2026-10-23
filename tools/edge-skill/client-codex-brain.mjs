@@ -20,6 +20,7 @@ export function codexExecBrain({model,system,resumeId,stateless,effort,executabl
     const terminate=reason=>{problem=reason;kill(child,'SIGTERM');setTimeout(()=>kill(child,'SIGKILL'),1500).unref();finish(Error(reason));};
     const timer=setTimeout(()=>terminate('Codex turn exceeded bounded wall deadline'),timeoutMs);cancel=()=>terminate('Codex turn superseded');
     child.stdout.on('data',chunk=>{if(epoch!==generation||settled)return;bytes+=chunk.length;if(bytes>maxBytes){terminate('Codex stream exceeds byte bound');return;}buffer+=chunk;let cut;while((cut=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,cut);buffer=buffer.slice(cut+1);let row;try{row=JSON.parse(line);}catch{continue;}
+     if(row.item?.type==='error'){tail=(tail+'\nwarning: '+String(row.item.message??'')).slice(-500);continue;} // Codex >=0.16x reports config notices as item type "error"; real failures arrive as turn.failed / top-level error / exit code
      if(row.item?.type&&!['agent_message','reasoning'].includes(row.item.type)){terminate('Unexpected Codex tool/item type '+row.item.type);return;}
      if(row.type==='thread.started'&&typeof row.thread_id==='string'){thread=row.thread_id;processSession=row.thread_id;}
      if(row.type==='item.completed'&&row.item?.type==='agent_message')answer=row.item.text??answer;
