@@ -375,3 +375,40 @@ test('god queue over HTTP: a real build links its ticket to where it stands; fai
   const sup = await g1; assert.equal(sup.status, 409); assert.equal(sup.data.code, 'superseded');
   assert.equal((await g2).status, 200);
 });
+
+// LISTEN-LEAK (2026-10-23): live refusals "at most two inbox listeners per agent" came within ~45 s of each world boot while
+// the owner ran ONE listen process. After a boot, one client reconnecting N times in a row (attempts cut client-side, or
+// overlapping before the old socket is reaped, plus a request that was in flight across the boot) is never refused: each
+// newer listen supersedes the older, a wait peek is answered, one live listener takes the message and it is acked once.
+test('after a boot, one client reconnecting N times in a row is never refused and leaves one live listener', async t => {
+  const f = fixture(':memory:'); f.brain.quiesce(); t.after(() => { f.host.stop(); f.db.close(); });
+  await invite(f, 'alice');
+  const a = await accept(f.host, f.souls.create('dev:alice', {name: 'Avery', description: 'Reboot fixture'}));
+  const tokenA = f.souls.pairExchange(f.souls.pairCode(a, 'http://127.0.0.1:5960').code, 'scripted').token;
+  const god = new GodMode(f.db, {worldId: f.host.worldId, ownerId: 'dev:alice', tick: () => f.host.engine.world.tick, emit() {}});
+  const boot = () => buildApp({cfg: {...config, port: 5960, worldPath: '/w/eden', publicUrl: 'http://127.0.0.1:5960/w/eden', accountAuthRequired: false, webDir: '/nonexistent-inbox-fixture', marsWebDir: '/nonexistent-inbox-fixture'}, db: f.db, host: f.host, auth: f.auth, brain: f.brain, souls: f.souls, edge: new EdgeLedger(f.host, f.db), god, hub: {clients: new Map(), refreshMe() {}} as never});
+  const req = async (app: ReturnType<typeof boot>, path: string, token?: string, body?: unknown, signal?: AbortSignal) => {
+    const r = await app.request(path, {method: body === undefined ? 'GET' : 'POST', headers: {...(token ? {authorization: `Bearer ${token}`} : {}), 'content-type': 'application/json'}, ...(body === undefined ? {} : {body: JSON.stringify(body)}), ...(signal ? {signal} : {})});
+    return {status: r.status, data: await r.json() as any};
+  };
+  const tick = () => new Promise(r => setTimeout(r, 20)), listen = '/v1/edge/inbox/listen?timeoutMs=25000';
+  const before = boot(), gone = new AbortController();
+  const stale = req(before, listen, tokenA, undefined, gone.signal);   // in flight when the process went away
+  await tick();
+  const app = boot(), statuses: number[] = [], overlapping: Promise<{status: number, data: any}>[] = [];
+  for (let i = 0; i < 8; i++) {
+    const cut = new AbortController(), p = req(app, listen, tokenA, undefined, cut.signal); await tick();
+    if (i % 2 === 0) { cut.abort(); statuses.push((await p).status); }   // cut client-side: its socket is reaped
+    else overlapping.push(p);                                            // the old socket not yet reaped
+    statuses.push((await req(app, '/v1/edge/inbox/listen?timeoutMs=0', tokenA)).status);   // the CLI's wait peek
+  }
+  assert.ok(!statuses.includes(429), `never refused: ${statuses}`);
+  assert.equal((await req(app, `/v1/edge/owner/${a.id}/inbox`, 'dev:alice')).data.inbox.presence, 'listening');
+  const id = (await req(app, `/v1/souls/${a.id}/command`, 'dev:alice', {text: 'after the boot'})).data.inbox.latest.id;
+  const answers = await Promise.all(overlapping), handed = answers.filter(x => x.status === 200 && x.data.backlog?.length);
+  assert.deepEqual(answers.slice(0, -1).map(x => [x.status, x.data.code]), Array(overlapping.length - 1).fill([409, 'superseded']));
+  assert.equal(handed.length, 1, 'exactly one live listener took it'); assert.deepEqual(handed[0].data.backlog.map((m: any) => m.id), [id]);
+  assert.equal((await req(app, `/v1/edge/inbox/${id}/ack`, tokenA, {reply: 'Once.'})).status, 200);
+  assert.equal((await req(app, `/v1/edge/inbox/listen?after=${id}&timeoutMs=0`, tokenA)).data.backlog.length, 0, 'nothing handed twice');
+  gone.abort(); await stale;
+});
