@@ -415,9 +415,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
    * something passing: asleep, mid-step, a crowd). Cached per navigation epoch, 0.5 m position bucket and capability,
    * so `here` exits and `go` can ask on every frame.
    */
-  routeProblem(soul: EdgeSoul, capId: string): {code: string; reason: string} | null {
+  routeProblem(soul: EdgeSoul, capId: string, plans?: Plans): {code: string; reason: string} | null {
     const b = this.body(soul.entityId), engine = this.host.engine as unknown as {navEpochV1?(): number};
-    const plan = b ? this.binds(soul).plans.get(capId) : undefined;
+    const plan = b ? (plans ?? this.binds(soul).plans).get(capId) : undefined;
     if (!b || !plan?.steps.some(s => s.verb === 'walk_to') || !engine.navEpochV1) return null;
     const [x, y, z] = b.pose.p, key = `${engine.navEpochV1()}|${Math.round(x * 2)},${Math.round(y * 2)},${Math.round(z * 2)}|${capId}`;
     const hit = this.routeMemo.get(key); if (hit !== undefined) return hit;
