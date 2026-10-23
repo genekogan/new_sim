@@ -94,6 +94,9 @@ test('Soul card start prompt names pair-soul with the window code; without a cod
   assert.match(withCode, /open Sim window/);
   assert.match(withCode, /approval wait/);
   assert.match(withCode, /Do not create another Soul/);
+  assert.match(withCode, /in this folder\. Do not create another Soul\.\n/, 'PROMPT-SHORT: line 1 = read the skill, resume this Soul here, no new Soul');
+  assert.equal(withCode.split('\n').length, 2); assert.doesNotMatch(withCode, /Always listen|run_in_background|ack each/);
+  assert.ok(withCode.length < 400, `short prompt (${withCode.length} chars)`);
   const plain = soulStartPrompt('http://localhost:5960/w/inbox', 's_abc', 'Ada', null);
   assert.match(plain, /pair-soul "s_abc" \(/);
   assert.doesNotMatch(plain, /--for/);

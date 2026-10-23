@@ -98,7 +98,9 @@ export function AgentMessageBoxView({kind, inbox, prompt, text, sending = false,
  * window's code, like the New Soul prompt, so a fresh folder's request comes up in this window instead of only a link. */
 export function soulStartPrompt(base: string, soulId: string, name: string | undefined, code: string | null) {
   const pair = `node eden-agent.mjs pair-soul ${JSON.stringify(soulId)}${code ? ` --for ${code}` : ''}`;
-  return `Read ${base}/SKILL.md and resume my existing Soul ${name ? `${JSON.stringify(name)} (ID ${JSON.stringify(soulId)})` : JSON.stringify(soulId)}. If this folder is not yet paired with it, run ${pair}${code ? ' (the request comes up in my open Sim window; the approval link is a backup)' : ' (I approve it in my open Sim window or at the approval link)'}, then node eden-agent.mjs approval wait. Always listen: run node eden-agent.mjs listen in the background (Claude Code: Bash run_in_background; Codex: as the last command of every turn), never filter its output, ack each message, then result, and run listen again after each batch. Do not create another Soul.`;
+  // PROMPT-SHORT (Gene 2026-10-23 #16): two lines; the listen mechanics live in the skill (lane LISTEN-LEAK)
+  return `Read ${base}/SKILL.md and resume my existing Soul ${name ? `${JSON.stringify(name)} (ID ${JSON.stringify(soulId)})` : JSON.stringify(soulId)} in this folder. Do not create another Soul.\n`
+    + `If this folder is not paired with it yet, run ${pair}${code ? ' (the request comes up in my open Sim window)' : ' (I approve it in my open Sim window or at the approval link)'}, then node eden-agent.mjs approval wait; then listen as the skill says.`;
 }
 let codeOnce: Promise<string | null> | null = null;
 export function SoulAgentMessageBox({api, soulId, name}: {api: Api; soulId: string; name?: string}) {
