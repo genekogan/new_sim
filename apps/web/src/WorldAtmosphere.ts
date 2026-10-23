@@ -13,7 +13,7 @@ import {installAtmosphereChunks,ATMOS,MIST,SHEEN,DUST,NOISE_MAP} from './atmosph
 import {desertDustAt,parseDustOverride,DESERT_DUST_SEED,type DustSample} from './atmosphere/desert-dust.ts';
 import {SkyDome} from './atmosphere/sky.ts';
 import {skyLook,type SkyLook} from './atmosphere/palettes.ts';
-import {updateRainCover,rainCoverRendering,disposeRainCover} from './atmosphere/rain-cover.ts';
+import {COVER_A,updateRainCover,rainCoverRendering,disposeRainCover} from './atmosphere/rain-cover.ts';
 import {MotionPatches,ROTOR,RIPPLE,SKY_OBJECTS} from './atmosphere/motion.ts';
 import {Rain} from './atmosphere/rain.ts';
 import {Halos,type HaloSource} from './atmosphere/halos.ts';
@@ -54,7 +54,7 @@ export type AtmosphereFrame={seconds:number;dt:number;daylight:number|null;camer
  indoors?:(x:number,y:number,z:number)=>boolean};
 /** A god's weather as set (apps/server god/world-env.ts): channels 0..1; kind 'storm' brings lightning. */
 export type SetWeather={kind:string;clouds:number;rain:number;wind:number;fog:number;intensity:number};
-export type AtmosphereInspection={profile:'eden'|'world';dust:({profile:'mars-desert';seed:number}&DustSample)|null;set:boolean;lightning:number;active:boolean;rotor:boolean;fountainWater:number;skyClouds:number;kind:WeatherKind|null;state:WeatherState;windMaterials:number;windModes:Record<string,number>;smokeSources:number;flowers:number;meadow:number;roofs:number;water:number;harbour:boolean;scans:number;drawCalls:number};
+export type AtmosphereInspection={bow:number;rainCover:number;profile:'eden'|'world';dust:({profile:'mars-desert';seed:number}&DustSample)|null;set:boolean;lightning:number;active:boolean;rotor:boolean;fountainWater:number;skyClouds:number;kind:WeatherKind|null;state:WeatherState;windMaterials:number;windModes:Record<string,number>;smokeSources:number;flowers:number;meadow:number;roofs:number;water:number;harbour:boolean;scans:number;drawCalls:number};
 const SCAN_AT=[0,1.5,5,12,25,45];
 /** W2b: phones skip the sea fog banks (big alpha-blended puffs: fill rate). */
 /** Rainbow life after a shower stops (world seconds): full until HOLD, gone by GONE. */
@@ -177,8 +177,10 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
   // A rainbow opposite the sun once rain passes while the ground is still wet.
   // WEATHER-FX (Gene #18): only for a few world minutes after a real shower stops, and never with the sun low or down
   // (the night sun is parked just under the horizon, which used to put a full bow overhead all night).
-  if(state.rain>.35)bowArmed=true,bowFrom=null;else if(bowArmed&&state.rain<.08){bowArmed=false;bowFrom=clockNow;}
-  const bowAge=bowFrom===null?-1:(clockNow-bowFrom)/1000;
+  // Age in world seconds, or viewing seconds when the world clock is slower or held (shots).
+  if(state.rain>.35)bowArmed=true,bowFrom=null;else if(bowArmed&&state.rain<.08){bowArmed=false;bowFrom=clockNow;bowSeen=0;}
+  if(bowFrom!==null)bowSeen+=Math.min(frame.dt,1);
+  const bowAge=bowFrom===null?-1:Math.max(bowSeen,(clockNow-bowFrom)/1000);
   const bowLife=bowAge<0?0:smooth(0,20,bowAge)*(1-smooth(BOW_HOLD_S,BOW_GONE_S,bowAge));
   sky.uniforms.uBow.value.x=bowLife*smooth(.3,.8,state.wet)*(1-smooth(.08,.35,state.rain))*(1-smooth(.5,.8,state.cloud))*smooth(.45,.8,day)*smooth(.06,.2,sunDir.y);
   // Stars on clear nights (clouds and fog hide them).
@@ -241,7 +243,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
  const beforeRender:THREE.Object3D['onBeforeRender']=function(this:THREE.Object3D,renderer,s,camera,geometry,material,group){
   previousBeforeRender.call(this,renderer,s,camera,geometry,material,group);if(rainCoverRendering())return;lastRenderer=renderer;if(active&&!closed)forCamera(camera);};
  let lastRenderer:THREE.WebGLRenderer|null=null;
- let bowArmed=false,bowFrom:number|null=null;
+ let bowArmed=false,bowFrom:number|null=null,bowSeen=0;
  scene.onBeforeRender=beforeRender;
  function windDirection(seconds:number,ms:number){
   const day=Math.floor(ms/86_400_000),a=hash01(day,313)*Math.PI*2+Math.sin(seconds/420)*.35;
@@ -325,7 +327,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    rain.update2(dustScheduled?dustSample.worldMs/1000:seconds,still?0:state.rain*spell,desert?0:leaves,day,frame.camera,WIND.value.z,WIND.value.w,visualWind,desert?(still?0:dustSample.intensity):Math.max(motes,dust),desert?1:dust>motes?1:0);rainWanted=rain.lines.visible;
   },
   onLightning:null as ((strength:number,dir:THREE.Vector3)=>void)|null,
-  inspect(){return {profile,dust:desert?{profile:'mars-desert' as const,seed:DESERT_DUST_SEED,...dustSample}:null,set:!!setWeather,lightning:lastFlash,active,kind,state:{...state},rotor:motion.rotorFound,fountainWater:motion.waterFound,skyClouds:motion.skyClouds,windMaterials:wind.count,windModes:wind.modes(),smokeSources:smoke.sourceCount,flowers:lastFound.flowers,meadow:lastFound.meadow,roofs:lastFound.roofs,water:lastFound.water,harbour:lastFound.harbour,scans,drawCalls:root.children.filter(o=>o.visible).length};},
+  inspect(){return {bow:sky.uniforms.uBow.value.x,rainCover:COVER_A.value.w,profile,dust:desert?{profile:'mars-desert' as const,seed:DESERT_DUST_SEED,...dustSample}:null,set:!!setWeather,lightning:lastFlash,active,kind,state:{...state},rotor:motion.rotorFound,fountainWater:motion.waterFound,skyClouds:motion.skyClouds,windMaterials:wind.count,windModes:wind.modes(),smokeSources:smoke.sourceCount,flowers:lastFound.flowers,meadow:lastFound.meadow,roofs:lastFound.roofs,water:lastFound.water,harbour:lastFound.harbour,scans,drawCalls:root.children.filter(o=>o.visible).length};},
   dispose(){if(closed)return;closed=true;if(review&&(globalThis as Record<string,unknown>).edenAtmosphere===api)delete (globalThis as Record<string,unknown>).edenAtmosphere;deactivate();wind.dispose();motion.dispose();fauna.dispose();balloons.dispose();fireflies.dispose();smoke.dispose();sky.dispose();rain.dispose();halos.dispose();lighthouse.dispose();for(const b of beacons)b.dispose();fogBanks.dispose();root.removeFromParent();if(ownsFog&&scene.fog===fog)scene.fog=null;if(scene.onBeforeRender===beforeRender)scene.onBeforeRender=previousBeforeRender;},
  };
  // Review hook (only with ?weather=… or ?atmos in the URL): window.edenAtmosphere.inspect() in the console.
