@@ -134,9 +134,9 @@ class Builder{
 const PROFILE:readonly [number,number][]=[[3.2,.85],[4.4,1.7],[5.8,2.9],[7.2,3.8],[8.7,4.2],[10,4.1],[11.1,3.5],[12,2.5],[12.6,1.3],[12.9,0]];
 const GORES=16,RED='#c8382c',CREAM='#f2ebdb',GOLD='#e0b040',WICKER='#b98a52',WICKER_DARK='#7c5530',LEATHER='#4a3020',ROPE='#cdbf9c',WOOD='#8b6440',STEEL='#5a5a5e',SAND='#b49c70';
 /** Balloon in basket-local space (origin = basket floor centre, +x forward). Hollow basket so riders show inside. */
-/** Half the door gap in the back wall (BALLOON.door.width / 2), and the burner frame height: above the head of the tallest
- *  Soul standing at its place (Gene 2026-10-23: no head through the "ceiling"). */
-const DOOR_HALF=BALLOON.door.width/2,FRAME_Y=2.75,GATE_OPEN=1.75;
+/** Half the door gap in the back wall (BALLOON.door.width / 2); the cabin's canopy valance (its bottom edge = the door's lintel,
+ *  2.08 m) and the burner frame stand above the head of the tallest Soul at its place (Gene 2026-10-23: no head through the "ceiling"). */
+const DOOR_HALF=BALLOON.door.width/2,CANOPY_Y=2.3,FRAME_Y=2.75,GATE_OPEN=1.75;
 /** The wicker gate, hinged on the back wall at local (x0, +DOOR_HALF); closed it spans the gap along -z. */
 export function buildGate(){
  const b=new Builder(),H=BALLOON.basket.height,w=BALLOON.door.width-.02;
@@ -160,13 +160,16 @@ export function buildBalloon(){
  b.quad(WICKER,[x1,0,z1],[x1,0,z0],[x1,H,z0],[x1,H,z1]);
  // the back wall (local -x) has the door: two wall pieces either side of a gap DOOR_HALF wide each way (the gate is its own mesh)
  const g=DOOR_HALF;b.quad(WICKER,[x0,0,z0],[x0,0,-g],[x0,H,-g],[x0,H,z0]);b.quad(WICKER,[x0,0,g],[x0,0,z1],[x0,H,z1],[x0,H,g]);
- for(const z of [-g,g])b.box(WICKER_DARK,x0,0,z,.07,H+.02,.05);// door posts
+ // a cabin, not a crate: corner posts up to a canopy valance above the tallest head; the door posts carry the valance as a lintel
+ const cy=CANOPY_Y,vh=.22;for(const z of [-g,g])b.box(WOOD,x0,0,z,.07,cy-vh,.06);// door posts
+ for(const [sx,sz] of [[-1,-1],[1,-1],[1,1],[-1,1]] as const)b.box(WOOD,sx*(L/2-.03),0,sz*(W/2-.03),.06,cy,.06);
+ for(const [x,z,w,d] of [[0,z1,L+.06,.03],[0,z0,L+.06,.03],[x1,0,.03,W+.06],[x0,0,.03,W+.06]] as const){b.box(RED,x,cy-vh,z,w,vh,d);b.box(CREAM,x,cy-vh-.005,z,w+.01,.045,d+.01);}
  b.quad(WICKER_DARK,[x0,.005,z1],[x1,.005,z1],[x1,.005,z0],[x0,.005,z0]);b.box(WICKER_DARK,0,-.075,0,L+.04,.08,W+.04);// floor top at y 0 = Core's floorY
  const side=(W/2-g),mid=(W/2+g)/2;for(const [x,z,w,d] of [[0,z1,L+.08,.09],[0,z0,L+.08,.09],[x1,0,.09,W],[x0,-mid,.09,side],[x0,mid,.09,side]] as const)b.box(LEATHER,x,H-.02,z,w,.09,d);
  // wicker weave bands so the basket reads as woven, not as a crate
  for(const y of [.28,.56,.84])for(const [x,z,w,d] of [[0,z1+.006,L,.01],[0,z0-.006,L,.01],[x1+.006,0,.01,W],[x0-.006,-mid,.01,side],[x0-.006,mid,.01,side]] as const)b.box(WICKER_DARK,x,y,z,w,.05,d);
  // burner frame: four uprights, a square, the twin burner, load tapes to the mouth
- const fy=FRAME_Y;for(const [sx,sz] of [[-1,-1],[1,-1],[1,1],[-1,1]] as const){b.rope(STEEL,[sx*(L/2-.06),H,sz*(W/2-.06)],[sx*.45,fy,sz*.4],.035);b.rope(ROPE,[sx*.45,fy,sz*.4],[sx*.62,PROFILE[0][0]+.05,sz*.62],.025);}
+ const fy=FRAME_Y;for(const [sx,sz] of [[-1,-1],[1,-1],[1,1],[-1,1]] as const){b.rope(STEEL,[sx*(L/2-.03),CANOPY_Y,sz*(W/2-.03)],[sx*.45,fy,sz*.4],.035);b.rope(ROPE,[sx*.45,fy,sz*.4],[sx*.62,PROFILE[0][0]+.05,sz*.62],.025);}
  for(const [a,c] of [[[-.45,-.4],[.45,-.4]],[[.45,-.4],[.45,.4]],[[.45,.4],[-.45,.4]],[[-.45,.4],[-.45,-.4]]] as const)b.rope(STEEL,[a[0],fy,a[1]],[c[0],fy,c[1]],.04);
  b.box(STEEL,0,fy-.18,0,.42,.28,.3);b.box('#2e2e30',-.1,fy+.1,0,.14,.12,.14);b.box('#2e2e30',.1,fy+.1,0,.14,.12,.14);
  // fuel tanks in the back corners, below the rim, clear of the door
