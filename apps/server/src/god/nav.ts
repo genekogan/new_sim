@@ -302,8 +302,10 @@ export class GodNav {
     // listing never waits for them)
     const toMain = (g: { p: Vec2; level: number } | null, r: number, ...alts: Vec2[]) => {
       if (!g || g.level || !E.navCheckV1 || !E.navNearestMainV1 || !E.navWarmV1?.(0) || E.navCheckV1([{ id: t.ref, p: g.p, level: 0 }])[0]?.ok) return g;
-      let q = E.navNearestMainV1(g.p, except, r);
-      for (const a of alts) q ??= E.navNearestMainV1(a, except, r);
+      // an area's spot must stay inside it: main ground outside a walled yard is not the yard (route truth)
+      const ok = (v: Vec2 | null) => (v && (!t.area || inPoly(v[0], v[1], t.area)) ? v : null);
+      let q = ok(E.navNearestMainV1(g.p, except, r));
+      for (const a of alts) q ??= ok(E.navNearestMainV1(a, except, r));
       return q ? { p: [r2(q[0]), r2(q[1])] as Vec2, level: 0 } : g;
     };
     let goal: { p: Vec2; level: number } | null = null;
