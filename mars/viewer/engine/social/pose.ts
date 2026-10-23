@@ -200,7 +200,8 @@ function together(rt: Runtime, ex: Exec, a: NonNullable<Runtime['world']['entiti
       ex.phase = 'active'; ex.until = tick + ticks(ex.p.seconds); ex.late = true;
     }
     else if ((ex.waited = (ex.waited ?? 0) + 1) > ticks(ex.p.waitSeconds ?? 30)) {
-      if (ex.p.alone !== 'start') { restore(rt, ex); return { status: 'failed' as const, diagnostic: issue('partner-absent', 'Nobody came to do it with you in time.', [ex.p.actor]) }; }
+      // a game: say why plainly (a late joiner finds the court empty when the last player's 30 s lonely wait ran out first)
+      if (ex.p.alone !== 'start') { restore(rt, ex); return { status: 'failed' as const, diagnostic: issue('partner-absent', ex.p.game ? 'Nobody was playing here when you arrived and nobody came to play in time (a game ends 30 s after its last partner leaves).' : 'Nobody came to do it with you in time.', [ex.p.actor]) }; }
       ex.phase = 'active'; ex.until = tick + ticks(ex.p.seconds);
     } else {
       h.together = { group: ex.p.group!, phase: 'waiting', mobile: !!ex.mobile, ...(once ? { windowPolicy: 'once-v1' as const } : {}) };
@@ -303,7 +304,8 @@ function playGame(rt: Runtime, ex: Exec, a: NonNullable<Runtime['world']['entiti
     // the rally alternates over the net: one side, the other, … (each side in id order, cycling the shorter side)
     const [x0, z0, x1, z1] = g.net, side = (id: string) => { const p = rt.world.entities[id].pose.p; return (x1 - x0) * (p[2] - z0) - (z1 - z0) * (p[0] - x0) < 0 ? 0 : 1; };
     const sides = [players.filter((id) => side(id) === 0), players.filter((id) => side(id) === 1)];
-    players = sides[0].length && sides[1].length ? Array.from({ length: 2 * Math.max(sides[0].length, sides[1].length) }, (_, i) => sides[i % 2][Math.floor(i / 2) % sides[i % 2].length]) : [];
+    // everyone on one side (a joiner took a place beside a player, then the other side left): they pass among themselves
+    if (sides[0].length && sides[1].length) players = Array.from({ length: 2 * Math.max(sides[0].length, sides[1].length) }, (_, i) => sides[i % 2][Math.floor(i / 2) % sides[i % 2].length]);
   }
   const done = () => tick >= ex.until! ? finish(rt, ex) : { status: 'running' as const, phase: 'together' };
   if (new Set(players).size < 2) {

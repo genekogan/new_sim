@@ -1,5 +1,4 @@
 import {SoulAvatar} from './MySouls.tsx';
-import {requestSoulConversations} from './dialogue-speaking.ts';
 import {useEffect,useRef,useState} from 'react';
 import type {PlayView,PublicSoul,TalkLine} from '@sim/protocol';
 import type {Api} from './useSim.ts';
@@ -64,9 +63,9 @@ export function SoulCard({api,soul,doing,energy,plays,talk,camera,pin,ownerActio
    {energy&&<span className="soul-energy">{energy}</span>}
    <VisitorFrom soulId={soul.id}/>
   </p>
-  {ownerAction&&<SoulAgentMessageBox api={api} soulId={soul.id}/>}
+  <div className="soul-card-thread" data-soul-thread={soul.id}/>
+  {ownerAction&&<SoulAgentMessageBox api={api} soulId={soul.id} name={soul.name}/>}
   <div className="soul-actions">
-   <button onClick={()=>requestSoulConversations(soul.id)}>Conversations</button>
    {ownerAction&&<button onClick={ownerAction}>This mind</button>}
    {pin&&<button aria-pressed={pin.pinned} aria-label={pin.pinned?'Pinned favourite; unpin this Soul':'Pin this Soul as a favourite'} title={pin.pinned?'Unpin favourite':'Pin favourite'} onClick={pin.toggle}>{pin.pinned?'Pinned':'Pin'}</button>}
    {camera&&<button className={camera.following?'soul-follow on':'soul-follow'} aria-pressed={camera.following} title={camera.following?'Stop following':'Keep the camera on this Soul'} onClick={camera.following?camera.stop:camera.follow}><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.6" fill="currentColor"/><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.4"/></svg>{camera.following?'Following':'Follow'}</button>}

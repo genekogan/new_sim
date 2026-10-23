@@ -73,7 +73,7 @@ Billing & plans to unblock hosted CI; Modal remains independent. No billing sett
   `one-validation.sh --skip V7,V8`: V1 types, V2 builds, V3 package/engine/CLI/launcher/harness suites, V4 web tests,
   V5 recursive server tests and V6 god/Soul/join API e2es. `--baseline-ref none` suppresses the duplicate V4 baseline.
   Each V5 shard has a 150-minute envelope; exceeding it always blocks the gate.
-- **Fan-out (t4-o1, 2026-10-19).** One run is 14 containers at once: six step groups (`GROUPS` in `modal_suite.py`,
+- **Fan-out (t4-o1, 2026-10-19).** One run is 15 containers at once: seven step groups (`GROUPS` in `modal_suite.py`,
   selected by `SUITE_ONLY`) and eight V5 shards (`V5_SHARD=i/8`: contiguous slices of the sorted server test files,
   balanced by `v5-durations.json`; each shard also records per-file times in `V5-server-full-files.jsonl`, the source
   for rebalancing). The cheap V2 builds also run unrecorded first in every group, so later steps see the same tree.
@@ -81,6 +81,9 @@ Billing & plans to unblock hosted CI; Modal remains independent. No billing sett
   serial test order and duplicate-title ordinals), one RUN-METADATA.json that is complete only if every group was.
   Per-group SUMMARY/metadata/V0/install logs stay in `out/groups/<name>/`. A missing group or shard, a duplicated
   row or an inexact shard file cover fails closed. The gate's verdict logic is unchanged. Wall time ~15–25 min.
+  `run` has `max_containers = len(GROUPS) + V5_SHARDS` (15): each `modal run` is its own ephemeral app, so this caps
+  one gate; the edenartlab workspace limit (100 containers) is kept by the ledger `team/lanes/GATES.inflight`
+  (at most 3 gates in flight across tranches).
   Rebalance after big test changes: `node tools/test-harness/v5-shard.mjs` reads `v5-durations.json`; regenerate it
   from a run's `out/groups/v5-*/V5-server-full-files.jsonl` (sum of top-level `ms` per file).
   - The container has its own network namespace, so the 54xx test ports can't collide with anything.

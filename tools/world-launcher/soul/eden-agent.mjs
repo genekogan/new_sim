@@ -226,7 +226,7 @@ function approvalPublic(data, world) {
   if (!a || !/^ap_[a-f0-9]{32}$/.test(a.id ?? "") || !["pending", "creating", "ready", "refused", "cancelled", "expired"].includes(a.status)) throw Error("Canonical account approval response unavailable.");
   const approvalURL = world + "/#approve/" + a.id;
   const inWindow = a.inWindow === true;
-  return { approvalId: a.id, status: a.status, name: a.name, soulId: a.soulId ?? null, approvalURL, ...inWindow ? { delivery: "window" } : {}, ...a.status === "refused" && typeof a.reason?.message === "string" ? { reason: a.reason.message, reasonCode: a.reason.code } : {}, ...a.status === "pending" ? { next: inWindow ? "Tell your human: approve it in your open Sim window (backup: the approval link). Then run: approval wait." : "Ask your human to open the approval link, sign in, and approve the intended world, Soul and agent. Then run: approval wait." } : a.status === "creating" ? { next: "Creation is accepted but its body is not ready. Run: approval wait." } : a.status === "expired" ? { next: "The request timed out. Your human can press Ask again on it (their open window or the link); run approval wait to pick it up, or create-soul again for a fresh request." } : {} };
+  return { approvalId: a.id, status: a.status, name: a.name, soulId: a.soulId ?? null, approvalURL, ...inWindow ? { delivery: "window" } : {}, ...a.status === "refused" && typeof a.reason?.message === "string" ? { reason: a.reason.message, reasonCode: a.reason.code } : {}, ...a.status === "pending" ? { next: inWindow ? "Tell your human: approve it in your open Sim window (backup: the approval link). Then run: approval wait." : "No window code (--for) was given, so this request is not shown in anyone's open Sim window: ask your human to open the approval link, sign in, and approve the intended world, Soul and agent (or to copy the New Soul prompt from their open window, which carries the code). Then run: approval wait." } : a.status === "creating" ? { next: "Creation is accepted but its body is not ready. Run: approval wait." } : a.status === "expired" ? { next: "The request timed out. Your human can press Ask again on it (their open window or the link); run approval wait to pick it up, or create-soul again for a fresh request." } : {} };
 }
 function acceptDelegation(data, pending, world) {
   if (data?.status !== "ready") return null;
@@ -3676,7 +3676,7 @@ async function travelCommand(args, { load: load2, save: save2, live: live2 = () 
 }
 
 // tools/edge-skill/eden-agent.mjs
-var SKILL_VERSION = "1.9.8";
+var SKILL_VERSION = "1.9.9";
 var CONTRACT = "eden-edge/1";
 var API_CONTRACT = "eden-edge/1.1";
 var STATE = ".eden-agent.json";
@@ -3920,9 +3920,9 @@ async function startApproval({ name, description, soulId, forCode }) {
   }
   if (!soulId && s.reconnectSoul?.world === s.world && s.reconnectSoul.name === name) soulId = s.reconnectSoul.id;
   let pending = s.pendingApproval;
-  if (pending && (pending.world !== s.world || pending.input.name !== name || pending.input.description !== description || pending.input.soulId !== soulId)) throw Error("A different approval is pending. Check it with approval status or cancel it before creating another.");
+  if (pending && (pending.world !== s.world || (soulId ? false : pending.input.name !== name) || pending.input.description !== description || pending.input.soulId !== soulId)) throw Error("A different approval is pending. Check it with approval status or cancel it before creating another.");
   if (!pending) {
-    pending = { world: s.world, worldId: s.worldId, input: { name, ...description === void 0 ? {} : { description }, ...soulId ? { soulId } : {}, agentLabel: "eden-agent " + SKILL_VERSION, idempotencyKey: randomUUID4(), pollSecret: randomBytes2(32).toString("base64url") } };
+    pending = { world: s.world, worldId: s.worldId, input: { ...soulId ? {} : { name }, ...description === void 0 ? {} : { description }, ...soulId ? { soulId } : {}, agentLabel: "eden-agent " + SKILL_VERSION, idempotencyKey: randomUUID4(), pollSecret: randomBytes2(32).toString("base64url") } };
     save({ pendingApproval: pending });
   }
   const data = await approvalCall("/v1/agent/approval/start", { ...pending.input, ...forCode ? { for: forCode } : {} }, "approval start", Date.now() + 6e4);
@@ -3956,10 +3956,10 @@ function supersededApproval(pending) {
   if (cur?.approvalId === pending.approvalId) return null;
   return {
     approvalId: pending.approvalId,
-    name: pending.input.name,
+    name: pending.input.name ?? pending.input.soulId,
     status: "superseded",
-    ...cur ? { newer: { name: cur.input.name, ...cur.approvalId ? { approvalId: cur.approvalId } : {} } } : {},
-    next: cur ? 'This folder now has a newer request ("' + cur.input.name + '"); this wait stopped and changed nothing. Run approval wait (in the background) for the newer one.' : "This request is no longer this folder's pending one (cancelled or finished by another command); nothing was changed. Run status."
+    ...cur ? { newer: { name: cur.input.name ?? cur.input.soulId, ...cur.approvalId ? { approvalId: cur.approvalId } : {} } } : {},
+    next: cur ? 'This folder now has a newer request ("' + (cur.input.name ?? cur.input.soulId) + '"); this wait stopped and changed nothing. Run approval wait (in the background) for the newer one.' : "This request is no longer this folder's pending one (cancelled or finished by another command); nothing was changed. Run status."
   };
 }
 async function approval(action = "status") {
@@ -4002,11 +4002,8 @@ async function approval(action = "status") {
 async function pairSoul(...argv) {
   const { rest: [id3, name], forCode } = forOption(argv);
   if (liveRunning()) throw Error("Stop this folder\u2019s mind before changing its selected Soul.");
-  if (!/^s_[A-Za-z0-9_-]+$/.test(id3 ?? "")) throw Error('usage: pair-soul <immutable Soul ID> "<current name>"');
-  if (load().accountAuth) {
-    if (!name) throw Error("Include the current Soul name for the approval preview.");
-    return startApproval({ name, soulId: id3, forCode });
-  }
+  if (!/^s_[A-Za-z0-9_-]+$/.test(id3 ?? "")) throw Error("usage: pair-soul <immutable Soul ID> [--for <CODE>]");
+  if (load().accountAuth) return startApproval({ soulId: id3, forCode });
   const me = ok(await call(OWNER.me, { as: "owner" }), "pair-soul");
   if (!me.souls.some((s) => s.id === id3)) throw Error("That Soul is not owned by this identity.");
   await pair(id3);

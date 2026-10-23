@@ -9,8 +9,8 @@ const {build} = createRequire(require.resolve('vite/package.json'))('esbuild');
 const dir = await mkdtemp(join(tmpdir(), 'sim-inbox-render-'));
 Object.assign(globalThis, {location: {origin: 'http://localhost:5960', pathname: '/w/inbox/', search: '', hash: ''}, sessionStorage: {getItem: () => null}});
 const outfile = join(dir, 'render.cjs');
-await build({stdin: {contents: `export {AgentMessageBoxView} from './AgentMessageBox.tsx';export {watchStatus} from './god-ui/god-api.ts';export {watchInbox, godState} from './god-ui/god-store.ts';export {publishSession} from './auth-session.ts';export {SoulFocus} from './SoulFocus.tsx';export {createElement} from 'react';export {renderToStaticMarkup} from 'react-dom/server';`, resolveDir: new URL('.', import.meta.url).pathname, loader: 'tsx'}, outfile, bundle: true, format: 'cjs', platform: 'node', jsx: 'automatic', loader: {'.css': 'empty'}, logLevel: 'silent'});
-const {AgentMessageBoxView, watchStatus, watchInbox, godState, publishSession, SoulFocus, createElement: h, renderToStaticMarkup: render} = require(outfile);
+await build({stdin: {contents: `export {AgentMessageBoxView, soulStartPrompt} from './AgentMessageBox.tsx';export {watchStatus} from './god-ui/god-api.ts';export {watchInbox, godState} from './god-ui/god-store.ts';export {publishSession} from './auth-session.ts';export {SoulFocus} from './SoulFocus.tsx';export {createElement} from 'react';export {renderToStaticMarkup} from 'react-dom/server';`, resolveDir: new URL('.', import.meta.url).pathname, loader: 'tsx'}, outfile, bundle: true, format: 'cjs', platform: 'node', jsx: 'automatic', loader: {'.css': 'empty'}, logLevel: 'silent'});
+const {AgentMessageBoxView, soulStartPrompt, watchStatus, watchInbox, godState, publishSession, SoulFocus, createElement: h, renderToStaticMarkup: render} = require(outfile);
 const props = {kind: 'god', prompt: 'Resume the existing agent and listen.', text: '', onText() {}, onSend() {}, onCopy() {}};
 test('absent and unknown agent presence make no delivery claim; start prompt is copyable', () => {
   const absent = render(h(AgentMessageBoxView, {...props, inbox: {connected: false, lastSeenAt: null, latest: null}}));
@@ -81,3 +81,16 @@ test('God box disappears on sign-out even if the provider retains the same label
   } finally { stopStatus(); globalThis.fetch = realFetch; }
 });
 test.after(() => rm(dir, {recursive: true, force: true}));
+
+// Lane PAIR-INWINDOW (Gene's review 2026-10-22 #1): the card's start prompt carries the window code like the New Soul prompt
+test('Soul card start prompt names pair-soul with the window code; without a code it still names the command', () => {
+  const withCode = soulStartPrompt('http://localhost:5960/w/inbox', 's_abc', 'Ada', 'K7QX-M2PA');
+  assert.match(withCode, /pair-soul "s_abc" --for K7QX-M2PA/);
+  assert.match(withCode, /Soul "Ada" \(ID "s_abc"\)/);
+  assert.match(withCode, /open Sim window/);
+  assert.match(withCode, /approval wait/);
+  assert.match(withCode, /Do not create another Soul/);
+  const plain = soulStartPrompt('http://localhost:5960/w/inbox', 's_abc', 'Ada', null);
+  assert.match(plain, /pair-soul "s_abc" \(/);
+  assert.doesNotMatch(plain, /--for/);
+});

@@ -100,9 +100,16 @@ V5_SHARDS = 8
 assert sorted(s for g in GROUPS.values() for s in g) == sorted(set(ORDER) - {"V5-server-full", "V5-server-baseline"})
 
 
+# max_containers (lane GATECAP, 2026-10-23; Modal 1.5.2 keyword): the edenartlab workspace has a 100-container limit.
+# `modal run` makes a fresh ephemeral app per gate, so this caps ONE gate, not all of them: at most one gate's full
+# fan-out (7 groups + 8 V5 shards = 15) in flight, extra inputs (e.g. preemption restarts) queue instead of adding
+# containers. The cross-gate bound is the ledger team/lanes/GATES.inflight (at most 3 gates = 45 containers).
+MAX_CONTAINERS = len(GROUPS) + V5_SHARDS
+
+
 # single_use_containers: a preempted input is restarted by Modal, and without this it can land on a warm container that
 # already ran another group (2026-10-19, R's 3.9 gate: group b's suite came back as shard v5-1). One input per container.
-@app.function(image=image, cpu=8.0, memory=16384, timeout=4 * 3600, single_use_containers=True)
+@app.function(image=image, cpu=8.0, memory=16384, timeout=4 * 3600, single_use_containers=True, max_containers=MAX_CONTAINERS)
 def run(skip: str, server_files: str = "", only: str = "", shard: str = "") -> bytes:
     files = server_files.split()
     if any(not re.fullmatch(r"src/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_.-]+\.test\.ts", f) for f in files):

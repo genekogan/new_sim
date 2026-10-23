@@ -32,7 +32,7 @@ import type { InitialWorldProgress } from './InitialWorldReadiness.ts';
 import {connectionLost} from './viewer-arrival.ts';
 import {BringAgent} from './BringAgent.tsx';
 import {OldWorldApprovals} from './OldWorldApprovals.tsx';
-import {approvalFromHash} from './approval-link.ts';
+import {answerApprovalTabs,approvalChannelName,approvalFromHash,askOpenTab} from './approval-link.ts';
 import {useApprovalFollow} from './useApprovalFollow.ts';
 import {FOLLOW_SOUL_WAIT_MS,onFollowSoulRequest} from './follow-soul-request.ts';
 import {worldClockAt,worldTimeText} from './world-clock.ts';
@@ -73,7 +73,21 @@ const ADMIN_TABS = new Set<string>(['spend', 'admin']);
 const hashTab = (): { tab: Tab; pair: string | null; soul?:string|null } => { const soul=soulFromFragment(location.hash); if(soul)return {tab:'watch',pair:null,soul}; let h = ''; try { h = decodeURIComponent(location.hash.slice(1)); } catch { /* a mangled link: fall back to the first tab */ } if (h.startsWith('pair/')) return /^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/.test(h.slice(5)) ? { tab: 'my soul', pair: h.slice(5) } : { tab: 'my soul', pair: null }; return { tab: (TABS as readonly string[]).includes(h) ? (h as Tab) : 'watch', pair: null, soul:null }; };
 type Tab = (typeof TABS)[number];
 
-export function Shell({ cfg, auth: providerAuth, arrivalEnabled=false,humanPresetsEnabled=true }: { cfg: Cfg; auth: AuthCtx; arrivalEnabled?:boolean;humanPresetsEnabled?:boolean }) {
+// Gene's review #1 item 3 (lane PAIR-UI): an #approve link opened while a tab of this world is open hands the request to
+// that tab (approval-link.ts askOpenTab) and shows only a short note here (ApproveOnly.tsx, its own small chunk): no second
+// world, socket or score. With no open tab it boots the world with the card, as before.
+const ApproveOnly=lazy(()=>import('./ApproveOnly.tsx').then(m=>({default:m.ApproveOnly})));
+type ShellProps={ cfg: Cfg; auth: AuthCtx; arrivalEnabled?:boolean;humanPresetsEnabled?:boolean };
+export function Shell(props:ShellProps){
+  const [linkId]=useState(()=>approvalFromHash(location.hash));
+  const [mode,setMode]=useState<'world'|'asking'|'handed'>(linkId?'asking':'world');
+  useEffect(()=>{if(!linkId)return;let live=true;void askOpenTab(approvalChannelName(props.cfg.worldId),linkId).then(ok=>{if(live)setMode(m=>m==='asking'?(ok?'handed':'world'):m);});return()=>{live=false;};},[linkId,props.cfg.worldId]);
+  if(mode==='world'||!linkId)return <ShellWorld {...props}/>;
+  if(mode==='asking')return <main className="approve-only" aria-busy="true"/>;
+  return <Suspense fallback={<main className="approve-only" aria-busy="true"/>}><ApproveOnly id={linkId} cfg={props.cfg} auth={props.auth} worldName={worldTitle(props.cfg.worldName,worldKey)}/></Suspense>;
+}
+
+function ShellWorld({ cfg, auth: providerAuth, arrivalEnabled=false,humanPresetsEnabled=true }: ShellProps) {
   const auth = useSignOutAtOnce(providerAuth);  // U3: signed-out everywhere the moment Sign out is pressed
   const tokenReader = useRef(auth.getToken);
   tokenReader.current = auth.getToken;
@@ -109,7 +123,13 @@ export function Shell({ cfg, auth: providerAuth, arrivalEnabled=false,humanPrese
   // lane QA: the landing's own '#watch' replaces the bare URL instead of pushing a second entry: one Back now leaves the
   // world (a stranger pressed Back and stayed on the same view).
   useEffect(()=>{const changed=()=>{setApprovalId(approvalFromHash(location.hash));};addEventListener('hashchange',changed);return()=>removeEventListener('hashchange',changed);},[]);
-  useEffect(() => { const f = () => { if(location.hash==='#advanced'){setAdvanced(true);setPanelOpen(false);setTab('watch');return;} const h = hashTab(); setTab(h.tab); if (!['watch', 'my soul'].includes(h.tab)) setAdvanced(true); else if(h.soul){setAdvanced(false);setPanelOpen(true);setNavigationOpen(false);} if(h.tab==='watch')setSelected(h.soul??null); if (h.pair) setPairCode(h.pair); else if(h.tab==='watch')setPairCode(null); }; addEventListener('hashchange', f); return () => removeEventListener('hashchange', f); }, []);
+  // lane PAIR-UI: this open world tab answers an #approve link opened in another tab of the same world (Shell above): the
+  // tab most recently in front shows the card. The hash says so too, so a sign-in round trip comes back to it.
+  useEffect(()=>{let front=document.visibilityState==='visible'?Date.now():0;const mark=()=>{if(document.visibilityState==='visible')front=Date.now();};
+    addEventListener('focus',mark);document.addEventListener('visibilitychange',mark);
+    const stop=answerApprovalTabs(approvalChannelName(cfg.worldId),id=>{location.hash='approve/'+id;},()=>front);
+    return()=>{stop();removeEventListener('focus',mark);document.removeEventListener('visibilitychange',mark);};},[cfg.worldId]);
+  useEffect(() => { const f = () => { if(approvalFromHash(location.hash))return; if(location.hash==='#advanced'){setAdvanced(true);setPanelOpen(false);setTab('watch');return;} const h = hashTab(); setTab(h.tab); if (!['watch', 'my soul'].includes(h.tab)) setAdvanced(true); else if(h.soul){setAdvanced(false);setPanelOpen(true);setNavigationOpen(false);} if(h.tab==='watch')setSelected(h.soul??null); if (h.pair) setPairCode(h.pair); else if(h.tab==='watch')setPairCode(null); }; addEventListener('hashchange', f); return () => removeEventListener('hashchange', f); }, []);
   const [lessonIndex,setLessonIndex]=useState(0);
   const [lessonOpen,setLessonOpen]=useState(false);
   // VF3 (Gene): Advanced is unlisted; reach it at #advanced (or any Advanced tab's hash).

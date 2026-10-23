@@ -43,7 +43,7 @@ export class WorldAccounts {
   this.verifySession(identity);
   const user=this.host.db.user(identity.id);if(!user)throw new ApiError(401,'unauthorized','Sign in first.');this.souls.requireInvited(user);
   const dto=this.store.db.tx(()=>{const wasPending=this.store.view(id,identity).status==='pending';const dto=this.store.approve(identity,id,input=>{
-   if(input.mode==='repair'){const row=input.soulId?this.host.db.soul(input.soulId):undefined;if(!row||!this.owns(identity.id,row)||row.retired_at!==null)throw new ApiError(403,'forbidden','Not your Soul.');if(row.name!==input.name)throw new ApiError(409,'soul-name-changed','This Soul has a different current name. Ask the agent for a fresh exact-ID/current-name request.');return {worldId:this.host.worldId,accountId:identity.id,requestId:input.requestId,soulId:row.id};}
+   if(input.mode==='repair'){const row=input.soulId?this.host.db.soul(input.soulId):undefined;if(!row||!this.owns(identity.id,row)||row.retired_at!==null)throw new ApiError(403,'forbidden','Not your Soul.');/* lane PAIR-INWINDOW: the request carries the Soul's name read at request time; identity is the ID, so a rename since then never fails a pressed Approve */return {worldId:this.host.worldId,accountId:identity.id,requestId:input.requestId,soulId:row.id};}
    if(!this.souls.lifecycle)throw new ApiError(503,'arrival-unavailable','Account arrivals are unavailable in this world.');
    this.approving.add(identity.id);let op;try{op=this.souls.acceptLifecycleCreate(identity.id,{name:input.name,...(input.description?{description:input.description}:{})},input.requestId);}finally{this.approving.delete(identity.id);}
    return {worldId:this.host.worldId,accountId:identity.id,requestId:op.requestId,soulId:op.scope.soulId};

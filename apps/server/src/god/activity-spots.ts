@@ -45,7 +45,8 @@ const centroidOf = (p: V2[]): V2 => [p.reduce((s, q) => s + q[0], 0) / p.length,
 type Thing = { on?: string; id: string; e: Entity; def: StoredDef; name: string; tags: Set<string>; c: Record<string, any>; at: V2; y: number; yaw: number; level: number; size: [number, number, number]; slots: { id: string; kind: string; local: V2; yaw: number }[] };
 
 /** Words that say what a def is (its name without `core-`, its tags). */
-const kindOf = (t: Thing) => t.def.name.replace(/^core-/, '');
+const kinds = new WeakMap<StoredDef, string>();
+const kindOf = (t: Thing) => { let k = kinds.get(t.def); if (k === undefined) kinds.set(t.def, (k = t.def.name.replace(/^core-/, ''))); return k; };
 const is = (t: Thing, ...words: string[]) => words.some(w => t.tags.has(w) || kindOf(t) === w);
 const SEAT_KINDS = new Set(['chair', 'armchair', 'sofa', 'stool', 'bench-seat', 'bench', 'pew', 'office-chair', 'dining-chair', 'bar-stool', 'loveseat']);
 
@@ -60,15 +61,26 @@ export class GodActivitySpots {
   stats = { ms: 0, spots: 0, shelves: 0, derives: 0, kept: 0 };
   constructor(h: SpotsHost) { this.h = h; }
 
-  data(): SpotsData {
-    const key = `${this.h.version()}:${this.h.model.entities.size}`;
+  /** A reader asked for the spots since the last warm(): worth deriving them ahead of the next read. */
+  private wanted = false;
+  data(): SpotsData { this.wanted = true; return this.get(); }
+  /** Derive now, off a Soul's listing, if the spots are stale and someone reads them (the host calls it once a god
+   *  edit has been caught up with). Same derive and cache as data(): the next read finds them. True when it derived. */
+  warm(): boolean {
+    if (!this.wanted || this.cache?.key === this.key() || this.h.catchingUp?.()) return false;
+    this.wanted = false; this.get(); return true;
+  }
+  private key() { return `${this.h.version()}:${this.h.model.entities.size}`; }
+  private get(): SpotsData {
+    const key = this.key();
     if (this.cache?.key === key) return this.cache.value;
     if (this.cache && this.h.catchingUp?.()) { this.stats.kept++; return this.cache.value; }
     this.h.prepare?.();
     const t0 = performance.now();
     let value: SpotsData;
     this.locate = this.h.placeLocator?.() ?? null;
-    try { value = this.derive(); } finally { this.locate = null; }
+    this.placeMemo = new WeakMap();
+    try { value = this.derive(); } finally { this.locate = null; this.placeMemo = null; }
     this.stats = { ms: Math.round(performance.now() - t0), spots: value.spots.length, shelves: value.shelves.length, derives: this.stats.derives + 1, kept: this.stats.kept };
     this.cache = { key, value };
     return value;
@@ -100,7 +112,14 @@ export class GodActivitySpots {
   }
   /** During a derive: the places as they were when it began (placeLocator), asked many times. */
   private locate: ((at: V2, level: number) => string | null) | null = null;
-  private place(at: V2, level: number) { return (this.locate ? this.locate(at, level) : this.h.placeAt(at, level)) ?? undefined; }
+  /** During a derive: place() answers by point (the same point is asked for one thing by several passes). */
+  private placeMemo: WeakMap<V2, { level: number; v: string | undefined }> | null = null;
+  private place(at: V2, level: number) {
+    const m = this.placeMemo?.get(at); if (m && m.level === level) return m.v;
+    const v = (this.locate ? this.locate(at, level) : this.h.placeAt(at, level)) ?? undefined;
+    this.placeMemo?.set(at, { level, v });
+    return v;
+  }
   private label(t: Thing, place?: string) { const p = place ? this.h.placeName(place) : null; return `${t.name}${p && p.toLowerCase() !== t.name.toLowerCase() ? ` in ${p}` : ''}`.slice(0, 80); }
 
   private derive(): SpotsData {
@@ -246,6 +265,7 @@ export class GodActivitySpots {
    *  tables, dancing on a bandstand, a yoga class round the lawn mat; and hammocks. Done together (Spot.together). */
   private groupLife(all: Thing[], seats: Thing[], add: (s: Spot) => void, seatSpot: (seat: Thing, activity: string, faceTo: V2 | undefined, extra?: Partial<Spot>) => void, standSpot: (t: Thing, activity: string, extra?: Partial<Spot>, slot?: string) => void) {
     const grp = (k: string) => k.replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 80);
+    const potOn = new Set(all.filter(o => o.on !== undefined && is(o, 'pot', 'cooking')).map(o => o.on!));
     for (const t of all) {
       const place = this.place(t.at, t.level);
       // a campfire with seats: one storyteller's place by the fire, its seats listen (once the story has started)
@@ -265,7 +285,7 @@ export class GodActivitySpots {
         for (const q of round) seatSpot(q, 'book-club', [r2(t.at[0]), r2(t.at[1])], { prop: 'book', together: { group: grp(`book-club-${t.id}`), need: 1, wait: TOGETHER_WAIT, alone: 'fail' }, label: `${this.label(t, place)} (book club)` });
       }
       // a preparation table with a pot: two cooks together
-      if (t.c.surface && !t.c.workstation && all.some(o => o.on === t.id && is(o, 'pot', 'cooking'))) {
+      if (t.c.surface && !t.c.workstation && potOn.has(t.id)) {
         ([[-0.5, 1], [0.5, 1]] as V2[]).forEach((l, k) => { const at = this.world(t, [l[0], t.size[2] / 2 + 0.45]); add({ id: `cook-together.${t.id}.${k}`.toLowerCase(), activity: 'cook-together', base: 'idle', at, faceTo: [r2(t.at[0]), r2(t.at[1])], together: { group: grp(`cooks-${t.id}`), need: 1, wait: TOGETHER_WAIT, alone: 'fail' }, label: `${this.label(t, place)} (cooking together)`, ...(place ? { place } : {}) }); });
       }
       // the lawn's yoga mat: the teacher's place and two rows of six for a class

@@ -4,6 +4,11 @@ import {createHash} from 'node:crypto';
 import {openMemoryFolder} from './memory-folder.mjs';
 import {currentPlaceAncestors,recordedVisitParent} from './client-place-arrivals.mjs';
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
+// One gazetteer record holds at most 1000 places / 64 KB (memory-folder.mjs). Big worlds (eden-2026: 1,505 places) are written as
+// several records; replay upserts each place, so chunks merge into one normalized gazetteer. Rows are bounded to the record schema.
+const GAZETTEER_CHUNK_PLACES=400,GAZETTEER_CHUNK_BYTES=48*1024;
+const boundedText=(value,max)=>{const t=String(value).replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g,' ').trim();return t.length>max?t.slice(0,max-1).trimEnd()+'…':t;};
+export function gazetteerChunks(places){const chunks=[];let chunk=[],bytes=0;for(const raw of places){const p={...raw,name:boundedText(raw.name,100)||String(raw.id),goodFor:[...new Set(raw.goodFor.map(v=>boundedText(v,160)).filter(Boolean))].slice(0,12)};const size=Buffer.byteLength(JSON.stringify(p))+1;if(chunk.length&&(chunk.length>=GAZETTEER_CHUNK_PLACES||bytes+size>GAZETTEER_CHUNK_BYTES)){chunks.push(chunk);chunk=[];bytes=0;}chunk.push(p);bytes+=size;}if(chunk.length||!chunks.length)chunks.push(chunk);return chunks;}
 const safe=path=>{try{if(lstatSync(path).isSymbolicLink())throw Error('linked memory evidence refused');}catch(e){if(e.code!=='ENOENT')throw e;}return path;};
 /** Typed adapter: public normalized data only; no HTTP/identity/auth state here. */
 export function openClientMemory(directory,{scope,now=()=>new Date().toISOString(),onProblem=()=>{}}){
@@ -19,7 +24,7 @@ export function openClientMemory(directory,{scope,now=()=>new Date().toISOString
  const observed=place=>{if(place)fold('observed-place:'+hash(place),{type:'place.observed',place:{id:place,name:place}});};
  const coveredParent=place=>{state.coveredParents??=[];if(place&&state.parentDestinations?.includes(place)&&!state.coveredParents.includes(place)){observed(place);fold('arrival-parent:'+hash([scope,place]),{type:'arrival',placeId:place});state.coveredParents.push(place);save();}};
  const api={
-  catalogue(cache){const places=cache.places.map(p=>({id:p.id,name:p.name,admittedDestination:p.walkable===true,goodFor:(Array.isArray(p.goodFor)?p.goodFor:typeof p.goodFor==='string'?[p.goodFor]:[]).filter(value=>typeof value==='string'&&value.trim())}));fold('catalogue:'+hash(places),{type:'gazetteer',places});refs(cache.references??[]);state.hierarchy=cache.hierarchy??{};state.parentDestinations=cache.places.filter(p=>p.walkable&&p.kind!=='world'&&p.kind!=='sleeping-mat').map(p=>p.id);save();},
+  catalogue(cache){const places=cache.places.map(p=>({id:p.id,name:p.name,admittedDestination:p.walkable===true,goodFor:(Array.isArray(p.goodFor)?p.goodFor:typeof p.goodFor==='string'?[p.goodFor]:[]).filter(value=>typeof value==='string'&&value.trim())}));const digest=hash(places);gazetteerChunks(places).forEach((chunk,i,all)=>fold(`catalogue:${digest}:${i+1}of${all.length}`,{type:'gazetteer',places:chunk}));refs(cache.references??[]);state.hierarchy=cache.hierarchy??{};state.parentDestinations=cache.places.filter(p=>p.walkable&&p.kind!=='world'&&p.kind!=='sleeping-mat').map(p=>p.id);save();},
   here(frame){const observationMs=Date.parse(now()),idle=frame.me?.activity?.kind==='idle',previous=state.observation;if(idle&&previous?.idle&&observationMs>previous.at&&observationMs-previous.at<=120000)fold('idle:'+hash([previous.at,observationMs]),{type:'idle.sample',milliseconds:observationMs-previous.at});state.observation={at:observationMs,idle};save();const place=frame.me?.place??null;observed(place);if(place&&place!==state.place){fold('arrival:'+hash([scope,frame.tick,place,state.place]),{type:'arrival',placeId:place});state.place=place;save();}for(const parent of currentPlaceAncestors(place,state.hierarchy).slice(1))coveredParent(parent);},
   terminal(receipt,step){
    if(!['completed','failed','replaced'].includes(receipt.phase))return;
