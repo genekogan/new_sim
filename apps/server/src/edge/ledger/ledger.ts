@@ -36,7 +36,7 @@ import {Intents,walkWithDestinationWords,walkWithFallback, attentionWords, type 
 import {classWords} from '../intents/class-words.ts';
 import {strictCheck} from '../intents/strict.ts';
 import {bodyEnd} from '../perception/here.ts';
-import {bootAliases,explicitPlaceCapability,lookupPlaceIdentity,resolvePlaceForVerb} from '../boot/world-places.ts';
+import {bootAliases,explicitPlaceCapability,knownBootPlaces,lookupPlaceIdentity,resolvePlaceForVerb} from '../boot/world-places.ts';
 import {ActionOutcomes,outcomeParams,type ConfirmedEffects} from '../outcomes/store.ts';
 import {holdingFact,receiptItemOp,confirmedTogetherEffects,confirmedObjectEffects} from '../outcomes/effects.ts';
 import {resolveMailRecipient} from '../outcomes/recipients.ts';
@@ -1081,8 +1081,19 @@ export class EdgeLedger implements EdgeLedgerHooks {
   steerTarget(soulId: string, entityId: string, spec: {to?: string; direction?: string; distance?: number}): {ok: true; x: number; z: number; label: string} | {ok: false; code: string; reason: string; did_you_mean?: unknown} {
     const c = this.carriersNative().find(x => x.id === entityId); if (!c) return {ok: false, code: 'ride.closed', reason: 'This ride is not running.'};
     if (spec.to !== undefined) {
-      const r = lookupPlaceIdentity(this, spec.to, soulId);
-      if (!r.ok) return {ok: false, code: 'steer.unknown-place', reason: `"${String(spec.to).slice(0, 60)}" is not a place you know; name a place (or give a direction and distance).`, did_you_mean: r.did_you_mean.slice(0, 5)};
+      let r = lookupPlaceIdentity(this, spec.to, soulId);
+      // "the lighthouse" names several places (a region, its breakwater, a room): steering wants the first that every word fits
+      if (!r.ok && r.did_you_mean.length) {
+        const words = String(spec.to).toLowerCase().replace(/^the\s+/, '').split(/[^a-z0-9]+/).filter(Boolean);
+        const fit = r.did_you_mean.map(d => this.places.byId.get(d.placeId)).find(pl => pl?.polygon?.length && !pl.carrier && words.every(w => `${pl.id} ${pl.name}`.toLowerCase().includes(w)));
+        if (fit) r = {ok: true, chosen: {place: fit.id, name: fit.name}} as unknown as typeof r;
+      }
+      if (!r.ok) {
+        // name a few real choices: the near-misses, else the known places nearest the ride
+        const near = r.did_you_mean.length ? r.did_you_mean.map(d => this.places.byId.get(d.placeId)?.name ?? d.label) : knownBootPlaces(this, soulId).filter(k => k.access === 'admitted' || k.access === 'scenery').map(k => this.places.byId.get(k.id)).filter(pl => pl?.polygon?.length && !pl.carrier)
+          .map(pl => {const [x, z] = centroid(pl!.polygon!); return {name: pl!.name, d: Math.hypot(x - c.pose.p[0], z - c.pose.p[2])};}).sort((a, b) => a.d - b.d).slice(0, 5).map(x => x.name);
+        return {ok: false, code: 'steer.unknown-place', reason: `"${String(spec.to).slice(0, 60)}" is not a place you know; name a place (or give a direction and distance)${near.length ? `. Places you know: ${[...new Set(near)].slice(0, 5).join(', ')}` : ''}.`, did_you_mean: r.did_you_mean.slice(0, 5)};
+      }
       const pl = this.places.byId.get(r.chosen.place); if (!pl?.polygon?.length) return {ok: false, code: 'steer.unknown-place', reason: `${r.chosen.name} has no location to steer to.`};
       const [x, z] = centroid(pl.polygon); return {ok: true, x: Math.round(x * 100) / 100, z: Math.round(z * 100) / 100, label: pl.name};
     }

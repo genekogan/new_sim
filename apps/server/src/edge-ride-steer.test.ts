@@ -5,6 +5,8 @@ import assert from 'node:assert/strict';
 import {setImmediate} from 'node:timers/promises';
 import {retainedCommonsShoreFactory,nativeSleepSnapshotFactoryV1} from '@sim/engine-mars';
 import {Hono} from 'hono';
+import {kernelHash} from '@sim/kernel';
+import {WorldHost} from './world.ts';
 import {fixture,invite,accept} from '../test/native-owner-fixture.ts';
 import {LivingWorld} from './living.ts';
 import {hashToken} from './auth.ts';
@@ -32,6 +34,10 @@ async function world(t:any,opts:{balloon?:boolean;punt?:boolean}){
  const steer=(i:number,ride:string,params:Record<string,unknown>)=>call(i,'POST',`/v1/edge/objects/${ride}/act`,{action:'steer',params});
  return {f,rows,ledger,comms,call,run,ent,car,steer};
 }
+// a fresh replay of the log from genesis reaches the same world (the steer is a logged decision like any other)
+async function replayExact(w:any){const f=w.f;f.host.drainInputs();f.host.saveSnapshot(true);const head={engine:f.host.engine.stateHash(),kernel:kernelHash(f.host.kernel)};
+ f.db.db.prepare('DELETE FROM snapshots WHERE world_id=?').run(f.host.worldId);
+ const h=new WorldHost(f.db,await retainedCommonsShoreFactory().then(nativeSleepSnapshotFactoryV1),f.host.seed,1e9,f.host.worldId,{durableClockV1:true});assert.equal(h.boot().from,'genesis');assert.deepEqual({engine:h.engine.stateHash(),kernel:kernelHash(h.kernel)},head,'replay exact');h.stop();}
 const flat=(a:number[],b:number[])=>Math.hypot(a[0]-b[0],a[2]-b[2]);
 
 const boardAndLift=async(w:any)=>{
@@ -64,6 +70,7 @@ test('steer the balloon to a named place and land there; the other rider is refu
  assert.ok(await w.run(6000,()=>b().carrier.phase==='parked'),'flew home empty: '+b().carrier.phase);
  assert.ok(flat(b().pose.p,home)<.5,`parked at home ${b().pose.p}`);assert.equal(b().carrier.steer,undefined);
  assert.deepEqual(w.f.host.engine.runtime.violations,[]);assert.equal(w.f.db.paidCost(),0);
+ await replayExact(w);
 });
 
 test('stop holds the balloon in the air, then with nobody steering it rejoins its own route and lands at home; out of bounds is refused',{timeout:600000},async t=>{
