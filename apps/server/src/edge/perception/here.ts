@@ -155,6 +155,12 @@ export function bodyEnd(ledger: EdgeLedger, soulId: string): {place: string | nu
 }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** The world's time and date in one line, first in `here` (lane AWARE): "Wed 21 Oct 2026 · 03:33 · night · world day 19". */
+export function worldNow(c: {day: number; hour: number; minute: number; datetime: string}): string {
+  const d = new Date(c.datetime);
+  return `${WEEKDAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()} · ${String(c.hour).padStart(2, '0')}:${String(c.minute).padStart(2, '0')} · ${lightOf(c.hour, c.minute)} · world day ${c.day + 1}`;
+}
 function lightOf(hour: number, minute: number) {const t = hour * 60 + minute; return t < 330 ? 'night' : t < 420 ? 'dawn' : t < 1110 ? 'day' : t < 1200 ? 'dusk' : 'night';}
 function skyOf(w: {clouds?: number; rain?: number; wind?: number; fog?: number; kind?: string} | undefined) {
   if (!w) return null;
@@ -234,7 +240,7 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
       const problem = ledger.routeProblem(soul, x.c.id);
       return problem ? {...base, reachable: false, why: problem.code} : {...base, eta: '~' + durationWord(walkSeconds(x.d * 1.25))};}) : [];
   const frame = {
-    tick, ...(c ? {clock: `${String(c.hour).padStart(2, '0')}:${String(c.minute).padStart(2, '0')}`, day: WEEKDAYS[new Date(c.datetime).getUTCDay()], light: lightOf(c.hour, c.minute)} : {}),
+    ...(c ? {now: worldNow(c)} : {}), tick, ...(c ? {clock: `${String(c.hour).padStart(2, '0')}:${String(c.minute).padStart(2, '0')}`, day: WEEKDAYS[new Date(c.datetime).getUTCDay()], light: lightOf(c.hour, c.minute)} : {}),
     ...(weather ? {weather: (() => {const l = P.pos ? ledger.lightningNear?.(P.pos[0], P.pos[1]) : null; return l ? {...weather, lightning: l} : weather;})()} : {}),
     me: {soulId:soul.soulId,name:host.minds.get(soul.soulId)?.name??soul.name,profileRevision:host.profileFact(soul.soulId)?.revision??0,place: me.place, placePath: me.placePath, pos: me.pos, heading: me.heading, facing: compassPoint(me.heading), posture: me.posture, body:P.w.entities[soul.entityId]?.body??{family:'humanoid'}, ...(me.seat ? {seat: me.seat} : {}),
       activity: inviting ? {kind: 'inviting', what: inviting.what, with: inviting.waitingFor.map(g => g.name), answerWithin: durationWord(inviting.expiresInSeconds)} : {kind: activityKind, ...(endsIn ? {endsIn} : {})},
