@@ -646,6 +646,9 @@ export class MarsEngine implements Engine {
     const shape = (this.m.describeVerbs(new Map([[verb, def]]))[0].inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
     return { verb, params: { ...a, ...('actor' in shape && !('actor' in a) ? { actor: me } : {}), ...('actors' in shape && !('actors' in a) ? { actors: [me] } : {}) } };
   }
+  /** VERBS (accept2 brief 10): read-only, for offers: why a new boarding of this carrier would be refused today, or null.
+   *  Lets the ride offer say so up front instead of offering a punt the world then blocks (punt.unsupported-water). */
+  carrierBoardingIssueV1(id:string):Diag|null{return this.puntBoardingIssue(id);}
   /** A logged punt stays installed across author edits, but every new boarding must qualify against today's water. */
   private puntBoardingIssue(id:string):Diag|null{
     const e=this.ents[id],c=e?.carrier;if(e?.def!=='rowing-punt'||!c)return null;

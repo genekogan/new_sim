@@ -1114,7 +1114,19 @@ export class EdgeLedger implements EdgeLedgerHooks {
       departsInSeconds: c.state.phase === 'boarding' && c.state.departAtTick !== null ? Math.max(0, Math.round((c.state.departAtTick - tick) / 20)) : null,
       departsAtTick: c.state.phase === 'boarding' ? c.state.departAtTick : null, returnsAtTick: c.state.phase === 'aloft' ? tick + Math.max(0, Math.round(end * 20) - c.state.elapsed) : null,
       route: {id: c.state.route.id, seconds: end, elapsedSeconds: Math.round(c.state.elapsed / 2) / 10, keys: c.state.route.keys, interpolation: 'eden-rides/1 hermite'},
-      flights: c.state.flights, phaseTick: c.state.phaseTick, tick, waitSeconds: Math.round(((c.state as {waitTicks?: number}).waitTicks ?? 900) / 20)};
+      flights: c.state.flights, phaseTick: c.state.phaseTick, tick, waitSeconds: Math.round(((c.state as {waitTicks?: number}).waitTicks ?? 900) / 20),
+      ...((b: {code: string; message: string} | null) => b ? {blocked: b} : {})(this.boardingIssue(c.id, tick))};
+  }
+  /** VERBS (accept2 brief 10): a punt whose bank or water no longer qualifies (a later ground edit) was offered and then refused
+   *  by the world (punt.unsupported-water). The engine's own boarding check, cached for 30 s (it costs ~10 ms a punt). */
+  private boardingChecks = new Map<string, {tick: number; issue: {code: string; message: string} | null}>();
+  private boardingIssue(id: string, tick: number): {code: string; message: string} | null {
+    const was = this.boardingChecks.get(id);
+    if (was && tick >= was.tick && tick - was.tick < 600) return was.issue;
+    const check = (this.host.engine as unknown as {carrierBoardingIssueV1?: (id: string) => {code: string; message: string} | null}).carrierBoardingIssueV1;
+    const issue = check ? check.call(this.host.engine, id) ?? null : null;
+    this.boardingChecks.set(id, {tick, issue});
+    return issue;
   }
   rides() {return this.carriersNative().map(c => this.carrierView(c.id)!);}
   private rideKey = new Map<string, string>();

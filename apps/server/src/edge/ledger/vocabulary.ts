@@ -2,6 +2,7 @@
 // always wins. Otherwise an unambiguous alias is accepted (reported back as `resolved`), and anything else is
 // refused capability.unknown with `did_you_mean`: the closest capabilities actually offered. Pure and deterministic.
 import type {EdgeCapability} from '../contract.ts';
+import {SPOT_ACTIVITIES} from './activities.ts';
 
 export type VocabTarget = {
   /** Extra names a capability answers to: its target place's name, a Soul's name. */
@@ -459,6 +460,12 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       return {kind: 'unknown', code: 'place.unreachable', place: place.id, ...(seek ? {seek} : {}), reason: `${input}: ${why}${ranked.length ? ` (the nearest place you can ${verb} to is ${ranked[0].c.id}, ${Math.round(ranked[0].d)} m from it)` : ''}; nothing else was chosen in its place.`,
         didYouMean: ranked.slice(0, 3).map(r => ({id: r.c.id, label: r.c.label}))};
     }
+  }
+  // VERBS (accept2 brief 10): "lift weights at the gym" away from the gym parsed as the verb "lift" (the whole-sentence rule
+  // only wins when its verb is offered here). A spot activity offered elsewhere says where the nearest one is.
+  if (!pool.length && colon < 0) for (const [re, v] of INTENTS) if (!verbs.has(v) && v in SPOT_ACTIVITIES && re.test(text)) {
+    const e = ctx.elsewhere?.(v); if (e === undefined) break;
+    return unknown(elsewhereReason(v, ctx, `${SPOT_ACTIVITIES[v].label} is not offered within reach of where you are.`));
   }
   if (!pool.length) return unknown(`No "${verb}" capability is offered to this Soul right now. Things you can do: ${ctx.caps.filter(c => c.id.endsWith(':here')).map(c => c.id).slice(0, 12).join(', ')} (and walk:<place>, stroll:<place>, read:<place>); read capabilities again.`, ctx.caps.filter(c => c.id.endsWith(':here')));
   const left = tokens(rest).filter(t => !FILLER.has(t) && !ctx.root.includes(t));
