@@ -4,6 +4,8 @@ import {worldKey,worldPath} from './world-path.ts';
 import {requestSoulConversations} from './dialogue-speaking.ts';
 import {soulAvatars} from './SoulAvatars.ts';
 import {soulAvatarImage} from './soul-avatar-source.ts';
+import type {Api} from './useSim.ts';
+import {useOwnedAgentPresence} from './agent-presence.ts';
 const ID=/^[a-zA-Z0-9_-]{1,100}$/;
 export function mineIds(value:unknown):string[]{return Array.isArray(value)?[...new Set(value.filter((id):id is string=>typeof id==='string'&&ID.test(id)))].slice(0,24):[];}
 const key='sim.mine.'+worldKey;
@@ -22,8 +24,10 @@ export function SoulAvatar({soul}:{soul:PublicSoul}){
  const image=soulAvatarImage(soul,worldPath,soulAvatars.images.get(soul.id),failedPhoto),source=soulAvatars.sources.get(soul.id);let hash=0;for(const c of soul.id)hash=(hash*31+c.charCodeAt(0))>>>0;
  return image?<img key={image.key} className="soul-avatar" src={image.src} data-avatar-source={image.kind} data-profile-photo-hash={image.hash} data-avatar-entity={image.kind==='generated'?source?.entityId:undefined} data-avatar-model={image.kind==='generated'?source?.model:undefined} data-avatar-body-root={image.kind==='generated'?source?.bodyRoot:undefined} onError={image.kind==='profile-photo'?()=>setFailedPhoto(image.key):undefined} alt=""/>:<span className="soul-avatar initials" style={{background:`hsl(${hash%360} 38% 46%)`}} aria-hidden="true">{soul.name.split(/\s+/).slice(0,2).map(n=>n[0]).join('')}</span>;
 }
-export function MySouls({ids,souls,select,present}:{ids:readonly string[];souls:ReadonlyMap<string,PublicSoul>;select:(id:string)=>void;present?:ReadonlySet<string>}){
+export function MySouls({ids,souls,select,present,api}:{ids:readonly string[];souls:ReadonlyMap<string,PublicSoul>;select:(id:string)=>void;present?:ReadonlySet<string>;api?:Api}){
  const pinned=ids.flatMap(id=>{const soul=souls.get(id);return soul?[soul]:[];});const gone=ids.length-pinned.length;
+ // AWAY-UI: a chip whose agent is away is dimmed and says so (polled for the three shown chips)
+ const agent=useOwnedAgentPresence(api,pinned.slice(0,3).map(s=>s.id)),agentAway=(id:string)=>!!agent(id)?.away;
  if(!ids.length)return null;
- return <div className="my-souls" aria-label="Your account Souls">{pinned.slice(0,3).map(soul=><button key={soul.id} className={present&&!present.has(soul.id)?'my-souls-away':undefined} onContextMenu={e=>{e.preventDefault();select(soul.id);requestSoulConversations(soul.id);}} title={`${soul.name} · Soul details · right-click for conversations`} aria-label={`Open ${soul.name}`} onClick={()=>select(soul.id)}><SoulAvatar soul={soul}/></button>)}{pinned.length>3&&<details className="my-souls-more"><summary>+{pinned.length-3}</summary><div>{pinned.slice(3).map(soul=><button key={soul.id} onClick={()=>select(soul.id)}><SoulAvatar soul={soul}/><span>{soul.name}</span></button>)}</div></details>}{gone>0&&<span className="my-souls-gone" title="Owned Souls absent from this world">{gone} away</span>}</div>;
+ return <div className="my-souls" aria-label="Your account Souls">{pinned.slice(0,3).map(soul=><button key={soul.id} className={(present&&!present.has(soul.id))||agentAway(soul.id)?'my-souls-away':undefined} data-agent-away={agentAway(soul.id)?'1':undefined} onContextMenu={e=>{e.preventDefault();select(soul.id);requestSoulConversations(soul.id);}} title={`${soul.name}${agentAway(soul.id)?' · agent away':''} · Soul details · right-click for conversations`} aria-label={`Open ${soul.name}${agentAway(soul.id)?' (agent away)':''}`} onClick={()=>select(soul.id)}><SoulAvatar soul={soul}/>{agentAway(soul.id)&&<span className="my-souls-agent-away" aria-hidden="true">away</span>}</button>)}{pinned.length>3&&<details className="my-souls-more"><summary>+{pinned.length-3}</summary><div>{pinned.slice(3).map(soul=><button key={soul.id} onClick={()=>select(soul.id)}><SoulAvatar soul={soul}/><span>{soul.name}</span></button>)}</div></details>}{gone>0&&<span className="my-souls-gone" title="Owned Souls absent from this world">{gone} away</span>}</div>;
 }

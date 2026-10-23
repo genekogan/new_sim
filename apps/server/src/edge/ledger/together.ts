@@ -67,7 +67,7 @@ const ITEM_WORDS: [ItemKind, RegExp][] = [['book', /\b(?:book|books|novel)\b/], 
   ['food', /\b(?:food|snack|bread|apple|fruit|cake|bun|sandwich|something to eat|to eat)\b/], ['letter', /\b(?:letter|card|note|paper|postcard)\b/], ['tool', /\b(?:tool|hammer|trowel|chisel|spade)\b/], ['frisbee', /\b(?:frisbee|disc|disk)\b/]];
 /** Bounds (Gene: simple, deterministic, bounded). */
 export const ITEM_LIMITS = {perPlace: 12, placedWorld: 150, pickReach: 120, consumableMinutes: 20, keepHours: 4, nearItems: 20};
-const INVITE_RADIUS = 60, GESTURE_RADIUS = 8, FOLLOW_RADIUS = 20, FOLLOW_LOST = 45;
+const INVITE_RADIUS = 60, GESTURE_RADIUS = 8, FOLLOW_RADIUS = 20, FOLLOW_LOST = 45, CATCH_UP = 3;
 /** A shared walk is only "together" when the guest ends beside the host: follow standoff is 1.5 m, so 2.2 m leaves slack but not 2.8 m apart. */
 export const TOGETHER_RADIUS = 2.2;
 export const besideEachOther = (a: readonly number[], b: readonly number[]) => Math.hypot(a[0] - b[0], a[1] - b[1]) <= TOGETHER_RADIUS;
@@ -76,7 +76,9 @@ export const besideEachOther = (a: readonly number[], b: readonly number[]) => M
 const INVITABLE = new Set(['walk', 'stroll', 'wander', 'hang-out', 'gather', 'warm-by-fire', 'sit', 'sit-ground', 'lie', 'nap', 'read', 'write', 'swim', 'rest',
   'dance', 'jump', 'stretch', 'jumping-jacks', 'yoga', 'pushups', 'situps', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'object',
   // CN5
-  'use-computer', 'sing', 'listen', 'lift-weights', 'bench-press', 'pull-ups', 'dips', 'play-frisbee', 'play-petanque', 'play-volleyball']);
+  'use-computer', 'sing', 'listen', 'lift-weights', 'bench-press', 'pull-ups', 'dips', 'play-frisbee', 'play-petanque', 'play-volleyball',
+  // GEST-LIVE: the shared spots are what an invitation is for ("invite Ada to cook together")
+  'cook-together', 'tell-story', 'hear-story', 'book-club', 'social-dance', 'yoga-class']);
 
 export type Invite = {id: string; what: string; host: {soulId: string; name: string}; guests: {soulId: string; name: string}[]; capability: string; label: string;
   kind: 'paired' | 'give' | 'activity' | 'ride'; pairedPolicy?: 'ready-v1';
@@ -149,6 +151,15 @@ export class Together {
   /** Where to stand to meet someone face to face: within 1.1 m of them with a clear line between (nearest to `from`),
    *  so a hug or a hand-over never reaches across a fire, a bench or a wall. Null when they are already in reach.
    *  `otherAt`: where the other body is going to stand (a host still walking to its meet spot), instead of where it is. */
+  /** A hand-over needs no clear gesture ring (GEST-LIVE 2026-10-22: a give to a Soul on a bench or beside a bystander was
+   *  refused gesture.no-room with no way forward): the strict meet spot when there is one, else arm's length on my side. */
+  handSteps(me: string, other: string, otherAt?: V2): Steps | null {
+    const strict = this.meetSteps(me, other, 1.1, 0.8, otherAt); if (strict) return strict;
+    const mb = this.p.body(me), ob = this.p.body(other); if (!mb || !ob) return null;
+    const at: V2 = otherAt ?? [ob.pose.p[0], ob.pose.p[2]], L = Math.hypot(mb.pose.p[0] - at[0], mb.pose.p[2] - at[1]) || 1;
+    const p: V2 = [r2(at[0] + (mb.pose.p[0] - at[0]) / L * 1.1), r2(at[1] + (mb.pose.p[2] - at[1]) / L * 1.1)];
+    return [{verb: 'walk_to', params: {to: p, standoff: 0}}, {verb: 'wave', params: {at: other, seconds: 0.2}}];
+  }
   meetSteps(me: string, other: string, standoff = 1.1, gap = 0.8, otherAt?: V2): Steps | null {
     const mb = this.p.body(me), ob = this.p.body(other); if (!mb || !ob) return [{verb: 'walk_to', params: {to: other, standoff}}];
     const from: V2 = [mb.pose.p[0], mb.pose.p[2]], at: V2 = otherAt ?? [ob.pose.p[0], ob.pose.p[2]], d = Math.hypot(at[0] - from[0], at[1] - from[1]);
@@ -218,7 +229,7 @@ export class Together {
   private sourceCache: {key: string; list: {id: string; kind: ItemKind; label: string; at: V2; face?: V2; place: string | null}[]} | null = null;
   /** Deterministic item sources: shelves (books), writing desks (letters) and walkable places by kind (gardens → flowers…). */
   sources() {
-    const nav = (this.w as {navV1?: {solids?: unknown[]; ground?: unknown[]}}).navV1, key = Object.keys(this.w.regions).length + ':' + (nav?.solids?.length ?? -1) + ':' + (nav?.ground?.length ?? -1);
+    const nav = (this.w as {navV1?: {solids?: unknown[]; ground?: unknown[]}}).navV1, key = Object.keys(this.w.regions).length + ':' + this.p.places.byId.size + ':' + (nav?.solids?.length ?? -1) + ':' + (nav?.ground?.length ?? -1);
     if (this.sourceCache?.key === key) return this.sourceCache.list;
     const out: {id: string; kind: ItemKind; label: string; at: V2; face?: V2; place: string | null}[] = [];
     const nameOf = (id?: string) => (id ? this.p.places.byId.get(id)?.name : undefined) ?? 'the shelf';
@@ -226,13 +237,22 @@ export class Together {
     for (const s of this.p.spots().spots) if (s.activity === 'write' || s.activity === 'post-letter') out.push({id: 'spot:' + s.id, kind: 'letter', label: s.label ?? 'a writing desk', at: s.at, ...(s.faceTo ? {face: s.faceTo} : {}), place: s.place ?? null});
     const engine = this.p.host.engine as unknown as {nearestStandableV1?: (at: V2, except?: string, min?: number, rings?: number) => V2 | null};
     for (const place of [...this.p.places.byId.values()].sort((a, b) => a.id.localeCompare(b.id))) {
-      if (!this.w.regions[place.id] || place.kind === 'water' || place.carrier) continue;
+      // places come from the place registry (a mars-engine world keeps its places there, not in world.regions)
+      if (!place.polygon?.length || place.kind === 'water' || place.carrier) continue;
       const text = (place.id + ' ' + place.name).toLowerCase(), kinds = SOURCE_WORDS.filter(([, re]) => re.test(text)).map(([k]) => k);
       if (!kinds.length) continue;
       const at = engine.nearestStandableV1?.(centroid(place.polygon), undefined, 0.6, 24) ?? null; if (!at) continue;
       for (const kind of [...new Set(kinds)]) out.push({id: 'place:' + place.id, kind, label: place.name, at, place: place.id});
     }
     this.sourceCache = {key, list: out}; return out;
+  }
+
+  /** GEST-LIVE: the other sources of an item kind within reach, nearest first (the nearest one may have no walkable route). */
+  pickUpAlternatives(entityId: string, kind: string): {id: string; at: V2; face?: V2}[] {
+    const b = this.p.body(entityId); if (!b) return [];
+    const here: V2 = [b.pose.p[0], b.pose.p[2]];
+    return this.sources().filter(s => s.kind === kind).map(s => ({s, d: Math.hypot(s.at[0] - here[0], s.at[1] - here[1])}))
+      .filter(x => x.d <= ITEM_LIMITS.pickReach).sort((a, b) => a.d - b.d).slice(0, 6).map(({s}) => ({id: s.id, at: s.at, ...(s.face ? {face: s.face} : {})}));
   }
 
   // ---------------------------------------------------------------- capabilities
@@ -295,10 +315,17 @@ export class Together {
       }
     }
   }
-  /** One follow leg programme: walk up behind them and pause, repeated; the ledger re-issues it while the follow lasts. */
-  private followSteps(me: string, target: string): Steps {
-    const legs: Steps = [];
-    for (let i = 0; i < 10; i++) legs.push({verb: 'walk_to', params: {to: target, standoff: 1.5}}, {verb: 'rest', params: {seconds: 2}});
+  /** One follow leg programme: walk up behind them and pause, repeated; the ledger re-issues it while the follow lasts.
+   *  Each leg walks to where they were when it began, so a follower at the same pace falls further behind every leg
+   *  by its standoff and pause (GEST-LIVE r11: 13 m after 15 s, follow.lost at 45 m on a 240 m walk). So the programme is
+   *  three legs, re-issued with the current gap, and a follower more than CATCH_UP metres behind jogs them (humanoids
+   *  only; floaters glide at one pace). */
+  private followSteps(me: string, target: string, gap = 0): Steps {
+    const tb = this.p.body(target), engine = this.p.host.engine as unknown as {movementVerb?: (actor: string, x: number, z: number) => string};
+    // jogging is dry-ground only: a shore or water leg with a gait would fail the follow
+    const dry = !tb || (engine.movementVerb?.(me, tb.pose.p[0], tb.pose.p[2]) ?? 'walk_to') === 'walk_to';
+    const legs: Steps = [], jog = gap > CATCH_UP && dry && this.p.body(me)?.body?.family !== 'floater';
+    for (let i = 0; i < 3; i++) legs.push({verb: 'walk_to', params: {to: target, standoff: 1.5, ...(jog ? {gait: 'jog'} : {})}}, {verb: 'rest', params: {seconds: 0.5}});
     return [...this.standFirst(me), ...legs];
   }
 
@@ -320,7 +347,7 @@ export class Together {
 
   /** Before an act is accepted: validate what it adds, adjust its steps, and say what to record once its receipt exists.
    *  No side effects here (a refusal later in act leaves nothing behind). */
-  prepare(soul: EdgeSoul, cap: EdgeCapability, plan: TogetherPlan, params: Record<string, unknown>, steps: Steps): {code: string; reason: string} | {steps: Steps; label?: string; commit?: (receipt: string) => void; noBody?: boolean} {
+  prepare(soul: EdgeSoul, cap: EdgeCapability, plan: TogetherPlan, params: Record<string, unknown>, steps: Steps): {code: string; reason: string; did_you_mean?: {id: string; label: string}[]} | {steps: Steps; label?: string; commit?: (receipt: string) => void; noBody?: boolean} {
     const tag = plan.together;
     // an earlier invitation of mine that this act replaces is withdrawn when its receipt ends (onReceipt)
     if (tag?.kind === 'paired' || tag?.kind === 'give') {
@@ -334,8 +361,8 @@ export class Together {
       const id = 'inv_' + randomUUID().slice(0, 12), def = tag.kind === 'paired' ? PAIRED[tag.what] : null;
       const seconds = tag.kind === 'paired' && tag.what === 'dance-with' && Number.isInteger(params.seconds) ? params.seconds as number : def?.seconds ?? 2.5;
       // walk to a spot facing them with nothing between (never across a fire or a bench)
-      const meet = this.meetSteps(soul.entityId, g.entityId, 1.1, def?.gap ?? 0.8);
-      if (!meet) return {code: 'gesture.no-room', reason: `There is no clear spot beside ${g.name} right now (someone else is standing too close); try again in a moment or somewhere roomier.`};
+      const meet = tag.kind === 'give' ? this.handSteps(soul.entityId, g.entityId) : this.meetSteps(soul.entityId, g.entityId, 1.1, def?.gap ?? 0.8);
+      if (!meet) return {code: 'gesture.no-room', reason: `There is no clear spot beside ${g.name} right now (someone else is standing too close); try again in a moment or somewhere roomier.`, did_you_mean: [{id: 'go-near:' + g.soulId, label: `Go near ${g.name}`}]};
       const out = structuredClone(steps).flatMap(s => s.verb === 'walk_to' && s.params.to === g.entityId ? meet : [s]);
       const meetAt: V2 = meet[0].verb === 'walk_to' ? meet[0].params.to as V2 : [r2(me.pose.p[0]), r2(me.pose.p[2])];
       for (const s of out) if (s.verb === 'mars:pose_v1') {s.params.group = id; s.params.seconds = seconds;if(tag.kind==='paired')s.params.pairedPolicy='ready-v1';}
@@ -442,7 +469,7 @@ export class Together {
       // F1: until the host has reached its own meet spot (its grouped pose not yet begun), meet it there; planning against
       // the still-walking body sent the guest across the host's path and could leave a bystander standing between them
       const hostAt = inv.meetAt && hb.human?.together?.group !== inv.id ? inv.meetAt : undefined;
-      const meet = seatedTake ? [] : this.meetSteps(soul.entityId, host.entityId, 1.1, inv.gap ?? 0.8, hostAt);
+      const meet = seatedTake ? [] : inv.kind === 'give' ? this.handSteps(soul.entityId, host.entityId, hostAt) : this.meetSteps(soul.entityId, host.entityId, 1.1, inv.gap ?? 0.8, hostAt);
       if (!meet) return {code: 'gesture.no-room', reason: `There is no clear spot beside ${inv.host.name} right now (someone else is standing too close); try again in a moment.`};
       const steps: Steps = [...(seatedTake ? [] : [...this.standFirst(soul.entityId), ...meet]),
         pose(inv.activity!, inv.seconds!, {group: inv.id, gap: inv.gap, ...(inv.pairedPolicy?{pairedPolicy:inv.pairedPolicy}:{}), waitSeconds: 30, alone: 'fail', clear: true, ...(inv.kind === 'give' ? {prop: inv.item!.kind, hold: inv.item!.kind} : {})})];
@@ -553,7 +580,7 @@ export class Together {
     if (this.arrivedTogether(f)) {this.endFollow(f, 'completed'); return false;}
     if (this.tick >= f.untilTick) {this.endFollow(f, 'completed'); return false;}
     if (Math.hypot(tb.pose.p[0] - me.pose.p[0], tb.pose.p[2] - me.pose.p[2]) > FOLLOW_LOST) {this.endFollow(f, 'failed', 'follow.lost', `You lost sight of ${t.name}.`); return false;}
-    void this.p.decide(soul, receiptId, 'follow:' + f.target, `Walk with ${t.name}`, this.followSteps(soul.entityId, t.entityId).filter(s => s.verb !== 'stand')).catch(() => this.p.fail(receiptId, 'ledger.unavailable', 'The world could not record this action.'));
+    void this.p.decide(soul, receiptId, 'follow:' + f.target, `Walk with ${t.name}`, this.followSteps(soul.entityId, t.entityId, Math.hypot(tb.pose.p[0] - me.pose.p[0], tb.pose.p[2] - me.pose.p[2])).filter(s => s.verb !== 'stand')).catch(() => this.p.fail(receiptId, 'ledger.unavailable', 'The world could not record this action.'));
     return true;
   }
   /** Walking together (an accepted walk invitation): the host's walk is over and the guest is beside them. */
@@ -653,6 +680,16 @@ export class Together {
     if (!mine.length && /^(?:accept|decline|yes|no thanks|no thank you|accept (?:the |their )?(?:invitation|invite|offer)|decline (?:the |their )?(?:invitation|invite|offer))$/.test(t)) return {code: 'invite.none', reason: 'Nobody has invited you to anything right now (observe → invites).', did_you_mean: []};
     const acc = /^(?:accept|join)\s+(.+?)(?:['’]s)?(?:\s+(?:invitation|invite|offer|hug|dance))?$/.exec(t);
     if (acc && mine.length) {const o = who(acc[1]); const i = o ? mine.filter(x => x.host.soulId === o.soulId).at(-1) : undefined; if (i) return {capability: 'accept:' + i.id, note: `accepting ${i.host.name}'s invitation (${i.what})`};}
+    // "take the book" / "take it" / "take X's flower" while someone offers me an item: accept that hand-over (never a pick-up elsewhere)
+    const tk = /^(?:take|accept|receive|grab|get)\s+(?:it|that|this|(?:(.+?)['’]s\s+|the\s+|their\s+|his\s+|her\s+|an?\s+)?(.+?))(?:\s+from\s+(.+))?$/.exec(t);
+    if (tk && mine.some(x => x.kind === 'give')) {
+      const from = tk[1] ?? tk[3], o = from ? who(from) : undefined, what = tk[2]?.replace(/^(?:the|a|an)\s+/, '');
+      const i = mine.filter(x => x.kind === 'give' && (!o || x.host.soulId === o.soulId) && (!what || x.item?.kind === what || x.item?.name.toLowerCase().includes(what) || what === 'gift' || what === 'offer')).at(-1);
+      if (i) return {capability: 'accept:' + i.id, note: `taking ${i.item?.name ?? 'the item'} ${i.host.name} offers you`};
+      const askedKind = what ? ITEM_WORDS.find(([, re]) => re.test(' ' + what + ' '))?.[0] : undefined, offered = mine.filter(x => x.kind === 'give' && (!o || x.host.soulId === o.soulId)).at(-1);
+      if (!i && offered && askedKind && !caps.some(c => c.verb === 'pick-up' && (c.id === 'pick-up:' + askedKind || this.item(c.target?.id ?? '')?.kind === askedKind)))
+        return {code: 'give.other-item', reason: `${offered.host.name} offers you ${offered.item?.name ?? 'something'}, not ${ITEM_NAMES[askedKind]}.`, did_you_mean: [{id: 'accept:' + offered.id, label: `Accept: take ${offered.item?.name ?? 'it'} from ${offered.host.name}`}, {id: 'decline:' + offered.id, label: 'Decline'}]};
+    }
     // gestures
     const G: [RegExp, string][] = [[/^(?:give\s+(.+?)\s+a\s+hug|hug|embrace|cuddle)\s*(.*)$/, 'hug'], [/^(?:give\s+(.+?)\s+a\s+high[- ]?five|high[- ]?five|hi[- ]?five)\s*(.*)$/, 'high-five'],
       [/^(?:shake\s+hands\s+with|shake\s+(.+?)['’]s\s+hand|handshake(?:\s+with)?|shake\s+hands)\s*(.*)$/, 'handshake'], [/^(?:dance\s+with|ask\s+(.+?)\s+to\s+dance|have\s+a\s+dance\s+with)\s*(.*)$/, 'dance-with']];
@@ -671,13 +708,25 @@ export class Together {
       if (!target) return {capability: verb + ':here', note: `${raw} is ${verb}:here`};
       return {capability: verb + ':here', params: verb === 'point' ? {at: target} : {to: target}, note: `${raw} is ${verb}:here (${verb === 'point' ? 'at' : 'to'} ${target})`};
     }
+    // stop / unfollow: stand:here ends whatever the body is doing, a follow or walk-with included
+    if (/^(?:stop|halt|stand still|unfollow(?:\s+.+)?|stop\s+(?:that|it|everything|moving|walking|what\s+(?:i\s+am|i'm|you\s+are|you're)\s+doing)|(?:stop|quit)\s+(?:following|walking\s+with|tagging\s+along\s+with|going\s+with|accompanying)(?:\s+.+)?)$/.test(t) && caps.some(c => c.id === 'stand:here'))
+      return {capability: 'stand:here', note: `${raw} is stand:here (stops what you are doing, a follow included)`};
+    // "go to <Soul>", "find <Soul>": walk over to a Soul by name (a place of the same words is left to the place resolver)
+    const goto = /^(?:(?:(?:go|walk|run|head|come|get|wander)\s+)?(?:over\s+|back\s+)?(?:to|near|towards?|up\s+to|next\s+to)|find|approach|meet|join|catch\s+up\s+with)\s+(.+)$/.exec(t);
+    if (goto) {
+      const w = goto[1].trim().replace(/^the\s+/, ''), named = (n: string) => n.toLowerCase() === w || (tokens(n).length > 0 && tokens(n).every(x => tokens(w).includes(x)));
+      const o = near.find(o => o.soulId === w || named(o.name));
+      if (o) {const c = caps.find(c => c.id === 'go-near:' + o.soulId); if (c) return {capability: c.id, note: `${raw} is ${c.id}`};}
+      else if ([...this.p.host.minds.values()].some(x => x.soulId !== soul.soulId && (x.soulId === w || named(x.name)))) return notHere('meet them', goto[1]);
+    }
     // follow / walk with
     const fol = /^(?:follow|walk\s+with|go\s+with|accompany|tag\s+along\s+with|come\s+with)\s+(.+)$/.exec(t);
     if (fol && !/^(?:me|us)$/.test(fol[1].trim())) {
       if(/\s+to\s+\S/.test(fol[1])&&!near.some(o=>o.name.toLowerCase()===fol[1].trim()))return {code:'follow.destination',reason:'Following only tracks the named Soul. To reach a place, walk with them to that place and invite them.',did_you_mean:[]};
       const o = who(fol[1]); if (!o) return /^(?:him|her|them|they|she|he)$/.test(fol[1].trim()) ? null : notHere('follow', fol[1]);
-      const back = this.invitesFor(soul.soulId).find(i => i.host.soulId === o.soulId); if (back) return {capability: 'accept:' + back.id, note: `joining ${o.name}'s ${back.what}`};
-      const c = capFor('follow', o); if (!c) return {code: 'follow.unavailable', reason: `${o.name} is too far away to walk with (${o.distance} m).`, did_you_mean: []};
+      const back = this.invitesFor(soul.soulId).find(i => i.host.soulId === o.soulId && i.kind !== 'paired' && i.kind !== 'give'); if (back) return {capability: 'accept:' + back.id, note: `joining ${o.name}'s ${back.what}`};
+      if (this.followingOf(soul.soulId)?.target === o.soulId) return {code: 'follow.already', reason: `You are already walking with ${o.name}.`, did_you_mean: []};
+      const c = capFor('follow', o); if (!c) return {code: 'follow.unavailable', reason: `${o.name} is too far away to walk with (${o.distance} m); go near them first.`, did_you_mean: caps.filter(c => c.id === 'go-near:' + o.soulId).map(c => ({id: c.id, label: c.label}))};
       return {capability: c.id, note: `${raw} is ${c.id}`};
     }
     // items
@@ -687,6 +736,8 @@ export class Together {
       // a world may offer its own give for what is in the hand (a god-built thing: god/held.ts)
       if (!held && !caps.some(c => c.verb === 'give')) return {code: 'hands.empty', reason: 'You are not holding anything to give; pick something up first.', did_you_mean: caps.filter(c => c.verb === 'pick-up').slice(0, 5).map(c => ({id: c.id, label: c.label}))};
       const o = who(give[1]); if (!o) return notHere('give', give[1]);
+      const said = ITEM_WORDS.find(([, re]) => re.test(' ' + t + ' '))?.[0];
+      if (held && said && said !== held.kind) {const g = capFor('give', o); return {code: 'item.not-held', reason: `You are holding ${held.name}, not ${ITEM_NAMES[said]}; you can give ${held.name}, or put it down and pick up ${ITEM_NAMES[said]} first.`, did_you_mean: [...(g ? [g] : []), ...caps.filter(c => c.id === 'put-down:here')].map(c => ({id: c.id, label: c.label}))};}
       const c = capFor('give', o); if (!c) return tooFar('give', o);
       return {capability: c.id, note: `${raw} is ${c.id}${held ? ` (${held.name})` : ''}`};
     }
@@ -703,7 +754,11 @@ export class Together {
         if (held) return {code: 'hands.full', reason: `You are holding ${held.name}; put it down or give it away first.`, did_you_mean: caps.filter(c => c.id === 'put-down:here' || c.verb === 'give').slice(0, 4).map(c => ({id: c.id, label: c.label}))};
         const lying = caps.filter(c => c.verb === 'pick-up' && c.target?.kind === 'item' && this.item(c.target.id)?.kind === kind)[0];
         const c = lying ?? caps.find(c => c.id === 'pick-up:' + kind);
-        if (!c) return {code: 'item.none-near', reason: `There is no ${kind} to pick up within ${ITEM_LIMITS.pickReach} m.`, did_you_mean: caps.filter(c => c.verb === 'pick-up').slice(0, 5).map(c => ({id: c.id, label: c.label}))};
+        if (!c) {
+          const me = this.posOf(soul.soulId), far = me ? this.sources().filter(s => s.kind === kind && s.place).map(s => ({s, d: Math.hypot(s.at[0] - me[0], s.at[1] - me[1])})).sort((a, b) => a.d - b.d) : [];
+          const hit = far.map(f => ({f, w: caps.find(c => c.verb === 'walk' && c.target && (c.target.id === f.s.place || this.p.places.byId.get(f.s.place!)?.parent === c.target.id))})).find(x => x.w), walk = hit?.w;
+          return {code: 'item.none-near', reason: `There is no ${kind} to pick up within ${ITEM_LIMITS.pickReach} m${hit ? `; the nearest is ${hit.f.s.label}, ${Math.round(hit.f.d)} m away: walk there first` : ''}.`, did_you_mean: [...(walk ? [walk] : []), ...caps.filter(c => c.verb === 'pick-up').slice(0, walk ? 3 : 5)].map(c => ({id: c.id, label: c.label}))};
+        }
         return {capability: c.id, note: `${raw} is ${c.id} (${c.label})`};
       }
     }

@@ -380,6 +380,26 @@ export class Runtime {
   isActive(id: string) {
     return this.live.has(id) || this.waiting.has(id);
   }
+  /** stall-guard/1: true while a live action is in a deferred (controlled) stop. */
+  isCancelling(id: string) {
+    return !!this.live.get(id)?.cancelling;
+  }
+  /** stall-guard/1 (apps/server/src/edge/ledger/stall-guard.ts): the world ends an action that has stopped making progress,
+   *  without asking its def (a def's deferred or refused stop is what stalled it). Its reservations and claims are released
+   *  and the usual failed-action cleanup runs; a claim left by an action that is no longer live is dropped too. */
+  forceCancel(id: string, reason: Diagnostic): boolean {
+    if (this.waiting.has(id)) { this.cancel(id, reason); return true; }
+    const l = this.live.get(id);
+    if (l) { l.rec.diagnostic = reason; this.finish(l, 'cancelled', reason); return true; }
+    let dropped = false;
+    for (const [k, list] of this.owners) {
+      const kept = list.filter((o) => o.action !== id);
+      if (kept.length === list.length) continue;
+      dropped = true;
+      if (kept.length) this.owners.set(k, kept); else this.owners.delete(k);
+    }
+    return dropped;
+  }
   holder(resource: string) {
     return this.owners.get(resource)?.map((o) => o.action) ?? [];
   }

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import {ownerReplyWithLocalResults,ownerAnswerText,routeOwnerReport} from './client-owner-reply.mjs';
 import {clientHelp} from './client-help.mjs';
-import {clientListen,clientAck,clientResult,noticeOwnerInbox,noticeInboxHeader} from './client-inbox.mjs';
+import {clientListen,clientAck,clientResult,noticeOwnerInbox,noticeInboxHeader,folderListenClaim} from './client-inbox.mjs';
 // Eden edge agent CLI — skill 1.0.0 for contract eden-edge/1 (team/CONTRACTS/EDGE-CONTRACT-v1.md).
 // Dependency-free, Node 18+. One Soul, one world, any folder. State in ./.eden-agent.json is PRIVATE
 // (identity + Soul token). Edge verbs use /v1/edge/* with the Soul token; when a world does not serve
@@ -375,7 +375,8 @@ export async function act(first,...rest){
 }
 /** 1.7.1: everyday phrasings the world does not resolve yet, rewritten to ones it does (the world still decides).
  *  "X, then Y": a walk through X then to Y becomes one walk with via; anything else does X now and returns `then`. */
-const ITEM=/^(?:pick|grab|fetch|take|collect|get me|find)\s+(?:up\s+)?(a|an|some|the)\s+((?:flower|book|letter|tool|frisbee|cup|snack|apple|bread|tea|coffee)s?\b.*)$/;
+// 'take'/'grab' stay with the server: it reads them as accepting a pending give first, else a pick-up (GEST-LIVE 2026-10-23)
+const ITEM=/^(?:pick|fetch|collect|get me|find)\s+(?:up\s+)?(a|an|some|the)\s+((?:flower|book|letter|tool|frisbee|cup|snack|apple|bread|tea|coffee)s?\b.*)$/;
 const EXERCISE=/^(?:let'?s\s+)?(?:do|get|have|go)?\s*(?:some|a|an)?\s*(?:exercise|exercises|workout|work ?out|working out|fitness|calisthenics|training)\b(.*)$/;
 const LEG=/^(?:(?:take|go for|have)\s+(?:a\s+)?(?:little\s+)?(?:walk|stroll|wander)\s+(?:through|around|in|across|to|round)|(?:walk|stroll|wander|go|head|pass)\s+(?:through|around|across|round|to|over to|via))\s+(.+)$/;
 export function rewrite(text){
@@ -1214,7 +1215,7 @@ export async function dashboard(...args){
  liveOptions(liveArgs);const service=await startClientDashboard({cli:resolve(process.argv[1]),liveArgs,port});console.log('Local Soul dashboard: '+service.origin+' (mind starts automatically; pause/stop preserves world activity)');
  await new Promise(resolve=>{let closing=false;const close=async()=>{if(closing)return;closing=true;await service.close();resolve();};process.once('SIGINT',close);process.once('SIGTERM',close);});return {dashboard:'closed'};
 }
-export async function listen(...args){return clientListen(args,{call});}
+export async function listen(...args){return clientListen(args,{call,claim:()=>folderListenClaim()});}
 export async function ack(...args){const r=await clientAck(args,{call});save({lastOwnerAckAt:now()});return r;}
 /** 1.9.5 (lane MSG): the second answer on the owner's card, when the work ends: result <id> done|failed "what happened". */
 export async function result(...args){return clientResult(args,{call});}

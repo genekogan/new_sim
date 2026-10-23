@@ -103,9 +103,17 @@ const WEIGHTS: Record<string, Record<Kind, number>> = {
 const pick = <T extends string>(rows: [T, number][], u: number): T => {const total = rows.reduce((t, r) => t + r[1], 0); let x = u * total; for (const [k, w] of rows) {if (x < w) return k; x -= w;} return rows[rows.length - 1][0];};
 export function viewerWeatherKind(datetime: string): Kind | null {
   const m = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?/.exec(datetime), ms = m ? Date.parse(m[0] + 'Z') : NaN; if (!Number.isFinite(ms)) return null;
-  const day = Math.floor(ms / 86_400_000), slot = Math.floor((ms - day * 86_400_000) / 3_600_000 / 2), w = {...WEIGHTS[pick(REGIMES, hash01(day, 7919))]};
+  const day = Math.floor(ms / 86_400_000), slot = Math.floor((ms - day * 86_400_000) / 3_600_000 / 2);
+  // WEATHER-RULES: a shower is one 2 h slot at most (the slot after a wet one is dry), as the viewer draws it
+  const k = slotKind(day, slot); if (!wetKind(k)) return k;
+  return wetKind(slot > 0 ? slotKind(day, slot - 1) : slotKind(day - 1, 11)) ? slotKind(day, slot, true) : k;
+}
+const wetKind = (k: Kind) => k === 'rain' || k === 'storm';
+function slotKind(day: number, slot: number, dry = false): Kind {
+  const w = {...WEIGHTS[pick(REGIMES, hash01(day, 7919))]};
   if (slot === 2 || slot === 3) w.fog *= 2.2; else if (slot >= 5 && slot <= 8) w.fog *= .25;
   if (slot >= 6 && slot <= 8) {w.rain *= 1.3; w.storm *= 1.8;}
+  if (dry) w.rain = w.storm = 0;
   return pick(Object.entries(w) as [Kind, number][], hash01(day, slot * 131 + 17));
 }
 const KIND_WORDS: Record<Kind, string[]> = {clear: ['clear sky'], cloudy: ['cloudy'], rain: ['raining'], wind: ['windy'], fog: ['foggy'], storm: ['stormy', 'raining']};

@@ -18,6 +18,7 @@ import {publishedWaitsFor} from '../../../mars/viewer/engine/runtime/waits.ts';
 import {inShoreDomain} from '../../../mars/viewer/engine/locomotion/connected-shore.ts';
 import {rerouteCarrier,setCarrierRoute,type CarrierInstallSpec} from '../../../mars/viewer/engine/vehicles/carrier.ts';
 import {puntCandidates,previewPunt} from './punt.ts';
+import {probeBody,releaseBody,setDownFrom} from './stall.ts';
 import {commonsFoodDeliveryItemsV1} from './food-delivery.ts';
 import {commonsFoodDeliveryV1Schema,type CommonsFoodDeliveryV1} from '@sim/engine-contract';
 import {socialEdenV1} from './social-eden.ts';
@@ -884,6 +885,22 @@ export class MarsEngine implements Engine {
     this.end(p, 'cancelled', { code: 'program.stopped', message: 'stopped' });
   }
   programOf(actor: string) { return this.byActor.get(actor) ?? null; }
+  /** stall-guard/1 (stall.ts): what holds this body, read-only; `pending` = a program still waiting for the body. */
+  stallProbeV1(actor:string){const p=probeBody(this.rt,actor);if(!p)return null;const id=this.byActor.get(actor),pp=id?this.programs.get(id):undefined;return {...p,pending:!!pp&&!pp.started};}
+  /** stall-guard/1: the world releases a stalled body (folded from 'edge-stop' {stallReleaseV1}) and stands it at the nearest
+   *  free standing spot to its seat exit or where it is. A program whose own step held the body ends with `reason`; one still
+   *  waiting for the body starts on the next tick. Null when bodiless, not held, or exempt (aloft, construction). */
+  stallReleaseV1(actor:string,reason:{code:string;message:string}){
+    const p=probeBody(this.rt,actor),a:any=this.ents[actor];if(!p||!a||p.exempt||!p.held)return null;
+    const from=setDownFrom(this.rt,actor),upper=(a.human?.level??0)!==0;
+    const xz=upper?from.at:(this.freeStandingNearV1([r3(from.at[0]),r3(from.at[1])],a.body?.radius??HUMAN_RADIUS)??from.at);
+    const f=this.rt.world.groundV1&&!upper?(this.rt.services.spatial as Spatial).ground?.field:undefined;
+    const y=f?standHeight(f,xz[0],xz[1]):(from.y??a.pose.p[1]);
+    const id=this.byActor.get(actor),pp=id?this.programs.get(id):undefined,own=!!pp?.action&&p.holders.some(x=>x.id===pp!.action);
+    const r=releaseBody(this.rt,actor,[r3(xz[0]),r3(y),r3(xz[1])],reason);
+    if(r&&pp&&own)this.end(pp,'failed',reason);
+    return r;
+  }
   nativeSeatHoldsV1(actor:string):{action:string;slot:string}[]{
     const out:{action:string;slot:string}[]=[];
     for(const action of this.rt.holder('actor:'+actor)){
@@ -1981,9 +1998,11 @@ export class MarsEngine implements Engine {
     return out;
   }
   /** carrier/1: the carrier this body is boarding, seated in or leaving, if any. */
-  carrierOf(actor:string):{id:string;slot:string;riderPhase:string;phase:string;label:string}|null{
+  carrierOf(actor:string):{id:string;slot:string;riderPhase:string;phase:string;label:string;outInSeconds?:number}|null{
     const b=this.ents[actor]?.human?.carrier,e=b?this.ents[b.id]:undefined;if(!b||!e?.carrier)return null;
-    return {id:e.id,slot:b.slot,riderPhase:b.phase,phase:e.carrier.phase,label:e.label??e.id};
+    // On the ground (landed, or stepping out): seconds until the body is out at the latest (carrier.ts LEAVE_LIMIT, 12 s).
+    const out=b.phase==='leaving'||e.carrier.phase==='landed'?Math.max(1,Math.ceil(((b.phase==='leaving'&&b.outBy!==undefined?b.outBy:this.world.tick+240)-this.world.tick)/20)):undefined;
+    return {id:e.id,slot:b.slot,riderPhase:b.phase,phase:e.carrier.phase,label:e.label??e.id,...(out!==undefined?{outInSeconds:out}:{})};
   }
   /** carrier/1: every carrier entity's public state (riders by entity id). */
   carriers(){return listEntities(this.ents).filter((e:any)=>e.carrier).map((e:any)=>({id:e.id as string,def:e.def as string,label:(e.label??e.id) as string,pose:structuredClone(e.pose),state:structuredClone(e.carrier)}));}

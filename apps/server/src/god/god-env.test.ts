@@ -56,7 +56,7 @@ test('lightning: storm strikes are deterministic, scale with intensity, stay in 
   const b = [-500, -500, 500, 500];
   const a1 = stormStrikes('w', b, 1, 0, 20 * 600), a2 = stormStrikes('w', b, 1, 0, 20 * 600);
   assert.deepEqual(a1, a2, 'same world, same strikes');
-  assert.ok(a1.length > 60 && a1.length < 100, `a full storm: about 85 strikes in 10 min, got ${a1.length}`);
+  assert.ok(a1.length > 20 && a1.length < 45, `a full storm (WEATHER-RULES): about 30 strikes in 10 min, got ${a1.length}`);
   assert.ok(stormStrikes('w', b, 0.3, 0, 20 * 600).length < a1.length / 2);
   assert.ok(a1.every((s) => s.x >= -450 && s.x <= 450 && s.z >= -450 && s.z <= 450));
   // windows split anywhere give the same strikes

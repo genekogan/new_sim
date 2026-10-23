@@ -143,6 +143,8 @@
 @media(max-width:700px){.human-world:not(.has-advanced) .world-hud.slim .hud-actions .my-souls{max-width:88px}.human-world:not(.has-advanced) .world-hud.slim .hud-actions{gap:5px}}
 
 .my-souls-away .soul-avatar{filter:grayscale(1);opacity:.5}
+/* AWAY-UI: an owned Soul whose agent is away (dimmed above) carries a small "away" strip across the chip's foot */
+.my-souls>button[data-agent-away]{position:relative}.my-souls-agent-away{position:absolute;left:0;right:0;bottom:0;padding-bottom:2px;font:600 8px/10px system-ui,sans-serif;letter-spacing:.02em;text-transform:lowercase;color:#fff;background:#0009;text-align:center;pointer-events:none}
 
 /* Shared glass treatment with Explore; retain readable theme foreground. */
 .human-world:not(.has-advanced) .account-panel section{background:transparent}

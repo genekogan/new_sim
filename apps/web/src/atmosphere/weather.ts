@@ -19,22 +19,31 @@ export function hash01(a:number,b=0){let h=(Math.imul(a|0,0x27d4eb2d)^Math.imul(
 type Regime='fair'|'unsettled'|'misty'|'breezy';
 const REGIMES:[Regime,number][]=[['fair',.34],['unsettled',.26],['misty',.2],['breezy',.2]];
 // Gene 2026-10-07: rain about 5% of the time, storms rarer still (was ~16% rain+storm).
+// WEATHER-RULES ("too long + too often"): unsettled rain/storm lower, a few breezy storms, so every kind still occurs under the
+// one-slot shower cap while rain and storms are rarer than before (20-year: wet 4.1% vs 5.2%, storm 1.04% vs 1.13%).
 const WEIGHTS:Record<Regime,Record<WeatherKind,number>>={
  fair:{clear:.64,cloudy:.24,rain:.005,wind:.115,fog:0,storm:0},
- unsettled:{clear:.22,cloudy:.42,rain:.115,wind:.21,fog:0,storm:.035},
+ unsettled:{clear:.22,cloudy:.42,rain:.09,wind:.21,fog:0,storm:.03},
  misty:{clear:.33,cloudy:.3,rain:.015,wind:0,fog:.355,storm:0},
- breezy:{clear:.42,cloudy:.2,rain:.015,wind:.36,fog:0,storm:.005},
+ breezy:{clear:.42,cloudy:.2,rain:.015,wind:.36,fog:0,storm:.012},
 };
 function pick<T extends string>(rows:[T,number][],u:number):T{const total=rows.reduce((s,r)=>s+r[1],0);let x=u*total;for(const [k,w] of rows){if(x<w)return k;x-=w;}return rows[rows.length-1][0];}
 export function regimeOf(day:number):Regime{return pick(REGIMES,hash01(day,7919));}
 /** Scheduled weather kind at a world time (epoch milliseconds, UTC). */
 export function weatherKindAt(epochMs:number):WeatherKind{
- const day=Math.floor(epochMs/DAY_MS),hour=(epochMs-day*DAY_MS)/3_600_000,slot=Math.floor(hour/SLOT_HOURS),regime=regimeOf(day);
- const w={...WEIGHTS[regime]};
- // Mist forms around dawn; afternoons convect (showers) a little more often.
+ const day=Math.floor(epochMs/DAY_MS),hour=(epochMs-day*DAY_MS)/3_600_000,slot=Math.floor(hour/SLOT_HOURS);
+ // WEATHER-RULES (Gene 2026-10-23, "rain lasts too long"): a shower is one slot at most; the slot after a wet one is dry
+ const k=slotKind(day,slot);if(!wetKind(k))return k;
+ const prev=slot>0?slotKind(day,slot-1):slotKind(day-1,24/SLOT_HOURS-1);
+ return wetKind(prev)?slotKind(day,slot,true):k;
+}
+const wetKind=(k:WeatherKind)=>k==='rain'||k==='storm';
+function slotKind(day:number,slot:number,dry=false):WeatherKind{
+ const w={...WEIGHTS[regimeOf(day)]};
  // (2 h slots) mist around dawn, showers and storms in the afternoon
  if(slot===2||slot===3)w.fog*=2.2;else if(slot>=5&&slot<=8)w.fog*=.25;
  if(slot>=6&&slot<=8){w.rain*=1.3;w.storm*=1.8;}
+ if(dry)w.rain=w.storm=0;
  return pick(Object.entries(w) as [WeatherKind,number][],hash01(day,slot*131+17));
 }
 /** Hour of day (0..24) at a world time. */

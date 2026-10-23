@@ -6,6 +6,7 @@ export { GENERATORS, registerGenerator, scatterPoints, type Generator, type Bake
 export { hashOf, sha256Hex, stableStringify } from './hash.ts';
 export { CORE_KIT, coreRef } from './core-kit.ts';
 export { stormStrikes, strikesBetween, STRIKE_CELL, STRIKE_FRESH, SOUND_MPS, type Strike } from './lightning.ts';
+export { WEATHER_RULES, isWetSetting, showerMinutes, showerUntil, setWeatherInForce } from './weather-rules.ts';
 export * as vocab from './vocab/index.ts';
 export { categoryOf, manifestRow, manifestLine, interfacesOf, lintDef, facetFilter, hasFacet, categoryCounts, TAXONOMY, CONVENTIONS, ACTUATORS, type ManifestRow, type VocabDef } from './vocab/index.ts';
 export * as layers from './layers.ts';

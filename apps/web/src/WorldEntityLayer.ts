@@ -489,6 +489,16 @@ export class WorldEntityLayer {
     const w = waterLevel(this.model.ground(), x, z);
     return w !== null && w > y ? w : y;
   };
+  /** groundAt's exact height without baking a terrain tile that is not baked yet (Terrain.peek): for scans of far points
+   *  (world-env's lamp pools), which otherwise bake the whole world's terrain in one frame before a phone's card. */
+  groundPeek = (x: number, z: number): number | null => {
+    if (!this.model) return null;
+    const [bx0, bz0, bx1, bz1] = this.model.ground().extent;
+    if (x < bx0 || x > bx1 || z < bz0 || z > bz1) return null;
+    const y = this.model.terrain.peek(x, z);
+    const w = waterLevel(this.model.ground(), x, z);
+    return w !== null && w > y ? w : y;
+  };
 
   dispose() {
     this.sites.dispose();

@@ -9,8 +9,9 @@
 // EDGE_EYES_NICE (default 10), EDGE_EYES_CPUS (taskset CPU list), EDGE_EYES_CHROME_ARGS (extra --switches).
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
-import {setPriority} from 'node:os';
-import {readdirSync, readFileSync} from 'node:fs';
+import {setPriority, tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {mkdtempSync, readdirSync, readFileSync, rmSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {EYES_UA_TAG, eyesBrowserLaunch, eyesBrowserModes, eyesCpus, eyesNice} from './browser-config.mjs';
 
@@ -50,13 +51,16 @@ function reniceTree(root = process.pid, nice = eyesNice()) {
 let reniced = 0;
 const renice = () => {try {const n = reniceTree(); if (n && !reniced++) log('reniced', n, 'browser threads to', eyesNice(), '(logged once)');} catch (e) {log('renice failed', e.message);}};
 const order = eyesBrowserModes();
+// writable XDG dir for Chrome's crash handler (the unit hides $HOME); removed at exit
+const home = mkdtempSync(join(tmpdir(), 'eden-eyes-'));
+process.on('exit', () => {try {rmSync(home, {recursive: true, force: true});} catch {/* best effort */}});
 let browser = null, page = null, renderer = null, ready = false, closing = false, loadedAt = 0, busy = false;
 const queue = [];
 
 async function launch() {
   for (const mode of order) {
     try {
-      const b = await chromium.launch(eyesBrowserLaunch(mode));
+      const b = await chromium.launch(eyesBrowserLaunch(mode, process.env, process.platform, home));
       const probe = await b.newPage(), ua = await probe.evaluate(() => navigator.userAgent); await probe.close();
       const p = await b.newPage({viewport: {width: 512, height: 320}, deviceScaleFactor: 1, userAgent: `${ua} ${EYES_UA_TAG}`});
       const gl = await p.evaluate(() => {const c = document.createElement('canvas').getContext('webgl2'); if (!c) return null; const x = c.getExtension('WEBGL_debug_renderer_info'); return x ? c.getParameter(x.UNMASKED_RENDERER_WEBGL) : c.getParameter(c.RENDERER);});

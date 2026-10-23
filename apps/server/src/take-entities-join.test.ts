@@ -9,6 +9,7 @@ import WebSocket from 'ws';
 import {hashOf} from '@sim/engine-contract';
 import {PROTO,TAKE_ENTITIES_WIRE_V1,TAKE_ENTITIES_JOIN_V1,TAKE_BOUNDARY_WIRE_V1,TAKE_CHUNKS_WIRE_V1,TakeEntitiesEncoderV1,adoptSnapshotTableV1,hydrateTakeEntitiesV1,hydrateTakeBoundaryWireV1,hydrateTakeChunksV1,type TakeEntitiesStateV1,type TakeChunksStateV1} from '@sim/protocol';
 import {Connection} from '@sim/client';
+import {COLUMNS_V1,isPackedColumnsV1,unpackColumnsV1} from '@sim/protocol';
 import {helloMessage} from '../../../packages/client/src/hello.ts';
 import {fixture} from '../test/native-owner-fixture.ts';
 import {recordedToyFactory} from './toy-takes.ts';
@@ -57,7 +58,7 @@ test('protocol: a registered snapshot table is the base of the next take (refere
 });
 
 test('hello: a transport-capable Connection announces take-entities-join/1 after its other take contracts',()=>{
- assert.deepEqual(Object.keys(helloMessage({takeBoundaryTransport:true})),['t','proto','takeTransport','takeEntities','takeChunks','takeEntitiesJoin']);
+ assert.deepEqual(Object.keys(helloMessage({takeBoundaryTransport:true})),['t','proto','takeTransport','takeEntities','takeChunks','takeEntitiesJoin','snapshotColumns']);
  assert.equal((helloMessage({takeBoundaryTransport:true}) as any).takeEntitiesJoin,TAKE_ENTITIES_JOIN_V1);
  assert.equal((helloMessage({}) as any).takeEntitiesJoin,undefined);
 });
@@ -140,4 +141,25 @@ test('actual Hub: a resync snapshot re-bases a join peer; a moved entity then tr
  assert.equal(ids.length,2);assert.ok(ids.every(id=>Number.isSafeInteger(id)));
  assert.ok(raw.filter(s=>s.startsWith('{"t":"take-entities"')).at(-1)!.includes('$takeEntitiesPatchV1'));
  assert.equal(Object.values(last.chunks[0].take.finalState.entities as Table)[0].movedForTest,true);
+});
+
+test('actual Hub: columns/1 peers get the join snapshot table in the column form, restored exactly and smaller',async t=>{
+ const f=await local(t,f=>[chunk(f.host.engine.world.tick,structuredClone(f.host.engine.world.entities))]);
+ const all={takeTransport:TAKE_BOUNDARY_WIRE_V1,takeEntities:TAKE_ENTITIES_WIRE_V1,takeChunks:TAKE_CHUNKS_WIRE_V1,takeEntitiesJoin:TAKE_ENTITIES_JOIN_V1};
+ const offers=[all,{...all,snapshotColumns:COLUMNS_V1},{snapshotColumns:COLUMNS_V1},{...all,snapshotColumns:'columns/9'}],packed=[false,true,true,false];
+ const out:{snap:string;raw:number;takes:string[]}[]=[];
+ for(const [i,offer] of offers.entries()){
+  const socket=new WebSocket('ws://127.0.0.1:'+f.port+'/ws'),raw:string[]=[];
+  const ready=new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('finite WS takes deadline')),2000);socket.on('message',data=>{const s=String(data);raw.push(s);if(/^\{"t":"(takes|take-entities|take-boundary-wire|take-chunks)"/.test(s)){clearTimeout(timer);resolve();}});socket.once('error',reject);})
+  await once(socket,'open');socket.send(JSON.stringify({t:'hello',proto:PROTO,...offer}));await ready;socket.close();
+  const ents:TakeEntitiesStateV1={last:null},chunkState:TakeChunksStateV1={last:null};let snap='',size=0;const takes:string[]=[];
+  const boundary=(v:any)=>v?.t==='take-boundary-wire'?hydrateTakeBoundaryWireV1(v):v,entities=(v:any)=>v?.t==='take-entities'?hydrateTakeEntitiesV1(v,ents,boundary):boundary(v);
+  for(const s of raw){let m=JSON.parse(s);
+   if(m.t==='snapshot'){size=s.length;assert.equal(isPackedColumnsV1(m.entities),packed[i],'column form '+i);if(isPackedColumnsV1(m.entities))m.entities=unpackColumnsV1(m.entities);if(m.entitiesTable!==undefined)m=adoptSnapshotTableV1(m,ents);const {reason:_r,...rest}=m;snap=JSON.stringify(rest);}
+   else if(m.t==='take-chunks')m=hydrateTakeChunksV1(m,chunkState,entities);else m=entities(m);
+   if(m.t==='takes')takes.push(JSON.stringify(m));}
+  out.push({snap,raw:size,takes});
+ }
+ for(let i=1;i<offers.length;i++){assert.equal(out[i].snap,out[0].snap,'decoded snapshot '+i);if((offers[i] as {takeEntities?:string}).takeEntities)assert.deepEqual(out[i].takes,out[0].takes,'decoded takes '+i);}
+ assert.ok(out[1].raw<out[0].raw,`the column form is smaller (${out[1].raw} vs ${out[0].raw})`);
 });

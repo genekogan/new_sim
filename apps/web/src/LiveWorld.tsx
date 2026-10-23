@@ -943,7 +943,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       // Orbit click-to-centre glide; any other mode or a new gesture cancels it.
       if(viewing!=='manual'||context.current.manualNavigation!=='orbit')orbitPivot.cancel();
       orbitPivot.update(step,camera,controls.target);
-      atmosphereSeconds+=step;godLiving?.update(now,light.daylight,!!reducedMotionQuery?.matches||(look.enabled&&shotMode));const godSky=godLiving&&entityLayer.active&&!expansion?godLiving.atmosphere():forkLand&&!expansion?forkLand.atmosphere():null;  // look pass: a still picture shows patterned lamps at their steady level (repeatable shots)
+      atmosphereSeconds+=step;godLiving?.update(now,light.daylight,!!reducedMotionQuery?.matches||(look.enabled&&shotMode));const godSky=godLiving&&entityLayer.active&&!expansion?godLiving.atmosphere(shown.current?.tick??NaN):forkLand&&!expansion?forkLand.atmosphere():null;  // look pass: a still picture shows patterned lamps at their steady level (repeatable shots)
       if(!holdDraw)try{atmosphere.update({seconds:atmosphereSeconds,dt:step,daylight:light.daylight,camera,eden:(!!expansion||!!godSky)&&!past.current,reducedMotion:!!reducedMotionQuery?.matches,clock:shotClockAt(shown.current?.datetime??adopted?.clock??null,shotHour??visitorPreviewHour()),...(godSky?{profile:'world' as const,weather:godSky.weather,indoors:godSky.indoors}:{})});}catch{}
       try{godLightning?.update(shown.current?.tick??NaN,camera,step,!!reducedMotionQuery?.matches);}catch{}
       if(controls.enabled)controls.update();

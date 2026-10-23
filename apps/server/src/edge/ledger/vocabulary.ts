@@ -262,7 +262,9 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
     const r = resolveCapability(`${loop || !target ? 'cycle-around' : 'cycle'}:${target || 'here'}`, ctx);
     return r.kind === 'unknown' ? r : {kind: 'alias', cap: r.cap, note: `${input} is ${r.cap.id} (${r.cap.label}).`};
   }
-  const rideIntent = /\b(?:row|rowing|boating|ride|rides|fly|flight|flying|leave|disembark|alight|start|depart)\b/.test(text) || /^(?:punt|boat|balloon)(?::|$)/.test(text);
+  // RIDE-EXIT (A, Gene's review): "get inside the hot air balloon", "board the punt", "climb into the boat" are the join too.
+  const boardWords = /\b(?:board|boarding|embark|(?:get|getting|climb|climbing|hop|step|jump)\s+(?:in|into|inside|aboard|onto|on\s+board))\b/.test(text);
+  const rideIntent = boardWords || /\b(?:row|rowing|boating|ride|rides|fly|flight|flying|leave|disembark|alight|start|depart)\b/.test(text) || /^(?:punt|boat|balloon)(?::|$)/.test(text);
   // Rowing always means a punt, and an explicit balloon always means a balloon.
   if ((colon < 0 || ['ride', 'fly', 'balloon', 'row', 'punt', 'boat'].includes(head)) && rideIntent && RIDE_WORDS.test(text) && !/\b(?:bike|bicycle|horse|see[- ]?saw|teeter[- ]?totter|swings?|ferris|big wheel|carousel|merry[- ]go[- ]round)\b/.test(text)) {
     const water = /\b(?:row|rowing|punt|boat|boating)\b/.test(text), air = /\b(?:balloon|fly|flight|flying|hot[- ]air)\b/.test(text);
@@ -270,7 +272,7 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
     // the vehicle is told by the ride's id (ride-eden-punt, ride-eden-balloon), never by the join label, which reads the same
     // for every ride ("…punt receipt includes disembarkation"): "row a boat" took Eden 2026's balloon (quality case 22)
     const rides = ctx.caps.filter(c => c.verb === 'object' && c.action === action && (water ? /punt|rowing|boat|canoe|kayak/i.test(c.id) && !/balloon/i.test(c.id) : air ? /balloon/i.test(c.id) : /ride|balloon|carrier|punt/i.test(c.id + ' ' + c.label)));
-    const target = text.replace(/\b(?:let|lets|s|go|for|take|have|a|an|the|ride|rides|row|rowing|boat|boating|punt|balloon|fly|flight|flying|in|on|at|around|start|leave|disembark|depart|out|of|to|loop|together)\b/g, ' ').replace(/[:.!]/g, ' ').trim();
+    const target = text.replace(/\b(?:let|lets|s|go|for|take|have|a|an|the|ride|rides|row|rowing|boat|boating|punt|balloon|fly|flight|flying|in|on|at|around|start|leave|disembark|depart|out|of|to|loop|together|board|boarding|embark|get|getting|climb|climbing|hop|step|jump|into|inside|aboard|onto|hot|air)\b/g, ' ').replace(/[:.!]/g, ' ').trim();
     const words = tokens(target), named = words.length ? rides.filter(c => {const t = ctx.target(c); return words.every(w => tokenHit(w, tokens([c.id, c.label, ...t.names, ...t.around].join(' '))));}) : rides;
     const pick = named.sort((a, b) => Number(b.available) - Number(a.available) || dist(ctx.target(a).at, ctx.me) - dist(ctx.target(b).at, ctx.me) || a.id.localeCompare(b.id))[0];
     if (pick) return {kind: 'alias', cap: pick, note: `${input} is ${pick.id} (${pick.label}).`};

@@ -2,11 +2,12 @@
 // state (the god's `world` op; apps/server/src/god/world-env.ts is the setter). Presentation only.
 import * as THREE from 'three';
 import type { SetWeather } from './WorldAtmosphere.ts';
+import { setWeatherInForce } from '@sim/world-compiler/weather-rules';
 import { nightOf, setClockNight, worldSeconds } from './gen-mesh/motion.ts';
 import { defLights, flickers, lightPhase, PatternNightMap, paintOnlySources, setNightLightStrength, worldNightBounds, type AuthoredLight, type NightSource } from './WorldNightLights.ts';
 import type { HaloSource } from './atmosphere/halos.ts';
 
-type WorldStateLike = { weather?: { kind?: string; clouds?: number; rain?: number; wind?: number; fog?: number; intensity?: number } } | null | undefined;
+type WorldStateLike = { weather?: { kind?: string; clouds?: number; rain?: number; wind?: number; fog?: number; intensity?: number; until?: number | null } } | null | undefined;
 
 /** A picture's local time override, in minutes after midnight. Ordinary viewers ignore it. */
 export function parseShotHour(search: string): number | null {
@@ -52,12 +53,13 @@ export function whenShotClock(hasClock: () => boolean, { timeoutMs, signal, fram
   });
 }
 
-/** The god's set weather, or null when the world follows the scheduled weather ('auto', the default). */
-export function setWeatherOf(state: WorldStateLike): SetWeather | null {
+/** The god's set weather, or null when the world follows the scheduled weather ('auto', the default, or a rain/storm
+ *  past its end tick: WEATHER-RULES; `tick` NaN = unknown, trusts a stamped end). */
+export function setWeatherOf(state: WorldStateLike, tick = NaN): SetWeather | null {
   const w = state?.weather;
-  if (!w || !w.kind || w.kind === 'auto') return null;
+  if (!w || !setWeatherInForce(w, tick)) return null;
   const n = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : d);
-  return { kind: w.kind, clouds: n(w.clouds, 0.1), rain: n(w.rain, 0), wind: n(w.wind, 0.1), fog: n(w.fog, 0), intensity: n(w.intensity, 1) };
+  return { kind: w.kind!, clouds: n(w.clouds, 0.1), rain: n(w.rain, 0), wind: n(w.wind, 0.1), fog: n(w.fog, 0), intensity: n(w.intensity, 1) };
 }
 
 /** The entity layer's world state (its model is private to the layer; read-only here). */
@@ -106,7 +108,7 @@ type ModelLike = {
   ground?(): { extent?: readonly number[] };
   editSeq?: number;
 };
-type LayerLike = { active: boolean; groundAt(x: number, z: number): number | null; group: THREE.Object3D };
+type LayerLike = { active: boolean; groundAt(x: number, z: number): number | null; groundPeek?(x: number, z: number): number | null; group: THREE.Object3D };
 
 /** God worlds get Eden's living presentation: lamps that light at dusk with warm pools and halos, the sky, weather
  *  (scheduled, or the god's), and rain that stays out of god-built rooms. One per live view. */
@@ -202,7 +204,7 @@ export class GodWorldLiving {
         if (light.on === false) continue;
         const at = light.at, dx = (at?.[0] ?? 0) * scale, dz = (at?.[at.length - 1] ?? 0) * scale;
         const x = p.x + dx * cos + dz * sin, z = p.z - dx * sin + dz * cos;
-        const base = this.layer.groundAt(x, z) ?? 0, range = Math.max(2, Math.min(14, light.range ?? 8));
+        const base = (this.layer.groundPeek ? this.layer.groundPeek(x, z) : this.layer.groundAt(x, z)) ?? 0, range = Math.max(2, Math.min(14, light.range ?? 8));
         const pattern = light.pattern ?? (flame ? 'flicker' as const : undefined);
         const phase = lightPhase(e.id, i, lights.length, pattern);
         sources.push({ x, z, base, radius: range * (fire ? 0.4 : POOL_RADIUS) * this.pools.radius, intensity: fire ? 1.1 : POOL_LAMP, color: light.color ?? '#ffe9c4', halo: range * POOL_HALO * this.pools.radius, pattern, phase });
@@ -232,8 +234,8 @@ export class GodWorldLiving {
     this.group.userData.edenBalloonTracks = tracks; this.group.userData.edenFogBand = band;
   }
   /** For the atmosphere: the god's weather (null = scheduled) and "under a roof" for camera-local rain. */
-  atmosphere(): { weather: SetWeather | null; indoors: (x: number, y: number, z: number) => boolean } {
-    return { weather: setWeatherOf(entityWorldState(this.layer)), indoors: (x, y, z) => this.layer.active && sharedCoverProbe(this.layer.group).test(x, y, z) };
+  atmosphere(tick = NaN): { weather: SetWeather | null; indoors: (x: number, y: number, z: number) => boolean } {
+    return { weather: setWeatherOf(entityWorldState(this.layer), tick), indoors: (x, y, z) => this.layer.active && sharedCoverProbe(this.layer.group).test(x, y, z) };
   }
   dispose() { setClockNight(null); this.patterns?.dispose(); this.patterns = null; this.group.removeFromParent(); }
 }
