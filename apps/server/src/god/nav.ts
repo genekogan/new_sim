@@ -354,17 +354,6 @@ export class GodNav {
         const edge = nearestOn(w.area, t.at, true), c = centroid(w.area), dx = edge.q[0] - c[0], dz = edge.q[1] - c[1], n = Math.hypot(dx, dz) || 1;
         goal = near([edge.q[0] + (dx / n) * 1.5, edge.q[1] + (dz / n) * 1.5], 0, 16); if (goal) break;
       }
-      // RESOLVE2: a thing on a raised floor (a roof bench, an upstairs lamp) must be reached from the ground: no stair to
-      // it -> no goal (offered as unavailable), not a walk that 'completes' on the ground below it
-      // (and that ground from where I stand: the watermill's door opens onto its river, so its stair is reached from nowhere)
-      const myLevel = (except ? E.world.entities[except]?.human?.level : undefined) ?? 0;
-      if (goal && goal.level > 0 && goal.level !== myLevel && E.reachV1) {
-        const ground = near(t.at, 0, 40);
-        // where I stand, snapped to standing room (the walk audit asks from the thing's own point, inside a wall or a bed)
-        const from = myLevel === 0 ? near(me, 0, 4) : null;
-        const ok = !!ground && E.reachV1({ p: ground.p, level: 0 }, goal).ok && (myLevel !== 0 || !from || E.reachV1({ p: from.p, level: 0 }, { p: ground.p, level: 0 }).ok);
-        if (!ok) { goal = null; this.blocked.set(t.ref, `No walkable route reaches ${t.ref} from here: no stair or way in leads up to it.`); }
-      }
     }
     this.goals.set(key, { tick, key, goal });
     return goal;
