@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import {ownerReplyWithLocalResults,ownerAnswerText,routeOwnerReport,ownerPlainLine} from './client-owner-reply.mjs';
+import {ownerReplyWithLocalResults,ownerAnswerText,routeOwnerReport,ownerPlainLine} from './client-owner-reply.mjs';import {guardStaleOwnerSteps,priorOwnerRequests} from './client-owner-stale.mjs';
 import {clientHelp} from './client-help.mjs';
 import {clientListen,clientAck,clientResult,noticeOwnerInbox,noticeInboxHeader,folderListenClaim} from './client-inbox.mjs';
 // Eden edge agent CLI — skill 1.0.0 for contract eden-edge/1 (team/CONTRACTS/EDGE-CONTRACT-v1.md).
@@ -958,6 +958,7 @@ export async function live(...argv){
   let steps;try{steps=replySteps(plan).map(normaliseStep);}catch(error){steps=[];pending.push({kind:'queue.refusal',text:error.message,_rx:Date.now()});}
   const results=[],localOwnerResults=[];const localOwnerResult=(operation,accepted,line)=>{localOwnerResults.push({operation,accepted,line});results.push(line);};let follow=false;if(reviewTask?.compile&&steps.length){results.push('Compilation body steps deferred: provide compile bindings instead of do.');steps=[];}
   if(own&&Array.isArray(plan.targets)&&plan.targets.length&&plan.targets.length<=8&&plan.targets.every(n=>typeof n==='string'&&n.length<=200&&literalSoulReference(own.text,n))){S.identityGoal={...S.identityGoal,ownerRequestId:own.id,text:own.text,requestedNames:plan.targets};saveS();}
+  if(own&&steps.length){const stale=guardStaleOwnerSteps(steps,own.text,priorOwnerRequests(readJSONL(LIVE.replies),own.id));if(stale.replaced.length){steps=stale.steps;results.push(stale.line);logLive({staleOwnerSteps:{ownerRequestId:own.id,replaced:stale.replaced}});}}
   if(later){const routed=routeOwnerReport(steps,plan.owner);if(routed.routed){steps=routed.steps;plan.owner=routed.owner;results.push(routed.line);logLive({ownerReportRouted:{ownerRequestId:later.id,steps:routed.routed}});}}
   const identityOwner=own??later??S.identityGoal;const identity=await qualifyIdentitySteps(steps,identityOwner?.text??'',identityOwner?.id??identityOwner?.ownerRequestId??null);
   const execution=identity.ok?await executeReplySteps(identity.steps,{queue:bodyQueue,id:own?.id??('wake-'+randomUUID()),source:own?'owner':'mind',force:own?.force===true,replace:!!own||bodyQueue.snapshot().steps.some(s=>['failed','interrupted','blocked'].includes(s.status)),pump:()=>bodyQueue.pump(queueContext(),leaseHeld()),runPublic:runStep}):{results:[{operation:'identity-preflight',accepted:false,code:identity.code,reason:identity.reason,line:`refused ${identity.code}: ${identity.reason}`}],again:true,retained:false};
