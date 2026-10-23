@@ -225,7 +225,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   const entityLayerRef = useRef<WorldEntityLayer | null>(null);
   const entitiesAt = useCallback((seq: number) => entityLayerRef.current?.entitiesAt(seq) ?? null, []);
   /** Entity worlds: the person's camera across scene re-mounts of this page (framed once, on first arrival). */
-  const entityView = useRef<{eye:[number,number,number];target:[number,number,number];pending?:boolean}|null>(null);
+  const entityView = useRef<{eye:[number,number,number];target:[number,number,number];pending?:boolean;broadcast?:boolean}|null>(null);
   const context = useRef({ placeCard, sim, selected, onSelect, follow, cameraMode, setCameraMode, thing, setThing, onViewerState, loading, graphicsUnavailable, viewportInsets, manualNavigation, setManualNavigation, depictionBeatAt, publishSpeechAnchors, edenExpansion, localClassroomPresentation });
   context.current = { placeCard, sim, selected, onSelect, follow, cameraMode, setCameraMode, thing, setThing, onViewerState, loading, graphicsUnavailable, viewportInsets, manualNavigation, setManualNavigation, depictionBeatAt, publishSpeechAnchors, edenExpansion, localClassroomPresentation };
   const past = useRef<Past | null>(null);
@@ -360,7 +360,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     // once, on first arrival (after the snapshot loads; never from the render loop), at a human distance (entity-arrival.ts).
     const frameEntityWorld=()=>{if(!entityLayer.active||entityWorldFramed)return;entityWorldFramed=true;const q=new URLSearchParams(location.search),pin=shotMode?shotPin():null,eye=pin?.eye??q.get('eye')?.split(',').map(Number),at=pin?.at??q.get('at')?.split(',').map(Number);  // lookrace: a re-mounted shot page keeps the look's pinned camera
       if(eye?.length===3&&at?.length===3&&eye.every(Number.isFinite)&&at.every(Number.isFinite)){controls.target.set(at[0],at[1],at[2]);camera.position.set(eye[0],eye[1],eye[2]);}
-      else if(entityView.current){controls.target.fromArray(entityView.current.target);camera.position.fromArray(entityView.current.eye);if(entityView.current.pending){camera.lookAt(controls.target);arrivalPending={eye:entityView.current.eye,target:entityView.current.target};return;}}  // a re-mount (welcome, reconnect) keeps the person's camera (and an undecided arrival stays undecided)
+      else if(entityView.current){controls.target.fromArray(entityView.current.target);camera.position.fromArray(entityView.current.eye);if(entityView.current.pending){camera.lookAt(controls.target);arrivalPending={eye:entityView.current.eye,target:entityView.current.target};return;}if(entityView.current.broadcast&&context.current.cameraMode==='broadcast'){camera.lookAt(controls.target);return;}}  // DIRECTOR2: a re-mount (a new Soul, a reconnect) left a broadcast viewer on 'your camera' with no input  // a re-mount (welcome, reconnect) keeps the person's camera (and an undecided arrival stays undecided)
       else{  // the orbit target is the centre of the screen and of what was built: no panel-dependent shift (Gene: off-centre pivot on small screens)
         const pose=adopted?.target&&adopted.eye?{target:adopted.target,eye:adopted.eye,opening:adopted.opening??null}:worldArrivalPose(entityLayer,camera.aspect);controls.target.fromArray(pose.target);camera.position.fromArray(pose.eye);broadcast.opening=pose.opening;  // P7f: one arrival camera (arrival-shot.ts): the poster's, and with Souls the broadcast's first shot starts from it
         camera.lookAt(controls.target);arrivalPending={eye:camera.position.toArray(),target:controls.target.toArray()};return;}  // R4-LIVE: broadcast if Souls live here (decided once the welcome lists them), as on /w/eden
@@ -1116,7 +1116,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       for (const l of labels.values()) { labelScene.remove(l.obj); l.obj.element.remove(); }
       labels.clear();
       people?.dispose();
-      if(entityWorldFramed)entityView.current={eye:camera.position.toArray(),target:controls.target.toArray(),pending:!!arrivalPending};  // entity worlds only: the camera survives the scene re-mount
+      if(entityWorldFramed)entityView.current={eye:camera.position.toArray(),target:controls.target.toArray(),pending:!!arrivalPending,broadcast:context.current.cameraMode==='broadcast'};  // entity worlds only: the camera survives the scene re-mount
       edgeItems.dispose();entityLayer.dispose();const entityDebug=window as unknown as {__simEntity?:{layer:WorldEntityLayer}};if(entityDebug.__simEntity?.layer===entityLayer)delete entityDebug.__simEntity;setFleeSources(null);
       initialGate?.cancel();retryInitial.current=null;staticBatches.dispose();distanceDetail?.dispose();meshLod?.dispose();farStandIns?.dispose();diagnostics.dispose();placePreviews.dispose();bodyModels.dispose();
       floaters.dispose();
