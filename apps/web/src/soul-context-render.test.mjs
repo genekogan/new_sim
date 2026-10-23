@@ -37,6 +37,17 @@ test('owner mind shows only validated granted access, never claims an active cli
   const html=render(h(SoulMindDetails,{...props,connection}));assert.match(html,/Connection details are unavailable/);assert.doesNotMatch(html,/PRIVATE_STALE|Disconnect assistant|Request one-use code/);
  }
 });
+test('MIND-PANEL-COPY: owner terms, never a bare label; the one-use code control only without a live grant',()=>{
+ const props={api,soulId:'s_A',name:'Longrun Ada',refresh(){}},now=Date.now();
+ const legacy=render(h(SoulMindDetails,{...props,connection:{attached:true,label:'travel',since:now-2*3_600_000,last_used:now-300_000}}));
+ assert.match(legacy,/<b>Your agent<\/b> has access to Longrun Ada/);assert.doesNotMatch(legacy,/<b>travel<\/b>/);
+ assert.match(legacy,/Your agent · connected 2 h ago from “travel” · last active 5 min ago/);
+ assert.doesNotMatch(legacy,/one-use|Connect a new agent/);
+ const account=render(h(SoulMindDetails,{...props,connection:{attached:true,label:'eden-agent 1.9.9',since:now-60_000,last_used:null}}));
+ assert.match(account,/Your agent \(eden-agent 1\.9\.9\) · connected 1 min ago\./);
+ const none=render(h(SoulMindDetails,{...props,connection:{attached:false,label:null,since:null,last_used:null}}));
+ assert.match(none,/No agent has access/);assert.match(none,/Connect a new agent with a one-use code/);
+});
 test('multiple stable Soul IDs remain selectable despite mutable duplicate names',()=>{
  const s2={...soul,id:'s_B',entityId:'h_B'};const state={...sim,me:{...me,souls:['s_A','s_B']},conn:{...sim.conn,replica:{...sim.conn.replica,souls:new Map([['s_A',soul],['s_B',s2]])}}};
  const html=render(h(SoulAccount,{sim:state,auth:auth('acct_A'),api,select(){},pairCode:null,clearPair(){}}));assert.equal((html.match(/Mutable Name/g)??[]).length,2);assert.equal(calls,0);
