@@ -101,7 +101,7 @@ test('GodPanel flags: flagRefsOf over the layer\'s entities = the old snapshot d
 });
 
 // Lane W1: the socket at page entry, adopted by useSim's Connection.
-import { CONFIG_GLOBAL, SOCKET_GLOBAL, takeBootSocket, takeConfigPrefetch, entrySnapshotUrl, entryWireUrl } from './snapshot-prefetch.ts';
+import { CONFIG_GLOBAL, OPEN_SOCKET_GLOBAL, SOCKET_GLOBAL, takeBootSocket, takeConfigPrefetch, entrySnapshotUrl, entryWireUrl } from './snapshot-prefetch.ts';
 import { anonymousHello, Connection } from '@sim/client';
 
 class FakeWS { static made: FakeWS[] = []; readyState = 0; sent: string[] = []; closed = false; onopen: any; onmessage: any; onclose: any; onerror: any; url: string;
@@ -209,6 +209,9 @@ test('entry socket: an #approve link opens no world socket (a full boot opens it
   const loc = { pathname: '/worlds/w/eden-2026/', protocol: 'https:', host: 'sim.test' };
   runEntryWithSocket(loc.pathname, anonymousHello(true), { location: { ...loc, hash: '#approve/ap_0123456789abcdef' } });
   assert.equal(FakeWS.made.length, 0);
+  const phased = runEntryWithSocket(loc.pathname, anonymousHello(true), { location: { ...loc, hash: '#approve/ap_0123456789abcdef', search: '?early=1' }, URLSearchParams, screen: { width: 390, height: 844 }, navigator: {} });
+  assert.equal(typeof phased.ctx[OPEN_SOCKET_GLOBAL], 'function', 'phased entry');
+  const open = phased.ctx[OPEN_SOCKET_GLOBAL] as (() => void) | undefined; open?.(); assert.equal(FakeWS.made.length, 0, 'phased second phase too');
   runEntryWithSocket(loc.pathname, anonymousHello(true), { location: { ...loc, hash: '#soul/s_1' } });
   assert.equal(FakeWS.made.length, 1);
 });
