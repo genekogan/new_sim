@@ -177,7 +177,7 @@ function ShellWorld({ cfg, auth: providerAuth, arrivalEnabled=false,humanPresets
   }, [advanced, tab, panelOpen]);
   const show = (...t: Tab[]) => tab === 'everything' || t.includes(tab);
   const r = sim.conn.replica, st = sim.conn.stats;
-  const pins=useMySouls();
+  useMySouls(); // keeps reading #mine= share fragments; the card's Pin button is gone (CARD-TRIM)
   // Local favourites never establish ownership. Navbar comes only from server Me.
   const ownedIds=currentMe?.souls??[];
   const signinEnabled=AUTH_UI&&configuredSignIn(cfg,launcherWorld);  // new worlds: local dev sign-in too
@@ -218,7 +218,7 @@ function ShellWorld({ cfg, auth: providerAuth, arrivalEnabled=false,humanPresets
         <button className="panel-close" aria-label="Close panel" title="Close" onClick={() => setPanelOpen(false)}>×</button>
         {lessonOpen&&localClassroomPresentation&&<ClassroomPresentation worldId={localClassroomPresentation.worldId} screenEntityId={localClassroomPresentation.screenEntityId} index={lessonIndex} onSelect={setLessonIndex}/>}
         {pairCode&&<button onClick={()=>{setAdvanced(false);setTab('my soul');revealPanel();}}>Finish assistant approval</button>}
-        <SoulFocus key={`${selected}:${sim.me?.userId ?? 'public'}`} sim={sim} api={api} auth={auth} selected={selected} select={inspect} pin={selected?{pinned:pins.ids.includes(selected),toggle:()=>pins.toggle(selected)}:undefined} camera={selected&&viewerHandle?{following:viewerState?.cameraMode==='follow'&&viewerState.selection.soulId===selected,follow:()=>{if(viewerHandle.selectSoul(selected)){viewerHandle.setCameraMode('follow');}},stop:()=>{viewerHandle.setManualNavigation?.('orbit');viewerHandle.setCameraMode('manual');}}:undefined} manage={openAccount} active={!advanced&&panelOpen&&tab!=='my soul'} />
+        <SoulFocus key={`${selected}:${sim.me?.userId ?? 'public'}`} sim={sim} api={api} auth={auth} selected={selected} select={inspect} camera={selected&&viewerHandle?{following:viewerState?.cameraMode==='follow'&&viewerState.selection.soulId===selected,follow:()=>{if(viewerHandle.selectSoul(selected)){viewerHandle.setCameraMode('follow');}},stop:()=>{viewerHandle.setManualNavigation?.('orbit');viewerHandle.setCameraMode('manual');}}:undefined} manage={openAccount} active={!advanced&&panelOpen&&tab!=='my soul'} />
       </aside>
       <aside id="account-panel" className="human-panel account-panel" hidden={advanced||tab!=='my soul'||!panelOpen} aria-label="Soul and account tools">
         <button onClick={() => setTab('watch')}>← Back to the world</button><div className="grid"><SoulAccount sim={sim} auth={auth} api={api} select={id=>{inspect(id);setTab('watch');}} pairCode={pairCode} clearPair={()=>setPairCode(null)}/></div>

@@ -21,7 +21,7 @@ const base={sim,api,selected:'s_A',select(){},manage(){},camera:{following:false
 const forbidden=/Give .* direction|Send direction|standing rules|reconsiders in|recent thinking|intent-v2|mandate|public download and setup/;
 for(const [name,identity,owner] of [['signed out',null,false],['current owner','acct_A',true],['different account','acct_B',false]])test(`modern context for ${name}`,()=>{
  const html=render(h(SoulFocus,{...base,auth:auth(identity)}));
- assert.match(html,/class="soul-card"/);assert.match(html,/Curious artist/);assert.match(html,/>Follow</);assert.match(html,/>Share</);assert.match(html,/>Activity/);assert.equal(html.includes('This mind'),owner);assert.doesNotMatch(html,forbidden);
+ assert.match(html,/class="soul-card"/);assert.match(html,/Curious artist/);assert.match(html,/>Follow</);assert.match(html,/class="soul-share" aria-label="Copy a link to Mutable Name"/);assert.doesNotMatch(html,/>Share<|>Pin<|Pin this Soul|Travel to/,'CARD-TRIM: Share is a paperclip by the name; no Pin, no Travel to');assert.match(html,/>Activity/);assert.equal(html.includes('This mind'),owner);assert.doesNotMatch(html,forbidden);
 });
 test('account switching suppresses stale owned roster until matching server identity',()=>{
  const props={sim,api,select(){},pairCode:null,clearPair(){}};
