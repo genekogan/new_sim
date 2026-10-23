@@ -30,6 +30,8 @@ test('compile cache: world and fork commands carry it only when the launcher has
   assert.equal(defaultCommand(world, 1, { ...o, compileCache: '/d/cc' }).env.NODE_COMPILE_CACHE, '/d/cc');
   assert.deepEqual(defaultCommand(world, 1, o).args, ['apps/server/src/main.ts'], 'no cache: no strip cache either');
   assert.deepEqual(defaultCommand(world, 1, { ...o, compileCache: '/d/cc' }).args, ['--import', './apps/server/src/strip-cache.mjs', 'apps/server/src/main.ts'], 'lane BOOT2');
+  // a release that does not ship the hook (the keeper's test releases, an older tree) boots without it, never a failed import
+  assert.deepEqual(defaultCommand(world, 1, { ...o, compileCache: '/d/cc', root: mkdtempSync(join(tmpdir(), 'boot2-nohook-')) }).args, ['apps/server/src/main.ts'], 'no hook in the release: plain boot');
   const fork = { ...world, fork: { descriptor: '/f.json', accounts: '/a.sqlite' } }, auth = { auth: { envFile: '/e.env' } };
   assert.equal(forkCommand(fork, 1, { ...o, ...auth, compileCache: '/d/cc' }).env.NODE_COMPILE_CACHE, '/d/cc');
 });
