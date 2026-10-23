@@ -203,7 +203,7 @@ function scanWorld(model: WorldModel) {
 const lastValue = new Map<string, unknown>();
 let meter: AnalyserNode | null = null;
 // lane AMBIENT: recorded beds under the procedural voices (lazy chunk after the first unlock; see ambient-beds.ts)
-let bedsMod: typeof import('./ambient-beds.ts') | null = null, beds: import('./ambient-beds.ts').Beds | null = null, bedsLoading = false;
+let bedsMod: typeof import('./ambient-beds.ts') | null = null, beds: import('./ambient-beds.ts').Beds | null = null, bedsLoading = false, bedsOn = true;
 const log: LogRow[] = [];
 const events: EventRow[] = [];
 const started = new Set<string>();
@@ -261,7 +261,7 @@ function step(host: Host) {
   if (!audible()) { applyMaster(); return; }
   if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
   if (!bedsLoading) { bedsLoading = true; void import('./ambient-beds.ts').then((mod) => { bedsMod = mod; if (ctx && master) beds = mod.createBeds(ctx, master); }, () => {}); }
-  if (beds && bedTargets) beds.update(bedTargets, now);
+  if (beds && bedTargets) beds.update(bedsOn ? bedTargets : bedsMod!.bedMix([], { x, z }, { exposure: 0, covered: true, music: false }), now);
   const live = new Set(heard.map((h) => h.id)), t = ctx.currentTime;
   for (const h of heard) {
     let v = voices.get(h.id);
@@ -335,6 +335,8 @@ export function startSoundLayer() {
     mute: (m: boolean) => setSettings({ muted: m }),
     music: (m: boolean) => setSettings({ music: m }),
     unlock,
+    /** Recorded ambient beds on/off (A/B listening and level checks); the speaker's mute is the user control. */
+    beds: (on: boolean) => { bedsOn = on; },
   };
   (window as unknown as { __edenMusic?: unknown }).__edenMusic = { state: musicState, log: musicLog, level: musicLevel, next: nextPiece, trackSeconds: musicTrackSeconds };
   // another tab took the sound, or this one came back: act now, not on the next (throttled, when hidden) tick
