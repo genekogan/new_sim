@@ -11,7 +11,7 @@ void test('conversation start keeps the old single form and adds explicit unique
  const ids=Array.from({length:8},(_,i)=>'s_'+i);assert.deepEqual(conversationStartBody('--with',ids.join(',')).with,ids);
  const backend=readFileSync(new URL('./edge/comms/converse.ts',import.meta.url),'utf8');
  assert.equal(Number(/MAX_INVITEES\s*=\s*(\d+)/.exec(backend)![1]),CONVERSATION_MAX_INVITEES,'CLI limit matches existing backend');
- assert.equal(SKILL_VERSION,'1.9.12');const skill=readFileSync(new URL('../../../tools/edge-skill/SKILL.md',import.meta.url),'utf8');assert.match(skill,/^metadata:\n  version: "1\.9\.12"\n  contract: eden-edge\/1\n  apiContract: eden-edge\/1\.1$/m);assert.match(skill,/wire contract remains `eden-edge\/1`/);
+ assert.equal(SKILL_VERSION,'1.9.13');const skill=readFileSync(new URL('../../../tools/edge-skill/SKILL.md',import.meta.url),'utf8');assert.match(skill,/^metadata:\n  version: "1\.9\.13"\n  contract: eden-edge\/1\n  apiContract: eden-edge\/1\.1$/m);assert.match(skill,/wire contract remains `eden-edge\/1`/);
 });
 
 void test('invalid group entries refuse rather than losing a recipient or inventing a target',()=>{
