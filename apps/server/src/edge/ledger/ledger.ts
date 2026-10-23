@@ -1222,7 +1222,13 @@ export class EdgeLedger implements EdgeLedgerHooks {
         .sort((a, b) => a.distance - b.distance || a.label.localeCompare(b.label))[0];
       return best ?? null;
     };
-    return {caps, me: here, root: root ? [...tokens(root.id), ...tokens(root.name)] : [], elsewhere,
+    // ROUTE-RECHECK: places with a reading spot in them (the spot's place and every place round it), from the world's spots
+    const spotPlaces = new Map<string, Set<string>>(), hasSpot = (verb: string, placeId: string) => {
+      let set = spotPlaces.get(verb);
+      if (!set) {set = new Set(); for (const s of this.spots.spots) if (s.place && (s.activity === verb || s.also?.includes(verb))) for (let p: string | undefined = s.place, n = 0; p && n < 20; p = this.places.byId.get(p)?.parent ?? undefined, n++) set.add(p); spotPlaces.set(verb, set);}
+      return set.has(placeId);
+    };
+    return {caps, me: here, root: root ? [...tokens(root.id), ...tokens(root.name)] : [], elsewhere, hasSpot,
       withheld, places: known.map(p => ({id: p.id, name: p.name, aliases: aliases[p.id] ?? [], center: centroid(p.polygon), parent: p.parent, kind: p.kind, description: p.description, walkable: !!(w.regions as Record<string, unknown>)[p.id] || !!this.placeWalkable?.(p.id)})),
       target: c => {
         const t = c.target; if (!t) return {names: [], around: [], at: null};
@@ -1461,6 +1467,20 @@ export class EdgeLedger implements EdgeLedgerHooks {
       const more = [...caps], morePlans = new Map(plans), got = this.thingOnDemand(soul, v.seek, more, morePlans), cap = got ? more.find(c => c.id === got.id) : undefined;
       // knowledge/1: never a secret place this Soul does not know, under its thing name
       if (got && cap && !this.secretOffer(soul, cap)) return {v: {kind: 'alias', cap, note: `${text} is ${cap.id} (${cap.label}): the nearest ${v.seek.join(' ')} you can stand next to${got.count > 1 ? ` (of ${got.count} in this world)` : ''}.`}, caps: more, plans: morePlans};
+    }
+    // ROUTE-RECHECK ("read a book in the library" from the park was place.unreachable: the listing keeps only the nearest
+    // reading places): the places the words name get their read:<place> for this act, then the words resolve again
+    if (v.kind === 'unknown' && v.code === 'place.unreachable' && v.verb === 'read' && v.places?.length) {
+      const me = this.body(soul.entityId);
+      if (me) try {
+        const more = [...caps], morePlans = new Map(plans), aw = this.activityWorld(soul, me, more, morePlans);
+        const list = () => activityCapabilities({...this.spots, readFor: v.kind === 'unknown' ? v.places : []}, aw);
+        const eng = this.host.engine as unknown as {readPassV1?: <T>(f: () => T) => T};
+        const act = eng.readPassV1 ? eng.readPassV1(list) : list();
+        const add = act.caps.filter(c => c.verb === 'read' && c.target?.kind === 'place' && !more.some(x => x.id === c.id));
+        for (const c of add) {more.push(c); morePlans.set(c.id, act.plans.get(c.id)!);}
+        if (add.length) {const again = resolveCapability(text, this.vocabulary(soul, more)); if (again.kind !== 'unknown') {caps = more; plans = morePlans; v = again;}}
+      } catch (e) {console.error('[edge] read on demand', e instanceof Error ? e.message : e);}
     }
     if (v.kind === 'unknown' && v.code === 'place.unreachable' && v.place && this.walkOnDemand) {
       const more = [...caps], morePlans = new Map(plans);

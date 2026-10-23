@@ -28,7 +28,10 @@ export type Dock = {id: string; place?: string; at: V2; faceTo?: V2; bikes: numb
 export type SpotsData = {contract: 'activity-spots/1'; spots: Spot[]; shelves: Shelf[]; interiors: Interior[]; solids: Solid[]; rings: Ring[]; platforms: Platform[]; docks?: Dock[];
   /** E-life (derived spots on big god worlds): offer only the nearest N free spots per activity and the nearest N places to
    *  read in (Eden 2026 has ~300 tables and ~100 bookcases; all of them within 200 m made a 470 kB list). Unset: all. */
-  nearest?: number};
+  nearest?: number;
+  /** ROUTE-RECHECK (on demand, one act): places named by the Soul's words ("read a book in the library") whose read:<place>
+   *  is offered beyond the nearest-N cap and the 200 m listing limit (still only spots within reach). */
+  readFor?: string[]};
 export type Plan = {label: string; steps: Program['steps']; seconds?: boolean};
 
 /** Activities a spot may offer, with their default prop and seconds. */
@@ -223,16 +226,22 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
   else add({id: 'read:here', verb: 'read', label: 'Read the book you carry, standing here', available: true, params: secondsParam(180)}, {label: 'Read a book', steps: [...standFirst(w), pose('read', 180, {prop: 'book'})], seconds: true});
   // read:<place>: every place that has reading spots (the room and its building), nearest free spot in it
   const byPlace = new Map<string, Spot[]>();
+  const asked = new Set(data.readFor ?? []), named = (p: string) => asked.has(p) || w.ancestors(p).some(a => asked.has(a));
   for (const s of readers) {
     const ps = s.place ? [s.place, ...w.ancestors(s.place)] : [];
-    if (data.nearest && (ps.every(p => byPlace.has(p)) || byPlace.size >= data.nearest * 4 || !ok(s))) continue;   // readers are nearest first
+    const want = asked.size > 0 && ps.some(named);
+    if (data.nearest && !want && (ps.every(p => byPlace.has(p)) || byPlace.size >= data.nearest * 4 || !ok(s))) continue;   // readers are nearest first
+    if (want && !ok(s)) continue;
     for (const p of ps) byPlace.set(p, [...(byPlace.get(p) ?? []), s]);
   }
   const placesToRead = [...byPlace].sort((a, b) => a[0].localeCompare(b[0]));
-  if (data.nearest) placesToRead.sort((a, b) => d2(a[1][0].at, w.me) - d2(b[1][0].at, w.me) || a[0].localeCompare(b[0])).splice(data.nearest * 2);
+  if (data.nearest) {
+    const dropped = placesToRead.sort((a, b) => d2(a[1][0].at, w.me) - d2(b[1][0].at, w.me) || a[0].localeCompare(b[0])).splice(data.nearest * 2);
+    if (asked.size) placesToRead.push(...dropped.filter(([p]) => named(p)));
+  }
   for (const [place, list] of placesToRead) {
     const s = list[0], name = w.placeName(place) ?? place;
-    if (d2(s.at, w.me) > 200) continue;
+    if (d2(s.at, w.me) > 200 && !named(place)) continue;
     add({id: 'read:' + place, verb: 'read', label: `Read a book in ${name}`, available: true, target: {id: place, kind: 'place'}, params: secondsParam(180)}, {label: `Read a book in ${name}`, steps: readAt(s), seconds: true});
   }
   // ---- every other free spot within reach: play-piano:<spot>, paint:<spot>, use-computer:<spot>, sing:<spot>, listen:<seat>…
