@@ -101,3 +101,14 @@ test('DIRECTOR2: at most one cut per MIN_CUT seconds, and no town view while a c
   for(let t=0;t<200;t+=.25){const key=c.choose(conv(t))?.key??'';if(t>20)towns.push(key.startsWith('landmark:')?1:0);}
   assert.equal(towns.reduce((a,b)=>a+b,0),0);
 });
+
+test('DIRECTOR2: two Souls who are talking high-five (2.5 s): the gesture gets its own shot at its start, held MIN_CUT', () => {
+  const d=new WorldDirector(),sp=(t:number)=>new Map([['a',{thread:'t',at:t-1}],['b',{thread:'t',at:t-3}]]);
+  const g=(t:number)=>t>=40&&t<42.5?'high-five':'idle';
+  const scene=(t:number):DirectorInput=>({bodies:[body('a',0,0,g(t)),body('b',1,0,g(t))],speaking:sp(t),now:t,landmarks:L});
+  const at:[number,string][]=[];for(let t=0;t<70;t+=.25)at.push([t,d.choose(scene(t))?.key??'']);
+  const first=at.find(([t,k])=>t>=40&&k==='pair:high-five:a:b');
+  assert.ok(first&&first[0]<=40.5,'framed on its start event');
+  const cuts=at.filter(([,k],i)=>i&&k!==at[i-1][1]).map(([t])=>t);
+  assert.ok(cuts.every((t,i)=>!i||t-cuts[i-1]>=MIN_CUT),'no cut pair under MIN_CUT: '+cuts.join(','));
+});

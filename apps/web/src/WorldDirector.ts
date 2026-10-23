@@ -96,13 +96,16 @@ export function candidates(input: DirectorInput): SubjectChoice[] {
       focus: b.id, members: players, phase: 'working', twoShot: false });
   }
   // A paired gesture (a hug, a high five, a handshake, a dance together): brief, so it is the best shot while it lasts.
+  // Two Souls who were just talking still get the gesture's own shot (a high five lasts ~2.5 s; inside the conversation's
+  // framing it was never shown as the event).
+  const paired = new Set<string>();
   for (const b of bodies) {
     const a = (b.activity ?? '').replace(/^mars:/, '');
-    if (inConversation.has(b.id) || !PAIRED.test(a)) continue;
-    const partner = bodies.filter(o => o.id !== b.id && !inConversation.has(o.id) && (o.activity ?? '').replace(/^mars:/, '') === a && flat(o.p, b.p) < 2.5)
+    if (paired.has(b.id) || !PAIRED.test(a)) continue;
+    const partner = bodies.filter(o => o.id !== b.id && !paired.has(o.id) && (o.activity ?? '').replace(/^mars:/, '') === a && flat(o.p, b.p) < 2.5)
       .sort((x, y) => flat(x.p, b.p) - flat(y.p, b.p))[0];
     if (!partner) continue;
-    const pair = [b.id, partner.id].sort(); pair.forEach(id => inConversation.add(id));
+    const pair = [b.id, partner.id].sort(); pair.forEach(id => { inConversation.add(id); paired.add(id); });
     out.push({ kind: 'subjects', key: 'pair:' + a + ':' + pair.join(':'), label: a === 'dance' ? 'dancing together' : a, score: a === 'dance' ? 8.5 : 10.5,
       focus: pair[0], members: pair, phase: 'working', twoShot: true });
   }
