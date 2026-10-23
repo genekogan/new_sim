@@ -143,7 +143,10 @@
   }
   /** Fiddle: a sawtooth with a slow filter bite (the bow), then a body: a 450 Hz hump and the 2.7 kHz bridge hill. */
   function fiddleSource(ctx, dest) {
-    const hp = ctx.keep(new Tone.Filter({ frequency: 170, type: "highpass", rolloff: -12 })).connect(dest);
+    // `out` is the highpass: P.wrap chains it into its own vibrato/tremolo/gain, so it connects to `dest` only when given
+    // (the lint's Tone mock accepted connect(undefined); real Tone throws "Cannot connect to undefined node")
+    const hp = ctx.keep(new Tone.Filter({ frequency: 170, type: "highpass", rolloff: -12 }));
+    if (dest) hp.connect(dest);
     const hill = ctx.keep(new Tone.Filter({ frequency: 2700, type: "peaking", Q: 1.8, gain: 7 })).connect(hp);
     const body = ctx.keep(new Tone.Filter({ frequency: 450, type: "peaking", Q: 1.2, gain: 3 })).connect(hill);
     const synth = ctx.keep(new Tone.MonoSynth({
