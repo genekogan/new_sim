@@ -58,7 +58,7 @@ export const config = {
   engine: (env.ENGINE === 'mars' ? 'mars' : 'toy') as 'toy' | 'mars',
   snapshotEveryTicks: Number(env.SNAPSHOT_EVERY_TICKS ?? 20 * 60 * 5),
   seedNatives: env.SEED_NATIVES !== '0',
-  maxSoulsPerUser: Number(env.MAX_SOULS_PER_USER ?? 5),
+  maxSoulsPerUser: Number(env.MAX_SOULS_PER_USER ?? 20),
   inviteRequired: env.INVITE_REQUIRED !== '0',
   build: env.BUILD_ID || (() => { try { return readFileSync(new URL('../../../BUILD', import.meta.url), 'utf8').trim(); } catch { return 'dev'; } })(),
 };

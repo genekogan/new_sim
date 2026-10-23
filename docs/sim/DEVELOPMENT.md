@@ -55,7 +55,7 @@ engine always loads from the hard fork inside this repository.
 | `TALK_MODEL` | `NARRATOR_MODEL` | spoken words |
 | `ENGINE` | `toy` | `mars` runs the Mars adapter; any other value means toy |
 | `INVITE_REQUIRED` | on (`0` disables) | invite gate |
-| `MAX_SOULS_PER_USER` | 5 | |
+| `MAX_SOULS_PER_USER` | 20 | Per-account body limit in a world; Soul minds run at the edge. |
 | `SNAPSHOT_EVERY_TICKS` | 6000 | 5 minutes at rate 1 |
 | `SEED_NATIVES` | on (`0` disables) | Toy seeds its original cast; new worlds seed the defined cast owned by `WORLD_OWNER_ID` |
 | `WORLD_SEED` | `sim-genesis-1` | genesis RNG seed |
