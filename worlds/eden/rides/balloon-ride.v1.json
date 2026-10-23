@@ -10,7 +10,7 @@
         {"slot": "rider-a", "at": [0.3, -0.3], "yaw": 0.35, "pose": "stand, hands on the rim"},
         {"slot": "rider-b", "at": [0.3, 0.3], "yaw": -0.35, "pose": "stand, hands on the rim"}
       ],
-      "door": {"at": [-1.25, 0], "width": 0.56, "note": "a hinged wicker gate in the back wall; riders walk in and out through it, never over the rim"}
+      "door": {"at": [-1.25, 0], "width": 0.56, "note": "an open doorway in the back wall; riders walk in and out through it, never over the rim"}
     }
   ],
   "routes": [
