@@ -23,7 +23,7 @@
     // directory grouping; pieces not listed land in "More"
     families: [
       ["Disco & house", ["mirror-ball", "roller-rink", "italo-nights", "magic-orbit", "hi-nrg", "filter-house", "warehouse", "neon-shibuya"]],
-      ["New pieces", ["skylight-rain", "harbour-mouth", "branch-line", "lantern-square", "nightside-pass", "hydroponics-deck", "section-lines", "citronella", "heron-causeway", "second-ring-road", "sunken-causeway", "cheese-stall", "firn-light", "aerial-causeway", "service-corridor", "after-the-fireworks", "night-approach", "headland", "evening-rounds", "velour", "halogen", "cloud-street", "lamplighter", "frost-fair", "heat-lightning", "under-glass", "flying-junction", "coin-laundry"]],
+      ["New pieces", ["skylight-rain", "harbour-mouth", "branch-line", "lantern-square", "nightside-pass", "hydroponics-deck", "section-lines", "citronella", "heron-causeway", "second-ring-road", "sunken-causeway", "cheese-stall", "firn-light", "aerial-causeway", "service-corridor", "after-the-fireworks", "night-approach", "headland", "evening-rounds", "velour", "halogen", "cloud-street", "lamplighter", "frost-fair", "heat-lightning", "under-glass", "flying-junction", "coin-laundry", "clock-tower", "milonga-terrace", "ridge-road", "riverboat"]],
       ["Game music", ["line-clear", "grand-prix", "final-round", "pixel-town"]],
       ["80s & synthwave", ["night-patrol", "montage", "night-drive", "marina-district"]],
       ["Ambient & minimal", ["departure-lounge", "starfield", "tidepool", "petri-dish", "public-works", "traffic-grid", "green-world"]],

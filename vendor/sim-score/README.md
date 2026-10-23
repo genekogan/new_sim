@@ -1,6 +1,6 @@
 # Sim Score
 
-Background music written as code: ninety-two pieces in about fifty genres, in the spirit of SimCity, Spore,
+Background music written as code: ninety-six pieces in about fifty genres, in the spirit of SimCity, Spore,
 The Sims and Second Life. Every note is composed in the browser a few bars before it plays (Tone.js, no
 samples), so each performance is different and none of them ends.
 
@@ -108,6 +108,15 @@ declares its own `situations` and `energy`; `site/catalog.js` holds the families
 | Campfire | Campfire folk | campfire, hangout | Travis picking, a harmonica singalong, cajon, crickets and a crackling fire |
 | Starfield | Ambient country | campfire, sleep, explore | Pedal steel swells over open-fifth drones, a tremolo guitar, desert wind |
 | Night Light | Lullaby | sleep | A celesta music box in 3/4 that winds down almost to silence, then is wound again |
+
+### Round five (October 2026, the round-4 method: hand-written hooks, own palettes, a finite lap)
+
+| Piece | Genre | Situations | Idea |
+|---|---|---|---|
+| Clock Tower | 16-bit clockwork | mystery, explore, work | 5/4 counted 3+2 at 96: a tick on every eighth and an escapement pluck alternating C4/G3 that swaps sides every bar; a tune in long values, a chromatic bell that strikes the hour, gears that slip to 2+2+3, a wind-down (engine: `Sim.spc`) |
+| Milonga Terrace | Tango nuevo / milonga | hangout, romance | The band keeps the 3-3-2 dead in time while a bandoneon sings in rubato; a chromatic tenor line against the tonic pedal, arrastres into the downbeats, a major second strain, a variación, a fermata and a count-in (engine: `Sim.groove`) |
+| Ridge Road | Bluegrass | explore, campfire, hangout | A cut-time reel in G, AABB, on a fiddle with scoops and shuffle bowing; banjo break with real rolls, a low break under mandolin tremolo, the last chorus lifted to A (engine: `Sim.phrasing`) |
+| Riverboat | Trad jazz | celebrate, hangout, party | A 16-bar strain in B♭ never played by one horn alone: cornet lead, hand-written clarinet obbligato, tailgate trombone; a stop-time chorus hocketed note by note, up a fourth for the out-chorus (engine: `Sim.dialogue`) |
 
 ## Run
 

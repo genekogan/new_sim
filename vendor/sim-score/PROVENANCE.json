@@ -2,9 +2,9 @@
   "source": {
     "repository": "sim-score",
     "path": "<sim-score-repo>",
-    "commit": "8cf5c0542bb06f2e042870c67f1010f3d8f7eb95",
-    "date": "2026-10-22T10:52:50-04:00",
-    "subject": "Round 4: 32 new pieces, four engine modules, sticky player with seek"
+    "commit": "5ea3783080f404a4463855dff95097766ab36ff9",
+    "date": "2026-10-23T16:26:05-04:00",
+    "subject": "Round 5: Clock Tower, Milonga Terrace, Ridge Road, Riverboat (one per engine module)"
   },
   "syncedBy": "tools/score/sync-sim-score.mjs",
   "note": "Byte-for-byte copy of the listed files at source.commit. Do not edit here: fix in sim-score, commit there, then sync.",
@@ -16,8 +16,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "4296f2b854ae0951072d924ec4ea865c7249ea5dbf4996554908832ec5ef4b23",
-      "bytes": 16501
+      "sha256": "69d310d0bb48c0eb7daeb4071597dd0121f418c6f3c0c55b1d04cea16f2fd14f",
+      "bytes": 17780
     },
     {
       "path": "site/app.js",
@@ -26,8 +26,8 @@
     },
     {
       "path": "site/catalog.js",
-      "sha256": "e065490ac817cc53e4bb446c91c53706e6fe7ab66a97e075308cc854bfe21190",
-      "bytes": 5321
+      "sha256": "f67a944a54589b64788db98cd0191ce47d84e28d022115c98b05cbaa4204090f",
+      "bytes": 5382
     },
     {
       "path": "site/dev.html",
@@ -158,6 +158,11 @@
       "path": "site/pieces/citronella.js",
       "sha256": "0b57a7f96c41367fa31c82f160635d651bc3f423d5556f6c0cf7a710d3c99d11",
       "bytes": 29846
+    },
+    {
+      "path": "site/pieces/clock-tower.js",
+      "sha256": "8a2f223c40cb08978a4e1cf6d37ccb0a199dd67ee4caeb7b527d96dbb3084539",
+      "bytes": 27133
     },
     {
       "path": "site/pieces/cloud-street.js",
@@ -355,6 +360,11 @@
       "bytes": 35735
     },
     {
+      "path": "site/pieces/milonga-terrace.js",
+      "sha256": "1ffd32887e2700e0432d95d46c085faa38c2ef1c2ea06690eca2792c90f88fd0",
+      "bytes": 33866
+    },
+    {
       "path": "site/pieces/mirror-ball.js",
       "sha256": "7762ea80e51421fc48e491f7b74833e7e75d882d2be52930778206d8ad1875aa",
       "bytes": 36162
@@ -448,6 +458,16 @@
       "path": "site/pieces/rice-terraces.js",
       "sha256": "ccf079b4263c389e53c5c3de6f1a73c09231809696c19dbfd32e5e0f99167769",
       "bytes": 39280
+    },
+    {
+      "path": "site/pieces/ridge-road.js",
+      "sha256": "0747714647a0f33b510fbaa8b2f5c60c9a4a1c9c4f3a2d0634a2c8c53487f039",
+      "bytes": 29920
+    },
+    {
+      "path": "site/pieces/riverboat.js",
+      "sha256": "1535c3fd910935b411e1f025653e082d4ffc95c1a1de2910ff49fc2d6e4b7b7a",
+      "bytes": 36340
     },
     {
       "path": "site/pieces/roller-rink.js",
