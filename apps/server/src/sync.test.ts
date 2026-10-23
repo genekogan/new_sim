@@ -202,6 +202,15 @@ test('the DJ story through the real server: an agent proposes cards, two owners 
   assert.equal(bad.body.ok, false);
   assert.ok(bad.body.cards[0].problems.some((p: string) => p.includes('must start from the actor')));
 
+  // run the world at five times speed so the test does not take minutes
+  assert.equal((await api('/v1/admin', admin, { action: 'clock_rate', rate: 5 })).status, 200);
+  const mine = async () => (await (await fetch(`${BASE}/v1/plays?limit=200`)).json() as any).plays.filter((p: any) => [rob.id, wren.id].includes(p.soulId));
+  // each owner gives direction as an agenda of cards; nobody scripts the other Soul
+  assert.equal((await api(`/v1/souls/${rob.id}/intent`, admin, { intent: { agenda: [{ card: 'host a gathering', target: 'the campfire' }, { card: 'say yes', target: null }], text: 'throw a party at the campfire and let people help' } })).status, 200);
+  // Rob's gathering exists before Wren holds the DJ cards or a plan. Otherwise, while her plan has no Rob's gathering to
+  // aim at, a near-tie choice can spend the new card at whichever native gathering she happens to be standing in.
+  for (let i = 0; i < 200 && !(await mine()).some((p) => p.ok && p.soulId === rob.id && p.card === 'host a gathering'); i++) await sleep(300);
+
   // Wren's agent proposes the two cards the DJ story needs
   const cards = [
     { name: 'ask to be the dj', summary: 'Ask the host of a gathering to let you play the music', good_when: 'the intent is to DJ', not_for: 'there is already a DJ',
@@ -219,18 +228,14 @@ test('the DJ story through the real server: an agent proposes cards, two owners 
   assert.equal(proposed.body.ok, true, JSON.stringify(proposed.body));
   await sleep(300);
 
-  // each owner gives direction as an agenda of cards; nobody scripts the other Soul
-  assert.equal((await api(`/v1/souls/${rob.id}/intent`, admin, { intent: { agenda: [{ card: 'host a gathering', target: 'the campfire' }, { card: 'say yes', target: null }], text: 'throw a party at the campfire and let people help' } })).status, 200);
+  // Wren's owner gives her direction the same way
   const wrenIntent = await api(`/v1/souls/${wren.id}/intent`, admin, { intent: { agenda: [{ card: 'go to', target: 'the gate' }, { card: 'ask to be the dj', of: 'Rob' }, { card: 'be the dj', of: 'Rob' }], text: "go to Rob's party and ask him if you can DJ" } });
   // (That agenda is deliberately clumsy, as a model wrote it once: its first step is already true, and it never says to join.
   //  The plan must still work: a step that cannot be played does not block the rest, and getting there is found by looking ahead.)
   assert.equal(wrenIntent.status, 200, JSON.stringify(wrenIntent.body));
   assert.equal((await api(`/v1/souls/${wren.id}/intent`, admin, { intent: { agenda: [{ card: 'no such card', target: null }] } })).status, 400);
 
-  // run the world at five times speed so the test does not take minutes
-  assert.equal((await api('/v1/admin', admin, { action: 'clock_rate', rate: 5 })).status, 200);
   // the world runs: wait until the record shows Wren became the DJ
-  const mine = async () => (await (await fetch(`${BASE}/v1/plays?limit=200`)).json() as any).plays.filter((p: any) => [rob.id, wren.id].includes(p.soulId));
   let plays: any[] = [];
   for (let i = 0; i < 400; i++) { await sleep(300); plays = await mine(); if (plays.some((p) => p.ok && p.card === 'be the dj')) break; }
   await api('/v1/admin', admin, { action: 'clock_rate', rate: 1 });
