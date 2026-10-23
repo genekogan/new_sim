@@ -114,3 +114,11 @@ test('AWAY-UI: the page-wide agent presence store follows owner-inbox reports bo
   reportAgentPresence('s_x', null); assert.equal(agentPresence('s_x'), null, 'status unavailable clears the claim');
   assert.equal(awaySince(null), 'Away'); assert.match(awaySince(Date.now() - 60_000), /^Away since \d/);
 });
+
+test('AWAY-UI phone: the Copy start prompt link never shrinks (card buttons carry min-width:44px); the away line wraps or the link stacks', async () => {
+  const {readFile} = await import('node:fs/promises');
+  const css = (await readFile(new URL('./AgentMessageBox.css', import.meta.url), 'utf8')).replace(/\s+/g, '');
+  assert.match(css, /\.agent-message\.agent-message-presencebutton\{[^}]*flex:00auto[^}]*white-space:nowrap/);
+  assert.match(css, /\.agent-message-presence\{[^}]*flex-wrap:wrap/);
+  assert.match(css, /\.agent-message-presence>span\{[^}]*min-width:0/);
+});
