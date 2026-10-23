@@ -7,7 +7,8 @@
 //   (a) after LIMIT_S (default 30, per-activity override in LIMIT_BY_VERB) the world ends it: a logged 'edge-stop'
 //       {stallReleaseV1} (replay is exact) frees the body and stands it at the nearest free spot; the owner gets a
 //       `stall:released` receipt (code stall.released, detail.stallV1) in the day timeline;
-//   (b) the owner wins: a request waiting for the stalled body releases it after OWNER_S, and stand:here releases at once;
+//   (b) the owner wins: a request waiting for the stalled body releases it after OWNER_S (10 s, inside the engine's 15 s
+//       release wait), and stand:here releases at once (a live seat's own safe exit first gets OWNER_S);
 //   (c) the guard holds no durable state: after a restore it re-arms from the restored world, so a held body is released
 //       LIMIT_S after boot at the latest.
 // Never released: a body in a carrier that is aloft, construction work (the engine's own safety owns those), steady holds
@@ -18,7 +19,8 @@ export const LIMIT_S = 30;
 /** Per-activity override (seconds without progress) keyed by the holding action's verb. */
 export const LIMIT_BY_VERB: Record<string, number> = {};
 /** A request from the owner's agent is waiting for this body: the stalled holder does not get the full limit. */
-export const OWNER_S = 3;
+export const OWNER_S = 10;
+const SEATS = new Set(['sit', 'take_slot', 'stand']);
 const TPS = 20;
 
 type Probe = {held: boolean; candidate: boolean; exempt: string | null; signature: string; verbs: string[]; pending: boolean;
@@ -79,7 +81,11 @@ export class StallGuard {
   async ownerStand(soul: EdgeSoul): Promise<boolean> {
     const p = this.off ? null : this.h.probe(soul.entityId);
     if (!p || !p.held || !p.candidate || p.exempt) return false;
-    const s = this.seen.get(soul.soulId);
+    const s = this.seen.get(soul.soulId), still = s && s.sig === p.signature ? this.h.tick() - s.since : 0;
+    // A live seat runs its own safe exit (it waits for someone standing at the seat's exit to step away): the stand goes
+    // there first, and the guard steps in once that exit has made no progress for OWNER_S. Anything else (a ride, a
+    // leftover claim) would accept the stand and leave the body held, so it is released now.
+    if (p.holders.some(h => SEATS.has(h.verb) && h.state !== 'orphan') && still < OWNER_S * TPS) return false;
     return this.fire(soul, p, s ? Math.round((this.h.tick() - s.since) / TPS) : 0, 'stand');
   }
 
