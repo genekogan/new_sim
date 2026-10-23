@@ -1918,8 +1918,8 @@ async function mirror({ fresh = false, trust = false } = {}) {
   writeCache(memo);
   return memo;
 }
-function adoptMirror(p) {
-  const world = load().world, base = memo?.world === world ? memo : readCache();
+function adoptMirror(p, held = null) {
+  const world = load().world, base = held?.world === world ? held : memo?.world === world ? memo : readCache();
   const m = applyMirror(base?.world === world ? base : null, p, world);
   if (!m) return false;
   memo = m;
@@ -1929,6 +1929,7 @@ function adoptMirror(p) {
   writeCache(m);
   return true;
 }
+var heldMirror = () => memo;
 function invalidate() {
   memo = null;
   synced = null;
@@ -3875,11 +3876,11 @@ async function freePlots(size, flags2 = {}) {
   return flags2.json ? r : r.length ? r.map((f) => `- (${f.at.join(", ")}) y ${f.y}, slope ${f.slope}, ${f.dist} m from (${near.x}, ${near.z})`).join("\n") : "no free plot of that size within the radius";
 }
 async function act(batch, note) {
-  const want = mirrorState();
+  const want = mirrorState(), held = want ? heldMirror() : null;
   const r = ok(await call("/v1/god/act", { body: { ...batch, ...note ? { note } : {}, ...want ? { mirror: want } : {} } }), "act");
   invalidate();
   if (r.mirror) {
-    adoptMirror(r.mirror);
+    adoptMirror(r.mirror, held);
     delete r.mirror;
   }
   return r;

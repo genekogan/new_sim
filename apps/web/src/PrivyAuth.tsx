@@ -1,16 +1,9 @@
-import {PrivyProvider,usePrivy} from '@privy-io/react-auth';
-import {Shell,type AuthCtx} from './Shell.tsx';
+// Privy sign-in is not built into this release (DEPS 2026-10-22: @privy-io/react-auth removed; live auth is Clerk).
+// A server still configured with AUTH_PROVIDER=privy (the server default) and a PRIVY_APP_ID lands here: the world stays
+// visitable signed out, and the sign-in button says plainly why it does nothing.
+import {Shell} from './Shell.tsx';
 type Cfg={privyAppId:string;publicUrl:string;worldId:string;authReady:boolean;devAuth:boolean;accountAuthRequired?:boolean};
-function WithPrivy({ cfg,arrivalEnabled }: { cfg: Cfg;arrivalEnabled:boolean }) {
-  const p = usePrivy();
-  const email = p.user?.email?.address ?? p.user?.google?.email ?? null;
-  const auth: AuthCtx = {
-    ready: p.ready, authed: p.ready && p.authenticated, label: email ?? p.user?.id ?? null,
-    login: () => p.login(), logout: () => p.logout(),
-    getToken: async () => (p.ready && p.authenticated ? await p.getAccessToken() : null),
-    debug: { privyUserId:p.user?.id??null,wallet:null,linked:[] },
-  };
-  return <Shell cfg={cfg} auth={auth} arrivalEnabled={arrivalEnabled} />;
+const MESSAGE='Sign-in is not available: this server is configured for Privy, which is not built into this release. Use Clerk (AUTH_PROVIDER=clerk).';
+export default function PrivyAuth({cfg,arrivalEnabled}:{cfg:Cfg;arrivalEnabled:boolean}){
+  return <Shell cfg={cfg} auth={{ready:true,authed:false,label:null,login:()=>alert(MESSAGE),logout:()=>{},getToken:async()=>null,debug:{privyUserId:null,wallet:null,linked:[]}}} arrivalEnabled={arrivalEnabled}/>;
 }
-
-export default function PrivyAuth({cfg,arrivalEnabled}:{cfg:Cfg;arrivalEnabled:boolean}){return <PrivyProvider appId={cfg.privyAppId} config={{loginMethods:['google','email'],embeddedWallets:{ethereum:{createOnLogin:'off'},showWalletUIs:false},appearance:{theme:'dark'}}}><WithPrivy cfg={cfg} arrivalEnabled={arrivalEnabled}/></PrivyProvider>;}

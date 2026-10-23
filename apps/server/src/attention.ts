@@ -6,6 +6,7 @@
 // long-poll, a Soul's call), or any request in the last `graceMs`. Passive reads that only report on the world (its
 // health and the homepage's numbers, asked by the launcher without a token) do not count.
 import type { IncomingMessage, Server } from 'node:http';
+import { isEyesAgent } from './edge/eyes/browser-config.mjs';
 
 const PASSIVE = /\/(?:healthz|v1\/god\/status|v1\/world\/souls)\/?$/;
 /** A request that only reports on the world: health, and the homepage's numbers asked without a token. */
@@ -33,13 +34,15 @@ export class Attention {
   }
   /** Count this server's WebSockets and requests. */
   watch(server: Server, everyMs = 5_000) {
-    server.on('upgrade', (_req: IncomingMessage, socket) => {
+    server.on('upgrade', (req: IncomingMessage, socket) => {
+      // the Eyes render worker's own viewer (edge/eyes) is the world looking at itself, not a visitor
+      if (isEyesAgent(req.headers['user-agent'])) return;
       this.open++; this.touch();
       let gone = false; const left = () => { if (gone) return; gone = true; this.open--; this.lastActive = this.now(); };
       socket.once('close', left);
     });
     server.on('request', (req: IncomingMessage, res) => {
-      if (passiveRequest(req)) return;
+      if (passiveRequest(req) || isEyesAgent(req.headers['user-agent'])) return;
       this.inflight++; this.touch();
       let done = false; res.once('close', () => { if (done) return; done = true; this.inflight--; this.lastActive = this.now(); });
     });

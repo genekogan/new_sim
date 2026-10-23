@@ -12,6 +12,7 @@ import * as J from './join-api.ts';
 import { approvalLine, preparingLine, safePhoto } from './window-approvals.ts';
 import { requestFollowSoul } from '../follow-soul-request.ts';
 import { countPairing, pairingTaken } from '../visitor-counts.ts';
+import { APPROVAL_COPY, approvalTitle } from '../approval-link.ts';
 import './approval-card.css';
 
 const AVATAR = <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="15" r="7" fill="currentColor" opacity=".55" /><path d="M6 36a14 14 0 0 1 28 0" fill="currentColor" opacity=".55" /></svg>;
@@ -59,13 +60,14 @@ export function ApprovalCard({ id, signedIn, signIn, onDone }: { id: string; sig
         {photo ? <img className="ap-avatar" src={photo} alt="" /> : <span className="ap-avatar ap-generic">{AVATAR}</span>}
         <div className="ap-who">
           <span className="ap-kicker">{kicker}</span>
-          <span className="ap-nameline"><b className="ap-name" data-approval-name="1">{a?.name ?? (signedIn ? '…' : 'Your agent is asking')}</b>
+          <span className="ap-nameline"><b className="ap-name" data-approval-name="1">{approvalTitle(a) ?? (signedIn ? '…' : 'Your agent is asking')}</b>
           {a && <button type="button" className="ap-info" aria-expanded={about} aria-label="About this request" data-approval-about="1" onClick={() => setAbout((v) => !v)}><span>i</span></button>}</span>
         </div>
       </div>
-      {about && a && <p className="ap-note" data-approval-note="1">Asked by {a.agentLabel}. Approve only if you started this agent: it will act as this Soul.</p>}
+      {about && a && <p className="ap-note" data-approval-note="1">Asked by {a.agentLabel}.{a.soulId ? <> Soul ID <code>{a.soulId}</code>.</> : null} Approve only if you started this agent yourself.</p>}
+      {a?.status === 'pending' && !preparing && <p className="ap-line" data-approval-copy="1">{APPROVAL_COPY}</p>}
       {!signedIn && <><p className="ap-line">Sign in to answer.</p>{signIn && <div className="ap-signin">{signIn}</div>}</>}
-      {preparing && a && <p className="ap-line ap-wait" role="status" data-approval-preparing="1"><span className="ap-spinner" aria-hidden="true" />{preparingLine(a)}</p>}
+      {preparing && a && <p className="ap-line ap-wait" role="status" data-approval-preparing="1"><span className="ap-spinner" aria-hidden="true" />{preparingLine({ ...a, name: approvalTitle(a) ?? a.name })}</p>}
       {a?.status === 'pending' && !preparing && <div className="ap-actions">
         <button type="button" className="ap-btn ap-primary" data-approve-agent={id} disabled={busy} onClick={() => void check('approve')}>Approve</button>
         <button type="button" className="ap-btn" data-refuse-agent={id} disabled={busy} onClick={() => void check('cancel')}>Refuse</button>

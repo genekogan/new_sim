@@ -128,12 +128,16 @@ export async function mirror({ fresh = false, trust = false } = {}) {
   return memo;
 }
 /** An edit's answer carried the mirror delta (`act` sent mirrorState()): adopt it, so the next read needs no request. */
-export function adoptMirror(p) {
-  const world = load().world, base = memo?.world === world ? memo : readCache();
+export function adoptMirror(p, held = null) {
+  // `held`: the mirror this process held when it sent the edit (the one its `mirror` state described); reading the
+  // cache file again would cost a 7+ MB JSON parse per edit at Eden 2026 size (GODPLACE, ~100 ms of a ~280 ms place)
+  const world = load().world, base = held?.world === world ? held : memo?.world === world ? memo : readCache();
   const m = applyMirror(base?.world === world ? base : null, p, world);
   if (!m) return false;
   memo = m; synced = m; syncedAt = Date.now(); syncedWrites = writesSent(); writeCache(m); return true;
 }
+/** The mirror this process holds in memory (null: none read yet). */
+export const heldMirror = () => memo;
 export function invalidate() { memo = null; synced = null; }
 
 function build(world, snapshot, rows, sync) {

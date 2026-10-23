@@ -215,7 +215,9 @@ export class AccountStore {
       if (mode === 'create' && this.nameTaken(name)) fail('name-taken', `a soul named ${name} already exists in this world; ask your person for another name`);
       const id = nonce('ap_'), pollSecret = input.pollSecret ?? randomBytes(32).toString('base64url'), now = this.time();
       // Lane PUX: a live window code addresses the request to its account; an unknown or stale code leaves the link only
-      const target = this.codeAccount(input.forCode);
+      // Lane PAIR-INWINDOW (Gene's review #1): a repair names a Soul whose owner is already known, so with no code the request
+      // goes to the owner's open window. This conveys no control: approve() still requires that exact membership.
+      const target = (repairSoulId ? this.member(repairSoulId)?.account_id : null) ?? this.codeAccount(input.forCode);
       this.db.db.prepare("INSERT INTO account_approvals_v1(id,world_id,agent_label,name,description,mode,status,repair_soul_id,request_nonce,poll_hash,client_poll_secret,input_hash,idempotency_hash,created_at,expires_at,target_account_id) VALUES (?,?,?,?,?,?,'pending',?,?,?,?,?,?,?,?,?)").run(id, this.worldId, agentLabel, name, description, mode, repairSoulId, nonce('rq_'), sha(pollSecret), input.pollSecret === undefined ? 0 : 1, inputHash, idempotencyHash, now, now + this.approvalTtlMs, target);
       // Client-generated credentials are already durable in its own secure
       // storage before POST; never echo them into a response or regenerate them.

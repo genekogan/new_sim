@@ -32,7 +32,7 @@ sends it uncompressed, or it is incompressible and the CDN gives better caching.
 | Mars backdrop tiers + fork campus `/blobs/assets/<sha>` (/w/mars) | yes (sha) | br q11 precompressed: 3 files 22,097,032 B | CDN2 (q4 on the fly): 25,992,771 B (+17.6%); CDN3 stored q11: 22,097,032 B (the same bytes) | **On the CDN**, precompressed (CDN3). 3 objects, 51.9 MB raw, `served-blobs.json`. |
 | Character models, clips, Eden packs `/modular/environment/*?v=`, humanoid kit `/modular/humanoid/**` (and `/worlds/modular/**`) | per release (version query or kit sha) | br: arrival set 1,459,486 B, fallback characters 1,209,736 B, kit 4,814,562 B | CDN3 stored q11: 1,370,104 B (-6.1%), 1,209,736 B (0%), 4,356,965 B (-9.5%) | **On the CDN** since CDN3: 230 GLBs, exact client query aliases (served-public class `modular`). |
 | Vite bundles `/assets/*.js`, css, mp4, icons (~1 MB br per page) | yes (hashed) | br q11 precompressed (release.sh), edge HIT | q4, plus a second host: +31-51 ms connection setup on the boot path; script tags bypass the fetch transport | **Origin.** |
-| Draco decoder `/mars-assets/draco/*` (wasm, js; ~70 KB) | name, max-age 600 | br | | **Origin.** Tiny, and the transport does not map wasm. A longer origin max-age would remove its revalidations. |
+| Draco decoder `/mars-assets/draco/*` (wasm, js; ~70 KB) | name; max-age 86400 + SWR 7 d (CACHE 2026-10-22: `/worlds/` had none and was DYNAMIC, legacy was 600) | br | | **Origin, Cloudflare-cached.** Tiny, and the transport does not map wasm (DRACOLoader needs both fixed names in one directory). `cdn-walk` fails if it regresses (`origin-cache.mjs`). |
 | World JSON: `/engine/*.json`, templates, `scene.json`, footprints | name | br | | **Origin.** The client manifest carries no JSON (mutable, path-pinned). |
 | Mars history images `/history/**`, `/2020/**` (345 files, ~46 MB) | name | | | Not added: the Sim client never requests them (legacy viewer only). |
 | Catalogue thumbnails `/v1/god/defs/<ref>/thumb.png` | no (by ref) | | | **Origin.** God tooling only; mutable. |
@@ -141,7 +141,7 @@ Gene or the internet session are listed at the end, in order.
 | Stage | Who serves blobs | Caching | Mars campus on the wire |
 |---|---|---|---|
 | Before (until 20:41 UTC Oct 11) | the laptop, through the SSH tunnel (~3.9 MB/s) | none (only Last-Modified) | 70.8 MB, uncompressed |
-| Now (Caddy on eden2) | `/srv/sim-blobs` on eden2, Caddy `file_server` | hashed: `max-age=31536000, immutable`; legacy names: `max-age=600` + ETag | 34.1 MB br (legacy name) |
+| Now (Caddy on eden2) | `/srv/sim-blobs` on eden2, Caddy `file_server` | hashed: `max-age=31536000, immutable`; legacy names: `max-age=86400, stale-while-revalidate=604800` + ETag (CACHE, was 600) | 34.1 MB br (legacy name) |
 | After 004 + /worlds release | same | same | **17.8 MB br** (`/blobs/assets/64/64b8838c….glb`, quantized + WebP + meshopt filters) |
 | CDN (this plan) | Cloudflare edge in front of R2 | same headers, served from the visitor's nearest PoP | 17.8 MB, no eden2 or laptop in the path |
 
