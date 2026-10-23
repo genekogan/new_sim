@@ -69,6 +69,7 @@ test('steer the balloon to a named place and land there; the other rider is refu
  // empty, it flies itself home and parks
  assert.ok(await w.run(6000,()=>b().carrier.phase==='parked'),'flew home empty: '+b().carrier.phase);
  assert.ok(flat(b().pose.p,home)<.5,`parked at home ${b().pose.p}`);assert.equal(b().carrier.steer,undefined);
+ assert.ok(!String(b().carrier.route.id).startsWith('steer'),'its own route is back after a steered trip: '+b().carrier.route.id);
  assert.deepEqual(w.f.host.engine.runtime.violations,[]);assert.equal(w.f.db.paidCost(),0);
  await replayExact(w);
 });
@@ -87,6 +88,7 @@ test('stop holds the balloon in the air, then with nobody steering it rejoins it
  assert.ok(await w.run(12000,()=>b().carrier.phase==='parked'||(b().carrier.phase==='landed'&&flat(b().pose.p,home)<.5)),'back home: '+b().carrier.phase+' '+b().pose.p);
  assert.ok(flat(b().pose.p,home)<.5);
  assert.ok(await w.run(800,()=>!w.ent(0).human.carrier&&!w.ent(1).human.carrier),'riders off at home');
+ assert.ok(!String(b().carrier.route.id).startsWith('steer'),'its own route is back after the rejoin: '+b().carrier.route.id);
  assert.deepEqual(w.f.host.engine.runtime.violations,[]);
 });
 
@@ -105,5 +107,8 @@ test('row the punt: steering out over open water is fine, a land target off its 
  assert.ok(await w.run(8000,()=>!w.ent(0).human.carrier),'rowed back and stepped out: '+p().carrier.phase+' '+p().pose.p);
  assert.ok(flat(p().pose.p,home)<1.5,`back at its bank: ${p().pose.p} vs ${home}`);
  assert.equal(w.ent(0).human.shore?.depthMetres??0,0,'rower on dry ground');
+ assert.ok(await w.run(2000,()=>p().carrier.phase==='parked'),'parked again: '+p().carrier.phase);
+ assert.ok(!String(p().carrier.route.id).startsWith('steer'),'its own loop is back after a steered trip: '+p().carrier.route.id);
+ const again=await w.call(0,'POST','/v1/edge/act',{capability:'object:ride-eden-punt:join'});assert.equal(again.accepted,true,'boards again after a steered trip: '+JSON.stringify(again));
  assert.deepEqual(w.f.host.engine.runtime.violations,[]);
 });

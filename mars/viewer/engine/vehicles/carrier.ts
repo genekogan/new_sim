@@ -398,6 +398,12 @@ function startReturn(c: CarrierState, by: string | null = null) {
   c.steer = { by, to: [...c.home] as Vec3, land: [...c.home] as Vec3, built: false, ret: true, away: c.steer!.away };
 }
 
+/** A steer is over: the ride gets its own route back (a steer flew a 'steer'/'steer-return' route in its place), so the next
+ *  boarding qualifies and the next unsteered trip flies the ride's own route again. */
+function endSteer(c: CarrierState): void {
+  if (c.steer) c.route = c.steer.away.route;
+  delete c.steer;
+}
 type SteerParams = { actor: string; carrier: string; x?: number; z?: number; land?: boolean; stop?: boolean };
 type SteerPlan = { to: Vec3; land?: Vec3; ret?: true; mode: 'to' | 'land' | 'stop' | 'return'; seconds: number };
 const steer: ActionDef<SteerParams, SteerPlan, { carrier: string; id: string; plan: SteerPlan }> = {
@@ -509,7 +515,7 @@ export function stepCarriers(rt: Runtime, table?: EntityTable | null): void {
       if (!Object.values(c.seats).some(Boolean)) {
         // VEHICLE-STEER: a ride that landed away from home flies itself back empty once its riders are out
         if (c.steer?.land && !same(c.steer.land, c.home)) { startReturn(c); c.phase = 'aloft'; e.phase = 'carried'; c.elapsed = 0; }
-        else { delete c.steer; c.phase = 'parked'; }
+        else { endSteer(c); c.phase = 'parked'; }
         c.phaseTick = tick;
       }
       continue;
@@ -536,7 +542,7 @@ export function stepCarriers(rt: Runtime, table?: EntityTable | null): void {
     if (s && !s.land) continue;   // a steer without land ends in the air (or afloat): the hold above takes it from the next tick
     if (c.elapsed >= end && away) { e.pose.p = [...L] as Vec3; delete e.phase; c.phase = 'landed'; c.phaseTick = tick; c.elapsed = end; continue; }   // steered down away from home: as it is
     if (c.elapsed >= end && Math.abs(angleDelta(e.pose.yaw, c.yaw)) > 1e-6) { c.elapsed = end - 1; continue; }   // finish turning before touching down
-    if (c.elapsed >= end) { delete c.steer; e.pose.p = [...c.home] as Vec3; e.pose.yaw = c.yaw; delete e.phase; c.phase = 'landed'; c.phaseTick = tick; c.elapsed = end; }
+    if (c.elapsed >= end) { endSteer(c); e.pose.p = [...c.home] as Vec3; e.pose.yaw = c.yaw; delete e.phase; c.phase = 'landed'; c.phaseTick = tick; c.elapsed = end; }
   }
 }
 
