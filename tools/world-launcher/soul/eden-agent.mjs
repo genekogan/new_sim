@@ -3861,7 +3861,7 @@ async function travelCommand(args, { load: load2, save: save2, live: live2 = () 
 }
 
 // tools/edge-skill/eden-agent.mjs
-var SKILL_VERSION = "1.9.13";
+var SKILL_VERSION = "1.9.14";
 var CONTRACT = "eden-edge/1";
 var API_CONTRACT = "eden-edge/1.1";
 var STATE = ".eden-agent.json";
@@ -6445,19 +6445,13 @@ async function tell(...args) {
     const r = readJSONL(LIVE.replies).filter((x) => x.id === id3).at(-1);
     if (r) {
       const q = readJSON(".client-queue.json", {});
-      if (q.id === id3 && !q.steps?.some((s) => ["failed", "interrupted", "blocked"].includes(s.status)) && q.steps?.some((s) => ["pending", "running", "waiting", "dispatching", "stopping"].includes(s.status))) {
-        await sleep(500);
-        continue;
-      }
       if (q.id === id3) r.queue = q;
       const latest = readJSONL(LIVE.replies).filter((x) => x.id === id3).at(-1);
       if (latest?.queueComplete) Object.assign(r, latest);
+      const completed = r.queueComplete === true, inProgress = !completed && q.id === id3 && !q.steps?.some((s) => ["failed", "interrupted", "blocked"].includes(s.status)) && r.queue?.steps?.some((s) => ["pending", "running", "waiting", "dispatching", "stopping"].includes(s.status)) === true;
       let rec = null;
-      if (r.receipt) {
-        await sleep(2500);
-        rec = await receipt(r.receipt).catch(() => null);
-      }
-      return { delivered: true, id: id3, request: r.text, answer: ownerPlainLine(r.answer), answerSource: r.answerSource ?? "unverified-legacy-answer", did: r.results, ...r.queue ? { queue: r.queue } : {}, ...r.initialAnswer ? { initialAnswer: r.initialAnswer, finalObservation: r.finalObservation, completed: r.queueComplete === true } : {}, ...rec && rec.capability ? { receipt: { id: rec.id, capability: rec.capability, phase: rec.phase, ...rec.code ? { code: rec.code } : {} } } : {}, ...r.error ? { error: r.error } : {}, seconds: r.latencySeconds };
+      if (r.receipt) rec = await receipt(r.receipt, { timeoutMs: 2500 }).catch(() => null);
+      return { delivered: true, id: id3, request: r.text, completed, inProgress, answer: ownerPlainLine(r.answer), answerSource: r.answerSource ?? "unverified-legacy-answer", did: r.results, ...r.queue ? { queue: r.queue } : {}, ...r.initialAnswer ? { initialAnswer: r.initialAnswer, finalObservation: r.finalObservation } : {}, ...rec && rec.capability ? { receipt: { id: rec.id, capability: rec.capability, phase: rec.phase, ...rec.code ? { code: rec.code } : {} } } : {}, ...r.error ? { error: r.error } : {}, seconds: r.latencySeconds };
     }
     if (!liveRunning()) return { delivered: true, id: id3, outcome: null, reason: "live stopped before answering" };
     await sleep(1500);
