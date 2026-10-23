@@ -209,7 +209,7 @@ test('the DJ story through the real server: an agent proposes cards, two owners 
   assert.equal((await api(`/v1/souls/${rob.id}/intent`, admin, { intent: { agenda: [{ card: 'host a gathering', target: 'the campfire' }, { card: 'say yes', target: null }], text: 'throw a party at the campfire and let people help' } })).status, 200);
   // Rob's gathering exists before Wren holds the DJ cards or a plan. Otherwise, while her plan has no Rob's gathering to
   // aim at, a near-tie choice can spend the new card at whichever native gathering she happens to be standing in.
-  for (let i = 0; i < 200 && !(await mine()).some((p) => p.ok && p.soulId === rob.id && p.card === 'host a gathering'); i++) await sleep(300);
+  for (let i = 0; i < 200 && !(await mine()).some((p: any) => p.ok && p.soulId === rob.id && p.card === 'host a gathering'); i++) await sleep(300);
 
   // Wren's agent proposes the two cards the DJ story needs
   const cards = [
