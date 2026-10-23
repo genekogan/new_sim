@@ -1,4 +1,4 @@
-import {GRADE_A} from './atmosphere/grade.ts';
+import {cdnRoute} from './cdn-assets.ts';
 import * as THREE from 'three';
 import type {WorldLocation} from './WorldLocations.ts';
 import {worldPlaceView,type WorldPlaceId} from './WorldPlaces.ts';
@@ -16,16 +16,18 @@ export function fitPlacePreviewCamera(box:THREE.Box3,direction:THREE.Vector3,asp
  * (the place not drawn yet, e.g. a god world still streaming its things in) is not cached: the next opening retries. */
 export class WorldPlacePreviews{
  private images=new Map<string,string|null>();private pending=new Map<string,Promise<string|null>>();private closed=false;private revision=0;private tail:Promise<unknown>=Promise.resolve();
- private renderer:THREE.WebGLRenderer;private roots:()=>readonly THREE.Object3D[];
- constructor(renderer:THREE.WebGLRenderer,roots:()=>readonly THREE.Object3D[]){this.renderer=renderer;this.roots=roots;}
- capture(id:WorldPlaceId):Promise<string|null>{return this.request(id,()=>this.render(id));}
- captureLocation(location:WorldLocation,sceneKey:string):Promise<string|null>{return this.request(sceneKey+':'+location.id,()=>this.render(location.id,location));}
+ private renderer:THREE.WebGLRenderer;private live:()=>THREE.Scene|null;private roots:()=>readonly THREE.Object3D[];
+ constructor(renderer:THREE.WebGLRenderer,roots:()=>readonly THREE.Object3D[],live:()=>THREE.Scene|null=()=>null){this.renderer=renderer;this.roots=roots;this.live=live;}
+ capture(id:WorldPlaceId):Promise<string|null>{return this.request(id,()=>this.render(id,id));}
+ captureLocation(location:WorldLocation,sceneKey:string):Promise<string|null>{const key=sceneKey+':'+location.id;return this.request(key,()=>this.render(location.id,key,location));}
  invalidate(){this.revision++;this.images.clear();this.pending.clear();}
- private request(key:string,render:()=>string|null):Promise<string|null>{
+ private request(key:string,render:()=>Promise<string|null>):Promise<string|null>{
   if(this.closed)return Promise.resolve(null);if(this.images.has(key))return Promise.resolve(this.images.get(key)!);const pending=this.pending.get(key);if(pending)return pending;const revision=this.revision;
   const job=this.tail.then(()=>new Promise<void>(resolve=>setTimeout(resolve,0))).then(()=>this.closed||revision!==this.revision?null:render()).catch(()=>null).then(image=>{if(this.closed||revision!==this.revision)return null;this.pending.delete(key);if(image)this.images.set(key,image);if(this.images.size>24)this.images.delete(this.images.keys().next().value!);return image;});this.pending.set(key,job);this.tail=job;return job;
  }
- private render(id:string,location?:WorldLocation):string|null{
+ private async render(id:string,key:string,location?:WorldLocation):Promise<string|null>{
+  const served=await cdnRoute(placeShotPath(key)).catch(()=>null);if(served)return served.url;  // published per build by the release (perf owns CDN): every visitor sees the same picture
+  const kept=readKept(key);if(kept)return kept;
   const view=location??worldPlaceView(id as WorldPlaceId);if(this.closed||!view)return null;
   const center=new THREE.Vector3().fromArray(view.target),radius=location?Math.min(100,location.radius):Math.min(35,Math.max(8,new THREE.Vector3().fromArray(view.p).distanceTo(center)*.28));
   const scene=new THREE.Scene(),geometries:THREE.BufferGeometry[]=[],instances:THREE.InstancedMesh[]=[],materials=new Map<THREE.Material,THREE.Material>(),target=new THREE.WebGLRenderTarget(160,112,{depthBuffer:true});target.texture.colorSpace=THREE.SRGBColorSpace;
@@ -49,14 +51,49 @@ export class WorldPlacePreviews{
    });}
    if(!scene.children.length)return null;
    scene.updateMatrixWorld(true);
-   const box=new THREE.Box3().setFromObject(scene),direction=new THREE.Vector3().fromArray(view.p).sub(center);direction.y=Math.max(direction.length()*.45,Math.abs(direction.y));const camera=fitPlacePreviewCamera(box,direction);
-   scene.add(new THREE.HemisphereLight(0xffffff,0x5a635b,2.5));const light=new THREE.DirectionalLight(0xffffff,2);light.position.copy(camera.position).add(new THREE.Vector3(0,5,0));scene.add(light);
-   const renderer=this.renderer,previous=renderer.getRenderTarget(),viewport=renderer.getViewport(new THREE.Vector4()),scissor=renderer.getScissor(new THREE.Vector4()),scissorTest=renderer.getScissorTest(),clear=renderer.getClearColor(new THREE.Color()),alpha=renderer.getClearAlpha(),autoClear=renderer.autoClear,gradeStrength=GRADE_A.x;
-   const pixels=new Uint8Array(160*112*4);
-   try{GRADE_A.x=0;renderer.setRenderTarget(target);renderer.setScissorTest(false);renderer.setClearColor(0,0);renderer.autoClear=true;renderer.render(scene,camera);renderer.readRenderTargetPixels(target,0,0,160,112,pixels);}
-   finally{renderer.setRenderTarget(previous);renderer.setViewport(viewport);renderer.setScissor(scissor);renderer.setScissorTest(scissorTest);renderer.setClearColor(clear,alpha);renderer.autoClear=autoClear;GRADE_A.x=gradeStrength;}
-   const canvas=document.createElement('canvas');canvas.width=160;canvas.height=112;const ctx=canvas.getContext('2d');if(!ctx)return null;const image=ctx.createImageData(160,112);for(let y=0;y<112;y++)image.data.set(pixels.subarray((111-y)*160*4,(112-y)*160*4),y*160*4);ctx.putImageData(image,0,0);return canvas.toDataURL('image/png');
+   const shot=this.shoot(scene,center,radius,view.p,key);if(shot)keep(key,shot);return shot;
   }finally{target.dispose();for(const mesh of instances)mesh.dispose();for(const g of geometries)g.dispose();for(const m of materials.values())m.dispose();scene.clear();}
+ }
+ /** Gene 2026-10-23 (#13): a full photogenic shot of the place in the real world (terrain, water, sky, neighbours), not a
+  * cut-out of its assets. Rule: frame the place's geometry plus its region at a 35° elevated 3/4 view from its tour side;
+  * occlusion check: draw the place alone (white), then the world in black with the place on top, and count how much of the
+  * place stays visible; above 40 % hidden, turn 45° and retry, keeping the clearest of the 8 views. */
+ private shoot(mask:THREE.Scene,center:THREE.Vector3,radius:number,from:readonly number[],key:string):string|null{
+  const live=this.live();if(!live){return null;}
+  const box=new THREE.Box3().setFromObject(mask),r=radius*.8,extent=box.clone().union(new THREE.Box3(new THREE.Vector3(center.x-r,center.y,center.z-r),new THREE.Vector3(center.x+r,center.y,center.z+r))),aim=extent.getCenter(new THREE.Vector3());
+  const az0=Math.atan2(from[0]-aim.x,from[2]-aim.z),el=35*Math.PI/180,W=SHOT_W,H=SHOT_H,CW=80,CH=56;
+  const renderer=this.renderer,previous=renderer.getRenderTarget(),viewport=renderer.getViewport(new THREE.Vector4()),scissor=renderer.getScissor(new THREE.Vector4()),scissorTest=renderer.getScissorTest(),clear=renderer.getClearColor(new THREE.Color()),alpha=renderer.getClearAlpha(),autoClear=renderer.autoClear;
+  const white=new THREE.MeshBasicMaterial({color:0xffffff,fog:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-8}),black=new THREE.MeshBasicMaterial({color:0,fog:false});
+  const check=new THREE.WebGLRenderTarget(CW,CH,{depthBuffer:true}),target=new THREE.WebGLRenderTarget(W,H,{depthBuffer:true});target.texture.colorSpace=THREE.SRGBColorSpace;
+  const small=new Uint8Array(CW*CH*4),count=()=>{renderer.readRenderTargetPixels(check,0,0,CW,CH,small);let n=0;for(let i=0;i<small.length;i+=4)if(small[i]>127)n++;return n;};
+  const hidden:THREE.Object3D[]=[],seeThrough:THREE.Object3D[]=[];live.traverse(o=>{if(!o.visible)return;if(/marker|label/i.test(o.name)){o.visible=false;hidden.push(o);}else if(/water|sea|sky|cloud|rain|fog/i.test(o.name))seeThrough.push(o);});
+  const background=live.background,override=live.overrideMaterial;
+  try{
+   renderer.setScissorTest(false);mask.overrideMaterial=white;let best:THREE.PerspectiveCamera|null=null,bestHidden=2,turn=0;
+   for(let k=0;k<8&&bestHidden>.4;k++){
+    const az=az0+k*Math.PI/4,camera=fitPlacePreviewCamera(extent,new THREE.Vector3(Math.sin(az)*Math.cos(el),Math.sin(el),Math.cos(az)*Math.cos(el)),W/H);
+    const d=camera.position.distanceTo(aim);camera.near=Math.max(.05,d/400);camera.far=Math.max(3000,d*20);camera.updateProjectionMatrix();
+    renderer.setRenderTarget(check);renderer.setClearColor(0,1);renderer.autoClear=true;renderer.render(mask,camera);const all=count();if(!all)continue;
+    for(const o of seeThrough)o.visible=false;live.background=null;live.overrideMaterial=black;
+    try{renderer.render(live,camera);renderer.autoClear=false;renderer.render(mask,camera);}finally{for(const o of seeThrough)o.visible=true;live.background=background;live.overrideMaterial=override;renderer.autoClear=true;}
+    const blocked=1-Math.min(1,count()/all);if(blocked<bestHidden){bestHidden=blocked;best=camera;turn=k;}
+   }
+   if(!best)return null;
+   STATS.set(key,{turn,hidden:Math.round(bestHidden*100)/100});
+   const pixels=new Uint8Array(W*H*4);renderer.setRenderTarget(target);renderer.setClearColor(clear,alpha);renderer.render(live,best);renderer.readRenderTargetPixels(target,0,0,W,H,pixels);
+   const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d');if(!ctx)return null;const image=ctx.createImageData(W,H);for(let y=0;y<H;y++)image.data.set(pixels.subarray((H-1-y)*W*4,(H-y)*W*4),y*W*4);ctx.putImageData(image,0,0);
+   const webp=canvas.toDataURL('image/webp',.82);return webp.startsWith('data:image/webp')?webp:canvas.toDataURL('image/jpeg',.85);
+  }finally{for(const o of hidden)o.visible=true;mask.overrideMaterial=null;renderer.setRenderTarget(previous);renderer.setViewport(viewport);renderer.setScissor(scissor);renderer.setScissorTest(scissorTest);renderer.setClearColor(clear,alpha);renderer.autoClear=autoClear;check.dispose();target.dispose();white.dispose();black.dispose();}
  }
  dispose(){this.closed=true;this.invalidate();}
 }
+declare const __BUILD__:string;
+const BUILD=typeof __BUILD__==='string'?__BUILD__:'dev',SHOT_W=320,SHOT_H=224,KEPT='sim.placeShot.';
+/** The last framing per place (turns of 45° from the tour side, share of the place hidden): read by the shot export script. */
+export const STATS=new Map<string,{turn:number;hidden:number}>();
+/** Where a release publishes a place's shot (world-scoped in the CDN manifest; the query pins the build). */
+export function placeShotPath(key:string){return '/place-shots/'+encodeURIComponent(key.replace(/[^\w.:-]+/g,'_'))+'.webp?b='+encodeURIComponent(BUILD);}
+/** Shots are kept per build in this browser, so a visitor renders each place once per release. */
+function readKept(key:string):string|null{try{return localStorage.getItem(KEPT+BUILD+'.'+key);}catch{return null;}}
+function keep(key:string,shot:string){try{localStorage.setItem(KEPT+BUILD+'.'+key,shot);}catch{try{for(let i=localStorage.length-1;i>=0;i--){const k=localStorage.key(i);if(k?.startsWith(KEPT)&&!k.startsWith(KEPT+BUILD+'.'))localStorage.removeItem(k);}localStorage.setItem(KEPT+BUILD+'.'+key,shot);}catch{/* full: the in-memory cache still holds it */}}}
+if(typeof window!=='undefined')(window as unknown as {__placeShotStats?:typeof STATS}).__placeShotStats=STATS;
