@@ -208,8 +208,31 @@ export function resolveCapability(input: string, ctx: VocabContext): VocabResult
   const name = ctx.places.find(p => p.id === r.cap.target!.id)?.name ?? r.cap.target.id;
   return {kind: 'alias', cap: wander, note: `${input}: you are in ${name} already and its loop (${r.cap.id}) is closed right now (${(r.cap.blocked?.reason ?? 'unavailable').replace(/[.\s]+$/, '')}); wandering around where you are instead (${wander.id}).`};
 }
+// VEHICLE-STEER (Gene 2026-10-23, #12): a seated rider's words to its ride. Only when a steer is offered to this Soul now
+// (it is aboard); otherwise the words fall through ("fly the balloon" from the ground is still the join).
+const STEER_DIRS = 'north|northeast|north-east|east|southeast|south-east|south|southwest|south-west|west|northwest|north-west|n|ne|e|se|s|sw|w|nw';
+const STEER_VEHICLE = String.raw`(?:(?:the|our|this|my)\s+)?(?:hot[- ]air\s+|red\s+|rowing\s+)?(?:balloon|punt|boat|basket|ride|it|us)`;
+const STEER_GO = String.raw`(?:fly|flying|steer|drive|sail|float|row|rowing|pilot|navigate|head|take|move|go|bring)`;
+function steerWords(input: string, ctx: VocabContext): VocabResult | null {
+  const caps = ctx.caps.filter(c => c.verb === 'object' && c.action === 'steer' && c.available); if (!caps.length) return null;
+  const t = input.toLowerCase().replace(/^(?:please\s+|let'?s\s+|now\s+|ok(?:ay)?,?\s+)+/, '').replace(/[.!?\s]+$/, '').trim(); if (!t || t.includes(':')) return null;
+  const water = /\b(?:row|rowing|punt|boat|ashore|bank)\b/.test(t), air = /\b(?:fly|flying|balloon|basket|hover)\b/.test(t);
+  const cap = caps.find(c => water ? /punt|boat|rowing/i.test(c.id) : air ? /balloon/i.test(c.id) : true) ?? caps[0];
+  const say = (params: Record<string, unknown>, what: string): VocabResult => ({kind: 'alias', cap, params, note: `${input} is ${cap.id} (${what}).`});
+  if (new RegExp(String.raw`^(?:land|touch\s+down|set\s+(?:${STEER_VEHICLE}\s+)?down|bring\s+${STEER_VEHICLE}\s+down|go\s+down|descend|come\s+down|row\s+(?:${STEER_VEHICLE}\s+)?(?:back|ashore|home)|go\s+back\s+to\s+(?:the\s+|its\s+)?(?:bank|shore))(?:\s+${STEER_VEHICLE})?(?:\s+(?:here|now|please))?$`).test(t)) return say({land: true}, 'land');
+  if (new RegExp(String.raw`^(?:(?:stop|halt|hold)\s+${STEER_VEHICLE}(?:\s+(?:here|still|there))?|(?:stop|hold)\s+(?:here|still)|hover(?:\s+here)?|hold\s+position)$`).test(t)) return say({stop: true}, 'stop and hold');
+  const dir = new RegExp(String.raw`^${STEER_GO}(?:\s+${STEER_VEHICLE})?\s+(?:(\d+)\s*(?:m|metres|meters)\s+)?(${STEER_DIRS})(?:wards?)?(?:\s+(?:for\s+)?(\d+)\s*(?:m|metres|meters))?(\s*(?:,\s*)?(?:and|then|,)\s+land(?:\s+there)?)?$`).exec(t);
+  if (dir) return say({direction: dir[2].replace('-', ''), distance: Math.min(1000, Math.max(5, Number(dir[1] ?? dir[3] ?? 100))), ...(dir[4] ? {land: true} : {})}, `steer ${dir[2]}`);
+  const to = new RegExp(String.raw`^${STEER_GO}(?:\s+${STEER_VEHICLE})?\s+(?:over\s+)?(?:to(?:wards?)?|toward|over)\s+(.+?)(\s*(?:,\s*)?(?:and|then|,)\s+(?:then\s+)?land(?:\s+(?:there|it))?)?$`).exec(t);
+  // "go to X" / "take me to X" without a vehicle word stays a walk (refused aloft with its own reason)
+  if (to && (/^(?:fly|flying|steer|drive|sail|float|row|rowing|pilot|navigate)\b/.test(t) || new RegExp(String.raw`^\w+\s+${STEER_VEHICLE}\b`).test(t))) {
+    const place = to[1].replace(/^(?:the\s+)/, '').trim(); if (place) return say({to: place, ...(to[2] ? {land: true} : {})}, `steer toward ${place}${to[2] ? ', land there' : ''}`);
+  }
+  return null;
+}
 function resolveWords(input: string, ctx: VocabContext): VocabResult {
   const exact = ctx.caps.find(c => c.id === input); if (exact) return {kind: 'exact', cap: exact};
+  const steered = steerWords(input, ctx); if (steered) return steered;
   // CN5 (acceptance): "A, then B" is two things. Walks and strolls chain (the earlier ones become `via` legs of the last);
   // anything else does the first and says to act again for the rest (never a mix-up of the two).
   // r3 quality case 35: "pick up a book and give it to X" is two steps too (the give is offered only once holding it).

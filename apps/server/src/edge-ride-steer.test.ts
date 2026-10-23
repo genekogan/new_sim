@@ -50,7 +50,8 @@ test('steer the balloon to a named place and land there; the other rider is refu
  // honest refusals before anything moves: an unknown place, a bad mix of params
  const unk=await w.steer(0,'ride-eden-balloon',{to:'the moon'});assert.equal(unk.accepted,false);assert.equal(unk.code,'steer.unknown-place',JSON.stringify(unk));
  const mix=await w.steer(0,'ride-eden-balloon',{to:'Presentation deck',stop:true});assert.equal(mix.accepted,false);assert.equal(mix.code,'ride.steer-params');
- const go=await w.steer(0,'ride-eden-balloon',{to:'Presentation deck',land:true});assert.equal(go.accepted,true,JSON.stringify(go));
+ // the Soul's own words: "fly the balloon to the presentation deck and land there" is the steer with to + land
+ const go=await w.call(0,'POST','/v1/edge/act',{capability:'fly the balloon to the presentation deck and land there'});assert.equal(go.accepted,true,JSON.stringify(go));assert.equal(go.resolved?.to,'object:ride-eden-balloon:steer',JSON.stringify(go.resolved));
  assert.ok(await w.run(40,()=>!!b().carrier.steer),'the engine takes the steer');
  // ben is a rider too, but ana is steering
  const other=await w.steer(1,'ride-eden-balloon',{direction:'N',distance:50});assert.equal(other.accepted,false,JSON.stringify(other));assert.equal(other.code,'ride.steered');assert.match(other.reason,/ana/);
@@ -71,7 +72,7 @@ test('stop holds the balloon in the air, then with nobody steering it rejoins it
  // out of bounds: the engine's refusal reaches the Soul as a ride.* code with a readable reason (this fixture has no ground
  // field, so the bound here is the ride's range from home)
  const far=w.ledger.steerCheck(w.rows[0].entity_id,'eden-balloon',{x:home[0]+5000,z:home[2]});assert.equal(far?.code,'ride.out-of-bounds',JSON.stringify(far));assert.match(String(far?.reason),/outside the world/);
- const stop=await w.steer(0,'ride-eden-balloon',{stop:true});assert.equal(stop.accepted,true,JSON.stringify(stop));
+ const stop=await w.call(0,'POST','/v1/edge/act',{capability:'hover here'});assert.equal(stop.resolved?.to,'object:ride-eden-balloon:steer',JSON.stringify(stop));assert.equal(stop.accepted,true,JSON.stringify(stop));
  assert.ok(await w.run(60,()=>!!b().carrier.steer),'holding');
  const at=[...b().pose.p];assert.ok(await w.run(1200,()=>false)===false);
  assert.ok(flat(b().pose.p,at)<2&&b().pose.p[1]>3,`hovers where it stopped: ${at} -> ${b().pose.p}`);
@@ -90,10 +91,10 @@ test('row the punt: steering out over open water is fine, a land target off its 
  assert.ok(await w.run(3000,()=>w.ent(0).human.carrier?.phase==='seated'),'seated');
  assert.ok(await w.run(2000,()=>p().carrier.phase==='aloft'),'pushed off: '+p().carrier.phase);
  const ashore=await w.steer(0,'ride-eden-punt',{to:'Presentation deck',land:true});assert.equal(ashore.accepted,false,JSON.stringify(ashore));
- const water=await w.steer(0,'ride-eden-punt',{to:'Connected calm water'});assert.equal(water.accepted,true,JSON.stringify(water));
+ const water=await w.call(0,'POST','/v1/edge/act',{capability:'row to the connected calm water'});assert.equal(water.resolved?.to,'object:ride-eden-punt:steer',JSON.stringify(water));assert.equal(water.accepted,true,JSON.stringify(water));
  assert.ok(await w.run(40,()=>!!p().carrier.steer),'steering: '+JSON.stringify(w.ledger.receipt(w.rows[0].id,water.receipt.id))+' phase '+p().carrier.phase+' ground '+!!(w.f.host.engine as any).rt?.services?.spatial?.ground);
  assert.ok(await w.run(1200,()=>false)===false);
- const land=await w.steer(0,'ride-eden-punt',{land:true});assert.equal(land.accepted,true,JSON.stringify(land));
+ const land=await w.call(0,'POST','/v1/edge/act',{capability:'row back'});assert.equal(land.resolved?.to,'object:ride-eden-punt:steer',JSON.stringify(land));assert.equal(land.accepted,true,JSON.stringify(land));
  assert.ok(await w.run(8000,()=>!w.ent(0).human.carrier),'rowed back and stepped out: '+p().carrier.phase+' '+p().pose.p);
  assert.ok(flat(p().pose.p,home)<1.5,`back at its bank: ${p().pose.p} vs ${home}`);
  assert.equal(w.ent(0).human.shore?.depthMetres??0,0,'rower on dry ground');
