@@ -36,7 +36,7 @@ import {publishCompletedOwnerQueue} from './client-owner-result.mjs';
 import {openClientMemory} from './client-memory.mjs';
 import {travelCommand} from './client-travel.mjs';
 
-export const SKILL_VERSION='1.9.13';
+export const SKILL_VERSION='1.9.14';
 export const CONTRACT='eden-edge/1';
 export const API_CONTRACT='eden-edge/1.1'; // Additive support; preserve legacy wire contract.
 const STATE='.eden-agent.json';
@@ -1119,8 +1119,11 @@ export async function tell(...args){
  const until=Date.now()+Math.min(600,waitS)*1000;
  while(Date.now()<until){
   const r=readJSONL(LIVE.replies).filter(x=>x.id===id).at(-1);
-  if(r){const q=readJSON('.client-queue.json',{});if(q.id===id&&!q.steps?.some(s=>['failed','interrupted','blocked'].includes(s.status))&&q.steps?.some(s=>['pending','running','waiting','dispatching','stopping'].includes(s.status))){await sleep(500);continue;}if(q.id===id)r.queue=q;const latest=readJSONL(LIVE.replies).filter(x=>x.id===id).at(-1);if(latest?.queueComplete)Object.assign(r,latest);let rec=null;if(r.receipt){await sleep(2500);rec=await receipt(r.receipt).catch(()=>null);} // the body's real state, not the mind's claim
-   return {delivered:true,id,request:r.text,answer:ownerPlainLine(r.answer),answerSource:r.answerSource??'unverified-legacy-answer',did:r.results,...(r.queue?{queue:r.queue}:{}),...(r.initialAnswer?{initialAnswer:r.initialAnswer,finalObservation:r.finalObservation,completed:r.queueComplete===true}:{}),...(rec&&rec.capability?{receipt:{id:rec.id,capability:rec.capability,phase:rec.phase,...(rec.code?{code:rec.code}:{})}}:{}),...(r.error?{error:r.error}:{}),seconds:r.latencySeconds};}
+  if(r){const q=readJSON('.client-queue.json',{});if(q.id===id)r.queue=q;const latest=readJSONL(LIVE.replies).filter(x=>x.id===id).at(-1);if(latest?.queueComplete)Object.assign(r,latest);
+   // Wait for an answer, not for the owner's entire physical queue. A long nap/walk can outlast --wait.
+   const completed=r.queueComplete===true,inProgress=!completed&&q.id===id&&!q.steps?.some(s=>['failed','interrupted','blocked'].includes(s.status))&&r.queue?.steps?.some(s=>['pending','running','waiting','dispatching','stopping'].includes(s.status))===true;
+   let rec=null;if(r.receipt)rec=await receipt(r.receipt,{timeoutMs:2500}).catch(()=>null); // current body evidence; a reply never implies completion
+   return {delivered:true,id,request:r.text,completed,inProgress,answer:ownerPlainLine(r.answer),answerSource:r.answerSource??'unverified-legacy-answer',did:r.results,...(r.queue?{queue:r.queue}:{}),...(r.initialAnswer?{initialAnswer:r.initialAnswer,finalObservation:r.finalObservation}:{}),...(rec&&rec.capability?{receipt:{id:rec.id,capability:rec.capability,phase:rec.phase,...(rec.code?{code:rec.code}:{})}}:{}),...(r.error?{error:r.error}:{}),seconds:r.latencySeconds};}
   if(!liveRunning())return {delivered:true,id,outcome:null,reason:'live stopped before answering'};
   await sleep(1500);
  }
