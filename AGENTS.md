@@ -38,6 +38,12 @@ writes to eden2 and pushes. A lane hands R `branch@sha` + a gate receipt; R ship
   `node tools/test-harness/walk/walk.mjs` (`--world fuzz,bench-hamlet` for a subset). A deliberate change (better or worse)
   updates the baseline as a reviewed file change, in its own commit before the final gate: `walk.mjs --write`, or
   `walk.mjs --from <gate out>/candidate/out/suite/walk --write`.
+- **Bundle size is gated (V3-bundle):** `tools/test-harness/bundle-budget/bundle-gate.test.mjs` measures the web build
+  (code files; keyed by chunk name without its hash, raw + gzip) against the reviewed
+  `tools/test-harness/bundle-budget/baseline.json` and fails on +10% or more for any chunk (over 4 KB slack) or the total,
+  or on a new chunk of 100 KB+ the baseline does not know. Local check: `node tools/test-harness/bundle-budget/budget.mjs
+  --build --check`. A deliberate change updates the baseline in its own reviewed commit: `budget.mjs --build --write`, or
+  `budget.mjs --from <gate out>/candidate/out/suite/bundle/current.json --write`; the gate never writes it.
 - **Godmode build safety (BUILDSAFE, `buildsafe/1`):** god `commitBatch` repairs at commit time what an edit newly cuts off
   (a 1 m gate or a nudge, in the same batch, on the shared clearance rule); leftovers come back as one actionable line plus
   a tested op, and a sealed refusal stands unless the repair reopens it. Never add a separate post-hoc walk fix for a
