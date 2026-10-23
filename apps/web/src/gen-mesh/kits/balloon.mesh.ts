@@ -5,6 +5,7 @@
 // dropped, so riders stand visibly on the floor and walk in through the door instead of through a solid crate. The cabin is
 // built at Core's size whatever the thing's scale, in Core's frame (+x forward; the entity layer turns the thing to Core's yaw
 // while the ride twin exists, WorldEntityLayer.poseOverride).
+import { isRideBalloonDef } from './ride-balloon.ts';
 import * as THREE from 'three';
 import { kitArgs } from '@sim/generators';
 import { buildKit } from '../kit.mesh.ts';
@@ -28,7 +29,7 @@ registerMesh({
   build(ctx) {
     bindMotionModel(ctx.model);
     const parsed = kitArgs.safeParse(ctx.args); if (!parsed.success) return null;
-    if (!ctx.def.components.carrier) return buildKit(parsed.data, ctx);
+    if (!isRideBalloonDef(ctx.def)) return buildKit(parsed.data, ctx);
     const shapes = parsed.data.shapes as unknown as Shape[];
     const root = buildKit({ ...parsed.data, shapes: envelopeShapes(shapes) as typeof parsed.data.shapes }, ctx);
     const s = ctx.entity.s ?? 1;

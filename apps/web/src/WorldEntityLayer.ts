@@ -31,6 +31,7 @@ import { entityArrivalPose } from './entity-arrival.ts';
 import { keySeen, shapeWedgeDistance, viewFirst, viewWedge, type ViewWedge } from './arrival-view.ts';
 import { WorldBuildSites, SITE_REFINEMENT, type PublicSite } from './WorldBuildSites.ts';
 import { GroundCover, coverSetting } from './gen-mesh/ground-cover.ts';
+import { isRideBalloonDef } from './gen-mesh/kits/ride-balloon.ts';
 
 type Snapshot = { contract: string; worldId: string; seq: number; counter?: number; seed?: string; constants: WorldModel['constants']; state: WorldModel['state']; ground: Ground; defs: StoredDef[]; entities: Entity[]; tiles: Record<string, string>; assetBytes?: Record<string, number>; builds?: PublicSite[]; buildsRev?: number; now?: number };
 type DiffMsg = { type: 'edge'; kind: 'world-diff'; seq: number; diff: { upserts: Entity[]; removes: string[]; defs: StoredDef[]; tiles: string[]; world?: Partial<WorldModel['state']> }; ground?: Ground; defs?: StoredDef[] };
@@ -264,7 +265,7 @@ export class WorldEntityLayer {
   rideNames(): string[] {
     if (!this.model) return [];
     const out: string[] = [];
-    for (const e of this.model.entities.values()) { if (!e.name || e.in.parent !== 'world') continue; const def = this.model.resolvedDef(e.def) as (StoredDef & { components: Record<string, unknown> }) | undefined; if (def?.components.carrier && def.tags.includes('balloon')) out.push(e.name); }
+    for (const e of this.model.entities.values()) { if (!e.name || e.in.parent !== 'world') continue; const def = this.model.resolvedDef(e.def) as (StoredDef & { components: Record<string, unknown> }) | undefined; if (def && isRideBalloonDef(def)) out.push(e.name); }
     return out;
   }
   /** Draw the god thing named `name` where its native twin is (`p`: the recorded engine position), or at its own pose (null).
