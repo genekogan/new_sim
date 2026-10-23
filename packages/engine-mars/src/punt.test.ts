@@ -7,7 +7,7 @@ import type {MarsEngine} from './engine.ts';
 import type {Ground} from '../../ground/src/index.ts';
 import {connectedCommonsShoreFixture} from './connected-shore.ts';
 import {puntCandidates} from './punt.ts';
-import {carrierEntity,stepCarriers,LEAVE_LIMIT} from '../../../mars/viewer/engine/vehicles/carrier.ts';
+import {carrierEntity,stepCarriers} from '../../../mars/viewer/engine/vehicles/carrier.ts';
 
 test('native pond punt carries two rowers at water level, turns, returns them to dry bank and restores exactly',async()=>{
   const factory=await connectedCommonsShoreFactory(),e=factory.create(factory.genesis('punt')) as MarsEngine,spec=e.puntCandidatesV1()[0];
@@ -98,7 +98,7 @@ test('a landed punt rider whose step-out is held up (plank taken) is set down on
   const c=(boat as any).carrier;c.phase='landed';c.phaseTick=rt.tick;c.doorBy='someone-else';const landed=rt.tick;
   for(let i=0;i<40;i++)step();
   assert.equal(world.entities.a.human!.carrier?.phase,'leaving','held at the taken plank');
-  for(let i=0;i<LEAVE_LIMIT+200&&world.entities.a.human!.carrier;i++)step();
+  for(let i=0;i<12*20+200&&world.entities.a.human!.carrier;i++)step();
   assert.equal(world.entities.a.human!.carrier,undefined,'set down');assert.ok((rt.tick-landed)/20<=30,`out ${(rt.tick-landed)/20} s after landing`);
   assert.equal(rt.isActive(ride.id),false);assert.equal(world.entities.a.human!.shore?.depthMetres,0,'on dry bank, not in the water');
   assert.equal(world.entities.a.human!.activity,'idle');assert.deepEqual(rt.violations,[]);
