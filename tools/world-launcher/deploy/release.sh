@@ -38,8 +38,17 @@ if [ -n "$LOCAL" ]; then
   OUT="$LOCAL"
 fi
 
+# Rebuilding a local artifact preserves its previous contents in a unique Trash directory.
+trash_existing() {
+  [ -e "$1" ] || [ -L "$1" ] || return 0
+  mkdir -p "$HOME/.Trash"
+  local destination
+  destination="$(mktemp -d "$HOME/.Trash/sim-release.XXXXXX")"
+  mv "$1" "$destination/"
+  echo "   retained previous local artifact in $destination"
+}
 echo "== assemble $BUILD"
-rm -rf "$OUT"; mkdir -p "$OUT"
+trash_existing "$OUT"; mkdir -p "$OUT"
 git archive HEAD | tar -x -C "$OUT"
 echo "$BUILD" > "$OUT/BUILD"
 # The Eden experience (connected growing world, atmosphere, presets) is pinned to the qualified Eden world id, exactly as
@@ -62,16 +71,17 @@ fi
 [ -z "$EDEN_WORLDS" ] || grep -qsE "[A-Za-z_\$][A-Za-z0-9_\$]*\(\`${EDEN_WORLDS%%,*}" "$OUT"/apps/web/dist/assets/*.js || { echo "web build lacks the Eden experience pin ($EDEN_WORLDS)"; exit 1; }
 # P1 phones: .br/.gz beside each hashed asset (the launcher serves them; nothing is compressed on the request path)
 node tools/world-launcher/deploy/precompress.mjs "$OUT/apps/web/dist/assets"
-rsync -aL --delete "$MARS_WEB_SRC/" "$OUT/mars-web/"
+rsync -aL --exclude /modular "$MARS_WEB_SRC/" "$OUT/mars-web/"
 # /modular (the humanoid kit and the environment GLBs) is this commit's own copy, never whatever a lane overlay's
 # symlink pointed at when the release was assembled: a relative link into the archived tree (no second copy).
-rm -rf "$OUT/mars-web/modular"; ln -s ../mars/viewer/public/modular "$OUT/mars-web/modular"
+trash_existing "$OUT/mars-web/modular"; ln -s ../mars/viewer/public/modular "$OUT/mars-web/modular"
 [ -f "$OUT/mars-web/modular/humanoid/kit.json" ] || { echo "no humanoid kit in the release"; exit 1; }
 # legacy: every file's sha256 (FILES.sha256), so the kit's preflight proves eden2 runs exactly this tree (sha256sum -c)
 [ "$STAGE" != legacy ] || (cd "$OUT" && find . -type f ! -name FILES.sha256 -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256 > FILES.sha256)
 du -sh "$OUT" | sed 's/^/   size /'
-# keep-last-3 for the laptop builds next to this one (SIM_RELEASE_KEEP=<n> to change, 0 keeps all; never fails the release)
-"$ROOT/tools/world-launcher/deploy/prune-local.sh" "$(dirname "$OUT")" "${SIM_RELEASE_KEEP:-3}" || echo "   (local prune failed; the release is unaffected)"
+# Retention is a separate explicit operation, never an automatic side effect of shipping.
+echo "   retained all local releases (no automatic pruning)"
+node "$ROOT/tools/world-launcher/deploy/release-manifest.mjs" snapshot "$OUT" > "$OUT/RELEASE-MANIFEST.json"
 if [ -n "$LOCAL" ]; then
   echo "assembled $BUILD in $OUT (run pnpm install --offline --frozen-lockfile --filter @sim/server... there; command in team/lanes/deploy.md)"; exit 0
 fi
@@ -79,9 +89,19 @@ fi
 REL="$RELROOT/$BUILD"
 echo "== upload to $HOST:$REL"
 PREV="$(ssh "$HOST" "readlink /srv/sim-worlds/$STAGE 2>/dev/null || true")"
-# never re-mode an existing releases root (install -d would chmod it; /srv/sim-old/releases must stay traversable)
-ssh "$HOST" "[ -d $RELROOT ] || install -d -m 750 $RELROOT; install -d -m 750 $REL"
-rsync -az --delete ${PREV:+--link-dest="$PREV/"} --exclude node_modules "$OUT/" "$HOST:$REL/"
+# A repeated exact build may be reused only after inventory/content verification. Never delete stale remote files.
+MANIFEST_SHA="$(shasum -a 256 "$OUT/RELEASE-MANIFEST.json" | cut -d ' ' -f 1)"
+REMOTE_STATE="$(ssh "$HOST" "if [ -L '$REL' ]; then echo occupied; elif [ ! -e '$REL' ]; then echo fresh; elif [ -d '$REL' ] && [ -z \"\$(find '$REL' -mindepth 1 -maxdepth 1 -print -quit)\" ]; then echo fresh; elif [ -f '$REL/RELEASE-MANIFEST.json' ]; then sha256sum '$REL/RELEASE-MANIFEST.json' | cut -d ' ' -f 1; else echo occupied; fi")"
+if [ "$REMOTE_STATE" = "$MANIFEST_SHA" ]; then
+  ssh "$HOST" "node --input-type=module - verify '$REL' '$REL/RELEASE-MANIFEST.json'" < "$ROOT/tools/world-launcher/deploy/release-manifest.mjs"
+elif [ "$REMOTE_STATE" = fresh ]; then
+  # never re-mode an existing releases root; legacy releases must stay traversable
+  ssh "$HOST" "[ -d $RELROOT ] || install -d -m 750 $RELROOT; install -d -m 750 $REL"
+  rsync -az ${PREV:+--link-dest="$PREV/"} --exclude node_modules "$OUT/" "$HOST:$REL/"
+else
+  echo "refusing to overwrite nonempty $REL: manifest missing or different; retained without deleting anything. Use a new build."
+  exit 1
+fi
 
 echo "== install (user, dirs, unit; idempotent) and Linux dependencies"
 # legacy: never install.sh (it rewrites the shared unit file and daemon-reloads beside the live /worlds unit); the kit's
@@ -101,7 +121,5 @@ ssh "$HOST" "set -e
   [ '$STAGE' != production ] || test -f /etc/sim-worlds/production-auth.env || { echo 'production needs /etc/sim-worlds/production-auth.env (the account provider settings) first'; exit 1; }
   systemctl enable sim-worlds@$STAGE >/dev/null 2>&1
   bash $REL/tools/world-launcher/deploy/activate.sh $STAGE $REL $HOW
-  # retention: keep what a stage points at plus the three newest others
-  keep=\$(for s in staging production staging.previous production.previous; do readlink -f /srv/sim-worlds/\$s 2>/dev/null; done)
-  ls -1dt /srv/sim-worlds/releases/we-*/ | sed 's:/\$::' | tail -n +4 | while read -r d; do echo \"\$keep\" | grep -qx \"\$d\" || { rm -rf \"\$d\" \"\$d.deps.log\"; echo \"pruned \$d\"; }; done"
+  echo 'retained all remote releases (no automatic pruning; destructive retention needs Gene approval)'"
 echo "released $BUILD to $STAGE"

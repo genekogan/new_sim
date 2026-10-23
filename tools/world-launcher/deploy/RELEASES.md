@@ -38,6 +38,13 @@ handover, and the probe's exit 3 says it happened.
 - Tests: `node --test tools/world-launcher/ship.test.mjs` stubs every command (`SHIP_TEST=1`, `SHIP_SSH`, `SHIP_SCP`,
   `SHIP_NODE`, `SHIP_PYTHON`, `SHIP_RELEASE_SH`).
 
+`release.sh` never prunes remote or local releases. Rebuilding a local artifact moves its previous copy to a unique
+directory under `~/.Trash`. Destructive retention on eden2 remains a separate operation requiring Gene's approval.
+A same-build remote upload is reused only when `RELEASE-MANIFEST.json` matches the new assembly and every artifact,
+symlink and file mode still matches that manifest (installed `node_modules` are excluded). Missing manifests,
+partial uploads and changed/extra artifacts are retained and refused; use a new commit/build instead of deleting or
+overwriting them. Focused checks: `node --test tools/test-harness/release-no-delete.test.mjs`.
+
 ## Release-probe world (one-time setup, then every release)
 The probe's CLI edits go to its own world, **release-probe**: an unlisted scratch world, flagged test, with no Soul a person
 owns. Releases never write to bench-hamlet again (it holds Kwyjibo). ship.sh's god folder is
