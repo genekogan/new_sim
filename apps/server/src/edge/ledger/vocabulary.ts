@@ -31,6 +31,9 @@ export type VocabContext = {
   /** r3 quality (cases 23/29): where the nearest thing for a spot-based verb (swing, fish, cycle = a bicycle dock…) is anywhere in
    *  this world, ignoring offer reach. `null`: none exists in this world (the refusal is terminal); `undefined`: not spot-based. */
   elsewhere?: (verb: string) => {label: string; place?: string; placeId?: string; distance: number} | null | undefined;
+  /** ROUTE-RECHECK: whether a place (or a place inside it) has a spot for this verb anywhere in the world (a reading spot),
+   *  offered or not; unset: unknown (every named place counts). */
+  hasSpot?: (verb: string, placeId: string) => boolean;
 };
 export type VocabResult =
   | {kind: 'exact'; cap: EdgeCapability}
@@ -46,7 +49,10 @@ export type VocabResult =
     code?: string;
     /** place.unreachable: the named place (a host may offer a walk to it on demand and resolve again). gait.unavailable:
      *  the named place with no faster-gait offer (a host may offer that gait on demand: lane RT, run to a building's door). */
-    place?: string};
+    place?: string;
+    /** place.unreachable: the verb asked and every place the words name, best name first (a host may build that verb's
+     *  offers for them on demand: read:<place> beyond the nearest reading places). */
+    verb?: string; places?: string[]};
 
 const STOP = new Set(['the', 'a', 'an', 'to', 'of', 'in', 'at', 'by', 'on', 'into', 'near', 'with', 'my', 'some', 'through', 'thru', 'around', 'across', 'over', 'back', 'please', 'little', 'bit', 'for', 'while', 'and', 'then', 'there']);
 const VERBS: Record<string, string> = {go: 'walk', goto: 'walk', 'go-to': 'walk', 'walk-to': 'walk', visit: 'walk', 'go-inside': 'walk', 'go-into': 'walk', 'go-in': 'walk', enter: 'walk', 'step-inside': 'walk', 'step-into': 'walk', 'walk-into': 'walk', 'walk-inside': 'walk', move: 'walk', head: 'walk', travel: 'walk', 'come-back': 'walk', return: 'walk', 'go-back': 'walk', 'head-back': 'walk', 'walk-back': 'walk', running: 'run', sprint: 'run', sprinting: 'run', hurry: 'run', jogging: 'jog', 'go-over': 'walk',
@@ -196,6 +202,8 @@ export function parseCapability(input: string, verbs: Set<string>): {verb: strin
 
 /** Verbs whose target is a place (natural place names and the places map apply). */
 const PLACE_VERBS = new Set(['walk', 'jog', 'run', 'jog-around', 'run-around', 'cycle', 'cycle-around', 'hang-out', 'gather', 'stroll', 'read']);
+/** Place verbs done at a spot in the place (a reading spot), not on its ground: the best-named place first. */
+const SPOT_PLACE_VERBS = new Set(['read']);
 const GAIT_VERBS = new Set(['jog', 'run', 'jog-around', 'run-around', 'cycle', 'cycle-around']);
 
 export function resolveCapability(input: string, ctx: VocabContext): VocabResult {
@@ -418,6 +426,12 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       const near = pool.filter(c => c.available).sort((a, b) => dme(a) - dme(b) || a.id.localeCompare(b.id));
       if (near.length) return {kind: 'alias', cap: near[0], note: `${input} is the nearest free one, ${near[0].id} (${near[0].label}, ${Math.round(dme(near[0]))} m).`};
     }
+    // ROUTE-RECHECK ("go for a swim" in the park pond was "Say which"): a swim with no water named is in the water the Soul
+    // is in, else the nearest it can swim in
+    if (!q.length && verb === 'swim') {
+      const near = pool.filter(c => c.available).sort((a, b) => Number(!ctx.here?.includes(a.target?.id ?? '')) - Number(!ctx.here?.includes(b.target?.id ?? '')) || dme(a) - dme(b) || a.id.localeCompare(b.id));
+      if (near.length) return {kind: 'alias', cap: near[0], note: `${input} is ${ctx.here?.includes(near[0].target?.id ?? '') ? 'the water you are in' : 'the nearest water'}, ${near[0].id} (${near[0].label}).`};
+    }
     if (!q.length) return unknown(`Say which: "${verb}:<target>".`, pool);
     // "here" without a :here capability: the nearest free one within reach (30 m for seats).
     if (qs === 'here' || qs === 'nearby' || qs === 'nearest') {
@@ -443,7 +457,14 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       const r2 = also(one(pool.filter(c => info.get(c.id)!.t.around.some(n => norm(n) === s)), c => `${input}: ${c.id} (${c.label}) is there.`)); if (r2) return r2;
       // 3. Every word appears in the target's own names (walk:pond → the pond).
       const strict = pool.filter(c => words.every(w => tokenHit(w, info.get(c.id)!.strictTokens)));
-      const r3 = also(one(ownFirst(strict.length ? strict : pool.filter(c => words.every(w => tokenHit(w, info.get(c.id)!.ownTokens))), words), c => `${input} is ${c.id} (${c.label}).`)); if (r3) return r3;
+      const named3 = strict.length ? strict : pool.filter(c => words.every(w => tokenHit(w, info.get(c.id)!.ownTokens)));
+      // ROUTE-RECHECK: a spot verb's places ("read a book in the library") are chosen by 3b below, best name first and offered
+      // on demand when far, not as the nearest offer whose name has the word (the library annex next to the quad)
+      // ... and a place verb's words that only an offer's "by <neighbours>" names ("go to the south lawn": the quad lawn "by
+      // land-campus-south-gate") go to the place whose own name has them (the south lawn, offered on demand when far)
+      const byPlace3 = (SPOT_PLACE_VERBS.has(verb) && named3.some(c => c.target?.kind === 'place') && placeMatch(words, ctx.places, ctx.withheld).length > 0)
+        || (PLACE_VERBS.has(verb) && !strict.length && named3.length > 0 && [0, 1].includes(placeMatchTier(words, ctx.places, ctx.withheld).tier));
+      const r3 = byPlace3 ? null : also(one(ownFirst(named3, words), c => `${input} is ${c.id} (${c.label}).`)); if (r3) return r3;
     }
     // 3c (SOULSIM-E): a thing's everyday synonyms, after its exact words fail, for verbs at things (places have 3b): Mars's
     // "sit by the campfire" was capability.unknown while "sit by the fire" sat on a fire bench (its benches are "Fire
@@ -460,14 +481,21 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
     // place that contains it. A named place that cannot be reached is refused honestly (place.unreachable), never swapped
     // for an unrelated place; the nearest places you can reach are offered in did_you_mean.
     if (PLACE_VERBS.has(verb)) for (const words of passes) {
-      const m = placeMatchTier(words, ctx.places, ctx.withheld), found = m.found;
-      if (!found.length) continue;
+      const m = placeMatchTier(words, ctx.places, ctx.withheld);
+      if (!m.found.length) continue;
+      // ROUTE-RECHECK ("read a book in the library" read in the campus library annex): for a spot verb, the place called just
+      // these words (the Library) comes before one whose name says more (the library annex); nearest among equals
+      const extra = (p: VocabPlace) => new Set(tokens(p.name).filter(t => !words.includes(t) && !ctx.root.includes(t) && !/^\d+$/.test(t))).size;
+      const spotted = SPOT_PLACE_VERBS.has(verb) && ctx.hasSpot ? m.found.filter(p => ctx.hasSpot!(verb, p.id)) : [];
+      const found = SPOT_PLACE_VERBS.has(verb) ? [...(spotted.length ? spotted : m.found)].sort((a, b) => extra(a) - extra(b)) : m.found;
       // RESOLVE: matched by a place's description only (a lawn "with ... a horse"): the words name a thing in it
       const seek = m.tier === 3 ? words : undefined;
       const one = (cs: EdgeCapability[], note: (c: EdgeCapability) => string): VocabResult | null => {const r = one0(cs, note); return r && seek && r.kind === 'alias' ? {...r, seek} : r;};
       const capOf = new Map(pool.filter(c => c.target).map(c => [c.target!.id, c]));
       const reach = found.filter(p => capOf.has(p.id));
-      if (reach.length) {const r = one(reach.map(p => capOf.get(p.id)!), c => `${input} is ${c.id} (${c.label}).`); if (r) return r;}
+      // (the best-named place with a spot but no offer from here is refused below, and its host offers it on demand)
+      const best = SPOT_PLACE_VERBS.has(verb) && spotted.length ? reach.filter(p => extra(p) === extra(found[0])) : SPOT_PLACE_VERBS.has(verb) && reach.length ? reach.filter(p => extra(p) === extra(reach[0])) : reach;
+      if (best.length) {const r = one(best.map(p => capOf.get(p.id)!), c => `${input} is ${c.id} (${c.label}).`); if (r) return r;}
       const place = found[0], inner = pool.filter(c => c.available && c.target && isAncestor(ctx, place.id, c.target.id));
       if (inner.length) {const r = one(inner, c => `${place.name} itself is not a ${verb} target; ${c.id} (${c.label}) is in it.`); if (r) return r;}
       // the nearest containing place this verb reaches (the harbour for its lighthouse), never the world root
@@ -479,7 +507,7 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       const reachable = pool.filter(c => c.available && info.get(c.id)!.t.at), wholes = reachable.filter(c => c.target?.kind === 'place');
       const ranked = (wholes.length ? wholes : reachable).map(c => ({c, d: dist(info.get(c.id)!.t.at, place.center)})).sort((a, b) => a.d - b.d || a.c.id.localeCompare(b.c.id));
       const why = verb === 'read' ? `there is nowhere to read in ${place.name}` : `${place.name} is not walkable ground yet`;
-      return {kind: 'unknown', code: 'place.unreachable', place: place.id, ...(seek ? {seek} : {}), reason: `${input}: ${why}${ranked.length ? ` (the nearest place you can ${verb} to is ${ranked[0].c.id}, ${Math.round(ranked[0].d)} m from it)` : ''}; nothing else was chosen in its place.`,
+      return {kind: 'unknown', code: 'place.unreachable', place: place.id, verb, places: found.map(p => p.id), ...(seek ? {seek} : {}), reason: `${input}: ${why}${ranked.length ? ` (the nearest place you can ${verb} to is ${ranked[0].c.id}, ${Math.round(ranked[0].d)} m from it)` : ''}; nothing else was chosen in its place.`,
         didYouMean: ranked.slice(0, 3).map(r => ({id: r.c.id, label: r.c.label}))};
     }
   }
