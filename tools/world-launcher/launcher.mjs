@@ -507,7 +507,11 @@ export async function openLauncher(cfg = {}) {
     if (!s.agentSeenAt && rest.startsWith('/v1/god/') && /^Bearer god_/i.test(auth) && !/Mozilla\//.test(ua)) { s.agentSeenAt = Date.now(); registry.update(slug, { agentSeenAt: s.agentSeenAt }); }
     return rest;
   }
+  // the client hung up while we waited (a world booting, a retry, a hand-back): nothing is sent on its behalf, or a
+  // long-poll listen would reach the world as a ghost and could supersede the agent's real listener
+  const clientGone = (req, res) => res.destroyed || req.socket.destroyed;
   function proxyHttp(req, res, targetPort, { tee, path, retry } = {}) {
+    if (clientGone(req, res)) return;
     // Behind Caddy (a public origin other than our own) keep the visitor's x-forwarded-for, so per-person limits in
     // the worlds see people, not the proxy; locally it is set to the connecting address as before.
     const xff = behindProxy && req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'] : (req.socket.remoteAddress ?? '127.0.0.1');
@@ -547,6 +551,7 @@ export async function openLauncher(cfg = {}) {
       if (await waitHandBack(slug, e)) { forward(req, res); return; }
       json(res, 503, { ok: false, code: 'world.unavailable', slug, message: e.message }, { 'retry-after': '3' }); return;
     }
+    if (clientGone(req, res)) return;   // before httpLive: a closed response never fires 'close' again to undo it
     // a request in flight (a god's long-poll listen, a slow upload) keeps the world awake (pool busy), and its end counts as use
     httpLive.set(slug, (httpLive.get(slug) ?? 0) + 1);
     res.once('close', () => { const n = (httpLive.get(slug) ?? 1) - 1; if (n > 0) httpLive.set(slug, n); else httpLive.delete(slug); const k = pool.state(slug); if (k && !passive) k.lastUsed = Date.now(); });
