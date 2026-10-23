@@ -38,7 +38,11 @@ test('MSG: presence says listening now / seen recently / away; an unread message
   assert.match(listening, /Your agent is listening now/); assert.match(listening, /data-agent-presence="listening"/); assert.doesNotMatch(listening, /Copy start prompt/);
   assert.match(at({...base, presence: 'recent', latest: null}), /Your agent was seen recently \(12 s ago\)/);
   assert.match(at({...base, presence: 'working', latest: null}), /seen recently/);
-  const away = at({connected: false, lastSeenAt: now - 3_600_000, presence: 'away', latest: null}); assert.match(away, /away — messages will wait/); assert.match(away, /Copy start prompt/);
+  const away = at({connected: false, lastSeenAt: now - 3_600_000, presence: 'away', latest: null}); assert.match(away, /Away since .* copy the start prompt/); assert.match(away, /Copy start prompt/);
+  assert.doesNotMatch(away, /Message your agent/, 'AWAY-UI: no message box while the Soul agent is away');
+  const godAway = at({connected: false, lastSeenAt: now - 3_600_000, presence: 'away', latest: null}, 'god'); assert.match(godAway, /away — messages will wait/); assert.match(godAway, /Message your agent/);
+  assert.match(listening, /Message your agent/, 'the message box is back once the agent listens');
+  assert.match(at({connected: false, lastSeenAt: null, presence: 'away', latest: null}), />Away · copy/, 'never seen: plain Away');
   const fresh = at({...base, presence: 'listening', queued: 1, latest: {id: 'm', text: 'run!', state: 'sent', sentAt: now - 4_000}});
   assert.match(fresh, />Sent</); assert.doesNotMatch(fresh, /Not picked up|waiting/);
   const stuck = at({...base, presence: 'away', connected: false, queued: 3, latest: {id: 'm', text: 'the house!!!!', state: 'sent', sentAt: now - 14_000}});
@@ -90,7 +94,31 @@ test('Soul card start prompt names pair-soul with the window code; without a cod
   assert.match(withCode, /open Sim window/);
   assert.match(withCode, /approval wait/);
   assert.match(withCode, /Do not create another Soul/);
+  assert.match(withCode, /in this folder\. Do not create another Soul\.\n/, 'PROMPT-SHORT: line 1 = read the skill, resume this Soul here, no new Soul');
+  assert.equal(withCode.split('\n').length, 2); assert.doesNotMatch(withCode, /Always listen|run_in_background|ack each/);
+  assert.ok(withCode.length < 400, `short prompt (${withCode.length} chars)`);
   const plain = soulStartPrompt('http://localhost:5960/w/inbox', 's_abc', 'Ada', null);
   assert.match(plain, /pair-soul "s_abc" \(/);
   assert.doesNotMatch(plain, /--for/);
+});
+
+test('AWAY-UI: the page-wide agent presence store follows owner-inbox reports both ways; unknown makes no claim', async () => {
+  const {build: b} = createRequire(require.resolve('vite/package.json'))('esbuild');
+  const out = join(dir, 'presence.cjs');
+  await b({stdin: {contents: `export * from './agent-presence.ts';`, resolveDir: new URL('.', import.meta.url).pathname, loader: 'ts'}, bundle: true, platform: 'node', format: 'cjs', outfile: out, logLevel: 'silent'});
+  const {reportAgentPresence, agentPresence, awaySince} = require(out);
+  assert.equal(agentPresence('s_x'), null);
+  reportAgentPresence('s_x', {connected: false, lastSeenAt: 5, presence: 'away'}); assert.deepEqual(agentPresence('s_x'), {away: true, lastSeenAt: 5});
+  reportAgentPresence('s_x', {connected: true, lastSeenAt: 9, presence: 'listening'}); assert.equal(agentPresence('s_x').away, false);
+  reportAgentPresence('s_x', {connected: true, lastSeenAt: 9}); assert.equal(agentPresence('s_x').away, false, 'older server: connected = here');
+  reportAgentPresence('s_x', null); assert.equal(agentPresence('s_x'), null, 'status unavailable clears the claim');
+  assert.equal(awaySince(null), 'Away'); assert.match(awaySince(Date.now() - 60_000), /^Away since \d/);
+});
+
+test('AWAY-UI phone: the Copy start prompt link never shrinks (card buttons carry min-width:44px); the away line wraps or the link stacks', async () => {
+  const {readFile} = await import('node:fs/promises');
+  const css = (await readFile(new URL('./AgentMessageBox.css', import.meta.url), 'utf8')).replace(/\s+/g, '');
+  assert.match(css, /\.agent-message\.agent-message-presencebutton\{[^}]*flex:00auto[^}]*white-space:nowrap/);
+  assert.match(css, /\.agent-message-presence\{[^}]*flex-wrap:wrap/);
+  assert.match(css, /\.agent-message-presence>span\{[^}]*min-width:0/);
 });

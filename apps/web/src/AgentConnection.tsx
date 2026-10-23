@@ -5,6 +5,17 @@ import {connectionSetupPrompt} from './connection-prompt.ts';
 import {BASE} from './base-path.ts';
 import {copyText,manualCopyHint} from './clipboard.ts';
 type Connection=AgentConnectionProjection;
+const since=(at:number|null,now:number)=>{if(at==null)return null;const m=Math.round((now-at)/60_000);return m<1?'just now':m<60?`${m} min ago`:m<2880?`${Math.round(m/60)} h ago`:`${Math.round(m/1440)} days ago`;};
+/** MIND-PANEL-COPY (Gene 2026-10-23 #15): the owner reads "Your agent", never a bare internal label. The Soul CLI names
+ * itself "eden-agent <version>"; any other label is what the connecting client called itself, shown as where it came from. */
+export function connectionDetail(c:Connection,now:number){
+  const label=c.label?.trim()||null,client=label&&/^eden-agent \d/.test(label)?label:null;
+  const parts=[client?`Your agent (${client})`:'Your agent'];
+  const paired=since(c.since,now);if(paired)parts.push(`connected ${paired}${label&&!client?` from “${label}”`:''}`);
+  else if(label&&!client)parts.push(`connected from “${label}”`);
+  const used=since(c.last_used,now);if(used)parts.push(`last active ${used}`);
+  return parts.join(' · ');
+}
 type Props={api:Api;soulId:string;name:string;base:string;connection:Connection|null;refresh():void;notice?:{message:string;setMessage(value:string):void}};
 export function AgentConnection(props:Props){
   return <ConnectionCard key={JSON.stringify([props.base,props.soulId])} {...props}/>;
@@ -33,19 +44,19 @@ function ConnectionCard({api,soulId,name,base,connection,refresh,notice}:Props){
   };
   return <section className="wide" aria-label="Assistant connection">
     <h3>Agent access</h3>
-    <p>{!connection?'Checking connection…':connection.attached?<><span className="ok">●</span> <b>{connection.label??'Your agent'}</b> has access to {name}.</>: 'No agent has access to this Soul.'}</p>
-    {connection?.attached&&<p className="small dim">Granted access does not confirm that your agent is running.</p>}
+    <p>{!connection?'Checking connection…':connection.attached?<><span className="ok">●</span> <b>Your agent</b> has access to {name}.</>: 'No agent has access to this Soul.'}</p>
+    {connection?.attached&&<p className="small dim" data-connection-detail="1">{connectionDetail(connection,clock)}. Access does not confirm that your agent is running.</p>}
     <details><summary>Connect or re-pair your agent</summary>
       <p>Give this prompt to your agent, then approve its link in your browser.</p>
       {setupPrompt&&<><textarea ref={prompt} aria-label="Connection setup prompt" readOnly rows={4} value={setupPrompt}/><button onClick={async()=>{const copied=await copyText(setupPrompt);if(!live.current)return;if(!copied){prompt.current?.focus();prompt.current?.select();}setMessage(copied?'Copied.':manualCopyHint);}}>Copy prompt</button></>}
       <a href={`${base}/instructions.md`} target="_blank" rel="noreferrer">Read the instructions</a>
     </details>
     {connection?.attached&&<button disabled={busy} onClick={()=>void act('revoke')}>Disconnect assistant</button>}
-    <details><summary>Advanced: one-use owner code</summary><p>For a reviewed client that accepts a code through a private input channel. Keep the code out of assistant prompts and configuration. Generating a code does not connect an assistant; exchanging it replaces the current connection.</p>
-      <button disabled={busy||!connection} onClick={()=>void act('pair')}>Request one-use code</button>
+    {connection&&!connection.attached&&<details><summary>Connect a new agent with a one-use code</summary><p>For a reviewed client that accepts a code through a private input channel. Keep the code out of assistant prompts and configuration. Generating a code does not connect an assistant; exchanging it replaces the current connection.</p>
+      <button disabled={busy||!connection} onClick={()=>void act('pair')}>Connect a new agent</button>
       {code&&!expired&&<p>One-use code: <code>{code}</code>. Expires 15 minutes after request. <button onClick={()=>setCode(null)}>Hide code</button></p>}
       {expired&&<p>Code expired. Request a new one if you still want to connect.</p>}
-    </details>
+    </details>}
     {message&&<p role="status">{message}</p>}
   </section>;
 }

@@ -21,7 +21,7 @@ const base={sim,api,selected:'s_A',select(){},manage(){},camera:{following:false
 const forbidden=/Give .* direction|Send direction|standing rules|reconsiders in|recent thinking|intent-v2|mandate|public download and setup/;
 for(const [name,identity,owner] of [['signed out',null,false],['current owner','acct_A',true],['different account','acct_B',false]])test(`modern context for ${name}`,()=>{
  const html=render(h(SoulFocus,{...base,auth:auth(identity)}));
- assert.match(html,/class="soul-card"/);assert.match(html,/Curious artist/);assert.match(html,/>Follow</);assert.match(html,/>Share</);assert.match(html,/>Activity/);assert.equal(html.includes('This mind'),owner);assert.doesNotMatch(html,forbidden);
+ assert.match(html,/class="soul-card"/);assert.match(html,/Curious artist/);assert.match(html,/>Follow</);assert.match(html,/class="soul-share" aria-label="Copy a link to Mutable Name"/);assert.doesNotMatch(html,/>Share<|>Pin<|Pin this Soul|Travel to/,'CARD-TRIM: Share is a paperclip by the name; no Pin, no Travel to');assert.match(html,/>Activity/);assert.equal(html.includes('This mind'),owner);assert.doesNotMatch(html,forbidden);
 });
 test('account switching suppresses stale owned roster until matching server identity',()=>{
  const props={sim,api,select(){},pairCode:null,clearPair(){}};
@@ -36,6 +36,17 @@ test('owner mind shows only validated granted access, never claims an active cli
  for(const connection of [null,{attached:true,label:'PRIVATE_STALE',since:'invalid',last_used:2},{attached:true}]){
   const html=render(h(SoulMindDetails,{...props,connection}));assert.match(html,/Connection details are unavailable/);assert.doesNotMatch(html,/PRIVATE_STALE|Disconnect assistant|Request one-use code/);
  }
+});
+test('MIND-PANEL-COPY: owner terms, never a bare label; the one-use code control only without a live grant',()=>{
+ const props={api,soulId:'s_A',name:'Longrun Ada',refresh(){}},now=Date.now();
+ const legacy=render(h(SoulMindDetails,{...props,connection:{attached:true,label:'travel',since:now-2*3_600_000,last_used:now-300_000}}));
+ assert.match(legacy,/<b>Your agent<\/b> has access to Longrun Ada/);assert.doesNotMatch(legacy,/<b>travel<\/b>/);
+ assert.match(legacy,/Your agent · connected 2 h ago from “travel” · last active 5 min ago/);
+ assert.doesNotMatch(legacy,/one-use|Connect a new agent/);
+ const account=render(h(SoulMindDetails,{...props,connection:{attached:true,label:'eden-agent 1.9.9',since:now-60_000,last_used:null}}));
+ assert.match(account,/Your agent \(eden-agent 1\.9\.9\) · connected 1 min ago\./);
+ const none=render(h(SoulMindDetails,{...props,connection:{attached:false,label:null,since:null,last_used:null}}));
+ assert.match(none,/No agent has access/);assert.match(none,/Connect a new agent with a one-use code/);
 });
 test('multiple stable Soul IDs remain selectable despite mutable duplicate names',()=>{
  const s2={...soul,id:'s_B',entityId:'h_B'};const state={...sim,me:{...me,souls:['s_A','s_B']},conn:{...sim.conn,replica:{...sim.conn.replica,souls:new Map([['s_A',soul],['s_B',s2]])}}};
