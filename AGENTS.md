@@ -31,7 +31,8 @@ writes to eden2 and pushes. A lane hands R `branch@sha` + a gate receipt; R ship
 - **Conformance re-pins:** known library failures are pinned by exact def hash, so a changed def revision fails
   `conformance` until a reviewed supplement `packages/conformance/conformance/<lane>-<date>.json` re-pins its documented
   tuples hash for hash (e.g. `bsgen-20261021.json`, `seatdef-20261022.json`), listed with a note in that folder's
-  README. A re-pin made to pass a gate needs Gene's OK in chat and that record note; never edit older supplements.
+  README. A re-pin is made by the lane that changed the behaviour, in the same change, with its reason in that record note;
+  no approval is needed (Gene, 2026-10-23: no approval gates for test expectations, baselines or skill bumps). Never edit older supplements.
 - **Walkability is gated (V3-walk):** the gate audits fixed copies of eden-2026, bench-eden, bench-hamlet, a fresh Eden 2026
   genesis and the generated fuzz world (`tools/test-harness/walk/fuzz-world.mjs`, `walk-audit.ts --fuzz`: every building type
   x 5 yaws x 3 grounds, packed rows, furnished, stacked, nested; also scores seats and beds a Soul cannot use) with
