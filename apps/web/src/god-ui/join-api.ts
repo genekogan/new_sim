@@ -64,9 +64,9 @@ export async function windowCode(): Promise<string | null> {
 export const worldUrl = (base?: string) => base || `${location.origin}${worldPath}`;
 /** The one thing the person pastes to their agent: make my Soul here. */
 export const joinPrompt = (base: string, worldName: string, name?: string) =>
-  `Read ${base}/SKILL.md and follow its Soul mode section: make my Soul${name ? ` "${name}"` : ''} in the Eden world "${worldName}". If it gives an approval link, show it to me and I'll approve it.`;
+  `Read the instructions at ${base}/instructions.md and follow them to create my new Soul${name ? ` "${name}"` : ''} in the Eden world "${worldName}" and get it living there.${name ? '' : ` "${worldName}" is the world's name, not the Soul's: give the Soul its own name.`} If it gives an approval link, show it to me and I'll approve it.`;
 /** …or reconnect a Soul I already have here (a new agent folder). */
 export const reconnectPrompt = (base: string, worldName: string, soul: { id: string; name: string }) =>
-  `Read ${base}/SKILL.md and follow its Soul mode section: reconnect my Soul "${soul.name}" (${soul.id}) in the Eden world "${worldName}". Show me the approval link and I'll approve it.`;
+  `Read ${base}/skill.md and follow its Start or resume section: reconnect my Soul "${soul.name}" (${soul.id}) in the Eden world "${worldName}". Show me the approval link and I'll approve it.`;
 /** The link a god shares so friends land on the Join section. */
 export const joinLink = (base?: string) => `${worldUrl(base)}/#join`;

@@ -10,7 +10,7 @@ const NEW_SOUL_ICON=<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="7.5"
 export function BringAgent({auth,requireAuth=false,showButton=true,worldName}:{auth:{ready:boolean;authed:boolean;login():void;signInUrl?:string};requireAuth?:boolean;showButton?:boolean;worldName?:string}){
  // lane PUX (LAP: every world): when signed in the prompt carries this window's code; the agent's request then comes up right here
  const [code,setCode]=useState<string|null>(null);
- const worldUrl=location.origin+location.pathname.replace(/\/+$/,''),{world,instructionsUrl,text}=agentOnboarding(worldUrl,worldName,code);
+ const worldUrl=location.origin+location.pathname.replace(/\/+$/,''),{world,instructionsUrl,tail,text}=agentOnboarding(worldUrl,worldName,code);
  const port={location,history:{replaceState:(data:unknown,title:string,url?:string|URL|null)=>history.replaceState(data,title,url)},storage:()=>sessionStorage};
  const [pending,setPending]=useState(()=>pendingNewSoul(worldUrl,location.hash,port.storage)),[open,setOpen]=useState(()=>location.hash==='#join'&&(!requireAuth||auth.authed)),[note,setNote]=useState(''),prompt=useRef<HTMLParagraphElement>(null),modal=useRef<HTMLElement>(null);
  useEffect(()=>{const h=()=>{if(location.hash==='#join'){setPending(true);if(!requireAuth||auth.authed)setOpen(true);}};addEventListener('hashchange',h);return()=>removeEventListener('hashchange',h);},[auth.authed,requireAuth]);
@@ -34,7 +34,7 @@ export function BringAgent({auth,requireAuth=false,showButton=true,worldName}:{a
   <section ref={modal} className="bring-agent" role="dialog" aria-modal="true" aria-labelledby="bring-agent-title">
    <button type="button" className="bring-agent-close" aria-label="Close" onClick={close}>×</button>
    <h2 id="bring-agent-title">Give this prompt to your agent:</h2>
-   <p ref={prompt} className="bring-agent-prompt">Read the instructions at <a href={instructionsUrl} target="_blank" rel="noreferrer">{instructionsUrl}</a> to create a new soul in the world {world}.</p>
+   <p ref={prompt} className="bring-agent-prompt">Read the instructions at <a href={instructionsUrl} target="_blank" rel="noreferrer">{instructionsUrl}</a> {tail}</p>
    <div className="bring-agent-row"><button type="button" className="primary" onClick={copy}>Copy prompt</button>{note&&<span role="status">{note}</span>}</div>
   </section>
  </div>,document.body)}</>;
