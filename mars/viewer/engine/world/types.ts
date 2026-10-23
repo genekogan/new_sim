@@ -53,7 +53,7 @@ export type HumanState = {
   boatPassenger?: { boatId: string; slotId: string; phase: 'boarding' | 'seated' | 'leaving'; localRoot: Vec3; relativeYaw: number };
   boatTransit?: { from: Vec3; to: Vec3; t: number; supportId: string };
   /** carrier/1 (vehicles/carrier.ts): this body is boarding, seated in or leaving a carrier's seat; the carrier supports it. */
-  carrier?: { id: string; slot: string; phase: 'boarding' | 'seated' | 'leaving' };
+  carrier?: { id: string; slot: string; phase: 'boarding' | 'seated' | 'leaving'; outBy?: number };
   /** Opt-in shore/1 controller: metres, upright-capsule immersion length (not
    * body-volume fraction), centre bed normal and prescribed calm buoyancy. */
   shore?: {

@@ -155,7 +155,7 @@ export class GodPlaces {
   }
 
   private *deriveGen(): Generator<void, GodPlace[], void> {
-    const m = this.h.model, things = this.h.nav.things();
+    const m = this.h.model, things = this.h.nav.thingsGen ? yield* this.h.nav.thingsGen() : this.h.nav.things();
     let n = 0;
     const out: GodPlace[] = [];
     const base = { parent: null as string | null, enclosed: false, capacity: null as number | null, starting: false };

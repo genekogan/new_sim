@@ -77,3 +77,8 @@
 .conversation-marker:hover,.conversation-marker:focus-visible{outline:2px solid var(--thread);outline-offset:3px}
 .dialogue-dock.contextual{z-index:5;left:calc(12px + var(--sa-l));bottom:auto}.dlg-empty{padding:16px;color:var(--muted)}
 @media(max-width:700px){.dialogue-dock.contextual{left:calc(8px + var(--sa-l));right:calc(8px + var(--sa-r));width:auto;max-width:none}.conversation-marker{width:36px;height:36px;padding:5px}}
+/* CONV-UI: the selected Soul's threads inside its card (a slot in SoulCard), not a floating panel */
+.soul-card-thread:empty{display:none}
+.soul-card-thread{margin:0 0 12px}
+.dialogue-dock.dlg-card{position:static;width:auto;z-index:auto;background:transparent;border:0;border-radius:0;box-shadow:none;gap:4px;font-size:13px}
+.dialogue-dock.dlg-card .dlg-thread{padding:6px 8px 4px}

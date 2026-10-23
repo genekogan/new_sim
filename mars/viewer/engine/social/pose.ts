@@ -91,7 +91,8 @@ function admission(rt: Runtime, p: Params): Diagnostic | null {
   if (!h || a.kind !== 'human') return issue('not-human', `${p.actor} is not a person`, [p.actor]);
   if (h.grip || h.riding || h.on || h.shore || h.carrier || h.sleepPose || (h as { boatPassenger?: unknown }).boatPassenger) return issue('occupied-support', 'Leave the climb, load, water, ride or mat first.', [p.actor]);
   // seat fit (bodies/humanoid.ts): a scenery seat's top must suit the body's height (today's body: 0.2–1.2 m, the schema's range)
-  if (p.seatHeight !== undefined && !LYING.has(p.activity)) { const fit = seatFitProblem(a.body, p.seatHeight); if (fit) return issue(fit.code.replace('.', '-'), `This seat does not fit your body: ${fit.message}.`, [p.actor]); }
+  // a picnic sits on the blanket, i.e. on the ground: any body fits (SPOTS 2026-10-22: a tall Soul was refused seat-too-low)
+  if (p.seatHeight !== undefined && !LYING.has(p.activity) && p.activity !== 'picnic') { const fit = seatFitProblem(a.body, p.seatHeight); if (fit) return issue(fit.code.replace('.', '-'), `This seat does not fit your body: ${fit.message}.`, [p.actor]); }
   // together/1: a grouped pose may start while someone's make-way nudge steps this body aside (it settles first)
   if (rt.holder('actor:' + p.actor).some((id) => rt.records.get(id)?.verb === 'walk_to' && !(p.group && nudge(id)))) return issue('not-still', 'Finish walking first.', [p.actor]);
   const seated = h.activity === 'sit' || (h.baseActivity === 'sit' && OVERLAY.has(h.activity));
@@ -199,7 +200,8 @@ function together(rt: Runtime, ex: Exec, a: NonNullable<Runtime['world']['entiti
       ex.phase = 'active'; ex.until = tick + ticks(ex.p.seconds); ex.late = true;
     }
     else if ((ex.waited = (ex.waited ?? 0) + 1) > ticks(ex.p.waitSeconds ?? 30)) {
-      if (ex.p.alone !== 'start') { restore(rt, ex); return { status: 'failed' as const, diagnostic: issue('partner-absent', 'Nobody came to do it with you in time.', [ex.p.actor]) }; }
+      // a game: say why plainly (a late joiner finds the court empty when the last player's 30 s lonely wait ran out first)
+      if (ex.p.alone !== 'start') { restore(rt, ex); return { status: 'failed' as const, diagnostic: issue('partner-absent', ex.p.game ? 'Nobody was playing here when you arrived and nobody came to play in time (a game ends 30 s after its last partner leaves).' : 'Nobody came to do it with you in time.', [ex.p.actor]) }; }
       ex.phase = 'active'; ex.until = tick + ticks(ex.p.seconds);
     } else {
       h.together = { group: ex.p.group!, phase: 'waiting', mobile: !!ex.mobile, ...(once ? { windowPolicy: 'once-v1' as const } : {}) };
@@ -302,7 +304,8 @@ function playGame(rt: Runtime, ex: Exec, a: NonNullable<Runtime['world']['entiti
     // the rally alternates over the net: one side, the other, … (each side in id order, cycling the shorter side)
     const [x0, z0, x1, z1] = g.net, side = (id: string) => { const p = rt.world.entities[id].pose.p; return (x1 - x0) * (p[2] - z0) - (z1 - z0) * (p[0] - x0) < 0 ? 0 : 1; };
     const sides = [players.filter((id) => side(id) === 0), players.filter((id) => side(id) === 1)];
-    players = sides[0].length && sides[1].length ? Array.from({ length: 2 * Math.max(sides[0].length, sides[1].length) }, (_, i) => sides[i % 2][Math.floor(i / 2) % sides[i % 2].length]) : [];
+    // everyone on one side (a joiner took a place beside a player, then the other side left): they pass among themselves
+    if (sides[0].length && sides[1].length) players = Array.from({ length: 2 * Math.max(sides[0].length, sides[1].length) }, (_, i) => sides[i % 2][Math.floor(i / 2) % sides[i % 2].length]);
   }
   const done = () => tick >= ex.until! ? finish(rt, ex) : { status: 'running' as const, phase: 'together' };
   if (new Set(players).size < 2) {

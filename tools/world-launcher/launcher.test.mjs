@@ -187,6 +187,24 @@ test('an idle world falls asleep (frozen in place) and wakes at once on its next
     await L4.pool.stop('held'); assert.ok(['SIGTERM', 0].includes(await exited));
   } finally { await L4.close(); }
 });
+test('the Eyes render worker (user agent EdenEyes/1) is not a watcher: its page and socket let the world sleep', async () => {
+  // lane soul-eyes-on ports 7420-7429
+  const P = 7429, base = `http://127.0.0.1:${P}`, UA = 'Mozilla/5.0 HeadlessChrome EdenEyes/1';
+  const L6 = await openLauncher({ port: P, range: [7427, 7428], dataDir: join(dir, 'data-eyes'), webDir, templatesDir, command, sleepMs: 400, eager: 0, log: () => {} });
+  const kids = async () => Object.fromEntries((await (await fetch(`${base}/__sim/launcher`)).json()).children.map((c) => [c.slug, c.status]));
+  try {
+    assert.equal((await fetch(`${base}/__sim/worlds`, { method: 'POST', body: JSON.stringify({ name: 'Seen' }) })).status, 201);
+    const used = L6.pool.state('seen').lastUsed;
+    const ws = await new Promise((yes, no) => { const s = connect(P, '127.0.0.1', () => s.write(`GET /w/seen/ws HTTP/1.1\r\nHost: x\r\nUser-Agent: ${UA}\r\nUpgrade: test\r\nConnection: Upgrade\r\n\r\n`)); s.once('data', () => yes(s)); s.on('error', no); });
+    assert.equal((await fetch(`${base}/w/seen/slow?ms=1`, { headers: { 'user-agent': UA } })).status, 200);
+    assert.equal(L6.pool.state('seen').lastUsed, used, 'an eyes request is not a use');
+    for (let i = 0; i < 40 && (await kids()).seen !== 'asleep'; i++) await new Promise((r) => setTimeout(r, 100));
+    assert.equal((await kids()).seen, 'asleep', 'the eyes socket does not hold the world awake');
+    ws.destroy();
+    assert.equal(L6.pool.state('seen').lastUsed, used, 'the eyes socket leaving is not a use either');
+  } finally { await L6.close(); }
+});
+
 test('a flood refusal (P2) neither wakes a sleeping world nor counts as its use', async () => {
   const P = 6548, base = `http://127.0.0.1:${P}`;   // lane P2's ports
   const L5 = await openLauncher({ port: P, range: [6549, 6549], dataDir: join(dir, 'data-flood'), webDir, templatesDir, command, sleepMs: 400, eager: 0, log: () => {}, floodLimits: { godTokenPerS: 0.001, godTokenBurst: 1 } });

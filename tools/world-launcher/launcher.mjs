@@ -115,6 +115,10 @@ export function idleExitMs(env = process.env) {
   return Number.isFinite(v) && v >= 0 ? v * 60_000 : 60 * 60_000;
 }
 /** Reads that only report on a world (health, config, the homepage's numbers): answered, but not a visit. */
+// the Eyes render worker inside a world (apps/server/src/edge/eyes, user agent tag EdenEyes/1, same test as isEyesAgent in
+// browser-config.mjs) is the world looking at itself: its page and socket neither keep the world awake nor count as use
+const EYES_UA = /EdenEyes\/1/;
+export const eyesAgent = (ua) => typeof ua === 'string' && EYES_UA.test(ua);
 const PASSIVE_READ = /\/w\/[a-z][a-z0-9-]{0,31}\/(?:healthz|v1\/config|v1\/god\/status|v1\/world\/souls)\/?$/;
 export const SOUL = { cli: join(here, 'soul/eden-agent.mjs'), skill: join(here, 'soul/skill.md'), instructions: join(here, 'soul/instructions.md') };
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.glb': 'model/gltf-binary', '.bin': 'application/octet-stream', '.wasm': 'application/wasm', '.woff2': 'font/woff2', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json', '.md': 'text/markdown; charset=utf-8', '.txt': 'text/plain; charset=utf-8' };
@@ -542,7 +546,7 @@ export async function openLauncher(cfg = {}) {
     if (flooded) { refuseSlowly(req, res, flooded); return; }
     // a monitor's or the homepage's read (health, config, status, no token) is answered, waking the world if it sleeps, but
     // is not a visit: it neither keeps the world awake nor counts as its last use (lane P3; sim-watch polls every 5 min)
-    const passive = PASSIVE_READ.test(url.pathname) && (req.method === 'GET' || req.method === 'HEAD') && !req.headers.authorization;
+    const passive = (PASSIVE_READ.test(url.pathname) && (req.method === 'GET' || req.method === 'HEAD') && !req.headers.authorization) || eyesAgent(req.headers['user-agent']);
     let p;
     try { p = await pool.ensure(worldEnv(w), { passive }); }
     catch (e) {
@@ -771,13 +775,15 @@ export async function openLauncher(cfg = {}) {
     const slug = rel.match(/^\/w\/([a-z][a-z0-9-]{0,31})(?:[/?]|$)/)?.[1];
     const w = slug && !closing.has(slug) && registry.get(slug);
     if (!w) { socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n'); return; }
+    const eyes = eyesAgent(req.headers['user-agent']);
     const attach = async (again) => {
-      let p; try { p = await pool.ensure(worldEnv(w)); }
+      let p; try { p = await pool.ensure(worldEnv(w), { passive: eyes }); }
       catch (e) { if ((e.code === 'handed-over' && retiredTo) || (await waitHandBack(slug, e))) pipeUpgrade(req, socket, head, port); else socket.end('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n'); return; }
       // a world being handed over may refuse once (its old process just stopped): ask again, which waits for the new one
       pipeUpgrade(req, socket, head, p, again ? () => void attach(false) : undefined);
     };
     await attach(true);
+    if (eyes) return; // not a watcher: never holds the world awake (busy) nor counts as use
     live.set(slug, (live.get(slug) ?? 0) + 1);
     let gone = false;
     const left = () => { if (gone) return; gone = true; const n = (live.get(slug) ?? 1) - 1; if (n > 0) live.set(slug, n); else live.delete(slug); const k = pool.state(slug); if (k) k.lastUsed = Date.now(); };
