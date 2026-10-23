@@ -6,6 +6,7 @@ import type {Context, Hono} from 'hono';
 import {EDGE_CONTRACT, EdgeError, type EdgeSoul} from './contract.ts';
 import type {EdgeLedger} from './ledger/ledger.ts';
 import type {Db} from '../db.ts';
+import {SPOT_ACTIVITIES} from './ledger/activities.ts';
 
 export type DayEntry = {
   at: number; kind: 'did' | 'doing' | 'stopped' | 'refused' | 'said';
@@ -13,27 +14,63 @@ export type DayEntry = {
   where: {x: number; z: number} | null; place?: string | null;
 };
 
+// Plain past-tense words for an owner reading the day. Bare verbs (no target) and verbs with a target differ:
+// `jog:here` is "went for a jog", `jog:park` is "jogged to the park". Spot activities fall back to their own
+// labels in activities.ts ("Do yoga" -> "did yoga"); anything unknown reads as its verb.
 const PAST: Record<string, string> = {
-  walk: 'walked to', go: 'went to', sit: 'sat down', rest: 'rested', stand: 'stood', look: 'looked', swim: 'swam',
-  hug: 'hugged', make: 'made', 'pick-up': 'picked up', 'put-down': 'put down', accept: 'accepted an invitation',
-  decline: 'declined an invitation', wave: 'waved', dance: 'danced', play: 'played', eat: 'ate', drink: 'drank',
-  follow: 'followed', give: 'gave', greet: 'greeted', sleep: 'slept', read: 'read', watch: 'watched', visit: 'visited',
+  walk: 'went for a walk', go: 'went out', sit: 'sat down', rest: 'rested', stand: 'stood', look: 'looked around', swim: 'went for a swim',
+  hug: 'hugged someone', make: 'made something', 'pick-up': 'picked something up', 'put-down': 'put something down', accept: 'accepted an invitation',
+  decline: 'declined an invitation', wave: 'waved', dance: 'danced', play: 'played', eat: 'ate', drink: 'had a drink',
+  follow: 'followed someone', give: 'gave something', greet: 'greeted someone', sleep: 'slept', read: 'did some reading', watch: 'watched', visit: 'visited',
+  stretch: 'did a stretch', yoga: 'did yoga', clap: 'clapped', jog: 'went for a jog', run: 'went for a run', fly: 'flew', ride: 'went for a ride',
+  stargaze: 'watched the stars', bow: 'bowed', cheer: 'cheered', point: 'pointed', wait: 'waited', jump: 'jumped', 'jumping-jacks': 'did jumping jacks',
+  pushups: 'did push-ups', situps: 'did sit-ups', write: 'wrote', paint: 'painted', cook: 'cooked', talk: 'talked', listen: 'listened', nap: 'took a nap',
+  lie: 'lay down', 'sit-ground': 'sat on the ground', 'high-five': 'high-fived someone', craft: 'made something', 'play-piano': 'played the piano',
+  'play-music': 'played music', 'play-game': 'played a game', warm: 'warmed up by the fire', 'warm-by-fire': 'warmed up by the fire', wade: 'waded',
+  meditate: 'meditated', board: 'got on board', alight: 'stepped out', browse: 'browsed a shelf',
 };
+const PAST_TO: Record<string, string> = {
+  walk: 'walked to', go: 'went to', jog: 'jogged to', run: 'ran to', fly: 'flew to', swim: 'swam in', ride: 'rode', visit: 'visited', follow: 'followed',
+  greet: 'greeted', hug: 'hugged', watch: 'watched', read: 'read', sit: 'sat at', look: 'looked at', 'pick-up': 'picked up', 'put-down': 'put down',
+  give: 'gave', eat: 'ate', drink: 'drank', play: 'played', make: 'made', board: 'boarded', wade: 'waded in',
+};
+/** The base form, for "tried to ...": `sit:here` -> "sit down", `fly:moon` -> "fly to moon". */
+const BASE: Record<string, string> = {sit: 'sit down', stand: 'stand up', lie: 'lie down', stargaze: 'watch the stars', 'sit-ground': 'sit on the ground', nap: 'take a nap', look: 'look around'};
+const BASE_TO: Record<string, string> = {walk: 'walk to', go: 'go to', jog: 'jog to', run: 'run to', fly: 'fly to', swim: 'swim in', sit: 'sit at', look: 'look at'};
+const IRREGULAR: Record<string, string> = {do: 'did', have: 'had', sit: 'sat', read: 'read', lie: 'lay', write: 'wrote', throw: 'threw', tell: 'told', take: 'took', swing: 'swung',
+  sing: 'sang', ride: 'rode', make: 'made', give: 'gave', eat: 'ate', feed: 'fed', go: 'went', run: 'ran', swim: 'swam', get: 'got', put: 'put'};
+/** "Do yoga" -> "did yoga", "Join the yoga class" -> "joined the yoga class" (the label's first word to the past). */
+const labelPast = (label: string) => { const [w = '', ...rest] = label.split(' '), v = w.toLowerCase(); return [IRREGULAR[v] ?? (v.endsWith('e') ? `${v}d` : `${v}ed`), ...rest].join(' '); };
 const DAY_MS = 86_400_000, MAX = 200;
+
+// God-built places are often named by their id ("place-commons-kitchen"): read those as words ("commons kitchen").
+const plain = (n: string) => /\s/.test(n) ? n : n.replace(/^(g-)?(place-)?/, '').replace(/[-_]+/g, ' ');
+const targetOf = (rest: string[], nameOf: (id: string) => string | null) => { const t = rest.join(':'); return !t || t === 'here' || t === 'ahead' ? '' : (nameOf(t) ?? plain(t)); };
 
 /** Human words for a capability id like `walk:place_bakery`, `object:ride-eden-balloon:join` or `rest:here`. */
 export function describeCapability(cap: string, nameOf: (id: string) => string | null): string {
   const [verb = cap, ...rest] = cap.split(':');
-  if (verb === 'object') { const [obj = '', action = 'use'] = rest; return `${action === 'join' ? 'joined' : action.replace(/-/g, ' ')} ${nameOf(obj) ?? obj.replace(/[-_]/g, ' ')}`.trim(); }
-  const target = rest.join(':'), named = !target || target === 'here' || target === 'ahead' ? '' : (nameOf(target) ?? target.replace(/[-_]/g, ' '));
-  return `${PAST[verb] ?? verb.replace(/-/g, ' ')}${named ? ` ${named}` : ''}`;
+  if (verb === 'object') { const [obj = '', action = 'use'] = rest; return `${action === 'join' ? 'joined' : action.replace(/-/g, ' ')} ${nameOf(obj) ?? plain(obj)}`.trim(); }
+  const named = targetOf(rest, nameOf), spot = SPOT_ACTIVITIES[verb]?.label;
+  if (named) return `${PAST_TO[verb] ?? (spot ? labelPast(spot) + ' at' : PAST[verb] ?? verb.replace(/-/g, ' '))} ${named}`;
+  return PAST[verb] ?? (spot ? labelPast(spot) : verb.replace(/-/g, ' '));
 }
 
-const xz = (p: unknown): {x: number; z: number} | null => Array.isArray(p) && typeof p[0] === 'number' && typeof p[1] === 'number' ? {x: p[0], z: p[1]} : null;
+/** What the Soul tried, for a refusal: "tried to sit down", "tried to fly to moon". */
+export function describeAttempt(cap: string, nameOf: (id: string) => string | null): string {
+  const [verb = cap, ...rest] = cap.split(':');
+  if (verb === 'object') { const [obj = '', action = 'use'] = rest; return `tried to ${action.replace(/-/g, ' ')} ${nameOf(obj) ?? plain(obj)}`.trim(); }
+  const named = targetOf(rest, nameOf), spot = SPOT_ACTIVITIES[verb]?.label, plain = verb.replace(/-/g, ' ');
+  if (named) return `tried to ${BASE_TO[verb] ?? (spot ? spot.toLowerCase() + ' at' : plain)} ${named}`;
+  return `tried to ${BASE[verb] ?? (spot ? spot.toLowerCase() : plain)}`;
+}
+
+const r1 = (n: number) => Math.round(n * 10) / 10;
+const xz = (p: unknown): {x: number; z: number} | null => Array.isArray(p) && typeof p[0] === 'number' && typeof p[1] === 'number' ? {x: r1(p[0]), z: r1(p[1])} : null;
 
 export function ownerDay(L: EdgeLedger, db: Db, soulId: string, since: number): DayEntry[] {
   const w = L.host.worldId, sql = db.db;
-  const nameOf = (id: string) => L.places.byId.get(id)?.name ?? (L.host.nameOf(id) !== id ? L.host.nameOf(id) : null);
+  const nameOf = (id: string) => { const n = L.places.byId.get(id)?.name ?? (L.host.nameOf(id) !== id ? L.host.nameOf(id) : null) ?? (L.places.byId.has(id.replace(/^g-/, '')) ? id : null); return n == null ? null : plain(n); };
   const out: DayEntry[] = [];
   const ids = sql.prepare('SELECT receipt_id FROM edge_receipts_v1 WHERE world_id=? AND soul_id=? AND created_at>=? ORDER BY created_at DESC LIMIT ?').all(w, soulId, since, MAX) as {receipt_id: string}[];
   const created = sql.prepare('SELECT created_at FROM edge_receipts_v1 WHERE world_id=? AND receipt_id=?');
@@ -43,14 +80,14 @@ export function ownerDay(L: EdgeLedger, db: Db, soulId: string, since: number): 
     const end = r.endedAt as {pos?: unknown; place?: unknown} | undefined;
     const place = typeof end?.place === 'string' ? (nameOf(end.place) ?? end.place) : null;
     const text = describeCapability(r.capability, nameOf);
-    if (r.phase === 'completed') out.push({at, kind: 'did', text, where: xz(end?.pos), place});
+    // `replaced` is the Soul's own next act taking over: the act happened (a jog that moved the body still did), so it reads as done.
+    if (r.phase === 'completed' || r.phase === 'replaced') out.push({at, kind: 'did', text, where: xz(end?.pos), place});
     else if (r.phase === 'started' || r.phase === 'waiting') out.push({at, kind: 'doing', text, where: xz(end?.pos), place});
-    // `replaced` is the Soul's own next act taking over: not a failure worth an owner's attention.
     else if (r.phase === 'failed') out.push({at, kind: 'stopped', text, where: xz(end?.pos), place, ...(r.reason ? {reason: r.reason} : {}), ...(r.code ? {code: r.code} : {})});
   }
   const cols = new Set((sql.prepare('PRAGMA table_info(edge_refusals_v1)').all() as {name: string}[]).map(c => c.name));
   if (cols.has('reason')) for (const f of sql.prepare('SELECT at,capability,code,reason,x,z FROM edge_refusals_v1 WHERE world_id=? AND soul_id=? AND at>=? ORDER BY at DESC LIMIT ?').all(w, soulId, since, MAX) as {at: number; capability: string; code: string; reason: string | null; x: number | null; z: number | null}[])
-    out.push({at: f.at, kind: 'refused', text: `tried: ${describeCapability(f.capability, nameOf)}`, code: f.code, reason: f.reason || `the world said no (${f.code})`, where: f.x == null || f.z == null ? null : {x: f.x, z: f.z}});
+    out.push({at: f.at, kind: 'refused', text: describeAttempt(f.capability, nameOf), code: f.code, reason: f.reason || `the world said no (${f.code})`, where: f.x == null || f.z == null ? null : {x: r1(f.x), z: r1(f.z)}});
   if (sql.prepare("SELECT 1 FROM sqlite_master WHERE name='edge_comms_speech'").get())
     for (const s of sql.prepare('SELECT at,text FROM edge_comms_speech WHERE world_id=? AND soul_id=? AND at>=? ORDER BY at DESC LIMIT ?').all(w, soulId, since, MAX) as {at: number; text: string}[])
       out.push({at: s.at, kind: 'said', text: s.text, where: null});

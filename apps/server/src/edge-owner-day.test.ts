@@ -3,7 +3,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import type {Hono} from 'hono';
 import {fixture,invite,accept} from '../test/native-owner-fixture.ts';import {EdgeLedger} from './edge/ledger/ledger.ts';import {buildApp} from './http.ts';
-import {describeCapability} from './edge/owner-day.ts';
+import {describeAttempt, describeCapability} from './edge/owner-day.ts';
 import type {Hub} from './hub.ts';
 
 const born=async(f:ReturnType<typeof fixture>,owner:string,name:string)=>{await invite(f,owner);return accept(f.host,f.souls.create('dev:'+owner,{name,description:'scripted day test'}));};
@@ -40,5 +40,11 @@ test('OWNER DAY: capability ids read as plain words',()=>{
  assert.equal(describeCapability('walk:place_bakery',n),'walked to the bakery');
  assert.equal(describeCapability('rest:here',n),'rested');
  assert.equal(describeCapability('object:ride-eden-balloon:join',n),'joined the balloon');
- assert.equal(describeCapability('swim:shore-water',n),'swam shore water');
+ assert.equal(describeCapability('swim:shore-water',n),'swam in shore water');
+ assert.equal(describeCapability('stretch:here',n),'did a stretch');
+ assert.equal(describeCapability('jog:field',n),'jogged to field');
+ assert.equal(describeCapability('yoga:here',n),'did yoga');
+ assert.equal(describeCapability('yoga-class:here',n),'joined the yoga class');
+ assert.equal(describeAttempt('sit:here',n),'tried to sit down');
+ assert.equal(describeAttempt('fly:moon',n),'tried to fly to moon');
 });

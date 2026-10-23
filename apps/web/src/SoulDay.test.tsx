@@ -8,7 +8,7 @@ const t0=new Date(2026,9,23,9,5).getTime();
 const day:DayEntry[]=[
  {at:t0,kind:'did',text:'walked to the bakery',where:{x:10,z:-4},place:'Bakery'},
  {at:t0+60_000,kind:'said',text:'Good morning!',where:{x:10,z:-4}},
- {at:t0+120_000,kind:'refused',text:'tried: swam the fountain',code:'not-here',reason:'There is no water to swim in here.',where:{x:12,z:-3}},
+ {at:t0+120_000,kind:'refused',text:'tried to swim in the fountain',code:'not-here',reason:'There is no water to swim in here.',where:{x:12,z:-3}},
  {at:t0+180_000,kind:'doing',text:'sat down',where:null,place:'Plaza'},
 ];
 test('Today lists what the Soul did, said and what the world refused, newest first, with the world\'s reason',()=>{
