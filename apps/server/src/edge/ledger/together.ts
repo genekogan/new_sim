@@ -740,7 +740,7 @@ export class Together {
     };
     /** SOCIAL-APPROACH: a named Soul out of sight but awake in this world: offer the act with a walk over first. */
     const walkOver = (verb: string, name: string) => {
-      const m = plans ? this.farSoul(soul, name) : null;
+      if (!plans) return null; const m = this.farSoul(soul, name);
       if (!m || !this.approachCaps(soul, m.soulId, caps, plans)) return null;
       const c = caps.find(c => c.id === `${verb}:${m.soulId}`); return c ? {capability: c.id, note: `${text.trim()} is ${c.id} (walks over to ${m.name} first)`} : null;
     };
