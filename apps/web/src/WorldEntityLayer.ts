@@ -258,6 +258,8 @@ export class WorldEntityLayer {
   /** E-life B7: god things that follow a native engine entity of the same name (a god balloon flying as its native ride,
    *  server god/rides.ts): world position from the recording, or none (back at its own pose). */
   private overrides = new Map<string, THREE.Vector3>();
+  /** BALLOON-BODY: the native twin's yaw (Core convention: rotation.y = -yaw), so the drawn cabin's door is Core's door. */
+  private overrideYaw = new Map<string, number>();
   /** Names of world-level god things with a native ride twin: the god's balloons (def carrier + tag balloon). */
   rideNames(): string[] {
     if (!this.model) return [];
@@ -267,13 +269,14 @@ export class WorldEntityLayer {
   }
   /** Draw the god thing named `name` where its native twin is (`p`: the recorded engine position), or at its own pose (null).
    *  It keeps its own height above the ground: drawn y = its own y + (recorded y − the ground at its home). */
-  poseOverride(name: string, p: readonly [number, number, number] | null) {
+  poseOverride(name: string, p: readonly [number, number, number] | null, yaw?: number) {
     const e = this.model ? [...this.model.entities.values()].find((x) => x.name === name && x.in.parent === 'world') : undefined;
     if (!e) return;
-    if (!p) { if (this.overrides.delete(e.id)) { const d = this.drawn.get(e.id); if (d) d.settled = false; } return; }
+    if (!p) { this.overrideYaw.delete(e.id); if (this.overrides.delete(e.id)) { const d = this.drawn.get(e.id); if (d) d.settled = false; } return; }
     const d = this.drawn.get(e.id); if (!d) return;
     const g = this.groundAt(d.to.p.x, d.to.p.z) ?? 0;
     const v = this.overrides.get(e.id) ?? new THREE.Vector3(); v.set(p[0], d.to.p.y + (p[1] - g), p[2]); this.overrides.set(e.id, v);
+    if (yaw === undefined) this.overrideYaw.delete(e.id); else this.overrideYaw.set(e.id, yaw);
   }
 
   update(dt: number, nowMs: number, baseGround?: THREE.Object3D) {
@@ -315,7 +318,7 @@ export class WorldEntityLayer {
       if (d.frozen) this.thaw(d);
       const t = easeOut((nowMs - d.t0) / 1000 / d.dur);
       d.obj.position.lerpVectors(d.from.p, d.to.p, t);
-      const ride = this.overrides.get(id); if (ride) d.obj.position.copy(ride);
+      const ride = this.overrides.get(id); if (ride) { d.obj.position.copy(ride); const yaw = this.overrideYaw.get(id); if (yaw !== undefined) d.obj.rotation.y = -yaw; }
       const s = d.from.s + (d.to.s - d.from.s) * t;
       d.obj.scale.setScalar(s);
       const shown = this.interiorVisible(id, d);
