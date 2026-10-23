@@ -30,8 +30,8 @@ export type TogetherPlan = {label: string; steps: Steps; seconds?: boolean;
   /** what this capability does beyond its body steps (invitations, items, follows) */
   together?: Tag};
 type Tag =
-  | {kind: 'paired'; what: Paired; guest: string}
-  | {kind: 'give'; guest: string; item: string}
+  | {kind: 'paired'; what: Paired; guest: string; approach?: boolean}
+  | {kind: 'give'; guest: string; item: string; approach?: boolean}
   | {kind: 'accept'; invite: string}
   | {kind: 'decline'; invite: string}
   | {kind: 'follow'; target: string}
@@ -67,7 +67,7 @@ const ITEM_WORDS: [ItemKind, RegExp][] = [['book', /\b(?:book|books|novel)\b/], 
   ['food', /\b(?:food|snack|bread|apple|fruit|cake|bun|sandwich|something to eat|to eat)\b/], ['letter', /\b(?:letter|card|note|paper|postcard)\b/], ['tool', /\b(?:tool|hammer|trowel|chisel|spade)\b/], ['frisbee', /\b(?:frisbee|disc|disk)\b/]];
 /** Bounds (Gene: simple, deterministic, bounded). */
 export const ITEM_LIMITS = {perPlace: 12, placedWorld: 150, pickReach: 120, consumableMinutes: 20, keepHours: 4, nearItems: 20};
-const INVITE_RADIUS = 60, GESTURE_RADIUS = 8, FOLLOW_RADIUS = 20, FOLLOW_LOST = 45, CATCH_UP = 3;
+const INVITE_RADIUS = 60, GESTURE_RADIUS = 8, APPROACH_RADIUS = 400, APPROACH_SECONDS = 240, FOLLOW_RADIUS = 20, FOLLOW_LOST = 45, CATCH_UP = 3;
 /** A shared walk is only "together" when the guest ends beside the host: follow standoff is 1.5 m, so 2.2 m leaves slack but not 2.8 m apart. */
 export const TOGETHER_RADIUS = 2.2;
 export const besideEachOther = (a: readonly number[], b: readonly number[]) => Math.hypot(a[0] - b[0], a[1] - b[1]) <= TOGETHER_RADIUS;
@@ -91,6 +91,8 @@ export type Invite = {id: string; what: string; host: {soulId: string; name: str
   meetAt?: V2; item?: {id: string; kind: ItemKind; name: string}; ride?: {object: string; carrier: string}; place?: string | null};
 export type Item = {id: string; kind: ItemKind; name: string; holder: string | null; placeId: string | null; at: V2 | null; state: 'held' | 'placed' | 'gone'; claimedBy: string | null; by: string | null; createdAt: number; placedAt: number | null};
 type ItemOp = {soulId: string; op: 'pick-up' | 'put-down' | 'consume' | 'give' | 'take'; item?: string; kind?: ItemKind; source?: string; to?: string; invite?: string};
+/** SOCIAL-APPROACH: the act waiting at the end of a walk over to its partner (its pose steps, params, label). */
+type Approach = {tag: Extract<Tag, {kind: 'paired' | 'give'}>; capability: string; label: string; act: Steps; params: Record<string, unknown>; untilTick: number};
 type Follow = {receipt: string; soulId: string; target: string; untilTick: number; withHost?: string};
 
 /** What the ledger lends this module (closures over its internals). */
@@ -119,6 +121,7 @@ const r2 = (v: number) => Math.round(v * 100) / 100;
 export class Together {
   private p: TogetherPort;
   private follows = new Map<string, Follow>();          // receipt id → follow
+  private approaches = new Map<string, Approach>();     // receipt id → a walk over to a Soul before a paired act or hand-over
   constructor(port: TogetherPort) {
     this.p = port;
     port.db.db.exec(`CREATE TABLE IF NOT EXISTS edge_invites_v1 (world_id TEXT NOT NULL, invite_id TEXT NOT NULL, state TEXT NOT NULL, body TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (world_id, invite_id));
@@ -267,23 +270,13 @@ export class Together {
       add({id: 'decline:' + inv.id, verb: 'decline', label: `Decline ${inv.host.name}'s invitation (${inv.what})`, target: {id: inv.host.soulId, kind: 'soul'}, available: true}, {label: 'Decline the invitation', steps: [], together: {kind: 'decline', invite: inv.id}});
     }
     const held = this.heldBy(soul.soulId), mine = this.followingOf(soul.soulId);
-    for (const o of this.p.perceived(soul.soulId, FOLLOW_RADIUS)) {
+    for (const o of this.p.perceived(soul.soulId, INVITE_RADIUS)) {
       if (this.p.faded(o.soulId)) continue;
       const om = this.mindOf(o.soulId); if (!om) continue;
       const busy = this.asleep(o.entityId) ? 'asleep' : this.p.aboard(o.entityId) ? 'riding' : null;
-      if (o.distance <= GESTURE_RADIUS) {
-        for (const g of Object.keys(PAIRED) as Paired[]) {
-          const def = PAIRED[g], blocked = busy ? {code: 'gesture.partner-unavailable', reason: `${o.name} is ${busy}.`} : aloft ? {code: 'ride.aboard', reason: 'Not while riding.'} : null;
-          add({id: `${g}:${o.soulId}`, verb: g, label: def.label(o.name), target: {id: o.soulId, kind: 'soul'}, available: !blocked, ...(blocked ? {blocked} : {}), ...(g === 'dance-with' ? {params: {seconds: {type: 'integer', min: 5, max: 600, default: 60}}} : {})},
-            {label: def.label(o.name).replace(/ \(.*\)$/, ''), seconds: g === 'dance-with', steps: [...this.standFirst(soul.entityId), {verb: 'walk_to', params: {to: o.entityId, standoff: 1.1}}, pose(def.activity, def.seconds, {gap: def.gap, waitSeconds: 45, alone: 'fail', clear: true})], together: {kind: 'paired', what: g, guest: o.soulId}});
-        }
-        if (held) {
-          const blocked = busy ? {code: 'gesture.partner-unavailable', reason: `${o.name} is ${busy}.`} : this.heldBy(o.soulId) ? {code: 'hands.full', reason: `${o.name}'s hands are full.`} : null;
-          add({id: 'give:' + o.soulId, verb: 'give', label: `Give ${o.name} ${held.name} you are holding (they accept or decline)`, target: {id: o.soulId, kind: 'soul'}, available: !blocked, ...(blocked ? {blocked} : {})},
-            {label: `Give ${o.name} ${held.name}`, steps: [...this.standFirst(soul.entityId), {verb: 'walk_to', params: {to: o.entityId, standoff: 1.1}}, pose('give', 2.5, {prop: held.kind, gap: 0.8, waitSeconds: 45, alone: 'fail', release: true, clear: true})], together: {kind: 'give', guest: o.soulId, item: held.id}});
-        }
-      }
-      if (mine?.target !== o.soulId) add({id: 'follow:' + o.soulId, verb: 'follow', label: `Walk with ${o.name}: follow them wherever they go until you do something else`, target: {id: o.soulId, kind: 'soul'}, available: !busy && !aloft, ...(busy || aloft ? {blocked: {code: 'follow.unavailable', reason: busy ? `${o.name} is ${busy}.` : 'Not while riding.'}} : {}), params: {seconds: {type: 'integer', min: 10, max: 3600, default: 600}}},
+      // SOCIAL-APPROACH: a Soul in sight but out of reach is offered the same acts; the world walks over first, then asks
+      this.socialCaps(soul, o, busy, aloft, held, add);
+      if (o.distance <= FOLLOW_RADIUS && mine?.target !== o.soulId) add({id: 'follow:' + o.soulId, verb: 'follow', label: `Walk with ${o.name}: follow them wherever they go until you do something else`, target: {id: o.soulId, kind: 'soul'}, available: !busy && !aloft, ...(busy || aloft ? {blocked: {code: 'follow.unavailable', reason: busy ? `${o.name} is ${busy}.` : 'Not while riding.'}} : {}), params: {seconds: {type: 'integer', min: 10, max: 3600, default: 600}}},
         {label: `Walk with ${o.name}`, seconds: true, steps: this.followSteps(soul.entityId, o.entityId), together: {kind: 'follow', target: o.soulId}});
     }
     for (const f of this.followersOf(soul.soulId)) {const n = this.mindOf(f.soulId)?.name ?? 'someone'; add({id: 'ask-to-stop:' + f.soulId, verb: 'ask-to-stop', label: `Ask ${n} to stop following you`, target: {id: f.soulId, kind: 'soul'}, available: true}, {label: `Ask ${n} to stop following`, steps: [], together: {kind: 'unfollow', follower: f.soulId}});}
@@ -320,6 +313,54 @@ export class Together {
    *  by its standoff and pause (GEST-LIVE r11: 13 m after 15 s, follow.lost at 45 m on a 240 m walk). So the programme is
    *  three legs, re-issued with the current gap, and a follower more than CATCH_UP metres behind jogs them (humanoids
    *  only; floaters glide at one pace). */
+  /** Paired gestures and a hand-over offered toward one Soul. Within GESTURE_RADIUS the plan steps in and asks; farther
+   *  off (SOCIAL-APPROACH, ACCEPT2 brief 6) the same id is offered with `approach`: the world walks the Soul over to them
+   *  first (follow-style legs that track a moving partner) and asks once it is there, never "not nearby". */
+  private socialCaps(soul: EdgeSoul, o: {soulId: string; name: string; entityId: string; distance: number}, busy: string | null, aloft: unknown, held: Item | null | undefined, add: (c: EdgeCapability, plan: TogetherPlan) => void) {
+    const far = o.distance > GESTURE_RADIUS, then = far ? ' (walks over to them first, then asks)' : '';
+    for (const g of Object.keys(PAIRED) as Paired[]) {
+      const def = PAIRED[g], blocked = busy ? {code: 'gesture.partner-unavailable', reason: `${o.name} is ${busy}.`} : aloft ? {code: 'ride.aboard', reason: 'Not while riding.'} : null;
+      add({id: `${g}:${o.soulId}`, verb: g, label: far ? def.label(o.name).replace(/ \(.*\)$/, '') + then : def.label(o.name), target: {id: o.soulId, kind: 'soul'}, available: !blocked, ...(blocked ? {blocked} : {}), ...(g === 'dance-with' ? {params: {seconds: {type: 'integer', min: 5, max: 600, default: 60}}} : {})},
+        {label: def.label(o.name).replace(/ \(.*\)$/, ''), seconds: g === 'dance-with', steps: [...this.standFirst(soul.entityId), {verb: 'walk_to', params: {to: o.entityId, standoff: 1.1}}, pose(def.activity, def.seconds, {gap: def.gap, waitSeconds: 45, alone: 'fail', clear: true})], together: {kind: 'paired', what: g, guest: o.soulId, ...(far ? {approach: true} : {})}});
+    }
+    if (held) {
+      const blocked = busy ? {code: 'gesture.partner-unavailable', reason: `${o.name} is ${busy}.`} : this.heldBy(o.soulId) ? {code: 'hands.full', reason: `${o.name}'s hands are full.`} : null;
+      add({id: 'give:' + o.soulId, verb: 'give', label: `Give ${o.name} ${held.name} you are holding (${far ? 'walks over to them first; ' : ''}they accept or decline)`, target: {id: o.soulId, kind: 'soul'}, available: !blocked, ...(blocked ? {blocked} : {})},
+        {label: `Give ${o.name} ${held.name}`, steps: [...this.standFirst(soul.entityId), {verb: 'walk_to', params: {to: o.entityId, standoff: 1.1}}, pose('give', 2.5, {prop: held.kind, gap: 0.8, waitSeconds: 45, alone: 'fail', release: true, clear: true})], together: {kind: 'give', guest: o.soulId, item: held.id, ...(far ? {approach: true} : {})}});
+    }
+  }
+  /** SOCIAL-APPROACH: the same acts toward a Soul out of sight (inside a building, or beyond INVITE_RADIUS) but awake in
+   *  this world, offered on demand when the owner names them ("hug Wren" while Wren is on the far lawn). */
+  approachCaps(soul: EdgeSoul, targetSoulId: string, caps: EdgeCapability[], plans: Map<string, TogetherPlan>): boolean {
+    const m = this.mindOf(targetSoulId), tb = m ? this.p.body(m.entityId) : undefined, me = this.p.body(soul.entityId);
+    if (!m || !tb || !me || m.soulId === soul.soulId || this.p.faded(m.soulId)) return false;
+    const distance = Math.round(Math.hypot(tb.pose.p[0] - me.pose.p[0], tb.pose.p[2] - me.pose.p[2])); if (distance > APPROACH_RADIUS) return false;
+    const busy = this.asleep(m.entityId) ? 'asleep' : this.p.aboard(m.entityId) ? 'riding' : null;
+    const add = (c: EdgeCapability, plan: TogetherPlan) => {if (!caps.some(x => x.id === c.id)) {caps.push(c); plans.set(c.id, plan);}};
+    this.socialCaps(soul, {soulId: m.soulId, name: m.name, entityId: m.entityId, distance: Math.max(distance, GESTURE_RADIUS + 1)}, busy, this.p.aboard(soul.entityId), this.heldBy(soul.soulId), add);
+    return true;
+  }
+  /** onProgram hook: an approach leg finished — walk on, or (once within reach) start the act itself under the same receipt. */
+  continueApproach(receiptId: string, soul: EdgeSoul): boolean {
+    const a = this.approaches.get(receiptId); if (!a) return false;
+    const g = this.mindOf(a.tag.guest), gb = g ? this.p.body(g.entityId) : undefined, me = this.p.body(soul.entityId);
+    const end = (code: string, reason: string) => {this.approaches.delete(receiptId); this.p.fail(receiptId, code, reason); return false;};
+    if (!g || !gb || !me || this.p.faded(a.tag.guest)) return end('gesture.partner-unavailable', 'They are not here any more.');
+    if (this.asleep(g.entityId) || this.p.aboard(g.entityId)) return end('gesture.partner-unavailable', `${g.name} is ${this.asleep(g.entityId) ? 'asleep' : 'riding'}.`);
+    const d = Math.hypot(gb.pose.p[0] - me.pose.p[0], gb.pose.p[2] - me.pose.p[2]);
+    if (d > GESTURE_RADIUS) {
+      if (this.tick >= a.untilTick) return end('gesture.too-far', `Walked toward ${g.name} but could not reach them in time (still ${Math.round(d)} m away).`);
+      void this.p.decide(soul, receiptId, a.capability, `Walk over to ${g.name}`, this.followSteps(soul.entityId, g.entityId, d).filter(s => s.verb !== 'stand')).catch(() => this.p.fail(receiptId, 'ledger.unavailable', 'The world could not continue the walk.'));
+      return true;
+    }
+    this.approaches.delete(receiptId);
+    const tag = {...a.tag, approach: false} as Tag, steps: Steps = [{verb: 'walk_to', params: {to: g.entityId, standoff: 1.1}}, ...a.act];
+    const prep = this.prepare(soul, {id: a.capability, verb: a.capability.split(':')[0]!, label: a.label, available: true}, {label: a.label, steps, together: tag}, a.params, steps);
+    if ('code' in prep) {this.p.fail(receiptId, prep.code, prep.reason); return false;}
+    prep.commit?.(receiptId);
+    void this.p.decide(soul, receiptId, a.capability, a.label, prep.steps).catch(() => this.p.fail(receiptId, 'ledger.unavailable', 'The world could not continue.'));
+    return true;
+  }
   private followSteps(me: string, target: string, gap = 0): Steps {
     const tb = this.p.body(target), engine = this.p.host.engine as unknown as {movementVerb?: (actor: string, x: number, z: number) => string};
     // jogging is dry-ground only: a shore or water leg with a gait would fail the follow
@@ -354,6 +395,17 @@ export class Together {
       const g = this.mindOf(tag.guest), gb = g ? this.p.body(g.entityId) : undefined, me = this.p.body(soul.entityId);
       if (!g || !gb || !me || this.p.faded(tag.guest)) return {code: 'gesture.partner-unavailable', reason: 'They are not here any more.'};
       if(isRigidBody(me)||isRigidBody(gb))return {code:'body.unsupported',reason:'Paired limb gestures and hand transfers require humanoid bodies; try looking or talking instead.'};
+      // SOCIAL-APPROACH: out of reach, walk over first (legs that track them); the act and its invitation start on arrival
+      const apart = Math.hypot(gb.pose.p[0] - me.pose.p[0], gb.pose.p[2] - me.pose.p[2]);
+      if (tag.approach && apart > GESTURE_RADIUS) {
+        if (tag.kind === 'give' && this.heldBy(tag.guest)) return {code: 'hands.full', reason: `${g.name}'s hands are full.`};
+        if (tag.kind === 'give' && this.heldBy(soul.soulId)?.id !== tag.item) return {code: 'hands.empty', reason: 'You are not holding that any more.'};
+        const act = steps.filter(s => s.verb !== 'stand' && !(s.verb === 'walk_to' && s.params.to === g.entityId)), label = plan.label;
+        return {steps: this.followSteps(soul.entityId, g.entityId, apart), label: `Walk over to ${g.name} (${label.toLowerCase()} on arrival)`, commit: receipt => {
+          this.approaches.set(receipt, {tag, capability: cap.id, label, act, params, untilTick: this.tick + APPROACH_SECONDS * 20});
+          this.p.deliver(soul.soulId, 'world', {text: `${g.name} is ${Math.round(apart)} m away; walking over to them first.`});
+        }};
+      }
       if (Math.hypot(gb.pose.p[0] - me.pose.p[0], gb.pose.p[2] - me.pose.p[2]) > GESTURE_RADIUS + 2) return {code: 'gesture.too-far', reason: `${g.name} is too far away; go near them first.`};
       if (tag.kind === 'give' && this.heldBy(tag.guest)) return {code: 'hands.full', reason: `${g.name}'s hands are full.`};
       const held = tag.kind === 'give' ? this.heldBy(soul.soulId) : null;
@@ -535,6 +587,7 @@ export class Together {
     const op = this.takeOp(r.id);
     if (op) this.applyOp(op, r);
     if (this.follows.has(r.id)) this.dropFollow(r.id);
+    this.approaches.delete(r.id);
     // the host's act ended: a still-open invitation closes (a ride's stays open while its host sits in the basket)
     for (const inv of this.pending()) if (inv.hostReceipt === r.id && !(inv.kind === 'ride' && r.phase === 'completed')) {
       const open = inv.guests.filter(g => !inv.responses[g.soulId]);

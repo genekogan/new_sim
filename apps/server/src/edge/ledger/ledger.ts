@@ -312,6 +312,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
       // together/1: a follow walks on leg after leg under the same receipt until it is stopped or its target is gone
       const m = this.host.minds.get(r.soul_id);
       if (m && this.together.continueFollow(r.receipt_id, {soulId: m.soulId, entityId: m.entityId, name: m.name, owner: m.owner})) return;
+      // SOCIAL-APPROACH: a walk over to a Soul continues, then becomes the hug / dance / hand-over itself, under one receipt
+      if (m && this.together.continueApproach(r.receipt_id, {soulId: m.soulId, entityId: m.entityId, name: m.name, owner: m.owner})) return;
       const warmTarget=r.detail?(JSON.parse(r.detail) as {warmTargetV1?:string}).warmTargetV1:undefined;
       if(warmTarget){const body=m?this.body(m.entityId):undefined,fire=this.body(warmTarget),live=new Set(this.host.engine.runtime.liveIds());
         const occupied=!!m&&[...this.host.engine.runtime.records.values()].some(record=>{const p=record.params as {actor?:string;slot?:string};return live.has(record.id)&&record.verb==='take_slot'&&record.phase==='occupied'&&p.actor===m.entityId&&typeof p.slot==='string'&&p.slot.startsWith(warmTarget+'#');});
