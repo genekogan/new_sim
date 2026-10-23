@@ -7,6 +7,7 @@
 // or key). Presentation only; nothing here is authoritative.
 import * as THREE from 'three';
 import { strikesBetween, SOUND_MPS, type Strike } from '@sim/world-compiler';
+import { setWeatherInForce } from '@sim/world-compiler/weather-rules';
 import { warmSceneChange } from './gen-mesh/texture-budget.ts';
 import { arrivalMark, arrivalOver } from './arrival-marks.ts';
 import { audible } from './audio-focus.ts';
@@ -58,7 +59,7 @@ export class WorldLightning {
   update(tick: number, camera: THREE.Camera, dt: number, reducedMotion = false) {
     const m = this.model();
     if (!this.layer.active || !m || !Number.isFinite(tick)) return;
-    this.keepLight(m);
+    this.keepLight(m, tick);
     // first frame, a jump (replay, resync) or time running back: start from here, no backlog of old strikes
     if (this.lastTick < 0 || tick < this.lastTick || tick - this.lastTick > 400) this.lastTick = tick;
     else if (tick > this.lastTick) {
@@ -164,9 +165,9 @@ export class WorldLightning {
    *  fair weather). Its programs are linked in parallel first (warmSceneChange: the scene compiled with the light and a bolt
    *  in it, both taken out again before the next frame), only 2 s after the arrival and in idle time, so it never competes with the arrival's frames.
    *  It leaves a minute after the storm and the last bolt; the programs without it are still cached then. */
-  private keepLight(m: ModelLike) {
-    const now = performance.now(), w = (m.state as { weather?: { kind?: string } } | null)?.weather;
-    if (w?.kind === 'storm') this.lightWanted = Math.max(this.lightWanted, now + 60_000);
+  private keepLight(m: ModelLike, tick: number) {
+    const now = performance.now(), w = (m.state as { weather?: { kind?: string; until?: number | null } } | null)?.weather;
+    if (w?.kind === 'storm' && setWeatherInForce(w, tick)) this.lightWanted = Math.max(this.lightWanted, now + 60_000);
     const want = now < this.lightWanted;
     if (want && this.lightState === 'off' && arrivalOver()) {
       // the warm's whole-scene compile is a ~300 ms frame on a 4x-throttled phone: not on the arrival's frames, in idle time

@@ -23,6 +23,7 @@ import { viewerWeatherKind } from '../edge/eyes/sight.ts';
 import { ApiError } from '../souls.ts';
 import { recentStrikes } from './lightning.ts';
 import { CREATION_LIMITS } from '@sim/generators';
+import { WEATHER_RULES, setWeatherInForce, showerMinutes } from '@sim/world-compiler';
 import { godTokenLimiter } from './rate-limit.ts';
 import { syncWorldClock } from './world-clock.ts';
 import { callerOf } from './builds.ts';
@@ -31,7 +32,7 @@ export type WeatherKind = (typeof WEATHER_KINDS)[number];
 export type EnvInput = {
   timeOfDay?: number | string;
   timeScale?: number;
-  weather?: { kind?: WeatherKind; intensity?: number; wind?: number; fog?: number; clouds?: number; rain?: number };
+  weather?: { kind?: WeatherKind; intensity?: number; wind?: number; fog?: number; clouds?: number; rain?: number; minutes?: number };
 };
 export type Channels = { clouds: number; rain: number; wind: number; fog: number };
 
@@ -85,6 +86,12 @@ export function envPatch(state: WorldState, env: EnvInput, journalSeq: number): 
       for (const k of ['clouds', 'rain', 'wind', 'fog'] as const) patch[k] = round(CALM[k] + (full[k] - CALM[k]) * intensity);
     }
     for (const k of ['clouds', 'rain', 'wind', 'fog'] as const) if (w[k] !== undefined) patch[k] = round(Number(w[k]));
+    // WEATHER-RULES: a rain or storm is a shower with an end; `minutes` (world minutes) sets its length
+    if (w.minutes !== undefined) {
+      const m = Number(w.minutes);
+      if (!(m >= WEATHER_RULES.minMinutes && m <= WEATHER_RULES.maxMinutes)) throw new ApiError(400, 'invalid', `weather.minutes is ${WEATHER_RULES.minMinutes}…${WEATHER_RULES.maxMinutes} world minutes (how long the rain or storm lasts)`);
+      patch.minutes = Math.round(m);
+    } else if (w.kind === 'rain' || w.kind === 'storm') patch.minutes = showerMinutes({ kind });
     out.weather = patch;
   }
   return out;
@@ -98,15 +105,16 @@ export function setEnv(god: GodMode, env: EnvInput, note = 'environment') {
 }
 
 /** What the weather is right now (the scheduled kind on 'auto'), for Souls and the API. */
-export function weatherNow(state: WorldState, datetime: string | null): Channels & { kind: Exclude<WeatherKind, 'auto'>; scheduled: boolean; intensity: number; lightning: number } {
-  const w = state.weather as WorldState['weather'] & Partial<Channels> & { kind?: WeatherKind; intensity?: number };
-  const kind = w.kind ?? 'auto';
+export function weatherNow(state: WorldState, datetime: string | null, tick = NaN): Channels & { kind: Exclude<WeatherKind, 'auto'>; scheduled: boolean; intensity: number; lightning: number; until?: number } {
+  const w = state.weather as WorldState['weather'] & Partial<Channels> & { kind?: WeatherKind; intensity?: number; until?: number | null };
+  // WEATHER-RULES: a set rain/storm past its end (or without one) is back on the schedule
+  const kind = setWeatherInForce(w, tick) ? w.kind! : 'auto';
   if (kind === 'auto') {
     const k = (datetime ? viewerWeatherKind(datetime) : null) ?? 'clear';
     return { kind: k, scheduled: true, intensity: 1, ...KIND_CHANNELS[k], lightning: k === 'storm' ? 1 : 0 };
   }
   const ch = { clouds: clamp01(w.clouds ?? 0.1), rain: clamp01(w.rain ?? 0), wind: clamp01(w.wind ?? 0.1), fog: clamp01(w.fog ?? 0) };
-  return { kind, scheduled: false, intensity: clamp01(w.intensity ?? 1), ...ch, lightning: kind === 'storm' ? clamp01(w.intensity ?? 1) : 0 };
+  return { kind, scheduled: false, intensity: clamp01(w.intensity ?? 1), ...ch, lightning: kind === 'storm' ? clamp01(w.intensity ?? 1) : 0, ...(typeof w.until === 'number' ? { until: w.until } : {}) };
 }
 
 /** The env as a reader sees it: the clock (from the engine), its speed, and the weather now. */
@@ -117,17 +125,17 @@ export function envView(host: WorldHost, god: GodMode) {
   return {
     contract: 'world-env/1',
     time: { datetime, clock: datetime ? datetime.slice(11, 16) : null, paused, timeScale: paused ? 0 : round((24 * 3600 * 20) / dayTicks), dayTicks, set: t.set ?? null },
-    weather: weatherNow(god.model.state, datetime),
+    weather: weatherNow(god.model.state, datetime, host.engine.world.tick),
     undoNote: 'Undo restores environment settings; it does not rewind the world clock.',
     // GOD-ENV: the last lightning strike of the last minute (the storm's or the god's)
     ...(() => { const tick = host.engine.world.tick, l = recentStrikes(god, tick).pop(); return l ? { strike: { x: l.x, z: l.z, tick: l.tick, ago: Math.round((tick - l.tick) / 20), god: !!l.god } } : {}; })(),
-    setter: 'POST /v1/god/env { timeOfDay?, timeScale?, weather?: { kind?, intensity?, wind?, fog?, clouds?, rain? } } (god token)',
+    setter: 'POST /v1/god/env { timeOfDay?, timeScale?, weather?: { kind?, intensity?, wind?, fog?, clouds?, rain?, minutes? } } (god token); a rain or storm ends after `minutes` world minutes (default rain 90, storm 45; 5…360)',
   };
 }
 
 /** Souls perceive the god's weather (edge `here`, Eyes' caption). */
 export function installWorldEnv(host: WorldHost, god: GodMode, edge?: EdgeLedger) {
-  if (edge) edge.weatherNow = () => weatherNow(god.model.state, (host.engine.world as { env?: { datetime?: string } }).env?.datetime ?? null);
+  if (edge) edge.weatherNow = () => weatherNow(god.model.state, (host.engine.world as { env?: { datetime?: string } }).env?.datetime ?? null, host.engine.world.tick);
 }
 
 export function mountEnvRoutes(app: Hono, d: { host: WorldHost; god: GodMode; requireGod: (c: Context) => unknown }) {
