@@ -21,13 +21,14 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const vendor = resolve(root, 'vendor/sim-score');
 export const OUT = resolve(root, 'apps/web/src/score/playlist');
 
-// The playlist, in play order (README.md "World playlist"): sim-score's round-four "New pieces" family in catalog order,
-// then the twelve round-three pieces lane S3 chose for Gene's named influences.
+// The playlist, in play order (README.md "World playlist"): sim-score's "New pieces" family in catalog order (round four's
+// 28, then round five's 4), then the twelve round-three pieces lane S3 chose for Gene's named influences.
 export const PLAYLIST = [
   'skylight-rain', 'harbour-mouth', 'branch-line', 'lantern-square', 'nightside-pass', 'hydroponics-deck', 'section-lines',
   'citronella', 'heron-causeway', 'second-ring-road', 'sunken-causeway', 'cheese-stall', 'firn-light', 'aerial-causeway',
   'service-corridor', 'after-the-fireworks', 'night-approach', 'headland', 'evening-rounds', 'velour', 'halogen',
   'cloud-street', 'lamplighter', 'frost-fair', 'heat-lightning', 'under-glass', 'flying-junction', 'coin-laundry',
+  'clock-tower', 'milonga-terrace', 'ridge-road', 'riverboat',
   'pixel-town', 'downtown-rush', 'neon-shibuya', 'departure-lounge', 'line-clear', 'mirror-ball',
   'night-drive', 'plaza-mall', 'grand-prix', 'magic-orbit', 'montage', 'night-patrol',
 ];

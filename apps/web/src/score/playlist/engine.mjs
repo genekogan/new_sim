@@ -4,7 +4,7 @@
 // and registers it with register(Sim, Tone).
 /* eslint-disable */
 // @ts-nocheck
-export const PLAYLIST = ["skylight-rain","harbour-mouth","branch-line","lantern-square","nightside-pass","hydroponics-deck","section-lines","citronella","heron-causeway","second-ring-road","sunken-causeway","cheese-stall","firn-light","aerial-causeway","service-corridor","after-the-fireworks","night-approach","headland","evening-rounds","velour","halogen","cloud-street","lamplighter","frost-fair","heat-lightning","under-glass","flying-junction","coin-laundry","pixel-town","downtown-rush","neon-shibuya","departure-lounge","line-clear","mirror-ball","night-drive","plaza-mall","grand-prix","magic-orbit","montage","night-patrol"];
+export const PLAYLIST = ["skylight-rain","harbour-mouth","branch-line","lantern-square","nightside-pass","hydroponics-deck","section-lines","citronella","heron-causeway","second-ring-road","sunken-causeway","cheese-stall","firn-light","aerial-causeway","service-corridor","after-the-fireworks","night-approach","headland","evening-rounds","velour","halogen","cloud-street","lamplighter","frost-fair","heat-lightning","under-glass","flying-junction","coin-laundry","clock-tower","milonga-terrace","ridge-road","riverboat","pixel-town","downtown-rush","neon-shibuya","departure-lounge","line-clear","mirror-ball","night-drive","plaza-mall","grand-prix","magic-orbit","montage","night-patrol"];
 const PIECES = {
   "skylight-rain": () => import("./pieces/skylight-rain.mjs"),
   "harbour-mouth": () => import("./pieces/harbour-mouth.mjs"),
@@ -34,6 +34,10 @@ const PIECES = {
   "under-glass": () => import("./pieces/under-glass.mjs"),
   "flying-junction": () => import("./pieces/flying-junction.mjs"),
   "coin-laundry": () => import("./pieces/coin-laundry.mjs"),
+  "clock-tower": () => import("./pieces/clock-tower.mjs"),
+  "milonga-terrace": () => import("./pieces/milonga-terrace.mjs"),
+  "ridge-road": () => import("./pieces/ridge-road.mjs"),
+  "riverboat": () => import("./pieces/riverboat.mjs"),
   "pixel-town": () => import("./pieces/pixel-town.mjs"),
   "downtown-rush": () => import("./pieces/downtown-rush.mjs"),
   "neon-shibuya": () => import("./pieces/neon-shibuya.mjs"),

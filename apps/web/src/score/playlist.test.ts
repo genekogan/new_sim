@@ -22,7 +22,7 @@ async function loaded() {
 
 test('the playlist registers each of its pieces once, in order, without touching Tone', async () => {
   const Sim = await loaded();
-  assert.equal(PLAYLIST.length, 40);
+  assert.equal(PLAYLIST.length, 44);
   assert.equal(new Set(PLAYLIST).size, PLAYLIST.length);
   assert.deepEqual([...PLAYLIST], BUILDER_PLAYLIST);
   assert.deepEqual(Sim.pieces.map((p) => p.id), [...PLAYLIST]);

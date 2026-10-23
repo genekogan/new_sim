@@ -130,13 +130,15 @@ now a playlist of Sim Score pieces, replacing the sound layer's own generative `
   `register(Sim, Tone)`; `BUILD.json` records the source commit and a sha256 per generated file. Edit `PLAYLIST` in the
   builder and rerun it to change the playlist (sync reruns it too). Until 2026-10-22 an importer read `<sim-score-repo>`
   directly and bundled everything into one `playlist-runtime.mjs`.
-- **The playlist (40, lane SCORE 2026-10-22; Gene may trim it).** First the 28 pieces of sim-score's round-four "New
-  pieces" catalog family, in catalog order (Skylight Rain, Harbour Mouth, Branch Line, Lantern Square, Nightside Pass,
+- **The playlist (44, lane SCORE 2026-10-22/23; Gene may trim it).** First sim-score's "New pieces" catalog family, in
+  catalog order: the 28 round-four pieces (Skylight Rain, Harbour Mouth, Branch Line, Lantern Square, Nightside Pass,
   Hydroponics Deck, Section Lines, Citronella, Heron Causeway, Second Ring Road, Sunken Causeway, Cheese Stall, Firn Light,
   Aerial Causeway, Service Corridor, After the Fireworks, Night Approach, Headland, Evening Rounds, Velour, Halogen, Cloud
   Street, Lamplighter, Frost Fair, Heat Lightning, Under Glass, Flying Junction, Coin Laundry), written to Gene's round-four
-  verdict (hand-written hooks, own palettes, "game music sits in the room"; `vendor/sim-score/COMPOSING.md`); then the
-  twelve below. The builder prints any "New pieces" id the playlist leaves out.
+  verdict (hand-written hooks, own palettes, "game music sits in the room"; `vendor/sim-score/COMPOSING.md`), then the
+  four of round five (2026-10-23, one per engine module: Clock Tower (`Sim.spc`, 5/4 clockwork), Milonga Terrace
+  (`Sim.groove`, rubato bandoneon over a 3-3-2 band), Ridge Road (`Sim.phrasing`, cut-time bluegrass reel), Riverboat
+  (`Sim.dialogue`, trad-jazz counterpoint)); then the twelve below. The builder prints any "New pieces" id the playlist leaves out.
 - **Why the original 12.** Gene's last word on Sim Score (Oct 4) asked for "more adventurous music and a bit more percussion"
   and named SimCity, Tetris, Brian Eno, F-Zero, Karate Kid, Knight Rider, disco subgenres and vaporwave; there is no
   later per-piece verdict, so the playlist is one round-three piece per named influence, in this order:
@@ -157,7 +159,7 @@ now a playlist of Sim Score pieces, replacing the sound layer's own generative `
   chunks fetched so far); `score/playlist.test.ts` (every piece registers once and composes three cycles under an inert
   Tone, the four optional modules load, the vendored copy matches `PROVENANCE.json`, the generated chunks match a fresh
   build); the vendored lint over the playlist (`node vendor/sim-score/tools/lint.mjs <ids> --cycles 32 --seed 1|7|12345`:
-  40/40 clean at sim-score 8cf5c05); `tools/sound/camera-restarts.mjs` (60 s of camera drags: sound and music restarts).
+  44/44 clean at sim-score 5ea3783); `tools/sound/camera-restarts.mjs` (60 s of camera drags: sound and music restarts).
 
 ### Vendored Sim Score (lane SCORE, 2026-10-22)
 
