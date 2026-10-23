@@ -19,7 +19,9 @@ export type Refusal = {code: string; reason: string};
 export type ObjectEvent = {to: string[]; kind?: 'object' | 'schedule'; text: string; data?: Record<string, unknown>; untrusted?: boolean};
 /** carrier/1: the native ride an object may read (rides only; Ledger supplies it). */
 export type CarrierView = NonNullable<ReturnType<import('../../ledger/ledger.ts').EdgeLedger['carrierView']>>;
-export type ActionCtx = {soul: EdgeSoul; roles: string[]; tick: number; now: number; nameOf(soulId: string): string; inPlace: boolean; carrier?(entityId: string): CarrierView | null};
+export type ActionCtx = {soul: EdgeSoul; roles: string[]; tick: number; now: number; nameOf(soulId: string): string; inPlace: boolean; carrier?(entityId: string): CarrierView | null;
+  /** VEHICLE-STEER: resolve a ride's steer destination for this Soul (a known place, or a direction + distance). */
+  steerTarget?(entityId: string, spec: {to?: string; direction?: string; distance?: number}): {ok: true; x: number; z: number; label: string} | {ok: false; code: string; reason: string; did_you_mean?: unknown}};
 export type TimeCtx = {tick: number; now: number; nameOf(soulId: string): string; carrier?(entityId: string): CarrierView | null};
 /** Body steps for the acting Soul (OBJECT-CONTRACT §7): the Ledger performs them as a logged decision with a normal receipt. */
 export type BodyRequest = {label: string; steps: {verb: string; params: Record<string, unknown>}[]};

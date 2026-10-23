@@ -12,7 +12,9 @@ export type RideState = {carrier: string; capacity: number; phase: string; rider
   /** RIDE-EXIT: riders back on the ground who are still stepping out (their body is in the basket/punt until the engine sets it down). */
   stepping?: SoulRef[];
   /** seconds a boarding ride waits for more riders before it departs by itself */
-  waitSeconds?: number};
+  waitSeconds?: number;
+  /** VEHICLE-STEER: the rider steering it now (null: it follows its own route, or flies itself back). */
+  steeredBy?: SoulRef | null};
 
 const view = (ctx: TimeCtx | ActionCtx, id: string): CarrierView | null => ctx.carrier?.(id) ?? null;
 function from(state: RideState, v: CarrierView | null): RideState {
@@ -20,7 +22,8 @@ function from(state: RideState, v: CarrierView | null): RideState {
   return {carrier: state.carrier, rowing: v.def === 'rowing-punt', capacity: v.capacity, phase: v.phase, holding: v.holding, flights: v.flights, seatsFree: v.seatsFree, routeSeconds: v.route.seconds,
     door: v.door as [number, number] | null, departsInSeconds: v.departsInSeconds, waitSeconds: (v as {waitSeconds?: number}).waitSeconds ?? 45, keptFor: (v as {hold?: {for: SoulRef[]}}).hold?.for ?? [],
     riders: v.riders.filter(r => r.soulId && r.phase !== 'leaving').map(r => ({soulId: r.soulId!, name: r.name ?? 'someone'})),
-    stepping: v.riders.filter(r => r.soulId && r.phase === 'leaving').map(r => ({soulId: r.soulId!, name: r.name ?? 'someone'}))};
+    stepping: v.riders.filter(r => r.soulId && r.phase === 'leaving').map(r => ({soulId: r.soulId!, name: r.name ?? 'someone'})),
+    steeredBy: ((v as {steer?: {by: SoulRef | null}}).steer?.by) ?? null};
 }
 const minutes = (s: number) => s >= 90 ? `about ${Math.round(s / 60)} minutes` : `${Math.round(s)} seconds`;
 
@@ -37,6 +40,7 @@ export const rideKind: ObjectKind<RideState> = {
     keptFor: {type: 'json', visibility: 'public', description: 'invited companions the basket keeps a place for and waits for'},
     stepping: {type: 'soul[]', visibility: 'public', description: 'riders back on the ground who are stepping out now'},
     waitSeconds: {type: 'integer', visibility: 'public', description: 'seconds it waits at boarding before it departs by itself'},
+    steeredBy: {type: 'json', visibility: 'public', description: 'the rider steering it now; null when it follows its own route'},
   },
   initial(params, ctx) {
     const carrier = String(params.carrier ?? '');
@@ -103,6 +107,41 @@ export const rideKind: ObjectKind<RideState> = {
         : (s.keptFor ?? []).length ? {code: 'ride.keeping-place', reason: `It is keeping a place for ${(s.keptFor ?? []).map(k => k.name).join(', ')} (invited) and departs by itself once they are aboard or the hold ends; starting now would leave them behind. Keep waiting.`} : null,
       validate(s, _p, ctx) { return rideKind.actions.start.available!(s, ctx); },
       apply(s) { return {state: s, result: {departing: s.carrier}, bodies: [{label: s.rowing ? 'Start the rowing loop' : 'Ask the balloon to lift off', steps: [{verb: 'mars:carrier_depart', params: {carrier: s.carrier}}]}]}; },
+    },
+    // VEHICLE-STEER (Gene 2026-10-23, #12): one verb for every ride. The engine owns the physics and the honest refusals
+    // (another rider steering, no landing spot, no open water, out of bounds); this resolves the destination for the Soul.
+    steer: {
+      movesBody: true,
+      label: 'Steer it: to a place (to) or a direction + distance; add land to set down there; land alone lands here (a punt rows back to its bank); stop holds here',
+      roles: ['rider'], reach: 'anywhere',
+      params: {
+        to: {type: 'string', maxLength: 100, optional: true, description: 'a place you know'},
+        direction: {type: 'string', maxLength: 10, optional: true, description: 'N, NE, E, SE, S, SW, W or NW (with distance)'},
+        distance: {type: 'integer', min: 5, max: 1000, optional: true, description: 'metres in that direction'},
+        land: {type: 'boolean', optional: true, description: 'set down (there, or here); a punt lands only at its own bank'},
+        stop: {type: 'boolean', optional: true, description: 'stop and hold here; with no new steer it rejoins its own route after 2 minutes'},
+      },
+      available: (s, ctx) => !s.riders.some(r => r.soulId === ctx.soul.soulId) ? {code: 'ride.not-aboard', reason: 'Only a seated rider can steer; join it first.'}
+        : s.phase !== 'aloft' && s.phase !== 'boarding' ? {code: 'ride.on-ground', reason: 'It is on the ground; its riders are stepping out.'}
+        : s.steeredBy && s.steeredBy.soulId !== ctx.soul.soulId ? {code: 'ride.steered', reason: `${s.steeredBy.name} is steering it; wait until they stop or land.`}
+        : null,
+      validate(s, p, ctx) {
+        const no = rideKind.actions.steer.available!(s, ctx); if (no) return no;
+        const modes = [p.to !== undefined, p.direction !== undefined || p.distance !== undefined, p.stop === true].filter(Boolean).length;
+        if (modes > 1 || (p.stop && p.land) || (modes === 0 && !p.land)) return {code: 'ride.steer-params', reason: 'Steer with one of: to (a place), direction + distance, land, or stop.'};
+        if (p.stop || (p.land && modes === 0)) return null;
+        const t = ctx.steerTarget?.(s.carrier, {to: p.to as string | undefined, direction: p.direction as string | undefined, distance: p.distance as number | undefined});
+        return !t ? {code: 'steer.unavailable', reason: 'Steering is not available here.'} : t.ok ? null : {code: t.code, reason: t.reason};
+      },
+      apply(s, p, ctx) {
+        const what = s.rowing ? 'the punt' : 'the balloon';
+        const t = p.stop || (p.land && p.to === undefined && p.direction === undefined) ? null : ctx.steerTarget!(s.carrier, {to: p.to as string | undefined, direction: p.direction as string | undefined, distance: p.distance as number | undefined});
+        const at = t && t.ok ? t : null, land = p.land === true;
+        const doing = p.stop ? `stops ${what} where it is` : at ? `steers ${what} toward ${at.label}${land ? (s.rowing ? '' : ' to land there') : ''}` : s.rowing ? 'rows the punt back to its bank' : 'brings the balloon down here';
+        return {state: s, result: {steering: s.carrier, ...(at ? {toward: at.label} : {}), land, stop: p.stop === true},
+          events: [{to: s.riders.map(r => r.soulId).filter(id => id !== ctx.soul.soulId), text: `${ctx.nameOf(ctx.soul.soulId)} ${doing}.`, untrusted: true}],
+          bodies: [{label: `Steer ${what}${at ? ` toward ${at.label}` : p.stop ? ': stop' : ': land'}`, steps: [{verb: 'mars:carrier_steer', params: {carrier: s.carrier, ...(at ? {x: at.x, z: at.z} : {}), ...(land ? {land: true} : {}), ...(p.stop ? {stop: true} : {})}}]}]};
+      },
     },
   },
 };

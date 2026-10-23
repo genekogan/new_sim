@@ -778,7 +778,7 @@ export class MarsEngine implements Engine {
     }
     const first = program.steps[0]; if (!first) return null;
     const aboard=this.carrierOf(program.actor);
-    if(aboard&&aboard.phase==='aloft'&&!program.steps.every(s=>['rest','wave','perform','mars:carrier_depart'].includes(s.verb)))
+    if(aboard&&aboard.phase==='aloft'&&!program.steps.every(s=>['rest','wave','perform','mars:carrier_depart','mars:carrier_steer'].includes(s.verb)))
       return {code:'carrier.aloft',message:`You are riding in ${aboard.label} above the ground; it lands by itself and you step out then.`};
     if(first.verb==='stand'&&first.params.nativeSeatReleaseV1!==undefined){
       if(this.ents[program.actor].body?.family==='floater'||typeof first.params.nativeSeatReleaseV1!=='string'||!this.nativeSeatHoldsV1(program.actor).some(s=>s.action===first.params.nativeSeatReleaseV1))return {code:'stand.seat-claim-changed',message:'The explicit stand no longer owns its original native seat claim.'};
