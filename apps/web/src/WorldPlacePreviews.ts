@@ -59,7 +59,8 @@ export class WorldPlacePreviews{
    this.pacer.done();STEPS.push(['slice',Math.round(performance.now()-sliceStart)]);
    const bare=!scene.children.length;if(bare&&!this.live())return null;  // nothing of the place drawn: with a live world it is still pictured (a lake that is only water), never kept
    scene.updateMatrixWorld(true);
-   const shot=await this.shoot(scene,center,radius,view,key,alive,id.startsWith('room:')||Object.hasOwn(INTERIOR_PLACE_VIEWS,id));if(shot&&!bare)keep(key,shot);return shot;
+   const inside=location?.inside;  // a one-room building: shot from inside its room at eye level, like the room cards
+   const shot=await this.shoot(scene,center,radius,inside??view,key,alive,!!inside||id.startsWith('room:')||Object.hasOwn(INTERIOR_PLACE_VIEWS,id));if(shot&&!bare)keep(key,shot);return shot;
   }finally{target.dispose();for(const mesh of instances)mesh.dispose();for(const g of geometries)g.dispose();for(const m of materials.values())m.dispose();scene.clear();}
  }
  /** Gene 2026-10-23 (#13): a full photogenic shot of the place in the real world (terrain, water, sky, neighbours), not a
