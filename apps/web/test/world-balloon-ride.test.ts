@@ -118,3 +118,9 @@ test('the ride asset is cheap: five meshes (BALLOON-BODY added the swinging gate
   assert.equal(meshes, 5); assert.ok(tris < 3000, String(tris));
   ride.dispose();
 });
+
+test('a balloon rider stands with both hands on the rim (carrier activity "ride" is a standing overlay, never a gait)', async () => {
+  const {activityFrame, activityBase, ACTIVITY_OVERLAYS} = await import('../../../mars/viewer/app/engine-view/activity-poses.ts');
+  assert.ok(ACTIVITY_OVERLAYS.has('ride')); assert.equal(activityBase('ride'), 'idle');
+  for (const s of [0, 7, 31]) { const f = activityFrame('ride', 'idle', s, 'soul-a')!; assert.ok(f.hands?.[0] && f.hands[1], 'both hands placed'); assert.ok(f.hands[0][2] < -0.3, 'hands down at the rim'); }
+});
