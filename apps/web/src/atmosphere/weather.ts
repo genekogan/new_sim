@@ -19,9 +19,10 @@ export function hash01(a:number,b=0){let h=(Math.imul(a|0,0x27d4eb2d)^Math.imul(
 type Regime='fair'|'unsettled'|'misty'|'breezy';
 const REGIMES:[Regime,number][]=[['fair',.34],['unsettled',.26],['misty',.2],['breezy',.2]];
 // Gene 2026-10-07: rain about 5% of the time, storms rarer still (was ~16% rain+storm).
+// WEATHER-RULES: unsettled rain/storm weights raised so the one-slot shower cap keeps those totals (wet ~5%, storm ~1.5%).
 const WEIGHTS:Record<Regime,Record<WeatherKind,number>>={
  fair:{clear:.64,cloudy:.24,rain:.005,wind:.115,fog:0,storm:0},
- unsettled:{clear:.22,cloudy:.42,rain:.115,wind:.21,fog:0,storm:.035},
+ unsettled:{clear:.22,cloudy:.42,rain:.125,wind:.21,fog:0,storm:.06},
  misty:{clear:.33,cloudy:.3,rain:.015,wind:0,fog:.355,storm:0},
  breezy:{clear:.42,cloudy:.2,rain:.015,wind:.36,fog:0,storm:.005},
 };
