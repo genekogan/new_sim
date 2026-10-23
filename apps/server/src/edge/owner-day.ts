@@ -60,9 +60,9 @@ export function describeCapability(cap: string, nameOf: (id: string) => string |
 export function describeAttempt(cap: string, nameOf: (id: string) => string | null): string {
   const [verb = cap, ...rest] = cap.split(':');
   if (verb === 'object') { const [obj = '', action = 'use'] = rest; return `tried to ${action.replace(/-/g, ' ')} ${nameOf(obj) ?? plain(obj)}`.trim(); }
-  const named = targetOf(rest, nameOf), spot = SPOT_ACTIVITIES[verb]?.label, plain = verb.replace(/-/g, ' ');
-  if (named) return `tried to ${BASE_TO[verb] ?? (spot ? spot.toLowerCase() + ' at' : plain)} ${named}`;
-  return `tried to ${BASE[verb] ?? (spot ? spot.toLowerCase() : plain)}`;
+  const named = targetOf(rest, nameOf), spot = SPOT_ACTIVITIES[verb]?.label, verbWords = verb.replace(/-/g, ' ');
+  if (named) return `tried to ${BASE_TO[verb] ?? (spot ? spot.toLowerCase() + ' at' : verbWords)} ${named}`;
+  return `tried to ${BASE[verb] ?? (spot ? spot.toLowerCase() : verbWords)}`;
 }
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
