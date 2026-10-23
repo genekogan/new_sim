@@ -59,7 +59,7 @@ export function explicitPlaceCapability(L:EdgeLedger,soul:EdgeSoul,asked:string)
  if(verb==='walk'){const object=offeredWalkObject(L,soul,target);if(object)return object.ok?null:object;}
  const q=normalizedPlaceName(target),named=knownBootPlaces(L,soul.soulId).some(p=>p.id===target||normalizedPlaceName(p.name)===q||p.aliases.some(a=>normalizedPlaceName(a)===q));
  // Preserve strict/1 unknown-ID diagnostics without blocking declared idlike aliases.
- if(!named){const strict=strictCheck(L,soul,asked,caps);if(strict)return L.onDemandId(soul,asked)?null:{ok:false as const,...strict};}
+ if(!named){const strict=strictCheck(L,soul,asked,caps);if(strict)return L.onDemandId?.(soul,asked)?null:{ok:false as const,...strict};}
  if(!named&&verb!=='walk'&&verb!=='stroll'&&verb!=='gather'&&verb!=='hang-out')return null;
  const r=resolvePlaceForVerb(L,soul,target,verb);
  // F6: the asked ID is itself the walk offered on demand: act/resolve read it as an offered ID (it is not in the listing)
