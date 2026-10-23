@@ -177,18 +177,21 @@ export class Intents {
 
   private go(P: Perception, s: Record<string, unknown>, verb: string): Resolution {
     const asked = str(s.place) ?? str(s.target); if (!asked) return no('capability.params', `${verb} needs a place: {"verb":"go","target":{"place":"<id or name>"}}.`);
-    const {caps} = this.L.coreA.binds(P.soul), via = s.via !== undefined ? {via: s.via} : {}, withP = s.with !== undefined ? {with: s.with} : {};
+    const {caps, plans} = this.L.coreA.binds(P.soul), via = s.via !== undefined ? {via: s.via} : {}, withP = s.with !== undefined ? {with: s.with} : {};
     const walkTo = (c: EdgeCapability) => {const p = this.L.places.byId.get(c.target!.id); return {ok: true as const, kind: 'capability' as const, capability: c.id, ...(Object.keys({...via, ...withP}).length ? {params: {...via, ...withP}} : {}), chosen: {...(c.target!.kind==='place'?{place:c.target!.id}:{target:c.target!.id,kind:c.target!.kind}), name: p?.name ?? c.label, ...(p ? this.eta(P, centroid(p.polygon)) : {})}};};
     // Preserve exact non-place destinations such as a carrier boarding object.
     const exact = caps.find(c => c.verb==='walk'&&(c.id===asked||c.id === `walk:${asked}`));
     // RT: a walk the body cannot make from here is refused with the engine's route code, not resolved and then refused at act
-    const dead = (c: EdgeCapability) => {const d = this.L.routeProblem(P.soul, c.id); return d ? no(d.code, d.reason) : null;};
+    const dead = (c: EdgeCapability, p?: typeof plans) => {const d = this.L.routeProblem(P.soul, c.id, p); return d ? no(d.code, d.reason) : null;};
     if (exact?.target?.kind === 'object') {if (!exact.available && exact.blocked) return no(exact.blocked.code, exact.blocked.reason);return dead(exact) ?? walkTo(exact);}
     const object=offeredWalkObject(this.L,P.soul,asked);if(object){if(!object.ok)return object;const d=dead(object.cap);if(d)return d;const out=walkTo(object.cap);return {...out,chosen:{...out.chosen,matchedBy:object.matchedBy}};}
     const r=resolvePlaceForVerb(this.L,P.soul,exact?.target?.kind==='place'?exact.target.id:asked);
     if(!r.ok)return r;
-    const cap=caps.find(c=>c.id===r.chosen.capability)!;
-    const d=dead(cap);if(d)return d;
+    // GO-FAR (2026-10-23): a far place's walk the listing leaves out is built on demand, as act "walk to <place>" does
+    // (it was caps.find(...)!, a TypeError the edge answered as 503 "the ledger could not answer")
+    let cap=caps.find(c=>c.id===r.chosen.capability),capPlans:typeof plans|undefined;
+    if(!cap){const od=this.L.resolveOnDemand(P.soul,r.chosen.capability,caps,plans);if(od.v.kind==='unknown'||od.v.cap.id!==r.chosen.capability)return no('place.unwalkable',`No walk reaches ${r.chosen.name??asked} from where you are.`);cap=od.v.cap;capPlans=od.plans;}
+    const d=dead(cap,capPlans);if(d)return d;
     const out=walkTo(cap);return {...out,chosen:{...out.chosen,...r.chosen}};
   }
 
