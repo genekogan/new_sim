@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.6",
-    "@privy-io/react-auth": "^3.46.0",
     "@sim/client": "workspace:*",
     "@sim/ground": "workspace:*",
     "@sim/world-compiler": "workspace:*",
