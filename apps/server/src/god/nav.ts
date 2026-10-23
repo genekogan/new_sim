@@ -348,6 +348,9 @@ export class GodNav {
       // a thing with no approach of its own: the main ground nearest it when the spot beside it is a pocket (a lamp behind
       // a fence, a shelf with a gap behind it), and a big structure from the main ground near it
       if (!t.stands?.length) goal = toMain(goal, t.big ? 80 : 3);
+      // RESOLVE2: a thing up on a roof whose own patch is cut off (eden-house-3: its planters stand on a strip a ridge
+      // parts from the terrace its roof stair lands on): the nearest connected standing room on that roof within 4 m
+      if (goal && goal.level > 0 && E.navCheckV1 && E.navWarmV1?.(0) && !E.navCheckV1([{ id: t.ref, ...goal }])[0]?.ok) goal = this.roofReach(goal) ?? goal;
       // WALK3: a duck on the lake, a boat in the harbour: the shore of the water it floats on, nearest to it
       if (!goal && !t.level) for (const w of this.things()) {
         if (w.kind !== 'water' || !w.area || !inPoly(t.at[0], t.at[1], w.area)) continue;
@@ -357,6 +360,18 @@ export class GodNav {
     }
     this.goals.set(key, { tick, key, goal });
     return goal;
+  }
+
+  /** RESOLVE2: the nearest connected (walkable both ways from the main ground) standing spot on `g`'s level within 4 m. */
+  private roofReach(g: { p: Vec2; level: number }): { p: Vec2; level: number } | null {
+    const E = this.h.engine, pts: { id: string; p: Vec2; level: number }[] = [];
+    for (let dz = -4; dz <= 4; dz += 0.5) for (let dx = -4; dx <= 4; dx += 0.5) if (Math.hypot(dx, dz) <= 4) pts.push({ id: `${dx},${dz}`, p: [r2(g.p[0] + dx), r2(g.p[1] + dz)], level: g.level });
+    let best: Vec2 | null = null, bd = Infinity;
+    for (const v of E.navCheckV1!(pts) as { id: string; ok: boolean }[]) {
+      if (!v.ok) continue; const [dx, dz] = v.id.split(',').map(Number), d = Math.hypot(dx, dz);
+      if (d < bd) { bd = d; best = [r2(g.p[0] + dx), r2(g.p[1] + dz)]; }
+    }
+    return best ? { p: best, level: g.level } : null;
   }
 
   /** F1: a room's goal is standing room inside it that the front door reaches (furniture can close off its middle):
@@ -598,9 +613,13 @@ export class GodNav {
   private offerWalk(soul: EdgeSoul, t: Thing, d: number, at: { here: Vec2; myLevel: number; seated: boolean; exit: { p: Vec2; level: number } | null }, caps: EdgeCapability[], plans: Plans) {
     const { here, myLevel, seated, exit } = at;
     const id = `walk:${t.ref}`; if (caps.some((c) => c.id === id)) return;
-    const goal = this.goal(t, here, soul.entityId), where = this.label(t, Math.round(d)), place = this.h.placeOf?.(t.ref);
+    const g0 = this.goal(t, here, soul.entityId), where = this.label(t, Math.round(d)), place = this.h.placeOf?.(t.ref);
+    // RESOLVE2: a goal up on a roof (or a raised floor) the main ground has no way up to is never offered as available
+    // (a roof bench with no stair: the walk 'completed' in the lobby below)
+    const E = this.h.engine, cut = !!g0 && g0.level > 0 && !!E.navCheckV1 && !!E.navWarmV1?.(0) && E.navCheckV1([{ id, ...g0 }])[0]?.ok === false;
+    const goal = cut ? null : g0;
     const cap: EdgeCapability = { id, verb: 'walk', label: where, target: place ? { id: place, kind: 'place' } : { id: t.id, kind: 'object' }, available: !!goal,
-      ...(goal ? {} : { blocked: this.blocked.has(t.ref) ? { code: 'route.unreachable', reason: this.blocked.get(t.ref)! } : { code: 'place.no-standing-room', reason: `There is no clear standing room at ${t.ref} right now.` } }) };
+      ...(goal ? {} : { blocked: cut ? { code: 'route.unreachable', reason: `${t.ref} is up where no stair or ramp from the ground reaches.` } : this.blocked.has(t.ref) ? { code: 'route.unreachable', reason: this.blocked.get(t.ref)! } : { code: 'place.no-standing-room', reason: `There is no clear standing room at ${t.ref} right now.` } }) };
     caps.push(cap);
     if (!goal) return;
     const stand: Step[] = seated ? [{ verb: 'stand', params: {} }] : [];
