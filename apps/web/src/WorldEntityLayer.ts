@@ -31,7 +31,7 @@ import { entityArrivalPose } from './entity-arrival.ts';
 import { keySeen, shapeWedgeDistance, viewFirst, viewWedge, type ViewWedge } from './arrival-view.ts';
 import { WorldBuildSites, SITE_REFINEMENT, type PublicSite } from './WorldBuildSites.ts';
 import { GroundCover, coverSetting } from './gen-mesh/ground-cover.ts';
-import { isRideBalloonDef } from './gen-mesh/kits/ride-balloon.ts';
+import { isRideBalloonDef, rideMotionDef } from './gen-mesh/kits/ride-balloon.ts';
 
 type Snapshot = { contract: string; worldId: string; seq: number; counter?: number; seed?: string; constants: WorldModel['constants']; state: WorldModel['state']; ground: Ground; defs: StoredDef[]; entities: Entity[]; tiles: Record<string, string>; assetBytes?: Record<string, number>; builds?: PublicSite[]; buildsRev?: number; now?: number };
 type DiffMsg = { type: 'edge'; kind: 'world-diff'; seq: number; diff: { upserts: Entity[]; removes: string[]; defs: StoredDef[]; tiles: string[]; world?: Partial<WorldModel['state']> }; ground?: Ground; defs?: StoredDef[] };
@@ -277,7 +277,7 @@ export class WorldEntityLayer {
     if (!p) { this.overrideYaw.delete(e.id); if (this.overrides.delete(e.id)) { const d = this.drawn.get(e.id); if (d) d.settled = false; } return; }
     const d = this.drawn.get(e.id); if (!d) return;
     const g = this.groundAt(d.to.p.x, d.to.p.z) ?? 0;
-    const v = this.overrides.get(e.id) ?? new THREE.Vector3(); const lift = d.to.p.y - g; v.set(p[0], (lift < 0.5 ? 0 : lift) + p[1], p[2]);  // BALLOON-BODY: a basket standing on the ground draws its floor at the twin's floor (its riders' feet) this.overrides.set(e.id, v);
+    const v = this.overrides.get(e.id) ?? new THREE.Vector3(); const lift = d.to.p.y - g; v.set(p[0], (lift < 0.5 ? 0 : lift) + p[1], p[2]); this.overrides.set(e.id, v);  // BALLOON-BODY: a basket standing on the ground draws its floor at the twin's floor (its riders' feet)
     if (yaw === undefined) this.overrideYaw.delete(e.id); else this.overrideYaw.set(e.id, yaw);
   }
 
@@ -336,7 +336,7 @@ export class WorldEntityLayer {
       // P1: a hidden thing (a storey its building hides, or far furniture on a phone) is not animated: nobody sees it
       // P7b: things stay at their stored pose under the arrival card (the creatures' first route search was ~0.09 s of a 4x
       // phone's card); nobody sees motion before the card is gone
-      if (d.motion && t >= 1 && !inHand && shown && moving) animate(d.obj, d.motion.entity, d.motion.def, nowMs / 1000, { y: ride ? ride.y : d.to.p.y, yaw: d.motion.yaw });
+      if (d.motion && t >= 1 && !inHand && shown && moving) animate(d.obj, d.motion.entity, d.motion.def, nowMs / 1000, { y: ride ? ride.y : d.to.p.y, yaw: ride && this.overrideYaw.has(id) ? -this.overrideYaw.get(id)! : d.motion.yaw });
       if (ride) { d.obj.position.x = ride.x; d.obj.position.z = ride.z; }
     }
     void dt;
@@ -693,7 +693,8 @@ export class WorldEntityLayer {
     if (!instKey) this.thingsGroup.add(built);
     const to = { p: target, s: isWorld ? 1 : wp.s };
     if (isWorld) { from.s = fresh && ease ? 1 : 1; }
-    this.drawn.set(e.id, { ...(instKey ? { inst: instKey, settled: false } : {}), obj: built, from, to, t0: this.now, dur: ease ? refinement?.seconds ?? EASE_IN_S : 0.001, defHash, world: isWorld, ...(hasMotion(def) ? { motion: { entity: e, def, yaw: wp.yaw, glowOnly: glowOnly(def) } } : {}) });
+    const mdef = rideMotionDef(def);  // BALLOON-BODY: a ride balloon does not hover; Core's vehicle owns its motion
+    this.drawn.set(e.id, { ...(instKey ? { inst: instKey, settled: false } : {}), obj: built, from, to, t0: this.now, dur: ease ? refinement?.seconds ?? EASE_IN_S : 0.001, defHash, world: isWorld, ...(hasMotion(mdef) ? { motion: { entity: e, def: mdef, yaw: wp.yaw, glowOnly: glowOnly(mdef) } } : {}) });
   }
   private undraw(id: string, delaySeconds = 0) {
     this.held.delete(id); this.horizonBy.delete(id);
