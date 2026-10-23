@@ -74,3 +74,21 @@ test('attention: a server counts websockets and requests', async (t) => {
   assert.equal(a.inflight, 0, 'health checks are not attention');
   assert.ok(changes >= 2);
 });
+
+test('attention: the Eyes render worker (user agent EdenEyes/1) is not a watcher', async (t) => {
+  const server = createServer((_req, res) => { setTimeout(() => res.end('ok'), 50); });
+  const a = new Attention(() => {}, 0).watch(server, 60_000);
+  server.listen(0, '127.0.0.1'); await once(server, 'listening'); t.after(() => { a.stop(); server.close(); });
+  const port = (server.address() as { port: number }).port;
+  assert.equal(a.check(), false);
+  const ua = 'Mozilla/5.0 HeadlessChrome/140 EdenEyes/1';
+  const r = fetch(`http://127.0.0.1:${port}/v1/config`, { headers: { 'user-agent': ua } }); await new Promise((x) => setTimeout(x, 20));
+  assert.equal(a.inflight, 0); assert.equal(a.watched, false);
+  await (await r).text();
+  const { EventEmitter } = await import('node:events');
+  server.emit('upgrade', { url: '/ws', headers: { 'user-agent': ua } }, new EventEmitter(), Buffer.alloc(0));
+  assert.equal(a.open, 0); assert.equal(a.check(), false);
+  const sock = new EventEmitter();
+  server.emit('upgrade', { url: '/ws', headers: { 'user-agent': 'Mozilla/5.0' } }, sock, Buffer.alloc(0));
+  assert.equal(a.open, 1); sock.emit('close'); assert.equal(a.open, 0);
+});
