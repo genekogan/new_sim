@@ -94,7 +94,9 @@ export class Objects {
     };
   }
   private ctx(o: ObjectRecord, kind: ObjectKind, soul: EdgeSoul, inPlace: (placeId: string) => boolean = id => this.inPlace(soul.soulId, id)): ActionCtx {
-    return {soul, roles: kind.rolesOf(o.state, soul.soulId), tick: this.core.tick(), now: this.core.now(), nameOf: this.core.nameOf, inPlace: inPlace(o.placeId), carrier: this.carrierRead};
+    return {soul, roles: kind.rolesOf(o.state, soul.soulId), tick: this.core.tick(), now: this.core.now(), nameOf: this.core.nameOf, inPlace: inPlace(o.placeId), carrier: this.carrierRead,
+      steerTarget: (id, spec) => this.core.deps.ledger.steerTarget?.(soul.soulId, id, spec) ?? {ok: false, code: 'steer.unavailable', reason: 'Steering is not available here.'},
+      steerCheck: (carrier, step) => this.core.deps.ledger.steerCheck?.(soul.entityId, carrier, step) ?? null};
   }
   /** Apply time-driven transitions and persist them (with their events). */
   private advanced(o: ObjectRecord,persist=true,pre?:ReturnType<NonNullable<ObjectKind['advance']>>): ObjectRecord {

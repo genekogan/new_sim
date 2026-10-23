@@ -37,7 +37,7 @@ import {Intents,walkWithDestinationWords,walkWithFallback, attentionWords, type 
 import {classWords} from '../intents/class-words.ts';
 import {strictCheck} from '../intents/strict.ts';
 import {bodyEnd} from '../perception/here.ts';
-import {bootAliases,explicitPlaceCapability,lookupPlaceIdentity,resolvePlaceForVerb} from '../boot/world-places.ts';
+import {bootAliases,explicitPlaceCapability,knownBootPlaces,lookupPlaceIdentity,resolvePlaceForVerb} from '../boot/world-places.ts';
 import {ActionOutcomes,outcomeParams,type ConfirmedEffects} from '../outcomes/store.ts';
 import {holdingFact,receiptItemOp,confirmedTogetherEffects,confirmedObjectEffects} from '../outcomes/effects.ts';
 import {resolveMailRecipient} from '../outcomes/recipients.ts';
@@ -1057,7 +1057,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
         if(issue?.code==='program.safe-stop-required')await this.host.enqueue('edge-stop',`edge:${soul.soulId}`,{soulId:soul.soulId,entityId:soul.entityId,receipt:id});
       }else{
         const guard=():true=>{authority();if(this.host.quietBarrier)throw new EdgeError(409,'state.changed','The world entered a quiet barrier; retry.');const fresh=this.host.engine.canPerform({actor:soul.entityId,label,steps});if(fresh)throw new EdgeError(409,fresh.code,fresh.code.startsWith('carrier.')?fresh.message:humanBlockedExplanationV1(fresh.code,label));return true;};
-        await this.host.enqueueObjectDecision(`edge:${soul.soulId}`,{soulId:soul.soulId,entityId:soul.entityId,option:capability,label,steps,reevalTicks:1e9,fallback:false,trigger:`edge-act:${id}`},guard,()=>{const detail=admission.commit(id)??{};this.insert(soul,capability,'waiting',clientRef,false,detail,{},id);const program=this.host.engine.programOf(soul.entityId);if(!program)throw Error('object.native-program-missing');this.update(id,{phase:'started',program_id:program});return true;});
+        await this.host.enqueueObjectDecision(`edge:${soul.soulId}`,{soulId:soul.soulId,entityId:soul.entityId,option:capability,label,steps,reevalTicks:1e9,fallback:false,trigger:`edge-act:${id}`},guard,()=>{const detail=admission.commit(id)??{};this.insert(soul,capability,'waiting',clientRef,false,detail,{},id);const program=(this.host.engine as {instantProgramV1?(a:string):string|null}).instantProgramV1?.(soul.entityId)??this.host.engine.programOf(soul.entityId);if(!program)throw Error('object.native-program-missing');this.update(id,{phase:'started',program_id:program});return true;});
       }
       return {accepted:true as const,receipt:this.receipt(soul.soulId,id)!};
     }catch(error){return refuse(error instanceof EdgeError?error.code:'object.admission-failed',error instanceof EdgeError?error.message:'Object/body admission did not commit; observe and retry.');}
@@ -1099,7 +1099,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
   carrierView(entityId: string) {
     const c = this.carriersNative().find(x => x.id === entityId); if (!c) return null;
     const def = CATALOG[c.def]?.capabilities?.carrier, tick = this.host.engine.world.tick, place = this.places.carrierPlaces.get(c.id);
-    const rot = (l: [number, number]) => {const cs = Math.cos(c.pose.yaw), sn = Math.sin(c.pose.yaw); return [Math.round((c.state.home[0] + l[0] * cs - l[1] * sn) * 100) / 100, Math.round((c.state.home[2] + l[0] * sn + l[1] * cs) * 100) / 100];};
+    const rot = (l: [number, number]) => {const cs = Math.cos(c.pose.yaw), sn = Math.sin(c.pose.yaw); return [Math.round((c.pose.p[0] + l[0] * cs - l[1] * sn) * 100) / 100, Math.round((c.pose.p[2] + l[0] * sn + l[1] * cs) * 100) / 100];};
     const riders = Object.entries(c.state.seats).flatMap(([seat, entity]) => {
       if (!entity) return []; const m = this.host.mindByEntity?.get(entity) ?? [...this.host.minds.values()].find(x => x.entityId === entity), b = this.aboard(entity);
       const exit = def?.seats.find(s => s.id === seat)?.exit, bankExit = c.state.bank?.exits[seat];
@@ -1114,7 +1114,43 @@ export class EdgeLedger implements EdgeLedgerHooks {
       departsInSeconds: c.state.phase === 'boarding' && c.state.departAtTick !== null ? Math.max(0, Math.round((c.state.departAtTick - tick) / 20)) : null,
       departsAtTick: c.state.phase === 'boarding' ? c.state.departAtTick : null, returnsAtTick: c.state.phase === 'aloft' ? tick + Math.max(0, Math.round(end * 20) - c.state.elapsed) : null,
       route: {id: c.state.route.id, seconds: end, elapsedSeconds: Math.round(c.state.elapsed / 2) / 10, keys: c.state.route.keys, interpolation: 'eden-rides/1 hermite'},
+      ...((c.state as {steer?: {by: string | null; land?: number[]; to: number[]; ret?: true}}).steer ? (() => {const st = (c.state as unknown as {steer: {by: string | null; land?: number[]; to: number[]; ret?: true}}).steer, m = st.by ? this.host.mindByEntity?.get(st.by) ?? [...this.host.minds.values()].find(x => x.entityId === st.by) : undefined;
+        return {steer: {by: m ? {soulId: m.soulId, name: m.name} : null, returning: !!st.ret, to: [st.to[0], st.to[2]], ...(st.land ? {landAt: [st.land[0], st.land[2]]} : {})}};})() : {}),
       flights: c.state.flights, phaseTick: c.state.phaseTick, tick, waitSeconds: Math.round(((c.state as {waitTicks?: number}).waitTicks ?? 900) / 20)};
+  }
+  /** VEHICLE-STEER: where a rider asks a ride to go, as ground (x, z): a place the Soul knows (its centre), or a compass
+   *  direction + distance from the ride's position. Validation of the spot itself (water, landing, bounds) is the engine's. */
+  steerTarget(soulId: string, entityId: string, spec: {to?: string; direction?: string; distance?: number}): {ok: true; x: number; z: number; label: string} | {ok: false; code: string; reason: string; did_you_mean?: unknown} {
+    const c = this.carriersNative().find(x => x.id === entityId); if (!c) return {ok: false, code: 'ride.closed', reason: 'This ride is not running.'};
+    if (spec.to !== undefined) {
+      let r = lookupPlaceIdentity(this, spec.to, soulId);
+      // "the lighthouse" names several places (a region, its breakwater, a room): steering wants the first that every word fits
+      if (!r.ok && r.did_you_mean.length) {
+        const words = String(spec.to).toLowerCase().replace(/^the\s+/, '').split(/[^a-z0-9]+/).filter(Boolean);
+        const fit = r.did_you_mean.map(d => this.places.byId.get(d.placeId)).find(pl => pl?.polygon?.length && !pl.carrier && words.every(w => `${pl.id} ${pl.name}`.toLowerCase().includes(w)));
+        if (fit) r = {ok: true, chosen: {place: fit.id, name: fit.name}} as unknown as typeof r;
+      }
+      if (!r.ok) {
+        // name a few real choices: the near-misses, else the known places nearest the ride
+        const near = r.did_you_mean.length ? r.did_you_mean.map(d => this.places.byId.get(d.placeId)?.name ?? d.label) : knownBootPlaces(this, soulId).filter(k => k.access === 'admitted' || k.access === 'scenery').map(k => this.places.byId.get(k.id)).filter(pl => pl?.polygon?.length && !pl.carrier)
+          .map(pl => {const [x, z] = centroid(pl!.polygon!); return {name: pl!.name, d: Math.hypot(x - c.pose.p[0], z - c.pose.p[2])};}).sort((a, b) => a.d - b.d).slice(0, 5).map(x => x.name);
+        return {ok: false, code: 'steer.unknown-place', reason: `"${String(spec.to).slice(0, 60)}" is not a place you know; name a place (or give a direction and distance)${near.length ? `. Places you know: ${[...new Set(near)].slice(0, 5).join(', ')}` : ''}.`, did_you_mean: r.did_you_mean.slice(0, 5)};
+      }
+      const pl = this.places.byId.get(r.chosen.place); if (!pl?.polygon?.length) return {ok: false, code: 'steer.unknown-place', reason: `${r.chosen.name} has no location to steer to.`};
+      const [x, z] = centroid(pl.polygon); return {ok: true, x: Math.round(x * 100) / 100, z: Math.round(z * 100) / 100, label: pl.name};
+    }
+    const POINTS: Record<string, number> = {n: 0, north: 0, ne: 45, northeast: 45, e: 90, east: 90, se: 135, southeast: 135, s: 180, south: 180, sw: 225, southwest: 225, w: 270, west: 270, nw: 315, northwest: 315};
+    const deg = POINTS[String(spec.direction ?? '').toLowerCase().replace(/[\s-]/g, '')], d = Number(spec.distance);
+    if (deg === undefined || !(d >= 5 && d <= 1000)) return {ok: false, code: 'steer.params', reason: 'Steer to a place (to) or a compass direction (N, NE, ... NW) with a distance of 5-1000 m.'};
+    const a = deg * Math.PI / 180, x = c.pose.p[0] + d * Math.sin(a), z = c.pose.p[2] - d * Math.cos(a);
+    return {ok: true, x: Math.round(x * 100) / 100, z: Math.round(z * 100) / 100, label: `${Math.round(d)} m ${['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'][deg / 45]}`};
+  }
+  /** VEHICLE-STEER: the engine's own refusal for a steer step now (another rider steering, out of bounds, no open water, no
+   *  landing spot), so the Soul hears it at once instead of in a failed receipt. Pure: nothing changes. */
+  steerCheck(entityId: string, carrier: string, step: {x?: number; z?: number; land?: boolean; stop?: boolean}): {code: string; reason: string} | null {
+    const eng = this.host.engine as {previewMarsVerbV1?(verb: string, params: unknown): {code: string; message: string} | null};
+    const no = eng.previewMarsVerbV1?.('carrier_steer', {actor: entityId, carrier, ...step}); if (!no) return null;
+    return {code: no.code.replace(/^carrier\./, 'ride.'), reason: no.message.charAt(0).toUpperCase() + no.message.slice(1) + '.'};
   }
   rides() {return this.carriersNative().map(c => this.carrierView(c.id)!);}
   private rideKey = new Map<string, string>();

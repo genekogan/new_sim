@@ -495,6 +495,8 @@ export class MarsEngine implements Engine {
     const r = def.plan(this.rt, parsed.data);
     return r.ok ? null : { code: r.diagnostic.code, message: r.diagnostic.message, ...(subjects?{subjects:[...(r.diagnostic.subjects??[])]}:{}) };
   }
+  /** VEHICLE-STEER: a pure check of a Mars verb (no `mars:` prefix) against the world now: the refusal it would meet, or null. */
+  previewMarsVerbV1(verb: string, params: unknown): Diag | null { return this.plan(verb, params, true); }
   /** A reachable standing point `standoff` metres from a target, on the side the actor comes from if possible. 'here' if already there. */
   private goalNear(actor: string, to: unknown, standoff: number): { x: number; z: number; level: number } | 'here' | Diag {
     const me = this.pos(actor)!, t = this.pointOf(to);
@@ -761,7 +763,14 @@ export class MarsEngine implements Engine {
     }
     return [...ids].sort();
   }
+  /** VEHICLE-STEER: a seated rider's steer is a word to the ride, not a body movement: it never replaces the rider's own
+   *  programme (a rower's punt loop stays its receipt) and completes at once. */
+  private instantV1:{actor:string;id:string}|null=null;
+  /** The programme id of an instant steer this actor was just given (it is already complete), for the edge receipt. */
+  instantProgramV1(actor:string):string|null{return this.instantV1?.actor===actor?this.instantV1.id:null;}
+  private steerOnlyV1(program: Program): boolean { return program.steps.length===1&&program.steps[0]?.verb==='mars:carrier_steer'&&!!this.ents[program.actor]&&!!this.carrierOf(program.actor); }
   canPerform(program: Program): Diag | null {
+    if(this.steerOnlyV1(program))return this.plan('carrier_steer',{...program.steps[0].params,actor:program.actor});
     for(const step of program.steps)if(step.verb==='mars:carrier_ride'){const issue=this.puntBoardingIssue(String(step.params.carrier??''));if(issue)return issue;}
     for(const step of program.steps)if(step.params?.spreadWaitPolicy!==undefined&&!this.sharedWaterStep(step))return {code:'action.invalid-spread-wait-policy',message:'Only shared-water-wait/1 or /2 on a pond/1 or pond-lap/1 walk is supported.'};
     const bodyIssue=this.bodyProgramProblemV1(program); if(bodyIssue)return bodyIssue;
@@ -779,7 +788,7 @@ export class MarsEngine implements Engine {
     }
     const first = program.steps[0]; if (!first) return null;
     const aboard=this.carrierOf(program.actor);
-    if(aboard&&aboard.phase==='aloft'&&!program.steps.every(s=>['rest','wave','perform','mars:carrier_depart'].includes(s.verb)))
+    if(aboard&&aboard.phase==='aloft'&&!program.steps.every(s=>['rest','wave','perform','mars:carrier_depart','mars:carrier_steer'].includes(s.verb)))
       return {code:'carrier.aloft',message:`You are riding in ${aboard.label} above the ground; it lands by itself and you step out then.`};
     if(first.verb==='stand'&&first.params.nativeSeatReleaseV1!==undefined){
       if(this.ents[program.actor].body?.family==='floater'||typeof first.params.nativeSeatReleaseV1!=='string'||!this.nativeSeatHoldsV1(program.actor).some(s=>s.action===first.params.nativeSeatReleaseV1))return {code:'stand.seat-claim-changed',message:'The explicit stand no longer owns its original native seat claim.'};
@@ -852,6 +861,12 @@ export class MarsEngine implements Engine {
   }
   previewAdmission(program:Program) { return structuredClone(this.prepareAdmission(program).result); }
   perform(program: Program) {
+    if(this.steerOnlyV1(program)){
+      const id=`p${this.nextProg}`,params={...program.steps[0].params,actor:program.actor},no=this.plan('carrier_steer',params);this.nextProg++;
+      if(no)return {id,ok:false as const,diagnostic:no};
+      const def=this.registry.get('carrier_steer'),parsed=def.schema.parse(params),r=def.plan(this.rt,parsed);def.start(this.rt,parsed,r.program,id);
+      const p={id,actor:program.actor} as Prog;this.emit(p,'step');this.emit(p,'completed');this.instantV1={actor:program.actor,id};return {id,ok:true as const};
+    }
     const {result,build,reverse}=this.prepareAdmission(program),id=result.id;
     this.nextProg++;
     if (!result.ok) {
