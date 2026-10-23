@@ -8,7 +8,7 @@ import type { Entity } from '../../../mars/viewer/engine/world/types.ts';
 import type { SpatialScene } from '../../../mars/viewer/engine/spatial/types.ts';
 import { floaterBody } from '../../../mars/viewer/engine/bodies/body.ts';
 import type { CameraPose, SubjectPose } from '../../../mars/viewer/engine/camera/shots.ts';
-import { WorldDirector, type DirectorChoice, type Landmark } from './WorldDirector.ts';
+import { WorldDirector, MIN_CUT, type DirectorChoice, type Landmark } from './WorldDirector.ts';
 import { WORLD_PLACE_VIEWS, REGION_PLACE_VIEWS } from './WorldPlaces.ts';
 import { WorldTour, type TourView } from './WorldTour.ts';
 import { speakingNow } from './dialogue-speaking.ts';
@@ -62,6 +62,11 @@ const TOUR_VIEWS: readonly TourView[] = [
 /** A subject drawn smaller than this fraction of the frame height is "lost in the scenery". */
 const MIN_SUBJECT_FRACTION = .045;
 const EMPTY_SECONDS = 1.5;
+/** DIRECTOR2: what took the director off its rhythm (resets, solver rejections), for the cut logger; last 50. */
+/** DIRECTOR2: a speck framing is left after EMPTY_SECONDS, but not before the shot has had MIN_CUT on screen (leaving a
+ *  shot cut to 2 s ago made a cut pair under MIN_CUT); until then the camera stays on it. */
+export const leaveSpeck = (smallFor: number, shotAge: number) => smallFor >= EMPTY_SECONDS && shotAge >= MIN_CUT;
+const broadcastLog = (ev: string, key: string) => { const l = ((globalThis as unknown as { __simBroadcastLog?: { t: number; ev: string; key: string }[] }).__simBroadcastLog ??= []); l.push({ t: Date.now() / 1000, ev, key }); if (l.length > 50) l.shift(); };
 const projector = new THREE.PerspectiveCamera(), projected = new THREE.Vector3();
 /** How much of the frame height a standing body at `p` fills from `pose` (0 when behind or outside the frame). */
 export function subjectFraction(pose: CameraPose, aspect: number, p: readonly number[], height: number): number {
@@ -93,6 +98,7 @@ export class WorldBroadcast {
   private choice: DirectorChoice | null = null;
   private lastPick = -Infinity;
   private emptySince: number | null = null;
+  private cutAt = -Infinity;
   private ride: { azimuth: number; checked: number } | null = null;
   /** P7f: the view the arrival camera already shows (arrival-shot.ts: the phone's poster, LiveWorld's first frames), or null.
    *  The first tour shot is then that view's opening push from k = 0 (WorldTour.openingMove), even when the arrival is
@@ -117,6 +123,7 @@ export class WorldBroadcast {
   }
 
   reset() {
+    broadcastLog('reset', this.choice?.key ?? '');
     this.director.reset('live-world');this.rendered.reset();
     this.lastTick = this.lastDecisionWall = -Infinity;
     this.signature = '';
@@ -148,7 +155,7 @@ export class WorldBroadcast {
       const before = this.choice?.key;
       const carriers = hints?.carriers ?? [];
       this.choice = this.picker.choose({ bodies: people.map(id => ({ id, p: frame[id].p, activity: frame[id].activity, riding: records[id]?.body?.family !== 'floater' && !!ridingCarrier(frame[id].p, carriers) })), speaking, now: wallSeconds, landmarks: this.viewsOf(hints)?.landmarks ?? [] });
-      if (this.choice?.key !== before) { const cuts = ((globalThis as unknown as { __simBroadcastCuts?: { t: number; key: string; label: string }[] }).__simBroadcastCuts ??= []); cuts.push({ t: Date.now() / 1000, key: this.choice?.key ?? '', label: this.choice?.label ?? '' }); if (cuts.length > 400) cuts.shift(); this.emptySince = null; if (this.choice?.kind === 'landmark' || before?.startsWith('landmark:')) this.director.reset('live-world'); }
+      if (this.choice?.key !== before) { this.cutAt = wallSeconds; const cuts = ((globalThis as unknown as { __simBroadcastCuts?: { t: number; key: string; label: string }[] }).__simBroadcastCuts ??= []); cuts.push({ t: Date.now() / 1000, key: this.choice?.key ?? '', label: this.choice?.label ?? '' }); if (cuts.length > 400) cuts.shift(); this.emptySince = null; if (this.choice?.kind === 'landmark' || before?.startsWith('landmark:')) this.director.reset('live-world'); }
     }
     const choice = this.choice;
     if (!choice) return null;
@@ -214,7 +221,7 @@ export class WorldBroadcast {
     if (result?.pose && subjects[focus]) {
       const small = subjectFraction(result.pose, aspect, subjects[focus].p, subjects[focus].height ?? 1.75) < MIN_SUBJECT_FRACTION;
       if (!small) this.emptySince = null;
-      else if ((this.emptySince ??= wallSeconds) <= wallSeconds - EMPTY_SECONDS) { this.picker.reject(choice.key, wallSeconds); this.lastPick = -Infinity; this.emptySince = null; }
+      else if (leaveSpeck(wallSeconds - (this.emptySince ??= wallSeconds), wallSeconds - this.cutAt)) { broadcastLog('reject', choice.key); this.picker.reject(choice.key, wallSeconds); this.lastPick = -Infinity; this.emptySince = null; }
     }
     return result ? { ...result, shot: `${choice.label}:${result.shot ?? ''}` } : result;
   }
