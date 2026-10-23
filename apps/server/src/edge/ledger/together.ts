@@ -72,6 +72,10 @@ const INVITE_RADIUS = 60, GESTURE_RADIUS = 8, APPROACH_RADIUS = 400, APPROACH_SE
 export const TOGETHER_RADIUS = 2.2;
 export const besideEachOther = (a: readonly number[], b: readonly number[]) => Math.hypot(a[0] - b[0], a[1] - b[1]) <= TOGETHER_RADIUS;
 
+// Library plans finish with a short shelf visit. Invite the actual activity, not its browse epilogue.
+const invitedPose = (steps: Steps) => [...steps].reverse().find(s => s.verb === 'mars:pose_v1' && s.params.activity !== 'browse')
+  ?? [...steps].reverse().find(s => s.verb === 'mars:pose_v1');
+
 /** Activity verbs an invitation may carry (params.with). */
 const INVITABLE = new Set(['walk', 'stroll', 'wander', 'hang-out', 'gather', 'warm-by-fire', 'sit', 'sit-ground', 'lie', 'nap', 'read', 'write', 'swim', 'rest',
   'dance', 'jump', 'stretch', 'jumping-jacks', 'yoga', 'pushups', 'situps', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'object',
@@ -479,7 +483,7 @@ export class Together {
     if (params.with !== undefined) {
       if (!INVITABLE.has(cap.verb) || (cap.verb === 'object' && cap.action !== 'join')) return {code: 'capability.params', reason: `with (inviting others) works with activities, walks and rides, not ${cap.verb}.`};
       const w = this.withSouls(soul, params.with); if (!w.ok) return {code: w.code, reason: w.reason};
-      const id = 'inv_' + randomUUID().slice(0, 12), out = structuredClone(steps), last = [...out].reverse().find(s => s.verb === 'mars:pose_v1');
+      const id = 'inv_' + randomUUID().slice(0, 12), out = structuredClone(steps), last = invitedPose(out);
       // Keep the activity's destination when the host has not arrived yet. Planning a guest against the
       // host's departure pose otherwise starts two "shared" activities in different buildings.
       const lastMove = last ? out.slice(0, out.indexOf(last)).reverse().find(s => s.verb === 'walk_to' || s.verb === 'mars:walk_to') : undefined;
@@ -570,14 +574,14 @@ export class Together {
       const to = (id: string) => {const t = (ownPlans.get(id)?.steps ?? []).find(s => s.verb === 'walk_to')?.params.to; return Array.isArray(t) ? Math.hypot(Number(t[0]) - activityAt[0], Number(t[1]) - activityAt[1]) : Infinity;};
       const near = ownCaps.filter(c => c.verb === verb && c.available && c.target?.kind === 'spot' && ownPlans.has(c.id)).map(c => ({c, d: to(c.id)})).filter(x => x.d <= 12).sort((a, b) => a.d - b.d || a.c.id.localeCompare(b.c.id))[0];
       if (near) {
-        const steps = structuredClone(ownPlans.get(near.c.id)!.steps), last = [...steps].reverse().find(s => s.verb === 'mars:pose_v1');
-        if (last) {last.params.group = inv.id; last.params.waitSeconds = 20; last.params.alone = 'start'; if (inv.windowPolicy) last.params.windowPolicy = inv.windowPolicy;}
+        const steps = structuredClone(ownPlans.get(near.c.id)!.steps), last = invitedPose(steps);
+        if (last) {if (Number.isFinite(inv.seconds) && inv.seconds! > 0) last.params.seconds = inv.seconds; last.params.group = inv.id; last.params.waitSeconds = 20; last.params.alone = 'start'; if (inv.windowPolicy) last.params.windowPolicy = inv.windowPolicy;}
         return {label: ownPlans.get(near.c.id)!.label, steps, capability: 'accept:' + inv.id, commit};
       }
     }
     if (!hostCap.endsWith(':here') && ownPlans.has(hostCap) && ownCaps.find(c => c.id === hostCap)?.available) {
-      const own = ownPlans.get(hostCap)!, steps = structuredClone(own.steps), last = [...steps].reverse().find(s => s.verb === 'mars:pose_v1');
-      if (last) {last.params.group = inv.id; last.params.waitSeconds = 20; last.params.alone = 'start'; if (inv.windowPolicy) last.params.windowPolicy = inv.windowPolicy;}
+      const own = ownPlans.get(hostCap)!, steps = structuredClone(own.steps), last = invitedPose(steps);
+      if (last) {if (Number.isFinite(inv.seconds) && inv.seconds! > 0) last.params.seconds = inv.seconds; last.params.group = inv.id; last.params.waitSeconds = 20; last.params.alone = 'start'; if (inv.windowPolicy) last.params.windowPolicy = inv.windowPolicy;}
       return {label: own.label, steps, capability: 'accept:' + inv.id, commit};
     }
     if (verb === 'sit') {

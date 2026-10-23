@@ -93,10 +93,13 @@ export class Intents {
       case 'auto-face': return this.autoFaceSetting(soul, s);
       default: {
         let target = str(s.target) ?? str(s.place);
-        if(str(s.place)){const place=resolvePlaceForVerb(this.L,soul,str(s.place),verb);if(!place.ok)return place;target=place.chosen.place;return {ok:true,kind:'capability',capability:place.chosen.capability,...(typeof s.seconds==='number'?{params:{seconds:s.seconds}}:{}),chosen:place.chosen};}
+        // Activity companions must reach Together.prepare unchanged: it owns identity, availability and consent checks.
+        // Preserve invalid values too, so an invalid invitation is refused instead of silently becoming a solo action.
+        const params = {...(typeof s.seconds === 'number' ? {seconds: s.seconds} : {}), ...(s.with !== undefined ? {with: s.with} : {})};
+        if(str(s.place)){const place=resolvePlaceForVerb(this.L,soul,str(s.place),verb);if(!place.ok)return place;target=place.chosen.place;return {ok:true,kind:'capability',capability:place.chosen.capability,...(Object.keys(params).length?{params}:{}),chosen:place.chosen};}
         const {caps} = this.L.coreA.binds(soul), here = caps.find(c => c.id === `${verb}:here`);
         const capability = target ? `${verb}:${target}` : here ? here.id : verb;
-        return {ok: true, kind: 'capability', capability, ...(typeof s.seconds === 'number' ? {params: {seconds: s.seconds}} : {}), chosen: {capability}};
+        return {ok: true, kind: 'capability', capability, ...(Object.keys(params).length ? {params} : {}), chosen: {capability}};
       }
     }
   }

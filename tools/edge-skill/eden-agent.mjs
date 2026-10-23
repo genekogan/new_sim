@@ -36,7 +36,7 @@ import {publishCompletedOwnerQueue} from './client-owner-result.mjs';
 import {openClientMemory} from './client-memory.mjs';
 import {travelCommand} from './client-travel.mjs';
 
-export const SKILL_VERSION='1.9.15';
+export const SKILL_VERSION='1.9.16';
 export const CONTRACT='eden-edge/1';
 export const API_CONTRACT='eden-edge/1.1'; // Additive support; preserve legacy wire contract.
 const STATE='.eden-agent.json';
@@ -1138,7 +1138,10 @@ async function hereRaw(){
 /** resolve — a dry run of act (same arguments): which seat / place / path the world would choose, how far, the ETA, or why not. */
 export async function resolveAct(first,...rest){
  if(!first)throw new Error('usage: resolve <same arguments as act>   e.g. resolve sit --in eden-classroom-1 --row front');
- const intent=intentOf(first,rest)??(first.trim().startsWith('{')?JSON.parse(first):null),body=intent??{capability:[first,...rest].join(' ')};
+ rest=rest.filter(x=>x!=='--force'); // local act override is never part of the server's dry-run request
+ const intent=intentOf(first,rest)??(first.trim().startsWith('{')?JSON.parse(first):null);
+ let body=intent;
+ if(!body){let params;const wordsRest=[...rest];if(wordsRest.length&&wordsRest.at(-1).trim().startsWith('{')){params=JSON.parse(wordsRest.pop());if(!params||typeof params!=='object'||Array.isArray(params))throw new Error('act params must be a JSON object');}body={capability:[first,...wordsRest].join(' '),...(params!==undefined?{params}:{})};}
  return ok(await call(EDGE.resolve,{body}),'resolve').resolve;
 }
 /** report — what your Soul sees and does right now, briefly (to tell your owner). Use view for pictures. */
