@@ -17,9 +17,7 @@ export function agentOnboarding(worldUrl:string,worldName?:string,windowCode?:st
  const world=worldTitle(worldName,key);
  // lane PUX: the signed-in window's code, so the agent's request comes up in this window (instructions.md?for=CODE)
  const instructionsUrl=base+'/instructions.md'+(windowCode&&/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/.test(windowCode)?'?for='+windowCode:'');
- // lane JOIN-PROMPT (ACCEPT2): fresh agents named the Soul after the world and stopped after each step; say both plainly
- const tail=` and follow them to create my new Soul in the Eden world "${world}" and get it living there. "${world}" is the world's name, not the Soul's: give the Soul its own name.`;
- return {world,instructionsUrl,tail,text:`Read the instructions at ${instructionsUrl}${tail}`};
+ return {world,instructionsUrl,text:`Read the instructions at ${instructionsUrl} to create a new soul in the world ${world}.`};
 }
 export function agentQuickstart(worldUrl:string,worldName?:string):string{return agentOnboarding(worldUrl,worldName).text;}
 
