@@ -31,7 +31,7 @@ import type * as THREE from 'three';
 export { condition, distanceTo, falloff, emittersOf } from './sound-plan.ts';
 export type { SoundKind, SoundSpec } from './sound-plan.ts';
 
-type Cam = { position: { x: number; y: number; z: number } };
+type Cam = { position: { x: number; y: number; z: number }; matrixWorld?: { elements: ArrayLike<number> } };
 type Host = { layer: { model?: WorldModel | null; group?: THREE.Object3D; groundAt?(x: number, z: number): number | null }; camera: Cam; residents?: () => Resident[] };
 
 const MAX_VOICES = 12, TICK_MS = 100;
@@ -202,6 +202,8 @@ function scanWorld(model: WorldModel) {
 }
 const lastValue = new Map<string, unknown>();
 let meter: AnalyserNode | null = null;
+// lane AMBIENT: recorded beds under the procedural voices (lazy chunk after the first unlock; see ambient-beds.ts)
+let bedsMod: typeof import('./ambient-beds.ts') | null = null, beds: import('./ambient-beds.ts').Beds | null = null, bedsLoading = false;
 const log: LogRow[] = [];
 const events: EventRow[] = [];
 const started = new Set<string>();
@@ -251,11 +253,15 @@ function step(host: Host) {
     const g = falloff(d, e.spec.radius, e.spec.volume) * (covered && e.source === 'object' && d > 8 ? 0.4 : 1);
     if (g > 0.001) heard.push({ id: e.id, kind: e.spec.kind, variant: e.spec.variant ?? 0, source: e.source, gain: g, d, e });
   }
+  const m = host.camera.matrixWorld?.elements;
+  const bedTargets = bedsMod && ctx ? bedsMod.bedMix(heard, { x, z, right: m ? [m[0], m[2]] : undefined }, { exposure, covered, music: playlist }) : null;
   heard.sort((a, b) => b.gain - a.gain); heard.length = Math.min(heard.length, MAX_VOICES);
   lastHeard = heard;
   if (!ctx) return;
   if (!audible()) { applyMaster(); return; }
   if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
+  if (!bedsLoading) { bedsLoading = true; void import('./ambient-beds.ts').then((mod) => { bedsMod = mod; if (ctx && master) beds = mod.createBeds(ctx, master); }, () => {}); }
+  if (beds && bedTargets) beds.update(bedTargets, now);
   const live = new Set(heard.map((h) => h.id)), t = ctx.currentTime;
   for (const h of heard) {
     let v = voices.get(h.id);
@@ -320,6 +326,7 @@ export function startSoundLayer() {
       world: { trees: trees.count, exposure: +exposure.toFixed(2), night: +night.toFixed(2), typicalGround: +typicalGround.toFixed(1) },
       emitters: [...objects, ...ambient, ...people].map((e) => ({ id: e.id, kind: e.spec.kind, variant: e.spec.variant ?? 0, source: e.source, when: e.spec.when ?? null, on: condition(e.spec.when, e.state, night) })),
       heard: lastHeard.map(({ e: _e, ...h }) => ({ ...h, gain: +h.gain.toFixed(3), d: +h.d.toFixed(1) })),
+      beds: beds?.state() ?? null,
       voices: [...voices.entries()].map(([id, v]) => ({ id, kind: v.kind, variant: v.variant, source: v.source, gain: +v.gain.toFixed(3) })) }),
     log: () => log.slice(),
     events: () => events.slice(),
