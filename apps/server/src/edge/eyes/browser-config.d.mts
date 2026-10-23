@@ -1,5 +1,5 @@
 export function eyesBrowserModes(env?: NodeJS.ProcessEnv, platform?: string): string[];
-export function eyesBrowserLaunch(mode: string, env?: NodeJS.ProcessEnv, platform?: string): {headless: boolean; channel?: string; args: string[]};
+export function eyesBrowserLaunch(mode: string, env?: NodeJS.ProcessEnv, platform?: string, home?: string | null): {headless: boolean; channel?: string; env?: NodeJS.ProcessEnv; args: string[]};
 export function eyesWorkerProblem(platform?: string): string | null;
 export const EYES_UA_TAG: string;
 export function isEyesAgent(ua: unknown): boolean;
