@@ -81,6 +81,7 @@ export function subjectFraction(pose: CameraPose, aspect: number, p: readonly nu
  * Recorded activities nominate shots; selection/private intention never does.
  * It uses the existing safety/readability director, rather than a second mover. */
 export class WorldBroadcast {
+  constructor() { broadcastLog('mount', ''); }
   private rendered=new WorldRenderedVisibility();
   // Rendered occluders also bound indoor framing: clearance around the camera
   // and the reach of a blocked sightline (see feasibleShots' enclosed pass).
