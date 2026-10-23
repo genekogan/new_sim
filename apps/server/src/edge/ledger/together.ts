@@ -87,7 +87,8 @@ export type Invite = {id: string; what: string; host: {soulId: string; name: str
   createdTick: number; expiresTick: number; state: 'pending' | 'closed'; responses: Record<string, 'accepted' | 'declined' | 'expired' | 'cancelled'>;
   hostReceipt: string | null; guestReceipts: Record<string, string>;
   /** F1 (2026-10-20): where the host will stand for a paired gesture or hand-over (its meet spot, or where it already
-   *  stood), so a guest who accepts while the host is still walking there plans against that spot, not the moving body. */
+   *  stood), or the destination of an invited activity, so a guest who accepts while the host is still walking there
+   *  plans against that spot, not the moving body. */
   meetAt?: V2; item?: {id: string; kind: ItemKind; name: string}; ride?: {object: string; carrier: string}; place?: string | null};
 export type Item = {id: string; kind: ItemKind; name: string; holder: string | null; placeId: string | null; at: V2 | null; state: 'held' | 'placed' | 'gone'; claimedBy: string | null; by: string | null; createdAt: number; placedAt: number | null};
 type ItemOp = {soulId: string; op: 'pick-up' | 'put-down' | 'consume' | 'give' | 'take'; item?: string; kind?: ItemKind; source?: string; to?: string; invite?: string};
@@ -479,6 +480,12 @@ export class Together {
       if (!INVITABLE.has(cap.verb) || (cap.verb === 'object' && cap.action !== 'join')) return {code: 'capability.params', reason: `with (inviting others) works with activities, walks and rides, not ${cap.verb}.`};
       const w = this.withSouls(soul, params.with); if (!w.ok) return {code: w.code, reason: w.reason};
       const id = 'inv_' + randomUUID().slice(0, 12), out = structuredClone(steps), last = [...out].reverse().find(s => s.verb === 'mars:pose_v1');
+      // Keep the activity's destination when the host has not arrived yet. Planning a guest against the
+      // host's departure pose otherwise starts two "shared" activities in different buildings.
+      const lastMove = last ? out.slice(0, out.indexOf(last)).reverse().find(s => s.verb === 'walk_to' || s.verb === 'mars:walk_to') : undefined;
+      // Level-aware routes keep their existing spot plan; never mistake an earlier ground leg for their destination.
+      const destination = lastMove?.verb === 'walk_to' ? lastMove.params.to : undefined;
+      const meetAt: V2 | undefined = Array.isArray(destination) && destination.length === 2 && destination.every(Number.isFinite) ? [destination[0], destination[1]] : undefined;
       // CN5: a game keeps its court's group (the guest takes a free place at the same court)
       if (last && !last.params.game) {last.params.group = id; last.params.waitSeconds = 20; last.params.alone = 'start'; last.params.need = 1; last.params.windowPolicy = 'once-v1';}  // E2 #2: one shared window
       const ride = cap.verb === 'object' ? out.find(s => s.verb === 'mars:carrier_ride') : undefined;
@@ -486,7 +493,7 @@ export class Together {
       const what = ride ? 'ride' : cap.verb, label = ride ? `invites you on ${cap.label.replace(/^.*\(/, '').replace(/\)$/, '') || 'the ride'}` : `invites you to join: ${cap.label}`;
       return {steps: out, commit: receipt => {
         const inv: Invite = {id, what, kind: ride ? 'ride' : 'activity', host: {soulId: soul.soulId, name: soul.name}, guests: w.souls.map(s => ({soulId: s.soulId, name: s.name})), capability: cap.id, label,
-          ...(last?.params.windowPolicy ? {windowPolicy: 'once-v1' as const} : {}), ...(last ? {activity: String(last.params.activity), seconds: Number(last.params.seconds), ...(last.params.prop ? {prop: String(last.params.prop)} : {}), ...(last.params.base ? {base: String(last.params.base)} : {})} : {}),
+          ...(meetAt ? {meetAt} : {}), ...(last?.params.windowPolicy ? {windowPolicy: 'once-v1' as const} : {}), ...(last ? {activity: String(last.params.activity), seconds: Number(last.params.seconds), ...(last.params.prop ? {prop: String(last.params.prop)} : {}), ...(last.params.base ? {base: String(last.params.base)} : {})} : {}),
           ...(ride && cap.object ? {ride: {object: cap.object, carrier: String(ride.params.carrier)}} : {}), place: cap.target?.kind === 'place' ? cap.target.id : null,
           createdTick: this.tick, expiresTick: this.tick + (ride ? 90 : 90) * 20, state: 'pending', responses: {}, hostReceipt: receipt, guestReceipts: {}};
         this.saveInvite(inv); this.announce(inv);
@@ -526,7 +533,8 @@ export class Together {
     const host = this.mindOf(inv.host.soulId), hb = host ? this.p.body(host.entityId) : undefined, me = this.p.body(soul.entityId);
     if (!host || !hb || !me || this.p.faded(inv.host.soulId)) return {code: 'invite.gone', reason: `${inv.host.name} is not here any more.`};
     const commit = (receipt: string) => this.respond(inv.id, soul, 'accepted', receipt);
-    const d = Math.hypot(hb.pose.p[0] - me.pose.p[0], hb.pose.p[2] - me.pose.p[2]), go = (standoff: number): Steps => d > standoff + 0.6 ? [{verb: 'walk_to', params: {to: host.entityId, standoff}}] : [{verb: 'wave', params: {at: host.entityId, seconds: 0.2}}];
+    const activityAt: V2 = inv.kind === 'activity' && inv.meetAt ? inv.meetAt : [hb.pose.p[0], hb.pose.p[2]];
+    const d = Math.hypot(activityAt[0] - me.pose.p[0], activityAt[1] - me.pose.p[2]), go = (standoff: number): Steps => d > standoff + 0.6 ? [{verb: 'walk_to', params: {to: inv.kind === 'activity' && inv.meetAt ? inv.meetAt : host.entityId, standoff}}] : [{verb: 'wave', params: {at: host.entityId, seconds: 0.2}}];
     if (inv.kind === 'paired' || inv.kind === 'give') {
       if (inv.kind === 'give' && this.heldBy(soul.soulId)) return {code: 'hands.full', reason: `Your hands are full; put down ${this.heldBy(soul.soulId)!.name} first.`};
       if (this.asleep(soul.entityId)) return {code: 'state.asleep', reason: 'Wake up first.'};
@@ -559,7 +567,7 @@ export class Together {
     }
     // CN5: a spot activity (listen in the audience, play in the band, use a computer): my nearest free spot of it by the host
     if (!ownCaps.some(c => c.id === hostCap && c.available)) {
-      const to = (id: string) => {const t = (ownPlans.get(id)?.steps ?? []).find(s => s.verb === 'walk_to')?.params.to; return Array.isArray(t) ? Math.hypot(Number(t[0]) - hb.pose.p[0], Number(t[1]) - hb.pose.p[2]) : Infinity;};
+      const to = (id: string) => {const t = (ownPlans.get(id)?.steps ?? []).find(s => s.verb === 'walk_to')?.params.to; return Array.isArray(t) ? Math.hypot(Number(t[0]) - activityAt[0], Number(t[1]) - activityAt[1]) : Infinity;};
       const near = ownCaps.filter(c => c.verb === verb && c.available && c.target?.kind === 'spot' && ownPlans.has(c.id)).map(c => ({c, d: to(c.id)})).filter(x => x.d <= 12).sort((a, b) => a.d - b.d || a.c.id.localeCompare(b.c.id))[0];
       if (near) {
         const steps = structuredClone(ownPlans.get(near.c.id)!.steps), last = [...steps].reverse().find(s => s.verb === 'mars:pose_v1');
@@ -764,7 +772,16 @@ export class Together {
     if (/^(?:decline|no|no thanks|no thank you|not now|decline (?:the |their )?(?:invitation|invite|offer)|refuse)$/.test(t) && mine.length) {const i = mine.at(-1)!; return {capability: 'decline:' + i.id, note: `declining ${i.host.name}'s invitation (${i.what})`};}
     if (!mine.length && /^(?:accept|decline|yes|no thanks|no thank you|accept (?:the |their )?(?:invitation|invite|offer)|decline (?:the |their )?(?:invitation|invite|offer))$/.test(t)) return {code: 'invite.none', reason: 'Nobody has invited you to anything right now (observe → invites).', did_you_mean: []};
     const acc = /^(?:accept|join)\s+(.+?)(?:['’]s)?(?:\s+(?:invitation|invite|offer|hug|dance))?$/.exec(t);
-    if (acc && mine.length) {const o = who(acc[1]); const i = o ? mine.filter(x => x.host.soulId === o.soulId).at(-1) : undefined; if (i) return {capability: 'accept:' + i.id, note: `accepting ${i.host.name}'s invitation (${i.what})`};}
+    if (acc && mine.length) {
+      const name = acc[1].trim().replace(/['’]s\b.*$/, '').trim(), stale = this.p.host.soulNameRefusal(name);
+      if (stale) return {code: stale, reason: 'That previous Soul name is unavailable or ambiguous; use the current name and immutable Soul ID.', did_you_mean: []};
+      // A personal pending invitation identifies its sender even after they leave sight. Use current metadata,
+      // not an old invitation label, and never choose between two senders with the same exact name.
+      const named = mine.filter(i => i.host.soulId === name || this.mindOf(i.host.soulId)?.name.toLowerCase() === name);
+      if (new Set(named.map(i => i.host.soulId)).size > 1) return {code: 'soul.name-ambiguous', reason: 'More than one inviter has that name; accept the exact invitation ID.', did_you_mean: []};
+      const o = named.length ? null : who(acc[1]), i = named.at(-1) ?? (o ? mine.filter(x => x.host.soulId === o.soulId).at(-1) : undefined);
+      if (i) return {capability: 'accept:' + i.id, note: `accepting ${i.host.name}'s invitation (${i.what})`};
+    }
     // "take the book" / "take it" / "take X's flower" while someone offers me an item: accept that hand-over (never a pick-up elsewhere)
     const tk = /^(?:take|accept|receive|grab|get)\s+(?:it|that|this|(?:(.+?)['’]s\s+|the\s+|their\s+|his\s+|her\s+|an?\s+)?(.+?))(?:\s+from\s+(.+))?$/.exec(t);
     if (tk && mine.some(x => x.kind === 'give')) {
