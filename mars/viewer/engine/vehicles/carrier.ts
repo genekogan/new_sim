@@ -19,7 +19,7 @@ import { z } from 'zod';
 import type { ActionDef, Diagnostic } from '../actions/types.ts';
 import type { Runtime, Invariant } from '../runtime/runtime.ts';
 import type { Entity, WorldState } from '../world/types.ts';
-import { angleDelta, heading, hypot, rot2, wrapAngle, type Vec2, type Vec3 } from '../core/math.ts';
+import { angleDelta, dcos, dsin, heading, hypot, rot2, wrapAngle, type Vec2, type Vec3 } from '../core/math.ts';
 import { CATALOG } from '../world/catalog.ts';
 import { entityList, stableIndices, type EntityTable } from '../world/entity-list.ts';
 import { relevantEntities } from '../world/relevant.ts';
@@ -345,7 +345,7 @@ function landableAt(g: GroundNav | null, x: number, z: number, fallbackY: number
   if (!g) return fallbackY;
   const y = g.standY(x, z);
   for (let k = 0; k < 9; k++) {
-    const a = k * Math.PI / 4, px = k === 8 ? x : x + 2 * Math.cos(a), pz = k === 8 ? z : z + 2 * Math.sin(a);
+    const a = k * Math.PI / 4, px = k === 8 ? x : x + 2 * dcos(a), pz = k === 8 ? z : z + 2 * dsin(a);
     if (!inExtent(g, px, pz) || g.base.medium(px, pz) !== G_WALK || g.coarseSolid(px, pz) || Math.abs(g.standY(px, pz) - y) > 1) return null;
   }
   return y;
@@ -355,7 +355,7 @@ function findLanding(g: GroundNav | null, x: number, z: number, fallbackY: numbe
   for (let r = 0; r <= STEER_LAND_SEARCH; r += 4) {
     const n = r === 0 ? 1 : Math.ceil(2 * Math.PI * r / 4);
     for (let i = 0; i < n; i++) {
-      const a = i * 2 * Math.PI / n, px = r4(x + r * Math.cos(a)), pz = r4(z + r * Math.sin(a)), y = landableAt(g, px, pz, fallbackY);
+      const a = i * 2 * Math.PI / n, px = r4(x + r * dcos(a)), pz = r4(z + r * dsin(a)), y = landableAt(g, px, pz, fallbackY);
       if (y !== null) return [px, r4(y), pz];
     }
   }
