@@ -35,7 +35,7 @@ export class WorldPlacePreviews{
  private async render(id:string,key:string,alive:()=>boolean,location?:WorldLocation):Promise<string|null>{
   const served=await cdnRoute(placeShotPath(key)).catch(()=>null);if(served)return served.url;  // published per build by the release (perf owns CDN): every visitor sees the same picture
   const kept=readKept(key);if(kept)return kept;
-  const view=location??worldPlaceView(id as WorldPlaceId);if(!view||!await this.pacer.turn(alive))return null;  // the region slice below is its own paced step
+  const view=location??worldPlaceView(id as WorldPlaceId);if(!view||!await this.pacer.turn(alive))return null;const sliceStart=performance.now();  // the region slice below is its own paced step
   const center=new THREE.Vector3().fromArray(view.target),radius=location?Math.min(100,location.radius):Math.min(35,Math.max(8,new THREE.Vector3().fromArray(view.p).distanceTo(center)*.28));
   const scene=new THREE.Scene(),geometries:THREE.BufferGeometry[]=[],instances:THREE.InstancedMesh[]=[],materials=new Map<THREE.Material,THREE.Material>(),target=new THREE.WebGLRenderTarget(160,112,{depthBuffer:true});target.texture.colorSpace=THREE.SRGBColorSpace;
   const material=(original:THREE.Material)=>{let m=materials.get(original);if(!m){m=original.clone();materials.set(original,m);}return m;};
@@ -56,7 +56,7 @@ export class WorldPlacePreviews{
     }
     if(!vertices.length)return;const sliced=new THREE.BufferGeometry();geometries.push(sliced);sliced.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));if(normals.length)sliced.setAttribute('normal',new THREE.Float32BufferAttribute(normals,3));else sliced.computeVertexNormals();if(colors.length)sliced.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));if(uvs.length)sliced.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));const mesh=new THREE.Mesh(sliced,material(object.material));mesh.matrixAutoUpdate=false;mesh.matrix.copy(object.matrixWorld);mesh.matrixWorldNeedsUpdate=true;scene.add(mesh);
    });}
-   this.pacer.done();
+   this.pacer.done();STEPS.push(['slice',Math.round(performance.now()-sliceStart)]);
    const bare=!scene.children.length;if(bare&&!this.live())return null;  // nothing of the place drawn: with a live world it is still pictured (a lake that is only water), never kept
    scene.updateMatrixWorld(true);
    const shot=await this.shoot(scene,center,radius,view,key,alive,id.startsWith('room:')||Object.hasOwn(INTERIOR_PLACE_VIEWS,id));if(shot&&!bare)keep(key,shot);return shot;
@@ -77,21 +77,37 @@ export class WorldPlacePreviews{
   let work=0;
   /** One paced synchronous step (one or two renders): the renderer state and the live world's hidden markers are back before
    * the main view draws its next frame. Null when the job was dropped while waiting. */
-  const step=async<T>(fn:()=>T):Promise<{v:T}|null>=>{
+  const step=async<T>(label:string,fn:()=>T):Promise<{v:T}|null>=>{
    if(!await this.pacer.turn(alive))return null;
    const s0=performance.now(),previous=renderer.getRenderTarget(),viewport=renderer.getViewport(new THREE.Vector4()),scissor=renderer.getScissor(new THREE.Vector4()),scissorTest=renderer.getScissorTest(),clear=renderer.getClearColor(new THREE.Color()),alpha=renderer.getClearAlpha(),autoClear=renderer.autoClear,gradeStrength=GRADE_A.x;
    const hidden:THREE.Object3D[]=[];live.traverse(o=>{if(o.visible&&/marker|label/i.test(o.name)){o.visible=false;hidden.push(o);}});
    try{renderer.setScissorTest(false);return{v:fn()};}
-   finally{for(const o of hidden)o.visible=true;renderer.setRenderTarget(previous);renderer.setViewport(viewport);renderer.setScissor(scissor);renderer.setScissorTest(scissorTest);renderer.setClearColor(clear,alpha);renderer.autoClear=autoClear;GRADE_A.x=gradeStrength;work+=performance.now()-s0;this.pacer.done();}
+   finally{for(const o of hidden)o.visible=true;renderer.setRenderTarget(previous);renderer.setViewport(viewport);renderer.setScissor(scissor);renderer.setScissorTest(scissorTest);renderer.setClearColor(clear,alpha);renderer.autoClear=autoClear;GRADE_A.x=gradeStrength;const ms=performance.now()-s0;work+=ms;STEPS.push([label,Math.round(ms)]);if(STEPS.length>200)STEPS.shift();this.pacer.done();}
   };
   try{
+   // the programs these renders need (the black/white occlusion variants of every live material kind, the shot light's
+   // other light counts) are linked once, asynchronously, before the first check: compiling them inside a render stalled
+   // the first shot for 0.7-1.6 s on a cold context
+   if(world&&!this.warmed){
+    const eye=fitPlacePreviewCamera(extent,new THREE.Vector3(Math.sin(az0)*Math.cos(el),Math.sin(el),Math.cos(az0)*Math.cos(el)),W/H);
+    const warm=await step('warm',()=>{
+     const swapped:[THREE.Object3D&{material:unknown},unknown][]=[];
+     renderer.setRenderTarget(check);let occlusion:Promise<unknown>,masks:Promise<unknown>;
+     try{live.traverse(o=>{const m=o as THREE.Object3D&{material?:unknown};if(m.material){swapped.push([m as THREE.Object3D&{material:unknown},m.material]);m.material=black;}});occlusion=renderer.compileAsync(live,eye);
+      for(const [o] of swapped)o.material=white;masks=renderer.compileAsync(live,eye);}
+     finally{for(const [o,m] of swapped)o.material=m;}
+     renderer.setRenderTarget(target);const undo=this.pose();let lit:Promise<unknown>;try{lit=renderer.compileAsync(live,eye);}finally{undo();}
+     return Promise.all([occlusion,masks,lit]);
+    });
+    if(!warm)return null;await warm.v.catch(()=>{});this.warmed=true;
+   }
    mask.overrideMaterial=white;let best:THREE.PerspectiveCamera|null=null,bestHidden=2,turn=0;
    // a room ("Inside: …") is pictured from its own tour eye, standing inside it: from above it would be the roof
    if(interior&&world){best=new THREE.PerspectiveCamera(64,W/H,.05,3000);best.position.fromArray(from);best.lookAt(new THREE.Vector3().fromArray(view.target));best.updateMatrixWorld(true);bestHidden=0;turn=-1;}
    for(let k=0;k<8&&bestHidden>.4;k++){
     const az=az0+k*Math.PI/4,camera=fitPlacePreviewCamera(extent,new THREE.Vector3(Math.sin(az)*Math.cos(el),Math.sin(el),Math.cos(az)*Math.cos(el)),W/H);
     const d=camera.position.distanceTo(aim);camera.near=Math.max(.05,d/400);camera.far=Math.max(3000,d*20);camera.updateProjectionMatrix();
-    const seen=await step(()=>{
+    const seen=await step('check'+k,()=>{
      renderer.setRenderTarget(check);renderer.setClearColor(0,1);renderer.autoClear=true;renderer.render(mask,camera);const all=count();if(!all||!world)return{all,blocked:0};
      const seeThrough:THREE.Object3D[]=[];live.traverse(o=>{if(o.visible&&/water|sea|sky|cloud|rain|fog/i.test(o.name)&&!/marker|label/i.test(o.name))seeThrough.push(o);});
      const background=live.background,override=live.overrideMaterial;for(const o of seeThrough)o.visible=false;live.background=null;live.overrideMaterial=black;
@@ -103,10 +119,7 @@ export class WorldPlacePreviews{
     if(seen.v.blocked<bestHidden){bestHidden=seen.v.blocked;best=camera;turn=k;}
    }
    if(!best)return null;const shotCamera=best;
-   // the shot light's programs (other light counts/shadows than the visitor's night or storm) are linked once, off the
-   // critical path, instead of stalling the first shot's render
-   if(world&&!this.warmed){const warm=await step(()=>{renderer.setRenderTarget(target);const undo=this.pose();try{return renderer.compileAsync(live,shotCamera);}finally{undo();}});if(!warm)return null;await warm.v.catch(()=>{});this.warmed=true;}
-   const shot=await step(()=>{
+   const shot=await step('shot',()=>{
     const pixels=new Uint8Array(W*H*4);renderer.setRenderTarget(target);if(!world)GRADE_A.x=0;  // the bare place-only picture stays ungraded
     // the live world in the shot light (Gene #13: never the visitor's night or storm); the shadow map is the main view's, left as it is
     const undo=world?this.pose():null,shadows=renderer.shadowMap.autoUpdate,shadowsDue=renderer.shadowMap.needsUpdate;renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=false;
@@ -126,10 +139,12 @@ declare const __BUILD__:string;
 export const PLACE_SHOT_MINUTES=10*60+30;
 const BUILD=typeof __BUILD__==='string'?__BUILD__:'dev',SHOT_W=320,SHOT_H=224,KEPT='sim.placeShot.';
 /** The last framing per place (turns of 45° from the tour side, share of the place hidden): read by the shot export script. */
+/** The last paced shot steps and their main-thread ms (diagnostics, read by the Explore repro). */
+export const STEPS:[string,number][]=[];
 export const STATS=new Map<string,{turn:number;hidden:number;ms:number;work:number;bare:boolean}>();
 /** Where a release publishes a place's shot (world-scoped in the CDN manifest; the query pins the build). */
 export function placeShotPath(key:string){return '/place-shots/'+encodeURIComponent(key.replace(/[^\w.:-]+/g,'_'))+'.webp?b='+encodeURIComponent(BUILD);}
 /** Shots are kept per build in this browser, so a visitor renders each place once per release. */
 function readKept(key:string):string|null{try{return localStorage.getItem(KEPT+BUILD+'.'+key);}catch{return null;}}
 function keep(key:string,shot:string){try{localStorage.setItem(KEPT+BUILD+'.'+key,shot);}catch{try{for(let i=localStorage.length-1;i>=0;i--){const k=localStorage.key(i);if(k?.startsWith(KEPT)&&!k.startsWith(KEPT+BUILD+'.'))localStorage.removeItem(k);}localStorage.setItem(KEPT+BUILD+'.'+key,shot);}catch{/* full: the in-memory cache still holds it */}}}
-if(typeof window!=='undefined')(window as unknown as {__placeShotStats?:typeof STATS}).__placeShotStats=STATS;
+if(typeof window!=='undefined')(window as unknown as {__placeShotStats?:typeof STATS;__placeShotSteps?:typeof STEPS}).__placeShotStats=STATS,(window as unknown as {__placeShotSteps?:typeof STEPS}).__placeShotSteps=STEPS;
