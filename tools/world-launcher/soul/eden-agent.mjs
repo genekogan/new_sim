@@ -40,7 +40,10 @@ function ownerPlainLine(line2) {
   if (typeof line2 !== "string") return line2;
   let text3 = line2.replace(/Retained (\d+) ordered steps? in queue \S+?; (?:actual receipt \S+ is (\w+)|physical admission not yet confirmed)\. Future steps are pending, not already accepted or completed\./g, (_, n, phase) => {
     const steps = Number(n), what = steps === 1 ? "it" : `the first of ${steps} steps`;
-    return phase ? `I've started ${what}; it is ${PHASE_WORDS[phase] ?? phase}.${steps > 1 ? " The rest follow in order." : ""}` : `I've asked to start ${what}; it has not begun yet.${steps > 1 ? " The rest follow in order." : ""}`;
+    if (phase === "waiting") return `I've asked to start ${what}; it is waiting to start.${steps > 1 ? " The rest have not run yet." : ""}`;
+    if (phase === "replaced") return `The action was replaced by something newer.${steps > 1 ? " The rest have not run yet." : ""}`;
+    if (["refused", "failed", "cancelled"].includes(phase)) return `${phase === "refused" ? `I couldn't start ${what}; it was refused` : `The action ${phase === "cancelled" ? "was cancelled" : "failed"}`}.${steps > 1 ? " The rest have not run yet." : ""}`;
+    return ["started", "running", "completed", "ended"].includes(phase) ? `I've started ${what}; it is ${PHASE_WORDS[phase] ?? phase}.${steps > 1 ? " The rest follow in order." : ""}` : `I've asked to start ${what}; it has not begun yet.${steps > 1 ? " The rest follow in order." : ""}`;
   });
   text3 = text3.replace(/\bQueue req-[A-Za-z0-9_-]+ retained, but (.+?) (?:failed|blocked): ([A-Za-z0-9_.-]+)\. Dependent public steps have not run\./g, (_, what, code) => `I couldn't ${what.replace(/^(?:[a-z-]+):/, "")} (${code.replace(/[._-]+/g, " ")}). Nothing after it ran.`);
   text3 = text3.replace(/(^|[.;!?]\s+)queue:? req-[A-Za-z0-9_-]+/gi, "$1Your request");
@@ -64,7 +67,7 @@ function guardStaleOwnerSteps(steps, ownerText, prior = []) {
     if (typeof step?.act !== "string" || !seen.has(norm(step.act)) || norm(step.act) === norm(ownerText)) return step;
     if (words(step.act).some((w) => mine.has(w))) return step;
     replaced.push(step.act);
-    return { ...step, act: String(ownerText).trim(), params: {}, staleReplaced: step.act };
+    return { act: String(ownerText).trim(), params: {}, staleReplaced: step.act };
   });
   return { steps: out, replaced, line: replaced.length ? `Dropped ${replaced.length === 1 ? "a step" : replaced.length + " steps"} carried over from an earlier request (${replaced.map((a) => `"${a}"`).join(", ")}); acting on your owner's own words instead.` : null };
 }
@@ -3848,7 +3851,7 @@ async function travelCommand(args, { load: load2, save: save2, live: live2 = () 
 }
 
 // tools/edge-skill/eden-agent.mjs
-var SKILL_VERSION = "1.9.11";
+var SKILL_VERSION = "1.9.12";
 var CONTRACT = "eden-edge/1";
 var API_CONTRACT = "eden-edge/1.1";
 var STATE = ".eden-agent.json";
