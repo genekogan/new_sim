@@ -1017,7 +1017,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
         if(issue?.code==='program.safe-stop-required')await this.host.enqueue('edge-stop',`edge:${soul.soulId}`,{soulId:soul.soulId,entityId:soul.entityId,receipt:id});
       }else{
         const guard=():true=>{authority();if(this.host.quietBarrier)throw new EdgeError(409,'state.changed','The world entered a quiet barrier; retry.');const fresh=this.host.engine.canPerform({actor:soul.entityId,label,steps});if(fresh)throw new EdgeError(409,fresh.code,fresh.code.startsWith('carrier.')?fresh.message:humanBlockedExplanationV1(fresh.code,label));return true;};
-        await this.host.enqueueObjectDecision(`edge:${soul.soulId}`,{soulId:soul.soulId,entityId:soul.entityId,option:capability,label,steps,reevalTicks:1e9,fallback:false,trigger:`edge-act:${id}`},guard,()=>{const detail=admission.commit(id)??{};this.insert(soul,capability,'waiting',clientRef,false,detail,{},id);const program=this.host.engine.programOf(soul.entityId);if(!program)throw Error('object.native-program-missing');this.update(id,{phase:'started',program_id:program});return true;});
+        await this.host.enqueueObjectDecision(`edge:${soul.soulId}`,{soulId:soul.soulId,entityId:soul.entityId,option:capability,label,steps,reevalTicks:1e9,fallback:false,trigger:`edge-act:${id}`},guard,()=>{const detail=admission.commit(id)??{};this.insert(soul,capability,'waiting',clientRef,false,detail,{},id);const program=(this.host.engine as {instantProgramV1?(a:string):string|null}).instantProgramV1?.(soul.entityId)??this.host.engine.programOf(soul.entityId);if(!program)throw Error('object.native-program-missing');this.update(id,{phase:'started',program_id:program});return true;});
       }
       return {accepted:true as const,receipt:this.receipt(soul.soulId,id)!};
     }catch(error){return refuse(error instanceof EdgeError?error.code:'object.admission-failed',error instanceof EdgeError?error.message:'Object/body admission did not commit; observe and retry.');}
@@ -1072,7 +1072,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       departsInSeconds: c.state.phase === 'boarding' && c.state.departAtTick !== null ? Math.max(0, Math.round((c.state.departAtTick - tick) / 20)) : null,
       departsAtTick: c.state.phase === 'boarding' ? c.state.departAtTick : null, returnsAtTick: c.state.phase === 'aloft' ? tick + Math.max(0, Math.round(end * 20) - c.state.elapsed) : null,
       route: {id: c.state.route.id, seconds: end, elapsedSeconds: Math.round(c.state.elapsed / 2) / 10, keys: c.state.route.keys, interpolation: 'eden-rides/1 hermite'},
-      ...((c.state as {steer?: {by: string | null; land?: number[]; to: number[]; ret?: true}}).steer ? (() => {const st = (c.state as {steer: {by: string | null; land?: number[]; to: number[]; ret?: true}}).steer, m = st.by ? this.host.mindByEntity?.get(st.by) ?? [...this.host.minds.values()].find(x => x.entityId === st.by) : undefined;
+      ...((c.state as {steer?: {by: string | null; land?: number[]; to: number[]; ret?: true}}).steer ? (() => {const st = (c.state as unknown as {steer: {by: string | null; land?: number[]; to: number[]; ret?: true}}).steer, m = st.by ? this.host.mindByEntity?.get(st.by) ?? [...this.host.minds.values()].find(x => x.entityId === st.by) : undefined;
         return {steer: {by: m ? {soulId: m.soulId, name: m.name} : null, returning: !!st.ret, to: [st.to[0], st.to[2]], ...(st.land ? {landAt: [st.land[0], st.land[2]]} : {})}};})() : {}),
       flights: c.state.flights, phaseTick: c.state.phaseTick, tick, waitSeconds: Math.round(((c.state as {waitTicks?: number}).waitTicks ?? 900) / 20)};
   }
@@ -1091,6 +1091,13 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (deg === undefined || !(d >= 5 && d <= 1000)) return {ok: false, code: 'steer.params', reason: 'Steer to a place (to) or a compass direction (N, NE, ... NW) with a distance of 5-1000 m.'};
     const a = deg * Math.PI / 180, x = c.pose.p[0] + d * Math.sin(a), z = c.pose.p[2] - d * Math.cos(a);
     return {ok: true, x: Math.round(x * 100) / 100, z: Math.round(z * 100) / 100, label: `${Math.round(d)} m ${['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'][deg / 45]}`};
+  }
+  /** VEHICLE-STEER: the engine's own refusal for a steer step now (another rider steering, out of bounds, no open water, no
+   *  landing spot), so the Soul hears it at once instead of in a failed receipt. Pure: nothing changes. */
+  steerCheck(entityId: string, carrier: string, step: {x?: number; z?: number; land?: boolean; stop?: boolean}): {code: string; reason: string} | null {
+    const eng = this.host.engine as {previewMarsVerbV1?(verb: string, params: unknown): {code: string; message: string} | null};
+    const no = eng.previewMarsVerbV1?.('carrier_steer', {actor: entityId, carrier, ...step}); if (!no) return null;
+    return {code: no.code.replace(/^carrier\./, 'ride.'), reason: no.message.charAt(0).toUpperCase() + no.message.slice(1) + '.'};
   }
   rides() {return this.carriersNative().map(c => this.carrierView(c.id)!);}
   private rideKey = new Map<string, string>();

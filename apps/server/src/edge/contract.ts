@@ -37,6 +37,8 @@ export interface EdgeLedgerHooks {
   carrierView?(entityId: string): unknown;
   /** VEHICLE-STEER: a steer destination (a known place or compass direction + distance) as ground (x, z). */
   steerTarget?(soulId: string, entityId: string, spec: {to?: string; direction?: string; distance?: number}): {ok: true; x: number; z: number; label: string} | {ok: false; code: string; reason: string; did_you_mean?: unknown};
+  /** VEHICLE-STEER: the engine's refusal for a steer step now, or null. */
+  steerCheck?(entityId: string, carrier: string, step: {x?: number; z?: number; land?: boolean; stop?: boolean}): {code: string; reason: string} | null;
   /** OBJECT-CONTRACT §7: perform an object action's body steps as a logged decision with a normal receipt. */
   /** EVENTS-v1: a Soul's body position and heading yaw (facing = (cos yaw, sin yaw)), for bearings in event envelopes. */
   poseOf?(soulId: string): {x: number; z: number; yaw: number} | null;

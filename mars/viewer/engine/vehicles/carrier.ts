@@ -533,6 +533,7 @@ export function stepCarriers(rt: Runtime, table?: EntityTable | null): void {
     const turn = angleDelta(e.pose.yaw, want); e.pose.yaw = wrapAngle(e.pose.yaw + Math.max(-0.5 / TPS, Math.min(0.5 / TPS, turn)));
     e.pose.p = next;
     for (const a of riders) { const b = rt.world.entities[a], s = seatPose(e, carried(b)!.slot); if (b && s) { b.pose.p = s.p; b.pose.yaw = s.yaw; } }
+    if (s && !s.land) continue;   // a steer without land ends in the air (or afloat): the hold above takes it from the next tick
     if (c.elapsed >= end && away) { e.pose.p = [...L] as Vec3; delete e.phase; c.phase = 'landed'; c.phaseTick = tick; c.elapsed = end; continue; }   // steered down away from home: as it is
     if (c.elapsed >= end && Math.abs(angleDelta(e.pose.yaw, c.yaw)) > 1e-6) { c.elapsed = end - 1; continue; }   // finish turning before touching down
     if (c.elapsed >= end) { delete c.steer; e.pose.p = [...c.home] as Vec3; e.pose.yaw = c.yaw; delete e.phase; c.phase = 'landed'; c.phaseTick = tick; c.elapsed = end; }

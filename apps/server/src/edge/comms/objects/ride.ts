@@ -19,7 +19,7 @@ export type RideState = {carrier: string; capacity: number; phase: string; rider
 const view = (ctx: TimeCtx | ActionCtx, id: string): CarrierView | null => ctx.carrier?.(id) ?? null;
 function from(state: RideState, v: CarrierView | null): RideState {
   if (!v) return {...state, phase: 'closed', riders: [], seatsFree: 0, departsInSeconds: null};
-  return {carrier: state.carrier, rowing: v.def === 'rowing-punt', capacity: v.capacity, phase: v.phase, holding: v.holding, flights: v.flights, seatsFree: v.seatsFree, routeSeconds: v.route.seconds,
+  return {carrier: state.carrier, rowing: v.def === 'rowing-punt', capacity: v.capacity, phase: v.phase, holding: v.holding, flights: v.flights, seatsFree: v.seatsFree, routeSeconds: Math.round(v.route.seconds),
     door: v.door as [number, number] | null, departsInSeconds: v.departsInSeconds, waitSeconds: (v as {waitSeconds?: number}).waitSeconds ?? 45, keptFor: (v as {hold?: {for: SoulRef[]}}).hold?.for ?? [],
     riders: v.riders.filter(r => r.soulId && r.phase !== 'leaving').map(r => ({soulId: r.soulId!, name: r.name ?? 'someone'})),
     stepping: v.riders.filter(r => r.soulId && r.phase === 'leaving').map(r => ({soulId: r.soulId!, name: r.name ?? 'someone'})),
@@ -129,9 +129,10 @@ export const rideKind: ObjectKind<RideState> = {
         const no = rideKind.actions.steer.available!(s, ctx); if (no) return no;
         const modes = [p.to !== undefined, p.direction !== undefined || p.distance !== undefined, p.stop === true].filter(Boolean).length;
         if (modes > 1 || (p.stop && p.land) || (modes === 0 && !p.land)) return {code: 'ride.steer-params', reason: 'Steer with one of: to (a place), direction + distance, land, or stop.'};
-        if (p.stop || (p.land && modes === 0)) return null;
-        const t = ctx.steerTarget?.(s.carrier, {to: p.to as string | undefined, direction: p.direction as string | undefined, distance: p.distance as number | undefined});
-        return !t ? {code: 'steer.unavailable', reason: 'Steering is not available here.'} : t.ok ? null : {code: t.code, reason: t.reason};
+        const t = p.stop || (p.land && modes === 0) ? null : ctx.steerTarget?.(s.carrier, {to: p.to as string | undefined, direction: p.direction as string | undefined, distance: p.distance as number | undefined});
+        if (t === undefined) return {code: 'steer.unavailable', reason: 'Steering is not available here.'};
+        if (t && !t.ok) return {code: t.code, reason: t.reason};
+        return ctx.steerCheck?.(s.carrier, {...(t ? {x: t.x, z: t.z} : {}), ...(p.land ? {land: true} : {}), ...(p.stop ? {stop: true} : {})}) ?? null;
       },
       apply(s, p, ctx) {
         const what = s.rowing ? 'the punt' : 'the balloon';
