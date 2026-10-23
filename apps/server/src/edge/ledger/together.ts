@@ -321,7 +321,10 @@ export class Together {
    *  three legs, re-issued with the current gap, and a follower more than CATCH_UP metres behind jogs them (humanoids
    *  only; floaters glide at one pace). */
   private followSteps(me: string, target: string, gap = 0): Steps {
-    const legs: Steps = [], jog = gap > CATCH_UP && this.p.body(me)?.body?.family !== 'floater';
+    const tb = this.p.body(target), engine = this.p.host.engine as unknown as {movementVerb?: (actor: string, x: number, z: number) => string};
+    // jogging is dry-ground only: a shore or water leg with a gait would fail the follow
+    const dry = !tb || (engine.movementVerb?.(me, tb.pose.p[0], tb.pose.p[2]) ?? 'walk_to') === 'walk_to';
+    const legs: Steps = [], jog = gap > CATCH_UP && dry && this.p.body(me)?.body?.family !== 'floater';
     for (let i = 0; i < 3; i++) legs.push({verb: 'walk_to', params: {to: target, standoff: 1.5, ...(jog ? {gait: 'jog'} : {})}}, {verb: 'rest', params: {seconds: 0.5}});
     return [...this.standFirst(me), ...legs];
   }
