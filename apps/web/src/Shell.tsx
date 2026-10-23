@@ -35,6 +35,7 @@ import {OldWorldApprovals} from './OldWorldApprovals.tsx';
 import {answerApprovalTabs,approvalChannelName,approvalFromHash,askOpenTab} from './approval-link.ts';
 import {useApprovalFollow} from './useApprovalFollow.ts';
 import {FOLLOW_SOUL_WAIT_MS,onFollowSoulRequest} from './follow-soul-request.ts';
+import {onLookAtRequest} from './look-at-request.ts';
 import {worldClockAt,worldTimeText} from './world-clock.ts';
 import type { WorldViewerHandle, WorldViewerState } from './WorldViewer.ts';
 import { worldKey } from './world-path.ts';
@@ -157,6 +158,8 @@ function ShellWorld({ cfg, auth: providerAuth, arrivalEnabled=false,humanPresets
   useEffect(()=>onFollowSoulRequest(soulId=>{setCardFollow({soulId,scope:'card'});if(!meRef.current?.souls.includes(soulId))refreshMe(sim);}),[]);
   useEffect(()=>{if(!cardFollow)return;const t=setTimeout(()=>setCardFollow(null),FOLLOW_SOUL_WAIT_MS);return()=>clearTimeout(t);},[cardFollow]);
   useApprovalFollow(cardFollow,'card',true,viewerHandle,viewerState,()=>setCardFollow(null));
+  // OWNER-DAY: a "Today" entry moves the camera to where it happened (your own camera, not follow/broadcast).
+  useEffect(()=>onLookAtRequest(({x,z})=>{if(viewerHandle?.setManualNavigation)viewerHandle.setManualNavigation('orbit');else viewerHandle?.setCameraMode('manual');void import('./god-ui/camera.ts').then(m=>m.flyTo(x,0,z,{distance:28}));}),[viewerHandle]);
   const placePreview=useCallback((place:EdenTourPlace)=>viewerHandle?.locationPreview?.(place)??Promise.resolve(null),[viewerHandle]);
   const openNavigation = useCallback(() => setPanelOpen(false), []);
   const viewportInsets = useViewerInsets(frame, !advanced && panelOpen, `${advanced}:${navigationOpen}:${tab}:${selected}`);
