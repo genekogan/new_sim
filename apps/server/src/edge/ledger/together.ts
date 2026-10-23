@@ -744,6 +744,19 @@ export class Together {
       if (!m || !this.approachCaps(soul, m.soulId, caps, plans)) return null;
       const c = caps.find(c => c.id === `${verb}:${m.soulId}`); return c ? {capability: c.id, note: `${text.trim()} is ${c.id} (walks over to ${m.name} first)`} : null;
     };
+    // PERSON-GO: the same named, awake target allowed by social approach can be walked to directly.
+    // Keep this on demand: perception does not list hidden bodies. Native walk_to still checks every route.
+    const goToBody = (name: string) => {
+      if (!plans) return null; const m = this.farSoul(soul, name); if (!m) return null;
+      const id = 'go-near:' + m.soulId, label = `Go near ${m.name}`;
+      if (!caps.some(c => c.id === id)) {
+        caps.push({id, verb: 'go-near', label, target: {id: m.soulId, kind: 'soul'}, available: true});
+        plans.set(id, {label, steps: [...this.standFirst(soul.entityId), {verb: 'walk_to', params: {to: m.entityId, standoff: 1.3}}]});
+      }
+      return {capability: id, note: `${text.trim()} is ${id} (walks to ${m.name})`};
+    };
+    const exactGo = /^go-near:(s_[0-9a-f]+)$/.exec(text.trim());
+    if (exactGo) return goToBody(exactGo[1]);
     const tooFar = (verb: string, o: NearbyBody) => {const g = caps.find(c => c.id === 'go-near:' + o.soulId); return {code: 'gesture.too-far', reason: `${o.name} is ${o.distance} m away; ${verb} needs you within ${GESTURE_RADIUS} m. Go near them first (go-near:${o.soulId}), then ask again.`, did_you_mean: [{id: 'go-near:' + o.soulId, label: g?.label ?? `Go near ${o.name}`}]};};
     // invitations to me
     const mine = this.invitesFor(soul.soulId);
@@ -789,7 +802,7 @@ export class Together {
       const w = goto[1].trim().replace(/^the\s+/, ''), named = (n: string) => n.toLowerCase() === w || (tokens(n).length > 0 && tokens(n).every(x => tokens(w).includes(x)));
       const o = near.find(o => o.soulId === w || named(o.name));
       if (o) {const c = caps.find(c => c.id === 'go-near:' + o.soulId); if (c) return {capability: c.id, note: `${raw} is ${c.id}`};}
-      else if ([...this.p.host.minds.values()].some(x => x.soulId !== soul.soulId && (x.soulId === w || named(x.name)))) return notHere('meet them', goto[1]);
+      else if ([...this.p.host.minds.values()].some(x => x.soulId !== soul.soulId && (x.soulId === w || named(x.name)))) return goToBody(goto[1]) ?? notHere('meet them', goto[1]);
     }
     // follow / walk with
     const fol = /^(?:follow|walk\s+with|go\s+with|accompany|tag\s+along\s+with|come\s+with)\s+(.+)$/.exec(t);
