@@ -3,7 +3,7 @@
   "name": "eden-2026",
   "worldId": "eden-2026-1",
   "auditVersion": 1,
-  "totals": {"dests":7561,"bad":48,"disconnected":48,"oneWay":0,"noRoom":0,"goalless":8,"roots":1453,"floats":87},
+  "totals": {"dests":7562,"bad":42,"disconnected":42,"oneWay":0,"noRoom":0,"goalless":7,"roots":1453,"floats":87},
   "places": {
     "botanic-koi-1": {"float":1},
     "botanic-koi-2": {"float":1},
@@ -40,7 +40,6 @@
     "harbour-motorboat": {"float":1},
     "harbour-rowing-boat-1": {"float":1},
     "harbour-rowing-boat-2": {"float":1},
-    "hillside-home-12": {"bad":6,"goalless":1},
     "lake-duck-1": {"float":1},
     "lake-duck-2": {"float":1},
     "lake-duck-3": {"float":1},
@@ -138,8 +137,6 @@
     "trees-old-17-n9": {"goalless":1}
   },
   "bad": [
-    ["nav.disconnected","berth:e_5510b16c#bed-l","hillside-home-12"],
-    ["nav.disconnected","berth:e_5510b16c#bed-r","hillside-home-12"],
     ["nav.disconnected","walk:canal-east-home-2/canal-east-home-2-roof-planter","canal-east-home-2"],
     ["nav.disconnected","walk:canal-east-home-6/canal-east-home-6-roof-planter","canal-east-home-6"],
     ["nav.disconnected","walk:canal-west-home-6/canal-west-home-6-roof-planter","canal-west-home-6"],
@@ -168,10 +165,6 @@
     ["nav.disconnected","walk:eden-house-4/eden-house-4-roof-planter-2","eden-house-4"],
     ["nav.disconnected","walk:eden-library-1/library-roof-planter-1","eden-library-1"],
     ["nav.disconnected","walk:eden-library-1/library-roof-planter-2","eden-library-1"],
-    ["nav.disconnected","walk:hillside-home-12/bedroom-bed","hillside-home-12"],
-    ["nav.disconnected","walk:hillside-home-12/bedroom-lamp","hillside-home-12"],
-    ["nav.disconnected","walk:hillside-home-12/bedroom-wardrobe","hillside-home-12"],
-    ["nav.disconnected","walk:hillside-home-12/landing-lamp","hillside-home-12"],
     ["nav.disconnected","walk:land-alpine-backdrop","land-alpine-backdrop"],
     ["nav.disconnected","walk:land-northeast-ridge","land-northeast-ridge"],
     ["nav.disconnected","walk:land-western-hills","land-western-hills"],
@@ -189,7 +182,6 @@
   ],
   "goalless": [
     ["eden-house-2-kitchen/kitchen-1","eden-house-2-kitchen"],
-    ["hillside-home-12/bedroom","hillside-home-12"],
     ["land-northwest-slope-pines","land-northwest-slope-pines"],
     ["place-region-southern-sea","place-region-southern-sea"],
     ["trees-old-13-n12","trees-old-13-n12"],
