@@ -2,7 +2,7 @@
 // always wins. Otherwise an unambiguous alias is accepted (reported back as `resolved`), and anything else is
 // refused capability.unknown with `did_you_mean`: the closest capabilities actually offered. Pure and deterministic.
 import type {EdgeCapability} from '../contract.ts';
-import {SPOT_ACTIVITIES} from './activities.ts';
+import {SPOT_ACTIVITIES, SPOT_REACH} from './activities.ts';
 
 export type VocabTarget = {
   /** Extra names a capability answers to: its target place's name, a Soul's name. */
@@ -276,6 +276,14 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
     const target = text.replace(/\b(?:let|lets|s|go|for|take|have|a|an|the|ride|rides|row|rowing|boat|boating|punt|balloon|fly|flight|flying|in|on|at|around|start|leave|disembark|depart|out|of|to|loop|together|board|boarding|embark|get|getting|climb|climbing|hop|step|jump|into|inside|aboard|onto|hot|air)\b/g, ' ').replace(/[:.!]/g, ' ').trim();
     const words = tokens(target), named = words.length ? rides.filter(c => {const t = ctx.target(c); return words.every(w => tokenHit(w, tokens([c.id, c.label, ...t.names, ...t.around].join(' '))));}) : rides;
     const pick = named.sort((a, b) => Number(b.available) - Number(a.available) || dist(ctx.target(a).at, ctx.me) - dist(ctx.target(b).at, ctx.me) || a.id.localeCompare(b.id))[0];
+    // VERBS (accept2 brief 10): the named ride cannot be boarded now (a punt whose bank no longer qualifies) but another one
+    // works: "the pond" in general takes it; a specific name is refused with the working one named.
+    const other = pick && !pick.available ? rides.filter(c => c.available).sort((a, b) => dist(ctx.target(a).at, ctx.me) - dist(ctx.target(b).at, ctx.me) || a.id.localeCompare(b.id))[0] : undefined;
+    if (pick && other) {
+      const why = pick.blocked?.reason ? ` (${pick.blocked.reason.replace(/[.\s]+$/, '')})` : '';
+      if (words.every(w => /^(?:pond|ponds|lake|water|river|boat|punt)$/.test(w))) return {kind: 'alias', cap: other, note: `${input} is ${other.id} (${other.label}): ${pick.id} cannot be boarded right now${why}.`};
+      return {kind: 'unknown', code: 'ride.blocked', reason: `${pick.id} cannot be boarded right now${why}. ${other.id} (${other.label}) can; nothing else was chosen.`, didYouMean: [{id: other.id, label: other.label}]};
+    }
     if (pick) return {kind: 'alias', cap: pick, note: `${input} is ${pick.id} (${pick.label}).`};
     // E-life (Eden 2026 quality case 22): with no punt anywhere in this world the refusal is terminal (the agent walked off to look)
     const punts = water ? ctx.elsewhere?.('punt') : undefined;
@@ -298,7 +306,7 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   // Unsupported motions are refused honestly, with the nearest real things to do.
   // Quality 22/29/30: a refusal for something that exists nowhere is terminal (NOWHERE); one whose verb a world can
   // offer (fish, swing, picnic…) may exist elsewhere, so it keeps todo's place-specific wording.
-  if (colon < 0 || !ctx.caps.some(c => c.verb === head)) for (const [re, reason, prefer, offer] of notYet) if (re.test(colon < 0 ? text : head)) return {kind: 'unknown', reason: offer && offer !== 'feed-birds' ? elsewhereReason(offer, ctx, offer === 'ride-attraction' && ctx.elsewhere?.(offer) ? 'No Ferris wheel or carousel ride is offered from here.' : reason) : reason + NOWHERE, didYouMean: suggest(input, prefer[0], '', ctx, ctx.caps.filter(c => prefer.includes(c.verb) && c.available).slice(0, 5))};
+  if (colon < 0 || !ctx.caps.some(c => c.verb === head)) for (const [re, reason, prefer, offer] of notYet) if (re.test(colon < 0 ? text : head)) return {kind: 'unknown', reason: offer === 'feed-birds' ? feedBirdsReason(ctx, reason) : offer ? elsewhereReason(offer, ctx, offer === 'ride-attraction' && ctx.elsewhere?.(offer) ? 'No Ferris wheel or carousel ride is offered from here.' : reason) : reason + NOWHERE, didYouMean: suggest(input, prefer[0], '', ctx, ctx.caps.filter(c => prefer.includes(c.verb) && c.available).slice(0, 5))};
   const verbs = new Set(ctx.caps.map(c => c.verb));
   // VOCAB-MECH: a god-built thing's actuator actions (object caps on `e_…` entities) answer to their own names as verbs:
   // "open the blue door", "put out the fire", "switch off the lamp" (+ everyday aliases). Other objects are unchanged.
@@ -465,6 +473,8 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   // only wins when its verb is offered here). A spot activity offered elsewhere says where the nearest one is.
   if (!pool.length && colon < 0) for (const [re, v] of INTENTS) if (!verbs.has(v) && v in SPOT_ACTIVITIES && re.test(text)) {
     const e = ctx.elsewhere?.(v); if (e === undefined) break;
+    // within offer reach but not offered: every such spot is taken (another body is at the gym's dumbbells)
+    if (e && e.distance <= SPOT_REACH) return unknown(`${SPOT_ACTIVITIES[v].label} is not free right now: the nearest, ${e.label}${e.place && !e.label.endsWith(` in ${e.place}`) ? ` in ${e.place}` : ''} (about ${Math.round(e.distance)} m away), is in use by someone. Ask again in a minute or two; nothing else was chosen.`);
     return unknown(elsewhereReason(v, ctx, `${SPOT_ACTIVITIES[v].label} is not offered within reach of where you are.`));
   }
   if (!pool.length) return unknown(`No "${verb}" capability is offered to this Soul right now. Things you can do: ${ctx.caps.filter(c => c.id.endsWith(':here')).map(c => c.id).slice(0, 12).join(', ')} (and walk:<place>, stroll:<place>, read:<place>); read capabilities again.`, ctx.caps.filter(c => c.id.endsWith(':here')));
@@ -480,13 +490,23 @@ function isAncestor(ctx: VocabContext, ancestor: string, id: string | undefined)
 }
 /** Places named by these words: own name/id first, then everyday synonyms, then description words; the most
  *  obvious first (by name over description, walkable, outermost, larger). */
+/** VERBS (accept2 brief 10): "feed the ducks" away from a duck bank said "There are no ducks or birds to feed here" although
+ *  Eden 2026 has two duck banks: name the nearest (or that it is taken); the old wording stays only where none exists. */
+function feedBirdsReason(ctx: VocabContext, none: string): string {
+  const e = ctx.elsewhere?.('feed-birds');
+  if (e === undefined) return none + NOWHERE;
+  if (e === null) return none + NOWHERE;
+  const where = e.place && !e.label.endsWith(` in ${e.place}`) ? ` in ${e.place}` : '';
+  if (e.distance <= SPOT_REACH) return `Feeding the ducks is not free right now: the nearest place for it, ${e.label}${where} (about ${Math.round(e.distance)} m away), is in use by someone. Ask again in a minute or two; nothing else was chosen.`;
+  return `No duck feeding is offered within reach of where you are. The nearest is ${e.label}${where}, about ${Math.round(e.distance)} m away: walk there first${e.placeId ? ` (walk:${e.placeId})` : ''}, then ask again.`;
+}
 /** A refusal for a spot-based thing (a swing, a bicycle) that is not offered from here: say where the nearest one is, or that
  *  none exists in this world at all (terminal, NOWHERE). Without world knowledge the place-specific wording stays. */
 function elsewhereReason(verb: string, ctx: VocabContext, here: string, none?: string): string {
   const e = ctx.elsewhere?.(verb);
   if (e === undefined) return here;
   if (e === null) return (none ?? here) + NOWHERE;
-  const where = e.place ? ` in ${e.place}` : '', go = e.placeId ? ` (walk:${e.placeId})` : '';
+  const where = e.place && !e.label.endsWith(` in ${e.place}`) ? ` in ${e.place}` : '', go = e.placeId ? ` (walk:${e.placeId})` : '';
   return `${here.replace(/[.\s]+$/, '')}. The nearest is ${e.label}${where}, about ${Math.round(e.distance)} m away: walk there first${go}, then ask again.`;
 }
 export function placeMatch(words: string[], places: VocabPlace[], withheld: readonly string[] = []): VocabPlace[] {return placeMatchTier(words, places, withheld).found;}

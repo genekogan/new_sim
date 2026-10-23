@@ -1227,6 +1227,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
         : verb === 'punt' ? this.carriersNative().filter(c => c.def === 'rowing-punt').map(c => ({at: [c.pose.p[0], c.pose.p[2]] as [number, number], label: c.label, place: undefined as string | undefined})) : null;
       if (rideMarks && !rideMarks.length) return verb === 'punt' ? null : undefined;
       const marks = rideMarks ?? (verb === 'cycle' ? (this.spots.docks ?? []).map(k => ({at: k.at, label: k.label ?? 'a bicycle dock', place: k.place}))
+        // VERBS: ducks or swans to feed (a feed spot whose title or label names birds), for "feed the ducks"
+        : verb === 'feed-birds' ? this.spots.spots.filter(x => x.activity === 'feed' && /\b(?:ducks?|swans?|geese|goose|birds?)\b/i.test(`${x.title ?? ''} ${x.label ?? ''}`)).map(x => ({at: x.at, label: x.label ?? 'a duck-feeding bank', place: x.place}))
         : verb in SPOT_ACTIVITIES ? this.spots.spots.filter(x => x.activity === verb || x.also?.includes(verb)).map(x => ({at: x.at, label: x.label ?? `a ${verb} spot`, place: x.place})) : undefined);
       if (!marks) return undefined;
       const best = marks.map(m => {const placeId = m.place ?? around(m.at[0], m.at[1])[0], pl = placeId ? this.places.byId.get(placeId) : undefined;
