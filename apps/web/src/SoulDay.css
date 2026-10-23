@@ -1,0 +1,13 @@
+/* OWNER-DAY: the Soul's "Today" timeline on its home view. */
+.soul-day .day-summary { margin: 0 0 8px; }
+.soul-day .day-list { list-style: none; margin: 0; padding: 0; }
+.soul-day .day-row { border-bottom: 1px solid var(--line); }
+.soul-day .day-go { display: grid; grid-template-columns: 3.6em auto 1fr; gap: 2px 8px; align-items: baseline; width: 100%; padding: 6px 2px; text-align: left; background: none; border: 0; color: inherit; font: inherit; }
+.soul-day button.day-go { cursor: pointer; }
+.soul-day button.day-go:hover, .soul-day button.day-go:focus-visible { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.soul-day .day-time { font-variant-numeric: tabular-nums; }
+.soul-day .day-text { min-width: 0; overflow-wrap: anywhere; }
+.soul-day .day-reason { display: block; color: var(--warn); }
+.soul-day .tag.day-refused { color: var(--bad); border-color: var(--bad); }
+.soul-day .day-refused .day-text, .soul-day .day-stopped .day-text { color: var(--fg, inherit); }
+@media (max-width: 520px) { .soul-day .day-go { grid-template-columns: auto 1fr; } .soul-day .day-text { grid-column: 1 / -1; } }

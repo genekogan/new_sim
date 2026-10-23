@@ -8,7 +8,9 @@ import {InviteAccess} from './InviteAccess.tsx';
 import {isConnectionRefusal} from './connection-response.ts';
 import {AgentConnection} from './AgentConnection.tsx';
 import { DeckPanel, HeardPanel, SentencesPanel } from './Grammar.tsx';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+// OWNER-DAY: the "Today" timeline is its own chunk, loaded only on a Soul's home view.
+const SoulDay = lazy(() => import('./SoulDay.tsx').then((m) => ({ default: m.SoulDay })));
 import { GOALS, type BrainCall, type MandateRule } from '@sim/protocol';
 import type { AuthCtx } from './Shell.tsx';
 import type { Api, Sim } from './useSim.ts';
@@ -194,6 +196,8 @@ function Dashboard({ sim, api, soul, isAdmin, base, refresh, onGone, active }: {
           <span>happening</span><span>{s.happening}</span>
         </div>}
       </section>
+
+      <Suspense fallback={null}><SoulDay api={api} soulId={soul.id} name={soul.name} /></Suspense>
 
       <section>
         <h2>{s?.needs?'Mandate':`Step 3 — give ${soul.name} direction`}</h2>

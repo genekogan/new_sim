@@ -32,7 +32,7 @@ export interface EdgeLedgerHooks {
   /** Opaque capability providers (Comms objects) are merged into capabilities. */
   addCapabilityProvider(p: (soul: EdgeSoul) => EdgeCapability[]): void;
   /** Persist a refusal for measurement (no text from agents). */
-  recordRefusal?(soulId: string, verb: string, capability: string, code: string): void;
+  recordRefusal?(soulId: string, verb: string, capability: string, code: string, reason?: string): void;
   /** carrier/1: a native ride's public state, for ride objects (null when there is no such carrier). */
   carrierView?(entityId: string): unknown;
   /** OBJECT-CONTRACT §7: perform an object action's body steps as a logged decision with a normal receipt. */

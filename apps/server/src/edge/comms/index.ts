@@ -164,7 +164,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   app.get('/v1/edge/objects/:id', route((c, soul) => objects.get(c.req.param('id') ?? '', soul)));
   app.post('/v1/edge/objects/:id/act', route(async (c, soul) => {
     const body = await json(c), id = c.req.param('id') ?? '', cap = `object:${id}:${String(body.action ?? '')}`,prepared=objects.prepareAct(id,soul,body),out=prepared.result;
-    if (!out.accepted) { if(!prepared.movesBody)objects.act(id,soul,body);deps.ledger.recordRefusal?.(soul.soulId, 'object', cap, String((out as {code?: unknown}).code ?? 'refused')); return out; }
+    if (!out.accepted) { if(!prepared.movesBody)objects.act(id,soul,body);deps.ledger.recordRefusal?.(soul.soulId, 'object', cap, String((out as {code?: unknown}).code ?? 'refused'), String((out as {reason?: unknown}).reason ?? '')); return out; }
     // A body-moving action (a ride's join/leave/start) gets a normal receipt from the Ledger, or its genuine refusal.
     const {bodies, ...rest} = out;
     if(!bodies?.length){const accepted=prepared.commit();fading.touch(soul.soulId);return accepted;}
