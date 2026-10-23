@@ -8,9 +8,11 @@ import { rot2 } from '../../../mars/viewer/engine/core/math.ts';
 import { acknowledgeRelocation } from '../../../mars/viewer/engine/runtime/invariants.ts';
 
 /** Phases that move a body from one hold to another (on, off, up, down). They last seconds when they work. */
-export const TRANSFER_PHASES = new Set(['boarding', 'boarding-wait', 'leaving', 'leaving-wait', 'stand-up', 'step-off', 'step-aside',
+export const TRANSFER_PHASES = new Set(['boarding', 'boarding-wait', 'leaving', 'leaving-wait', 'stand-up', 'step-off',
   'transferring', 'releasing', 'safe-release', 'stopping', 'stopping-walk', 'cleanup', 'climb-down', 'cancel-climb', 'departure-release',
-  'sit-down', 'settle', 'settling', 'changing-floor', 'ending', 'safe-end', 'waking', 'performer-leaving-chair', 'gather-cancel']);
+  // not 'settle' or 'step-aside': those are walk's own running phases (closing on the goal, queued or stepped aside for another
+  // body on a shared route), served by the traffic and deadlock resolvers; a queued walker or swimmer is not a stall
+  'sit-down', 'settling', 'changing-floor', 'ending', 'safe-end', 'waking', 'performer-leaving-chair', 'gather-cancel']);
 /** Body markers that say "something holds me"; with no live holder they are left over (the stall that bricked Mickey). */
 const MARKERS = ['carrier', 'task', 'berth', 'seatHeight'] as const;
 const CONSTRUCTION = /build|unbuild|lookout|beam|frame|deck|stair|solar|raise|passup|handup|setpart|cut|bundle|disassembl/;
