@@ -105,14 +105,10 @@ export class Daylight {
   }
 
   /** Preserve renderer-derived millisecond precision; second bins freeze sunlight between samples. */
-  private datetime: string | null = null;
-  /** Explore place shots (Gene #13): the light at another clock for one offscreen render; returns the undo. */
-  get clock() { return this.datetime; }
-  photo(datetime: string) { const live = this.datetime; this.update(datetime); return () => this.update(live); }
   update(datetime: string | null) {
     const key = datetime ? `${datetime}|${siteNorthOffset()}` : 'none';
     if (key === this.key) return;
-    this.key = key;this.datetime=datetime;
+    this.key = key;
     if (!datetime) { // no clock yet: a soft midday so the camp reads
       this.daylightFactor=null;
       this.sun.position.copy(this.sun.target.position).add(new THREE.Vector3(20, 35, 15));
