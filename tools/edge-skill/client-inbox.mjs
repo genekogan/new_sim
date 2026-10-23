@@ -1,3 +1,5 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 // Receive only the authenticated Soul owner's private inbox; never infer completion.
 const noticed = new Set();
 export function noticeOwnerInbox(data) {
@@ -21,6 +23,17 @@ export const LISTEN_NEXT = 'From your human, oldest first. 1) Ack them all now, 
 /** 1.9.6: LISTEN_NEXT with the id the next listen starts after. */
 export const listenNext = lastId => LISTEN_NEXT.replace('<last id>', lastId);
 const transient = r => r.status === 0 || r.status === 429 || r.status >= 500;
+/** LISTEN-LEAK (1.9.10): a newer listen for this agent (same folder or not) ended this one: the server answers 409
+ * superseded, or the folder's claim file names a newer listen. Never retried: the newer listen is the one live listener. */
+export const SUPERSEDED = 'listen: superseded by a newer listen for this Soul; this one has ended (do not restart it)';
+const superseded = r => r.status === 409 && (r.data?.code === 'superseded' || r.data?.error?.code === 'superseded');
+/** The folder's listen claim: a new listen writes its own token to `file`, so an older listen of the same folder sees it
+ * is no longer the newest before its next poll (also while it backs off from an outage). */
+export function folderListenClaim(file = '.eden-listen', fs = { readFileSync, writeFileSync }) {
+  const token = randomUUID();
+  try { fs.writeFileSync(file, token + '\n', { mode: 0o600 }); } catch { return () => true; }
+  return () => { try { return fs.readFileSync(file, 'utf8').trim() === token; } catch { return true; } };
+}
 /** The messages one listen answer hands over: a 1.9.5 world's whole backlog, else (older world) its one latest. */
 function handed(data, after) {
   if (Array.isArray(data.backlog)) return data.backlog.filter(m => m && typeof m.id === 'string' && m.state !== 'acknowledged');
@@ -33,7 +46,7 @@ const line = (m, emittedAt) => ({ id: m.id, text: m.text, sentAt: m.sentAt, emit
  * first, and exits. It long-polls inside (one request per ~50 s, no model tokens while it waits); a restarting world or a
  * network drop is retried quietly. The output carries no credential, so never filter it.
  * --once: one long-poll, then the raw answer.  --follow: never exits; one JSON line per new message (a stream). */
-export async function clientListen(args, { call, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), write, stop, now = Date.now }) {
+export async function clientListen(args, { call, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), write, stop, now = Date.now, claim }) {
   let seconds, after, once = false, follow = false;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -51,17 +64,27 @@ export async function clientListen(args, { call, sleep = ms => new Promise(resol
   if (!Number.isFinite(seconds) || seconds < 0 || seconds > 55) throw new Error('listen --timeout takes seconds from 0 to 55');
   if (seconds === 0 && !once) throw new Error('listen --timeout 0 requires --once');
   const poll = last => call(`/v1/edge/inbox/listen?${new URLSearchParams({ timeoutMs: String(Math.round(seconds * 1000)), ...(last ? { after: last } : {}) })}`, { timeoutMs: Math.round(seconds * 1000) + 10_000 });
-  if (follow) return followInbox({ poll, after, wait: sleep, write, stop, now });
   if (once) return inboxResult(await poll(after), 'listen');
+  // Only the newest listen of this folder stays live (--once is a peek and claims nothing).
+  const mine = claim ? claim() : () => true;
+  if (follow) return followInbox({ poll, after, wait: sleep, write, stop, now, mine, ...(claim ? { step: 1000 } : {}) });
   for (let delay = 0; ;) {
+    if (!mine()) return SUPERSEDED;
     // A connection dropped mid-answer throws instead of returning status 0: an outage too, never the end of listen.
     let r; try { r = await poll(after); } catch (e) { r = { status: 0, data: { error: { code: 'unreachable', message: String(e?.message ?? e) } } }; }
-    if (transient(r)) { delay = Math.min(30_000, delay ? delay * 2 : 1000); await sleep(delay); continue; }
+    if (superseded(r)) return SUPERSEDED;
+    if (transient(r)) { delay = Math.min(30_000, delay ? delay * 2 : 1000); if (await backoff(delay, sleep, mine, claim ? 1000 : delay)) return SUPERSEDED; continue; }
     delay = 0;
     const messages = handed(inboxResult(r, 'listen'), after);
     if (messages.length) { const at = new Date(now()).toISOString(); return { messages: messages.map(m => line(m, at)), waiting: messages.length, next: listenNext(messages.at(-1).id) }; }
     await sleep(50);
   }
+}
+
+/** Sleeps `delay` in steps of at most 1 s; true as soon as a newer listen took over. */
+async function backoff(delay, sleep, mine, step = 1000) {
+  for (let t = 0; t < delay; t += step) { if (!mine()) return true; await sleep(Math.min(step, delay - t)); }
+  return !mine();
 }
 
 export async function clientAck(args, { call }) {
@@ -89,11 +112,13 @@ function inboxResult(response, operation) {
 
 /** listen --follow: never returns; prints one compact JSON line per new owner message, oldest first (a stream for a
  * watcher that delivers lines as they come). Network, 429 and 5xx answers back off and retry. */
-export async function followInbox({ poll, after, write = line => process.stdout.write(line + '\n'), wait, stop = () => false, now = Date.now }) {
+export async function followInbox({ poll, after, write = line => process.stdout.write(line + '\n'), wait, stop = () => false, now = Date.now, mine = () => true, step = Infinity }) {
   let last = after, delay = 0;
   while (!stop()) {
+    if (!mine()) return SUPERSEDED;
     const r = await poll(last);
-    if (transient(r)) { delay = Math.min(30_000, delay ? delay * 2 : 1000); await wait(delay); continue; }
+    if (superseded(r)) return SUPERSEDED;
+    if (transient(r)) { delay = Math.min(30_000, delay ? delay * 2 : 1000); if (await backoff(delay, wait, mine, step)) return SUPERSEDED; continue; }
     delay = 0;
     const messages = handed(inboxResult(r, 'listen'), last).filter(m => m.id !== last);
     if (!messages.length) { await wait(50); continue; }

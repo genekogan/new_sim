@@ -111,18 +111,23 @@ export function mountAgentInbox(app: Hono, d: Deps) {
       const s = requireAgent(c, kind), raw = c.req.query('timeoutMs'), timeout = raw === undefined ? 25_000 : Number(raw), after = c.req.query('after');
       if (!Number.isInteger(timeout) || timeout < 0 || timeout > 55_000 || (after?.length ?? 0) > 100) throw new ApiError(400, 'invalid', 'timeoutMs must be 0..55000 and after must be a message id');
       const key = JSON.stringify(s); limit(`inbox-listen:${kind}:${key}`, 120);
-      if (inbox.listenerCount(s) >= 2) throw new ApiError(429, 'rate-limited', 'at most two inbox listeners per agent');
+      // LISTEN-LEAK: a newer listen for the same agent supersedes this one instead of being refused (one live listener).
+      // A timeoutMs=0 peek (the CLI's wait interrupt) never supersedes the waiting listener.
+      const claim = timeout > 0 ? inbox.claimListen(s) : {signal: new AbortController().signal, release: () => {}};
       const end = inbox.listening(s);   // G4: the owner's "connected" is a listener waiting now
       let handed = false;               // MSG: an empty answer means the CLI re-polls at once (presence keeps 'listening')
       try {
-        await inbox.listen(s, after, timeout, c.req.raw.signal);
+        await inbox.listen(s, after, timeout, AbortSignal.any([c.req.raw.signal, claim.signal]));
+        // Superseded (or the caller hung up): hand over nothing; the newer listen takes every waiting message.
+        if (claim.signal.aborted) throw new ApiError(409, 'superseded', 'superseded by a newer listen for this agent; this listen has ended, do not restart it');
+        if (c.req.raw.signal.aborted) throw new ApiError(499, 'closed', 'the listener hung up');
         const current = requireAgent(c, kind);
         if (current.owner !== s.owner || current.scope !== s.scope) throw new ApiError(401, 'unauthorized', 'agent authority changed');
         // MSG: a Soul's listen hands over every waiting message at once, oldest first (the agent works through them all).
         // An older CLI reads `latest`: the first one after its cursor, so its listen/follow loop walks the queue in order.
         if (kind === 'soul') { const backlog = inbox.takeBacklog(s, after), v = inbox.view(s); handed = backlog.length > 0; return c.json({inbox: {...v, latest: backlog[0] ?? v.latest}, backlog}); }
         return c.json({inbox: inbox.view(s)});
-      } finally { end(handed); }
+      } finally { claim.release(); end(handed); }
     });
     app.post(`${path}/:id/ack`, async c => {
       const s = requireAgent(c, kind), b = await json(c); limit(`inbox-ack:${kind}:${JSON.stringify(s)}`, 120);

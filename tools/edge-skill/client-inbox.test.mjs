@@ -146,3 +146,28 @@ test('Soul inbox --follow on a 1.9.5 world prints every message of a backlog, in
   await clientListen(['--follow'], { call: async path => { calls.push(path); return { status: 200, data: answers.shift() }; }, sleep: async () => {}, write: l => lines.push(JSON.parse(l).id), stop: () => !answers.length });
   assert.deepEqual(lines, ['a', 'b', 'c', 'd']); assert.equal(calls[1], '/v1/edge/inbox/listen?timeoutMs=50000&after=c');
 });
+
+test('LISTEN-LEAK: a superseded listen prints one line and ends (exit 0), never reconnecting; --follow too', async () => {
+  const { SUPERSEDED } = await import('./client-inbox.mjs');
+  for (const args of [[], ['--follow']]) {
+    const calls = [];
+    const out = await clientListen(args, { call: async path => { calls.push(path); return { status: 409, data: { ok: false, code: 'superseded', message: 'superseded by a newer listen' } }; }, sleep: async () => { throw new Error('no retry after superseded'); }, write: () => {} });
+    assert.equal(out, SUPERSEDED); assert.equal(calls.length, 1, 'one poll, no reconnect'); assert.ok(!/\n/.test(JSON.stringify(out)), 'one line');
+  }
+  // an older world's 409 for something else stays an error
+  await assert.rejects(clientListen([], { call: async () => ({ status: 409, data: { code: 'conflict' } }), sleep: async () => {} }), /HTTP 409/);
+});
+
+test('LISTEN-LEAK: a second listen in the same folder supersedes the first, also while the first backs off from an outage', async () => {
+  const { folderListenClaim, SUPERSEDED } = await import('./client-inbox.mjs');
+  const scratch = '<team>/scratch/inbox'; mkdirSync(scratch, { recursive: true });
+  const file = join(mkdtempSync(join(scratch, 'listen-claim-')), '.eden-listen');
+  let second, sleeps = 0;
+  const first = clientListen([], { claim: () => folderListenClaim(file), call: async () => ({ status: 502, data: {} }),
+    sleep: async () => { if (++sleeps === 2) second = clientListen([], { claim: () => folderListenClaim(file), call: async () => ({ status: 200, data: { ...envelope(null), backlog: [latest('m1')] } }), sleep: async () => {} }); } });
+  assert.equal(await first, SUPERSEDED, 'the older one ends within a second of the newer one starting');
+  assert.equal(sleeps, 2); assert.deepEqual((await second).messages.map(m => m.id), ['m1'], 'the newer one is the listener');
+  // --once is a peek: it claims nothing
+  let peeks = 0; await clientListen(['--once'], { claim: () => { peeks++; return () => true; }, call: async () => ({ status: 200, data: envelope(null) }) });
+  assert.equal(peeks, 0);
+});

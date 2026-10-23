@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import {ownerReplyWithLocalResults,ownerAnswerText,routeOwnerReport} from './client-owner-reply.mjs';
 import {clientHelp} from './client-help.mjs';
-import {clientListen,clientAck,clientResult,noticeOwnerInbox,noticeInboxHeader} from './client-inbox.mjs';
+import {clientListen,clientAck,clientResult,noticeOwnerInbox,noticeInboxHeader,folderListenClaim} from './client-inbox.mjs';
 // Eden edge agent CLI — skill 1.0.0 for contract eden-edge/1 (team/CONTRACTS/EDGE-CONTRACT-v1.md).
 // Dependency-free, Node 18+. One Soul, one world, any folder. State in ./.eden-agent.json is PRIVATE
 // (identity + Soul token). Edge verbs use /v1/edge/* with the Soul token; when a world does not serve
@@ -1215,7 +1215,7 @@ export async function dashboard(...args){
  liveOptions(liveArgs);const service=await startClientDashboard({cli:resolve(process.argv[1]),liveArgs,port});console.log('Local Soul dashboard: '+service.origin+' (mind starts automatically; pause/stop preserves world activity)');
  await new Promise(resolve=>{let closing=false;const close=async()=>{if(closing)return;closing=true;await service.close();resolve();};process.once('SIGINT',close);process.once('SIGTERM',close);});return {dashboard:'closed'};
 }
-export async function listen(...args){return clientListen(args,{call});}
+export async function listen(...args){return clientListen(args,{call,claim:()=>folderListenClaim()});}
 export async function ack(...args){const r=await clientAck(args,{call});save({lastOwnerAckAt:now()});return r;}
 /** 1.9.5 (lane MSG): the second answer on the owner's card, when the work ends: result <id> done|failed "what happened". */
 export async function result(...args){return clientResult(args,{call});}
