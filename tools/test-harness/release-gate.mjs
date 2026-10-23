@@ -207,9 +207,9 @@ export function readRun(dir, expected, manifest, requiredSteps = REQUIRED_STEPS)
         const failures = tap.tests.filter(t => t.status === 'fail' && !t.aggregate);
         if (Number(exit) === 0 && failures.length) errors.push(`${step}: failure hidden by zero exit`);
         if (Number(exit) !== 0 && !failures.length) errors.push(`${step}: nonzero exit without test failure evidence`);
-        if (step === 'V4-web') {
+        if (step === 'V4-web' || step === 'V3-harness') {
           try {
-            const attributionPath = join(dir, 'out/suite/V4-web-files.jsonl');
+            const attributionPath = join(dir, `out/suite/${step}-files.jsonl`);
             const events = read(attributionPath).trim().split(/\r?\n/).map(line => JSON.parse(line));
             if (events.at(-1)?.event !== 'test:summary') errors.push(`${step}: incomplete executed-files attribution`);
             const finalCounts = events.at(-1)?.counts;

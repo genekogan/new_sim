@@ -56,9 +56,13 @@ test('keep argument: 1 keeps one id, 0 keeps everything, junk is refused', () =>
   assert.equal(run(join(dir, 'missing')), '');
 });
 
+// Historical gate identity retained intentionally: Gene's 2026-10-23 no-delete rule
+// reverses the old automatic-prune contract. This now proves retention, not pruning.
+// Descriptive release-no-delete tests exercise the actual Trash/reuse behavior.
 test('release.sh prunes the laptop builds after assembling', async () => {
   const { readFileSync } = await import('node:fs');
   const sh = readFileSync(join(dirname(SCRIPT), 'release.sh'), 'utf8');
-  assert.match(sh, /prune-local\.sh" "\$\(dirname "\$OUT"\)" "\$\{SIM_RELEASE_KEEP:-3\}"/);
-  assert.ok(sh.indexOf('prune-local.sh') < sh.indexOf('if [ -n "$LOCAL" ]; then\n  echo "assembled'), 'prune runs before the --local exit');
+  assert.doesNotMatch(sh, /prune-local\.sh|\brm\s+-|--delete/, 'release must not automatically prune or delete');
+  assert.match(sh, /trash_existing "\$OUT"/);
+  assert.ok(sh.indexOf('trash_existing "$OUT"') < sh.indexOf('echo "assembled'), 'prior artifact is retained before the --local exit');
 });

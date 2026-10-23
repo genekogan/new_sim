@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdtempSync, mkdirSync, writeFileSync, renameSync, readFileSync } from 'node:fs';
+import { tmpdir, homedir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { compareRuns, parseTap, readRun, validateQuarantine, REQUIRED_STEPS } from './release-gate.mjs';
 
+// Preserve fixture artifacts under the same no-delete rule as release work.
+const retireFixture = dir => { const trash = join(homedir(), '.Trash'); mkdirSync(trash, { recursive: true }); renameSync(dir, join(trash, dir.split('/').at(-1) + '-' + Date.now())); };
 const manifest = (entries = []) => ({ schemaVersion: 1, entries, scopeExclusions: ['V7', 'V8'].map(step => ({ step, owner: 'gate test fixture', reason: 'Separately owned explicit scope exclusion' })) });
 const entry = (id, extra = {}) => ({ step: 'V4-web', id, owner: 'gate test fixture', reason: 'Known fixture failure, isolated by exact assertion', ...extra });
 function tap(nodes, { prefix = '', omitEnd = false } = {}) {
@@ -130,7 +132,7 @@ test('package names prevent equal test names in different packages from collidin
 });
 test('actual Node TAP catches an additional failure in the same already failing file', t => {
   const dir = mkdtempSync(join(process.env.GATE_TEST_TMPDIR || tmpdir(), 'sim-release-tap-real-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  t.after(() => retireFixture(dir));
   const path = join(dir, 'real.test.mjs');
   const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
   const execute = extra => {
@@ -148,7 +150,7 @@ test('actual Node TAP catches an additional failure in the same already failing 
 const expected = { schemaVersion: 1, sourceSha: 'a'.repeat(40), harnessRef: 'b'.repeat(40), harnessTree: 'c'.repeat(40), harnessArchiveSha256: 'd'.repeat(64), node: '22' };
 function fixture(t, { exit = '0', step = 'V4-web', metadata = {}, log = tap([{ name: 'works' }]), summary = true, attribution = [{ event: 'test:pass', file: '/work/head/apps/web/src/widget.test.ts', name: 'works', type: 'test' }, { event: 'test:summary' }] } = {}) {
   const dir = mkdtempSync(join(process.env.GATE_TEST_TMPDIR || tmpdir(), 'sim-release-gate-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  t.after(() => retireFixture(dir));
   mkdirSync(join(dir, 'out/suite'), { recursive: true });
   writeFileSync(join(dir, 'out/RUN-METADATA.json'), JSON.stringify({ ...expected, baselineSha: null, suiteCompleted: true, skip: ['V7', 'V8'], serverFiles: [], nodeVersion: 'v22.23.0', pnpmVersion: '10.27.0', ...metadata }));
   if (summary) writeFileSync(join(dir, 'out/suite/SUMMARY.tsv'), `step\texit\tseconds\tlog\n${step}\t${exit}\t2\t/out/suite/${step}.log\nV8-history-boot\tSKIP\t0\t-\n`);
@@ -156,7 +158,7 @@ function fixture(t, { exit = '0', step = 'V4-web', metadata = {}, log = tap([{ n
   if (attribution) {
     const c = parseTap(log || '').counts;
     const counts = { tests: c.tests, suites: c.suites, passed: c.pass, failed: c.fail, cancelled: c.cancelled, skipped: c.skipped, todo: c.todo, topLevel: c.topLevel };
-    writeFileSync(join(dir, 'out/suite/V4-web-files.jsonl'), attribution.map(e => JSON.stringify(e.event === 'test:summary' && e.counts === undefined ? { ...e, counts } : e)).join('\n') + '\n');
+    writeFileSync(join(dir, `out/suite/${step}-files.jsonl`), attribution.map(e => JSON.stringify(e.event === 'test:summary' && e.counts === undefined ? { ...e, counts } : e)).join('\n') + '\n');
   }
   return dir;
 }
@@ -191,6 +193,23 @@ test('missing/truncated executed-file evidence blocks a loader-repair claim', t 
     const dir = fixture(t, { attribution });
     assert.match(readRun(dir, expected, manifest(), ['V4-web']).errors.join('\n'), /executed-files attribution/);
   }
+});
+test('harness loader repair requires real executed-file reporter evidence', t => {
+  const step = 'V3-harness', source = 'tools/test-harness/repaired.test.mjs';
+  const dir = fixture(t, { step, attribution: null });
+  const folder = join(dir, 'work/head/tools/test-harness'); mkdirSync(folder, { recursive: true });
+  const file = join(dir, 'work/head', source); writeFileSync(file, "import test from 'node:test'; test('real harness assertion', () => {});\n");
+  const attribution = join(dir, 'out/suite', `${step}-files.jsonl`);
+  const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
+  const actual = spawnSync(process.execPath, ['--test', '--test-reporter=tap', `--test-reporter=${new URL('./file-reporter.mjs', import.meta.url).href}`, '--test-reporter-destination=stdout', `--test-reporter-destination=${attribution}`, file], { encoding: 'utf8', env });
+  assert.equal(actual.status, 0, actual.stderr); writeFileSync(join(dir, 'out/suite', `${step}.log`), actual.stdout);
+  const candidate = readRun(dir, expected, manifest(), [step]);
+  assert.deepEqual(candidate.errors, []); assert.deepEqual(candidate.steps[step].executedFiles, [source]);
+  const baseline = run(tap([{ name: '/work/base/' + source, status: 'fail', loader: true }]), step);
+  const result = compareRuns(baseline, candidate, manifest(), new Set([source]));
+  assert.equal(result.status, 'pass'); assert.equal(result.fixed[0].kind, 'repaired-loader');
+  renameSync(attribution, attribution + '.retained');
+  assert.match(readRun(dir, expected, manifest(), [step]).errors.join('\n'), /executed-files attribution/);
 });
 test('a passing empty-file wrapper and skipped tests do not prove test execution', t => {
   const file = '/work/head/apps/web/src/widget.test.ts';
