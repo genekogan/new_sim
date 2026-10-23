@@ -220,3 +220,25 @@ test('objects refuse unavailable or unknown actor bodies before state or log mut
   entities[entityId]=original;assert.equal((await f.post('Alice','/v1/edge/objects/chess-1/act',{action:'sit',params:{color:'white'}})).body.accepted,true);
  }finally{f.destroy();}
 });
+
+test('GODPERF: fresh() returns still objects as read and advances (and persists) each due object once', async () => {
+  const f = talkWorld();
+  try {
+    const o = f.runtime.objects;
+    o.create({id: 'chess-1', kind: 'chess', name: 'Chess table', placeId: 'eden-classroom-1'});
+    o.create({id: 'thu-talk', kind: 'presentation', name: 'Thursday talk', placeId: 'eden-classroom-1',
+      params: {title: 'Roots', startsAtTick: 1000, doorsOpenTicks: 200, durationTicks: 500, capacity: 2, presenter: f.id('Eve')}});
+    const v = (id: string) => o.all().find(x => x.id === id)!.version;
+    const before = {chess: v('chess-1'), wed: v('wed-talk'), thu: v('thu-talk')};
+    const quiet = o.fresh();
+    assert.deepEqual(quiet, o.all(), 'nothing due: fresh() is exactly what all() reads');
+    assert.deepEqual({chess: v('chess-1'), wed: v('wed-talk'), thu: v('thu-talk')}, before);
+    setTick(f, 800);                                   // doors open on both talks: two objects advance in one sweep
+    const swept = o.fresh();
+    assert.equal(swept.find(x => x.id === 'wed-talk')!.version, before.wed + 1);
+    assert.equal(swept.find(x => x.id === 'thu-talk')!.version, before.thu + 1);
+    assert.equal(swept.find(x => x.id === 'chess-1')!.version, before.chess);
+    assert.deepEqual(swept, o.all(), 'what fresh() returns is what was persisted');
+    assert.deepEqual(o.fresh(), swept, 'a second sweep at the same tick changes nothing');
+  } finally { f.destroy(); }
+});
