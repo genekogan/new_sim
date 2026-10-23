@@ -142,8 +142,9 @@ export class WorldBroadcast {
     // VF1: WorldDirector decides what is worth watching and for how long (4x a second; cheap, no rays).
     if (wallSeconds - this.lastPick >= .25 || !this.choice) {
       this.lastPick = wallSeconds;
-      const hints = this.hints?.(), speaking = new Map<string, { thread: string; at: number }>();
-      if (hints) for (const [soulId, sp] of speakingNow) { const id = hints.soulEntity(soulId); if (id && frame[id]) speaking.set(id, { thread: sp.thread, at: sp.since / 1000 }); }
+      // DIRECTOR2: speakingNow.since is on the performance.now() clock; the director's `now` is wall seconds.
+      const hints = this.hints?.(), speaking = new Map<string, { thread: string; at: number }>(), perfNow = performance.now();
+      if (hints) for (const [soulId, sp] of speakingNow) { const id = hints.soulEntity(soulId); if (id && frame[id]) speaking.set(id, { thread: sp.thread, at: wallSeconds - (perfNow - sp.since) / 1000 }); }
       const before = this.choice?.key;
       const carriers = hints?.carriers ?? [];
       this.choice = this.picker.choose({ bodies: people.map(id => ({ id, p: frame[id].p, activity: frame[id].activity, riding: records[id]?.body?.family !== 'floater' && !!ridingCarrier(frame[id].p, carriers) })), speaking, now: wallSeconds, landmarks: this.viewsOf(hints)?.landmarks ?? [] });
