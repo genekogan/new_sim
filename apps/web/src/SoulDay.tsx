@@ -9,7 +9,7 @@ import './SoulDay.css';
 export type DayEntry = { at: number; kind: 'did' | 'doing' | 'stopped' | 'refused' | 'said'; text: string; reason?: string; code?: string; where: { x: number; z: number } | null; place?: string | null };
 
 const TAG: Record<DayEntry['kind'], { label: string; cls: string }> = {
-  did: { label: 'did', cls: 'mid' }, doing: { label: 'doing now', cls: 'translate' }, said: { label: 'said', cls: 'narrator' },
+  did: { label: 'done', cls: 'mid' }, doing: { label: 'doing now', cls: 'translate' }, said: { label: 'said', cls: 'narrator' },
   refused: { label: 'refused', cls: 'day-refused' }, stopped: { label: 'stopped', cls: 'day-refused' },
 };
 const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
