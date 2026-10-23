@@ -26,3 +26,8 @@ test('fresh supersedes old turn and byte/wall limits terminate the owned child',
 test('owned model-process lifecycle reports PID/group/generation and close without auth or stdout',async t=>{
  const f=fixture(t,`process.stdin.resume();process.stdin.on('end',()=>console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:'{"do":[]}'}})));`),events=[];const brain=codexExecBrain({model:'fixture',executable:f.exe,onProcess:e=>events.push(e)});t.after(()=>brain.close());await brain.ask('one');assert.equal(events[0].status,'started');assert.equal(events[1].status,'exited');assert.ok(Number.isSafeInteger(events[0].pid));assert.equal(events[0].pid,events[1].pid);if(process.platform!=='win32')assert.equal(events[0].pgid,events[0].pid);assert.equal(events[1].code,0);assert.ok(events.every(e=>Object.keys(e).every(k=>['pid','pgid','generation','session','status','code','signal'].includes(k))));
 });
+
+test('Codex warning items (item type "error") do not end a turn; tool items still fail closed',async t=>{
+ const f=fixture(t,`process.stdin.resume();process.stdin.on('end',()=>{console.log(JSON.stringify({type:'item.completed',item:{type:'error',message:'session-flags: tools.view_image is ignored'}}));console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:'{"do":[]}'}}));console.log(JSON.stringify({type:'turn.completed',usage:{input_tokens:5,output_tokens:2}}));});`);
+ const brain=codexExecBrain({model:'fixture',executable:f.exe});t.after(()=>brain.close());const r=await brain.ask('one');assert.equal(r.text,'{"do":[]}');
+});

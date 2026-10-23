@@ -1,3 +1,4 @@
+import {ownerPlainLine} from './client-owner-reply.mjs';
 const bodyUnconfirmed=queue=>queue.steps.some(s=>s.status==='completed'&&!s.publicStep&&(!s.receiptId||s.receipt?.id!==s.receiptId||!['completed','replaced'].includes(s.receipt?.phase)));
 const constraints=step=>Object.fromEntries(['for','until','if','protected'].filter(key=>Object.hasOwn(step,key)).map(key=>[key,structuredClone(step[key])]));
 /** Final owner reporting uses only completed queue/receipt and fresh public here
@@ -16,7 +17,7 @@ export function completedOwnerResult(initial,queue,{here=null,at=new Date().toIS
  const repairText=repairs.length?` Preserved ${repairs.length} refused attempt${repairs.length===1?'':'s'}: ${repairs.map(r=>`${r.attempt} (${r.code})`).join('; ')}.`:'';
  const repairResults=repairs.length?` Repair results: ${repairs.map(r=>`${r.attempt} ${JSON.stringify({params:r.failedParams,...r.failedConstraints})} → ${r.replacement?`${r.replacement.act} ${JSON.stringify({params:r.replacement.params,...r.replacement.constraints})}: ${r.replacement.status}${r.replacement.phase?' (native '+r.replacement.phase+')':''}`:'replacement evidence unavailable'}`).join('; ')}. Fulfillment of your original request has not been confirmed.`:'';
  const prefix=repairs.length?'Replacement actions finished:':'Finished';
- return {...initial,t:at,initialAnswer:initial.initialAnswer??{text:initial.answer??null,at:initial.t},answerSource:'queue-and-receipt-evidence',answer:`${prefix} ${queue.steps.length} ordered steps: ${states}. ${body}${repairText}${repairResults} ${results.join(' → ')}`,results,bodyEvidence,receipt:last?.receiptId??null,finalReceipt:last?.receipt??null,finalObservation:observed,queueComplete:true,...(repairs.length?{ownerIntentFulfillment:{status:'unproven',basis:'Canonical receipts prove repaired execution; fulfilling the original request is a separate semantic judgment.'}}:{}),repairs,queue};
+ return {...initial,t:at,initialAnswer:initial.initialAnswer??{text:initial.answer??null,at:initial.t},answerSource:'queue-and-receipt-evidence',answer:ownerPlainLine(`${prefix} ${queue.steps.length} ordered steps: ${states}. ${body}${repairText}${repairResults} ${results.join(' → ')}`),results,bodyEvidence,receipt:last?.receiptId??null,finalReceipt:last?.receipt??null,finalObservation:observed,queueComplete:true,...(repairs.length?{ownerIntentFulfillment:{status:'unproven',basis:'Canonical receipts prove repaired execution; fulfilling the original request is a separate semantic judgment.'}}:{}),repairs,queue};
 }
 
 /** The ordinary live reconciliation seam. A final canonical result is appended
