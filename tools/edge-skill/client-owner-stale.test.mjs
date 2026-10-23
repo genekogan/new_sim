@@ -28,3 +28,10 @@ test('the live owner wake applies the guard before dispatch',()=>{
  const src=readFileSync(new URL('./eden-agent.mjs',import.meta.url),'utf8');
  assert.match(src,/if\(own&&steps\.length\)\{const stale=guardStaleOwnerSteps\(steps,own\.text,priorOwnerRequests\(readJSONL\(LIVE\.replies\),own\.id\)\)/);
 });
+
+test('replacing a stale body step drops the old target duration guard protection and repair identity',()=>{
+ const old={act:'take a walk through the park',params:{with:'s_old'},targetSoul:{id:'s_old'},for:'3m',until:{event:'old-event'},if:{place:'park'},protected:true,fixes:'old-step',identityBasis:'someone'};
+ const g=guardStaleOwnerSteps([old],'stroll through the gardens',priorOwnerRequests(replies,'req-gardens'));
+ assert.deepEqual(g.steps,[{act:'stroll through the gardens',params:{},staleReplaced:old.act}]);
+ assert.deepEqual(old.targetSoul,{id:'s_old'},'the historical step itself stays unchanged');
+});
