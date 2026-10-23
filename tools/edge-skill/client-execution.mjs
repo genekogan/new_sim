@@ -56,6 +56,15 @@ function nearbySocialChoice(ownerText,chosen,nearby,selfName){
  let rest=identityText(ownerText);for(const p of [...nearby,chosen,{name:selfName}])if(p?.name&&literalSoulReference(ownerText,p.name))rest=rest.split(identityText(p.name)).join(' ');
  return !nameWords(chosen.name??row.name).some(w=>literalSoulReference(rest,w));
 }
+/** ACCEPT2 class 2: the owner said only the first name ("wave to Wren"). It binds the chosen Soul when that first name is
+ * unique in the same public evidence and the owner did not go on to name another surname ("Wren Other"); several Souls with
+ * that first name return soul.name-ambiguous with their full names as did_you_mean. */
+function firstNameBinding(ownerText,chosen,resolve){
+ const words=String(chosen?.name??'').normalize('NFKC').trim().split(/\s+/u),first=words[0];if(!first||!literalSoulReference(ownerText,first))return null;
+ const text=String(ownerText).normalize('NFKC'),re=new RegExp('(?<![\\p{L}\\p{N}_-])'+first.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?![\\p{L}\\p{N}_-])\\s+([\\p{L}\\p{N}_-]+)','giu');
+ for(const m of text.matchAll(re)){const next=m[1];if(/^\p{Lu}|\p{N}/u.test(next)&&identityText(next)!==identityText(words[1]??''))return null;}
+ const r=resolve([first]);if(!r.ok)return r.code==='soul.name-ambiguous'?r:null;return r.chosen[0]?.id===chosen.id?{ok:true}:null;
+}
 /** Validate supplied references, not arbitrary prose semantics. A generic choice
  * needs an explicit supported selector actually present in the trusted request.
  * Neither a model judgment nor a similar first name supplies owner authority. */
@@ -65,6 +74,7 @@ export function bindLiveSoulReferences(refs,{ownerText='',identityBasis,resolve,
  if(ownerText&&!generic){for(let i=0;i<list.length;i++){const ref=list[i],chosen=resolved.chosen[i],name=typeof ref==='string'&&!ref.startsWith('s_')?ref:ref?.name??chosen.name,id=typeof ref==='string'&&ref.startsWith('s_')?ref:ref?.id??chosen.id;
   if(chosen.nameAmbiguous&&!literalSoulReference(ownerText,chosen.id))return {ok:false,code:'identity.reassigned-name',reason:'The named label was reassigned. An explicit canonical ID must come from the trusted owner request, not a model-invented pair; clarify instead of substituting.',requested:resolved.requested,chosen:resolved.chosen};
   if(!literalSoulReference(ownerText,name)&&!literalSoulReference(ownerText,id)&&social&&nearbySocialChoice(ownerText,chosen,nearby,selfName)){nearbySocial=true;continue;}
+  if(!literalSoulReference(ownerText,name)&&!literalSoulReference(ownerText,id)){const byFirst=firstNameBinding(ownerText,chosen,resolve);if(byFirst?.ok===false)return {...byFirst,requested:resolved.requested};if(byFirst)continue;}
   if(!literalSoulReference(ownerText,name)&&!literalSoulReference(ownerText,id))return {ok:false,code:'identity.owner-binding-required',reason:'Selected full name/ID is not a literal reference in the trusted owner request. '+(literalGenericIdentityBases(ownerText).length?'For an intended generic choice, this request contains a literal selector: retry the step with top-level identityBasis:'+JSON.stringify(literalGenericIdentityBases(ownerText)[0])+', keeping the exact observed with/targetSoul reference. identityBasis belongs on this do step, not inside params. This is a repair hint, not acceptance or consent.':'Use the exact intended full name, wait for it, or ask for clarification; no similar-name substitution.'),requested:resolved.requested,chosen:resolved.chosen};}}
  return {...resolved,basis:ownerText?(generic?'literal-generic-choice':nearbySocial?'nearby-social-choice':'literal-owner-reference'):'observed-autonomous-choice'};
 }

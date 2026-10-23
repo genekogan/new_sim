@@ -50,12 +50,13 @@ test('until uses qualified native renewals and observed owned release, never an 
  q.event({kind:'presentation.started'});await q.pump();assert.equal(sent[2].capability,'stand:here');assert.equal(physical,'standing');await q.pump();assert.equal(q.snapshot().steps[0].status,'completed');
 });
 
-test('owner-protected read refuses non-force owner replacement; nonprotected replan waits for native safe-stop',async t=>{
+// Gene's OK 2026-10-23 (OWNER-FIRST): a newer owner request replaces a protected step.
+test('owner-protected read yields to a newer non-force owner replacement; the replan waits for native safe-stop',async t=>{
  const root=folder(t),receipts=new Map(),sent=[];let physical='reading',unsafe=true;
  const adapter={send:async body=>{sent.push(body);const r={id:'r'+sent.length,capability:body.capability,phase:sent.length===1?'started':'waiting'};receipts.set(r.id,r);return {accepted:true,receipt:r};},readReceipt:async id=>receipts.get(id)};
  const q=openClientQueue(root,{adapter});t.after(()=>q.close());q.enqueue([{act:'read:library',protected:true}],{id:'original',source:'owner'});await q.pump();
- assert.throws(()=>q.enqueue([{act:'walk:tea'}],{id:'new',replace:true,source:'owner'}),/protected/);assert.equal(sent.length,1);assert.equal(physical,'reading');
- q.enqueue([{act:'walk:tea'}],{id:'new',replace:true,force:true,source:'owner'});await q.pump({busy:{id:'r1'}});assert.equal(sent.length,2);assert.equal(q.snapshot().steps[0].status,'waiting');assert.equal(physical,'reading','native unsafe phase has not yet stopped');
+ assert.throws(()=>q.enqueue([{act:'walk:tea'}],{id:'mind',replace:true,source:'mind'}));assert.equal(sent.length,1);assert.equal(physical,'reading');
+ q.enqueue([{act:'walk:tea'}],{id:'new',replace:true,source:'owner'});assert.equal(q.snapshot().id,'new');assert.equal(q.snapshot().previous.at(-1).status,'superseded');assert.equal(sent.length,1);assert.equal(physical,'reading');await q.pump({busy:{id:'r1'}});assert.equal(sent.length,2);assert.equal(q.snapshot().steps[0].status,'waiting');assert.equal(physical,'reading','native unsafe phase has not yet stopped');
  unsafe=false;if(!unsafe){receipts.get('r1').phase='replaced';receipts.get('r2').phase='started';physical='walking';}await q.pump();assert.equal(q.snapshot().steps[0].status,'running');assert.equal(physical,'walking');
 });
 
@@ -80,9 +81,10 @@ test('attended pause reconciles completed canonical work but never dispatches it
  const root=folder(t);let phase='started',sent=0,folded=0;const q=openClientQueue(root,{adapter:{send:async body=>{sent++;return {accepted:true,receipt:{id:'r'+sent,phase,capability:body.capability}};},readReceipt:async id=>({id,phase,capability:'walk:tea'})},onReceipt:()=>folded++});t.after(()=>q.close());q.enqueue([{act:'walk:tea'},{act:'sit:here'}]);await q.pump();phase='completed';await q.pump({},true);assert.equal(folded,1);assert.equal(sent,1);assert.equal(q.snapshot().steps[0].status,'completed');assert.equal(q.snapshot().steps[1].status,'pending');
 });
 
+// Gene's OK 2026-10-23 (OWNER-FIRST): a newer owner request replaces a protected step.
 test('actual params.protected reading shape becomes durable local protection and never a world parameter',async t=>{
  const root=folder(t),sent=[];let walkDone=false;const adapter={send:async body=>{sent.push(body);return {accepted:true,receipt:{id:sent.length===1?'r-walk-alias':'r-protected-alias',capability:sent.length===1?'walk:eden-library-1':'read:eden-library-1',phase:'started'}};},readReceipt:async id=>({id,capability:id==='r-walk-alias'?'walk:eden-library-1':'read:eden-library-1',phase:id==='r-walk-alias'&&walkDone?'completed':'started'})};
- let q=openClientQueue(root,{adapter});q.enqueue([{act:'walk to the library'},{act:'read a book in the library',params:{seconds:360,protected:true}}],{id:'reading-alias',source:'owner'});await q.pump();assert.equal(sent.length,1);walkDone=true;await q.pump();assert.equal(q.snapshot().steps[1].protected,true);assert.deepEqual(sent[1].params,{seconds:360});assert.deepEqual(sent.map(s=>s.capability),['walk to the library','read a book in the library']);q.close();q=openClientQueue(root,{adapter});t.after(()=>q.close());assert.equal(q.snapshot().steps[1].protected,true);assert.throws(()=>q.enqueue([{act:'walk:field'}],{id:'replacement',source:'owner',replace:true}),/protected/);assert.equal(sent.length,2);
+ let q=openClientQueue(root,{adapter});q.enqueue([{act:'walk to the library'},{act:'read a book in the library',params:{seconds:360,protected:true}}],{id:'reading-alias',source:'owner'});await q.pump();assert.equal(sent.length,1);walkDone=true;await q.pump();assert.equal(q.snapshot().steps[1].protected,true);assert.deepEqual(sent[1].params,{seconds:360});assert.deepEqual(sent.map(s=>s.capability),['walk to the library','read a book in the library']);q.close();q=openClientQueue(root,{adapter});t.after(()=>q.close());assert.equal(q.snapshot().steps[1].protected,true);q.enqueue([{act:'walk:field'}],{id:'replacement',source:'owner',replace:true});assert.equal(q.snapshot().id,'replacement');assert.equal(q.snapshot().previous.at(-1).protected,true);assert.equal(sent.length,2);
 });
 test('local protection aliases preserve explicit booleans and reject conflict or invalid types atomically',()=>{
  for(const value of [true,false]){const step=replySteps({do:[{act:'read:here',protected:value,params:{protected:value,seconds:180}}]})[0];assert.equal(step.protected,value);assert.deepEqual(step.params,{seconds:180});assert.equal(replySteps({do:[{act:'read:here',protected:value}]})[0].protected,value);}
