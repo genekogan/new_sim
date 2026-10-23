@@ -16,6 +16,7 @@ import {registerEdgePlans} from './plans/index.ts';
 import type {Plans} from './plans/plans.ts';
 import {mountEdgeEyes} from './eyes/routes.ts';
 import {mountBodyRoutes} from './body/routes.ts';
+import {mountOwnerDay} from './owner-day.ts';
 import {livePlatforms} from './eyes/platforms.ts';
 import type {WorldHost} from '../world.ts';
 import type {Souls} from '../souls.ts';
@@ -33,6 +34,7 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
   mountBootRoutes(app,deps,[...EDGE_ACT_VERBS,...INTENT_VERBS]);
   mountOutcomeRoutes(app,deps);
   mountBodyRoutes(app,deps);
+  mountOwnerDay(app,{ledger:L,db:deps.db,ownerSoul:deps.ownerSoul});
   // EVENTS-v1: idempotency keys guard act/say/converse/plan writes; it must be mounted before those routes.
   mountIdempotency(app, deps);
   const wrap = (fn: (c: Context) => unknown | Promise<unknown>) => async (c: Context) => {

@@ -282,7 +282,7 @@ export class Intents {
     if (clientRef) {const old = this.L.coreA.byClientRef(soul.soulId, clientRef); if (old) return {accepted: true, receipt: old, chosen: (old as {chosen?: Chosen}).chosen ?? {}, channel: (old as {channel?: string}).channel ?? 'body'};}
     await this.L.coreA.reclaim(soul);
     const r = this.resolve(soul, input), verb = String(input.verb ?? '');
-    if (!r.ok) {this.L.recordRefusal(soul.soulId, 'intent', verb, r.code); const {ok:_ok,...refusal}=r;return {accepted:false,...refusal,capability:verb};}
+    if (!r.ok) {this.L.recordRefusal(soul.soulId, 'intent', verb, r.code, r.reason); const {ok:_ok,...refusal}=r;return {accepted:false,...refusal,capability:verb};}
     const extra = input.params && typeof input.params === 'object' && !Array.isArray(input.params) ? input.params as Record<string, unknown> : {};
     if (r.kind === 'capability') {
       const out = await this.L.act(soul, {capability: r.capability, params: {...extra, ...(r.params ?? {})}, ...(clientRef ? {clientRef} : {})});

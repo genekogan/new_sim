@@ -184,6 +184,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (!(db.db.prepare('PRAGMA table_info(edge_receipts_v1)').all() as {name: string}[]).some(c => c.name === 'plan')) db.db.exec('ALTER TABLE edge_receipts_v1 ADD COLUMN plan TEXT');
     // intents/1 + strict/1 (Core-A): receipt detail {channel, chosen, endedAt} (JSON)
     if (!(db.db.prepare('PRAGMA table_info(edge_receipts_v1)').all() as {name: string}[]).some(c => c.name === 'detail')) db.db.exec('ALTER TABLE edge_receipts_v1 ADD COLUMN detail TEXT');
+    // OWNER-DAY: refusals keep the world's reason and the body's position for the owner's timeline.
+    {const have = new Set((db.db.prepare('PRAGMA table_info(edge_refusals_v1)').all() as {name: string}[]).map(c => c.name));
+      for (const [c, t] of [['reason', 'TEXT'], ['x', 'REAL'], ['z', 'REAL']] as const) if (!have.has(c)) db.db.exec(`ALTER TABLE edge_refusals_v1 ADD COLUMN ${c} ${t}`);}
     this.intents = new Intents(this);
     this.places = new PlaceIndex(this.loadPlaces(placeData));
     this.knowledge = new PlaceKnowledge(this);
@@ -593,8 +596,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
   addCapabilityProvider(p: (soul: EdgeSoul) => EdgeCapability[]) {this.providers.push(p);}
 
-  recordRefusal(soulId: string, verb: string, capability: string, code: string) {
-    try {this.db.db.prepare('INSERT INTO edge_refusals_v1 (world_id,at,tick,soul_id,verb,capability,code) VALUES (?,?,?,?,?,?,?)').run(this.host.worldId, Date.now(), this.host.engine.world.tick, soulId, verb.slice(0, 40), capability.slice(0, 200), code.slice(0, 100));} catch {/* measurement never breaks acting */}
+  /** OWNER-DAY: the world's reason and where the body stood are kept so its owner can read the refusal on the "Today" timeline. */
+  recordRefusal(soulId: string, verb: string, capability: string, code: string, reason = '') {
+    try {const e = this.host.minds.get(soulId)?.entityId, p = e ? this.body(e)?.pose?.p : undefined, pos = p ? [p[0], p[2]] : null;
+      this.db.db.prepare('INSERT INTO edge_refusals_v1 (world_id,at,tick,soul_id,verb,capability,code,reason,x,z) VALUES (?,?,?,?,?,?,?,?,?,?)').run(this.host.worldId, Date.now(), this.host.engine.world.tick, soulId, verb.slice(0, 40), capability.slice(0, 200), code.slice(0, 100), String(reason ?? '').slice(0, 300), pos?.[0] ?? null, pos?.[1] ?? null);} catch {/* measurement never breaks acting */}
   }
   /** Counts only (no agent text): acts, receipts by phase, refusals by code, active Souls, speech/conversations when Comms is present. */
   metrics(windowMs = 3600_000) {
@@ -646,7 +651,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       // that id, as the skill says; the id was refused place.unwalkable here. actOnce below walks it on demand, as words.
       const onDemand=!!place&&!place.ok&&place.code==='place.unwalkable'&&this.onDemandId(soul,input.capability.trim());
       if(place&&!onDemand){
-        if(!place.ok){this.recordRefusal(soul.soulId,'act',input.capability,place.code);const {ok:_ok,...refusal}=place;return this.withInPlaceAlternative(soul,{accepted:false as const,capability:input.capability,...refusal});}
+        if(!place.ok){this.recordRefusal(soul.soulId,'act',input.capability,place.code,place.reason);const {ok:_ok,...refusal}=place;return this.withInPlaceAlternative(soul,{accepted:false as const,capability:input.capability,...refusal});}
         const out=await this.act(soul,{...input,capability:place.chosen.capability});
         if(!out.accepted)return out;
         const receipt=this.coreA.setDetail(out.receipt.id,{chosen:place.chosen})??out.receipt;return {...out,receipt};
@@ -666,7 +671,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     let capability = asked;
     const clientRef = typeof input.clientRef === 'string' && input.clientRef.length <= 100 ? input.clientRef : undefined;
     if (clientRef) {const old = this.rows('soul_id=? AND client_ref=?', soul.soulId, clientRef)[0]; if (old) return {accepted: true, receipt: this.view(old)};}
-    const refuse = (code: string, reason: string, extra?: {retry_after?: number}) => {this.recordRefusal(soul.soulId, 'act', capability, code); return this.withInPlaceAlternative(soul, {accepted: false as const, code, reason, capability, ...extra});};
+    const refuse = (code: string, reason: string, extra?: {retry_after?: number}) => {this.recordRefusal(soul.soulId, 'act', capability, code, reason); return this.withInPlaceAlternative(soul, {accepted: false as const, code, reason, capability, ...extra});};
     const askedVerb=asked.split(/[:\s]/)[0]!;const unsupported=askedVerb==='object'?null:this.bodyVerbProblem(soul,askedVerb);if(unsupported)return refuse(unsupported.code,unsupported.reason);
     if (this.faded.has(soul.soulId)) {
       // Reclaim: fall onto feet at a starting place, identity and history intact (C9).
@@ -978,7 +983,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
    *  accepted with a receipt (waiting → started → completed/failed) for a logged decision with trigger edge-act. */
   async performBodies(soul: EdgeSoul, capability: string, label: string, steps: Program['steps'], clientRef?: string,effects?:ConfirmedEffects,admission?:ObjectBodyAdmission): Promise<{accepted: true; receipt: EdgeReceipt} | {accepted: false; code: string; reason: string}> {
     if (clientRef) {const old = this.rows('soul_id=? AND client_ref=?', soul.soulId, clientRef)[0]; if (old) return {accepted: true, receipt: this.view(old)};}
-    const refuse = (code: string, reason: string) => {this.recordRefusal(soul.soulId, 'object', capability, code); return {accepted: false as const, code, reason};};
+    const refuse = (code: string, reason: string) => {this.recordRefusal(soul.soulId, 'object', capability, code, reason); return {accepted: false as const, code, reason};};
     const nativeUse = this.nativeUseRefusal?.(capability, steps);
     if (nativeUse) return refuse(nativeUse.code, nativeUse.reason);
     if(admission)return this.performAtomicObjectBodies(soul,capability,label,steps,clientRef,admission);
@@ -997,7 +1002,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
 
   private async performAtomicObjectBodies(soul:EdgeSoul,capability:string,label:string,steps:Program['steps'],clientRef:string|undefined,admission:ObjectBodyAdmission){
-    const refuse=(code:string,reason:string)=>{this.recordRefusal(soul.soulId,'object',capability,code);return {accepted:false as const,code,reason};};
+    const refuse=(code:string,reason:string)=>{this.recordRefusal(soul.soulId,'object',capability,code,reason);return {accepted:false as const,code,reason};};
     const source=this.db.soul(soul.soulId),id='r_'+randomUUID();
     const authority=():true=>{const row=this.db.soul(soul.soulId),mind=this.host.minds.get(soul.soulId);if(!source||!row||row.owner!==source.owner||row.owner!==soul.owner||mind?.owner!==row.owner||row.token_hash!==source.token_hash||row.retired_at!==null||row.world_id!==this.host.worldId||row.entity_id!==soul.entityId||mind?.entityId!==soul.entityId)throw new EdgeError(401,'unauthorized','Soul authority changed before object admission.');if(this.faded.has(soul.soulId))throw new EdgeError(409,'soul.faded','This Soul has faded; act to return first.');admission.guard();return true;};
     try{
@@ -1482,7 +1487,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       launchPlan: async (s: EdgeSoul, capability: string, label: string, steps: Program['steps'], clientRef?: string,contentParams:Record<string,unknown>={}) => {
         if (steps.length > 80) return {accepted: false as const, code: 'capability.params', reason: 'that plan is too long; act in shorter legs.', capability};
         if (self.aboard(s.entityId)?.phase === 'aloft') return {accepted: false as const, code: 'ride.aboard', reason: 'You are aloft; it lands by itself and you step out then.', capability};
-        const refuse = (code: string, reason: string) => {self.recordRefusal(s.soulId, 'intent', capability, code); return {accepted: false as const, code, reason, capability};};
+        const refuse = (code: string, reason: string) => {self.recordRefusal(s.soulId, 'intent', capability, code, reason); return {accepted: false as const, code, reason, capability};};
         const out = await self.launch(s, capability, label, steps, clientRef, {}, refuse,undefined,contentParams); if (out.accepted) self.capCache.clear(); return out;
       },
       /** A faded Soul's next act lands it at a starting place first (C9), as act() does. */
