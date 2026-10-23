@@ -67,7 +67,7 @@ const ITEM_WORDS: [ItemKind, RegExp][] = [['book', /\b(?:book|books|novel)\b/], 
   ['food', /\b(?:food|snack|bread|apple|fruit|cake|bun|sandwich|something to eat|to eat)\b/], ['letter', /\b(?:letter|card|note|paper|postcard)\b/], ['tool', /\b(?:tool|hammer|trowel|chisel|spade)\b/], ['frisbee', /\b(?:frisbee|disc|disk)\b/]];
 /** Bounds (Gene: simple, deterministic, bounded). */
 export const ITEM_LIMITS = {perPlace: 12, placedWorld: 150, pickReach: 120, consumableMinutes: 20, keepHours: 4, nearItems: 20};
-const INVITE_RADIUS = 60, GESTURE_RADIUS = 8, FOLLOW_RADIUS = 20, FOLLOW_LOST = 45;
+const INVITE_RADIUS = 60, GESTURE_RADIUS = 8, FOLLOW_RADIUS = 20, FOLLOW_LOST = 45, CATCH_UP = 3;
 /** A shared walk is only "together" when the guest ends beside the host: follow standoff is 1.5 m, so 2.2 m leaves slack but not 2.8 m apart. */
 export const TOGETHER_RADIUS = 2.2;
 export const besideEachOther = (a: readonly number[], b: readonly number[]) => Math.hypot(a[0] - b[0], a[1] - b[1]) <= TOGETHER_RADIUS;
@@ -315,10 +315,14 @@ export class Together {
       }
     }
   }
-  /** One follow leg programme: walk up behind them and pause, repeated; the ledger re-issues it while the follow lasts. */
-  private followSteps(me: string, target: string): Steps {
-    const legs: Steps = [];
-    for (let i = 0; i < 10; i++) legs.push({verb: 'walk_to', params: {to: target, standoff: 1.5}}, {verb: 'rest', params: {seconds: 2}});
+  /** One follow leg programme: walk up behind them and pause, repeated; the ledger re-issues it while the follow lasts.
+   *  Each leg walks to where they were when it began, so a follower at the same pace falls further behind every leg
+   *  by its standoff and pause (GEST-LIVE r11: 13 m after 15 s, follow.lost at 45 m on a 240 m walk). So the programme is
+   *  three legs, re-issued with the current gap, and a follower more than CATCH_UP metres behind jogs them (humanoids
+   *  only; floaters glide at one pace). */
+  private followSteps(me: string, target: string, gap = 0): Steps {
+    const legs: Steps = [], jog = gap > CATCH_UP && this.p.body(me)?.body?.family !== 'floater';
+    for (let i = 0; i < 3; i++) legs.push({verb: 'walk_to', params: {to: target, standoff: 1.5, ...(jog ? {gait: 'jog'} : {})}}, {verb: 'rest', params: {seconds: 0.5}});
     return [...this.standFirst(me), ...legs];
   }
 
@@ -573,7 +577,7 @@ export class Together {
     if (this.arrivedTogether(f)) {this.endFollow(f, 'completed'); return false;}
     if (this.tick >= f.untilTick) {this.endFollow(f, 'completed'); return false;}
     if (Math.hypot(tb.pose.p[0] - me.pose.p[0], tb.pose.p[2] - me.pose.p[2]) > FOLLOW_LOST) {this.endFollow(f, 'failed', 'follow.lost', `You lost sight of ${t.name}.`); return false;}
-    void this.p.decide(soul, receiptId, 'follow:' + f.target, `Walk with ${t.name}`, this.followSteps(soul.entityId, t.entityId).filter(s => s.verb !== 'stand')).catch(() => this.p.fail(receiptId, 'ledger.unavailable', 'The world could not record this action.'));
+    void this.p.decide(soul, receiptId, 'follow:' + f.target, `Walk with ${t.name}`, this.followSteps(soul.entityId, t.entityId, Math.hypot(tb.pose.p[0] - me.pose.p[0], tb.pose.p[2] - me.pose.p[2])).filter(s => s.verb !== 'stand')).catch(() => this.p.fail(receiptId, 'ledger.unavailable', 'The world could not record this action.'));
     return true;
   }
   /** Walking together (an accepted walk invitation): the host's walk is over and the guest is beside them. */
@@ -718,6 +722,7 @@ export class Together {
       if(/\s+to\s+\S/.test(fol[1])&&!near.some(o=>o.name.toLowerCase()===fol[1].trim()))return {code:'follow.destination',reason:'Following only tracks the named Soul. To reach a place, walk with them to that place and invite them.',did_you_mean:[]};
       const o = who(fol[1]); if (!o) return /^(?:him|her|them|they|she|he)$/.test(fol[1].trim()) ? null : notHere('follow', fol[1]);
       const back = this.invitesFor(soul.soulId).find(i => i.host.soulId === o.soulId && i.kind !== 'paired' && i.kind !== 'give'); if (back) return {capability: 'accept:' + back.id, note: `joining ${o.name}'s ${back.what}`};
+      if (this.followingOf(soul.soulId)?.target === o.soulId) return {code: 'follow.already', reason: `You are already walking with ${o.name}.`, did_you_mean: []};
       const c = capFor('follow', o); if (!c) return {code: 'follow.unavailable', reason: `${o.name} is too far away to walk with (${o.distance} m); go near them first.`, did_you_mean: caps.filter(c => c.id === 'go-near:' + o.soulId).map(c => ({id: c.id, label: c.label}))};
       return {capability: c.id, note: `${raw} is ${c.id}`};
     }

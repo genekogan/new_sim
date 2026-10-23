@@ -152,6 +152,7 @@ test('together: hug (accept), high-five (decline), handshake (lapses), hug back 
   // follow: c walks with a (no invitation needed; a is told and can ask c to stop)
   const fo = await w.act(c, 'walk with ' + a.name); assert.equal(fo.resolved?.to, 'follow:' + a.soulId);
   assert.ok(w.events(a, 'follow').length, 'a hears c is walking with them');
+  const again: any = await w.act(c, 'follow ' + a.name, undefined, false); assert.equal(again.code, 'follow.already', JSON.stringify(again).slice(0, 300));
   const home = await w.act(a, 'walk:social-eden-fire-circle');
   await w.run([{soulId: a.soulId, id: home.receipt.id}], 6000);
   for (let i = 0; i < 300; i++) {w.f.host.tickOnce(); if (i % 20 === 0) {await new Promise(r => setImmediate(r)); w.f.host.drainInputs();}}
