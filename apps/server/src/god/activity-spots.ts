@@ -49,6 +49,10 @@ const kindOf = (t: Thing) => t.def.name.replace(/^core-/, '');
 const is = (t: Thing, ...words: string[]) => words.some(w => t.tags.has(w) || kindOf(t) === w);
 const SEAT_KINDS = new Set(['chair', 'armchair', 'sofa', 'stool', 'bench-seat', 'bench', 'pew', 'office-chair', 'dining-chair', 'bar-stool', 'loveseat']);
 
+/** A two-person spot (see-saw, book club, cooking together) waits this long for the other end: a partner is offered the
+ *  waiting seat from anywhere within SPOT_REACH (200 m), about 150 s on foot, so a shorter wait (the see-saw had 60 s) let
+ *  the first rider give up while the second was still walking over (both failed partner-absent). */
+export const TOGETHER_WAIT = 150;
 export class GodActivitySpots {
   private h: SpotsHost;
   private cache: { key: string; value: SpotsData } | null = null;
@@ -217,7 +221,7 @@ export class GodActivitySpots {
     // B5 the playground and the gym and courts the god put up (tags say which apparatus)
     for (const t of all) {
       if (is(t, 'swings') && t.slots.some(s => s.kind === 'seat')) seatSpot(t, 'swing', undefined);
-      if (is(t, 'see-saw') && t.slots.some(s => s.kind === 'seat')) seatSpot(t, 'seesaw', undefined, { together: { group: `seesaw-${t.id}`.replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 80), need: 1, wait: 60, alone: 'fail' } });
+      if (is(t, 'see-saw') && t.slots.some(s => s.kind === 'seat')) seatSpot(t, 'seesaw', undefined, { together: { group: `seesaw-${t.id}`.replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 80), need: 1, wait: TOGETHER_WAIT, alone: 'fail' } });
       for (const [tag, activity, base] of APPARATUS) if (t.tags.has(tag)) {
         if (base === 'lie') { const h = Number(t.c.seat?.height ?? t.size[1]); const at = this.standAt(t); if (!at) continue; const place = this.place(t.at, t.level);
           add({ id: `${activity}.${t.id}`.toLowerCase(), activity, base: 'lie', at: [r2(t.at[0]), r2(t.at[1])], seatHeight: Math.min(1.2, Math.max(0.2, h)), ...(activity === 'yoga' ? { also: ['pushups'] } : {}), label: this.label(t, place), ...(place ? { place } : {}) }); }
@@ -246,7 +250,7 @@ export class GodActivitySpots {
       const place = this.place(t.at, t.level);
       // a campfire with seats: one storyteller's place by the fire, its seats listen (once the story has started)
       if (t.slots.some(q => q.kind === 'fire-circle') && t.slots.some(q => q.kind === 'seat')) {
-        const ring = t.slots.find(q => q.kind === 'fire-circle')!, at = this.world(t, ring.local), id = `tell-story.${t.id}`.toLowerCase(), together = { group: grp(`story-${t.id}`), need: 1, wait: 150, alone: 'fail' as const };
+        const ring = t.slots.find(q => q.kind === 'fire-circle')!, at = this.world(t, ring.local), id = `tell-story.${t.id}`.toLowerCase(), together = { group: grp(`story-${t.id}`), need: 1, wait: TOGETHER_WAIT, alone: 'fail' as const };
         add({ id, activity: 'tell-story', base: 'idle', at, faceTo: [r2(t.at[0]), r2(t.at[1])], label: `the storyteller's place at ${this.label(t, place)}`, together, ...(place ? { place } : {}) });
         t.slots.filter(q => q.kind === 'seat').slice(0, 3).forEach((q, k) => add({ id: `hear-story.${t.id}.${k}`.toLowerCase(), activity: 'hear-story', base: 'sit', at: this.world(t, q.local), seat: t.id, faceTo: [r2(t.at[0]), r2(t.at[1])], requires: id, together, label: `a log at ${this.label(t, place)}`, ...(place ? { place } : {}) }));
       }
@@ -258,15 +262,15 @@ export class GodActivitySpots {
       // a library's reading table: a book club round it (the chairs beside it)
       if (t.c.surface && t.tags.has('table') && place && /librar|reading/i.test(`${place} ${this.h.placeName(place) ?? ''}`)) {
         const round = seats.filter(q => q.level === t.level && d2(q.at, t.at) <= Math.hypot(t.size[0], t.size[2]) / 2 + 1).slice(0, 4);
-        for (const q of round) seatSpot(q, 'book-club', [r2(t.at[0]), r2(t.at[1])], { prop: 'book', together: { group: grp(`book-club-${t.id}`), need: 1, wait: 150, alone: 'fail' }, label: `${this.label(t, place)} (book club)` });
+        for (const q of round) seatSpot(q, 'book-club', [r2(t.at[0]), r2(t.at[1])], { prop: 'book', together: { group: grp(`book-club-${t.id}`), need: 1, wait: TOGETHER_WAIT, alone: 'fail' }, label: `${this.label(t, place)} (book club)` });
       }
       // a preparation table with a pot: two cooks together
       if (t.c.surface && !t.c.workstation && all.some(o => o.on === t.id && is(o, 'pot', 'cooking'))) {
-        ([[-0.5, 1], [0.5, 1]] as V2[]).forEach((l, k) => { const at = this.world(t, [l[0], t.size[2] / 2 + 0.45]); add({ id: `cook-together.${t.id}.${k}`.toLowerCase(), activity: 'cook-together', base: 'idle', at, faceTo: [r2(t.at[0]), r2(t.at[1])], together: { group: grp(`cooks-${t.id}`), need: 1, wait: 150, alone: 'fail' }, label: `${this.label(t, place)} (cooking together)`, ...(place ? { place } : {}) }); });
+        ([[-0.5, 1], [0.5, 1]] as V2[]).forEach((l, k) => { const at = this.world(t, [l[0], t.size[2] / 2 + 0.45]); add({ id: `cook-together.${t.id}.${k}`.toLowerCase(), activity: 'cook-together', base: 'idle', at, faceTo: [r2(t.at[0]), r2(t.at[1])], together: { group: grp(`cooks-${t.id}`), need: 1, wait: TOGETHER_WAIT, alone: 'fail' }, label: `${this.label(t, place)} (cooking together)`, ...(place ? { place } : {}) }); });
       }
       // the lawn's yoga mat: the teacher's place and two rows of six for a class
       if (t.tags.has('yoga-mat')) {
-        const together = { group: grp(`yoga-${t.id}`), need: 1, wait: 150, alone: 'fail' as const }, face = this.world(t, [0, -3]);
+        const together = { group: grp(`yoga-${t.id}`), need: 1, wait: TOGETHER_WAIT, alone: 'fail' as const }, face = this.world(t, [0, -3]);
         add({ id: `yoga-class.${t.id}.front`.toLowerCase(), activity: 'yoga-class', base: 'idle', at: this.world(t, [0, 0]), faceTo: this.world(t, [0, 4]), together, label: `the teacher's mat (${this.label(t, place)})`, ...(place ? { place } : {}) });
         for (const [k, l] of ([[-2, 2.6], [0, 2.6], [2, 2.6], [-2, 5], [0, 5], [2, 5]] as V2[]).entries()) add({ id: `yoga-class.${t.id}.${k}`.toLowerCase(), activity: 'yoga-class', base: 'idle', at: this.world(t, l), faceTo: face, together, label: `a mat in the yoga class (${this.label(t, place)})`, ...(place ? { place } : {}) });
       }
