@@ -3,8 +3,8 @@
 // the body (the door stays taken), then check the request during landing, `leave`, the set-down within 30 s and the receipt.
 import test from 'node:test';import assert from 'node:assert/strict';
 import {retainedCommonsShoreFactory,nativeSleepSnapshotFactoryV1} from '@sim/engine-mars';
-import {Hono} from 'hono';import {fixture,invite,accept} from '../../test/native-owner-fixture.ts';
-import {LivingWorld} from '../living.ts';import {hashToken} from '../auth.ts';import {EdgeLedger} from './ledger/ledger.ts';import {mountEdgeRoutes,edgeSoulResolver} from './routes.ts';
+import {Hono} from 'hono';import {fixture,invite,accept} from '../test/native-owner-fixture.ts';
+import {LivingWorld} from './living.ts';import {hashToken} from './auth.ts';import {EdgeLedger} from './edge/ledger/ledger.ts';import {mountEdgeRoutes,edgeSoulResolver} from './edge/routes.ts';
 const common=await retainedCommonsShoreFactory().then(nativeSleepSnapshotFactoryV1);
 async function setup(t:{after(fn:()=>void):void}){
  const f=fixture(':memory:',common,{durableClockV1:true});f.souls.enableLifecycle();f.brain.quiesce();
