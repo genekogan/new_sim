@@ -7,10 +7,10 @@
       "basket": {"length": 1.5, "width": 1.2, "height": 1.1},
       "envelope": {"radius": 4.2, "mouthHeight": 3.2, "crownHeight": 12.9},
       "seats": [
-        {"slot": "rider-a", "at": [0.12, -0.3], "yaw": 0.35, "pose": "stand, hands on the rim"},
-        {"slot": "rider-b", "at": [0.12, 0.3], "yaw": -0.35, "pose": "stand, hands on the rim"}
+        {"slot": "rider-a", "at": [0.3, -0.3], "yaw": 0.35, "pose": "stand, hands on the rim"},
+        {"slot": "rider-b", "at": [0.3, 0.3], "yaw": -0.35, "pose": "stand, hands on the rim"}
       ],
-      "mount": {"at": [-1.25, 0], "steps": [0.25, 0.5], "note": "two-step wooden block behind the basket; riders step up and in"}
+      "door": {"at": [-1.25, 0], "width": 0.56, "note": "an open doorway in the back wall; riders walk in and out through it, never over the rim"}
     }
   ],
   "routes": [
