@@ -471,6 +471,9 @@ export class MarsEngine implements Engine {
           if (host?.label.startsWith('host supper ') && this.holders(participant.actor).length === 0) this.stop(host.id);
         }
       }
+      // A solo pose waits out a courtesy step aside (walk.ts makeWay, `<actor>:make-way:<tick>`) begun as the last step ended,
+      // for at most 10 s, instead of failing pose.not-still; a grouped pose settles through it itself, any other walk refuses.
+      if (op.raw && op.verb === 'pose_v1' && !op.params.group && this.holders(p.actor).some(id => tick - Number(/:make-way:(\d+)$/.exec(id)?.[1] ?? -Infinity) <= 200 && this.rt.isActive(id))) { p.ops.unshift(op); return; }
       const rec = this.rt.submit(op.verb, op.params);
       if (rec.status === 'failed' && (!op.soft || this.sharedWaterStep(p.steps[p.index])) && this.spreadRetry(p, rec.diagnostic?.code,rec.diagnostic)) continue;
       if (rec.status === 'failed') { if (op.soft && !(this.sharedWaterStep(p.steps[p.index]) && !!rec.diagnostic && this.waterBodyObstruction(rec.diagnostic,p.actor))) continue; return this.end(p, 'failed', { code: rec.diagnostic?.code ?? 'action.failed', message: rec.diagnostic?.message ?? 'refused' }); }

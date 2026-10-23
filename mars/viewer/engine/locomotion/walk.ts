@@ -1268,6 +1268,10 @@ export function makeWay(rt: Runtime, who: string, keepClear: Vec2, clearOf?: { b
   // A coordinator may hold an idle actor between physical children. Respect
   // that claim instead of repeatedly submitting a conflicting ambient nudge.
   if (!ex && rt.holder(`actor:${who}`).length) return;
+  // A short solo pose (a shelf browse) is not shoved off its spot: the walker waits the few seconds it has left.
+  // Grouped poses settle through a nudge (social/pose.ts) and a long pose is nudged as before.
+  if (!ex && rt.holder(`pose:${who}`).some((id) => { const r = rt.records.get(id), p = r?.params as { group?: string; seconds?: number } | undefined;
+    return r?.verb === 'pose_v1' && !p?.group && rt.isActive(id) && (p?.seconds ?? Infinity) - (rt.tick - r.requestedTick) * DT <= POSE_DEFER_S; })) return;
   const sp = spatial(rt,o.id);
   const g = sp.level(o.human.level);
   if (!g) return;
@@ -1298,6 +1302,8 @@ export function makeWay(rt: Runtime, who: string, keepClear: Vec2, clearOf?: { b
 
 /** Ticks two walkers may stand face to face, each blocked by the other, before one steps aside (1 s). */
 export const FACEOFF_TICKS = 20;
+/** makeWay leaves a solo pose alone in its last seconds (a 3-4 s shelf browse); longer poses are nudged. */
+export const POSE_DEFER_S = 5;
 /**
  * Entity worlds (god-built, `world.entityPhysicsV1`): two walkers face to face, each blocked by the other — in a
  * cottage doorway or a furnished room that is one single-file stretch, where the yielder is already inside the passage
