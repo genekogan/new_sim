@@ -14,3 +14,12 @@ test('bounded distinct targets accept public-directory evidence without implying
 test('reassigned full name requires canonical identity; flag is sticky across same-ID sources',()=>{const rows=[{id:'s_original',name:'Renamed Original'},{id:'s_current',name:'Earlier Name',nameAmbiguous:true}];const o={worldId:'private-world',rosters:[...options(rows).rosters,...options([{id:'s_current',name:'Earlier Name'}],'conversation-participants').rosters]};assert.equal(resolveSoulReference('Earlier Name',o).code,'soul.name-ambiguous');assert.equal(resolveSoulReference('s_current',o).ok,true);assert.equal(resolveSoulReference({id:'s_current',name:'Earlier Name'},o).ok,true);assert.equal(resolveSoulReference({id:'s_original',name:'Earlier Name'},o).code,'soul.id-name-mismatch');assert.equal(resolveSoulReference('Renamed Original',o).chosen.id,'s_original');});
 
 test('unique first names resolve while duplicate first names ask for full names',()=>{for(const [name,id] of [['Beryl','s_oldB'],['Nola','s_oldN']]){const r=resolveSoulReference(name,options());assert.equal(r.ok,true);assert.equal(r.chosen.id,id);}const ambiguous=resolveSoulReference('Beryl',options([...old,...fresh]));assert.equal(ambiguous.code,'soul.name-ambiguous');assert.deepEqual(ambiguous.did_you_mean.map(x=>x.label).sort(),['Beryl Cadence19','Beryl Coherent19']);});
+
+// A first-name alias must pass the same reassigned-name check as its matched full name.
+test('unique first-name aliases cannot bypass a reassigned full label, including trusted constraints',()=>{
+ const rows=[{id:'s_original',name:'Renamed Original'},{id:'s_current',name:'Earlier Name',nameAmbiguous:true}],o=options(rows);
+ assert.equal(resolveSoulReference('Earlier',o).code,'soul.name-ambiguous');
+ assert.equal(resolveSoulReferences(['s_current'],{...o,constraints:['Earlier']}).code,'soul.name-ambiguous');
+ assert.equal(resolveSoulReference('s_current',o).chosen.nameAmbiguous,true,'explicit ID retains provenance warning');
+ assert.equal(resolveSoulReference({id:'s_current',name:'Earlier Name'},o).ok,true,'explicit matching canonical identity remains available');
+});
