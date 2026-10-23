@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setImmediate } from 'node:timers/promises';
 import { coreRef } from '@sim/world-compiler';
+import { GodActivitySpots } from './activity-spots.ts';
 import { fixture, invite, accept, factory } from '../../test/native-owner-fixture.ts';
 import { EdgeLedger } from '../edge/ledger/ledger.ts';
 import { GodMode } from './god.ts';
@@ -212,6 +213,26 @@ test('B9: a resident gives a talk at the podium; another attends it from a seat,
   assert.equal(seen, 'sit', 'Bo listened seated while Ana talked');
   assert.equal(r.phase, 'completed', JSON.stringify(r));
   assert.deepEqual((w.host.engine as any).runtime.violations, []);
+});
+
+// SPOTS 2026-10-22: a lectern's audience never takes seats through a wall (the cliff-village chapel lectern offered "attend"
+// at seats in neighbouring cliff-house kitchens and baths). Same scene, places stubbed: podium in a building room vs the open.
+test('attend seats: same room as an indoor lectern; any open seat in front of an outdoor podium', { timeout: 300000 }, async (t) => {
+  const w = await lifeWorld(t, [
+    { op: 'place', def: coreRef('podium'), name: 'podium', p: [0, 16], r: Math.PI },
+    { op: 'place', def: coreRef('bench'), name: 'nave-bench', p: [0, 12] },
+    { op: 'place', def: coreRef('bench'), name: 'kitchen-bench', p: [0, 5] },
+  ]);
+  const seatsFor = (placeAt: (at: [number, number]) => string | null) => {
+    const s = new GodActivitySpots({ model: w.god.model, engine: w.host.engine as never, version: () => 1, levelAt: () => 0, placeAt, placeName: id => id });
+    const d = s.data(), lec = d.spots.find((x: any) => x.activity === 'lecture');
+    assert.ok(lec, 'a lecture spot at the podium');
+    return d.spots.filter((x: any) => x.requires === lec!.id).map((x: any) => Math.round(x.at[1]));
+  };
+  const open = seatsFor(() => null);
+  assert.ok(open.some(z => z > 9) && open.some(z => z < 9), 'outdoors both benches face the podium: ' + open);
+  const indoor = seatsFor(at => (at[1] >= 9 ? 'g-chapel.nave' : 'g-house.kitchen'));
+  assert.ok(indoor.length && indoor.every(z => z > 9), 'only the nave bench attends: ' + indoor);
 });
 
 test('B7: a god-built balloon is a native ride: a resident joins, flies its loop and steps out back home', { timeout: 900000 }, async (t) => {

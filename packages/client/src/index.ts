@@ -4,7 +4,7 @@
 // carries the server's view hash; the replica recomputes its own at that tick
 // and asks for a resync when they differ. Runs in browsers and in Node.
 import type { Entity, Environment, PathCommit, PoseSample, Region } from '@sim/engine-contract';
-import { samplePath, viewHashOf, viewRow, PROTO,TAKE_BOUNDARY_WIRE_V1,hydrateTakeBoundaryWireV1,TAKE_ENTITIES_WIRE_V1,TAKE_ENTITIES_JOIN_V1,adoptSnapshotTableV1,hydrateTakeEntitiesV1,type TakeEntitiesStateV1,TAKE_CHUNKS_WIRE_V1,hydrateTakeChunksV1,hydrateKernelTickV1,type TakeChunksStateV1, stationLiveV1Schema,stationV2MessageSchema,acceptStationLiveProgressV2,stationHelloCapabilitiesV1Schema,stationLiveContractSchema,meLiveDescriptorV1Schema,meLiveViewV1Schema,meLiveMessageV1Schema,
+import { isPackedColumnsV1, unpackColumnsV1, samplePath, viewHashOf, viewRow, PROTO,TAKE_BOUNDARY_WIRE_V1,hydrateTakeBoundaryWireV1,TAKE_ENTITIES_WIRE_V1,TAKE_ENTITIES_JOIN_V1,adoptSnapshotTableV1,hydrateTakeEntitiesV1,type TakeEntitiesStateV1,TAKE_CHUNKS_WIRE_V1,hydrateTakeChunksV1,hydrateKernelTickV1,type TakeChunksStateV1, stationLiveV1Schema,stationV2MessageSchema,acceptStationLiveProgressV2,stationHelloCapabilitiesV1Schema,stationLiveContractSchema,meLiveDescriptorV1Schema,meLiveViewV1Schema,meLiveMessageV1Schema,
   type StationLiveV2,type StationAnchorVariant,type StationLiveContract,type StationLiveV1, type KernelView, type PlayView, type TalkLine, type Batch, type BrainCall, type CameraLine, type ClientMsg, type Heartbeat, type LogEvent, type Me, type NarrativeView, type PublicSoul, type ServerMsg, type ServerStats, type Snapshot, type TickerLine } from '@sim/protocol';
 
 import { helloMessage } from './hello.ts';
@@ -251,6 +251,8 @@ export class Connection {
       if(m&&typeof m==='object'&&(m as {type?:unknown}).type==='edge'){this.handlers.onEdge?.(m as unknown as EdgeSpectatorMessage);return;}
       if(!m||typeof m!=='object'||typeof m.t!=='string')return;
       try{
+        // columns/1 (lane JOINSET): a snapshot's entity table in the column form is put back exactly before anything reads it
+        if(m.t==='snapshot'&&isPackedColumnsV1((m as {entities?:unknown}).entities))(m as {entities:unknown}).entities=unpackColumnsV1((m as unknown as {entities:Parameters<typeof unpackColumnsV1>[0]}).entities);
         // take-chunks wraps whatever take-entities / take-boundary-wire / takes message the reduced stream became
         const t=(v:unknown)=>v&&typeof v==='object'?(v as {t?:unknown}).t:undefined;
         const boundary=(v:unknown)=>{if(t(v)!=='take-boundary-wire')return v;if(!this.takeBoundaryTransport||this.welcome?.takeTransport!==TAKE_BOUNDARY_WIRE_V1)throw new Error('unnegotiated take transport');return hydrateTakeBoundaryWireV1(v);};

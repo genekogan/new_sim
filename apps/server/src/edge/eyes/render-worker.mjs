@@ -5,10 +5,14 @@
 //
 // Env: EDGE_EYES_URL (viewer URL, e.g. http://127.0.0.1:4970/w/eden/), EDGE_EYES_GPU=auto|metal|gl|swiftshader,
 // EDGE_EYES_PLAYWRIGHT (a package.json whose node_modules has @playwright/test; default <repo>/mars/viewer),
-// PLAYWRIGHT_BROWSERS_PATH, EDGE_EYES_RELOAD_HOURS (default 6), EDGE_EYES_HEADLESS_SHELL=1 (old headless shell).
+// PLAYWRIGHT_BROWSERS_PATH, EDGE_EYES_RELOAD_HOURS (default 6), EDGE_EYES_HEADLESS_SHELL=1 (old headless shell),
+// EDGE_EYES_NICE (default 10), EDGE_EYES_CPUS (taskset CPU list), EDGE_EYES_CHROME_ARGS (extra --switches).
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
-import {eyesBrowserLaunch, eyesBrowserModes} from './browser-config.mjs';
+import {setPriority} from 'node:os';
+import {readdirSync, readFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {EYES_UA_TAG, eyesBrowserLaunch, eyesBrowserModes, eyesCpus, eyesNice} from './browser-config.mjs';
 
 const viewer = process.env.EDGE_EYES_URL;
 const from = process.env.EDGE_EYES_PLAYWRIGHT || fileURLToPath(new URL('../../../../../mars/viewer/package.json', import.meta.url));
@@ -17,6 +21,34 @@ const log = (...a) => console.error(new Date().toISOString(), ...a);
 if (!viewer || !process.send) {log('eyes worker needs EDGE_EYES_URL and an IPC parent'); process.exit(2);}
 const {chromium} = createRequire(from)('@playwright/test');
 
+// below the world's own priority (the browser processes inherit it): renders never delay a tick
+try {setPriority(0, eyesNice());} catch (e) {log('could not lower priority:', e.message);}
+// Optional CPU pinning (EDGE_EYES_CPUS): the browser inherits it, and SwiftShader sizes its worker pool from the CPUs it may
+// use, so pinning also shrinks the pool of threads that wake on every scene update. Linux (taskset) only.
+const cpus = eyesCpus();
+if (cpus && process.platform === 'linux') {try {execFileSync('taskset', ['-p', '-c', cpus, String(process.pid)], {stdio: 'ignore'}); log('pinned to CPUs', cpus);} catch (e) {log('could not pin CPUs:', e.message);}}
+// Chromium re-prioritises its own processes and threads (Modal as root saw nice -8, 0 and 5 under a nice-10 worker), so
+// put every thread of the browser's process tree back to at least the worker's niceness after launch and every 30 s.
+// Raising a nice value never needs a privilege; Linux only (/proc).
+function reniceTree(root = process.pid, nice = eyesNice()) {
+  if (process.platform !== 'linux') return 0;
+  const kids = new Map();
+  for (const d of readdirSync('/proc')) {
+    if (!/^\d+$/.test(d)) continue;
+    try {const st = readFileSync(`/proc/${d}/stat`, 'utf8'), f = st.slice(st.lastIndexOf(')') + 2).split(' '); const pp = Number(f[1]); (kids.get(pp) ?? kids.set(pp, []).get(pp)).push(Number(d));} catch {/* gone */}
+  }
+  let changed = 0;
+  for (const stack = [...(kids.get(root) ?? [])]; stack.length;) {
+    const pid = stack.pop(); stack.push(...(kids.get(pid) ?? []));
+    let tids = []; try {tids = readdirSync(`/proc/${pid}/task`).map(Number);} catch {continue;}
+    for (const tid of tids) {
+      try {const st = readFileSync(`/proc/${pid}/task/${tid}/stat`, 'utf8'), n = Number(st.slice(st.lastIndexOf(')') + 2).split(' ')[16]); if (n < nice) {setPriority(tid, nice); changed++;}} catch {/* gone or not ours */}
+    }
+  }
+  return changed;
+}
+let reniced = 0;
+const renice = () => {try {const n = reniceTree(); if (n && !reniced++) log('reniced', n, 'browser threads to', eyesNice(), '(logged once)');} catch (e) {log('renice failed', e.message);}};
 const order = eyesBrowserModes();
 let browser = null, page = null, renderer = null, ready = false, closing = false, loadedAt = 0, busy = false;
 const queue = [];
@@ -25,7 +57,8 @@ async function launch() {
   for (const mode of order) {
     try {
       const b = await chromium.launch(eyesBrowserLaunch(mode));
-      const p = await b.newPage({viewport: {width: 512, height: 320}, deviceScaleFactor: 1});
+      const probe = await b.newPage(), ua = await probe.evaluate(() => navigator.userAgent); await probe.close();
+      const p = await b.newPage({viewport: {width: 512, height: 320}, deviceScaleFactor: 1, userAgent: `${ua} ${EYES_UA_TAG}`});
       const gl = await p.evaluate(() => {const c = document.createElement('canvas').getContext('webgl2'); if (!c) return null; const x = c.getExtension('WEBGL_debug_renderer_info'); return x ? c.getParameter(x.UNMASKED_RENDERER_WEBGL) : c.getParameter(c.RENDERER);});
       if (!gl) {await b.close(); log('no WebGL with', mode); continue;}
       if (mode === 'metal' && /swiftshader|llvmpipe|software/i.test(gl)) {await b.close(); log('Metal hardware required, got', gl); continue;}
@@ -50,7 +83,7 @@ async function load() {
   }
   // one throwaway frame compiles the shaders before the first real request
   try {await page.evaluate(() => window.edenEyes.capture({mode: 'eyes', w: 320, h: 180, quality: 0.5, pose: {p: [9, 1.6, 12], yaw: -Math.PI / 2, pitch: -0.06, vfov: 1}, self: '', show: []}));} catch (e) {log('warm-up frame failed', e.message.split('\n')[0]);}
-  loadedAt = Date.now(); ready = true; send({t: 'status', ready: true, renderer, detail: null}); log('viewer ready');
+  renice(); loadedAt = Date.now(); ready = true; send({t: 'status', ready: true, renderer, detail: null}); log('viewer ready');
 }
 let failing = false;
 async function fail(why) {
@@ -84,6 +117,7 @@ process.on('message', msg => {
 async function shutdown(code) {closing = true; try {await browser?.close();} catch {/* gone */} process.exit(code);}
 process.on('disconnect', () => void shutdown(0));
 process.on('SIGTERM', () => void shutdown(0));
+setInterval(renice, 30_000).unref();
 // liveness: if the page stops answering, start it again
 setInterval(async () => {
   if (!ready || busy || !page) return;

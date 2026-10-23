@@ -96,6 +96,8 @@ test('channels: attention never cancels the body; speech and conversation never 
   w.comms.conversations.handle(c, {op: 'accept', conversation: talk.conversation.id});
   w.comms.conversations.handle(c, {op: 'say', conversation: talk.conversation.id, text: 'hi there'}); await w.ticks(5);
   assert.equal(w.body(b).human.gaze?.kind, 'auto'); assert.equal(w.body(b).human.gaze?.target, c.entityId);
+  // CONV-UI: free standing bodies turn to face each other too (the speaker included): B east towards C, C west towards B
+  assert.ok(Math.abs(w.body(b).pose.yaw) < 0.01, `B faces C: ${w.body(b).pose.yaw}`); assert.ok(Math.abs(Math.abs(w.body(c).pose.yaw) - Math.PI) < 0.01, `C faces B: ${w.body(c).pose.yaw}`);
   // turned off for this conversation: no more auto-face
   const off = await act(b, {verb: 'auto-face', on: false, conversation: talk.conversation.id}); assert.equal(off.accepted, true, JSON.stringify(off));
   await act(b, {verb: 'look', direction: 'ahead'}); await w.ticks(5);
