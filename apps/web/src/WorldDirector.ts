@@ -31,15 +31,16 @@ export type LandmarkChoice = { kind: 'landmark'; key: string; label: string; sco
 export type DirectorChoice = SubjectChoice | LandmarkChoice;
 
 /** DIRECTOR2: never two cuts within MIN_CUT seconds; an event is "fresh" (worth a visit) for FRESH seconds; arrivals score for ARRIVAL. */
-export const MIN_CUT = 6, FRESH = 10, ARRIVAL = 12;
+export const MIN_CUT = 6, FRESH = 10, ARRIVAL = 12, PAIR_LINGER = MIN_CUT;
 export const MIN_HOLD = 8, CONVERSATION_MIN_HOLD = 12, MAX_HOLD = 24, CONVERSATION_MAX_HOLD = 36, LANDMARK_HOLD = 14, OPENING = 7;
 /** Below this, nothing is happening: show the town. */
 export const LANDMARK_SCORE = 2.5;
 const IN_WATER_Y = -.8, NEAR = 3.2, GROUP = 6, CONVERSATION_RECENT = 40, BAN_SECONDS = 40, COOLDOWN = 30;
 
 const WORKING = /dance|paint|garden|plant|eat|read|write|cook|drink|play|craft|yoga|stretch|jump|pushup|situp|browse|piano|game|wave|post-letter|work|bow|clap|cheer|point|nod|shake-head|give|take|sing|fish|feed|swing|seesaw|picnic|tell-story/;
-/** Paired touch gestures (together.ts PAIRED; both bodies share one start) and the CN5 choreographed games. */
-const PAIRED = /^(hug|high-five|handshake|dance)$/, GAME = /^play-(frisbee|petanque|volleyball)$/;
+/** Paired touch gestures (together.ts PAIRED, and a hand-over: the giver poses give, the taker take; both bodies share one
+ *  start) and the CN5 choreographed games. */
+const PAIRED = /^(hug|high-five|handshake|dance|give)$/, GAME = /^play-(frisbee|petanque|volleyball)$/;
 const EVENT = /^(conversation:|game:|pair:|arrival:|ride:)/;
 const RESTING = /^(sit|warm|sit-ground|rest)$/;
 export function activityScore(activity = ''): { score: number; label: string } {
@@ -102,7 +103,8 @@ export function candidates(input: DirectorInput): SubjectChoice[] {
   for (const b of bodies) {
     const a = (b.activity ?? '').replace(/^mars:/, '');
     if (paired.has(b.id) || !PAIRED.test(a)) continue;
-    const partner = bodies.filter(o => o.id !== b.id && !paired.has(o.id) && (o.activity ?? '').replace(/^mars:/, '') === a && flat(o.p, b.p) < 2.5)
+    const want = a === 'give' ? 'take' : a;
+    const partner = bodies.filter(o => o.id !== b.id && !paired.has(o.id) && (o.activity ?? '').replace(/^mars:/, '') === want && flat(o.p, b.p) < 2.5)
       .sort((x, y) => flat(x.p, b.p) - flat(y.p, b.p))[0];
     if (!partner) continue;
     const pair = [b.id, partner.id].sort(); pair.forEach(id => { inConversation.add(id); paired.add(id); });
@@ -170,7 +172,10 @@ export class WorldDirector {
   private seen = new Map<string, [number, number]>();
   private eventSeen = new Map<string, [number, number]>();
   private lastCut = -Infinity;
-  reset() { this.current = null; this.since = -Infinity; this.started = null; this.banned.clear(); this.cooling.clear(); this.recentLandmarks = []; this.landmarkRun = 0; this.seen.clear(); this.eventSeen.clear(); this.lastCut = -Infinity; }
+  /** DIRECTOR2: a paired gesture lasts 2.5-5 s; when it starts inside the cut window of an unrelated cut it would be over
+   *  before the camera may move. It stays a candidate for PAIR_LINGER s after it ends (the two are still face to face). */
+  private pairs = new Map<string, { c: SubjectChoice; until: number }>();
+  reset() { this.pairs.clear(); this.current = null; this.since = -Infinity; this.started = null; this.banned.clear(); this.cooling.clear(); this.recentLandmarks = []; this.landmarkRun = 0; this.seen.clear(); this.eventSeen.clear(); this.lastCut = -Infinity; }
   /** The solver could only frame this choice small or not at all: leave it alone for a while. */
   reject(key: string, now: number) { this.banned.set(key, now + BAN_SECONDS); if (this.current?.key === key) { this.since = -Infinity; this.lastCut = -Infinity; } }
 
@@ -194,6 +199,12 @@ export class WorldDirector {
     for (const [k, until] of this.banned) if (until <= now) this.banned.delete(k);
     for (const [k, until] of this.cooling) if (until <= now) this.cooling.delete(k);
     const all = candidates({ ...input, arrivals: input.arrivals ?? this.arrivals(input) }).filter(c => !this.banned.has(c.key));
+    for (const c of all) if (c.key.startsWith('pair:')) this.pairs.set(c.key, { c, until: now + PAIR_LINGER });
+    const ids = new Set(input.bodies.map(b => b.id));
+    for (const [k, p] of this.pairs) {
+      if (p.until <= now || !p.c.members.every(id => ids.has(id))) this.pairs.delete(k);
+      else if (!this.banned.has(k) && !all.some(c => c.key === k)) all.push(p.c);
+    }
     for (const c of all) if (EVENT.test(c.key)) { const e = this.eventSeen.get(c.key); if (!e || now - e[1] > 5) this.eventSeen.set(c.key, [now, now]); else e[1] = now; }
     for (const [k, e] of this.eventSeen) if (now - e[1] > 5) this.eventSeen.delete(k);
     const choice = this.decide(input, all);

@@ -112,3 +112,18 @@ test('DIRECTOR2: two Souls who are talking high-five (2.5 s): the gesture gets i
   const cuts=at.filter(([,k],i)=>i&&k!==at[i-1][1]).map(([t])=>t);
   assert.ok(cuts.every((t,i)=>!i||t-cuts[i-1]>=MIN_CUT),'no cut pair under MIN_CUT: '+cuts.join(','));
 });
+
+test('DIRECTOR2: a paired gesture that starts just after a cut still gets its pair shot once the cut window opens, held MIN_CUT', () => {
+  for (const [ga, gb, key, len] of [['high-five','high-five','pair:high-five:a:b',2.5],['hug','hug','pair:hug:a:b',5],['handshake','handshake','pair:handshake:a:b',3.5],['give','take','pair:give:a:b',2.5]] as const) {
+    const d=new WorldDirector();let gs=Infinity,prev='';
+    const act=(t:number,g:string)=>t>=gs&&t<gs+len?g:'idle';
+    const scene=(t:number):DirectorInput=>({bodies:[body('a',0,0,act(t,ga)),body('b',.8,0,act(t,gb)),body('c',30,0,'paint'),body('e',-30,10,'read')],speaking:new Map(),now:t,landmarks:L});
+    const at:[number,string][]=[];
+    for(let t=0;t<120;t+=.25){const k=d.choose(scene(t))?.key??'';if(t>=30&&gs===Infinity&&prev&&k!==prev)gs=t+1;prev=k;at.push([t,k]);}
+    assert.ok(Number.isFinite(gs),'a cut after 30 s');
+    const first=at.find(([t,k])=>t>=gs&&k===key);
+    assert.ok(first&&first[0]-gs<=MIN_CUT,`${key} framed ${first?first[0]-gs:'never'} s after its start`);
+    const cuts=at.filter(([,k],i)=>i&&k!==at[i-1][1]).map(([t])=>t);
+    assert.ok(cuts.every((t,i)=>!i||t-cuts[i-1]>=MIN_CUT),'no cut pair under MIN_CUT: '+cuts.join(','));
+  }
+});
