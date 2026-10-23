@@ -7,7 +7,7 @@ import { cameraGround, CAMERA_GROUND_MARGIN } from './WorldCameraGround.ts';
 /** One manual camera: default drag orbits, RMB looks in place, WASD moves horizontally (faster the higher the eye),
  * arrows rotate the head, Q/E (or F/R) lower/raise, Shift boosts and Alt gives precision. C1: the wheel zooms
  * toward/away from the point under the cursor without turning the view (stopping at the ground, never re-tilting),
- * out to the edge of the map; a click on open ground turns the view to make that point the pivot; Home/H shows
+ * out to the edge of the map; a click (or tap) on the ground or a thing glides the camera so that point is the pivot; Home/H shows
  * everything.
  * Deliberate movement takes over from Follow/Broadcast at the same eye and gaze.
  * Orbit gestures in Follow keep the tracked Soul centred. Presentation only. */
@@ -35,8 +35,16 @@ const FLY_SECONDS = .8, MARKER_SECONDS = .9, REANCHOR_IDLE = .25;
 export const ZOOM_PER_PIXEL = .0012, ZOOM_EASE = .08, ZOOM_TO_CURSOR = true;
 /** C1: the nearest the eye comes to its pivot; the farthest is the map's half-size × FAR_PER_RADIUS (320 m at least, MANUAL_FAR_LIMIT at most). */
 export const NEAR_LIMIT = 2, FAR_PER_RADIUS = 2.5;
-/** C1: a click waits out the double-click window before it turns the view to its point (a double-click only flies). */
-export const CLICK_PIVOT_DELAY_MS = 300, TURN_SECONDS = .45;
+/** C1: a click waits out the double-click window before it glides to its point (a double-click only flies). CAMERA-PIVOT:
+ * the glide moves eye and pivot together for GLIDE_SECONDS, so the clicked point lands under the screen centre. */
+export const CLICK_PIVOT_DELAY_MS = 300, GLIDE_SECONDS = .4;
+/** CAMERA-PIVOT: where a click on `point` takes the camera: the pivot becomes the point and the eye keeps its offset from the
+ * pivot (same angle, same distance: a glide, never a turn or a jump). An eye that would end up below the point is lifted
+ * to `minHeight` above it at the same horizontal offset. */
+export function pivotGlide(eye:THREE.Vector3,pivot:THREE.Vector3,point:THREE.Vector3,minHeight=1):{eye:THREE.Vector3;pivot:THREE.Vector3}{
+  const offset=eye.clone().sub(pivot);if(offset.y<minHeight)offset.y=minHeight;
+  return {pivot:point.clone(),eye:point.clone().add(offset)};
+}
 /** C1: metres the eye must be above the ground to move at the base WASD speed; higher multiplies it (up to 40x). */
 const SPEED_HEIGHT = 8, SPEED_MAX = 40;
 
@@ -100,8 +108,10 @@ export class WorldRtsCamera {
   private dot: THREE.Mesh;
   private material = new THREE.MeshBasicMaterial({ color: '#fff3c4', transparent: true, opacity: 0, depthTest: false, side: THREE.DoubleSide });
   private boundControls: OrbitControls | null = null;
-  private onStart = () => { this.dragging = true; this.markerAge = 0; };
-  private onEnd = () => { this.dragging = false; this.idle = 0; this.moved = true; };
+  private dragFrom: THREE.Vector3 | null = null;
+  private onStart = () => { this.dragging = true; this.markerAge = 0; this.dragFrom = this.boundControls?.target.clone() ?? null; };
+  /** CAMERA-PIVOT: only a gesture that moved the pivot (pan, cursor zoom) re-anchors it; a pure orbit keeps the chosen point. */
+  private onEnd = () => { const t = this.boundControls?.target; this.dragging = false; this.idle = 0; this.moved = !this.dragFrom || !t || t.distanceToSquared(this.dragFrom) > 1e-6; this.dragFrom = null; };
   private onChange = () => { if (this.dragging) this.markerAge = 0; };
 
   private canvas: HTMLCanvasElement;
@@ -192,18 +202,19 @@ export class WorldRtsCamera {
     const g = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3());
     return g && ray.ray.origin.distanceTo(g) < far ? g : null;
   }
-  /** C1: a plain click on open ground (LiveWorld calls this when nothing is selected by it): after the double-click
-   * window, that point becomes the pivot. The eye stays where it is; the view turns to the point (orbit controls
-   * always look at their pivot). Mouse and pen only: a phone's tap is unchanged. */
+  /** C1 + CAMERA-PIVOT: a plain click or tap (LiveWorld calls this after its own selection): after the double-click
+   * window, the clicked world point (raycast hit on a thing, else the drawn ground) becomes the pivot and the camera
+   * glides there at the same angle and distance (pivotGlide); later orbit and zoom turn around it. Manual camera only:
+   * Follow and Broadcast ignore it. */
   clickPivot(e:{clientX:number;clientY:number;pointerType?:string}){
     this.cancelClick();
-    if(e.pointerType==='touch'||this.enabledNow()===false||this.o.mode()!=='manual')return;
+    if(this.enabledNow()===false||this.o.mode()!=='manual')return;
     const {clientX:x,clientY:y}=e;
     this.pendingClick=setTimeout(()=>{
       this.pendingClick=null;if(this.enabledNow()===false||this.o.mode()!=='manual'||this.dragging||this.rightHeld||this.keys.size)return;
       const point=this.pickPoint(x,y);if(!point||point.distanceTo(this.camera.position)<1)return;
-      const c=this.bind(),eye=this.camera.position.clone();
-      this.flight={fromT:c.target.clone(),toT:point,fromP:eye,toP:eye.clone(),t:0,seconds:TURN_SECONDS};this.markerAge=0;this.moved=false;
+      const c=this.bind(),eye=this.camera.position.clone(),to=pivotGlide(eye,c.target,point);
+      this.flight={fromT:c.target.clone(),toT:to.pivot,fromP:eye,toP:to.eye,t:0,seconds:GLIDE_SECONDS};this.markerAge=0;this.moved=false;
     },CLICK_PIVOT_DELAY_MS);
   }
   /** Discard an old orbit gesture/damping once, before direct eye-relative controls. */

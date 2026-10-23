@@ -1076,7 +1076,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) { down = null; return; }
       down = null;
       if (entityLayer.active && godFeature('flags') && (e.altKey || flagModeRef.current)) return;  // a flag drop (onFlagClick), not a selection: no place card over the god panel
-      const target=hover.pick(e.clientX,e.clientY);if(target)inspectHover(target);else{setPlaceCard(null);context.current.setThing(null);rts.clickPivot(e);}  // C1: open ground: pivot there
+      const target=hover.pick(e.clientX,e.clientY);if(target)inspectHover(target);else{setPlaceCard(null);context.current.setThing(null);}rts.clickPivot(e);  // C1 + CAMERA-PIVOT: the clicked point (thing or ground) becomes the pivot (manual camera only)
 
     };
     renderer.domElement.addEventListener('pointerdown', onDown);
