@@ -312,6 +312,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
       // together/1: a follow walks on leg after leg under the same receipt until it is stopped or its target is gone
       const m = this.host.minds.get(r.soul_id);
       if (m && this.together.continueFollow(r.receipt_id, {soulId: m.soulId, entityId: m.entityId, name: m.name, owner: m.owner})) return;
+      // SOCIAL-APPROACH: a walk over to a Soul continues, then becomes the hug / dance / hand-over itself, under one receipt
+      if (m && this.together.continueApproach(r.receipt_id, {soulId: m.soulId, entityId: m.entityId, name: m.name, owner: m.owner})) return;
       const warmTarget=r.detail?(JSON.parse(r.detail) as {warmTargetV1?:string}).warmTargetV1:undefined;
       if(warmTarget){const body=m?this.body(m.entityId):undefined,fire=this.body(warmTarget),live=new Set(this.host.engine.runtime.liveIds());
         const occupied=!!m&&[...this.host.engine.runtime.records.values()].some(record=>{const p=record.params as {actor?:string;slot?:string};return live.has(record.id)&&record.verb==='take_slot'&&record.phase==='occupied'&&p.actor===m.entityId&&typeof p.slot==='string'&&p.slot.startsWith(warmTarget+'#');});
@@ -707,7 +709,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
     // together/1: social phrasing first (accept/decline, "hug Tamsin", "give her the book", "dance with Roger", "invite X to …")
     let social: {note: string} | null = null, text = asked;
     if (!caps.some(c => c.id === asked)) {
-      const r = this.together.resolve(soul, asked, caps);
+      const more = [...caps], morePlans = new Map(plans), r = this.together.resolve(soul, asked, more, morePlans as Map<string, TogetherPlan>);
+      if (more.length !== caps.length) {caps = more; plans = morePlans;}   // SOCIAL-APPROACH: a walk-over act toward a Soul out of sight
       if (r && 'code' in r) return {...refuse(r.code, r.reason), did_you_mean: r.did_you_mean};
       if (r) {social = {note: r.note}; params = {...params, ...(r.params ?? {})}; text = r.capability || r.rest || asked;}
     }
