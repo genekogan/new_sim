@@ -2,8 +2,8 @@
 // A conversation that is speaking now must reach the director as recent (it was decades old before the conversion).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { WorldBroadcast } from './WorldBroadcast.ts';
-import { speakingNow } from './dialogue-speaking.ts';
+import { WorldBroadcast } from '../src/WorldBroadcast.ts';
+import { speakingNow } from '../src/dialogue-speaking.ts';
 
 test('DIRECTOR2: a Soul speaking now is a conversation for the broadcast, whatever the clocks', () => {
   const g = globalThis as unknown as { __simBroadcastCuts?: { key: string }[] };
