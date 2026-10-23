@@ -10,7 +10,8 @@ import {SPOT_ACTIVITIES} from './ledger/activities.ts';
 
 export type DayEntry = {
   at: number; kind: 'did' | 'doing' | 'stopped' | 'refused' | 'said';
-  text: string; reason?: string; code?: string;
+  /** `cut`: begun but cut short by the Soul's own next act (a `replaced` receipt). */
+  text: string; reason?: string; code?: string; cut?: true;
   where: {x: number; z: number} | null; place?: string | null;
 };
 
@@ -44,7 +45,39 @@ const labelPast = (label: string) => { const [w = '', ...rest] = label.split(' '
 const DAY_MS = 86_400_000, MAX = 200;
 
 // God-built places are often named by their id ("place-commons-kitchen"): read those as words ("commons kitchen").
-const plain = (n: string) => /\s/.test(n) ? n : n.replace(/^(g-)?(place-)?/, '').replace(/[-_]+/g, ' ');
+// Same rules as the web's place label (world-env.ts placeLabel): drop kind prefixes, the copy number and sub-parts, so
+// "g-commons-kitchen-table-3" reads "commons kitchen table" and a god's tree stand "trees-south-park-canopy" reads "south park trees".
+export const plain = (n: string) => {
+  if (/\s/.test(n)) return n;
+  let t = (n.split('/')[0] ?? n).replace(/^g-/, '').replace(/^(?:(?:region|place|land|int|eden)-)+/, '').replace(/(?:-\d+)+$/, '');
+  const trees = /^trees-(.+?)(?:-canopy)?$/.exec(t); if (trees) t = `${trees[1]}-trees`;
+  return t.replace(/[-_]+/g, ' ').trim() || n.replace(/[-_]+/g, ' ');
+};
+
+// Owner words for a refusal: the engine's codes ("(pose.not-still)") never reach the owner. Energy first (a Soul freed after
+// hours held is exhausted), then known codes by full code or by their last part, then the engine's own sentence without the code.
+const PLAIN_REASON: Record<string, string> = {
+  'not-still': 'still moving: stand still first', 'no-room': 'no room there', 'hands.full': 'hands full: put something down first',
+  'hands.empty': 'nothing in hand to do that with', 'walk.stuck': 'got stuck on the way', 'walk.obstacle': 'something was in the way',
+  'walk.goal-occupied': 'someone was already standing there', 'slot.none-free': 'no free spot there', 'slot.none': 'no free spot there',
+  'seat.too-high': 'the seat is too high', 'traffic.person': 'gave way to someone passing', 'traffic.vehicle': 'gave way to a vehicle',
+  'traffic.yield': 'gave way to someone passing', 'soul.faded': 'it had faded', 'conversation.out-of-range': 'too far away to talk',
+  'gesture.partner-unavailable': 'the other one was not there', 'follow.unavailable': 'nobody there to follow',
+  'place.ambiguous': 'not sure which place was meant', 'entity.unknown': 'could not find that here', 'capability.unknown': 'not something it can do here',
+  'action.unknown-verb': 'not something it can do here', 'capability.params': 'the request was missing something', 'action.invalid-params': 'the request was missing something',
+  'ride.full': 'the ride was full', 'ride.departed': 'the ride had already left', 'ride.closed': 'the ride is closed now', 'ride.aboard': 'already on a ride',
+  'ride.already-aboard': 'already on a ride', 'window-closed': 'too late to join in', 'hands-out-of-reach': 'out of reach',
+};
+const TIRED = /\b(energy|tired|exhaust\w*|fatigue\w*)\b/i;
+export function plainReason(code: string | null | undefined, reason: string | null | undefined): string {
+  const c = code ?? '', r = (reason ?? '').trim();
+  if (TIRED.test(c.replace(/[.-]/g, ' ')) || TIRED.test(r)) return 'too tired: rest first';
+  const jargon = !r || (c && r.includes(c)) || /\bis supported, but\b/.test(r) || /\([a-z]+\.[a-z.-]+\)/.test(r);
+  const mapped = PLAIN_REASON[c] ?? PLAIN_REASON[c.slice(c.lastIndexOf('.') + 1)];
+  if (mapped && jargon) return mapped;
+  const cleaned = r.replace(/\s*\([a-z]+\.[a-z.-]+\)/g, '').replace(/^.{1,120}? is supported, but /, '').trim();
+  return cleaned || mapped || 'the world said no';
+}
 const targetOf = (rest: string[], nameOf: (id: string) => string | null) => { const t = rest.join(':'); return !t || t === 'here' || t === 'ahead' ? '' : (nameOf(t) ?? plain(t)); };
 
 /** Human words for a capability id like `walk:place_bakery`, `object:ride-eden-balloon:join` or `rest:here`. */
@@ -80,14 +113,16 @@ export function ownerDay(L: EdgeLedger, db: Db, soulId: string, since: number): 
     const end = r.endedAt as {pos?: unknown; place?: unknown} | undefined;
     const place = typeof end?.place === 'string' ? (nameOf(end.place) ?? end.place) : null;
     const text = describeCapability(r.capability, nameOf);
-    // `replaced` is the Soul's own next act taking over: the act happened (a jog that moved the body still did), so it reads as done.
-    if (r.phase === 'completed' || r.phase === 'replaced') out.push({at, kind: 'did', text, where: xz(end?.pos), place});
+    // `replaced` is the Soul's own next act taking over: the act happened (a jog that moved the body still did), so it reads as done,
+    if (r.phase === 'completed') out.push({at, kind: 'did', text, where: xz(end?.pos), place});
+    // ...but it did not finish: say so ("watched the stars (cut short)") so the owner can tell.
+    else if (r.phase === 'replaced') out.push({at, kind: 'did', text: `${text} (cut short)`, cut: true, where: xz(end?.pos), place});
     else if (r.phase === 'started' || r.phase === 'waiting') out.push({at, kind: 'doing', text, where: xz(end?.pos), place});
-    else if (r.phase === 'failed') out.push({at, kind: 'stopped', text, where: xz(end?.pos), place, ...(r.reason ? {reason: r.reason} : {}), ...(r.code ? {code: r.code} : {})});
+    else if (r.phase === 'failed') out.push({at, kind: 'stopped', text, where: xz(end?.pos), place, ...(r.reason || r.code ? {reason: plainReason(r.code, r.reason)} : {}), ...(r.code ? {code: r.code} : {})});
   }
   const cols = new Set((sql.prepare('PRAGMA table_info(edge_refusals_v1)').all() as {name: string}[]).map(c => c.name));
   if (cols.has('reason')) for (const f of sql.prepare('SELECT at,capability,code,reason,x,z FROM edge_refusals_v1 WHERE world_id=? AND soul_id=? AND at>=? ORDER BY at DESC LIMIT ?').all(w, soulId, since, MAX) as {at: number; capability: string; code: string; reason: string | null; x: number | null; z: number | null}[])
-    out.push({at: f.at, kind: 'refused', text: describeAttempt(f.capability, nameOf), code: f.code, reason: f.reason || `the world said no (${f.code})`, where: f.x == null || f.z == null ? null : {x: r1(f.x), z: r1(f.z)}});
+    out.push({at: f.at, kind: 'refused', text: describeAttempt(f.capability, nameOf), code: f.code, reason: plainReason(f.code, f.reason), where: f.x == null || f.z == null ? null : {x: r1(f.x), z: r1(f.z)}});
   if (sql.prepare("SELECT 1 FROM sqlite_master WHERE name='edge_comms_speech'").get())
     for (const s of sql.prepare('SELECT at,text FROM edge_comms_speech WHERE world_id=? AND soul_id=? AND at>=? ORDER BY at DESC LIMIT ?').all(w, soulId, since, MAX) as {at: number; text: string}[])
       out.push({at: s.at, kind: 'said', text: s.text, where: null});

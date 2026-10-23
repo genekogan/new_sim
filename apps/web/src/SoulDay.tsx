@@ -6,12 +6,14 @@ import type { Api } from './useSim.ts';
 import { requestLookAt } from './look-at-request.ts';
 import './SoulDay.css';
 
-export type DayEntry = { at: number; kind: 'did' | 'doing' | 'stopped' | 'refused' | 'said'; text: string; reason?: string; code?: string; where: { x: number; z: number } | null; place?: string | null };
+export type DayEntry = { at: number; kind: 'did' | 'doing' | 'stopped' | 'refused' | 'said'; text: string; reason?: string; code?: string; cut?: true; where: { x: number; z: number } | null; place?: string | null };
 
 const TAG: Record<DayEntry['kind'], { label: string; cls: string }> = {
   did: { label: 'done', cls: 'mid' }, doing: { label: 'doing now', cls: 'translate' }, said: { label: 'said', cls: 'narrator' },
   refused: { label: 'refused', cls: 'day-refused' }, stopped: { label: 'stopped', cls: 'day-refused' },
 };
+/** An act begun and then cut short by the Soul's own next act: not "done". */
+const CUT = { label: 'cut short', cls: 'translate' };
 const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 const midnight = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); };
 
@@ -30,7 +32,7 @@ export function DayList({ name, entries, look = requestLookAt }: { name: string;
     <p className="day-summary">{daySummary(name, entries)}</p>
     <ol className="day-list">
       {entries.slice().reverse().map((e, i) => {
-        const t = TAG[e.kind];
+        const t = e.cut ? CUT : TAG[e.kind];
         const body = <>
           <span className="dim day-time">{clock(e.at)}</span>
           <span className={`tag ${t.cls}`}>{t.label}</span>

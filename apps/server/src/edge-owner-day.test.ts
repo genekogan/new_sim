@@ -3,7 +3,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import type {Hono} from 'hono';
 import {fixture,invite,accept} from '../test/native-owner-fixture.ts';import {EdgeLedger} from './edge/ledger/ledger.ts';import {buildApp} from './http.ts';
-import {describeAttempt, describeCapability} from './edge/owner-day.ts';
+import {describeAttempt, describeCapability, ownerDay, plain, plainReason} from './edge/owner-day.ts';
 import type {Hub} from './hub.ts';
 
 const born=async(f:ReturnType<typeof fixture>,owner:string,name:string)=>{await invite(f,owner);return accept(f.host,f.souls.create('dev:'+owner,{name,description:'scripted day test'}));};
@@ -47,4 +47,35 @@ test('OWNER DAY: capability ids read as plain words',()=>{
  assert.equal(describeCapability('yoga-class:here',n),'joined the yoga class');
  assert.equal(describeAttempt('sit:here',n),'tried to sit down');
  assert.equal(describeAttempt('fly:moon',n),'tried to fly to moon');
+});
+
+// OWNER-DAY follow-up (stranger-owner walk on the eden-2026 fixture Soul Bo): an act cut short is marked, engine codes
+// read as plain words (energy included), and god-built place ids read as place labels.
+test('OWNER DAY: god-built place ids read as place labels, not raw ids',()=>{
+ const none=()=>null;
+ assert.equal(plain('commons-kitchen-table-3'),'commons kitchen table');
+ assert.equal(plain('trees-south-park-canopy'),'south park trees');
+ assert.equal(plain('g-place-commons-kitchen'),'commons kitchen');
+ assert.equal(plain('commons-pavilion/pavilion'),'commons pavilion');
+ assert.equal(plain('trees-old-3-2'),'old trees');
+ assert.equal(plain('The Bakery'),'The Bakery','a real name is kept as is');
+ assert.equal(describeCapability('walk:commons-kitchen-table-3',none),'walked to commons kitchen table');
+ assert.equal(describeCapability('jog:g-trees-south-park-canopy',none),'jogged to south park trees');
+});
+test('OWNER DAY: refusal reasons are plain words, never engine codes',()=>{
+ assert.equal(plainReason('pose.not-still','Sit on the ground is supported, but the world blocks it right now (pose.not-still).'),'still moving: stand still first');
+ assert.equal(plainReason('sit.not-still',''),'still moving: stand still first');
+ assert.equal(plainReason('needs.energy','Bo is exhausted.'),'too tired: rest first');
+ assert.equal(plainReason('walk.blocked','Bo is too tired to walk that far.'),'too tired: rest first');
+ assert.equal(plainReason('ride.unavailable','No matching ride is offered here; nothing else was chosen.'),'No matching ride is offered here; nothing else was chosen.','a plain engine sentence is kept');
+ assert.equal(plainReason('zz.odd','Swim is supported, but the world blocks it right now (zz.odd).'),'the world blocks it right now.');
+ assert.equal(plainReason('zz.odd',null),'the world said no');
+ for(const r of [plainReason('pose.not-still','x (pose.not-still)'),plainReason('zz.odd','y (zz.odd)')])assert.ok(!/\([a-z]+\.[a-z.-]+\)/.test(r),r);
+});
+test('OWNER DAY: an act cut short by the Soul\'s next act is marked, not shown as finished',()=>{
+ const rows:Record<string,{phase:string;capability:string;endedAt:unknown}>={r1:{phase:'replaced',capability:'stargaze:here',endedAt:{pos:[9,-1.3],place:'g-commons-deck'}},r2:{phase:'completed',capability:'stretch:here',endedAt:{pos:[9,-1.3],place:'g-commons-deck'}}};
+ const sql={prepare:(q:string)=>({all:()=>/edge_receipts_v1/.test(q)?[{receipt_id:'r1'},{receipt_id:'r2'}]:[],get:(_w:string,id:string)=>/created_at FROM/.test(q)?{created_at:id==='r1'?1000:2000}:undefined})};
+ const L={host:{worldId:'w',nameOf:(id:string)=>id},places:{byId:new Map([['g-commons-deck',{name:'commons-deck'}]])},receipt:(_s:string,id:string)=>rows[id]};
+ const day=ownerDay(L as never,{db:sql} as never,'s1',0);
+ assert.deepEqual(day.map(e=>[e.kind,e.text,e.cut??false,e.place]),[['did','watched the stars (cut short)',true,'commons deck'],['did','did a stretch',false,'commons deck']]);
 });
