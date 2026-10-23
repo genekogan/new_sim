@@ -194,6 +194,18 @@ test('real owner and paired HTTP flows: absent, browser, command polling, listen
     const next = await req(path, 'dev:alice', {text: 'the house!!!!'});
     const woke = await listening; assert.deepEqual(woke.data.backlog.map((m: any) => m.id), [next.data.inbox.latest.id]); assert.ok(performance.now() - begun < 10_000);
     assert.equal((await req(`/v1/edge/inbox/${next.data.inbox.latest.id}/ack`, tokenA, {reply: 'Going to the house.'})).status, 200);
+    // LISTEN-LEAK: a newer listen supersedes the older ones (409 superseded, nothing handed) instead of being refused; the
+    // message then reaches exactly one listener, the newest, and is acked once.
+    const tick = () => new Promise(r => setTimeout(r, 20));
+    const l1 = req('/v1/edge/inbox/listen?timeoutMs=25000', tokenA); await tick();
+    const l2 = req('/v1/edge/inbox/listen?timeoutMs=25000', tokenA); await tick();
+    const l3 = req('/v1/edge/inbox/listen?timeoutMs=25000', tokenA); await tick();
+    for (const old of await Promise.all([l1, l2])) { assert.equal(old.status, 409); assert.equal(old.data.code, 'superseded'); assert.equal(old.data.backlog, undefined); }
+    assert.equal((await req(path, 'dev:alice')).data.inbox.presence, 'listening');
+    const only = (await req(path, 'dev:alice', {text: 'just once'})).data.inbox.latest.id;
+    const newest = await l3; assert.equal(newest.status, 200); assert.deepEqual(newest.data.backlog.map((m: any) => m.id), [only]);
+    assert.equal((await req(`/v1/edge/inbox/${only}/ack`, tokenA, {reply: 'Once.'})).status, 200);
+    assert.equal((await req(`/v1/edge/inbox/listen?after=${only}&timeoutMs=0`, tokenA)).data.backlog.length, 0, 'nothing handed twice');
     // an older CLI's `listen --follow` loop (after = the last it printed) walks the queue in order and then waits
     const m1 = (await req(path, 'dev:alice', {text: 'one'})).data.inbox.latest.id, m2 = (await req(path, 'dev:alice', {text: 'two'})).data.inbox.latest.id;
     const f1 = await req('/v1/edge/inbox/listen?timeoutMs=25000', tokenA); assert.equal(f1.data.inbox.latest.id, m1); assert.equal(f1.data.backlog.length, 2);
@@ -356,4 +368,9 @@ test('god queue over HTTP: a real build links its ticket to where it stands; fai
   const ac = new AbortController(), open = app.request(`/v1/god/inbox/listen?after=${third.id}&timeoutMs=300`, {headers: {authorization: `Bearer ${godToken}`}, signal: ac.signal});
   await new Promise(r => setTimeout(r, 30)); assert.equal((await ownerBox()).presence, 'listening');
   await (await open).arrayBuffer(); assert.equal((await ownerBox()).presence, 'recent');
+  // LISTEN-LEAK: the god's box too: a second listen supersedes the first (409) and is the one live listener.
+  const g1 = req(`/v1/god/inbox/listen?after=${third.id}&timeoutMs=25000`, godToken); await new Promise(r => setTimeout(r, 20));
+  const g2 = req(`/v1/god/inbox/listen?after=${third.id}&timeoutMs=300`, godToken);
+  const sup = await g1; assert.equal(sup.status, 409); assert.equal(sup.data.code, 'superseded');
+  assert.equal((await g2).status, 200);
 });
