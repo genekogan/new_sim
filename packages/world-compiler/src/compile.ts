@@ -473,7 +473,10 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         const merged = worldStateSchema.parse(next);
         // WEATHER-RULES: a set rain/storm gets its end tick now (a strike alone leaves the shower as it is)
         const wp = op.state.weather as Record<string, unknown> | undefined;
-        if (wp && ['kind', 'intensity', 'rain', 'minutes'].some((f) => wp[f] !== undefined)) {
+        // (re-sending the same weather while its shower runs keeps the end: a carried-along weather never stretches a storm)
+        const cw = (cur.weather ?? {}) as Record<string, unknown>, running = typeof cw.until === 'number' && tick < cw.until;
+        const fields = ['kind', 'intensity', 'rain', 'minutes'].filter((f) => wp?.[f] !== undefined);
+        if (wp && fields.length && !(running && fields.every((f) => wp[f] === cw[f]))) {
           const mw = merged.weather as typeof merged.weather & { until?: number | null };
           mw.until = isWetSetting(mw) ? showerUntil(mw, tick, Number(merged.time.dayTicks)) : null;
         }

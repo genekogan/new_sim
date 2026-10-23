@@ -57,3 +57,17 @@ test('the schedule: never two wet 2 h slots running; most of the daylight dry', 
   assert.equal(wetRuns, 0);
   assert.ok(dayWet / day < 0.25, `daylight wet share ${dayWet / day}`);
 });
+
+test('re-sending the same weather while a storm runs keeps its end; after the end, setting it again starts a new one', () => {
+  let tick = 1000;
+  const god = new GodMode(new Db(':memory:'), { worldId: 'wr2', ownerId: null, tick: () => tick, emit: () => {}, constants: { extent: 400 } } as any);
+  assert.equal((setEnv(god, { weather: { kind: 'storm', intensity: 0.8 } }) as any).accepted, true);
+  const end = (god.model.state.weather as any).until;
+  tick = 1500;
+  const w = god.model.state.weather as any;
+  god.act({ ops: [{ op: 'world', state: { sky: { palette: 'clear-day', sun: 0.5 }, weather: { kind: w.kind, intensity: w.intensity, minutes: w.minutes } } }] } as any);
+  assert.equal((god.model.state.weather as any).until, end, 'carried-along weather does not stretch the storm');
+  tick = end + 10;
+  assert.equal((setEnv(god, { weather: { kind: 'storm', intensity: 0.8 } }) as any).accepted, true);
+  assert.equal((god.model.state.weather as any).until, end + 10 + 2250);
+});
