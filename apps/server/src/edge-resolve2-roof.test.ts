@@ -6,14 +6,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { bootEden } from '../test/eden-capabilities-timing.ts';
+import type { EdgeCapability } from './edge/contract.ts';
 
 const NO_EDEN = existsSync(new URL('../../../worlds/templates/eden-2026.json', import.meta.url)) ? false : 'needs worlds/templates/eden-2026.json (lane/engine content)';
 type Cap = { id: string; available: boolean; blocked?: { code: string } };
+type NavV1 = { navWarmV1(ms: number): boolean; navCheckV1(xs: unknown[]): { ok: boolean }[] };
 
 test('Eden 2026: roof things are offered available only when a stair from the ground reaches them', { timeout: 600_000, skip: NO_EDEN }, async (t) => {
   const w = await bootEden();
   t.after(() => w.close());
-  const nav = w.bridge.nav, E = w.host.engine;
+  const nav = w.bridge.nav, E = w.host.engine as unknown as NavV1;
   assert.ok(E.navWarmV1(Infinity));
   const thing = (ref: string) => nav.things().find((x: { ref?: string }) => x.ref === ref);
   const stairRoof = thing('eden-house-3/eden-house-3-roof-planter-1'); assert.ok(stairRoof, 'eden-house-3 roof planter');
@@ -23,7 +25,7 @@ test('Eden 2026: roof things are offered available only when a stair from the gr
   for (const ref of ['eden-house-3-kitchen/eden-house-3-kitchen-roof-planter-1', 'eden-house-3/eden-house-3-roof-planter-1']) {
     const caps: Cap[] = [], plans = new Map();
     assert.ok(thing(ref), ref);
-    nav.walkRefOnDemand(w.soul, ref, caps, plans);
+    nav.walkRefOnDemand(w.soul, ref, caps as EdgeCapability[], plans);
     const c = caps.find((x) => x.id === `walk:${ref}`); assert.ok(c, `offered walk:${ref}`);
     if (ref.includes('kitchen')) { assert.equal(c.available, false, 'no stair to the kitchen roof'); assert.equal(c.blocked?.code, 'route.unreachable'); }
     else assert.equal(c.available, true, 'the house roof has a stair');
