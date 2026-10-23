@@ -343,7 +343,8 @@ export class Intents {
       const walk=walkWithDestinationWords(input.capability,[...this.L.host.minds.values()].map(m=>m.name));if(walk){const out=this.dryRun(soul,{...walk,...(input.params?{params:input.params}:{})});if(out.ok!==false)return out;
         // quality case 27: an ambiguous destination name ("the library") falls back to the walk the plain words resolve to, still inviting the companions
         const alt=walkWithFallback(this.L,soul,walk);return alt?{ok:true,would:{capability:alt.cap.id,label:alt.cap.label,available:alt.cap.available,params:{with:walk.with},channel:'body',resolved:`${input.capability} is ${alt.cap.id} with ${(walk.with as string[]).join(', ')} invited ({"with": ${JSON.stringify(walk.with)}}); they join if they accept.`}}:out;}
-      const {caps} = this.L.coreA.binds(soul), asked = input.capability.trim();
+      // Social approaches may add an on-demand plan. Keep the dry run's additions local, just as act does.
+      const bound = this.L.coreA.binds(soul), caps = [...bound.caps], plans = new Map(bound.plans), asked = input.capability.trim();
       // SOULSIM-E: a far place's id the listing leaves out resolves on demand below, as act walks it (resolveText)
       const place=explicitPlaceCapability(this.L,soul,asked),onDemand=!!place&&!place.ok&&place.code==='place.unwalkable'&&this.L.onDemandId(soul,asked);if(place&&!onDemand){if(!place.ok)return place;return {ok:true,would:{capability:place.chosen.capability,channel:'body',chosen:place.chosen}};}
       const bodyIssue=asked.startsWith('object:')?null:this.L.bodyVerbProblem(soul,asked.split(/[:\s]/)[0]!);if(bodyIssue)return {ok:false,...bodyIssue};
@@ -352,7 +353,7 @@ export class Intents {
       const cls = classWords(asked, this.L.places.byId.values()); if (cls) return this.dryRun(soul, cls);
       const strict = strictCheck(this.L, soul, asked, caps); if (strict && !this.L.onDemandId(soul, asked)) return {ok: false, ...strict};
       // quality cases 21/28: resolve reads social phrasing exactly as act does ("ride the balloon with X" invites X; "hug X")
-      const social = caps.some(c => c.id === asked) ? null : this.L.together.resolve(soul, asked, caps);
+      const social = caps.some(c => c.id === asked) ? null : this.L.together.resolve(soul, asked, caps, plans);
       if (social && 'code' in social) return {ok: false, code: social.code, reason: social.reason, did_you_mean: social.did_you_mean};
       const text = social ? social.capability || social.rest || asked : asked, extra = social?.params;
       const r = text === asked ? this.L.coreA.resolveText(soul, asked, caps) : caps.some(c => c.id === text) ? {kind: 'exact' as const, cap: caps.find(c => c.id === text)!} : this.L.coreA.resolveText(soul, text, caps);
