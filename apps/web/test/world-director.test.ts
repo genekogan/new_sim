@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {WorldDirector,candidates,landmarkPose,MIN_HOLD,LANDMARK_SCORE,type DirectorInput,type Landmark} from '../src/WorldDirector.ts';
+import {WorldDirector,candidates,landmarkPose,MIN_HOLD,MIN_CUT,LANDMARK_SCORE,type DirectorInput,type Landmark} from '../src/WorldDirector.ts';
 import {subjectFraction} from '../src/WorldBroadcast.ts';
 
 const L:Landmark[]=[{id:'commons',label:'Commons',p:[35,20,35],target:[8,1,0]},{id:'market',label:'Market',p:[83,12,42],target:[70,1,29]}];
@@ -73,4 +73,57 @@ test('VF1 director: one long-running scene alternates with a wide town view', ()
 test('VF5 director: sleepers and idle crowds are not a show; the tour runs', () => {
   const d=new WorldDirector(),night=(t:number):DirectorInput=>({bodies:[body('a',0,0,'sleep'),body('b',1,0,'lie'),body('c',2,0,'sleep'),body('d',1,1,'idle'),body('e',0,1,'sit')],speaking:new Map(),now:t,landmarks:L});
   assert.ok(run(d,night,0,60).every(k=>k.startsWith('landmark:')),'only the town');
+});
+
+test('DIRECTOR2: games, paired gestures, rides and arrivals are events; a fresh one is framed within 10 s', () => {
+  const c=candidates({bodies:[body('a',0,0,'play-frisbee'),body('b',10,0,'play-frisbee'),body('c',30,0,'hug'),body('d',30.5,0,'hug'),body('e',60,0,'sit',12),{id:'f',p:[80,0,0],activity:'idle',riding:true}],speaking:new Map(),now:0,landmarks:L});
+  const key=(k:string)=>c.find(x=>x.key.startsWith(k));
+  assert.deepEqual(key('game:play-frisbee')?.members,['a','b']);
+  assert.ok(key('pair:hug')?.twoShot&&key('pair:hug')!.score>key('game:')!.score);
+  assert.ok(key('ride:f'));
+  // a long conversation is on; a hug starts at 60 s, a stranger arrives at 90 s: each is framed within 10 s
+  const d=new WorldDirector(),sp=(t:number)=>new Map([['a',{thread:'t',at:t-1}],['b',{thread:'t',at:t-3}]]);
+  const scene=(t:number):DirectorInput=>({bodies:[body('a',0,0),body('b',1,0),...(t>=60&&t<65?[body('c',20,0,'hug'),body('d',20.5,0,'hug')]:[body('c',20,0),body('d',25,0)]),...(t>=90?[body('z',40,0,'walk')]:[])],speaking:sp(t),now:t,landmarks:L});
+  const at:Record<number,string>={};for(let t=0;t<120;t+=.25)at[t]=d.choose(scene(t))?.key??'';
+  const within=(t0:number,p:string)=>Object.entries(at).some(([t,k])=>+t>=t0&&+t<=t0+10&&k.startsWith(p));
+  assert.ok(within(60,'pair:hug:c:d'),'hug');assert.ok(within(90,'arrival:z'),'arrival');
+});
+
+test('DIRECTOR2: at most one cut per MIN_CUT seconds, and no town view while a conversation is the only thing on', () => {
+  const d=new WorldDirector();let last=-Infinity,prev='';const towns:number[]=[];
+  for(let t=0;t<300;t+=.25){
+    const k=Math.floor(t/4)%4,acts=['hug','play-petanque','read','dance'];
+    const bodies=[body('a',0,0,acts[k]),body('b',.5,0,acts[k]),body('c',30,0,acts[(k+1)%4]),body('d',30.5,0,acts[(k+1)%4]),...(Math.floor(t/7)%2?[body('n'+Math.floor(t/14),50,0,'walk')]:[])];
+    const key=d.choose({bodies,speaking:new Map(),now:t,landmarks:L})?.key??'';
+    if(key!==prev){if(prev)assert.ok(t-last>=MIN_CUT,`cut at ${t} after ${last}`);last=t;prev=key;}
+  }
+  const c=new WorldDirector(),conv=(t:number):DirectorInput=>({bodies:[body('a',0,0),body('b',1,0)],speaking:new Map([['a',{thread:'t',at:t}],['b',{thread:'t',at:t-2}]]),now:t,landmarks:L});
+  for(let t=0;t<200;t+=.25){const key=c.choose(conv(t))?.key??'';if(t>20)towns.push(key.startsWith('landmark:')?1:0);}
+  assert.equal(towns.reduce((a,b)=>a+b,0),0);
+});
+
+test('DIRECTOR2: two Souls who are talking high-five (2.5 s): the gesture gets its own shot at its start, held MIN_CUT', () => {
+  const d=new WorldDirector(),sp=(t:number)=>new Map([['a',{thread:'t',at:t-1}],['b',{thread:'t',at:t-3}]]);
+  const g=(t:number)=>t>=40&&t<42.5?'high-five':'idle';
+  const scene=(t:number):DirectorInput=>({bodies:[body('a',0,0,g(t)),body('b',1,0,g(t))],speaking:sp(t),now:t,landmarks:L});
+  const at:[number,string][]=[];for(let t=0;t<70;t+=.25)at.push([t,d.choose(scene(t))?.key??'']);
+  const first=at.find(([t,k])=>t>=40&&k==='pair:high-five:a:b');
+  assert.ok(first&&first[0]<=40.5,'framed on its start event');
+  const cuts=at.filter(([,k],i)=>i&&k!==at[i-1][1]).map(([t])=>t);
+  assert.ok(cuts.every((t,i)=>!i||t-cuts[i-1]>=MIN_CUT),'no cut pair under MIN_CUT: '+cuts.join(','));
+});
+
+test('DIRECTOR2: a paired gesture that starts just after a cut still gets its pair shot once the cut window opens, held MIN_CUT', () => {
+  for (const [ga, gb, key, len] of [['high-five','high-five','pair:high-five:a:b',2.5],['hug','hug','pair:hug:a:b',5],['handshake','handshake','pair:handshake:a:b',3.5],['give','take','pair:give:a:b',2.5]] as const) {
+    const d=new WorldDirector();let gs=Infinity,prev='';
+    const act=(t:number,g:string)=>t>=gs&&t<gs+len?g:'idle';
+    const scene=(t:number):DirectorInput=>({bodies:[body('a',0,0,act(t,ga)),body('b',.8,0,act(t,gb)),body('c',30,0,'paint'),body('e',-30,10,'read')],speaking:new Map(),now:t,landmarks:L});
+    const at:[number,string][]=[];
+    for(let t=0;t<120;t+=.25){const k=d.choose(scene(t))?.key??'';if(t>=30&&gs===Infinity&&prev&&k!==prev)gs=t+1;prev=k;at.push([t,k]);}
+    assert.ok(Number.isFinite(gs),'a cut after 30 s');
+    const first=at.find(([t,k])=>t>=gs&&k===key);
+    assert.ok(first&&first[0]-gs<=MIN_CUT,`${key} framed ${first?first[0]-gs:'never'} s after its start`);
+    const cuts=at.filter(([,k],i)=>i&&k!==at[i-1][1]).map(([t])=>t);
+    assert.ok(cuts.every((t,i)=>!i||t-cuts[i-1]>=MIN_CUT),'no cut pair under MIN_CUT: '+cuts.join(','));
+  }
 });
