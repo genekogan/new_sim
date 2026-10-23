@@ -59,8 +59,8 @@ export class WorldPlacePreviews{
   * occlusion check: draw the place alone (white), then the world in black with the place on top, and count how much of the
   * place stays visible; above 40 % hidden, turn 45° and retry, keeping the clearest of the 8 views. */
  private shoot(mask:THREE.Scene,center:THREE.Vector3,radius:number,from:readonly number[],key:string):string|null{
-  const live=this.live();if(!live){return null;}
-  const box=new THREE.Box3().setFromObject(mask),r=radius*.8,extent=box.clone().union(new THREE.Box3(new THREE.Vector3(center.x-r,center.y,center.z-r),new THREE.Vector3(center.x+r,center.y,center.z+r))),aim=extent.getCenter(new THREE.Vector3());
+  const world=this.live(),live=world??mask;  // no live world (tests, a bare viewer): the place's own geometry
+  const box=new THREE.Box3().setFromObject(mask),r=world?radius*.8:0,extent=r<=0?box.clone():box.clone().union(new THREE.Box3(new THREE.Vector3(center.x-r,center.y,center.z-r),new THREE.Vector3(center.x+r,center.y,center.z+r))),aim=extent.getCenter(new THREE.Vector3());
   const az0=Math.atan2(from[0]-aim.x,from[2]-aim.z),el=35*Math.PI/180,W=SHOT_W,H=SHOT_H,CW=80,CH=56;
   const renderer=this.renderer,previous=renderer.getRenderTarget(),viewport=renderer.getViewport(new THREE.Vector4()),scissor=renderer.getScissor(new THREE.Vector4()),scissorTest=renderer.getScissorTest(),clear=renderer.getClearColor(new THREE.Color()),alpha=renderer.getClearAlpha(),autoClear=renderer.autoClear;
   const white=new THREE.MeshBasicMaterial({color:0xffffff,fog:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-8}),black=new THREE.MeshBasicMaterial({color:0,fog:false});
@@ -73,7 +73,7 @@ export class WorldPlacePreviews{
    for(let k=0;k<8&&bestHidden>.4;k++){
     const az=az0+k*Math.PI/4,camera=fitPlacePreviewCamera(extent,new THREE.Vector3(Math.sin(az)*Math.cos(el),Math.sin(el),Math.cos(az)*Math.cos(el)),W/H);
     const d=camera.position.distanceTo(aim);camera.near=Math.max(.05,d/400);camera.far=Math.max(3000,d*20);camera.updateProjectionMatrix();
-    renderer.setRenderTarget(check);renderer.setClearColor(0,1);renderer.autoClear=true;renderer.render(mask,camera);const all=count();if(!all)continue;
+    renderer.setRenderTarget(check);renderer.setClearColor(0,1);renderer.autoClear=true;renderer.render(mask,camera);const all=count();if(!all)continue;if(!world){best=camera;bestHidden=0;break;}
     for(const o of seeThrough)o.visible=false;live.background=null;live.overrideMaterial=black;
     try{renderer.render(live,camera);renderer.autoClear=false;renderer.render(mask,camera);}finally{for(const o of seeThrough)o.visible=true;live.background=background;live.overrideMaterial=override;renderer.autoClear=true;}
     const blocked=1-Math.min(1,count()/all);if(blocked<bestHidden){bestHidden=blocked;best=camera;turn=k;}
