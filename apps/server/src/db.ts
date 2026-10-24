@@ -180,11 +180,12 @@ export class Db {
   createSoul(s: { id: string; worldId: string; owner: string; entityId: string; name: string; description: string; native: boolean }) {
     this.db.prepare('INSERT INTO souls (id, world_id, owner, entity_id, name, description, created_at, native) VALUES (?,?,?,?,?,?,?,?)').run(s.id, s.worldId, s.owner, s.entityId, s.name, s.description, Date.now(), s.native ? 1 : 0);
   }
-  retireSoul(id: string) { this.retireToken(id, null); this.db.prepare('UPDATE souls SET retired_at = ?, token_hash = NULL, token_generation = NULL WHERE id = ?').run(Date.now(), id); }
+  retireSoul(id: string) { this.retireToken(id, null, 'retired'); this.db.prepare('UPDATE souls SET retired_at = ?, token_hash = NULL, token_generation = NULL WHERE id = ?').run(Date.now(), id); }
   /** SOUL3: the outgoing token's hash (never the token) is kept, so its holder learns it was superseded. */
-  private retireToken(id: string, next: string | null) { this.db.prepare('INSERT OR IGNORE INTO soul_token_tombstones_v1 (token_hash, world_id, soul_id, label, issued_at, revoked_at) SELECT token_hash, world_id, id, token_label, token_created_at, ? FROM souls WHERE id = ? AND token_hash IS NOT NULL AND token_hash IS NOT ?').run(Date.now(), id, next); }
-  tokenTombstone(hash: string) { return this.db.prepare('SELECT * FROM soul_token_tombstones_v1 WHERE token_hash = ?').get(hash) as { token_hash: string; world_id: string; soul_id: string; label: string | null; issued_at: number | null; revoked_at: number } | undefined; }
-  setSoulToken(id: string, hash: string | null, label: string | null = null) { this.retireToken(id, hash); this.db.prepare('UPDATE souls SET token_hash = ?, token_generation = ?, token_created_at = ?, token_label = ?, token_last_used = NULL WHERE id = ?').run(hash, hash ? `g_${randomUUID()}` : null, hash ? Date.now() : null, hash ? label : null, id); }
+  private retireToken(id: string, next: string | null, reason: string) { this.db.prepare('INSERT OR IGNORE INTO soul_token_tombstones_v1 (token_hash, world_id, soul_id, label, issued_at, revoked_at, reason) SELECT token_hash, world_id, id, token_label, token_created_at, ?, ? FROM souls WHERE id = ? AND token_hash IS NOT NULL AND token_hash IS NOT ?').run(Date.now(), reason, id, next); }
+  tokenTombstone(hash: string) { return this.db.prepare('SELECT * FROM soul_token_tombstones_v1 WHERE token_hash = ?').get(hash) as { token_hash: string; world_id: string; soul_id: string; label: string | null; issued_at: number | null; revoked_at: number; reason: string | null } | undefined; }
+  /** `reason` records why the outgoing token ended: a new token replaces it; clearing is a revoke unless said otherwise. */
+  setSoulToken(id: string, hash: string | null, label: string | null = null, reason: 'replaced' | 'revoked' | 'released' = hash ? 'replaced' : 'revoked') { this.retireToken(id, hash, reason); this.db.prepare('UPDATE souls SET token_hash = ?, token_generation = ?, token_created_at = ?, token_label = ?, token_last_used = NULL WHERE id = ?').run(hash, hash ? `g_${randomUUID()}` : null, hash ? Date.now() : null, hash ? label : null, id); }
   touchSoulToken(id: string) { this.db.prepare('UPDATE souls SET token_last_used = ? WHERE id = ?').run(Date.now(), id); }
 
   // brain calls

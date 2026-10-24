@@ -1,6 +1,7 @@
 // SOUL3 controller: one delegated controller per Soul. Only a newly approved pairing/creation or an explicit owner revoke
-// supersedes it; registration, sign-out, idle time and restarts keep it. A superseded token answers 401 control.revoked
-// (with the Soul, when and how to pair again); a token the world never issued answers 401 control.unknown. Fake world, $0.
+// supersedes it (retirement removes the body); registration, sign-out, idle time,
+// a not-ready moment and restarts keep it. A superseded token answers 401 control.revoked (which Soul, when, why, how to
+// pair again); any other supplied bearer answers 401 control.unknown. Fake world, $0.
 import test,{type TestContext} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
@@ -29,70 +30,112 @@ function accountWorld(t:TestContext){
  f.auth.accountFromToken=async token=>token==='alice'?{identity,user:f.db.user(id)!}:null;
  const originalAuth=f.auth.userFromToken.bind(f.auth);f.auth.userFromToken=async token=>token==='alice'?f.db.user(id)!:originalAuth(token);
  const make=()=>buildApp({cfg:f.souls.cfg,db:f.db,host:f.host,souls:f.souls,brain:f.brain,auth:f.auth,edge:new EdgeLedger(f.host,f.db),hub:{clients:new Map(),refreshMe(){}} as unknown as Hub});
- let app=make();
+ let app=make(),skew=0;
+ // The account store's clock: `skew` moves it forward (approval and first poll can be far apart).
+ const clock=()=>{(f.souls.accounts!.store as unknown as {now:()=>number}).now=()=>Date.now()+skew;};clock();
  const request=async(path:string,body?:unknown,token?:string)=>{const res=await app.request(path,{method:body===undefined?'GET':'POST',headers:{host:'127.0.0.1:4956',...(token?{authorization:'Bearer '+token}:{}),...(body===undefined?{}:{'content-type':'application/json'})},...(body===undefined?{}:{body:JSON.stringify(body)})});return {status:res.status,body:await res.json() as any};};
  let n=0;
  const start=async(input:{name?:string;soulId?:string},label='agent one')=>{const secret=randomBytes(32).toString('base64url');const r=await request('/v1/agent/approval/start',{agentLabel:label,idempotencyKey:'controller-test-key-'+(n++).toString().padStart(4,'0'),pollSecret:secret,...input});assert.equal(r.status,200,JSON.stringify(r.body));return {id:r.body.approval.id as string,secret};};
- const poll=async(a:{id:string;secret:string})=>{let out:any;for(let i=0;i<50;i++){await setImmediate();f.host.drainInputs();out=(await request('/v1/agent/approval/poll',{approvalId:a.id,pollSecret:a.secret})).body;if(out.token)break;}return out;};
- const pair=async(input:{name?:string;soulId?:string},label?:string)=>{const a=await start(input,label);assert.equal((await request('/v1/account/approvals/'+a.id+'/approve',{},'alice')).status,200);const out=await poll(a);assert.ok(out.token,JSON.stringify(out));return {token:out.token as string,soulId:out.soulId as string,approval:a};};
- return {...f,request,start,pair,restart(){f.souls.accounts=new WorldAccounts(f.host,f.souls);app=make();}};
+ const approve=async(a:{id:string})=>assert.equal((await request('/v1/account/approvals/'+a.id+'/approve',{},'alice')).status,200);
+ const poll=async(a:{id:string;secret:string})=>{let out:any;for(let i=0;i<50;i++){await setImmediate();f.host.drainInputs();out=(await request('/v1/agent/approval/poll',{approvalId:a.id,pollSecret:a.secret})).body;if(out.token)break;}assert.ok(out.token,JSON.stringify(out));return {token:out.token as string,soulId:out.soulId as string,approval:a};};
+ const pair=async(input:{name?:string;soulId?:string},label?:string)=>{const a=await start(input,label);await approve(a);return poll(a);};
+ // Owner-made legacy pairing code exchanged by an agent (the other kind of controller).
+ const legacyPair=async(soulId:string)=>{const code=(await request('/v1/souls/'+soulId+'/pair',{},'alice')).body.code;assert.ok(code);const r=await request('/v1/agent/pair',{code,agent:'legacy agent'});assert.ok(r.body.token,JSON.stringify(r.body));return r.body.token as string;};
+ return {...f,request,start,approve,poll,pair,legacyPair,advance(ms:number){skew+=ms;},restart(){f.souls.accounts=new WorldAccounts(f.host,f.souls);app=make();clock();}};
 }
+const me=(f:ReturnType<typeof accountWorld>,token:string)=>f.request('/v1/agent/me',undefined,token);
 
-test('account controller: registration, idle views and restart keep it; approved replacement and owner revoke answer control.revoked',async t=>{
+test('account controller: issue time is the first poll; registration, a not-ready moment and restart keep it; replacement says it moved, revoke says revoked',async t=>{
  const f=accountWorld(t);
- const first=await f.pair({name:'Ada Lovelace'}),sid=first.soulId;
- const me=await f.request('/v1/agent/me',undefined,first.token);assert.equal(me.status,200);
- assert.equal(me.body.paired_as,'agent one','paired_as is the delegated grant label');
- assert.equal(typeof me.body.since,'number');assert.match(me.body.since_at,ISO);assert.equal(new Date(me.body.since_at).getTime(),me.body.since);
+ // since = the token's actual first issue (first ready poll), not the approval; stable across re-polls and restart.
+ const a=await f.start({name:'Ada Lovelace'});await f.approve(a);const approvedAt=Date.now();f.advance(60_000);
+ const first=await f.poll(a),sid=first.soulId;
+ const m=await me(f,first.token);assert.equal(m.status,200);assert.equal(m.body.paired_as,'agent one');
+ assert.ok(m.body.since>=approvedAt+60_000,`since ${m.body.since} is the first poll, not approval ${approvedAt}`);assert.equal(new Date(m.body.since_at).getTime(),m.body.since);assert.match(m.body.since_at,ISO);
+ f.advance(30_000);const repoll=await f.poll(a);assert.equal(repoll.token,first.token);assert.equal((await me(f,first.token)).body.since,m.body.since,'a re-poll does not move the issue time');
  assert.equal((await f.request('/v1/edge/observe',undefined,first.token)).status,200,'edge route accepts the controller');
- // A fresh registration (another Soul approved for the same account) and a pending-then-cancelled re-pair keep the controller.
+ const release=await f.request('/v1/agent/release',{},first.token);assert.equal(release.status,403);assert.equal(release.body.error.code,'control.owner_required');assert.equal((await me(f,first.token)).status,200);
+ const garbage=await me(f,'garbage');assert.equal(garbage.body.contract,'eden-edge/1');assert.equal(garbage.body.error.code,'control.unknown');
+ // A fresh registration (another Soul approved for the same account), a cancelled re-pair request, the world's config
+ // read (what `register` does in account worlds), a browser session read, and 40 idle days keep the controller.
  const other=await f.pair({name:'Second Soul'},'agent two');assert.notEqual(other.soulId,sid);
  const pending=await f.start({soulId:sid},'agent three');assert.equal((await f.request('/v1/agent/approval/cancel',{approvalId:pending.id,pollSecret:pending.secret})).status,200);
- // The owner's browser viewing the approval while the Soul is momentarily not ready must not end the grant.
- const ready=f.souls.controlReady.bind(f.souls);f.souls.controlReady=()=>false;await f.request('/v1/account/approvals/'+first.approval.id,undefined,'alice');f.souls.controlReady=ready;
- assert.equal((await f.request('/v1/agent/me',undefined,first.token)).status,200,'controller survives registration, cancel and a not-ready view');
- assert.equal((await f.request('/v1/agent/me',undefined,other.token)).status,200);
- // Approved replacement supersedes.
- const second=await f.pair({soulId:sid},'agent four');assert.equal(second.soulId,sid);
- const now=await f.request('/v1/agent/me',undefined,second.token);assert.equal(now.status,200);assert.equal(now.body.paired_as,'agent four');
- const old=await f.request('/v1/agent/me',undefined,first.token);assert.equal(old.status,401);assert.equal(old.body.code,'control.revoked');
- assert.equal(old.body.soul.name,'Ada Lovelace');assert.match(old.body.revokedAt,ISO);assert.equal(old.body.replacedAt,now.body.since_at);
- assert.match(old.body.message,/Ada Lovelace/);assert.ok(old.body.message.includes(now.body.since_at),old.body.message);
- assert.equal(old.body.hint,`Ask your human for a new code, then: node eden.mjs pair ${sid} --for CODE`);
+ assert.equal((await f.request('/v1/config')).status,200);assert.equal((await f.request('/v1/account/session',undefined,'alice')).status,200);
+ // Not ready: no authority (401), but the pairing is kept and works again once ready; a browser view meanwhile ends nothing.
+ const ready=f.souls.controlReady.bind(f.souls);f.souls.controlReady=()=>false;
+ const nr=await me(f,first.token);assert.equal(nr.status,401);assert.equal(nr.body.code,'unauthorized');
+ assert.equal((await f.request('/v1/edge/observe',undefined,first.token)).status,401);
+ await f.request('/v1/account/approvals/'+a.id,undefined,'alice');f.souls.controlReady=ready;
+ assert.equal((await me(f,first.token)).status,200,'controller survives registration, cancel and a not-ready moment with a browser view');
+ f.advance(40*86_400_000);assert.equal((await me(f,first.token)).status,200,'40 idle days end nothing');
+ f.advance(-40*86_400_000); // the owner's fixture sign-in is short-lived; back to the present for the owner's next approval
+ // Approved replacement: the old token is revoked at approval, before the new agent has polled.
+ const b=await f.start({soulId:sid},'agent four');await f.approve(b);
+ const old=await me(f,first.token);assert.equal(old.status,401);assert.equal(old.body.code,'control.revoked');assert.equal(old.body.reason,'replaced');
+ assert.match(old.body.revokedAt,ISO);assert.equal(old.body.replacedAt,old.body.revokedAt);
+ assert.equal(old.body.message,`Ada Lovelace's control moved to a newer pairing at ${old.body.revokedAt}.`);
+ assert.equal(old.body.hint,`Run: node eden.mjs pair ${sid} --for CODE`);assert.deepEqual(old.body.soul,{id:sid,name:'Ada Lovelace'});
+ const second=await f.poll(b);assert.notEqual(second.token,first.token);
+ const after=await me(f,first.token);assert.deepEqual(after.body,old.body,'the new agent polling changes nothing the old holder sees');
+ assert.ok(!JSON.stringify(old.body).includes(second.token)&&!JSON.stringify(old.body).includes('did:privy'),'no replacement bearer or account');
+ assert.equal((await me(f,second.token)).body.paired_as,'agent four');
  assert.equal((await f.request('/v1/agent/soul',undefined,first.token)).body.code,'control.revoked','profile/dashboard route agrees');
  const edge=await f.request('/v1/edge/observe',undefined,first.token);assert.equal(edge.status,401);assert.equal(edge.body.contract,EDGE_CONTRACT);
- assert.equal(edge.body.error.code,'control.revoked');assert.equal(edge.body.error.revokedAt,old.body.revokedAt);assert.equal(edge.body.error.hint,old.body.hint);
- // Unknown is different from revoked.
- const unknown='sim_'+sid+'_'+'0'.repeat(64);
- assert.equal((await f.request('/v1/agent/me',undefined,unknown)).body.code,'control.unknown');
- const unknownEdge=await f.request('/v1/edge/observe',undefined,unknown);assert.equal(unknownEdge.status,401);assert.equal(unknownEdge.body.error.code,'control.unknown');assert.equal(unknownEdge.body.error.soul,undefined);
- // Restart (fresh account service + routes over the same database) keeps both facts.
- f.restart();
- assert.equal((await f.request('/v1/agent/me',undefined,second.token)).body.paired_as,'agent four');
- assert.equal((await f.request('/v1/agent/me',undefined,first.token)).body.code,'control.revoked');
- assert.equal((await f.request('/v1/agent/me',undefined,other.token)).status,200);
- // Explicit owner revoke supersedes; no replacement time.
+ assert.equal(edge.body.error.code,'control.revoked');assert.equal(edge.body.error.message,old.body.message);assert.equal(edge.body.error.hint,old.body.hint);assert.equal(edge.body.error.revokedAt,old.body.revokedAt);
+ // Unknown: never issued, garbage, oversized or a browser credential on a Soul route. Missing stays unauthorized.
+ for(const bad of ['sim_'+sid+'_'+'0'.repeat(64),'garbage-token','sim_'+'x'.repeat(2000),'x'.repeat(5000),'alice']){
+  const r=await me(f,bad);assert.equal(r.status,401);assert.equal(r.body.code,'control.unknown',bad.slice(0,20));assert.equal(r.body.soul,undefined);
+  const e=await f.request('/v1/edge/observe',undefined,bad);assert.equal(e.status,401);assert.equal(e.body.error.code,'control.unknown');
+ }
+ assert.equal((await f.request('/v1/agent/me')).body.code,'unauthorized');assert.equal((await f.request('/v1/edge/observe')).body.error.code,'unauthorized');
+ // Restart (fresh account service + routes over the same database) keeps both facts and the issue time.
+ const sinceB=(await me(f,second.token)).body.since;f.restart();
+ assert.equal((await me(f,second.token)).body.since,sinceB);
+ assert.deepEqual((await me(f,first.token)).body,old.body);
+ assert.equal((await me(f,other.token)).status,200);
+ // Explicit owner revoke says revoked, not moved.
  assert.equal((await f.request('/v1/account/souls/'+sid+'/revoke',{},'alice')).status,200);
- const revoked=await f.request('/v1/agent/me',undefined,second.token);assert.equal(revoked.status,401);assert.equal(revoked.body.code,'control.revoked');
- assert.equal(revoked.body.replacedAt,null);assert.match(revoked.body.revokedAt,ISO);assert.match(revoked.body.message,/Ada Lovelace/);
- assert.equal((await f.request('/v1/agent/me',undefined,other.token)).status,200,'revoking one Soul leaves the other controller');
- assert.equal((await f.request('/v1/edge/observe',undefined,'not-a-soul-token')).body.error.code,'unauthorized','a non-Soul bearer keeps the old answer');
+ const revoked=await me(f,second.token);assert.equal(revoked.status,401);assert.equal(revoked.body.code,'control.revoked');assert.equal(revoked.body.reason,'revoked');
+ assert.equal(revoked.body.replacedAt,null);assert.equal(revoked.body.message,`Ada Lovelace's control was revoked by its owner at ${revoked.body.revokedAt}.`);
+ assert.equal((await me(f,other.token)).status,200,'revoking one Soul leaves the other controller');
 });
 
-test('legacy controller: re-pair supersedes with control.revoked; the tombstone survives reopening the database without storing the token',async t=>{
+test('account world: a legacy token and a delegated grant never both steer one Soul, in either order',async t=>{
+ const f=accountWorld(t);
+ const grant=await f.pair({name:'Cleo'}),sid=grant.soulId;
+ const legacy=await f.legacyPair(sid);
+ assert.equal((await me(f,legacy)).status,200);
+ const g=await me(f,grant.token);assert.equal(g.body.code,'control.revoked');assert.equal(g.body.reason,'replaced');assert.equal(g.body.message,`Cleo's control moved to a newer pairing at ${g.body.revokedAt}.`);
+ const repaired=await f.pair({soulId:sid},'agent five');
+ assert.equal((await me(f,repaired.token)).status,200);
+ const l=await me(f,legacy);assert.equal(l.body.code,'control.revoked');assert.equal(l.body.reason,'replaced');assert.equal(l.body.message,`Cleo's control moved to a newer pairing at ${l.body.revokedAt}.`);
+ assert.equal((await me(f,grant.token)).body.code,'control.revoked');
+ const live=[grant.token,legacy,repaired.token].filter(token=>f.souls.soulFromToken(token)?.id===sid);assert.deepEqual(live,[repaired.token],'exactly one live controller');
+});
+
+test('legacy world: register paths keep the controller; re-pair says moved; agent release cannot revoke control; tombstones survive reopening without the token',async t=>{
  const dir=mkdtempSync(join(tmpdir(),'soul-controller-')),path=join(dir,'world.db');
  const f=fixture(path,factory);f.brain.quiesce();let closed=false;t.after(()=>{if(!closed){f.host.stop();f.db.close();}});
  await invite(f,'alice');const row=await accept(f.host,f.souls.create('dev:alice',{name:'Basil',description:'Synthetic controller Soul'}));
+ const agentMe=async(token:string)=>{const r=await f.app.request('/v1/agent/me',{headers:{authorization:'Bearer '+token}});return {status:r.status,body:await r.json() as any};};
  const pairOnce=async()=>{const code=(await (await f.request('/v1/souls/'+row.id+'/pair',{})).json() as any).code;const res=await f.app.request('/v1/agent/pair',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code,agent:'legacy agent'})});return (await res.json() as any).token as string;};
  const a=await pairOnce();
- const meA=await (await f.app.request('/v1/agent/me',{headers:{authorization:'Bearer '+a}})).json() as any;assert.equal(meA.paired_as,'legacy agent');assert.match(meA.since_at,ISO);
+ const meA=await agentMe(a);assert.equal(meA.body.paired_as,'legacy agent');assert.match(meA.body.since_at,ISO);assert.equal(meA.body.since,f.db.soul(row.id)!.token_created_at);
+ // What `register` sends (config, the owner identity's /v1/me, an invitation) and a second folder registering a new identity.
+ assert.equal((await f.request('/v1/config')).status,200);assert.equal((await f.request('/v1/me')).status,200);
+ assert.equal((await f.request('/v1/me',undefined,'agent-'+'e'.repeat(24))).status,200);
+ const still=await agentMe(a);assert.deepEqual([still.status,still.body.paired_as,still.body.since],[200,meA.body.paired_as,meA.body.since],'register paths leave the controller and its issue time alone');
  const b=await pairOnce();assert.notEqual(a,b);
- const old=await f.app.request('/v1/agent/me',{headers:{authorization:'Bearer '+a}}),body=await old.json() as any;
- assert.equal(old.status,401);assert.equal(body.code,'control.revoked');assert.equal(body.soul.name,'Basil');
- const meB=await (await f.app.request('/v1/agent/me',{headers:{authorization:'Bearer '+b}})).json() as any;assert.equal(body.replacedAt,meB.since_at);
- assert.equal((await f.app.request('/v1/agent/me',{headers:{authorization:'Bearer sim_'+row.id+'_nope'}})).status,401);
+ const old=await agentMe(a);assert.equal(old.status,401);assert.equal(old.body.code,'control.revoked');assert.equal(old.body.reason,'replaced');
+ assert.equal(old.body.message,`Basil's control moved to a newer pairing at ${old.body.revokedAt}.`);assert.equal(old.body.hint,`Run: node eden.mjs pair ${row.id} --for CODE`);
+ // Only the human can revoke; an old client's register/cleanup release call cannot disconnect control.
+ const attempt=await f.app.request('/v1/agent/release',{method:'POST',headers:{authorization:'Bearer '+b}});assert.equal(attempt.status,403);assert.equal((await attempt.json() as any).error.code,'control.owner_required');
+ assert.equal((await agentMe(b)).status,200);
+ assert.equal((await f.request('/v1/souls/'+row.id+'/revoke',{})).status,200);
+ const released=await agentMe(b);assert.equal(released.body.code,'control.revoked');assert.equal(released.body.reason,'revoked');assert.equal(released.body.contract,'eden-edge/1');assert.equal(released.body.error.revokedAt,released.body.revokedAt);
+ assert.equal((await agentMe('sim_'+row.id+'_nope')).body.code,'control.unknown');
  f.host.stop();f.db.close();closed=true;
  const reopened=new Db(path);t.after(()=>reopened.close());
- const dump=JSON.stringify(reopened.db.prepare("SELECT * FROM soul_token_tombstones_v1").all());assert.ok(!dump.includes(a),'no bearer plaintext');assert.ok(dump.includes(hashToken(a)));
- assert.equal(reopened.tokenTombstone(hashToken(a))?.soul_id,row.id);assert.equal(reopened.tokenTombstone(hashToken(b)),undefined);
+ const dump=JSON.stringify(reopened.db.prepare('SELECT * FROM soul_token_tombstones_v1').all());assert.ok(!dump.includes(a)&&!dump.includes(b),'no bearer plaintext');assert.ok(dump.includes(hashToken(a)));
+ assert.equal(reopened.tokenTombstone(hashToken(a))?.reason,'replaced');assert.equal(reopened.tokenTombstone(hashToken(b))?.reason,'revoked');
 });

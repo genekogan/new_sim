@@ -29,7 +29,7 @@ export const siblingBase = (base: string, here: string, there: string) => base.e
 export function mountTravelRoutes(app: Hono, d: TravelRouteDeps) {
   const T = d.travel;
   const fail = (c: Context, e: unknown, edge = false) => {
-    if (e instanceof TravelError) return c.json({ok: false, code: e.code, message: e.message, ...e.extra, ...(edge ? {contract: EDGE_CONTRACT, error: {code: e.code, message: e.message}} : {})}, e.status as 400);
+    if (e instanceof TravelError) return c.json({ok: false, code: e.code, message: e.message, ...e.extra, ...(edge ? {contract: EDGE_CONTRACT, error: {code: e.code, message: e.message, ...e.extra}} : {})}, e.status as 400);
     const x = e as {status?: number; code?: string; message?: string};
     if (typeof x?.status === 'number' && typeof x.code === 'string') return c.json({ok: false, code: x.code, message: x.message, ...(edge ? {contract: EDGE_CONTRACT, error: {code: x.code, message: x.message}} : {})}, x.status as 400);
     console.error('[travel]', c.req.method, c.req.path, e instanceof Error ? e.stack : e);

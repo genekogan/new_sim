@@ -25,7 +25,7 @@ import type {Souls} from '../souls.ts';
 export function edgeSoulResolver(host: WorldHost, souls: Souls, bearer: (c: Context) => string | undefined) {
   return (c: Context): EdgeSoul => {
     const s = souls.soulFromToken(bearer(c));
-    if (!s || s.retired_at || s.world_id !== host.worldId) { const r = souls.controlRefusal(bearer(c)); throw new EdgeError(401, r.code, r.code === 'unauthorized' ? 'missing or invalid Soul token; pair again (see the skill)' : r.message, r.extra); }
+    if (!s || s.retired_at || s.world_id !== host.worldId) { const r = souls.controlRefusal(bearer(c)); throw new EdgeError(401, r.code, r.message, r.extra); }
     const m = host.minds.get(s.id); if (!m) throw new EdgeError(404, 'not-found', 'this Soul has no body in the world');
     return {soulId: s.id, entityId: m.entityId, name: m.name, owner: s.owner};
   };
