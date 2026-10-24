@@ -427,9 +427,18 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   // RESOLVE (Ada "go to the pond" went to twinkle lights "lights-pond-2", Wren "go to the market" to string lights by the
   // kiosks): of the walk targets whose names hold the words, those that are what the words say (", a pond") come first;
   // else the places, before the things named after the place they stand in
+  const kindOf = (c: EdgeCapability) => /,\s+an?\s+([^,:(]+?)(?=\s*[,:(]|\s+(?:by|in|of)\s|$)/.exec(c.label)?.[1] ?? /^Go into (.+?) of /.exec(c.label)?.[1];
+  // B9 (ACCEPT3, live 3.87: "go to the library" walked to eden-house-3-roof-stairs, "a mars-tool-library-stair", and ended on
+  // the south lawn): a word found only as a modifier of an offer's kind, not its head ("stair") nor any of its own names,
+  // does not name that offer; the words go to what they do name (the library, offered on demand when far)
+  const modifierOnly = (c: EdgeCapability, words: string[]) => {
+    const k = kindOf(c), kt = k ? tokens(k) : [];
+    if (!k || kt.length < 2 || words.some(w => tokenHit(w, kt.slice(-1)))) return false;
+    const i = info.get(c.id)!, rest = [i.own[0], i.own[1], c.label.replace(k, ' '), ...i.t.names].filter(Boolean).flatMap(tokens);
+    return words.some(w => tokenHit(w, kt) && !tokenHit(w, rest));
+  };
   const ownFirst = (cs: EdgeCapability[], words: string[]) => {
     if (cs.length < 2 || !PLACE_VERBS.has(verb)) return cs;
-    const kindOf = (c: EdgeCapability) => /,\s+an?\s+([^,:(]+?)(?=\s*[,:(]|\s+(?:by|in|of)\s|$)/.exec(c.label)?.[1] ?? /^Go into (.+?) of /.exec(c.label)?.[1];
     const kinded = cs.filter(c => {const k = kindOf(c); return !!k && words.every(w => tokenHit(w, tokens(k)));});
     // ... with the building a matching room is in, when the building matches too (the cafe: in at its front door)
     if (kinded.length) return cs.filter(c => kinded.includes(c) || (c.target?.kind === 'place' && kinded.some(k => isAncestor(ctx, c.target!.id, k.target?.id))));
@@ -478,8 +487,9 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       // 2. The place an object stands in (sit:commons-deck, warm-by-fire:social-eden-fire-circle).
       const r2 = also(one(pool.filter(c => info.get(c.id)!.t.around.some(n => norm(n) === s)), c => `${input}: ${c.id} (${c.label}) is there.`)); if (r2) return r2;
       // 3. Every word appears in the target's own names (walk:pond → the pond).
-      const strict = pool.filter(c => words.every(w => tokenHit(w, info.get(c.id)!.strictTokens)));
-      const named3 = strict.length ? strict : pool.filter(c => words.every(w => tokenHit(w, info.get(c.id)!.ownTokens)));
+      const named = (c: EdgeCapability) => !PLACE_VERBS.has(verb) || !modifierOnly(c, words);
+      const strict = pool.filter(c => words.every(w => tokenHit(w, info.get(c.id)!.strictTokens)) && named(c));
+      const named3 = strict.length ? strict : pool.filter(c => words.every(w => tokenHit(w, info.get(c.id)!.ownTokens)) && named(c));
       // ROUTE-RECHECK: a spot verb's places ("read a book in the library") are chosen by 3b below, best name first and offered
       // on demand when far, not as the nearest offer whose name has the word (the library annex next to the quad)
       // ... and a place verb's words that only an offer's "by <neighbours>" names ("go to the south lawn": the quad lawn "by
