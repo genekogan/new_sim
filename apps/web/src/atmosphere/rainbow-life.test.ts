@@ -83,6 +83,8 @@ test('a clock jump or a held clock does not keep a rainbow up', () => {
   assert.ok(jump.step(40, null).shown > .1);
   jump.jump(3600);
   assert.equal(jump.step(2, null).shown, 0, 'an hour later in world time it is gone at once');
+  jump.jump(-3600);
+  assert.equal(jump.step(2, null).shown, 0, 'rewinding the world clock cannot resurrect an expired rainbow');
   const held = world('2026-10-24T16:00:00');
   held.step(120, STORM, true);
   assert.ok(held.step(40, null, true).shown > .1);

@@ -188,6 +188,8 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
   if(!photoFrame){if(state.rain>.35)bowArmed=true,bowFrom=null;else if(bowArmed&&state.rain<.08){bowArmed=false;bowFrom=clockNow;bowSeen=0;}
    if(bowFrom!==null)bowSeen+=Math.min(frame.dt,1);}
   const bowAge=bowFrom===null?-1:Math.max(bowSeen,(clockNow-bowFrom)/1000);
+  // Expiry is final for this shower, even if a later clock adjustment moves world time backwards.
+  if(!photoFrame&&bowAge>=BOW_GONE_S)bowFrom=null;
   const bowLife=bowAge<0?0:smooth(0,20,bowAge)*(1-smooth(BOW_HOLD_S,BOW_GONE_S,bowAge));
   const bowWeather=bowLife*smooth(.3,.8,state.wet)*(1-smooth(.08,.35,state.rain))*(1-smooth(.5,.8,state.cloud))*smooth(.45,.8,day);
   sky.uniforms.uBow.value.x=bowWeather*bowSunGate(sunDir.y);
