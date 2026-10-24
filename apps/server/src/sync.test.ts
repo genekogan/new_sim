@@ -228,7 +228,9 @@ test('the DJ story through the real server: an agent proposes cards, two owners 
   assert.equal(proposed.body.ok, true, JSON.stringify(proposed.body));
   await sleep(300);
 
-  // Wren's owner gives her direction the same way
+  // Wren's owner gives her direction the same way (the tick just before it bounds which of her plays the owner directed)
+  const intentTick = ((await (await fetch(`${BASE}/v1/kernel`)).json()) as any).tick as number;
+  assert.ok(Number.isInteger(intentTick));
   const wrenIntent = await api(`/v1/souls/${wren.id}/intent`, admin, { intent: { agenda: [{ card: 'go to', target: 'the gate' }, { card: 'ask to be the dj', of: 'Rob' }, { card: 'be the dj', of: 'Rob' }], text: "go to Rob's party and ask him if you can DJ" } });
   // (That agenda is deliberately clumsy, as a model wrote it once: its first step is already true, and it never says to join.
   //  The plan must still work: a step that cannot be played does not block the rest, and getting there is found by looking ahead.)
@@ -250,8 +252,17 @@ test('the DJ story through the real server: an agent proposes cards, two owners 
   assert.ok(dj.changes.some((c: any) => c.op === 'link' && c.kind === 'dj of' && c.from === wren.id));
   assert.ok(dj.changes.some((c: any) => c.op === 'appear' && c.kind === 'dj kit'));
   assert.ok(dj.changes.some((c: any) => c.op === 'set' && c.key === 'music' && c.value === 'playing'));
-  const asked = plays.find((p) => p.ok && p.card === 'ask to be the dj');
-  assert.deepEqual(asked.changes[0], { op: 'say', from: wren.id, to: rob.id, act: 'ask', about: 'being the DJ at Rob’s gathering', manner: asked.manner });
+  // The owner-directed ask is Wren's first ask after her owner's intent, and every ask after it goes to Rob's gathering.
+  // An ask BEFORE the intent is not part of the chain: Wren holds the new card with no plan for that moment, and the real
+  // server's seeded natives (main.ts NATIVES) host their own gatherings, so she may spend it at one (R392 gate: "Basil’s
+  // gathering" as her first ask; reproduced with a widened plan-less window: Tamsin’s gathering at tick 2213 < intent 2699,
+  // then Rob’s at 4885). The old "first ask" selection picked that ambient ask.
+  const asks = plays.filter((p) => p.ok && p.soul === 'Wren' && p.card === 'ask to be the dj'), directed = asks.filter((p) => p.tick >= intentTick);
+  const askTrace = `intent at tick ${intentTick}; asks: ${asks.map((p) => `${p.tick} ${p.targetName}`).join(', ')}\n${trace}`;
+  assert.ok(directed.length > 0, `Wren asked after her owner's intent\n${askTrace}`);
+  assert.deepEqual(directed.filter((p) => p.targetName !== 'Rob’s gathering').map((p) => `${p.tick} ${p.targetName}`), [], `no owner-directed ask to another host\n${askTrace}`);
+  const asked = directed[0];
+  assert.deepEqual(asked.changes[0], { op: 'say', from: wren.id, to: rob.id, act: 'ask', about: 'being the DJ at Rob’s gathering', manner: asked.manner }, askTrace);
   const k = await (await fetch(`${BASE}/v1/kernel`)).json() as any;
   assert.equal(k.vocab.cards['be the dj'].origin, 'agent'); assert.equal(k.plays['be the dj'], 1);
   // words were rendered for what was said
