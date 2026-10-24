@@ -93,7 +93,8 @@ const groundSpeedWithinCap = (rt: any) => {
   for (const e of entityList(rt.world) as any[]) {
     const sp = e.human?.speed; if (sp === undefined) continue;
     const cap = GROUND_SPEED_CAPS[e.human.activity];
-    if (cap !== undefined && sp <= cap * 1.05) continue;
+    // Stationary activities can publish zero after a walk stops; they need no locomotion speed cap.
+    if (sp === 0 || (cap !== undefined && sp <= cap * 1.05)) continue;
     out.push({ code: 'motion.overspeed', message: cap === undefined ? `${e.id} publishes a ground speed of ${sp} m/s in activity ${e.human.activity}, which has no speed cap` : `${e.id} moved at ${sp} m/s in activity ${e.human.activity} (cap ${cap} m/s + 5 %)`, subjects: [e.id], at: e.pose.p });
   }
   return out;

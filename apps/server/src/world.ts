@@ -204,7 +204,10 @@ export class WorldHost {
       this.kernel = initKernel(this.engine, pinnedVocabulary(this.db.rulesEvents(this.worldId)));
     }
     // fast-forward: replay events logged after the snapshot, stepping the engine to their ticks
-    let later = this.db.events(this.worldId, this.seq);
+    // Only the last logged recovery and what follows it replay (it supersedes its prefix, below), so the prefix is
+    // never read: its own recovery recipes each carry a whole world body.
+    const lastRepair = this.db.lastRecoverySeq(this.worldId, this.seq);
+    let later = this.db.events(this.worldId, lastRepair === null ? this.seq : lastRepair - 1);
     let checkedClock=false;
     if(clock&&this.seq>clock.throughSeq){
       if(this.engine.world.tick<clock.tick)throw new Error('clock-frontier.snapshot-prefix-differs');
@@ -249,8 +252,10 @@ export class WorldHost {
     if(this.extra.stationV1)this.stationPhysicalHeadV1();
     this.acc.fromTick = this.engine.world.tick;
     this.resetAcc();
-    if (snap) this.recoveryBaseline = structuredClone(snap.body as SnapshotBody);
-    else if (!this.engine.canSnapshot || this.engine.canSnapshot()) this.recoveryBaseline = this.captureBody();
+    // After a logged recovery the baseline is the replayed head, so the next fault neither rereads nor nests its recipe.
+    const canCapture = !this.engine.canSnapshot || this.engine.canSnapshot();
+    if (snap && (lastRepair === null || !canCapture)) this.recoveryBaseline = structuredClone(snap.body as SnapshotBody);
+    else if (canCapture) this.recoveryBaseline = this.captureBody();
     // Write this world's starting vocabulary into its log once, so its history never depends on what the code's set becomes.
     if (!this.db.hasVocabulary(this.worldId)) void this.enqueue('rules', 'system', { vocabulary: structuredClone(baseVocabulary(this.kernel)), why: 'the vocabulary this world began with' });
     if (this.pendingBootstrap) { void this.enqueue('rules', 'system', { kernelBootstrap: this.pendingBootstrap, why: 'the kernel begins here for a world that predates it' }); this.pendingBootstrap = null; }
@@ -1275,12 +1280,19 @@ export class WorldHost {
     this.seq = body.seq;
   }
   private restoreRecovery(recipe: RecoveryRecipe) {
+    // A recipe logged before recipes stopped nesting carries the earlier recipes among its events. The last one restores
+    // a whole body, so what precedes it is overwritten: start from it (else each level replays its chain again, 2^depth).
+    let nested = -1; for (let i=0;i<recipe.events.length;i++) if (recipe.events[i].kind === 'rules' && recipe.events[i].payload?.recovery) nested=i;
+    // Keep the outer recipe's original violation ceiling even when its replay prefix is superseded.
     this.restoreBody(recipe.baseline);
     const historicViolations=this.engine.runtime.violations.length;
-    // The baseline may contain a resumable program whose later tick proved faulty.
-    for (const m of this.minds.values()) if (m.pending && recipe.excluded.includes(m.pending.card)) { this.engine.stop(m.pending.program); m.pending=null; }
-    for (const actor of recipe.edge?.stopActors ?? []) { const program=this.engine.programOf(actor); if (program) this.engine.stop(program); }
-    for (const e of recipe.events) {
+    if (nested >= 0) { this.apply(recipe.events[nested],true); this.seq=recipe.events[nested].seq; }
+    else {
+      // The baseline may contain a resumable program whose later tick proved faulty.
+      for (const m of this.minds.values()) if (m.pending && recipe.excluded.includes(m.pending.card)) { this.engine.stop(m.pending.program); m.pending=null; }
+      for (const actor of recipe.edge?.stopActors ?? []) { const program=this.engine.programOf(actor); if (program) this.engine.stop(program); }
+    }
+    for (const e of recipe.events.slice(nested+1)) {
       while (this.engine.world.tick < e.tick) { const out=this.engine.step(); this.advanceLives(); this.afterPrograms(out.programs,true); }
       this.apply(e,true); this.seq=e.seq;
     }
@@ -1321,6 +1333,9 @@ export class WorldHost {
       if(this.durableClockV1)this.persistClockFrontier();
       for (const m of this.minds.values()) this.acc.dirty.add(m.soulId);
       for (const l of this.listeners) l.onApplied?.(e);
+      // Rebaseline at the repaired head, so the next recipe never nests this one (each carries a whole body: nested,
+      // they double per fault), and snapshot it so a boot starts after it too.
+      if (!this.engine.canSnapshot || this.engine.canSnapshot()) this.snapshotHead(true);
       this.flush(); this.heartbeat(); return;
     }
   }
@@ -1532,7 +1547,7 @@ export class WorldHost {
   // ------------------------------------------------------------ snapshots
   snapshotMs = { capture: 0, persist: 0 };
   /** Capture is synchronous (it must see one consistent tick); the database write is deferred past the current tick. */
-  saveSnapshot(sync = true) {
+  saveSnapshot(sync = true): { tick: number; stateHash: string; pending?: undefined } | { pending: boolean; tick: number; stateHash?: undefined } {
     this.assertClockReady();
     this.drainInputs();
     if(this.durableClockV1)this.persistClockFrontier();
@@ -1545,6 +1560,10 @@ export class WorldHost {
       }
       return { pending: true, tick: this.lastSnapshotTick };
     }
+    return this.snapshotHead(sync);
+  }
+  /** Capture and persist the head as the snapshot and recovery baseline (the caller has checked it can snapshot). */
+  private snapshotHead(sync: boolean): { tick: number; stateHash: string } {
     const t0 = performance.now();
     const runtime = this.engine.snapshot();
     const body = this.captureBody(runtime);

@@ -12,6 +12,7 @@ import {insideBuilding} from './atmosphere/indoors.ts';
 import {installAtmosphereChunks,ATMOS,MIST,SHEEN,DUST,NOISE_MAP} from './atmosphere/chunks.ts';
 import {desertDustAt,parseDustOverride,DESERT_DUST_SEED,type DustSample} from './atmosphere/desert-dust.ts';
 import {SkyDome,bowSunGate} from './atmosphere/sky.ts';
+import {RainbowThings} from './atmosphere/rainbow-things.ts';
 import {skyLook,type SkyLook} from './atmosphere/palettes.ts';
 import {COVER_A,updateRainCover,rainCoverRendering,disposeRainCover} from './atmosphere/rain-cover.ts';
 import {MotionPatches,ROTOR,RIPPLE,SKY_OBJECTS} from './atmosphere/motion.ts';
@@ -54,7 +55,7 @@ export type AtmosphereFrame={seconds:number;dt:number;daylight:number|null;camer
  indoors?:(x:number,y:number,z:number)=>boolean};
 /** A god's weather as set (apps/server god/world-env.ts): channels 0..1; kind 'storm' brings lightning. */
 export type SetWeather={kind:string;clouds:number;rain:number;wind:number;fog:number;intensity:number};
-export type AtmosphereInspection={bow:number;sun:number[];rainCover:number;profile:'eden'|'world';dust:({profile:'mars-desert';seed:number}&DustSample)|null;set:boolean;lightning:number;active:boolean;rotor:boolean;fountainWater:number;skyClouds:number;kind:WeatherKind|null;state:WeatherState;windMaterials:number;windModes:Record<string,number>;smokeSources:number;flowers:number;meadow:number;roofs:number;water:number;harbour:boolean;scans:number;drawCalls:number};
+export type AtmosphereInspection={bow:number;rainbowThings:number;rainbowThing:number;sun:number[];rainCover:number;profile:'eden'|'world';dust:({profile:'mars-desert';seed:number}&DustSample)|null;set:boolean;lightning:number;active:boolean;rotor:boolean;fountainWater:number;skyClouds:number;kind:WeatherKind|null;state:WeatherState;windMaterials:number;windModes:Record<string,number>;smokeSources:number;flowers:number;meadow:number;roofs:number;water:number;harbour:boolean;scans:number;drawCalls:number};
 const SCAN_AT=[0,1.5,5,12,25,45];
 /** W2b: phones skip the sea fog banks (big alpha-blended puffs: fill rate). */
 /** Rainbow life after a shower stops (world seconds): full until HOLD, gone by GONE. */
@@ -86,6 +87,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
  const fog=new THREE.FogExp2(0xffffff,0);const ownsFog=!scene.fog;if(ownsFog)scene.fog=fog;
  const lights:{sun:ScaledNumber|null;hemi:ScaledNumber|null;sunLight:THREE.DirectionalLight|null}={sun:null,hemi:null,sunLight:null};
  const background=new TintedColor(()=>(scene.background as THREE.Color|null)?.isColor?scene.background as THREE.Color:null);
+ const rainbowThings=new RainbowThings();
  const cWarm=new THREE.Color(),cSky=new THREE.Color(),cGrey=new THREE.Color(),cFog=new THREE.Color(),cTmp=new THREE.Color(),sunDir=new THREE.Vector3();
  const dustColor=new THREE.Color('#c4a57e'),dustSample=desertDustAt(0);let desert=false,dustScheduled=false;
  let driftX=0,driftZ=0;
@@ -130,14 +132,14 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
   worldBalloons=Array.isArray(tracks)&&tracks.length>0;worldFog=Array.isArray(band)&&band.length>=4;
   if(worldBalloons)balloons.setTracks(tracks as number[][]);else balloons.setTracks(null);
   fogBanks.setBand(worldFog?(band as number[]).slice(0,4):null,worldFog?Number((band as number[])[4]??0):0);palLook=skyLook(pal);desert=pal==='mars-desert';
-  collectLights();
+  collectLights();rainbowThings.scan(scene);
   // W2: a god world's lighthouses (GodWorldLiving publishes their lanterns); at most four beam pairs
   const lanterns:THREE.Vector3[]=[];scene.traverse(o=>{const l=o.userData?.edenLighthouses;if(o===root||!Array.isArray(l))return;o.updateWorldMatrix(true,false);for(const a of l)if(Array.isArray(a)&&a.length===3&&a.every(Number.isFinite)&&lanterns.length<4)lanterns.push(new THREE.Vector3(a[0],a[1],a[2]).applyMatrix4(o.matrixWorld));});
   const lkey=lanterns.map(v=>v.toArray().map(n=>n.toFixed(1)).join(',')).join(';');
   if(lkey!==lanternKey){lanternKey=lkey;for(const b of beacons)b.dispose();beacons.length=0;for(const v of lanterns){const b=new Lighthouse(v);beacons.push(b);root.add(b.group);}}
   scans++;const since=seconds-expansionSeen;nextScan=expansionSeen+(scans<SCAN_AT.length?SCAN_AT[scans]:since+RESCAN_EVERY);
  }
- function deactivate(){disposeRainCover();
+ function deactivate(){disposeRainCover();rainbowThings.apply(0);
   if(!active)return;active=false;WIND.value.y=0;root.visible=false;
   lights.sun?.restore();lights.hemi?.restore();background.restore();clearGrade();halos.mesh.visible=false;fog.density=0;DUST.value.x=0;MIST.value.x=0;MIST.value.w=0;ATMOS.value.x=0;SHEEN.value.w=0;RIPPLE.value.y=0;SURF.value.y=0;SKY_OBJECTS.value.x=SKY_OBJECTS.value.y=0;SKY_OBJECTS.value.z=1;ROTOR.value.w=sailAngle=0;
  }
@@ -181,12 +183,18 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
   // sits below the horizon, so strength (and inspect().bow) is 0 there.
   // WEATHER-FX (Gene #18): only for a few world minutes after a real shower stops, and never with the sun low or down
   // (the night sun is parked just under the horizon, which used to put a full bow overhead all night).
-  // Age in world seconds, or viewing seconds when the world clock is slower or held (shots).
-  if(state.rain>.35)bowArmed=true,bowFrom=null;else if(bowArmed&&state.rain<.08){bowArmed=false;bowFrom=clockNow;bowSeen=0;}
-  if(bowFrom!==null)bowSeen+=Math.min(frame.dt,1);
+  // Age in world seconds, or viewing seconds when the world clock is slower or held (shots). A place shot's dry clear
+  // frame is not the end of a shower: it leaves the bow's state alone.
+  if(!photoFrame){if(state.rain>.35)bowArmed=true,bowFrom=null;else if(bowArmed&&state.rain<.08){bowArmed=false;bowFrom=clockNow;bowSeen=0;}
+   if(bowFrom!==null)bowSeen+=Math.min(frame.dt,1);}
   const bowAge=bowFrom===null?-1:Math.max(bowSeen,(clockNow-bowFrom)/1000);
+  // Expiry is final for this shower, even if a later clock adjustment moves world time backwards.
+  if(!photoFrame&&bowAge>=BOW_GONE_S)bowFrom=null;
   const bowLife=bowAge<0?0:smooth(0,20,bowAge)*(1-smooth(BOW_HOLD_S,BOW_GONE_S,bowAge));
-  sky.uniforms.uBow.value.x=bowLife*smooth(.3,.8,state.wet)*(1-smooth(.08,.35,state.rain))*(1-smooth(.5,.8,state.cloud))*smooth(.45,.8,day)*bowSunGate(sunDir.y);
+  const bowWeather=bowLife*smooth(.3,.8,state.wet)*(1-smooth(.08,.35,state.rain))*(1-smooth(.5,.8,state.cloud))*smooth(.45,.8,day);
+  sky.uniforms.uBow.value.x=bowWeather*bowSunGate(sunDir.y);
+  // A god-built rainbow thing keeps the same post-rain daylight window (it is no optical bow, so no sun-height cut).
+  rainbowThings.apply(bowWeather);
   // Stars on clear nights (clouds and fog hide them).
   sky.uniforms.uBow.value.y=(1-smooth(.05,.3,day))*(1-smooth(.3,.75,state.cloud))*(1-state.fog)*(1-state.mist*.5);sky.uniforms.uBow.value.z=frame.reducedMotion?0:frame.seconds%600;
   // Distant lightning in a storm: brief double pulses in the cloud deck only (no scene light flash), a few per minute.
@@ -342,7 +350,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
     try{api.update({...real,dt:0});}catch{/* next frame */}lastFlash=was.lastFlash;};
   },
   onLightning:null as ((strength:number,dir:THREE.Vector3)=>void)|null,
-  inspect(){return {bow:sky.uniforms.uBow.value.x,sun:sunDir.toArray(),rainCover:COVER_A.value.w,profile,dust:desert?{profile:'mars-desert' as const,seed:DESERT_DUST_SEED,...dustSample}:null,set:!!setWeather,lightning:lastFlash,active,kind,state:{...state},rotor:motion.rotorFound,fountainWater:motion.waterFound,skyClouds:motion.skyClouds,windMaterials:wind.count,windModes:wind.modes(),smokeSources:smoke.sourceCount,flowers:lastFound.flowers,meadow:lastFound.meadow,roofs:lastFound.roofs,water:lastFound.water,harbour:lastFound.harbour,scans,drawCalls:root.children.filter(o=>o.visible).length};},
+  inspect(){return {bow:sky.uniforms.uBow.value.x,rainbowThings:rainbowThings.count,rainbowThing:rainbowThings.strength,sun:sunDir.toArray(),rainCover:COVER_A.value.w,profile,dust:desert?{profile:'mars-desert' as const,seed:DESERT_DUST_SEED,...dustSample}:null,set:!!setWeather,lightning:lastFlash,active,kind,state:{...state},rotor:motion.rotorFound,fountainWater:motion.waterFound,skyClouds:motion.skyClouds,windMaterials:wind.count,windModes:wind.modes(),smokeSources:smoke.sourceCount,flowers:lastFound.flowers,meadow:lastFound.meadow,roofs:lastFound.roofs,water:lastFound.water,harbour:lastFound.harbour,scans,drawCalls:root.children.filter(o=>o.visible).length};},
   dispose(){if(closed)return;closed=true;if(review&&(globalThis as Record<string,unknown>).edenAtmosphere===api)delete (globalThis as Record<string,unknown>).edenAtmosphere;deactivate();wind.dispose();motion.dispose();fauna.dispose();balloons.dispose();fireflies.dispose();smoke.dispose();sky.dispose();rain.dispose();halos.dispose();lighthouse.dispose();for(const b of beacons)b.dispose();fogBanks.dispose();root.removeFromParent();if(ownsFog&&scene.fog===fog)scene.fog=null;if(scene.onBeforeRender===beforeRender)scene.onBeforeRender=previousBeforeRender;},
  };
  // Review hook (only with ?weather=… or ?atmos in the URL): window.edenAtmosphere.inspect() in the console.

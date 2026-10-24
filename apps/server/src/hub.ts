@@ -204,7 +204,7 @@ export class Hub {
       const canResume = typeof m.since === 'number' && m.epoch === this.epoch && ring.length > 0 && m.since >= ring[0].seq - 1 && m.since <= this.host.currentBatchSeq;
       if (canResume) for (const b of ring) { if (b.seq > m.since!) this.send(c, { t: 'batch', ...b, log: b.log.map(publicEvent) }); }
       else this.send(c, { t: 'snapshot', reason: typeof m.since === 'number' ? 'too far behind; full snapshot' : 'join', ...this.host.snapshotView() });
-      this.send(c, { t: 'log', events: this.db.tailEvents(this.host.worldId, 150).map(e=>joinLogEvent(publicEvent(e))) });
+      this.send(c, { t: 'log', events: this.db.tailEvents(this.host.worldId, 150, true).map(e=>joinLogEvent(publicEvent(e))) });
       this.send(c, { t: 'kernel', view: this.host.kernelView() });
       this.send(c, { t: 'plays', plays: this.host.recentPlays.slice(-60) });
       this.send(c, { t: 'talk', lines: this.db.recentTalk(40) });

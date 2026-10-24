@@ -120,11 +120,17 @@ export class Db {
   recentKind(worldId: string, kind: string, limit: number): LogEvent[] {
     return (this.db.prepare('SELECT seq, tick, kind, author, payload, at FROM events WHERE world_id = ? AND kind = ? ORDER BY seq DESC LIMIT ?').all(worldId, kind, limit) as any[]).map(rowToEvent).reverse();
   }
-  events(worldId: string, afterSeq = 0, limit = 1_000_000): LogEvent[] {
-    return (this.db.prepare('SELECT seq, tick, kind, author, payload, at FROM events WHERE world_id = ? AND seq > ? ORDER BY seq LIMIT ?').all(worldId, afterSeq, limit) as any[]).map(rowToEvent);
+  /** `light` reads a logged recovery as only its public receipt (excluded cards, faults): its recipe carries a whole
+   *  world body, so the public log, joins and prompts would otherwise parse megabytes per event. */
+  events(worldId: string, afterSeq = 0, limit = 1_000_000, light = false): LogEvent[] {
+    return (this.db.prepare(`SELECT seq, tick, kind, author, ${light ? LIGHT_PAYLOAD : 'payload'}, at FROM events WHERE world_id = ? AND seq > ? ORDER BY seq LIMIT ?`).all(worldId, afterSeq, limit) as any[]).map(rowToEvent);
   }
-  tailEvents(worldId: string, n: number): LogEvent[] {
-    return (this.db.prepare('SELECT seq, tick, kind, author, payload, at FROM events WHERE world_id = ? ORDER BY seq DESC LIMIT ?').all(worldId, n) as any[]).map(rowToEvent).reverse();
+  tailEvents(worldId: string, n: number, light = false): LogEvent[] {
+    return (this.db.prepare(`SELECT seq, tick, kind, author, ${light ? LIGHT_PAYLOAD : 'payload'}, at FROM events WHERE world_id = ? ORDER BY seq DESC LIMIT ?`).all(worldId, n) as any[]).map(rowToEvent).reverse();
+  }
+  /** The seq of the last logged recovery after `afterSeq`, if any (a recovery supersedes the log before it). */
+  lastRecoverySeq(worldId: string, afterSeq: number): number | null {
+    return ((this.db.prepare("SELECT MAX(seq) AS s FROM events WHERE world_id = ? AND seq > ? AND kind = 'rules' AND author = 'world:recovery'").get(worldId, afterSeq) as any)?.s as number) ?? null;
   }
   /** The tick at which each Soul was born (from the log). */
   birthTicks(worldId: string): Record<string, number> {
@@ -133,7 +139,7 @@ export class Db {
     return out;
   }
   rulesEvents(worldId: string): LogEvent[] { return (this.db.prepare("SELECT seq, tick, kind, author, payload, at FROM events WHERE world_id = ? AND kind = 'rules' ORDER BY seq").all(worldId) as any[]).map(rowToEvent); }
-  hasVocabulary(worldId: string): boolean { return this.rulesEvents(worldId).some((e) => !!(e.payload as { vocabulary?: unknown } | null)?.vocabulary); }
+  hasVocabulary(worldId: string): boolean { return !!this.db.prepare("SELECT 1 FROM events WHERE world_id = ? AND kind = 'rules' AND author <> 'world:recovery' AND json_type(payload, '$.vocabulary') = 'object' LIMIT 1").get(worldId); }
   lastSeq(worldId: string): number { return ((this.db.prepare('SELECT MAX(seq) AS s FROM events WHERE world_id = ?').get(worldId) as any)?.s as number) ?? 0; }
   countEvents(worldId: string): number { return (this.db.prepare('SELECT COUNT(*) AS c FROM events WHERE world_id = ?').get(worldId) as any).c; }
 
@@ -296,4 +302,5 @@ export class Db {
   }
   close() { this.db.close(); }
 }
+const LIGHT_PAYLOAD = "CASE WHEN kind = 'rules' AND author = 'world:recovery' THEN json_object('recovery', json_object('excluded', json(json_extract(payload, '$.recovery.excluded')), 'faults', json(json_extract(payload, '$.recovery.faults')))) ELSE payload END AS payload";
 const rowToEvent = (r: any): LogEvent => ({ seq: r.seq, tick: r.tick, kind: r.kind, author: r.author, payload: JSON.parse(r.payload), at: r.at });
