@@ -120,20 +120,22 @@ export class ChildPool {
    *  A boot still going after `waitMs` (a world stuck booting: R389/R390 held the keeper's 60 s prepare for its 90 s boot
    *  timeout) is abandoned instead: it never served, so its process is killed, and that process must be seen to exit
    *  within `goneMs`, else this throws (closure unproven: no handover, one writer). Resolves with the abandoned boots. */
-  async settled({ waitMs = Infinity, goneMs = 5_000 } = {}) {
-    let timer; const all = Promise.allSettled([...this.inflight.keys()]).then(() => true);
+  async settled({ waitMs = Infinity, goneMs = 5_000, still = () => true } = {}) {
+    const runs = [...this.inflight.keys()];   // only boots already past the gate; `still()` false: the prepare was given up
+    let timer; const all = Promise.allSettled(runs).then(() => true);
     const done = Number.isFinite(waitMs) ? await Promise.race([all, new Promise((r) => { timer = setTimeout(() => r(false), waitMs); })]).finally(() => clearTimeout(timer)) : await all;
-    if (!done) {
-      const stuck = [...this.inflight.values()], out = [];
+    if (!done && still()) {
+      const stuck = runs.filter((r) => this.inflight.has(r)).map((r) => this.inflight.get(r)), out = [];
       for (const k of stuck) {
         k.stopped = true; k.abandoned = true;   // spawnAndWait / healthy() stop here; nothing launches after this
         out.push({ slug: k.slug, pid: k.child?.pid ?? null, status: k.status });
         k.child?.kill('SIGKILL');
       }
       const deadline = Date.now() + goneMs;
-      while ((this.inflight.size || stuck.some((k) => k.child)) && Date.now() < deadline) await sleep(25);
+      const pending = () => runs.some((r) => this.inflight.has(r));
+      while ((pending() || stuck.some((k) => k.child)) && Date.now() < deadline) await sleep(25);
       const left = stuck.filter((k) => k.child);
-      if (this.inflight.size || left.length) throw new Error(`boot(s) of ${stuck.map((k) => k.slug).join(', ')} still running ${goneMs / 1000} s after being stopped${left.length ? ` (pid ${left.map((k) => k.child.pid).join(', ')})` : ''}: their data may still be open`);
+      if (pending() || left.length) throw new Error(`boot(s) of ${stuck.map((k) => k.slug).join(', ')} still running ${goneMs / 1000} s after being stopped${left.length ? ` (pid ${left.map((k) => k.child.pid).join(', ')})` : ''}: their data may still be open`);
       for (const k of stuck) { k.abandoned = false; k.lastError = `abandoned: still booting after ${waitMs / 1000} s when a handover was prepared`; }
       return out.map((b) => ({ ...b, error: this.kids.get(b.slug)?.lastError }));
     }
