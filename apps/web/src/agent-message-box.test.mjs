@@ -87,18 +87,19 @@ test('God box disappears on sign-out even if the provider retains the same label
 test.after(() => rm(dir, {recursive: true, force: true}));
 
 // Lane PAIR-INWINDOW (Gene's review 2026-10-22 #1): the card's start prompt carries the window code like the New Soul prompt
-test('Soul card start prompt names pair-soul with the window code; without a code it still names the command', () => {
+test('Soul card start prompt names pair with the window code; without a code it still names the command', () => {
   const withCode = soulStartPrompt('http://localhost:5960/w/inbox', 's_abc', 'Ada', 'K7QX-M2PA');
-  assert.match(withCode, /pair-soul "s_abc" --for K7QX-M2PA/);
+  assert.match(withCode, /node eden\.mjs pair "s_abc" --for K7QX-M2PA/);
   assert.match(withCode, /Soul "Ada" \(ID "s_abc"\)/);
   assert.match(withCode, /open Sim window/);
-  assert.match(withCode, /approval wait/);
+  assert.match(withCode, /start listening/);
+  assert.doesNotMatch(withCode, /eden-agent|pair-soul|approval wait|auto mode/);
   assert.match(withCode, /Do not create another Soul/);
   assert.match(withCode, /in this folder\. Do not create another Soul\.\n/, 'PROMPT-SHORT: line 1 = read the skill, resume this Soul here, no new Soul');
   assert.equal(withCode.split('\n').length, 2); assert.doesNotMatch(withCode, /Always listen|run_in_background|ack each/);
   assert.ok(withCode.length < 400, `short prompt (${withCode.length} chars)`);
   const plain = soulStartPrompt('http://localhost:5960/w/inbox', 's_abc', 'Ada', null);
-  assert.match(plain, /pair-soul "s_abc" \(/);
+  assert.match(plain, /node eden\.mjs pair "s_abc" \(/);
   assert.doesNotMatch(plain, /--for/);
 });
 

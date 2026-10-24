@@ -53,7 +53,7 @@ test('multiple stable Soul IDs remain selectable despite mutable duplicate names
  const html=render(h(SoulAccount,{sim:state,auth:auth('acct_A'),api,select(){},pairCode:null,clearPair(){}}));assert.equal((html.match(/Mutable Name/g)??[]).length,2);assert.equal(calls,0);
 });
 test('published reconnect prompt preserves exact ID/world and accepts names only as data',()=>{
- const prompt=connectionSetupPrompt('https://sim.eden.art/w/mars','s_A','Changed name');assert.match(prompt,/pair-soul/);assert.match(prompt,/approval wait/);assert.match(prompt,/instructions.md/);assert.match(prompt,/"soulId":"s_A"/);assert.match(prompt,/"currentName":"Changed name"/);assert.doesNotMatch(prompt,/Start connect|OS store|plaintext|skill.md/);assert.match(prompt,/Do not create another/);
+ const prompt=connectionSetupPrompt('https://sim.eden.art/w/mars','s_A','Changed name');assert.match(prompt,/node eden\.mjs pair/);assert.match(prompt,/start listening/);assert.doesNotMatch(prompt,/pair-soul|approval wait|auto mode/);assert.match(prompt,/instructions.md/);assert.match(prompt,/"soulId":"s_A"/);assert.match(prompt,/"currentName":"Changed name"/);assert.doesNotMatch(prompt,/Start connect|OS store|plaintext|skill.md/);assert.match(prompt,/Do not create another/);
  for(const base of ['https://evil.example/w/unknown','https://sim.eden.art/w/mars?secret=x','https://user:pass@sim.eden.art/w/eden'])assert.equal(connectionSetupPrompt(base,'s_A'),null);
  assert.equal(connectionSetupPrompt('https://sim.eden.art/w/eden','bad ID'),null);
 });
