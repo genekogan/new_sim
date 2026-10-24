@@ -52,5 +52,7 @@ export type EdgeDeps = {host: WorldHost; db: Db; souls: Souls; build?: string; s
   ownerSoul?(c: Context, id: string): Promise<EdgeSoul>;
   /** SOULSIM-H F1: the owner inbox, so a Soul's `wait` returns as soon as its owner writes (the agent sees it mid-action). */
   ownerInbox?: {onSoulSend(listener: (soulId: string) => void): void; ownerWrote(s: {scope: string; owner: string}, since: number): {waiting: number; newestAt: number} | null}};
-export class EdgeError extends Error {readonly status: number; readonly code: string; constructor(status: number, code: string, message: string) {super(message); this.status = status; this.code = code;}}
+export class EdgeError extends Error {readonly status: number; readonly code: string; readonly extra?: Record<string, unknown>; constructor(status: number, code: string, message: string, extra?: Record<string, unknown>) {super(message); this.status = status; this.code = code; if (extra) this.extra = extra;}}
+/** The `error` object of an eden-edge/1 refusal: code, message and any structured detail (e.g. `control.revoked`). */
+export const edgeErrorOf = (e: EdgeError) => ({code: e.code, message: e.message, ...e.extra});
 export const edgeBody = <T extends object>(body: T) => ({contract: EDGE_CONTRACT, ...body});

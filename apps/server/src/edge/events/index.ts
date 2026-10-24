@@ -8,7 +8,7 @@ import {streamSSE} from 'hono/streaming';
 import type {ContentfulStatusCode} from 'hono/utils/http-status';
 import {WebSocketServer, type WebSocket} from 'ws';
 import {clockAt} from '@sim/brain';
-import {EDGE_CONTRACT, EdgeError, edgeBody, type EdgeDeps, type EdgeSoul} from '../contract.ts';
+import {EDGE_CONTRACT, EdgeError, edgeBody, type EdgeDeps, type EdgeSoul, edgeErrorOf} from '../contract.ts';
 import type {CommsRuntime} from '../comms/index.ts';
 import {cursorOf, parseCursor, type StreamEvent} from '../comms/stream.ts';
 import {oneLine, parseFilter, passes, relativeBearing, toEnvelope, type Envelope, type Filter} from './envelope.ts';
@@ -102,7 +102,7 @@ export function registerEdgeEvents(app: Hono, deps: EdgeDeps, comms: CommsRuntim
   };
 
   const failure = (c: Context, error: unknown) => {
-    if (error instanceof EdgeError) return c.json(edgeBody({error: {code: error.code, message: error.message}}), error.status as ContentfulStatusCode);
+    if (error instanceof EdgeError) return c.json(edgeBody({error: edgeErrorOf(error)}), error.status as ContentfulStatusCode);
     console.error('[edge] events fault', c.req.method, c.req.path, error instanceof Error ? (error.stack ?? error.message).split('\n').slice(0, 4).join(' | ') : String(error));
     return c.json(edgeBody({error: {code: 'unavailable', message: 'the world could not answer; retry'}}), 503);
   };
@@ -206,7 +206,7 @@ export function registerEdgeEvents(app: Hono, deps: EdgeDeps, comms: CommsRuntim
       start = startOf(soul.soulId, url.searchParams.get('cursor') ?? url.searchParams.get('after'));
     } catch (error) {
       const e = error instanceof EdgeError ? error : new EdgeError(503, 'unavailable', 'the world could not answer; retry');
-      await send({type: 'error', contract: EDGE_CONTRACT, error: {code: e.code, message: e.message}}); ws.close(e.status === 401 ? 4401 : e.status === 429 ? 4429 : 4400, e.code); return;
+      await send({type: 'error', contract: EDGE_CONTRACT, error: edgeErrorOf(e)}); ws.close(e.status === 401 ? 4401 : e.status === 429 ? 4429 : 4400, e.code); return;
     }
     const ac = new AbortController();
     let alive = true;

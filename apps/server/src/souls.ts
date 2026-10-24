@@ -576,6 +576,31 @@ export class Souls {
     if(!row||row.world_id!==this.host.worldId||row.retired_at!==null)return null;
     return {row,kind:legacy?'legacy' as const:'grant' as const,generation:legacy?row.token_generation:grant!.id,grant};
   }
+  /** SOUL3: who issued the token this agent holds and when (the delegated grant or the legacy token), for GET /v1/agent/me. */
+  agentPairing(token:string|undefined){
+    const credential=this.agentCredential(token);if(!credential)return null;
+    if(credential.kind==='legacy')return {label:credential.row.token_label,since:credential.row.token_created_at};
+    const label=(this.db.db.prepare('SELECT agent_label FROM account_approvals_v1 WHERE world_id=? AND id=?').get(this.host.worldId,credential.grant!.approvalId) as {agent_label:string}|undefined)?.agent_label??null;
+    return {label,since:credential.grant!.createdAt};
+  }
+  /** SOUL3: why a Soul bearer is refused. A token this world issued and then superseded (a newly approved pairing, the
+   * owner's revoke, a release, retirement) is `control.revoked`, with the Soul and how to pair again; any other `sim_`
+   * token is `control.unknown`. Non-Soul bearers keep `unauthorized`. Only hashes are consulted. */
+  controlRefusal(token:string|undefined):{code:string;message:string;extra?:Record<string,unknown>}{
+    if(!token?.startsWith('sim_')||token.length>1024)return {code:'unauthorized',message:'missing or invalid soul token; pair again (see /skill.md)'};
+    const notReady={code:'unauthorized',message:'missing or invalid soul token; pair again (see /skill.md)'};
+    const hash=hashToken(token),tomb=this.db.tokenTombstone(hash),legacy=tomb?.world_id===this.host.worldId?tomb:undefined,grant=legacy?null:this.accounts?.store.grantOf(token)??null;
+    const soul=legacy||grant?this.db.soul(legacy?.soul_id??grant!.soulId):undefined;
+    if(!soul||soul.world_id!==this.host.worldId)return this.db.soulByTokenHash(hash)?notReady:{code:'control.unknown',message:'This world never issued this Soul token. Pair your Soul again (see /skill.md).'};
+    if(grant&&grant.revokedAt===null&&soul.retired_at===null)return notReady; // issued and current, but the Soul is not admitted and ready
+    const iso=(ms:number|null|undefined)=>typeof ms==='number'&&Number.isFinite(ms)?new Date(ms).toISOString():null;
+    const revokedAt=iso(legacy?.revoked_at??grant?.revokedAt??soul.retired_at)!,issuedAt=iso(legacy?.issued_at??grant?.issuedAt);
+    if(soul.retired_at!==null)return {code:'control.revoked',message:`This token no longer steers ${soul.name}: the Soul was retired at ${iso(soul.retired_at)}.`,extra:{soul:{id:soul.id,name:soul.name},revokedAt,issuedAt,replacedAt:null,hint:null}};
+    const current=this.agentStatus(soul),replacedAt=current.attached?iso(current.since):null;
+    const hint=`Ask your human for a new code, then: node eden.mjs pair ${soul.id} --for CODE`;
+    const why=replacedAt?`a newer pairing was approved at ${replacedAt}; only one controller steers a Soul`:`it was revoked at ${revokedAt}`;
+    return {code:'control.revoked',message:`This token no longer steers ${soul.name}: ${why}. ${hint}`,extra:{soul:{id:soul.id,name:soul.name},revokedAt,issuedAt,replacedAt,hint}};
+  }
   soulFromToken(token: string | undefined): SoulRow | null {
     if (!token?.startsWith('sim_')) return null;
     const soul = this.agentCredential(token)?.row??null;

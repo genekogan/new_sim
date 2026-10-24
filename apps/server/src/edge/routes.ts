@@ -1,6 +1,6 @@
 // Mounts the EDGE-CONTRACT-v1 surface under /v1/edge. Ledger verbs here; Comms registers its own.
 import type {Context, Hono} from 'hono';
-import {EDGE_CONTRACT, EdgeError, edgeBody, type EdgeDeps, type EdgeSoul} from './contract.ts';
+import {EDGE_CONTRACT, EdgeError, edgeBody, type EdgeDeps, type EdgeSoul, edgeErrorOf} from './contract.ts';
 import type {EdgeLedger} from './ledger/ledger.ts';
 import {registerEdgeComms} from './comms/index.ts';
 import {hereFrame} from './perception/here.ts';
@@ -25,7 +25,7 @@ import type {Souls} from '../souls.ts';
 export function edgeSoulResolver(host: WorldHost, souls: Souls, bearer: (c: Context) => string | undefined) {
   return (c: Context): EdgeSoul => {
     const s = souls.soulFromToken(bearer(c));
-    if (!s || s.retired_at || s.world_id !== host.worldId) throw new EdgeError(401, 'unauthorized', 'missing or invalid Soul token; pair again (see the skill)');
+    if (!s || s.retired_at || s.world_id !== host.worldId) { const r = souls.controlRefusal(bearer(c)); throw new EdgeError(401, r.code, r.code === 'unauthorized' ? 'missing or invalid Soul token; pair again (see the skill)' : r.message, r.extra); }
     const m = host.minds.get(s.id); if (!m) throw new EdgeError(404, 'not-found', 'this Soul has no body in the world');
     return {soulId: s.id, entityId: m.entityId, name: m.name, owner: s.owner};
   };
@@ -42,7 +42,7 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
     c.header('Cache-Control', 'no-store');
     try {return c.json(edgeBody(await fn(c) as object));}
     catch (error) {
-      if (error instanceof EdgeError) return c.json({contract: EDGE_CONTRACT, error: {code: error.code, message: error.message}}, error.status as 400);
+      if (error instanceof EdgeError) return c.json({contract: EDGE_CONTRACT, error: edgeErrorOf(error)}, error.status as 400);
       console.error('[edge] ledger fault', c.req.method, c.req.path, error instanceof Error ? (error.stack ?? error.message).split('\n').slice(0, 4).join(' | ') : String(error));
       return c.json({contract: EDGE_CONTRACT, error: {code: 'unavailable', message: 'the ledger could not answer; retry'}}, 503);
     }

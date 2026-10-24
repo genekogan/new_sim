@@ -1,7 +1,7 @@
 // /v1/edge/plan routes (EVENTS-v1 §plans): POST a plan, GET the current one or one by id, PATCH it, DELETE (cancel).
 import type {Context, Hono} from 'hono';
 import type {ContentfulStatusCode} from 'hono/utils/http-status';
-import {EdgeError, edgeBody, type EdgeDeps, type EdgeReceipt, type EdgeSoul} from '../contract.ts';
+import {EdgeError, edgeBody, type EdgeDeps, type EdgeReceipt, type EdgeSoul, edgeErrorOf} from '../contract.ts';
 import type {CommsRuntime} from '../comms/index.ts';
 import {say} from '../comms/speech.ts';
 import type {EventsRuntime} from '../events/index.ts';
@@ -26,7 +26,7 @@ export function registerEdgePlans(app: Hono, deps: EdgeDeps, comms: CommsRuntime
   comms.fading.addHold(id => plans.holding(id));
 
   const failure = (c: Context, error: unknown) => {
-    if (error instanceof EdgeError) return c.json(edgeBody({error: {code: error.code, message: error.message}}), error.status as ContentfulStatusCode);
+    if (error instanceof EdgeError) return c.json(edgeBody({error: edgeErrorOf(error)}), error.status as ContentfulStatusCode);
     console.error('[edge] plans fault', c.req.method, c.req.path, error instanceof Error ? (error.stack ?? error.message).split('\n').slice(0, 4).join(' | ') : String(error));
     return c.json(edgeBody({error: {code: 'unavailable', message: 'the world could not answer; retry'}}), 503);
   };

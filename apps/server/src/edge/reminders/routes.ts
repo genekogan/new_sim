@@ -1,5 +1,5 @@
 import type {Context,Hono} from 'hono';
-import {EdgeError,edgeBody,type EdgeDeps} from '../contract.ts';
+import {EdgeError,edgeBody,type EdgeDeps, edgeErrorOf} from '../contract.ts';
 import type {CommsRuntime} from '../comms/index.ts';
 import {freshBootClock} from '../boot/clock.ts';
 import {PersonalReminders} from './reminders.ts';
@@ -8,7 +8,7 @@ export function mountPersonalReminders(app:Hono,deps:EdgeDeps,comms:CommsRuntime
  const wrap=(fn:(c:Context)=>unknown|Promise<unknown>)=>async(c:Context)=>{
   c.header('Cache-Control','no-store');
   try{return c.json(edgeBody({apiContract:'eden-edge/1.1',...await fn(c) as object,clocks:{...clock(),realTime:new Date(now()).toISOString()}}));}
-  catch(error){if(error instanceof EdgeError)return c.json(edgeBody({apiContract:'eden-edge/1.1',error:{code:error.code,message:error.message}}),error.status as 400);throw error;}
+  catch(error){if(error instanceof EdgeError)return c.json(edgeBody({apiContract:'eden-edge/1.1',error:edgeErrorOf(error)}),error.status as 400);throw error;}
  };
  const soul=(c:Context,key:string,n:number)=>{const s=deps.soul(c),limits=(deps.souls as {limits?:{allow(k:string,n:number,ms:number):{ok:boolean}}}).limits;if(limits&&!limits.allow(`edge-reminders-${key}:${s.soulId}`,n,60000).ok)throw new EdgeError(429,'rate-limited','Too many personal reminder requests.');return s;};
  app.post('/v1/edge/reminders',wrap(async c=>{

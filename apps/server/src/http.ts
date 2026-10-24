@@ -112,7 +112,7 @@ export function buildApp(d: Deps) {
     if(requireInvitation)d.souls.requireInvited(current);return current;
   };
   const ownSoul = (authenticated: UserRow, id: string): SoulRow => { const u=privateUser(authenticated),s = d.db.soul(id); if (!s || s.retired_at || s.world_id !== d.host.worldId) throw new ApiError(404, 'not-found', 'no such soul'); if (!d.souls.owns(u.id,s) && u.role !== 'admin') throw new ApiError(403, 'forbidden', 'not your soul'); d.souls.requireControlReady(s); return s; };
-  const agentSoul = (c: Context): SoulRow => { const s = d.souls.soulFromToken(bearer(c)); if (!s) throw new ApiError(401, 'unauthorized', 'missing or invalid soul token; pair again (see /skill.md)'); return s; };
+  const agentSoul = (c: Context): SoulRow => { const s = d.souls.soulFromToken(bearer(c)); if (!s) { const r = d.souls.controlRefusal(bearer(c)); throw new ApiError(401, r.code, r.message, r.extra); } return s; };
   const controlReply=async(c:Context,guard:AcceptanceGuard|undefined,run:()=>Promise<object>)=>{
     const result=await run();if(guard)checkAcceptanceGuard(guard);return c.json(result);
   };
@@ -461,7 +461,7 @@ export function buildApp(d: Deps) {
   });
   // Legacy compatibility only; the audited launcher uses the POST body above.
   app.get('/v1/agent/pair/poll', (c) => { limitIp(c, 'pairpoll', 60, 60_000); return c.json({ ok: true, ...d.souls.pairPoll(c.req.query('poll_token') ?? '') }, 200, { 'cache-control': 'no-store' }); });
-  app.get('/v1/agent/me', (c) => { const s = agentSoul(c); return c.json({ soul: { id: s.id, name: s.name, description: s.description }, paired_as: s.token_label, since: s.token_created_at }); });
+  app.get('/v1/agent/me', (c) => { const s = agentSoul(c), p = d.souls.agentPairing(bearer(c)); return c.json({ soul: { id: s.id, name: s.name, description: s.description }, paired_as: p?.label ?? null, since: p?.since ?? null, since_at: p?.since == null ? null : new Date(p.since).toISOString() }); });
   // Agent-local credentials expose only the selected Soul, never the browser
   // account's other memberships or a reusable human identity credential.
   app.get('/v1/agent/account-me',c=>{const s=agentSoul(c),credential=d.souls.agentCredential(bearer(c)!)!;return c.json({me:{id:credential.grant?.id??s.id,email:null,wallet:null,role:'user',invited:true,souls:[s.id]},souls:[{id:s.id,name:s.name,description:s.description,entityId:s.entity_id,profile:profiles.view(s.id)}]});});

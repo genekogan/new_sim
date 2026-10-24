@@ -3,7 +3,7 @@
 // and the Soul's own speech (what it said). Every entry carries where it happened so the page can
 // move the camera there. Nothing here is another owner's private text: only this Soul's rows.
 import type {Context, Hono} from 'hono';
-import {EDGE_CONTRACT, EdgeError, type EdgeSoul} from './contract.ts';
+import {EDGE_CONTRACT, EdgeError, type EdgeSoul, edgeErrorOf} from './contract.ts';
 import type {EdgeLedger} from './ledger/ledger.ts';
 import type {Db} from '../db.ts';
 import {SPOT_ACTIVITIES} from './ledger/activities.ts';
@@ -144,7 +144,7 @@ export function mountOwnerDay(app: Hono, deps: {ledger: EdgeLedger; db: Db; owne
       const since = Number.isFinite(asked) && asked > 0 ? Math.max(asked, now - 2 * DAY_MS) : now - DAY_MS;
       return c.json({contract: EDGE_CONTRACT, soul: {id: s.soulId, name: s.name}, since, entries: ownerDay(deps.ledger, deps.db, s.soulId, since)});
     } catch (error) {
-      if (error instanceof EdgeError) return c.json({contract: EDGE_CONTRACT, error: {code: error.code, message: error.message}}, error.status as 403);
+      if (error instanceof EdgeError) return c.json({contract: EDGE_CONTRACT, error: edgeErrorOf(error)}, error.status as 403);
       throw error;
     }
   });
