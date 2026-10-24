@@ -126,6 +126,8 @@ const pose = (activity: string, seconds: number, extra: Record<string, unknown> 
 const walk = (to: V2, level?: number, from = 0) => level || (level === 0 && from) ? {verb: 'mars:walk_to', params: {x: to[0], z: to[1], level}} : {verb: 'walk_to', params: {to: [to[0], to[1]]}};
 const standFirst = (w: ActivityWorld): Program['steps'] => w.seated ? [{verb: 'stand', params: {}}] : [];
 const secondsParam = (def: number, max = 1800) => ({seconds: {type: 'integer', min: 5, max, default: def}});
+/** A seat's sit (no pose): the ledger times its rest or sit step, 1..600 s, 60 by default, like every sit:<seat>. */
+const seatSeconds = () => ({seconds: {type: 'integer', min: 1, max: 600, default: 60}});
 export const ACTIVITY_SECONDS_MAX = 1800;
 
 /** The activity capabilities and plans for one Soul right now. */
@@ -192,7 +194,7 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
     return [...standFirst(w), ...(spot ? [walk(spot)] : []), pose('sit-ground', sec)];
   };
   add({id: 'sit-ground:here', verb: 'sit-ground', label: 'Sit down on the ground here', available: true, params: secondsParam(120)}, {label: 'Sit on the ground', steps: sitGround(120), seconds: true});
-  if (seat) add({id: 'sit:here', verb: 'sit', label: `Sit down on the nearest free seat (${seat.cap.label}, ${Math.round(seat.distance)} m)`, available: true, target: seat.cap.target, params: secondsParam(60)}, {label: 'Sit down', steps: seat.plan.steps, seconds: true});
+  if (seat) add({id: 'sit:here', verb: 'sit', label: `Sit down on the nearest free seat (${seat.cap.label}, ${Math.round(seat.distance)} m)`, available: true, target: seat.cap.target, params: seatSeconds()}, {label: 'Sit down', steps: seat.plan.steps, seconds: true});
   else add({id: 'sit:here', verb: 'sit', label: 'Sit down (no free seat within 30 m: on the ground here)', available: true, params: secondsParam(120)}, {label: 'Sit on the ground', steps: sitGround(120), seconds: true});
   for (const [act, sec] of [['lie', 120], ['nap', 300]] as const) {
     const beds = live.filter(s => s.base === 'lie' && s.activity === act && !w.taken(s.at, s.id) && d2(s.at, w.me) <= 12 && (!data.nearest || ok(s))).sort((a, b) => d2(a.at, w.me) - d2(b.at, w.me));
