@@ -32,6 +32,7 @@ import { keySeen, shapeWedgeDistance, viewFirst, viewWedge, type ViewWedge } fro
 import { WorldBuildSites, SITE_REFINEMENT, type PublicSite } from './WorldBuildSites.ts';
 import { GroundCover, coverSetting } from './gen-mesh/ground-cover.ts';
 import { isRideBalloonDef, rideMotionDef } from './gen-mesh/kits/ride-balloon.ts';
+import { holdRainbow, isRainbowDef } from './atmosphere/rainbow-things.ts';
 
 type Snapshot = { contract: string; worldId: string; seq: number; counter?: number; seed?: string; constants: WorldModel['constants']; state: WorldModel['state']; ground: Ground; defs: StoredDef[]; entities: Entity[]; tiles: Record<string, string>; assetBytes?: Record<string, number>; builds?: PublicSite[]; buildsRev?: number; now?: number };
 type DiffMsg = { type: 'edge'; kind: 'world-diff'; seq: number; diff: { upserts: Entity[]; removes: string[]; defs: StoredDef[]; tiles: string[]; world?: Partial<WorldModel['state']> }; ground?: Ground; defs?: StoredDef[] };
@@ -693,8 +694,10 @@ export class WorldEntityLayer {
     let built = this.build(e, def);
     if (!built) { if (existing) this.undraw(e.id); return; }
     if (existing) { if (existing.inst) this.instancer.remove(existing.inst, e.id); else { this.thingsGroup.remove(existing.obj); disposeObject(existing.obj); } this.drawn.delete(e.id); }
+    // a rainbow thing is weather: hidden until the atmosphere shows it after rain (its own meshes, never instanced)
+    const rainbow = isRainbowDef(def); if (rainbow) holdRainbow(built);
     // static things with an instance key share one InstancedMesh per part (a few draws for hundreds of props)
-    const instKey = !isWorld && !hasMotion(def) && typeof built.userData.instanceKey === 'string' && instanceable(built) ? built.userData.instanceKey as string : undefined;
+    const instKey = !isWorld && !rainbow && !hasMotion(def) && typeof built.userData.instanceKey === 'string' && instanceable(built) ? built.userData.instanceKey as string : undefined;
     if (instKey) { this.instancer.ensure(instKey, built); built = new THREE.Object3D(); }
     if (!isWorld) { built.rotation.set(0, wp.yaw, 0); applyTilt(built, e); }
     const fresh = !existing;
