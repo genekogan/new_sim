@@ -62,7 +62,8 @@ export type CarrierState = {
 export type CarrierSteer = { by: string | null; to: Vec3; land?: Vec3; built: boolean; hoverUntil?: number; ret?: true;
   away: { route: CarrierRoute; elapsed: number; wake: Vec3[] } };
 /** `outBy` (leaving only): the tick by which the rider is on the ground; a step-out still held up then is set down at its exit. */
-export type CarriedBody = { id: string; slot: string; phase: 'boarding' | 'seated' | 'leaving'; outBy?: number };
+// alighting: a carrier_alight has asked this seated rider's ride to stop; the carrier does not lift off before the step-out begins.
+export type CarriedBody = { id: string; slot: string; phase: 'boarding' | 'seated' | 'leaving'; outBy?: number; alighting?: true };
 
 const TPS = 20;
 /** Clearance of the landing spot: no other person within this distance of the home centre below this height. */
@@ -331,7 +332,7 @@ const alight: ActionDef<{ actor: string; carrier: string }, null, AlightExec> = 
     if (!task || rec?.verb !== 'carrier_ride' || !rt.isActive(task)) return { ok: false, diagnostic: diag('no-ride', `${p.actor} holds no ride in ${e.label ?? e.id}`, [p.actor]) };
     return { ok: true, program: null };
   },
-  start(rt, p, _prog, id) { rt.cancel(rt.world.entities[p.actor].human!.task!, { code: 'carrier.alight', message: 'stepping out before lift-off' }); return { actor: p.actor, carrier: p.carrier, id }; },
+  start(rt, p, _prog, id) { const h = rt.world.entities[p.actor].human!; (h as { carrier?: CarriedBody }).carrier!.alighting = true; rt.cancel(h.task!, { code: 'carrier.alight', message: 'stepping out before lift-off' }); return { actor: p.actor, carrier: p.carrier, id }; },
   step(rt, ex) {
     const me = carried(rt.world.entities[ex.actor]);
     if (!me || me.id !== ex.carrier) return { status: 'completed', outputs: { carrier: ex.carrier, phase: 'ashore' } };
@@ -522,7 +523,7 @@ export function stepCarriers(rt: Runtime, table?: EntityTable | null): void {
         } else continue;
       }
       if (riders.length === d.seats.length) c.departAtTick = Math.min(c.departAtTick ?? tick, tick + 5 * TPS);
-      const allSeated = riders.every(a => carried(rt.world.entities[a])?.phase === 'seated');
+      const allSeated = riders.every(a => {const b = carried(rt.world.entities[a]); return b?.phase === 'seated' && !b.alighting;});
       if (allSeated && c.departAtTick !== null && tick >= c.departAtTick) {
         c.phase = 'aloft'; c.phaseTick = tick; c.elapsed = 0; c.flights++; c.departAtTick = null; e.phase = 'carried';
       }

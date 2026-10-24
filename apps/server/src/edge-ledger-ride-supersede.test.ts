@@ -84,3 +84,42 @@ test('parked balloon: a seated rider leaves before lift-off, on foot through the
  assert.ok(await run(400,()=>balloon().carrier.phase==='aloft'&&balloon().pose.p[1]>3),'lifted off with ben');
  const la=await call(1,'POST','/v1/edge/act',{capability:'object:ride-eden-balloon:leave'});assert.equal(la.accepted,false);assert.equal(la.code,'ride.aloft');
 });
+
+// RIDE-EXIT race: leave asked as lift-off falls due. d=0: the balloon is already up when the alight is admitted, so it fails truthfully
+// (carrier.not-on-ground) and the rider steps out after landing; d>=1: the accepted alight holds lift-off and the rider walks out first.
+test('parked balloon exit vs lift-off due d ticks later: never carried after an admitted alight, never out mid-air',{timeout:900000},async t=>{
+ const f=fixture(':memory:',await factory(),{durableClockV1:true});f.souls.enableLifecycle();f.brain.quiesce();t.after(()=>{f.host.stop();f.db.close();});
+ await accept<unknown>(f.host,new LivingWorld(f.host).install(['Owners drive their Souls.']));for(let i=0;i<4;i++)f.host.tickOnce();
+ await accept(f.host,f.host.installCommonsProvisionsV1());await accept(f.host,f.host.installRetainedCommonsShoreV1());
+ for(const p of [f.host.enableYieldTimeoutV1(),f.host.enableSpreadV2(),f.host.enableReflexTimeoutV1(),f.host.enableContinuousDayV1(),f.host.enableEdgeMotionV1()])await accept<unknown>(f.host,p);
+ const rows:any[]=[];for(const n of ['ana','ben','cy']){await invite(f,n);rows.push(await accept(f.host,f.souls.create('dev:'+n,{name:n,description:'rider'})));}
+ const tokens=rows.map((r,i)=>{const tok='sim_RIDE_TEST_TOKEN_'+i;f.db.setSoulToken(r.id,hashToken(tok),'synthetic');return tok;});
+ await accept<unknown>(f.host,f.host.installCarrierV1({id:'eden-balloon',def:'hot-air-balloon',label:'Red balloon',at:[-20,-9],yaw:Math.PI,route:'commons-hop',waitSeconds:60}));
+ const ledger=new EdgeLedger(f.host,f.db,undefined,{ambient:true}),app=new Hono(),bearer=(c:any)=>c.req.header('authorization')?.replace(/^Bearer\s+/i,'');
+ const comms=mountEdgeRoutes(app,{host:f.host,db:f.db,souls:f.souls,soul:edgeSoulResolver(f.host,f.souls,bearer),ledger});t.after(()=>comms.close());
+ comms.objects.create({id:'ride-eden-balloon',kind:'ride',name:'Red balloon',placeId:'world',params:{carrier:'eden-balloon'}});
+ const pump=async<T>(p:Promise<T>)=>{let done=false;p.then(()=>done=true,()=>done=true);for(let i=0;i<400&&!done;i++){await setImmediate();f.host.drainInputs();}assert.ok(done,'request settled');return p;};
+ const call=async(i:number,method:string,path:string,body?:unknown)=>{const res=await pump(app.request(path,{method,headers:{authorization:'Bearer '+tokens[i],'content-type':'application/json'},...(body?{body:JSON.stringify(body)}:{})}) as Promise<Response>);return await res.json() as any;};
+ const dump=()=>rows.map((r,i)=>`${i}:${r.entity_id} ${ent(i).pose.p.map((v:number)=>v.toFixed(2))} ${ent(i).human.activity} ${JSON.stringify(ent(i).human.carrier??null)} task=${ent(i).human.task} rec=${ent(i).human.task?JSON.stringify((f.host.engine.runtime.records.get(ent(i).human.task) as any)):''}`).join('\n');
+ const run=async(n:number,until:()=>boolean)=>{for(let i=0;i<n&&!until();i++){try{f.host.tickOnce();}catch(e){console.error(dump());throw e;}if(i%20===0){await setImmediate();f.host.drainInputs();}}return until();};
+ const W=f.host.engine.world as any,balloon=()=>W.entities['eden-balloon'],ent=(i:number)=>W.entities[rows[i].entity_id];
+ const phase=(i:number,id:string)=>ledger.receipt(rows[i].id,id)!;
+ // BALLOON-BODY (Gene 2026-10-23: "they walk through the walls"): a body (radius ~0.2 m) near the back wall is in its door gap
+ // (0.56 m wide, so the centre within 0.08 m of the door line), and never near the other three walls while on the ground.
+ const walls:string[]=[],watch=()=>{const b=balloon();if(b.pose.p[1]>.05)return;const c=Math.cos(b.pose.yaw),s=Math.sin(b.pose.yaw);
+  for(const i of [0]){const p=ent(i).pose.p,dx=p[0]-b.pose.p[0],dz=p[2]-b.pose.p[2],lx=dx*c+dz*s,lz=-dx*s+dz*c,R=.2;
+   const nearBack=Math.abs(lx+.75)<R&&Math.abs(lz)<.6+R,nearOther=(Math.abs(lx-.75)<R&&Math.abs(lz)<.6+R)||(Math.abs(Math.abs(lz)-.6)<R&&Math.abs(lx)<.75+R);
+   if((nearBack&&Math.abs(lz)>.28-R)||nearOther)walls.push(`${i}@tick ${f.host.engine.world.tick} local ${lx.toFixed(2)},${lz.toFixed(2)}`);}};
+ for(const d of [0,1,2]){
+  const ja=await call(0,'POST','/v1/edge/act',{capability:'object:ride-eden-balloon:join'});
+  assert.ok(await run(3000,()=>phase(0,ja.receipt.id).phase==='completed'&&ent(0).human.carrier?.phase==='seated'),'seated d='+d);
+  balloon().carrier.departAtTick=f.host.engine.world.tick+d;
+  const lv=await call(0,'POST','/v1/edge/act',{capability:'object:ride-eden-balloon:leave'});assert.equal(lv.accepted,true,JSON.stringify(lv));
+  let lifted=false,out=-1,offY=0;
+  for(let k=0;k<4000;k++){await run(1,()=>false);watch();const ab=!!ledger.aboard(rows[0].entity_id);if(ab&&balloon().carrier.phase==='aloft')lifted=true;
+   if(!ab){offY=Math.max(offY,ent(0).pose.p[1]);if(out<0)out=k;}if(out>=0&&balloon().carrier.phase==='parked'&&k>out+40)break;}
+  const rc=phase(0,lv.receipt.id);assert.ok(offY<.05,`never out mid-air d=${d}: ${offY}`);assert.deepEqual(walls,[],'door only');
+  if(d===0){assert.equal(lifted,true,'already up at d=0');assert.equal(rc.phase,'failed');assert.equal(rc.code,'carrier.not-on-ground');assert.ok(out>0,'out after landing');}
+  else {assert.equal(lifted,false,`an admitted alight holds lift-off d=${d}`);assert.ok(out>=0&&out<=12*20,`out in ${out} ticks d=${d}`);assert.equal(rc.phase,'completed',JSON.stringify(rc));}
+ }
+});
