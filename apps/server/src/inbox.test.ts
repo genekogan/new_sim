@@ -89,6 +89,25 @@ test('one durable latest message: truthful transitions, replacement, isolation, 
   assert.equal(inbox.view(a).queued, 1);
 });
 
+// Historical title retained as the release gate's stable test identity. Its scenarios (the gap between two long-polls, a
+// listener that is gone, an agent holding a message) are kept, but the SOUL3 PRESENCE semantics intentionally supersede the
+// old expectations per Gene's brief: a Soul is listening while a listen is open or closed <= SOUL_LISTEN_GRACE_MS (60 s) ago,
+// then 'away' (was 'recent' after a short gap); after handing messages, a newer queued message within the grace still shows
+// 'listening' (was "nobody listens until the agent runs listen again"). The full new contract is the PRESENCE test below.
+test('presence stays listening across the gap between two long-polls, not after the listener is gone or once it holds a message', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'sim-inbox-')); t.after(() => rmSync(dir, {recursive: true, force: true}));
+  const db = new Db(join(dir, 'fixture.db')); t.after(() => db.close());
+  let now = 1000; const inbox = new AgentInbox(db, 'w1', () => now), a = {scope: 'soul:a', owner: 'alice'};
+  inbox.touch(a); const end = inbox.listening(a); assert.equal(inbox.view(a).presence, 'listening');
+  end(); now += 60; assert.equal(inbox.view(a).presence, 'listening', 're-polling');
+  now += SOUL_LISTEN_GRACE_MS; assert.equal(inbox.view(a).presence, 'away', 'gone: grace over (superseded: was recent)');
+  inbox.send(a, 'go to the cottage'); const end2 = inbox.listening(a); const [m] = inbox.takeBacklog(a); end2(true); now += 10;
+  assert.equal(inbox.view(a).presence, 'working', 'it took a message: working, not listening');
+  inbox.result(a, m.id, 'Arrived.', 'done'); inbox.send(a, 'now the garden'); now += 100;
+  assert.equal(inbox.view(a).presence, 'listening', 'superseded: within the grace a newer queued message shows listening');
+  now += SOUL_LISTEN_GRACE_MS; assert.equal(inbox.view(a).presence, 'away', 'after the grace nobody listens until the agent runs listen again');
+});
+
 test('PRESENCE: a Soul listens while a listen is open or closed <= 60 s ago; other traffic, a stepped-back clock and the god box', t => {
   const dir = mkdtempSync(join(tmpdir(), 'sim-inbox-')); t.after(() => rmSync(dir, {recursive: true, force: true}));
   let db = new Db(join(dir, 'fixture.db')); t.after(() => db.close());
