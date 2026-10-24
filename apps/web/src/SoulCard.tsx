@@ -10,7 +10,7 @@ import {BASE} from './base-path.ts';
 import './SoulCard.css';
 import {SoulAgentMessageBox} from './AgentMessageBox.tsx';
 import {VisitorFrom} from './SoulTravel.tsx';
-import {useAgentPresence} from './agent-presence.ts';
+import {soulPresenceChip,useAgentPresence} from './agent-presence.ts';
 
 /** UI2 (Gene: "it looks like a markdown file"): the selected Soul as a compact card. Name, character, a status
  * dot, what it is doing, Share. Everything else (last action, recent actions/events, public activity) sits in a
@@ -45,7 +45,9 @@ function usePublicRecord(api:Api,soulId:string):Rec{
 export function SoulCard({api,soul,doing,energy,plays,talk,camera,ownerAction}:{api:Api;soul:PublicSoul;doing:string;energy:string|null;plays:readonly PlayView[];talk:readonly TalkLine[];camera?:{following:boolean;follow():void;stop():void};ownerAction?:()=>void}){
  const rec=usePublicRecord(api,soul.id);
  // AWAY-UI: the owner's card drops Follow while the agent is away (still offered to stop a follow already on)
- const agentAway=!!useAgentPresence(ownerAction?soul.id:null)?.away;
+ const here=useAgentPresence(ownerAction?soul.id:null),agentAway=!!here?.away;
+ // PRESENCE (SOUL3): the owner's card says whether its agent is listening (only the owner's own inbox read feeds it)
+ const chip=ownerAction?soulPresenceChip(here):null;
  const [view,setView]=useState<'card'|'activity'>('card');
  const [copied,setCopied]=useState<''|'ok'|'failed'>('');
  const title=useRef<HTMLHeadingElement>(null),alive=useRef(true);
@@ -70,6 +72,7 @@ export function SoulCard({api,soul,doing,energy,plays,talk,camera,ownerAction}:{
    {doing&&<span className="soul-doing">{doing}</span>}
    {energy&&<span className="soul-energy">{energy}</span>}
    <VisitorFrom soulId={soul.id}/>
+   {chip&&<span className="soul-agent" data-agent-state={chip.state} title={chip.title}><i aria-hidden="true"/>{chip.text}</span>}
   </p>
   <div className="soul-card-thread" data-soul-thread={soul.id}/>
   {ownerAction&&<SoulAgentMessageBox api={api} soulId={soul.id} name={soul.name}/>}

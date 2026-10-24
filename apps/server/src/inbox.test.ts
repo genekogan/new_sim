@@ -4,7 +4,7 @@ import {mkdtempSync, rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {Db} from './db.ts';
-import {AgentInbox, INBOX_CONNECTED_MS, LISTEN_GAP_MS} from './inbox.ts';
+import {AgentInbox, INBOX_CONNECTED_MS, SOUL_LISTEN_GRACE_MS} from './inbox.ts';
 import {fixture, invite, accept} from '../test/native-owner-fixture.ts';
 import {buildApp} from './http.ts';
 import {config} from './config.ts';
@@ -17,7 +17,7 @@ test('soul queue: nothing overwrites, the oldest waits first, listen takes the w
   const dir = mkdtempSync(join(tmpdir(), 'sim-inbox-')); t.after(() => rmSync(dir, {recursive: true, force: true}));
   let db = new Db(join(dir, 'fixture.db')), now = 1000, inbox = new AgentInbox(db, 'w1', () => now);
   const a = {scope: 'soul:a', owner: 'alice'}, b = {scope: 'soul:a', owner: 'bob'}, other = new AgentInbox(db, 'w2', () => now);
-  assert.deepEqual(inbox.view(a), {connected: false, lastSeenAt: null, latest: null, queued: 0, presence: 'away'});
+  assert.deepEqual(inbox.view(a), {connected: false, lastSeenAt: null, listenedAt: null, latest: null, queued: 0, presence: 'away'});
   const first = inbox.send(a, 'go find the horses').latest!; now++;
   assert.throws(() => inbox.send(a, '\u0000'.repeat(1000)), /control characters/);
   const second = inbox.send(a, 'hello?').latest!; now++;
@@ -26,8 +26,8 @@ test('soul queue: nothing overwrites, the oldest waits first, listen takes the w
   assert.equal(inbox.view(a).latest!.id, first.id, 'the agent sees the oldest waiting'); assert.equal(inbox.view(a).queued, 3);
   assert.equal(inbox.view(b).latest, null); assert.equal(other.view(a).latest, null);
   // a private notice on any other answer does not consume it (listen is the one consumer)
-  inbox.touch(a); assert.equal(inbox.view(a).latest!.state, 'sent'); assert.equal(inbox.view(a).presence, 'recent');
-  const backlog = inbox.takeBacklog(a);
+  inbox.touch(a); assert.equal(inbox.view(a).latest!.state, 'sent'); assert.equal(inbox.view(a).presence, 'away', 'PRESENCE: other calls never make a Soul present');
+  const backlog = inbox.takeBacklog(a); inbox.listening(a)(true);   // the route's listen closes as it hands them over
   assert.deepEqual(backlog.map(m => m.text), ['go find the horses', 'hello?', 'can you ride the horse?']);
   assert.deepEqual(backlog.map(m => m.state), ['delivered', 'delivered', 'delivered']);
   assert.equal(inbox.view(a).presence, 'working');
@@ -73,7 +73,8 @@ test('one durable latest message: truthful transitions, replacement, isolation, 
   assert.throws(() => inbox.send(a, '\u0000'.repeat(1000)), /control characters/);
   assert.equal(first.state, 'sent'); assert.equal(inbox.view(a).connected, false);
   assert.equal(inbox.view(b).latest, null); assert.equal(other.view(a).latest, null);
-  inbox.touch(a); assert.equal(inbox.view(a).connected, true); assert.equal(inbox.view(a).latest!.state, 'sent');
+  inbox.touch(a); assert.equal(inbox.view(a).connected, false, 'PRESENCE: a call is not a listen');
+  inbox.listening(a)(); assert.equal(inbox.view(a).connected, true); assert.equal(inbox.view(a).latest!.state, 'sent');
   now++; assert.equal(inbox.deliver(a).latest!.state, 'delivered');
   assert.throws(() => inbox.acknowledge(a, first.id, 'x'.repeat(141)), /140/);
   assert.throws(() => inbox.acknowledge(a, first.id, 'two\nlines'), /one line/);
@@ -88,17 +89,44 @@ test('one durable latest message: truthful transitions, replacement, isolation, 
   assert.equal(inbox.view(a).queued, 1);
 });
 
-test('presence stays listening across the gap between two long-polls, not after the listener is gone or once it holds a message', t => {
+test('PRESENCE: a Soul listens while a listen is open or closed <= 60 s ago; other traffic, a stepped-back clock and the god box', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'sim-inbox-')); t.after(() => rmSync(dir, {recursive: true, force: true}));
+  let db = new Db(join(dir, 'fixture.db')); t.after(() => db.close());
+  let now = 1000, inbox = new AgentInbox(db, 'w1', () => now); const a = {scope: 'soul:a', owner: 'alice'}, g = {scope: 'god', owner: 'alice'};
+  assert.equal(inbox.view(a).presence, 'away'); assert.equal(inbox.view(a).listenedAt, null, 'never seen');
+  inbox.touch(a); assert.equal(inbox.view(a).presence, 'away', 'other traffic alone never counts');
+  const end = inbox.listening(a); now += 20_000;
+  assert.equal(inbox.view(a).presence, 'listening'); assert.equal(inbox.view(a).listenedAt, now, 'open: listening now');
+  end(); const closed = now;
+  now += SOUL_LISTEN_GRACE_MS; assert.equal(inbox.view(a).presence, 'listening', 'within the grace after close');
+  assert.equal(inbox.view(a).listenedAt, closed); assert.equal(inbox.view(a).connected, true);
+  now += 1; assert.equal(inbox.view(a).presence, 'away', 'grace over'); assert.equal(inbox.view(a).connected, false);
+  inbox.touch(a); now += 10_000; inbox.touch(a);
+  assert.equal(inbox.view(a).presence, 'away', 'ack/act/other calls do not keep presence alive'); assert.equal(inbox.view(a).listenedAt, closed, 'away since the close');
+  const end2 = inbox.listening(a); assert.equal(inbox.view(a).presence, 'listening', 'reopen'); end2(); now += 59_000;
+  // the stamp is durable: a restart within the grace still says listening, and after it, away since that close
+  db.close(); db = new Db(join(dir, 'fixture.db')); inbox = new AgentInbox(db, 'w1', () => now);
+  assert.equal(inbox.view(a).presence, 'listening', 'restart within the grace'); now += 2_000; assert.equal(inbox.view(a).presence, 'away');
+  assert.equal(inbox.view(a).listenedAt, now - 61_000);
+  now -= 120_000; assert.equal(inbox.view(a).presence, 'away', 'a clock stepped back claims nothing'); now += 120_000;
+  // it took messages: working within the grace (still not away), away after
+  inbox.send(a, 'go to the cottage'); const end3 = inbox.listening(a); const [m] = inbox.takeBacklog(a); end3(true); now += 10;
+  assert.equal(inbox.view(a).presence, 'working'); assert.equal(inbox.ownerView(a).queued, 1, 'unacked count');
+  now += SOUL_LISTEN_GRACE_MS; assert.equal(inbox.view(a).presence, 'away');
+  inbox.result(a, m.id, 'Arrived.', 'done'); assert.equal(inbox.ownerView(a).queued, 0);
+  // the god box is unchanged: a call within 30 s is recent, with no listenedAt field
+  inbox.touch(g); assert.equal(inbox.view(g).presence, 'recent'); assert.equal('listenedAt' in inbox.view(g), false);
+  now += 31_000; assert.equal(inbox.view(g).presence, 'away');
+});
+
+test('PRESENCE: an older agent_inbox_v1 table without listened_at gains the column at boot and keeps its rows', t => {
   const dir = mkdtempSync(join(tmpdir(), 'sim-inbox-')); t.after(() => rmSync(dir, {recursive: true, force: true}));
   const db = new Db(join(dir, 'fixture.db')); t.after(() => db.close());
+  db.db.exec(`CREATE TABLE agent_inbox_v1 (world_id TEXT NOT NULL, scope TEXT NOT NULL, owner TEXT NOT NULL, id TEXT, text TEXT, sent_at INTEGER, delivered_at INTEGER, acknowledged_at INTEGER, reply TEXT, last_seen_at INTEGER, PRIMARY KEY(world_id,scope,owner)) WITHOUT ROWID;
+    INSERT INTO agent_inbox_v1(world_id,scope,owner,last_seen_at) VALUES('w1','soul:a','alice',7)`);
   let now = 1000; const inbox = new AgentInbox(db, 'w1', () => now), a = {scope: 'soul:a', owner: 'alice'};
-  inbox.touch(a); const end = inbox.listening(a); assert.equal(inbox.view(a).presence, 'listening');
-  end(); now += 60; assert.equal(inbox.view(a).presence, 'listening', 're-polling');
-  now += LISTEN_GAP_MS; assert.equal(inbox.view(a).presence, 'recent', 'gone');
-  inbox.send(a, 'go to the cottage'); const end2 = inbox.listening(a); const [m] = inbox.takeBacklog(a); end2(true); now += 10;
-  assert.equal(inbox.view(a).presence, 'working', 'it took a message: working, not listening');
-  inbox.result(a, m.id, 'Arrived.', 'done'); inbox.send(a, 'now the garden'); now += 100;
-  assert.notEqual(inbox.view(a).presence, 'listening', 'after handing messages nobody listens until the agent runs listen again');
+  assert.deepEqual([inbox.view(a).lastSeenAt, inbox.view(a).listenedAt, inbox.view(a).presence], [7, null, 'away']);
+  inbox.listening(a)(); now += 5; assert.equal(inbox.view(a).listenedAt, 1000); assert.equal(inbox.view(a).presence, 'listening');
 });
 
 test('LISTEN-LEAK: a newer listen supersedes only the same agent (same Soul, same owner, same world), never another Soul, owner, god box or world', t => {
@@ -196,6 +224,7 @@ test('real owner and paired HTTP flows: absent, browser, command polling, listen
     let box = (await req(path, 'dev:alice')).data.inbox; assert.equal(box.latest.id, ids[2]); assert.equal(box.queued, 3); assert.equal(box.presence, 'away');
     const busy = await req('/v1/edge/observe', tokenA); assert.equal(busy.data.inbox.latest.id, ids[0]); assert.equal(busy.data.inbox.latest.state, 'sent', 'a notice is not a delivery');
     assert.equal(busy.headers.get('cache-control'), 'no-store');
+    box = (await req(path, 'dev:alice')).data.inbox; assert.equal(box.presence, 'away', 'PRESENCE: an authenticated observe is not a listen'); assert.equal(box.listenedAt, null);
     const got = await req('/v1/edge/inbox/listen?timeoutMs=25000', tokenA);
     assert.deepEqual(got.data.backlog.map((m: any) => m.text), texts); assert.deepEqual(got.data.backlog.map((m: any) => m.state), ['delivered', 'delivered', 'delivered']);
     box = (await req(path, 'dev:alice')).data.inbox; assert.equal(box.presence, 'working'); assert.equal(box.latest.state, 'delivered');

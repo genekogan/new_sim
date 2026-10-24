@@ -2,12 +2,14 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 import type {Api} from './useSim.ts';
 import {apiPath} from './world-path.ts';
 import {windowCode} from './god-ui/join-api.ts';
-import {awaySince,reportAgentPresence} from './agent-presence.ts';
+import {presenceOf,reportAgentPresence,soulPresenceLine,useAgentPresence,type AgentHere} from './agent-presence.ts';
 import './AgentMessageBox.css';
 
 export type AgentInbox = {
   connected: boolean;
   lastSeenAt: number | null;
+  /** A Soul's box: when its agent last had a listen open (null = never). */
+  listenedAt?: number | null;
   latest: {id: string; text: string; state: 'sent' | 'delivered' | 'acknowledged'; sentAt?: number; reply?: string | null; result?: string | null; outcome?: 'done' | 'failed' | 'withdrawn'} | null;
   /** Messages waiting for the agent (the shown one included), and whether a listener is waiting right now. */
   queued?: number;
@@ -32,7 +34,7 @@ export function receiptState(latest: NonNullable<AgentInbox['latest']>, queued: 
 type Transport = (text?: string) => Promise<AgentInbox>;
 
 /** A single private note and receipt, deliberately without a conversation history. */
-export function AgentMessageBox({request, prompt, kind}: {request: Transport; prompt: string; kind: 'god' | 'soul'}) {
+export function AgentMessageBox({request, prompt, kind, name, here}: {request: Transport; prompt: string; kind: 'god' | 'soul'; name?: string; here?: AgentHere | null}) {
   const [inbox, setInbox] = useState<AgentInbox | null>(null);
   const [text, setText] = useState(''), [sending, setSending] = useState(false), [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
@@ -58,33 +60,36 @@ export function AgentMessageBox({request, prompt, kind}: {request: Transport; pr
     catch (e) {if (mounted.current) setError(e instanceof Error ? e.message : 'Message could not be sent. Try again.');}
     finally {revision.current++; if (mounted.current) setSending(false);}
   };
-  return <AgentMessageBoxView kind={kind} inbox={inbox} prompt={prompt} text={text} sending={sending} error={error} copied={copied}
+  return <AgentMessageBoxView kind={kind} name={name} here={here} inbox={inbox} prompt={prompt} text={text} sending={sending} error={error} copied={copied}
     onText={setText} onSend={send} onCopy={async () => {
       try {await navigator.clipboard.writeText(prompt); if (mounted.current) setCopied(true);}
       catch {if (mounted.current) setError('Copy unavailable. Select the start prompt to copy it.');}
     }}/>;
 }
 
-export function AgentMessageBoxView({kind, inbox, prompt, text, sending = false, error = '', copied = false, now = Date.now(), onText, onSend, onCopy}: {
-  kind: 'god' | 'soul'; inbox: AgentInbox | null; prompt: string; text: string; sending?: boolean; error?: string; copied?: boolean; now?: number;
+export function AgentMessageBoxView({kind, name, here, inbox, prompt, text, sending = false, error = '', copied = false, now = Date.now(), onText, onSend, onCopy}: {
+  /** A Soul's box: its name, and the page's current (non-stale) presence for it; absent = read from `inbox`. */
+  kind: 'god' | 'soul'; name?: string; here?: AgentHere | null; inbox: AgentInbox | null; prompt: string; text: string; sending?: boolean; error?: string; copied?: boolean; now?: number;
   onText(text: string): void; onSend(event: React.FormEvent): void; onCopy(): void;
 }) {
-  const latest = inbox?.latest, presence = inbox ? presenceLine(inbox, now) : null;
-  // AWAY-UI: a Soul whose agent is away shows when it left and the start prompt, and no message box until it is back
-  const soulAway = kind === 'soul' && !!presence?.away;
-  // the owner's newest message; `queued` counts what still waits (the agent works oldest first)
-  const state = latest ? receiptState(latest, inbox?.queued ?? 0, now) : '';
+  const latest = inbox?.latest;
+  // PRESENCE (SOUL3): a Soul's box says, before typing, whether its agent is listening or since when it is away (the message
+  // then waits), with how many of the owner's messages wait; the box itself stays, since a message typed now is queued.
+  const soul = kind === 'soul' ? soulPresenceLine(name, here !== undefined ? here : inbox ? presenceOf(inbox, now) : null, now) : null;
+  const presence = soul ? {away: soul.state === 'away' || soul.state === 'never', text: soul.text} : inbox ? presenceLine(inbox, now) : null;
+  // the owner's newest message; `queued` counts what still waits (the agent works oldest first; a Soul's line says it)
+  const state = latest ? receiptState(latest, soul ? 0 : inbox?.queued ?? 0, now) : '';
   const answers = latest ? [latest.reply, latest.result].filter((x): x is string => !!x) : [];
   const receipt = latest ? [state, latest.text, ...answers].join(' · ') : '';
   return <div className="agent-message" data-agent-message={kind}>
-    <div className="agent-message-presence" data-agent-presence={inbox?.presence ?? (inbox ? inbox.connected ? 'recent' : 'away' : 'unknown')}>
-      <span>{soulAway ? `${awaySince(inbox?.lastSeenAt ?? null, now)} · copy the start prompt into your agent to bring it back` : presence ? presence.text : 'Agent status unavailable'}</span>
+    <div className="agent-message-presence" data-agent-presence={soul ? soul.state : inbox?.presence ?? (inbox ? inbox.connected ? 'recent' : 'away' : 'unknown')}>
+      <span role={soul ? 'status' : undefined} title={soul?.title}>{presence ? presence.text : 'Agent status unavailable'}{soul?.waiting && <span className="agent-message-waiting"> · {soul.waiting}</span>}</span>
       {presence?.away && <button type="button" onClick={onCopy} title={prompt}>{copied ? 'Copied' : 'Copy start prompt'}</button>}
     </div>
-    {!soulAway && <form className="agent-message-form" onSubmit={onSend}>
+    <form className="agent-message-form" onSubmit={onSend}>
       <input aria-label="Message your agent" placeholder="Message your agent…" value={text} onChange={e => onText(e.target.value)} maxLength={1000} disabled={sending} autoComplete="off"/>
       <button type="submit" disabled={sending || !text.trim()}>{sending ? 'Sending…' : 'Send'}</button>
-    </form>}
+    </form>
     {latest && <p className="agent-message-receipt" role="status" title={receipt} data-message-state={latest.state}>
       <span className="agent-message-state">{state}</span><span aria-hidden="true"> · </span><span className="agent-message-text">{latest.text}</span>
       {answers.map((a, i) => <span key={i} className="agent-message-answer"><span aria-hidden="true"> · </span><span className="agent-message-reply">{a}</span></span>)}
@@ -124,5 +129,6 @@ export function SoulAgentMessageBox({api, soulId, name}: {api: Api; soulId: stri
     return () => { live = false; };
   }, []);
   const base = location.origin + apiPath('');
-  return <AgentMessageBox key={soulId} kind="soul" request={request} prompt={soulStartPrompt(base, soulId, name, code)}/>;
+  const here = useAgentPresence(soulId);
+  return <AgentMessageBox key={soulId} kind="soul" name={name} here={here} request={request} prompt={soulStartPrompt(base, soulId, name, code)}/>;
 }

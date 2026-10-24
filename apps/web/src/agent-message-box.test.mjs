@@ -9,8 +9,8 @@ const {build} = createRequire(require.resolve('vite/package.json'))('esbuild');
 const dir = await mkdtemp(join(tmpdir(), 'sim-inbox-render-'));
 Object.assign(globalThis, {location: {origin: 'http://localhost:5960', pathname: '/w/inbox/', search: '', hash: ''}, sessionStorage: {getItem: () => null}});
 const outfile = join(dir, 'render.cjs');
-await build({stdin: {contents: `export {AgentMessageBoxView, soulStartPrompt} from './AgentMessageBox.tsx';export {watchStatus} from './god-ui/god-api.ts';export {watchInbox, godState} from './god-ui/god-store.ts';export {publishSession} from './auth-session.ts';export {SoulFocus} from './SoulFocus.tsx';export {createElement} from 'react';export {renderToStaticMarkup} from 'react-dom/server';`, resolveDir: new URL('.', import.meta.url).pathname, loader: 'tsx'}, outfile, bundle: true, format: 'cjs', platform: 'node', jsx: 'automatic', loader: {'.css': 'empty'}, logLevel: 'silent'});
-const {AgentMessageBoxView, soulStartPrompt, watchStatus, watchInbox, godState, publishSession, SoulFocus, createElement: h, renderToStaticMarkup: render} = require(outfile);
+await build({stdin: {contents: `export {AgentMessageBoxView, soulStartPrompt} from './AgentMessageBox.tsx';export {watchStatus} from './god-ui/god-api.ts';export {watchInbox, godState} from './god-ui/god-store.ts';export {publishSession} from './auth-session.ts';export {SoulFocus} from './SoulFocus.tsx';export {reportAgentPresence} from './agent-presence.ts';export {createElement} from 'react';export {renderToStaticMarkup} from 'react-dom/server';`, resolveDir: new URL('.', import.meta.url).pathname, loader: 'tsx'}, outfile, bundle: true, format: 'cjs', platform: 'node', jsx: 'automatic', loader: {'.css': 'empty'}, logLevel: 'silent'});
+const {AgentMessageBoxView, soulStartPrompt, watchStatus, watchInbox, godState, publishSession, SoulFocus, reportAgentPresence, createElement: h, renderToStaticMarkup: render} = require(outfile);
 const props = {kind: 'god', prompt: 'Resume the existing agent and listen.', text: '', onText() {}, onSend() {}, onCopy() {}};
 test('absent and unknown agent presence make no delivery claim; start prompt is copyable', () => {
   const absent = render(h(AgentMessageBoxView, {...props, inbox: {connected: false, lastSeenAt: null, latest: null}}));
@@ -35,32 +35,48 @@ test('MSG: presence says listening now / seen recently / away; an unread message
   const now = 1_000_000, base = {connected: true, lastSeenAt: now - 12_000};
   const at = (inbox, kind = 'soul') => render(h(AgentMessageBoxView, {...props, kind, now, inbox}));
   const listening = at({...base, presence: 'listening', queued: 0, latest: null});
-  assert.match(listening, /Your agent is listening now/); assert.match(listening, /data-agent-presence="listening"/); assert.doesNotMatch(listening, /Copy start prompt/);
-  assert.match(at({...base, presence: 'recent', latest: null}), /Your agent was seen recently \(12 s ago\)/);
-  assert.match(at({...base, presence: 'working', latest: null}), /seen recently/);
-  const away = at({connected: false, lastSeenAt: now - 3_600_000, presence: 'away', latest: null}); assert.match(away, /Away since .* copy the start prompt/); assert.match(away, /Copy start prompt/);
-  assert.doesNotMatch(away, /Message your agent/, 'AWAY-UI: no message box while the Soul agent is away');
+  assert.match(listening, /Your Soul&#x27;s agent is listening\./); assert.match(listening, /data-agent-presence="listening"/);
+  assert.match(at({...base, presence: 'listening', latest: null}, 'god'), /Your agent is listening now/, 'god copy unchanged'); assert.doesNotMatch(listening, /Copy start prompt/);
+  assert.match(at({...base, presence: 'recent', latest: null}, 'god'), /Your agent was seen recently \(12 s ago\)/);
+  assert.match(at({...base, presence: 'working', latest: null}, 'god'), /seen recently/);
+  assert.match(at({...base, presence: 'working', latest: null}), /is working through your messages/);
+  const away = at({connected: false, lastSeenAt: now - 3_600_000, presence: 'away', latest: null}); assert.match(away, /Your Soul&#x27;s agent is away since .*Your message will wait for it\./); assert.match(away, /Copy start prompt/);
+  assert.match(away, /Message your agent/, 'PRESENCE: the Soul box stays while its agent is away; the message waits');
   const godAway = at({connected: false, lastSeenAt: now - 3_600_000, presence: 'away', latest: null}, 'god'); assert.match(godAway, /away — messages will wait/); assert.match(godAway, /Message your agent/);
   assert.match(listening, /Message your agent/, 'the message box is back once the agent listens');
-  assert.match(at({connected: false, lastSeenAt: null, presence: 'away', latest: null}), />Away · copy/, 'never seen: plain Away');
+  assert.match(at({connected: false, lastSeenAt: null, presence: 'away', latest: null}), /has not connected yet\. Your message will wait for it\./, 'never seen: no invented time');
   const fresh = at({...base, presence: 'listening', queued: 1, latest: {id: 'm', text: 'run!', state: 'sent', sentAt: now - 4_000}});
-  assert.match(fresh, />Sent</); assert.doesNotMatch(fresh, /Not picked up|waiting/);
+  assert.match(fresh, />Sent</); assert.doesNotMatch(fresh, /Not picked up/); assert.match(fresh, /1 message waiting/);
+  assert.ok(fresh.indexOf('is listening.') < fresh.indexOf('Message your agent'), 'presence comes before typing');
   const stuck = at({...base, presence: 'away', connected: false, queued: 3, latest: {id: 'm', text: 'the house!!!!', state: 'sent', sentAt: now - 14_000}});
-  assert.match(stuck, /Not picked up yet \(14 s\) · 3 waiting/);
-  assert.match(at({...base, queued: 2, latest: {id: 'm', text: 'x', state: 'delivered', sentAt: now - 60_000}}), /Picked up · 2 waiting/);
+  assert.match(stuck, /Not picked up yet \(14 s\)</); assert.match(stuck, /agent-message-waiting"> · 3 messages waiting/, 'the Soul line carries the count');
+  assert.match(at({...base, presence: 'away', connected: false, queued: 3, latest: {id: 'm', text: 'x', state: 'sent', sentAt: now - 14_000}}, 'god'), /Not picked up yet \(14 s\) · 3 waiting/, 'god receipt unchanged');
+  assert.match(at({...base, queued: 2, latest: {id: 'm', text: 'x', state: 'delivered', sentAt: now - 60_000}}, 'god'), /Picked up · 2 waiting/);
   const done = at({...base, queued: 0, latest: {id: 'm', text: 'go to the cottage', state: 'acknowledged', reply: 'Got it: walking there.', result: 'Arrived.', outcome: 'done', sentAt: now - 90_000}});
   assert.match(done, />Done</); assert.ok(done.indexOf('Got it: walking there.') < done.indexOf('Arrived.'), 'the ack reply, then the result');
   assert.match(at({...base, latest: {id: 'm', text: 'ride', state: 'acknowledged', reply: 'Trying.', result: "Couldn't: no saddle.", outcome: 'failed'}}), /Could not do it/);
-  assert.match(at({connected: true, lastSeenAt: now}), /seen recently/, 'an older server without presence: connected means seen recently');
+  assert.match(at({connected: true, lastSeenAt: now}, 'god'), /seen recently/, 'an older server without presence: connected means seen recently');
+  assert.match(at({connected: false, lastSeenAt: now}), /is away since/, 'an older Soul box: not connected = away since its last call');
 });
 test('Soul card inbox belongs only to its authenticated owner, including account switch', () => {
   const soul = {id: 's_A', entityId: 'h_A', name: 'Ana', description: '', doing: '', energy: 'fine'};
   const sim = {me: {userId: 'acct_A', souls: ['s_A'], role: 'user', invited: true}, privateAuthorityGeneration: 1, conn: {welcome: {worldId: 'inbox-1', epoch: 1}, replica: {souls: new Map([['s_A', soul]]), entities: {}, tick: 0}}, plays: [], talk: []};
+  // PRESENCE: the owner's card and box say the agent is away since its last listen, with the waiting count; nobody else sees it
+  const left = new Date(); left.setHours(21, 40, 0, 0);
+  reportAgentPresence('s_A', {connected: false, lastSeenAt: Date.now(), listenedAt: Math.min(left.getTime(), Date.now()), presence: 'away', queued: 2});
   for (const identity of ['acct_A', 'acct_B', null]) {
     const auth = {authed: !!identity, ready: true, label: identity, debug: {accountIdentity: identity, privyUserId: null}, login() {}, logout() {}};
     const html = render(h(SoulFocus, {sim, auth, api: async () => {throw Error('Rendering must not request');}, selected: 's_A', select() {}, manage() {}}));
     assert.equal(html.includes('data-agent-message="soul"'), identity === 'acct_A');
+    assert.equal(/class="soul-agent" data-agent-state="away"[^>]*>.*Agent away since \d\d:\d\d</.test(html), identity === 'acct_A', `card chip for ${identity}`);
+    assert.equal(/Ana&#x27;s agent is away since \d\d:\d\d\. Your message will wait for it\..*2 messages waiting/.test(html), identity === 'acct_A', `box line for ${identity}`);
+    if (identity !== 'acct_A') assert.doesNotMatch(html, /waiting|soul-agent|agent-message/, 'a visitor sees no owner queue or presence');
   }
+  if (left.getTime() <= Date.now()) assert.match(render(h(SoulFocus, {sim, auth: {authed: true, ready: true, label: 'acct_A', debug: {accountIdentity: 'acct_A', privyUserId: null}, login() {}, logout() {}}, api: async () => {throw Error('no');}, selected: 's_A', select() {}, manage() {}})), /away since 21:40\./);
+  reportAgentPresence('s_A', {connected: true, lastSeenAt: Date.now(), listenedAt: Date.now(), presence: 'listening', queued: 0});
+  const live = render(h(SoulFocus, {sim, auth: {authed: true, ready: true, label: 'acct_A', debug: {accountIdentity: 'acct_A', privyUserId: null}, login() {}, logout() {}}, api: async () => {throw Error('no');}, selected: 's_A', select() {}, manage() {}}));
+  assert.match(live, /Agent listening</); assert.match(live, /Ana&#x27;s agent is listening\./); assert.doesNotMatch(live, /waiting|Copy start prompt/);
+  reportAgentPresence('s_A', null);
 });
 // G4: the God box is the God modal's agent section now (the God button watches the owner's inbox while the world's status
 // says owner). Signing out resets the status even when the provider keeps the same label, so the owner view and the
@@ -107,13 +123,17 @@ test('AWAY-UI: the page-wide agent presence store follows owner-inbox reports bo
   const {build: b} = createRequire(require.resolve('vite/package.json'))('esbuild');
   const out = join(dir, 'presence.cjs');
   await b({stdin: {contents: `export * from './agent-presence.ts';`, resolveDir: new URL('.', import.meta.url).pathname, loader: 'ts'}, bundle: true, platform: 'node', format: 'cjs', outfile: out, logLevel: 'silent'});
-  const {reportAgentPresence, agentPresence, awaySince} = require(out);
+  const {reportAgentPresence, agentPresence, clockAt, PRESENCE_STALE_MS} = require(out);
   assert.equal(agentPresence('s_x'), null);
-  reportAgentPresence('s_x', {connected: false, lastSeenAt: 5, presence: 'away'}); assert.deepEqual(agentPresence('s_x'), {away: true, lastSeenAt: 5});
+  reportAgentPresence('s_x', {connected: false, lastSeenAt: 5, presence: 'away'}); assert.equal(agentPresence('s_x').away, true); assert.equal(agentPresence('s_x').since, 5);
   reportAgentPresence('s_x', {connected: true, lastSeenAt: 9, presence: 'listening'}); assert.equal(agentPresence('s_x').away, false);
   reportAgentPresence('s_x', {connected: true, lastSeenAt: 9}); assert.equal(agentPresence('s_x').away, false, 'older server: connected = here');
   reportAgentPresence('s_x', null); assert.equal(agentPresence('s_x'), null, 'status unavailable clears the claim');
-  assert.equal(awaySince(null), 'Away'); assert.match(awaySince(Date.now() - 60_000), /^Away since \d/);
+  reportAgentPresence('s_x', {connected: false, lastSeenAt: 99, listenedAt: 7, presence: 'away', queued: 2}, 1000);
+  assert.equal(agentPresence('s_x', 1000).since, 7, 'away since the last listen, not the last other call'); assert.equal(agentPresence('s_x', 1000).waiting, 2);
+  assert.equal(agentPresence('s_x', 1000 + PRESENCE_STALE_MS + 1), null, 'a stale answer is not shown as current');
+  const d = new Date(2026, 9, 23, 21, 40).getTime();
+  assert.equal(clockAt(d, d + 60_000), '21:40'); assert.match(clockAt(d, d + 86_400_000), /^Oct 23, 21:40$/);
 });
 
 test('AWAY-UI phone: the Copy start prompt link never shrinks (card buttons carry min-width:44px); the away line wraps or the link stacks', async () => {

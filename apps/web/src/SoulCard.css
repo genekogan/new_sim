@@ -11,6 +11,9 @@
 .soul-meta>span+span::before{content:'·';margin:0 8px;color:var(--dim)}
 .soul-status{display:inline-flex;align-items:center;gap:7px;font-weight:650}
 .soul-status i{display:inline-block;width:8px;height:8px;border-radius:50%}
+.soul-agent{display:inline-flex;align-items:center;gap:6px;color:var(--dim)}
+.soul-agent i{display:inline-block;width:7px;height:7px;border-radius:50%;border:1.5px solid currentColor;box-sizing:border-box}
+.soul-agent[data-agent-state=listening] i,.soul-agent[data-agent-state=working] i{background:#2e9d4f;border-color:#2e9d4f}
 .soul-doing,.soul-energy{color:color-mix(in srgb,var(--fg) 78%,var(--dim))}
 .soul-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding-top:12px;border-top:1px solid color-mix(in srgb,var(--fg) 10%,transparent)}
 .soul-actions>button{flex:0 0 auto;max-width:100%;white-space:nowrap}
