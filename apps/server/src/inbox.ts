@@ -22,16 +22,19 @@ export type InboxMessage = {id: string; text: string; state: 'sent' | 'delivered
 export type TicketFocus = {x: number; y: number; z: number; span: number; label?: string; count: number};
 export type Ticket = InboxMessage & {focus?: TicketFocus; touched?: number};
 /** listening = a listener is waiting now; working = it holds a message and called recently; recent = it called within the
- *  last half minute; away = none of these. */
+ *  last half minute; away = none of these. PRESENCE (SOUL3): a Soul's box is only ever listening (a listen open, or one
+ *  closed within SOUL_LISTEN_GRACE_MS), working (that grace, holding messages it took) or away; its other calls never count. */
 export type Presence = 'listening' | 'working' | 'recent' | 'away';
-export type InboxView = {connected: boolean; lastSeenAt: number | null; latest: InboxMessage | null; queued?: number; presence?: Presence; log?: Ticket[]};
+/** `listenedAt` (a Soul's box only): when its agent last had a listen open (now while one is), null = never; durable. */
+export type InboxView = {connected: boolean; lastSeenAt: number | null; listenedAt?: number | null; latest: InboxMessage | null; queued?: number; presence?: Presence; log?: Ticket[]};
 type QRow = {n: number; id: string; text: string; sent_at: number; delivered_at: number | null; acknowledged_at: number | null; reply: string | null; outcome: Outcome | null; touched: string | null; focus: string | null; result: string | null; result_at: number | null};
 export const INBOX_CONNECTED_MS = 120_000;
 export const INBOX_TEXT_MAX = 1000;
 /** God presence: a call within this long counts as connected; a god holding a command, within WORKING_MS. */
 export const GOD_RECENT_MS = 30_000, GOD_WORKING_MS = 600_000;
-/** Between two long-polls of a Soul's `listen` (the CLI re-polls within ~50 ms) presence stays 'listening' this long. */
-export const LISTEN_GAP_MS = 2_000;
+/** PRESENCE (SOUL3): a Soul stays listening this long after its last listen closed (the CLI re-polls within ~50 ms; an
+ *  agent working through what it took listens again soon). Only a listen counts: ordinary calls never keep it here. */
+export const SOUL_LISTEN_GRACE_MS = 60_000;
 /** At most this many commands wait at once; the owner's log keeps the newest LOG_KEEP. */
 export const GOD_QUEUE_MAX = 50, GOD_LOG_KEEP = 200, GOD_LOG_VIEW = 50, GOD_TOUCHED_MAX = 300;
 /** A Soul's box: at most this many wait; the newest SOUL_KEEP (finished included) are kept. */
@@ -46,15 +49,13 @@ export class AgentInbox {
   private listeners = new Map<string, number>();
   /** LISTEN-LEAK: the live listen of each scope (the newest; older ones are aborted as superseded). */
   private claims = new Map<string, Set<AbortController>>();
-  /** When the last listener of a scope ended: a CLI re-polls within ~50 ms, so the card must not flicker away. */
-  private listenEnded = new Map<string, number>();
   /** SOULSIM-H F1: told the Soul id whenever its owner writes, so its `/v1/edge/wait` wakes too (not only its listen). */
   private soulSends: ((soulId: string) => void)[] = [];
   constructor(db: Db, worldId: string, now = Date.now) {
     this.db = db; this.worldId = worldId; this.now = now;
     db.db.exec(`CREATE TABLE IF NOT EXISTS agent_inbox_v1 (
       world_id TEXT NOT NULL, scope TEXT NOT NULL, owner TEXT NOT NULL,
-      id TEXT, text TEXT, sent_at INTEGER, delivered_at INTEGER, acknowledged_at INTEGER, reply TEXT, last_seen_at INTEGER,
+      id TEXT, text TEXT, sent_at INTEGER, delivered_at INTEGER, acknowledged_at INTEGER, reply TEXT, last_seen_at INTEGER, listened_at INTEGER,
       PRIMARY KEY(world_id,scope,owner)
     ) WITHOUT ROWID;
     CREATE TABLE IF NOT EXISTS god_inbox_queue_v1 (
@@ -71,6 +72,7 @@ export class AgentInbox {
     ) WITHOUT ROWID;
     CREATE UNIQUE INDEX IF NOT EXISTS soul_inbox_queue_v1_id ON soul_inbox_queue_v1(world_id,scope,owner,id);
     CREATE INDEX IF NOT EXISTS soul_inbox_queue_v1_open ON soul_inbox_queue_v1(world_id,scope,owner,n) WHERE acknowledged_at IS NULL;`);
+    if (!(db.db.prepare(`SELECT 1 FROM pragma_table_info('agent_inbox_v1') WHERE name='listened_at'`).get())) db.db.exec('ALTER TABLE agent_inbox_v1 ADD COLUMN listened_at INTEGER');
     // A message still waiting in the old one-message box becomes the first of its queue; the old slot is then emptied
     // (only last_seen_at stays there), so a later boot never moves it again.
     db.db.exec('BEGIN');
@@ -95,7 +97,7 @@ export class AgentInbox {
   private set(s: InboxScope, sets: string, n: number, ...args: SQLInputValue[]) { const q = this.q(s); this.db.db.prepare(`UPDATE ${q.t} SET ${sets} WHERE ${q.k} AND n=?`).run(...args, ...q.a, n); }
   private key(s: InboxScope) { return JSON.stringify([this.worldId, s.scope, s.owner]); }
   private god(s: InboxScope) { return s.scope === 'god'; }
-  private lastSeen(s: InboxScope) { return (this.db.db.prepare('SELECT last_seen_at FROM agent_inbox_v1 WHERE world_id=? AND scope=? AND owner=?').get(this.worldId, s.scope, s.owner) as {last_seen_at: number | null} | undefined)?.last_seen_at ?? null; }
+  private seen(s: InboxScope) { const r = this.db.db.prepare('SELECT last_seen_at,listened_at FROM agent_inbox_v1 WHERE world_id=? AND scope=? AND owner=?').get(this.worldId, s.scope, s.owner) as {last_seen_at: number | null; listened_at: number | null} | undefined; return {lastSeenAt: r?.last_seen_at ?? null, listenedAt: r?.listened_at ?? null}; }
   private nextN(s: InboxScope) { const q = this.q(s); return ((this.db.db.prepare(`SELECT MAX(n) m FROM ${q.t} WHERE ${q.k}`).get(...q.a) as {m: number | null}).m ?? 0) + 1; }
   /** The message the agent sees: the oldest one not acknowledged. */
   private head(s: InboxScope) { return this.get(s, 'AND acknowledged_at IS NULL ORDER BY n LIMIT 1'); }
@@ -111,10 +113,12 @@ export class AgentInbox {
     const touched = r.touched ? (JSON.parse(r.touched) as string[]).length : 0;
     return {...this.message(r), ...(r.focus ? {focus: JSON.parse(r.focus) as TicketFocus} : {}), ...(touched ? {touched} : {})};
   }
-  private presence(s: InboxScope, lastSeenAt: number | null, head: QRow | undefined): Presence {
+  private presence(s: InboxScope, lastSeenAt: number | null, listenedAt: number | null, head: QRow | undefined): Presence {
     if ((this.listeners.get(this.key(s)) ?? 0) > 0) return 'listening';
-    const ended = this.listenEnded.get(this.key(s));
-    if (ended !== undefined && !this.god(s) && head?.delivered_at == null && this.now() - ended <= LISTEN_GAP_MS) return 'listening';
+    if (!this.god(s)) {
+      const gap = listenedAt === null ? Infinity : this.now() - listenedAt;   // a clock stepped back (gap < 0) claims nothing
+      return gap < 0 || gap > SOUL_LISTEN_GRACE_MS ? 'away' : head?.delivered_at != null ? 'working' : 'listening';
+    }
     const age = lastSeenAt === null ? Infinity : this.now() - lastSeenAt;
     if (age < 0) return 'away';
     if (head?.delivered_at != null && age <= GOD_WORKING_MS) return 'working';
@@ -123,8 +127,9 @@ export class AgentInbox {
   /** What the agent sees (and every generic caller): one message, the oldest not acknowledged (else the newest), with
    *  `queued` = how many wait, this one included. */
   view(s: InboxScope): InboxView {
-    const lastSeenAt = this.lastSeen(s), head = this.head(s), shown = head ?? this.newest(s), presence = this.presence(s, lastSeenAt, head);
-    return {connected: presence !== 'away', lastSeenAt, latest: shown ? this.message(shown) : null, queued: head ? this.waiting(s) : 0, presence};
+    const {lastSeenAt, listenedAt} = this.seen(s), head = this.head(s), shown = head ?? this.newest(s), presence = this.presence(s, lastSeenAt, listenedAt, head);
+    const listened = this.god(s) ? {} : {listenedAt: this.listeners.get(this.key(s)) ? this.now() : listenedAt};
+    return {connected: presence !== 'away', lastSeenAt, ...listened, latest: shown ? this.message(shown) : null, queued: head ? this.waiting(s) : 0, presence};
   }
   /** What the owner sees: `latest` = the newest message (its state and reply); the god's adds its recent log, newest first. */
   ownerView(s: InboxScope): InboxView {
@@ -233,12 +238,18 @@ export class AgentInbox {
     for (const id of ids) { if (have.length >= GOD_TOUCHED_MAX) break; if (!seen.has(id)) { seen.add(id); have.push(id); } }
     if (have.length !== before) this.set(s, 'touched=?', head.n, JSON.stringify(have));
   }
-  /** A listener is waiting for this scope (presence); the returned function ends it (`handed`: it took messages, so no
-   *  re-poll follows until the agent has worked through them). */
+  /** A listener is waiting for this scope (presence); the returned function ends it. A Soul's open and close are stamped
+   *  durably (`listened_at`), so its grace and "away since" survive a restart. (`handed` is kept for the routes' call.) */
   listening(s: InboxScope) {
     const key = this.key(s); this.listeners.set(key, (this.listeners.get(key) ?? 0) + 1);
+    this.listened(s);
     let ended = false;
-    return (handed = false) => { if (ended) return; ended = true; const n = (this.listeners.get(key) ?? 1) - 1; if (n > 0) this.listeners.set(key, n); else { this.listeners.delete(key); if (handed) this.listenEnded.delete(key); else this.listenEnded.set(key, this.now()); } };
+    return (_handed = false) => { if (ended) return; ended = true; const n = (this.listeners.get(key) ?? 1) - 1; if (n > 0) this.listeners.set(key, n); else this.listeners.delete(key); this.listened(s); };
+  }
+  private listened(s: InboxScope) {
+    if (this.god(s)) return;
+    this.db.db.prepare(`INSERT INTO agent_inbox_v1(world_id,scope,owner,listened_at) VALUES(?,?,?,?)
+      ON CONFLICT(world_id,scope,owner) DO UPDATE SET listened_at=excluded.listened_at`).run(this.worldId, s.scope, s.owner, this.now());
   }
   listenerCount(s: InboxScope) { return this.listeners.get(this.key(s)) ?? 0; }
   /** LISTEN-LEAK: one live listen per agent. A new listen supersedes every older one for the same scope (its signal aborts;
