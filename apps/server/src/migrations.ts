@@ -183,7 +183,7 @@ export const MIGRATIONS: { id: number; name: string; up(db: DatabaseSync): void 
     // SOUL3: a replaced or revoked legacy Soul token keeps only its hash, so a later use answers "revoked", not "unknown".
     db.exec(`CREATE TABLE soul_token_tombstones_v1 (
       token_hash TEXT PRIMARY KEY, world_id TEXT NOT NULL, soul_id TEXT NOT NULL, label TEXT,
-      issued_at INTEGER, revoked_at INTEGER NOT NULL
+      issued_at INTEGER, revoked_at INTEGER NOT NULL, reason TEXT
     )`);
   }},
 ];

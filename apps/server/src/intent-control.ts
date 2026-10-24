@@ -68,8 +68,9 @@ export class IntentControlV2 {
   }
   agentScope(token:string|undefined,channel:'api'|'mcp'='api'):IntentRequestScope {
     const unauthorized=()=>new ApiError(401,'unauthorized','missing or invalid Soul credential');
-    if(!token?.startsWith('sim_'))throw unauthorized();
-    const hash=hashToken(token),first=this.souls.soulFromToken(token);if(!first){const r=this.souls.controlRefusal(token);throw r.code==='unauthorized'?unauthorized():new ApiError(401,r.code,r.message,r.extra);}
+    const refuse=()=>{const r=this.souls.controlRefusal(token);return r.code==='unauthorized'?unauthorized():new ApiError(401,r.code,r.message,r.extra);};
+    if(!token?.startsWith('sim_'))throw refuse();
+    const hash=hashToken(token),first=this.souls.soulFromToken(token);if(!first)throw refuse();
     const read=()=>{
       const credential=this.souls.agentCredential(token),row=credential?.row;if(!row||row.id!==first.id||row.world_id!==this.host.worldId)throw unauthorized();
       const owner=this.host.db.user(row.owner);if(!owner||!this.souls.invited(owner)||row.retired_at!==null)throw unauthorized();

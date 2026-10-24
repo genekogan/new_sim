@@ -92,7 +92,7 @@ export function buildApp(d: Deps) {
     travel = new Travel({ host: d.host, db: d.db, souls: d.souls, fading: comms?.fading ?? null, slug: d.cfg.worldKey, name: process.env.WORLD_NAME?.slice(0, 60) || d.cfg.worldKey,
       site: launcherSite(process.env.SIM_SITE_URL, process.env.SIM_SITE_KEY), invalidateBodies: () => d.edge?.invalidateBodies() });
     mountTravelRoutes(app, { travel, siteKey: process.env.SIM_SITE_KEY, baseOf: (c) => baseOf(c),
-      tokenSoul: (c) => { const s = d.souls.soulFromToken(bearer(c)); if (!s) throw new TravelError(401, 'unauthorized', 'missing or invalid Soul token'); return s; },
+      tokenSoul: (c) => { const s = d.souls.soulFromToken(bearer(c)); if (!s) { const r = d.souls.controlRefusal(bearer(c)); throw new TravelError(401, r.code, r.message, r.extra); } return s; },
       ownerSoul: async (c, id) => { const u = await requireUser(c); return ownSoul(u, id); },
       isGod: async (c) => { const t = bearer(c); if (t?.startsWith('god_')) { const w = god.godIdentity(t); return !!w && !w.child; } const u = t ? await d.auth.userFromToken(t) : null; return !!u && !!god.owner && u.id === god.owner; } });
     const t = travel; setTimeout(() => { void t.reconcile().then((r) => { if (r.length) console.log(`[travel] reconciled ${r.join(', ')}`); }, () => {}); }, 3000).unref?.();
@@ -135,7 +135,7 @@ export function buildApp(d: Deps) {
   if (d.god) { const god = d.god; mountEnvRoutes(app, { host: d.host, god, requireGod: (c) => { const who = god.godIdentity(bearer(c)); if (!who) throw new ApiError(401, 'unauthorized', 'missing or invalid god token'); if (who.child) throw new ApiError(403, 'helper.scope', 'helper tokens cannot change the environment'); return who; } }); }  // R4-LIVE env setter; WD7: helpers refused, edits attributed
 
   app.onError((err, c) => {
-    if (err instanceof ApiError) { if (err.status === 429 || err.status === 413) refusals.note(err.status === 429 ? 'rate' : 'size', err.code, `${c.req.method} ${c.req.path}: ${err.message}`); if (err.status === 429 && err.extra?.retry_after) c.header('Retry-After', String(err.extra.retry_after)); return c.json({ ok: false, code: err.code, message: err.message, ...err.extra }, err.status as 400); }
+    if (err instanceof ApiError) { if (err.status === 429 || err.status === 413) refusals.note(err.status === 429 ? 'rate' : 'size', err.code, `${c.req.method} ${c.req.path}: ${err.message}`); if (err.status === 429 && err.extra?.retry_after) c.header('Retry-After', String(err.extra.retry_after)); return c.json({ ok: false, code: err.code, message: err.message, ...err.extra, ...(err.code.startsWith('control.') ? {contract: 'eden-edge/1', error: {code: err.code, message: err.message, ...err.extra}} : {}) }, err.status as 400); }
     console.error('[http]', err);
     return c.json({ ok: false, code: 'internal', message: 'internal error' }, 500);
   });
@@ -492,7 +492,7 @@ export function buildApp(d: Deps) {
   app.delete('/v1/agent/mandate/:rule',async c=>{const s=agentSoul(c),guard=d.souls.agentControlGuard(s,bearer(c));return controlReply(c,guard,()=>d.souls.removeRule(s,c.req.param('rule'),guard));});
   app.get('/v1/agent/deck', (c) => c.json(d.souls.deck(agentSoul(c))));
   app.post('/v1/agent/cards', async (c) => {const s=agentSoul(c),input=await body(c),guard=d.souls.agentControlGuard(s,bearer(c));return controlReply(c,guard,()=>d.souls.proposeCards(s,input,guard));});
-  app.post('/v1/agent/release', (c) => { const s = agentSoul(c);if(d.souls.accounts)d.souls.accounts.releaseAgent(bearer(c)!);else d.db.setSoulToken(s.id, null); return c.json({ ok: true }); });
+  app.post('/v1/agent/release', (c) => { agentSoul(c); throw new ApiError(403, 'control.owner_required', 'Only your human can revoke control from the Soul card. Stop listening to go away; your pairing will remain valid.'); });
 
   // ---- static web app (SPA)
   const worldAssets = new URL('../../../worlds', import.meta.url).pathname;

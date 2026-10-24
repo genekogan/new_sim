@@ -24,7 +24,7 @@ export type Allocation = { worldId: string; accountId: string; requestId: string
  * legacy-ready is only a repair of an existing body, not a synthetic birth fact. */
 export type LifecycleProjection = Allocation & { lifecycleState: 'pending' | 'recorded' | 'complete' | 'refused' | 'legacy-ready'; ready: boolean };
 export type SoulMembership = { worldId: string; soulId: string; accountId: string; attribution: string; evidenceHash: string; createdAt: number };
-export type DelegatedGrant = { id: string; worldId: string; soulId: string; accountId: string; approvalId: string; requestId: string; createdAt: number };
+export type DelegatedGrant = { id: string; worldId: string; soulId: string; accountId: string; approvalId: string; requestId: string; createdAt: number; /** SOUL3: the token's first issue (its first ready poll); createdAt for older grants. */ issuedAt: number };
 export class AccountStoreError extends Error {
   code: string;
   constructor(code: string, message: string) { super(message); this.name = 'AccountStoreError'; this.code = code; }
@@ -37,7 +37,7 @@ type ApprovalRow = {
   request_nonce: string; poll_hash: string; client_poll_secret: number; input_hash: string; created_at: number; expires_at: number;
   target_account_id: string | null;
 };
-type GrantRow = { id: string; world_id: string; soul_id: string; account_id: string; approval_id: string; request_id: string; nonce: string; token_hash: string | null; created_at: number; revoked_at: number | null };
+type GrantRow = { id: string; world_id: string; soul_id: string; account_id: string; approval_id: string; request_id: string; nonce: string; token_hash: string | null; created_at: number; revoked_at: number | null; token_issued_at?: number | null; revoked_reason?: string | null };
 type MemberRow = { world_id: string; soul_id: string; account_id: string; attribution: string; evidence_hash: string; created_at: number; current_grant_id: string | null };
 const sha = (value: string) => createHash('sha256').update(value).digest('hex');
 const nonce = (prefix: string) => prefix + randomBytes(16).toString('hex');
@@ -115,6 +115,10 @@ export class AccountStore {
     this.db.tx(() => {
       const cols = this.db.db.prepare('PRAGMA table_info(account_approvals_v1)').all() as { name: string }[];
       if (!cols.some(c => c.name === 'target_account_id')) this.db.db.exec('ALTER TABLE account_approvals_v1 ADD COLUMN target_account_id TEXT');
+      // SOUL3: when a grant's token was first handed out (its first ready poll) and why the grant ended.
+      const grantCols = this.db.db.prepare('PRAGMA table_info(account_agent_grants_v1)').all() as { name: string }[];
+      if (!grantCols.some(c => c.name === 'token_issued_at')) this.db.db.exec('ALTER TABLE account_agent_grants_v1 ADD COLUMN token_issued_at INTEGER');
+      if (!grantCols.some(c => c.name === 'revoked_reason')) this.db.db.exec('ALTER TABLE account_agent_grants_v1 ADD COLUMN revoked_reason TEXT');
       this.db.db.exec('CREATE INDEX IF NOT EXISTS account_approvals_target_v1 ON account_approvals_v1(world_id,target_account_id,status)');
     });
   }
@@ -192,7 +196,7 @@ export class AccountStore {
   captureLegacyAuthority(soulId:string,ownerId:string){if(!/^dev:agent-[a-f0-9]{24}$/.test(ownerId))return;this.db.tx(()=>this.db.db.prepare('INSERT OR IGNORE INTO account_legacy_authority_v1(world_id,soul_id,legacy_owner_id,captured_at) VALUES(?,?,?,?)').run(this.worldId,soulId,ownerId,this.time()));}
   legacyAuthority(soulId:string,ownerId:string){return !!this.db.db.prepare('SELECT 1 FROM account_legacy_authority_v1 WHERE world_id=? AND soul_id=? AND legacy_owner_id=? AND revoked_at IS NULL').get(this.worldId,soulId,ownerId);}
   invalidateSoul(soulId:string,ownerId:string,reason:string){this.db.tx(()=>{
-    this.db.db.prepare('UPDATE account_agent_grants_v1 SET revoked_at=? WHERE world_id=? AND soul_id=? AND revoked_at IS NULL').run(this.time(),this.worldId,soulId);
+    this.db.db.prepare('UPDATE account_agent_grants_v1 SET revoked_at=?,revoked_reason=? WHERE world_id=? AND soul_id=? AND revoked_at IS NULL').run(this.time(),text(reason,'revocation reason',1,80),this.worldId,soulId);
     this.db.db.prepare('UPDATE account_soul_memberships_v1 SET current_grant_id=NULL WHERE world_id=? AND soul_id=?').run(this.worldId,soulId);
     if(/^dev:agent-[a-f0-9]{24}$/.test(ownerId))this.db.db.prepare('INSERT INTO account_legacy_authority_v1(world_id,soul_id,legacy_owner_id,captured_at,revoked_at,revoked_reason) VALUES(?,?,?,?,?,?) ON CONFLICT(world_id,soul_id) DO UPDATE SET revoked_at=COALESCE(account_legacy_authority_v1.revoked_at,excluded.revoked_at),revoked_reason=COALESCE(account_legacy_authority_v1.revoked_reason,excluded.revoked_reason)').run(this.worldId,soulId,ownerId,this.time(),this.time(),text(reason,'revocation reason',1,80));
   });}
@@ -272,7 +276,7 @@ export class AccountStore {
       this.db.db.prepare("UPDATE account_approvals_v1 SET account_id=?,soul_id=?,request_id=?,status='creating' WHERE world_id=? AND id=? AND status='pending'").run(identity.id, allocation.soulId, allocation.requestId, this.worldId, id);
       if (row.mode === 'create') this.associate(identity, allocation.soulId, { attribution: 'approved-creation', evidenceHash: sha(JSON.stringify(['account-approval/1', this.worldId, id, allocation.requestId, allocation.soulId, identity.id, row.request_nonce])) });
       const member = this.owned(identity, allocation.soulId), grantId = nonce('gr_'), now = this.time();
-      this.db.db.prepare('UPDATE account_agent_grants_v1 SET revoked_at=? WHERE world_id=? AND soul_id=? AND revoked_at IS NULL').run(now, this.worldId, allocation.soulId);
+      this.db.db.prepare("UPDATE account_agent_grants_v1 SET revoked_at=?,revoked_reason='replaced' WHERE world_id=? AND soul_id=? AND revoked_at IS NULL").run(now, this.worldId, allocation.soulId);
       this.db.db.prepare('INSERT INTO account_agent_grants_v1(id,world_id,soul_id,account_id,approval_id,request_id,nonce,created_at) VALUES (?,?,?,?,?,?,?,?)').run(grantId, this.worldId, allocation.soulId, member.account_id, id, allocation.requestId, nonce('gn_'), now);
       this.db.db.prepare('UPDATE account_soul_memberships_v1 SET current_grant_id=? WHERE world_id=? AND soul_id=? AND account_id=?').run(grantId, this.worldId, allocation.soulId, identity.id);
       return this.dto(this.required(id));
@@ -357,7 +361,7 @@ export class AccountStore {
       const status: ApprovalStatus = actual.lifecycleState === 'refused' ? 'refused' : actual.ready || row.status === 'ready' ? 'ready' : 'creating';
       this.db.db.prepare('UPDATE account_approvals_v1 SET status=? WHERE world_id=? AND id=?').run(status, this.worldId, id);
       if (status === 'refused') {
-        this.db.db.prepare('UPDATE account_agent_grants_v1 SET revoked_at=? WHERE world_id=? AND approval_id=? AND revoked_at IS NULL').run(this.time(), this.worldId, id);
+        this.db.db.prepare("UPDATE account_agent_grants_v1 SET revoked_at=?,revoked_reason='refused' WHERE world_id=? AND approval_id=? AND revoked_at IS NULL").run(this.time(), this.worldId, id);
         this.db.db.prepare('UPDATE account_soul_memberships_v1 SET current_grant_id=NULL WHERE world_id=? AND soul_id=? AND current_grant_id IN (SELECT id FROM account_agent_grants_v1 WHERE world_id=? AND approval_id=?)').run(this.worldId, row.soul_id, this.worldId, id);
       }
       return this.dto(this.required(id));
@@ -379,7 +383,7 @@ export class AccountStore {
       const digest = createHmac('sha256', pollSecret).update(JSON.stringify(['eden-account-soul-grant/1', this.worldId, grant.soul_id, grant.request_id, grant.nonce])).digest('hex');
       const token = `sim_${grant.soul_id}_${digest}`, hash = sha(token);
       if (grant.token_hash && grant.token_hash !== hash) fail('grant-conflict', 'Delegated grant integrity changed');
-      if (!grant.token_hash) this.db.db.prepare('UPDATE account_agent_grants_v1 SET token_hash=? WHERE world_id=? AND id=? AND token_hash IS NULL AND revoked_at IS NULL').run(hash, this.worldId, grant.id);
+      if (!grant.token_hash) this.db.db.prepare('UPDATE account_agent_grants_v1 SET token_hash=?,token_issued_at=? WHERE world_id=? AND id=? AND token_hash IS NULL AND revoked_at IS NULL').run(hash, this.time(), this.worldId, grant.id);
       return { ...dto, token };
     });
   }
@@ -389,17 +393,17 @@ export class AccountStore {
     if (typeof token !== 'string' || token.length > 1024 || !token.startsWith('sim_')) return null;
     const grant = this.db.db.prepare("SELECT g.* FROM account_agent_grants_v1 g JOIN account_soul_memberships_v1 m ON m.world_id=g.world_id AND m.soul_id=g.soul_id AND m.account_id=g.account_id AND m.current_grant_id=g.id JOIN account_approvals_v1 a ON a.world_id=g.world_id AND a.id=g.approval_id AND a.soul_id=g.soul_id AND a.account_id=g.account_id AND a.request_id=g.request_id AND a.status='ready' WHERE g.world_id=? AND g.token_hash=? AND g.revoked_at IS NULL").get(this.worldId, sha(token)) as GrantRow | undefined;
     if (!grant) return null;
-    return { id: grant.id, worldId: grant.world_id, soulId: grant.soul_id, accountId: grant.account_id, approvalId: grant.approval_id, requestId: grant.request_id, createdAt: grant.created_at };
+    return { id: grant.id, worldId: grant.world_id, soulId: grant.soul_id, accountId: grant.account_id, approvalId: grant.approval_id, requestId: grant.request_id, createdAt: grant.created_at, issuedAt: grant.token_issued_at ?? grant.created_at };
   }
   revoke(identity: AccountIdentity, soulId: string): void {
     this.db.tx(() => {
       this.owned(identity, soulId);
-      this.db.db.prepare('UPDATE account_agent_grants_v1 SET revoked_at=? WHERE world_id=? AND soul_id=? AND revoked_at IS NULL').run(this.time(), this.worldId, soulId);
+      this.db.db.prepare("UPDATE account_agent_grants_v1 SET revoked_at=?,revoked_reason='revoked' WHERE world_id=? AND soul_id=? AND revoked_at IS NULL").run(this.time(), this.worldId, soulId);
       this.db.db.prepare('UPDATE account_soul_memberships_v1 SET current_grant_id=NULL WHERE world_id=? AND soul_id=? AND account_id=?').run(this.worldId, soulId, identity.id);
     });
   }
-  releaseGrant(token:string){return this.db.tx(()=>{const grant=this.resolveGrant(token);if(!grant)fail('forbidden','Delegated grant unavailable');this.db.db.prepare('UPDATE account_agent_grants_v1 SET revoked_at=? WHERE world_id=? AND id=? AND revoked_at IS NULL').run(this.time(),this.worldId,grant.id);this.db.db.prepare('UPDATE account_soul_memberships_v1 SET current_grant_id=NULL WHERE world_id=? AND soul_id=? AND current_grant_id=?').run(this.worldId,grant.soulId,grant.id);});}
+  releaseGrant(token:string){return this.db.tx(()=>{const grant=this.resolveGrant(token);if(!grant)fail('forbidden','Delegated grant unavailable');this.db.db.prepare("UPDATE account_agent_grants_v1 SET revoked_at=?,revoked_reason='released' WHERE world_id=? AND id=? AND revoked_at IS NULL").run(this.time(),this.worldId,grant.id);this.db.db.prepare('UPDATE account_soul_memberships_v1 SET current_grant_id=NULL WHERE world_id=? AND soul_id=? AND current_grant_id=?').run(this.worldId,grant.soulId,grant.id);});}
   /** SOUL3: the grant a delegated token was issued under, current or revoked (its hash stays on the row; never the token). */
-  grantOf(token:string){if(typeof token!=='string'||token.length>1024||!token.startsWith('sim_'))return null;const row=this.db.db.prepare('SELECT soul_id,created_at,revoked_at FROM account_agent_grants_v1 WHERE world_id=? AND token_hash=?').get(this.worldId,sha(token)) as {soul_id:string;created_at:number;revoked_at:number|null}|undefined;return row?{soulId:row.soul_id,issuedAt:row.created_at,revokedAt:row.revoked_at}:null;}
-  agentStatus(soulId:string){const row=this.db.db.prepare("SELECT a.agent_label,g.created_at FROM account_agent_grants_v1 g JOIN account_soul_memberships_v1 m ON m.world_id=g.world_id AND m.soul_id=g.soul_id AND m.current_grant_id=g.id JOIN account_approvals_v1 a ON a.id=g.approval_id AND a.world_id=g.world_id AND a.status='ready' WHERE g.world_id=? AND g.soul_id=? AND g.revoked_at IS NULL AND g.token_hash IS NOT NULL").get(this.worldId,soulId) as {agent_label:string;created_at:number}|undefined;return row?{attached:true,label:row.agent_label,since:row.created_at,last_used:null}:null;}
+  grantOf(token:string){if(typeof token!=='string'||token.length>1024||!token.startsWith('sim_'))return null;const row=this.db.db.prepare('SELECT soul_id,created_at,token_issued_at,revoked_at,revoked_reason FROM account_agent_grants_v1 WHERE world_id=? AND token_hash=?').get(this.worldId,sha(token)) as {soul_id:string;created_at:number;token_issued_at:number|null;revoked_at:number|null;revoked_reason:string|null}|undefined;return row?{soulId:row.soul_id,issuedAt:row.token_issued_at??row.created_at,revokedAt:row.revoked_at,reason:row.revoked_reason}:null;}
+  agentStatus(soulId:string){const row=this.db.db.prepare("SELECT a.agent_label,COALESCE(g.token_issued_at,g.created_at) AS created_at FROM account_agent_grants_v1 g JOIN account_soul_memberships_v1 m ON m.world_id=g.world_id AND m.soul_id=g.soul_id AND m.current_grant_id=g.id JOIN account_approvals_v1 a ON a.id=g.approval_id AND a.world_id=g.world_id AND a.status='ready' WHERE g.world_id=? AND g.soul_id=? AND g.revoked_at IS NULL AND g.token_hash IS NOT NULL").get(this.worldId,soulId) as {agent_label:string;created_at:number}|undefined;return row?{attached:true,label:row.agent_label,since:row.created_at,last_used:null}:null;}
 }
