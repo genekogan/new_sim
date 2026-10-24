@@ -827,9 +827,15 @@ export async function openLauncher(cfg = {}) {
       if (phase !== 'active') throw new Error(`cannot prepare a handover while ${phase}`);
       phase = 'preparing'; let open; gate = { p: new Promise((r) => { open = r; }), open };
       pool.pause();
-      await creating; await pool.settled();
+      await creating;
+      // a world stuck booting must not hold the keeper's 60 s prepare: its boot is abandoned (process killed and seen gone)
+      // and reported; if that cannot be proven, prepare fails and this launcher serves on (one writer, no handover)
+      const abandoned = await pool.settled({ waitMs: cfg.prepareBootWaitMs ?? 30_000, goneMs: 10_000 });
+      for (const b of abandoned) log(`handover: ${b.slug} was still booting${b.pid ? ` (pid ${b.pid})` : ''}; boot stopped, it is not handed over and starts fresh on its next visit`);
+      // the keeper gave up (resume) while this waited: stay serving, freeze nothing
+      if (phase !== 'preparing' || gate?.open !== open) throw new Error('handover abandoned while preparing');
       registry.frozen = true; pool.savePids(); const pidFile = pool.o.pidFile; pool.o.pidFile = null; gate.pidFile = pidFile;
-      return pool.handoverList();
+      return { children: pool.handoverList(), abandoned };
     },
     /** Keeper: the next launcher failed before it served anyone; carry on as before. */
     resumeHandover() {
@@ -938,7 +944,7 @@ function serveKeeper(l, stop) {
     if (!m || typeof m !== 'object') return;
     if (m.t === 'conn') { if (handle) l.accept(handle); return; }
     const reply = (p) => p.then((r) => process.send({ t: `${m.t}-done`, id: m.id, ok: true, ...r }), (e) => process.send({ t: `${m.t}-done`, id: m.id, ok: false, error: e.message }));
-    if (m.t === 'prepare') reply(l.prepareHandover().then((children) => ({ children })));
+    if (m.t === 'prepare') reply(l.prepareHandover());
     else if (m.t === 'resume') l.resumeHandover();
     else if (m.t === 'retire') l.retire();
     else if (m.t === 'release') reply(l.releaseWorld(m.slug).then((st) => ({ slug: m.slug, status: st.status })));

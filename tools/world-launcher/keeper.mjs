@@ -146,6 +146,8 @@ async function handover() {
   try {
     const prep = await ask(old, { t: 'prepare' }, 60_000);
     h.adopted = prep.children.map((c) => c.slug); h.state = 'starting';
+    // worlds stuck booting at prepare: stopped there (their process gone), not handed over; they start fresh on a visit
+    if (prep.abandoned?.length) { h.abandoned = prep.abandoned; log(`prepare stopped ${prep.abandoned.length} stuck boot(s): ${prep.abandoned.map((b) => `${b.slug} (${b.error ?? b.status})`).join('; ')}`); }
     next = spawnGen({ SIM_ADOPT: JSON.stringify(prep.children) }); h.to = next.build; writeStatus();
     await withTimeout(next.ready, 120_000, 'new generation start');
   } catch (e) {
