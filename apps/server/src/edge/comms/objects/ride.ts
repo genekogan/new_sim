@@ -116,7 +116,10 @@ export const rideKind: ObjectKind<RideState> = {
       apply(s, _p, ctx) {
         // Already stepping out (the ride is back on the ground): the engine is moving the body out; nothing new to start.
         if ((s.stepping ?? []).some(r => r.soulId === ctx.soul.soulId)) return {state: s, result: {steppingOut: s.carrier, onGroundWithinSeconds: 12}};
-        const exit = ctx.carrier?.(s.carrier)?.riders.find(r => r.soulId === ctx.soul.soulId)?.exit ?? s.door;
+        const rider = ctx.carrier?.(s.carrier)?.riders.find(r => r.soulId === ctx.soul.soulId), exit = rider?.exit ?? s.door;
+        // A rider seated in a parked balloon: a walk cannot start inside the basket (route.start-blocked), so carrier_alight ends the
+        // held ride, whose own step-out walks the body out through the door before lift-off (carrier.ts).
+        if (rider && !s.rowing) return {state: s, result: {leaving: s.carrier}, bodies: [{label: 'Step out of the balloon', steps: [{verb: 'mars:carrier_alight', params: {carrier: s.carrier}}]}]};
         return {state: s, result: {leaving: s.carrier}, bodies: [{label: s.rowing ? 'Disembark the punt' : 'Step out of the balloon', steps: [{verb: 'walk_to', params: {to: exit, standoff: 0}}]}]};
       },
     },
