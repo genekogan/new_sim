@@ -601,7 +601,8 @@ export class Souls {
     const raw=soul.retired_at!==null?'retired':legacy?.reason??grant?.reason??null;
     const reason=raw==='legacy-pair-rotation'?'replaced':raw==='account-revoke'?'revoked':raw==='agent-release'?'released':raw==='account-repair'?'replaced':raw;
     const revokedAt=iso(reason==='retired'?soul.retired_at:legacy?.revoked_at??grant?.revokedAt??soul.retired_at)!;
-    const hint=reason==='retired'?null:`Run: node eden.mjs pair ${soul.id} --for CODE`;
+    // SERVER-NEXT: this world serves the 1.9 eden-agent.mjs (no eden.mjs 2.0 publication), so name its own re-pair command
+    const hint=reason==='retired'?null:`Run: node eden-agent.mjs pair-soul ${soul.id} --for CODE`;
     const message=reason==='replaced'?`${soul.name}'s control moved to a newer pairing at ${revokedAt}.`
       :reason==='revoked'?`${soul.name}'s control was revoked by its owner at ${revokedAt}.`
       :reason==='released'?`${soul.name}'s control was released by its agent at ${revokedAt}.`
