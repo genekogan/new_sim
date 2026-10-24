@@ -252,8 +252,10 @@ export class WorldHost {
     if(this.extra.stationV1)this.stationPhysicalHeadV1();
     this.acc.fromTick = this.engine.world.tick;
     this.resetAcc();
-    if (snap) this.recoveryBaseline = structuredClone(snap.body as SnapshotBody);
-    else if (!this.engine.canSnapshot || this.engine.canSnapshot()) this.recoveryBaseline = this.captureBody();
+    // After a logged recovery the baseline is the replayed head, so the next fault neither rereads nor nests its recipe.
+    const canCapture = !this.engine.canSnapshot || this.engine.canSnapshot();
+    if (snap && (lastRepair === null || !canCapture)) this.recoveryBaseline = structuredClone(snap.body as SnapshotBody);
+    else if (canCapture) this.recoveryBaseline = this.captureBody();
     // Write this world's starting vocabulary into its log once, so its history never depends on what the code's set becomes.
     if (!this.db.hasVocabulary(this.worldId)) void this.enqueue('rules', 'system', { vocabulary: structuredClone(baseVocabulary(this.kernel)), why: 'the vocabulary this world began with' });
     if (this.pendingBootstrap) { void this.enqueue('rules', 'system', { kernelBootstrap: this.pendingBootstrap, why: 'the kernel begins here for a world that predates it' }); this.pendingBootstrap = null; }

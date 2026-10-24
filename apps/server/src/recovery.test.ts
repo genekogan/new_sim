@@ -52,6 +52,7 @@ test('repeated faults between snapshots never nest recovery recipes; boot and re
   const db=new Db(join(mkdtempSync(join(tmpdir(),'sim-recovery-nest-')),'sim.db')), factory=faultyFactory();
   const h=new WorldHost(db,factory,'nest',1e9); h.boot();
   void h.enqueue('birth','test',{soulId:'s_A',entityId:'h_A',name:'A',description:'quiet',owner:'private-owner'}); h.tickOnce(); h.saveSnapshot();
+  const preFix=db.db.prepare('SELECT * FROM snapshots WHERE world_id=? ORDER BY tick DESC LIMIT 1').get(h.worldId) as Record<string,any>;
   const sizes:number[]=[];
   for(let fault=1;fault<=5;fault++) {
     void h.enqueue('decision','test',{soulId:'s_A',entityId:'h_A',option:'rest',card:`rest-${fault}`,label:'bad test',steps:[{verb:'rest',params:{seconds:60}}],target:null,approachLen:0,reevalTicks:1200,trigger:'test',fallback:true});
@@ -72,5 +73,14 @@ test('repeated faults between snapshots never nest recovery recipes; boot and re
   const next=new WorldHost(db,factory,'nest',1e9); next.boot(); assert.equal(next.engine.stateHash(),h.engine.stateHash()); assert.equal(kernelHash(next.kernel),kernelHash(h.kernel));
   const lastRepair=db.lastRecoverySeq(h.worldId,0)!; assert.ok(db.latestSnapshot(h.worldId)!.seq>=lastRepair,'a snapshot follows the last recovery');
   const after=new WorldHost(db,factory,'nest',1e9); after.boot(); assert.equal(after.engine.stateHash(),h.engine.stateHash()); assert.equal(kernelHash(after.kernel),kernelHash(h.kernel));
+  // A log written before this fix: no snapshot after the recoveries. The boot replays the last one and rebaselines there.
+  const firstRepair=db.events(h.worldId).find(e=>e.payload?.recovery)!.seq;
+  db.db.prepare('DELETE FROM snapshots WHERE world_id=?').run(h.worldId);
+  db.db.prepare(`INSERT INTO snapshots (${Object.keys(preFix)}) VALUES (${Object.keys(preFix).map(()=>'?')})`).run(...Object.values(preFix)); assert.ok(db.latestSnapshot(h.worldId)!.seq<firstRepair);
+  const old=new WorldHost(db,factory,'nest',1e9); old.boot(); assert.equal(old.engine.stateHash(),h.engine.stateHash());
+  void old.enqueue('decision','test',{soulId:'s_A',entityId:'h_A',option:'rest',card:'rest-6',label:'bad test',steps:[{verb:'rest',params:{seconds:60}}],target:null,approachLen:0,reevalTicks:1200,trigger:'test',fallback:true});
+  old.tickOnce();
+  const sixth=db.tailEvents(h.worldId,5).filter(e=>e.payload?.recovery).at(-1)!; assert.ok(sixth.seq>lastRepair);
+  assert.ok(!sixth.payload.recovery.events.some((e:any)=>e.payload?.recovery),'a recovery after such a boot carries no earlier recipe');
   db.close();
 });
