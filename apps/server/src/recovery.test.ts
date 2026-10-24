@@ -47,3 +47,30 @@ test('historical Mars invariant receipts survive restart without being treated a
  const fresh=new WorldHost(db,factory,'historic',1e9);fresh.boot();assert.equal(fresh.engine.runtime.violations.length,1);fresh.tickOnce();
  assert.equal(fresh.engine.runtime.violations.length,1);assert.equal(db.events(h.worldId).filter(e=>e.payload?.recovery).length,0);db.close();
 });
+
+test('repeated faults between snapshots never nest recovery recipes; boot and readers skip the recipe bodies',()=>{
+  const db=new Db(join(mkdtempSync(join(tmpdir(),'sim-recovery-nest-')),'sim.db')), factory=faultyFactory();
+  const h=new WorldHost(db,factory,'nest',1e9); h.boot();
+  void h.enqueue('birth','test',{soulId:'s_A',entityId:'h_A',name:'A',description:'quiet',owner:'private-owner'}); h.tickOnce(); h.saveSnapshot();
+  const sizes:number[]=[];
+  for(let fault=1;fault<=5;fault++) {
+    void h.enqueue('decision','test',{soulId:'s_A',entityId:'h_A',option:'rest',card:`rest-${fault}`,label:'bad test',steps:[{verb:'rest',params:{seconds:60}}],target:null,approachLen:0,reevalTicks:1200,trigger:'test',fallback:true});
+    h.tickOnce();
+    const repair=db.tailEvents(h.worldId,5).filter(e=>e.payload?.recovery).at(-1)!;
+    assert.ok(!repair.payload.recovery.events.some((e:any)=>e.payload?.recovery),`recipe ${fault} carries no earlier recipe`);
+    sizes.push(JSON.stringify(repair.payload).length);
+    for(let i=0;i<3;i++) h.tickOnce();
+  }
+  assert.ok(Math.max(...sizes) < 2*Math.min(...sizes), `recipe sizes stay flat: ${sizes}`);
+  const light=db.tailEvents(h.worldId,40,true).filter(e=>e.payload?.recovery);
+  assert.equal(light.length,5); for (const e of light) { assert.deepEqual(Object.keys(e.payload.recovery).sort(),['excluded','faults']); assert.equal(e.payload.recovery.excluded.length,1); }
+  assert.deepEqual(db.tailEvents(h.worldId,40,true).map(e=>publicEvent(e)),db.tailEvents(h.worldId,40).map(e=>publicEvent(e)));
+  assert.ok(db.hasVocabulary(h.worldId));
+  void h.enqueue('rules','test',{checkpoint:'exact tick'}); h.drainInputs();
+  const events=db.events(h.worldId), replay=replayFromGenesis(factory,'nest',events,h.engine.world.tick);
+  assert.equal(replay.engine.stateHash(),h.engine.stateHash());
+  const next=new WorldHost(db,factory,'nest',1e9); next.boot(); assert.equal(next.engine.stateHash(),h.engine.stateHash()); assert.equal(kernelHash(next.kernel),kernelHash(h.kernel));
+  const lastRepair=db.lastRecoverySeq(h.worldId,0)!; assert.ok(db.latestSnapshot(h.worldId)!.seq>=lastRepair,'a snapshot follows the last recovery');
+  const after=new WorldHost(db,factory,'nest',1e9); after.boot(); assert.equal(after.engine.stateHash(),h.engine.stateHash()); assert.equal(kernelHash(after.kernel),kernelHash(h.kernel));
+  db.close();
+});

@@ -882,7 +882,7 @@ export class Brain {
     const places = Object.values(w.entities).filter((e) => e.kind === 'fixture' && e.id !== 'gate' && eng.regionAt(e.pose.p) === region)
       .map((e) => { const n = Object.values(w.entities).filter((x) => x.human?.on === e.id).length; return { id: e.id, name: e.label ?? e.id, state: n ? `${n} souls here` : 'empty' }; });
     const names = new Set(here.map((m) => m.name));
-    const recent = this.db.tailEvents(this.host.worldId, 120).filter((e) => e.kind === 'decision' || e.kind === 'birth' || e.kind === 'intent').map((e) => tickerText(e, this.host)).filter((t): t is string => !!t && [...names].some((n) => t.startsWith(n))).slice(-25);
+    const recent = this.db.tailEvents(this.host.worldId, 120, true).filter((e) => e.kind === 'decision' || e.kind === 'birth' || e.kind === 'intent').map((e) => tickerText(e, this.host)).filter((t): t is string => !!t && [...names].some((n) => t.startsWith(n))).slice(-25);
     const others = this.regions().filter((r) => r !== region).map((r) => { const n = [...this.host.minds.values()].filter((m) => w.entities[m.entityId] && eng.regionAt(w.entities[m.entityId].pose.p) === r).length; return `${nameOf(r)}: ${n} souls`; });
     return {
       region, label: nameOf(region), time: timeWord(w.env.datetime), weather: weatherWord(w.env.weather), places,

@@ -225,7 +225,7 @@ export function buildApp(d: Deps) {
     return c.json(res.ok ? { ok: true, length: res.route.length, legs: res.route.legs.length, end: res.route.legs.at(-1)?.points?.at(-1), endLevel: res.route.legs.at(-1)?.level, levels } : { ok: false, diagnostic: res.diagnostic, levels }, 200, { 'Cache-Control': 'no-store' });
   });
   app.get('/v1/debug/verbs', (c) => c.json({ rulesVersion: d.host.engine.rulesVersion, dt: d.host.engine.dt, verbs: d.host.engine.describeVerbs() }));
-  app.get('/v1/log', (c) => c.json({ events: d.db.events(d.host.worldId, intQ(c, 'after', 0, 0, Number.MAX_SAFE_INTEGER), intQ(c, 'limit', 200, 1, 1000)).map(publicEvent) }));
+  app.get('/v1/log', (c) => c.json({ events: d.db.events(d.host.worldId, intQ(c, 'after', 0, 0, Number.MAX_SAFE_INTEGER), intQ(c, 'limit', 200, 1, 1000), true).map(publicEvent) }));
   // App owns the skill text (EDGE_SKILL_FILE / descriptor skillFile, read per request so edits apply live).
   // The legacy approval-pairing skill applies only to central-mind worlds.
   const skillText = (base: string) => {

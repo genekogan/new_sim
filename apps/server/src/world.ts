@@ -204,7 +204,10 @@ export class WorldHost {
       this.kernel = initKernel(this.engine, pinnedVocabulary(this.db.rulesEvents(this.worldId)));
     }
     // fast-forward: replay events logged after the snapshot, stepping the engine to their ticks
-    let later = this.db.events(this.worldId, this.seq);
+    // Only the last logged recovery and what follows it replay (it supersedes its prefix, below), so the prefix is
+    // never read: its own recovery recipes each carry a whole world body.
+    const lastRepair = this.db.lastRecoverySeq(this.worldId, this.seq);
+    let later = this.db.events(this.worldId, lastRepair === null ? this.seq : lastRepair - 1);
     let checkedClock=false;
     if(clock&&this.seq>clock.throughSeq){
       if(this.engine.world.tick<clock.tick)throw new Error('clock-frontier.snapshot-prefix-differs');
@@ -1321,6 +1324,9 @@ export class WorldHost {
       if(this.durableClockV1)this.persistClockFrontier();
       for (const m of this.minds.values()) this.acc.dirty.add(m.soulId);
       for (const l of this.listeners) l.onApplied?.(e);
+      // Rebaseline at the repaired head, so the next recipe never nests this one (each carries a whole body: nested,
+      // they double per fault), and snapshot it so a boot starts after it too.
+      if (!this.engine.canSnapshot || this.engine.canSnapshot()) this.snapshotHead(true);
       this.flush(); this.heartbeat(); return;
     }
   }
@@ -1532,7 +1538,7 @@ export class WorldHost {
   // ------------------------------------------------------------ snapshots
   snapshotMs = { capture: 0, persist: 0 };
   /** Capture is synchronous (it must see one consistent tick); the database write is deferred past the current tick. */
-  saveSnapshot(sync = true) {
+  saveSnapshot(sync = true): { tick: number; stateHash: string; pending?: undefined } | { pending: boolean; tick: number; stateHash?: undefined } {
     this.assertClockReady();
     this.drainInputs();
     if(this.durableClockV1)this.persistClockFrontier();
@@ -1545,6 +1551,10 @@ export class WorldHost {
       }
       return { pending: true, tick: this.lastSnapshotTick };
     }
+    return this.snapshotHead(sync);
+  }
+  /** Capture and persist the head as the snapshot and recovery baseline (the caller has checked it can snapshot). */
+  private snapshotHead(sync: boolean): { tick: number; stateHash: string } {
     const t0 = performance.now();
     const runtime = this.engine.snapshot();
     const body = this.captureBody(runtime);
