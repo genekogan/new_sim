@@ -574,6 +574,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (ride && stepping) for (const c of caps) if (!/^object:[^:]+:leave$/.test(c.id) && !['accept', 'decline', 'ask-to-stop'].includes(c.verb)) {c.available = false; c.blocked = stepping;}
     if (ride && !stepping) for (const c of caps) if (c.verb === 'make' || (ride.phase === 'aloft' && !['rest:here', 'stand:here'].includes(c.id) && !['accept', 'decline', 'ask-to-stop'].includes(c.verb))) {c.available = false; c.blocked = {code: 'ride.aboard', reason: ride.phase === 'aloft' ? `You are travelling in ${ride.label}; it returns by itself and you step out then.` : `You are in ${ride.label}; leave it first.`};}
     for (const p of this.providers) try {caps.push(...p(soul));} catch {/* a provider fault hides only its own entries */}
+    if (ride && !stepping) {const seated = this.rideStandRefusal(soul.entityId, caps), st = seated && caps.find(c => c.id === 'stand:here'); if (st) {st.available = false; st.blocked = seated!;}}
     shapeRigidCapabilities(me,caps,plans as never,secondsParam);
     // knowledge/1: an offer that leads to (or names) a secret place this Soul has not been to or found is not offered
     if (this.knowledge.marked().size) for (let i = caps.length - 1; i >= 0; i--) {const t = caps[i]!.target; if (t?.kind === 'place' && !this.knowledge.knows(soul.soulId, t.id)) {plans.delete(caps[i]!.id); caps.splice(i, 1);}}
@@ -830,6 +831,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     }
     // RIDE-EXIT: a stop while stepping out of a landed ride would complete without moving the body; say how long instead.
     if (plan.stop) {const stepOut = this.stepOutRefusal(soul.entityId); if (stepOut) return {...refuse(stepOut.code, stepOut.reason), ...resolved};}
+    if (plan.stop) {const seated = this.rideStandRefusal(soul.entityId, caps); if (seated) return {...refuse(seated.code, seated.reason), ...resolved};}
     if (plan.stop) {
       await this.stallGuard.ownerStand(soul);   // stall-guard/1 (b): the owner's stand always wins over a stalled holder
       const program = this.host.engine.programOf(soul.entityId), h = this.body(soul.entityId)?.human;
@@ -1092,6 +1094,14 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (r.outInSeconds !== undefined && !(r.outInSeconds <= 60)) return null;
     const noun = /punt|boat/i.test(r.id + ' ' + r.label) ? 'punt' : /balloon/i.test(r.id + ' ' + r.label) ? 'balloon' : r.label;
     return {code: 'ride.landing', reason: `Stepping out of the ${noun}, ~${r.outInSeconds ?? 12} s; you are on the ground at its exit then.`};
+  }
+  /** SOUL3 stand truthfulness: a body seated in a ride with nothing running cannot stand up in the basket, so stand:here would answer
+   *  'completed' with the body still seated. Refuse truthfully instead, naming the explicit exit while the ride is on the ground (a stand
+   *  is never turned into a leave); aloft it lands by itself. A running program (e.g. rest aloft) is still stopped by stand:here. */
+  rideStandRefusal(entityId: string, caps: EdgeCapability[]): {code: string; reason: string} | null {
+    const r = this.aboard(entityId); if (!r || r.riderPhase !== 'seated' || this.host.engine.programOf(entityId)) return null;
+    const leave = r.phase === 'aloft' ? undefined : caps.find(c => /^object:[^:]+:leave$/.test(c.id) && c.available);
+    return {code: 'ride.seated', reason: `You are seated in ${r.label} and cannot stand up in it; nothing else is running to stop.${r.phase === 'aloft' ? ' It returns to the ground by itself and you step out then.' : leave ? ` To get out, use ${leave.id} while it is on the ground.` : ''}`};
   }
   aboard(entityId: string): {id: string; slot: string; riderPhase: string; phase: string; label: string; outInSeconds?: number} | null {
     return (this.host.engine as unknown as {carrierOf?: (a: string) => ReturnType<EdgeLedger['aboard']>}).carrierOf?.(entityId) ?? null;
