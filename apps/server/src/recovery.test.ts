@@ -114,3 +114,23 @@ test('a legacy nested recovery chain boots in one linear replay, to the same hea
   assert.equal(nested.engine.stateHash(),flat.engine.stateHash()); assert.equal(kernelHash(nested.kernel),kernelHash(flat.kernel));
   flatDb.close(); nestDb.close();
 });
+
+
+test('skipping a superseded recovery prefix preserves its original violation ceiling',()=>{
+  const factory:EngineFactory={...toyFactory,restore:s=>{
+    const e=toyFactory.restore(s);
+    if((s as any).testHistoricViolation)e.runtime.violations.push({rule:'fixture.historic',message:'fixture'} as any);
+    return e;
+  }};
+  const db=new Db(join(mkdtempSync(join(tmpdir(),'sim-recovery-ceiling-')),'sim.db'));
+  const h=new WorldHost(db,factory,'ceiling',1e9); h.boot(); h.saveSnapshot();
+  const snap=db.latestSnapshot(h.worldId)!, baseline=snap.body as any;
+  const innerBody=structuredClone(baseline); innerBody.runtime.testHistoricViolation=true;
+  const inner={baseline:innerBody,events:[],untilTick:snap.tick,faults:{},excluded:[],reason:'fixture'};
+  const event={seq:h.seq+1,tick:snap.tick,kind:'rules',author:'world:recovery',payload:{recovery:inner},at:Date.now()};
+  const outer={...inner,baseline,events:[event]};
+  db.db.prepare('INSERT INTO events (world_id,seq,tick,kind,author,payload,at) VALUES (?,?,?,?,?,?,?)')
+    .run(h.worldId,h.seq+2,snap.tick,'rules','world:recovery',JSON.stringify({recovery:outer}),Date.now());
+  assert.throws(()=>new WorldHost(db,factory,'ceiling',1e9).boot(),/recovery replay still violates/);
+  db.close();
+});
