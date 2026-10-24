@@ -339,6 +339,7 @@ export class Together {
   farSoul(soul: EdgeSoul, words: string): NearbyBody | null {
     const w = words.trim().toLowerCase().replace(/^(?:to|with|at|the)\s+/, ''); if (!w || this.p.host.soulNameRefusal(w)) return null;
     const me = this.p.body(soul.entityId); if (!me) return null;
+    if (this.farTwins(soul, words)) return null; // SOUL3: two awake Souls answer to this name; never choose one
     for (const m of this.p.host.minds.values()) {
       if (m.soulId === soul.soulId || !(m.soulId === words.trim() || m.name.toLowerCase() === w || (tokens(m.name).length > 0 && tokens(m.name).every(t => tokens(w).includes(t))))) continue;
       const b = this.p.body(m.entityId); if (!b || this.p.faded(m.soulId)) return null;
@@ -346,6 +347,11 @@ export class Together {
       return distance <= APPROACH_RADIUS ? {soulId: m.soulId, name: m.name, entityId: m.entityId, distance} as NearbyBody : null;
     }
     return null;
+  }
+  /** SOUL3: an exact display name (not an id) held by more than one other awake Soul in this world. */
+  farTwins(soul: EdgeSoul, words: string): boolean {
+    const w = words.trim().toLowerCase().replace(/^(?:to|with|at|the)\s+/, '');
+    return [...this.p.host.minds.values()].filter(m => m.soulId !== soul.soulId && m.name.toLowerCase() === w && !this.p.faded(m.soulId)).length > 1;
   }
   /** SOCIAL-APPROACH: the same acts toward a Soul out of sight (inside a building, or beyond INVITE_RADIUS) but awake in
    *  this world, offered on demand when the owner names them ("hug Wren" while Wren is on the far lawn). */
@@ -815,11 +821,31 @@ export class Together {
         return {code: 'give.other-item', reason: `${offered.host.name} offers you ${offered.item?.name ?? 'something'}, not ${ITEM_NAMES[askedKind]}.`, did_you_mean: [{id: 'accept:' + offered.id, label: `Accept: take ${offered.item?.name ?? 'it'} from ${offered.host.name}`}, {id: 'decline:' + offered.id, label: 'Decline'}]};
     }
     // gestures
+    // SOUL3 SOCIAL: "wave to/at <Soul>" keeps its target — wave:<id> walks up and waves facing them (on demand when they
+    // are beyond the listed caps, like go-near), never a solo wave:here from afar; any other name stays the facing target.
+    const wv = /^(?:wave|say\s+(?:hi|hello))\s+(?:to|at)\s+(.+)$/.exec(t);
+    if (wv && plans) {
+      if (this.farTwins(soul, wv[1])) return {code: 'soul.name-ambiguous', reason: `More than one Soul is called ${wv[1].trim()}; use the exact Soul ID.`, did_you_mean: []};
+      const o = who(wv[1]) ?? this.farSoul(soul, wv[1]), ob = o ? this.p.body(o.entityId) : undefined;
+      if (o && ob) {
+        const id = 'wave:' + o.soulId, label = `Wave to ${o.name}`;
+        if (!caps.some(c => c.id === id)) {
+          caps.push({id, verb: 'wave', label, target: {id: o.soulId, kind: 'soul'}, available: true});
+          plans.set(id, {label, steps: [...this.standFirst(soul.entityId), {verb: 'walk_to', params: {to: o.entityId, standoff: 1.6}}, {verb: 'wave', params: {at: o.entityId, seconds: 0.5}}, {verb: 'mars:pose_v1', params: {activity: 'wave', seconds: 3}}]});
+        }
+        return {capability: id, note: `${raw} is ${id} (walks over to ${o.name} first)`};
+      }
+      // no awake Soul by that name: keep the target so act faces a real thing or refuses, never a bare wave:here
+      const stale = this.p.host.soulNameRefusal(wv[1].trim().toLowerCase().replace(/^(?:to|with|at|the)\s+/, ''));
+      if (stale) return {code: stale, reason: 'That previous Soul name is unavailable or ambiguous; use the current name and immutable Soul ID.', did_you_mean: []};
+      return {capability: 'wave:here', params: {to: wv[1].trim()}, note: `${raw} is wave:here (to ${wv[1].trim()})`};
+    }
     const G: [RegExp, string][] = [[/^(?:give\s+(.+?)\s+a\s+hug|hug|embrace|cuddle)\s*(.*)$/, 'hug'], [/^(?:give\s+(.+?)\s+a\s+high[- ]?five|high[- ]?five|hi[- ]?five)\s*(.*)$/, 'high-five'],
       [/^(?:shake\s+hands\s+with|shake\s+(.+?)['’]s\s+hand|handshake(?:\s+with)?|shake\s+hands)\s*(.*)$/, 'handshake'], [/^(?:dance\s+with|ask\s+(.+?)\s+to\s+dance|have\s+a\s+dance\s+with)\s*(.*)$/, 'dance-with']];
     for (const [re, verb] of G) {
       const m = re.exec(t); if (!m) continue;
       const name = (m[1] ?? m[2] ?? '').trim();
+      if (name && this.farTwins(soul, name)) return {code: 'soul.name-ambiguous', reason: `More than one Soul is called ${name}; use the exact Soul ID.`, did_you_mean: []};
       const o = name ? who(name) : near.filter(x => x.distance <= GESTURE_RADIUS).length === 1 ? near[0] : null;
       if (!o) return name ? walkOver(verb, name) ?? notHere(verb, name) : {code: 'capability.unknown', reason: `Say who: "${verb} <name>".`, did_you_mean: caps.filter(c => c.verb === verb).slice(0, 5).map(c => ({id: c.id, label: c.label}))};
       const back = this.reciprocal(soul.soulId, o.soulId, verb); if (back) return {capability: 'accept:' + back.id, note: `${o.name} already offered ${verb}; accepting`};
