@@ -1385,7 +1385,7 @@ export class EngineBridge {
     if (!best) return;
     const plan = plans.get(best.c.id)!;
     const { blocked: _blocked, ...hereCap } = caps[i];
-    caps[i] = { ...hereCap, label: `Sit down on the nearest free seat (${best.c.label.replace(/^Sit on /, '')})`, target: best.c.target, available: true };
+    caps[i] = { ...hereCap, label: `Sit down on the nearest free seat (${best.c.label.replace(/^Sit on /, '')})`, target: best.c.target, available: true, params: best.c.params };
     plans.set('sit:here', { label: 'Sit down', steps: structuredClone(plan.steps), seconds: true });
   }
 }

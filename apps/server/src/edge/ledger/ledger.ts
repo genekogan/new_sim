@@ -781,7 +781,12 @@ export class EdgeLedger implements EdgeLedgerHooks {
       if (!plan.seconds || !Number.isInteger(params.seconds) || (params.seconds as number) < 1 || (params.seconds as number) > max) return refuse('capability.params', `seconds must be an integer 1..${max} for this capability.`);
       // an activity's own pose takes the seconds (not the short shelf visits); otherwise the resting/strolling step does
       if (posed) {for (const s of steps) if (s.verb === 'mars:pose_v1' && s.params.activity !== 'browse') s.params.seconds = params.seconds;}
-      else if (cap.verb !== 'follow') for (const s of steps) if (s.verb === 'rest' || s.verb === 'ambient_wander' || s.verb === 'gather') s.params.seconds = params.seconds;
+      else if (cap.verb !== 'follow') {
+        const timed = steps.filter(s => s.verb === 'rest' || s.verb === 'ambient_wander' || s.verb === 'gather');
+        // SOUL3: a seat plan with no rest after it (a god-built seat: one sit step) is timed by the sit step itself; its
+        // seconds count once seated, so the walk to the seat does not use them up
+        for (const s of timed.length ? timed : steps.filter(s => s.verb === 'sit')) s.params.seconds = params.seconds;
+      }
     }
     if (params.pause !== undefined && cap.verb === 'stroll') {
       if (!Number.isInteger(params.pause) || (params.pause as number) < 0 || (params.pause as number) > 60) return refuse('capability.params', 'pause must be an integer 0..60 seconds.');
