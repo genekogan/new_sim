@@ -32,7 +32,7 @@ export class ChildPool {
    *           healthPath?: (slug: string) => string, onChange?: (slug: string) => void, pidFile?: string, idleMs?: number,
    *           maxRunning?: number, minFreeMb?: number, busy?: (slug: string) => boolean,
    *           decorate?: (c: { cmd: string, args: string[], env?: object }) => { cmd: string, args: string[], env?: object },
-   *           soulCliFile?: string | null, soulSkillFile?: string | null, soulInstructionsFile?: string | null }} o
+   *           soulCliFile?: string | null, soulControllerCliFile?: string | null, soulSkillFile?: string | null, soulInstructionsFile?: string | null }} o
    * maxRunning / minFreeMb: before a world boots, idle worlds are put to sleep until it fits; when none can sleep the
    * boot is refused (error.code 'capacity'). busy(slug): a world with live viewers is never put to sleep.
    * stopGraceMs: how long stop() waits after SIGTERM before SIGKILL (10 s; tests shorten it).
@@ -394,6 +394,7 @@ export function defaultCommand(world, port, o) {
     // served as is from the published files when the launcher is given them (--soul-skill, --soul-cli).
     ...(o.soulSkillFile && existsSync(o.soulSkillFile) ? { EDGE_SKILL_FILE: resolve(o.soulSkillFile) } : {}),
     ...(o.soulCliFile && existsSync(o.soulCliFile) ? { EDGE_CLI_FILE: resolve(o.soulCliFile) } : {}),
+    ...(o.soulControllerCliFile && existsSync(o.soulControllerCliFile) ? { EDGE_CONTROLLER_CLI_FILE: resolve(o.soulControllerCliFile) } : {}),
     ...(o.soulInstructionsFile && existsSync(o.soulInstructionsFile) ? { EDGE_INSTRUCTIONS_FILE: resolve(o.soulInstructionsFile) } : {}),
     ...(marsWeb && existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}),
     ...(world.templateFile ? { GENESIS_FILE: world.templateFile } : {}),
@@ -428,6 +429,7 @@ export function forkCommand(world, port, o) {
     SIM_FORK: world.slug,
     ...(o.compileCache ? { NODE_COMPILE_CACHE: o.compileCache } : {}),
     ...(o.soulCliFile && existsSync(o.soulCliFile) ? { EDGE_CLI_FILE: resolve(o.soulCliFile) } : {}),
+    ...(o.soulControllerCliFile && existsSync(o.soulControllerCliFile) ? { EDGE_CONTROLLER_CLI_FILE: resolve(o.soulControllerCliFile) } : {}),
     ...(marsWeb && existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}),
   };
   return { cmd: process.execPath, args: [`--env-file=${resolve(clerk.envFile)}`, '--experimental-transform-types', 'tools/world-launcher/fork-world.mjs', world.fork.descriptor], env };
