@@ -833,12 +833,15 @@ export async function openLauncher(cfg = {}) {
       for (let c = null; c !== creating;) {
         c = creating; let timer;
         const ok = await Promise.race([c.then(() => true), new Promise((r) => { timer = setTimeout(() => r(false), Math.max(0, createBy - Date.now())); })]).finally(() => clearTimeout(timer));
+        // the keeper gave up (resume) while creations drained: that launcher is active again; pause and close nothing
+        if (phase !== 'preparing' || gate?.open !== open) throw new Error('handover abandoned while preparing');
         if (!ok) {
           log(`handover: a world creation is still in progress after ${(cfg.prepareCreateWaitMs ?? 15_000) / 1000} s; not preparing`);
           if (phase === 'preparing' && gate?.open === open) { phase = 'active'; const g = gate; gate = null; g.open(); }
           throw new Error(`a world creation is still in progress after ${(cfg.prepareCreateWaitMs ?? 15_000) / 1000} s: handover not prepared, this launcher serves on`);
         }
       }
+      if (phase !== 'preparing' || gate?.open !== open) throw new Error('handover abandoned while preparing');
       creationsClosed = true; pool.pause();   // (same tick as the drain: no creation can reach the registry or a boot after it)
       // a world stuck booting must not hold the keeper's 60 s prepare: its boot is abandoned (process killed and seen gone)
       // and reported; if that cannot be proven, prepare fails and this launcher serves on (one writer, no handover)

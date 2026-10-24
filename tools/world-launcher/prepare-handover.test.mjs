@@ -15,7 +15,8 @@ const templatesDir = join(dir, 'templates'); mkdirSync(templatesDir);
 const webDir = join(dir, 'web'); mkdirSync(webDir); writeFileSync(join(webDir, 'index.html'), '<!doctype html><title>Sim</title>');
 const fake = new URL('./fake-world.mjs', import.meta.url).pathname;
 const hang = new Set();   // worlds whose next process never opens its port (stuck booting)
-const command = (w, port) => ({ cmd: process.execPath, args: [fake], env: { ...process.env, WORLD_KEY: w.slug, PORT: String(port), ...(hang.has(w.slug) ? { FAKE_BOOT_MS: '600000' } : {}) } });
+const slow = new Set();   // worlds whose next process opens its port after 350 ms (a creation that finishes in time)
+const command = (w, port) => ({ cmd: process.execPath, args: [fake], env: { ...process.env, WORLD_KEY: w.slug, PORT: String(port), ...(hang.has(w.slug) ? { FAKE_BOOT_MS: '600000' } : slow.has(w.slug) ? { FAKE_BOOT_MS: '350' } : {}) } });
 const L = await openLauncher({ port: PORT, range: RANGE, dataDir: join(dir, 'data'), webDir, templatesDir, command, eager: 0, idleMs: 0, sleepMs: 0, log: () => {},
   prepareCreateWaitMs: 600, prepareBootWaitMs: 600 });
 after(async () => { await L.close(); });
@@ -79,4 +80,23 @@ test('the keeper gives up (resume) while prepare waits on a stuck boot: nothing 
   assert.equal(L.pool.o.pidFile, pidFile, 'the pid file is still written');
   assert.ok(alive(pid), 'a boot belonging to the resumed launcher is not killed by the abandoned prepare');
   hang.delete('wedged'); await L.pool.stop('wedged');
+});
+
+test('the keeper resumes while prepare drains a creation that then finishes: nothing is paused or closed afterwards', async () => {
+  slow.add('slowpoke');
+  const making = create('Slowpoke');
+  await booting('slowpoke');
+  const preparing = ms(L.prepareHandover());
+  await new Promise((r) => setTimeout(r, 50));
+  L.resumeHandover();   // (the keeper's prepare timed out) while the creation is still booting, before the 0.6 s drain bound
+  assert.equal((await making).status, 201, 'the creation finishes');
+  const r = await preparing;
+  assert.match(r.error?.message ?? '', /handover abandoned while preparing/);
+  assert.ok(r.at < 600, `prepare gave up on the resume when the creation finished (${r.at} ms), not at the drain bound`);
+  assert.equal(L.pool.gate, null, 'the resumed launcher\'s pool is not paused');
+  assert.equal(L.registry.frozen, false);
+  assert.equal((await create('Later')).status, 201, 'a later creation (and its boot) works');
+  await L.pool.stop('fine');
+  assert.equal((await api('/w/fine/healthz')).status, 200, 'an existing world boots again on its next visit');
+  slow.delete('slowpoke');
 });
