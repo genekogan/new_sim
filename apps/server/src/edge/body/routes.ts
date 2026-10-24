@@ -1,6 +1,6 @@
 import type {Context,Hono} from 'hono';
 import type {Entity} from '@sim/engine-contract';
-import {EDGE_CONTRACT,EdgeError,edgeBody,type EdgeDeps} from '../contract.ts';
+import {EDGE_CONTRACT,EdgeError,edgeBody,type EdgeDeps, edgeErrorOf} from '../contract.ts';
 import type {EdgeLedger} from '../ledger/ledger.ts';
 import {admitBodyGLB,BodyAdmissionError,BODY_LIMITS} from './admission.ts';
 import {FLOATER_MODELS} from '../../../../../mars/viewer/engine/bodies/models.ts';
@@ -49,7 +49,7 @@ export function mountBodyRoutes(app:Hono,deps:EdgeDeps&{ledger:EdgeLedger}){
   const wrap=(fn:(c:Context)=>unknown|Promise<unknown>)=>async(c:Context)=>{
     c.header('Cache-Control','no-store');try{return c.json(edgeBody(await fn(c) as object));}
     catch(e){if(e instanceof BodyAdmissionError)return c.json({contract:EDGE_CONTRACT,error:{code:e.code,message:e.message}},400);
-      if(e instanceof EdgeError)return c.json({contract:EDGE_CONTRACT,error:{code:e.code,message:e.message}},e.status as 400);
+      if(e instanceof EdgeError)return c.json({contract:EDGE_CONTRACT,error:edgeErrorOf(e)},e.status as 400);
       console.error('[body] request failed',e instanceof Error?e.message:'unknown');return c.json({contract:EDGE_CONTRACT,error:{code:'body.unavailable',message:'Body admission is unavailable; retry'}},503);}
   };
   const current=(id:string)=>deps.host.engine.world.entities[id]?.body??null;

@@ -3,7 +3,7 @@
 import type {Hono,Context} from 'hono';
 import {hashOf,stableStringify} from '@sim/engine-contract';
 import type {EdgeLedger} from '../ledger/ledger.ts';
-import {EdgeError,type EdgeDeps} from '../contract.ts';
+import {EdgeError,type EdgeDeps, edgeErrorOf} from '../contract.ts';
 import {hereFrame,SIGHT_RADIUS} from '../perception/here.ts';
 import {EARSHOT_RADIUS} from '../comms/speech.ts';
 import {buildBootStatic,assembleBootSession} from './boot-pack.ts';
@@ -45,7 +45,7 @@ export function mountBootRoutes(app:Hono,deps:EdgeDeps&{ledger:EdgeLedger},verbs
  const guard=(fn:(c:Context)=>Response)=> (c:Context)=>{
   try{return fn(c);}catch(error){
    c.header('Cache-Control','no-store');
-   if(error instanceof EdgeError)return c.json({apiContract:BOOT_API_CONTRACT,error:{code:error.code,message:error.message}},error.status as 400);
+   if(error instanceof EdgeError)return c.json({apiContract:BOOT_API_CONTRACT,error:edgeErrorOf(error)},error.status as 400);
    if(error instanceof Error&&error.message.startsWith('boot-pack.overflow'))return c.json({apiContract:BOOT_API_CONTRACT,error:{code:'boot-pack.overflow',message:error.message},fullMap:{url:'/v1/edge/boot/places'}},413);
    throw error;
   }

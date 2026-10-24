@@ -179,6 +179,13 @@ export const MIGRATIONS: { id: number; name: string; up(db: DatabaseSync): void 
     )`);
     db.exec('CREATE INDEX intent_arrivals_owner ON intent_arrivals_v1(world_id,soul_id,owner_id,seq)');
   }},
+  {id:18,name:'superseded Soul controller token hashes',up(db){
+    // SOUL3: a replaced or revoked legacy Soul token keeps only its hash, so a later use answers "revoked", not "unknown".
+    db.exec(`CREATE TABLE soul_token_tombstones_v1 (
+      token_hash TEXT PRIMARY KEY, world_id TEXT NOT NULL, soul_id TEXT NOT NULL, label TEXT,
+      issued_at INTEGER, revoked_at INTEGER NOT NULL
+    )`);
+  }},
 ];
 
 export function migrate(db: DatabaseSync): number[] {

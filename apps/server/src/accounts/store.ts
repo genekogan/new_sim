@@ -353,7 +353,8 @@ export class AccountStore {
       if (row.status === 'refused' && actual.lifecycleState !== 'refused') fail('projection-conflict', 'Refused creation cannot be revived');
       const member = this.member(row.soul_id);
       if (!member || member.account_id !== row.account_id) fail('membership-conflict', 'Current account membership changed');
-      const status: ApprovalStatus = actual.lifecycleState === 'refused' ? 'refused' : actual.ready ? 'ready' : 'creating';
+      // SOUL3: a delegated grant, once ready, is not ended by a moment of not-ready (each use still checks readiness).
+      const status: ApprovalStatus = actual.lifecycleState === 'refused' ? 'refused' : actual.ready || row.status === 'ready' ? 'ready' : 'creating';
       this.db.db.prepare('UPDATE account_approvals_v1 SET status=? WHERE world_id=? AND id=?').run(status, this.worldId, id);
       if (status === 'refused') {
         this.db.db.prepare('UPDATE account_agent_grants_v1 SET revoked_at=? WHERE world_id=? AND approval_id=? AND revoked_at IS NULL').run(this.time(), this.worldId, id);
@@ -398,5 +399,7 @@ export class AccountStore {
     });
   }
   releaseGrant(token:string){return this.db.tx(()=>{const grant=this.resolveGrant(token);if(!grant)fail('forbidden','Delegated grant unavailable');this.db.db.prepare('UPDATE account_agent_grants_v1 SET revoked_at=? WHERE world_id=? AND id=? AND revoked_at IS NULL').run(this.time(),this.worldId,grant.id);this.db.db.prepare('UPDATE account_soul_memberships_v1 SET current_grant_id=NULL WHERE world_id=? AND soul_id=? AND current_grant_id=?').run(this.worldId,grant.soulId,grant.id);});}
+  /** SOUL3: the grant a delegated token was issued under, current or revoked (its hash stays on the row; never the token). */
+  grantOf(token:string){if(typeof token!=='string'||token.length>1024||!token.startsWith('sim_'))return null;const row=this.db.db.prepare('SELECT soul_id,created_at,revoked_at FROM account_agent_grants_v1 WHERE world_id=? AND token_hash=?').get(this.worldId,sha(token)) as {soul_id:string;created_at:number;revoked_at:number|null}|undefined;return row?{soulId:row.soul_id,issuedAt:row.created_at,revokedAt:row.revoked_at}:null;}
   agentStatus(soulId:string){const row=this.db.db.prepare("SELECT a.agent_label,g.created_at FROM account_agent_grants_v1 g JOIN account_soul_memberships_v1 m ON m.world_id=g.world_id AND m.soul_id=g.soul_id AND m.current_grant_id=g.id JOIN account_approvals_v1 a ON a.id=g.approval_id AND a.world_id=g.world_id AND a.status='ready' WHERE g.world_id=? AND g.soul_id=? AND g.revoked_at IS NULL AND g.token_hash IS NOT NULL").get(this.worldId,soulId) as {agent_label:string;created_at:number}|undefined;return row?{attached:true,label:row.agent_label,since:row.created_at,last_used:null}:null;}
 }

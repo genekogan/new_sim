@@ -62,7 +62,7 @@ export function mountEdgeEyes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}, 
     while (images.size > 300) images.delete(images.keys().next().value!);
     while (frames.size > 300) frames.delete(frames.keys().next().value!);
   };
-  const fail = (c: Context, status: number, code: string, message: string, extra: object = {}) => {c.header('Cache-Control', 'no-store'); return c.json({contract: EDGE_CONTRACT, error: {code, message}, ...extra}, status as 400);};
+  const fail = (c: Context, status: number, code: string, message: string, extra: object = {}, detail: object = {}) => {c.header('Cache-Control', 'no-store'); return c.json({contract: EDGE_CONTRACT, error: {code, message, ...detail}, ...extra}, status as 400);};
   const limit = (s: EdgeSoul, key: string, n: number) => {const r = deps.souls.limits.allow(`edge-${key}:${s.soulId}`, n, 60_000); if (!r.ok) throw new EdgeError(429, 'rate-limited', 'too many requests; slow down');};
   const summary = (p: ViewPlan) => ({tick: p.tick, heading: p.sight.heading, gaze: p.sight.gaze, mode: p.request.mode, fov: Math.round(p.sight.pose.hfov * 180 / Math.PI), size: [p.request.w, p.request.h],
     where: p.sight.where, light: p.sight.light, alt: p.sight.alt,
@@ -113,7 +113,7 @@ export function mountEdgeEyes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}, 
       return c.json(edgeBody({...base, url: `/v1/edge/view/img/${img}.jpg`, expiresAt: new Date(expires).toISOString(), cached: false, bytes: out.jpeg.length,
         render: {ms: Math.round(out.ms), queueMs: Math.max(0, Math.round(out.queueMs)), frameTick: out.frameTick, renderer: st.renderer}}));
     } catch (error) {
-      if (error instanceof EdgeError) return fail(c, error.status, error.code, error.message);
+      if (error instanceof EdgeError) return fail(c, error.status, error.code, error.message, {}, error.extra);
       console.error('[edge] eyes fault', error instanceof Error ? (error.stack ?? error.message).split('\n').slice(0, 4).join(' | ') : String(error));
       return fail(c, 503, 'unavailable', 'the view could not be computed; retry');
     }

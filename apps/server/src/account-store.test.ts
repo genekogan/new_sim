@@ -171,8 +171,10 @@ test('only exact actual complete/body-ready projection permits token release', t
   assert.equal(f.store.reconcile(f.start.id, { ...f.actual, ready: false }).status, 'creating');
   assert.equal(f.store.reconcile(f.start.id, f.actual).status, 'ready');
   const token = f.store.poll(f.start.id, f.start.pollSecret!).token!; assert.ok(token);
-  assert.equal(f.store.reconcile(f.start.id, { ...f.actual, ready: false }).status, 'creating');
-  assert.equal(f.store.resolveGrant(token), null); assert.equal(f.store.poll(f.start.id, f.start.pollSecret!).token, undefined);
+  // SOUL3: once ready, a later not-ready projection no longer suspends the stored grant (nothing would resume it until a
+  // poll or a browser view); every use still checks the Soul is admitted and ready (Souls.soulFromToken / controlReady).
+  assert.equal(f.store.reconcile(f.start.id, { ...f.actual, ready: false }).status, 'ready');
+  assert.ok(f.store.resolveGrant(token)); assert.equal(f.store.poll(f.start.id, f.start.pollSecret!).token, token);
   f.store.reconcile(f.start.id, f.actual); assert.equal(f.store.poll(f.start.id, f.start.pollSecret!).token, token);
 });
 
