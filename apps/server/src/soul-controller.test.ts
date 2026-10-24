@@ -82,10 +82,14 @@ test('account controller: issue time is the first poll; registration, a not-read
  assert.equal((await f.request('/v1/agent/soul',undefined,first.token)).body.code,'control.revoked','profile/dashboard route agrees');
  const edge=await f.request('/v1/edge/observe',undefined,first.token);assert.equal(edge.status,401);assert.equal(edge.body.contract,EDGE_CONTRACT);
  assert.equal(edge.body.error.code,'control.revoked');assert.equal(edge.body.error.message,old.body.message);assert.equal(edge.body.error.hint,old.body.hint);assert.equal(edge.body.error.revokedAt,old.body.revokedAt);
+ for(const [path,body] of [['/v1/edge/inbox/listen?timeoutMs=0',undefined],['/v1/edge/inbox/missing/ack',{}],['/v1/edge/inbox/missing/result',{}]] as const){
+  const r=await f.request(path,body,first.token);assert.equal(r.status,401);assert.equal(r.body.contract,EDGE_CONTRACT);assert.equal(r.body.error.code,'control.revoked');assert.equal(r.body.error.revokedAt,old.body.revokedAt);assert.equal(r.body.error.hint,old.body.hint);
+ }
  // Unknown: never issued, garbage, oversized or a browser credential on a Soul route. Missing stays unauthorized.
  for(const bad of ['sim_'+sid+'_'+'0'.repeat(64),'garbage-token','sim_'+'x'.repeat(2000),'x'.repeat(5000),'alice']){
   const r=await me(f,bad);assert.equal(r.status,401);assert.equal(r.body.code,'control.unknown',bad.slice(0,20));assert.equal(r.body.soul,undefined);
   const e=await f.request('/v1/edge/observe',undefined,bad);assert.equal(e.status,401);assert.equal(e.body.error.code,'control.unknown');
+  const inbox=await f.request('/v1/edge/inbox/listen?timeoutMs=0',undefined,bad);assert.equal(inbox.status,401);assert.equal(inbox.body.error.code,'control.unknown');
  }
  assert.equal((await f.request('/v1/agent/me')).body.code,'unauthorized');assert.equal((await f.request('/v1/edge/observe')).body.error.code,'unauthorized');
  // Restart (fresh account service + routes over the same database) keeps both facts and the issue time.
@@ -98,6 +102,18 @@ test('account controller: issue time is the first poll; registration, a not-read
  const revoked=await me(f,second.token);assert.equal(revoked.status,401);assert.equal(revoked.body.code,'control.revoked');assert.equal(revoked.body.reason,'revoked');
  assert.equal(revoked.body.replacedAt,null);assert.equal(revoked.body.message,`Ada Lovelace's control was revoked by its owner at ${revoked.body.revokedAt}.`);
  assert.equal((await me(f,other.token)).status,200,'revoking one Soul leaves the other controller');
+});
+
+test('an open listen rechecks a replaced controller before delivering owner messages',async t=>{
+ const f=accountWorld(t),first=await f.pair({name:'Listener'});
+ const pending=f.request('/v1/edge/inbox/listen?timeoutMs=1000',undefined,first.token);
+ let open=false;
+ for(let i=0;i<30;i++){await setImmediate();open=(await f.request(`/v1/edge/owner/${first.soulId}/inbox`,undefined,'alice')).body.inbox.connected;if(open)break;}
+ assert.equal(open,true);
+ const second=await f.pair({soulId:first.soulId},'replacement');
+ await f.request(`/v1/edge/owner/${first.soulId}/inbox`,{text:'Only the new controller may see this.'},'alice');
+ const old=await pending;assert.equal(old.status,401);assert.equal(old.body.error.code,'control.revoked');assert.ok(!JSON.stringify(old.body).includes('Only the new controller'));
+ const current=await f.request('/v1/edge/inbox/listen?timeoutMs=0',undefined,second.token);assert.equal(current.status,200);assert.equal(current.body.backlog[0].text,'Only the new controller may see this.');
 });
 
 test('account world: a legacy token and a delegated grant never both steer one Soul, in either order',async t=>{
