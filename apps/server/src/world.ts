@@ -1280,12 +1280,18 @@ export class WorldHost {
     this.seq = body.seq;
   }
   private restoreRecovery(recipe: RecoveryRecipe) {
-    this.restoreBody(recipe.baseline);
+    // A recipe logged before recipes stopped nesting carries the earlier recipes among its events. The last one restores
+    // a whole body, so what precedes it is overwritten: start from it (else each level replays its chain again, 2^depth).
+    let nested = -1; for (let i=0;i<recipe.events.length;i++) if (recipe.events[i].kind === 'rules' && recipe.events[i].payload?.recovery) nested=i;
+    if (nested >= 0) { this.apply(recipe.events[nested],true); this.seq=recipe.events[nested].seq; }
+    else this.restoreBody(recipe.baseline);
     const historicViolations=this.engine.runtime.violations.length;
-    // The baseline may contain a resumable program whose later tick proved faulty.
-    for (const m of this.minds.values()) if (m.pending && recipe.excluded.includes(m.pending.card)) { this.engine.stop(m.pending.program); m.pending=null; }
-    for (const actor of recipe.edge?.stopActors ?? []) { const program=this.engine.programOf(actor); if (program) this.engine.stop(program); }
-    for (const e of recipe.events) {
+    if (nested < 0) {
+      // The baseline may contain a resumable program whose later tick proved faulty.
+      for (const m of this.minds.values()) if (m.pending && recipe.excluded.includes(m.pending.card)) { this.engine.stop(m.pending.program); m.pending=null; }
+      for (const actor of recipe.edge?.stopActors ?? []) { const program=this.engine.programOf(actor); if (program) this.engine.stop(program); }
+    }
+    for (const e of recipe.events.slice(nested+1)) {
       while (this.engine.world.tick < e.tick) { const out=this.engine.step(); this.advanceLives(); this.afterPrograms(out.programs,true); }
       this.apply(e,true); this.seq=e.seq;
     }

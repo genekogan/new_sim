@@ -84,3 +84,33 @@ test('repeated faults between snapshots never nest recovery recipes; boot and re
   assert.ok(!sixth.payload.recovery.events.some((e:any)=>e.payload?.recovery),'a recovery after such a boot carries no earlier recipe');
   db.close();
 });
+
+test('a legacy nested recovery chain boots in one linear replay, to the same head as its flat equivalent',()=>{
+  let steps=0;
+  const counting=(e:Engine)=>{ const step=e.step.bind(e); e.step=()=>{steps++; return step();}; return e; };
+  const factory:EngineFactory={...toyFactory,create:w=>counting(toyFactory.create(w)),restore:s=>counting(toyFactory.restore(s))};
+  const span=50, levels=5;
+  // Recipes as recoverFault logged them before they stopped nesting (eden-2026 seq 828..835): each carries the
+  // baseline body and every event since it, the earlier recipes included.
+  const world=(nest:boolean)=>{
+    const db=new Db(join(mkdtempSync(join(tmpdir(),'sim-recovery-legacy-')),'sim.db'));
+    const h=new WorldHost(db,factory,'legacy',1e9); h.boot();
+    void h.enqueue('birth','test',{soulId:'s_A',entityId:'h_A',name:'A',description:'quiet',owner:'private-owner'}); h.tickOnce(); h.saveSnapshot();
+    const snap=db.latestSnapshot(h.worldId)!, baseline=snap.body, since:any[]=[]; let seq=h.seq;
+    const ins=db.db.prepare('INSERT INTO events (world_id, seq, tick, kind, author, payload, at) VALUES (?,?,?,?,?,?,?)');
+    for(let k=1;k<=levels;k++){
+      const recipe={baseline,events:nest?[...since]:[],untilTick:snap.tick+k*span,faults:{},excluded:[],reason:'legacy nested recovery'};
+      const e={seq:++seq,tick:recipe.untilTick,kind:'rules',author:'world:recovery',payload:{recovery:recipe},at:Date.now()};
+      if(nest||k===levels) ins.run(h.worldId,e.seq,e.tick,e.kind,e.author,JSON.stringify(e.payload),e.at);
+      since.push(e);
+    }
+    return db;
+  };
+  const flatDb=world(false), nestDb=world(true);
+  steps=0; const flat=new WorldHost(flatDb,factory,'legacy',1e9); flat.boot(); const flatSteps=steps;
+  steps=0; const nested=new WorldHost(nestDb,factory,'legacy',1e9); nested.boot();
+  assert.equal(flatSteps,levels*span);
+  assert.equal(steps,levels*span,`nested chain steps once per tick, not once per level (2^${levels}): ${steps}`);
+  assert.equal(nested.engine.stateHash(),flat.engine.stateHash()); assert.equal(kernelHash(nested.kernel),kernelHash(flat.kernel));
+  flatDb.close(); nestDb.close();
+});
