@@ -31,7 +31,13 @@ export function mountAgentInbox(app: Hono, d: Deps) {
   };
   const requireAgent = (c: Context, kind: Agent['kind']) => {
     const a = agent(c);
-    if (!a || a.kind !== kind) throw new ApiError(401, 'unauthorized', 'use the paired agent credential; browser access does not receive messages');
+    if (!a || a.kind !== kind) {
+      if (kind === 'soul') {
+        const refusal = d.souls.controlRefusal(bearer(c));
+        throw new ApiError(401, refusal.code, refusal.message, refusal.extra);
+      }
+      throw new ApiError(401, 'unauthorized', 'use the paired agent credential; browser access does not receive messages');
+    }
     return a.scope;
   };
   // This middleware precedes every God/edge subroute. A human identity and the
