@@ -67,3 +67,43 @@ test('a released process that never exits fails the takeover clearly and the sta
   process.kill(pid, 'SIGKILL'); await stopping;
   assert.equal(alive(pid), false);
 });
+
+// R389/R390: a world stuck booting held prepareHandover (pool.settled) for its whole 90 s boot timeout, past the keeper's
+// 60 s prepare. Now the stuck boot is abandoned after waitMs: its process is killed and seen gone, the healthy world is
+// handed over, and the stuck one is reported; it is never handed over while its process may still hold the data.
+const stuckPool = () => {
+  const command = (w, port) => ({ cmd: process.execPath, args: [fake], env: { ...process.env, WORLD_KEY: w.slug, PORT: String(port), DATA_DIR: w.dataDir, FAKE_LOCK: '1', ...(w.slug === 'wedged' ? { FAKE_BOOT_MS: '600000' } : {}) } });
+  const p = new ChildPool({ root: process.cwd(), range: [6630, 6633], logDir: mkdtempSync(join(tmpdir(), 't4-race-')), command, healthPath: (s) => `/w/${s}/healthz` });
+  pools.push(p); return p;
+};
+const bootPid = async (p, slug) => { for (let i = 0; i < 200 && !p.state(slug)?.child; i++) await new Promise((r) => setTimeout(r, 10)); return p.state(slug).child.pid; };
+
+test('a world stuck booting cannot starve prepare: its boot is stopped (process gone), the healthy world is handed over', async () => {
+  const a = stuckPool();
+  await a.ensure(world('fine'));
+  const booting = a.ensure(world('wedged'), { timeoutMs: 60_000 }); booting.catch(() => {});
+  const pid = await bootPid(a, 'wedged');
+  a.pause();
+  const t0 = Date.now();
+  const abandoned = await a.settled({ waitMs: 400, goneMs: 3_000 });
+  assert.ok(Date.now() - t0 < 2_500, `prepare answered in ${Date.now() - t0} ms, not after the boot timeout`);
+  assert.deepEqual(abandoned.map((b) => [b.slug, b.pid]), [['wedged', pid]]);
+  assert.match(abandoned[0].error, /abandoned: still booting after 0.4 s/);
+  assert.equal(alive(pid), false, 'the stuck boot\'s process is gone before prepare answers (one writer)');
+  await assert.rejects(booting);
+  assert.deepEqual(a.handoverList().map((c) => c.slug), ['fine'], 'only the healthy world is handed over');
+  assert.equal(a.state('wedged').child, null);
+  const { port } = a.state('fine');
+  assert.equal((await fetch(`http://127.0.0.1:${port}/w/fine/healthz`)).status, 200, 'the healthy world still serves');
+  a.unpause();
+});
+
+test('prepare fails (no handover) when a stuck boot cannot be proven gone in time', async () => {
+  const a = stuckPool();
+  const booting = a.ensure(world('wedged'), { timeoutMs: 60_000 }); booting.catch(() => {});
+  await bootPid(a, 'wedged');
+  a.pause();
+  await assert.rejects(a.settled({ waitMs: 200, goneMs: 0 }), /boot\(s\) of wedged still running 0 s after being stopped/);
+  await assert.rejects(booting);
+  a.unpause();
+});

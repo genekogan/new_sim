@@ -881,6 +881,12 @@ export class EdgeLedger implements EdgeLedgerHooks {
       return {accepted: true as const, receipt: this.receipt(soul.soulId, r.id)!, ...resolved};
     }
     let issue = this.host.engine.canPerform({actor: soul.entityId, label, steps});
+    // SOUL3 continuation (ACCEPT3 A7): a here-activity asked while this Soul's own replaceable walk still holds the body (e.g. on
+    // the way to board a balloon) was refused not-still, so the superseded walk went on and boarded; the body stops first instead.
+    if (issue && /(^|\.)not-still$/.test(issue.code) && steps[0]?.verb !== 'stand' && this.host.engine.programOf(soul.entityId)) {
+      const stopped = [{verb: 'stand', params: {}}, ...steps], again = this.host.engine.canPerform({actor: soul.entityId, label, steps: stopped});
+      if (!again || WAIT_CODES.has(again.code)) {steps = stopped; issue = again;}
+    }
     // CN5 (acceptance: stuck at the pond bank / after a landing): a body standing where no walk can start steps to the
     // nearest clear spot within 4 m first (a logged edge-relocate), then starts
     if (issue?.code === 'route.start-blocked') {

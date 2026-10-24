@@ -62,7 +62,8 @@ export type CarrierState = {
 export type CarrierSteer = { by: string | null; to: Vec3; land?: Vec3; built: boolean; hoverUntil?: number; ret?: true;
   away: { route: CarrierRoute; elapsed: number; wake: Vec3[] } };
 /** `outBy` (leaving only): the tick by which the rider is on the ground; a step-out still held up then is set down at its exit. */
-export type CarriedBody = { id: string; slot: string; phase: 'boarding' | 'seated' | 'leaving'; outBy?: number };
+// alighting: a carrier_alight has asked this seated rider's ride to stop; the carrier does not lift off before the step-out begins.
+export type CarriedBody = { id: string; slot: string; phase: 'boarding' | 'seated' | 'leaving'; outBy?: number; alighting?: true };
 
 const TPS = 20;
 /** Clearance of the landing spot: no other person within this distance of the home centre below this height. */
@@ -312,6 +313,34 @@ const ride: ActionDef<RideParams, { slot: string }, RideExec> = {
   cancel(_rt, ex) { ex.stopping = true; return { ok: true, deferred: true }; },
 };
 
+type AlightExec = { actor: string; carrier: string; id: string };
+/** RIDE-EXIT (soul3 continuation): a rider seated in a carrier still on the ground (parked/boarding) steps out before lift-off. It
+ *  cancels the rider's own held carrier_ride, whose deferred cancel walks the body out through the door (never aloft; lift-off
+ *  waits while any rider is not seated). Completes when the body is ashore. */
+const alight: ActionDef<{ actor: string; carrier: string }, null, AlightExec> = {
+  verb: 'carrier_alight',
+  description: 'A rider seated in a carrier that is still on the ground steps out through its door before it lifts off.',
+  schema: z.object({ actor: z.string().min(1), carrier: z.string().min(1) }).strict(),
+  resumable: true,
+  reservations: (_w, p) => [{ resource: `carrier-alight:${p.actor}`, mode: 'exclusive' }],
+  plan(rt, p) {
+    const e = rt.world.entities[p.carrier], c = state(e), a = rt.world.entities[p.actor], me = carried(a);
+    if (!e || !c) return { ok: false, diagnostic: diag('unknown', `no carrier ${p.carrier}`) };
+    if (me?.id !== e.id || me.phase !== 'seated') return { ok: false, diagnostic: diag('not-aboard', `${p.actor} is not seated in ${e.label ?? e.id}`, [p.actor]) };
+    if (c.phase !== 'parked' && c.phase !== 'boarding') return { ok: false, diagnostic: diag('not-on-ground', `${e.label ?? e.id} is not on the ground; it lands by itself and riders step out then`) };
+    const task = a.human?.task, rec = task ? rt.records.get(task) : undefined;
+    if (!task || rec?.verb !== 'carrier_ride' || !rt.isActive(task)) return { ok: false, diagnostic: diag('no-ride', `${p.actor} holds no ride in ${e.label ?? e.id}`, [p.actor]) };
+    return { ok: true, program: null };
+  },
+  start(rt, p, _prog, id) { const h = rt.world.entities[p.actor].human!; (h as { carrier?: CarriedBody }).carrier!.alighting = true; rt.cancel(h.task!, { code: 'carrier.alight', message: 'stepping out before lift-off' }); return { actor: p.actor, carrier: p.carrier, id }; },
+  step(rt, ex) {
+    const me = carried(rt.world.entities[ex.actor]);
+    if (!me || me.id !== ex.carrier) return { status: 'completed', outputs: { carrier: ex.carrier, phase: 'ashore' } };
+    return { status: 'running', phase: me.phase };
+  },
+  cancel() { return { ok: true }; },
+};
+
 type DepartExec = { carrier: string; id: string };
 const depart: ActionDef<{ actor: string; carrier: string }, null, DepartExec> = {
   verb: 'carrier_depart',
@@ -461,7 +490,7 @@ const steer: ActionDef<SteerParams, SteerPlan, { carrier: string; id: string; pl
   step(_rt, ex) { const q = ex.plan; return { status: 'completed', outputs: { steering: ex.carrier, mode: q.mode, to: [q.to[0], q.to[2]], ...(q.land ? { landAt: [q.land[0], q.land[2]] } : {}), seconds: q.seconds } }; },
   cancel() { return { ok: true }; },
 };
-export const CARRIER_ACTIONS: ActionDef[] = [ride, depart, steer] as ActionDef[];
+export const CARRIER_ACTIONS: ActionDef[] = [ride, alight, depart, steer] as ActionDef[];
 
 function landingClear(rt: Runtime, e: Entity, c: CarrierState, d: CarrierDef, at: Vec3 = c.home): boolean {
   for (const o of Object.values(rt.world.entities)) {
@@ -494,7 +523,7 @@ export function stepCarriers(rt: Runtime, table?: EntityTable | null): void {
         } else continue;
       }
       if (riders.length === d.seats.length) c.departAtTick = Math.min(c.departAtTick ?? tick, tick + 5 * TPS);
-      const allSeated = riders.every(a => carried(rt.world.entities[a])?.phase === 'seated');
+      const allSeated = riders.every(a => {const b = carried(rt.world.entities[a]); return b?.phase === 'seated' && !b.alighting;});
       if (allSeated && c.departAtTick !== null && tick >= c.departAtTick) {
         c.phase = 'aloft'; c.phaseTick = tick; c.elapsed = 0; c.flights++; c.departAtTick = null; e.phase = 'carried';
       }

@@ -271,7 +271,7 @@ export async function openLauncher(cfg = {}) {
   }
 
   // ---------- create
-  let creating = Promise.resolve();
+  let creating = Promise.resolve(), creationsClosed = false;   // closed: a handover is taking the registry (prepareHandover)
   /** `op.owner`: the operator's create (direct loopback only, below): the world is born owned by that existing account
    *  (WORLD_OWNER_ID on its first boot only matters while it has no store yet), with no sign-in and no claim. */
   async function createWorld(body, authorization, op = null) {
@@ -314,6 +314,7 @@ export async function openLauncher(cfg = {}) {
       return [409, { ok: false, code: 'exists', message: `slug ${chosen} is in use, archived, or has data on disk` }];
     const slug = chosen ?? slugFor(name, taken);
     const entry = { slug, name, template: t.id, port: null, createdAt: Date.now(), ...(typeof body?.creator === 'string' && body.creator ? { createdBy: body.creator.slice(0, 40) } : {}), ...(op && typeof body?.unlisted === 'boolean' ? { unlisted: body.unlisted } : {}) };
+    if (creationsClosed) return [503, { ok: false, code: 'handover', message: 'a new release is starting; try again in a minute' }];
     rmSync(registry.worldDir(slug), { recursive: true, force: true });
     mkdirSync(registry.worldDir(slug), { recursive: true });
     registry.add(entry);
@@ -826,15 +827,35 @@ export async function openLauncher(cfg = {}) {
     async prepareHandover() {
       if (phase !== 'active') throw new Error(`cannot prepare a handover while ${phase}`);
       phase = 'preparing'; let open; gate = { p: new Promise((r) => { open = r; }), open };
-      pool.pause();
-      await creating; await pool.settled();
+      // creations in flight finish first (new ones wait at the gate). A creation's boot is never abandoned (a failed one
+      // deletes its new world), so creations that do not finish in time fail prepare: nothing is touched, it serves on.
+      const createBy = Date.now() + (cfg.prepareCreateWaitMs ?? 15_000);
+      for (let c = null; c !== creating;) {
+        c = creating; let timer;
+        const ok = await Promise.race([c.then(() => true), new Promise((r) => { timer = setTimeout(() => r(false), Math.max(0, createBy - Date.now())); })]).finally(() => clearTimeout(timer));
+        // the keeper gave up (resume) while creations drained: that launcher is active again; pause and close nothing
+        if (phase !== 'preparing' || gate?.open !== open) throw new Error('handover abandoned while preparing');
+        if (!ok) {
+          log(`handover: a world creation is still in progress after ${(cfg.prepareCreateWaitMs ?? 15_000) / 1000} s; not preparing`);
+          if (phase === 'preparing' && gate?.open === open) { phase = 'active'; const g = gate; gate = null; g.open(); }
+          throw new Error(`a world creation is still in progress after ${(cfg.prepareCreateWaitMs ?? 15_000) / 1000} s: handover not prepared, this launcher serves on`);
+        }
+      }
+      if (phase !== 'preparing' || gate?.open !== open) throw new Error('handover abandoned while preparing');
+      creationsClosed = true; pool.pause();   // (same tick as the drain: no creation can reach the registry or a boot after it)
+      // a world stuck booting must not hold the keeper's 60 s prepare: its boot is abandoned (process killed and seen gone)
+      // and reported; if that cannot be proven, prepare fails and this launcher serves on (one writer, no handover)
+      const abandoned = await pool.settled({ waitMs: cfg.prepareBootWaitMs ?? 25_000, goneMs: 10_000, still: () => phase === 'preparing' && gate?.open === open });   // (with the creation drain: <= 50 s, under the keeper's 60 s)
+      for (const b of abandoned) log(`handover: ${b.slug} was still booting${b.pid ? ` (pid ${b.pid})` : ''}; boot stopped, it is not handed over and starts fresh on its next visit`);
+      // the keeper gave up (resume) while this waited: stay serving, freeze nothing
+      if (phase !== 'preparing' || gate?.open !== open) throw new Error('handover abandoned while preparing');
       registry.frozen = true; pool.savePids(); const pidFile = pool.o.pidFile; pool.o.pidFile = null; gate.pidFile = pidFile;
-      return pool.handoverList();
+      return { children: pool.handoverList(), abandoned };
     },
     /** Keeper: the next launcher failed before it served anyone; carry on as before. */
     resumeHandover() {
       if (phase !== 'preparing') return;
-      phase = 'active'; registry.frozen = false; pool.o.pidFile = gate.pidFile; pool.savePids(); registry.save();
+      phase = 'active'; creationsClosed = false; registry.frozen = false; if (gate.pidFile !== undefined) pool.o.pidFile = gate.pidFile; pool.savePids(); registry.save();
       const g = gate; gate = null; pool.unpause(); g.open();
       log('handover abandoned: serving on as before');
     },
@@ -851,7 +872,7 @@ export async function openLauncher(cfg = {}) {
      *  before, booting that world here on this release's code. The other worlds never left this launcher. */
     async unretire(slug) {
       if (phase !== 'retired') throw new Error(`cannot unretire while ${phase}`);
-      phase = 'active'; retiredTo = null; pool.unfence(); registry.frozen = false; pool.o.pidFile = retiredPidFile; pool.savePids(); registry.save();
+      phase = 'active'; retiredTo = null; pool.unfence(); creationsClosed = false; registry.frozen = false; pool.o.pidFile = retiredPidFile; pool.savePids(); registry.save();
       log(`the next launcher's canary failed: serving on as before${slug ? `, booting ${slug} here again` : ''}`);
       const w = slug ? registry.get(slug) : null;
       return w ? pool.ensure(worldEnv(w)) : null;
@@ -938,7 +959,7 @@ function serveKeeper(l, stop) {
     if (!m || typeof m !== 'object') return;
     if (m.t === 'conn') { if (handle) l.accept(handle); return; }
     const reply = (p) => p.then((r) => process.send({ t: `${m.t}-done`, id: m.id, ok: true, ...r }), (e) => process.send({ t: `${m.t}-done`, id: m.id, ok: false, error: e.message }));
-    if (m.t === 'prepare') reply(l.prepareHandover().then((children) => ({ children })));
+    if (m.t === 'prepare') reply(l.prepareHandover());
     else if (m.t === 'resume') l.resumeHandover();
     else if (m.t === 'retire') l.retire();
     else if (m.t === 'release') reply(l.releaseWorld(m.slug).then((st) => ({ slug: m.slug, status: st.status })));

@@ -45,7 +45,7 @@ export class ChildPool {
     this.closing = false;
     /** Handed over to a newer launcher (keeper.mjs): no world of this pool may start or restart again. */
     this.fenced = false;
-    this.gate = null; this.inflight = new Set();
+    this.gate = null; this.inflight = new Map();   // boot promise -> its kid
     mkdirSync(o.logDir, { recursive: true });
   }
 
@@ -81,7 +81,7 @@ export class ChildPool {
         k.status = 'starting'; k.port = warm.port; k.asleep = false; this.attach(k, warm);
         warm.child.kill('SIGUSR2');   // open the data and the port now
         const run = this.healthy(k, warm, timeoutMs);
-        this.inflight.add(run); run.then(() => this.inflight.delete(run), () => this.inflight.delete(run));
+        this.inflight.set(run, k); run.then(() => this.inflight.delete(run), () => this.inflight.delete(run));
         return run;
       }
       return this.boot(k, timeoutMs);   // no standby process (old release, or it failed): a cold boot, as before
@@ -116,8 +116,31 @@ export class ChildPool {
   /** Preparing a handover: hold every new boot at the gate (unpause() lets them go on; fence() refuses them). */
   pause() { if (!this.gate) { let open; const p = new Promise((r) => { open = r; }); this.gate = { p, open }; } }
   unpause() { const g = this.gate; this.gate = null; g?.open(); }
-  /** Boots already past the gate (spawned), settled: after pause() nothing new starts, so the running set is final. */
-  async settled() { await Promise.allSettled([...this.inflight]); }
+  /** Boots already past the gate (spawned), settled: after pause() nothing new starts, so the running set is final.
+   *  A boot still going after `waitMs` (a world stuck booting: R389/R390 held the keeper's 60 s prepare for its 90 s boot
+   *  timeout) is abandoned instead: it never served, so its process is killed, and that process must be seen to exit
+   *  within `goneMs`, else this throws (closure unproven: no handover, one writer). Resolves with the abandoned boots. */
+  async settled({ waitMs = Infinity, goneMs = 5_000, still = () => true } = {}) {
+    const runs = [...this.inflight.keys()];   // only boots already past the gate; `still()` false: the prepare was given up
+    let timer; const all = Promise.allSettled(runs).then(() => true);
+    const done = Number.isFinite(waitMs) ? await Promise.race([all, new Promise((r) => { timer = setTimeout(() => r(false), waitMs); })]).finally(() => clearTimeout(timer)) : await all;
+    if (!done && still()) {
+      const stuck = runs.filter((r) => this.inflight.has(r)).map((r) => this.inflight.get(r)), out = [];
+      for (const k of stuck) {
+        k.stopped = true; k.abandoned = true;   // spawnAndWait / healthy() stop here; nothing launches after this
+        out.push({ slug: k.slug, pid: k.child?.pid ?? null, status: k.status });
+        k.child?.kill('SIGKILL');
+      }
+      const deadline = Date.now() + goneMs;
+      const pending = () => runs.some((r) => this.inflight.has(r));
+      while ((pending() || stuck.some((k) => k.child)) && Date.now() < deadline) await sleep(25);
+      const left = stuck.filter((k) => k.child);
+      if (pending() || left.length) throw new Error(`boot(s) of ${stuck.map((k) => k.slug).join(', ')} still running ${goneMs / 1000} s after being stopped${left.length ? ` (pid ${left.map((k) => k.child.pid).join(', ')})` : ''}: their data may still be open`);
+      for (const k of stuck) { k.abandoned = false; k.lastError = `abandoned: still booting after ${waitMs / 1000} s when a handover was prepared`; }
+      return out.map((b) => ({ ...b, error: this.kids.get(b.slug)?.lastError }));
+    }
+    return [];
+  }
   /** After a handover: refuse every start and restart; children that exit stay stopped. */
   fence() { this.fenced = true; for (const k of this.kids.values()) if (k.timer) { clearTimeout(k.timer); k.timer = null; } this.unpause(); }
   /** This pool's canary failed (keeper.mjs hands back to the previous launcher): the world is never started here again
@@ -236,7 +259,7 @@ export class ChildPool {
     // adopted but its handover failed: the previous launcher may still hold its database, so it is never started here
     if (k?.adopted) { const e = new Error(`world ${world.slug} could not be taken over from the previous launcher${k.lastError ? `: ${k.lastError}` : ''}`); e.code = 'handover-failed'; return Promise.reject(e); }
     k = k ?? { slug: world.slug, world, restarts: 0, crashes: 0, status: 'starting', port: null, child: null, upSince: null, lastExit: null, ready: null, stopped: false, lastUsed: Date.now() };
-    k.world = world; k.stopped = false;
+    k.world = world; k.stopped = false; k.abandoned = false;
     if (k.timer) { clearTimeout(k.timer); k.timer = null; }  // someone is waiting: restart now, not after the backoff
     this.kids.set(world.slug, k);
     k.ready = this.boot(k, timeoutMs).finally(() => { k.ready = null; });
@@ -266,7 +289,7 @@ export class ChildPool {
     while (this.gate) await this.gate.p;
     if (this.fenced) { k.status = 'stopped'; const e = new Error(`world ${k.slug} is served by a newer launcher`); e.code = 'handed-over'; throw e; }
     const run = this.spawnAndWait(k, timeoutMs);
-    this.inflight.add(run); run.then(() => this.inflight.delete(run), () => this.inflight.delete(run));
+    this.inflight.set(run, k); run.then(() => this.inflight.delete(run), () => this.inflight.delete(run));
     return run;
   }
   async spawnAndWait(k, timeoutMs) {
@@ -279,6 +302,7 @@ export class ChildPool {
       for (let i = 0; ; i++) { try { port = await this.pickPort(k.port ?? k.world.port, k.slug); break; } catch (again) { if (i >= 50) throw again; await sleep(100); } }  // the sleeper's socket takes a moment to close
     }
     k.port = port; k.asleep = false;
+    if (k.abandoned) { k.status = 'failed'; this.o.onChange?.(k.slug); throw new Error(`world ${k.slug}: boot abandoned for a handover`); }
     const run = this.launch(k, port);
     this.attach(k, run);
     return this.healthy(k, run, timeoutMs);
