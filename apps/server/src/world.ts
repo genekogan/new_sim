@@ -1452,8 +1452,11 @@ export class WorldHost {
       ...(this.profilePhoto(m.soulId)?{profilePhoto:this.profilePhoto(m.soulId)!}:{}),
       intent: publicIntent(m.intent), intentText: describeIntent(publicIntent(m.intent), nameOf), mood: m.mood, energy: energyWord(m.energy), doing: m.doing,
       ...this.publicNow(m.soulId),
+      ...(this.publicBodyOf?.(m.soulId) ? {body: this.publicBodyOf(m.soulId)!} : {}),
     };
   }
+  /** LINK BODY: the body rule's public state for a Soul (edge worlds; the Ledger sets it). Re-sent via markSoulDirty. */
+  publicBodyOf?:(soulId:string)=>NonNullable<PublicSoul['body']>|null;
   /** A human-readable name for a kernel thing id, an engine entity id or a region id. */
   nameOf(id: string): string { return this.kernel.things[id]?.name ?? this.engine.world.entities[id]?.label ?? this.engine.world.regions[id]?.label ?? id; }
   private stationGenesisV1?:string;

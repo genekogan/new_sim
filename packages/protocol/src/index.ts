@@ -130,6 +130,10 @@ export type PublicSoul = {
   intent: WireIntent | null; intentText: string; mood: string; energy: string; doing: string; native: boolean;
   /** LINK: the agent's self-authored public status line (≤140 chars, untrusted text), or null. */
   now?: {text: string; at: number} | null;
+  /** LINK (COMMON-LINK §2): the body follows the agent's presence. awake = connected and directed; idle = connected, the
+   *  idle reflex runs; zombie = disconnected, shuffling; asleep = disconnected, still. `doing` is the posture word (null when
+   *  directed); `since` (ms) when the state began. Edge worlds only. */
+  body?: {state: 'awake' | 'idle' | 'zombie' | 'asleep'; doing: 'standing' | 'sitting' | 'dozing' | 'drifting' | 'floating' | null; since: number};
 };
 export type BrainCall = {
   id: number; tick: number; at: number; tier: 'mid' | 'translate' | 'director' | 'narrator' | 'shot' | 'compile' | 'talk' | 'attune' | 'reflection';

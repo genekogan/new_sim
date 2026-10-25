@@ -145,7 +145,7 @@ export const BODY_VERBS: VerbInfo[] = [
   {verb:'activity_readiness_v1',description:'My bounded voluntary standing wait for one host and venue; only a matching owned classroom may hand over this wait.',inputSchema:{type:'object',properties:{host:{type:'string'},venue:{type:'string'},activity:{const:'classroom'},seconds:{type:'number',minimum:20,maximum:300}},required:['host','venue','activity','seconds'],additionalProperties:false}},
   {verb:'control_classroom_v1',description:'Apply an owned host control to its actual classroom without replacing its body programme; accepted control is not completed cleanup.',inputSchema:{type:'object',properties:{session:{type:'string',maxLength:80},kind:{enum:['cancel','advance']}},required:['session','kind'],additionalProperties:false}},
   { verb: 'build_lookout', description: 'Choose one finite camp construction job: stage carries rack parts to the build site; frame raises/connects/releases the uprights; deck installs joists/sheets; stairs completes access. Use the exact unprefixed verb build_lookout, target:null, approach:[], and a single during step with phase. The card sets only $actor.doing; physical part progress is maintained by the engine, never invented target states or permission links. The committed crew finishes a safe segment before interruption.', inputSchema: {type:'object',properties:{phase:{type:'string',enum:['stage','frame','deck','stairs']}},required:['phase']} },
-  { verb: 'walk_to', description: 'Go to a thing or a point, stopping `standoff` metres short of it. Optional dry-ground gait: walk (default), jog (2.5 m/s), run (4 m/s), cycle (4.5 m/s, a docked bicycle); stairs remain slow.', inputSchema: { type: 'object', properties: { to: ref, standoff: num, gait: {enum:['walk','jog','run','cycle']} }, required: ['to'] } },
+  { verb: 'walk_to', description: 'Go to a thing or a point, stopping `standoff` metres short of it. Optional dry-ground gait: walk (default), jog (2.5 m/s), run (4 m/s), cycle (4.5 m/s, a docked bicycle); stairs remain slow.', inputSchema: { type: 'object', properties: { to: ref, standoff: num, gait: {enum:['walk','jog','run','cycle']}, pace: {enum:['shuffle']} }, required: ['to'] } },
   { verb: 'sit', description: 'Go to a free seat of a fixture (a bench, a chair) and sit there for a number of seconds; stays seated afterwards.', inputSchema: { type: 'object', properties: { on: str, seconds: num }, required: ['on'] } },
   { verb: 'stand', description: 'Stand up, leaving a seat or a place in a gathering.', inputSchema: { type: 'object', properties: {} } },
   { verb: 'rest', description: 'Stay as you are (seated if sitting) for a number of seconds.', inputSchema: { type: 'object', properties: { seconds: num, seatedAt:str } } },
@@ -686,7 +686,10 @@ export class MarsEngine implements Engine {
         if ('code' in g) return g;
         const movement = this.movementVerb(me,g.x,g.z);
         if (a.gait && a.gait !== 'walk' && movement !== 'walk_to') return {code:'gait.dry-ground-required',message:'This shore or water route does not support jogging or running; return to dry ground first.'};
-        const ops: Op[] = [{ verb: movement, params: { actor: me, x: g.x, z: g.z, level:g.level, ...(a.gait && a.gait !== 'walk' ? {gait:a.gait} : {}), ...(this.cfg.nativeArrivalWitnessV1&&movement==='walk_to'?{arrivalEvidence:'navigation-arrival/1'}:{}) }, settle: 'done', ...(a.spread === 'pond-lap/1' ? { soft: true } : {}) }];
+        // LINK BODY: a zombie's shuffle (pace 'shuffle'): half the body's walking speed, dry ground at both ends only
+        const shuffle = a.pace === 'shuffle';
+        if (shuffle && (movement !== 'walk_to' || a.gait || !this.dryGroundAtV1(g.x, g.z))) return {code:'shuffle.dry-ground-required',message:'A shuffle stays on dry ground.'};
+        const ops: Op[] = [{ verb: movement, params: { actor: me, x: g.x, z: g.z, level:g.level, ...(a.gait && a.gait !== 'walk' ? {gait:a.gait} : {}), ...(shuffle ? {speed: r3(0.5 * bodyProfile(this.ents[me]).speed)} : {}), ...(this.cfg.nativeArrivalWitnessV1&&movement==='walk_to'?{arrivalEvidence:'navigation-arrival/1'}:{}) }, settle: 'done', ...(a.spread === 'pond-lap/1' || shuffle ? { soft: true } : {}) }];
         if (typeof a.to === 'string' && this.ents[a.to]) ops.push({ verb: 'face', params: { actor: me, target: { entity: a.to } }, settle: 'done', soft: true });
         return ops;
       }
@@ -906,6 +909,9 @@ export class MarsEngine implements Engine {
     this.end(p, 'cancelled', { code: 'program.stopped', message: 'stopped' });
   }
   programOf(actor: string) { return this.byActor.get(actor) ?? null; }
+  /** LINK BODY (2026-10-24): dry standing ground at (x, z): not the shore's slope or water, not wading or swimming depth,
+   *  not steep or outside the ground. Where a zombie may shuffle (edge/ledger/body-rule.ts). Read-only. */
+  dryGroundAtV1(x:number,z:number):boolean{if(this.physical&&inShoreDomain(this.rt.world,x,z))return false;const f=(this.rt.services.spatial as Spatial|undefined)?.ground?.field;return !f||f.medium(x,z)===0;}
   /** stall-guard/1 (stall.ts): what holds this body, read-only; `pending` = a program still waiting for the body. */
   stallProbeV1(actor:string){const p=probeBody(this.rt,actor);if(!p)return null;const id=this.byActor.get(actor),pp=id?this.programs.get(id):undefined;return {...p,pending:!!pp&&!pp.started};}
   /** stall-guard/1: the world releases a stalled body (folded from 'edge-stop' {stallReleaseV1}) and stands it at the nearest

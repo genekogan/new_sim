@@ -1,4 +1,5 @@
 // C9: fading ships flag-off; with the flag on, warnings at 30/50 min, removal at 60, reclaim on action.
+// LINK BODY (2026-10-24): the idle beam-up runs only with SIM_BEAM (option `beam`); without it nothing warns or removes.
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {commsFixture} from './edge/comms/testing.ts';
@@ -15,8 +16,24 @@ test('fading is off by default: no status, no events, no table writes', async ()
   } finally { f.destroy(); }
 });
 
-test('with the flag on: yellow at 30, red at 50, gone at 60; any accepted action reclaims', async () => {
-  const f = commsFixture(['Alice', 'Bob'], {fading: true});
+test('LINK: beam off (the default): no warnings, never gone, status green; touches still reach onTouch listeners', async () => {
+  const f = commsFixture(['Alice'], {fading: true});
+  const touched: string[] = [];
+  f.runtime.fading.onTouch(id => touched.push(id));
+  try {
+    assert.equal(f.runtime.fading.beam, false);
+    f.at('Alice', 0, 0); f.runtime.sweep();
+    f.clock.now += 120 * MIN; f.runtime.sweep();
+    assert.deepEqual(f.runtime.fading.status(f.id('Alice')), {colour: 'green', idleSeconds: 0});
+    assert.equal((await f.drain('Alice')).events.filter((e: any) => e.kind === 'fade').length, 0);
+    assert.deepEqual(f.runtime.fading.gone(), []);
+    f.ledger.receipt({id: 'r_x', soulId: f.id('Alice'), phase: 'started'});
+    assert.deepEqual(touched, [f.id('Alice')]);
+  } finally { f.destroy(); }
+});
+
+test('with the flag and SIM_BEAM on: yellow at 30, red at 50, gone at 60; any accepted action reclaims', async () => {
+  const f = commsFixture(['Alice', 'Bob'], {fading: true, beam: true});
   const changes: string[] = [];
   f.runtime.fading.onFade(c => changes.push(`${c.soulId}:${c.change}:${c.colour}`));
   try {

@@ -4,6 +4,10 @@
 // nothing is recorded, no events are sent and status() is null. The ledger owns the
 // body effects: it listens with onFade() to remove the body at 60 and to land it at a
 // starting place on reclaim. Comms owns the clock, stream warnings and narration items.
+// LINK BODY (2026-10-24, Gene: "the body never leaves"): the idle beam-up is retired behind SIM_BEAM (off). With the beam
+// off nothing warns, nothing is removed and `status()` stays green while the body is here; the idle clock (touch) still
+// runs and its listeners (onTouch) feed the presence-driven body rule (edge/ledger/body-rule.ts: zombie, sleep, idle
+// reflex). Travel's depart/arrive keep their own removal ('gone' + away), unchanged.
 import type {CommsCore} from './core.ts';
 import type {Steward} from './steward.ts';
 import {tx} from './store.ts';
@@ -15,14 +19,19 @@ export const YELLOW_MS = 30 * 60_000, RED_MS = 50 * 60_000, GONE_MS = 60 * 60_00
  *  after the Soul's last accepted action, so a body left seated by an agent that never returns still fades eventually. */
 export const HOLD_MAX_MS = 12 * 3600_000;
 export type FadeChange = {soulId: string; colour: FadeColour; change: 'warn' | 'removed' | 'reclaimed'; idleSeconds: number};
+/** SIM_BEAM=1 brings back the idle beam-up (warnings at 30/50 min, removal at 60). Off by default since LINK. */
+export const beamEnabled = () => process.env.SIM_BEAM === '1';
 
 const colourAt = (idle: number): FadeColour => idle >= GONE_MS ? 'gone' : idle >= RED_MS ? 'red' : idle >= YELLOW_MS ? 'yellow' : 'green';
 
 export class Fading {
   private core: CommsCore; private steward: Steward; readonly enabled: boolean;
+  /** The idle beam-up (SIM_BEAM). Off: no warnings, no removal, never `gone` except by travel. */
+  readonly beam: boolean;
   private listeners: ((c: FadeChange) => void)[] = [];
-  constructor(core: CommsCore, steward: Steward, enabled: boolean) {
-    this.core = core; this.steward = steward; this.enabled = enabled;
+  private touches: ((soulId: string) => void)[] = [];
+  constructor(core: CommsCore, steward: Steward, enabled: boolean, beam = beamEnabled()) {
+    this.core = core; this.steward = steward; this.enabled = enabled; this.beam = beam;
     if (enabled) {
       core.db.exec('CREATE TABLE IF NOT EXISTS edge_comms_activity (world_id TEXT NOT NULL, soul_id TEXT NOT NULL, last_at INTEGER NOT NULL, colour TEXT NOT NULL, PRIMARY KEY (world_id, soul_id)) WITHOUT ROWID;');
       // contact_at: the last accepted action itself (last_at is the idle clock, which a hold keeps moving)
@@ -38,6 +47,8 @@ export class Fading {
     return null;
   }
   onFade(l: (c: FadeChange) => void) { this.listeners.push(l); }
+  /** LINK BODY: told of every accepted action (whether or not the fading flag is on); the body rule wakes on it. */
+  onTouch(l: (soulId: string) => void) { this.touches.push(l); }
   private row(soulId: string) { return this.core.db.prepare('SELECT last_at, colour, contact_at FROM edge_comms_activity WHERE world_id = ? AND soul_id = ?').get(this.core.worldId, soulId) as {last_at: number; colour: FadeColour; contact_at: number | null} | undefined; }
   private set(soulId: string, lastAt: number, colour: FadeColour, contactAt?: number) {
     this.core.db.prepare('INSERT INTO edge_comms_activity (world_id, soul_id, last_at, colour, contact_at) VALUES (?,?,?,?,?) ON CONFLICT (world_id, soul_id) DO UPDATE SET last_at = excluded.last_at, colour = excluded.colour, contact_at = COALESCE(excluded.contact_at, edge_comms_activity.contact_at)').run(this.core.worldId, soulId, lastAt, colour, contactAt ?? null);
@@ -88,6 +99,7 @@ export class Fading {
 
   /** Any accepted action by the Soul. Reclaims a faded Soul. */
   touch(soulId: string) {
+    for (const l of this.touches) { try { l(soulId); } catch { /* a body-rule fault never blocks an action */ } }
     if (!this.enabled || this.isAway(soulId)) return;
     const now = this.core.now();
     tx(this.core.db, () => {
@@ -102,7 +114,7 @@ export class Fading {
   }
 
   sweep() {
-    if (!this.enabled) return;
+    if (!this.enabled || !this.beam) return;
     const now = this.core.now();
     for (const soulId of this.core.liveSoulIds()) tx(this.core.db, () => {
       const r = this.row(soulId);
@@ -118,6 +130,14 @@ export class Fading {
     });
   }
 
+  /** LINK BODY migration: with the beam off, Souls the old idle beam took (`gone`, not away by travel) come back. Their rows
+   *  turn green (no announcement: the body rule places them asleep); returns their ids. `dryRun` only lists them. */
+  restoreGone(dryRun = false): string[] {
+    if (!this.enabled || this.beam) return [];
+    const ids = this.gone().filter(id => !this.isAway(id));
+    if (!dryRun) for (const id of ids) tx(this.core.db, () => { const r = this.row(id); if (r?.colour === 'gone') this.set(id, this.core.now(), 'green'); });
+    return ids;
+  }
   /** Souls currently faded out (colour `gone`). Durable, so a restarted Ledger re-learns who is absent. */
   gone(): string[] {
     if (!this.enabled) return [];
@@ -134,6 +154,7 @@ export class Fading {
     if (!this.enabled) return null;
     const r = this.row(soulId);
     if (!r) return {colour: 'green', idleSeconds: 0};
+    if (!this.beam) return r.colour === 'gone' ? {colour: 'gone', idleSeconds: Math.floor((this.core.now() - r.last_at) / 1000)} : {colour: 'green', idleSeconds: 0};
     const now = this.core.now(), held = r.colour === 'gone' ? null : this.heldNow(soulId, r, now);
     if (held) return {colour: 'green', idleSeconds: 0, held};
     const idle = now - r.last_at;

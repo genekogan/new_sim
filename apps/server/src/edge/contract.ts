@@ -51,7 +51,9 @@ export type EdgeDeps = {host: WorldHost; db: Db; souls: Souls; build?: string; s
   /** The signed-in owner's Soul `id` (owner routes such as PUT /v1/souls/:id/look); throws when not theirs. */
   ownerSoul?(c: Context, id: string): Promise<EdgeSoul>;
   /** SOULSIM-H F1: the owner inbox, so a Soul's `wait` returns as soon as its owner writes (the agent sees it mid-action). */
-  ownerInbox?: {onSoulSend(listener: (soulId: string) => void): void; ownerWrote(s: {scope: string; owner: string}, since: number): {waiting: number; newestAt: number} | null}};
+  ownerInbox?: {onSoulSend(listener: (soulId: string) => void): void; ownerWrote(s: {scope: string; owner: string}, since: number): {waiting: number; newestAt: number} | null;
+    /** LINK BODY: the agent's listen presence per Soul, and a wake when a listen opens (edge/ledger/body-rule.ts). */
+    soulPresence?(soulId: string): {listening: boolean; at: number | null}; onSoulListen?(listener: (soulId: string) => void): void}};
 export class EdgeError extends Error {readonly status: number; readonly code: string; readonly extra?: Record<string, unknown>; constructor(status: number, code: string, message: string, extra?: Record<string, unknown>) {super(message); this.status = status; this.code = code; if (extra) this.extra = extra;}}
 /** The `error` object of an eden-edge/1 refusal: code, message and any structured detail (e.g. `control.revoked`). */
 export const edgeErrorOf = (e: EdgeError) => ({code: e.code, message: e.message, ...e.extra});
