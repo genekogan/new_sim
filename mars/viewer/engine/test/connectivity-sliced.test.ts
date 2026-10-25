@@ -115,6 +115,19 @@ test('connectivity: static epoch interruption discards partial work without publ
   assert.equal(w.conn.ready, true);
 });
 
+test('connectivity: epoch interruption retains completed content-keyed tiles without publishing roots', () => {
+  const w = fixture(), ref = fixture();
+  let slices = 0;
+  // The second relabel begins only after the first tile summary is complete.
+  while (w.conn.stats.relabelled < 2) { assert.equal(w.conn.update(Number.MIN_VALUE), false); assert.ok(++slices < 10000); }
+  assert.equal(w.conn.stats.reused, 0); assert.equal(w.conn.version, ''); assert.equal(w.conn.main, -1);
+  for (const f of [w, ref]) { f.world.entities.edit = component('edit', 'test-wall', [0, 0, 8]); f.spatial.sync(f.world); }
+  assert.equal(w.conn.update(0), false);
+  drainSlices(w.conn); ref.conn.update(Infinity);
+  assert.ok(w.conn.stats.reused > 0, 'unchanged completed tiles are reused despite no published graph yet');
+  assert.deepEqual(answers(w.conn), answers(ref.conn));
+});
+
 test('connectivity: body window movement at the same epoch preserves an in-progress build', () => {
   const w = fixture(), ref = fixture(), epoch = w.spatial.epoch;
   let turns = 0;

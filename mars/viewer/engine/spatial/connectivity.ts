@@ -150,6 +150,8 @@ export class NavConnectivity {
   private publishedKey = '';
   private publishedGround?: GroundNav;
   private pending?: { key: string; ground?: GroundNav; work: NavConnectivity; steps: Generator<BuildPhase, BuildPhase> };
+  /** Completed content-keyed tile values survive cancellation, but never its partial union-find or graph. */
+  private carried?: { ground: GroundNav; per: number; tiles: Map<string, TileLabels>; lru: Map<string, RasterLabels>; mediaMemo: Map<string, 0 | 1 | 2> };
   /** A private builder owns all mutable derived state until the entire graph can be published. */
   private building = false;
   private reading = false;
@@ -174,7 +176,7 @@ export class NavConnectivity {
    * A finite slice may overrun by one atomic raster/label/cluster-level/link operation. No partial graph is published. */
   update(budgetMs = Infinity): boolean {
     const t0 = performance.now(), key = this.currentKey(), ground = this.spatial.ground;
-    if (this.pending && (this.pending.key !== key || this.pending.ground !== ground)) this.pending = undefined;
+    if (this.pending && (this.pending.key !== key || this.pending.ground !== ground)) this.cancelBuild();
     if (this.ready) return true;
     if (!(budgetMs > 0)) return false;
     if (!this.pending) {
@@ -188,6 +190,12 @@ export class NavConnectivity {
       work.parent = this.parent.slice(); work.base = new Map(this.base); work.rootSize = new Map(this.rootSize);
       work.clusters = this.clusters; work.good = this.good; work.fwd = this.fwd; work.bwd = this.bwd;
       work.main = this.main; work.version = this.version; work.graphVer = this.graphVer; work.dirty = this.dirty;
+      const carry = this.carried; this.carried = undefined;
+      if (carry && ground === carry.ground && ground.per === carry.per) {
+        work.tiles = new Map(carry.tiles); work.lru = new Map(carry.lru); work.mediaMemo = new Map(carry.mediaMemo);
+        // compile checks every tile's current key before reuse, and join derives all roots anew.
+        work.version = ''; work.graphVer = ''; work.dirty = true;
+      }
       if (ground && this.per && ground.per !== this.per) {
         work.tiles.clear(); work.lru.clear(); work.linkMemo.clear(); work.version = ''; work.graphVer = ''; work.dirty = true;
       }
@@ -197,12 +205,12 @@ export class NavConnectivity {
     try {
       do {
         // No yield crosses a stale static epoch. Window movement alone is deliberately not part of this key.
-        if (job.key !== this.currentKey() || job.ground !== this.spatial.ground) { this.pending = undefined; return false; }
+        if (job.key !== this.currentKey() || job.ground !== this.spatial.ground) { this.cancelBuild(); return false; }
         const start = performance.now(), step = job.steps.next(), ms = performance.now() - start;
         if (step.value === 'clusters') this.stats.clusterMs += ms;
         if (step.value === 'clusters' || step.value === 'graph') this.stats.graphMs += ms;
         if (step.done) {
-          if (job.key !== this.currentKey() || job.ground !== this.spatial.ground) { this.pending = undefined; return false; }
+          if (job.key !== this.currentKey() || job.ground !== this.spatial.ground) { this.cancelBuild(); return false; }
           this.publish(job.work); this.publishedKey = job.key; this.publishedGround = job.ground;
           this.pending = undefined;
           return true;
@@ -211,6 +219,15 @@ export class NavConnectivity {
       return false;
     } catch (error) { this.pending = undefined; throw error; }
     finally { this.finishStats(t0, job.work.buildRelabelled - before); }
+  }
+
+  private cancelBuild() {
+    const job = this.pending;
+    if (job?.ground) {
+      const w = job.work;
+      this.carried = { ground: job.ground, per: w.per, tiles: w.tiles, lru: w.lru, mediaMemo: w.mediaMemo };
+    }
+    this.pending = undefined;
   }
 
   private publish(w: NavConnectivity) {
