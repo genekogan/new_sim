@@ -1,6 +1,7 @@
 // Provision a local dev world from a server root (the SOUL3 integration worktree) and describe it in world.json.
 // DESIGN §4.1. Only world.kind "dev" is supported at this stage; fork/template-eden2/live are refused.
 import { spawn } from 'node:child_process';
+import { homedir } from 'node:os';
 import { openSync, rmSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { mkdirSync, existsSync } from 'node:fs';
@@ -56,7 +57,10 @@ export async function startWorld({ serverRoot, slug, port, genesis, dataDir, log
   const data = resolve(dataDir ?? join(root, `.lane/data-${slug}`));
   if (fresh) rmSync(data, { recursive: true, force: true });
   mkdirSync(data, { recursive: true });
-  const marsWeb = join(root, '.lane/mars-web');
+  // Assets: a playtest-owned overlay (the root worlds' immutable asset dir plus the humanoid kit mirrored from production),
+  // so Souls get their composed bodies locally; falls back to the server root's .lane/mars-web.
+  const overlay = process.env.PLAYTEST_MARS_WEB ?? join(homedir(), 'Eden/team/playtest/mars-web');
+  const marsWeb = existsSync(join(overlay, 'modular/humanoid/kit.json')) ? overlay : join(root, '.lane/mars-web');
   const base = `http://127.0.0.1:${port}/w/${slug}`;
   // The same environment tools/god-skill/dev-world.mjs sets, plus §0, with a boot wait long enough for a loaded
   // machine and a large genesis (dev-world.mjs gives up after 180 s; Eden 2026 under load 19 took longer).
@@ -73,7 +77,7 @@ export async function startWorld({ serverRoot, slug, port, genesis, dataDir, log
     await sleep(500);
   }
   if (!h) { try { process.kill(-child.pid, 'SIGTERM'); } catch { /* gone */ } throw new Error(`world ${slug} did not come up on :${port} within ${Math.round(bootTimeoutMs / 1000)} s`); }
-  return { base, pid: child.pid, build: h.build ?? null, healthz: h, bootMs: Date.now() - t0, child, dataDir: data };
+  return { base, pid: child.pid, build: h.build ?? null, healthz: h, bootMs: Date.now() - t0, child, dataDir: data, marsWebDir: marsWeb };
 }
 
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
