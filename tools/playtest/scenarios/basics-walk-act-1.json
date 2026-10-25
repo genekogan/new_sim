@@ -227,12 +227,11 @@
  "observer": {
   "sampleSec": 5,
   "cameras": [
-   "follow",
-   "wide"
+   "follow"
   ],
   "viewport": [
-   1280,
-   800
+   1024,
+   640
   ],
   "dpr": 1,
   "gpu": "metal"
