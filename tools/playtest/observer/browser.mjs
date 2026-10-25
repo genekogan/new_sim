@@ -57,7 +57,7 @@ export async function openCamera({ browser, base, identity = null, kind = 'wide'
   page.on('pageerror', (e) => errors.push(String(e?.message ?? e).slice(0, 300)));
   const t0 = performance.now();
   const url = String(base).replace(/\/+$/, '') + '/' + (kind === 'follow' && soulId ? '#soul/' + encodeURIComponent(soulId) : '');
-  await page.goto(url);
+  await page.goto(url, { timeout: 120000 });
   await page.waitForFunction(() => document.body && !document.body.innerText.includes('Arriving in') && document.querySelector('.viewer-history[data-viewer-ready="true"]'), null, { timeout: arrivalTimeoutMs });
   const cam = { name: name ?? (kind === 'follow' ? soulId : 'wide'), kind, soulId, page, context: ctx, errors, arrivedMs: Math.round(performance.now() - t0), follow: null };
   cam.viewer = () => page.evaluate(() => { const d = document.querySelector('.viewer-history')?.dataset ?? {}; return { mode: d.viewerMode ?? null, selection: d.viewerSelection ?? null, presentation: d.viewerPresentation ?? null, tick: d.viewerTick ? Number(d.viewerTick) : null }; }).catch(() => ({}));
