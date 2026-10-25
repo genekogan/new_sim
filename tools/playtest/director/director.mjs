@@ -33,8 +33,9 @@ export function nextIntervalMs(glance, waitSec, r) {
   return Math.round(Math.min(900, Math.max(a, sec)) * 1000);
 }
 
-export function budgetMsFor({ scenario, quick, budgetSec }) {
+export function budgetMsFor({ scenario, quick, budgetSec, god = false }) {
   if (Number.isFinite(budgetSec)) return budgetSec * 1000;
+  if (god) return (scenario.director?.godBudgetSec ?? 600) * 1000; // a build outlives a Soul request window
   const o = scenario.director?.budgetSec;
   if (Number.isFinite(o)) return o * 1000;
   return ((quick ? o?.quick : o?.default) ?? (quick ? 90 : 180)) * 1000;
@@ -134,7 +135,7 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
     try { evidence = await observer?.evidence?.openRequest({ runDir, seat: ctx.id, soulId: ctx.soulId, requestId, text: say.text, channel: say.channel, sentAt, messageId }); }
     catch (e) { log(ctx.id, 'openRequest failed', e?.message ?? e); }
     const lv = ctx.lastView;
-    ctx.open.set(requestId, { requestId, channel: say.channel, messageId, evidence, openedAt: sentMono, budgetMs: budgetMsFor({ scenario, quick, budgetSec }),
+    ctx.open.set(requestId, { requestId, channel: say.channel, messageId, evidence, openedAt: sentMono, budgetMs: budgetMsFor({ scenario, quick, budgetSec, god: ctx.kind === 'god' }),
       turnsAtOpen: turnCountOf(ctx.seat), directorTurnsAtOpen: ctx.directorTurns - (say.channel === 'chat' ? 1 : 0), resultSigAtOpen: resultSig(lv) });
     return { requestId, channel: say.channel, messageId };
   }
