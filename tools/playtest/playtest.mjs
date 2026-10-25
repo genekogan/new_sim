@@ -86,14 +86,14 @@ async function cmdRun(a) {
       if (!m.seat || !m.owner) throw new Error('arena/seat.mjs or owner.mjs missing');
       ctx.owner = m.owner;
       for (const s of scenario.seats) {
-        const seat = await m.seat.createSeat({ runDir, seat: s, worldBase: ctx.world.base, serverRoot });
+        const seat = await m.seat.createSeat({ runDir, seat: s, worldBase: ctx.world.base, serverRoot, rails: scenario.rails ?? {} });
         const ob = await seat.onboard({ text: onboardingText(ctx.world.base, s.soulName), maxWallSec: scenario.rails?.onboardWallSec ?? 600, timeoutSec: scenario.rails?.onboardTimeoutSec ?? 540 });
         log(`seat ${s.id}: ${ob.ok ? 'paired ' + ob.soulId : 'NOT PAIRED'}`);
         if (ob.ok) { const w = seat.wakeLoop?.(); log(`seat ${s.id}: wake loop ${w ? 'on' : 'off'}`); }
         ctx.seats.push(seat);
       }
       if (scenario.god && m.godSeat) {
-        ctx.god = await m.godSeat.createGodSeat({ runDir, god: scenario.god, worldBase: ctx.world.base, serverRoot });
+        ctx.god = await m.godSeat.createGodSeat({ runDir, god: scenario.god, worldBase: ctx.world.base, serverRoot, rails: scenario.rails ?? {} });
         const gb = ctx.god.onboardGod ? await ctx.god.onboardGod({ maxWallSec: scenario.rails?.onboardWallSec ?? 600, timeoutSec: scenario.rails?.onboardTimeoutSec ?? 540 }) : await ctx.god.onboard({ text: godOnboardingText(ctx.world.base), maxWallSec: scenario.rails?.maxTurnWallSec ?? 300 });
         log(`god seat: ${gb.ok ? 'paired' : 'NOT PAIRED'}`);
         if (gb.ok) ctx.god.wakeLoop?.();
