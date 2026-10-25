@@ -65,6 +65,8 @@ export type LayersHost = {
   engineAct(ops: Op[], note: string): Result;
   /** The place a thing is (its own, else the innermost holding it). */
   placeOf?(e: Entity): { id: string; name: string } | null;
+  /** Optional calendar-only lookup, prepared lazily when a new occurrence needs a place. */
+  calendarPlaces?(sources: readonly Entity[]): (e: Entity) => { id: string; name: string } | null;
   building?: (id: string) => { id: string; title: string; step: string } | null;
   buildingActive?: () => boolean;
   closingSites?: () => ClosingSite[];
@@ -160,7 +162,7 @@ export class GodLayers {
       } else legacyDates.add(clockAt((o.state as { startsAtTick: number }).startsAtTick, living.origin, living.dayTicks).datetime.slice(0, 10));
     }
     for (const e of scheduled) for (const ev of e.schedule?.events ?? []) for (const date of legacyDates) keep.add(calendarId(e.id, ev.name, date));
-    let posted = 0;
+    let posted = 0, placeOf: LayersHost['placeOf'];
     for (const e of scheduled) for (const ev of e.schedule?.events ?? []) {
       const at = minutesOf(ev.at);
       for (const dayAhead of [0, 1]) {
@@ -168,7 +170,8 @@ export class GodLayers {
         const weekday = (c.weekday + dayAhead) % 7; if (ev.days?.length && !ev.days.includes((['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const)[weekday])) continue;
         const date = new Date(Date.parse(c.day + 'T00:00:00Z') + dayAhead * 86400_000).toISOString().slice(0, 10);
         const id = calendarId(e.id, ev.name, date); keep.add(id); if (have.has(id)) continue;
-        const place = this.h.placeOf?.(e), title = (ev.label ?? ev.name).slice(0, 80);
+        placeOf ??= this.h.calendarPlaces?.(scheduled) ?? this.h.placeOf?.bind(this.h);
+        const place = placeOf?.(e), title = (ev.label ?? ev.name).slice(0, 80);
         try {
           objs.create({ id, kind: 'calendar-item', name: title, placeId: place?.id ?? 'world', params: { godSchedule: { entity: e.id, event: ev.name, date }, title, description: `${title} at ${place?.name ?? this.m.pathOf(e.id)}, ${ev.at} for ${ev.minutes} minutes (the god's schedule)`, placeId: place?.id ?? '', placeName: place?.name ?? this.m.pathOf(e.id), proposedBy: 'the god of this world', startsAtTick: Math.round(c.tick + until * c.ticksPerMinute), durationTicks: Math.max(1, Math.round(ev.minutes * c.ticksPerMinute)) } });
           posted++; have.add(id);

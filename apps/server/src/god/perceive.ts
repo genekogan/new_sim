@@ -329,7 +329,8 @@ export class GodPerceive {
     const r = this.run, objs = this.objs as unknown as { create(i: unknown): unknown; fresh(): unknown; refresh?(ids: string[]): void };
     while (r.i < r.queue.length) {
       this.apply(r, r.queue[r.i++], objs);
-      if ((r.i & 7) === 0 && performance.now() - t0 >= budgetMs) { r.ms += performance.now() - t0; return false; }
+      // One apply can rebuild the named-thing index; do not start another object after it consumes the slice.
+      if (performance.now() - t0 >= budgetMs) { r.ms += performance.now() - t0; return false; }
     }
     if (r.changed.length) { if (objs.refresh) objs.refresh(r.changed); else objs.fresh(); }
     r.ms += performance.now() - t0;

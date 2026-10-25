@@ -47,6 +47,8 @@ export type BodyPort = {
   /** The agent's own work is in progress (an open receipt, a waiting act, an invitation it awaits). */
   agentBusy(soulId: string): boolean;
   running(entityId: string): boolean;
+  /** False until the initial enclosed-place index is published; presence and wake remain immediate. */
+  spatialReady?(): boolean;
   /** Dry standing ground here (no water, no wading). */
   dry(x: number, z: number): boolean;
   /** Free room for a body here (nav clearance), true when the world has no clearance reader. */
@@ -187,6 +189,7 @@ export class BodyRule {
       const doing: BodyDoing = this.inWater(s) ? 'floating' : 'drifting';
       if (doing !== r.doing) this.set(s, r, 'zombie', doing, now);
       if (now < r.next_at) return;
+      if (this.port.spatialReady?.() === false) return;
       r.next_at = now + this.jitter(s.soulId, r, k.zombieStepMinMs, k.zombieStepMaxMs); this.save(r);
       if (doing === 'drifting' && !this.port.agentBusy(s.soulId) && !this.port.running(s.entityId)) this.shuffle(s, r, SHUFFLE_M, k.reflexRadiusM, 'zombie', 'Shuffling about');
       return;
@@ -210,6 +213,7 @@ export class BodyRule {
   /** Idle reflex: one move, weighted by how long the Soul has idled (doze dominates after IDLE_DOZE). */
   private idleStep(s: BodySoul, r: Row, now: number, k: BodyKnobs) {
     if (this.port.posture(s.entityId) === 'moving' && this.port.running(s.entityId)) {this.port.stop(s); r.next_at = now + 3000; this.save(r); return;}   // a drift ends first
+    if (this.port.spatialReady?.() === false) return;
     const stepMs = this.jitter(s.soulId, r, k.idleStepMinMs, k.idleStepMaxMs); r.next_at = now + stepMs;
     const posture = this.port.posture(s.entityId), seconds = Math.max(5, Math.min(600, Math.round(stepMs / 1000) + 30));
     if (posture === 'water' || posture === 'basket') return this.set(s, r, 'idle', posture === 'water' ? 'floating' : 'sitting', now);

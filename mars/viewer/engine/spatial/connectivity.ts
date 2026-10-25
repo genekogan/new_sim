@@ -27,8 +27,8 @@ import { buildGridsOverFloors, latticeIndex, latticeCentre, type LevelGrid } fro
 import { GROUND_TILE_M, G_OUTSIDE, G_STEEP, G_WALK, type GroundField } from './ground.ts';
 import { linkApproach, linkEdgeTest, PLAN_MARGIN, snap as snapCell } from './path.ts';
 import type { Spatial } from './service.ts';
-import { boxesOf } from './tiled.ts';
-import { HUMAN_PROFILE, type Link, type Surface } from './types.ts';
+import { boxesOf, type GroundNav } from './tiled.ts';
+import { HUMAN_PROFILE, type Link, type Obstacle, type Surface, type SpatialScene } from './types.ts';
 
 /** Policy id of the audit's rules (what counts as connected, what a rescue picks): bump when they change. */
 export const NAV_CONNECT_POLICY = 'nav-connect/1';
@@ -47,6 +47,8 @@ const CLUSTER_GAP = 1;
 type TileLabels = { key: string; n: number; sizes: Int32Array; border: Int32Array; uniform: 0 | 1 | 2 };
 /** A building's upper floors: its surfaces, and per level the grid the planner would build there, labelled. */
 type Cluster = { key: string; box: [number, number, number, number]; members: Surface[]; levels: Map<number, { g: LevelGrid; labels: Int32Array }> };
+type RasterLabels = { labels: Int32Array; clearance: Float32Array };
+type BuildPhase = 'tiles' | 'join' | 'clusters' | 'graph';
 
 export type ConnPoint = { id: string; p: Vec2; level?: number; tol?: number };
 export type ConnVerdict = {
@@ -126,7 +128,7 @@ export class NavConnectivity {
   private parent = new Int32Array(0);
   private base = new Map<string, number>();
   private rootSize = new Map<number, number>();
-  private lru = new Map<string, { labels: Int32Array; clearance: Float32Array }>();
+  private lru = new Map<string, RasterLabels>();
   private mediaMemo = new Map<string, 0 | 1 | 2>();
   /** Level-0 labels changed since the last join (a budgeted update can stop part way). */
   private dirty = true;
@@ -145,20 +147,113 @@ export class NavConnectivity {
   main = -1;
   /** What the labels were last built from (changes exactly when the static world does). */
   version = '';
-  /** False while a budgeted update has tiles left to label (check/nearestMain need a complete one). */
-  ready = false;
+  private publishedKey = '';
+  private publishedGround?: GroundNav;
+  private pending?: { key: string; ground?: GroundNav; work: NavConnectivity; steps: Generator<BuildPhase, BuildPhase> };
+  /** Completed content-keyed tile values survive cancellation, but never its partial union-find or graph. */
+  private carried?: { ground: GroundNav; per: number; tiles: Map<string, TileLabels>; lru: Map<string, RasterLabels>; mediaMemo: Map<string, 0 | 1 | 2> };
+  /** A private builder owns all mutable derived state until the entire graph can be published. */
+  private building = false;
+  private reading = false;
+  private buildScene?: SpatialScene;
+  private buildRelabelled = 0;
+  /** Pin only the current link's patches: prewarming into the eight-entry LRU alone can evict their first tile. */
+  private patchTiles?: Map<string, RasterLabels>;
+  /** A scene/window change without a static epoch change does not invalidate the world-wide audit. */
+  private currentKey(): string {
+    const sp = this.spatial, g = sp.ground;
+    return `${sp.baseId}|${sp.epoch}|${g ? `${g.field.id}|${g.cell}|${g.extentTiles()}` : sp.cell}|${this.t}`;
+  }
+  get ready(): boolean { return !this.pending && this.publishedKey === this.currentKey() && this.publishedGround === this.spatial.ground; }
+  private get scene(): SpatialScene { return this.buildScene ?? this.spatial.scene; }
   stats = { updates: 0, relabelled: 0, reused: 0, uniform: 0, lastMs: 0, lastRelabelled: 0, graphMs: 0, clusterMs: 0, links: 0, edges: 0, clusters: 0, clusterBuilds: 0, linkHits: 0 };
 
   constructor(spatial: Spatial, opts: { anchors: () => Vec2[]; clear?: number }) {
     this.spatial = spatial; this.anchors = opts.anchors; this.t = opts.clear ?? CONNECT_CLEAR;
   }
 
-  /**
-   * Relabel what changed since the last update (call after spatial.sync(world)). `budgetMs`: stop labelling tiles once
-   * this much time is spent (a background warm-up), leaving `ready` false; the next update carries on. Returns `ready`.
-   */
+  /** Call after spatial.sync(world). Zero only polls; Infinity drains the same work used by background warm-up.
+   * A finite slice may overrun by one atomic raster/label/cluster-level/link operation. No partial graph is published. */
   update(budgetMs = Infinity): boolean {
-    const t0 = performance.now(), sp = this.spatial, g = sp.ground;
+    const t0 = performance.now(), key = this.currentKey(), ground = this.spatial.ground;
+    if (this.pending && (this.pending.key !== key || this.pending.ground !== ground)) this.cancelBuild();
+    if (this.ready) return true;
+    if (!(budgetMs > 0)) return false;
+    if (!this.pending) {
+      const anchors = this.anchors().map(p => [...p] as Vec2);
+      const work = new NavConnectivity(this.spatial, { anchors: () => anchors, clear: this.t });
+      work.building = true; work.buildScene = this.spatial.scene; work.stats = this.stats;
+      // Cache values are immutable. Union-find path compression, maps and graph sets belong to the builder alone.
+      work.tiles = new Map(this.tiles); work.lru = new Map(this.lru); work.mediaMemo = new Map(this.mediaMemo);
+      work.clusterMemo = new Map(this.clusterMemo); work.linkMemo = new Map(this.linkMemo);
+      work.flat = this.flat; work.flatUpper = this.flatUpper; work.ext = this.ext; work.per = this.per;
+      work.parent = this.parent.slice(); work.base = new Map(this.base); work.rootSize = new Map(this.rootSize);
+      work.clusters = this.clusters; work.good = this.good; work.fwd = this.fwd; work.bwd = this.bwd;
+      work.main = this.main; work.version = this.version; work.graphVer = this.graphVer; work.dirty = this.dirty;
+      const carry = this.carried; this.carried = undefined;
+      if (carry && ground === carry.ground && ground.per === carry.per) {
+        work.tiles = new Map(carry.tiles); work.lru = new Map(carry.lru); work.mediaMemo = new Map(carry.mediaMemo);
+        // compile checks every tile's current key before reuse, and join derives all roots anew.
+        work.version = ''; work.graphVer = ''; work.dirty = true;
+      }
+      if (ground && this.per && ground.per !== this.per) {
+        work.tiles.clear(); work.lru.clear(); work.linkMemo.clear(); work.version = ''; work.graphVer = ''; work.dirty = true;
+      }
+      this.pending = { key, ground, work, steps: work.compile() };
+    }
+    const job = this.pending, before = job.work.buildRelabelled;
+    try {
+      do {
+        // No yield crosses a stale static epoch. Window movement alone is deliberately not part of this key.
+        if (job.key !== this.currentKey() || job.ground !== this.spatial.ground) { this.cancelBuild(); return false; }
+        const start = performance.now(), step = job.steps.next(), ms = performance.now() - start;
+        if (step.value === 'clusters') this.stats.clusterMs += ms;
+        if (step.value === 'clusters' || step.value === 'graph') this.stats.graphMs += ms;
+        if (step.done) {
+          if (job.key !== this.currentKey() || job.ground !== this.spatial.ground) { this.cancelBuild(); return false; }
+          this.publish(job.work); this.publishedKey = job.key; this.publishedGround = job.ground;
+          this.pending = undefined;
+          return true;
+        }
+      } while (performance.now() - t0 < budgetMs);
+      return false;
+    } catch (error) { this.pending = undefined; throw error; }
+    finally { this.finishStats(t0, job.work.buildRelabelled - before); }
+  }
+
+  private cancelBuild() {
+    const job = this.pending;
+    if (job?.ground) {
+      const w = job.work;
+      this.carried = { ground: job.ground, per: w.per, tiles: w.tiles, lru: w.lru, mediaMemo: w.mediaMemo };
+    }
+    this.pending = undefined;
+  }
+
+  private *fineTile(tx: number, tz: number, rel: Obstacle[], key: string, phase: BuildPhase) {
+    const steps = this.spatial.ground!.fineTileSteps(tx, tz, rel, key, false);
+    let step = steps.next();
+    while (!step.done) { yield phase; step = steps.next(); }
+    return step.value;
+  }
+
+  private publish(w: NavConnectivity) {
+    this.tiles = w.tiles; this.ext = w.ext; this.per = w.per; this.flat = w.flat;
+    this.parent = w.parent; this.base = w.base; this.rootSize = w.rootSize; this.lru = w.lru; this.mediaMemo = w.mediaMemo;
+    this.dirty = w.dirty; this.clusters = w.clusters; this.clusterMemo = w.clusterMemo; this.flatUpper = w.flatUpper;
+    this.good = w.good; this.fwd = w.fwd; this.bwd = w.bwd; this.graphVer = w.graphVer; this.linkMemo = w.linkMemo;
+    this.main = w.main; this.version = w.version;
+  }
+
+  /** Public reads drain an unfinished build; internal builder reads never recurse into update(). */
+  private read<T>(fn: () => T): T {
+    if (!this.update(Infinity)) throw new Error('navigation changed during connectivity read');
+    this.reading = true;
+    try { return fn(); } finally { this.reading = false; }
+  }
+
+  private *compile(): Generator<BuildPhase, BuildPhase> {
+    const sp = this.spatial, g = sp.ground;
     let relabelled = 0;
     if (!g) {
       const lv = sp.grids.levels.get(0);
@@ -171,11 +266,12 @@ export class NavConnectivity {
           this.parent = Int32Array.from({ length: n }, (_, i) => i);
           this.rootSize = new Map(sizes.map((s, i) => [i, s]));
         } else { this.flat = null; this.parent = new Int32Array(0); this.rootSize.clear(); }
-        relabelled = 1; this.version = key; this.findMain();
+        relabelled = 1; this.buildRelabelled++; this.version = key; this.findMain();
+        yield 'tiles';
       }
     } else {
       this.flat = null;
-      const obstacles = sp.scene.obstacles, ext = g.extentTiles();
+      const obstacles = this.scene.obstacles, ext = g.extentTiles();
       this.per = g.per; this.ext = ext;
       const seen = new Set<string>();
       for (let tz = ext[1]; tz <= ext[3]; tz++) for (let tx = ext[0]; tx <= ext[2]; tx++) {
@@ -184,30 +280,32 @@ export class NavConnectivity {
         let uni: 0 | 1 | 2 = 0;
         if (!te.rel.length) { const mk = `${g.field.id}|${id}`; uni = this.mediaMemo.get(mk) ?? 0; if (!this.mediaMemo.has(mk)) { uni = mediaClass(g.field, tx, tz); this.mediaMemo.set(mk, uni); } }
         const key = uni ? `${g.field.id}|u${uni}` : te.key, old = this.tiles.get(id);
-        if (old?.key === key) { this.stats.reused++; continue; }
-        if (relabelled && performance.now() - t0 > budgetMs) { this.ready = false; this.finishStats(t0, relabelled); return false; }
-        this.dirty = true; relabelled++;
-        if (uni === 1) { this.tiles.set(id, { key, n: 1, sizes: Int32Array.of(this.per * this.per), border: ALL, uniform: 1 }); this.stats.uniform++; continue; }
-        if (uni === 2) { this.tiles.set(id, { key, n: 0, sizes: new Int32Array(0), border: NONE, uniform: 2 }); this.stats.uniform++; continue; }
+        if (old?.key === key) { this.stats.reused++; yield 'tiles'; continue; }
+        this.dirty = true; relabelled++; this.buildRelabelled++;
+        if (uni === 1) { this.tiles.set(id, { key, n: 1, sizes: Int32Array.of(this.per * this.per), border: ALL, uniform: 1 }); this.stats.uniform++; yield 'tiles'; continue; }
+        if (uni === 2) { this.tiles.set(id, { key, n: 0, sizes: new Int32Array(0), border: NONE, uniform: 2 }); this.stats.uniform++; yield 'tiles'; continue; }
         // (keep = false: a tile the engine's windows do not hold is built for its labels without evicting theirs)
-        const ft = g.fineTile(tx, tz, te.rel, te.key, false), per = this.per;
+        const ft = yield* this.fineTile(tx, tz, te.rel, te.key, 'tiles'), per = this.per;
         const { labels, n, sizes } = labelComponents(ft.clearance, per, per, this.t);
         const border = new Int32Array(4 * per);
         for (let i = 0; i < per; i++) { border[i] = labels[i]; border[per + i] = labels[(per - 1) * per + i]; border[2 * per + i] = labels[i * per]; border[3 * per + i] = labels[i * per + per - 1]; }
         this.tiles.set(id, { key, n, sizes: Int32Array.from(sizes), border, uniform: 0 });
         this.lru.set(key, { labels, clearance: ft.clearance }); this.trimLru();
+        yield 'tiles';
       }
       for (const id of [...this.tiles.keys()]) if (!seen.has(id)) { this.tiles.delete(id); this.dirty = true; }
       const ver = `${g.field.id}|${sp.baseId}|${sp.epoch}`;
       if (this.dirty || this.version === '') { this.join(); this.dirty = false; }
       this.version = ver;
+      yield 'join';
     }
     // the stairs graph: rebuilt when the static world moved (an upper-floor edit leaves level 0 alone but moves the epoch)
     const gv = `${this.version}|${sp.epoch}|${this.main}|${this.parent.length}`;
-    if (gv !== this.graphVer || relabelled) { this.graph(); this.graphVer = gv; }
-    this.ready = true;
-    this.finishStats(t0, relabelled);
-    return true;
+    if (gv !== this.graphVer || relabelled) {
+      this.stats.graphMs = 0; this.stats.clusterMs = 0;
+      yield* this.graph(); this.graphVer = gv;
+    }
+    return 'graph';
   }
   private finishStats(t0: number, relabelled: number) {
     this.stats.updates++; this.stats.relabelled += relabelled; this.stats.lastRelabelled = relabelled; this.stats.lastMs = performance.now() - t0;
@@ -268,14 +366,14 @@ export class NavConnectivity {
     if (!t || t.uniform === 2) return OFF;
     const b = this.base.get(id)!;
     if (t.uniform === 1) return { tile: id, b, label: 0, clear: 9 };
-    let hit = this.lru.get(t.key);
+    let hit = this.patchTiles?.get(t.key) ?? this.lru.get(t.key);
     if (!hit) {
-      const g = this.spatial.ground!, te = g.tileEntry(tx, tz, this.spatial.scene.obstacles);
+      const g = this.spatial.ground!, te = g.tileEntry(tx, tz, this.scene.obstacles);
       if (te.key !== t.key) return OFF;   // the world changed since update(): unlabelled
       const ft = g.fineTile(tx, tz, te.rel, te.key, false);
       hit = { labels: labelComponents(ft.clearance, per, per, this.t).labels, clearance: ft.clearance };
       this.lru.set(t.key, hit); this.trimLru();
-    } else { this.lru.delete(t.key); this.lru.set(t.key, hit); }
+    } else { this.lru.delete(t.key); this.lru.set(t.key, hit); this.trimLru(); }
     const k = (J - tz * per) * per + (I - tx * per);
     return { tile: id, b, label: hit.labels[k], clear: hit.clearance[k] };
   }
@@ -284,6 +382,7 @@ export class NavConnectivity {
 
   /** The nearest passable level-0 cell within `tol` m of p (as the planner snaps a start or goal): its root and centre. */
   snap(p: Vec2, tol = 0.35): { root: number; at: Vec2 } | null {
+    if (!this.building && !this.reading) return this.read(() => this.snap(p, tol));
     const c = this.cell, I = latticeIndex(p[0], c), J = latticeIndex(p[1], c), R = Math.ceil(tol / c);
     let best: { root: number; at: Vec2 } | null = null, bd = Infinity;
     for (let dj = -R; dj <= R; dj++) for (let di = -R; di <= R; di++) {
@@ -297,11 +396,18 @@ export class NavConnectivity {
   /** The level-0 component root at p (snapped within tol), -1 when no passable cell is that close. */
   rootAt(p: Vec2, tol = 0.35): number { return this.snap(p, tol)?.root ?? -1; }
   /** Whether a level-0 component is joined to the main area both ways (the main area itself, or through stairs). */
-  connectedRoot(root: number): boolean { return root >= 0 && this.good.has(`0:${root}`); }
+  connectedRoot(root: number): boolean {
+    if (!this.building && !this.reading) return this.read(() => this.connectedRoot(root));
+    return root >= 0 && this.good.has(`0:${root}`);
+  }
   /** Area (m²) of a level-0 component. */
-  areaOf(root: number): number { return Math.round((this.rootSize.get(root) ?? 0) * this.cell * this.cell * 10) / 10; }
+  areaOf(root: number): number {
+    if (!this.building && !this.reading) return this.read(() => this.areaOf(root));
+    return Math.round((this.rootSize.get(root) ?? 0) * this.cell * this.cell * 10) / 10;
+  }
   /** Components and the main one's area, for reports. */
   summary(): { components: number; mainArea: number; tiles: number; clusters: number; connected: number } {
+    if (!this.building && !this.reading) return this.read(() => this.summary());
     return { components: this.rootSize.size, mainArea: this.areaOf(this.main), tiles: this.tiles.size || (this.flat ? 1 : 0), clusters: this.clusters.length, connected: this.good.size };
   }
 
@@ -325,6 +431,27 @@ export class NavConnectivity {
     let k = '';
     for (let tz = tz0; tz <= tz1; tz++) for (let tx = tx0; tx <= tx1; tx++) k += `${tx},${tz}=${this.tiles.get(`${tx},${tz}`)?.key ?? '-'};`;
     return k;
+  }
+  /** Retain the exact rasters a link's two patches will read across yields and LRU eviction. */
+  private *warmPatch(p: Vec2, half: number): Generator<BuildPhase, void> {
+    if (this.flat || !this.spatial.ground) return;
+    const c = this.cell, per = this.per, g = this.spatial.ground!;
+    const tx0 = Math.floor(latticeIndex(p[0] - half, c) / per), tx1 = Math.floor(latticeIndex(p[0] + half, c) / per);
+    const tz0 = Math.floor(latticeIndex(p[1] - half, c) / per), tz1 = Math.floor(latticeIndex(p[1] + half, c) / per);
+    for (let tz = tz0; tz <= tz1; tz++) for (let tx = tx0; tx <= tx1; tx++) {
+      const t = this.tiles.get(`${tx},${tz}`);
+      if (!t || t.uniform || this.patchTiles!.has(t.key)) continue;
+      let hit = this.lru.get(t.key);
+      if (!hit) {
+        const te = g.tileEntry(tx, tz, this.scene.obstacles);
+        if (te.key !== t.key) throw new Error('navigation tile changed during connectivity build');
+        const ft = yield* this.fineTile(tx, tz, te.rel, te.key, 'graph');
+        hit = { labels: labelComponents(ft.clearance, per, per, this.t).labels, clearance: ft.clearance };
+        this.lru.set(t.key, hit); this.trimLru();
+      }
+      this.patchTiles!.set(t.key, hit);
+      yield 'graph';
+    }
   }
   /** A memoised node ref back to a node id: level-0 refs are tile-local ("T<tile>#<label>"), upper ones content-keyed already. */
   private resolve(ref: string): string | null {
@@ -356,8 +483,8 @@ export class NavConnectivity {
   }
 
   /** Cluster the upper surfaces into buildings and (re)build the grids of those whose content changed. */
-  private buildClusters() {
-    const sp = this.spatial, scene = sp.scene, cell = this.cell;
+  private *buildClusters(): Generator<BuildPhase, void> {
+    const scene = this.scene, cell = this.cell;
     const ups = scene.surfaces.filter((s) => s.level !== 0).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     const boxes = ups.map((s) => aabb(s.obb, CLUSTER_GAP / 2));
     const par = ups.map((_, i) => i), f = (i: number): number => { while (par[i] !== i) { par[i] = par[par[i]]; i = par[i]; } return i; };
@@ -368,6 +495,7 @@ export class NavConnectivity {
         const b = boxes[order[y]]; if (b[0] > a[2]) break;
         if (b[1] <= a[3] && b[3] >= a[1]) { const ra = f(order[x]), rb = f(order[y]); if (ra !== rb) par[Math.max(ra, rb)] = Math.min(ra, rb); }
       }
+      yield 'clusters';
     }
     const groups = new Map<number, number[]>();
     for (let i = 0; i < ups.length; i++) { const r = f(i); const g = groups.get(r); if (g) g.push(i); else groups.set(r, [i]); }
@@ -393,24 +521,25 @@ export class NavConnectivity {
           const sub = { bounds: box, levels: scene.levels.filter((l) => l.id === id), surfaces: members.filter((s) => s.level === id), obstacles: inBox, links: [] };
           const g = buildGridsOverFloors(sub, cell).levels.get(id);
           if (g) levels.set(id, { g, labels: labelComponents(g.clearance, g.nx, g.nz, this.t).labels });
+          yield 'clusters';
         }
         cl = { key, box, members, levels };
       }
       memo.set(key, cl); out.push(cl);
+      yield 'clusters';
     }
     this.clusters = out; this.clusterMemo = memo; this.stats.clusters = out.length;
   }
 
   /** The stairs graph: components as nodes, the planner's link edges between them; then which are joined to main. */
-  private graph() {
-    const t0 = performance.now(), sp = this.spatial, r = this.t, radius = HUMAN_PROFILE.radius;
-    if (sp.ground) this.buildClusters(); else this.clusters = [];
-    this.stats.clusterMs = performance.now() - t0;
+  private *graph(): Generator<BuildPhase, void> {
+    const sp = this.spatial, r = this.t, radius = HUMAN_PROFILE.radius;
+    if (sp.ground) yield* this.buildClusters(); else this.clusters = [];
     const fwdAdj = new Map<string, string[]>(), bwdAdj = new Map<string, string[]>();
     const at = (level: number, p: Vec2, half: number) => (level === 0 ? this.patch0(p, half) : this.upperAt(level, p, half));
     let edges = 0;
     const tasks: { link: Link; ascending: boolean }[] = [];
-    for (const link of sp.scene.links) if (link.usable && link.width >= 2 * r) tasks.push({ link, ascending: true }, { link, ascending: false });
+    for (const link of this.scene.links) if (link.usable && link.width >= 2 * r) tasks.push({ link, ascending: true }, { link, ascending: false });
     // tile by tile, as check
     const order = this.byTile(tasks.map((x) => linkApproach(x.link, x.ascending).approach));
     // each verdict memoised by what it reads: the link, and the tiles (level 0) or the floor cluster (upper) at both feet;
@@ -428,24 +557,30 @@ export class NavConnectivity {
         if (was !== undefined) {
           memo.set(mk, was); this.stats.linkHits++;
           const a = was && this.resolve(was.a), b = was && this.resolve(was.b);
-          if (!a || !b || a === b) continue;
+          if (!a || !b || a === b) { yield 'graph'; continue; }
           edges++;
           (fwdAdj.get(a) ?? fwdAdj.set(a, []).get(a)!).push(b);
           (bwdAdj.get(b) ?? bwdAdj.set(b, []).get(b)!).push(a);
+          yield 'graph';
           continue;
         }
       }
+      this.patchTiles = new Map();
+      if (entry.level === 0) yield* this.warmPatch(approach, he);
+      if (exit.level === 0) yield* this.warmPatch(far, 0.6);
       const ge = at(entry.level, approach, he), gx = at(exit.level, far, 0.6);
-      if (!ge || !gx) { if (ground) memo.set(mk, null); continue; }
+      this.patchTiles = undefined;
+      if (!ge || !gx) { if (ground) memo.set(mk, null); yield 'graph'; continue; }
       const t = linkEdgeTest(link, ascending, ge.g, gx.g, r, radius);
       const ref = (side: typeof ge, c: number) => ('ref' in side ? side.ref(c) : side.node(c));
       if (ground) { const ra = t.ok ? ref(ge, t.ca) : null, rb = t.ok ? ref(gx, t.cx) : null; memo.set(mk, ra && rb ? { a: ra, b: rb } : null); }
-      if (!t.ok) continue;
+      if (!t.ok) { yield 'graph'; continue; }
       const a = ge.node(t.ca), b = gx.node(t.cx);
-      if (!a || !b || a === b) continue;
+      if (!a || !b || a === b) { yield 'graph'; continue; }
       edges++;
       (fwdAdj.get(a) ?? fwdAdj.set(a, []).get(a)!).push(b);
       (bwdAdj.get(b) ?? bwdAdj.set(b, []).get(b)!).push(a);
+      yield 'graph';
     }
     const reach = (adj: Map<string, string[]>, from: string) => {
       const seen = new Set<string>([from]), q = [from];
@@ -459,7 +594,7 @@ export class NavConnectivity {
       for (const n of this.fwd) if (this.bwd.has(n)) this.good.add(n);
     } else { this.fwd = new Set(); this.bwd = new Set(); }
     this.linkMemo = memo;
-    this.stats.links = tasks.length / 2; this.stats.edges = edges; this.stats.graphMs = performance.now() - t0;
+    this.stats.links = tasks.length / 2; this.stats.edges = edges;
   }
 
   /**
@@ -467,6 +602,7 @@ export class NavConnectivity {
    * out to maxR m; ties go to the nearer cell centre, then the lower lattice index (deterministic). Null when none.
    */
   nearestMain(p: Vec2, maxR = 40, minClear = RESCUE_CLEAR, avoid: (q: Vec2) => boolean = () => false): Vec2 | null {
+    if (!this.building && !this.reading) return this.read(() => this.nearestMain(p, maxR, minClear, avoid));
     if (this.main < 0) return null;
     const c = this.cell, I = latticeIndex(p[0], c), J = latticeIndex(p[1], c), R = Math.ceil(maxR / c);
     let best: Vec2 | null = null, bd = Infinity;
@@ -488,6 +624,7 @@ export class NavConnectivity {
 
   /** Verdicts for standing points, one per component (`area`): joined to the main area both ways, or not. */
   check(points: ConnPoint[]): ConnVerdict[] {
+    if (!this.building && !this.reading) return this.read(() => this.check(points));
     // tile by tile (a tile's full labels are rebuilt when they have left the small LRU), answers in the callers' order
     const out = new Array<ConnVerdict>(points.length);
     for (const k of this.byTile(points.map((q) => q.p))) out[k] = this.verdict(points[k]);

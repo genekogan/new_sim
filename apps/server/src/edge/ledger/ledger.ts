@@ -146,6 +146,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** LINK BODY: the presence-driven body rule (body-rule.ts: awake / idle / zombie / asleep). On once the edge routes
    *  attach the owner inbox's presence (`attachPresence`); off in tools that build a Ledger alone (walk audit). */
   bodyRule: BodyRule | null = null;
+  /** A bridge may defer its first place index. Unknown rooms must not be treated as outdoors. */
+  bodyPlacesReady: () => boolean = () => true;
   private bodyMigrated = false;
   attachPresence(inbox: {soulPresence(soulId: string): {listening: boolean; at: number | null}; onSoulListen?(l: (soulId: string) => void): void; onSoulSend?(l: (soulId: string) => void): void}, knobs?: Partial<BodyKnobs>) {
     if (process.env.SIM_BODY === '0' || this.bodyRule) return this.bodyRule;
@@ -163,6 +165,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       posture: id => this.posture(id),
       agentBusy: id => this.pending.has(id) || this.openReceipts(id).length > 0 || this.together.awaiting(id),
       running: id => !!this.host.engine.programOf(id),
+      spatialReady: () => this.bodyPlacesReady(),
       dry: (x, z) => engine.dryGroundAtV1?.(x, z) ?? true,
       clear: (x, z, level) => !(this.host.engine.world as {navV1?: unknown}).navV1 || !engine.clearanceUpToV1 || engine.clearanceUpToV1(x, z, 1, level) >= 0.3,
       places: (x, z, level) => this.places.containing(x, z, this.placeLevel(level)).filter(p => p.enclosed).map(p => p.id).join('|'),
@@ -426,7 +429,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       void this.decide(p.soul, p.receipt, p.capability, p.label, p.steps).catch(() => this.update(p.receipt, {phase: 'failed', code: 'ledger.unavailable', reason: 'The world could not record this action.'}));
     }
     if (this.ambient && tick % 20 === 0) this.ambientLife(tick);
-    if (this.bodyRule && tick % 20 === 0) {if (!this.bodyMigrated) {this.bodyMigrated = true; this.migrateGone();} this.bodyRule.sweep();}
+    if (this.bodyRule && tick % 20 === 0) {if (!this.bodyMigrated && this.bodyPlacesReady()) {this.bodyMigrated = true; this.migrateGone();} this.bodyRule.sweep();}
     if (tick % 100 === 0) this.unstick(tick);
     if (tick % 20 === 0) try {this.together.sweep();} catch (e) {console.error('[edge] together sweep', e instanceof Error ? e.message : e);}
     if (tick % 10 === 0) this.rideFrames(tick);
@@ -1292,7 +1295,14 @@ export class EdgeLedger implements EdgeLedgerHooks {
       if (fresh) {this.rideKey.set(c.id, key); changed = true;}
       if (moved || fresh) try {(this.comms as unknown as {core?: {spectate(m: object): void}} | undefined)?.core?.spectate({kind: 'ride', tick, ride: (() => {const v = this.carrierView(c.id)!; return fresh ? v : {...v, route: {...v.route, keys: undefined}};})()});} catch {/* spectators never break the ledger */}
     }
-    if (changed) try {(this.comms?.objects as unknown as {sweep?(): void} | undefined)?.sweep?.();} catch {/* object events catch up on the next read */}
+    if (changed) try {
+      const objects = this.comms?.objects as unknown as {ofKind?(kind: string): {id: string}[]; refresh?(ids: Iterable<string>): void; sweep?(): void} | undefined;
+      // A physical carrier change needs its ride projections now (including arbitrary object aliases), not every
+      // unrelated calendar/presentation/built object's time advance. Those keep their own read/maintenance triggers.
+      // ofKind keeps object-id order; refresh re-reads each row in its committed transaction before the next ride.
+      if (objects?.ofKind && objects.refresh) objects.refresh(objects.ofKind('ride').map(o => o.id));
+      else objects?.sweep?.(); // older object adapters expose only the full sweep
+    } catch {/* object events catch up on the next read */}
   }
 
   /** activities/1: the world facts activity capabilities need, for one Soul. */

@@ -63,6 +63,26 @@ export type ProgramAction = { tick:number; programId:string; actor:string; step:
 export interface RuntimeView { readonly tick: number; readonly records: Map<string, ActionRecord>; readonly violations: { tick: number; code: string; message: string }[]; liveIds(): string[] }
 /** An engine's resumable checkpoint. Only these three fields are read by the shell; the rest is the engine's own. */
 export type EngineSnapshot = { format: string; tick: number; stateHash: string };
+/** Owned checkpoint at a single synchronous engine boundary. Every completion
+ * returns a fresh snapshot; iterators and finish() may be used independently.
+ * steps() yields bounded graph work, not engine ticks, and never reads live state. */
+export type EngineSnapshotCapture = {
+  readonly tick: number;
+  readonly stateHash: string;
+  steps(): Generator<void, EngineSnapshot, void>;
+  finish(): EngineSnapshot;
+};
+
+/** Internal periodic checkpoint: all inputs are owned before return, including
+ * physical hash inputs. Hashing and encoding can finish later without live reads. */
+export type EngineCheckpoint = { snapshot: EngineSnapshot; physicalHash: string };
+/** Deferred owned hashes. Exceptional legacy selector metadata may instead
+ * return EngineSnapshotCapture, preserving the host's eager physical-hash order. */
+export type EngineCheckpointCapture = {
+  readonly tick: number;
+  finish(): EngineCheckpoint;
+  steps(): Generator<void, EngineCheckpoint, void>;
+};
 
 export interface Engine {
   readonly rulesVersion: string;
@@ -76,6 +96,9 @@ export interface Engine {
   previewEdenLectureV1?(placement:import('./eden-lecture.ts').EdenLecturePlacementV1):{ok:true;transition:import('./eden-lecture.ts').EdenLectureTransitionV1}|{ok:false;diagnostic:{code:string}};
   adoptEdenLectureV1?(fact:import('./eden-lecture.ts').EdenLectureTransitionV1):void;
   describeVerbs(): VerbInfo[];
+  /** Optional synchronous boot preparation. May warm private caches only: no ticks, inputs,
+   * state changes, recorder cuts or publication. Call after initial projection, before serving. */
+  prepareForServing?(): void;
   stateHash(): string;
   physicalHash(): string;
   /** Advance one tick. Returns what changed for broadcast. */
@@ -112,6 +135,8 @@ export interface Engine {
   submit(verb: string, params: unknown, opts?: { id?: string; parent?: string; preempt?: boolean }): ActionRecord;
   cancel(id: string, reason?: { code: string; message: string }): ActionRecord;
   snapshot(): EngineSnapshot;
+  captureSnapshot?(): EngineSnapshotCapture;
+  captureCheckpoint?(): EngineCheckpointCapture | EngineSnapshotCapture;
   /** Recorded rendering chunks; no browser Runtime. Optional for engines without takes. */
   takeChunks?(afterTick: number): { fromTick: number; toTick: number; take: unknown }[];
   renderScene?(): RenderScene;
