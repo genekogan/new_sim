@@ -88,13 +88,13 @@ async function cmdRun(a) {
       for (const s of scenario.seats) {
         const seat = await m.seat.createSeat({ runDir, seat: s, worldBase: ctx.world.base, serverRoot });
         const ob = await seat.onboard({ text: onboardingText(ctx.world.base, s.soulName), maxWallSec: scenario.rails?.onboardWallSec ?? 600, timeoutSec: scenario.rails?.onboardTimeoutSec ?? 540 });
-        log(`seat ${s.id}: ${ob.paired ? 'paired ' + ob.soulId : 'NOT PAIRED'}`);
+        log(`seat ${s.id}: ${ob.ok ? 'paired ' + ob.soulId : 'NOT PAIRED'}`);
         ctx.seats.push(seat);
       }
       if (scenario.god && m.godSeat) {
         ctx.god = await m.godSeat.createGodSeat({ runDir, god: scenario.god, worldBase: ctx.world.base, serverRoot });
         const gb = ctx.god.onboardGod ? await ctx.god.onboardGod({ maxWallSec: scenario.rails?.onboardWallSec ?? 600, timeoutSec: scenario.rails?.onboardTimeoutSec ?? 540 }) : await ctx.god.onboard({ text: godOnboardingText(ctx.world.base), maxWallSec: scenario.rails?.maxTurnWallSec ?? 300 });
-        log(`god seat: ${gb.paired ? 'paired' : 'NOT PAIRED'}`);
+        log(`god seat: ${gb.ok ? 'paired' : 'NOT PAIRED'}`);
       }
       receipt(runDir, 2, 'seats', { ok: ctx.seats.every((s) => !!infoOf(s).soulId), seats: ctx.seats.map((s) => infoOf(s)), god: ctx.god ? infoOf(ctx.god) : null });
     }
@@ -104,7 +104,7 @@ async function cmdRun(a) {
       let observer = null;
       if (m.browser && m.evidence && m.truth) {
         ctx.browser = await m.browser.openBrowser({ headless: true, gpu: scenario.observer?.gpu ?? 'metal' });
-        const vp = scenario.observer?.viewport ?? [1280, 800];
+        const vpRaw = scenario.observer?.viewport ?? [1280, 800]; const vp = Array.isArray(vpRaw) ? { width: vpRaw[0], height: vpRaw[1] } : vpRaw;
         for (const seat of ctx.seats) { const info = infoOf(seat); if (info.soulId) ctx.cameras[info.id] = await ctx.browser.openCamera({ base: ctx.world.base, identity: info.ownerIdentity, kind: 'follow', soulId: info.soulId, viewport: vp, dpr: scenario.observer?.dpr ?? 1, runDir, name: info.id }); }
         if ((scenario.observer?.cameras ?? []).includes('wide')) ctx.cameras.wide = await ctx.browser.openCamera({ base: ctx.world.base, identity: null, kind: 'wide', viewport: vp, dpr: scenario.observer?.dpr ?? 1, runDir, name: 'wide' });
         observer = { camera: (id) => ctx.cameras[id] ?? null, cameras: ctx.cameras, truth: m.truth, evidence: m.evidence, browser: ctx.browser, sampleSec: scenario.observer?.sampleSec ?? 5 };

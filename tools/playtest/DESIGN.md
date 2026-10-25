@@ -283,3 +283,8 @@ one scripted request, one shot, and tears down (≈ 2 min; run manually).
 - Speech bubbles are drawn in 3D and are not legible as text; name tags, chips and the dialogue dock are.
 - Under machine load 15–25 each client call took 20–25 s and arrival shots 2.4–3.5 s; unloaded, calls are 1–6 s (`here` is
   the slowest) and shots about 1 s.
+- Claude Code refuses a headless seat's writes under its own `.claude/` folder (the skill install the onboarding guide
+  asks for) in every permission mode short of bypass, whatever the allowlist says. A person would approve that write;
+  the harness cannot, and bypass mode is off by policy. The seat is left to cope (in playout 1 it skipped the install,
+  kept SKILL.md in the folder and carried on); recorded in each report as a harness limitation, and as a product note:
+  the onboarding step needs a path a sandboxed agent can write.
