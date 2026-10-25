@@ -131,6 +131,9 @@ export const engineBridges = new WeakMap<WorldModel, EngineBridge>();
 
 /** G1: the most a tick spends catching Souls' perception up with god edits (perceive.ts `step`). */
 const PERCEIVE_SLICE_MS = Number(process.env.PERCEIVE_SLICE_MS ?? 8);
+const WRITE_BACK_SLICE_MS = 8;
+type WriteBackUnit = { key: string; ops: Op[]; body?: string };
+type WriteBackBody = { pose: string; entity: Entity | undefined };
 
 export class EngineBridge {
   readonly host: WorldHost; readonly god: GodMode; readonly edge?: EdgeLedger;
@@ -194,7 +197,7 @@ export class EngineBridge {
     // LAYERS: "under construction (step)" is part of what an owned or scheduled thing is seen as
     this.god.onBuild(() => { if (this.layers.active()) this.notePerceive([], true); });
     this.host.listeners.push({
-      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); this.perceiveStep(tick); if (tick % 5 === 4) this.spotsStep(); if (tick % 40 === 7) this.layersStep(); if (tick % 20 === 13) this.flushMapNotices(); if (!this.navWarm || this.navPending) this.navStep(); if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); } if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); } } },
+      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0 || this.writeBackPass) this.writeBack(WRITE_BACK_SLICE_MS); this.perceiveStep(tick); if (tick % 5 === 4) this.spotsStep(); if (tick % 40 === 7) this.layersStep(); if (tick % 20 === 13) this.flushMapNotices(); if (!this.navWarm || this.navPending) this.navStep(); if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); } if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); } } },
       onApplied: (e) => { if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
     });
     reachProviders.set(this.god.model, (from, to) => this.reach(from, to));
@@ -971,86 +974,157 @@ export class EngineBridge {
    *  engine world. Without bodies nothing moves a god thing in the engine (Souls carry, rides seat bodies) except an
    *  edit flushed from the model, which changes the key, so the next pass would find nothing again. */
   private writeBackQuiet: { key: object; ents: object } | null = null;
-  writeBack() {
-    if (this.writeBackBusy) return;
+  /** The roster retains stable work IDs; poses/supports are freshly planned before each selected unit.
+   * The roster advances on refusal or disappearance too, so a busy/refused prefix cannot starve its tail. */
+  private writeBackPass: { keys: string[]; next: number; bodies: Map<string, WriteBackBody> } | null = null;
+  /** Without a budget, retain the ordinary synchronous full drain. Scheduled slices yield only between complete
+   * units: a carry's body prerequisite, strict/nudge retry, and item reparent retain their separate ordered commits. */
+  writeBack(budgetMs = Infinity): boolean {
+    if (this.writeBackBusy || !(budgetMs > 0)) return false;
+    const sliced = Number.isFinite(budgetMs);
+    if (!sliced) this.writeBackPass = null;
     if (this.writeBackQuiet) {
       const ents = this.engine.world.entities as Record<string, any>;
       let body = false;
       for (const id in ents) if (ents[id]?.human) { body = true; break; }
-      if (!body && this.writeBackQuiet.key === this.model.safetyCacheKey() && this.writeBackQuiet.ents === ents) return;
+      if (!body && this.writeBackQuiet.key === this.model.safetyCacheKey() && this.writeBackQuiet.ents === ents) return true;
       this.writeBackQuiet = null;
     }
     this.writeBackBusy = true;
     try {
-      const ops: Op[] = [], bodies = new Set<string>(), holders = new Set<string>();
-      // S1 V7d: one allocation-free walk (Object.entries' order) collects the god things and the bodies; the cheap kind
-      // test goes first. Eden 2026 lists ~4,900 engine entities twice a second here.
-      const ents = this.engine.world.entities as Record<string, any>, humans: string[] = [];
-      for (const id in ents) {
-        if (!Object.hasOwn(ents, id)) continue;
-        const x = ents[id];
-        if (x?.human) humans.push(id);
-        if (x.kind !== 'component' || !x.tags?.includes('entity-world')) continue;
-        const e = this.model.entities.get(id); if (!e) continue;
-        const s = x.support;
-        if (s?.kind === 'in-hand') {
-          if (e.in.parent === s.by && e.in.slot === 'carry') { holders.add(s.by); continue; }
-          if (!this.model.entities.has(s.by)) continue; // the body entity is not in the entity world (pre-bridge Soul)
-          if (!bodies.has(s.by)) { const b = this.engine.world.entities[s.by]; if (b) { ops.push({ op: 'move', id: s.by, p: [r3(b.pose.p[0]), r3(b.pose.p[1]), r3(b.pose.p[2])], r: r3(-b.pose.yaw), mode: 'strict' } as Op); bodies.add(s.by); } }
-          ops.push({ op: 'move', id, in: { parent: s.by, slot: 'carry' }, p: [0, 0, 0], r: 0, mode: 'strict' } as Op);
-        } else if (s?.kind === 'resting-on') {
-          const parent = this.model.entities.get(s.on); if (!parent) continue;
-          const slotId = String(s.slot).replace(/-r\d+c\d+$/, '');
-          const pp = this.model.worldPose(parent), c = Math.cos(pp.yaw), sn = Math.sin(pp.yaw), dx = x.pose.p[0] - pp.x, dz = x.pose.p[2] - pp.z;
-          const slot = this.model.slotsOf(parent).find((q) => q.id === slotId);
-          const lx = dx * c - dz * sn - (slot?.p[0] ?? 0), lz = dx * sn + dz * c - (slot?.p[2] ?? 0);
-          const want: [number, number, number] = [r3(lx), 0, r3(lz)];
-          const have = e.p ?? [0, 0, 0];
-          if (e.in.parent === s.on && (e.in.slot ?? '') === (slot ? slotId : '') && Math.hypot((have[0] ?? 0) - want[0], (have[have.length - 1] ?? 0) - want[2]) < 0.05) continue;
-          ops.push({ op: 'move', id, in: { parent: s.on, ...(slot ? { slot: slotId } : {}) }, p: want, r: r3(-(x.pose.yaw) - pp.yaw), mode: 'strict' } as Op);
-        } else if (s?.kind === 'ground') {
-          if (e.in.parent === 'world') { const p = e.p ?? [0, 0]; if (Math.hypot(p[0] - x.pose.p[0], p[p.length - 1] - x.pose.p[2]) < 0.05) continue; }
-          // a thing the god stood in a room, on a pier's end or a balcony stays in it until a Soul moves it away
-          else { const wp = this.model.worldPose(e); if (Math.hypot(wp.x - x.pose.p[0], wp.z - x.pose.p[2]) < 0.05) continue; }
-          ops.push({ op: 'move', id, in: { parent: 'world' }, p: [r3(x.pose.p[0]), r3(x.pose.p[2])], r: r3(-x.pose.yaw), mode: 'strict' } as Op);
-        }
-      }
-      // a body carrying god things: keep its entity's pose near the engine's, so what it holds is drawn in its hands
-      // (coarsely while it walks, exactly once it stops; viewer B7 would follow the hand from the takes instead)
-      for (const id of holders) {
-        const b = this.engine.world.entities[id], e = this.model.entities.get(id); if (!b?.human || !e || bodies.has(id)) continue;
-        const have = e.p ?? [0, 0, 0], d = Math.hypot((have[0] ?? 0) - b.pose.p[0], (have.length === 3 ? have[1] : 0) - b.pose.p[1], (have[have.length - 1] ?? 0) - b.pose.p[2]);
-        const moving = (b.human.speed ?? 0) > 0.05 || b.human.activity === 'walk';
-        if (d > (moving ? 2 : 0.15)) ops.push({ op: 'move', id, p: [r3(b.pose.p[0]), r3(b.pose.p[1]), r3(b.pose.p[2])], r: r3(-b.pose.yaw), mode: 'strict' } as Op);
-      }
-      // F1: every Soul's body entity follows its engine body once it comes to rest (a walk's end, a seat), so the god's
-      // map and snapshot show where Souls are and what they sit on (one engine edit per stop, none while walking)
-      for (const id of humans) {
-        const b = ents[id];
-        if (!b?.human || bodies.has(id) || holders.has(id)) continue;
-        const e = this.model.entities.get(id); if (!e || e.in.parent !== 'world') continue;
-        if ((b.human.speed ?? 0) > 0.05 || ['walk', 'wade', 'swim', 'tread', 'sit-down', 'stand-up'].includes(b.human.activity)) continue;
-        const have = e.p ?? [0, 0, 0], d = Math.hypot((have[0] ?? 0) - b.pose.p[0], (have.length === 3 ? have[1] : 0) - b.pose.p[1], (have[have.length - 1] ?? 0) - b.pose.p[2]);
-        if (d > 0.4) ops.push({ op: 'move', id, p: [r3(b.pose.p[0]), r3(b.pose.p[1]), r3(b.pose.p[2])], r: r3(-b.pose.yaw), mode: 'strict' } as Op);
-      }
-      if (!ops.length) { if (!humans.length) this.writeBackQuiet = { key: this.model.safetyCacheKey(), ents }; return; }
-      for (const op of ops) {
-        { const o = op as { id: string; p?: number[] }; if (this.refusedPose.has(`${o.id}@${o.p?.join(',')}`)) continue; }
-        const r = this.engineAct([op], `engine: ${describeOp(op, this.model)}`);
-        if (r.accepted) this.stats.writeBacks++;
-        else {
-          // a body's pose refused (it sits inside a bench's footprint): try once more letting the compiler nudge it, and
-          // never retry the same refused pose
-          const o = op as { id: string; p?: number[]; mode?: string }, key = `${o.id}@${o.p?.join(',')}`;
-          if (this.model.resolvedDef(this.model.entities.get(o.id)?.def ?? '')?.components.body) {
-            const r2 = this.engineAct([{ ...(op as object), mode: 'nudge' } as Op], `engine: ${describeOp(op, this.model)}`);
-            if (r2.accepted) { this.stats.writeBacks++; continue; }
-            this.refusedPose.add(key); if (this.refusedPose.size > 500) this.refusedPose.clear();
+      const started = performance.now();
+      if (!sliced) {
+        const plan = this.writeBackUnits(), bodies = new Map<string, WriteBackBody>();
+        for (const unit of plan.units) this.applyWriteBackUnit(unit, bodies);
+        if (!plan.units.length && !plan.humans) this.writeBackQuiet = { key: this.model.safetyCacheKey(), ents: this.engine.world.entities };
+      } else {
+        if (!this.writeBackPass) {
+          const plan = this.writeBackUnits();
+          if (!plan.units.length) {
+            if (!plan.humans) this.writeBackQuiet = { key: this.model.safetyCacheKey(), ents: this.engine.world.entities };
+            return true;
           }
-          this.log(`write-back refused for ${o.id}: ${JSON.stringify(r.failures).slice(0, 200)}`);
+          this.writeBackPass = { keys: plan.units.map(unit => unit.key), next: 0, bodies: new Map() };
         }
+        const pass = this.writeBackPass;
+        while (pass.next < pass.keys.length) {
+          const unit = this.writeBackUnit(pass.keys[pass.next]);
+          if (unit) this.applyWriteBackUnit(unit, pass.bodies);
+          pass.next++;
+          if (pass.next < pass.keys.length && performance.now() - started >= budgetMs) return false;
+        }
+        this.writeBackPass = null;
       }
+      return true;
     } finally { this.writeBackBusy = false; }
+  }
+
+  /** Discovery runs once per pass. The ordinary synchronous drain keeps this complete ordered plan. */
+  private writeBackUnits(): { units: WriteBackUnit[]; humans: number } {
+    const units: WriteBackUnit[] = [], bodies = new Set<string>(), holders = new Set<string>();
+    const ents = this.engine.world.entities as Record<string, any>, humans: string[] = [];
+    for (const id in ents) {
+      if (!Object.hasOwn(ents, id)) continue;
+      if (ents[id]?.human) humans.push(id);
+      const unit = this.writeBackComponent(id, holders);
+      if (unit) { units.push(unit); if (unit.body) bodies.add(unit.body); }
+    }
+    for (const id of holders) {
+      if (bodies.has(id)) continue;
+      const unit = this.writeBackBody(id, true); if (unit) units.push(unit);
+    }
+    for (const id of humans) {
+      if (bodies.has(id) || holders.has(id)) continue;
+      const unit = this.writeBackBody(id, false); if (unit) units.push(unit);
+    }
+    return { units, humans: humans.length };
+  }
+
+  /** Recompute only the selected ID and its direct dependencies. Never rescan or re-plan the world after a commit.
+   * A body's role that changes during a pass is eligible for discovery on the next pass, just like new work. */
+  private writeBackUnit(key: string): WriteBackUnit | undefined {
+    const colon = key.indexOf(':'), kind = key.slice(0, colon), id = key.slice(colon + 1);
+    if (kind === 'component') return this.writeBackComponent(id);
+    // The holder predicate can be checked through the model's direct-child index: a projected held item must be
+    // in this body's carry slot AND still supported by this body in the engine. No whole-engine scan is needed.
+    let holder = false;
+    const ents = this.engine.world.entities as Record<string, any>;
+    for (const child of this.model.children.get(id) ?? []) {
+      const e = this.model.entities.get(child), x = ents[child];
+      if (e?.in.parent === id && e.in.slot === 'carry' && x?.kind === 'component' && x.tags?.includes('entity-world') && x.support?.kind === 'in-hand' && x.support.by === id) { holder = true; break; }
+    }
+    if (holder !== (kind === 'holder')) return;
+    return this.writeBackBody(id, holder);
+  }
+
+  private writeBackComponent(id: string, holders?: Set<string>): WriteBackUnit | undefined {
+    const x = this.engine.world.entities[id] as any;
+    if (x?.kind !== 'component' || !x.tags?.includes('entity-world')) return;
+    const e = this.model.entities.get(id); if (!e) return;
+    const ops: Op[] = []; let body: string | undefined;
+    const s = x.support;
+    if (s?.kind === 'in-hand') {
+      if (e.in.parent === s.by && e.in.slot === 'carry') { holders?.add(s.by); return; }
+      if (!this.model.entities.has(s.by)) return; // the body entity is not in the entity world (pre-bridge Soul)
+      const b = this.engine.world.entities[s.by];
+      if (b) { ops.push({ op: 'move', id: s.by, p: [r3(b.pose.p[0]), r3(b.pose.p[1]), r3(b.pose.p[2])], r: r3(-b.pose.yaw), mode: 'strict' } as Op); body = s.by; }
+      ops.push({ op: 'move', id, in: { parent: s.by, slot: 'carry' }, p: [0, 0, 0], r: 0, mode: 'strict' } as Op);
+    } else if (s?.kind === 'resting-on') {
+      const parent = this.model.entities.get(s.on); if (!parent) return;
+      const slotId = String(s.slot).replace(/-r\d+c\d+$/, '');
+      const pp = this.model.worldPose(parent), c = Math.cos(pp.yaw), sn = Math.sin(pp.yaw), dx = x.pose.p[0] - pp.x, dz = x.pose.p[2] - pp.z;
+      const slot = this.model.slotsOf(parent).find((q) => q.id === slotId);
+      const lx = dx * c - dz * sn - (slot?.p[0] ?? 0), lz = dx * sn + dz * c - (slot?.p[2] ?? 0);
+      const want: [number, number, number] = [r3(lx), 0, r3(lz)];
+      const have = e.p ?? [0, 0, 0];
+      if (e.in.parent === s.on && (e.in.slot ?? '') === (slot ? slotId : '') && Math.hypot((have[0] ?? 0) - want[0], (have[have.length - 1] ?? 0) - want[2]) < 0.05) return;
+      ops.push({ op: 'move', id, in: { parent: s.on, ...(slot ? { slot: slotId } : {}) }, p: want, r: r3(-(x.pose.yaw) - pp.yaw), mode: 'strict' } as Op);
+    } else if (s?.kind === 'ground') {
+      if (e.in.parent === 'world') { const p = e.p ?? [0, 0]; if (Math.hypot(p[0] - x.pose.p[0], p[p.length - 1] - x.pose.p[2]) < 0.05) return; }
+      // A thing placed in a room, on a pier or balcony stays there until a Soul moves it away.
+      else { const wp = this.model.worldPose(e); if (Math.hypot(wp.x - x.pose.p[0], wp.z - x.pose.p[2]) < 0.05) return; }
+      ops.push({ op: 'move', id, in: { parent: 'world' }, p: [r3(x.pose.p[0]), r3(x.pose.p[2])], r: r3(-x.pose.yaw), mode: 'strict' } as Op);
+    }
+    if (ops.length) return { key: `component:${id}`, ops, ...(body ? { body } : {}) };
+  }
+
+  private writeBackBody(id: string, holder: boolean): WriteBackUnit | undefined {
+    const b = this.engine.world.entities[id], e = this.model.entities.get(id);
+    if (!b?.human || !e) return;
+    // Carrying bodies follow coarsely while walking, exactly at rest. Other bodies follow only at rest.
+    const moving = (b.human.speed ?? 0) > 0.05 || b.human.activity === 'walk';
+    if (!holder && (e.in.parent !== 'world' || (b.human.speed ?? 0) > 0.05 || ['walk', 'wade', 'swim', 'tread', 'sit-down', 'stand-up'].includes(b.human.activity))) return;
+    const have = e.p ?? [0, 0, 0], d = Math.hypot((have[0] ?? 0) - b.pose.p[0], (have.length === 3 ? have[1] : 0) - b.pose.p[1], (have[have.length - 1] ?? 0) - b.pose.p[2]);
+    if (d > (holder ? (moving ? 2 : 0.15) : 0.4)) return { key: `${holder ? 'holder' : 'human'}:${id}`, ops: [{ op: 'move', id, p: [r3(b.pose.p[0]), r3(b.pose.p[1]), r3(b.pose.p[2])], r: r3(-b.pose.yaw), mode: 'strict' } as Op] };
+  }
+
+  private applyWriteBackUnit(unit: WriteBackUnit, bodies: Map<string, WriteBackBody>) {
+    for (let i = 0; i < unit.ops.length; i++) {
+      const op = unit.ops[i];
+      // Several items can share a holder. Match the full drain's one prerequisite per unchanged pose,
+      // while a holder changed in either world between slices gets its prerequisite before the next transfer.
+      const pose = unit.body && i === 0 ? JSON.stringify(op) : undefined;
+      const done = unit.body ? bodies.get(unit.body) : undefined;
+      if (pose !== undefined && done?.pose === pose && done.entity === this.model.entities.get(unit.body!)) continue;
+      this.applyWriteBackOp(op);
+      if (pose !== undefined) bodies.set(unit.body!, { pose, entity: this.model.entities.get(unit.body!) });
+    }
+  }
+
+  private applyWriteBackOp(op: Op) {
+    { const o = op as { id: string; p?: number[] }; if (this.refusedPose.has(`${o.id}@${o.p?.join(',')}`)) return; }
+    const r = this.engineAct([op], `engine: ${describeOp(op, this.model)}`);
+    if (r.accepted) this.stats.writeBacks++;
+    else {
+      // A body's strict/nudge pair remains in this unit; never retry the same refused pose.
+      const o = op as { id: string; p?: number[]; mode?: string }, key = `${o.id}@${o.p?.join(',')}`;
+      if (this.model.resolvedDef(this.model.entities.get(o.id)?.def ?? '')?.components.body) {
+        const r2 = this.engineAct([{ ...(op as object), mode: 'nudge' } as Op], `engine: ${describeOp(op, this.model)}`);
+        if (r2.accepted) { this.stats.writeBacks++; return; }
+        this.refusedPose.add(key); if (this.refusedPose.size > 500) this.refusedPose.clear();
+      }
+      this.log(`write-back refused for ${o.id}: ${JSON.stringify(r.failures).slice(0, 200)}`);
+    }
   }
 
   /** Birth: the Soul's body becomes an entity (core/humanoid) with the engine's own id (spec 31 §3 rule 3). */
