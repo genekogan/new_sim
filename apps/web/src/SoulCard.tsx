@@ -54,14 +54,15 @@ function OwnerCard({api,soul,camera,signedIn=true,body,now,place}:SoulCardProps&
 export type SoulCardViewProps={soul:PublicSoul;view:'owner'|'visitor';body:Body|null;now:Now|null;place:string|null;camera?:Camera;
  /** owner only: the one state (null = not known yet), presence, inbox, the start prompt, Disconnect */
  link?:Link|null;here?:AgentHere|null;inbox?:AgentInbox|null;send?(text:string):Promise<unknown>;prompt?:string;signedIn?:boolean;disconnect?():Promise<boolean>;
- clock?:number};
-export function SoulCardView({soul,view,body,now,place,camera,link=null,here=null,inbox=null,send,prompt='',signedIn=true,disconnect,clock}:SoulCardViewProps){
+ /** fixtures and shots: a fixed clock, the link details (and Pair another session) open from the start */
+ clock?:number;open?:{details?:boolean;pair?:boolean}};
+export function SoulCardView({soul,view,body,now,place,camera,link=null,here=null,inbox=null,send,prompt='',signedIn=true,disconnect,clock,open}:SoulCardViewProps){
  const t=clock??Date.now();
  const [copied,setCopied]=useState<''|'ok'|'failed'>('');
- const [details,setDetails]=useState(false);
+ const [details,setDetails]=useState(!!open?.details);
  const title=useRef<HTMLHeadingElement>(null),alive=useRef(true);
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
- useEffect(()=>{setCopied('');setDetails(false);},[soul.id]);
+ useEffect(()=>{setCopied('');},[soul.id]);
  useEffect(()=>{if(title.current?.offsetParent)title.current.focus({preventScroll:true});},[soul.id]);
  useEffect(()=>{if(!copied)return;const k=setTimeout(()=>setCopied(''),2200);return()=>clearTimeout(k);},[copied]);
  // the waiting variant offers the prompt after a minute: re-render once then
@@ -89,7 +90,7 @@ export function SoulCardView({soul,view,body,now,place,camera,link=null,here=nul
    <StatusPlace text={!owner?visitorPhrase(body,place,t):waiting?(link?.since&&t-link.since<WAITING_PROMPT_MS?'approved just now':'approved'):disconnected&&!body?(link?.since?`since ${clockAt(link.since,t)}`:''):bodyPhrase(body,place,t)} title={body?.since?clockTitle(body.since):undefined}/>
    <VisitorFrom soulId={soul.id}/>
   </p>
-  {connected&&details&&<LinkDetails name={soul.name} link={link!} here={here} prompt={prompt} disconnect={disconnect} clock={t}/>}
+  {connected&&details&&<LinkDetails name={soul.name} link={link!} here={here} prompt={prompt} disconnect={disconnect} clock={t} pairOpen={!!open?.pair}/>}
   {now&&<p className={'soul-now'+(sleeping?' soul-now-dim':'')} data-now="1"><q>{now.text}</q>{now.at>0&&<span className="soul-dim" title={clockTitle(now.at)}> · {ageText(now.at,t)}</span>}</p>}
   {waiting&&<WaitingNote name={soul.name} place={place} since={link!.since} prompt={prompt} clock={t}/>}
   {disconnected&&!waiting&&<ReconnectBox name={soul.name} link={link!} prompt={prompt} clock={t}/>}
@@ -134,8 +135,8 @@ function PromptCopy({prompt}:{prompt:string}){
   <button type="button" className="soul-pill fill" onClick={()=>void copy()}>{state==='ok'?'Copied':'Copy prompt'}</button>
   {state==='failed'&&<span className="soul-dim" role="status"> Copy unavailable: select the prompt above.</span>}</>;
 }
-function LinkDetails({name,link,here,prompt,disconnect,clock}:{name:string;link:Link;here:AgentHere|null;prompt:string;disconnect?():Promise<boolean>;clock:number}){
- const [pair,setPair]=useState(false),[busy,setBusy]=useState(false),[note,setNote]=useState('');
+function LinkDetails({name,link,here,prompt,disconnect,clock,pairOpen}:{name:string;link:Link;here:AgentHere|null;prompt:string;disconnect?():Promise<boolean>;clock:number;pairOpen:boolean}){
+ const [pair,setPair]=useState(pairOpen),[busy,setBusy]=useState(false),[note,setNote]=useState('');
  const off=async()=>{if(!disconnect||busy)return;setBusy(true);setNote('');
   try{setNote(await disconnect()?`Disconnected. ${name} stays where it is.`:'Not confirmed. Check again in a moment.');}catch{setNote('Not confirmed. Check again in a moment.');}finally{setBusy(false);}};
  return <div className="soul-box" id="soul-link-details" data-link-details="1">

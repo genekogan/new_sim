@@ -34,7 +34,7 @@ export function readBody(raw:unknown):Body|null{
 export function readNow(raw:unknown):Now|null{
  const d=obj(raw);if(!d||typeof d.text!=='string')return null;
  // eslint-disable-next-line no-control-regex
- const text=d.text.replace(/[\u0000-\u001f\u007f-\u009f]+/g,' ').trim().slice(0,140);
+ const text=d.text.replace(/[\u0000-\u001f\u007f-\u009f]+/g,' ').replace(/\s{2,}/g,' ').trim().slice(0,140).trimEnd();
  return text?{text,at:time(d.at)??0}:null;
 }
 /** The newest of several sources (replica, public record, stream event): a later `since`/`at` wins. */

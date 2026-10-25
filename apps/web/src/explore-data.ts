@@ -32,4 +32,4 @@ export function exploreSoulState(soul:PublicSoul,bodies?:ReadonlyMap<string,Body
  return {body:newest(readBody(x.body),bodies?.get(soul.id)??null),now:readNow(x.now)};
 }
 /** "Heading to the pond to see if…" — a row-sized `now`. */
-export const truncateNow=(text:string,max=34)=>text.length<=max?text:text.slice(0,max-1).replace(/\s+\S*$/,'')+'…';
+export function truncateNow(text:string,max=34){if(text.length<=max)return text;const cut=text.slice(0,max-1);return (/\s/.test(text[max-1])?cut:cut.replace(/\s+\S*$/,'')||cut).trimEnd()+'…';}
