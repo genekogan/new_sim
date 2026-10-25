@@ -8,6 +8,7 @@ import { now, setAnchor, sleep, monoMs } from './lib/clock.mjs';
 import { writeJson, readJson, appendJsonl } from './lib/jsonl.mjs';
 import { quota, quotaAllows } from './lib/quota.mjs';
 import { sha256, rng } from './lib/hash.mjs';
+import { freeMemGb, resolvePlaywright } from './lib/platform.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_SERVER_ROOT = '<worktrees>/soul3-integration';
@@ -40,18 +41,19 @@ async function loadModules() {
   return m;
 }
 
-/** Machine gate (Gene 2026-10-25): 1-minute load under 10 and at least 6 GB reclaimable memory (vm_stat on macOS). */
+/** Machine gate (Gene 2026-10-25): 1-minute load under 10 and at least 6 GB reclaimable memory (vm_stat on macOS,
+ *  MemAvailable on Linux; lib/platform.mjs). */
 export async function machineCheck() {
   const checks = {};
   try { const { loadavg } = await import('node:os'); checks.laptopLoad = loadavg().map((x) => Math.round(x * 10) / 10); } catch { /* n/a */ }
-  try { const { run: sh } = await import('./lib/proc.mjs'); const vm = (await sh('vm_stat', [], { maxWallMs: 10000 })).stdout; const page = Number(vm.match(/page size of (\d+)/)?.[1] ?? 16384); const pages = (k) => Number(vm.match(new RegExp(`${k}:\\s+(\\d+)`))?.[1] ?? 0); checks.freeGb = Math.round((pages('Pages free') + pages('Pages inactive') + pages('Pages purgeable') + pages('Pages speculative')) * page / 1073741824 * 10) / 10; } catch { checks.freeGb = null; }
+  checks.freeGb = freeMemGb();
   checks.machineOk = (checks.laptopLoad?.[0] ?? 0) < 10 && (checks.freeGb == null || checks.freeGb >= 6);
   return checks;
 }
 
 export async function preflight({ serverRoot }) {
   const q = await quota();
-  const checks = { quota: q, serverRoot: existsSync(join(serverRoot, 'tools/god-skill/dev-world.mjs')), webDist: existsSync(join(serverRoot, 'apps/web/dist/index.html')), controllerCli: existsSync(join(serverRoot, 'tools/world-launcher/soul/eden.mjs')), playwright: existsSync('<repo>/mars/viewer/node_modules/@playwright/test'), claude: null, codex: null };
+  const checks = { quota: q, serverRoot: existsSync(join(serverRoot, 'tools/god-skill/dev-world.mjs')), webDist: existsSync(join(serverRoot, 'apps/web/dist/index.html')), controllerCli: existsSync(join(serverRoot, 'tools/world-launcher/soul/eden.mjs')), playwright: resolvePlaywright({ serverRoot })?.from ?? false, claude: null, codex: null };
   const { run } = await import('./lib/proc.mjs');
   checks.claude = (await run('claude', ['--version'], { maxWallMs: 20000 })).stdout.trim();
   checks.codex = (await run('codex', ['--version'], { maxWallMs: 20000 })).stdout.trim();
@@ -60,7 +62,7 @@ export async function preflight({ serverRoot }) {
   for (const w of ['eden-2026', 'godmode-lab']) { try { const r = await fetch(`https://sim.eden.art/worlds/w/${w}/healthz`, { signal: AbortSignal.timeout(8000) }); const j = await r.json(); checks.live[w] = { ok: j.ok, build: j.build, tickMs: j.tickMs, clients: j.clients }; } catch (e) { checks.live[w] = { ok: false, error: String(e.message).slice(0, 80) }; } }
   // Machine gate (Gene 2026-10-25): a loaded or memory-bound laptop produced false failures all night. Refuse to start
   // unless the 1-minute load is under 10 and at least 6 GB of memory is free; `--force-machine` records the breach instead.
-  // macOS: os.freemem() excludes inactive and purgeable pages; vm_stat gives the reclaimable total.
+  // macOS: os.freemem() excludes inactive and purgeable pages; vm_stat gives the reclaimable total (Linux: MemAvailable).
   Object.assign(checks, await machineCheck());
   const allow = quotaAllows(q, { stopPct: 85 });
   const ok = checks.serverRoot && checks.webDist && checks.controllerCli && checks.playwright && !!checks.claude && allow.allowed && (checks.machineOk || process.argv.includes('--force-machine'));
@@ -122,7 +124,7 @@ async function cmdRun(a) {
       if (!m.director) throw new Error('director/director.mjs missing');
       let observer = null;
       if (m.browser && m.evidence && m.truth) {
-        ctx.browser = await m.browser.openBrowser({ headless: true, gpu: scenario.observer?.gpu ?? 'metal' });
+        ctx.browser = await m.browser.openBrowser({ headless: true, gpu: scenario.observer?.gpu ?? 'metal', serverRoot });
         const vpRaw = scenario.observer?.viewport ?? [1280, 800]; const vp = Array.isArray(vpRaw) ? { width: vpRaw[0], height: vpRaw[1] } : vpRaw;
         const openCam = async (opts) => { try { return await ctx.browser.openCamera({ ...opts, arrivalTimeoutMs: scenario.observer?.arrivalTimeoutMs ?? 180000 }); } catch (e) { log(`camera ${opts.name} failed: ${String(e.message).split('\n')[0]}`); return null; } };
         for (const seat of ctx.seats) { const info = infoOf(seat); if (info.soulId) { const cam = await openCam({ base: ctx.world.base, identity: info.ownerIdentity, kind: 'follow', soulId: info.soulId, viewport: vp, dpr: scenario.observer?.dpr ?? 1, runDir, name: info.id }); if (cam) ctx.cameras[info.id] = cam; } }
@@ -234,8 +236,9 @@ async function cmdReplaySet(a) {
       if (existsSync(join(dir, 'receipts', '7-report.json'))) { if (!entry.repeats.includes(dir)) entry.repeats.push(dir); continue; } // resumable
       const gateUntil = Date.now() + Number(a['gate-wait-min'] ?? 30) * 60000;
       let gate = await machineCheck();
-      while (!gate.machineOk && Date.now() < gateUntil) { log(`machine gate: load ${gate.laptopLoad?.[0]} free ${gate.freeGb} GB; waiting`); await sleep(60000); gate = await machineCheck(); }
-      if (!gate.machineOk) { log('machine gate never cleared; stopping the replay set'); entry.exits.push({ dir, exit: 'gate' }); save(); return 2; }
+      while (!gate.machineOk && !a['force-machine'] && Date.now() < gateUntil) { log(`machine gate: load ${gate.laptopLoad?.[0]} free ${gate.freeGb} GB; waiting`); await sleep(60000); gate = await machineCheck(); }
+      if (!gate.machineOk && a['force-machine']) { log(`machine gate breached (load ${gate.laptopLoad?.[0]} free ${gate.freeGb} GB); --force-machine: recorded, continuing`); entry.gateBreaches = [...(entry.gateBreaches ?? []), { dir, ...gate }]; }
+      else if (!gate.machineOk) { log('machine gate never cleared; stopping the replay set'); entry.exits.push({ dir, exit: 'gate' }); save(); return 2; }
       log(`replay ${p.label} → ${dir}`);
       const code = await cmdRun({ _: ['run', p.scenarioFile], seed: p.scenario.seed, 'server-root': a['server-root'], out: dir });
       entry.exits.push({ dir, exit: code }); if (existsSync(join(dir, 'evidence'))) entry.repeats.push(dir); save();

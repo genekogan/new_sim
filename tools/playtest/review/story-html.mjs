@@ -1,6 +1,6 @@
 // Story rendering: the HTML fragment (booklet run pages), the standalone story.html with inlined 640 px JPEG
 // thumbnails (publishable on its own), and the plain-text lines REPORT.md lists. Data comes from buildStory.
-import { execFileSync } from 'node:child_process';
+import { toJpeg } from '../lib/platform.mjs';
 import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
@@ -127,7 +127,7 @@ export function storyLines(story, run = null) {
 export function inlineThumbs(runDir, paths, { maxEach = 120_000, maxTotal = 3_400_000 } = {}) {
   const tmp = mkdtempSync(join(tmpdir(), 'pt-story-')); const out = {};
   try {
-    const enc = (rel, q, px) => { const f = join(tmp, `${Object.keys(out).length}-${q}.jpg`); execFileSync('sips', ['-s', 'format', 'jpeg', '-s', 'formatOptions', String(q), '-Z', String(px), join(runDir, rel), '--out', f], { stdio: 'ignore' }); return readFileSync(f); };
+    const enc = (rel, q, px) => { const f = join(tmp, `${Object.keys(out).length}-${q}.jpg`); toJpeg(join(runDir, rel), f, { quality: q, maxDim: px }); return readFileSync(f); };
     let q = 60, px = 640;
     for (let pass = 0; pass < 4; pass++) {
       let total = 0;

@@ -1,10 +1,10 @@
 // Morning summary: ONE self-contained HTML page over every run with results in a runs root (the night at a glance).
-// Read-only over run folders; chosen thumbnails are copied (resized to ≤ 640 px JPEG with macOS sips) into an assets dir
+// Read-only over run folders; chosen thumbnails are copied (resized to ≤ 640 px JPEG: sips on macOS, ImageMagick/ffmpeg on Linux) into an assets dir
 // and referenced by relative path. No external resources, no base64.
 // node tools/playtest/review/summary.mjs [--runs-root dir] [--out file.html] [--assets dir] [--max-shots 12] [--night-log file]
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { toJpeg } from '../lib/platform.mjs';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_RUNS_ROOT, esc as esc0, chip, md2html, listRuns, loadBundle } from './booklet.mjs';
 import { computeMetrics } from './metrics.mjs';
@@ -126,11 +126,10 @@ export function readNightLog(file) {
 const bullets = (body) => { const li = body.split('\n').filter((l) => /^\s*[-*]\s+/.test(l)); if (li.length) return body; return body.replace(/\s+/g, ' ').trim().replace(/\.$/, '').split(/;\s+/).map((x) => `- ${x.charAt(0).toUpperCase()}${x.slice(1)}.`).join('\n'); };
 
 // ---------- images
+/** ≤ 640 px wide JPEG under ~120 KB: sips on macOS, ImageMagick or ffmpeg elsewhere (lib/platform.mjs). */
 export function sipsThumb(src, dst) {
-  const w = parseInt(execFileSync('sips', ['-g', 'pixelWidth', src], { encoding: 'utf8' }).match(/pixelWidth:\s*(\d+)/)?.[1] ?? '0', 10);
   for (const q of [72, 55, 40]) {
-    const args = ['-s', 'format', 'jpeg', '-s', 'formatOptions', String(q), ...(w > 640 ? ['--resampleWidth', '640'] : []), src, '--out', dst];
-    execFileSync('sips', args, { stdio: 'ignore' });
+    toJpeg(src, dst, { quality: q, maxWidth: 640 });
     if (statSync(dst).size < 120 * 1024) break;
   }
   return dst;

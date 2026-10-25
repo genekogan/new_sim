@@ -23,26 +23,23 @@
 //              .warn (e.g. "A Soul's chosen look could not be composed…" on local dev worlds)
 //  roster      .my-souls button[aria-label] (own Souls, "Open Mira (agent away)"); .explore-souls (Explore open)
 //  new soul    button.bring-agent-open / any button whose text is "New Soul"
-import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { homedir } from 'node:os';
+import { resolvePlaywright, browsersPath, launchArgs } from '../lib/platform.mjs';
 import { now, sleep } from '../lib/clock.mjs';
 import { appendJsonl } from '../lib/jsonl.mjs';
 
-const VIEWER_PKG = process.env.PLAYTEST_PLAYWRIGHT_PKG ?? join(homedir(), 'Eden/sim/mars/viewer/package.json');
-const GPU_ARGS = {
-  metal: ['--use-angle=metal', '--ignore-gpu-blocklist', '--enable-gpu-rasterization'],
-  swiftshader: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
-};
-
-/** openBrowser({headless, gpu}) → {browser, gpu, openCamera(opts), close()} */
-export async function openBrowser({ headless = true, gpu = 'metal' } = {}) {
-  process.env.PLAYWRIGHT_BROWSERS_PATH ??= join(homedir(), 'Library/Caches/ms-playwright');
-  const { chromium } = createRequire(VIEWER_PKG)('@playwright/test');
-  const browser = await chromium.launch({ headless, args: GPU_ARGS[gpu] ?? GPU_ARGS.metal });
+/** openBrowser({headless, gpu, serverRoot}) → {browser, gpu, playwright, openCamera(opts), close()}.
+ *  Playwright: global `playwright` first (cloud), then <serverRoot>/mars/viewer, then the laptop viewer (lib/platform.mjs).
+ *  On Linux the launch is SwiftShader headless with --no-sandbox whatever `gpu` says; `gpu` returned is what was used. */
+export async function openBrowser({ headless = true, gpu: wantGpu = 'metal', serverRoot = null } = {}) {
+  browsersPath();
+  const pw = resolvePlaywright({ serverRoot });
+  if (!pw) throw new Error('Playwright not found (global playwright, <server-root>/mars/viewer or the laptop viewer)');
+  const { args, gpu } = launchArgs({ gpu: wantGpu });
+  const browser = await pw.chromium.launch({ headless, args });
   const cams = [];
-  return { browser, gpu,
+  return { browser, gpu, playwright: pw.from,
     openCamera: async (o) => { const c = await openCamera({ ...o, browser }); cams.push(c); return c; },
     close: async () => { for (const c of cams) await c.close().catch(() => {}); await browser.close().catch(() => {}); } };
 }
