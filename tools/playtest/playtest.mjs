@@ -147,7 +147,13 @@ async function reviewRun(runDir, m, { serverRoot, from = 5 } = {}) {
     receipt(runDir, 5, 'review', { ok: true, requests: r.reviews?.length ?? 0, issues: r.issues?.length ?? 0, featureRequests: r.featureRequests?.length ?? 0, fidelity: (r.reviews ?? []).map((x) => `${x.requestId}:${x.fidelity}`).join(' ') });
   }
   if (from <= 6) {
-    if (m.developer) { const d = await m.developer.developRun({ runDir, serverRoot: serverRoot ?? scenario.serverRoot ?? DEFAULT_SERVER_ROOT, model: scenario.review?.developerModel ?? 'opus', log }); receipt(runDir, 6, 'develop', { ok: true, ...summary(d) }); }
+    if (m.developer) {
+      // The Developer is a draft generator in this stage: cap how many issues and feature requests get a spec per run.
+      const maxI = scenario.review?.developerMaxIssues ?? 4, maxF = scenario.review?.developerMaxFeatureRequests ?? 3;
+      const ids = [...(readJson(join(runDir, 'issues.json'), []) ?? []).slice(0, maxI).map((i) => i.id), ...(readJson(join(runDir, 'feature-requests.json'), []) ?? []).slice(0, maxF).map((f) => f.id)].filter(Boolean);
+      const d = await m.developer.developRun({ runDir, serverRoot: serverRoot ?? scenario.serverRoot ?? DEFAULT_SERVER_ROOT, model: scenario.review?.developerModel ?? 'opus', only: ids.length ? ids : null, log });
+      receipt(runDir, 6, 'develop', { ok: true, drafted: ids.length, ...summary(d) });
+    }
     else receipt(runDir, 6, 'develop', { ok: false, note: 'developer module missing' });
   }
   if (from <= 7) {
