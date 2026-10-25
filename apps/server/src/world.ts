@@ -106,7 +106,8 @@ export type HostListener = {
   /** A card's effects were applied (or refused). Not called during replay. */
   onPlay?(p: PlayView, m: Mind | undefined): void;
   onKernel?(v: KernelView): void;
-  afterTick?(tick: number): void;
+  /** Advisory wall-time context; authoritative tick work remains synchronous and ordered. */
+  afterTick?(tick: number, context?: Readonly<{ startedAtMs: number }>): void;
   /** Notification only: the whole tick, including broadcasts/checkpoint scheduling, completed. */
   afterTickComplete?(tick: number): void;
   /** Notification only: the clock was stopped; no queued work is drained. */
@@ -499,7 +500,8 @@ export class WorldHost {
     }
     for (const ev of out.events) for (const l of this.listeners) l.onRuntimeEvent?.(ev);
     const now = this.engine.world.tick;
-    for (const l of this.listeners) l.afterTick?.(now);
+    const tickContext = Object.freeze({ startedAtMs: t0 });
+    for (const l of this.listeners) l.afterTick?.(now, tickContext);
     // 3. broadcast
     if (now % BATCH_TICKS === 0) this.flush();
     if (now % HEARTBEAT_TICKS === 0) this.heartbeat();
