@@ -36,7 +36,7 @@ export class OwnerLoop {
   link(soul: EdgeSoul, receipt: EdgeReceipt, message: string) {
     this.links.set(receipt.id, {scope: this.scope(soul), message});
     if (this.links.size > MAX_LINKS) this.links.delete(this.links.keys().next().value!);
-    if (receipt.phase !== 'waiting' && receipt.phase !== 'started' && receipt.phase !== 'accepted') this.ended(receipt);
+    if (receipt.phase !== 'waiting' && receipt.phase !== 'started') this.ended(receipt);
   }
   private ended(r: EdgeReceipt) {
     const l = this.links.get(r.id); if (!l || ['waiting', 'started', 'accepted'].includes(r.phase)) return;
