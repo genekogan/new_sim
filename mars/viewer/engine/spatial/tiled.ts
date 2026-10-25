@@ -13,7 +13,7 @@
 //    a *window* that always covers every body and every active route; it only grows.
 //    Each hop is planned with the existing planner (findRoute) on a composite of
 //    just that hop's tiles, so a route never depends on how far the window has grown.
-import { datan2, hypot, obbCorners, pointInObb, type Vec2 } from '../core/math.ts';
+import { datan2, dcos, dsin, hypot, obbCorners, pointInObb, type Vec2 } from '../core/math.ts';
 import { BODY_HEIGHT, STEP, buildGrids, buildGridsOverFloors, edt, gridContentKeys, latticeCentre, latticeIndex, latticeOf, obbRange, rasterObb, type GridSet, type LevelGrid } from './grid.ts';
 import { findRoute, linkApproach, type Leg, type Place, type RouteOpts, type RouteResult, type WalkLeg } from './path.ts';
 import type { AgentProfile, Obstacle, SpatialScene, Surface } from './types.ts';
@@ -99,18 +99,30 @@ class ComposedBlockers extends Map<number, string> {
 export function deckedField(base: GroundField, decks: Surface[], key: string): GroundField {
   // numeric 8 m cell keys (L1: deckY runs for every fine cell of a nav tile; string keys were a third of its cost)
   const bk = (i: number, j: number) => (i + 1048576) * 2097152 + (j + 1048576);
-  const buckets = new Map<number, Surface[]>(), cellsOf: [number, number][] = [];
+  // The exact pointInObb/rot2 arithmetic, with the deterministic trig shared by every point.
+  // Keep the surface live as before; a caller mutating yaw must not leave a stale basis.
+  type Deck = { surface: Surface; yaw: number; c: number; s: number };
+  const buckets = new Map<number, Deck[]>(), cellsOf: [number, number][] = [];
   for (const s of decks) {
+    const deck: Deck = { surface: s, yaw: s.obb.yaw, c: dcos(-s.obb.yaw), s: dsin(-s.obb.yaw) };
     let ax = Infinity, az = Infinity, bx = -Infinity, bz = -Infinity;
     for (const [x, z] of obbCorners(s.obb)) { if (x < ax) ax = x; if (x > bx) bx = x; if (z < az) az = z; if (z > bz) bz = z; }
     for (let j = Math.floor(az / 8); j <= Math.floor(bz / 8); j++) for (let i = Math.floor(ax / 8); i <= Math.floor(bx / 8); i++) {
-      const k = bk(i, j), l = buckets.get(k); if (l) l.push(s); else { buckets.set(k, [s]); cellsOf.push([i, j]); }
+      const k = bk(i, j), l = buckets.get(k); if (l) l.push(deck); else { buckets.set(k, [deck]); cellsOf.push([i, j]); }
     }
   }
   const deckY = (x: number, z: number): number | null => {
     const l = buckets.get(bk(Math.floor(x / 8), Math.floor(z / 8))); if (!l) return null;
     let y = -Infinity, g = NaN;
-    for (const s of l) if (s.y > y && pointInObb([x, z], s.obb)) { if (g !== g) g = base.height(x, z); if (s.y >= g - 0.05) y = s.y; }
+    for (const d of l) {
+      const s = d.surface; if (!(s.y > y)) continue;
+      const o = s.obb;
+      if (!Object.is(d.yaw, o.yaw)) { d.yaw = o.yaw; d.c = dcos(-o.yaw); d.s = dsin(-o.yaw); }
+      const dx = x - o.c[0], dz = z - o.c[1];
+      if (Math.abs(dx * d.c - dz * d.s) <= o.half[0] + 0 && Math.abs(dx * d.s + dz * d.c) <= o.half[1] + 0) {
+        if (g !== g) g = base.height(x, z); if (s.y >= g - 0.05) y = s.y;
+      }
+    }
     return y === -Infinity ? null : y;
   };
   const tiles = new Map<string, Uint8Array>();

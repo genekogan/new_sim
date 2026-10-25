@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { GroundNav, boxesOf } from '../spatial/tiled.ts';
+import { GroundNav, deckedField, boxesOf } from '../spatial/tiled.ts';
 import { BODY_HEIGHT, STEP, edt, latticeCentre, rasterObb } from '../spatial/grid.ts';
 import { coarseMedium, G_OUTSIDE, G_STEEP, G_SWIM, G_WADE, G_WALK, type GroundField } from '../spatial/ground.ts';
 import { CONNECT_CLEAR, labelComponents } from '../spatial/connectivity.ts';
-import type { Obstacle } from '../spatial/types.ts';
+import { pointInObb, rot2, type Vec2 } from '../core/math.ts';
+import type { Obstacle, Surface } from '../spatial/types.ts';
 
 // Independent reference copied from tiled.ts at 058d93795d57, before resumable classification.
 // Keep its whole-raster traversal and id allocation order; do not regenerate from the sliced implementation.
@@ -117,3 +118,37 @@ test('fine tile: a synchronous read during unfinished work sees a complete raste
   sameTile(step.value, synchronous, nav.per);
 });
 
+test('deck basis: legacy point predicates at rotated boundaries, overlaps and mutable yaw', () => {
+  const decks: Surface[] = [
+    { id: 'a', level: 0, y: 1, obb: { c: [0, 0], half: [2, 1], yaw: .731 } },
+    { id: 'b', level: 0, y: 2, obb: { c: [.2, -.1], half: [1, 1.5], yaw: -.44 } },
+  ];
+  const field = deckedField(base, decks, 'test');
+  const expected = (x: number, z: number) => {
+    let y = -Infinity, g = NaN;
+    for (const s of decks) if (s.y > y && pointInObb([x, z], s.obb)) { if (g !== g) g = base.height(x, z); if (s.y >= g - .05) y = s.y; }
+    return y === -Infinity ? null : y;
+  };
+  for (const [tx, tz] of [[0, 0], [-1, -1]]) {
+    const want = base.mediaTile(tx, tz).slice();
+    for (let j = 0; j < 64; j++) for (let i = 0; i < 64; i++) if (expected(tx * 64 + i + .5, tz * 64 + j + .5) !== null) want[j * 64 + i] = G_WALK;
+    assert.deepEqual(field.mediaTile(tx, tz), want, 'coarse deck media matches the legacy point predicate');
+  }
+  for (const yaw of [0, -0, .731, -Math.PI, Math.PI / 2, 9.3]) {
+    decks[0].obb.yaw = yaw;
+    for (const s of decks) for (const edge of [-1, 1]) for (const eps of [-1e-12, 0, 1e-12]) for (let t = -1; t <= 1; t += .25) {
+      for (const local of [[edge * (s.obb.half[0] + eps), t * s.obb.half[1]], [t * s.obb.half[0], edge * (s.obb.half[1] + eps)]] as Vec2[]) {
+        const r = rot2(local, s.obb.yaw), x = s.obb.c[0] + r[0], z = s.obb.c[1] + r[1], y = expected(x, z);
+        assert.equal(field.height(x, z), y ?? base.height(x, z));
+        assert.equal(field.waterLevel(x, z), y === null ? base.waterLevel(x, z) : null);
+        assert.equal(field.medium(x, z), y === null ? base.medium(x, z) : G_WALK);
+      }
+    }
+  }
+  const nav = new GroundNav(base, .5); nav.setFloors(decks); const before = nav.field;
+  const media = before.mediaTile(0, 0);
+  decks[0].obb.yaw = .321; decks[0].obb.c = [20, 20]; nav.setFloors(decks);
+  assert.notEqual(nav.field, before); assert.notEqual(nav.field.id, before.id);
+  assert.notEqual(nav.field.mediaTile(0, 0), media, 'setFloors replaces the overlay and its media cache');
+  assert.equal(nav.field.height(20, 20), 1);
+});
