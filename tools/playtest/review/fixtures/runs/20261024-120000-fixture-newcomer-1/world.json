@@ -1,0 +1,17 @@
+{
+ "kind": "dev",
+ "base": "http://127.0.0.1:4990",
+ "slug": "pt-fixture",
+ "port": 4990,
+ "pid": 4242,
+ "build": "we-22303887a287",
+ "skill": {
+  "version": "1.9.16",
+  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+ },
+ "cli": {
+  "eden.mjs": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "eden-agent.mjs": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+ },
+ "startedAt": "2026-10-24T11:59:50.000Z"
+}

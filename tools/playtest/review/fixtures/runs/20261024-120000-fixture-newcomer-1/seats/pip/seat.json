@@ -1,0 +1,10 @@
+{
+ "id": "pip",
+ "adapter": "claude-headless",
+ "model": "haiku",
+ "effort": "medium",
+ "soulId": "soul_pip01",
+ "soulName": "Pip",
+ "sessionId": "sess-pip",
+ "ownerIdentity": "agent-000000000000000000000000"
+}

@@ -1,0 +1,29 @@
+{
+ "final": {
+  "fun": 2,
+  "alive": 2,
+  "words": "Cute when she sat down, but then she lied about the library."
+ },
+ "perTurn": [
+  {
+   "turn": 2,
+   "fun": 4,
+   "alive": 3
+  },
+  {
+   "turn": 4,
+   "fun": 3,
+   "alive": 2
+  },
+  {
+   "turn": 6,
+   "fun": 2,
+   "alive": 2
+  },
+  {
+   "turn": 7,
+   "fun": 2,
+   "alive": 2
+  }
+ ]
+}

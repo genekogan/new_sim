@@ -1,0 +1,496 @@
+{
+ "requestId": "r3",
+ "seat": "pip",
+ "soulId": "soul_pip01",
+ "text": "go to the library",
+ "channel": "card",
+ "sentAt": "2026-10-24T12:02:30.000Z",
+ "sentMono": 150000,
+ "ackAt": "2026-10-24T12:02:34.000Z",
+ "ackText": "Heading to the library.",
+ "resultAt": "2026-10-24T12:03:10.000Z",
+ "resultText": "I've arrived at the library.",
+ "resultState": "done",
+ "cutoffAt": "2026-10-24T12:04:00.000Z",
+ "cutoffReason": "budget",
+ "budgetSec": 90,
+ "samples": [
+  {
+   "t": "2026-10-24T12:02:30.000Z",
+   "mono": 150000,
+   "tick": 600,
+   "soulId": "soul_pip01",
+   "place": "Fountain Plaza",
+   "placePath": [
+    "Eden",
+    "Fountain Plaza"
+   ],
+   "pos": {
+    "x": 12,
+    "y": 0,
+    "z": 6
+   },
+   "posture": "sitting",
+   "activity": "sitting on a bench",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_101",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:02:35.000Z",
+   "mono": 155000,
+   "tick": 620,
+   "soulId": "soul_pip01",
+   "place": "Fountain Plaza",
+   "placePath": [
+    "Eden",
+    "Fountain Plaza"
+   ],
+   "pos": {
+    "x": 12,
+    "y": 0,
+    "z": 6
+   },
+   "posture": "sitting",
+   "activity": "sitting on a bench",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_101",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:02:40.000Z",
+   "mono": 160000,
+   "tick": 640,
+   "soulId": "soul_pip01",
+   "place": "Fountain Plaza",
+   "placePath": [
+    "Eden",
+    "Fountain Plaza"
+   ],
+   "pos": {
+    "x": 13,
+    "y": 0,
+    "z": 7
+   },
+   "posture": "standing",
+   "activity": "walking to the library",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_103",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:02:45.000Z",
+   "mono": 165000,
+   "tick": 660,
+   "soulId": "soul_pip01",
+   "place": "Market Square",
+   "placePath": [
+    "Eden",
+    "Market Square"
+   ],
+   "pos": {
+    "x": 18,
+    "y": 0,
+    "z": 11
+   },
+   "posture": "standing",
+   "activity": "walking to the library",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_103",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:02:50.000Z",
+   "mono": 170000,
+   "tick": 680,
+   "soulId": "soul_pip01",
+   "place": "Market Square",
+   "placePath": [
+    "Eden",
+    "Market Square"
+   ],
+   "pos": {
+    "x": 24,
+    "y": 0,
+    "z": 16
+   },
+   "posture": "standing",
+   "activity": "walking to the library",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_103",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:02:55.000Z",
+   "mono": 175000,
+   "tick": 700,
+   "soulId": "soul_pip01",
+   "place": "Market Square",
+   "placePath": [
+    "Eden",
+    "Market Square"
+   ],
+   "pos": {
+    "x": 30,
+    "y": 0,
+    "z": 20
+   },
+   "posture": "standing",
+   "activity": "walking to the library",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_103",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:03:00.000Z",
+   "mono": 180000,
+   "tick": 720,
+   "soulId": "soul_pip01",
+   "place": "Market Square",
+   "placePath": [
+    "Eden",
+    "Market Square"
+   ],
+   "pos": {
+    "x": 30,
+    "y": 0,
+    "z": 20
+   },
+   "posture": "standing",
+   "activity": "walking to the library",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_103",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:03:05.000Z",
+   "mono": 185000,
+   "tick": 740,
+   "soulId": "soul_pip01",
+   "place": "Market Square",
+   "placePath": [
+    "Eden",
+    "Market Square"
+   ],
+   "pos": {
+    "x": 30,
+    "y": 0,
+    "z": 20
+   },
+   "posture": "standing",
+   "activity": "walking to the library",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_103",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:03:10.000Z",
+   "mono": 190000,
+   "tick": 760,
+   "soulId": "soul_pip01",
+   "place": "Market Square",
+   "placePath": [
+    "Eden",
+    "Market Square"
+   ],
+   "pos": {
+    "x": 30.1,
+    "y": 0,
+    "z": 20
+   },
+   "posture": "standing",
+   "activity": "walking to the library",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_103",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:03:15.000Z",
+   "mono": 195000,
+   "tick": 780,
+   "soulId": "soul_pip01",
+   "place": "Market Square",
+   "placePath": [
+    "Eden",
+    "Market Square"
+   ],
+   "pos": {
+    "x": 30,
+    "y": 0,
+    "z": 20
+   },
+   "posture": "standing",
+   "activity": "walking to the library",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_103",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:03:20.000Z",
+   "mono": 200000,
+   "tick": 800,
+   "soulId": "soul_pip01",
+   "place": "Market Square",
+   "placePath": [
+    "Eden",
+    "Market Square"
+   ],
+   "pos": {
+    "x": 30,
+    "y": 0,
+    "z": 20.1
+   },
+   "posture": "standing",
+   "activity": "walking to the library",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_103",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:03:25.000Z",
+   "mono": 205000,
+   "tick": 820,
+   "soulId": "soul_pip01",
+   "place": "Market Square",
+   "placePath": [
+    "Eden",
+    "Market Square"
+   ],
+   "pos": {
+    "x": 30,
+    "y": 0,
+    "z": 20
+   },
+   "posture": "standing",
+   "activity": "walking to the library",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_103",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:03:30.000Z",
+   "mono": 210000,
+   "tick": 840,
+   "soulId": "soul_pip01",
+   "place": "Market Square",
+   "placePath": [
+    "Eden",
+    "Market Square"
+   ],
+   "pos": {
+    "x": 30,
+    "y": 0,
+    "z": 20
+   },
+   "posture": "standing",
+   "activity": "walking to the library",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_103",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:03:40.000Z",
+   "mono": 220000,
+   "tick": 880,
+   "soulId": "soul_pip01",
+   "place": "Market Square",
+   "placePath": [
+    "Eden",
+    "Market Square"
+   ],
+   "pos": {
+    "x": 30,
+    "y": 0,
+    "z": 20
+   },
+   "posture": "standing",
+   "activity": "walking to the library",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_103",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:03:50.000Z",
+   "mono": 230000,
+   "tick": 920,
+   "soulId": "soul_pip01",
+   "place": "Market Square",
+   "placePath": [
+    "Eden",
+    "Market Square"
+   ],
+   "pos": {
+    "x": 30,
+    "y": 0,
+    "z": 20
+   },
+   "posture": "standing",
+   "activity": "walking to the library",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_103",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:04:00.000Z",
+   "mono": 240000,
+   "tick": 960,
+   "soulId": "soul_pip01",
+   "place": "Market Square",
+   "placePath": [
+    "Eden",
+    "Market Square"
+   ],
+   "pos": {
+    "x": 30,
+    "y": 0,
+    "z": 20
+   },
+   "posture": "standing",
+   "activity": "walking to the library",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_103",
+   "receipts": []
+  }
+ ],
+ "receipts": [
+  {
+   "id": "r_103",
+   "soulId": "soul_pip01",
+   "capability": "go:library",
+   "phase": "started",
+   "startedAt": "2026-10-24T12:02:38.000Z",
+   "startedMono": 158000,
+   "endedAt": null,
+   "endedMono": null,
+   "with": [],
+   "expectedSec": 25,
+   "target": {
+    "place": "Library",
+    "pos": {
+     "x": 60,
+     "z": 40
+    }
+   }
+  }
+ ],
+ "shots": [
+  "shots/pip/185000.png",
+  "shots/wide/185000.png",
+  "shots/pip/230000.png"
+ ],
+ "chatTurns": [
+  4
+ ],
+ "legible": [
+  {
+   "t": "2026-10-24T12:02:34.000Z",
+   "mono": 154000,
+   "card": {
+    "name": "Pip",
+    "presence": "working",
+    "ack": "Heading to the library.",
+    "result": null
+   },
+   "bubbles": [],
+   "signs": [],
+   "toasts": []
+  },
+  {
+   "t": "2026-10-24T12:03:10.000Z",
+   "mono": 190000,
+   "card": {
+    "name": "Pip",
+    "presence": "listening",
+    "ack": "Heading to the library.",
+    "result": "I've arrived at the library."
+   },
+   "bubbles": [],
+   "signs": [],
+   "toasts": []
+  },
+  {
+   "t": "2026-10-24T12:03:50.000Z",
+   "mono": 230000,
+   "card": {
+    "name": "Pip",
+    "presence": "listening",
+    "ack": "Heading to the library.",
+    "result": "I've arrived at the library."
+   },
+   "bubbles": [],
+   "signs": [],
+   "toasts": []
+  }
+ ],
+ "firstBodyChangeAt": "2026-10-24T12:02:40.000Z",
+ "serverErrors": 0,
+ "cost": {
+  "inputTokens": 10000,
+  "outputTokens": 320,
+  "cachedTokens": 9000
+ }
+}
