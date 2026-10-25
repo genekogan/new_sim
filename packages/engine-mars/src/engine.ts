@@ -19,7 +19,7 @@ import {angleDelta} from '../../../mars/viewer/engine/core/math.ts';
 import {publishedWaitsFor} from '../../../mars/viewer/engine/runtime/waits.ts';
 import {inShoreDomain} from '../../../mars/viewer/engine/locomotion/connected-shore.ts';
 import {rerouteCarrier,setCarrierRoute,type CarrierInstallSpec} from '../../../mars/viewer/engine/vehicles/carrier.ts';
-import {puntCandidates,previewPunt} from './punt.ts';
+import {puntCandidates,previewPunt,PuntSearch} from './punt.ts';
 import {probeBody,releaseBody,setDownFrom} from './stall.ts';
 import {commonsFoodDeliveryItemsV1} from './food-delivery.ts';
 import {commonsFoodDeliveryV1Schema,type CommonsFoodDeliveryV1} from '@sim/engine-contract';
@@ -2075,6 +2075,8 @@ export class MarsEngine implements Engine {
   }
   /** First activity slice: only actual admitted standing water with a reachable dry bank qualifies. */
   puntCandidatesV1():CarrierInstallSpec[]{return puntCandidates(this.rt,this.renderScene());}
+  /** The same candidate builder, privately advanced by the activity installer's tick budget. */
+  puntCandidatesJobV1():PuntSearch{return new PuntSearch(this.rt,()=>this.renderScene());}
   /** Prospective ground-reclaim/1 reader; cfg and its state hash preserve the activation in snapshots. */
   groundReclaimEnabledV1(): boolean { return this.cfg.groundReclaimV1 === true; }
   enableGroundReclaimV1(): void { this.cfg = { ...this.cfg, groundReclaimV1: true }; }
