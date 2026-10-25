@@ -41,6 +41,7 @@ export function loadRun(runDir) {
     .map((f) => readJson(join(runDir, 'evidence', f))).filter(Boolean)
     .map((e) => ({ ...e, sentMono: e.sentMono ?? (Date.parse(e.sentAt) - anchorMs) }))
     .sort((a, b) => a.sentMono - b.sentMono || String(a.requestId).localeCompare(String(b.requestId)));
+  linkTurns(seats, evidence);
   return {
     runDir, scenario, world, anchorMs, seats, personas, evidence,
     session: readJson(join(runDir, 'evidence/session.json'), null),
@@ -48,6 +49,30 @@ export function loadRun(runDir) {
     healthz: { before: readJson(join(runDir, 'server/healthz-before.json'), null), after: readJson(join(runDir, 'server/healthz-after.json'), null) },
     close: readJson(join(runDir, 'close.json'), null), preflight: readJson(join(runDir, 'preflight.json'), null),
   };
+}
+
+/** Runs recorded before the Director linked turns (2026-10-25) have `chatTurns: []`. Infer the link offline, in place:
+ *  a chat-channel request is carried by the seat's next unclaimed `chat` turn that starts at or after its sentAt (the
+ *  Director queues chat per seat, so the order is the same); a card request is served by the `wake` turns that start
+ *  inside its window (sentAt..cutoffAt). Inferred links are marked `chatTurnsInferred`. */
+export function linkTurns(seats, evidence) {
+  for (const [id, s] of Object.entries(seats)) {
+    const turns = (s.turns ?? []).filter((t) => t.startedAt);
+    const chat = turns.filter((t) => t.reason === 'chat').sort((a, b) => a.turn - b.turn);
+    const claimed = new Set(evidence.filter((e) => e.seat === id).flatMap((e) => e.chatTurns ?? []));
+    const mine = evidence.filter((e) => e.seat === id && !(e.chatTurns ?? []).length).sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt));
+    for (const e of mine) {
+      const sent = Date.parse(e.sentAt), cut = Date.parse(e.cutoffAt ?? '') || Infinity;
+      if (e.channel === 'chat') {
+        const t = chat.find((x) => !claimed.has(x.turn) && Date.parse(x.startedAt) >= sent - 2000);
+        if (t) { claimed.add(t.turn); e.chatTurns = [t.turn]; e.chatTurnsInferred = true; }
+      } else {
+        const ts = turns.filter((x) => x.reason === 'wake' && Date.parse(x.startedAt) >= sent - 2000 && Date.parse(x.startedAt) <= cut).map((x) => x.turn);
+        if (ts.length) { e.chatTurns = ts; e.chatTurnsInferred = true; }
+      }
+    }
+  }
+  return evidence;
 }
 
 export const monoOf = (run, iso) => (iso ? Date.parse(iso) - run.anchorMs : null);
