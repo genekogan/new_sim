@@ -147,7 +147,7 @@ const note = (name, ok, detail) => { report2.checks.push({ name, ok: !!ok, ...de
 let release = null, browser = null; const errors = [];
 try {
   for (let i = 0; i < 60; i++) { if ((await fetch(`${origin}${BASE}/__sim/worlds.json`).then((r) => r.ok, () => false))) break; await sleep(1000); }
-  let made; for (let i = 0; i < 6; i++) { made = await call(`${origin}${BASE}/__sim/worlds`, { sub: 'user_gene', body: { name: `Link ${Date.now() % 100000}` } }); if (made.status !== 401) break; await sleep(3000); }
+  let made; for (let i = 0; i < 20; i++) { made = await call(`${origin}${BASE}/__sim/worlds`, { sub: 'user_gene', body: { name: `Link ${Date.now() % 100000}` } }); if (made.status !== 401) break; await sleep(10_000); }
   const slug = made.data?.slug ?? made.data?.world?.slug ?? String(made.data?.url ?? '').match(/\/w\/([a-z][a-z0-9-]*)/)?.[1];
   if (made.status !== 201 || !slug) throw new Error(`create world: ${made.status} ${JSON.stringify(made.data).slice(0, 300)}`);
   const base = `${origin}${BASE}/w/${slug}`;
