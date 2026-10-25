@@ -20,7 +20,11 @@ test('worker round trip: identical soups (keys, order, float bytes), triangles a
     const job = buildingJob({ def, params: params as never, args }, gen.layout(params, args), '#f1e7d2');
     const here = buildingBuffers(job), there = structuredClone(buildingBuffers(structuredClone(job)));
     assert.deepEqual(there.raw.map((r) => r.k), here.raw.map((r) => r.k), def.ref);
-    for (let i = 0; i < here.raw.length; i++) for (const a of ['p', 'n', 'c'] as const) assert.deepEqual(Buffer.from(there.raw[i][a].buffer), Buffer.from(here.raw[i][a].buffer), `${def.ref} ${here.raw[i].k} ${a}`);
+    for (let i = 0; i < here.raw.length; i++) {
+      for (const a of ['p', 'n', 'c'] as const) assert.deepEqual(Buffer.from(there.raw[i][a].buffer), Buffer.from(here.raw[i][a].buffer), `${def.ref} ${here.raw[i].k} ${a}`);
+      assert.deepEqual(there.raw[i].face, here.raw[i].face, `${def.ref}: outer face ranges`);
+      assert.deepEqual(there.raw[i].pane, here.raw[i].pane, `${def.ref}: window pane coordinates`);
+    }
     assert.equal(there.tris, here.tris); assert.deepEqual(there.anchors, here.anchors);
     soups += here.raw.length;
   }

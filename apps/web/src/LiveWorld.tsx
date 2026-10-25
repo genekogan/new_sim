@@ -5,7 +5,7 @@ import {WorldAuthoredBoundaries} from './WorldAuthoredBoundaries.ts';
 import {exploreRoom} from './explore-data.ts';
 import {RendererDiagnostics} from './RendererDiagnostics.ts';
 import {StaticBatchOwner} from './rendering/StaticBatchOwner.ts';
-import {AssetDownloads,type AssetDownloadProgress} from './AssetDownloads.ts';
+import {AssetDownloads,trackAssetDownloads,type AssetDownloadProgress} from './AssetDownloads.ts';
 import {PLACE_SHOT_MINUTES,WorldPlacePreviews} from './WorldPlacePreviews.ts';
 import {constrainOfficeGuardCamera,officeGuardsFromPublication} from './WorldOfficeGuards.ts';
 import {recordedBody,admittedBodyUrl} from '../../../mars/viewer/app/engine-view/recorded-body.ts';
@@ -515,16 +515,15 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     // models: one loader (Draco for the character scans) shared by buildings, floaters and kin
     const diagnostics=new RendererDiagnostics(host);
     const downloads=new AssetDownloads(()=>{if(!abort.signal.aborted)setAssetProgress(downloads.snapshot());}),manager=new THREE.LoadingManager();
-    manager.onStart=(url)=>downloads.start(url);
-    manager.onProgress=(url)=>downloads.finish(url);
-    manager.onError=(url)=>downloads.finish(url,true);
-    const originalStart=manager.itemStart.bind(manager);manager.itemStart=(url)=>{downloads.start(url);originalStart(url);};
+    const releaseDownloads = trackAssetDownloads(manager, downloads);
     const draco = new DRACOLoader(manager).setDecoderPath(BASE+'/mars-assets/draco/');
     const placePreviews=new WorldPlacePreviews(renderer,()=>[geometry.group,...(expansion?[expansion.group]:[]),...(entityLayer.active?[entityLayer.group]:[])],()=>scene,()=>{  // Gene #13: every place shot in the same late-morning, clear, dry light, whatever the live clock and weather
       const at=shotClockAt(light.clock??'2026-06-21T12:00:00',PLACE_SHOT_MINUTES)!,undoLight=light.photo(at),undoAtmosphere=atmosphere.photo(at,light.daylight),night=nightLightStrength();setNightLightStrength(1);houseWindows?.setNight(0);
       return ()=>{undoLight();undoAtmosphere();setNightLightStrength(0,night);houseWindows?.setNight(night);};});  // E2 #7: a god world's landmarks are drawn by its entity layer
     const loader = new GLTFLoader(manager).setDRACOLoader(draco).setMeshoptDecoder(MeshoptDecoder);
-    setAssetLoader(loader);if(newWorld){setTextureRenderer(renderer,scene,camera);MeshoptDecoder.useWorkers?.(2);renderer.debug.checkShaderErrors=false;}  // lane PERF: paced GLB texture uploads, meshopt decoding in 2 workers, no sync link-status reads (new worlds only)
+    const releaseAssetLoader = setAssetLoader(loader);
+    const releaseTexturePreparation = newWorld ? setTextureRenderer(renderer,scene,camera) : () => {};
+    if(newWorld){MeshoptDecoder.useWorkers?.(2);renderer.debug.checkShaderErrors=false;}  // lane PERF: paced GLB texture uploads, meshopt decoding in 2 workers, no sync link-status reads (new worlds only)
     else if(quality.tier==='phone'&&!import.meta.env.DEV)renderer.debug.checkShaderErrors=false;  // F12: an old world on a phone skips the sync link-status/info-log reads too (~0.2 s of /w/eden's first compile at 4x)
     const floaters = new FloaterView(scene, { baseUrl: '/world-assets/littlemartians/characters/', loader });
     const bodyModels=new WorldBodyModels(loader,problem);bodyModels.held=peopleLater;
@@ -1090,6 +1089,9 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     animate();
 
     return () => {
+      releaseTexturePreparation();
+      releaseAssetLoader();
+      releaseDownloads();
       eyes?.dispose();
       waterDetail.dispose();
       games.dispose();
