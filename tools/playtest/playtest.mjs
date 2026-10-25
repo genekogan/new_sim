@@ -40,6 +40,15 @@ async function loadModules() {
   return m;
 }
 
+/** Machine gate (Gene 2026-10-25): 1-minute load under 10 and at least 6 GB reclaimable memory (vm_stat on macOS). */
+export async function machineCheck() {
+  const checks = {};
+  try { const { loadavg } = await import('node:os'); checks.laptopLoad = loadavg().map((x) => Math.round(x * 10) / 10); } catch { /* n/a */ }
+  try { const { run: sh } = await import('./lib/proc.mjs'); const vm = (await sh('vm_stat', [], { maxWallMs: 10000 })).stdout; const page = Number(vm.match(/page size of (\d+)/)?.[1] ?? 16384); const pages = (k) => Number(vm.match(new RegExp(`${k}:\\s+(\\d+)`))?.[1] ?? 0); checks.freeGb = Math.round((pages('Pages free') + pages('Pages inactive') + pages('Pages purgeable') + pages('Pages speculative')) * page / 1073741824 * 10) / 10; } catch { checks.freeGb = null; }
+  checks.machineOk = (checks.laptopLoad?.[0] ?? 0) < 10 && (checks.freeGb == null || checks.freeGb >= 6);
+  return checks;
+}
+
 export async function preflight({ serverRoot }) {
   const q = await quota();
   const checks = { quota: q, serverRoot: existsSync(join(serverRoot, 'tools/god-skill/dev-world.mjs')), webDist: existsSync(join(serverRoot, 'apps/web/dist/index.html')), controllerCli: existsSync(join(serverRoot, 'tools/world-launcher/soul/eden.mjs')), playwright: existsSync('<repo>/mars/viewer/node_modules/@playwright/test'), claude: null, codex: null };
@@ -49,13 +58,11 @@ export async function preflight({ serverRoot }) {
   // Live arena health, so a slow world is caught before a playout, not after (Gene 2026-10-25).
   checks.live = {};
   for (const w of ['eden-2026', 'godmode-lab']) { try { const r = await fetch(`https://sim.eden.art/worlds/w/${w}/healthz`, { signal: AbortSignal.timeout(8000) }); const j = await r.json(); checks.live[w] = { ok: j.ok, build: j.build, tickMs: j.tickMs, clients: j.clients }; } catch (e) { checks.live[w] = { ok: false, error: String(e.message).slice(0, 80) }; } }
-  try { const { loadavg } = await import('node:os'); checks.laptopLoad = loadavg().map((x) => Math.round(x * 10) / 10); } catch { /* n/a */ }
-  const allow = quotaAllows(q, { stopPct: 85 });
   // Machine gate (Gene 2026-10-25): a loaded or memory-bound laptop produced false failures all night. Refuse to start
   // unless the 1-minute load is under 10 and at least 6 GB of memory is free; `--force-machine` records the breach instead.
   // macOS: os.freemem() excludes inactive and purgeable pages; vm_stat gives the reclaimable total.
-  try { const { run: sh } = await import('./lib/proc.mjs'); const vm = (await sh('vm_stat', [], { maxWallMs: 10000 })).stdout; const page = Number(vm.match(/page size of (\d+)/)?.[1] ?? 16384); const pages = (k) => Number(vm.match(new RegExp(`${k}:\\s+(\\d+)`))?.[1] ?? 0); checks.freeGb = Math.round((pages('Pages free') + pages('Pages inactive') + pages('Pages purgeable') + pages('Pages speculative')) * page / 1073741824 * 10) / 10; } catch { checks.freeGb = null; }
-  checks.machineOk = (checks.laptopLoad?.[0] ?? 0) < 10 && (checks.freeGb == null || checks.freeGb >= 6);
+  Object.assign(checks, await machineCheck());
+  const allow = quotaAllows(q, { stopPct: 85 });
   const ok = checks.serverRoot && checks.webDist && checks.controllerCli && checks.playwright && !!checks.claude && allow.allowed && (checks.machineOk || process.argv.includes('--force-machine'));
   return { ok, allow, checks };
 }
@@ -160,7 +167,8 @@ async function reviewRun(runDir, m, { serverRoot, from = 5 } = {}) {
     receipt(runDir, 5, 'review', { ok: true, requests: r.reviews?.length ?? 0, issues: r.issues?.length ?? 0, featureRequests: r.featureRequests?.length ?? 0, fidelity: (r.reviews ?? []).map((x) => `${x.requestId}:${x.fidelity}`).join(' ') });
   }
   if (from <= 6) {
-    if (m.developer) {
+    if (scenario.review?.developer === false) receipt(runDir, 6, 'develop', { ok: true, skipped: 'scenario.review.developer is false' });
+    else if (m.developer) {
       // The Developer is a draft generator in this stage: cap how many issues and feature requests get a spec per run.
       const maxI = scenario.review?.developerMaxIssues ?? 4, maxF = scenario.review?.developerMaxFeatureRequests ?? 3;
       const ids = [...(readJson(join(runDir, 'issues.json'), []) ?? []).slice(0, maxI).map((i) => i.id), ...(readJson(join(runDir, 'feature-requests.json'), []) ?? []).slice(0, maxF).map((f) => f.id)].filter(Boolean);
@@ -183,6 +191,68 @@ const summary = (x) => (x && typeof x === 'object' ? Object.fromEntries(Object.e
 export function onboardingText(base, name) { return `Make me a Soul in this world: ${base}/ . Call it ${name}. Start from ${base}/instructions.md and do everything it says without stopping to ask; tell me when it is ready.`; }
 export function godOnboardingText(base) { return `You are the god of my world at ${base}/ . Set yourself up from ${base}/god/SKILL.md (register with dev:admin and mint, since this is a local world), then wait for my messages.`; }
 
+/** replay-set: the frozen set (ROOT-CAUSES §E) as scripted replays, one playout at a time under the machine gate,
+ *  then <out>/SCORECARD.md against --baseline (a previous replay-set out dir) or the original runs. */
+async function cmdReplaySet(a) {
+  const sc = await import('./review/scorecard.mjs');
+  const runsRoot = resolve(a['runs-root'] ?? RUNS_ROOT);
+  const repeats = Number(a.repeats ?? 2);
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..*/, '').replace('T', '-');
+  const out = resolve(a.out ?? join(runsRoot, `replay-set-${stamp}`));
+  const baselineDir = a.baseline ? resolve(a.baseline) : null;
+  const only = a.only ? String(a.only).split(',') : null;
+  const frozen = sc.FROZEN.filter((f) => !only || only.includes(f.label));
+  const plan = frozen.map((f) => {
+    const src = join(runsRoot, f.run);
+    const orig = readJson(join(src, 'scenario.json'), {});
+    const current = orig.scenarioPath && existsSync(orig.scenarioPath) ? readJson(orig.scenarioPath, null) : null;
+    const scen = sc.frozenScenario(src, { currentScenario: current });
+    return { ...f, source: src, scenario: scen, scenarioFile: join(out, 'scenarios', `${f.label}.json`), repeats: Array.from({ length: repeats }, (_, i) => join(out, `${f.label}-r${i + 1}`)) };
+  });
+  if (a['dry-run']) {
+    console.log(`replay-set plan → ${out}\nbaseline: ${baselineDir ?? 'the original runs'} · repeats ${repeats} · sequential, one playout at a time, machine gate before each\n`);
+    for (const p of plan) {
+      const s = p.scenario; const script = s.director.script;
+      const ch = script.reduce((acc, e) => ({ ...acc, [e.channel]: (acc[e.channel] ?? 0) + 1 }), {});
+      console.log(`${p.label} (${p.kind}) ← ${p.run}\n  seed ${s.seed} · ${s.durationSec} s · seats ${(s.seats ?? []).map((x) => `${x.id}:${x.adapter}/${x.model}`).join(', ')}${s.god ? ` · god ${s.god.adapter}/${s.god.model}` : ''} · natives ${s.world.natives === true} · sequential ${s.director.sequential} · developer off`);
+      console.log(`  ${script.length} requests (${Object.entries(ch).map(([k, v]) => `${v} ${k}`).join(', ')}):`);
+      for (const e of script) console.log(`    +${String(e.atSec).padStart(6)} s ${e.seat.padEnd(5)} ${e.channel.padEnd(4)} budget ${e.budgetSec ?? 'default'}  "${e.text.slice(0, 70)}"`);
+      console.log(`  → ${p.repeats.join(', ')}`);
+    }
+    return 0;
+  }
+  mkdirSync(join(out, 'scenarios'), { recursive: true });
+  const manifestFile = join(out, 'replay-set.json');
+  const manifest = readJson(manifestFile, null) ?? { version: 1, createdAt: new Date().toISOString(), baseline: baselineDir, repeats, runs: [] };
+  const save = () => writeJson(manifestFile, manifest);
+  for (const p of plan) {
+    writeJson(p.scenarioFile, p.scenario);
+    let entry = manifest.runs.find((r) => r.label === p.label);
+    if (!entry) { entry = { label: p.label, kind: p.kind, source: p.source, scenario: p.scenarioFile, repeats: [], exits: [] }; manifest.runs.push(entry); }
+    if (a['score-only']) { entry.repeats = p.repeats.filter((d) => existsSync(join(d, 'evidence'))); continue; }
+    for (const dir of p.repeats) {
+      if (existsSync(join(dir, 'receipts', '7-report.json'))) { if (!entry.repeats.includes(dir)) entry.repeats.push(dir); continue; } // resumable
+      const gateUntil = Date.now() + Number(a['gate-wait-min'] ?? 30) * 60000;
+      let gate = await machineCheck();
+      while (!gate.machineOk && Date.now() < gateUntil) { log(`machine gate: load ${gate.laptopLoad?.[0]} free ${gate.freeGb} GB; waiting`); await sleep(60000); gate = await machineCheck(); }
+      if (!gate.machineOk) { log('machine gate never cleared; stopping the replay set'); entry.exits.push({ dir, exit: 'gate' }); save(); return 2; }
+      log(`replay ${p.label} → ${dir}`);
+      const code = await cmdRun({ _: ['run', p.scenarioFile], seed: p.scenario.seed, 'server-root': a['server-root'], out: dir });
+      entry.exits.push({ dir, exit: code }); if (existsSync(join(dir, 'evidence'))) entry.repeats.push(dir); save();
+    }
+  }
+  save();
+  const entries = manifest.runs.filter((r) => r.repeats.length || a['score-only']).map((r) => {
+    const f = sc.FROZEN.find((x) => x.label === r.label);
+    const b = sc.baselineFor(f, { baselineDir, runsRoot });
+    return { label: r.label, kind: r.kind, base: sc.mergeBase(b.measures), reps: r.repeats.map(sc.runMeasures) };
+  });
+  const md = sc.renderScorecard({ entries, repeats, baselineName: baselineDir ? `previous replay set \`${baselineDir}\`` : 'the original runs (re-scored with the current oracles)', notes: [`Frozen runs from ${runsRoot}.`, 'Pinkteam is a stress add-on (report, do not gate); it is not in this set.'] });
+  writeFileSync(join(out, 'SCORECARD.md'), md);
+  log(`scorecard: ${join(out, 'SCORECARD.md')}`);
+  return 0;
+}
+
 async function main() {
   const a = args(process.argv.slice(2));
   const cmd = a._[0];
@@ -190,6 +260,7 @@ async function main() {
   if (cmd === 'review') process.exit(await reviewRun(resolve(a._[1]), null, { serverRoot: a['server-root'], from: a.from ? STEPS.indexOf(a.from) : 5 }));
   if (cmd === 'preflight') { const pf = await preflight({ serverRoot: resolve(a['server-root'] ?? DEFAULT_SERVER_ROOT) }); console.log(JSON.stringify(pf, null, 1)); process.exit(pf.ok ? 0 : 2); }
   if (cmd === 'compare') { const m = await loadModules(); if (!m.compare) { log('compare module missing'); process.exit(3); } const c = m.compare.compareRuns(resolve(a._[1]), resolve(a._[2])); console.log(m.compare.compareMd ? m.compare.compareMd(c) : JSON.stringify(c, null, 1)); process.exit(0); }
+  if (cmd === 'replay-set') process.exit(await cmdReplaySet(a));
   if (cmd === 'replay') {
     const src = resolve(a._[1]); const rp = readJson(join(src, 'replay.json')); if (!rp) { log('no replay.json'); process.exit(2); }
     const mode = a.mode ?? 'scripted';
@@ -197,7 +268,7 @@ async function main() {
     const tmp = join(src, `replay-${mode}.scenario.json`); writeJson(tmp, scen);
     process.exit(await cmdRun({ _: ['run', tmp], seed: rp.seed, 'server-root': a['server-root'], out: a.out }));
   }
-  console.log('usage: playtest.mjs run <scenario.json> [--seed n] [--out dir] [--from step] [--server-root dir] [--keep-world] | review <run> | replay <run> --mode scripted|live | compare <a> <b> | preflight');
+  console.log('usage: playtest.mjs run <scenario.json> [--seed n] [--out dir] [--from step] [--server-root dir] [--keep-world] | review <run> | replay <run> --mode scripted|live | compare <a> <b> | preflight | replay-set [--server-root dir] [--repeats 2] [--out dir] [--baseline dir] [--dry-run] [--score-only] [--only labels]');
   process.exit(1);
 }
 if (import.meta.url === `file://${process.argv[1]}`) main();

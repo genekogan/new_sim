@@ -30,7 +30,7 @@ export function buildReplay(run) {
 export function replayToScenario(replay, mode = 'scripted') {
   const base = { ...replay.scenario, seed: replay.seed, replayOf: replay.run, replayMode: mode };
   if (mode === 'live') return base;
-  return { ...base, director: { ...(replay.scenario.director ?? {}), mode: 'scripted', script: replay.requests.map((r) => ({ seat: r.seat, atSec: r.sendOffsetSec, channel: r.channel, text: r.text, budgetSec: r.budgetSec ?? 180 })) } };
+  return { ...base, director: { ...(replay.scenario.director ?? {}), mode: 'scripted', script: replay.requests.map((r) => ({ seat: r.seat, atSec: r.sendOffsetSec, channel: r.channel, text: r.text, budgetSec: r.budgetSec ?? null })) } };
 }
 /** Check persona sheets in a personas dir still match the hashes the replay recorded. */
 export function verifyReplay(replay, personaSheets) { return Object.entries(replay.personas).map(([seat, p]) => ({ seat, ok: personaSheets[seat] != null && sha256(personaSheets[seat]) === p.sha256 })); }
