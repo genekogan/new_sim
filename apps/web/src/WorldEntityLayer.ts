@@ -32,6 +32,7 @@ import { keySeen, shapeWedgeDistance, viewFirst, viewWedge, type ViewWedge } fro
 import { WorldBuildSites, SITE_REFINEMENT, type PublicSite } from './WorldBuildSites.ts';
 import { GroundCover, coverSetting } from './gen-mesh/ground-cover.ts';
 import { isRideBalloonDef, rideMotionDef } from './gen-mesh/kits/ride-balloon.ts';
+import { isRideCarrierDef, carrierIdOf } from './ride-carriers.ts';
 import { holdRainbow, isRainbowDef } from './atmosphere/rainbow-things.ts';
 
 type Snapshot = { contract: string; worldId: string; seq: number; counter?: number; seed?: string; constants: WorldModel['constants']; state: WorldModel['state']; ground: Ground; defs: StoredDef[]; entities: Entity[]; tiles: Record<string, string>; assetBytes?: Record<string, number>; builds?: PublicSite[]; buildsRev?: number; now?: number };
@@ -267,6 +268,14 @@ export class WorldEntityLayer {
     if (!this.model) return [];
     const out: string[] = [];
     for (const e of this.model.entities.values()) { if (!e.name || e.in.parent !== 'world') continue; const def = this.model.resolvedDef(e.def) as (StoredDef & { components: Record<string, unknown> }) | undefined; if (def && isRideBalloonDef(def)) out.push(e.name); }
+    return out;
+  }
+  /** D1: native carrier ids of world-level god rides that are not balloons (a ferris wheel, a carousel): the thing stays
+   *  where the god put it; World draws a car at its twin (WorldRideCars). */
+  rideCars(): string[] {
+    if (!this.model) return [];
+    const out: string[] = [], m = this.model;
+    for (const e of m.entities.values()) { if (e.in.parent !== 'world') continue; const def = m.resolvedDef(e.def) as (StoredDef & { components: Record<string, unknown> }) | undefined; if (def && isRideCarrierDef(def) && !isRideBalloonDef(def)) out.push(carrierIdOf(e, id => m.entities.has(id))); }
     return out;
   }
   /** Draw the god thing named `name` where its native twin is (`p`: the recorded engine position), or at its own pose (null).
