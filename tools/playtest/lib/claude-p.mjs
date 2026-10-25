@@ -3,10 +3,12 @@ import { run } from './proc.mjs';
 import { randomUUID } from 'node:crypto';
 const DEFAULT_TOOLS = [];
 /** callModel({model, prompt, cwd, allowedTools, sessionId, resume, maxWallSec, appendSystem}) → {text, json, usage, sessionId, wallMs, exit, timedOut, raw} */
-export async function callModel({ model = 'opus', prompt, cwd = process.cwd(), allowedTools = DEFAULT_TOOLS, sessionId = null, resume = false, maxWallSec = 300, appendSystem = null, effort = null }) {
+export async function callModel({ model = 'opus', prompt, cwd = process.cwd(), allowedTools = DEFAULT_TOOLS, sessionId = null, resume = false, maxWallSec = 300, appendSystem = null, effort = null, tools = null }) {
   const sid = sessionId ?? randomUUID();
   const args = ['-p', prompt, '--model', model, resume ? '--resume' : '--session-id', sid, '--setting-sources', 'project', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--output-format', 'json'];
-  if (allowedTools.length) args.push('--allowedTools', ...allowedTools); else args.push('--tools', '');
+  // `tools` is the hard tool set (e.g. 'Read,Grep,Glob' for the Developer); `allowedTools` the permission allowlist within it.
+  if (tools != null) args.push('--tools', tools); else if (!allowedTools.length) args.push('--tools', '');
+  if (allowedTools.length) args.push('--allowedTools', ...allowedTools);
   if (appendSystem) args.push('--append-system-prompt', appendSystem);
   if (effort) args.push('--effort', effort);
   // Input fidelity: a seat, persona, reviewer or developer must never inherit this repo's or the user's CLAUDE.md.

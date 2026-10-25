@@ -62,7 +62,7 @@ export async function developRun({ runDir, serverRoot = DEFAULT_SERVER_ROOT, mod
     const packs = (item.requestIds ?? []).map((rid) => run.evidence.find((e) => e.requestId === rid)).filter(Boolean).map((ev) => ({ ...projectEvidence(run, ev, 4000), oracleFailures: runOracles(ev, { run }).filter((o) => o.status === 'fail').map(({ id, detail }) => ({ id, detail })) }));
     const before = await gitState(serverRoot);
     log(`develop ${item.id}: calling ${model} in ${serverRoot}`);
-    const res = await call({ model, prompt: specPrompt(item, kind, packs), appendSystem: DEVELOPER_ROLE, cwd: serverRoot, allowedTools, maxWallSec });
+    const res = await call({ tools: 'Read,Grep,Glob', model, prompt: specPrompt(item, kind, packs), appendSystem: DEVELOPER_ROLE, cwd: serverRoot, allowedTools, maxWallSec });
     const after = await gitState(serverRoot);
     const spec = finalizeSpec(res.text, item);
     writeFileSync(join(runDir, 'specs', `${item.id}.md`), spec.body);
