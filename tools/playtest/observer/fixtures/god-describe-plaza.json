@@ -1,0 +1,119 @@
+{
+  "id": "e_1f528c20",
+  "path": "plaza",
+  "name": "plaza",
+  "def": "core-flag@1",
+  "description": "A labelled flag on a pole: a reference point for building (\"put the well near flag:camp\"). No collider; Souls walk through it.",
+  "tags": [
+    "flag",
+    "marker"
+  ],
+  "layer": "decor",
+  "form": "point",
+  "anchor": "center",
+  "in": "world",
+  "pose": {
+    "x": 0,
+    "y": -0.2,
+    "z": 0,
+    "yaw": 0,
+    "faces": "s",
+    "s": 1
+  },
+  "box": [
+    0.08,
+    3,
+    0.08
+  ],
+  "aabb": [
+    -0.04,
+    -0.04,
+    0.04,
+    0.04
+  ],
+  "y": [
+    -0.2,
+    2.8
+  ],
+  "colliders": 0,
+  "tris": 12,
+  "params": {
+    "w": 0.08,
+    "h": 3,
+    "d": 0.08,
+    "color": "#e8c547"
+  },
+  "state": {
+    "label": "plaza"
+  },
+  "shape": null,
+  "rooms": [],
+  "openings": [],
+  "links": [],
+  "slots": [
+    {
+      "id": "top",
+      "kind": "surface",
+      "p": [
+        0,
+        2.8,
+        0
+      ],
+      "yaw": 0,
+      "capacity": 64,
+      "used": 0,
+      "occupants": []
+    }
+  ],
+  "children": [],
+  "constraints": [],
+  "behaviours": {
+    "supported": [],
+    "missing": {}
+  },
+  "ground": {
+    "y": 0,
+    "slopeDeg": 0,
+    "water": 0,
+    "medium": "walk"
+  },
+  "near": [
+    {
+      "path": "pip",
+      "def": "core/humanoid@1",
+      "dist": 0,
+      "dir": "s"
+    },
+    {
+      "path": "mira",
+      "def": "core/humanoid@1",
+      "dist": 0.53,
+      "dir": "se"
+    },
+    {
+      "path": "knoll",
+      "def": "core-knoll@1",
+      "dist": 18,
+      "dir": "e"
+    },
+    {
+      "path": "pond",
+      "def": "core-pond@1",
+      "dist": 32.25,
+      "dir": "s"
+    },
+    {
+      "path": "cottage",
+      "def": "core-cottage@1",
+      "dist": 39.76,
+      "dir": "e"
+    },
+    {
+      "path": "orchard",
+      "def": "core-flag@1",
+      "dist": 49.94,
+      "dir": "nw"
+    }
+  ],
+  "notes": []
+}

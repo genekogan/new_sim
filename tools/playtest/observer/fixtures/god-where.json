@@ -1,0 +1,65 @@
+{
+  "x": 0,
+  "z": 0,
+  "y": 0,
+  "slopeDeg": 0,
+  "water": null,
+  "medium": "walk",
+  "inside": [
+    {
+      "path": "plaza",
+      "def": "core-flag@1",
+      "layer": "decor"
+    },
+    {
+      "path": "pip",
+      "def": "core/humanoid@1",
+      "layer": "solid"
+    }
+  ],
+  "room": null,
+  "near": [
+    {
+      "path": "plaza",
+      "def": "core-flag@1",
+      "dist": 0,
+      "dir": "s"
+    },
+    {
+      "path": "pip",
+      "def": "core/humanoid@1",
+      "dist": 0,
+      "dir": "s"
+    },
+    {
+      "path": "mira",
+      "def": "core/humanoid@1",
+      "dist": 0.53,
+      "dir": "se"
+    },
+    {
+      "path": "knoll",
+      "def": "core-knoll@1",
+      "dist": 18,
+      "dir": "e"
+    },
+    {
+      "path": "pond",
+      "def": "core-pond@1",
+      "dist": 32.25,
+      "dir": "s"
+    },
+    {
+      "path": "cottage",
+      "def": "core-cottage@1",
+      "dist": 39.76,
+      "dir": "e"
+    },
+    {
+      "path": "orchard",
+      "def": "core-flag@1",
+      "dist": 49.94,
+      "dir": "nw"
+    }
+  ]
+}

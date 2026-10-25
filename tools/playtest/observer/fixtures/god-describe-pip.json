@@ -1,0 +1,122 @@
+{
+  "id": "h_6021854a99",
+  "path": "pip",
+  "name": "pip",
+  "def": "core/humanoid@1",
+  "description": "A human body on the humanoid rig.",
+  "tags": [
+    "body"
+  ],
+  "layer": "solid",
+  "form": "point",
+  "anchor": "center",
+  "in": "world",
+  "pose": {
+    "x": 0,
+    "y": 0,
+    "z": 0,
+    "yaw": 0,
+    "faces": "s",
+    "s": 1
+  },
+  "box": [
+    0.56,
+    1.8,
+    0.56
+  ],
+  "aabb": [
+    -0.28,
+    -0.28,
+    0.28,
+    0.28
+  ],
+  "y": [
+    0,
+    1.8
+  ],
+  "colliders": 0,
+  "tris": 0,
+  "params": {},
+  "state": {},
+  "shape": null,
+  "rooms": [],
+  "openings": [],
+  "links": [],
+  "slots": [
+    {
+      "id": "carry",
+      "kind": "carry",
+      "p": [
+        0,
+        1,
+        0.35
+      ],
+      "yaw": 0,
+      "capacity": 2,
+      "used": 0,
+      "occupants": [],
+      "accepts": {
+        "tags": [
+          "item"
+        ],
+        "maxMass": 25
+      }
+    }
+  ],
+  "children": [],
+  "constraints": [],
+  "behaviours": {
+    "supported": [
+      "wander",
+      "follow",
+      "idle",
+      "swim"
+    ],
+    "missing": {}
+  },
+  "ground": {
+    "y": 0,
+    "slopeDeg": 0,
+    "water": 0,
+    "medium": "walk"
+  },
+  "near": [
+    {
+      "path": "plaza",
+      "def": "core-flag@1",
+      "dist": 0,
+      "dir": "s"
+    },
+    {
+      "path": "mira",
+      "def": "core/humanoid@1",
+      "dist": 0.53,
+      "dir": "se"
+    },
+    {
+      "path": "knoll",
+      "def": "core-knoll@1",
+      "dist": 18,
+      "dir": "e"
+    },
+    {
+      "path": "pond",
+      "def": "core-pond@1",
+      "dist": 32.25,
+      "dir": "s"
+    },
+    {
+      "path": "cottage",
+      "def": "core-cottage@1",
+      "dist": 39.76,
+      "dir": "e"
+    },
+    {
+      "path": "orchard",
+      "def": "core-flag@1",
+      "dist": 49.94,
+      "dir": "nw"
+    }
+  ],
+  "notes": []
+}
