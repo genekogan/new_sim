@@ -12,7 +12,8 @@ import {registerEdgeComms} from './edge/comms/index.ts';
 import {WorldHost} from './world.ts';
 import {kernelHash} from '@sim/kernel';
 import {edgeSoulResolver} from './edge/routes.ts';
-test('fading (flag and SIM_BEAM on): removed after 60 min idle, hidden from others; next act reclaims at a starting place',{timeout:300000},async t=>{
+// LINK (Gene 2026-10-24): idle bodies now stay in the world (zombie/asleep); removal after 60 min idle only runs with SIM_BEAM on, so this enables it.
+test('fading (flag on): removed after 60 min idle, hidden from others; next act reclaims at a starting place',{timeout:300000},async t=>{
  const f=fixture(':memory:',nativeSleepSnapshotFactoryV1(await retainedCommonsShoreFactory()),{durableClockV1:true});f.souls.enableLifecycle();f.brain.quiesce();t.after(()=>{f.host.stop();f.db.close();});
  await accept<unknown>(f.host,new LivingWorld(f.host).install(['Owners drive their Souls.']));for(let i=0;i<4;i++)f.host.tickOnce();
  const rows:any[]=[];for(const n of ['ana','ben']){await invite(f,n);rows.push(await accept(f.host,f.souls.create('dev:'+n,{name:n,description:'fade'})));}

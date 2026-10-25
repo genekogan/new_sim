@@ -32,7 +32,8 @@ test('LINK: beam off (the default): no warnings, never gone, status green; touch
   } finally { f.destroy(); }
 });
 
-test('with the flag and SIM_BEAM on: yellow at 30, red at 50, gone at 60; any accepted action reclaims', async () => {
+// LINK (Gene 2026-10-24): idle bodies now stay in the world (zombie/asleep); the 30/50 min warnings and the 60 min removal only run with SIM_BEAM on, so this enables it.
+test('with the flag on: yellow at 30, red at 50, gone at 60; any accepted action reclaims', async () => {
   const f = commsFixture(['Alice', 'Bob'], {fading: true, beam: true});
   const changes: string[] = [];
   f.runtime.fading.onFade(c => changes.push(`${c.soulId}:${c.change}:${c.colour}`));
