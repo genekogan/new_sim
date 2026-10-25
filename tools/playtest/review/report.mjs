@@ -8,6 +8,7 @@ import { renderJournal } from './journal.mjs';
 import { metricsRun, readLedger } from './metrics.mjs';
 import { earlierRuns, rubricHash, RUBRIC_PATH } from './reviewer.mjs';
 import { ORACLE_IDS } from './oracles.mjs';
+import { buildStory, storyLines, writeStory } from './story.mjs'; // story (worker S)
 export { renderJournal } from './journal.mjs';
 
 export const seedOf = (run) => run.scenario?.seed ?? (Number(basename(run.runDir).match(/-(\d+)$/)?.[1]) || null);
@@ -42,7 +43,7 @@ const delta = (a, b) => (typeof a === 'number' && typeof b === 'number' ? (a - b
 
 export function previousRun(runDir) { return earlierRuns(runDir).reverse().find((d) => existsSync(join(d, 'metrics.json'))) ?? null; }
 
-export function renderReport(run, { metrics, prevMetrics = null, prevName = null, ledger = [], issues = [], frs = [], emergence = null, specs = [], reviews = [] }) {
+export function renderReport(run, { metrics, prevMetrics = null, prevName = null, ledger = [], issues = [], frs = [], emergence = null, specs = [], reviews = [], story = null }) {
   const b = metrics?.basics ?? {};
   const s = run.scenario ?? {}; const L = [];
   const cost = metrics.cost.tokensTotal;
@@ -57,6 +58,12 @@ export function renderReport(run, { metrics, prevMetrics = null, prevName = null
   L.push('## 1b. Basics scorecard', '', 'Plain walking and acting first; everything subjective comes after.', '', '| walks asked | arrived | arrival rate | body moved in budget | ack median (s) | first body change median (s) | stuck / no progress | inside solid | wrong | hits |', '|---|---|---|---|---|---|---|---|---|---|', `| ${b.walkRequests ?? 0} | ${b.walksArrived ?? 0} of ${b.walksArrivalKnown ?? 0} known | ${fmt(b.walkArrivalRate)} | ${b.bodyMovedInBudget ?? 0} of ${b.requests ?? 0} (${fmt(b.bodyMovedRate)}) | ${fmt(b.ackMedianSec)} | ${fmt(b.firstBodyChangeMedianSec)} | ${b.stuck ?? 0} | ${b.insideSolid ?? 0} | ${b.wrong ?? 0} | ${b.hits ?? 0} |`, '');
   L.push('## 2. What happened', '');
   if (emergence?.narrative?.strangerReading) L.push(emergence.narrative.strangerReading, '');
+  // --- story (worker S): one line per important moment, the director's view beside each in story.html
+  try {
+    const st = story ?? buildStory(run);
+    if (st.merged.length) L.push(`**The story in ${st.merged.length} moments** — open [story.html](story.html) to see each with the screenshot the player was shown:`, '', '```', ...storyLines(st, run), '```', '');
+  } catch (e) { L.push(`*(story not built: ${e.message})*`, ''); }
+  // --- end story
   const frames = []; for (const ev of run.evidence) { const r = ledger.find((x) => x.requestId === ev.requestId); const shot = (ev.shots ?? []).find((p) => existsSync(join(run.runDir, p))); if (shot) frames.push({ shot, cap: `${ev.requestId} "${ev.text}" — ${r?.fidelity ?? '?'}` }); }
   frames.slice(0, 4).forEach((f) => L.push(`![${f.cap}](${f.shot})`, `*${f.cap}*`, ''));
   L.push('The full player\'s-eye story is in [journal.md](journal.md).', '');
@@ -131,5 +138,6 @@ export function reportRun(runDir) {
   const replay = buildReplay(run); writeJson(join(runDir, 'replay.json'), replay);
   const md = renderReport(run, { metrics, prevMetrics: prev ? readJson(join(prev, 'metrics.json')) : null, prevName: prev ? basename(prev) : null, ledger: readLedger(join(runDir, 'ledger.tsv')), issues: readJson(join(runDir, 'issues.json'), []), frs: readJson(join(runDir, 'feature-requests.json'), []), emergence: readJson(join(runDir, 'emergence.json'), null), specs: loadSpecs(runDir), reviews: readJsonl(join(runDir, 'reviews.jsonl')) });
   writeFileSync(join(runDir, 'REPORT.md'), md);
+  try { writeStory(runDir, { run }); } catch { /* story (worker S): REPORT.md stands without it */ }
   return { report: join(runDir, 'REPORT.md'), metrics, replay };
 }

@@ -9,6 +9,8 @@ import { loadRun, secsBetween } from './run.mjs';
 import { bodySummary } from './journal.mjs';
 import { computeMetrics, readLedger } from './metrics.mjs';
 import { loadSpecs } from './report.mjs';
+import { buildStory } from './story.mjs'; // story (worker S)
+import { renderStoryHtml } from './story-html.mjs'; // story (worker S)
 
 export const DEFAULT_RUNS_ROOT = '<team>/playtest/runs';
 const PHYS = new Set(['inside-solid', 'no-progress', 'stuck-receipt']);
@@ -145,6 +147,14 @@ details{margin:.3em 0}summary{cursor:pointer;color:var(--mute)}.egr li{margin:.5
 `;
 const page = (title, body, wide = false) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>${CSS}</style></head><body><main${wide ? ' class="wide"' : ''}>${body}</main></body></html>\n`;
 
+// ---------- story (worker S): the run as 10–30 important moments with the director's view; see story.mjs
+const storyLinks = (b, L) => `<a href="${esc(b.name)}.html#story">story</a>${L('story.html') ? ` (<a href="${esc(L('story.html'))}">standalone</a>)` : ''}`;
+function storySection(b, outDir) {
+  if (!b.run.evidence.length && !Object.keys(b.run.personas).length) return '';
+  try { return renderStoryHtml(buildStory(b.run), b.run, { relTo: outDir, issueHref: () => '#review' }); } catch (e) { return `<h2 id="story">Story</h2><p class="mute small">The story could not be built: ${esc(e.message)}</p>`; }
+}
+// ---------- end story
+
 // ---------- index
 function scorecard(m) {
   const b = m?.basics; if (!b) return '<span class="mute">no metrics</span>';
@@ -164,7 +174,7 @@ export function renderIndex(allBundles, outDir) {
     const seats = seatsOf(b).map((x) => `<div>${esc(x.id)}${x.god ? ' (god)' : ''}: ${esc(x.adapter)} ${esc(x.model ?? 'default')}${x.effort ? '/' + esc(x.effort) : ''}, ${esc(x.persona)}</div>`).join('');
     const story = b.emergence?.narrative?.storyRating ?? b.metrics?.emergence?.storyRating;
     const status = !b.run.evidence.length ? 'no requests' : !b.metrics ? 'not reviewed' : !existsSync(join(b.runDir, 'metrics.json')) ? 'in progress' : b.metricsLive ? 'basics computed live' : '';
-    rows.push(`<tr><td data-l="scenario"><a href="${esc(b.name)}.html">${esc(s.name ?? b.name)}</a><div class="small mute">${esc(b.name)}${status ? ` · ${status}` : ''}</div></td><td data-l="world">${esc(s.world?.slug ?? b.run.world?.slug ?? '')}<div class="small mute">${esc((s.world?.genesis ?? '').split('/').pop())}</div></td><td data-l="seats" class="small">${seats}</td><td data-l="duration">${playSec(b) != null ? `${Math.round(playSec(b))} s` : '—'}<div class="small mute">plan ${esc(s.durationSec ?? '?')} s</div></td><td data-l="basics" class="small">${scorecard(b.metrics)}</td><td data-l="fidelity">${fidChips(c)}</td><td data-l="story">${story ?? '—'}</td><td data-l="issues / FRs">${b.issues.length} / ${b.frs.length}</td></tr>`);
+    rows.push(`<tr><td data-l="scenario"><a href="${esc(b.name)}.html">${esc(s.name ?? b.name)}</a><div class="small mute">${esc(b.name)}${status ? ` · ${status}` : ''} · ${storyLinks(b, L)}</div></td><td data-l="world">${esc(s.world?.slug ?? b.run.world?.slug ?? '')}<div class="small mute">${esc((s.world?.genesis ?? '').split('/').pop())}</div></td><td data-l="seats" class="small">${seats}</td><td data-l="duration">${playSec(b) != null ? `${Math.round(playSec(b))} s` : '—'}<div class="small mute">plan ${esc(s.durationSec ?? '?')} s</div></td><td data-l="basics" class="small">${scorecard(b.metrics)}</td><td data-l="fidelity">${fidChips(c)}</td><td data-l="story">${story ?? '—'}</td><td data-l="issues / FRs">${b.issues.length} / ${b.frs.length}</td></tr>`);
   }
   const egrHtml = egr.length ? `<ul>${egr.map((e) => `<li><div class="row"><div class="ph">${e.shot ? thumb(e.shot, e.requestId) : ''}</div><div title="${esc(e.reason)}">${e.why.map((w) => chip(w, 'fW')).join('')} <span class="mono">"${esc(e.text)}"</span><div class="small mute"><a href="${esc(e.run)}.html#${esc(e.requestId)}">${esc(e.run)}</a> · ${esc(e.seat)} · ${esc(e.requestId)}</div></div></div></li>`).join('')}</ul>` : '<p class="mute">None.</p>';
   const body = `<h1>Playtest booklet</h1><p class="mute small">${bundles.length} run(s) with results, newest first. Built ${esc(new Date().toISOString().slice(0, 16).replace('T', ' '))} UTC.</p>
@@ -284,14 +294,15 @@ export function renderRunPage(b, outDir) {
   const raw = ['REPORT.md', 'journal.md', 'metrics.json', 'replay.json', 'issues.md', 'feature-requests.md', 'ledger.tsv'].map((f) => [f, L(f)]).filter(([, h]) => h);
   const body = `<p class="small"><a href="index.html">← booklet</a></p><h1>${esc(s.name ?? b.name)}</h1><p class="mute small">${esc(b.name)}</p>
 <div class="box small"><strong>Basics:</strong> ${scorecard(b.metrics)} · ${fidChips(counts(b))}</div>
-<p class="small">${['setup', 'play', 'review', 'drafts', 'harness', 'raw'].map((x) => `<a href="#${x}">${x}</a>`).join(' · ')}</p>
+<p class="small">${['setup', 'story', 'play', 'review', 'drafts', 'harness', 'raw'].map((x) => `<a href="#${x}">${x}</a>`).join(' · ')}</p>
 ${setupSection(b, L)}
+${storySection(b, outDir)}
 ${timeline(b, L)}
 ${reviewSection(b, L)}
 ${draftsSection(b, L)}
 ${harnessSection(b, L)}
 <h2 id="raw">Raw</h2><p>${raw.map(([f, h]) => `<a href="${esc(h)}">${esc(f)}</a>`).join(' · ') || '<span class="mute">none yet</span>'}</p>`;
-  return page(`${s.name ?? b.name} — playtest`, body);
+  return page(`${s.name ?? b.name} — playtest`, body, seatsOf(b).length > 1); // wide for the story's seat columns (worker S)
 }
 
 export function buildBooklet({ runsRoot = DEFAULT_RUNS_ROOT, outDir = null, runs = null, only = null } = {}) {
