@@ -11,6 +11,8 @@ export type RideState = {carrier: string; capacity: number; phase: string; rider
   keptFor?: SoulRef[]; rowing?: boolean;
   /** RIDE-EXIT: riders back on the ground who are still stepping out (their body is in the basket/punt until the engine sets it down). */
   stepping?: SoulRef[];
+  /** D1: riders still boarding (walking into their seat); they are "in" the basket or punt only once seated. */
+  boarding?: SoulRef[];
   /** seconds a boarding ride waits for more riders before it departs by itself */
   waitSeconds?: number;
   /** VEHICLE-STEER: the rider steering it now (null: it follows its own route, or flies itself back). */
@@ -37,6 +39,7 @@ function from(state: RideState, v: CarrierView | null): RideState {
     door: v.door as [number, number] | null, departsInSeconds: v.departsInSeconds, waitSeconds: (v as {waitSeconds?: number}).waitSeconds ?? 45, keptFor: (v as {hold?: {for: SoulRef[]}}).hold?.for ?? [],
     riders: v.riders.filter(r => r.soulId && r.phase !== 'leaving').map(r => ({soulId: r.soulId!, name: r.name ?? 'someone'})),
     stepping: v.riders.filter(r => r.soulId && r.phase === 'leaving').map(r => ({soulId: r.soulId!, name: r.name ?? 'someone'})),
+    boarding: v.riders.filter(r => r.soulId && r.phase === 'boarding').map(r => ({soulId: r.soulId!, name: r.name ?? 'someone'})),
     steeredBy: ((v as {steer?: {by: SoulRef | null}}).steer?.by) ?? null};
 }
 /** VERBS (accept2 brief 10): the refusal for a ride the world would not board today; join offers it as unavailable. */
@@ -75,9 +78,12 @@ export const rideKind: ObjectKind<RideState> = {
       if (next.phase === 'aloft') events.push({to: was, text: next.rowing ? `You row away from the bank. The water loop takes ${minutes(next.routeSeconds)}; you can talk in the open punt.` : attraction(next) ? `The ${attraction(next)} starts. The ride takes ${minutes(next.routeSeconds)}; you can talk freely in the car (only riders hear you).` : `The balloon lifts off. The flight takes ${minutes(next.routeSeconds)}; you can talk freely in the basket (only riders hear you).`});
       if (next.phase === 'landed' || (state.phase === 'aloft' && next.phase === 'parked')) events.push({to: was, text: next.rowing ? 'The punt has returned to its bank; you are disembarking. Wait for the row receipt and your ashore observation.' : attraction(next) ? `The ${attraction(next)} has stopped where you boarded; you step out.` : 'The balloon has landed where it started; you step out onto the grass.'});
     }
-    if (next.phase === 'boarding' && next.riders.length > state.riders.length) for (const r of next.riders.filter(r => !state.riders.some(o => o.soulId === r.soulId)))
-      events.push({to: to.filter(id => id !== r.soulId), text: `${r.name} climbs into ${next.rowing ? 'the punt' : 'the basket'} with you.`, untrusted: true}, {to: [r.soulId], text: (next.keptFor ?? []).length
-        ? `You are in ${next.rowing ? 'the punt' : 'the basket'}. It waits for ${(next.keptFor ?? []).map(k => k.name).join(', ')} before departing, and lifts off by itself once they are aboard.` : `You are in ${next.rowing ? 'the punt' : 'the basket'}. It departs in about ${next.departsInSeconds ?? 0} seconds, or now if a rider says start.`, untrusted: true});
+    // D1 (playtest 121122 zed-019: "You are in the punt" at accept, rowing ~10 s later): a rider is in only once seated
+    const seated = (x: RideState, id: string) => x.riders.some(o => o.soulId === id) && !(x.boarding ?? []).some(o => o.soulId === id);
+    const into = next.rowing ? 'the punt' : attraction(next) ? `the ${attraction(next)} car` : 'the basket';
+    if (next.phase === 'boarding') for (const r of next.riders.filter(r => seated(next, r.soulId) && !seated(state, r.soulId)))
+      events.push({to: to.filter(id => id !== r.soulId), text: `${r.name} climbs into ${into} with you.`, untrusted: true}, {to: [r.soulId], text: (next.keptFor ?? []).length
+        ? `You are in ${into}. It waits for ${(next.keptFor ?? []).map(k => k.name).join(', ')} before departing, and lifts off by itself once they are aboard.` : `You are in ${into}. It departs in about ${next.departsInSeconds ?? 0} seconds, or now if a rider says start.`, untrusted: true});
     // RIDE-EXIT: the owner-readable end of a ride: the body is out and standing on the ground.
     const inside = (x: RideState) => [...x.riders, ...(x.stepping ?? [])];
     if (state.phase === 'aloft' || state.phase === 'landed') for (const r of inside(state).filter(r => !inside(next).some(o => o.soulId === r.soulId)))

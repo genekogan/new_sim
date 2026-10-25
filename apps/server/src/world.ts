@@ -14,6 +14,7 @@ import {existingGreenLandmarkV1} from '@sim/engine-mars';
 import {socialEdenV1} from '@sim/engine-mars';
 import {captureIntentArrivalV1,journalIntentArrivalV1,verifyIntentArrivalV1} from './intent-arrivals.ts';
 import {previewHumanSleepStopV1} from './human-sleep-transition.ts';
+import {bodyState,cardDoing,type ApproachV1,type BodyStateV1} from './body-state.ts';
 import {intentSleepStopV1Schema,type IntentSleepStopV1} from '@sim/protocol';
 // WorldHost: the sequencer. Owns the engine, the event log, the tick loop,
 // snapshots, and the per-batch broadcast. The fold (doc 11):
@@ -585,6 +586,9 @@ export class WorldHost {
         if (mine) m.pending = null;
         if (mine && ev.kind === 'failed') m.avoid = { id: mine.option ?? (mine.target ? `${mine.card}@${mine.target}` : mine.card), untilTick: ev.tick + 1200 };
         if (mine && ev.kind === 'failed' && m.agendaPos < m.agenda.length) m.planBlockedSince ??= ev.tick;
+        // D1: a program stopped with nothing after it (stand:here ended a lie-down) no longer names the old plan; one replaced
+        // by a newer decision keeps the new label, which that decision already wrote
+        if (ev.kind === 'cancelled' && !this.engine.programOf(ev.actor)) m.doing = 'standing around';
         if (ev.kind !== 'cancelled') {
           m.doing = 'standing around';
           // re-evaluate shortly after an activity ends; jitter by soul so they do not all think on the same tick
@@ -1437,13 +1441,25 @@ export class WorldHost {
   profilePhotoSource(id:string):'custom'|'auto'|null{return this.profileFact(id)?.photo?'custom':this.autoProfilePhoto?.(id)?'auto':null;}
   /** Re-send this Soul's public card with the next batch (e.g. a new automatic portrait). */
   markSoulDirty(id:string){if(this.minds.has(id))this.acc.dirty.add(id);}
+  /** D1: where a Soul's running act travels to (set by the edge ledger for edge acts); native cards use their target. */
+  approachV1?:(m:Mind)=>ApproachV1|null;
+  private approachOfV1(m:Mind):ApproachV1|null{
+    if(this.approachV1){const a=this.approachV1(m);if(a)return a;}
+    const t=m.pending&&this.engine.programOf(m.entityId)===m.pending.program?m.pending.target:null;if(!t)return null;
+    const id=(this.kernel.things[t]?.traits.entity as string|undefined)??t,e=this.engine.world.entities[id];
+    return {name:this.nameOf(t),to:e?[e.pose.p[0],e.pose.p[2]]:null};
+  }
+  /** D1: the body as the engine has it now (posture, activity, carrier, in water, current step); never stored. */
+  bodyOfV1(m:Mind):BodyStateV1|null{return bodyState(this,m.entityId,this.approachOfV1(m));}
+  /** D1: the card's doing line: the plan's label only while the body is in it; its approach, carrier or water otherwise. */
+  doingOfV1(m:Mind):string{return cardDoing(this,m,this.approachOfV1(m));}
   publicSoul(m: Mind): PublicSoul {
     const nameOf = (id: string) => this.nameOf(id);
     return {
       id: m.soulId, entityId: m.entityId, name: m.name, description: m.description, owner: ownerShort(m.owner), native: m.native,
       ...this.publicNameMetadata(m.soulId),
       ...(this.profilePhoto(m.soulId)?{profilePhoto:this.profilePhoto(m.soulId)!}:{}),
-      intent: publicIntent(m.intent), intentText: describeIntent(publicIntent(m.intent), nameOf), mood: m.mood, energy: energyWord(m.energy), doing: m.doing,
+      intent: publicIntent(m.intent), intentText: describeIntent(publicIntent(m.intent), nameOf), mood: m.mood, energy: energyWord(m.energy), doing: this.doingOfV1(m),
     };
   }
   /** A human-readable name for a kernel thing id, an engine entity id or a region id. */
