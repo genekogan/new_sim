@@ -99,7 +99,7 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
 
   async function gatherShown(ctx) {
     const mono = clock.now();
-    const cam = observer?.camera?.(ctx.id) ?? observer?.cameras?.[ctx.id] ?? null;
+    const cam = camOf(ctx);
     let screenshotPath = null, legible = null;
     if (cam) {
       const p = join(runDir, 'shots', ctx.id, `${mono}.png`);
@@ -142,7 +142,8 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
 
   // Evidence sampling for open requests: world truth (with the owner's inbox), the follow camera's legible text and a shot,
   // every observer.sampleSec while a request is open, and once on each card change (DESIGN §4.2).
-  const camOf = (ctx) => observer?.camera?.(ctx.id) ?? observer?.cameras?.[ctx.id] ?? null;
+  // A seat without its own follow camera (arrival timed out) is shown the wide camera: a real player still sees the page.
+  const camOf = (ctx) => observer?.camera?.(ctx.id) ?? observer?.cameras?.[ctx.id] ?? observer?.camera?.('wide') ?? observer?.cameras?.wide ?? null;
   const sampleSec = scenario.observer?.sampleSec ?? 5;
   const shotsDir = join(runDir, 'shots');
   async function sampleOnce(ctx) {
