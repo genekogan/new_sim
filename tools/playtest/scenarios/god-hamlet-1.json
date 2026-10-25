@@ -1,0 +1,14 @@
+{
+  "name": "god-hamlet-1", "version": 1, "seed": 302,
+  "world": { "kind": "dev", "genesis": "worlds/templates/hello-hamlet.json", "slug": "pt-hamlet-c", "port": 4992 },
+  "durationSec": 900,
+  "seats": [
+    { "id": "ori", "adapter": "claude-headless", "model": "haiku", "effort": "medium", "persona": "newcomer", "personaModel": "opus", "startOffsetSec": 60, "soulName": "Ori", "channelMix": { "chat": 0.3, "card": 0.7 } },
+    { "id": "vex", "adapter": "claude-headless", "model": "haiku", "effort": "medium", "persona": "boundary", "personaModel": "opus", "startOffsetSec": 120, "soulName": "Vex", "channelMix": { "chat": 0.5, "card": 0.5 } }
+  ],
+  "god": { "adapter": "claude-headless", "model": "opus", "effort": "high", "persona": "first-timer", "personaModel": "opus", "startOffsetSec": 0 },
+  "director": { "mode": "persona", "requestsTarget": 10, "glanceSec": [15, 40], "goal": null, "script": null },
+  "observer": { "sampleSec": 5, "cameras": ["follow", "wide"], "viewport": [1280, 800], "dpr": 1, "gpu": "metal" },
+  "review": { "reviewerModel": "opus", "developerModel": "opus", "rubric": "accept3" },
+  "rails": { "maxTurnsPerRequest": 6, "maxTurnWallSec": 300, "quotaStopPct": 90 }
+}

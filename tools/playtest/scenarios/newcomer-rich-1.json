@@ -1,0 +1,15 @@
+{
+  "name": "newcomer-rich-1", "version": 1, "seed": 4117,
+  "world": { "kind": "dev", "genesis": "worlds/templates/eden-2026.json", "slug": "pt-eden-a", "port": 4990 },
+  "durationSec": 600,
+  "seats": [
+    { "id": "pip", "adapter": "claude-headless", "model": "haiku", "effort": "medium",
+      "persona": "newcomer", "personaModel": "opus", "startOffsetSec": 0,
+      "soulName": "Pip", "channelMix": { "chat": 0.3, "card": 0.7 } }
+  ],
+  "god": null,
+  "director": { "mode": "persona", "requestsTarget": 8, "glanceSec": [10, 30], "goal": null, "script": null },
+  "observer": { "sampleSec": 5, "cameras": ["follow", "wide"], "viewport": [1280, 800], "dpr": 1, "gpu": "metal" },
+  "review": { "reviewerModel": "opus", "developerModel": "opus", "rubric": "accept3" },
+  "rails": { "maxTurnsPerRequest": 6, "maxTurnWallSec": 240, "quotaStopPct": 90 }
+}
