@@ -75,7 +75,9 @@ export class Seat {
 
   async _turn(text, reason) {
     if (this.stopped && reason !== 'final') throw new Error('seat stopped');
-    this.stopListen();
+    // Fidelity: Claude Code keeps a background `listen` alive across turns, so the harness one keeps running during a turn.
+    // The agent's own `listen` supersedes it (the old one prints `listen: superseded` and exits); ours restarts at turn end.
+    this.inTurn = true;
     const n = ++this.turnN, started = now();
     const first = !this.info.sessionId;
     if (first && this.info.adapter === 'claude-headless') { this.info.sessionId = randomUUID(); this.save(); }
@@ -94,6 +96,7 @@ export class Seat {
     appendJsonl(join(this.dir, 'cost.jsonl'), { t: ended.t, mono: ended.mono, turn: n, inputTokens: u.inputTokens ?? null, cachedTokens: u.cachedTokens ?? null,
       cacheCreationTokens: u.cacheCreationTokens ?? null, outputTokens: u.outputTokens ?? null, ...(u.costUsd != null ? { costUsd: u.costUsd } : {}) });
     writeFileSync(join(this.dir, 'chat-as-rendered.md'), `\n<!-- turn ${n} (${reason}) ${started.t} -->\n\n${this.adapter.renderChat(r.stream)}`, { flag: 'a' });
+    this.inTurn = false;
     if (this.waking && !this.stopped) this.startListen();
     return rec;
   }
@@ -145,6 +148,7 @@ export class Seat {
       const msgs = listenMessages(stdout);
       appendJsonl(join(this.dir, 'listen.jsonl'), { ...now(), startMono: startedAt.mono, cmd: cmdLine, code, signal, killedByUs: !!killed, messages: msgs.map((m) => m.id), stdout: killed ? undefined : stdout, stderr: stderr.slice(-500) || undefined });
       if (killed || this.stopped) return;
+      if (/superseded/i.test(stdout)) { this.supersededAt = Date.now(); if (!this.inTurn) setTimeout(() => this.startListen(), 2000); return; }
       if (msgs.length) {
         this.listenFailures = 0; this.lastListenId = msgs.at(-1).id;
         if (++this.wakesSinceRequest > this.rails.maxTurnsPerRequest) { this.info.wakeCapped = (this.info.wakeCapped ?? 0) + 1; this.save(); return; }
