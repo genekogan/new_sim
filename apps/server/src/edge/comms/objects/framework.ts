@@ -130,6 +130,18 @@ export class Objects {
   refresh(ids: Iterable<string>): void { for (const id of ids) tx(this.core.db, () => { const cur = this.row(id); if (cur) this.advanced(cur); }); }
   sweep() { this.fresh(); }
 
+  /** Timer maintenance owns only the ordered ids across turns, never stale object bodies. A whole object's advance,
+   * durable log and committed notifications finish before yielding; no transaction survives a yield. New ids wait for
+   * the next pass, removed ids are skipped, and a replacement under an existing id is read in its current form. */
+  *sweepSteps(): Generator<void, void, void> {
+    const ids = this.ids();
+    yield;
+    for (const id of ids) {
+      tx(this.core.db, () => { const cur = this.row(id); if (cur) this.advanced(cur); });
+      yield;
+    }
+  }
+
   private emit(o: ObjectRecord, events: ObjectEvent[]) {
     const tick = this.core.tick();
     for (const e of events) {

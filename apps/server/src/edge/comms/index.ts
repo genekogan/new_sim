@@ -208,15 +208,57 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
     return steward.log(since);
   }));
 
-  const sweep = () => {
-    try { conversations.sweep(); } catch { /* retried next period */ }
-    try { objects.sweep(); } catch { /* retried next period */ }
-    try { steward.schedule(); } catch { /* retried next period */ }
-    try { fading.sweep(); } catch { /* retried next period */ }
-    try { for (const m of roster()) core.spectate(m); } catch { /* retried next period */ }
-    try { streams.pruneAll(); } catch { /* retried next period */ }
+  let closed = false;
+  let pendingSweep: Generator<void, void, void> | undefined;
+  let sweepTurn: ReturnType<typeof setImmediate> | undefined;
+  const cancelSweep = () => {
+    pendingSweep = undefined;
+    if (sweepTurn) clearImmediate(sweepTurn);
+    sweepTurn = undefined;
   };
-  const timer = (options.sweepMs ?? 30_000) > 0 ? setInterval(sweep, options.sweepMs ?? 30_000) : null;
+  // Keep the existing phase order and retry policy. Only timer maintenance yields to the event loop; explicit sweep()
+  // remains synchronous. Object work yields after a complete transaction, including its committed notifications.
+  function* sweepSteps(sliced: boolean): Generator<void, void, void> {
+    try { conversations.sweep(); } catch { /* retried next period */ }
+    yield;
+    try { if (sliced) yield* objects.sweepSteps(); else objects.sweep(); } catch { /* retried next period */ }
+    yield;
+    try { steward.schedule(); } catch { /* retried next period */ }
+    yield;
+    try { fading.sweep(); } catch { /* retried next period */ }
+    yield;
+    try { for (const m of roster()) core.spectate(m); } catch { /* retried next period */ }
+    yield;
+    try { streams.pruneAll(); } catch { /* retried next period */ }
+  }
+  const sweep = () => {
+    cancelSweep();
+    if (closed) return;
+    for (const _ of sweepSteps(false)) if (closed) break;
+  };
+  const advanceSweep = (work: Generator<void, void, void>) => {
+    if (closed || pendingSweep !== work) return;
+    const deadline = performance.now() + 8;
+    do {
+      const done = work.next().done;
+      // A committed notification can close the runtime or request a synchronous sweep reentrantly.
+      if (closed || pendingSweep !== work) return;
+      if (done) { pendingSweep = undefined; return; }
+    } while (performance.now() < deadline);
+    // Eight milliseconds is a turn budget, not a preemption guarantee: one advance/other phase remains atomic.
+    sweepTurn = setImmediate(() => {
+      if (closed || pendingSweep !== work) return;
+      sweepTurn = undefined;
+      advanceSweep(work);
+    });
+    sweepTurn.unref?.();
+  };
+  const scheduleSweep = () => {
+    if (closed || pendingSweep) return;
+    pendingSweep = sweepSteps(true);
+    advanceSweep(pendingSweep);
+  };
+  const timer = (options.sweepMs ?? 30_000) > 0 ? setInterval(scheduleSweep, options.sweepMs ?? 30_000) : null;
   timer?.unref?.();
   for (const r of db.prepare('SELECT soul_id FROM edge_comms_subscriptions WHERE world_id = ?').all(worldId) as {soul_id: string}[]) void webhooks.push(r.soul_id);
 
@@ -230,7 +272,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
     onSpectator(l) { spectators.push(l); },
     spectatorJoin: () => { let replay: SpectatorEdgeMessage[] = []; try { replay = dialogueReplay(core); } catch { /* history is optional */ } return [...roster(), ...replay]; },
     sweep,
-    close() { if (timer) clearInterval(timer); webhooks.close(); streams.wakeAll(); },
+    close() { closed = true; if (timer) clearInterval(timer); cancelSweep(); webhooks.close(); streams.wakeAll(); },
   };
 }
 
