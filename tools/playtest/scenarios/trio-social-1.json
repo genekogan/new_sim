@@ -1,6 +1,6 @@
 {
   "name": "trio-social-1", "version": 1, "seed": 9020,
-  "world": { "kind": "dev", "genesis": "worlds/templates/eden-2026.json", "slug": "pt-eden-b", "port": 4991 },
+  "world": { "kind": "dev", "genesis": "worlds/templates/eden-district.json", "slug": "pt-eden-b", "port": 4991 },
   "durationSec": 900,
   "seats": [
     { "id": "rook", "adapter": "claude-headless", "model": "haiku", "effort": "medium", "persona": "casual", "personaModel": "opus", "startOffsetSec": 0, "soulName": "Rook", "channelMix": { "chat": 0.4, "card": 0.6 } },

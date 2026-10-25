@@ -1,6 +1,6 @@
 {
   "name": "newcomer-rich-1", "version": 1, "seed": 4117,
-  "world": { "kind": "dev", "genesis": "worlds/templates/eden-2026.json", "slug": "pt-eden-a", "port": 4990 },
+  "world": { "kind": "dev", "genesis": "worlds/templates/eden-district.json", "slug": "pt-eden-a", "port": 4990 },
   "durationSec": 600,
   "seats": [
     { "id": "pip", "adapter": "claude-headless", "model": "haiku", "effort": "medium",
