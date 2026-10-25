@@ -88,10 +88,13 @@ export function reconnectSentence(name:string,link:Link,now=Date.now()){
   :'The agent stopped listening.';
  return `${why} Give it this prompt; its request shows up here for you to approve, and ${name} wakes up.`;
 }
-/** The link details' second line: "eden-agent 1.9.16 · paired 14:02 · listening now". */
+/** The link details' second line under "Held by your agent": "eden-agent 1.9.16 · paired 14:02 · listening now".
+ * Owner terms, never a bare internal label: an eden-agent label is the client's name; any other grant label is quoted
+ * as where the agent connected from ("from “travel”"). */
+export const holderClient=(label:string)=>/^eden-agent(\s|$)/.test(label)?label:`from “${label}”`;
 export function holderLine(link:Link,here:AgentHere|null,now=Date.now()){
  const parts:string[]=[];
- if(link.holder?.label)parts.push(link.holder.label);
+ if(link.holder?.label)parts.push(holderClient(link.holder.label));
  const paired=link.holder?.since??null;if(paired)parts.push(`paired ${clockAt(paired,now)}`);
  parts.push(here?.state==='working'?'working through your messages':'listening now');
  return parts.join(' · ');
