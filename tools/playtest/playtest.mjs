@@ -93,7 +93,7 @@ async function cmdRun(a) {
       }
       if (scenario.god && m.godSeat) {
         ctx.god = await m.godSeat.createGodSeat({ runDir, god: scenario.god, worldBase: ctx.world.base, serverRoot });
-        const gb = await ctx.god.onboard({ text: godOnboardingText(ctx.world.base), maxWallSec: scenario.rails?.maxTurnWallSec ?? 300 });
+        const gb = ctx.god.onboardGod ? await ctx.god.onboardGod({ maxWallSec: scenario.rails?.maxTurnWallSec ?? 300 }) : await ctx.god.onboard({ text: godOnboardingText(ctx.world.base), maxWallSec: scenario.rails?.maxTurnWallSec ?? 300 });
         log(`god seat: ${gb.paired ? 'paired' : 'NOT PAIRED'}`);
       }
       receipt(runDir, 2, 'seats', { ok: ctx.seats.every((s) => s.info().paired), seats: ctx.seats.map((s) => s.info()), god: ctx.god?.info() ?? null });
@@ -160,7 +160,7 @@ async function reviewRun(runDir, m, { serverRoot, from = 5 } = {}) {
 const summary = (x) => (x && typeof x === 'object' ? Object.fromEntries(Object.entries(x).filter(([, v]) => ['number', 'string', 'boolean'].includes(typeof v))) : {});
 
 export function onboardingText(base, name) { return `Make me a Soul in this world: ${base}/ . Call it ${name}. Start from ${base}/instructions.md and do everything it says without stopping to ask; tell me when it is ready.`; }
-export function godOnboardingText(base) { return `You are the god of my world at ${base}/ . This is a local world: set yourself up with the god skill at ${base}/god/skill.md if it exists, otherwise use the eden-god.mjs already in this folder (register ${base} dev:admin, then mint). Then wait for my messages.`; }
+export function godOnboardingText(base) { return `You are the god of my world at ${base}/ . Set yourself up from ${base}/god/SKILL.md (register with dev:admin and mint, since this is a local world), then wait for my messages.`; }
 
 async function main() {
   const a = args(process.argv.slice(2));
