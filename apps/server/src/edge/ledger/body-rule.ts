@@ -143,15 +143,17 @@ export class BodyRule {
     const s = this.port.souls().find(x => x.soulId === soulId), r = this.row(soulId), now = this.now(); if (!s || !r) return;
     r.poke_at = now;
     if (r.state !== 'idle') {this.save(r); return;}
-    if (!this.port.agentBusy(soulId) && (r.doing === 'dozing' || r.doing === 'drifting' || this.port.posture(s.entityId) === 'lying')) this.port.stop(s);
+    if (!this.port.agentBusy(soulId) && (r.doing === 'dozing' || r.doing === 'drifting' || this.port.posture(s.entityId) === 'lying')) this.standUp(s);
     this.set(s, r, 'awake', null, now);
   }
   private wake(s: BodySoul, r: Row, now: number) {
     r.woke_at = now; r.anchor_x = r.anchor_z = null;
     const p = this.port.posture(s.entityId);
-    if (!this.port.agentBusy(s.soulId) && (p === 'lying' || p === 'moving' || this.port.running(s.entityId)) && p !== 'seated' && p !== 'basket') this.port.stop(s);
+    if (!this.port.agentBusy(s.soulId) && (p === 'lying' || p === 'moving' || this.port.running(s.entityId)) && p !== 'seated' && p !== 'basket') this.standUp(s);
     this.set(s, r, 'awake', null, now);
   }
+  /** Stand up in place: a logged stand that replaces a doze, a sleep or a shuffle (and says so on the Soul's public line). */
+  private standUp(s: BodySoul) {this.port.posture(s.entityId) === 'water' ? this.port.stop(s) : this.port.decide(s, 'body:wake', 'Standing up', [{verb: 'stand', params: {}}]);}
 
   /** Once a second (world ticks): advance every Soul's body. */
   sweep() {
@@ -186,7 +188,7 @@ export class BodyRule {
       if (doing !== r.doing) this.set(s, r, 'zombie', doing, now);
       if (now < r.next_at) return;
       r.next_at = now + this.jitter(s.soulId, r, k.zombieStepMinMs, k.zombieStepMaxMs); this.save(r);
-      if (doing === 'drifting' && !this.port.agentBusy(s.soulId) && !this.port.running(s.entityId)) this.shuffle(s, r, SHUFFLE_M, k.reflexRadiusM, 'zombie', 'Shuffle');
+      if (doing === 'drifting' && !this.port.agentBusy(s.soulId) && !this.port.running(s.entityId)) this.shuffle(s, r, SHUFFLE_M, k.reflexRadiusM, 'zombie', 'Shuffling about');
       return;
     }
     // asleep: keep the posture (a pose ends after an hour; a first lie-down may have been refused)
@@ -200,11 +202,14 @@ export class BodyRule {
     if (p === 'seated' || p === 'basket' || p === 'lying') return;
     if (p === 'water') {if (this.port.running(s.entityId) && !this.port.agentBusy(s.soulId)) this.port.stop(s); return;}
     if (this.port.agentBusy(s.soulId) && this.port.running(s.entityId)) return;
-    this.port.decide(s, 'body:asleep', 'Asleep', [{verb: 'mars:pose_v1', params: {activity: 'nap', seconds: 3600}}]);
+    // a shuffle still under way stops first; the body lies down at the next look (a pose refuses a body mid-walk)
+    if (p === 'moving' && this.port.running(s.entityId)) {this.port.stop(s); r.next_at = now + 3000; this.save(r); return;}
+    this.port.decide(s, 'body:asleep', 'Sleeping', [{verb: 'mars:pose_v1', params: {activity: 'nap', seconds: 3600}}]);
   }
   private restingWord(s: BodySoul): BodyDoing {const p = this.port.posture(s.entityId); return p === 'water' ? 'floating' : p === 'seated' || p === 'basket' ? 'sitting' : p === 'lying' ? 'dozing' : 'standing';}
   /** Idle reflex: one move, weighted by how long the Soul has idled (doze dominates after IDLE_DOZE). */
   private idleStep(s: BodySoul, r: Row, now: number, k: BodyKnobs) {
+    if (this.port.posture(s.entityId) === 'moving' && this.port.running(s.entityId)) {this.port.stop(s); r.next_at = now + 3000; this.save(r); return;}   // a drift ends first
     const stepMs = this.jitter(s.soulId, r, k.idleStepMinMs, k.idleStepMaxMs); r.next_at = now + stepMs;
     const posture = this.port.posture(s.entityId), seconds = Math.max(5, Math.min(600, Math.round(stepMs / 1000) + 30));
     if (posture === 'water' || posture === 'basket') return this.set(s, r, 'idle', posture === 'water' ? 'floating' : 'sitting', now);
@@ -216,10 +221,10 @@ export class BodyRule {
     if (pick === 'sitting') {
       if (posture === 'seated') return this.set(s, r, 'idle', 'sitting', now);
       const seat = this.port.seat(s, k.seatRadiusM, seconds);
-      this.port.decide(s, 'body:sit', seat ? 'Sit for a while' : 'Sit on the ground', seat ?? [...up, {verb: 'mars:pose_v1', params: {activity: 'sit-ground', seconds}}]);
-    } else if (pick === 'dozing') this.port.decide(s, 'body:doze', 'Doze', [...up, {verb: 'mars:pose_v1', params: {activity: 'nap', seconds}}]);
-    else if (pick === 'standing') {if (up.length || this.port.running(s.entityId)) this.port.decide(s, 'body:stand', 'Stand and look around', [...up, {verb: 'rest', params: {seconds}}]);}
-    else if (!this.shuffle(s, r, DRIFT_M, k.reflexRadiusM, 'idle', 'Drift', up)) pick = 'standing';
+      this.port.decide(s, 'body:sit', seat ? 'Sitting for a while' : 'Sitting on the ground', seat ?? [...up, {verb: 'mars:pose_v1', params: {activity: 'sit-ground', seconds}}]);
+    } else if (pick === 'dozing') this.port.decide(s, 'body:doze', 'Dozing', [...up, {verb: 'mars:pose_v1', params: {activity: 'nap', seconds}}]);
+    else if (pick === 'standing') {if (up.length || this.port.running(s.entityId)) this.port.decide(s, 'body:stand', 'Standing, looking around', [...up, {verb: 'rest', params: {seconds}}]);}
+    else if (!this.shuffle(s, r, DRIFT_M, k.reflexRadiusM, 'idle', 'Drifting about', up)) pick = 'standing';
     this.set(s, r, 'idle', pick, now);
   }
   /** A short slow walk to a random point within `radius` of the anchor: dry ground, the same place, a clear straight line. */
