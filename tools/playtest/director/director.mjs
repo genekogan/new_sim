@@ -221,8 +221,10 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
 
   async function scriptedLoop(ctx) {
     const entries = (scenario.director?.script ?? []).filter((e) => (e.seat ?? null) === ctx.id).sort((a, b) => a.atSec - b.atSec);
+    const sequential = scenario.director?.sequential !== false; // a person waits for the result before the next basic instruction
     for (const e of entries) {
       await sleepUntil(start + e.atSec * 1000);
+      if (sequential) { while (live() && (ctx.open.size > 0 || ctx.pending > 0)) await clock.sleep(Math.min(pollMs, Math.max(1, endAt - clock.now()))); }
       if (!live()) break;
       ctx.step += 1;
       const shown = await gatherShown(ctx);
