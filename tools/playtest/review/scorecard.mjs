@@ -183,7 +183,10 @@ export function renderScorecard({ title = 'Frozen-set scorecard', entries, basel
 export function baselineFor(entry, { baselineDir = null, runsRoot, dirOnly = false }) {
   if (baselineDir) {
     const man = readJson(join(baselineDir, 'replay-set.json'), null);
-    const dirs = (man?.runs ?? []).find((r) => r.label === entry.label)?.repeats?.filter((d) => existsSync(join(d, 'evidence'))) ?? [];
+    // A set pulled from another machine (the cloud box) keeps that machine's absolute paths: fall back to the same
+    // folder name beside the manifest.
+    const local = (d) => (existsSync(join(d, 'evidence')) ? d : existsSync(join(baselineDir, basename(d), 'evidence')) ? join(baselineDir, basename(d)) : null);
+    const dirs = ((man?.runs ?? []).find((r) => r.label === entry.label)?.repeats ?? []).map(local).filter(Boolean);
     if (dirs.length) return { from: dirs, measures: dirs.map(runMeasures) };
   }
   if (dirOnly) return null;
