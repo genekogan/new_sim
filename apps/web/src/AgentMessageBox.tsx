@@ -128,7 +128,7 @@ export function useSoulInbox(api: Api, soulId: string) {
       if (text === undefined) reportAgentPresence(soulId, null);
       throw new Error(r.data?.message ?? r.data?.error?.message ?? 'Message could not be sent. Try again.');
     }
-    const inbox = withLink(r.data);
+    const inbox = withLink<AgentInbox>(r.data);
     reportAgentPresence(soulId, inbox);
     return inbox;
   }, [api, soulId]);

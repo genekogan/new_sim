@@ -9,7 +9,7 @@ const mickey=soul('s_7f3mickey','Mickey'),wren=soul('s_wren','Wren');
 const here=(state:AgentHere['state'],link:Link|null):AgentHere=>({away:state==='away',state,since:T-20*min,waiting:0,readAt:T,lastSeenAt:T-20*min,link});
 const prompt='Read https://sim.eden.art/worlds/w/eden-2026/SKILL.md and resume my existing Soul "Mickey" (ID "s_7f3mickey") in this folder. Do not create another Soul.\nIf this folder is not paired with it yet, run node eden-agent.mjs pair-soul "s_7f3mickey" --for K7QX-M2PA (the request comes up in my open Sim window), then node eden-agent.mjs approval wait; then listen as the skill says.';
 const connected:Link={state:'connected',reason:'listening',since:T-28*min,holder:{label:'eden-agent 1.9.16',since:T-28*min}};
-const off=(reason:Link['reason'],since=T-2*60*min):Link=>({state:'disconnected',reason,since,holder:null});
+const off=(reason:Link['reason'],since:number|null=T-2*60*min):Link=>({state:'disconnected',reason,since,holder:null});
 const camera={following:false,follow(){},stop(){}};
 const inbox={connected:true,lastSeenAt:T,latest:{id:'m1',text:'go to the pond',state:'acknowledged' as const,reply:null,result:'Arrived at the pond.',outcome:'done' as const,sentAt:T-5*min},queued:0,presence:'listening' as const};
 const owner=(link:Link|null,extra:Partial<SoulCardViewProps>={}):SoulCardViewProps=>({soul:mickey,view:'owner',link,here:here(link?.state==='connected'?'listening':'away',link),inbox,send:async()=>inbox,prompt,camera,clock:T,body:{state:'awake',doing:null,since:T-28*min},now:{text:'Heading to the pond to see if the koi are up.',at:T-3*min},place:'the pond',...extra});
