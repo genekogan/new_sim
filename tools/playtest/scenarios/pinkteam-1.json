@@ -1,0 +1,63 @@
+{
+ "name": "pinkteam-1",
+ "version": 1,
+ "seed": 666,
+ "world": {
+  "kind": "dev",
+  "genesis": "worlds/templates/eden-district.json",
+  "slug": "pt-eden-pink",
+  "port": 4992
+ },
+ "durationSec": 720,
+ "seats": [
+  {
+   "id": "zed",
+   "adapter": "claude-headless",
+   "model": "haiku",
+   "effort": "medium",
+   "persona": "pinkteam",
+   "personaModel": "opus",
+   "startOffsetSec": 0,
+   "soulName": "Zed",
+   "channelMix": {
+    "chat": 0.5,
+    "card": 0.5
+   }
+  }
+ ],
+ "god": null,
+ "director": {
+  "mode": "persona",
+  "requestsTarget": 12,
+  "glanceSec": [
+   10,
+   30
+  ],
+  "goal": "pink team: make the world fail to do what you want",
+  "script": null
+ },
+ "observer": {
+  "sampleSec": 5,
+  "cameras": [
+   "follow"
+  ],
+  "viewport": [
+   1024,
+   640
+  ],
+  "dpr": 1,
+  "gpu": "metal"
+ },
+ "review": {
+  "reviewerModel": "opus",
+  "developerModel": "opus",
+  "rubric": "accept3"
+ },
+ "rails": {
+  "maxTurnsPerRequest": 6,
+  "maxTurnWallSec": 480,
+  "quotaStopPct": 90,
+  "onboardWallSec": 600,
+  "onboardTimeoutSec": 540
+ }
+}
