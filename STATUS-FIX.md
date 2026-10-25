@@ -102,3 +102,59 @@ symlinks, gitignored) so server tests resolve workspace packages from this workt
 - Re-run on a quiet machine: `edge-ledger-resolve-phrases.test.ts` (timed out at 600 s under load) and the Eden half of
   `edge-ledger-library-not-stair.test.ts` (its synthetic half passed; the Eden walk hit its 900 s limit under load 27).
 - Walk baseline and bundle budget untouched (no web change).
+
+## D1: the world reports the body, not the plan (round 1, second implementer)
+
+### `c077857e0` D3 follow-up: server typecheck
+- `edge/owner-loop.ts:39` compared a receipt phase with `'accepted'`, a value the type never has (tsc TS2367; harmless
+  at runtime). Removed it. Server `tsc --noEmit` is now clean.
+
+### `d81ff3044` D1 server
+- Before: the card `doing` was the program label from start (`world.ts` decision), approach included, then
+  "standing around" at program end even on a carrier or in water; a `cancelled` end left the old label (stale
+  "Lie down"); `souls.ts` mapped only swim/tread/wade; receipts had `phase` only; the ride said "You are in the punt"
+  as soon as the rider was listed (still boarding).
+- After:
+  - `apps/server/src/body-state.ts` (new): `bodyState(host, entity, approach?)` gives `{posture, activity, on, aboard?,
+    inWater, step?}`, read on every call (never stored). `stateOf` moved there (ledger re-exports it).
+    `inWater` = swim/tread/wade, or depth > 0.3 m from the new engine `bodyWaterDepthV1` (ground/1 base water; 0 aboard,
+    on a deck, upstairs) or the shore/1 `submergedHeightMetres`. `cardDoing` = carrier words (boarding / seated,
+    waiting / riding / rowing / stepping out); the approach ("walking to Kitchen chair") while the body walks toward a
+    non-walk act; the label while in the pose; water words after the program ends.
+  - `world.ts`: `publicSoul.doing` = `doingOfV1(m)`; `bodyOfV1`; `approachV1` hook; a cancelled program with nothing
+    running after it sets `m.doing = 'standing around'` (a replaced one keeps the new label). `m.doing` stays the plan
+    label for the brain and `recent`.
+  - `souls.ts` status: `doing` from the body plus `body`. `ledger.ts`: open receipts carry `body` and `now`
+    ("walking to ferris wheel, 12 m left; not aboard yet"); `bodyOf` in the public Soul `self` and observe `self`; plans
+    remembered per receipt in `decide` and the object-decision path (in memory, 512; a restart loses only the step).
+    eden.mjs unchanged: `brief()` already prints `receipt.now`, which the server now fills from `body`.
+  - `ride.ts`: "You are in the punt" / "climbs into" fire when the rider is seated (`boarding` list added to the ride
+    state), and an attraction's car is "the ferris wheel car", not "the basket".
+- Tests: new `body-state.test.ts` (5: riding, rowing, swimming/standing in water, approach walk, idle);
+  `edge-body-state-ride.test.ts` (2, retained-commons engine: a ferris-wheel carrier on the attraction route; card read
+  "riding the ferris wheel" for all 1,739 seated aloft ticks and never "standing around" aboard; the walk receipt's
+  `body.step`/`now`; status `body.on`; stand after lie clears "Lie down", fails on the old world.ts);
+  `edge-ride-boarding-text.test.ts` (1). Deliberate update: `swim-status-words.test.ts` publicSoul doing
+  "standing around" → "treading water" (the old line said the web relabelled it). Green, one at a time: those, plus
+  edge-ride-labels, edge-ride-exit, edge-ledger-ride, edge-ledger-punt, edge-ledger-ride-together, edge-owner-loop,
+  edge-ledger-here, edge-body, edge-sit-here. Server and web `tsc --noEmit` clean.
+
+### `e31c5a155` D1 web
+- Before: only balloon-tagged things were rides; the wheel's carrier had no car, the broadcast did not frame its rider;
+  POSES had no ride/row/board.
+- After: `place-names.ts` POSES ride/row/board/alight; `ride-carriers.ts` (`isRideCarrierDef`, `carrierIdOf` mirroring
+  installGodRides, `recordedCarriers`, `carrierPoses`); `WorldEntityLayer.rideCars()` (carrier things that are not
+  balloons); `LiveWorld` frames every recorded carrier and god ride car, and `WorldRideCars` draws an open car with a
+  hanger bar at each god attraction's carrier pose. Balloons unchanged; the wheel's gondola clock untouched.
+- Tests: new `ride-carriers.test.ts` (4); `WorldEntityLayer.ride.test.ts` still green.
+- Build: `apps/web/dist` was a symlink into soul3-integration; removed the link only and built here (`npx vite build`,
+  `apps/web/dist/index.html` 15:02); the integration dist is untouched (mtime unchanged). Bundle:
+  `budget.mjs --build --check` → OK, 8681.2 KB raw / 2452.2 KB gzip, 0 offenders, 10 new keys under 100 KB; baseline
+  unchanged.
+
+### D1 gaps left
+- The car is a stand-in: the rider is not seated in it (no `ride` pose animation) and it does not match the wheel's
+  drawn gondolas (their clock is decorative). Eden's punt is framed but no new mesh is drawn (it has its own).
+- Terminal receipts get no new `done` line from `body`; they keep `outcome.summary` (D3).
+- Native minds' approach name comes from the card target only; no "m left" if the target has no entity.
+- Not measured in the replay set yet; a browser check of the wheel car is still due.
