@@ -36,7 +36,7 @@ import {publishCompletedOwnerQueue} from './client-owner-result.mjs';
 import {openClientMemory} from './client-memory.mjs';
 import {travelCommand} from './client-travel.mjs';
 
-export const SKILL_VERSION='1.9.16';
+export const SKILL_VERSION='1.9.17';
 export const CONTRACT='eden-edge/1';
 export const API_CONTRACT='eden-edge/1.1'; // Additive support; preserve legacy wire contract.
 const STATE='.eden-agent.json';
@@ -51,7 +51,17 @@ const EDGE={observe:'/v1/edge/observe',capabilities:'/v1/edge/capabilities',act:
 const OWNER={config:'/v1/config',me:'/v1/me',invite:'/v1/invite',souls:'/v1/souls',pair:s=>`/v1/souls/${s}/pair`,exchange:'/v1/agent/pair',
  soul:s=>`/v1/souls/${s}`,caps:s=>`/v1/souls/${s}/intent-v2/capabilities`,act:s=>`/v1/souls/${s}/intent-v2`,
  request:(s,r)=>`/v1/souls/${s}/intent-v2/requests/${r}`,diag:(s,r)=>`/v1/souls/${s}/intent-v2/requests/${r}/diagnostics`};
-const FADE={yellowMin:30,redMin:50,goneMin:60};
+/** LINK (1.9.17): the Soul's public `now` line: one short first-person line a stranger can read, ≤140 characters. */
+export const NOW_MAX=140;
+/** `--now "<text>"` taken out of a command's args (act/say/ack/result/wait); the next matching world call carries it. */
+let nextNow;
+export function takeNowFlag(args){const i=args.indexOf('--now');if(i<0)return args;const v=args[i+1];if(v===undefined||v.startsWith('--'))throw new Error('usage: --now "<one short first-person line, at most 140 characters>"');nextNow=cleanNowText(v);return [...args.slice(0,i),...args.slice(i+2)];}
+export function cleanNowText(v){const t=String(v).replace(/[\u0000-\u001f\u007f-\u009f]/g,' ').replace(/\s+/g,' ').trim();if([...t].length>NOW_MAX)throw new Error(`now is at most ${NOW_MAX} characters (yours has ${[...t].length})`);return t||null;}
+/** The world call that carries a pending --now: act, say, ack and result in the JSON body; wait as its `now` query. */
+function withNow(path,body){if(nextNow===undefined)return {path,body};
+ if(body&&/^\/v1\/edge\/(act|say|inbox\/[^/?]+\/(ack|result))$/.test(path)){const now=nextNow;nextNow=undefined;return {path,body:{...body,now}};}
+ if(!body&&path.startsWith('/v1/edge/wait?')){const now=nextNow;nextNow=undefined;return {path:`${path}&now=${encodeURIComponent(now??'')}`,body};}
+ return {path,body};}
 const TERMINAL=new Set(['completed','failed','replaced']);
 
 const load=()=>existsSync(STATE)?JSON.parse(readFileSync(STATE,'utf8')):{};
@@ -97,6 +107,7 @@ function need(s,k,hint){if(!s[k])throw new Error(`No ${k} yet. ${hint}`);return 
 async function call(path,{body,method,as='soul',timeoutMs=90_000,signal,extraHeaders={}}={}){
  assertLiveDispatch(IN_LIVE,leaseHeld,method??(body?'POST':'GET'));
  const s=load(),headers={'content-type':'application/json',...extraHeaders};
+ if(as==='soul')({path,body}=withNow(path,body));
  if(as==='owner'&&s.accountAuth){path=delegatedOwnerPath(path,need(s,'soul','Complete an account approval first.'));if(s.token)headers.authorization=`Bearer ${s.token}`;}
  else if(as==='owner'&&s.identity)headers.authorization=`Bearer dev:${s.identity}`;
  if(as==='soul'&&s.token)headers.authorization=`Bearer ${s.token}`;
@@ -235,14 +246,20 @@ When I ask you to have my Soul do something ("sit down", "go read a book", "hug 
 `;
  writeSoulGuides(process.cwd(),text);
 }
-/** status: Soul, fade colour and idle minutes since your last accepted action, contract mode. */
+/** LINK: the link state the owner sees (connected / disconnected + reason) and the public `now` line, as the world says. */
+async function selfLink(){const r=await call('/v1/edge/self/link');
+ if(r.status===200)return {link:r.data.link,now:r.data.now??null};
+ if(r.status===401&&r.data?.code==='control.revoked'){const why=r.data.reason;return {link:{state:'disconnected',reason:why==='replaced'?'replaced':why==='revoked'||why==='refused'?'revoked':'stopped-listening',since:r.data.revokedAt?Date.parse(r.data.revokedAt):null,holder:null},now:null};}
+ return {link:null,now:null};}
+/** status: Soul, link state and public `now` line, minutes since your last accepted action, contract mode. Bodies never
+ *  fade (1.9.17): while nothing listens the body wanders, then sleeps where it stands; a listen wakes it. */
 export async function status(){
  const s=load(),m=await mode(true);
  if(s.token&&s.soul)folderGuide(s.soul);
  const idle=s.lastAcceptedAt?Math.round((Date.now()-Date.parse(s.lastAcceptedAt))/60000):null;
- const fade=idle==null?'unknown':idle>=FADE.goneMin?'gone (act to reclaim)':idle>=FADE.redMin?'red':idle>=FADE.yellowMin?'yellow':'green';
+ const self=s.token&&m==='edge'?await selfLink():{link:null,now:null};
  return {skillVersion:SKILL_VERSION,contract:m==='edge'?CONTRACT:'legacy owner routes',soul:s.soul??null,paired:!!s.token,
-  minutesSinceAcceptedAction:idle,fade,live:(()=>{const L=liveRunning();return L?`running (pid ${L.pid}): relay your human's requests with tell "<words>" --wait; report shows what the Soul sees`:'not running (act directly, or see SKILL.md: Start or resume)';})(),...(idle!=null&&idle>=FADE.yellowMin-5?{keepAlive:'Act soon: any accepted action resets fading.'}:{}),lastReceipt:s.lastReceipt??null,...(readJSON(LIVE.state,{}).health?{runtime:(()=>{const h=readJSON(LIVE.state,{}).health;return {...h,stream:{...h.stream,lastFrameAgeMs:h.stream?.lastFrameAt?Date.now()-h.stream.lastFrameAt:null,lastEventAgeMs:h.stream?.lastEventAt?Date.now()-h.stream.lastEventAt:null}};})()}:{})};
+  link:self.link,now:self.now,minutesSinceAcceptedAction:idle,live:(()=>{const L=liveRunning();return L?`running (pid ${L.pid}): relay your human's requests with tell "<words>" --wait; report shows what the Soul sees`:'not running (act directly, or see SKILL.md: Start or resume)';})(),lastReceipt:s.lastReceipt??null,...(readJSON(LIVE.state,{}).health?{runtime:(()=>{const h=readJSON(LIVE.state,{}).health;return {...h,stream:{...h.stream,lastFrameAgeMs:h.stream?.lastFrameAt?Date.now()-h.stream.lastFrameAt:null,lastEventAgeMs:h.stream?.lastEventAt?Date.now()-h.stream.lastEventAt:null}};})()}:{})};
 }
 
 // ---------------------------------------------------------------- perception
@@ -254,13 +271,13 @@ export async function observe(){
   if(d.streamCursor&&!s.cursor)save({cursor:d.streamCursor});
   return {contract:d.contract,time:d.world?.time?.label,clock:hhmm(worldMinutes(d.world?.time)),quiet:d.world?.quiet,me:{name:d.self?.name,where:(d.self?.placePath??[]).map(p=>p.name).join(' < '),state:d.self?.state,activity:d.self?.activity,
    ...(d.self?.holding?{holding:d.self.holding}:{}),...(d.self?.following?{following:d.self.following}:{}),...(d.self?.followedBy?.length?{followedBy:d.self.followedBy}:{}),...(d.self?.game?{game:d.self.game}:{}),
-   openReceipts:(d.self?.receipts??[]).map(r=>({id:r.id,capability:r.capability,phase:r.phase})),fade:d.self?.fade??(await status()).fade},
+   openReceipts:(d.self?.receipts??[]).map(r=>({id:r.id,capability:r.capability,phase:r.phase}))},
    // 1.6.0: invitations to you come first (accept / decline), then your own open ones
    ...(d.invites?.length?{invites:d.invites}:{}),...(d.invited?.length?{invited:d.invited}:{}),
    here:{souls:d.here?.souls??[],objects:d.here?.objects??[],...(d.here?.items?.length?{items:d.here.items}:{})},...(d.doHere?{doHere:d.doHere}:{}),canDo:summarise(d.capabilities??[])};
  }
  const st=ok(await call(OWNER.soul(soul),{as:'owner'}),'observe').status??{},c=await capabilities();
- return {contract:'legacy',time:st.time,me:{name:st.name,where:st.position?.region,state:st.activity,doing:st.doing,mood:st.mood,energy:st.energy,fade:(await status()).fade},
+ return {contract:'legacy',time:st.time,me:{name:st.name,where:st.position?.region,state:st.activity,doing:st.doing,mood:st.mood,energy:st.energy},
   here:{nearby:(st.nearby??[]).slice(0,12).map(n=>({who:n.who,distance:n.distance,doing:n.doing||undefined})),untrusted:true},
   happening:st.happening,canDo:c.canDo};
 }
@@ -608,7 +625,7 @@ export async function events(...args){
   const c=opt('--since')??load().cursor??'c_0';
   if(!/^c_(0|[1-9][0-9]{0,15})$/.test(c))throw new Error('events --since requires an event cursor c_<number>');
   if(args.includes('--raw'))return {...ok(await call(EDGE.wait(c,1)),'events raw'),untrusted:true,note:'Full retained event page; this read does not consume the folder cursor. Continue with events --raw --since <returned cursor>. Conversation replay: converse turns <conversationId>.'};
-  const d=ok(await call(EDGE.eventsDigest(c)),'digest');return {digest:d.text,cursor:d.cursor,since:d.since,counts:d.counts,conversations:d.conversations,gap:d.gap,toMe:d.toMe,invites:d.invites,salient:d.salient,plan:d.plan,fade:d.fade,untrusted:true,note:'Short summary of incoming events since this cursor; conversation turns are counts in this window, not lifetime totals. Full text: converse list, then converse turns <conversationId>, or events --raw.'};
+  const d=ok(await call(EDGE.eventsDigest(c)),'digest');return {digest:d.text,cursor:d.cursor,since:d.since,counts:d.counts,conversations:d.conversations,gap:d.gap,toMe:d.toMe,invites:d.invites,salient:d.salient,plan:d.plan,untrusted:true,note:'Short summary of incoming events since this cursor; conversation turns are counts in this window, not lifetime totals. Full text: converse list, then converse turns <conversationId>, or events --raw.'};
  }
  let last=opt('--since')??null;
  for(;;){await sse(EDGE.events(`minSalience=${min}${kinds?'&kinds='+encodeURIComponent(kinds):''}`),{lastId:last,onMessage:m=>{
@@ -635,7 +652,7 @@ export async function decline(id){return act(id?`decline:${String(id).replace(/^
 // ================================================================ live — one economical always-on mind (1.6.0-runner)
 // Plain code keeps the Soul's body: it long-polls the world's event stream (free), tracks what the body is doing,
 // and wakes the model ONLY for real decisions (spoken to, invited, a conversation turn, activity finished, a
-// scheduled happening, a quiet-time check, fade guard). The model answers with one small JSON plan that code
+// scheduled happening, a quiet-time check). The model answers with one small JSON plan that code
 // carries out and verifies. One long-lived model session (Claude Code or Codex, your subscription sign-in, no API
 // keys) keeps its prompt cache warm and is rolled over with a short memory when its context grows.
 // Hard budget per Soul: calls/hour and tokens/day caps; quiet-world backoff; cost-log.jsonl + `cost`.
@@ -650,7 +667,7 @@ function liveRunning(){const l=readJSON(LIVE.lock,null);if(!l?.pid||l.pid===proc
 function readJSONL(p){try{return readFileSync(p,'utf8').split('\n').filter(Boolean).map(l=>{try{return JSON.parse(l);}catch{return null;}}).filter(Boolean);}catch{return [];}}
 // Subscription cost is unknown unless provider reports an actual charge; never assume aliases are free.
 const LIVE_DEFAULTS={engine:'claude',model:null,memory:'session',callsPerHour:30,tokensPerDay:8_000_000,rotateAt:30_000,effort:'low',routine:null,
- idleSeconds:120,idleMaxSeconds:900,checkMinutes:20,fadeGuardMinutes:22,whatsonMinutes:15,unknownBillingCohort:false,runSeconds:0};
+ idleSeconds:120,idleMaxSeconds:900,checkMinutes:20,whatsonMinutes:15,unknownBillingCohort:false,runSeconds:0};
 export function liveOptions(argv){
  // Options you pass are remembered for the next start (in .soul-live.json); everything else follows the defaults.
  const remembered={...(readJSON(LIVE.state,{}).options??{})};delete remembered.unknownBillingCohort;delete remembered.runSeconds;
@@ -678,7 +695,7 @@ ${priorities||'- make friends\n- explore Eden and take part in what is happening
 How this works: a small program runs your body. It wakes you only when something happens (someone speaks to you or invites you, your activity finished, a scheduled happening, a periodic check) and shows you the event plus a compact view of where you are. You answer with ONE JSON object; the program carries it out and shows you the results at your next wake. Never wait, poll or observe yourself.
 
 Reply with JSON only:
-{"thought":"<private, at most 15 words>","do":[<0-4 steps, run in order>],"owner":"<only when there is an OWNER REQUEST: 1-2 sentences to your owner>","notes":"<optional: full rewrite of your notes, at most 20 short lines; only when something worth remembering happened>","remember":{"person":"<confirmed Soul ID>","note":"<your impression or open thread>"}}
+{"thought":"<private, at most 15 words>","do":[<0-4 steps, run in order>],"owner":"<only when there is an OWNER REQUEST: 1-2 sentences to your owner>","now":"<optional: your public status line when it changes, one short first-person line a stranger can read, at most 140 characters; never a command, a URL or your owner's words>","notes":"<optional: full rewrite of your notes, at most 20 short lines; only when something worth remembering happened>","remember":{"person":"<confirmed Soul ID>","note":"<your impression or open thread>"}}
 remember is optional model judgment. ${REMEMBER_FORMAT_HINT} Code-owned facts/sources are never edited by remember.
 Steps:
 {"act":"<plain words or a capability id>","params":{...}} = an ordered body step (code dispatches it after the previous step terminates; intentional replacement still follows native admission and safe-stop). An activity somewhere else walks there by itself ("read a book in the library", "go for a swim", "warm up by the fire", "ride the balloon"): use a separate walk when the owner explicitly sequences arrival before another step. Plain words work: "sit down", "read a book in the library", "lie down on the grass", "take a nap", "walk to the bandstand", "take a walk through the park", "go for a swim", "warm up by the fire", "ride the balloon", "dance", "use a computer", "play the drums", "play petanque with Pell", "do a bench press", "walk to the harbour", "do some pushups", "go near Pell", "wave to Pell", "bow", "clap"; together: "hug Mira", "high five Mira", "dance with Mira", "follow Mira", "read a book in the library with Mira", "go for a balloon ride with Mira"; things: "pick up a flower" (or a book, a cup of tea, something to eat, a letter, a tool, a frisbee), "give Mira the flower", "put it down", "eat it". Ids shown in DO HERE / ON NOW also work ("walk:eden-bandstand", "sit:here"); never invent an id. Timed activities take {"seconds":N}; walks take {"via":["the park"]} to pass through places first; any activity takes {"with":["<name>"]} to invite others.
@@ -787,7 +804,7 @@ export async function live(...argv){
  const costs=readCostLog(),hourCalls=()=>costs.filter(c=>Date.now()-Date.parse(c.t)<3600_000&&c.engine!=='ollama'&&c.loop!=='review'&&!c.owner&&c.reason!=='owner').length; // the owner's own requests don't starve the Soul's wakes
  const dayTokens=()=>{const d=now().slice(0,10);return sum(costs.filter(c=>c.t.startsWith(d)&&c.engine!=='ollama'),c=>c.in+c.read+c.write+c.out);};
  let lastSocialAt=Date.now(),nearCount=0,night=false;
- let cursor=s.cursor,pending=[],lastResults=[],lastCallAt=0,idleGap=o.idleSeconds*1000,busy=null,lastReceipt=s.lastReceipt,whatsOn=null,whatsOnAt=0,errors=0,fadeKick=0;
+ let cursor=s.cursor,pending=[],lastResults=[],lastCallAt=0,idleGap=o.idleSeconds*1000,busy=null,lastReceipt=s.lastReceipt,whatsOn=null,whatsOnAt=0,errors=0;
  // Is the body busy with an action right now? (one receipt read at start; afterwards receipt events keep it current)
  if(lastReceipt){const r=await receipt(lastReceipt).catch(()=>null);busy=r&&(r.phase==='started'||r.phase==='waiting')?r.capability:null;}
  // EVENTS-v1: the world pushes events (SSE, salience ≥1) instead of being long-polled; a reconnect after a while starts
@@ -821,7 +838,7 @@ export async function live(...argv){
  const initialBoot=await perception.boot();try{clientMemory.catalogue(perception.snapshot());}catch(error){projectionProblem('catalogue',error);}lastHere=initialBoot.here??null;
  const leanObservation=async()=>{
   const fresh=await perception.wake();if(fresh.fallback)return observe();lastLean=fresh;lastHere=fresh.frame;
-  const frame=fresh.frame;return {clock:frame.clock,time:frame.day,me:{name:persona.name,where:(frame.me?.placePath??[]).join(' < '),state:frame.me?.posture,activity:frame.me?.activity?.kind,holding:frame.me?.holding,fade:frame.me?.fade,openReceipts:busy&&lastReceipt?[{id:lastReceipt,capability:busy,phase:'started'}]:[]},here:{souls:(frame.near??[]).map(x=>({...x,soulId:x.id,distance:x.dist,state:x.doing})),objects:frame.objects??[]},doHere:frame.doHere??[],canDo:summarise(fresh.capabilities??[]),exits:frame.exits??[]};
+  const frame=fresh.frame;return {clock:frame.clock,time:frame.day,me:{name:persona.name,where:(frame.me?.placePath??[]).join(' < '),state:frame.me?.posture,activity:frame.me?.activity?.kind,holding:frame.me?.holding,openReceipts:busy&&lastReceipt?[{id:lastReceipt,capability:busy,phase:'started'}]:[]},here:{souls:(frame.near??[]).map(x=>({...x,soulId:x.id,distance:x.dist,state:x.doing})),objects:frame.objects??[]},doHere:frame.doHere??[],canDo:summarise(fresh.capabilities??[]),exits:frame.exits??[]};
  };
  const queueContext=()=>({placeId:lastHere?.me?.place??null,nearCount:lastHere?.near?.length??0,worldMinutes:lastLean?.clock?.absoluteWorldMinutes??initialBoot.clock?.absoluteWorldMinutes,busy:busy&&lastReceipt?{id:lastReceipt,capability:busy}:null});
  receiptReads=openClientReceipts({scope:s.world+'|'+s.soul,soulId:s.soul,read:receipt,onChange:rec=>{logLive({canonicalReceiptUpdate:{id:rec.id,phase:rec.phase}});queuePollAt=0;pollAbort?.abort();nudge?.();}});
@@ -840,7 +857,7 @@ export async function live(...argv){
  console.log(`live: ${persona.name} · ${o.engine} ${o.model} (${o.memory}${warm?', resumed warm session':''}) · caps ${o.callsPerHour} calls/h, ${o.tokensPerDay} tokens/day · stop: Ctrl-C or touch ${LIVE.stop}`);
  logLive({start:{engine:o.engine,model:o.model,memory:o.memory,resumed:!!warm,persona:persona.name}});
 
- const addressed=e=>(e._sal>=3&&e.kind!=='receipt'&&!String(e.kind).startsWith('plan.'))||e.kind==='conversation.invite'||e.kind==='invite'||e.kind==='conversation.turn'||(e.kind==='speech'&&(e.text??'').toLowerCase().includes(firstName))||(e.kind==='fade'&&e.colour&&e.colour!=='green');
+ const addressed=e=>(e._sal>=3&&e.kind!=='receipt'&&!String(e.kind).startsWith('plan.'))||e.kind==='conversation.invite'||e.kind==='invite'||e.kind==='conversation.turn'||(e.kind==='speech'&&(e.text??'').toLowerCase().includes(firstName));
  function reconcileIdentityGoal(){const id=S.identityGoal?.conversationId;if(!id)return;const g=conversations.snapshot().groups.find(g=>g.id===id);if(g&&(!g.attached||g.state==='closed')){logLive({identityGoalClosed:{ownerRequestId:S.identityGoal.ownerRequestId,conversation:id}});S.identityGoal=null;saveS();}}
  function track(e){
   if(e.id){S.eventIds??=[];if(S.eventIds.includes(e.id))return false;S.eventIds.push(e.id);S.eventIds=S.eventIds.slice(-500);}
@@ -854,14 +871,13 @@ export async function live(...argv){
   if(e.kind==='plan.done'||e.kind==='plan.paused')planBusy=false;
  }
  function wakeReason(){
-  const t=Date.now(),since=t-lastCallAt,idleMin=(t-Date.parse(load().lastAcceptedAt??now()))/60_000;
+  const t=Date.now(),since=t-lastCallAt;
   if(pending.some(e=>e.kind==='queue.refusal'))return 'queue';
   if(pending.some(e=>e.kind==='plan.step.failed'||e.kind==='plan.paused'))return 'plan';
   if(pending.some(e=>e.kind==='digest'))return 'resume';
-  const urgent=pending.find(addressed);if(urgent&&t-urgent._rx>=1500)return urgent.kind==='invite'?'invited-together':urgent.kind==='conversation.invite'?'invited':urgent.kind==='conversation.turn'?'conversation':urgent.kind==='fade'?'fade':'spoken-to';
+  const urgent=pending.find(addressed);if(urgent&&t-urgent._rx>=1500)return urgent.kind==='invite'?'invited-together':urgent.kind==='conversation.invite'?'invited':urgent.kind==='conversation.turn'?'conversation':'spoken-to';
   if(cadences?.nextReview())return 'review';
   const heard=pending.find(e=>e.kind==='speech');if(heard&&t-heard._rx>=4000&&since>=(busy?90_000:45_000))return 'heard';
-  if(!pushed&&idleMin>=o.fadeGuardMinutes&&t-fadeKick>120_000)return 'fade';   // EVENTS-v1 worlds warn us themselves (fade events)
   if(pending.some(e=>e.kind==='plan.done')&&!busy&&since>=5000)return 'plan-done';
   if(pending.some(e=>e.kind==='receipt'&&e.receipt?.id===lastReceipt&&TERMINAL.has(e.receipt?.phase))&&!busy&&!bodyQueue?.snapshot().steps.some(s=>['pending','dispatching','running','waiting','stopping','waiting-condition'].includes(s.status))&&since>=15_000)return 'done';
   if(pending.some(e=>e.kind==='world'||(e.kind==='conversation.member'&&e.change==='joined'))&&since>=60_000)return 'news';
@@ -893,7 +909,7 @@ export async function live(...argv){
   const social=(ob.canDo?.available??[]).filter(c=>/^(go-near|wave|warm-by-fire|gather|object):/.test(c.id)).slice(0,8).map(c=>c.id);
   const conv=conversations.context().map(c=>JSON.stringify(c));
   const idle=Math.round((Date.now()-Date.parse(load().lastAcceptedAt??now()))/60_000);
-  return [`TIME ${ob.clock??''} ${ob.time??''}`,`YOU ${persona.name} at ${m.where} · ${m.state}${m.activity&&m.activity!=='idle'?' · '+clip(m.activity,60):''}${(m.openReceipts??[]).length?' · doing '+m.openReceipts.map(r=>r.capability+' '+r.phase).join(', '):''} · fade ${m.fade?.colour??m.fade} (last action ${idle} min ago)`,
+  return [`TIME ${ob.clock??''} ${ob.time??''}`,`YOU ${persona.name} at ${m.where} · ${m.state}${m.activity&&m.activity!=='idle'?' · '+clip(m.activity,60):''}${(m.openReceipts??[]).length?' · doing '+m.openReceipts.map(r=>r.capability+' '+r.phase).join(', '):''} · last action ${idle} min ago`,
    `NEAR ${souls.length?souls.join(' | '):'nobody'}`,objs.length?`OBJECTS ${objs.join(' | ')}`:null,
    `DO HERE ${(ob.doHere??[]).slice(0,8).map(d=>d.id).join(', ')}${social.length?' | '+social.join(', '):''}`,
    m.holding||m.following||m.followedBy?`HANDS ${m.holding?'holding '+(m.holding.name??m.holding.kind):'empty'}${m.following?' · following '+(m.following.name??m.following.soulId??clip(m.following,40)):''}${m.followedBy?' · followed by '+m.followedBy.map(f=>f.name??f.soulId??f).join(', '):''}`:null,
@@ -920,9 +936,8 @@ export async function live(...argv){
   const own=ownerActive,later=!own&&laterDue(reason)?ownerLater:null;if(later)ownerLater=null;
   const b=useRoutine&&!own?routine:brain,newConv=b.isNew;
   const evText=evs.filter(e=>e.kind!=='receipt'||e.receipt?.id===lastReceipt).slice(-12).map(evLine);
-  const idleMin=Math.round((Date.now()-Date.parse(load().lastAcceptedAt??now()))/60_000);
   const why={done:'your last action finished; you are free now: choose your next activity',idle:'you are not doing anything right now: choose an activity',
-   check:`periodic check: you have been busy with ${busy} for a while; carry on (reply {"do":[]}) or change`,fade:`you have taken no action for ${idleMin} min (you fade at 60): do something now`,
+   check:`periodic check: you have been busy with ${busy} for a while; carry on (reply {"do":[]}) or change`,
    'spoken-to':'someone spoke to you: answer','heard':'you overheard speech nearby: join in only if it suits you',invited:'you are invited to a conversation: accept (and say something) or decline',
    conversation:'a new turn in your conversation: reply, or leave if it is finished',news:'news from the world',arrival:'someone arrived nearby','follow-up':'here are the results of the steps you just took','invited-together':'someone invites you to do something together (INVITES): accept or decline now, they are waiting',
    owner:'your owner asks you something directly (OWNER REQUEST): do it now and answer them in "owner"',
@@ -957,6 +972,7 @@ export async function live(...argv){
    return;
   }
   const plan=lastJSON(ans.text)??{do:[],unparsed:clip(ans.text,200)};
+  if(typeof plan.now==='string'&&plan.now.trim())await setNowLine(plan.now).then(r=>{if(r.now)logLive({now:r.now.text});}).catch(e=>logLive({nowError:clip(e.message,120)}));
   let steps;try{steps=replySteps(plan).map(normaliseStep);}catch(error){steps=[];pending.push({kind:'queue.refusal',text:error.message,_rx:Date.now()});}
   const results=[],localOwnerResults=[];const localOwnerResult=(operation,accepted,line)=>{localOwnerResults.push({operation,accepted,line});results.push(line);};let follow=false;if(reviewTask?.compile&&steps.length){results.push('Compilation body steps deferred: provide compile bindings instead of do.');steps=[];}
   if(own&&Array.isArray(plan.targets)&&plan.targets.length&&plan.targets.length<=8&&plan.targets.every(n=>typeof n==='string'&&n.length<=200&&literalSoulReference(own.text,n))){S.identityGoal={...S.identityGoal,ownerRequestId:own.id,text:own.text,requestedNames:plan.targets};saveS();}
@@ -1044,11 +1060,6 @@ export async function live(...argv){
   if(st.look){const k=String(st.look),r=k==='whatson'?await whatson():k==='explore'?await explore():k==='calendar'?await calendar():k.startsWith('object:')?await object(k.slice(7)):{note:'unknown look'};return {readOnly:true,line:clip(r,900),again:true};}
   return {accepted:false,code:'local.unknown-step',reason:'No supported step operation was requested',line:'refused local.unknown-step',again:true};
  }
- async function keepAlive(why){fadeKick=Date.now();if(bodyQueue.snapshot().steps.some(s=>['pending','dispatching','running','waiting','stopping','waiting-condition'].includes(s.status)))return;
-  // EVENTS-v1: a chosen resting posture holds fade at green, so one sit lasts; older worlds need movement every 20 min
-  let r={accepted:false};for(const [c,p] of pushed?[['sit:here','{"seconds":600}'],['sit-ground:here','{"seconds":600}'],['wander:here','{"seconds":600}']]:[['wander:here','{"seconds":600}']]){r=await act(c,p).catch(()=>({accepted:false}));if(r.accepted){lastReceipt=load().lastReceipt;busy=c;break;}}
-  logLive({keepAlive:why,accepted:!!r.accepted});console.log(`keep-alive (${why}): wander ${r.accepted?'ok':'refused'}`);}
-
  // ---- main loop: long-poll the world (free) and wake the model only when wakeReason() says so
  while(!stopping){
   try{
@@ -1076,12 +1087,11 @@ export async function live(...argv){
    if(ownerQueue.length){await think('owner');continue;} // the owner's requests are always answered, whatever the budget (they are counted)
    const reason=wakeReason();if(!reason)continue;
    if(laterDue(reason)){await think(reason);continue;} // the next step of an owner's request
-   const urgent=['invited','invited-together','conversation','spoken-to','fade','plan'].includes(reason);
-   if(dayTokens()>=o.tokensPerDay){if(reason==='fade')await keepAlive('daily token cap reached');else if(!urgent)lastCallAt=Date.now();pending=pending.filter(e=>!addressed(e));continue;}
-   if(reason!=='review'&&hourCalls()>=o.callsPerHour*(urgent?1.5:1)){if(reason==='fade')await keepAlive('hourly call cap reached');lastCallAt=Date.now()-Math.max(0,idleGap-60_000);continue;}
+   const urgent=['invited','invited-together','conversation','spoken-to','plan'].includes(reason);
+   if(dayTokens()>=o.tokensPerDay){if(!urgent)lastCallAt=Date.now();pending=pending.filter(e=>!addressed(e));continue;}
+   if(reason!=='review'&&hourCalls()>=o.callsPerHour*(urgent?1.5:1)){lastCallAt=Date.now()-Math.max(0,idleGap-60_000);continue;}
    const useRoutine=!!routine&&['done','idle','check','arrival','news'].includes(reason);
-   const before=load().lastAcceptedAt;await think(reason,0,useRoutine);
-   if(reason==='fade'&&load().lastAcceptedAt===before)await keepAlive('model chose no action near fading');
+   await think(reason,0,useRoutine);
   }catch(e){logLive({error:clip(e.message,300)});console.log('live error: '+clip(e.message,200));await sleep(10_000);}
  }
  clearTimeout(cohortTimer);streamAbort.abort();receiptReads.close();bodyQueue.close();await brain.close();await routine?.close();telemetry=null;saveS();clearInterval(watcher);unwatchParent();unlock();logLive({stop:true});console.log('live: stopped.');return {stopped:true,cost:costLine(readCostLog(),o)};
@@ -1148,7 +1158,7 @@ export async function resolveAct(first,...rest){
 export async function report(){
  const o=await observe(),L=liveRunning(),m=o.me??{},h=await hereRaw().catch(()=>null),pl=await eventsV1().catch(()=>false)?(await call(EDGE.plan).catch(()=>null))?.data?.plan??null:null;
  const recent=readJSONL(LIVE.log).filter(x=>x.results?.length).slice(-5).map(x=>`${x.t.slice(11,16)}Z ${x.reason}: ${clip(x.results.join('; '),160)}`);
- return {soul:m.name,clock:o.clock,where:m.where,state:m.state,doing:m.activity,...(m.holding?{holding:m.holding.name??m.holding.kind}:{}),...(m.following?{following:m.following.name??m.following}:{}),fade:m.fade?.colour??m.fade,
+ return {soul:m.name,clock:o.clock,where:m.where,state:m.state,doing:m.activity,...(m.holding?{holding:m.holding.name??m.holding.kind}:{}),...(m.following?{following:m.following.name??m.following}:{}),
   near:(o.here?.souls??[]).slice(0,8).map(x=>[x.name,x.distance!=null?Math.round(x.distance)+'m':null,x.state??x.activity].filter(Boolean).join(' · ')),
   objects:(o.here?.objects??[]).slice(0,6).map(x=>x.name??x.public?.title??x.id),...(o.here?.items?.length?{itemsHere:o.here.items.slice(0,5).map(i=>i.name??i.kind)}:{}),
   ...(o.invites?.length?{invitedBy:o.invites.map(i=>i.label??i.what)}:{}),doHere:(o.doHere??[]).slice(0,8).map(d=>d.label??d.id),
@@ -1231,11 +1241,23 @@ export async function ack(...args){const r=await clientAck(args,{call});save({la
 export async function result(...args){return clientResult(args,{call});}
 /** look around — the same as explore. */
 export async function look(what,...rest){if(what!=='around')throw new Error('usage: look around [--full]   (a body action: act look <target>; your appearance: body look)');return explore(...rest);}
-const commands={look,listen,ack,result,body,travel,live,dashboard,profile,tell,report,view,cost,plan,events,attend,register,status,approval,'pair-soul':pairSoul,'select-soul':selectSoul,'create-soul':createSoul,here,observe,capabilities,map,digest,calendar,whatson,explore,act,resolve:resolveAct,say,converse,object,mark,project,wait,receipt,accept,decline,version:async()=>({skillVersion:SKILL_VERSION,contract:CONTRACT,apiContract:API_CONTRACT})};
+/** LINK (1.9.17): set the Soul's public `now` line alone: now "<text>" · now --clear. */
+let lastNowSent;
+async function setNowLine(text){const clean=text===null?null:cleanNowText(text);if(clean===lastNowSent)return {now:undefined,unchanged:true};
+ const r=await call('/v1/edge/self/now',{body:{text:clean}});
+ if(r.status===404)return {now:null,set:false,reason:'This world does not show a now line yet.'};
+ if(r.status!==200)throw new Error(r.data?.message??`now refused (${r.status})`);lastNowSent=clean;return {now:r.data.now};}
+export async function nowCommand(...args){
+ if(args[0]==='--clear'&&args.length===1)return setNowLine(null);
+ const text=args.join(' ').trim();if(!text||text.startsWith('--'))throw new Error('usage: now "<one short first-person line, at most 140 characters>" · now --clear');
+ return setNowLine(text);}
+/** A --now no world call carried (an older world path, a refused act before the call): set it alone. */
+export async function flushNow(){if(nextNow===undefined)return;const text=nextNow;nextNow=undefined;try{await setNowLine(text);}catch(e){console.error('now not set: '+e.message);}}
+const commands={now:nowCommand,look,listen,ack,result,body,travel,live,dashboard,profile,tell,report,view,cost,plan,events,attend,register,status,approval,'pair-soul':pairSoul,'select-soul':selectSoul,'create-soul':createSoul,here,observe,capabilities,map,digest,calendar,whatson,explore,act,resolve:resolveAct,say,converse,object,mark,project,wait,receipt,accept,decline,version:async()=>({skillVersion:SKILL_VERSION,contract:CONTRACT,apiContract:API_CONTRACT})};
 if(process.argv[1]&&import.meta.url===pathToFileURL(realpathSync(process.argv[1])).href){
  const [cmd,...args]=process.argv.slice(2);
  if(!cmd||['help','--help','-h'].includes(cmd)){console.log(clientHelp(SKILL_VERSION,CONTRACT));process.exit(0);}
  if(!commands[cmd]){console.log(`eden-agent ${SKILL_VERSION} (${CONTRACT})\nusage: node eden-agent.mjs <${Object.keys(commands).join('|')}> [args]\n  while live runs: tell "<your human's request>" --wait · report (what the Soul sees/does) · view --out view.jpg (a picture of what it sees) · full guide: SKILL.md`);process.exit(cmd?2:0);}
- try{console.log(JSON.stringify(await commands[cmd](...args),null,1));if(cmd==='live')process.exit(0);}
+ try{const argv=['act','say','ack','result','wait'].includes(cmd)?takeNowFlag(args):args;const out=await commands[cmd](...argv);await flushNow();console.log(JSON.stringify(out,null,1));if(cmd==='live')process.exit(0);}
  catch(e){console.error('error: '+e.message);process.exit(1);}
 }
