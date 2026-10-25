@@ -65,16 +65,17 @@ symlinks, gitignored) so server tests resolve workspace packages from this workt
   says what you will try, never what happened."; step 3 says each act serves the message acked last (`--for`).
   93 → 93 lines, 5,990 → 5,970 bytes (≈1.5k tokens). SOURCES.json skill hash + 2.1.0.
 
-## Uncommitted: D2 walk into a one-room building (see the walk-audit note)
-- `god/nav.ts:371-375` (goal) + `:691` (label): a building whose front door reads closed and that has exactly one room is
-  walked into that room (as `walk:<b>/<room>`), label "inside, into <room>". Test `edge-walk-into-building.test.ts`
-  (Eden 2026 commons → "walk to the pavilion on the commons" ends in `g-commons-pavilion.pavilion`; fails on the old
-  nav.ts at [9.0, -1.3], the playtest's exact spot).
-- Walk audit (`walk.mjs`, all worlds, load ~27): eden-2026, bench-eden, genesis, bench-hamlet unchanged; **fuzz WORSE:
-  hedge-cabin bad 0 → 13 (walk:hedge-cabin and everything inside it nav.disconnected), unusable 2 → 5.** A second fuzz
-  run is the check for flakiness — see the result line below. Do not commit nav.ts until hedge-cabin is understood.
-- Multi-room buildings with a closed door still end at the door; their label already says "to its front door
-  (closed)". A receipt "at the door" line was not added (the outcome summary names the outside place).
+### 6. D2: a walk to a one-room building lands inside (commit after STATUS)
+- Before: "walk to the pavilion on the commons" → `walk:commons-pavilion` "to its front door (closed)"; 4 of 4 walks
+  ended at [9, -1.5], outside the pavilion floor; only `walk:commons-pavilion/pavilion` got in.
+- After: `god/nav.ts:371-375` (goal) + `:691` (label): a building whose front door reads closed and that has exactly one
+  room is walked into that room, as `walk:<b>/<room>` is; label "inside, into <room>". Multi-room buildings with a closed
+  door still end at the door (their label already says so); no separate "at the door" receipt line was added.
+- Test: `edge-walk-into-building.test.ts` (Eden 2026; fails on the old nav.ts at [9.0, -1.3], the playtest's spot).
+- Walk audit: run 1 (all worlds, concurrent with Eden-boot tests, load ~27) showed fuzz hedge-cabin bad 0 → 13; run 2
+  (`walk.mjs --world fuzz`, alone) **fuzz 536 → 536, unusable 277 → 277, equal to baseline**; eden-2026, bench-eden,
+  genesis, bench-hamlet were equal in run 1. Baseline untouched. Treat the run-1 hedge-cabin line as load flake, but
+  the gate's V3-walk is the authority.
 
 ## Not done: D1 (body state) — precise plan
 1. Server, one derivation `bodyState(entityId)` in `edge/ledger/ledger.ts` beside `seatIsHere`: `{posture, activity,
@@ -98,6 +99,6 @@ symlinks, gitignored) so server tests resolve workspace packages from this workt
    swim-then-wave body reading in-water, and `sit:here` receipt `now` = "walking to …" until seated.
 
 ## Still open for the coordinator
-- Re-run on a quiet machine: `edge-ledger-resolve-phrases.test.ts`, `edge-ledger-library-not-stair.test.ts` (both boot
-  Eden 2026; timed out / interrupted under load).
+- Re-run on a quiet machine: `edge-ledger-resolve-phrases.test.ts` (timed out at 600 s under load) and the Eden half of
+  `edge-ledger-library-not-stair.test.ts` (its synthetic half passed; the Eden walk hit its 900 s limit under load 27).
 - Walk baseline and bundle budget untouched (no web change).
