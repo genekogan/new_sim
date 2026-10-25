@@ -9,7 +9,8 @@ export async function callModel({ model = 'opus', prompt, cwd = process.cwd(), a
   if (allowedTools.length) args.push('--allowedTools', ...allowedTools); else args.push('--tools', '');
   if (appendSystem) args.push('--append-system-prompt', appendSystem);
   if (effort) args.push('--effort', effort);
-  const env = { ...process.env }; delete env.CLAUDECODE; delete env.CLAUDE_CODE_ENTRYPOINT;
+  // Input fidelity: a seat, persona, reviewer or developer must never inherit this repo's or the user's CLAUDE.md.
+  const env = { ...process.env, CLAUDE_CODE_DISABLE_CLAUDE_MDS: '1' }; delete env.CLAUDECODE; delete env.CLAUDE_CODE_ENTRYPOINT;
   const r = await run('claude', args, { cwd, env, maxWallMs: maxWallSec * 1000 });
   let parsed = null; try { parsed = JSON.parse(r.stdout); } catch { /* not json */ }
   const text = parsed?.result ?? r.stdout;
