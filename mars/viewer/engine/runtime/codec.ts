@@ -25,23 +25,24 @@ const isPlain = (o: object) => {
 };
 
 type Captured = { refs: number } & (
-  | { kind: 'object'; entries: [string, unknown][]; tilde: boolean }
+  | { kind: 'object'; keys: string[]; values: unknown[]; tilde: boolean }
   | { kind: 'array'; values: unknown[] }
   | { kind: 'set'; values: unknown[] }
   | { kind: 'map'; entries: [unknown, unknown][] }
 );
 
-function rejectSymbolKeys(v: object, path: string): void {
+type ErrorPath = (key?: string) => string;
+function rejectSymbolKeys(v: object, path: ErrorPath): void {
   for (const key of Object.getOwnPropertySymbols(v))
     if (Object.getOwnPropertyDescriptor(v, key)!.enumerable)
-      throw new CodecError(path, 'an object with an enumerable symbol key');
+      throw new CodecError(path(), 'an object with an enumerable symbol key');
 }
 
 /** Read descriptors, never values through accessors (including diagnostic getters such as constructor/name). */
-function dataValue(v: object, key: string, path: string): unknown {
+function dataValue(v: object, key: string, path: ErrorPath): unknown {
   const descriptor = Object.getOwnPropertyDescriptor(v, key);
-  if (!descriptor) throw new CodecError(path, 'an array hole');
-  if (!('value' in descriptor)) throw new CodecError(path, 'an accessor property');
+  if (!descriptor) throw new CodecError(path(key), 'an array hole');
+  if (!('value' in descriptor)) throw new CodecError(path(key), 'an accessor property');
   return descriptor.value;
 }
 
@@ -59,54 +60,71 @@ export function encode(root: unknown, rootPath = '$', skipMapValues: ReadonlySet
   // Pass 1 validates and captures each object's children once, and counts references.
   // Pass 2 reads only these captured values: no getters, source iterators or second source traversal.
   const captured = new Map<object, Captured>();
-  const visit = (v: unknown, path: string) => {
+  // Successful captures need no diagnostic strings. Reuse these stacks rather than
+  // constructing a full path twice per property (descriptor validation and traversal).
+  type PathKind = 'property' | 'map key' | 'map value' | 'set';
+  const pathKeys: (string | number)[] = [], pathKinds: PathKind[] = [];
+  const path: ErrorPath = (key) => {
+    let out = rootPath;
+    for (let i = 0; i < pathKeys.length; i++)
+      out += pathKinds[i] === 'property' ? `.${pathKeys[i]}` : `.<${pathKinds[i]} ${pathKeys[i]}>`;
+    return key === undefined ? out : `${out}.${key}`;
+  };
+  const visit = (v: unknown, key?: string | number, kind: PathKind = 'property'): void => {
     const type = typeof v;
-    if (type === 'function' || type === 'symbol' || type === 'bigint') throw new CodecError(path, `a ${type}`);
-    if (typeof v !== 'object' || v === null) return;
-    const known = captured.get(v);
+    if (v === null || type === 'number' || type === 'string' || type === 'boolean' || type === 'undefined') return;
+    const known = typeof v === 'object' ? captured.get(v) : undefined;
     if (known) { known.refs++; return; }
+    // Keep one recursive frame per graph edge, as before lazy paths. Primitive
+    // leaves and already-captured aliases do not need path bookkeeping at all.
+    if (key !== undefined) { pathKeys.push(key); pathKinds.push(kind); }
+    if (typeof v !== 'object' || v === null) throw new CodecError(path(), `a ${type}`);
     rejectSymbolKeys(v, path);
     if (Array.isArray(v)) {
       const values: unknown[] = [], length = v.length;
       for (const key of Object.keys(v)) {
         const index = Number(key);
         if (!Number.isInteger(index) || index < 0 || index >= length || String(index) !== key)
-          throw new CodecError(`${path}.${key}`, 'an extra array property');
+          throw new CodecError(path(key), 'an extra array property');
       }
-      for (let i = 0; i < length; i++) values.push(dataValue(v, String(i), `${path}.${i}`));
+      for (let i = 0; i < length; i++) values.push(dataValue(v, String(i), path));
       captured.set(v, { kind: 'array', refs: 1, values });
-      for (let i = 0; i < values.length; i++) visit(values[i], `${path}.${i}`);
+      for (let i = 0; i < values.length; i++) visit(values[i], i);
     } else if (v instanceof Map) {
       const extra = Object.keys(v)[0];
-      if (extra !== undefined) throw new CodecError(`${path}.${extra}`, 'an extra Map property');
+      if (extra !== undefined) throw new CodecError(path(extra), 'an extra Map property');
       const entries: [unknown, unknown][] = [];
       // Native iteration bypasses user-defined iterators and never coerces object keys for a path.
       for (const [key, value] of Map.prototype.entries.call(v))
         if (!(typeof value === 'object' && value !== null && skipMapValues.has(value))) entries.push([key, value]);
       captured.set(v, { kind: 'map', refs: 1, entries });
       for (let i = 0; i < entries.length; i++) {
-        visit(entries[i][0], `${path}.<map key ${i}>`);
-        visit(entries[i][1], `${path}.<map value ${i}>`);
+        visit(entries[i][0], i, 'map key');
+        visit(entries[i][1], i, 'map value');
       }
     } else if (v instanceof Set) {
       const extra = Object.keys(v)[0];
-      if (extra !== undefined) throw new CodecError(`${path}.${extra}`, 'an extra Set property');
+      if (extra !== undefined) throw new CodecError(path(extra), 'an extra Set property');
       const values: unknown[] = [...Set.prototype.values.call(v)];
       captured.set(v, { kind: 'set', refs: 1, values });
-      for (let i = 0; i < values.length; i++) visit(values[i], `${path}.<set ${i}>`);
+      for (let i = 0; i < values.length; i++) visit(values[i], i, 'set');
     } else {
-      if (!isPlain(v)) throw new CodecError(path, 'an instance with an unsupported prototype');
-      const entries: [string, unknown][] = [];
+      if (!isPlain(v)) throw new CodecError(path(), 'an instance with an unsupported prototype');
+      // Keep Object.keys' ordering and one parallel value array; a tuple for every
+      // property would allocate another temporary object for each edge in the graph.
+      const keys = Object.keys(v), values: unknown[] = new Array(keys.length);
       let tilde = false;
-      for (const key of Object.keys(v)) {
-        entries.push([key, dataValue(v, key, `${path}.${key}`)]);
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        values[i] = dataValue(v, key, path);
         tilde ||= key.startsWith('~');
       }
-      captured.set(v, { kind: 'object', refs: 1, entries, tilde });
-      for (const [key, value] of entries) visit(value, `${path}.${key}`);
+      captured.set(v, { kind: 'object', refs: 1, keys, values, tilde });
+      for (let i = 0; i < keys.length; i++) visit(values[i], keys[i]);
     }
+    if (key !== undefined) { pathKeys.pop(); pathKinds.pop(); }
   };
-  visit(root, rootPath);
+  visit(root);
   // pass 2: emit in the same depth-first order decode() walks
   const ids = new Map<object, number>();
   let next = 0;
@@ -130,10 +148,10 @@ export function encode(root: unknown, rootPath = '$', skipMapValues: ReadonlySet
     if (node.kind === 'array') body = node.values.map(emit);
     else if (node.kind === 'set') body = { '~set': node.values.map(emit) };
     else if (node.kind === 'map') body = { '~map': node.entries.map(([key, value]) => [emit(key), emit(value)]) };
-    else if (node.tilde) body = { '~o': node.entries.map(([key, value]) => [key, emit(value)]) };
+    else if (node.tilde) body = { '~o': node.keys.map((key, i) => [key, emit(node.values[i])]) };
     else {
       const o: Record<string, unknown> = {};
-      for (const [key, value] of node.entries) putOwn(o, key, emit(value));
+      for (let i = 0; i < node.keys.length; i++) putOwn(o, node.keys[i], emit(node.values[i]));
       body = o;
     }
     return shared ? { '~id': myId, '~v': body } : body;

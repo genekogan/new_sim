@@ -205,6 +205,42 @@ test('native collection iteration and key paths bypass executable user hooks', (
   assert.equal(calls, 0);
 });
 
+test('lazy diagnostic paths retain nested collection positions, literal keys and custom roots', () => {
+  const bad = () => 1;
+  const cases: [unknown, string][] = [
+    [{ nested: [new Map([[new Set([{ deep: bad }]), 0]])] }, '$.nested.0.<map key 0>.<set 0>.deep'],
+    [{ map: new Map([['key', new Set([[0, { bad: 1n }]])]]) }, '$.map.<map value 0>.<set 0>.1.bad'],
+    [{ map: new Map([['key', [0, , 2]]]) }, '$.map.<map value 0>.1'],
+    [{ 'key.with.dots': { '': [Symbol('bad')] } }, '$.key.with.dots..0'],
+  ];
+  for (const [value, expected] of cases) {
+    for (const root of ['$', 'action a (walk_to) exec']) {
+      const path = root + expected.slice(1);
+      assert.throws(() => encode(value, root), error => error instanceof CodecError && error.path === path && error.message.startsWith(`${path} is `));
+    }
+  }
+  const shared = { clean: new Map([['values', new Set([1, undefined, -0])]]) };
+  const siblings = { first: shared, again: shared, last: { invalid: bad } };
+  assert.throws(() => encode(siblings), error => error instanceof CodecError && error.path === '$.last.invalid',
+    'a completed branch or alias must leave no stale path segments');
+  assert.equal(JSON.stringify(encode({ valid: [1, undefined, -0] })), JSON.stringify(legacyEncode({ valid: [1, undefined, -0] })),
+    'a failed capture must not leak path or traversal state into a later call');
+});
+
+test('descriptor refusal still precedes traversal of captured children', () => {
+  let calls = 0;
+  const getter = () => { calls++; return 0; };
+  const object = Object.defineProperty({ first: () => 1 }, 'later', { enumerable: true, get: getter });
+  const array = Object.defineProperty([() => 1, 0], '1', { enumerable: true, get: getter });
+  for (const [value, path] of [[{ object }, '$.object.later'], [{ array }, '$.array.1']] as const)
+    assert.throws(() => encode(value), error => error instanceof CodecError && error.path === path && error.message.includes('an accessor property'));
+  assert.equal(calls, 0);
+  const dropped = { invalid: () => 1 };
+  const map = new Map<unknown, unknown>([['discarded', dropped], ['retained', new Set([1n])]]);
+  assert.throws(() => encode({ map }, '$', new Set([dropped])), error => error instanceof CodecError && error.path === '$.map.<map value 0>.<set 0>',
+    'Map diagnostic positions continue to count only retained entries');
+});
+
 test('dropped Map values remove the whole entry before validation and preserve retained key/value aliases', () => {
   let calls = 0;
   const dropped = { closure: () => 1 }, badKey = Object.defineProperty({}, 'bad', { enumerable: true, get: () => { calls++; return 1; } });
