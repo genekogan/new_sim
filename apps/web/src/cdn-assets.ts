@@ -105,12 +105,78 @@ function godUpload(pathname: string, pageUrl: string): CdnAsset | undefined {
   return { key: `w/${m[1]}/assets/${m[2]}.glb`, sha256: m[2], bytes, licence: 'god-upload' };
 }
 
-/** `timeoutMs` bounds the wait for CDN headers and every stall in its body (no bytes for that long), so a large world
- *  file on a slow but moving connection is not abandoned halfway. `onProgress` reports verified-download progress
- *  under the original URL while the body is buffered for its hash check. PF2 (2026-10-20), as the page-entry snapshot
- *  (snapshot-wire.ts hedged): when the CDN has not answered in `hedgeMs`, the original request is made beside it and
- *  whichever answers first is used (the other is cancelled), instead of waiting out the 12 s timeout on a stalled CDN
- *  request. */
+type AssetRequest = { response: Promise<Response>; signal: AbortSignal; cancel(reason?: unknown): void; release(): void };
+const discardResponse = (response: Response) => { try { void response.body?.cancel().catch(() => {}); } catch { /* already reader-owned */ } };
+/** Own a header wait even when the underlying transport ignores AbortSignal. */
+function assetRequest(run: (signal: AbortSignal) => Promise<Response>, caller: AbortSignal | null | undefined, timeoutMs: number): AssetRequest {
+  const ctl = new AbortController(); let response: Response | undefined, timer: ReturnType<typeof setTimeout> | undefined;
+  const abort = () => ctl.abort(caller?.reason);
+  const release = () => { clearTimeout(timer); caller?.removeEventListener('abort', abort); };
+  const cancel = (reason?: unknown) => { ctl.abort(reason); if (response) discardResponse(response); release(); };
+  const promise = new Promise<Response>((resolve, reject) => {
+    let settled = false;
+    const finish = (error: unknown, value?: Response) => {
+      if (settled) { if (value) discardResponse(value); return; }
+      settled = true; clearTimeout(timer); ctl.signal.removeEventListener('abort', aborted);
+      if (value) { response = value; resolve(value); } else { release(); reject(error); }
+    };
+    const aborted = () => finish(ctl.signal.reason);
+    ctl.signal.addEventListener('abort', aborted, { once: true });
+    caller?.addEventListener('abort', abort, { once: true });
+    timer = setTimeout(() => cancel(new DOMException('Asset headers stalled', 'TimeoutError')), timeoutMs);
+    if (caller?.aborted) { abort(); return; }
+    Promise.resolve().then(() => { ctl.signal.throwIfAborted(); return run(ctl.signal); }).then(r => finish(null, r), e => finish(e));
+  });
+  return { response: promise, signal: ctl.signal, cancel, release };
+}
+
+/** Keep the native Response metadata, including clones, when replacing only its body stream. */
+function responseMetadata(out: Response, original: Pick<Response, 'url' | 'type' | 'redirected'>): Response {
+  const metadata = { url: original.url, type: original.type, redirected: original.redirected };
+  for (const key of ['url', 'type', 'redirected'] as const) Object.defineProperty(out, key, { value: metadata[key], configurable: true });
+  const clone = out.clone.bind(out);
+  Object.defineProperty(out, 'clone', { value: () => responseMetadata(clone(), metadata), configurable: true });
+  return out;
+}
+/** A timer exists only during a consumer pull waiting for positive bytes. Backpressure is not a network stall. */
+function guardedBody(response: Response, request: AssetRequest, timeoutMs: number): Response {
+  request.signal.throwIfAborted();
+  if (!response.body) { request.release(); return response; } // also preserves opaque/status-0 and 204 responses
+  const reader = response.body.getReader();
+  let ended = false, timer: ReturnType<typeof setTimeout> | undefined, rejectRead: ((reason: unknown) => void) | undefined;
+  let controller: ReadableStreamDefaultController<Uint8Array>;
+  const release = () => { clearTimeout(timer); request.signal.removeEventListener('abort', aborted); request.release(); try { reader.releaseLock(); } catch { /* an ignored read may still be pending */ } };
+  const stop = (reason: unknown) => {
+    if (ended) return; ended = true; clearTimeout(timer); rejectRead?.(reason); rejectRead = undefined;
+    request.cancel(reason); try { void reader.cancel(reason).catch(() => {}); } catch { /* noncooperative stream */ }
+    release(); controller.error(reason);
+  };
+  const aborted = () => stop(request.signal.reason);
+  const stream = new ReadableStream<Uint8Array>({
+    start(c) { controller = c; request.signal.addEventListener('abort', aborted, { once: true }); if (request.signal.aborted) aborted(); },
+    async pull(c) {
+      if (ended) return;
+      timer = setTimeout(() => stop(new DOMException('Asset body stalled', 'TimeoutError')), timeoutMs);
+      try {
+        for (;;) {
+          const value = await new Promise<ReadableStreamReadResult<Uint8Array>>((resolve, reject) => {
+            rejectRead = reject; reader.read().then(resolve, reject);
+          });
+          rejectRead = undefined;
+          if (ended) return;
+          if (value.done) { ended = true; release(); c.close(); return; }
+          if (!value.value.byteLength) continue;
+          clearTimeout(timer); c.enqueue(value.value); return;
+        }
+      } catch (error) { stop(error); }
+    },
+    cancel(reason) { if (ended) return; ended = true; rejectRead?.(reason); rejectRead = undefined; request.cancel(reason); try { void reader.cancel(reason).catch(() => {}); } finally { release(); } },
+  }, { highWaterMark: 0 });
+  return responseMetadata(new Response(stream, { status: response.status, statusText: response.statusText, headers: response.headers }), response);
+}
+
+/** Listed assets use bounded header waits and positive-byte body inactivity, without a total transfer deadline.
+ * The original request retains its HTTP status and streaming body. Unlisted/range/non-GET requests pass through. */
 export const CDN_HEDGE_MS = 4_000;
 export function cdnFetch(original: Fetch, manifest: CdnManifest, origin: string, pageUrl: string, timeoutMs = 12_000, onProgress?: CdnProgress, hedgeMs = CDN_HEDGE_MS): Fetch {
   const remote = cdnOrigin(origin);
@@ -121,54 +187,55 @@ export function cdnFetch(original: Fetch, manifest: CdnManifest, origin: string,
     const headers = new Headers(init?.headers ?? request?.headers);
     const asset = method === 'GET' && !headers.has('range') ? manifestAsset(manifest, url, pageUrl) : undefined;
     if (!asset) return original(input, init);
-    const callerSignal = init?.signal ?? request?.signal;
-    const stall = new AbortController();
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const arm = () => { clearTimeout(timer); timer = setTimeout(() => stall.abort(new DOMException('CDN stalled', 'TimeoutError')), timeoutMs); };
-    const beside = new AbortController();
-    let hedge: Promise<Response> | null = null, hedgeTimer: ReturnType<typeof setTimeout> | undefined;
+    const caller = init?.signal ?? request?.signal;
+    const fromOrigin = () => assetRequest(signal => original(input, { ...init, signal }), caller, timeoutMs);
+    // Never send an origin's auth headers, cookies or referrer to the public bucket.
+    const cdn = assetRequest(signal => original(remote + '/' + asset.key, { method: 'GET', mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer', signal }), caller, timeoutMs);
+    let beside: AssetRequest | undefined, hedgeTimer: ReturnType<typeof setTimeout> | undefined, besideDiscarded = false;
+    let cdnBody: ReadableStreamDefaultReader<Uint8Array> | undefined;
     try {
-      arm();
-      const signal = callerSignal ? AbortSignal.any([callerSignal, stall.signal]) : stall.signal;
-      // Never send an origin's auth headers, cookies or referrer to the public bucket.
-      const fromCdn = original(remote + '/' + asset.key, { method: 'GET', mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer', signal });
-      const first = await new Promise<Response | 'original'>((resolve, reject) => {
-        fromCdn.then(resolve, reject);
-        hedgeTimer = setTimeout(() => {
-          hedge = original(input, { ...init, signal: callerSignal ? AbortSignal.any([callerSignal, beside.signal]) : beside.signal });
-          hedge.then(() => resolve('original'), () => {});
-        }, hedgeMs);
+      type Answer = { request: AssetRequest; response: Response };
+      const first = await new Promise<Answer>((resolve, reject) => {
+        let pending = 1, settled = false, failed: Answer | undefined;
+        const accept = (owner: AssetRequest) => (response: Response) => {
+          if (settled) { owner.cancel(); return; }
+          if (response.ok) { settled = true; resolve({ request: owner, response }); return; }
+          // An HTTP-error hedge must not cancel a pending successful response. Prefer the origin's terminal status.
+          if (!failed || owner === beside) { failed?.request.cancel(); failed = { request: owner, response }; } else owner.cancel();
+          if (--pending === 0) { settled = true; resolve(failed); }
+        };
+        const fail = (error: unknown) => { if (--pending === 0 && !settled) { settled = true; if (failed) resolve(failed); else reject(error); } };
+        cdn.response.then(accept(cdn), fail);
+        hedgeTimer = setTimeout(() => { if (settled) return; pending++; beside = fromOrigin(); beside.response.then(accept(beside), fail); }, hedgeMs);
       });
       clearTimeout(hedgeTimer);
-      if (first === 'original') { stall.abort(new DOMException('answered from the original', 'AbortError')); return hedge!; }
-      beside.abort();
-      const response = first;
-      if (!response.ok || !response.body) throw Error('CDN response failed');
-      const reader = response.body.getReader();
-      signal.addEventListener('abort', () => { void reader.cancel().catch(() => {}); }, { once: true });
-      const bytes = new Uint8Array(asset.bytes);
-      let loaded = 0;
-      for (arm(); ; arm()) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      if (beside && first.request === beside) { cdn.cancel(); return guardedBody(first.response, beside, timeoutMs); }
+      if (!first.response.ok || !first.response.body) throw Error('CDN response failed');
+      if (beside) { besideDiscarded = true; beside.cancel(); }
+      const response = guardedBody(first.response, cdn, timeoutMs);
+      cdnBody = response.body!.getReader();
+      const bytes = new Uint8Array(asset.bytes); let loaded = 0;
+      for (;;) {
+        const { done, value } = await cdnBody.read(); if (done) break;
         if (loaded + value.byteLength > asset.bytes) throw Error('CDN length mismatch');
-        bytes.set(value, loaded); loaded += value.byteLength;
-        onProgress?.(url, loaded, asset.bytes);
+        bytes.set(value, loaded); loaded += value.byteLength; onProgress?.(url, loaded, asset.bytes);
       }
-      callerSignal?.throwIfAborted();
-      if (loaded !== asset.bytes || stall.signal.aborted) throw Error('CDN length mismatch');
+      caller?.throwIfAborted();
+      if (loaded !== asset.bytes) throw Error('CDN length mismatch');
       const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(b => b.toString(16).padStart(2, '0')).join('');
       if (hash !== asset.sha256) throw Error('CDN hash mismatch');
-      callerSignal?.throwIfAborted();
+      caller?.throwIfAborted();
       const outHeaders = new Headers(response.headers);
-      outHeaders.delete('content-encoding'); // fetch already decoded the transfer encoding
+      outHeaders.delete('content-encoding');
       outHeaders.set('content-length', String(bytes.byteLength));
       return new Response(bytes, { status: 200, headers: outHeaders });
     } catch (error) {
-      if (callerSignal?.aborted) throw error;
-      // The caller's exact request survives HTTP/CORS/network/timeout/integrity errors (the one already beside it, if any).
-      return hedge && !beside.signal.aborted ? hedge : original(input, init);
-    } finally { clearTimeout(timer); clearTimeout(hedgeTimer); }
+      cdn.cancel(error); try { void cdnBody?.cancel(error).catch(() => {}); } catch { /* already closed */ }
+      if (caller?.aborted) { beside?.cancel(error); throw caller.reason; }
+      // Reuse a still-owned hedge; a cancelled loser must never be adopted for fallback.
+      const fallback = beside && !besideDiscarded ? beside : fromOrigin();
+      return guardedBody(await fallback.response, fallback, timeoutMs);
+    } finally { clearTimeout(hedgeTimer); try { cdnBody?.releaseLock(); } catch { /* cancellation pending */ } }
   };
 }
 
