@@ -10,7 +10,7 @@ import { randomUUID, randomBytes } from "node:crypto";
 import { resolve as resolvePath } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const VERSION = "2.0.0";
+const VERSION = "2.1.0";
 const STATE = ".eden-agent.json";
 const CLI = "node eden.mjs";
 
@@ -316,29 +316,58 @@ async function view(...args) {
 // The server resolves words to an offer, so this is one POST. With --wait it then
 // long-polls until the receipt is terminal and returns the final receipt.
 async function act(...argv) {
-  const { args, wait: waitFor } = waitOption(argv);
-  if (!args.length) throw new Error('usage: act "<what to do>" [params-json] [--wait [seconds]]');
+  const { args, wait: waitFor, json, for: forArg } = waitOption(argv);
+  if (!args.length) throw new Error('usage: act "<what to do>" [params-json] [--wait [seconds]] [--for <message-id>|none] [--json]');
   let params = {};
   if (args.at(-1).trim().startsWith("{")) params = JSON.parse(args.pop());
   const body = args[0].trim().startsWith("{") && args.length === 1
     ? { ...JSON.parse(args[0]), clientRef: randomUUID() }
     : { capability: args.join(" "), params, clientRef: randomUUID() };
-  const d = ok(await call("/v1/edge/act", { body }), "act");
+  // D3: the owner message this act serves (default: the newest one acked here in the last 15 min); the world writes its
+  // result line when the act ends, unless you write one first
+  const s = load(), implicit = forArg === undefined && s.lastAcked && Date.now() - Date.parse(s.lastAckedAt ?? 0) < 15 * 60_000;
+  const forId = forArg === "none" ? undefined : forArg ?? (implicit ? s.lastAcked : undefined);
+  let r = await call("/v1/edge/act", { body: forId ? { ...body, for: forId } : body });
+  if (implicit && r.status === 400 && /owner message/.test(r.data?.error?.message ?? "")) { save({ lastAcked: undefined, lastAckedAt: undefined }); r = await call("/v1/edge/act", { body }); }
+  const d = ok(r, "act");
   if (!d.accepted) return { accepted: false, code: d.code, reason: d.reason, ...(d.did_you_mean?.length ? { did_you_mean: d.did_you_mean.slice(0, 8) } : {}), ...(d.retry_after ? { retry_after: d.retry_after } : {}) };
-  const out = { accepted: true, receipt: d.receipt, ...(d.resolved ? { resolved: d.resolved } : {}), ...(d.chosen ? { chosen: d.chosen } : {}), channel: d.channel };
+  let out = { accepted: true, receipt: d.receipt, ...(d.resolved ? { resolved: d.resolved } : {}), ...(d.chosen ? { chosen: d.chosen } : {}), channel: d.channel, ...(d.for ? { for: d.for } : {}) };
   if (d.receipt?.id && d.channel !== "attention" && d.channel !== "none") save({ lastReceipt: d.receipt.id, lastActAt: now() });
-  if (waitFor && d.receipt?.id && !TERMINAL.has(d.receipt.phase)) return { ...out, ...(await wait(waitFor, d.receipt.id)) };
-  return out;
+  if (waitFor && d.receipt?.id && !TERMINAL.has(d.receipt.phase)) out = { ...out, ...(await wait(waitFor, d.receipt.id, "--json")) };
+  return json ? out : brief(out);
+}
+
+// D3: the default output is one top-level sentence from the world, `done` when the receipt has ended, else `now` (what
+// the body is doing: "walking to the bench, 18 m left; not sitting yet"), plus the few fields an agent needs; at most
+// 600 characters. --json prints everything.
+export function brief(out) {
+  const rec = out.receipt && !out.receipt.error ? out.receipt : null, fin = !!rec && TERMINAL.has(rec.phase);
+  const sentence = !rec ? null : fin ? rec.done ?? rec.outcome?.summary ?? `${rec.capability} ${rec.phase}${rec.reason ? `: ${rec.reason}` : ""}.`
+    : rec.now ?? `${rec.capability} ${rec.phase}: under way, not finished.`;
+  const o = {
+    ...(out.accepted !== undefined ? { accepted: out.accepted } : {}), ...(out.waited ? { waited: out.waited } : {}),
+    ...(sentence ? { [fin ? "done" : "now"]: sentence } : {}),
+    ...(rec ? { receipt: { id: rec.id, capability: rec.capability, phase: rec.phase, ...(rec.code ? { code: rec.code } : {}) } } : {}),
+    ...(out.for ? { for: out.for } : {}), ...(out.ownerMessages ? { ownerMessages: out.ownerMessages } : {}),
+    ...(out.resolved?.to && out.resolved.to !== out.resolved.from ? { resolved: out.resolved.to } : {}),
+    ...(out.events?.length ? { events: out.events.slice(-4).map((e) => e.text ?? e.kind) } : {}),
+  };
+  for (const k of ["events", "resolved", "receipt"]) if (JSON.stringify(o).length > 600) delete o[k];
+  const key = fin ? "done" : "now", over = JSON.stringify(o).length - 600;
+  if (over > 0 && o[key]) o[key] = o[key].slice(0, Math.max(40, o[key].length - over - 1)) + "…";
+  return o;
 }
 
 function waitOption(argv) {
   const args = [];
-  let wait = 0;
+  let wait = 0, json = false, forId;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--wait") { wait = /^\d+$/.test(argv[i + 1] ?? "") ? Number(argv[++i]) : 60; }
+    else if (argv[i] === "--json") json = true;
+    else if (argv[i] === "--for") forId = argv[++i];
     else args.push(argv[i]);
   }
-  return { args, wait };
+  return { args, wait, json, for: forId };
 }
 
 async function resolve(...args) {
@@ -351,7 +380,12 @@ async function resolve(...args) {
 
 // wait [seconds] [receiptId]: long-poll world events (max 60 s) until the receipt is terminal,
 // the owner writes, or an invitation arrives. Saves the event cursor.
-async function wait(seconds = 45, receiptId) {
+async function wait(...argv) {
+  const json = argv.includes("--json"), [secArg, idArg] = argv.filter((a) => a !== "--json");
+  const out = await waitRaw(secArg, idArg);
+  return json ? out : brief(out);
+}
+async function waitRaw(seconds = 45, receiptId) {
   const s = load();
   seconds = Math.min(60, Math.max(1, Number(seconds) || 45));
   receiptId = /^r_/.test(String(receiptId ?? "")) ? receiptId : s.lastReceipt;
@@ -379,7 +413,6 @@ async function wait(seconds = 45, receiptId) {
   if (receiptId) {
     const rec = await receipt(receiptId).catch((e) => ({ id: receiptId, error: String(e.message) }));
     out.receipt = rec;
-    out.done = TERMINAL.has(rec?.phase);
   }
   if (ownerWrote) {
     const inbox = await call("/v1/edge/inbox/listen?timeoutMs=0");
@@ -459,6 +492,7 @@ async function ack(id, reply) {
   if (!id) throw new Error('usage: ack <message-id> ["reply, up to 140 chars"]');
   if (reply && reply.length > 140) throw new Error("ack reply must be at most 140 characters");
   const d = clean(ok(await call(`/v1/edge/inbox/${encodeURIComponent(id)}/ack`, { body: reply ? { reply } : {} }), "ack"));
+  save({ lastAcked: id, lastAckedAt: now() });   // D3: the next act serves this message (act --for)
   return { acked: id, ...(reply ? { reply } : {}), ...d };
 }
 
@@ -467,6 +501,7 @@ async function result(id, outcome, ...text) {
   if (!id || !["done", "failed"].includes(outcome) || !t) throw new Error('usage: result <message-id> done|failed "what happened, up to 140 chars"');
   if (t.length > 140) throw new Error("result text must be at most 140 characters");
   const d = clean(ok(await call(`/v1/edge/inbox/${encodeURIComponent(id)}/result`, { body: { outcome, text: t } }), "result"));
+  if (load().lastAcked === id) save({ lastAcked: undefined, lastAckedAt: undefined });
   return { reported: id, outcome, text: t, ...d };
 }
 
@@ -571,7 +606,7 @@ setup     register <world-url>            create "<Name>" [--for CODE]    pair <
           approval [status|wait|cancel]   status                          guide
 look      here   observe   around [place]   caps [--search w] [--verb v] [--all]   map   view [--map|--alt-only|--out f]
           receipt [id]   events [--since c_N]   conversations
-do        act "<words or offer:id>" [params-json] [--wait [s]]     resolve "<words>"     wait [s] [receiptId]
+do        act "<words or offer:id>" [params-json] [--wait [s]] [--for id|none] [--json]   resolve "<words>"   wait [s] [receiptId] [--json]
           say "<text>"   converse <list|turns|start|say|accept|decline|leave|ask> …   object <id> [action] [json]
 owner     listen [--after id] [--once]   ack <id> ["reply"]   result <id> done|failed "<text>"
 self      profile [name|description|photo …]   body [presets|set|look …]   travel [<world>|home]

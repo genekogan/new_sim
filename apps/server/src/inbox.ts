@@ -17,7 +17,7 @@ export type InboxScope = {scope: string; owner: string};
 export type Outcome = 'done' | 'failed' | 'withdrawn';
 /** `reply` = the agent's first answer ("Got it: walking to the cottage"); a Soul's `result` = its second, the outcome
  *  ("Arrived" / "Couldn't: ..."), with `outcome` done or failed. */
-export type InboxMessage = {id: string; text: string; state: 'sent' | 'delivered' | 'acknowledged'; sentAt: number; deliveredAt?: number; acknowledgedAt?: number; reply?: string; outcome?: Outcome; result?: string; resultAt?: number};
+export type InboxMessage = {id: string; text: string; state: 'sent' | 'delivered' | 'acknowledged'; sentAt: number; deliveredAt?: number; acknowledgedAt?: number; reply?: string; outcome?: Outcome; result?: string; resultAt?: number; resultBy?: 'server'};
 /** Where a finished command's edits are: the camera's target and the span to frame. */
 export type TicketFocus = {x: number; y: number; z: number; span: number; label?: string; count: number};
 export type Ticket = InboxMessage & {focus?: TicketFocus; touched?: number};
@@ -27,7 +27,7 @@ export type Ticket = InboxMessage & {focus?: TicketFocus; touched?: number};
 export type Presence = 'listening' | 'working' | 'recent' | 'away';
 /** `listenedAt` (a Soul's box only): when its agent last had a listen open (now while one is), null = never; durable. */
 export type InboxView = {connected: boolean; lastSeenAt: number | null; listenedAt?: number | null; latest: InboxMessage | null; queued?: number; presence?: Presence; log?: Ticket[]};
-type QRow = {n: number; id: string; text: string; sent_at: number; delivered_at: number | null; acknowledged_at: number | null; reply: string | null; outcome: Outcome | null; touched: string | null; focus: string | null; result: string | null; result_at: number | null};
+type QRow = {n: number; id: string; text: string; sent_at: number; delivered_at: number | null; acknowledged_at: number | null; reply: string | null; outcome: Outcome | null; touched: string | null; focus: string | null; result: string | null; result_by?: string | null; result_at: number | null};
 export const INBOX_CONNECTED_MS = 120_000;
 export const INBOX_TEXT_MAX = 1000;
 /** God presence: a call within this long counts as connected; a god holding a command, within WORKING_MS. */
@@ -73,6 +73,8 @@ export class AgentInbox {
     CREATE UNIQUE INDEX IF NOT EXISTS soul_inbox_queue_v1_id ON soul_inbox_queue_v1(world_id,scope,owner,id);
     CREATE INDEX IF NOT EXISTS soul_inbox_queue_v1_open ON soul_inbox_queue_v1(world_id,scope,owner,n) WHERE acknowledged_at IS NULL;`);
     if (!(db.db.prepare(`SELECT 1 FROM pragma_table_info('agent_inbox_v1') WHERE name='listened_at'`).get())) db.db.exec('ALTER TABLE agent_inbox_v1 ADD COLUMN listened_at INTEGER');
+    // D3: 'server' when the world wrote a message's result from the act linked to it (the agent's own result replaces it)
+    if (!(db.db.prepare(`SELECT 1 FROM pragma_table_info('soul_inbox_queue_v1') WHERE name='result_by'`).get())) db.db.exec('ALTER TABLE soul_inbox_queue_v1 ADD COLUMN result_by TEXT');
     // A message still waiting in the old one-message box becomes the first of its queue; the old slot is then emptied
     // (only last_seen_at stays there), so a later boot never moves it again.
     db.db.exec('BEGIN');
@@ -89,8 +91,8 @@ export class AgentInbox {
   /** Which queue holds this box: the god's (one per owner) or a Soul's (one per Soul and owner). */
   private q(s: InboxScope) {
     return s.scope === 'god'
-      ? {t: 'god_inbox_queue_v1', k: 'world_id=? AND owner=?', cols: 'world_id,owner', a: [this.worldId, s.owner], sel: QCOLS + ',NULL AS result,NULL AS result_at'}
-      : {t: 'soul_inbox_queue_v1', k: 'world_id=? AND scope=? AND owner=?', cols: 'world_id,scope,owner', a: [this.worldId, s.scope, s.owner], sel: QCOLS + ',result,result_at'};
+      ? {t: 'god_inbox_queue_v1', k: 'world_id=? AND owner=?', cols: 'world_id,owner', a: [this.worldId, s.owner], sel: QCOLS + ',NULL AS result,NULL AS result_at,NULL AS result_by'}
+      : {t: 'soul_inbox_queue_v1', k: 'world_id=? AND scope=? AND owner=?', cols: 'world_id,scope,owner', a: [this.worldId, s.scope, s.owner], sel: QCOLS + ',result,result_at,result_by'};
   }
   private get(s: InboxScope, where: string, ...args: SQLInputValue[]) { const q = this.q(s); return this.db.db.prepare(`SELECT ${q.sel} FROM ${q.t} WHERE ${q.k} ${where}`).get(...q.a, ...args) as QRow | undefined; }
   private all(s: InboxScope, where: string, ...args: SQLInputValue[]) { const q = this.q(s); return this.db.db.prepare(`SELECT ${q.sel} FROM ${q.t} WHERE ${q.k} ${where}`).all(...q.a, ...args) as QRow[]; }
@@ -107,7 +109,7 @@ export class AgentInbox {
     return {id: r.id, text: r.text, state: r.acknowledged_at !== null ? 'acknowledged' : r.delivered_at !== null ? 'delivered' : 'sent', sentAt: r.sent_at,
       ...(r.delivered_at !== null ? {deliveredAt: r.delivered_at} : {}), ...(r.acknowledged_at !== null ? {acknowledgedAt: r.acknowledged_at} : {}),
       ...(r.reply !== null ? {reply: r.reply} : {}), ...(r.acknowledged_at !== null && r.outcome ? {outcome: r.outcome} : {}),
-      ...(r.result != null ? {result: r.result} : {}), ...(r.result_at != null ? {resultAt: r.result_at} : {})};
+      ...(r.result != null ? {result: r.result} : {}), ...(r.result_at != null ? {resultAt: r.result_at} : {}), ...(r.result_by === 'server' ? {resultBy: 'server' as const} : {})};
   }
   private ticket(r: QRow): Ticket {
     const touched = r.touched ? (JSON.parse(r.touched) as string[]).length : 0;
@@ -211,14 +213,26 @@ export class AgentInbox {
     if (outcome !== 'done' && outcome !== 'failed') throw new ApiError(400, 'invalid', 'outcome is done or failed');
     let r = this.get(s, 'AND id=?', id);
     if (!r) throw new ApiError(404, 'not-found', 'no such message (it may be too old)');
-    if (r.result_at !== null) {
+    if (r.result_at !== null && r.result_by !== 'server') {
       if (r.result === text.trim() && r.outcome === outcome) return {...this.view(s), latest: this.message(r)};
       throw new ApiError(409, 'finished', 'this message already has its result');
     }
     if (r.acknowledged_at === null) { this.acknowledge(s, id, undefined); r = this.get(s, 'AND id=?', id)!; }
-    this.set(s, 'result=?,result_at=?,outcome=?', r.n, text.trim(), this.now(), outcome);
+    this.set(s, 'result=?,result_at=?,outcome=?,result_by=NULL', r.n, text.trim(), this.now(), outcome);
     return {...this.view(s), latest: this.message(this.get(s, 'AND n=?', r.n)!)};
   }
+  /** D3 (playtest 2026-10-25: 39% of card messages got a result before the cutoff): the world's result for a message an
+   *  act was linked to (`act --for <id>`), written when that act ends. Never over the agent's own result; a later linked
+   *  act's end replaces the world's earlier line. False when nothing was written. */
+  serverResult(s: InboxScope, id: string, text: string, outcome: 'done' | 'failed'): boolean {
+    if (this.god(s)) return false;
+    const r = this.get(s, 'AND id=?', id); if (!r || (r.result_at !== null && r.result_by !== 'server')) return false;
+    const line = text.replace(/\s+/g, ' ').trim(); if (!line) return false;
+    this.set(s, "delivered_at=COALESCE(delivered_at,?),acknowledged_at=COALESCE(acknowledged_at,?),result=?,result_at=?,outcome=?,result_by='server'", r.n, this.now(), this.now(), line.length > 140 ? line.slice(0, 139) + '…' : line, this.now(), outcome);
+    return true;
+  }
+  /** D3: whether this Soul's box holds a message with this id (an act may be linked to it). */
+  hasMessage(s: InboxScope, id: string): boolean { return !this.god(s) && !!this.get(s, 'AND id=?', id); }
   /** The owner takes back a command that is not finished (waiting, or one the agent holds and never finished). */
   withdraw(s: InboxScope, id: string) {
     if (!this.god(s)) throw new ApiError(404, 'not-found', 'only god commands can be withdrawn');

@@ -2,10 +2,10 @@
   "what": "The Soul CLIs and Soul guides every launcher world serves (/eden.mjs, /skill.md, /instructions.md; retained legacy /eden-agent.mjs). Exact copies, never forks.",
   "controllerCli": {
     "file": "eden.mjs",
-    "version": "2.0.0",
-    "sha256": "57fd84f117894f6a1efbcacc4b44a590ddade475b53619150b0c65d442941701",
+    "version": "2.1.0",
+    "sha256": "a6f633ac222b05dba4a0015edad7c5ec91684555880b6b247926082213b7ff4c",
     "from": "authorized laptop 2 handover, copied from <team>/scratch/soul3/client-handover/eden.mjs",
-    "note": "SOUL3: the one-Soul, one-controller thin client (eden 2.0.0), served at /eden.mjs. Owned by the separate client rewrite; published byte for byte."
+    "note": "SOUL3: the one-Soul, one-controller thin client (eden 2.0.0), served at /eden.mjs. Owned by the separate client rewrite; published byte for byte. 2.1.0 (soul fix round 1, 2026-10-25, D3): act --for <message-id>|none (default: the newest message acked in this folder) links the act to the owner message the world closes when it ends; act/wait print one top-level now/done sentence in at most 600 characters, --json for everything."
   },
   "cli": {
     "file": "eden-agent.mjs",
