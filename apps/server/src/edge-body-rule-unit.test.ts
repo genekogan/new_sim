@@ -18,7 +18,7 @@ function fake(start: [number, number]) {
     souls: () => [soul], presence: () => ({listening: false, at: 0}), createdAt: () => 0,
     pose: () => ({x: pos.x, z: pos.z, level: 0}), posture: (): Posture => 'standing', agentBusy: () => false, running: () => running,
     dry, clear: (x, z) => !wall(x, z), places: (x, z) => inHouse(x, z) ? 'house' : '',
-    seat: () => null, decide: (_s, option, _l, steps) => {decisions.push({option, steps}); const to = steps.find(s => s.verb === 'walk_to')?.params.to; if (to) {pos.x = to[0]; pos.z = to[1];}},
+    seat: () => null, decide: (_s, option, _l, steps) => {decisions.push({option, steps}); const to = steps.find(s => s.verb === 'walk_to')?.params.to as [number, number] | undefined; if (to) {pos.x = to[0]; pos.z = to[1];}},
     stop: () => {running = false;}, publish: () => {},
   };
   return {pos, decisions, port, soul};
