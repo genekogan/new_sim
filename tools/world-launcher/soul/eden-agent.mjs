@@ -94,6 +94,7 @@ Travel: travel \xB7 travel <world on this site> \xB7 travel home (this folder fo
 Auto mode: dashboard [--engine codex] \xB7 live [--engine codex] \xB7 cost
 While live: tell "<human request>" --wait \xB7 report
 Owner inbox: listen [--after <last id>] (waits until your human writes, prints every waiting message; ack the batch, then run it again before the work) \xB7 wait 60 during an action returns when your human writes \xB7 ack <message-id> ["Got it: ..."] \xB7 result <message-id> done|failed "what happened"
+Public status: now "<one short first-person line>" \xB7 now --clear \xB7 or add --now "<line>" to act, say, ack, result or wait (public, \u2264140 characters; keep it true)
 Manual session: attend 90 \xB7 act/say/converse \xB7 attend --release
 Pause with the dashboard or its pause API; STOP ends the ordinary live loop.
 Guide: SKILL.md (Start or resume; Observe, resolve, finish).
@@ -3893,7 +3894,7 @@ async function travelCommand(args, { load: load2, save: save2, live: live2 = () 
 }
 
 // tools/edge-skill/eden-agent.mjs
-var SKILL_VERSION = "1.9.16";
+var SKILL_VERSION = "1.9.17";
 var CONTRACT = "eden-edge/1";
 var API_CONTRACT = "eden-edge/1.1";
 var STATE = ".eden-agent.json";
@@ -3935,7 +3936,35 @@ var OWNER = {
   request: (s, r) => `/v1/souls/${s}/intent-v2/requests/${r}`,
   diag: (s, r) => `/v1/souls/${s}/intent-v2/requests/${r}/diagnostics`
 };
-var FADE = { yellowMin: 30, redMin: 50, goneMin: 60 };
+var NOW_MAX = 140;
+var nextNow;
+function takeNowFlag(args) {
+  const i = args.indexOf("--now");
+  if (i < 0) return args;
+  const v = args[i + 1];
+  if (v === void 0 || v.startsWith("--")) throw new Error('usage: --now "<one short first-person line, at most 140 characters>"');
+  nextNow = cleanNowText(v);
+  return [...args.slice(0, i), ...args.slice(i + 2)];
+}
+function cleanNowText(v) {
+  const t = String(v).replace(/[\u0000-\u001f\u007f-\u009f]/g, " ").replace(/\s+/g, " ").trim();
+  if ([...t].length > NOW_MAX) throw new Error(`now is at most ${NOW_MAX} characters (yours has ${[...t].length})`);
+  return t || null;
+}
+function withNow(path, body2) {
+  if (nextNow === void 0) return { path, body: body2 };
+  if (body2 && /^\/v1\/edge\/(act|say|inbox\/[^/?]+\/(ack|result))$/.test(path)) {
+    const now2 = nextNow;
+    nextNow = void 0;
+    return { path, body: { ...body2, now: now2 } };
+  }
+  if (!body2 && path.startsWith("/v1/edge/wait?")) {
+    const now2 = nextNow;
+    nextNow = void 0;
+    return { path: `${path}&now=${encodeURIComponent(now2 ?? "")}`, body: body2 };
+  }
+  return { path, body: body2 };
+}
 var TERMINAL3 = /* @__PURE__ */ new Set(["completed", "failed", "replaced"]);
 var load = () => existsSync9(STATE) ? JSON.parse(readFileSync11(STATE, "utf8")) : {};
 var save = (patch) => {
@@ -3983,6 +4012,7 @@ function need(s, k, hint) {
 async function call(path, { body: body2, method, as = "soul", timeoutMs = 9e4, signal, extraHeaders = {} } = {}) {
   assertLiveDispatch(IN_LIVE, leaseHeld, method ?? (body2 ? "POST" : "GET"));
   const s = load(), headers = { "content-type": "application/json", ...extraHeaders };
+  if (as === "soul") ({ path, body: body2 } = withNow(path, body2));
   if (as === "owner" && s.accountAuth) {
     path = delegatedOwnerPath(path, need(s, "soul", "Complete an account approval first."));
     if (s.token) headers.authorization = `Bearer ${s.token}`;
@@ -4255,23 +4285,32 @@ When I ask you to have my Soul do something ("sit down", "go read a book", "hug 
 `;
   writeSoulGuides(process.cwd(), text3);
 }
+async function selfLink() {
+  const r = await call("/v1/edge/self/link");
+  if (r.status === 200) return { link: r.data.link, now: r.data.now ?? null };
+  if (r.status === 401 && r.data?.code === "control.revoked") {
+    const why = r.data.reason;
+    return { link: { state: "disconnected", reason: why === "replaced" ? "replaced" : why === "revoked" || why === "refused" ? "revoked" : "stopped-listening", since: r.data.revokedAt ? Date.parse(r.data.revokedAt) : null, holder: null }, now: null };
+  }
+  return { link: null, now: null };
+}
 async function status() {
   const s = load(), m = await mode(true);
   if (s.token && s.soul) folderGuide(s.soul);
   const idle = s.lastAcceptedAt ? Math.round((Date.now() - Date.parse(s.lastAcceptedAt)) / 6e4) : null;
-  const fade = idle == null ? "unknown" : idle >= FADE.goneMin ? "gone (act to reclaim)" : idle >= FADE.redMin ? "red" : idle >= FADE.yellowMin ? "yellow" : "green";
+  const self = s.token && m === "edge" ? await selfLink() : { link: null, now: null };
   return {
     skillVersion: SKILL_VERSION,
     contract: m === "edge" ? CONTRACT : "legacy owner routes",
     soul: s.soul ?? null,
     paired: !!s.token,
+    link: self.link,
+    now: self.now,
     minutesSinceAcceptedAction: idle,
-    fade,
     live: (() => {
       const L = liveRunning();
       return L ? `running (pid ${L.pid}): relay your human's requests with tell "<words>" --wait; report shows what the Soul sees` : "not running (act directly, or see SKILL.md: Start or resume)";
     })(),
-    ...idle != null && idle >= FADE.yellowMin - 5 ? { keepAlive: "Act soon: any accepted action resets fading." } : {},
     lastReceipt: s.lastReceipt ?? null,
     ...readJSON(LIVE.state, {}).health ? { runtime: (() => {
       const h = readJSON(LIVE.state, {}).health;
@@ -4298,8 +4337,7 @@ async function observe() {
         ...d.self?.following ? { following: d.self.following } : {},
         ...d.self?.followedBy?.length ? { followedBy: d.self.followedBy } : {},
         ...d.self?.game ? { game: d.self.game } : {},
-        openReceipts: (d.self?.receipts ?? []).map((r) => ({ id: r.id, capability: r.capability, phase: r.phase })),
-        fade: d.self?.fade ?? (await status()).fade
+        openReceipts: (d.self?.receipts ?? []).map((r) => ({ id: r.id, capability: r.capability, phase: r.phase }))
       },
       // 1.6.0: invitations to you come first (accept / decline), then your own open ones
       ...d.invites?.length ? { invites: d.invites } : {},
@@ -4313,7 +4351,7 @@ async function observe() {
   return {
     contract: "legacy",
     time: st.time,
-    me: { name: st.name, where: st.position?.region, state: st.activity, doing: st.doing, mood: st.mood, energy: st.energy, fade: (await status()).fade },
+    me: { name: st.name, where: st.position?.region, state: st.activity, doing: st.doing, mood: st.mood, energy: st.energy },
     here: { nearby: (st.nearby ?? []).slice(0, 12).map((n) => ({ who: n.who, distance: n.distance, doing: n.doing || void 0 })), untrusted: true },
     happening: st.happening,
     canDo: c.canDo
@@ -4859,7 +4897,7 @@ async function events(...args) {
     if (!/^c_(0|[1-9][0-9]{0,15})$/.test(c)) throw new Error("events --since requires an event cursor c_<number>");
     if (args.includes("--raw")) return { ...ok(await call(EDGE.wait(c, 1)), "events raw"), untrusted: true, note: "Full retained event page; this read does not consume the folder cursor. Continue with events --raw --since <returned cursor>. Conversation replay: converse turns <conversationId>." };
     const d = ok(await call(EDGE.eventsDigest(c)), "digest");
-    return { digest: d.text, cursor: d.cursor, since: d.since, counts: d.counts, conversations: d.conversations, gap: d.gap, toMe: d.toMe, invites: d.invites, salient: d.salient, plan: d.plan, fade: d.fade, untrusted: true, note: "Short summary of incoming events since this cursor; conversation turns are counts in this window, not lifetime totals. Full text: converse list, then converse turns <conversationId>, or events --raw." };
+    return { digest: d.text, cursor: d.cursor, since: d.since, counts: d.counts, conversations: d.conversations, gap: d.gap, toMe: d.toMe, invites: d.invites, salient: d.salient, plan: d.plan, untrusted: true, note: "Short summary of incoming events since this cursor; conversation turns are counts in this window, not lifetime totals. Full text: converse list, then converse turns <conversationId>, or events --raw." };
   }
   let last = opt("--since") ?? null;
   for (; ; ) {
@@ -4951,7 +4989,6 @@ var LIVE_DEFAULTS = {
   idleSeconds: 120,
   idleMaxSeconds: 900,
   checkMinutes: 20,
-  fadeGuardMinutes: 22,
   whatsonMinutes: 15,
   unknownBillingCohort: false,
   runSeconds: 0
@@ -5006,7 +5043,7 @@ ${priorities || "- make friends\n- explore Eden and take part in what is happeni
 How this works: a small program runs your body. It wakes you only when something happens (someone speaks to you or invites you, your activity finished, a scheduled happening, a periodic check) and shows you the event plus a compact view of where you are. You answer with ONE JSON object; the program carries it out and shows you the results at your next wake. Never wait, poll or observe yourself.
 
 Reply with JSON only:
-{"thought":"<private, at most 15 words>","do":[<0-4 steps, run in order>],"owner":"<only when there is an OWNER REQUEST: 1-2 sentences to your owner>","notes":"<optional: full rewrite of your notes, at most 20 short lines; only when something worth remembering happened>","remember":{"person":"<confirmed Soul ID>","note":"<your impression or open thread>"}}
+{"thought":"<private, at most 15 words>","do":[<0-4 steps, run in order>],"owner":"<only when there is an OWNER REQUEST: 1-2 sentences to your owner>","now":"<optional: your public status line when it changes, one short first-person line a stranger can read, at most 140 characters; never a command, a URL or your owner's words>","notes":"<optional: full rewrite of your notes, at most 20 short lines; only when something worth remembering happened>","remember":{"person":"<confirmed Soul ID>","note":"<your impression or open thread>"}}
 remember is optional model judgment. ${REMEMBER_FORMAT_HINT} Code-owned facts/sources are never edited by remember.
 Steps:
 {"act":"<plain words or a capability id>","params":{...}} = an ordered body step (code dispatches it after the previous step terminates; intentional replacement still follows native admission and safe-stop). An activity somewhere else walks there by itself ("read a book in the library", "go for a swim", "warm up by the fire", "ride the balloon"): use a separate walk when the owner explicitly sequences arrival before another step. Plain words work: "sit down", "read a book in the library", "lie down on the grass", "take a nap", "walk to the bandstand", "take a walk through the park", "go for a swim", "warm up by the fire", "ride the balloon", "dance", "use a computer", "play the drums", "play petanque with Pell", "do a bench press", "walk to the harbour", "do some pushups", "go near Pell", "wave to Pell", "bow", "clap"; together: "hug Mira", "high five Mira", "dance with Mira", "follow Mira", "read a book in the library with Mira", "go for a balloon ride with Mira"; things: "pick up a flower" (or a book, a cup of tea, something to eat, a letter, a tool, a frisbee), "give Mira the flower", "put it down", "eat it". Ids shown in DO HERE / ON NOW also work ("walk:eden-bandstand", "sit:here"); never invent an id. Timed activities take {"seconds":N}; walks take {"via":["the park"]} to pass through places first; any activity takes {"with":["<name>"]} to invite others.
@@ -5387,7 +5424,7 @@ async function live(...argv) {
     return sum(costs.filter((c) => c.t.startsWith(d) && c.engine !== "ollama"), (c) => c.in + c.read + c.write + c.out);
   };
   let lastSocialAt = Date.now(), nearCount = 0, night = false;
-  let cursor = s.cursor, pending = [], lastResults = [], lastCallAt = 0, idleGap = o.idleSeconds * 1e3, busy = null, lastReceipt = s.lastReceipt, whatsOn = null, whatsOnAt = 0, errors = 0, fadeKick = 0;
+  let cursor = s.cursor, pending = [], lastResults = [], lastCallAt = 0, idleGap = o.idleSeconds * 1e3, busy = null, lastReceipt = s.lastReceipt, whatsOn = null, whatsOnAt = 0, errors = 0;
   if (lastReceipt) {
     const r = await receipt(lastReceipt).catch(() => null);
     busy = r && (r.phase === "started" || r.phase === "waiting") ? r.capability : null;
@@ -5489,7 +5526,7 @@ async function live(...argv) {
     lastLean = fresh;
     lastHere = fresh.frame;
     const frame = fresh.frame;
-    return { clock: frame.clock, time: frame.day, me: { name: persona.name, where: (frame.me?.placePath ?? []).join(" < "), state: frame.me?.posture, activity: frame.me?.activity?.kind, holding: frame.me?.holding, fade: frame.me?.fade, openReceipts: busy && lastReceipt ? [{ id: lastReceipt, capability: busy, phase: "started" }] : [] }, here: { souls: (frame.near ?? []).map((x) => ({ ...x, soulId: x.id, distance: x.dist, state: x.doing })), objects: frame.objects ?? [] }, doHere: frame.doHere ?? [], canDo: summarise(fresh.capabilities ?? []), exits: frame.exits ?? [] };
+    return { clock: frame.clock, time: frame.day, me: { name: persona.name, where: (frame.me?.placePath ?? []).join(" < "), state: frame.me?.posture, activity: frame.me?.activity?.kind, holding: frame.me?.holding, openReceipts: busy && lastReceipt ? [{ id: lastReceipt, capability: busy, phase: "started" }] : [] }, here: { souls: (frame.near ?? []).map((x) => ({ ...x, soulId: x.id, distance: x.dist, state: x.doing })), objects: frame.objects ?? [] }, doHere: frame.doHere ?? [], canDo: summarise(fresh.capabilities ?? []), exits: frame.exits ?? [] };
   };
   const queueContext = () => ({ placeId: lastHere?.me?.place ?? null, nearCount: lastHere?.near?.length ?? 0, worldMinutes: lastLean?.clock?.absoluteWorldMinutes ?? initialBoot.clock?.absoluteWorldMinutes, busy: busy && lastReceipt ? { id: lastReceipt, capability: busy } : null });
   receiptReads = openClientReceipts({ scope: s.world + "|" + s.soul, soulId: s.soul, read: receipt, onChange: (rec) => {
@@ -5618,7 +5655,7 @@ async function live(...argv) {
   if (pushed && !quickTunnel) void streamLoop();
   console.log(`live: ${persona.name} \xB7 ${o.engine} ${o.model} (${o.memory}${warm ? ", resumed warm session" : ""}) \xB7 caps ${o.callsPerHour} calls/h, ${o.tokensPerDay} tokens/day \xB7 stop: Ctrl-C or touch ${LIVE.stop}`);
   logLive({ start: { engine: o.engine, model: o.model, memory: o.memory, resumed: !!warm, persona: persona.name } });
-  const addressed = (e) => e._sal >= 3 && e.kind !== "receipt" && !String(e.kind).startsWith("plan.") || e.kind === "conversation.invite" || e.kind === "invite" || e.kind === "conversation.turn" || e.kind === "speech" && (e.text ?? "").toLowerCase().includes(firstName) || e.kind === "fade" && e.colour && e.colour !== "green";
+  const addressed = (e) => e._sal >= 3 && e.kind !== "receipt" && !String(e.kind).startsWith("plan.") || e.kind === "conversation.invite" || e.kind === "invite" || e.kind === "conversation.turn" || e.kind === "speech" && (e.text ?? "").toLowerCase().includes(firstName);
   function reconcileIdentityGoal() {
     const id3 = S.identityGoal?.conversationId;
     if (!id3) return;
@@ -5665,16 +5702,15 @@ async function live(...argv) {
     if (e.kind === "plan.done" || e.kind === "plan.paused") planBusy = false;
   }
   function wakeReason() {
-    const t = Date.now(), since = t - lastCallAt, idleMin = (t - Date.parse(load().lastAcceptedAt ?? now())) / 6e4;
+    const t = Date.now(), since = t - lastCallAt;
     if (pending.some((e) => e.kind === "queue.refusal")) return "queue";
     if (pending.some((e) => e.kind === "plan.step.failed" || e.kind === "plan.paused")) return "plan";
     if (pending.some((e) => e.kind === "digest")) return "resume";
     const urgent = pending.find(addressed);
-    if (urgent && t - urgent._rx >= 1500) return urgent.kind === "invite" ? "invited-together" : urgent.kind === "conversation.invite" ? "invited" : urgent.kind === "conversation.turn" ? "conversation" : urgent.kind === "fade" ? "fade" : "spoken-to";
+    if (urgent && t - urgent._rx >= 1500) return urgent.kind === "invite" ? "invited-together" : urgent.kind === "conversation.invite" ? "invited" : urgent.kind === "conversation.turn" ? "conversation" : "spoken-to";
     if (cadences?.nextReview()) return "review";
     const heard = pending.find((e) => e.kind === "speech");
     if (heard && t - heard._rx >= 4e3 && since >= (busy ? 9e4 : 45e3)) return "heard";
-    if (!pushed && idleMin >= o.fadeGuardMinutes && t - fadeKick > 12e4) return "fade";
     if (pending.some((e) => e.kind === "plan.done") && !busy && since >= 5e3) return "plan-done";
     if (pending.some((e) => e.kind === "receipt" && e.receipt?.id === lastReceipt && TERMINAL3.has(e.receipt?.phase)) && !busy && !bodyQueue?.snapshot().steps.some((s2) => ["pending", "dispatching", "running", "waiting", "stopping", "waiting-condition"].includes(s2.status)) && since >= 15e3) return "done";
     if (pending.some((e) => e.kind === "world" || e.kind === "conversation.member" && e.change === "joined") && since >= 6e4) return "news";
@@ -5714,7 +5750,7 @@ async function live(...argv) {
     const idle = Math.round((Date.now() - Date.parse(load().lastAcceptedAt ?? now())) / 6e4);
     return [
       `TIME ${ob.clock ?? ""} ${ob.time ?? ""}`,
-      `YOU ${persona.name} at ${m.where} \xB7 ${m.state}${m.activity && m.activity !== "idle" ? " \xB7 " + clip(m.activity, 60) : ""}${(m.openReceipts ?? []).length ? " \xB7 doing " + m.openReceipts.map((r) => r.capability + " " + r.phase).join(", ") : ""} \xB7 fade ${m.fade?.colour ?? m.fade} (last action ${idle} min ago)`,
+      `YOU ${persona.name} at ${m.where} \xB7 ${m.state}${m.activity && m.activity !== "idle" ? " \xB7 " + clip(m.activity, 60) : ""}${(m.openReceipts ?? []).length ? " \xB7 doing " + m.openReceipts.map((r) => r.capability + " " + r.phase).join(", ") : ""} \xB7 last action ${idle} min ago`,
       `NEAR ${souls.length ? souls.join(" | ") : "nobody"}`,
       objs.length ? `OBJECTS ${objs.join(" | ")}` : null,
       `DO HERE ${(ob.doHere ?? []).slice(0, 8).map((d) => d.id).join(", ")}${social.length ? " | " + social.join(", ") : ""}`,
@@ -5811,12 +5847,10 @@ async function live(...argv) {
     if (later) ownerLater = null;
     const b = useRoutine && !own ? routine : brain, newConv = b.isNew;
     const evText = evs.filter((e) => e.kind !== "receipt" || e.receipt?.id === lastReceipt).slice(-12).map(evLine);
-    const idleMin = Math.round((Date.now() - Date.parse(load().lastAcceptedAt ?? now())) / 6e4);
     const why = {
       done: "your last action finished; you are free now: choose your next activity",
       idle: "you are not doing anything right now: choose an activity",
       check: `periodic check: you have been busy with ${busy} for a while; carry on (reply {"do":[]}) or change`,
-      fade: `you have taken no action for ${idleMin} min (you fade at 60): do something now`,
       "spoken-to": "someone spoke to you: answer",
       "heard": "you overheard speech nearby: join in only if it suits you",
       invited: "you are invited to a conversation: accept (and say something) or decline",
@@ -5921,6 +5955,9 @@ async function live(...argv) {
       return;
     }
     const plan2 = lastJSON(ans.text) ?? { do: [], unparsed: clip(ans.text, 200) };
+    if (typeof plan2.now === "string" && plan2.now.trim()) await setNowLine(plan2.now).then((r) => {
+      if (r.now) logLive({ now: r.now.text });
+    }).catch((e) => logLive({ nowError: clip(e.message, 120) }));
     let steps;
     try {
       steps = replySteps(plan2).map(normaliseStep);
@@ -6229,21 +6266,6 @@ async function live(...argv) {
     }
     return { accepted: false, code: "local.unknown-step", reason: "No supported step operation was requested", line: "refused local.unknown-step", again: true };
   }
-  async function keepAlive(why) {
-    fadeKick = Date.now();
-    if (bodyQueue.snapshot().steps.some((s2) => ["pending", "dispatching", "running", "waiting", "stopping", "waiting-condition"].includes(s2.status))) return;
-    let r = { accepted: false };
-    for (const [c, p] of pushed ? [["sit:here", '{"seconds":600}'], ["sit-ground:here", '{"seconds":600}'], ["wander:here", '{"seconds":600}']] : [["wander:here", '{"seconds":600}']]) {
-      r = await act(c, p).catch(() => ({ accepted: false }));
-      if (r.accepted) {
-        lastReceipt = load().lastReceipt;
-        busy = c;
-        break;
-      }
-    }
-    logLive({ keepAlive: why, accepted: !!r.accepted });
-    console.log(`keep-alive (${why}): wander ${r.accepted ? "ok" : "refused"}`);
-  }
   while (!stopping) {
     try {
       if (Date.now() >= runDeadline) {
@@ -6346,22 +6368,18 @@ async function live(...argv) {
         await think(reason);
         continue;
       }
-      const urgent = ["invited", "invited-together", "conversation", "spoken-to", "fade", "plan"].includes(reason);
+      const urgent = ["invited", "invited-together", "conversation", "spoken-to", "plan"].includes(reason);
       if (dayTokens() >= o.tokensPerDay) {
-        if (reason === "fade") await keepAlive("daily token cap reached");
-        else if (!urgent) lastCallAt = Date.now();
+        if (!urgent) lastCallAt = Date.now();
         pending = pending.filter((e) => !addressed(e));
         continue;
       }
       if (reason !== "review" && hourCalls() >= o.callsPerHour * (urgent ? 1.5 : 1)) {
-        if (reason === "fade") await keepAlive("hourly call cap reached");
         lastCallAt = Date.now() - Math.max(0, idleGap - 6e4);
         continue;
       }
       const useRoutine = !!routine && ["done", "idle", "check", "arrival", "news"].includes(reason);
-      const before = load().lastAcceptedAt;
       await think(reason, 0, useRoutine);
-      if (reason === "fade" && load().lastAcceptedAt === before) await keepAlive("model chose no action near fading");
     } catch (e) {
       logLive({ error: clip(e.message, 300) });
       console.log("live error: " + clip(e.message, 200));
@@ -6523,7 +6541,6 @@ async function report() {
     doing: m.activity,
     ...m.holding ? { holding: m.holding.name ?? m.holding.kind } : {},
     ...m.following ? { following: m.following.name ?? m.following } : {},
-    fade: m.fade?.colour ?? m.fade,
     near: (o.here?.souls ?? []).slice(0, 8).map((x) => [x.name, x.distance != null ? Math.round(x.distance) + "m" : null, x.state ?? x.activity].filter(Boolean).join(" \xB7 ")),
     objects: (o.here?.objects ?? []).slice(0, 6).map((x) => x.name ?? x.public?.title ?? x.id),
     ...o.here?.items?.length ? { itemsHere: o.here.items.slice(0, 5).map((i) => i.name ?? i.kind) } : {},
@@ -6712,7 +6729,33 @@ async function look(what, ...rest) {
   if (what !== "around") throw new Error("usage: look around [--full]   (a body action: act look <target>; your appearance: body look)");
   return explore(...rest);
 }
-var commands = { look, listen, ack, result, body, travel, live, dashboard, profile, tell, report, view, cost, plan, events, attend, register, status, approval, "pair-soul": pairSoul, "select-soul": selectSoul, "create-soul": createSoul, here, observe, capabilities, map, digest, calendar, whatson, explore, act, resolve: resolveAct, say, converse, object, mark, project, wait, receipt, accept, decline, version: async () => ({ skillVersion: SKILL_VERSION, contract: CONTRACT, apiContract: API_CONTRACT }) };
+var lastNowSent;
+async function setNowLine(text3) {
+  const clean3 = text3 === null ? null : cleanNowText(text3);
+  if (clean3 === lastNowSent) return { now: void 0, unchanged: true };
+  const r = await call("/v1/edge/self/now", { body: { text: clean3 } });
+  if (r.status === 404) return { now: null, set: false, reason: "This world does not show a now line yet." };
+  if (r.status !== 200) throw new Error(r.data?.message ?? `now refused (${r.status})`);
+  lastNowSent = clean3;
+  return { now: r.data.now };
+}
+async function nowCommand(...args) {
+  if (args[0] === "--clear" && args.length === 1) return setNowLine(null);
+  const text3 = args.join(" ").trim();
+  if (!text3 || text3.startsWith("--")) throw new Error('usage: now "<one short first-person line, at most 140 characters>" \xB7 now --clear');
+  return setNowLine(text3);
+}
+async function flushNow() {
+  if (nextNow === void 0) return;
+  const text3 = nextNow;
+  nextNow = void 0;
+  try {
+    await setNowLine(text3);
+  } catch (e) {
+    console.error("now not set: " + e.message);
+  }
+}
+var commands = { now: nowCommand, look, listen, ack, result, body, travel, live, dashboard, profile, tell, report, view, cost, plan, events, attend, register, status, approval, "pair-soul": pairSoul, "select-soul": selectSoul, "create-soul": createSoul, here, observe, capabilities, map, digest, calendar, whatson, explore, act, resolve: resolveAct, say, converse, object, mark, project, wait, receipt, accept, decline, version: async () => ({ skillVersion: SKILL_VERSION, contract: CONTRACT, apiContract: API_CONTRACT }) };
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync3(process.argv[1])).href) {
   const [cmd, ...args] = process.argv.slice(2);
   if (!cmd || ["help", "--help", "-h"].includes(cmd)) {
@@ -6726,7 +6769,10 @@ usage: node eden-agent.mjs <${Object.keys(commands).join("|")}> [args]
     process.exit(cmd ? 2 : 0);
   }
   try {
-    console.log(JSON.stringify(await commands[cmd](...args), null, 1));
+    const argv = ["act", "say", "ack", "result", "wait"].includes(cmd) ? takeNowFlag(args) : args;
+    const out = await commands[cmd](...argv);
+    await flushNow();
+    console.log(JSON.stringify(out, null, 1));
     if (cmd === "live") process.exit(0);
   } catch (e) {
     console.error("error: " + e.message);
@@ -6737,6 +6783,7 @@ export {
   API_CONTRACT,
   CONTRACT,
   CONVERSATION_MAX_INVITEES,
+  NOW_MAX,
   OWNER_WROTE_NOTE,
   SKILL_VERSION,
   accept,
@@ -6747,6 +6794,7 @@ export {
   body,
   calendar,
   capabilities,
+  cleanNowText,
   compactAround,
   conversationStartBody,
   converse,
@@ -6757,6 +6805,7 @@ export {
   digest,
   events,
   explore,
+  flushNow,
   forOption,
   here,
   intentOf,
@@ -6766,6 +6815,7 @@ export {
   look,
   map,
   mark,
+  nowCommand,
   object,
   observe,
   pairSoul,
@@ -6782,6 +6832,7 @@ export {
   searchTerms,
   selectSoul,
   status,
+  takeNowFlag,
   tell,
   travel,
   view,
