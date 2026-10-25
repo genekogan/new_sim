@@ -143,6 +143,9 @@ export class WorldHost {
   private acc = { paths: [] as PathCommit[], changes: [] as ChangeEvent[], log: [] as LogEvent[], dirty: new Set<string>(), removed: [] as string[], plays: [] as PlayView[], fromTick: 0 };
   private batchSeq = 0;
   private timer: NodeJS.Timeout | null = null;
+  private clockGeneration = 0;
+  private frameBatch: { remaining: number; generation: number } | null = null;
+  private frameImmediate: NodeJS.Immediate | null = null;
   private recoveryBaseline: SnapshotBody | null = null;
   /** Edge worlds: the Souls' bodies' poses at the start of the latest tick (valid: the previous tick passed the invariants). */
   private validPoses: { tick: number; poses: Map<string, RecoveryPose> } | null = null;
@@ -378,10 +381,22 @@ export class WorldHost {
   }
 
   start() {
+    if (this.timer) return;
     this.last = performance.now();
-    this.timer = setInterval(() => this.frame(), TICK_MS / this.pace);
+    this.clockGeneration++;
+    this.startFrameTimer();
   }
-  stop() { if (this.timer) clearInterval(this.timer); this.timer = null; }
+  private startFrameTimer() {
+    const generation = this.clockGeneration;
+    const timer = setInterval(() => { if (generation === this.clockGeneration && this.timer === timer) this.frame(); }, TICK_MS / this.pace);
+    this.timer = timer;
+  }
+  /** Stop/pause discard the pending tick batch, never queued inputs or accepted events; existing carry is retained. */
+  private cancelFrameBatch() {
+    if (this.frameImmediate) clearImmediate(this.frameImmediate);
+    this.frameImmediate = null; this.frameBatch = null;
+  }
+  stop() { if (this.timer) clearInterval(this.timer); this.timer = null; this.clockGeneration++; this.cancelFrameBatch(); }
   /** The world's own clock loop is running (start(); a served world). False while stepped by hand (tests, tools): lane P5
    *  defers some boot-time derived work only in a served world, so a stepped one sees it at the same tick as before. */
   get running(): boolean { return this.timer !== null; }
@@ -395,7 +410,7 @@ export class WorldHost {
     const now = performance.now();
     if (this.timer && !this.paused) this.carry += (Math.min(1000, now - this.last) * this.clockRate * this.pace) / TICK_MS;  // the time so far, at the old pace
     this.last = now; this.pace = pace;
-    if (this.timer) { clearInterval(this.timer); this.timer = setInterval(() => this.frame(), TICK_MS / pace); }
+    if (this.timer) { clearInterval(this.timer); this.startFrameTimer(); }
   }
 
   // ------------------------------------------------------------ the loop
@@ -403,11 +418,15 @@ export class WorldHost {
    *  is still going out: lane P5). Holds stay well under the 1 s elapsed cap, so the same ticks run, only later. */
   holdClock?: () => boolean;
   private frame() {
+    if (!this.timer) return;
+    if (this.paused || !this.clockAvailable) { this.cancelFrameBatch(); this.last = performance.now(); return; }
+    // A catch-up batch owns its original elapsed/carry/dilation decision. A held batch resumes from the timer;
+    // otherwise its single immediate continues it. Account wall time again only when starting the next batch.
+    if (this.frameBatch) { if (!this.frameImmediate) this.pumpFrame(this.frameBatch); return; }
     const now = performance.now();
     if (this.holdClock?.()) return;
     const elapsed = Math.min(1000, now - this.last);
     this.last = now;
-    if (this.paused) return;
     this.carry += (elapsed * this.clockRate * this.pace) / TICK_MS;
     let due = Math.floor(this.carry);
     this.carry -= due;
@@ -420,7 +439,27 @@ export class WorldHost {
       this.overruns = 0;
       if (this.clockRate < this.baseRate && ++this.calm >= 200) { this.calm = 0; this.clockRate = Math.min(this.baseRate, this.clockRate * 2); void this.enqueue('rules', 'system', { clockRate: this.clockRate, why: 'recovered' }); }
     }
-    for (let i = 0; i < due; i++) this.tickOnce();
+    if (due > 0) {
+      this.frameBatch = { remaining: due, generation: this.clockGeneration };
+      this.pumpFrame(this.frameBatch);
+    }
+  }
+  /** Yield only after a complete tick, including input logging, durable frontier, listeners and broadcasts. */
+  private pumpFrame(batch: { remaining: number; generation: number }) {
+    if (this.frameBatch !== batch || batch.generation !== this.clockGeneration || !this.timer) return;
+    if (this.paused || !this.clockAvailable) { this.cancelFrameBatch(); return; }
+    if (this.holdClock?.()) return; // park; the interval polls the hold without an immediate spin
+    batch.remaining--;
+    try { this.tickOnce(); }
+    catch (error) { this.cancelFrameBatch(); throw error; }
+    if (this.frameBatch !== batch) return; // a listener may have stopped/restarted or paused the host
+    if (this.paused || !this.clockAvailable) { this.cancelFrameBatch(); return; }
+    if (!batch.remaining) { this.frameBatch = null; return; }
+    this.frameImmediate = setImmediate(() => {
+      if (this.frameBatch !== batch || batch.generation !== this.clockGeneration) return;
+      this.frameImmediate = null;
+      this.pumpFrame(batch);
+    });
   }
 
   tickOnce() {
@@ -1413,6 +1452,7 @@ export class WorldHost {
     void this.enqueue('rules', author, { clockRate: rate, why });
   }
   setPaused(p: boolean, author: string) {
+    this.cancelFrameBatch();
     if (p) { void this.enqueue('admin', author, { action: 'pause' }); this.tickOnceForQueue(); this.paused = true; this.flush(); this.heartbeat(); }   // tell clients now: no tick will
     else { this.paused = false; this.last = performance.now(); this.carry = 0; void this.enqueue('admin', author, { action: 'resume' }); }
   }
