@@ -64,7 +64,7 @@ function previewContext(rt:Runtime,render?:RenderScene):PreviewContext{
 export function previewPunt(rt:Runtime,spec:CarrierInstallSpec,render?:RenderScene):{code:string;message:string}|null{
   return previewInContext(spec,previewContext(rt,render));
 }
-function previewInContext(spec:CarrierInstallSpec,context:PreviewContext,bankFirst=false):{code:string;message:string}|null{
+function previewInContext(spec:CarrierInstallSpec,context:PreviewContext):{code:string;message:string}|null{
   const no=(message:string)=>({code:'punt.unsupported-water',message});
   if(!spec.bank||!spec.routeKeys)return no('A punt needs a water-level loop and dry-bank boarding points.');
   const route:CarrierRoute={id:spec.route,keys:spec.routeKeys};
@@ -72,19 +72,13 @@ function previewInContext(spec:CarrierInstallSpec,context:PreviewContext,bankFir
   if(!surface)return no('There is no calm water deep and wide enough for the punt hull at this home.');
   const end=routeTicks(route);
   if(end<20*20||end>600*20)return no('A punt loop must take between 20 seconds and 10 minutes.');
-  // Generated candidates need only an acceptance verdict. A bank failure is conclusive
-  // before the expensive route sweep; public previews keep their original diagnostic order.
-  if(bankFirst){const issue=previewBank(surface,route.keys[0].p,spec.bank,context);if(issue)return issue;}
   let last=routePosition(route,0);
   for(let k=1;k<=end;k++){const p=routePosition(route,k);
     if(Math.hypot(p[0]-last[0],p[1]-last[1],p[2]-last[2])>.6/20+.001)return no('The punt route exceeds its calm rowing speed of 0.6 m/s.');
     if((k%10===0||k===end)&&!hullWet(surface,p))return no('The entire punt loop must stay on water with room around the hull.');
     last=p;
   }
-  return bankFirst?null:previewBank(surface,route.keys[0].p,spec.bank,context);
-}
-function previewBank(surface:Surface,home:V3,bank:NonNullable<CarrierInstallSpec['bank']>,context:PreviewContext):{code:string;message:string}|null{
-  const no=(message:string)=>({code:'punt.unsupported-water',message});
+  const home=route.keys[0].p,bank=spec.bank;
   if(Math.hypot(bank.door[0]-home[0],bank.door[2]-home[2])>3.2)return no('The dry bank must be within reach of a short boarding plank.');
   for(const p of [bank.door,...Object.values(bank.exits)]){
     const y=surface.bank(p[0],p[2]);if(y===null||Math.abs(y-p[1])>.001)return no('The boarding plank and both exits need supported dry bank.');
@@ -115,7 +109,7 @@ export function puntCandidates(rt:Runtime,render?:RenderScene):CarrierInstallSpe
         const id=idOf(surface);
         const keys=Array.from({length:17},(_,i)=>{const angle=i/16*2*Math.PI,n=radius*(1-Math.cos(angle)),t=radius*.65*Math.sin(angle);return {t:i/16*150,p:[round(home[0]+normal[0]*n+tangent[0]*t),home[1],round(home[2]+normal[1]*n+tangent[1]*t)] as V3};});
         const spec:CarrierInstallSpec={id,def:'rowing-punt',label:surface.id==='eden-pond'?'Pond rowing punt':`${surface.id} rowing punt`,at:[home[0],home[2]],y:home[1],yaw:Math.atan2(-normal[1],-normal[0]),route:`${id}-loop`,routeKeys:keys,bank:{door,exits:{'rider-a':ea,'rider-b':eb}},waitSeconds:30};
-        if(!previewInContext(spec,context,true)){found=spec;break;}
+        if(!previewInContext(spec,context)){found=spec;break;}
       }
     }
     if(!found&&!rt.world.entities[idOf(surface)]){
@@ -164,7 +158,7 @@ function shelfCandidate(surface:Surface,context:PreviewContext):CarrierInstallSp
       for(const radius of [5,4,3,2]){
         const keys=Array.from({length:17},(_,i)=>{const angle=i/16*2*Math.PI,n=radius*(1-Math.cos(angle)),t=radius*.65*Math.sin(angle);return {t:i/16*150,p:[round(home[0]+normal[0]*n+tangent[0]*t),home[1],round(home[2]+normal[1]*n+tangent[1]*t)] as V3};});
         const spec:CarrierInstallSpec={id,def:'rowing-punt',label,at:[home[0],home[2]],y:home[1],yaw:Math.atan2(-normal[1],-normal[0]),route:`${id}-loop`,routeKeys:keys,bank:{door,exits:{'rider-a':ea,'rider-b':eb}},waitSeconds:30};
-        if(!previewInContext(spec,context,true))return spec;
+        if(!previewInContext(spec,context))return spec;
         if(++tried>400)return undefined;   // bounded: a water this shallow everywhere is an honest "no punt"
       }
       break;
