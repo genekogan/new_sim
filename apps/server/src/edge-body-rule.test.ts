@@ -98,16 +98,23 @@ test('a Soul left in water floats at the surface: zombie floating (no shuffles),
 });
 
 test('idle reflex: a silent connected Soul sits and dozes within 2 h; an owner message ends it at once',{timeout:1800000},async t=>{
- const w=await world(['ana']);t.after(w.close);const s=w.souls[0],e=w.ents()[s.entityId];
+ // Test actual idle postures on open ground. Seat approaches and random drifts can otherwise leave the Soul
+ // beside furniture where native nap correctly refuses pose.no-room; the separate wander tests cover movement.
+ const w=await world(['ana'],{seatRadiusM:0,reflexRadiusM:0});t.after(w.close);const s=w.souls[0],e=w.ents()[s.entityId],eng=w.f.host.engine as any;
+ const at=e.pose.p.slice();assert.ok(eng.dryGroundAtV1(at[0],at[2]),'the posture fixture is dry');
+ assert.ok(eng.clearanceUpToV1(at[0],at[2],1)>=0.9,'the posture fixture has native nap clearance');
+ assert.equal(eng.canPerform({actor:s.entityId,label:'fixture nap',steps:[{verb:'mars:pose_v1',params:{activity:'nap',seconds:5}}]}),null,'native nap is initially admissible');
  w.listen(0,true);w.run(9*MIN,1000);assert.equal(stateOf(w).state,'awake');
  const seen=new Map<string,number>(),body=new Map<string,number>();w.run(2*3600*SEC,1000,()=>{const v=stateOf(w),h=e.human as any;if(v.state==='idle'){seen.set(v.doing,(seen.get(v.doing)??0)+1);
   const k=v.doing==='sitting'&&(String(h.activity).startsWith('sit')||h.baseActivity==='sit')?'seated':v.doing==='dozing'&&h.activity==='nap'?'napping':null;if(k)body.set(k,(body.get(k)??0)+1);}w.listen(0,true);});
+ assert.deepEqual(e.pose.p,at,'posture choices stay on the verified open patch');
  t.diagnostic('engine postures while idle '+JSON.stringify(Object.fromEntries(body)));assert.ok((body.get('seated')??0)>0&&(body.get('napping')??0)>0,'the body really sat and napped');
  const moves=shuffles(w,s.soulId);t.diagnostic('idle seconds by posture '+JSON.stringify(Object.fromEntries(seen))+'; moves '+JSON.stringify(moves.reduce((a:any,o:string)=>(a[o]=(a[o]??0)+1,a),{})));
  assert.ok((seen.get('sitting')??0)>0&&(seen.get('dozing')??0)>0,'>= 1 sit and >= 1 doze');
  assert.equal(stateOf(w).state,'idle');
  // dozing at the end of a 2 h idle is the dominant case; force one more doze to test the stand-up
- while(stateOf(w).doing!=='dozing')w.run(60*SEC,1000,()=>w.listen(0,true));
+ for(let n=0;n<120&&stateOf(w).doing!=='dozing';n++)w.run(60*SEC,1000,()=>w.listen(0,true));
+ assert.equal(stateOf(w).doing,'dozing','the bounded late-idle window reaches a doze');
  w.run(5*SEC,50);w.send(0);assert.equal(stateOf(w).state,'awake','owner message ends the reflex at once');
  w.run(2*SEC,50);assert.notEqual(String((e.human as any).activity),'nap','a doze stands up');
  assert.deepEqual(w.f.host.engine.runtime.violations,[]);
