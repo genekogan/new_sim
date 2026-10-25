@@ -7,6 +7,7 @@ type Msg = { id: number; url: string };
 class FakeWorker {
   static mode: 'ok' | 'http' | 'broken' = 'ok';
   onmessage: ((ev: { data: unknown }) => void) | null = null; onerror: (() => void) | null = null;
+  terminate() {}
   postMessage(m: Msg) {
     setTimeout(() => {
       if (FakeWorker.mode === 'broken') { this.onerror?.(); return; }

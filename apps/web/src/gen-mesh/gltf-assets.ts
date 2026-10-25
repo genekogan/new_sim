@@ -66,7 +66,7 @@ export function loadAsset(sha: string): Promise<GLTF> {
 /** loadAsync, with the bytes downloaded in a worker when one is available (asset-fetch.ts); the loader's manager sees
  *  the same itemStart / itemEnd (and itemError) as FileLoader gives it. */
 function download(l: GLTFLoader, url: string): Promise<GLTF> {
-  const bytes = fetchInWorker(url);
+  const bytes = fetchInWorker(url, l.manager.abortController.signal);
   if (!bytes) return l.loadAsync(url);
   l.manager.itemStart(url);
   return bytes.then(
