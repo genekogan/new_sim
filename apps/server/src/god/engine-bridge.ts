@@ -179,7 +179,7 @@ export class EngineBridge {
     (this.god as unknown as { layers?: GodLayers }).layers = this.layers;
     // P3 (E-life): places follow the god's edits, not the engine's (a carried cup, a duck, a lamp switched on move no place);
     // descriptions that list the things in a place catch up once a minute (1200 ticks)
-    this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, version: () => `${this.godEdits}:${Math.floor(this.host.engine.world.tick / 1200)}` as never, deferred: () => this.perceiveRunning || !!this.perceive?.pending(), engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), layers: this.layers });
+    this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, version: () => `${this.godEdits}:${Math.floor(this.host.engine.world.tick / 1200)}` as never, structuralVersion: () => `${this.version}:${this.describeEpoch}:${this.levels.length}`, deferred: () => this.perceiveRunning || !!this.perceive?.pending(), engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), layers: this.layers });
     this.god.builds.inventoryContext = () => {
       this.places.sync(true);
       return {

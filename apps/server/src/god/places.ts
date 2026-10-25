@@ -24,6 +24,14 @@ import type { GodNav, Thing } from './nav.ts';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
 export type GodPlace = Place & { ref: string; of: 'area' | 'water' | 'shore' | 'building' | 'room' | 'thing' | 'landmark' | 'landform' | 'land'; entity: string };
+type StructureStamp = { model: object | undefined; revision: number | string | undefined };
+const sortPlaces = (list: GodPlace[]) => list.sort((a, b) => (a.id < b.id ? -1 : 1));
+function placeIndex(list: GodPlace[]) {
+  const byRef = new Map<string, GodPlace>(), byEntity = new Map<string, GodPlace>();
+  // A water's walk targets its shore; preserve the full index's duplicate-ref precedence.
+  for (const p of list) { if (p.of === 'water' && byRef.has(p.ref)) continue; byRef.set(p.ref, p); if (p.of !== 'room' && p.of !== 'shore') byEntity.set(p.entity, p); }
+  return { list, byRef, byEntity };
+}
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const SHORE = 3;                   // m: a water's bank, round it
@@ -91,6 +99,8 @@ export type PlacesHost = {
   nav: GodNav;
   edge?: EdgeLedger;
   version?: () => number | string;
+  /** Includes every model/terrain/state edit and navigation level change, without the description clock. Unset: no membership memo reuse. */
+  structuralVersion?: () => number | string;
   /** G1: true while the host is catching up with god edits (reads may take the places as they were). */
   deferred?: () => boolean;
   engineOwned(e: Entity): boolean;
@@ -115,17 +125,22 @@ export class GodPlaces {
   list(fresh = false): GodPlace[] { return this.index(fresh).list; }
   /** The place a god thing itself is (a plaza, a house, a gazebo, a lone fountain): its objects stand in it. */
   ofEntity(id: string): GodPlace | undefined { return this.index().byEntity.get(id); }
-  private calendarIdentityCache?: { model: object; revision: number; index: object; own: Map<string, { id: string; name: string } | null> };
+  private calendarIdentityCache?: { model: object; revision: number; structuralVersion: number | string | undefined; index: object | null; own: Map<string, { id: string; name: string } | null> };
+  /** Undecorated, privately owned geometry. Neither public places nor navigation Things alias this memo. */
+  private membership?: { stamp: StructureStamp; list: GodPlace[] };
   /** Calendar creation needs stable own-place identities, not minute-dependent descriptions. Prime every scheduled
    *  source together so a later event entering the horizon does not trigger another full description derive. The
    *  bridge revision covers terrain/state commits; the index identity also invalidates after a deferred install.
    *  Misses are explicit: callers must resolve containment and native ledger names live. Ordinary reads stay fresh. */
   calendarIdentities(sources: readonly Entity[], revision: number): ReadonlyMap<string, { id: string; name: string } | null> {
-    const model = this.h.model.safetyCacheKey(), cached = this.calendarIdentityCache;
-    if (cached?.model === model && cached.revision === revision && cached.index === this.cache && sources.length === cached.own.size && sources.every(e => cached.own.has(e.id))) return cached.own;
-    const index = this.index(), own = new Map<string, { id: string; name: string } | null>();
+    const model = this.h.model.safetyCacheKey(), structuralVersion = this.h.structuralVersion?.(), cached = this.calendarIdentityCache;
+    if (cached?.model === model && cached.revision === revision && cached.structuralVersion === structuralVersion && cached.index === this.cache && sources.length === cached.own.size && sources.every(e => cached.own.has(e.id))) return cached.own;
+    // Preserve installed/deferred reads. A cold lookup only needs membership, not descriptions or today's slots.
+    const index = this.cache && (this.h.deferred?.() || this.cache.key === this.key()) ? this.cache
+      : placeIndex(sortPlaces([...drain(this.membershipGen())]));
+    const own = new Map<string, { id: string; name: string } | null>();
     for (const e of sources) { const p = index.byEntity.get(e.id); own.set(e.id, p ? { id: p.id, name: p.name } : null); }
-    this.calendarIdentityCache = { model, revision, index, own };
+    this.calendarIdentityCache = { model, revision, structuralVersion, index: this.cache, own };
     return own;
   }
   /** Walkable (the ledger's hook): every place this layer made. */
@@ -142,16 +157,19 @@ export class GodPlaces {
     return this.install(key, this.derive());
   }
   /** Derives done (all at once or sliced): tests check edits re-derive and engine writebacks do not. */
-  readonly stats = { derives: 0 };
+  readonly stats = { derives: 0, memberships: 0 };
   private derive(): GodPlace[] { this.stats.derives++; return drain(this.deriveGen()); }
   private install(key: string, list: GodPlace[]) {
-    const byRef = new Map<string, GodPlace>(), byEntity = new Map<string, GodPlace>();
-    // a thing's walk targets its place; a water's walk (to its shore) targets the shore
-    for (const p of list) { if (p.of === 'water' && byRef.has(p.ref)) continue; byRef.set(p.ref, p); if (p.of !== 'room' && p.of !== 'shore') byEntity.set(p.entity, p); }
-    this.cache = { key, list, byRef, byEntity };
+    this.cache = { key, ...placeIndex(list) };
     return this.cache;
   }
   private gen: { key: string; it: Generator<void, GodPlace[], void> } | null = null;
+  private structure(): StructureStamp {
+    const model = this.h.model.safetyCacheKey();
+    // Untracked replacement Maps deliberately return a new key on every read: never memoize those inputs.
+    return { model: model === this.h.model.safetyCacheKey() ? model : undefined, revision: this.h.structuralVersion?.() };
+  }
+  private sameStructure(a: StructureStamp, b: StructureStamp) { return a.model === b.model && a.revision === b.revision; }
   /** The index key last put in the ledger (an engine-only edit leaves it: nothing to install again). */
   private installedKey: string | undefined;
   /** Re-derive the places in slices of about `budgetMs`, then put them in the ledger's index. True when done. An edit
@@ -167,8 +185,20 @@ export class GodPlaces {
     }
   }
 
-  private *deriveGen(): Generator<void, GodPlace[], void> {
-    const m = this.h.model, things = this.h.nav.thingsGen ? yield* this.h.nav.thingsGen() : this.h.nav.things();
+  private *membershipGen(things?: Thing[], stamp = this.structure()): Generator<void, GodPlace[], void> {
+    const memo = this.membership;
+    // A full derive may already have yielded while acquiring Things: include that entire range in provenance.
+    if (stamp.model && stamp.revision !== undefined && memo && this.sameStructure(memo.stamp, stamp) && this.sameStructure(stamp, this.structure())) return memo.list;
+    this.membership = undefined;
+    this.stats.memberships++;
+    const list = yield* this.buildMembershipGen(things);
+    if (stamp.model && stamp.revision !== undefined && this.sameStructure(stamp, this.structure())) this.membership = { stamp, list };
+    return list;
+  }
+
+  private *buildMembershipGen(things?: Thing[]): Generator<void, GodPlace[], void> {
+    const m = this.h.model;
+    things ??= this.h.nav.thingsGen ? yield* this.h.nav.thingsGen() : this.h.nav.things();
     let n = 0;
     const out: GodPlace[] = [];
     const base = { parent: null as string | null, enclosed: false, capacity: null as number | null, starting: false };
@@ -240,6 +270,16 @@ export class GodPlaces {
       if (w < LANDMARK_MIN || outer.some((o) => inBoxPoly(t.at[0], t.at[1], o.box, o.p.polygon))) continue;
       push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'landmark', entity: t.id, name: t.ref, kind: 'landmark', polygon: circle(t.at, Math.max(4, w / 2 + 3)), level: 0 });
     }
+    return out;
+  }
+
+  private *deriveGen(): Generator<void, GodPlace[], void> {
+    // Things carry current descriptions/door state: read them afresh, never retain them in the geometry memo.
+    const stamp = this.structure();
+    const things = this.h.nav.thingsGen ? yield* this.h.nav.thingsGen() : this.h.nav.things();
+    const out = structuredClone(yield* this.membershipGen(things, stamp));
+    let n = 0;
+    // Parents and decoration read live ledger/clock facts. Full places own even their nested polygon arrays.
     // parents: the smallest bigger place (god-built or the world's own) that holds its centre; else the root
     const boot = [...(this.h.edge?.places.byId.values() ?? [])].filter((p) => !this.installed.has(p.id) && !p.carrier);
     const root = boot.find((p) => p.parent === null)?.id ?? null;
@@ -260,7 +300,7 @@ export class GodPlaces {
       if (++n % 16 === 0) yield;
     }
     if (this.h.layers?.active()) this.layer(out);
-    return out.sort((a, b) => (a.id < b.id ? -1 : 1));
+    return sortPlaces(out);
   }
 
   /** LAYERS: a zone's kind is its use ("commercial zone"); a place's own thing adds its owner, hours and people to the
