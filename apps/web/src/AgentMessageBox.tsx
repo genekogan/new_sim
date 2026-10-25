@@ -2,6 +2,7 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 import type {Api} from './useSim.ts';
 import {windowCode} from './god-ui/join-api.ts';
 import {reportAgentPresence,withLink} from './agent-presence.ts';
+import {pollInbox} from './inbox-poll.ts';
 import './AgentMessageBox.css';
 
 export type AgentInbox = {
@@ -44,15 +45,8 @@ export function AgentMessageBox({request, prompt, kind}: {request: Transport; pr
   const mounted = useRef(false), revision = useRef(0);
   useEffect(() => {
     mounted.current = true;
-    let stopped = false, timer: ReturnType<typeof setTimeout>;
-    const refresh = async () => {
-      const at = revision.current;
-      try {const result = await request(); if (!stopped && at === revision.current) setInbox(result);}
-      catch {if (!stopped && at === revision.current) setInbox(null);}
-      if (!stopped) timer = setTimeout(() => void refresh(), 2000);
-    };
-    void refresh();
-    return () => {stopped = true; mounted.current = false; clearTimeout(timer);};
+    const stop = pollInbox(() => request(), setInbox, () => revision.current);
+    return () => {stop(); mounted.current = false;};
   }, [request]);
   useEffect(() => {if (!copied) return; const t = setTimeout(() => setCopied(false), 2000); return () => clearTimeout(t);}, [copied]);
   const send = async (event: React.FormEvent) => {
@@ -120,7 +114,7 @@ export function useWindowCode() {
   }, []);
   return code;
 }
-/** The owner card's inbox: read every 2 s (this also feeds the page's presence and link record), and send one message. */
+/** The owner card's inbox: read every 2 s while the page is shown (this also feeds the page's presence and link record), and send one message. */
 export function useSoulInbox(api: Api, soulId: string) {
   const request = useCallback<Transport>(async text => {
     let r;
@@ -137,16 +131,8 @@ export function useSoulInbox(api: Api, soulId: string) {
   const [inbox, setInbox] = useState<AgentInbox | null>(null);
   const revision = useRef(0);
   useEffect(() => {
-    let stopped = false, timer: ReturnType<typeof setTimeout>;
     setInbox(null);
-    const refresh = async () => {
-      const at = revision.current;
-      try {const result = await request(); if (!stopped && at === revision.current) setInbox(result);}
-      catch {if (!stopped && at === revision.current) setInbox(null);}
-      if (!stopped) timer = setTimeout(() => void refresh(), 2000);
-    };
-    void refresh();
-    return () => {stopped = true; clearTimeout(timer);};
+    return pollInbox(() => request(), setInbox, () => revision.current);
   }, [request]);
   const send = useCallback(async (text: string) => {
     revision.current++;
