@@ -42,4 +42,4 @@ zipped or published as-is. The browser check found 580 refs and none broken.
 - The md renderer flattens nested lists and does not handle inline HTML.
 - REPORT.md §8 says "92 indexed shot file(s) are missing on disk" for the newcomer run, but the files are there. `harnessNotes`
   joins the run folder onto an absolute index path. That is worker D's code, not changed here.
-- Thumbnails are the full PNGs (no resized copies), so a run page with ~40 shots loads about 40 MB lazily.
+- Thumbnails are the full PNGs (no resized copies), so a run page with ~40 shots loads about 25 MB lazily (about 0.7 MB per shot).
