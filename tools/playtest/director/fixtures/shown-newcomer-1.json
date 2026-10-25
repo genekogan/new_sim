@@ -1,0 +1,14 @@
+{
+ "elapsedSec": 40,
+ "screenshotPath": "shot5-metal.png",
+ "legible": {
+  "card": null,
+  "bubbles": [],
+  "signs": ["Pttest", "8 things", "Nobody owns this world yet: claim it, and your agent builds it."],
+  "toasts": ["A Soul's chosen look could not be composed; a simple figure marks its position."],
+  "roster": ["Pip (away)"]
+ },
+ "cardView": { "presence": "away", "queued": [] },
+ "chatRendered": "> Make me a Soul in this world: http://127.0.0.1:4990/ . Call it Pip.\n⏺ Bash(node eden.mjs status)\n  ⎿ paired\n⏺ Done! Pip now lives in the world. Open the page and you'll see Pip; you can tell Pip what to do here or on Pip's card.",
+ "lastRequests": [{ "atSec": 0, "channel": "chat", "text": "Make me a Soul in this world: http://127.0.0.1:4990/ . Call it Pip." }]
+}
