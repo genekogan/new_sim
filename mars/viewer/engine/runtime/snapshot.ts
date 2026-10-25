@@ -12,7 +12,7 @@
 import type { ActionDef, ActionRecord, Diagnostic } from '../actions/types.ts';
 import type { WorldState } from '../world/types.ts';
 import { hashOf } from '../core/hash.ts';
-import { CodecError, captureGraph, decode, encode, finishGraph, finishGraphSteps, type GraphCapture } from './codec.ts';
+import { CodecError, captureGraphDeferred, decode, encode, finishGraph, finishGraphSteps, type GraphCapture } from './codec.ts';
 import type { Runtime, Violation } from './runtime.ts';
 
 export const SNAPSHOT_FORMAT = 'mars-runtime-snapshot/1';
@@ -192,7 +192,7 @@ export function captureSnapshot(rt: Runtime, int: RuntimeInternals, opts: Snapsh
   }
   let graphCapture: GraphCapture;
   try {
-    graphCapture = captureGraph(graph, '$', skip);
+    graphCapture = captureGraphDeferred(graph, '$', skip);
   } catch (e) {
     if (!(e instanceof CodecError)) throw e;
     throw new SnapshotError('snapshot.unencodable', `cannot take a resumable snapshot at tick ${rt.tick}: ${e.message}`);

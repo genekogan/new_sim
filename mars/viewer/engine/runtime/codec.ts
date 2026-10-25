@@ -39,7 +39,8 @@ declare const graphCaptureBrand: unique symbol;
 /** Opaque, process-local captured graph. Counts make cold/warm capture measurable;
  * source identities and the captured child arrays are never exposed to callers. */
 export type GraphCapture = { readonly [graphCaptureBrand]: true; readonly nodes: number; readonly cachedNodes: number };
-const captures = new WeakMap<GraphCapture, { root: unknown; captured: Map<object, Captured> }>();
+type CapturedGraph = { root: unknown; captured: Map<object, Captured>; frozenFrontier?: object[] };
+const captures = new WeakMap<GraphCapture, CapturedGraph>();
 
 type ErrorPath = (key?: string) => string;
 function rejectSymbolKeys(v: object, path: ErrorPath): void {
@@ -76,10 +77,19 @@ export function captureGraph(root: unknown, rootPath = '$', skipMapValues: Reado
   return capture(root, rootPath, skipMapValues, false);
 }
 
-function capture(root: unknown, rootPath: string, skipMapValues: ReadonlySet<object>, admission: boolean): GraphCapture {
+/** Own mutable data now, but leave already-admitted immutable closures for
+ * completion-local reference counting. The counters describe only nodes visited
+ * at this boundary; eager captureGraph retains its complete-graph counters.
+ * No source properties are read after return, including inside frozen closures. */
+export function captureGraphDeferred(root: unknown, rootPath = '$', skipMapValues: ReadonlySet<object> = new Set()): GraphCapture {
+  return capture(root, rootPath, skipMapValues, false, true);
+}
+
+function capture(root: unknown, rootPath: string, skipMapValues: ReadonlySet<object>, admission: boolean, deferFrozen = false): GraphCapture {
   // Pass 1 validates and captures each object's children once, and counts references.
   // Pass 2 reads only these captured values: no getters, source iterators or second source traversal.
   const captured = new Map<object, Captured>();
+  const frozenFrontier: object[] = [];
   let cachedNodes = 0;
   // Successful captures need no diagnostic strings. Reuse these stacks rather than
   // constructing a full path twice per property (descriptor validation and traversal).
@@ -100,9 +110,11 @@ function capture(root: unknown, rootPath: string, skipMapValues: ReadonlySet<obj
     if (immutable) {
       captured.set(v as object, { ...immutable, refs: 1 });
       cachedNodes++;
-      // Admission only checks/freezes new nodes; an admitted node already proves
-      // its entire immutable closure. Actual capture MUST count all its edges.
+      // Admission already proves the whole closure. Deferred capture records
+      // mutable-to-frozen incoming edges now; completion counts frozen edges
+      // before assigning any reference IDs. Eager capture counts everything now.
       if (admission) return;
+      if (deferFrozen) { frozenFrontier.push(v as object); return; }
       // Its entire enumerable closure was validated and frozen at admission.
       // Still traverse every edge for THIS graph's aliases, counts and ID order.
       // No diagnostic paths are needed: descendants cannot become unsupported.
@@ -160,8 +172,45 @@ function capture(root: unknown, rootPath: string, skipMapValues: ReadonlySet<obj
   };
   visit(root);
   const handle = Object.freeze({ nodes: captured.size, cachedNodes }) as GraphCapture;
-  captures.set(handle, { root, captured });
+  captures.set(handle, { root, captured, ...(frozenFrontier.length ? { frozenFrontier } : {}) });
   return handle;
+}
+
+/** Each completion owns its overlay. Initialize every boundary's incoming count
+ * before following frozen edges, then expand each node exactly once. An admitted
+ * closure has no mutable descendants, Maps or Sets. Only private cached shapes
+ * are read; source identities are keys, never objects to inspect dynamically. */
+function* expandFrozenSteps(state: CapturedGraph, maxWork: number): Generator<void, { frozen: ReadonlyMap<object, Captured>; work: number }, void> {
+  type FrozenCaptured = { refs: number } & ImmutableShape;
+  const frozen = new Map<object, FrozenCaptured>();
+  const stack: { node: FrozenCaptured; index: number }[] = [];
+  let work = 0;
+  for (const source of state.frozenFrontier!) {
+    const node = { ...state.captured.get(source)! } as FrozenCaptured;
+    frozen.set(source, node); stack.push({ node, index: 0 });
+    if (++work === maxWork) { work = 0; yield; }
+  }
+  while (stack.length) {
+    const frame = stack[stack.length - 1];
+    if (frame.index === frame.node.values.length) stack.pop();
+    else {
+      const value = frame.node.values[frame.index++];
+      if (typeof value === 'object' && value !== null) {
+        const known = frozen.get(value);
+        if (known) known.refs++;
+        else {
+          const shape = immutableShapes.get(value);
+          if (!shape) throw new Error('admitted snapshot closure has an uncached descendant');
+          const node = { ...shape, refs: 1 };
+          frozen.set(value, node); stack.push({ node, index: 0 });
+        }
+      }
+    }
+    // Carry the partial quantum into emission, so a next() call cannot spend a
+    // full budget on the end of expansion and another full budget on emission.
+    if (++work === maxWork) { work = 0; yield; }
+  }
+  return { frozen, work };
 }
 
 /** Emit a fresh owned JSON tree with the existing marker/reference order. This
@@ -171,6 +220,13 @@ export function finishGraph(handle: GraphCapture): unknown {
   const state = captures.get(handle);
   if (!state) throw new TypeError('not a captured snapshot graph');
   const { root, captured } = state;
+  let frozen: ReadonlyMap<object, Captured> | undefined;
+  if (state.frozenFrontier) {
+    const expansion = expandFrozenSteps(state, Number.MAX_SAFE_INTEGER);
+    let result = expansion.next();
+    while (!result.done) result = expansion.next();
+    frozen = result.value.frozen;
+  }
   // pass 2: emit in the same depth-first order decode() walks
   const ids = new Map<object, number>();
   let next = 0;
@@ -186,7 +242,7 @@ export function finishGraph(handle: GraphCapture): unknown {
     if (typeof v !== 'object' || v === null) return v;
     const id = ids.get(v);
     if (id !== undefined) return { '~r': id };
-    const node = captured.get(v)!;
+    const node = frozen?.get(v) ?? captured.get(v)!;
     const shared = node.refs > 1;
     let myId = -1;
     if (shared) ids.set(v, (myId = next++));
@@ -214,6 +270,11 @@ export function* finishGraphSteps(handle: GraphCapture, maxWork = 256): Generato
   if (!Number.isSafeInteger(maxWork) || maxWork < 1) throw new RangeError('snapshot emission work limit must be a positive safe integer');
   const state = captures.get(handle);
   if (!state) throw new TypeError('not a captured snapshot graph');
+  let frozen: ReadonlyMap<object, Captured> | undefined, work = 0;
+  if (state.frozenFrontier) {
+    const prepared = yield* expandFrozenSteps(state, maxWork);
+    frozen = prepared.frozen; work = prepared.work;
+  }
   type Frame = { node: Captured; output: unknown[] | Record<string, unknown>; index: number };
   const stack: Frame[] = [], ids = new Map<object, number>();
   let nextId = 0;
@@ -229,7 +290,7 @@ export function* finishGraphSteps(handle: GraphCapture, maxWork = 256): Generato
     if (value === null || typeof value !== 'object') return value;
     const id = ids.get(value);
     if (id !== undefined) return { '~r': id };
-    const node = state.captured.get(value)!;
+    const node = frozen?.get(value) ?? state.captured.get(value)!;
     const shared = node.refs > 1, myId = shared ? nextId++ : -1;
     if (shared) ids.set(value, myId);
     const output: unknown[] | Record<string, unknown> = node.kind === 'object' && !node.tilde ? {} : [];
@@ -239,7 +300,6 @@ export function* finishGraphSteps(handle: GraphCapture, maxWork = 256): Generato
     return shared ? { '~id': myId, '~v': body } : body;
   };
   const result = emit(state.root);
-  let work = 0;
   while (stack.length) {
     const frame = stack[stack.length - 1], { node, output } = frame;
     const length = node.kind === 'map' ? node.entries.length * 2 : node.values.length;

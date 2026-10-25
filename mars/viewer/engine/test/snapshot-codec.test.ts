@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CodecError, captureGraph, decode, encode, finishGraph, finishGraphSteps, prepareImmutableSnapshotData, type GraphCapture } from '../runtime/codec.ts';
+import { CodecError, captureGraph, captureGraphDeferred, decode, encode, finishGraph, finishGraphSteps, prepareImmutableSnapshotData, type GraphCapture } from '../runtime/codec.ts';
 import { decodeSnapshot, SNAPSHOT_FORMAT, type RuntimeSnapshot } from '../runtime/snapshot.ts';
 import { hashOf } from '../core/hash.ts';
 import { Runtime } from '../runtime/runtime.ts';
@@ -439,4 +439,102 @@ test('interleaved emitters and synchronous finish own outputs and never reread m
   assert.equal(JSON.stringify(a), expected); a.map = 'changed output';
   assert.equal(JSON.stringify(drainGraph(second).value), expected);
   assert.equal(JSON.stringify(drainGraph(finishGraphSteps(capture)).value), expected);
+});
+
+
+test('deferred frozen traversal preserves eager counters and legacy bytes across a frozen graph corpus', () => {
+  for (let seed = 1; seed <= 40; seed++) {
+    let state = seed;
+    const next = () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state; };
+    const nodes: (unknown[] | Record<string, unknown>)[] = Array.from({ length: 12 }, (_, i) => i % 2 ? [] : {});
+    const atoms = [undefined, -0, NaN, Infinity, -Infinity, null, false, '🌱'];
+    const value = () => next() % 3 ? nodes[next() % nodes.length] : atoms[next() % atoms.length];
+    for (const node of nodes) {
+      if (Array.isArray(node)) for (let i = 0; i < 4; i++) node.push(value());
+      else Object.assign(node, { '2': value(), '1': value(), '~literal': value(), child: value() });
+    }
+    assert.equal(prepareImmutableSnapshotData(nodes), true);
+    const interior = nodes[seed % nodes.length];
+    for (const source of [nodes, { interior, nodes, again: interior }, { nodes, interior, again: interior },
+      { map: new Map<unknown, unknown>([[interior, nodes]]), nodes, set: new Set([interior]) }]) {
+      const eager = captureGraph(source), lazy = captureGraphDeferred(source);
+      const expected = JSON.stringify(legacyEncode(source));
+      assert.ok(lazy.nodes < eager.nodes, 'atomic capture stops at admitted roots and interiors');
+      assert.equal(captureGraph(source).nodes, eager.nodes, 'eager complete-graph counters remain unchanged');
+      assert.equal(JSON.stringify(finishGraph(lazy)), expected);
+      for (const budget of [1, 17, 256]) {
+        const output = drainGraph(finishGraphSteps(lazy, budget)).value;
+        assertJsonTree(output); assert.equal(JSON.stringify(output), expected);
+        sameGraph(source, decode(JSON.parse(expected)));
+      }
+    }
+  }
+});
+
+test('frozen reference counting itself yields within large flat containers before bounded emission', () => {
+  const n = 513, values = Array.from({ length: n }, (_, i) => i);
+  for (const source of [values, Object.fromEntries(values.map(i => ['key' + i, i])),
+    Object.fromEntries(values.map(i => ['~key' + i, i]))]) {
+    assert.equal(prepareImmutableSnapshotData(source), true);
+    const capture = captureGraphDeferred(source);
+    assert.equal(capture.nodes, 1); assert.equal(capture.cachedNodes, 1);
+    const { value, yields } = drainGraph(finishGraphSteps(capture, 32));
+    // One frontier initialization, each frozen edge+retirement, then each emitted
+    // edge+retirement. The partial expansion quantum carries into emission.
+    assert.equal(yields, Math.floor((2 * n + 2) / 32));
+    assert.equal(JSON.stringify(value), JSON.stringify(legacyEncode(source)));
+  }
+});
+
+test('independent lazy completions count frozen cycles, escaped keys and dropped shared Map keys exactly once', () => {
+  const interior: Record<string, unknown> = { value: 4, '~id': 'literal' };
+  Object.defineProperty(interior, '__proto__', { value: interior, enumerable: true });
+  const physics = { interior, repeated: interior }; interior.root = physics;
+  assert.equal(prepareImmutableSnapshotData(physics), true);
+  const dropped = { fn() {} }, mutable = { value: 3 };
+  const source = { interior, map: new Map<unknown, unknown>([[interior, dropped], ['keep', physics]]), physics, mutable };
+  const reference = { ...source, map: new Map<unknown, unknown>([['keep', physics]]) };
+  const expected = JSON.stringify(encode(reference));
+  const capture = captureGraphDeferred(source, '$', new Set([dropped]));
+  const first = finishGraphSteps(capture, 1), second = finishGraphSteps(capture, 2);
+  assert.equal(first.next().done, false); assert.equal(second.next().done, false);
+  const synchronous = finishGraph(capture) as Record<string, unknown>;
+  assert.equal(JSON.stringify(synchronous), expected); synchronous.physics = 'changed output';
+  source.physics = { interior: {}, repeated: {} }; source.map.clear();
+  Object.defineProperty(mutable, 'value', { get() { throw new Error('live mutable getter read'); } });
+  const a = drainGraph(first).value as Record<string, unknown>;
+  assert.equal(JSON.stringify(a), expected); a.interior = 'changed first output';
+  const b = drainGraph(second).value;
+  assertJsonTree(b); assert.equal(JSON.stringify(b), expected);
+  sameGraph(reference.physics, (decode(b) as typeof reference).physics);
+  assert.equal(JSON.stringify(finishGraph(capture)), expected);
+  assert.equal(JSON.stringify(drainGraph(finishGraphSteps(capture, 1)).value), expected);
+});
+
+test('admitting a mutable node after capture cannot replace its previously captured values', () => {
+  const frozen = { leaf: { value: 1 } };
+  assert.equal(prepareImmutableSnapshotData(frozen), true);
+  const mutable = { leaf: { value: 2 }, values: [3, 4] }, source = { frozen, mutable };
+  const expected = JSON.stringify(legacyEncode(source)), capture = captureGraphDeferred(source);
+  const steps = finishGraphSteps(capture, 1); assert.equal(steps.next().done, false);
+  mutable.leaf.value = 99; mutable.values.push(5);
+  assert.equal(prepareImmutableSnapshotData(mutable), true);
+  assert.equal(JSON.stringify(finishGraph(capture)), expected);
+  assert.equal(JSON.stringify(drainGraph(steps).value), expected);
+});
+
+test('deferred capture retains fallback and synchronous refusal boundaries for untrusted shapes', () => {
+  const map = new Map<unknown, unknown>([['x', new Set([1, 2])]]);
+  const lookalike = { version: 'entity-physics/1', hash: 'a'.repeat(64), child: { value: 1 } };
+  const shallow = Object.freeze({ child: { value: 2 } });
+  assert.equal(prepareImmutableSnapshotData(map), false);
+  for (const source of [map, lookalike, shallow]) {
+    const eager = captureGraph(source), lazy = captureGraphDeferred(source);
+    assert.equal(lazy.cachedNodes, 0); assert.equal(lazy.nodes, eager.nodes);
+    assert.equal(JSON.stringify(finishGraph(lazy)), JSON.stringify(legacyEncode(source)));
+  }
+  const admitted = { child: { value: 1 } }; assert.equal(prepareImmutableSnapshotData(admitted), true);
+  const bad = { get x() { assert.fail('capture must not call a getter'); return 1; } };
+  assert.throws(() => captureGraphDeferred({ admitted, bad }),
+    e => e instanceof CodecError && e.message.includes('$.bad.x is an accessor property'));
 });
