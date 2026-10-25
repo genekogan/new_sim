@@ -38,6 +38,8 @@ export type CommsOptions = {
   stewardToken?: string;
   /** C9 fading rule. Ships OFF; only Gene turns it on. */
   fading?: boolean;
+  /** LINK BODY: the idle beam-up (default: SIM_BEAM=1 only). Tests of the old rule pass true. */
+  beam?: boolean;
 };
 
 export type CommsRuntime = {
@@ -91,7 +93,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   objects.register(rideKind);
   deps.ledger.addCapabilityProvider(soul => objects.capabilities(soul));
   const steward = new Steward(core, options.stewardToken);
-  const fading = new Fading(core, steward, options.fading === true);
+  const fading = new Fading(core, steward, options.fading === true, options.beam);
   core.isFaded = id => fading.status(id)?.colour === 'gone';
   const roster = (): SpectatorEdgeMessage[] => fading.enabled ? [{type: 'edge', kind: 'fade.roster', tick: core.tick(), at: now(), souls: fading.roster()}] : [];
   const presence = new Presence({ledger: deps.ledger, liveSoulIds: core.liveSoulIds, nameOf: core.nameOf, deliver: (s, k, t, b) => { streams.deliver(s, k, t, b); }});
