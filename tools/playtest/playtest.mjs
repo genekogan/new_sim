@@ -74,7 +74,8 @@ async function cmdRun(a) {
     if (scenario.world.kind !== 'dev') throw new Error(`world kind ${scenario.world.kind} is not available in this stage`);
     const slug = scenario.world.slug ?? `pt-${scenario.name}`.slice(0, 31);
     ctx.world = await m.provision.startWorld({ serverRoot, slug, port: scenario.world.port, genesis: join(serverRoot, scenario.world.genesis), dataDir: join(runDir, 'server', 'data'), log: join(runDir, 'server', 'world.log'), fresh: true });
-    writeJson(join(runDir, 'world.json'), ctx.world);
+    try { ctx.world = { ...ctx.world, ...(await m.provision.describeWorld({ base: ctx.world.base, slug, port: scenario.world.port, pid: ctx.world.pid, build: ctx.world.build, startedAt: new Date().toISOString() })) }; } catch (e) { log('describeWorld failed', e.message); }
+    writeJson(join(runDir, 'world.json'), { ...ctx.world, child: undefined, healthz: undefined });
     try { writeJson(join(runDir, 'server', 'healthz-before.json'), await m.provision.healthz(ctx.world.base)); } catch { /* recorded as missing */ }
     receipt(runDir, 1, 'provision', { ok: true, base: ctx.world.base, build: ctx.world.build });
   } else { ctx.world = readJson(join(runDir, 'world.json')); }

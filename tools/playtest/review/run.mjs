@@ -23,7 +23,7 @@ export function loadRun(runDir) {
   const personas = {};
   for (const id of list(join(runDir, 'personas'))) {
     const d = join(runDir, 'personas', id);
-    personas[id] = { sheet: text(join(d, 'sheet.md')) ?? '', turns: readJsonl(join(d, 'turns.jsonl')), ratings: readJson(join(d, 'ratings.json'), null), desires: readJsonl(join(d, 'desires.jsonl')) };
+    personas[id] = { sheet: text(join(d, 'sheet.md')) ?? '', turns: readJsonl(join(d, 'turns.jsonl')), ratings: readJson(join(d, 'ratings.json'), null), desires: readJsonl(join(d, 'desires.jsonl')).filter((x) => (x.kind ?? 'desire') === 'desire'), complaints: readJsonl(join(d, 'desires.jsonl')).filter((x) => x.kind === 'complaint') };
   }
   const evidence = list(join(runDir, 'evidence')).filter((f) => f.endsWith('.json') && f !== 'session.json')
     .map((f) => readJson(join(runDir, 'evidence', f))).filter(Boolean)

@@ -71,7 +71,10 @@ export function requestPrompt(run, ev, oracles, { earlierTitles = [] } = {}) {
 }
 
 const normTitle = (t) => String(t ?? '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter((w) => w.length > 2 && !['the', 'and', 'for', 'not', 'was', 'with'].includes(w)).map((w) => (w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w));
-export function similar(a, b) { const A = new Set(normTitle(a)), B = new Set(normTitle(b)); if (!A.size || !B.size) return false; let n = 0; A.forEach((w) => { if (B.has(w)) n++; }); return n / Math.min(A.size, B.size) >= 0.6; }
+const STOP = new Set(['i','a','an','the','to','and','or','but','he','she','it','him','her','his','its','my','me','just','so','at','in','on','of','for','was','is','be','that','this','there','then','even','still','when','not','no','never','like','wanted','want','asked','said','says','did','do','does','him','them','they','you','your','with','all','up','out','into','have','has','had','been','get','got','one','once','time','only','also','any','anything','something','nothing','pip','mira','rook','tam','ori','vex']);
+const keywords = (t) => new Set(normTitle(t).filter((w) => w.length > 2 && !STOP.has(w)));
+/** Two wishes are the same wish when their content words overlap enough (Jaccard ≥ 0.34, or ≥ 0.5 of the smaller set). */
+export function similar(a, b) { const A = keywords(a), B = keywords(b); if (!A.size || !B.size) return false; let n = 0; A.forEach((w) => { if (B.has(w)) n++; }); const j = n / (A.size + B.size - n); return j >= 0.34 || n / Math.min(A.size, B.size) >= 0.5 && n >= 2; }
 
 /** Earlier runs of the same scenario in the runs dir (sorted by folder name, before this run). */
 export function earlierRuns(runDir) {

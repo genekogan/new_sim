@@ -1,6 +1,6 @@
 // Step 7: REPORT.md (spec §12.3), journal.md, metrics.json (via metrics.mjs) and replay.json (spec §12.4).
 import { join, basename } from 'node:path';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { readJson, readJsonl, writeJson } from '../lib/jsonl.mjs';
 import { sha256 } from '../lib/hash.mjs';
 import { loadRun, secsBetween } from './run.mjs';
@@ -69,7 +69,7 @@ export function renderReport(run, { metrics, prevMetrics = null, prevName = null
   (emergence?.narrative?.wantedMore ?? []).forEach((w) => L.push(`- wanted more: "${w.wording}" (${w.persona}${w.count > 1 ? ` ×${w.count}` : ''})`));
   L.push('', '## 6. Issues and feature requests', '');
   if (!issues.length) L.push('No issues raised.');
-  issues.forEach((i) => L.push(`### ${i.id}: ${i.title}`, '', `Asked "${i.asked}". ${i.happened} Expected: ${i.expected} (${i.whereWhen}; ${i.frequency}.) Score ${i.fidelity}/${i.class ?? '—'}, ${i.inputDepth} depth, ${i.noticedByPlayer ? 'the player noticed' : 'the player did not notice'}${i.earlierSessions.length ? `; also in ${i.earlierSessions.length} earlier session(s)` : ''}.`, '', `Evidence: ${i.evidence.slice(0, 6).map((p) => `[${p.split('/').pop()}](${p.split('#')[0]})`).join(' · ')}`, ''));
+  issues.forEach((i) => L.push(`### ${i.id}: ${i.title}`, '', `Asked "${i.asked}". ${i.happened} Expected: ${i.expected} (${i.whereWhen}; ${i.frequency}.) Score ${i.fidelity}/${i.class ?? '—'}, ${i.inputDepth} depth, ${i.noticedByPlayer ? 'the player noticed' : 'the player did not notice'}${i.earlierSessions.length ? `; also in ${i.earlierSessions.length} earlier session(s)` : ''}.`, '', `Evidence: ${i.evidence.slice(0, 6).map((p) => (/^[\w./-]+\.(png|json|jsonl|md|tsv|gz)(#|$)/.test(p) ? `[${p.split('/').pop()}](${p.split('#')[0]})` : p)).join(' · ')}`, ''));
   L.push('**Feature requests** (grouped):', '');
   if (!frs.length) L.push('None.');
   frs.forEach((f) => L.push(`- **${f.title}** ×${f.count + (f.desireCount ?? 0)} — ${f.wordings.map((w) => `"${w}"`).join(', ')} (${f.personas.join(', ')})`));
@@ -102,13 +102,30 @@ export function harnessNotes(run, { metrics, ledger, reviews, specs, emergence }
 }
 
 /** reportRun(runDir) → step 7. */
+
+/** Developer drafts: specs/index.json when the Developer finished; otherwise every specs/*.md on disk (a killed run). */
+export function loadSpecs(runDir) {
+  const idx = readJson(join(runDir, 'specs/index.json'), null);
+  if (Array.isArray(idx) && idx.length) return idx;
+  const dir = join(runDir, 'specs');
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir).filter((f) => f.endsWith('.md')).sort().map((f) => {
+    const text = readFileSync(join(dir, f), 'utf8');
+    const id = f.replace(/\.md$/, '');
+    const title = text.match(/^\*\*Issue\*\*\s*\n+([^\n]+)/m)?.[1] ?? text.match(/^#+\s*(.+)$/m)?.[1] ?? id;
+    const kind = /^F-/.test(id) ? 'feature request' : 'issue';
+    const brief = text.match(/```json\s*([\s\S]*?)```/)?.[1]; let laneBrief = null; try { laneBrief = brief ? JSON.parse(brief) : null; } catch { laneBrief = null; }
+    return { id, title: title.slice(0, 120), kind, file: `specs/${f}`, laneBrief, indexed: false };
+  });
+}
+
 export function reportRun(runDir) {
   const run = loadRun(runDir);
   const metrics = metricsRun(runDir);
   const prev = previousRun(runDir);
   writeFileSync(join(runDir, 'journal.md'), renderJournal(run));
   const replay = buildReplay(run); writeJson(join(runDir, 'replay.json'), replay);
-  const md = renderReport(run, { metrics, prevMetrics: prev ? readJson(join(prev, 'metrics.json')) : null, prevName: prev ? basename(prev) : null, ledger: readLedger(join(runDir, 'ledger.tsv')), issues: readJson(join(runDir, 'issues.json'), []), frs: readJson(join(runDir, 'feature-requests.json'), []), emergence: readJson(join(runDir, 'emergence.json'), null), specs: readJson(join(runDir, 'specs/index.json'), []), reviews: readJsonl(join(runDir, 'reviews.jsonl')) });
+  const md = renderReport(run, { metrics, prevMetrics: prev ? readJson(join(prev, 'metrics.json')) : null, prevName: prev ? basename(prev) : null, ledger: readLedger(join(runDir, 'ledger.tsv')), issues: readJson(join(runDir, 'issues.json'), []), frs: readJson(join(runDir, 'feature-requests.json'), []), emergence: readJson(join(runDir, 'emergence.json'), null), specs: loadSpecs(runDir), reviews: readJsonl(join(runDir, 'reviews.jsonl')) });
   writeFileSync(join(runDir, 'REPORT.md'), md);
   return { report: join(runDir, 'REPORT.md'), metrics, replay };
 }
