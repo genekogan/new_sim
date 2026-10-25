@@ -34,7 +34,12 @@ node tools/playtest/playtest.mjs review <run-dir>          # steps 5–7 again o
 node tools/playtest/playtest.mjs replay <run-dir> --mode scripted|live [--out dir]
 node tools/playtest/playtest.mjs compare <runA> <runB>
 node tools/playtest/playtest.mjs preflight [--server-root dir]
+node tools/playtest/playtest.mjs replay-set [--server-root dir] [--repeats 2] [--out dir] [--baseline dir] [--dry-run] [--score-only] [--only labels]
+node tools/playtest/review/rescore-oracles.mjs <run-dir>… | --all <runs-root>   # oracles.jsonl + metrics.json, no model
 ```
+
+`replay-set` replays the frozen set of `team/playtest/ROOT-CAUSES-20261025.md` §E (`review/scorecard.mjs` `FROZEN`) as
+scripted replays, sequentially, behind the machine gate, and writes `<out>/SCORECARD.md` and `<out>/replay-set.json`.
 
 Steps and receipts (each writes `receipts/<n>-<step>.json` with `ok`, `t`, `mono`, details; a failure stops the run and
 leaves everything in place):
@@ -288,3 +293,24 @@ one scripted request, one shot, and tears down (≈ 2 min; run manually).
   the harness cannot, and bypass mode is off by policy. The seat is left to cope (in playout 1 it skipped the install,
   kept SKILL.md in the folder and carried on); recorded in each report as a harness limitation, and as a product note:
   the onboarding step needs a path a sandboxed agent can write.
+
+## 9b. Measurement choices (2026-10-25, worker H; ROOT-CAUSES B2–B4)
+
+- **Chat queue delay is measured, not fixed.** Claude Code queues a typed message until the running turn reaches its next
+  boundary; `claude -p` (one process per turn) waits for the whole turn. The Director therefore links each chat request
+  to the seat turn that carried it (`chatTurns`, from `Seat.chat(…, {onStart})`), records `queuedSec` (sentAt → that
+  turn's start) and `budgetStartAt`, and runs the chat budget from the turn start. `sentAt` is unchanged, so ack/result
+  latencies still count from the owner's message; `metrics.speed.chatQueuedSec` reports the wait separately. This is a
+  harness measurement choice; the product residue (a long turn delays any chat reply) belongs to D3.
+- **Arrival** targets only the seat's last walk act for the request or a walk receipt accepted inside sentAt..cutoffAt
+  (receipt ticks are mapped to time from the samples' ticks). An act accepted after the cutoff leaves arrival unknown
+  ("accepted after the cutoff"); body-moved-in-budget carries that failure. Arrival passes on a place/path/near name match,
+  the target position, or the completed walk's end point within 3 m.
+- **Truthfulness** reads the card ack/result and, on the chat channel, the final text of the linked turn(s), each judged
+  against the body samples around the time it was written (seat-wide samples, so a reply after the cutoff is judged by
+  the next window's facts) and the seat's receipts. Negated, future, conditional and question clauses, and clauses whose
+  subject is another Soul, are not claims; a claim with no body facts near its time is not counted.
+- **Cost** joins seat turns to requests by window overlap (plus `chatTurns`); a turn's tokens and CLI calls are split
+  evenly over the requests it served. Card requests' wake turns are linked at review time (turns starting in the window);
+  runs before this change also get their chat turns inferred in order (`chatTurnsInferred`).
+
