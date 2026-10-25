@@ -82,6 +82,8 @@ export function renderReport(run, { metrics, prevMetrics = null, prevName = null
   L.push('', '## 8. Harness notes', '');
   const notes = harnessNotes(run, { metrics, ledger, reviews, specs, emergence });
   L.push(...(notes.length ? notes.map((n) => `- ${n}`) : ['- Nothing the framework got wrong was detected.']), '');
+  const coord = existsSync(join(run.runDir, 'COORDINATOR-NOTES.md')) ? readFileSync(join(run.runDir, 'COORDINATOR-NOTES.md'), 'utf8').trim() : '';
+  if (coord) L.push('', '## 9. Coordinator note (read before trusting the scores)', '', coord, '');
   return L.join('\n');
 }
 
