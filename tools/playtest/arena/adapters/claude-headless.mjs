@@ -2,8 +2,11 @@
 // DESIGN §4.1. One session per seat: first turn --session-id, then --resume.
 import { run, start } from '../../lib/proc.mjs';
 
-export const DEFAULT_ALLOWED = ['Bash(node eden.mjs:*)', 'Bash(node eden-agent.mjs:*)', 'Bash(curl:*)', 'Bash(ls:*)', 'Bash(cat:*)', 'Bash(mkdir:*)',
-  'Bash(pwd:*)', 'Bash(test:*)', 'Bash(cp:*)', 'Read(./**)', 'Write(./**)', 'Edit(./**)'];
+// The ordinary shell verbs a human would approve for their own agent in its own folder; a compound command is allowed
+// only when every part is (so echo/mkdir/cp/chmod/head/tail/grep/wc/date/sleep/true/mv/touch/rm-free list matters).
+export const DEFAULT_ALLOWED = ['Bash(node eden.mjs:*)', 'Bash(node eden-agent.mjs:*)', 'Bash(node eden-god.mjs:*)', 'Bash(node --version)', 'Bash(curl:*)', 'Bash(ls:*)', 'Bash(cat:*)', 'Bash(mkdir:*)',
+  'Bash(pwd:*)', 'Bash(test:*)', 'Bash(cp:*)', 'Bash(mv:*)', 'Bash(touch:*)', 'Bash(chmod:*)', 'Bash(echo:*)', 'Bash(head:*)', 'Bash(tail:*)', 'Bash(grep:*)', 'Bash(wc:*)', 'Bash(date:*)', 'Bash(sleep:*)', 'Bash(true)', 'Bash(cd:*)',
+  'Read(./**)', 'Write(./**)', 'Edit(./**)'];
 
 let effortSupport = null;
 /** Whether the installed CLI accepts --effort (checked once from `claude --help`). */

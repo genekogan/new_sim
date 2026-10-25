@@ -11,5 +11,5 @@
   "director": { "mode": "persona", "requestsTarget": 8, "glanceSec": [10, 30], "goal": null, "script": null },
   "observer": { "sampleSec": 5, "cameras": ["follow", "wide"], "viewport": [1280, 800], "dpr": 1, "gpu": "metal" },
   "review": { "reviewerModel": "opus", "developerModel": "opus", "rubric": "accept3" },
-  "rails": { "maxTurnsPerRequest": 6, "maxTurnWallSec": 240, "quotaStopPct": 90 }
+  "rails": { "maxTurnsPerRequest": 6, "maxTurnWallSec": 240, "quotaStopPct": 90, "onboardWallSec": 600, "onboardTimeoutSec": 540 }
 }

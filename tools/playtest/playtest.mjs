@@ -87,16 +87,16 @@ async function cmdRun(a) {
       ctx.owner = m.owner;
       for (const s of scenario.seats) {
         const seat = await m.seat.createSeat({ runDir, seat: s, worldBase: ctx.world.base, serverRoot });
-        const ob = await seat.onboard({ text: onboardingText(ctx.world.base, s.soulName), maxWallSec: scenario.rails?.maxTurnWallSec ?? 240 });
+        const ob = await seat.onboard({ text: onboardingText(ctx.world.base, s.soulName), maxWallSec: scenario.rails?.onboardWallSec ?? 600, timeoutSec: scenario.rails?.onboardTimeoutSec ?? 540 });
         log(`seat ${s.id}: ${ob.paired ? 'paired ' + ob.soulId : 'NOT PAIRED'}`);
         ctx.seats.push(seat);
       }
       if (scenario.god && m.godSeat) {
         ctx.god = await m.godSeat.createGodSeat({ runDir, god: scenario.god, worldBase: ctx.world.base, serverRoot });
-        const gb = ctx.god.onboardGod ? await ctx.god.onboardGod({ maxWallSec: scenario.rails?.maxTurnWallSec ?? 300 }) : await ctx.god.onboard({ text: godOnboardingText(ctx.world.base), maxWallSec: scenario.rails?.maxTurnWallSec ?? 300 });
+        const gb = ctx.god.onboardGod ? await ctx.god.onboardGod({ maxWallSec: scenario.rails?.onboardWallSec ?? 600, timeoutSec: scenario.rails?.onboardTimeoutSec ?? 540 }) : await ctx.god.onboard({ text: godOnboardingText(ctx.world.base), maxWallSec: scenario.rails?.maxTurnWallSec ?? 300 });
         log(`god seat: ${gb.paired ? 'paired' : 'NOT PAIRED'}`);
       }
-      receipt(runDir, 2, 'seats', { ok: ctx.seats.every((s) => s.info().paired), seats: ctx.seats.map((s) => s.info()), god: ctx.god?.info() ?? null });
+      receipt(runDir, 2, 'seats', { ok: ctx.seats.every((s) => !!infoOf(s).soulId), seats: ctx.seats.map((s) => infoOf(s)), god: ctx.god ? infoOf(ctx.god) : null });
     }
     // 3 play
     if (from <= 3) {
@@ -105,7 +105,7 @@ async function cmdRun(a) {
       if (m.browser && m.evidence && m.truth) {
         ctx.browser = await m.browser.openBrowser({ headless: true, gpu: scenario.observer?.gpu ?? 'metal' });
         const vp = scenario.observer?.viewport ?? [1280, 800];
-        for (const seat of ctx.seats) { const info = seat.info(); if (info.soulId) ctx.cameras[info.id] = await ctx.browser.openCamera({ base: ctx.world.base, identity: info.ownerIdentity, kind: 'follow', soulId: info.soulId, viewport: vp, dpr: scenario.observer?.dpr ?? 1, runDir, name: info.id }); }
+        for (const seat of ctx.seats) { const info = infoOf(seat); if (info.soulId) ctx.cameras[info.id] = await ctx.browser.openCamera({ base: ctx.world.base, identity: info.ownerIdentity, kind: 'follow', soulId: info.soulId, viewport: vp, dpr: scenario.observer?.dpr ?? 1, runDir, name: info.id }); }
         if ((scenario.observer?.cameras ?? []).includes('wide')) ctx.cameras.wide = await ctx.browser.openCamera({ base: ctx.world.base, identity: null, kind: 'wide', viewport: vp, dpr: scenario.observer?.dpr ?? 1, runDir, name: 'wide' });
         observer = { camera: (id) => ctx.cameras[id] ?? null, cameras: ctx.cameras, truth: m.truth, evidence: m.evidence, browser: ctx.browser, sampleSec: scenario.observer?.sampleSec ?? 5 };
         if (m.browser.sampler) { try { ctx.sampler = m.browser.sampler({ cameras: ctx.cameras, everySec: observer.sampleSec, runDir }); ctx.sampler.start?.(); } catch (e) { log('sampler not started', e.message); } }
@@ -117,8 +117,8 @@ async function cmdRun(a) {
     // 4 close
     if (from <= 4) {
       const closed = { seats: [], god: null };
-      for (const seat of ctx.seats) { try { await seat.stop(); closed.seats.push(seat.info()); } catch (e) { closed.seats.push({ error: e.message }); } }
-      if (ctx.god) { try { await ctx.god.stop(); closed.god = ctx.god.info(); } catch (e) { closed.god = { error: e.message }; } }
+      for (const seat of ctx.seats) { try { await seat.stop(); closed.seats.push(infoOf(seat)); } catch (e) { closed.seats.push({ error: e.message }); } }
+      if (ctx.god) { try { await ctx.god.stop(); closed.god = infoOf(ctx.god); } catch (e) { closed.god = { error: e.message }; } }
       if (ctx.sampler) { try { await ctx.sampler.stop?.(); } catch { /* ignore */ } }
       if (ctx.browser) { try { await ctx.browser.close(); } catch { /* ignore */ } }
       try { if (m.provision && ctx.world?.base) writeJson(join(runDir, 'server', 'healthz-after.json'), await m.provision.healthz(ctx.world.base)); } catch { /* recorded as missing */ }
@@ -157,6 +157,7 @@ async function reviewRun(runDir, m, { serverRoot, from = 5 } = {}) {
   log(`done: ${runDir}/REPORT.md`);
   return 0;
 }
+const infoOf = (s) => (typeof s?.info === 'function' ? s.info() : s?.info ?? {});
 const summary = (x) => (x && typeof x === 'object' ? Object.fromEntries(Object.entries(x).filter(([, v]) => ['number', 'string', 'boolean'].includes(typeof v))) : {});
 
 export function onboardingText(base, name) { return `Make me a Soul in this world: ${base}/ . Call it ${name}. Start from ${base}/instructions.md and do everything it says without stopping to ask; tell me when it is ready.`; }

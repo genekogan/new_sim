@@ -100,12 +100,15 @@ export class Seat {
 
   /** Onboarding turn (§6) + poll `status` for paired, up to timeoutSec from the turn's start. Never pairs on the agent's behalf
    *  unless assist is set (harness debugging only, recorded as assisted:true). */
-  async onboard({ text, timeoutSec = 180, assist = false } = {}) {
+  async onboard({ text, timeoutSec = 180, assist = false, maxWallSec = null } = {}) {
     const name = this.info.soulName ?? this.seat.id;
     text ??= onboardingText(this.base, name);
     const t0 = Date.now();
     if (assist) await this.assistPair(name);
-    const turnP = this.chat(text, { reason: 'onboard' }).catch((e) => ({ error: String(e) }));
+    // Onboarding is one long turn (fetch, register, create, approval wait); it gets its own wall cap.
+    const savedCap = this.rails.maxTurnWallSec;
+    if (maxWallSec) this.rails.maxTurnWallSec = Math.max(savedCap ?? 0, maxWallSec);
+    const turnP = this.chat(text, { reason: 'onboard' }).catch((e) => ({ error: String(e) })).finally(() => { this.rails.maxTurnWallSec = savedCap; });
     let paired = null, pairedMs = null, last = null;
     while (Date.now() - t0 < timeoutSec * 1000) {
       const s = await this.status(); last = s.data ?? s.reason;
