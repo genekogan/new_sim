@@ -88,7 +88,7 @@ async function openWorld(ctx, base, errors) {
 async function windowCode(page) {
   await page.locator('button.bring-agent-open').first().click();
   const link = page.locator('.bring-agent-prompt a');
-  await page.waitForFunction(() => /\?for=[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(document.querySelector('.bring-agent-prompt a')?.getAttribute('href') ?? ''), null, { timeout: 20_000 });
+  await page.waitForFunction(() => /\?for=[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(document.querySelector('.bring-agent-prompt a')?.getAttribute('href') ?? ''), null, { timeout: 90_000 });
   const href = await link.getAttribute('href');
   return { href, code: href.match(/\?for=([A-Z2-9]{4}-[A-Z2-9]{4})$/)[1] };
 }
@@ -159,6 +159,9 @@ try {
     const ctx = await context(browser, 'user_gene', { ...opts });
     const cur = { f: null, fresh: 0 }; await rewrite(ctx, cur);
     const page = await openWorld(ctx, base, errors);
+    // a new world's owner sees God Mode open by itself once (no agent yet): close it first
+    await page.waitForSelector('dialog[open][data-god-modal]', { timeout: sid ? 12_000 : 30_000 }).catch(() => {});
+    for (let i = 0; i < 4 && await page.evaluate(() => !!document.querySelector('dialog[open][data-god-modal]')); i++) { await page.keyboard.press('Escape'); await sleep(700); }
     const { code } = await windowCode(page); await page.keyboard.press('Escape'); await sleep(400);
     if (!sid) {
       // Pairing, forced up with no card open: a new Soul's request
@@ -212,7 +215,7 @@ try {
     }
     await vctx.close();
   }
-} catch (e) { console.error(e); report2.error = String(e?.stack ?? e).slice(0, 1200); }
+} catch (e) { console.error(e); for (const c of browser?.contexts() ?? []) for (const p of c.pages()) await p.screenshot({ path: join(out, 'failure.png') }).catch(() => {}); report2.error = String(e?.stack ?? e).slice(0, 1200); }
 finally {
   report2.pageErrors = errors.slice(0, 20);
   writeFileSync(join(out, 'shots-report.json'), JSON.stringify(report2, null, 1));

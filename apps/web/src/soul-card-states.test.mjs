@@ -24,24 +24,24 @@ test('invariant: never two of {message box, Reconnect box, Approve} in any state
 test('Connected: status button, place, the now line with its age, message box + receipt, Follow; no Reconnect',()=>{
  const html=card('connected'),t=text(html);
  assert.match(html,/data-soul-state="connected"/);assert.match(html,/<button[^>]*class="soul-status soul-link"[^>]*aria-expanded="false"/);
- assert.match(t,/Connected▾/);assert.match(t,/at the pond/);assert.match(html,/<q>Heading to the pond to see if the koi are up\.<\/q>/);assert.match(t,/· 3 min ago/);
+ assert.match(t,/Connected/);assert.match(t,/at the pond/);assert.match(html,/<q>Heading to the pond to see if the koi are up\.<\/q>/);assert.match(t,/· 3 min ago/);
  assert.ok(has.box(html));assert.match(t,/Done · go to the pond · Arrived at the pond\./);assert.match(t,/Follow/);
  assert.doesNotMatch(t,/Reconnect|This mind|Activity|Agent access|one-use|Copy start prompt|Standing around|tired/);
  assert.doesNotMatch(html,/data-link-details/,'details closed by default');
 });
 test('Connected, details open: holder, Disconnect, Pair another session with the window-code prompt and Copy',()=>{
  const html=card('connected-open'),t=text(html);
- assert.match(html,/aria-expanded="true"/);assert.match(t,/Held by your agent/);assert.match(t,/eden-agent 1\.9\.16 · paired \d\d:\d\d · listening now/);
- assert.match(t,/Disconnect/);assert.match(t,/Pair another session▴/);assert.match(t,/approving it disconnects the current one/);
+ assert.match(html,/aria-expanded="true"/);assert.match(html,/data-caret="up"/);assert.match(t,/Held by your agent/);assert.match(t,/eden-agent 1\.9\.16 · paired \d\d:\d\d · listening now/);
+ assert.match(t,/Disconnect/);assert.match(t,/Pair another session/);assert.match(t,/approving it disconnects the current one/);
  assert.match(t,/pair-soul "s_7f3mickey" --for K7QX-M2PA/);assert.match(t,/Copy prompt/);assert.ok(has.box(html),'the message box stays');
 });
 test('Connected idle: the reflex word in the dim slot, still Connected',()=>{
- const t=text(card('connected-idle'));assert.match(t,/Connected▾dozing by the pond/);assert.match(t,/40 min ago/);
+ const t=text(card('connected-idle'));assert.match(t,/Connected · dozing by the pond/);assert.match(t,/40 min ago/);
 });
 test('Disconnected: body word + since, the last now dimmed, Reconnect box as the primary element, no message box, no Follow',()=>{
  const z=card('disconnected-zombie'),a=card('disconnected-asleep'),f=card('disconnected-floating');
- assert.match(text(z),/Disconnectedzombie, wandering by the pond since \d\d:\d\d/);
- assert.match(text(a),/Disconnectedasleep by the pond since \d\d:\d\d/);
+ assert.match(text(z),/Disconnected · zombie, wandering by the pond since \d\d:\d\d/);
+ assert.match(text(a),/Disconnected · asleep by the pond since \d\d:\d\d/);
  assert.match(text(f),/asleep, floating by the pond since/);
  for(const html of [z,a,f]){
   assert.ok(has.reconnect(html));assert.ok(!has.box(html));assert.doesNotMatch(text(html),/Follow/);
@@ -57,7 +57,7 @@ test('Disconnected reasons each have their own sentence',()=>{
 });
 test('Just approved: standing at the place, waiting for the agent; the prompt only after a minute; never the Reconnect box',()=>{
  const fresh=card('approved-waiting'),late=card('approved-waiting-late');
- assert.match(text(fresh),/Disconnectedapproved just now/);assert.match(text(fresh),/Mickey is standing at the commons\. Waiting for the agent to start listening…/);
+ assert.match(text(fresh),/Disconnected · approved just now/);assert.match(text(fresh),/Mickey is standing at the commons\. Waiting for the agent to start listening…/);
  assert.doesNotMatch(text(fresh),/copy the prompt|Copy prompt/);assert.ok(!has.reconnect(fresh));assert.ok(!has.box(fresh));
  assert.match(text(late),/Still here after a minute\? Tell the agent to continue, or copy the prompt again\./);assert.ok(!has.reconnect(late));
  // the body went to sleep without a listen: the Reconnect box takes over
@@ -71,8 +71,8 @@ test('Pairing: the card is the approval, nothing else on it',()=>{
 });
 test('Visitor: Awake / Zombie / Asleep + place + now + Follow; no owner controls',()=>{
  const awake=text(card('visitor-awake')),idle=text(card('visitor-idle')),zombie=text(card('visitor-zombie')),asleep=text(card('visitor-asleep'));
- assert.match(awake,/Awakeat the pond/);assert.match(idle,/Awakesitting by the pond/);
- assert.match(zombie,/Zombiewandering by the commons since \d\d:\d\d/);assert.match(asleep,/Asleepby the commons since Oct 23, \d\d:\d\d/);
+ assert.match(awake,/Awake · at the pond/);assert.match(idle,/Awake · sitting by the pond/);
+ assert.match(zombie,/Zombie · wandering by the commons since \d\d:\d\d/);assert.match(asleep,/Asleep · by the commons since Oct 23, \d\d:\d\d/);
  for(const name of ['visitor-awake','visitor-idle','visitor-zombie','visitor-asleep']){const html=card(name),t=text(html);
   assert.match(t,/Follow/);assert.match(html,/<q>/);assert.ok(!has.box(html)&&!has.reconnect(html)&&!has.approve(html));
   assert.doesNotMatch(t,/Connected|Disconnected|Reconnect|Disconnect|Pair another|Message your agent/);}

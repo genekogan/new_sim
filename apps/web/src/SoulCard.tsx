@@ -37,6 +37,7 @@ const fadeBody=(rec:PublicRecord|null):Body|null=>rec?.fade&&['green','yellow','
 export type SoulCardProps={api:Api;soul:PublicSoul;owner:boolean;signedIn?:boolean;bodyEvent?:Body|null;camera?:Camera};
 export function SoulCard(props:SoulCardProps){
  const rec=usePublicRecord(props.api,props.soul.id),r=rec==='loading'||rec==='unavailable'?null:rec;
+ // COMMON-LINK §2 addendum: the replica's `now` is optional (present only when set); the record always carries it (or null)
  const x=props.soul as PublicSoul&{body?:unknown;now?:unknown};
  const body=newest(readBody(x.body),r?.body??null,props.bodyEvent??null)??fadeBody(r);
  const now=newest(readNow(x.now),r?.now??null);
@@ -47,7 +48,7 @@ function OwnerCard({api,soul,camera,signedIn=true,body,now,place}:SoulCardProps&
  const {inbox,send}=useSoulInbox(api,soul.id),here=useAgentPresence(soul.id),code=useWindowCode();
  const link=ownerLink(here?.link??null,here);
  const disconnect=async()=>{const r=await api(`/v1/souls/${encodeURIComponent(soul.id)}/revoke`,{});return r.status===200&&r.data?.ok===true;};
- return <SoulCardView soul={soul} view="owner" link={link} here={here} inbox={inbox} send={send} body={body} now={now} place={place}
+ return <SoulCardView soul={soul} view="owner" link={link} here={here} inbox={inbox} send={send} body={body} now={newest(now,readNow(inbox?.now))} place={place}
   prompt={soulStartPrompt(location.origin+apiPath(''),soul.id,soul.name,code)} camera={camera} signedIn={signedIn} disconnect={disconnect}/>;
 }
 
@@ -75,7 +76,7 @@ export function SoulCardView({soul,view,body,now,place,camera,link=null,here=nul
  if(view==='owner'&&link?.state==='pairing'){
   return <article className="soul-card" aria-label={`${soul.name}, pairing`} data-soul-state="pairing">
    {link.approvalId?<ApprovalCard key={link.approvalId} id={link.approvalId} signedIn={signedIn} embedded onDone={()=>{}}/>
-    :<><Head soul={soul} title={title} share={share} copied={copied}/><p className="soul-meta"><span className="soul-status" data-status="pairing"><i aria-hidden="true"/>Pairing</span><span className="soul-place">waiting for your answer</span></p></>}
+    :<><Head soul={soul} title={title} share={share} copied={copied}/><p className="soul-meta"><span className="soul-status" data-status="pairing"><i aria-hidden="true"/>Pairing</span><StatusPlace text="waiting for your answer"/></p></>}
   </article>;
  }
  const owner=view==='owner',connected=owner&&link?.state==='connected',disconnected=owner&&link?.state==='disconnected';
@@ -114,10 +115,12 @@ function Head({soul,title,share,copied}:{soul:PublicSoul;title:React.RefObject<H
   {soul.description&&<p className="soul-character">{soul.description}</p>}
  </>;
 }
-const StatusPlace=({text,title}:{text:string;title?:string})=>text?<span className="soul-place" title={title}>{text}</span>:null;
+/** A small chevron (a text ▾ reads as a second dot next to the · separator at 13 px). */
+const Chevron=({up,right}:{up:boolean;right?:boolean})=><svg className="soul-caret" data-caret={up?'up':right?'right':'down'} viewBox="0 0 10 10" aria-hidden="true"><path d={up?'M2 6.5 5 3.5 8 6.5':right?'M3.5 2 6.5 5 3.5 8':'M2 3.5 5 6.5 8 3.5'} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+const StatusPlace=({text,title}:{text:string;title?:string})=>text?<span className="soul-place" title={title}><span className="soul-sep" aria-hidden="true"> · </span>{text}</span>:null;
 function OwnerStatus({link,waiting,details,toggle}:{link:Link|null;waiting:boolean;details:boolean;toggle():void}){
  if(!link)return <span className="soul-status" data-status="checking"><i aria-hidden="true"/>Checking…</span>;
- if(link.state==='connected')return <span><button type="button" className="soul-status soul-link" data-status="connected" aria-expanded={details} aria-controls="soul-link-details" title="Link details" onClick={toggle}><i aria-hidden="true"/>Connected<span className="soul-caret" aria-hidden="true">{details?'▴':'▾'}</span></button></span>;
+ if(link.state==='connected')return <button type="button" className="soul-status soul-link" data-status="connected" aria-expanded={details} aria-controls="soul-link-details" title="Link details" onClick={toggle}><i aria-hidden="true"/>Connected<Chevron up={details}/></button>;
  return <span className="soul-status" data-status={waiting?'approved-waiting':'disconnected'}><i aria-hidden="true"/>Disconnected</span>;
 }
 function VisitorStatus({body}:{body:Body|null}){
@@ -144,7 +147,7 @@ function LinkDetails({name,link,here,prompt,disconnect,clock,pairOpen}:{name:str
   <p className="soul-dim soul-box-line">{holderLine(link,here,clock)}</p>
   <div className="soul-box-actions">
    <button type="button" className="soul-pill" disabled={busy} onClick={()=>void off()}>Disconnect</button>
-   <button type="button" className="soul-pill quiet" aria-expanded={pair} onClick={()=>setPair(v=>!v)}>Pair another session<span className="soul-caret" aria-hidden="true">{pair?'▴':'▸'}</span></button>
+   <button type="button" className="soul-pill quiet" aria-expanded={pair} onClick={()=>setPair(v=>!v)}>Pair another session<Chevron up={pair} right={!pair}/></button>
   </div>
   {pair&&<><p className="soul-box-text">Give this to the agent that should take over. Its request shows up here; approving it disconnects the current one.</p><PromptCopy prompt={prompt}/></>}
   {note&&<p className="soul-box-text" role="status">{note}</p>}

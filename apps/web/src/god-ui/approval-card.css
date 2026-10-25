@@ -39,7 +39,8 @@
   .ap-dialog.ap-dialog .ap-close { width: 44px; height: 44px; min-height: 44px; top: -12px; right: -12px; }
   .human-world .ap-embedded .ap-btn { min-height: 44px; }
 }
-@media (max-width: 460px) { .ap-dialog { inset: calc(var(--app-hud-bottom, 56px) + 8px) calc(8px + var(--sa-r, 0px)) auto calc(8px + var(--sa-l, 0px)); width: auto; max-width: none; } }
+/* LINK (canvas PhonePairing): on a phone the forced-up Pairing card is the bottom sheet, like the Soul card */
+@media (max-width: 460px) { .ap-dialog { inset: auto calc(8px + var(--sa-r, 0px)) calc(8px + var(--sa-b, 0px)) calc(8px + var(--sa-l, 0px)); width: auto; max-width: none; border-radius: 22px; padding: 18px 16px 18px; } }
 .ap-line[data-approval-copy] { font-weight: 500; }
 /* LINK Pairing state (spec §4): the status line, the ask, one warning line; the same copy inside an open Soul card. */
 .ap-state { display: flex; flex-wrap: wrap; align-items: center; margin: 12px 0 8px; font-size: 13px; }

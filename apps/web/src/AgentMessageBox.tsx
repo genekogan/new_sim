@@ -15,6 +15,8 @@ export type AgentInbox = {
   presence?: 'listening' | 'working' | 'recent' | 'away';
   /** LINK (COMMON-LINK §2): the owner's one state, read by `readLink`. */
   link?: unknown;
+  /** LINK: the agent's public `now` line, also on the owner view. */
+  now?: unknown;
 };
 /** A message still unread after this long says so, with its age. */
 export const NOT_PICKED_UP_MS = 10_000;
