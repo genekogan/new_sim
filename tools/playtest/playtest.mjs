@@ -53,7 +53,8 @@ export async function preflight({ serverRoot }) {
   const allow = quotaAllows(q, { stopPct: 85 });
   // Machine gate (Gene 2026-10-25): a loaded or memory-bound laptop produced false failures all night. Refuse to start
   // unless the 1-minute load is under 10 and at least 6 GB of memory is free; `--force-machine` records the breach instead.
-  try { const os = await import('node:os'); checks.freeGb = Math.round(os.freemem() / 1073741824 * 10) / 10; } catch { checks.freeGb = null; }
+  // macOS: os.freemem() excludes inactive and purgeable pages; vm_stat gives the reclaimable total.
+  try { const { run: sh } = await import('./lib/proc.mjs'); const vm = (await sh('vm_stat', [], { maxWallMs: 10000 })).stdout; const page = Number(vm.match(/page size of (\d+)/)?.[1] ?? 16384); const pages = (k) => Number(vm.match(new RegExp(`${k}:\\s+(\\d+)`))?.[1] ?? 0); checks.freeGb = Math.round((pages('Pages free') + pages('Pages inactive') + pages('Pages purgeable') + pages('Pages speculative')) * page / 1073741824 * 10) / 10; } catch { checks.freeGb = null; }
   checks.machineOk = (checks.laptopLoad?.[0] ?? 0) < 10 && (checks.freeGb == null || checks.freeGb >= 6);
   const ok = checks.serverRoot && checks.webDist && checks.controllerCli && checks.playwright && !!checks.claude && allow.allowed && (checks.machineOk || process.argv.includes('--force-machine'));
   return { ok, allow, checks };
