@@ -13,6 +13,7 @@ import { freeMemGb, resolvePlaywright } from './lib/platform.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_SERVER_ROOT = '<worktrees>/soul3-integration';
 const RUNS_ROOT = join(homedir(), 'Eden/team/playtest/runs');
+const FROZEN_BUNDLE = join(here, 'frozen/frozen.json');
 const STEPS = ['preflight', 'provision', 'seats', 'play', 'close', 'review', 'develop', 'report'];
 
 function args(argv) { const out = { _: [] }; for (let i = 0; i < argv.length; i++) { const a = argv[i]; if (a.startsWith('--')) { const k = a.slice(2); const v = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : true; out[k] = v; } else out._.push(a); } return out; }
@@ -204,12 +205,26 @@ async function cmdReplaySet(a) {
   const baselineDir = a.baseline ? resolve(a.baseline) : null;
   const only = a.only ? String(a.only).split(',') : null;
   const frozen = sc.FROZEN.filter((f) => !only || only.includes(f.label));
+  // Frozen bundle (tools/playtest/frozen/frozen.json, from `freeze-bundle`): the frozen scenarios and baseline measures
+  // without the run folders, for a machine that does not have them (the cloud box). Used when --frozen is given, or
+  // when a frozen run folder is missing and the default bundle exists.
+  const bundleFile = a.frozen ? resolve(a.frozen) : (frozen.some((f) => !existsSync(join(runsRoot, f.run, 'scenario.json'))) && existsSync(FROZEN_BUNDLE) ? FROZEN_BUNDLE : null);
+  const bundle = bundleFile ? readJson(bundleFile, null) : null;
+  if (bundleFile && !bundle) { log(`frozen bundle unreadable: ${bundleFile}`); return 2; }
+  if (bundle) log(`frozen bundle ${bundleFile} (${bundle.createdAt})`);
+  const fromBundle = (label) => bundle?.entries?.find((e) => e.label === label) ?? null;
   const plan = frozen.map((f) => {
     const src = join(runsRoot, f.run);
-    const orig = readJson(join(src, 'scenario.json'), {});
-    const current = orig.scenarioPath && existsSync(orig.scenarioPath) ? readJson(orig.scenarioPath, null) : null;
-    const scen = sc.frozenScenario(src, { currentScenario: current });
-    return { ...f, source: src, scenario: scen, scenarioFile: join(out, 'scenarios', `${f.label}.json`), repeats: Array.from({ length: repeats }, (_, i) => join(out, `${f.label}-r${i + 1}`)) };
+    const b = fromBundle(f.label);
+    if (bundle && !b) throw new Error(`frozen bundle has no entry for ${f.label}; rebuild it with freeze-bundle`);
+    let scen;
+    if (b) scen = b.scenario;
+    else {
+      const orig = readJson(join(src, 'scenario.json'), {});
+      const current = orig.scenarioPath && existsSync(orig.scenarioPath) ? readJson(orig.scenarioPath, null) : null;
+      scen = sc.frozenScenario(src, { currentScenario: current });
+    }
+    return { ...f, source: b ? `${bundleFile}#${f.label}` : src, scenario: scen, scenarioFile: join(out, 'scenarios', `${f.label}.json`), repeats: Array.from({ length: repeats }, (_, i) => join(out, `${f.label}-r${i + 1}`)) };
   });
   if (a['dry-run']) {
     console.log(`replay-set plan → ${out}\nbaseline: ${baselineDir ?? 'the original runs'} · repeats ${repeats} · sequential, one playout at a time, machine gate before each\n`);
@@ -245,14 +260,39 @@ async function cmdReplaySet(a) {
     }
   }
   save();
+  const baseFrom = {};
   const entries = manifest.runs.filter((r) => r.repeats.length || a['score-only']).map((r) => {
     const f = sc.FROZEN.find((x) => x.label === r.label);
-    const b = sc.baselineFor(f, { baselineDir, runsRoot });
+    const fb = fromBundle(r.label);
+    const fromDir = baselineDir && sc.baselineFor(f, { baselineDir, runsRoot: null, dirOnly: true });
+    const b = fromDir?.measures?.length ? fromDir : fb?.replayBaseline?.measures?.length ? fb.replayBaseline : fb ? { measures: [fb.baseline] } : sc.baselineFor(f, { baselineDir, runsRoot });
+    baseFrom[r.label] = fromDir?.measures?.length ? 'replay set dir' : fb?.replayBaseline?.measures?.length ? `bundle replay set ${fb.replayBaseline.from}` : fb ? 'bundle original run' : 'original run';
     return { label: r.label, kind: r.kind, base: sc.mergeBase(b.measures), reps: r.repeats.map(sc.runMeasures) };
   });
-  const md = sc.renderScorecard({ entries, repeats, baselineName: baselineDir ? `previous replay set \`${baselineDir}\`` : 'the original runs (re-scored with the current oracles)', notes: [`Frozen runs from ${runsRoot}.`, 'Pinkteam is a stress add-on (report, do not gate); it is not in this set.'] });
+  const md = sc.renderScorecard({ entries, repeats, baselineName: baselineDir ? `previous replay set \`${baselineDir}\`` : bundle ? `the frozen bundle (${bundle.createdAt}): ${[...new Set(Object.values(baseFrom))].join(', ')}` : 'the original runs (re-scored with the current oracles)', notes: [bundle ? `Frozen scenarios and baselines from ${basename(bundleFile)} (built from ${bundle.runsRoot}). Baseline per run: ${Object.entries(baseFrom).map(([k, v]) => `${k} ← ${v}`).join('; ')}.` : `Frozen runs from ${runsRoot}.`, 'Pinkteam is a stress add-on (report, do not gate); it is not in this set.'] });
   writeFileSync(join(out, 'SCORECARD.md'), md);
   log(`scorecard: ${join(out, 'SCORECARD.md')}`);
+  return 0;
+}
+
+/** freeze-bundle: frozen.json with each frozen run's replay scenario and its baseline measures (current oracles), so a
+ *  replay set runs where the run folders are not (tools/playtest/frozen/; small: no screenshots, no transcripts).
+ *  --baseline <replay-set dir> also stores that set's repeats' measures per label (replayBaseline), which replay-set
+ *  then prefers over the original run (like-for-like: scripted replay against scripted replay). */
+export async function cmdFreezeBundle(a) {
+  const sc = await import('./review/scorecard.mjs');
+  const runsRoot = resolve(a['runs-root'] ?? RUNS_ROOT);
+  const out = resolve(a.out ?? FROZEN_BUNDLE);
+  const baselineDir = a.baseline ? resolve(a.baseline) : null; // a previous replay set: its repeats become the preferred baseline
+  const entries = sc.FROZEN.map((f) => {
+    const src = join(runsRoot, f.run);
+    const orig = readJson(join(src, 'scenario.json'), {});
+    const current = orig.scenarioPath && existsSync(orig.scenarioPath) ? readJson(orig.scenarioPath, null) : null;
+    const rb = baselineDir ? sc.baselineFor(f, { baselineDir, runsRoot: null, dirOnly: true }) : null;
+    return { ...f, scenario: sc.frozenScenario(src, { currentScenario: current }), baseline: sc.runMeasures(src), ...(rb ? { replayBaseline: { from: basename(baselineDir), measures: rb.measures } } : {}) };
+  });
+  writeJson(out, { version: 1, createdAt: new Date().toISOString(), runsRoot, replayBaseline: baselineDir ? basename(baselineDir) : null, entries });
+  log(`frozen bundle: ${out} (${entries.length} runs)`);
   return 0;
 }
 
@@ -264,6 +304,7 @@ async function main() {
   if (cmd === 'preflight') { const pf = await preflight({ serverRoot: resolve(a['server-root'] ?? DEFAULT_SERVER_ROOT) }); console.log(JSON.stringify(pf, null, 1)); process.exit(pf.ok ? 0 : 2); }
   if (cmd === 'compare') { const m = await loadModules(); if (!m.compare) { log('compare module missing'); process.exit(3); } const c = m.compare.compareRuns(resolve(a._[1]), resolve(a._[2])); console.log(m.compare.compareMd ? m.compare.compareMd(c) : JSON.stringify(c, null, 1)); process.exit(0); }
   if (cmd === 'replay-set') process.exit(await cmdReplaySet(a));
+  if (cmd === 'freeze-bundle') process.exit(await cmdFreezeBundle(a));
   if (cmd === 'replay') {
     const src = resolve(a._[1]); const rp = readJson(join(src, 'replay.json')); if (!rp) { log('no replay.json'); process.exit(2); }
     const mode = a.mode ?? 'scripted';
@@ -271,7 +312,7 @@ async function main() {
     const tmp = join(src, `replay-${mode}.scenario.json`); writeJson(tmp, scen);
     process.exit(await cmdRun({ _: ['run', tmp], seed: rp.seed, 'server-root': a['server-root'], out: a.out }));
   }
-  console.log('usage: playtest.mjs run <scenario.json> [--seed n] [--out dir] [--from step] [--server-root dir] [--keep-world] | review <run> | replay <run> --mode scripted|live | compare <a> <b> | preflight | replay-set [--server-root dir] [--repeats 2] [--out dir] [--baseline dir] [--dry-run] [--score-only] [--only labels]');
+  console.log('usage: playtest.mjs run <scenario.json> [--seed n] [--out dir] [--from step] [--server-root dir] [--keep-world] | review <run> | replay <run> --mode scripted|live | compare <a> <b> | preflight | replay-set [--server-root dir] [--repeats 2] [--out dir] [--baseline dir] [--dry-run] [--score-only] [--only labels] [--frozen bundle.json] [--force-machine] | freeze-bundle [--runs-root dir] [--out file]');
   process.exit(1);
 }
 if (import.meta.url === `file://${process.argv[1]}`) main();

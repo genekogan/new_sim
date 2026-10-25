@@ -179,12 +179,14 @@ export function renderScorecard({ title = 'Frozen-set scorecard', entries, basel
 }
 
 /** Measures for the baseline of one frozen run: the matching repeats of a previous replay-set, else the original run. */
-export function baselineFor(entry, { baselineDir = null, runsRoot }) {
+/** dirOnly: only a previous replay set's repeats (null when it has none), for callers with their own fallback. */
+export function baselineFor(entry, { baselineDir = null, runsRoot, dirOnly = false }) {
   if (baselineDir) {
     const man = readJson(join(baselineDir, 'replay-set.json'), null);
     const dirs = (man?.runs ?? []).find((r) => r.label === entry.label)?.repeats?.filter((d) => existsSync(join(d, 'evidence'))) ?? [];
     if (dirs.length) return { from: dirs, measures: dirs.map(runMeasures) };
   }
+  if (dirOnly) return null;
   const d = join(runsRoot, entry.run);
   return { from: [d], measures: [runMeasures(d)] };
 }
