@@ -24,16 +24,19 @@ import { addShadowProxy } from './shadow-proxy.ts';
 import { captureTexturePreparation, compileModel, fitTextures, uploadTextures } from './texture-budget.ts';
 import { decodedImagesOf, fetchInWorker, warmAssetWorker } from './asset-fetch.ts';
 
-let shared: GLTFLoader | null = null;
+let shared: { loader: GLTFLoader } | null = null;
 /** LiveWorld may hand over its own loader (download progress, one Draco worker pool). */
-export function setAssetLoader(loader: GLTFLoader) { shared = loader; warmAssetWorker(); }
+export function setAssetLoader(loader: GLTFLoader): () => void {
+  const owner = { loader }; shared = owner; warmAssetWorker();
+  return () => { if (shared === owner) shared = null; };
+}
 function loader(): GLTFLoader {
-  return (shared ??= new GLTFLoader().setDRACOLoader(new DRACOLoader().setDecoderPath(BASE + '/mars-assets/draco/')).setMeshoptDecoder(MeshoptDecoder));
+  return (shared ??= { loader: new GLTFLoader().setDRACOLoader(new DRACOLoader().setDecoderPath(BASE + '/mars-assets/draco/')).setMeshoptDecoder(MeshoptDecoder) }).loader;
 }
 /** URL of a stored asset (served immutable by the world's server). */
 export const assetUrl = (sha: string, ext = 'glb') => apiPath(`/assets/${sha}.${ext}`);
 
-const cache = new Map<string, { p: Promise<GLTF>; by: GLTFLoader; settled: boolean }>();
+const cache = new Map<string, { p: Promise<GLTF>; by: GLTFLoader | null; settled: boolean }>();
 const failed = new Set<string>();
 /** Load (once) and parse a GLB by sha. Rejects on 404 or a parse error; a failure is retried after 30 s.
  *  A load still in flight on a loader that has since been replaced (LiveWorld re-mounts its scene on a new welcome and
@@ -49,12 +52,14 @@ export function loadAsset(sha: string): Promise<GLTF> {
   // A download/resize may outlive its view. It may populate the shared asset cache, but must not prepare GPU work in
   // whichever unrelated world happens to be current when it finishes.
   const preparation = captureTexturePreparation();
-  const entry = { p: download(l, assetUrl(sha)).then(async (g) => { stage('fit'); await fitTextures(g); stage('prepare'); prepare(g); stage('compile'); await compileModel(g, preparation); stage('upload'); await uploadTextures(g, preparation); stage('done'); return g; }), by: l, settled: false };
+  const entry: { p: Promise<GLTF>; by: GLTFLoader | null; settled: boolean } = { p: download(l, assetUrl(sha)).then(async (g) => { stage('fit'); await fitTextures(g); stage('prepare'); prepare(g); stage('compile'); await compileModel(g, preparation); stage('upload'); await uploadTextures(g, preparation); stage('done'); return g; }), by: l, settled: false };
   cache.set(sha, entry);
-  entry.p.then(() => { entry.settled = true; }, (e: unknown) => {
+  // Only pending requests need their loader identity. A settled cache entry must not retain the old view through
+  // GLTFLoader.manager's progress callbacks; the shared parsed asset itself remains reusable.
+  entry.p.then(() => { entry.settled = true; entry.by = null; }, (e: unknown) => {
     if (cache.get(sha) !== entry) return;
     if ((e as { name?: string })?.name === 'AbortError' || entry.by !== loader()) { cache.delete(sha); return; }
-    entry.settled = true; failed.add(sha); setTimeout(() => { if (cache.get(sha) === entry) cache.delete(sha); failed.delete(sha); }, 30_000);
+    entry.settled = true; entry.by = null; failed.add(sha); setTimeout(() => { if (cache.get(sha) === entry) cache.delete(sha); failed.delete(sha); }, 30_000);
   });
   return entry.p;
 }
