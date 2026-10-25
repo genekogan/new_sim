@@ -8,7 +8,11 @@ dedicated cloud box and commits the results to the `playtest-results` branch.
 Create a Claude Code cloud session on `genekogan/sim`, branch **`lane/playtest-20261024`** (the runner lives there),
 and give it exactly:
 
-> run `bash tools/playtest/cloud/run-replay.sh lane/soul-fix-20261025 fix-r1 1` and report the SCORECARD.md path
+> Start the runner detached so it outlives any tool call (the harness stops foreground Bash at 10 minutes and background
+> tasks at 30; the replay needs 1 to 3 hours):
+> `cd /home/user/sim && nohup setsid bash tools/playtest/cloud/run-replay.sh lane/soul-fix-20261025 fix-r1 1 > /tmp/replay-fix-r1.log 2>&1 &`
+> then poll with foreground calls under 10 minutes each (`sleep 540; tail -n 30 /tmp/replay-fix-r1.log; pgrep -f run-replay.sh || echo FINISHED`)
+> until FINISHED, and report the SCORECARD.md path and its first 60 lines, the playtest-results push result and CLOUD.md.
 
 Change the three arguments per run: `<fix-branch> <out-name> [repeats]`. A rerun with the same out-name resumes.
 If the session starts on another branch, prefix the prompt with "git fetch origin lane/playtest-20261024 && git checkout
