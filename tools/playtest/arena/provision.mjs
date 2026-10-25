@@ -30,13 +30,13 @@ export function worldEnv(serverRoot) {
 }
 
 export async function healthz(base) {
-  try { const r = await fetch(`${base}/healthz`, { signal: AbortSignal.timeout(5000) }); return r.ok ? await r.json() : { ok: false, status: r.status }; }
+  try { const r = await fetch(`${base}/healthz`, { signal: AbortSignal.timeout(15000) }); return r.ok ? await r.json() : { ok: false, status: r.status }; }
   catch (e) { return { ok: false, error: String(e?.message ?? e) }; }
 }
 
 async function served(base, path) {
   try {
-    const r = await fetch(`${base}/${path}`, { signal: AbortSignal.timeout(10000) });
+    const r = await fetch(`${base}/${path}`, { signal: AbortSignal.timeout(30000) });
     const text = await r.text();
     const html = /^\s*<!doctype html/i.test(text);
     return r.ok && !html ? { ok: true, bytes: text.length, sha256: sha256(text), text } : { ok: false, status: r.status, html };
@@ -81,7 +81,10 @@ export async function stopWorld({ pid, graceMs = 10000 }) {
 
 /** world.json: {kind, base, slug, port, pid, build, skill:{version, sha256}, cli:{eden.mjs, eden-agent.mjs, eden-god.mjs}, startedAt} */
 export async function describeWorld({ base, slug, port, pid, build, kind = 'dev', startedAt }) {
-  const [skill, eden, agent, god, instr] = await Promise.all(['skill.md', 'eden.mjs', 'eden-agent.mjs', 'god/eden-god.mjs', 'instructions.md'].map((p) => served(base, p)));
+  const fetchAll = () => Promise.all(['skill.md', 'eden.mjs', 'eden-agent.mjs', 'god/eden-god.mjs', 'instructions.md'].map((p) => served(base, p)));
+  let got = await fetchAll();
+  for (let i = 0; i < 2 && got.some((x) => x.error); i++) { await sleep(3000); got = await fetchAll(); } // a just-booted world on a loaded machine can be slow
+  const [skill, eden, agent, god, instr] = got;
   const skillVersion = skill.ok ? (skill.text.match(/^\s*version:\s*"?([^"\s]+)/m)?.[1] ?? null) : null;
   const cliVersion = eden.ok ? (eden.text.match(/const VERSION = "([^"]+)"/)?.[1] ?? null) : null;
   return {

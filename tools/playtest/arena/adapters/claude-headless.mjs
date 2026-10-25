@@ -1,9 +1,9 @@
 // Claude Code headless seat turns (`claude -p … --output-format stream-json --verbose`) and the terminal-like chat render.
 // DESIGN §4.1. One session per seat: first turn --session-id, then --resume.
-import { run } from '../../lib/proc.mjs';
+import { run, start } from '../../lib/proc.mjs';
 
 export const DEFAULT_ALLOWED = ['Bash(node eden.mjs:*)', 'Bash(node eden-agent.mjs:*)', 'Bash(curl:*)', 'Bash(ls:*)', 'Bash(cat:*)', 'Bash(mkdir:*)',
-  'Bash(pwd:*)', 'Bash(test:*)', 'Read(./**)', 'Write(./**)', 'Edit(./**)'];
+  'Bash(pwd:*)', 'Bash(test:*)', 'Bash(cp:*)', 'Read(./**)', 'Write(./**)', 'Edit(./**)'];
 
 let effortSupport = null;
 /** Whether the installed CLI accepts --effort (checked once from `claude --help`). */
@@ -21,6 +21,9 @@ export function buildArgs({ sessionId, resume, model, effort, text, allowedTools
   if (allowedTools.length) args.push('--allowedTools', ...allowedTools);
   return args;
 }
+
+/** A turn's closing result event (a resumed session can emit an early empty one: num_turns 0, stop_reason null). */
+export const isFinalResult = (e) => e?.type === 'result' && (e.stop_reason != null || (e.num_turns ?? 0) > 0 || e.subtype !== 'success');
 
 export function parseLine(line) { if (!line.trim()) return null; try { return JSON.parse(line); } catch { return { type: 'unparsed', raw: line.slice(0, 2000) }; } }
 
@@ -72,15 +75,40 @@ export function renderChat(stream) {
 }
 
 /** turn({cwd, sessionId, resume, model, effort, text, allowedTools, maxWallSec}) → {stream, usage, finalText, sessionId, exit, wallMs, timedOut, toolCalls, effortApplied} */
-export async function turn({ cwd, sessionId, resume = false, model = 'haiku', effort = null, text, allowedTools = DEFAULT_ALLOWED, maxWallSec = 240 }) {
+export async function turn({ cwd, sessionId, resume = false, model = 'haiku', effort = null, text, allowedTools = DEFAULT_ALLOWED, maxWallSec = 240, resultGraceMs = 3000 }) {
   const effortOk = effort ? await supportsEffort() : false;
   const args = buildArgs({ sessionId, resume, model, effort, text, allowedTools, effortOk });
-  const env = { ...process.env }; delete env.CLAUDECODE; delete env.CLAUDE_CODE_ENTRYPOINT;
+  // CLAUDE_CODE_DISABLE_CLAUDE_MDS: a seat must not load the user's or ~/Eden's CLAUDE.md (--setting-sources does not stop it).
+  const env = { ...process.env, CLAUDE_CODE_DISABLE_CLAUDE_MDS: '1' }; delete env.CLAUDECODE; delete env.CLAUDE_CODE_ENTRYPOINT;
   const stream = [{ type: 'harness_user', text, _rx: Date.now() }];
-  const r = await run('claude', args, { cwd, env, maxWallMs: maxWallSec * 1000, onStdoutLine: (l) => { const e = parseLine(l); if (e) { e._rx = Date.now(); stream.push(e); } } });
-  if (r.timedOut) stream.push({ type: 'harness_timeout', maxWallSec, _rx: Date.now() });
-  if (r.code !== 0 && r.stderr) stream.push({ type: 'harness_stderr', text: r.stderr.slice(-2000), _rx: Date.now() });
+  // `claude -p` does not exit while the agent's own background Bash tasks (its `listen`) run: the turn is over at the final
+  // result event, so after a short grace the harness ends the process group (the wake loop's listen takes over).
+  let grace = null, endedAfterResult = false;
+  const h = startTurn('claude', args, { cwd, env, maxWallSec, onLine: (l) => {
+    const e = parseLine(l); if (!e) return; e._rx = Date.now(); stream.push(e);
+    if (grace && e.type === 'assistant') { clearTimeout(grace); grace = null; }
+    if (isFinalResult(e)) { clearTimeout(grace); grace = setTimeout(() => { endedAfterResult = true; h.kill(); }, resultGraceMs); }
+  } });
+  const r = await h.done; clearTimeout(grace);
+  const timedOut = r.timedOut && !endedAfterResult;
+  if (timedOut) stream.push({ type: 'harness_timeout', maxWallSec, _rx: Date.now() });
+  if (endedAfterResult) stream.push({ type: 'harness_end', reason: 'final result; background tasks ended', _rx: Date.now() });
+  if (r.code !== 0 && r.stderr && !endedAfterResult) stream.push({ type: 'harness_stderr', text: r.stderr.slice(-2000), _rx: Date.now() });
   const s = summarize(stream);
-  return { stream, usage: s.usage, finalText: s.finalText, sessionId: s.sessionId ?? sessionId, exit: r.code, wallMs: r.wallMs, timedOut: r.timedOut, toolCalls: s.toolCalls, effortApplied: effort ? effortOk : null };
+  return { stream, usage: s.usage, finalText: s.finalText, sessionId: s.sessionId ?? sessionId, exit: endedAfterResult ? 0 : r.code, rawExit: r.code, wallMs: r.wallMs, timedOut, endedAfterResult,
+    toolCalls: s.toolCalls, effortApplied: effort ? effortOk : null };
+}
+
+/** proc.run with an external kill handle: {done: Promise<{code, signal, stdout, stderr, wallMs, timedOut}>, kill()}. */
+function startTurn(cmd, args, { cwd, env, maxWallSec, onLine }) {
+  let killFn = () => {};
+  const t0 = Date.now(); let timedOut = false;
+  const done = new Promise((resolve) => {
+    const p = start(cmd, args, { cwd, env, onLine, onExit: ({ code, signal, stdout, stderr }) => { clearTimeout(timer); resolve({ code, signal, stdout, stderr, wallMs: Date.now() - t0, timedOut }); } });
+    const hardKill = () => { p.kill('SIGTERM'); setTimeout(() => p.kill('SIGKILL'), 5000); };
+    killFn = hardKill;
+    const timer = setTimeout(() => { timedOut = true; hardKill(); }, maxWallSec * 1000);
+  });
+  return { done, kill: () => killFn() };
 }
 export const name = 'claude-headless';

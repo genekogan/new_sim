@@ -57,3 +57,10 @@ test('codex: render, shell-wrapper stripping and resume args', () => {
   const b = codex.buildArgs({ threadId: null, resume: false, model: 'gpt-6.1-sol', effort: 'medium', text: 'go' });
   assert.equal(b[1], '--ignore-user-config'); assert.equal(b[b.indexOf('-m') + 1], 'gpt-6.1-sol'); assert.ok(b.includes('model_reasoning_effort="medium"'));
 });
+
+test('claude: the early empty result of a resumed session is not the closing result', () => {
+  assert.equal(claude.isFinalResult({ type: 'result', subtype: 'success', num_turns: 0, stop_reason: null }), false);
+  assert.equal(claude.isFinalResult({ type: 'result', subtype: 'success', num_turns: 4, stop_reason: 'end_turn' }), true);
+  assert.equal(claude.isFinalResult({ type: 'result', subtype: 'error_max_turns' }), true);
+  assert.equal(claude.isFinalResult(fx('claude-turn.jsonl').findLast((e) => e.type === 'result')), true);
+});

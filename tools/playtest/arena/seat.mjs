@@ -2,10 +2,10 @@
 // background-task plumbing played by the harness (the wake loop). DESIGN §4.1, §6.
 // The harness writes `.eden-agent.json` ONLY before register (the identity seed) and never reads it.
 import { join } from 'node:path';
-import { mkdirSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, readdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { run, start } from '../lib/proc.mjs';
-import { appendJsonl, writeJson, readJson } from '../lib/jsonl.mjs';
+import { appendJsonl, writeJson, readJson, readJsonl } from '../lib/jsonl.mjs';
 import { newIdentity } from '../lib/hash.mjs';
 import { now, sleep } from '../lib/clock.mjs';
 import * as claude from './adapters/claude-headless.mjs';
@@ -23,6 +23,14 @@ export function listenMessages(stdout) {
 }
 
 const parseJsonStatus = (stdout, code) => { try { return { ok: code === 0, data: JSON.parse(stdout) }; } catch { return { ok: false, reason: stdout.slice(0, 300) }; } };
+/** chat-as-rendered.md → [{turn, text}] split at the `<!-- turn N (...) -->` markers each turn writes. */
+export function splitRendered(md) {
+  const out = [], re = /\n?<!-- turn (\d+) [^>]*-->\n/g; let m, last = null;
+  while ((m = re.exec(md))) { if (last) last.text = md.slice(last.start, m.index); last = { turn: Number(m[1]), start: m.index }; out.push(last); }
+  if (last) last.text = md.slice(last.start);
+  return out.map(({ turn, text }) => ({ turn, text }));
+}
+
 export const SOUL_CLI = { file: 'eden.mjs', fallbackFile: 'eden-agent.mjs', listen: (after) => ['listen', ...(after ? ['--after', after] : [])], status: ['status'], parseStatus: parseJsonStatus };
 
 export class Seat {
@@ -39,6 +47,13 @@ export class Seat {
   }
   save() { writeJson(join(this.dir, 'seat.json'), this.info); }
   get sessionId() { return this.info.sessionId; }
+  /** Number of completed turns (as recorded in turns.jsonl, so it survives a harness restart). */
+  turnCount() { return readJsonl(join(this.dir, 'turns.jsonl')).length; }
+  /** Markdown of chat-as-rendered.md for the turns after turnIndex (0 → everything). */
+  renderedChatSince(turnIndex = 0) {
+    const f = join(this.dir, 'chat-as-rendered.md'); if (!existsSync(f)) return '';
+    return splitRendered(readFileSync(f, 'utf8')).filter((b) => b.turn > turnIndex).map((b) => b.text).join('');
+  }
 
   /** Run the seat's own CLI in its folder (read-only commands only: status). Never logs credentials: these print none. */
   async cliJson(args, maxWallMs = 20000) {
@@ -73,7 +88,7 @@ export class Seat {
     this.save();
     for (const e of r.stream) appendJsonl(join(this.dir, 'transcript.jsonl'), { turn: n, ...e });
     const rec = { turn: n, reason, startedAt: started.t, endedAt: ended.t, startMono: started.mono, endMono: ended.mono, wallMs: r.wallMs, usage: r.usage, finalText: r.finalText,
-      toolCalls: r.toolCalls.map((c) => ({ cmd: c.cmd ?? c.name, ms: c.ms, isError: c.isError })), exit: r.exit, timedOut: r.timedOut };
+      toolCalls: r.toolCalls.map((c) => ({ cmd: c.cmd ?? c.name, ms: c.ms, isError: c.isError })), exit: r.exit, timedOut: r.timedOut, endedAfterResult: r.endedAfterResult ?? null };
     appendJsonl(join(this.dir, 'turns.jsonl'), rec);
     const u = r.usage ?? {};
     appendJsonl(join(this.dir, 'cost.jsonl'), { t: ended.t, mono: ended.mono, turn: n, inputTokens: u.inputTokens ?? null, cachedTokens: u.cachedTokens ?? null,

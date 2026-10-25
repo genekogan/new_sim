@@ -34,6 +34,8 @@ export function createGodSeat({ runDir, god, worldBase, serverRoot, rails, prein
   s.info.ownerIdentity = GOD_OWNER.replace(/^dev:/, '');
   s.save();
   s.onboardGod = (opts = {}) => s.onboard({ text: godOnboardingText(worldBase), ...opts });
+  s.sendGodCard = ({ text }) => { s.noteRequest(); return sendGodCard({ base: worldBase, text }); };
+  s.cardView = () => godCardView({ base: worldBase });
   return s;
 }
 

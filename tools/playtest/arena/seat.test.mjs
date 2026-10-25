@@ -42,3 +42,18 @@ test('provision: only dev worlds; §0 env names the SOUL3 clients and the 2.0 gu
   assert.equal(e.INVITE_REQUIRED, '0'); assert.equal(e.EDGE_CONTROLLER_CLI_FILE, '/srv/tools/world-launcher/soul/eden.mjs');
   assert.equal(e.EDGE_INSTRUCTIONS_FILE, '/srv/tools/world-launcher/soul/instructions.md'); assert.equal(e.WEB_DIR, '/srv/apps/web/dist');
 });
+
+test('renderedChatSince splits chat-as-rendered.md at turn markers; turnCount reads turns.jsonl', async () => {
+  const { splitRendered } = await import('./seat.mjs');
+  const md = '\n<!-- turn 1 (onboard) t -->\n\n> a\n\n⏺ ok\n\n<!-- turn 2 (wake) t -->\n\n> b\n\n<!-- turn 3 (chat) t -->\n\n> c\n';
+  assert.deepEqual(splitRendered(md).map((b) => b.turn), [1, 2, 3]);
+  const run = mkdtempSync(join(tmpdir(), 'pt-seat-'));
+  const s = createSeat({ runDir: run, seat: { id: 'p' }, worldBase: 'http://h' });
+  writeFileSync(join(s.dir, 'chat-as-rendered.md'), md);
+  writeFileSync(join(s.dir, 'turns.jsonl'), '{"turn":1}\n{"turn":2}\n{"turn":3}\n');
+  assert.equal(s.turnCount(), 3);
+  const since1 = s.renderedChatSince(1);
+  assert.ok(!since1.includes('> a') && since1.includes('> b') && since1.includes('> c'));
+  assert.equal(s.renderedChatSince(3), '');
+  assert.ok(s.renderedChatSince(0).includes('> a'));
+});
