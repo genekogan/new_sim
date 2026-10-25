@@ -1,6 +1,7 @@
 import { FullscreenToggle } from './FullscreenToggle.tsx';
 import { HudMore } from './HudMore.tsx';
 import {explorePresence} from './explore-data.ts';
+import {bodiesFromEvents} from './soul-state.ts';
 import {exploreAvailable} from './explore-control.ts';
 import {arrivalOver} from './arrival-marks.ts';
 import {MySouls,useMySouls} from './MySouls.tsx';
@@ -193,6 +194,7 @@ function ShellWorld({ cfg, auth: providerAuth, arrivalEnabled=false,humanPresets
   const exploreSeen=useRef(false),exploreOn=exploreAvailable(exploreSeen.current,viewerState);exploreSeen.current=exploreOn;  // V1: a viewer blip no longer unmounts Explore
   const exploreLocations=arrivalOver()?viewerHandle?.locations?.()??[]:[];  // P7b: the first scan of the world's views (~0.12 s on a 4x phone) waits for the card
   const exploreName=worldName;
+  const soulBodies=bodiesFromEvents(sim.edge??[]);
   const localClassroomPresentation=classroomProjection(edenExpansion,sim.conn.welcome?.worldId,Object.hasOwn(r.entities,classroomScreenEntityId),viewerState?.presentation==='live'&&!viewerState.loading&&!viewerState.unavailableReason,lessonIndex,cfg.worldId);
   const openAccount = () => { setAdvanced(false); setPairCode(null); setTab('my soul'); revealPanel(); };
   return (
@@ -209,7 +211,7 @@ function ShellWorld({ cfg, auth: providerAuth, arrivalEnabled=false,humanPresets
         <span className={st.state === 'open' ? 'ok' : 'dim'}>{st.state === 'open' ? '● Connected' : 'Connecting…'}</span>
         </>}
         {!advanced&&<div className="hud-left"><EdenMark/><div className="hud-status" ref={setStatusSlot}/><div className="hud-camera-row"><div className="hud-camera-slot" ref={setCameraSlot}/><button className="hud-camera" aria-label="Camera controls" aria-expanded={navigationOpen} title="Camera controls" onClick={()=>setNavigationOpen(o=>!o)}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6.5h3l1.4-2h5.2l1.4 2h3v9.5H3z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><circle cx="10" cy="11" r="3" fill="none" stroke="currentColor" strokeWidth="1.5"/></svg></button><FullscreenToggle/></div></div>}
-        {!advanced&&exploreOn&&tourHandle?.frameLocation&&<div className="hud-explore-group"><EdenTour worldName={exploreName} locations={exploreLocations} presence={explorePresence(sim.edge??[],r.souls.keys())} room={viewerState?.room} souls={r.souls} present={new Set([...r.souls.values()].filter(s=>r.entities[s.entityId]).map(s=>s.id))} onOpen={()=>{viewerHandle?.releaseInput?.();setNavigationOpen(false);}} onSoul={id=>{if(!viewerHandle?.selectSoul(id))return false;return viewerHandle.frameSouls?.([id])??false;}} preview={placePreview} onView={place=>{const viewed=tourHandle.frameLocation?.(place)??false;if(viewed){setPanelOpen(false);setNavigationOpen(false);}return viewed;}}/>{launcherWorld&&<GodButton/>}<MySouls api={api} ids={ownedIds} souls={r.souls} present={new Set([...r.souls.values()].filter(s=>r.entities[s.entityId]).map(s=>s.id))} select={inspect}/></div>}
+        {!advanced&&exploreOn&&tourHandle?.frameLocation&&<div className="hud-explore-group"><EdenTour bodies={soulBodies} worldName={exploreName} locations={exploreLocations} presence={explorePresence(sim.edge??[],r.souls.keys())} room={viewerState?.room} souls={r.souls} present={new Set([...r.souls.values()].filter(s=>r.entities[s.entityId]).map(s=>s.id))} onOpen={()=>{viewerHandle?.releaseInput?.();setNavigationOpen(false);}} onSoul={id=>{if(!viewerHandle?.selectSoul(id))return false;return viewerHandle.frameSouls?.([id])??false;}} preview={placePreview} onView={place=>{const viewed=tourHandle.frameLocation?.(place)??false;if(viewed){setPanelOpen(false);setNavigationOpen(false);}return viewed;}}/>{launcherWorld&&<GodButton/>}<MySouls api={api} bodies={soulBodies} ids={ownedIds} souls={r.souls} present={new Set([...r.souls.values()].filter(s=>r.entities[s.entityId]).map(s=>s.id))} select={inspect}/></div>}
         {!launcherWorld&&<LocalIntegrationNotice source={cfg.localIntegrationMetadataPath}/>}{AUTH_UI&&!launcherWorld&&<LocalConnectionHelp devAuth={cfg.devAuth}/>}
         <div className="hud-actions">
           {advanced&&<a className="world-back" href="#watch" onClick={e => { e.preventDefault(); setAdvanced(false); setPairCode(null); setTab('watch'); history.replaceState(null, '', '#watch'); }}>← Back to the world</a>}

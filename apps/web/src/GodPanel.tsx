@@ -14,6 +14,7 @@ import { SMALL_SCREEN } from './HudMore.tsx';
 import { previewGhost, takePreviewKey, type GhostSummary } from './WorldPreviewGhost.ts';
 import { useSession } from './auth-session.ts';
 import { ApprovalDialog } from './god-ui/ApprovalDialog.tsx';
+import { offerApproval, useCardIsOpen } from './pairing-slot.ts';
 import { OwnerGod, ago as since } from './god-ui/GodModal.tsx';
 import { closeGod, openGod, useGod, watchInbox } from './god-ui/god-store.ts';
 import { ConstitutionBody } from './god-ui/Constitution.tsx';
@@ -162,7 +163,13 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
     if (approvalId) { approvalClosed = true; setApprovalId(null); if (approvalFromHash(location.hash)) history.replaceState(null, '', location.pathname + location.search); }
     else setWindowId(null);
   };
-  const approvalModal = shownId && <ApprovalDialog id={shownId} signedIn={signedIn} onDone={approvalDone} signIn={!signedIn && <>{signInButton}{signInForm}</>} />;
+  // LINK Pairing: while a Soul card is open the card turns into this request (pairing-slot.ts); the forced-up dialog is drawn
+  // only when no card is open, so a second dialog never covers an open Soul card. Signed out, the dialog carries sign-in.
+  const cardIsOpen = useCardIsOpen(), inCard = !!shownId && cardIsOpen && signedIn;
+  const doneRef = useRef(approvalDone); doneRef.current = approvalDone;
+  useEffect(() => { offerApproval(shownId && signedIn ? { id: shownId, done: () => doneRef.current() } : null); }, [shownId, signedIn]);
+  useEffect(() => () => offerApproval(null), []);
+  const approvalModal = shownId && !inCard && <ApprovalDialog id={shownId} signedIn={signedIn} onDone={approvalDone} signIn={!signedIn && <>{signInButton}{signInForm}</>} />;
   const canUndo = (edits ?? []).some((e) => !e.undone && e.kind !== 'undo' && e.ops.length > 0);
   // a new owner whose agent is not connected yet: God opens by itself once (it shows the line to give the agent)
   useEffect(() => {
