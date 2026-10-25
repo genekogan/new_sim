@@ -103,6 +103,37 @@ test('a synchronous search shares geometry and obstacle enumeration, and failed 
   assert.equal(oldDry.counts.water,16);assert.equal(nowDry.counts.water,1);
 });
 
+test('generated bank rejection avoids route probes without changing the 401-attempt shelf cutoff',t=>{
+  const entities:Record<string,Entity>={};
+  // A ring of furniture blocks every reachable door, while leaving the water and
+  // supported bank geometry intact. The reference must exhaust its exact trial limit.
+  for(let n=-17;n<=17;n++)for(const side of [-1,1]){
+    const a=`east-west-${n}-${side}`,b=`north-south-${n}-${side}`;
+    entities[a]=obstacle(a,side*15.5,n);entities[b]=obstacle(b,n,side*15.5);
+  }
+  const old=fixture(ground(),structuredClone(entities)),now=fixture(ground(),structuredClone(entities));
+  // Each constructed trial computes one heading, independently of preview's
+  // check order. Count both writers without exposing production search internals.
+  let trials=0;const atan2=Math.atan2;
+  t.mock.method(Math,'atan2',(y:number,x:number)=>{trials++;return atan2(y,x);});
+  const expected=legacyCandidates(old.rt),oldTrials=trials;trials=0;
+  const actual=puntCandidates(now.rt);
+  assert.deepEqual(expected,[]);assert.deepEqual(actual,expected);
+  assert.equal(oldTrials,16+401,'four long sides × four radii, then exactly 401 shelf trials');
+  assert.equal(trials,oldTrials,'bank-first refusal consumes the same trials in the same bounded search');
+  assert.ok(now.counts.water<old.counts.water,`water probes ${now.counts.water} < ${old.counts.water}`);
+});
+
+test('public preview keeps route failures ahead of an obstructed bank',()=>{
+  const old=fixture(ground()),now=fixture(ground()),spec=legacyCandidates(old.rt)[0];
+  const [x,,z]=spec.bank!.door;
+  old.entities.table=obstacle('table',x,z);now.entities.table=obstacle('table',x,z);
+  assert.match(previewPunt(now.rt,spec)!.message,/Furniture/);
+  const fast=structuredClone(spec);fast.routeKeys![1].p[0]+=100;
+  const expected=legacyPreview(old.rt,fast);
+  assert.match(expected!.message,/speed/);assert.deepEqual(previewPunt(now.rt,fast),expected);
+});
+
 test('search-local geometry and furniture are refreshed after edits and spatial synchronization',()=>{
   const old=fixture(ground()),now=fixture(ground());
   const spec=legacyCandidates(old.rt)[0];assert.deepEqual(puntCandidates(now.rt),[spec]);
