@@ -1206,7 +1206,14 @@ export class EdgeLedger implements EdgeLedgerHooks {
       if (fresh) {this.rideKey.set(c.id, key); changed = true;}
       if (moved || fresh) try {(this.comms as unknown as {core?: {spectate(m: object): void}} | undefined)?.core?.spectate({kind: 'ride', tick, ride: (() => {const v = this.carrierView(c.id)!; return fresh ? v : {...v, route: {...v.route, keys: undefined}};})()});} catch {/* spectators never break the ledger */}
     }
-    if (changed) try {(this.comms?.objects as unknown as {sweep?(): void} | undefined)?.sweep?.();} catch {/* object events catch up on the next read */}
+    if (changed) try {
+      const objects = this.comms?.objects as unknown as {ofKind?(kind: string): {id: string}[]; refresh?(ids: Iterable<string>): void; sweep?(): void} | undefined;
+      // A physical carrier change needs its ride projections now (including arbitrary object aliases), not every
+      // unrelated calendar/presentation/built object's time advance. Those keep their own read/maintenance triggers.
+      // ofKind keeps object-id order; refresh re-reads each row in its committed transaction before the next ride.
+      if (objects?.ofKind && objects.refresh) objects.refresh(objects.ofKind('ride').map(o => o.id));
+      else objects?.sweep?.(); // older object adapters expose only the full sweep
+    } catch {/* object events catch up on the next read */}
   }
 
   /** activities/1: the world facts activity capabilities need, for one Soul. */
