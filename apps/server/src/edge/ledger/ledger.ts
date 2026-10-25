@@ -184,6 +184,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
         this.host.markSoulDirty?.(soulId);
       },
     }, {now: this.controlNow, knobs: {...env, ...(knobs ?? {})}});
+    this.host.publicBodyOf = id => this.bodyRule?.view(id) ?? null;
     inbox.onSoulListen?.(id => {try {this.bodyRule?.listen(id);} catch {/* best effort */}});
     inbox.onSoulSend?.(id => {try {this.bodyRule?.poke(id);} catch {/* best effort */}});
     return this.bodyRule;

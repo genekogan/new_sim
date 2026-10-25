@@ -127,7 +127,7 @@ export function buildApp(d: Deps) {
   /** The title a visitor sees (viewer arrival card, Explore, welcome-back), served in /v1/config so the first frame never shows a slug. */
   const displayWorldName = d.god ? safeWorldName(worldName) : d.cfg.worldKey === 'littlemartians' ? 'Little Martians' : d.cfg.worldKey[0].toUpperCase() + d.cfg.worldKey.slice(1);
   // the world's one skill (/SKILL.md) and who lives here (/v1/world/souls): lane P2
-  if (d.god) { mountJoinRoutes(app, { worldName, baseOf, soulCliUrl: (c) => (d.cfg.cliFile ? baseOf(c) + '/eden-agent.mjs' : PUBLISHED_SOUL_CLI), souls: () => d.db.liveSouls(d.host.worldId).filter((s) => !travel?.isAway(s.id)), poseOf: (id) => { const p = (d.host.engine.world.entities as Record<string, { pose?: { p?: number[] } } | undefined>)[id]?.pose?.p; return p ? { x: p[0], y: p[1], z: p[2] } : null; } }); }
+  if (d.god) { mountJoinRoutes(app, { worldName, baseOf, soulCliUrl: (c) => (d.cfg.cliFile ? baseOf(c) + '/eden-agent.mjs' : PUBLISHED_SOUL_CLI), souls: () => d.db.liveSouls(d.host.worldId).filter((s) => !travel?.isAway(s.id)), bodyOf: (id) => d.edge?.bodyRule?.view(id) ?? null, poseOf: (id) => { const p = (d.host.engine.world.entities as Record<string, { pose?: { p?: number[] } } | undefined>)[id]?.pose?.p; return p ? { x: p[0], y: p[1], z: p[2] } : null; } }); }
   const godRoutes = d.god ? mountGodRoutes(app, { god: d.god, worldName, requireUser, soulFromBearer: (c) => { const s = d.souls.soulFromToken(bearer(c)); return s ? { id: s.id, name: s.name } : null; }, baseOf, limitIp, verifyUse: new VerifyUse(d.host, d.souls, d.god, d.edge), lookWorldUrl: `http://127.0.0.1:${d.cfg.port}${d.cfg.worldPath}` /* W2 remote looks */ }) : null;
   if (d.god && d.edge) { const god = d.god; mountSecretPlaceRoutes(app, { ledger: d.edge, requireGod: (c) => { const who = god.godIdentity(bearer(c)); if (!who) throw new ApiError(401, 'unauthorized', 'missing or invalid god token'); if (who.child) throw new ApiError(403, 'helper.scope', 'helper tokens cannot change secret places'); } }); }  // knowledge/1; WD7: helpers refused
   if (d.god) { const god = d.god; mountSharedLibraryRoutes(app, { god, slug: d.cfg.worldKey, dir: process.env.SIM_LIBRARY_DIR, requireGod: (c) => { if (!god.godFromToken(bearer(c))) throw new ApiError(401, 'unauthorized', 'missing or invalid god token'); } }); }  // M4 shared library
@@ -161,7 +161,7 @@ export function buildApp(d: Deps) {
   // ---- public
   mountWelcomeRoutes(app,d);
   // lane OPS2: operator commands for TEST Souls (the launcher only, with the site key: op-souls.ts)
-  mountOperatorSouls(app,{db:d.db,worldId:d.host.worldId,souls:d.souls,inbox:ownerInbox,god:d.god,siteKey:process.env.SIM_SITE_KEY});
+  mountOperatorSouls(app,{db:d.db,worldId:d.host.worldId,souls:d.souls,inbox:ownerInbox,god:d.god,siteKey:process.env.SIM_SITE_KEY,body:()=>d.edge?.bodyRule??null});
   if(d.souls.accounts)mountAccountRoutes(app,{accounts:d.souls.accounts,auth:d.auth,baseOf:d.cfg.authProvider==='clerk'?()=>publicWorldBase(d.cfg):baseOf,limit:limitIp});
   mountStationRoutesV2(app,d.stationV2);
   // lane DASH: tickMs = the last ~20 s of ticks (avg/max ms against the 50 ms budget); clockRate < 1 = the clock is dilated (behind)
