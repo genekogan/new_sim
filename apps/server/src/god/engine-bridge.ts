@@ -182,7 +182,7 @@ export class EngineBridge {
     (this.god as unknown as { layers?: GodLayers }).layers = this.layers;
     // P3 (E-life): places follow the god's edits, not the engine's (a carried cup, a duck, a lamp switched on move no place);
     // descriptions that list the things in a place catch up once a minute (1200 ticks)
-    this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, version: () => `${this.godEdits}:${Math.floor(this.host.engine.world.tick / 1200)}` as never, structuralVersion: () => `${this.version}:${this.describeEpoch}:${this.levels.length}`, deferred: () => this.perceiveRunning || !!this.perceive?.pending(), engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), layers: this.layers });
+    this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, version: () => `${this.godEdits}:${Math.floor(this.host.engine.world.tick / 1200)}` as never, structuralVersion: () => `${this.version}:${this.describeEpoch}:${this.levels.length}`, deferred: () => this.layerPlacesPending !== null || this.perceiveRunning || !!this.perceive?.pending(), engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), layers: this.layers });
     this.god.builds.inventoryContext = () => {
       this.places.sync(true);
       return {
@@ -197,7 +197,7 @@ export class EngineBridge {
     // LAYERS: "under construction (step)" is part of what an owned or scheduled thing is seen as
     this.god.onBuild(() => { if (this.layers.active()) this.notePerceive([], true); });
     this.host.listeners.push({
-      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0 || this.writeBackPass) this.writeBack(WRITE_BACK_SLICE_MS); this.perceiveStep(tick); if (tick % 5 === 4) this.spotsStep(); if (tick % 40 === 7) this.layersStep(); if (tick % 20 === 13) this.flushMapNotices(); if (!this.navWarm || this.navPending) this.navStep(); if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); } if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); } } },
+      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0 || this.writeBackPass) this.writeBack(WRITE_BACK_SLICE_MS); this.perceiveStep(tick); if (tick % 5 === 4) this.spotsStep(); if (tick % 40 === 7 || this.layerPlacesPending !== null) this.layersStep(tick % 40 === 7); if (tick % 20 === 13) this.flushMapNotices(); if (!this.navWarm || this.navPending) this.navStep(); if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); } if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); } } },
       onApplied: (e) => { if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
     });
     reachProviders.set(this.god.model, (from, to) => this.reach(from, to));
@@ -915,14 +915,36 @@ export class EngineBridge {
   }
   /** LAYERS: the world clock drives schedules (states that follow them, calendar items); a new day re-derives places. */
   private layerDay = '';
-  private layersStep() {
+  /** The requested day stays fixed while places finish. Engine writebacks must not restart this pass. */
+  private layerPlacesPending: string | null = null;
+  private layersStep(sweep = true) {
     try {
-      this.god.builds.sweep();
-      if (this.god.builds.hasClosure()) this.evacuateSites();
-      if (!this.layers.active()) return;
-      const day = this.layers.dayKey(); if (day !== this.layerDay) { this.layerDay = day; this.places.sync(true); }
+      if (sweep) {
+        this.god.builds.sweep();
+        if (this.god.builds.hasClosure()) this.evacuateSites();
+      }
+      if (!this.layers.active()) { this.layerPlacesPending = null; return; }
+      const day = this.layers.dayKey();
+      if (day !== this.layerDay || this.layerPlacesPending !== null) {
+        if (!this.host.running) {
+          // Tools that step a world by hand retain synchronous publication.
+          this.places.sync(true);
+          this.layerDay = day;
+          this.layerPlacesPending = null;
+        } else {
+          this.layerPlacesPending ??= day;
+          if (!this.places.syncStep(PERCEIVE_SLICE_MS)) return;
+          // Keep deferral through both syncStep's final sync() and the calendar lookup:
+          // an edit/minute boundary during the pass must not force another full derive.
+          // The completed list has the existing deferred-place semantics. If the day
+          // changed meanwhile, the next normal cadence starts its catch-up.
+          this.layerDay = this.layerPlacesPending;
+          try { this.layers.step(); } finally { this.layerPlacesPending = null; }
+          return;
+        }
+      }
       this.layers.step();
-    } catch (e) { this.log(`layers: ${(e as Error).message}`); }
+    } catch (e) { this.layerPlacesPending = null; this.log(`layers: ${(e as Error).message}`); }
   }
   private calendarPlaces(sources: readonly Entity[]): (e: Entity) => { id: string; name: string } | null {
     const own = this.places.calendarIdentities(sources, this.version);

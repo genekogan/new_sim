@@ -178,10 +178,17 @@ export class GodPlaces {
     if (!this.h.edge?.places) return true;
     if (!this.gen) { const key = this.key(); if (this.cache?.key === key) { if (this.installedKey !== key) this.sync(); return true; } this.gen = { key, it: this.deriveGen() }; this.stats.derives++; }
     const t0 = performance.now();
-    for (;;) {
-      const r = this.gen.it.next();
-      if (r.done) { this.install(this.gen.key, r.value); this.gen = null; this.sync(); return true; }
-      if (performance.now() - t0 >= budgetMs) return false;
+    try {
+      for (;;) {
+        const r = this.gen.it.next();
+        if (r.done) { this.install(this.gen.key, r.value); this.gen = null; this.sync(); return true; }
+        if (performance.now() - t0 >= budgetMs) return false;
+      }
+    } catch (error) {
+      // A throwing generator is closed. Retrying it would return undefined instead
+      // of a complete place list; retain the installed index and start anew later.
+      this.gen = null;
+      throw error;
     }
   }
 
