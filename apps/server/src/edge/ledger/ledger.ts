@@ -165,7 +165,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       running: id => !!this.host.engine.programOf(id),
       dry: (x, z) => engine.dryGroundAtV1?.(x, z) ?? true,
       clear: (x, z, level) => !(this.host.engine.world as {navV1?: unknown}).navV1 || !engine.clearanceUpToV1 || engine.clearanceUpToV1(x, z, 1, level) >= 0.3,
-      places: (x, z, level) => this.places.containing(x, z, this.placeLevel(level)).map(p => p.id).join('|'),
+      places: (x, z, level) => this.places.containing(x, z, this.placeLevel(level)).filter(p => p.enclosed).map(p => p.id).join('|'),
       seat: (soul, radius, seconds) => {
         const {caps, plans} = this.binds(soul), me = this.body(soul.entityId), world = this.host.engine.world as NativeWorld; if (!me) return null;
         const c = caps.find(c => c.verb === 'sit' && c.available && c.target && (() => {const e = world.entities[c.target!.id]; return !!e && Math.hypot(e.pose.p[0] - me.pose.p[0], e.pose.p[2] - me.pose.p[2]) <= radius;})());

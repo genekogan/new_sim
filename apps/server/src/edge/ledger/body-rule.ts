@@ -51,7 +51,8 @@ export type BodyPort = {
   dry(x: number, z: number): boolean;
   /** Free room for a body here (nav clearance), true when the world has no clearance reader. */
   clear(x: number, z: number, level: number): boolean;
-  /** The ids of the places containing this point (innermost first). Equal lists = the same room/outdoors. */
+  /** The enclosed places (rooms, buildings) containing this point, as one key. Equal keys = the same room, or both outdoors:
+   *  a way between two points with the same key at every step never passes a door. */
   places(x: number, z: number, level: number): string;
   /** A free seat within `radius` m: the plan steps to sit there (seconds filled), or null. */
   seat(soul: BodySoul, radius: number, seconds: number): Program['steps'] | null;
