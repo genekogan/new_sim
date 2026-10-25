@@ -1,0 +1,92 @@
+{
+ "name": "trio-social-2",
+ "version": 1,
+ "seed": 9021,
+ "world": {
+  "kind": "dev",
+  "genesis": "worlds/templates/eden-district.json",
+  "slug": "pt-eden-t2",
+  "port": 4997
+ },
+ "durationSec": 900,
+ "seats": [
+  {
+   "id": "rook",
+   "adapter": "claude-headless",
+   "model": "haiku",
+   "effort": "medium",
+   "persona": "casual",
+   "personaModel": "opus",
+   "startOffsetSec": 0,
+   "soulName": "Rook",
+   "channelMix": {
+    "chat": 0.4,
+    "card": 0.6
+   }
+  },
+  {
+   "id": "mira",
+   "adapter": "codex-headless",
+   "model": "gpt-6.1-sol",
+   "effort": "medium",
+   "persona": "social",
+   "personaModel": "opus",
+   "startOffsetSec": 90,
+   "soulName": "Mira",
+   "channelMix": {
+    "chat": 1.0,
+    "card": 0.0
+   },
+   "wake": false
+  },
+  {
+   "id": "tam",
+   "adapter": "claude-headless",
+   "model": "haiku",
+   "effort": "medium",
+   "persona": "spectator",
+   "personaModel": "opus",
+   "startOffsetSec": 180,
+   "soulName": "Tam",
+   "channelMix": {
+    "chat": 0.1,
+    "card": 0.9
+   }
+  }
+ ],
+ "god": null,
+ "director": {
+  "mode": "persona",
+  "requestsTarget": 12,
+  "glanceSec": [
+   15,
+   45
+  ],
+  "goal": null,
+  "script": null
+ },
+ "observer": {
+  "sampleSec": 5,
+  "cameras": [
+   "follow"
+  ],
+  "viewport": [
+   1024,
+   640
+  ],
+  "dpr": 1,
+  "gpu": "metal"
+ },
+ "review": {
+  "reviewerModel": "opus",
+  "developerModel": "opus",
+  "rubric": "accept3"
+ },
+ "rails": {
+  "maxTurnsPerRequest": 6,
+  "maxTurnWallSec": 480,
+  "quotaStopPct": 90,
+  "onboardWallSec": 600,
+  "onboardTimeoutSec": 540
+ }
+}
