@@ -89,12 +89,14 @@ async function cmdRun(a) {
         const seat = await m.seat.createSeat({ runDir, seat: s, worldBase: ctx.world.base, serverRoot });
         const ob = await seat.onboard({ text: onboardingText(ctx.world.base, s.soulName), maxWallSec: scenario.rails?.onboardWallSec ?? 600, timeoutSec: scenario.rails?.onboardTimeoutSec ?? 540 });
         log(`seat ${s.id}: ${ob.ok ? 'paired ' + ob.soulId : 'NOT PAIRED'}`);
+        if (ob.ok) { const w = seat.wakeLoop?.(); log(`seat ${s.id}: wake loop ${w ? 'on' : 'off'}`); }
         ctx.seats.push(seat);
       }
       if (scenario.god && m.godSeat) {
         ctx.god = await m.godSeat.createGodSeat({ runDir, god: scenario.god, worldBase: ctx.world.base, serverRoot });
         const gb = ctx.god.onboardGod ? await ctx.god.onboardGod({ maxWallSec: scenario.rails?.onboardWallSec ?? 600, timeoutSec: scenario.rails?.onboardTimeoutSec ?? 540 }) : await ctx.god.onboard({ text: godOnboardingText(ctx.world.base), maxWallSec: scenario.rails?.maxTurnWallSec ?? 300 });
         log(`god seat: ${gb.ok ? 'paired' : 'NOT PAIRED'}`);
+        if (gb.ok) ctx.god.wakeLoop?.();
       }
       receipt(runDir, 2, 'seats', { ok: ctx.seats.every((s) => !!infoOf(s).soulId), seats: ctx.seats.map((s) => infoOf(s)), god: ctx.god ? infoOf(ctx.god) : null });
     }
@@ -108,7 +110,6 @@ async function cmdRun(a) {
         for (const seat of ctx.seats) { const info = infoOf(seat); if (info.soulId) ctx.cameras[info.id] = await ctx.browser.openCamera({ base: ctx.world.base, identity: info.ownerIdentity, kind: 'follow', soulId: info.soulId, viewport: vp, dpr: scenario.observer?.dpr ?? 1, runDir, name: info.id }); }
         if ((scenario.observer?.cameras ?? []).includes('wide')) ctx.cameras.wide = await ctx.browser.openCamera({ base: ctx.world.base, identity: null, kind: 'wide', viewport: vp, dpr: scenario.observer?.dpr ?? 1, runDir, name: 'wide' });
         observer = { camera: (id) => ctx.cameras[id] ?? null, cameras: ctx.cameras, truth: m.truth, evidence: m.evidence, browser: ctx.browser, sampleSec: scenario.observer?.sampleSec ?? 5 };
-        if (m.browser.sampler) { try { ctx.sampler = m.browser.sampler({ cameras: ctx.cameras, everySec: observer.sampleSec, runDir }); ctx.sampler.start?.(); } catch (e) { log('sampler not started', e.message); } }
       } else log('observer modules missing: playing without screenshots/evidence');
       const quotaCheck = async () => { const q = await quota(); const r = quotaAllows(q, { stopPct: scenario.rails?.quotaStopPct ?? 90 }); if (!r.allowed) log('QUOTA STOP', r.note); return r.allowed; };
       const play = await m.director.runPlay({ runDir, scenario, world: { ...ctx.world, name: scenario.world.slug, skillPath: join(runDir, 'server', 'skill.md') }, seats: Object.fromEntries(ctx.seats.map((s) => [infoOf(s).id, s])), god: ctx.god, observer, owner: m.owner, seed, quotaCheck });

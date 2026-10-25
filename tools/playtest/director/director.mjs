@@ -139,6 +139,30 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
     return { requestId, channel: say.channel, messageId };
   }
 
+
+  // Evidence sampling for open requests: world truth (with the owner's inbox), the follow camera's legible text and a shot,
+  // every observer.sampleSec while a request is open, and once on each card change (DESIGN §4.2).
+  const camOf = (ctx) => observer?.camera?.(ctx.id) ?? observer?.cameras?.[ctx.id] ?? null;
+  const sampleSec = scenario.observer?.sampleSec ?? 5;
+  const shotsDir = join(runDir, 'shots');
+  async function sampleOnce(ctx) {
+    if (!ctx.open.size || ctx.kind === 'god') return;
+    const cam = camOf(ctx);
+    let snap = null, legible = null, shot = null;
+    try { if (observer?.truth?.snapshotSoul && ctx.soulId) snap = await observer.truth.snapshotSoul({ base: world?.base, soulId: ctx.soulId, identity: ctx.identity }); } catch (e) { log(ctx.id, 'snapshot failed', e?.message ?? e); }
+    try { if (cam?.legible) legible = await cam.legible(); } catch { /* best effort */ }
+    try { if (cam?.shot) { const mono = Math.round(clock.now() - start); const p = join(shotsDir, ctx.id, `${mono}.png`); mkdirSync(join(shotsDir, ctx.id), { recursive: true }); await cam.shot(p); shot = p; appendJsonl(join(shotsDir, 'index.jsonl'), { cam: ctx.id, mono, t: new Date().toISOString(), path: p }); } } catch (e) { log(ctx.id, 'shot failed', e?.message ?? e); }
+    for (const r of ctx.open.values()) { try { r.evidence?.sample?.({ snap, legible, shot }); } catch { /* sampling is best effort */ } }
+  }
+  async function sampleLoop(ctx) {
+    while (live()) {
+      const t0 = clock.now();
+      if (ctx.open.size) await sampleOnce(ctx);
+      const wait = Math.max(500, sampleSec * 1000 - (clock.now() - t0));
+      await clock.sleep(Math.min(wait, Math.max(1, endAt - clock.now())));
+    }
+  }
+
   async function closeReq(ctx, req, cutoffReason, extra = {}) {
     ctx.open.delete(req.requestId);
     const rec = { t: new Date().toISOString(), mono: clock.now(), requestId: req.requestId, cutoffReason, openSec: (clock.now() - req.openedAt) / 1000, ...extra };
@@ -163,7 +187,7 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
     while (live()) {
       const view = await cardView(ctx);
       const sig = cardSig(view);
-      if (ctx.cardSeen !== null && sig !== ctx.cardSeen) { ctx.changedAt = clock.now(); for (const r of ctx.open.values()) { try { await r.evidence?.sample?.(); } catch { /* sampling is best effort */ } } }
+      if (ctx.cardSeen !== null && sig !== ctx.cardSeen) { ctx.changedAt = clock.now(); try { await sampleOnce(ctx); } catch { /* sampling is best effort */ } }
       ctx.cardSeen = sig; ctx.lastView = view;
       const chat = await chatSince(ctx, ctx.lastTurn);
       if (chat.text && chat.text !== ctx.lastChatSeen) { ctx.changedAt = clock.now(); ctx.lastChatSeen = chat.text; }
@@ -218,7 +242,7 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
   }
 
   const loops = ctxs.map((c) => (mode === 'scripted' ? scriptedLoop(c) : personaLoop(c)).catch((e) => { log(c.id, 'loop error', e?.stack ?? e); }));
-  const background = [...ctxs.map((c) => monitor(c).catch((e) => log(c.id, 'monitor error', e?.message ?? e))), quotaLoop()];
+  const background = [...ctxs.map((c) => monitor(c).catch((e) => log(c.id, 'monitor error', e?.message ?? e))), ...ctxs.map((c) => sampleLoop(c).catch((e) => log(c.id, 'sampler error', e?.message ?? e))), quotaLoop()];
   await Promise.all(loops);
   if (!state.stopped) {
     if (mode === 'scripted') await sleepUntil(endAt, () => ctxs.every((c) => c.open.size === 0)); // let open requests resolve
@@ -226,7 +250,7 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
   }
   await Promise.all(background);
   const reason = state.stopped.startsWith('quota') ? 'quota' : 'run-end';
-  for (const c of ctxs) for (const r of [...c.open.values()]) await closeReq(c, r, reason);
+  for (const c of ctxs) { if (c.open.size) { try { await sampleOnce(c); } catch { /* best effort */ } } for (const r of [...c.open.values()]) await closeReq(c, r, reason); }
   const summary = { stoppedBy: state.stopped, elapsedSec: elapsedSec(), mode, seats: {} };
   for (const c of ctxs) {
     let final = null;
