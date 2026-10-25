@@ -10,7 +10,9 @@ export function loadRun(runDir) {
   const scenario = readJson(join(runDir, 'scenario.json'), {});
   const world = readJson(join(runDir, 'world.json'), {});
   const play = readJson(join(runDir, 'receipts/3-play.json'), null);
-  const anchorMs = Date.parse(play?.anchor ?? play?.t ?? world.startedAt ?? 0) || 0;
+  // Play starts when the seats step's receipt is written; the play receipt itself is written at the END of play.
+  const seatsReceipt = readJson(join(runDir, 'receipts/2-seats.json'), null);
+  const anchorMs = Date.parse(play?.anchor ?? seatsReceipt?.t ?? world.startedAt ?? play?.t ?? 0) || 0;
   const seats = {};
   for (const id of list(join(runDir, 'seats'))) {
     const d = join(runDir, 'seats', id);
