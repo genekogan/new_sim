@@ -63,12 +63,12 @@ const key = (line) => {
   const m = args.match(/(release-probe|walk|poster|stall|cdn-walk|checks)\.(mjs|py)( \S+)?/) ?? args.match(/(poster-count)\.py/);
   if (m) return m[1] + (m[1] === 'checks' ? ' ' + args.split(' ')[1] : m[1] === 'walk' ? (args.includes('walk-phone') ? ' phone' : ' desktop') : '');
   if (name === 'release') return `release ${args}`;
-  if (name === 'scp') return `scp ${args.match(/ship\/(\S+)/)[1]}`;
+  if (name === 'scp') return `scp ${args.match(/(?:ship|old-worlds)\/(\S+)/)[1]}`;
   for (const [re, k] of [[/readlink/, 'read links'], [/compact-backup\.sh pre-r999 production/, 'backup production'], [/compact-backup\.sh pre-r999 legacy/, 'backup legacy'],
     [/sim-quick-check/, 'quick-check'], [/sha256sum -c FILES\.sha256/, 'sha256 legacy'], [/activate\.sh legacy/, 'activate legacy']]) if (re.test(args)) return k;
   return `${name} ${args}`;
 };
-const FULL = ['read links', 'scp compact-backup.sh', 'scp quick-check.mjs', 'backup production', 'backup legacy', 'quick-check', 'checks quick-check',
+const FULL = ['read links', 'scp compact-backup.sh', 'scp compact-copy.py', 'scp quick-check.mjs', 'backup production', 'backup legacy', 'quick-check', 'checks quick-check',
   'release legacy', 'release-probe', 'release production --reload', 'sha256 legacy', 'activate legacy',
   'walk desktop', 'walk phone', 'checks walks', 'poster', 'poster-count', 'checks poster', 'stall', 'checks stall', 'cdn-walk'];
 const STEPS = ['preflight', 'backup', 'legacy-upload', 'probe-start', 'release', 'legacy-activate', 'released', 'probe-check', 'walks', 'poster', 'stall', 'cdn-walk'];
@@ -90,6 +90,14 @@ test('ship.sh --dry-run exits 1 when preflight would stop a real run', () => {
   assert.equal(r.code, 1);
   assert.match(r.out, /PREFLIGHT WOULD STOP: no Mars web assets/);
   assert.match(r.out, /PREFLIGHT: 1 problem\(s\)/);
+});
+
+test('a missing dedicated probe stops before any remote or release command', () => {
+  const s = setup(), r = s.run([], { SHIP_PROBE_CLI: join(s.t, 'missing-probe') });
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /STOPPED at step preflight: no probe god folder/);
+  assert.deepEqual(r.calls, []);
+  assert.ok(!existsSync(s.env.SHIP_LEGACY_RELEASE_FILE));
 });
 
 test('ship.sh runs every step in the proven order and records it', () => {
