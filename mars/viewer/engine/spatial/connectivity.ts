@@ -28,7 +28,7 @@ import { GROUND_TILE_M, G_OUTSIDE, G_STEEP, G_WALK, type GroundField } from './g
 import { linkApproach, linkEdgeTest, PLAN_MARGIN, snap as snapCell } from './path.ts';
 import type { Spatial } from './service.ts';
 import { boxesOf, type GroundNav } from './tiled.ts';
-import { HUMAN_PROFILE, type Link, type Surface, type SpatialScene } from './types.ts';
+import { HUMAN_PROFILE, type Link, type Obstacle, type Surface, type SpatialScene } from './types.ts';
 
 /** Policy id of the audit's rules (what counts as connected, what a rescue picks): bump when they change. */
 export const NAV_CONNECT_POLICY = 'nav-connect/1';
@@ -230,6 +230,13 @@ export class NavConnectivity {
     this.pending = undefined;
   }
 
+  private *fineTile(tx: number, tz: number, rel: Obstacle[], key: string, phase: BuildPhase) {
+    const steps = this.spatial.ground!.fineTileSteps(tx, tz, rel, key, false);
+    let step = steps.next();
+    while (!step.done) { yield phase; step = steps.next(); }
+    return step.value;
+  }
+
   private publish(w: NavConnectivity) {
     this.tiles = w.tiles; this.ext = w.ext; this.per = w.per; this.flat = w.flat;
     this.parent = w.parent; this.base = w.base; this.rootSize = w.rootSize; this.lru = w.lru; this.mediaMemo = w.mediaMemo;
@@ -278,7 +285,7 @@ export class NavConnectivity {
         if (uni === 1) { this.tiles.set(id, { key, n: 1, sizes: Int32Array.of(this.per * this.per), border: ALL, uniform: 1 }); this.stats.uniform++; yield 'tiles'; continue; }
         if (uni === 2) { this.tiles.set(id, { key, n: 0, sizes: new Int32Array(0), border: NONE, uniform: 2 }); this.stats.uniform++; yield 'tiles'; continue; }
         // (keep = false: a tile the engine's windows do not hold is built for its labels without evicting theirs)
-        const ft = g.fineTile(tx, tz, te.rel, te.key, false), per = this.per;
+        const ft = yield* this.fineTile(tx, tz, te.rel, te.key, 'tiles'), per = this.per;
         const { labels, n, sizes } = labelComponents(ft.clearance, per, per, this.t);
         const border = new Int32Array(4 * per);
         for (let i = 0; i < per; i++) { border[i] = labels[i]; border[per + i] = labels[(per - 1) * per + i]; border[2 * per + i] = labels[i * per]; border[3 * per + i] = labels[i * per + per - 1]; }
@@ -438,7 +445,7 @@ export class NavConnectivity {
       if (!hit) {
         const te = g.tileEntry(tx, tz, this.scene.obstacles);
         if (te.key !== t.key) throw new Error('navigation tile changed during connectivity build');
-        const ft = g.fineTile(tx, tz, te.rel, te.key, false);
+        const ft = yield* this.fineTile(tx, tz, te.rel, te.key, 'graph');
         hit = { labels: labelComponents(ft.clearance, per, per, this.t).labels, clearance: ft.clearance };
         this.lru.set(t.key, hit); this.trimLru();
       }

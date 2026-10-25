@@ -40,6 +40,12 @@ export const HOP_M = 48;
 
 export type TileRect = [tx0: number, tz0: number, tx1: number, tz1: number];
 type FineTile = { key: string; free: Uint8Array; clearance: Float32Array; blk: Int16Array; ids: string[] };
+const CLASSIFY_ROWS = 16;
+function drain<T>(steps: Generator<void, T>): T {
+  let step = steps.next();
+  while (!step.done) step = steps.next();
+  return step.value;
+}
 
 const tileOf = (v: number) => Math.floor(v / GROUND_TILE_M);
 /** Margin (m) a window keeps around what it must cover: a neighbouring tile joins only when a point is this close to it. */
@@ -262,6 +268,10 @@ export class GroundNav {
    * cells are identical. `blk` / `ids` (whole raster only) name what blocks each cell.
    */
   private classify(ox: number, oz: number, M: number, rel: Obstacle[], i0: number, j0: number, ni: number, nj: number, blk?: Int16Array, ids?: string[]): Uint8Array {
+    return drain(this.classifySteps(ox, oz, M, rel, i0, j0, ni, nj, blk, ids));
+  }
+  /** Rows retain the original visitation order and one obstacle id table across all slices. */
+  private *classifySteps(ox: number, oz: number, M: number, rel: Obstacle[], i0: number, j0: number, ni: number, nj: number, blk?: Int16Array, ids?: string[]): Generator<void, Uint8Array> {
     const { cell, field } = this;
     const free = new Uint8Array(ni * nj);
     // coarse media around the apron'd tile (1 m cells), and which cells touch water — evaluated as first needed
@@ -290,29 +300,42 @@ export class GroundNav {
         }
         free[k] = 1;
       }
+      if ((j + 1) % CLASSIFY_ROWS === 0 || j + 1 === nj) yield;
     }
     // obstacles in the body band above the ground at each cell (first listed names the cell, as stampLevel)
     const whole = i0 === 0 && j0 === 0 && ni === M && nj === M, boxes = whole ? null : boxesOf(rel);
     const bx0 = latticeCentre(ox + i0, cell) - cell, bz0 = latticeCentre(oz + j0, cell) - cell, bx1 = latticeCentre(ox + i0 + ni - 1, cell) + cell, bz1 = latticeCentre(oz + j0 + nj - 1, cell) + cell;
-    const clip: [number, number, number, number] | undefined = whole ? undefined : [i0, i0 + ni - 1, j0, j0 + nj - 1];
     for (let n = 0; n < rel.length; n++) {
       if (boxes && (boxes[4 * n + 2] < bx0 || boxes[4 * n] > bx1 || boxes[4 * n + 3] < bz0 || boxes[4 * n + 1] > bz1)) continue;
       const o = rel[n];
       let idx = -1;
-      rasterObb(o.obb, ox, oz, cell, M, M, (g) => {
+      const visit = (g: number) => {
         const k = (Math.floor(g / M) - j0) * ni + (g % M) - i0;
         if (!free[k]) return;
         const x = latticeCentre(ox + (g % M), cell), z = latticeCentre(oz + Math.floor(g / M), cell), h = field.height(x, z);
         if (o.y1 <= h + STEP || o.y0 >= h + BODY_HEIGHT) return;
         if (blk && ids) { if (idx < 0) { idx = ids.length; ids.push(o.id); if (idx > 32000) throw new Error('ground: too many obstacles in one tile'); } blk[k] = idx; }
         free[k] = 0;
-      }, o.raster !== 'centre', clip);
+      };
+      const [a, b, lo, hi] = obbRange(o.obb, ox, oz, cell, M, M);
+      const x0 = Math.max(a, i0), x1 = Math.min(b, i0 + ni - 1), z1 = Math.min(hi, j0 + nj - 1);
+      if (x0 > x1) continue;
+      for (let z = Math.max(lo, j0); z <= z1; z += CLASSIFY_ROWS) {
+        rasterObb(o.obb, ox, oz, cell, M, M, visit, o.raster !== 'centre', [x0, x1, z, Math.min(z1, z + CLASSIFY_ROWS - 1)]);
+        yield;
+      }
     }
     return free;
   }
 
   /** One tile's fine level-0 raster: ground media, then obstacles in the body band above the ground there, then the exact EDT. */
   fineTile(tx: number, tz: number, rel: Obstacle[], key = this.keyOf(tx, tz, rel), keep = true): FineTile {
+    return drain(this.fineTileSteps(tx, tz, rel, key, keep));
+  }
+  /** A resumable cold tile. No partial raster enters the cache; synchronous callers drain the same builder.
+   * The caller must abandon an unfinished iterator if its field or obstacle inputs change (NavConnectivity checks epochs).
+   * EDT, crop and a cold GroundField.mediaTile remain atomic, so this is not a hard wall-time bound. */
+  *fineTileSteps(tx: number, tz: number, rel: Obstacle[], key = this.keyOf(tx, tz, rel), keep = true): Generator<void, FineTile> {
     const hit = this.fine.get(key);
     // keep = false reads a hit without refreshing it: the audit's sweep must not age the tiles the engine's windows use
     if (hit) { if (keep) { this.fine.delete(key); this.fine.set(key, hit); } this.stats.fineHits++; return hit; }
@@ -320,8 +343,9 @@ export class GroundNav {
     const { per, apron: A, cell } = this;
     const M = per + 2 * A, ox = tx * per - A, oz = tz * per - A;
     const blk = new Int16Array(M * M).fill(-1), ids: string[] = ['ground:outside', 'ground:steep', 'ground:water'];
-    const free = this.classify(ox, oz, M, rel, 0, 0, M, M, blk, ids);
+    const free = yield* this.classifySteps(ox, oz, M, rel, 0, 0, M, M, blk, ids);
     const clear = edt(free, M, M, cell);
+    yield;
     // crop to the tile
     const t: FineTile = { key, free: new Uint8Array(per * per), clearance: new Float32Array(per * per), blk: new Int16Array(per * per), ids };
     for (let j = 0; j < per; j++) {
