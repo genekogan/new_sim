@@ -34,48 +34,47 @@ for (const kind of ['god', 'soul']) for (const state of ['sent', 'delivered', 'a
 test('MSG: presence says listening now / seen recently / away; an unread message says how long; queued count; reply then result', () => {
   const now = 1_000_000, base = {connected: true, lastSeenAt: now - 12_000};
   const at = (inbox, kind = 'soul') => render(h(AgentMessageBoxView, {...props, kind, now, inbox}));
+  // LINK (2026-10-24): a Soul's box is only the form and the receipt; the card's status line says Connected/Disconnected
+  // and the box is shown only while Connected, so it carries no presence line and no start prompt of its own.
   const listening = at({...base, presence: 'listening', queued: 0, latest: null});
-  assert.match(listening, /Your Soul&#x27;s agent is listening\./); assert.match(listening, /data-agent-presence="listening"/);
-  assert.match(at({...base, presence: 'listening', latest: null}, 'god'), /Your agent is listening now/, 'god copy unchanged'); assert.doesNotMatch(listening, /Copy start prompt/);
+  assert.doesNotMatch(listening, /agent-message-presence|is listening|Copy start prompt/); assert.match(listening, /Message your agent/);
+  assert.match(at({...base, presence: 'listening', latest: null}, 'god'), /Your agent is listening now/, 'god copy unchanged');
   assert.match(at({...base, presence: 'recent', latest: null}, 'god'), /Your agent was seen recently \(12 s ago\)/);
   assert.match(at({...base, presence: 'working', latest: null}, 'god'), /seen recently/);
-  assert.match(at({...base, presence: 'working', latest: null}), /is working through your messages/);
-  const away = at({connected: false, lastSeenAt: now - 3_600_000, presence: 'away', latest: null}); assert.match(away, /Your Soul&#x27;s agent is away since .*Your message will wait for it\./); assert.match(away, /Copy start prompt/);
-  assert.match(away, /Message your agent/, 'PRESENCE: the Soul box stays while its agent is away; the message waits');
-  const godAway = at({connected: false, lastSeenAt: now - 3_600_000, presence: 'away', latest: null}, 'god'); assert.match(godAway, /away — messages will wait/); assert.match(godAway, /Message your agent/);
-  assert.match(listening, /Message your agent/, 'the message box is back once the agent listens');
-  assert.match(at({connected: false, lastSeenAt: null, presence: 'away', latest: null}), /has not connected yet\. Your message will wait for it\./, 'never seen: no invented time');
+  const godAway = at({connected: false, lastSeenAt: now - 3_600_000, presence: 'away', latest: null}, 'god'); assert.match(godAway, /away — messages will wait/); assert.match(godAway, /Message your agent/); assert.match(godAway, /Copy start prompt/);
   const fresh = at({...base, presence: 'listening', queued: 1, latest: {id: 'm', text: 'run!', state: 'sent', sentAt: now - 4_000}});
-  assert.match(fresh, />Sent</); assert.doesNotMatch(fresh, /Not picked up/); assert.match(fresh, /1 message waiting/);
-  assert.ok(fresh.indexOf('is listening.') < fresh.indexOf('Message your agent'), 'presence comes before typing');
-  const stuck = at({...base, presence: 'away', connected: false, queued: 3, latest: {id: 'm', text: 'the house!!!!', state: 'sent', sentAt: now - 14_000}});
-  assert.match(stuck, /Not picked up yet \(14 s\)</); assert.match(stuck, /agent-message-waiting"> · 3 messages waiting/, 'the Soul line carries the count');
+  assert.match(fresh, />Sent</); assert.doesNotMatch(fresh, /Not picked up/);
+  const stuck = at({...base, presence: 'listening', queued: 3, latest: {id: 'm', text: 'the house!!!!', state: 'sent', sentAt: now - 14_000}});
+  assert.match(stuck, /Not picked up yet \(14 s\) · 3 waiting</, 'the Soul receipt carries the waiting count now');
   assert.match(at({...base, presence: 'away', connected: false, queued: 3, latest: {id: 'm', text: 'x', state: 'sent', sentAt: now - 14_000}}, 'god'), /Not picked up yet \(14 s\) · 3 waiting/, 'god receipt unchanged');
   assert.match(at({...base, queued: 2, latest: {id: 'm', text: 'x', state: 'delivered', sentAt: now - 60_000}}, 'god'), /Picked up · 2 waiting/);
   const done = at({...base, queued: 0, latest: {id: 'm', text: 'go to the cottage', state: 'acknowledged', reply: 'Got it: walking there.', result: 'Arrived.', outcome: 'done', sentAt: now - 90_000}});
   assert.match(done, />Done</); assert.ok(done.indexOf('Got it: walking there.') < done.indexOf('Arrived.'), 'the ack reply, then the result');
   assert.match(at({...base, latest: {id: 'm', text: 'ride', state: 'acknowledged', reply: 'Trying.', result: "Couldn't: no saddle.", outcome: 'failed'}}), /Could not do it/);
   assert.match(at({connected: true, lastSeenAt: now}, 'god'), /seen recently/, 'an older server without presence: connected means seen recently');
-  assert.match(at({connected: false, lastSeenAt: now}), /is away since/, 'an older Soul box: not connected = away since its last call');
 });
 test('Soul card inbox belongs only to its authenticated owner, including account switch', () => {
   const soul = {id: 's_A', entityId: 'h_A', name: 'Ana', description: '', doing: '', energy: 'fine'};
-  const sim = {me: {userId: 'acct_A', souls: ['s_A'], role: 'user', invited: true}, privateAuthorityGeneration: 1, conn: {welcome: {worldId: 'inbox-1', epoch: 1}, replica: {souls: new Map([['s_A', soul]]), entities: {}, tick: 0}}, plays: [], talk: []};
-  // PRESENCE: the owner's card and box say the agent is away since its last listen, with the waiting count; nobody else sees it
+  const sim = {me: {userId: 'acct_A', souls: ['s_A'], role: 'user', invited: true}, privateAuthorityGeneration: 1, conn: {welcome: {worldId: 'inbox-1', epoch: 1}, replica: {souls: new Map([['s_A', soul]]), entities: {}, tick: 0}}, plays: [], talk: [], edge: []};
+  const card = (identity) => render(h(SoulFocus, {sim, auth: {authed: !!identity, ready: true, label: identity, debug: {accountIdentity: identity, privyUserId: null}, login() {}, logout() {}}, api: async () => {throw Error('Rendering must not request');}, selected: 's_A', select() {}, manage() {}}));
+  // LINK, an older server (no `link` field): away since the last listen = Disconnected with the Reconnect box; nobody else sees it
   const left = new Date(); left.setHours(21, 40, 0, 0);
   reportAgentPresence('s_A', {connected: false, lastSeenAt: Date.now(), listenedAt: Math.min(left.getTime(), Date.now()), presence: 'away', queued: 2});
   for (const identity of ['acct_A', 'acct_B', null]) {
-    const auth = {authed: !!identity, ready: true, label: identity, debug: {accountIdentity: identity, privyUserId: null}, login() {}, logout() {}};
-    const html = render(h(SoulFocus, {sim, auth, api: async () => {throw Error('Rendering must not request');}, selected: 's_A', select() {}, manage() {}}));
-    assert.equal(html.includes('data-agent-message="soul"'), identity === 'acct_A');
-    assert.equal(/class="soul-agent" data-agent-state="away"[^>]*>.*Agent away since \d\d:\d\d</.test(html), identity === 'acct_A', `card chip for ${identity}`);
-    assert.equal(/Ana&#x27;s agent is away since \d\d:\d\d\. Your message will wait for it\..*2 messages waiting/.test(html), identity === 'acct_A', `box line for ${identity}`);
-    if (identity !== 'acct_A') assert.doesNotMatch(html, /waiting|soul-agent|agent-message/, 'a visitor sees no owner queue or presence');
+    const html = card(identity);
+    assert.equal(/data-status="disconnected"[^>]*>.*Disconnected</.test(html), identity === 'acct_A', `card state for ${identity}`);
+    assert.equal(html.includes('data-reconnect="1"'), identity === 'acct_A', `Reconnect box for ${identity}`);
+    assert.doesNotMatch(html, /data-agent-message="soul"/, 'no message box while disconnected (D3)');
+    if (identity !== 'acct_A') assert.doesNotMatch(html, /waiting|Reconnect|agent-message|Disconnected/, 'a visitor sees no owner state');
   }
-  if (left.getTime() <= Date.now()) assert.match(render(h(SoulFocus, {sim, auth: {authed: true, ready: true, label: 'acct_A', debug: {accountIdentity: 'acct_A', privyUserId: null}, login() {}, logout() {}}, api: async () => {throw Error('no');}, selected: 's_A', select() {}, manage() {}})), /away since 21:40\./);
+  if (left.getTime() <= Date.now()) assert.match(card('acct_A'), /since 21:40/);
   reportAgentPresence('s_A', {connected: true, lastSeenAt: Date.now(), listenedAt: Date.now(), presence: 'listening', queued: 0});
-  const live = render(h(SoulFocus, {sim, auth: {authed: true, ready: true, label: 'acct_A', debug: {accountIdentity: 'acct_A', privyUserId: null}, login() {}, logout() {}}, api: async () => {throw Error('no');}, selected: 's_A', select() {}, manage() {}}));
-  assert.match(live, /Agent listening</); assert.match(live, /Ana&#x27;s agent is listening\./); assert.doesNotMatch(live, /waiting|Copy start prompt/);
+  const live = card('acct_A');
+  assert.match(live, /data-status="connected"/); assert.match(live, /data-agent-message="soul"/); assert.doesNotMatch(live, /Reconnect|Copy start prompt/);
+  // the server's `link` wins over presence
+  reportAgentPresence('s_A', {connected: true, lastSeenAt: Date.now(), listenedAt: Date.now(), presence: 'listening', queued: 0, link: {state: 'disconnected', reason: 'revoked', since: Date.now(), holder: null}});
+  const revoked = card('acct_A');
+  assert.match(revoked, /You disconnected the agent at \d\d:\d\d\./); assert.doesNotMatch(revoked, /data-agent-message/);
   reportAgentPresence('s_A', null);
 });
 // G4: the God box is the God modal's agent section now (the God button watches the owner's inbox while the world's status

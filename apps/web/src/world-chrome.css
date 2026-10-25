@@ -144,7 +144,10 @@
 
 .my-souls-away .soul-avatar{filter:grayscale(1);opacity:.5}
 /* AWAY-UI: an owned Soul whose agent is away (dimmed above) carries a small "away" strip across the chip's foot */
-.my-souls>button[data-agent-away]{position:relative}.my-souls-agent-away{position:absolute;left:0;right:0;bottom:0;padding-bottom:2px;font:600 8px/10px system-ui,sans-serif;letter-spacing:.02em;text-transform:lowercase;color:#fff;background:#0009;text-align:center;pointer-events:none}
+/* LINK chips (canvas board 6): green ring connected, amber ring + ! pairing, dimmed + zz asleep, dimmed + ≈ zombie */
+.my-souls>button[data-link-state]{position:relative}.my-souls>button[data-link-state=connected]{border:2px solid #2e9d4f}.my-souls>button[data-link-state=pairing]{border:2px solid #d6a700}
+.my-souls-zz{position:absolute;left:0;right:0;bottom:0;padding-bottom:1px;font:650 8px/10px system-ui,sans-serif;letter-spacing:.04em;color:#f3f5f0;background:#1b1f1ccc;text-align:center;pointer-events:none}.my-souls-zombie{font-size:10px}
+.my-souls-pair{position:absolute;top:0;right:0;width:13px;height:13px;border-radius:50%;background:#d6a700;color:#1b1f1c;font:800 9px/13px system-ui,sans-serif;text-align:center;pointer-events:none}
 
 /* Shared glass treatment with Explore; retain readable theme foreground. */
 .human-world:not(.has-advanced) .account-panel section{background:transparent}

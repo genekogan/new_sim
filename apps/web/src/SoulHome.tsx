@@ -6,7 +6,6 @@ import {InviteAccess} from './InviteAccess.tsx';
 // The signed-in home: invite → create a Soul → steer it here or from your own
 // agent → watch its dashboard. One column of cards, in the order a newcomer needs them.
 import {isConnectionRefusal} from './connection-response.ts';
-import {AgentConnection} from './AgentConnection.tsx';
 import { DeckPanel, HeardPanel, SentencesPanel } from './Grammar.tsx';
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 // OWNER-DAY: the "Today" timeline is its own chunk, loaded only on a Soul's home view.
@@ -137,7 +136,6 @@ function Dashboard({ sim, api, soul, isAdmin, base, refresh, onGone, active }: {
   const [unavailable, setUnavailable] = useState(false);
   const [checking, setChecking] = useState(true);
   // A same-account refresh hides the card; retain its receipt in this Soul's lifetime.
-  const [connectionMessage,setConnectionMessage]=useState('');
   useLayoutEffect(() => {
     if (!active) return;
     setChecking(true);
@@ -150,7 +148,7 @@ function Dashboard({ sim, api, soul, isAdmin, base, refresh, onGone, active }: {
       if (a.status === 200 && a.data?.status && b.status === 200 && Array.isArray(b.data?.events)) {
         setD(a.data); setTl(b.data.events); setUnavailable(false);
       } else {
-        setD(null); setTl([]); setReplies([]); setShot(null); setOpenCall(null); setConnectionMessage(''); setUnavailable(true);
+        setD(null); setTl([]); setReplies([]); setShot(null); setOpenCall(null); setUnavailable(true);
       }
       setChecking(false);
     };
@@ -225,7 +223,8 @@ function Dashboard({ sim, api, soul, isAdmin, base, refresh, onGone, active }: {
       <SentencesPanel sim={sim} soulId={soul.id} limit={14} />
       <HeardPanel sim={sim} soulId={soul.id} />
 
-      <AgentConnection api={api} soulId={soul.id} name={soul.name} base={base} connection={d?.agent??null} refresh={refresh} notice={{message:connectionMessage,setMessage:setConnectionMessage}} />
+      {/* LINK: the agent link (Disconnect, Pair another session) lives on the Soul's card in the world: "Connected ▾" */}
+      <section className="wide" aria-label="Agent link"><h3>Agent link</h3><p className="small dim">{d?.agent?.attached?'An agent holds this Soul.':'No agent holds this Soul.'} Open {soul.name}’s card in the world to disconnect it or pair another session.</p></section>
 
       <section className="wide">
         <h2>{soul.name}’s story so far</h2>

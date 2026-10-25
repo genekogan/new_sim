@@ -100,10 +100,11 @@ const where = () => {
   const r = card.closest('dialog')?.getBoundingClientRect() ?? card.getBoundingClientRect();
   const pts = [[r.left + 14, r.top + 14], [r.right - 50, r.top + 14], [r.left + r.width / 2, r.bottom - 14]];
   const onTop = pts.every(([x, y]) => { const e = document.elementFromPoint(x, y); return !!e && (card.closest('dialog') ?? card).contains(e); });
-  return { present: true, status: card.getAttribute('data-approval-status'), box: [r.left, r.top, r.width, r.height].map(Math.round), vw: innerWidth, onTop, hash: location.hash,
+  return { present: true, status: card.getAttribute('data-approval-status'), box: [r.left, r.top, r.width, r.height].map(Math.round), vw: innerWidth, vh: innerHeight, onTop, hash: location.hash,
     rightGap: Math.round(innerWidth - r.right), name: card.querySelector('[data-approval-name]')?.textContent ?? '', avatar: !!card.querySelector('.ap-avatar') };
 };
-const topRight = (w) => w.present && w.onTop && w.rightGap <= 40 && w.box[1] <= 170 && (w.vw < 600 || w.box[0] > w.vw / 2);
+// LINK 2026-10-24: on a phone (< 460 px) the Pairing card is the bottom sheet (canvas PhonePairing)
+const topRight = (w) => w.present && w.onTop && w.rightGap <= 40 && (w.vw <= 460 ? w.box[1] + w.box[3] >= w.vh - 40 : w.box[1] <= 170) && (w.vw < 600 || w.box[0] > w.vw / 2);
 async function windowCode(page) {
   await page.locator('button.bring-agent-open').first().click();
   const link = page.locator('.bring-agent-prompt a');
@@ -157,11 +158,10 @@ try {
     const id = JSON.stringify(made).match(/ap_[a-f0-9]{32}/)?.[0];
     const label = (await call(`${base}/v1/account/approvals/${id}`, { sub: 'user_gene' })).data?.approval?.agentLabel;
     const plain = await page.locator('[data-approval]').innerText();
-    check('A5a no agent label, folder or approval-wait talk on the card', !!label && !plain.includes(label) && !/label|folder|approval wait|Connected|s_[A-Za-z0-9]/.test(plain), { plain, label });
-    await page.locator('[data-approval-about]').click(); await sleep(200);
-    check('A5 the (i) note holds the agent name', (await page.locator('[data-approval-note]').innerText()).startsWith(`Asked by ${label}.`));
-    await shot(page, 'A5-card-info-open');
-    await page.locator('[data-approval-about]').click();
+    // LINK 2026-10-24 (spec §4): the card says "An agent calling itself <label> asks …" inline; the (i) toggle is gone
+    check('A5a the label shows only as what the agent calls itself; no folder or approval-wait talk', !!label && plain.includes(`An agent calling itself ${label}`) && !/folder|approval wait|Connected|s_[A-Za-z0-9]/.test(plain), { plain, label });
+    check('A5 the note line holds the agent name', (await page.locator('[data-approval-note]').innerText()).includes(label));
+    await shot(page, 'A5-card-pairing');
     // what the card shows between Approve and the body (it can be short): recorded by an observer, not by polling
     await page.evaluate(() => { const seen = window.__apSeen = []; new MutationObserver(() => { const p = document.querySelector('[data-approval-preparing]'); if (p) { const sp = p.querySelector('.ap-spinner'); const r = sp?.getBoundingClientRect(); seen.push({ text: p.textContent, spinner: !!sp && r.width > 0 && getComputedStyle(sp).animationName === 'ap-spin', buttons: document.querySelectorAll('[data-approve-agent],[data-refuse-agent]').length }); } }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true }); });
     await page.locator('[data-approve-agent]').click();
