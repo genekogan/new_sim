@@ -46,6 +46,10 @@ export async function preflight({ serverRoot }) {
   const { run } = await import('./lib/proc.mjs');
   checks.claude = (await run('claude', ['--version'], { maxWallMs: 20000 })).stdout.trim();
   checks.codex = (await run('codex', ['--version'], { maxWallMs: 20000 })).stdout.trim();
+  // Live arena health, so a slow world is caught before a playout, not after (Gene 2026-10-25).
+  checks.live = {};
+  for (const w of ['eden-2026', 'godmode-lab']) { try { const r = await fetch(`https://sim.eden.art/worlds/w/${w}/healthz`, { signal: AbortSignal.timeout(8000) }); const j = await r.json(); checks.live[w] = { ok: j.ok, build: j.build, tickMs: j.tickMs, clients: j.clients }; } catch (e) { checks.live[w] = { ok: false, error: String(e.message).slice(0, 80) }; } }
+  try { const { loadavg } = await import('node:os'); checks.laptopLoad = loadavg().map((x) => Math.round(x * 10) / 10); } catch { /* n/a */ }
   const allow = quotaAllows(q, { stopPct: 85 });
   const ok = checks.serverRoot && checks.webDist && checks.controllerCli && checks.playwright && !!checks.claude && allow.allowed;
   return { ok, allow, checks };
