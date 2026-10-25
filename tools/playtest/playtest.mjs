@@ -141,17 +141,17 @@ async function reviewRun(runDir, m, { serverRoot, from = 5 } = {}) {
   const scenario = readJson(join(runDir, 'scenario.json'));
   if (!m) m = await loadModules();
   if (from <= 5) {
-    if (!m.oracles || !m.reviewer) { log('review modules missing'); return 3; }
-    const r = await m.reviewer.reviewRun({ runDir, scenario, oracles: m.oracles, log });
-    receipt(runDir, 5, 'review', { ok: true, ...summary(r) });
+    if (!m.reviewer) { log('review module missing'); return 3; }
+    const r = await m.reviewer.reviewRun({ runDir, model: scenario.review?.reviewerModel ?? 'opus', log });
+    receipt(runDir, 5, 'review', { ok: true, requests: r.reviews?.length ?? 0, issues: r.issues?.length ?? 0, featureRequests: r.featureRequests?.length ?? 0, fidelity: (r.reviews ?? []).map((x) => `${x.requestId}:${x.fidelity}`).join(' ') });
   }
   if (from <= 6) {
-    if (m.developer) { const d = await m.developer.draftSpecs({ runDir, scenario, serverRoot: serverRoot ?? scenario.serverRoot ?? DEFAULT_SERVER_ROOT, log }); receipt(runDir, 6, 'develop', { ok: true, ...summary(d) }); }
+    if (m.developer) { const d = await m.developer.developRun({ runDir, serverRoot: serverRoot ?? scenario.serverRoot ?? DEFAULT_SERVER_ROOT, model: scenario.review?.developerModel ?? 'opus', log }); receipt(runDir, 6, 'develop', { ok: true, ...summary(d) }); }
     else receipt(runDir, 6, 'develop', { ok: false, note: 'developer module missing' });
   }
   if (from <= 7) {
-    if (m.metrics) writeJson(join(runDir, 'metrics.json'), await m.metrics.computeMetrics({ runDir, scenario }));
-    if (m.report) await m.report.writeReport({ runDir, scenario, runsRoot: RUNS_ROOT, log });
+    if (m.metrics?.metricsRun) m.metrics.metricsRun(runDir);
+    if (m.report?.reportRun) m.report.reportRun(runDir);
     receipt(runDir, 7, 'report', { ok: true });
   }
   log(`done: ${runDir}/REPORT.md`);
@@ -168,11 +168,11 @@ async function main() {
   if (cmd === 'run') process.exit(await cmdRun(a));
   if (cmd === 'review') process.exit(await reviewRun(resolve(a._[1]), null, { serverRoot: a['server-root'], from: a.from ? STEPS.indexOf(a.from) : 5 }));
   if (cmd === 'preflight') { const pf = await preflight({ serverRoot: resolve(a['server-root'] ?? DEFAULT_SERVER_ROOT) }); console.log(JSON.stringify(pf, null, 1)); process.exit(pf.ok ? 0 : 2); }
-  if (cmd === 'compare') { const m = await loadModules(); if (!m.compare) { log('compare module missing'); process.exit(3); } console.log(await m.compare.compareRuns(resolve(a._[1]), resolve(a._[2]))); process.exit(0); }
+  if (cmd === 'compare') { const m = await loadModules(); if (!m.compare) { log('compare module missing'); process.exit(3); } const c = m.compare.compareRuns(resolve(a._[1]), resolve(a._[2])); console.log(m.compare.compareMd ? m.compare.compareMd(c) : JSON.stringify(c, null, 1)); process.exit(0); }
   if (cmd === 'replay') {
     const src = resolve(a._[1]); const rp = readJson(join(src, 'replay.json')); if (!rp) { log('no replay.json'); process.exit(2); }
     const mode = a.mode ?? 'scripted';
-    const scen = { ...rp.scenario, name: `${rp.scenario.name}-replay`, director: mode === 'scripted' ? { ...rp.scenario.director, mode: 'scripted', script: rp.script } : rp.scenario.director };
+    const { replayToScenario } = await import('./review/report.mjs'); const scen = { ...replayToScenario(rp, mode), name: `${rp.scenario.name}-replay` };
     const tmp = join(src, `replay-${mode}.scenario.json`); writeJson(tmp, scen);
     process.exit(await cmdRun({ _: ['run', tmp], seed: rp.seed, 'server-root': a['server-root'], out: a.out }));
   }
