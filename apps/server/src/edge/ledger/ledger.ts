@@ -688,18 +688,22 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** A pond loop must stay outside its entire outline and on admitted clear ground.
    * If a world has only one accessible bank, it gets no misleading "around" offer. */
   private bankLoop(poly: [number, number][], from: [number, number]): [number, number][] {
-    const engine = this.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number; clearanceUpToV1?: (x: number, z: number, cap?: number) => number};
+    const engine = this.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number; clearanceUpToV1?: (x: number, z: number, cap?: number) => number; readPassV1?: <T>(f: () => T) => T};
     if (!engine.clearanceAtV1 || poly.length < 3) return [];
-    const clear = (x: number, z: number) => engine.clearanceUpToV1 ? engine.clearanceUpToV1(x, z, 1) : engine.clearanceAtV1!(x, z);
-    const xs = poly.map(p => p[0]), zs = poly.map(p => p[1]);
-    for (const margin of [2, 3.5, 5]) {
-      const x0 = Math.min(...xs) - margin, x1 = Math.max(...xs) + margin, z0 = Math.min(...zs) - margin, z1 = Math.max(...zs) + margin;
-      const route: [number, number][] = [[x0,z0],[(x0+x1)/2,z0],[x1,z0],[x1,(z0+z1)/2],[x1,z1],[(x0+x1)/2,z1],[x0,z1],[x0,(z0+z1)/2]];
-      if (route.some(p => clear(p[0], p[1]) < 0.7)) continue;
-      let near = 0; for (let i = 1; i < route.length; i++) if (Math.hypot(route[i][0]-from[0],route[i][1]-from[1]) < Math.hypot(route[near][0]-from[0],route[near][1]-from[1])) near=i;
-      return [...route.slice(near), ...route.slice(0,near)];
-    }
-    return [];
+    // These probes only read the world. Sync the planner once for this loop, never across capability requests.
+    const read = (): [number, number][] => {
+      const clear = (x: number, z: number) => engine.clearanceUpToV1 ? engine.clearanceUpToV1(x, z, 1) : engine.clearanceAtV1!(x, z);
+      const xs = poly.map(p => p[0]), zs = poly.map(p => p[1]);
+      for (const margin of [2, 3.5, 5]) {
+        const x0 = Math.min(...xs) - margin, x1 = Math.max(...xs) + margin, z0 = Math.min(...zs) - margin, z1 = Math.max(...zs) + margin;
+        const route: [number, number][] = [[x0,z0],[(x0+x1)/2,z0],[x1,z0],[x1,(z0+z1)/2],[x1,z1],[(x0+x1)/2,z1],[x0,z1],[x0,(z0+z1)/2]];
+        if (route.some(p => clear(p[0], p[1]) < 0.7)) continue;
+        let near = 0; for (let i = 1; i < route.length; i++) if (Math.hypot(route[i][0]-from[0],route[i][1]-from[1]) < Math.hypot(route[near][0]-from[0],route[near][1]-from[1])) near=i;
+        return [...route.slice(near), ...route.slice(0,near)];
+      }
+      return [];
+    };
+    return engine.readPassV1 ? engine.readPassV1(read) : read();
   }
   addCapabilityProvider(p: (soul: EdgeSoul) => EdgeCapability[]) {this.providers.push(p);}
 
@@ -1309,7 +1313,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
   private activityWorld(soul: EdgeSoul, me: NonNullable<ReturnType<EdgeLedger['body']>>, caps: EdgeCapability[], plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean}>) {
     const engine = this.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number; clearanceUpToV1?: (x: number, z: number, cap?: number) => number; nearestStandableV1?: (at: [number, number], except?: string, min?: number, rings?: number) => [number, number] | null};
     const w = this.host.engine.world as NativeWorld, here: [number, number] = [me.pose.p[0], me.pose.p[2]];
-    const others = Object.values(w.entities).filter(e => e.kind === 'human' && e.id !== soul.entityId).map(e => [e.pose.p[0], e.pose.p[2]] as [number, number]);
+    // One synchronous, read-only activity listing: entity membership is fixed, but group state is read on every call.
+    // Reuse the human references here; never retain a group count or this subset across listings/ticks.
+    const humans = Object.values(w.entities).filter(e => e.kind === 'human');
+    const others = humans.filter(e => e.id !== soul.entityId).map(e => [e.pose.p[0], e.pose.p[2]] as [number, number]);
     const claimed = new Set<string>();
     for (const m of this.host.minds.values()) if (m.soulId !== soul.soulId) for (const r of this.openReceipts(m.soulId)) claimed.add(r.capability.slice(r.capability.indexOf(':') + 1));
     const navIds = new Set(((w as {navV1?: {solids: {id: string}[]}}).navV1?.solids ?? []).map(x => x.id));
@@ -1329,7 +1336,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       // an installed upper-floor room/lobby is a world region the place data predates: name it by its label, never its id
       placeName: (id: string | undefined) => id ? this.places.byId.get(id)?.name ?? w.regions[id]?.label ?? null : null,
       ancestors: (id: string) => {const out: string[] = []; for (let p = this.places.byId.get(id); p?.parent; p = this.places.byId.get(p.parent)) {const q = this.places.byId.get(p.parent); if (q?.enclosed) out.push(q.id);} return out;},
-      groupSize: (group: string) => Object.values(w.entities).filter(e => e.kind === 'human' && e.human?.together?.group === group).length,
+      groupSize: (group: string) => humans.filter(e => e.kind === 'human' && e.human?.together?.group === group).length,
       clock: this.host.living ? (({hour, minute}) => ({hour, minute}))(clockAt(w.tick, this.host.living.origin, this.host.living.dayTicks)) : null,
     };
   }
