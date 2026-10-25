@@ -4,6 +4,7 @@ import { mkdirSync, existsSync, readFileSync, writeFileSync, copyFileSync, cpSyn
 import { resolve, join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { now, setAnchor, sleep, monoMs } from './lib/clock.mjs';
 import { writeJson, readJson, appendJsonl } from './lib/jsonl.mjs';
 import { quota, quotaAllows } from './lib/quota.mjs';
@@ -105,8 +106,17 @@ async function cmdRun(a) {
     if (from <= 2) {
       if (!m.seat || !m.owner) throw new Error('arena/seat.mjs or owner.mjs missing');
       ctx.owner = m.owner;
-      for (const s of scenario.seats) {
+      // A Codex seat on a box without Codex (the cloud arena) is played by Claude instead, recorded on the seat and in
+      // the log, so the replay still has a live body there and the scorecard can say the seat was substituted.
+      const codexHere = (() => { try { return spawnSync('codex', ['--version'], { stdio: 'ignore', timeout: 10000 }).status === 0; } catch { return false; } })();
+      for (const s0 of scenario.seats) {
+        let s = s0;
+        if (s0.adapter === 'codex-headless' && !codexHere) {
+          s = { ...s0, adapter: 'claude-headless', model: process.env.PLAYTEST_CODEX_SUBSTITUTE_MODEL ?? 'sonnet', wake: true, substitutedFrom: `codex-headless/${s0.model ?? 'default'}` };
+          log(`seat ${s0.id}: codex not installed here; played by claude-headless/${s.model} (recorded as substituted)`);
+        }
         const seat = await m.seat.createSeat({ runDir, seat: s, worldBase: ctx.world.base, serverRoot, rails: scenario.rails ?? {} });
+        if (s.substitutedFrom) { seat.info.substitutedFrom = s.substitutedFrom; seat.save?.(); }
         const ob = await seat.onboard({ text: onboardingText(ctx.world.base, s.soulName), maxWallSec: scenario.rails?.onboardWallSec ?? 600, timeoutSec: scenario.rails?.onboardTimeoutSec ?? 540 });
         log(`seat ${s.id}: ${ob.ok ? 'paired ' + ob.soulId : 'NOT PAIRED'}`);
         if (ob.ok) { const w = seat.wakeLoop?.(); log(`seat ${s.id}: wake loop ${w ? 'on' : 'off'}`); }

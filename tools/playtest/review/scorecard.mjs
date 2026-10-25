@@ -59,9 +59,17 @@ const POSTURE_WORD = [['sitting', /\b(sit|sitting|seated)\b/i], ['lying', /\b(ly
 
 /** §E measures for one run folder (oracles from oracles.jsonl when present, else recomputed). */
 export function runMeasures(runDir) {
-  const run = loadRun(runDir);
-  const ledger = readLedger(join(runDir, 'ledger.tsv'));
-  const file = readJsonl(join(runDir, 'oracles.jsonl'));
+  const full = loadRun(runDir);
+  // Seats that never paired (onboard.ok false, no soulId) had no body: their requests are not measures of the product.
+  // They are listed as dead seats and left out of every denominator. Seats whose adapter was substituted (a Codex seat
+  // on a box without Codex) are listed too, so a reader can see the replay was not the exact original.
+  const deadSeats = Object.entries(full.seats ?? {}).filter(([id, s]) => id !== 'god' && s.seat?.kind !== 'god' && s.seat && (s.seat.onboard ? s.seat.onboard.ok === false : !s.seat.soulId)).map(([id]) => id);
+  const substituted = Object.entries(full.seats ?? {}).filter(([, s]) => s.seat?.substitutedFrom).map(([id, s]) => `${id}: ${s.seat.substitutedFrom} → ${s.seat.adapter}/${s.seat.model ?? '?'}`);
+  const live = (e) => !deadSeats.includes(e.seat);
+  const run = deadSeats.length ? { ...full, evidence: full.evidence.filter(live) } : full;
+  const liveIds = new Set(run.evidence.map((e) => e.requestId));
+  const ledger = readLedger(join(runDir, 'ledger.tsv')).filter((r) => !deadSeats.includes(r.seat));
+  const file = readJsonl(join(runDir, 'oracles.jsonl')).filter((r) => !r.requestId || liveIds.has(r.requestId));
   const rows = file.length ? file : run.evidence.flatMap((e) => runOracles(e, { run }));
   const m = computeMetrics(run, { ledger, oracles: rows });
   const joined = joinTurns(run);
@@ -98,7 +106,7 @@ export function runMeasures(runDir) {
     listenOpenFails: rows.filter((r) => r.id === 'listen-open' && r.status === 'fail').length,
     physical: Object.fromEntries(PHYS_IDS.map((id) => [id, rows.filter((r) => r.id === id && r.status === 'fail').length])),
     sits, namedWalks: { pass: named.filter((e) => of(e, 'arrival').status === 'pass').length, n: named.length },
-    doing: { agree, compared }, seatH,
+    doing: { agree, compared }, seatH, deadSeats, substituted, requestsDropped: full.evidence.length - run.evidence.length,
     raw: { ackSec: card.map((e) => secsBetween(e.sentAt, e.ackAt)), cardTurns: card.map((e) => joined.get(e.requestId)?.turns ?? 0), calls: run.evidence.map((e) => joined.get(e.requestId)?.calls ?? 0) },
   };
 }
@@ -145,9 +153,15 @@ export function noNewBugs(label, kind, base, reps) {
 
 const f = (v) => (v == null ? '—' : typeof v === 'number' ? (Number.isInteger(v) ? String(v) : v.toFixed(2)) : String(v));
 const fr2 = (o, a, b) => `${o[a]}/${o[b]}`;
+function seatNotes(m) {
+  const n = [];
+  if (m.deadSeats?.length) n.push(`${m.deadSeats.join(', ')} never paired: ${m.requestsDropped} requests left out`);
+  if (m.substituted?.length) n.push(`substituted ${m.substituted.join('; ')}`);
+  return n.length ? ` (${n.join('; ')})` : '';
+}
 function runRow(tag, x) {
   const m = x.m; const ph = PHYS_IDS.reduce((a, id) => a + m.physical[id], 0); const sit = Object.values(m.sits);
-  return `| ${x.label} | ${tag} | ${fr2(m.walks, 'arrived', 'known')} | ${fr2(m.bodyMoved, 'n', 'of')} | ${f(m.ackMedianSec)} | ${f(m.firstBodyMedianSec)} | ${f(m.chatQueuedMedianSec)} | ${m.truth.n ? f(m.truth.pass / m.truth.n) : '—'} | ${m.fidelity.H}/${m.fidelity.P}/${m.fidelity.M}/${m.fidelity.W} | ${f(m.outTokPerReq)} | ${f(m.turnsPerReq)} | ${f(m.callsPerReq)} | ${fr2(m.cardResult, 'pass', 'n')} | ${m.listenOpenFails} | ${ph} | ${sit.length ? `${sit.filter((s) => s.ok).length}/${sit.length}` : '—'} | \`${m.run}\` |`;
+  return `| ${x.label} | ${tag} | ${fr2(m.walks, 'arrived', 'known')} | ${fr2(m.bodyMoved, 'n', 'of')} | ${f(m.ackMedianSec)} | ${f(m.firstBodyMedianSec)} | ${f(m.chatQueuedMedianSec)} | ${m.truth.n ? f(m.truth.pass / m.truth.n) : '—'} | ${m.fidelity.H}/${m.fidelity.P}/${m.fidelity.M}/${m.fidelity.W} | ${f(m.outTokPerReq)} | ${f(m.turnsPerReq)} | ${f(m.callsPerReq)} | ${fr2(m.cardResult, 'pass', 'n')} | ${m.listenOpenFails} | ${ph} | ${sit.length ? `${sit.filter((s) => s.ok).length}/${sit.length}` : '—'} | \`${m.run}\`${seatNotes(m)} |`;
 }
 
 /** SCORECARD.md. entries: [{label, kind, base: measures, baseFrom, reps: [measures…]}] */

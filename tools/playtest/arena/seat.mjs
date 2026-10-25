@@ -113,15 +113,26 @@ export class Seat {
     // Onboarding is one long turn (fetch, register, create, approval wait); it gets its own wall cap.
     const savedCap = this.rails.maxTurnWallSec;
     if (maxWallSec) this.rails.maxTurnWallSec = Math.max(savedCap ?? 0, maxWallSec);
-    const turnP = this.chat(text, { reason: 'onboard' }).catch((e) => ({ error: String(e) })).finally(() => { this.rails.maxTurnWallSec = savedCap; });
-    let paired = null, pairedMs = null, last = null;
-    while (Date.now() - t0 < timeoutSec * 1000) {
-      const s = await this.status(); last = s.data ?? s.reason;
-      if (s.ok && s.data?.paired && (this.kind === 'god' || s.data?.soul?.id)) { paired = s.data; pairedMs = Date.now() - t0; break; }
-      await sleep(3000);
+    // The onboarding turn may end unpaired with time left (seen 2026-10-25: a seat found a seeded `.eden-agent.json`,
+    // read "reuse that Soul", saw paired: false and stopped). Then it gets a nudge that quotes the status and asks it to
+    // finish, up to two more turns inside the same timeout. Each nudge is a recorded turn (reason onboard-nudge).
+    let paired = null, pairedMs = null, last = null, turn = null, attempts = 0;
+    const nudge = () => `Onboarding is not finished. \`node eden.mjs status\` shows ${JSON.stringify(last ?? {}).slice(0, 300)}. Run the \`next\` command it prints (register, then create the Soul "${name}"), keep going until status shows paired: true, then start listening as the instructions say. Do not stop to ask me anything.`;
+    while (!paired && attempts < 3 && (attempts === 0 || Date.now() - t0 < timeoutSec * 1000)) {
+      attempts += 1;
+      let ended = false;
+      const turnP = this.chat(attempts === 1 ? text : nudge(), { reason: attempts === 1 ? 'onboard' : 'onboard-nudge' }).catch((e) => ({ error: String(e) })).finally(() => { ended = true; });
+      while (Date.now() - t0 < timeoutSec * 1000) {
+        const s = await this.status(); last = s.data ?? s.reason;
+        if (s.ok && s.data?.paired && (this.kind === 'god' || s.data?.soul?.id)) { paired = s.data; pairedMs = Date.now() - t0; break; }
+        if (ended) break;
+        await sleep(3000);
+      }
+      turn = await turnP;
+      if (!paired) { const s = await this.status(); last = s.data ?? s.reason; if (s.ok && s.data?.paired && (this.kind === 'god' || s.data?.soul?.id)) { paired = s.data; pairedMs = Date.now() - t0; } }
     }
-    const turn = await turnP;
-    this.info.onboard = { ok: !!paired, pairedWithinSec: paired ? Math.round(pairedMs / 1000) : null, timeoutSec, onboardTurnWallMs: turn?.wallMs ?? null,
+    this.rails.maxTurnWallSec = savedCap;
+    this.info.onboard = { ok: !!paired, pairedWithinSec: paired ? Math.round(pairedMs / 1000) : null, timeoutSec, onboardTurnWallMs: turn?.wallMs ?? null, attempts,
       cliFile: paired ? (existsSync(join(this.folder, this.cli.file)) ? this.cli.file : this.cli.fallbackFile) : null, lastStatus: paired ? null : last };
     if (paired && paired.soul) { this.info.soulId = paired.soul.id; this.info.soulName = paired.soul.name ?? name; }
     this.save();
