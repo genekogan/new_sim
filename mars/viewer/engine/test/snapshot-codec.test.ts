@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CodecError, decode, encode } from '../runtime/codec.ts';
+import { CodecError, captureGraph, decode, encode, finishGraph, prepareImmutableSnapshotData, type GraphCapture } from '../runtime/codec.ts';
 import { decodeSnapshot, SNAPSHOT_FORMAT, type RuntimeSnapshot } from '../runtime/snapshot.ts';
 import { hashOf } from '../core/hash.ts';
 import { Runtime } from '../runtime/runtime.ts';
@@ -168,6 +168,97 @@ test('source and restored mutations cannot change an owned encoded checkpoint', 
   restored.a.values.push(10); restored.map.set('extra', { values: [20] });
   assert.equal(JSON.stringify(encoded), bytes);
   assert.equal(source.a.values.includes(10), false);
+});
+
+test('split capture owns every child before deferred finish and each finish owns its output', () => {
+  const shared = { values: [1, undefined, -0] };
+  const source = { first: shared, again: shared, map: new Map<unknown, unknown>([[shared, shared]]), set: new Set([shared]) };
+  const expected = JSON.stringify(legacyEncode(source)), capture = captureGraph(source);
+  let calls = 0;
+  shared.values.length = 0;
+  Object.defineProperty(source, 'first', { enumerable: true, get: () => { calls++; throw new Error('live read'); } });
+  source.map.clear(); source.set.clear();
+  const finished = finishGraph(capture);
+  assert.equal(JSON.stringify(finished), expected); assert.equal(calls, 0);
+  (finished as Record<string, unknown>).first = null;
+  assert.equal(JSON.stringify(finishGraph(capture)), expected, 'finishing twice cannot reuse a mutable output tree');
+  assert.ok(Object.isFrozen(capture));
+  assert.deepEqual(Object.keys(capture), ['nodes', 'cachedNodes'], 'the capture handle exposes no source or captured arrays');
+  assert.throws(() => finishGraph({ nodes: 0, cachedNodes: 0 } as GraphCapture), /not a captured snapshot graph/);
+});
+
+test('split capture and finish retain the independent legacy bytes across the graph corpus', () => {
+  for (const source of [undefined, -0, NaN, ...Array.from({ length: 80 }, (_, i) => generatedGraph(i + 1))])
+    assert.equal(JSON.stringify(finishGraph(captureGraph(source))), JSON.stringify(legacyEncode(source)));
+});
+
+test('admitted immutable shapes retain global aliases and fresh reference IDs at every boundary', () => {
+  const leaf = { number: -0, values: [undefined, Infinity, '🌱'] };
+  const physics: { leaf: typeof leaf; literal: Record<string, unknown>; self?: unknown } = { leaf, literal: { '~id': 'literal' } };
+  physics.self = physics;
+  assert.equal(prepareImmutableSnapshotData(physics), true);
+  assert.ok(Object.isFrozen(physics)); assert.ok(Object.isFrozen(leaf)); assert.ok(Object.isFrozen(leaf.values));
+  assert.equal(captureGraph(physics).cachedNodes, captureGraph(physics).nodes);
+  for (const source of [physics, { physics, leaf }, { leaf, physics },
+    { map: new Map<unknown, unknown>([[leaf, physics]]), physics, set: new Set([leaf]) }]) {
+    const expected = JSON.stringify(legacyEncode(source));
+    for (let i = 0; i < 2; i++) {
+      const capture = captureGraph(source), output = finishGraph(capture);
+      assert.ok(capture.cachedNodes > 0); assert.equal(JSON.stringify(output), expected);
+      sameGraph(source, decode(JSON.parse(expected)));
+      if (typeof output === 'object' && output) Object.assign(output, { changed: true });
+      assert.equal(JSON.stringify(finishGraph(capture)), expected);
+    }
+  }
+  assert.throws(() => { leaf.values.push('mutation'); }, TypeError);
+});
+
+test('immutable admission validates without getters and falls back without partially freezing collections', () => {
+  let calls = 0;
+  const child = { untouched: [] }, bad = Object.defineProperty({}, 'value', { enumerable: true, get: () => { calls++; return 1; } });
+  for (const unsupported of [bad, new Map([['x', 1]]), new Set([1]), [1, , 3], () => 1]) {
+    const root = { child, unsupported };
+    assert.equal(prepareImmutableSnapshotData(root), false);
+    assert.equal(Object.isFrozen(root), false); assert.equal(Object.isFrozen(child), false);
+    assert.equal(captureGraph(child).cachedNodes, 0);
+  }
+  assert.equal(calls, 0);
+  const mutable = { child, map: new Map([['x', 1]]), set: new Set([1]) };
+  const before = JSON.stringify(encode(mutable));
+  assert.equal(prepareImmutableSnapshotData(mutable), false);
+  mutable.map.set('y', 2); mutable.set.add(2);
+  assert.notEqual(JSON.stringify(encode(mutable)), before);
+  assert.equal(JSON.stringify(encode(mutable)), JSON.stringify(legacyEncode(mutable)));
+});
+
+test('physics lookalikes and shallow frozen roots never acquire trusted cached shapes', () => {
+  const child = { x: 1 }, lookalike = Object.freeze({ version: 'entity-physics/1', hash: 'a'.repeat(64), byEntity: { child } });
+  const first = captureGraph(lookalike); assert.equal(first.cachedNodes, 0);
+  child.x = 2;
+  assert.equal((decode(finishGraph(first)) as typeof lookalike).byEntity.child.x, 1);
+  const next = captureGraph(lookalike); assert.equal(next.cachedNodes, 0);
+  assert.equal((decode(finishGraph(next)) as typeof lookalike).byEntity.child.x, 2);
+  Object.defineProperty(child, 'bad', { enumerable: true, get: () => { throw new Error('must not run'); } });
+  assert.throws(() => captureGraph(lookalike), error => error instanceof CodecError && error.path === '$.byEntity.child.bad');
+});
+
+test('immutable admission keeps literal proto/marker data and validates new siblings beside cached subtrees', () => {
+  const source = JSON.parse('{"__proto__":{"safe":true},"~r":"literal","nested":[1,2]}');
+  const before = JSON.stringify(encode(source));
+  assert.equal(prepareImmutableSnapshotData(source), true);
+  assert.equal(JSON.stringify(encode(source)), before);
+  assert.ok(Object.hasOwn(decode(encode(source)) as object, '__proto__'));
+  let calls = 0;
+  const bad = Object.defineProperty({}, 'later', { enumerable: true, get: () => { calls++; return 1; } });
+  const next = { old: source, bad };
+  assert.equal(prepareImmutableSnapshotData(next), false);
+  assert.equal(Object.isFrozen(next), false); assert.equal(Object.isFrozen(bad), false); assert.equal(calls, 0);
+  assert.throws(() => encode(next), error => error instanceof CodecError && error.path === '$.bad.later');
+  const valid = { old: source, alias: source.nested, fresh: [3] };
+  assert.equal(prepareImmutableSnapshotData(valid), true);
+  const out = decode(encode(valid)) as typeof valid;
+  assert.strictEqual(out.alias, out.old.nested);
+  assert.equal(captureGraph(valid).cachedNodes, captureGraph(valid).nodes);
 });
 
 test('accessors, unsupported values and extra collection data fail with paths without executing getters', () => {

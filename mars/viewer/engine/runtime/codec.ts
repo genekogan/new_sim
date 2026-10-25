@@ -24,12 +24,22 @@ const isPlain = (o: object) => {
   return p === Object.prototype || p === null;
 };
 
-type Captured = { refs: number } & (
+type ImmutableShape =
   | { kind: 'object'; keys: string[]; values: unknown[]; tilde: boolean }
-  | { kind: 'array'; values: unknown[] }
+  | { kind: 'array'; values: unknown[] };
+type Captured = { refs: number } & (ImmutableShape
   | { kind: 'set'; values: unknown[] }
   | { kind: 'map'; entries: [unknown, unknown][] }
 );
+
+// Only prepareImmutableSnapshotData can admit nodes. A matching version/hash, a frozen
+// root, or a caller's assertion of immutability never grants this shortcut.
+const immutableShapes = new WeakMap<object, ImmutableShape>();
+declare const graphCaptureBrand: unique symbol;
+/** Opaque, process-local captured graph. Counts make cold/warm capture measurable;
+ * source identities and the captured child arrays are never exposed to callers. */
+export type GraphCapture = { readonly [graphCaptureBrand]: true; readonly nodes: number; readonly cachedNodes: number };
+const captures = new WeakMap<GraphCapture, { root: unknown; captured: Map<object, Captured> }>();
 
 type ErrorPath = (key?: string) => string;
 function rejectSymbolKeys(v: object, path: ErrorPath): void {
@@ -57,9 +67,20 @@ function putOwn(out: Record<string, unknown>, key: string, value: unknown): void
  * no source object/getter/iterator survives in the result. `skipMapValues` omits
  * whole Map entries whose value is in the set (dropped actions). */
 export function encode(root: unknown, rootPath = '$', skipMapValues: ReadonlySet<object> = new Set()): unknown {
+  return finishGraph(captureGraph(root, rootPath, skipMapValues));
+}
+
+/** Capture one synchronous graph boundary. finishGraph never rereads live source
+ * properties or iterators, so callers may mutate the source after this returns. */
+export function captureGraph(root: unknown, rootPath = '$', skipMapValues: ReadonlySet<object> = new Set()): GraphCapture {
+  return capture(root, rootPath, skipMapValues, false);
+}
+
+function capture(root: unknown, rootPath: string, skipMapValues: ReadonlySet<object>, admission: boolean): GraphCapture {
   // Pass 1 validates and captures each object's children once, and counts references.
   // Pass 2 reads only these captured values: no getters, source iterators or second source traversal.
   const captured = new Map<object, Captured>();
+  let cachedNodes = 0;
   // Successful captures need no diagnostic strings. Reuse these stacks rather than
   // constructing a full path twice per property (descriptor validation and traversal).
   type PathKind = 'property' | 'map key' | 'map value' | 'set';
@@ -75,6 +96,19 @@ export function encode(root: unknown, rootPath = '$', skipMapValues: ReadonlySet
     if (v === null || type === 'number' || type === 'string' || type === 'boolean' || type === 'undefined') return;
     const known = typeof v === 'object' ? captured.get(v) : undefined;
     if (known) { known.refs++; return; }
+    const immutable = typeof v === 'object' ? immutableShapes.get(v) : undefined;
+    if (immutable) {
+      captured.set(v as object, { ...immutable, refs: 1 });
+      cachedNodes++;
+      // Admission only checks/freezes new nodes; an admitted node already proves
+      // its entire immutable closure. Actual capture MUST count all its edges.
+      if (admission) return;
+      // Its entire enumerable closure was validated and frozen at admission.
+      // Still traverse every edge for THIS graph's aliases, counts and ID order.
+      // No diagnostic paths are needed: descendants cannot become unsupported.
+      for (const value of immutable.values) visit(value);
+      return;
+    }
     // Keep one recursive frame per graph edge, as before lazy paths. Primitive
     // leaves and already-captured aliases do not need path bookkeeping at all.
     if (key !== undefined) { pathKeys.push(key); pathKinds.push(kind); }
@@ -125,6 +159,18 @@ export function encode(root: unknown, rootPath = '$', skipMapValues: ReadonlySet
     if (key !== undefined) { pathKeys.pop(); pathKinds.pop(); }
   };
   visit(root);
+  const handle = Object.freeze({ nodes: captured.size, cachedNodes }) as GraphCapture;
+  captures.set(handle, { root, captured });
+  return handle;
+}
+
+/** Emit a fresh owned JSON tree with the existing marker/reference order. This
+ * may run later or repeatedly; neither source mutation nor output mutation can
+ * change a captured graph. The handle is not a worker transport format. */
+export function finishGraph(handle: GraphCapture): unknown {
+  const state = captures.get(handle);
+  if (!state) throw new TypeError('not a captured snapshot graph');
+  const { root, captured } = state;
   // pass 2: emit in the same depth-first order decode() walks
   const ids = new Map<object, number>();
   let next = 0;
@@ -157,6 +203,35 @@ export function encode(root: unknown, rootPath = '$', skipMapValues: ReadonlySet
     return shared ? { '~id': myId, '~v': body } : body;
   };
   return emit(root);
+}
+
+/** Explicit ownership boundary for static snapshot facts (currently entity
+ * physics construction/restore only). Validate the whole enumerable graph before
+ * freezing any source node. Object.freeze cannot make Map/Set entries immutable,
+ * so those collections are deliberately excluded from this admission path.
+ * Returns false without freezing new nodes when admission is unsupported;
+ * generic encode continues accepting collections through ordinary capture. */
+export function prepareImmutableSnapshotData(root: unknown, rootPath = '$'): boolean {
+  if (root !== null && typeof root === 'object' && immutableShapes.has(root)) return true;
+  let handle: GraphCapture;
+  try { handle = capture(root, rootPath, new Set(), true); }
+  catch (error) {
+    // Admission is an optimization, not a new construction/restore refusal.
+    // Ordinary encoding remains responsible for diagnosing unsupported state.
+    if (error instanceof CodecError) return false;
+    throw error;
+  }
+  const { captured } = captures.get(handle)!;
+  for (const node of captured.values())
+    if (node.kind === 'map' || node.kind === 'set')
+      return false;
+  for (const [source, node] of captured) {
+    if (immutableShapes.has(source)) continue;
+    Object.freeze(source);
+    if (node.kind === 'array') immutableShapes.set(source, { kind: 'array', values: node.values });
+    else if (node.kind === 'object') immutableShapes.set(source, { kind: 'object', keys: node.keys, values: node.values, tilde: node.tilde });
+  }
+  return true;
 }
 
 export function decode(data: unknown): unknown {

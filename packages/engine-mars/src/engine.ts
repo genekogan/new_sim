@@ -48,7 +48,7 @@ import { hashOf, physicalView, type BirthNearV1, type ActionRecord, type Activit
 import { loadMars, type Mars } from './load.ts';
 import type {CampExpansionReader} from './camp-expansion.ts';
 import {campExpansionV1Schema,type CampExpansionV1,type CampExpansionAdmissionV1} from '@sim/engine-contract';
-import { CodecError } from '../../../mars/viewer/engine/runtime/codec.ts';
+import { CodecError, prepareImmutableSnapshotData } from '../../../mars/viewer/engine/runtime/codec.ts';
 import { constructionPlan, unsafeConstruction, type BuildPhase } from './construction.ts';
 import { disassemblyPlan, DISASSEMBLY_POLICY } from './disassembly.ts';
 import { MARS_2026_MAP, withMars2026Map } from './mars-2026-map.ts';
@@ -248,7 +248,7 @@ export class MarsEngine implements Engine {
     if(saved?.renderPlatformsV1)this.renderPlatformMetadata=renderPlatformsV1Schema.parse(saved.renderPlatformsV1);
     // entity-physics/1 (world-edit, lane L9): a restored entity world re-registers its derived assets and re-bases its
     // Spatial on its own physics (absent in every authored world, so they are untouched).
-    if(rt.world.entityPhysicsV1)registerAssets(rt.world.entityPhysicsV1.assets);
+    if(rt.world.entityPhysicsV1){prepareImmutableSnapshotData(rt.world.entityPhysicsV1, '$.entityPhysicsV1');registerAssets(rt.world.entityPhysicsV1.assets);}
     // A restored world's services come from its factory's genesis base (snapshot restore): re-base on the world's own
     // logged static facts (nav/1, office guards, authored boundaries, upper floors, entity physics) so a restart equals
     // the live world in every state, including after all upper floors are removed. A no-op when the base id already matches.
