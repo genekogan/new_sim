@@ -2039,12 +2039,15 @@ export class MarsEngine implements Engine {
     if(!Array.isArray(spec.at)||!spec.at.every(Number.isFinite))return {code:'carrier.bad-home',message:'at must be [x,z]'};
     const e=this.m.carrierEntity(spec,this.rt.tick);if('code' in e)return e;
     if(spec.def==='rowing-punt')return previewPunt(this.rt,spec,this.renderScene());
-    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.levelAt(0,[spec.at[0],spec.at[1]]);
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);
     const need=Math.hypot(0.75,0.6)+0.3;
-    if(!grid||clearanceAt(grid,spec.at)<need)return {code:'carrier.home-blocked',message:'the carrier home is not clear level-0 ground'};
+    // One home-selected reader preserves the same bounds for home, door and every exit. Off-window
+    // capped reads classify only nearby cells; in-window/flat reads keep the existing full-grid path.
+    const clear=spatial.clearanceCapped(0,[spec.at[0],spec.at[1]],Math.max(need,HUMAN_RADIUS+.3));
+    if(!clear||clear(spec.at)<need)return {code:'carrier.home-blocked',message:'the carrier home is not clear level-0 ground'};
     for(const o of listEntities(this.ents) as any[])if(o.human&&Math.hypot(o.pose.p[0]-spec.at[0],o.pose.p[2]-spec.at[1])<2.5)return {code:'carrier.home-occupied',message:`${o.id} stands where the carrier would be`};
     const dp=e.pose,c=dcos(dp.yaw),sn=dsin(dp.yaw);
-    const cd=CATALOG[spec.def]?.capabilities?.carrier!;for(const local of [cd.door,...cd.seats.map(x=>x.exit)]){const x=dp.p[0]+local[0]*c-local[1]*sn,z=dp.p[2]+local[0]*sn+local[1]*c;if(clearanceAt(grid,[x,z])<HUMAN_RADIUS+.3)return {code:'carrier.door-blocked',message:'the boarding step or exit spots are not clear ground'};}
+    const cd=CATALOG[spec.def]?.capabilities?.carrier!;for(const local of [cd.door,...cd.seats.map(x=>x.exit)]){const x=dp.p[0]+local[0]*c-local[1]*sn,z=dp.p[2]+local[0]*sn+local[1]*c;if(clear([x,z])<HUMAN_RADIUS+.3)return {code:'carrier.door-blocked',message:'the boarding step or exit spots are not clear ground'};}
     return null;
   }
   /** CN5 (logged rules fact `carrierRouteV1`): a parked, empty carrier flies another named route from its next flight. */
