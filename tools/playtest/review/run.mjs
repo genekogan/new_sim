@@ -12,7 +12,17 @@ export function loadRun(runDir) {
   const play = readJson(join(runDir, 'receipts/3-play.json'), null);
   // Play starts when the seats step's receipt is written; the play receipt itself is written at the END of play.
   const seatsReceipt = readJson(join(runDir, 'receipts/2-seats.json'), null);
-  const anchorMs = Date.parse(play?.anchor ?? seatsReceipt?.t ?? world.startedAt ?? play?.t ?? 0) || 0;
+  let anchorMs = Date.parse(play?.anchor ?? seatsReceipt?.t ?? world.startedAt ?? play?.t ?? 0) || 0;
+  // Cameras open between the seats receipt and the first glance; the persona's own first turn (t minus elapsedSec) is
+  // the true play start when it exists.
+  try {
+    const firsts = [];
+    for (const d of (existsSync(join(runDir, 'personas')) ? readdirSync(join(runDir, 'personas')) : [])) {
+      const t0 = readJsonl(join(runDir, 'personas', d, 'turns.jsonl'))[0];
+      if (t0?.t && Number.isFinite(t0.elapsedSec)) firsts.push(Date.parse(t0.t) - t0.elapsedSec * 1000);
+    }
+    if (firsts.length) anchorMs = Math.min(...firsts);
+  } catch { /* keep the receipt anchor */ }
   const seats = {};
   for (const id of list(join(runDir, 'seats'))) {
     const d = join(runDir, 'seats', id);

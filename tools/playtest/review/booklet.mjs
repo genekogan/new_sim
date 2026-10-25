@@ -151,7 +151,10 @@ function scorecard(m) {
   return `walk ${pct(b.walkArrivalRate)} (${b.walksArrived ?? 0}/${b.walksArrivalKnown ?? 0}) · moved ${b.bodyMovedInBudget ?? 0}/${b.requests ?? 0} · ack ${b.ackMedianSec == null ? '—' : num(b.ackMedianSec, 1) + ' s'} · stuck ${b.stuck ?? 0} · wrong ${b.wrong ?? 0} · hits ${b.hits ?? 0}`;
 }
 
-export function renderIndex(bundles, outDir) {
+export function renderIndex(allBundles, outDir) {
+  // Runs that never delivered a request (failed starts, aborted runs) are listed apart so they do not read as results.
+  const failedStarts = allBundles.filter((b) => !b.run.evidence.length);
+  const bundles = allBundles.filter((b) => b.run.evidence.length);
   const rows = []; const egr = []; const caveats = [];
   for (const b of bundles) {
     const L = linker(b.runDir, outDir); const s = b.run.scenario ?? {}; const c = counts(b);
@@ -164,11 +167,12 @@ export function renderIndex(bundles, outDir) {
     rows.push(`<tr><td data-l="scenario"><a href="${esc(b.name)}.html">${esc(s.name ?? b.name)}</a><div class="small mute">${esc(b.name)}${status ? ` · ${status}` : ''}</div></td><td data-l="world">${esc(s.world?.slug ?? b.run.world?.slug ?? '')}<div class="small mute">${esc((s.world?.genesis ?? '').split('/').pop())}</div></td><td data-l="seats" class="small">${seats}</td><td data-l="duration">${playSec(b) != null ? `${Math.round(playSec(b))} s` : '—'}<div class="small mute">plan ${esc(s.durationSec ?? '?')} s</div></td><td data-l="basics" class="small">${scorecard(b.metrics)}</td><td data-l="fidelity">${fidChips(c)}</td><td data-l="story">${story ?? '—'}</td><td data-l="issues / FRs">${b.issues.length} / ${b.frs.length}</td></tr>`);
   }
   const egrHtml = egr.length ? `<ul>${egr.map((e) => `<li><div class="row"><div class="ph">${e.shot ? thumb(e.shot, e.requestId) : ''}</div><div title="${esc(e.reason)}">${e.why.map((w) => chip(w, 'fW')).join('')} <span class="mono">"${esc(e.text)}"</span><div class="small mute"><a href="${esc(e.run)}.html#${esc(e.requestId)}">${esc(e.run)}</a> · ${esc(e.seat)} · ${esc(e.requestId)}</div></div></div></li>`).join('')}</ul>` : '<p class="mute">None.</p>';
-  const body = `<h1>Playtest booklet</h1><p class="mute small">${bundles.length} run(s), newest first. Built ${esc(new Date().toISOString().slice(0, 16).replace('T', ' '))} UTC.</p>
+  const body = `<h1>Playtest booklet</h1><p class="mute small">${bundles.length} run(s) with results, newest first. Built ${esc(new Date().toISOString().slice(0, 16).replace('T', ' '))} UTC.</p>
 <section class="box bad egr"><h2 style="margin-top:0">Egregious failures</h2><p class="small mute">Every W, every inside-solid / stuck / no-progress oracle fail, and every request with no ack and no body movement.</p>${egrHtml}</section>
 <section class="box"><h3 style="margin-top:0">Harness caveats</h3><p class="small">Speed numbers (ack, first body change, walk) were measured with the playtest harness, the seats and the world all on one laptop: they are under load and read slower than an unloaded server would be. Load averages are 1 / 5 / 15 min from pre-flight; tick is the world's own tick time at provision.</p><ul class="small">${caveats.join('')}</ul></section>
 <h2>Runs</h2><div class="scroll"><table class="cards"><tr><th>scenario</th><th>world</th><th>seats</th><th>duration</th><th>basics</th><th>fidelity</th><th>story</th><th>issues / FRs</th></tr>${rows.join('')}</table></div>`;
-  return page('Playtest booklet', body, true);
+  const failedHtml = failedStarts.length ? `<details class="small"><summary>${failedStarts.length} failed or aborted start(s), kept for the record</summary><ul>${failedStarts.map((b) => { const ab = existsSync(join(b.runDir, 'ABORTED.json')); const f = existsSync(join(b.runDir, 'receipts/9-failure.json')); return `<li><a href="${esc(b.name)}.html">${esc(b.name)}</a> · ${ab ? 'aborted' : f ? 'failed start' : 'no requests'}</li>`; }).join('')}</ul></details>` : '';
+  return page('Playtest booklet', body + failedHtml, true);
 }
 
 // ---------- run page

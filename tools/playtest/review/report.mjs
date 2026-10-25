@@ -87,7 +87,7 @@ export function renderReport(run, { metrics, prevMetrics = null, prevName = null
 
 export function harnessNotes(run, { metrics, ledger, reviews, specs, emergence }) {
   const n = [];
-  const missing = run.shotsIndex.filter((s) => s.path && !existsSync(join(run.runDir, s.path))).length;
+  const missing = run.shotsIndex.filter((s) => s.path && !existsSync(s.path.startsWith('/') ? s.path : join(run.runDir, s.path))).length;
   if (metrics.harness.shotsTaken < metrics.harness.shotsPlanned) n.push(`shots: ${metrics.harness.shotsTaken} indexed of ${metrics.harness.shotsPlanned} planned.`);
   if (missing) n.push(`shots: ${missing} indexed shot file(s) are missing on disk.`);
   if (metrics.harness.lateSamples) n.push(`samples: ${metrics.harness.lateSamples} gap(s) longer than 1.5× the sample interval.`);
