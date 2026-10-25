@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { capturePhysicalHashInput, capturedPhysicalHashSteps, physicalHashNeedsLegacyCapture } from './checkpoint-hash.ts';
 import { stableStringify } from '@sim/engine-contract';
 import {bodyProfile} from '../../../mars/viewer/engine/bodies/navigation.ts';
 import {immutableAuthoredBoundaryFact} from '../../../mars/viewer/engine/spatial/edits.ts';
@@ -46,11 +47,11 @@ import {attachGround,groundRegistry,installGroundV1 as installGround,previewGrou
 //     them back at any time, and the borrower treats that as the scene ending.
 //  3. Feasibility is asked first (verb.plan), because in Mars even a refused
 //     instruction pulls a person out of what they were doing.
-import { hashOf, physicalView, type BirthNearV1, type ActionRecord, type ActivityOption, type Anchor, type ChangeEvent, type Engine, type EngineFactory, type EngineSnapshot, type EngineSnapshotCapture, type PathCommit, type PoseSample, type Program, type ProgramEvent, type RuntimeEvent, type RuntimeView, type Vec3, type VerbInfo, type WorldState } from '@sim/engine-contract';
+import { hashOf, physicalView, type BirthNearV1, type ActionRecord, type ActivityOption, type Anchor, type ChangeEvent, type Engine, type EngineFactory, type EngineSnapshot, type EngineSnapshotCapture, type EngineCheckpointCapture, type EngineCheckpoint, type PathCommit, type PoseSample, type Program, type ProgramEvent, type RuntimeEvent, type RuntimeView, type Vec3, type VerbInfo, type WorldState } from '@sim/engine-contract';
 import { loadMars, type Mars } from './load.ts';
 import type {CampExpansionReader} from './camp-expansion.ts';
 import {campExpansionV1Schema,type CampExpansionV1,type CampExpansionAdmissionV1} from '@sim/engine-contract';
-import { CodecError, prepareImmutableSnapshotData } from '../../../mars/viewer/engine/runtime/codec.ts';
+import { CodecError, assertCapturedHashable, captureGraph, prepareImmutableSnapshotData } from '../../../mars/viewer/engine/runtime/codec.ts';
 import { constructionPlan, unsafeConstruction, type BuildPhase } from './construction.ts';
 import { disassemblyPlan, DISASSEMBLY_POLICY } from './disassembly.ts';
 import { MARS_2026_MAP, withMars2026Map } from './mars-2026-map.ts';
@@ -282,7 +283,8 @@ export class MarsEngine implements Engine {
   /** The world plus the adapter's own state (which program each actor is in), since both decide what happens next. */
   stateHash(): string { return this.stateHashWithWorld(this.rt.stateHash()); }
   /** Reuse only the native hash captured synchronously by snapshot(); never cache a live world hash across calls. */
-  private stateHashWithWorld(nativeStateHash: string): string { return hashOf({ ...(this.cfg.groundReclaimV1===true?{groundReclaimPolicy:'ground-reclaim/1'}:{}), ...(this.world.officeStairGuardsV1?{officeGuardPolicy:this.world.officeStairGuardsV1.version}:{}), ...(this.lecturePlacement?{lecturePolicy:this.lecturePlacement}:{}), ...(this.sleepSnapshotActive?{sleepSnapshotPolicy:NATIVE_SLEEP_SNAPSHOT_V1}:{}), ...(this.newcomerResources.length?{newcomerResources:this.newcomerResources}:{}), w: nativeStateHash, p: [...this.programs.values()], l: this.leaving, clock: this.cfg.clock ?? null, quiet: this.quiet, ...(this.cfg.safeCrewRemoval?{removalPolicy:'crew-removal/1'}:{}), ...(this.cfg.disassemblyV1?{disassemblyPolicy:DISASSEMBLY_POLICY}:{}), ...(this.cfg.fixtureGroundGoalsV1?{fixtureGoalPolicy:'ground-fixture-levels/1'}:{}), ...(this.cfg.nativeArrivalWitnessV1?{arrivalWitnessPolicy:'native-navigation-arrival/1'}:{}), ...(this.cfg.quietLandingCourtesyV1?{quietLandingPolicy:'idle-landing-courtesy/1'}:{}), ...(this.commonsProvisionsActive?{provisionsPolicy:'commons-provisions/1'}:{}), ...(this.commonsKitchenActive?{kitchenPolicy:this.commonsKitchenVersion}:{}), ...(this.greenLandmarkActive?{greenLandmarkPolicy:'existing-green-landmark/1'}:{}), ...(this.socialEdenActive?{socialPolicy:'social-eden/1'}:{}), ...(this.foodDeliveries.length?{foodDeliveryPolicy:'commons-food-delivery/1',foodDeliveries:this.foodDeliveries}:{}), ...(this.cfg.safeArrivalV1?{arrivalPolicy:'arrival-clearance/1'}:{}), ...(this.cfg.walkSettleWaitV1===true?{walkSettlePolicy:'walk-settle-wait/1'}:{}), ...(this.cfg.walkBlockV1?{walkPolicy:'walk-block/1'}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion,physicalPolicy:this.cfg}:{}) }); }
+  private stateHashWithWorld(nativeStateHash: string): string { return hashOf(this.stateHashInputs(nativeStateHash)); }
+  private stateHashInputs(nativeStateHash: string) { return { ...(this.cfg.groundReclaimV1===true?{groundReclaimPolicy:'ground-reclaim/1'}:{}), ...(this.world.officeStairGuardsV1?{officeGuardPolicy:this.world.officeStairGuardsV1.version}:{}), ...(this.lecturePlacement?{lecturePolicy:this.lecturePlacement}:{}), ...(this.sleepSnapshotActive?{sleepSnapshotPolicy:NATIVE_SLEEP_SNAPSHOT_V1}:{}), ...(this.newcomerResources.length?{newcomerResources:this.newcomerResources}:{}), w: nativeStateHash, p: [...this.programs.values()], l: this.leaving, clock: this.cfg.clock ?? null, quiet: this.quiet, ...(this.cfg.safeCrewRemoval?{removalPolicy:'crew-removal/1'}:{}), ...(this.cfg.disassemblyV1?{disassemblyPolicy:DISASSEMBLY_POLICY}:{}), ...(this.cfg.fixtureGroundGoalsV1?{fixtureGoalPolicy:'ground-fixture-levels/1'}:{}), ...(this.cfg.nativeArrivalWitnessV1?{arrivalWitnessPolicy:'native-navigation-arrival/1'}:{}), ...(this.cfg.quietLandingCourtesyV1?{quietLandingPolicy:'idle-landing-courtesy/1'}:{}), ...(this.commonsProvisionsActive?{provisionsPolicy:'commons-provisions/1'}:{}), ...(this.commonsKitchenActive?{kitchenPolicy:this.commonsKitchenVersion}:{}), ...(this.greenLandmarkActive?{greenLandmarkPolicy:'existing-green-landmark/1'}:{}), ...(this.socialEdenActive?{socialPolicy:'social-eden/1'}:{}), ...(this.foodDeliveries.length?{foodDeliveryPolicy:'commons-food-delivery/1',foodDeliveries:this.foodDeliveries}:{}), ...(this.cfg.safeArrivalV1?{arrivalPolicy:'arrival-clearance/1'}:{}), ...(this.cfg.walkSettleWaitV1===true?{walkSettlePolicy:'walk-settle-wait/1'}:{}), ...(this.cfg.walkBlockV1?{walkPolicy:'walk-block/1'}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion,physicalPolicy:this.cfg}:{}) }; }
   // Preserve the contract serializer's exact bytes; only the Node digest implementation changes.
   physicalHash(): string { return createHash('sha256').update(stableStringify(physicalView(this.world))).digest('hex'); }
 
@@ -2243,7 +2245,7 @@ export class MarsEngine implements Engine {
     const mars = this.rt.captureSnapshot() as RuntimeSnapshotCapture;
     // Capture every adapter input and policy hash at the native boundary. Neither
     // completion path below reads the live engine. Keep the mars slot/order intact.
-    const snapshot = structuredClone({ ...(this.lecturePlacement?{edenLectureV1:this.lecturePlacement,lectureBaseStateHash:this.lectureBaseStateHash(mars.stateHash)}:{}), ...(this.sleepSnapshotActive?{nativeSleepSnapshotV1:true,sleepSnapshotBaseStateHash:this.sleepSnapshotBaseStateHash(mars.stateHash)}:{}), ...(this.newcomerResources.length?{commonsNewcomerResourcesV1:structuredClone(this.newcomerResources),newcomerBaseStateHash:this.newcomerBaseStateHash(mars.stateHash)}:{}), ...(this.renderPlatformMetadata?{renderPlatformsV1:structuredClone(this.renderPlatformMetadata)}:{}), format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHashWithWorld(mars.stateHash), mars: undefined as unknown, dropped: mars.droppedCount, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, ...(this.cfg.scene==='eden-commons'?{commonsVersion:'commons/1'}:{}), quiet: this.quiet, ...(this.commonsProvisionsActive?{commonsProvisionsV1:true}:{}), ...(this.commonsKitchenActive?{commonsKitchenV1:true}:{}), ...(this.socialEdenActive?{socialEdenV1:true}:{}), ...(this.greenLandmarkActive?{greenLandmarkV1:true}:{}), ...(this.foodDeliveries.length?{foodDeliveriesV1:structuredClone(this.foodDeliveries)}:{}), ...(this.commonsKitchenActive&&this.commonsKitchenVersion==='commons-kitchen/2'?{commonsKitchenVersion:this.commonsKitchenVersion}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion}:{}), ...(this.rt.world.groundV1?{groundV1:true}:{}) });
+    const snapshot = this.captureSnapshotEnvelope(mars.stateHash, mars.droppedCount);
     const assemble = (native: RuntimeSnapshot): EngineSnapshot => {
       const result = structuredClone(snapshot);
       result.mars = native;
@@ -2252,6 +2254,51 @@ export class MarsEngine implements Engine {
     return Object.freeze({ tick: snapshot.tick, stateHash: snapshot.stateHash,
       finish: () => assemble(mars.finish()),
       *steps() { return assemble(yield* mars.steps()); },
+    });
+  }
+  private captureSnapshotEnvelope(nativeStateHash: string | undefined, droppedCount: number) {
+    return structuredClone({ ...(this.lecturePlacement?{edenLectureV1:this.lecturePlacement,lectureBaseStateHash:nativeStateHash === undefined ? '' : this.lectureBaseStateHash(nativeStateHash)}:{}), ...(this.sleepSnapshotActive?{nativeSleepSnapshotV1:true,sleepSnapshotBaseStateHash:nativeStateHash === undefined ? '' : this.sleepSnapshotBaseStateHash(nativeStateHash)}:{}), ...(this.newcomerResources.length?{commonsNewcomerResourcesV1:structuredClone(this.newcomerResources),newcomerBaseStateHash:nativeStateHash === undefined ? '' : this.newcomerBaseStateHash(nativeStateHash)}:{}), ...(this.renderPlatformMetadata?{renderPlatformsV1:structuredClone(this.renderPlatformMetadata)}:{}), format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: nativeStateHash === undefined ? '' : this.stateHashWithWorld(nativeStateHash), mars: undefined as unknown, dropped: droppedCount, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, ...(this.cfg.scene==='eden-commons'?{commonsVersion:'commons/1'}:{}), quiet: this.quiet, ...(this.commonsProvisionsActive?{commonsProvisionsV1:true}:{}), ...(this.commonsKitchenActive?{commonsKitchenV1:true}:{}), ...(this.socialEdenActive?{socialEdenV1:true}:{}), ...(this.greenLandmarkActive?{greenLandmarkV1:true}:{}), ...(this.foodDeliveries.length?{foodDeliveriesV1:structuredClone(this.foodDeliveries)}:{}), ...(this.commonsKitchenActive&&this.commonsKitchenVersion==='commons-kitchen/2'?{commonsKitchenVersion:this.commonsKitchenVersion}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion}:{}), ...(this.rt.world.groundV1?{groundV1:true}:{}) });
+  }
+  captureCheckpoint(): EngineCheckpointCapture | EngineSnapshotCapture {
+    const native = this.rt.captureSnapshotDeferred({}, physicalHashNeedsLegacyCapture);
+    if (native.eagerStateHash !== undefined) {
+      // Hidden selector metadata retains the exact legacy native getter order.
+      // Return the existing eager shape so the host still captures its own fields
+      // before reading the live physical hash, with no second native capture.
+      const envelope = this.captureSnapshotEnvelope(native.eagerStateHash, native.droppedCount);
+      const assemble = (mars: RuntimeSnapshot): EngineSnapshot => {
+        const result = { ...structuredClone(envelope), mars };
+        return result;
+      };
+      return Object.freeze({ tick: envelope.tick, stateHash: envelope.stateHash,
+        finish: () => assemble(native.finish()),
+        *steps() { return assemble(yield* native.steps()); },
+      });
+    }
+    const envelope = this.captureSnapshotEnvelope(undefined, native.droppedCount);
+    // Every policy input, including fields not persisted in the envelope, belongs
+    // to this exact frontier. Only owned records are used after this method returns.
+    const inputs = structuredClone(this.stateHashInputs(''));
+    assertCapturedHashable(captureGraph(inputs), []);
+    const physical = capturePhysicalHashInput(native.world);
+    const assemble = (mars: RuntimeSnapshot): EngineSnapshot => {
+      const result = structuredClone(envelope);
+      const full = { ...inputs, w: mars.stateHash };
+      result.stateHash = hashOf(full);
+      if ('lectureBaseStateHash' in result) { const base = { ...full }; delete base.lecturePolicy; delete base.sleepSnapshotPolicy; result.lectureBaseStateHash = hashOf(base); }
+      if ('sleepSnapshotBaseStateHash' in result) { const base = { ...full }; delete base.sleepSnapshotPolicy; result.sleepSnapshotBaseStateHash = hashOf(base); }
+      if ('newcomerBaseStateHash' in result) { const base = { ...full }; delete base.newcomerResources; delete base.lecturePolicy; delete base.sleepSnapshotPolicy; result.newcomerBaseStateHash = hashOf(base); }
+      result.mars = mars;
+      return result;
+    };
+    const steps = function* (): Generator<void, EngineCheckpoint, void> {
+      const snapshot = assemble(yield* native.steps());
+      yield;
+      const physicalHash = yield* capturedPhysicalHashSteps(physical);
+      return { snapshot, physicalHash };
+    };
+    return Object.freeze({ tick: native.tick, steps,
+      finish() { const iterator = steps(); let result = iterator.next(); while (!result.done) result = iterator.next(); return result.value; },
     });
   }
   canSnapshot(): boolean {

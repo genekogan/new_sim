@@ -73,6 +73,17 @@ export type EngineSnapshotCapture = {
   finish(): EngineSnapshot;
 };
 
+/** Internal periodic checkpoint: all inputs are owned before return, including
+ * physical hash inputs. Hashing and encoding can finish later without live reads. */
+export type EngineCheckpoint = { snapshot: EngineSnapshot; physicalHash: string };
+/** Deferred owned hashes. Exceptional legacy selector metadata may instead
+ * return EngineSnapshotCapture, preserving the host's eager physical-hash order. */
+export type EngineCheckpointCapture = {
+  readonly tick: number;
+  finish(): EngineCheckpoint;
+  steps(): Generator<void, EngineCheckpoint, void>;
+};
+
 export interface Engine {
   readonly rulesVersion: string;
   readonly dt: number;
@@ -125,6 +136,7 @@ export interface Engine {
   cancel(id: string, reason?: { code: string; message: string }): ActionRecord;
   snapshot(): EngineSnapshot;
   captureSnapshot?(): EngineSnapshotCapture;
+  captureCheckpoint?(): EngineCheckpointCapture | EngineSnapshotCapture;
   /** Recorded rendering chunks; no browser Runtime. Optional for engines without takes. */
   takeChunks?(afterTick: number): { fromTick: number; toTick: number; take: unknown }[];
   renderScene?(): RenderScene;
