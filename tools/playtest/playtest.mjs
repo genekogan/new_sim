@@ -107,8 +107,9 @@ async function cmdRun(a) {
       if (m.browser && m.evidence && m.truth) {
         ctx.browser = await m.browser.openBrowser({ headless: true, gpu: scenario.observer?.gpu ?? 'metal' });
         const vpRaw = scenario.observer?.viewport ?? [1280, 800]; const vp = Array.isArray(vpRaw) ? { width: vpRaw[0], height: vpRaw[1] } : vpRaw;
-        for (const seat of ctx.seats) { const info = infoOf(seat); if (info.soulId) ctx.cameras[info.id] = await ctx.browser.openCamera({ base: ctx.world.base, identity: info.ownerIdentity, kind: 'follow', soulId: info.soulId, viewport: vp, dpr: scenario.observer?.dpr ?? 1, runDir, name: info.id }); }
-        if ((scenario.observer?.cameras ?? []).includes('wide')) ctx.cameras.wide = await ctx.browser.openCamera({ base: ctx.world.base, identity: null, kind: 'wide', viewport: vp, dpr: scenario.observer?.dpr ?? 1, runDir, name: 'wide' });
+        const openCam = async (opts) => { try { return await ctx.browser.openCamera({ ...opts, arrivalTimeoutMs: scenario.observer?.arrivalTimeoutMs ?? 180000 }); } catch (e) { log(`camera ${opts.name} failed: ${String(e.message).split('\n')[0]}`); return null; } };
+        for (const seat of ctx.seats) { const info = infoOf(seat); if (info.soulId) { const cam = await openCam({ base: ctx.world.base, identity: info.ownerIdentity, kind: 'follow', soulId: info.soulId, viewport: vp, dpr: scenario.observer?.dpr ?? 1, runDir, name: info.id }); if (cam) ctx.cameras[info.id] = cam; } }
+        if ((scenario.observer?.cameras ?? []).includes('wide')) { const cam = await openCam({ base: ctx.world.base, identity: null, kind: 'wide', viewport: vp, dpr: scenario.observer?.dpr ?? 1, runDir, name: 'wide' }); if (cam) ctx.cameras.wide = cam; }
         observer = { camera: (id) => ctx.cameras[id] ?? null, cameras: ctx.cameras, truth: m.truth, evidence: m.evidence, browser: ctx.browser, sampleSec: scenario.observer?.sampleSec ?? 5 };
       } else log('observer modules missing: playing without screenshots/evidence');
       const quotaCheck = async () => { const q = await quota(); const r = quotaAllows(q, { stopPct: scenario.rails?.quotaStopPct ?? 90 }); if (!r.allowed) log('QUOTA STOP', r.note); return r.allowed; };
