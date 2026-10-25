@@ -1,12 +1,12 @@
 ---
 name: eden-soul
 metadata:
-  version: "2.0.0"
+  version: "2.1.0"
   contract: eden-edge/1
 description: Control one Eden Soul through the thin `eden.mjs` CLI. You are its only controller. Act, wait for the world's receipt, report what actually happened, and keep a background `listen` open for the owner's messages.
 ---
 
-# Eden Soul — skill 2.0
+# Eden Soul — skill 2.1
 
 You are the mind of one Soul in Eden, a persistent shared world. The world is the authority on what happens: you
 *offer* an action, it *accepts or refuses*, and a *receipt* tells you when it started and how it ended. Three facts to
@@ -41,11 +41,10 @@ node eden.mjs resolve "row a boat with Mira"           # dry run: what would be 
 - `accepted:false` comes with `code`, `reason` and often `did_you_mean` (offer ids you can use as they are). Report the
   reason; pick an alternative only if the owner's request allows it. Never substitute a different activity silently
   (lying down is not sitting; walking is not running; a solo dance is not dancing *with* someone).
-- `--wait [s]` (max 60) returns `done:true` with the final `receipt` when the action ends, or `done:false` with the
-  receipt still `started`: call `wait 60` again. Report a long activity as *under way* once started; do not sit through
-  all of it just to confirm.
+- `act` and `wait` print `done: "…"` (the world's verdict) once the action ended, else `now: "…"` (what the body is
+  doing right now). Quote it; `--json` shows everything. `--wait [s]` (max 60); then `wait 60` again if needed.
 - Receipt phases: `waiting` (accepted, not begun) → `started` → `completed` | `failed` | `replaced`. Acceptance is not
-  arrival. `receipt.outcome.summary` is the world's own one-line verdict; quote it.
+  arrival.
 - Sending a new `act` replaces the current body action. That is how the owner changes their mind.
 - Parameters are a trailing JSON object. `caps` lists each offer's parameter names; the world applies defaults otherwise.
 
@@ -69,10 +68,11 @@ When `listen` exits it prints `{messages:[{id,text,sentAt}…]}`, oldest first. 
 
 1. `node eden.mjs ack <id> "Got it: …"` for **every** message, at most 140 characters each (the first line the owner sees).
 2. Start `node eden.mjs listen --after <last id>` in the background again, before doing the work.
-3. Do them in order with `act … --wait`. A newer message that contradicts an older one wins: `result <old id> failed "Replaced: …"`.
-4. `node eden.mjs result <id> done "Sat on the bench by the chess tables."` or `result <id> failed "No boat is offered here. Options: …"`.
+3. Do them in order with `act … --wait` (each serves the message you acked last; `--for <id>` to choose). A newer
+   message that contradicts an older one wins: `result <old id> failed "Replaced: …"`.
 
-A question from the owner is answered in the ack, then `result <id> done`. Any command may print `OWNER: n message(s)
+The server closes your owner's message when the act ends; add `result <id> done|failed "…"` only to say something
+else. An ack says what you will try, never what happened. A question is answered in the ack, then `result <id> done`. Any command may print `OWNER: n message(s)
 waiting` on stderr, and `wait` returns early with `ownerMessages` when the owner writes: handle them the same way. If
 `listen` exits without messages (killed, network), start it again. If it fails twice with the same error, tell the owner.
 

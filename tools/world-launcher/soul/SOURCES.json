@@ -17,10 +17,10 @@
   },
   "skill": {
     "file": "skill.md",
-    "version": "2.0.0",
-    "sha256": "102e9115d1ec0c9c88b302af5a5e61540a1029fb0411590b12401ac927b5952a",
+    "version": "2.1.0",
+    "sha256": "8cf21c2103b422411743bede1aad452b5829b1b75e07f114b897e17ebfd7d989",
     "from": "authorized laptop 2 handover, copied from <team>/scratch/soul3/client-handover/SKILL-v2.md",
-    "note": "SOUL3 guide for eden.mjs, published byte for byte; no {{}} templates (the world serves it as is). Replaces the 1.9 skill below."
+    "note": "SOUL3 guide for eden.mjs, published byte for byte; no {{}} templates (the world serves it as is). Replaces the 1.9 skill below. 2.1.0 (soul fix round 1, D3): owner step 4 and the long-activity advice became one sentence (the server closes the message), one rule added (an ack says what you will try, never what happened); net 0 lines, 5,970 bytes."
   },
   "instructions": {
     "file": "instructions.md",
