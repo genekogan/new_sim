@@ -115,6 +115,8 @@ async function cmdRun(a) {
         const openCam = async (opts) => { try { return await ctx.browser.openCamera({ ...opts, arrivalTimeoutMs: scenario.observer?.arrivalTimeoutMs ?? 180000 }); } catch (e) { log(`camera ${opts.name} failed: ${String(e.message).split('\n')[0]}`); return null; } };
         for (const seat of ctx.seats) { const info = infoOf(seat); if (info.soulId) { const cam = await openCam({ base: ctx.world.base, identity: info.ownerIdentity, kind: 'follow', soulId: info.soulId, viewport: vp, dpr: scenario.observer?.dpr ?? 1, runDir, name: info.id }); if (cam) ctx.cameras[info.id] = cam; } }
         if ((scenario.observer?.cameras ?? []).includes('wide')) { const cam = await openCam({ base: ctx.world.base, identity: null, kind: 'wide', viewport: vp, dpr: scenario.observer?.dpr ?? 1, runDir, name: 'wide' }); if (cam) ctx.cameras.wide = cam; }
+        // The creator sees the whole world page as its owner (dev:admin on a dev world): a wide camera named after the god seat.
+        if (ctx.god) { const gid = infoOf(ctx.god).id ?? 'god'; const cam = await openCam({ base: ctx.world.base, identity: 'admin', kind: 'wide', viewport: vp, dpr: scenario.observer?.dpr ?? 1, runDir, name: gid }); if (cam) ctx.cameras[gid] = cam; }
         observer = { camera: (id) => ctx.cameras[id] ?? null, cameras: ctx.cameras, truth: m.truth, evidence: m.evidence, browser: ctx.browser, sampleSec: scenario.observer?.sampleSec ?? 5 };
       } else log('observer modules missing: playing without screenshots/evidence');
       const quotaCheck = async () => { const q = await quota(); const r = quotaAllows(q, { stopPct: scenario.rails?.quotaStopPct ?? 90 }); if (!r.allowed) log('QUOTA STOP', r.note); return r.allowed; };
