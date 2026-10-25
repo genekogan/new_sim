@@ -688,18 +688,22 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** A pond loop must stay outside its entire outline and on admitted clear ground.
    * If a world has only one accessible bank, it gets no misleading "around" offer. */
   private bankLoop(poly: [number, number][], from: [number, number]): [number, number][] {
-    const engine = this.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number; clearanceUpToV1?: (x: number, z: number, cap?: number) => number};
+    const engine = this.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number; clearanceUpToV1?: (x: number, z: number, cap?: number) => number; readPassV1?: <T>(f: () => T) => T};
     if (!engine.clearanceAtV1 || poly.length < 3) return [];
-    const clear = (x: number, z: number) => engine.clearanceUpToV1 ? engine.clearanceUpToV1(x, z, 1) : engine.clearanceAtV1!(x, z);
-    const xs = poly.map(p => p[0]), zs = poly.map(p => p[1]);
-    for (const margin of [2, 3.5, 5]) {
-      const x0 = Math.min(...xs) - margin, x1 = Math.max(...xs) + margin, z0 = Math.min(...zs) - margin, z1 = Math.max(...zs) + margin;
-      const route: [number, number][] = [[x0,z0],[(x0+x1)/2,z0],[x1,z0],[x1,(z0+z1)/2],[x1,z1],[(x0+x1)/2,z1],[x0,z1],[x0,(z0+z1)/2]];
-      if (route.some(p => clear(p[0], p[1]) < 0.7)) continue;
-      let near = 0; for (let i = 1; i < route.length; i++) if (Math.hypot(route[i][0]-from[0],route[i][1]-from[1]) < Math.hypot(route[near][0]-from[0],route[near][1]-from[1])) near=i;
-      return [...route.slice(near), ...route.slice(0,near)];
-    }
-    return [];
+    // These probes only read the world. Sync the planner once for this loop, never across capability requests.
+    const read = (): [number, number][] => {
+      const clear = (x: number, z: number) => engine.clearanceUpToV1 ? engine.clearanceUpToV1(x, z, 1) : engine.clearanceAtV1!(x, z);
+      const xs = poly.map(p => p[0]), zs = poly.map(p => p[1]);
+      for (const margin of [2, 3.5, 5]) {
+        const x0 = Math.min(...xs) - margin, x1 = Math.max(...xs) + margin, z0 = Math.min(...zs) - margin, z1 = Math.max(...zs) + margin;
+        const route: [number, number][] = [[x0,z0],[(x0+x1)/2,z0],[x1,z0],[x1,(z0+z1)/2],[x1,z1],[(x0+x1)/2,z1],[x0,z1],[x0,(z0+z1)/2]];
+        if (route.some(p => clear(p[0], p[1]) < 0.7)) continue;
+        let near = 0; for (let i = 1; i < route.length; i++) if (Math.hypot(route[i][0]-from[0],route[i][1]-from[1]) < Math.hypot(route[near][0]-from[0],route[near][1]-from[1])) near=i;
+        return [...route.slice(near), ...route.slice(0,near)];
+      }
+      return [];
+    };
+    return engine.readPassV1 ? engine.readPassV1(read) : read();
   }
   addCapabilityProvider(p: (soul: EdgeSoul) => EdgeCapability[]) {this.providers.push(p);}
 
