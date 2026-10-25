@@ -15,6 +15,10 @@ type V2=[number,number];
 type V3=[number,number,number];
 type Surface={id:string;polygon:V2[];level:number;wet(x:number,z:number):boolean;bank(x:number,z:number):number|null};
 const round=(v:number)=>Math.round(v*1e4)/1e4;
+// Pure numeric constants, with the same angle/multiplication order as the original
+// probes. Cache neither world geometry nor verdicts; every point still queries the live surface.
+const HULL_OFFSETS=Array.from({length:16},(_,i)=>{const a=i*Math.PI/8;return [Math.cos(a)*1.75,Math.sin(a)*1.75] as const;});
+const DISC_OFFSETS=Array.from({length:8},(_,i)=>{const a=i*Math.PI/4;return [Math.cos(a)*.3,Math.sin(a)*.3] as const;});
 const inPoly=(x:number,z:number,p:V2[])=>{let c=false;for(let i=0,j=p.length-1;i<p.length;j=i++){const a=p[i],b=p[j];if((a[1]>z)!==(b[1]>z)&&x<(b[0]-a[0])*(z-a[1])/(b[1]-a[1])+a[0])c=!c;}return c;};
 function surfaces(rt:Runtime,render?:RenderScene):Surface[]{
   const out:Surface[]=[],sp=rt.services.spatial as Spatial;
@@ -32,7 +36,7 @@ function surfaces(rt:Runtime,render?:RenderScene):Surface[]{
 }
 const hullWet=(s:Surface,p:V3)=>{
   if(!(Math.abs(p[1]-s.level)<.001))return false;
-  for(let i=0;i<16;i++){const a=i*Math.PI/8;if(!s.wet(p[0]+Math.cos(a)*1.75,p[2]+Math.sin(a)*1.75))return false;}
+  for(let i=0;i<HULL_OFFSETS.length;i++){const d=HULL_OFFSETS[i];if(!s.wet(p[0]+d[0],p[2]+d[1]))return false;}
   return true;
 };
 
@@ -84,7 +88,7 @@ function previewBank(surface:Surface,home:V3,bank:NonNullable<CarrierInstallSpec
   if(Math.hypot(bank.door[0]-home[0],bank.door[2]-home[2])>3.2)return no('The dry bank must be within reach of a short boarding plank.');
   for(const p of [bank.door,...Object.values(bank.exits)]){
     const y=surface.bank(p[0],p[2]);if(y===null||Math.abs(y-p[1])>.001)return no('The boarding plank and both exits need supported dry bank.');
-    for(let i=0;i<8;i++){const a=i*Math.PI/4;if(surface.bank(p[0]+Math.cos(a)*.3,p[2]+Math.sin(a)*.3)===null)return no('The whole standing disc needs dry bank.');}
+    for(let i=0;i<DISC_OFFSETS.length;i++){const d=DISC_OFFSETS[i];if(surface.bank(p[0]+d[0],p[2]+d[1])===null)return no('The whole standing disc needs dry bank.');}
     for(const e of context.obstacles()){
       // Flat native fixture boxes conservatively exclude a bank obstructed by furniture; ground solids are checked by the adapter.
       if(Math.hypot(e.x-p[0],e.z-p[2])<e.radius)return no('Furniture obstructs the boarding bank.');
@@ -143,7 +147,7 @@ function shelfCandidate(surface:Surface,context:PreviewContext):CarrierInstallSp
   const S=0.5,nx=Math.ceil((x1-x0)/S)+1,nz=Math.ceil((z1-z0)/S)+1,cx=xs.reduce((a,b)=>a+b,0)/xs.length,cz=zs.reduce((a,b)=>a+b,0)/zs.length;
   const disc=(x:number,z:number)=>{
     if(surface.bank(x,z)===null)return false;
-    for(let i=0;i<8;i++){const a=i*Math.PI/4;if(surface.bank(x+Math.cos(a)*.3,z+Math.sin(a)*.3)===null)return false;}
+    for(let i=0;i<DISC_OFFSETS.length;i++){const d=DISC_OFFSETS[i];if(surface.bank(x+d[0],z+d[1])===null)return false;}
     return true;
   };
   const homes:V3[]=[];

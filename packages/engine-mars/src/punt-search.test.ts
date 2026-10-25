@@ -134,6 +134,24 @@ test('public preview keeps route failures ahead of an obstructed bank',()=>{
   assert.match(expected!.message,/speed/);assert.deepEqual(previewPunt(now.rt,fast),expected);
 });
 
+test('constant hull/disc offsets preserve exact probe coordinates and shallow-water boundary verdicts',()=>{
+  const old=fixture(ground()),now=fixture(ground()),spec=legacyCandidates(old.rt)[0];
+  const oldPoints:V2[]=[],newPoints:V2[]=[];
+  for(const [f,points] of [[old,oldPoints],[now,newPoints]] as const)
+    f.setField({...f.base,waterLevel:(x,z)=>{points.push([x,z]);return f.base.waterLevel(x,z);}});
+  assert.equal(legacyPreview(old.rt,spec),null);assert.equal(previewPunt(now.rt,spec),null);
+  assert.ok(oldPoints.length>16*300,'the full route hull and standing discs were probed');
+  assert.deepEqual(newPoints,oldPoints,'the complete accepted preview queries bit-identical coordinates in the original order');
+  const first:V2=[spec.routeKeys![0].p[0]+1.75,spec.routeKeys![0].p[2]];
+  for(const depth of [.12-1e-12,.12,.12+1e-12]){
+    for(const f of [old,now])f.setField({...f.base,height:(x,z)=>x===first[0]&&z===first[1]?spec.y!-depth:f.base.height(x,z)});
+    const expected=legacyPreview(old.rt,spec),actual=previewPunt(now.rt,spec);
+    assert.deepEqual(actual,expected,`depth boundary ${depth}`);
+    if(depth<.12)assert.match(actual!.message,/deep and wide/);
+    if(depth>.12)assert.equal(actual,null);
+  }
+});
+
 test('search-local geometry and furniture are refreshed after edits and spatial synchronization',()=>{
   const old=fixture(ground()),now=fixture(ground());
   const spec=legacyCandidates(old.rt)[0];assert.deepEqual(puntCandidates(now.rt),[spec]);
