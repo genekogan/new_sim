@@ -32,11 +32,11 @@ export function spill(value, { runDir, limit = MAX_INLINE, path, omitted }) {
   return { omitted: true, raw: rel, sha, bytes: json.length, projection: projectBody(value) };
 }
 
-/** openRequest({runDir, seat, soulId, requestId, text, channel, sentAt}) → RequestEvidence
+/** openRequest({runDir, seat, soulId, requestId, text, channel, sentAt, budgetSec?}) → RequestEvidence
  *  sentAt: epoch ms or ISO. requestId: the inbox message id (msg_…) when the channel is the card. */
-export function openRequest({ runDir, seat, soulId = null, requestId, text, channel = 'card', sentAt = Date.now(), limit = MAX_INLINE }) {
+export function openRequest({ runDir, seat, soulId = null, requestId, text, channel = 'card', sentAt = Date.now(), budgetSec = null, limit = MAX_INLINE }) {
   const sentMs = typeof sentAt === 'number' ? sentAt : Date.parse(sentAt);
-  const ev = { requestId, seat, soulId, text, channel, sentAt: iso(sentMs), ackAt: null, ackText: null, resultAt: null, resultText: null,
+  const ev = { requestId, seat, soulId, text, channel, sentAt: iso(sentMs), budgetSec, queuedSec: null, budgetStartAt: null, ackAt: null, ackText: null, resultAt: null, resultText: null,
     resultState: null, cutoffAt: null, cutoffReason: null, samples: [], receipts: [], shots: [], chatTurns: [], legible: [],
     firstBodyChangeAt: null, firstBodyChangeMono: null, serverErrors: 0, cost: {}, cardSeen: { ackAt: null, resultAt: null } };
   const seenReceipts = new Map();
@@ -68,6 +68,9 @@ export function openRequest({ runDir, seat, soulId = null, requestId, text, chan
       if (shot) ev.shots.push(typeof shot === 'string' ? shot : shot.path);
     },
     addChatTurn(id) { if (id != null && !ev.chatTurns.includes(id)) ev.chatTurns.push(id); },
+    /** A chat message waits for the seat's running turn (Claude Code queues typed input to the next turn boundary):
+     *  queuedSec = sentAt → start of the turn that carried it; the request budget runs from budgetStartAt. */
+    setQueue({ queuedSec = null, budgetStartAt = null } = {}) { ev.queuedSec = queuedSec; ev.budgetStartAt = budgetStartAt; },
     addServerErrors(n) { ev.serverErrors += n | 0; },
     setCost(cost) { ev.cost = { ...ev.cost, ...cost }; },
     /** close({cutoffReason, cutoffAt?}) → the written pack (with `file`). */

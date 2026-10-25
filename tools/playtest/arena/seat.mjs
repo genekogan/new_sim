@@ -64,21 +64,23 @@ export class Seat {
   }
   status() { return this.cliJson(this.cli.status); }
 
-  /** One agent turn through the adapter; serialized; writes turns/transcript/cost/chat files. */
-  chat(text, { reason = 'chat' } = {}) {
+  /** One agent turn through the adapter; serialized; writes turns/transcript/cost/chat files.
+   *  onStart({turn, reason, startedAt, startMono}) is called when this turn actually starts (after any running turn). */
+  chat(text, { reason = 'chat', onStart = null } = {}) {
     if (reason === 'chat') this.noteRequest();
-    const p = this.chain.then(() => this._turn(text, reason));
+    const p = this.chain.then(() => this._turn(text, reason, onStart));
     this.chain = p.catch(() => {});
     return p;
   }
   noteRequest() { this.wakesSinceRequest = 0; }
 
-  async _turn(text, reason) {
+  async _turn(text, reason, onStart = null) {
     if (this.stopped && reason !== 'final') throw new Error('seat stopped');
     // Fidelity: Claude Code keeps a background `listen` alive across turns, so the harness one keeps running during a turn.
     // The agent's own `listen` supersedes it (the old one prints `listen: superseded` and exits); ours restarts at turn end.
     this.inTurn = true;
     const n = ++this.turnN, started = now();
+    try { onStart?.({ turn: n, reason, startedAt: started.t, startMono: started.mono }); } catch { /* observer hook is best effort */ }
     const first = !this.info.sessionId;
     if (first && this.info.adapter === 'claude-headless') { this.info.sessionId = randomUUID(); this.save(); }
     const r = await this.adapter.turn({ cwd: this.folder, sessionId: this.info.sessionId, resume: !first, model: this.info.model ?? undefined, effort: this.info.effort,

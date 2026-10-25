@@ -30,8 +30,9 @@ export function fakeSeat({ id, soulId = `soul-${id}`, identity = `agent-${id}`, 
   return {
     id, soulId, identity, soulName: `Soul ${id}`, calls, turns, godCards,
     turnCount: () => turns.length,
-    async chat(text, { reason } = {}) {
+    async chat(text, { reason, onStart } = {}) {
       calls.push({ text, reason, at: clock.now() });
+      onStart?.({ turn: turns.length + 1, reason, startedAt: new Date().toISOString(), startMono: clock.now() });
       await clock.sleep(turnMs);
       const rendered = `> ${text}\n⏺ ${reply(text)} ${secret}`.trim();
       turns.push({ text, rendered, endedAt: clock.now() });
@@ -86,7 +87,8 @@ export function fakeObserver({ clock, legibleFor = (seat) => ({ card: { name: `S
       openRequest(args) {
         const rec = { ...args, openedAt: clock.now(), samples: 0 };
         opened.push(rec);
-        return { sample() { rec.samples += 1; }, close({ cutoffReason }) { closed.push({ requestId: args.requestId, cutoffReason, at: clock.now() }); } };
+        rec.chatTurns = []; rec.queue = null;
+        return { sample() { rec.samples += 1; }, addChatTurn(t) { rec.chatTurns.push(t); }, setQueue(q) { rec.queue = q; }, close({ cutoffReason }) { closed.push({ requestId: args.requestId, cutoffReason, at: clock.now() }); } };
       },
     },
   };

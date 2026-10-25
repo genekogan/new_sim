@@ -123,21 +123,37 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
       if (say.channel === 'card') {
         const r = ctx.kind === 'god' ? await ctx.seat.sendGodCard({ text: say.text }) : await owner.sendCard({ base: world?.base, soulId: ctx.soulId, identity: ctx.identity, text: say.text });
         messageId = r?.messageId ?? r?.id ?? null;
-      } else {
-        ctx.directorTurns += 1; ctx.pending += 1;
-        const text = say.text;
-        ctx.chatChain = ctx.chatChain.then(() => ctx.seat.chat(text, { reason: 'chat' })).catch((e) => log(ctx.id, 'chat failed', e?.message ?? e)).finally(() => { ctx.pending -= 1; });
       }
     } catch (e) { return { requestId, error: String(e?.message ?? e) }; }
     const atSec = Math.round((sentMono - start) / 100) / 10;
     ctx.requests.push({ atSec, channel: say.channel, text: say.text, requestId });
+    const budgetMs = budgetMsFor({ scenario, quick, budgetSec, god: ctx.kind === 'god' });
     let evidence = null;
-    try { evidence = await observer?.evidence?.openRequest({ runDir, seat: ctx.id, soulId: ctx.soulId, requestId, text: say.text, channel: say.channel, sentAt, messageId }); }
+    try { evidence = await observer?.evidence?.openRequest({ runDir, seat: ctx.id, soulId: ctx.soulId, requestId, text: say.text, channel: say.channel, sentAt, messageId, budgetSec: budgetMs / 1000 }); }
     catch (e) { log(ctx.id, 'openRequest failed', e?.message ?? e); }
     const lv = ctx.lastView;
-    ctx.open.set(requestId, { requestId, channel: say.channel, messageId, evidence, openedAt: sentMono, budgetMs: budgetMsFor({ scenario, quick, budgetSec, god: ctx.kind === 'god' }),
-      turnsAtOpen: turnCountOf(ctx.seat), directorTurnsAtOpen: ctx.directorTurns - (say.channel === 'chat' ? 1 : 0), resultSigAtOpen: resultSig(lv) });
+    const req = { requestId, channel: say.channel, messageId, evidence, openedAt: sentMono, budgetMs, budgetFrom: say.channel === 'chat' ? null : sentMono,
+      turnsAtOpen: turnCountOf(ctx.seat), directorTurnsAtOpen: ctx.directorTurns, resultSigAtOpen: resultSig(lv) };
+    ctx.open.set(requestId, req);
+    if (say.channel === 'chat') {
+      // The chat message waits for the seat's running turn (wake or earlier chat): Claude Code queues typed input until the
+      // turn boundary. The budget clock starts when the turn carrying it starts; queuedSec records the wait (DESIGN §9).
+      ctx.directorTurns += 1; ctx.pending += 1;
+      const text = say.text;
+      const onStart = (info) => chatStarted(req, info);
+      ctx.chatChain = ctx.chatChain.then(() => ctx.seat.chat(text, { reason: 'chat', onStart })).then((rec) => { if (rec?.turn != null) chatStarted(req, { turn: rec.turn, afterEnd: true }); })
+        .catch((e) => log(ctx.id, 'chat failed', e?.message ?? e)).finally(() => { ctx.pending -= 1; if (req.budgetFrom == null) req.budgetFrom = clock.now(); });
+    }
     return { requestId, channel: say.channel, messageId };
+  }
+
+  function chatStarted(req, info) {
+    if (req.turnLinked) return;
+    req.turnLinked = true;
+    try { req.evidence?.addChatTurn?.(info.turn); } catch { /* best effort */ }
+    if (info.afterEnd) return; // the seat did not report its start: the budget ran from the turn's end
+    const t = clock.now(); req.budgetFrom = t; req.queuedSec = Math.max(0, Math.round((t - req.openedAt) / 100) / 10);
+    try { req.evidence?.setQueue?.({ queuedSec: req.queuedSec, budgetStartAt: new Date().toISOString() }); } catch { /* best effort */ }
   }
 
 
@@ -181,7 +197,8 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
       if (res) await closeReq(ctx, req, 'result', res);
       else if (req.channel === 'chat' && ctx.pending === 0 && resultSig(view) && resultSig(view) !== req.resultSigAtOpen) await closeReq(ctx, req, 'result', { via: 'card-after-chat' });
       else if (turns > maxTurns) await closeReq(ctx, req, 'max-turns', { turns });
-      else if (now - req.openedAt >= req.budgetMs) await closeReq(ctx, req, 'budget');
+      else if (req.budgetFrom != null && now - req.budgetFrom >= req.budgetMs) await closeReq(ctx, req, 'budget', req.queuedSec ? { queuedSec: req.queuedSec } : {});
+      else if (req.budgetFrom == null && now - req.openedAt >= req.budgetMs + 2 * (rails.maxTurnWallSec ?? 240) * 1000) await closeReq(ctx, req, 'queued');
     }
   }
 

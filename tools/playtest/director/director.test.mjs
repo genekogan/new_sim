@@ -117,3 +117,21 @@ test('helpers', () => {
   assert.equal(cardResultFor({ latest: { id: 'm2', result: 'sat' } }, 'm1'), null);
   assert.equal(cardResultFor({ latest: { id: 'm1', state: 'acked' } }, 'm1'), null);
 });
+
+test('chat queued behind a running turn: turn linked, queuedSec recorded, budget clock starts at the carrying turn', async () => {
+  const r = rig({ turnMs: 5000 });
+  const scenario = scen({ durationSec: 60, director: { mode: 'scripted', sequential: false, script: [
+    { seat: 'a', atSec: 5, channel: 'chat', text: 'wave', budgetSec: 30 },
+    { seat: 'a', atSec: 6, channel: 'chat', text: 'sit down', budgetSec: 3 }] } });
+  await runPlay({ ...r, scenario, world, quotaCheck: noQuota });
+  const [o1, o2] = r.observer.opened;
+  assert.deepEqual([o1.chatTurns, o2.chatTurns], [[1], [2]]);
+  assert.equal(o1.queue.queuedSec, 0);
+  assert.equal(o2.queue.queuedSec, 4, 'sent at 6 s, its turn started at 10 s');
+  assert.equal(o2.budgetSec, 3);
+  const c2 = r.observer.closed.find((c) => c.requestId === 'a-002');
+  assert.equal(c2.cutoffReason, 'budget');
+  assert.ok(c2.at >= 13000 && c2.at <= 18000, `budget from the turn start (10 s), not sentAt: closed at ${c2.at}`);
+  const rec = jsonl(join(r.runDir, 'personas/a/requests.jsonl')).find((x) => x.requestId === 'a-002');
+  assert.equal(rec.queuedSec, 4);
+});
