@@ -209,6 +209,7 @@ export class MarsEngine implements Engine {
   private leaving: string[] = [];                    // bodies to remove once nothing holds them
   private out: { paths: PathCommit[]; changes: ChangeEvent[]; programs: ProgramEvent[] } = { paths: [], changes: [], programs: [] };
   private recorder: any;
+  private servingPrepared = false;
   private readerRecordingDepth=0;
   private recorderScene!: RenderSceneCaptureV1;
   private renderBaseKey = '';
@@ -270,6 +271,13 @@ export class MarsEngine implements Engine {
   private get ents(): Record<string, any> { return this.rt.world.entities; }
   describeVerbs(): VerbInfo[] {
     return [...BODY_VERBS, ...(this.cfg.disassemblyV1?[UNBUILD_VERB]:[]), ...this.m.describeVerbs(this.registry).map((v) => ({ ...v, verb: `mars:${v.verb}`, description: `[Mars verb] ${v.description}`, scope: 'world' as const }))];
+  }
+  /** Pay the recorder's cold copy/text preparation before HTTP opens, without finishing or replacing a take.
+   * Discard the result: every real cut still calls finalStateOf against the then-current live world. */
+  prepareForServing(): void {
+    if (this.servingPrepared) return;
+    this.m.finalStateOf(this.rt.world);
+    this.servingPrepared = true;
   }
   /** The world plus the adapter's own state (which program each actor is in), since both decide what happens next. */
   stateHash(): string { return this.stateHashWithWorld(this.rt.stateHash()); }

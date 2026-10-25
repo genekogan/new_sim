@@ -85,6 +85,9 @@ export interface Engine {
   previewEdenLectureV1?(placement:import('./eden-lecture.ts').EdenLecturePlacementV1):{ok:true;transition:import('./eden-lecture.ts').EdenLectureTransitionV1}|{ok:false;diagnostic:{code:string}};
   adoptEdenLectureV1?(fact:import('./eden-lecture.ts').EdenLectureTransitionV1):void;
   describeVerbs(): VerbInfo[];
+  /** Optional synchronous boot preparation. May warm private caches only: no ticks, inputs,
+   * state changes, recorder cuts or publication. Call after initial projection, before serving. */
+  prepareForServing?(): void;
   stateHash(): string;
   physicalHash(): string;
   /** Advance one tick. Returns what changed for broadcast. */

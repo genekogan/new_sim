@@ -226,6 +226,9 @@ if (engineBridge) {
     }
     while (!engineBridge.initialProjectionReady());
     console.log(`[boot] initial physics coherent at tick ${host.engine.world.tick}; readiness wait ${Math.round(performance.now() - waitAt)} ms`);
+    const prepareAt = performance.now();
+    host.engine.prepareForServing?.();
+    console.log(`[boot] serving cache preparation ${Math.round(performance.now() - prepareAt)} ms at tick ${host.engine.world.tick}`);
   } catch (error) {
     closing = true; console.error('[boot] initial physics unavailable; HTTP was not opened', error);
     try {
