@@ -20,6 +20,8 @@ export type JoinDeps = {
   souls: () => { id: string; entity_id: string; name: string; created_at: number; token_last_used: number | null }[];
   /** Where a body is now (its entity in the god model), when it has one. */
   poseOf?: (entityId: string) => { x: number; y: number; z: number } | null;
+  /** LINK: the Soul's self-authored public `now` line, when it has one. */
+  nowOf?: (soulId: string) => { text: string; at: number } | null;
 };
 
 const skillFile = resolve(new URL('../../../../tools/world-skill/SKILL.md', import.meta.url).pathname);
@@ -40,7 +42,7 @@ export function mountJoinRoutes(app: Hono, d: JoinDeps) {
     const ACTIVE_MS = 10 * 60_000, now = Date.now();
     const souls = d.souls().map((s) => {
       const p = d.poseOf?.(s.entity_id) ?? null;
-      return { id: s.id, entityId: s.entity_id, name: s.name, since: s.created_at, active: !!s.token_last_used && now - s.token_last_used < ACTIVE_MS, ...(p ? { p: [p.x, p.y, p.z] } : {}) };
+      return { id: s.id, entityId: s.entity_id, name: s.name, since: s.created_at, active: !!s.token_last_used && now - s.token_last_used < ACTIVE_MS, ...(p ? { p: [p.x, p.y, p.z] } : {}), now: d.nowOf?.(s.id) ?? null };
     });
     return c.json({ souls }, 200, { 'cache-control': 'no-store' });
   });

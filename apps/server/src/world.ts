@@ -1,4 +1,5 @@
 import {tx} from './edge/comms/store.ts';
+import { SoulNow, type SoulNowLine } from './soul-now.ts';
 import type {CarrierInstallSpec} from '../../../mars/viewer/engine/vehicles/carrier.ts';
 import {soulProfileFactV1Schema,type SoulProfileFactV1} from '@sim/protocol';
 import {authoredBoundariesDeclarationV1Schema,type AuthoredBoundariesDeclarationV1} from '@sim/engine-contract';
@@ -1437,6 +1438,12 @@ export class WorldHost {
   profilePhotoSource(id:string):'custom'|'auto'|null{return this.profileFact(id)?.photo?'custom':this.autoProfilePhoto?.(id)?'auto':null;}
   /** Re-send this Soul's public card with the next batch (e.g. a new automatic portrait). */
   markSoulDirty(id:string){if(this.minds.has(id))this.acc.dirty.add(id);}
+  private soulNowStore?: SoulNow;
+  /** LINK: the agents' public `now` lines (soul-now.ts); a change re-sends that Soul's public card. */
+  get soulNow(): SoulNow { if (!this.soulNowStore) { const store = new SoulNow(this.db.db, this.worldId); store.onChange = id => this.markSoulDirty(id); this.soulNowStore = store; } return this.soulNowStore; }
+  nowOf(soulId: string): SoulNowLine | null { try { return this.soulNow.get(soulId); } catch { return null; } }
+  /** Present only when set, so the cards of Souls without a line keep their exact earlier shape (absent = null). */
+  private publicNow(soulId: string): {now?: SoulNowLine} { const now = this.nowOf(soulId); return now ? {now} : {}; }
   publicSoul(m: Mind): PublicSoul {
     const nameOf = (id: string) => this.nameOf(id);
     return {
@@ -1444,6 +1451,7 @@ export class WorldHost {
       ...this.publicNameMetadata(m.soulId),
       ...(this.profilePhoto(m.soulId)?{profilePhoto:this.profilePhoto(m.soulId)!}:{}),
       intent: publicIntent(m.intent), intentText: describeIntent(publicIntent(m.intent), nameOf), mood: m.mood, energy: energyWord(m.energy), doing: m.doing,
+      ...this.publicNow(m.soulId),
     };
   }
   /** A human-readable name for a kernel thing id, an engine entity id or a region id. */

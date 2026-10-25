@@ -128,6 +128,8 @@ export type PublicSoul = {
   nameAmbiguous?: true;
   profilePhoto?: {hash:string;url:string;mime:'image/png';width:number;height:number;bytes:number};
   intent: WireIntent | null; intentText: string; mood: string; energy: string; doing: string; native: boolean;
+  /** LINK: the agent's self-authored public status line (≤140 chars, untrusted text), or null. */
+  now?: {text: string; at: number} | null;
 };
 export type BrainCall = {
   id: number; tick: number; at: number; tier: 'mid' | 'translate' | 'director' | 'narrator' | 'shot' | 'compile' | 'talk' | 'attune' | 'reflection';
