@@ -6,6 +6,7 @@ import { SRC } from './asset-fetch.ts';
 import { DeferredLoadQueue } from './lazy-assets.ts';
 
 type Message = { id: number; url?: string; cancel?: boolean; images?: boolean; cdn?: { url: string; bytes: number; sha256: string }; [key: string]: unknown };
+type Reply = { id: number; buffer?: ArrayBuffer; images?: [number, Pick<ImageBitmap, 'close'>][]; loaded?: number; total?: number | null; error?: string; status?: number; cdn?: boolean };
 type Fetcher = (url: string, init: RequestInit, clock: Clock) => Promise<Response>;
 const flush = async () => { for (let i = 0; i < 12; i++) await new Promise<void>(resolve => setImmediate(resolve)); };
 class Clock {
@@ -22,9 +23,9 @@ class Clock {
     this.now = until; await flush();
   }
 }
-function runtime(fetcher: Fetcher, onMessage?: (m: Message) => void, extras: Record<string, unknown> = {}) {
-  const clock = new Clock(), reports: Message[] = [], requests: { url: string; signal: AbortSignal }[] = [];
-  const self = { onmessage: null as unknown as (ev: { data: Message }) => Promise<void>, postMessage: (m: Message) => { reports.push(m); onMessage?.(m); } };
+function runtime(fetcher: Fetcher, onMessage?: (m: Reply) => void, extras: Record<string, unknown> = {}) {
+  const clock = new Clock(), reports: Reply[] = [], requests: { url: string; signal: AbortSignal }[] = [];
+  const self = { onmessage: null as unknown as (ev: { data: Message }) => Promise<void>, postMessage: (m: Reply) => { reports.push(m); onMessage?.(m); } };
   const context = vm.createContext({ self, AbortController, DOMException, Response, ReadableStream, Uint8Array, DataView, TextDecoder, Blob, crypto,
     Date: { now: () => clock.now }, setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout,
     fetch: (url: string, init: RequestInit) => { requests.push({ url, signal: init.signal! }); return fetcher(url, init, clock); }, ...extras });
@@ -128,7 +129,7 @@ test('cancellation during image decode releases the job and closes late bitmaps 
 
 class WorkerDouble {
   static latest: WorkerDouble; static sourceFetch: Fetcher = async () => response();
-  onmessage: ((e: { data: Message }) => void) | null = null; onerror: (() => void) | null = null;
+  onmessage: ((e: { data: Reply }) => void) | null = null; onerror: (() => void) | null = null;
   posted: Message[] = []; terminated = 0; w: ReturnType<typeof runtime>;
   constructor() { WorkerDouble.latest = this; this.w = runtime((...args) => WorkerDouble.sourceFetch(...args), m => queueMicrotask(() => this.onmessage?.({ data: m }))); }
   postMessage(m: Message) { this.posted.push(m); void this.w.send(m); }
