@@ -175,7 +175,7 @@ export class EngineBridge {
     this.host = o.host; this.god = o.god; this.edge = o.edge; this.maxLevel = Math.min(o.maxLevel ?? MAX_LEVEL_ID, MAX_LEVEL_ID); this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
     engineBridges.set(this.god.model, this);
     this.nav = new GodNav({ model: this.god.model, version: () => this.version, staticVersion: () => this.godEdits, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e), placeOf: (ref) => (this.edge ? this.places.forRef(ref)?.id : undefined), describeStamp: () => `${this.describeEpoch}:${this.levels.length}` });
-    this.layers = new GodLayers({ model: this.god.model, edge: this.edge, get engine() { return o.host.engine as never; }, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), building: id => this.god.builds.closing(id, this.model), buildingActive: () => this.god.builds.hasClosure(), closingSites: () => this.god.builds.closingSites(), log: (m) => this.log(m) });
+    this.layers = new GodLayers({ model: this.god.model, edge: this.edge, get engine() { return o.host.engine as never; }, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), calendarPlaces: (sources) => this.calendarPlaces(sources), building: id => this.god.builds.closing(id, this.model), buildingActive: () => this.god.builds.hasClosure(), closingSites: () => this.god.builds.closingSites(), log: (m) => this.log(m) });
     (this.god as unknown as { layers?: GodLayers }).layers = this.layers;
     // P3 (E-life): places follow the god's edits, not the engine's (a carried cup, a duck, a lamp switched on move no place);
     // descriptions that list the things in a place catch up once a minute (1200 ticks)
@@ -921,10 +921,15 @@ export class EngineBridge {
       this.layers.step();
     } catch (e) { this.log(`layers: ${(e as Error).message}`); }
   }
+  private calendarPlaces(sources: readonly Entity[]): (e: Entity) => { id: string; name: string } | null {
+    const own = this.places.calendarIdentities(sources, this.version);
+    return (e) => this.layerPlace(e, own.get(e.id) ?? null);
+  }
   /** The place a thing is in: its own place (a café building, a market plaza), else the innermost holding it. */
-  private layerPlace(e: Entity): { id: string; name: string } | null {
+  private layerPlace(e: Entity, own?: { id: string; name: string } | null): { id: string; name: string } | null {
     if (!this.edge) return null;
-    const own = this.places.ofEntity(e.id); if (own) return { id: own.id, name: own.name };
+    if (own === undefined) own = this.places.ofEntity(e.id);
+    if (own) return { id: own.id, name: own.name };
     const wp = this.model.worldPose(e), id = this.places.placeAt([wp.x, wp.z], this.levelAt(wp.x, wp.z, wp.y)); if (!id) return null;
     return { id, name: this.edge.places.byId.get(id)?.name ?? id };
   }

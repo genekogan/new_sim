@@ -115,6 +115,19 @@ export class GodPlaces {
   list(fresh = false): GodPlace[] { return this.index(fresh).list; }
   /** The place a god thing itself is (a plaza, a house, a gazebo, a lone fountain): its objects stand in it. */
   ofEntity(id: string): GodPlace | undefined { return this.index().byEntity.get(id); }
+  private calendarIdentityCache?: { model: object; revision: number; index: object; own: Map<string, { id: string; name: string } | null> };
+  /** Calendar creation needs stable own-place identities, not minute-dependent descriptions. Prime every scheduled
+   *  source together so a later event entering the horizon does not trigger another full description derive. The
+   *  bridge revision covers terrain/state commits; the index identity also invalidates after a deferred install.
+   *  Misses are explicit: callers must resolve containment and native ledger names live. Ordinary reads stay fresh. */
+  calendarIdentities(sources: readonly Entity[], revision: number): ReadonlyMap<string, { id: string; name: string } | null> {
+    const model = this.h.model.safetyCacheKey(), cached = this.calendarIdentityCache;
+    if (cached?.model === model && cached.revision === revision && cached.index === this.cache && sources.length === cached.own.size && sources.every(e => cached.own.has(e.id))) return cached.own;
+    const index = this.index(), own = new Map<string, { id: string; name: string } | null>();
+    for (const e of sources) { const p = index.byEntity.get(e.id); own.set(e.id, p ? { id: p.id, name: p.name } : null); }
+    this.calendarIdentityCache = { model, revision, index, own };
+    return own;
+  }
   /** Walkable (the ledger's hook): every place this layer made. */
   walkable(id: string): boolean { return this.installed.has(id); }
 
