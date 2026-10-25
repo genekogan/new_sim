@@ -399,7 +399,10 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   // RESOLVE: a world-engine label's ", by <neighbours> (16 m)" names the neighbours, not the thing ("go to the pond" was a tree
   // by the pond reeds): step 3 tries the names before it first (strict), then the whole label ("the bench by the pond")
   const info = new Map(pool.map(c => {const t = ctx.target(c), own = [c.target?.id ?? '', c.id.slice(c.id.indexOf(':') + 1), c.label, ...t.names].filter(Boolean);
-    return [c.id, {t, own, ownTokens: own.flatMap(tokens), strictTokens: [own[0], own[1], c.label.replace(/,\s*by\s.*$/, ''), ...t.names].filter(Boolean).flatMap(tokens)}];}));
+    // D2 (playtest 2026-10-25: "go inside house 2, into the kitchen" went to House 1's kitchen chair): a number in the words
+    // names a number in a name ("house 2", "chair-2"), never a count or distance in the label ("2 rooms", "(2 m)")
+    const label = c.label.replace(/\b\d+(?:\.\d+)?\s*(?:m|s|rooms?|seats?|stops?)\b/g, ' ');
+    return [c.id, {t, own, ownTokens: [own[0], own[1], label, ...t.names].filter(Boolean).flatMap(tokens), strictTokens: [own[0], own[1], label.replace(/,\s*by\s.*$/, ''), ...t.names].filter(Boolean).flatMap(tokens)}];}));
   const unknown = (reason: string, prefer: EdgeCapability[] = []) => ({kind: 'unknown' as const, reason, didYouMean: suggest(input, verb, rest, ctx, prefer)});
   const dme = (c: EdgeCapability) => dist(info.get(c.id)?.t.at ?? null, ctx.me);
   const placeOf = (c: EdgeCapability) => ctx.places.find(p => p.id === c.target?.id);

@@ -227,3 +227,26 @@ test('vocabulary (SOULSIM-E): a thing answers to its everyday synonyms after its
  assert.equal(go('walk to the campfire'), 'walk:fire-circle', 'places keep their own path (3b)');
  assert.match(go('sit by the waterfall'), /^unknown/, 'no synonym, no swap');
 });
+
+test('vocabulary (D2, playtest 2026-10-25): "house 2" is the house named 2, never a label\'s "(2 m)" or "2 rooms"; room words go to rooms, not kitchen chairs', () => {
+ const hp: VocabPlace[] = [
+  {id: 'g-eden-house-1', name: 'eden-house-1', center: [32, 17], kind: 'building', parent: null, walkable: true},
+  {id: 'g-eden-house-1.kitchen', name: 'eden-house-1/kitchen', center: [31, 17], kind: 'room', parent: 'g-eden-house-1', walkable: true},
+  {id: 'g-eden-house-2', name: 'eden-house-2', center: [50, 15], kind: 'building', parent: null, walkable: true},
+  {id: 'g-eden-house-2.kitchen', name: 'eden-house-2/kitchen', center: [49, 15], kind: 'room', parent: 'g-eden-house-2', walkable: true},
+ ] as VocabPlace[];
+ const W = (id: string, label: string): EdgeCapability => ({id: `walk:${hp.find(p => p.id === id)!.name}`, verb: 'walk', label, available: true, target: {id, kind: 'place'}});
+ const hcaps: EdgeCapability[] = [
+  W('g-eden-house-1', 'Walk to eden-house-1, a house: in at its front door (2 rooms, each walk:eden-house-1/<room>; 4 m)'), W('g-eden-house-1.kitchen', 'Go into Kitchen of eden-house-1 (eden-house-1/kitchen; 2 m)'),
+  W('g-eden-house-2', 'Walk to eden-house-2, a house: in at its front door (2 rooms, each walk:eden-house-2/<room>; 20 m)'), W('g-eden-house-2.kitchen', 'Go into Kitchen of eden-house-2 (eden-house-2/kitchen; 18 m)'),
+  {id: 'walk:eden-house-1/kitchen-chair-2', verb: 'walk', label: 'Walk to eden-house-1/kitchen-chair-2, a chair in eden-house-1, by eden-house-1/kitchen-chair-1 (8 m)', available: true, target: {id: 'e_chair2', kind: 'object'}},
+ ];
+ const hctx = (me: [number, number], caps = hcaps): VocabContext => ({caps, places: hp, root: ['eden'], me, target: c => {
+  const p = hp.find(x => x.id === c.target?.id); return {names: p ? [p.name] : [], around: c.target?.id === 'e_chair2' ? ['g-eden-house-1.kitchen', 'eden-house-1/kitchen'] : [], at: p ? p.center : [31, 17]};
+ }});
+ const go = (q: string, c: VocabContext) => {const r = resolveCapability(q, c); return r.kind === 'unknown' ? 'unknown' : r.cap.id;};
+ for (const q of ['go inside house 2, into the kitchen', 'walk to the kitchen in house 2', 'go to the kitchen of house 2']) assert.equal(go(q, hctx([31.8, 17.2])), 'walk:eden-house-2/kitchen', q);
+ assert.equal(go('go into house 2', hctx([31.8, 17.2])), 'walk:eden-house-2');
+ assert.equal(go('go to the kitchen', hctx([20, 10], hcaps.filter(c => c.id !== 'walk:eden-house-1/kitchen'))), 'walk:eden-house-2/kitchen', 'a room word names the room, not the nearer kitchen chair');
+ assert.equal(go('go to the kitchen chair', hctx([31.8, 17.2])), 'walk:eden-house-1/kitchen-chair-2', 'the chair, when the words say chair');
+});
