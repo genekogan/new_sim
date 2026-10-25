@@ -21,7 +21,7 @@ import { BASE } from '../base-path.ts';
 import { mergeStatic } from './static-merge.ts';
 import { preciseBounds } from './fast-geometry.ts';
 import { addShadowProxy } from './shadow-proxy.ts';
-import { compileModel, fitTextures, uploadTextures } from './texture-budget.ts';
+import { captureTexturePreparation, compileModel, fitTextures, uploadTextures } from './texture-budget.ts';
 import { decodedImagesOf, fetchInWorker, warmAssetWorker } from './asset-fetch.ts';
 
 let shared: GLTFLoader | null = null;
@@ -46,7 +46,10 @@ export function loadAsset(sha: string): Promise<GLTF> {
   const G = globalThis as unknown as { __assetStages?: Record<string, string>; __assetTimes?: Record<string, Record<string, number>> };
   const st = (G.__assetStages ??= {}), times: Record<string, number> = ((G.__assetTimes ??= {})[sha] = { start: performance.now() });   // probes (tools/speed)
   const stage = (s: string) => { st[sha] = s; times[s] = performance.now(); };
-  const entry = { p: download(l, assetUrl(sha)).then(async (g) => { stage('fit'); await fitTextures(g); stage('prepare'); prepare(g); stage('compile'); await compileModel(g); stage('upload'); await uploadTextures(g); stage('done'); return g; }), by: l, settled: false };
+  // A download/resize may outlive its view. It may populate the shared asset cache, but must not prepare GPU work in
+  // whichever unrelated world happens to be current when it finishes.
+  const preparation = captureTexturePreparation();
+  const entry = { p: download(l, assetUrl(sha)).then(async (g) => { stage('fit'); await fitTextures(g); stage('prepare'); prepare(g); stage('compile'); await compileModel(g, preparation); stage('upload'); await uploadTextures(g, preparation); stage('done'); return g; }), by: l, settled: false };
   cache.set(sha, entry);
   entry.p.then(() => { entry.settled = true; }, (e: unknown) => {
     if (cache.get(sha) !== entry) return;
