@@ -194,7 +194,7 @@ export class EngineBridge {
     // LAYERS: "under construction (step)" is part of what an owned or scheduled thing is seen as
     this.god.onBuild(() => { if (this.layers.active()) this.notePerceive([], true); });
     this.host.listeners.push({
-      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); this.perceiveStep(tick); if (tick % 5 === 4) this.spotsStep(); if (tick % 40 === 7) this.layersStep(); if (tick % 20 === 13) this.flushMapNotices(); if (tick % 5 === 2 && (!this.navWarm || this.navPending)) this.navStep(); if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); } if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); } } },
+      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); this.perceiveStep(tick); if (tick % 5 === 4) this.spotsStep(); if (tick % 40 === 7) this.layersStep(); if (tick % 20 === 13) this.flushMapNotices(); if (!this.navWarm || this.navPending) this.navStep(); if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); } if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); } } },
       onApplied: (e) => { if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
     });
     reachProviders.set(this.god.model, (from, to) => this.reach(from, to));
@@ -663,7 +663,7 @@ export class EngineBridge {
   /** Plan who walks out of an accepted edit's way (pure). A planning fault never refuses the edit: it is logged, and
    *  the engine's own step-clear of buried bodies still applies. `dry` (dry run, preview): plan only, nothing rewritten. */
   /** nav-connect/1 (lane NAV): nothing a god edit does leaves a Soul unable to walk. The connectivity labels warm up after
-   *  boot in ~20 ms slices every 5 ticks (eden-2026: ~8 s of labelling spread over a few minutes), then every Soul is
+   *  boot in ~20 ms slices on each completed tick until ready, then every Soul is
    *  checked once (Souls stranded before this release step out too). After an edit that changes geometry within 30 m of a
    *  Soul, the request brings the engine up to date and checks every Soul (only the edited tiles are relabelled: tens of ms); a Soul cut
    *  off in a small area (or upstairs) steps to the nearest open spot of the main area as a logged edge-relocate
