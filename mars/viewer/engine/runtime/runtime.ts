@@ -8,7 +8,7 @@ import { hashOf } from '../core/hash.ts';
 import { listTable, withEntityList, type EntityTable } from '../world/entity-list.ts';
 import { Profiler } from './profile.ts';
 import { deadlockDiagnostics, exhaustedWaitMovers, recoverPersistentWaits } from './waits.ts';
-import { applySnapshot, decodeSnapshot, takeSnapshot, type Graph, type RuntimeInternals, type RuntimeSnapshot, type SnapshotOptions } from './snapshot.ts';
+import { applySnapshot, captureSnapshot, decodeSnapshot, takeSnapshot, type Graph, type RuntimeInternals, type RuntimeSnapshot, type RuntimeSnapshotCapture, type SnapshotOptions } from './snapshot.ts';
 
 export const DT = 1 / 20; // seconds per tick; changing this is a rules-version change
 
@@ -419,6 +419,10 @@ export class Runtime {
    */
   snapshot(opts?: SnapshotOptions): RuntimeSnapshot {
     return takeSnapshot(this, this.internals(), opts);
+  }
+  /** Owned synchronous capture; finishing it never observes a later runtime tick. */
+  captureSnapshot(opts?: SnapshotOptions): RuntimeSnapshotCapture {
+    return captureSnapshot(this, this.internals(), opts);
   }
 
   /** Rebuild a runtime from a snapshot; stepping it matches stepping the paused original tick for tick.

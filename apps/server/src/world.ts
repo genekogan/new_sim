@@ -147,6 +147,10 @@ export class WorldHost {
   private frameBatch: { remaining: number; generation: number } | null = null;
   private frameImmediate: NodeJS.Immediate | null = null;
   private recoveryBaseline: SnapshotBody | null = null;
+  /** Owned checkpoint captured at the latest periodic boundary, before deferred encoding finishes. */
+  private recoveryCapture: (() => SnapshotBody) | null = null;
+  private periodicSnapshot: { engine: Engine; previousTick: number; immediate: NodeJS.Immediate | null } | null = null;
+  private snapshotGeneration = 0;
   /** Edge worlds: the Souls' bodies' poses at the start of the latest tick (valid: the previous tick passed the invariants). */
   private validPoses: { tick: number; poses: Map<string, RecoveryPose> } | null = null;
   private last = 0;
@@ -174,6 +178,7 @@ export class WorldHost {
   // ------------------------------------------------------------ boot
   /** Load the latest snapshot and fast-forward through later log events, or start from genesis. */
   boot(): { from: 'genesis' | 'snapshot'; replayed: number } {
+    this.cancelPeriodicSnapshot(); this.recoveryCapture = null; this.recoveryBaseline = null;
     let w = this.db.world(this.worldId);
     if (!w) {
       this.db.createWorld({ id: this.worldId, schema: 'pending', rules_version: this.factory.rulesVersion, dt: 1 / 20, seed: this.seed });
@@ -396,7 +401,7 @@ export class WorldHost {
     if (this.frameImmediate) clearImmediate(this.frameImmediate);
     this.frameImmediate = null; this.frameBatch = null;
   }
-  stop() { if (this.timer) clearInterval(this.timer); this.timer = null; this.clockGeneration++; this.cancelFrameBatch(); }
+  stop() { if (this.timer) clearInterval(this.timer); this.timer = null; this.clockGeneration++; this.cancelFrameBatch(); this.cancelPeriodicSnapshot(); }
   /** The world's own clock loop is running (start(); a served world). False while stepped by hand (tests, tools): lane P5
    *  defers some boot-time derived work only in a served world, so a stepped one sees it at the same tick as before. */
   get running(): boolean { return this.timer !== null; }
@@ -494,7 +499,7 @@ export class WorldHost {
     // 3. broadcast
     if (now % BATCH_TICKS === 0) this.flush();
     if (now % HEARTBEAT_TICKS === 0) this.heartbeat();
-    if (now - this.lastSnapshotTick >= this.snapshotEvery) this.saveSnapshot(false);
+    if (now - this.lastSnapshotTick >= this.snapshotEvery) this.schedulePeriodicSnapshot();
     this.tickMs.push(performance.now() - t0);
     if (this.tickMs.length > 400) this.tickMs.splice(0, 200);
   }
@@ -1309,10 +1314,17 @@ export class WorldHost {
     }
   }
 
+  private captureHostState(): Omit<SnapshotBody, 'runtime'> {
+    return { minds: structuredClone([...this.minds.values()]), seq: this.seq, extra: structuredClone(this.extra), kernel: structuredClone(this.kernel), counts: {...this.counts} };
+  }
   private captureBody(runtime = this.engine.snapshot()): SnapshotBody {
-    return { runtime, minds: structuredClone([...this.minds.values()]), seq: this.seq, extra: structuredClone(this.extra), kernel: structuredClone(this.kernel), counts: {...this.counts} };
+    return { runtime, ...this.captureHostState() };
   }
   private restoreBody(body: SnapshotBody) {
+    // Transaction rollback replaces the engine but must keep the latest owned
+    // recovery boundary even if its deferred encoding had not finished yet.
+    const recovery = this.recoveryCapture ? this.recoveryCapture() : this.recoveryBaseline;
+    this.cancelPeriodicSnapshot(); this.recoveryCapture = null; this.recoveryBaseline = recovery;
     this.engine = this.factory.restore(structuredClone(body.runtime)); this.minds.clear(); this.mindByEntity.clear();
     for (const m of structuredClone(body.minds)) this.addMind(m);
     this.kernel = structuredClone(body.kernel!); this.extra = structuredClone(body.extra); this.counts = {...body.counts};
@@ -1344,7 +1356,10 @@ export class WorldHost {
     this.kernel.tick=this.engine.world.tick; sweep(this.kernel); this.kernelDirty=true;
   }
   private recoverFault(error: unknown, cardHint?: string, edgeHint?: {seq: number; entityId?: string}) {
-    const baseline=this.recoveryBaseline;
+    // A pending checkpoint already owns this boundary. Materialize that same
+    // capture before recovery replaces the engine; never fall back to an older head.
+    const baseline=this.recoveryCapture ? this.recoveryCapture() : this.recoveryBaseline;
+    this.cancelPeriodicSnapshot(); this.recoveryCapture = null; this.recoveryBaseline = baseline;
     if (!baseline) { if (this.edgeRecovery()) return this.haltOnFault(error, 'no resumable recovery baseline'); throw new Error(`No resumable recovery baseline: ${String(error)}`); }
     const untilTick=this.engine.world.tick, originalSeq=this.seq, all=this.db.events(this.worldId,baseline.seq);
     const pending=[...this.minds.values()].filter(m=>m.pending).map(m=>m.pending!.card);
@@ -1585,10 +1600,11 @@ export class WorldHost {
   }
 
   // ------------------------------------------------------------ snapshots
-  snapshotMs = { capture: 0, persist: 0 };
+  snapshotMs = { capture: 0, persist: 0, finish: 0, serialize: 0 };
   /** Capture is synchronous (it must see one consistent tick); the database write is deferred past the current tick. */
   saveSnapshot(sync = true): { tick: number; stateHash: string; pending?: undefined } | { pending: boolean; tick: number; stateHash?: undefined } {
     this.assertClockReady();
+    this.cancelPeriodicSnapshot();
     this.drainInputs();
     if(this.durableClockV1)this.persistClockFrontier();
     if (this.engine.canSnapshot && !this.engine.canSnapshot()) {
@@ -1604,18 +1620,89 @@ export class WorldHost {
   }
   /** Capture and persist the head as the snapshot and recovery baseline (the caller has checked it can snapshot). */
   private snapshotHead(sync: boolean): { tick: number; stateHash: string } {
+    this.cancelPeriodicSnapshot();
     const t0 = performance.now();
     const runtime = this.engine.snapshot();
     const body = this.captureBody(runtime);
     // captureBody owns every field; persistence only reads it, and restoration/
     // recovery recipes clone before mutation. Keep one immutable captured body.
-    this.recoveryBaseline = body;
+    this.recoveryBaseline = body; this.recoveryCapture = null;
     const meta = { tick: runtime.tick, seq: this.seq, stateHash: runtime.stateHash, physicalHash: this.engine.physicalHash(), rulesVersion: this.engine.rulesVersion, body };
     this.snapshotMs.capture = performance.now() - t0;
     this.lastSnapshotTick = runtime.tick;
-    const persist = () => { const t1 = performance.now(); this.db.saveSnapshot(this.worldId, meta); this.snapshotMs.persist = performance.now() - t1; };
+    const generation = this.snapshotGeneration;
+    const persist = () => { if (generation !== this.snapshotGeneration) return; const t1 = performance.now(); this.db.saveSnapshot(this.worldId, meta); this.snapshotMs.persist = performance.now() - t1; };
     if (sync) persist(); else setImmediate(persist);
     return { tick: runtime.tick, stateHash: runtime.stateHash };
+  }
+  /** Periodic checkpoints own a complete boundary before yielding. Only emission
+   * and persistence use continuations; ordinary/manual snapshots keep their API. */
+  private schedulePeriodicSnapshot(): void {
+    if (this.periodicSnapshot) return;
+    if (!this.engine.captureSnapshot) { this.saveSnapshot(false); return; }
+    this.assertClockReady(); this.drainInputs();
+    if (this.durableClockV1) this.persistClockFrontier();
+    if (this.engine.canSnapshot && !this.engine.canSnapshot()) return;
+    this.snapshotGeneration++;
+    const t0 = performance.now(), engine = this.engine;
+    const capture = engine.captureSnapshot!(), fields = this.captureHostState();
+    const meta = { tick: capture.tick, seq: fields.seq, stateHash: capture.stateHash,
+      physicalHash: engine.physicalHash(), rulesVersion: engine.rulesVersion };
+    const materialize = (): SnapshotBody => ({ runtime: capture.finish(), ...fields });
+    const steps = capture.steps();
+    const job = { engine, previousTick: this.lastSnapshotTick, immediate: null as NodeJS.Immediate | null };
+    this.periodicSnapshot = job;
+    this.recoveryCapture = materialize; this.recoveryBaseline = null;
+    this.lastSnapshotTick = capture.tick;
+    this.snapshotMs.capture = performance.now() - t0;
+    this.snapshotMs.finish = 0; this.snapshotMs.serialize = 0;
+    const current = () => this.periodicSnapshot === job && this.engine === engine;
+    const fail = (error: unknown) => {
+      if (!current()) return;
+      // A failed checkpoint never claims durability. Fail closed through the
+      // existing unavailable-clock path instead of losing an async exception.
+      console.error('[snapshot] periodic checkpoint failed', error);
+      this.clockFailure = error; this.paused = true; this.stop();
+      for (const listener of this.listeners) try { listener.onClockUnavailable?.(); } catch { /* preserve checkpoint fault */ }
+    };
+    const later = (work: () => void) => {
+      job.immediate = setImmediate(() => {
+        job.immediate = null;
+        if (!current()) { if (this.periodicSnapshot === job) this.cancelPeriodicSnapshot(); return; }
+        try { work(); } catch (error) { fail(error); }
+      });
+    };
+    const finish = () => {
+      const start = performance.now();
+      let result: IteratorResult<void, EngineSnapshot>;
+      do { result = steps.next(); } while (!result.done && performance.now() - start < 4);
+      this.snapshotMs.finish += performance.now() - start;
+      if (!result.done) { later(finish); return; }
+      const body: SnapshotBody = { runtime: result.value, ...fields };
+      if (this.recoveryCapture === materialize) { this.recoveryBaseline = body; this.recoveryCapture = null; }
+      // JSON and SQLite each take tens of milliseconds on a large world. Give
+      // queued HTTP/ticks a turn between them without changing stored bytes.
+      later(() => {
+        const at = performance.now(), json = JSON.stringify(body);
+        this.snapshotMs.serialize = performance.now() - at;
+        later(() => {
+          const at = performance.now(); this.db.saveSnapshotSerialized(this.worldId, meta, json);
+          this.snapshotMs.persist = performance.now() - at;
+          this.periodicSnapshot = null;
+        });
+      });
+    };
+    later(finish);
+  }
+  /** Superseding snapshots, recovery and stop must not leave a writer scheduled
+   * against an old engine or a database the owner may close next. */
+  private cancelPeriodicSnapshot(): void {
+    this.snapshotGeneration++;
+    const job = this.periodicSnapshot;
+    if (!job) return;
+    if (job.immediate) clearImmediate(job.immediate);
+    this.periodicSnapshot = null;
+    this.lastSnapshotTick = job.previousTick;
   }
   private persistClockFrontier():void {
     try{

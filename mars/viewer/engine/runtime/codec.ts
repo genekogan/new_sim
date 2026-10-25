@@ -205,6 +205,61 @@ export function finishGraph(handle: GraphCapture): unknown {
   return emit(root);
 }
 
+/** Iterative depth-first emission with bounded work between yields. One work
+ * unit handles one child edge (including each Map key/value separately) or
+ * retires one frame. Large flat collections therefore yield too. Each iterator
+ * owns its output and reference IDs; finishGraph can independently materialize
+ * the same capture while an iterator is suspended. */
+export function* finishGraphSteps(handle: GraphCapture, maxWork = 256): Generator<void, unknown, void> {
+  if (!Number.isSafeInteger(maxWork) || maxWork < 1) throw new RangeError('snapshot emission work limit must be a positive safe integer');
+  const state = captures.get(handle);
+  if (!state) throw new TypeError('not a captured snapshot graph');
+  type Frame = { node: Captured; output: unknown[] | Record<string, unknown>; index: number };
+  const stack: Frame[] = [], ids = new Map<object, number>();
+  let nextId = 0;
+  const emit = (value: unknown): unknown => {
+    if (value === undefined) return { '~u': 1 };
+    if (typeof value === 'number') {
+      if (Number.isNaN(value)) return { '~n': 'NaN' };
+      if (value === Infinity) return { '~n': 'Infinity' };
+      if (value === -Infinity) return { '~n': '-Infinity' };
+      if (Object.is(value, -0)) return { '~n': '-0' };
+      return value;
+    }
+    if (value === null || typeof value !== 'object') return value;
+    const id = ids.get(value);
+    if (id !== undefined) return { '~r': id };
+    const node = state.captured.get(value)!;
+    const shared = node.refs > 1, myId = shared ? nextId++ : -1;
+    if (shared) ids.set(value, myId);
+    const output: unknown[] | Record<string, unknown> = node.kind === 'object' && !node.tilde ? {} : [];
+    const body = node.kind === 'set' ? { '~set': output } : node.kind === 'map' ? { '~map': output }
+      : node.kind === 'object' && node.tilde ? { '~o': output } : output;
+    stack.push({ node, output, index: 0 });
+    return shared ? { '~id': myId, '~v': body } : body;
+  };
+  const result = emit(state.root);
+  let work = 0;
+  while (stack.length) {
+    const frame = stack[stack.length - 1], { node, output } = frame;
+    const length = node.kind === 'map' ? node.entries.length * 2 : node.values.length;
+    if (frame.index === length) stack.pop();
+    else {
+      const i = frame.index++;
+      if (node.kind === 'map') {
+        const out = output as unknown[][], entry = node.entries[Math.floor(i / 2)];
+        if (i % 2 === 0) out.push([emit(entry[0])]);
+        else out[out.length - 1].push(emit(entry[1]));
+      } else if (node.kind === 'object') {
+        if (node.tilde) (output as unknown[]).push([node.keys[i], emit(node.values[i])]);
+        else putOwn(output as Record<string, unknown>, node.keys[i], emit(node.values[i]));
+      } else (output as unknown[]).push(emit(node.values[i]));
+    }
+    if (++work === maxWork && stack.length) { work = 0; yield; }
+  }
+  return result;
+}
+
 /** Explicit ownership boundary for static snapshot facts (currently entity
  * physics construction/restore only). Validate the whole enumerable graph before
  * freezing any source node. Object.freeze cannot make Map/Set entries immutable,

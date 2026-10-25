@@ -46,7 +46,7 @@ import {attachGround,groundRegistry,installGroundV1 as installGround,previewGrou
 //     them back at any time, and the borrower treats that as the scene ending.
 //  3. Feasibility is asked first (verb.plan), because in Mars even a refused
 //     instruction pulls a person out of what they were doing.
-import { hashOf, physicalView, type BirthNearV1, type ActionRecord, type ActivityOption, type Anchor, type ChangeEvent, type Engine, type EngineFactory, type EngineSnapshot, type PathCommit, type PoseSample, type Program, type ProgramEvent, type RuntimeEvent, type RuntimeView, type Vec3, type VerbInfo, type WorldState } from '@sim/engine-contract';
+import { hashOf, physicalView, type BirthNearV1, type ActionRecord, type ActivityOption, type Anchor, type ChangeEvent, type Engine, type EngineFactory, type EngineSnapshot, type EngineSnapshotCapture, type PathCommit, type PoseSample, type Program, type ProgramEvent, type RuntimeEvent, type RuntimeView, type Vec3, type VerbInfo, type WorldState } from '@sim/engine-contract';
 import { loadMars, type Mars } from './load.ts';
 import type {CampExpansionReader} from './camp-expansion.ts';
 import {campExpansionV1Schema,type CampExpansionV1,type CampExpansionAdmissionV1} from '@sim/engine-contract';
@@ -65,7 +65,7 @@ import {commonsProvisions,COMMONS_PERSONAL_RESOURCES} from './commons-provisions
 import {commonsKitchen,COMMONS_KITCHENS,type CommonsKitchenVersion} from './commons-kitchen.ts';
 import type {RetainedCommonsShoreReader} from './retained-shore.ts';
 import {retainedCommonsShoreV1Schema,type RetainedCommonsShoreV1,type RetainedCommonsShoreAdmissionV1} from '@sim/engine-contract';
-import { decodeSnapshot } from '../../../mars/viewer/engine/runtime/snapshot.ts';
+import { decodeSnapshot, type RuntimeSnapshot, type RuntimeSnapshotCapture } from '../../../mars/viewer/engine/runtime/snapshot.ts';
 import {encode} from '../../../mars/viewer/engine/runtime/codec.ts';
 import { dcos,dsin,hypot } from '../../../mars/viewer/engine/core/math.ts';
 import { clearanceAt } from '../../../mars/viewer/engine/spatial/grid.ts';
@@ -2225,13 +2225,21 @@ export class MarsEngine implements Engine {
 
   // ------------------------------------------------------------------ checkpoints
   /** Mars's own resumable snapshot, plus which program each actor is in. Body-language steps lower only to verbs Mars can resume exactly. */
-  snapshot(): EngineSnapshot {
-    const mars = this.rt.snapshot();
-    // The native encoder already owns mars.data. Clone only adapter-owned state,
-    // leaving the mars slot in place so the persisted object shape/order is unchanged.
-    const snapshot = structuredClone({ ...(this.lecturePlacement?{edenLectureV1:this.lecturePlacement,lectureBaseStateHash:this.lectureBaseStateHash(mars.stateHash)}:{}), ...(this.sleepSnapshotActive?{nativeSleepSnapshotV1:true,sleepSnapshotBaseStateHash:this.sleepSnapshotBaseStateHash(mars.stateHash)}:{}), ...(this.newcomerResources.length?{commonsNewcomerResourcesV1:structuredClone(this.newcomerResources),newcomerBaseStateHash:this.newcomerBaseStateHash(mars.stateHash)}:{}), ...(this.renderPlatformMetadata?{renderPlatformsV1:structuredClone(this.renderPlatformMetadata)}:{}), format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHashWithWorld(mars.stateHash), mars: undefined as unknown, dropped: mars.dropped?.length ?? 0, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, ...(this.cfg.scene==='eden-commons'?{commonsVersion:'commons/1'}:{}), quiet: this.quiet, ...(this.commonsProvisionsActive?{commonsProvisionsV1:true}:{}), ...(this.commonsKitchenActive?{commonsKitchenV1:true}:{}), ...(this.socialEdenActive?{socialEdenV1:true}:{}), ...(this.greenLandmarkActive?{greenLandmarkV1:true}:{}), ...(this.foodDeliveries.length?{foodDeliveriesV1:structuredClone(this.foodDeliveries)}:{}), ...(this.commonsKitchenActive&&this.commonsKitchenVersion==='commons-kitchen/2'?{commonsKitchenVersion:this.commonsKitchenVersion}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion}:{}), ...(this.rt.world.groundV1?{groundV1:true}:{}) });
-    snapshot.mars = mars;
-    return snapshot;
+  snapshot(): EngineSnapshot { return this.captureSnapshot().finish(); }
+  captureSnapshot(): EngineSnapshotCapture {
+    const mars = this.rt.captureSnapshot() as RuntimeSnapshotCapture;
+    // Capture every adapter input and policy hash at the native boundary. Neither
+    // completion path below reads the live engine. Keep the mars slot/order intact.
+    const snapshot = structuredClone({ ...(this.lecturePlacement?{edenLectureV1:this.lecturePlacement,lectureBaseStateHash:this.lectureBaseStateHash(mars.stateHash)}:{}), ...(this.sleepSnapshotActive?{nativeSleepSnapshotV1:true,sleepSnapshotBaseStateHash:this.sleepSnapshotBaseStateHash(mars.stateHash)}:{}), ...(this.newcomerResources.length?{commonsNewcomerResourcesV1:structuredClone(this.newcomerResources),newcomerBaseStateHash:this.newcomerBaseStateHash(mars.stateHash)}:{}), ...(this.renderPlatformMetadata?{renderPlatformsV1:structuredClone(this.renderPlatformMetadata)}:{}), format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHashWithWorld(mars.stateHash), mars: undefined as unknown, dropped: mars.droppedCount, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, ...(this.cfg.scene==='eden-commons'?{commonsVersion:'commons/1'}:{}), quiet: this.quiet, ...(this.commonsProvisionsActive?{commonsProvisionsV1:true}:{}), ...(this.commonsKitchenActive?{commonsKitchenV1:true}:{}), ...(this.socialEdenActive?{socialEdenV1:true}:{}), ...(this.greenLandmarkActive?{greenLandmarkV1:true}:{}), ...(this.foodDeliveries.length?{foodDeliveriesV1:structuredClone(this.foodDeliveries)}:{}), ...(this.commonsKitchenActive&&this.commonsKitchenVersion==='commons-kitchen/2'?{commonsKitchenVersion:this.commonsKitchenVersion}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion}:{}), ...(this.rt.world.groundV1?{groundV1:true}:{}) });
+    const assemble = (native: RuntimeSnapshot): EngineSnapshot => {
+      const result = structuredClone(snapshot);
+      result.mars = native;
+      return result;
+    };
+    return Object.freeze({ tick: snapshot.tick, stateHash: snapshot.stateHash,
+      finish: () => assemble(mars.finish()),
+      *steps() { return assemble(yield* mars.steps()); },
+    });
   }
   canSnapshot(): boolean {
     // A legacy formation callback is not data and must wait for a quiet point.

@@ -63,6 +63,15 @@ export type ProgramAction = { tick:number; programId:string; actor:string; step:
 export interface RuntimeView { readonly tick: number; readonly records: Map<string, ActionRecord>; readonly violations: { tick: number; code: string; message: string }[]; liveIds(): string[] }
 /** An engine's resumable checkpoint. Only these three fields are read by the shell; the rest is the engine's own. */
 export type EngineSnapshot = { format: string; tick: number; stateHash: string };
+/** Owned checkpoint at a single synchronous engine boundary. Every completion
+ * returns a fresh snapshot; iterators and finish() may be used independently.
+ * steps() yields bounded graph work, not engine ticks, and never reads live state. */
+export type EngineSnapshotCapture = {
+  readonly tick: number;
+  readonly stateHash: string;
+  steps(): Generator<void, EngineSnapshot, void>;
+  finish(): EngineSnapshot;
+};
 
 export interface Engine {
   readonly rulesVersion: string;
@@ -112,6 +121,7 @@ export interface Engine {
   submit(verb: string, params: unknown, opts?: { id?: string; parent?: string; preempt?: boolean }): ActionRecord;
   cancel(id: string, reason?: { code: string; message: string }): ActionRecord;
   snapshot(): EngineSnapshot;
+  captureSnapshot?(): EngineSnapshotCapture;
   /** Recorded rendering chunks; no browser Runtime. Optional for engines without takes. */
   takeChunks?(afterTick: number): { fromTick: number; toTick: number; take: unknown }[];
   renderScene?(): RenderScene;

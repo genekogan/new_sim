@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CodecError, captureGraph, decode, encode, finishGraph, prepareImmutableSnapshotData, type GraphCapture } from '../runtime/codec.ts';
+import { CodecError, captureGraph, decode, encode, finishGraph, finishGraphSteps, prepareImmutableSnapshotData, type GraphCapture } from '../runtime/codec.ts';
 import { decodeSnapshot, SNAPSHOT_FORMAT, type RuntimeSnapshot } from '../runtime/snapshot.ts';
 import { hashOf } from '../core/hash.ts';
 import { Runtime } from '../runtime/runtime.ts';
@@ -384,4 +384,59 @@ test('a valid legacy-written runtime checkpoint restores native state and servic
     restored.step(); uninterrupted.step();
     assert.equal(restored.stateHash(), uninterrupted.stateHash());
   }
+});
+
+function drainGraph(steps: Generator<void, unknown, void>): { value: unknown; yields: number } {
+  let yields = 0, result = steps.next();
+  while (!result.done) { assert.ok(++yields < 100000, 'emission must terminate'); result = steps.next(); }
+  return { value: result.value, yields };
+}
+
+test('bounded emitter preserves independent legacy bytes across aliases, cycles and special values', () => {
+  for (const source of [undefined, null, -0, NaN, Infinity, -Infinity,
+    ...Array.from({ length: 80 }, (_, i) => generatedGraph(i + 1))]) {
+    const capture = captureGraph(source), expected = JSON.stringify(legacyEncode(source));
+    for (const budget of [1, 7, 256]) {
+      const { value } = drainGraph(finishGraphSteps(capture, budget));
+      assertJsonTree(value);
+      assert.equal(JSON.stringify(value), expected);
+      sameGraph(source, decode(JSON.parse(expected)));
+    }
+  }
+});
+
+test('bounded emitter yields within flat arrays, objects, maps and sets, including escaped objects', () => {
+  const n = 513, values = Array.from({ length: n }, (_, i) => i);
+  const entries = values.map(i => ['key' + i, i] as const);
+  for (const [source, edges] of [
+    [values, n], [Object.fromEntries(entries), n], [new Map(entries), n * 2], [new Set(values), n],
+    [Object.fromEntries(entries.map(([key, value]) => ['~' + key, value])), n],
+  ] as [unknown, number][]) {
+    const { value, yields } = drainGraph(finishGraphSteps(captureGraph(source), 32));
+    assert.equal(yields, Math.floor(edges / 32), 'primitive edges and final frame retirement bound each turn');
+    assert.equal(JSON.stringify(value), JSON.stringify(legacyEncode(source)));
+  }
+  for (const budget of [0, -1, 1.5, Infinity, NaN])
+    assert.throws(() => finishGraphSteps(captureGraph([]), budget).next(), RangeError);
+});
+
+test('interleaved emitters and synchronous finish own outputs and never reread mutated source state', () => {
+  const shared: Record<string, unknown> = { value: 3 }; shared.self = shared;
+  Object.defineProperty(shared, '__proto__', { enumerable: true, configurable: true, writable: true, value: shared });
+  const dropped = { closure: () => 1 };
+  const source = { map: new Map<unknown, unknown>([[shared, dropped], ['keep', shared]]), shared,
+    values: [shared, -0, undefined], set: new Set([shared]) };
+  const capture = captureGraph(source, '$', new Set([dropped]));
+  const expected = JSON.stringify(finishGraph(capture));
+  const first = finishGraphSteps(capture, 1), second = finishGraphSteps(capture, 2);
+  assert.equal(first.next().done, false); assert.equal(second.next().done, false);
+  shared.value = 99; source.map.clear(); source.values.length = 0; source.set.clear();
+  Object.defineProperty(shared, 'self', { get() { throw new Error('live source was reread'); } });
+  const synchronous = finishGraph(capture) as Record<string, unknown>;
+  assert.equal(JSON.stringify(synchronous), expected);
+  synchronous.shared = 'changed output';
+  const a = drainGraph(first).value as Record<string, unknown>;
+  assert.equal(JSON.stringify(a), expected); a.map = 'changed output';
+  assert.equal(JSON.stringify(drainGraph(second).value), expected);
+  assert.equal(JSON.stringify(drainGraph(finishGraphSteps(capture)).value), expected);
 });
