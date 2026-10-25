@@ -107,10 +107,11 @@ async function cmdRun(a) {
         const vp = scenario.observer?.viewport ?? [1280, 800];
         for (const seat of ctx.seats) { const info = seat.info(); if (info.soulId) ctx.cameras[info.id] = await ctx.browser.openCamera({ base: ctx.world.base, identity: info.ownerIdentity, kind: 'follow', soulId: info.soulId, viewport: vp, dpr: scenario.observer?.dpr ?? 1, runDir, name: info.id }); }
         if ((scenario.observer?.cameras ?? []).includes('wide')) ctx.cameras.wide = await ctx.browser.openCamera({ base: ctx.world.base, identity: null, kind: 'wide', viewport: vp, dpr: scenario.observer?.dpr ?? 1, runDir, name: 'wide' });
-        observer = { cameras: ctx.cameras, truth: m.truth, evidence: m.evidence, browser: ctx.browser, sampleSec: scenario.observer?.sampleSec ?? 5 };
+        observer = { camera: (id) => ctx.cameras[id] ?? null, cameras: ctx.cameras, truth: m.truth, evidence: m.evidence, browser: ctx.browser, sampleSec: scenario.observer?.sampleSec ?? 5 };
+        if (m.browser.sampler) { try { ctx.sampler = m.browser.sampler({ cameras: ctx.cameras, everySec: observer.sampleSec, runDir }); ctx.sampler.start?.(); } catch (e) { log('sampler not started', e.message); } }
       } else log('observer modules missing: playing without screenshots/evidence');
       const quotaCheck = async () => { const q = await quota(); const r = quotaAllows(q, { stopPct: scenario.rails?.quotaStopPct ?? 90 }); if (!r.allowed) log('QUOTA STOP', r.note); return r.allowed; };
-      const play = await m.director.runPlay({ runDir, scenario, world: ctx.world, seats: ctx.seats, god: ctx.god, observer, owner: m.owner, persona: m.persona, seed, quotaCheck, log });
+      const play = await m.director.runPlay({ runDir, scenario, world: { ...ctx.world, name: scenario.world.slug, skillPath: join(runDir, 'server', 'skill.md') }, seats: ctx.seats, god: ctx.god, observer, owner: m.owner, seed, quotaCheck });
       receipt(runDir, 3, 'play', { ok: true, ...play });
     }
     // 4 close
@@ -118,6 +119,7 @@ async function cmdRun(a) {
       const closed = { seats: [], god: null };
       for (const seat of ctx.seats) { try { await seat.stop(); closed.seats.push(seat.info()); } catch (e) { closed.seats.push({ error: e.message }); } }
       if (ctx.god) { try { await ctx.god.stop(); closed.god = ctx.god.info(); } catch (e) { closed.god = { error: e.message }; } }
+      if (ctx.sampler) { try { await ctx.sampler.stop?.(); } catch { /* ignore */ } }
       if (ctx.browser) { try { await ctx.browser.close(); } catch { /* ignore */ } }
       try { if (m.provision && ctx.world?.base) writeJson(join(runDir, 'server', 'healthz-after.json'), await m.provision.healthz(ctx.world.base)); } catch { /* recorded as missing */ }
       writeJson(join(runDir, 'close.json'), { ...now(), ...closed });
