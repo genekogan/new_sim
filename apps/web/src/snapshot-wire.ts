@@ -4,7 +4,7 @@
 // with the same set). expandSnapshot puts it back together exactly as the plain snapshot, so WorldModel.fromSnapshot
 // and everything after it see no difference. Any failure falls back to the plain snapshot.
 import { isPackedColumnsV1, unpackColumnsV1 } from '@sim/protocol/columns-v1';
-import { entryWireUrl, takeSnapshotPrefetch, takePartPrefetch } from './snapshot-prefetch.ts';
+import { entryWireUrl, takeSnapshotPrefetchBatch, type PrefetchRequest } from './snapshot-prefetch.ts';
 
 type Spec = Record<string, { default?: unknown } | undefined>;
 type Def = { name?: string; version?: number; params?: Spec };
@@ -27,39 +27,109 @@ export function expandSnapshot(body: WireBody, defs: Def[], ground: unknown): Re
   return { ...rest, ground, defs, entities: full };
 }
 
-/** PF2 (2026-10-20): a page-entry request (the snapshot, its parts) that has not answered in this long is asked for again
- *  beside it and the first answer wins. Nothing else bounds them: one stalled request held the arrival until it ended
- *  (live phone Eden 2026 with the snapshot held 20 s / 45 s arrived at 20.9 s / 45.9 s). Live answers in ~0.1-0.4 s. */
+/** A first page-entry request is hedged after four seconds. Each request also has an inactivity bound. */
 export const ENTRY_HEDGE_MS = 4_000;
 
-/** `first`, or, when it has not answered within `ms`, whichever of it and `again()` answers first; fails when both have. */
-export function hedged(first: Promise<Response>, again: () => Promise<Response>, ms = ENTRY_HEDGE_MS): Promise<Response> {
-  return new Promise((resolve, reject) => {
-    let settled = false, out = 1;
-    const win = (r: Response) => { if (!settled) { settled = true; clearTimeout(timer); resolve(r); } };
-    const lose = (e: unknown) => { if (--out === 0 && !settled) { settled = true; clearTimeout(timer); reject(e); } };
-    const timer = setTimeout(() => { if (settled) return; out++; try { again().then(win, lose); } catch (e) { lose(e); } }, ms);
-    first.then(win, lose);
-  });
+/** Header wait and body inactivity, not a total download deadline. */
+export const SNAPSHOT_STALL_MS = 12_000;
+const stalled = () => new DOMException('Snapshot transport stalled', 'TimeoutError');
+const cancelBody = (r: Response) => { void r.body?.cancel().catch(() => {}); };
+
+/** Each wire/plain attempt owns its requests. A failed part cancels siblings before plain fallback starts. */
+async function withTransport<T>(caller: AbortSignal, work: (transport: {
+  headers(url: string, prefetch?: PrefetchRequest | null, hedge?: boolean): Promise<Response>;
+  json(response: Response): Promise<unknown>;
+}) => Promise<T>): Promise<T> {
+  caller.throwIfAborted();
+  const controller = new AbortController(), signal = controller.signal, cancels = new Set<() => void>();
+  const close = () => { controller.abort(caller.aborted ? caller.reason : new DOMException('Snapshot attempt completed', 'AbortError')); for (const cancel of cancels) cancel(); cancels.clear(); };
+  caller.addEventListener('abort', close, { once: true });
+  const request = (url: string, prefetch?: PrefetchRequest | null) => {
+    const own = new AbortController();
+    const source = prefetch ?? { response: Promise.resolve().then(() => { own.signal.throwIfAborted(); return fetch(url, { signal: own.signal }); }), abort: () => own.abort() };
+    let response: Response | undefined, ended = false, rejectWait: (e: unknown) => void = () => {};
+    const cancel = () => { source.abort?.(); if (response) cancelBody(response); rejectWait(signal.aborted ? signal.reason : new DOMException('Snapshot request cancelled', 'AbortError')); };
+    cancels.add(cancel);
+    const promise = new Promise<Response>((resolve, reject) => {
+      let timer: ReturnType<typeof setTimeout>;
+      const finish = (error?: unknown, value?: Response) => {
+        if (ended) return; ended = true; clearTimeout(timer); signal.removeEventListener('abort', cancel);
+        if (value) resolve(value); else reject(error);
+      };
+      rejectWait = error => finish(error);
+      timer = setTimeout(() => { finish(stalled()); source.abort?.(); }, SNAPSHOT_STALL_MS);
+      signal.addEventListener('abort', cancel, { once: true });
+      source.response.then(r => { response = r; if (ended) { cancelBody(r); return; } finish(undefined, r); }, e => finish(e));
+      if (signal.aborted) cancel();
+    });
+    return { promise, cancel };
+  };
+  try {
+    const result = await work({
+      headers(url, prefetch, hedge = false) {
+        if (!hedge) return request(url, prefetch).promise;
+        return new Promise<Response>((resolve, reject) => {
+          const tasks = [request(url, prefetch)]; let done = false, pending = 1;
+          const timer = setTimeout(() => { if (done) return; pending++; const next = request(url); tasks.push(next); listen(next); }, ENTRY_HEDGE_MS);
+          const fail = (error: unknown) => { if (--pending === 0 && !done) { done = true; clearTimeout(timer); reject(error); } };
+          const listen = (task: ReturnType<typeof request>) => { task.promise.then(r => {
+            if (done) { task.cancel(); return; }
+            // A failed hedge must not cancel a still-pending valid response. Before a hedge exists, fail immediately.
+            if (!r.ok) { task.cancel(); fail(new Error(`snapshot ${r.status}`)); return; }
+            done = true; clearTimeout(timer); for (const other of tasks) if (other !== task) other.cancel(); resolve(r);
+          }, fail); };
+          listen(tasks[0]);
+        });
+      },
+      json(response) {
+        signal.throwIfAborted();
+        if (!response.body) return Promise.reject(new SyntaxError('Unexpected end of JSON input'));
+        const reader = response.body.getReader(), decoder = new TextDecoder(), chunks: string[] = [];
+        return new Promise((resolve, reject) => {
+          let finished = false, timer: ReturnType<typeof setTimeout>;
+          const cleanup = () => { clearTimeout(timer); signal.removeEventListener('abort', aborted); };
+          const fail = (error: unknown) => { if (finished) return; finished = true; cleanup(); reject(error); void reader.cancel(error).catch(() => {}); };
+          const aborted = () => fail(signal.reason);
+          const arm = () => { clearTimeout(timer); timer = setTimeout(() => fail(stalled()), SNAPSHOT_STALL_MS); };
+          signal.addEventListener('abort', aborted, { once: true }); arm();
+          void (async () => {
+            try {
+              for (;;) {
+                const { done, value } = await reader.read(); if (finished) return;
+                if (done) break;
+                if (value.byteLength) { chunks.push(decoder.decode(value, { stream: true })); arm(); }
+              }
+              chunks.push(decoder.decode()); const value = JSON.parse(chunks.join(''));
+              finished = true; cleanup(); resolve(value);
+            } catch (error) { fail(error); } finally { reader.releaseLock(); }
+          })();
+        });
+      },
+    });
+    caller.throwIfAborted(); return result;
+  } finally { caller.removeEventListener('abort', close); close(); }
 }
 
 export type Loaded = { snap: Record<string, unknown>; response: Response };
-/** The world snapshot for a viewer: the wire form when the server speaks it, else the plain one. `first` takes the
- *  page-entry prefetch (snapshot-prefetch.ts) and its edge-cacheable key. `response` is the snapshot's own (headers:
- *  moderation version, Age). Null when the world answered with an error. */
+/** Preserve exact wire references/response metadata; transport failure falls back once to the bounded plain request. */
 export async function loadSnapshot(plainUrl: string, signal: AbortSignal, first = false): Promise<Loaded | null> {
-  const plain = async (): Promise<Loaded | null> => { const r = await fetch(plainUrl, { signal }); return r.ok ? { snap: await r.json() as Record<string, unknown>, response: r } : null; };
+  const plain = () => withTransport(signal, async t => { const r = await t.headers(plainUrl); return r.ok ? { snap: await t.json(r) as Record<string, unknown>, response: r } : null; });
+  const url = first ? entryWireUrl(plainUrl) : `${plainUrl}?defs=ref&cols=1`;
+  const batch = first ? takeSnapshotPrefetchBatch(url) : null;
   try {
-    const url = first ? entryWireUrl(plainUrl) : `${plainUrl}?defs=ref&cols=1`;
-    const again = () => fetch(url, { signal });
-    const r = await (first ? hedged(takeSnapshotPrefetch(url) ?? again(), again) : again());
-    if (!r.ok) return plain();
-    const defsRef = r.headers.get('x-defs-ref'), groundRef = r.headers.get('x-ground-ref');
-    if (!defsRef || !groundRef) { const snap = await r.json() as Record<string, unknown>; return 'defsRef' in snap ? plain() : { snap, response: r }; } // an older server answers plainly; a wire body without its part headers is asked for again plainly
-    const part = async (ref: string) => { const get = () => fetch(plainUrl.replace(/\/v1\/world\/snapshot$/, `/v1/world/part/${ref}`), { signal });
-      const pre = takePartPrefetch(ref), p = await (first ? hedged(pre ?? get(), get) : pre ?? get()); if (!p.ok) throw Error(`part ${p.status}`); return p.json(); };
-    const [body, defs, ground] = await Promise.all([r.json() as Promise<WireBody>, part(defsRef), part(groundRef)]);
-    if (body.defsRef !== defsRef || body.groundRef !== groundRef || !Array.isArray(defs)) return plain();
-    return { snap: expandSnapshot(body, defs, ground), response: r };
-  } catch (e) { if (signal.aborted) throw e; return plain(); }
+    return await withTransport(signal, async t => {
+      const r = await t.headers(url, batch?.request, first);
+      if (!r.ok) throw Error(`snapshot ${r.status}`);
+      const defsRef = r.headers.get('x-defs-ref'), groundRef = r.headers.get('x-ground-ref');
+      if (!defsRef || !groundRef) { const snap = await t.json(r) as Record<string, unknown>; if ('defsRef' in snap) throw Error('Snapshot part headers missing'); return { snap, response: r }; }
+      const part = async (ref: string) => { const p = await t.headers(plainUrl.replace(/\/v1\/world\/snapshot$/, `/v1/world/part/${ref}`), batch?.part(ref), first); if (!p.ok) throw Error(`part ${p.status}`); return t.json(p); };
+      const [body, defs, ground] = await Promise.all([t.json(r) as Promise<WireBody>, part(defsRef), part(groundRef)]);
+      if (body.defsRef !== defsRef || body.groundRef !== groundRef || !Array.isArray(defs)) throw Error('Snapshot part references mismatch');
+      return { snap: expandSnapshot(body, defs, ground), response: r };
+    });
+  } catch (error) {
+    signal.throwIfAborted();
+    // Close entry prefetch ownership before falling back, including any unused HTML-predicted parts.
+    batch?.close(); return plain();
+  } finally { batch?.close(); }
 }
