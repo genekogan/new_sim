@@ -17,6 +17,8 @@ const ROUTE_DEAD = new Set(['route.unreachable', 'route.goal-blocked', 'route.li
 /** BS3: refusals a plain walk answers with its closest approach (the fine planner's; ground.* keep their named refusals). */
 const APPROACH_CODES = new Set(['route.unreachable', 'route.goal-blocked']);
 const STUCK_RADIUS = 0.34;
+/** D2: a seat this close (m) with no enclosure boundary between is "here" for sit:here. */
+export const HERE_SEAT_M = 3;
 const STUCK_REASON = 'The walk made no headway for 30 seconds, even after looking for another way from where it stood; choose another way or somewhere else.';
 import {EdgeError, type EdgeCapability, type EdgeLedgerHooks, type EdgeReceipt, type EdgeSoul, type NearbyBody, type PlaceRef,type ObjectBodyAdmission} from '../contract.ts';
 import {CATALOG} from '../../../../../mars/viewer/engine/world/catalog.ts';
@@ -1226,8 +1228,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
       taken: (at: [number, number], spotId?: string) => others.some(o => Math.hypot(o[0] - at[0], o[1] - at[1]) < 0.7) || (!!spotId && claimed.has(spotId)),
       // a spot inside a building is offered only when that building's interior was admitted (its walls are a shell, nav/1)
       enterable: (place: string | undefined) => {const b = enclosingBuilding(place); return !b || !!w.regions[b] || !!this.placeWalkable?.(b) || [...navIds].some(id => id.startsWith('nav-solid:' + b + '#w'));},
-      seat: (radius: number) => {
-        const free = caps.filter(c => c.verb === 'sit' && c.available && c.target && c.id !== 'sit:here').map(c => {const e = w.entities[(this.host.kernel.things[c.target!.id]?.traits.entity as string | undefined) ?? c.target!.id]; return e ? {c, d: Math.hypot(e.pose.p[0] - here[0], e.pose.p[2] - here[1])} : null;}).filter((x): x is {c: EdgeCapability; d: number} => !!x && x.d <= radius).sort((a, b) => a.d - b.d || a.c.id.localeCompare(b.c.id));
+      seat: (radius: number, near?: boolean) => {
+        const free = caps.filter(c => c.verb === 'sit' && c.available && c.target && c.id !== 'sit:here').map(c => {const e = w.entities[(this.host.kernel.things[c.target!.id]?.traits.entity as string | undefined) ?? c.target!.id]; return e && (!near || this.seatIsHere(soul.entityId, e.pose.p)) ? {c, d: Math.hypot(e.pose.p[0] - here[0], e.pose.p[2] - here[1])} : null;}).filter((x): x is {c: EdgeCapability; d: number} => !!x && x.d <= radius).sort((a, b) => a.d - b.d || a.c.id.localeCompare(b.c.id));
         const pick = free[0]; return pick && plans.get(pick.c.id) ? {cap: pick.c, plan: plans.get(pick.c.id)!, distance: pick.d} : null;
       },
       // an installed upper-floor room/lobby is a world region the place data predates: name it by its label, never its id
@@ -1349,6 +1351,16 @@ export class EdgeLedger implements EdgeLedgerHooks {
     return occ ? [{id: occ.occ.id, name: `${occ.place.name} seat`, kind: 'occupier'}, ...path] : path;
   }
   private innermostPlace(m: Mind): string | null {const b = this.body(m.entityId); if (!b) return null; const ride = this.aboard(m.entityId), basket = ride ? this.places.carrierPlaces.get(ride.id) : undefined; if (basket) return basket.id; return this.places.containing(b.pose.p[0], b.pose.p[2], this.placeLevel(b.human?.level))[0]?.id ?? null;}
+  /** D2 ("sit down" means here): a seat at `seat` ([x, y, z]) is here for this body when it stands in the body's own
+   *  room (the innermost place, enclosed) on its floor, or within HERE_SEAT_M with the same enclosure (none outdoors)
+   *  on both sides. Named seats ("sit on the bench") keep their own reach. */
+  seatIsHere(entityId: string, seat: readonly number[]): boolean {
+    const b = this.body(entityId); if (!b || this.aboard(entityId)) return false;
+    if (Math.abs((seat[1] ?? 0) - b.pose.p[1]) > 1.5) return false;
+    const level = this.placeLevel(b.human?.level), mine = this.places.containing(b.pose.p[0], b.pose.p[2], level)[0], its = this.places.containing(seat[0], seat[2], level)[0];
+    if (mine?.enclosed && its?.id === mine.id) return true;
+    return Math.hypot(seat[0] - b.pose.p[0], seat[2] - b.pose.p[2]) <= HERE_SEAT_M && this.enclosureAtPoint(seat[0], seat[2], level) === this.enclosureAtPoint(b.pose.p[0], b.pose.p[2], level);
+  }
   enclosureOf(soulId: string): string | null {
     const m = this.host.minds.get(soulId), b = m ? this.body(m.entityId) : undefined; if (!b) return null;
     const ride = this.aboard(m!.entityId), basket = ride ? this.places.carrierPlaces.get(ride.id) : undefined;

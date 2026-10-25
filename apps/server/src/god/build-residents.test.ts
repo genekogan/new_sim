@@ -260,9 +260,10 @@ test('C1b #11: read and every model-object target honor closure while private ac
 });
 
 test('C1b #12: sit:here chooses the nearest usable seat and named sit reports the construction code', async t => {
+  // D2 (2026-10-25): sit:here takes only a seat that is here (within 3 m outdoors), so the Soul stands 2 m from outer
   const w = world(t);
   assert.equal(w.god.act({ ops: [{ op: 'place', def: coreRef('bench'), name: 'inner', p: [30, 0] }, { op: 'place', def: coreRef('bench'), name: 'outer', p: [30, 17] }] }).accepted, true); await w.settle();
-  const s = await w.soul(); await w.move(s, [30, 7.5]); w.start({ root: 'inner', site: { at: [30, 0], size: [6, 6] } }); await w.settle(1);
+  const s = await w.soul(); await w.move(s, [30, 15]); w.start({ root: 'inner', site: { at: [30, 0], size: [6, 6] } }); await w.settle(1);
   const inner = w.god.model.get('inner')!.id, outer = w.god.model.get('outer')!.id;
   blocked(cap(w, s, `sit:${inner}`), 'site.under-construction'); assert.equal(cap(w, s, `sit:${outer}`).available, true);
   const here = cap(w, s, 'sit:here'); assert.equal(here.available, true); assert.equal(here.target?.id, outer); assert.equal(here.blocked, undefined);
