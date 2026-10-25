@@ -1,5 +1,7 @@
 // Provision a local dev world from a server root (the SOUL3 integration worktree) and describe it in world.json.
 // DESIGN §4.1. Only world.kind "dev" is supported at this stage; fork/template-eden2/live are refused.
+import { spawn } from 'node:child_process';
+import { openSync, rmSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { mkdirSync, existsSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -44,27 +46,34 @@ async function served(base, path) {
 }
 
 /** startWorld({serverRoot, slug, port, genesis, dataDir, log, fresh}) → {base, pid, build, healthz, child, dataDir} */
-export async function startWorld({ serverRoot, slug, port, genesis, dataDir, log, fresh = true, kind = 'dev' }) {
+export async function startWorld({ serverRoot, slug, port, genesis, dataDir, log, fresh = true, kind = 'dev', bootTimeoutMs = 900000 }) {
   assertKind(kind);
   const root = resolve(serverRoot);
-  const devWorld = join(root, 'tools/god-skill/dev-world.mjs');
-  if (!existsSync(devWorld)) throw new Error(`no dev-world.mjs under ${root}`);
+  if (!existsSync(join(root, 'apps/server/src/main.ts'))) throw new Error(`no server under ${root}`);
+  if (!/^[a-z][a-z0-9-]{0,31}$/.test(slug ?? '')) throw new Error('slug: lowercase letters, digits, dashes');
   const env = worldEnv(root);
   for (const [k, v] of Object.entries(env)) if (k !== 'INVITE_REQUIRED' && !existsSync(v)) throw new Error(`${k} missing: ${v}`);
+  const data = resolve(dataDir ?? join(root, `.lane/data-${slug}`));
+  if (fresh) rmSync(data, { recursive: true, force: true });
+  mkdirSync(data, { recursive: true });
+  const marsWeb = join(root, '.lane/mars-web');
+  const base = `http://127.0.0.1:${port}/w/${slug}`;
+  // The same environment tools/god-skill/dev-world.mjs sets, plus §0, with a boot wait long enough for a loaded
+  // machine and a large genesis (dev-world.mjs gives up after 180 s; Eden 2026 under load 19 took longer).
+  const worldEnvironment = { ...process.env, ...env, WORLD_KEY: slug, WORLD_ID: `${slug}-1`, ENGINE: 'mars', PORT: String(port), DEV_AUTH: '1', BRAIN_MODE: 'fake', SEED_NATIVES: '0', EDGE_FADING: '1', DATA_DIR: data, PUBLIC_URL: `http://127.0.0.1:${port}`, ...(existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}), ...(genesis ? { GENESIS_FILE: resolve(root, genesis) } : {}) };
   if (log) mkdirSync(resolve(log, '..'), { recursive: true });
-  const mod = await import(pathToFileURL(devWorld).href);
-  // dev-world.mjs spreads process.env synchronously before its first await; set the §0 env only around the call.
-  const saved = Object.fromEntries(Object.keys(env).map((k) => [k, process.env[k]]));
-  Object.assign(process.env, env);
-  let started;
-  try {
-    started = await mod.startWorld({ slug, port, data: dataDir ? resolve(dataDir) : undefined, genesis: genesis ? resolve(root, genesis) : undefined, fresh, log: log ? resolve(log) : undefined });
-  } finally {
-    for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  const out = log ? openSync(resolve(log), 'a') : 'ignore';
+  const child = spawn(process.execPath, ['apps/server/src/main.ts'], { cwd: root, env: worldEnvironment, stdio: ['ignore', out, out], detached: true });
+  child.unref();
+  const t0 = Date.now();
+  let h = null;
+  while (Date.now() - t0 < bootTimeoutMs) {
+    if (child.exitCode != null) throw new Error(`world ${slug} exited during boot (code ${child.exitCode}); see ${log}`);
+    try { const r = await fetch(`${base}/healthz`); if (r.ok) { h = await r.json(); break; } } catch { /* booting */ }
+    await sleep(500);
   }
-  started.child.unref();
-  const h = await healthz(started.base);
-  return { base: started.base, pid: started.child.pid, build: h.build ?? null, healthz: h, child: started.child, dataDir: started.dataDir };
+  if (!h) { try { process.kill(-child.pid, 'SIGTERM'); } catch { /* gone */ } throw new Error(`world ${slug} did not come up on :${port} within ${Math.round(bootTimeoutMs / 1000)} s`); }
+  return { base, pid: child.pid, build: h.build ?? null, healthz: h, bootMs: Date.now() - t0, child, dataDir: data };
 }
 
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
