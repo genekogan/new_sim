@@ -44,6 +44,11 @@ bash tools/test-harness/v7-walks.sh /absolute/scratch/gate/<run>-v7          # p
 node tools/test-harness/ship-receipt.mjs <run>/receipt.json <run>-v7/v7-receipt.json   # prints RELEASE_SHIP, writes <run>/ship-receipt.json
 ```
 
+Set `SIM_PREBUILT_WEB_ROOT` to the two exact-source Modal release web artifacts to skip the V7 local builds.
+The same source, flag and file-hash verifier used by `deploy/release.sh` installs the root build into
+`apps/web/dist` and the prefixed build into the fresh run directory. Both destinations must be absent;
+retain any previous output before starting. Browser scenarios and verdicts are unchanged.
+
 `ship-receipt.json` is what a ship attaches. It is `pass`/`quarantined` (the gate's status) only when the V7 source
 SHA equals the gate's candidate SHA, the V7 checkout was clean, every V7 check passed and the gate was not blocked;
 otherwise `blocked` (exit 1). It records both input receipts' sha256 and the remaining exclusion (V8).
