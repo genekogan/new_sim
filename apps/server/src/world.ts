@@ -107,6 +107,10 @@ export type HostListener = {
   onPlay?(p: PlayView, m: Mind | undefined): void;
   onKernel?(v: KernelView): void;
   afterTick?(tick: number): void;
+  /** Notification only: the whole tick, including broadcasts/checkpoint scheduling, completed. */
+  afterTickComplete?(tick: number): void;
+  /** Notification only: the clock was stopped; no queued work is drained. */
+  onStop?(): void;
   onClockUnavailable?():void;
 };
 
@@ -401,7 +405,7 @@ export class WorldHost {
     if (this.frameImmediate) clearImmediate(this.frameImmediate);
     this.frameImmediate = null; this.frameBatch = null;
   }
-  stop() { if (this.timer) clearInterval(this.timer); this.timer = null; this.clockGeneration++; this.cancelFrameBatch(); this.cancelPeriodicSnapshot(); }
+  stop() { if (this.timer) clearInterval(this.timer); this.timer = null; this.clockGeneration++; this.cancelFrameBatch(); this.cancelPeriodicSnapshot(); for (const l of this.listeners) { try { l.onStop?.(); } catch { /* observers cannot prevent stopping */ } } }
   /** The world's own clock loop is running (start(); a served world). False while stepped by hand (tests, tools): lane P5
    *  defers some boot-time derived work only in a served world, so a stepped one sees it at the same tick as before. */
   get running(): boolean { return this.timer !== null; }
@@ -502,6 +506,7 @@ export class WorldHost {
     if (now - this.lastSnapshotTick >= this.snapshotEvery) this.schedulePeriodicSnapshot();
     this.tickMs.push(performance.now() - t0);
     if (this.tickMs.length > 400) this.tickMs.splice(0, 200);
+    for (const l of this.listeners) { try { l.afterTickComplete?.(now); } catch { /* observers cannot undo a completed tick */ } }
   }
 
   /** Accept queued inputs without advancing the engine or starting new mind work. */

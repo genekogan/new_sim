@@ -11,6 +11,7 @@ import { deckRaised, railGaps, rasterOf } from '@sim/generators';
 import { applyBatch, obbOverlap, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type ResidentMove, type WorldModel } from '@sim/world-compiler';
 import { assetFromDef, assetIdFor, isFixtureDef, isFloatingDef, nearestSurfaceSlot, nextEntityPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
 import type { WorldHost } from '../world.ts';
+import type { LogEvent } from '@sim/protocol';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { GodMode } from './god.ts';
@@ -145,6 +146,16 @@ export class EngineBridge {
   /** Level ids levelFor handed out during the current send (their parts are not in `sent` yet). */
   private levelsNow = new Set<number>();
   private reconciled = false;
+  // Readiness observes the ordinary queue/fold; it never steps, drains or changes the projection.
+  private readonly initialEngine: WorldHost['engine'];
+  private projectionFailure: Error | null = null;
+  private projectionDrafts = new Map<WorldEditV1, { applied: boolean }>();
+  private completedTicks = 0;
+  private lastProjectionFold = 0;
+  private completedEdits = -1;
+  private projectedEdits = -1;
+  private readinessChecks = new Set<() => void>();
+  private readinessQueued = false;
   private writeBackBusy = false;
   private refusedPose = new Set<string>();
   /** Bumped by every god edit and by engine edits of things other than bodies (a Soul moving a bowl), not by a body's
@@ -176,6 +187,7 @@ export class EngineBridge {
 
   constructor(o: BridgeOptions) {
     this.host = o.host; this.god = o.god; this.edge = o.edge; this.maxLevel = Math.min(o.maxLevel ?? MAX_LEVEL_ID, MAX_LEVEL_ID); this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
+    this.initialEngine = this.host.engine;
     engineBridges.set(this.god.model, this);
     this.nav = new GodNav({ model: this.god.model, version: () => this.version, staticVersion: () => this.godEdits, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e), placeOf: (ref) => (this.edge ? this.places.forRef(ref)?.id : undefined), describeStamp: () => `${this.describeEpoch}:${this.levels.length}` });
     this.layers = new GodLayers({ model: this.god.model, edge: this.edge, get engine() { return o.host.engine as never; }, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), calendarPlaces: (sources) => this.calendarPlaces(sources), building: id => this.god.builds.closing(id, this.model), buildingActive: () => this.god.builds.hasClosure(), closingSites: () => this.god.builds.closingSites(), log: (m) => this.log(m) });
@@ -197,8 +209,11 @@ export class EngineBridge {
     // LAYERS: "under construction (step)" is part of what an owned or scheduled thing is seen as
     this.god.onBuild(() => { if (this.layers.active()) this.notePerceive([], true); });
     this.host.listeners.push({
-      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0 || this.writeBackPass) this.writeBack(WRITE_BACK_SLICE_MS); this.perceiveStep(tick); if (tick % 5 === 4) this.spotsStep(); if (tick % 40 === 7 || this.layerPlacesPending !== null) this.layersStep(tick % 40 === 7); if (tick % 20 === 13) this.flushMapNotices(); if (!this.navWarm || this.navPending) this.navStep(); if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); } if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); } } },
-      onApplied: (e) => { if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
+      afterTick: (tick) => { try { if (!this.reconciled) { this.reconcile(); this.projectedEdits = this.godEdits; } else { this.flush(); this.projectedEdits = this.godEdits; if (tick % 10 === 0 || this.writeBackPass) this.writeBack(WRITE_BACK_SLICE_MS); this.perceiveStep(tick); if (tick % 5 === 4) this.spotsStep(); if (tick % 40 === 7 || this.layerPlacesPending !== null) this.layersStep(tick % 40 === 7); if (tick % 20 === 13) this.flushMapNotices(); if (!this.navWarm || this.navPending) this.navStep(); if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); } if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); } } } catch (error) { this.failProjection(error); throw error; } },
+      onApplied: (e) => { this.projectionApplied(e); if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
+      afterTickComplete: () => { this.completedTicks++; this.completedEdits = this.projectedEdits; this.checkProjectionSoon(); },
+      onClockUnavailable: () => this.failProjection(new Error('bridge.readiness.clock-unavailable')),
+      onStop: () => this.failProjection(new Error('bridge.readiness.stopped')),
     });
     reachProviders.set(this.god.model, (from, to) => this.reach(from, to));
     syncProviders.set(this.god.model, () => { this.flush(); return this.physics?.hash === this.engine.world.entityPhysicsV1?.hash; });
@@ -242,6 +257,59 @@ export class EngineBridge {
   }
   private get engine(): EngineV1 { return this.host.engine as unknown as EngineV1; }
   private get model(): WorldModel { return this.god.model; }
+
+  /** True only at a completed normal tick frontier, with every derived draft accepted by this engine.
+   * Call again immediately before publishing HTTP: a model commit may occur between promise continuations. */
+  initialProjectionReady(): boolean {
+    if (this.projectionFailure) throw this.projectionFailure;
+    if (this.host.engine !== this.initialEngine) throw new Error('bridge.readiness.engine-replaced');
+    if (!this.host.clockAvailable || this.host.engineFault) throw new Error('bridge.readiness.clock-unavailable');
+    if (!this.reconciled || this.pending.size || this.projectionDrafts.size ||
+        this.completedTicks <= this.lastProjectionFold || this.completedEdits !== this.godEdits) return false;
+    if (this.physics?.hash !== this.engine.world.entityPhysicsV1?.hash) throw new Error('bridge.readiness.physics-mismatch');
+    return true;
+  }
+
+  /** Optional boot barrier. Deadlines fail closed; they are not a delay or a source of synthetic ticks.
+   * No eager promise exists, so installations that do not use this API cannot produce an unhandled rejection. */
+  waitForInitialProjection(o: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<void> {
+    const timeoutMs = o.timeoutMs ?? 60_000;
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return Promise.reject(new Error('bridge.readiness.invalid-deadline'));
+    return new Promise<void>((resolve, reject) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const finish = (error?: unknown) => {
+        this.readinessChecks.delete(check); if (timer) clearTimeout(timer);
+        o.signal?.removeEventListener('abort', abort);
+        if (error !== undefined) reject(error); else resolve();
+      };
+      const abort = () => finish(o.signal?.reason ?? new Error('bridge.readiness.aborted'));
+      const check = () => { try { if (this.initialProjectionReady()) finish(); } catch (error) { finish(error); } };
+      if (o.signal?.aborted) { abort(); return; }
+      this.readinessChecks.add(check);
+      o.signal?.addEventListener('abort', abort, { once: true });
+      timer = setTimeout(() => finish(new Error('bridge.readiness.timeout')), timeoutMs);
+      this.checkProjectionSoon();
+    });
+  }
+  private checkProjectionSoon() {
+    if (!this.readinessChecks.size || this.readinessQueued) return;
+    this.readinessQueued = true;
+    queueMicrotask(() => { this.readinessQueued = false; for (const check of this.readinessChecks) check(); });
+  }
+  private failProjection(error: unknown) {
+    this.projectionFailure ??= error instanceof Error ? error : new Error(String(error));
+    this.projectionDrafts.clear();
+    this.checkProjectionSoon();
+  }
+  private projectionApplied(event: LogEvent) {
+    if (event.kind !== 'world-edit') return;
+    const draft = event.payload as WorldEditV1, pending = this.projectionDrafts.get(draft);
+    if (!pending) return;
+    if (this.host.engine !== this.initialEngine || this.engine.world.entityPhysicsV1?.hash !== draft.hash) {
+      this.failProjection(new Error('bridge.readiness.projection-not-installed')); return;
+    }
+    pending.applied = true; this.lastProjectionFold = this.completedTicks;
+  }
 
   // ------------------------------------------------------------------ entity world → engine
 
@@ -313,7 +381,20 @@ export class EngineBridge {
     this.physics = nextEntityPhysics(this.physics, draft);
     draft.hash = this.physics.hash;
     this.stats.edits++; this.stats.entities += Object.keys(set).length; this.stats.lastMs = Math.round((performance.now() - t0) * 10) / 10;
-    void this.host.enqueue('world-edit', 'god', draft).catch((err) => this.log(`world-edit ${seq} not logged: ${err?.message ?? err}`));
+    const acceptance = { applied: false };
+    this.projectionDrafts.set(draft, acceptance);
+    try {
+      void this.host.enqueue('world-edit', 'god', draft).then(event => {
+        this.projectionDrafts.delete(draft);
+        if (event.payload !== draft || !acceptance.applied || this.host.engine !== this.initialEngine) {
+          this.failProjection(new Error('bridge.readiness.draft-not-accepted')); return;
+        }
+        this.checkProjectionSoon();
+      }, err => {
+        this.projectionDrafts.delete(draft);
+        this.failProjection(err); this.log(`world-edit ${seq} not logged: ${err?.message ?? err}`);
+      });
+    } catch (error) { this.failProjection(error); throw error; }
     if (why !== 'commit' || Object.keys(set).length > 8) this.log(`${why}: world-edit seq ${seq}, ${Object.keys(set).length} entities, ${this.stats.lastMs} ms`);
   }
 

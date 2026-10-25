@@ -154,7 +154,7 @@ const god = config.worldEngine ? new GodMode(db, { genesis, worldId: host.worldI
 const groundHost = god && (host.engine as unknown as {installGroundV1?:unknown}).installGroundV1 ? new GroundHost(db, host, god) : undefined;
 if (groundHost && edge) installGroundCapabilities(edge as never, god!, host);
 // Stage B (lane L9): Souls live among god-built things — entity physics into the engine, fixtures usable, bodies as entities.
-if (god && config.engine === 'mars' && process.env.ENTITY_BRIDGE !== '0') installEngineBridge({ host, god, edge });
+const engineBridge = god && config.engine === 'mars' && process.env.ENTITY_BRIDGE !== '0' ? installEngineBridge({ host, god, edge }) : undefined;
 if (god && process.env.BIRTH_LOOKS !== '0') installBirthLooks(host, edge);  // lane LOOKS: new Souls in new worlds get a varied kit look
 if (god) installWorldEnv(host, god, edge);  // R4-LIVE: Souls perceive the god's weather
 if (god) installLightning(god, edge, () => host.engine.world.tick);  // GOD-ENV: Souls see the bolts and hear the thunder
@@ -209,6 +209,37 @@ if (config.seedNatives && db.liveSouls(host.worldId).length === 0) {
 {const {legacyLookBootHook}=await import('./edge/body/migrate-looks.ts');await legacyLookBootHook(host,db,edge,config.dataDir,process.env);}
 // One-shot operator maintenance: <DATA_DIR>/retire-residents.env retires Souls with no signed-in owner (retire-residents.ts).
 {const {retireResidentsBootHook}=await import('./retire-residents.ts');await retireResidentsBootHook(souls,db,host.worldId,config.dataDir,process.env);}
+// A full model is not ready for HTTP until its ordinary queued projection has folded into the engine.
+// Keep start, maintenance and input ordering above unchanged; this is a readiness boundary, not a CPU saving.
+let closing = false;
+if (engineBridge) {
+  const waitAt = performance.now(), abort = new AbortController();
+  const stopped = (signal: string) => abort.abort(new Error(`boot interrupted: ${signal}`));
+  const term = () => stopped('SIGTERM'), interrupt = () => stopped('SIGINT');
+  process.on('SIGTERM', term); process.on('SIGINT', interrupt);
+  try {
+    // Recheck in this continuation: a pre-listen model commit can follow the bridge's notification microtask.
+    do {
+      const remaining = 60_000 - (performance.now() - waitAt);
+      if (remaining <= 0) throw new Error('bridge.readiness.timeout');
+      await engineBridge.waitForInitialProjection({ signal: abort.signal, timeoutMs: remaining });
+    }
+    while (!engineBridge.initialProjectionReady());
+    console.log(`[boot] initial physics coherent at tick ${host.engine.world.tick}; readiness wait ${Math.round(performance.now() - waitAt)} ms`);
+  } catch (error) {
+    closing = true; console.error('[boot] initial physics unavailable; HTTP was not opened', error);
+    try {
+      for (const close of [() => host.stop(), () => takes.stop(), () => edge?.comms?.close(), () => auth.close(), () => db.close()]) {
+        try { close(); } catch (cleanupError) { console.error('[boot] cleanup failed', cleanupError); }
+      }
+    } finally {
+      process.off('SIGTERM', term); process.off('SIGINT', interrupt);
+      process.exit(abort.signal.aborted ? 0 : 1);
+    }
+  } finally {
+    process.off('SIGTERM', term); process.off('SIGINT', interrupt);
+  }
+}
 server.listen(config.port, config.host, () => {
   console.log(`[http] listening on http://${config.host}:${config.port} (public ${config.publicUrl}), build ${config.build}, brain ${brain.mode}, budget $${brain.budget}/day, invites ${config.inviteRequired ? 'required' : 'open'}`);
   const s = (ms: number) => (ms / 1000).toFixed(2);
@@ -216,7 +247,6 @@ server.listen(config.port, config.host, () => {
   if (process.env.SIM_STANDBY === '1') console.log(`[boot] listening ${s(performance.now() - bootAt.go)} s after the standby go: database ${s(bootAt.db - bootAt.go)}, factory ${s(bootAt.open - bootAt.db)}, engine ${s(bootAt.engine - bootAt.open)}, the rest ${s(performance.now() - bootAt.engine)}`);
 });
 
-let closing = false;
 const shutdown = async (sig: string) => {
   if (closing) return; closing = true;
   if (writesInFlight.size) {
