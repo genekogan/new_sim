@@ -111,7 +111,7 @@ async function cmdRun(a) {
         if (m.browser.sampler) { try { ctx.sampler = m.browser.sampler({ cameras: ctx.cameras, everySec: observer.sampleSec, runDir }); ctx.sampler.start?.(); } catch (e) { log('sampler not started', e.message); } }
       } else log('observer modules missing: playing without screenshots/evidence');
       const quotaCheck = async () => { const q = await quota(); const r = quotaAllows(q, { stopPct: scenario.rails?.quotaStopPct ?? 90 }); if (!r.allowed) log('QUOTA STOP', r.note); return r.allowed; };
-      const play = await m.director.runPlay({ runDir, scenario, world: { ...ctx.world, name: scenario.world.slug, skillPath: join(runDir, 'server', 'skill.md') }, seats: ctx.seats, god: ctx.god, observer, owner: m.owner, seed, quotaCheck });
+      const play = await m.director.runPlay({ runDir, scenario, world: { ...ctx.world, name: scenario.world.slug, skillPath: join(runDir, 'server', 'skill.md') }, seats: Object.fromEntries(ctx.seats.map((s) => [infoOf(s).id, s])), god: ctx.god, observer, owner: m.owner, seed, quotaCheck });
       receipt(runDir, 3, 'play', { ok: true, ...play });
     }
     // 4 close
