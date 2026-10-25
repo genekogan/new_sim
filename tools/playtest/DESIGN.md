@@ -10,7 +10,9 @@ This file is the contract between the modules. Workers own the files listed unde
 
 - **Worlds for stage 3 rung 1**: local dev worlds started from the SOUL3 integration worktree server
   (`--server-root <worktrees>/soul3-integration`), with `INVITE_REQUIRED=0`, `EDGE_CONTROLLER_CLI_FILE` (eden.mjs),
-  `EDGE_CLI_FILE` (eden-agent.mjs), `WEB_DIR=<server-root>/apps/web/dist`, `DEV_AUTH=1`, fake minds, one port per world
+  `EDGE_CLI_FILE` (eden-agent.mjs), **`EDGE_SKILL_FILE` and `EDGE_INSTRUCTIONS_FILE`** (`tools/world-launcher/soul/skill.md`,
+  `instructions.md`; without them the world serves the 2.0 client with the 1.9.5 skill and onboards with eden-agent.mjs: found
+  by worker A, missed by pre-flight which checked status codes only), `WEB_DIR=<server-root>/apps/web/dist`, `DEV_AUTH=1`, fake minds, one port per world
   from 4990 upward. `tools/god-skill/dev-world.mjs` from that root does the start (it spreads `process.env`).
 - **Owner identity**: the harness generates `agent-<24 hex>` per seat, writes `{"identity":"agent-…"}` to the seat
   folder as `.eden-agent.json` before `register`, and acts as the owner with `Bearer dev:agent-…`. The browser signs in
@@ -247,9 +249,9 @@ usage, sessionId}`; parses the last JSON object in the text).
 Soul seat (chat turn 1): `Make me a Soul in this world: <base>/ . Call it <Name>. Start from <base>/instructions.md.`
 (The persona sheet may rephrase in its own voice; the Director passes the persona's wording when in persona mode and
 this default in scripted mode.)
-God seat (turn 1): `You are the god of my world at <base>/ . Set yourself up from <base>/god-skill (register with
-dev:admin and mint, since this is a local world), then wait for my messages.` Verify the served god skill path at build
-time (`/god/SKILL.md`?) and correct this line in `god-seat.mjs`.
+God seat (turn 1): `You are the god of my world at <base>/ . Set yourself up from <base>/god/SKILL.md (the CLI is
+<base>/god/eden-god.mjs; register with dev:admin and mint, since this is a local world), then wait for my messages.`
+Verified: the world serves `/god/SKILL.md` and `/god/eden-god.mjs`; `tools/god-skill/build/` does not exist.
 
 ## 7. Tests
 
@@ -265,3 +267,19 @@ one scripted request, one shot, and tears down (≈ 2 min; run manually).
   lane branch with clear messages; never push; never touch `<repo>` main or the integration worktree's source.
 - Context hygiene: keep under ~120k; read only what you need; prefer small files; no full-suite runs.
 - Never print or copy a token; never read `.eden-agent.json` after a seat ran; TEST names only.
+
+## 9. Findings from the build (2026-10-24, workers A–D)
+
+- `claude -p` does not exit while the agent's background `listen` is alive: the adapter ends a turn 3 s after the closing
+  `result` event (a resumed session also emits an early empty `result`, ignored). Turns killed at the wall cap have no
+  usage row (cost unknown, recorded as null).
+- Headless `claude -p` under `~/Eden` loads the repo's and the user's CLAUDE.md even with `--setting-sources project`;
+  `CLAUDE_CODE_DISABLE_CLAUDE_MDS=1` is set on every seat, persona, Reviewer and Developer call.
+- Absolute paths in `--allowedTools` need the `//` form (`Read(//Users/...)`); seats use relative `./**` rules.
+- Codex seats load `~/.codex/AGENTS.md` even with `--ignore-user-config`, and Codex follows the skill by running `listen`
+  in the foreground, so every Codex turn runs to its wall cap. Codex seats are not used in rung 1; both are open items.
+- `#soul/<id>` only selects a Soul; Follow needs a real click on `.soul-card .soul-follow`; the owner's card hides Follow
+  while the agent is away. `/v1/god/snapshot` refuses `dev:admin`; godSlice uses the served god CLI with its own folder.
+- Speech bubbles are drawn in 3D and are not legible as text; name tags, chips and the dialogue dock are.
+- Under machine load 15–25 each client call took 20–25 s and arrival shots 2.4–3.5 s; unloaded, calls are 1–6 s (`here` is
+  the slowest) and shots about 1 s.
