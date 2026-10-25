@@ -31,7 +31,8 @@ export function summarizeCall(cmd, tool) {
   let s = String(cmd ?? '').replace(/\s+/g, ' ').trim();
   s = s.replace(/\bnode eden\.mjs\b/g, 'eden').replace(/(msg_[0-9a-f]{8})[0-9a-f-]{20,}/g, '$1…');
   if (/^\{/.test(s)) { try { const o = JSON.parse(cmd); s = `${tool ?? 'tool'} ${o.file_path ?? o.path ?? o.pattern ?? o.url ?? ''}`.trim(); } catch { /* keep */ } }
-  if (/^\/(private|tmp|Users)\//.test(s)) s = `${tool ?? 'file'} …/${s.split(/[\s/]/).filter(Boolean).slice(-1)[0]}`;
+  if (/^\/(private|tmp|Users)\//.test(s)) s = `${tool ?? 'file'} ${s}`;
+  s = s.replace(/\/(?:private|tmp|Users)\/[^\s'"]*\/([^\s'"/]+)/g, '…/$1'); // local folders say nothing and should not travel
   return clip(s, 120);
 }
 
@@ -57,7 +58,7 @@ function seatStreams(run, seat) {
     const g = { ms: ms(t.t), n, kind: t.kind ?? 'step', png, json, decision: t.decision ?? {}, requestId: t.requestId ?? null };
     turns.push(g); if (png) glances.push(g);
   }
-  const shown = (g) => { if (g._legible !== undefined) return g._legible; const j = readJson(isAbsolute(g.json) ? g.json : join(run.runDir, g.json), null); g._legible = j?.legible ?? null; return g._legible; };
+  const shown = (g) => { if (!g?.json) return null; if (g._legible !== undefined) return g._legible; const j = readJson(isAbsolute(g.json) ? g.json : join(run.runDir, g.json), null); g._legible = j?.legible ?? null; return g._legible; };
   const cam = seat === 'god' ? 'god' : seat;
   const camShots = run.shotsIndex.filter((s) => s.cam === cam && s.t).map((s) => ({ ms: ms(s.t), path: rel(s.path) })).filter((s) => s.path).sort((a, b) => a.ms - b.ms);
   const evs = run.evidence.filter((e) => e.seat === seat);
@@ -105,15 +106,15 @@ function candidates(run, seat, S, side) {
   }
   for (const ev of S.evs) {
     const rid = [ev.requestId]; const chat = ev.channel === 'chat'; const sent = S.ms(ev.sentAt); const cut = ev.cutoffAt ? S.ms(ev.cutoffAt) : null;
-    if (ev.ackAt) add({ ms: S.ms(ev.ackAt), kind: 'ack', imp: 2, title: chat ? 'assistant acknowledged' : 'card acknowledged', said: ev.ackText, requestIds: rid, lines: [`after ${((S.ms(ev.ackAt) - sent) / 1000).toFixed(0)} s`] });
-    if (ev.resultAt) add({ ms: S.ms(ev.resultAt), kind: 'result', imp: 2, title: chat ? 'assistant replied' : `card result${ev.resultState ? ` (${ev.resultState})` : ''}`, said: ev.resultText, requestIds: rid, lines: [`after ${((S.ms(ev.resultAt) - sent) / 1000).toFixed(0)} s`] });
-    if (ev.firstBodyChangeAt && (cut == null || S.ms(ev.firstBodyChangeAt) <= cut)) add({ ms: S.ms(ev.firstBodyChangeAt), kind: 'body', imp: 1, bodyChanged: true, title: 'body started to change', requestIds: rid, lines: [`${((S.ms(ev.firstBodyChangeAt) - sent) / 1000).toFixed(0)} s after the ask`] });
+    if (ev.ackAt) add({ ms: S.ms(ev.ackAt), kind: 'ack', imp: 2, title: chat ? 'assistant acknowledged' : 'card acknowledged', said: ev.ackText, requestIds: rid, lines: [`ack after ${((S.ms(ev.ackAt) - sent) / 1000).toFixed(0)} s`] });
+    if (ev.resultAt) add({ ms: S.ms(ev.resultAt), kind: 'result', imp: 2, title: chat ? 'assistant replied' : `card result${ev.resultState ? ` (${ev.resultState})` : ''}`, said: ev.resultText, requestIds: rid, lines: [`answer after ${((S.ms(ev.resultAt) - sent) / 1000).toFixed(0)} s`] });
+    if (ev.firstBodyChangeAt && (cut == null || S.ms(ev.firstBodyChangeAt) <= cut)) add({ ms: S.ms(ev.firstBodyChangeAt), kind: 'body', imp: 1, bodyChanged: true, title: 'body started to change', requestIds: rid, lines: [`body moved ${((S.ms(ev.firstBodyChangeAt) - sent) / 1000).toFixed(0)} s after the ask`] });
     if (cut != null) {
       const v = side.ledger.find((r) => r.requestId === ev.requestId) ?? side.reviews.find((r) => r.requestId === ev.requestId) ?? null;
       const fails = side.oracles.filter((o) => o.requestId === ev.requestId && o.status === 'fail').map((o) => ({ id: o.id, detail: clip(o.detail, 160) }));
       const issue = side.issues.find((i) => (i.requestIds ?? []).includes(ev.requestId)) ?? null;
       const fid = v?.fidelity || null; const phys = fails.some((f) => PHYS.has(f.id));
-      const verdict = { requestId: ev.requestId, asked: ev.text, fidelity: fid, class: v?.class || null, reason: v?.reason ? clip(v.reason, 420) : null, issueId: issue?.id ?? null, issueTitle: issue?.title ?? null, oracleFails: fails };
+      const verdict = { requestId: ev.requestId, asked: ev.text, fidelity: fid, class: v?.class || null, reason: v?.reason ? clip(v.reason, 640) : null, issueId: issue?.id ?? null, issueTitle: issue?.title ?? null, oracleFails: fails };
       const noAnswer = !ev.ackAt && !ev.resultAt;
       add({ ms: cut, kind: 'close', imp: fid === 'W' || fails.length ? 3 : 2, protect: fid === 'W', sev: Math.max(fidSev[fid] ?? 0, phys ? 3 : fails.length ? 1 : 0, noAnswer ? 2 : 0), title: `${ev.requestId} closed${noAnswer ? ' with no answer' : ''}`, verdict, requestIds: rid, lines: [`"${clip(ev.text, 90)}" (${ev.cutoffReason ?? 'closed'})`] });
       if (fid === 'M' || v?.class === 'O4') {
@@ -259,7 +260,7 @@ function finish(k, S, run) {
   const shot = shotFor(k.ms, S, k.shotPref);
   // The card line is what the pictured screen showed; the body line is the world's record at the moment itself.
   const card = (shot?.source === 'director' ? lastAt(S.legible, Math.max(k.ms, shot.ms), 300) : lastAt(S.legible, k.ms))?.card ?? null; const smp = lastAt(S.samples, k.ms);
-  const glanceDoing = !smp ? S.shown(lastAt(S.glances, k.ms) ?? {}) ?? null : null;
+  const g = !smp ? lastAt(S.glances, k.ms) : null; const glanceDoing = g ? S.shown(g) : null;
   const v = k.verdicts.reduce((a, b) => (!a || (fidSev[b.fidelity] ?? -1) > (fidSev[a.fidelity] ?? -1) ? b : a), null);
   return {
     t: Math.round(k.ms / 100) / 10, mono: Math.round(k.ms), seat: k.seat, kind: k.kind, kinds: k.kinds, title: k.title, text: k.text,
