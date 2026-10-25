@@ -65,6 +65,16 @@ desire "i wanted pip to jump in the boat but i cant even find him". Valid JSON b
 - From the world: `world.name` (or `slug`), and `world.skillPath` for the expert.
 - Glance range precedence: `seat.glanceSec`, then the sheet, then `scenario.director.glanceSec`.
 
+## Glue needed against the committed arena/observer (checked at the end)
+- `Seat` has no `renderedChatSince` or `turnCount`. The director needs one of them over the adapter's `renderChat`.
+  It already reads `seat.info.soulId` and `seat.info.ownerIdentity`.
+- The director calls `seat.noteRequest()` on each delivery, if the seat has it.
+- `sendGodCard` and `godCardView` are module functions that take `{base, text}`. The director wants `sendGodCard({text})`
+  and `cardView()` methods on the god seat object: wrap them.
+- The observer exports `openCamera(...)`, not `observer.camera(seatId)`. Pass
+  `{camera: (id) => followCams[id], evidence: {openRequest}}`.
+- `owner.mjs` `sendCard` and `cardView` match as they are.
+
 ## Stubbed or not done
 - Not run against the real arena or observer, which do not exist yet.
 - Chat-channel requests close when the card result changes after the chat turn, otherwise at max-turns or budget.

@@ -117,6 +117,7 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
     const requestId = `${ctx.id}-${String(++ctx.reqN).padStart(3, '0')}`;
     const sentMono = clock.now(); const sentAt = new Date().toISOString();
     let messageId = null;
+    try { ctx.seat.noteRequest?.(); } catch { /* optional: arena's per-request wake counter */ }
     try {
       if (say.channel === 'card') {
         const r = ctx.kind === 'god' ? await ctx.seat.sendGodCard({ text: say.text }) : await owner.sendCard({ base: world?.base, soulId: ctx.soulId, identity: ctx.identity, text: say.text });
