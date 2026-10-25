@@ -47,7 +47,7 @@ async function served(base, path) {
 }
 
 /** startWorld({serverRoot, slug, port, genesis, dataDir, log, fresh}) → {base, pid, build, healthz, child, dataDir} */
-export async function startWorld({ serverRoot, slug, port, genesis, dataDir, log, fresh = true, kind = 'dev', bootTimeoutMs = 900000 }) {
+export async function startWorld({ serverRoot, slug, port, genesis, dataDir, log, fresh = true, kind = 'dev', bootTimeoutMs = 900000, natives = false }) {
   assertKind(kind);
   const root = resolve(serverRoot);
   if (!existsSync(join(root, 'apps/server/src/main.ts'))) throw new Error(`no server under ${root}`);
@@ -61,10 +61,11 @@ export async function startWorld({ serverRoot, slug, port, genesis, dataDir, log
   // so Souls get their composed bodies locally; falls back to the server root's .lane/mars-web.
   const overlay = process.env.PLAYTEST_MARS_WEB ?? join(homedir(), 'Eden/team/playtest/mars-web');
   const marsWeb = existsSync(join(overlay, 'modular/humanoid/kit.json')) ? overlay : join(root, '.lane/mars-web');
+  // natives: scenario.world.natives seeds native residents (production worlds have them; dev worlds default to none).
   const base = `http://127.0.0.1:${port}/w/${slug}`;
   // The same environment tools/god-skill/dev-world.mjs sets, plus §0, with a boot wait long enough for a loaded
   // machine and a large genesis (dev-world.mjs gives up after 180 s; Eden 2026 under load 19 took longer).
-  const worldEnvironment = { ...process.env, ...env, WORLD_KEY: slug, WORLD_ID: `${slug}-1`, ENGINE: 'mars', PORT: String(port), DEV_AUTH: '1', BRAIN_MODE: 'fake', SEED_NATIVES: '0', EDGE_FADING: '1', DATA_DIR: data, PUBLIC_URL: `http://127.0.0.1:${port}`, ...(existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}), ...(genesis ? { GENESIS_FILE: resolve(root, genesis) } : {}) };
+  const worldEnvironment = { ...process.env, ...env, WORLD_KEY: slug, WORLD_ID: `${slug}-1`, ENGINE: 'mars', PORT: String(port), DEV_AUTH: '1', BRAIN_MODE: 'fake', SEED_NATIVES: natives ? '1' : '0', EDGE_FADING: '1', DATA_DIR: data, PUBLIC_URL: `http://127.0.0.1:${port}`, ...(existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}), ...(genesis ? { GENESIS_FILE: resolve(root, genesis) } : {}) };
   if (log) mkdirSync(resolve(log, '..'), { recursive: true });
   const out = log ? openSync(resolve(log), 'a') : 'ignore';
   const child = spawn(process.execPath, ['apps/server/src/main.ts'], { cwd: root, env: worldEnvironment, stdio: ['ignore', out, out], detached: true });
