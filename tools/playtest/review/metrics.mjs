@@ -35,8 +35,25 @@ export function computeMetrics(run, { ledger = [], oracles = null, emergence = n
   const shotsPlanned = Math.floor((run.scenario?.durationSec ?? 0) / sampleSec) * (cams === 1 ? seatsN : seatsN + cams - 1);
   const lateness = ev.flatMap((e) => { const s = (e.samples ?? []).map((x) => Date.parse(x.t)); return s.slice(1).map((t, i) => (t - s[i]) / 1000 - sampleSec).filter((d) => d > sampleSec * 0.5); });
   const disagreements = existsSync(join(run.runDir, 'coordinator-ledger.tsv')) ? (() => { const c = readLedger(join(run.runDir, 'coordinator-ledger.tsv')); return c.filter((x) => ledger.find((r) => r.requestId === x.requestId && r.fidelity !== x.fidelity)).length; })() : null;
+  // Basics scorecard (Gene 2026-10-25): plain walking and acting must work before anything subjective is scored.
+  const WALKREQ = /\b(walk|go|come|head|run|stroll)\b/i;
+  const walkReqs = ev.filter((e) => WALKREQ.test(e.text ?? ''));
+  const oracleFor = (e, id) => ors.find((r) => r.requestId === e.requestId && r.id === id);
+  const arrived = walkReqs.filter((e) => oracleFor(e, 'arrival')?.status === 'pass').length;
+  const arrivalKnown = walkReqs.filter((e) => ['pass', 'fail'].includes(oracleFor(e, 'arrival')?.status)).length;
+  const startedInBudget = ev.filter((e) => e.firstBodyChangeAt && (!e.budgetSec || secsBetween(e.sentAt, e.firstBodyChangeAt) <= e.budgetSec)).length;
+  const basics = {
+    requests: ev.length, walkRequests: walkReqs.length, walksArrived: arrived, walksArrivalKnown: arrivalKnown,
+    walkArrivalRate: arrivalKnown ? arrived / arrivalKnown : null,
+    bodyMovedInBudget: startedInBudget, bodyMovedRate: ev.length ? startedInBudget / ev.length : null,
+    ackMedianSec: stats(cardEv.map((e) => secsBetween(e.sentAt, e.ackAt))).median,
+    firstBodyChangeMedianSec: stats(ev.map((e) => secsBetween(e.sentAt, e.firstBodyChangeAt))).median,
+    stuck: count(ors, 'stuck-receipt') + count(ors, 'no-progress'), insideSolid: count(ors, 'inside-solid'), oscillations: count(ors, 'oscillation'),
+    wrong: fid.W, hits: fid.H,
+    basis: 'walk requests by verb in the owner text; arrival from the arrival oracle (unknown excluded); body moved = first visible body change inside the request budget',
+  };
   return {
-    version: 1, scenario: run.scenario?.name ?? null, requests: ev.length,
+    version: 1, scenario: run.scenario?.name ?? null, requests: ev.length, basics,
     speed: {
       ackSec: stats(cardEv.map((e) => secsBetween(e.sentAt, e.ackAt))), firstBodyChangeSec: stats(ev.map((e) => secsBetween(e.sentAt, e.firstBodyChangeAt))), resultSec: stats(ev.map((e) => secsBetween(e.sentAt, e.resultAt))),
       walkMps: stats(speeds), wallVsBudget: stats(ev.map((e) => (e.budgetSec ? secsBetween(e.sentAt, e.cutoffAt) / e.budgetSec : null))),

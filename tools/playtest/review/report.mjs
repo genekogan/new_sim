@@ -43,6 +43,7 @@ const delta = (a, b) => (typeof a === 'number' && typeof b === 'number' ? (a - b
 export function previousRun(runDir) { return earlierRuns(runDir).reverse().find((d) => existsSync(join(d, 'metrics.json'))) ?? null; }
 
 export function renderReport(run, { metrics, prevMetrics = null, prevName = null, ledger = [], issues = [], frs = [], emergence = null, specs = [], reviews = [] }) {
+  const b = metrics?.basics ?? {};
   const s = run.scenario ?? {}; const L = [];
   const cost = metrics.cost.tokensTotal;
   L.push(`# Playtest report — ${s.name ?? 'session'} (${basename(run.runDir)})`, '');
@@ -53,6 +54,7 @@ export function renderReport(run, { metrics, prevMetrics = null, prevName = null
     `| Seed / duration | ${seedOf(run) ?? '—'} · ${s.durationSec ?? '?'} s · director ${s.director?.mode ?? '?'} |`,
     `| Cost (seats) | ${cost.input} in / ${cost.cached} cached / ${cost.output} out tokens |`,
     `| Review | Reviewer ${s.review?.reviewerModel ?? 'opus'}, Developer ${s.review?.developerModel ?? 'opus'}, rubric \`RUBRIC.md\` \`${rubricHash().slice(0, 12)}\` |`, '');
+  L.push('## 1b. Basics scorecard', '', 'Plain walking and acting first; everything subjective comes after.', '', '| walks asked | arrived | arrival rate | body moved in budget | ack median (s) | first body change median (s) | stuck / no progress | inside solid | wrong | hits |', '|---|---|---|---|---|---|---|---|---|---|', `| ${b.walkRequests ?? 0} | ${b.walksArrived ?? 0} of ${b.walksArrivalKnown ?? 0} known | ${fmt(b.walkArrivalRate)} | ${b.bodyMovedInBudget ?? 0} of ${b.requests ?? 0} (${fmt(b.bodyMovedRate)}) | ${fmt(b.ackMedianSec)} | ${fmt(b.firstBodyChangeMedianSec)} | ${b.stuck ?? 0} | ${b.insideSolid ?? 0} | ${b.wrong ?? 0} | ${b.hits ?? 0} |`, '');
   L.push('## 2. What happened', '');
   if (emergence?.narrative?.strangerReading) L.push(emergence.narrative.strangerReading, '');
   const frames = []; for (const ev of run.evidence) { const r = ledger.find((x) => x.requestId === ev.requestId); const shot = (ev.shots ?? []).find((p) => existsSync(join(run.runDir, p))); if (shot) frames.push({ shot, cap: `${ev.requestId} "${ev.text}" — ${r?.fidelity ?? '?'}` }); }
