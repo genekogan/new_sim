@@ -6,7 +6,8 @@
   "kind": "dev",
   "genesis": "worlds/templates/eden-district.json",
   "slug": "pt-eden-t2",
-  "port": 4997
+  "port": 4997,
+  "natives": true
  },
  "durationSec": 900,
  "seats": [
@@ -34,8 +35,8 @@
    "startOffsetSec": 90,
    "soulName": "Mira",
    "channelMix": {
-    "chat": 1.0,
-    "card": 0.0
+    "chat": 1,
+    "card": 0
    },
    "wake": false
   },

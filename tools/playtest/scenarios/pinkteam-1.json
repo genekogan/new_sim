@@ -6,7 +6,8 @@
   "kind": "dev",
   "genesis": "worlds/templates/eden-district.json",
   "slug": "pt-eden-pink",
-  "port": 4992
+  "port": 4992,
+  "natives": true
  },
  "durationSec": 720,
  "seats": [

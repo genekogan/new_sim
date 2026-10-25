@@ -135,3 +135,14 @@ test('chat queued behind a running turn: turn linked, queuedSec recorded, budget
   const rec = jsonl(join(r.runDir, 'personas/a/requests.jsonl')).find((x) => x.requestId === 'a-002');
   assert.equal(rec.queuedSec, 4);
 });
+
+test('scenario defaults: persona scenarios seed natives; the scripted basics batteries do not; god requests get 600 s', async () => {
+  const { readdirSync } = await import('node:fs');
+  const dir = new URL('../scenarios/', import.meta.url);
+  for (const f of readdirSync(dir).filter((x) => x.endsWith('.json'))) {
+    const s = JSON.parse(readFileSync(new URL(f, dir), 'utf8'));
+    if ((s.director?.mode ?? 'persona') === 'persona') assert.equal(s.world.natives, true, f);
+    else assert.notEqual(s.world.natives, true, f);
+  }
+  assert.equal(budgetMsFor({ scenario: {}, god: true }), 600000);
+});

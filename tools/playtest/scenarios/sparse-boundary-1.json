@@ -6,7 +6,8 @@
   "kind": "dev",
   "genesis": "worlds/templates/hello-hamlet.json",
   "slug": "pt-hamlet-sb",
-  "port": 4996
+  "port": 4996,
+  "natives": true
  },
  "durationSec": 720,
  "seats": [
@@ -20,8 +21,8 @@
    "startOffsetSec": 0,
    "soulName": "Vex",
    "channelMix": {
-    "chat": 1.0,
-    "card": 0.0
+    "chat": 1,
+    "card": 0
    },
    "wake": false
   },

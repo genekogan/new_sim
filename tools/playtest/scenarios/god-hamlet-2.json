@@ -6,7 +6,8 @@
   "kind": "dev",
   "genesis": "worlds/templates/hello-hamlet.json",
   "slug": "pt-hamlet-g2",
-  "port": 4998
+  "port": 4998,
+  "natives": true
  },
  "durationSec": 900,
  "seats": [

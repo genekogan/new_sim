@@ -6,7 +6,8 @@
   "kind": "dev",
   "genesis": "worlds/templates/eden-district.json",
   "slug": "pt-eden-b",
-  "port": 4991
+  "port": 4991,
+  "natives": true
  },
  "durationSec": 900,
  "seats": [
