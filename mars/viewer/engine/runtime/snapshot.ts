@@ -184,9 +184,9 @@ export function takeSnapshot(rt: Runtime, int: RuntimeInternals, opts: SnapshotO
     if (!(e instanceof CodecError)) throw e;
     throw new SnapshotError('snapshot.unencodable', `cannot take a resumable snapshot at tick ${rt.tick}: ${e.message}`);
   }
-  // prove the blob is plain JSON that decodes to the same graph
-  const back = encode(decode(JSON.parse(JSON.stringify(data))));
-  if (hashOf(back) !== hashOf(data)) throw new SnapshotError('snapshot.roundtrip', `snapshot at tick ${rt.tick} does not survive a JSON round trip`);
+  // encode validates inert source data and constructs an owned JSON-safe graph. Its
+  // alias/JSON roundtrip contract is exercised in codec tests, not by decoding and
+  // re-encoding every captured world here. Restore still verifies the world hash.
   return {
     format: SNAPSHOT_FORMAT,
     tick: rt.tick,

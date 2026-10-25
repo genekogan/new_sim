@@ -5,6 +5,10 @@
 //   - Map / Set (traffic holds, owners), undefined, NaN / ±Infinity / -0.
 // Anything else — functions (closures), class instances, typed arrays, symbols, bigints — cannot be
 // resumed faithfully, so encode() throws a CodecError naming the path instead of silently dropping it.
+// Inputs are inert simulation data: own enumerable data properties, dense arrays and native Map/Set
+// entries. Accessors, enumerable symbol keys and extra enumerable collection properties are refused.
+// Non-enumerable object metadata and prototypes are not part of the persisted graph. As with the
+// runtime itself, proxies and modified global built-ins are outside this data contract.
 // Objects referenced only once encode as themselves, so the world stays readable plain JSON.
 
 export class CodecError extends Error {
@@ -20,41 +24,86 @@ const isPlain = (o: object) => {
   return p === Object.prototype || p === null;
 };
 
-function describe(v: unknown): string | null {
-  const t = typeof v;
-  if (t === 'function') return `a function (${(v as { name?: string }).name || 'closure'})`;
-  if (t === 'symbol' || t === 'bigint') return `a ${t}`;
-  if (t !== 'object' || v === null) return null;
-  if (Array.isArray(v) || v instanceof Map || v instanceof Set) return null;
-  if (!isPlain(v as object)) return `an instance of ${(v as object).constructor?.name ?? 'an unknown class'}`;
-  return null;
+type Captured = { refs: number } & (
+  | { kind: 'object'; entries: [string, unknown][]; tilde: boolean }
+  | { kind: 'array'; values: unknown[] }
+  | { kind: 'set'; values: unknown[] }
+  | { kind: 'map'; entries: [unknown, unknown][] }
+);
+
+function rejectSymbolKeys(v: object, path: string): void {
+  for (const key of Object.getOwnPropertySymbols(v))
+    if (Object.getOwnPropertyDescriptor(v, key)!.enumerable)
+      throw new CodecError(path, 'an object with an enumerable symbol key');
 }
 
-function children(v: object): [string, unknown][] {
-  if (Array.isArray(v)) return v.map((x, i) => [String(i), x]);
-  if (v instanceof Set) return [...v].map((x, i) => [`<set ${i}>`, x]);
-  if (v instanceof Map) {
-    const out: [string, unknown][] = [];
-    for (const [k, x] of v) out.push([`<key ${String(k)}>`, k], [String(k), x]);
-    return out;
-  }
-  return Object.entries(v);
+/** Read descriptors, never values through accessors (including diagnostic getters such as constructor/name). */
+function dataValue(v: object, key: string, path: string): unknown {
+  const descriptor = Object.getOwnPropertyDescriptor(v, key);
+  if (!descriptor) throw new CodecError(path, 'an array hole');
+  if (!('value' in descriptor)) throw new CodecError(path, 'an accessor property');
+  return descriptor.value;
 }
 
-/** `skipMapValues`: Map entries whose value is one of these objects are left out (dropped actions). */
+function putOwn(out: Record<string, unknown>, key: string, value: unknown): void {
+  // Assignment would invoke Object.prototype.__proto__, losing a legitimate data key.
+  if (key === '__proto__') Object.defineProperty(out, key, { value, enumerable: true, writable: true, configurable: true });
+  else out[key] = value;
+}
+
+/** Successful encoding returns an owned JSON tree: dense arrays, plain objects and
+ * finite JSON primitives. Special values and graph edges use the existing tags;
+ * no source object/getter/iterator survives in the result. `skipMapValues` omits
+ * whole Map entries whose value is in the set (dropped actions). */
 export function encode(root: unknown, rootPath = '$', skipMapValues: ReadonlySet<object> = new Set()): unknown {
-  // pass 1: find objects reached more than once (they get an id at their first emission)
-  const seen = new Map<object, number>();
+  // Pass 1 validates and captures each object's children once, and counts references.
+  // Pass 2 reads only these captured values: no getters, source iterators or second source traversal.
+  const captured = new Map<object, Captured>();
   const visit = (v: unknown, path: string) => {
-    const bad = describe(v);
-    if (bad) throw new CodecError(path, bad);
+    const type = typeof v;
+    if (type === 'function' || type === 'symbol' || type === 'bigint') throw new CodecError(path, `a ${type}`);
     if (typeof v !== 'object' || v === null) return;
-    const n = seen.get(v) ?? 0;
-    seen.set(v, n + 1);
-    if (n) return;
-    for (const [k, x] of children(v)) {
-      if (v instanceof Map && typeof x === 'object' && x !== null && skipMapValues.has(x)) continue;
-      visit(x, `${path}.${k}`);
+    const known = captured.get(v);
+    if (known) { known.refs++; return; }
+    rejectSymbolKeys(v, path);
+    if (Array.isArray(v)) {
+      const values: unknown[] = [], length = v.length;
+      for (const key of Object.keys(v)) {
+        const index = Number(key);
+        if (!Number.isInteger(index) || index < 0 || index >= length || String(index) !== key)
+          throw new CodecError(`${path}.${key}`, 'an extra array property');
+      }
+      for (let i = 0; i < length; i++) values.push(dataValue(v, String(i), `${path}.${i}`));
+      captured.set(v, { kind: 'array', refs: 1, values });
+      for (let i = 0; i < values.length; i++) visit(values[i], `${path}.${i}`);
+    } else if (v instanceof Map) {
+      const extra = Object.keys(v)[0];
+      if (extra !== undefined) throw new CodecError(`${path}.${extra}`, 'an extra Map property');
+      const entries: [unknown, unknown][] = [];
+      // Native iteration bypasses user-defined iterators and never coerces object keys for a path.
+      for (const [key, value] of Map.prototype.entries.call(v))
+        if (!(typeof value === 'object' && value !== null && skipMapValues.has(value))) entries.push([key, value]);
+      captured.set(v, { kind: 'map', refs: 1, entries });
+      for (let i = 0; i < entries.length; i++) {
+        visit(entries[i][0], `${path}.<map key ${i}>`);
+        visit(entries[i][1], `${path}.<map value ${i}>`);
+      }
+    } else if (v instanceof Set) {
+      const extra = Object.keys(v)[0];
+      if (extra !== undefined) throw new CodecError(`${path}.${extra}`, 'an extra Set property');
+      const values: unknown[] = [...Set.prototype.values.call(v)];
+      captured.set(v, { kind: 'set', refs: 1, values });
+      for (let i = 0; i < values.length; i++) visit(values[i], `${path}.<set ${i}>`);
+    } else {
+      if (!isPlain(v)) throw new CodecError(path, 'an instance with an unsupported prototype');
+      const entries: [string, unknown][] = [];
+      let tilde = false;
+      for (const key of Object.keys(v)) {
+        entries.push([key, dataValue(v, key, `${path}.${key}`)]);
+        tilde ||= key.startsWith('~');
+      }
+      captured.set(v, { kind: 'object', refs: 1, entries, tilde });
+      for (const [key, value] of entries) visit(value, `${path}.${key}`);
     }
   };
   visit(root, rootPath);
@@ -73,24 +122,19 @@ export function encode(root: unknown, rootPath = '$', skipMapValues: ReadonlySet
     if (typeof v !== 'object' || v === null) return v;
     const id = ids.get(v);
     if (id !== undefined) return { '~r': id };
-    const shared = (seen.get(v) ?? 0) > 1;
+    const node = captured.get(v)!;
+    const shared = node.refs > 1;
     let myId = -1;
     if (shared) ids.set(v, (myId = next++));
     let body: unknown;
-    if (Array.isArray(v)) body = v.map(emit);
-    else if (v instanceof Set) body = { '~set': [...v].map(emit) };
-    else if (v instanceof Map) {
-      const es: unknown[] = [];
-      for (const [k, x] of v) if (!(typeof x === 'object' && x !== null && skipMapValues.has(x))) es.push([emit(k), emit(x)]);
-      body = { '~map': es };
-    } else {
+    if (node.kind === 'array') body = node.values.map(emit);
+    else if (node.kind === 'set') body = { '~set': node.values.map(emit) };
+    else if (node.kind === 'map') body = { '~map': node.entries.map(([key, value]) => [emit(key), emit(value)]) };
+    else if (node.tilde) body = { '~o': node.entries.map(([key, value]) => [key, emit(value)]) };
+    else {
       const o: Record<string, unknown> = {};
-      let tilde = false;
-      for (const [k, x] of Object.entries(v)) {
-        if (k.startsWith('~')) tilde = true;
-        o[k] = emit(x);
-      }
-      body = tilde ? { '~o': Object.entries(o) } : o;
+      for (const [key, value] of node.entries) putOwn(o, key, emit(value));
+      body = o;
     }
     return shared ? { '~id': myId, '~v': body } : body;
   };
@@ -130,7 +174,7 @@ export function decode(data: unknown): unknown {
     const out: Record<string, unknown> = {};
     register?.(out);
     const entries = '~o' in o ? (o['~o'] as [string, unknown][]) : Object.entries(o);
-    for (const [k, x] of entries) out[k] = dec(x);
+    for (const [k, x] of entries) putOwn(out, k, dec(x));
     return out;
   };
   return dec(data);
