@@ -237,9 +237,9 @@ export class BodyRule {
     }
     this.save(r); return false;
   }
-  /** Every half metre of the way (and the end): dry, clear for a body, inside exactly the same places. */
+  /** Every quarter metre of the way (and the end): dry, clear for a body, inside exactly the same places. */
   private lineOk(x0: number, z0: number, x1: number, z1: number, room: string) {
-    const n = Math.max(2, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 0.5));
+    const n = Math.max(2, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 0.25));
     for (let i = 1; i <= n; i++) {
       const x = x0 + (x1 - x0) * i / n, z = z0 + (z1 - z0) * i / n;
       if (!this.port.dry(x, z) || !this.port.clear(x, z, 0) || this.port.places(x, z, 0) !== room) return false;

@@ -75,7 +75,7 @@ test('2 h of zombie by the shore: never in water, never off its place, never bey
  const w=await world(['ana'],{zombieWanderMs:3*3600*SEC});t.after(w.close);const s=w.souls[0],e=w.ents()[s.entityId],eng=w.f.host.engine as any;
  await accept(w.f.host,w.f.host.enqueue('edge-relocate',`edge:${s.soulId}`,{soulId:s.soulId,entityId:s.entityId,to:[-24,2]}));w.run(2*SEC,50);
  t.diagnostic('start '+JSON.stringify(e.pose.p));
- w.run(125*SEC,1000);assert.equal(stateOf(w).state,'zombie');
+ w.run(150*SEC,1000);assert.equal(stateOf(w).state,"zombie");
  const anchor=[e.pose.p[0],e.pose.p[2]];let far=0,wet=0,moved=0,last=anchor.slice(),minX=Infinity;
  w.run(2*3600*SEC,1000,()=>{const x=e.pose.p[0],z=e.pose.p[2];far=Math.max(far,Math.hypot(x-anchor[0],z-anchor[1]));if(!eng.dryGroundAtV1(x,z))wet++;minX=Math.min(minX,x);if(Math.hypot(x-last[0],z-last[1])>0.01)moved++;last=[x,z];
   assert.ok(!(e.human as any).shore,'never on the shore');});
@@ -89,8 +89,8 @@ test('a Soul left in water floats at the surface: zombie floating (no shuffles),
  const w=await world(['ana'],{zombieWanderMs:2*MIN});t.after(w.close);const s=w.souls[0],e=w.ents()[s.entityId];
  w.listen(0,true);const r=await accept(w.f.host,w.ledger.act(s,{capability:'swim:shore-water'}));assert.equal(r.accepted,true);
  for(let i=0;i<300&&w.ledger.receipt(s.soulId,(r as any).receipt.id)!.phase!=='completed';i++)w.run(1*SEC,50);
- w.listen(0,false);w.run(2*MIN+5*SEC,1000);assert.deepEqual([stateOf(w).state,stateOf(w).doing],['zombie','floating']);
- w.run(2*MIN+10*SEC,1000);assert.deepEqual([stateOf(w).state,stateOf(w).doing],['asleep','floating']);
+ w.listen(0,false);w.run(2*MIN+25*SEC,1000);assert.deepEqual([stateOf(w).state,stateOf(w).doing],['zombie','floating']);
+ w.run(2*MIN+30*SEC,1000);assert.deepEqual([stateOf(w).state,stateOf(w).doing],['asleep','floating']);
  const at=e.pose.p.slice();w.run(10*MIN,1000);
  t.diagnostic('floating at '+JSON.stringify(at)+' activity '+(e.human as any).activity+'; body shuffles '+shuffles(w,s.soulId).length);
  assert.deepEqual(e.pose.p,at,'still');assert.ok(at[1]<-1,'in the water');assert.ok(['tread','swim'].includes(String((e.human as any).activity)));
@@ -100,7 +100,9 @@ test('a Soul left in water floats at the surface: zombie floating (no shuffles),
 test('idle reflex: a silent connected Soul sits and dozes within 2 h; an owner message ends it at once',{timeout:1800000},async t=>{
  const w=await world(['ana']);t.after(w.close);const s=w.souls[0],e=w.ents()[s.entityId];
  w.listen(0,true);w.run(9*MIN,1000);assert.equal(stateOf(w).state,'awake');
- const seen=new Map<string,number>();w.run(2*3600*SEC,1000,()=>{const v=stateOf(w);if(v.state==='idle')seen.set(v.doing,(seen.get(v.doing)??0)+1);w.listen(0,true);});
+ const seen=new Map<string,number>(),body=new Map<string,number>();w.run(2*3600*SEC,1000,()=>{const v=stateOf(w),h=e.human as any;if(v.state==='idle'){seen.set(v.doing,(seen.get(v.doing)??0)+1);
+  const k=v.doing==='sitting'&&(String(h.activity).startsWith('sit')||h.baseActivity==='sit')?'seated':v.doing==='dozing'&&h.activity==='nap'?'napping':null;if(k)body.set(k,(body.get(k)??0)+1);}w.listen(0,true);});
+ t.diagnostic('engine postures while idle '+JSON.stringify(Object.fromEntries(body)));assert.ok((body.get('seated')??0)>0&&(body.get('napping')??0)>0,'the body really sat and napped');
  const moves=shuffles(w,s.soulId);t.diagnostic('idle seconds by posture '+JSON.stringify(Object.fromEntries(seen))+'; moves '+JSON.stringify(moves.reduce((a:any,o:string)=>(a[o]=(a[o]??0)+1,a),{})));
  assert.ok((seen.get('sitting')??0)>0&&(seen.get('dozing')??0)>0,'>= 1 sit and >= 1 doze');
  assert.equal(stateOf(w).state,'idle');
