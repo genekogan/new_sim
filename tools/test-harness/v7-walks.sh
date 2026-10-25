@@ -44,9 +44,7 @@ node tools/test-harness/old-worlds.mjs "$ROOT" 5870 head > "$OUT/servers-head.lo
 for i in $(seq 1 90); do curl -s -m 2 http://127.0.0.1:5872/w/littlemartians/v1/config >/dev/null && break; sleep 2; done
 perl -e 'alarm 1800; exec @ARGV' node tools/test-harness/walk-old.mjs "$OUT/old" > "$OUT/walk-old.log" 2>&1; RC_OLD=$?
 kill "${PIDS[0]}" 2>/dev/null; PIDS=(); sleep 3
-node tools/world-launcher/launcher.mjs --port 5873 --range 5874-5876 --data "$OUT/launcher-data" --base /worlds --web "$OUT/web-worlds" --mars-web "$MARS_WEB" --dev-auth > "$OUT/launcher.log" 2>&1 & PIDS+=($!)
-for i in $(seq 1 30); do curl -s -m 2 http://127.0.0.1:5873/worlds/__sim/worlds.json >/dev/null && break; sleep 1; done
-perl -e 'alarm 1800; exec @ARGV' node tools/test-harness/walk-new.mjs http://127.0.0.1:5873 "$OUT/new" > "$OUT/walk-new.log" 2>&1; RC_NEW=$?
+perl -e 'alarm 1800; exec @ARGV' node tools/test-harness/walk-new.mjs http://127.0.0.1:5873 "$OUT/new" --web "$OUT/web-worlds" --mars-web "$MARS_WEB" > "$OUT/walk-new.log" 2>&1; RC_NEW=$?
 cleanup; PIDS=()
 perl -e 'alarm 1200; exec @ARGV' node tools/god-skill/e2e/launcher.mjs --port 5877 --range 5878-5879 --web "$OUT/web-worlds" --mars-web "$MARS_WEB" --out "$OUT/god" > "$OUT/god-modal.log" 2>&1; RC_GOD=$?
 # lane HF: the god opens an agent's approval link (#approve/<id>) in Clerk mode; it must stay on top through the whole

@@ -106,11 +106,30 @@ const where = () => {
 // LINK 2026-10-24: on a phone (< 460 px) the Pairing card is the bottom sheet (canvas PhonePairing)
 const topRight = (w) => w.present && w.onTop && w.rightGap <= 40 && (w.vw <= 460 ? w.box[1] + w.box[3] >= w.vh - 40 : w.box[1] <= 170) && (w.vw < 600 || w.box[0] > w.vw / 2);
 async function windowCode(page) {
-  await page.locator('button.bring-agent-open').first().click();
-  const link = page.locator('.bring-agent-prompt a');
-  await page.waitForFunction(() => /\?for=[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(document.querySelector('.bring-agent-prompt a')?.getAttribute('href') ?? ''), null, { timeout: 20_000 });
-  const href = await link.getAttribute('href');
-  return { href, code: href.match(/\?for=([A-Z2-9]{4}-[A-Z2-9]{4})$/)[1] };
+  const state = () => page.evaluate(() => ({clerkLoaded: !!window.Clerk?.loaded, clerkStatus: window.Clerk?.status,
+    accountMenu: !!document.querySelector('summary.account-avatar'), explanation: !!document.querySelector('[data-new-soul-explain]'),
+    promptHref: document.querySelector('.bring-agent-prompt a')?.getAttribute('href') ?? null}));
+  const attempt = {at: new Date().toISOString(), before: await state(), responses: []};
+  (report.windowCodeAttempts ??= []).push(attempt);
+  const response = r => {const path = new URL(r.url()).pathname;if (/\/v1\/account\//.test(path)) attempt.responses.push({at: Date.now(), path, status: r.status(), method: r.request().method()});};
+  page.on('response', response);
+  try {
+    // World drawing can finish before the deferred auth bridge. This scenario is explicitly signed in.
+    // Wait for its real account UI before New Soul; otherwise the correct signed-out explanation opens.
+    await page.locator('summary.account-avatar').waitFor({state: 'visible', timeout: 20_000});
+    attempt.signedIn = await state();
+    await page.locator('button.bring-agent-open').first().click();
+    const link = page.locator('.bring-agent-prompt a');
+    await page.waitForFunction(() => /\?for=[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(document.querySelector('.bring-agent-prompt a')?.getAttribute('href') ?? ''), null, { timeout: 20_000 });
+    const href = await link.getAttribute('href');
+    return { href, code: href.match(/\?for=([A-Z2-9]{4}-[A-Z2-9]{4})$/)[1] };
+  } catch (error) {
+    attempt.failure = await state().catch(() => null);
+    const stem = `window-code-failure-${report.windowCodeAttempts.length}`;
+    await page.screenshot({path: join(out, stem+'.png')}).catch(() => {});
+    writeFileSync(join(out, stem+'.txt'), await page.locator('body').innerText().catch(() => '(page unavailable)'));
+    throw error;
+  } finally {page.off('response', response);}
 }
 async function waitStatus(page, status, timeout = 60_000) { await page.waitForFunction((s) => document.querySelector('[data-approval]')?.getAttribute('data-approval-status') === s, status, { timeout, polling: 250 }); }
 async function newAgent(base, name) { const folder = mkdtempSync(join(tmpdir(), `soul-${name}-`)); await agent(folder, ['register', base]); return folder; }
