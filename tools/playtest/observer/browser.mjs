@@ -19,7 +19,8 @@
 //  bubbles     .world-name-tag[data-soul-id] children: b=name, div1=doing/speech line, div2=card line,
 //              [data-channel-chip]; dialogue dock .dlg-row-text, .dlg-lines
 //  signs       .world-place-card, .world-hover-tooltip
-//  toasts      [role=status],[role=alert],[aria-live] outside the card and agent box; .viewer-follow-hint
+//  toasts      [role=status],[role=alert],[aria-live] outside the card and agent box; .viewer-follow-hint;
+//              .warn (e.g. "A Soul's chosen look could not be composed…" on local dev worlds)
 //  roster      .my-souls button[aria-label] (own Souls, "Open Mira (agent away)"); .explore-souls (Explore open)
 //  new soul    button.bring-agent-open / any button whose text is "New Soul"
 import { createRequire } from 'node:module';
@@ -110,7 +111,7 @@ function readLegible() {
   const bubbles = qa('.world-name-tag').map((el) => { const k = [...el.children]; return { soulId: el.dataset.soulId ?? null, name: tx(k[0]), line: tx(k[1]), card: tx(k[2]), chip: tx(q('[data-channel-chip]', el)) }; })
     .concat(qa('.dlg-row-text, .dlg-lines').map((el) => ({ dock: true, text: tx(el) })));
   const inCard = (el) => (cardEl && cardEl.contains(el)) || (box && box.contains(el));
-  const toasts = qa('[role=status],[role=alert],[aria-live],.viewer-follow-hint').filter((el) => !inCard(el)).map((el) => ({ cls: String(el.className || el.getAttribute('role') || ''), text: tx(el) })).filter((x) => x.text);
+  const toasts = qa('[role=status],[role=alert],[aria-live],.viewer-follow-hint,.warn').filter((el) => !inCard(el)).map((el) => ({ cls: String(el.className || el.getAttribute('role') || ''), text: tx(el) })).filter((x) => x.text);
   const d = q('.viewer-history')?.dataset ?? {};
   return {
     card, bubbles,
@@ -136,7 +137,7 @@ export function sampler({ cameras, everySec = 5, runDir, onShot = null }) {
         if (stopped) break;
         try {
           const mono = now().mono, path = join(runDir, 'shots', name, `${mono}.png`);
-          const rec = { cam: name, ...(await cam.shot(path)) };
+          const rec = { cam: name, ...(await cam.shot(path)), mono }; // mono = the file name; rec.t is when the shot ran
           appendJsonl(join(runDir, 'shots', 'index.jsonl'), rec);
           await onShot?.(rec, cam);
         } catch (e) { appendJsonl(join(runDir, 'shots', 'index.jsonl'), { cam: name, ...now(), error: String(e?.message ?? e).slice(0, 300) }); }
