@@ -10,8 +10,8 @@ const dir=await mkdtemp(join(tmpdir(),'sim-soul-context-'));
 globalThis.location={origin:'https://sim.eden.art',pathname:'/w/eden/',hash:''};
 globalThis.sessionStorage={getItem:()=>null};
 const outfile=join(dir,'context.cjs');
-await build({stdin:{contents:`export {SoulFocus} from './SoulFocus.tsx';export {SoulAccount} from './SoulAccount.tsx';export {connectionSetupPrompt} from './connection-prompt.ts';export {createElement} from 'react';export {renderToStaticMarkup} from 'react-dom/server';`,resolveDir:new URL('.',import.meta.url).pathname,loader:'tsx'},outfile,bundle:true,format:'cjs',platform:'node',jsx:'automatic',loader:{'.css':'empty'},logLevel:'silent'});
-const {SoulFocus,SoulAccount,connectionSetupPrompt,createElement:h,renderToStaticMarkup:render}=require(outfile);
+await build({stdin:{contents:`export {SoulFocus} from './SoulFocus.tsx';export {SoulAccount} from './SoulAccount.tsx';export {connectionSetupPrompt} from './connection-prompt.ts';export {SoulCardView} from './SoulCard.tsx';export {CARD_FIXTURES} from './soul-card-fixtures.ts';export {readLink} from './soul-state.ts';export {pollInbox} from './inbox-poll.ts';export {createElement} from 'react';export {renderToStaticMarkup} from 'react-dom/server';`,resolveDir:new URL('.',import.meta.url).pathname,loader:'tsx'},outfile,bundle:true,format:'cjs',platform:'node',jsx:'automatic',loader:{'.css':'empty'},logLevel:'silent'});
+const {SoulFocus,SoulAccount,connectionSetupPrompt,SoulCardView,CARD_FIXTURES,readLink,pollInbox,createElement:h,renderToStaticMarkup:render}=require(outfile);
 const soul={id:'s_A',entityId:'h_A',name:'Mutable Name',description:'Curious artist',doing:'',energy:'fine'};
 const auth=(id=null)=>({authed:!!id,ready:true,label:id,debug:{accountIdentity:id,privyUserId:null},login(){},logout(){}});
 const me={userId:'acct_A',souls:['s_A'],role:'user',invited:true};
@@ -28,6 +28,42 @@ test('account switching suppresses stale owned roster until matching server iden
  const owner=render(h(SoulAccount,{...props,auth:auth('acct_A')}));assert.match(owner,/Mutable Name/);assert.match(owner,/New Soul/);assert.doesNotMatch(owner,forbidden);
  const switched=render(h(SoulAccount,{...props,auth:auth('acct_B')}));assert.match(switched,/Checking current account/);assert.doesNotMatch(switched,/Mutable Name|Agent access/);
  const unsigned=render(h(SoulAccount,{...props,auth:auth()}));assert.match(unsigned,/Sign in/);assert.doesNotMatch(unsigned,/Mutable Name/);
+});
+// LINK (Gene 2026-10-24): the This mind grant panel is gone; the Connected card's link details show the holder from a validated `link.holder` only, and say no more than "listening now".
+test('owner mind shows only validated granted access, never claims an active client or server steering',()=>{
+ const card=(link,open=true)=>render(h(SoulCardView,{...CARD_FIXTURES.connected,link,open:{details:open}}));
+ const valid=card(CARD_FIXTURES.connected.link);
+ assert.match(valid,/Held by your agent/);assert.match(valid,/eden-agent 1\.9\.16 · paired [^<]+ · listening now/);assert.match(valid,/>Disconnect</);
+ assert.doesNotMatch(valid,/is running|steer|controls? .* now|working through/i);assert.doesNotMatch(valid,forbidden);
+ for(const raw of [{state:'connected',reason:'listening',since:1,holder:'PRIVATE_STALE'},{state:'connected',reason:'listening',since:1,holder:['PRIVATE_STALE']},{state:'connected',reason:'listening',since:1,holder:{label:42,since:'invalid'}},{state:'connected',reason:'listening',since:1}]){
+  const link=readLink(raw);assert.ok(link&&(link.holder===null||link.holder.label===null),JSON.stringify(raw));
+  const html=card(link);assert.doesNotMatch(html,/PRIVATE_STALE|paired/);assert.match(html,/<p class="soul-dim soul-box-line">listening now<\/p>/);
+ }
+ for(const raw of [null,undefined,'connected',{state:'bogus',holder:{label:'PRIVATE_STALE',since:1}},[]]){
+  assert.equal(readLink(raw),null);const html=card(null);assert.match(html,/data-status="checking"/);assert.doesNotMatch(html,/Held by|PRIVATE_STALE|>Connected/);
+ }
+});
+// LINK (Gene 2026-10-24): the one-use code control is removed in every state (the Reconnect prompt pairs instead); the holder line keeps owner terms.
+test('MIND-PANEL-COPY: owner terms, never a bare label; the one-use code control only without a live grant',()=>{
+ const card=label=>render(h(SoulCardView,{...CARD_FIXTURES.connected,link:{...CARD_FIXTURES.connected.link,holder:{label,since:null}},open:{details:true}}));
+ const travel=card('travel');assert.match(travel,/Held by your agent/);assert.match(travel,/from “travel” · listening now/);assert.doesNotMatch(travel,/>travel<|<b>travel<\/b>|travel ·/);
+ assert.match(card('eden-agent 1.9.9'),/>eden-agent 1\.9\.9 · listening now</);
+ for(const [name,props] of Object.entries(CARD_FIXTURES)){const html=render(h(SoulCardView,{...props,open:{details:true,pair:true}}));assert.doesNotMatch(html,/one-use|Connect a new agent|Request one-use code/,name);}
+});
+// LINK (Gene 2026-10-24): the grant poll is gone; the card's owner state comes from the owner inbox poll (pollInbox, under useSoulInbox and AgentMessageBox).
+test('private polling pauses when hidden and cancels stale in-flight grant reads',async()=>{
+ const flush=()=>new Promise(resolve=>setImmediate(resolve));
+ const listeners=new Set(),doc={hidden:true,addEventListener:(_t,fn)=>listeners.add(fn),removeEventListener:(_t,fn)=>listeners.delete(fn)},show=hidden=>{doc.hidden=hidden;for(const fn of listeners)fn();};
+ let reads=0,rev=0;const pending=[],values=[],scheduled=[];
+ const read=()=>{reads++;return new Promise(resolve=>pending.push(resolve));},schedule=fn=>{scheduled.push(fn);return scheduled.length;},cancel=()=>{};
+ const stop=pollInbox(read,v=>values.push(v),()=>rev,{doc,schedule,cancel});
+ assert.equal(reads,0,'hidden: no read');show(false);assert.equal(reads,1,'shown: reads at once');
+ pending.shift()('first');await flush();assert.deepEqual(values,['first']);assert.equal(scheduled.length,1);
+ show(true);scheduled.shift()();await flush();assert.equal(reads,1,'hidden again: the due read is skipped');assert.equal(scheduled.length,0);
+ show(false);assert.equal(reads,2);rev++;pending.shift()('STALE');await flush();assert.deepEqual(values,['first'],'an answer older than a newer write is dropped');
+ scheduled.shift()();assert.equal(reads,3);pending.shift()('second');await flush();assert.deepEqual(values,['first','second']);
+ scheduled.shift()();assert.equal(reads,4);stop();pending.shift()('AFTER_STOP');await flush();assert.deepEqual(values,['first','second']);assert.equal(scheduled.length,0);assert.equal(listeners.size,0);
+ show(false);assert.equal(reads,4,'stopped: no resume');
 });
 test('multiple stable Soul IDs remain selectable despite mutable duplicate names',()=>{
  const s2={...soul,id:'s_B',entityId:'h_B'};const state={...sim,me:{...me,souls:['s_A','s_B']},conn:{...sim.conn,replica:{...sim.conn.replica,souls:new Map([['s_A',soul],['s_B',s2]])}}};
