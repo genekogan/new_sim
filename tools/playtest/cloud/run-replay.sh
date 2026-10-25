@@ -55,7 +55,8 @@ if ! command -v convert >/dev/null && ! command -v magick >/dev/null && ! comman
 fi
 export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 [ -z "${PLAYWRIGHT_BROWSERS_PATH:-}" ] && [ -d /opt/pw-browsers ] && export PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
-export NODE_PATH="${NODE_PATH:-}${NODE_PATH:+:}$(npm root -g 2>/dev/null || true)"
+NPM_GLOBAL="$(npm root -g 2>/dev/null || true)"
+export NODE_PATH="${NODE_PATH:-}${NODE_PATH:+:}$NPM_GLOBAL"
 
 # --- fix branch → ../server (worktree, detached at origin/<fix>)
 step fetch-fix retry git fetch --no-tags origin "+refs/heads/$FIX:refs/remotes/origin/$FIX"
@@ -68,7 +69,7 @@ step install-playtest retry pnpm install --frozen-lockfile
 step install-server bash -c "cd '$SERVER' && pnpm install --frozen-lockfile"
 STAMP="$SERVER/apps/web/dist/.built-sha"
 if [ "$(cat "$STAMP" 2>/dev/null || true)" = "$FIX_SHA" ] && [ -f "$SERVER/apps/web/dist/index.html" ]; then say "web build for $FIX_SHA present"
-else step web-build bash -c "cd '$SERVER/apps/web' && npx vite build"; echo "$FIX_SHA" > "$STAMP"; fi
+else step web-build bash -c "cd '$SERVER/apps/web' && npx vite build"; [ -d "$(dirname "$STAMP")" ] && echo "$FIX_SHA" > "$STAMP"; fi
 
 # --- asset overlay from production URLs (resumable; sha256 manifest)
 step overlay retry node tools/playtest/arena/assets-overlay.mjs "$MARSWEB" --server-root "$SERVER"
@@ -76,7 +77,7 @@ export PLAYTEST_MARS_WEB="$MARSWEB"
 
 # --- preflight (recorded) and the replay set (the box is dedicated: --force-machine records gate breaches)
 step preflight bash -c "node tools/playtest/playtest.mjs preflight --server-root '$SERVER' --force-machine > '$OUT/cloud-preflight.json'" || { say "preflight failed: see $OUT/cloud-preflight.json"; }
-PF_OK="$(node -e "try{console.log(JSON.parse(require('fs').readFileSync('$OUT/cloud-preflight.json','utf8')).ok)}catch{console.log('unknown')}")"
+PF_OK="$(node -e 'try{console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).ok)}catch{console.log("unknown")}' "$OUT/cloud-preflight.json")"
 RS_RC=0
 if [ "$PF_OK" = "true" ]; then
   step replay-set node tools/playtest/playtest.mjs replay-set --server-root "$SERVER" --out "$OUT" --repeats "$REPEATS" --force-machine --frozen tools/playtest/frozen/frozen.json || RS_RC=$?
@@ -87,6 +88,7 @@ LOAD_AFTER="$(load1)"; MEM_AFTER="$(mem)"
 step compress node tools/playtest/cloud/compress-shots.mjs "$OUT" --width 1024 --quality 75 --jobs "$(nproc 2>/dev/null || echo 4)" || true
 
 # --- CLOUD.md
+OVERLAY_FACT="$(node -e 'try{const m=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(`${m.files.length} files, ${Math.round(m.bytes/1048576)} MB from ${m.origin}, missing: ${m.missing.map((x)=>x.rel).join(", ")||"none"}`)}catch{console.log("n/a")}' "$MARSWEB/overlay-manifest.json")"
 {
   echo "# Cloud replay: $NAME"
   echo
@@ -98,7 +100,7 @@ step compress node tools/playtest/cloud/compress-shots.mjs "$OUT" --width 1024 -
   echo "- Memory before: $MEM_BEFORE · after: $MEM_AFTER"
   echo "- Load before: $LOAD_BEFORE · after: $LOAD_AFTER"
   echo "- Browser: Playwright Chromium headless, SwiftShader GL (Linux launch args in lib/platform.mjs); PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:-unset}"
-  echo "- Asset overlay: $(node -e "try{const m=JSON.parse(require('fs').readFileSync('$MARSWEB/overlay-manifest.json','utf8'));console.log(m.files.length+' files, '+Math.round(m.bytes/1048576)+' MB from '+m.origin+', missing: '+(m.missing.map(x=>x.rel).join(', ')||'none'))}catch{console.log('n/a')}")"
+  echo "- Asset overlay: $OVERLAY_FACT"
   echo "- Screenshots: PNG → JPEG ≤ 1024 px (q75); \`.png\` references in text files rewritten to \`.jpg\`."
   echo
   echo "## Timings (s)"

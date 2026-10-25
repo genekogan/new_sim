@@ -314,3 +314,15 @@ one scripted request, one shot, and tears down (≈ 2 min; run manually).
   evenly over the requests it served. Card requests' wake turns are linked at review time (turns starting in the window);
   runs before this change also get their chat turns inferred in order (`chatTurnsInferred`).
 
+
+## 9c. Cloud portability (2026-10-25, worker C2)
+
+- The harness runs on macOS (laptop) and Linux (a dedicated cloud box); `lib/platform.mjs` holds every platform split:
+  Playwright resolution (global `playwright` first, then `<server-root>/mars/viewer`, then the laptop viewer), Chromium
+  args (Linux: SwiftShader headless, `--no-sandbox`; the scenario's `gpu` applies on macOS only), reclaimable memory
+  (vm_stat / MemAvailable), JPEG thumbnails (sips / ImageMagick / ffmpeg). The quota rail is skipped with a note where
+  `usage.py` is absent.
+- A dev world without an asset overlay proxies `/modular` and `/browser` to sim.mars.college; `arena/assets-overlay.mjs`
+  builds the overlay from sim.eden.art URLs, and `provision.mjs` finds it beside the server root (`../mars-web`).
+- `tools/playtest/frozen/frozen.json` (`playtest.mjs freeze-bundle`) carries the frozen scenarios and baseline measures
+  so `replay-set` runs without the run folders. `cloud/run-replay.sh` is the one-shot runner; see `cloud/README.md`.
