@@ -27,6 +27,13 @@ function physicsText(v: Record<string, unknown>): { levels: string; byEntity: st
 }
 const isPhysics = (v: Record<string, unknown>) => v.version === 'entity-physics/1' && typeof v.hash === 'string' && (v.hash as string).length === 64;
 
+/** Pin the existing native serializer's selection at an owned checkpoint boundary.
+ * This intentionally preserves physicsText's existing validation/cache semantics;
+ * callers retain scalar strings, never perform a later cache lookup. */
+export function selectPhysicsTextForCapture(value: Record<string, unknown>): Readonly<Record<'levels' | 'byEntity' | 'assets', string>> | undefined {
+  return isPhysics(value) ? Object.freeze({ ...physicsText(value) }) : undefined;
+}
+
 /** Where the stable text goes: appended to a string, or handed on in pieces (a streamed hash) once it passes `flushAt`.
  *  Pieces are whole tokens (JSON.stringify output, punctuation, cached texts), so a piece never splits a surrogate pair. */
 class Sink {
@@ -158,6 +165,19 @@ export function hashStable(value: unknown, known?: ReadonlyMap<object, string>):
 }
 
 export const hashOf = (value: unknown) => hashStable(value);
+
+/** Consume already-canonical JSON text pieces, preserving the writer's yield points.
+ * Pieces never split a Unicode surrogate pair. Hosts use the existing native stream;
+ * the portable fallback retains text and uses the same SHA implementation. */
+export function* hashCanonicalSteps(tokens: Generator<string | void, void, void>): Generator<void, string, void> {
+  const stream = nativeSha256Stream?.();
+  const parts: string[] = [];
+  for (const token of tokens) {
+    if (typeof token !== 'string') { yield; continue; }
+    if (stream) stream.update(token); else parts.push(token);
+  }
+  return stream ? stream.digest() : sha256(parts.join(''));
+}
 
 /** Where hashStableResumable can pick up next time: the sorted keys and values it hashed, and the digest state after
  *  the first `n` of them (inside the object's opening brace). The state is only ever copied, never updated. */
