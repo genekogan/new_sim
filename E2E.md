@@ -20,3 +20,26 @@ The deployed ten-route smoke sets `SIM_SMOKE_EXTRA_WORLDS=1` and covers the worl
 list, four live worlds, three Labs and two representative year pages. All eight
 year pages have separate merge proof. Route smoke proves load/health, not every
 physical activity; use the qualification note for completion/restart evidence.
+
+
+Client performance scenarios in `e2e/scenarios/` use private, test-flagged tracked-genesis
+fixtures on loopback7830–7833, read-only bundle overlays7834/7835, an explicit scratch Chrome profile/CDP7838, and the
+read-only physical-phone observer on7839. The coordinating lane owns fixture boot
+and teardown through receipt-recorded PIDs; scenario drivers own and close their
+browser contexts. Never kill a process merely because it owns a port. Never use
+ports4981–4999 or product world data. Build exact committed browser bundles on
+Modal, then provide their path/hash with the fixture receipt. Parse scenarios with
+`.e2e/parse-scenario.mjs`; save snapshots, screenshots, console logs, assertions,
+and summaries under `.e2e/runs/`. A source change permits a new validation run;
+passing scenarios are not rerun for reassurance. Cap failed attempts at three,
+with independent diagnosis before the third. Performance A/B samples are separately
+planned measurements, not repeated functional smoke attempts.
+
+The performance lane attaches to receipt-owned remote fixtures through loopback
+tunnels instead of booting another server. Its browser driver uses Playwright CDP
+against the owned hardware-GPU Chrome, records a ready receipt, and closes only
+its own browser contexts. Read-only `/healthz` is the isolated navigation-away
+target; the product-facing all-worlds link is outside this fixture scenario.
+Selected distance LOD assets, not every possible original model, define arrival
+completeness. Same-document scene cleanup needs the separate epoch-remount proof;
+full-document navigation alone does not establish that contract.
