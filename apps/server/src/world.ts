@@ -1567,7 +1567,9 @@ export class WorldHost {
     const t0 = performance.now();
     const runtime = this.engine.snapshot();
     const body = this.captureBody(runtime);
-    this.recoveryBaseline = structuredClone(body);
+    // captureBody owns every field; persistence only reads it, and restoration/
+    // recovery recipes clone before mutation. Keep one immutable captured body.
+    this.recoveryBaseline = body;
     const meta = { tick: runtime.tick, seq: this.seq, stateHash: runtime.stateHash, physicalHash: this.engine.physicalHash(), rulesVersion: this.engine.rulesVersion, body };
     this.snapshotMs.capture = performance.now() - t0;
     this.lastSnapshotTick = runtime.tick;
