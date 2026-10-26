@@ -46,7 +46,7 @@ test('Disconnected: body word + since, the last now dimmed, Reconnect box as the
  for(const html of [z,a,f]){
   assert.ok(has.reconnect(html));assert.ok(!has.box(html));assert.doesNotMatch(text(html),/Follow/);
   assert.match(html,/class="soul-now soul-now-dim"/);assert.match(text(html),/2 h ago/);
-  assert.match(text(html),/The agent stopped listening\. Give it this prompt; its request shows up here for you to approve, and Mickey wakes up\./);
+  assert.match(text(html),/The agent stopped listening\.Reconnect to Mickey by prompting your agent:/);
   assert.match(text(html),/Copy prompt/);assert.match(html,/data-sleeping="1"/);
  }
 });
@@ -55,6 +55,36 @@ test('Disconnected reasons each have their own sentence',()=>{
  assert.match(text(card('disconnected-revoked')),/You disconnected the agent at \d\d:\d\d\./);
  const never=text(card('disconnected-never'));assert.match(never,/No agent has connected yet\./);assert.doesNotMatch(never,/“|”/,'no now line when the agent never set one');
 });
+// C1 (Gene 2026-10-26): every Reconnect box is the dim reason, then exactly "Reconnect to {name} by prompting your agent:", then the prompt.
+const box=html=>{const i=html.indexOf('data-reconnect="1"');assert.ok(i>=0,'a Reconnect box');return html.slice(i);};
+const BOXES={'disconnected-asleep':'The agent stopped listening.','disconnected-zombie':'The agent stopped listening.','disconnected-replaced':/^Another session took over at \d\d:\d\d, then stopped\.$/,
+ 'disconnected-revoked':/^You disconnected the agent at \d\d:\d\d\.$/,'disconnected-never':'No agent has connected yet.','approved-waiting-asleep':'The agent never started listening.'};
+test('Reconnect copy: dim reason line, then the same ask for every reason that renders a box',()=>{
+ const seen=new Set();
+ for(const [name,why] of Object.entries(BOXES)){
+  const b=box(card(name)),m=/<p class="soul-dim soul-box-line" data-reconnect-why="1">([^<]*)<\/p><p class="soul-box-text">([^<]*)<\/p>/.exec(b);
+  assert.ok(m,`${name}: why line then ask line`);seen.add(F[name].link.reason);
+  if(typeof why==='string')assert.equal(m[1],why,name);else assert.match(m[1],why,name);
+  assert.equal(m[2],'Reconnect to Mickey by prompting your agent:',name);
+  assert.match(b,/Copy prompt/,name);assert.doesNotMatch(text(b),/Give it this prompt|wakes up|shows up here/,name);
+  assert.doesNotMatch(b,/soul-box-title/,`${name}: no separate title, the ask says Reconnect`);
+ }
+ assert.deepEqual([...seen].sort(),['approved-waiting','never','replaced','revoked','stopped-listening']);
+});
+test('reconnectSentence: {why, ask} for all seven reasons; ask never varies',()=>{
+ const reasons=['listening','pending-approval','approved-waiting','stopped-listening','replaced','revoked','never'];
+ const whys=new Map();
+ for(const reason of reasons){
+  const r=M.reconnectSentence('Wren',{state:'disconnected',reason,since:T-60_000,holder:null},T);
+  assert.deepEqual(Object.keys(r).sort(),['ask','why']);assert.equal(r.ask,'Reconnect to Wren by prompting your agent:');
+  assert.ok(r.why.length>0&&!/Reconnect/.test(r.why),reason);whys.set(reason,r.why);
+ }
+ assert.equal(whys.get('approved-waiting'),'The agent never started listening.');
+ assert.equal(M.reconnectSentence('Wren',{state:'disconnected',reason:'replaced',since:null,holder:null},T).why,'Another session took over, then stopped.');
+ // the two reasons that never reach a disconnected card fall back to the plain line
+ assert.equal(whys.get('listening'),'The agent stopped listening.');assert.equal(whys.get('pending-approval'),'The agent stopped listening.');
+ for(const name of ['connected','pairing'])assert.ok(!card(name).includes('data-reconnect="1"'),`${name}: no Reconnect box`);
+});
 test('Just approved: standing at the place, waiting for the agent; the prompt only after a minute; never the Reconnect box',()=>{
  const fresh=card('approved-waiting'),late=card('approved-waiting-late');
  assert.match(text(fresh),/Disconnected · approved just now/);assert.match(text(fresh),/Mickey is standing at the commons\. Waiting for the agent to start listening…/);
@@ -62,7 +92,7 @@ test('Just approved: standing at the place, waiting for the agent; the prompt on
  assert.match(text(late),/Still here after a minute\? Tell the agent to continue, or copy the prompt again\./);assert.ok(!has.reconnect(late));
  // the body went to sleep without a listen: the Reconnect box takes over
  const slept=render(h(SoulCardView,{...F['approved-waiting-late'],body:{state:'asleep',doing:null,since:T-1000}}));
- assert.ok(has.reconnect(slept));assert.match(text(slept),/The agent never started listening\./);
+ assert.ok(has.reconnect(slept));assert.match(text(slept),/The agent never started listening\.Reconnect to Mickey by prompting your agent:/);
 });
 test('Pairing: the card is the approval, nothing else on it',()=>{
  const html=card('pairing');assert.match(html,/data-soul-state="pairing"/);assert.match(html,/data-approval="ap_0123456789abcdef0123456789abcdef"/);
