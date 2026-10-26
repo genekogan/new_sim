@@ -81,7 +81,9 @@ rsync -aL --exclude /modular "$MARS_WEB_SRC/" "$OUT/mars-web/"
 trash_existing "$OUT/mars-web/modular"; ln -s ../mars/viewer/public/modular "$OUT/mars-web/modular"
 [ -f "$OUT/mars-web/modular/humanoid/kit.json" ] || { echo "no humanoid kit in the release"; exit 1; }
 # legacy: every file's sha256 (FILES.sha256), so the kit's preflight proves eden2 runs exactly this tree (sha256sum -c)
-[ "$STAGE" != legacy ] || (cd "$OUT" && find . -type f ! -name FILES.sha256 -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256 > FILES.sha256)
+# .DS_Store: Finder writes it into any folder it looks at (R395, 2026-10-26: one appeared in the staging root mid-upload and failed sha256sum -c on eden2); never hashed, never uploaded
+find "$OUT" -name .DS_Store -type f -delete 2>/dev/null || true
+[ "$STAGE" != legacy ] || (cd "$OUT" && find . -type f ! -name FILES.sha256 ! -name .DS_Store -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256 > FILES.sha256)
 du -sh "$OUT" | sed 's/^/   size /'
 # Retention is a separate explicit operation, never an automatic side effect of shipping.
 echo "   retained all local releases (no automatic pruning)"
@@ -101,7 +103,7 @@ if [ "$REMOTE_STATE" = "$MANIFEST_SHA" ]; then
 elif [ "$REMOTE_STATE" = fresh ]; then
   # never re-mode an existing releases root; legacy releases must stay traversable
   ssh "$HOST" "[ -d $RELROOT ] || install -d -m 750 $RELROOT; install -d -m 750 $REL"
-  rsync -az ${PREV:+--link-dest="$PREV/"} --exclude node_modules "$OUT/" "$HOST:$REL/"
+  rsync -az ${PREV:+--link-dest="$PREV/"} --exclude node_modules --exclude .DS_Store "$OUT/" "$HOST:$REL/"
 else
   echo "refusing to overwrite nonempty $REL: manifest missing or different; retained without deleting anything. Use a new build."
   exit 1
