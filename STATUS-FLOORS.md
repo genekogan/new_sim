@@ -1,4 +1,4 @@
-RESUME: lane/mars-floors-20261026 @ HEAD (F1-F3 committed, F4 unit + local Playwright done); next: walk audit result, push, hand to coordinator for the Modal gate.
+RESUME: lane/mars-floors-20261026 @ HEAD — F1-F4 done, walk audit not worse, tsc server/engine/web clean, pushed; next: coordinator merges main + Modal gate; optional follow-up plates for tool-camp/freeside/west-racks.
 
 # Floors, steps and seat tops (tranche team/TRANCHE-MARS-FLOORS-20261026.md)
 
@@ -71,6 +71,13 @@ authored (rooms + stairs in layout.mjs). Not in this tranche's bar; listed for a
 - Chiba's tiers (bleacher steps 0.74–3.0 m) and the 3.24 m mezzanine are not walkable; their cushions/chairs on level 0
   now refuse `seat.inside` honestly (higher ones resolve to levels 2+ and are offered as before).
 - Not run here: conformance `--k 2`, the Modal gate (coordinator).
+
+## Walk audit (`node tools/test-harness/walk/walk.mjs`, 2026-10-26 06:35Z, laptop load 26-35)
+eden-2026 42/7/87, bench-eden 392/58/47, eden-2026-genesis 46/8/48, bench-hamlet 0/0/0 (bad/goalless/floats): all
+identical to the baseline. fuzz 536 -> 549 bad, 277 -> 280 unusable, all in one place (hedge-cabin: 13 nav.disconnected,
+3 unusable). Re-running that shard alone at load 7 (`walk-audit.ts --fuzz ... --shard 1/3`): hedge-cabin 0 bad, shard
+total 215 (= baseline 536 - 182 - 139), unusable 96 (= 277 - 124 - 57): the extra lines were load (nav time budgets),
+not this change (no hedge-cabin path touches the plates; births only change y). No baseline update.
 
 ## FOR GENE
 - Defaults: step limit 0.45 m (floors higher than that above the terrain stay separate levels needing stairs).
