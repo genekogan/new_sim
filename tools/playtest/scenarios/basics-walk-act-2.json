@@ -1,0 +1,254 @@
+{
+ "name": "basics-walk-act-2",
+ "version": 1,
+ "seed": 78,
+ "world": {
+  "kind": "dev",
+  "genesis": "worlds/templates/eden-district.json",
+  "slug": "pt-eden-basics2",
+  "port": 4994
+ },
+ "durationSec": 1490,
+ "seats": [
+  {
+   "id": "pip",
+   "adapter": "claude-headless",
+   "model": "opus",
+   "effort": "medium",
+   "persona": "expert",
+   "personaModel": "opus",
+   "startOffsetSec": 0,
+   "soulName": "Pip",
+   "channelMix": {
+    "chat": 1.0,
+    "card": 0.0
+   }
+  },
+  {
+   "id": "quin",
+   "adapter": "codex-headless",
+   "model": "gpt-6-astra",
+   "effort": "medium",
+   "persona": "expert",
+   "personaModel": "opus",
+   "startOffsetSec": 0,
+   "soulName": "Quin",
+   "channelMix": {
+    "chat": 1.0,
+    "card": 0.0
+   },
+   "wake": false
+  }
+ ],
+ "god": null,
+ "director": {
+  "mode": "scripted",
+  "requestsTarget": 12,
+  "glanceSec": [
+   10,
+   30
+  ],
+  "goal": "basics: walking and acting reliability",
+  "script": [
+   {
+    "seat": "pip",
+    "atSec": 20,
+    "channel": "chat",
+    "text": "walk over to the pavilion on the commons",
+    "budgetSec": 120
+   },
+   {
+    "seat": "pip",
+    "atSec": 155,
+    "channel": "chat",
+    "text": "sit down",
+    "budgetSec": 60
+   },
+   {
+    "seat": "pip",
+    "atSec": 230,
+    "channel": "chat",
+    "text": "stand up",
+    "budgetSec": 60
+   },
+   {
+    "seat": "pip",
+    "atSec": 305,
+    "channel": "chat",
+    "text": "wave",
+    "budgetSec": 60
+   },
+   {
+    "seat": "pip",
+    "atSec": 380,
+    "channel": "chat",
+    "text": "go to the library",
+    "budgetSec": 150
+   },
+   {
+    "seat": "pip",
+    "atSec": 545,
+    "channel": "chat",
+    "text": "lie down",
+    "budgetSec": 60
+   },
+   {
+    "seat": "pip",
+    "atSec": 620,
+    "channel": "chat",
+    "text": "stand up",
+    "budgetSec": 60
+   },
+   {
+    "seat": "pip",
+    "atSec": 695,
+    "channel": "chat",
+    "text": "dance for twenty seconds",
+    "budgetSec": 60
+   },
+   {
+    "seat": "pip",
+    "atSec": 770,
+    "channel": "chat",
+    "text": "go to the pond",
+    "budgetSec": 150
+   },
+   {
+    "seat": "pip",
+    "atSec": 935,
+    "channel": "chat",
+    "text": "go inside house 2, into the kitchen",
+    "budgetSec": 150
+   },
+   {
+    "seat": "pip",
+    "atSec": 1100,
+    "channel": "chat",
+    "text": "come back to the commons",
+    "budgetSec": 150
+   },
+   {
+    "seat": "pip",
+    "atSec": 1265,
+    "channel": "chat",
+    "text": "go stand under oak 1",
+    "budgetSec": 150
+   },
+   {
+    "seat": "quin",
+    "atSec": 20,
+    "channel": "chat",
+    "text": "walk over to the pavilion on the commons",
+    "budgetSec": 120
+   },
+   {
+    "seat": "quin",
+    "atSec": 155,
+    "channel": "chat",
+    "text": "sit down",
+    "budgetSec": 60
+   },
+   {
+    "seat": "quin",
+    "atSec": 230,
+    "channel": "chat",
+    "text": "stand up",
+    "budgetSec": 60
+   },
+   {
+    "seat": "quin",
+    "atSec": 305,
+    "channel": "chat",
+    "text": "wave",
+    "budgetSec": 60
+   },
+   {
+    "seat": "quin",
+    "atSec": 380,
+    "channel": "chat",
+    "text": "go to the library",
+    "budgetSec": 150
+   },
+   {
+    "seat": "quin",
+    "atSec": 545,
+    "channel": "chat",
+    "text": "lie down",
+    "budgetSec": 60
+   },
+   {
+    "seat": "quin",
+    "atSec": 620,
+    "channel": "chat",
+    "text": "stand up",
+    "budgetSec": 60
+   },
+   {
+    "seat": "quin",
+    "atSec": 695,
+    "channel": "chat",
+    "text": "dance for twenty seconds",
+    "budgetSec": 60
+   },
+   {
+    "seat": "quin",
+    "atSec": 770,
+    "channel": "chat",
+    "text": "go to the pond",
+    "budgetSec": 150
+   },
+   {
+    "seat": "quin",
+    "atSec": 935,
+    "channel": "chat",
+    "text": "go inside house 2, into the kitchen",
+    "budgetSec": 150
+   },
+   {
+    "seat": "quin",
+    "atSec": 1100,
+    "channel": "chat",
+    "text": "come back to the commons",
+    "budgetSec": 150
+   },
+   {
+    "seat": "quin",
+    "atSec": 1265,
+    "channel": "chat",
+    "text": "go stand under oak 1",
+    "budgetSec": 150
+   }
+  ],
+  "budgetSec": {
+   "quick": 60,
+   "default": 150
+  }
+ },
+ "observer": {
+  "sampleSec": 5,
+  "cameras": [
+   "follow"
+  ],
+  "viewport": [
+   1024,
+   640
+  ],
+  "dpr": 1,
+  "gpu": "metal"
+ },
+ "review": {
+  "reviewerModel": "opus",
+  "developerModel": "opus",
+  "rubric": "accept3",
+  "developerMaxIssues": 4,
+  "developerMaxFeatureRequests": 2
+ },
+ "rails": {
+  "maxTurnsPerRequest": 6,
+  "maxTurnWallSec": 480,
+  "quotaStopPct": 90,
+  "onboardWallSec": 600,
+  "onboardTimeoutSec": 540
+ },
+ "notes": "Basics battery, stronger models: Claude Opus seat vs Codex Astra seat, same 12 requests."
+}

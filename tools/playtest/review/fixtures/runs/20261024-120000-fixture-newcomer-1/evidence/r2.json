@@ -1,0 +1,237 @@
+{
+ "requestId": "r2",
+ "seat": "pip",
+ "soulId": "soul_pip01",
+ "text": "say hi to the duck",
+ "channel": "chat",
+ "sentAt": "2026-10-24T12:01:30.000Z",
+ "sentMono": 90000,
+ "ackAt": null,
+ "ackText": null,
+ "resultAt": "2026-10-24T12:01:44.000Z",
+ "resultText": "There's no way to greet the duck here, so I didn't. Pip is still sitting on the bench.",
+ "resultState": "answered",
+ "cutoffAt": "2026-10-24T12:02:00.000Z",
+ "cutoffReason": "result",
+ "budgetSec": 90,
+ "samples": [
+  {
+   "t": "2026-10-24T12:01:30.000Z",
+   "mono": 90000,
+   "tick": 360,
+   "soulId": "soul_pip01",
+   "place": "Fountain Plaza",
+   "placePath": [
+    "Eden",
+    "Fountain Plaza"
+   ],
+   "pos": {
+    "x": 12,
+    "y": 0,
+    "z": 6
+   },
+   "posture": "sitting",
+   "activity": "sitting on a bench",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_101",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:01:35.000Z",
+   "mono": 95000,
+   "tick": 380,
+   "soulId": "soul_pip01",
+   "place": "Fountain Plaza",
+   "placePath": [
+    "Eden",
+    "Fountain Plaza"
+   ],
+   "pos": {
+    "x": 12,
+    "y": 0,
+    "z": 6
+   },
+   "posture": "sitting",
+   "activity": "sitting on a bench",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_101",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:01:40.000Z",
+   "mono": 100000,
+   "tick": 400,
+   "soulId": "soul_pip01",
+   "place": "Fountain Plaza",
+   "placePath": [
+    "Eden",
+    "Fountain Plaza"
+   ],
+   "pos": {
+    "x": 12,
+    "y": 0,
+    "z": 6
+   },
+   "posture": "sitting",
+   "activity": "sitting on a bench",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_101",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:01:45.000Z",
+   "mono": 105000,
+   "tick": 420,
+   "soulId": "soul_pip01",
+   "place": "Fountain Plaza",
+   "placePath": [
+    "Eden",
+    "Fountain Plaza"
+   ],
+   "pos": {
+    "x": 12,
+    "y": 0,
+    "z": 6
+   },
+   "posture": "sitting",
+   "activity": "sitting on a bench",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_101",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:01:50.000Z",
+   "mono": 110000,
+   "tick": 440,
+   "soulId": "soul_pip01",
+   "place": "Fountain Plaza",
+   "placePath": [
+    "Eden",
+    "Fountain Plaza"
+   ],
+   "pos": {
+    "x": 12,
+    "y": 0,
+    "z": 6
+   },
+   "posture": "sitting",
+   "activity": "sitting on a bench",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_101",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:01:55.000Z",
+   "mono": 115000,
+   "tick": 460,
+   "soulId": "soul_pip01",
+   "place": "Fountain Plaza",
+   "placePath": [
+    "Eden",
+    "Fountain Plaza"
+   ],
+   "pos": {
+    "x": 12,
+    "y": 0,
+    "z": 6
+   },
+   "posture": "sitting",
+   "activity": "sitting on a bench",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_101",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:02:00.000Z",
+   "mono": 120000,
+   "tick": 480,
+   "soulId": "soul_pip01",
+   "place": "Fountain Plaza",
+   "placePath": [
+    "Eden",
+    "Fountain Plaza"
+   ],
+   "pos": {
+    "x": 12,
+    "y": 0,
+    "z": 6
+   },
+   "posture": "sitting",
+   "activity": "sitting on a bench",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_101",
+   "receipts": []
+  }
+ ],
+ "receipts": [],
+ "shots": [
+  "shots/pip/100000.png"
+ ],
+ "chatTurns": [
+  3
+ ],
+ "legible": [
+  {
+   "t": "2026-10-24T12:01:40.000Z",
+   "mono": 100000,
+   "card": {
+    "name": "Pip",
+    "presence": "listening",
+    "ack": null,
+    "result": null
+   },
+   "bubbles": [],
+   "signs": [],
+   "toasts": []
+  }
+ ],
+ "firstBodyChangeAt": null,
+ "serverErrors": 0,
+ "cost": {
+  "inputTokens": 9500,
+  "outputTokens": 250,
+  "cachedTokens": 8500
+ },
+ "godSlice": {
+  "around": [
+   12,
+   6
+  ],
+  "radius": 10,
+  "entities": [
+   {
+    "id": "bench-2",
+    "def": "bench",
+    "layer": "props"
+   }
+  ]
+ }
+}

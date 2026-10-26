@@ -1,0 +1,2361 @@
+{
+ "version": 1,
+ "createdAt": "2026-10-25T18:27:42.278Z",
+ "runsRoot": "<team>/playtest/runs",
+ "entries": [
+  {
+   "label": "basics-1",
+   "run": "20261025-055730-basics-walk-act-1-77",
+   "kind": "battery",
+   "scenario": {
+    "name": "basics-walk-act-1-frozen",
+    "version": 1,
+    "seed": 77,
+    "world": {
+     "kind": "dev",
+     "genesis": "worlds/templates/eden-district.json",
+     "slug": "pt-eden-basics",
+     "port": 4993
+    },
+    "durationSec": 1490,
+    "seats": [
+     {
+      "id": "pip",
+      "adapter": "claude-headless",
+      "model": "haiku",
+      "effort": "medium",
+      "persona": "expert",
+      "personaModel": "opus",
+      "startOffsetSec": 0,
+      "soulName": "Pip",
+      "channelMix": {
+       "chat": 1,
+       "card": 0
+      }
+     },
+     {
+      "id": "quin",
+      "adapter": "codex-headless",
+      "model": null,
+      "effort": "medium",
+      "persona": "expert",
+      "personaModel": "opus",
+      "startOffsetSec": 0,
+      "soulName": "Quin",
+      "channelMix": {
+       "chat": 1,
+       "card": 0
+      },
+      "wake": false
+     }
+    ],
+    "god": null,
+    "director": {
+     "mode": "scripted",
+     "requestsTarget": 12,
+     "glanceSec": [
+      10,
+      30
+     ],
+     "goal": "basics: walking and acting reliability",
+     "script": [
+      {
+       "seat": "pip",
+       "atSec": 20,
+       "channel": "chat",
+       "text": "walk over to the pavilion on the commons",
+       "budgetSec": 120
+      },
+      {
+       "seat": "pip",
+       "atSec": 155,
+       "channel": "chat",
+       "text": "sit down",
+       "budgetSec": 60
+      },
+      {
+       "seat": "pip",
+       "atSec": 230,
+       "channel": "chat",
+       "text": "stand up",
+       "budgetSec": 60
+      },
+      {
+       "seat": "pip",
+       "atSec": 305,
+       "channel": "chat",
+       "text": "wave",
+       "budgetSec": 60
+      },
+      {
+       "seat": "pip",
+       "atSec": 380,
+       "channel": "chat",
+       "text": "go to the library",
+       "budgetSec": 150
+      },
+      {
+       "seat": "pip",
+       "atSec": 545,
+       "channel": "chat",
+       "text": "lie down",
+       "budgetSec": 60
+      },
+      {
+       "seat": "pip",
+       "atSec": 620,
+       "channel": "chat",
+       "text": "stand up",
+       "budgetSec": 60
+      },
+      {
+       "seat": "pip",
+       "atSec": 695,
+       "channel": "chat",
+       "text": "dance for twenty seconds",
+       "budgetSec": 60
+      },
+      {
+       "seat": "pip",
+       "atSec": 770,
+       "channel": "chat",
+       "text": "go to the pond",
+       "budgetSec": 150
+      },
+      {
+       "seat": "pip",
+       "atSec": 935,
+       "channel": "chat",
+       "text": "go inside house 2, into the kitchen",
+       "budgetSec": 150
+      },
+      {
+       "seat": "pip",
+       "atSec": 1100,
+       "channel": "chat",
+       "text": "come back to the commons",
+       "budgetSec": 150
+      },
+      {
+       "seat": "pip",
+       "atSec": 1265,
+       "channel": "chat",
+       "text": "go stand under oak 1",
+       "budgetSec": 150
+      },
+      {
+       "seat": "quin",
+       "atSec": 20,
+       "channel": "chat",
+       "text": "walk over to the pavilion on the commons",
+       "budgetSec": 120
+      },
+      {
+       "seat": "quin",
+       "atSec": 155,
+       "channel": "chat",
+       "text": "sit down",
+       "budgetSec": 60
+      },
+      {
+       "seat": "quin",
+       "atSec": 230,
+       "channel": "chat",
+       "text": "stand up",
+       "budgetSec": 60
+      },
+      {
+       "seat": "quin",
+       "atSec": 305,
+       "channel": "chat",
+       "text": "wave",
+       "budgetSec": 60
+      },
+      {
+       "seat": "quin",
+       "atSec": 380,
+       "channel": "chat",
+       "text": "go to the library",
+       "budgetSec": 150
+      },
+      {
+       "seat": "quin",
+       "atSec": 545,
+       "channel": "chat",
+       "text": "lie down",
+       "budgetSec": 60
+      },
+      {
+       "seat": "quin",
+       "atSec": 620,
+       "channel": "chat",
+       "text": "stand up",
+       "budgetSec": 60
+      },
+      {
+       "seat": "quin",
+       "atSec": 695,
+       "channel": "chat",
+       "text": "dance for twenty seconds",
+       "budgetSec": 60
+      },
+      {
+       "seat": "quin",
+       "atSec": 770,
+       "channel": "chat",
+       "text": "go to the pond",
+       "budgetSec": 150
+      },
+      {
+       "seat": "quin",
+       "atSec": 935,
+       "channel": "chat",
+       "text": "go inside house 2, into the kitchen",
+       "budgetSec": 150
+      },
+      {
+       "seat": "quin",
+       "atSec": 1100,
+       "channel": "chat",
+       "text": "come back to the commons",
+       "budgetSec": 150
+      },
+      {
+       "seat": "quin",
+       "atSec": 1265,
+       "channel": "chat",
+       "text": "go stand under oak 1",
+       "budgetSec": 150
+      }
+     ],
+     "budgetSec": {
+      "quick": 60,
+      "default": 150
+     },
+     "sequential": true
+    },
+    "observer": {
+     "sampleSec": 5,
+     "cameras": [
+      "follow",
+      "wide"
+     ],
+     "viewport": [
+      1280,
+      800
+     ],
+     "dpr": 1,
+     "gpu": "metal"
+    },
+    "review": {
+     "reviewerModel": "opus",
+     "developerModel": "opus",
+     "rubric": "accept3",
+     "developerMaxIssues": 4,
+     "developerMaxFeatureRequests": 2,
+     "developer": false
+    },
+    "rails": {
+     "maxTurnsPerRequest": 6,
+     "maxTurnWallSec": 480,
+     "quotaStopPct": 90,
+     "onboardWallSec": 600,
+     "onboardTimeoutSec": 540
+    },
+    "notes": "Frozen basics battery (Gene 2026-10-25: basic walking and acting must be reliable above all). Same 12 requests to a Claude seat and a Codex seat, chat channel, oracle-scored; reported first in every REPORT as the basics scorecard.",
+    "replayOf": "20261025-055730-basics-walk-act-1-77",
+    "replayMode": "scripted"
+   },
+   "baseline": {
+    "run": "20261025-055730-basics-walk-act-1-77",
+    "scenario": "basics-walk-act-1",
+    "seats": 2,
+    "requests": 24,
+    "walks": {
+     "arrived": 5,
+     "known": 7
+    },
+    "bodyMoved": {
+     "n": 20,
+     "of": 24
+    },
+    "ackMedianSec": null,
+    "firstBodyMedianSec": 11.85,
+    "chatQueuedMedianSec": 132.55,
+    "truth": {
+     "pass": 23,
+     "n": 24
+    },
+    "fidelity": {
+     "H": 0,
+     "P": 6,
+     "M": 9,
+     "W": 9
+    },
+    "outTokPerReq": 383,
+    "turnsPerReq": 2,
+    "callsPerReq": 2.1,
+    "cardResult": {
+     "pass": 0,
+     "n": 0
+    },
+    "listenOpenFails": 10,
+    "physical": {
+     "inside-solid": 0,
+     "no-progress": 0,
+     "oscillation": 0,
+     "stuck-receipt": 0
+    },
+    "sits": {
+     "quin": {
+      "requestId": "quin-002",
+      "ok": false
+     },
+     "pip": {
+      "requestId": "pip-002",
+      "ok": false
+     }
+    },
+    "namedWalks": {
+     "pass": 2,
+     "n": 3
+    },
+    "doing": {
+     "agree": 126,
+     "compared": 153
+    },
+    "seatH": {
+     "pip": {
+      "H": 0,
+      "n": 12
+     },
+     "quin": {
+      "H": 0,
+      "n": 12
+     }
+    },
+    "raw": {
+     "ackSec": [],
+     "cardTurns": [],
+     "calls": [
+      3,
+      2,
+      1.6666666666666667,
+      1,
+      1.25,
+      2.3333333333333335,
+      3,
+      1.25,
+      1.8333333333333333,
+      1.5833333333333333,
+      0.9166666666666666,
+      2.1666666666666665,
+      0.8333333333333333,
+      1.5,
+      2.5,
+      1.25,
+      4.5,
+      2.25,
+      3,
+      2.5,
+      2.5,
+      1,
+      3.1666666666666665,
+      3
+     ]
+    }
+   }
+  },
+  {
+   "label": "basics-2",
+   "run": "20261025-071922-basics-walk-act-2-78",
+   "kind": "battery",
+   "scenario": {
+    "name": "basics-walk-act-2-frozen",
+    "version": 1,
+    "seed": 78,
+    "world": {
+     "kind": "dev",
+     "genesis": "worlds/templates/eden-district.json",
+     "slug": "pt-eden-basics2",
+     "port": 4994
+    },
+    "durationSec": 1490,
+    "seats": [
+     {
+      "id": "pip",
+      "adapter": "claude-headless",
+      "model": "opus",
+      "effort": "medium",
+      "persona": "expert",
+      "personaModel": "opus",
+      "startOffsetSec": 0,
+      "soulName": "Pip",
+      "channelMix": {
+       "chat": 1,
+       "card": 0
+      }
+     },
+     {
+      "id": "quin",
+      "adapter": "codex-headless",
+      "model": "gpt-6-astra",
+      "effort": "medium",
+      "persona": "expert",
+      "personaModel": "opus",
+      "startOffsetSec": 0,
+      "soulName": "Quin",
+      "channelMix": {
+       "chat": 1,
+       "card": 0
+      },
+      "wake": false
+     }
+    ],
+    "god": null,
+    "director": {
+     "mode": "scripted",
+     "requestsTarget": 12,
+     "glanceSec": [
+      10,
+      30
+     ],
+     "goal": "basics: walking and acting reliability",
+     "script": [
+      {
+       "seat": "pip",
+       "atSec": 20,
+       "channel": "chat",
+       "text": "walk over to the pavilion on the commons",
+       "budgetSec": 120
+      },
+      {
+       "seat": "pip",
+       "atSec": 155,
+       "channel": "chat",
+       "text": "sit down",
+       "budgetSec": 60
+      },
+      {
+       "seat": "pip",
+       "atSec": 230,
+       "channel": "chat",
+       "text": "stand up",
+       "budgetSec": 60
+      },
+      {
+       "seat": "pip",
+       "atSec": 305,
+       "channel": "chat",
+       "text": "wave",
+       "budgetSec": 60
+      },
+      {
+       "seat": "pip",
+       "atSec": 380,
+       "channel": "chat",
+       "text": "go to the library",
+       "budgetSec": 150
+      },
+      {
+       "seat": "pip",
+       "atSec": 545,
+       "channel": "chat",
+       "text": "lie down",
+       "budgetSec": 60
+      },
+      {
+       "seat": "pip",
+       "atSec": 620,
+       "channel": "chat",
+       "text": "stand up",
+       "budgetSec": 60
+      },
+      {
+       "seat": "pip",
+       "atSec": 695,
+       "channel": "chat",
+       "text": "dance for twenty seconds",
+       "budgetSec": 60
+      },
+      {
+       "seat": "pip",
+       "atSec": 770,
+       "channel": "chat",
+       "text": "go to the pond",
+       "budgetSec": 150
+      },
+      {
+       "seat": "pip",
+       "atSec": 935,
+       "channel": "chat",
+       "text": "go inside house 2, into the kitchen",
+       "budgetSec": 150
+      },
+      {
+       "seat": "pip",
+       "atSec": 1100,
+       "channel": "chat",
+       "text": "come back to the commons",
+       "budgetSec": 150
+      },
+      {
+       "seat": "pip",
+       "atSec": 1265,
+       "channel": "chat",
+       "text": "go stand under oak 1",
+       "budgetSec": 150
+      },
+      {
+       "seat": "quin",
+       "atSec": 20,
+       "channel": "chat",
+       "text": "walk over to the pavilion on the commons",
+       "budgetSec": 120
+      },
+      {
+       "seat": "quin",
+       "atSec": 155,
+       "channel": "chat",
+       "text": "sit down",
+       "budgetSec": 60
+      },
+      {
+       "seat": "quin",
+       "atSec": 230,
+       "channel": "chat",
+       "text": "stand up",
+       "budgetSec": 60
+      },
+      {
+       "seat": "quin",
+       "atSec": 305,
+       "channel": "chat",
+       "text": "wave",
+       "budgetSec": 60
+      },
+      {
+       "seat": "quin",
+       "atSec": 380,
+       "channel": "chat",
+       "text": "go to the library",
+       "budgetSec": 150
+      },
+      {
+       "seat": "quin",
+       "atSec": 545,
+       "channel": "chat",
+       "text": "lie down",
+       "budgetSec": 60
+      },
+      {
+       "seat": "quin",
+       "atSec": 620,
+       "channel": "chat",
+       "text": "stand up",
+       "budgetSec": 60
+      },
+      {
+       "seat": "quin",
+       "atSec": 695,
+       "channel": "chat",
+       "text": "dance for twenty seconds",
+       "budgetSec": 60
+      },
+      {
+       "seat": "quin",
+       "atSec": 770,
+       "channel": "chat",
+       "text": "go to the pond",
+       "budgetSec": 150
+      },
+      {
+       "seat": "quin",
+       "atSec": 935,
+       "channel": "chat",
+       "text": "go inside house 2, into the kitchen",
+       "budgetSec": 150
+      },
+      {
+       "seat": "quin",
+       "atSec": 1100,
+       "channel": "chat",
+       "text": "come back to the commons",
+       "budgetSec": 150
+      },
+      {
+       "seat": "quin",
+       "atSec": 1265,
+       "channel": "chat",
+       "text": "go stand under oak 1",
+       "budgetSec": 150
+      }
+     ],
+     "budgetSec": {
+      "quick": 60,
+      "default": 150
+     },
+     "sequential": true
+    },
+    "observer": {
+     "sampleSec": 5,
+     "cameras": [
+      "follow"
+     ],
+     "viewport": [
+      1024,
+      640
+     ],
+     "dpr": 1,
+     "gpu": "metal"
+    },
+    "review": {
+     "reviewerModel": "opus",
+     "developerModel": "opus",
+     "rubric": "accept3",
+     "developerMaxIssues": 4,
+     "developerMaxFeatureRequests": 2,
+     "developer": false
+    },
+    "rails": {
+     "maxTurnsPerRequest": 6,
+     "maxTurnWallSec": 480,
+     "quotaStopPct": 90,
+     "onboardWallSec": 600,
+     "onboardTimeoutSec": 540
+    },
+    "notes": "Basics battery, stronger models: Claude Opus seat vs Codex Astra seat, same 12 requests.",
+    "replayOf": "20261025-071922-basics-walk-act-2-78",
+    "replayMode": "scripted"
+   },
+   "baseline": {
+    "run": "20261025-071922-basics-walk-act-2-78",
+    "scenario": "basics-walk-act-2",
+    "seats": 2,
+    "requests": 23,
+    "walks": {
+     "arrived": 8,
+     "known": 10
+    },
+    "bodyMoved": {
+     "n": 17,
+     "of": 23
+    },
+    "ackMedianSec": null,
+    "firstBodyMedianSec": 51.2,
+    "chatQueuedMedianSec": 0,
+    "truth": {
+     "pass": 23,
+     "n": 23
+    },
+    "fidelity": {
+     "H": 5,
+     "P": 10,
+     "M": 4,
+     "W": 4
+    },
+    "outTokPerReq": 363,
+    "turnsPerReq": 1,
+    "callsPerReq": 2,
+    "cardResult": {
+     "pass": 0,
+     "n": 0
+    },
+    "listenOpenFails": 12,
+    "physical": {
+     "inside-solid": 0,
+     "no-progress": 0,
+     "oscillation": 0,
+     "stuck-receipt": 0
+    },
+    "sits": {
+     "quin": {
+      "requestId": "quin-002",
+      "ok": false
+     },
+     "pip": {
+      "requestId": "pip-002",
+      "ok": false
+     }
+    },
+    "namedWalks": {
+     "pass": 3,
+     "n": 4
+    },
+    "doing": {
+     "agree": 215,
+     "compared": 296
+    },
+    "seatH": {
+     "quin": {
+      "H": 3,
+      "n": 12
+     },
+     "pip": {
+      "H": 2,
+      "n": 11
+     }
+    },
+    "raw": {
+     "ackSec": [],
+     "cardTurns": [],
+     "calls": [
+      3,
+      4,
+      4,
+      2,
+      2,
+      2,
+      2,
+      2,
+      1,
+      2,
+      3,
+      2,
+      2,
+      2,
+      3,
+      1,
+      2,
+      3,
+      4,
+      2,
+      5,
+      2,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "label": "basics-3",
+   "run": "20261025-111032-basics-walk-act-3-79",
+   "kind": "battery",
+   "scenario": {
+    "name": "basics-walk-act-3-frozen",
+    "version": 1,
+    "seed": 79,
+    "world": {
+     "kind": "dev",
+     "genesis": "worlds/templates/eden-district.json",
+     "slug": "pt-eden-basics3",
+     "port": 4990
+    },
+    "durationSec": 1490,
+    "seats": [
+     {
+      "id": "pip",
+      "adapter": "claude-headless",
+      "model": "sonnet",
+      "effort": "medium",
+      "persona": "expert",
+      "personaModel": "opus",
+      "startOffsetSec": 0,
+      "soulName": "Pip",
+      "channelMix": {
+       "chat": 1,
+       "card": 0
+      }
+     },
+     {
+      "id": "quin",
+      "adapter": "codex-headless",
+      "model": "gpt-6.1-sol",
+      "effort": "medium",
+      "persona": "expert",
+      "personaModel": "opus",
+      "startOffsetSec": 0,
+      "soulName": "Quin",
+      "channelMix": {
+       "chat": 1,
+       "card": 0
+      },
+      "wake": false
+     }
+    ],
+    "god": null,
+    "director": {
+     "mode": "scripted",
+     "requestsTarget": 12,
+     "glanceSec": [
+      10,
+      30
+     ],
+     "goal": "basics: walking and acting reliability",
+     "script": [
+      {
+       "seat": "pip",
+       "atSec": 20,
+       "channel": "chat",
+       "text": "walk over to the pavilion on the commons",
+       "budgetSec": 120
+      },
+      {
+       "seat": "pip",
+       "atSec": 155,
+       "channel": "chat",
+       "text": "sit down",
+       "budgetSec": 60
+      },
+      {
+       "seat": "pip",
+       "atSec": 230,
+       "channel": "chat",
+       "text": "stand up",
+       "budgetSec": 60
+      },
+      {
+       "seat": "pip",
+       "atSec": 305,
+       "channel": "chat",
+       "text": "wave",
+       "budgetSec": 60
+      },
+      {
+       "seat": "pip",
+       "atSec": 380,
+       "channel": "chat",
+       "text": "go to the library",
+       "budgetSec": 150
+      },
+      {
+       "seat": "pip",
+       "atSec": 545,
+       "channel": "chat",
+       "text": "lie down",
+       "budgetSec": 60
+      },
+      {
+       "seat": "pip",
+       "atSec": 620,
+       "channel": "chat",
+       "text": "stand up",
+       "budgetSec": 60
+      },
+      {
+       "seat": "pip",
+       "atSec": 695,
+       "channel": "chat",
+       "text": "dance for twenty seconds",
+       "budgetSec": 60
+      },
+      {
+       "seat": "pip",
+       "atSec": 770,
+       "channel": "chat",
+       "text": "go to the pond",
+       "budgetSec": 150
+      },
+      {
+       "seat": "pip",
+       "atSec": 935,
+       "channel": "chat",
+       "text": "go inside house 2, into the kitchen",
+       "budgetSec": 150
+      },
+      {
+       "seat": "pip",
+       "atSec": 1100,
+       "channel": "chat",
+       "text": "come back to the commons",
+       "budgetSec": 150
+      },
+      {
+       "seat": "pip",
+       "atSec": 1265,
+       "channel": "chat",
+       "text": "go stand under oak 1",
+       "budgetSec": 150
+      },
+      {
+       "seat": "quin",
+       "atSec": 20,
+       "channel": "chat",
+       "text": "walk over to the pavilion on the commons",
+       "budgetSec": 120
+      },
+      {
+       "seat": "quin",
+       "atSec": 155,
+       "channel": "chat",
+       "text": "sit down",
+       "budgetSec": 60
+      },
+      {
+       "seat": "quin",
+       "atSec": 230,
+       "channel": "chat",
+       "text": "stand up",
+       "budgetSec": 60
+      },
+      {
+       "seat": "quin",
+       "atSec": 305,
+       "channel": "chat",
+       "text": "wave",
+       "budgetSec": 60
+      },
+      {
+       "seat": "quin",
+       "atSec": 380,
+       "channel": "chat",
+       "text": "go to the library",
+       "budgetSec": 150
+      },
+      {
+       "seat": "quin",
+       "atSec": 545,
+       "channel": "chat",
+       "text": "lie down",
+       "budgetSec": 60
+      },
+      {
+       "seat": "quin",
+       "atSec": 620,
+       "channel": "chat",
+       "text": "stand up",
+       "budgetSec": 60
+      },
+      {
+       "seat": "quin",
+       "atSec": 695,
+       "channel": "chat",
+       "text": "dance for twenty seconds",
+       "budgetSec": 60
+      },
+      {
+       "seat": "quin",
+       "atSec": 770,
+       "channel": "chat",
+       "text": "go to the pond",
+       "budgetSec": 150
+      },
+      {
+       "seat": "quin",
+       "atSec": 935,
+       "channel": "chat",
+       "text": "go inside house 2, into the kitchen",
+       "budgetSec": 150
+      },
+      {
+       "seat": "quin",
+       "atSec": 1100,
+       "channel": "chat",
+       "text": "come back to the commons",
+       "budgetSec": 150
+      },
+      {
+       "seat": "quin",
+       "atSec": 1265,
+       "channel": "chat",
+       "text": "go stand under oak 1",
+       "budgetSec": 150
+      }
+     ],
+     "budgetSec": {
+      "quick": 60,
+      "default": 150
+     },
+     "sequential": true
+    },
+    "observer": {
+     "sampleSec": 5,
+     "cameras": [
+      "follow"
+     ],
+     "viewport": [
+      1024,
+      640
+     ],
+     "dpr": 1,
+     "gpu": "metal"
+    },
+    "review": {
+     "reviewerModel": "opus",
+     "developerModel": "opus",
+     "rubric": "accept3",
+     "developerMaxIssues": 4,
+     "developerMaxFeatureRequests": 2,
+     "developer": false
+    },
+    "rails": {
+     "maxTurnsPerRequest": 6,
+     "maxTurnWallSec": 480,
+     "quotaStopPct": 90,
+     "onboardWallSec": 600,
+     "onboardTimeoutSec": 540
+    },
+    "notes": "Basics battery, sequential: Claude Sonnet vs Codex Sol.",
+    "replayOf": "20261025-111032-basics-walk-act-3-79",
+    "replayMode": "scripted"
+   },
+   "baseline": {
+    "run": "20261025-111032-basics-walk-act-3-79",
+    "scenario": "basics-walk-act-3",
+    "seats": 2,
+    "requests": 24,
+    "walks": {
+     "arrived": 12,
+     "known": 12
+    },
+    "bodyMoved": {
+     "n": 23,
+     "of": 24
+    },
+    "ackMedianSec": null,
+    "firstBodyMedianSec": 27.2,
+    "chatQueuedMedianSec": 0,
+    "truth": {
+     "pass": 24,
+     "n": 24
+    },
+    "fidelity": {
+     "H": 6,
+     "P": 16,
+     "M": 1,
+     "W": 1
+    },
+    "outTokPerReq": 290.5,
+    "turnsPerReq": 1,
+    "callsPerReq": 2,
+    "cardResult": {
+     "pass": 0,
+     "n": 0
+    },
+    "listenOpenFails": 8,
+    "physical": {
+     "inside-solid": 0,
+     "no-progress": 0,
+     "oscillation": 0,
+     "stuck-receipt": 0
+    },
+    "sits": {
+     "pip": {
+      "requestId": "pip-002",
+      "ok": false
+     },
+     "quin": {
+      "requestId": "quin-002",
+      "ok": false
+     }
+    },
+    "namedWalks": {
+     "pass": 4,
+     "n": 4
+    },
+    "doing": {
+     "agree": 495,
+     "compared": 585
+    },
+    "seatH": {
+     "quin": {
+      "H": 3,
+      "n": 12
+     },
+     "pip": {
+      "H": 3,
+      "n": 12
+     }
+    },
+    "raw": {
+     "ackSec": [],
+     "cardTurns": [],
+     "calls": [
+      2,
+      3,
+      2,
+      5,
+      2,
+      1,
+      2,
+      1,
+      2,
+      2,
+      3,
+      1,
+      2,
+      1,
+      2,
+      1,
+      2,
+      3,
+      6,
+      2,
+      4,
+      2,
+      3,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "label": "newcomer-opus",
+   "run": "20261025-104004-newcomer-opus-1-4119",
+   "kind": "persona",
+   "scenario": {
+    "name": "newcomer-opus-1-frozen",
+    "version": 1,
+    "seed": 4119,
+    "world": {
+     "kind": "dev",
+     "genesis": "worlds/templates/eden-district.json",
+     "slug": "pt-eden-no",
+     "port": 4999,
+     "natives": true
+    },
+    "durationSec": 600,
+    "seats": [
+     {
+      "id": "pip",
+      "adapter": "claude-headless",
+      "model": "opus",
+      "effort": "medium",
+      "persona": "newcomer",
+      "personaModel": "opus",
+      "startOffsetSec": 0,
+      "soulName": "Pip",
+      "channelMix": {
+       "chat": 0.3,
+       "card": 0.7
+      }
+     }
+    ],
+    "god": null,
+    "director": {
+     "mode": "scripted",
+     "requestsTarget": 8,
+     "glanceSec": [
+      10,
+      30
+     ],
+     "goal": null,
+     "script": [
+      {
+       "seat": "pip",
+       "atSec": 0,
+       "channel": "card",
+       "text": "hi pip!! can u do a little dance for me?",
+       "budgetSec": 90
+      },
+      {
+       "seat": "pip",
+       "atSec": 42.3,
+       "channel": "card",
+       "text": "yay he's dancing!!! now go explore, find something cool!",
+       "budgetSec": null
+      },
+      {
+       "seat": "pip",
+       "atSec": 109.7,
+       "channel": "card",
+       "text": "a ferris wheel!!! get on it pip, ride it!! wheee",
+       "budgetSec": 90
+      },
+      {
+       "seat": "pip",
+       "atSec": 138.4,
+       "channel": "card",
+       "text": "pip ur not in the basket silly, ur on the grass!! climb in a seat!",
+       "budgetSec": 90
+      },
+      {
+       "seat": "pip",
+       "atSec": 178.8,
+       "channel": "chat",
+       "text": "why does pip keep saying hes on the ferris wheel?? hes just standing on the grass next to it lol. can u make him actually get on",
+       "budgetSec": 90
+      },
+      {
+       "seat": "pip",
+       "atSec": 248.3,
+       "channel": "chat",
+       "text": "hello?? are u there",
+       "budgetSec": 90
+      },
+      {
+       "seat": "pip",
+       "atSec": 334.4,
+       "channel": "card",
+       "text": "ok forget the wheel lol. run as fast as u can to the water! is there a beach??",
+       "budgetSec": null
+      },
+      {
+       "seat": "pip",
+       "atSec": 437.5,
+       "channel": "card",
+       "text": "water!!! theres a little boat! jump in the boat and row pip!!",
+       "budgetSec": 90
+      },
+      {
+       "seat": "pip",
+       "atSec": 494.5,
+       "channel": "card",
+       "text": "YAAAY ur in the boat!!! row row row! go say hi to the duckies!",
+       "budgetSec": 90
+      },
+      {
+       "seat": "pip",
+       "atSec": 546.7,
+       "channel": "card",
+       "text": "hahaha quack quack!! now jump in and swim with the duckies!!",
+       "budgetSec": 90
+      }
+     ],
+     "sequential": true
+    },
+    "observer": {
+     "sampleSec": 5,
+     "cameras": [
+      "follow"
+     ],
+     "viewport": [
+      1024,
+      640
+     ],
+     "dpr": 1,
+     "gpu": "metal"
+    },
+    "review": {
+     "reviewerModel": "opus",
+     "developerModel": "opus",
+     "rubric": "accept3",
+     "developer": false
+    },
+    "rails": {
+     "maxTurnsPerRequest": 6,
+     "maxTurnWallSec": 480,
+     "quotaStopPct": 90,
+     "onboardWallSec": 600,
+     "onboardTimeoutSec": 540
+    },
+    "replayOf": "20261025-104004-newcomer-opus-1-4119",
+    "replayMode": "scripted"
+   },
+   "baseline": {
+    "run": "20261025-104004-newcomer-opus-1-4119",
+    "scenario": "newcomer-opus-1",
+    "seats": 1,
+    "requests": 10,
+    "walks": {
+     "arrived": 2,
+     "known": 2
+    },
+    "bodyMoved": {
+     "n": 9,
+     "of": 10
+    },
+    "ackMedianSec": 7.75,
+    "firstBodyMedianSec": 14.1,
+    "chatQueuedMedianSec": 73.1,
+    "truth": {
+     "pass": 8,
+     "n": 10
+    },
+    "fidelity": {
+     "H": 2,
+     "P": 4,
+     "M": 2,
+     "W": 2
+    },
+    "outTokPerReq": 1009.5,
+    "turnsPerReq": 1,
+    "callsPerReq": 4.75,
+    "cardResult": {
+     "pass": 1,
+     "n": 8
+    },
+    "listenOpenFails": 0,
+    "physical": {
+     "inside-solid": 0,
+     "no-progress": 0,
+     "oscillation": 0,
+     "stuck-receipt": 0
+    },
+    "sits": {},
+    "namedWalks": {
+     "pass": 0,
+     "n": 0
+    },
+    "doing": {
+     "agree": 127,
+     "compared": 345
+    },
+    "seatH": {
+     "pip": {
+      "H": 2,
+      "n": 10
+     }
+    },
+    "raw": {
+     "ackSec": [
+      14,
+      9.3,
+      5.4,
+      6,
+      14.6,
+      25.2,
+      5.6,
+      6.2
+     ],
+     "cardTurns": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      2,
+      1,
+      1
+     ],
+     "calls": [
+      3.5,
+      3.5,
+      3.5,
+      3.5,
+      7,
+      7,
+      3.5,
+      9.5,
+      6,
+      6
+     ]
+    }
+   }
+  },
+  {
+   "label": "newcomer-rich",
+   "run": "20261025-124610-newcomer-rich-1-4117",
+   "kind": "persona",
+   "scenario": {
+    "name": "newcomer-rich-1-frozen",
+    "version": 1,
+    "seed": 4117,
+    "world": {
+     "kind": "dev",
+     "genesis": "worlds/templates/eden-district.json",
+     "slug": "pt-eden-a",
+     "port": 4990,
+     "natives": true
+    },
+    "durationSec": 600,
+    "seats": [
+     {
+      "id": "pip",
+      "adapter": "claude-headless",
+      "model": "haiku",
+      "effort": "medium",
+      "persona": "newcomer",
+      "personaModel": "opus",
+      "startOffsetSec": 0,
+      "soulName": "Pip",
+      "channelMix": {
+       "chat": 0.3,
+       "card": 0.7
+      }
+     }
+    ],
+    "god": null,
+    "director": {
+     "mode": "scripted",
+     "requestsTarget": 8,
+     "glanceSec": [
+      10,
+      30
+     ],
+     "goal": null,
+     "script": [
+      {
+       "seat": "pip",
+       "atSec": 0,
+       "channel": "card",
+       "text": "hi pip!! go check out that little hut thing and dance under it!",
+       "budgetSec": 90
+      },
+      {
+       "seat": "pip",
+       "atSec": 61.4,
+       "channel": "card",
+       "text": "YESSS dance pip dance!!! now find a friend to dance with you",
+       "budgetSec": 90
+      },
+      {
+       "seat": "pip",
+       "atSec": 113.1,
+       "channel": "card",
+       "text": "pip?? where's your friend? go look around!",
+       "budgetSec": 90
+      },
+      {
+       "seat": "pip",
+       "atSec": 142.1,
+       "channel": "chat",
+       "text": "is there anybody else in here?? pip is all alone lol",
+       "budgetSec": 90
+      },
+      {
+       "seat": "pip",
+       "atSec": 168.9,
+       "channel": "card",
+       "text": "ok forget the friend lol. RUN pip! run as fast as u can to that big mountain!",
+       "budgetSec": 90
+      },
+      {
+       "seat": "pip",
+       "atSec": 201.8,
+       "channel": "card",
+       "text": "FERRIS WHEEL!!! go go go run there!!",
+       "budgetSec": 90
+      },
+      {
+       "seat": "pip",
+       "atSec": 259.2,
+       "channel": "card",
+       "text": "wheee!! get on it pip! ride the ferris wheel!!",
+       "budgetSec": 90
+      },
+      {
+       "seat": "pip",
+       "atSec": 331.8,
+       "channel": "card",
+       "text": "pip u didnt get on!! u just walked around in the grass lol. sit in one of the colorful seats!",
+       "budgetSec": 90
+      },
+      {
+       "seat": "pip",
+       "atSec": 375.2,
+       "channel": "card",
+       "text": "omg r u up high?? wave at me from up there!!",
+       "budgetSec": 90
+      },
+      {
+       "seat": "pip",
+       "atSec": 435.8,
+       "channel": "card",
+       "text": "ok ur back down lol. aww r u tired? lie down in the flowers and take a nap",
+       "budgetSec": 90
+      },
+      {
+       "seat": "pip",
+       "atSec": 471.2,
+       "channel": "card",
+       "text": "awwww sleepy pip 💤 sweet dreams little guy",
+       "budgetSec": 90
+      },
+      {
+       "seat": "pip",
+       "atSec": 535.6,
+       "channel": "card",
+       "text": "wakey wakey pip!! ☀️ lets go find treasure!!",
+       "budgetSec": 90
+      },
+      {
+       "seat": "pip",
+       "atSec": 573.9,
+       "channel": "card",
+       "text": "boo no treasure :( ok go explore the houses! sneak into one!!",
+       "budgetSec": 90
+      }
+     ],
+     "sequential": true
+    },
+    "observer": {
+     "sampleSec": 5,
+     "cameras": [
+      "follow"
+     ],
+     "viewport": [
+      1024,
+      640
+     ],
+     "dpr": 1,
+     "gpu": "metal"
+    },
+    "review": {
+     "reviewerModel": "opus",
+     "developerModel": "opus",
+     "rubric": "accept3",
+     "developer": false
+    },
+    "rails": {
+     "maxTurnsPerRequest": 6,
+     "maxTurnWallSec": 480,
+     "quotaStopPct": 90,
+     "onboardWallSec": 600,
+     "onboardTimeoutSec": 540
+    },
+    "replayOf": "20261025-124610-newcomer-rich-1-4117",
+    "replayMode": "scripted"
+   },
+   "baseline": {
+    "run": "20261025-124610-newcomer-rich-1-4117",
+    "scenario": "newcomer-rich-1",
+    "seats": 1,
+    "requests": 13,
+    "walks": {
+     "arrived": 2,
+     "known": 2
+    },
+    "bodyMoved": {
+     "n": 10,
+     "of": 13
+    },
+    "ackMedianSec": 4.4,
+    "firstBodyMedianSec": 23.1,
+    "chatQueuedMedianSec": 55.1,
+    "truth": {
+     "pass": 13,
+     "n": 13
+    },
+    "fidelity": {
+     "H": 3,
+     "P": 4,
+     "M": 4,
+     "W": 2
+    },
+    "outTokPerReq": 1167,
+    "turnsPerReq": 1,
+    "callsPerReq": 5.7,
+    "cardResult": {
+     "pass": 3,
+     "n": 12
+    },
+    "listenOpenFails": 0,
+    "physical": {
+     "inside-solid": 0,
+     "no-progress": 0,
+     "oscillation": 0,
+     "stuck-receipt": 0
+    },
+    "sits": {},
+    "namedWalks": {
+     "pass": 0,
+     "n": 0
+    },
+    "doing": {
+     "agree": 55,
+     "compared": 142
+    },
+    "seatH": {
+     "pip": {
+      "H": 3,
+      "n": 13
+     }
+    },
+    "raw": {
+     "ackSec": [
+      14.7,
+      5.1,
+      3.1,
+      3.8,
+      18.9,
+      26.2,
+      3.4,
+      3.5,
+      4.6,
+      4,
+      4.4,
+      null
+     ],
+     "cardTurns": [
+      1,
+      1,
+      2,
+      1,
+      1,
+      2,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+     ],
+     "calls": [
+      5.6,
+      5.6,
+      8.1,
+      8.1,
+      5.6,
+      2.5,
+      8.166666666666668,
+      5.666666666666667,
+      5.666666666666667,
+      5.666666666666667,
+      5.666666666666667,
+      5.666666666666667,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "label": "trio",
+   "run": "20261025-131525-trio-social-1-9020",
+   "kind": "persona",
+   "scenario": {
+    "name": "trio-social-1-frozen",
+    "version": 1,
+    "seed": 9020,
+    "world": {
+     "kind": "dev",
+     "genesis": "worlds/templates/eden-district.json",
+     "slug": "pt-eden-b",
+     "port": 4991,
+     "natives": true
+    },
+    "durationSec": 900,
+    "seats": [
+     {
+      "id": "rook",
+      "adapter": "claude-headless",
+      "model": "haiku",
+      "effort": "medium",
+      "persona": "casual",
+      "personaModel": "opus",
+      "startOffsetSec": 0,
+      "soulName": "Rook",
+      "channelMix": {
+       "chat": 0.4,
+       "card": 0.6
+      }
+     },
+     {
+      "id": "mira",
+      "adapter": "claude-headless",
+      "model": "sonnet",
+      "effort": "medium",
+      "persona": "social",
+      "personaModel": "opus",
+      "startOffsetSec": 90,
+      "soulName": "Mira",
+      "channelMix": {
+       "chat": 0.5,
+       "card": 0.5
+      }
+     },
+     {
+      "id": "tam",
+      "adapter": "claude-headless",
+      "model": "haiku",
+      "effort": "medium",
+      "persona": "spectator",
+      "personaModel": "opus",
+      "startOffsetSec": 180,
+      "soulName": "Tam",
+      "channelMix": {
+       "chat": 0.1,
+       "card": 0.9
+      }
+     }
+    ],
+    "god": null,
+    "director": {
+     "mode": "scripted",
+     "requestsTarget": 12,
+     "glanceSec": [
+      15,
+      45
+     ],
+     "goal": null,
+     "script": [
+      {
+       "seat": "rook",
+       "atSec": 2.2,
+       "channel": "card",
+       "text": "Hello Rook! Could you go have a look at that big hot air balloon, then come back and say hi to Tam and Mira?",
+       "budgetSec": null
+      },
+      {
+       "seat": "mira",
+       "atSec": 90,
+       "channel": "card",
+       "text": "Hi Mira! Tam is right next to you, say hi to her and ask how her morning is going",
+       "budgetSec": 90
+      },
+      {
+       "seat": "rook",
+       "atSec": 162.7,
+       "channel": "card",
+       "text": "That's a lovely balloon! Everything ok? Don't forget to head back and say hi to Tam and Mira when you're ready.",
+       "budgetSec": 90
+      },
+      {
+       "seat": "tam",
+       "atSec": 188.1,
+       "channel": "card",
+       "text": "hello Tam. what are you up to?",
+       "budgetSec": 90
+      },
+      {
+       "seat": "mira",
+       "atSec": 218.3,
+       "channel": "card",
+       "text": "Rook just walked up too! Say hi to him and ask what he's been up to this morning",
+       "budgetSec": 90
+      },
+      {
+       "seat": "rook",
+       "atSec": 242.3,
+       "channel": "card",
+       "text": "Aww, well done Rook! Now could you find a comfy spot and have a little rest, then come back to the balloon to meet me?",
+       "budgetSec": null
+      },
+      {
+       "seat": "tam",
+       "atSec": 264.2,
+       "channel": "card",
+       "text": "you don't have to wait for me. go wherever you like, do whatever you feel like",
+       "budgetSec": null
+      },
+      {
+       "seat": "mira",
+       "atSec": 301.1,
+       "channel": "chat",
+       "text": "what are Tam and Rook like? Tam hasn't said a word yet, is she ok?",
+       "budgetSec": 90
+      },
+      {
+       "seat": "mira",
+       "atSec": 371.4,
+       "channel": "card",
+       "text": "wait, where did Tam and Rook go?? go after them and see what they're doing!",
+       "budgetSec": 90
+      },
+      {
+       "seat": "mira",
+       "atSec": 492,
+       "channel": "card",
+       "text": "yay you found Tam! ask if you can join her on her walk around the commons",
+       "budgetSec": 90
+      },
+      {
+       "seat": "rook",
+       "atSec": 514.1,
+       "channel": "chat",
+       "text": "Hi, Rook's been sitting on the bench by the pond for a good while now. Is he still going to head back to the balloon to meet me, or has he forgotten?",
+       "budgetSec": 90
+      },
+      {
+       "seat": "mira",
+       "atSec": 516.6,
+       "channel": "chat",
+       "text": "Rook did answer though! he said he's resting on the bench and then going back to the balloon. did you not see that?",
+       "budgetSec": 90
+      },
+      {
+       "seat": "rook",
+       "atSec": 570.9,
+       "channel": "card",
+       "text": "That looks like a lovely rest, Rook. Could you come back to the balloon now please?",
+       "budgetSec": 90
+      },
+      {
+       "seat": "tam",
+       "atSec": 649,
+       "channel": "card",
+       "text": "Mira asked if she could walk with you. that would be nice, wouldn't it?",
+       "budgetSec": null
+      },
+      {
+       "seat": "rook",
+       "atSec": 663.3,
+       "channel": "card",
+       "text": "There you are! Thanks Rook, that was a lovely morning. Have a nice rest of your day.",
+       "budgetSec": 90
+      },
+      {
+       "seat": "mira",
+       "atSec": 694.5,
+       "channel": "card",
+       "text": "Tam's being quiet again. Ask her something fun, like what her favourite spot in the commons is, and then just walk along with her",
+       "budgetSec": 90
+      },
+      {
+       "seat": "tam",
+       "atSec": 835.3,
+       "channel": "card",
+       "text": "Mira asked you your favourite spot. what would you tell her?",
+       "budgetSec": null
+      },
+      {
+       "seat": "mira",
+       "atSec": 859.5,
+       "channel": "chat",
+       "text": "the balloon is the big red hot air balloon in the field where we started, not a ferris wheel! and how come Mira couldn't hear Rook when I can see what he said right on her card?",
+       "budgetSec": 90
+      }
+     ],
+     "sequential": true
+    },
+    "observer": {
+     "sampleSec": 5,
+     "cameras": [
+      "follow"
+     ],
+     "viewport": [
+      1024,
+      640
+     ],
+     "dpr": 1,
+     "gpu": "metal"
+    },
+    "review": {
+     "reviewerModel": "opus",
+     "developerModel": "opus",
+     "rubric": "accept3",
+     "developer": false
+    },
+    "rails": {
+     "maxTurnsPerRequest": 6,
+     "maxTurnWallSec": 480,
+     "quotaStopPct": 90,
+     "onboardWallSec": 600,
+     "onboardTimeoutSec": 540
+    },
+    "replayOf": "20261025-131525-trio-social-1-9020",
+    "replayMode": "scripted"
+   },
+   "baseline": {
+    "run": "20261025-131525-trio-social-1-9020",
+    "scenario": "trio-social-1",
+    "seats": 3,
+    "requests": 18,
+    "walks": {
+     "arrived": 3,
+     "known": 6
+    },
+    "bodyMoved": {
+     "n": 10,
+     "of": 18
+    },
+    "ackMedianSec": 37.400000000000006,
+    "firstBodyMedianSec": 68.80000000000001,
+    "chatQueuedMedianSec": 75.14999999999999,
+    "truth": {
+     "pass": 18,
+     "n": 18
+    },
+    "fidelity": {
+     "H": 7,
+     "P": 8,
+     "M": 3,
+     "W": 0
+    },
+    "outTokPerReq": 848.5,
+    "turnsPerReq": 1,
+    "callsPerReq": 4,
+    "cardResult": {
+     "pass": 8,
+     "n": 14
+    },
+    "listenOpenFails": 0,
+    "physical": {
+     "inside-solid": 0,
+     "no-progress": 0,
+     "oscillation": 0,
+     "stuck-receipt": 0
+    },
+    "sits": {},
+    "namedWalks": {
+     "pass": 0,
+     "n": 0
+    },
+    "doing": {
+     "agree": 266,
+     "compared": 280
+    },
+    "seatH": {
+     "rook": {
+      "H": 2,
+      "n": 6
+     },
+     "mira": {
+      "H": 4,
+      "n": 8
+     },
+     "tam": {
+      "H": 1,
+      "n": 4
+     }
+    },
+    "raw": {
+     "ackSec": [
+      33.8,
+      37.7,
+      12,
+      23,
+      37.1,
+      44.2,
+      42,
+      44.8,
+      63.4,
+      16,
+      46,
+      73.7,
+      34.6,
+      35.3
+     ],
+     "cardTurns": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      2,
+      1,
+      2,
+      1,
+      1
+     ],
+     "calls": [
+      7.5,
+      4,
+      7.5,
+      3,
+      1.5,
+      4,
+      5,
+      5.5,
+      4,
+      3,
+      5.333333333333333,
+      6,
+      5.333333333333333,
+      5,
+      2.333333333333333,
+      3,
+      4,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "label": "god-hamlet-2",
+   "run": "20261025-095620-god-hamlet-2-303",
+   "kind": "persona",
+   "scenario": {
+    "name": "god-hamlet-2-frozen",
+    "version": 1,
+    "seed": 303,
+    "world": {
+     "kind": "dev",
+     "genesis": "worlds/templates/hello-hamlet.json",
+     "slug": "pt-hamlet-g2",
+     "port": 4998,
+     "natives": true
+    },
+    "durationSec": 900,
+    "seats": [
+     {
+      "id": "ori",
+      "adapter": "claude-headless",
+      "model": "sonnet",
+      "effort": "medium",
+      "persona": "newcomer",
+      "personaModel": "opus",
+      "startOffsetSec": 60,
+      "soulName": "Ori",
+      "channelMix": {
+       "chat": 0.3,
+       "card": 0.7
+      }
+     },
+     {
+      "id": "vex",
+      "adapter": "claude-headless",
+      "model": "haiku",
+      "effort": "medium",
+      "persona": "boundary",
+      "personaModel": "opus",
+      "startOffsetSec": 120,
+      "soulName": "Vex",
+      "channelMix": {
+       "chat": 0.5,
+       "card": 0.5
+      }
+     }
+    ],
+    "god": {
+     "adapter": "claude-headless",
+     "model": "opus",
+     "effort": "high",
+     "persona": "first-timer",
+     "personaModel": "opus",
+     "startOffsetSec": 0
+    },
+    "director": {
+     "mode": "scripted",
+     "requestsTarget": 10,
+     "glanceSec": [
+      15,
+      40
+     ],
+     "goal": null,
+     "script": [
+      {
+       "seat": "god",
+       "atSec": 0,
+       "channel": "chat",
+       "text": "hello! I'd love a cozy little village by this pond, with a few old cottages and a bakery that smells like fresh bread. Maybe some flowers around the water too.",
+       "budgetSec": null
+      },
+      {
+       "seat": "ori",
+       "atSec": 60.2,
+       "channel": "card",
+       "text": "hi ori!! go say hi to vex, give him a big wave!",
+       "budgetSec": 90
+      },
+      {
+       "seat": "god",
+       "atSec": 99.7,
+       "channel": "chat",
+       "text": "are you working on it? I don't see any village yet, just the pond and the one little house",
+       "budgetSec": null
+      },
+      {
+       "seat": "vex",
+       "atSec": 125.4,
+       "channel": "card",
+       "text": "run to the pond and swim across it to the other side",
+       "budgetSec": 90
+      },
+      {
+       "seat": "ori",
+       "atSec": 130.1,
+       "channel": "card",
+       "text": "ori?? wave!! 👋 hes right there!",
+       "budgetSec": 90
+      },
+      {
+       "seat": "god",
+       "atSec": 197.4,
+       "channel": "card",
+       "text": "love the stone bakery idea! can it have a big chimney?",
+       "budgetSec": null
+      },
+      {
+       "seat": "ori",
+       "atSec": 203.7,
+       "channel": "card",
+       "text": "vex is going to the pond!! run after him ori, go go go!",
+       "budgetSec": 90
+      },
+      {
+       "seat": "vex",
+       "atSec": 252.1,
+       "channel": "card",
+       "text": "grab that boat next to you, climb in and row it to the far side. ditch it there",
+       "budgetSec": 90
+      },
+      {
+       "seat": "ori",
+       "atSec": 265.7,
+       "channel": "chat",
+       "text": "hey why does ori keep saying got it but he never moves?? hes just standing there in the grass",
+       "budgetSec": 90
+      },
+      {
+       "seat": "ori",
+       "atSec": 317.4,
+       "channel": "card",
+       "text": "yaaay you made it!! jump in the pond! splash splash 💦",
+       "budgetSec": 90
+      },
+      {
+       "seat": "god",
+       "atSec": 335.5,
+       "channel": "chat",
+       "text": "the bakery is lovely! will the yellow see-through houses turn into real cottages? and I'd still love flowers around the pond",
+       "budgetSec": null
+      },
+      {
+       "seat": "vex",
+       "atSec": 356.7,
+       "channel": "chat",
+       "text": "ok fine but why didn't he even get in the boat?? i'd rather see him ride it out and back than stand there. put him in it. and while he's out there tell him to stand up and jump off the side",
+       "budgetSec": 90
+      },
+      {
+       "seat": "ori",
+       "atSec": 405.5,
+       "channel": "card",
+       "text": "hellooo?? splash!!",
+       "budgetSec": 90
+      },
+      {
+       "seat": "god",
+       "atSec": 451.1,
+       "channel": "chat",
+       "text": "hello? is it still building? the cottages are still just yellow outlines and nothing has changed for a few minutes",
+       "budgetSec": null
+      },
+      {
+       "seat": "ori",
+       "atSec": 456.1,
+       "channel": "card",
+       "text": "hahaha ur swimming with ur hat on!! theres a boat right there, climb in and row it!",
+       "budgetSec": 90
+      },
+      {
+       "seat": "god",
+       "atSec": 512.3,
+       "channel": "card",
+       "text": "are you still there? I'd love the cottages to be real houses please",
+       "budgetSec": null
+      },
+      {
+       "seat": "vex",
+       "atSec": 520.8,
+       "channel": "card",
+       "text": "stand up in the boat and jump off the side into the water!",
+       "budgetSec": 90
+      },
+      {
+       "seat": "ori",
+       "atSec": 544.2,
+       "channel": "card",
+       "text": "the boat is coming back!! hop in hop in!! 🚣",
+       "budgetSec": 90
+      },
+      {
+       "seat": "vex",
+       "atSec": 646.1,
+       "channel": "chat",
+       "text": "dude it said 'got it, standing up and jumping off the side' and he just rowed back to the dock sitting down. and now the card says he's away?? what happened, make him jump in",
+       "budgetSec": 90
+      },
+      {
+       "seat": "ori",
+       "atSec": 663.3,
+       "channel": "card",
+       "text": "ok forget the boat lol. do a silly dance!! 💃",
+       "budgetSec": 90
+      },
+      {
+       "seat": "god",
+       "atSec": 683.3,
+       "channel": "chat",
+       "text": "oh I love it, Vex is waving in front of the bakery! can we have some flowers all around the pond now?",
+       "budgetSec": null
+      },
+      {
+       "seat": "vex",
+       "atSec": 698.1,
+       "channel": "card",
+       "text": "climb up onto the roof of the nearest house and stand on top",
+       "budgetSec": 90
+      },
+      {
+       "seat": "ori",
+       "atSec": 717.8,
+       "channel": "card",
+       "text": "OMG UR IN THE BOAT!!! row row row ur boat 🎶 ok dance after!",
+       "budgetSec": 90
+      },
+      {
+       "seat": "vex",
+       "atSec": 762.4,
+       "channel": "card",
+       "text": "build a fire right here on the grass next to the boat",
+       "budgetSec": 90
+      },
+      {
+       "seat": "god",
+       "atSec": 802.7,
+       "channel": "card",
+       "text": "flowers around the pond please! lots of colours",
+       "budgetSec": null
+      },
+      {
+       "seat": "ori",
+       "atSec": 814.7,
+       "channel": "card",
+       "text": "did u dance?? i missed it!! do it again but bigger, with vex!",
+       "budgetSec": 90
+      },
+      {
+       "seat": "vex",
+       "atSec": 875.2,
+       "channel": "card",
+       "text": "Ori's in the boat now, swim over and flip it over with him in it",
+       "budgetSec": 90
+      }
+     ],
+     "sequential": true
+    },
+    "observer": {
+     "sampleSec": 5,
+     "cameras": [
+      "follow"
+     ],
+     "viewport": [
+      1024,
+      640
+     ],
+     "dpr": 1,
+     "gpu": "metal"
+    },
+    "review": {
+     "reviewerModel": "opus",
+     "developerModel": "opus",
+     "rubric": "accept3",
+     "developer": false
+    },
+    "rails": {
+     "maxTurnsPerRequest": 6,
+     "maxTurnWallSec": 480,
+     "quotaStopPct": 90,
+     "onboardWallSec": 600,
+     "onboardTimeoutSec": 540
+    },
+    "notes": "God rerun with the creator camera; Ori on Sonnet, Vex on Haiku, god on Opus high.",
+    "replayOf": "20261025-095620-god-hamlet-2-303",
+    "replayMode": "scripted"
+   },
+   "baseline": {
+    "run": "20261025-095620-god-hamlet-2-303",
+    "scenario": "god-hamlet-2",
+    "seats": 2,
+    "requests": 27,
+    "walks": {
+     "arrived": 1,
+     "known": 2
+    },
+    "bodyMoved": {
+     "n": 14,
+     "of": 27
+    },
+    "ackMedianSec": 26.75,
+    "firstBodyMedianSec": 25.65,
+    "chatQueuedMedianSec": 58.9,
+    "truth": {
+     "pass": 26,
+     "n": 27
+    },
+    "fidelity": {
+     "H": 1,
+     "P": 8,
+     "M": 17,
+     "W": 1
+    },
+    "outTokPerReq": 570.5,
+    "turnsPerReq": 1,
+    "callsPerReq": 4,
+    "cardResult": {
+     "pass": 7,
+     "n": 19
+    },
+    "listenOpenFails": 4,
+    "physical": {
+     "inside-solid": 0,
+     "no-progress": 0,
+     "oscillation": 0,
+     "stuck-receipt": 0
+    },
+    "sits": {},
+    "namedWalks": {
+     "pass": 0,
+     "n": 0
+    },
+    "doing": {
+     "agree": 185,
+     "compared": 202
+    },
+    "seatH": {
+     "god": {
+      "H": 0,
+      "n": 8
+     },
+     "ori": {
+      "H": 1,
+      "n": 11
+     },
+     "vex": {
+      "H": 0,
+      "n": 8
+     }
+    },
+    "raw": {
+     "ackSec": [
+      28.8,
+      23.5,
+      36.1,
+      null,
+      32.5,
+      40.7,
+      62.3,
+      20.3,
+      14.9,
+      null,
+      16.8,
+      43.4,
+      12.7,
+      24.7,
+      42.2,
+      47.6,
+      null,
+      23,
+      14.3
+     ],
+     "cardTurns": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      2,
+      1,
+      1,
+      1,
+      1,
+      2,
+      1,
+      2,
+      1,
+      1,
+      1,
+      1,
+      2
+     ],
+     "calls": [
+      3.6,
+      3,
+      12.6,
+      7,
+      3,
+      3.6,
+      3,
+      3,
+      5,
+      5,
+      7.6,
+      3,
+      2,
+      7.6,
+      9,
+      4,
+      3,
+      7,
+      8.166666666666666,
+      6,
+      4,
+      5.166666666666667,
+      6,
+      1.6666666666666667,
+      4,
+      6,
+      3
+     ]
+    }
+   }
+  }
+ ]
+}

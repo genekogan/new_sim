@@ -1,0 +1,286 @@
+{
+ "requestId": "r1",
+ "seat": "pip",
+ "soulId": "soul_pip01",
+ "text": "sit down",
+ "channel": "card",
+ "sentAt": "2026-10-24T12:00:30.000Z",
+ "sentMono": 30000,
+ "ackAt": "2026-10-24T12:00:33.000Z",
+ "ackText": "On it, finding a bench.",
+ "resultAt": "2026-10-24T12:00:52.000Z",
+ "resultText": "I'm sitting on the bench by the fountain.",
+ "resultState": "done",
+ "cutoffAt": "2026-10-24T12:01:00.000Z",
+ "cutoffReason": "result",
+ "budgetSec": 90,
+ "samples": [
+  {
+   "t": "2026-10-24T12:00:30.000Z",
+   "mono": 30000,
+   "tick": 120,
+   "soulId": "soul_pip01",
+   "place": "Fountain Plaza",
+   "placePath": [
+    "Eden",
+    "Fountain Plaza"
+   ],
+   "pos": {
+    "x": 10,
+    "y": 0,
+    "z": 5
+   },
+   "posture": "standing",
+   "activity": null,
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": null,
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:00:35.000Z",
+   "mono": 35000,
+   "tick": 140,
+   "soulId": "soul_pip01",
+   "place": "Fountain Plaza",
+   "placePath": [
+    "Eden",
+    "Fountain Plaza"
+   ],
+   "pos": {
+    "x": 10,
+    "y": 0,
+    "z": 5
+   },
+   "posture": "standing",
+   "activity": null,
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": null,
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:00:40.000Z",
+   "mono": 40000,
+   "tick": 160,
+   "soulId": "soul_pip01",
+   "place": "Fountain Plaza",
+   "placePath": [
+    "Eden",
+    "Fountain Plaza"
+   ],
+   "pos": {
+    "x": 11,
+    "y": 0,
+    "z": 5.5
+   },
+   "posture": "standing",
+   "activity": "sitting down",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_101",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:00:45.000Z",
+   "mono": 45000,
+   "tick": 180,
+   "soulId": "soul_pip01",
+   "place": "Fountain Plaza",
+   "placePath": [
+    "Eden",
+    "Fountain Plaza"
+   ],
+   "pos": {
+    "x": 12,
+    "y": 0,
+    "z": 6
+   },
+   "posture": "sitting",
+   "activity": "sitting on a bench",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_101",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:00:50.000Z",
+   "mono": 50000,
+   "tick": 200,
+   "soulId": "soul_pip01",
+   "place": "Fountain Plaza",
+   "placePath": [
+    "Eden",
+    "Fountain Plaza"
+   ],
+   "pos": {
+    "x": 12,
+    "y": 0,
+    "z": 6
+   },
+   "posture": "sitting",
+   "activity": "sitting on a bench",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_101",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:00:55.000Z",
+   "mono": 55000,
+   "tick": 220,
+   "soulId": "soul_pip01",
+   "place": "Fountain Plaza",
+   "placePath": [
+    "Eden",
+    "Fountain Plaza"
+   ],
+   "pos": {
+    "x": 12,
+    "y": 0,
+    "z": 6
+   },
+   "posture": "sitting",
+   "activity": "sitting on a bench",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_101",
+   "receipts": []
+  },
+  {
+   "t": "2026-10-24T12:01:00.000Z",
+   "mono": 60000,
+   "tick": 240,
+   "soulId": "soul_pip01",
+   "place": "Fountain Plaza",
+   "placePath": [
+    "Eden",
+    "Fountain Plaza"
+   ],
+   "pos": {
+    "x": 12,
+    "y": 0,
+    "z": 6
+   },
+   "posture": "sitting",
+   "activity": "sitting on a bench",
+   "near": [],
+   "holding": null,
+   "following": null,
+   "riding": null,
+   "fade": 0,
+   "lastReceipt": "r_101",
+   "receipts": []
+  }
+ ],
+ "receipts": [
+  {
+   "id": "r_101",
+   "soulId": "soul_pip01",
+   "capability": "sit:bench-2",
+   "phase": "completed",
+   "startedAt": "2026-10-24T12:00:41.000Z",
+   "startedMono": 41000,
+   "endedAt": "2026-10-24T12:00:45.000Z",
+   "endedMono": 45000,
+   "with": [],
+   "expectedSec": 8
+  }
+ ],
+ "shots": [
+  "shots/pip/45000.png",
+  "shots/wide/45000.png"
+ ],
+ "chatTurns": [
+  2
+ ],
+ "legible": [
+  {
+   "t": "2026-10-24T12:00:33.000Z",
+   "mono": 33000,
+   "card": {
+    "name": "Pip",
+    "presence": "listening",
+    "ack": "On it, finding a bench.",
+    "result": null
+   },
+   "bubbles": [],
+   "signs": [],
+   "toasts": []
+  },
+  {
+   "t": "2026-10-24T12:00:52.000Z",
+   "mono": 52000,
+   "card": {
+    "name": "Pip",
+    "presence": "listening",
+    "ack": "On it, finding a bench.",
+    "result": "I'm sitting on the bench by the fountain."
+   },
+   "bubbles": [],
+   "signs": [],
+   "toasts": []
+  }
+ ],
+ "firstBodyChangeAt": "2026-10-24T12:00:40.000Z",
+ "serverErrors": 0,
+ "cost": {
+  "inputTokens": 9000,
+  "outputTokens": 300,
+  "cachedTokens": 8000
+ },
+ "godSlice": {
+  "around": [
+   12,
+   6
+  ],
+  "radius": 10,
+  "entities": [
+   {
+    "id": "bench-2",
+    "def": "bench",
+    "layer": "props",
+    "footprint": {
+     "minX": 11.2,
+     "maxX": 12.8,
+     "minZ": 5.6,
+     "maxZ": 6.4
+    },
+    "solid": false,
+    "slots": [
+     "seat"
+    ]
+   },
+   {
+    "id": "fountain-1",
+    "def": "fountain",
+    "layer": "props",
+    "footprint": {
+     "minX": 3,
+     "maxX": 7,
+     "minZ": 1,
+     "maxZ": 5
+    },
+    "solid": true
+   }
+  ]
+ }
+}

@@ -1,0 +1,40 @@
+{
+ "version": 1,
+ "speed": {
+  "ackSec": {
+   "median": 6
+  },
+  "firstBodyChangeSec": {
+   "median": 14
+  },
+  "resultSec": {
+   "median": 30
+  }
+ },
+ "fidelity": {
+  "counts": {
+   "H": 1,
+   "P": 1,
+   "M": 1,
+   "W": 0
+  },
+  "wrong": 0,
+  "truthfulnessPassRate": 1
+ },
+ "physical": {
+  "insideSolid": 0,
+  "noProgress": 0,
+  "stuckReceipts": 0,
+  "oscillations": 0
+ },
+ "cost": {
+  "tokensPerRequest": {
+   "input": 30000,
+   "output": 900,
+   "cached": 20000
+  }
+ },
+ "uptime": {
+  "listenOpenFraction": 1
+ }
+}

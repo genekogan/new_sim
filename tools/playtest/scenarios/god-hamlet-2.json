@@ -1,0 +1,86 @@
+{
+ "name": "god-hamlet-2",
+ "version": 1,
+ "seed": 303,
+ "world": {
+  "kind": "dev",
+  "genesis": "worlds/templates/hello-hamlet.json",
+  "slug": "pt-hamlet-g2",
+  "port": 4998,
+  "natives": true
+ },
+ "durationSec": 900,
+ "seats": [
+  {
+   "id": "ori",
+   "adapter": "claude-headless",
+   "model": "sonnet",
+   "effort": "medium",
+   "persona": "newcomer",
+   "personaModel": "opus",
+   "startOffsetSec": 60,
+   "soulName": "Ori",
+   "channelMix": {
+    "chat": 0.3,
+    "card": 0.7
+   }
+  },
+  {
+   "id": "vex",
+   "adapter": "claude-headless",
+   "model": "haiku",
+   "effort": "medium",
+   "persona": "boundary",
+   "personaModel": "opus",
+   "startOffsetSec": 120,
+   "soulName": "Vex",
+   "channelMix": {
+    "chat": 0.5,
+    "card": 0.5
+   }
+  }
+ ],
+ "god": {
+  "adapter": "claude-headless",
+  "model": "opus",
+  "effort": "high",
+  "persona": "first-timer",
+  "personaModel": "opus",
+  "startOffsetSec": 0
+ },
+ "director": {
+  "mode": "persona",
+  "requestsTarget": 10,
+  "glanceSec": [
+   15,
+   40
+  ],
+  "goal": null,
+  "script": null
+ },
+ "observer": {
+  "sampleSec": 5,
+  "cameras": [
+   "follow"
+  ],
+  "viewport": [
+   1024,
+   640
+  ],
+  "dpr": 1,
+  "gpu": "metal"
+ },
+ "review": {
+  "reviewerModel": "opus",
+  "developerModel": "opus",
+  "rubric": "accept3"
+ },
+ "rails": {
+  "maxTurnsPerRequest": 6,
+  "maxTurnWallSec": 480,
+  "quotaStopPct": 90,
+  "onboardWallSec": 600,
+  "onboardTimeoutSec": 540
+ },
+ "notes": "God rerun with the creator camera; Ori on Sonnet, Vex on Haiku, god on Opus high."
+}

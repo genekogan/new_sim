@@ -1,0 +1,9 @@
+{
+ "ok": true,
+ "t": "2026-10-24T12:04:10.000Z",
+ "mono": 250000,
+ "seatsStopped": [
+  "pip"
+ ],
+ "retired": []
+}

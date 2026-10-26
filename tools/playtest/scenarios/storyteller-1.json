@@ -1,0 +1,64 @@
+{
+ "name": "storyteller-1",
+ "version": 1,
+ "seed": 2001,
+ "world": {
+  "kind": "dev",
+  "genesis": "worlds/templates/eden-district.json",
+  "slug": "pt-eden-story",
+  "port": 4991,
+  "natives": true
+ },
+ "durationSec": 1200,
+ "seats": [
+  {
+   "id": "bran",
+   "adapter": "claude-headless",
+   "model": "opus",
+   "effort": "medium",
+   "persona": "storyteller",
+   "personaModel": "opus",
+   "startOffsetSec": 0,
+   "soulName": "Bran",
+   "channelMix": {
+    "chat": 0.6,
+    "card": 0.4
+   }
+  }
+ ],
+ "god": null,
+ "director": {
+  "mode": "persona",
+  "requestsTarget": 8,
+  "glanceSec": [
+   10,
+   30
+  ],
+  "goal": "a self-entertainer role-plays a baker opening a shop",
+  "script": null
+ },
+ "observer": {
+  "sampleSec": 5,
+  "cameras": [
+   "follow"
+  ],
+  "viewport": [
+   1024,
+   640
+  ],
+  "dpr": 1,
+  "gpu": "metal"
+ },
+ "review": {
+  "reviewerModel": "opus",
+  "developerModel": "opus",
+  "rubric": "accept3"
+ },
+ "rails": {
+  "maxTurnsPerRequest": 6,
+  "maxTurnWallSec": 480,
+  "quotaStopPct": 90,
+  "onboardWallSec": 600,
+  "onboardTimeoutSec": 540
+ }
+}
