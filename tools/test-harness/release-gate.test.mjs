@@ -5,7 +5,7 @@ import { existsSync, mkdtempSync, mkdirSync, writeFileSync, renameSync, readFile
 import { tmpdir, homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cacheAdd, cacheKey, compareRuns, lookupCache, main, parseArgs, parseTap, readRun, scopeFor, storeCache, validateQuarantine, REQUIRED_PACKAGES, REQUIRED_STEPS } from './release-gate.mjs';
+import { cacheAdd, cacheKey, compareRuns, lookupCache, suiteTree, DRIVER_ONLY, main, parseArgs, parseTap, readRun, scopeFor, storeCache, validateQuarantine, REQUIRED_PACKAGES, REQUIRED_STEPS } from './release-gate.mjs';
 
 // Preserve fixture artifacts under the same no-delete rule as release work.
 const retireFixture = dir => { const trash = join(homedir(), '.Trash'); mkdirSync(trash, { recursive: true }); renameSync(dir, join(trash, dir.split('/').at(-1) + '-' + Date.now())); };
@@ -361,22 +361,24 @@ test('baseline reuse: a miss runs main once and caches it; the next gate on the 
   const second = await gate(repo, [c2, '--baseline', c1, '--out', out2, '--cache', cache], fakeModal(calls));
   const r2 = receiptOf(out2);
   assert.equal(second.rc, 0, r2.blockers.join('\n')); assert.deepEqual(calls, [c2]);
-  assert.equal(r2.baseline.source, 'cached'); assert.equal(r2.baseline.dir, join(cache, `${c1}-${r2.harness.tree}-node22`));
+  assert.equal(r2.baseline.source, 'cached'); assert.equal(r2.baseline.dir, join(cache, `${c1}-${r2.harness.suiteTree}-node22`));
+  assert.equal(r2.baseline.suiteTree, r2.harness.suiteTree); assert.equal(r2.baseline.driverTestsChanged, false);
   assert.equal(r2.runs.baseline.metadata.harnessRef, c1); assert.notEqual(r2.runs.baseline.metadata.harnessArchiveSha256, r2.harness.archiveSha256);
   assert.deepEqual(r2.cache.stored.map(s => s.label), ['candidate']); assert.equal(r2.status, 'pass');
-  assert.ok(existsSync(join(cache, `${c2}-${r2.harness.tree}-node22/CACHE.json`)));
+  assert.ok(existsSync(join(cache, `${c2}-${r2.harness.suiteTree}-node22/CACHE.json`)));
 });
 test('a modified cache entry or another harness tree is a miss, never a silent reuse', async t => {
   const repo = gateRepo(t), cache = mkdtempSync(join(dirname(repo.dir), 'sim-gate-cache-')); t.after(() => retireFixture(cache));
   const c1 = repo.commit('apps/web/src/a.ts', 'one\n'), calls = [];
   await gate(repo, [c1, '--baseline', repo.base, '--out', join(repo.dir, '.lane/g1'), '--cache', cache], fakeModal(calls));
-  const tree = gitIn(repo.dir, 'rev-parse', 'HEAD:tools/test-harness'), m = manifest();
-  assert.equal(lookupCache(cache, { sourceSha: c1, harnessTree: tree, node: '22' }, m).hit, true);
-  const log = join(cache, cacheKey({ sourceSha: c1, harnessTree: tree, node: '22' }), 'out/suite/V5-server-full.log');
+  const tree = suiteTree(repo.dir, 'HEAD'), m = manifest(), at = { root: repo.dir };
+  const look = (identity) => lookupCache(cache, identity, m, REQUIRED_STEPS, {}, at.root);
+  assert.equal(look({ sourceSha: c1, suiteTree: tree, node: '22' }).hit, true);
+  const log = join(cache, cacheKey({ sourceSha: c1, suiteTree: tree, node: '22' }), 'out/suite/V5-server-full.log');
   writeFileSync(log, readFileSync(log, 'utf8').replace('ok 1 - works', 'ok 1 - works # edited'));
-  assert.match(lookupCache(cache, { sourceSha: c1, harnessTree: tree, node: '22' }, m).reason, /changed since it was stored: suite\/V5-server-full.log/);
-  assert.match(lookupCache(cache, { sourceSha: c1, harnessTree: 'f'.repeat(40), node: '22' }, m).reason, /no cached run/);
-  assert.match(lookupCache(cache, { sourceSha: c1, harnessTree: tree, node: '26' }, m).reason, /no cached run/);
+  assert.match(look({ sourceSha: c1, suiteTree: tree, node: '22' }).reason, /changed since it was stored: suite\/V5-server-full.log/);
+  assert.match(look({ sourceSha: c1, suiteTree: 'f'.repeat(64), node: '22' }).reason, /no cached run/);
+  assert.match(look({ sourceSha: c1, suiteTree: tree, node: '26' }).reason, /no cached run/);
   // the tampered entry is not reused: the gate runs the baseline again and keeps the existing entry untouched
   const c2 = repo.commit('apps/web/src/b.ts', 'two\n'); calls.length = 0;
   const out = join(repo.dir, '.lane/g2');
@@ -481,7 +483,7 @@ test('scope auto: a web-only candidate runs only its steps against the cached fu
   // a scoped run is never a full-gate run: not as a baseline, not in the cache
   const full = readRun(join(out, 'candidate'), { schemaVersion: 1, sourceSha: c2, harnessTree: r.harness.tree, node: '22' }, manifest());
   assert.match(full.errors.join('\n'), /scoped run .* is not a full gate run/);
-  assert.match(storeCache(cache, { ...full, errors: [] }).reason, /scoped run/);
+  assert.match(storeCache(cache, { ...full, errors: [] }, {}, repo.dir).reason, /scoped run/);
   // the full default on the same head runs every step again
   onlys.length = 0;
   const fullOut = join(repo.dir, '.lane/g3');
@@ -519,12 +521,45 @@ test('cache-add stores a bare remote-suite run (no gate receipt) only when it pa
   assert.equal(refused.stored, false); assert.match(refused.reason, /run: V5-server-full: baseline failure has no quarantine: works/);
   const added = cacheAdd(bare, { root: repo.dir, cacheDir: cache });
   assert.equal(added.stored, true, added.reason);
-  assert.equal(added.key, `${c1}-${gitIn(repo.dir, 'rev-parse', 'HEAD:tools/test-harness')}-node22`);
+  assert.equal(added.key, `${c1}-${suiteTree(repo.dir, 'HEAD')}-node22`);
   const entry = JSON.parse(readFileSync(join(added.dir, 'CACHE.json'), 'utf8'));
   assert.deepEqual(entry.provenance, { via: 'cache-add-bare', receipt: null });
-  assert.equal(lookupCache(cache, { sourceSha: c1, harnessTree: entry.harnessTree, node: '22' }, manifest()).hit, true);
+  assert.equal(entry.harnessTree, gitIn(repo.dir, 'rev-parse', 'HEAD:tools/test-harness')); assert.equal(entry.suiteTree, suiteTree(repo.dir, 'HEAD'));
+  assert.equal(lookupCache(cache, { sourceSha: c1, suiteTree: entry.suiteTree, node: '22' }, manifest(), REQUIRED_STEPS, {}, repo.dir).hit, true);
   // a wrong harness identity is still refused without a receipt
   const meta = join(failing, 'out/RUN-METADATA.json'), m = JSON.parse(readFileSync(meta, 'utf8'));
   writeFileSync(meta, JSON.stringify({ ...m, harnessTree: 'a'.repeat(40) }));
   assert.match(cacheAdd(failing, { root: repo.dir, cacheDir: cache }).reason, /metadata mismatch: harnessTree/);
+});
+test('suite tree: a driver-only edit keeps the cache key and reuses the baseline; a container-side edit changes it', async t => {
+  const repo = gateRepo(t), cache = mkdtempSync(join(dirname(repo.dir), 'sim-gate-cache-')); t.after(() => retireFixture(cache));
+  repo.commit('tools/test-harness/modal_suite.py', 'V5_SHARDS = 2\n'); repo.commit('tools/test-harness/release-gate.mjs', '// driver v1\n');
+  const c1 = repo.commit('apps/web/src/a.ts', 'one\n'), before = suiteTree(repo.dir, 'HEAD'), full = gitIn(repo.dir, 'rev-parse', 'HEAD:tools/test-harness');
+  await gate(repo, [c1, '--baseline', repo.base, '--out', join(repo.dir, '.lane/g1'), '--cache', cache], fakeModal([]));
+  assert.ok(DRIVER_ONLY.includes('release-gate.mjs') && !DRIVER_ONLY.includes('modal_suite.py') && !DRIVER_ONLY.includes('quarantine.json'));
+  for (const f of DRIVER_ONLY) repo.commit(`tools/test-harness/${f}`, `// driver edit ${f}\n`);
+  assert.equal(suiteTree(repo.dir, 'HEAD'), before); assert.notEqual(gitIn(repo.dir, 'rev-parse', 'HEAD:tools/test-harness'), full);
+  const c2 = repo.commit('apps/web/src/b.ts', 'two\n'), calls = [];
+  const out = join(repo.dir, '.lane/g2');
+  const { rc } = await gate(repo, [c2, '--baseline', c1, '--out', out, '--cache', cache], fakeModal(calls));
+  const r = receiptOf(out);
+  assert.equal(rc, 0, r.blockers.join('\n')); assert.deepEqual(calls, [c2]); assert.equal(r.baseline.source, 'cached');
+  assert.equal(r.baseline.harnessTree, full); assert.notEqual(r.harness.tree, full); assert.equal(r.baseline.suiteTree, r.harness.suiteTree);
+  assert.equal(r.baseline.driverTestsChanged, true); assert.deepEqual(r.driverTestsRemoved, []);
+  // anything a container runs changes the key: the next gate runs its baseline again
+  repo.commit('tools/test-harness/modal_suite.py', 'V5_SHARDS = 3\n');
+  assert.notEqual(suiteTree(repo.dir, 'HEAD'), before);
+  repo.commit('tools/test-harness/one-validation.sh', 'echo\n'); const c3 = repo.commit('apps/web/src/c.ts', 'three\n'); calls.length = 0;
+  const out3 = join(repo.dir, '.lane/g3');
+  await gate(repo, [c3, '--baseline', c2, '--out', out3, '--cache', cache], fakeModal(calls));
+  assert.equal(receiptOf(out3).baseline.source, 'run'); assert.deepEqual(calls.sort(), [c2, c3].sort());
+});
+test('against a cached baseline with other driver files, only their own removed self-tests are not lost coverage', () => {
+  const harness = (names, source) => { const p = parseTap(tap(names.map(name => ({ name, source }))), 'V3-harness');
+    return { errors: [], steps: { 'V3-harness': { exit: '0', tests: p.tests, executedFiles: [] } } }; };
+  const driver = 'tools/test-harness/release-gate.test.mjs', other = 'tools/test-harness/harness.test.mjs';
+  const renamed = compareRuns(harness(['old name'], driver), harness(['new name'], driver), manifest(), new Set(), { driverTestsChanged: true });
+  assert.equal(renamed.status, 'pass'); assert.equal(renamed.driverTestsRemoved[0].id, 'old name');
+  assert.equal(compareRuns(harness(['old name'], driver), harness(['new name'], driver), manifest()).status, 'blocked');
+  assert.equal(compareRuns(harness(['old name'], other), harness(['new name'], other), manifest(), new Set(), { driverTestsChanged: true }).status, 'blocked');
 });

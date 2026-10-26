@@ -10,16 +10,22 @@ bash /absolute/checkout/tools/test-harness/release-gate.sh <candidate-ref> --out
 (`--baseline 19d17c90` for 3.0.1); the receipt records it.
 
 **Baseline cache (MODAL-POLICY rule 1: no baseline re-runs).** The baseline is not re-run on Modal when the gate cache
-holds a validated run of it: `team/scratch/gates/cache/<baselineSha>-<harnessTree>-node<major>/` (the first ancestor of
+holds a validated run of it: `team/scratch/gates/cache/<baselineSha>-<suiteTree>-node<major>/` (the first ancestor of
 the checkout with `team/lanes`; `SIM_GATE_CACHE` or `--cache <dir>` override, `--no-cache` disables reads and writes).
-The key is the `tools/test-harness` **tree** sha, not the harness commit: `git archive` bytes embed the commit id, so
-identical harness content run from a later main commit has another archive hash but runs the identical suite. An entry
-is a copy of the run's `out/` plus `CACHE.json` with every file's sha256; a hit requires the unchanged file hashes and
-`readRun` validation of source sha, harness tree, Node major, completeness and every step. If the candidate's actual
-Node/pnpm differ from the cached run's (the `node:22` image moves its patch), the baseline is run again instead of
-compared. A miss runs the baseline once beside the candidate and caches it when it validates; every passing full
-gate caches its candidate, which serves as the next gate's baseline once it is main. The receipt records
-`baseline.source` (`cached` | `run` | `imported`), the cache key/miss reason and what was stored.
+The key is the harness that executed inside the containers, not the harness commit (`git archive` bytes embed the
+commit id) and not the laptop-side driver: `suiteTree` is the sha256 of the `tools/test-harness` entries (mode, type,
+blob sha, path; path order) without `DRIVER_ONLY` in release-gate.mjs (release-gate.mjs, ship-receipt.mjs, their
+tests, release-no-delete.test.mjs, this file). Everything a container runs stays in: modal_suite.py, remote-suite.sh,
+one-validation.sh, package-suite.sh, quarantine.json, step scripts, v5-durations.json, campus-assets.json. A cached
+run's suite tree is recomputed from its own harness commit, whose full tree must equal the run's recorded
+`harnessTree`. Receipts and CACHE.json record both trees. When the cached baseline ran other driver files, V3-harness
+self-tests of those files may be renamed or removed (`driverTestsRemoved`); every other removal still blocks.
+Imported pairs keep the exact full-tree identity. An entry is a copy of the run's `out/` plus `CACHE.json` with every
+file's sha256; a hit requires the unchanged file hashes and `readRun` validation of source sha, suite tree, Node
+major, completeness and every step. If the candidate's actual Node/pnpm differ from the cached run's (the `node:22`
+image moves its patch), the baseline is run again instead of compared. A miss runs the baseline once beside the
+candidate and caches it when it validates; every passing full gate caches its candidate, which serves as the next
+gate's baseline once it is main. The receipt records `baseline.source` (`cached` | `run` | `imported`), the cache key/miss reason and what was stored.
 `--dry-run` prints the plan (refs, cache hit or miss, Modal runs) without contacting Modal or writing anything.
 **Scoped candidate gates (MODAL-POLICY rule 4).** `--scope auto` picks steps from
 `git diff --name-only <baseline> <candidate>`: `apps/server/` → V1, V3-packages, V3-walk, V5, V6; `apps/web/` → V1, V2,
