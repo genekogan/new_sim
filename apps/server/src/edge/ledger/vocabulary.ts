@@ -84,6 +84,23 @@ const SYNONYMS: Record<string, string[]> = {
 const ACT_ALIASES: Record<string, string> = {'turn-on': 'switch-on', 'turn-off': 'switch-off', shut: 'close', 'shut-off': 'switch-off', extinguish: 'put-out', 'blow-out': 'put-out', ignite: 'light', kindle: 'light', 'light-up': 'light', 'fill-up': 'fill', drain: 'empty'};
 export const tokens = (s: string) => s.toLowerCase().replace(/\[[^\]]*\]/g, ' ').split(/[^a-z0-9]+/).filter(t => t && !STOP.has(t));
 const norm = (s: string) => tokens(s).join(' ');
+// D3b (cloud fix-r3 basics-1 pip-010: "walk to the kitchen in eden-house-2" walked to eden-house-1/kitchen-chair-2, its
+// "chair-2" holding the 2): a number names the word right before it ("house 2", "house two"). A name that numbers that word
+// only otherwise ("house 1") is not what the words say; a name without such a number is unaffected.
+const NUMBER_WORDS: Record<string, string> = {one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10', eleven: '11', twelve: '12'};
+const numbered = (ts: string[]) => ts.flatMap((t, i) => i && /^\d+$/.test(t) && !/^\d+$/.test(ts[i - 1]!) ? [[ts[i - 1]!, Number(t)] as const] : []);
+/** The words number a word ("house 2") that this name (its token streams) numbers only differently ("house 1"). */
+export function numberConflict(words: string[], names: string[][]): boolean {
+  const want = numbered(words); if (!want.length) return false;
+  const have = names.flatMap(numbered);
+  return want.some(([w, n]) => have.some(([x, m]) => x === w && m !== n) && !have.some(([x, m]) => x === w && m === n));
+}
+/** "house two" is "house 2" where a name here numbers that word (a number word after any other word stays a word). */
+export function numberWords(words: string[], names: () => string[][]): string[] {
+  if (!words.some((w, i) => i && NUMBER_WORDS[w])) return words;
+  const counted = new Set(names().flatMap(numbered).map(([w]) => w));
+  return words.map((w, i) => i && NUMBER_WORDS[w] && counted.has(words[i - 1]!) ? NUMBER_WORDS[w]! : w);
+}
 // A word names a token when equal, or one is the other with a short ending (garden/gardens, librar-/library); CN5: never a
 // different word that merely starts with it ("watermill" is not "water").
 export const tokenHit = (q: string, set: string[]) => set.some(t => t === q || (q.length >= 4 && t.length >= 4 && Math.abs(q.length - t.length) <= 3 && (t.startsWith(q) || q.startsWith(t))));
@@ -402,7 +419,7 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
     // D2 (playtest 2026-10-25: "go inside house 2, into the kitchen" went to House 1's kitchen chair): a number in the words
     // names a number in a name ("house 2", "chair-2"), never a count or distance in the label ("2 rooms", "(2 m)")
     const label = c.label.replace(/\b\d+(?:\.\d+)?\s*(?:m|s|rooms?|seats?|stops?)\b/g, ' ');
-    return [c.id, {t, own, ownTokens: [own[0], own[1], label, ...t.names].filter(Boolean).flatMap(tokens), strictTokens: [own[0], own[1], label.replace(/,\s*by\s.*$/, ''), ...t.names].filter(Boolean).flatMap(tokens)}];}));
+    return [c.id, {t, own, ownTokens: [own[0], own[1], label, ...t.names].filter(Boolean).flatMap(tokens), ownNames: [own[0], own[1], label, ...t.names].filter(Boolean).map(tokens), strictTokens: [own[0], own[1], label.replace(/,\s*by\s.*$/, ''), ...t.names].filter(Boolean).flatMap(tokens)}];}));
   const unknown = (reason: string, prefer: EdgeCapability[] = []) => ({kind: 'unknown' as const, reason, didYouMean: suggest(input, verb, rest, ctx, prefer)});
   const dme = (c: EdgeCapability) => dist(info.get(c.id)?.t.at ?? null, ctx.me);
   const placeOf = (c: EdgeCapability) => ctx.places.find(p => p.id === c.target?.id);
@@ -449,7 +466,7 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
     return places.length ? places : cs;
   };
   if (pool.length) {
-    const q = tokens(rest).filter(t => !FILLER.has(t) || !PLACE_VERBS.has(verb) ? true : false), qs = q.join(' '), byOwn = (want: string) => pool.filter(c => info.get(c.id)!.own.some(n => norm(n) === want));
+    const q = numberWords(tokens(rest).filter(t => !FILLER.has(t) || !PLACE_VERBS.has(verb) ? true : false), () => [...[...info.values()].flatMap(i => i.ownNames), ...ctx.places.map(p => tokens(p.name))]), qs = q.join(' '), byOwn = (want: string) => pool.filter(c => info.get(c.id)!.own.some(n => norm(n) === want));
     const here = pool.find(c => c.id === `${verb}:here`);
     // 0. Verbs with a single non-targeted (or "here") capability: rest:anything, swim:pond, wander:around.
     if (pool.length === 1 && (!pool[0].target || pool[0].id.endsWith(':here') || !q.length || pool[0].verb === 'swim')) return {kind: 'alias', cap: pool[0], note: `${input} is ${pool[0].id}.`};
@@ -490,7 +507,7 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       // 2. The place an object stands in (sit:commons-deck, warm-by-fire:social-eden-fire-circle).
       const r2 = also(one(pool.filter(c => info.get(c.id)!.t.around.some(n => norm(n) === s)), c => `${input}: ${c.id} (${c.label}) is there.`)); if (r2) return r2;
       // 3. Every word appears in the target's own names (walk:pond → the pond).
-      const named = (c: EdgeCapability) => !PLACE_VERBS.has(verb) || !modifierOnly(c, words);
+      const named = (c: EdgeCapability) => (!PLACE_VERBS.has(verb) || !modifierOnly(c, words)) && !numberConflict(words, info.get(c.id)!.ownNames);
       const strict = pool.filter(c => words.every(w => tokenHit(w, info.get(c.id)!.strictTokens)) && named(c));
       const named3 = strict.length ? strict : pool.filter(c => words.every(w => tokenHit(w, info.get(c.id)!.ownTokens)) && named(c));
       // ROUTE-RECHECK: a spot verb's places ("read a book in the library") are chosen by 3b below, best name first and offered
@@ -595,9 +612,9 @@ export function placeMatchTier(words: string[], places: VocabPlace[], withheld: 
   const tiers = [
     // CN5: a place whose own name is exactly these words comes first ("Artists' studio" is the office studio, not the village's warehouse)
     places.filter(p => tokens(p.name).join(' ') === words.join(' ')),
-    places.filter(p => words.every(w => tokenHit(w, nameT(p)))),
-    places.filter(p => words.every(w => hit(w, nameT(p)))),
-    places.filter(p => words.every(w => hit(w, [...nameT(p), ...descT(p)]))),
+    places.filter(p => words.every(w => tokenHit(w, nameT(p))) && !numberConflict(words, [tokens(p.name), tokens(p.id)])),
+    places.filter(p => words.every(w => hit(w, nameT(p))) && !numberConflict(words, [tokens(p.name), tokens(p.id)])),
+    places.filter(p => words.every(w => hit(w, [...nameT(p), ...descT(p)])) && !numberConflict(words, [tokens(p.name), tokens(p.id)])),
   ];
   // knowledge/1: a withheld place's own name is not an everyday word for some other place (the grove is not the orchard)
   if (!tiers[0].length && !tiers[1].length && withheld.includes(words.join(' '))) return {found: [], tier: -1};

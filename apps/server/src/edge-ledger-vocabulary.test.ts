@@ -2,7 +2,7 @@
 // walk:eden-commons, "hang out at the deck", hang-out:commons-deck[90], …) resolve when unambiguous, else did_you_mean.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {resolveCapability, parseCapability, type VocabContext, type VocabPlace} from './edge/ledger/vocabulary.ts';
+import {resolveCapability, parseCapability, type VocabContext, type VocabPlace, numberConflict, numberWords} from './edge/ledger/vocabulary.ts';
 import type {EdgeCapability} from './edge/contract.ts';
 
 const places: VocabPlace[] = [
@@ -249,4 +249,33 @@ test('vocabulary (D2, playtest 2026-10-25): "house 2" is the house named 2, neve
  assert.equal(go('go into house 2', hctx([31.8, 17.2])), 'walk:eden-house-2');
  assert.equal(go('go to the kitchen', hctx([20, 10], hcaps.filter(c => c.id !== 'walk:eden-house-1/kitchen'))), 'walk:eden-house-2/kitchen', 'a room word names the room, not the nearer kitchen chair');
  assert.equal(go('go to the kitchen chair', hctx([31.8, 17.2])), 'walk:eden-house-1/kitchen-chair-2', 'the chair, when the words say chair');
+});
+
+test('vocabulary (D3b, cloud fix-r3 basics-1 pip-010): "house 2" / "house two" never resolves into house 1, offered room or not', () => {
+ const hp: VocabPlace[] = [
+  {id: 'g-eden-house-1', name: 'eden-house-1', center: [32, 17], kind: 'building', parent: null, walkable: true},
+  {id: 'g-eden-house-1.kitchen', name: 'eden-house-1/kitchen', center: [31, 17], kind: 'room', parent: 'g-eden-house-1', walkable: true},
+  {id: 'g-eden-house-2', name: 'eden-house-2', center: [50, 15], kind: 'building', parent: null, walkable: true},
+  {id: 'g-eden-house-2.kitchen', name: 'eden-house-2/kitchen', center: [49, 15], kind: 'room', parent: 'g-eden-house-2', walkable: true},
+ ] as VocabPlace[];
+ const W = (id: string, label: string): EdgeCapability => ({id: `walk:${hp.find(p => p.id === id)!.name}`, verb: 'walk', label, available: true, target: {id, kind: 'place'}});
+ const chair: EdgeCapability = {id: 'walk:eden-house-1/kitchen-chair-2', verb: 'walk', label: 'Walk to eden-house-1/kitchen-chair-2, a chair in eden-house-1, by eden-house-1/kitchen-chair-1 (8 m)', available: true, target: {id: 'e_chair2', kind: 'object'}};
+ const all: EdgeCapability[] = [
+  W('g-eden-house-1', 'Walk to eden-house-1, a house: in at its front door (2 rooms, each walk:eden-house-1/<room>; 4 m)'), W('g-eden-house-1.kitchen', 'Go into Kitchen of eden-house-1 (eden-house-1/kitchen; 2 m)'),
+  W('g-eden-house-2', 'Walk to eden-house-2, a house: in at its front door (2 rooms, each walk:eden-house-2/<room>; 20 m)'), W('g-eden-house-2.kitchen', 'Go into Kitchen of eden-house-2 (eden-house-2/kitchen; 18 m)'), chair,
+ ];
+ const ctx = (caps: EdgeCapability[]): VocabContext => ({caps, places: hp, root: ['eden'], me: [31.8, 17.2], target: c => {
+  const p = hp.find(x => x.id === c.target?.id); return {names: p ? [p.name] : [], around: c.target?.id === 'e_chair2' ? ['g-eden-house-1.kitchen', 'eden-house-1/kitchen'] : [], at: p ? p.center : [31, 17]};
+ }});
+ const go = (q: string, caps: EdgeCapability[]) => {const r = resolveCapability(q, ctx(caps)); return r.kind === 'unknown' ? 'unknown' : r.cap.id;};
+ const asked = ['walk to the kitchen in eden-house-2', 'go inside house 2, into the kitchen', 'go inside house two, into the kitchen', 'walk to the kitchen of house two'];
+ for (const q of asked) assert.equal(go(q, all), 'walk:eden-house-2/kitchen', q);
+ // the playtest: house 2's kitchen not offered from where the Soul stood; "chair-2" in house 1 matched every word before
+ const far = all.filter(c => c.id !== 'walk:eden-house-2/kitchen');
+ for (const q of asked) assert.equal(go(q, far), 'walk:eden-house-2', q + ' (the house that holds the kitchen, never house 1)');
+ assert.equal(go('walk to kitchen chair 2', all), chair.id, 'a number after "chair" still names chair-2');
+ assert.equal(go('walk to house one', all), 'walk:eden-house-1', 'a number word after a numbered word');
+ assert.deepEqual(numberWords(['red', 'one'], () => [['eden', 'house', '1']]), ['red', 'one'], 'a number word after an unnumbered word stays a word');
+ assert.equal(numberConflict(['house', '2'], [['eden', 'house', '1', 'kitchen', 'chair', '2']]), true);
+ assert.equal(numberConflict(['house', '2'], [['eden', 'house', '2', 'kitchen'], ['by', 'eden', 'house', '1']]), false);
 });
