@@ -26,6 +26,7 @@ export const CARD_FIXTURES:Record<string,SoulCardViewProps>={
  'disconnected-never':owner(off('never',null),{body:{state:'asleep',doing:null,since:T-5*min},now:null,place:'the commons'}),
  'approved-waiting':owner(off('approved-waiting',T-20_000),{body:{state:'awake',doing:'standing',since:T-20_000},now:null,place:'the commons'}),
  'approved-waiting-late':owner(off('approved-waiting',T-90_000),{body:{state:'awake',doing:'standing',since:T-90_000},now:null,place:'the commons'}),
+ 'approved-waiting-asleep':owner(off('approved-waiting',T-30*min),{body:{state:'asleep',doing:null,since:T-10*min},now:null,place:'the commons'}),
  'pairing':owner({state:'pairing',reason:'pending-approval',since:T-10_000,holder:null,approvalId:'ap_0123456789abcdef0123456789abcdef'}),
  'visitor-awake':{soul:mickey,view:'visitor',camera,clock:T,body:{state:'awake',doing:null,since:T-28*min},now:{text:'Heading to the pond to see if the koi are up.',at:T-3*min},place:'the pond'},
  'visitor-idle':{soul:mickey,view:'visitor',camera,clock:T,body:{state:'idle',doing:'sitting',since:T-12*min},now:{text:'Watching the koi.',at:T-12*min},place:'the pond'},
