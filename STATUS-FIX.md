@@ -243,3 +243,52 @@ in eden-house-2"`) resolved to `walk:eden-house-1/kitchen-chair-2`.
   seated changes how agents word sit/lie replies is for the replay set to show.
 - The real Eden 2026 offer set for pip-010's spot was not reproduced (the unit fixture models "house 2's kitchen not
   offered"); the Eden-boot resolve suites were not run.
+
+## D3c: a default-linked act closes an owner message only with its last step
+
+Why: laptop re-measure `replays/laptop-20261026/fix/trio-r1` rook-003 (W, O2). Mira: "find a comfy spot and have a
+little rest, then come back to the balloon to meet me"; Rook acked "will say hi to Mira, rest a bit, then back to the
+balloon" and waved at Tam. D3b's default `--for` linked that first act to the message, and the wave's end wrote
+"wave completed at g-commons." as the result: the card read Done; Rook never rested or went back.
+
+- **A. Steps of a message (vocabulary.ts `messageSteps`).** The owner's words split into steps (sentence ends, commas,
+  "then", "after that"); each step is the verbs it names (the whole-sentence INTENTS, plain verbs and their VERBS
+  synonyms, "rest/relax/break", ride words), a vague one widened (a rest = sit/sit-ground/lie/nap/hammock; coming back =
+  walk/run/jog/go-near/stroll; a ride = join). Steps naming no verb drop out. rook-003 reads
+  `[[rest, sit, sit-ground, lie, nap, hammock], [walk, ride, run, jog, go-near, stroll, join]]`.
+- **B. Server closure (owner-loop.ts, routes.ts, inbox.ts).** `act` takes `forDefault: true` beside `for` (the CLI's
+  implicit link). Such a link closes the message only when the receipt's verb is in the message's **last** step. Any
+  other act's end writes `progress` instead ("now: wave completed at g-commons; not resting yet"; then "now: sat …; not
+  there yet"), the message stays open, and the act's answer carries `open: true`. Explicit `for` (the agent chose) and a
+  message whose words name no act keep D3's behaviour (the act's end closes it). A progress line never lands on a message
+  that already has a result. New column `soul_inbox_queue_v1.progress` (added on boot like `result_by`);
+  `InboxMessage.progress`; `messageText`/`serverProgress` on the inbox.
+- **C. Card (AgentMessageBox.tsx).** Until the result, a message with a progress line reads **Under way** with that line
+  after the ack; the result replaces it (Done / Could not do it as before).
+- **D. CLI eden.mjs 2.2.2 + skill 2.2.2.** A default link is sent with `forDefault`; when the world answers `open` the
+  default is not used up and serves the next act too (the 120 s window restarts from that act); `brief` prints
+  `open: true`. Skill owner step 3: "(the first act after an ack serves it, the next too after `open`; else
+  `--for <id>`)", net 0 lines, 6,412 bytes. SOURCES.json re-pinned; `soul-publication.test.ts` and
+  `soul-cli-now.test.mjs` pin 2.2.2 (test titles unchanged, so test IDs are kept); `cli.version` stays "1.9".
+- **Tests.** rook-003 reproduction: `edge-owner-loop.test.ts` "D3c rook-003: a default-linked wave, then a sit, keep
+  "rest, then come back to the balloon" open; the walk back closes it" (wave → open + progress "not resting yet"; sit →
+  open, "not there yet"; walk:festival-balloon → closed done by the server; explicit link and a verbless message still
+  close; no progress over an agent result). The D3 HTTP test gained `forDefault` assertions (`open: true`, progress, no
+  result). CLI: `soul-cli-owner-loop.test.mjs` "act --for (D3c): a default link is marked forDefault; an open answer
+  keeps the default for the next act". Card: `agent-message-box.test.mjs` MSG test gained the Under way / result-replaces
+  assertions.
+
+### tam-003 (looked at, not fixed: not load)
+"Mira asked if she could walk with you": Tam acked at 65 s and sent `follow:s_d8b2982a18` at ~157 s (tick 21156). For
+the 24 s observed after, the body stood at (23, −20), "Walk with Mira", while ticks ran 21224 → 21470 (≈ 10/s against the
+nominal 20/s: the laptop ran at about half speed). Mira (mira-006 samples) stood idle at (22.9, −18.8), 1.2 m away, the
+whole time. A follower already within follow distance of a leader who does not move has nowhere to go, so the body would
+have stood still at full speed too: the half-speed clock is load, but the stillness is not. The product gap is that
+"walk with X" maps to follow, which is a walk only when X walks (the card and doing line say "Walk with Mira" while
+nobody moves); a joint walk needs X's agent to walk, or a follow that leads when the leader is idle. Recorded, not changed.
+
+### Not verified here
+- No Modal gate, dev world or replay was run (the coordinator gates and measures). Whether agents read `open: true` and
+  carry on with the next step, or still write their own `result done` after the first act, is for the replay set.
+- Step splitting is word-level: a message whose last step names a verb the act set does not offer (or names it only
+  through a word outside VERBS/INTENTS) will stay open under a default link until the agent writes `result` itself.

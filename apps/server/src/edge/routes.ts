@@ -54,10 +54,11 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
   const limit = (s: EdgeSoul, key: string, n: number) => {const r = deps.souls.limits.allow(`edge-${key}:${s.soulId}`, n, 60_000); if (!r.ok) throw new EdgeError(429, 'rate-limited', 'too many requests; slow down');};
   app.get('/v1/edge/observe', wrap(c => {const s = deps.soul(c); limit(s, 'observe', 240); return L.observe(s, new Set((c.req.query('include') ?? '').split(',').filter(Boolean)));}));
   app.get('/v1/edge/capabilities', wrap(c => {const s = deps.soul(c); limit(s, 'capabilities', 240); return {tick: deps.host.engine.world.tick, capabilities: L.capabilities(s)};}));
-  app.post('/v1/edge/act', wrap(async c => {const s = deps.soul(c); limit(s, 'act', 60); const body = await c.req.json().catch(() => { throw new EdgeError(400, 'invalid', 'body must be JSON {capability, params?, clientRef?} or {verb, target, …}'); }); const {for: forMessage, ...input} = (body ?? {}) as Record<string, unknown>;
+  app.post('/v1/edge/act', wrap(async c => {const s = deps.soul(c); limit(s, 'act', 60); const body = await c.req.json().catch(() => { throw new EdgeError(400, 'invalid', 'body must be JSON {capability, params?, clientRef?} or {verb, target, …}'); }); const {for: forMessage, forDefault, ...input} = (body ?? {}) as Record<string, unknown>;
     if (forMessage !== undefined && loop) {const no = loop.check(s, forMessage); if (no) throw new EdgeError(400, 'invalid', no);}
     const out = await L.act(s, input) as {accepted?: boolean; receipt?: EdgeReceipt};
-    if (forMessage !== undefined && loop && out?.accepted && out.receipt) {loop.link(s, out.receipt, forMessage as string); return {...out, for: forMessage};}
+    // D3c: `forDefault` = the CLI linked it by default; `open` = this act is not the message's last step (the card stays open)
+    if (forMessage !== undefined && loop && out?.accepted && out.receipt) {const {open} = loop.link(s, out.receipt, forMessage as string, forDefault === true); return {...out, for: forMessage, ...(open ? {open} : {})};}
     return out;}));
   // perception/1 + intents/1 (Core-A, EDGE-CONTRACT-v1 §8): a compact first-person frame, and the dry run of act.
   app.get('/v1/edge/here', wrap(c => {const s = deps.soul(c); limit(s, 'here', 240); const modern=(c.req.query('include')??'').split(',').includes('doHere');return {tick: deps.host.engine.world.tick, here: hereFrame(L, s,{doHere:modern}),...(modern?{apiContract:'eden-edge/1.1'}:{})};}));

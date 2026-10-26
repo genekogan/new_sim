@@ -10,7 +10,7 @@ export type AgentInbox = {
   lastSeenAt: number | null;
   /** A Soul's box: when its agent last had a listen open (null = never). */
   listenedAt?: number | null;
-  latest: {id: string; text: string; state: 'sent' | 'delivered' | 'acknowledged'; sentAt?: number; reply?: string | null; result?: string | null; outcome?: 'done' | 'failed' | 'withdrawn'} | null;
+  latest: {id: string; text: string; state: 'sent' | 'delivered' | 'acknowledged'; sentAt?: number; reply?: string | null; result?: string | null; outcome?: 'done' | 'failed' | 'withdrawn'; progress?: string | null} | null;
   /** Messages waiting for the agent (the shown one included), and whether a listener is waiting right now. */
   queued?: number;
   presence?: 'listening' | 'working' | 'recent' | 'away';
@@ -32,7 +32,7 @@ export function presenceLine(inbox: AgentInbox, now: number) {
 export function receiptState(latest: NonNullable<AgentInbox['latest']>, queued: number, now: number) {
   const age = latest.sentAt === undefined ? 0 : now - latest.sentAt;
   const base = latest.state === 'sent' ? age > NOT_PICKED_UP_MS ? `Not picked up yet (${ago(age)})` : 'Sent'
-    : latest.state === 'delivered' ? 'Picked up' : latest.outcome === 'failed' ? 'Could not do it' : latest.result ? 'Done' : 'Acknowledged';
+    : latest.state === 'delivered' ? 'Picked up' : latest.outcome === 'failed' ? 'Could not do it' : latest.result ? 'Done' : latest.progress ? 'Under way' : 'Acknowledged';
   return queued > 1 ? `${base} · ${queued} waiting` : base;
 }
 type Transport = (text?: string) => Promise<AgentInbox>;
@@ -74,7 +74,8 @@ export function AgentMessageBoxView({kind, inbox, prompt = '', text, sending = f
   const presence = !soul && inbox ? presenceLine(inbox, now) : null;
   // the owner's newest message; `queued` counts what still waits (the agent works oldest first)
   const state = latest ? receiptState(latest, inbox?.queued ?? 0, now) : '';
-  const answers = latest ? [latest.reply, latest.result].filter((x): x is string => !!x) : [];
+  // D3c: until the result, the world's progress line (an act served an earlier step: "now: …; not resting yet")
+  const answers = latest ? [latest.reply, latest.result ?? latest.progress].filter((x): x is string => !!x) : [];
   const receipt = latest ? [state, latest.text, ...answers].join(' · ') : '';
   return <div className="agent-message" data-agent-message={kind}>
     {!soul && <div className="agent-message-presence" data-agent-presence={inbox?.presence ?? (inbox ? inbox.connected ? 'recent' : 'away' : 'unknown')}>

@@ -1,7 +1,7 @@
 ---
 name: eden-soul
 metadata:
-  version: "2.2.1"
+  version: "2.2.2"
   contract: eden-edge/1
 description: Control one Eden Soul through the thin `eden.mjs` CLI. You are its only controller. Act, wait for the world's receipt, report what actually happened, and keep a background `listen` open for the owner's messages.
 ---
@@ -75,8 +75,8 @@ When `listen` exits it prints `{messages:[{id,text,sentAt}…]}`, oldest first. 
 
 1. `node eden.mjs ack <id> "Got it: …"` for **every** message, at most 140 characters each (the first line the owner sees).
 2. Start `node eden.mjs listen --after <last id>` in the background again, before doing the work.
-3. Do them in order with `act … --wait` (only the first act after an ack serves it; else `--for <id>`). A newer
-   message that contradicts an older one wins: `result <old id> failed "Replaced: …"`.
+3. Do them in order with `act … --wait` (the first act after an ack serves it, the next too after `open`; else
+   `--for <id>`). A newer message that contradicts an older one wins: `result <old id> failed "Replaced: …"`.
 
 The server closes your owner's message when the act ends. When no act is needed (already done, a question), close it
 yourself: `result <id> done|failed "…"`. An ack says what you will try, never what happened. A question is answered in the ack, then `result <id> done`. Any command may print `OWNER: n message(s)

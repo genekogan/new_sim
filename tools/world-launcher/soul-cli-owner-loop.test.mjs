@@ -65,3 +65,39 @@ test('act --for: by default the first accepted act within 120 s of an ack serves
   const retried = await cli('act', 'wave'); assert.equal(retried.accepted, true); assert.equal(retried.for, undefined, 'a default the world no longer knows is dropped and the act sent plainly');
   assert.equal(state().lastAcked, undefined);
 });
+
+// D3c (laptop trio-r1 rook-003): the default link says it is a default (forDefault); when the world answers `open` (the
+// act is not the message's last step: a wave for "rest, then come back to the balloon") the default serves the next act
+// too, until an act the world does not keep open; an explicit --for never sends forDefault.
+test('act --for (D3c): a default link is marked forDefault; an open answer keeps the default for the next act', async t => {
+  const seen = [];
+  const server = createServer((req, res) => {
+    let b = ''; req.on('data', d => b += d); req.on('end', () => {
+      const body = b ? JSON.parse(b) : null; seen.push({path: req.url, body});
+      const reply = (status, data) => {res.writeHead(status, {'content-type': 'application/json'}); res.end(JSON.stringify(data));};
+      if (req.url.includes('/ack')) return reply(200, {inbox: {}});
+      if (req.url === '/v1/edge/act') {
+        const open = body.forDefault === true && body.capability !== 'walk to the balloon';
+        return reply(200, {accepted: true, channel: 'body', receipt: {id: 'r_9', capability: body.capability, phase: 'started', now: 'busy'}, ...(body.for ? {for: body.for} : {}), ...(open ? {open: true} : {})});
+      }
+      reply(404, {error: {code: 'not-found', message: req.url}});
+    });
+  });
+  await new Promise(r => server.listen(0, '127.0.0.1', r)); t.after(() => server.close());
+  const dir = mkdtempSync(join(tmpdir(), 'eden-cli-for-d3c-'));
+  writeFileSync(join(dir, '.eden-agent.json'), JSON.stringify({world: `http://127.0.0.1:${server.address().port}`, token: 'tok'}));
+  const cli = (...args) => new Promise((res, rej) => execFile(process.execPath, [CLI, ...args], {cwd: dir}, (e, out, err) => e ? rej(new Error(err || e.message)) : res(JSON.parse(out))));
+  const acts = () => seen.filter(x => x.path === '/v1/edge/act').map(x => [x.body.for ?? null, x.body.forDefault ?? null]);
+  const state = () => JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8'));
+  await cli('ack', 'm_1', 'Got it: rest a bit, then back to the balloon');
+  const wave = await cli('act', 'wave');
+  assert.equal(wave.for, 'm_1'); assert.equal(wave.open, true, 'the world keeps the message open: brief says so');
+  assert.equal(state().lastAckedActed, undefined, 'an open answer does not use the default up');
+  assert.equal((await cli('act', 'sit')).open, true, 'the next act is linked by default too');
+  const back = await cli('act', 'walk to the balloon'); assert.equal(back.for, 'm_1'); assert.equal(back.open, undefined);
+  assert.equal(state().lastAckedActed, true, 'an act the world does not keep open uses the default up');
+  assert.equal((await cli('act', 'wave')).for, undefined, 'then no default link');
+  await cli('ack', 'm_2');
+  assert.equal((await cli('act', 'wave', '--for', 'm_2')).open, undefined, 'an explicit --for is never a default');
+  assert.deepEqual(acts(), [['m_1', true], ['m_1', true], ['m_1', true], [null, null], ['m_2', null]]);
+});

@@ -51,6 +51,12 @@ test('MSG: presence says listening now / seen recently / away; an unread message
   const done = at({...base, queued: 0, latest: {id: 'm', text: 'go to the cottage', state: 'acknowledged', reply: 'Got it: walking there.', result: 'Arrived.', outcome: 'done', sentAt: now - 90_000}});
   assert.match(done, />Done</); assert.ok(done.indexOf('Got it: walking there.') < done.indexOf('Arrived.'), 'the ack reply, then the result');
   assert.match(at({...base, latest: {id: 'm', text: 'ride', state: 'acknowledged', reply: 'Trying.', result: "Couldn't: no saddle.", outcome: 'failed'}}), /Could not do it/);
+  // D3c (rook-003): an act that served an earlier step leaves the message open: Under way with the world's progress line,
+  // never Done; the result replaces the progress line
+  const going = at({...base, queued: 0, latest: {id: 'm', text: 'rest, then come back', state: 'acknowledged', reply: 'Got it.', progress: 'now: wave completed at g-commons; not resting yet', sentAt: now - 30_000}});
+  assert.match(going, />Under way</); assert.doesNotMatch(going, />Done</); assert.match(going, /not resting yet/);
+  const closed = at({...base, queued: 0, latest: {id: 'm', text: 'rest, then come back', state: 'acknowledged', reply: 'Got it.', progress: 'now: sat; not there yet', result: 'Arrived at the balloon.', outcome: 'done'}});
+  assert.match(closed, />Done</); assert.match(closed, /Arrived at the balloon/); assert.doesNotMatch(closed, /not there yet/);
   assert.match(at({connected: true, lastSeenAt: now}, 'god'), /seen recently/, 'an older server without presence: connected means seen recently');
 });
 test('Soul card inbox belongs only to its authenticated owner, including account switch', () => {

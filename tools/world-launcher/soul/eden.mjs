@@ -10,7 +10,7 @@ import { randomUUID, randomBytes } from "node:crypto";
 import { resolve as resolvePath } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const VERSION = "2.2.1";
+const VERSION = "2.2.2";
 const STATE = ".eden-agent.json";
 const CLI = "node eden.mjs";
 
@@ -381,14 +381,17 @@ async function act(...argv) {
   // D3: the owner message this act serves; the world writes its result line when the act ends, unless you write one first.
   // D3b (cloud fix-r3 trio tam-003: a later walk closed "walk with Mira" as Done): by default only the first act the world
   // accepts after an ack, within IMPLICIT_FOR_MS of it, serves that message; later acts serve one only with --for <id>.
+  // D3c (laptop trio-r1 rook-003: a wave closed "rest, then come back to the balloon"): a default link says so
+  // (forDefault); the world closes the message only with an act of its last step and answers `open` otherwise, and then
+  // the default serves the next act too (within IMPLICIT_FOR_MS of this one).
   const s = load(), implicit = forArg === undefined && s.lastAcked && !s.lastAckedActed && Date.now() - Date.parse(s.lastAckedAt ?? 0) < IMPLICIT_FOR_MS;
   const forId = forArg === "none" ? undefined : forArg ?? (implicit ? s.lastAcked : undefined);
-  let r = await call("/v1/edge/act", { body: forId ? { ...body, for: forId } : body });
+  let r = await call("/v1/edge/act", { body: forId ? { ...body, for: forId, ...(implicit ? { forDefault: true } : {}) } : body });
   if (implicit && r.status === 400 && /owner message/.test(r.data?.error?.message ?? "")) { save({ lastAcked: undefined, lastAckedAt: undefined, lastAckedActed: undefined }); r = await call("/v1/edge/act", { body }); }
   const d = ok(r, "act");
-  if (d.accepted) { const t = load(); if (t.lastAcked && !t.lastAckedActed) save({ lastAckedActed: true }); }
+  if (d.accepted) { const t = load(); if (implicit && d.open) save({ lastAckedAt: now() }); else if (t.lastAcked && !t.lastAckedActed) save({ lastAckedActed: true }); }
   if (!d.accepted) return { accepted: false, code: d.code, reason: d.reason, ...(d.did_you_mean?.length ? { did_you_mean: d.did_you_mean.slice(0, 8) } : {}), ...(d.retry_after ? { retry_after: d.retry_after } : {}) };
-  let out = { accepted: true, receipt: d.receipt, ...(d.resolved ? { resolved: d.resolved } : {}), ...(d.chosen ? { chosen: d.chosen } : {}), channel: d.channel, ...(d.for ? { for: d.for } : {}) };
+  let out = { accepted: true, receipt: d.receipt, ...(d.resolved ? { resolved: d.resolved } : {}), ...(d.chosen ? { chosen: d.chosen } : {}), channel: d.channel, ...(d.for ? { for: d.for } : {}), ...(d.open ? { open: true } : {}) };
   if (d.receipt?.id && d.channel !== "attention" && d.channel !== "none") save({ lastReceipt: d.receipt.id, lastActAt: now() });
   if (waitFor && d.receipt?.id && !TERMINAL.has(d.receipt.phase)) out = { ...out, ...(await wait(waitFor, d.receipt.id, "--json")) };
   return json ? out : brief(out);
@@ -405,7 +408,7 @@ export function brief(out) {
     ...(out.accepted !== undefined ? { accepted: out.accepted } : {}), ...(out.waited ? { waited: out.waited } : {}),
     ...(sentence ? (fin ? { done: sentence } : { now: sentence, done: false }) : {}),
     ...(rec ? { receipt: { id: rec.id, capability: rec.capability, phase: rec.phase, ...(rec.code ? { code: rec.code } : {}) } } : {}),
-    ...(out.for ? { for: out.for } : {}), ...(out.ownerMessages ? { ownerMessages: out.ownerMessages } : {}),
+    ...(out.for ? { for: out.for } : {}), ...(out.open ? { open: true } : {}), ...(out.ownerMessages ? { ownerMessages: out.ownerMessages } : {}),
     ...(out.resolved?.to && out.resolved.to !== out.resolved.from ? { resolved: out.resolved.to } : {}),
     ...(out.events?.length ? { events: out.events.slice(-4).map((e) => e.text ?? e.kind) } : {}),
   };
