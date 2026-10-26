@@ -5,7 +5,7 @@
 import type {EdgeLedger} from '../ledger/ledger.ts';
 import type {EdgeSoul} from '../contract.ts';
 import {centroid, inPoly} from '../ledger/places.ts';
-import {Perception} from './here.ts';
+import {Perception, floorLines} from './here.ts';
 import {compassOf, compassPoint, dist2, durationWord, walkSeconds} from './geometry.ts';
 
 /** People and things are listed within this many metres (sightline and enclosure as `here`). */
@@ -37,5 +37,5 @@ export function aroundFrame(ledger: EdgeLedger, soul: EdgeSoul) {
         ...(p.description ? {what: clip(p.description, 110)} : {}), ...(k ? {been: k.how === 'visited' ? k.visits : 'found'} : {}), ...(K.isSecret(p.id) ? {secret: true} : {})};});
   const unvisited = places.filter(p => !mem.has(p.id) && p.walk).slice(0, 3).map(p => p.walk!);
   return {tick, ...(found.length ? {found: found.map(p => ({id: p.id, name: p.name, ...(walks.has(p.id) ? {walk: walks.get(p.id)} : {}), ...(p.description ? {what: clip(p.description, 110)} : {})}))} : {}),
-    people, things, places, ...(unvisited.length ? {unvisited} : {}), untrusted: true};
+    people, things, places, ...(() => {const f = floorLines(ledger, P, 60); return f.length ? {floors: f} : {};})(), ...(unvisited.length ? {unvisited} : {}), untrusted: true};
 }

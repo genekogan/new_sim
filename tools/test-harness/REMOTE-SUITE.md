@@ -9,6 +9,42 @@ bash /absolute/checkout/tools/test-harness/release-gate.sh <candidate-ref> --out
 `--baseline <ref>` (default `main`) compares with another baseline, e.g. the live release of a release line
 (`--baseline 19d17c90` for 3.0.1); the receipt records it.
 
+**Baseline cache (MODAL-POLICY rule 1: no baseline re-runs).** The baseline is not re-run on Modal when the gate cache
+holds a validated run of it: `team/scratch/gates/cache/<baselineSha>-<suiteTree>-node<major>/` (the first ancestor of
+the checkout with `team/lanes`; `SIM_GATE_CACHE` or `--cache <dir>` override, `--no-cache` disables reads and writes).
+The key is the harness that executed inside the containers, not the harness commit (`git archive` bytes embed the
+commit id) and not the laptop-side driver: `suiteTree` is the sha256 of the `tools/test-harness` entries (mode, type,
+blob sha, path; path order) without `DRIVER_ONLY` in release-gate.mjs (release-gate.mjs, ship-receipt.mjs, their
+tests, release-no-delete.test.mjs, this file). Everything a container runs stays in: modal_suite.py, remote-suite.sh,
+one-validation.sh, package-suite.sh, quarantine.json, step scripts, v5-durations.json, campus-assets.json. A cached
+run's suite tree is recomputed from its own harness commit, whose full tree must equal the run's recorded
+`harnessTree`. Receipts and CACHE.json record both trees. When the cached baseline ran other driver files, V3-harness
+self-tests of those files may be renamed or removed (`driverTestsRemoved`); every other removal still blocks.
+Imported pairs keep the exact full-tree identity. An entry is a copy of the run's `out/` plus `CACHE.json` with every
+file's sha256; a hit requires the unchanged file hashes and `readRun` validation of source sha, suite tree, Node
+major, completeness and every step. If the candidate's actual Node/pnpm differ from the cached run's (the `node:22`
+image moves its patch), the baseline is run again instead of compared. A miss runs the baseline once beside the
+candidate and caches it when it validates; every passing full gate caches its candidate, which serves as the next
+gate's baseline once it is main. The receipt records `baseline.source` (`cached` | `run` | `imported`), the cache key/miss reason and what was stored.
+`--dry-run` prints the plan (refs, cache hit or miss, Modal runs) without contacting Modal or writing anything.
+**Scoped candidate gates (MODAL-POLICY rule 4).** `--scope auto` picks steps from
+`git diff --name-only <baseline> <candidate>`: `apps/server/` → V1, V3-packages, V3-walk, V5, V6; `apps/web/` → V1, V2,
+V3-bundle, V4; `packages/` → V1, V3-packages, V3-mars-engine, V3-walk, V5 (V3-walk runs the server's walk audit on
+genesis); `tools/world-launcher/` → V3-launcher-unit, V6; `tools/edge-skill/`, `tools/client-eval/` → V3-client-cli;
+`tools/god-skill/` → V6; other `tools/`, `docs/` and root `*.md` → nothing. Any other path (root files, the lockfile,
+`mars/`, `worlds/`, `vendor/`, `infra/`, `e2e/`, `.github/`) takes the full contract. Nothing to run means no Modal
+call: exit 0 with `status: not-gated`, `scope.resolved: none`. A scoped candidate runs only its steps (`--only` to
+remote-suite.sh; modal_suite.py launches only the groups/V5 shards holding them; RUN-METADATA records `only`) against
+the full cached baseline. The receipt records `scope` (mode, resolved, steps, diff range, files per area, unmapped).
+A scoped run never enters the cache, never serves as a baseline, and `ship-receipt.mjs` blocks any gate whose scope is
+not `full`: the release owner gates the final release head with the default `--scope full`.
+Seed or repair the cache with `release-gate.sh cache-add <run-dir>`: a gate's `<gate-out>/candidate` (the gate receipt
+beside it must name the run and have passed; CACHE.json records it, `via: cache-add`) or a bare `remote-suite.sh`
+run, the way a baseline is produced once under a new harness tree (`via: cache-add-bare`, `receipt: null`). Either is
+validated with the exact identity of a `--baseline-results` import (source sha, harness commit/tree/archive
+recomputed locally, Node, complete contract) and must pass on its own quarantine: every failure, skip and TODO has
+its exact quarantine entry, no test file failed to load, no V6 scenario failed.
+
 Run from a committed harness checkout. The gate pins `main`, the candidate and the invocation's harness before
 starting **two isolated Modal runs concurrently**. Both source archives receive the identical committed harness.
 It prints one `RELEASE_GATE` line and writes `receipt.json` with exact source/harness/archive/quarantine hashes,
@@ -55,7 +91,8 @@ otherwise `blocked` (exit 1). It records both input receipts' sha256 and the rem
 
 For audited recovery, `--baseline-results <dir> --candidate-results <dir>` imports a completed pair only when the
 resolved source SHAs, identical harness commit/tree/archive, Node major/patch, pnpm, complete step contract and
-scope all validate. Output directories with an existing receipt are never overwritten. Older unpinned runs and
+scope all validate. `--baseline-results <dir>` alone imports the baseline (same harness tree, Node major/patch,
+pnpm, contract) and runs only the candidate. Output directories with an existing receipt are never overwritten. Older unpinned runs and
 bounded `--server-files`/`--skip` proofs cannot qualify a release.
 
 GitHub CI read-only check on 2026-10-15: run38331634849 for main1080cfa9 did not start jobs because account payments
@@ -67,28 +104,39 @@ Billing & plans to unblock hosted CI; Modal remains independent. No billing sett
 `tools/test-harness/remote-suite.sh <outDir> [--ref HEAD] [--baseline-ref main|none] [--harness-ref HEAD] [--skip V7,V8] [--node 22]`
 
 - **What it ships.** It sends `git archive <ref>` and, for V4's failure-set comparison, `git archive <baseline-ref>` to a
-  Modal container (`modal_suite.py`: `node:<node>-bookworm`, pnpm 10.27.0, 8 CPU, 16 GB, 4 h cap).
+  Modal container (`modal_suite.py`: `node:<node>-bookworm`, pnpm 10.27.0, 4 h cap; group a 8 CPU / 16 GB, the rest
+  4 CPU / 8 GB).
   - Only committed files go, so commit first. `--harness-ref` selects the committed harness overlaid on both trees.
     Returned RUN-METADATA.json records both identities; V0's synthetic container Git commit is not a source SHA.
   - Nothing secret is in the tree. Nothing from `.lane/`, `~/.modal.toml` or the laptop's data goes.
   - Frozen camp/station fixtures also receive their exact historical producer files as a Git object pack.
     It includes the original commit and directory tree objects plus only fixture-declared source blobs;
     it excludes ancestor history and all other historical file contents. Its receipt is returned in `/out`.
-- **What runs.** Each container does a fresh `pnpm install --frozen-lockfile` and then
+- **What runs.** Each container runs `pnpm install --frozen-lockfile` and then
   `one-validation.sh --skip V7,V8`: V1 types, V2 builds, V3 package/engine/CLI/launcher/harness suites, V4 web tests,
   V5 recursive server tests and V6 god/Soul/join API e2es. `--baseline-ref none` suppresses the duplicate V4 baseline.
   Each V5 shard has a 150-minute envelope; exceeding it always blocks the gate.
-- **Fan-out (t4-o1, 2026-10-19).** One run is 15 containers at once: seven step groups (`GROUPS` in `modal_suite.py`,
-  selected by `SUITE_ONLY`) and eight V5 shards (`V5_SHARD=i/8`: contiguous slices of the sorted server test files,
+- **Dependency layer (2026-10-26).** remote-suite.sh stages the source ref's `pnpm-lock.yaml` and `pnpm-workspace.yaml`
+  in `<stage>/deps`; `modal_suite.py` copies them into the image and runs `pnpm fetch --store-dir /pnpm-store` there,
+  a layer Modal caches by those files' content. A tree whose lockfile sha256 equals the layer's links offline from it
+  (`install-<tree>.log` starts `cached layer <sha256>`; an offline failure falls back to an online install and says so);
+  any other lockfile installs online (`no cached layer for lockfile <sha256> …`). A changed lockfile builds the layer
+  once (~1 min).
+- **Fan-out (t4-o1 2026-10-19; right-sized by lane gate-cost 2026-10-26, MODAL-POLICY rule 3).** One run is 4
+  containers at once: group `a` (V1, V2, V3-harness/bundle/packages, V4, the short V6 joins; 8 CPU / 16 GB because it
+  builds the web twice), group `s` (the former b, c, d, e, f, w: V3-walk, V3-mars-engine, V3-client-cli,
+  V3-launcher-unit and the long V6 scenarios, run serially) and two V5 shards, all at 4 CPU / 8 GB (`GROUPS`/`LARGE`
+  in `modal_suite.py`, selected by `SUITE_ONLY`). V5 runs `--test-concurrency=1`, so more cores were idle. V5 shards
+  (`V5_SHARD=i/2`: contiguous slices of the sorted server test files,
   balanced by `v5-durations.json`; each shard also records per-file times in `V5-server-full-files.jsonl`, the source
   for rebalancing). The cheap V2 builds also run unrecorded first in every group, so later steps see the same tree.
   `merge()` rebuilds the serial layout: one SUMMARY.tsv in serial order, the shard TAP logs concatenated in order (the
   serial test order and duplicate-title ordinals), one RUN-METADATA.json that is complete only if every group was.
   Per-group SUMMARY/metadata/V0/install logs stay in `out/groups/<name>/`. A missing group or shard, a duplicated
-  row or an inexact shard file cover fails closed. The gate's verdict logic is unchanged. Wall time ~15–25 min.
-  `run` has `max_containers = len(GROUPS) + V5_SHARDS` (15): each `modal run` is its own ephemeral app, so this caps
-  one gate; the edenartlab workspace limit (100 containers) is kept by the ledger `team/lanes/GATES.inflight`
-  (at most 3 gates in flight across tranches).
+  row or an inexact shard file cover fails closed. The gate's verdict logic is unchanged. Expected wall time ~45–50 min
+  (group s ~31–40 min serial, each V5 shard ~2280 s of tests, group a ~10 min); it was ~22 min with 15 containers.
+  `run_large` (group a) has `max_containers = 1` and `run` has `max_containers = 3`: each `modal run` is its own
+  ephemeral app, so this caps one run; the ledger `team/lanes/GATES.inflight` bounds gates across tranches.
   Rebalance after big test changes: `node tools/test-harness/v5-shard.mjs` reads `v5-durations.json`; regenerate it
   from a run's `out/groups/v5-*/V5-server-full-files.jsonl` (sum of top-level `ms` per file).
   - The container has its own network namespace, so the 54xx test ports can't collide with anything.
@@ -100,7 +148,11 @@ Billing & plans to unblock hosted CI; Modal remains independent. No billing sett
   V3 retains raw Node TAP/spec output and an explicit exit code for every package. Any package failure fails V3.
   The raw runner returns suite artifacts even for failing assertions; use release-gate.sh to evaluate a ship.
 - **Node.** The default is 22 (eden2 production runs v22.23). Use `--node 26` to match the laptop.
-- **Cost.** CPU only, 14 containers × 8 cores × ~5–10 min per run (about the same core-hours as the old serial hour).
+- **Cost.** CPU only. Before 2026-10-26 a run held 15 containers × 8 cores / 16 GB for ~7,500 container-seconds of
+  steps plus boot/install/prep (~2.4 container-h, ~19 core-h, ~39 GB-h) and every gate made two runs (~39 core-h).
+  Now one full run is ~2.3 container-h, ~9.7 core-h, ~20 GB-h (a: ~0.17 h × 8 cores; s and 2 V5 shards: ~2.1 h ×
+  4 cores), and a gate with a cached baseline makes one run (~75% less per full gate; a web-only scoped gate is one
+  group-a container, ~0.9 core-h).
 - **Setup.** Needs `modal` installed and authenticated: `pip install modal && modal token new`. On this laptop it is
   installed (1.5.2) and `modal profile current` answers `edenartlab`.
 - **Smoke test** (install + preflight only, a few minutes):

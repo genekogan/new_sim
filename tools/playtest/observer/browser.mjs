@@ -77,7 +77,8 @@ export async function openCamera({ browser, base, identity = null, kind = 'wide'
     if (kind === 'follow' && !cam.follow?.ok) await cam.ensureFollow({ waitMs: 1500 });
     mkdirSync(dirname(outPath), { recursive: true });
     const c = now(), s0 = performance.now();
-    await page.screenshot({ path: outPath });
+    // software GL (the Linux cloud box) renders a frame slowly: a 30 s timeout dropped every shot of a 1280x800 world page
+    await page.screenshot({ path: outPath, timeout: process.platform === 'linux' ? 90000 : 30000 });
     const v = await cam.viewer();
     return { t: c.t, mono: c.mono, ms: Math.round(performance.now() - s0), path: outPath, mode: v.mode, selection: v.selection, tick: v.tick, following: v.mode === 'follow' };
   };

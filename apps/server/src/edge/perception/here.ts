@@ -143,8 +143,22 @@ export class Perception {
     const m = this.L.host.minds.get(this.soul.soulId), b = this.w.entities[this.soul.entityId];
     const path: PlaceRef[] = this.L.placePathOf(this.soul.soulId), seat = path[0]?.kind === 'occupier' ? path[0].id : this.seat(), places = path.filter(p => p.kind !== 'occupier');
     const posture = this.L.faded.has(this.soul.soulId) ? 'faded' : m ? stateOf(this.L.host, m.entityId) : 'absent';
-    return {place: places[0]?.id ?? null, placePath: places.map(p => p.name), pos: this.pos ? [round1(this.pos[0]), round1(this.pos[1])] as V2 : null, heading: this.heading, posture, ...(seat ? {seat} : {}), body: b};
+    // floors (2026-10-26): the floor plate the body stands on (a building's raised floor), with its height
+    const plate = this.pos && (b?.human?.level ?? 0) === 0 ? this.L.floorsNear?.(this.pos, 0).find(f => f.on) : undefined;
+    return {place: places[0]?.id ?? null, placePath: places.map(p => p.name), pos: this.pos ? [round1(this.pos[0]), round1(this.pos[1])] as V2 : null, heading: this.heading, posture, ...(seat ? {seat} : {}), ...(plate && b ? {floor: plate.id, y: Math.round(b.pose.p[1] * 100) / 100} : {}), body: b};
   }
+}
+
+/** Floors (2026-10-26): the raised floors near the body in plain words — the one it stands on, or how far one is, the
+ *  step up and which sides are open — so an agent knows the true floors and openings of the buildings around it. */
+const SIDE_WORDS: Record<string, string> = {N: 'north', NE: 'northeast', E: 'east', SE: 'southeast', S: 'south', SW: 'southwest', W: 'west', NW: 'northwest'};
+export function floorLines(ledger: EdgeLedger, P: {pos: V2 | null; bearing(at: V2): string}, radius = 30): string[] {
+  const fl = P.pos ? ledger.floorsNear?.(P.pos, radius) ?? [] : [];
+  return fl.slice(0, 3).map(f => {
+    const sides = [...new Set(f.openings.map(n => SIDE_WORDS[compassPoint(compassOf(n[0], n[1]))] ?? compassPoint(compassOf(n[0], n[1]))))], high = `${f.rise.toFixed(2)} m above the ground`;
+    const open = sides.length === 4 ? 'open on all four sides' : sides.length ? `open on its ${sides.length > 1 ? `${sides.slice(0, -1).join(', ')} and ${sides[sides.length - 1]}` : sides[0]} side${sides.length > 1 ? 's' : ''}` : 'no open side found';
+    return f.on ? `You are standing on ${f.name}, ${high}; ${open}.` : `${f.name[0].toUpperCase()}${f.name.slice(1)}: ${f.d} m ${P.bearing(f.at)}, ${f.rise <= 0.45 ? `a ${f.rise.toFixed(2)} m step up` : `${high}, reached by stairs`}; ${open}.`;
+  });
 }
 
 /** endedAt for a terminal receipt: where the body is and how (EDGE-CONTRACT-v1 §8.4). */
@@ -248,7 +262,7 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
       activity: inviting ? {kind: 'inviting', what: inviting.what, with: inviting.waitingFor.map(g => g.name), answerWithin: durationWord(inviting.expiresInSeconds)} : {kind: activityKind, ...(endsIn ? {endsIn} : {})},
       ...(gaze ? {gaze: {kind: gaze.kind, ...(gaze.target ? {at: nameOfEntity(gaze.target)} : gaze.at && P.pos ? {bearing: P.bearing(gaze.at)} : {})}} : {}),
       ...(holding?.name ? {holding: holding.name} : {}), ...(fade?.colour ? {fade: fade.colour} : {})},
-    near, objects, ...(Object.keys(more).length ? {more} : {}), conversations_in_earshot: conversations, exits,
+    near, objects, ...(Object.keys(more).length ? {more} : {}), conversations_in_earshot: conversations, exits, ...(() => {const f = floorLines(ledger, P); return f.length ? {floors: f} : {};})(),
     // knowledge/1: the district summarised, far districts as names and directions (more once visited)
     ...(ledger.knowledge?.scales(soul.soulId, ledger.placePathOf(soul.soulId).filter(p => p.kind !== 'occupier').map(p => p.id), P.pos, c ? c.hour * 60 + c.minute : null) ?? {}),
     untrusted: true,

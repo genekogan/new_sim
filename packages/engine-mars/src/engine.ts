@@ -30,7 +30,7 @@ import {applyUpperFloorsV1,placeLevelOf,previewUpperFloorsV1,type UpperFloorsFac
 import {registerAssets} from './catalog-adapter.ts';
 import {socialEdenTransitionV1Schema,type SocialEdenTransitionV1} from '@sim/engine-contract';
 import {searchArrival,arrivalPocket,type ArrivalGround,type ArrivalPocket,type ArrivalSpot} from './arrival-search.ts';
-import {attachGround,groundRegistry,installGroundV1 as installGround,previewGroundV1,standHeight,groundArrival,inDeepWater} from './ground-bridge.ts';
+import {attachGround,groundRegistry,installGroundV1 as installGround,previewGroundV1,standOn,groundArrival,inDeepWater} from './ground-bridge.ts';
 // The Mars engine behind Sim's engine contract.
 //
 // The shell speaks a small BODY LANGUAGE (walk_to, sit, stand, rest, wave,
@@ -936,8 +936,8 @@ export class MarsEngine implements Engine {
     const p=probeBody(this.rt,actor),a:any=this.ents[actor];if(!p||!a||p.exempt||!p.held)return null;
     const from=setDownFrom(this.rt,actor),upper=(a.human?.level??0)!==0;
     const xz=upper?from.at:(this.freeStandingNearV1([r3(from.at[0]),r3(from.at[1])],a.body?.radius??HUMAN_RADIUS)??from.at);
-    const f=this.rt.world.groundV1&&!upper?(this.rt.services.spatial as Spatial).ground?.field:undefined;
-    const y=f?standHeight(f,xz[0],xz[1]):(from.y??a.pose.p[1]);
+    const f=this.rt.world.groundV1&&!upper?(this.rt.services.spatial as Spatial).ground:undefined;
+    const y=f?standOn(f,xz[0],xz[1]):(from.y??a.pose.p[1]);
     const id=this.byActor.get(actor),pp=id?this.programs.get(id):undefined,own=!!pp?.action&&p.holders.some(x=>x.id===pp!.action);
     const r=releaseBody(this.rt,actor,[r3(xz[0]),r3(y),r3(xz[1])],reason);
     if(r&&pp&&own)this.end(pp,'failed',reason);
@@ -1118,11 +1118,11 @@ export class MarsEngine implements Engine {
     // Finish the seat's ordinary rise before admitting a native route from that standing point.
     const land=()=>{
       for(const itemId of drop){const item=this.ents[itemId];placeOnGround(item,setDown,yaw);delete item.reservedBy;acknowledgeRelocation(this.rt,itemId);}
-      e.pose.p=[r3(to[0]),toLevel===0&&field?r3(standHeight(field,...to)):r3(spatial.base.levels.find(l=>l.id===toLevel)?.y??0),r3(to[1])];e.human.level=toLevel;
+      e.pose.p=[r3(to[0]),toLevel===0&&field?r3(standOn(spatial.ground!,...to)):r3(spatial.base.levels.find(l=>l.id===toLevel)?.y??0),r3(to[1])];e.human.level=toLevel;
     };
     let walked=false;
     if(how==='walked'){
-      const level=spatial.base.levels.find(l=>l.id===start.level),height=start.level===0&&field?standHeight(field,...start.p):level?.y??feet[1];
+      const level=spatial.base.levels.find(l=>l.id===start.level),height=start.level===0&&field?standOn(spatial.ground!,...start.p):level?.y??feet[1];
       e.pose.p=[start.p[0],r3(height),start.p[1]];e.human.level=start.level;
       const walk=this.rt.submit('walk_to',{actor:id,x:to[0],z:to[1],level:toLevel},{preempt:false});
       const live=walk.status==='failed'?undefined:internal.live.get(walk.id);
@@ -1186,7 +1186,7 @@ export class MarsEngine implements Engine {
     const ok = (x: number, z: number) => clearanceAt(grid, [x, z]) >= HUMAN_RADIUS && free(x, z, 0) && (!f || f.medium(x, z) <= 1);
     for (let ring = 0; ring <= 80; ring++) { const n = Math.max(1, ring * 8); for (let k = 0; k < n; k++) {
       const ang = (k / n) * Math.PI * 2, x = r3(x0 + dcos(ang) * ring * 0.5), z = r3(z0 + dsin(ang) * ring * 0.5);
-      if (ok(x, z)) return land([x, f ? r3(standHeight(f, x, z)) : 0, z], 0);
+      if (ok(x, z)) return land([x, f ? r3(standOn(spatial.ground!, x, z)) : 0, z], 0);
     } }
     return false;
   }
@@ -1252,7 +1252,7 @@ export class MarsEngine implements Engine {
     if (!spot && near) spot = this.freeStandingNearV1([ax, az], body?.radius ?? HUMAN_RADIUS) ?? (near.first ? null : this.freeStandingNearV1(near.at, body?.radius ?? HUMAN_RADIUS));
     if (!spot) throw new Error('no free standing room at the arrival point');
     const e = this.m.human(id, spot[0], spot[1], { label, provenance: { origin: 'simulation', confidence: 'hypothetical' } });
-    if(this.rt.world.groundV1){const f=(this.rt.services.spatial as Spatial).ground!.field;e.pose.p[1]=standHeight(f,spot[0],spot[1]);}
+    if(this.rt.world.groundV1){const g=(this.rt.services.spatial as Spatial).ground!;e.pose.p[1]=standOn(g,spot[0],spot[1]);}
     e.human.soul = soul; if(body)e.body=body;
     this.ents[id] = e; this.m.canonicalEntityOrder(this.rt.world);
     this.out.changes.push([this.rt.tick, id, 'present', e]);
@@ -2006,6 +2006,9 @@ export class MarsEngine implements Engine {
   /** lane NAV: the audit's policy id and passable clearance (reports). */
   navPolicyV1(){return {policy:NAV_CONNECT_POLICY,clear:CONNECT_CLEAR};}
   /** nav/1 read: clearance (m) of level-0 standing ground at a point (0 off ground or inside a solid). */
+  /** Floors (2026-10-26): where a body's feet rest at (x, z) on `level`: level 0 of a ground world is the nav's standing
+   *  height (the terrain, or a floor plate / deck on it; the swim root in deep water); else the level's flat height. */
+  standYAtV1(x:number,z:number,level=0):number|null{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);if(level===0&&this.rt.world.groundV1&&spatial.ground)return r3(standOn(spatial.ground,x,z));const l=spatial.scene.levels.find(v=>v.id===level);return l?l.y:null;}
   clearanceAtV1(x:number,z:number,level=0):number{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const clear=spatial.clearanceReader(level,[x,z]);return clear?clear([x,z]):0;}
   /** nav read (L1): clearanceAtV1 capped at `cap` — the same value below it, `cap` at or above it — answered off the paged
    *  windows without building fine nav tiles. For the many "is there standing room here (≥ t ≤ cap)?" reads. */

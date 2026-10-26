@@ -12,7 +12,7 @@ import { applyBatch, obbOverlap, type Diff, type Entity, type Failure, type Op, 
 import { assetFromDef, assetIdFor, isFixtureDef, isFloatingDef, nearestSurfaceSlot, nextEntityPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
 import type { WorldHost } from '../world.ts';
 import type { LogEvent } from '@sim/protocol';
-import type { EdgeLedger } from '../edge/ledger/ledger.ts';
+import type { EdgeLedger, FloorNear } from '../edge/ledger/ledger.ts';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { GodMode } from './god.ts';
 import { reachProviders, seatProviders, syncProviders, usesProviders, type ReachEnd, type ReachEndpoint } from './query.ts';
@@ -34,6 +34,7 @@ import { installHeld } from './held.ts';
 import { installWorldClock } from './world-clock.ts';
 import { config, KNOWN_WORLD_KEYS } from '../config.ts';
 import { seatFitProblem } from '../../../../mars/viewer/engine/bodies/humanoid.ts';
+import { floorPlatesOf, plateIsStep } from './floor-plates.ts';
 import { isVerificationProbe } from '../verification-probe.ts';
 import { planWalkouts, dropReleased, unhand, stuckWarning, type StuckResident } from './walkout.ts';
 import { GodNotices } from './notices.ts';
@@ -71,6 +72,8 @@ type EngineV1 = {
   bodyUsesV1(id: string): { body: string; how: 'occupied' | 'held' } | null;
   reachV1(from: { p: Vec2; level?: number }, to: { p: Vec2; level?: number }): { ok: true; length: number; legs: number; levels: number[] } | { ok: false; code: string; message: string };
   standableNearV1(at: Vec2, level?: number, except?: string, minClear?: number, maxRing?: number): Vec2 | null;
+  /** Floors (2026-10-26): where a body's feet rest at (x, z) on `level` (level 0: the terrain or a floor plate on it). */
+  standYAtV1?(x: number, z: number, level?: number): number | null;
   programOf(id: string): string | null;
   godWalkoutRouteV1(id: string, to: Vec2, level?: number): boolean;
   godWalkoutLandableV1(id: string, to: Vec2, level?: number): boolean;
@@ -82,6 +85,7 @@ const EVACUATE_RETRY_TICKS = 400; // a closure walk-out the engine could not lan
 /** `sent` marker for a thing a walk-out took out of a resident's hands: whatever the entity world says next (a place on
  *  the ground, or nothing: removed) differs from it, so it is always sent. */
 const RELEASED = '"released"';
+const SEAT_LIFT = 0.15;       // floors: a seat's thing standing this far above the sitter's floor would seat the body inside it
 const GROUND_BAND = 0.35;      // a floor within this of the ground is level 0 (the engine's ground is flat at y 0 until L8's tiles)
 const LEVEL_MATCH = 0.12;      // floors this close in height share an engine level
 const FLOOR_NEAR = 0.6;        // levelAt: a level counts at a point within this of one of its floors (thresholds, stair heads)
@@ -502,6 +506,9 @@ export class EngineBridge {
     }
     // floors: polygons → oriented rectangles on levels
     const surfaces = [...(baked.surfaces ?? [])];
+    // floors (2026-10-26): a mesh def's measured floor plates (floor-plates.ts: the Chiba deck), walked onto as a step
+    const plates = new Set<object>();
+    if (!worldFrame && def.make.kind === 'mesh') for (const f of floorPlatesOf(def.name)) { const s = { level: 0, y: f.y, polygon: f.polygon, tag: f.id }; plates.add(s); surfaces.push(s); }
     if (!surfaces.length && def.components.floor) { const [w, , d] = baked.box; surfaces.push({ level: 0, y: def.components.floor.y ?? baked.box[1], polygon: [[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]] }); }
     // ground cover (roads, lawns, plazas: ground-relative level-0 surfaces of world-frame shapes) is the ground itself
     const floors = surfaces.filter((x) => !(worldFrame && !(x as { abs?: boolean }).abs && x.level === 0));
@@ -513,12 +520,14 @@ export class EngineBridge {
     const c0 = g0 ? (() => { const r = rectOf(g0.polygon); return toWorld(r.c[0], r.c[1]); })() : undefined;
     const groundY = g0 && c0 && Math.abs(heightAt(g0.y, c0) - this.model.terrain.sample(c0[0], c0[1])) <= GROUND_BAND + 0.5 ? heightAt(g0.y, c0) : undefined;
     const levelOn = (y: number, at: Vec2) => (groundY !== undefined && Math.abs(y - groundY) <= LEVEL_MATCH ? 0 : this.levelFor(y, at));
+    // a floor plate within a step of the terrain under it is the ground's level (GroundNav.standY stands every body on it)
+    const plateLevel = (y: number, at: Vec2) => (plateIsStep(y, this.model.terrain.sample(at[0], at[1])) ? 0 : this.levelFor(y, at));
     if (floors.length) part.surfaces = floors.map((s, i) => {
       const r = rectOf(s.polygon), abs = (s as { abs?: boolean }).abs;
       const c = toWorld(r.c[0], r.c[1]), y = heightAt(s.y, c, abs);
       // decks and bridges of world-frame shapes are walked from the ground: level 0 at their own height (L8 slabs); a
       // raised deck (deck/1 with rails, DECK_RAISED up) is an upper floor of its own that stairs, ramps and ladders reach
-      const level = worldFrame && abs && s.level === 0 && !raisedDeck ? 0 : levelOn(y, c);
+      const level = worldFrame && abs && s.level === 0 && !raisedDeck ? 0 : plates.has(s) ? plateLevel(y, c) : levelOn(y, c);
       const sc = worldFrame ? 1 : wp.s, yaw = worldFrame ? r.yaw : wp.yaw + r.yaw;
       return { id: `${e.id}#f${i}`, level, y: level === 0 && Math.abs(y) <= GROUND_BAND ? 0 : y, obb: { c, half: [r3(r.half[0] * sc), r3(r.half[1] * sc)] as Vec2, yaw: r3(-yaw) }, label: `${this.model.pathOf(e.id)} ${s.tag ?? 'floor'}`.slice(0, 100) };
     });
@@ -567,6 +576,42 @@ export class EngineBridge {
     if (part.solids || part.surfaces || part.links) withLinkApproaches(part);
     return part.solids || part.surfaces || part.links || part.fixture ? part : null;
   }
+  /** Floors (2026-10-26): the measured floor plates (floor-plates.ts) of placed things within `radius` of `at`, in world
+   *  terms, with the sides a body can step across (clear ground 0.45 m outside and inside along ≥ 1 m of the edge). */
+  floorsNear(at: Vec2, radius: number): FloorNear[] {
+    const out: FloorNear[] = [], eng = this.engine as unknown as { clearanceAtV1?: (x: number, z: number, level?: number) => number }, epoch = (this.engine.world as { entityPhysicsV1?: { hash?: string } }).entityPhysicsV1?.hash ?? '';
+    for (const e of this.model.entities.values()) {
+      const def = this.model.resolvedDef(e.def); if (!def || def.make.kind !== 'mesh') continue;
+      const plates = floorPlatesOf(def.name); if (!plates.length) continue;
+      const wp = this.model.worldPose(e), c = Math.cos(wp.yaw), s = Math.sin(wp.yaw), k = wp.s;
+      const toW = (x: number, z: number): Vec2 => [wp.x + (x * c + z * s) * k, wp.z + (-x * s + z * c) * k];
+      const dx = (at[0] - wp.x) / k, dz = (at[1] - wp.z) / k, lx = dx * c - dz * s, lz = dx * s + dz * c;
+      for (const f of plates) {
+        const xs = f.polygon.map((p) => p[0]), zs = f.polygon.map((p) => p[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs);
+        const d = Math.hypot(Math.max(0, x0 - lx, lx - x1), Math.max(0, z0 - lz, lz - z1)) * k; if (d > radius) continue;
+        const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, centre = toW(cx, cz), y = r3(wp.y + f.y * k), key = `${e.id}|${f.id}|${epoch}`;
+        let openings = this.plateOpenings.get(key);
+        if (!openings) {
+          openings = [];
+          const sides: [Vec2, Vec2, Vec2][] = [[[x1, z0], [x1, z1], [1, 0]], [[x0, z0], [x0, z1], [-1, 0]], [[x0, z1], [x1, z1], [0, 1]], [[x0, z0], [x1, z0], [0, -1]]];
+          for (const [a, b, n] of sides) {
+            const len = Math.hypot(b[0] - a[0], b[1] - a[1]), steps = Math.max(1, Math.floor(len / 0.5)); let run = 0, best = 0;
+            for (let i = 0; i <= steps; i++) {
+              const t = i / steps, px = a[0] + (b[0] - a[0]) * t, pz = a[1] + (b[1] - a[1]) * t, o = toW(px + n[0] * 0.45, pz + n[1] * 0.45), q = toW(px - n[0] * 0.45, pz - n[1] * 0.45);
+              const clear = (eng.clearanceAtV1?.(o[0], o[1], 0) ?? 0) >= 0.3 && (eng.clearanceAtV1?.(q[0], q[1], 0) ?? 0) >= 0.3;
+              run = clear ? run + len / steps : 0; best = Math.max(best, run);
+            }
+            if (best >= 1) openings.push([r3(n[0] * c + n[1] * s), r3(-n[0] * s + n[1] * c)]);
+          }
+          if (this.plateOpenings.size > 64) this.plateOpenings.clear();
+          this.plateOpenings.set(key, openings);
+        }
+        out.push({ id: f.id, name: `the ${f.label} of ${this.model.pathOf(e.id)}`, y, rise: r3(y - this.model.terrain.sample(centre[0], centre[1])), on: d === 0, d: Math.round(d), at: [r3(centre[0]), r3(centre[1])], openings });
+      }
+    }
+    return out.sort((a, b) => a.d - b.d || a.id.localeCompare(b.id));
+  }
+  private plateOpenings = new Map<string, Vec2[]>();
   /** A deck/1 at the root, high enough to have rails (generators DECK_RAISED): its floor is a level of its own. */
   private isRaisedDeck(e: Entity, def = this.model.resolvedDef(e.def)): boolean {
     return !!def && def.make.kind === 'gen' && def.make.gen === 'deck/1' && def.form !== 'point' && e.in.parent === 'world' && deckRaised(e.params ?? {});
@@ -1376,6 +1421,7 @@ export class EngineBridge {
     L.thingOnDemand = (soul, ask, caps, plans) => pass('thing on demand', () => this.nav.thingOnDemand(soul, ask, caps, plans, tokenHit), null);
     L.walkRefOnDemand = (soul, ref, caps, plans) => pass('walk ref on demand', () => this.nav.walkRefOnDemand(soul, ref, caps, plans), false);
     L.floorOnDemand = (soul, q, caps, plans) => pass('floor on demand', () => this.nav.floorOnDemand(soul, q, caps, plans, tokenHit), null);
+    L.floorsNear = (at, radius) => pass('floors near', () => this.floorsNear(at, radius), []);
     L.thingAt = (id) => { const t = this.nav.thingById(id); return t ? [t.at[0], t.at[1]] : null; };
     L.thingWords = () => pass('thing words', () => this.nav.thingWords(), [] as string[]);
     L.beforeMap = () => { this.flush(); this.perceiveSync(); };
@@ -1473,6 +1519,8 @@ export class EngineBridge {
       return at ? [{ verb: 'mars:walk_to', params: { x: at[0], z: at[1], level } }] : [];
     };
     const stand = me.human.activity === 'sit' || me.human.baseActivity === 'sit' || me.human.berth ? [{ verb: 'stand', params: {} }] : [];
+    // floors (2026-10-26): a seat the body cannot use names the nearest one it can (or the ground)
+    const unusable: number[] = [], usable: { id: string; label: string; d: number }[] = [];
     for (const x of near) {
       const asset = (this.physics?.assets[x.def] ?? {}) as { slots?: { kind: string }[]; surfaceSlots?: { id: string }[]; category?: string };
       const d = Math.round(Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]));
@@ -1483,7 +1531,7 @@ export class EngineBridge {
         // resolves through the ledger's vocabulary (every word in the label) to this seat and not another bench
         const ent = this.model.entities.get(x.id), kind = ent ? this.model.resolvedDef(ent.def)?.name.replace(/^core-/, '') : undefined;
         const by = ent ? this.nav.namesNear([x.pose.p[0], x.pose.p[2]], x.id) : [];
-        const id = `sit:${x.id}`, label = `${name(x.id)} (${kind && !name(x.id).split('/').pop()!.includes(kind) ? `a ${kind}, ` : ''}${by.length ? `by ${by.join(' and ')}; ` : ''}${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
+        const id = `sit:${x.id}`, labelOf = (seatWords: string) => `${name(x.id)} (${kind && !name(x.id).split('/').pop()!.includes(kind) ? `a ${kind}, ` : ''}${seatWords}${by.length ? `by ${by.join(' and ')}; ` : ''}${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
         // F1: a bench for two stays free while one of its seats is; the seat a Soul sits on is not free to itself
         const full = others.length >= seats || (!!u && !mine && seats <= 1);
         // seat fit (engine bodies/humanoid.ts): a body whose look sets its height cannot get onto a seat too high for it.
@@ -1491,7 +1539,17 @@ export class EngineBridge {
         // none, so this read nothing before). Only too-high blocks: a seat lower than a body likes (a floor cushion) is sat on.
         const tops = [...seatTopsOf(this.model, x.id).values()].filter((y) => Number.isFinite(y));
         const misfit = tops.length && tops.every((y) => seatFitProblem(me.body, y)?.code === 'seat.too-high') ? seatFitProblem(me.body, Math.min(...tops)) : null;
-        const block = mine ? { code: 'seat.yours', reason: `You are sitting on ${name(x.id)} already; stand:here to get up.` } : full ? { code: 'seat.taken', reason: `${(others.length ? others : [u!.body]).map((b) => this.soulName(b)).join(' and ')} ${others.length > 1 ? 'are' : 'is'} sitting there.` } : misfit ? { code: misfit.code, reason: `${name(x.id)} does not fit your body: ${misfit.message}.` } : null;
+        // floors (2026-10-26): the sitter's feet rest on the floor under the seat (the terrain, or a floor plate on it); a
+        // thing standing higher than that floor (on a deck the world does not walk on) would seat the body inside it
+        const feet = levelOf(x) === 0 ? this.engine.standYAtV1?.(x.pose.p[0], x.pose.p[2], 0) : undefined, lift = typeof feet === 'number' ? x.pose.p[1] - feet : 0;
+        // a floating thing (a moored canoe, party S8) rides above the pond floor by design and is boarded from its side
+        const afloat = !!ent && isFloatingDef(this.model.resolvedDef(ent.def) as { components: Record<string, unknown> });
+        const inside = !afloat && lift > SEAT_LIFT ? { code: 'seat.inside', reason: `${name(x.id)} stands ${lift.toFixed(2)} m above the floor you would stand on there, on something the world does not walk on: sitting on it would put you inside it.` } : null;
+        const top = tops.length ? Math.min(...tops) : undefined, ownDef = ent ? this.model.resolvedDef(ent.def) : undefined;
+        const onTop = top !== undefined && ownDef && ownDef.size.box[1] > 0 && top >= ownDef.size.box[1] * (ent ? this.model.worldPose(ent).s : 1) - 0.05 ? `sit on top, ${top.toFixed(2)} m high; ` : top !== undefined ? `seat ${top.toFixed(2)} m high; ` : '';
+        const block = mine ? { code: 'seat.yours', reason: `You are sitting on ${name(x.id)} already; stand:here to get up.` } : full ? { code: 'seat.taken', reason: `${(others.length ? others : [u!.body]).map((b) => this.soulName(b)).join(' and ')} ${others.length > 1 ? 'are' : 'is'} sitting there.` } : misfit ? { code: misfit.code, reason: `${name(x.id)} does not fit your body: ${misfit.message}.` } : inside;
+        const label = labelOf(onTop);
+        if (block?.code === 'seat.inside' || block?.code === 'seat.too-high') unusable.push(caps.length); else if (!block) usable.push({ id, label, d });
         caps.push({ id, verb: 'sit', label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: 60 } } });
         plans.set(id, { label, steps: [{ verb: 'sit', params: { on: x.id, seconds: 60 } }], seconds: true });
       }
@@ -1528,6 +1586,8 @@ export class EngineBridge {
         if (free) plans.set(id, { label, steps: [...stand, ...approach(x), { verb: 'mars:put_item', params: { item: held.id, surfaceSlot: `${x.id}#${free.id}` } }] });
       }
     }
+    const alt = usable.sort((a, b) => a.d - b.d || a.id.localeCompare(b.id))[0];
+    for (const i of unusable) { const b = caps[i].blocked; if (b) b.reason = `${b.reason} ${alt ? `Nearest seat you can use: ${alt.id} (${alt.label}).` : 'Sit on the ground instead: sit-ground:here.'}`; }
     if (this.layers.active()) try { this.layers.capabilities(soul, caps, plans as never, here); } catch (e) { this.log(`layers capabilities: ${(e as Error).message}`); }
     this.sitHere(caps, plans, here, soul.entityId);
     this.fireLit(caps);

@@ -18,6 +18,20 @@ Change the three arguments per run: `<fix-branch> <out-name> [repeats]`. A rerun
 If the session starts on another branch, prefix the prompt with "git fetch origin lane/playtest-20261024 && git checkout
 lane/playtest-20261024, then".
 
+## A directed session (swarm director, `PLAYTEST_DIRECT`)
+
+`PLAYTEST_DIRECT=<cast.json>` runs `playtest.mjs direct <cast> --headless` once per repeat instead of the frozen set
+(the cast's `console.script` plays the console; verdict in `<run>/director/VERDICT.md`, story in `<run>/story.html`).
+The session must be on the branch that has `director/swarm/` (`lane/swarm-director-20261026` until it is merged):
+
+> `cd /home/user/sim && git fetch origin lane/swarm-director-20261026 && git checkout lane/swarm-director-20261026 &&
+> PLAYTEST_DIRECT=tools/playtest/scenarios/casts/seven-dwarves.json nohup setsid bash tools/playtest/cloud/run-replay.sh main dwarves-r1 1 > /tmp/dwarves-r1.log 2>&1 &`
+> then poll (`sleep 540; tail -n 30 /tmp/dwarves-r1.log; pgrep -f run-replay.sh || echo FINISHED`) until FINISHED, and
+> report `results/dwarves-r1/seven-dwarves-r1/director/VERDICT.md` in full, the playtest-results push result and CLOUD.md.
+
+The first argument is the server branch the world runs (`main` = the live Sim build). Seven haiku seats plus one Opus
+planner call; expect 40–60 minutes.
+
 ## What it does (beside the clone, in its parent directory)
 
 1. `git worktree add ../server origin/<fix-branch>` (detached; a rerun checks out the branch's current head).
