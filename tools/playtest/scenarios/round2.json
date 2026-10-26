@@ -1,0 +1,27 @@
+{
+ "kind": "round",
+ "name": "round2",
+ "version": 1,
+ "brief": "team/PLAYTEST-ROUND2-20261026.md",
+ "notes": "The eight playtests of round 2 in run order (nine runs: slot 8 is the newcomer and pink-teamer pair). Paths are relative to tools/playtest/scenarios/. 'run' entries go through `playtest.mjs run`, 'direct' entries through `playtest.mjs direct`. Run them serially, one at a time behind the machine gate. estMin is wall time including onboarding, play and review (an estimate, not a measurement). How to run and what each oracle scores: tools/playtest/ROUND2.md.",
+ "runs": [
+  { "slot": 1, "label": "wayfind-eden", "kind": "run", "scenario": "wayfind-eden-2026.json", "world": "eden-2026", "seats": "sonnet + haiku", "estMin": 65,
+    "scores": ["target-arrival", "answer-names", "answer-direction", "truthfulness-basic", "arrival", "ack/result", "Reviewer H/P/M/W"] },
+  { "slot": 2, "label": "wayfind-mars", "kind": "run", "scenario": "wayfind-mars-two.json", "world": "mars-two", "seats": "sonnet + haiku", "estMin": 65,
+    "scores": ["target-arrival", "answer-names", "answer-direction", "truthfulness-basic", "arrival", "ack/result", "Reviewer H/P/M/W"] },
+  { "slot": 3, "label": "wayfind-hamlet", "kind": "run", "scenario": "wayfind-hello-hamlet.json", "world": "hello-hamlet", "seats": "sonnet + haiku", "estMin": 60,
+    "scores": ["target-arrival", "answer-names", "answer-direction", "truthfulness-basic", "arrival", "ack/result", "Reviewer H/P/M/W"] },
+  { "slot": 4, "label": "look-eden", "kind": "run", "scenario": "look-eden-2026.json", "world": "eden-2026", "seats": "sonnet", "estMin": 50,
+    "scores": ["target-arrival", "facing", "view-used", "named-in-description", "truthfulness-basic", "Reviewer H/P/M/W"] },
+  { "slot": 5, "label": "look-mars", "kind": "run", "scenario": "look-mars-two.json", "world": "mars-two", "seats": "sonnet", "estMin": 50,
+    "scores": ["target-arrival", "facing", "view-used", "named-in-description", "truthfulness-basic", "Reviewer H/P/M/W"] },
+  { "slot": 6, "label": "podium-eden", "kind": "direct", "cast": "casts/podium-eden-hall.json", "world": "eden-2026", "seats": "haiku x5, opus planner", "estMin": 55,
+    "scores": ["allPresent", "eachPresented", "inOrder", "eachOnce", "fromPodium", "cost per seat"] },
+  { "slot": 7, "label": "podium-mars", "kind": "direct", "cast": "casts/podium-mars-room.json", "world": "mars-two", "seats": "haiku x5", "estMin": 55,
+    "scores": ["allPresent", "eachPresented", "inOrder", "eachOnce", "fromPodium", "cost per seat"] },
+  { "slot": 8, "label": "newcomer", "kind": "run", "scenario": "newcomer-r2.json", "world": "eden-district", "seats": "opus (newcomer persona, opus persona model)", "estMin": 30,
+    "scores": ["persona fun/alive ratings", "desires", "Reviewer H/P/M/W", "the fifteen oracles"] },
+  { "slot": 8, "label": "pinkteam", "kind": "run", "scenario": "pinkteam-r2.json", "world": "eden-district", "seats": "sonnet (pinkteam persona, opus persona model)", "estMin": 35,
+    "scores": ["persona fun/alive ratings", "complaints", "Reviewer H/P/M/W", "the fifteen oracles"] }
+ ]
+}

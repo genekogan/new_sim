@@ -102,3 +102,13 @@ test('validateExpect names every problem; an invalid expect reports unknown, nev
   assert.deepEqual(validateExpect({ kind: 'near', source: SRC, answer: { anyOf: ['x'] } }), []);
   assert.equal(row(run1(pack(), { expect: { kind: 'go', source: SRC } }), 'target-arrival').status, 'unknown');
 });
+
+test('a scripted replay keeps each request\'s expect (k-th occurrence), and adds none where there was none', async () => {
+  const { replayToScenario } = await import('../report.mjs');
+  const script = [{ seat: 'sol', text: 'go to the pond', expect: { kind: 'go', n: 1 } }, { seat: 'sol', text: 'wave' }, { seat: 'sol', text: 'go to the pond', expect: { kind: 'go', n: 2 } }];
+  const replay = { run: 'x', seed: 1, scenario: { name: 'w', director: { mode: 'scripted', script } }, requests: [
+    { seat: 'sol', channel: 'chat', text: 'go to the pond', sendOffsetSec: 20 }, { seat: 'sol', channel: 'chat', text: 'wave', sendOffsetSec: 40 }, { seat: 'sol', channel: 'chat', text: 'go to the pond', sendOffsetSec: 60 }] };
+  const out = replayToScenario(replay).director.script;
+  assert.deepEqual(out.map((e) => e.expect?.n ?? null), [1, null, 2]);
+  assert.equal('expect' in out[1], false);
+});

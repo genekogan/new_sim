@@ -31,7 +31,11 @@ export function buildReplay(run) {
 export function replayToScenario(replay, mode = 'scripted') {
   const base = { ...replay.scenario, seed: replay.seed, replayOf: replay.run, replayMode: mode };
   if (mode === 'live') return base;
-  return { ...base, director: { ...(replay.scenario.director ?? {}), mode: 'scripted', script: replay.requests.map((r) => ({ seat: r.seat, atSec: r.sendOffsetSec, channel: r.channel, text: r.text, budgetSec: r.budgetSec ?? null })) } };
+  // A request's scenario-truth expectation (round 2, review/expect-oracles.mjs) rides along: the k-th request with a seat
+  // and text gets the k-th original script entry's expect, so a scripted replay is scored by the same oracles.
+  const orig = replay.scenario?.director?.script ?? [], seen = new Map();
+  const expectOf = (r) => { const k = `${r.seat}\u0000${r.text}`, n = seen.get(k) ?? 0; seen.set(k, n + 1); return orig.filter((e) => e.seat === r.seat && e.text === r.text)[n]?.expect ?? null; };
+  return { ...base, director: { ...(replay.scenario.director ?? {}), mode: 'scripted', script: replay.requests.map((r) => { const x = expectOf(r); return { seat: r.seat, atSec: r.sendOffsetSec, channel: r.channel, text: r.text, budgetSec: r.budgetSec ?? null, ...(x ? { expect: x } : {}) }; }) } };
 }
 /** Check persona sheets in a personas dir still match the hashes the replay recorded. */
 export function verifyReplay(replay, personaSheets) { return Object.entries(replay.personas).map(([seat, p]) => ({ seat, ok: personaSheets[seat] != null && sha256(personaSheets[seat]) === p.sha256 })); }

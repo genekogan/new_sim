@@ -67,3 +67,13 @@ test('casts: the loader accepts them; a podium cast names a podium the template 
   for (const f of casts) assert.deepEqual(validateCast(read(f)), [], f);
   assert.ok(existsSync(join(REPO, 'worlds/templates/eden-2026.json')));
 });
+
+test('round2.json names the eight slots (nine runs), every file loads and validates', async () => {
+  const { validateRound } = await import('../lib/validate.mjs');
+  const r = read('round2.json');
+  assert.deepEqual(validateRound(r), []);
+  assert.equal(r.runs.length, 9); assert.deepEqual([...new Set(r.runs.map((x) => x.slot))], [1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.deepEqual(r.runs.filter((x) => x.kind === 'direct').map((x) => x.cast), ['casts/podium-eden-hall.json', 'casts/podium-mars-room.json']);
+  assert.ok(r.runs.every((x) => (x.kind === 'direct') === !!x.cast && x.estMin > 0));
+  assert.ok(validateRound({ kind: 'round', runs: [{ label: 'x', scenario: 'nope.json' }] }).some((e) => /not found/.test(e)));
+});
