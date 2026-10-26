@@ -36,6 +36,7 @@ node tools/playtest/playtest.mjs compare <runA> <runB>
 node tools/playtest/playtest.mjs preflight [--server-root dir]
 node tools/playtest/playtest.mjs replay-set [--server-root dir] [--repeats 2] [--out dir] [--baseline dir] [--dry-run] [--score-only] [--only labels]
 node tools/playtest/review/rescore-oracles.mjs <run-dir>… | --all <runs-root>   # oracles.jsonl + metrics.json, no model
+node tools/playtest/playtest.mjs direct <cast.json> [--server-root dir] [--world <url>] [--headless] [--script file] [--only a,b] [--out dir]   # swarm director (director/swarm/)
 ```
 
 `replay-set` replays the frozen set of `team/playtest/ROOT-CAUSES-20261025.md` §E (`review/scorecard.mjs` `FROZEN`) as

@@ -315,6 +315,8 @@ async function main() {
   if (cmd === 'compare') { const m = await loadModules(); if (!m.compare) { log('compare module missing'); process.exit(3); } const c = m.compare.compareRuns(resolve(a._[1]), resolve(a._[2])); console.log(m.compare.compareMd ? m.compare.compareMd(c) : JSON.stringify(c, null, 1)); process.exit(0); }
   if (cmd === 'replay-set') process.exit(await cmdReplaySet(a));
   if (cmd === 'freeze-bundle') process.exit(await cmdFreezeBundle(a));
+  // direct: a swarm-directed session from a cast file (director/swarm/, STATUS-SWARM.md at the worktree root)
+  if (cmd === 'direct') { const { cmdDirect } = await import('./director/swarm/run.mjs'); process.exit(await cmdDirect(a, { log })); }
   if (cmd === 'replay') {
     const src = resolve(a._[1]); const rp = readJson(join(src, 'replay.json')); if (!rp) { log('no replay.json'); process.exit(2); }
     const mode = a.mode ?? 'scripted';
@@ -322,7 +324,7 @@ async function main() {
     const tmp = join(src, `replay-${mode}.scenario.json`); writeJson(tmp, scen);
     process.exit(await cmdRun({ _: ['run', tmp], seed: rp.seed, 'server-root': a['server-root'], out: a.out }));
   }
-  console.log('usage: playtest.mjs run <scenario.json> [--seed n] [--out dir] [--from step] [--server-root dir] [--keep-world] | review <run> | replay <run> --mode scripted|live | compare <a> <b> | preflight | replay-set [--server-root dir] [--repeats 2] [--out dir] [--baseline dir] [--dry-run] [--score-only] [--only labels] [--frozen bundle.json] [--force-machine] | freeze-bundle [--runs-root dir] [--out file]');
+  console.log('usage: playtest.mjs run <scenario.json> [--seed n] [--out dir] [--from step] [--server-root dir] [--keep-world] | review <run> | replay <run> --mode scripted|live | compare <a> <b> | preflight | replay-set [--server-root dir] [--repeats 2] [--out dir] [--baseline dir] [--dry-run] [--score-only] [--only labels] [--frozen bundle.json] [--force-machine] | freeze-bundle [--runs-root dir] [--out file] | direct <cast.json> [--server-root dir] [--world <url>] [--headless] [--script file] [--only a,b] [--out dir] [--no-planner] [--force-machine] [--keep-world]');
   process.exit(1);
 }
 if (import.meta.url === `file://${process.argv[1]}`) main();

@@ -2,6 +2,8 @@
 # One-shot cloud runner: replay the frozen set against a fix branch and commit the results to `playtest-results`.
 #   bash tools/playtest/cloud/run-replay.sh <fix-branch> <out-name> [repeats=1]
 #   PLAYTEST_SCENARIO=tools/playtest/scenarios/<x>.json … runs that one scenario instead of the frozen set.
+#   PLAYTEST_DIRECT=tools/playtest/scenarios/casts/<x>.json … runs that cast as a headless swarm-directed session
+#   (`playtest.mjs direct --headless`; the cast's console script plays the console) instead of the frozen set.
 # Run from a clone of the playtest branch (lane/playtest-20261024). Idempotent: rerunning resumes every step
 # (worktree, install, web build stamp, asset overlay, replay-set receipts, PNG compression, commit). See README.md.
 # Layout beside the clone: ../server (fix branch worktree), ../mars-web (overlay), ../results/<out-name>, ../results-branch.
@@ -86,6 +88,11 @@ elif [ -n "${PLAYTEST_SCENARIO:-}" ]; then
   for i in $(seq 1 "$REPEATS"); do
     step "run-$(basename "$PLAYTEST_SCENARIO" .json)-r$i" node tools/playtest/playtest.mjs run "$PLAYTEST_SCENARIO" --server-root "$SERVER" --out "$OUT/$(basename "$PLAYTEST_SCENARIO" .json)-r$i" || RS_RC=$?
   done
+elif [ -n "${PLAYTEST_DIRECT:-}" ]; then
+  # one directed session per repeat (PLAYTEST_DIRECT=<cast.json>, -r1, -r2 …): verdict in <run>/director/VERDICT.md
+  for i in $(seq 1 "$REPEATS"); do
+    step "direct-$(basename "$PLAYTEST_DIRECT" .json)-r$i" node tools/playtest/playtest.mjs direct "$PLAYTEST_DIRECT" --headless --force-machine --server-root "$SERVER" --out "$OUT/$(basename "$PLAYTEST_DIRECT" .json)-r$i" || RS_RC=$?
+  done
 else
   step replay-set node tools/playtest/playtest.mjs replay-set --server-root "$SERVER" --out "$OUT" --repeats "$REPEATS" --force-machine --frozen tools/playtest/frozen/frozen.json || RS_RC=$?
 fi
@@ -151,5 +158,6 @@ else git -C "$RB" commit -q -m "playtest results $NAME: $FIX @ ${FIX_SHA:0:12}, 
 push() { git -C "$RB" push -q origin playtest-results 2>>"$LOG" || { git -C "$RB" fetch -q --no-tags origin "+refs/heads/playtest-results:refs/remotes/origin/playtest-results" 2>>"$LOG" && git -C "$RB" rebase -q origin/playtest-results 2>>"$LOG"; return 1; }; }
 step push retry push || { say "push failed after retries; results are committed locally in $RB"; exit 4; }
 
+if [ -n "${PLAYTEST_DIRECT:-}" ]; then for v in "$OUT"/*/director/VERDICT.md; do [ -f "$v" ] && say "VERDICT: results/$NAME/${v#"$OUT"/} ($(head -1 "$v"))"; done; fi
 say "SCORECARD: results/$NAME/SCORECARD.md on branch playtest-results ($( [ -f "$OUT/SCORECARD.md" ] && echo present || echo MISSING)); local $OUT/SCORECARD.md"
 exit "$RS_RC"

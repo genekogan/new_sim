@@ -171,3 +171,16 @@ test('the direction log, timeline and state files are written', async () => {
   assert.equal(readJson(join(r.runDir, 'director', 'state.json')).phase, 'done');
   assert.match(readFileSync(join(r.runDir, 'director', 'VERDICT.md'), 'utf8'), /PASS/);
 });
+
+test('story: the session renders as director moments per seat (review/story.mjs reads the run folder as any run)', async () => {
+  const { castToScenario } = await import('../cast.mjs');
+  const { loadRun } = await import('../../../review/run.mjs');
+  const { buildStory } = await import('../../../review/story.mjs');
+  const r = await play();
+  writeJson(join(r.runDir, 'scenario.json'), castToScenario(testCast()));
+  const st = buildStory(loadRun(r.runDir));
+  assert.deepEqual(Object.keys(st.seats).sort(), ['ann', 'bob', 'cy']);
+  const says = st.merged.filter((m) => m.kinds.includes('say'));
+  assert.ok(says.length >= 6, `director moments: ${says.length}`);
+  assert.ok(says.some((m) => /^director: /.test(m.persona.thought ?? '')));
+});
