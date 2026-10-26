@@ -99,7 +99,7 @@ import {WorldEdgeItems} from './WorldEdgeItems.ts';
 import { WorldNavigation, createWorldOrbitControls, type ManualNavigation, type CameraMove } from './WorldNavigation.ts';
 import {WorldPlaceCamera} from './WorldPlaceCamera.ts';
 import { composeVisibleViewport, visibleViewport, type ViewportInsets } from './WorldViewport.ts';
-import { placeWorldLabels, type LabelBox, type LabelOffset } from './WorldLabels.ts';
+import { nameTag, placeWorldLabels, plateAnchor, type LabelBox, type LabelOffset } from './WorldLabels.ts';
 import {projectSpeechAnchors,type SpeechAnchorPoint} from './WorldSpeechAnchors.ts';
 import {paintSpeakingDot} from './dialogue-speaking.ts';
 import {WorldGames} from './WorldGames.ts';
@@ -143,7 +143,7 @@ const HOUR_SECONDS = 3600;
 type Past = { tick: number; playing: boolean; chunks: Chunk[]; extending: boolean; retryAt: number; ended: boolean };
 /** What is on screen, for the panels (written by the frame loop, read on React renders). */
 type Shown = { tick: number; datetime: string | null; take: Take | null; entities: Record<string, SampledEntity> };
-type Label = { obj: CSS2DObject; name: HTMLElement; line: HTMLElement; card: HTMLElement; leader: HTMLElement; offset: LabelOffset; text: string };
+type Label = { obj: CSS2DObject; head: THREE.Vector3; name: HTMLElement; line: HTMLElement; card: HTMLElement; offset: LabelOffset; text: string };  // obj sits under the body (C2); head is where speech anchors
 
 async function fetchChunks(from: number, to: number, limit: number, signal: AbortSignal): Promise<Chunk[]> {
   let out: Chunk[] = [], cursor = from;
@@ -643,19 +643,16 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     // selection marker and stand-in figures (used only if the people models fail)
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.64, 40), new THREE.MeshBasicMaterial({ color: 0xffd34d, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }));
     ring.rotation.x = -Math.PI / 2; ring.visible = false; scene.add(ring);
+    // C2: name plates hang just outside this ring's drawn outer edge (read from the ring itself, never a separate constant)
+    const plateRadius = () => ring.geometry.parameters.outerRadius * ring.scale.x;
+    const screenDown = new THREE.Vector3();
     const standInGeometry = new THREE.CapsuleGeometry(0.22, 1.2, 4, 12), standInMaterial = new THREE.MeshStandardMaterial({ color: 0x5d7f9e, roughness: 0.7 });
     const standIns = new THREE.Group(); scene.add(standIns);
     const labels = new Map<string, Label>();
     const labelFor = (soul: PublicSoul): Label => {
       let l = labels.get(soul.id);
       if (l) return l;
-      const el = document.createElement('div');el.className='world-name-tag';
-      el.style.cssText = 'font:11px/1.25 system-ui,sans-serif;color:#fff;background:rgba(18,20,18,.66);padding:2px 7px 3px;border-radius:5px;text-align:center;white-space:nowrap;pointer-events:auto;cursor:pointer;max-width:260px';
-      const name = document.createElement('b'), line = document.createElement('div'), card = document.createElement('div'), chan = document.createElement('div');
-      line.style.cssText = 'opacity:.85'; card.style.cssText = 'opacity:.7;font-style:italic'; chan.style.cssText = 'display:none;font-size:10px;margin-top:1px;white-space:normal;max-width:240px'; chan.dataset.channelChip = '';
-      const leader = document.createElement('div');
-      leader.style.cssText = 'position:absolute;top:100%;left:50%;width:1px;background:rgba(255,255,255,.45);transform-origin:top;pointer-events:none';
-      el.append(name, line, card, chan, leader);
+      const {el, name, line, card} = nameTag(document);
       el.dataset.soulId = soul.id;
       el.addEventListener('click', e => { e.stopPropagation(); setPlaceCard(null); context.current.setThing(null); context.current.onSelect(soul.id); });
       el.addEventListener('dblclick', e => {
@@ -664,9 +661,9 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         if(point){navigation?.release();context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');rts.frameSubject(new THREE.Vector3(point[0],point[1]+1,point[2]),1);}
       });
       const obj = new CSS2DObject(el);
-      obj.center.set(0.5, 1);
+      obj.center.set(0.5, 0);  // C2: the plate hangs below its anchor under the body
       labelScene.add(obj);
-      l = { obj, name, line, card, leader, offset: {dx:0,dy:0}, text: '' };
+      l = { obj, head: new THREE.Vector3(), name, line, card, offset: {dx:0,dy:0}, text: '' };
       labels.set(soul.id, l);
       return l;
     };
@@ -850,6 +847,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       const cards = refresh ? cardsAt(s.plays, at.tick) : null;
       const alive = new Set<string>();
       let focus: THREE.Vector3 | null = null;
+      screenDown.setFromMatrixColumn(camera.matrixWorld, 1).negate();
+      const ringR = plateRadius(), eye = camera.position, down = {x: screenDown.x, z: screenDown.z};
       for (const soul of souls) {
         const pos = at.entities[soul.entityId]?.p, rec = records[soul.entityId];
         if (!pos || fadedOut.has(soul.id)) continue;   // DLG1: a faded (absent) Soul has no name tag or speech anchor
@@ -858,7 +857,9 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         const lift = drawnBody?.family === 'floater' ? (() => { const b = floaterBody(drawnBody); return b.hoverHeight + b.radius + 0.15; })() : 2.05;
         if(refresh&&!eyes&&!soul.profilePhoto)portraits.capture(soul.id,JSON.stringify([drawnBody,soul.entityId]),people?.bodyObject(soul.entityId)??floaters.object(soul.entityId)??standIns.getObjectByName(soul.entityId)??null,drawnBody?.family==='floater',now);
         const l = labelFor(soul);
-        l.obj.position.set(pos[0], pos[1] + lift, pos[2]);
+        l.head.set(pos[0], pos[1] + lift, pos[2]);
+        const plate = plateAnchor(pos, eye, down, ringR);  // ground point (lying sleepers too), at the ring's near edge
+        l.obj.position.set(plate[0], markHeight(waterDetail.regions, plate[0], plate[1], plate[2]) + 0.03, plate[2]);
         l.obj.visible = true;
         if (cards) {
           const activity = at.entities[soul.entityId]?.activity;
@@ -886,7 +887,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         for(const sp of speeches)if(now-sp.at<8000&&(!latest.get(sp.speaker)||latest.get(sp.speaker)!.at<sp.at))latest.set(sp.speaker,sp);
         for(const [id,l] of labels){
           // DLG2: in dock mode the dialogue dock carries the words and who can hear; the tag only gets a small speaking dot.
-          paintSpeakingDot(l.obj.element as HTMLElement,id,context.current.publishSpeechAnchors,performance.now(),camera.position.distanceTo(l.obj.position));
+          paintSpeakingDot(l.obj.element as HTMLElement,id,context.current.publishSpeechAnchors,performance.now(),camera.position.distanceTo(l.head));
           const chip=l.obj.element.querySelector('[data-channel-chip]') as HTMLElement|null;if(!chip)continue;const sp=latest.get(id);
           if(!sp||context.current.publishSpeechAnchors){chip.style.display='none';continue;}const c=channelChip(sp,nameOf);chip.textContent=c.text;chip.style.color=c.colour;chip.style.display='';}}
       speechLayer.update(speeches,Date.now(),soulId=>{const id=s.conn.replica.souls.get(soulId)?.entityId,e=id?at.entities[id]:null;if(!id||!e)return null;const body=recordedBody(records[id]?.body,e.state),b=body?.family==='floater'?floaterBody(body):null;return speechHead.set(e.p[0],e.p[1]+(b?b.hoverHeight+b.radius+.05:1.95),e.p[2]).clone();});
@@ -1023,8 +1024,6 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         el.style.visibility=offset?'visible':'hidden';
         if(!offset) continue;
         l.offset=offset; el.style.translate=`${offset.dx}px ${offset.dy}px`;
-        l.leader.style.height=`${Math.hypot(offset.dx,offset.dy)}px`;
-        l.leader.style.transform=`rotate(${Math.atan2(offset.dx,-offset.dy)}rad)`;
       }
       // P1: a new world prepares its first frame once its layer is built (layerStarted): before, a gate whose takes and
       // assets were in hand finished while the layer still loaded its snapshot, so the card went, showed bare ground, and came back
@@ -1046,7 +1045,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           const label=labels.get(soul.id),rec=records[soul.entityId];
           if(!at.take||!at.entities[soul.entityId]||!label?.obj.visible||rec?.kind!=='human')return [];
           const rendered=!!floaters.object(soul.entityId)||!!people?.bodyObject(soul.entityId)||!!standIns.getObjectByName(soul.entityId);
-          return [{soulId:soul.id,point:label.obj.position.toArray() as [number,number,number],rendered}];
+          return [{soulId:soul.id,point:label.head.toArray() as [number,number,number],rendered}];
         }):[];
         let speechAnchors:ReturnType<typeof projectSpeechAnchors>|undefined;
         if(context.current.publishSpeechAnchors&&(!points.length||(initialGate&&(['waiting','downloading','preparing','first-frame'].includes(initialGate.snapshot().stage)||(!arrivalCardDone&&performance.now()<20_000)))))speechAnchors=[];  // F12: none under the arrival card, its ready frame included (that pass held /w/eden's card ~0.15 s at 4x after initial-ready) (the visibility pass cost /w/eden ~0.3 s at 4x before its card). P1: nobody to place: skip the visibility pass over every mesh (~1 ms a frame on Eden 2026)
