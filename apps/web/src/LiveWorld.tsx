@@ -27,6 +27,7 @@ import {SpectatorSpeechLayer,speechFromTalk,speechFromEdge,channelChip,type Spec
 import {WorldFadingLayer,parseFadeOverride,fadingFromEdge,beamedOut,type FadingState} from './WorldFading.ts';
 import {renderEyes,renderOverhead,renderMap} from './WorldSnapshots.ts';
 import {conversationAttention,WorldIdleLife,type IdleSoul} from './WorldIdleLife.ts';
+import {WorldBodyPoses,bodyLabel} from './WorldBodyState.ts';
 import {WorldBalloonRide,parseRideOverride,previewState} from './WorldBalloonRide.ts';
 import {WorldRideCars} from './WorldRideCars.ts';
 import {recordedCarriers,carrierPoses} from './ride-carriers.ts';
@@ -350,7 +351,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const portraits=new WorldSoulAvatars(renderer);
     const seatSurvey=new URLSearchParams(location.search).get('survey')==='seats'?{done:false,since:null as number|null}:null;
     const waterDetail=new WorldWaterDetail(()=>!!reducedMotionQuery?.matches,()=>quality.tier==='phone'),waterDetailOff=new URLSearchParams(location.search).get('water')==='0';  // ?water=0: before/after comparisons
-    waterDetail.boats=AFLOAT;(window as unknown as {__simWater?:unknown}).__simWater=waterDetail.stats;    const idleLife=new WorldIdleLife();const idleSouls:IdleSoul[]=[];let attentionTargets=new Map<string,readonly string[]>();
+    waterDetail.boats=AFLOAT;(window as unknown as {__simWater?:unknown}).__simWater=waterDetail.stats;    const idleLife=new WorldIdleLife();const bodyPoses=new WorldBodyPoses();const idleSouls:IdleSoul[]=[];let attentionTargets=new Map<string,readonly string[]>();
     const edgeItems=new WorldEdgeItems(apiPath('/v1/edge/items'));scene.add(edgeItems.group);edgeItems.start(abort.signal);  // things lying around (together/1)
     const early=newWorld?takeEarlyLayer():null;if(early)abort.signal.addEventListener('abort',()=>early.abort.abort());const entityLayer=early?.layer??new WorldEntityLayer(apiPath);entityLayerRef.current=entityLayer;  // P7b: a phone's layer may have started before this page's code was in (early-layer.ts)
     scene.add(entityLayer.group);let entityWorldFramed=false,rideNames:string[]|null=null,rideNamesAt=0,rideCarriers:CarrierPose[]=[],rideCars:string[]=[],carrierIds:string[]=[];
@@ -869,12 +870,13 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         l.obj.visible = true;
         if (cards) {
           const activity = at.entities[soul.entityId]?.activity;
-          const doing = past.current ? activityWords(activity,soul.id) : doingText(soul.doing,activity,soul.id);
+          const away = past.current ? null : bodyLabel(soul.body);   // LINK: "Asleep" / "Zombie" over a body whose agent is away
+          const doing = past.current ? activityWords(activity,soul.id) : away ?? doingText(soul.doing,activity,soul.id);
           const card = cardText(cards.get(soul.id));
           const text = `${soul.name}|${doing}|${card}|${soul.id === soulId||groupSelection.has(soul.id)}`;
           if (text !== l.text) {
             l.text = text; l.name.textContent = soul.name; l.line.textContent = clip(doing, 48); l.card.textContent = clip(card, 48);
-            l.line.style.display = doing && soul.id===soulId ? '' : 'none'; l.card.style.display = card && soul.id===soulId ? '' : 'none';
+            l.line.style.display = doing && (soul.id===soulId||!!away) ? '' : 'none'; l.card.style.display = card && soul.id===soulId ? '' : 'none';
             (l.obj.element as HTMLElement).style.outline = soul.id === soulId||groupSelection.has(soul.id) ? '2px solid #ffd34d' : 'none';
           }
         }
@@ -991,6 +993,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         idleSouls.push({id:soul.id,root:people?.bodyObject(soul.entityId)??null,p:e.p,yaw:e.yaw??0,activity:String(e.activity??'idle'),speaking:speeches.some(sp=>sp.speaker===soul.id&&nowMs-sp.at<4000),attention:attentionTargets.get(soul.id)});}}
       if(refresh)idleLife.forget(new Set(idleSouls.map(s=>s.id)));
       idleLife.apply(idleSouls,atmosphereSeconds,step,!!reducedMotionQuery?.matches);
+      bodyPoses.apply(idleSouls.map(x=>({...x,body:s.conn.replica.souls.get(x.id)?.body})),atmosphereSeconds,!!reducedMotionQuery?.matches);  // LINK: zombie arms/lurch, floating sleepers
       if(seatSurvey&&!seatSurvey.done&&sceneSettled&&(!initialGate||initialGate.snapshot().stage==='ready')&&(seatSurvey.since??=now)<now-12000){seatSurvey.done=true;try{const seats=findSeats(scene),solids=scene.children.filter(o=>o!==people?.group&&!o.name.startsWith('atmosphere'));(window as unknown as {__simSeatSurvey?:unknown}).__simSeatSurvey=surveySeats(seats,solids,(x,z)=>cameraGround.heightAt(scene,x,z));}catch(e){(window as unknown as {__simSeatSurvey?:unknown}).__simSeatSurvey={error:String(e)};}}  // W8 ?survey=seats
       if(!waterDetailOff)try{waterDetail.update(scene,camera,idleSouls,shown.current.take?shown.current.tick*dt:atmosphereSeconds,light.daylight,undefined,soulId=>{const e=s.conn.replica.souls.get(soulId)?.entityId;return e?floaters.object(e)??standIns.getObjectByName(e)??null:null;});}catch{}  // W11: ripples, glitter, underwater fade (render-time only)
       people?.setSpeaking(new Set(idleSouls.flatMap(x=>{const id=x.speaking?s.conn.replica.souls.get(x.id)?.entityId:undefined;return id?[id]:[];})));  // speakers talk with their hands (library clips)
@@ -1009,6 +1012,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(holdDraw){/* nothing to show yet */}else{if(batchEnabled)staticBatches.withRender(draw);else draw();if(afterNextDraw){const f=afterNextDraw;afterNextDraw=null;f();}if(posterFrames<2&&earlyPosterShown()&&mount.current?.style.visibility==='visible'&&!mount.current.parentElement?.querySelector('.world-initial-loading')&&++posterFrames===2)requestAnimationFrame(removeEarlyPoster);/* P7d: the early renderer's poster goes once two frames of ours are on screen under it */if(earlyPending&&mount.current?.style.visibility==='visible'&&!mount.current.parentElement?.querySelector('.world-initial-loading')&&--earlyPending===0)requestAnimationFrame(()=>{if(!abort.signal.aborted)earlyArrival.mark();});}  // P7 fix: two frames drawn with nothing covering the canvas, then the next frame (the second is on screen) lifts the card
       shadowDetail?.restore();
       waterDetail.restoreUnderwater();
+      bodyPoses.restore();
       idleLife.restore();
       fading.restore();
       balloonRide.restore();

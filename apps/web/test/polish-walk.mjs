@@ -86,9 +86,8 @@ try{
   await page.locator('.gp-copy').click();
   if(phase==='after'){
    await page.getByRole('status').filter({hasText:'Press ⌘C'}).waitFor();assert.match(await page.getByLabel('Text to copy').evaluate(e=>e.value.slice(e.selectionStart,e.selectionEnd)),/God mode section/);
-   await page.getByText('Connect or re-pair your agent',{exact:true}).click();await page.getByRole('button',{name:'Copy prompt',exact:true}).click();
-   assert.match(await page.getByLabel('Connection setup prompt').evaluate(e=>e.value.slice(e.selectionStart,e.selectionEnd)),/pair-soul/);
-   report.checks.push({name:'pairing and connection copy denial selects text and shows manual hint',result:true});
+   // LINK 2026-10-24: the Agent access panel (AgentConnection) is gone; its start prompt lives on the Soul card's Reconnect box
+   report.checks.push({name:'pairing copy denial selects text and shows manual hint',result:true});
   }
   await page.screenshot({path:`${out}/${phase}-pairing-denied.png`});
   const names=['mars-college-2026','mars-college-2026-2','mars-college-2026-3'];

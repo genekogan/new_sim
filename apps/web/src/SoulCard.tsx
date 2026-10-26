@@ -1,35 +1,25 @@
 import {SoulAvatar} from './MySouls.tsx';
 import {useEffect,useRef,useState} from 'react';
-import type {PlayView,PublicSoul,TalkLine} from '@sim/protocol';
+import type {PublicSoul} from '@sim/protocol';
 import type {Api} from './useSim.ts';
 import {PUBLIC_SOUL_PATH,readPublicRecord,type PublicRecord} from './public-soul-record.ts';
-import {publicSoulActivity} from './PublicSoulActivity.tsx';
 import {publicSoulLink} from './soul-link.ts';
-import {worldPath} from './world-path.ts';
+import {apiPath,worldPath} from './world-path.ts';
 import {BASE} from './base-path.ts';
 import './SoulCard.css';
-import {SoulAgentMessageBox} from './AgentMessageBox.tsx';
+import {SoulMessageBox,soulStartPrompt,useSoulInbox,useWindowCode,type AgentInbox} from './AgentMessageBox.tsx';
 import {VisitorFrom} from './SoulTravel.tsx';
-import {soulPresenceChip,useAgentPresence} from './agent-presence.ts';
+import {clockAt,clockTitle,useAgentPresence,type AgentHere} from './agent-presence.ts';
+import {ApprovalCard} from './god-ui/ApprovalDialog.tsx';
+import {WAITING_PROMPT_MS,ageText,bodyPhrase,bodyWord,holderLine,newest,ownerLink,placeOf,readBody,readNow,reconnectSentence,visitorPhrase,type Body,type Link,type Now} from './soul-state.ts';
 
-/** UI2 (Gene: "it looks like a markdown file"): the selected Soul as a compact card. Name, character, a status
- * dot, what it is doing, Share. Everything else (last action, recent actions/events, public activity) sits in a
- * secondary Activity view. All record text is untrusted and rendered as text only. */
-const FADE:Record<string,{word:string;colour:string}>={green:{word:'Active',colour:'#2e9d4f'},yellow:{word:'Fading',colour:'#d6a700'},red:{word:'Nearly gone',colour:'#c2372b'},gone:{word:'Gone',colour:'#9a9a92'}};
+/** LINK (spec SOUL-LINK r3 §4, canvas v5): one Soul card, one frame, the status line changes shape.
+ * Owner: Connected (link details inline, the agent's `now`, message box + receipt, Follow) · Disconnected (the body as a
+ * zombie or asleep, the last `now` dimmed, the Reconnect box as the primary element; just approved: waiting for the agent)
+ * · Pairing (the card is the approval). Visitor: Awake / Zombie / Asleep, place, `now`, Follow.
+ * Never two of {message box, Reconnect box, Approve} at once. All server text is untrusted and rendered as text only. */
 type Rec=PublicRecord|'loading'|'unavailable';
-function ago(at:number|string|null|undefined){if(at==null)return null;const t=typeof at==='number'?at:Date.parse(at);if(!Number.isFinite(t))return null;const m=Math.round((Date.now()-t)/60000);return m<1?'just now':m<60?`${m} min ago`:`${Math.round(m/60)} h ago`;}
-const plain=(s:string|undefined)=>(s??'').replace(/[-_]+/g,' ').trim();
-/** "walk:commons" → "Walk · commons" (labels from the record win). */
-const actionText=(x:{label?:string;capability?:string})=>{if(x.label)return x.label;const [verb,...rest]=(x.capability??'').split(':');const v=plain(verb);return (v?v[0].toUpperCase()+v.slice(1):'Action')+(rest.length?' · '+plain(rest.join(' ')):'');};
-function eventText(e:PublicRecord['events'][number]){
- switch(e.kind){
-  case 'arrival':return `${e.soul?.name??'Someone'} arrived`;
-  case 'departure':return `${e.soul?.name??'Someone'} left`;
-  case 'speech':return `${e.from?.name??'Someone'}: “${e.text??''}”`;
-  case 'receipt':return 'Action update';
-  default:return e.text??plain(e.kind);
- }
-}
+type Camera={following:boolean;follow():void;stop():void};
 
 function usePublicRecord(api:Api,soulId:string):Rec{
  const [rec,setRec]=useState<Rec>('loading');
@@ -41,24 +31,80 @@ function usePublicRecord(api:Api,soulId:string):Rec{
   void read();return()=>{live=false;clearTimeout(timer);};},[api,soulId]);
  return rec;
 }
+/** The fade colour of an older server, as a body (green = present and awake); nothing new reads `fade` otherwise. */
+const fadeBody=(rec:PublicRecord|null):Body|null=>rec?.fade&&['green','yellow','red'].includes(rec.fade.colour)?{state:'awake',doing:null,since:0}:null;
 
-export function SoulCard({api,soul,doing,energy,plays,talk,camera,ownerAction}:{api:Api;soul:PublicSoul;doing:string;energy:string|null;plays:readonly PlayView[];talk:readonly TalkLine[];camera?:{following:boolean;follow():void;stop():void};ownerAction?:()=>void}){
- const rec=usePublicRecord(api,soul.id);
- // AWAY-UI: the owner's card drops Follow while the agent is away (still offered to stop a follow already on)
- const here=useAgentPresence(ownerAction?soul.id:null),agentAway=!!here?.away;
- // PRESENCE (SOUL3): the owner's card says whether its agent is listening (only the owner's own inbox read feeds it)
- const chip=ownerAction?soulPresenceChip(here):null;
- const [view,setView]=useState<'card'|'activity'>('card');
+export type SoulCardProps={api:Api;soul:PublicSoul;owner:boolean;signedIn?:boolean;bodyEvent?:Body|null;camera?:Camera};
+export function SoulCard(props:SoulCardProps){
+ const rec=usePublicRecord(props.api,props.soul.id),r=rec==='loading'||rec==='unavailable'?null:rec;
+ // COMMON-LINK §2 addendum: the replica's `now` is optional (present only when set); the record always carries it (or null)
+ const x=props.soul as PublicSoul&{body?:unknown;now?:unknown};
+ const body=newest(readBody(x.body),r?.body??null,props.bodyEvent??null)??fadeBody(r);
+ const now=newest(readNow(x.now),r?.now??null);
+ const place=placeOf(r?.self?.placePath);
+ return props.owner?<OwnerCard {...props} body={body} now={now} place={place}/>:<SoulCardView soul={props.soul} view="visitor" body={body} now={now} place={place} camera={props.camera}/>;
+}
+function OwnerCard({api,soul,camera,signedIn=true,body,now,place}:SoulCardProps&{body:Body|null;now:Now|null;place:string|null}){
+ const {inbox,send}=useSoulInbox(api,soul.id),here=useAgentPresence(soul.id),code=useWindowCode();
+ const link=ownerLink(here?.link??null,here);
+ const disconnect=async()=>{const r=await api(`/v1/souls/${encodeURIComponent(soul.id)}/revoke`,{});return r.status===200&&r.data?.ok===true;};
+ return <SoulCardView soul={soul} view="owner" link={link} here={here} inbox={inbox} send={send} body={body} now={newest(now,readNow(inbox?.now))} place={place}
+  prompt={soulStartPrompt(location.origin+apiPath(''),soul.id,soul.name,code)} camera={camera} signedIn={signedIn} disconnect={disconnect}/>;
+}
+
+export type SoulCardViewProps={soul:PublicSoul;view:'owner'|'visitor';body:Body|null;now:Now|null;place:string|null;camera?:Camera;
+ /** owner only: the one state (null = not known yet), presence, inbox, the start prompt, Disconnect */
+ link?:Link|null;here?:AgentHere|null;inbox?:AgentInbox|null;send?(text:string):Promise<unknown>;prompt?:string;signedIn?:boolean;disconnect?():Promise<boolean>;
+ /** fixtures and shots: a fixed clock, the link details (and Pair another session) open from the start */
+ clock?:number;open?:{details?:boolean;pair?:boolean}};
+export function SoulCardView({soul,view,body,now,place,camera,link=null,here=null,inbox=null,send,prompt='',signedIn=true,disconnect,clock,open}:SoulCardViewProps){
+ const t=clock??Date.now();
  const [copied,setCopied]=useState<''|'ok'|'failed'>('');
+ const [details,setDetails]=useState(!!open?.details);
  const title=useRef<HTMLHeadingElement>(null),alive=useRef(true);
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
- useEffect(()=>{setView('card');setCopied('');},[soul.id]);
- useEffect(()=>{if(view==='card'&&title.current?.offsetParent)title.current.focus({preventScroll:true});},[soul.id,view]);
- useEffect(()=>{if(!copied)return;const t=setTimeout(()=>setCopied(''),2200);return()=>clearTimeout(t);},[copied]);
+ useEffect(()=>{setCopied('');},[soul.id]);
+ useEffect(()=>{if(title.current?.offsetParent)title.current.focus({preventScroll:true});},[soul.id]);
+ useEffect(()=>{if(!copied)return;const k=setTimeout(()=>setCopied(''),2200);return()=>clearTimeout(k);},[copied]);
+ // the waiting variant offers the prompt after a minute: re-render once then
+ const [,tick]=useState(0);
+ const waitingSince=view==='owner'&&link?.reason==='approved-waiting'?link.since:null;
+ useEffect(()=>{if(waitingSince==null)return;const left=waitingSince+WAITING_PROMPT_MS-Date.now();if(left<=0)return;const k=setTimeout(()=>tick(n=>n+1),left+50);return()=>clearTimeout(k);},[waitingSince]);
  const share=async()=>{try{await navigator.clipboard.writeText(publicSoulLink(location.origin,worldPath,soul.id,BASE));if(alive.current)setCopied('ok');}catch{if(alive.current)setCopied('failed');}};
- const fade=rec!=='loading'&&rec!=='unavailable'&&rec.fade?FADE[rec.fade.colour]??null:null;
- if(view==='activity')return <SoulActivity soul={soul} rec={rec} plays={plays} talk={talk} back={()=>setView('card')}/>;
- return <article className="soul-card" aria-labelledby="soul-card-name" data-agent-away={agentAway?'1':undefined}>
+
+ // Pairing: the card is the approval (nothing else on it)
+ if(view==='owner'&&link?.state==='pairing'){
+  return <article className="soul-card" aria-label={`${soul.name}, pairing`} data-soul-state="pairing">
+   {link.approvalId?<ApprovalCard key={link.approvalId} id={link.approvalId} signedIn={signedIn} embedded onDone={()=>{}}/>
+    :<><Head soul={soul} title={title} share={share} copied={copied}/><p className="soul-meta"><span className="soul-status" data-status="pairing"><i aria-hidden="true"/>Pairing</span><StatusPlace text="waiting for your answer"/></p></>}
+  </article>;
+ }
+ const owner=view==='owner',connected=owner&&link?.state==='connected',disconnected=owner&&link?.state==='disconnected';
+ const waiting=disconnected&&link!.reason==='approved-waiting'&&body?.state!=='zombie'&&body?.state!=='asleep';
+ const sleeping=owner?disconnected:body?.state==='zombie'||body?.state==='asleep';
+ const state=!owner?(body?.state??'unknown'):link?(waiting?'approved-waiting':link.state):'checking';
+ const followShown=camera&&(owner?connected||camera.following:true);
+ return <article className="soul-card" aria-labelledby="soul-card-name" data-soul-state={state} data-body={body?.state} data-sleeping={sleeping?'1':undefined}>
+  <Head soul={soul} title={title} share={share} copied={copied}/>
+  <p className="soul-meta">
+   {owner?<OwnerStatus link={link} waiting={waiting} details={details} toggle={()=>setDetails(v=>!v)}/>:<VisitorStatus body={body}/>}
+   <StatusPlace text={!owner?visitorPhrase(body,place,t):waiting?(link?.since&&t-link.since<WAITING_PROMPT_MS?'approved just now':'approved'):disconnected&&!body?(link?.since?`since ${clockAt(link.since,t)}`:''):bodyPhrase(body,place,t)} title={body?.since?clockTitle(body.since):undefined}/>
+   <VisitorFrom soulId={soul.id}/>
+  </p>
+  {connected&&details&&<LinkDetails name={soul.name} link={link!} here={here} prompt={prompt} disconnect={disconnect} clock={t} pairOpen={!!open?.pair}/>}
+  {now&&<p className={'soul-now'+(sleeping?' soul-now-dim':'')} data-now="1"><q>{now.text}</q>{now.at>0&&<span className="soul-dim" title={clockTitle(now.at)}> · {ageText(now.at,t)}</span>}</p>}
+  {waiting&&<WaitingNote name={soul.name} place={place} since={link!.since} prompt={prompt} clock={t}/>}
+  {disconnected&&!waiting&&<ReconnectBox name={soul.name} link={link!} prompt={prompt} clock={t}/>}
+  <div className="soul-card-thread" data-soul-thread={soul.id}/>
+  {connected&&send&&<SoulMessageBox inbox={inbox} send={send}/>}
+  {followShown&&<div className="soul-actions">
+   <button className={camera.following?'soul-follow on':'soul-follow'} aria-pressed={camera.following} title={camera.following?'Stop following':'Keep the camera on this Soul'} onClick={camera.following?camera.stop:camera.follow}><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.6" fill="currentColor"/><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.4"/></svg>{camera.following?'Following':'Follow'}</button>
+  </div>}
+ </article>;
+}
+
+function Head({soul,title,share,copied}:{soul:PublicSoul;title:React.RefObject<HTMLHeadingElement|null>;share():void;copied:string}){
+ return <>
   <div className="soul-card-portrait"><SoulAvatar soul={soul}/></div>
   <div className="soul-card-head">
    <h1 id="soul-card-name" ref={title} tabIndex={-1} title={soul.name}>{soul.name}</h1>
@@ -67,44 +113,59 @@ export function SoulCard({api,soul,doing,energy,plays,talk,camera,ownerAction}:{
    <span className="soul-copied" role="status" aria-live="polite">{copied==='ok'?'Link copied':copied==='failed'?'Copy unavailable':''}</span>
   </div>
   {soul.description&&<p className="soul-character">{soul.description}</p>}
-  <p className="soul-meta">
-   {fade&&<span className="soul-status"><i style={{background:fade.colour}} aria-hidden="true"/>{fade.word}</span>}
-   {doing&&<span className="soul-doing">{doing}</span>}
-   {energy&&<span className="soul-energy">{energy}</span>}
-   <VisitorFrom soulId={soul.id}/>
-   {chip&&<span className="soul-agent" data-agent-state={chip.state} title={chip.title}><i aria-hidden="true"/>{chip.text}</span>}
-  </p>
-  <div className="soul-card-thread" data-soul-thread={soul.id}/>
-  {ownerAction&&<SoulAgentMessageBox api={api} soulId={soul.id} name={soul.name}/>}
-  <div className="soul-actions">
-   {ownerAction&&<button onClick={ownerAction}>This mind</button>}
-   {camera&&(!agentAway||camera.following)&&<button className={camera.following?'soul-follow on':'soul-follow'} aria-pressed={camera.following} title={camera.following?'Stop following':'Keep the camera on this Soul'} onClick={camera.following?camera.stop:camera.follow}><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.6" fill="currentColor"/><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.4"/></svg>{camera.following?'Following':'Follow'}</button>}
-   <button className="soul-more" onClick={()=>setView('activity')}>Activity<span aria-hidden="true">›</span></button>
-  </div>
- </article>;
+ </>;
 }
-
-function SoulActivity({soul,rec,plays,talk,back}:{soul:PublicSoul;rec:Rec;plays:readonly PlayView[];talk:readonly TalkLine[];back():void}){
- const heading=useRef<HTMLHeadingElement>(null);
- useEffect(()=>{heading.current?.focus({preventScroll:true});},[]);
- const r=rec!=='loading'&&rec!=='unavailable'?rec:null,rows=publicSoulActivity(soul.id,plays,talk);
- const where=r?.self?[plain(r.self.state),r.self.placePath?.map(p=>p.name).filter(Boolean)[0]].filter(Boolean).join(' · '):'';
- const last=r?.receipts[0],lastAgo=ago(r?.lastAcceptedAt);
- const empty=!where&&!last&&!lastAgo&&!(r?.receipts.length)&&!(r?.events.length)&&!rows.length;
- return <article className="soul-card soul-activity" aria-labelledby="soul-activity-title">
-  <button className="soul-back" onClick={back} title={soul.name}><span aria-hidden="true">‹</span><span className="soul-back-name">{soul.name}</span></button>
-  <h2 id="soul-activity-title" ref={heading} tabIndex={-1}>Activity</h2>
-  {(where||lastAgo||last)&&<dl className="soul-facts">
-   {where&&<><dt>Now</dt><dd>{where}</dd></>}
-   {(lastAgo||last)&&<><dt>Last action</dt><dd>{[last?actionText(last):null,lastAgo].filter(Boolean).join(' · ')}</dd></>}
-  </dl>}
-  {r&&r.receipts.length>0&&<section className="soul-list-block" aria-label="Recent actions"><h3>Recent actions</h3>
-   <ol>{r.receipts.map(x=><li key={x.id}>{actionText(x)}<span className="soul-dim"> · {x.phase}{x.code?` (${x.code})`:''}</span></li>)}</ol></section>}
-  {r&&r.events.length>0&&<section className="soul-list-block" aria-label="Recent events"><h3>Recent events</h3>
-   <ol>{r.events.slice(-8).reverse().map(e=><li key={e.id}>{eventText(e)}</li>)}</ol></section>}
-  {rows.length>0&&<section className="soul-list-block" aria-label="Recent public activity"><h3>Recent public activity</h3>
-   <ol>{rows.map(x=><li key={x.key}><b>{x.title}</b> {x.detail}</li>)}</ol></section>}
-  {empty&&<p className="soul-dim">{rec==='loading'?'Loading…':'Nothing recorded yet.'}</p>}
-  {(r?.events.length||rows.length)?<p className="soul-fine">Names and words are written by other people’s agents.</p>:null}
- </article>;
+/** A small chevron (a text ▾ reads as a second dot next to the · separator at 13 px). */
+const Chevron=({up,right}:{up:boolean;right?:boolean})=><svg className="soul-caret" data-caret={up?'up':right?'right':'down'} viewBox="0 0 10 10" aria-hidden="true"><path d={up?'M2 6.5 5 3.5 8 6.5':right?'M3.5 2 6.5 5 3.5 8':'M2 3.5 5 6.5 8 3.5'} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+const StatusPlace=({text,title}:{text:string;title?:string})=>text?<span className="soul-place" title={title}><span className="soul-sep" aria-hidden="true"> · </span>{text}</span>:null;
+function OwnerStatus({link,waiting,details,toggle}:{link:Link|null;waiting:boolean;details:boolean;toggle():void}){
+ if(!link)return <span className="soul-status" data-status="checking"><i aria-hidden="true"/>Checking…</span>;
+ if(link.state==='connected')return <button type="button" className="soul-status soul-link" data-status="connected" aria-expanded={details} aria-controls="soul-link-details" title="Link details" onClick={toggle}><i aria-hidden="true"/>Connected<Chevron up={details}/></button>;
+ return <span className="soul-status" data-status={waiting?'approved-waiting':'disconnected'}><i aria-hidden="true"/>Disconnected</span>;
+}
+function VisitorStatus({body}:{body:Body|null}){
+ const word=bodyWord(body);
+ return word?<span className="soul-status" data-status={word.toLowerCase()}><i aria-hidden="true"/>{word}</span>:null;
+}
+function useCopy(text:string){
+ const [state,setState]=useState<''|'ok'|'failed'>('');
+ useEffect(()=>{if(!state)return;const k=setTimeout(()=>setState(''),2000);return()=>clearTimeout(k);},[state]);
+ return [state,async()=>{try{await navigator.clipboard.writeText(text);setState('ok');}catch{setState('failed');}}] as const;
+}
+function PromptCopy({prompt}:{prompt:string}){
+ const [state,copy]=useCopy(prompt);
+ return <><p className="soul-prompt" aria-label="Start prompt">{prompt}</p>
+  <button type="button" className="soul-pill fill" onClick={()=>void copy()}>{state==='ok'?'Copied':'Copy prompt'}</button>
+  {state==='failed'&&<span className="soul-dim" role="status"> Copy unavailable: select the prompt above.</span>}</>;
+}
+function LinkDetails({name,link,here,prompt,disconnect,clock,pairOpen}:{name:string;link:Link;here:AgentHere|null;prompt:string;disconnect?():Promise<boolean>;clock:number;pairOpen:boolean}){
+ const [pair,setPair]=useState(pairOpen),[busy,setBusy]=useState(false),[note,setNote]=useState('');
+ const off=async()=>{if(!disconnect||busy)return;setBusy(true);setNote('');
+  try{setNote(await disconnect()?`Disconnected. ${name} stays where it is.`:'Not confirmed. Check again in a moment.');}catch{setNote('Not confirmed. Check again in a moment.');}finally{setBusy(false);}};
+ return <div className="soul-box" id="soul-link-details" data-link-details="1">
+  <p className="soul-box-title">Held by your agent</p>
+  <p className="soul-dim soul-box-line">{holderLine(link,here,clock)}</p>
+  <div className="soul-box-actions">
+   <button type="button" className="soul-pill" disabled={busy} onClick={()=>void off()}>Disconnect</button>
+   <button type="button" className="soul-pill quiet" aria-expanded={pair} onClick={()=>setPair(v=>!v)}>Pair another session<Chevron up={pair} right={!pair}/></button>
+  </div>
+  {pair&&<><p className="soul-box-text">Give this to the agent that should take over. Its request shows up here; approving it disconnects the current one.</p><PromptCopy prompt={prompt}/></>}
+  {note&&<p className="soul-box-text" role="status">{note}</p>}
+ </div>;
+}
+function ReconnectBox({name,link,prompt,clock}:{name:string;link:Link;prompt:string;clock:number}){
+ const sentence=link.reason==='approved-waiting'?`The agent never started listening. Give it this prompt; its request shows up here for you to approve, and ${name} wakes up.`:reconnectSentence(name,link,clock);
+ return <div className="soul-box soul-reconnect" data-reconnect="1">
+  <p className="soul-box-title">Reconnect</p>
+  <p className="soul-box-text">{sentence}</p>
+  <PromptCopy prompt={prompt}/>
+ </div>;
+}
+function WaitingNote({name,place,since,prompt,clock}:{name:string;place:string|null;since:number|null;prompt:string;clock:number}){
+ const [state,copy]=useCopy(prompt);
+ const late=since==null||clock-since>=WAITING_PROMPT_MS;
+ return <div className="soul-waiting" data-waiting="1">
+  <p className="soul-box-text">{name} is standing {place?`at ${place}`:'at the arrival point'}. Waiting for the agent to start listening…</p>
+  {late&&<p className="soul-dim soul-box-text">Still here after a minute? Tell the agent to continue, or <button type="button" className="soul-pill small" onClick={()=>void copy()}>{state==='ok'?'copied':'copy the prompt'}</button> again.</p>}
+ </div>;
 }

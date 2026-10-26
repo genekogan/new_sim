@@ -41,7 +41,7 @@ test('an ignored invitation expires after 2 minutes and the inviter hears invite
 });
 
 test('faded Souls cannot be invited or hear; a pending invite to one expires at the next sweep; roster for viewers', async () => {
-  const {f, seen} = pair({fading: true, conversationTimeoutMs: 3 * 3600_000, inviteTimeoutMs: 3 * 3600_000});  // isolate fading from timeouts
+  const {f, seen} = pair({fading: true, beam: true, conversationTimeoutMs: 3 * 3600_000, inviteTimeoutMs: 3 * 3600_000});  // isolate fading from timeouts
   try {
     f.runtime.sweep();                                        // first sight: everyone green
     assert.deepEqual(f.runtime.spectatorJoin()[0].souls, []);

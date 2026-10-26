@@ -1,4 +1,5 @@
 import {tx} from './edge/comms/store.ts';
+import { SoulNow, type SoulNowLine } from './soul-now.ts';
 import type {CarrierInstallSpec} from '../../../mars/viewer/engine/vehicles/carrier.ts';
 import {soulProfileFactV1Schema,type SoulProfileFactV1} from '@sim/protocol';
 import {authoredBoundariesDeclarationV1Schema,type AuthoredBoundariesDeclarationV1} from '@sim/engine-contract';
@@ -1453,6 +1454,12 @@ export class WorldHost {
   bodyOfV1(m:Mind):BodyStateV1|null{return bodyState(this,m.entityId,this.approachOfV1(m));}
   /** D1: the card's doing line: the plan's label only while the body is in it; its approach, carrier or water otherwise. */
   doingOfV1(m:Mind):string{return cardDoing(this,m,this.approachOfV1(m));}
+  private soulNowStore?: SoulNow;
+  /** LINK: the agents' public `now` lines (soul-now.ts); a change re-sends that Soul's public card. */
+  get soulNow(): SoulNow { if (!this.soulNowStore) { const store = new SoulNow(this.db.db, this.worldId); store.onChange = id => this.markSoulDirty(id); this.soulNowStore = store; } return this.soulNowStore; }
+  nowOf(soulId: string): SoulNowLine | null { try { return this.soulNow.get(soulId); } catch { return null; } }
+  /** Present only when set, so the cards of Souls without a line keep their exact earlier shape (absent = null). */
+  private publicNow(soulId: string): {now?: SoulNowLine} { const now = this.nowOf(soulId); return now ? {now} : {}; }
   publicSoul(m: Mind): PublicSoul {
     const nameOf = (id: string) => this.nameOf(id);
     return {
@@ -1460,8 +1467,12 @@ export class WorldHost {
       ...this.publicNameMetadata(m.soulId),
       ...(this.profilePhoto(m.soulId)?{profilePhoto:this.profilePhoto(m.soulId)!}:{}),
       intent: publicIntent(m.intent), intentText: describeIntent(publicIntent(m.intent), nameOf), mood: m.mood, energy: energyWord(m.energy), doing: this.doingOfV1(m),
+      ...this.publicNow(m.soulId),
+      ...(this.publicBodyOf?.(m.soulId) ? {body: this.publicBodyOf(m.soulId)!} : {}),
     };
   }
+  /** LINK BODY: the body rule's public state for a Soul (edge worlds; the Ledger sets it). Re-sent via markSoulDirty. */
+  publicBodyOf?:(soulId:string)=>NonNullable<PublicSoul['body']>|null;
   /** A human-readable name for a kernel thing id, an engine entity id or a region id. */
   nameOf(id: string): string { return this.kernel.things[id]?.name ?? this.engine.world.entities[id]?.label ?? this.engine.world.regions[id]?.label ?? id; }
   private stationGenesisV1?:string;

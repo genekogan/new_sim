@@ -10,7 +10,7 @@ import { randomUUID, randomBytes } from "node:crypto";
 import { resolve as resolvePath } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const VERSION = "2.1.0";
+const VERSION = "2.2.0";
 const STATE = ".eden-agent.json";
 const CLI = "node eden.mjs";
 
@@ -30,6 +30,57 @@ const need = (s, k, hint) => {
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const now = () => new Date().toISOString();
+
+// LINK (2.2): the Soul's public `now` line: one short first-person line a stranger can read, at most 140 characters.
+// `--now "<line>"` rides on act, say, ack, result (JSON body) and wait (query); `now "<line>"` / `now --clear` set it alone.
+const NOW_MAX = 140;
+let nextNow, lastNowSent;
+export function takeNowFlag(args) {
+  const i = args.indexOf("--now"); if (i < 0) return args;
+  const v = args[i + 1];
+  if (v === undefined || v.startsWith("--")) throw new Error('usage: --now "<one short first-person line, at most 140 characters>"');
+  nextNow = cleanNowText(v);
+  return [...args.slice(0, i), ...args.slice(i + 2)];
+}
+export function cleanNowText(v) {
+  const t = String(v).replace(/[\u0000-\u001f\u007f-\u009f]/g, " ").replace(/\s+/g, " ").trim();
+  if ([...t].length > NOW_MAX) throw new Error(`now is at most ${NOW_MAX} characters (yours has ${[...t].length})`);
+  return t || null;
+}
+function withNow(path, body) {
+  if (nextNow === undefined) return { path, body };
+  if (body && /^\/v1\/edge\/(act|say|inbox\/[^/?]+\/(ack|result))$/.test(path)) { const v = nextNow; nextNow = undefined; return { path, body: { ...body, now: v } }; }
+  if (!body && path.startsWith("/v1/edge/wait")) { const v = nextNow; nextNow = undefined; return { path: `${path}${path.includes("?") ? "&" : "?"}now=${encodeURIComponent(v ?? "")}`, body }; }
+  return { path, body };
+}
+async function setNowLine(text) {
+  const clean = text === null ? null : cleanNowText(text);
+  if (clean === lastNowSent) return { now: undefined, unchanged: true };
+  const r = await call("/v1/edge/self/now", { body: { text: clean } });
+  if (r.status === 404) return { now: null, set: false, reason: "This world does not show a now line yet." };
+  if (r.status !== 200) throw new Error(r.data?.error?.message ?? r.data?.message ?? `now refused (${r.status})`);
+  lastNowSent = clean;
+  return { now: r.data.now };
+}
+async function nowLine(...args) {
+  if (args[0] === "--clear" && args.length === 1) return setNowLine(null);
+  const text = args.join(" ").trim();
+  if (!text || text.startsWith("--")) throw new Error('usage: now "<one short first-person line, at most 140 characters>" · now --clear');
+  return setNowLine(text);
+}
+/** A --now that no world call carried (a refusal before the call, an older world path): set it alone. */
+export async function flushNow() {
+  if (nextNow === undefined) return;
+  const text = nextNow; nextNow = undefined;
+  try { await setNowLine(text); } catch (e) { console.error("now not set: " + e.message); }
+}
+/** The link state the owner sees (connected / disconnected and why) and the public `now` line, as the world says. */
+async function selfLink() {
+  const r = await call("/v1/edge/self/link");
+  if (r.status === 200) return { link: r.data.link, now: r.data.now ?? null };
+  if (r.status === 401 && r.data?.code === "control.revoked") { const why = r.data.reason; return { link: { state: "disconnected", reason: why === "replaced" ? "replaced" : why === "revoked" || why === "refused" ? "revoked" : "stopped-listening", since: r.data.revokedAt ? Date.parse(r.data.revokedAt) : null }, now: null }; }
+  return { link: null, now: null };
+}
 const TERMINAL = new Set(["completed", "failed", "replaced"]);
 
 // ---------------------------------------------------------------- transport
@@ -38,6 +89,7 @@ const TERMINAL = new Set(["completed", "failed", "replaced"]);
 // "dev" (legacy self-made identity), "none".
 async function call(path, { method, body, as = "soul", timeoutMs = 90_000 } = {}) {
   const s = load();
+  if (as === "soul") ({ path, body } = withNow(path, body));
   const url = need(s, "world", `Run: ${CLI} register <world-url>`) + path;
   const headers = { "content-type": "application/json" };
   if ((as === "soul" || as === "owner") && s.token) headers.authorization = `Bearer ${s.token}`;
@@ -212,9 +264,10 @@ async function status() {
   if (!s.token) return { paired: false, world: s.world, pending: s.pendingApproval?.approvalId ?? null, next: s.pendingApproval ? `${CLI} approval wait` : `${CLI} create "<Name>" --for <CODE>` };
   const me = ok(await call("/v1/agent/me"), "status");
   const inbox = me.inbox ?? {};
+  const self = await selfLink();
   return {
     soul: me.soul, paired: true, world: s.world, client: VERSION,
-    listening: inbox.connected === true,
+    listening: inbox.connected === true, link: self.link, now: self.now,
     ownerMessagesWaiting: inbox.queued ?? 0,
     lastReceipt: s.lastReceipt ?? null,
     note: inbox.connected ? "A listen is open: owner messages reach this folder." : `Nobody is listening. Start: ${CLI} listen (in the background).`,
@@ -609,16 +662,20 @@ look      here   observe   around [place]   caps [--search w] [--verb v] [--all]
 do        act "<words or offer:id>" [params-json] [--wait [s]] [--for id|none] [--json]   resolve "<words>"   wait [s] [receiptId] [--json]
           say "<text>"   converse <list|turns|start|say|accept|decline|leave|ask> …   object <id> [action] [json]
 owner     listen [--after id] [--once]   ack <id> ["reply"]   result <id> done|failed "<text>"
+          now "<public one-line status>" | now --clear   (or add --now "<line>" to act, say, ack, result, wait)
 self      profile [name|description|photo …]   body [presets|set|look …]   travel [<world>|home]
 `;
 
-const commands = { register, create, pair, approval, status, guide, here, observe, around, caps, capabilities: caps, map, view, receipt, events, conversations, act, resolve, wait, say, converse, object, listen, ack, result, profile, body, travel, version: async () => ({ version: VERSION }), help: async () => HELP };
+const commands = { now: nowLine, register, create, pair, approval, status, guide, here, observe, around, caps, capabilities: caps, map, view, receipt, events, conversations, act, resolve, wait, say, converse, object, listen, ack, result, profile, body, travel, version: async () => ({ version: VERSION }), help: async () => HELP };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [cmd, ...args] = process.argv.slice(2);
   const fn = commands[cmd];
   if (!fn) { process.stdout.write(HELP); process.exit(cmd ? 1 : 0); }
-  fn(...args).then((out) => {
+  let argv = args;
+  try { argv = ["act", "say", "ack", "result", "wait"].includes(cmd) ? takeNowFlag(args) : args; } catch (e) { process.stderr.write(`error: ${e.message}\n`); process.exit(1); }
+  fn(...argv).then(async (out) => {
+    await flushNow();
     process.stdout.write(typeof out === "string" ? out : JSON.stringify(out, null, 1) + "\n");
   }, (e) => {
     process.stderr.write(`error: ${e.message}\n`);

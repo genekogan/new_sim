@@ -19,7 +19,7 @@ test('plans + fade by abandonment in a native world: lie 90 min on instruction s
   const w = await edenNavWorld(4); t.after(() => {w.f.host.stop(); w.f.db.close();});
   let now = 1_900_000_000_000;
   const app = new Hono(), deps = {host: w.f.host, db: w.f.db, souls: w.f.souls, soul: edgeSoulResolver(w.f.host, w.f.souls, () => undefined), ledger: w.ledger};
-  const comms = registerEdgeComms(app, deps, {fading: true, now: () => now, sweepMs: 0}); w.ledger.attachComms(comms as never);
+  const comms = registerEdgeComms(app, deps, {fading: true, beam: true, now: () => now, sweepMs: 0}); w.ledger.attachComms(comms as never);
   const events = registerEdgeEvents(app, deps, comms, {placeName: id => w.ledger.places.byId.get(id)?.name ?? null});
   const plans = registerEdgePlans(app, deps, comms, events, w.ledger, {tickMs: 0});
   t.after(() => {plans.close(); events.close(); comms.close();});
@@ -89,7 +89,7 @@ test('Core-A/B composition: plan resolves a structured seat intent when it start
   const w = await edenNavWorld(1); t.after(() => {w.f.host.stop();w.f.db.close();});
   let now = 1_900_000_000_000;
   const app = new Hono(), deps = {host:w.f.host,db:w.f.db,souls:w.f.souls,soul:edgeSoulResolver(w.f.host,w.f.souls,()=>undefined),ledger:w.ledger};
-  const comms = registerEdgeComms(app,deps,{fading:true,now:()=>now,sweepMs:0});w.ledger.attachComms(comms as never);
+  const comms = registerEdgeComms(app,deps,{fading:true,beam:true,now:()=>now,sweepMs:0});w.ledger.attachComms(comms as never);
   const events = registerEdgeEvents(app,deps,comms,{placeName:id=>w.ledger.places.byId.get(id)?.name??null});
   const plans = registerEdgePlans(app,deps,comms,events,w.ledger,{tickMs:0});t.after(()=>{plans.close();events.close();comms.close();});
   const soul=w.souls[0]!;

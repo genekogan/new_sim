@@ -9,13 +9,15 @@ import { buildApp } from './http.ts';
 import type { Hub } from './hub.ts';
 import type { AccountIdentity } from './accounts/store.ts';
 import { AgentInbox } from './inbox.ts';
+import { EdgeLedger } from './edge/ledger/ledger.ts';
+import { BODY_KNOBS } from './edge/ledger/body-rule.ts';
 import { OPERATOR_ACCOUNT, isTestName, deniedSoul } from './op-souls.ts';
 import { marsFactory, GREEN_FIELD_WORLD } from '@sim/engine-mars';
 
 const KEY = randomBytes(32).toString('hex');
 const input = (key: string, name: string, extra: Record<string, unknown> = {}) => ({ agentLabel: 'eden-agent 1.9.5', name, idempotencyKey: 'op-souls-test-key-' + key, pollSecret: randomBytes(32).toString('base64url'), ...extra });
 
-async function world(t: import('node:test').TestContext) {
+async function world(t: import('node:test').TestContext, o: { edge?: boolean } = {}) {
   process.env.SIM_SITE_KEY = KEY;
   const f = worldFixture(':memory:', await marsFactory({ ...GREEN_FIELD_WORLD, safeCrewRemoval: true })); f.brain.quiesce(); f.souls.enableLifecycle(); t.after(() => { f.host.stop(); f.db.close(); });
   f.souls.cfg.accountAuthRequired = true; f.souls.cfg.inviteRequired = true;
@@ -23,7 +25,7 @@ async function world(t: import('node:test').TestContext) {
   f.db.upsertUser({ id: gene.id, email: null, wallet: null, role: 'user' }); f.db.setInvited(gene.id, 'test');
   f.auth.accountFromToken = async token => token === 'gene' ? { identity: gene, user: f.db.user(gene.id)! } : null;
   const original = f.auth.userFromToken.bind(f.auth); f.auth.userFromToken = async token => token === 'gene' ? f.db.user(gene.id)! : original(token);
-  const app = buildApp({ cfg: f.souls.cfg, db: f.db, host: f.host, souls: f.souls, brain: f.brain, auth: f.auth, hub: { clients: new Map(), refreshMe() {} } as unknown as Hub });
+  const app = buildApp({ cfg: f.souls.cfg, db: f.db, host: f.host, souls: f.souls, brain: f.brain, auth: f.auth, hub: { clients: new Map(), refreshMe() {} } as unknown as Hub, ...(o.edge ? { edge: new EdgeLedger(f.host, f.db) } : {}) });
   const call = async (path: string, body?: unknown, o: { token?: string; key?: string | null; xff?: string } = {}) => {
     const key = o.key === undefined ? KEY : o.key;
     const r = await app.request(path, { method: body === undefined ? 'GET' : 'POST', headers: { host: '127.0.0.1:7051', ...(o.token ? { authorization: 'Bearer ' + o.token } : {}), ...(key ? { 'x-sim-site-key': key } : {}), ...(o.xff ? { 'x-forwarded-for': o.xff } : {}), ...(body === undefined ? {} : { 'content-type': 'application/json' }) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
@@ -118,4 +120,25 @@ test('message, inbox, delete: only Souls the operator approved, by name + id; Ge
   for (let i = 0; i < 40 && w.f.db.soul(soulId)!.retired_at === null; i++) { await setImmediate(); w.f.host.drainInputs(); }
   assert.notEqual(w.f.db.soul(soulId)!.retired_at, null);
   assert.equal((await w.op('inbox', { soulId, name: 'TestInbox' })).status, 404);
+});
+
+test('LINK body: a TEST Soul\'s body clocks shorten (never lengthen) for the live checks; other worlds have no body rule', async t => {
+  const plain = await world(t);
+  const p = await plain.request('0301', 'TestPlain'); await plain.op('approve', { approvalId: p.id, name: 'TestPlain' }); const pid = (await plain.ready(p)).soulId as string;
+  assert.deepEqual([(await plain.op('body', { soulId: pid, name: 'TestPlain' })).status], [409], 'no edge ledger: no body rule');
+  const w = await world(t, { edge: true });
+  const mine = await w.request('0302', 'TestBody'); assert.equal((await w.op('approve', { approvalId: mine.id, name: 'TestBody' })).status, 200);
+  const soulId = (await w.ready(mine)).soulId as string;
+  const read = await w.op('body', { soulId, name: 'TestBody' });
+  assert.equal(read.status, 200, JSON.stringify(read.data)); assert.deepEqual(read.data.knobs, BODY_KNOBS);
+  const set = await w.op('body', { soulId, name: 'TestBody', knobs: { sleepGraceMs: 10_000, zombieWanderMs: 60_000 } });
+  assert.equal(set.status, 200); assert.equal(set.data.knobs.sleepGraceMs, 10_000); assert.equal(set.data.knobs.zombieWanderMs, 60_000); assert.equal(set.data.knobs.idleStartMs, BODY_KNOBS.idleStartMs);
+  assert.equal((await w.op('body', { soulId, name: 'TestBody', knobs: { sleepGraceMs: 10 * 60_000 } })).status, 400, 'never longer than the default');
+  assert.equal((await w.op('body', { soulId, name: 'TestBody', knobs: { sleepGraceMs: 10 } })).status, 400, 'at least a second');
+  assert.equal((await w.op('body', { soulId, name: 'TestBody', knobs: { bogus: 1 } })).status, 400);
+  assert.deepEqual((await w.op('body', { soulId, name: 'TestBody', knobs: null })).data.knobs, BODY_KNOBS, 'null restores the defaults');
+  assert.equal((await w.op('body', { soulId, name: 'TestBody' }, { key: null })).status, 404, 'launcher only');
+  // Gene's own Souls are never touched
+  const his = await w.request('0303', 'TestGene'); await w.call(`/v1/account/approvals/${his.id}/approve`, {}, { token: 'gene', key: null }); const hisId = (await w.ready(his)).soulId as string;
+  assert.equal((await w.op('body', { soulId: hisId, name: 'TestGene', knobs: { sleepGraceMs: 5000 } })).status, 403);
 });

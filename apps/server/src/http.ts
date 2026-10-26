@@ -51,6 +51,8 @@ import {Travel,TravelError,launcherSite,TRAVEL_CONTRACT} from './travel/travel.t
 import {mountTravelRoutes} from './travel/routes.ts';
 import { intentArrivalReadError,intentHistoryReadError,intentTransportError, intentLookupError, type IntentControlV2, type IntentIdentityV2 } from './intent-control.ts';
 import {mountAgentInbox} from './inbox-routes.ts';
+import {mountSoulNow} from './soul-now-routes.ts';
+import {soulLink} from './soul-link.ts';
 import {mountOperatorSouls} from './op-souls.ts';
 import { strandedMetrics } from '../../../mars/viewer/engine/spatial/path.ts';
 
@@ -82,6 +84,7 @@ export function buildApp(d: Deps) {
   // lane O2: the first snapshot is edge-cacheable when the page asks for it by the current key (edge-snapshot.ts)
   const godForKey = d.god, currentSnapshotKey = godForKey ? () => snapshotKey({ editSeq: godForKey.model.editSeq, buildsRev: godForKey.store.buildsRev(), moderation: moderation.version() }) : null;
   if (currentSnapshotKey) mountEdgeSnapshot(app, currentSnapshotKey);
+  mountSoulNow(app, {host: d.host, souls: d.souls, inbox: () => ownerInbox}); // LINK: the agent's public `now` line (before the routes it rides on)
   const ownerInbox = mountAgentInbox(app, {db: d.db, worldId: d.host.worldId, souls: d.souls, god: d.god, edge: !!d.edge, requireUser: c => requireUser(c), ownerSoul: async (c, id) => { const u = await requireUser(c); d.souls.requireInvited(u); const s = ownSoul(u, id); if (!d.souls.owns(u.id, s)) throw new ApiError(403, 'forbidden', 'not your soul'); return s; }}); // invite gate as on the central /v1/souls/:id/command
   // Travel (M3, travel/): a Soul whose body is in another world acts there; here only its travel calls answer.
   let travel: Travel | undefined;
@@ -127,7 +130,7 @@ export function buildApp(d: Deps) {
   /** The title a visitor sees (viewer arrival card, Explore, welcome-back), served in /v1/config so the first frame never shows a slug. */
   const displayWorldName = d.god ? safeWorldName(worldName) : d.cfg.worldKey === 'littlemartians' ? 'Little Martians' : d.cfg.worldKey[0].toUpperCase() + d.cfg.worldKey.slice(1);
   // the world's one skill (/SKILL.md) and who lives here (/v1/world/souls): lane P2
-  if (d.god) { mountJoinRoutes(app, { worldName, baseOf, soulCliUrl: (c) => (d.cfg.cliFile ? baseOf(c) + '/eden-agent.mjs' : PUBLISHED_SOUL_CLI), souls: () => d.db.liveSouls(d.host.worldId).filter((s) => !travel?.isAway(s.id)), poseOf: (id) => { const p = (d.host.engine.world.entities as Record<string, { pose?: { p?: number[] } } | undefined>)[id]?.pose?.p; return p ? { x: p[0], y: p[1], z: p[2] } : null; } }); }
+  if (d.god) { mountJoinRoutes(app, { worldName, baseOf, soulCliUrl: (c) => (d.cfg.cliFile ? baseOf(c) + '/eden-agent.mjs' : PUBLISHED_SOUL_CLI), souls: () => d.db.liveSouls(d.host.worldId).filter((s) => !travel?.isAway(s.id)), nowOf: (id) => d.host.nowOf(id), bodyOf: (id) => d.edge?.bodyRule?.view(id) ?? null, poseOf: (id) => { const p = (d.host.engine.world.entities as Record<string, { pose?: { p?: number[] } } | undefined>)[id]?.pose?.p; return p ? { x: p[0], y: p[1], z: p[2] } : null; } }); }
   const godRoutes = d.god ? mountGodRoutes(app, { god: d.god, worldName, requireUser, soulFromBearer: (c) => { const s = d.souls.soulFromToken(bearer(c)); return s ? { id: s.id, name: s.name } : null; }, baseOf, limitIp, verifyUse: new VerifyUse(d.host, d.souls, d.god, d.edge), lookWorldUrl: `http://127.0.0.1:${d.cfg.port}${d.cfg.worldPath}` /* W2 remote looks */ }) : null;
   if (d.god && d.edge) { const god = d.god; mountSecretPlaceRoutes(app, { ledger: d.edge, requireGod: (c) => { const who = god.godIdentity(bearer(c)); if (!who) throw new ApiError(401, 'unauthorized', 'missing or invalid god token'); if (who.child) throw new ApiError(403, 'helper.scope', 'helper tokens cannot change secret places'); } }); }  // knowledge/1; WD7: helpers refused
   if (d.god) { const god = d.god; mountSharedLibraryRoutes(app, { god, slug: d.cfg.worldKey, dir: process.env.SIM_LIBRARY_DIR, requireGod: (c) => { if (!god.godFromToken(bearer(c))) throw new ApiError(401, 'unauthorized', 'missing or invalid god token'); } }); }  // M4 shared library
@@ -161,7 +164,7 @@ export function buildApp(d: Deps) {
   // ---- public
   mountWelcomeRoutes(app,d);
   // lane OPS2: operator commands for TEST Souls (the launcher only, with the site key: op-souls.ts)
-  mountOperatorSouls(app,{db:d.db,worldId:d.host.worldId,souls:d.souls,inbox:ownerInbox,god:d.god,siteKey:process.env.SIM_SITE_KEY});
+  mountOperatorSouls(app,{db:d.db,worldId:d.host.worldId,souls:d.souls,inbox:ownerInbox,god:d.god,siteKey:process.env.SIM_SITE_KEY,body:()=>d.edge?.bodyRule??null});
   if(d.souls.accounts)mountAccountRoutes(app,{accounts:d.souls.accounts,auth:d.auth,baseOf:d.cfg.authProvider==='clerk'?()=>publicWorldBase(d.cfg):baseOf,limit:limitIp});
   mountStationRoutesV2(app,d.stationV2);
   // lane DASH: tickMs = the last ~20 s of ticks (avg/max ms against the 50 ms budget); clockRate < 1 = the clock is dilated (behind)
@@ -367,13 +370,15 @@ export function buildApp(d: Deps) {
   });
   app.delete('/v1/souls/:id', async (c) => { const u = await requireUser(c),optIn=lifecycleOptIn(c),soul=ownSoul(u,c.req.param('id'));if(d.souls.lifecycle){const op=d.souls.acceptLifecycleRetire(u.id,soul);d.hub.refreshMe(soul.owner);return lifecycleReply(c,u.id,op.requestId,optIn);}await d.souls.retire(soul); d.hub.refreshMe(u.id); return c.json({ ok: true }); });
   app.get('/v1/souls/:id', async (c) => {
-    if(!d.intentV2){const u=await requireUser(c);return c.json(d.souls.dashboard(ownSoul(u,c.req.param('id'))));}
+    // LINK: the owner's `agent` gains the one link state (COMMON-LINK §2) and the dashboard the agent's public `now` line.
+    const linked=(dash:ReturnType<typeof d.souls.dashboard>,row:SoulRow,accountId:string)=>({...dash,agent:{...dash.agent,link:soulLink(d.souls,ownerInbox,row,accountId)},now:d.host.nowOf(row.id)});
+    if(!d.intentV2){const u=await requireUser(c),row=ownSoul(u,c.req.param('id'));return c.json(linked(d.souls.dashboard(row),row,u.id));}
     // Explicit candidate only: the same trusted expiry/current authority and
     // body readiness used by submission select the genuine-owner human adapter.
     c.header('Cache-Control','no-store');
     try {
-      const service=d.intentV2,scope=service.ownerScope(await intentIdentity(c),c.req.param('id'));
-      const dashboard=d.souls.dashboard(d.db.soul(scope.soulId)!),control=service.ownerControl(scope);
+      const service=d.intentV2,identity=await intentIdentity(c),scope=service.ownerScope(identity,c.req.param('id'));
+      const row=d.db.soul(scope.soulId)!,dashboard=linked(d.souls.dashboard(row),row,identity.userId),control=service.ownerControl(scope);
       service.guard(scope);return c.json({...dashboard,...(control?{control}:{})});
     }catch(error){throw intentTransportError(error);}
   });

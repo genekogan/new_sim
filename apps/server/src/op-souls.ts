@@ -21,6 +21,7 @@ import type {AgentInbox} from './inbox.ts';
 import type {GodMode} from './god/god.ts';
 import {AccountStoreError, type AccountIdentity} from './accounts/store.ts';
 import {siteRequestOk} from './travel/travel.ts';
+import {BODY_KNOBS, type BodyKnobs, type BodyRule} from './edge/ledger/body-rule.ts';
 
 /** The account every operator-approved TEST Soul belongs to. No sign-in provider issues an `op:` id. */
 export const OPERATOR_ACCOUNT = 'op:test-operator';
@@ -33,7 +34,9 @@ export const isTestName = (name: string) => TEST_NAME.test(name);
 export const deniedSoul = (id: string | null | undefined, name: string | null | undefined) =>
   (!!id && DENY_SOUL_IDS.includes(id)) || (!!name && DENY_SOUL_NAMES.some(r => r.test(name)));
 
-type Deps = {db: Db; worldId: string; souls: Souls; inbox: AgentInbox; god?: GodMode; siteKey: string | undefined; log?: (line: string) => void};
+type Deps = {db: Db; worldId: string; souls: Souls; inbox: AgentInbox; god?: GodMode; siteKey: string | undefined; log?: (line: string) => void;
+  /** LINK BODY: the edge world's body rule, for TEST-Soul clock knobs (shorter only); null elsewhere. */
+  body?: () => BodyRule | null};
 type PendingRow = {id: string; name: string; agent_label: string; mode: string; status: string; account_id: string | null; target_account_id: string | null; created_at: number; expires_at: number};
 
 export function mountOperatorSouls(app: Hono, d: Deps) {
@@ -111,6 +114,28 @@ export function mountOperatorSouls(app: Hono, d: Deps) {
     const row = testSoul(b), inbox = d.inbox.ownerView(scope(row));
     journal('inbox', {soulId: row.id, name: row.name});
     return c.json({ok: true, soulId: row.id, name: row.name, inbox});
+  });
+
+  // LINK BODY: a TEST Soul's body clocks, shortened for the live checks (zombie, asleep, idle reflex). Only shorter than the
+  // defaults (never longer), at least one second each; {knobs: null} restores the defaults. Answers the body and its knobs.
+  app.post('/v1/op/souls/body', async c => {
+    const b = await gate(c); if (!b) return c.json({ok: false, code: 'not-found'}, 404);
+    const row = testSoul(b), rule = d.body?.() ?? null;
+    if (!rule) refuse('op.no-body-rule', 'this world has no body rule', 409);
+    let knobs: Partial<BodyKnobs> | null | undefined;
+    if (b.knobs === null) knobs = null;
+    else if (b.knobs !== undefined) {
+      if (typeof b.knobs !== 'object' || Array.isArray(b.knobs)) refuse('invalid', 'knobs must be an object or null', 400);
+      knobs = {};
+      for (const [k, v] of Object.entries(b.knobs as Record<string, unknown>)) {
+        const max = (BODY_KNOBS as Record<string, number>)[k];
+        if (max === undefined || typeof v !== 'number' || !Number.isFinite(v) || v > max || v < (k === 'reflexRadiusM' || k === 'seatRadiusM' ? 1 : 1000)) refuse('invalid', `${k}: a number no larger than the default ${max ?? '(unknown knob)'}`, 400);
+        (knobs as Record<string, number>)[k] = v as number;
+      }
+    }
+    const now = knobs === undefined ? rule!.knobs(row.id) : rule!.setKnobs(row.id, knobs);
+    journal('body', {soulId: row.id, name: row.name, ...(knobs !== undefined ? {knobs} : {})});
+    return c.json({ok: true, soulId: row.id, name: row.name, body: rule!.view(row.id), knobs: now});
   });
 
   app.post('/v1/op/souls/delete', async c => {

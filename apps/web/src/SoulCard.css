@@ -1,4 +1,4 @@
-/* UI2 Soul card: name, character, status line, Share/Activity. Light/dark from styles.css tokens. */
+/* UI2 Soul card: name, character, status line, Share. LINK (2026-10-24): one card, three owner states + the visitor view. Light/dark from styles.css tokens. */
 .human-world .soul-card{display:block;margin:0;padding:0;border:0;background:transparent;font:14px/1.45 system-ui,sans-serif;color:var(--fg)}
 .human-world .human-panel .soul-card h1{margin:0;min-width:0;font:680 24px/1.15 system-ui,sans-serif;letter-spacing:-.015em;outline:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .soul-card-head{display:flex;align-items:center;gap:6px;margin:0 40px 6px 0;min-width:0}
@@ -7,14 +7,11 @@
 .soul-card-head .soul-share svg{width:17px;height:17px}
 .soul-card-head .soul-copied{flex:0 0 auto;white-space:nowrap}.soul-card-head .soul-copied:empty{display:none}
 .soul-character{margin:0 0 12px;font-size:14.5px;line-height:1.5;color:var(--fg);opacity:.86}
-.soul-meta{display:flex;flex-wrap:wrap;align-items:center;margin:0 0 14px;font-size:13px;color:var(--fg)}
-.soul-meta>span+span::before{content:'·';margin:0 8px;color:var(--dim)}
-.soul-status{display:inline-flex;align-items:center;gap:7px;font-weight:650}
+.soul-meta{display:block;margin:0 0 14px;font-size:13px;line-height:1.5;color:var(--fg)}
+.soul-meta .soul-status{vertical-align:baseline}.soul-sep{margin:0 4px;color:var(--dim)}
+.soul-meta .soul-visiting::before{content:'·';margin:0 8px;color:var(--dim)}
+.soul-status{display:inline-flex;align-items:center;gap:7px;font-weight:650;white-space:nowrap}
 .soul-status i{display:inline-block;width:8px;height:8px;border-radius:50%}
-.soul-agent{display:inline-flex;align-items:center;gap:6px;color:var(--dim)}
-.soul-agent i{display:inline-block;width:7px;height:7px;border-radius:50%;border:1.5px solid currentColor;box-sizing:border-box}
-.soul-agent[data-agent-state=listening] i,.soul-agent[data-agent-state=working] i{background:#2e9d4f;border-color:#2e9d4f}
-.soul-doing,.soul-energy{color:color-mix(in srgb,var(--fg) 78%,var(--dim))}
 .soul-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding-top:12px;border-top:1px solid color-mix(in srgb,var(--fg) 10%,transparent)}
 .soul-actions>button{flex:0 0 auto;max-width:100%;white-space:nowrap}
 .soul-actions .soul-copied:empty{display:none}
@@ -22,26 +19,50 @@
 .human-world .soul-card .soul-share:hover{opacity:.88}
 .soul-share svg{width:15px;height:15px}
 .soul-copied{font-size:12.5px;font-weight:600;color:var(--ok)}
-.human-world .soul-card .soul-more{display:inline-flex;align-items:center;gap:6px;margin-left:auto;min-height:34px;padding:6px 6px 6px 10px;border:0;border-radius:999px;background:transparent;color:var(--fg);font:600 13.5px/1 system-ui,sans-serif}
-.human-world .soul-card .soul-more:hover{background:color-mix(in srgb,var(--fg) 7%,transparent)}
-.soul-more span{font-size:18px;line-height:1;margin-top:-2px;color:var(--dim)}
-/* Activity view */
-.human-world .soul-card .soul-back{display:inline-flex;align-items:center;gap:6px;min-height:28px;margin:-4px 0 6px -6px;padding:2px 8px 2px 6px;border:0;border-radius:999px;background:transparent;color:var(--dim);font:600 13px/1 system-ui,sans-serif}
-.human-world .soul-card .soul-back:hover{color:var(--fg);background:color-mix(in srgb,var(--fg) 7%,transparent)}
-.soul-back span{font-size:18px;line-height:1;margin-top:-2px}
-.human-world .soul-card .soul-back{max-width:100%;min-width:0}
-.soul-back .soul-back-name{font:inherit;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.human-world .human-panel .soul-activity h2{margin:0 0 10px;font:680 20px/1.2 system-ui,sans-serif;letter-spacing:-.01em;color:var(--fg);text-transform:none;outline:none}
-.soul-facts{display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;margin:0 0 14px;font-size:13.5px}
-.soul-facts dt{color:var(--dim)}.soul-facts dd{margin:0;overflow-wrap:anywhere}
-.human-world .soul-card .soul-list-block{margin:0 0 12px;padding:0;border:0;background:transparent}
-.human-world .human-panel .soul-list-block h3{margin:0 0 6px;font:650 11px/1.3 system-ui,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
-.soul-list-block ol{list-style:none;margin:0;padding:0}
-.soul-list-block li{padding:6px 0;border-top:1px solid color-mix(in srgb,var(--fg) 8%,transparent);font-size:13.5px;overflow-wrap:anywhere}
-.soul-dim{color:var(--dim)}
-.soul-fine{margin:4px 0 0;font-size:11.5px;color:var(--dim)}
 /* VF2: Follow lives on the card. Outlined; filled while following. */
 .human-world .soul-follow{display:inline-flex;align-items:center;gap:7px;min-height:34px;padding:6px 15px 6px 12px;border:1.5px solid var(--fg);border-radius:999px;background:transparent;color:var(--fg);font:600 13.5px/1 system-ui,sans-serif}
 .human-world .soul-follow:hover{background:color-mix(in srgb,var(--fg) 8%,transparent)}
 .human-world .soul-follow.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .soul-follow svg{width:14px;height:14px}
+
+/* LINK status line: the dot and word, then the dim place/body phrase */
+.soul-status[data-status] i{box-sizing:border-box;width:9px;height:9px}
+.soul-status[data-status=connected] i,.soul-status[data-status=awake] i{background:#2e9d4f}
+.soul-status[data-status=pairing] i{background:#d6a700}
+.soul-status[data-status=disconnected] i,.soul-status[data-status=approved-waiting] i,.soul-status[data-status=checking] i,.soul-status[data-status=zombie] i,.soul-status[data-status=asleep] i{background:transparent;border:1.5px solid var(--dim)}
+.soul-place{color:var(--dim)}
+.human-world .soul-card .soul-link{display:inline-flex;align-items:center;gap:7px;min-height:0;padding:2px 4px;margin:-2px -4px;border:0;border-radius:8px;background:transparent;color:var(--fg);font:650 13px/1.3 system-ui,sans-serif;cursor:pointer}
+.human-world .soul-card .soul-link:hover,.human-world .soul-card .soul-link:focus-visible{background:color-mix(in srgb,var(--fg) 7%,transparent)}
+.soul-caret{width:10px;height:10px;color:var(--dim);flex:none}
+.soul-card[data-sleeping] .soul-card-portrait{opacity:.7}
+/* the agent's own line, in quotes, with its age */
+.soul-now{margin:0 0 12px;font-size:15px;line-height:1.4;overflow-wrap:anywhere}
+.soul-now q{font-style:italic}
+.soul-now .soul-dim{font-size:12.5px;white-space:nowrap}
+.soul-now.soul-now-dim{font-size:13.5px;color:var(--dim)}
+/* link details, Reconnect, waiting */
+.soul-box{box-sizing:border-box;margin:0 0 12px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--fg) 6%,transparent);font-size:13px}
+.soul-box.soul-reconnect{background:color-mix(in srgb,var(--bg) 55%,transparent);border:1.5px solid var(--fg);margin-bottom:4px}
+.soul-box-title{margin:0 0 2px;font-weight:650}
+.soul-box-line{margin:0 0 10px}
+.soul-box-text{margin:6px 0 0;font-size:12.5px}
+.soul-waiting{margin:0 0 4px}.soul-waiting .soul-box-text:first-child{margin-top:0;font-size:13.5px}
+.soul-box-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.soul-prompt{box-sizing:border-box;margin:8px 0;padding:8px 10px;max-height:9.5em;overflow:auto;border-radius:8px;background:color-mix(in srgb,var(--bg) 70%,transparent);border:1px solid color-mix(in srgb,var(--fg) 15%,transparent);font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-word;user-select:all}
+.human-world .soul-card .soul-pill{display:inline-flex;align-items:center;gap:6px;min-height:30px;padding:4px 12px;border:1.5px solid var(--fg);border-radius:999px;background:transparent;color:var(--fg);font:600 12.5px/1 system-ui,sans-serif;cursor:pointer}
+.human-world .soul-card .soul-pill.fill{background:var(--fg);color:var(--bg)}
+.human-world .soul-card .soul-pill.quiet{border-color:transparent;padding-left:6px}
+.human-world .soul-card .soul-pill.small{min-height:26px;padding:2px 10px;vertical-align:middle}
+.human-world .soul-card .soul-pill:disabled{opacity:.55;cursor:default}
+.human-world .soul-card .soul-pill:hover:not(:disabled){background:color-mix(in srgb,var(--fg) 8%,transparent)}
+.human-world .soul-card .soul-pill.fill:hover:not(:disabled){background:color-mix(in srgb,var(--fg) 86%,transparent)}
+/* the Pairing card inside an open card: no frame of its own */
+.soul-card .ap-card.ap-embedded{padding:0}
+/* phone bottom sheet: 44 px touch targets */
+@media (max-width:700px),(pointer:coarse){
+ .human-world .soul-card .soul-pill,.human-world .soul-card .soul-follow,.human-world .soul-card .soul-link{min-height:44px}
+ .human-world .soul-card .soul-link{padding:0 8px;margin:0 -8px}
+ .human-world .soul-card .soul-card-head .soul-share{width:44px;height:44px}
+}
+/* LINK integration: on a phone the Reconnect prompt is clamped to ~3 scrollable lines so Copy stays on screen (the full text still copies) */
+@media (max-width: 700px), (pointer: coarse){.soul-prompt{max-height:4.6em;margin:6px 0}}

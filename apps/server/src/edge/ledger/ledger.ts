@@ -49,6 +49,7 @@ import {EDEN_LIBRARY_CATALOGUE} from '../content/eden-library-catalogue.ts';
 import {isVerificationProbe, PROBE_OWNER} from '../../verification-probe.ts';
 import {tx,afterCommit} from '../comms/store.ts';
 import {PlaceKnowledge} from '../perception/knowledge.ts';
+import {BodyRule, type BodyKnobs, type BodySoul, type Posture} from './body-rule.ts';
 
 type Resolved = {from: string; to: string; note: string};
 const WAIT_CODES = new Set(['program.safe-stop-required', 'program.safe-stop-pending']);
@@ -115,10 +116,14 @@ export class EdgeLedger implements EdgeLedgerHooks {
     try {(c as unknown as {onSpectator?(l: (m: {kind: string; conversation?: string; turn?: {from?: {soulId: string}}}) => void): void}).onSpectator?.(m => {
       if (m.kind !== 'conversation.turn' || !m.conversation || !m.turn?.from) return;
       const members = this.coreA.conversations().find(x => x.id === m.conversation)?.members ?? [];
+      // LINK BODY: a turn addressed to a member ends its idle reflex
+      for (const id of members) if (id !== m.turn.from.soulId) try {this.bodyRule?.poke(id);} catch {/* best effort */}
       try {this.intents.onTurn(m.conversation, m.turn.from.soulId, members);} catch {/* attention is best effort */}
     });} catch {/* no spectator hook: auto-face off */}
     // C9 body effects (fading itself only runs when Comms' fading flag is on — Gene has not approved it).
-    const fading = (c as unknown as {fading?: {onFade?(l: (e: {soulId: string; change: string}) => void): void; gone?(): string[]}}).fading;
+    const fading = (c as unknown as {fading?: {onFade?(l: (e: {soulId: string; change: string}) => void): void; gone?(): string[]; onTouch?(l: (soulId: string) => void): void}}).fading;
+    // LINK BODY: every accepted action wakes the body (body-rule.ts)
+    fading?.onTouch?.(id => {try {this.bodyRule?.touch(id);} catch {/* best effort */}});
     const fadeOut = (soulId: string) => {
       const m = this.host.minds.get(soulId); if (!m) return;
       this.faded.add(soulId); this.pending.delete(soulId);
@@ -141,6 +146,86 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
   /** Souls faded out (removed at 60 min idle); their next act lands them at a starting place. */
   readonly faded = new Set<string>();
+  /** LINK BODY: the presence-driven body rule (body-rule.ts: awake / idle / zombie / asleep). On once the edge routes
+   *  attach the owner inbox's presence (`attachPresence`); off in tools that build a Ledger alone (walk audit). */
+  bodyRule: BodyRule | null = null;
+  private bodyMigrated = false;
+  attachPresence(inbox: {soulPresence(soulId: string): {listening: boolean; at: number | null}; onSoulListen?(l: (soulId: string) => void): void; onSoulSend?(l: (soulId: string) => void): void}, knobs?: Partial<BodyKnobs>) {
+    if (process.env.SIM_BODY === '0' || this.bodyRule) return this.bodyRule;
+    // a dev/test world may shorten the clocks (SIM_BODY_KNOBS JSON, DEV_AUTH worlds only); real worlds never
+    let env: Partial<BodyKnobs> = {};
+    if (process.env.SIM_BODY_KNOBS && process.env.DEV_AUTH === '1') try {env = JSON.parse(process.env.SIM_BODY_KNOBS) as Partial<BodyKnobs>;} catch {/* ignored */}
+    const live = (m: Mind) => {const row = this.db.soul(m.soulId); return !!row && row.retired_at === null && row.owner === m.owner && row.entity_id === m.entityId && row.world_id === this.host.worldId;};
+    const soulOf = (m: Mind): BodySoul => ({soulId: m.soulId, entityId: m.entityId, name: m.name, owner: m.owner});
+    const engine = this.host.engine as unknown as {dryGroundAtV1?: (x: number, z: number) => boolean; clearanceUpToV1?: (x: number, z: number, cap?: number, level?: number) => number};
+    this.bodyRule = new BodyRule(this.db.db, this.host.worldId, {
+      souls: () => [...this.host.minds.values()].filter(m => !!m.owner && m.owner !== 'system' && !m.native && !this.faded.has(m.soulId) && !!this.body(m.entityId) && live(m)).map(soulOf),
+      presence: id => inbox.soulPresence(id),
+      createdAt: id => (this.db.soul(id) as {created_at?: number} | undefined)?.created_at ?? null,
+      pose: id => {const b = this.body(id); return b ? {x: b.pose.p[0], z: b.pose.p[2], level: b.human?.level ?? 0} : null;},
+      posture: id => this.posture(id),
+      agentBusy: id => this.pending.has(id) || this.openReceipts(id).length > 0 || this.together.awaiting(id),
+      running: id => !!this.host.engine.programOf(id),
+      dry: (x, z) => engine.dryGroundAtV1?.(x, z) ?? true,
+      clear: (x, z, level) => !(this.host.engine.world as {navV1?: unknown}).navV1 || !engine.clearanceUpToV1 || engine.clearanceUpToV1(x, z, 1, level) >= 0.3,
+      places: (x, z, level) => this.places.containing(x, z, this.placeLevel(level)).filter(p => p.enclosed).map(p => p.id).join('|'),
+      seat: (soul, radius, seconds) => {
+        const {caps, plans} = this.binds(soul), me = this.body(soul.entityId), world = this.host.engine.world as NativeWorld; if (!me) return null;
+        const c = caps.find(c => c.verb === 'sit' && c.available && c.target && (() => {const e = world.entities[c.target!.id]; return !!e && Math.hypot(e.pose.p[0] - me.pose.p[0], e.pose.p[2] - me.pose.p[2]) <= radius;})());
+        const plan = c && plans.get(c.id); if (!plan) return null;
+        const steps = structuredClone(plan.steps); for (const x of steps) if (x.params && 'seconds' in x.params) x.params.seconds = seconds;
+        return steps;
+      },
+      decide: (soul, option, label, steps) => {
+        this.ambientAt.set(soul.soulId, Date.now());   // a posture the rule chose is not the Soul's own choice (postureHold)
+        const guard = (): true => {const m = this.host.minds.get(soul.soulId); if (!m || !live(m) || this.pending.has(soul.soulId) || this.openReceipts(soul.soulId).length || this.faded.has(soul.soulId)) throw Error('edge.body-stale'); return true;};
+        try {void this.host.enqueueChecked('decision', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, option, label, steps, reevalTicks: 1e9, fallback: false, trigger: 'edge-body'}, guard).catch(() => {/* best effort */});} catch {/* clock not ready */}
+      },
+      stop: soul => {try {void this.host.enqueue('edge-stop', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, why: 'body'}).catch(() => {/* best effort */});} catch {/* clock not ready */}},
+      publish: (soulId, view) => {
+        try {(this.comms as unknown as {core?: {spectate(m: object): void}} | undefined)?.core?.spectate({kind: 'body', tick: this.host.engine.world.tick, soulId, ...view});} catch {/* spectators never break the ledger */}
+        this.host.markSoulDirty?.(soulId);
+      },
+    }, {now: this.controlNow, knobs: {...env, ...(knobs ?? {})}});
+    this.host.publicBodyOf = id => this.bodyRule?.view(id) ?? null;
+    inbox.onSoulListen?.(id => {try {this.bodyRule?.listen(id);} catch {/* best effort */}});
+    inbox.onSoulSend?.(id => {try {this.bodyRule?.poke(id);} catch {/* best effort */}});
+    return this.bodyRule;
+  }
+  /** LINK BODY: how a body is held now, in the body rule's words. */
+  private posture(entityId: string): Posture {
+    const b = this.body(entityId), h = b?.human; if (!b || !h) return 'other';
+    if (this.aboard(entityId) || h.carrier) return 'basket';
+    const st = stateOf(this.host, entityId);
+    if (h.shore || st === 'swimming') return 'water';
+    if (st === 'seated') return 'seated';
+    if (st === 'lying' || st === 'sleeping' || ['stargaze', 'hammock'].includes(String(h.activity))) return 'lying';
+    if (['walking', 'jogging', 'running', 'cycling'].includes(st)) return 'moving';
+    return st === 'standing' ? 'standing' : 'other';
+  }
+  /** LINK BODY migration (once, at the first body sweep, after travel has registered who is away): Souls the old idle beam
+   *  took (`gone`, not away) come back as sleeping bodies: where they were if that is dry, clear ground in a place, else at
+   *  a starting place. SIM_BODY_MIGRATE=dry reports without changing anything. */
+  private migrateGone() {
+    const fading = (this.comms as unknown as {fading?: {restoreGone?(dry?: boolean): string[]}} | undefined)?.fading, dry = process.env.SIM_BODY_MIGRATE === 'dry';
+    let ids: string[] = [];
+    try {ids = fading?.restoreGone?.(dry) ?? [];} catch (e) {console.error('[body] migration', e instanceof Error ? e.message : e); return;}
+    if (!ids.length) return;
+    const engine = this.host.engine as unknown as {dryGroundAtV1?: (x: number, z: number) => boolean; clearanceUpToV1?: (x: number, z: number, cap?: number) => number}, nav = !!(this.host.engine.world as {navV1?: unknown}).navV1;
+    const lines: string[] = [];
+    for (const id of ids) {
+      const m = this.host.minds.get(id), b = m ? this.body(m.entityId) : undefined; if (!m) {lines.push(`${id} (no body: skipped)`); continue;}
+      const p = b ? [b.pose.p[0], b.pose.p[2]] as [number, number] : null;
+      const keep = !!p && (b!.human?.level ?? 0) === 0 && (engine.dryGroundAtV1?.(p[0], p[1]) ?? true) && (!nav || !engine.clearanceUpToV1 || engine.clearanceUpToV1(p[0], p[1], 1) >= 0.27) && this.places.containing(p[0], p[1]).length > 0;
+      const to = keep ? p! : this.startingPoint(id);
+      lines.push(`${id} ${JSON.stringify(m.name)} ${keep ? 'stays' : 'to the arrival point'} at ${to.map(v => Math.round(v * 10) / 10).join(',')}`);
+      if (dry) continue;
+      this.faded.delete(id); this.capCache.delete(id);
+      if (!keep && m) try {void this.host.enqueue('edge-relocate', `edge:${id}`, {soulId: id, entityId: m.entityId, to, why: 'back as a sleeping body (LINK)'}).catch(() => {/* best effort */});} catch {/* clock not ready */}
+      this.bodyRule?.restoreAsleep({soulId: id, entityId: m.entityId, name: m.name, owner: m.owner});
+    }
+    console.log(`[body] migration${dry ? ' (dry run, nothing changed)' : ''}: ${ids.length} faded Soul(s) back as sleeping bodies\n  ${lines.join('\n  ')}`);
+  }
   private startingPoint(soulId: string): [number, number] {
     // Only starting places on admitted native ground (an engine region of the same id); W1 scenery (e.g. region-*) is never a landing spot.
     const ground = (this.host.engine.world as {regions?: Record<string, unknown>}).regions ?? {};
@@ -382,6 +467,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       void this.decide(p.soul, p.receipt, p.capability, p.label, p.steps).catch(() => this.update(p.receipt, {phase: 'failed', code: 'ledger.unavailable', reason: 'The world could not record this action.'}));
     }
     if (this.ambient && tick % 20 === 0) this.ambientLife(tick);
+    if (this.bodyRule && tick % 20 === 0) {if (!this.bodyMigrated) {this.bodyMigrated = true; this.migrateGone();} this.bodyRule.sweep();}
     if (tick % 100 === 0) this.unstick(tick);
     if (tick % 20 === 0) try {this.together.sweep();} catch (e) {console.error('[edge] together sweep', e instanceof Error ? e.message : e);}
     if (tick % 10 === 0) this.rideFrames(tick);
@@ -412,7 +498,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     for (const m of this.host.minds.values()) {
       const row=this.db.soul(m.soulId);
       if(!row||row.retired_at!==null||row.owner!==m.owner||row.entity_id!==m.entityId||row.world_id!==this.host.worldId)continue;
-      const busy = this.ownerControls(m.soulId) || this.faded.has(m.soulId) || this.pending.has(m.soulId) || !!this.aboard(m.entityId) || !!this.host.engine.programOf(m.entityId) || !!this.host.engine.actorBorrowed?.(m.entityId) || this.openReceipts(m.soulId).length > 0 || this.together.awaiting(m.soulId);
+      const busy = this.ownerControls(m.soulId) || this.faded.has(m.soulId) || !!this.bodyRule?.reflexOwns(m.soulId) || this.pending.has(m.soulId) || !!this.aboard(m.entityId) || !!this.host.engine.programOf(m.entityId) || !!this.host.engine.actorBorrowed?.(m.entityId) || this.openReceipts(m.soulId).length > 0 || this.together.awaiting(m.soulId);
       const b = this.body(m.entityId), state = stateOf(this.host, m.entityId);
       if (busy || !b || state === 'sleeping' || state === 'absent' || state === 'swimming') {this.idleSince.set(m.soulId, tick); continue;}
       const since = this.idleSince.get(m.soulId); if (since === undefined) {this.idleSince.set(m.soulId, tick); continue;}
@@ -1462,8 +1548,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (has('edge_comms_stream')) for (const e of this.db.db.prepare("SELECT tick,at,kind,body FROM edge_comms_stream WHERE world_id=? AND soul_id=? AND kind IN ('arrival','departure','world') ORDER BY seq DESC LIMIT 30").all(this.host.worldId, soulId) as {tick: number; at: number; kind: string; body: string}[]) events.push({tick: e.tick, at: e.at, kind: e.kind, ...JSON.parse(e.body)});
     if (has('edge_comms_speech')) for (const e of this.db.db.prepare('SELECT tick,at,channel,text FROM edge_comms_speech WHERE world_id=? AND soul_id=? ORDER BY tick DESC LIMIT 30').all(this.host.worldId, soulId) as {tick: number; at: number; channel: string; text: string}[]) events.push({tick: e.tick, at: e.at, kind: 'speech', channel: JSON.parse(e.channel), text: e.text, untrusted: true});
     events.sort((a, b) => b.tick - a.tick);
-    return {soul: {soulId, name: row.name ?? m?.name ?? soulId, description: row.description ?? null, untrusted: true}, fade: this.comms?.fading.status(soulId) ?? null, lastAcceptedAt: last.at,
-      self: m ? {placePath: this.placePathOf(soulId), state: stateOf(this.host, m.entityId), activity: String(this.body(m.entityId)?.human?.activity ?? 'idle'), body: this.bodyOf(soulId), doing: this.host.doingOfV1(m)} : null, receipts, events: events.slice(0, 30)};
+    return {soul: {soulId, name: row.name ?? m?.name ?? soulId, description: row.description ?? null, untrusted: true}, fade: this.comms?.fading.status(soulId) ?? null, now: this.host.nowOf(soulId), body: this.bodyRule?.view(soulId) ?? null, lastAcceptedAt: last.at,
+      self: m ? {placePath: this.placePathOf(soulId), state: stateOf(this.host, m.entityId), activity: String(this.body(m.entityId)?.human?.activity ?? 'idle'), bodyState: this.bodyOf(soulId), doing: this.host.doingOfV1(m)} : null, receipts, events: events.slice(0, 30)};
   }
   map() {this.beforeMap?.(); const regions = (this.host.engine.world as NativeWorld).regions ?? {}; return [...this.places.byId.values()].filter(p => !this.knowledge.isSecret(p.id)).map(p => ({id: p.id, name: p.name, kind: p.kind, enclosed: p.enclosed, capacity: p.capacity, parent: p.parent, walkable: p.id in regions || !!this.placeWalkable?.(p.id), center: (p.carrier ? (() => {const e = (this.host.engine.world as NativeWorld).entities[p.carrier!.entity]; return e ? [e.pose.p[0], e.pose.p[2]] : [0, 0];})() : centroid(p.polygon)).map(v => Math.round(v * 10) / 10), ...(p.carrier ? {carrier: p.carrier.entity} : {}), starting: p.starting, ...(p.description ? {description: p.description} : {}), schedule: (p.schedule ?? []).map(s => ({id: s.id, cron: s.cron, durationMinutes: s.durationMinutes ?? null, ticketed: !!s.ticketed, label: s.label ?? null}))}));}
 
@@ -1515,8 +1601,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
       // that gets there), then a few other places nearby: quiet ones, ones with lasting marks/projects or something on.
       happening: spread.happening, elsewhere: spread.elsewhere,
       self: {soulId: soul.soulId, name: soul.name, entityId: soul.entityId, placePath: this.placePathOf(soul.soulId), position: b ? b.pose.p.map(v => Math.round(v * 100) / 100) : null, facing: b ? Math.round(b.pose.yaw * 100) / 100 : null,
-        state: this.faded.has(soul.soulId) ? 'faded' : stateOf(this.host, m.entityId), activity: String(b?.human?.activity ?? 'idle'), reflex: action && action.actor === m.entityId ? {verb: action.action.verb, phase: action.action.phase ?? action.action.status} : null, body: this.bodyOf(soul.soulId),
-        receipts: this.openReceipts(soul.soulId), fade: this.comms?.fading.status(soul.soulId) ?? null,
+        state: this.faded.has(soul.soulId) ? 'faded' : stateOf(this.host, m.entityId), activity: String(b?.human?.activity ?? 'idle'), reflex: action && action.actor === m.entityId ? {verb: action.action.verb, phase: action.action.phase ?? action.action.status} : null,
+        receipts: this.openReceipts(soul.soulId), fade: this.comms?.fading.status(soul.soulId) ?? null, body: this.bodyRule?.view(soul.soulId) ?? null, bodyState: this.bodyOf(soul.soulId),
         holding: social.holding, following: social.following, followedBy: social.followedBy, ...this.gameView(b)},
       // together/1: invitations to me (accept:<id> / decline:<id>) and my own open ones
       ...(social.invites.length ? {invites: social.invites} : {}), ...(social.invited.length ? {invited: social.invited} : {}),

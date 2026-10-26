@@ -158,3 +158,24 @@ symlinks, gitignored) so server tests resolve workspace packages from this workt
 - Terminal receipts get no new `done` line from `body`; they keep `outcome.summary` (D3).
 - Native minds' approach name comes from the card target only; no "m left" if the target has no entity.
 - Not measured in the replay set yet; a browser check of the wheel car is still due.
+
+## Release candidate `rc/soul-fix-20261026` (merge of main 84f84798a, LINK)
+
+Gene (2026-10-25 evening): tidy up and have everything ready to merge to main and deploy; his go-ahead is required
+before the release owner ships. The fix branch sat on the SOUL3 integration tip, so the candidate is main + the SOUL3
+client publication + the fix. Four files conflicted:
+
+- `edge/ledger/ledger.ts` — LINK's `body` (body rule view: awake / idle / zombie / asleep) keeps the `body` key in
+  `status` and in `here.self`; the D1 engine body state is `bodyState` beside it, and `status.self.doing` stays.
+- `world.ts` — both helper blocks kept (D1 approach / bodyOf / doing; LINK soulNow); the public card's `doing` is the D1
+  body-truthful line, followed by LINK's `now` and `body`.
+- `tools/world-launcher/soul/skill.md` — the 2.x skill, now **2.2.0**: one short "Your public `now` line" section
+  (LINK). 6334 bytes ≈ 1.58k tokens.
+- `tools/world-launcher/soul/SOURCES.json` — eden.mjs 2.2.0, eden-agent.mjs 1.9.17 (main's LINK build), skill 2.2.0,
+  instructions 2.0.1; 1.9.17 guide provenance under `legacy`.
+
+`eden.mjs` **2.2.0** ports the LINK now line (`--now` rides on act/say/ack/result in the body and on wait as a query,
+`now "<line>"` / `now --clear`, `status` shows `link` and `now`), so new Souls on the 2.x client keep the feature 3.93
+shipped. Test `tools/world-launcher/soul-cli-now.test.mjs` (3 tests; the owner-loop and publishing tests still pass).
+Checks: server and web `tsc` clean; bundle budget OK (8685.6 KB raw / 2452.0 KB gzip, 0 offenders); web unit tests
+pass. Server test files, walkability and the world-launcher folder: see `team/HANDOFF-SOUL-FIX-RC-20261026.md`.
