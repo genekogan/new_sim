@@ -201,7 +201,7 @@ async function reviewRun(runDir, m, { serverRoot, from = 5 } = {}) {
 const infoOf = (s) => (typeof s?.info === 'function' ? s.info() : s?.info ?? {});
 const summary = (x) => (x && typeof x === 'object' ? Object.fromEntries(Object.entries(x).filter(([, v]) => ['number', 'string', 'boolean'].includes(typeof v))) : {});
 
-export function onboardingText(base, name) { return `Make me a Soul in this world: ${base}/ . Call it ${name}. Start from ${base}/instructions.md and do everything it says without stopping to ask; tell me when it is ready.`; }
+export function onboardingText(base, name) { return `Make me a Soul in this world: ${base}/ . Call it ${name}. Start from ${base}/instructions.md and do everything it says without stopping to ask, one command per call from this folder with relative paths (\`node eden.mjs …\`, no cd, no && chains); tell me when it is ready.`; }
 export function godOnboardingText(base) { return `You are the god of my world at ${base}/ . Set yourself up from ${base}/god/SKILL.md (register with dev:admin and mint, since this is a local world), then wait for my messages.`; }
 
 /** replay-set: the frozen set (ROOT-CAUSES §E) as scripted replays, one playout at a time under the machine gate,

@@ -38,7 +38,10 @@ export class Seat {
     this.dir = dir; this.folder = join(dir, 'folder'); this.seat = seat; this.base = worldBase; this.kind = kind; this.cli = cli;
     this.adapter = ADAPTERS[seat.adapter ?? 'claude-headless']; if (!this.adapter) throw new Error(`unknown adapter ${seat.adapter}`);
     this.rails = { maxTurnsPerRequest: 6, maxTurnWallSec: 240, ...rails };
-    this.allowedTools = allowedTools ?? claude.DEFAULT_ALLOWED;
+    // 2026-10-26 (round 2): seats sometimes call the CLI by its absolute path and write the skill under .claude/; both were
+    // refused by the allowlist and the seat never paired (fix-d3d trio r1, round2 run 1). Allow them for this folder only.
+    this.allowedTools = [...(allowedTools ?? claude.DEFAULT_ALLOWED), `Bash(node ${this.folder}/eden.mjs:*)`, `Bash(node ${this.folder}/eden-agent.mjs:*)`,
+      `Write(${this.folder}/.claude/**)`, `Edit(${this.folder}/.claude/**)`, 'Write(./.claude/**)', 'Edit(./.claude/**)'];
     this.turnN = 0; this.chain = Promise.resolve(); this.listener = null; this.waking = false; this.stopped = false;
     this.lastListenId = null; this.wakesSinceRequest = 0; this.cumulative = null; this.listenFailures = 0;
     this.info = readJson(join(dir, 'seat.json'), null) ?? { id: seat.id, kind, adapter: seat.adapter ?? 'claude-headless', model: seat.model ?? null, effort: seat.effort ?? null,
@@ -117,7 +120,7 @@ export class Seat {
     // read "reuse that Soul", saw paired: false and stopped). Then it gets a nudge that quotes the status and asks it to
     // finish, up to two more turns inside the same timeout. Each nudge is a recorded turn (reason onboard-nudge).
     let paired = null, pairedMs = null, last = null, turn = null, attempts = 0;
-    const nudge = () => `Onboarding is not finished. \`node eden.mjs status\` shows ${JSON.stringify(last ?? {}).slice(0, 300)}. Run the \`next\` command it prints (register, then create the Soul "${name}"), keep going until status shows paired: true, then start listening as the instructions say. Do not stop to ask me anything.`;
+    const nudge = () => `Onboarding is not finished. Run one command per call from this folder with relative paths (\`node eden.mjs …\`), no cd and no && chains. \`node eden.mjs status\` shows ${JSON.stringify(last ?? {}).slice(0, 300)}. Run the \`next\` command it prints (register, then create the Soul "${name}"), keep going until status shows paired: true, then start listening as the instructions say. Do not stop to ask me anything.`;
     while (!paired && attempts < 3 && (attempts === 0 || Date.now() - t0 < timeoutSec * 1000)) {
       attempts += 1;
       let ended = false;
