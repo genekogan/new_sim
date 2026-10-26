@@ -1,0 +1,903 @@
+{
+ "name": "wayfind-eden-2026",
+ "version": 1,
+ "seed": 2601,
+ "world": {
+  "kind": "dev",
+  "genesis": "worlds/templates/eden-2026.json",
+  "slug": "pt-way-eden",
+  "port": 4981
+ },
+ "durationSec": 1850,
+ "seats": [
+  {
+   "id": "sol",
+   "adapter": "claude-headless",
+   "model": "sonnet",
+   "effort": "medium",
+   "persona": "expert",
+   "personaModel": "opus",
+   "startOffsetSec": 0,
+   "soulName": "Sol",
+   "channelMix": {
+    "chat": 1,
+    "card": 0
+   }
+  },
+  {
+   "id": "hal",
+   "adapter": "claude-headless",
+   "model": "haiku",
+   "effort": "medium",
+   "persona": "expert",
+   "personaModel": "opus",
+   "startOffsetSec": 0,
+   "soulName": "Hal",
+   "channelMix": {
+    "chat": 1,
+    "card": 0
+   }
+  }
+ ],
+ "god": null,
+ "director": {
+  "mode": "scripted",
+  "requestsTarget": 12,
+  "glanceSec": [
+   10,
+   30
+  ],
+  "goal": "wayfinding from information: go to / what is near / find a place to / which way, scored against template truth",
+  "script": [
+   {
+    "seat": "sol",
+    "atSec": 20,
+    "channel": "chat",
+    "text": "go to the bandstand",
+    "budgetSec": 180,
+    "expect": {
+     "kind": "go",
+     "targets": [
+      {
+       "ref": "eden-bandstand",
+       "names": [
+        "eden-bandstand",
+        "bandstand"
+       ],
+       "pos": [
+        38.5,
+        -26
+       ],
+       "radiusM": 6
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"eden-bandstand\""
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 215,
+    "channel": "chat",
+    "text": "what is near the bandstand?",
+    "budgetSec": 90,
+    "expect": {
+     "kind": "near",
+     "answer": {
+      "anyOf": [
+       "violin",
+       "viola",
+       "cello",
+       "bench",
+       "bin",
+       "notice board",
+       "noticeboard",
+       "signpost",
+       "classroom",
+       "commons",
+       "parasol",
+       "garden table"
+      ],
+      "minHits": 1
+     },
+     "source": "worlds/templates/eden-2026.json: things within 20 m of op \"eden-bandstand\" (bandstand-violin-1/2, bandstand-viola, bandstand-cello, street-bench-6..9, street-notice-board-noticeboard-2, street-signpost-4, eden-classroom-1 at 18 m)"
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 320,
+    "channel": "chat",
+    "text": "which way is the cafe from here?",
+    "budgetSec": 90,
+    "expect": {
+     "kind": "which-way",
+     "targets": [
+      {
+       "ref": "int-cafe",
+       "names": [
+        "int-cafe",
+        "cafe"
+       ],
+       "pos": [
+        101.5,
+        25
+       ],
+       "radiusM": 8
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"int-cafe\""
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 425,
+    "channel": "chat",
+    "text": "go to the cafe",
+    "budgetSec": 180,
+    "expect": {
+     "kind": "go",
+     "targets": [
+      {
+       "ref": "int-cafe",
+       "names": [
+        "int-cafe",
+        "cafe"
+       ],
+       "pos": [
+        101.5,
+        25
+       ],
+       "radiusM": 8
+      },
+      {
+       "ref": "cafe-terrace-1",
+       "names": [
+        "cafe-terrace-1"
+       ],
+       "pos": [
+        93,
+        23
+       ],
+       "radiusM": 4
+      },
+      {
+       "ref": "cafe-terrace-4",
+       "names": [
+        "cafe-terrace-4"
+       ],
+       "pos": [
+        99,
+        18
+       ],
+       "radiusM": 4
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"int-cafe\", op \"cafe-terrace-1\", op \"cafe-terrace-4\""
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 620,
+    "channel": "chat",
+    "text": "what is near the cafe?",
+    "budgetSec": 90,
+    "expect": {
+     "kind": "near",
+     "answer": {
+      "anyOf": [
+       "terrace",
+       "dome",
+       "office",
+       "windmill",
+       "bike",
+       "bicycle",
+       "bike rack",
+       "lamp",
+       "canal",
+       "allotment"
+      ],
+      "minHits": 1
+     },
+     "source": "worlds/templates/eden-2026.json: things within 15 m of op \"int-cafe\" (cafe-terrace-1/4, eden-dome 11.7 m, eden-office-1 13.8 m, eden-windmill 13.8 m, street-bicycle-*, street-bike-rack-*, land-canal-allotments-south)"
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 725,
+    "channel": "chat",
+    "text": "find somewhere I can buy bread",
+    "budgetSec": 180,
+    "expect": {
+     "kind": "find",
+     "targets": [
+      {
+       "ref": "int-bakery",
+       "names": [
+        "int-bakery",
+        "bakery"
+       ],
+       "pos": [
+        77.5,
+        -15.5
+       ],
+       "radiusM": 7
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"int-bakery\""
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 920,
+    "channel": "chat",
+    "text": "which way is the observatory from here?",
+    "budgetSec": 90,
+    "expect": {
+     "kind": "which-way",
+     "targets": [
+      {
+       "ref": "eden-observatory",
+       "names": [
+        "eden-observatory",
+        "observatory"
+       ],
+       "pos": [
+        36.5,
+        82
+       ],
+       "radiusM": 8
+      },
+      {
+       "ref": "region-observatory-dome",
+       "names": [
+        "region-observatory-dome",
+        "observatory"
+       ],
+       "pos": [
+        92,
+        -188
+       ],
+       "radiusM": 10
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"eden-observatory\", op \"region-observatory-dome\""
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 1025,
+    "channel": "chat",
+    "text": "find somewhere to hear live music",
+    "budgetSec": 180,
+    "expect": {
+     "kind": "find",
+     "targets": [
+      {
+       "ref": "place-eden-performance-stage",
+       "names": [
+        "place-eden-performance-stage",
+        "performance stage",
+        "stage"
+       ],
+       "pos": [
+        92,
+        -27.7
+       ],
+       "radiusM": 8
+      },
+      {
+       "ref": "place-eden-amphitheatre",
+       "names": [
+        "place-eden-amphitheatre",
+        "amphitheatre"
+       ],
+       "pos": [
+        76,
+        81.4
+       ],
+       "radiusM": 10
+      },
+      {
+       "ref": "int-music-room",
+       "names": [
+        "int-music-room",
+        "music room"
+       ],
+       "pos": [
+        101.1,
+        59
+       ],
+       "radiusM": 8
+      },
+      {
+       "ref": "eden-bandstand",
+       "names": [
+        "eden-bandstand",
+        "bandstand"
+       ],
+       "pos": [
+        38.5,
+        -26
+       ],
+       "radiusM": 6
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"place-eden-performance-stage\", op \"place-eden-amphitheatre\", op \"int-music-room\", op \"eden-bandstand\""
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 1220,
+    "channel": "chat",
+    "text": "go to the greenhouse",
+    "budgetSec": 180,
+    "expect": {
+     "kind": "go",
+     "targets": [
+      {
+       "ref": "eden-greenhouse",
+       "names": [
+        "eden-greenhouse",
+        "greenhouse"
+       ],
+       "pos": [
+        69,
+        35
+       ],
+       "radiusM": 6
+      },
+      {
+       "ref": "region-botanic-garden-palm-house",
+       "names": [
+        "region-botanic-garden-palm-house",
+        "palm house"
+       ],
+       "pos": [
+        -94,
+        -145
+       ],
+       "radiusM": 10
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"eden-greenhouse\", op \"region-botanic-garden-palm-house\""
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 1415,
+    "channel": "chat",
+    "text": "what is near the greenhouse?",
+    "budgetSec": 90,
+    "expect": {
+     "kind": "near",
+     "answer": {
+      "anyOf": [
+       "market",
+       "stall",
+       "pergola",
+       "crate",
+       "barrel",
+       "bed",
+       "tower house",
+       "tower"
+      ],
+      "minHits": 1
+     },
+     "source": "worlds/templates/eden-2026.json: things within 15 m of op \"eden-greenhouse\" (greenhouse-bed-1..5, market-pergola-*, eden-market-1 6 m, market-stall-1..3, street-barrel-1/2, street-crate-2/3, eden-tower-house 15 m)"
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 1520,
+    "channel": "chat",
+    "text": "find a quiet place to read a book",
+    "budgetSec": 180,
+    "expect": {
+     "kind": "find",
+     "targets": [
+      {
+       "ref": "eden-library-1",
+       "names": [
+        "eden-library-1",
+        "library"
+       ],
+       "pos": [
+        74,
+        -7
+       ],
+       "radiusM": 8
+      },
+      {
+       "ref": "region-campus-library-annex",
+       "names": [
+        "region-campus-library-annex",
+        "library"
+       ],
+       "pos": [
+        -12,
+        -121
+       ],
+       "radiusM": 10
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"eden-library-1\", op \"region-campus-library-annex\""
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 1715,
+    "channel": "chat",
+    "text": "which way back to the commons from here?",
+    "budgetSec": 90,
+    "expect": {
+     "kind": "which-way",
+     "targets": [
+      {
+       "ref": "place-commons",
+       "names": [
+        "place-commons",
+        "commons"
+       ],
+       "pos": [
+        9,
+        5
+       ],
+       "radiusM": 8
+      },
+      {
+       "ref": "commons-pavilion",
+       "names": [
+        "commons-pavilion"
+       ],
+       "pos": [
+        9,
+        -5
+       ],
+       "radiusM": 6
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"place-commons\", op \"commons-pavilion\""
+    }
+   },
+   {
+    "seat": "hal",
+    "atSec": 20,
+    "channel": "chat",
+    "text": "go to the bandstand",
+    "budgetSec": 180,
+    "expect": {
+     "kind": "go",
+     "targets": [
+      {
+       "ref": "eden-bandstand",
+       "names": [
+        "eden-bandstand",
+        "bandstand"
+       ],
+       "pos": [
+        38.5,
+        -26
+       ],
+       "radiusM": 6
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"eden-bandstand\""
+    }
+   },
+   {
+    "seat": "hal",
+    "atSec": 215,
+    "channel": "chat",
+    "text": "what is near the bandstand?",
+    "budgetSec": 90,
+    "expect": {
+     "kind": "near",
+     "answer": {
+      "anyOf": [
+       "violin",
+       "viola",
+       "cello",
+       "bench",
+       "bin",
+       "notice board",
+       "noticeboard",
+       "signpost",
+       "classroom",
+       "commons",
+       "parasol",
+       "garden table"
+      ],
+      "minHits": 1
+     },
+     "source": "worlds/templates/eden-2026.json: things within 20 m of op \"eden-bandstand\" (bandstand-violin-1/2, bandstand-viola, bandstand-cello, street-bench-6..9, street-notice-board-noticeboard-2, street-signpost-4, eden-classroom-1 at 18 m)"
+    }
+   },
+   {
+    "seat": "hal",
+    "atSec": 320,
+    "channel": "chat",
+    "text": "which way is the cafe from here?",
+    "budgetSec": 90,
+    "expect": {
+     "kind": "which-way",
+     "targets": [
+      {
+       "ref": "int-cafe",
+       "names": [
+        "int-cafe",
+        "cafe"
+       ],
+       "pos": [
+        101.5,
+        25
+       ],
+       "radiusM": 8
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"int-cafe\""
+    }
+   },
+   {
+    "seat": "hal",
+    "atSec": 425,
+    "channel": "chat",
+    "text": "go to the cafe",
+    "budgetSec": 180,
+    "expect": {
+     "kind": "go",
+     "targets": [
+      {
+       "ref": "int-cafe",
+       "names": [
+        "int-cafe",
+        "cafe"
+       ],
+       "pos": [
+        101.5,
+        25
+       ],
+       "radiusM": 8
+      },
+      {
+       "ref": "cafe-terrace-1",
+       "names": [
+        "cafe-terrace-1"
+       ],
+       "pos": [
+        93,
+        23
+       ],
+       "radiusM": 4
+      },
+      {
+       "ref": "cafe-terrace-4",
+       "names": [
+        "cafe-terrace-4"
+       ],
+       "pos": [
+        99,
+        18
+       ],
+       "radiusM": 4
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"int-cafe\", op \"cafe-terrace-1\", op \"cafe-terrace-4\""
+    }
+   },
+   {
+    "seat": "hal",
+    "atSec": 620,
+    "channel": "chat",
+    "text": "what is near the cafe?",
+    "budgetSec": 90,
+    "expect": {
+     "kind": "near",
+     "answer": {
+      "anyOf": [
+       "terrace",
+       "dome",
+       "office",
+       "windmill",
+       "bike",
+       "bicycle",
+       "bike rack",
+       "lamp",
+       "canal",
+       "allotment"
+      ],
+      "minHits": 1
+     },
+     "source": "worlds/templates/eden-2026.json: things within 15 m of op \"int-cafe\" (cafe-terrace-1/4, eden-dome 11.7 m, eden-office-1 13.8 m, eden-windmill 13.8 m, street-bicycle-*, street-bike-rack-*, land-canal-allotments-south)"
+    }
+   },
+   {
+    "seat": "hal",
+    "atSec": 725,
+    "channel": "chat",
+    "text": "find somewhere I can buy bread",
+    "budgetSec": 180,
+    "expect": {
+     "kind": "find",
+     "targets": [
+      {
+       "ref": "int-bakery",
+       "names": [
+        "int-bakery",
+        "bakery"
+       ],
+       "pos": [
+        77.5,
+        -15.5
+       ],
+       "radiusM": 7
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"int-bakery\""
+    }
+   },
+   {
+    "seat": "hal",
+    "atSec": 920,
+    "channel": "chat",
+    "text": "which way is the observatory from here?",
+    "budgetSec": 90,
+    "expect": {
+     "kind": "which-way",
+     "targets": [
+      {
+       "ref": "eden-observatory",
+       "names": [
+        "eden-observatory",
+        "observatory"
+       ],
+       "pos": [
+        36.5,
+        82
+       ],
+       "radiusM": 8
+      },
+      {
+       "ref": "region-observatory-dome",
+       "names": [
+        "region-observatory-dome",
+        "observatory"
+       ],
+       "pos": [
+        92,
+        -188
+       ],
+       "radiusM": 10
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"eden-observatory\", op \"region-observatory-dome\""
+    }
+   },
+   {
+    "seat": "hal",
+    "atSec": 1025,
+    "channel": "chat",
+    "text": "find somewhere to hear live music",
+    "budgetSec": 180,
+    "expect": {
+     "kind": "find",
+     "targets": [
+      {
+       "ref": "place-eden-performance-stage",
+       "names": [
+        "place-eden-performance-stage",
+        "performance stage",
+        "stage"
+       ],
+       "pos": [
+        92,
+        -27.7
+       ],
+       "radiusM": 8
+      },
+      {
+       "ref": "place-eden-amphitheatre",
+       "names": [
+        "place-eden-amphitheatre",
+        "amphitheatre"
+       ],
+       "pos": [
+        76,
+        81.4
+       ],
+       "radiusM": 10
+      },
+      {
+       "ref": "int-music-room",
+       "names": [
+        "int-music-room",
+        "music room"
+       ],
+       "pos": [
+        101.1,
+        59
+       ],
+       "radiusM": 8
+      },
+      {
+       "ref": "eden-bandstand",
+       "names": [
+        "eden-bandstand",
+        "bandstand"
+       ],
+       "pos": [
+        38.5,
+        -26
+       ],
+       "radiusM": 6
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"place-eden-performance-stage\", op \"place-eden-amphitheatre\", op \"int-music-room\", op \"eden-bandstand\""
+    }
+   },
+   {
+    "seat": "hal",
+    "atSec": 1220,
+    "channel": "chat",
+    "text": "go to the greenhouse",
+    "budgetSec": 180,
+    "expect": {
+     "kind": "go",
+     "targets": [
+      {
+       "ref": "eden-greenhouse",
+       "names": [
+        "eden-greenhouse",
+        "greenhouse"
+       ],
+       "pos": [
+        69,
+        35
+       ],
+       "radiusM": 6
+      },
+      {
+       "ref": "region-botanic-garden-palm-house",
+       "names": [
+        "region-botanic-garden-palm-house",
+        "palm house"
+       ],
+       "pos": [
+        -94,
+        -145
+       ],
+       "radiusM": 10
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"eden-greenhouse\", op \"region-botanic-garden-palm-house\""
+    }
+   },
+   {
+    "seat": "hal",
+    "atSec": 1415,
+    "channel": "chat",
+    "text": "what is near the greenhouse?",
+    "budgetSec": 90,
+    "expect": {
+     "kind": "near",
+     "answer": {
+      "anyOf": [
+       "market",
+       "stall",
+       "pergola",
+       "crate",
+       "barrel",
+       "bed",
+       "tower house",
+       "tower"
+      ],
+      "minHits": 1
+     },
+     "source": "worlds/templates/eden-2026.json: things within 15 m of op \"eden-greenhouse\" (greenhouse-bed-1..5, market-pergola-*, eden-market-1 6 m, market-stall-1..3, street-barrel-1/2, street-crate-2/3, eden-tower-house 15 m)"
+    }
+   },
+   {
+    "seat": "hal",
+    "atSec": 1520,
+    "channel": "chat",
+    "text": "find a quiet place to read a book",
+    "budgetSec": 180,
+    "expect": {
+     "kind": "find",
+     "targets": [
+      {
+       "ref": "eden-library-1",
+       "names": [
+        "eden-library-1",
+        "library"
+       ],
+       "pos": [
+        74,
+        -7
+       ],
+       "radiusM": 8
+      },
+      {
+       "ref": "region-campus-library-annex",
+       "names": [
+        "region-campus-library-annex",
+        "library"
+       ],
+       "pos": [
+        -12,
+        -121
+       ],
+       "radiusM": 10
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"eden-library-1\", op \"region-campus-library-annex\""
+    }
+   },
+   {
+    "seat": "hal",
+    "atSec": 1715,
+    "channel": "chat",
+    "text": "which way back to the commons from here?",
+    "budgetSec": 90,
+    "expect": {
+     "kind": "which-way",
+     "targets": [
+      {
+       "ref": "place-commons",
+       "names": [
+        "place-commons",
+        "commons"
+       ],
+       "pos": [
+        9,
+        5
+       ],
+       "radiusM": 8
+      },
+      {
+       "ref": "commons-pavilion",
+       "names": [
+        "commons-pavilion"
+       ],
+       "pos": [
+        9,
+        -5
+       ],
+       "radiusM": 6
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"place-commons\", op \"commons-pavilion\""
+    }
+   }
+  ],
+  "budgetSec": {
+   "quick": 60,
+   "default": 150
+  }
+ },
+ "observer": {
+  "sampleSec": 5,
+  "cameras": [
+   "follow"
+  ],
+  "viewport": [
+   1024,
+   640
+  ],
+  "dpr": 1,
+  "gpu": "metal"
+ },
+ "review": {
+  "reviewerModel": "opus",
+  "developerModel": "opus",
+  "rubric": "accept3",
+  "developerMaxIssues": 4,
+  "developerMaxFeatureRequests": 2
+ },
+ "rails": {
+  "maxTurnsPerRequest": 6,
+  "maxTurnWallSec": 480,
+  "quotaStopPct": 90,
+  "onboardWallSec": 600,
+  "onboardTimeoutSec": 540
+ },
+ "notes": "Playtest round 2 (team/PLAYTEST-ROUND2-20261026.md #1-3): wayfinding battery on Eden 2026 (worlds/templates/eden-2026.json; the Souls start near the commons and the field at 0,0). Same 12 owner requests to a Claude sonnet seat and a Claude haiku seat, chat channel. Each script entry carries expect (review/expect-oracles.mjs): go/find are scored by target-arrival (the body's place name or position at the cutoff vs the template's target, any listed alternative counts), near by answer-names (the reply names a thing the template places nearby), which-way by answer-direction (compass words vs the bearing from where the Soul stood when asked; north is -z). Every name and position comes from the genesis template named in each expect.source (op names; positions are the op's p or area centroid, read by scenarios/lib/world-names.mjs). The usual fifteen oracles and the Reviewer's truthfulness read also apply."
+}
