@@ -194,3 +194,52 @@ pass. Server test files, walkability and the world-launcher folder: see `team/HA
   (seated, never napping). With the 8 m radius `sit:here` carries the nearest seat's target, so the LINK idle reflex
   took `sit:here` instead of the concrete seat offer and never reached its doze. The reflex now skips `sit:here`
   (`ledger.ts` attachPresence seat hook); the test passes again (seated 411, napping 1212 ticks).
+
+## D3b: unfinished acts read unfinished; a result lands on its own message; "house 2" is house 2
+
+Why: the two-repeat cloud scorecard (`team/playtest/replays/cloud/fix-r3/SCORECARD-vs-baseline-cloud2.md`, ledgers in
+`fix-r3/*` and `rc-r2/*`) kept the sitting (6/6 twice) and walk (100 %) wins, but W rose and pip's H fell in basics-2:
+(1) agents reported an outcome as soon as `act` returned accepted (fix-r3 basics-2 pip-006 "lying down" 13 s early,
+pip-009 "at the pond" 15 s early; rc-r2 basics-2 pip-002/quin-002 "sitting" while standing); (2) the CLI's implicit
+`--for` linked any act within 15 min of the last ack, so trio tam-003's later walk to the pavilion closed "walk with
+Mira" as Done; (3) basics-1 r1 pip-010 "go inside house 2, into the kitchen" (the agent sent `act "walk to the kitchen
+in eden-house-2"`) resolved to `walk:eden-house-1/kitchen-chair-2`.
+
+- **A. `--for` default (eden.mjs 2.2.1).** The implicit link applies only to the first act the world *accepts* after an
+  ack and only within 120 s of it (`IMPLICIT_FOR_MS`); state `.eden-agent.json` `lastAckedActed` beside
+  `lastAcked`/`lastAckedAt` (set by that act, cleared by `ack`/`result`/a stale-default drop). A refused act
+  (`accepted:false`) links nothing, so it does not use the default up. Explicit `--for <id>` and `--for none` unchanged
+  (any accepted act after the ack counts as the first, `--for none` included). Test: `soul-cli-owner-loop.test.mjs`
+  (refused act, first act links, second does not, explicit still links, `none` uses it up, `--json`, > 120 s, stale drop).
+- **B. Unfinished sentence.** `body-state.ts` `notYet()` (MAIN_POSE moved here from ledger.ts); `ledger.ts` `bodyFacts`
+  now ends every open receipt's `now` with it: walk/run/jog/go/go-near/stroll/follow "not there yet"; sit/sit-ground
+  "not sitting yet" until seated; lie/nap "not lying yet" until lying; stand "not standing yet"; a body already in a
+  timed pose (seated for the 60 s sit, lying, dancing, other timed acts) "not finished yet"; an approach for read/eat/…
+  "not reading yet"; waiting and not running, or an invitation nobody has answered, "not started yet"; a join "not
+  aboard yet". Never "lying down; not lying yet": once in the pose the open receipt reads "not finished yet". `brief()`
+  prints `done: false` next to `now`. Skill 2.2.1 Acting bullet: "Until `done` appears the request is not done; say
+  so."; owner step 3: "only the first act after an ack serves it; else `--for <id>`". 6,334 → 6,390 bytes (≤ 6,400).
+  SOURCES.json re-pinned (eden.mjs and skill.md 2.2.1); `soul-publication.test.ts` and `soul-cli-now.test.mjs` pin 2.2.1.
+  Test: `body-state.test.ts` D3b case (11 readings).
+- **C. Numbers bind to the word before them (vocabulary.ts).** The resolver was wrong, not the agent: the agent's words
+  named eden-house-2, but house 2's kitchen was not among the offers where Pip stood, and `kitchen-chair-2` in house 1
+  held every word (kitchen, eden, house, 2) in step 3, so the nearest match won. Reproduced in a unit fixture (the
+  4945f650a fixture without the house-2 kitchen offer). Now `numberConflict`: words that number a word ("house 2")
+  exclude a name that numbers that word only otherwise ("house 1"); names without such a number are unaffected; applied
+  in step 3 and in `placeMatchTier` tiers 1–3. `numberWords`: "house two" reads "house 2" only where a name here numbers
+  "house" ("the red one" stays words). With the room offered the walk is `walk:eden-house-2/kitchen`; without it, the
+  house that holds it (`walk:eden-house-2`, existing contains-it path), never house 1. Test: `edge-ledger-vocabulary`
+  D3b case next to the D2 one.
+- **D. Unchanged:** the 8 m seat radius, the idle-reflex `sit:here` skip, D1's body-truthful `doing` line.
+
+### Product issue recorded (not papered over)
+- **The world's dance has no visible body effect indoors.** fix-r3 basics-1 r2, basics-2 r1/r2 pip-008 "dance for twenty
+  seconds": the receipt completed after 20 s, but every body sample read standing/idle and the card read "Standing
+  around" (D1's doing line is body-truthful, so it reports what the body shows). The dance program needs a visible pose
+  or animation (or a refusal where it cannot show one); D3b does not change the doing line to hide it.
+
+### Not verified here
+- No Modal gate, dev world or replay was run (coordinator re-gates and re-measures). Whether `not finished yet` while
+  seated changes how agents word sit/lie replies is for the replay set to show.
+- The real Eden 2026 offer set for pip-010's spot was not reproduced (the unit fixture models "house 2's kitchen not
+  offered"); the Eden-boot resolve suites were not run.
