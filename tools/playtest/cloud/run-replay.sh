@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # One-shot cloud runner: replay the frozen set against a fix branch and commit the results to `playtest-results`.
 #   bash tools/playtest/cloud/run-replay.sh <fix-branch> <out-name> [repeats=1]
+#   PLAYTEST_SCENARIO=tools/playtest/scenarios/<x>.json … runs that one scenario instead of the frozen set.
 # Run from a clone of the playtest branch (lane/playtest-20261024). Idempotent: rerunning resumes every step
 # (worktree, install, web build stamp, asset overlay, replay-set receipts, PNG compression, commit). See README.md.
 # Layout beside the clone: ../server (fix branch worktree), ../mars-web (overlay), ../results/<out-name>, ../results-branch.
@@ -79,9 +80,15 @@ export PLAYTEST_MARS_WEB="$MARSWEB"
 step preflight bash -c "node tools/playtest/playtest.mjs preflight --server-root '$SERVER' --force-machine > '$OUT/cloud-preflight.json'" || { say "preflight failed: see $OUT/cloud-preflight.json"; }
 PF_OK="$(node -e 'try{console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).ok)}catch{console.log("unknown")}' "$OUT/cloud-preflight.json")"
 RS_RC=0
-if [ "$PF_OK" = "true" ]; then
+if [ "$PF_OK" != "true" ]; then RS_RC=2; say "skipping the play: preflight not ok"
+elif [ -n "${PLAYTEST_SCENARIO:-}" ]; then
+  # one scenario instead of the frozen set (PLAYTEST_SCENARIO=<scenario.json>, repeats as -r1, -r2 …)
+  for i in $(seq 1 "$REPEATS"); do
+    step "run-$(basename "$PLAYTEST_SCENARIO" .json)-r$i" node tools/playtest/playtest.mjs run "$PLAYTEST_SCENARIO" --server-root "$SERVER" --out "$OUT/$(basename "$PLAYTEST_SCENARIO" .json)-r$i" || RS_RC=$?
+  done
+else
   step replay-set node tools/playtest/playtest.mjs replay-set --server-root "$SERVER" --out "$OUT" --repeats "$REPEATS" --force-machine --frozen tools/playtest/frozen/frozen.json || RS_RC=$?
-else RS_RC=2; say "skipping the replay set: preflight not ok"; fi
+fi
 LOAD_AFTER="$(load1)"; MEM_AFTER="$(mem)"
 
 # --- shrink screenshots for git (story.html keeps its inline thumbnails)

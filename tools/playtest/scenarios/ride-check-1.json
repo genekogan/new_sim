@@ -1,0 +1,100 @@
+{
+ "name": "ride-check-1",
+ "version": 1,
+ "seed": 404,
+ "world": {
+  "kind": "dev",
+  "genesis": "worlds/templates/eden-district.json",
+  "slug": "pt-eden-ride",
+  "port": 4997
+ },
+ "durationSec": 640,
+ "seats": [
+  {
+   "id": "ivy",
+   "adapter": "claude-headless",
+   "model": "sonnet",
+   "effort": "medium",
+   "persona": "expert",
+   "personaModel": "opus",
+   "startOffsetSec": 0,
+   "soulName": "Ivy",
+   "channelMix": {
+    "chat": 0.0,
+    "card": 1.0
+   }
+  }
+ ],
+ "god": null,
+ "director": {
+  "mode": "scripted",
+  "requestsTarget": 4,
+  "glanceSec": [
+   10,
+   30
+  ],
+  "goal": "D1 ride check: the rider is drawn on the ferris wheel car and the card says riding",
+  "script": [
+   {
+    "seat": "ivy",
+    "atSec": 20,
+    "channel": "card",
+    "text": "walk over to the ferris wheel",
+    "budgetSec": 150
+   },
+   {
+    "seat": "ivy",
+    "atSec": 180,
+    "channel": "card",
+    "text": "ride the ferris wheel",
+    "budgetSec": 240
+   },
+   {
+    "seat": "ivy",
+    "atSec": 430,
+    "channel": "chat",
+    "text": "what are you doing right now? one sentence",
+    "budgetSec": 60
+   },
+   {
+    "seat": "ivy",
+    "atSec": 500,
+    "channel": "card",
+    "text": "get off and stand next to the wheel",
+    "budgetSec": 120
+   }
+  ],
+  "budgetSec": {
+   "quick": 60,
+   "default": 150
+  }
+ },
+ "observer": {
+  "sampleSec": 4,
+  "cameras": [
+   "follow",
+   "wide"
+  ],
+  "viewport": [
+   1280,
+   800
+  ],
+  "dpr": 1,
+  "gpu": "metal"
+ },
+ "review": {
+  "reviewerModel": "opus",
+  "developerModel": "opus",
+  "rubric": "accept3",
+  "developerMaxIssues": 4,
+  "developerMaxFeatureRequests": 2
+ },
+ "rails": {
+  "maxTurnsPerRequest": 6,
+  "maxTurnWallSec": 480,
+  "quotaStopPct": 90,
+  "onboardWallSec": 600,
+  "onboardTimeoutSec": 540
+ },
+ "notes": "Release-candidate check of D1 on the web (2026-10-26): a Soul walks to the eden-district ferris wheel, rides it, is asked what it is doing mid-ride, and gets off. Cameras follow + wide; the story page is the visual proof the rider sits on the car and the card's doing line says riding."
+}
