@@ -154,10 +154,10 @@ function LinkDetails({name,link,here,prompt,disconnect,clock,pairOpen}:{name:str
  </div>;
 }
 function ReconnectBox({name,link,prompt,clock}:{name:string;link:Link;prompt:string;clock:number}){
- const sentence=link.reason==='approved-waiting'?`The agent never started listening. Give it this prompt; its request shows up here for you to approve, and ${name} wakes up.`:reconnectSentence(name,link,clock);
+ const {why,ask}=reconnectSentence(name,link,clock);
  return <div className="soul-box soul-reconnect" data-reconnect="1">
-  <p className="soul-box-title">Reconnect</p>
-  <p className="soul-box-text">{sentence}</p>
+  <p className="soul-dim soul-box-line" data-reconnect-why="1">{why}</p>
+  <p className="soul-box-text">{ask}</p>
   <PromptCopy prompt={prompt}/>
  </div>;
 }
