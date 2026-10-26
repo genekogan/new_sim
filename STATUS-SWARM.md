@@ -40,6 +40,7 @@ Brief: `<team>/TRANCHE-SWARM-DIRECTOR-20261026.md`. Branch `lane/swarm-director-
   "durationSec": 2700,                                   // hard stop for the whole scene
   "brief": "one paragraph every seat shares",
   "room": { "label": "the library hall", "match": ["hall"] },  // placePath name substrings (case-insensitive)
+  "podium": { "label": "the lectern at the front", "pos": [x, z], "radiusM": 2, "ref": "op-name", "refs": ["…"] },  // optional (round 2): the speaker is sent there on its turn; ref/refs are checked against the template by scenarios/lib/validate.mjs
   "order": ["doc", "happy", …],                          // presentation order (seat ids)
   "seats": [ { "id": "doc", "soulName": "Doc", "character": "one paragraph", "topic": "what they present",
                "adapter": "claude-headless", "model": "haiku", "effort": "low", "economy": "lean" }, … ],
@@ -47,7 +48,7 @@ Brief: `<team>/TRANCHE-SWARM-DIRECTOR-20261026.md`. Branch `lane/swarm-director-
   "timing": { "truthPollSec": 5, "gatherMaxSec": 900, "nudgeAfterSec": 150, "maxNudges": 3, "quietSec": 25,
               "speakTimeoutSec": 240, "prepareAhead": true },
   "orchestrator": { "planner": "opus" | null, "plannerEffort": "medium" },
-  "success": { "allPresent": true, "minChars": 40, "inOrder": true, "eachOnce": true },
+  "success": { "allPresent": true, "minChars": 40, "inOrder": true, "eachOnce": true, "fromPodium": false },  // fromPodium: every talk's lines spoken within podium.radiusM (position = the speaker's newest receipt ended by the line's tick, public Soul page)
   "observer": { "sampleSec": 15, "cameras": ["follow", "wide"], "viewport": [1024, 640] },
   "rails": { "onboardWallSec": 600, "onboardTimeoutSec": 540, "onboardConcurrency": 4, "quotaStopPct": 90 },
   "console": { "script": [ { "at": "go:sleepy", "line": "redirect grumpy: …", "expect": ["piano"] } ] }

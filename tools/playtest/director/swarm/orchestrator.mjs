@@ -157,12 +157,12 @@ export function createSwarm({ cast, runDir, seats, world, owner, truth, plan, cl
       const now = inRoom(tr.placePath, cast.room);
       if (now !== st.present) {
         st.present = now; if (now) st.everPresent = true;
-        appendJsonl(join(dir, 'presence.jsonl'), { t: iso(), mono: clock.now(), seat: st.id, present: now, placePath: tr.placePath, posture: tr.posture });
+        appendJsonl(join(dir, 'presence.jsonl'), { t: iso(), mono: clock.now(), seat: st.id, present: now, placePath: tr.placePath, posture: tr.posture, pos: tr.pos ?? null });
         timeline('presence', { seat: st.id, present: now, placePath: tr.placePath }, `${st.id.padEnd(8)} ${now ? 'is in' : 'left'} ${cast.room.label} (${tr.placePath.slice(0, 2).join(' / ') || '?'})`);
       }
       for (const sp of tr.speech) {
         const k = `${sp.atMs}|${sp.text}`; if (st.seen.has(k)) continue; st.seen.add(k);
-        const rec = { seat: st.id, atMs: sp.atMs, at: sp.atMs ? new Date(sp.atMs).toISOString() : null, tick: sp.tick, text: sp.text, channel: sp.channel, present: st.present, speaker: cast.order[state.speakerIdx] ?? null, phase: state.phase };
+        const rec = { seat: st.id, atMs: sp.atMs, at: sp.atMs ? new Date(sp.atMs).toISOString() : null, tick: sp.tick, text: sp.text, channel: sp.channel, present: st.present, pos: sp.pos ?? tr.pos ?? null, posSource: sp.posSource ?? tr.posSource ?? null, speaker: cast.order[state.speakerIdx] ?? null, phase: state.phase };
         st.speech.push(rec);
         appendJsonl(join(dir, 'speech.jsonl'), { t: iso(), mono: clock.now(), ...rec });
         timeline('speech', { seat: st.id, text: sp.text, atMs: sp.atMs }, `${st.id.padEnd(8)} says: "${clip(sp.text, 120)}"`);

@@ -11,7 +11,7 @@ export const ECONOMY = {
 };
 
 export const TIMING = { truthPollSec: 5, gatherMaxSec: 900, nudgeAfterSec: 150, maxNudges: 3, quietSec: 25, speakTimeoutSec: 240, maxSpeakNudges: 1, prepareAhead: true, presentWaitSec: 120 };
-export const SUCCESS = { allPresent: true, minChars: 40, inOrder: true, eachOnce: true };
+export const SUCCESS = { allPresent: true, minChars: 40, inOrder: true, eachOnce: true, fromPodium: false };
 
 export function loadCast(file) { return normalizeCast(JSON.parse(readFileSync(file, 'utf8'))); }
 
@@ -34,6 +34,15 @@ export function normalizeCast(raw) {
     if (!s.soulName) errs.push(`seats[${i}].soulName required`);
     if (!s.character) errs.push(`seats[${i}].character required`);
   }
+  // Optional podium: where each talk is given from. {label (owner words), pos [x, z] (world), radiusM, ref? (template op name)}.
+  // The speaker is directed there on its turn; verify's fromPodium check reads the speaker's position when it spoke.
+  if (c.podium != null) {
+    const p = c.podium;
+    if (!p.label) errs.push('podium.label required');
+    if (!(Array.isArray(p.pos) && p.pos.length === 2 && p.pos.every(Number.isFinite))) errs.push('podium.pos must be [x, z]');
+    if (!(p.radiusM > 0)) errs.push('podium.radiusM must be > 0');
+  }
+  if (c.success?.fromPodium && !c.podium) errs.push('success.fromPodium needs a podium');
   c.economy = { ...ECONOMY, ...(c.economy ?? {}) };
   for (const s of c.seats ?? []) if (s.economy && !c.economy[s.economy]) errs.push(`seat ${s.id}: unknown economy ${s.economy}`);
   c.order = c.order ?? (c.seats ?? []).map((s) => s.id);

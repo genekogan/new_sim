@@ -76,6 +76,7 @@ export function validateCast(raw) {
     const N = namesOf(c.world.genesis);
     for (const m of c.room.match) if (![...N.keys()].some((n) => n.toLowerCase().includes(m.toLowerCase()))) errs.push(`room.match "${m}" names nothing placed in ${c.world.genesis}`);
     if (c.podium?.ref) errs.push(...checkTargets(c.world.genesis, [{ ref: c.podium.ref, pos: c.podium.pos }], 'podium'));
+    for (const r of c.podium?.refs ?? []) { const n = N.get(r); if (!n) errs.push(`podium.refs: "${r}" is not a placed name in ${c.world.genesis}`); else if (n.pos && dist(n.pos, c.podium.pos) > c.podium.radiusM) errs.push(`podium.refs: ${r} at ${n.pos} is outside the podium radius`); }
   }
   return errs;
 }

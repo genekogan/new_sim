@@ -18,6 +18,17 @@ export function presenceStats(presence, seats) {
   return { maxTogether: max, allTogetherAt: allAt, everPresent: ever };
 }
 
+/** Was a seat's talk given from the podium? Its in-turn lines' recorded positions (truth.mjs: where the newest receipt
+ *  ended by each line's tick) against podium.pos within podium.radiusM. → {ok: true|false|null, at, d, known, lines} */
+export function podiumOf(podium, lines) {
+  if (!podium || !lines.length) return null;
+  const known = lines.filter((s) => Array.isArray(s.pos) && s.pos.length === 2);
+  if (!known.length) return { ok: null, known: 0, lines: lines.length, d: null, at: null };
+  const ds = known.map((s) => Math.hypot(s.pos[0] - podium.pos[0], s.pos[1] - podium.pos[1]));
+  const d = Math.max(...ds);
+  return { ok: d <= podium.radiusM, known: known.length, lines: lines.length, d: Math.round(d * 10) / 10, at: known[ds.indexOf(d)].pos };
+}
+
 export function verifySession({ cast, directions, speech, presence, state = null }) {
   const order = cast.order, minChars = cast.success.minChars;
   const goOf = (id) => directions.find((d) => d.seat === id && d.kind === 'go' && !d.error) ?? null;
@@ -35,7 +46,8 @@ export function verifySession({ cast, directions, speech, presence, state = null
     const outside = speech.filter((s) => s.seat === id && s.atMs != null && s.atMs >= turnsFrom && s.text.length >= minChars && !(w && s.atMs >= w[0] && s.atMs < w[1]));
     const before = speech.filter((s) => s.seat === id && s.atMs != null && s.atMs < turnsFrom);
     per[id] = { go: goes.find((g) => g.id === id).go?.t ?? null, presented: chars >= minChars, lines: lines.length, chars, firstAt: lines[0]?.at ?? null, text: lines.map((s) => s.text).join(' '),
-      inRoomWhenSpeaking: lines.length ? lines.every((s) => s.present !== false) : null, outOfTurn: outside.map((s) => ({ at: s.at, text: clip(s.text) })), beforeTurns: before.length };
+      inRoomWhenSpeaking: lines.length ? lines.every((s) => s.present !== false) : null, outOfTurn: outside.map((s) => ({ at: s.at, text: clip(s.text) })), beforeTurns: before.length,
+      ...(cast.podium ? { podium: podiumOf(cast.podium, lines) } : {}) };
   }
   const firsts = order.filter((id) => per[id].presented).map((id) => ({ id, ms: Date.parse(per[id].firstAt) }));
   const byTime = [...firsts].sort((a, b) => a.ms - b.ms).map((x) => x.id);
@@ -53,7 +65,14 @@ export function verifySession({ cast, directions, speech, presence, state = null
     eachOnce: { pass: order.every((id) => per[id].outOfTurn.length === 0), detail: `${order.reduce((n, id) => n + per[id].outOfTurn.length, 0)} long lines outside the speaker's own turn` },
     redirect: { pass: redirects.every((r) => r.observed !== false), detail: redirects.length ? redirects.map((r) => `${r.seat}: ${r.observed == null ? 'no expectation' : r.observed ? 'observed' : 'NOT observed'}`).join('; ') : 'none' },
   };
-  const want = Object.entries(cast.success).filter(([, v]) => v === true).map(([k]) => ({ allPresent: 'allPresent', inOrder: 'inOrder', eachOnce: 'eachOnce' }[k])).filter(Boolean);
+  if (cast.podium) {
+    // Every talk given (presented) must come from the podium; a talk with no recorded position counts against it.
+    const given = order.filter((id) => per[id].presented);
+    const at = given.filter((id) => per[id].podium?.ok === true), off = given.filter((id) => per[id].podium?.ok === false), unk = given.filter((id) => per[id].podium?.ok == null);
+    checks.fromPodium = { pass: given.length === order.length && at.length === given.length,
+      detail: `${at.length}/${order.length} talks from ${cast.podium.label} (≤ ${cast.podium.radiusM} m)${off.length ? `; away: ${off.map((id) => `${id} ${per[id].podium.d} m`).join(', ')}` : ''}${unk.length ? `; position unknown: ${unk.join(', ')}` : ''}` };
+  }
+  const want = Object.entries(cast.success).filter(([, v]) => v === true).map(([k]) => ({ allPresent: 'allPresent', inOrder: 'inOrder', eachOnce: 'eachOnce', fromPodium: 'fromPodium' }[k])).filter((k) => k && checks[k]);
   const pass = ['eachPresented', 'redirect', ...want].every((k) => checks[k].pass);
   return { pass, checks, seats: per, presence: ps, redirects, spokenOrder: byTime };
 }
@@ -75,7 +94,7 @@ export function costOf(runDir) {
 }
 
 export function renderVerdictMd(cast, v, cost) {
-  const L = [`# ${cast.name}: ${v.pass ? 'PASS' : 'FAIL'}`, '', `Room: ${cast.room.label} · order: ${cast.order.join(' → ')}`, '', '| check | result | detail |', '|---|---|---|'];
+  const L = [`# ${cast.name}: ${v.pass ? 'PASS' : 'FAIL'}`, '', `Room: ${cast.room.label}${cast.podium ? ` · podium: ${cast.podium.label} (${cast.podium.pos.join(', ')}, ≤ ${cast.podium.radiusM} m)` : ''} · order: ${cast.order.join(' → ')}`, '', '| check | result | detail |', '|---|---|---|'];
   for (const [k, c] of Object.entries(v.checks)) L.push(`| ${k} | ${c.pass ? 'pass' : 'FAIL'} | ${c.detail} |`);
   L.push('', '## Talks (world speech in each turn)', '', '| seat | turn began | lines | chars | in room | out of turn | talk |', '|---|---|---:|---:|---|---:|---|');
   for (const id of cast.order) { const s = v.seats[id]; L.push(`| ${id} | ${s.go ?? '—'} | ${s.lines} | ${s.chars} | ${s.inRoomWhenSpeaking ?? '—'} | ${s.outOfTurn.length} | ${clip(s.text, 160).replace(/\|/g, '/')} |`); }
