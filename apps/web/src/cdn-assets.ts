@@ -175,10 +175,14 @@ function guardedBody(response: Response, request: AssetRequest, timeoutMs: numbe
   return responseMetadata(new Response(stream, { status: response.status, statusText: response.statusText, headers: response.headers }), response);
 }
 
-/** Listed assets use bounded header waits and positive-byte body inactivity, without a total transfer deadline.
- * The original request retains its HTTP status and streaming body. Unlisted/range/non-GET requests pass through. */
+/** Fetch cannot distinguish a browser connection queue from a server waiting to send headers. Give queued
+ * assets a finite minute to reach headers; once reading, twelve seconds without bytes still fails promptly. */
+export const CDN_HEADER_WAIT_MS = 60_000;
+export const CDN_BODY_IDLE_MS = 12_000;
 export const CDN_HEDGE_MS = 4_000;
-export function cdnFetch(original: Fetch, manifest: CdnManifest, origin: string, pageUrl: string, timeoutMs = 12_000, onProgress?: CdnProgress, hedgeMs = CDN_HEDGE_MS): Fetch {
+/** Listed assets use separate header and positive-byte body budgets, without a total transfer deadline.
+ * The original request retains its HTTP status and streaming body. Unlisted/range/non-GET requests pass through. */
+export function cdnFetch(original: Fetch, manifest: CdnManifest, origin: string, pageUrl: string, bodyIdleMs = CDN_BODY_IDLE_MS, onProgress?: CdnProgress, hedgeMs = CDN_HEDGE_MS): Fetch {
   const remote = cdnOrigin(origin);
   return async (input, init) => {
     const request = input instanceof Request ? input : null;
@@ -188,9 +192,9 @@ export function cdnFetch(original: Fetch, manifest: CdnManifest, origin: string,
     const asset = method === 'GET' && !headers.has('range') ? manifestAsset(manifest, url, pageUrl) : undefined;
     if (!asset) return original(input, init);
     const caller = init?.signal ?? request?.signal;
-    const fromOrigin = () => assetRequest(signal => original(input, { ...init, signal }), caller, timeoutMs);
+    const fromOrigin = () => assetRequest(signal => original(input, { ...init, signal }), caller, CDN_HEADER_WAIT_MS);
     // Never send an origin's auth headers, cookies or referrer to the public bucket.
-    const cdn = assetRequest(signal => original(remote + '/' + asset.key, { method: 'GET', mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer', signal }), caller, timeoutMs);
+    const cdn = assetRequest(signal => original(remote + '/' + asset.key, { method: 'GET', mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer', signal }), caller, CDN_HEADER_WAIT_MS);
     let beside: AssetRequest | undefined, hedgeTimer: ReturnType<typeof setTimeout> | undefined, besideDiscarded = false;
     let cdnBody: ReadableStreamDefaultReader<Uint8Array> | undefined;
     try {
@@ -209,10 +213,10 @@ export function cdnFetch(original: Fetch, manifest: CdnManifest, origin: string,
         hedgeTimer = setTimeout(() => { if (settled) return; pending++; beside = fromOrigin(); beside.response.then(accept(beside), fail); }, hedgeMs);
       });
       clearTimeout(hedgeTimer);
-      if (beside && first.request === beside) { cdn.cancel(); return guardedBody(first.response, beside, timeoutMs); }
+      if (beside && first.request === beside) { cdn.cancel(); return guardedBody(first.response, beside, bodyIdleMs); }
       if (!first.response.ok || !first.response.body) throw Error('CDN response failed');
       if (beside) { besideDiscarded = true; beside.cancel(); }
-      const response = guardedBody(first.response, cdn, timeoutMs);
+      const response = guardedBody(first.response, cdn, bodyIdleMs);
       cdnBody = response.body!.getReader();
       const bytes = new Uint8Array(asset.bytes); let loaded = 0;
       for (;;) {
@@ -234,7 +238,7 @@ export function cdnFetch(original: Fetch, manifest: CdnManifest, origin: string,
       if (caller?.aborted) { beside?.cancel(error); throw caller.reason; }
       // Reuse a still-owned hedge; a cancelled loser must never be adopted for fallback.
       const fallback = beside && !besideDiscarded ? beside : fromOrigin();
-      return guardedBody(await fallback.response, fallback, timeoutMs);
+      return guardedBody(await fallback.response, fallback, bodyIdleMs);
     } finally { clearTimeout(hedgeTimer); try { cdnBody?.releaseLock(); } catch { /* cancellation pending */ } }
   };
 }

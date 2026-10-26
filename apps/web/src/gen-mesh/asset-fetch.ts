@@ -32,9 +32,10 @@ async function decodeImages(buf, n) {
     return (await Promise.all(jobs)).filter(Boolean);
   } catch (e) { return []; }
 }
-// Each header wait is bounded independently; the second request starts after 4 s. Body deadlines measure inactivity,
+// Header waits include the native connection queue shared with page asset downloads; allow a finite minute.
+// The second request still starts after 4 s. Body deadlines measure twelve seconds of inactivity,
 // not total transfer time, so a slow connection that keeps delivering bytes can finish without a size/quality change.
-const HEDGE_MS = 4000, STALL_MS = 12000;
+const HEDGE_MS = 4000, HEADER_WAIT_MS = 60000, STALL_MS = 12000;
 const running = new Map();
 const abortError = () => new DOMException('asset request aborted', 'AbortError');
 function cancelResponse(r) { try { if (r.body) void r.body.cancel().catch(() => {}); } catch (_) {} }
@@ -50,7 +51,7 @@ function headers(run, job) {
     };
     const aborted = () => finish(ctl.signal.reason || abortError());
     ctl.signal.addEventListener('abort', aborted, { once: true });
-    timer = setTimeout(() => { const e = new Error('headers stalled for ' + STALL_MS / 1000 + ' s'); finish(e); ctl.abort(e); }, STALL_MS);
+    timer = setTimeout(() => { const e = new Error('headers stalled for ' + HEADER_WAIT_MS / 1000 + ' s'); finish(e); ctl.abort(e); }, HEADER_WAIT_MS);
     if (job.cancelled) { ctl.abort(abortError()); return; }
     Promise.resolve().then(() => { ctl.signal.throwIfAborted(); return run(ctl.signal); }).then((r) => {
       // A failed hedge must not beat a successful sibling that is still waiting for its headers.

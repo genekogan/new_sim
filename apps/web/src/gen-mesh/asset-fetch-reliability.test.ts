@@ -39,13 +39,34 @@ const response = () => new Response(bytes.slice());
 const terminal = (w: ReturnType<typeof runtime>) => w.reports.filter(m => m.error !== undefined || m.buffer !== undefined);
 function clean(w: ReturnType<typeof runtime>) { assert.equal(w.pending(), 0, 'worker job released'); assert.equal(w.clock.timers.size, 0, 'all transport timers released'); }
 
-test('both original headers hang even ignoring abort: bounded error at16s, both requests cancelled and late bodies released', async () => {
+test('worker headers queued behind six healthy page bodies survive a20s native connection wait', async () => {
+  let occupied = 6, admitted = 0, bodyCloses = 0;
+  const waiting: (() => void)[] = [];
+  const w = runtime((_url, init) => new Promise(resolve => {
+    const admit = () => { admitted++; resolve(response()); };
+    waiting.push(admit);
+    init.signal!.addEventListener('abort', () => { const i = waiting.indexOf(admit); if (i >= 0) waiting.splice(i, 1); }, { once: true });
+  }));
+  // Page-owned responses occupy the same six native HTTP connections. Each still receives positive bytes.
+  const pages = Array.from({ length: 6 }, () => new Response(new ReadableStream<Uint8Array>({ start(c) {
+    c.enqueue(bytes.slice(0, 1));
+    for (const at of [5000, 10000, 15000]) w.clock.setTimeout(() => c.enqueue(bytes.slice(0, 1)), at);
+    w.clock.setTimeout(() => { c.close(); bodyCloses++; occupied--; while (occupied < 6 && waiting.length) { occupied++; waiting.shift()!(); } }, 20_000);
+  } })).arrayBuffer());
+  void w.send({ id: 99, url: origin }); await flush(); await w.clock.tick(20_000); await Promise.all(pages); await flush();
+  assert.equal(bodyCloses, 6); assert.equal(w.requests.length, 2, 'original plus four-second hedge waited for native slots');
+  assert.equal(admitted, 1, 'the winner cancels its queued sibling before that request is admitted');
+  assert.equal(terminal(w).length, 1); assert.equal(terminal(w)[0].error, undefined);
+  assert.deepEqual(new Uint8Array(terminal(w)[0].buffer!), bytes); clean(w);
+});
+
+test('both original headers hang even ignoring abort: bounded error at64s, both requests cancelled and late bodies released', async () => {
   const finish: ((r: Response) => void)[] = []; let cancelled = 0;
   const w = runtime(() => new Promise(resolve => finish.push(resolve)));
   let done = false; void w.send({ id: 1, url: origin }).then(() => { done = true; }); await flush();
   await w.clock.tick(3999); assert.equal(w.requests.length, 1);
   await w.clock.tick(1); assert.equal(w.requests.length, 2);
-  await w.clock.tick(7999); assert.equal(done, false);
+  await w.clock.tick(55_999); assert.equal(done, false); assert(w.requests.every(r => !r.signal.aborted));
   await w.clock.tick(1); assert.equal(done, false); assert.equal(w.requests[0].signal.aborted, true);
   await w.clock.tick(4000); assert.equal(done, true); assert.match(String(terminal(w)[0].error), /headers stalled/);
   assert(w.requests.every(r => r.signal.aborted)); clean(w);
@@ -55,7 +76,7 @@ test('both original headers hang even ignoring abort: bounded error at16s, both 
 
 test('CDN and original header hangs exhaust bounded CDN fallback and terminate once', async () => {
   const w = runtime(() => new Promise(() => {})); void w.send({ id: 2, url: origin, cdn }); await flush();
-  await w.clock.tick(32_000);
+  await w.clock.tick(128_000);
   assert.equal(w.requests.length, 4); assert.equal(terminal(w).length, 1); assert.match(String(terminal(w)[0].error), /headers stalled/);
   assert(w.requests.every(r => r.signal.aborted)); clean(w);
 });
@@ -145,7 +166,7 @@ test('page bridge: timeout releases queue slot; predispatch/active cancellation 
   queue.add('good', { priority: () => [0, 1], start: () => fetchInWorker(origin + '?good')!.then(() => completed.push('good')) });
   queue.pump(); await flush(); const w = WorkerDouble.latest;
   assert.equal(queue.stats().active, 1); assert.equal(completed.length, 0);
-  await w.w.clock.tick(16_000); assert.equal(failed.length, 1); assert.deepEqual(completed, ['good']);
+  await w.w.clock.tick(64_000); assert.equal(failed.length, 1); assert.deepEqual(completed, ['good']);
   assert.deepEqual(queue.stats(), { active: 0, pending: 0 }); clean(w.w);
 
   const early = new AbortController(), posted = w.posted.length;
