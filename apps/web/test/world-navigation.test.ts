@@ -192,7 +192,7 @@ test('actual OrbitControls accepts head tilt and a Follow handover without apply
   const horizontal=direction.clone();horizontal.y=0;horizontal.normalize();
   assert.ok(f.camera.position.distanceTo(p.clone().addScaledVector(horizontal,.3))<1e-8);
   assert.ok(f.camera.getWorldDirection(new Vector3()).distanceTo(direction)<1e-8);assert.equal(controls.mouseButtons.RIGHT,null);
-  const eye=f.camera.position.clone();key('keydown','ArrowUp');for(let i=0;i<20;i++){rts.update(.05);controls.update();}key('keyup','ArrowUp');
+  const eye=f.camera.position.clone();key('keydown','ArrowUp');for(let i=0;i<20;i++){rts.update(.05);controls.update();rts.afterControls();}key('keyup','ArrowUp');
   assert.ok(f.camera.position.distanceTo(eye)<1e-8,'head pitch stays at the eye even after actual OrbitControls update');assert.ok(f.camera.getWorldDirection(new Vector3()).y>.5);
   key('keydown','KeyW');f.canvas.blur();rts.update(.1);assert.ok(f.camera.position.distanceTo(eye)<1e-8,'blur releases global RTS movement');
  }finally{rts.dispose();controls.dispose();}
