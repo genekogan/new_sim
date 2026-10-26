@@ -172,7 +172,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
       places: (x, z, level) => this.places.containing(x, z, this.placeLevel(level)).filter(p => p.enclosed).map(p => p.id).join('|'),
       seat: (soul, radius, seconds) => {
         const {caps, plans} = this.binds(soul), me = this.body(soul.entityId), world = this.host.engine.world as NativeWorld; if (!me) return null;
-        const c = caps.find(c => c.verb === 'sit' && c.available && c.target && (() => {const e = world.entities[c.target!.id]; return !!e && Math.hypot(e.pose.p[0] - me.pose.p[0], e.pose.p[2] - me.pose.p[2]) <= radius;})());
+        // the reflex takes a concrete seat offer, never sit:here (which since D2 carries the nearest seat's target and
+        // plan: through it the rule sat but never reached its doze in the 2 h idle test)
+        const c = caps.find(c => c.verb === 'sit' && c.id !== 'sit:here' && c.available && c.target && (() => {const e = world.entities[c.target!.id]; return !!e && Math.hypot(e.pose.p[0] - me.pose.p[0], e.pose.p[2] - me.pose.p[2]) <= radius;})());
         const plan = c && plans.get(c.id); if (!plan) return null;
         const steps = structuredClone(plan.steps); for (const x of steps) if (x.params && 'seconds' in x.params) x.params.seconds = seconds;
         return steps;

@@ -190,3 +190,7 @@ pass. Server test files, walkability and the world-launcher folder: see `team/HA
   the 2.x publication (no templates, version 2.x) as well.
 - `V4-web` removed assertion: the renamed test "Soul card start prompt names pair with the window code" keeps main's
   ID ("pair-soul") with the 2.x assertion, as the LINK integration did for its renames.
+- Gate run 2 on c48c705bc (03:05–03:28Z): one new failure, `edge-body-rule` "idle reflex … sits and dozes within 2 h"
+  (seated, never napping). With the 8 m radius `sit:here` carries the nearest seat's target, so the LINK idle reflex
+  took `sit:here` instead of the concrete seat offer and never reached its doze. The reflex now skips `sit:here`
+  (`ledger.ts` attachPresence seat hook); the test passes again (seated 411, napping 1212 ticks).
