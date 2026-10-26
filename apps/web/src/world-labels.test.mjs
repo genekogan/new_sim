@@ -36,6 +36,10 @@ test('solver never returns a negative dy, nor an offset beyond 180 px, nor overl
    for(const q of rects)assert.ok(!overlap(rect,q),`round ${round}: overlap`);rects.push(rect);}
  }
 });
+test('solver: a free plate goes back under its body; a crowded one keeps its previous lane',()=>{
+ assert.deepEqual(placeWorldLabels([box('a',100,300,{previous:{dx:-35,dy:0}})],area).get('a'),{dx:0,dy:0});
+ const r=placeWorldLabels([box('a',100,300),box('b',104,302,{previous:{dx:90,dy:0}})],area);assert.deepEqual(r.get('b'),{dx:90,dy:0});
+});
 test('solver: a stale upward placement is dropped for a downward one',()=>{
  const r=placeWorldLabels([box('a',100,300,{previous:{dx:0,dy:-30}})],area);assert.deepEqual(r.get('a'),{dx:0,dy:0});
 });

@@ -43,10 +43,12 @@ export function placeWorldLabels(boxes: readonly LabelBox[], area: VisibleViewpo
     const anchorX=b.x+b.width/2, anchorY=b.y;
     if (anchorX<area.left || anchorX>right || anchorY<area.top || anchorY>bottom) continue;
     const dx=Math.max(area.left,Math.min(right-b.width,b.x))-b.x;
-    const tail: LabelOffset[] = [{dx,dy:0}];
+    // The plate's own spot first (centred under its body); when that is taken, the previous placement (so a crowd does
+    // not change lanes every frame), then the nearest free spot below or beside the plates already placed.
+    const tail: LabelOffset[] = [];
     for(const p of placed) tail.push({dx,dy:p.y+p.height+gap-b.y},{dx:p.x-gap-b.width-b.x,dy:0},{dx:p.x+p.width+gap-b.x,dy:0});
     tail.sort((a,b)=>Math.hypot(a.dx,a.dy)-Math.hypot(b.dx,b.dy) || a.dy-b.dy || a.dx-b.dx);
-    const candidates=(b.previous?[b.previous,...tail]:tail).filter(c=>c.dy>=0);
+    const candidates=[{dx,dy:0},...(b.previous?[b.previous]:[]),...tail].filter(c=>c.dy>=0);
     for(const c of candidates) {
       const rect={x:b.x+c.dx,y:b.y+c.dy,width:b.width,height:b.height};
       if(!Number.isFinite(c.dx)||!Number.isFinite(c.dy)||Math.hypot(c.dx,c.dy)>180 || rect.x<area.left || rect.y<area.top || rect.x+rect.width>right || rect.y+rect.height>bottom || placed.some(p=>intersects(rect,p))) continue;
