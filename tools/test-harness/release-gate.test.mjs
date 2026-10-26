@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, renameSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync, renameSync, readFileSync } from 'node:fs';
 import { tmpdir, homedir } from 'node:os';
-import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { compareRuns, parseTap, readRun, validateQuarantine, REQUIRED_STEPS } from './release-gate.mjs';
+import { dirname, join } from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { cacheAdd, cacheKey, compareRuns, lookupCache, main, parseArgs, parseTap, readRun, validateQuarantine, REQUIRED_PACKAGES, REQUIRED_STEPS } from './release-gate.mjs';
 
 // Preserve fixture artifacts under the same no-delete rule as release work.
 const retireFixture = dir => { const trash = join(homedir(), '.Trash'); mkdirSync(trash, { recursive: true }); renameSync(dir, join(trash, dir.split('/').at(-1) + '-' + Date.now())); };
@@ -294,4 +295,152 @@ test('receipt evidence hashes change when returned log contents change', t => {
 });
 test('the fixed release contract includes every package/server/web/harness step', () => {
   for (const s of ['V3-packages', 'V3-harness', 'V3-walk', 'V3-bundle', 'V4-web', 'V5-server-full', 'V6-mars-two', 'V6-lm-two']) assert.ok(REQUIRED_STEPS.includes(s));
+});
+
+// ── Baseline cache (MODAL-POLICY rule 1): fake Modal runs in a throwaway git repository ────────────────────────────
+const shaOf = b => createHash('sha256').update(b).digest('hex');
+const gitIn = (dir, ...a) => execFileSync('git', ['-C', dir, ...a], { encoding: 'utf8' }).trim();
+function gateRepo(t) {
+  const dir = mkdtempSync(join(process.env.GATE_TEST_TMPDIR || tmpdir(), 'sim-gate-repo-'));
+  t.after(() => retireFixture(dir));
+  gitIn(dir, 'init', '-q', '-b', 'main');
+  const commit = (path, text) => {
+    mkdirSync(dirname(join(dir, path)), { recursive: true }); writeFileSync(join(dir, path), text);
+    gitIn(dir, 'add', '-A'); gitIn(dir, '-c', 'user.email=gate@test', '-c', 'user.name=gate test', 'commit', '-qm', path);
+    return gitIn(dir, 'rev-parse', 'HEAD');
+  };
+  commit('tools/test-harness/quarantine.json', JSON.stringify(manifest()));
+  return { dir, commit, base: commit('README.md', 'base\n') };
+}
+/** A complete, passing run of every REQUIRED_STEPS row, shaped like a merged Modal run. */
+function writeFullRun(dir, meta, { nodeVersion = 'v22.23.0', steps = REQUIRED_STEPS } = {}) {
+  mkdirSync(join(dir, 'out/suite'), { recursive: true });
+  writeFileSync(join(dir, 'out/RUN-METADATA.json'), JSON.stringify({ baselineSha: null, suiteCompleted: true, skip: ['V7', 'V8'], serverFiles: [], nodeVersion, pnpmVersion: '10.27.0', ...meta }));
+  const rows = ['step\texit\tseconds\tlog'];
+  for (const step of steps) {
+    let log = tap([{ name: 'works', source: 'apps/web/src/widget.test.ts' }]);
+    if (['V1-types', 'V2-build-root', 'V2-build-worlds'].includes(step)) log = 'built\n';
+    if (step === 'V3-packages') log = REQUIRED_PACKAGES.map(p => tap([{ name: 'works' }], { prefix: `## ${p}` }) + `## ${p} exit=0\n`).join('');
+    if (step.startsWith('V6-')) { log = 'scenario ok\n'; writeFileSync(join(dir, `out/suite/${step}-cases.json`), JSON.stringify({ schemaVersion: 1, completed: true, steps: [{ id: 'case', status: 'pass' }], harnessFailures: [], sourceReport: 'report.json' })); }
+    if (step === 'V4-web' || step === 'V3-harness') {
+      const c = parseTap(log).counts;
+      writeFileSync(join(dir, `out/suite/${step}-files.jsonl`), [{ event: 'test:pass', file: '/work/head/apps/web/src/widget.test.ts', name: 'works', type: 'test' },
+        { event: 'test:summary', counts: { tests: c.tests, suites: c.suites, passed: c.pass, failed: c.fail, cancelled: c.cancelled, skipped: c.skipped, todo: c.todo, topLevel: c.topLevel } }].map(e => JSON.stringify(e)).join('\n') + '\n');
+    }
+    writeFileSync(join(dir, `out/suite/${step}.log`), log); rows.push(`${step}\t0\t1\t/out/suite/${step}.log`);
+  }
+  rows.push('V8-history-boot\tSKIP\t0\t-');
+  writeFileSync(join(dir, 'out/suite/SUMMARY.tsv'), rows.join('\n') + '\n');
+}
+function fakeModal(calls, nodeVersionFor = () => 'v22.23.0') {
+  return async (out, sourceSha, harnessRef, node, root) => {
+    calls.push(sourceSha);
+    const archive = execFileSync('git', ['-C', root, 'archive', '--format=tar.gz', harnessRef, 'tools/test-harness']);
+    writeFullRun(out, { schemaVersion: 1, sourceSha, harnessRef, harnessTree: gitIn(root, 'rev-parse', `${harnessRef}:tools/test-harness`), harnessArchiveSha256: shaOf(archive), node }, { nodeVersion: nodeVersionFor(sourceSha) });
+    return { exit: 0, timedOut: false, log: join(out, 'gate-driver.log'), logSha256: '' };
+  };
+}
+const gate = async (repo, args, remoteRun, lines = []) => ({ rc: await main(args, { root: repo.dir, remoteRun, log: l => lines.push(l) }), lines });
+const receiptOf = out => JSON.parse(readFileSync(join(out, 'receipt.json'), 'utf8'));
+
+test('baseline reuse: a miss runs main once and caches it; the next gate on the same harness tree runs only the candidate', async t => {
+  const repo = gateRepo(t), tmp = dirname(repo.dir), cache = mkdtempSync(join(tmp, 'sim-gate-cache-')); t.after(() => retireFixture(cache));
+  const c1 = repo.commit('apps/web/src/a.ts', 'one\n'), calls = [];
+  const out1 = join(repo.dir, '.lane/g1');
+  const first = await gate(repo, [c1, '--baseline', repo.base, '--out', out1, '--cache', cache], fakeModal(calls));
+  const r1 = receiptOf(out1);
+  assert.equal(first.rc, 0, r1.blockers.join('\n')); assert.deepEqual(calls.sort(), [c1, repo.base].sort());
+  assert.equal(r1.baseline.source, 'run'); assert.match(r1.baseline.cacheMiss, /no cached run/);
+  assert.deepEqual(r1.cache.stored.map(s => s.label), ['baseline', 'candidate']);
+  assert.match(first.lines.at(-1), /baseline_source=run/);
+  // a later commit with the identical harness tree: other harness commit and archive bytes, same suite
+  const c2 = repo.commit('apps/web/src/b.ts', 'two\n'); calls.length = 0;
+  const out2 = join(repo.dir, '.lane/g2');
+  const second = await gate(repo, [c2, '--baseline', c1, '--out', out2, '--cache', cache], fakeModal(calls));
+  const r2 = receiptOf(out2);
+  assert.equal(second.rc, 0, r2.blockers.join('\n')); assert.deepEqual(calls, [c2]);
+  assert.equal(r2.baseline.source, 'cached'); assert.equal(r2.baseline.dir, join(cache, `${c1}-${r2.harness.tree}-node22`));
+  assert.equal(r2.runs.baseline.metadata.harnessRef, c1); assert.notEqual(r2.runs.baseline.metadata.harnessArchiveSha256, r2.harness.archiveSha256);
+  assert.deepEqual(r2.cache.stored.map(s => s.label), ['candidate']); assert.equal(r2.status, 'pass');
+  assert.ok(existsSync(join(cache, `${c2}-${r2.harness.tree}-node22/CACHE.json`)));
+});
+test('a modified cache entry or another harness tree is a miss, never a silent reuse', async t => {
+  const repo = gateRepo(t), cache = mkdtempSync(join(dirname(repo.dir), 'sim-gate-cache-')); t.after(() => retireFixture(cache));
+  const c1 = repo.commit('apps/web/src/a.ts', 'one\n'), calls = [];
+  await gate(repo, [c1, '--baseline', repo.base, '--out', join(repo.dir, '.lane/g1'), '--cache', cache], fakeModal(calls));
+  const tree = gitIn(repo.dir, 'rev-parse', 'HEAD:tools/test-harness'), m = manifest();
+  assert.equal(lookupCache(cache, { sourceSha: c1, harnessTree: tree, node: '22' }, m).hit, true);
+  const log = join(cache, cacheKey({ sourceSha: c1, harnessTree: tree, node: '22' }), 'out/suite/V5-server-full.log');
+  writeFileSync(log, readFileSync(log, 'utf8').replace('ok 1 - works', 'ok 1 - works # edited'));
+  assert.match(lookupCache(cache, { sourceSha: c1, harnessTree: tree, node: '22' }, m).reason, /changed since it was stored: suite\/V5-server-full.log/);
+  assert.match(lookupCache(cache, { sourceSha: c1, harnessTree: 'f'.repeat(40), node: '22' }, m).reason, /no cached run/);
+  assert.match(lookupCache(cache, { sourceSha: c1, harnessTree: tree, node: '26' }, m).reason, /no cached run/);
+  // the tampered entry is not reused: the gate runs the baseline again and keeps the existing entry untouched
+  const c2 = repo.commit('apps/web/src/b.ts', 'two\n'); calls.length = 0;
+  const out = join(repo.dir, '.lane/g2');
+  await gate(repo, [c2, '--baseline', c1, '--out', out, '--cache', cache], fakeModal(calls));
+  const r = receiptOf(out);
+  assert.equal(r.baseline.source, 'run'); assert.match(r.baseline.cacheMiss, /changed since/); assert.deepEqual(calls.sort(), [c1, c2].sort());
+  assert.equal(r.cache.notStored.find(s => s.label === 'baseline').reason, 'already cached');
+});
+test('a cached baseline on another Node patch is run again, never compared across runtimes', async t => {
+  const repo = gateRepo(t), cache = mkdtempSync(join(dirname(repo.dir), 'sim-gate-cache-')); t.after(() => retireFixture(cache));
+  const c1 = repo.commit('apps/web/src/a.ts', 'one\n'), calls = [];
+  await gate(repo, [c1, '--baseline', repo.base, '--out', join(repo.dir, '.lane/g1'), '--cache', cache], fakeModal(calls));
+  const c2 = repo.commit('apps/web/src/b.ts', 'two\n'); calls.length = 0;
+  const out = join(repo.dir, '.lane/g2');
+  const { rc } = await gate(repo, [c2, '--baseline', c1, '--out', out, '--cache', cache], fakeModal(calls, () => 'v22.24.0'));
+  const r = receiptOf(out);
+  assert.equal(rc, 0, r.blockers.join('\n')); assert.deepEqual(calls, [c2, c1]);
+  assert.equal(r.baseline.source, 'run'); assert.match(r.baseline.cacheRejected, /runtime v22.23.0\/10.27.0 differs/);
+  assert.equal(r.runs.baseline.metadata.nodeVersion, 'v22.24.0');
+});
+test('--baseline-results alone imports the baseline and runs only the candidate; --candidate-results alone is refused', async t => {
+  assert.throws(() => parseArgs(['abc', '--candidate-results', '/x']), /needs --baseline-results/);
+  assert.throws(() => parseArgs(['abc', '--dry-run', '--dry-run']), /duplicate option/);
+  const repo = gateRepo(t), c1 = repo.commit('apps/web/src/a.ts', 'one\n'), calls = [];
+  const first = join(repo.dir, '.lane/g1');
+  await gate(repo, [c1, '--baseline', repo.base, '--out', first, '--no-cache'], fakeModal(calls));
+  assert.equal(receiptOf(first).cache, undefined);
+  const c2 = repo.commit('apps/web/src/b.ts', 'two\n'); calls.length = 0;
+  const out = join(repo.dir, '.lane/g2');
+  const { rc } = await gate(repo, [c2, '--baseline', c1, '--baseline-results', join(first, 'candidate'), '--out', out, '--no-cache'], fakeModal(calls));
+  const r = receiptOf(out);
+  assert.equal(rc, 0, r.blockers.join('\n')); assert.deepEqual(calls, [c2]); assert.equal(r.baseline.source, 'imported');
+  // the import must be a run of the named baseline
+  const wrong = join(repo.dir, '.lane/g3');
+  assert.equal((await gate(repo, [c2, '--baseline', repo.base, '--baseline-results', join(first, 'candidate'), '--out', wrong, '--no-cache'], fakeModal([]))).rc, 1);
+  assert.match(receiptOf(wrong).blockers.join('\n'), /baseline: metadata mismatch: sourceSha/);
+});
+test('cache-add stores only a validated run named by a passing gate receipt', async t => {
+  const repo = gateRepo(t), cache = mkdtempSync(join(dirname(repo.dir), 'sim-gate-cache-')); t.after(() => retireFixture(cache));
+  const c1 = repo.commit('apps/web/src/a.ts', 'one\n');
+  const out = join(repo.dir, '.lane/g1');
+  await gate(repo, [c1, '--baseline', repo.base, '--out', out, '--no-cache'], fakeModal([]));
+  const added = cacheAdd(join(out, 'candidate'), { root: repo.dir, cacheDir: cache });
+  assert.equal(added.stored, true, added.reason); assert.equal(cacheAdd(join(out, 'candidate'), { root: repo.dir, cacheDir: cache }).reason, 'already cached');
+  const entry = JSON.parse(readFileSync(join(added.dir, 'CACHE.json'), 'utf8'));
+  assert.equal(entry.provenance.label, 'candidate'); assert.equal(entry.provenance.receiptSha256, shaOf(readFileSync(join(out, 'receipt.json'))));
+  // a blocked gate's run, or a run whose metadata no longer matches its harness, is refused
+  const receipt = receiptOf(out); writeFileSync(join(out, 'receipt.json'), JSON.stringify({ ...receipt, status: 'blocked' }));
+  assert.match(cacheAdd(join(out, 'baseline'), { root: repo.dir, cacheDir: mkdtempSync(join(dirname(repo.dir), 'sim-gate-cache-')) }).reason, /status blocked/);
+  writeFileSync(join(out, 'receipt.json'), JSON.stringify(receipt));
+  const meta = join(out, 'baseline/out/RUN-METADATA.json'), m = JSON.parse(readFileSync(meta, 'utf8'));
+  writeFileSync(meta, JSON.stringify({ ...m, harnessArchiveSha256: 'e'.repeat(64) }));
+  assert.match(cacheAdd(join(out, 'baseline'), { root: repo.dir, cacheDir: cache }).reason, /metadata mismatch: harnessArchiveSha256/);
+});
+test('a dry run prints the plan without Modal and without writing an output directory', async t => {
+  const repo = gateRepo(t), cache = mkdtempSync(join(dirname(repo.dir), 'sim-gate-cache-')); t.after(() => retireFixture(cache));
+  const c1 = repo.commit('apps/web/src/a.ts', 'one\n');
+  const never = async () => { throw Error('Modal contacted'); };
+  const out = join(repo.dir, '.lane/dry');
+  const miss = await gate(repo, [c1, '--baseline', repo.base, '--out', out, '--cache', cache, '--dry-run'], never);
+  assert.equal(miss.rc, 0); assert.ok(!existsSync(out));
+  assert.match(miss.lines.at(-1), /RELEASE_GATE_PLAN .*baseline_source=run modal_runs=2/);
+  assert.deepEqual(JSON.parse(miss.lines[0]).modalRuns, ['candidate', 'baseline']);
+  await gate(repo, [c1, '--baseline', repo.base, '--out', join(repo.dir, '.lane/g1'), '--cache', cache], fakeModal([]));
+  const hit = await gate(repo, ['HEAD', '--baseline', c1, '--out', out, '--cache', cache, '--dry-run'], never);
+  assert.match(hit.lines.at(-1), /baseline_source=cached modal_runs=1/); assert.ok(!existsSync(out));
+  const help = await gate(repo, ['--help'], never);
+  assert.equal(help.rc, 0); assert.match(help.lines[0], /usage: release-gate.sh/);
 });

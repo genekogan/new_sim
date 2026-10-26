@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync, writeSync } from 'node:fs';
-import { basename, join, resolve } from 'node:path';
+import { closeSync, constants, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, renameSync, writeFileSync, writeSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // This is the CPU-only contract, not a discovery list supplied by a candidate.
@@ -17,7 +18,7 @@ export const REQUIRED_STEPS = [
 // V3-walk (lane WALK, 2026-10-21): walkability of fixed world fixtures + a fresh Eden 2026 genesis against tools/test-harness/walk/baseline.
 // V3-bundle (lane BUDGET, 2026-10-22): web chunk/total sizes of V2-build-root's apps/web/dist against tools/test-harness/bundle-budget/baseline.json.
 const TAP_STEPS = new Set(['V3-packages', 'V3-mars-engine', 'V3-client-cli', 'V3-launcher-unit', 'V3-harness', 'V3-walk', 'V3-bundle', 'V4-web', 'V5-server-full']);
-const REQUIRED_PACKAGES = ['engine-mars', 'world-compiler', 'generators', 'ground', 'kernel', 'brain', 'engine-toy', 'engine-contract', 'protocol', 'engine-native', 'conformance'];
+export const REQUIRED_PACKAGES = ['engine-mars', 'world-compiler', 'generators', 'ground', 'kernel', 'brain', 'engine-toy', 'engine-contract', 'protocol', 'engine-native', 'conformance'];
 /** Runs made before 2026-10-16 name the EF4 conformance package by its old directory, packages/catalog. */
 const PACKAGE_ALIASES = { catalog: 'conformance' };
 const STEP_EXCLUSIONS = new Set(); // No step is excluded whole any more (the launcher e2e moved to V7, see above).
@@ -136,7 +137,7 @@ export function validateQuarantine(manifest) {
 }
 
 /** Validate a returned Modal directory; exported for synthetic, port-free proof. */
-export function readRun(dir, expected, manifest, requiredSteps = REQUIRED_STEPS) {
+export function readRun(dir, expected, manifest, requiredSteps = REQUIRED_STEPS, options = {}) {
   const errors = [], steps = {}, evidence = {};
   const q = validateQuarantine(manifest);
   const read = path => { const b = readFileSync(path); evidence[path] = sha256(b); return b.toString(); };
@@ -295,13 +296,14 @@ export function compareRuns(baseline, candidate, manifest, candidateSourceFiles 
   return { status: blockers.length ? 'blocked' : quarantined.length ? 'quarantined' : 'pass', blockers, fixed, quarantined, newFailures, removed, unexpectedSkips, added };
 }
 
-function git(...args) { return execFileSync('git', ['-C', ROOT, ...args], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim(); }
-async function remoteRun(out, sourceSha, harnessRef, node) {
+const MAX_BUFFER = 64 * 1024 * 1024;
+function gitAt(root, ...args) { return execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', maxBuffer: MAX_BUFFER }).trim(); }
+async function remoteRun(out, sourceSha, harnessRef, node, root = ROOT) {
   mkdirSync(out, { recursive: true });
   const logPath = join(out, 'gate-driver.log');
   const logFd = openSync(logPath, 'w');
-  const child = spawn('bash', [join(ROOT, 'tools/test-harness/remote-suite.sh'), out, '--ref', sourceSha, '--baseline-ref', 'none', '--harness-ref', harnessRef, '--node', node], {
-    cwd: ROOT, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, MODAL_PROFILE: 'edenartlab' },
+  const child = spawn('bash', [join(root, 'tools/test-harness/remote-suite.sh'), out, '--ref', sourceSha, '--baseline-ref', 'none', '--harness-ref', harnessRef, '--node', node], {
+    cwd: root, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, MODAL_PROFILE: 'edenartlab' },
   });
   child.stdout.on('data', b => writeSync(logFd, b)); child.stderr.on('data', b => writeSync(logFd, b));
   let timedOut = false;
@@ -318,63 +320,218 @@ async function remoteRun(out, sourceSha, harnessRef, node) {
   return { exit: rc, timedOut, log: logPath, logSha256: sha256(readFileSync(logPath)) };
 }
 
-export async function main(args = process.argv.slice(2)) {
-  let receipt = { schemaVersion: 1, startedAt: new Date().toISOString(), status: 'blocked', blockers: [] };
-  let out = join(ROOT, '.lane/release-gate', new Date().toISOString().replace(/[:.]/g, '-'));
+// ── Baseline cache (team/lanes/MODAL-POLICY.md rule 1: no baseline re-runs) ─────────────────────────────────────────────
+// A completed, validated run is stored as <cache>/<sourceSha>-<harnessTree>-node<major>/ (its out/ plus CACHE.json, which
+// records every file's sha256). The key uses the harness TREE (tools/test-harness content), not the harness commit: git
+// archive bytes embed the commit id, so the same harness content run from a later main commit has another archive hash
+// but runs exactly the same suite. Runtime (actual Node patch, pnpm) is checked against the candidate before comparing.
+export const SUCCESS = new Set(['pass', 'quarantined']);
+export const cacheKey = ({ sourceSha, harnessTree, node }) => `${sourceSha}-${harnessTree}-node${String(node).split('.')[0]}`;
+/** Identity for reusing a run across harness commits with the identical harness tree. */
+export const reuseIdentity = ({ sourceSha, harnessTree, node }) => ({ schemaVersion: 1, sourceSha, harnessTree, node });
+export function defaultCacheDir(root = ROOT) {
+  if (process.env.SIM_GATE_CACHE) return resolve(process.env.SIM_GATE_CACHE);
+  for (let d = resolve(root); d !== dirname(d); d = dirname(d)) if (existsSync(join(d, 'team/lanes'))) return join(d, 'team/scratch/gates/cache');
+  return join(resolve(root), '.lane/gate-cache');
+}
+const listFiles = (dir, rel = '') => readdirSync(join(dir, rel), { withFileTypes: true })
+  .flatMap(e => e.isDirectory() ? listFiles(dir, join(rel, e.name)) : e.isFile() ? [join(rel, e.name)] : []).sort();
+const hashTree = dir => Object.fromEntries(listFiles(dir).map(f => [f, sha256(readFileSync(join(dir, f)))]));
+// No-delete rule: anything we abandon moves to the Trash, like remote-suite.sh's stage.
+function retire(path) {
+  const trash = join(homedir(), '.Trash'); mkdirSync(trash, { recursive: true });
+  renameSync(path, join(trash, `${basename(path)}-${Date.now()}`));
+}
+
+export function lookupCache(cacheDir, identity, manifest, requiredSteps = REQUIRED_STEPS, readOptions = {}) {
+  const key = cacheKey(identity), dir = join(cacheDir, key);
+  if (!existsSync(join(dir, 'CACHE.json'))) return { hit: false, key, dir, reason: 'no cached run' };
+  let entry;
+  try { entry = JSON.parse(readFileSync(join(dir, 'CACHE.json'), 'utf8')); } catch (e) { return { hit: false, key, dir, reason: `unreadable CACHE.json: ${e.message}` }; }
+  if (entry.key !== key) return { hit: false, key, dir, reason: 'cache entry key mismatch' };
+  let now;
+  try { now = hashTree(join(dir, 'out')); } catch (e) { return { hit: false, key, dir, reason: `unreadable cached run: ${e.message}` }; }
+  const recorded = entry.files || {};
+  const changed = [...new Set([...Object.keys(recorded), ...Object.keys(now)])].filter(f => recorded[f] !== now[f]);
+  if (!Object.keys(recorded).length || changed.length) return { hit: false, key, dir, reason: `cache entry changed since it was stored: ${changed.slice(0, 3).join(', ') || 'no file list'}` };
+  const run = readRun(dir, reuseIdentity(identity), manifest, requiredSteps, readOptions);
+  if (run.errors.length) return { hit: false, key, dir, reason: `cached run does not validate: ${run.errors.slice(0, 3).join('; ')}` };
+  return { hit: true, key, dir, run, entry };
+}
+
+/** Copy a validated run into the cache (APFS clone where possible). Never overwrites an entry. */
+export function storeCache(cacheDir, run, provenance = {}) {
+  const m = run.metadata;
+  if (!m || run.errors.length) return { stored: false, reason: 'run has validation errors' };
+  const key = cacheKey(m), dir = join(cacheDir, key);
+  if (existsSync(dir)) return { stored: false, key, dir, reason: 'already cached' };
+  mkdirSync(cacheDir, { recursive: true });
+  const tmp = mkdtempSync(join(cacheDir, `.incoming-${m.sourceSha.slice(0, 9)}-`));
   try {
-    const candidateRef = args.shift();
-    if (!candidateRef || candidateRef.startsWith('-')) throw Error('usage: release-gate.sh <candidate-ref> [--baseline <ref>] [--out <dir>] [--baseline-results <dir> --candidate-results <dir>]');
-    const options = {};
-    while (args.length) {
-      const option = args.shift();
-      if (!['--out', '--baseline', '--baseline-results', '--candidate-results', '--node'].includes(option) || !args.length) throw Error(`invalid option ${option}`);
-      if (options[option]) throw Error(`duplicate option ${option}`);
-      options[option] = args.shift();
+    cpSync(join(run.dir, 'out'), join(tmp, 'out'), { recursive: true, mode: constants.COPYFILE_FICLONE });
+    if (existsSync(join(run.dir, 'REFS.txt'))) copyFileSync(join(run.dir, 'REFS.txt'), join(tmp, 'REFS.txt'));
+    const files = hashTree(join(tmp, 'out'));
+    for (const [path, hash] of Object.entries(run.evidence)) {
+      const rel = relative(join(run.dir, 'out'), resolve(path));
+      if (files[rel] !== hash) throw Error(`copy differs from the validated evidence: ${rel}`);
     }
+    writeFileSync(join(tmp, 'CACHE.json'), JSON.stringify({ schemaVersion: 1, key, sourceSha: m.sourceSha, harnessTree: m.harnessTree, harnessRef: m.harnessRef,
+      harnessArchiveSha256: m.harnessArchiveSha256, sourceArchiveSha256: m.sourceArchiveSha256, node: m.node, nodeVersion: m.nodeVersion, pnpmVersion: m.pnpmVersion,
+      from: run.dir, storedAt: new Date().toISOString(), provenance, files }, null, 2) + '\n');
+    renameSync(tmp, dir);
+  } catch (e) { try { retire(tmp); } catch {} return { stored: false, key, dir, reason: e.message }; }
+  return { stored: true, key, dir };
+}
+
+/** Seed the cache with a completed run of a passing gate, validated exactly like a --baseline-results import. */
+export function cacheAdd(runDir, { root = ROOT, cacheDir = defaultCacheDir(root) } = {}) {
+  runDir = resolve(runDir);
+  let run;
+  try {
+    const meta = JSON.parse(readFileSync(join(runDir, 'out/RUN-METADATA.json'), 'utf8'));
+    for (const f of ['sourceSha', 'harnessRef']) if (!/^[0-9a-f]{40}$/.test(meta[f] || '')) throw Error(`${f} is not a full commit sha`);
+    gitAt(root, 'cat-file', '-e', `${meta.sourceSha}^{commit}`);
+    const harnessTree = gitAt(root, 'rev-parse', `${meta.harnessRef}:tools/test-harness`);
+    const archive = execFileSync('git', ['-C', root, 'archive', '--format=tar.gz', meta.harnessRef, 'tools/test-harness'], { maxBuffer: MAX_BUFFER });
+    const manifest = JSON.parse(execFileSync('git', ['-C', root, 'show', `${meta.harnessRef}:tools/test-harness/quarantine.json`], { maxBuffer: MAX_BUFFER }));
+    run = readRun(runDir, { schemaVersion: 1, sourceSha: meta.sourceSha, harnessRef: meta.harnessRef, harnessTree, harnessArchiveSha256: sha256(archive), node: meta.node }, manifest);
+    const receiptPath = join(dirname(runDir), 'receipt.json'), receiptBytes = readFileSync(receiptPath), receipt = JSON.parse(receiptBytes);
+    const label = ['candidate', 'baseline'].find(l => receipt.runs?.[l]?.dir === runDir);
+    if (!label) run.errors.push('the gate receipt beside the run does not name this run directory');
+    else if (receipt.refs?.[label]?.sha !== meta.sourceSha) run.errors.push(`receipt ${label} sha differs from the run`);
+    if (!SUCCESS.has(receipt.status)) run.errors.push(`gate receipt status ${receipt.status}`);
+    if (receipt.harness?.tree !== harnessTree) run.errors.push('receipt harness tree differs from the run');
+    if (run.errors.length) return { stored: false, reason: run.errors.join('; ') };
+    return storeCache(cacheDir, run, { via: 'cache-add', receipt: receiptPath, receiptSha256: sha256(receiptBytes), label });
+  } catch (e) { return { stored: false, reason: e.message }; }
+}
+
+export const USAGE = `usage: release-gate.sh <candidate-ref> [--baseline <ref>] [--out <dir>] [--node 22|26]
+         [--baseline-results <dir> [--candidate-results <dir>]] [--cache <dir> | --no-cache] [--dry-run]
+       release-gate.sh cache-add <completed-run-dir> [--cache <dir>]
+The baseline (default main) comes from the gate cache when a validated run of it exists for this harness tree and Node
+major; otherwise it runs once on Modal beside the candidate and is cached. A passing gate caches its candidate run.
+--dry-run prints the plan (refs, cache hit/miss, Modal runs) without contacting Modal or writing anything.`;
+const VALUE_OPTIONS = ['--out', '--baseline', '--baseline-results', '--candidate-results', '--node', '--cache'];
+const FLAG_OPTIONS = ['--dry-run', '--no-cache'];
+export function parseArgs(args) {
+  args = [...args];
+  const candidateRef = args.shift();
+  if (!candidateRef || candidateRef.startsWith('-')) throw Error(USAGE);
+  const options = {}, flags = new Set();
+  while (args.length) {
+    const option = args.shift();
+    if (FLAG_OPTIONS.includes(option)) { if (flags.has(option)) throw Error(`duplicate option ${option}`); flags.add(option); continue; }
+    if (!VALUE_OPTIONS.includes(option) || !args.length) throw Error(`invalid option ${option}`);
+    if (options[option] !== undefined) throw Error(`duplicate option ${option}`);
+    options[option] = args.shift();
+  }
+  if (options['--candidate-results'] && !options['--baseline-results']) throw Error('--candidate-results needs --baseline-results');
+  if (options['--cache'] && flags.has('--no-cache')) throw Error('--cache and --no-cache conflict');
+  return { candidateRef, options, flags };
+}
+
+function cacheAddCli(args, { root, log }) {
+  const runDir = args.shift();
+  let cacheDir = defaultCacheDir(root);
+  if (args[0] === '--cache' && args[1]) { cacheDir = resolve(args[1]); args.splice(0, 2); }
+  if (!runDir || args.length) { log(USAGE); return 2; }
+  const r = cacheAdd(runDir, { root, cacheDir });
+  log(`GATE_CACHE ${r.stored ? 'STORED' : r.reason === 'already cached' ? 'PRESENT' : 'REJECTED'} run=${resolve(runDir)}${r.key ? ` key=${r.key}` : ''}${r.dir ? ` dir=${r.dir}` : ''}${r.stored ? '' : ` reason=${r.reason}`}`);
+  return r.stored || r.reason === 'already cached' ? 0 : 1;
+}
+
+export async function main(args = process.argv.slice(2), deps = {}) {
+  const root = deps.root || ROOT, runRemote = deps.remoteRun || remoteRun, log = deps.log || console.log;
+  const git = (...a) => gitAt(root, ...a);
+  if (['--help', '-h'].includes(args[0])) { log(USAGE); return 0; }
+  if (args[0] === 'cache-add') return cacheAddCli(args.slice(1), { root, log });
+  let receipt = { schemaVersion: 1, startedAt: new Date().toISOString(), status: 'blocked', blockers: [] };
+  let out = join(root, '.lane/release-gate', new Date().toISOString().replace(/[:.]/g, '-'));
+  let dryRun = false;
+  try {
+    const { candidateRef, options, flags } = parseArgs(args);
+    dryRun = flags.has('--dry-run');
     if (options['--out']) out = resolve(options['--out']);
-    if (existsSync(join(out, 'receipt.json'))) { const previous = out; out = join(out, `rejected-attempt-${Date.now()}`); throw Error(`output already has a receipt: ${previous}`); }
-    mkdirSync(out, { recursive: true });
+    if (!dryRun) {
+      if (existsSync(join(out, 'receipt.json'))) { const previous = out; out = join(out, `rejected-attempt-${Date.now()}`); throw Error(`output already has a receipt: ${previous}`); }
+      mkdirSync(out, { recursive: true });
+    }
     // the baseline is what is live: main by default; a release line compares with its live release (e.g. --baseline 19d17c90)
     const baselineRef = options['--baseline'] || 'main';
     const baselineSha = git('rev-parse', '--verify', `${baselineRef}^{commit}`);
     const candidateSha = git('rev-parse', '--verify', `${candidateRef}^{commit}`);
     const harnessRef = git('rev-parse', 'HEAD');
     const harnessTree = git('rev-parse', `${harnessRef}:tools/test-harness`);
-    if (git('status', '--porcelain', '--', 'tools/test-harness')) throw Error('commit the trusted harness and quarantine before running the gate');
-    const harnessArchive = execFileSync('git', ['-C', ROOT, 'archive', '--format=tar.gz', harnessRef, 'tools/test-harness'], { maxBuffer: 64 * 1024 * 1024 });
-    const manifestBytes = execFileSync('git', ['-C', ROOT, 'show', `${harnessRef}:tools/test-harness/quarantine.json`]);
+    const harnessClean = !git('status', '--porcelain', '--', 'tools/test-harness');
+    if (!harnessClean && !dryRun) throw Error('commit the trusted harness and quarantine before running the gate');
+    const harnessArchive = execFileSync('git', ['-C', root, 'archive', '--format=tar.gz', harnessRef, 'tools/test-harness'], { maxBuffer: MAX_BUFFER });
+    const manifestBytes = execFileSync('git', ['-C', root, 'show', `${harnessRef}:tools/test-harness/quarantine.json`]);
     const manifest = JSON.parse(manifestBytes);
     validateQuarantine(manifest);
     const node = options['--node'] || '22';
     if (!['22', '26'].includes(node)) throw Error('supported Node versions: 22, 26');
     receipt = { ...receipt, refs: { baseline: { ref: baselineRef, sha: baselineSha }, candidate: { ref: candidateRef, sha: candidateSha } },
       harness: { ref: harnessRef, tree: harnessTree, archiveSha256: sha256(harnessArchive) }, quarantineSha256: sha256(manifestBytes), node, exclusions: EXPECTED_SKIP, scopeExclusions: manifest.scopeExclusions };
-    const imported = Boolean(options['--baseline-results'] || options['--candidate-results']);
-    if (imported && !(options['--baseline-results'] && options['--candidate-results'])) throw Error('provide both audited result directories or neither');
-    const baselineDir = imported ? resolve(options['--baseline-results']) : join(out, 'baseline');
-    const candidateDir = imported ? resolve(options['--candidate-results']) : join(out, 'candidate');
-    receipt.importedResults = imported;
-    const drivers = {};
-    if (!imported) {
-      [drivers.baseline, drivers.candidate] = await Promise.all([
-        remoteRun(baselineDir, baselineSha, harnessRef, node),
-        remoteRun(candidateDir, candidateSha, harnessRef, node),
-      ]);
-    }
     const identity = { schemaVersion: 1, harnessRef, harnessTree, harnessArchiveSha256: sha256(harnessArchive), node };
-    const baseline = readRun(baselineDir, { ...identity, sourceSha: baselineSha }, manifest);
-    const candidate = readRun(candidateDir, { ...identity, sourceSha: candidateSha }, manifest);
-    for (const [label, driver] of Object.entries(drivers)) {
-      if (driver.exit !== 0 || driver.timedOut) (label === 'baseline' ? baseline : candidate).errors.push(`Modal driver failed (${driver.timedOut ? 'timeout' : driver.exit})`);
+    const useCache = !flags.has('--no-cache'), cacheDir = resolve(options['--cache'] || defaultCacheDir(root));
+    const pairImport = Boolean(options['--candidate-results']);
+    // Where the baseline comes from: an audited import, the cache, or one fresh Modal run (which is then cached).
+    let base, cached;
+    if (options['--baseline-results']) base = { source: 'imported', dir: resolve(options['--baseline-results']), exact: pairImport };
+    else if (useCache && (cached = lookupCache(cacheDir, { sourceSha: baselineSha, harnessTree, node }, manifest)).hit) base = { source: 'cached', dir: cached.dir, cacheKey: cached.key };
+    else base = { source: 'run', dir: join(out, 'baseline'), exact: true, cacheKey: cacheKey({ sourceSha: baselineSha, harnessTree, node }), cacheMiss: useCache ? cached.reason : 'cache disabled (--no-cache)' };
+    const candidateDir = pairImport ? resolve(options['--candidate-results']) : join(out, 'candidate');
+    const plan = { refs: receipt.refs, harness: { ...receipt.harness, clean: harnessClean }, node, cache: useCache ? cacheDir : null,
+      baseline: { source: base.source, dir: base.dir, cacheKey: base.cacheKey, cacheMiss: base.cacheMiss },
+      candidate: { source: pairImport ? 'imported' : 'run', dir: candidateDir },
+      modalRuns: [...(pairImport ? [] : ['candidate']), ...(base.source === 'run' ? ['baseline'] : [])] };
+    if (dryRun) {
+      log(JSON.stringify(plan, null, 2));
+      log(`RELEASE_GATE_PLAN candidate=${candidateSha} baseline=${baselineSha} baseline_source=${base.source} modal_runs=${plan.modalRuns.length}${harnessClean ? '' : ' harness=DIRTY(would block)'}`);
+      return 0;
     }
+    receipt.importedResults = pairImport;
+    receipt.baseline = { source: base.source, dir: base.dir, ...(base.cacheKey && { cacheKey: base.cacheKey }), ...(base.cacheMiss && { cacheMiss: base.cacheMiss }) };
+    const drivers = {};
+    const runs = [];
+    if (!pairImport) runs.push(runRemote(candidateDir, candidateSha, harnessRef, node, root).then(d => { drivers.candidate = d; }));
+    if (base.source === 'run') runs.push(runRemote(base.dir, baselineSha, harnessRef, node, root).then(d => { drivers.baseline = d; }));
+    await Promise.all(runs);
+    const readBaseline = () => readRun(base.dir, base.exact ? { ...identity, sourceSha: baselineSha } : reuseIdentity({ sourceSha: baselineSha, harnessTree, node }), manifest);
+    let baseline = readBaseline();
+    const candidate = readRun(candidateDir, { ...identity, sourceSha: candidateSha }, manifest);
+    if (drivers.candidate && (drivers.candidate.exit !== 0 || drivers.candidate.timedOut)) candidate.errors.push(`Modal driver failed (${drivers.candidate.timedOut ? 'timeout' : drivers.candidate.exit})`);
+    // A cached baseline is only comparable on the candidate's exact runtime (the node:<major> image can move its patch).
+    const runtime = r => r.metadata && `${r.metadata.nodeVersion}/${r.metadata.pnpmVersion}`;
+    if (base.source === 'cached' && candidate.metadata && runtime(baseline) !== runtime(candidate)) {
+      receipt.baseline = { ...receipt.baseline, source: 'run', cacheRejected: `runtime ${runtime(baseline)} differs from the candidate's ${runtime(candidate)}`, cachedDir: base.dir, dir: join(out, 'baseline') };
+      base = { source: 'run', dir: join(out, 'baseline'), exact: true };
+      drivers.baseline = await runRemote(base.dir, baselineSha, harnessRef, node, root);
+      baseline = readBaseline();
+    }
+    if (drivers.baseline && (drivers.baseline.exit !== 0 || drivers.baseline.timedOut)) baseline.errors.push(`Modal driver failed (${drivers.baseline.timedOut ? 'timeout' : drivers.baseline.exit})`);
     const candidateSourceFiles = new Set(git('ls-tree', '-r', '--name-only', candidateSha).split('\n'));
     receipt = { ...receipt, ...compareRuns(baseline, candidate, manifest, candidateSourceFiles), drivers,
-      runs: { baseline, candidate }, endedAt: new Date().toISOString() };
-  } catch (e) { receipt.blockers.push(e.message); receipt.endedAt = new Date().toISOString(); }
+      runs: { baseline, candidate } };
+    // Cache what this gate proved: a fresh baseline run that validated, and the candidate of a passing gate
+    // (the next gate's baseline once it becomes main).
+    if (useCache) {
+      receipt.cache = { dir: cacheDir, stored: [], notStored: [] };
+      const keep = (label, run) => { const r = storeCache(cacheDir, run, { via: 'gate', label, gate: out, status: receipt.status });
+        (r.stored ? receipt.cache.stored : receipt.cache.notStored).push({ label, key: r.key, dir: r.dir, ...(r.stored ? {} : { reason: r.reason }) }); };
+      if (base.source === 'run' && !baseline.errors.length) keep('baseline', baseline);
+      if (SUCCESS.has(receipt.status)) keep('candidate', candidate);
+    }
+    receipt.endedAt = new Date().toISOString();
+  } catch (e) {
+    if (dryRun) { log(`RELEASE_GATE_PLAN ERROR ${e.message}`); return 2; }
+    receipt.blockers.push(e.message); receipt.endedAt = new Date().toISOString();
+  }
   mkdirSync(out, { recursive: true });
   const receiptPath = join(out, 'receipt.json');
   writeFileSync(receiptPath, JSON.stringify(receipt, null, 2) + '\n');
-  console.log(`RELEASE_GATE ${receipt.status.toUpperCase()} baseline=${receipt.refs?.baseline.sha || '?'} candidate=${receipt.refs?.candidate.sha || '?'} fixed=${receipt.fixed?.length || 0} quarantined=${receipt.quarantined?.length || 0} new=${receipt.newFailures?.length || 0} blockers=${receipt.blockers.length} receipt=${receiptPath}`);
+  log(`RELEASE_GATE ${receipt.status.toUpperCase()} baseline=${receipt.refs?.baseline.sha || '?'} candidate=${receipt.refs?.candidate.sha || '?'} baseline_source=${receipt.baseline?.source || '?'} fixed=${receipt.fixed?.length || 0} quarantined=${receipt.quarantined?.length || 0} new=${receipt.newFailures?.length || 0} blockers=${receipt.blockers.length} receipt=${receiptPath}`);
   return receipt.status === 'blocked' ? 1 : 0;
 }
 

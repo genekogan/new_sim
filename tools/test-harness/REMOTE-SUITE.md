@@ -9,6 +9,22 @@ bash /absolute/checkout/tools/test-harness/release-gate.sh <candidate-ref> --out
 `--baseline <ref>` (default `main`) compares with another baseline, e.g. the live release of a release line
 (`--baseline 19d17c90` for 3.0.1); the receipt records it.
 
+**Baseline cache (MODAL-POLICY rule 1: no baseline re-runs).** The baseline is not re-run on Modal when the gate cache
+holds a validated run of it: `team/scratch/gates/cache/<baselineSha>-<harnessTree>-node<major>/` (the first ancestor of
+the checkout with `team/lanes`; `SIM_GATE_CACHE` or `--cache <dir>` override, `--no-cache` disables reads and writes).
+The key is the `tools/test-harness` **tree** sha, not the harness commit: `git archive` bytes embed the commit id, so
+identical harness content run from a later main commit has another archive hash but runs the identical suite. An entry
+is a copy of the run's `out/` plus `CACHE.json` with every file's sha256; a hit requires the unchanged file hashes and
+`readRun` validation of source sha, harness tree, Node major, completeness and every step. If the candidate's actual
+Node/pnpm differ from the cached run's (the `node:22` image moves its patch), the baseline is run again instead of
+compared. A miss runs the baseline once beside the candidate and caches it when it validates; every passing full
+gate caches its candidate, which serves as the next gate's baseline once it is main. The receipt records
+`baseline.source` (`cached` | `run` | `imported`), the cache key/miss reason and what was stored.
+`--dry-run` prints the plan (refs, cache hit or miss, Modal runs) without contacting Modal or writing anything.
+Seed or repair the cache from a completed run of a passing gate (validated with the exact identity of a
+`--baseline-results` import, plus the gate receipt beside it naming that run):
+`release-gate.sh cache-add <gate-out>/candidate`.
+
 Run from a committed harness checkout. The gate pins `main`, the candidate and the invocation's harness before
 starting **two isolated Modal runs concurrently**. Both source archives receive the identical committed harness.
 It prints one `RELEASE_GATE` line and writes `receipt.json` with exact source/harness/archive/quarantine hashes,
@@ -55,7 +71,8 @@ otherwise `blocked` (exit 1). It records both input receipts' sha256 and the rem
 
 For audited recovery, `--baseline-results <dir> --candidate-results <dir>` imports a completed pair only when the
 resolved source SHAs, identical harness commit/tree/archive, Node major/patch, pnpm, complete step contract and
-scope all validate. Output directories with an existing receipt are never overwritten. Older unpinned runs and
+scope all validate. `--baseline-results <dir>` alone imports the baseline (same harness tree, Node major/patch,
+pnpm, contract) and runs only the candidate. Output directories with an existing receipt are never overwritten. Older unpinned runs and
 bounded `--server-files`/`--skip` proofs cannot qualify a release.
 
 GitHub CI read-only check on 2026-10-15: run38331634849 for main1080cfa9 did not start jobs because account payments

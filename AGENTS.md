@@ -22,7 +22,7 @@ triggers cause thinking, and only an explicit NOW instruction runs directly.
 Only the release owner (R, id on the top line of `<team>/lanes/ROSTER.md`, holding `team/lanes/DEPLOY.lock`) ships,
 writes to eden2 and pushes. A lane hands R `branch@sha` + a gate receipt; R ships it on current main.
 - **Gate (Modal; never full suites on the laptop):** `tools/test-harness/release-gate.sh <head> --baseline <main sha>
-  --out <dir>`. Clean = 0 new failures, 0 blockers, 0 unexpected skips; the standing quarantine
+  --out <dir>` (`--dry-run` first: it shows whether main's run comes from the gate cache; see REMOTE-SUITE.md). Clean = 0 new failures, 0 blockers, 0 unexpected skips; the standing quarantine
   (`tools/test-harness/quarantine.json`) has **9 entries** (10 retired); a clean gate reports `quarantined 8`, because the
   east-house phase A whole-skeleton entry now runs and passes (kept only for older baselines; see the file's 2026-10-21
   note). GitHub Actions runs fail at start (account billing, Gene's); the Modal gate is the release check.
