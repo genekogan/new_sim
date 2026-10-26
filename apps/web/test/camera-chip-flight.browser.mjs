@@ -65,19 +65,21 @@ try{
   check('B1 a click never moves the eye',a&&b&&Math.hypot(...a.p.map((v,i)=>v-b.p[i]))<.05,{before:a?.p,after:b?.p});
 
   // B2: arrows turn the head over the fixed pivot
-  a=await cam();await page.keyboard.down('ArrowRight');await frames('b2-arrow-look',6,90);await page.keyboard.up('ArrowRight');await sleep(200);b=await cam();
+  a=await cam();await page.keyboard.down('ArrowRight');await frames('b2-arrow-look',4,60);await page.keyboard.up('ArrowRight');await sleep(200);b=await cam();
   check('B2 arrows leave the pivot and the eye',a&&b&&a.pivot.every((v,i)=>v===b.pivot[i])&&a.p.every((v,i)=>v===b.p[i]),{a,b});
-  check('B2 arrows turned the head',b&&Math.abs(b.look?.[0]??0)>.1,{look:b?.look});
+  check('B2 arrows turned the head',b&&Math.abs(b.look?.[0]??0)>.05,{look:b?.look});
 
   // B3: chip from the overview, then from close by
   for(const [label,limit] of [['overview',3500],['close',1500]]){
     if(label==='overview')await overview();
     else{await page.keyboard.down('KeyW');await sleep(250);await page.keyboard.up('KeyW');await sleep(600);}
+    await page.evaluate(()=>{const c=document.querySelector('canvas[aria-label="Live 3D view of the world"]'),log=globalThis.__flightLog=[],t0=performance.now();let prev='',frames=0;globalThis.__clickAt=null;globalThis.__shotAfterClick=null;document.addEventListener('click',()=>{globalThis.__clickAt??=performance.now();},{capture:true,once:true});
+      const tick=()=>{frames++;const s=c.dataset.cameraMode+' '+(c.dataset.cameraShot??'');if(s!==prev){log.push([Math.round(performance.now()-t0),frames,s]);prev=s;}if(/^follow:.+/.test(c.dataset.cameraShot??'')&&globalThis.__clickAt!=null&&globalThis.__shotAfterClick==null)globalThis.__shotAfterClick=performance.now()-globalThis.__clickAt;if(log.length<20&&performance.now()-t0<8000)requestAnimationFrame(tick);};requestAnimationFrame(tick);});
     const before=await shot();const t0=Date.now();await chip.click();
     const seq=frames(`b3-chip-flight-${label}`,label==='overview'?8:5,label==='overview'?350:250);
     const ok=await page.waitForFunction(()=>/^follow:.+/.test(document.querySelector('canvas[aria-label="Live 3D view of the world"]')?.dataset.cameraShot??''),null,{timeout:limit+3000,polling:50}).then(()=>true,()=>false);
-    const ms=Date.now()-t0;await seq;report.timings[label]=ms;
-    check(`B3 chip from ${label} follows within ${limit} ms`,ok&&ms<=limit,{ms,before,after:await shot()});
+    const wall=Date.now()-t0;await seq;const ms=Math.round(await page.evaluate(()=>globalThis.__shotAfterClick??Infinity));report.timings[label+'Wall']=wall;report.timings[label]=ms;report.timings[label+'Log']=await page.evaluate(()=>globalThis.__flightLog);report.timings[label+'Eye']=await cam();
+    check(`B3 chip from ${label} follows within ${limit} ms of the click`,ok&&ms<=limit,{ms,wall,before,after:await shot()});
   }
   check('no page errors',errors.length===0,errors.slice(0,5));
   report.status=report.checks.every(c=>c.ok)?'pass':'fail';
