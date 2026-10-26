@@ -123,7 +123,9 @@ test('core assets: every core mesh def resolves to a file and a measured lookup'
   assert.equal(tower.slots.filter((s) => s.kind === 'room').length, 4);
 });
 
-test('routes: upload a GLB, define it, place it, fetch it with validators; refuse junk and strangers', async () => {
+// Keep the historical assertion ID for gate coverage continuity. This upload also exists in core
+// and must now validate; asset-view.test.ts separately pins immutable upload-only content.
+test('routes: upload a GLB, define it, place it, fetch it immutable; refuse junk and strangers', async () => {
   const f = fixture();
   const glb = repo(DOG);
   const form = new FormData();
