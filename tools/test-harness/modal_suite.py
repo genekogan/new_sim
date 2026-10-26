@@ -81,36 +81,47 @@ ORDER = ["V1-types", "V2-build-root", "V2-build-worlds", "V3-harness", "V3-walk"
          "V3-launcher-unit", "V4-web", "V4-web-baseline", "V5-server-full", "V5-server-baseline", "V6-scenarios", "V6-party",
          "V6-souls-r2", "V6-join-clerk", "V6-join-dev", "V6-souls-ux", "V6-mars-two", "V6-lm-two",
          "V7-old-worlds", "V7-new-world", "V7-camera-dpr2", "V7-god-modal", "V8-history-boot"]
-# Groups balanced on the 3.8 gate's step times (seconds: V3-mars-engine 371, V3-client-cli 356, V6-souls-r2 287,
-# V6-lm-two 191, V3-packages 164, V6-party 148, V4-web 143, V6-mars-two 126, V3-launcher-unit 115, V1-types 68).
+# Right-sized fan-out (lane gate-cost, 2026-10-26, team/lanes/MODAL-POLICY.md rule 3). Step times of the 7696422b0 gate
+# (seconds): V3-mars-engine 421, V3-client-cli 393, V6-souls-r2 286, V3-launcher-unit 214, V4-web 211, V6-lm-two 187,
+# V3-packages 171, V6-party 146, V6-mars-two 127, V3-walk 97, V1-types 70. Group a builds the web twice (prep + V2) and
+# keeps 8 CPU; every other container is 4 CPU / 8 GB. The former small groups b, c, d, e, f, w run as one container "s"
+# (serial sum ~1870 s, i.e. ~31-40 min at 4 CPU) beside 2 V5 shards (~2280 s of serial tests each, --test-concurrency=1,
+# so 4 cores are enough): 4 containers per run instead of 15, wall ~45-50 min instead of ~22 (accepted by the policy).
 # Every step of ORDER is in exactly one group. Ports differ per V6 step, but each group still runs its steps serially.
 GROUPS = {
     "a": ["V1-types", "V2-build-root", "V2-build-worlds", "V3-harness", "V3-bundle", "V3-packages", "V4-web", "V4-web-baseline",
           "V6-scenarios", "V6-join-clerk", "V6-join-dev", "V7-old-worlds", "V7-new-world",
           "V7-camera-dpr2", "V7-god-modal", "V8-history-boot"],
-    "b": ["V3-mars-engine"],
-    "c": ["V3-client-cli"],
-    "d": ["V3-launcher-unit", "V6-party", "V6-mars-two"],
-    "e": ["V6-souls-r2", "V6-souls-ux"],
-    "f": ["V6-lm-two"],
-    # lane WALK (2026-10-21): the walkability audit runs ~10 shard processes at once, so it gets a container of its own
-    "w": ["V3-walk"],
+    # the former groups b, c, d, e, f and w; one-validation.sh runs them in its serial order (V3-walk's ~10 shard
+    # processes now share 4 cores: 97 s at 8 CPU)
+    "s": ["V3-walk", "V3-mars-engine", "V3-client-cli", "V3-launcher-unit", "V6-party", "V6-souls-r2", "V6-souls-ux",
+          "V6-mars-two", "V6-lm-two"],
 }
-V5_SHARDS = 8
+LARGE = {"a"}  # groups on the 8 CPU / 16 GB function; all others use 4 CPU / 8 GB
+V5_SHARDS = 2
 assert sorted(s for g in GROUPS.values() for s in g) == sorted(set(ORDER) - {"V5-server-full", "V5-server-baseline"})
 
 
 # max_containers (lane GATECAP, 2026-10-23; Modal 1.5.2 keyword): the edenartlab workspace has a 100-container limit.
-# `modal run` makes a fresh ephemeral app per gate, so this caps ONE gate, not all of them: at most one gate's full
-# fan-out (7 groups + 8 V5 shards = 15) in flight, extra inputs (e.g. preemption restarts) queue instead of adding
-# containers. The cross-gate bound is the ledger team/lanes/GATES.inflight (at most 3 gates = 45 containers).
-MAX_CONTAINERS = len(GROUPS) + V5_SHARDS
+# `modal run` makes a fresh ephemeral app per run, so this caps ONE run, not all of them: at most one run's fan-out
+# (group a on run_large; group s + 2 V5 shards on run) in flight, extra inputs (e.g. preemption restarts) queue instead
+# of adding containers. The cross-gate bound is the ledger team/lanes/GATES.inflight.
+MAX_SMALL = len(GROUPS) - len(LARGE) + V5_SHARDS
 
 
 # single_use_containers: a preempted input is restarted by Modal, and without this it can land on a warm container that
 # already ran another group (2026-10-19, R's 3.9 gate: group b's suite came back as shard v5-1). One input per container.
-@app.function(image=image, cpu=8.0, memory=16384, timeout=4 * 3600, single_use_containers=True, max_containers=MAX_CONTAINERS)
+@app.function(image=image, cpu=8.0, memory=16384, timeout=4 * 3600, single_use_containers=True, max_containers=len(LARGE))
+def run_large(skip: str, server_files: str = "", only: str = "", shard: str = "") -> bytes:
+    return suite(skip, server_files, only, shard)
+
+
+@app.function(image=image, cpu=4.0, memory=8192, timeout=4 * 3600, single_use_containers=True, max_containers=MAX_SMALL)
 def run(skip: str, server_files: str = "", only: str = "", shard: str = "") -> bytes:
+    return suite(skip, server_files, only, shard)
+
+
+def suite(skip: str, server_files: str, only: str, shard: str) -> bytes:
     files = server_files.split()
     if any(not re.fullmatch(r"src/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_.-]+\.test\.ts", f) for f in files):
         raise ValueError("server files must be src/<safe path>/<name>.test.ts")
@@ -269,7 +280,11 @@ def main(out: str, skip: str = "V7,V8", server_files: str = ""):
     jobs = plan(server_files)
     t0 = time.time()
     print(f"fan-out: {len(jobs)} containers: {', '.join(j[0] for j in jobs)}")
-    results = list(run.starmap([(skip, server_files, only, shard) for _, only, shard in jobs], return_exceptions=True, order_outputs=True))
+    calls = [(run_large if name in LARGE else run).spawn(skip, server_files, only, shard) for name, only, shard in jobs]
+    results = []
+    for call in calls:  # in job order; a failed container is an exception result, which merge() reports and fails closed
+        try: results.append(call.get())
+        except Exception as e: results.append(e)
     print(f"all containers returned in {time.time() - t0:.0f} s")
     os.makedirs(out, exist_ok=True)
     problems = merge(out, jobs, results)

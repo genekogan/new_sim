@@ -84,7 +84,8 @@ Billing & plans to unblock hosted CI; Modal remains independent. No billing sett
 `tools/test-harness/remote-suite.sh <outDir> [--ref HEAD] [--baseline-ref main|none] [--harness-ref HEAD] [--skip V7,V8] [--node 22]`
 
 - **What it ships.** It sends `git archive <ref>` and, for V4's failure-set comparison, `git archive <baseline-ref>` to a
-  Modal container (`modal_suite.py`: `node:<node>-bookworm`, pnpm 10.27.0, 8 CPU, 16 GB, 4 h cap).
+  Modal container (`modal_suite.py`: `node:<node>-bookworm`, pnpm 10.27.0, 4 h cap; group a 8 CPU / 16 GB, the rest
+  4 CPU / 8 GB).
   - Only committed files go, so commit first. `--harness-ref` selects the committed harness overlaid on both trees.
     Returned RUN-METADATA.json records both identities; V0's synthetic container Git commit is not a source SHA.
   - Nothing secret is in the tree. Nothing from `.lane/`, `~/.modal.toml` or the laptop's data goes.
@@ -95,17 +96,21 @@ Billing & plans to unblock hosted CI; Modal remains independent. No billing sett
   `one-validation.sh --skip V7,V8`: V1 types, V2 builds, V3 package/engine/CLI/launcher/harness suites, V4 web tests,
   V5 recursive server tests and V6 god/Soul/join API e2es. `--baseline-ref none` suppresses the duplicate V4 baseline.
   Each V5 shard has a 150-minute envelope; exceeding it always blocks the gate.
-- **Fan-out (t4-o1, 2026-10-19).** One run is 15 containers at once: seven step groups (`GROUPS` in `modal_suite.py`,
-  selected by `SUITE_ONLY`) and eight V5 shards (`V5_SHARD=i/8`: contiguous slices of the sorted server test files,
+- **Fan-out (t4-o1 2026-10-19; right-sized by lane gate-cost 2026-10-26, MODAL-POLICY rule 3).** One run is 4
+  containers at once: group `a` (V1, V2, V3-harness/bundle/packages, V4, the short V6 joins; 8 CPU / 16 GB because it
+  builds the web twice), group `s` (the former b, c, d, e, f, w: V3-walk, V3-mars-engine, V3-client-cli,
+  V3-launcher-unit and the long V6 scenarios, run serially) and two V5 shards, all at 4 CPU / 8 GB (`GROUPS`/`LARGE`
+  in `modal_suite.py`, selected by `SUITE_ONLY`). V5 runs `--test-concurrency=1`, so more cores were idle. V5 shards
+  (`V5_SHARD=i/2`: contiguous slices of the sorted server test files,
   balanced by `v5-durations.json`; each shard also records per-file times in `V5-server-full-files.jsonl`, the source
   for rebalancing). The cheap V2 builds also run unrecorded first in every group, so later steps see the same tree.
   `merge()` rebuilds the serial layout: one SUMMARY.tsv in serial order, the shard TAP logs concatenated in order (the
   serial test order and duplicate-title ordinals), one RUN-METADATA.json that is complete only if every group was.
   Per-group SUMMARY/metadata/V0/install logs stay in `out/groups/<name>/`. A missing group or shard, a duplicated
-  row or an inexact shard file cover fails closed. The gate's verdict logic is unchanged. Wall time ~15–25 min.
-  `run` has `max_containers = len(GROUPS) + V5_SHARDS` (15): each `modal run` is its own ephemeral app, so this caps
-  one gate; the edenartlab workspace limit (100 containers) is kept by the ledger `team/lanes/GATES.inflight`
-  (at most 3 gates in flight across tranches).
+  row or an inexact shard file cover fails closed. The gate's verdict logic is unchanged. Expected wall time ~45–50 min
+  (group s ~31–40 min serial, each V5 shard ~2280 s of tests, group a ~10 min); it was ~22 min with 15 containers.
+  `run_large` (group a) has `max_containers = 1` and `run` has `max_containers = 3`: each `modal run` is its own
+  ephemeral app, so this caps one run; the ledger `team/lanes/GATES.inflight` bounds gates across tranches.
   Rebalance after big test changes: `node tools/test-harness/v5-shard.mjs` reads `v5-durations.json`; regenerate it
   from a run's `out/groups/v5-*/V5-server-full-files.jsonl` (sum of top-level `ms` per file).
   - The container has its own network namespace, so the 54xx test ports can't collide with anything.
@@ -117,7 +122,9 @@ Billing & plans to unblock hosted CI; Modal remains independent. No billing sett
   V3 retains raw Node TAP/spec output and an explicit exit code for every package. Any package failure fails V3.
   The raw runner returns suite artifacts even for failing assertions; use release-gate.sh to evaluate a ship.
 - **Node.** The default is 22 (eden2 production runs v22.23). Use `--node 26` to match the laptop.
-- **Cost.** CPU only, 14 containers × 8 cores × ~5–10 min per run (about the same core-hours as the old serial hour).
+- **Cost.** CPU only. Before 2026-10-26 a run held 15 containers × 8 cores / 16 GB for ~7,500 container-seconds of
+  steps (~2.1 container-h, ~17 core-h) and every gate made two runs. Now one run is ~1.6 container-h and ~9.5 core-h
+  (a: ~0.17 h × 8 cores; s and 2 V5 shards: ~1.45 h × 4 cores), and a gate with a cached baseline makes one run.
 - **Setup.** Needs `modal` installed and authenticated: `pip install modal && modal token new`. On this laptop it is
   installed (1.5.2) and `modal profile current` answers `edenartlab`.
 - **Smoke test** (install + preflight only, a few minutes):
