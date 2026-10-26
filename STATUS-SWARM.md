@@ -56,4 +56,11 @@ Brief: `<team>/TRANCHE-SWARM-DIRECTOR-20261026.md`. Branch `lane/swarm-director-
 
 ## Progress
 
-- (in progress) schema + modules + tests.
+- Built: `director/swarm/{cast,truth,planner,console,orchestrator,verify,run}.mjs`, casts `seven-dwarves.json` and
+  `smoke-duo.json`, `playtest.mjs direct`, `PLAYTEST_DIRECT` in `cloud/run-replay.sh` (+ README section).
+- Tests: `node --test tools/playtest/director/swarm/test/*.test.mjs` (21 pass; fake seats/world/virtual clock, no model):
+  gather gate, straggler nudge, never-paired chat nudge, onboarding hand-off, turn order, next go waits for the previous
+  speaker's speech + result/quiet, prepare-ahead, silent speaker nudge→skip, left-room nudge, early talker caught,
+  scripted redirect changes the talk and is observed, broadcast/seat lines verbatim, pause/resume/end, economy, gather
+  timeout drop, log files, story.html renders director moments.
+- Planner checked for real on seven-dwarves: opus, 30 s, $0.073, all 21 directions from the model.
