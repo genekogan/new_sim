@@ -74,7 +74,7 @@ test('account controller: issue time is the first poll; registration, a not-read
  const old=await me(f,first.token);assert.equal(old.status,401);assert.equal(old.body.code,'control.revoked');assert.equal(old.body.reason,'replaced');
  assert.match(old.body.revokedAt,ISO);assert.equal(old.body.replacedAt,old.body.revokedAt);
  assert.equal(old.body.message,`Ada Lovelace's control moved to a newer pairing at ${old.body.revokedAt}.`);
- assert.equal(old.body.hint,`Run: node eden-agent.mjs pair-soul ${sid} --for CODE`);assert.deepEqual(old.body.soul,{id:sid,name:'Ada Lovelace'});
+ assert.equal(old.body.hint,`Run: node eden.mjs pair ${sid} --for CODE`);assert.deepEqual(old.body.soul,{id:sid,name:'Ada Lovelace'});
  const second=await f.poll(b);assert.notEqual(second.token,first.token);
  const after=await me(f,first.token);assert.deepEqual(after.body,old.body,'the new agent polling changes nothing the old holder sees');
  assert.ok(!JSON.stringify(old.body).includes(second.token)&&!JSON.stringify(old.body).includes('did:privy'),'no replacement bearer or account');
@@ -143,7 +143,7 @@ test('legacy world: register paths keep the controller; re-pair says moved; agen
  const still=await agentMe(a);assert.deepEqual([still.status,still.body.paired_as,still.body.since],[200,meA.body.paired_as,meA.body.since],'register paths leave the controller and its issue time alone');
  const b=await pairOnce();assert.notEqual(a,b);
  const old=await agentMe(a);assert.equal(old.status,401);assert.equal(old.body.code,'control.revoked');assert.equal(old.body.reason,'replaced');
- assert.equal(old.body.message,`Basil's control moved to a newer pairing at ${old.body.revokedAt}.`);assert.equal(old.body.hint,`Run: node eden-agent.mjs pair-soul ${row.id} --for CODE`);
+ assert.equal(old.body.message,`Basil's control moved to a newer pairing at ${old.body.revokedAt}.`);assert.equal(old.body.hint,`Run: node eden.mjs pair ${row.id} --for CODE`);
  // Only the human can revoke; an old client's register/cleanup release call cannot disconnect control.
  const attempt=await f.app.request('/v1/agent/release',{method:'POST',headers:{authorization:'Bearer '+b}});assert.equal(attempt.status,403);assert.equal((await attempt.json() as any).error.code,'control.owner_required');
  assert.equal((await agentMe(b)).status,200);

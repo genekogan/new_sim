@@ -157,8 +157,8 @@ try {
     const cfg = (await api('/v1/config')).data, edge = await api('/v1/edge/schema');
     const cli = await (await fetch(`${base}/eden-agent.mjs`)).text(), soulSkill = await (await fetch(`${base}/skill.md`)).text(), instr = await (await fetch(`${base}/instructions.md`)).text();
     return { auth: cfg.authProvider, devAuth: cfg.devAuth, accountApproval: cfg.accountApproval?.contract ?? null, inviteRequired: cfg.inviteRequired, edge: edge.status, cliSame: cli === readFileSync(SOUL_CLI, 'utf8'), skillVersion: soulSkill.match(/version: "([\d.]+)"/)?.[1],
-      skillHere: soulSkill.includes(`This world is **${base}**`) && !/\{\{/.test(soulSkill), instructions: instr.startsWith(`# Create a Soul in ${worldName}`) && instr.includes(`World: ${base}`) && !/\{\{/.test(instr) };
-  }, (r) => r.inviteRequired === false && r.edge === 200 && r.cliSame && /^1\.9(\.\d+)?$/.test(r.skillVersion ?? '') && r.skillHere && r.instructions && (MODE === 'dev' ? r.devAuth === true : r.auth === 'clerk' && r.devAuth === false && r.accountApproval === 'account-soul-approval/1'));
+      skillHere: !/\{\{/.test(soulSkill) && (soulSkill.includes(`This world is **${base}**`) || /^\s*version:\s*"2\./m.test(soulSkill)), instructions: instr.startsWith(`# Create a Soul in ${worldName}`) && instr.includes(`World: ${base}`) && !/\{\{/.test(instr) };
+  }, (r) => r.inviteRequired === false && r.edge === 200 && r.cliSame && /^(1\.9(\.\d+)?|2\.\d+\.\d+)$/.test(r.skillVersion ?? '') && r.skillHere && r.instructions && (MODE === 'dev' ? r.devAuth === true : r.auth === 'clerk' && r.devAuth === false && r.accountApproval === 'account-soul-approval/1'));
   await step('K1 ONE skill at /SKILL.md: God mode and Soul mode, each alone; Soul mode points at this world\'s CLI copy and Soul skill', async () => {
     skill = await (await fetch(`${base}/SKILL.md`)).text();
     const god = section('God mode'), soul = section('Soul mode');

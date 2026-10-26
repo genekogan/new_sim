@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, renameSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync, renameSync, readFileSync } from 'node:fs';
 import { tmpdir, homedir } from 'node:os';
-import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { compareRuns, parseTap, readRun, validateQuarantine, REQUIRED_STEPS } from './release-gate.mjs';
+import { dirname, join } from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { cacheAdd, cacheKey, compareRuns, lookupCache, suiteTree, DRIVER_ONLY, main, parseArgs, parseTap, readRun, scopeFor, storeCache, validateQuarantine, REQUIRED_PACKAGES, REQUIRED_STEPS } from './release-gate.mjs';
 
 // Preserve fixture artifacts under the same no-delete rule as release work.
 const retireFixture = dir => { const trash = join(homedir(), '.Trash'); mkdirSync(trash, { recursive: true }); renameSync(dir, join(trash, dir.split('/').at(-1) + '-' + Date.now())); };
@@ -294,4 +295,271 @@ test('receipt evidence hashes change when returned log contents change', t => {
 });
 test('the fixed release contract includes every package/server/web/harness step', () => {
   for (const s of ['V3-packages', 'V3-harness', 'V3-walk', 'V3-bundle', 'V4-web', 'V5-server-full', 'V6-mars-two', 'V6-lm-two']) assert.ok(REQUIRED_STEPS.includes(s));
+});
+
+// ── Baseline cache (MODAL-POLICY rule 1): fake Modal runs in a throwaway git repository ────────────────────────────
+const shaOf = b => createHash('sha256').update(b).digest('hex');
+const gitIn = (dir, ...a) => execFileSync('git', ['-C', dir, ...a], { encoding: 'utf8' }).trim();
+function gateRepo(t) {
+  const dir = mkdtempSync(join(process.env.GATE_TEST_TMPDIR || tmpdir(), 'sim-gate-repo-'));
+  t.after(() => retireFixture(dir));
+  gitIn(dir, 'init', '-q', '-b', 'main');
+  const commit = (path, text) => {
+    mkdirSync(dirname(join(dir, path)), { recursive: true }); writeFileSync(join(dir, path), text);
+    gitIn(dir, 'add', '-A'); gitIn(dir, '-c', 'user.email=gate@test', '-c', 'user.name=gate test', 'commit', '-qm', path);
+    return gitIn(dir, 'rev-parse', 'HEAD');
+  };
+  commit('.gitignore', '.lane/\n');
+  commit('tools/test-harness/quarantine.json', JSON.stringify(manifest()));
+  return { dir, commit, base: commit('README.md', 'base\n') };
+}
+/** A complete, passing run of every REQUIRED_STEPS row, shaped like a merged Modal run. */
+function writeFullRun(dir, meta, { nodeVersion = 'v22.23.0', steps = REQUIRED_STEPS } = {}) {
+  mkdirSync(join(dir, 'out/suite'), { recursive: true });
+  writeFileSync(join(dir, 'out/RUN-METADATA.json'), JSON.stringify({ baselineSha: null, suiteCompleted: true, skip: ['V7', 'V8'], serverFiles: [], nodeVersion, pnpmVersion: '10.27.0', ...meta }));
+  const rows = ['step\texit\tseconds\tlog'];
+  for (const step of steps) {
+    let log = tap([{ name: 'works', source: 'apps/web/src/widget.test.ts' }]);
+    if (['V1-types', 'V2-build-root', 'V2-build-worlds'].includes(step)) log = 'built\n';
+    if (step === 'V3-packages') log = REQUIRED_PACKAGES.map(p => tap([{ name: 'works' }], { prefix: `## ${p}` }) + `## ${p} exit=0\n`).join('');
+    if (step.startsWith('V6-')) { log = 'scenario ok\n'; writeFileSync(join(dir, `out/suite/${step}-cases.json`), JSON.stringify({ schemaVersion: 1, completed: true, steps: [{ id: 'case', status: 'pass' }], harnessFailures: [], sourceReport: 'report.json' })); }
+    if (step === 'V4-web' || step === 'V3-harness') {
+      const c = parseTap(log).counts;
+      writeFileSync(join(dir, `out/suite/${step}-files.jsonl`), [{ event: 'test:pass', file: '/work/head/apps/web/src/widget.test.ts', name: 'works', type: 'test' },
+        { event: 'test:summary', counts: { tests: c.tests, suites: c.suites, passed: c.pass, failed: c.fail, cancelled: c.cancelled, skipped: c.skipped, todo: c.todo, topLevel: c.topLevel } }].map(e => JSON.stringify(e)).join('\n') + '\n');
+    }
+    writeFileSync(join(dir, `out/suite/${step}.log`), log); rows.push(`${step}\t0\t1\t/out/suite/${step}.log`);
+  }
+  rows.push('V8-history-boot\tSKIP\t0\t-');
+  writeFileSync(join(dir, 'out/suite/SUMMARY.tsv'), rows.join('\n') + '\n');
+}
+function fakeModal(calls, nodeVersionFor = () => 'v22.23.0', onlys = []) {
+  return async (out, sourceSha, harnessRef, node, root, only = []) => {
+    calls.push(sourceSha); onlys.push(only);
+    const archive = execFileSync('git', ['-C', root, 'archive', '--format=tar.gz', harnessRef, 'tools/test-harness']);
+    writeFullRun(out, { schemaVersion: 1, sourceSha, harnessRef, harnessTree: gitIn(root, 'rev-parse', `${harnessRef}:tools/test-harness`), harnessArchiveSha256: shaOf(archive), node, ...(only.length ? { only } : {}) },
+      { nodeVersion: nodeVersionFor(sourceSha), steps: only.length ? only : REQUIRED_STEPS });
+    return { exit: 0, timedOut: false, log: join(out, 'gate-driver.log'), logSha256: '' };
+  };
+}
+const gate = async (repo, args, remoteRun, lines = []) => ({ rc: await main(args, { root: repo.dir, remoteRun, log: l => lines.push(l) }), lines });
+const receiptOf = out => JSON.parse(readFileSync(join(out, 'receipt.json'), 'utf8'));
+
+test('baseline reuse: a miss runs main once and caches it; the next gate on the same harness tree runs only the candidate', async t => {
+  const repo = gateRepo(t), tmp = dirname(repo.dir), cache = mkdtempSync(join(tmp, 'sim-gate-cache-')); t.after(() => retireFixture(cache));
+  const c1 = repo.commit('apps/web/src/a.ts', 'one\n'), calls = [];
+  const out1 = join(repo.dir, '.lane/g1');
+  const first = await gate(repo, [c1, '--baseline', repo.base, '--out', out1, '--cache', cache], fakeModal(calls));
+  const r1 = receiptOf(out1);
+  assert.equal(first.rc, 0, r1.blockers.join('\n')); assert.deepEqual(calls.sort(), [c1, repo.base].sort());
+  assert.equal(r1.baseline.source, 'run'); assert.match(r1.baseline.cacheMiss, /no cached run/);
+  assert.deepEqual(r1.cache.stored.map(s => s.label), ['baseline', 'candidate']);
+  assert.match(first.lines.at(-1), /baseline_source=run/);
+  // a later commit with the identical harness tree: other harness commit and archive bytes, same suite
+  const c2 = repo.commit('apps/web/src/b.ts', 'two\n'); calls.length = 0;
+  const out2 = join(repo.dir, '.lane/g2');
+  const second = await gate(repo, [c2, '--baseline', c1, '--out', out2, '--cache', cache], fakeModal(calls));
+  const r2 = receiptOf(out2);
+  assert.equal(second.rc, 0, r2.blockers.join('\n')); assert.deepEqual(calls, [c2]);
+  assert.equal(r2.baseline.source, 'cached'); assert.equal(r2.baseline.dir, join(cache, `${c1}-${r2.harness.suiteTree}-node22`));
+  assert.equal(r2.baseline.suiteTree, r2.harness.suiteTree); assert.equal(r2.baseline.driverTestsChanged, false);
+  assert.equal(r2.runs.baseline.metadata.harnessRef, c1); assert.notEqual(r2.runs.baseline.metadata.harnessArchiveSha256, r2.harness.archiveSha256);
+  assert.deepEqual(r2.cache.stored.map(s => s.label), ['candidate']); assert.equal(r2.status, 'pass');
+  assert.ok(existsSync(join(cache, `${c2}-${r2.harness.suiteTree}-node22/CACHE.json`)));
+});
+test('a modified cache entry or another harness tree is a miss, never a silent reuse', async t => {
+  const repo = gateRepo(t), cache = mkdtempSync(join(dirname(repo.dir), 'sim-gate-cache-')); t.after(() => retireFixture(cache));
+  const c1 = repo.commit('apps/web/src/a.ts', 'one\n'), calls = [];
+  await gate(repo, [c1, '--baseline', repo.base, '--out', join(repo.dir, '.lane/g1'), '--cache', cache], fakeModal(calls));
+  const tree = suiteTree(repo.dir, 'HEAD'), m = manifest(), at = { root: repo.dir };
+  const look = (identity) => lookupCache(cache, identity, m, REQUIRED_STEPS, {}, at.root);
+  assert.equal(look({ sourceSha: c1, suiteTree: tree, node: '22' }).hit, true);
+  const log = join(cache, cacheKey({ sourceSha: c1, suiteTree: tree, node: '22' }), 'out/suite/V5-server-full.log');
+  writeFileSync(log, readFileSync(log, 'utf8').replace('ok 1 - works', 'ok 1 - works # edited'));
+  assert.match(look({ sourceSha: c1, suiteTree: tree, node: '22' }).reason, /changed since it was stored: suite\/V5-server-full.log/);
+  assert.match(look({ sourceSha: c1, suiteTree: 'f'.repeat(64), node: '22' }).reason, /no cached run/);
+  assert.match(look({ sourceSha: c1, suiteTree: tree, node: '26' }).reason, /no cached run/);
+  // the tampered entry is not reused: the gate runs the baseline again and keeps the existing entry untouched
+  const c2 = repo.commit('apps/web/src/b.ts', 'two\n'); calls.length = 0;
+  const out = join(repo.dir, '.lane/g2');
+  await gate(repo, [c2, '--baseline', c1, '--out', out, '--cache', cache], fakeModal(calls));
+  const r = receiptOf(out);
+  assert.equal(r.baseline.source, 'run'); assert.match(r.baseline.cacheMiss, /changed since/); assert.deepEqual(calls.sort(), [c1, c2].sort());
+  assert.equal(r.cache.notStored.find(s => s.label === 'baseline').reason, 'already cached');
+});
+test('a cached baseline on another Node patch is run again, never compared across runtimes', async t => {
+  const repo = gateRepo(t), cache = mkdtempSync(join(dirname(repo.dir), 'sim-gate-cache-')); t.after(() => retireFixture(cache));
+  const c1 = repo.commit('apps/web/src/a.ts', 'one\n'), calls = [];
+  await gate(repo, [c1, '--baseline', repo.base, '--out', join(repo.dir, '.lane/g1'), '--cache', cache], fakeModal(calls));
+  const c2 = repo.commit('apps/web/src/b.ts', 'two\n'); calls.length = 0;
+  const out = join(repo.dir, '.lane/g2');
+  const { rc } = await gate(repo, [c2, '--baseline', c1, '--out', out, '--cache', cache], fakeModal(calls, () => 'v22.24.0'));
+  const r = receiptOf(out);
+  assert.equal(rc, 0, r.blockers.join('\n')); assert.deepEqual(calls, [c2, c1]);
+  assert.equal(r.baseline.source, 'run'); assert.match(r.baseline.cacheRejected, /runtime v22.23.0\/10.27.0 differs/);
+  assert.equal(r.runs.baseline.metadata.nodeVersion, 'v22.24.0');
+});
+test('--baseline-results alone imports the baseline and runs only the candidate; --candidate-results alone is refused', async t => {
+  assert.throws(() => parseArgs(['abc', '--candidate-results', '/x']), /needs --baseline-results/);
+  assert.throws(() => parseArgs(['abc', '--dry-run', '--dry-run']), /duplicate option/);
+  const repo = gateRepo(t), c1 = repo.commit('apps/web/src/a.ts', 'one\n'), calls = [];
+  const first = join(repo.dir, '.lane/g1');
+  await gate(repo, [c1, '--baseline', repo.base, '--out', first, '--no-cache'], fakeModal(calls));
+  assert.equal(receiptOf(first).cache, undefined);
+  const c2 = repo.commit('apps/web/src/b.ts', 'two\n'); calls.length = 0;
+  const out = join(repo.dir, '.lane/g2');
+  const { rc } = await gate(repo, [c2, '--baseline', c1, '--baseline-results', join(first, 'candidate'), '--out', out, '--no-cache'], fakeModal(calls));
+  const r = receiptOf(out);
+  assert.equal(rc, 0, r.blockers.join('\n')); assert.deepEqual(calls, [c2]); assert.equal(r.baseline.source, 'imported');
+  // the import must be a run of the named baseline
+  const wrong = join(repo.dir, '.lane/g3');
+  assert.equal((await gate(repo, [c2, '--baseline', repo.base, '--baseline-results', join(first, 'candidate'), '--out', wrong, '--no-cache'], fakeModal([]))).rc, 1);
+  assert.match(receiptOf(wrong).blockers.join('\n'), /baseline: metadata mismatch: sourceSha/);
+});
+test('cache-add stores only a validated run named by a passing gate receipt', async t => {
+  const repo = gateRepo(t), cache = mkdtempSync(join(dirname(repo.dir), 'sim-gate-cache-')); t.after(() => retireFixture(cache));
+  const c1 = repo.commit('apps/web/src/a.ts', 'one\n');
+  const out = join(repo.dir, '.lane/g1');
+  await gate(repo, [c1, '--baseline', repo.base, '--out', out, '--no-cache'], fakeModal([]));
+  const added = cacheAdd(join(out, 'candidate'), { root: repo.dir, cacheDir: cache });
+  assert.equal(added.stored, true, added.reason); assert.equal(cacheAdd(join(out, 'candidate'), { root: repo.dir, cacheDir: cache }).reason, 'already cached');
+  const entry = JSON.parse(readFileSync(join(added.dir, 'CACHE.json'), 'utf8'));
+  assert.equal(entry.provenance.label, 'candidate'); assert.equal(entry.provenance.receiptSha256, shaOf(readFileSync(join(out, 'receipt.json'))));
+  // a blocked gate's run, or a run whose metadata no longer matches its harness, is refused
+  const receipt = receiptOf(out); writeFileSync(join(out, 'receipt.json'), JSON.stringify({ ...receipt, status: 'blocked' }));
+  assert.match(cacheAdd(join(out, 'baseline'), { root: repo.dir, cacheDir: mkdtempSync(join(dirname(repo.dir), 'sim-gate-cache-')) }).reason, /status blocked/);
+  writeFileSync(join(out, 'receipt.json'), JSON.stringify(receipt));
+  const meta = join(out, 'baseline/out/RUN-METADATA.json'), m = JSON.parse(readFileSync(meta, 'utf8'));
+  writeFileSync(meta, JSON.stringify({ ...m, harnessArchiveSha256: 'e'.repeat(64) }));
+  assert.match(cacheAdd(join(out, 'baseline'), { root: repo.dir, cacheDir: cache }).reason, /metadata mismatch: harnessArchiveSha256/);
+});
+test('a dry run prints the plan without Modal and without writing an output directory', async t => {
+  const repo = gateRepo(t), cache = mkdtempSync(join(dirname(repo.dir), 'sim-gate-cache-')); t.after(() => retireFixture(cache));
+  const c1 = repo.commit('apps/web/src/a.ts', 'one\n');
+  const never = async () => { throw Error('Modal contacted'); };
+  const out = join(repo.dir, '.lane/dry');
+  const miss = await gate(repo, [c1, '--baseline', repo.base, '--out', out, '--cache', cache, '--dry-run'], never);
+  assert.equal(miss.rc, 0); assert.ok(!existsSync(out));
+  assert.match(miss.lines.at(-1), /RELEASE_GATE_PLAN .*baseline_source=run modal_runs=2/);
+  assert.deepEqual(JSON.parse(miss.lines[0]).modalRuns, ['candidate', 'baseline']);
+  await gate(repo, [c1, '--baseline', repo.base, '--out', join(repo.dir, '.lane/g1'), '--cache', cache], fakeModal([]));
+  const hit = await gate(repo, ['HEAD', '--baseline', c1, '--out', out, '--cache', cache, '--dry-run'], never);
+  assert.match(hit.lines.at(-1), /baseline_source=cached modal_runs=1/); assert.ok(!existsSync(out));
+  const help = await gate(repo, ['--help'], never);
+  assert.equal(help.rc, 0); assert.match(help.lines[0], /usage: release-gate.sh/);
+});
+
+// ── Scoped candidate gates (MODAL-POLICY rule 4) ──────────────────────────────────────────────────────────────────
+test('scope: steps follow the changed areas; docs/tools never gate; anything unnamed takes the full contract', () => {
+  const V6 = REQUIRED_STEPS.filter(s => s.startsWith('V6-'));
+  assert.deepEqual(scopeFor(['apps/web/src/a.ts']).steps, ['V1-types', 'V2-build-root', 'V2-build-worlds', 'V3-bundle', 'V4-web']);
+  assert.deepEqual(scopeFor(['apps/server/src/a.ts']).steps, ['V1-types', 'V3-packages', 'V3-walk', 'V5-server-full', ...V6]);
+  assert.deepEqual(scopeFor(['packages/kernel/src/a.ts']).steps, ['V1-types', 'V3-packages', 'V3-mars-engine', 'V3-walk', 'V5-server-full']);
+  assert.deepEqual(scopeFor(['tools/world-launcher/launcher.mjs']).steps, ['V3-launcher-unit', ...V6]);
+  assert.deepEqual(scopeFor(['tools/edge-skill/a.mjs', 'tools/client-eval/b.mjs']).steps, ['V3-client-cli']);
+  const none = scopeFor(['docs/a.md', 'tools/test-harness/x.mjs', 'tools/ops/y.sh', 'README.md', '']);
+  assert.equal(none.resolved, 'none'); assert.deepEqual(none.steps, []); assert.deepEqual(none.diff.byArea, { 'docs/': 2, 'tools/': 2 });
+  for (const f of ['pnpm-lock.yaml', 'package.json', 'mars/viewer/engine/x.ts', 'worlds/eden/a.json', 'vendor/x.js', '.github/workflows/ci.yml']) {
+    const r = scopeFor(['apps/web/src/a.ts', f]);
+    assert.equal(r.resolved, 'full', f); assert.deepEqual(r.steps, REQUIRED_STEPS); assert.deepEqual(r.diff.unmapped, [f]);
+  }
+  // all three product areas: everything but the client CLI, launcher and harness self-tests
+  assert.deepEqual(REQUIRED_STEPS.filter(s => !scopeFor(['apps/web/a.ts', 'apps/server/b.ts', 'packages/c/d.ts']).steps.includes(s)), ['V3-client-cli', 'V3-launcher-unit', 'V3-harness']);
+  assert.throws(() => parseArgs(['abc', '--scope', 'some']), /--scope is full or auto/);
+});
+test('scope auto: a web-only candidate runs only its steps against the cached full baseline and is never cached', async t => {
+  const repo = gateRepo(t), cache = mkdtempSync(join(dirname(repo.dir), 'sim-gate-cache-')); t.after(() => retireFixture(cache));
+  const c1 = repo.commit('apps/server/src/a.ts', 'one\n'), calls = [];
+  await gate(repo, [c1, '--baseline', repo.base, '--out', join(repo.dir, '.lane/g1'), '--cache', cache], fakeModal(calls));
+  const c2 = repo.commit('apps/web/src/b.ts', 'two\n'); calls.length = 0; const onlys = [];
+  const out = join(repo.dir, '.lane/g2');
+  const { rc, lines } = await gate(repo, [c2, '--baseline', c1, '--out', out, '--cache', cache, '--scope', 'auto'], fakeModal(calls, undefined, onlys));
+  const r = receiptOf(out);
+  assert.equal(rc, 0, r.blockers.join('\n')); assert.deepEqual(calls, [c2]);
+  assert.deepEqual(onlys, [['V1-types', 'V2-build-root', 'V2-build-worlds', 'V3-bundle', 'V4-web']]);
+  assert.equal(r.scope.mode, 'auto'); assert.equal(r.scope.resolved, 'scoped'); assert.deepEqual(r.scope.diff.byArea, { 'apps/web/': 1 });
+  assert.equal(r.scope.diff.range, `${c1}..${c2}`); assert.equal(r.baseline.source, 'cached'); assert.equal(r.status, 'pass');
+  assert.deepEqual(r.cache.stored, []); assert.match(lines.at(-1), /scope=scoped/);
+  // a scoped run is never a full-gate run: not as a baseline, not in the cache
+  const full = readRun(join(out, 'candidate'), { schemaVersion: 1, sourceSha: c2, harnessTree: r.harness.tree, node: '22' }, manifest());
+  assert.match(full.errors.join('\n'), /scoped run .* is not a full gate run/);
+  assert.match(storeCache(cache, { ...full, errors: [] }, {}, repo.dir).reason, /scoped run/);
+  // the full default on the same head runs every step again
+  onlys.length = 0;
+  const fullOut = join(repo.dir, '.lane/g3');
+  await gate(repo, [c2, '--baseline', c1, '--out', fullOut, '--cache', cache], fakeModal([], undefined, onlys));
+  assert.deepEqual(onlys, [[]]); assert.equal(receiptOf(fullOut).scope.resolved, 'full'); assert.equal(receiptOf(fullOut).cache.stored[0].label, 'candidate');
+});
+test('scope auto: docs/tools-only candidates are not gated (exit 0, no Modal); an unnamed path runs the full contract', async t => {
+  const repo = gateRepo(t), cache = mkdtempSync(join(dirname(repo.dir), 'sim-gate-cache-')); t.after(() => retireFixture(cache));
+  const c1 = repo.commit('docs/notes.md', 'notes\n');
+  const c2 = repo.commit('tools/ops/tool.sh', 'echo\n');
+  const out = join(repo.dir, '.lane/none'), never = async () => { throw Error('Modal contacted'); };
+  const { rc, lines } = await gate(repo, [c2, '--baseline', repo.base, '--out', out, '--cache', cache, '--scope', 'auto'], never);
+  const r = receiptOf(out);
+  assert.equal(rc, 0); assert.equal(r.status, 'not-gated'); assert.equal(r.scope.resolved, 'none'); assert.deepEqual(r.blockers, []);
+  assert.deepEqual(r.scope.diff.byArea, { 'docs/': 1, 'tools/': 1 }); assert.match(lines.at(-1), /RELEASE_GATE NOT-GATED .*scope=none/);
+  const dry = await gate(repo, [c2, '--baseline', repo.base, '--cache', cache, '--scope', 'auto', '--dry-run'], never);
+  assert.match(dry.lines.at(-1), /scope=none modal_runs=0/);
+  const c3 = repo.commit('pnpm-lock.yaml', 'lock\n'), onlys = [];
+  const fullOut = join(repo.dir, '.lane/full');
+  await gate(repo, [c3, '--baseline', c1, '--out', fullOut, '--cache', cache, '--scope', 'auto'], fakeModal([], undefined, onlys));
+  const f = receiptOf(fullOut);
+  assert.equal(f.scope.resolved, 'full'); assert.deepEqual(f.scope.diff.unmapped, ['pnpm-lock.yaml']); assert.deepEqual(onlys, [[], []]);
+});
+test('cache-add stores a bare remote-suite run (no gate receipt) only when it passes on its own quarantine', async t => {
+  const repo = gateRepo(t), cache = mkdtempSync(join(dirname(repo.dir), 'sim-gate-cache-')); t.after(() => retireFixture(cache));
+  const c1 = repo.commit('apps/web/src/a.ts', 'one\n'), head = gitIn(repo.dir, 'rev-parse', 'HEAD');
+  const runs = join(repo.dir, '.lane/runs'), bare = join(runs, 'bare'), failing = join(runs, 'failing');
+  await fakeModal([])(bare, c1, head, '22', repo.dir);
+  await fakeModal([])(failing, c1, head, '22', repo.dir);
+  assert.ok(!existsSync(join(runs, 'receipt.json')));
+  // an unquarantined test failure in an otherwise complete run is refused
+  writeFileSync(join(failing, 'out/suite/V5-server-full.log'), tap([{ name: 'works', status: 'fail', source: 'apps/server/src/a.test.ts' }]));
+  writeFileSync(join(failing, 'out/suite/SUMMARY.tsv'), readFileSync(join(failing, 'out/suite/SUMMARY.tsv'), 'utf8').replace('V5-server-full\t0', 'V5-server-full\t1'));
+  const refused = cacheAdd(failing, { root: repo.dir, cacheDir: cache });
+  assert.equal(refused.stored, false); assert.match(refused.reason, /run: V5-server-full: baseline failure has no quarantine: works/);
+  const added = cacheAdd(bare, { root: repo.dir, cacheDir: cache });
+  assert.equal(added.stored, true, added.reason);
+  assert.equal(added.key, `${c1}-${suiteTree(repo.dir, 'HEAD')}-node22`);
+  const entry = JSON.parse(readFileSync(join(added.dir, 'CACHE.json'), 'utf8'));
+  assert.deepEqual(entry.provenance, { via: 'cache-add-bare', receipt: null });
+  assert.equal(entry.harnessTree, gitIn(repo.dir, 'rev-parse', 'HEAD:tools/test-harness')); assert.equal(entry.suiteTree, suiteTree(repo.dir, 'HEAD'));
+  assert.equal(lookupCache(cache, { sourceSha: c1, suiteTree: entry.suiteTree, node: '22' }, manifest(), REQUIRED_STEPS, {}, repo.dir).hit, true);
+  // a wrong harness identity is still refused without a receipt
+  const meta = join(failing, 'out/RUN-METADATA.json'), m = JSON.parse(readFileSync(meta, 'utf8'));
+  writeFileSync(meta, JSON.stringify({ ...m, harnessTree: 'a'.repeat(40) }));
+  assert.match(cacheAdd(failing, { root: repo.dir, cacheDir: cache }).reason, /metadata mismatch: harnessTree/);
+});
+test('suite tree: a driver-only edit keeps the cache key and reuses the baseline; a container-side edit changes it', async t => {
+  const repo = gateRepo(t), cache = mkdtempSync(join(dirname(repo.dir), 'sim-gate-cache-')); t.after(() => retireFixture(cache));
+  repo.commit('tools/test-harness/modal_suite.py', 'V5_SHARDS = 2\n'); repo.commit('tools/test-harness/release-gate.mjs', '// driver v1\n');
+  const c1 = repo.commit('apps/web/src/a.ts', 'one\n'), before = suiteTree(repo.dir, 'HEAD'), full = gitIn(repo.dir, 'rev-parse', 'HEAD:tools/test-harness');
+  await gate(repo, [c1, '--baseline', repo.base, '--out', join(repo.dir, '.lane/g1'), '--cache', cache], fakeModal([]));
+  assert.ok(DRIVER_ONLY.includes('release-gate.mjs') && !DRIVER_ONLY.includes('modal_suite.py') && !DRIVER_ONLY.includes('quarantine.json'));
+  for (const f of DRIVER_ONLY) repo.commit(`tools/test-harness/${f}`, `// driver edit ${f}\n`);
+  assert.equal(suiteTree(repo.dir, 'HEAD'), before); assert.notEqual(gitIn(repo.dir, 'rev-parse', 'HEAD:tools/test-harness'), full);
+  const c2 = repo.commit('apps/web/src/b.ts', 'two\n'), calls = [];
+  const out = join(repo.dir, '.lane/g2');
+  const { rc } = await gate(repo, [c2, '--baseline', c1, '--out', out, '--cache', cache], fakeModal(calls));
+  const r = receiptOf(out);
+  assert.equal(rc, 0, r.blockers.join('\n')); assert.deepEqual(calls, [c2]); assert.equal(r.baseline.source, 'cached');
+  assert.equal(r.baseline.harnessTree, full); assert.notEqual(r.harness.tree, full); assert.equal(r.baseline.suiteTree, r.harness.suiteTree);
+  assert.equal(r.baseline.driverTestsChanged, true); assert.deepEqual(r.driverTestsRemoved, []);
+  // anything a container runs changes the key: the next gate runs its baseline again
+  repo.commit('tools/test-harness/modal_suite.py', 'V5_SHARDS = 3\n');
+  assert.notEqual(suiteTree(repo.dir, 'HEAD'), before);
+  repo.commit('tools/test-harness/one-validation.sh', 'echo\n'); const c3 = repo.commit('apps/web/src/c.ts', 'three\n'); calls.length = 0;
+  const out3 = join(repo.dir, '.lane/g3');
+  await gate(repo, [c3, '--baseline', c2, '--out', out3, '--cache', cache], fakeModal(calls));
+  assert.equal(receiptOf(out3).baseline.source, 'run'); assert.deepEqual(calls.sort(), [c2, c3].sort());
+});
+test('against a cached baseline with other driver files, only their own removed self-tests are not lost coverage', () => {
+  const harness = (names, source) => { const p = parseTap(tap(names.map(name => ({ name, source }))), 'V3-harness');
+    return { errors: [], steps: { 'V3-harness': { exit: '0', tests: p.tests, executedFiles: [] } } }; };
+  const driver = 'tools/test-harness/release-gate.test.mjs', other = 'tools/test-harness/harness.test.mjs';
+  const renamed = compareRuns(harness(['old name'], driver), harness(['new name'], driver), manifest(), new Set(), { driverTestsChanged: true });
+  assert.equal(renamed.status, 'pass'); assert.equal(renamed.driverTestsRemoved[0].id, 'old name');
+  assert.equal(compareRuns(harness(['old name'], driver), harness(['new name'], driver), manifest()).status, 'blocked');
+  assert.equal(compareRuns(harness(['old name'], other), harness(['new name'], other), manifest(), new Set(), { driverTestsChanged: true }).status, 'blocked');
 });

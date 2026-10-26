@@ -1589,7 +1589,7 @@ export class EngineBridge {
     const alt = usable.sort((a, b) => a.d - b.d || a.id.localeCompare(b.id))[0];
     for (const i of unusable) { const b = caps[i].blocked; if (b) b.reason = `${b.reason} ${alt ? `Nearest seat you can use: ${alt.id} (${alt.label}).` : 'Sit on the ground instead: sit-ground:here.'}`; }
     if (this.layers.active()) try { this.layers.capabilities(soul, caps, plans as never, here); } catch (e) { this.log(`layers capabilities: ${(e as Error).message}`); }
-    this.sitHere(caps, plans, here);
+    this.sitHere(caps, plans, here, soul.entityId);
     this.fireLit(caps);
     try { this.meals?.capabilities(caps); } catch (e) { this.log(`meals capabilities: ${(e as Error).message}`); }
   }
@@ -1626,17 +1626,18 @@ export class EngineBridge {
     if (e.seatOccupantsV1) return e.seatOccupantsV1.call(this.engine, id).map((x) => x.body);
     const u = this.engine.bodyUsesV1(id); return u?.how === 'occupied' ? [u.body] : [];
   }
-  /** F1: the ledger lists `sit:here` before the world profile adds god-built seats, so it says "no free seat within
-   *  30 m" beside free benches. Point it at the nearest free god-built seat instead (the same plan as its sit:<id>). */
-  private sitHere(caps: EdgeCapability[], plans: Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>, here: Vec2) {
+  /** F1: the ledger lists `sit:here` before the world profile adds god-built seats, so it says "no free seat" beside
+   *  free benches. Point it at the nearest free god-built seat instead (the same plan as its sit:<id>) — D2 (2026-10-25):
+   *  only a seat that is here (EdgeLedger.seatIsHere: the Soul's own room, or within 3 m with no wall between). */
+  private sitHere(caps: EdgeCapability[], plans: Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>, here: Vec2, entityId: string) {
     const i = caps.findIndex((c) => c.id === 'sit:here'); if (i < 0 || caps[i].target && caps[i].available) return;
     const ents = this.engine.world.entities;
-    const best = caps.filter((c) => c.verb === 'sit' && c.id !== 'sit:here' && c.available && c.target && ents[c.target.id]?.tags?.includes('entity-world') && plans.has(c.id))
+    const best = caps.filter((c) => c.verb === 'sit' && c.id !== 'sit:here' && c.available && c.target && ents[c.target.id]?.tags?.includes('entity-world') && plans.has(c.id) && (!this.edge || this.edge.seatIsHere(entityId, ents[c.target.id].pose.p)))
       .map((c) => ({ c, d: Math.hypot(ents[c.target!.id].pose.p[0] - here[0], ents[c.target!.id].pose.p[2] - here[1]) })).filter((x) => x.d <= 30).sort((a, b) => a.d - b.d || (a.c.id < b.c.id ? -1 : 1))[0];
     if (!best) return;
     const plan = plans.get(best.c.id)!;
     const { blocked: _blocked, ...hereCap } = caps[i];
-    caps[i] = { ...hereCap, label: `Sit down on the nearest free seat (${best.c.label.replace(/^Sit on /, '')})`, target: best.c.target, available: true, params: best.c.params };
+    caps[i] = { ...hereCap, label: `Sit down on the free seat here (${best.c.label.replace(/^Sit on /, '')})`, target: best.c.target, available: true, params: best.c.params };
     plans.set('sit:here', { label: 'Sit down', steps: structuredClone(plan.steps), seconds: true });
   }
 }

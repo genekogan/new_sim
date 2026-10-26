@@ -11,12 +11,16 @@ import type {WorldState as NativeWorld} from '../../../../../mars/viewer/engine/
 import type {WorldHost, Mind} from '../../world.ts';
 import type {Db} from '../../db.ts';
 import {readHumanCapabilitiesV1, type HumanBindingV1} from '../../human-capabilities.ts';
+import {stateOf, bodyState, bodyWords, notYet, type ApproachV1, type BodyStateV1} from '../../body-state.ts';
 import {humanBlockedExplanationV1} from '../../human-wait-condition.ts';
 /** RT: route refusals that hold until the world itself changes (not a crowd, a search limit or a start a step clears). */
 const ROUTE_DEAD = new Set(['route.unreachable', 'route.goal-blocked', 'route.link-unusable', 'route.unknown-level']);
 /** BS3: refusals a plain walk answers with its closest approach (the fine planner's; ground.* keep their named refusals). */
 const APPROACH_CODES = new Set(['route.unreachable', 'route.goal-blocked']);
 const STUCK_RADIUS = 0.34;
+/** D2: a seat this close (m) with no enclosure boundary between is "here" for sit:here: a few steps (a fire-circle log, the
+ *  bench by the fountain), never the 30 m walk to a chair in another house. 3 m failed the party and activities gates. */
+export const HERE_SEAT_M = 8;
 const STUCK_REASON = 'The walk made no headway for 30 seconds, even after looking for another way from where it stood; choose another way or somewhere else.';
 import {EdgeError, type EdgeCapability, type EdgeLedgerHooks, type EdgeReceipt, type EdgeSoul, type NearbyBody, type PlaceRef,type ObjectBodyAdmission} from '../contract.ts';
 import {CATALOG} from '../../../../../mars/viewer/engine/world/catalog.ts';
@@ -29,7 +33,7 @@ const bboxDistance = (p: [number, number][], at: [number, number]) => {let x0 = 
 const LOOP_SPAN = 160;
 const bboxSpan = (p: [number, number][]) => {const xs = p.map(q => q[0]), zs = p.map(q => q[1]); return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs));};
 const area = (p: [number, number][]) => Math.abs(p.reduce((s, [x, z], i) => {const [x2, z2] = p[(i + 1) % p.length]; return s + x * z2 - x2 * z;}, 0)) / 2;
-import {resolveCapability, tokens, placeMatch, typoFix, type VocabContext, type VocabResult} from './vocabulary.ts';
+import {resolveCapability, tokens, placeMatch, placeMatchTier, typoFix, type VocabContext, type VocabResult} from './vocabulary.ts';
 import {isCampfire} from './fire.ts';
 import {activityCapabilities, loadSpots, ACTIVITY_SECONDS_MAX, SPOT_ACTIVITIES, type SpotsData} from './activities.ts';
 import {Together, PAIRED, type TogetherPlan} from './together.ts';
@@ -175,7 +179,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
       places: (x, z, level) => this.places.containing(x, z, this.placeLevel(level)).filter(p => p.enclosed).map(p => p.id).join('|'),
       seat: (soul, radius, seconds) => {
         const {caps, plans} = this.binds(soul), me = this.body(soul.entityId), world = this.host.engine.world as NativeWorld; if (!me) return null;
-        const c = caps.find(c => c.verb === 'sit' && c.available && c.target && (() => {const e = world.entities[c.target!.id]; return !!e && Math.hypot(e.pose.p[0] - me.pose.p[0], e.pose.p[2] - me.pose.p[2]) <= radius;})());
+        // the reflex takes a concrete seat offer, never sit:here (which since D2 carries the nearest seat's target and
+        // plan: through it the rule sat but never reached its doze in the 2 h idle test)
+        const c = caps.find(c => c.verb === 'sit' && c.id !== 'sit:here' && c.available && c.target && (() => {const e = world.entities[c.target!.id]; return !!e && Math.hypot(e.pose.p[0] - me.pose.p[0], e.pose.p[2] - me.pose.p[2]) <= radius;})());
         const plan = c && plans.get(c.id); if (!plan) return null;
         const steps = structuredClone(plan.steps); for (const x of steps) if (x.params && 'seconds' in x.params) x.params.seconds = seconds;
         return steps;
@@ -309,6 +315,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
       touch: id => this.comms?.fading.touch?.(id),
       decide: (soul, receipt, capability, label, steps) => this.decide(soul, receipt, capability, label, steps)});
     this.receiptListeners.push(r => {if(!OPEN.includes(r.phase))this.capCache.clear();});
+    // D1: the card's doing line names an edge act's approach ("walking to Kitchen chair") from this ledger's plans
+    host.approachV1 = m => {const program = host.engine.programOf(m.entityId), r = program ? this.rows("soul_id=? AND phase='started' AND program_id=?", m.soulId, program)[0] : undefined; return r ? this.approachFor(m, r.receipt_id) : null;};
     // Open receipts from a previous process: a started one whose programme the snapshot carries is still followed;
     // a waiting one with its plan is re-armed (fresh one-minute wait); anything else cannot be followed honestly.
     for (const r of this.rows("phase IN ('waiting','started')")) {
@@ -340,7 +348,43 @@ export class EdgeLedger implements EdgeLedgerHooks {
   private view(r: Row): EdgeReceipt {const outcome=this.outcomes.read(r.receipt_id);
     // An invitation nobody has answered yet is not a shared activity: the host's receipt stays `waiting` (quality case 32).
     const awaiting=r.phase==='started'?this.together?.awaitingAnswer(r.receipt_id,r.capability)??null:null;
-    return {id: r.receipt_id, soulId: r.soul_id, capability: r.capability, phase: awaiting?'waiting':r.phase, acceptedTick: r.accepted_tick, startedTick: r.started_tick, endedTick: r.ended_tick, code: r.code, reason: r.reason, programId: r.program_id, ...detailOf(r),...(outcome?{outcome}:{}),...(awaiting?{awaitingAnswer:{...awaiting,note:`Invitation sent; ${awaiting.waitingFor.map(g=>g.name).join(', ')} has not accepted yet. Nothing shared has started.`}}:{})};}
+    return {id: r.receipt_id, soulId: r.soul_id, capability: r.capability, phase: awaiting?'waiting':r.phase, acceptedTick: r.accepted_tick, startedTick: r.started_tick, endedTick: r.ended_tick, code: r.code, reason: r.reason, programId: r.program_id, ...detailOf(r),...(outcome?{outcome}:{}),...(awaiting?{awaitingAnswer:{...awaiting,note:`Invitation sent; ${awaiting.waitingFor.map(g=>g.name).join(', ')} has not accepted yet. Nothing shared has started.`}}:{}),...(OPEN.includes(r.phase)?this.bodyFacts(r,!!awaiting):{})};}
+  /** D1: an open receipt's body (what the engine has the body doing now, not the plan) and one `now` sentence built from it. */
+  private bodyFacts(r: Row, awaiting = false): {body?: BodyStateV1; now?: string} {
+    const m = this.host.minds.get(r.soul_id); if (!m) return {};
+    const running = r.phase === 'started' && !!r.program_id && this.host.engine.programOf(m.entityId) === r.program_id;
+    const body = bodyState(this.host, m.entityId, running ? this.approachFor(m, r.receipt_id) : null); if (!body) return {};
+    // D3b: every open receipt's sentence says what it has not done yet ("standing; not lying yet", "walking to pond-reeds,
+    // 9 m left; not there yet"); an invitation nobody has answered is "not started yet"
+    return {body, now: `${bodyWords(this.host, m.entityId, body)}; ${awaiting ? 'not started yet' : notYet(r.capability, r.phase, running, body)}`};
+  }
+  /** D1: where this Soul's running act travels to now: the next step of its plan that names a thing or a point. */
+  private approachFor(m: Mind, receipt: string): ApproachV1 | null {
+    const plan = this.bodyPlans.get(receipt); if (!plan) return null;
+    const program = this.host.engine.programOf(m.entityId), at = program ? this.host.engine.programAction?.(program)?.step ?? 0 : 0;
+    const world = this.host.engine.world as NativeWorld, idName = (id: string) => {const o = this.host.mindByEntity?.get(id); if (o) return o.name; const n = this.places.byId.get(id)?.name ?? this.host.nameOf(id); return n && n !== id ? n : null;};
+    const target = (this.places.byId.get(plan.capability.split(':').slice(1).join(':').split('/').pop() ?? '')?.name) ?? null;
+    const fromLabel = plan.label.replace(/^(walk|run|jog|go|head|stroll|cycle|wander|swim)( over| back| down| up)? (to|into|onto|towards?|in) /i, '');
+    for (const st of plan.steps.slice(Math.min(at, plan.steps.length - 1))) {
+      const p = (st.params ?? {}) as Record<string, unknown>;
+      for (const k of ['on', 'carrier', 'to']) {
+        const v = p[k];
+        if (typeof v === 'string') {const e = world.entities[v]; return {name: idName(v) ?? target ?? fromLabel, to: e ? [e.pose.p[0], e.pose.p[2]] : null};}
+        if (Array.isArray(v) && v.length === 2 && v.every(Number.isFinite)) return {name: target ?? (fromLabel !== plan.label ? fromLabel : `the spot to ${plan.label.toLowerCase()}`), to: [v[0] as number, v[1] as number]};
+      }
+      if (Number.isFinite(p.x) && Number.isFinite(p.z)) return {name: target ?? (fromLabel !== plan.label ? fromLabel : `the spot to ${plan.label.toLowerCase()}`), to: [p.x as number, p.z as number]};
+    }
+    return null;
+  }
+  /** D1: the plans this ledger started, by receipt (for the body's current step), newest 512. */
+  private bodyPlans = new Map<string, {capability: string; label: string; steps: Program['steps']}>();
+  private planFor(receipt: string, capability: string, label: string, steps: Program['steps']) {this.bodyPlans.set(receipt, {capability, label, steps}); if (this.bodyPlans.size > 512) this.bodyPlans.delete(this.bodyPlans.keys().next().value!);}
+  /** D1: the body of a Soul as the engine has it now, with its running act's current step. */
+  bodyOf(soulId: string): BodyStateV1 | null {
+    const m = this.host.minds.get(soulId); if (!m) return null;
+    const program = this.host.engine.programOf(m.entityId), r = program ? this.rows("soul_id=? AND phase='started' AND program_id=?", soulId, program)[0] : undefined;
+    return bodyState(this.host, m.entityId, r ? this.approachFor(m, r.receipt_id) : null);
+  }
   receipt(soulId: string, id: string): EdgeReceipt | null {const r = this.rows('receipt_id=? AND soul_id=?', id, soulId)[0]; return r ? this.view(r) : null;}
   openReceipts(soulId: string): EdgeReceipt[] {return this.rows("soul_id=? AND phase IN ('waiting','started') ORDER BY accepted_tick", soulId).map(r => this.view(r));}
   private insert(soul: EdgeSoul, capability: string, phase: EdgeReceipt['phase'], clientRef?: string, keepActivity = false, detail: Record<string, unknown> = {},contentParams:Record<string,unknown>={},receiptId?:string): EdgeReceipt {
@@ -527,6 +571,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
   private async decide(soul: EdgeSoul, receipt: string, capability: string, label: string, steps: Program['steps']) {
     const unsupported = this.nativeUseRefusal?.(capability, steps);
     if (unsupported) { this.update(receipt, {phase: 'failed', code: unsupported.code, reason: unsupported.reason}); return; }
+    this.planFor(receipt, capability, label, steps);
     return this.host.enqueue('decision', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, option: capability, label, steps, reevalTicks: 1e9, fallback: false, trigger: `edge-act:${receipt}`});
   }
 
@@ -1172,6 +1217,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
         if(issue?.code==='program.safe-stop-required')await this.host.enqueue('edge-stop',`edge:${soul.soulId}`,{soulId:soul.soulId,entityId:soul.entityId,receipt:id});
       }else{
         const guard=():true=>{authority();if(this.host.quietBarrier)throw new EdgeError(409,'state.changed','The world entered a quiet barrier; retry.');const fresh=this.host.engine.canPerform({actor:soul.entityId,label,steps});if(fresh)throw new EdgeError(409,fresh.code,fresh.code.startsWith('carrier.')?fresh.message:humanBlockedExplanationV1(fresh.code,label));return true;};
+        this.planFor(id,capability,label,steps);
         await this.host.enqueueObjectDecision(`edge:${soul.soulId}`,{soulId:soul.soulId,entityId:soul.entityId,option:capability,label,steps,reevalTicks:1e9,fallback:false,trigger:`edge-act:${id}`},guard,()=>{const detail=admission.commit(id)??{};this.insert(soul,capability,'waiting',clientRef,false,detail,{},id);const program=(this.host.engine as {instantProgramV1?(a:string):string|null}).instantProgramV1?.(soul.entityId)??this.host.engine.programOf(soul.entityId);if(!program)throw Error('object.native-program-missing');this.update(id,{phase:'started',program_id:program});return true;});
       }
       return {accepted:true as const,receipt:this.receipt(soul.soulId,id)!};
@@ -1333,8 +1379,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
       taken: (at: [number, number], spotId?: string) => others.some(o => Math.hypot(o[0] - at[0], o[1] - at[1]) < 0.7) || (!!spotId && claimed.has(spotId)),
       // a spot inside a building is offered only when that building's interior was admitted (its walls are a shell, nav/1)
       enterable: (place: string | undefined) => {const b = enclosingBuilding(place); return !b || !!w.regions[b] || !!this.placeWalkable?.(b) || [...navIds].some(id => id.startsWith('nav-solid:' + b + '#w'));},
-      seat: (radius: number) => {
-        const free = caps.filter(c => c.verb === 'sit' && c.available && c.target && c.id !== 'sit:here').map(c => {const e = w.entities[(this.host.kernel.things[c.target!.id]?.traits.entity as string | undefined) ?? c.target!.id]; return e ? {c, d: Math.hypot(e.pose.p[0] - here[0], e.pose.p[2] - here[1])} : null;}).filter((x): x is {c: EdgeCapability; d: number} => !!x && x.d <= radius).sort((a, b) => a.d - b.d || a.c.id.localeCompare(b.c.id));
+      seat: (radius: number, near?: boolean) => {
+        const free = caps.filter(c => c.verb === 'sit' && c.available && c.target && c.id !== 'sit:here').map(c => {const e = w.entities[(this.host.kernel.things[c.target!.id]?.traits.entity as string | undefined) ?? c.target!.id]; return e && (!near || this.seatIsHere(soul.entityId, e.pose.p)) ? {c, d: Math.hypot(e.pose.p[0] - here[0], e.pose.p[2] - here[1])} : null;}).filter((x): x is {c: EdgeCapability; d: number} => !!x && x.d <= radius).sort((a, b) => a.d - b.d || a.c.id.localeCompare(b.c.id));
         const pick = free[0]; return pick && plans.get(pick.c.id) ? {cap: pick.c, plan: plans.get(pick.c.id)!, distance: pick.d} : null;
       },
       // an installed upper-floor room/lobby is a world region the place data predates: name it by its label, never its id
@@ -1376,6 +1422,37 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const place = this.placePathOf(soul.soulId).find(p => p.kind !== 'occupier' && this.places.byId.get(p.id)?.parent != null);
     const where = !place ? 'around here' : /^the |'s\b/i.test(place.name) ? place.name : `the ${place.name}`;
     return {...out, reason: `${out.reason.replace(/[.\s]+$/, '')}; to stroll here instead, explore ${where} (${wander.id}).`, did_you_mean: [{id: wander.id, label: wander.label}, ...(out.did_you_mean ?? []).filter(d => d.id !== wander.id)]};
+  }
+  /** D3d (owner-loop.ts): what an owner message step's target words name for this Soul. Souls by name; the rest through
+   *  the walk resolver (`walk:<words>`: a place, a thing, a Soul), or the named place a walk cannot reach yet. Null: the
+   *  words name nothing the world knows. */
+  stepTarget(soul: EdgeSoul, words: string[]): {places: string[]; things: string[]; souls: string[]} | null {
+    const souls: string[] = [], used = new Set<string>();
+    for (const m of this.host.minds.values()) {const n = tokens(m.name); if (m.soulId !== soul.soulId && n.length && n.every(w => words.includes(w))) {souls.push(m.soulId); n.forEach(w => used.add(w));}}
+    const rest = words.filter(w => !used.has(w)), out = {places: [] as string[], things: [] as string[], souls};
+    if (rest.length) {
+      const ctx = this.vocabulary(soul, this.binds(soul).caps), r = resolveCapability(`walk:${rest.join(' ')}`, ctx), t = r.kind !== 'unknown' ? r.cap.target : undefined;
+      if (r.kind === 'alias' && r.inside) out.places.push(r.inside);
+      else if (t) (t.kind === 'place' ? out.places : t.kind === 'soul' ? out.souls : out.things).push(t.id);
+      else if (r.kind === 'unknown' && r.place) out.places.push(r.place);
+      // every place these words name by its own name counts too ("the pavilion": any pavilion, not only the one the walk picked)
+      const named = placeMatchTier(rest, ctx.places, ctx.withheld); if (named.tier >= 0 && named.tier <= 1) for (const p of named.found) if (!out.places.includes(p.id)) out.places.push(p.id);
+      if (!out.places.length && !out.things.length) return null;   // words that name nothing the world knows, even beside a Soul's name
+    }
+    return souls.length || out.places.length || out.things.length ? out : null;
+  }
+  /** D3d: the id an offered capability's target has (walk:commons-pavilion points at a place with another id), else null. */
+  actTarget(soul: EdgeSoul, capability: string): string | null {return this.binds(soul).caps.find(c => c.id === capability)?.target?.id ?? null;}
+  /** D3d: a place id with its ancestors (innermost first), or null when it names no place. */
+  placeAncestry(id: string): string[] | null {
+    const out: string[] = []; for (let p = this.places.byId.get(id); p && out.length < 30; p = p.parent ? this.places.byId.get(p.parent) : undefined) out.push(p.id);
+    return out.length ? out : null;
+  }
+  /** D3d: where a Soul, engine body, kernel thing, activity spot or named thing (nav: the festival balloon) stands now. */
+  positionOf(id: string): [number, number] | null {
+    const w = this.host.engine.world as NativeWorld, m = this.host.minds.get(id), e = m ? this.body(m.entityId) : w.entities[(this.host.kernel.things[id]?.traits.entity as string | undefined) ?? id];
+    if (e) return [e.pose.p[0], e.pose.p[2]];
+    const sp = this.spots.spots.find(x => x.id === id); return sp ? [sp.at[0], sp.at[1]] : this.thingAt?.(id) ?? null;
   }
   /** What each capability answers to, for PM-R057 natural names (built only when an id is not exact). */
   private vocabulary(soul: EdgeSoul, caps: EdgeCapability[]): VocabContext {
@@ -1456,6 +1533,16 @@ export class EdgeLedger implements EdgeLedgerHooks {
     return occ ? [{id: occ.occ.id, name: `${occ.place.name} seat`, kind: 'occupier'}, ...path] : path;
   }
   private innermostPlace(m: Mind): string | null {const b = this.body(m.entityId); if (!b) return null; const ride = this.aboard(m.entityId), basket = ride ? this.places.carrierPlaces.get(ride.id) : undefined; if (basket) return basket.id; return this.places.containing(b.pose.p[0], b.pose.p[2], this.placeLevel(b.human?.level))[0]?.id ?? null;}
+  /** D2 ("sit down" means here): a seat at `seat` ([x, y, z]) is here for this body when it stands in the body's own
+   *  room (the innermost place, enclosed) on its floor, or within HERE_SEAT_M with the same enclosure (none outdoors)
+   *  on both sides. Named seats ("sit on the bench") keep their own reach. */
+  seatIsHere(entityId: string, seat: readonly number[]): boolean {
+    const b = this.body(entityId); if (!b || this.aboard(entityId)) return false;
+    if (Math.abs((seat[1] ?? 0) - b.pose.p[1]) > 1.5) return false;
+    const level = this.placeLevel(b.human?.level), mine = this.places.containing(b.pose.p[0], b.pose.p[2], level)[0], its = this.places.containing(seat[0], seat[2], level)[0];
+    if (mine?.enclosed && its?.id === mine.id) return true;
+    return Math.hypot(seat[0] - b.pose.p[0], seat[2] - b.pose.p[2]) <= HERE_SEAT_M && this.enclosureAtPoint(seat[0], seat[2], level) === this.enclosureAtPoint(b.pose.p[0], b.pose.p[2], level);
+  }
   enclosureOf(soulId: string): string | null {
     const m = this.host.minds.get(soulId), b = m ? this.body(m.entityId) : undefined; if (!b) return null;
     const ride = this.aboard(m!.entityId), basket = ride ? this.places.carrierPlaces.get(ride.id) : undefined;
@@ -1517,7 +1604,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (has('edge_comms_speech')) for (const e of this.db.db.prepare('SELECT tick,at,channel,text FROM edge_comms_speech WHERE world_id=? AND soul_id=? ORDER BY tick DESC LIMIT 30').all(this.host.worldId, soulId) as {tick: number; at: number; channel: string; text: string}[]) events.push({tick: e.tick, at: e.at, kind: 'speech', channel: JSON.parse(e.channel), text: e.text, untrusted: true});
     events.sort((a, b) => b.tick - a.tick);
     return {soul: {soulId, name: row.name ?? m?.name ?? soulId, description: row.description ?? null, untrusted: true}, fade: this.comms?.fading.status(soulId) ?? null, now: this.host.nowOf(soulId), body: this.bodyRule?.view(soulId) ?? null, lastAcceptedAt: last.at,
-      self: m ? {placePath: this.placePathOf(soulId), state: stateOf(this.host, m.entityId), activity: String(this.body(m.entityId)?.human?.activity ?? 'idle')} : null, receipts, events: events.slice(0, 30)};
+      self: m ? {placePath: this.placePathOf(soulId), state: stateOf(this.host, m.entityId), activity: String(this.body(m.entityId)?.human?.activity ?? 'idle'), bodyState: this.bodyOf(soulId), doing: this.host.doingOfV1(m)} : null, receipts, events: events.slice(0, 30)};
   }
   map() {this.beforeMap?.(); const regions = (this.host.engine.world as NativeWorld).regions ?? {}; return [...this.places.byId.values()].filter(p => !this.knowledge.isSecret(p.id)).map(p => ({id: p.id, name: p.name, kind: p.kind, enclosed: p.enclosed, capacity: p.capacity, parent: p.parent, walkable: p.id in regions || !!this.placeWalkable?.(p.id), center: (p.carrier ? (() => {const e = (this.host.engine.world as NativeWorld).entities[p.carrier!.entity]; return e ? [e.pose.p[0], e.pose.p[2]] : [0, 0];})() : centroid(p.polygon)).map(v => Math.round(v * 10) / 10), ...(p.carrier ? {carrier: p.carrier.entity} : {}), starting: p.starting, ...(p.description ? {description: p.description} : {}), schedule: (p.schedule ?? []).map(s => ({id: s.id, cron: s.cron, durationMinutes: s.durationMinutes ?? null, ticketed: !!s.ticketed, label: s.label ?? null}))}));}
 
@@ -1570,7 +1657,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       happening: spread.happening, elsewhere: spread.elsewhere,
       self: {soulId: soul.soulId, name: soul.name, entityId: soul.entityId, placePath: this.placePathOf(soul.soulId), position: b ? b.pose.p.map(v => Math.round(v * 100) / 100) : null, facing: b ? Math.round(b.pose.yaw * 100) / 100 : null,
         state: this.faded.has(soul.soulId) ? 'faded' : stateOf(this.host, m.entityId), activity: String(b?.human?.activity ?? 'idle'), reflex: action && action.actor === m.entityId ? {verb: action.action.verb, phase: action.action.phase ?? action.action.status} : null,
-        receipts: this.openReceipts(soul.soulId), fade: this.comms?.fading.status(soul.soulId) ?? null, body: this.bodyRule?.view(soul.soulId) ?? null,
+        receipts: this.openReceipts(soul.soulId), fade: this.comms?.fading.status(soul.soulId) ?? null, body: this.bodyRule?.view(soul.soulId) ?? null, bodyState: this.bodyOf(soul.soulId),
         holding: social.holding, following: social.following, followedBy: social.followedBy, ...this.gameView(b)},
       // together/1: invitations to me (accept:<id> / decline:<id>) and my own open ones
       ...(social.invites.length ? {invites: social.invites} : {}), ...(social.invited.length ? {invited: social.invited} : {}),
@@ -1803,23 +1890,7 @@ export function edgeIdOf(b: HumanBindingV1): {id: string; verb: string} {
   if (b.goal === 'hang_out') return {id: 'hang-out:' + b.id.slice('hang_out:'.length), verb: 'hang-out'};
   return {id: b.id, verb: b.goal};
 }
-export function stateOf(host: WorldHost, entityId: string): string {
-  const h = (host.engine.world as NativeWorld).entities[entityId]?.human; if (!h) return 'absent';
-  if (h.sleepPose) return 'sleeping';
-  if (h.carrier) return h.activity === 'row' ? 'rowing' : 'riding';
-  const a = String(h.activity ?? 'idle');
-  if (a === 'sit' || a.startsWith('sit') || h.baseActivity === 'sit') return 'seated';
-  if (a === 'lie' || a === 'nap') return 'lying';
-  if (a === 'walk') return 'walking';
-  if (a === 'jog') return 'jogging';
-  if (a === 'run') return 'running';
-  if (a === 'cycle') return 'cycling';
-  if (a === 'row') return 'rowing';
-  if (a === 'swim' || a === 'tread' || a === 'wade') return 'swimming';
-  if (a === 'wait') return 'waiting';
-  if (a === 'idle') return host.engine.programOf(entityId) ? 'busy' : 'standing';
-  return 'busy';
-}
+export {stateOf};
 /** Verbs whose resting posture is a chosen activity (fade-by-abandonment holds the Soul while the body keeps it). */
 const POSTURE_VERBS = new Set(['sit', 'sit-ground', 'lie', 'nap', 'read', 'rest', 'warm-by-fire', 'gather', 'swim', 'accept', 'object', 'paint', 'play-piano', 'play-music', 'write', 'play-game', 'craft', 'eat', 'drink', 'cook', 'dance-with']);
 export function timeLabel(phase: number) {return phase < .2 ? 'morning' : phase < .45 ? 'day' : phase < .55 ? 'evening' : phase < .75 ? 'dusk' : 'night';}

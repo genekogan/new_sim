@@ -147,7 +147,11 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
     // acknowledged ends the wait: an agent looping `wait 60` before acking "stop" slept 20 s through it. Older clients
     // (no ownerSince, e.g. the live poll) keep the since-now rule, so a held message never spins them.
     const scope = {scope: `soul:${soul.soulId}`, owner: soul.owner}, from = rawSince === undefined ? since : 0;
-    const r = await streams.wait(soul.soulId, after, seconds * 1000, c.req.raw.signal, () => !!box.ownerWrote(scope, from));
+    // D3 (playtest 2026-10-25: the card read "away" while the agent sat in `act --wait`, which does return on owner messages):
+    // a wait that ends when the owner writes is listening, so presence says the agent will see the next message
+    const end = (box as {listening?: (s: {scope: string; owner: string}) => () => void}).listening?.(scope);
+    let r: Awaited<ReturnType<typeof streams.wait>>;
+    try {r = await streams.wait(soul.soulId, after, seconds * 1000, c.req.raw.signal, () => !!box.ownerWrote(scope, from));} finally {end?.();}
     const wrote = box.ownerWrote(scope, from);
     return wrote ? {...r, ownerWrote: wrote.waiting, ownerMark: Math.max(since, wrote.newestAt + 1)} : {...r, ownerMark: Math.max(since, now())};
   }));

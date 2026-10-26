@@ -17,6 +17,8 @@ export function combineReceipts(gate, v7) {
   if (!candidate) blockers.push('gate receipt: no candidate sha');
   if (!['pass', 'quarantined'].includes(gate?.status)) blockers.push(`gate status ${gate?.status}`);
   if (gate?.blockers?.length) blockers.push(`gate has ${gate.blockers.length} blocker(s)`);
+  // a scoped candidate gate (release-gate.sh --scope auto) proves a subset of steps; only the full contract ships
+  if (gate?.scope && gate.scope.resolved !== 'full') blockers.push(`gate scope ${gate.scope.resolved} is not the full contract`);
   if (!gate?.exclusions?.includes('V7')) blockers.push('gate receipt does not list V7 as excluded (unexpected harness)');
   if (v7?.schemaVersion !== 1 || v7?.step !== 'V7') blockers.push('v7 receipt: unknown schema');
   if (v7?.status !== 'pass') blockers.push(`V7 status ${v7?.status} (failed: ${(v7?.failed || []).join(', ')})`);

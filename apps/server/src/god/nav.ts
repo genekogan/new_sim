@@ -368,6 +368,12 @@ export class GodNav {
         goal = near([edge.q[0] + (dx / n) * 1.5, edge.q[1] + (dz / n) * 1.5], 0, 16); if (goal) break;
       }
     }
+    // D2 (playtest 2026-10-25: 4 of 4 "walk to the pavilion" ended at its closed front door, outside its floor): a building
+    // with a single room is walked into that room, as walk:<building>/<room> is, whenever the room has standing room
+    if (t.kind === 'building' && !t.doorOpen && t.rooms?.length === 1) {
+      const room = this.things().find((x) => x.kind === 'room' && x.ref === t.rooms![0]), inner = room ? this.goal(room, me, except) : null;
+      if (inner) goal = inner;
+    }
     this.goals.set(key, { tick, key, goal });
     return goal;
   }
@@ -683,7 +689,7 @@ export class GodNav {
   private label(t: Thing, d: number): string {
     const by = this.landmarks(t).map((x) => x.ref);
     if (t.kind === 'room') return `Go into ${t.what} (${t.ref}; ${d} m)`;
-    if (t.kind === 'building') return `Walk to ${t.ref}, ${t.what}: ${t.doorOpen ? 'in at its front door' : 'to its front door (closed)'} (${t.rooms?.length ?? 0} rooms, each walk:${t.ref}/<room>; ${d} m)`;
+    if (t.kind === 'building') return `Walk to ${t.ref}, ${t.what}: ${t.doorOpen ? 'in at its front door' : t.rooms?.length === 1 ? `inside, into ${t.rooms[0]}` : 'to its front door (closed)'} (${t.rooms?.length ?? 0} rooms, each walk:${t.ref}/<room>; ${d} m)`;
     if (t.kind === 'water') return `Walk to the shore of ${t.ref}, ${t.what} (${d} m)`;
     return `Walk to ${t.ref}, ${t.what}${by.length ? `, by ${by.join(' and ')}` : ''} (${d} m)`;
   }

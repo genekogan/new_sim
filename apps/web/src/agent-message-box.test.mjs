@@ -51,6 +51,12 @@ test('MSG: presence says listening now / seen recently / away; an unread message
   const done = at({...base, queued: 0, latest: {id: 'm', text: 'go to the cottage', state: 'acknowledged', reply: 'Got it: walking there.', result: 'Arrived.', outcome: 'done', sentAt: now - 90_000}});
   assert.match(done, />Done</); assert.ok(done.indexOf('Got it: walking there.') < done.indexOf('Arrived.'), 'the ack reply, then the result');
   assert.match(at({...base, latest: {id: 'm', text: 'ride', state: 'acknowledged', reply: 'Trying.', result: "Couldn't: no saddle.", outcome: 'failed'}}), /Could not do it/);
+  // D3c (rook-003): an act that served an earlier step leaves the message open: Under way with the world's progress line,
+  // never Done; the result replaces the progress line
+  const going = at({...base, queued: 0, latest: {id: 'm', text: 'rest, then come back', state: 'acknowledged', reply: 'Got it.', progress: 'now: wave completed at g-commons; not resting yet', sentAt: now - 30_000}});
+  assert.match(going, />Under way</); assert.doesNotMatch(going, />Done</); assert.match(going, /not resting yet/);
+  const closed = at({...base, queued: 0, latest: {id: 'm', text: 'rest, then come back', state: 'acknowledged', reply: 'Got it.', progress: 'now: sat; not there yet', result: 'Arrived at the balloon.', outcome: 'done'}});
+  assert.match(closed, />Done</); assert.match(closed, /Arrived at the balloon/); assert.doesNotMatch(closed, /not there yet/);
   assert.match(at({connected: true, lastSeenAt: now}, 'god'), /seen recently/, 'an older server without presence: connected means seen recently');
 });
 test('Soul card inbox belongs only to its authenticated owner, including account switch', () => {
@@ -102,18 +108,20 @@ test('God box disappears on sign-out even if the provider retains the same label
 test.after(() => rm(dir, {recursive: true, force: true}));
 
 // Lane PAIR-INWINDOW (Gene's review 2026-10-22 #1): the card's start prompt carries the window code like the New Soul prompt
+// Test ID kept from main (the gate compares assertion IDs); the command is now `pair` (eden.mjs 2.x), was `pair-soul`.
 test('Soul card start prompt names pair-soul with the window code; without a code it still names the command', () => {
   const withCode = soulStartPrompt('http://localhost:5960/w/inbox', 's_abc', 'Ada', 'K7QX-M2PA');
-  assert.match(withCode, /pair-soul "s_abc" --for K7QX-M2PA/);
+  assert.match(withCode, /node eden\.mjs pair "s_abc" --for K7QX-M2PA/);
   assert.match(withCode, /Soul "Ada" \(ID "s_abc"\)/);
   assert.match(withCode, /open Sim window/);
-  assert.match(withCode, /approval wait/);
+  assert.match(withCode, /start listening/);
+  assert.doesNotMatch(withCode, /eden-agent|pair-soul|approval wait|auto mode/);
   assert.match(withCode, /Do not create another Soul/);
   assert.match(withCode, /in this folder\. Do not create another Soul\.\n/, 'PROMPT-SHORT: line 1 = read the skill, resume this Soul here, no new Soul');
   assert.equal(withCode.split('\n').length, 2); assert.doesNotMatch(withCode, /Always listen|run_in_background|ack each/);
   assert.ok(withCode.length < 400, `short prompt (${withCode.length} chars)`);
   const plain = soulStartPrompt('http://localhost:5960/w/inbox', 's_abc', 'Ada', null);
-  assert.match(plain, /pair-soul "s_abc" \(/);
+  assert.match(plain, /node eden\.mjs pair "s_abc" \(/);
   assert.doesNotMatch(plain, /--for/);
 });
 

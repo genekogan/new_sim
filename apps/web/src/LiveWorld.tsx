@@ -29,6 +29,8 @@ import {renderEyes,renderOverhead,renderMap} from './WorldSnapshots.ts';
 import {conversationAttention,WorldIdleLife,type IdleSoul} from './WorldIdleLife.ts';
 import {WorldBodyPoses,bodyLabel} from './WorldBodyState.ts';
 import {WorldBalloonRide,parseRideOverride,previewState} from './WorldBalloonRide.ts';
+import {WorldRideCars} from './WorldRideCars.ts';
+import {recordedCarriers,carrierPoses} from './ride-carriers.ts';
 import {WorldShadowDetail} from './WorldShadowDetail.ts';
 import {WorldPlaceActivity} from './WorldPlaceActivity.ts';
 import {installLookToneCurve,installMaterialDetail,setMaterialDetail,lookSettings,lookExposure,WorldPost} from './rendering/WorldLook.ts';
@@ -354,7 +356,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     waterDetail.boats=AFLOAT;(window as unknown as {__simWater?:unknown}).__simWater=waterDetail.stats;    const idleLife=new WorldIdleLife();const bodyPoses=new WorldBodyPoses();const idleSouls:IdleSoul[]=[];let attentionTargets=new Map<string,readonly string[]>();
     const edgeItems=new WorldEdgeItems(apiPath('/v1/edge/items'));scene.add(edgeItems.group);edgeItems.start(abort.signal);  // things lying around (together/1)
     const early=newWorld?takeEarlyLayer():null;if(early)abort.signal.addEventListener('abort',()=>early.abort.abort());const entityLayer=early?.layer??new WorldEntityLayer(apiPath);entityLayerRef.current=entityLayer;  // P7b: a phone's layer may have started before this page's code was in (early-layer.ts)
-    scene.add(entityLayer.group);let entityWorldFramed=false,rideNames:string[]|null=null,rideNamesAt=0,rideCarriers:CarrierPose[]=[];
+    scene.add(entityLayer.group);let entityWorldFramed=false,rideNames:string[]|null=null,rideNamesAt=0,rideCarriers:CarrierPose[]=[],rideCars:string[]=[],carrierIds:string[]=[];
     // E2 #3: shy animals in a god world run from where the Souls' figures are now; ANI: every animal (god worlds and old Eden) gives way to them
     setFleeSources(()=>{const out:[number,number][]=[];for(const soul of context.current.sim.conn.replica.souls.values()){const e=shown.current.entities[soul.entityId];if(e?.p)out.push([e.p[0],e.p[2]]);}return out;});
     const godLiving=newWorld?new GodWorldLiving(entityLayer,renderer,{radius:look.enabled?1.45:1,gain:look.poolGain}):null;if(godLiving){scene.add(godLiving.group);(window as unknown as {__simLiving?:unknown}).__simLiving={get lights(){return godLiving.lights;},atmosphere:()=>atmosphere.inspect(),broadcastViews:()=>godTourViews(entityLayer,entityLayer.groundAt).length,lightning:()=>godLightning?.inspect()??null,holdLightning:(ms:number)=>{if(godLightning)godLightning.holdUntil=performance.now()+ms;}};}  // R4-LIVE: lamps at dusk, the god's weather, rain kept out of rooms
@@ -422,7 +424,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const placeActivity=new WorldPlaceActivity();scene.add(placeActivity.group);
     const fading=new WorldFadingLayer();scene.add(fading.group);let fadedOut=new Set<string>();const fadeOverride=parseFadeOverride(location.search),fadeSince=new Map<string,number>();
     // Balloon ride: Core's ride state (edge frames) or a native carrier; ?ride=Alice,Bob previews a flight locally.
-    const balloonRide=new WorldBalloonRide();scene.add(balloonRide.group);const rideOverride=parseRideOverride(location.search),rideStart=performance.now();
+    const balloonRide=new WorldBalloonRide();scene.add(balloonRide.group);const rideCarsDrawn=new WorldRideCars();scene.add(rideCarsDrawn.group);const rideOverride=parseRideOverride(location.search),rideStart=performance.now();
     const atmosphere=(adopted?.atmosphere as ReturnType<typeof createWorldAtmosphere>|undefined)??createWorldAtmosphere(scene);
     // MARSLAND-FORK: the Mars fork (/worlds/w/mars) draws the mars-two template's drone surroundings and its desert sky (lazy: only the fork loads the kit)
     let forkLand:ForkLand|null=null,forkLandLoad:Promise<void>|null=null;
@@ -856,6 +858,11 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       // E-life B7: a god's balloon flies with its native ride (the recorded carrier entity of the same name)
       rideCarriers=expansion?[{p:balloonRide.basket.p,yaw:balloonRide.basket.yaw}]:[];  // V1: Broadcast frames a rider with its carrier
       if(entityLayer.active&&!expansion){if(refresh||!rideNames||(!rideNames.length&&performance.now()-rideNamesAt>2000)){rideNames=entityLayer.rideNames();rideNamesAt=performance.now();}/* BALLOON-BODY: an empty list (asked before the world's things arrived) is asked again */for(const n of rideNames){const e=at.entities[n] as {p?:readonly[number,number,number];yaw?:number}|undefined;entityLayer.poseOverride(n,e?.p??null,e?.yaw);if(e?.p)rideCarriers.push({p:e.p,yaw:e.yaw??0});}}
+      // D1: every native carrier is a ride (a god's ferris wheel or carousel, Eden's punt), not only balloons: framed with its
+      // rider, and a god attraction's carrier gets a car drawn at its twin (the wheel itself and its gondola clock stay as built)
+      if(refresh){carrierIds=recordedCarriers(records);rideCars=entityLayer.active&&!expansion?entityLayer.rideCars():[];}
+      {const framed=new Set<string>([...(expansion?['eden-balloon']:[]),...(entityLayer.active&&!expansion?rideNames??[]:[])]),more=carrierPoses([...new Set([...carrierIds,...rideCars])],at.entities as Record<string,{p?:readonly number[];yaw?:number}|undefined>,framed);
+       rideCarriers.push(...more);const cars=new Set(rideCars);rideCarsDrawn.update(more.filter(c=>cars.has(c.id)));}
       const cards = refresh ? cardsAt(s.plays, at.tick) : null;
       const alive = new Set<string>();
       let focus: THREE.Vector3 | null = null;
@@ -1120,6 +1127,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       speechLayer.dispose();
       fading.dispose();
       balloonRide.dispose();
+      rideCarsDrawn.dispose();
       placeActivity.dispose();
       try{nativeSocialDraw?.dispose(people);}catch{problem('Some fixture scenery could not be released.');}
       clearConnectedDressing();

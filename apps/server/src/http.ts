@@ -239,10 +239,11 @@ export function buildApp(d: Deps) {
   app.get('/skill.md', skill);
   app.get('/instructions.md',c=>{if(!d.cfg.instructionsFile)return c.json({ok:false,code:'instructions-unavailable'},503);
     // lane PUX: ?for=<window code> (the signed-in page's New Soul prompt) names the code in the guide; never cached shared
-    try{const code=c.req.query('for')??null,text=fillInstructions(readFileSync(d.cfg.instructionsFile,'utf8'),baseOf(c),displayWorldName,code);return c.text(text,200,{'content-type':'text/markdown; charset=utf-8','cache-control':code?'no-store':'public, max-age=60'});}
+    try{const code=c.req.query('for')??null,text=fillInstructions(readFileSync(d.cfg.instructionsFile,'utf8'),baseOf(c),displayWorldName,code,publicWorldBase(d.cfg));return c.text(text,200,{'content-type':'text/markdown; charset=utf-8','cache-control':code?'no-store':'public, max-age=60'});}
     catch{return c.json({ok:false,code:'instructions-unavailable'},503);}
   });
   app.get('/eden-agent.mjs', c => { if (!d.cfg.cliFile) throw new ApiError(404, 'not-found', 'no agent CLI is published on this world'); let js: string; try { js = readFileSync(d.cfg.cliFile, 'utf8'); } catch { throw new ApiError(404, 'not-found', 'agent CLI unavailable'); } return c.body(js, 200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=60' }); });
+  app.get('/eden.mjs', c => { if (!d.cfg.controllerCliFile) throw new ApiError(404, 'not-found', 'no controller CLI is published on this world'); let js: string; try { js = readFileSync(d.cfg.controllerCliFile, 'utf8'); } catch { throw new ApiError(404, 'not-found', 'controller CLI unavailable'); } return c.body(js, 200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=60' }); });
   app.get('/v1/skill.md', skill);
   // Selected-world text producer, before the SPA fallback. Origin/prefix come
   // from approved server configuration, never forwarded or caller headers.

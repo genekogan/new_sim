@@ -28,8 +28,6 @@ type Pairing =
   | { kind: 'owner'; code: string; soulId: string; owner: string; issuer: string; expires: number }
   | { kind: 'agent'; code: string; poll: string; agent: string; expires: number; token?: string; soulId?: string; owner?: string; issuer?: string };
 const PAIR_TTL = 15 * 60_000;
-/** A body left in water when its activity ends is swimming, or treading water when still, not "standing around". */
-const IN_WATER: Record<string, string> = { swim: 'swimming', tread: 'treading water', wade: 'wading' };
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O/1/I/L
 const humanCode = () => { const b = randomBytes(8); let s = ''; for (let i = 0; i < 8; i++) s += ALPHABET[b[i] % ALPHABET.length]; return `${s.slice(0, 4)}-${s.slice(4)}`; };
 const normCode = (c: string) => c.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^(.{4})(.{4})$/, '$1-$2');
@@ -430,7 +428,7 @@ export class Souls {
     const location=e.observeBodyLocation?.(m.entityId);
     return {
       id: soul.id, name: soul.name, description: soul.description, in_world: true, tick: e.world.tick, time: e.world.env.datetime,
-      position: { x: ent.pose.p[0], z: ent.pose.p[2], region: location?.region?.id??s.region }, activity: ent.human!.activity, doing: e.programOf(m.entityId) ? m.doing : IN_WATER[ent.human!.activity] ?? 'standing around',
+      position: { x: ent.pose.p[0], z: ent.pose.p[2], region: location?.region?.id??s.region }, activity: ent.human!.activity, doing: this.host.doingOfV1(m), body: this.host.bodyOfV1(m),
       mood: m.mood, energy: energyWord(m.energy), wants_company: m.wantsCompany,
       ...(m.life ? { needs: m.life.needs, journal: m.life.journal, reflected_day: m.life.reflectedDay, customs: this.host.living?.customs } : {}),
       mandate:mandateOf(this.host.kernel,soul.id),
@@ -601,8 +599,7 @@ export class Souls {
     const raw=soul.retired_at!==null?'retired':legacy?.reason??grant?.reason??null;
     const reason=raw==='legacy-pair-rotation'?'replaced':raw==='account-revoke'?'revoked':raw==='agent-release'?'released':raw==='account-repair'?'replaced':raw;
     const revokedAt=iso(reason==='retired'?soul.retired_at:legacy?.revoked_at??grant?.revokedAt??soul.retired_at)!;
-    // SERVER-NEXT: this world serves the 1.9 eden-agent.mjs (no eden.mjs 2.0 publication), so name its own re-pair command
-    const hint=reason==='retired'?null:`Run: node eden-agent.mjs pair-soul ${soul.id} --for CODE`;
+    const hint=reason==='retired'?null:`Run: node eden.mjs pair ${soul.id} --for CODE`;
     const message=reason==='replaced'?`${soul.name}'s control moved to a newer pairing at ${revokedAt}.`
       :reason==='revoked'?`${soul.name}'s control was revoked by its owner at ${revokedAt}.`
       :reason==='released'?`${soul.name}'s control was released by its agent at ${revokedAt}.`

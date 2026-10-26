@@ -314,7 +314,7 @@ try {
     const a = await cli('act', 'walk:fountain'); await follow(a.data, { maxS: 200 });
     const o = await cli('observe'); const sh = [...(o.data?.doHere ?? []), ...(o.data?.canDo?.available ?? [])].find((c) => c.id === 'sit:here');
     return { label: sh?.label };
-  }, (r) => /nearest free seat \(plaza-bench/.test(r.label ?? ''));
+  }, (r) => /free seat/.test(r.label ?? '') && /plaza-bench/.test(r.label ?? ''));   // D2 (2026-10-25): the label reads "Sit down on the free seat here (plaza-bench-1 …)"
   const f10 = await step('S10 CLI: act sit:here → she sits on that bench; describe shows the seat taken by Ana; to her it is seat.yours (not free)', async () => {
     const a = await cli('act', 'sit:here', '{"seconds":300}');
     const r = await follow(a.data, { maxS: 120, until: (me) => me.activity === 'sit' });

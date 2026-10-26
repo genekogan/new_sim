@@ -132,6 +132,8 @@ export interface Engine {
   observeLocalClassroomV1?(observer:string):LocalClassroomObservationV1|undefined;
   /** Actual settled body-language rest, distinct from travelling toward it. */
   bodyResting?(actor:string): boolean;
+  /** D1 body state: metres of water over the ground at the body's root (0 aboard, on a deck, upstairs, or with no ground). */
+  bodyWaterDepthV1?(actor:string): number;
   submit(verb: string, params: unknown, opts?: { id?: string; parent?: string; preempt?: boolean }): ActionRecord;
   cancel(id: string, reason?: { code: string; message: string }): ActionRecord;
   snapshot(): EngineSnapshot;

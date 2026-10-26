@@ -2,9 +2,11 @@
 // and then sat the engine's default 60 s: a god-built seat's plan is one sit step with no rest after it, and the ledger
 // gave the seconds only to pose/rest/wander/gather steps. The seconds are the time seated: the walk to the seat comes
 // first and does not use them up. sit:here on such a seat now advertises that seat's own 1..600 s, 60 by default.
-// Predeclared (20 ticks/s): seated 10 s = 200 ticks (accept 190..260) after a walk of > 60 ticks from 8 m; the default
+// Predeclared (20 ticks/s): seated 10 s = 200 ticks (accept 190..260) after a walk of > 20 ticks from 2.5 m; the default
 // 60 s = 1200 (1150..1300); sit:<seat> with 10 s the same 190..260; dance 5 s = 100 ticks (80..160, unchanged control);
 // a stand while seated ends a 600 s sit within 200 ticks, not completed.
+// D2 (2026-10-25): sit:here takes a seat only when it is here (own room, or within 3 m with no wall between), so the
+// bench moved from 8 m to 2.5 m; edge-sit-here.test.ts covers the 8 m bench (on the ground instead).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {setImmediate} from 'node:timers/promises';
@@ -30,7 +32,7 @@ test('seat duration: sit down with seconds sits that long once seated; default 6
   await settle(3);
   const body = () => (f.host.engine.world.entities as Record<string, any>)[soul.entityId]!;
   const start = [body().pose.p[0], body().pose.p[2]] as [number, number];
-  assert.equal(god.act({ops: [{op: 'place', def: coreRef('bench'), name: 'bench', p: [start[0] + 8, start[1]]}]}).accepted, true);
+  assert.equal(god.act({ops: [{op: 'place', def: coreRef('bench'), name: 'bench', p: [start[0] + 2.5, start[1]]}]}).accepted, true);
   await settle(3);
   const tick = () => f.host.engine.world.tick, open = (id: string) => ['waiting', 'started'].includes(edge.receipt(soul.soulId, id)!.phase);
   const act = async (input: object) => {const r = await accept(f.host, edge.act(soul, input)) as any; assert.equal(r.accepted, true, JSON.stringify(r)); return r;};
@@ -58,7 +60,7 @@ test('seat duration: sit down with seconds sits that long once seated; default 6
   assert.ok(danced >= 80 && danced <= 160, 'dance 5 s: ' + danced);
   const ten = await timed({capability: 'sit down', params: {seconds: 10}});
   assert.equal(ten.to, 'sit:here');
-  assert.ok(ten.walk > 60, 'walked to the bench first: ' + JSON.stringify(ten));
+  assert.ok(ten.walk > 20, 'walked to the bench first: ' + JSON.stringify(ten));
   assert.ok(ten.seated >= 190 && ten.seated <= 260, 'seated 10 s after the walk: ' + JSON.stringify(ten));
   const dflt = await timed({capability: 'sit down'});
   assert.ok(dflt.seated >= 1150 && dflt.seated <= 1300, 'seated the default 60 s: ' + JSON.stringify(dflt));

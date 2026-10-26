@@ -107,7 +107,9 @@ export type ActivityWorld = {
   /** Admitted interiors (spots in a closed building are not offered). */
   enterable(place: string | undefined): boolean;
   /** Nearest free native seat within `radius` m: its sit capability id and plan. */
-  seat(radius: number): {cap: EdgeCapability; plan: Plan; distance: number} | null;
+  /** The nearest free seat within `radius` m; `here` (D2, "sit down" means here): only a seat in the Soul's own room or
+   *  within HERE_SEAT_M with no enclosure boundary between (EdgeLedger.seatIsHere). */
+  seat(radius: number, here?: boolean): {cap: EdgeCapability; plan: Plan; distance: number} | null;
   placeName(id: string | undefined): string | null;
   /** Place ids containing a spot's place (for read:<place> on the building as well as the room). */
   ancestors(id: string): string[];
@@ -189,13 +191,16 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
     return [...standFirst(w), ...browse(4), ...spotSteps(s).filter(x => x.verb !== 'stand'), ...(s.seat && shelf ? [{verb: 'stand', params: {}}] : []), ...browse(3)];
   };
   // ---- sitting and lying, anywhere
-  const seat = w.seat(30), groundHere = w.clearance(w.me[0], w.me[1]), sitGround = (sec: number): Program['steps'] => {
+  // D2 (playtest 2026-10-25: "sit down" walked 30 m to a kitchen chair in another house, 3 of 3 batteries): sit:here sits
+  // on a seat only in the Soul's own room or within a few metres with no wall between, else on the ground here; reading
+  // keeps the nearest free seat within 30 m
+  const seat = w.seat(30), seatHere = w.seat(30, true), groundHere = w.clearance(w.me[0], w.me[1]), sitGround = (sec: number): Program['steps'] => {
     const spot = groundHere >= 0.45 ? null : w.open(w.me, 0.45, 20);
     return [...standFirst(w), ...(spot ? [walk(spot)] : []), pose('sit-ground', sec)];
   };
   add({id: 'sit-ground:here', verb: 'sit-ground', label: 'Sit down on the ground here', available: true, params: secondsParam(120)}, {label: 'Sit on the ground', steps: sitGround(120), seconds: true});
-  if (seat) add({id: 'sit:here', verb: 'sit', label: `Sit down on the nearest free seat (${seat.cap.label}, ${Math.round(seat.distance)} m)`, available: true, target: seat.cap.target, params: seatSeconds()}, {label: 'Sit down', steps: seat.plan.steps, seconds: true});
-  else add({id: 'sit:here', verb: 'sit', label: 'Sit down (no free seat within 30 m: on the ground here)', available: true, params: secondsParam(120)}, {label: 'Sit on the ground', steps: sitGround(120), seconds: true});
+  if (seatHere) add({id: 'sit:here', verb: 'sit', label: `Sit down on the free seat here (${seatHere.cap.label}, ${Math.round(seatHere.distance)} m)`, available: true, target: seatHere.cap.target, params: seatSeconds()}, {label: 'Sit down', steps: seatHere.plan.steps, seconds: true});
+  else add({id: 'sit:here', verb: 'sit', label: 'Sit down on the ground here (no free seat right here)', available: true, params: secondsParam(120)}, {label: 'Sit on the ground', steps: sitGround(120), seconds: true});
   for (const [act, sec] of [['lie', 120], ['nap', 300]] as const) {
     const beds = live.filter(s => s.base === 'lie' && s.activity === act && !w.taken(s.at, s.id) && d2(s.at, w.me) <= 12 && (!data.nearest || ok(s))).sort((a, b) => d2(a.at, w.me) - d2(b.at, w.me));
     const spot = groundHere >= 0.95 ? null : w.open(w.me, 0.95, 30), canHere = groundHere >= 0.95 || !!spot;

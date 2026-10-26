@@ -22,6 +22,9 @@ test('a Soul left treading water after its swim reads "treading water" in status
  assert.equal(ledger.receipt(soul.soulId,id)!.phase,'completed');
  assert.equal(w.entities[soul.entityId].human?.activity,'tread');                  // the body stays in the water, still
  assert.equal(f.host.engine.programOf(soul.entityId),null);                        // and no activity is running
- assert.equal(f.host.publicSoul(f.host.minds.get(soul.soulId)!).doing,'standing around'); // the mind's idle word (web labels override it)
+ assert.equal(f.host.minds.get(soul.soulId)!.doing,'standing around');            // the plan's idle word, kept for the mind
+ // D1: the card reads the body, not the idle plan (before: publicSoul said "standing around" and only the web relabelled it)
+ assert.equal(f.host.publicSoul(f.host.minds.get(soul.soulId)!).doing,'treading water');
+ assert.equal((status() as {body?:{inWater?:boolean}}).body?.inWater,true);
  assert.equal(status().activity,'tread');assert.equal(status().doing,'treading water');
 });

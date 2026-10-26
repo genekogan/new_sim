@@ -979,6 +979,15 @@ export class MarsEngine implements Engine {
   }
   /** Seconds of the rest step a program is on (0 when it is not resting). */
   private restSecondsOf(actor:string):number { const id=this.byActor.get(actor),p=id?this.programs.get(id):undefined,s=p?.steps[p.index]; return s?.verb==='rest'?Number(s.params?.seconds??0):0; }
+  /** D1 body state: metres of water over the ground at the body's root (the recipe's base water; 0 aboard a carrier, on a
+   *  deck over the water, upstairs, or on a world without ground/1). Read-only. */
+  bodyWaterDepthV1(actor:string):number {
+    const e=this.ents[actor],h=e?.human;if(!h||(h.level??0)!==0||h.carrier||h.riding||!this.rt.world.groundV1)return 0;
+    const g=(this.rt.services.spatial as Spatial|undefined)?.ground;if(!g)return 0;
+    const x=e.pose.p[0],z=e.pose.p[2],lvl=g.base.waterLevel(x,z);if(lvl===null)return 0;
+    if(g.field!==g.base&&e.pose.p[1]>=g.field.height(x,z)-0.5&&g.field.height(x,z)>=lvl)return 0;
+    return Math.max(0,lvl-g.base.height(x,z));
+  }
   bodyResting(actor:string) { const id=this.byActor.get(actor),p=id?this.programs.get(id):undefined; return !!p && p.until!==undefined && p.steps[p.index]?.verb==='rest' && !this.ents[actor]?.human?.task; }
   observeLocalClassroomV1(observer:string){return readLocalClassroomV1(this.rt,observer,this.rulesVersion);}
   gatheringObservation() { return readNativeGathering(this.rt,this.rulesVersion,this.dt); }

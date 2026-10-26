@@ -43,6 +43,7 @@ export function forkOptions(d, env, root = ROOT) {
     placeData: at(d.placeData), authoredBoundariesFile: at(d.authoredBoundariesFile), activitySpots: at(d.activitySpots),
     skillFile: at(d.skillFile), instructionsFile: at(d.instructionsFile),
     cliFile: env.EDGE_CLI_FILE ? resolve(env.EDGE_CLI_FILE) : at(d.cliFile),
+    controllerCliFile: env.EDGE_CONTROLLER_CLI_FILE ? resolve(env.EDGE_CONTROLLER_CLI_FILE) : at(d.controllerCliFile),
   };
 }
 
