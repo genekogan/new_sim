@@ -336,7 +336,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       const target=controls.target.clone();controls.dispose();controls=newControls(target);
     },owned=>{if(latestViewerState.current)emitState({...latestViewerState.current,inputOwned:owned});});
     // B3: a flight to a Soul's Follow shot (flyToSoul); any pointer or key input stops it where it is (manual camera).
-    let soulFlight:SoulFlight|null=null;const stopSoulFlight=()=>{soulFlight=null;};
+    let soulFlight:SoulFlight|null=null,soulFlightClock=0;const stopSoulFlight=()=>{soulFlight=null;};
     for(const type of ['pointerdown','keydown','wheel'] as const)window.addEventListener(type,stopSoulFlight,{capture:true,passive:true});
     const rts=new WorldRtsCamera(renderer.domElement,camera,{controls:()=>controls,mode:()=>context.current.cameraMode,takeOver:()=>{context.current.manualNavigation='orbit';context.current.cameraMode='manual';context.current.follow=false;if(!navigation?.sync(true))navigation?.release(false);context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');},scene:()=>scene,pickRoots:()=>[floaters.root,kin.view.root,standIns,...(people?.pickingRoots()??[]),...visualObstructionRoots()],focusAt:(x,y)=>{const target=hover.pick(x,y);if(target){inspectHover(target);return {center:target.point,radius:target.radius};}return null;},enabled:()=>!(context.current.cameraMode==='manual'&&context.current.manualNavigation==='free'),
       extent:()=>(entityLayer.active?entityLayer.groundExtent():null)??(expansion?EDEN_TERRAIN_EXTENT:geometry.bounds),home:()=>{context.current.setCameraMode('manual');controlsApi.current?.overview();}});scene.add(rts.marker);  // VF2: your camera (keys, pivot, double-click)
@@ -488,7 +488,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         const target=new THREE.Vector3(p[0],p[1]+1,p[2]);
         if(reducedMotionQuery?.matches){soulFlight=null;c.cameraMode='follow';c.follow=true;c.setCameraMode('follow');return true;}
         c.manualNavigation='orbit';c.cameraMode='manual';c.follow=false;c.setManualNavigation('orbit');c.setCameraMode('manual');
-        camera.updateMatrixWorld();soulFlight=new SoulFlight(soulId,camera.position,camera.getWorldDirection(new THREE.Vector3()),camera.position.distanceTo(controls.target),target);
+        camera.updateMatrixWorld();soulFlightClock=performance.now();soulFlight=new SoulFlight(soulId,camera.position,camera.getWorldDirection(new THREE.Vector3()),camera.position.distanceTo(controls.target),target);
         return true;
       },
       move: delta => navigation?.move(delta) ?? false,
@@ -958,7 +958,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(soulFlight){
         const flight=soulFlight,id=s.conn.replica.souls.get(flight.soulId)?.entityId,q=id?at.entities[id]?.p:null;
         if(!q||context.current.cameraMode!=='manual'||past.current)soulFlight=null;
-        else{const pose=flight.step(step,new THREE.Vector3(q[0],q[1]+1,q[2]));controls.target.copy(pose.target);camera.position.copy(pose.eye);camera.lookAt(pose.target);
+        else{const wall=performance.now(),pose=flight.step(Math.min(.5,(wall-soulFlightClock)/1000),new THREE.Vector3(q[0],q[1]+1,q[2]));soulFlightClock=wall;  // wall time: a slow frame rate (step is capped at 0.1 s) does not stretch the flight
+          controls.target.copy(pose.target);camera.position.copy(pose.eye);camera.lookAt(pose.target);
           if(pose.done){soulFlight=null;context.current.onSelect(flight.soulId);context.current.setThing(null);context.current.cameraMode='follow';context.current.follow=true;context.current.setCameraMode('follow');}}
       }
       atmosphereSeconds+=step;godLiving?.update(now,light.daylight,!!reducedMotionQuery?.matches||(look.enabled&&shotMode));const godSky=godLiving&&entityLayer.active&&!expansion?godLiving.atmosphere(shown.current?.tick??NaN):forkLand&&!expansion?forkLand.atmosphere():null;  // look pass: a still picture shows patterned lamps at their steady level (repeatable shots)

@@ -32,7 +32,7 @@ const call=async(url,{as,body}={})=>{const r=await fetch(url,{method:body?'POST'
 const CLI=resolve(root,'tools/edge-skill/eden-agent.mjs');
 const agent=(folder,argv)=>new Promise((ok,bad)=>execFile(process.execPath,[CLI,...argv],{cwd:folder,timeout:300000,maxBuffer:4<<20},(e,so,se)=>e?bad(new Error(`${argv[0]}: ${String(se||e.message).slice(0,400)}`)):ok(so)));
 
-let release=null,browser=null;
+let release=null,browser=null,page=null;
 try{
   for(let i=0;i<90;i++){if(await fetch(`${origin}${BASE}/__sim/worlds.json`).then(r=>r.ok,()=>false))break;await sleep(1000);}
   const made=await call(`${origin}${BASE}/__sim/worlds`,{as:'camera',body:{name:`Camera ${Date.now()%100000}`}});
@@ -48,7 +48,7 @@ try{
   browser=await chromium.launch({channel:'chrome',headless:true,args:['--ignore-gpu-blocklist']});
   const ctx=await browser.newContext({viewport:{width:1280,height:800},deviceScaleFactor:1});
   await ctx.addInitScript(o=>{try{localStorage.setItem('sim.dev',o);localStorage.setItem('skipgc','t');}catch{}},owner);
-  const page=await ctx.newPage();const errors=[];page.on('pageerror',e=>errors.push(String(e).slice(0,200)));
+  page=await ctx.newPage();const errors=[];page.on('pageerror',e=>errors.push(String(e).slice(0,200)));
   await page.goto(base+'/',{waitUntil:'domcontentloaded'});
   const chip=page.locator('.my-souls>button').first();await chip.waitFor({state:'visible',timeout:180000});
   await page.waitForFunction(()=>!!globalThis.__simCamera,null,{timeout:120000});
@@ -81,6 +81,7 @@ try{
   }
   check('no page errors',errors.length===0,errors.slice(0,5));
   report.status=report.checks.every(c=>c.ok)?'pass':'fail';
-}catch(e){report.status='error';report.error=String(e?.stack??e).slice(0,1200);console.error(e);}
+}catch(e){report.status='error';report.error=String(e?.stack??e).slice(0,1200);console.error(e);
+  if(page){await page.screenshot({path:join(out,'error.png')}).catch(()=>{});report.page=await page.evaluate(()=>({url:location.href,dev:localStorage.getItem('sim.dev'),hud:document.querySelector('.hud-left')?.parentElement?.innerText?.slice(0,400)})).catch(()=>null);}}
 finally{await browser?.close().catch(()=>{});release?.();stop();writeFileSync(join(out,'report.json'),JSON.stringify(report,null,1));writeFileSync(join(out,'launcher.log'),log);}
 console.log(`${report.status.toUpperCase()} ${out}`);process.exit(report.status==='pass'?0:1);
