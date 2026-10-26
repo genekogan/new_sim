@@ -58,8 +58,10 @@ export function fakeWorld({ clock, cast, behaviour = {} }) {
     }
     if (b.leaveAfterGather && sw.placePath === HALL && !b.left) { b.left = true; await clock.sleep(5000); sw.placePath = FIELD; }
     const turn = /^Your turn|turn now: say the talk/.test(t);
-    if ((turn && !b.silent) || (b.speakOnPrepare && /is next/.test(t))) {
-      const m = t.match(/in character: (.*?) Then stop/);
+    // speaksOnAny: an eager agent that talks on every card unless the card carries the hold guard (obeysGuard).
+    const eager = b.speaksOnAny && !(b.obeysGuard && t.includes('Do not say it yet; wait until I write "your turn".'));
+    if ((turn && !b.silent) || (b.speakOnPrepare && /is next/.test(t)) || (eager && !turn)) {
+      const m = t.match(/in character: (.*?) Then stop/) ?? (eager && !turn ? t.match(/: (.*?)(?: Do not say it yet|$)/) : null);
       const body = m ? m[1] : `Hello everyone, I am ${id} and this is my talk about my favourite rock, which is grey.`;
       for (let i = 0; i < b.lines; i++) { say(soulId, i ? `And one more thing from ${id}: rocks are older than all of us here.` : body); await clock.sleep(4000); }
       msg.state = 'acknowledged'; msg.outcome = 'done'; msg.result = 'gave the talk'; msg.resultAt = wall();

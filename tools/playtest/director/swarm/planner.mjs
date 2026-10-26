@@ -29,9 +29,14 @@ export const NUDGE = {
   left: (cast, s) => `${s.soulName} has left ${cast.room.label}. Go back there now and wait for your turn.`,
   speak: (cast, s) => `It is ${s.soulName}'s turn now: say the talk out loud in ${cast.room.label} (say), 2 to 4 sentences, then stop.`,
   onboard: (base, s) => `Is my Soul ${s.soulName} ready yet? Finish setting it up from ${base}/instructions.md, keep listening for my messages, and tell me when it is ready.`,
-  redirect: (s, text) => `Change of plan for ${s.soulName}: ${text}`,
+  redirect: (s, text, beforeTurn = false) => (beforeTurn ? `Change of plan for ${s.soulName}, for when your turn comes: ${text}` : `Change of plan for ${s.soulName}: ${text}`),
   goOverride: (cast, s, text) => `Your turn: ${s.soulName} gives the talk now, out loud to the room with say, 2 to 4 sentences, in character: ${text} Then stop and listen.`,
 };
+
+/** The hold guard every direction carries while the seat's own turn has not begun (gather, prepare, nudges, redirects):
+ *  the seat has one thing to say, at the right time, when its "your turn" direction arrives. */
+export const HOLD = 'Do not say it yet; wait until I write "your turn".';
+export const withHold = (text) => (text.includes(HOLD) ? text : `${text.trim()} ${HOLD}`);
 
 /** Wrap a direction with the seat's token-economy guidance. */
 export const withEconomy = (cast, level, text) => `${text} ${economyOf(cast, level).guidance}`.trim();

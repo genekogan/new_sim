@@ -184,3 +184,30 @@ test('story: the session renders as director moments per seat (review/story.mjs 
   assert.ok(says.length >= 6, `director moments: ${says.length}`);
   assert.ok(says.some((m) => /^director: /.test(m.persona.thought ?? '')));
 });
+
+test('hold guard: an eager seat that speaks on any card speaks only in its turn; the redirect is folded into its turn direction', async () => {
+  const { HOLD } = await import('../planner.mjs');
+  const script = [{ at: 'go:ann', line: 'redirect cy: talk about the piano in the hall instead.', expect: ['piano'] }];
+  const r = await play({ script, behaviour: { cy: { speaksOnAny: true, obeysGuard: true }, bob: { speaksOnAny: true, obeysGuard: true } } });
+  // every card a seat got before its own turn carries the guard; its turn direction does not
+  for (const id of ['ann', 'bob', 'cy']) {
+    const goT = Date.parse(r.dirs.find((d) => d.kind === 'go' && d.seat === id).t);
+    for (const d of r.dirs.filter((x) => x.seat === id && x.channel === 'card' && Date.parse(x.t) < goT)) assert.ok(d.text.includes(HOLD), `${id} ${d.kind} held`);
+    assert.ok(!r.dirs.find((d) => d.kind === 'go' && d.seat === id).text.includes(HOLD));
+  }
+  const red = r.dirs.find((d) => d.kind === 'redirect');
+  assert.ok(red.text.includes(HOLD)); assert.match(red.text, /for when your turn comes/); assert.match(red.reason, /folded/);
+  const cyGo = r.dirs.find((d) => d.kind === 'go' && d.seat === 'cy');
+  assert.match(cyGo.text, /piano in the hall instead/);
+  const speech = readJsonl(join(r.runDir, 'director', 'speech.jsonl'));
+  assert.equal(speech.filter((s) => s.seat === 'cy').length, 1, 'cy spoke once, in its turn');
+  assert.ok(speech.find((s) => s.seat === 'cy').atMs >= Date.parse(cyGo.t));
+  assert.equal(r.verdict.checks.eachOnce.pass, true, r.verdict.checks.eachOnce.detail);
+  assert.equal(r.verdict.redirects[0].observed, true);
+  assert.equal(r.verdict.pass, true, JSON.stringify(r.verdict.checks));
+});
+
+test('without the guard the same eager seat would talk out of turn (the verifier\'s eachOnce rule is unchanged)', async () => {
+  const r = await play({ behaviour: { cy: { speaksOnAny: true, obeysGuard: false } } });
+  assert.equal(r.verdict.checks.eachOnce.pass, false);
+});

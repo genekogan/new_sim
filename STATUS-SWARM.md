@@ -72,7 +72,20 @@ Brief: `<team>/TRANCHE-SWARM-DIRECTOR-20261026.md`. Branch `lane/swarm-director-
   go → first speech 107 s for Doc (no prepare) vs 40 s for Grumpy (prepared ahead). Fixed after it: the wide camera
   loop now waits for the camera to open (the smoke had no wide shots).
 
-## Cloud acceptance (not run yet)
+## Cloud acceptance
+
+- dwarves-r1 (cloud, server rc/soul-fix-20261026 @ 8c8f101b3; results in `<team>/playtest/replays/cloud/dwarves-r1/`):
+  4/5: allPresent 7/7, eachPresented 7/7, inOrder, redirect observed; **eachOnce FAIL**: Grumpy spoke his piano line
+  when the redirect card arrived (before his turn) and again in his turn. Two stragglers (sleepy, dopey) needed one
+  nudge each. $0.44 total (seats $0.37 + planner $0.07).
+- Fix (orchestrator only, verifier unchanged): every composed card direction to a seat before its own turn (gather,
+  prepare, nudges, redirect) carries the hold guard `Do not say it yet; wait until I write "your turn".`
+  (`planner.mjs` HOLD/withHold, applied in `direct()`); a pre-turn redirect reads "for when your turn comes" and its
+  content is folded into the seat's "your turn" direction (NUDGE.goOverride). Gene's verbatim console lines stay
+  unguarded. Tests: an eager fake seat that talks on any unguarded card speaks once, in its turn; the redirect content
+  is in its turn direction; without the guard the same seat fails eachOnce. Rerun as dwarves-r2.
+
+### How to run it
 
 Cloud session (Sim Env `env_01VeMJKsnDSYrGaH6hdWakQ7`) on `genekogan/sim`, prompt:
 

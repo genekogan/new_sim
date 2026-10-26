@@ -14,7 +14,7 @@ import { appendJsonl, writeJson } from '../../lib/jsonl.mjs';
 import { monoMs, sleep as realSleep } from '../../lib/clock.mjs';
 import { cardResultFor } from '../director.mjs';
 import { economyOf } from './cast.mjs';
-import { NUDGE, withEconomy } from './planner.mjs';
+import { NUDGE, withEconomy, withHold } from './planner.mjs';
 import { inRoom } from './truth.mjs';
 import { parseLine, scriptFeeder } from './console.mjs';
 
@@ -77,9 +77,12 @@ export function createSwarm({ cast, runDir, seats, world, owner, truth, plan, cl
   }
 
   /** Send one direction. channel 'card' (owner inbox), 'chat' (the owner's terminal: onboarding only), 'none' (log only). */
-  async function direct(st, kind, text, reason, { by = 'director', channel = 'card', economy = true } = {}) {
+  // Before a seat's own turn every composed direction carries the hold guard; Gene's verbatim console lines do not.
+  const beforeTurn = (st) => !st.goAt && !st.done && cast.order.includes(st.id);
+  async function direct(st, kind, text, reason, { by = 'director', channel = 'card', economy = true, hold = channel === 'card' && kind !== 'go' && kind !== 'console' } = {}) {
     const lvl = economyOf(cast, st.economy);
-    const body = channel === 'card' && economy ? withEconomy(cast, st.economy, text) : text;
+    const held = hold && beforeTurn(st) ? withHold(text) : text;
+    const body = channel === 'card' && economy ? withEconomy(cast, st.economy, held) : held;
     const n = ++state.directions;
     const rec = { t: iso(), mono: clock.now(), elapsedSec: Math.round(elapsed() * 10) / 10, n, seat: st.id, kind, by, channel, text: body, reason, phase: state.phase,
       speaker: cast.order[state.speakerIdx] ?? null, economy: st.economy, messageId: null, requestId: null };
@@ -186,7 +189,8 @@ export function createSwarm({ cast, runDir, seats, world, owner, truth, plan, cl
     }
     if (p.cmd === 'redirect') {
       const st = S[p.seat]; st.override = p.text;
-      const rec = await direct(st, 'redirect', NUDGE.redirect(st.cfg, p.text), st.goAt ? 'redirect during its turn' : 'redirect before its turn: its talk changes', { by, economy: false });
+      // Before its turn the redirect is held and folded into its "your turn" direction (NUDGE.goOverride); during its turn it applies now.
+      const rec = await direct(st, 'redirect', NUDGE.redirect(st.cfg, p.text, !st.goAt), st.goAt ? 'redirect during its turn' : 'redirect before its turn: held, folded into its turn direction', { by, economy: false });
       state.redirects.push({ seat: st.id, text: p.text, t: rec.t, atMs: wallMs(), expect: expect ?? null, beforeTurn: !st.goAt, requestId: rec.requestId });
       fire(`redirect:${st.id}`);
     }
