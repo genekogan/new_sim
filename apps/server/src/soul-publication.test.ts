@@ -12,9 +12,9 @@ const sources = JSON.parse(readFileSync(dir + 'SOURCES.json', 'utf8'));
 const sha = (b: string | Buffer) => createHash('sha256').update(b).digest('hex');
 const capture = readFileSync(dir + 'instructions.md', 'utf8');
 
-test('SOURCES.json pins every published Soul file by sha: the 2.1.0 controller and guides (soul fix round 1, D3), and the retained 1.9 CLI', () => {
+test('SOURCES.json pins every published Soul file by sha: the 2.2.0 controller and guides (soul fix round 1 release candidate), and the retained 1.9 CLI', () => {
   for (const k of ['controllerCli', 'cli', 'skill', 'instructions']) assert.equal(sha(readFileSync(dir + sources[k].file)), sources[k].sha256, k);
-  assert.equal(sources.controllerCli.file, 'eden.mjs'); assert.equal(sources.controllerCli.version, '2.1.0');
+  assert.equal(sources.controllerCli.file, 'eden.mjs'); assert.equal(sources.controllerCli.version, '2.2.0');
   assert.match(readFileSync(dir + 'eden.mjs', 'utf8'), /const VERSION = "2\.1\.0";/);
   assert.equal(sources.cli.file, 'eden-agent.mjs'); assert.equal(sources.cli.version, '1.9', 'the legacy CLI keeps its version');
   assert.deepEqual(sources.instructions.capture, CAPTURE, 'the server recognises exactly the recorded capture');
