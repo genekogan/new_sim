@@ -79,14 +79,15 @@ export function ageText(at:number,now=Date.now()){
  if(m<1)return 'just now';if(m<60)return `${m} min ago`;if(m<24*60)return `${Math.round(m/60)} h ago`;
  if(m<48*60)return 'yesterday';return new Date(at).toLocaleDateString([],{month:'short',day:'numeric'});
 }
-/** The Reconnect box's one sentence, from the link reason. */
-export function reconnectSentence(name:string,link:Link,now=Date.now()){
+/** The Reconnect box's two lines: `why` (the dim reason) and `ask`, the same stem for every reason. */
+export function reconnectSentence(name:string,link:Link,now=Date.now()):{why:string;ask:string}{
  const at=link.since?` at ${clockAt(link.since,now)}`:'';
  const why=link.reason==='replaced'?`Another session took over${at}, then stopped.`
   :link.reason==='revoked'?`You disconnected the agent${at}.`
   :link.reason==='never'?'No agent has connected yet.'
+  :link.reason==='approved-waiting'?'The agent never started listening.'
   :'The agent stopped listening.';
- return `${why} Give it this prompt; its request shows up here for you to approve, and ${name} wakes up.`;
+ return {why,ask:`Reconnect to ${name} by prompting your agent:`};
 }
 /** The link details' second line under "Held by your agent": "eden-agent 1.9.16 · paired 14:02 · listening now".
  * Owner terms, never a bare internal label: an eden-agent label is the client's name; any other grant label is quoted
