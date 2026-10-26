@@ -1,4 +1,4 @@
-RESUME: lane/mars-floors-20261026 @ (see git log) — diagnosis written; next: F1 floor plates (engine-bridge) + engine standY callers.
+RESUME: lane/mars-floors-20261026 @ HEAD (F1-F3 committed, F4 unit + local Playwright done); next: walk audit result, push, hand to coordinator for the Modal gate.
 
 # Floors, steps and seat tops (tranche team/TRANCHE-MARS-FLOORS-20261026.md)
 
@@ -48,6 +48,29 @@ authored (rooms + stairs in layout.mjs). Not in this tranche's bar; listed for a
 - F3: `here`/`around` name level-0 floors ("Chiba: raised floor 0.37 m, a step up"); receipts' `endedAt` carry
   `floor` and `y`; sit offers say "on top of the presenter timber box (0.41 m)".
 - F4: unit tests + local Mars-two Playwright at the Chiba gallery.
+
+## Done (2026-10-26)
+- F1 `apps/server/src/god/floor-plates.ts` (registry + `plateIsStep`), `engine-bridge.ts derive` (plates within 0.45 m
+  of the terrain are level 0), `packages/engine-mars/src/ground-bridge.ts standOn` + `engine.ts` (births, stall
+  releases, relocations, set-downs on the nav's standing height).
+- F2 `engine.ts standYAtV1`; `engine-bridge.ts` sit capability: `seat.inside` (thing > 0.15 m above the sitter's floor),
+  `seat.inside`/`seat.too-high` name the nearest usable seat or `sit-ground:here`.
+- F3 ledger hook `floorsNear` (bridge `floorsNear`: on/off, step, open sides), `here.floors`, `around.floors`,
+  `endedAt.floor` + `y` on a plate, sit labels "sit on top, 0.41 m high" / "seat N m high".
+- F4 tests: `packages/engine-mars/src/floor-plate.test.ts` (3), `apps/server/src/god/floor-plates.test.ts` (3); focused
+  server files 29 + 31 pass, engine files 32 pass; tsc server + engine-mars clean.
+- Local Mars-two (port 5891, template from this worktree): Ember walked from the arrival point onto the deck (track y 0
+  outside, 0.37 inside; stepped up at the north edge), sat on the presenter box at root y 0.37 (on its top), stood at
+  y 0.37; `here.floors` = "You are standing on the raised gallery floor of chiba, 0.37 m above the ground; open on its
+  south, north and west sides." Frames + JSON: `team/scratch/mars-floors-20261026/{seated,standing}-{inside,above}-dpr{1,2}.png`,
+  `chiba-proof.json`, script `chiba-proof.mjs`.
+
+## Not done / follow-ups
+- Tool camp, Freeside and the west racks have raised floors too (probe numbers above); measure and add their plates
+  (rack decks are several rectangles each).
+- Chiba's tiers (bleacher steps 0.74–3.0 m) and the 3.24 m mezzanine are not walkable; their cushions/chairs on level 0
+  now refuse `seat.inside` honestly (higher ones resolve to levels 2+ and are offered as before).
+- Not run here: conformance `--k 2`, the Modal gate (coordinator).
 
 ## FOR GENE
 - Defaults: step limit 0.45 m (floors higher than that above the terrain stay separate levels needing stairs).
