@@ -1,0 +1,65 @@
+{
+ "name": "pinkteam-r2",
+ "version": 1,
+ "seed": 2608,
+ "world": {
+  "kind": "dev",
+  "genesis": "worlds/templates/eden-district.json",
+  "slug": "pt-r2-pink",
+  "port": 4987,
+  "natives": true
+ },
+ "durationSec": 720,
+ "seats": [
+  {
+   "id": "zed",
+   "adapter": "claude-headless",
+   "model": "sonnet",
+   "effort": "medium",
+   "persona": "pinkteam",
+   "personaModel": "opus",
+   "startOffsetSec": 0,
+   "soulName": "Zed",
+   "channelMix": {
+    "chat": 0.5,
+    "card": 0.5
+   }
+  }
+ ],
+ "god": null,
+ "director": {
+  "mode": "persona",
+  "requestsTarget": 12,
+  "glanceSec": [
+   10,
+   30
+  ],
+  "goal": "pink team: make the world fail to do what you want",
+  "script": null
+ },
+ "observer": {
+  "sampleSec": 5,
+  "cameras": [
+   "follow"
+  ],
+  "viewport": [
+   1024,
+   640
+  ],
+  "dpr": 1,
+  "gpu": "metal"
+ },
+ "review": {
+  "reviewerModel": "opus",
+  "developerModel": "opus",
+  "rubric": "accept3"
+ },
+ "rails": {
+  "maxTurnsPerRequest": 6,
+  "maxTurnWallSec": 480,
+  "quotaStopPct": 90,
+  "onboardWallSec": 600,
+  "onboardTimeoutSec": 540
+ },
+ "notes": "Playtest round 2 (team/PLAYTEST-ROUND2-20261026.md #8b): the pink-teamer persona run kept from pinkteam-1 (same world eden-district, pinkteam persona with an opus persona model, 720 s), with the seat on Claude sonnet as the round plan sets."
+}

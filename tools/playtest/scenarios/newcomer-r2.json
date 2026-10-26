@@ -1,0 +1,65 @@
+{
+ "name": "newcomer-r2",
+ "version": 1,
+ "seed": 2607,
+ "world": {
+  "kind": "dev",
+  "genesis": "worlds/templates/eden-district.json",
+  "slug": "pt-r2-new",
+  "port": 4986,
+  "natives": true
+ },
+ "durationSec": 600,
+ "seats": [
+  {
+   "id": "pip",
+   "adapter": "claude-headless",
+   "model": "opus",
+   "effort": "medium",
+   "persona": "newcomer",
+   "personaModel": "opus",
+   "startOffsetSec": 0,
+   "soulName": "Pip",
+   "channelMix": {
+    "chat": 0.3,
+    "card": 0.7
+   }
+  }
+ ],
+ "god": null,
+ "director": {
+  "mode": "persona",
+  "requestsTarget": 8,
+  "glanceSec": [
+   10,
+   30
+  ],
+  "goal": null,
+  "script": null
+ },
+ "observer": {
+  "sampleSec": 5,
+  "cameras": [
+   "follow"
+  ],
+  "viewport": [
+   1024,
+   640
+  ],
+  "dpr": 1,
+  "gpu": "metal"
+ },
+ "review": {
+  "reviewerModel": "opus",
+  "developerModel": "opus",
+  "rubric": "accept3"
+ },
+ "rails": {
+  "maxTurnsPerRequest": 6,
+  "maxTurnWallSec": 480,
+  "quotaStopPct": 90,
+  "onboardWallSec": 600,
+  "onboardTimeoutSec": 540
+ },
+ "notes": "Playtest round 2 (team/PLAYTEST-ROUND2-20261026.md #8a): the newcomer persona run kept from newcomer-opus-1 (same world eden-district, Claude opus seat, opus persona, 600 s), renamed and re-seeded for the round so the fun/intuitive path is still measured next to the scripted batteries."
+}
