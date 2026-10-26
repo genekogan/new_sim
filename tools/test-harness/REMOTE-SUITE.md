@@ -140,8 +140,10 @@ Billing & plans to unblock hosted CI; Modal remains independent. No billing sett
   The raw runner returns suite artifacts even for failing assertions; use release-gate.sh to evaluate a ship.
 - **Node.** The default is 22 (eden2 production runs v22.23). Use `--node 26` to match the laptop.
 - **Cost.** CPU only. Before 2026-10-26 a run held 15 containers × 8 cores / 16 GB for ~7,500 container-seconds of
-  steps (~2.1 container-h, ~17 core-h) and every gate made two runs. Now one run is ~1.6 container-h and ~9.5 core-h
-  (a: ~0.17 h × 8 cores; s and 2 V5 shards: ~1.45 h × 4 cores), and a gate with a cached baseline makes one run.
+  steps plus boot/install/prep (~2.4 container-h, ~19 core-h, ~39 GB-h) and every gate made two runs (~39 core-h).
+  Now one full run is ~2.3 container-h, ~9.7 core-h, ~20 GB-h (a: ~0.17 h × 8 cores; s and 2 V5 shards: ~2.1 h ×
+  4 cores), and a gate with a cached baseline makes one run (~75% less per full gate; a web-only scoped gate is one
+  group-a container, ~0.9 core-h).
 - **Setup.** Needs `modal` installed and authenticated: `pip install modal && modal token new`. On this laptop it is
   installed (1.5.2) and `modal profile current` answers `edenartlab`.
 - **Smoke test** (install + preflight only, a few minutes):
