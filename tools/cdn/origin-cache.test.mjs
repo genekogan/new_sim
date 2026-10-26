@@ -24,3 +24,34 @@ test('problems: the 3.62 draco miss, a short-lived hashed bundle, an uncacheable
   assert.equal(originCacheProblem(r('/worlds/mars-assets/draco/draco_decoder.wasm', DAYSWR, 'REVALIDATED')), null);
   assert.equal(originCacheProblem(r('/worlds/assets/index-AbCdEf12.js', null, null, 304)), null);
 });
+
+const SHA = 'a'.repeat(64), VIEW = 'public, no-cache';
+test('mutable GLB views and legacy aliases include root and world-scoped paths', () => {
+  for (const prefix of ['', '/worlds', '/w/eden-2026', '/worlds/w/eden-2026']) {
+    assert.equal(originCacheClass(`${prefix}/asset-view/${SHA}.glb`), 'mutable-view');
+    assert.equal(originCacheClass(`${prefix}/asset-view/${SHA}.glb?cache=unchanged`), 'mutable-view');
+    assert.equal(originCacheClass(`${prefix}/assets/${SHA}.glb`), 'legacy-glb');
+    assert.equal(originCacheClass(`${prefix}/assets/${SHA}.png`), 'hashed');
+    assert.equal(originCacheClass(`${prefix}/asset-view/${SHA}.png`), null);
+  }
+});
+test('mutable views require public no-cache without immutable and allow dynamic origin validation', () => {
+  const path = `/worlds/w/eden-2026/asset-view/${SHA}.glb`;
+  for (const cf of ['DYNAMIC', 'BYPASS', 'HIT', 'MISS', 'REVALIDATED']) assert.equal(originCacheProblem(r(path, VIEW, cf)), null);
+  for (const cc of [null, IMM, 'no-cache', 'public, max-age=0', 'public, no-cache, immutable', 'public, no-cache="ETag"']) assert.match(originCacheProblem(r(path, cc)), /mutable asset view/, cc);
+  for (const cc of ['private, no-cache', 'no-store']) assert.match(originCacheProblem(r(path, cc)), /not publicly cacheable/);
+  assert.match(originCacheProblem(r(path, IMM, 'BYPASS')), /mutable asset view/);
+});
+test('legacy core GLBs may revalidate while uploaded GLBs and other hash objects retain immutable checks', () => {
+  const glb = `/worlds/w/eden-2026/assets/${SHA}.glb`, png = glb.replace('.glb', '.png');
+  assert.equal(originCacheProblem(r(glb, VIEW, 'DYNAMIC')), null);
+  assert.equal(originCacheProblem(r(glb, VIEW, 'BYPASS')), null);
+  assert.equal(originCacheProblem(r(glb, IMM, 'HIT')), null);
+  assert.match(originCacheProblem(r(glb, IMM, 'DYNAMIC')), /Cloudflare DYNAMIC/);
+  assert.match(originCacheProblem(r(glb, IMM, 'BYPASS')), /Cloudflare BYPASS/);
+  assert.match(originCacheProblem(r(glb, 'public, max-age=3600')), /immutable/);
+  assert.match(originCacheProblem(r(glb, 'no-cache')), /mutable asset view/);
+  assert.match(originCacheProblem(r(glb, 'public, no-cache, immutable')), /mutable asset view/);
+  assert.match(originCacheProblem(r(png, VIEW, 'DYNAMIC')), /immutable/);
+  assert.equal(originCacheProblem(r(png, IMM, 'HIT')), null);
+});
