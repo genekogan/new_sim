@@ -14,16 +14,17 @@ import {authoredBoundaryDeclarationV1} from '../../../packages/engine-contract/s
 import {createEdenPublicQuarter} from '../../../mars/viewer/app/engine-view/content/assets/eden-expansion-assets/public-quarter.ts';
 import {createEdenInteriors,interiorBoxes} from '../../../mars/viewer/app/engine-view/content/assets/eden-interiors/index.ts';
 
-void test('Explore replaces a pending RTS flight, retaining its endpoint across scene refreshes',()=>{
+// Test ID kept from main; Explore now replaces a pending RTS flight and a pending re-aim (head-look blend).
+void test('Explore replaces pending RTS flight and orbit glide, retaining its endpoint across scene refreshes',()=>{
  const win=new EventTarget(),doc=Object.assign(new EventTarget(),{defaultView:win,activeElement:null,querySelector:()=>null});
  const canvas=Object.assign(new EventTarget(),{ownerDocument:doc}) as unknown as HTMLCanvasElement;
  const controls=Object.assign(new THREE.EventDispatcher(),{target:new THREE.Vector3(),maxPolarAngle:Math.PI,update(){}}) as unknown as OrbitControls;
  const camera=new THREE.PerspectiveCamera(45,16/9,.1,2000);camera.position.set(0,10,10);
  let mode:'follow'|'manual'='follow';const rts=new WorldRtsCamera(canvas,camera,{controls:()=>controls,mode:()=>mode,takeOver:()=>{mode='manual';},scene:()=>new THREE.Scene(),pickRoots:()=>[]}),framing=new WorldPlaceCamera();
  try{rts.flyTo(new THREE.Vector3(150,0,150));rts.update(.1);
-  for(const id of ['fountain','gallery','int-office-studio']){win.dispatchEvent(Object.assign(new Event('keydown',{cancelable:true}),{code:'KeyW',key:'w'}));const view=worldPlaceView(id)!;framing.place(camera,()=>controls,view,()=>{mode='manual';},()=>{rts.release();});
+  for(const id of ['fountain','gallery','int-office-studio']){win.dispatchEvent(Object.assign(new Event('keydown',{cancelable:true}),{code:'ArrowRight',key:'ArrowRight'}));rts.update(.1);assert.ok(rts.headLook.yaw!==0,'a head turn is pending');win.dispatchEvent(Object.assign(new Event('keydown',{cancelable:true}),{code:'KeyW',key:'w'}));const view=worldPlaceView(id)!;framing.place(camera,()=>controls,view,()=>{mode='manual';},()=>{rts.release();});
    for(let i=0;i<100;i++){rts.update(.05);framing.initial(()=>{camera.position.set(400,200,400);});}
-   assert.deepEqual(camera.position.toArray(),view.p);assert.deepEqual(controls.target.toArray(),view.target);assert.equal(mode,'manual');
+   assert.deepEqual(camera.position.toArray(),view.p);assert.deepEqual(controls.target.toArray(),view.target);assert.equal(mode,'manual');assert.deepEqual(rts.headLook,{yaw:0,pitch:0},'Explore replaced the head turn');
   }
  }finally{rts.dispose();}
  const fresh=new WorldPlaceCamera();let calls=0;fresh.initial(()=>calls++);fresh.initial(()=>calls++);assert.equal(calls,1,'initial real scenery is still framed exactly once');
