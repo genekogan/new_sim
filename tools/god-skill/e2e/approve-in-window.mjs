@@ -21,6 +21,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
+import { clickNewSoulEntry } from './window-entry.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : []).filter(Boolean));
@@ -119,17 +120,10 @@ async function windowCode(page) {
     // Wait for its real account UI before New Soul; otherwise the correct signed-out explanation opens.
     await page.locator('summary.account-avatar').waitFor({state: 'visible', timeout: 20_000});
     attempt.signedIn = await state();
-    // A new owner's native God dialog opens automatically and makes the header inert.
-    // Dismiss it as a visitor would before using the public New Soul entry (button or link).
-    const godModal = page.locator('[data-god-modal][open]');
-    if (await godModal.count()) {
-      await page.keyboard.press('Escape');
-      await godModal.waitFor({state: 'hidden'});
-    }
-    const entry = page.locator('.bring-agent-open:visible').first();
-    attempt.entry = await entry.evaluate(el => ({tag: el.tagName, href: el.getAttribute('href'),
-      currentURL: location.href, godOpen: !!document.querySelector('[data-god-modal][open]')}));
-    await entry.click();
+    await clickNewSoulEntry(page, (event, detail) => {
+      if (event === 'entry') attempt.entry = detail;
+      else (attempt.godDismissals ??= []).push({at: Date.now()});
+    });
     const link = page.locator('.bring-agent-prompt a');
     await page.waitForFunction(() => /\?for=[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(document.querySelector('.bring-agent-prompt a')?.getAttribute('href') ?? ''), null, { timeout: 20_000 });
     const href = await link.getAttribute('href');
