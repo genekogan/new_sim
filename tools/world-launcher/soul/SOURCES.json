@@ -2,10 +2,10 @@
   "what": "The Soul CLIs and Soul guides every launcher world serves (/eden.mjs, /skill.md, /instructions.md; retained legacy /eden-agent.mjs). Exact copies, never forks.",
   "controllerCli": {
     "file": "eden.mjs",
-    "version": "2.2.0",
-    "sha256": "9b72c335630a4ad67460fc5e13699a4d7529de7e11c4bedbcb4c70c1608fe225",
+    "version": "2.2.1",
+    "sha256": "955d41bb08dcbec3ee9fa66a32cc4560ea40328ab8cf629b357b4435f4002338",
     "from": "authorized laptop 2 handover, copied from <team>/scratch/soul3/client-handover/eden.mjs",
-    "note": "SOUL3: the one-Soul, one-controller thin client (eden 2.0.0), served at /eden.mjs. Owned by the separate client rewrite; published byte for byte. 2.1.0 (soul fix round 1, 2026-10-25, D3): act --for <message-id>|none (default: the newest message acked in this folder) links the act to the owner message the world closes when it ends; act/wait print one top-level now/done sentence in at most 600 characters, --json for everything. 2.2.0 (release candidate 2026-10-26): the LINK public `now` line ported from eden-agent 1.9.17 (--now on act/say/ack/result/wait, `now` command, status shows link and now)."
+    "note": "SOUL3: the one-Soul, one-controller thin client (eden 2.0.0), served at /eden.mjs. Owned by the separate client rewrite; published byte for byte. 2.1.0 (soul fix round 1, 2026-10-25, D3): act --for <message-id>|none (default: the newest message acked in this folder) links the act to the owner message the world closes when it ends; act/wait print one top-level now/done sentence in at most 600 characters, --json for everything. 2.2.0 (release candidate 2026-10-26): the LINK public `now` line ported from eden-agent 1.9.17 (--now on act/say/ack/result/wait, `now` command, status shows link and now). 2.2.1 (D3b, cloud fix-r3): the default --for serves only the first act the world accepts after an ack, within 120 s of it; an unfinished receipt prints done: false beside now."
   },
   "cli": {
     "file": "eden-agent.mjs",
@@ -17,10 +17,10 @@
   },
   "skill": {
     "file": "skill.md",
-    "version": "2.2.0",
-    "sha256": "b57c6e32694034dca527f0393e31d6f62e2e0967218eaf934a8423e0f92f4424",
+    "version": "2.2.1",
+    "sha256": "98a911f745276622e51610d44b38d16525008c3369304bfeaa40d419213a889b",
     "from": "authorized laptop 2 handover, copied from <team>/scratch/soul3/client-handover/SKILL-v2.md",
-    "note": "SOUL3 guide for eden.mjs, published byte for byte; no {{}} templates (the world serves it as is). Replaces the 1.9 skill below. 2.1.0 (soul fix round 1, D3): owner step 4 and the long-activity advice became one sentence (the server closes the message), one rule added (an ack says what you will try, never what happened); net 0 lines, 5,970 bytes. 2.2.0: adds the public `now` line section (LINK). 2.2.0 also says to close an owner message yourself when no act is needed (ride-check I-2)."
+    "note": "SOUL3 guide for eden.mjs, published byte for byte; no {{}} templates (the world serves it as is). Replaces the 1.9 skill below. 2.1.0 (soul fix round 1, D3): owner step 4 and the long-activity advice became one sentence (the server closes the message), one rule added (an ack says what you will try, never what happened); net 0 lines, 5,970 bytes. 2.2.0: adds the public `now` line section (LINK). 2.2.0 also says to close an owner message yourself when no act is needed (ride-check I-2). 2.2.1 (D3b): \"Until `done` appears the request is not done; say so.\" in Acting; owner step 3 says only the first act after an ack serves it; 6,390 bytes."
   },
   "instructions": {
     "file": "instructions.md",

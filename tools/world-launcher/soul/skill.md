@@ -1,7 +1,7 @@
 ---
 name: eden-soul
 metadata:
-  version: "2.2.0"
+  version: "2.2.1"
   contract: eden-edge/1
 description: Control one Eden Soul through the thin `eden.mjs` CLI. You are its only controller. Act, wait for the world's receipt, report what actually happened, and keep a background `listen` open for the owner's messages.
 ---
@@ -42,7 +42,8 @@ node eden.mjs resolve "row a boat with Mira"           # dry run: what would be 
   reason; pick an alternative only if the owner's request allows it. Never substitute a different activity silently
   (lying down is not sitting; walking is not running; a solo dance is not dancing *with* someone).
 - `act` and `wait` print `done: "…"` (the world's verdict) once the action ended, else `now: "…"` (what the body is
-  doing right now). Quote it; `--json` shows everything. `--wait [s]` (max 60); then `wait 60` again if needed.
+  doing right now). Until `done` appears the request is not done; say so. Quote it; `--json` shows everything.
+  `--wait [s]` (max 60); then `wait 60` again if needed.
 - Receipt phases: `waiting` (accepted, not begun) → `started` → `completed` | `failed` | `replaced`. Acceptance is not
   arrival.
 - Sending a new `act` replaces the current body action. That is how the owner changes their mind.
@@ -74,7 +75,7 @@ When `listen` exits it prints `{messages:[{id,text,sentAt}…]}`, oldest first. 
 
 1. `node eden.mjs ack <id> "Got it: …"` for **every** message, at most 140 characters each (the first line the owner sees).
 2. Start `node eden.mjs listen --after <last id>` in the background again, before doing the work.
-3. Do them in order with `act … --wait` (each serves the message you acked last; `--for <id>` to choose). A newer
+3. Do them in order with `act … --wait` (only the first act after an ack serves it; else `--for <id>`). A newer
    message that contradicts an older one wins: `result <old id> failed "Replaced: …"`.
 
 The server closes your owner's message when the act ends. When no act is needed (already done, a question), close it

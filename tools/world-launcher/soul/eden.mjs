@@ -10,7 +10,7 @@ import { randomUUID, randomBytes } from "node:crypto";
 import { resolve as resolvePath } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const VERSION = "2.2.0";
+const VERSION = "2.2.1";
 const STATE = ".eden-agent.json";
 const CLI = "node eden.mjs";
 
@@ -30,6 +30,8 @@ const need = (s, k, hint) => {
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const now = () => new Date().toISOString();
+/** D3b: how long after an ack its first act still serves that message by default (act --for). */
+const IMPLICIT_FOR_MS = 120_000;
 
 // LINK (2.2): the Soul's public `now` line: one short first-person line a stranger can read, at most 140 characters.
 // `--now "<line>"` rides on act, say, ack, result (JSON body) and wait (query); `now "<line>"` / `now --clear` set it alone.
@@ -376,13 +378,15 @@ async function act(...argv) {
   const body = args[0].trim().startsWith("{") && args.length === 1
     ? { ...JSON.parse(args[0]), clientRef: randomUUID() }
     : { capability: args.join(" "), params, clientRef: randomUUID() };
-  // D3: the owner message this act serves (default: the newest one acked here in the last 15 min); the world writes its
-  // result line when the act ends, unless you write one first
-  const s = load(), implicit = forArg === undefined && s.lastAcked && Date.now() - Date.parse(s.lastAckedAt ?? 0) < 15 * 60_000;
+  // D3: the owner message this act serves; the world writes its result line when the act ends, unless you write one first.
+  // D3b (cloud fix-r3 trio tam-003: a later walk closed "walk with Mira" as Done): by default only the first act the world
+  // accepts after an ack, within IMPLICIT_FOR_MS of it, serves that message; later acts serve one only with --for <id>.
+  const s = load(), implicit = forArg === undefined && s.lastAcked && !s.lastAckedActed && Date.now() - Date.parse(s.lastAckedAt ?? 0) < IMPLICIT_FOR_MS;
   const forId = forArg === "none" ? undefined : forArg ?? (implicit ? s.lastAcked : undefined);
   let r = await call("/v1/edge/act", { body: forId ? { ...body, for: forId } : body });
-  if (implicit && r.status === 400 && /owner message/.test(r.data?.error?.message ?? "")) { save({ lastAcked: undefined, lastAckedAt: undefined }); r = await call("/v1/edge/act", { body }); }
+  if (implicit && r.status === 400 && /owner message/.test(r.data?.error?.message ?? "")) { save({ lastAcked: undefined, lastAckedAt: undefined, lastAckedActed: undefined }); r = await call("/v1/edge/act", { body }); }
   const d = ok(r, "act");
+  if (d.accepted) { const t = load(); if (t.lastAcked && !t.lastAckedActed) save({ lastAckedActed: true }); }
   if (!d.accepted) return { accepted: false, code: d.code, reason: d.reason, ...(d.did_you_mean?.length ? { did_you_mean: d.did_you_mean.slice(0, 8) } : {}), ...(d.retry_after ? { retry_after: d.retry_after } : {}) };
   let out = { accepted: true, receipt: d.receipt, ...(d.resolved ? { resolved: d.resolved } : {}), ...(d.chosen ? { chosen: d.chosen } : {}), channel: d.channel, ...(d.for ? { for: d.for } : {}) };
   if (d.receipt?.id && d.channel !== "attention" && d.channel !== "none") save({ lastReceipt: d.receipt.id, lastActAt: now() });
@@ -391,15 +395,15 @@ async function act(...argv) {
 }
 
 // D3: the default output is one top-level sentence from the world, `done` when the receipt has ended, else `now` (what
-// the body is doing: "walking to the bench, 18 m left; not sitting yet"), plus the few fields an agent needs; at most
-// 600 characters. --json prints everything.
+// the body is doing: "walking to the bench, 18 m left; not sitting yet") with `done: false` (D3b), plus the few fields an
+// agent needs; at most 600 characters. --json prints everything.
 export function brief(out) {
   const rec = out.receipt && !out.receipt.error ? out.receipt : null, fin = !!rec && TERMINAL.has(rec.phase);
   const sentence = !rec ? null : fin ? rec.done ?? rec.outcome?.summary ?? `${rec.capability} ${rec.phase}${rec.reason ? `: ${rec.reason}` : ""}.`
     : rec.now ?? `${rec.capability} ${rec.phase}: under way, not finished.`;
   const o = {
     ...(out.accepted !== undefined ? { accepted: out.accepted } : {}), ...(out.waited ? { waited: out.waited } : {}),
-    ...(sentence ? { [fin ? "done" : "now"]: sentence } : {}),
+    ...(sentence ? (fin ? { done: sentence } : { now: sentence, done: false }) : {}),
     ...(rec ? { receipt: { id: rec.id, capability: rec.capability, phase: rec.phase, ...(rec.code ? { code: rec.code } : {}) } } : {}),
     ...(out.for ? { for: out.for } : {}), ...(out.ownerMessages ? { ownerMessages: out.ownerMessages } : {}),
     ...(out.resolved?.to && out.resolved.to !== out.resolved.from ? { resolved: out.resolved.to } : {}),
@@ -545,7 +549,7 @@ async function ack(id, reply) {
   if (!id) throw new Error('usage: ack <message-id> ["reply, up to 140 chars"]');
   if (reply && reply.length > 140) throw new Error("ack reply must be at most 140 characters");
   const d = clean(ok(await call(`/v1/edge/inbox/${encodeURIComponent(id)}/ack`, { body: reply ? { reply } : {} }), "ack"));
-  save({ lastAcked: id, lastAckedAt: now() });   // D3: the next act serves this message (act --for)
+  save({ lastAcked: id, lastAckedAt: now(), lastAckedActed: undefined });   // D3: the next act serves this message (act --for)
   return { acked: id, ...(reply ? { reply } : {}), ...d };
 }
 
@@ -554,7 +558,7 @@ async function result(id, outcome, ...text) {
   if (!id || !["done", "failed"].includes(outcome) || !t) throw new Error('usage: result <message-id> done|failed "what happened, up to 140 chars"');
   if (t.length > 140) throw new Error("result text must be at most 140 characters");
   const d = clean(ok(await call(`/v1/edge/inbox/${encodeURIComponent(id)}/result`, { body: { outcome, text: t } }), "result"));
-  if (load().lastAcked === id) save({ lastAcked: undefined, lastAckedAt: undefined });
+  if (load().lastAcked === id) save({ lastAcked: undefined, lastAckedAt: undefined, lastAckedActed: undefined });
   return { reported: id, outcome, text: t, ...d };
 }
 
