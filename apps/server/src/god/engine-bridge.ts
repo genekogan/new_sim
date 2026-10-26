@@ -34,6 +34,7 @@ import { installHeld } from './held.ts';
 import { installWorldClock } from './world-clock.ts';
 import { config, KNOWN_WORLD_KEYS } from '../config.ts';
 import { seatFitProblem } from '../../../../mars/viewer/engine/bodies/humanoid.ts';
+import { floorPlatesOf, plateIsStep } from './floor-plates.ts';
 import { isVerificationProbe } from '../verification-probe.ts';
 import { planWalkouts, dropReleased, unhand, stuckWarning, type StuckResident } from './walkout.ts';
 import { GodNotices } from './notices.ts';
@@ -502,6 +503,9 @@ export class EngineBridge {
     }
     // floors: polygons → oriented rectangles on levels
     const surfaces = [...(baked.surfaces ?? [])];
+    // floors (2026-10-26): a mesh def's measured floor plates (floor-plates.ts: the Chiba deck), walked onto as a step
+    const plates = new Set<object>();
+    if (!worldFrame && def.make.kind === 'mesh') for (const f of floorPlatesOf(def.name)) { const s = { level: 0, y: f.y, polygon: f.polygon, tag: f.id }; plates.add(s); surfaces.push(s); }
     if (!surfaces.length && def.components.floor) { const [w, , d] = baked.box; surfaces.push({ level: 0, y: def.components.floor.y ?? baked.box[1], polygon: [[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]] }); }
     // ground cover (roads, lawns, plazas: ground-relative level-0 surfaces of world-frame shapes) is the ground itself
     const floors = surfaces.filter((x) => !(worldFrame && !(x as { abs?: boolean }).abs && x.level === 0));
@@ -513,12 +517,14 @@ export class EngineBridge {
     const c0 = g0 ? (() => { const r = rectOf(g0.polygon); return toWorld(r.c[0], r.c[1]); })() : undefined;
     const groundY = g0 && c0 && Math.abs(heightAt(g0.y, c0) - this.model.terrain.sample(c0[0], c0[1])) <= GROUND_BAND + 0.5 ? heightAt(g0.y, c0) : undefined;
     const levelOn = (y: number, at: Vec2) => (groundY !== undefined && Math.abs(y - groundY) <= LEVEL_MATCH ? 0 : this.levelFor(y, at));
+    // a floor plate within a step of the terrain under it is the ground's level (GroundNav.standY stands every body on it)
+    const plateLevel = (y: number, at: Vec2) => (plateIsStep(y, this.model.terrain.sample(at[0], at[1])) ? 0 : this.levelFor(y, at));
     if (floors.length) part.surfaces = floors.map((s, i) => {
       const r = rectOf(s.polygon), abs = (s as { abs?: boolean }).abs;
       const c = toWorld(r.c[0], r.c[1]), y = heightAt(s.y, c, abs);
       // decks and bridges of world-frame shapes are walked from the ground: level 0 at their own height (L8 slabs); a
       // raised deck (deck/1 with rails, DECK_RAISED up) is an upper floor of its own that stairs, ramps and ladders reach
-      const level = worldFrame && abs && s.level === 0 && !raisedDeck ? 0 : levelOn(y, c);
+      const level = worldFrame && abs && s.level === 0 && !raisedDeck ? 0 : plates.has(s) ? plateLevel(y, c) : levelOn(y, c);
       const sc = worldFrame ? 1 : wp.s, yaw = worldFrame ? r.yaw : wp.yaw + r.yaw;
       return { id: `${e.id}#f${i}`, level, y: level === 0 && Math.abs(y) <= GROUND_BAND ? 0 : y, obb: { c, half: [r3(r.half[0] * sc), r3(r.half[1] * sc)] as Vec2, yaw: r3(-yaw) }, label: `${this.model.pathOf(e.id)} ${s.tag ?? 'floor'}`.slice(0, 100) };
     });

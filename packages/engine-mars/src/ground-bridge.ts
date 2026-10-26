@@ -159,6 +159,10 @@ export function attachGround(rt: Rt): boolean {
 
 /** Height a standing body takes on the ground here (a swimmer's root in deep water). */
 export function standHeight(f: GroundField, x: number, z: number): number { return f.medium(x, z) === G_SWIM ? swimRootY(f, x, z) : f.height(x, z); }
+/** Floors (2026-10-26): where a body placed at (x, z) on level 0 stands — the nav's standing height (the terrain, or a
+ *  floor slab laid on it: a deck, a building's raised floor plate) as every walk tick reads it, the swim root in deep
+ *  water. Births, releases and relocations use it, so a body set down on a deck stands on the deck, not under it. */
+export function standOn(nav: { field: GroundField; standY(x: number, z: number): number }, x: number, z: number): number { return nav.field.medium(x, z) === G_SWIM ? swimRootY(nav.field, x, z) : nav.standY(x, z); }
 
 /**
  * Bodies follow the ground when it changes under them (a raised hill lifts them, a lowered one sets them down):
