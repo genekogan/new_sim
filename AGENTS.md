@@ -17,6 +17,19 @@ require the verified human owner. Toy retains `toy-1` and its database.
 No timetable/routine object. World customs and perception inform decisions;
 triggers cause thinking, and only an explicit NOW instruction runs directly.
 
+## Playtests, the swarm director and Modal spend (since 2026-10-26)
+
+- **Playtest framework** (`tools/playtest/`, `DESIGN.md`): scripted batteries, persona runs and casts play Souls as Claude CLI seats in a
+  dev world; Reviewer + Developer passes; frozen sets and `replay-set` scorecards (`team/playtest/ROOT-CAUSES-20261025.md` §E). Measure
+  on a quiet machine only: never run workers, tsc, tests or ship checks on the laptop during a battery (two were contaminated on 10-26);
+  two repeats per arm; seats must use one relative command per call (allowlist, `arena/adapters/claude-headless.mjs`).
+- **Swarm director** (`tools/playtest/director/swarm/`, `playtest.mjs direct <cast>`): several Souls directed live through the owner
+  card channel with a typed console; casts in `tools/playtest/scenarios/casts/`. From a chat session: the `sim-director` skill.
+- **Modal policy is binding** (`<team>/lanes/MODAL-POLICY.md`): one gate per release head, cached baseline (no main re-runs),
+  4 containers per run, scoped candidate gates, never for perf experiments or tools/docs-only changes; ≤ 3 gates/day across lanes.
+- Round 2 of the playtests (wayfinding, look/see, podium casts) lives in `tools/playtest/scenarios/{wayfind,look}-*.json`,
+  `casts/podium-*.json`, `scenarios/round2.json`, plan `tools/playtest/ROUND2.md`.
+
 ## Releases (current since 2026-10-20; the old `pnpm check` / staging / `/srv/sim/ops` recipe is retired)
 
 Only the release owner (R, id on the top line of `<team>/lanes/ROSTER.md`, holding `team/lanes/DEPLOY.lock`) ships,
