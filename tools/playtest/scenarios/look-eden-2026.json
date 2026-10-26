@@ -1,0 +1,386 @@
+{
+ "name": "look-eden-2026",
+ "version": 1,
+ "seed": 2604,
+ "world": {
+  "kind": "dev",
+  "genesis": "worlds/templates/eden-2026.json",
+  "slug": "pt-look-eden",
+  "port": 4984
+ },
+ "durationSec": 1790,
+ "seats": [
+  {
+   "id": "sol",
+   "adapter": "claude-headless",
+   "model": "sonnet",
+   "effort": "medium",
+   "persona": "expert",
+   "personaModel": "opus",
+   "startOffsetSec": 0,
+   "soulName": "Sol",
+   "channelMix": {
+    "chat": 1,
+    "card": 0
+   }
+  }
+ ],
+ "god": null,
+ "director": {
+  "mode": "scripted",
+  "requestsTarget": 12,
+  "glanceSec": [
+   10,
+   30
+  ],
+  "goal": "walk, face, look and say: walk there, turn to face the thing, view (--alt-only or --out) and say what is seen",
+  "script": [
+   {
+    "seat": "sol",
+    "atSec": 20,
+    "channel": "chat",
+    "text": "walk to the fire circle",
+    "budgetSec": 180,
+    "expect": {
+     "kind": "go",
+     "targets": [
+      {
+       "ref": "place-social-eden-fire-circle",
+       "names": [
+        "place-social-eden-fire-circle",
+        "fire circle"
+       ],
+       "pos": [
+        24,
+        -7
+       ],
+       "radiusM": 5
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"place-social-eden-fire-circle\""
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 215,
+    "channel": "chat",
+    "text": "turn to face the bandstand",
+    "budgetSec": 90,
+    "expect": {
+     "kind": "face",
+     "targets": [
+      {
+       "ref": "eden-bandstand",
+       "names": [
+        "eden-bandstand",
+        "bandstand"
+       ],
+       "pos": [
+        38.5,
+        -26
+       ],
+       "radiusM": 6
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"eden-bandstand\""
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 320,
+    "channel": "chat",
+    "text": "look at the bandstand and tell me what you see",
+    "budgetSec": 120,
+    "expect": {
+     "kind": "look",
+     "answer": {
+      "anyOf": [
+       "bandstand",
+       "pavilion",
+       "violin",
+       "viola",
+       "cello",
+       "instrument",
+       "music stand"
+      ],
+      "minHits": 1
+     },
+     "view": "any",
+     "source": "worlds/templates/eden-2026.json: op \"eden-bandstand\" (core/pavilion) with bandstand-violin-1/2, bandstand-viola, bandstand-cello"
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 455,
+    "channel": "chat",
+    "text": "walk to the stone garden",
+    "budgetSec": 180,
+    "expect": {
+     "kind": "go",
+     "targets": [
+      {
+       "ref": "place-eden-stone-garden",
+       "names": [
+        "place-eden-stone-garden",
+        "stone garden"
+       ],
+       "pos": [
+        57,
+        -10
+       ],
+       "radiusM": 6
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"place-eden-stone-garden\""
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 650,
+    "channel": "chat",
+    "text": "turn to face the library",
+    "budgetSec": 90,
+    "expect": {
+     "kind": "face",
+     "targets": [
+      {
+       "ref": "eden-library-1",
+       "names": [
+        "eden-library-1",
+        "library"
+       ],
+       "pos": [
+        74,
+        -7
+       ],
+       "radiusM": 8
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"eden-library-1\""
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 755,
+    "channel": "chat",
+    "text": "what does the library look like from where you are?",
+    "budgetSec": 120,
+    "expect": {
+     "kind": "look",
+     "answer": {
+      "anyOf": [
+       "library",
+       "stone",
+       "books",
+       "bookshelf",
+       "shelves"
+      ],
+      "minHits": 1
+     },
+     "view": "any",
+     "source": "worlds/templates/eden-2026.json: op \"eden-library-1\" (core/hall, stone, flat roof, reading room with library-*-shelf)"
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 890,
+    "channel": "chat",
+    "text": "walk over to the cafe terrace",
+    "budgetSec": 180,
+    "expect": {
+     "kind": "go",
+     "targets": [
+      {
+       "ref": "cafe-terrace-1",
+       "names": [
+        "cafe-terrace-1",
+        "cafe terrace"
+       ],
+       "pos": [
+        93,
+        23
+       ],
+       "radiusM": 5
+      },
+      {
+       "ref": "cafe-terrace-4",
+       "names": [
+        "cafe-terrace-4"
+       ],
+       "pos": [
+        99,
+        18
+       ],
+       "radiusM": 5
+      },
+      {
+       "ref": "int-cafe",
+       "names": [
+        "int-cafe",
+        "cafe"
+       ],
+       "pos": [
+        101.5,
+        25
+       ],
+       "radiusM": 10
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"cafe-terrace-1\", op \"cafe-terrace-4\", op \"int-cafe\""
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 1085,
+    "channel": "chat",
+    "text": "turn to face the windmill",
+    "budgetSec": 90,
+    "expect": {
+     "kind": "face",
+     "targets": [
+      {
+       "ref": "eden-windmill",
+       "names": [
+        "eden-windmill",
+        "windmill"
+       ],
+       "pos": [
+        88,
+        27.8
+       ],
+       "radiusM": 6
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"eden-windmill\""
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 1190,
+    "channel": "chat",
+    "text": "send me a picture of the windmill and tell me what is in it",
+    "budgetSec": 120,
+    "expect": {
+     "kind": "look",
+     "answer": {
+      "anyOf": [
+       "windmill",
+       "sails",
+       "blades",
+       "mill"
+      ],
+      "minHits": 1
+     },
+     "view": "out",
+     "source": "worlds/templates/eden-2026.json: op \"eden-windmill\" (core/windmill)"
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 1325,
+    "channel": "chat",
+    "text": "go to the greenhouse",
+    "budgetSec": 180,
+    "expect": {
+     "kind": "go",
+     "targets": [
+      {
+       "ref": "eden-greenhouse",
+       "names": [
+        "eden-greenhouse",
+        "greenhouse"
+       ],
+       "pos": [
+        69,
+        35
+       ],
+       "radiusM": 6
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"eden-greenhouse\""
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 1520,
+    "channel": "chat",
+    "text": "now face the market",
+    "budgetSec": 90,
+    "expect": {
+     "kind": "face",
+     "targets": [
+      {
+       "ref": "eden-market-1",
+       "names": [
+        "eden-market-1",
+        "market"
+       ],
+       "pos": [
+        70,
+        29
+       ],
+       "radiusM": 6
+      }
+     ],
+     "source": "worlds/templates/eden-2026.json: op \"eden-market-1\""
+    }
+   },
+   {
+    "seat": "sol",
+    "atSec": 1625,
+    "channel": "chat",
+    "text": "look at the market and tell me what is there",
+    "budgetSec": 120,
+    "expect": {
+     "kind": "look",
+     "answer": {
+      "anyOf": [
+       "market",
+       "stall",
+       "crate",
+       "barrel",
+       "pergola",
+       "vegetables",
+       "fruit",
+       "produce"
+      ],
+      "minHits": 1
+     },
+     "view": "any",
+     "source": "worlds/templates/eden-2026.json: op \"eden-market-1\" (core/pavilion) with market-stall-1..3, market-pergola-*"
+    }
+   }
+  ],
+  "budgetSec": {
+   "quick": 60,
+   "default": 150
+  }
+ },
+ "observer": {
+  "sampleSec": 5,
+  "cameras": [
+   "follow"
+  ],
+  "viewport": [
+   1024,
+   640
+  ],
+  "dpr": 1,
+  "gpu": "metal"
+ },
+ "review": {
+  "reviewerModel": "opus",
+  "developerModel": "opus",
+  "rubric": "accept3",
+  "developerMaxIssues": 4,
+  "developerMaxFeatureRequests": 2
+ },
+ "rails": {
+  "maxTurnsPerRequest": 6,
+  "maxTurnWallSec": 480,
+  "quotaStopPct": 90,
+  "onboardWallSec": 600,
+  "onboardTimeoutSec": 540
+ },
+ "notes": "Playtest round 2 (team/PLAYTEST-ROUND2-20261026.md #4-5): look/see battery on Eden 2026 (worlds/templates/eden-2026.json). One Claude sonnet seat, chat channel, four walk -> face -> look triples. Each script entry carries expect (review/expect-oracles.mjs): the walk by target-arrival, the turn by facing (the heading of the last completed act in the window vs the bearing to the template's position; 45 degrees; view --gaze at the thing also counts), the look by view-used (view --alt-only or view --out; --out where the owner asks for a picture) and named-in-description (the reply names the thing or its parts). Every name and position comes from the genesis template named in each expect.source."
+}
