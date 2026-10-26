@@ -1,0 +1,23 @@
+{
+ "kind": "cast",
+ "name": "smoke-duo",
+ "version": 1,
+ "seed": 7002,
+ "world": { "kind": "dev", "genesis": "worlds/templates/eden-district.json", "slug": "pt-duo", "port": 4997, "natives": false },
+ "durationSec": 1800,
+ "brief": "Two friends meet in the library hall and each gives one short talk to the other, one at a time.",
+ "room": { "label": "the library hall", "match": ["hall"] },
+ "order": ["doc", "grumpy"],
+ "seats": [
+  { "id": "doc", "soulName": "Doc", "model": "haiku", "effort": "medium", "economy": "lean",
+    "character": "Doc is kindly and a little pompous, fond of long words he sometimes muddles.", "topic": "why a well-run mine needs a good plan" },
+  { "id": "grumpy", "soulName": "Grumpy", "model": "haiku", "effort": "medium", "economy": "lean",
+    "character": "Grumpy grumbles about everything but is secretly soft-hearted.", "topic": "everything that is wrong with talks" }
+ ],
+ "timing": { "truthPollSec": 5, "gatherMaxSec": 1200, "nudgeAfterSec": 150, "maxNudges": 3, "quietSec": 25, "speakTimeoutSec": 240, "maxSpeakNudges": 1, "prepareAhead": true, "presentWaitSec": 120 },
+ "orchestrator": { "planner": null },
+ "success": { "allPresent": true, "minChars": 40, "inOrder": true, "eachOnce": true },
+ "observer": { "sampleSec": 15, "cameras": ["follow", "wide"], "viewport": [1024, 640], "dpr": 1, "arrivalTimeoutMs": 180000 },
+ "rails": { "onboardWallSec": 600, "onboardTimeoutSec": 540, "onboardConcurrency": 2, "quotaStopPct": 90, "maxTurnsPerRequest": 4, "maxTurnWallSec": 240 },
+ "console": { "script": [ { "at": "go:doc", "line": "redirect grumpy: instead, Grumpy admits that he loves the old piano in this hall.", "expect": ["piano"] } ] }
+}
