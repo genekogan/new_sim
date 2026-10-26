@@ -1,0 +1,9 @@
+{"type":"thread.started","thread_id":"01a1710e-412b-7133-afbe-554144dd5c93"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"I’ll list this directory, then read a.txt.\n"}}
+{"type":"item.started","item":{"id":"item_1","type":"command_execution","command":"/bin/zsh -lc 'ls -la'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"/bin/zsh -lc 'ls -la'","aggregated_output":"total 8\ndrwxr-xr-x@  3 gene  wheel   96 Oct 24 23:14 .\ndrwx------@ 13 gene  wheel  416 Oct 24 23:15 ..\n-rw-r--r--@  1 gene  wheel    3 Oct 24 23:14 a.txt\n","exit_code":0,"status":"completed"}}
+{"type":"item.started","item":{"id":"item_2","type":"command_execution","command":"/bin/zsh -lc 'cat a.txt'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_2","type":"command_execution","command":"/bin/zsh -lc 'cat a.txt'","aggregated_output":"hi\n","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"done"}}
+{"type":"turn.completed","usage":{"input_tokens":38506,"cached_input_tokens":31360,"cache_write_input_tokens":0,"output_tokens":71,"reasoning_output_tokens":0}}

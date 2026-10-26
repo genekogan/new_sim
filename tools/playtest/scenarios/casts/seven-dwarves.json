@@ -1,0 +1,44 @@
+{
+ "kind": "cast",
+ "name": "seven-dwarves",
+ "version": 1,
+ "seed": 7007,
+ "world": { "kind": "dev", "genesis": "worlds/templates/eden-district.json", "slug": "pt-dwarves", "port": 4996, "natives": false },
+ "durationSec": 3600,
+ "brief": "Seven friends who share a cottage by the mine are holding a little show-and-tell tonight. Everyone meets in the library hall, and each gives one short talk to the others, one at a time, in the agreed order, while the rest listen.",
+ "room": { "label": "the library hall", "match": ["hall"] },
+ "order": ["doc", "happy", "sleepy", "bashful", "sneezy", "grumpy", "dopey"],
+ "seats": [
+  { "id": "doc", "soulName": "Doc", "model": "haiku", "effort": "medium", "economy": "normal",
+    "character": "Doc is the self-appointed leader: kindly, a little pompous, fond of long words he sometimes muddles. He opens the evening and likes things done in order.",
+    "topic": "why a well-run mine needs a good plan, and a welcome to everyone" },
+  { "id": "happy", "soulName": "Happy", "model": "haiku", "effort": "medium", "economy": "lean",
+    "character": "Happy is cheerful through and through, laughs easily and sees the bright side of everything, even a collapsed tunnel.",
+    "topic": "the best thing that happened this week" },
+  { "id": "sleepy", "soulName": "Sleepy", "model": "haiku", "effort": "medium", "economy": "lean",
+    "character": "Sleepy is drowsy and slow-spoken, yawns mid-sentence and would rather be napping, but is gentle and means well.",
+    "topic": "the perfect place for a nap" },
+  { "id": "bashful", "soulName": "Bashful", "model": "haiku", "effort": "medium", "economy": "lean",
+    "character": "Bashful is shy and blushes when looked at; he speaks softly and apologises for taking up time, but has lovely things to say.",
+    "topic": "a flower he found by the stream" },
+  { "id": "sneezy", "soulName": "Sneezy", "model": "haiku", "effort": "medium", "economy": "lean",
+    "character": "Sneezy has terrible hay fever; his sentences get interrupted by enormous sneezes that he apologises for.",
+    "topic": "the dust in the deepest tunnel" },
+  { "id": "grumpy", "soulName": "Grumpy", "model": "haiku", "effort": "medium", "economy": "lean",
+    "character": "Grumpy grumbles about everything and pretends not to care, but under the scowl he is loyal and secretly soft-hearted.",
+    "topic": "everything that is wrong with show-and-tell evenings" },
+  { "id": "dopey", "soulName": "Dopey", "model": "haiku", "effort": "medium", "economy": "lean",
+    "character": "Dopey is the youngest: wide-eyed, clumsy and sweet, rarely talks, and when he does it comes out in short, earnest words.",
+    "topic": "his very favourite thing in the whole world" }
+ ],
+ "timing": { "truthPollSec": 5, "gatherMaxSec": 1500, "nudgeAfterSec": 150, "maxNudges": 3, "quietSec": 25, "speakTimeoutSec": 240, "maxSpeakNudges": 1, "prepareAhead": true, "presentWaitSec": 120 },
+ "orchestrator": { "planner": "opus", "plannerEffort": "medium" },
+ "success": { "allPresent": true, "minChars": 40, "inOrder": true, "eachOnce": true },
+ "observer": { "sampleSec": 15, "cameras": ["follow", "wide"], "viewport": [1024, 640], "dpr": 1, "arrivalTimeoutMs": 180000 },
+ "rails": { "onboardWallSec": 600, "onboardTimeoutSec": 540, "onboardConcurrency": 4, "quotaStopPct": 90, "maxTurnsPerRequest": 4, "maxTurnWallSec": 240 },
+ "console": {
+  "script": [
+   { "at": "go:sleepy", "line": "redirect grumpy: instead of grumbling about show-and-tell, Grumpy admits, grudgingly, that he loves the old piano in this hall and says why.", "expect": ["piano"] }
+  ]
+ }
+}
