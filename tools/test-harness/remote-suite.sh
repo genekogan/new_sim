@@ -34,6 +34,10 @@ HARNESS="$(git -C "$ROOT" rev-parse --verify "$HARNESS^{commit}")"
 [ "$BASE" = none ] || BASE="$(git -C "$ROOT" rev-parse --verify "$BASE^{commit}")"
 git -C "$ROOT" archive --format=tar.gz -o "$STAGE/head.tgz" "$REF"
 git -C "$ROOT" archive --format=tar.gz -o "$STAGE/harness.tgz" "$HARNESS" tools/test-harness
+# The source ref's lockfile keys modal_suite.py's prebuilt dependency layer (pnpm fetch, cached by Modal per content).
+mkdir -p "$STAGE/deps"
+git -C "$ROOT" show "$REF:pnpm-lock.yaml" > "$STAGE/deps/pnpm-lock.yaml"
+git -C "$ROOT" show "$REF:pnpm-workspace.yaml" > "$STAGE/deps/pnpm-workspace.yaml"
 # Z3: the gitignored inputs of the full campus re-extraction (V3-mars-engine, CAMPUS_FULL=1), as the exact bytes the
 # harness pins in campus-assets.json; one-validation.sh copies them into each tree. Missing or different bytes stop here.
 if CAMPUS_PINS="$(git -C "$ROOT" show "$HARNESS:tools/test-harness/campus-assets.json" 2>/dev/null)"; then

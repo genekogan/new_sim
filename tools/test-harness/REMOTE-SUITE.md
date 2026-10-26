@@ -92,10 +92,16 @@ Billing & plans to unblock hosted CI; Modal remains independent. No billing sett
   - Frozen camp/station fixtures also receive their exact historical producer files as a Git object pack.
     It includes the original commit and directory tree objects plus only fixture-declared source blobs;
     it excludes ancestor history and all other historical file contents. Its receipt is returned in `/out`.
-- **What runs.** Each container does a fresh `pnpm install --frozen-lockfile` and then
+- **What runs.** Each container runs `pnpm install --frozen-lockfile` and then
   `one-validation.sh --skip V7,V8`: V1 types, V2 builds, V3 package/engine/CLI/launcher/harness suites, V4 web tests,
   V5 recursive server tests and V6 god/Soul/join API e2es. `--baseline-ref none` suppresses the duplicate V4 baseline.
   Each V5 shard has a 150-minute envelope; exceeding it always blocks the gate.
+- **Dependency layer (2026-10-26).** remote-suite.sh stages the source ref's `pnpm-lock.yaml` and `pnpm-workspace.yaml`
+  in `<stage>/deps`; `modal_suite.py` copies them into the image and runs `pnpm fetch --store-dir /pnpm-store` there,
+  a layer Modal caches by those files' content. A tree whose lockfile sha256 equals the layer's links offline from it
+  (`install-<tree>.log` starts `cached layer <sha256>`; an offline failure falls back to an online install and says so);
+  any other lockfile installs online (`no cached layer for lockfile <sha256> …`). A changed lockfile builds the layer
+  once (~1 min).
 - **Fan-out (t4-o1 2026-10-19; right-sized by lane gate-cost 2026-10-26, MODAL-POLICY rule 3).** One run is 4
   containers at once: group `a` (V1, V2, V3-harness/bundle/packages, V4, the short V6 joins; 8 CPU / 16 GB because it
   builds the web twice), group `s` (the former b, c, d, e, f, w: V3-walk, V3-mars-engine, V3-client-cli,

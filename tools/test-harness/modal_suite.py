@@ -5,7 +5,8 @@
 # in the serial step order, one V5-server-full.log (the shard logs concatenated in order, i.e. the serial TAP), one
 # RUN-METADATA.json (suiteCompleted only if every group completed). Each group's own SUMMARY/metadata/V0/install
 # logs stay under out/groups/<name>/ for audit. A missing group, step or shard fails closed in the gate.
-# Inside: node $REMOTE_SUITE_NODE + pnpm 10.27.0, a fresh `pnpm install --frozen-lockfile`, then
+# Inside: node $REMOTE_SUITE_NODE + pnpm 10.27.0, `pnpm install --frozen-lockfile` (offline from the image's cached
+# dependency layer when the lockfile matches it), then
 # tools/test-harness/one-validation.sh --skip <skip> (V7 real-Chrome walks and V8 laptop-history boot are skipped by
 # default: no GPU, and the production histories live on the laptop). The container has its own network namespace, so
 # the test ports can't collide with anything. Returns /out as a tarball that remote-suite.sh unpacks into <outDir>.
@@ -33,6 +34,15 @@ image = (
     .run_commands("corepack enable && corepack prepare pnpm@10.27.0 --activate && pnpm --version" if int(NODE.split(".")[0]) < 25
                   else "npm install -g pnpm@10.27.0 && pnpm --version")
 )
+# Prebuilt dependency layer (lane gate-cost, 2026-10-26, MODAL-POLICY rule 3): remote-suite.sh stages the source ref's
+# pnpm-lock.yaml (+ pnpm-workspace.yaml, whose overrides the lockfile records) in <stage>/deps. Copied into the image,
+# they key a cached layer holding the `pnpm fetch` store for exactly that lockfile, so a container only links
+# node_modules offline (prep() below) and nothing is downloaded unless the lockfile changed.
+DEPS = os.path.join(SRC, "deps") if SRC else None
+if DEPS and os.path.exists(os.path.join(DEPS, "pnpm-lock.yaml")):
+    image = image.add_local_dir(DEPS, "/deps", copy=True).run_commands(
+        "cd /deps && sha256sum pnpm-lock.yaml | cut -d' ' -f1 > LOCK.sha256"
+        " && pnpm fetch --store-dir /pnpm-store > fetch.log 2>&1 && tail -n 2 fetch.log && echo \"cached layer $(cat LOCK.sha256)\"")
 if SRC:
     image = image.add_local_dir(SRC, "/in")
 
@@ -49,8 +59,16 @@ prep() {  # prep <tgz> <dir>: unpack, make it a git repo (one-validation's V0 re
   if [ -f /in/historical-inputs.pack ]; then
     git index-pack --stdin < /in/historical-inputs.pack || return 1
   fi
-  pnpm install --frozen-lockfile > "/out/install-$(basename "$2").log" 2>&1; local rc=$?
-  echo "install $(basename "$2") rc=$rc"; tail -n 3 "/out/install-$(basename "$2").log"
+  # the image's dependency layer serves this tree when it was fetched for the identical lockfile (sha256)
+  local log="/out/install-$(basename "$2").log" lock; lock=$(sha256sum pnpm-lock.yaml | cut -d' ' -f1)
+  if [ -f /deps/LOCK.sha256 ] && [ "$lock" = "$(cat /deps/LOCK.sha256)" ]; then
+    { echo "cached layer $lock"; pnpm install --frozen-lockfile --offline --store-dir /pnpm-store ||
+      { echo "offline install from cached layer $lock failed; installing online"; pnpm install --frozen-lockfile; }; } > "$log" 2>&1
+  else
+    { echo "no cached layer for lockfile $lock (layer: $(cat /deps/LOCK.sha256 2>/dev/null || echo none)); full install"
+      pnpm install --frozen-lockfile; } > "$log" 2>&1
+  fi; local rc=$?
+  echo "install $(basename "$2") rc=$rc"; head -n 1 "$log"; tail -n 3 "$log"
   return "$rc"
 }
 rm -rf /out /work  # never inherit a previous input's tree or results (see single_use_containers below)
