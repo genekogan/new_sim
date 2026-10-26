@@ -70,14 +70,14 @@
   }
  },
  "observer": {
-  "sampleSec": 4,
+  "sampleSec": 5,
   "cameras": [
    "follow",
    "wide"
   ],
   "viewport": [
-   1280,
-   800
+   1024,
+   640
   ],
   "dpr": 1,
   "gpu": "metal"
@@ -96,5 +96,5 @@
   "onboardWallSec": 600,
   "onboardTimeoutSec": 540
  },
- "notes": "Release-candidate check of D1 on the web (2026-10-26): a Soul walks to the eden-district ferris wheel, rides it, is asked what it is doing mid-ride, and gets off. Cameras follow + wide; the story page is the visual proof the rider sits on the car and the card's doing line says riding."
+ "notes": "Release-candidate check of D1 on the web (2026-10-26): a Soul walks to the eden-district ferris wheel, rides it, is asked what it is doing mid-ride, and gets off. Cameras follow + wide; the story page is the visual proof the rider sits on the car and the card's doing line says riding. Viewport 1024x640 (1280x800 timed out every screenshot on the software-GL cloud box)."
 }
