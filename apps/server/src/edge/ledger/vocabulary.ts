@@ -716,14 +716,22 @@ function osa(a: string, b: string, max: number): number {
 /** D3c (laptop trio-r1 rook-003: "have a little rest, then come back to the balloon" was closed Done by a wave): an
  *  owner message's steps in order, each the verbs its words name (whole-sentence intents and plain verbs, a vague one
  *  widened: a rest is any way of resting, coming back any way of getting there). Steps naming no verb are left out; a
- *  message naming none has no steps (nothing to judge an act by). */
+ *  message naming none has no steps (nothing to judge an act by).
+ *  D3d (fix-d3c-c trio-r1 rook-003: a walk to a bench closed "…then come back to the balloon"): each step also has its
+ *  target, what its other words name through `resolve` (the ledger's resolver: places, things, Souls by id). Words that
+ *  name nothing to resolve ("a comfy spot", "me") leave `target: null`; words the resolver cannot place leave
+ *  `target: null, unresolved: true`. Without `resolve` no target is judged. */
+export type StepTarget = {places: string[]; things: string[]; souls: string[]};
+export type MessageStep = {verbs: string[]; target: StepTarget | null; unresolved?: true; words?: string};
 const STEP_SPLIT = /[.!?;,]+|\b(?:and )?then\b|\bafter(?:wards| that)\b/;
 const STEP_WIDEN: Record<string, string[]> = {rest: ['sit', 'sit-ground', 'lie', 'nap', 'hammock'], nap: ['lie'], lie: ['nap'], sit: ['sit-ground'],
   walk: ['run', 'jog', 'go-near', 'stroll'], 'go-near': ['walk'], ride: ['join']};
+/** Words of a step that carry its act or its manner, never its target. */
+const STEP_FILLER = new Set(['meet', 'say', 'hi', 'hello', 'hey', 'rest', 'relax', 'break', 'breather', 'wait', 'us', 'again', 'look', 'bit', 'moment', 'first', 'okay', 'ok', 'well', 'done', 'aww', 'thanks', 'thank', 'yes', 'sure', 'stay', 'staying']);
 let stepVerbs: Set<string> | null = null;
-export function messageSteps(text: string): string[][] {
+export function messageSteps(text: string, resolve?: (words: string[]) => StepTarget | null): MessageStep[] {
   stepVerbs ??= new Set([...Object.values(VERBS), ...INTENTS.map(i => i[1]), ...GO_FOR_X.map(i => i[1])]);
-  const out: string[][] = [];
+  const out: MessageStep[] = [];
   for (const part of text.toLowerCase().split(STEP_SPLIT)) {
     const words = part.split(/[^a-z0-9]+/).filter(Boolean), v = new Set<string>();
     for (const [re, verb] of INTENTS) if (re.test(part)) v.add(verb);
@@ -731,7 +739,10 @@ export function messageSteps(text: string): string[][] {
     if (/\b(?:rest|relax|break|breather)\b/.test(part)) v.add('rest');
     if (RIDE_WORDS.test(part)) v.add('ride');
     for (const x of [...v]) for (const w of STEP_WIDEN[x] ?? []) v.add(w);
-    if (v.size) out.push([...v]);
+    if (!v.size) continue;
+    const named = resolve ? tokens(part).filter(w => !FILLER.has(w) && !STEP_FILLER.has(w) && !VERBS[w] && !stepVerbs!.has(w)) : [];
+    const target = named.length ? resolve!(named) : null;
+    out.push({verbs: [...v], target, ...(named.length ? {words: named.join(' '), ...(target ? {} : {unresolved: true as const})} : {})});
   }
   return out;
 }

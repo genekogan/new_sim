@@ -33,7 +33,7 @@ const bboxDistance = (p: [number, number][], at: [number, number]) => {let x0 = 
 const LOOP_SPAN = 160;
 const bboxSpan = (p: [number, number][]) => {const xs = p.map(q => q[0]), zs = p.map(q => q[1]); return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs));};
 const area = (p: [number, number][]) => Math.abs(p.reduce((s, [x, z], i) => {const [x2, z2] = p[(i + 1) % p.length]; return s + x * z2 - x2 * z;}, 0)) / 2;
-import {resolveCapability, tokens, placeMatch, typoFix, type VocabContext, type VocabResult} from './vocabulary.ts';
+import {resolveCapability, tokens, placeMatch, placeMatchTier, typoFix, type VocabContext, type VocabResult} from './vocabulary.ts';
 import {isCampfire} from './fire.ts';
 import {activityCapabilities, loadSpots, ACTIVITY_SECONDS_MAX, SPOT_ACTIVITIES, type SpotsData} from './activities.ts';
 import {Together, PAIRED, type TogetherPlan} from './together.ts';
@@ -1422,6 +1422,37 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const place = this.placePathOf(soul.soulId).find(p => p.kind !== 'occupier' && this.places.byId.get(p.id)?.parent != null);
     const where = !place ? 'around here' : /^the |'s\b/i.test(place.name) ? place.name : `the ${place.name}`;
     return {...out, reason: `${out.reason.replace(/[.\s]+$/, '')}; to stroll here instead, explore ${where} (${wander.id}).`, did_you_mean: [{id: wander.id, label: wander.label}, ...(out.did_you_mean ?? []).filter(d => d.id !== wander.id)]};
+  }
+  /** D3d (owner-loop.ts): what an owner message step's target words name for this Soul. Souls by name; the rest through
+   *  the walk resolver (`walk:<words>`: a place, a thing, a Soul), or the named place a walk cannot reach yet. Null: the
+   *  words name nothing the world knows. */
+  stepTarget(soul: EdgeSoul, words: string[]): {places: string[]; things: string[]; souls: string[]} | null {
+    const souls: string[] = [], used = new Set<string>();
+    for (const m of this.host.minds.values()) {const n = tokens(m.name); if (m.soulId !== soul.soulId && n.length && n.every(w => words.includes(w))) {souls.push(m.soulId); n.forEach(w => used.add(w));}}
+    const rest = words.filter(w => !used.has(w)), out = {places: [] as string[], things: [] as string[], souls};
+    if (rest.length) {
+      const ctx = this.vocabulary(soul, this.binds(soul).caps), r = resolveCapability(`walk:${rest.join(' ')}`, ctx), t = r.kind !== 'unknown' ? r.cap.target : undefined;
+      if (r.kind === 'alias' && r.inside) out.places.push(r.inside);
+      else if (t) (t.kind === 'place' ? out.places : t.kind === 'soul' ? out.souls : out.things).push(t.id);
+      else if (r.kind === 'unknown' && r.place) out.places.push(r.place);
+      // every place these words name by its own name counts too ("the pavilion": any pavilion, not only the one the walk picked)
+      const named = placeMatchTier(rest, ctx.places, ctx.withheld); if (named.tier >= 0 && named.tier <= 1) for (const p of named.found) if (!out.places.includes(p.id)) out.places.push(p.id);
+      if (!out.places.length && !out.things.length) return null;   // words that name nothing the world knows, even beside a Soul's name
+    }
+    return souls.length || out.places.length || out.things.length ? out : null;
+  }
+  /** D3d: the id an offered capability's target has (walk:commons-pavilion points at a place with another id), else null. */
+  actTarget(soul: EdgeSoul, capability: string): string | null {return this.binds(soul).caps.find(c => c.id === capability)?.target?.id ?? null;}
+  /** D3d: a place id with its ancestors (innermost first), or null when it names no place. */
+  placeAncestry(id: string): string[] | null {
+    const out: string[] = []; for (let p = this.places.byId.get(id); p && out.length < 30; p = p.parent ? this.places.byId.get(p.parent) : undefined) out.push(p.id);
+    return out.length ? out : null;
+  }
+  /** D3d: where a Soul, engine body, kernel thing, activity spot or named thing (nav: the festival balloon) stands now. */
+  positionOf(id: string): [number, number] | null {
+    const w = this.host.engine.world as NativeWorld, m = this.host.minds.get(id), e = m ? this.body(m.entityId) : w.entities[(this.host.kernel.things[id]?.traits.entity as string | undefined) ?? id];
+    if (e) return [e.pose.p[0], e.pose.p[2]];
+    const sp = this.spots.spots.find(x => x.id === id); return sp ? [sp.at[0], sp.at[1]] : this.thingAt?.(id) ?? null;
   }
   /** What each capability answers to, for PM-R057 natural names (built only when an id is not exact). */
   private vocabulary(soul: EdgeSoul, caps: EdgeCapability[]): VocabContext {

@@ -278,6 +278,28 @@ balloon" and waved at Tam. D3b's default `--for` linked that first act to the me
   keeps the default for the next act". Card: `agent-message-box.test.mjs` MSG test gained the Under way / result-replaces
   assertions.
 
+## D3d: a default-linked act closes a several-step owner message only at the last step's target
+
+Why: `replays/laptop-20261026/fix-d3c-c/trio-r1` rook-003 (W): "…have a little rest, then come back to the balloon";
+D3c matched the last step on its verb only, so `walk:bank-bench` closed the card "walk completed at g-commons." Done.
+
+- **Steps carry targets (vocabulary.ts).** `messageSteps(text, resolve?)` returns `{verbs, target, unresolved?, words?}`.
+  A step's words minus intent/manner words ("a comfy spot", "me", "meet", "say hi") are resolved by the ledger
+  (`EdgeLedger.stepTarget`: Souls by name; the rest through `resolveCapability('walk:<words>')` plus every place the
+  words name by its own name). Nothing left: `target: null`; words the world cannot place: `unresolved: true`.
+- **Closure (owner-loop.ts).** For a message of two or more steps, a default link closes only when the receipt's verb is
+  in the last step AND (when it names a target) the act reached it: the capability's target id (`actTarget`) or its
+  suffix is that place/thing/Soul or a place inside it, or the terminal receipt's `endedAt.place` lies in the named place,
+  or `endedAt.pos` is within 6 m of the named thing/Soul. An unresolved last-step target never auto-closes (progress
+  only; the agent's `result` closes it). One-step messages, verbless messages and explicit `--for` are unchanged. The
+  progress wording is unchanged ("not there yet"). Routes pass the ledger as `OwnerLoopWorld`.
+- **Eden 2026 probe (not committed):** "come back to the balloon" → thing `e_2867f12c` (= `walk:festival-balloon`'s target,
+  at [290, 65]); "the pavilion" → every pavilion place; "the gazebo on the moon" → unresolved.
+- **Tests.** `edge-owner-loop.test.ts` "D3c rook-003 …" gained walk:bank-bench → open, sit:bank-bench → open before the
+  balloon walk closes it; new "D3d: a default-linked last step closes only at its target; an unresolved target stays
+  open until the agent says" (place, thing-by-position, Soul, unresolved, one-step cases and `messageSteps` targets).
+  Skill 2.2.2 unchanged.
+
 ### tam-003 (looked at, not fixed: not load)
 "Mira asked if she could walk with you": Tam acked at 65 s and sent `follow:s_d8b2982a18` at ~157 s (tick 21156). For
 the 24 s observed after, the body stood at (23, −20), "Walk with Mira", while ticks ran 21224 → 21470 (≈ 10/s against the
