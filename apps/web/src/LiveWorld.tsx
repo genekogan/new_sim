@@ -21,7 +21,7 @@ import type {createWorldEdenExpansion} from './WorldEdenExpansion.ts';
 import type {LocalClassroomPresentation} from './WorldClassroomPresentation.ts';
 import {WorldFollow} from './WorldFollow.ts';
 import {worldCameraRenderRoots} from './WorldCameraRenderRoots.ts';
-import {WorldOrbitPivot} from './WorldOrbitPivot.ts';import {WorldRtsCamera,EDEN_TERRAIN_EXTENT,forwardWheel} from './WorldRtsCamera.ts';import {FramePacer} from './frame-pacing.ts';
+import {SoulFlight} from './WorldSoulFlight.ts';import {WorldRtsCamera,EDEN_TERRAIN_EXTENT,forwardWheel} from './WorldRtsCamera.ts';import {FramePacer} from './frame-pacing.ts';
 import {createWorldAtmosphere} from './WorldAtmosphere.ts';
 import {SpectatorSpeechLayer,speechFromTalk,speechFromEdge,channelChip,type SpectatorSpeech,type EdgeSpectatorMessage} from './WorldSpectatorSpeech.ts';
 import {WorldFadingLayer,parseFadeOverride,fadingFromEdge,beamedOut,type FadingState} from './WorldFading.ts';
@@ -243,7 +243,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     stateSignature.current = signature; context.current.onViewerState(state);
   };
   const seeking = useRef<AbortController | null>(null);
-  const controlsApi = useRef<{ feedbackContext(): import('./WorldViewer.ts').WorldViewContext; overview(): void; frameSouls(ids:readonly string[]):boolean; framePoint(point:THREE.Vector3,radius:number):void; locations():readonly WorldLocation[];frameLocation(id:string):boolean;locationPreview(id:string):Promise<string|null>;framePlace(place:WorldPlaceId): boolean; placePreview(place:WorldPlaceId):Promise<string|null>; focusSelected(): boolean; reset(): boolean; releaseInput(): void; move(delta: CameraMove): boolean; inputOwned(): boolean } | null>(null);
+  const controlsApi = useRef<{ feedbackContext(): import('./WorldViewer.ts').WorldViewContext; overview(): void; frameSouls(ids:readonly string[]):boolean; framePoint(point:THREE.Vector3,radius:number):void; locations():readonly WorldLocation[];frameLocation(id:string):boolean;locationPreview(id:string):Promise<string|null>;framePlace(place:WorldPlaceId): boolean; placePreview(place:WorldPlaceId):Promise<string|null>; focusSelected(): boolean; reset(): boolean; releaseInput(): void; flyToSoul(soulId:string):boolean; move(delta: CameraMove): boolean; inputOwned(): boolean } | null>(null);
   const playbackCommands = useRef<{ seek(tick: number): Promise<void>; live(): void; setPlaying(playing: boolean): boolean } | null>(null);
   const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -337,7 +337,9 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       down=null;if(abort.signal.aborted)return;
       const target=controls.target.clone();controls.dispose();controls=newControls(target);
     },owned=>{if(latestViewerState.current)emitState({...latestViewerState.current,inputOwned:owned});});
-    const orbitPivot=new WorldOrbitPivot();scene.add(orbitPivot.group);
+    // B3: a flight to a Soul's Follow shot (flyToSoul); any pointer or key input stops it where it is (manual camera).
+    let soulFlight:SoulFlight|null=null,soulFlightClock=0;const stopSoulFlight=()=>{soulFlight=null;};
+    for(const type of ['pointerdown','keydown','wheel'] as const)window.addEventListener(type,stopSoulFlight,{capture:true,passive:true});
     const rts=new WorldRtsCamera(renderer.domElement,camera,{controls:()=>controls,mode:()=>context.current.cameraMode,takeOver:()=>{context.current.manualNavigation='orbit';context.current.cameraMode='manual';context.current.follow=false;if(!navigation?.sync(true))navigation?.release(false);context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');},scene:()=>scene,pickRoots:()=>[floaters.root,kin.view.root,standIns,...(people?.pickingRoots()??[]),...visualObstructionRoots()],focusAt:(x,y)=>{const target=hover.pick(x,y);if(target){inspectHover(target);return {center:target.point,radius:target.radius};}return null;},enabled:()=>!(context.current.cameraMode==='manual'&&context.current.manualNavigation==='free'),
       extent:()=>(entityLayer.active?entityLayer.groundExtent():null)??(expansion?EDEN_TERRAIN_EXTENT:geometry.bounds),home:()=>{context.current.setCameraMode('manual');controlsApi.current?.overview();}});scene.add(rts.marker);  // VF2: your camera (keys, pivot, double-click)
     const speechLayer=new SpectatorSpeechLayer();scene.add(speechLayer.group);let speeches:SpectatorSpeech[]=[];const speechHead=new THREE.Vector3();
@@ -477,10 +479,20 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         if(!shot)return false;groupSelection.clear();members.forEach(m=>groupSelection.add(m.id));context.current.onSelect(members[0].id);controls.target.copy(shot.target);camera.position.copy(shot.position);camera.lookAt(shot.target);controls.update();return true;
       },
       locations:()=>expansion&&!past.current?CURATED_WORLD_LOCATIONS:entityLayer.active?[...depictedLocations,...[...godTourViews(entityLayer,entityLayer.groundAt,120),...godRoomViews(entityLayer,entityLayer.groundAt)].map(v=>({id:v.id,label:v.label,regionId:v.id,p:v.p,target:v.target,radius:v.radius??8,...(v.inside?{inside:v.inside}:{})}))]:depictedLocations,  // R4-LIVE: Explore lists what the god built
-      frameLocation:id=>{if(initialGate?.snapshot().stage!=='ready')return false;const view=controlsApi.current?.locations().find(p=>p.id===id);if(!view)return false;framing.place(camera,()=>controls,view,()=>{context.current.manualNavigation='orbit';context.current.cameraMode='manual';context.current.follow=false;context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');},()=>{rts.release();orbitPivot.cancel();navigation?.release();});return true;},
+      frameLocation:id=>{if(initialGate?.snapshot().stage!=='ready')return false;const view=controlsApi.current?.locations().find(p=>p.id===id);if(!view)return false;framing.place(camera,()=>controls,view,()=>{context.current.manualNavigation='orbit';context.current.cameraMode='manual';context.current.follow=false;context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');},()=>{rts.release();navigation?.release();});return true;},
       locationPreview:id=>{if(initialGate?.snapshot().stage!=='ready')return Promise.resolve(null);const location=controlsApi.current?.locations().find(p=>p.id===id);if(!location)return Promise.resolve(null);return location.regionId?placePreviews.captureLocation(location,sceneKey??''):placePreviews.capture(id as WorldPlaceId);},
-      framePlace: place => {const view=worldPlaceView(place);if(!view||!expansion||past.current)return false;framing.place(camera,()=>controls,view,()=>{context.current.manualNavigation='orbit';context.current.cameraMode='manual';context.current.follow=false;context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');},()=>{rts.release();orbitPivot.cancel();navigation?.release();});return true;},
+      framePlace: place => {const view=worldPlaceView(place);if(!view||!expansion||past.current)return false;framing.place(camera,()=>controls,view,()=>{context.current.manualNavigation='orbit';context.current.cameraMode='manual';context.current.follow=false;context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');},()=>{rts.release();navigation?.release();});return true;},
       releaseInput: () => {rts.release();navigation?.release();},
+      flyToSoul: soulId => {
+        const c=context.current,soul=c.sim.conn.replica.souls.get(soulId),p=soul?shown.current.entities[soul.entityId]?.p:null;
+        if(!soul||!p||past.current||c.loading||c.graphicsUnavailable||!shown.current.take||(initialGate&&initialGate.snapshot().stage!=='ready'))return false;
+        navigation?.release();rts.release();groupSelection.clear();c.onSelect(soulId);c.setThing(null);
+        const target=new THREE.Vector3(p[0],p[1]+1,p[2]);
+        if(reducedMotionQuery?.matches){soulFlight=null;c.cameraMode='follow';c.follow=true;c.setCameraMode('follow');return true;}
+        c.manualNavigation='orbit';c.cameraMode='manual';c.follow=false;c.setManualNavigation('orbit');c.setCameraMode('manual');
+        camera.updateMatrixWorld();soulFlightClock=performance.now();soulFlight=new SoulFlight(soulId,camera.position,camera.getWorldDirection(new THREE.Vector3()),camera.position.distanceTo(controls.target),target);
+        return true;
+      },
       move: delta => navigation?.move(delta) ?? false,
       inputOwned: () => navigation?.inputOwned ?? false,
       reset: () => {
@@ -683,7 +695,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const goLive = () => { past.current = null; liveTick = null; setMode('live'); setNote(null); };
 
     const pacer = new FramePacer();
-    const eyes=WorldEyes.fromSearch(location.search,{renderer,camera,scene,body:id=>people?.bodyObject(id)??floaters.object(id)??standIns.getObjectByName(id)??null,souls:()=>[...context.current.sim.conn.replica.souls.values()].map(x=>x.entityId),overlays:()=>[speechLayer.group,ring,orbitPivot.group,fading.group,hover.marker],tick:()=>shown.current.tick,ready:()=>sceneSettled&&drawnTick.current!==null});
+    const eyes=WorldEyes.fromSearch(location.search,{renderer,camera,scene,body:id=>people?.bodyObject(id)??floaters.object(id)??standIns.getObjectByName(id)??null,souls:()=>[...context.current.sim.conn.replica.souls.values()].map(x=>x.entityId),overlays:()=>[speechLayer.group,ring,fading.group,hover.marker],tick:()=>shown.current.tick,ready:()=>sceneSettled&&drawnTick.current!==null});
     const officeGuardFrom=new THREE.Vector3(),authoredBoundaries=new WorldAuthoredBoundaries();
     let shadowFrame=0;  // P1 phones
     let posterFrames=0,programsPending=false,arrivedOnce=false,earlyPending=0,buildingFrameAt=-Infinity,layerStarted=false,afterNextDraw:(()=>void)|null=null;  // afterNextDraw: ?shot waits for a frame drawn after the build  // lane W1: the built world's shaders are still linking in parallel: no frame yet
@@ -951,13 +963,18 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       navigation?.update(step);
       rts.update(step);
       hover.update(now);
-      // Orbit click-to-centre glide; any other mode or a new gesture cancels it.
-      if(viewing!=='manual'||context.current.manualNavigation!=='orbit')orbitPivot.cancel();
-      orbitPivot.update(step,camera,controls.target);
+      if(soulFlight){
+        const flight=soulFlight,id=s.conn.replica.souls.get(flight.soulId)?.entityId,q=id?at.entities[id]?.p:null;
+        if(!q||context.current.cameraMode!=='manual'||past.current)soulFlight=null;
+        else{const wall=performance.now(),pose=flight.step(Math.min(.5,(wall-soulFlightClock)/1000),new THREE.Vector3(q[0],q[1]+1,q[2]));soulFlightClock=wall;  // wall time: a slow frame rate (step is capped at 0.1 s) does not stretch the flight
+          controls.target.copy(pose.target);camera.position.copy(pose.eye);camera.lookAt(pose.target);
+          if(pose.done){soulFlight=null;context.current.onSelect(flight.soulId);context.current.setThing(null);context.current.cameraMode='follow';context.current.follow=true;context.current.setCameraMode('follow');}}
+      }
       atmosphereSeconds+=step;godLiving?.update(now,light.daylight,!!reducedMotionQuery?.matches||(look.enabled&&shotMode));const godSky=godLiving&&entityLayer.active&&!expansion?godLiving.atmosphere(shown.current?.tick??NaN):forkLand&&!expansion?forkLand.atmosphere():null;  // look pass: a still picture shows patterned lamps at their steady level (repeatable shots)
       if(!holdDraw)try{atmosphere.update({seconds:atmosphereSeconds,dt:step,daylight:light.daylight,camera,eden:(!!expansion||!!godSky)&&!past.current,reducedMotion:!!reducedMotionQuery?.matches,clock:shotClockAt(shown.current?.datetime??adopted?.clock??null,shotHour??visitorPreviewHour()),...(godSky?{profile:'world' as const,weather:godSky.weather,indoors:godSky.indoors}:{})});}catch{}
       try{godLightning?.update(shown.current?.tick??NaN,camera,step,!!reducedMotionQuery?.matches);}catch{}
       if(controls.enabled)controls.update();
+      rts.afterControls();  // B2: the head offset over the pivot (controls.update aims at the pivot)
       if(context.current.cameraMode==='follow'&&focus){renderer.domElement.dataset.cameraShot='follow:'+(soulId?s.conn.replica.souls.get(soulId)?.entityId??'':thingId??'');const offset=followView.resolve(controls.target,camera.position.clone().sub(controls.target),visualObstructionRoots(),step);camera.position.copy(controls.target).add(offset);camera.lookAt(controls.target);}
       const area = visibleViewport(host.clientWidth, host.clientHeight, context.current.viewportInsets);
       // P7 lever D: an early arrival stays on the near world it drew until the rest is built (a cut to a Soul before that
@@ -1076,7 +1093,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     // click (not drag) to select a Soul, a thing, or a kin
     const inspectHover=(t:HoverTarget)=>{if(t.kind==='soul'){setPlaceCard(null);context.current.setThing(null);context.current.onSelect(t.id);}else if(t.kind==='object'){setPlaceCard(null);context.current.onSelect(null);context.current.setThing(t.id);}else setPlaceCard(t);};
     const hover=new WorldHover(renderer.domElement,camera,{scene:()=>scene,roots:()=>[entityLayer.sites.group,floaters.root,kin.view.root,standIns,...(people?.pickingRoots()??[]),...visualObstructionRoots()],entity:id=>{const site=entityLayer.sites.hoverTarget(id);if(site)return site;const soul=[...context.current.sim.conn.replica.souls.values()].find(s=>s.entityId===id);if(soul){const q=shown.current.entities[id]?.p??[0,0,0];return {kind:'soul',id:soul.id,name:soul.name,point:new THREE.Vector3(q[0],markHeight(waterDetail.regions,q[0],q[1],q[2]),q[2]),detail:doingText(soul.doing,shown.current.entities[id]?.activity,soul.id)};}const rec=records[id];return rec?{kind:'object',id,name:rec.label??plainWords(rec.def),point:new THREE.Vector3(...(shown.current.entities[id]?.p??[0,0,0])),detail:plainWords(shown.current.entities[id]?.activity)}:null;},places:()=>entityLayer.active?[]:expansion?EDEN_VIEWER_PLACES.filter(p=>p.kind!=='world'):Object.entries(shown.current.take?.finalState.regions??{}).flatMap(([id,r])=>r.polygon&&r.label?[{id,name:r.label,polygon:r.polygon}]:[]),available:()=>(entityLayer.active||drawnTick.current!==null)&&!context.current.loading&&!context.current.graphicsUnavailable,inspect:inspectHover});scene.add(hover.marker);
-    const onDown = (e: PointerEvent) => { groupSelection.clear(); orbitPivot.cancel(); down = e.button === 0 ? { x: e.clientX, y: e.clientY } : null; };
+    const onDown = (e: PointerEvent) => { groupSelection.clear(); down = e.button === 0 ? { x: e.clientX, y: e.clientY } : null; };
     const onMove = (e: PointerEvent) => {
       if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) context.current.setCameraMode(cameraModeAfterGesture(context.current.cameraMode));
     };
@@ -1104,7 +1121,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       platformDraw.dispose();
       hover.dispose();
       portraits.dispose();
-      orbitPivot.dispose();
+      for(const type of ['pointerdown','keydown','wheel'] as const)window.removeEventListener(type,stopSoulFlight,{capture:true});
       rts.dispose();
       atmosphere.dispose();forkLand?.dispose();godLiving?.dispose();post?.dispose();godLightning?.dispose();
       speechLayer.dispose();
@@ -1223,6 +1240,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       locationPreview:id=>controlsApi.current?.locationPreview(id)??Promise.resolve(null),
       framePlace: place => controlsApi.current?.framePlace(place) ?? false,
       frameSouls: ids => controlsApi.current?.frameSouls(ids) ?? false,
+      flyToSoul: id => controlsApi.current?.flyToSoul(id) ?? false,
       frameAll: () => { context.current.setCameraMode('manual'); controlsApi.current?.overview(); },
       placePreview: place => controlsApi.current?.placePreview(place) ?? Promise.resolve(null),
       focusSelected: () => { const found = controlsApi.current?.focusSelected() ?? false; if (found) context.current.setCameraMode('manual'); return found; },

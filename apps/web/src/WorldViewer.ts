@@ -17,6 +17,8 @@ export interface WorldViewerHandle {
   frameAll(): void;
   /** Select and frame the speakers together; presentation only. */
   frameSouls?(ids:readonly string[]):boolean;
+  /** B3: select this Soul and fly the camera to its Follow shot, then follow it; false when it is not in the live picture. */
+  flyToSoul?(id:string):boolean;
   /** Local current-world scenery tour; no simulation command or selection. */
   framePlace?(place:WorldPlaceId): boolean;
   placePreview?(place:WorldPlaceId):Promise<string|null>;
@@ -71,6 +73,8 @@ export interface WorldViewerPort {
   frameAll(): void;
   /** Select and frame the speakers together; presentation only. */
   frameSouls?(ids:readonly string[]):boolean;
+  /** B3: select this Soul and fly the camera to its Follow shot, then follow it; false when it is not in the live picture. */
+  flyToSoul?(id:string):boolean;
   /** Local current-world scenery tour; no simulation command or selection. */
   framePlace?(place:WorldPlaceId): boolean;
   placePreview?(place:WorldPlaceId):Promise<string|null>;
@@ -96,6 +100,7 @@ export function createWorldViewerHandle(current: () => WorldViewerPort): WorldVi
     setCameraMode: mode => { if (mode === 'broadcast' || mode === 'follow' || mode === 'manual') current().setCameraMode(mode); },
     frameAll: () => current().frameAll(),
     frameSouls: ids => current().frameSouls?.(ids) ?? false,
+    flyToSoul: id => current().flyToSoul?.(id) ?? false,
     framePlace: place => current().framePlace?.(place) ?? false,
     placePreview: place => current().placePreview?.(place) ?? Promise.resolve(null),
     locations:()=>current().locations?.()??[],
