@@ -145,7 +145,12 @@ export class Db {
 
   // snapshots
   saveSnapshot(worldId: string, s: { tick: number; seq: number; stateHash: string; physicalHash: string; rulesVersion: string; body: unknown }) {
-    this.db.prepare('INSERT OR REPLACE INTO snapshots (world_id, tick, seq, state_hash, physical_hash, rules_version, snapshot, at) VALUES (?,?,?,?,?,?,?,?)').run(worldId, s.tick, s.seq, s.stateHash, s.physicalHash, s.rulesVersion, JSON.stringify(s.body), Date.now());
+    this.saveSnapshotSerialized(worldId, s, JSON.stringify(s.body));
+  }
+  /** The caller owns the captured body and serialized it before this synchronous write.
+   * Keep the same TEXT bytes, write timestamp and retention policy as saveSnapshot. */
+  saveSnapshotSerialized(worldId: string, s: { tick: number; seq: number; stateHash: string; physicalHash: string; rulesVersion: string }, bodyJson: string) {
+    this.db.prepare('INSERT OR REPLACE INTO snapshots (world_id, tick, seq, state_hash, physical_hash, rules_version, snapshot, at) VALUES (?,?,?,?,?,?,?,?)').run(worldId, s.tick, s.seq, s.stateHash, s.physicalHash, s.rulesVersion, bodyJson, Date.now());
     // keep the latest 5, plus the first snapshot of each of the last 7 days
     this.db.prepare(`DELETE FROM snapshots WHERE world_id = ?1
       AND tick NOT IN (SELECT tick FROM snapshots WHERE world_id = ?1 ORDER BY tick DESC LIMIT 5)

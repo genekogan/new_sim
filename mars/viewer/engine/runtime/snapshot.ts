@@ -11,8 +11,8 @@
 // else is refused loudly, naming the action and why (NON_RESUMABLE, or "not verified").
 import type { ActionDef, ActionRecord, Diagnostic } from '../actions/types.ts';
 import type { WorldState } from '../world/types.ts';
-import { hashOf } from '../core/hash.ts';
-import { CodecError, decode, encode } from './codec.ts';
+import { hashCanonicalSteps, hashOf } from '../core/hash.ts';
+import { CodecError, captureGraphDeferred, captureGraphForCheckpoint, checkpointNeedsEagerNativeHash, capturedCanonicalRoot, canonicalGet, canonicalTextSteps, decode, encode, finishGraph, finishGraphSteps, type GraphCapture, type CanonicalValue } from './codec.ts';
 import type { Runtime, Violation } from './runtime.ts';
 
 export const SNAPSHOT_FORMAT = 'mars-runtime-snapshot/1';
@@ -68,6 +68,15 @@ export type RuntimeSnapshot = {
 };
 
 export type SnapshotOptions = { allowDrop?: boolean };
+export type RuntimeSnapshotCapture = {
+  readonly tick: number;
+  readonly stateHash: string;
+  readonly droppedCount: number;
+  finish(): RuntimeSnapshot;
+  steps(): Generator<void, RuntimeSnapshot, void>;
+};
+
+export type RuntimeDeferredSnapshotCapture = Omit<RuntimeSnapshotCapture, 'stateHash'> & { readonly world: CanonicalValue; readonly eagerStateHash?: string };
 
 /** What Runtime exposes to this module (its private live/owner maps and id counter). */
 export type LiveEntry = { rec: ActionRecord; def: ActionDef; exec: unknown; program: unknown; cancelling?: boolean; reason?: Diagnostic; prior: Map<string, WorldState['entities'][string]['phase']> };
@@ -120,6 +129,22 @@ function holdsLoad(rt: Runtime, id: string): string | null {
 }
 
 export function takeSnapshot(rt: Runtime, int: RuntimeInternals, opts: SnapshotOptions = {}): RuntimeSnapshot {
+  return captureSnapshot(rt, int, opts).finish();
+}
+
+/** Fix every graph, hash and metadata input at one synchronous runtime boundary.
+ * Completion may be delayed; neither completion path reads rt or int again. */
+export function captureSnapshot(rt: Runtime, int: RuntimeInternals, opts: SnapshotOptions = {}): RuntimeSnapshotCapture {
+  return captureSnapshotAtBoundary(rt, int, opts, false) as RuntimeSnapshotCapture;
+}
+/** Additive checkpoint path: own the same boundary, then hash only captured shapes.
+ * The optional descriptor-only compatibility predicate runs after graph capture
+ * but before native pin/cache selection. Actual eager hashing stays at its original
+ * metadata expression; neither predicate nor live state is read in completion. */
+export function captureSnapshotDeferred(rt: Runtime, int: RuntimeInternals, opts: SnapshotOptions = {}, eagerHashRequired?: (world: WorldState) => boolean): RuntimeDeferredSnapshotCapture {
+  return captureSnapshotAtBoundary(rt, int, opts, true, eagerHashRequired) as RuntimeDeferredSnapshotCapture;
+}
+function captureSnapshotAtBoundary(rt: Runtime, int: RuntimeInternals, opts: SnapshotOptions, deferredHash: boolean, eagerHashRequired?: (world: WorldState) => boolean): RuntimeSnapshotCapture | RuntimeDeferredSnapshotCapture {
   const refused: DroppedAction[] = [];
   const graph: Graph = { world: rt.world, records: [...rt.records.values()], live: [], dropped: [], owners: [...int.owners], services: {} };
   if (int.waiting.size) graph.waiting = [...int.waiting.values()].map((w) => ({ id: w.rec.id, params: w.params, parent: w.parent, holds: w.holds }));
@@ -177,21 +202,21 @@ export function takeSnapshot(rt: Runtime, int: RuntimeInternals, opts: SnapshotO
     if (typeof v === 'object' && v !== null && !Array.isArray(v) && !(v instanceof Map) && !(v instanceof Set) && !isPlainObject(v)) continue;
     graph.services[k] = v;
   }
-  let data: unknown;
+  let graphCapture: GraphCapture;
   try {
-    data = encode(graph, '$', skip);
+    graphCapture = deferredHash ? captureGraphForCheckpoint(graph, ['world'], '$', skip, eagerHashRequired && (() => eagerHashRequired(rt.world))) : captureGraphDeferred(graph, '$', skip);
   } catch (e) {
     if (!(e instanceof CodecError)) throw e;
     throw new SnapshotError('snapshot.unencodable', `cannot take a resumable snapshot at tick ${rt.tick}: ${e.message}`);
   }
-  // prove the blob is plain JSON that decodes to the same graph
-  const back = encode(decode(JSON.parse(JSON.stringify(data))));
-  if (hashOf(back) !== hashOf(data)) throw new SnapshotError('snapshot.roundtrip', `snapshot at tick ${rt.tick} does not survive a JSON round trip`);
-  return {
+  // Capture validates inert source data and owns every value needed for emission. Its
+  // alias/JSON roundtrip contract is exercised in codec tests, not by decoding and
+  // re-encoding every captured world here. Restore still verifies the world hash.
+  const metadata: RuntimeSnapshot = {
     format: SNAPSHOT_FORMAT,
     tick: rt.tick,
-    stateHash: hashOf(rt.world),
-    data,
+    stateHash: deferredHash && !checkpointNeedsEagerNativeHash(graphCapture) ? '' : hashOf(rt.world),
+    data: undefined,
     spatialEpoch,
     nextId: int.nextId,
     idPrefix: int.idPrefix,
@@ -199,6 +224,25 @@ export function takeSnapshot(rt: Runtime, int: RuntimeInternals, opts: SnapshotO
     violations: structuredClone(rt.violations),
     dropped: refused,
   };
+  const assemble = (data: unknown): RuntimeSnapshot => {
+    const result = structuredClone(metadata);
+    result.data = data;
+    return result;
+  };
+  if (!deferredHash) return Object.freeze({ tick: metadata.tick, stateHash: metadata.stateHash, droppedCount: refused.length,
+    finish: () => assemble(finishGraph(graphCapture)),
+    *steps() { return assemble(yield* finishGraphSteps(graphCapture)); },
+  });
+  const world = canonicalGet(capturedCanonicalRoot(graphCapture), 'world');
+  const hashed = (data: unknown, stateHash: string): RuntimeSnapshot => ({ ...assemble(data), stateHash });
+  const steps = function* (): Generator<void, RuntimeSnapshot, void> {
+    const stateHash = metadata.stateHash || (yield* hashCanonicalSteps(canonicalTextSteps(world, 'native')));
+    yield; // Do not join the last hash quantum to the first graph-emission quantum.
+    return hashed(yield* finishGraphSteps(graphCapture), stateHash);
+  };
+  return Object.freeze({ tick: metadata.tick, droppedCount: refused.length, world, eagerStateHash: metadata.stateHash || undefined, steps,
+    finish() { const iterator = steps(); let result = iterator.next(); while (!result.done) result = iterator.next(); return result.value; },
+  });
 }
 
 /** Decode and verify a snapshot; the world is returned first so Runtime.restore can construct around it. */

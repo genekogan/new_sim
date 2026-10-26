@@ -150,6 +150,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** LINK BODY: the presence-driven body rule (body-rule.ts: awake / idle / zombie / asleep). On once the edge routes
    *  attach the owner inbox's presence (`attachPresence`); off in tools that build a Ledger alone (walk audit). */
   bodyRule: BodyRule | null = null;
+  /** A bridge may defer its first place index. Unknown rooms must not be treated as outdoors. */
+  bodyPlacesReady: () => boolean = () => true;
   private bodyMigrated = false;
   attachPresence(inbox: {soulPresence(soulId: string): {listening: boolean; at: number | null}; onSoulListen?(l: (soulId: string) => void): void; onSoulSend?(l: (soulId: string) => void): void}, knobs?: Partial<BodyKnobs>) {
     if (process.env.SIM_BODY === '0' || this.bodyRule) return this.bodyRule;
@@ -167,6 +169,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       posture: id => this.posture(id),
       agentBusy: id => this.pending.has(id) || this.openReceipts(id).length > 0 || this.together.awaiting(id),
       running: id => !!this.host.engine.programOf(id),
+      spatialReady: () => this.bodyPlacesReady(),
       dry: (x, z) => engine.dryGroundAtV1?.(x, z) ?? true,
       clear: (x, z, level) => !(this.host.engine.world as {navV1?: unknown}).navV1 || !engine.clearanceUpToV1 || engine.clearanceUpToV1(x, z, 1, level) >= 0.3,
       places: (x, z, level) => this.places.containing(x, z, this.placeLevel(level)).filter(p => p.enclosed).map(p => p.id).join('|'),
@@ -470,7 +473,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       void this.decide(p.soul, p.receipt, p.capability, p.label, p.steps).catch(() => this.update(p.receipt, {phase: 'failed', code: 'ledger.unavailable', reason: 'The world could not record this action.'}));
     }
     if (this.ambient && tick % 20 === 0) this.ambientLife(tick);
-    if (this.bodyRule && tick % 20 === 0) {if (!this.bodyMigrated) {this.bodyMigrated = true; this.migrateGone();} this.bodyRule.sweep();}
+    if (this.bodyRule && tick % 20 === 0) {if (!this.bodyMigrated && this.bodyPlacesReady()) {this.bodyMigrated = true; this.migrateGone();} this.bodyRule.sweep();}
     if (tick % 100 === 0) this.unstick(tick);
     if (tick % 20 === 0) try {this.together.sweep();} catch (e) {console.error('[edge] together sweep', e instanceof Error ? e.message : e);}
     if (tick % 10 === 0) this.rideFrames(tick);
@@ -730,18 +733,22 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** A pond loop must stay outside its entire outline and on admitted clear ground.
    * If a world has only one accessible bank, it gets no misleading "around" offer. */
   private bankLoop(poly: [number, number][], from: [number, number]): [number, number][] {
-    const engine = this.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number; clearanceUpToV1?: (x: number, z: number, cap?: number) => number};
+    const engine = this.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number; clearanceUpToV1?: (x: number, z: number, cap?: number) => number; readPassV1?: <T>(f: () => T) => T};
     if (!engine.clearanceAtV1 || poly.length < 3) return [];
-    const clear = (x: number, z: number) => engine.clearanceUpToV1 ? engine.clearanceUpToV1(x, z, 1) : engine.clearanceAtV1!(x, z);
-    const xs = poly.map(p => p[0]), zs = poly.map(p => p[1]);
-    for (const margin of [2, 3.5, 5]) {
-      const x0 = Math.min(...xs) - margin, x1 = Math.max(...xs) + margin, z0 = Math.min(...zs) - margin, z1 = Math.max(...zs) + margin;
-      const route: [number, number][] = [[x0,z0],[(x0+x1)/2,z0],[x1,z0],[x1,(z0+z1)/2],[x1,z1],[(x0+x1)/2,z1],[x0,z1],[x0,(z0+z1)/2]];
-      if (route.some(p => clear(p[0], p[1]) < 0.7)) continue;
-      let near = 0; for (let i = 1; i < route.length; i++) if (Math.hypot(route[i][0]-from[0],route[i][1]-from[1]) < Math.hypot(route[near][0]-from[0],route[near][1]-from[1])) near=i;
-      return [...route.slice(near), ...route.slice(0,near)];
-    }
-    return [];
+    // These probes only read the world. Sync the planner once for this loop, never across capability requests.
+    const read = (): [number, number][] => {
+      const clear = (x: number, z: number) => engine.clearanceUpToV1 ? engine.clearanceUpToV1(x, z, 1) : engine.clearanceAtV1!(x, z);
+      const xs = poly.map(p => p[0]), zs = poly.map(p => p[1]);
+      for (const margin of [2, 3.5, 5]) {
+        const x0 = Math.min(...xs) - margin, x1 = Math.max(...xs) + margin, z0 = Math.min(...zs) - margin, z1 = Math.max(...zs) + margin;
+        const route: [number, number][] = [[x0,z0],[(x0+x1)/2,z0],[x1,z0],[x1,(z0+z1)/2],[x1,z1],[(x0+x1)/2,z1],[x0,z1],[x0,(z0+z1)/2]];
+        if (route.some(p => clear(p[0], p[1]) < 0.7)) continue;
+        let near = 0; for (let i = 1; i < route.length; i++) if (Math.hypot(route[i][0]-from[0],route[i][1]-from[1]) < Math.hypot(route[near][0]-from[0],route[near][1]-from[1])) near=i;
+        return [...route.slice(near), ...route.slice(0,near)];
+      }
+      return [];
+    };
+    return engine.readPassV1 ? engine.readPassV1(read) : read();
   }
   addCapabilityProvider(p: (soul: EdgeSoul) => EdgeCapability[]) {this.providers.push(p);}
 
@@ -1338,14 +1345,24 @@ export class EdgeLedger implements EdgeLedgerHooks {
       if (fresh) {this.rideKey.set(c.id, key); changed = true;}
       if (moved || fresh) try {(this.comms as unknown as {core?: {spectate(m: object): void}} | undefined)?.core?.spectate({kind: 'ride', tick, ride: (() => {const v = this.carrierView(c.id)!; return fresh ? v : {...v, route: {...v.route, keys: undefined}};})()});} catch {/* spectators never break the ledger */}
     }
-    if (changed) try {(this.comms?.objects as unknown as {sweep?(): void} | undefined)?.sweep?.();} catch {/* object events catch up on the next read */}
+    if (changed) try {
+      const objects = this.comms?.objects as unknown as {ofKind?(kind: string): {id: string}[]; refresh?(ids: Iterable<string>): void; sweep?(): void} | undefined;
+      // A physical carrier change needs its ride projections now (including arbitrary object aliases), not every
+      // unrelated calendar/presentation/built object's time advance. Those keep their own read/maintenance triggers.
+      // ofKind keeps object-id order; refresh re-reads each row in its committed transaction before the next ride.
+      if (objects?.ofKind && objects.refresh) objects.refresh(objects.ofKind('ride').map(o => o.id));
+      else objects?.sweep?.(); // older object adapters expose only the full sweep
+    } catch {/* object events catch up on the next read */}
   }
 
   /** activities/1: the world facts activity capabilities need, for one Soul. */
   private activityWorld(soul: EdgeSoul, me: NonNullable<ReturnType<EdgeLedger['body']>>, caps: EdgeCapability[], plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean}>) {
     const engine = this.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number; clearanceUpToV1?: (x: number, z: number, cap?: number) => number; nearestStandableV1?: (at: [number, number], except?: string, min?: number, rings?: number) => [number, number] | null};
     const w = this.host.engine.world as NativeWorld, here: [number, number] = [me.pose.p[0], me.pose.p[2]];
-    const others = Object.values(w.entities).filter(e => e.kind === 'human' && e.id !== soul.entityId).map(e => [e.pose.p[0], e.pose.p[2]] as [number, number]);
+    // One synchronous, read-only activity listing: entity membership is fixed, but group state is read on every call.
+    // Reuse the human references here; never retain a group count or this subset across listings/ticks.
+    const humans = Object.values(w.entities).filter(e => e.kind === 'human');
+    const others = humans.filter(e => e.id !== soul.entityId).map(e => [e.pose.p[0], e.pose.p[2]] as [number, number]);
     const claimed = new Set<string>();
     for (const m of this.host.minds.values()) if (m.soulId !== soul.soulId) for (const r of this.openReceipts(m.soulId)) claimed.add(r.capability.slice(r.capability.indexOf(':') + 1));
     const navIds = new Set(((w as {navV1?: {solids: {id: string}[]}}).navV1?.solids ?? []).map(x => x.id));
@@ -1365,7 +1382,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       // an installed upper-floor room/lobby is a world region the place data predates: name it by its label, never its id
       placeName: (id: string | undefined) => id ? this.places.byId.get(id)?.name ?? w.regions[id]?.label ?? null : null,
       ancestors: (id: string) => {const out: string[] = []; for (let p = this.places.byId.get(id); p?.parent; p = this.places.byId.get(p.parent)) {const q = this.places.byId.get(p.parent); if (q?.enclosed) out.push(q.id);} return out;},
-      groupSize: (group: string) => Object.values(w.entities).filter(e => e.kind === 'human' && e.human?.together?.group === group).length,
+      groupSize: (group: string) => humans.filter(e => e.kind === 'human' && e.human?.together?.group === group).length,
       clock: this.host.living ? (({hour, minute}) => ({hour, minute}))(clockAt(w.tick, this.host.living.origin, this.host.living.dayTicks)) : null,
     };
   }

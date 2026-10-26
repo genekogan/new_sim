@@ -75,7 +75,7 @@ for (const failure of ['network', 'http', 'length', 'hash', 'body']) test(`${fai
   const init = { headers: { 'x-test': 'retained' } };
   const original: typeof fetch = async (url, options) => {
     calls.push(url);
-    if (calls.length === 2) { assert.equal(url, input); assert.equal(options, init); return new Response('origin'); }
+    if (calls.length === 2) { assert.equal(url, input); assert.deepEqual(options?.headers, init.headers); assert.ok(options?.signal instanceof AbortSignal); return new Response('origin'); }
     if (failure === 'network') throw Error('offline');
     if (failure === 'http') return new Response('missing', { status: 404 });
     if (failure === 'length') return new Response('short');

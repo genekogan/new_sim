@@ -35,8 +35,9 @@ def main():
     src, dst = args
     drop = set() if keep else DROP
     tmp = dst + '.part'
-    for p in (tmp, tmp + '-journal', tmp + '-wal', tmp + '-shm'):
-        if os.path.exists(p): os.remove(p)
+    # A failed copy is evidence. Never delete it or overwrite a previous backup.
+    for p in (dst, tmp, tmp + '-journal', tmp + '-wal', tmp + '-shm'):
+        if os.path.lexists(p): raise SystemExit(f'destination already exists; retained: {p}')
     t0 = time.time()
     con = sqlite3.connect(tmp, uri=True, isolation_level=None)
     con.execute("ATTACH ? AS s", (f'file:{os.path.abspath(src)}?mode=ro',))

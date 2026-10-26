@@ -11,8 +11,8 @@ the gated head, with `node_modules` and `.lane/mars-web` in place. `<n>` is the 
 
 | step | what it does | its bar |
 |---|---|---|
-| preflight | local checks: clean tree, tools, Mars web assets, probe god folder (release-probe; bench-hamlet until it exists); prints the deploy lease | nothing missing |
-| backup | `ship/compact-backup.sh` (VACUUM INTO) of every production + legacy db, then `PRAGMA quick_check` on each copy | every db `ok` |
+| preflight | local checks: clean tree, tools, Mars web assets, required dedicated release-probe god folder; prints the deploy lease | nothing missing |
+| backup | `ship/compact-backup.sh` uses the row-verified compact-copy helper with `--keep-takes` for every production + legacy db, then `PRAGMA quick_check` | every copied row matches its source read transaction; every db `ok` |
 | legacy-upload | `release.sh legacy` builds and uploads `we-<sha12>-root` without activating it | exit 0 |
 | probe-start | `release-probe.mjs` in the background (desktop + phone, CLI edits, `--expect-build`); waits for `probe/ready` | ready within 10 min |
 | release | `release.sh production --reload` | exit 0 |
@@ -45,11 +45,17 @@ symlink and file mode still matches that manifest (installed `node_modules` are 
 partial uploads and changed/extra artifacts are retained and refused; use a new commit/build instead of deleting or
 overwriting them. Focused checks: `node --test tools/test-harness/release-no-delete.test.mjs`.
 
+To use builds produced on Modal, set `SIM_PREBUILT_WEB_ROOT` to a directory containing `<build>/dist` and
+`<build>/WEB-BUILD.json` for both `we-<sha12>` and `we-<sha12>-root`. The receipt is sealed by `prebuilt-web.mjs`
+after building and precompressing on Modal. Installation requires the exact full source SHA, build ID, base path,
+CDN flags/origin and Eden world pin; every artifact hash is checked before and after copying. The normal prefix,
+CDN and world-pin release checks still run. Without the variable the existing build path is unchanged.
+
 ## Release-probe world (one-time setup, then every release)
 The probe's CLI edits go to its own world, **release-probe**: an unlisted scratch world, flagged test, with no Soul a person
 owns. Releases never write to bench-hamlet again (it holds Kwyjibo). ship.sh's god folder is
-`<team>/runtime/t4-bench/release-probe` (`SHIP_PROBE_CLI` overrides it). Until that folder exists, ship.sh
-falls back to the old bench-hamlet folder and preflight prints a NOTE, so a release never blocks on this setup.
+`<team>/runtime/t4-bench/release-probe` (`SHIP_PROBE_CLI` overrides it). If that folder is missing,
+preflight stops before any remote command. There is no fallback to another world.
 
 R does the setup once, on eden2, after a release that carries `op.mjs god-approve` (lane OPS2) is live:
 1. `node tools/world-launcher/op.mjs create-world --port 4620 --base /worlds --name "Release probe (scratch)" --template hello-hamlet --owner-of bench-hamlet --slug release-probe --unlisted`

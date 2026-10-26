@@ -2,18 +2,23 @@
 // Home → New world (real clicks/typing) → world page: canvas geometry at dpr 1 and 2, drag/wheel/W/double-click,
 // God panel, Join as a Soul line. Chrome lease, real GPU. node walk-new.mjs <origin> <outDir>
 import {mkdirSync,writeFileSync} from 'node:fs';import {resolve} from 'node:path';import {createRequire} from 'node:module';
+import {startV7ClerkFixture} from './v7-clerk-fixture.mjs';
 const {chromeLease}=await import(process.env.CHROME_LEASE_MODULE??'../god-skill/lib/chrome-lease.mjs');
 const [origin,outArg]=process.argv.slice(2);const out=resolve(outArg);mkdirSync(out,{recursive:true});
+const arg=name=>{const i=process.argv.indexOf(name);return i<0?undefined:process.argv[i+1];};
+// The release walk exercises account-backed New Soul, so use production-shaped verified auth.
+// A manually supplied dev launcher remains supported when --web is omitted.
 const {chromium}=createRequire(new URL('../../mars/viewer/package.json', import.meta.url).pathname)('@playwright/test');
 const W=1352,H=780,report={origin,runs:[]};
 const geometry=()=>{const c=document.querySelector('canvas[aria-label="Live 3D view of the world"]');const r=c?.getBoundingClientRect();return {window:[innerWidth,innerHeight],dpr:devicePixelRatio,canvasCss:r&&[Math.round(r.width),Math.round(r.height)],buffer:c&&[c.width,c.height]};};
 const cam=()=>{const e=window.__simEntity;if(!e)return null;const p=e.camera.position,t=e.controls.target;return {p:[p.x,p.y,p.z],pivot:[t.x,t.y,t.z],view:e.camera.view?.enabled?[Math.round(e.camera.view.offsetX),Math.round(e.camera.view.offsetY)]:null};};
 const moved=(a,b,k)=>!!(a&&b)&&a[k].some((v,i)=>Math.abs(v-b[k][i])>0.01);
-const release=await chromeLease('rec-new-world');let worldUrl=null;
+let release=null,worldUrl=null,fixture=null;
+try{fixture=arg('--web')?await startV7ClerkFixture({origin,out,web:arg('--web'),marsWeb:arg('--mars-web')}):null;release=await chromeLease('rec-new-world');
 try{for(const dpr of [1,2]){const browser=await chromium.launch({channel:'chrome',headless:true,args:['--ignore-gpu-blocklist']});
- try{const ctx=await browser.newContext({viewport:{width:W,height:H},deviceScaleFactor:dpr});await ctx.addInitScript(()=>{try{localStorage.setItem('sim.dev','rec-gaia');}catch{}});
+ try{const ctx=await browser.newContext({viewport:{width:W,height:H},deviceScaleFactor:dpr});if(fixture)await fixture.prepareContext(ctx);else await ctx.addInitScript(()=>{try{localStorage.setItem('sim.dev','rec-gaia');}catch{}});
   const page=await ctx.newPage();const errors=[];page.on('pageerror',e=>errors.push(String(e).slice(0,200)));page.on('response',r=>{if(r.status()>=400)errors.push(r.status()+' '+new URL(r.url()).pathname);});const run={dpr};
-  if(!worldUrl){await page.goto(origin+'/worlds/',{waitUntil:'domcontentloaded'});await page.locator('[data-new-world]').first().click();
+  if(!worldUrl){await page.goto(origin+'/worlds/',{waitUntil:'domcontentloaded'});if(fixture)await page.locator('[data-signed-in="1"]').waitFor({state:'visible',timeout:20000});await page.locator('[data-new-world]').first().click();
    await page.locator('[data-world-name]').fill('Rec Hollow '+Date.now().toString(36).slice(-4));await page.locator('[data-god-name]').fill('Gaia').catch(()=>{});
    await page.screenshot({path:resolve(out,`home-new-world-dpr${dpr}.png`)});await page.locator('[data-create]').click();
    await page.waitForURL(/\/worlds\/w\/[a-z0-9-]+/,{timeout:120000});worldUrl=page.url().split('#')[0];run.created=worldUrl;}
@@ -47,5 +52,6 @@ try{for(const dpr of [1,2]){const browser=await chromium.launch({channel:'chrome
   await page.screenshot({path:resolve(out,`world-join-dpr${dpr}.png`)});
   run.errors=errors;report.runs.push(run);console.log(JSON.stringify({...run,joinLine:run.joinLine?.slice(0,140)}));await ctx.close();}
  finally{await browser.close();}}}
-finally{release();}
+finally{release?.();}
+}finally{await fixture?.stop();}
 writeFileSync(resolve(out,'report.json'),JSON.stringify(report,null,1));

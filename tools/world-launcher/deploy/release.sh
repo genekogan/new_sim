@@ -59,7 +59,11 @@ EDEN_WORLDS="${VITE_EDEN_EXPERIENCE_WORLD_IDS-pm-preview-eden-20261005}"
 # The switch is build-time and off when absent in vite, so every live build from 3.20 (we-f62375187ae5) to 3.49 shipped
 # without it: the release defaults it ON. Turn it off for one release with SIM_ASSETS_CDN_ENABLED=0 release.sh ...
 [ "$CDN" = 1 ] || echo "   CDN OFF for this build (SIM_ASSETS_CDN_ENABLED=0): every model is served from origin"
-BUILD_ID="$BUILD" VITE_EDEN_EXPERIENCE_WORLD_IDS="$EDEN_WORLDS" SIM_ASSETS_CDN_ENABLED="$CDN" SIM_ASSETS_CDN_ORIGIN="$CDN_ORIGIN" pnpm --filter @sim/web exec vite build --logLevel warn --outDir "$OUT/apps/web/dist" --emptyOutDir --base "$BASE/"
+if [ -n "${SIM_PREBUILT_WEB_ROOT:-}" ]; then
+  node tools/world-launcher/deploy/prebuilt-web.mjs install "$SIM_PREBUILT_WEB_ROOT/$BUILD" "$OUT/apps/web/dist" "$(git rev-parse HEAD)" "$BUILD" "$BASE/" "$CDN" "$CDN_ORIGIN" "$EDEN_WORLDS" "${SIM_ARRIVAL_UI_ENABLED:-0}" "${SIM_GOATCOUNTER-simeden}" "${SIM_GOD_UPLOADS_CDN:-1}"
+else
+  BUILD_ID="$BUILD" VITE_EDEN_EXPERIENCE_WORLD_IDS="$EDEN_WORLDS" SIM_ASSETS_CDN_ENABLED="$CDN" SIM_ASSETS_CDN_ORIGIN="$CDN_ORIGIN" pnpm --filter @sim/web exec vite build --logLevel warn --outDir "$OUT/apps/web/dist" --emptyOutDir --base "$BASE/"
+fi
 grep -qE "(src=|\")$BASE/assets/" "$OUT/apps/web/dist/index.html" || { echo "web build is not under $BASE/"; exit 1; }
 # With the switch on, the bundle must carry the CDN origin (the flag-off build tree-shakes it away) and the manifest.
 if [ "$CDN" = 1 ]; then
@@ -70,7 +74,7 @@ fi
 # elsewhere (classroom, old Eden), so match the call, in whatever chunk the bundler put Shell (P7d merged it into main).
 [ -z "$EDEN_WORLDS" ] || grep -qsE "[A-Za-z_\$][A-Za-z0-9_\$]*\(\`${EDEN_WORLDS%%,*}" "$OUT"/apps/web/dist/assets/*.js || { echo "web build lacks the Eden experience pin ($EDEN_WORLDS)"; exit 1; }
 # P1 phones: .br/.gz beside each hashed asset (the launcher serves them; nothing is compressed on the request path)
-node tools/world-launcher/deploy/precompress.mjs "$OUT/apps/web/dist/assets"
+[ -n "${SIM_PREBUILT_WEB_ROOT:-}" ] || node tools/world-launcher/deploy/precompress.mjs "$OUT/apps/web/dist/assets"
 rsync -aL --exclude /modular "$MARS_WEB_SRC/" "$OUT/mars-web/"
 # /modular (the humanoid kit and the environment GLBs) is this commit's own copy, never whatever a lane overlay's
 # symlink pointed at when the release was assembled: a relative link into the archived tree (no second copy).

@@ -11,6 +11,7 @@ import { deckRaised, railGaps, rasterOf } from '@sim/generators';
 import { applyBatch, obbOverlap, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type ResidentMove, type WorldModel } from '@sim/world-compiler';
 import { assetFromDef, assetIdFor, isFixtureDef, isFloatingDef, nearestSurfaceSlot, nextEntityPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
 import type { WorldHost } from '../world.ts';
+import type { LogEvent } from '@sim/protocol';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { GodMode } from './god.ts';
@@ -131,6 +132,9 @@ export const engineBridges = new WeakMap<WorldModel, EngineBridge>();
 
 /** G1: the most a tick spends catching Souls' perception up with god edits (perceive.ts `step`). */
 const PERCEIVE_SLICE_MS = Number(process.env.PERCEIVE_SLICE_MS ?? 8);
+const WRITE_BACK_SLICE_MS = 8;
+type WriteBackUnit = { key: string; ops: Op[]; body?: string };
+type WriteBackBody = { pose: string; entity: Entity | undefined };
 
 export class EngineBridge {
   readonly host: WorldHost; readonly god: GodMode; readonly edge?: EdgeLedger;
@@ -142,6 +146,16 @@ export class EngineBridge {
   /** Level ids levelFor handed out during the current send (their parts are not in `sent` yet). */
   private levelsNow = new Set<number>();
   private reconciled = false;
+  // Readiness observes the ordinary queue/fold; it never steps, drains or changes the projection.
+  private readonly initialEngine: WorldHost['engine'];
+  private projectionFailure: Error | null = null;
+  private projectionDrafts = new Map<WorldEditV1, { applied: boolean }>();
+  private completedTicks = 0;
+  private lastProjectionFold = 0;
+  private completedEdits = -1;
+  private projectedEdits = -1;
+  private readinessChecks = new Set<() => void>();
+  private readinessQueued = false;
   private writeBackBusy = false;
   private refusedPose = new Set<string>();
   /** Bumped by every god edit and by engine edits of things other than bodies (a Soul moving a bowl), not by a body's
@@ -173,13 +187,14 @@ export class EngineBridge {
 
   constructor(o: BridgeOptions) {
     this.host = o.host; this.god = o.god; this.edge = o.edge; this.maxLevel = Math.min(o.maxLevel ?? MAX_LEVEL_ID, MAX_LEVEL_ID); this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
+    this.initialEngine = this.host.engine;
     engineBridges.set(this.god.model, this);
     this.nav = new GodNav({ model: this.god.model, version: () => this.version, staticVersion: () => this.godEdits, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e), placeOf: (ref) => (this.edge ? this.places.forRef(ref)?.id : undefined), describeStamp: () => `${this.describeEpoch}:${this.levels.length}` });
-    this.layers = new GodLayers({ model: this.god.model, edge: this.edge, get engine() { return o.host.engine as never; }, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), building: id => this.god.builds.closing(id, this.model), buildingActive: () => this.god.builds.hasClosure(), closingSites: () => this.god.builds.closingSites(), log: (m) => this.log(m) });
+    this.layers = new GodLayers({ model: this.god.model, edge: this.edge, get engine() { return o.host.engine as never; }, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), calendarPlaces: (sources) => this.calendarPlaces(sources), building: id => this.god.builds.closing(id, this.model), buildingActive: () => this.god.builds.hasClosure(), closingSites: () => this.god.builds.closingSites(), log: (m) => this.log(m) });
     (this.god as unknown as { layers?: GodLayers }).layers = this.layers;
     // P3 (E-life): places follow the god's edits, not the engine's (a carried cup, a duck, a lamp switched on move no place);
     // descriptions that list the things in a place catch up once a minute (1200 ticks)
-    this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, version: () => `${this.godEdits}:${Math.floor(this.host.engine.world.tick / 1200)}` as never, deferred: () => this.perceiveRunning || !!this.perceive?.pending(), engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), layers: this.layers });
+    this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, version: () => `${this.godEdits}:${Math.floor(this.host.engine.world.tick / 1200)}` as never, structuralVersion: () => `${this.version}:${this.describeEpoch}:${this.levels.length}`, deferred: () => this.layerPlacesPending !== null || this.perceiveRunning || !!this.perceive?.pending(), engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), layers: this.layers });
     this.god.builds.inventoryContext = () => {
       this.places.sync(true);
       return {
@@ -194,8 +209,11 @@ export class EngineBridge {
     // LAYERS: "under construction (step)" is part of what an owned or scheduled thing is seen as
     this.god.onBuild(() => { if (this.layers.active()) this.notePerceive([], true); });
     this.host.listeners.push({
-      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); this.perceiveStep(tick); if (tick % 5 === 4) this.spotsStep(); if (tick % 40 === 7) this.layersStep(); if (tick % 20 === 13) this.flushMapNotices(); if (tick % 5 === 2 && (!this.navWarm || this.navPending)) this.navStep(); if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); } if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); } } },
-      onApplied: (e) => { if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
+      afterTick: (tick, context) => { try { if (!this.reconciled) { this.reconcile(); this.projectedEdits = this.godEdits; } else { this.flush(); this.projectedEdits = this.godEdits; if (tick % 10 === 0 || this.writeBackPass) this.writeBack(WRITE_BACK_SLICE_MS); this.perceiveStep(tick); if (tick % 5 === 4) this.spotsStep(); if (tick % 40 === 7 || this.layerPlacesPending !== null) this.layersStep(tick % 40 === 7); if (tick % 20 === 13) this.flushMapNotices(); if (!this.navWarm || this.navPending) this.navStep(context?.startedAtMs); if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); } if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); } } } catch (error) { this.failProjection(error); throw error; } },
+      onApplied: (e) => { this.projectionApplied(e); if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
+      afterTickComplete: () => { this.completedTicks++; this.completedEdits = this.projectedEdits; this.checkProjectionSoon(); },
+      onClockUnavailable: () => this.failProjection(new Error('bridge.readiness.clock-unavailable')),
+      onStop: () => this.failProjection(new Error('bridge.readiness.stopped')),
     });
     reachProviders.set(this.god.model, (from, to) => this.reach(from, to));
     syncProviders.set(this.god.model, () => { this.flush(); return this.physics?.hash === this.engine.world.entityPhysicsV1?.hash; });
@@ -239,6 +257,59 @@ export class EngineBridge {
   }
   private get engine(): EngineV1 { return this.host.engine as unknown as EngineV1; }
   private get model(): WorldModel { return this.god.model; }
+
+  /** True only at a completed normal tick frontier, with every derived draft accepted by this engine.
+   * Call again immediately before publishing HTTP: a model commit may occur between promise continuations. */
+  initialProjectionReady(): boolean {
+    if (this.projectionFailure) throw this.projectionFailure;
+    if (this.host.engine !== this.initialEngine) throw new Error('bridge.readiness.engine-replaced');
+    if (!this.host.clockAvailable || this.host.engineFault) throw new Error('bridge.readiness.clock-unavailable');
+    if (!this.reconciled || this.pending.size || this.projectionDrafts.size ||
+        this.completedTicks <= this.lastProjectionFold || this.completedEdits !== this.godEdits) return false;
+    if (this.physics?.hash !== this.engine.world.entityPhysicsV1?.hash) throw new Error('bridge.readiness.physics-mismatch');
+    return true;
+  }
+
+  /** Optional boot barrier. Deadlines fail closed; they are not a delay or a source of synthetic ticks.
+   * No eager promise exists, so installations that do not use this API cannot produce an unhandled rejection. */
+  waitForInitialProjection(o: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<void> {
+    const timeoutMs = o.timeoutMs ?? 60_000;
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return Promise.reject(new Error('bridge.readiness.invalid-deadline'));
+    return new Promise<void>((resolve, reject) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const finish = (error?: unknown) => {
+        this.readinessChecks.delete(check); if (timer) clearTimeout(timer);
+        o.signal?.removeEventListener('abort', abort);
+        if (error !== undefined) reject(error); else resolve();
+      };
+      const abort = () => finish(o.signal?.reason ?? new Error('bridge.readiness.aborted'));
+      const check = () => { try { if (this.initialProjectionReady()) finish(); } catch (error) { finish(error); } };
+      if (o.signal?.aborted) { abort(); return; }
+      this.readinessChecks.add(check);
+      o.signal?.addEventListener('abort', abort, { once: true });
+      timer = setTimeout(() => finish(new Error('bridge.readiness.timeout')), timeoutMs);
+      this.checkProjectionSoon();
+    });
+  }
+  private checkProjectionSoon() {
+    if (!this.readinessChecks.size || this.readinessQueued) return;
+    this.readinessQueued = true;
+    queueMicrotask(() => { this.readinessQueued = false; for (const check of this.readinessChecks) check(); });
+  }
+  private failProjection(error: unknown) {
+    this.projectionFailure ??= error instanceof Error ? error : new Error(String(error));
+    this.projectionDrafts.clear();
+    this.checkProjectionSoon();
+  }
+  private projectionApplied(event: LogEvent) {
+    if (event.kind !== 'world-edit') return;
+    const draft = event.payload as WorldEditV1, pending = this.projectionDrafts.get(draft);
+    if (!pending) return;
+    if (this.host.engine !== this.initialEngine || this.engine.world.entityPhysicsV1?.hash !== draft.hash) {
+      this.failProjection(new Error('bridge.readiness.projection-not-installed')); return;
+    }
+    pending.applied = true; this.lastProjectionFold = this.completedTicks;
+  }
 
   // ------------------------------------------------------------------ entity world → engine
 
@@ -310,7 +381,20 @@ export class EngineBridge {
     this.physics = nextEntityPhysics(this.physics, draft);
     draft.hash = this.physics.hash;
     this.stats.edits++; this.stats.entities += Object.keys(set).length; this.stats.lastMs = Math.round((performance.now() - t0) * 10) / 10;
-    void this.host.enqueue('world-edit', 'god', draft).catch((err) => this.log(`world-edit ${seq} not logged: ${err?.message ?? err}`));
+    const acceptance = { applied: false };
+    this.projectionDrafts.set(draft, acceptance);
+    try {
+      void this.host.enqueue('world-edit', 'god', draft).then(event => {
+        this.projectionDrafts.delete(draft);
+        if (event.payload !== draft || !acceptance.applied || this.host.engine !== this.initialEngine) {
+          this.failProjection(new Error('bridge.readiness.draft-not-accepted')); return;
+        }
+        this.checkProjectionSoon();
+      }, err => {
+        this.projectionDrafts.delete(draft);
+        this.failProjection(err); this.log(`world-edit ${seq} not logged: ${err?.message ?? err}`);
+      });
+    } catch (error) { this.failProjection(error); throw error; }
     if (why !== 'commit' || Object.keys(set).length > 8) this.log(`${why}: world-edit seq ${seq}, ${Object.keys(set).length} entities, ${this.stats.lastMs} ms`);
   }
 
@@ -663,7 +747,7 @@ export class EngineBridge {
   /** Plan who walks out of an accepted edit's way (pure). A planning fault never refuses the edit: it is logged, and
    *  the engine's own step-clear of buried bodies still applies. `dry` (dry run, preview): plan only, nothing rewritten. */
   /** nav-connect/1 (lane NAV): nothing a god edit does leaves a Soul unable to walk. The connectivity labels warm up after
-   *  boot in ~20 ms slices every 5 ticks (eden-2026: ~8 s of labelling spread over a few minutes), then every Soul is
+   *  boot in ~20 ms slices on each completed tick until ready, then every Soul is
    *  checked once (Souls stranded before this release step out too). After an edit that changes geometry within 30 m of a
    *  Soul, the request brings the engine up to date and checks every Soul (only the edited tiles are relabelled: tens of ms); a Soul cut
    *  off in a small area (or upstairs) steps to the nearest open spot of the main area as a logged edge-relocate
@@ -691,11 +775,16 @@ export class EngineBridge {
     if (!this.edge || this.perceiveRunning || this.perceive.pending()) return;
     try { if (this.activitySpots.warm()) this.logSpots(); } catch (e) { this.log(`activity spots: ${(e as Error).message}`); }
   }
-  private navStep() {
+  private navStep(tickStartedAtMs?: number) {
     try {
       const E = this.engine as unknown as { navWarmV1?: (ms: number) => boolean };
       if (!E.navWarmV1) { this.navWarm = true; this.navPending = false; return; }
-      this.navWarm = E.navWarmV1(20);
+      // The 50 ms tick cadence leaves a 10 ms reserve: warm compilation may use at most
+      // 20 ms, and only the remainder of a 40 ms total-tick envelope. Spatial sync remains
+      // authoritative even at zero; the engine polls and invalidates without compiling a stale graph.
+      const budgetMs = tickStartedAtMs === undefined ? 20
+        : Math.min(20, Math.max(0, 40 - (performance.now() - tickStartedAtMs)));
+      this.navWarm = E.navWarmV1(budgetMs);
       if (this.navWarm && this.navPending) {
         this.navPending = false; const spots = this.navDeferred; this.navDeferred = [];
         const lines = this.navLines(spots, this.navRescueSouls()); if (lines.length) this.navLater = [...this.navLater, ...lines].slice(-4);
@@ -912,19 +1001,49 @@ export class EngineBridge {
   }
   /** LAYERS: the world clock drives schedules (states that follow them, calendar items); a new day re-derives places. */
   private layerDay = '';
-  private layersStep() {
+  /** The requested day stays fixed while places finish. Engine writebacks must not restart this pass. */
+  private layerPlacesPending: string | null = null;
+  private layersStep(sweep = true) {
     try {
-      this.god.builds.sweep();
-      if (this.god.builds.hasClosure()) this.evacuateSites();
-      if (!this.layers.active()) return;
-      const day = this.layers.dayKey(); if (day !== this.layerDay) { this.layerDay = day; this.places.sync(true); }
-      this.layers.step();
-    } catch (e) { this.log(`layers: ${(e as Error).message}`); }
+      if (sweep) {
+        this.god.builds.sweep();
+        if (this.god.builds.hasClosure()) this.evacuateSites();
+      }
+      const active = this.layers.active();
+      // LINK still needs its initial door-safety index in worlds without calendar layers.
+      const initialBodyPlaces = !!this.edge?.bodyRule && !this.places.hasPublished();
+      if (!active && !initialBodyPlaces) { this.layerPlacesPending = null; return; }
+      const day = this.layers.dayKey();
+      if (initialBodyPlaces || day !== this.layerDay || this.layerPlacesPending !== null) {
+        if (!this.host.running) {
+          // Tools that step a world by hand retain synchronous publication.
+          this.places.sync(true);
+          this.layerDay = day;
+          this.layerPlacesPending = null;
+        } else {
+          this.layerPlacesPending ??= day;
+          if (!this.places.syncStep(PERCEIVE_SLICE_MS)) return;
+          // Keep deferral through both syncStep's final sync() and the calendar lookup:
+          // an edit/minute boundary during the pass must not force another full derive.
+          // The completed list has the existing deferred-place semantics. If the day
+          // changed meanwhile, the next normal cadence starts its catch-up.
+          this.layerDay = this.layerPlacesPending;
+          try { if (active) this.layers.step(); } finally { this.layerPlacesPending = null; }
+          return;
+        }
+      }
+      if (active) this.layers.step();
+    } catch (e) { this.layerPlacesPending = null; this.log(`layers: ${(e as Error).message}`); }
+  }
+  private calendarPlaces(sources: readonly Entity[]): (e: Entity) => { id: string; name: string } | null {
+    const own = this.places.calendarIdentities(sources, this.version);
+    return (e) => this.layerPlace(e, own.get(e.id) ?? null);
   }
   /** The place a thing is in: its own place (a café building, a market plaza), else the innermost holding it. */
-  private layerPlace(e: Entity): { id: string; name: string } | null {
+  private layerPlace(e: Entity, own?: { id: string; name: string } | null): { id: string; name: string } | null {
     if (!this.edge) return null;
-    const own = this.places.ofEntity(e.id); if (own) return { id: own.id, name: own.name };
+    if (own === undefined) own = this.places.ofEntity(e.id);
+    if (own) return { id: own.id, name: own.name };
     const wp = this.model.worldPose(e), id = this.places.placeAt([wp.x, wp.z], this.levelAt(wp.x, wp.z, wp.y)); if (!id) return null;
     return { id, name: this.edge.places.byId.get(id)?.name ?? id };
   }
@@ -966,86 +1085,157 @@ export class EngineBridge {
    *  engine world. Without bodies nothing moves a god thing in the engine (Souls carry, rides seat bodies) except an
    *  edit flushed from the model, which changes the key, so the next pass would find nothing again. */
   private writeBackQuiet: { key: object; ents: object } | null = null;
-  writeBack() {
-    if (this.writeBackBusy) return;
+  /** The roster retains stable work IDs; poses/supports are freshly planned before each selected unit.
+   * The roster advances on refusal or disappearance too, so a busy/refused prefix cannot starve its tail. */
+  private writeBackPass: { keys: string[]; next: number; bodies: Map<string, WriteBackBody> } | null = null;
+  /** Without a budget, retain the ordinary synchronous full drain. Scheduled slices yield only between complete
+   * units: a carry's body prerequisite, strict/nudge retry, and item reparent retain their separate ordered commits. */
+  writeBack(budgetMs = Infinity): boolean {
+    if (this.writeBackBusy || !(budgetMs > 0)) return false;
+    const sliced = Number.isFinite(budgetMs);
+    if (!sliced) this.writeBackPass = null;
     if (this.writeBackQuiet) {
       const ents = this.engine.world.entities as Record<string, any>;
       let body = false;
       for (const id in ents) if (ents[id]?.human) { body = true; break; }
-      if (!body && this.writeBackQuiet.key === this.model.safetyCacheKey() && this.writeBackQuiet.ents === ents) return;
+      if (!body && this.writeBackQuiet.key === this.model.safetyCacheKey() && this.writeBackQuiet.ents === ents) return true;
       this.writeBackQuiet = null;
     }
     this.writeBackBusy = true;
     try {
-      const ops: Op[] = [], bodies = new Set<string>(), holders = new Set<string>();
-      // S1 V7d: one allocation-free walk (Object.entries' order) collects the god things and the bodies; the cheap kind
-      // test goes first. Eden 2026 lists ~4,900 engine entities twice a second here.
-      const ents = this.engine.world.entities as Record<string, any>, humans: string[] = [];
-      for (const id in ents) {
-        if (!Object.hasOwn(ents, id)) continue;
-        const x = ents[id];
-        if (x?.human) humans.push(id);
-        if (x.kind !== 'component' || !x.tags?.includes('entity-world')) continue;
-        const e = this.model.entities.get(id); if (!e) continue;
-        const s = x.support;
-        if (s?.kind === 'in-hand') {
-          if (e.in.parent === s.by && e.in.slot === 'carry') { holders.add(s.by); continue; }
-          if (!this.model.entities.has(s.by)) continue; // the body entity is not in the entity world (pre-bridge Soul)
-          if (!bodies.has(s.by)) { const b = this.engine.world.entities[s.by]; if (b) { ops.push({ op: 'move', id: s.by, p: [r3(b.pose.p[0]), r3(b.pose.p[1]), r3(b.pose.p[2])], r: r3(-b.pose.yaw), mode: 'strict' } as Op); bodies.add(s.by); } }
-          ops.push({ op: 'move', id, in: { parent: s.by, slot: 'carry' }, p: [0, 0, 0], r: 0, mode: 'strict' } as Op);
-        } else if (s?.kind === 'resting-on') {
-          const parent = this.model.entities.get(s.on); if (!parent) continue;
-          const slotId = String(s.slot).replace(/-r\d+c\d+$/, '');
-          const pp = this.model.worldPose(parent), c = Math.cos(pp.yaw), sn = Math.sin(pp.yaw), dx = x.pose.p[0] - pp.x, dz = x.pose.p[2] - pp.z;
-          const slot = this.model.slotsOf(parent).find((q) => q.id === slotId);
-          const lx = dx * c - dz * sn - (slot?.p[0] ?? 0), lz = dx * sn + dz * c - (slot?.p[2] ?? 0);
-          const want: [number, number, number] = [r3(lx), 0, r3(lz)];
-          const have = e.p ?? [0, 0, 0];
-          if (e.in.parent === s.on && (e.in.slot ?? '') === (slot ? slotId : '') && Math.hypot((have[0] ?? 0) - want[0], (have[have.length - 1] ?? 0) - want[2]) < 0.05) continue;
-          ops.push({ op: 'move', id, in: { parent: s.on, ...(slot ? { slot: slotId } : {}) }, p: want, r: r3(-(x.pose.yaw) - pp.yaw), mode: 'strict' } as Op);
-        } else if (s?.kind === 'ground') {
-          if (e.in.parent === 'world') { const p = e.p ?? [0, 0]; if (Math.hypot(p[0] - x.pose.p[0], p[p.length - 1] - x.pose.p[2]) < 0.05) continue; }
-          // a thing the god stood in a room, on a pier's end or a balcony stays in it until a Soul moves it away
-          else { const wp = this.model.worldPose(e); if (Math.hypot(wp.x - x.pose.p[0], wp.z - x.pose.p[2]) < 0.05) continue; }
-          ops.push({ op: 'move', id, in: { parent: 'world' }, p: [r3(x.pose.p[0]), r3(x.pose.p[2])], r: r3(-x.pose.yaw), mode: 'strict' } as Op);
-        }
-      }
-      // a body carrying god things: keep its entity's pose near the engine's, so what it holds is drawn in its hands
-      // (coarsely while it walks, exactly once it stops; viewer B7 would follow the hand from the takes instead)
-      for (const id of holders) {
-        const b = this.engine.world.entities[id], e = this.model.entities.get(id); if (!b?.human || !e || bodies.has(id)) continue;
-        const have = e.p ?? [0, 0, 0], d = Math.hypot((have[0] ?? 0) - b.pose.p[0], (have.length === 3 ? have[1] : 0) - b.pose.p[1], (have[have.length - 1] ?? 0) - b.pose.p[2]);
-        const moving = (b.human.speed ?? 0) > 0.05 || b.human.activity === 'walk';
-        if (d > (moving ? 2 : 0.15)) ops.push({ op: 'move', id, p: [r3(b.pose.p[0]), r3(b.pose.p[1]), r3(b.pose.p[2])], r: r3(-b.pose.yaw), mode: 'strict' } as Op);
-      }
-      // F1: every Soul's body entity follows its engine body once it comes to rest (a walk's end, a seat), so the god's
-      // map and snapshot show where Souls are and what they sit on (one engine edit per stop, none while walking)
-      for (const id of humans) {
-        const b = ents[id];
-        if (!b?.human || bodies.has(id) || holders.has(id)) continue;
-        const e = this.model.entities.get(id); if (!e || e.in.parent !== 'world') continue;
-        if ((b.human.speed ?? 0) > 0.05 || ['walk', 'wade', 'swim', 'tread', 'sit-down', 'stand-up'].includes(b.human.activity)) continue;
-        const have = e.p ?? [0, 0, 0], d = Math.hypot((have[0] ?? 0) - b.pose.p[0], (have.length === 3 ? have[1] : 0) - b.pose.p[1], (have[have.length - 1] ?? 0) - b.pose.p[2]);
-        if (d > 0.4) ops.push({ op: 'move', id, p: [r3(b.pose.p[0]), r3(b.pose.p[1]), r3(b.pose.p[2])], r: r3(-b.pose.yaw), mode: 'strict' } as Op);
-      }
-      if (!ops.length) { if (!humans.length) this.writeBackQuiet = { key: this.model.safetyCacheKey(), ents }; return; }
-      for (const op of ops) {
-        { const o = op as { id: string; p?: number[] }; if (this.refusedPose.has(`${o.id}@${o.p?.join(',')}`)) continue; }
-        const r = this.engineAct([op], `engine: ${describeOp(op, this.model)}`);
-        if (r.accepted) this.stats.writeBacks++;
-        else {
-          // a body's pose refused (it sits inside a bench's footprint): try once more letting the compiler nudge it, and
-          // never retry the same refused pose
-          const o = op as { id: string; p?: number[]; mode?: string }, key = `${o.id}@${o.p?.join(',')}`;
-          if (this.model.resolvedDef(this.model.entities.get(o.id)?.def ?? '')?.components.body) {
-            const r2 = this.engineAct([{ ...(op as object), mode: 'nudge' } as Op], `engine: ${describeOp(op, this.model)}`);
-            if (r2.accepted) { this.stats.writeBacks++; continue; }
-            this.refusedPose.add(key); if (this.refusedPose.size > 500) this.refusedPose.clear();
+      const started = performance.now();
+      if (!sliced) {
+        const plan = this.writeBackUnits(), bodies = new Map<string, WriteBackBody>();
+        for (const unit of plan.units) this.applyWriteBackUnit(unit, bodies);
+        if (!plan.units.length && !plan.humans) this.writeBackQuiet = { key: this.model.safetyCacheKey(), ents: this.engine.world.entities };
+      } else {
+        if (!this.writeBackPass) {
+          const plan = this.writeBackUnits();
+          if (!plan.units.length) {
+            if (!plan.humans) this.writeBackQuiet = { key: this.model.safetyCacheKey(), ents: this.engine.world.entities };
+            return true;
           }
-          this.log(`write-back refused for ${o.id}: ${JSON.stringify(r.failures).slice(0, 200)}`);
+          this.writeBackPass = { keys: plan.units.map(unit => unit.key), next: 0, bodies: new Map() };
         }
+        const pass = this.writeBackPass;
+        while (pass.next < pass.keys.length) {
+          const unit = this.writeBackUnit(pass.keys[pass.next]);
+          if (unit) this.applyWriteBackUnit(unit, pass.bodies);
+          pass.next++;
+          if (pass.next < pass.keys.length && performance.now() - started >= budgetMs) return false;
+        }
+        this.writeBackPass = null;
       }
+      return true;
     } finally { this.writeBackBusy = false; }
+  }
+
+  /** Discovery runs once per pass. The ordinary synchronous drain keeps this complete ordered plan. */
+  private writeBackUnits(): { units: WriteBackUnit[]; humans: number } {
+    const units: WriteBackUnit[] = [], bodies = new Set<string>(), holders = new Set<string>();
+    const ents = this.engine.world.entities as Record<string, any>, humans: string[] = [];
+    for (const id in ents) {
+      if (!Object.hasOwn(ents, id)) continue;
+      if (ents[id]?.human) humans.push(id);
+      const unit = this.writeBackComponent(id, holders);
+      if (unit) { units.push(unit); if (unit.body) bodies.add(unit.body); }
+    }
+    for (const id of holders) {
+      if (bodies.has(id)) continue;
+      const unit = this.writeBackBody(id, true); if (unit) units.push(unit);
+    }
+    for (const id of humans) {
+      if (bodies.has(id) || holders.has(id)) continue;
+      const unit = this.writeBackBody(id, false); if (unit) units.push(unit);
+    }
+    return { units, humans: humans.length };
+  }
+
+  /** Recompute only the selected ID and its direct dependencies. Never rescan or re-plan the world after a commit.
+   * A body's role that changes during a pass is eligible for discovery on the next pass, just like new work. */
+  private writeBackUnit(key: string): WriteBackUnit | undefined {
+    const colon = key.indexOf(':'), kind = key.slice(0, colon), id = key.slice(colon + 1);
+    if (kind === 'component') return this.writeBackComponent(id);
+    // The holder predicate can be checked through the model's direct-child index: a projected held item must be
+    // in this body's carry slot AND still supported by this body in the engine. No whole-engine scan is needed.
+    let holder = false;
+    const ents = this.engine.world.entities as Record<string, any>;
+    for (const child of this.model.children.get(id) ?? []) {
+      const e = this.model.entities.get(child), x = ents[child];
+      if (e?.in.parent === id && e.in.slot === 'carry' && x?.kind === 'component' && x.tags?.includes('entity-world') && x.support?.kind === 'in-hand' && x.support.by === id) { holder = true; break; }
+    }
+    if (holder !== (kind === 'holder')) return;
+    return this.writeBackBody(id, holder);
+  }
+
+  private writeBackComponent(id: string, holders?: Set<string>): WriteBackUnit | undefined {
+    const x = this.engine.world.entities[id] as any;
+    if (x?.kind !== 'component' || !x.tags?.includes('entity-world')) return;
+    const e = this.model.entities.get(id); if (!e) return;
+    const ops: Op[] = []; let body: string | undefined;
+    const s = x.support;
+    if (s?.kind === 'in-hand') {
+      if (e.in.parent === s.by && e.in.slot === 'carry') { holders?.add(s.by); return; }
+      if (!this.model.entities.has(s.by)) return; // the body entity is not in the entity world (pre-bridge Soul)
+      const b = this.engine.world.entities[s.by];
+      if (b) { ops.push({ op: 'move', id: s.by, p: [r3(b.pose.p[0]), r3(b.pose.p[1]), r3(b.pose.p[2])], r: r3(-b.pose.yaw), mode: 'strict' } as Op); body = s.by; }
+      ops.push({ op: 'move', id, in: { parent: s.by, slot: 'carry' }, p: [0, 0, 0], r: 0, mode: 'strict' } as Op);
+    } else if (s?.kind === 'resting-on') {
+      const parent = this.model.entities.get(s.on); if (!parent) return;
+      const slotId = String(s.slot).replace(/-r\d+c\d+$/, '');
+      const pp = this.model.worldPose(parent), c = Math.cos(pp.yaw), sn = Math.sin(pp.yaw), dx = x.pose.p[0] - pp.x, dz = x.pose.p[2] - pp.z;
+      const slot = this.model.slotsOf(parent).find((q) => q.id === slotId);
+      const lx = dx * c - dz * sn - (slot?.p[0] ?? 0), lz = dx * sn + dz * c - (slot?.p[2] ?? 0);
+      const want: [number, number, number] = [r3(lx), 0, r3(lz)];
+      const have = e.p ?? [0, 0, 0];
+      if (e.in.parent === s.on && (e.in.slot ?? '') === (slot ? slotId : '') && Math.hypot((have[0] ?? 0) - want[0], (have[have.length - 1] ?? 0) - want[2]) < 0.05) return;
+      ops.push({ op: 'move', id, in: { parent: s.on, ...(slot ? { slot: slotId } : {}) }, p: want, r: r3(-(x.pose.yaw) - pp.yaw), mode: 'strict' } as Op);
+    } else if (s?.kind === 'ground') {
+      if (e.in.parent === 'world') { const p = e.p ?? [0, 0]; if (Math.hypot(p[0] - x.pose.p[0], p[p.length - 1] - x.pose.p[2]) < 0.05) return; }
+      // A thing placed in a room, on a pier or balcony stays there until a Soul moves it away.
+      else { const wp = this.model.worldPose(e); if (Math.hypot(wp.x - x.pose.p[0], wp.z - x.pose.p[2]) < 0.05) return; }
+      ops.push({ op: 'move', id, in: { parent: 'world' }, p: [r3(x.pose.p[0]), r3(x.pose.p[2])], r: r3(-x.pose.yaw), mode: 'strict' } as Op);
+    }
+    if (ops.length) return { key: `component:${id}`, ops, ...(body ? { body } : {}) };
+  }
+
+  private writeBackBody(id: string, holder: boolean): WriteBackUnit | undefined {
+    const b = this.engine.world.entities[id], e = this.model.entities.get(id);
+    if (!b?.human || !e) return;
+    // Carrying bodies follow coarsely while walking, exactly at rest. Other bodies follow only at rest.
+    const moving = (b.human.speed ?? 0) > 0.05 || b.human.activity === 'walk';
+    if (!holder && (e.in.parent !== 'world' || (b.human.speed ?? 0) > 0.05 || ['walk', 'wade', 'swim', 'tread', 'sit-down', 'stand-up'].includes(b.human.activity))) return;
+    const have = e.p ?? [0, 0, 0], d = Math.hypot((have[0] ?? 0) - b.pose.p[0], (have.length === 3 ? have[1] : 0) - b.pose.p[1], (have[have.length - 1] ?? 0) - b.pose.p[2]);
+    if (d > (holder ? (moving ? 2 : 0.15) : 0.4)) return { key: `${holder ? 'holder' : 'human'}:${id}`, ops: [{ op: 'move', id, p: [r3(b.pose.p[0]), r3(b.pose.p[1]), r3(b.pose.p[2])], r: r3(-b.pose.yaw), mode: 'strict' } as Op] };
+  }
+
+  private applyWriteBackUnit(unit: WriteBackUnit, bodies: Map<string, WriteBackBody>) {
+    for (let i = 0; i < unit.ops.length; i++) {
+      const op = unit.ops[i];
+      // Several items can share a holder. Match the full drain's one prerequisite per unchanged pose,
+      // while a holder changed in either world between slices gets its prerequisite before the next transfer.
+      const pose = unit.body && i === 0 ? JSON.stringify(op) : undefined;
+      const done = unit.body ? bodies.get(unit.body) : undefined;
+      if (pose !== undefined && done?.pose === pose && done.entity === this.model.entities.get(unit.body!)) continue;
+      this.applyWriteBackOp(op);
+      if (pose !== undefined) bodies.set(unit.body!, { pose, entity: this.model.entities.get(unit.body!) });
+    }
+  }
+
+  private applyWriteBackOp(op: Op) {
+    { const o = op as { id: string; p?: number[] }; if (this.refusedPose.has(`${o.id}@${o.p?.join(',')}`)) return; }
+    const r = this.engineAct([op], `engine: ${describeOp(op, this.model)}`);
+    if (r.accepted) this.stats.writeBacks++;
+    else {
+      // A body's strict/nudge pair remains in this unit; never retry the same refused pose.
+      const o = op as { id: string; p?: number[]; mode?: string }, key = `${o.id}@${o.p?.join(',')}`;
+      if (this.model.resolvedDef(this.model.entities.get(o.id)?.def ?? '')?.components.body) {
+        const r2 = this.engineAct([{ ...(op as object), mode: 'nudge' } as Op], `engine: ${describeOp(op, this.model)}`);
+        if (r2.accepted) { this.stats.writeBacks++; return; }
+        this.refusedPose.add(key); if (this.refusedPose.size > 500) this.refusedPose.clear();
+      }
+      this.log(`write-back refused for ${o.id}: ${JSON.stringify(r.failures).slice(0, 200)}`);
+    }
   }
 
   /** Birth: the Soul's body becomes an entity (core/humanoid) with the engine's own id (spec 31 §3 rule 3). */
@@ -1164,6 +1354,7 @@ export class EngineBridge {
   // ------------------------------------------------------------------ Souls: capabilities on god things, prayers
 
   private hookEdge(L: EdgeLedger) {
+    L.bodyPlacesReady = () => this.places.hasPublished();
     // G1/R8: a resident's next observation carries what the god just did around it (newest first).
     const observe = L.observe.bind(L);
     L.observe = (soul, include) => {
