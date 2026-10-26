@@ -2,7 +2,7 @@
 // call; these cases drive them with a small stand-in engine (the reading itself is engine-independent).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {bodyState, bodyWords, cardDoing} from './body-state.ts';
+import {bodyState, bodyWords, cardDoing, notYet, type BodyStateV1} from './body-state.ts';
 
 type Human = {activity: string; level?: number; carrier?: {id: string; slot: string; phase: string}; shore?: {submergedHeightMetres: number}; sleepPose?: unknown; baseActivity?: string; riding?: string};
 function fake() {
@@ -87,4 +87,19 @@ test('cancelled: with nothing running the card reads the body, not the stopped p
   f.mind.doing = 'standing around'; f.me.human!.activity = 'idle';
   assert.equal(cardDoing(f.host, f.m), 'standing around');
   assert.equal(bodyWords(f.host, 's1', bodyState(f.host, 's1')!), 'standing');
+});
+
+test('D3b: an open receipt says what it has not done yet; a body already in a timed pose is "not finished yet"', () => {
+  const b = (posture: string, extra: Partial<BodyStateV1> = {}): BodyStateV1 => ({posture, activity: 'idle', on: null, inWater: false, ...extra});
+  assert.equal(notYet('walk:pond-reeds', 'started', true, b('walking', {step: 'walking to pond-reeds, 9 m left'})), 'not there yet');
+  assert.equal(notYet('walk:pond-reeds', 'started', true, b('standing')), 'not there yet', 'a walk is never there before it ends');
+  assert.equal(notYet('go-near:soul-tam', 'started', true, b('walking')), 'not there yet');
+  assert.equal(notYet('sit:here', 'started', true, b('standing')), 'not sitting yet', 'standing while the sit runs (rc-r2 pip-002)');
+  assert.equal(notYet('sit:here', 'started', true, b('seated')), 'not finished yet');
+  assert.equal(notYet('lie:here', 'started', true, b('standing')), 'not lying yet', 'standing while the lie runs (fix-r3 pip-006)');
+  assert.equal(notYet('lie:here', 'started', true, b('lying')), 'not finished yet');
+  assert.equal(notYet('dance', 'started', true, b('busy')), 'not finished yet');
+  assert.equal(notYet('read:library', 'started', true, b('walking', {step: 'walking to the library, 12 m left'})), 'not reading yet');
+  assert.equal(notYet('sit:here', 'waiting', false, b('standing')), 'not started yet');
+  assert.equal(notYet('object:ride-wheel:join', 'started', true, b('walking')), 'not aboard yet');
 });

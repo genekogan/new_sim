@@ -101,3 +101,21 @@ export function cardDoing(host: WorldHost, m: Mind, approach?: ApproachV1 | null
   if (b.inWater) return WATER[b.activity] ?? 'standing in the water';
   return m.doing;
 }
+
+/** D1: the pose an act's verb ends in, for `now` while its approach runs ("walking to Kitchen chair, 18 m left; not reading yet"). */
+const MAIN_POSE: Record<string, string> = {read: 'reading', rest: 'resting', swim: 'swimming', 'warm-by-fire': 'warming up', eat: 'eating', drink: 'drinking', cook: 'cooking', paint: 'painting', write: 'writing', 'play-piano': 'playing', 'play-music': 'playing', dance: 'dancing', yoga: 'doing yoga', wave: 'waving', hug: 'hugging'};
+const THERE = new Set(['walk', 'run', 'jog', 'go', 'go-near', 'stroll', 'follow', 'return', 'come']);
+/** D3b (cloud fix-r3: "Pip is lying down" 13 s before it was, "at the pond" 15 s early, "sitting" while standing): what an open
+ *  receipt has not done yet. Every open receipt's `now` ends with it, so no reading of an unfinished act sounds finished: a
+ *  walk is "not there yet", a sit or lie "not sitting / lying yet" until the body is in that pose, then (a timed pose still
+ *  running) "not finished yet"; an act that has not begun "not started yet"; a boarding "not aboard yet". */
+export function notYet(capability: string, phase: string, running: boolean, b: BodyStateV1): string {
+  if (phase === 'waiting' && !running) return 'not started yet';
+  if (/^object:[^:]+:join$/.test(capability)) return 'not aboard yet';
+  const verb = capability.split(':')[0]!;
+  if (THERE.has(verb)) return 'not there yet';
+  if (verb === 'sit' || verb === 'sit-ground') return b.posture === 'seated' ? 'not finished yet' : 'not sitting yet';
+  if (verb === 'lie' || verb === 'nap') return b.posture === 'lying' || b.posture === 'sleeping' ? 'not finished yet' : 'not lying yet';
+  if (verb === 'stand') return b.posture === 'standing' ? 'not finished yet' : 'not standing yet';
+  return b.step && MAIN_POSE[verb] ? `not ${MAIN_POSE[verb]} yet` : 'not finished yet';
+}

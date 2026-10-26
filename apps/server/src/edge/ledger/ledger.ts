@@ -11,7 +11,7 @@ import type {WorldState as NativeWorld} from '../../../../../mars/viewer/engine/
 import type {WorldHost, Mind} from '../../world.ts';
 import type {Db} from '../../db.ts';
 import {readHumanCapabilitiesV1, type HumanBindingV1} from '../../human-capabilities.ts';
-import {stateOf, bodyState, bodyWords, type ApproachV1, type BodyStateV1} from '../../body-state.ts';
+import {stateOf, bodyState, bodyWords, notYet, type ApproachV1, type BodyStateV1} from '../../body-state.ts';
 import {humanBlockedExplanationV1} from '../../human-wait-condition.ts';
 /** RT: route refusals that hold until the world itself changes (not a crowd, a search limit or a start a step clears). */
 const ROUTE_DEAD = new Set(['route.unreachable', 'route.goal-blocked', 'route.link-unusable', 'route.unknown-level']);
@@ -344,15 +344,15 @@ export class EdgeLedger implements EdgeLedgerHooks {
   private view(r: Row): EdgeReceipt {const outcome=this.outcomes.read(r.receipt_id);
     // An invitation nobody has answered yet is not a shared activity: the host's receipt stays `waiting` (quality case 32).
     const awaiting=r.phase==='started'?this.together?.awaitingAnswer(r.receipt_id,r.capability)??null:null;
-    return {id: r.receipt_id, soulId: r.soul_id, capability: r.capability, phase: awaiting?'waiting':r.phase, acceptedTick: r.accepted_tick, startedTick: r.started_tick, endedTick: r.ended_tick, code: r.code, reason: r.reason, programId: r.program_id, ...detailOf(r),...(outcome?{outcome}:{}),...(awaiting?{awaitingAnswer:{...awaiting,note:`Invitation sent; ${awaiting.waitingFor.map(g=>g.name).join(', ')} has not accepted yet. Nothing shared has started.`}}:{}),...(OPEN.includes(r.phase)?this.bodyFacts(r):{})};}
+    return {id: r.receipt_id, soulId: r.soul_id, capability: r.capability, phase: awaiting?'waiting':r.phase, acceptedTick: r.accepted_tick, startedTick: r.started_tick, endedTick: r.ended_tick, code: r.code, reason: r.reason, programId: r.program_id, ...detailOf(r),...(outcome?{outcome}:{}),...(awaiting?{awaitingAnswer:{...awaiting,note:`Invitation sent; ${awaiting.waitingFor.map(g=>g.name).join(', ')} has not accepted yet. Nothing shared has started.`}}:{}),...(OPEN.includes(r.phase)?this.bodyFacts(r,!!awaiting):{})};}
   /** D1: an open receipt's body (what the engine has the body doing now, not the plan) and one `now` sentence built from it. */
-  private bodyFacts(r: Row): {body?: BodyStateV1; now?: string} {
+  private bodyFacts(r: Row, awaiting = false): {body?: BodyStateV1; now?: string} {
     const m = this.host.minds.get(r.soul_id); if (!m) return {};
     const running = r.phase === 'started' && !!r.program_id && this.host.engine.programOf(m.entityId) === r.program_id;
     const body = bodyState(this.host, m.entityId, running ? this.approachFor(m, r.receipt_id) : null); if (!body) return {};
-    const words = bodyWords(this.host, m.entityId, body), verb = r.capability.split(':')[0]!, main = /^object:[^:]+:join$/.test(r.capability) ? 'aboard' : MAIN_POSE[verb];
-    const now = body.step && main ? `${words}; not ${main} yet` : r.phase === 'waiting' && !running ? `${words}; not started yet` : words;
-    return {body, now};
+    // D3b: every open receipt's sentence says what it has not done yet ("standing; not lying yet", "walking to pond-reeds,
+    // 9 m left; not there yet"); an invitation nobody has answered is "not started yet"
+    return {body, now: `${bodyWords(this.host, m.entityId, body)}; ${awaiting ? 'not started yet' : notYet(r.capability, r.phase, running, body)}`};
   }
   /** D1: where this Soul's running act travels to now: the next step of its plan that names a thing or a point. */
   private approachFor(m: Mind, receipt: string): ApproachV1 | null {
@@ -1856,8 +1856,6 @@ export function edgeIdOf(b: HumanBindingV1): {id: string; verb: string} {
   return {id: b.id, verb: b.goal};
 }
 export {stateOf};
-/** D1: the pose an act's verb ends in, for `now` while its approach runs ("walking to Kitchen chair, 18 m left; not sitting yet"). */
-const MAIN_POSE: Record<string, string> = {sit: 'sitting', 'sit-ground': 'sitting', lie: 'lying down', nap: 'napping', read: 'reading', rest: 'resting', swim: 'swimming', 'warm-by-fire': 'warming up', eat: 'eating', drink: 'drinking', cook: 'cooking', paint: 'painting', write: 'writing', 'play-piano': 'playing', 'play-music': 'playing', dance: 'dancing', yoga: 'doing yoga', wave: 'waving', hug: 'hugging'};
 /** Verbs whose resting posture is a chosen activity (fade-by-abandonment holds the Soul while the body keeps it). */
 const POSTURE_VERBS = new Set(['sit', 'sit-ground', 'lie', 'nap', 'read', 'rest', 'warm-by-fire', 'gather', 'swim', 'accept', 'object', 'paint', 'play-piano', 'play-music', 'write', 'play-game', 'craft', 'eat', 'drink', 'cook', 'dance-with']);
 export function timeLabel(phase: number) {return phase < .2 ? 'morning' : phase < .45 ? 'day' : phase < .55 ? 'evening' : phase < .75 ? 'dusk' : 'night';}
