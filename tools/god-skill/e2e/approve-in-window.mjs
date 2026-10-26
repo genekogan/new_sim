@@ -108,6 +108,7 @@ const topRight = (w) => w.present && w.onTop && w.rightGap <= 40 && (w.vw <= 460
 async function windowCode(page) {
   const state = () => page.evaluate(() => ({clerkLoaded: !!window.Clerk?.loaded, clerkStatus: window.Clerk?.status,
     accountMenu: !!document.querySelector('summary.account-avatar'), explanation: !!document.querySelector('[data-new-soul-explain]'),
+    currentURL: location.href, godOpen: !!document.querySelector('[data-god-modal][open]'),
     promptHref: document.querySelector('.bring-agent-prompt a')?.getAttribute('href') ?? null}));
   const attempt = {at: new Date().toISOString(), before: await state(), responses: []};
   (report.windowCodeAttempts ??= []).push(attempt);
@@ -118,7 +119,17 @@ async function windowCode(page) {
     // Wait for its real account UI before New Soul; otherwise the correct signed-out explanation opens.
     await page.locator('summary.account-avatar').waitFor({state: 'visible', timeout: 20_000});
     attempt.signedIn = await state();
-    await page.locator('button.bring-agent-open').first().click();
+    // A new owner's native God dialog opens automatically and makes the header inert.
+    // Dismiss it as a visitor would before using the public New Soul entry (button or link).
+    const godModal = page.locator('[data-god-modal][open]');
+    if (await godModal.count()) {
+      await page.keyboard.press('Escape');
+      await godModal.waitFor({state: 'hidden'});
+    }
+    const entry = page.locator('.bring-agent-open:visible').first();
+    attempt.entry = await entry.evaluate(el => ({tag: el.tagName, href: el.getAttribute('href'),
+      currentURL: location.href, godOpen: !!document.querySelector('[data-god-modal][open]')}));
+    await entry.click();
     const link = page.locator('.bring-agent-prompt a');
     await page.waitForFunction(() => /\?for=[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(document.querySelector('.bring-agent-prompt a')?.getAttribute('href') ?? ''), null, { timeout: 20_000 });
     const href = await link.getAttribute('href');
