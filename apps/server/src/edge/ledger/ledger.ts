@@ -93,6 +93,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** World-engine worlds only, RESOLVE: a building's floor as its main room ("go upstairs", "go inside the cottage and go
    *  upstairs"), added to copies, or why not. Null when it could not be worked out. */
   floorOnDemand?: (soul: EdgeSoul, q: {ask: string[]; prefer?: string; floor: 'up' | 'down' | 'top' | number}, caps: EdgeCapability[], plans: Plans) => {id: string; note: string} | {code: string; reason: string} | null;
+  /** World-engine worlds only, floors (2026-10-26): the floor plates (a building's raised floor) within `radius` of `at`:
+   *  whether the point is on one, how far one is, how high above the terrain it lies and which sides are open (world
+   *  outward normals of the edges a body can step across). */
+  floorsNear?: (at: [number, number], radius: number) => FloorNear[];
   /** World-engine worlds only, RESOLVE: where a named thing that is not an engine body stands ([x, z]), by entity id. */
   thingAt?: (id: string) => [number, number] | null;
   /** World-engine worlds only, RESOLVE: the words of named things (beyond the listing), for reading a misspelt name. */
@@ -1822,6 +1826,9 @@ export function timeLabel(phase: number) {return phase < .2 ? 'morning' : phase 
 
 /** RESOLVE: a floor of a building named in plain words ("go upstairs", "go inside the cottage and go upstairs", "the top floor
  *  of the tower", "go downstairs"): which floor, and the words left that name the building (none: the one the Soul is in). */
+/** A floor plate near a body (floorsNear). */
+export type FloorNear = {id: string; name: string; y: number; rise: number; on: boolean; d: number; at: [number, number]; openings: [number, number][]};
+
 export function floorWords(text: string): {floor: 'up' | 'down' | 'top' | number; ask: string[]} | null {
   if (text.includes(':')) return null;
   const t = text.toLowerCase(), m = /\b(?:(up)stairs|(down)stairs|(?:go(?:ing)?|walk|climb|head|run|get)\s+(up|down)(?:\s+the)?\s+(?:stairs|staircase|steps)|climb(?:\s+up)?\s+the\s+(?:stairs|staircase)|(?:the\s+)?(upper|top|first|second|third|1st|2nd|3rd|ground|bottom|next)\s+(?:floor|storey|story|level))\b/.exec(t);

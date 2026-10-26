@@ -9,6 +9,8 @@ import {GodMode} from './god.ts';
 import {installEngineBridge} from './engine-bridge.ts';
 import {GroundHost} from './ground-host.ts';
 import {FLOOR_PLATES, plateIsStep, STEP_UP} from './floor-plates.ts';
+import {bodyEnd, hereFrame} from '../edge/perception/here.ts';
+import {aroundFrame} from '../edge/perception/around.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 test('the step rule: a plate up to 0.45 m above the terrain is a step (level 0); higher is a floor of its own', () => {
@@ -69,8 +71,20 @@ test('the presenter timber box on the Chiba deck is sat on top (0.41 m); one sta
   const caps = w.edge.capabilities(s as any), box = w.god.model.get('presenter-timber-box')!.id, lifted = w.god.model.get('floating-box')!.id;
   const onBox = caps.find(c => c.id === `sit:${box}`), off = caps.find(c => c.id === `sit:${lifted}`);
   assert.ok(onBox?.available, `the box on the deck is offered: ${JSON.stringify(onBox)}`);
-  assert.match(onBox!.label, /on top, 0\.41 m/);
+  assert.match(onBox!.label, /sit on top, 0\.41 m high/);
   assert.equal(off?.available, false, JSON.stringify(off));
   assert.equal(off!.blocked!.code, 'seat.inside');
   assert.match(off!.blocked!.reason, new RegExp(`Nearest seat you can use: sit:${box}`));
+  // F3: the agent is told the floor it stands on, and where the walk ended carries it
+  const here: any = hereFrame(w.edge, s as any);
+  assert.ok(here.floors?.some((l: string) => /^You are standing on the raised gallery floor of chiba, 0\.37 m above the ground; open on (all four sides|its .+ sides?)\.$/.test(l)), JSON.stringify(here.floors));
+  t.diagnostic(`here.floors ${JSON.stringify(here.floors)} sit ${onBox!.label}`);
+  const end: any = bodyEnd(w.edge, s.soulId);
+  assert.equal(end.floor, 'chiba-deck'); assert.ok(Math.abs(end.y - 0.37) < 0.02, JSON.stringify(end));
+  await accept(w.host, w.host.enqueue('edge-relocate', 'test:floors', {soulId: s.soulId, entityId: s.entityId, to: [-3, -12], why: 'outside Chiba'}));
+  await w.settle(2);
+  const around: any = aroundFrame(w.edge, s as any);
+  assert.ok(around.floors?.some((l: string) => /^The raised gallery floor of chiba: \d+ m .+, a 0\.37 m step up; open on /.test(l)), JSON.stringify(around.floors));
+  t.diagnostic(`around.floors ${JSON.stringify(around.floors)} blocked ${off!.blocked!.reason}`);
+  assert.equal(bodyEnd(w.edge, s.soulId)!.hasOwnProperty('floor'), false, 'off the deck: no floor in endedAt');
 });

@@ -12,7 +12,7 @@ import { applyBatch, obbOverlap, type Diff, type Entity, type Failure, type Op, 
 import { assetFromDef, assetIdFor, isFixtureDef, isFloatingDef, nearestSurfaceSlot, nextEntityPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
 import type { WorldHost } from '../world.ts';
 import type { LogEvent } from '@sim/protocol';
-import type { EdgeLedger } from '../edge/ledger/ledger.ts';
+import type { EdgeLedger, FloorNear } from '../edge/ledger/ledger.ts';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { GodMode } from './god.ts';
 import { reachProviders, seatProviders, syncProviders, usesProviders, type ReachEnd, type ReachEndpoint } from './query.ts';
@@ -576,6 +576,42 @@ export class EngineBridge {
     if (part.solids || part.surfaces || part.links) withLinkApproaches(part);
     return part.solids || part.surfaces || part.links || part.fixture ? part : null;
   }
+  /** Floors (2026-10-26): the measured floor plates (floor-plates.ts) of placed things within `radius` of `at`, in world
+   *  terms, with the sides a body can step across (clear ground 0.45 m outside and inside along ≥ 1 m of the edge). */
+  floorsNear(at: Vec2, radius: number): FloorNear[] {
+    const out: FloorNear[] = [], eng = this.engine as unknown as { clearanceAtV1?: (x: number, z: number, level?: number) => number }, epoch = (this.engine.world as { entityPhysicsV1?: { hash?: string } }).entityPhysicsV1?.hash ?? '';
+    for (const e of this.model.entities.values()) {
+      const def = this.model.resolvedDef(e.def); if (!def || def.make.kind !== 'mesh') continue;
+      const plates = floorPlatesOf(def.name); if (!plates.length) continue;
+      const wp = this.model.worldPose(e), c = Math.cos(wp.yaw), s = Math.sin(wp.yaw), k = wp.s;
+      const toW = (x: number, z: number): Vec2 => [wp.x + (x * c + z * s) * k, wp.z + (-x * s + z * c) * k];
+      const dx = (at[0] - wp.x) / k, dz = (at[1] - wp.z) / k, lx = dx * c - dz * s, lz = dx * s + dz * c;
+      for (const f of plates) {
+        const xs = f.polygon.map((p) => p[0]), zs = f.polygon.map((p) => p[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs);
+        const d = Math.hypot(Math.max(0, x0 - lx, lx - x1), Math.max(0, z0 - lz, lz - z1)) * k; if (d > radius) continue;
+        const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, centre = toW(cx, cz), y = r3(wp.y + f.y * k), key = `${e.id}|${f.id}|${epoch}`;
+        let openings = this.plateOpenings.get(key);
+        if (!openings) {
+          openings = [];
+          const sides: [Vec2, Vec2, Vec2][] = [[[x1, z0], [x1, z1], [1, 0]], [[x0, z0], [x0, z1], [-1, 0]], [[x0, z1], [x1, z1], [0, 1]], [[x0, z0], [x1, z0], [0, -1]]];
+          for (const [a, b, n] of sides) {
+            const len = Math.hypot(b[0] - a[0], b[1] - a[1]), steps = Math.max(1, Math.floor(len / 0.5)); let run = 0, best = 0;
+            for (let i = 0; i <= steps; i++) {
+              const t = i / steps, px = a[0] + (b[0] - a[0]) * t, pz = a[1] + (b[1] - a[1]) * t, o = toW(px + n[0] * 0.45, pz + n[1] * 0.45), q = toW(px - n[0] * 0.45, pz - n[1] * 0.45);
+              const clear = (eng.clearanceAtV1?.(o[0], o[1], 0) ?? 0) >= 0.3 && (eng.clearanceAtV1?.(q[0], q[1], 0) ?? 0) >= 0.3;
+              run = clear ? run + len / steps : 0; best = Math.max(best, run);
+            }
+            if (best >= 1) openings.push([r3(n[0] * c + n[1] * s), r3(-n[0] * s + n[1] * c)]);
+          }
+          if (this.plateOpenings.size > 64) this.plateOpenings.clear();
+          this.plateOpenings.set(key, openings);
+        }
+        out.push({ id: f.id, name: `the ${f.label} of ${this.model.pathOf(e.id)}`, y, rise: r3(y - this.model.terrain.sample(centre[0], centre[1])), on: d === 0, d: Math.round(d), at: [r3(centre[0]), r3(centre[1])], openings });
+      }
+    }
+    return out.sort((a, b) => a.d - b.d || a.id.localeCompare(b.id));
+  }
+  private plateOpenings = new Map<string, Vec2[]>();
   /** A deck/1 at the root, high enough to have rails (generators DECK_RAISED): its floor is a level of its own. */
   private isRaisedDeck(e: Entity, def = this.model.resolvedDef(e.def)): boolean {
     return !!def && def.make.kind === 'gen' && def.make.gen === 'deck/1' && def.form !== 'point' && e.in.parent === 'world' && deckRaised(e.params ?? {});
@@ -1385,6 +1421,7 @@ export class EngineBridge {
     L.thingOnDemand = (soul, ask, caps, plans) => pass('thing on demand', () => this.nav.thingOnDemand(soul, ask, caps, plans, tokenHit), null);
     L.walkRefOnDemand = (soul, ref, caps, plans) => pass('walk ref on demand', () => this.nav.walkRefOnDemand(soul, ref, caps, plans), false);
     L.floorOnDemand = (soul, q, caps, plans) => pass('floor on demand', () => this.nav.floorOnDemand(soul, q, caps, plans, tokenHit), null);
+    L.floorsNear = (at, radius) => pass('floors near', () => this.floorsNear(at, radius), []);
     L.thingAt = (id) => { const t = this.nav.thingById(id); return t ? [t.at[0], t.at[1]] : null; };
     L.thingWords = () => pass('thing words', () => this.nav.thingWords(), [] as string[]);
     L.beforeMap = () => { this.flush(); this.perceiveSync(); };
@@ -1507,7 +1544,7 @@ export class EngineBridge {
         const feet = levelOf(x) === 0 ? this.engine.standYAtV1?.(x.pose.p[0], x.pose.p[2], 0) : undefined, lift = typeof feet === 'number' ? x.pose.p[1] - feet : 0;
         const inside = lift > SEAT_LIFT ? { code: 'seat.inside', reason: `${name(x.id)} stands ${lift.toFixed(2)} m above the floor you would stand on there, on something the world does not walk on: sitting on it would put you inside it.` } : null;
         const top = tops.length ? Math.min(...tops) : undefined, ownDef = ent ? this.model.resolvedDef(ent.def) : undefined;
-        const onTop = top !== undefined && ownDef && ownDef.size.box[1] > 0 && top >= ownDef.size.box[1] * (ent ? this.model.worldPose(ent).s : 1) - 0.05 ? `on top, ${top.toFixed(2)} m; ` : top !== undefined ? `seat ${top.toFixed(2)} m; ` : '';
+        const onTop = top !== undefined && ownDef && ownDef.size.box[1] > 0 && top >= ownDef.size.box[1] * (ent ? this.model.worldPose(ent).s : 1) - 0.05 ? `sit on top, ${top.toFixed(2)} m high; ` : top !== undefined ? `seat ${top.toFixed(2)} m high; ` : '';
         const block = mine ? { code: 'seat.yours', reason: `You are sitting on ${name(x.id)} already; stand:here to get up.` } : full ? { code: 'seat.taken', reason: `${(others.length ? others : [u!.body]).map((b) => this.soulName(b)).join(' and ')} ${others.length > 1 ? 'are' : 'is'} sitting there.` } : misfit ? { code: misfit.code, reason: `${name(x.id)} does not fit your body: ${misfit.message}.` } : inside;
         const label = labelOf(onTop);
         if (block?.code === 'seat.inside' || block?.code === 'seat.too-high') unusable.push(caps.length); else if (!block) usable.push({ id, label, d });
