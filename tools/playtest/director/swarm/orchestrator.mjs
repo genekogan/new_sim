@@ -135,9 +135,11 @@ export function createSwarm({ cast, runDir, seats, world, owner, truth, plan, cl
   }
   async function sampleLoop(st) { while (!state.stopped) { const t0 = clock.now(); await sampleSeat(st); await clock.sleep(Math.max(500, (cast.observer?.sampleSec ?? 15) * 1000 - (clock.now() - t0))); } }
   async function wideLoop() {
-    const cam = camOf('wide'); if (!cam) return;
+    // The wide camera opens in the background (arrival can take minutes on software GL): wait for it, then sample.
+    if (!observer) return;
     while (!state.stopped) {
-      const t0 = clock.now();
+      const t0 = clock.now(); const cam = camOf('wide');
+      if (!cam) { await clock.sleep(5000); continue; }
       try { const mono = Math.round(clock.now() - start); const p = join(runDir, 'shots', 'wide', `${mono}.png`); mkdirSync(join(runDir, 'shots', 'wide'), { recursive: true }); await cam.shot(p); appendJsonl(join(runDir, 'shots', 'index.jsonl'), { cam: 'wide', mono, t: iso(), path: p }); } catch (e) { log(`wide shot: ${e?.message ?? e}`); }
       await clock.sleep(Math.max(500, (cast.observer?.sampleSec ?? 15) * 1000 - (clock.now() - t0)));
     }

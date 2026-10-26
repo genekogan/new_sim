@@ -64,3 +64,32 @@ Brief: `<team>/TRANCHE-SWARM-DIRECTOR-20261026.md`. Branch `lane/swarm-director-
   scripted redirect changes the talk and is observed, broadcast/seat lines verbatim, pause/resume/end, economy, gather
   timeout drop, log files, story.html renders director moments.
 - Planner checked for real on seven-dwarves: opus, 30 s, $0.073, all 21 directions from the model.
+- Local smoke 2026-10-26 03:19Z (load 5–6): `node tools/playtest/playtest.mjs direct tools/playtest/scenarios/casts/smoke-duo.json --headless`
+  on a local eden-district dev world (soul3-integration server), two haiku seats, template plan →
+  **PASS** (allPresent, eachPresented, inOrder, eachOnce, redirect observed), 8 min of play, $0.073 seats total.
+  Run: `<team>/playtest/runs/20261026-031937-smoke-duo-7002` (director/VERDICT.md, story.html with 6 director
+  moments). Room match `hall` works (placePath `hall / eden-library-1`). Latency: gather card → in hall ~2 min;
+  go → first speech 107 s for Doc (no prepare) vs 40 s for Grumpy (prepared ahead). Fixed after it: the wide camera
+  loop now waits for the camera to open (the smoke had no wide shots).
+
+## Cloud acceptance (not run yet)
+
+Cloud session (Sim Env `env_01VeMJKsnDSYrGaH6hdWakQ7`) on `genekogan/sim`, prompt:
+
+> `cd /home/user/sim && git fetch origin lane/swarm-director-20261026 && git checkout lane/swarm-director-20261026 &&
+> PLAYTEST_DIRECT=tools/playtest/scenarios/casts/seven-dwarves.json nohup setsid bash tools/playtest/cloud/run-replay.sh main dwarves-r1 1 > /tmp/dwarves-r1.log 2>&1 &`
+> then poll with foreground calls under 10 minutes each (`sleep 540; tail -n 30 /tmp/dwarves-r1.log; pgrep -f run-replay.sh || echo FINISHED`)
+> until FINISHED, and report `results/dwarves-r1/seven-dwarves-r1/director/VERDICT.md` in full, the playtest-results
+> push result and CLOUD.md.
+
+Results: branch `playtest-results`, `results/dwarves-r1/seven-dwarves-r1/` (story.html, director/VERDICT.md with
+per-seat tokens/USD). The live-console redirect is scripted in the cast (`at: go:sleepy` → redirect Grumpy to the piano).
+
+## Open items
+
+- The interactive console (stdin) is unit-tested through `submit()` only; a hand session by Gene is its real test.
+- The first direction's director's view has no picture when the follow camera is still opening (story uses the next).
+- `world.kind: "url"` / `--world` skips provisioning but seats onboard with the dev onboarding text; on a real world
+  the owner approval flow applies (rehearse on a dev or forked world, per the brief).
+- Speech finish = card result or `quietSec` silence; a seat that talks in many short lines with >25 s gaps would be
+  cut early (raise `timing.quietSec`).
