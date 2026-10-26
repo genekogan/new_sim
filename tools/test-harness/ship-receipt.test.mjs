@@ -41,3 +41,10 @@ test('CLI writes ship-receipt.json next to the gate receipt and exits by status'
     assert.equal(bad.status, 1); assert.match(bad.stdout, /^RELEASE_SHIP BLOCKED/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+test('a scoped or not-gated candidate gate never makes a ship receipt; a full-scope gate does', () => {
+  for (const resolved of ['scoped', 'none']) {
+    const r = combineReceipts(gate({ scope: { mode: 'auto', resolved } }), v7());
+    assert.equal(r.status, 'blocked'); assert.match(r.blockers.join('\n'), new RegExp(`gate scope ${resolved}`));
+  }
+  assert.equal(combineReceipts(gate({ scope: { mode: 'auto', resolved: 'full' } }), v7()).status, 'quarantined');
+});

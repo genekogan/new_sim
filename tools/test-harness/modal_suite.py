@@ -5,7 +5,8 @@
 # in the serial step order, one V5-server-full.log (the shard logs concatenated in order, i.e. the serial TAP), one
 # RUN-METADATA.json (suiteCompleted only if every group completed). Each group's own SUMMARY/metadata/V0/install
 # logs stay under out/groups/<name>/ for audit. A missing group, step or shard fails closed in the gate.
-# Inside: node $REMOTE_SUITE_NODE + pnpm 10.27.0, a fresh `pnpm install --frozen-lockfile`, then
+# Inside: node $REMOTE_SUITE_NODE + pnpm 10.27.0, `pnpm install --frozen-lockfile` (offline from the image's cached
+# dependency layer when the lockfile matches it), then
 # tools/test-harness/one-validation.sh --skip <skip> (V7 real-Chrome walks and V8 laptop-history boot are skipped by
 # default: no GPU, and the production histories live on the laptop). The container has its own network namespace, so
 # the test ports can't collide with anything. Returns /out as a tarball that remote-suite.sh unpacks into <outDir>.
@@ -33,6 +34,15 @@ image = (
     .run_commands("corepack enable && corepack prepare pnpm@10.27.0 --activate && pnpm --version" if int(NODE.split(".")[0]) < 25
                   else "npm install -g pnpm@10.27.0 && pnpm --version")
 )
+# Prebuilt dependency layer (lane gate-cost, 2026-10-26, MODAL-POLICY rule 3): remote-suite.sh stages the source ref's
+# pnpm-lock.yaml (+ pnpm-workspace.yaml, whose overrides the lockfile records) in <stage>/deps. Copied into the image,
+# they key a cached layer holding the `pnpm fetch` store for exactly that lockfile, so a container only links
+# node_modules offline (prep() below) and nothing is downloaded unless the lockfile changed.
+DEPS = os.path.join(SRC, "deps") if SRC else None
+if DEPS and os.path.exists(os.path.join(DEPS, "pnpm-lock.yaml")):
+    image = image.add_local_dir(DEPS, "/deps", copy=True).run_commands(
+        "cd /deps && sha256sum pnpm-lock.yaml | cut -d' ' -f1 > LOCK.sha256"
+        " && pnpm fetch --store-dir /pnpm-store > fetch.log 2>&1 && tail -n 2 fetch.log && echo \"cached layer $(cat LOCK.sha256)\"")
 if SRC:
     image = image.add_local_dir(SRC, "/in")
 
@@ -49,8 +59,16 @@ prep() {  # prep <tgz> <dir>: unpack, make it a git repo (one-validation's V0 re
   if [ -f /in/historical-inputs.pack ]; then
     git index-pack --stdin < /in/historical-inputs.pack || return 1
   fi
-  pnpm install --frozen-lockfile > "/out/install-$(basename "$2").log" 2>&1; local rc=$?
-  echo "install $(basename "$2") rc=$rc"; tail -n 3 "/out/install-$(basename "$2").log"
+  # the image's dependency layer serves this tree when it was fetched for the identical lockfile (sha256)
+  local log="/out/install-$(basename "$2").log" lock; lock=$(sha256sum pnpm-lock.yaml | cut -d' ' -f1)
+  if [ -f /deps/LOCK.sha256 ] && [ "$lock" = "$(cat /deps/LOCK.sha256)" ]; then
+    { echo "cached layer $lock"; pnpm install --frozen-lockfile --offline --store-dir /pnpm-store ||
+      { echo "offline install from cached layer $lock failed; installing online"; pnpm install --frozen-lockfile; }; } > "$log" 2>&1
+  else
+    { echo "no cached layer for lockfile $lock (layer: $(cat /deps/LOCK.sha256 2>/dev/null || echo none)); full install"
+      pnpm install --frozen-lockfile; } > "$log" 2>&1
+  fi; local rc=$?
+  echo "install $(basename "$2") rc=$rc"; head -n 1 "$log"; tail -n 3 "$log"
   return "$rc"
 }
 rm -rf /out /work  # never inherit a previous input's tree or results (see single_use_containers below)
@@ -81,36 +99,47 @@ ORDER = ["V1-types", "V2-build-root", "V2-build-worlds", "V3-harness", "V3-walk"
          "V3-launcher-unit", "V4-web", "V4-web-baseline", "V5-server-full", "V5-server-baseline", "V6-scenarios", "V6-party",
          "V6-souls-r2", "V6-join-clerk", "V6-join-dev", "V6-souls-ux", "V6-mars-two", "V6-lm-two",
          "V7-old-worlds", "V7-new-world", "V7-camera-dpr2", "V7-god-modal", "V8-history-boot"]
-# Groups balanced on the 3.8 gate's step times (seconds: V3-mars-engine 371, V3-client-cli 356, V6-souls-r2 287,
-# V6-lm-two 191, V3-packages 164, V6-party 148, V4-web 143, V6-mars-two 126, V3-launcher-unit 115, V1-types 68).
+# Right-sized fan-out (lane gate-cost, 2026-10-26, team/lanes/MODAL-POLICY.md rule 3). Step times of the 7696422b0 gate
+# (seconds): V3-mars-engine 421, V3-client-cli 393, V6-souls-r2 286, V3-launcher-unit 214, V4-web 211, V6-lm-two 187,
+# V3-packages 171, V6-party 146, V6-mars-two 127, V3-walk 97, V1-types 70. Group a builds the web twice (prep + V2) and
+# keeps 8 CPU; every other container is 4 CPU / 8 GB. The former small groups b, c, d, e, f, w run as one container "s"
+# (serial sum ~1870 s, i.e. ~31-40 min at 4 CPU) beside 2 V5 shards (~2280 s of serial tests each, --test-concurrency=1,
+# so 4 cores are enough): 4 containers per run instead of 15, wall ~45-50 min instead of ~22 (accepted by the policy).
 # Every step of ORDER is in exactly one group. Ports differ per V6 step, but each group still runs its steps serially.
 GROUPS = {
     "a": ["V1-types", "V2-build-root", "V2-build-worlds", "V3-harness", "V3-bundle", "V3-packages", "V4-web", "V4-web-baseline",
           "V6-scenarios", "V6-join-clerk", "V6-join-dev", "V7-old-worlds", "V7-new-world",
           "V7-camera-dpr2", "V7-god-modal", "V8-history-boot"],
-    "b": ["V3-mars-engine"],
-    "c": ["V3-client-cli"],
-    "d": ["V3-launcher-unit", "V6-party", "V6-mars-two"],
-    "e": ["V6-souls-r2", "V6-souls-ux"],
-    "f": ["V6-lm-two"],
-    # lane WALK (2026-10-21): the walkability audit runs ~10 shard processes at once, so it gets a container of its own
-    "w": ["V3-walk"],
+    # the former groups b, c, d, e, f and w; one-validation.sh runs them in its serial order (V3-walk's ~10 shard
+    # processes now share 4 cores: 97 s at 8 CPU)
+    "s": ["V3-walk", "V3-mars-engine", "V3-client-cli", "V3-launcher-unit", "V6-party", "V6-souls-r2", "V6-souls-ux",
+          "V6-mars-two", "V6-lm-two"],
 }
-V5_SHARDS = 8
+LARGE = {"a"}  # groups on the 8 CPU / 16 GB function; all others use 4 CPU / 8 GB
+V5_SHARDS = 2
 assert sorted(s for g in GROUPS.values() for s in g) == sorted(set(ORDER) - {"V5-server-full", "V5-server-baseline"})
 
 
 # max_containers (lane GATECAP, 2026-10-23; Modal 1.5.2 keyword): the edenartlab workspace has a 100-container limit.
-# `modal run` makes a fresh ephemeral app per gate, so this caps ONE gate, not all of them: at most one gate's full
-# fan-out (7 groups + 8 V5 shards = 15) in flight, extra inputs (e.g. preemption restarts) queue instead of adding
-# containers. The cross-gate bound is the ledger team/lanes/GATES.inflight (at most 3 gates = 45 containers).
-MAX_CONTAINERS = len(GROUPS) + V5_SHARDS
+# `modal run` makes a fresh ephemeral app per run, so this caps ONE run, not all of them: at most one run's fan-out
+# (group a on run_large; group s + 2 V5 shards on run) in flight, extra inputs (e.g. preemption restarts) queue instead
+# of adding containers. The cross-gate bound is the ledger team/lanes/GATES.inflight.
+MAX_SMALL = len(GROUPS) - len(LARGE) + V5_SHARDS
 
 
 # single_use_containers: a preempted input is restarted by Modal, and without this it can land on a warm container that
 # already ran another group (2026-10-19, R's 3.9 gate: group b's suite came back as shard v5-1). One input per container.
-@app.function(image=image, cpu=8.0, memory=16384, timeout=4 * 3600, single_use_containers=True, max_containers=MAX_CONTAINERS)
+@app.function(image=image, cpu=8.0, memory=16384, timeout=4 * 3600, single_use_containers=True, max_containers=len(LARGE))
+def run_large(skip: str, server_files: str = "", only: str = "", shard: str = "") -> bytes:
+    return suite(skip, server_files, only, shard)
+
+
+@app.function(image=image, cpu=4.0, memory=8192, timeout=4 * 3600, single_use_containers=True, max_containers=MAX_SMALL)
 def run(skip: str, server_files: str = "", only: str = "", shard: str = "") -> bytes:
+    return suite(skip, server_files, only, shard)
+
+
+def suite(skip: str, server_files: str, only: str, shard: str) -> bytes:
     files = server_files.split()
     if any(not re.fullmatch(r"src/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_.-]+\.test\.ts", f) for f in files):
         raise ValueError("server files must be src/<safe path>/<name>.test.ts")
@@ -124,9 +153,17 @@ def run(skip: str, server_files: str = "", only: str = "", shard: str = "") -> b
     return buf.getvalue()
 
 
-def plan(server_files: str):
-    """(name, only, shard) per container. A bounded --server-files run keeps V5 (and its baseline) in one container."""
-    jobs = [(name, ",".join(steps), "") for name, steps in GROUPS.items()]
+def plan(server_files: str, only: str = ""):
+    """(name, only, shard) per container. A bounded --server-files run keeps V5 (and its baseline) in one container.
+    A scoped run (only = the contract steps release-gate.sh --scope auto picked) launches only the groups and V5 shards
+    holding those steps."""
+    pick = set(only.split(",")) - {""}
+    jobs = []
+    for name, steps in GROUPS.items():
+        chosen = [s for s in steps if not pick or s in pick]
+        if chosen: jobs.append((name, ",".join(chosen), ""))
+    if pick and "V5-server-full" not in pick:
+        return jobs
     if server_files.split():
         jobs.append(("v5", "V5-server-full,V5-server-baseline", ""))
     else:
@@ -264,12 +301,18 @@ def shutil_copy(r, w):
 
 
 @app.local_entrypoint()
-def main(out: str, skip: str = "V7,V8", server_files: str = ""):
+def main(out: str, skip: str = "V7,V8", server_files: str = "", only: str = ""):
     import time
-    jobs = plan(server_files)
+    if not re.fullmatch(r"[A-Za-z0-9_,-]*", only) or (set(only.split(",")) - {""}) - set(ORDER):
+        raise ValueError(f"--only names unknown steps: {only}")
+    jobs = plan(server_files, only)
     t0 = time.time()
     print(f"fan-out: {len(jobs)} containers: {', '.join(j[0] for j in jobs)}")
-    results = list(run.starmap([(skip, server_files, only, shard) for _, only, shard in jobs], return_exceptions=True, order_outputs=True))
+    calls = [(run_large if name in LARGE else run).spawn(skip, server_files, only, shard) for name, only, shard in jobs]
+    results = []
+    for call in calls:  # in job order; a failed container is an exception result, which merge() reports and fails closed
+        try: results.append(call.get())
+        except Exception as e: results.append(e)
     print(f"all containers returned in {time.time() - t0:.0f} s")
     os.makedirs(out, exist_ok=True)
     problems = merge(out, jobs, results)
