@@ -33,8 +33,8 @@ export function setAssetLoader(loader: GLTFLoader): () => void {
 function loader(): GLTFLoader {
   return (shared ??= { loader: new GLTFLoader().setDRACOLoader(new DRACOLoader().setDecoderPath(BASE + '/mars-assets/draco/')).setMeshoptDecoder(MeshoptDecoder) }).loader;
 }
-/** URL of a stored asset (served immutable by the world's server). */
-export const assetUrl = (sha: string, ext = 'glb') => apiPath(`/assets/${sha}.${ext}`);
+/** GLB source identities select a mutable viewer representation; other stored objects retain their hash URL. */
+export const assetUrl = (sha: string, ext = 'glb') => apiPath(`/${ext === 'glb' ? 'asset-view' : 'assets'}/${sha}.${ext}`);
 
 const cache = new Map<string, { p: Promise<GLTF>; by: GLTFLoader | null; settled: boolean }>();
 const failed = new Set<string>();

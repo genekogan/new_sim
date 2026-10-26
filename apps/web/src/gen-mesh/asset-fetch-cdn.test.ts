@@ -40,7 +40,7 @@ test('the page posts each listed GLB with its CDN route; unlisted ones go to the
 });
 
 /** Run the worker's source with a fake `self` and `fetch`; returns what it posts for one job and which URLs it fetched. */
-async function runWorker(cdnBody: Uint8Array | null, status = 200) {
+async function runWorker(cdnBody: Uint8Array | null, status = 200, originUrl = 'https://sim.eden.art/w/eden/assets/x.glb') {
   const { SRC } = await import('./asset-fetch.ts');
   const out: Record<string, unknown>[] = [], fetched: string[] = [];
   const origin = new Uint8Array([7, 7, 7]);
@@ -52,7 +52,7 @@ async function runWorker(cdnBody: Uint8Array | null, status = 200) {
   };
   const self: { onmessage?: (ev: { data: unknown }) => Promise<void>; postMessage: (m: Record<string, unknown>) => void } = { postMessage: (m) => out.push(m) };
   new Function('self', 'fetch', SRC)(self, fetch);
-  await self.onmessage!({ data: { id: 1, url: 'https://sim.eden.art/w/eden/assets/x.glb', cdn: { url: 'https://assets.eden.art/assets/aa/x.glb', sha256, bytes: bytes.length }, images: false } });
+  await self.onmessage!({ data: { id: 1, url: originUrl, cdn: { url: 'https://assets.eden.art/assets/aa/x.glb', sha256, bytes: bytes.length }, images: false } });
   const last = out.at(-1)!;
   return { fetched, cdn: last.cdn === true, bytes: last.buffer ? [...new Uint8Array(last.buffer as ArrayBuffer)] : null };
 }
@@ -65,6 +65,26 @@ test('worker: verified CDN bytes are delivered without touching the origin; anyt
     ['oversize', await runWorker(new Uint8Array([...bytes, 1]))], ['short', await runWorker(bytes.slice(1))]] as const) {
     assert.deepEqual(r, { fetched: ['https://assets.eden.art/assets/aa/x.glb', 'https://sim.eden.art/w/eden/assets/x.glb'], cdn: false, bytes: [7, 7, 7] }, why);
   }
+});
+
+test('worker view jobs retain the mutable origin URL with unchanged CDN content keys, including unpublished/disabled cases', async () => {
+  const { setCdnRouteForTest, readCdnManifest, noteUploadSizes, clearUploadSizesForTest } = await import('../cdn-assets.ts');
+  const { fetchInWorker } = await import('./asset-fetch.ts');
+  const prior = globalThis.location, view = `https://sim.eden.art/w/eden/asset-view/${listed}.glb`;
+  (globalThis as { location: unknown }).location = new URL('https://sim.eden.art/worlds/w/bench-hamlet/');
+  try {
+    setCdnRouteForTest(readCdnManifest(manifest));
+    await fetchInWorker(view);
+    assert.equal(posted.at(-1)!.url, view); assert.equal((posted.at(-1)!.cdn as { sha256: string }).sha256, sha256);
+    const up = 'a'.repeat(64), upload = `https://sim.eden.art/worlds/w/bench-hamlet/asset-view/${up}.glb`;
+    noteUploadSizes({ [up]: 4096 }); await fetchInWorker(upload);
+    assert.equal(posted.at(-1)!.url, upload); assert.deepEqual(posted.at(-1)!.cdn, { url: `https://assets.eden.art/w/bench-hamlet/assets/${up}.glb`, sha256: up, bytes: 4096 });
+    await fetchInWorker(`/worlds/w/bench-hamlet/asset-view/${'b'.repeat(64)}.glb`); assert.equal(posted.at(-1)!.cdn, undefined, 'unpublished upload has no inferred CDN route');
+    setCdnRouteForTest(null); await fetchInWorker(view); assert.equal(posted.at(-1)!.url, view); assert.equal(posted.at(-1)!.cdn, undefined, 'disabled/missing manifest keeps the view origin');
+    const wrong = new Uint8Array(bytes); wrong[0] ^= 1;
+    const fallback = await runWorker(wrong, 200, view);
+    assert.deepEqual(fallback.fetched, ['https://assets.eden.art/assets/aa/x.glb', view]); assert.equal(fallback.cdn, false); assert.deepEqual(fallback.bytes, [7, 7, 7]);
+  } finally { clearUploadSizesForTest(); setCdnRouteForTest(null); (globalThis as { location: unknown }).location = prior; }
 });
 
 test('CDN4: the asset worker gets the Worker route for a sized god upload on its own /worlds page', async () => {

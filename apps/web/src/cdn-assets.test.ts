@@ -37,6 +37,33 @@ test('default-off never asks for a manifest; dynamic world slugs use explicit im
   assert.equal(manifestAsset(hashes, `/worlds/w/owner-created/assets/${sha256}.glb?v=new`, page), undefined);
 });
 
+test('mutable GLB view aliases reuse reviewed content keys without erasing version queries or world scope', () => {
+  const of = 'd'.repeat(64), rendition = { ...entry, of, licence: 'served-public' };
+  const hashes = readCdnManifest({ version: 1, assets: { [`/assets/${of}.glb`]: rendition, [`/worlds/assets/${of}.glb`]: rendition } });
+  for (const prefix of ['', '/worlds']) for (const scope of ['', '/w/fixture-world']) {
+    assert.equal(manifestAsset(hashes, `${prefix}${scope}/asset-view/${of}.glb`, page), rendition);
+    assert.equal(manifestAsset(hashes, `${prefix}${scope}/asset-view/${of}.glb?v=other`, page), undefined);
+    assert.equal(manifestAsset(hashes, `${prefix}${scope}/asset-view/${of}.png`, page), undefined);
+  }
+  const scopedEntry = { ...entry, key: `assets/worlds/w/eden/${sha256}.glb`, licence: 'world-scoped' };
+  const scoped = readCdnManifest({ version: 1, assets: {}, worlds: { '/worlds/w/eden': { [`/worlds/w/eden/assets/${sha256}.glb`]: scopedEntry } } });
+  assert.equal(manifestAsset(scoped, `/worlds/w/eden/asset-view/${sha256}.glb`, page), scopedEntry);
+  assert.equal(manifestAsset(scoped, `/worlds/w/eden/asset-view/${sha256}.glb`, 'https://sim.eden.art/worlds/w/other'), undefined);
+  assert.equal(manifestAsset(hashes, `https://other.test/worlds/asset-view/${of}.glb`, page), undefined);
+});
+
+test('page view transport keeps the new origin URL on CDN failure and missing publication', async () => {
+  const of = 'd'.repeat(64), view = `https://sim.eden.art/worlds/w/eden/asset-view/${of}.glb`;
+  const hashes = readCdnManifest({ version: 1, assets: { [`/worlds/assets/${of}.glb`]: { ...entry, of, licence: 'served-public' } } });
+  const calls: string[] = [];
+  const original: typeof fetch = async input => { const url = String(input); calls.push(url); if (url.startsWith('https://assets.eden.art/')) throw Error('CDN unavailable'); return new Response('current origin representation'); };
+  assert.equal(await (await cdnFetch(original, hashes, 'https://assets.eden.art', page)(view)).text(), 'current origin representation');
+  assert.deepEqual(calls, ['https://assets.eden.art/' + entry.key, view]);
+  calls.length = 0;
+  assert.equal(await (await cdnFetch(original, { version: 1, assets: {} }, 'https://assets.eden.art', page)(view)).text(), 'current origin representation');
+  assert.deepEqual(calls, [view]);
+});
+
 test('prepared publication manifest validates and resolves real core mesh requests on both site surfaces', () => {
   const prepared = readCdnManifest(JSON.parse(readFileSync(new URL('./cdn-manifest.json', import.meta.url), 'utf8')));
   const cow = 'bbb287748cb8dbbe4fbf63ca5d92c823cda863139bb4830182b3fc66a1f6deb9';

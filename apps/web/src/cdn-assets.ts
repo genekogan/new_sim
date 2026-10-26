@@ -69,15 +69,21 @@ export function manifestAsset(manifest: CdnManifest, input: string, pageUrl: str
     const url = new URL(input, pageUrl);
     if (url.origin !== new URL(pageUrl).origin || !FILE.test(url.pathname)) return;
     // World-scoped publications apply only on their own world's page, by exact path and version query.
-    const world = pageWorld(pageUrl), scoped = world ? manifest.worlds?.[world]?.[url.pathname + url.search] : undefined;
+    const world = pageWorld(pageUrl);
+    const viewAlias = !url.search && /^(?:\/worlds)?(?:\/w\/[a-z][a-z0-9-]{0,31})?\/asset-view\/[a-f0-9]{64}\.glb$/.test(url.pathname)
+      ? url.pathname.replace('/asset-view/', '/assets/') : undefined;
+    const scoped = world ? manifest.worlds?.[world]?.[url.pathname + url.search] ?? (viewAlias ? manifest.worlds?.[world]?.[viewAlias] : undefined) : undefined;
     if (scoped) return scoped;
     // Query strings are version pins. Do not silently give a newly pinned request an older pathname's bytes.
     const direct = manifest.assets[url.pathname + url.search];
     if (direct || url.search) return direct;
     // Entity worlds serve stored bytes under their own slug. Only a reviewed immutable hash may share
     // the canonical /assets alias; this does not turn arbitrary world paths or uploads into public CDN URLs.
-    const stored = /^(\/worlds)?\/w\/[a-z][a-z0-9-]{0,31}\/assets\/([a-f0-9]{64}\.[a-z0-9]+)$/.exec(url.pathname);
-    return (stored ? manifest.assets[(stored[1] ?? '') + '/assets/' + stored[2]] : undefined) ?? godUpload(url.pathname, pageUrl);
+    const stored = /^(\/worlds)?\/w\/[a-z][a-z0-9-]{0,31}\/(?:assets\/([a-f0-9]{64}\.[a-z0-9]+)|asset-view\/([a-f0-9]{64}\.glb))$/.exec(url.pathname);
+    // The mutable view alias keeps the same reviewed actual-content CDN key. Only its origin fallback revalidates.
+    const view = /^(\/worlds)?\/asset-view\/([a-f0-9]{64}\.glb)$/.exec(url.pathname);
+    return (stored ? manifest.assets[(stored[1] ?? '') + '/assets/' + (stored[2] ?? stored[3])] :
+      view ? manifest.assets[(view[1] ?? '') + '/assets/' + view[2]] : undefined) ?? godUpload(url.pathname, pageUrl);
   } catch { return; }
 }
 
@@ -89,7 +95,7 @@ export function manifestAsset(manifest: CdnManifest, input: string, pageUrl: str
 // (`/w/<slug>`) serve no uploads, so only `/worlds/w/` pages qualify. Off: SIM_GOD_UPLOADS_CDN=0 at build, `?godcdn=0`.
 declare const __SIM_GOD_UPLOADS_CDN__: boolean | undefined;
 export const UPLOAD_MAX_BYTES = 32 * 1024 * 1024;   // the Worker's own cap
-const UPLOAD = /^\/worlds\/w\/([a-z][a-z0-9-]{0,31})\/assets\/([a-f0-9]{64})\.glb$/;
+const UPLOAD = /^\/worlds\/w\/([a-z][a-z0-9-]{0,31})\/(?:assets|asset-view)\/([a-f0-9]{64})\.glb$/;
 const uploadSizes = new Map<string, number>();
 const godUploadsOn = () => (typeof __SIM_GOD_UPLOADS_CDN__ === 'undefined' || __SIM_GOD_UPLOADS_CDN__) &&
   !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('godcdn') === '0');

@@ -123,7 +123,7 @@ test('core assets: every core mesh def resolves to a file and a measured lookup'
   assert.equal(tower.slots.filter((s) => s.kind === 'room').length, 4);
 });
 
-test('routes: upload a GLB, define it, place it, fetch it immutable; refuse junk and strangers', async () => {
+test('routes: upload a GLB, define it, place it, fetch it with validators; refuse junk and strangers', async () => {
   const f = fixture();
   const glb = repo(DOG);
   const form = new FormData();
@@ -138,13 +138,14 @@ test('routes: upload a GLB, define it, place it, fetch it immutable; refuse junk
   assert.match(up.data.report, /602 tris/);
   const placed = f.god.act({ ops: [{ op: 'place', def: 'rex@1', p: [3, 4], name: 'rex' }] });
   assert.equal(placed.accepted, true, JSON.stringify(placed));
-  // the file: immutable, ETag = sha, 304 on revalidation
+  // This uploaded pack is also in core: its source alias may acquire a rendition and must validate.
   const get = await f.req(up.data.asset.url);
   assert.equal(get.status, 200);
-  assert.equal(get.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+  assert.equal(f.store.isCore(up.data.asset.sha), true);
+  assert.equal(get.headers.get('cache-control'), 'public, no-cache');
   assert.equal(get.bytes.byteLength, glb.byteLength);
   assert.equal((await f.req(up.data.asset.url, { headers: { 'if-none-match': `"${up.data.asset.sha}"` } })).status, 304);
-  // core assets are served the same way
+  // other core assets remain available
   const tower = f.god.model.def('core/ceramic-tower@1')!;
   assert.equal((await f.req(`/assets/${(tower.make as { asset: string }).asset}.glb`)).status, 200);
   // raw body upload with query params; junk refused; no token refused

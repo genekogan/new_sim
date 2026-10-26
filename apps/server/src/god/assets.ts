@@ -340,6 +340,8 @@ export class AssetStore {
     return existsSync(p) ? p : null;
   }
   private renditions: ReturnType<typeof readRenditions> | null = null;
+  /** Core source identities can acquire a different viewer rendition in a later release. */
+  isCore(sha: string): boolean { return Object.hasOwn(this.core, sha); }
   /** W3b: the smaller encoding of a core mesh the viewer gets instead (worlds/core-assets/renditions.json), or null. */
   rendition(sha: string) { if (!this.core[sha]) return null; this.renditions ??= readRenditions(this.renditionIndex, REPO_ROOT); return this.renditions.get(sha) ?? null; }
   coreAssets(): AssetMeta[] { return Object.entries(this.core).map(([sha, m]) => ({ ...m, sha })); }
@@ -544,7 +546,8 @@ const noStore = { 'cache-control': 'no-store' };
 /**
  * Mount the asset and catalog routes. Must run before mountGodRoutes' own `/v1/god/defs` (the lead calls
  * this at the top of mountGodRoutes). Also wires the store into the world model as its AssetLookup.
- *   GET  /assets/<sha>.<ext>                 immutable, ETag = sha (store or core)
+ *   GET  /assets/<sha>.<ext>                 immutable objects; core GLB aliases revalidate
+ *   GET  /asset-view/<source-sha>.glb        current viewer representation, revalidated by ETag
  *   POST /v1/god/assets                      god: multipart (file, footprint?, name?, height?, tags?, license?, source?, define?) or raw body + query
  *   GET  /v1/god/assets[?core=1]             god: this world's uploads (and the core assets)
  *   GET  /v1/god/assets/<sha>                public: measured facts
@@ -564,19 +567,26 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
 
   // W3b: a core mesh's rendition (renditions.json) goes out under the source sha; brotli once ready (asset-wire.ts)
   const wire = d.wire ?? new WireCache(join(store.dir, 'wire'));
-  app.get('/assets/:file{[0-9a-f]{64}\\.(glb|png|jpg|json)}', (c) => {
-    const [sha, ext] = c.req.param('file').split('.');
+  const serveAsset = (view: boolean) => (c: Context) => {
+    const [sha, ext] = c.req.param('file')!.split('.');
     const ren = ext === 'glb' ? store.rendition(sha) : null;
     const etag = ren ? `"${sha}-r${ren.sha.slice(0, 16)}"` : `"${sha}"`;
-    const cache = { 'cache-control': 'public, max-age=31536000, immutable', vary: 'accept-encoding' };
-    if ((c.req.header('if-none-match') ?? '').replace(/^W\//, '') === etag) return c.body(null, 304, { etag, ...cache });
-    const f = ren ? ren.file : store.file(sha, ext);
-    if (!f || !store.info(sha)) throw new ApiError(404, 'not-found', 'no such asset');
+    const f = ren ? (existsSync(ren.file) ? ren.file : null) : store.file(sha, ext);
+    if (!f || store.info(sha)?.ext !== ext) {
+      c.header('cache-control', 'no-store');
+      throw new ApiError(404, 'not-found', 'no such asset');
+    }
+    // A source SHA identifies the model, not necessarily its current wire bytes. Revalidate even before its first
+    // rendition. The new view namespace also escapes historically fresh immutable aliases without per-build URLs.
+    const cache = { 'cache-control': view || (ext === 'glb' && store.isCore(sha)) ? 'public, no-cache' : 'public, max-age=31536000, immutable', vary: 'accept-encoding' };
+    if ((c.req.header('if-none-match') ?? '').replace(/^W\//, '') === etag) return c.body(null, 304, { etag, ...cache, 'access-control-allow-origin': '*' });
     const headers: Record<string, string> = { 'content-type': EXT_TYPES[ext as AssetMeta['ext']], etag, ...cache, 'access-control-allow-origin': '*' };
     const br = ext === 'glb' || ext === 'json' ? wire.brotli(`${ren ? ren.sha : sha}.${ext}`, f) : null;
     if (br && acceptsBrotli(c.req.header('accept-encoding'))) return c.body(br as never, 200, { ...headers, 'content-encoding': 'br' });
     return c.body(readFileSync(f) as never, 200, headers);
-  });
+  };
+  app.get('/assets/:file{[0-9a-f]{64}\\.(glb|png|jpg|json)}', serveAsset(false));
+  app.get('/asset-view/:file{[0-9a-f]{64}\\.glb}', serveAsset(true));
 
   app.post('/v1/god/assets', godBodyLimit(budget), async (c) => {
     limitGod(c, 'asset-upload', L.assetUploadsPerMinute);
