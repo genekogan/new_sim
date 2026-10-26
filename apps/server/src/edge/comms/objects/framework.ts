@@ -11,6 +11,14 @@ import type {ActionCtx, BodyRequest, CarrierView, FieldSpec, ObjectEvent, Object
 const OBJECT_ID = /^[a-z0-9][a-z0-9._-]{0,99}$/;
 const ACTION = /^[a-z][a-z0-9_-]{0,39}$/;
 
+const READ_ONLY_ADVANCES = new WeakSet<NonNullable<ObjectKind['advance']>>();
+/** For an implementation that neither mutates nor retains its input. Only fresh(), on its own newly parsed rows,
+ * may omit the defensive clone; an overridden listing or a replacement advance function keeps the ordinary path. */
+export function readOnlyObjectAdvance<F extends NonNullable<ObjectKind['advance']>>(advance: F): F {
+  READ_ONLY_ADVANCES.add(advance);
+  return advance;
+}
+
 export type ObjectActResult = {accepted: true; object: {id: string; version: number}; action: string; result?: Record<string, unknown>; bodies?: BodyRequest[]}
   | {accepted: false; code: string; reason: string; object: string; action: string};
 
@@ -116,9 +124,12 @@ export class Objects {
     // go the old way (one transaction each: re-read, then advance), as an emit may have changed them. Was one savepoint,
     // re-read and parse per object: 3,292 on Eden 2026, ~47 ms of every listing.
     let wrote = false;
-    return this.all().map(o => {
+    const all = this.all, owned = all === ORIGINAL_ALL;
+    const rows: ObjectRecord[] = Reflect.apply(all, this, []);
+    return rows.map(o => {
       if (!wrote) {
-        const kind = this.kinds.get(o.kind), step = kind?.advance?.(structuredClone(o.state), this.timeCtx());
+        const kind = this.kinds.get(o.kind), advance = kind?.advance;
+        const step = advance == null ? undefined : Reflect.apply(advance, kind, [owned && READ_ONLY_ADVANCES.has(advance) ? o.state : structuredClone(o.state), this.timeCtx()]);
         if (!kind || !step) return o;
         wrote = true;
         return tx(this.core.db, () => this.advanced(o, true, step));
@@ -278,6 +289,9 @@ export class Objects {
     });
   }
 }
+
+// Capture once: kindOf() and public methods remain replaceable, but replacements cannot acquire parse ownership.
+const ORIGINAL_ALL = Objects.prototype.all;
 
 function entitled(spec: FieldSpec, roles: string[]) { return spec.visibility === 'public' || spec.visibility.some(r => roles.includes(r)); }
 function publicState(kind: ObjectKind, state: unknown) {

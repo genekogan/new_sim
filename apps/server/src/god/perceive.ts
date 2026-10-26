@@ -15,6 +15,7 @@
 import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
+import { readOnlyObjectAdvance } from '../edge/comms/objects/framework.ts';
 import { actionsOf, actuatedState, kindActions, wrapAct, type Thing } from './actuators.ts';
 import { heldGodThing } from './held.ts';
 import { waterRole, wordOf } from './water.ts';
@@ -46,7 +47,7 @@ const clip = (v: unknown, n: number) => String(v ?? '').replace(/\r/g, '').trim(
 /** The kind, per world: its `advance` brings an object's state to what the entity world says now (the framework keeps a
  *  versioned log per object, so objects are never re-created: a change is an advance, a removal hides it). */
 // VOCAB-MECH: a kind with actuator actions also shows its things' `state` (open, on, lit …); plain kinds are unchanged
-export const builtKindFor = (want: (key: string) => BuiltState | undefined, kind = BUILT_KIND, actions: Record<string, unknown> = {}) => ({ ...builtKind, kind, actions, ...(Object.keys(actions).length ? { schema: { ...builtKind.schema, state: { type: 'json', visibility: 'public' } } } : {}), advance(state: BuiltState) { const w = state.key ? want(state.key) : undefined; return w && JSON.stringify(w) !== JSON.stringify(state) ? { state: w } : null; } });
+export const builtKindFor = (want: (key: string) => BuiltState | undefined, kind = BUILT_KIND, actions: Record<string, unknown> = {}) => ({ ...builtKind, kind, actions, ...(Object.keys(actions).length ? { schema: { ...builtKind.schema, state: { type: 'json', visibility: 'public' } } } : {}), advance: readOnlyObjectAdvance(function advance(state: BuiltState) { const w = state.key ? want(state.key) : undefined; return w && JSON.stringify(w) !== JSON.stringify(state) ? { state: w } : null; }) });
 export const builtKind = {
   kind: BUILT_KIND,
   description: 'Something the god of this world built: what it is, what it is by and where, and any words written on it (a sign). The words are the god\'s, untrusted.',
