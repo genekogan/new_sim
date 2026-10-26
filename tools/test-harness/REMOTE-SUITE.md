@@ -21,6 +21,17 @@ compared. A miss runs the baseline once beside the candidate and caches it when 
 gate caches its candidate, which serves as the next gate's baseline once it is main. The receipt records
 `baseline.source` (`cached` | `run` | `imported`), the cache key/miss reason and what was stored.
 `--dry-run` prints the plan (refs, cache hit or miss, Modal runs) without contacting Modal or writing anything.
+**Scoped candidate gates (MODAL-POLICY rule 4).** `--scope auto` picks steps from
+`git diff --name-only <baseline> <candidate>`: `apps/server/` → V1, V3-packages, V3-walk, V5, V6; `apps/web/` → V1, V2,
+V3-bundle, V4; `packages/` → V1, V3-packages, V3-mars-engine, V3-walk, V5 (V3-walk runs the server's walk audit on
+genesis); `tools/world-launcher/` → V3-launcher-unit, V6; `tools/edge-skill/`, `tools/client-eval/` → V3-client-cli;
+`tools/god-skill/` → V6; other `tools/`, `docs/` and root `*.md` → nothing. Any other path (root files, the lockfile,
+`mars/`, `worlds/`, `vendor/`, `infra/`, `e2e/`, `.github/`) takes the full contract. Nothing to run means no Modal
+call: exit 0 with `status: not-gated`, `scope.resolved: none`. A scoped candidate runs only its steps (`--only` to
+remote-suite.sh; modal_suite.py launches only the groups/V5 shards holding them; RUN-METADATA records `only`) against
+the full cached baseline. The receipt records `scope` (mode, resolved, steps, diff range, files per area, unmapped).
+A scoped run never enters the cache, never serves as a baseline, and `ship-receipt.mjs` blocks any gate whose scope is
+not `full`: the release owner gates the final release head with the default `--scope full`.
 Seed or repair the cache from a completed run of a passing gate (validated with the exact identity of a
 `--baseline-results` import, plus the gate receipt beside it naming that run):
 `release-gate.sh cache-add <gate-out>/candidate`.

@@ -148,6 +148,7 @@ export function readRun(dir, expected, manifest, requiredSteps = REQUIRED_STEPS,
       if (JSON.stringify(metadata[field]) !== JSON.stringify(value)) errors.push(`metadata mismatch: ${field}`);
     }
     if (metadata.suiteCompleted !== true) errors.push('Modal suite did not complete');
+    if (metadata.only !== undefined && !('only' in expected)) errors.push('scoped run (a subset of steps) is not a full gate run');
     if (metadata.baselineSha !== null) errors.push('unexpected embedded baseline');
     if (JSON.stringify(metadata.skip) !== JSON.stringify(EXPECTED_SKIP)) errors.push('unexpected suite skips');
     if (!Array.isArray(metadata.serverFiles) || metadata.serverFiles.length) errors.push('bounded server suite is not a release gate');
@@ -298,11 +299,11 @@ export function compareRuns(baseline, candidate, manifest, candidateSourceFiles 
 
 const MAX_BUFFER = 64 * 1024 * 1024;
 function gitAt(root, ...args) { return execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', maxBuffer: MAX_BUFFER }).trim(); }
-async function remoteRun(out, sourceSha, harnessRef, node, root = ROOT) {
+async function remoteRun(out, sourceSha, harnessRef, node, root = ROOT, only = []) {
   mkdirSync(out, { recursive: true });
   const logPath = join(out, 'gate-driver.log');
   const logFd = openSync(logPath, 'w');
-  const child = spawn('bash', [join(root, 'tools/test-harness/remote-suite.sh'), out, '--ref', sourceSha, '--baseline-ref', 'none', '--harness-ref', harnessRef, '--node', node], {
+  const child = spawn('bash', [join(root, 'tools/test-harness/remote-suite.sh'), out, '--ref', sourceSha, '--baseline-ref', 'none', '--harness-ref', harnessRef, '--node', node, ...(only.length ? ['--only', only.join(',')] : [])], {
     cwd: root, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, MODAL_PROFILE: 'edenartlab' },
   });
   child.stdout.on('data', b => writeSync(logFd, b)); child.stderr.on('data', b => writeSync(logFd, b));
@@ -363,6 +364,7 @@ export function lookupCache(cacheDir, identity, manifest, requiredSteps = REQUIR
 export function storeCache(cacheDir, run, provenance = {}) {
   const m = run.metadata;
   if (!m || run.errors.length) return { stored: false, reason: 'run has validation errors' };
+  if (m.only !== undefined) return { stored: false, reason: 'scoped run (only full runs are cached)' };
   const key = cacheKey(m), dir = join(cacheDir, key);
   if (existsSync(dir)) return { stored: false, key, dir, reason: 'already cached' };
   mkdirSync(cacheDir, { recursive: true });
@@ -406,13 +408,49 @@ export function cacheAdd(runDir, { root = ROOT, cacheDir = defaultCacheDir(root)
   } catch (e) { return { stored: false, reason: e.message }; }
 }
 
+// ── Scoped candidate gates (MODAL-POLICY rule 4) ─────────────────────────────────────────────────────────────────────
+// `--scope auto` picks the CPU contract's steps from `git diff --name-only <baseline> <candidate>`; the release head
+// always takes the default `--scope full`. Paths no rule names (root files, lockfile, mars/, worlds/, vendor/, infra/,
+// e2e/, .github/ ...) select the full contract; docs and other tools never gate (the CPU contract does not cover them),
+// except the tools directories whose own tests or e2es are contract steps.
+const V6_STEPS = REQUIRED_STEPS.filter(step => step.startsWith('V6-'));
+const STEP_SETS = { V1: ['V1-types'], V2: ['V2-build-root', 'V2-build-worlds'], V4: ['V4-web'], V5: ['V5-server-full'], V6: V6_STEPS };
+export const SCOPE_RULES = [
+  // V3-walk audits fixed world fixtures and a fresh Eden genesis, which the server and the packages produce
+  ['apps/server/', ['V1', 'V3-packages', 'V3-walk', 'V5', 'V6']],
+  ['apps/web/', ['V1', 'V2', 'V3-bundle', 'V4']],
+  ['packages/', ['V1', 'V3-packages', 'V3-mars-engine', 'V3-walk', 'V5']],
+  ['tools/edge-skill/', ['V3-client-cli']],
+  ['tools/client-eval/', ['V3-client-cli']],
+  ['tools/world-launcher/', ['V3-launcher-unit', 'V6']],
+  ['tools/god-skill/', ['V6']],
+  ['tools/', []],
+  ['docs/', []],
+];
+const ROOT_DOCS = /^[^/]+\.md$|^LICENSE$/;
+export function scopeFor(files) {
+  const byArea = {}, unmapped = [], picked = new Set();
+  for (const file of files.filter(Boolean)) {
+    const rule = ROOT_DOCS.test(file) ? ['docs/', []] : SCOPE_RULES.find(([prefix]) => file.startsWith(prefix));
+    if (!rule) { unmapped.push(file); continue; }
+    byArea[rule[0]] = (byArea[rule[0]] || 0) + 1;
+    for (const set of rule[1]) for (const step of STEP_SETS[set] || [set]) picked.add(step);
+  }
+  const diff = { files: files.filter(Boolean).length, byArea, unmapped: unmapped.slice(0, 20), unmappedCount: unmapped.length };
+  if (unmapped.length) return { resolved: 'full', steps: [...REQUIRED_STEPS], diff };
+  if (!picked.size) return { resolved: 'none', steps: [], diff };
+  return { resolved: 'scoped', steps: REQUIRED_STEPS.filter(step => picked.has(step)), diff };
+}
+
 export const USAGE = `usage: release-gate.sh <candidate-ref> [--baseline <ref>] [--out <dir>] [--node 22|26]
-         [--baseline-results <dir> [--candidate-results <dir>]] [--cache <dir> | --no-cache] [--dry-run]
+         [--baseline-results <dir> [--candidate-results <dir>]] [--cache <dir> | --no-cache] [--scope full|auto] [--dry-run]
        release-gate.sh cache-add <completed-run-dir> [--cache <dir>]
 The baseline (default main) comes from the gate cache when a validated run of it exists for this harness tree and Node
 major; otherwise it runs once on Modal beside the candidate and is cached. A passing gate caches its candidate run.
---dry-run prints the plan (refs, cache hit/miss, Modal runs) without contacting Modal or writing anything.`;
-const VALUE_OPTIONS = ['--out', '--baseline', '--baseline-results', '--candidate-results', '--node', '--cache'];
+--scope auto (lane candidates) runs only the steps the baseline..candidate diff touches (docs/tools only: no gate, exit 0,
+status not-gated); the default --scope full is the release head's gate. Only full gates qualify a ship or fill the cache.
+--dry-run prints the plan (refs, scope, cache hit/miss, Modal runs) without contacting Modal or writing anything.`;
+const VALUE_OPTIONS = ['--out', '--baseline', '--baseline-results', '--candidate-results', '--node', '--cache', '--scope'];
 const FLAG_OPTIONS = ['--dry-run', '--no-cache'];
 export function parseArgs(args) {
   args = [...args];
@@ -428,6 +466,7 @@ export function parseArgs(args) {
   }
   if (options['--candidate-results'] && !options['--baseline-results']) throw Error('--candidate-results needs --baseline-results');
   if (options['--cache'] && flags.has('--no-cache')) throw Error('--cache and --no-cache conflict');
+  if (options['--scope'] && !['full', 'auto'].includes(options['--scope'])) throw Error('--scope is full or auto');
   return { candidateRef, options, flags };
 }
 
@@ -474,6 +513,17 @@ export async function main(args = process.argv.slice(2), deps = {}) {
     receipt = { ...receipt, refs: { baseline: { ref: baselineRef, sha: baselineSha }, candidate: { ref: candidateRef, sha: candidateSha } },
       harness: { ref: harnessRef, tree: harnessTree, archiveSha256: sha256(harnessArchive) }, quarantineSha256: sha256(manifestBytes), node, exclusions: EXPECTED_SKIP, scopeExclusions: manifest.scopeExclusions };
     const identity = { schemaVersion: 1, harnessRef, harnessTree, harnessArchiveSha256: sha256(harnessArchive), node };
+    const scopeMode = options['--scope'] || 'full';
+    const scope = scopeMode === 'full' ? { resolved: 'full', steps: [...REQUIRED_STEPS] }
+      : scopeFor(git('diff', '--name-only', baselineSha, candidateSha).split('\n'));
+    receipt.scope = { mode: scopeMode, resolved: scope.resolved, steps: scope.steps, ...(scope.diff && { diff: { range: `${baselineSha}..${candidateSha}`, ...scope.diff } }) };
+    const scoped = scope.resolved === 'scoped', only = scoped ? scope.steps : [];
+    const candidateIdentity = { ...identity, sourceSha: candidateSha, ...(scoped && { only }) };
+    if (scope.resolved === 'none') {
+      if (dryRun) { log(JSON.stringify({ refs: receipt.refs, scope: receipt.scope, modalRuns: [] }, null, 2)); log(`RELEASE_GATE_PLAN candidate=${candidateSha} baseline=${baselineSha} scope=none modal_runs=0`); return 0; }
+      receipt = { ...receipt, status: 'not-gated', endedAt: new Date().toISOString() };
+      throw Object.assign(Error('scope none'), { notGated: true });
+    }
     const useCache = !flags.has('--no-cache'), cacheDir = resolve(options['--cache'] || defaultCacheDir(root));
     const pairImport = Boolean(options['--candidate-results']);
     // Where the baseline comes from: an audited import, the cache, or one fresh Modal run (which is then cached).
@@ -482,25 +532,25 @@ export async function main(args = process.argv.slice(2), deps = {}) {
     else if (useCache && (cached = lookupCache(cacheDir, { sourceSha: baselineSha, harnessTree, node }, manifest)).hit) base = { source: 'cached', dir: cached.dir, cacheKey: cached.key };
     else base = { source: 'run', dir: join(out, 'baseline'), exact: true, cacheKey: cacheKey({ sourceSha: baselineSha, harnessTree, node }), cacheMiss: useCache ? cached.reason : 'cache disabled (--no-cache)' };
     const candidateDir = pairImport ? resolve(options['--candidate-results']) : join(out, 'candidate');
-    const plan = { refs: receipt.refs, harness: { ...receipt.harness, clean: harnessClean }, node, cache: useCache ? cacheDir : null,
+    const plan = { refs: receipt.refs, harness: { ...receipt.harness, clean: harnessClean }, node, scope: receipt.scope, cache: useCache ? cacheDir : null,
       baseline: { source: base.source, dir: base.dir, cacheKey: base.cacheKey, cacheMiss: base.cacheMiss },
       candidate: { source: pairImport ? 'imported' : 'run', dir: candidateDir },
       modalRuns: [...(pairImport ? [] : ['candidate']), ...(base.source === 'run' ? ['baseline'] : [])] };
     if (dryRun) {
       log(JSON.stringify(plan, null, 2));
-      log(`RELEASE_GATE_PLAN candidate=${candidateSha} baseline=${baselineSha} baseline_source=${base.source} modal_runs=${plan.modalRuns.length}${harnessClean ? '' : ' harness=DIRTY(would block)'}`);
+      log(`RELEASE_GATE_PLAN candidate=${candidateSha} baseline=${baselineSha} scope=${scope.resolved} steps=${scope.steps.length} baseline_source=${base.source} modal_runs=${plan.modalRuns.length}${harnessClean ? '' : ' harness=DIRTY(would block)'}`);
       return 0;
     }
     receipt.importedResults = pairImport;
     receipt.baseline = { source: base.source, dir: base.dir, ...(base.cacheKey && { cacheKey: base.cacheKey }), ...(base.cacheMiss && { cacheMiss: base.cacheMiss }) };
     const drivers = {};
     const runs = [];
-    if (!pairImport) runs.push(runRemote(candidateDir, candidateSha, harnessRef, node, root).then(d => { drivers.candidate = d; }));
+    if (!pairImport) runs.push(runRemote(candidateDir, candidateSha, harnessRef, node, root, only).then(d => { drivers.candidate = d; }));
     if (base.source === 'run') runs.push(runRemote(base.dir, baselineSha, harnessRef, node, root).then(d => { drivers.baseline = d; }));
     await Promise.all(runs);
     const readBaseline = () => readRun(base.dir, base.exact ? { ...identity, sourceSha: baselineSha } : reuseIdentity({ sourceSha: baselineSha, harnessTree, node }), manifest);
     let baseline = readBaseline();
-    const candidate = readRun(candidateDir, { ...identity, sourceSha: candidateSha }, manifest);
+    const candidate = readRun(candidateDir, candidateIdentity, manifest, scope.steps);
     if (drivers.candidate && (drivers.candidate.exit !== 0 || drivers.candidate.timedOut)) candidate.errors.push(`Modal driver failed (${drivers.candidate.timedOut ? 'timeout' : drivers.candidate.exit})`);
     // A cached baseline is only comparable on the candidate's exact runtime (the node:<major> image can move its patch).
     const runtime = r => r.metadata && `${r.metadata.nodeVersion}/${r.metadata.pnpmVersion}`;
@@ -521,17 +571,17 @@ export async function main(args = process.argv.slice(2), deps = {}) {
       const keep = (label, run) => { const r = storeCache(cacheDir, run, { via: 'gate', label, gate: out, status: receipt.status });
         (r.stored ? receipt.cache.stored : receipt.cache.notStored).push({ label, key: r.key, dir: r.dir, ...(r.stored ? {} : { reason: r.reason }) }); };
       if (base.source === 'run' && !baseline.errors.length) keep('baseline', baseline);
-      if (SUCCESS.has(receipt.status)) keep('candidate', candidate);
+      if (SUCCESS.has(receipt.status) && !scoped) keep('candidate', candidate);
     }
     receipt.endedAt = new Date().toISOString();
   } catch (e) {
     if (dryRun) { log(`RELEASE_GATE_PLAN ERROR ${e.message}`); return 2; }
-    receipt.blockers.push(e.message); receipt.endedAt = new Date().toISOString();
+    if (!e.notGated) { receipt.blockers.push(e.message); receipt.endedAt = new Date().toISOString(); }
   }
   mkdirSync(out, { recursive: true });
   const receiptPath = join(out, 'receipt.json');
   writeFileSync(receiptPath, JSON.stringify(receipt, null, 2) + '\n');
-  log(`RELEASE_GATE ${receipt.status.toUpperCase()} baseline=${receipt.refs?.baseline.sha || '?'} candidate=${receipt.refs?.candidate.sha || '?'} baseline_source=${receipt.baseline?.source || '?'} fixed=${receipt.fixed?.length || 0} quarantined=${receipt.quarantined?.length || 0} new=${receipt.newFailures?.length || 0} blockers=${receipt.blockers.length} receipt=${receiptPath}`);
+  log(`RELEASE_GATE ${receipt.status.toUpperCase()} baseline=${receipt.refs?.baseline.sha || '?'} candidate=${receipt.refs?.candidate.sha || '?'} scope=${receipt.scope?.resolved || '?'} baseline_source=${receipt.baseline?.source || '?'} fixed=${receipt.fixed?.length || 0} quarantined=${receipt.quarantined?.length || 0} new=${receipt.newFailures?.length || 0} blockers=${receipt.blockers.length} receipt=${receiptPath}`);
   return receipt.status === 'blocked' ? 1 : 0;
 }
 

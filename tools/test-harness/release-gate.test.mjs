@@ -5,7 +5,7 @@ import { existsSync, mkdtempSync, mkdirSync, writeFileSync, renameSync, readFile
 import { tmpdir, homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cacheAdd, cacheKey, compareRuns, lookupCache, main, parseArgs, parseTap, readRun, validateQuarantine, REQUIRED_PACKAGES, REQUIRED_STEPS } from './release-gate.mjs';
+import { cacheAdd, cacheKey, compareRuns, lookupCache, main, parseArgs, parseTap, readRun, scopeFor, storeCache, validateQuarantine, REQUIRED_PACKAGES, REQUIRED_STEPS } from './release-gate.mjs';
 
 // Preserve fixture artifacts under the same no-delete rule as release work.
 const retireFixture = dir => { const trash = join(homedir(), '.Trash'); mkdirSync(trash, { recursive: true }); renameSync(dir, join(trash, dir.split('/').at(-1) + '-' + Date.now())); };
@@ -309,6 +309,7 @@ function gateRepo(t) {
     gitIn(dir, 'add', '-A'); gitIn(dir, '-c', 'user.email=gate@test', '-c', 'user.name=gate test', 'commit', '-qm', path);
     return gitIn(dir, 'rev-parse', 'HEAD');
   };
+  commit('.gitignore', '.lane/\n');
   commit('tools/test-harness/quarantine.json', JSON.stringify(manifest()));
   return { dir, commit, base: commit('README.md', 'base\n') };
 }
@@ -332,11 +333,12 @@ function writeFullRun(dir, meta, { nodeVersion = 'v22.23.0', steps = REQUIRED_ST
   rows.push('V8-history-boot\tSKIP\t0\t-');
   writeFileSync(join(dir, 'out/suite/SUMMARY.tsv'), rows.join('\n') + '\n');
 }
-function fakeModal(calls, nodeVersionFor = () => 'v22.23.0') {
-  return async (out, sourceSha, harnessRef, node, root) => {
-    calls.push(sourceSha);
+function fakeModal(calls, nodeVersionFor = () => 'v22.23.0', onlys = []) {
+  return async (out, sourceSha, harnessRef, node, root, only = []) => {
+    calls.push(sourceSha); onlys.push(only);
     const archive = execFileSync('git', ['-C', root, 'archive', '--format=tar.gz', harnessRef, 'tools/test-harness']);
-    writeFullRun(out, { schemaVersion: 1, sourceSha, harnessRef, harnessTree: gitIn(root, 'rev-parse', `${harnessRef}:tools/test-harness`), harnessArchiveSha256: shaOf(archive), node }, { nodeVersion: nodeVersionFor(sourceSha) });
+    writeFullRun(out, { schemaVersion: 1, sourceSha, harnessRef, harnessTree: gitIn(root, 'rev-parse', `${harnessRef}:tools/test-harness`), harnessArchiveSha256: shaOf(archive), node, ...(only.length ? { only } : {}) },
+      { nodeVersion: nodeVersionFor(sourceSha), steps: only.length ? only : REQUIRED_STEPS });
     return { exit: 0, timedOut: false, log: join(out, 'gate-driver.log'), logSha256: '' };
   };
 }
@@ -443,4 +445,63 @@ test('a dry run prints the plan without Modal and without writing an output dire
   assert.match(hit.lines.at(-1), /baseline_source=cached modal_runs=1/); assert.ok(!existsSync(out));
   const help = await gate(repo, ['--help'], never);
   assert.equal(help.rc, 0); assert.match(help.lines[0], /usage: release-gate.sh/);
+});
+
+// ── Scoped candidate gates (MODAL-POLICY rule 4) ──────────────────────────────────────────────────────────────────
+test('scope: steps follow the changed areas; docs/tools never gate; anything unnamed takes the full contract', () => {
+  const V6 = REQUIRED_STEPS.filter(s => s.startsWith('V6-'));
+  assert.deepEqual(scopeFor(['apps/web/src/a.ts']).steps, ['V1-types', 'V2-build-root', 'V2-build-worlds', 'V3-bundle', 'V4-web']);
+  assert.deepEqual(scopeFor(['apps/server/src/a.ts']).steps, ['V1-types', 'V3-packages', 'V3-walk', 'V5-server-full', ...V6]);
+  assert.deepEqual(scopeFor(['packages/kernel/src/a.ts']).steps, ['V1-types', 'V3-packages', 'V3-mars-engine', 'V3-walk', 'V5-server-full']);
+  assert.deepEqual(scopeFor(['tools/world-launcher/launcher.mjs']).steps, ['V3-launcher-unit', ...V6]);
+  assert.deepEqual(scopeFor(['tools/edge-skill/a.mjs', 'tools/client-eval/b.mjs']).steps, ['V3-client-cli']);
+  const none = scopeFor(['docs/a.md', 'tools/test-harness/x.mjs', 'tools/ops/y.sh', 'README.md', '']);
+  assert.equal(none.resolved, 'none'); assert.deepEqual(none.steps, []); assert.deepEqual(none.diff.byArea, { 'docs/': 2, 'tools/': 2 });
+  for (const f of ['pnpm-lock.yaml', 'package.json', 'mars/viewer/engine/x.ts', 'worlds/eden/a.json', 'vendor/x.js', '.github/workflows/ci.yml']) {
+    const r = scopeFor(['apps/web/src/a.ts', f]);
+    assert.equal(r.resolved, 'full', f); assert.deepEqual(r.steps, REQUIRED_STEPS); assert.deepEqual(r.diff.unmapped, [f]);
+  }
+  // all three product areas: everything but the client CLI, launcher and harness self-tests
+  assert.deepEqual(REQUIRED_STEPS.filter(s => !scopeFor(['apps/web/a.ts', 'apps/server/b.ts', 'packages/c/d.ts']).steps.includes(s)), ['V3-client-cli', 'V3-launcher-unit', 'V3-harness']);
+  assert.throws(() => parseArgs(['abc', '--scope', 'some']), /--scope is full or auto/);
+});
+test('scope auto: a web-only candidate runs only its steps against the cached full baseline and is never cached', async t => {
+  const repo = gateRepo(t), cache = mkdtempSync(join(dirname(repo.dir), 'sim-gate-cache-')); t.after(() => retireFixture(cache));
+  const c1 = repo.commit('apps/server/src/a.ts', 'one\n'), calls = [];
+  await gate(repo, [c1, '--baseline', repo.base, '--out', join(repo.dir, '.lane/g1'), '--cache', cache], fakeModal(calls));
+  const c2 = repo.commit('apps/web/src/b.ts', 'two\n'); calls.length = 0; const onlys = [];
+  const out = join(repo.dir, '.lane/g2');
+  const { rc, lines } = await gate(repo, [c2, '--baseline', c1, '--out', out, '--cache', cache, '--scope', 'auto'], fakeModal(calls, undefined, onlys));
+  const r = receiptOf(out);
+  assert.equal(rc, 0, r.blockers.join('\n')); assert.deepEqual(calls, [c2]);
+  assert.deepEqual(onlys, [['V1-types', 'V2-build-root', 'V2-build-worlds', 'V3-bundle', 'V4-web']]);
+  assert.equal(r.scope.mode, 'auto'); assert.equal(r.scope.resolved, 'scoped'); assert.deepEqual(r.scope.diff.byArea, { 'apps/web/': 1 });
+  assert.equal(r.scope.diff.range, `${c1}..${c2}`); assert.equal(r.baseline.source, 'cached'); assert.equal(r.status, 'pass');
+  assert.deepEqual(r.cache.stored, []); assert.match(lines.at(-1), /scope=scoped/);
+  // a scoped run is never a full-gate run: not as a baseline, not in the cache
+  const full = readRun(join(out, 'candidate'), { schemaVersion: 1, sourceSha: c2, harnessTree: r.harness.tree, node: '22' }, manifest());
+  assert.match(full.errors.join('\n'), /scoped run .* is not a full gate run/);
+  assert.match(storeCache(cache, { ...full, errors: [] }).reason, /scoped run/);
+  // the full default on the same head runs every step again
+  onlys.length = 0;
+  const fullOut = join(repo.dir, '.lane/g3');
+  await gate(repo, [c2, '--baseline', c1, '--out', fullOut, '--cache', cache], fakeModal([], undefined, onlys));
+  assert.deepEqual(onlys, [[]]); assert.equal(receiptOf(fullOut).scope.resolved, 'full'); assert.equal(receiptOf(fullOut).cache.stored[0].label, 'candidate');
+});
+test('scope auto: docs/tools-only candidates are not gated (exit 0, no Modal); an unnamed path runs the full contract', async t => {
+  const repo = gateRepo(t), cache = mkdtempSync(join(dirname(repo.dir), 'sim-gate-cache-')); t.after(() => retireFixture(cache));
+  const c1 = repo.commit('docs/notes.md', 'notes\n');
+  const c2 = repo.commit('tools/ops/tool.sh', 'echo\n');
+  const out = join(repo.dir, '.lane/none'), never = async () => { throw Error('Modal contacted'); };
+  const { rc, lines } = await gate(repo, [c2, '--baseline', repo.base, '--out', out, '--cache', cache, '--scope', 'auto'], never);
+  const r = receiptOf(out);
+  assert.equal(rc, 0); assert.equal(r.status, 'not-gated'); assert.equal(r.scope.resolved, 'none'); assert.deepEqual(r.blockers, []);
+  assert.deepEqual(r.scope.diff.byArea, { 'docs/': 1, 'tools/': 1 }); assert.match(lines.at(-1), /RELEASE_GATE NOT-GATED .*scope=none/);
+  const dry = await gate(repo, [c2, '--baseline', repo.base, '--cache', cache, '--scope', 'auto', '--dry-run'], never);
+  assert.match(dry.lines.at(-1), /scope=none modal_runs=0/);
+  const c3 = repo.commit('pnpm-lock.yaml', 'lock\n'), onlys = [];
+  const fullOut = join(repo.dir, '.lane/full');
+  await gate(repo, [c3, '--baseline', c1, '--out', fullOut, '--cache', cache, '--scope', 'auto'], fakeModal([], undefined, onlys));
+  const f = receiptOf(fullOut);
+  assert.equal(f.scope.resolved, 'full'); assert.deepEqual(f.scope.diff.unmapped, ['pnpm-lock.yaml']); assert.deepEqual(onlys, [[], []]);
 });

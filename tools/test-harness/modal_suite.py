@@ -153,9 +153,17 @@ def suite(skip: str, server_files: str, only: str, shard: str) -> bytes:
     return buf.getvalue()
 
 
-def plan(server_files: str):
-    """(name, only, shard) per container. A bounded --server-files run keeps V5 (and its baseline) in one container."""
-    jobs = [(name, ",".join(steps), "") for name, steps in GROUPS.items()]
+def plan(server_files: str, only: str = ""):
+    """(name, only, shard) per container. A bounded --server-files run keeps V5 (and its baseline) in one container.
+    A scoped run (only = the contract steps release-gate.sh --scope auto picked) launches only the groups and V5 shards
+    holding those steps."""
+    pick = set(only.split(",")) - {""}
+    jobs = []
+    for name, steps in GROUPS.items():
+        chosen = [s for s in steps if not pick or s in pick]
+        if chosen: jobs.append((name, ",".join(chosen), ""))
+    if pick and "V5-server-full" not in pick:
+        return jobs
     if server_files.split():
         jobs.append(("v5", "V5-server-full,V5-server-baseline", ""))
     else:
@@ -293,9 +301,11 @@ def shutil_copy(r, w):
 
 
 @app.local_entrypoint()
-def main(out: str, skip: str = "V7,V8", server_files: str = ""):
+def main(out: str, skip: str = "V7,V8", server_files: str = "", only: str = ""):
     import time
-    jobs = plan(server_files)
+    if not re.fullmatch(r"[A-Za-z0-9_,-]*", only) or (set(only.split(",")) - {""}) - set(ORDER):
+        raise ValueError(f"--only names unknown steps: {only}")
+    jobs = plan(server_files, only)
     t0 = time.time()
     print(f"fan-out: {len(jobs)} containers: {', '.join(j[0] for j in jobs)}")
     calls = [(run_large if name in LARGE else run).spawn(skip, server_files, only, shard) for name, only, shard in jobs]
