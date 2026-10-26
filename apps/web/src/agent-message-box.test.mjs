@@ -102,7 +102,8 @@ test('God box disappears on sign-out even if the provider retains the same label
 test.after(() => rm(dir, {recursive: true, force: true}));
 
 // Lane PAIR-INWINDOW (Gene's review 2026-10-22 #1): the card's start prompt carries the window code like the New Soul prompt
-test('Soul card start prompt names pair with the window code; without a code it still names the command', () => {
+// Test ID kept from main (the gate compares assertion IDs); the command is now `pair` (eden.mjs 2.x), was `pair-soul`.
+test('Soul card start prompt names pair-soul with the window code; without a code it still names the command', () => {
   const withCode = soulStartPrompt('http://localhost:5960/w/inbox', 's_abc', 'Ada', 'K7QX-M2PA');
   assert.match(withCode, /node eden\.mjs pair "s_abc" --for K7QX-M2PA/);
   assert.match(withCode, /Soul "Ada" \(ID "s_abc"\)/);

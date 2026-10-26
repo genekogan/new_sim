@@ -179,3 +179,14 @@ client publication + the fix. Four files conflicted:
 shipped. Test `tools/world-launcher/soul-cli-now.test.mjs` (3 tests; the owner-loop and publishing tests still pass).
 Checks: server and web `tsc` clean; bundle budget OK (8685.6 KB raw / 2452.0 KB gzip, 0 offenders); web unit tests
 pass. Server test files, walkability and the world-launcher folder: see `team/HANDOFF-SOUL-FIX-RC-20261026.md`.
+
+### Early Modal gate on 163ce3404 (01:53–02:52Z): BLOCKED, 4 new failures + 1 removed assertion → fixed here
+- `V6-party` S9 and `V5-server-full` edge-ledger-activities both encode "sit down near seats takes the nearest free
+  seat" (the bench by the fountain, the fire-circle logs). D2's 3 m outdoor radius broke both: **HERE_SEAT_M is now
+  8 m** (a few steps, same enclosure, never the 30 m walk to another house's chair); the party S9 predicate accepts the
+  D2 label ("Sit down on the free seat here (plaza-bench-1 …)"); edge-sit-here's far bench is 12 m, and the commons
+  lawn case now expects the free outdoor chair 6 m off.
+- `V6-join-clerk/dev` L2 asserted the 1.9 skill template ("This world is **base**", version 1.9.x); it now accepts
+  the 2.x publication (no templates, version 2.x) as well.
+- `V4-web` removed assertion: the renamed test "Soul card start prompt names pair with the window code" keeps main's
+  ID ("pair-soul") with the 2.x assertion, as the LINK integration did for its renames.

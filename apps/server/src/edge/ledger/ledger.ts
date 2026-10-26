@@ -18,8 +18,9 @@ const ROUTE_DEAD = new Set(['route.unreachable', 'route.goal-blocked', 'route.li
 /** BS3: refusals a plain walk answers with its closest approach (the fine planner's; ground.* keep their named refusals). */
 const APPROACH_CODES = new Set(['route.unreachable', 'route.goal-blocked']);
 const STUCK_RADIUS = 0.34;
-/** D2: a seat this close (m) with no enclosure boundary between is "here" for sit:here. */
-export const HERE_SEAT_M = 3;
+/** D2: a seat this close (m) with no enclosure boundary between is "here" for sit:here: a few steps (a fire-circle log, the
+ *  bench by the fountain), never the 30 m walk to a chair in another house. 3 m failed the party and activities gates. */
+export const HERE_SEAT_M = 8;
 const STUCK_REASON = 'The walk made no headway for 30 seconds, even after looking for another way from where it stood; choose another way or somewhere else.';
 import {EdgeError, type EdgeCapability, type EdgeLedgerHooks, type EdgeReceipt, type EdgeSoul, type NearbyBody, type PlaceRef,type ObjectBodyAdmission} from '../contract.ts';
 import {CATALOG} from '../../../../../mars/viewer/engine/world/catalog.ts';
