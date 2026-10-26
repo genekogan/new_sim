@@ -22,6 +22,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { clickNewSoulEntry } from './window-entry.mjs';
+import { windowCheck, startWindowListener } from './window-fixture.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : []).filter(Boolean));
@@ -35,7 +36,7 @@ if (typeof args.web !== 'string') { console.error('--web <vite build --base /wor
 const CLI = resolve(root, 'tools/edge-skill/eden-agent.mjs');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const report = { origin, steps: [], failures: [] };
-const check = (name, ok, detail = {}) => { report.steps.push({ name, ok: !!ok, ...detail }); if (!ok) report.failures.push(name); console.log(`${ok ? '✔' : '✖'} ${name} ${JSON.stringify(detail).slice(0, 400)}`); return !!ok; };
+const check = (name, ok, detail = {}) => { report.steps.push(windowCheck(name, ok, detail)); if (!ok) report.failures.push(name); console.log(`${ok ? '✔' : '✖'} ${name} ${JSON.stringify(detail).slice(0, 400)}`); return !!ok; };
 
 // ---------- the launcher in Clerk mode (synthetic issuer)
 const { clerkKeys, ISSUER, PUBLISHABLE_KEY } = await import('../../../apps/server/test/clerk-fixture.ts');
@@ -48,7 +49,8 @@ const dataDir = join(out, 'data');
 const launcher = spawn(process.execPath, ['tools/world-launcher/launcher.mjs', '--port', String(port), '--range', range, '--data', dataDir, '--base', BASE,
   '--web', resolve(args.web), '--auth-env', join(dir, 'clerk.env'), '--public-origin', origin], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
 let launcherLog = ''; launcher.stdout.on('data', (d) => { launcherLog += d; }); launcher.stderr.on('data', (d) => { launcherLog += d; });
-const stop = () => { try { launcher.kill('SIGTERM'); } catch { /* gone */ } };
+const listeners = new Set();
+const stop = () => { for (const listener of listeners) void listener.stop('harness-stop'); try { launcher.kill('SIGTERM'); } catch { /* gone */ } };
 process.on('exit', stop); for (const s of ['SIGINT', 'SIGTERM']) process.on(s, () => { stop(); process.exit(130); });
 
 async function call(url, { sub, body } = {}) {
@@ -200,14 +202,32 @@ try {
     const chip = await page.evaluate(() => { const c = document.querySelector('[data-camera]'); return { mode: c?.getAttribute('data-camera'), soul: c?.getAttribute('data-follow-soul'), text: c?.textContent }; });
     check('A8 the camera follows the new Soul (follow target = its id)', following && chip.soul === server?.soulId && /Ana/.test(chip.text ?? ''), chip);
     await sleep(1500); await shot(page, 'A8-following-ana');
-    // R20 bug (2026-10-21): the owner's message box must be there for the new Soul with no reload
-    const urlA10 = page.url();
-    await page.evaluate((sid) => { location.hash = '#soul/' + sid; }, server?.soulId);
-    const ownerBox = await page.waitForSelector('[data-agent-message="soul"]', { timeout: 20_000 }).then(() => true, () => false);
-    check('A10 the owner message box appears for the new Soul without a reload', ownerBox && page.url().split('#')[0] === urlA10.split('#')[0], { ownerBox });
-    await shot(page, 'A10-owner-box');
+    // LINK: approval grants control; the message box belongs to Connected, reached by the CLI's first listen.
     const done = await waiting;
     report.waitA = done;
+    if (done.paired !== true || done.soul?.id !== server?.soulId) throw Error('A10 fixture: approval wait did not grant this Soul');
+    const urlA10 = page.url(), documentA10 = await page.evaluate(() => performance.timeOrigin);
+    await page.evaluate((sid) => { location.hash = '#soul/' + sid; }, server?.soulId);
+    await page.waitForSelector('[data-soul-state="approved-waiting"]', { timeout: 20_000 });
+    const beforeListen = await call(`${base}/v1/edge/owner/${server.soulId}/inbox`, {sub: 'user_gene'});
+    const waitingLink = beforeListen.data?.inbox?.link;
+    if (!check('A10a approved-waiting has no owner message box', beforeListen.status === 200 && waitingLink?.state === 'disconnected' && waitingLink?.reason === 'approved-waiting' && (await page.locator('[data-agent-message="soul"]').count()) === 0, {link: waitingLink})) throw Error('A10 fixture: expected approved-waiting before listen');
+    const listener = startWindowListener(CLI, folder); listeners.add(listener);
+    try {
+      await page.waitForSelector('[data-soul-state="connected"]', { timeout: 20_000 });
+      const afterListen = await call(`${base}/v1/edge/owner/${server.soulId}/inbox`, {sub: 'user_gene'});
+      const connectedLink = afterListen.data?.inbox?.link;
+      const connected = afterListen.status === 200 && connectedLink?.state === 'connected' && connectedLink?.reason === 'listening' && listener.running();
+      check('A10b the same granted CLI is actively listening and Connected', connected, {link: connectedLink, listenerPid: listener.evidence.pid});
+      // R20: retain the original selector,20s deadline and no-reload assertion; also verify document identity.
+      const ownerBox = await page.waitForSelector('[data-agent-message="soul"]', { timeout: 20_000 }).then(() => true, () => false);
+      const sameDocument = await page.evaluate(() => performance.timeOrigin) === documentA10;
+      check('A10 the owner message box appears for the new Soul without a reload', ownerBox && connected && listener.running() && sameDocument && page.url().split('#')[0] === urlA10.split('#')[0], { ownerBox, sameDocument });
+      await shot(page, 'A10-owner-box');
+    } finally {
+      report.listenA = await listener.stop(); listeners.delete(listener);
+      check('A10c owned CLI listener stopped cleanly', !report.listenA.error && !report.listenA.forcedKill && report.listenA.stopReason === 'fixture-finished' && (report.listenA.code === 0 || report.listenA.signal === 'SIGTERM'), report.listenA);
+    }
     const status = json(await agent(folder, ['status']).catch((e) => e.message));
     check('A8b the agent is paired', done.paired === true && done.soul?.name === 'Ana' && status.paired === true && status.soul === done.soul?.id && done.soul?.id === server?.soulId, { done: JSON.stringify(done).slice(0, 200), status: JSON.stringify(status).slice(0, 200) });
     await sleep(6000);
@@ -286,6 +306,7 @@ try {
   report.failures.push('harness: ' + String(e?.stack ?? e).split('\n').slice(0, 3).join(' | '));
   console.log('harness error', e);
 } finally {
+  await Promise.all([...listeners].map(listener => listener.stop('harness-finally')));
   if (browser) await browser.close().catch(() => {});
   release?.();
   writeFileSync(join(out, 'report.json'), JSON.stringify(report, null, 1));
