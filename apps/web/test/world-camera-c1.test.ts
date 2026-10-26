@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import * as THREE from 'three';
 import type {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {WorldRtsCamera,farLimit,pivotGlide,CLICK_PIVOT_DELAY_MS,GLIDE_SECONDS,NEAR_LIMIT} from '../src/WorldRtsCamera.ts';
+import {WorldRtsCamera,farLimit,CLICK_PIVOT_DELAY_MS,NEAR_LIMIT} from '../src/WorldRtsCamera.ts';
 import {liftHorizon,BROADCAST_HORIZON_LIFT} from '../src/broadcast-horizon.ts';
 import {manualCameraStep,MANUAL_FAR_LIMIT} from '../src/WorldNavigation.ts';
 import {CAMERA_GROUND_MARGIN} from '../src/WorldCameraGround.ts';
@@ -67,43 +67,7 @@ test('C1 far limit follows the map size, between 320 m and MANUAL_FAR_LIMIT', ()
   assert.equal(farLimit([-256,-256,256,256]),640);assert.equal(farLimit([-900,-900,900,900]),MANUAL_FAR_LIMIT);
 });
 
-test('CAMERA-PIVOT math: the pivot becomes the clicked point; the eye keeps its offset (no turn, no jump)', () => {
-  const eye=new THREE.Vector3(0,31,70),pivot=new THREE.Vector3(0,0,0);
-  for(const point of [new THREE.Vector3(40,0,-25),new THREE.Vector3(-120,3.5,60),new THREE.Vector3(5,12,5)]){
-    const to=pivotGlide(eye,pivot,point);
-    assert.deepEqual(to.pivot.toArray(),point.toArray());
-    assert.ok(to.eye.clone().sub(to.pivot).distanceTo(eye.clone().sub(pivot))<1e-9,'same angle and distance');
-  }
-  // an eye level with or below its pivot is lifted above the new point
-  const low=pivotGlide(new THREE.Vector3(10,-2,0),new THREE.Vector3(0,0,0),new THREE.Vector3(3,4,3));
-  assert.ok(low.eye.y>=4+1-1e-9&&Math.abs(low.eye.x-13)<1e-9,`lifted ${low.eye.toArray()}`);
-});
-
-test('CAMERA-PIVOT click: after the double-click window the camera glides so the clicked point is the pivot', async () => {
-  const f=rig();try{
-    const before=f.controls.target.clone(),offset=f.camera.position.clone().sub(before);
-    for(const [x,y,pointerType] of [[400,700,'mouse'],[1200,620,'mouse'],[900,520,'touch']] as const){
-      const from=f.controls.target.clone();
-      f.rts.clickPivot({clientX:x,clientY:y,pointerType});f.settle(5);
-      assert.ok(f.controls.target.distanceTo(from)<1e-9,'nothing happens inside the double-click window');
-      await new Promise(r=>setTimeout(r,CLICK_PIVOT_DELAY_MS+30));
-      // the clicked point is where the pointer ray met the ground before the glide
-      f.rts.update(GLIDE_SECONDS/2);const mid=f.controls.target.clone();
-      assert.ok(mid.distanceTo(from)>1,'moving, not jumped');f.settle(40);
-      assert.ok(f.controls.target.distanceTo(from)>3&&Math.abs(f.controls.target.y)<.05,`pivot on the clicked ground ${f.controls.target.toArray()}`);
-      assert.ok(f.camera.position.clone().sub(f.controls.target).distanceTo(offset)<1e-6,'eye keeps its offset');
-      // the clicked point is now under the screen centre
-      const ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2(0,0),f.camera);
-      assert.ok(ray.ray.distanceToPoint(f.controls.target)<1e-6,'pivot at the screen centre');
-    }
-    // a pure orbit (target unchanged) keeps the chosen pivot: no re-anchor
-    const t=f.controls.target.clone();f.controls.dispatchEvent({type:'start'} as never);f.camera.position.sub(t).applyAxisAngle(new THREE.Vector3(0,1,0),.8).add(t);
-    f.controls.dispatchEvent({type:'end'} as never);f.settle(40);assert.ok(f.controls.target.distanceTo(t)<1e-9,'orbit turns around the clicked point');
-    // a double-click cancels the pending single-click glide
-    f.rts.clickPivot({clientX:1200,clientY:700,pointerType:'mouse'});f.fire('pointerdown',{button:0});
-    await new Promise(r=>setTimeout(r,CLICK_PIVOT_DELAY_MS+30));f.settle(10);assert.ok(f.controls.target.distanceTo(t)<1e-9);
-  }finally{f.rts.dispose();}
-});
+// The click-pivot tests (B1: the eye stays, the view turns onto the pivot) are in world-camera-pivot-look.test.ts.
 
 test('CAMERA-PIVOT: Follow and Broadcast ignore a click', async () => {
   for(const mode of ['follow','broadcast'] as const){
