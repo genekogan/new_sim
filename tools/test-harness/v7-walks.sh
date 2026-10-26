@@ -26,15 +26,25 @@ SRC_REAL="$(cd "$MARS_WEB_SRC" && pwd -P)"; for e in "$SRC_REAL"/*; do ln -sfn "
 ln -sfn "$ROOT/mars/viewer/public/modular" "$MARS_WEB/modular"
 [ -f "$MARS_WEB/modular/humanoid/kit.json" ] && [ -f "$MARS_WEB/modular/environment/clips-ual.glb" ] || { echo "no humanoid kit / character wire files in $MARS_WEB/modular"; exit 1; }
 heavy() { python3 <team>/ops/with-heavy-slot.py --owner gate --purpose "$1" --timeout 1800 -- "${@:2}"; }
-heavy v7-build-root pnpm --filter @sim/web build > "$OUT/build-root.log" 2>&1 || { echo build-root failed; exit 1; }
-heavy v7-build-worlds bash -c "cd apps/web && npx vite build --base /worlds/ --outDir $OUT/web-worlds --emptyOutDir" > "$OUT/build-worlds.log" 2>&1 || { echo build-worlds failed; exit 1; }
+if [ -n "${SIM_PREBUILT_WEB_ROOT:-}" ]; then
+  SHA="$(git rev-parse HEAD)"; BUILD="we-${SHA:0:12}"
+  # Validate the exact release source/flags and every file hash before browser qualification.
+  for suffix in -root ''; do
+    base=/worlds/; target="$OUT/web-worlds"
+    if [ "$suffix" = -root ]; then base=/; target="$ROOT/apps/web/dist"; fi
+    node tools/world-launcher/deploy/prebuilt-web.mjs install "$SIM_PREBUILT_WEB_ROOT/$BUILD$suffix" "$target" "$SHA" "$BUILD$suffix" "$base" \
+      "${SIM_ASSETS_CDN_ENABLED-1}" "${SIM_ASSETS_CDN_ORIGIN:-https://assets.eden.art}" "${VITE_EDEN_EXPERIENCE_WORLD_IDS-pm-preview-eden-20261005}" \
+      "${SIM_ARRIVAL_UI_ENABLED:-0}" "${SIM_GOATCOUNTER-simeden}" "${SIM_GOD_UPLOADS_CDN:-1}" > "$OUT/prebuilt$([ -n "$suffix" ] && echo -root || echo -worlds).log" 2>&1 || { echo prebuilt install failed; exit 1; }
+  done
+else
+  heavy v7-build-root pnpm --filter @sim/web build > "$OUT/build-root.log" 2>&1 || { echo build-root failed; exit 1; }
+  heavy v7-build-worlds bash -c "cd apps/web && npx vite build --base /worlds/ --outDir $OUT/web-worlds --emptyOutDir" > "$OUT/build-worlds.log" 2>&1 || { echo build-worlds failed; exit 1; }
+fi
 node tools/test-harness/old-worlds.mjs "$ROOT" 5870 head > "$OUT/servers-head.log" 2>&1 & PIDS+=($!)
 for i in $(seq 1 90); do curl -s -m 2 http://127.0.0.1:5872/w/littlemartians/v1/config >/dev/null && break; sleep 2; done
 perl -e 'alarm 1800; exec @ARGV' node tools/test-harness/walk-old.mjs "$OUT/old" > "$OUT/walk-old.log" 2>&1; RC_OLD=$?
 kill "${PIDS[0]}" 2>/dev/null; PIDS=(); sleep 3
-node tools/world-launcher/launcher.mjs --port 5873 --range 5874-5876 --data "$OUT/launcher-data" --base /worlds --web "$OUT/web-worlds" --mars-web "$MARS_WEB" --dev-auth > "$OUT/launcher.log" 2>&1 & PIDS+=($!)
-for i in $(seq 1 30); do curl -s -m 2 http://127.0.0.1:5873/worlds/__sim/worlds.json >/dev/null && break; sleep 1; done
-perl -e 'alarm 1800; exec @ARGV' node tools/test-harness/walk-new.mjs http://127.0.0.1:5873 "$OUT/new" > "$OUT/walk-new.log" 2>&1; RC_NEW=$?
+perl -e 'alarm 1800; exec @ARGV' node tools/test-harness/walk-new.mjs http://127.0.0.1:5873 "$OUT/new" --web "$OUT/web-worlds" --mars-web "$MARS_WEB" > "$OUT/walk-new.log" 2>&1; RC_NEW=$?
 cleanup; PIDS=()
 perl -e 'alarm 1200; exec @ARGV' node tools/god-skill/e2e/launcher.mjs --port 5877 --range 5878-5879 --web "$OUT/web-worlds" --mars-web "$MARS_WEB" --out "$OUT/god" > "$OUT/god-modal.log" 2>&1; RC_GOD=$?
 # lane HF: the god opens an agent's approval link (#approve/<id>) in Clerk mode; it must stay on top through the whole

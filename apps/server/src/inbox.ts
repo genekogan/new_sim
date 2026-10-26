@@ -47,6 +47,7 @@ export class AgentInbox {
   focusOf: (ids: string[]) => TicketFocus | null = () => null;
   private waiters = new Map<string, Set<() => void>>();
   private listeners = new Map<string, number>();
+  private connectedAt = new Map<string, number>();
   /** LISTEN-LEAK: the live listen of each scope (the newest; older ones are aborted as superseded). */
   private claims = new Map<string, Set<AbortController>>();
   /** SOULSIM-H F1: told the Soul id whenever its owner writes, so its `/v1/edge/wait` wakes too (not only its listen). */
@@ -241,15 +242,38 @@ export class AgentInbox {
   /** A listener is waiting for this scope (presence); the returned function ends it. A Soul's open and close are stamped
    *  durably (`listened_at`), so its grace and "away since" survive a restart. (`handed` is kept for the routes' call.) */
   listening(s: InboxScope) {
-    const key = this.key(s); this.listeners.set(key, (this.listeners.get(key) ?? 0) + 1);
+    const key = this.key(s);
+    // LINK: when this listen turns an away Soul connected, the owner's `link.since` starts here (in memory; a restart
+    // falls back to the last listen stamp).
+    if (!this.god(s) && this.view(s).presence === 'away') this.connectedAt.set(key, this.now());
+    this.listeners.set(key, (this.listeners.get(key) ?? 0) + 1);
     this.listened(s);
+    const soul = !this.god(s) && s.scope.startsWith('soul:') ? s.scope.slice(5) : null;
+    if (soul) { this.soulOpen.set(soul, (this.soulOpen.get(soul) ?? 0) + 1); for (const l of this.soulListens) try { l(soul); } catch { /* a waker never breaks a listen */ } }
     let ended = false;
-    return (_handed = false) => { if (ended) return; ended = true; const n = (this.listeners.get(key) ?? 1) - 1; if (n > 0) this.listeners.set(key, n); else this.listeners.delete(key); this.listened(s); };
+    return (_handed = false) => { if (ended) return; ended = true; const n = (this.listeners.get(key) ?? 1) - 1; if (n > 0) this.listeners.set(key, n); else this.listeners.delete(key);
+      if (soul) { const k = (this.soulOpen.get(soul) ?? 1) - 1; if (k > 0) this.soulOpen.set(soul, k); else this.soulOpen.delete(soul); }
+      this.listened(s); };
+  }
+  /** LINK BODY: open listens per Soul id (any owner), and who is told when one opens (the body rule wakes the body). */
+  private soulOpen = new Map<string, number>();
+  private soulListens: ((soulId: string) => void)[] = [];
+  onSoulListen(listener: (soulId: string) => void) { this.soulListens.push(listener); }
+  /** LINK BODY: whether this Soul's agent has a listen open now, and when it last had one (ms; null = never). Durable. */
+  soulPresence(soulId: string): {listening: boolean; at: number | null} {
+    if ((this.soulOpen.get(soulId) ?? 0) > 0) return {listening: true, at: this.now()};
+    const r = this.db.db.prepare('SELECT MAX(listened_at) at FROM agent_inbox_v1 WHERE world_id=? AND scope=?').get(this.worldId, `soul:${soulId}`) as {at: number | null} | undefined;
+    return {listening: false, at: r?.at ?? null};
   }
   private listened(s: InboxScope) {
     if (this.god(s)) return;
     this.db.db.prepare(`INSERT INTO agent_inbox_v1(world_id,scope,owner,listened_at) VALUES(?,?,?,?)
       ON CONFLICT(world_id,scope,owner) DO UPDATE SET listened_at=excluded.listened_at`).run(this.worldId, s.scope, s.owner, this.now());
+  }
+  /** LINK: the owner link inputs: presence now, the last listen stamp, and when the current connection began. */
+  linkPresence(s: InboxScope): {presence: Presence; listenedAt: number | null; connectedSince: number | null} {
+    const v = this.view(s), listenedAt = v.listenedAt ?? null, presence = v.presence ?? 'away';
+    return {presence, listenedAt, connectedSince: presence === 'away' ? null : this.connectedAt.get(this.key(s)) ?? listenedAt};
   }
   listenerCount(s: InboxScope) { return this.listeners.get(this.key(s)) ?? 0; }
   /** LISTEN-LEAK: one live listen per agent. A new listen supersedes every older one for the same scope (its signal aborts;

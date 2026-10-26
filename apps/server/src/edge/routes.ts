@@ -70,6 +70,9 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
   const eyes = mountEdgeEyes(app, deps);
   const comms = registerEdgeComms(app, deps, {stewardToken: process.env.EDGE_STEWARD_TOKEN || undefined, fading: process.env.EDGE_FADING === '1'});
   L.attachComms(comms);
+  // LINK BODY: the body follows the agent's listen presence (edge/ledger/body-rule.ts)
+  const presence = deps.ownerInbox;
+  if (presence?.soulPresence) L.attachPresence({soulPresence: id => presence.soulPresence!(id), onSoulListen: l => presence.onSoulListen?.(l), onSoulSend: l => presence.onSoulSend(l)});
   // EVENTS-v1 (tranche agent-minds M1/M2/M4): push stream (SSE + WS), digest, world.notice, server-side plans, schema.
   let plans: Plans | null = null;
   const events = registerEdgeEvents(app, deps, comms, {placeName: id => L.places.byId.get(id)?.name ?? null, planSummary: id => plans?.summary(id) ?? null,

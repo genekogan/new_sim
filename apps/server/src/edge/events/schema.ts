@@ -7,7 +7,8 @@ import {EVENT_KINDS} from './envelope.ts';
 import {HEARTBEAT_MS, MAX_STREAMS_PER_SOUL} from './index.ts';
 import {PLAN_MAX_STEPS, ON_REFUSAL} from '../plans/plans.ts';
 import {IDEMPOTENCY_TTL_MS} from './idempotency.ts';
-import {HOLD_MAX_MS, GONE_MS, RED_MS, YELLOW_MS} from '../comms/fading.ts';
+import {HOLD_MAX_MS, GONE_MS, RED_MS, YELLOW_MS, beamEnabled} from '../comms/fading.ts';
+import {BODY_KNOBS} from '../ledger/body-rule.ts';
 
 const parts = new Map<string, unknown>();
 /** Register (or replace) a named part of the schema. */
@@ -78,7 +79,10 @@ export function edgeSchema() {
     },
     reminders:{apiContract:'eden-edge/1.1',auth:'own Soul only',clientRef:'stable1..100; normalized replay; changed request conflicts',clocks:'worldDayIndex+HH:MM | real ISO Z/offset; explicit, unambiguous, nonrelative',durationUnits:'native tick seconds ≠ calendar minutes ≠ real time',delivery:'private WS/wait reminder.due; durable outbox+atomic cursor; advisory, no body/native plan',paused:'world clock stops world targets; real continues',runningServerLatency:'target<=2 real seconds; independent poll<=1s; stalls/downtime may delay',activeLimits:{perSoul:64,perWorld:256}},
     mail:{contract:'eden-edge/1.1',write:'post-letter:<offered mailbox> {to:<canonical Soul id|exact public name>,text,title?}',scope:'private sender/recipient postbox; no courier physics',unaddressed:'private draft',read:['GET /v1/edge/mail','GET /v1/edge/mail/:id'],event:'mail.delivered'},
-    fading: {yellowMinutes: YELLOW_MS / 60_000, redMinutes: RED_MS / 60_000, goneMinutes: GONE_MS / 60_000, measures: 'abandoned: no accepted act/plan/turn AND no hold',
+    // LINK (2026-10-24): the body never leaves; the idle beam below runs only when `beam` is true (SIM_BEAM, off by default)
+    body: {states: ['awake', 'idle', 'zombie', 'asleep'], rule: 'no listen for SLEEP_GRACE: zombie (short slow shuffles near where it was left); after ZOMBIE_WANDER: asleep where it stands (floating in water); a listen or an accepted action wakes it; connected but no accepted action, owner message or addressed turn for IDLE_START: idle reflex (sit / stand / doze / drift)',
+      sleepGraceSeconds: BODY_KNOBS.sleepGraceMs / 1000, zombieWanderMinutes: BODY_KNOBS.zombieWanderMs / 60_000, idleStartMinutes: BODY_KNOBS.idleStartMs / 60_000, idleDozeMinutes: BODY_KNOBS.idleDozeMs / 60_000, reflexRadiusMetres: BODY_KNOBS.reflexRadiusM, public: 'body {state, doing, since} on the public Soul record and the world Soul list; spectator {kind:"body"}'},
+    fading: {beam: beamEnabled(), yellowMinutes: YELLOW_MS / 60_000, redMinutes: RED_MS / 60_000, goneMinutes: GONE_MS / 60_000, measures: 'abandoned: no accepted act/plan/turn AND no hold',
       holds: ['executing plan step', 'activity: open receipt/running programme', 'own chosen rest: seated/lying/sleeping/swimming, or ride'], holdMaxHours: HOLD_MAX_MS / 3600_000},
     limits: {eventStreamsPerSoul: MAX_STREAMS_PER_SOUL, heartbeatSeconds: HEARTBEAT_MS / 1000, streamRetention: '1000 events or 24 h per Soul', idempotencyHours: IDEMPOTENCY_TTL_MS / 3600_000, sayChars: 500, planSteps: PLAN_MAX_STEPS, earshotMetres: 12, perceptionMetres: 20},
     ...Object.fromEntries(parts),

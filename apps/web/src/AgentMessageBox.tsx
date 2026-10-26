@@ -1,8 +1,8 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import type {Api} from './useSim.ts';
-import {apiPath} from './world-path.ts';
 import {windowCode} from './god-ui/join-api.ts';
-import {presenceOf,reportAgentPresence,soulPresenceLine,useAgentPresence,type AgentHere} from './agent-presence.ts';
+import {reportAgentPresence,withLink} from './agent-presence.ts';
+import {pollInbox} from './inbox-poll.ts';
 import './AgentMessageBox.css';
 
 export type AgentInbox = {
@@ -14,6 +14,10 @@ export type AgentInbox = {
   /** Messages waiting for the agent (the shown one included), and whether a listener is waiting right now. */
   queued?: number;
   presence?: 'listening' | 'working' | 'recent' | 'away';
+  /** LINK (COMMON-LINK §2): the owner's one state, read by `readLink`. */
+  link?: unknown;
+  /** LINK: the agent's public `now` line, also on the owner view. */
+  now?: unknown;
 };
 /** A message still unread after this long says so, with its age. */
 export const NOT_PICKED_UP_MS = 10_000;
@@ -34,22 +38,15 @@ export function receiptState(latest: NonNullable<AgentInbox['latest']>, queued: 
 type Transport = (text?: string) => Promise<AgentInbox>;
 
 /** A single private note and receipt, deliberately without a conversation history. */
-export function AgentMessageBox({request, prompt, kind, name, here}: {request: Transport; prompt: string; kind: 'god' | 'soul'; name?: string; here?: AgentHere | null}) {
+export function AgentMessageBox({request, prompt, kind}: {request: Transport; prompt: string; kind: 'god' | 'soul'}) {
   const [inbox, setInbox] = useState<AgentInbox | null>(null);
   const [text, setText] = useState(''), [sending, setSending] = useState(false), [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const mounted = useRef(false), revision = useRef(0);
   useEffect(() => {
     mounted.current = true;
-    let stopped = false, timer: ReturnType<typeof setTimeout>;
-    const refresh = async () => {
-      const at = revision.current;
-      try {const result = await request(); if (!stopped && at === revision.current) setInbox(result);}
-      catch {if (!stopped && at === revision.current) setInbox(null);}
-      if (!stopped) timer = setTimeout(() => void refresh(), 2000);
-    };
-    void refresh();
-    return () => {stopped = true; mounted.current = false; clearTimeout(timer);};
+    const stop = pollInbox(() => request(), setInbox, () => revision.current);
+    return () => {stop(); mounted.current = false;};
   }, [request]);
   useEffect(() => {if (!copied) return; const t = setTimeout(() => setCopied(false), 2000); return () => clearTimeout(t);}, [copied]);
   const send = async (event: React.FormEvent) => {
@@ -60,32 +57,30 @@ export function AgentMessageBox({request, prompt, kind, name, here}: {request: T
     catch (e) {if (mounted.current) setError(e instanceof Error ? e.message : 'Message could not be sent. Try again.');}
     finally {revision.current++; if (mounted.current) setSending(false);}
   };
-  return <AgentMessageBoxView kind={kind} name={name} here={here} inbox={inbox} prompt={prompt} text={text} sending={sending} error={error} copied={copied}
+  return <AgentMessageBoxView kind={kind} inbox={inbox} prompt={prompt} text={text} sending={sending} error={error} copied={copied}
     onText={setText} onSend={send} onCopy={async () => {
       try {await navigator.clipboard.writeText(prompt); if (mounted.current) setCopied(true);}
       catch {if (mounted.current) setError('Copy unavailable. Select the start prompt to copy it.');}
     }}/>;
 }
 
-export function AgentMessageBoxView({kind, name, here, inbox, prompt, text, sending = false, error = '', copied = false, now = Date.now(), onText, onSend, onCopy}: {
-  /** A Soul's box: its name, and the page's current (non-stale) presence for it; absent = read from `inbox`. */
-  kind: 'god' | 'soul'; name?: string; here?: AgentHere | null; inbox: AgentInbox | null; prompt: string; text: string; sending?: boolean; error?: string; copied?: boolean; now?: number;
-  onText(text: string): void; onSend(event: React.FormEvent): void; onCopy(): void;
+export function AgentMessageBoxView({kind, inbox, prompt = '', text, sending = false, error = '', copied = false, now = Date.now(), onText, onSend, onCopy}: {
+  /** LINK: a Soul's box is only the form and the receipt; the card's status line says whether its agent is listening. */
+  kind: 'god' | 'soul'; inbox: AgentInbox | null; prompt?: string; text: string; sending?: boolean; error?: string; copied?: boolean; now?: number;
+  onText(text: string): void; onSend(event: React.FormEvent): void; onCopy?(): void;
 }) {
   const latest = inbox?.latest;
-  // PRESENCE (SOUL3): a Soul's box says, before typing, whether its agent is listening or since when it is away (the message
-  // then waits), with how many of the owner's messages wait; the box itself stays, since a message typed now is queued.
-  const soul = kind === 'soul' ? soulPresenceLine(name, here !== undefined ? here : inbox ? presenceOf(inbox, now) : null, now) : null;
-  const presence = soul ? {away: soul.state === 'away' || soul.state === 'never', text: soul.text} : inbox ? presenceLine(inbox, now) : null;
-  // the owner's newest message; `queued` counts what still waits (the agent works oldest first; a Soul's line says it)
-  const state = latest ? receiptState(latest, soul ? 0 : inbox?.queued ?? 0, now) : '';
+  const soul = kind === 'soul';
+  const presence = !soul && inbox ? presenceLine(inbox, now) : null;
+  // the owner's newest message; `queued` counts what still waits (the agent works oldest first)
+  const state = latest ? receiptState(latest, inbox?.queued ?? 0, now) : '';
   const answers = latest ? [latest.reply, latest.result].filter((x): x is string => !!x) : [];
   const receipt = latest ? [state, latest.text, ...answers].join(' · ') : '';
   return <div className="agent-message" data-agent-message={kind}>
-    <div className="agent-message-presence" data-agent-presence={soul ? soul.state : inbox?.presence ?? (inbox ? inbox.connected ? 'recent' : 'away' : 'unknown')}>
-      <span role={soul ? 'status' : undefined} title={soul?.title}>{presence ? presence.text : 'Agent status unavailable'}{soul?.waiting && <span className="agent-message-waiting"> · {soul.waiting}</span>}</span>
-      {presence?.away && <button type="button" onClick={onCopy} title={prompt}>{copied ? 'Copied' : 'Copy start prompt'}</button>}
-    </div>
+    {!soul && <div className="agent-message-presence" data-agent-presence={inbox?.presence ?? (inbox ? inbox.connected ? 'recent' : 'away' : 'unknown')}>
+      <span>{presence ? presence.text : 'Agent status unavailable'}</span>
+      {presence?.away && onCopy && <button type="button" onClick={onCopy} title={prompt}>{copied ? 'Copied' : 'Copy start prompt'}</button>}
+    </div>}
     <form className="agent-message-form" onSubmit={onSend}>
       <input aria-label="Message your agent" placeholder="Message your agent…" value={text} onChange={e => onText(e.target.value)} maxLength={1000} disabled={sending} autoComplete="off"/>
       <button type="submit" disabled={sending || !text.trim()}>{sending ? 'Sending…' : 'Send'}</button>
@@ -95,7 +90,7 @@ export function AgentMessageBoxView({kind, name, here, inbox, prompt, text, send
       {answers.map((a, i) => <span key={i} className="agent-message-answer"><span aria-hidden="true"> · </span><span className="agent-message-reply">{a}</span></span>)}
     </p>}
     {error && <p className="agent-message-error" role="alert">{error}</p>}
-    {error.startsWith('Copy unavailable') && <input className="agent-message-prompt" aria-label="Agent start prompt" value={prompt} readOnly onFocus={e => e.target.select()}/>}
+    {!soul && error.startsWith('Copy unavailable') && <input className="agent-message-prompt" aria-label="Agent start prompt" value={prompt} readOnly onFocus={e => e.target.select()}/>}
   </div>;
 }
 
@@ -108,7 +103,19 @@ export function soulStartPrompt(base: string, soulId: string, name: string | und
     + `If this folder is not paired with it yet, run ${pair}${code ? ' (the request comes up in my open Sim window)' : ' (I approve it in my open Sim window or at the approval link)'}, then node eden-agent.mjs approval wait; then listen as the skill says.`;
 }
 let codeOnce: Promise<string | null> | null = null;
-export function SoulAgentMessageBox({api, soulId, name}: {api: Api; soulId: string; name?: string}) {
+/** One window-code request per page (the server reuses a code while it has over an hour left); a failure is retried next mount. */
+export function useWindowCode() {
+  const [code, setCode] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    codeOnce ??= windowCode().then(c => { if (!c) codeOnce = null; return c; }, () => (codeOnce = null));
+    void codeOnce.then(c => { if (live && c) setCode(c); });
+    return () => { live = false; };
+  }, []);
+  return code;
+}
+/** The owner card's inbox: read every 2 s while the page is shown (this also feeds the page's presence and link record), and send one message. */
+export function useSoulInbox(api: Api, soulId: string) {
   const request = useCallback<Transport>(async text => {
     let r;
     try {r = await api(`/v1/edge/owner/${encodeURIComponent(soulId)}/inbox`, text === undefined ? undefined : {text});}
@@ -117,18 +124,35 @@ export function SoulAgentMessageBox({api, soulId, name}: {api: Api; soulId: stri
       if (text === undefined) reportAgentPresence(soulId, null);
       throw new Error(r.data?.message ?? r.data?.error?.message ?? 'Message could not be sent. Try again.');
     }
-    reportAgentPresence(soulId, r.data.inbox);
-    return r.data.inbox;
+    const inbox = withLink<AgentInbox>(r.data);
+    reportAgentPresence(soulId, inbox);
+    return inbox;
   }, [api, soulId]);
-  // one window-code request per page (the server reuses a code while it has over an hour left); a failure is retried next mount
-  const [code, setCode] = useState<string | null>(null);
+  const [inbox, setInbox] = useState<AgentInbox | null>(null);
+  const revision = useRef(0);
   useEffect(() => {
-    let live = true;
-    codeOnce ??= windowCode().then(c => { if (!c) codeOnce = null; return c; }, () => (codeOnce = null));
-    void codeOnce.then(c => { if (live && c) setCode(c); });
-    return () => { live = false; };
-  }, []);
-  const base = location.origin + apiPath('');
-  const here = useAgentPresence(soulId);
-  return <AgentMessageBox key={soulId} kind="soul" name={name} here={here} request={request} prompt={soulStartPrompt(base, soulId, name, code)}/>;
+    setInbox(null);
+    return pollInbox(() => request(), setInbox, () => revision.current);
+  }, [request]);
+  const send = useCallback(async (text: string) => {
+    revision.current++;
+    try {const result = await request(text); setInbox(result); return result;}
+    finally {revision.current++;}
+  }, [request]);
+  return {inbox, send};
+}
+/** The Connected card's box: the form and the latest receipt. */
+export function SoulMessageBox({inbox, send}: {inbox: AgentInbox | null; send(text: string): Promise<unknown>}) {
+  const [text, setText] = useState(''), [sending, setSending] = useState(false), [error, setError] = useState('');
+  const mounted = useRef(true);
+  useEffect(() => {mounted.current = true; return () => {mounted.current = false;};}, []);
+  const onSend = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (sending || !text.trim()) return;
+    setSending(true); setError('');
+    try {await send(text.trim()); if (mounted.current) setText('');}
+    catch (e) {if (mounted.current) setError(e instanceof Error ? e.message : 'Message could not be sent. Try again.');}
+    finally {if (mounted.current) setSending(false);}
+  };
+  return <AgentMessageBoxView kind="soul" inbox={inbox} text={text} sending={sending} error={error} onText={setText} onSend={onSend}/>;
 }

@@ -36,7 +36,10 @@ export const OPEN_SOCKET_GLOBAL = '__simOpenSocket';
 export const PREFETCH_GLOBAL = '__simSnapshotPrefetch';
 export const CONFIG_GLOBAL = '__simConfigPrefetch';
 export const SOCKET_GLOBAL = '__simSocketPrefetch';
-type Prefetch = { url: string; response: Promise<Response> };
+export type PrefetchRequest = { response: Promise<Response>; abort?: () => void };
+type Prefetch = PrefetchRequest & { url: string };
+type PrefetchPart = Promise<Response> | PrefetchRequest;
+type SnapshotPrefetch = Prefetch & { parts?: Record<string, PrefetchPart>; discard?: () => void };
 /** Lane W1: the world's WebSocket, opened at page entry with an anonymous hello (P7: in its URL, `?hello=`, said by the
  *  server at the upgrade); useSim's Connection adopts it (queue:
  *  every message that arrived before then, in order). Closed after 20 s if nothing adopted it. */
@@ -48,11 +51,11 @@ export type BootSocket = { url: string; ws: WebSocket; queue: unknown[]; hello: 
 export function entryPrefetchScript(base: string, oldKeys: readonly string[] = OLD_WORLD_KEYS, hello?: string): string {
   return `(function(){try{var b=${JSON.stringify(base)},k=(${worldKeyFrom.toString()})(location.pathname,b);`
     + `if(${JSON.stringify(oldKeys)}.indexOf(k)>=0||typeof fetch!=='function')return;`
-    + `var w=b+'/w/'+k,g=function(n,u){var p=fetch(u);p.catch(function(){});window[n]={url:u,response:p};};`
+    + `var w=b+'/w/'+k,rq=function(u){var c=typeof AbortController==='function'?new AbortController():null,p=c?fetch(u,{signal:c.signal}):fetch(u);p.catch(function(){});return {response:p,abort:function(){if(c)c.abort();}};},g=function(n,u){var r=rq(u);r.url=u;window[n]=r;};`
     // W3: the wire form (snapshot-wire.ts); its defs/ground part fetches start as soon as the response headers name them
     + `var x=window.__simSnapshotKey,n=w+'/v1/world/snapshot?defs=ref&cols=1';g(${JSON.stringify(PREFETCH_GLOBAL)},typeof x==='string'&&x?n+'&v='+encodeURIComponent(x):n);g(${JSON.stringify(CONFIG_GLOBAL)},w+'/v1/config');`
     // P7: the parts the HTML names (window.__simSnapshotParts) leave at once; any other the snapshot's headers name, then
-    + `var sp=window[${JSON.stringify(PREFETCH_GLOBAL)}],pp=sp.parts={},pf=function(f){if(typeof f==='string'&&/^[0-9a-f]{32}$/.test(f)&&!pp[f]){pp[f]=fetch(w+'/v1/world/part/'+f);pp[f].catch(function(){});}},hp=window.__simSnapshotParts;if(hp&&hp.forEach)hp.forEach(pf);`
+    + `var sp=window[${JSON.stringify(PREFETCH_GLOBAL)}],pp=sp.parts={},closed=false;sp.discard=function(){closed=true;sp.abort();Object.keys(pp).forEach(function(f){pp[f].abort();});};var pf=function(f){if(!closed&&typeof f==='string'&&/^[0-9a-f]{32}$/.test(f)&&!pp[f])pp[f]=rq(w+'/v1/world/part/'+f);},hp=window.__simSnapshotParts;if(hp&&hp.forEach)hp.forEach(pf);`
     + `sp.response.then(function(r){['x-defs-ref','x-ground-ref'].forEach(function(h){pf(r.headers.get(h));});},function(){});`
     // P7: the hello rides in the socket's URL (the server says it at the upgrade), not from the open event: that waited
     // for the page's main thread, busy building the world, and the join with it (~1 s on a phone)
@@ -103,11 +106,27 @@ function takePrefetch(name: string, url: string): Promise<Response> | null {
 
 /** The entry prefetch's response when it was for this exact URL, at most once per page (a later start, a resync or any
  *  other caller fetches afresh). null: there was none (old world, a test, a script-less page) or it is already taken. */
-export function takeSnapshotPrefetch(url: string): Promise<Response> | null {
-  const w = (typeof window === 'undefined' ? null : window) as unknown as Record<string, (Prefetch & { parts?: Record<string, Promise<Response>> }) | undefined> | null;
-  const p = w?.[PREFETCH_GLOBAL]; if (p && p.url === url) parts = p.parts ?? {};
-  return takePrefetch(PREFETCH_GLOBAL, url);
+const asRequest = (part: PrefetchPart): PrefetchRequest => 'response' in part ? part : { response: part };
+function discardRequest(request: PrefetchRequest) {
+  request.abort?.();
+  // Older cached HTML has no controller. Its late body can still be released, but its pending headers cannot be aborted.
+  void request.response.then(r => r.body?.cancel().catch(() => {}), () => {});
 }
-let parts: Record<string, Promise<Response>> = {};
-/** A part (snapshot-wire.ts) the entry prefetch started for the snapshot just taken, at most once. */
-export function takePartPrefetch(ref: string): Promise<Response> | null { const p = parts[ref] ?? null; delete parts[ref]; return p; }
+/** Claim the exact entry snapshot and its part requests as one loader-owned batch. */
+export function takeSnapshotPrefetchBatch(url: string): { request: PrefetchRequest; part(ref: string): PrefetchRequest | null; close(): void } | null {
+  const w = (typeof window === 'undefined' ? null : window) as unknown as Record<string, SnapshotPrefetch | undefined> | null;
+  const p = w?.[PREFETCH_GLOBAL]; if (!p) return null;
+  delete w![PREFETCH_GLOBAL];
+  const pending = p.parts ?? {}; let closed = false;
+  const close = () => { if (closed) return; closed = true; p.discard?.(); discardRequest(p); for (const ref of Object.keys(pending)) { discardRequest(asRequest(pending[ref])); delete pending[ref]; } };
+  if (p.url !== url) { close(); return null; }
+  return { request: p, part(ref) { if (closed) return null; const part = pending[ref]; delete pending[ref]; return part ? asRequest(part) : null; }, close };
+}
+// Compatibility API for existing consumers and pre-controller cached entry scripts.
+export function takeSnapshotPrefetch(url: string): Promise<Response> | null {
+  const batch = takeSnapshotPrefetchBatch(url); parts = batch;
+  return batch?.request.response ?? null;
+}
+let parts: ReturnType<typeof takeSnapshotPrefetchBatch> = null;
+/** A part of the snapshot just taken, at most once. New transport code owns its batch directly. */
+export function takePartPrefetch(ref: string): Promise<Response> | null { return parts?.part(ref)?.response ?? null; }

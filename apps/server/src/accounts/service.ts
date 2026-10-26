@@ -49,6 +49,20 @@ export class WorldAccounts {
    return {worldId:this.host.worldId,accountId:identity.id,requestId:op.requestId,soulId:op.scope.soulId};
   });if(wasPending&&dto.mode==='repair'&&dto.soulId&&['creating','ready'].includes(dto.status)){const row=this.host.db.soul(dto.soulId)!;this.host.db.setSoulToken(dto.soulId,null,null,'replaced');this.host.db.db.prepare('UPDATE account_legacy_authority_v1 SET revoked_at=COALESCE(revoked_at,?),revoked_reason=COALESCE(revoked_reason,?) WHERE world_id=? AND soul_id=?').run(Date.now(),'account-repair',this.host.worldId,row.id);afterCommit(this.host.db.db,()=>this.souls.invalidatePairings(row.id));}return dto;});this.reconcile(dto.id);return this.store.view(dto.id,identity);
  }
+ /** LINK (birth on approve): the owner never waits on `creating`. The accepted lifecycle birth is settled inside the approve
+  * request (inputs drained, the runner pumped) so the answer is `ready` with the body standing at the arrival point. A world
+  * that cannot settle within `maxMs` (a deferred admission) still answers `creating`; old clients keep polling as before. */
+ async approveSettled(identity:AccountIdentity,id:string,maxMs=5000){
+  let dto=this.approve(identity,id);if(dto.status!=='creating')return dto;
+  const deadline=Date.now()+maxMs;
+  for(let i=0;dto.status==='creating'&&Date.now()<deadline;i++){
+   try{this.host.drainInputs();}catch{/* a clock not ready yet: the served loop settles it */}
+   this.souls.lifecycle?.pump();
+   await new Promise<void>(r=>i<40?setImmediate(r):setTimeout(r,20));
+   this.reconcile(id);dto=this.store.view(id,identity);
+  }
+  return dto;
+ }
  poll(id:string,secret:string){
   // Validate the secret before reading private allocation/lifecycle scope.
   this.store.poll(id,secret);this.reconcile(id);const out=this.store.poll(id,secret);

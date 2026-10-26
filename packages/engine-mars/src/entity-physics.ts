@@ -9,6 +9,7 @@ import type { EntityPhysicsV1 } from '../../../mars/viewer/engine/spatial/edits.
 import type { Level, Link, Obstacle, Surface } from '../../../mars/viewer/engine/spatial/types.ts';
 import type { Entity, WorldState } from '../../../mars/viewer/engine/world/types.ts';
 import { registerAssets } from './catalog-adapter.ts';
+import { prepareImmutableSnapshotData } from '../../../mars/viewer/engine/runtime/codec.ts';
 
 export type { EntityPhysicsV1 };
 export type EntityPartV1 = { surfaces?: Surface[]; solids?: Obstacle[]; links?: Link[] };
@@ -77,6 +78,9 @@ export function nextEntityPhysics(prev: EntityPhysicsV1 | undefined, e: WorldEdi
   for (const p of [...Object.values(cur.byEntity), ...Object.values(cur.assets)]) if (p && typeof p === 'object' && !PART_TEXT.has(p)) PART_TEXT.set(p, flat(stableStringify(p)));
   cur.hash = hashStable({ levels: cur.levels, byEntity: cur.byEntity, assets: cur.assets }, PART_TEXT as unknown as ReadonlyMap<object, string>);
   cur.baseKey = hashOf({ levels: cur.levels, bounds: cur.bounds });
+  // Seal the existing replace-never-mutate ownership contract only after all
+  // derived fields are complete. Unchanged parts retain their admitted shapes.
+  prepareImmutableSnapshotData(cur, '$.entityPhysicsV1');
   return cur;
 }
 

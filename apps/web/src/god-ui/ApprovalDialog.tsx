@@ -7,21 +7,28 @@
 // wait…" with a spinner; when the Soul's body is in the world the card closes itself and the camera follows the new Soul
 // (follow-soul-request.ts -> the Shell's viewer). A refused body is one short line and Close. It opens from the agent's
 // link (#approve/<id>, older agents) or, with no navigation at all, in the window that gave the agent its window code.
+// LINK (spec SOUL-LINK §4, 2026-10-24): the card *is* the Pairing state of the Soul card: kicker, `● Pairing · asked …`,
+// "An agent calling itself <label> asks to control <name>", one warning line, Approve / Refuse, nothing else. While a Soul
+// card is open it is drawn inside that card (`embedded`, pairing-slot.ts), never as a second dialog over it.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import * as J from './join-api.ts';
 import { approvalLine, preparingLine, safePhoto } from './window-approvals.ts';
 import { requestFollowSoul } from '../follow-soul-request.ts';
 import { countPairing, pairingTaken } from '../visitor-counts.ts';
-import { APPROVAL_COPY, approvalTitle } from '../approval-link.ts';
+import { approvalTitle } from '../approval-link.ts';
+import { ageText } from '../soul-state.ts';
 import './approval-card.css';
 
 const AVATAR = <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="15" r="7" fill="currentColor" opacity=".55" /><path d="M6 36a14 14 0 0 1 28 0" fill="currentColor" opacity=".55" /></svg>;
 
-export function ApprovalCard({ id, signedIn, signIn, onDone }: { id: string; signedIn: boolean; signIn?: ReactNode; onDone: () => void }) {
+/** The agent's self-chosen label, clipped: it is untrusted text, shown as what the agent calls itself. */
+const agentName = (label: string | undefined) => (label ?? '').trim().slice(0, 60) || 'an unnamed agent';
+const askedAt = (a: J.Approval) => { const t = (a as { createdAt?: unknown }).createdAt; return typeof t === 'number' && Number.isFinite(t) ? t : null; };
+
+export function ApprovalCard({ id, signedIn, signIn, onDone, embedded = false }: { id: string; signedIn: boolean; signIn?: ReactNode; onDone: () => void; embedded?: boolean }) {
   const [a, setA] = useState<J.Approval | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [about, setAbout] = useState(false);
   const [refusedHere, setRefusedHere] = useState(false);
   const [approving, setApproving] = useState(false);
   const pressed = useRef(false);   // Approve was pressed in this card: only this card counts the pairing
@@ -53,19 +60,23 @@ export function ApprovalCard({ id, signedIn, signIn, onDone }: { id: string; sig
   // from the Approve press until the body is ready (or refused): the spinner line, nothing else to press
   const preparing = a?.status === 'creating' || (approving && a?.status === 'pending');
   const kicker = a?.mode === 'repair' ? 'Connect your Soul' : 'New Soul';
+  const title = approvalTitle(a) ?? (signedIn ? '…' : 'Your agent is asking');
+  const asked = a ? askedAt(a) : null;
   return (
-    <div className="ap-card" data-approval={id} data-approval-status={a?.status ?? ''}>
-      <button type="button" className="ap-close" data-approval-close="1" aria-label="Close" onClick={onDone}>×</button>
+    <div className={'ap-card' + (embedded ? ' ap-embedded' : '')} data-approval={id} data-approval-status={a?.status ?? ''}>
+      {!embedded && <button type="button" className="ap-close" data-approval-close="1" aria-label="Close" onClick={onDone}>×</button>}
       <div className="ap-head">
         {photo ? <img className="ap-avatar" src={photo} alt="" /> : <span className="ap-avatar ap-generic">{AVATAR}</span>}
         <div className="ap-who">
           <span className="ap-kicker">{kicker}</span>
-          <span className="ap-nameline"><b className="ap-name" data-approval-name="1">{approvalTitle(a) ?? (signedIn ? '…' : 'Your agent is asking')}</b>
-          {a && <button type="button" className="ap-info" aria-expanded={about} aria-label="About this request" data-approval-about="1" onClick={() => setAbout((v) => !v)}><span>i</span></button>}</span>
+          <b className="ap-name" data-approval-name="1" title={title}>{title}</b>
         </div>
       </div>
-      {about && a && <p className="ap-note" data-approval-note="1">Asked by {a.agentLabel}.{a.soulId ? <> Soul ID <code>{a.soulId}</code>.</> : null} Approve only if you started this agent yourself.</p>}
-      {a?.status === 'pending' && !preparing && <p className="ap-line" data-approval-copy="1">{APPROVAL_COPY}</p>}
+      {a?.status === 'pending' && !preparing && <>
+        <p className="ap-state"><span className="ap-pairing"><i aria-hidden="true" />Pairing</span><span className="ap-dim">{asked ? `asked ${ageText(asked)}` : 'waiting for your answer'}</span></p>
+        <p className="ap-ask" data-approval-copy="1"><span data-approval-note="1">An agent calling itself <b>{agentName(a.agentLabel)}</b></span> {a.mode === 'repair' ? <>asks to control {approvalTitle(a) ?? 'your Soul'}.</> : <>asks to make a new Soul, {approvalTitle(a) ?? 'unnamed'}, and control it.</>}</p>
+        <p className="ap-warn">Approve only if you started it yourself.{a.mode === 'repair' ? ' The agent connected now, if any, is disconnected.' : ''}</p>
+      </>}
       {!signedIn && <><p className="ap-line">Sign in to answer.</p>{signIn && <div className="ap-signin">{signIn}</div>}</>}
       {preparing && a && <p className="ap-line ap-wait" role="status" data-approval-preparing="1"><span className="ap-spinner" aria-hidden="true" />{preparingLine({ ...a, name: approvalTitle(a) ?? a.name })}</p>}
       {a?.status === 'pending' && !preparing && <div className="ap-actions">

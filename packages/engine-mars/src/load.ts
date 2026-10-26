@@ -14,6 +14,7 @@ export type Mars = {
   makeWay: (rt:any, actor:string, clear:[number,number])=>void;
   admitFloaters: (verb:string,params:any,body:(id:string)=>any)=>any;
   TakeRecorder: any;
+  finalStateOf: (world: any) => { hash: string };
   compactRuntime: (rt: any, services: (world: any) => any) => any;
   compactionIssue: (rt: any) => string | null;
   nonResumableReason: (def: any) => string | null;
@@ -61,7 +62,7 @@ export async function loadMars(): Promise<Mars> {
   campScene.bounds = [-30,-30,30,30]; campScene.surfaces[0].obb.half = [30,30];
   const campWorld = (seed?: string) => { const w = camp.edenCampWorld(seed); w.base.staticHash = hashes.hashOf(campScene); return w; };
   return {
-    Runtime: rt.Runtime, makeWay:walk.makeWay, admitFloaters:bodies.admitFloaters, compactRuntime: compact.compactRuntime, compactionIssue: compact.compactionIssue, TakeRecorder: recorder.TakeRecorder, nonResumableReason: snapshot.nonResumableReason, canonicalEntityOrder: rt.canonicalEntityOrder, rulesVersion: reg.ENGINE_RULES_VERSION, createRegistry: (extra: any[] = []) => reg.createRegistry([...carrier.CARRIER_ACTIONS, pose.poseV1, ...extra]), stepCarriers: carrier.stepCarriers, carrierEntity: carrier.carrierEntity, servicesFor: entityPhysicsServices(reg.servicesFor, edits.entityPhysicsContribution),
+    Runtime: rt.Runtime, makeWay:walk.makeWay, admitFloaters:bodies.admitFloaters, compactRuntime: compact.compactRuntime, compactionIssue: compact.compactionIssue, TakeRecorder: recorder.TakeRecorder, finalStateOf: recorder.finalStateOf, nonResumableReason: snapshot.nonResumableReason, canonicalEntityOrder: rt.canonicalEntityOrder, rulesVersion: reg.ENGINE_RULES_VERSION, createRegistry: (extra: any[] = []) => reg.createRegistry([...carrier.CARRIER_ACTIONS, pose.poseV1, ...extra]), stepCarriers: carrier.stepCarriers, carrierEntity: carrier.carrierEntity, servicesFor: entityPhysicsServices(reg.servicesFor, edits.entityPhysicsContribution),
     littleMartiansWorld: lm.littleMartiansWorld, greenFieldWorld:field.greenFieldWorld,edenCommonsWorld:commons.edenCommonsWorld,commonsLayout:commons.COMMONS_LAYOUT,littleMartiansRender:lm.LITTLE_MARTIANS_RENDER,
     invariants: [...reg.ENGINE_INVARIANTS, carrier.carrierInvariant], describeVerbs: reg.describeVerbs, scenes: {...seeds.ENGINE_SCENES, [camp.EDEN_CAMP_CAMPUS]: campScene,littlemartians:lm.LITTLE_MARTIANS_SCENE,greenfield:field.GREEN_FIELD_SCENE,'eden-commons':commons.EDEN_COMMONS_SCENE}, edenCampWorld: campWorld, campActivities: camp.edenCampActivities, bindCampActivity: camp.bindCampActivity, bindCampChess: camp.bindCampChess, provingGroundWorld: seeds.provingGroundWorld, human: fac.human, seedRng: rng.seedRng, nextRandom: rng.nextRandom, mealWorld: meal.mealWorld, mealSteps: meal.mealSteps,
   };

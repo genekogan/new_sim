@@ -21,6 +21,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
+import { clickNewSoulEntry } from './window-entry.mjs';
+import { windowCheck, startWindowListener } from './window-fixture.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : []).filter(Boolean));
@@ -34,7 +36,7 @@ if (typeof args.web !== 'string') { console.error('--web <vite build --base /wor
 const CLI = resolve(root, 'tools/edge-skill/eden-agent.mjs');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const report = { origin, steps: [], failures: [] };
-const check = (name, ok, detail = {}) => { report.steps.push({ name, ok: !!ok, ...detail }); if (!ok) report.failures.push(name); console.log(`${ok ? '✔' : '✖'} ${name} ${JSON.stringify(detail).slice(0, 400)}`); return !!ok; };
+const check = (name, ok, detail = {}) => { report.steps.push(windowCheck(name, ok, detail)); if (!ok) report.failures.push(name); console.log(`${ok ? '✔' : '✖'} ${name} ${JSON.stringify(detail).slice(0, 400)}`); return !!ok; };
 
 // ---------- the launcher in Clerk mode (synthetic issuer)
 const { clerkKeys, ISSUER, PUBLISHABLE_KEY } = await import('../../../apps/server/test/clerk-fixture.ts');
@@ -47,7 +49,8 @@ const dataDir = join(out, 'data');
 const launcher = spawn(process.execPath, ['tools/world-launcher/launcher.mjs', '--port', String(port), '--range', range, '--data', dataDir, '--base', BASE,
   '--web', resolve(args.web), '--auth-env', join(dir, 'clerk.env'), '--public-origin', origin], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
 let launcherLog = ''; launcher.stdout.on('data', (d) => { launcherLog += d; }); launcher.stderr.on('data', (d) => { launcherLog += d; });
-const stop = () => { try { launcher.kill('SIGTERM'); } catch { /* gone */ } };
+const listeners = new Set();
+const stop = () => { for (const listener of listeners) void listener.stop('harness-stop'); try { launcher.kill('SIGTERM'); } catch { /* gone */ } };
 process.on('exit', stop); for (const s of ['SIGINT', 'SIGTERM']) process.on(s, () => { stop(); process.exit(130); });
 
 async function call(url, { sub, body } = {}) {
@@ -100,16 +103,40 @@ const where = () => {
   const r = card.closest('dialog')?.getBoundingClientRect() ?? card.getBoundingClientRect();
   const pts = [[r.left + 14, r.top + 14], [r.right - 50, r.top + 14], [r.left + r.width / 2, r.bottom - 14]];
   const onTop = pts.every(([x, y]) => { const e = document.elementFromPoint(x, y); return !!e && (card.closest('dialog') ?? card).contains(e); });
-  return { present: true, status: card.getAttribute('data-approval-status'), box: [r.left, r.top, r.width, r.height].map(Math.round), vw: innerWidth, onTop, hash: location.hash,
+  return { present: true, status: card.getAttribute('data-approval-status'), box: [r.left, r.top, r.width, r.height].map(Math.round), vw: innerWidth, vh: innerHeight, onTop, hash: location.hash,
     rightGap: Math.round(innerWidth - r.right), name: card.querySelector('[data-approval-name]')?.textContent ?? '', avatar: !!card.querySelector('.ap-avatar') };
 };
-const topRight = (w) => w.present && w.onTop && w.rightGap <= 40 && w.box[1] <= 170 && (w.vw < 600 || w.box[0] > w.vw / 2);
+// LINK 2026-10-24: on a phone (< 460 px) the Pairing card is the bottom sheet (canvas PhonePairing)
+const topRight = (w) => w.present && w.onTop && w.rightGap <= 40 && (w.vw <= 460 ? w.box[1] + w.box[3] >= w.vh - 40 : w.box[1] <= 170) && (w.vw < 600 || w.box[0] > w.vw / 2);
 async function windowCode(page) {
-  await page.locator('button.bring-agent-open').first().click();
-  const link = page.locator('.bring-agent-prompt a');
-  await page.waitForFunction(() => /\?for=[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(document.querySelector('.bring-agent-prompt a')?.getAttribute('href') ?? ''), null, { timeout: 20_000 });
-  const href = await link.getAttribute('href');
-  return { href, code: href.match(/\?for=([A-Z2-9]{4}-[A-Z2-9]{4})$/)[1] };
+  const state = () => page.evaluate(() => ({clerkLoaded: !!window.Clerk?.loaded, clerkStatus: window.Clerk?.status,
+    accountMenu: !!document.querySelector('summary.account-avatar'), explanation: !!document.querySelector('[data-new-soul-explain]'),
+    currentURL: location.href, godOpen: !!document.querySelector('[data-god-modal][open]'),
+    promptHref: document.querySelector('.bring-agent-prompt a')?.getAttribute('href') ?? null}));
+  const attempt = {at: new Date().toISOString(), before: await state(), responses: []};
+  (report.windowCodeAttempts ??= []).push(attempt);
+  const response = r => {const path = new URL(r.url()).pathname;if (/\/v1\/account\//.test(path)) attempt.responses.push({at: Date.now(), path, status: r.status(), method: r.request().method()});};
+  page.on('response', response);
+  try {
+    // World drawing can finish before the deferred auth bridge. This scenario is explicitly signed in.
+    // Wait for its real account UI before New Soul; otherwise the correct signed-out explanation opens.
+    await page.locator('summary.account-avatar').waitFor({state: 'visible', timeout: 20_000});
+    attempt.signedIn = await state();
+    await clickNewSoulEntry(page, (event, detail) => {
+      if (event === 'entry') attempt.entry = detail;
+      else (attempt.godDismissals ??= []).push({at: Date.now()});
+    });
+    const link = page.locator('.bring-agent-prompt a');
+    await page.waitForFunction(() => /\?for=[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(document.querySelector('.bring-agent-prompt a')?.getAttribute('href') ?? ''), null, { timeout: 20_000 });
+    const href = await link.getAttribute('href');
+    return { href, code: href.match(/\?for=([A-Z2-9]{4}-[A-Z2-9]{4})$/)[1] };
+  } catch (error) {
+    attempt.failure = await state().catch(() => null);
+    const stem = `window-code-failure-${report.windowCodeAttempts.length}`;
+    await page.screenshot({path: join(out, stem+'.png')}).catch(() => {});
+    writeFileSync(join(out, stem+'.txt'), await page.locator('body').innerText().catch(() => '(page unavailable)'));
+    throw error;
+  } finally {page.off('response', response);}
 }
 async function waitStatus(page, status, timeout = 60_000) { await page.waitForFunction((s) => document.querySelector('[data-approval]')?.getAttribute('data-approval-status') === s, status, { timeout, polling: 250 }); }
 async function newAgent(base, name) { const folder = mkdtempSync(join(tmpdir(), `soul-${name}-`)); await agent(folder, ['register', base]); return folder; }
@@ -157,11 +184,10 @@ try {
     const id = JSON.stringify(made).match(/ap_[a-f0-9]{32}/)?.[0];
     const label = (await call(`${base}/v1/account/approvals/${id}`, { sub: 'user_gene' })).data?.approval?.agentLabel;
     const plain = await page.locator('[data-approval]').innerText();
-    check('A5a no agent label, folder or approval-wait talk on the card', !!label && !plain.includes(label) && !/label|folder|approval wait|Connected|s_[A-Za-z0-9]/.test(plain), { plain, label });
-    await page.locator('[data-approval-about]').click(); await sleep(200);
-    check('A5 the (i) note holds the agent name', (await page.locator('[data-approval-note]').innerText()).startsWith(`Asked by ${label}.`));
-    await shot(page, 'A5-card-info-open');
-    await page.locator('[data-approval-about]').click();
+    // LINK 2026-10-24 (spec §4): the card says "An agent calling itself <label> asks …" inline; the (i) toggle is gone
+    check('A5a the label shows only as what the agent calls itself; no folder or approval-wait talk', !!label && plain.includes(`An agent calling itself ${label}`) && !/folder|approval wait|Connected|s_[A-Za-z0-9]/.test(plain), { plain, label });
+    check('A5 the note line holds the agent name', (await page.locator('[data-approval-note]').innerText()).includes(label));
+    await shot(page, 'A5-card-pairing');
     // what the card shows between Approve and the body (it can be short): recorded by an observer, not by polling
     await page.evaluate(() => { const seen = window.__apSeen = []; new MutationObserver(() => { const p = document.querySelector('[data-approval-preparing]'); if (p) { const sp = p.querySelector('.ap-spinner'); const r = sp?.getBoundingClientRect(); seen.push({ text: p.textContent, spinner: !!sp && r.width > 0 && getComputedStyle(sp).animationName === 'ap-spin', buttons: document.querySelectorAll('[data-approve-agent],[data-refuse-agent]').length }); } }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true }); });
     await page.locator('[data-approve-agent]').click();
@@ -176,14 +202,32 @@ try {
     const chip = await page.evaluate(() => { const c = document.querySelector('[data-camera]'); return { mode: c?.getAttribute('data-camera'), soul: c?.getAttribute('data-follow-soul'), text: c?.textContent }; });
     check('A8 the camera follows the new Soul (follow target = its id)', following && chip.soul === server?.soulId && /Ana/.test(chip.text ?? ''), chip);
     await sleep(1500); await shot(page, 'A8-following-ana');
-    // R20 bug (2026-10-21): the owner's message box must be there for the new Soul with no reload
-    const urlA10 = page.url();
-    await page.evaluate((sid) => { location.hash = '#soul/' + sid; }, server?.soulId);
-    const ownerBox = await page.waitForSelector('[data-agent-message="soul"]', { timeout: 20_000 }).then(() => true, () => false);
-    check('A10 the owner message box appears for the new Soul without a reload', ownerBox && page.url().split('#')[0] === urlA10.split('#')[0], { ownerBox });
-    await shot(page, 'A10-owner-box');
+    // LINK: approval grants control; the message box belongs to Connected, reached by the CLI's first listen.
     const done = await waiting;
     report.waitA = done;
+    if (done.paired !== true || done.soul?.id !== server?.soulId) throw Error('A10 fixture: approval wait did not grant this Soul');
+    const urlA10 = page.url(), documentA10 = await page.evaluate(() => performance.timeOrigin);
+    await page.evaluate((sid) => { location.hash = '#soul/' + sid; }, server?.soulId);
+    await page.waitForSelector('[data-soul-state="approved-waiting"]', { timeout: 20_000 });
+    const beforeListen = await call(`${base}/v1/edge/owner/${server.soulId}/inbox`, {sub: 'user_gene'});
+    const waitingLink = beforeListen.data?.inbox?.link;
+    if (!check('A10a approved-waiting has no owner message box', beforeListen.status === 200 && waitingLink?.state === 'disconnected' && waitingLink?.reason === 'approved-waiting' && (await page.locator('[data-agent-message="soul"]').count()) === 0, {link: waitingLink})) throw Error('A10 fixture: expected approved-waiting before listen');
+    const listener = startWindowListener(CLI, folder); listeners.add(listener);
+    try {
+      await page.waitForSelector('[data-soul-state="connected"]', { timeout: 20_000 });
+      const afterListen = await call(`${base}/v1/edge/owner/${server.soulId}/inbox`, {sub: 'user_gene'});
+      const connectedLink = afterListen.data?.inbox?.link;
+      const connected = afterListen.status === 200 && connectedLink?.state === 'connected' && connectedLink?.reason === 'listening' && listener.running();
+      check('A10b the same granted CLI is actively listening and Connected', connected, {link: connectedLink, listenerPid: listener.evidence.pid});
+      // R20: retain the original selector,20s deadline and no-reload assertion; also verify document identity.
+      const ownerBox = await page.waitForSelector('[data-agent-message="soul"]', { timeout: 20_000 }).then(() => true, () => false);
+      const sameDocument = await page.evaluate(() => performance.timeOrigin) === documentA10;
+      check('A10 the owner message box appears for the new Soul without a reload', ownerBox && connected && listener.running() && sameDocument && page.url().split('#')[0] === urlA10.split('#')[0], { ownerBox, sameDocument });
+      await shot(page, 'A10-owner-box');
+    } finally {
+      report.listenA = await listener.stop(); listeners.delete(listener);
+      check('A10c owned CLI listener stopped cleanly', !report.listenA.error && !report.listenA.forcedKill && report.listenA.stopReason === 'fixture-finished' && (report.listenA.code === 0 || report.listenA.signal === 'SIGTERM'), report.listenA);
+    }
     const status = json(await agent(folder, ['status']).catch((e) => e.message));
     check('A8b the agent is paired', done.paired === true && done.soul?.name === 'Ana' && status.paired === true && status.soul === done.soul?.id && done.soul?.id === server?.soulId, { done: JSON.stringify(done).slice(0, 200), status: JSON.stringify(status).slice(0, 200) });
     await sleep(6000);
@@ -262,6 +306,7 @@ try {
   report.failures.push('harness: ' + String(e?.stack ?? e).split('\n').slice(0, 3).join(' | '));
   console.log('harness error', e);
 } finally {
+  await Promise.all([...listeners].map(listener => listener.stop('harness-finally')));
   if (browser) await browser.close().catch(() => {});
   release?.();
   writeFileSync(join(out, 'report.json'), JSON.stringify(report, null, 1));

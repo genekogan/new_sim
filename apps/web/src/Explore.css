@@ -29,3 +29,7 @@
 .asset-download-note{font-size:11px;margin-left:9px;color:var(--dim)}
 
 @media(min-width:701px) and (max-width:1050px){.human-world:not(.has-advanced) .explore-control{position:static;transform:none;margin-left:auto}.explore-open kbd{display:none}}
+
+/* LINK rows: Awake (green dot) / Zombie and Asleep (hollow dot, dimmed avatar) + the agent's `now` */
+.explore-soul.body-awake i,.explore-soul.body-idle i{background:#4faf76}.explore-soul.body-zombie i,.explore-soul.body-asleep i{background:transparent;border:1.5px solid #91999a;box-sizing:border-box;width:7px;height:7px}.explore-soul.body-zombie .soul-avatar,.explore-soul.body-asleep .soul-avatar{opacity:.7}
+.explore-soul small{min-width:0}.explore-line{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

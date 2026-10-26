@@ -464,16 +464,24 @@ export class WorldModel {
 /** 2-D separating-axis test for two yawed rectangles plus a vertical-interval test. */
 export function obbOverlap(a: OBB, b: OBB): boolean {
   if (a.y1 <= b.y0 || b.y1 <= a.y0) return false;
-  const axes: [number, number][] = [[Math.cos(a.yaw), -Math.sin(a.yaw)], [Math.sin(a.yaw), Math.cos(a.yaw)], [Math.cos(b.yaw), -Math.sin(b.yaw)], [Math.sin(b.yaw), Math.cos(b.yaw)]];
+  // Keep the original four-corner SAT arithmetic and read order. Flat local arrays avoid
+  // the temporary pairs/map/destructuring allocations without caching mutable OBB inputs.
+  const axes = [Math.cos(a.yaw), -Math.sin(a.yaw), Math.sin(a.yaw), Math.cos(a.yaw), Math.cos(b.yaw), -Math.sin(b.yaw), Math.sin(b.yaw), Math.cos(b.yaw)];
   const corners = (o: OBB) => {
     const c = Math.cos(o.yaw), s = Math.sin(o.yaw);
-    return ([[-1, -1], [1, -1], [1, 1], [-1, 1]] as const).map(([i, j]) => [o.c[0] + i * o.half[0] * c + j * o.half[1] * s, o.c[1] - i * o.half[0] * s + j * o.half[1] * c] as [number, number]);
+    return [
+      o.c[0] + -1 * o.half[0] * c + -1 * o.half[1] * s, o.c[1] - -1 * o.half[0] * s + -1 * o.half[1] * c,
+      o.c[0] + 1 * o.half[0] * c + -1 * o.half[1] * s, o.c[1] - 1 * o.half[0] * s + -1 * o.half[1] * c,
+      o.c[0] + 1 * o.half[0] * c + 1 * o.half[1] * s, o.c[1] - 1 * o.half[0] * s + 1 * o.half[1] * c,
+      o.c[0] + -1 * o.half[0] * c + 1 * o.half[1] * s, o.c[1] - -1 * o.half[0] * s + 1 * o.half[1] * c,
+    ];
   };
   const ca = corners(a), cb = corners(b);
-  for (const [ax, az] of axes) {
+  for (let k = 0; k < axes.length; k += 2) {
+    const ax = axes[k], az = axes[k + 1];
     let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
-    for (const [x, z] of ca) { const p = x * ax + z * az; a0 = Math.min(a0, p); a1 = Math.max(a1, p); }
-    for (const [x, z] of cb) { const p = x * ax + z * az; b0 = Math.min(b0, p); b1 = Math.max(b1, p); }
+    for (let i = 0; i < ca.length; i += 2) { const p = ca[i] * ax + ca[i + 1] * az; a0 = Math.min(a0, p); a1 = Math.max(a1, p); }
+    for (let i = 0; i < cb.length; i += 2) { const p = cb[i] * ax + cb[i + 1] * az; b0 = Math.min(b0, p); b1 = Math.max(b1, p); }
     if (a1 <= b0 + 1e-6 || b1 <= a0 + 1e-6) return false;
   }
   return true;

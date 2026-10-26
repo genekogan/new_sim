@@ -32,7 +32,7 @@ export function mountAccountRoutes(app:Hono,deps:{accounts:WorldAccounts;auth:Au
  app.post('/v1/account/window-code',c=>wrap(c,async()=>{const {identity}=await verified(c);deps.limit(c,'account-window-code',20,60000);return accounts.store.windowCode(identity);}));
  app.get('/v1/account/approvals',c=>wrap(c,async()=>{const {identity}=await verified(c);return {approvals:accounts.store.waiting(identity).map(shown)};}));
  app.post('/v1/account/approvals/:id/renew',c=>wrap(c,async()=>{const {identity}=await verified(c);deps.limit(c,'account-renew',10,60000);return {approval:shown(accounts.store.renew(identity,c.req.param('id'))),world:world(c)};}));
- app.post('/v1/account/approvals/:id/approve',c=>wrap(c,async()=>{const {identity}=await verified(c);deps.limit(c,'account-approve',10,60000);return {approval:shown(accounts.approve(identity,c.req.param('id'))),world:world(c)};}));
+ app.post('/v1/account/approvals/:id/approve',c=>wrap(c,async()=>{const {identity}=await verified(c);deps.limit(c,'account-approve',10,60000);return {approval:shown(await accounts.approveSettled(identity,c.req.param('id'))),world:world(c)};}));
  app.post('/v1/account/approvals/:id/cancel',c=>wrap(c,async()=>{const {identity}=await verified(c);return {approval:shown(accounts.store.cancel(identity,c.req.param('id'))),world:world(c)};}));
  app.post('/v1/account/souls/:id/revoke',c=>wrap(c,async()=>{const {identity}=await verified(c),row=accounts.host.db.soul(c.req.param('id'));if(!row||!accounts.owns(identity.id,row))throw new ApiError(403,'forbidden','Not your Soul.');accounts.revoke(identity,row.id);return {ok:true,soulId:row.id};}));
 }

@@ -6,6 +6,7 @@ import {soulAvatars} from './SoulAvatars.ts';
 import {soulAvatarImage} from './soul-avatar-source.ts';
 import type {Api} from './useSim.ts';
 import {useOwnedAgentPresence} from './agent-presence.ts';
+import {newest,ownerLink,readBody,type Body} from './soul-state.ts';
 const ID=/^[a-zA-Z0-9_-]{1,100}$/;
 export function mineIds(value:unknown):string[]{return Array.isArray(value)?[...new Set(value.filter((id):id is string=>typeof id==='string'&&ID.test(id)))].slice(0,24):[];}
 const key='sim.mine.'+worldKey;
@@ -24,10 +25,21 @@ export function SoulAvatar({soul}:{soul:PublicSoul}){
  const image=soulAvatarImage(soul,worldPath,soulAvatars.images.get(soul.id),failedPhoto),source=soulAvatars.sources.get(soul.id);let hash=0;for(const c of soul.id)hash=(hash*31+c.charCodeAt(0))>>>0;
  return image?<img key={image.key} className="soul-avatar" src={image.src} data-avatar-source={image.kind} data-profile-photo-hash={image.hash} data-avatar-entity={image.kind==='generated'?source?.entityId:undefined} data-avatar-model={image.kind==='generated'?source?.model:undefined} data-avatar-body-root={image.kind==='generated'?source?.bodyRoot:undefined} onError={image.kind==='profile-photo'?()=>setFailedPhoto(image.key):undefined} alt=""/>:<span className="soul-avatar initials" style={{background:`hsl(${hash%360} 38% 46%)`}} aria-hidden="true">{soul.name.split(/\s+/).slice(0,2).map(n=>n[0]).join('')}</span>;
 }
-export function MySouls({ids,souls,select,present,api}:{ids:readonly string[];souls:ReadonlyMap<string,PublicSoul>;select:(id:string)=>void;present?:ReadonlySet<string>;api?:Api}){
+/** LINK chips (canvas board 6): green ring = Connected; dimmed + "zz" = asleep; dimmed + a zombie mark = zombie;
+ * amber ring + "!" = Pairing; dimmed alone = disconnected with no body word yet; null = not known (claims nothing). */
+export type ChipState='pairing'|'connected'|'zombie'|'asleep'|'disconnected';
+export function chipState(link:ReturnType<typeof ownerLink>,body:Body|null):ChipState|null{
+ if(!link)return null;if(link.state!=='disconnected')return link.state;
+ return body?.state==='zombie'?'zombie':body?.state==='asleep'?'asleep':'disconnected';
+}
+const CHIP_WORD:Record<ChipState,string>={pairing:'pairing request waiting',connected:'connected',zombie:'disconnected, zombie',asleep:'disconnected, asleep',disconnected:'disconnected'};
+const CHIP_MARK:Partial<Record<ChipState,{cls:string;text:string}>>={pairing:{cls:'my-souls-pair',text:'!'},asleep:{cls:'my-souls-zz',text:'zz'},zombie:{cls:'my-souls-zz my-souls-zombie',text:'≈'}};
+export function MySouls({ids,souls,select,present,api,bodies}:{ids:readonly string[];souls:ReadonlyMap<string,PublicSoul>;select:(id:string)=>void;present?:ReadonlySet<string>;api?:Api;bodies?:ReadonlyMap<string,Body>}){
  const pinned=ids.flatMap(id=>{const soul=souls.get(id);return soul?[soul]:[];});const gone=ids.length-pinned.length;
- // AWAY-UI: a chip whose agent is away is dimmed and says so (polled for the three shown chips)
- const agent=useOwnedAgentPresence(api,pinned.slice(0,3).map(s=>s.id)),agentAway=(id:string)=>!!agent(id)?.away;
+ // the owner inbox of the three shown chips is polled; its `link` (or, from an older server, its presence) sets the ring
+ const agent=useOwnedAgentPresence(api,pinned.slice(0,3).map(s=>s.id));
+ const stateOf=(soul:PublicSoul)=>{const here=agent(soul.id);return chipState(ownerLink(here?.link??null,here),newest(readBody((soul as PublicSoul&{body?:unknown}).body),bodies?.get(soul.id)??null));};
  if(!ids.length)return null;
- return <div className="my-souls" aria-label="Your account Souls">{pinned.slice(0,3).map(soul=><button key={soul.id} className={(present&&!present.has(soul.id))||agentAway(soul.id)?'my-souls-away':undefined} data-agent-away={agentAway(soul.id)?'1':undefined} onContextMenu={e=>{e.preventDefault();select(soul.id);requestSoulConversations(soul.id);}} title={`${soul.name}${agentAway(soul.id)?' · agent away':''} · Soul details · right-click for conversations`} aria-label={`Open ${soul.name}${agentAway(soul.id)?' (agent away)':''}`} onClick={()=>select(soul.id)}><SoulAvatar soul={soul}/>{agentAway(soul.id)&&<span className="my-souls-agent-away" aria-hidden="true">away</span>}</button>)}{pinned.length>3&&<details className="my-souls-more"><summary>+{pinned.length-3}</summary><div>{pinned.slice(3).map(soul=><button key={soul.id} onClick={()=>select(soul.id)}><SoulAvatar soul={soul}/><span>{soul.name}</span></button>)}</div></details>}{gone>0&&<span className="my-souls-gone" title="Owned Souls absent from this world">{gone} away</span>}</div>;
+ return <div className="my-souls" aria-label="Your account Souls">{pinned.slice(0,3).map(soul=>{const st=stateOf(soul),mark=st?CHIP_MARK[st]:undefined,dim=st==='zombie'||st==='asleep'||st==='disconnected';
+  return <button key={soul.id} className={(present&&!present.has(soul.id))||dim?'my-souls-away':undefined} data-link-state={st??undefined} onContextMenu={e=>{e.preventDefault();select(soul.id);requestSoulConversations(soul.id);}} title={`${soul.name}${st?` · ${CHIP_WORD[st]}`:''} · Soul details · right-click for conversations`} aria-label={`Open ${soul.name}${st?` (${CHIP_WORD[st]})`:''}`} onClick={()=>select(soul.id)}><SoulAvatar soul={soul}/>{mark&&<span className={mark.cls} aria-hidden="true">{mark.text}</span>}</button>;})}{pinned.length>3&&<details className="my-souls-more"><summary>+{pinned.length-3}</summary><div>{pinned.slice(3).map(soul=><button key={soul.id} onClick={()=>select(soul.id)}><SoulAvatar soul={soul}/><span>{soul.name}</span></button>)}</div></details>}{gone>0&&<span className="my-souls-gone" title="Owned Souls absent from this world">{gone} away</span>}</div>;
 }

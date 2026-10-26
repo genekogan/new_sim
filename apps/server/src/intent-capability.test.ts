@@ -30,15 +30,18 @@ test('strict control DTO accepts only exact scoped version, never credentials or
     {...control,intentContract:undefined}])assert.equal(intentOwnerControlV2Schema.safeParse(bad).success,false);
 });
 
+// LINK (Gene 2026-10-24): GET /v1/souls/:id now also carries the owner link state (agent.link) and the public now line;
+// for a Soul no agent ever listened for, that is disconnected/never with no holder, and no now line.
+const withLink=(dash:object)=>{const d=JSON.parse(JSON.stringify(dash));return {...d,agent:{...d.agent,link:{state:'disconnected',reason:'never',since:null,holder:null}},now:null};};
 test('actual dashboard advertises only explicit candidate, is read-only and does not fork legacy output',async t=>{
   const off=intentNativeFixture(t,':memory:',false),legacy=await get(off);
-  assert.equal(legacy.status,200);assert.deepEqual(await legacy.json(),JSON.parse(JSON.stringify(off.souls.dashboard(off.db.soul('s_A')!))));
+  assert.equal(legacy.status,200);assert.deepEqual(await legacy.json(),withLink(off.souls.dashboard(off.db.soul('s_A')!)));
   assert.equal(legacy.headers.get('cache-control'),null);
   const f=intentNativeFixture(t),before=f.db.events(worldId),kernel=f.host.kernel,seq=f.host.seq;
   for(let i=0;i<2;i++) {
     const response=await get(f);assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');
     const {control:actual,...dashboard}=await response.json();assert.deepEqual(intentOwnerControlV2Schema.parse(actual),control);
-    assert.deepEqual(dashboard,JSON.parse(JSON.stringify(f.souls.dashboard(f.db.soul('s_A')!))));
+    assert.deepEqual(dashboard,withLink(f.souls.dashboard(f.db.soul('s_A')!)));
   }
   assert.deepEqual(f.db.events(worldId),before);assert.equal(f.host.kernel,kernel);assert.equal(f.host.seq,seq);
   assert.equal(f.calls,0);assert.equal(f.db.paidCost(),0);
