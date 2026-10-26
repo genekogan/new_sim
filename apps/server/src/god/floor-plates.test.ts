@@ -75,6 +75,15 @@ test('the presenter timber box on the Chiba deck is sat on top (0.41 m); one sta
   assert.equal(off?.available, false, JSON.stringify(off));
   assert.equal(off!.blocked!.code, 'seat.inside');
   assert.match(off!.blocked!.reason, new RegExp(`Nearest seat you can use: sit:${box}`));
+  // party S8: a floating canoe rides 0.66 m above the pond floor by design; it is boarded from its side, never "inside"
+  const c = w.god.act({ops: [
+    {op: 'place', def: 'core/pond@1', name: 'pond', params: {depth: 3}, shape: {area: [[-22, -36], [-10, -36], [-10, -24], [-22, -24]]}},
+    {op: 'place', def: 'core/canoe@1', name: 'pond-canoe', p: [-16, -30], r: 0},
+  ]} as any) as any;
+  assert.equal(c.accepted, true, JSON.stringify(c).slice(0, 400));
+  await w.settle(2);
+  const canoe = w.god.model.get('pond-canoe')!.id, aboard = w.edge.capabilities(s as any).find(x => x.id === `sit:${canoe}`);
+  assert.ok(aboard?.available, `the floating canoe is offered, not seat.inside: ${JSON.stringify(aboard)}`);
   // F3: the agent is told the floor it stands on, and where the walk ended carries it
   const here: any = hereFrame(w.edge, s as any);
   assert.ok(here.floors?.some((l: string) => /^You are standing on the raised gallery floor of chiba, 0\.37 m above the ground; open on (all four sides|its .+ sides?)\.$/.test(l)), JSON.stringify(here.floors));
