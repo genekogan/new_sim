@@ -1,6 +1,7 @@
 // Deterministic oracles over one request's evidence pack (DESIGN §4.4, spec §2.4). Code only: pass | fail | unknown
 // with pointers, never a score. Facts after the request's cutoff are excluded (late diagnostics never grant hits).
 import { seatActs, xz } from './run.mjs';
+import { expectFor, expectOracles } from './expect-oracles.mjs';
 
 export const ORACLE_IDS = ['ack-latency', 'result-sent', 'listen-open', 'arrival', 'posture', 'duration-held', 'inside-solid', 'no-progress', 'oscillation', 'stuck-receipt', 'truthfulness-basic', 'vocabulary', 'duplicate-acts', 'server-errors', 'first-body-change'];
 export const PHYSICAL = ['arrival', 'posture', 'truthfulness-basic', 'inside-solid', 'no-progress'];
@@ -109,7 +110,9 @@ export function claimsIn(text, { soulName = null, others = [] } = {}) {
   return found;
 }
 
-/** runOracles(evidence, ctx) — ctx: {acts?: seat tool calls with outputs, godSlice?, run?} (acts are read from the run when absent). */
+/** runOracles(evidence, ctx) — ctx: {acts?: seat tool calls with outputs, godSlice?, run?, expect?} (acts are read from the run when
+ *  absent; expect from the run's script entry when absent). A request with an `expect` also gets the scenario-truth oracles
+ *  of expect-oracles.mjs after the fifteen ORACLE_IDS; requests without one get exactly ORACLE_IDS. */
 export function runOracles(ev, ctx = {}) {
   const P = `evidence/${ev.requestId}.json`;
   const acts = ctx.acts ?? (ctx.run ? seatActs(ctx.run, ev.seat, ev.chatTurns) : []);
@@ -244,6 +247,8 @@ export function runOracles(ev, ctx = {}) {
   out.push(errs ? o('server-errors', 'fail', `${errs} server error(s)/unreachable`, [`${P}#serverErrors`]) : o('server-errors', 'pass', 'none'));
   const fb = ms(ev.firstBodyChangeAt);
   out.push(fb && fb <= cutoff ? o('first-body-change', 'pass', `first visible body change after ${secs(sent, fb)} s`, [`${P}#firstBodyChangeAt`]) : accepted ? o('first-body-change', 'fail', 'an action was accepted but no visible body change before cutoff', [`${P}#firstBodyChangeAt`]) : o('first-body-change', 'unknown', 'no body action was started'));
+  const expect = ctx.expect !== undefined ? ctx.expect : expectFor(ctx.run, ev);
+  if (expect) out.push(...expectOracles({ ev, expect, timely, replies, receipts, acts, inWindow, P }));
   if (late) out.forEach((r) => { r.lateSamplesExcluded = late; });
   return out.map((r) => ({ requestId: ev.requestId, ...r }));
 }
