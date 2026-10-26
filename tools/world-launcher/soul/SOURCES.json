@@ -18,9 +18,9 @@
   "skill": {
     "file": "skill.md",
     "version": "2.2.0",
-    "sha256": "74a39bb27168fbb8d4ceb26389b8ea96f0b150cee4d13230d109edef4c8f6d7e",
+    "sha256": "b57c6e32694034dca527f0393e31d6f62e2e0967218eaf934a8423e0f92f4424",
     "from": "authorized laptop 2 handover, copied from <team>/scratch/soul3/client-handover/SKILL-v2.md",
-    "note": "SOUL3 guide for eden.mjs, published byte for byte; no {{}} templates (the world serves it as is). Replaces the 1.9 skill below. 2.1.0 (soul fix round 1, D3): owner step 4 and the long-activity advice became one sentence (the server closes the message), one rule added (an ack says what you will try, never what happened); net 0 lines, 5,970 bytes. 2.2.0: adds the public `now` line section (LINK)."
+    "note": "SOUL3 guide for eden.mjs, published byte for byte; no {{}} templates (the world serves it as is). Replaces the 1.9 skill below. 2.1.0 (soul fix round 1, D3): owner step 4 and the long-activity advice became one sentence (the server closes the message), one rule added (an ack says what you will try, never what happened); net 0 lines, 5,970 bytes. 2.2.0: adds the public `now` line section (LINK). 2.2.0 also says to close an owner message yourself when no act is needed (ride-check I-2)."
   },
   "instructions": {
     "file": "instructions.md",
