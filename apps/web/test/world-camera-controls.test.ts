@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { WorldNavigation, type NavigationContext } from '../src/WorldNavigation.ts';
-import { WorldOrbitPivot } from '../src/WorldOrbitPivot.ts';
 
 // Minimal canvas stub: records listeners so tests can deliver focus/key events.
 function stubCanvas(){
@@ -51,19 +50,4 @@ test('button deltas (yaw/pitch) apply through move()', () => {
   nav.move({pitch:-.15});assert.ok(dir(camera).y<-.1);
 });
 
-test('orbit pivot: clicked point becomes the centre; camera keeps the same offset', () => {
-  const pivot=new WorldOrbitPivot(),camera=new THREE.PerspectiveCamera(45,1,.1,500),target=new THREE.Vector3(0,0,0);
-  camera.position.set(10,8,12);camera.lookAt(target);camera.updateMatrixWorld();
-  const ground=new THREE.Mesh(new THREE.PlaneGeometry(200,200).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial());ground.updateMatrixWorld();
-  const point=pivot.pick(new THREE.Vector2(.3,-.2),camera,[ground]);assert.ok(point&&Math.abs(point.y)<1e-6);
-  const offset=camera.position.clone().sub(target);pivot.start(camera,target,point!);
-  for(let i=0;i<40;i++)pivot.update(1/30,camera,target);
-  assert.ok(target.distanceTo(point!)<1e-6,'centre reached');assert.ok(camera.position.clone().sub(target).distanceTo(offset)<1e-6,'same distance and angle');
-  assert.equal(pivot.gliding,false);pivot.dispose();
-});
-
-test('orbit pivot: a new gesture cancels the glide mid-way', () => {
-  const pivot=new WorldOrbitPivot(),camera=new THREE.PerspectiveCamera(),target=new THREE.Vector3();camera.position.set(0,5,10);
-  pivot.start(camera,target,new THREE.Vector3(20,0,0));pivot.update(.1,camera,target);const mid=target.clone();
-  pivot.cancel();pivot.update(.1,camera,target);assert.ok(target.distanceTo(mid)<1e-9);assert.ok(mid.x>0&&mid.x<20);
-});
+// (The unused WorldOrbitPivot glide is gone; click-pivot is WorldRtsCamera's, tested in world-camera-pivot-look.test.ts.)
