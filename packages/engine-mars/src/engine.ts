@@ -1997,6 +1997,9 @@ export class MarsEngine implements Engine {
   /** lane NAV: the audit's policy id and passable clearance (reports). */
   navPolicyV1(){return {policy:NAV_CONNECT_POLICY,clear:CONNECT_CLEAR};}
   /** nav/1 read: clearance (m) of level-0 standing ground at a point (0 off ground or inside a solid). */
+  /** Floors (2026-10-26): where a body's feet rest at (x, z) on `level`: level 0 of a ground world is the nav's standing
+   *  height (the terrain, or a floor plate / deck on it; the swim root in deep water); else the level's flat height. */
+  standYAtV1(x:number,z:number,level=0):number|null{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);if(level===0&&this.rt.world.groundV1&&spatial.ground)return r3(standOn(spatial.ground,x,z));const l=spatial.scene.levels.find(v=>v.id===level);return l?l.y:null;}
   clearanceAtV1(x:number,z:number,level=0):number{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const clear=spatial.clearanceReader(level,[x,z]);return clear?clear([x,z]):0;}
   /** nav read (L1): clearanceAtV1 capped at `cap` — the same value below it, `cap` at or above it — answered off the paged
    *  windows without building fine nav tiles. For the many "is there standing room here (≥ t ≤ cap)?" reads. */

@@ -72,6 +72,8 @@ type EngineV1 = {
   bodyUsesV1(id: string): { body: string; how: 'occupied' | 'held' } | null;
   reachV1(from: { p: Vec2; level?: number }, to: { p: Vec2; level?: number }): { ok: true; length: number; legs: number; levels: number[] } | { ok: false; code: string; message: string };
   standableNearV1(at: Vec2, level?: number, except?: string, minClear?: number, maxRing?: number): Vec2 | null;
+  /** Floors (2026-10-26): where a body's feet rest at (x, z) on `level` (level 0: the terrain or a floor plate on it). */
+  standYAtV1?(x: number, z: number, level?: number): number | null;
   programOf(id: string): string | null;
   godWalkoutRouteV1(id: string, to: Vec2, level?: number): boolean;
   godWalkoutLandableV1(id: string, to: Vec2, level?: number): boolean;
@@ -83,6 +85,7 @@ const EVACUATE_RETRY_TICKS = 400; // a closure walk-out the engine could not lan
 /** `sent` marker for a thing a walk-out took out of a resident's hands: whatever the entity world says next (a place on
  *  the ground, or nothing: removed) differs from it, so it is always sent. */
 const RELEASED = '"released"';
+const SEAT_LIFT = 0.15;       // floors: a seat's thing standing this far above the sitter's floor would seat the body inside it
 const GROUND_BAND = 0.35;      // a floor within this of the ground is level 0 (the engine's ground is flat at y 0 until L8's tiles)
 const LEVEL_MATCH = 0.12;      // floors this close in height share an engine level
 const FLOOR_NEAR = 0.6;        // levelAt: a level counts at a point within this of one of its floors (thresholds, stair heads)
@@ -1479,6 +1482,8 @@ export class EngineBridge {
       return at ? [{ verb: 'mars:walk_to', params: { x: at[0], z: at[1], level } }] : [];
     };
     const stand = me.human.activity === 'sit' || me.human.baseActivity === 'sit' || me.human.berth ? [{ verb: 'stand', params: {} }] : [];
+    // floors (2026-10-26): a seat the body cannot use names the nearest one it can (or the ground)
+    const unusable: number[] = [], usable: { id: string; label: string; d: number }[] = [];
     for (const x of near) {
       const asset = (this.physics?.assets[x.def] ?? {}) as { slots?: { kind: string }[]; surfaceSlots?: { id: string }[]; category?: string };
       const d = Math.round(Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]));
@@ -1489,7 +1494,7 @@ export class EngineBridge {
         // resolves through the ledger's vocabulary (every word in the label) to this seat and not another bench
         const ent = this.model.entities.get(x.id), kind = ent ? this.model.resolvedDef(ent.def)?.name.replace(/^core-/, '') : undefined;
         const by = ent ? this.nav.namesNear([x.pose.p[0], x.pose.p[2]], x.id) : [];
-        const id = `sit:${x.id}`, label = `${name(x.id)} (${kind && !name(x.id).split('/').pop()!.includes(kind) ? `a ${kind}, ` : ''}${by.length ? `by ${by.join(' and ')}; ` : ''}${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
+        const id = `sit:${x.id}`, labelOf = (seatWords: string) => `${name(x.id)} (${kind && !name(x.id).split('/').pop()!.includes(kind) ? `a ${kind}, ` : ''}${seatWords}${by.length ? `by ${by.join(' and ')}; ` : ''}${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
         // F1: a bench for two stays free while one of its seats is; the seat a Soul sits on is not free to itself
         const full = others.length >= seats || (!!u && !mine && seats <= 1);
         // seat fit (engine bodies/humanoid.ts): a body whose look sets its height cannot get onto a seat too high for it.
@@ -1497,7 +1502,15 @@ export class EngineBridge {
         // none, so this read nothing before). Only too-high blocks: a seat lower than a body likes (a floor cushion) is sat on.
         const tops = [...seatTopsOf(this.model, x.id).values()].filter((y) => Number.isFinite(y));
         const misfit = tops.length && tops.every((y) => seatFitProblem(me.body, y)?.code === 'seat.too-high') ? seatFitProblem(me.body, Math.min(...tops)) : null;
-        const block = mine ? { code: 'seat.yours', reason: `You are sitting on ${name(x.id)} already; stand:here to get up.` } : full ? { code: 'seat.taken', reason: `${(others.length ? others : [u!.body]).map((b) => this.soulName(b)).join(' and ')} ${others.length > 1 ? 'are' : 'is'} sitting there.` } : misfit ? { code: misfit.code, reason: `${name(x.id)} does not fit your body: ${misfit.message}.` } : null;
+        // floors (2026-10-26): the sitter's feet rest on the floor under the seat (the terrain, or a floor plate on it); a
+        // thing standing higher than that floor (on a deck the world does not walk on) would seat the body inside it
+        const feet = levelOf(x) === 0 ? this.engine.standYAtV1?.(x.pose.p[0], x.pose.p[2], 0) : undefined, lift = typeof feet === 'number' ? x.pose.p[1] - feet : 0;
+        const inside = lift > SEAT_LIFT ? { code: 'seat.inside', reason: `${name(x.id)} stands ${lift.toFixed(2)} m above the floor you would stand on there, on something the world does not walk on: sitting on it would put you inside it.` } : null;
+        const top = tops.length ? Math.min(...tops) : undefined, ownDef = ent ? this.model.resolvedDef(ent.def) : undefined;
+        const onTop = top !== undefined && ownDef && ownDef.size.box[1] > 0 && top >= ownDef.size.box[1] * (ent ? this.model.worldPose(ent).s : 1) - 0.05 ? `on top, ${top.toFixed(2)} m; ` : top !== undefined ? `seat ${top.toFixed(2)} m; ` : '';
+        const block = mine ? { code: 'seat.yours', reason: `You are sitting on ${name(x.id)} already; stand:here to get up.` } : full ? { code: 'seat.taken', reason: `${(others.length ? others : [u!.body]).map((b) => this.soulName(b)).join(' and ')} ${others.length > 1 ? 'are' : 'is'} sitting there.` } : misfit ? { code: misfit.code, reason: `${name(x.id)} does not fit your body: ${misfit.message}.` } : inside;
+        const label = labelOf(onTop);
+        if (block?.code === 'seat.inside' || block?.code === 'seat.too-high') unusable.push(caps.length); else if (!block) usable.push({ id, label, d });
         caps.push({ id, verb: 'sit', label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: 60 } } });
         plans.set(id, { label, steps: [{ verb: 'sit', params: { on: x.id, seconds: 60 } }], seconds: true });
       }
@@ -1534,6 +1547,8 @@ export class EngineBridge {
         if (free) plans.set(id, { label, steps: [...stand, ...approach(x), { verb: 'mars:put_item', params: { item: held.id, surfaceSlot: `${x.id}#${free.id}` } }] });
       }
     }
+    const alt = usable.sort((a, b) => a.d - b.d || a.id.localeCompare(b.id))[0];
+    for (const i of unusable) { const b = caps[i].blocked; if (b) b.reason = `${b.reason} ${alt ? `Nearest seat you can use: ${alt.id} (${alt.label}).` : 'Sit on the ground instead: sit-ground:here.'}`; }
     if (this.layers.active()) try { this.layers.capabilities(soul, caps, plans as never, here); } catch (e) { this.log(`layers capabilities: ${(e as Error).message}`); }
     this.sitHere(caps, plans, here);
     this.fireLit(caps);

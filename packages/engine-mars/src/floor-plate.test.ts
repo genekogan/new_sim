@@ -60,3 +60,19 @@ test('a body born on a floor plate stands on it, not under it (births use the sa
   assert.ok(inside(p[0], p[2], 0.5), `born inside the deck: ${p}`);
   assert.ok(Math.abs(p[1] - DECK_Y) < 1e-9, `born on the deck: y ${p[1]}`);
 });
+
+test('sitting on the ground never picks a spot inside a solid: from inside a timber box on the deck, the open spot is clear of it', () => {
+  const e = factory.create(factory.genesis('floor-plate-box')) as never as E & { nearestStandableV1(at: [number, number], except?: string, minClear?: number, maxRing?: number): [number, number] | null; standYAtV1(x: number, z: number, level?: number): number | null; clearanceAtV1(x: number, z: number): number };
+  e.installGroundV1(fact);
+  const box = { id: 'e_box', obb: { c: [C[0] + 2, C[1]] as [number, number], half: [0.25, 0.23] as [number, number], yaw: 0 }, y0: DECK_Y, y1: DECK_Y + 0.41, kind: 'fixture' as const, label: 'presenter timber box' };
+  const ev: WorldEditV1 = { contract: 'world-edit/1', seq: 1, hash: '', levels: [], assets: {}, set: {
+    e_chiba: { surfaces: [{ id: 'e_chiba#f0', level: 0, y: DECK_Y, obb: { c: C, half: HALF, yaw: 0 }, label: 'chiba raised gallery floor' }] }, e_box: { solids: [box] } } };
+  ev.hash = nextEntityPhysics(undefined, ev).hash;
+  e.applyWorldEditV1(ev);
+  assert.equal(e.clearanceAtV1(box.obb.c[0], box.obb.c[1]), 0, 'no ground to sit on inside the box');
+  const spot = e.nearestStandableV1(box.obb.c, undefined, 0.45, 20);
+  assert.ok(spot, 'an open spot nearby');
+  const [dx, dz] = [Math.abs(spot[0] - box.obb.c[0]) - box.obb.half[0], Math.abs(spot[1] - box.obb.c[1]) - box.obb.half[1]];
+  assert.ok(Math.hypot(Math.max(0, dx), Math.max(0, dz)) >= 0.45 - 1e-6, `clear of the box by 0.45 m: ${spot}`);
+  assert.ok(Math.abs((e.standYAtV1(spot[0], spot[1], 0) ?? NaN) - DECK_Y) < 1e-9, 'the spot is on the deck, at its height');
+});

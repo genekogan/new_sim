@@ -3,7 +3,7 @@
 import test, {type TestContext} from 'node:test';
 import assert from 'node:assert/strict';
 import {setImmediate} from 'node:timers/promises';
-import {fixture, factory} from '../../test/native-owner-fixture.ts';
+import {fixture, factory, invite, accept} from '../../test/native-owner-fixture.ts';
 import {EdgeLedger} from '../edge/ledger/ledger.ts';
 import {GodMode} from './god.ts';
 import {installEngineBridge} from './engine-bridge.ts';
@@ -47,4 +47,30 @@ test('Chiba (mesh def, no floors in its footprint) gets its gallery deck as a le
   const c = deck.obb.c as [number, number];
   assert.ok(Math.abs(sp.ground.standY(c[0], c[1]) - 0.374) < 1e-6, `stands on the deck at ${c}: ${sp.ground.standY(c[0], c[1])}`);
   assert.ok(Math.abs(sp.ground.standY(c[0], c[1] + 30)) < 0.05, 'outside Chiba: the terrain');
+});
+
+test('the presenter timber box on the Chiba deck is sat on top (0.41 m); one standing on nothing the world walks on refuses seat.inside with the alternative', {timeout: 240_000}, async t => {
+  const w = world(t); await w.settle(2);
+  const r = w.god.act({ops: [
+    {op: 'place', def: 'core/mars-chiba@2', name: 'chiba', p: [0, 0, -40], r: -1.571},
+    {op: 'place', def: 'core/mars-presenter-timber-box@2', name: 'presenter-timber-box', p: [-1.125, 0.373, -30.335], r: -1.571},
+    {op: 'place', def: 'core/mars-presenter-timber-box@2', name: 'floating-box', p: [6, 0.373, -14], r: 0},
+  ]} as any) as any;
+  assert.equal(r.accepted, true, JSON.stringify(r).slice(0, 600));
+  await w.settle();
+  await invite(w, 'ember');
+  const row: any = await accept(w.host, w.souls.create('dev:ember', {name: 'Ember', description: 'curious'}));
+  await w.settle(3);
+  const s = {soulId: row.id, entityId: row.entity_id, name: row.name, owner: row.owner};
+  await accept(w.host, w.host.enqueue('edge-relocate', 'test:floors', {soulId: s.soulId, entityId: s.entityId, to: [-3, -31], why: 'stand in the Chiba gallery'}));
+  await w.settle(2);
+  const E = w.host.engine as any, body = E.world.entities[s.entityId];
+  assert.ok(Math.abs(body.pose.p[1] - 0.374) < 0.01, `Ember stands on the deck, not under it: ${JSON.stringify(body.pose.p)}`);
+  const caps = w.edge.capabilities(s as any), box = w.god.model.get('presenter-timber-box')!.id, lifted = w.god.model.get('floating-box')!.id;
+  const onBox = caps.find(c => c.id === `sit:${box}`), off = caps.find(c => c.id === `sit:${lifted}`);
+  assert.ok(onBox?.available, `the box on the deck is offered: ${JSON.stringify(onBox)}`);
+  assert.match(onBox!.label, /on top, 0\.41 m/);
+  assert.equal(off?.available, false, JSON.stringify(off));
+  assert.equal(off!.blocked!.code, 'seat.inside');
+  assert.match(off!.blocked!.reason, new RegExp(`Nearest seat you can use: sit:${box}`));
 });
