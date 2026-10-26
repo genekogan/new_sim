@@ -32,9 +32,12 @@ remote-suite.sh; modal_suite.py launches only the groups/V5 shards holding them;
 the full cached baseline. The receipt records `scope` (mode, resolved, steps, diff range, files per area, unmapped).
 A scoped run never enters the cache, never serves as a baseline, and `ship-receipt.mjs` blocks any gate whose scope is
 not `full`: the release owner gates the final release head with the default `--scope full`.
-Seed or repair the cache from a completed run of a passing gate (validated with the exact identity of a
-`--baseline-results` import, plus the gate receipt beside it naming that run):
-`release-gate.sh cache-add <gate-out>/candidate`.
+Seed or repair the cache with `release-gate.sh cache-add <run-dir>`: a gate's `<gate-out>/candidate` (the gate receipt
+beside it must name the run and have passed; CACHE.json records it, `via: cache-add`) or a bare `remote-suite.sh`
+run, the way a baseline is produced once under a new harness tree (`via: cache-add-bare`, `receipt: null`). Either is
+validated with the exact identity of a `--baseline-results` import (source sha, harness commit/tree/archive
+recomputed locally, Node, complete contract) and must pass on its own quarantine: every failure, skip and TODO has
+its exact quarantine entry, no test file failed to load, no V6 scenario failed.
 
 Run from a committed harness checkout. The gate pins `main`, the candidate and the invocation's harness before
 starting **two isolated Modal runs concurrently**. Both source archives receive the identical committed harness.

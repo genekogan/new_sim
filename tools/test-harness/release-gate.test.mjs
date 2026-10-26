@@ -505,3 +505,26 @@ test('scope auto: docs/tools-only candidates are not gated (exit 0, no Modal); a
   const f = receiptOf(fullOut);
   assert.equal(f.scope.resolved, 'full'); assert.deepEqual(f.scope.diff.unmapped, ['pnpm-lock.yaml']); assert.deepEqual(onlys, [[], []]);
 });
+test('cache-add stores a bare remote-suite run (no gate receipt) only when it passes on its own quarantine', async t => {
+  const repo = gateRepo(t), cache = mkdtempSync(join(dirname(repo.dir), 'sim-gate-cache-')); t.after(() => retireFixture(cache));
+  const c1 = repo.commit('apps/web/src/a.ts', 'one\n'), head = gitIn(repo.dir, 'rev-parse', 'HEAD');
+  const runs = join(repo.dir, '.lane/runs'), bare = join(runs, 'bare'), failing = join(runs, 'failing');
+  await fakeModal([])(bare, c1, head, '22', repo.dir);
+  await fakeModal([])(failing, c1, head, '22', repo.dir);
+  assert.ok(!existsSync(join(runs, 'receipt.json')));
+  // an unquarantined test failure in an otherwise complete run is refused
+  writeFileSync(join(failing, 'out/suite/V5-server-full.log'), tap([{ name: 'works', status: 'fail', source: 'apps/server/src/a.test.ts' }]));
+  writeFileSync(join(failing, 'out/suite/SUMMARY.tsv'), readFileSync(join(failing, 'out/suite/SUMMARY.tsv'), 'utf8').replace('V5-server-full\t0', 'V5-server-full\t1'));
+  const refused = cacheAdd(failing, { root: repo.dir, cacheDir: cache });
+  assert.equal(refused.stored, false); assert.match(refused.reason, /run: V5-server-full: baseline failure has no quarantine: works/);
+  const added = cacheAdd(bare, { root: repo.dir, cacheDir: cache });
+  assert.equal(added.stored, true, added.reason);
+  assert.equal(added.key, `${c1}-${gitIn(repo.dir, 'rev-parse', 'HEAD:tools/test-harness')}-node22`);
+  const entry = JSON.parse(readFileSync(join(added.dir, 'CACHE.json'), 'utf8'));
+  assert.deepEqual(entry.provenance, { via: 'cache-add-bare', receipt: null });
+  assert.equal(lookupCache(cache, { sourceSha: c1, harnessTree: entry.harnessTree, node: '22' }, manifest()).hit, true);
+  // a wrong harness identity is still refused without a receipt
+  const meta = join(failing, 'out/RUN-METADATA.json'), m = JSON.parse(readFileSync(meta, 'utf8'));
+  writeFileSync(meta, JSON.stringify({ ...m, harnessTree: 'a'.repeat(40) }));
+  assert.match(cacheAdd(failing, { root: repo.dir, cacheDir: cache }).reason, /metadata mismatch: harnessTree/);
+});

@@ -385,7 +385,8 @@ export function storeCache(cacheDir, run, provenance = {}) {
   return { stored: true, key, dir };
 }
 
-/** Seed the cache with a completed run of a passing gate, validated exactly like a --baseline-results import. */
+/** Seed the cache with a completed run (a passing gate's, or a bare remote-suite.sh run), validated exactly like a
+ * --baseline-results import plus its own quarantine check. */
 export function cacheAdd(runDir, { root = ROOT, cacheDir = defaultCacheDir(root) } = {}) {
   runDir = resolve(runDir);
   let run;
@@ -397,14 +398,25 @@ export function cacheAdd(runDir, { root = ROOT, cacheDir = defaultCacheDir(root)
     const archive = execFileSync('git', ['-C', root, 'archive', '--format=tar.gz', meta.harnessRef, 'tools/test-harness'], { maxBuffer: MAX_BUFFER });
     const manifest = JSON.parse(execFileSync('git', ['-C', root, 'show', `${meta.harnessRef}:tools/test-harness/quarantine.json`], { maxBuffer: MAX_BUFFER }));
     run = readRun(runDir, { schemaVersion: 1, sourceSha: meta.sourceSha, harnessRef: meta.harnessRef, harnessTree, harnessArchiveSha256: sha256(archive), node: meta.node }, manifest);
-    const receiptPath = join(dirname(runDir), 'receipt.json'), receiptBytes = readFileSync(receiptPath), receipt = JSON.parse(receiptBytes);
-    const label = ['candidate', 'baseline'].find(l => receipt.runs?.[l]?.dir === runDir);
-    if (!label) run.errors.push('the gate receipt beside the run does not name this run directory');
-    else if (receipt.refs?.[label]?.sha !== meta.sourceSha) run.errors.push(`receipt ${label} sha differs from the run`);
-    if (!SUCCESS.has(receipt.status)) run.errors.push(`gate receipt status ${receipt.status}`);
-    if (receipt.harness?.tree !== harnessTree) run.errors.push('receipt harness tree differs from the run');
+    // On its own terms, the run must pass as a gate baseline: every failure, skip and TODO has its exact quarantine,
+    // no test file failed to load and no V6 scenario failed (compareRuns of the run with itself, on its own source tree).
+    const sourceFiles = new Set(gitAt(root, 'ls-tree', '-r', '--name-only', meta.sourceSha).split('\n'));
+    if (!run.errors.length) run.errors.push(...compareRuns(run, run, manifest, sourceFiles).blockers.map(b => `run: ${b}`));
+    // A gate receipt beside the run (a gate's baseline/ or candidate/) must name it and have passed. A bare
+    // remote-suite.sh run (how a baseline is produced once under a new harness tree) has none: it is cached on its own.
+    const receiptPath = join(dirname(runDir), 'receipt.json');
+    let provenance = { via: 'cache-add-bare', receipt: null };
+    if (existsSync(receiptPath)) {
+      const receiptBytes = readFileSync(receiptPath), receipt = JSON.parse(receiptBytes);
+      const label = ['candidate', 'baseline'].find(l => receipt.runs?.[l]?.dir === runDir);
+      if (!label) run.errors.push('the gate receipt beside the run does not name this run directory');
+      else if (receipt.refs?.[label]?.sha !== meta.sourceSha) run.errors.push(`receipt ${label} sha differs from the run`);
+      if (!SUCCESS.has(receipt.status)) run.errors.push(`gate receipt status ${receipt.status}`);
+      if (receipt.harness?.tree !== harnessTree) run.errors.push('receipt harness tree differs from the run');
+      provenance = { via: 'cache-add', receipt: receiptPath, receiptSha256: sha256(receiptBytes), label };
+    }
     if (run.errors.length) return { stored: false, reason: run.errors.join('; ') };
-    return storeCache(cacheDir, run, { via: 'cache-add', receipt: receiptPath, receiptSha256: sha256(receiptBytes), label });
+    return storeCache(cacheDir, run, provenance);
   } catch (e) { return { stored: false, reason: e.message }; }
 }
 
