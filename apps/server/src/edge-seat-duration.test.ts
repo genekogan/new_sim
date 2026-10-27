@@ -7,6 +7,7 @@
 // a stand while seated ends a 600 s sit within 200 ticks, not completed.
 // D2 (2026-10-25): sit:here takes a seat only when it is here (own room, or within 3 m with no wall between), so the
 // bench moved from 8 m to 2.5 m; edge-sit-here.test.ts covers the 8 m bench (on the ground instead).
+// World semantics: ordinary "sit down" now names the nearby durable fixture directly; the physical duration contract is unchanged.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {setImmediate} from 'node:timers/promises';
@@ -46,6 +47,9 @@ test('seat duration: sit down with seconds sits that long once seated; default 6
     for (let i = 0; i < 4000 && open(out.receipt.id); i++) {await settle(1); if (seatedAt === null && body().human?.activity === 'sit') seatedAt = tick();}
     assert.equal(edge.receipt(soul.soulId, out.receipt.id)!.phase, 'completed');
     assert.ok(seatedAt !== null, 'sat down');
+    assert.equal(out.receipt.chosen?.target, bench.target?.id, 'the receipt binds the actual bench');
+    assert.equal(body().human.activity, 'sit', 'completing the requested duration leaves the fixture seat held');
+    assert.ok(f.host.engine.nativeSeatHoldsV1?.(soul.entityId).some(h => h.slot.startsWith(`${bench.target!.id}#`)), 'the exact bench remains physically held');
     return {to: out.resolved?.to ?? out.receipt.capability, walk: seatedAt! - t0, seated: tick() - seatedAt!};
   };
   const {caps} = edge.coreA.binds(soul), here = caps.find(c => c.id === 'sit:here')!, bench = caps.find(c => c.verb === 'sit' && c.id !== 'sit:here')!;
@@ -59,7 +63,7 @@ test('seat duration: sit down with seconds sits that long once seated; default 6
   assert.equal(edge.receipt(soul.soulId, dance.receipt.id)!.phase, 'completed', JSON.stringify(edge.receipt(soul.soulId, dance.receipt.id)));
   assert.ok(danced >= 80 && danced <= 160, 'dance 5 s: ' + danced);
   const ten = await timed({capability: 'sit down', params: {seconds: 10}});
-  assert.equal(ten.to, 'sit:here');
+  assert.equal(ten.to, bench.id, 'ordinary sit selects the durable nearby fixture directly');
   assert.ok(ten.walk > 20, 'walked to the bench first: ' + JSON.stringify(ten));
   assert.ok(ten.seated >= 190 && ten.seated <= 260, 'seated 10 s after the walk: ' + JSON.stringify(ten));
   const dflt = await timed({capability: 'sit down'});
