@@ -59,17 +59,25 @@ test('match rule: only a live window code of this world addresses a request, and
   assert.notEqual(f.store.windowCode(f.gene).code, mine.code);
 });
 
-test('a retry is the same request; one that adds a live code moves the unaddressed request into that window, never to a second one', t => {
+test('a retry of the same request keeps how it was addressed; the code is not part of the request', t => {
+  const f = fixture(t), code = f.store.windowCode(f.gene).code, req = input('0010', { forCode: code });
+  const first = f.store.start(req);
+  assert.equal(first.inWindow, true);
+  const retry = f.store.start({ ...req, forCode: f.store.windowCode(f.other).code });
+  assert.equal(retry.id, first.id); assert.equal(retry.inWindow, true);
+  assert.deepEqual(f.store.waiting(f.gene).map(x => x.id), [first.id]);
+  assert.deepEqual(f.store.waiting(f.other), [], 'an addressed request is never re-addressed');
+  assert.equal(f.store.start({ ...req, forCode: undefined }).id, first.id);
+});
+
+test('a retry that adds a live code moves the unaddressed request into that window', t => {
   // Real agent 2026-10-26: create-soul without the code, then with it, got the same request back as a link only.
-  const f = fixture(t), code = f.store.windowCode(f.gene).code, req = input('0010');
+  const f = fixture(t), code = f.store.windowCode(f.gene).code, req = input('0011');
   const first = f.store.start(req);
   assert.equal(first.inWindow, false);
   const retry = f.store.start({ ...req, forCode: code });
   assert.equal(retry.id, first.id); assert.equal(retry.inWindow, true);
   assert.deepEqual(f.store.waiting(f.gene).map(x => x.id), [first.id]);
-  const other = f.store.windowCode(f.other).code;
-  assert.equal(f.store.start({ ...req, forCode: other }).inWindow, true);
-  assert.deepEqual(f.store.waiting(f.other), [], 'an addressed request is never re-addressed');
 });
 
 test('expiry: a polled request never lapses; an unpolled one does; Ask again revives the same request for the waiting agent', t => {
