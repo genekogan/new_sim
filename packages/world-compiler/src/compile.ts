@@ -1198,7 +1198,11 @@ function resolveDependents(w: WorldModel, touched: Set<string>, removed: Set<str
         const baked = w.bake(def, e.params ?? {}, e.seed ?? 0, e.shape), s = e.s ?? 1;
         const yaw = typeof e.r === 'number' ? e.r : e.r?.[0] ?? 0;
         const fp = footprintOf(x, z, baked.box[0] * s / 2, baked.box[2] * s / 2, yaw);
-        const terrainChanged = !before || [...fp.corners, fp.center].some(([a,b]) => Math.abs(w.terrain.sample(a,b) - before.terrain.sample(a,b)) > 1e-5);
+        // An existing foundation masks the ground underneath it. Re-admit padded
+        // buildings with their pad removed below; visible samples cannot prove
+        // that their underlying support is unchanged.
+        const hasPad = w.ground().landforms.some(l => l.id === `${e.id}:pad`);
+        const terrainChanged = hasPad || !before || [...fp.corners, fp.center].some(([a,b]) => Math.abs(w.terrain.sample(a,b) - before.terrain.sample(a,b)) > 1e-5);
         const floats = (e.anchor ?? def.anchor) === 'float' || e.constraints?.some(c => c.kind === 'float');
         const waterChanged = floats && (!before || waterLevelAt(w.ground(),x,z) !== waterLevelAt(before.ground(),x,z));
         if (terrainChanged || waterChanged) next = { ...(next ?? e), p: [x, z] };

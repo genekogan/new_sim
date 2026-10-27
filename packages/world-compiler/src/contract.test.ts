@@ -111,3 +111,13 @@ test('an unrelated pond in the same terrain tile preserves explicit slab-support
   ok(applyBatch(w,{ops:[{op:'place',def:coreRef('pond'),name:'distant-pond',shape:{area:[[-48,-48],[-40,-48],[-40,-40],[-48,-40]]},params:{depth:2}}]},'god',2));
   assert.deepEqual(w.get('deck-bench'),before,'coarse tile invalidation is not a change to this support');
 });
+
+test('foundation pads cannot hide terrain changes from building resettlement', () => {
+  const w = fresh();
+  ok(applyBatch(w,{ops:[{op:'place',def:coreRef('knoll'),name:'hill',p:[40,10],params:{height:5,radius:20}}]},'god',1));
+  ok(applyBatch(w,{ops:[{op:'place',def:coreRef('cottage'),name:'house',p:[48,10]}]},'god',2));
+  const house=w.get('house')!, y=house.p![1];
+  assert.ok(w.ground().landforms.some(l=>l.id===`${house.id}:pad`));
+  ok(applyBatch(w,{ops:[{op:'set',id:'hill',params:{height:1}}]},'god',3));
+  assert.ok(w.get('house')!.p![1]<y-.5,'remove the old pad before measuring its new support');
+});
