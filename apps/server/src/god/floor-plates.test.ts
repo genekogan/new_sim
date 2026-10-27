@@ -128,7 +128,9 @@ for (const [name, height] of [['chiba',.374],['tool-camp',.424],['freeside',.375
     const floors=(part?.surfaces??[]).filter((s:any)=>s.label.includes('mesh-floor:'));
     assert.ok(floors.length,`${name}: actual compiler→bridge surfaces`);
     const sp=E.rt.services.spatial;sp.sync(E.world);
-    const usable=floors.filter((s:any)=>[[0,0],[.3,0],[-.3,0],[0,.3],[0,-.3]].every(([dx,dz])=>Math.abs(sp.ground.standY(s.obb.c[0]+dx,s.obb.c[1]+dz)-height)<.001));
+    // An upper gallery can share X/Z with the low slab. Test this support's
+    // own elevation, not just the ground surface found underneath its centre.
+    const usable=floors.filter((s:any)=>Math.abs(s.y-height)<.001&&[[0,0],[.3,0],[-.3,0],[0,.3],[0,-.3]].every(([dx,dz])=>Math.abs(sp.ground.standY(s.obb.c[0]+dx,s.obb.c[1]+dz)-height)<.001));
     assert.ok(usable.length,`${name}: not just hairline triangles`);
     for(const s of usable){assert.equal(s.level,0);assert.equal(s.y,height);assert.equal(sp.ground.standY(...s.obb.c),height);}
     assert.equal(sp.ground.standY(40,-40),0,'unrelated terrain is unchanged');
@@ -151,17 +153,13 @@ for (const [name, height] of [['chiba',.374],['tool-camp',.424],['freeside',.375
 test('full patched and rotated Mars keeps the presenter supported and persistently seated after completion', {timeout:180000}, async t => {
   const template=JSON.parse(readFileSync(new URL('../../../../worlds/templates/mars-two.json',import.meta.url),'utf8'));
   const w=world(t,template);await w.settle();
-  const {makePatch:fidelity,originalDefs}=await import(new URL('../../../../tools/mars-fidelity/patch.mjs',import.meta.url).href);
-  const {makePatch:rotate}=await import(new URL('../../../../tools/mars-rotation/patch.mjs',import.meta.url).href);
-  const historical:any={...w.god.model.snapshot(),worldId:w.host.worldId};
-  for(const d of historical.defs)if(originalDefs.some((o:any)=>o.name===d.name&&o.version===d.version)&&d.make.lod1)delete d.make.lod1;
-  const a=w.god.act(fidelity(historical,{group:'mars-fidelity-20261015-floor-regression'}).batch as any) as any;
-  assert.equal(a.accepted,true,JSON.stringify(a).slice(0,600));await w.settle();
-  const b=w.god.act(rotate({...w.god.model.snapshot(),worldId:w.host.worldId},{template,bearing:82,group:'floor-bearing'}).batch as any) as any;
-  assert.equal(b.accepted,true,JSON.stringify(b).slice(0,600));await w.settle();
+  // The shipped template already materializes fidelity and campus rotation.
+  // Boot that exact result once; historical patch planners target older defs.
   const box=w.god.model.get('presenter-timber-box')!, chiba=w.god.model.get('chiba')!,E=w.host.engine as any;
   assert.equal(w.god.model.resolvedDef(chiba.def)!.name,'mars-fidelity-chiba');
   const at=w.god.model.worldPose(box);assert.equal(at.y,.373);
+  assert.deepEqual([at.x,at.y,at.z,at.yaw],[-14.412,.373,-18.447,-1.431],'real rotated presenter pose');
+  const chibaPose=w.god.model.worldPose(chiba);assert.deepEqual([chibaPose.x,chibaPose.y,chibaPose.z,chibaPose.yaw],[-14.643,0,-28.174,-1.431],'real fidelity campus pose');
   assert.equal(E.standYAtV1(at.x,at.z,0),.374,'actual live fidelity mesh supports the presenter');
   await invite(w,'presenter');const row:any=await accept(w.host,w.souls.create('dev:presenter',{name:'Presenter',description:'giving a presentation'}));await w.settle();
   const s={soulId:row.id,entityId:row.entity_id,name:row.name,owner:row.owner};
