@@ -30,7 +30,7 @@ test('swim then exit must occur in order, and hold cannot bridge standing sample
 
 test('legitimate alternatives bind each physical region to its own receipt', () => {
   const alternatives={name:'study seat',postures:['seated'],anyOf:[{region:{pos:[1,2],radiusM:0.5},receipt:{capabilities:['sit:chair-a']}},{region:{pos:[10,2],radiusM:0.5},receipt:{capabilities:['sit:chair-b']}}]};
-  const receipt=capability=>[{capability,acceptedAt:iso(2)}];
+  const receipt=capability=>[{capability,acceptedAt:iso(2),phase:'completed'}];
   assert.equal(score({},[alternatives],receipt('sit:chair-a'))['journey-completion'].status,'pass');
   assert.equal(score({samples:[sample(6,'seated',10)]},[alternatives],receipt('sit:chair-b'))['journey-completion'].status,'pass');
   assert.equal(score({},[alternatives],receipt('sit:chair-b'))['journey-completion'].status,'fail');
@@ -41,4 +41,13 @@ test('shore return needs the real bank place as well as standing near the lake',
  const bank={name:'bank',region:{pos:[1,2],radiusM:20},postures:['standing'],places:['lake.bank']};
  assert.equal(score({samples:[{...sample(6,'standing'),place:'lake.water'}]},[bank])['journey-completion'].status,'fail');
  assert.equal(score({samples:[{...sample(6,'standing'),place:'lake.bank'}]},[bank])['journey-completion'].status,'pass');
+});
+
+test('bound seat requires a sit receipt, actual held seat and nonfailed action',()=>{
+ const seat={...phase,receipt:{verb:'sit',targetIds:['podium']}};
+ const ev={samples:[{...sample(6),seat:'podium'}]};
+ const r={capability:'sit:podium',target:{id:'podium'},phase:'completed',acceptedAt:iso(2)};
+ assert.equal(score(ev,[seat],[r])['journey-completion'].status,'pass');
+ for(const bad of [{...r,capability:'walk:podium'},{...r,phase:'failed'},{...r,phase:'replaced'},{...r,phase:undefined}]) assert.equal(score(ev,[seat],[bad])['journey-completion'].status,'fail');
+ for(const held of [null,'other-seat']){const result=score({samples:[{...sample(6),seat:held}]},[seat],[r]);assert.equal(result['journey-completion'].status,'fail');assert.equal(result['journey-truthfulness'].status,'fail');}
 });

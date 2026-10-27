@@ -7,7 +7,11 @@ const options = p => Array.isArray(p.anyOf) ? p.anyOf.map(branch => ({...p, ...b
 const phaseMatches = (s, p) => {
   if (p.anyOf) return options(p).some(branch => phaseMatches(s, branch));
   const pos = xz(s.pos);
-  if (p.region && (!pos || Math.hypot(pos[0] - p.region.pos[0], pos[1] - p.region.pos[1]) > p.region.radiusM)) return false;
+  if (p.region && (!pos || !pos.every(Number.isFinite) || Math.hypot(pos[0] - p.region.pos[0], pos[1] - p.region.pos[1]) > p.region.radiusM)) return false;
+  if (p.receipt?.verb === 'sit' && p.receipt.targetIds?.length) {
+    const held = typeof s.seat === 'string' ? s.seat : s.seat?.entityId ?? s.seat?.entity ?? s.seat?.id;
+    if (!p.receipt.targetIds.includes(held)) return false;
+  }
   if (p.places && !p.places.includes(s.place)) return false;
   if (p.postures && !p.postures.includes(s.posture)) return false;
   const activity = typeof s.activity === 'object' ? s.activity?.kind : s.activity;
@@ -30,10 +34,11 @@ export function validateJourney(j) {
 export function journeyOracles({ ev, journey: j, receipts, replies, acts, acceptedMs, endedMs }) {
   const sent = at(ev.budgetStartAt ?? ev.sentAt), cutoff = at(ev.cutoffAt);
   const samples = (ev.samples ?? []).filter(s => time(s) >= sent && time(s) <= cutoff).sort((a, b) => time(a) - time(b));
-  const validReceipts = receipts.filter(r => { const t = acceptedMs(r); return t != null && t >= sent && t <= cutoff; });
+  const validReceipts = receipts.filter(r => { const t = acceptedMs(r); return t != null && t >= sent && t <= cutoff && ['accepted','waiting','started','running','completed'].includes(r.phase); });
   const choiceMatches = (r, p) => {
     const rule = p.receipt;
     if (!rule) return true;
+    if (rule.verb && !r.capability?.startsWith(`${rule.verb}:`)) return false;
     const target = [r.chosen?.seat, r.chosen?.place, r.target?.id, r.target?.place].filter(x => typeof x === 'string');
     return rule.capabilities?.includes(r.capability) || rule.targetIds?.some(id => target.includes(id) || r.capability === `${rule.verb}:${id}`);
   };

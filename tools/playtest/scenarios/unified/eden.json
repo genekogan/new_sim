@@ -91,7 +91,7 @@
                   "swimming"
                 ],
                 "receipt": {
-                  "verb": "walk",
+                  "verb": "swim",
                   "capabilities": [
                     "swim:land-west-lake"
                   ]

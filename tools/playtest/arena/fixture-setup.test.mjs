@@ -35,3 +35,8 @@ test('alternative fixture receipt targets bind independently', async () => {
   bindJourneyFixtures({director:{script:[{id:'seats',expect:{journey:{phases}}}]}},{entities:[{id:'a',name:'chair-a'},{id:'b',name:'chair-b'}]});
   assert.deepEqual(phases[0].anyOf.map(p=>p.receipt.targetIds),[['a'],['b']]);
 });
+
+test('setup refuses malformed or nonfinite position and heading',()=>{
+ for(const pos of [[],[1],[NaN,NaN],[0,Infinity],[0,0,0,0],{x:0,z:NaN}]) assert.equal(checkStart({pos},{pos:[0,0]}).length,1);
+ for(const heading of [NaN,Infinity,undefined,'0']) assert.equal(checkStart({heading},{heading:0}).length,1);
+});

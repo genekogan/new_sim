@@ -3,9 +3,10 @@ import { appendJsonl } from '../lib/jsonl.mjs';
 import { join } from 'node:path';
 export function checkStart(me, expected = {}) {
   const problems = [];
-  const p = Array.isArray(me?.pos) ? me.pos : me?.pos && [me.pos.x, me.pos.z];
+  const raw = Array.isArray(me?.pos) ? me.pos : me?.pos && [me.pos.x, me.pos.z];
+  const p = Array.isArray(raw) && [2,3].includes(raw.length) && raw.every(Number.isFinite) ? raw : null;
   if (expected.pos && (!p || Math.hypot(p[0] - expected.pos[0], p[p.length - 1] - expected.pos[1]) > (expected.radiusM ?? 2))) problems.push('initial position outside frozen region');
-  if (expected.heading != null && (me?.heading == null || Math.abs(((me.heading - expected.heading + 540) % 360) - 180) > (expected.headingToleranceDeg ?? 5))) problems.push('initial heading differs');
+  if (expected.heading != null && (!Number.isFinite(me?.heading) || Math.abs(((me.heading - expected.heading + 540) % 360) - 180) > (expected.headingToleranceDeg ?? 5))) problems.push('initial heading differs');
   if (expected.posture && !expected.posture.includes(me?.posture)) problems.push('initial posture differs');
   return problems;
 }

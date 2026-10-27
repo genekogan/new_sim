@@ -159,7 +159,7 @@
                   "swimming"
                 ],
                 "receipt": {
-                  "verb": "walk",
+                  "verb": "swim",
                   "capabilities": [
                     "swim:campus-swimming-pond"
                   ]
