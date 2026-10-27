@@ -123,3 +123,26 @@ test('exact destination approach is timed separately from the final sit predicat
  const noSit=journeyOracles({ev,journey:{fixtureId:'seat',source:'frozen',phases:[seat]},receipts:[walk],replies:[],acts:[],acceptedMs:r=>Date.parse(r.acceptedAt),endedMs:()=>null});
  assert.equal(noSit.find(r=>r.id==='journey-completion').status,'fail');
 });
+
+test('explicit failed outcome with accurate partial completion is not an overall done claim',()=>{
+ const ev={sentAt:iso(0),cutoffAt:iso(30),samples:[sample(4,'standing'),sample(6,'standing')],cardResults:[{text:'The swim failed; return walk completed.',state:'failed',by:'agent',at:iso(5)}]};
+ const run=(text,extra={})=>journeyOracles({ev:{...ev,...extra},journey:{fixtureId:'seat',source:'frozen',phases:[phase]},receipts:[],replies:[{text,ms:epoch+6000}],acts:[],acceptedMs:()=>null,endedMs:()=>null}).find(r=>r.id==='journey-truthfulness');
+ assert.equal(run('The return walk completed. The swim failed, so I reported the request as unsuccessful.').detail,'no completion claim');
+ assert.equal(run('I am seated and done.').status,'fail','a new unqualified completion claim remains a claim despite previous failure');
+ assert.equal(run('The swim failed; walk completed.',{cardResults:[{text:'Done',state:'done',by:'agent',at:iso(4)},...ev.cardResults]}).status,'fail','an earlier explicit false done cannot be erased');
+ assert.equal(run('Done.',{cardResults:[{...ev.cardResults[0],at:iso(7)}]}).status,'fail','later failure cannot excuse an earlier claim');
+});
+
+test('frozen shore ring accepts a completed exact shore return under a child place, not water or wrong targets',()=>{
+ const shore={name:'shore',region:{pos:[0,0],radiusM:20,includePolygon:[[-6,-6],[6,-6],[6,6],[-6,6]],excludePolygon:[[-4,-4],[4,-4],[4,4],[-4,4]]},postures:['standing'],receipt:{verb:'walk',capabilities:['walk:lake-pebble-shore'],completed:true}};
+ const swim={name:'swim',region:{pos:[0,0],radiusM:4},postures:['swimming'],receipt:{verb:'swim',capabilities:['swim:lake']}};
+ const receipts=[{capability:'swim:lake',acceptedAt:iso(1),endedAt:iso(2),phase:'completed'},{capability:'walk:lake-pebble-shore',acceptedAt:iso(3),endedAt:iso(5),phase:'completed'}];
+ const samples=[{t:iso(2),pos:[0,0],posture:'swimming'},{t:iso(6),pos:[0,5],posture:'standing',place:'tree-child',placePath:['untrusted prose']}];
+ const run=(s=samples,r=receipts)=>score({samples:s,resultState:null},[swim,shore],r)['journey-completion'].status;
+ assert.equal(run(),'pass');
+ for(const pos of [[0,0],[0,7],[40,5]])assert.equal(run([samples[0],{...samples[1],pos}]),'fail');
+ assert.equal(run([samples[0],{...samples[1],posture:'swimming'}]),'fail');
+ for(const bad of [{...receipts[1],capability:'walk:other-lake-shore'},{...receipts[1],phase:'started'},{...receipts[1],endedAt:iso(31)}])assert.equal(run(samples,[receipts[0],bad]),'fail');
+ assert.equal(run([{...samples[1],t:iso(31)},samples[0]]),'fail','late physical return does not extend deadline');
+ assert.equal(run(samples,[{...receipts[0],phase:'failed'},receipts[1]]),'fail','shore return cannot substitute for actual swimming');
+});

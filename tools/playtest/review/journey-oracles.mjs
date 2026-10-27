@@ -19,10 +19,34 @@ function heldSeatMatches(value,rule) {
   });
 }
 
+// Optional frozen surface polygons constrain a region without depending on human-readable place paths.
+export function insidePolygon(pos, polygon) {
+  if(!pos?.every(Number.isFinite)||!Array.isArray(polygon)||polygon.length<3)return false;
+  let inside=false;
+  for(let i=0,j=polygon.length-1;i<polygon.length;j=i++){
+    const a=polygon[j],b=polygon[i];if(!Array.isArray(a)||!Array.isArray(b)||a.length!==2||b.length!==2||!a.every(Number.isFinite)||!b.every(Number.isFinite))return false;
+    const dx=b[0]-a[0],dz=b[1]-a[1],cross=(pos[0]-a[0])*dz-(pos[1]-a[1])*dx;
+    if(Math.abs(cross)<1e-9&&pos[0]>=Math.min(a[0],b[0])&&pos[0]<=Math.max(a[0],b[0])&&pos[1]>=Math.min(a[1],b[1])&&pos[1]<=Math.max(a[1],b[1]))return true;
+    if((a[1]>pos[1])!==(b[1]>pos[1])&&pos[0]<(b[0]-a[0])*(pos[1]-a[1])/(b[1]-a[1])+a[0])inside=!inside;
+  }
+  return inside;
+}
+const failedOutcome = state => ['failed','refused','declined','cancelled','canceled','error'].includes(String(state??'').toLowerCase());
+function failedPartialReport(reply,ev) {
+  if(failedOutcome(reply.state))return true;
+  const history=Array.isArray(ev.cardResults)?ev.cardResults:ev.resultAt?[{at:ev.resultAt,state:ev.resultState,by:ev.resultBy}]:[];
+  const terminal=history.filter(r=>r.by!=='server'&&at(r.at)<=reply.ms).sort((a,b)=>at(a.at)-at(b.at)).at(-1);
+  // A negative overall outcome may accurately report a successful sub-action. Do not infer overall success
+  // from that sub-action's "completed" word. Explicit earlier done claims remain in cardClaims.
+  return failedOutcome(terminal?.state)&&/\b(failed|unsuccessful|incomplete|could not|couldn't|unable)\b/i.test(reply.text??'');
+}
+
 const phaseMatches = (s, p) => {
   if (p.anyOf) return options(p).some(branch => phaseMatches(s, branch));
   const pos = xz(s.pos);
   if (p.region && (!pos || !pos.every(Number.isFinite) || Math.hypot(pos[0] - p.region.pos[0], pos[1] - p.region.pos[1]) > p.region.radiusM)) return false;
+  if(p.region?.includePolygon&&!insidePolygon(pos,p.region.includePolygon))return false;
+  if(p.region?.excludePolygon&&insidePolygon(pos,p.region.excludePolygon))return false;
   if (p.receipt?.verb === 'sit' && p.receipt.targetIds?.length) {
     if (!heldSeatMatches(s.seat,p.receipt)) return false;
   }
@@ -41,6 +65,7 @@ export function validateJourney(j) {
   for (const p of j?.phases ?? []) if (p.anyOf && (!Array.isArray(p.anyOf) || !p.anyOf.length)) errors.push('phase anyOf must contain alternatives');
   for (const [i, phase] of (j?.phases ?? []).entries()) for (const p of options(phase)) {
     if (!p.region || !Array.isArray(p.region.pos) || p.region.pos.length !== 2 || !p.region.pos.every(Number.isFinite) || !(p.region.radiusM > 0)) errors.push(`phase ${i} needs frozen region`);
+    for(const k of ['includePolygon','excludePolygon'])if(p.region?.[k]&&(!Array.isArray(p.region[k])||p.region[k].length<3||p.region[k].some(v=>!Array.isArray(v)||v.length!==2||!v.every(Number.isFinite))))errors.push(`phase ${i} has invalid ${k}`);
     if (p.receipt && !p.receipt.capabilities?.length && !p.receipt.targetIds?.length && !p.receipt.targetRefs?.length) errors.push(`phase ${i} receipt needs exact capabilities/targets`);
   }
   return errors;
@@ -83,7 +108,7 @@ export function journeyOracles({ ev, journey: j, receipts, replies, acts, accept
   const physicalAt = completed.length === j.phases.length && refusalProof ? after : null;
   const finalPhase = j.phases.at(-1);
   const cardClaims = Array.isArray(ev.cardResults) ? ev.cardResults.filter(r=>r.by!=='server'&&r.state==='done').map(r=>({text:r.text,ms:at(r.at),explicit:true})) : ev.resultBy!=='server'&&ev.resultState==='done'&&ev.resultAt ? [{text:ev.resultText,ms:at(ev.resultAt),explicit:true}] : [];
-  const claims = [...cardClaims, ...(replies ?? []).filter(r=>r.by!=='server').filter(r => /\b(done|finished|completed|I(?:'m| am) (?:seated|sitting|inside)|ready to (?:present|give))\b/i.test(r.text ?? '') && !/\b(not|haven't|couldn't|cannot|can't|unable|will|I'll)\b/i.test(r.text ?? '') && !/\bstill (?:walking|trying|working|waiting|on (?:my|the) way)\b/i.test(r.text ?? ''))].filter(r => r.ms >= sent && r.ms <= cutoff).sort((a,b)=>a.ms-b.ms);
+  const claims = [...cardClaims, ...(replies ?? []).filter(r=>r.by!=='server'&&!failedPartialReport(r,ev)).filter(r => /\b(done|finished|completed|I(?:'m| am) (?:seated|sitting|inside)|ready to (?:present|give))\b/i.test(r.text ?? '') && !/\b(not|haven't|couldn't|cannot|can't|unable|will|I'll)\b/i.test(r.text ?? '') && !/\bstill (?:walking|trying|working|waiting|on (?:my|the) way)\b/i.test(r.text ?? ''))].filter(r => r.ms >= sent && r.ms <= cutoff).sort((a,b)=>a.ms-b.ms);
   const claimVerdicts = claims.map(c => {
     const last = samples.filter(s => time(s) <= c.ms).at(-1);
     const fresh = last && c.ms-time(last) <= (j.maxSampleGapSec ?? 5)*1000;

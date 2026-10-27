@@ -200,7 +200,7 @@ export function runOracles(ev, ctx = {}) {
   // truthfulness: owner-facing claims (card ack/result; chat replies) vs the body facts when each was written
   const replies = [
     ...(ev.ackText ? [{ text: ev.ackText, ms: ms(ev.ackAt) ?? sent, ptr: `${P}#ackText` }] : []),
-    ...(ev.resultText && !chatReplies.length ? [{ text: ev.resultText, ms: ms(ev.resultAt) ?? cutoff, ptr: `${P}#resultText`, by:ev.resultBy }] : []),
+    ...(ev.resultText && !chatReplies.length ? [{ text: ev.resultText, ms: ms(ev.resultAt) ?? cutoff, ptr: `${P}#resultText`, by:ev.resultBy, state:ev.resultState }] : []),
     ...chatReplies,
   ];
   // A reply can be written after the cutoff: its facts come from the seat's samples and receipts across the run, and from
