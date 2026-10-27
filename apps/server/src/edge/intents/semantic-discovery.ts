@@ -70,3 +70,14 @@ export function semanticDiscovery(L:EdgeLedger,soul:EdgeSoul,text:string,caps:Ed
  const candidates=ranked.filter(x=>x.part.sit).slice(0,8).map(({p,part})=>({...candidate(L,soul,part.sit!,p,`${part.title} — ${p.name}`,part.target,caps,plans),...(part.what?{what:part.what}:{})}));
  return choice('interaction','sit',candidates,candidates.length?'Choose a bound seat by its exact sit capability ID. No seat has been selected.':'No bound sit action matches that named target; no nearby seat or walk was substituted.');
 }
+
+/** Explore accepts bare purpose words as well as sentences. Bare words must all be
+ * supported by one candidate's authored facts; never discard a missing name/qualifier. */
+export function exploreDiscovery(L:EdgeLedger,soul:EdgeSoul,query:string,caps:EdgeCapability[],plans:Parameters<EdgeLedger['resolveOnDemand']>[3]):VocabResult|null{
+ const direct=semanticDiscovery(L,soul,query,caps,plans);if(direct)return direct;
+ if(query.includes(':'))return null;
+ const result=semanticDiscovery(L,soul,`a place for ${query}`,caps,plans);
+ if(!result||result.kind!=='unknown'||result.discovery?.kind!=='purpose')return null;
+ const candidates=(result.discovery.candidates as Candidate[]).filter(c=>!c.unverified?.length);
+ return candidates.length?choice('purpose',query,candidates,result.reason,{note:result.discovery.note}):null;
+}

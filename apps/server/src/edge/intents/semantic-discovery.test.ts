@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {semanticDiscovery} from './semantic-discovery.ts';
+import {semanticDiscovery,exploreDiscovery} from './semantic-discovery.ts';
 function setup(){
  const places=[
   {id:'harbour',name:'Harbour',parent:'world'},
@@ -39,4 +39,13 @@ test('purpose-location phrasing returns place choices and evidence, not instrume
 test('ordinary exact fixture identities, generic nearest seats and unrelated queries retain vocabulary handling',()=>{
  const {L}=setup(),caps=[{id:'sit:presenter-timber-box',verb:'sit',label:'Sit at the presenter timber box',target:{kind:'object',id:'presenter'}},{id:'sit:e_commons',verb:'sit',label:'commons-bench (a bench, 20 m)',target:{kind:'object',id:'commons'}}] as any;
  for(const query of ['sit presenter-timber-box','sit at the presenter timber box','sit at the commons bench','sit at the closest bench','sit on the nearest chair','sit on unknown spaceship'])assert.equal(semanticDiscovery(L,{soulId:'s'} as any,query,caps,new Map()),null,query);
+});
+
+test('explore reuses purpose retrieval; bare queries require every term and preserve named scope',()=>{
+ const {L,secret}=setup(),run=(q:string)=>exploreDiscovery(L,{soulId:'s'} as any,q,[],new Map()) as any;
+ const live=run('live music');assert.deepEqual(live.didYouMean.map((c:any)=>c.id),['walk:stage']);assert.equal(live.discovery.candidates[0].unverified.length,0);
+ assert.ok(run('somewhere to hear live music').didYouMean.length);
+ for(const q of ['library missing','live music missing','teleportation','walk:missing'])assert.equal(run(q),null,q);
+ assert.equal(run('live music in missing district'),null);
+ secret.add('stage');assert.equal(run('live music'),null,'private purpose must not leak through fallback');
 });

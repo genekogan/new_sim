@@ -4,6 +4,7 @@
 // never moves anyone. A Soul elsewhere is placed by its building or outdoor place, never by the room it is in.
 import type {EdgeLedger} from '../ledger/ledger.ts';
 import type {EdgeSoul} from '../contract.ts';
+import {exploreDiscovery} from '../intents/semantic-discovery.ts';
 import {knownPart} from '../intents/resolved-parts.ts';
 import {tokens} from '../ledger/vocabulary.ts';
 import type {MeaningPart} from '../../god/meaning.ts';
@@ -67,7 +68,11 @@ export function routeFrame(ledger: EdgeLedger, soul: EdgeSoul, query: string) {
   }
   const tied=scored.filter(x=>x.tier===scored[0]?.tier);
   if(tied.length>1)return{query,found:false,code:'place.ambiguous',reason:'Several places match; choose one by its exact id.',candidates:tied.slice(0,5).map(({p,at})=>({id:p.id,name:p.name,...leg(at,false)}))};
-  if (!scored.length) return {query, found: false, reason: `No place or Soul you know is called "${query}". Try a word from its name; explore shows what is close by.`};
+  if (!scored.length) {
+    const bound=ledger.coreA.binds(soul),discovery=exploreDiscovery(ledger,soul,query,bound.caps,bound.plans);
+    if(discovery?.kind==='unknown')return {query,found:discovery.didYouMean.length>0,code:discovery.code,reason:discovery.reason,...discovery.discovery};
+    return {query, found: false, reason: `No place or Soul you know is called "${query}". Try a word from its name; explore shows what is close by.`};
+  }
   const walks = new Map(ledger.capabilities(soul).filter(c => c.verb === 'walk' && c.target?.kind === 'place').map(c => [c.target!.id, c.id]));
   const {p, at, d} = scored[0]!, inside = mine.has(p.id), l = leg(at, inside || d === 0), lm = landmark(at, new Set([p.id]));
   const walk = walks.get(p.id) ?? `walk:${p.id}`, problem = inside ? null : ledger.routeProblem(soul, walk);
