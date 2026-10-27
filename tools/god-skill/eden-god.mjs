@@ -624,7 +624,7 @@ function decorate(s, pathname, verb, body, { as = "god", noBuild = false } = {})
 var READ_POSTS = /* @__PURE__ */ new Set(["/v1/god/query", "/v1/god/dryrun", "/v1/god/preview", "/v1/god/verify-use"]);
 var writes = 0;
 var writesSent = () => writes;
-async function call(path, { body, method, as = "god", noBuild = false, timeoutMs = Number(process.env.EDEN_GOD_TIMEOUT_MS ?? 18e4) } = {}) {
+async function call(path, { body, method, as = "god", noBuild = false, requestRef, timeoutMs = Number(process.env.EDEN_GOD_TIMEOUT_MS ?? 18e4) } = {}) {
   const s = load(), world = need(s, "world", "Run: node eden-god.mjs register <world-url>"), headers = { "content-type": "application/json" };
   if (as === "god" && s.token) headers.authorization = `Bearer ${s.token}`;
   if (as === "owner" && s.identity) headers.authorization = `Bearer ${s.identity}`;
@@ -633,7 +633,8 @@ async function call(path, { body, method, as = "god", noBuild = false, timeoutMs
   const revertPath = ["/v1/god/undo", "/v1/god/redo"].includes(pathname);
   body = decorate(s, pathname, verb, body, { as, noBuild });
   if (verb !== "GET" && !READ_POSTS.has(pathname)) writes++;
-  const clientRef = as === "god" && verb !== "GET" && EDIT_PATHS.has(pathname) ? randomUUID2() : void 0;
+  if (requestRef !== void 0 && (typeof requestRef !== "string" || !requestRef.trim() || requestRef.length > 160 || as !== "god" || pathname !== "/v1/god/act" || verb !== "POST" || body?.clientRef !== requestRef)) throw Error("requestRef requires an act with the same explicit clientRef");
+  const clientRef = as === "god" && verb !== "GET" && EDIT_PATHS.has(pathname) ? requestRef ?? randomUUID2() : void 0;
   const payload = body || clientRef ? JSON.stringify(clientRef ? { ...body, clientRef } : body) : void 0;
   const recoverable = clientRef && pathname === "/v1/god/act" && verb === "POST";
   const retryBudget = { waited: 0, retries: 0 };
@@ -3938,9 +3939,9 @@ async function freePlots(size, flags2 = {}) {
   if (r[0]) void attention([r[0].at[0], r[0].y, r[0].at[1]]);
   return flags2.json ? r : r.length ? r.map((f) => `- (${f.at.join(", ")}) y ${f.y}, slope ${f.slope}, ${f.dist} m from (${near.x}, ${near.z})`).join("\n") : "no free plot of that size within the radius";
 }
-async function act(batch, note) {
+async function act(batch, note, requestRef) {
   const want = mirrorState(), held = want ? heldMirror() : null;
-  const r = ok(await call("/v1/god/act", { body: { ...batch, ...note ? { note } : {}, ...want ? { mirror: want } : {} } }), "act");
+  const r = ok(await call("/v1/god/act", { requestRef, body: { ...batch, ...note ? { note } : {}, ...want ? { mirror: want } : {} } }), "act");
   invalidate();
   if (r.mirror) {
     adoptMirror(r.mirror, held);
@@ -5331,7 +5332,7 @@ var FLAGS = {
   import: "group",
   flag: "at offset",
   schema: "md",
-  act: "note",
+  act: "note request-ref",
   prayers: "all",
   catalog: "category has tag page per",
   find: "category has tag all",
@@ -5412,7 +5413,7 @@ var COMMANDS = {
   recolor: (r, f) => recolor(r[0], r[1], f),
   remove: (r) => remove(r),
   clone: (r, f) => clone(r[0], f),
-  act: (r, f) => act(JSON.parse(readArg(r)), f.note),
+  act: (r, f) => act(JSON.parse(readArg(r)), f.note, f["request-ref"]),
   dryrun: (r) => dryrun(JSON.parse(readArg(r))),
   plan: (r) => planBatch(readArg(r)),
   preview: (r) => preview(readArg(r)),
