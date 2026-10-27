@@ -369,7 +369,8 @@ export const swimIn: ActionDef<SwimInParams,TravelOp[],SwimInExec>={
    if(hypot(x-from[0],z-from[1])<SWIM_IN_MARGIN)continue;
    candidates.push([x,z]);
   }
-  candidates.sort((a,b)=>(a[0]-from[0])**2+(a[1]-from[1])**2-((b[0]-from[0])**2+(b[1]-from[1])**2)||a[0]-b[0]||a[1]-b[1]);
+  const distanceSquared=(q:Vec2)=>{const dx=q[0]-from[0],dz=q[1]-from[1];return dx*dx+dz*dz;};
+  candidates.sort((a,b)=>distanceSquared(a)-distanceSquared(b)||a[0]-b[0]||a[1]-b[1]);
   const tried:Vec2[]=[];
   for(const to of candidates){
    if(tried.some(q=>hypot(q[0]-to[0],q[1]-to[1])<3))continue;
