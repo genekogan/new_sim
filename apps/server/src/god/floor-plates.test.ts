@@ -171,8 +171,18 @@ test('full patched and rotated Mars keeps the presenter supported and persistent
     assert.fail(`receipt did not finish: ${capability}`);
   };
   await receipt('walk:chiba');
+  const part=E.world.entityPhysicsV1.byEntity[chiba.id], upper=part.surfaces.filter((f:any)=>f.y>3.2&&f.obb.half.every((v:number)=>v>.5)).sort((a:any,b:any)=>b.obb.half[0]*b.obb.half[1]-a.obb.half[0]*a.obb.half[1])[0];
+  assert.ok(upper,'a body-sized upper gallery support with a proven stair entry');
+  const [x,z]=upper.obb.c, level=upper.level;
+  const start=E.world.entities[row.entity_id].pose.p;
+  assert.ok(E.reachV1({p:[start[0],start[2]],level:0},{p:[x,z],level}).ok,'upper gallery has a native route from the actual arrival');
+  await accept(w.host,w.host.enqueue('decision',`test:${row.id}`,{soulId:row.id,entityId:row.entity_id,option:'test:upper',label:'walk to upper Chiba',steps:[{verb:'mars:walk_to',params:{x,z,level}}],reevalTicks:1e9,fallback:false,trigger:'test:upper'}));
+  let arrived=false;
+  for(let i=0;i<10000;i++){w.host.tickOnce();if(i%20===0){await setImmediate();w.host.drainInputs();}const b=E.world.entities[row.entity_id];if((b.human.level??0)===level&&Math.hypot(b.pose.p[0]-x,b.pose.p[2]-z)<.6&&b.human.activity!=='walk'){arrived=true;break;}}
+  assert.ok(arrived,`upper gallery reached through the flight: target ${JSON.stringify(upper)} body ${JSON.stringify(E.world.entities[row.entity_id])}`);
   await receipt(`sit:${box.id}`,{seconds:1});
   for(let i=0;i<1200;i++){w.host.tickOnce();if(i%20===0){await setImmediate();w.host.drainInputs();}}
   assert.equal(E.world.entities[s.entityId].human.activity,'sit','completion leaves the presenter seated after sixty seconds');
   assert.equal(E.bodyUsesV1(box.id)?.body,s.entityId,'the exact presenter fixture is held');
+  assert.deepEqual(E.runtime.violations,[],'both stair directions and the seat approach remain collision free');
 });

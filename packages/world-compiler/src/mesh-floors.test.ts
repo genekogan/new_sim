@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {WorldModel, coreLibrary} from './index.ts';
-import {meshFloors} from './mesh-floors.ts';
+import {meshFloors,meshFloorLinks} from './mesh-floors.ts';
 import overlays from './mesh-floor-overlays.json' with {type:'json'};
 
 test('content-addressed floor supplements survive pinned-definition reloads and respect authored overrides', () => {
@@ -15,9 +15,12 @@ test('content-addressed floor supplements survive pinned-definition reloads and 
     const pinned=w.defineDef({...base,make:{...base.make,asset:hash},size:{...base.size,box:entry.box as [number,number,number]}},'fixture',0);
     const floors=w.bake(pinned,{},0).surfaces?.filter(s=>s.tag?.startsWith('mesh-floor:')) ?? [];
     assert.ok(floors.length>0,`${entry.name} ${hash.slice(0,8)} has supports`);
-    assert.ok(floors.every(s=>s.y>=0&&s.y<=.45));
+    assert.ok(floors.every(s=>s.y>=0&&(s.y<=.45||entry.name==='core-mars-chiba'&&s.y<=3.27)));
     const reload=WorldModel.fromSnapshot(w.snapshot());
     assert.deepEqual(reload.bake(reload.def(pinned.ref)!,{},0).surfaces,w.bake(pinned,{},0).surfaces);
+    const links=w.bake(pinned,{},0).links??[];
+    assert.deepEqual(reload.bake(reload.def(pinned.ref)!,{},0).links,links.length?links:undefined);
+    if(links.length)assert.deepEqual(meshFloorLinks(hash,entry.box,[links[0]]),[],'authored circulation wins');
     const first=floors[0], authored={...first,tag:'authored-floor'};
     assert.equal(meshFloors(hash,entry.box,[authored]).some(s=>Math.abs(s.y-first.y)<.02),false);
     assert.deepEqual(meshFloors(hash,entry.box.map(v=>v*2)),[],'a different mesh fit requires extraction of its own');

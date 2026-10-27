@@ -13,7 +13,7 @@
    "geometryHash": "dc8e2ef6427e83d8e4b0c3274eb4bce368bba6f3d255b4d6cc042f0ff4eb1ab6",
    "cell": 0.15,
    "headroom": 1.8,
-   "entry": "terrain-step<=0.45m",
+   "entry": "terrain-step and verified three-rise flight",
    "surfaces": [
     {
      "level": 0,
@@ -1118,6 +1118,2071 @@
       ]
      ],
      "tag": "mesh-floor:chiba:3:19"
+    },
+    {
+     "level": 1,
+     "y": 0.743,
+     "polygon": [
+      [
+       7.95,
+       -1.5
+      ],
+      [
+       8.85,
+       -1.5
+      ],
+      [
+       8.85,
+       1.95
+      ],
+      [
+       7.95,
+       1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:4:0"
+    },
+    {
+     "level": 2,
+     "y": 1.123,
+     "polygon": [
+      [
+       6.9,
+       -1.5
+      ],
+      [
+       7.8,
+       -1.5
+      ],
+      [
+       7.8,
+       1.95
+      ],
+      [
+       6.9,
+       1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:5:0"
+    },
+    {
+     "level": 3,
+     "y": 1.504,
+     "polygon": [
+      [
+       5.85,
+       -1.5
+      ],
+      [
+       6.75,
+       -1.5
+      ],
+      [
+       6.75,
+       1.95
+      ],
+      [
+       5.85,
+       1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:6:0"
+    },
+    {
+     "level": 4,
+     "y": 1.89,
+     "polygon": [
+      [
+       4.8,
+       -1.5
+      ],
+      [
+       5.85,
+       -1.5
+      ],
+      [
+       5.85,
+       1.95
+      ],
+      [
+       4.8,
+       1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:7:0"
+    },
+    {
+     "level": 5,
+     "y": 2.266,
+     "polygon": [
+      [
+       3.75,
+       -1.5
+      ],
+      [
+       4.8,
+       -1.5
+      ],
+      [
+       4.8,
+       1.95
+      ],
+      [
+       3.75,
+       1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:8:0"
+    },
+    {
+     "level": 6,
+     "y": 2.653,
+     "polygon": [
+      [
+       2.85,
+       -1.65
+      ],
+      [
+       3.45,
+       -1.65
+      ],
+      [
+       3.45,
+       1.95
+      ],
+      [
+       2.85,
+       1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:9:0"
+    },
+    {
+     "level": 6,
+     "y": 2.653,
+     "polygon": [
+      [
+       3.45,
+       -1.5
+      ],
+      [
+       3.75,
+       -1.5
+      ],
+      [
+       3.75,
+       1.95
+      ],
+      [
+       3.45,
+       1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:9:1"
+    },
+    {
+     "level": 7,
+     "y": 3.03,
+     "polygon": [
+      [
+       1.65,
+       -1.65
+      ],
+      [
+       2.7,
+       -1.65
+      ],
+      [
+       2.7,
+       1.95
+      ],
+      [
+       1.65,
+       1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:10:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       -1.65,
+       4.65
+      ],
+      [
+       0.6,
+       4.65
+      ],
+      [
+       0.6,
+       5.7
+      ],
+      [
+       -1.65,
+       5.7
+      ]
+     ],
+     "tag": "mesh-floor:chiba:11:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       0.75,
+       4.65
+      ],
+      [
+       5.55,
+       4.65
+      ],
+      [
+       5.55,
+       5.7
+      ],
+      [
+       0.75,
+       5.7
+      ]
+     ],
+     "tag": "mesh-floor:chiba:12:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       5.7,
+       4.65
+      ],
+      [
+       10.35,
+       4.65
+      ],
+      [
+       10.35,
+       5.7
+      ],
+      [
+       5.7,
+       5.7
+      ]
+     ],
+     "tag": "mesh-floor:chiba:13:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       10.5,
+       4.65
+      ],
+      [
+       12.75,
+       4.65
+      ],
+      [
+       12.75,
+       5.7
+      ],
+      [
+       10.5,
+       5.7
+      ]
+     ],
+     "tag": "mesh-floor:chiba:14:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       -1.65,
+       3.3
+      ],
+      [
+       0.6,
+       3.3
+      ],
+      [
+       0.6,
+       3.75
+      ],
+      [
+       -1.65,
+       3.75
+      ]
+     ],
+     "tag": "mesh-floor:chiba:15:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       -1.65,
+       3.75
+      ],
+      [
+       -0.45,
+       3.75
+      ],
+      [
+       -0.45,
+       4.5
+      ],
+      [
+       -1.65,
+       4.5
+      ]
+     ],
+     "tag": "mesh-floor:chiba:15:1"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       -0.15,
+       3.75
+      ],
+      [
+       0,
+       3.75
+      ],
+      [
+       0,
+       4.5
+      ],
+      [
+       -0.15,
+       4.5
+      ]
+     ],
+     "tag": "mesh-floor:chiba:15:2"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       0.3,
+       3.75
+      ],
+      [
+       0.6,
+       3.75
+      ],
+      [
+       0.6,
+       4.5
+      ],
+      [
+       0.3,
+       4.5
+      ]
+     ],
+     "tag": "mesh-floor:chiba:15:3"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       -0.45,
+       3.9
+      ],
+      [
+       -0.15,
+       3.9
+      ],
+      [
+       -0.15,
+       4.5
+      ],
+      [
+       -0.45,
+       4.5
+      ]
+     ],
+     "tag": "mesh-floor:chiba:15:4"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       0,
+       3.9
+      ],
+      [
+       0.3,
+       3.9
+      ],
+      [
+       0.3,
+       4.5
+      ],
+      [
+       0,
+       4.5
+      ]
+     ],
+     "tag": "mesh-floor:chiba:15:5"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       0.75,
+       3.3
+      ],
+      [
+       2.4,
+       3.3
+      ],
+      [
+       2.4,
+       3.9
+      ],
+      [
+       0.75,
+       3.9
+      ]
+     ],
+     "tag": "mesh-floor:chiba:16:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       2.4,
+       3.45
+      ],
+      [
+       5.55,
+       3.45
+      ],
+      [
+       5.55,
+       4.5
+      ],
+      [
+       2.4,
+       4.5
+      ]
+     ],
+     "tag": "mesh-floor:chiba:16:1"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       0.9,
+       3.9
+      ],
+      [
+       2.4,
+       3.9
+      ],
+      [
+       2.4,
+       4.5
+      ],
+      [
+       0.9,
+       4.5
+      ]
+     ],
+     "tag": "mesh-floor:chiba:16:2"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       0.75,
+       4.05
+      ],
+      [
+       0.9,
+       4.05
+      ],
+      [
+       0.9,
+       4.5
+      ],
+      [
+       0.75,
+       4.5
+      ]
+     ],
+     "tag": "mesh-floor:chiba:16:3"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       0.75,
+       2.1
+      ],
+      [
+       5.55,
+       2.1
+      ],
+      [
+       5.55,
+       3.15
+      ],
+      [
+       0.75,
+       3.15
+      ]
+     ],
+     "tag": "mesh-floor:chiba:17:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       3.6,
+       3.15
+      ],
+      [
+       5.55,
+       3.15
+      ],
+      [
+       5.55,
+       3.3
+      ],
+      [
+       3.6,
+       3.3
+      ]
+     ],
+     "tag": "mesh-floor:chiba:17:1"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       5.7,
+       3.45
+      ],
+      [
+       10.35,
+       3.45
+      ],
+      [
+       10.35,
+       4.5
+      ],
+      [
+       5.7,
+       4.5
+      ]
+     ],
+     "tag": "mesh-floor:chiba:18:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       10.5,
+       3.45
+      ],
+      [
+       12.75,
+       3.45
+      ],
+      [
+       12.75,
+       4.5
+      ],
+      [
+       10.5,
+       4.5
+      ]
+     ],
+     "tag": "mesh-floor:chiba:19:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       -1.65,
+       2.1
+      ],
+      [
+       0.6,
+       2.1
+      ],
+      [
+       0.6,
+       3.15
+      ],
+      [
+       -1.65,
+       3.15
+      ]
+     ],
+     "tag": "mesh-floor:chiba:20:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       5.7,
+       2.1
+      ],
+      [
+       10.35,
+       2.1
+      ],
+      [
+       10.35,
+       3.3
+      ],
+      [
+       5.7,
+       3.3
+      ]
+     ],
+     "tag": "mesh-floor:chiba:21:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       10.5,
+       2.25
+      ],
+      [
+       12.75,
+       2.25
+      ],
+      [
+       12.75,
+       3.3
+      ],
+      [
+       10.5,
+       3.3
+      ]
+     ],
+     "tag": "mesh-floor:chiba:22:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       -1.65,
+       -2.85
+      ],
+      [
+       0.6,
+       -2.85
+      ],
+      [
+       0.6,
+       -1.8
+      ],
+      [
+       -1.65,
+       -1.8
+      ]
+     ],
+     "tag": "mesh-floor:chiba:23:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       0.75,
+       -2.85
+      ],
+      [
+       5.55,
+       -2.85
+      ],
+      [
+       5.55,
+       -1.8
+      ],
+      [
+       0.75,
+       -1.8
+      ]
+     ],
+     "tag": "mesh-floor:chiba:24:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       5.7,
+       -2.85
+      ],
+      [
+       10.35,
+       -2.85
+      ],
+      [
+       10.35,
+       -1.8
+      ],
+      [
+       5.7,
+       -1.8
+      ]
+     ],
+     "tag": "mesh-floor:chiba:25:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       10.5,
+       -2.85
+      ],
+      [
+       12.9,
+       -2.85
+      ],
+      [
+       12.9,
+       -1.95
+      ],
+      [
+       10.5,
+       -1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:26:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       10.5,
+       -1.95
+      ],
+      [
+       12.75,
+       -1.95
+      ],
+      [
+       12.75,
+       -1.8
+      ],
+      [
+       10.5,
+       -1.8
+      ]
+     ],
+     "tag": "mesh-floor:chiba:26:1"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       -1.65,
+       -4.05
+      ],
+      [
+       0.6,
+       -4.05
+      ],
+      [
+       0.6,
+       -3
+      ],
+      [
+       -1.65,
+       -3
+      ]
+     ],
+     "tag": "mesh-floor:chiba:27:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       0.75,
+       -4.05
+      ],
+      [
+       5.55,
+       -4.05
+      ],
+      [
+       5.55,
+       -3
+      ],
+      [
+       0.75,
+       -3
+      ]
+     ],
+     "tag": "mesh-floor:chiba:28:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       5.7,
+       -4.05
+      ],
+      [
+       10.35,
+       -4.05
+      ],
+      [
+       10.35,
+       -3
+      ],
+      [
+       5.7,
+       -3
+      ]
+     ],
+     "tag": "mesh-floor:chiba:29:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       10.5,
+       -4.05
+      ],
+      [
+       12.9,
+       -4.05
+      ],
+      [
+       12.9,
+       -3
+      ],
+      [
+       10.5,
+       -3
+      ]
+     ],
+     "tag": "mesh-floor:chiba:30:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       -1.65,
+       -5.4
+      ],
+      [
+       -1.5,
+       -5.4
+      ],
+      [
+       -1.5,
+       -4.2
+      ],
+      [
+       -1.65,
+       -4.2
+      ]
+     ],
+     "tag": "mesh-floor:chiba:31:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       -1.5,
+       -5.25
+      ],
+      [
+       0.6,
+       -5.25
+      ],
+      [
+       0.6,
+       -4.2
+      ],
+      [
+       -1.5,
+       -4.2
+      ]
+     ],
+     "tag": "mesh-floor:chiba:31:1"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       0.75,
+       -5.25
+      ],
+      [
+       5.55,
+       -5.25
+      ],
+      [
+       5.55,
+       -4.2
+      ],
+      [
+       0.75,
+       -4.2
+      ]
+     ],
+     "tag": "mesh-floor:chiba:32:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       5.7,
+       -5.25
+      ],
+      [
+       10.35,
+       -5.25
+      ],
+      [
+       10.35,
+       -4.2
+      ],
+      [
+       5.7,
+       -4.2
+      ]
+     ],
+     "tag": "mesh-floor:chiba:33:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       10.5,
+       -5.25
+      ],
+      [
+       12.9,
+       -5.25
+      ],
+      [
+       12.9,
+       -4.2
+      ],
+      [
+       10.5,
+       -4.2
+      ]
+     ],
+     "tag": "mesh-floor:chiba:34:0"
+    },
+    {
+     "level": 8,
+     "y": 3.263,
+     "polygon": [
+      [
+       0.6,
+       -1.65
+      ],
+      [
+       1.65,
+       -1.65
+      ],
+      [
+       1.65,
+       1.95
+      ],
+      [
+       0.6,
+       1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:35:0"
+    },
+    {
+     "level": 8,
+     "y": 3.263,
+     "polygon": [
+      [
+       -0.6,
+       -1.65
+      ],
+      [
+       0.45,
+       -1.65
+      ],
+      [
+       0.45,
+       1.95
+      ],
+      [
+       -0.6,
+       1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:36:0"
+    }
+   ],
+   "links": [
+    {
+     "id": "mesh-step:1:5:0",
+     "kind": "stairs",
+     "from": 0,
+     "to": 1,
+     "path": [
+      [
+       9.65,
+       0.225
+      ],
+      [
+       8.33,
+       0.225
+      ]
+     ],
+     "width": 0.68,
+     "y0": 0.374,
+     "y1": 0.743
+    },
+    {
+     "id": "mesh-step:5:8:1",
+     "kind": "stairs",
+     "from": 1,
+     "to": 2,
+     "path": [
+      [
+       8.47,
+       0.225
+      ],
+      [
+       7.28,
+       0.225
+      ]
+     ],
+     "width": 0.68,
+     "y0": 0.743,
+     "y1": 1.123
+    },
+    {
+     "id": "mesh-step:8:10:2",
+     "kind": "stairs",
+     "from": 2,
+     "to": 3,
+     "path": [
+      [
+       7.42,
+       0.225
+      ],
+      [
+       6.23,
+       0.225
+      ]
+     ],
+     "width": 0.68,
+     "y0": 1.123,
+     "y1": 1.504
+    },
+    {
+     "id": "mesh-step:10:12:3",
+     "kind": "stairs",
+     "from": 3,
+     "to": 4,
+     "path": [
+      [
+       6.37,
+       0.225
+      ],
+      [
+       5.33,
+       0.225
+      ]
+     ],
+     "width": 0.68,
+     "y0": 1.504,
+     "y1": 1.89
+    },
+    {
+     "id": "mesh-step:12:14:4",
+     "kind": "stairs",
+     "from": 4,
+     "to": 5,
+     "path": [
+      [
+       5.32,
+       0.225
+      ],
+      [
+       4.28,
+       0.225
+      ]
+     ],
+     "width": 0.68,
+     "y0": 1.89,
+     "y1": 2.266
+    },
+    {
+     "id": "mesh-step:14:16:5",
+     "kind": "stairs",
+     "from": 5,
+     "to": 6,
+     "path": [
+      [
+       4.27,
+       0.225
+      ],
+      [
+       3.23,
+       0.225
+      ]
+     ],
+     "width": 0.68,
+     "y0": 2.266,
+     "y1": 2.653
+    },
+    {
+     "id": "mesh-step:16:18:6",
+     "kind": "stairs",
+     "from": 6,
+     "to": 7,
+     "path": [
+      [
+       3.37,
+       0.15
+      ],
+      [
+       2.18,
+       0.15
+      ]
+     ],
+     "width": 0.68,
+     "y0": 2.653,
+     "y1": 3.03
+    },
+    {
+     "id": "mesh-step:18:44:7",
+     "kind": "stairs",
+     "from": 7,
+     "to": 8,
+     "path": [
+      [
+       2.17,
+       0.15
+      ],
+      [
+       1.13,
+       0.15
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.03,
+     "y1": 3.263
+    },
+    {
+     "id": "mesh-step:2:5:8",
+     "kind": "stairs",
+     "from": 0,
+     "to": 1,
+     "path": [
+      [
+       8.4,
+       -2.6
+      ],
+      [
+       8.4,
+       -0.98
+      ]
+     ],
+     "width": 0.68,
+     "y0": 0.374,
+     "y1": 0.743
+    },
+    {
+     "id": "mesh-step:3:5:9",
+     "kind": "stairs",
+     "from": 0,
+     "to": 1,
+     "path": [
+      [
+       8.4,
+       3.05
+      ],
+      [
+       8.4,
+       1.43
+      ]
+     ],
+     "width": 0.68,
+     "y0": 0.374,
+     "y1": 0.743
+    },
+    {
+     "id": "mesh-step:44:25:10",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       1.2,
+       1.43
+      ],
+      [
+       1.2,
+       2.62
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.263,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:44:32:11",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       1.2,
+       -1.13
+      ],
+      [
+       1.2,
+       -2.32
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.263,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:44:45:12",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       1.12,
+       0.15
+      ],
+      [
+       -0.07,
+       0.15
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.263,
+     "y1": 3.263
+    },
+    {
+     "id": "mesh-step:25:24:13",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       3.15,
+       2.78
+      ],
+      [
+       3.15,
+       3.82
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:25:28:14",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       1.27,
+       2.625
+      ],
+      [
+       0.08,
+       2.625
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:25:29:15",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       5.03,
+       2.7
+      ],
+      [
+       6.22,
+       2.7
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:32:31:16",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       1.27,
+       -2.325
+      ],
+      [
+       0.08,
+       -2.325
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:32:33:17",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       5.03,
+       -2.325
+      ],
+      [
+       6.22,
+       -2.325
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:32:36:18",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       3.15,
+       -2.33
+      ],
+      [
+       3.15,
+       -3.52
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:24:20:19",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       3.15,
+       3.98
+      ],
+      [
+       3.15,
+       5.17
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:24:23:20",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       1.27,
+       3.9
+      ],
+      [
+       0.08,
+       3.9
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:24:26:21",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       5.03,
+       3.975
+      ],
+      [
+       6.22,
+       3.975
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:29:30:22",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       9.83,
+       2.775
+      ],
+      [
+       11.02,
+       2.775
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:31:35:23",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       -0.525,
+       -2.33
+      ],
+      [
+       -0.525,
+       -3.52
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:33:34:24",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       9.83,
+       -2.325
+      ],
+      [
+       11.02,
+       -2.325
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:33:37:25",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       8.025,
+       -2.33
+      ],
+      [
+       8.025,
+       -3.52
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:36:40:26",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       3.15,
+       -3.53
+      ],
+      [
+       3.15,
+       -4.72
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:20:19:27",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       1.27,
+       5.175
+      ],
+      [
+       0.08,
+       5.175
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:20:21:28",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       5.03,
+       5.175
+      ],
+      [
+       6.22,
+       5.175
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:26:27:29",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       9.83,
+       3.975
+      ],
+      [
+       11.02,
+       3.975
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:35:39:30",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       -0.525,
+       -3.53
+      ],
+      [
+       -0.525,
+       -4.72
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:34:38:31",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       11.7,
+       -2.33
+      ],
+      [
+       11.7,
+       -3.52
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:37:41:32",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       8.025,
+       -3.53
+      ],
+      [
+       8.025,
+       -4.72
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:21:22:33",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       9.83,
+       5.175
+      ],
+      [
+       11.02,
+       5.175
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:38:42:34",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       11.7,
+       -3.53
+      ],
+      [
+       11.7,
+       -4.72
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:1:5:35",
+     "kind": "stairs",
+     "from": 0,
+     "to": 1,
+     "path": [
+      [
+       9.65,
+       -0.375
+      ],
+      [
+       8.33,
+       -0.375
+      ]
+     ],
+     "width": 0.68,
+     "y0": 0.374,
+     "y1": 0.743
+    },
+    {
+     "id": "mesh-step:1:5:36",
+     "kind": "stairs",
+     "from": 0,
+     "to": 1,
+     "path": [
+      [
+       9.65,
+       0.825
+      ],
+      [
+       8.33,
+       0.825
+      ]
+     ],
+     "width": 0.68,
+     "y0": 0.374,
+     "y1": 0.743
+    },
+    {
+     "id": "mesh-step:1:5:37",
+     "kind": "stairs",
+     "from": 0,
+     "to": 1,
+     "path": [
+      [
+       9.65,
+       1.425
+      ],
+      [
+       8.33,
+       1.425
+      ]
+     ],
+     "width": 0.68,
+     "y0": 0.374,
+     "y1": 0.743
+    }
+   ],
+   "access": [
+    {
+     "from": 1,
+     "to": 5,
+     "rise": 0.369,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 5,
+     "to": 8,
+     "rise": 0.38,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 8,
+     "to": 10,
+     "rise": 0.381,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 10,
+     "to": 12,
+     "rise": 0.386,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 12,
+     "to": 14,
+     "rise": 0.376,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 14,
+     "to": 16,
+     "rise": 0.387,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 16,
+     "to": 18,
+     "rise": 0.377,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 18,
+     "to": 44,
+     "rise": 0.233,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 2,
+     "to": 5,
+     "rise": 0.369,
+     "axis": 1,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 3,
+     "to": 5,
+     "rise": 0.369,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 44,
+     "to": 25,
+     "rise": -0.016,
+     "axis": 1,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 44,
+     "to": 32,
+     "rise": -0.016,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 44,
+     "to": 45,
+     "rise": 0,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 25,
+     "to": 24,
+     "rise": 0,
+     "axis": 1,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 25,
+     "to": 28,
+     "rise": 0,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 25,
+     "to": 29,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 32,
+     "to": 31,
+     "rise": 0,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 32,
+     "to": 33,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 32,
+     "to": 36,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 24,
+     "to": 20,
+     "rise": 0,
+     "axis": 1,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 24,
+     "to": 23,
+     "rise": 0,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 24,
+     "to": 26,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 29,
+     "to": 30,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 31,
+     "to": 35,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 33,
+     "to": 34,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 33,
+     "to": 37,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 36,
+     "to": 40,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 20,
+     "to": 19,
+     "rise": 0,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 20,
+     "to": 21,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 26,
+     "to": 27,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 35,
+     "to": 39,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 34,
+     "to": 38,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 37,
+     "to": 41,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 21,
+     "to": 22,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 38,
+     "to": 42,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 1,
+     "to": 5,
+     "rise": 0.369,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 1,
+     "to": 5,
+     "rise": 0.369,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 1,
+     "to": 5,
+     "rise": 0.369,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
     }
    ],
    "patches": [
@@ -1148,17 +3213,243 @@
      "nodes": [
       "wood_component-0751"
      ]
+    },
+    {
+     "y": 0.743,
+     "area": 3.105,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 1.123,
+     "area": 3.105,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 1.504,
+     "area": 3.105,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 1.89,
+     "area": 3.6225,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 2.266,
+     "area": 3.6225,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 2.653,
+     "area": 3.195,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.03,
+     "area": 3.78,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 5.04,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 4.8825,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.61,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 5.265,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 5.3325,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 4.8825,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 5.58,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 5.04,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 4.8825,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.4975,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 5.04,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 4.8825,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.52,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.385,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 5.04,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 4.8825,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.52,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.263,
+     "area": 3.78,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.263,
+     "area": 3.78,
+     "nodes": [
+      "wood_component-0751"
+     ]
     }
    ],
    "rejected": [
     {
      "y": 0.546,
      "area": 2.7,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 0.743,
-     "area": 3.105,
      "reason": "no proven entrance or stair link"
     },
     {
@@ -1172,18 +3463,8 @@
      "reason": "no proven entrance or stair link"
     },
     {
-     "y": 1.123,
-     "area": 3.105,
-     "reason": "no proven entrance or stair link"
-    },
-    {
      "y": 1.317,
      "area": 2.7,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 1.504,
-     "area": 3.105,
      "reason": "no proven entrance or stair link"
     },
     {
@@ -1192,18 +3473,8 @@
      "reason": "no proven entrance or stair link"
     },
     {
-     "y": 1.89,
-     "area": 3.6225,
-     "reason": "no proven entrance or stair link"
-    },
-    {
      "y": 2.089,
      "area": 2.7,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 2.266,
-     "area": 3.6225,
      "reason": "no proven entrance or stair link"
     },
     {
@@ -1212,153 +3483,13 @@
      "reason": "no proven entrance or stair link"
     },
     {
-     "y": 2.653,
-     "area": 3.195,
-     "reason": "no proven entrance or stair link"
-    },
-    {
      "y": 2.86,
      "area": 2.7,
      "reason": "no proven entrance or stair link"
     },
     {
-     "y": 3.03,
-     "area": 3.78,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 5.04,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 4.8825,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.61,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 5.265,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 5.3325,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 4.8825,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 5.58,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 5.04,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 4.8825,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.4975,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 5.04,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 4.8825,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.52,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.385,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 5.04,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 4.8825,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.52,
-     "reason": "no proven entrance or stair link"
-    },
-    {
      "y": 3.247,
      "area": 3.3075,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.263,
-     "area": 3.78,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.263,
-     "area": 3.78,
      "reason": "no proven entrance or stair link"
     },
     {
@@ -1405,7 +3536,7 @@
    "geometryHash": "a5bf8e27a484d2d6c069c26dea83c030aa97fccccd141cdd5ede4be8ce5ae342",
    "cell": 0.15,
    "headroom": 1.8,
-   "entry": "terrain-step<=0.45m",
+   "entry": "terrain-step and verified three-rise flight",
    "surfaces": [
     {
      "level": 0,
@@ -2625,6 +4756,1733 @@
       ]
      ],
      "tag": "mesh-floor:chiba:3:20"
+    },
+    {
+     "level": 1,
+     "y": 0.742,
+     "polygon": [
+      [
+       7.95,
+       2.1
+      ],
+      [
+       8.85,
+       2.1
+      ],
+      [
+       8.85,
+       5.55
+      ],
+      [
+       7.95,
+       5.55
+      ]
+     ],
+     "tag": "mesh-floor:chiba:4:0"
+    },
+    {
+     "level": 2,
+     "y": 1.123,
+     "polygon": [
+      [
+       6.9,
+       2.1
+      ],
+      [
+       7.8,
+       2.1
+      ],
+      [
+       7.8,
+       5.55
+      ],
+      [
+       6.9,
+       5.55
+      ]
+     ],
+     "tag": "mesh-floor:chiba:5:0"
+    },
+    {
+     "level": 3,
+     "y": 1.504,
+     "polygon": [
+      [
+       5.85,
+       2.1
+      ],
+      [
+       6.75,
+       2.1
+      ],
+      [
+       6.75,
+       5.55
+      ],
+      [
+       5.85,
+       5.55
+      ]
+     ],
+     "tag": "mesh-floor:chiba:6:0"
+    },
+    {
+     "level": 4,
+     "y": 1.89,
+     "polygon": [
+      [
+       4.8,
+       2.1
+      ],
+      [
+       5.85,
+       2.1
+      ],
+      [
+       5.85,
+       5.55
+      ],
+      [
+       4.8,
+       5.55
+      ]
+     ],
+     "tag": "mesh-floor:chiba:7:0"
+    },
+    {
+     "level": 5,
+     "y": 2.265,
+     "polygon": [
+      [
+       3.75,
+       2.1
+      ],
+      [
+       4.8,
+       2.1
+      ],
+      [
+       4.8,
+       5.55
+      ],
+      [
+       3.75,
+       5.55
+      ]
+     ],
+     "tag": "mesh-floor:chiba:8:0"
+    },
+    {
+     "level": 6,
+     "y": 2.654,
+     "polygon": [
+      [
+       2.85,
+       2.1
+      ],
+      [
+       3.75,
+       2.1
+      ],
+      [
+       3.75,
+       5.55
+      ],
+      [
+       2.85,
+       5.55
+      ]
+     ],
+     "tag": "mesh-floor:chiba:9:0"
+    },
+    {
+     "level": 7,
+     "y": 3.03,
+     "polygon": [
+      [
+       1.65,
+       2.1
+      ],
+      [
+       2.7,
+       2.1
+      ],
+      [
+       2.7,
+       5.55
+      ],
+      [
+       1.65,
+       5.55
+      ]
+     ],
+     "tag": "mesh-floor:chiba:10:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       -1.65,
+       8.25
+      ],
+      [
+       0.6,
+       8.25
+      ],
+      [
+       0.6,
+       9.3
+      ],
+      [
+       -1.65,
+       9.3
+      ]
+     ],
+     "tag": "mesh-floor:chiba:11:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       0.75,
+       8.25
+      ],
+      [
+       5.55,
+       8.25
+      ],
+      [
+       5.55,
+       9.3
+      ],
+      [
+       0.75,
+       9.3
+      ]
+     ],
+     "tag": "mesh-floor:chiba:12:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       5.7,
+       8.25
+      ],
+      [
+       10.35,
+       8.25
+      ],
+      [
+       10.35,
+       9.3
+      ],
+      [
+       5.7,
+       9.3
+      ]
+     ],
+     "tag": "mesh-floor:chiba:13:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       10.5,
+       8.25
+      ],
+      [
+       12.75,
+       8.25
+      ],
+      [
+       12.75,
+       9.3
+      ],
+      [
+       10.5,
+       9.3
+      ]
+     ],
+     "tag": "mesh-floor:chiba:14:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       -1.65,
+       7.05
+      ],
+      [
+       0.6,
+       7.05
+      ],
+      [
+       0.6,
+       8.1
+      ],
+      [
+       -1.65,
+       8.1
+      ]
+     ],
+     "tag": "mesh-floor:chiba:15:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       0.75,
+       7.05
+      ],
+      [
+       5.55,
+       7.05
+      ],
+      [
+       5.55,
+       7.5
+      ],
+      [
+       0.75,
+       7.5
+      ]
+     ],
+     "tag": "mesh-floor:chiba:16:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       0.9,
+       7.5
+      ],
+      [
+       5.55,
+       7.5
+      ],
+      [
+       5.55,
+       8.1
+      ],
+      [
+       0.9,
+       8.1
+      ]
+     ],
+     "tag": "mesh-floor:chiba:16:1"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       0.75,
+       7.8
+      ],
+      [
+       0.9,
+       7.8
+      ],
+      [
+       0.9,
+       8.1
+      ],
+      [
+       0.75,
+       8.1
+      ]
+     ],
+     "tag": "mesh-floor:chiba:16:2"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       5.7,
+       7.05
+      ],
+      [
+       10.35,
+       7.05
+      ],
+      [
+       10.35,
+       8.1
+      ],
+      [
+       5.7,
+       8.1
+      ]
+     ],
+     "tag": "mesh-floor:chiba:17:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       10.5,
+       7.05
+      ],
+      [
+       12.75,
+       7.05
+      ],
+      [
+       12.75,
+       8.1
+      ],
+      [
+       10.5,
+       8.1
+      ]
+     ],
+     "tag": "mesh-floor:chiba:18:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       -1.65,
+       5.85
+      ],
+      [
+       0.6,
+       5.85
+      ],
+      [
+       0.6,
+       6.9
+      ],
+      [
+       -1.65,
+       6.9
+      ]
+     ],
+     "tag": "mesh-floor:chiba:19:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       0.75,
+       5.85
+      ],
+      [
+       5.55,
+       5.85
+      ],
+      [
+       5.55,
+       6.9
+      ],
+      [
+       0.75,
+       6.9
+      ]
+     ],
+     "tag": "mesh-floor:chiba:20:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       5.7,
+       5.85
+      ],
+      [
+       10.35,
+       5.85
+      ],
+      [
+       10.35,
+       6.9
+      ],
+      [
+       5.7,
+       6.9
+      ]
+     ],
+     "tag": "mesh-floor:chiba:21:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       10.5,
+       5.85
+      ],
+      [
+       12.75,
+       5.85
+      ],
+      [
+       12.75,
+       6.9
+      ],
+      [
+       10.5,
+       6.9
+      ]
+     ],
+     "tag": "mesh-floor:chiba:22:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       -1.65,
+       0.75
+      ],
+      [
+       0.6,
+       0.75
+      ],
+      [
+       0.6,
+       1.8
+      ],
+      [
+       -1.65,
+       1.8
+      ]
+     ],
+     "tag": "mesh-floor:chiba:23:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       0.75,
+       0.75
+      ],
+      [
+       5.55,
+       0.75
+      ],
+      [
+       5.55,
+       1.8
+      ],
+      [
+       0.75,
+       1.8
+      ]
+     ],
+     "tag": "mesh-floor:chiba:24:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       5.7,
+       0.75
+      ],
+      [
+       10.35,
+       0.75
+      ],
+      [
+       10.35,
+       1.8
+      ],
+      [
+       5.7,
+       1.8
+      ]
+     ],
+     "tag": "mesh-floor:chiba:25:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       10.5,
+       0.75
+      ],
+      [
+       12.9,
+       0.75
+      ],
+      [
+       12.9,
+       1.8
+      ],
+      [
+       10.5,
+       1.8
+      ]
+     ],
+     "tag": "mesh-floor:chiba:26:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       -1.65,
+       -0.45
+      ],
+      [
+       0.6,
+       -0.45
+      ],
+      [
+       0.6,
+       0.6
+      ],
+      [
+       -1.65,
+       0.6
+      ]
+     ],
+     "tag": "mesh-floor:chiba:27:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       0.75,
+       -0.45
+      ],
+      [
+       5.55,
+       -0.45
+      ],
+      [
+       5.55,
+       0.6
+      ],
+      [
+       0.75,
+       0.6
+      ]
+     ],
+     "tag": "mesh-floor:chiba:28:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       5.7,
+       -0.45
+      ],
+      [
+       10.35,
+       -0.45
+      ],
+      [
+       10.35,
+       0.6
+      ],
+      [
+       5.7,
+       0.6
+      ]
+     ],
+     "tag": "mesh-floor:chiba:29:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       10.5,
+       -0.45
+      ],
+      [
+       12.9,
+       -0.45
+      ],
+      [
+       12.9,
+       0.6
+      ],
+      [
+       10.5,
+       0.6
+      ]
+     ],
+     "tag": "mesh-floor:chiba:30:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       -1.65,
+       -1.65
+      ],
+      [
+       0.6,
+       -1.65
+      ],
+      [
+       0.6,
+       -0.6
+      ],
+      [
+       -1.65,
+       -0.6
+      ]
+     ],
+     "tag": "mesh-floor:chiba:31:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       0.75,
+       -1.65
+      ],
+      [
+       5.55,
+       -1.65
+      ],
+      [
+       5.55,
+       -0.6
+      ],
+      [
+       0.75,
+       -0.6
+      ]
+     ],
+     "tag": "mesh-floor:chiba:32:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       5.7,
+       -1.65
+      ],
+      [
+       10.35,
+       -1.65
+      ],
+      [
+       10.35,
+       -0.6
+      ],
+      [
+       5.7,
+       -0.6
+      ]
+     ],
+     "tag": "mesh-floor:chiba:33:0"
+    },
+    {
+     "level": 8,
+     "y": 3.251,
+     "polygon": [
+      [
+       10.5,
+       -1.65
+      ],
+      [
+       12.9,
+       -1.65
+      ],
+      [
+       12.9,
+       -0.6
+      ],
+      [
+       10.5,
+       -0.6
+      ]
+     ],
+     "tag": "mesh-floor:chiba:34:0"
+    },
+    {
+     "level": 8,
+     "y": 3.263,
+     "polygon": [
+      [
+       0.6,
+       2.1
+      ],
+      [
+       1.65,
+       2.1
+      ],
+      [
+       1.65,
+       5.55
+      ],
+      [
+       0.6,
+       5.55
+      ]
+     ],
+     "tag": "mesh-floor:chiba:35:0"
+    },
+    {
+     "level": 8,
+     "y": 3.263,
+     "polygon": [
+      [
+       -0.6,
+       2.1
+      ],
+      [
+       0.45,
+       2.1
+      ],
+      [
+       0.45,
+       5.55
+      ],
+      [
+       -0.6,
+       5.55
+      ]
+     ],
+     "tag": "mesh-floor:chiba:36:0"
+    }
+   ],
+   "links": [
+    {
+     "id": "mesh-step:2:11:0",
+     "kind": "stairs",
+     "from": 0,
+     "to": 1,
+     "path": [
+      [
+       8.4,
+       1
+      ],
+      [
+       8.4,
+       2.62
+      ]
+     ],
+     "width": 0.68,
+     "y0": 0.373,
+     "y1": 0.742
+    },
+    {
+     "id": "mesh-step:11:13:1",
+     "kind": "stairs",
+     "from": 1,
+     "to": 2,
+     "path": [
+      [
+       8.47,
+       3.825
+      ],
+      [
+       7.28,
+       3.825
+      ]
+     ],
+     "width": 0.68,
+     "y0": 0.742,
+     "y1": 1.123
+    },
+    {
+     "id": "mesh-step:13:15:2",
+     "kind": "stairs",
+     "from": 2,
+     "to": 3,
+     "path": [
+      [
+       7.42,
+       3.825
+      ],
+      [
+       6.23,
+       3.825
+      ]
+     ],
+     "width": 0.68,
+     "y0": 1.123,
+     "y1": 1.504
+    },
+    {
+     "id": "mesh-step:15:17:3",
+     "kind": "stairs",
+     "from": 3,
+     "to": 4,
+     "path": [
+      [
+       6.37,
+       3.825
+      ],
+      [
+       5.33,
+       3.825
+      ]
+     ],
+     "width": 0.68,
+     "y0": 1.504,
+     "y1": 1.89
+    },
+    {
+     "id": "mesh-step:17:19:4",
+     "kind": "stairs",
+     "from": 4,
+     "to": 5,
+     "path": [
+      [
+       5.32,
+       3.825
+      ],
+      [
+       4.28,
+       3.825
+      ]
+     ],
+     "width": 0.68,
+     "y0": 1.89,
+     "y1": 2.265
+    },
+    {
+     "id": "mesh-step:19:21:5",
+     "kind": "stairs",
+     "from": 5,
+     "to": 6,
+     "path": [
+      [
+       4.27,
+       3.825
+      ],
+      [
+       3.23,
+       3.825
+      ]
+     ],
+     "width": 0.68,
+     "y0": 2.265,
+     "y1": 2.654
+    },
+    {
+     "id": "mesh-step:21:23:6",
+     "kind": "stairs",
+     "from": 6,
+     "to": 7,
+     "path": [
+      [
+       3.37,
+       3.825
+      ],
+      [
+       2.18,
+       3.825
+      ]
+     ],
+     "width": 0.68,
+     "y0": 2.654,
+     "y1": 3.03
+    },
+    {
+     "id": "mesh-step:23:49:7",
+     "kind": "stairs",
+     "from": 7,
+     "to": 8,
+     "path": [
+      [
+       2.17,
+       3.825
+      ],
+      [
+       1.13,
+       3.825
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.03,
+     "y1": 3.263
+    },
+    {
+     "id": "mesh-step:3:11:8",
+     "kind": "stairs",
+     "from": 0,
+     "to": 1,
+     "path": [
+      [
+       8.4,
+       6.65
+      ],
+      [
+       8.4,
+       5.03
+      ]
+     ],
+     "width": 0.68,
+     "y0": 0.373,
+     "y1": 0.742
+    },
+    {
+     "id": "mesh-step:49:33:9",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       1.2,
+       5.03
+      ],
+      [
+       1.2,
+       6.37
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.263,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:49:37:10",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       1.2,
+       2.62
+      ],
+      [
+       1.2,
+       1.28
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.263,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:49:50:11",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       1.12,
+       3.825
+      ],
+      [
+       -0.07,
+       3.825
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.263,
+     "y1": 3.263
+    },
+    {
+     "id": "mesh-step:33:29:12",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       3.15,
+       6.38
+      ],
+      [
+       3.15,
+       7.57
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:33:32:13",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       1.27,
+       6.375
+      ],
+      [
+       0.08,
+       6.375
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:33:34:14",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       5.03,
+       6.375
+      ],
+      [
+       6.22,
+       6.375
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:37:36:15",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       1.27,
+       1.275
+      ],
+      [
+       0.08,
+       1.275
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:37:38:16",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       5.03,
+       1.275
+      ],
+      [
+       6.22,
+       1.275
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:37:41:17",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       3.15,
+       1.27
+      ],
+      [
+       3.15,
+       0.08
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:29:25:18",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       3.15,
+       7.58
+      ],
+      [
+       3.15,
+       8.77
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:29:28:19",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       1.27,
+       7.575
+      ],
+      [
+       0.08,
+       7.575
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:29:30:20",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       5.03,
+       7.575
+      ],
+      [
+       6.22,
+       7.575
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:34:35:21",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       9.83,
+       6.375
+      ],
+      [
+       11.02,
+       6.375
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:36:40:22",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       -0.525,
+       1.27
+      ],
+      [
+       -0.525,
+       0.08
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:38:39:23",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       9.83,
+       1.275
+      ],
+      [
+       11.02,
+       1.275
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:38:42:24",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       8.025,
+       1.27
+      ],
+      [
+       8.025,
+       0.08
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:41:45:25",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       3.15,
+       0.07
+      ],
+      [
+       3.15,
+       -1.12
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:25:24:26",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       1.27,
+       8.775
+      ],
+      [
+       0.08,
+       8.775
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:25:26:27",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       5.03,
+       8.775
+      ],
+      [
+       6.22,
+       8.775
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:30:31:28",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       9.83,
+       7.575
+      ],
+      [
+       11.02,
+       7.575
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:40:44:29",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       -0.525,
+       0.07
+      ],
+      [
+       -0.525,
+       -1.12
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:39:43:30",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       11.7,
+       1.27
+      ],
+      [
+       11.7,
+       0.08
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:42:46:31",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       8.025,
+       0.07
+      ],
+      [
+       8.025,
+       -1.12
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:26:27:32",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       9.83,
+       8.775
+      ],
+      [
+       11.02,
+       8.775
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    },
+    {
+     "id": "mesh-step:43:47:33",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       11.7,
+       0.07
+      ],
+      [
+       11.7,
+       -1.12
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.251,
+     "y1": 3.251
+    }
+   ],
+   "access": [
+    {
+     "from": 2,
+     "to": 11,
+     "rise": 0.369,
+     "axis": 1,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 11,
+     "to": 13,
+     "rise": 0.381,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 13,
+     "to": 15,
+     "rise": 0.381,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 15,
+     "to": 17,
+     "rise": 0.386,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 17,
+     "to": 19,
+     "rise": 0.375,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 19,
+     "to": 21,
+     "rise": 0.389,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 21,
+     "to": 23,
+     "rise": 0.376,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 23,
+     "to": 49,
+     "rise": 0.233,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 3,
+     "to": 11,
+     "rise": 0.369,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 49,
+     "to": 33,
+     "rise": -0.012,
+     "axis": 1,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 49,
+     "to": 37,
+     "rise": -0.012,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 49,
+     "to": 50,
+     "rise": 0,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 33,
+     "to": 29,
+     "rise": 0,
+     "axis": 1,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 33,
+     "to": 32,
+     "rise": 0,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 33,
+     "to": 34,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 37,
+     "to": 36,
+     "rise": 0,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 37,
+     "to": 38,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 37,
+     "to": 41,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 29,
+     "to": 25,
+     "rise": 0,
+     "axis": 1,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 29,
+     "to": 28,
+     "rise": 0,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 29,
+     "to": 30,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 34,
+     "to": 35,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 36,
+     "to": 40,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 38,
+     "to": 39,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 38,
+     "to": 42,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 41,
+     "to": 45,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 25,
+     "to": 24,
+     "rise": 0,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 25,
+     "to": 26,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 30,
+     "to": 31,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 40,
+     "to": 44,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 39,
+     "to": 43,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 42,
+     "to": 46,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 26,
+     "to": 27,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 43,
+     "to": 47,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
     }
    ],
    "patches": [
@@ -2654,6 +6512,237 @@
      "area": 42.9075,
      "nodes": [
       "wood_component-0006"
+     ]
+    },
+    {
+     "y": 0.742,
+     "area": 3.105,
+     "nodes": [
+      "wood_component-0006"
+     ]
+    },
+    {
+     "y": 1.123,
+     "area": 3.105,
+     "nodes": [
+      "wood_component-0006"
+     ]
+    },
+    {
+     "y": 1.504,
+     "area": 3.105,
+     "nodes": [
+      "wood_component-0006"
+     ]
+    },
+    {
+     "y": 1.89,
+     "area": 3.6225,
+     "nodes": [
+      "wood_component-0006"
+     ]
+    },
+    {
+     "y": 2.265,
+     "area": 3.6225,
+     "nodes": [
+      "wood_component-0006"
+     ]
+    },
+    {
+     "y": 2.654,
+     "area": 3.105,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.03,
+     "area": 3.6225,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 5.04,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 4.8825,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 4.995,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 4.8825,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 5.04,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 4.8825,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 5.04,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 4.8825,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 2.52,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 5.04,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 4.8825,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 2.52,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 5.04,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 4.8825,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.251,
+     "area": 2.52,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.263,
+     "area": 3.6225,
+     "nodes": [
+      "wood_component-0013"
+     ]
+    },
+    {
+     "y": 3.263,
+     "area": 3.6225,
+     "nodes": [
+      "wood_component-0013"
      ]
     }
    ],
@@ -2694,18 +6783,8 @@
      "reason": "no proven entrance or stair link"
     },
     {
-     "y": 0.742,
-     "area": 3.105,
-     "reason": "no proven entrance or stair link"
-    },
-    {
      "y": 0.932,
      "area": 2.7,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 1.123,
-     "area": 3.105,
      "reason": "no proven entrance or stair link"
     },
     {
@@ -2714,18 +6793,8 @@
      "reason": "no proven entrance or stair link"
     },
     {
-     "y": 1.504,
-     "area": 3.105,
-     "reason": "no proven entrance or stair link"
-    },
-    {
      "y": 1.703,
      "area": 2.7,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 1.89,
-     "area": 3.6225,
      "reason": "no proven entrance or stair link"
     },
     {
@@ -2734,18 +6803,8 @@
      "reason": "no proven entrance or stair link"
     },
     {
-     "y": 2.265,
-     "area": 3.6225,
-     "reason": "no proven entrance or stair link"
-    },
-    {
      "y": 2.477,
      "area": 2.7,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 2.654,
-     "area": 3.105,
      "reason": "no proven entrance or stair link"
     },
     {
@@ -2754,143 +6813,8 @@
      "reason": "no proven entrance or stair link"
     },
     {
-     "y": 3.03,
-     "area": 3.6225,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 5.04,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 4.8825,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 4.995,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 4.8825,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 5.04,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 4.8825,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 5.04,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 4.8825,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 2.52,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 5.04,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 4.8825,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 2.52,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 5.04,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 4.8825,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.251,
-     "area": 2.52,
-     "reason": "no proven entrance or stair link"
-    },
-    {
      "y": 3.251,
      "area": 3.3075,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.263,
-     "area": 3.6225,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.263,
-     "area": 3.6225,
      "reason": "no proven entrance or stair link"
     },
     {
@@ -2987,7 +6911,7 @@
    "geometryHash": "dc8e2ef6427e83d8e4b0c3274eb4bce368bba6f3d255b4d6cc042f0ff4eb1ab6",
    "cell": 0.15,
    "headroom": 1.8,
-   "entry": "terrain-step<=0.45m",
+   "entry": "terrain-step and verified three-rise flight",
    "surfaces": [
     {
      "level": 0,
@@ -4092,6 +8016,2071 @@
       ]
      ],
      "tag": "mesh-floor:chiba:3:19"
+    },
+    {
+     "level": 1,
+     "y": 0.743,
+     "polygon": [
+      [
+       7.95,
+       -1.5
+      ],
+      [
+       8.85,
+       -1.5
+      ],
+      [
+       8.85,
+       1.95
+      ],
+      [
+       7.95,
+       1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:4:0"
+    },
+    {
+     "level": 2,
+     "y": 1.123,
+     "polygon": [
+      [
+       6.9,
+       -1.5
+      ],
+      [
+       7.8,
+       -1.5
+      ],
+      [
+       7.8,
+       1.95
+      ],
+      [
+       6.9,
+       1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:5:0"
+    },
+    {
+     "level": 3,
+     "y": 1.504,
+     "polygon": [
+      [
+       5.85,
+       -1.5
+      ],
+      [
+       6.75,
+       -1.5
+      ],
+      [
+       6.75,
+       1.95
+      ],
+      [
+       5.85,
+       1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:6:0"
+    },
+    {
+     "level": 4,
+     "y": 1.89,
+     "polygon": [
+      [
+       4.8,
+       -1.5
+      ],
+      [
+       5.85,
+       -1.5
+      ],
+      [
+       5.85,
+       1.95
+      ],
+      [
+       4.8,
+       1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:7:0"
+    },
+    {
+     "level": 5,
+     "y": 2.266,
+     "polygon": [
+      [
+       3.75,
+       -1.5
+      ],
+      [
+       4.8,
+       -1.5
+      ],
+      [
+       4.8,
+       1.95
+      ],
+      [
+       3.75,
+       1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:8:0"
+    },
+    {
+     "level": 6,
+     "y": 2.653,
+     "polygon": [
+      [
+       2.85,
+       -1.65
+      ],
+      [
+       3.45,
+       -1.65
+      ],
+      [
+       3.45,
+       1.95
+      ],
+      [
+       2.85,
+       1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:9:0"
+    },
+    {
+     "level": 6,
+     "y": 2.653,
+     "polygon": [
+      [
+       3.45,
+       -1.5
+      ],
+      [
+       3.75,
+       -1.5
+      ],
+      [
+       3.75,
+       1.95
+      ],
+      [
+       3.45,
+       1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:9:1"
+    },
+    {
+     "level": 7,
+     "y": 3.03,
+     "polygon": [
+      [
+       1.65,
+       -1.65
+      ],
+      [
+       2.7,
+       -1.65
+      ],
+      [
+       2.7,
+       1.95
+      ],
+      [
+       1.65,
+       1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:10:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       -1.65,
+       4.65
+      ],
+      [
+       0.6,
+       4.65
+      ],
+      [
+       0.6,
+       5.7
+      ],
+      [
+       -1.65,
+       5.7
+      ]
+     ],
+     "tag": "mesh-floor:chiba:11:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       0.75,
+       4.65
+      ],
+      [
+       5.55,
+       4.65
+      ],
+      [
+       5.55,
+       5.7
+      ],
+      [
+       0.75,
+       5.7
+      ]
+     ],
+     "tag": "mesh-floor:chiba:12:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       5.7,
+       4.65
+      ],
+      [
+       10.35,
+       4.65
+      ],
+      [
+       10.35,
+       5.7
+      ],
+      [
+       5.7,
+       5.7
+      ]
+     ],
+     "tag": "mesh-floor:chiba:13:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       10.5,
+       4.65
+      ],
+      [
+       12.75,
+       4.65
+      ],
+      [
+       12.75,
+       5.7
+      ],
+      [
+       10.5,
+       5.7
+      ]
+     ],
+     "tag": "mesh-floor:chiba:14:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       -1.65,
+       3.3
+      ],
+      [
+       0.6,
+       3.3
+      ],
+      [
+       0.6,
+       3.75
+      ],
+      [
+       -1.65,
+       3.75
+      ]
+     ],
+     "tag": "mesh-floor:chiba:15:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       -1.65,
+       3.75
+      ],
+      [
+       -0.45,
+       3.75
+      ],
+      [
+       -0.45,
+       4.5
+      ],
+      [
+       -1.65,
+       4.5
+      ]
+     ],
+     "tag": "mesh-floor:chiba:15:1"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       -0.15,
+       3.75
+      ],
+      [
+       0,
+       3.75
+      ],
+      [
+       0,
+       4.5
+      ],
+      [
+       -0.15,
+       4.5
+      ]
+     ],
+     "tag": "mesh-floor:chiba:15:2"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       0.3,
+       3.75
+      ],
+      [
+       0.6,
+       3.75
+      ],
+      [
+       0.6,
+       4.5
+      ],
+      [
+       0.3,
+       4.5
+      ]
+     ],
+     "tag": "mesh-floor:chiba:15:3"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       -0.45,
+       3.9
+      ],
+      [
+       -0.15,
+       3.9
+      ],
+      [
+       -0.15,
+       4.5
+      ],
+      [
+       -0.45,
+       4.5
+      ]
+     ],
+     "tag": "mesh-floor:chiba:15:4"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       0,
+       3.9
+      ],
+      [
+       0.3,
+       3.9
+      ],
+      [
+       0.3,
+       4.5
+      ],
+      [
+       0,
+       4.5
+      ]
+     ],
+     "tag": "mesh-floor:chiba:15:5"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       0.75,
+       3.3
+      ],
+      [
+       2.4,
+       3.3
+      ],
+      [
+       2.4,
+       3.9
+      ],
+      [
+       0.75,
+       3.9
+      ]
+     ],
+     "tag": "mesh-floor:chiba:16:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       2.4,
+       3.45
+      ],
+      [
+       5.55,
+       3.45
+      ],
+      [
+       5.55,
+       4.5
+      ],
+      [
+       2.4,
+       4.5
+      ]
+     ],
+     "tag": "mesh-floor:chiba:16:1"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       0.9,
+       3.9
+      ],
+      [
+       2.4,
+       3.9
+      ],
+      [
+       2.4,
+       4.5
+      ],
+      [
+       0.9,
+       4.5
+      ]
+     ],
+     "tag": "mesh-floor:chiba:16:2"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       0.75,
+       4.05
+      ],
+      [
+       0.9,
+       4.05
+      ],
+      [
+       0.9,
+       4.5
+      ],
+      [
+       0.75,
+       4.5
+      ]
+     ],
+     "tag": "mesh-floor:chiba:16:3"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       0.75,
+       2.1
+      ],
+      [
+       5.55,
+       2.1
+      ],
+      [
+       5.55,
+       3.15
+      ],
+      [
+       0.75,
+       3.15
+      ]
+     ],
+     "tag": "mesh-floor:chiba:17:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       3.6,
+       3.15
+      ],
+      [
+       5.55,
+       3.15
+      ],
+      [
+       5.55,
+       3.3
+      ],
+      [
+       3.6,
+       3.3
+      ]
+     ],
+     "tag": "mesh-floor:chiba:17:1"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       5.7,
+       3.45
+      ],
+      [
+       10.35,
+       3.45
+      ],
+      [
+       10.35,
+       4.5
+      ],
+      [
+       5.7,
+       4.5
+      ]
+     ],
+     "tag": "mesh-floor:chiba:18:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       10.5,
+       3.45
+      ],
+      [
+       12.75,
+       3.45
+      ],
+      [
+       12.75,
+       4.5
+      ],
+      [
+       10.5,
+       4.5
+      ]
+     ],
+     "tag": "mesh-floor:chiba:19:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       -1.65,
+       2.1
+      ],
+      [
+       0.6,
+       2.1
+      ],
+      [
+       0.6,
+       3.15
+      ],
+      [
+       -1.65,
+       3.15
+      ]
+     ],
+     "tag": "mesh-floor:chiba:20:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       5.7,
+       2.1
+      ],
+      [
+       10.35,
+       2.1
+      ],
+      [
+       10.35,
+       3.3
+      ],
+      [
+       5.7,
+       3.3
+      ]
+     ],
+     "tag": "mesh-floor:chiba:21:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       10.5,
+       2.25
+      ],
+      [
+       12.75,
+       2.25
+      ],
+      [
+       12.75,
+       3.3
+      ],
+      [
+       10.5,
+       3.3
+      ]
+     ],
+     "tag": "mesh-floor:chiba:22:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       -1.65,
+       -2.85
+      ],
+      [
+       0.6,
+       -2.85
+      ],
+      [
+       0.6,
+       -1.8
+      ],
+      [
+       -1.65,
+       -1.8
+      ]
+     ],
+     "tag": "mesh-floor:chiba:23:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       0.75,
+       -2.85
+      ],
+      [
+       5.55,
+       -2.85
+      ],
+      [
+       5.55,
+       -1.8
+      ],
+      [
+       0.75,
+       -1.8
+      ]
+     ],
+     "tag": "mesh-floor:chiba:24:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       5.7,
+       -2.85
+      ],
+      [
+       10.35,
+       -2.85
+      ],
+      [
+       10.35,
+       -1.8
+      ],
+      [
+       5.7,
+       -1.8
+      ]
+     ],
+     "tag": "mesh-floor:chiba:25:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       10.5,
+       -2.85
+      ],
+      [
+       12.9,
+       -2.85
+      ],
+      [
+       12.9,
+       -1.95
+      ],
+      [
+       10.5,
+       -1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:26:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       10.5,
+       -1.95
+      ],
+      [
+       12.75,
+       -1.95
+      ],
+      [
+       12.75,
+       -1.8
+      ],
+      [
+       10.5,
+       -1.8
+      ]
+     ],
+     "tag": "mesh-floor:chiba:26:1"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       -1.65,
+       -4.05
+      ],
+      [
+       0.6,
+       -4.05
+      ],
+      [
+       0.6,
+       -3
+      ],
+      [
+       -1.65,
+       -3
+      ]
+     ],
+     "tag": "mesh-floor:chiba:27:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       0.75,
+       -4.05
+      ],
+      [
+       5.55,
+       -4.05
+      ],
+      [
+       5.55,
+       -3
+      ],
+      [
+       0.75,
+       -3
+      ]
+     ],
+     "tag": "mesh-floor:chiba:28:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       5.7,
+       -4.05
+      ],
+      [
+       10.35,
+       -4.05
+      ],
+      [
+       10.35,
+       -3
+      ],
+      [
+       5.7,
+       -3
+      ]
+     ],
+     "tag": "mesh-floor:chiba:29:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       10.5,
+       -4.05
+      ],
+      [
+       12.9,
+       -4.05
+      ],
+      [
+       12.9,
+       -3
+      ],
+      [
+       10.5,
+       -3
+      ]
+     ],
+     "tag": "mesh-floor:chiba:30:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       -1.65,
+       -5.4
+      ],
+      [
+       -1.5,
+       -5.4
+      ],
+      [
+       -1.5,
+       -4.2
+      ],
+      [
+       -1.65,
+       -4.2
+      ]
+     ],
+     "tag": "mesh-floor:chiba:31:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       -1.5,
+       -5.25
+      ],
+      [
+       0.6,
+       -5.25
+      ],
+      [
+       0.6,
+       -4.2
+      ],
+      [
+       -1.5,
+       -4.2
+      ]
+     ],
+     "tag": "mesh-floor:chiba:31:1"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       0.75,
+       -5.25
+      ],
+      [
+       5.55,
+       -5.25
+      ],
+      [
+       5.55,
+       -4.2
+      ],
+      [
+       0.75,
+       -4.2
+      ]
+     ],
+     "tag": "mesh-floor:chiba:32:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       5.7,
+       -5.25
+      ],
+      [
+       10.35,
+       -5.25
+      ],
+      [
+       10.35,
+       -4.2
+      ],
+      [
+       5.7,
+       -4.2
+      ]
+     ],
+     "tag": "mesh-floor:chiba:33:0"
+    },
+    {
+     "level": 8,
+     "y": 3.247,
+     "polygon": [
+      [
+       10.5,
+       -5.25
+      ],
+      [
+       12.9,
+       -5.25
+      ],
+      [
+       12.9,
+       -4.2
+      ],
+      [
+       10.5,
+       -4.2
+      ]
+     ],
+     "tag": "mesh-floor:chiba:34:0"
+    },
+    {
+     "level": 8,
+     "y": 3.263,
+     "polygon": [
+      [
+       0.6,
+       -1.65
+      ],
+      [
+       1.65,
+       -1.65
+      ],
+      [
+       1.65,
+       1.95
+      ],
+      [
+       0.6,
+       1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:35:0"
+    },
+    {
+     "level": 8,
+     "y": 3.263,
+     "polygon": [
+      [
+       -0.6,
+       -1.65
+      ],
+      [
+       0.45,
+       -1.65
+      ],
+      [
+       0.45,
+       1.95
+      ],
+      [
+       -0.6,
+       1.95
+      ]
+     ],
+     "tag": "mesh-floor:chiba:36:0"
+    }
+   ],
+   "links": [
+    {
+     "id": "mesh-step:1:5:0",
+     "kind": "stairs",
+     "from": 0,
+     "to": 1,
+     "path": [
+      [
+       9.65,
+       0.225
+      ],
+      [
+       8.33,
+       0.225
+      ]
+     ],
+     "width": 0.68,
+     "y0": 0.374,
+     "y1": 0.743
+    },
+    {
+     "id": "mesh-step:5:8:1",
+     "kind": "stairs",
+     "from": 1,
+     "to": 2,
+     "path": [
+      [
+       8.47,
+       0.225
+      ],
+      [
+       7.28,
+       0.225
+      ]
+     ],
+     "width": 0.68,
+     "y0": 0.743,
+     "y1": 1.123
+    },
+    {
+     "id": "mesh-step:8:10:2",
+     "kind": "stairs",
+     "from": 2,
+     "to": 3,
+     "path": [
+      [
+       7.42,
+       0.225
+      ],
+      [
+       6.23,
+       0.225
+      ]
+     ],
+     "width": 0.68,
+     "y0": 1.123,
+     "y1": 1.504
+    },
+    {
+     "id": "mesh-step:10:12:3",
+     "kind": "stairs",
+     "from": 3,
+     "to": 4,
+     "path": [
+      [
+       6.37,
+       0.225
+      ],
+      [
+       5.33,
+       0.225
+      ]
+     ],
+     "width": 0.68,
+     "y0": 1.504,
+     "y1": 1.89
+    },
+    {
+     "id": "mesh-step:12:14:4",
+     "kind": "stairs",
+     "from": 4,
+     "to": 5,
+     "path": [
+      [
+       5.32,
+       0.225
+      ],
+      [
+       4.28,
+       0.225
+      ]
+     ],
+     "width": 0.68,
+     "y0": 1.89,
+     "y1": 2.266
+    },
+    {
+     "id": "mesh-step:14:16:5",
+     "kind": "stairs",
+     "from": 5,
+     "to": 6,
+     "path": [
+      [
+       4.27,
+       0.225
+      ],
+      [
+       3.23,
+       0.225
+      ]
+     ],
+     "width": 0.68,
+     "y0": 2.266,
+     "y1": 2.653
+    },
+    {
+     "id": "mesh-step:16:18:6",
+     "kind": "stairs",
+     "from": 6,
+     "to": 7,
+     "path": [
+      [
+       3.37,
+       0.15
+      ],
+      [
+       2.18,
+       0.15
+      ]
+     ],
+     "width": 0.68,
+     "y0": 2.653,
+     "y1": 3.03
+    },
+    {
+     "id": "mesh-step:18:44:7",
+     "kind": "stairs",
+     "from": 7,
+     "to": 8,
+     "path": [
+      [
+       2.17,
+       0.15
+      ],
+      [
+       1.13,
+       0.15
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.03,
+     "y1": 3.263
+    },
+    {
+     "id": "mesh-step:2:5:8",
+     "kind": "stairs",
+     "from": 0,
+     "to": 1,
+     "path": [
+      [
+       8.4,
+       -2.6
+      ],
+      [
+       8.4,
+       -0.98
+      ]
+     ],
+     "width": 0.68,
+     "y0": 0.374,
+     "y1": 0.743
+    },
+    {
+     "id": "mesh-step:3:5:9",
+     "kind": "stairs",
+     "from": 0,
+     "to": 1,
+     "path": [
+      [
+       8.4,
+       3.05
+      ],
+      [
+       8.4,
+       1.43
+      ]
+     ],
+     "width": 0.68,
+     "y0": 0.374,
+     "y1": 0.743
+    },
+    {
+     "id": "mesh-step:44:25:10",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       1.2,
+       1.43
+      ],
+      [
+       1.2,
+       2.62
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.263,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:44:32:11",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       1.2,
+       -1.13
+      ],
+      [
+       1.2,
+       -2.32
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.263,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:44:45:12",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       1.12,
+       0.15
+      ],
+      [
+       -0.07,
+       0.15
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.263,
+     "y1": 3.263
+    },
+    {
+     "id": "mesh-step:25:24:13",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       3.15,
+       2.78
+      ],
+      [
+       3.15,
+       3.82
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:25:28:14",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       1.27,
+       2.625
+      ],
+      [
+       0.08,
+       2.625
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:25:29:15",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       5.03,
+       2.7
+      ],
+      [
+       6.22,
+       2.7
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:32:31:16",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       1.27,
+       -2.325
+      ],
+      [
+       0.08,
+       -2.325
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:32:33:17",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       5.03,
+       -2.325
+      ],
+      [
+       6.22,
+       -2.325
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:32:36:18",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       3.15,
+       -2.33
+      ],
+      [
+       3.15,
+       -3.52
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:24:20:19",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       3.15,
+       3.98
+      ],
+      [
+       3.15,
+       5.17
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:24:23:20",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       1.27,
+       3.9
+      ],
+      [
+       0.08,
+       3.9
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:24:26:21",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       5.03,
+       3.975
+      ],
+      [
+       6.22,
+       3.975
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:29:30:22",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       9.83,
+       2.775
+      ],
+      [
+       11.02,
+       2.775
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:31:35:23",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       -0.525,
+       -2.33
+      ],
+      [
+       -0.525,
+       -3.52
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:33:34:24",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       9.83,
+       -2.325
+      ],
+      [
+       11.02,
+       -2.325
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:33:37:25",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       8.025,
+       -2.33
+      ],
+      [
+       8.025,
+       -3.52
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:36:40:26",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       3.15,
+       -3.53
+      ],
+      [
+       3.15,
+       -4.72
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:20:19:27",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       1.27,
+       5.175
+      ],
+      [
+       0.08,
+       5.175
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:20:21:28",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       5.03,
+       5.175
+      ],
+      [
+       6.22,
+       5.175
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:26:27:29",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       9.83,
+       3.975
+      ],
+      [
+       11.02,
+       3.975
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:35:39:30",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       -0.525,
+       -3.53
+      ],
+      [
+       -0.525,
+       -4.72
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:34:38:31",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       11.7,
+       -2.33
+      ],
+      [
+       11.7,
+       -3.52
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:37:41:32",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       8.025,
+       -3.53
+      ],
+      [
+       8.025,
+       -4.72
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:21:22:33",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       9.83,
+       5.175
+      ],
+      [
+       11.02,
+       5.175
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:38:42:34",
+     "kind": "stairs",
+     "from": 8,
+     "to": 8,
+     "path": [
+      [
+       11.7,
+       -3.53
+      ],
+      [
+       11.7,
+       -4.72
+      ]
+     ],
+     "width": 0.68,
+     "y0": 3.247,
+     "y1": 3.247
+    },
+    {
+     "id": "mesh-step:1:5:35",
+     "kind": "stairs",
+     "from": 0,
+     "to": 1,
+     "path": [
+      [
+       9.65,
+       -0.375
+      ],
+      [
+       8.33,
+       -0.375
+      ]
+     ],
+     "width": 0.68,
+     "y0": 0.374,
+     "y1": 0.743
+    },
+    {
+     "id": "mesh-step:1:5:36",
+     "kind": "stairs",
+     "from": 0,
+     "to": 1,
+     "path": [
+      [
+       9.65,
+       0.825
+      ],
+      [
+       8.33,
+       0.825
+      ]
+     ],
+     "width": 0.68,
+     "y0": 0.374,
+     "y1": 0.743
+    },
+    {
+     "id": "mesh-step:1:5:37",
+     "kind": "stairs",
+     "from": 0,
+     "to": 1,
+     "path": [
+      [
+       9.65,
+       1.425
+      ],
+      [
+       8.33,
+       1.425
+      ]
+     ],
+     "width": 0.68,
+     "y0": 0.374,
+     "y1": 0.743
+    }
+   ],
+   "access": [
+    {
+     "from": 1,
+     "to": 5,
+     "rise": 0.369,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 5,
+     "to": 8,
+     "rise": 0.38,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 8,
+     "to": 10,
+     "rise": 0.381,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 10,
+     "to": 12,
+     "rise": 0.386,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 12,
+     "to": 14,
+     "rise": 0.376,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 14,
+     "to": 16,
+     "rise": 0.387,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 16,
+     "to": 18,
+     "rise": 0.377,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 18,
+     "to": 44,
+     "rise": 0.233,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 2,
+     "to": 5,
+     "rise": 0.369,
+     "axis": 1,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 3,
+     "to": 5,
+     "rise": 0.369,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 44,
+     "to": 25,
+     "rise": -0.016,
+     "axis": 1,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 44,
+     "to": 32,
+     "rise": -0.016,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 44,
+     "to": 45,
+     "rise": 0,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 25,
+     "to": 24,
+     "rise": 0,
+     "axis": 1,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 25,
+     "to": 28,
+     "rise": 0,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 25,
+     "to": 29,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 32,
+     "to": 31,
+     "rise": 0,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 32,
+     "to": 33,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 32,
+     "to": 36,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 24,
+     "to": 20,
+     "rise": 0,
+     "axis": 1,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 24,
+     "to": 23,
+     "rise": 0,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 24,
+     "to": 26,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 29,
+     "to": 30,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 31,
+     "to": 35,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 33,
+     "to": 34,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 33,
+     "to": 37,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 36,
+     "to": 40,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 20,
+     "to": 19,
+     "rise": 0,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 20,
+     "to": 21,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 26,
+     "to": 27,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 35,
+     "to": 39,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 34,
+     "to": 38,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 37,
+     "to": 41,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 21,
+     "to": 22,
+     "rise": 0,
+     "axis": 0,
+     "direction": 1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 38,
+     "to": 42,
+     "rise": 0,
+     "axis": 1,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 1,
+     "to": 5,
+     "rise": 0.369,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 1,
+     "to": 5,
+     "rise": 0.369,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
+    },
+    {
+     "from": 1,
+     "to": 5,
+     "rise": 0.369,
+     "axis": 0,
+     "direction": -1,
+     "proof": "three-rise flight or mesh-supported landing seam"
     }
    ],
    "patches": [
@@ -4122,17 +10111,243 @@
      "nodes": [
       "wood_component-0751"
      ]
+    },
+    {
+     "y": 0.743,
+     "area": 3.105,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 1.123,
+     "area": 3.105,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 1.504,
+     "area": 3.105,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 1.89,
+     "area": 3.6225,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 2.266,
+     "area": 3.6225,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 2.653,
+     "area": 3.195,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.03,
+     "area": 3.78,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 5.04,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 4.8825,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.61,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 5.265,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 5.3325,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 4.8825,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 5.58,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 5.04,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 4.8825,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.4975,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.3625,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 5.04,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 4.8825,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.52,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.385,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 5.04,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 4.8825,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.247,
+     "area": 2.52,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.263,
+     "area": 3.78,
+     "nodes": [
+      "wood_component-0751"
+     ]
+    },
+    {
+     "y": 3.263,
+     "area": 3.78,
+     "nodes": [
+      "wood_component-0751"
+     ]
     }
    ],
    "rejected": [
     {
      "y": 0.546,
      "area": 2.7,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 0.743,
-     "area": 3.105,
      "reason": "no proven entrance or stair link"
     },
     {
@@ -4146,18 +10361,8 @@
      "reason": "no proven entrance or stair link"
     },
     {
-     "y": 1.123,
-     "area": 3.105,
-     "reason": "no proven entrance or stair link"
-    },
-    {
      "y": 1.317,
      "area": 2.7,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 1.504,
-     "area": 3.105,
      "reason": "no proven entrance or stair link"
     },
     {
@@ -4166,18 +10371,8 @@
      "reason": "no proven entrance or stair link"
     },
     {
-     "y": 1.89,
-     "area": 3.6225,
-     "reason": "no proven entrance or stair link"
-    },
-    {
      "y": 2.089,
      "area": 2.7,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 2.266,
-     "area": 3.6225,
      "reason": "no proven entrance or stair link"
     },
     {
@@ -4186,153 +10381,13 @@
      "reason": "no proven entrance or stair link"
     },
     {
-     "y": 2.653,
-     "area": 3.195,
-     "reason": "no proven entrance or stair link"
-    },
-    {
      "y": 2.86,
      "area": 2.7,
      "reason": "no proven entrance or stair link"
     },
     {
-     "y": 3.03,
-     "area": 3.78,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 5.04,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 4.8825,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.61,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 5.265,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 5.3325,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 4.8825,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 5.58,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 5.04,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 4.8825,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.4975,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.3625,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 5.04,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 4.8825,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.52,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.385,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 5.04,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 4.8825,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.247,
-     "area": 2.52,
-     "reason": "no proven entrance or stair link"
-    },
-    {
      "y": 3.247,
      "area": 3.3075,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.263,
-     "area": 3.78,
-     "reason": "no proven entrance or stair link"
-    },
-    {
-     "y": 3.263,
-     "area": 3.78,
      "reason": "no proven entrance or stair link"
     },
     {

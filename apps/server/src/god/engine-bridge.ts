@@ -476,7 +476,7 @@ export class EngineBridge {
     // solids: wall segments and blocks (solid layer only; a def's own stair treads are walked by its links)
     if ((def.layer === 'solid' || def.layer === 'surface') && baked.colliders.length) {
       const fp = this.model.footprint(e, def);
-      const solids = fp.map((o, i) => ({ o, local: baked.colliders[i] })).filter(({ local }) => !(baked.links?.length && local.y1 - local.y0 <= 0.5));
+      const solids = fp.map((o, i) => ({ o, local: baked.colliders[i] })).filter(({ local }) => !(baked.links?.some(l => !l.id.startsWith('mesh-step:')) && local.y1 - local.y0 <= 0.5));
       // E-life B7: a god balloon is depiction; its body on the ground is the native ride installed at its spot (rides.ts)
       const nativeRide = !!(def.components as Record<string, unknown>).carrier && def.tags.includes('balloon');
       // door-raster/1 (lane RT): a building/1 wall piece at least a raster cell thick rasters by its cell centres, so its
@@ -550,7 +550,8 @@ export class EngineBridge {
       const n = Math.max(2, Math.ceil(Math.abs(yb - ya) / 0.18) + 1), path: [number, number, number][] = [];
       for (let k = 0; k < n; k++) { const t = k / (n - 1); path.push([r3(a[0] + (b[0] - a[0]) * t), r3(ya + (yb - ya) * t), r3(a[1] + (b[1] - a[1]) * t)]); }
       const kind = l.kind === 'float' ? 'climb' : l.kind;
-      const la = levelOn(ya, a), lb = levelOn(yb, b);
+      const linkLevel = l.id.startsWith('mesh-step:') ? plateLevel : levelOn;
+      const la = linkLevel(ya, a), lb = linkLevel(yb, b);
       return { id: `${e.id}#${l.id}`, kind: kind as 'stairs' | 'ramp' | 'ladder' | 'climb', from: { level: la, p: a, y: ya }, to: { level: lb, p: b, y: yb }, width: r3(l.width * wp.s), heading: r3(Math.atan2(b[1] - a[1], b[0] - a[0])), path, usable: true,
         ...(helix ? { approach: { from: toWorld(...helix.stepFrom), to: toWorld(...helix.stepTo) } } : {}) };
     });
@@ -576,6 +577,10 @@ export class EngineBridge {
       part.fixture = { def: aid, kind: 'fixture', label: titleOf(e) ?? (e.name ?? def.name.replace(/^core-/, '')).replace(/-/g, ' '), p: [r3(wp.x), r3(wp.y), r3(wp.z)], yaw: r3(-wp.yaw), support: { kind: 'ground' } };
     }
     if (part.solids || part.surfaces || part.links) withLinkApproaches(part);
+    // Extracted tread endpoints already sit a full body radius inside their
+    // supporting patches. A generic 0.7 m run-up falls off these narrow treads.
+    // Native link-edge tests still validate both endpoints against live obstacles.
+    for (const l of part.links ?? []) if (l.id.includes('#mesh-step:')) l.approach = {from: l.from.p, to: l.to.p};
     return part.solids || part.surfaces || part.links || part.fixture ? part : null;
   }
   /** Floors (2026-10-26): the measured floor plates (floor-plates.ts) of placed things within `radius` of `at`, in world

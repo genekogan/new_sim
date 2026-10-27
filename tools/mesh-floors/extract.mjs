@@ -6,6 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {readFileSync,writeFileSync,readdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {extractFloorPatches} from './geometry.mjs';
+import {stairAccess} from './steps.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'../..'),req=createRequire(resolve(root,'apps/server/package.json'));
 const {NodeIO}=req('@gltf-transform/core');
 const req2=createRequire(req.resolve('@gltf-transform/functions'));
@@ -31,9 +32,11 @@ for(const name of names)for(const [hash,asset] of Object.entries(assets).filter(
  const ext=min.map((v,i)=>max[i]-v),fitAxis=ext.indexOf(Math.max(...ext));
  const scale=def.size.box[fitAxis]/ext[fitAxis],origin=[(min[0]+max[0])/2,min[1],(min[2]+max[2])/2];
  for(const t of triangles)t.points=t.points.map(p=>p.map((v,i)=>(v-origin[i])*scale));
- const result=extractFloorPatches(triangles),accepted=result.patches.filter(p=>p.y>=-.05&&p.y<=.45);
- const surfaces=accepted.flatMap((p,i)=>p.polygons.map((polygon,j)=>({level:0,y:p.y,polygon,tag:`mesh-floor:${name}:${i}:${j}`})));
- output.assets[hash]={name:def.name,box:def.size.box,fitAxis,source:asset.path,geometryHash:sha(JSON.stringify(triangles)),cell:result.cell,headroom:result.headroom,entry:'terrain-step<=0.45m',surfaces,patches:accepted.map(p=>({y:p.y,area:p.area,nodes:p.nodes})),rejected:result.patches.filter(p=>!accepted.includes(p)).map(p=>({y:p.y,area:p.area,reason:'no proven entrance or stair link'}))};
+ const result=extractFloorPatches(triangles),access=name==='chiba'?stairAccess(result.patches,triangles):null,accepted=result.patches.filter((p,i)=>access?access.reached.includes(i):p.y>=-.05&&p.y<=.45);
+ const levels=[];for(const p of accepted)if(p.y>.45&&!levels.some(y=>Math.abs(y-p.y)<=.02))levels.push(p.y);
+ const levelOf=y=>y<=.45?0:levels.findIndex(h=>Math.abs(h-y)<=.02)+1;
+ const surfaces=accepted.flatMap((p,i)=>p.polygons.map((polygon,j)=>({level:levelOf(p.y),y:p.y,polygon,tag:`mesh-floor:${name}:${i}:${j}`})));
+ output.assets[hash]={name:def.name,box:def.size.box,fitAxis,source:asset.path,geometryHash:sha(JSON.stringify(triangles)),cell:result.cell,headroom:result.headroom,entry:access?'terrain-step and verified three-rise flight':'terrain-step<=0.45m',surfaces,...(access?{links:access.links.map(l=>({...l,from:levelOf(l.y0),to:levelOf(l.y1)})),access:access.provenance}:{}),patches:accepted.map(p=>({y:p.y,area:p.area,nodes:p.nodes})),rejected:result.patches.filter(p=>!accepted.includes(p)).map(p=>({y:p.y,area:p.area,reason:'no proven entrance or stair link'}))};
  console.log(JSON.stringify({name,triangles:triangles.length,patches:result.patches.length,accepted:accepted.map(p=>({y:p.y,area:p.area,rectangles:p.polygons.length})),rejected:result.patches.length-accepted.length}));
 }
 const path=resolve(root,'packages/world-compiler/src/mesh-floor-overlays.json'),data=JSON.stringify(output,null,1)+'\n';

@@ -1,7 +1,7 @@
 // The in-memory world model the compiler mutates: defs, entities, indices,
 // terrain. Pure data + lookups; no I/O. The server persists it; the god skill
 // mirrors it from snapshot + stream.
-import { meshFloors } from './mesh-floors.ts';
+import { meshFloors, meshFloorLinks } from './mesh-floors.ts';
 import { Terrain, emptyGround, type Ground, type Landform, type Water } from '@sim/ground';
 import { CREATION_LIMITS, GENERATORS, mergeKitSlots, type Baked, type LocalOBB } from '@sim/generators';
 import { cacheKeyOfText, hashOf, stableStringify } from './hash.ts';
@@ -244,6 +244,8 @@ export class WorldModel {
       baked = { box, colliders, slots: fp?.slots ?? [], tris: info?.tris ?? 0, ...(fp ? { surfaces: fp.surfaces, openings: fp.openings, links: fp.links, rooms: fp.rooms, notes: fp.notes } : {}) };
       const extracted = meshFloors(m.asset, box, fp?.surfaces);
       if (extracted.length) baked.surfaces = [...(baked.surfaces ?? []), ...extracted];
+      const links = meshFloorLinks(m.asset, box, fp?.links);
+      if (links.length) baked.links = [...(baked.links ?? []), ...links];
     } else if (m.kind === 'parts') {
       // Physics of a prefab = union of its parts' boxes (parts are placed as their own entities at expansion time).
       baked = { box: def.size.box, colliders: [], slots: [], tris: 0 };
