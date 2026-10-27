@@ -55,6 +55,7 @@ import type { TakePeople } from '../../../mars/viewer/app/engine-view/take-repla
 import type { loadTemplates } from '../../../mars/viewer/app/engine-view/people.ts';
 import {PEOPLE,templateNameFor} from '../../../mars/viewer/app/engine-view/people-light.ts';
 import {WorldLightPeople} from './WorldLightPeople.ts';
+import {WorldBodyStandIns} from './WorldBodyStandIns.ts';
 // P1 phones: the people renderer is a lazy chunk (people-kit.ts). Old worlds and desktops fetch it at once and wait for it
 // before their first frame; a phone's new world draws its first frames with WorldLightPeople and fetches it after arrival.
 /** F12: whether this page's arrival card has gone (speech anchors wait for it). */
@@ -662,6 +663,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const screenDown = new THREE.Vector3();
     const standInGeometry = new THREE.CapsuleGeometry(0.22, 1.2, 4, 12), standInMaterial = new THREE.MeshStandardMaterial({ color: 0x5d7f9e, roughness: 0.7 });
     const standIns = new THREE.Group(); scene.add(standIns);
+    const bodyStandIns = new WorldBodyStandIns(standIns,standInGeometry,standInMaterial);
     const labels = new Map<string, Label>();
     const labelFor = (soul: PublicSoul): Label => {
       let l = labels.get(soul.id);
@@ -819,13 +821,17 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
             const seen = new Set<string>();
             for (const [id, e] of Object.entries(sampled.entities)) {
               const rec = records[id];
-              if(rec?.kind!=='human'||recordedBody(rec.body,e.state)?.family==='floater'||!(bodyModels.unresolved.has(id)||!templates.some(t=>t.name===templateNameFor(id,PEOPLE))&&!recordedBody(rec.body,e.state)?.modelUrl))continue;
-              seen.add(id);const hidden=people.bodyObject(id);if(hidden)hidden.visible=false;
-              let m = standIns.getObjectByName(id) as THREE.Mesh | undefined;
-              if (!m) { m = new THREE.Mesh(standInGeometry, standInMaterial); m.name = id; m.castShadow = true; standIns.add(m); }
-              m.position.set(e.p[0], e.p[1] + 0.82, e.p[2]);
+              const body=recordedBody(rec?.body,e.state);
+              if(rec?.kind!=='human'||body?.family==='floater')continue;
+              seen.add(id);
+              bodyStandIns.sync(id,e.p,people.bodyObject(id),{
+                unresolved:bodyModels.unresolved.has(id),
+                customReady:!!body?.model&&bodyModels.templates.has(body.model),
+                uploaded:!!body?.modelUrl,
+                legacyReady:templates.some(t=>t.name===templateNameFor(id,PEOPLE)),
+              });
             }
-            for (const m of [...standIns.children]) if (!seen.has(m.name)) standIns.remove(m);
+            bodyStandIns.finish(seen);
           }
           // world clock at the moment shown (the sim's clock, moved back by how far behind it we are)
           // a world's `time.calendar` (MM-DD) dates its sky: the sun's path and the dusk follow that season, the hour stays the clock's
