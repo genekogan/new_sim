@@ -12,11 +12,12 @@ const canonical=v=>Array.isArray(v)?v.map(canonical):v&&typeof v==='object'?Obje
 export function physicalPoses(snapshot){
  const entities=new Map((snapshot.entities??[]).map(e=>[e.id,e]));
  const path=(e,seen=new Set())=>{if(seen.has(e.id))throw Error('physical parent cycle');seen.add(e.id);const name=e.name??`@unnamed:${sha256(JSON.stringify(canonical({def:e.def,p:e.p,r:e.r,s:e.s,shape:e.shape,params:e.params})))}`;return entities.has(e.in?.parent)?path(entities.get(e.in.parent),seen)+'/'+name:name;};
+ const portable=v=>typeof v==='string'&&entities.has(v)?path(entities.get(v)):Array.isArray(v)?v.map(portable):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([k,x])=>[k,portable(x)])):v;
  const rows=new Map();
  for(const e of entities.values()){
   if(e.id.startsWith('h_'))continue;
   const ref=path(e);if(!ref||rows.has(ref))throw Error('nonunique physical entity path');
-  rows.set(ref,canonical({ref,def:e.def,p:e.p,r:e.r,s:e.s,shape:e.shape,params:e.params,in:e.in?{...e.in,parent:entities.has(e.in.parent)?path(entities.get(e.in.parent)):e.in.parent}:undefined}));
+  rows.set(ref,canonical({ref,def:e.def,p:e.p,r:e.r??0,s:e.s??1,shape:e.shape,params:portable(e.params),in:e.in?{...e.in,parent:entities.has(e.in.parent)?path(entities.get(e.in.parent)):e.in.parent}:undefined}));
  }
  return [...rows].sort(([a],[b])=>a.localeCompare(b)).map(([,v])=>v);
 }

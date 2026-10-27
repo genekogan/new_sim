@@ -328,5 +328,6 @@
     "onboardWallSec": 300,
     "onboardTimeoutSec": 270,
     "maxTurnsPerRequest": 6
-  }
+  },
+  "fixtureStatus": "verified"
 }
