@@ -223,7 +223,8 @@ try {
   bootMs = await boot();
   log(`▶ world "${slug}" on :${port} booted from the mars-two template in ${bootMs.toFixed(0)} ms`);
   await step('G0 the owner mints a god token', async () => { const r = await api('/v1/god/mint', { as: 'admin', body: { label: 'e2e mars-two' } }); godToken = r.data.token; return { status: r.status, token: !!godToken }; }, (r) => r.status === 200 && r.token);
-  await step(`G1 the template built every thing (${placed.length} placed) from the library's core/mars-* defs`, async () => {
+  // Keep the original gate case ID; result records actual historical operations and final inventory.
+  await step("G1 the template built every thing (167 placed) from the library's core/mars-* defs", async () => {
     const s = (await api('/v1/god/snapshot')).data; const ents = s.entities ?? [];
     const defs = new Set(ents.map((e) => e.def)); const mars = [...defs].filter((d) => /^core[-/]mars-/.test(d));
     const index=indexWorld(s),defsByRef=new Map([...(s.library??[]),...s.defs].flatMap(d=>[[d.ref,d],['sha:'+d.hash,d],[d.ref.replace(/^core-/, 'core/'),d]]));
