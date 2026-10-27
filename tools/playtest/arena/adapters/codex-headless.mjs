@@ -5,7 +5,7 @@ import { run } from '../../lib/proc.mjs';
 /** Sandbox: workspace writes + network (the seat must reach the local world with curl/node). No approvals in exec. */
 export const SANDBOX_CONFIG = ['-c', 'sandbox_mode="workspace-write"', '-c', 'sandbox_workspace_write.network_access=true', '-c', 'approval_policy="never"'];
 
-export const COMMAND_DISCIPLINE = 'Run one command per tool call from the seat folder with relative paths (node eden.mjs … or node eden-god.mjs …). No cd, no && chains. Follow the served skill; finish each requested action and verify its receipt before claiming completion.';
+export const COMMAND_DISCIPLINE = 'Run one command per tool call from the seat folder with relative paths (node eden.mjs … or node eden-god.mjs …). No cd, no && chains. For first onboarding, fetch the supplied world instructions URL directly (curl or Node fetch), then download its served CLI and skill into this folder; the CLI does not exist until downloaded. Do not search parent folders for a launcher. After bootstrap use the relative CLI for all world actions. Follow the served skill; finish each requested action and verify its receipt before claiming completion.';
 
 export function buildArgs({ threadId, resume, model, effort, text }) {
   text = `${COMMAND_DISCIPLINE}\n\n${text}`;
