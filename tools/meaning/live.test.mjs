@@ -30,6 +30,7 @@ test('changed geometry and absent interaction anchors are skipped instead of mis
 test('fresh plans over the same preimage have independent request identities',()=>{
  const m=materialize('hello-hamlet').world,source=m.snapshot(),before=snapshot(m);
  const first=planLive(before,overlay(),source,target),second=planLive(before,overlay(),source,target);
+ assert.ok((first.group+'-rollback').length<=60,'rollback group must fit server schema');
  assert.notEqual(first.planId,second.planId);assert.notEqual(first.group,second.group);
  assert.notEqual(first.batches[0].clientRef,second.batches[0].clientRef);
  assert.deepEqual(first.batches.map(b=>b.ops),second.batches.map(b=>b.ops),'only transaction identities change');

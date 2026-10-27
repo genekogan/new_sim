@@ -66,7 +66,7 @@ export function planLive(snapshot,overlay,source,{expectedWorldId}={}){
  }
  // A fresh plan is a new transaction, even after rollback. Reusing this receipt
  // still reuses its exact saved clientRef/submission for interrupted responses.
- const group=`meaning-${hashOf(overlay).slice(0,12)}-${planId}`;
+ const group=`meaning-${planId}`;
  const batches=[];let pending=[];
  function batch(items){const ops=items.map(c=>c.ref==='world'?{op:'world',state:{about:c.after}}:{op:'set',id:c.id,about:c.after});return{group,note:`Reviewed world meaning: ${overlay.worldId}`,ops,expect:Object.assign({},...items.map(c=>c.expect)),...(items.some(c=>c.ref==='world')?{expectWorldAbout:hashOf(worldChange.before)}:{})};}
  const flush=()=>{if(pending.length)batches.push({...batch(pending),clientRef:`${group}-${batches.length}`,changes:pending});pending=[];};

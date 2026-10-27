@@ -125,7 +125,7 @@ export async function call(path, { body, method, as = 'god', noBuild = false, re
   if (verb !== 'GET' && !READ_POSTS.has(pathname)) writes++; // G2: the mirror's in-command freshness ends at any write
   // A new command is a new request, even if its input batch carried an old ref.
   // Keep the serialized bytes for the transport retry; never re-create the payload.
-  if(requestRef!==undefined&&(typeof requestRef!=='string'||!requestRef.trim()||requestRef.length>160||as!=='god'||pathname!=='/v1/god/act'||verb!=='POST'||body?.clientRef!==requestRef))throw Error('requestRef requires an act with the same explicit clientRef');
+  if(requestRef!==undefined&&(typeof requestRef!=='string'||!requestRef.trim()||requestRef.length>100||as!=='god'||pathname!=='/v1/god/act'||verb!=='POST'||body?.clientRef!==requestRef))throw Error('requestRef requires an act with the same explicit clientRef');
   const clientRef = as === 'god' && verb !== 'GET' && EDIT_PATHS.has(pathname) ? requestRef ?? randomUUID() : undefined;
   const payload = body || clientRef ? JSON.stringify(clientRef ? { ...body, clientRef } : body) : undefined;
   const recoverable = clientRef && pathname === '/v1/god/act' && verb === 'POST';
