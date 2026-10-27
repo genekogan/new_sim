@@ -2,6 +2,7 @@
 // Coordinator-invoked only. One local battery at a time; no automatic provider/model/review substitution or retries.
 import{readFileSync,writeFileSync,mkdirSync,appendFileSync,existsSync}from'node:fs';
 import{resolve,join}from'node:path';import{fileURLToPath,pathToFileURL}from'node:url';import{spawn,execFileSync}from'node:child_process';
+import{machineCheck}from'../../playtest.mjs';
 import{assertMeasurementReady,providerPolicy}from'../../lib/provider-policy.mjs';import{assertFrozenGenesis}from'../../lib/physical-fixture.mjs';
 const read=p=>JSON.parse(readFileSync(p,'utf8'));
 export function comparable(s){const c=structuredClone(s);delete c.freeze;delete c.world.genesis;delete c.world.snapshot;for(const e of c.director.script)delete e.expect.journey.source;return c;}
@@ -16,11 +17,14 @@ export async function overnight({baselineRoot,treatmentRoot,fixtures,out}){
  if(heads.control!=='db68679b747911f2546fc054345e96aa703090ea')throw Error('baseline changed from accepted release head');
  const plan=[];for(const world of['mars','eden','hamlet']){const paths=Object.fromEntries(['control','treatment'].map(arm=>[arm,resolve(fixtures,`${world}-${arm}.json`)])),pair={control:read(paths.control),treatment:read(paths.treatment)};assertPair(pair.control,pair.treatment);for(const arm of['control','treatment'])assertFrozenGenesis(pair[arm],roots[arm]);for(let repeat=1;repeat<=2;repeat++)for(const arm of['control','treatment'])plan.push({world,arm,repeat,scenario:paths[arm],serverRoot:roots[arm],out:resolve(out,`${world}-${arm}-r${repeat}`)});}
  if(existsSync(out))throw Error('output directory already exists; never overwrite or silently resume a measurement');mkdirSync(out,{recursive:true});
- writeFileSync(join(out,'manifest.json'),JSON.stringify({version:1,startedAt:new Date().toISOString(),heads,roots,plan,provider:'codex',model:'gpt-6-astra',effort:'high',automaticRetries:0,comparison:'old code/old meaning vs final code/new meaning; two serial repeats'},null,2)+'\n');
+ writeFileSync(join(out,'manifest.json'),JSON.stringify({version:1,startedAt:new Date().toISOString(),heads,roots,plan,provider:'codex',model:'gpt-6-astra',effort:'high',automaticRetries:0,machineSampling:{intervalSec:30,timingContamination:'two consecutive samples with load1>=10 or reclaimableGB<6 flag overlapping timing; preserve physical outcomes; no forced starts or automatic retries'},comparison:'old code/old meaning vs final code/new meaning; two serial repeats'},null,2)+'\n');
  const runner=fileURLToPath(new URL('../../playtest.mjs',import.meta.url));
  for(const run of plan){for(const[arm,root]of Object.entries(roots))if(git(root,'rev-parse','HEAD')!==heads[arm]||git(root,'status','--porcelain'))throw Error(`${arm} source changed or has uncommitted edits; stop before inference`);
   const startedAt=new Date().toISOString();console.log(`Starting ${run.world} ${run.arm} repeat${run.repeat}`);
-  const child=spawn(process.execPath,[runner,'run',run.scenario,'--server-root',run.serverRoot,'--out',run.out],{stdio:'inherit'});const exit=await new Promise((yes,no)=>{child.once('error',no);child.once('exit',(code,signal)=>yes({code,signal}));});
+  const sample=async()=>{const machine=await machineCheck();let world=null;const p=join(run.out,'world.json');if(existsSync(p)){try{const base=read(p).base;const h=await(await fetch(`${base.replace(/\/$/,'')}/healthz`,{signal:AbortSignal.timeout(2000)})).json();world={ok:h.ok,tick:h.tick,tickMs:h.tickMs,clockRate:h.clockRate};}catch{world={unavailable:true};}}appendJsonlMachine({...run,t:new Date().toISOString(),...machine,world});};
+  const appendJsonlMachine=row=>appendFileSync(join(out,'machine.jsonl'),JSON.stringify(row)+'\n');
+  let sampling=sample();const timer=setInterval(()=>{sampling=sampling.then(sample);},30000);timer.unref();
+  let exit;try{const child=spawn(process.execPath,[runner,'run',run.scenario,'--server-root',run.serverRoot,'--out',run.out],{stdio:'inherit'});exit=await new Promise((yes,no)=>{child.once('error',no);child.once('exit',(code,signal)=>yes({code,signal}));});}finally{clearInterval(timer);await sampling;}
   appendFileSync(join(out,'runs.jsonl'),JSON.stringify({...run,startedAt,endedAt:new Date().toISOString(),...exit})+'\n');
   if(exit.code!==0)throw Error(`battery infrastructure exited ${exit.code}/${exit.signal}; inspect recorded run, no automatic retry`);
  }
