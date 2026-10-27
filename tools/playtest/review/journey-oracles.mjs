@@ -66,6 +66,7 @@ export function validateJourney(j) {
   for (const [i, phase] of (j?.phases ?? []).entries()) for (const p of options(phase)) {
     if (!p.region || !Array.isArray(p.region.pos) || p.region.pos.length !== 2 || !p.region.pos.every(Number.isFinite) || !(p.region.radiusM > 0)) errors.push(`phase ${i} needs frozen region`);
     for(const k of ['includePolygon','excludePolygon'])if(p.region?.[k]&&(!Array.isArray(p.region[k])||p.region[k].length<3||p.region[k].some(v=>!Array.isArray(v)||v.length!==2||!v.every(Number.isFinite))))errors.push(`phase ${i} has invalid ${k}`);
+    if (p.receipt?.requiredChosenTargets && (!Array.isArray(p.receipt.requiredChosenTargets) || !p.receipt.requiredChosenTargets.length || p.receipt.requiredChosenTargets.some(x=>typeof x!=='string'||!x))) errors.push(`phase ${i} has invalid required chosen targets`);
     if (p.receipt && !p.receipt.capabilities?.length && !p.receipt.targetIds?.length && !p.receipt.targetRefs?.length) errors.push(`phase ${i} receipt needs exact capabilities/targets`);
   }
   return errors;
@@ -78,6 +79,7 @@ export function journeyOracles({ ev, journey: j, receipts, replies, acts, accept
     const rule = p.receipt;
     if (!rule) return true;
     if (rule.verb && !r.capability?.startsWith(`${rule.verb}:`)) return false;
+    if (rule.requiredChosenTargets && !rule.requiredChosenTargets.includes(r.chosen?.target)) return false;
     const target = [r.chosen?.target, r.chosen?.seat, r.chosen?.slot, r.chosen?.place, r.target?.id, r.target?.place].filter(x => typeof x === 'string');
     return rule.capabilities?.includes(r.capability) || rule.targetIds?.some(id => target.includes(id) || r.capability === `${rule.verb}:${id}`);
   };

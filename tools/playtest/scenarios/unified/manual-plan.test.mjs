@@ -1,4 +1,4 @@
-import test from'node:test';import assert from'node:assert/strict';import{mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync}from'node:fs';import{tmpdir}from'node:os';import{join}from'node:path';import{sha256}from'../../lib/hash.mjs';import{verifyRetained}from'./manual-plan.mjs';
+import test from'node:test';import assert from'node:assert/strict';import{mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync}from'node:fs';import{tmpdir}from'node:os';import{join}from'node:path';import{sha256}from'../../lib/hash.mjs';import{verifyRetained,validateScopeDiff}from'./manual-plan.mjs';
 test('retained controls fail closed on stale scorer, changed conditions, source head or infrastructure invalidity',t=>{
  const d=mkdtempSync(join(tmpdir(),'sim-retained-'));t.after(()=>rmSync(d,{recursive:true,force:true}));const run=join(d,'run'),rescore=join(d,'rescore');mkdirSync(join(run,'evidence'),{recursive:true});mkdirSync(rescore);
  const write=(p,x)=>writeFileSync(p,typeof x==='string'?x:JSON.stringify(x));
@@ -10,4 +10,14 @@ test('retained controls fail closed on stale scorer, changed conditions, source 
  assert.doesNotThrow(()=>verifyRetained(ref,planned));assert.throws(()=>verifyRetained({...ref,arm:'treatment'},planned));
  for(const edit of[a=>a.scorerFiles['oracles.mjs']='old',a=>a.deadlineChange=1,a=>a.originalOraclesSha256='modified',a=>a.correctedScenarioSha256='different',a=>a.sourceHeads={control:'different'}]){const bad=structuredClone(annotation);edit(bad);write(join(rescore,'annotation.json'),bad);assert.throws(()=>verifyRetained(ref,planned));}write(join(rescore,'annotation.json'),annotation);
  write(join(run,'infrastructure-invalid.jsonl'),'invalid\n');assert.throws(()=>verifyRetained(ref,planned));
+});
+
+test('scoped retention rejects runtime, skill, provider or fixture changes outside exact reviewed repair',()=>{
+ const runtime='apps/server/src/edge/boot/world-places.ts',changed=[runtime,'tools/playtest/review/journey-oracles.mjs'];
+ const diff='reviewed full patch',runtimeDiff='reviewed admission hunk',proof={changedFiles:changed,fullDiffSha256:sha256(diff),runtimeDiffSha256:sha256(runtimeDiff)};
+ assert.doesNotThrow(()=>validateScopeDiff(proof,{changed,diff,runtimeDiff}));
+ for(const path of ['apps/server/src/edge/engine.ts','tools/agent/eden.mjs','skills/soul/SKILL.md','worlds/templates/mars-two.json','tools/playtest/lib/codex.mjs']){
+  const bad=[...changed,path].sort();assert.throws(()=>validateScopeDiff({...proof,changedFiles:bad},{changed:bad,diff,runtimeDiff}));
+ }
+ for(const value of [{changed,diff:diff+'extra',runtimeDiff},{changed,diff,runtimeDiff:runtimeDiff+'extra'},{changed:changed.slice(1),diff,runtimeDiff},{changed,diff,runtimeDiff:''}])assert.throws(()=>validateScopeDiff(proof,value));
 });

@@ -150,3 +150,14 @@ test('frozen shore ring accepts a completed exact shore return under a child pla
  assert.equal(run([{...samples[1],t:iso(31)},samples[0]]),'fail','late physical return does not extend deadline');
  assert.equal(run(samples,[{...receipts[0],phase:'failed'},receipts[1]]),'fail','shore return cannot substitute for actual swimming');
 });
+
+
+test('bank return requires exact chosen bank identity AND completed known walk within frozen dry ring',()=>{
+ const bank={region:{pos:[0,0],radiusM:20,includePolygon:[[-6,-6],[6,-6],[6,6],[-6,6]],excludePolygon:[[-4,-4],[4,-4],[4,4],[-4,4]]},postures:['standing'],receipt:{verb:'walk',capabilities:['walk:lake'],requiredChosenTargets:['g-lake.shore-bank'],completed:true}};
+ const receipt={capability:'walk:lake',chosen:{target:'g-lake.shore-bank'},phase:'completed',acceptedAt:iso(2),endedAt:iso(4)};
+ const sample={t:iso(6),pos:[0,5],posture:'standing',place:'child-tree',placePath:['not used']};
+ const run=(r=receipt,s=sample)=>score({samples:[{...sample,t:iso(1),pos:[0,0]},s],resultState:null},[bank],[r])['journey-completion'].status;
+ assert.equal(run(),'pass');
+ for(const r of [{...receipt,chosen:null},{...receipt,chosen:{target:'other-bank'}},{...receipt,chosen:{target:'lake-water'}},{...receipt,capability:'walk:other-lake'},{...receipt,phase:'started'},{...receipt,endedAt:iso(31)}])assert.equal(run(r),'fail');
+ for(const s of [{...sample,pos:[0,0]},{...sample,pos:[0,7]},{...sample,posture:'swimming'},{...sample,t:iso(31)}])assert.equal(run(receipt,s),'fail');
+});
