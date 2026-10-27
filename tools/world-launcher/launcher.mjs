@@ -280,7 +280,9 @@ export async function openLauncher(cfg = {}) {
     if (!op && auth && !creator) return [401, { ok: false, code: 'signin-required', message: 'your sign-in was not accepted; sign in again' }];
     const name = typeof body?.name === 'string' ? body.name.trim().replace(/\s+/g, ' ') : '';
     if (!name || name.length > 60) return [400, { ok: false, code: 'invalid', message: 'name: 1–60 characters' }];
-    const templates = templateList();
+    // Hidden fixtures remain unavailable to public creation; only the existing
+    // direct-loopback operator route may explicitly select one.
+    const templates = templateList({ all: !!op });
     const template = typeof body?.template === 'string' ? body.template : 'empty';
     const t = templates.find((x) => x.id === template);
     if (!t) return [400, { ok: false, code: 'invalid', message: `unknown template ${template}; one of ${templates.map((x) => x.id).join(', ')}` }];

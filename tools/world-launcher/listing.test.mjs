@@ -14,6 +14,7 @@ const PORT = Number(process.env.LISTING_TEST_PORT ?? 7000), RANGE = [PORT + 1, P
 const dir = mkdtempSync(join(tmpdir(), 'launcher-listing-test-'));
 const templatesDir = join(dir, 'templates'); mkdirSync(templatesDir);
 writeFileSync(join(templatesDir, 'plain.json'), JSON.stringify({ schema: 'genesis/1', name: 'Plain', description: 'x', batches: [] }));
+writeFileSync(join(templatesDir, 'hidden-proof.json'), JSON.stringify({ schema: 'genesis/1', hidden: true, name: 'Hidden proof', batches: [] }));
 const webDir = join(dir, 'web'); mkdirSync(webDir); writeFileSync(join(webDir, 'index.html'), '<!doctype html>');
 const born = join(dir, 'born.mjs');
 writeFileSync(born, `import { DatabaseSync } from 'node:sqlite'; import { join } from 'node:path';
@@ -69,4 +70,22 @@ test('unlisted worlds (QA2 F4): bench slugs and "(scratch)" names stay off the p
   assert.ok(!(await list()).some((x) => x.slug === 'probe'));
   assert.equal((await post('/__sim/worlds', { name: 'Public', template: 'plain', unlisted: true })).status, 201);
   assert.ok((await list()).some((x) => x.slug === 'public'));
+});
+
+
+test('hidden templates stay out of public catalogs and public creation; direct operator creation may select one', async () => {
+  for (const path of ['/__sim/templates.json', '/__sim/worlds.json']) {
+    const body = await (await api(path)).json();
+    assert.ok(!body.templates.some(t => t.id === 'hidden-proof'), path);
+  }
+  const body = { name: 'Hidden fixture (scratch)', template: 'hidden-proof', owner: 'dev:gene', unlisted: true };
+  assert.equal((await post('/__sim/worlds', body, { authorization: 'Bearer dev:gene' })).status, 400, 'owner sign-in does not grant operator template access');
+  assert.equal((await post('/__sim/op/create-world', body, { 'x-forwarded-for': '203.0.113.9' })).status, 403, 'reverse-proxied operator request stays forbidden');
+  const r = await post('/__sim/op/create-world', body);
+  assert.equal(r.status, 201); const made = await r.json();
+  const health = await (await api(`/w/${made.slug}/healthz`)).json();
+  assert.match(health.genesis, /hidden-proof\.json$/, 'the selected hidden genesis reaches the child');
+  assert.equal(made.owner, 'dev:gene', 'operator creation verifies persisted child ownership');
+  assert.ok(!(await list()).some(w => w.slug === made.slug), 'scratch remains unlisted');
+  assert.ok(!(await (await api('/__sim/templates.json')).json()).templates.some(t => t.id === 'hidden-proof'), 'creation does not publish the template');
 });
