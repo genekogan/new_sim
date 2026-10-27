@@ -31,6 +31,7 @@ export function cardResultFor(view, messageId) {
 const cardSig = (v) => { try { return JSON.stringify(v ?? null); } catch { return String(v); } };
 const resultSig = (v) => { const l = v?.latest ?? v?.message; return l ? `${l.id ?? l.messageId}|${l.result ?? l.resultText ?? ''}|${l.state ?? ''}` : ''; };
 const turnCountOf = (s) => (typeof s.turnCount === 'function' ? s.turnCount() : Number.isFinite(s.turnCount) ? s.turnCount : null);
+const explicitTerminal = m => !!m?.result && m.resultBy!=='server' && RESULT_STATES.has(String(m.outcome??m.state??'').toLowerCase());
 
 /** Next glance delay (ms): the persona's waitSec jittered ±15%, else uniform in the glance range; never under its minimum. */
 export function nextIntervalMs(glance, waitSec, r) {
@@ -196,17 +197,19 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
   }
 
   async function closeReq(ctx, req, cutoffReason, extra = {}) {
+    let terminal = false;
     if (req.journey) {
       await sampleOnce(ctx); // terminal body and receipts, including failures after an intermediate result
       const latest = cardMessageFor(await cardView(ctx), req.messageId);
       req.evidence?.recordCard?.(latest, new Date().toISOString());
+      terminal = explicitTerminal(latest);
     }
     if(req.journey && req.budgetFrom!=null && clock.now()-req.budgetFrom>=req.budgetMs)cutoffReason='budget';
     if(req.journey && cutoffReason==='turn-complete') {
       // An async act or a new wake can start after checkOpen's previous observation.
       // The terminal refresh is authoritative; keep collecting if it found ongoing or unknown work.
       const receipts=ctx.latestSample?.receipts;
-      if(ctx.seat.inTurn || ctx.pending>0 || !Array.isArray(receipts) || receipts.some(r=>['accepted','waiting','started','running'].includes(r.phase)))return;
+      if(ctx.seat.inTurn || ctx.pending>0 || (!terminal && (!Array.isArray(receipts) || receipts.some(r=>['accepted','waiting','started','running'].includes(r.phase)))))return;
     }
     ctx.open.delete(req.requestId);
     const rec = { t: new Date().toISOString(), mono: clock.now(), requestId: req.requestId, cutoffReason, openSec: (clock.now() - req.openedAt) / 1000, ...extra };
@@ -230,7 +233,7 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
         const actionPending = !Array.isArray(receipts) || receipts.some(r=>['accepted','waiting','started','running'].includes(r.phase));
         if (req.budgetFrom != null && now-req.budgetFrom >= req.budgetMs) await closeReq(ctx,req,'budget');
         else if (turns > maxTurns) await closeReq(ctx,req,'max-turns',{turns});
-        else if (turnFinished && !ctx.seat.inTurn && ctx.pending===0 && !actionPending) await closeReq(ctx,req,'turn-complete',res??{});
+        else if (turnFinished && !ctx.seat.inTurn && ctx.pending===0 && (explicitTerminal(cardMessageFor(view,req.messageId)) || !actionPending)) await closeReq(ctx,req,'turn-complete',res??{});
         continue;
       }
       if (res) await closeReq(ctx, req, 'result', res);

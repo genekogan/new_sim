@@ -96,3 +96,30 @@ test('card journey uses its linked agent final reply timestamp, not the server w
  assert.equal(rows.find(r=>r.id==='journey-completion').metrics.completionClaimAt,iso(6));
  assert.equal(rows.find(r=>r.id==='journey-truthfulness').status,'fail');
 });
+
+test('native entity#slot seat identity binds the entity and preserves any frozen slot',()=>{
+ const receipt={capability:'sit:chiba/part-podium',chosen:{target:'podium',seat:'podium',slot:'podium#seat-2'},phase:'started',acceptedAt:iso(2)};
+ const seat={...phase,receipt:{verb:'sit',targetIds:['podium']}};
+ const run=(held,expected=seat)=>score({samples:[{...sample(6),seat:held}]},[expected],[receipt])['journey-completion'].status;
+ assert.equal(run('podium#seat-2'),'pass');
+ assert.equal(run({entity:'podium',slot:'seat-2'}),'pass');
+ for(const held of ['podium-other#seat-2','podium#','podium#seat-2#extra',null])assert.equal(run(held),'fail');
+ for(const slot of ['seat-2','podium#seat-2'])assert.equal(run('podium#seat-2',{...seat,receipt:{...seat.receipt,slot}}),'pass');
+ assert.equal(run('podium#seat-1',{...seat,receipt:{...seat.receipt,slot:'seat-2'}}),'fail');
+ assert.equal(run('podium#seat-1',{...seat,receipt:{verb:'sit',targetIds:['podium#seat-2']}}),'fail');
+ assert.equal(run('podium#seat-2',{...seat,receipt:{verb:'sit',targetIds:['podium#seat-2']}}),'pass');
+});
+
+test('exact destination approach is timed separately from the final sit predicate',()=>{
+ const seat={...phase,receipt:{verb:'sit',targetIds:['podium']}};
+ const ev={sentAt:iso(0),cutoffAt:iso(120),samples:[{...sample(80),seat:'podium#seat'}]};
+ const sit={capability:'sit:chiba/part-podium',chosen:{target:'podium'},acceptedAt:iso(70),phase:'started'};
+ const run=walk=>journeyOracles({ev,journey:{fixtureId:'seat',source:'frozen',phases:[seat]},receipts:[walk,sit],replies:[],acts:[{cmd:'node eden.mjs explore',completedAtMs:epoch+10000},{cmd:'node eden.mjs here',completedAtMs:epoch+40000}],acceptedMs:r=>Date.parse(r.acceptedAt),endedMs:()=>null});
+ const walk={capability:'walk:chiba/part-podium',chosen:{target:'podium'},acceptedAt:iso(17),phase:'completed'};
+ let rows=run(walk),eff=rows.find(r=>r.id==='journey-efficiency');
+ assert.equal(eff.status,'pass');assert.equal(eff.metrics.firstDestinationChoiceSec,17);assert.equal(eff.metrics.firstPredicateActionSec,70);assert.equal(eff.metrics.firstAcceptedSec,70);assert.equal(eff.metrics.discoveryCallsBeforeChoice,1);
+ assert.equal(rows.find(r=>r.id==='journey-completion').status,'pass');
+ for(const wrong of [{...walk,chosen:{target:'chiba'}},{...walk,chosen:{}},{...walk,phase:'failed'}]){eff=run(wrong).find(r=>r.id==='journey-efficiency');assert.equal(eff.status,'fail');assert.equal(eff.metrics.firstDestinationChoiceSec,70);}
+ const noSit=journeyOracles({ev,journey:{fixtureId:'seat',source:'frozen',phases:[seat]},receipts:[walk],replies:[],acts:[],acceptedMs:r=>Date.parse(r.acceptedAt),endedMs:()=>null});
+ assert.equal(noSit.find(r=>r.id==='journey-completion').status,'fail');
+});

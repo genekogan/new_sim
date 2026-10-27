@@ -149,13 +149,13 @@ test('scenario defaults: persona scenarios seed natives; the scripted basics bat
 });
 
 // Owner-card native autoresults are sub-action progress, not a multi-step journey boundary.
-async function journeyRig({ turnEnd=30000, actionEnd=30000, observeTurn=true, budgetSec=60, actionStart=0, sampleSec=2, finalCard=true }={}) {
+async function journeyRig({ turnEnd=30000, actionEnd=30000, observeTurn=true, budgetSec=60, actionStart=0, sampleSec=2, finalCard=true, finalOutcome='failed' }={}) {
  const r=rig({ownerOpts:{resultMs:5000},turnMs:30000});const seat=r.seats[0];
  const sent=()=>r.owner.sent[0]?.sentAt??Infinity;
  Object.defineProperty(seat,'inTurn',{get:()=>observeTurn&&r.clock.now()>=sent()&&r.clock.now()<sent()+turnEnd});
  seat.turnCount=()=>observeTurn&&r.clock.now()>=sent()+turnEnd?1:0;
  r.observer.truth={snapshotSoul:async()=>({t:new Date(r.clock.now()).toISOString(),receipts:r.clock.now()<sent()+actionStart?[]:r.clock.now()<sent()+actionEnd?[{id:'act',phase:'running'}]:[{id:'act',phase:'failed',code:'seat.inside'}],posture:'standing'})};
- const original=r.owner.cardView;r.owner.cardView=async args=>{const v=await original(args);if(v.latest?.result){Object.assign(v.latest,{outcome:'done',resultBy:'server',resultAt:sent()+5000});if(finalCard&&r.clock.now()>=sent()+turnEnd)Object.assign(v.latest,{result:'Unable to sit: seat.inside; I remain standing.',outcome:'failed',resultBy:undefined,resultAt:sent()+turnEnd});}return v;};
+ const original=r.owner.cardView;r.owner.cardView=async args=>{const v=await original(args);if(v.latest?.result){Object.assign(v.latest,{outcome:'done',resultBy:'server',resultAt:sent()+5000});if(finalCard&&r.clock.now()>=sent()+turnEnd)Object.assign(v.latest,{result:'Unable to sit: seat.inside; I remain standing.',outcome:finalOutcome,resultBy:undefined,resultAt:sent()+turnEnd});}return v;};
  const recorded=[];r.observer.evidence.openRequest=args=>{const ev={...args,recorded,samples:[]};r.observer.opened.push(ev);return{evidence:ev,sample({snap}){ev.samples.push(snap)},recordCard(m){if(m?.result)recorded.push({at:r.clock.now(),text:m.result,by:m.resultBy})},close({cutoffReason}){r.observer.closed.push({requestId:args.requestId,cutoffReason,at:r.clock.now()});}};};
  const scenario=scen({durationSec:90,observer:{sampleSec},director:{mode:'scripted',script:[{id:'podium',seat:'a',atSec:0,channel:'card',text:'Walk to the podium and sit',budgetSec,expect:{journey:{}}}]}});
  await runPlay({...r,scenario,world,quotaCheck:noQuota});return r;
@@ -166,7 +166,7 @@ test('journey waits through intermediate native done until requesting turn ends;
  assert.equal(r.observer.opened[0].samples.at(-1).receipts[0].code,'seat.inside');
 });
 test('journey keeps an asynchronous action open beyond the model turn, but never extends frozen budget',async()=>{
- let r=await journeyRig({turnEnd:10000,actionEnd:40000});assert.equal(r.observer.closed[0].cutoffReason,'turn-complete');assert.ok(r.observer.closed[0].at>=40000);
+ let r=await journeyRig({turnEnd:10000,actionEnd:40000,finalCard:false});assert.equal(r.observer.closed[0].cutoffReason,'turn-complete');assert.ok(r.observer.closed[0].at>=40000);
  r=await journeyRig({turnEnd:80000,actionEnd:80000,budgetSec:20});assert.equal(r.observer.closed[0].cutoffReason,'budget');assert.ok(r.observer.closed[0].at>=20000&&r.observer.closed[0].at<=25000);
 });
 test('journey with automatic result but no observed agent turn stays open to budget',async()=>{
@@ -180,4 +180,14 @@ test('terminal refresh catches an async action started after the last idle sampl
  assert.ok(samples.some(s=>Date.parse(s.t)===10000&&s.receipts[0]?.phase==='running'),'terminal refresh sees the intervening async action');
  assert.ok(r.observer.closed[0].at>=30000,`must not close while action runs: ${r.observer.closed[0].at}`);
  assert.equal(r.observer.closed[0].cutoffReason,'turn-complete');
+});
+
+test('explicit agent terminal result closes a held activity after its turn, while server progress waits',async()=>{
+ const done=await journeyRig({turnEnd:10000,actionEnd:80000,finalOutcome:'done'});
+ assert.equal(done.observer.closed[0].cutoffReason,'turn-complete');
+ assert.ok(done.observer.closed[0].at>=10000&&done.observer.closed[0].at<=15000);
+ assert.equal(done.observer.opened[0].samples.at(-1).receipts[0].phase,'running');
+ const progress=await journeyRig({turnEnd:10000,actionEnd:80000,finalCard:false,budgetSec:20});
+ assert.equal(progress.observer.closed[0].cutoffReason,'budget');
+ assert.ok(progress.observer.closed[0].at>=20000);
 });
