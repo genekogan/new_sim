@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { solarPosition } from '../../../mars/viewer/engine/env/sun.ts';
 import { siteNorthOffset } from './site-north.ts';
 import {createEdenDaylight} from './atmosphere/visual-transitions.ts';
-import {shadowFollowBox} from './rendering/WorldLook.ts';
+import {shadowFollowBox,installStableShadowFilter} from './rendering/WorldLook.ts';
 import { daylightFactors } from '../../../mars/viewer/engine/env/daylight.ts';
 import { fitNearPlane } from '../../../mars/viewer/lib/depth-fit.ts';
 const DAY_SKY = new THREE.Color('#a6bed0'), NIGHT_SKY = new THREE.Color('#121a2b'), DUSK_SKY = new THREE.Color('#d99a6c');
@@ -53,6 +53,7 @@ export class Daylight {
   private readonly previousBeforeRender: THREE.Object3D['onBeforeRender'];
 
   constructor(scene: THREE.Scene) {
+    installStableShadowFilter();
     this.scene = scene;
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);

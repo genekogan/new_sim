@@ -40,6 +40,41 @@ export function shadowFollowBox(target: { x: number; y: number; z: number }, eye
   return { half, cx, cy, cz, texel, radius: Math.max(1.25, Math.min(3.5, 0.18 / texel)), normalBias: Math.max(0.05, 2 * texel), key: `${half}|${cx}|${cy}|${cz}|${mapSize}` };
 }
 
+// ------------------------------------------------------------------ daylight shadow filtering
+/** Three r185 uses five rotated hardware-PCF samples. On tilted textured panels
+ * those sparse samples cross shadow-map texels as daylight moves, producing large
+ * pixel jumps even with a fixed camera. Keep the same footprint, bias and moving
+ * sun, but integrate it with sixteen samples on full-size maps. Phone maps retain
+ * the original five samples. This changes only directional/spot PCF, not point,
+ * basic or variance shadows. */
+export function stableShadowPCF(chunk: string): string {
+  if (chunk.includes('int edenSample = 0')) return chunk;
+  const start = chunk.indexOf('float getShadow( sampler2DShadow');
+  const begin = chunk.indexOf('shadow = (', start);
+  const end = chunk.indexOf(') * 0.2;', begin);
+  if (start < 0 || begin < start || end < begin) return chunk;
+  const sparse = chunk.slice(begin, end + ') * 0.2;'.length);
+  // Fail closed if a Three upgrade changes the sampling contract; do not replace
+  // another shadow algorithm merely because it has a similarly named function.
+  if (!sparse.includes('vogelDiskSample( 4, 5, phi )') || sparse.split('texture( shadowMap').length !== 6) return chunk;
+  const dense = `if ( shadowMapSize.x >= 2048.0 ) {
+                  shadow = 0.0;
+                  for ( int edenSample = 0; edenSample < 16; edenSample ++ ) {
+                    shadow += texture( shadowMap, vec3( shadowCoord.xy + vogelDiskSample( edenSample, 16, phi ) * radius, shadowCoord.z ) );
+                  }
+                  shadow *= 0.0625;
+                } else {
+                  ${sparse}
+                }`;
+  return chunk.slice(0, begin) + dense + chunk.slice(end + ') * 0.2;'.length);
+}
+let shadowFilterInstalled = false;
+export function installStableShadowFilter() {
+  if (shadowFilterInstalled) return;
+  shadowFilterInstalled = true;
+  THREE.ShaderChunk.shadowmap_pars_fragment = stableShadowPCF(THREE.ShaderChunk.shadowmap_pars_fragment);
+}
+
 // ------------------------------------------------------------------ tone curve (CustomToneMapping)
 const TONE_GLSL = /* glsl */`vec3 CustomToneMapping( vec3 color ) {
 	color *= toneMappingExposure;

@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {installLookToneCurve,installMaterialDetail,setMaterialDetail,lookSettings,lookExposure,shadowFollowBox,WorldPost} from './WorldLook.ts';
+import {installLookToneCurve,installMaterialDetail,setMaterialDetail,lookSettings,lookExposure,shadowFollowBox,stableShadowPCF,installStableShadowFilter,WorldPost} from './WorldLook.ts';
 import {setNightLightStrength,nightLightStrength} from '../WorldNightLights.ts';
 
 void test('look settings: entity worlds on, ?look=flat off, phones keep the direct draw and no material detail',()=>{
@@ -73,4 +73,16 @@ void test('lamp pools: the look gain scales the night light strength (1 keeps th
  setNightLightStrength(0);assert.equal(nightLightStrength(),1);
  setNightLightStrength(0,1.7);assert.equal(nightLightStrength(),1.7);
  setNightLightStrength(1,1.7);assert.equal(nightLightStrength(),0);
+});
+
+void test('daylight PCF integrates full maps densely while retaining phone and other shadow algorithms',()=>{
+ const original=THREE.ShaderChunk.shadowmap_pars_fragment,patched=stableShadowPCF(original);
+ assert.notEqual(patched,original,'the pinned Three sampling block is recognized');
+ assert.equal(stableShadowPCF(patched),patched,'the filter is idempotent');
+ assert.ok(patched.includes('shadowMapSize.x >= 2048.0'));
+ assert.ok(patched.includes('vogelDiskSample( edenSample, 16, phi )'));
+ assert.ok(patched.includes('vogelDiskSample( 4, 5, phi )'),'phone fallback retained');
+ assert.equal(patched.slice(patched.indexOf('#elif defined( SHADOWMAP_TYPE_VSM )')),original.slice(original.indexOf('#elif defined( SHADOWMAP_TYPE_VSM )')),'VSM, basic and point-shadow implementations unchanged');
+ assert.equal(stableShadowPCF('unknown upstream implementation'),'unknown upstream implementation');
+ installStableShadowFilter();const once=THREE.ShaderChunk.shadowmap_pars_fragment;installStableShadowFilter();assert.equal(THREE.ShaderChunk.shadowmap_pars_fragment,once);
 });
