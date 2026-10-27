@@ -618,7 +618,11 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       // these words (the Library) comes before one whose name says more (the library annex); nearest among equals
       const extra = (p: VocabPlace) => new Set(tokens(p.name).filter(t => !words.includes(t) && !ctx.root.includes(t) && !/^\d+$/.test(t))).size;
       const spotted = SPOT_PLACE_VERBS.has(verb) && ctx.hasSpot ? m.found.filter(p => ctx.hasSpot!(verb, p.id)) : [];
-      const found = SPOT_PLACE_VERBS.has(verb) ? [...(spotted.length ? spotted : m.found)].sort((a, b) => extra(a) - extra(b)) : m.found;
+      // Resolve a partial type name against known physical kinds before offer-list
+      // limits. An omitted/blocked pond still outranks its named reedbed; its normal
+      // on-demand admission must run instead of silently selecting the reeds.
+      const kinded=m.tier>0?m.found.filter(p=>words.every(w=>{const kinds=[p.kind??'',...(SYNONYMS[p.kind??'']??[])].flatMap(tokens);return tokenHit(w,kinds)||(SYNONYMS[w]??[]).some(x=>tokenHit(x,kinds));})):[];
+      const found = SPOT_PLACE_VERBS.has(verb) ? [...(spotted.length ? spotted : m.found)].sort((a, b) => extra(a) - extra(b)) : kinded.length?kinded:m.found;
       // RESOLVE: matched by a place's description only (a lawn "with ... a horse"): the words name a thing in it
       const seek = m.tier === 3 ? words : undefined;
       const one = (cs: EdgeCapability[], note: (c: EdgeCapability) => string): VocabResult | null => {const r = one0(cs, note); return r && seek && r.kind === 'alias' ? {...r, seek} : r;};
@@ -626,7 +630,9 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       const reach = found.filter(p => capOf.has(p.id));
       // (the best-named place with a spot but no offer from here is refused below, and its host offers it on demand)
       const best = SPOT_PLACE_VERBS.has(verb) && spotted.length ? reach.filter(p => extra(p) === extra(found[0])) : SPOT_PLACE_VERBS.has(verb) && reach.length ? reach.filter(p => extra(p) === extra(reach[0])) : reach;
-      if (best.length) {const r = one(best.map(p => capOf.get(p.id)!), c => `${input} is ${c.id} (${c.label}).`); if (r) return r;}
+      // At the same partial-name tier, keep the existing actual-kind preference:
+      // a pond is the pond, not the nearer reedbed named after it. Exact identities stay stronger.
+      if (best.length) {const candidates=best.map(p => capOf.get(p.id)!);const r = one(m.tier===0?candidates:ownFirst(candidates,words), c => `${input} is ${c.id} (${c.label}).`); if (r) return r;}
       const place = found[0], inner = pool.filter(c => c.available && c.target && isAncestor(ctx, place.id, c.target.id));
       if (inner.length) {const r = one(inner, c => `${place.name} itself is not a ${verb} target; ${c.id} (${c.label}) is in it.`); if (r) return r.kind==='unknown'&&r.code==='place.ambiguous'&&found.length===1?{...r,code:'place.unreachable',place:place.id,verb,places:[place.id],reason:`${place.name} has no direct ${verb} offer; choose one of its reachable parts. No part was selected.`}:r;}
       // the nearest containing place this verb reaches (the harbour for its lighthouse), never the world root

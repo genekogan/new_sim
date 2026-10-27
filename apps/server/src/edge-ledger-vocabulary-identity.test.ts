@@ -53,3 +53,13 @@ test('authored names beat generic definition aliases, which remain usable as unn
  const nearest=resolveCapability('walk to a cottage',generic);assert.notEqual(nearest.kind,'unknown');if(nearest.kind!=='unknown')assert.equal(nearest.cap.id,'walk:east-home');
  const named=context(cabins.map(p=>({...p,aliases:[...p.aliases!,'Retreat']})),generic.caps.map(c=>({...c,aliases:[...c.aliases!,'Retreat']})));assert.equal(resolveCapability('walk to Retreat',named).kind,'unknown');
 });
+
+test('partial place names retain actual-kind priority without weakening exact identity or real ambiguity',()=>{
+ const pond={...p('shore-pond','Shore Pond'),kind:'water'},reeds={...p('pond-reeds','Pond Reeds'),kind:'outdoor'};
+ const water={...c('shore-pond',pond.id),label:'Walk to shore-pond, a pond (40 m)',available:false,blocked:{code:'route.unreachable',reason:'Bank closed.'}},bed={...c('pond-reeds',reeds.id),label:'Walk to pond-reeds, a reedbed, by shore-pond (10 m)'};
+ const ctx=context([pond,reeds],[water,bed]);const r=resolveCapability('go to the pond',ctx);assert.notEqual(r.kind,'unknown',JSON.stringify(r));if(r.kind!=='unknown'){assert.equal(r.cap.id,water.id);assert.equal(r.cap.available,false,'a genuine blocked pond never becomes reachable reeds');}
+ const omitted=resolveCapability('go to the pond',context([pond,reeds],[bed]));assert.equal(omitted.kind,'unknown');if(omitted.kind==='unknown'){assert.equal(omitted.code,'place.unreachable');assert.equal(omitted.place,pond.id,'known omitted pond uses exact admission rather than substituting reeds');}
+ const exact=resolveCapability('go to Pond Reeds',ctx);assert.notEqual(exact.kind,'unknown');if(exact.kind!=='unknown')assert.equal(exact.cap.id,bed.id);
+ const named=resolveCapability('go to the pond',context([pond,{...reeds,aliases:['pond']}],[water,{...bed,aliases:['pond']}]));assert.notEqual(named.kind,'unknown');if(named.kind!=='unknown')assert.equal(named.cap.id,bed.id,'authored exact alias is stronger than a generic partial type match');
+ const other={...p('far-pond','Far Pond'),kind:'water'},otherCap={...c('far-pond',other.id),label:'Walk to far-pond, a pond (80 m)'};const ambiguous=resolveCapability('go to the pond',context([pond,other],[{...water,available:true},otherCap]));assert.equal(ambiguous.kind,'unknown');if(ambiguous.kind==='unknown')assert.equal(ambiguous.code,'place.ambiguous');
+});
