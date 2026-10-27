@@ -9,6 +9,7 @@ import { appendJsonl, readJson, writeJson } from '../lib/jsonl.mjs';
 import { sha256 } from '../lib/hash.mjs';
 import { loadRun, projectEvidence, personaTurnsFor, chatExcerpt } from './run.mjs';
 import { runOracles, oracleVetoes } from './oracles.mjs';
+import { providerPolicy } from '../lib/provider-policy.mjs';
 import { scrub } from './filter.mjs';
 import { gather, computeEmergence } from './emergence.mjs';
 import { renderJournal } from './journal.mjs';
@@ -143,6 +144,7 @@ export function featureRequestsMd(frs) {
 /** reviewRun({runDir}) → step 5. `call` is injectable for tests (defaults to the signed-in claude -p). */
 export async function reviewRun({ runDir, model, call = realCall, maxWallSec = 300, log = (m) => process.stderr.write(m + '\n') }) {
   const run = loadRun(runDir);
+  const { deterministic } = providerPolicy(run.scenario);
   model = model ?? run.scenario?.review?.reviewerModel ?? 'opus';
   const earlier = earlierRuns(runDir).map((dir) => ({ dir, issues: readJson(join(dir, 'issues.json'), []) }));
   const earlierTitles = earlier.flatMap((e) => e.issues.map((i) => i.title)).slice(0, 10);
@@ -154,10 +156,10 @@ export async function reviewRun({ runDir, model, call = realCall, maxWallSec = 3
     rows.forEach((r) => appendJsonl(join(runDir, 'oracles.jsonl'), r));
     const prompt = requestPrompt(run, ev, rows, { earlierTitles });
     const allowed = [`Read(${runDir}/shots/**)`, `Read(${runDir}/personas/${ev.seat}/shown/**)`];
-    log(`review ${ev.requestId}: calling ${model}`);
-    const res = await call({ model, prompt, appendSystem: system, cwd: runDir, allowedTools: allowed, maxWallSec });
+    log(`review ${ev.requestId}: ${deterministic ? 'deterministic oracles only' : `calling ${model}`}`);
+    const res = deterministic ? { json: { fidelity: 'unresolved', reason: 'Deterministic oracle results only; no subjective model score.', inputDepth: 'debug' }, wallMs: 0 } : await call({ model, prompt, appendSystem: system, cwd: runDir, allowedTools: allowed, maxWallSec });
     const r = normalizeReview(res.json ?? lastJson(res.text), ev, rows);
-    appendJsonl(join(runDir, 'reviews.jsonl'), { ...r, model, wallMs: res.wallMs, usage: res.usage, exit: res.exit, timedOut: res.timedOut, rawText: String(res.text ?? '').slice(0, 4000) });
+    appendJsonl(join(runDir, 'reviews.jsonl'), { ...r, model: deterministic ? null : model, mode: deterministic ? 'deterministic' : 'model', wallMs: res.wallMs, usage: res.usage, exit: res.exit, timedOut: res.timedOut, rawText: String(res.text ?? '').slice(0, 4000) });
     reviews.push(r);
   }
   writeFileSync(join(runDir, 'ledger.tsv'), ledgerTsv(reviews));
@@ -171,10 +173,10 @@ export async function reviewRun({ runDir, model, call = realCall, maxWallSec = 3
   const metric = computeEmergence({ ...g, requests: run.evidence, binSec: run.scenario?.observer?.sampleSec ?? 5, seed: run.scenario?.seed ?? 1 });
   const finals = Object.fromEntries(Object.entries(run.personas).map(([s, p]) => [s, { final: p.ratings?.final ?? p.ratings, desires: p.desires.map((d) => d.text) }]));
   const sprompt = ['# Whole session', '', 'Read this journal as a stranger would, then rate it as a story.', '', renderJournal(run), '', 'Players\' final ratings and wishes:', '```json', JSON.stringify(finals), '```', 'Measured social facts (for context only; do not restate them as numbers):', '```json', JSON.stringify({ souls: metric.souls, sharedActivities: metric.sharedActivities, conversations: metric.conversations.started }), '```', '', SESSION_CONTRACT].join('\n');
-  log(`review session: calling ${model}`);
-  const sres = await call({ model, prompt: sprompt, appendSystem: system, cwd: runDir, allowedTools: [], maxWallSec });
+  if (!deterministic) log(`review session: calling ${model}`);
+  const sres = deterministic ? { json: {}, wallMs: 0 } : await call({ model, prompt: sprompt, appendSystem: system, cwd: runDir, allowedTools: [], maxWallSec });
   const sj = scrub(sres.json ?? lastJson(sres.text) ?? {});
-  const narrative = { storyRating: Number.isInteger(sj.value.storyRating) ? Math.min(5, Math.max(1, sj.value.storyRating)) : null, strangerReading: sj.value.strangerReading ?? null, o5Count: Number(sj.value.o5Count ?? 0) || 0, o5Examples: sj.value.o5Examples ?? [], surprises: sj.value.surprises ?? [], wantedMore: sj.value.wantedMore ?? [], leaked: sj.leaked, leakedHits: sj.hits, model, wallMs: sres.wallMs };
+  const narrative = { storyRating: Number.isInteger(sj.value.storyRating) ? Math.min(5, Math.max(1, sj.value.storyRating)) : null, strangerReading: sj.value.strangerReading ?? null, o5Count: Number(sj.value.o5Count ?? 0) || 0, o5Examples: sj.value.o5Examples ?? [], surprises: sj.value.surprises ?? [], wantedMore: sj.value.wantedMore ?? [], leaked: sj.leaked, leakedHits: sj.hits, model: deterministic ? null : model, mode: deterministic ? 'deterministic' : 'model', wallMs: sres.wallMs };
   const emergence = { version: 1, metric, narrative };
   writeJson(join(runDir, 'emergence.json'), emergence);
   return { reviews, issues, featureRequests: frs, emergence, oracles: oraclesBy };

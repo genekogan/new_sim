@@ -6,6 +6,7 @@ import { homedir } from 'node:os';
 import { callModel as realCall, lastJson } from '../lib/claude-p.mjs';
 import { readJson, writeJson } from '../lib/jsonl.mjs';
 import { run as runProc } from '../lib/proc.mjs';
+import { providerPolicy } from '../lib/provider-policy.mjs';
 import { loadRun, projectEvidence } from './run.mjs';
 import { runOracles } from './oracles.mjs';
 
@@ -53,6 +54,7 @@ const gitState = async (root) => (await runProc('git', ['-C', root, 'status', '-
 /** developRun({runDir, serverRoot}) → step 6. `call` injectable for tests. `only` limits to some ids. */
 export async function developRun({ runDir, serverRoot = DEFAULT_SERVER_ROOT, model, call = realCall, maxWallSec = 600, only = null, log = (m) => process.stderr.write(m + '\n') }) {
   const run = loadRun(runDir);
+  if (providerPolicy(run.scenario).deterministic) return { skipped: 'deterministic review: no model developer', specs: [] };
   model = model ?? run.scenario?.review?.developerModel ?? 'opus';
   const items = [...readJson(join(runDir, 'issues.json'), []).map((x) => ({ kind: 'issue', item: x })), ...readJson(join(runDir, 'feature-requests.json'), []).map((x) => ({ kind: 'feature', item: x }))].filter((x) => !only || only.includes(x.item.id));
   mkdirSync(join(runDir, 'specs'), { recursive: true });

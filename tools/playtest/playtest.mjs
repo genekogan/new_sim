@@ -4,7 +4,7 @@ import { mkdirSync, existsSync, readFileSync, writeFileSync, copyFileSync, cpSyn
 import { resolve, join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
-import { spawnSync } from 'node:child_process';
+import { providerPolicy, requireProviders } from './lib/provider-policy.mjs';
 import { now, setAnchor, sleep, monoMs } from './lib/clock.mjs';
 import { writeJson, readJson, appendJsonl } from './lib/jsonl.mjs';
 import { quota, quotaAllows } from './lib/quota.mjs';
@@ -53,12 +53,16 @@ export async function machineCheck() {
   return checks;
 }
 
-export async function preflight({ serverRoot }) {
-  const q = await quota();
+export async function preflight({ serverRoot, scenario = {} }) {
+  const policy = providerPolicy(scenario);
+  const q = policy.claude ? await quota() : { skipped: 'no Claude roles' };
   const checks = { quota: q, serverRoot: existsSync(join(serverRoot, 'tools/god-skill/dev-world.mjs')), webDist: existsSync(join(serverRoot, 'apps/web/dist/index.html')), controllerCli: existsSync(join(serverRoot, 'tools/world-launcher/soul/eden.mjs')), playwright: resolvePlaywright({ serverRoot })?.from ?? false, claude: null, codex: null };
   const { run } = await import('./lib/proc.mjs');
-  checks.claude = (await run('claude', ['--version'], { maxWallMs: 20000 })).stdout.trim();
-  checks.codex = (await run('codex', ['--version'], { maxWallMs: 20000 })).stdout.trim();
+  for (const provider of policy.required) {
+    const version = await run(provider, ['--version'], { maxWallMs: 20000 });
+    checks[provider] = version.code === 0 ? version.stdout.trim() : null;
+  }
+  try { requireProviders(policy, checks); checks.providersOk = true; } catch (e) { checks.providersOk = false; checks.providerError = e.message; }
   // Live arena health, so a slow world is caught before a playout, not after (Gene 2026-10-25).
   checks.live = {};
   for (const w of ['eden-2026', 'godmode-lab']) { try { const r = await fetch(`https://sim.eden.art/worlds/w/${w}/healthz`, { signal: AbortSignal.timeout(8000) }); const j = await r.json(); checks.live[w] = { ok: j.ok, build: j.build, tickMs: j.tickMs, clients: j.clients }; } catch (e) { checks.live[w] = { ok: false, error: String(e.message).slice(0, 80) }; } }
@@ -66,14 +70,15 @@ export async function preflight({ serverRoot }) {
   // unless the 1-minute load is under 10 and at least 6 GB of memory is free; `--force-machine` records the breach instead.
   // macOS: os.freemem() excludes inactive and purgeable pages; vm_stat gives the reclaimable total (Linux: MemAvailable).
   Object.assign(checks, await machineCheck());
-  const allow = quotaAllows(q, { stopPct: 85 });
-  const ok = checks.serverRoot && checks.webDist && checks.controllerCli && checks.playwright && !!checks.claude && allow.allowed && (checks.machineOk || process.argv.includes('--force-machine'));
+  const allow = policy.claude ? quotaAllows(q, { stopPct: 85 }) : { allowed: true, note: 'Claude unused; Codex limit errors stop the seat' };
+  const ok = checks.serverRoot && checks.webDist && checks.controllerCli && checks.playwright && checks.providersOk && allow.allowed && (checks.machineOk || process.argv.includes('--force-machine'));
   return { ok, allow, checks };
 }
 
 async function cmdRun(a) {
   const scenarioPath = resolve(a._[1]);
   const scenario = JSON.parse(readFileSync(scenarioPath, 'utf8'));
+  const policy = providerPolicy(scenario);
   const seed = Number(a.seed ?? scenario.seed ?? 1);
   const serverRoot = resolve(a['server-root'] ?? scenario.serverRoot ?? DEFAULT_SERVER_ROOT);
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..*/, '').replace('T', '-');
@@ -87,7 +92,7 @@ async function cmdRun(a) {
   const ctx = { runDir, scenario, seed, serverRoot, m, world: null, seats: [], god: null, browser: null, cameras: {}, owner: null };
 
   // 0 preflight
-  if (from <= 0) { const pf = await preflight({ serverRoot }); writeJson(join(runDir, 'preflight.json'), pf); receipt(runDir, 0, 'preflight', { ok: pf.ok, allow: pf.allow }); if (!pf.ok) { log('preflight failed', JSON.stringify(pf.checks)); return 2; } }
+  if (from <= 0) { const pf = await preflight({ serverRoot, scenario }); writeJson(join(runDir, 'preflight.json'), pf); receipt(runDir, 0, 'preflight', { ok: pf.ok, allow: pf.allow }); if (!pf.ok) { log('preflight failed', JSON.stringify(pf.checks)); return 2; } }
   // 1 provision
   if (from <= 1) {
     if (!m.provision) throw new Error('arena/provision.mjs missing');
@@ -106,15 +111,8 @@ async function cmdRun(a) {
     if (from <= 2) {
       if (!m.seat || !m.owner) throw new Error('arena/seat.mjs or owner.mjs missing');
       ctx.owner = m.owner;
-      // A Codex seat on a box without Codex (the cloud arena) is played by Claude instead, recorded on the seat and in
-      // the log, so the replay still has a live body there and the scorecard can say the seat was substituted.
-      const codexHere = (() => { try { return spawnSync('codex', ['--version'], { stdio: 'ignore', timeout: 10000 }).status === 0; } catch { return false; } })();
-      for (const s0 of scenario.seats) {
-        let s = s0;
-        if (s0.adapter === 'codex-headless' && !codexHere) {
-          s = { ...s0, adapter: 'claude-headless', model: process.env.PLAYTEST_CODEX_SUBSTITUTE_MODEL ?? 'sonnet', wake: true, substitutedFrom: `codex-headless/${s0.model ?? 'default'}` };
-          log(`seat ${s0.id}: codex not installed here; played by claude-headless/${s.model} (recorded as substituted)`);
-        }
+      // Keep each declared adapter; a missing provider fails instead of spending on another one.
+      for (const s of scenario.seats) {
         const seat = await m.seat.createSeat({ runDir, seat: s, worldBase: ctx.world.base, serverRoot, rails: scenario.rails ?? {} });
         if (s.substitutedFrom) { seat.info.substitutedFrom = s.substitutedFrom; seat.save?.(); }
         const ob = await seat.onboard({ text: onboardingText(ctx.world.base, s.soulName), maxWallSec: scenario.rails?.onboardWallSec ?? 600, timeoutSec: scenario.rails?.onboardTimeoutSec ?? 540 });
@@ -144,7 +142,7 @@ async function cmdRun(a) {
         if (ctx.god) { const gid = infoOf(ctx.god).id ?? 'god'; const cam = await openCam({ base: ctx.world.base, identity: 'admin', kind: 'wide', viewport: vp, dpr: scenario.observer?.dpr ?? 1, runDir, name: gid }); if (cam) ctx.cameras[gid] = cam; }
         observer = { camera: (id) => ctx.cameras[id] ?? null, cameras: ctx.cameras, truth: m.truth, evidence: m.evidence, browser: ctx.browser, sampleSec: scenario.observer?.sampleSec ?? 5 };
       } else log('observer modules missing: playing without screenshots/evidence');
-      const quotaCheck = async () => { const q = await quota(); const r = quotaAllows(q, { stopPct: scenario.rails?.quotaStopPct ?? 90 }); if (!r.allowed) log('QUOTA STOP', r.note); return r.allowed; };
+      const quotaCheck = async () => { if (!policy.claude) return true; const q = await quota(); const r = quotaAllows(q, { stopPct: scenario.rails?.quotaStopPct ?? 90 }); if (!r.allowed) log('QUOTA STOP', r.note); return r.allowed; };
       const play = await m.director.runPlay({ runDir, scenario, world: { ...ctx.world, name: scenario.world.slug, skillPath: join(runDir, 'server', 'skill.md') }, seats: Object.fromEntries(ctx.seats.map((s) => [infoOf(s).id, s])), god: ctx.god, observer, owner: m.owner, seed, quotaCheck });
       receipt(runDir, 3, 'play', { ok: true, ...play });
     }
@@ -171,8 +169,9 @@ async function cmdRun(a) {
   return await reviewRun(runDir, m, { serverRoot, from });
 }
 
-async function reviewRun(runDir, m, { serverRoot, from = 5 } = {}) {
+export async function reviewRun(runDir, m, { serverRoot, from = 5 } = {}) {
   const scenario = readJson(join(runDir, 'scenario.json'));
+  const policy = providerPolicy(scenario);
   if (!m) m = await loadModules();
   if (from <= 5) {
     if (!m.reviewer) { log('review module missing'); return 3; }
@@ -180,7 +179,7 @@ async function reviewRun(runDir, m, { serverRoot, from = 5 } = {}) {
     receipt(runDir, 5, 'review', { ok: true, requests: r.reviews?.length ?? 0, issues: r.issues?.length ?? 0, featureRequests: r.featureRequests?.length ?? 0, fidelity: (r.reviews ?? []).map((x) => `${x.requestId}:${x.fidelity}`).join(' ') });
   }
   if (from <= 6) {
-    if (scenario.review?.developer === false) receipt(runDir, 6, 'develop', { ok: true, skipped: 'scenario.review.developer is false' });
+    if (policy.deterministic || scenario.review?.developer === false) receipt(runDir, 6, 'develop', { ok: true, skipped: policy.deterministic ? 'deterministic review: no model developer' : 'scenario.review.developer is false' });
     else if (m.developer) {
       // The Developer is a draft generator in this stage: cap how many issues and feature requests get a spec per run.
       const maxI = scenario.review?.developerMaxIssues ?? 4, maxF = scenario.review?.developerMaxFeatureRequests ?? 3;

@@ -52,7 +52,7 @@ test('codex: render, shell-wrapper stripping and resume args', () => {
   const md = codex.renderChat([{ type: 'harness_user', text: 'hello' }, ...fx('codex-turn.jsonl')]);
   assert.match(md, /^> hello/); assert.match(md, /⏺ Bash\(ls -la\)\n {2}⎿ {2}total 8/); assert.match(md, /⏺ done\n$/);
   const a = codex.buildArgs({ threadId: 'T', resume: true, model: null, effort: null, text: 'go' });
-  assert.deepEqual([a[0], a[1], a.at(-2), a.at(-1)], ['exec', 'resume', 'T', 'go']);
+  assert.deepEqual([a[0], a[1], a.at(-2), a.at(-1)], ['exec', 'resume', 'T', `${codex.COMMAND_DISCIPLINE}\n\ngo`]);
   assert.ok(a.includes('--json') && a.includes('--ignore-user-config') && a.includes('--skip-git-repo-check'));
   const b = codex.buildArgs({ threadId: null, resume: false, model: 'gpt-6.1-sol', effort: 'medium', text: 'go' });
   assert.equal(b[1], '--ignore-user-config'); assert.equal(b[b.indexOf('-m') + 1], 'gpt-6.1-sol'); assert.ok(b.includes('model_reasoning_effort="medium"'));

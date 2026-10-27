@@ -5,7 +5,10 @@ import { run } from '../../lib/proc.mjs';
 /** Sandbox: workspace writes + network (the seat must reach the local world with curl/node). No approvals in exec. */
 export const SANDBOX_CONFIG = ['-c', 'sandbox_mode="workspace-write"', '-c', 'sandbox_workspace_write.network_access=true', '-c', 'approval_policy="never"'];
 
+export const COMMAND_DISCIPLINE = 'Run one command per tool call from the seat folder with relative paths (node eden.mjs … or node eden-god.mjs …). No cd, no && chains. Follow the served skill; finish each requested action and verify its receipt before claiming completion.';
+
 export function buildArgs({ threadId, resume, model, effort, text }) {
+  text = `${COMMAND_DISCIPLINE}\n\n${text}`;
   const common = ['--ignore-user-config', '--skip-git-repo-check', '--json', ...SANDBOX_CONFIG];
   if (model) common.push('-m', model);
   if (effort) common.push('-c', `model_reasoning_effort="${effort}"`);
