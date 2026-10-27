@@ -81,7 +81,8 @@
           "title": "Reading chair",
           "anchor": {
             "kind": "entity",
-            "ref": "living-room/reading-chair"
+            "ref": "living-room/reading-chair",
+            "slot": "seat"
           }
         },
         {
@@ -89,7 +90,8 @@
           "title": "First computer chair",
           "anchor": {
             "kind": "entity",
-            "ref": "living-room/computer-1-chair"
+            "ref": "living-room/computer-1-chair",
+            "slot": "seat"
           }
         }
       ]
