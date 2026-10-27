@@ -1,6 +1,8 @@
 // Bind reviewed stable entity paths to this fresh world's generated IDs. Descriptions never enter oracle truth.
 import { sha256 } from '../lib/hash.mjs';
+import {assertDestinationBindings} from '../lib/destination-choice.mjs';
 export function bindJourneyFixtures(scenario, snapshot) {
+  const destinationBindings=assertDestinationBindings(scenario,snapshot); // actual boot geometry, before any model seat is launched
   const byId = new Map((snapshot.entities ?? []).map(e => [e.id, e]));
   const path = e => { const names = []; const seen = new Set(); while (e) { if (seen.has(e.id)) throw new Error('fixture parent cycle'); seen.add(e.id); names.unshift(e.name ?? e.id); e = byId.get(e.in?.parent); } return names.join('/'); };
   const byPath = new Map((snapshot.entities ?? []).map(e => [path(e), e]));
@@ -13,5 +15,5 @@ export function bindJourneyFixtures(scenario, snapshot) {
       return entity.id;
     });
   }
-  return { schema: 'journey-bindings/1', worldId: snapshot.worldId, snapshotSeq: snapshot.seq, geometrySha256: sha256(JSON.stringify((snapshot.entities ?? []).filter(e => !String(e.id).startsWith('h_')).map(({ id, name, def, p, r, s, shape, in: parent }) => ({ id, name, def, p, r, s, shape, parent })))), bindings };
+  return { schema: 'journey-bindings/1', destinationBindings, worldId: snapshot.worldId, snapshotSeq: snapshot.seq, geometrySha256: sha256(JSON.stringify((snapshot.entities ?? []).filter(e => !String(e.id).startsWith('h_')).map(({ id, name, def, p, r, s, shape, in: parent }) => ({ id, name, def, p, r, s, shape, parent })))), bindings };
 }

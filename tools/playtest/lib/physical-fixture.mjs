@@ -29,7 +29,11 @@ export function assertFrozenGenesis(scenario, serverRoot) {
     assertDestinationBindings(scenario,snapshot);
     return {path,physicalSha256:actual,snapshotPath,snapshotSha256:sha256(bytes),physicalSnapshotSha256:physical};
   }
-  if(scenario.director?.script?.some(e=>e.expect?.journey?.firstDestinationChoices?.length))throw Error('first destination credit requires a frozen snapshot binding');
+  if(scenario.director?.script?.some(e=>e.expect?.journey?.firstDestinationChoices?.length)){
+    const sources=scenario.freeze.destinationSources;
+    if(!sources?.control||!sources?.treatment)throw Error('first destination credit requires both frozen materialization proofs');
+    for(const source of Object.values(sources)){const bytes=readFileSync(resolve(serverRoot,source.path));if(sha256(bytes)!==source.sha256)throw Error('frozen destination materialization proof changed');assertDestinationBindings(scenario,JSON.parse(bytes));}
+  }
   return {path,physicalSha256:actual};
 }
 

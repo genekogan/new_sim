@@ -15,3 +15,13 @@ test('runner checks actual genesis bytes before a frozen measurement can launch'
  writeFileSync(join(dir,'world.json'),JSON.stringify({...base,constants:{extent:101}}));assert.throws(()=>assertFrozenGenesis(scenario,dir),/fixture mismatch/);
  assert.throws(()=>assertFrozenGenesis({freeze:{}},dir),/explicit genesis/);
 });
+
+test('genesis-only destination credit requires both unchanged materialization proofs before boot',async t=>{
+ const {destinationBinding}=await import('./destination-choice.mjs');
+ const dir=mkdtempSync(join(tmpdir(),'sim-destination-proof-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));writeFileSync(join(dir,'world.json'),JSON.stringify(base));
+ const snapshot={defs:[{ref:'hall@1',hash:'hash'}],entities:[{id:'hall-id',name:'hall',def:'hall@1',in:{parent:'world'},p:[1,0,2]}]};
+ const bytes=JSON.stringify(snapshot);for(const arm of['control','treatment'])writeFileSync(join(dir,arm+'.json'),bytes);
+ const {sha256}=await import('./hash.mjs');const s={world:{genesis:'world.json'},freeze:{physicalSha256:physicalGenesisSha256(base),destinationSources:Object.fromEntries(['control','treatment'].map(a=>[a,{path:a+'.json',sha256:sha256(bytes)}]))},director:{script:[{expect:{journey:{firstDestinationChoices:[{binding:destinationBinding(snapshot,'hall',{portable:true}),receipt:{verb:'walk',capabilities:['walk:hall']}}]}}}]}};
+ assert.doesNotThrow(()=>assertFrozenGenesis(s,dir));const missing=structuredClone(s);delete missing.freeze.destinationSources.control;assert.throws(()=>assertFrozenGenesis(missing,dir),/both frozen/);
+ writeFileSync(join(dir,'control.json'),bytes+' ');assert.throws(()=>assertFrozenGenesis(s,dir),/proof changed/);
+});

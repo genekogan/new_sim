@@ -62,7 +62,7 @@ const phaseMatches = (s, p) => {
 export function validateJourney(j) {
   const errors = [];
   if (!j?.fixtureId || !j?.source) errors.push('journey requires fixtureId and immutable source');
-  for(const c of j?.firstDestinationChoices??[])if(!c.binding?.ref||!c.binding?.entityId||!c.binding?.placeId||!c.binding?.entitySha256||c.receipt?.verb!=='walk'||!c.receipt.capabilities?.length)errors.push('first destination requires an exact frozen physical binding and walk capabilities');
+  for(const c of j?.firstDestinationChoices??[])if(!c.binding?.ref||(!c.binding?.entityId&&!c.binding?.portable)||!c.binding?.placeId||!c.binding?.entitySha256||c.receipt?.verb!=='walk'||!c.receipt.capabilities?.length)errors.push('first destination requires an exact frozen physical binding and walk capabilities');
   if (!Array.isArray(j?.phases) || !j.phases.length) errors.push('journey.phases required');
   for (const p of j?.phases ?? []) if (p.anyOf && (!Array.isArray(p.anyOf) || !p.anyOf.length)) errors.push('phase anyOf must contain alternatives');
   for (const [i, phase] of (j?.phases ?? []).entries()) for (const p of options(phase)) {
