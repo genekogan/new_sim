@@ -275,6 +275,7 @@
           "maxWallSec": 180,
           "steps": [
             "stand:here",
+            "walk:g-campus-swimming-pond.shore-bank",
             {
               "verb": "go",
               "target": {
