@@ -52,3 +52,26 @@ test('eden.mjs creates a Soul on an account world: create --for, owner approves,
   assert.equal(st.paired, true);
   assert.equal(f.db.soul(ready.soul.id)?.name, 'Wren');
 });
+
+test('a retry that adds the window code moves a pending request into that window (legacy create-soul, then create-soul --for)', async t => {
+  const f = fixture(':memory:', await marsFactory({ ...GREEN_FIELD_WORLD, safeCrewRemoval: true })); f.brain.quiesce(); f.souls.enableLifecycle();
+  t.after(() => { f.host.stop(); f.db.close(); });
+  f.souls.cfg.accountAuthRequired = true; f.souls.cfg.inviteRequired = false;
+  const identity: AccountIdentity = { id: 'account-late-code', issuer: 'fixture', subject: 'account-late-code', verifiedAt: Date.now(), expiresAt: Date.now() + 3_600_000 };
+  f.db.upsertUser({ id: identity.id, email: null, wallet: null, role: 'user' });
+  f.auth.accountFromToken = async token => token === 'owner' ? { identity, user: f.db.user(identity.id)! } : null;
+  const app = buildApp({ cfg: f.souls.cfg, db: f.db, host: f.host, souls: f.souls, brain: f.brain, auth: f.auth,
+    hub: { clients: new Map(), refreshMe() {} } as unknown as Hub });
+  const req = (method: string, path: string, body?: unknown, owner = false) => app.request(path, { method,
+    headers: { host: '127.0.0.1', 'content-type': 'application/json', ...(owner ? { authorization: 'Bearer owner' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
+  const { code } = await (await req('POST', '/v1/account/window-code', {}, true)).json() as { code: string };
+  const input = { name: 'Mira', agentLabel: 'eden-agent 1.9', idempotencyKey: 'late-code-retry-0001', pollSecret: 'A'.repeat(43) };
+  const first = await (await req('POST', '/v1/agent/approval/start', input)).json() as { approval: { id: string; inWindow: boolean }; delivery: string };
+  assert.equal(first.delivery, 'link'); assert.equal(first.approval.inWindow, false);
+  const again = await (await req('POST', '/v1/agent/approval/start', { ...input, for: 'ZZZZ-ZZZZ' })).json() as { approval: { inWindow: boolean } };
+  assert.equal(again.approval.inWindow, false, 'an unknown code changes nothing');
+  const retry = await (await req('POST', '/v1/agent/approval/start', { ...input, for: code })).json() as { approval: { id: string; inWindow: boolean }; delivery: string };
+  assert.equal(retry.approval.id, first.approval.id); assert.equal(retry.delivery, 'window'); assert.equal(retry.approval.inWindow, true);
+  const waiting = await (await req('GET', '/v1/account/approvals', undefined, true)).json() as { approvals: { id: string }[] };
+  assert.deepEqual(waiting.approvals.map(a => a.id), [first.approval.id], 'the open window shows it');
+});

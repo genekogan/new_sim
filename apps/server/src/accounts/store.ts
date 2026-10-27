@@ -210,8 +210,12 @@ export class AccountStore {
       if (previous) {
         if ((previous.client_poll_secret || input.pollSecret !== undefined) && !hashMatches(input.pollSecret, previous.poll_hash)) fail('poll-secret', 'Approval retry credential invalid');
         if (previous.input_hash !== inputHash) fail('idempotency-conflict', 'Approval retry changed its request');
+        // A retry may add the window code the first try lacked (real agent 2026-10-26: create-soul, then create-soul --for got
+        // the same request back, link only). Address a still-pending, unaddressed request to that window; it conveys no control.
+        const late = previous.status === 'pending' && !previous.target_account_id ? this.codeAccount(input.forCode) : null;
+        if (late) this.db.db.prepare('UPDATE account_approvals_v1 SET target_account_id=? WHERE id=?').run(late, previous.id);
         // Stored hashes cannot recover the secret. Never regenerate it on retry.
-        return this.dto(this.fresh(previous));
+        return this.dto(this.fresh(late ? this.required(previous.id) : previous));
       }
       // Lane SOULSIM-E (real-agent run 2026-10-21): a new Soul under a name already taken in this world was accepted here and
       // refused only when the person approved it, while the agent sat in `approval wait` for its full ten minutes. Refuse
