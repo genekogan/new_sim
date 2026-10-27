@@ -53,7 +53,8 @@ test('vocabulary (CN5): a known place that cannot be reached is refused honestly
  const named = resolveCapability('walk:library', ctx());assert.equal(named.kind, 'unknown');assert.match((named as any).reason, /Library is not walkable/, 'Library (exact name) beats Library annex');
  const far = resolveCapability('walk:region-park.pond', ctx());assert.equal(far.kind, 'unknown');assert.match((far as any).reason, /not walkable ground yet/);
 });
-test('vocabulary: ambiguous named matches return choices; unknown names get did_you_mean', () => {
+// Keep the published TAP identity; ambiguity now returns choices unless "nearest" is explicit.
+test('vocabulary: several matches prefer the obvious one (nearest, with the others named); unknown names get did_you_mean', () => {
  const shore = resolveCapability('walk:shore', ctx());assert.equal(shore.kind, 'unknown');assert.equal((shore as any).code, 'place.ambiguous');assert.ok((shore as any).didYouMean.some((c:any)=>c.id==='walk:shore-water'));const near=resolveCapability('walk to nearest shore',ctx());assert.equal(near.kind,'alias');assert.equal((near as any).cap.id,'walk:shore-bank');
  const dining = to('walk:dining-common') as {unknown: string[]};assert.equal(dining.unknown[0], 'walk:social-eden-dining');
  const bogus = resolveCapability('dance:moon', ctx());assert.equal(bogus.kind, 'unknown');assert.match((bogus as any).reason, /No "dance" capability/);assert.ok((bogus as any).didYouMean.some((d: any) => d.id === 'rest:here'), 'real things to do');

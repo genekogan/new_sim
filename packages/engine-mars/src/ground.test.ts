@@ -63,7 +63,9 @@ test('a Soul is born standing on the ground and walks up the knoll; its y follow
   assert.deepEqual(e.runtime.violations, []);
 });
 
-test('a cliff and the edge of the world are refused with precise codes', () => {
+// Keep the published TAP identity. Its historical water-refusal clause is superseded by
+// the composed walk/wade/swim/return and bridge-water assertions below; cliff/edge refusals remain.
+test('a cliff is refused with a precise code; deep water refuses walking; the edge of the world is refused', () => {
   const e = world();
   const cliff = e.canPerform({ actor: 'h_ada', label: 'mesa', steps: [{ verb: 'walk_to', params: { to: [0, 50] } }] }) ?? run(e, [{ verb: 'walk_to', params: { to: [0, 50] } }]).end;
   assert.match(String((cliff as { code?: string })?.code), /ground\.cliff/, JSON.stringify(cliff));
