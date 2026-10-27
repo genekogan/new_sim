@@ -18,7 +18,7 @@ test('meaning changes display and semantic hierarchy without changing physical m
  const {m}=setup(), ps=[place(m.get('land-campus')!.id,'land-campus','area'),place(m.get('speaker')!.id,'speaker','thing',[[-1,-1],[1,-1],[1,1],[-1,1]]),place(m.get('land-west-lake')!.id,'land-west-lake','water'),place(m.get('land-west-lake')!.id,'land-west-lake','shore')];
  ps[3].id+='-shore'; const before=ps.map(p=>({parent:p.parent,polygon:structuredClone(p.polygon),kind:p.kind})); decorateMeaning(m,ps,'world');
  assert.equal(ps[0].name,'Campus');assert.equal(ps[1].description,'A bench for the speaker.');assert.equal(ps[1].semanticParent,'g-land-campus');assert.equal(ps[3].semanticParent,'g-land-west-lake');
- assert.equal(ps[2].semanticKind,'lake'); assert.equal(ps[3].name,'West Lake bank');assert.ok(ps[2].aliases!.includes('swimming lake'));assert.ok(ps[2].aliases!.includes('pond'));
+ assert.equal(ps[2].semanticKind,'lake'); assert.equal(ps[3].name,'West Lake bank');assert.ok(ps[2].aliases!.includes('swimming lake'));assert.ok(ps[2].aliases!.includes('pond'));assert.ok(ps[2].genericAliases!.includes('pond'));assert.ok(!ps[2].genericAliases!.includes('swimming lake'),'authored names stay stronger than generic definition vocabulary');
  const waterPlaces=ps.slice(2).map(p=>({id:p.id,name:p.name,aliases:p.aliases!,level:0,nativeRegion:p.id,access:'admitted' as const}));
  const offers=waterPlaces.map(p=>({placeId:p.id,id:`walk:${p.id}`,available:true}));
  for(const ref of ['land-west-lake','swimming lake']){const r=resolveBootPlace(ref,waterPlaces,offers);assert.ok(r.ok);assert.equal(r.chosen.place,ps[2].id);}
@@ -43,4 +43,11 @@ test('named part walks use real bindings, exact seats and bounded local stands w
  const seat=caps.find(c=>c.id==='sit:land-campus/part-speaker');assert.ok(seat?.available);assert.ok(seat.aliases.includes('podium desk'));assert.ok(plans.get(seat.id).steps.some((s:any)=>s.verb==='mars:sit'&&s.params.slot===`${speaker.id}#${slot.id}`));
  const places=new GodPlaces({model:m,nav,engineOwned:()=>false,levelAt:()=>0,log:()=>{}});assert.equal(places.list().some(p=>p.ref.includes('/part-')),false,'semantic targets never add physical membership polygons');
  blocked=true;engine.world.tick++;const blockedCaps:any[]=[];nav.capabilities({entityId:'soul'} as never,blockedCaps,new Map());assert.equal(blockedCaps.find(c=>c.id==='walk:land-campus/part-bay')?.available,false,'reachability refusal does not substitute a nearby floor');
+});
+
+test('authored aliases retain priority across generic tag punctuation',()=>{
+ const {m,act}=setup();act([{op:'set',id:'speaker',about:{title:'Speaker bench',aliases:['garden seat']}}]);
+ const def=m.resolvedDef(m.get('speaker')!.def)!;def.tags.push('garden-seat');
+ const ps=[place(m.get('speaker')!.id,'speaker','thing')];decorateMeaning(m,ps,'world');
+ assert.ok(ps[0].aliases!.includes('garden-seat'));assert.ok(!ps[0].genericAliases!.includes('garden-seat'));
 });

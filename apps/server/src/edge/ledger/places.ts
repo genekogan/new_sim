@@ -10,7 +10,7 @@ type V2 = [number, number];
 export type Occupier = {id: string; fixture: string; slot: string; kind: string};
 export type Place = {id: string; name: string; kind: string; parent: string | null; polygon: V2[]; level: number; enclosed: boolean; capacity: number | null; starting: boolean; description?: string; occupiers?: Occupier[]; schedule?: {id: string; cron: string; durationMinutes?: number; ticketed?: boolean; label?: string}[]; roles?: {id: string; relations?: {name: string; to: string}[]}[];
   /** Public semantic hierarchy is independent of physical membership and access. */
-  ref?: string; worldAbout?: WorldAbout; aliases?: readonly string[]; semanticParent?: string | null; semanticKind?: string; semanticRole?: 'district' | 'quarter' | 'landmark' | 'part' | 'minor'; salience?: number; parts?: MeaningPart[];
+  ref?: string; worldAbout?: WorldAbout; aliases?: readonly string[]; genericAliases?: readonly string[]; semanticParent?: string | null; semanticKind?: string; semanticRole?: 'district' | 'quarter' | 'landmark' | 'part' | 'minor'; salience?: number; parts?: MeaningPart[];
   /** carrier/1: a place that moves with a native carrier entity (a balloon basket). Membership is by carriage, never geometry; `polygon` is in the entity's own frame. */
   carrier?: {entity: string; frame?: 'local'};
   /** knowledge/1: the world's creator keeps this place (and everything inside it) off maps and listings until a Soul has been there or found it. */

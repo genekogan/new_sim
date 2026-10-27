@@ -15,7 +15,7 @@ export type VocabTarget = {
 };
 export type VocabPlace = {id: string; ref?:string; name: string; center: [number, number];
   /** Declared place aliases, distinct from descriptive words and fuzzy matching. */
-  aliases?: readonly string[];
+  aliases?: readonly string[]; genericAliases?: readonly string[];
   /** Optional richer facts (live ledger): parent id, kind, description words and whether a walk reaches it natively. */
   parent?: string | null; kind?: string; description?: string; walkable?: boolean; polygon?: [number,number][]; level?: number};
 export type VocabContext = {
@@ -122,11 +122,11 @@ const INTENTS: [RegExp, string, ('keep')?][] = [
   [/\b(?:p[eé]tanque|boules|bocce)\b/, 'play-petanque'], [/\bfrisbee\b/, 'play-frisbee'], [/\b(?:beach )?volley ?ball\b/, 'play-volleyball'],
   // R5 group life: storytelling, a book club, cooking together, dancing on the bandstand, a yoga class, giving a concert
   [/\b(?:tell|telling|share|sharing) (?:a |some |the )?(?:stor(?:y|ies)|tales?)\b|\bstory ?tell\w*/, 'tell-story'],
-  [/\b(?:listen to|hear|join) (?:a |the |some )?(?:stor(?:y|ies)|storyteller|story ?(?:circle|time))\b|\bstory ?(?:circle|time)\b/, 'hear-story'],
+  [/\b(?:listen to|hear|join) (?:a |the |some )?(?:story ?(?:circle|time)|storyteller|stor(?:y|ies))\b|\bstory ?(?:circle|time)\b/, 'hear-story'],
   [/\bbook ?club\b|\bread(?:ing)? (?:together|with (?:others|friends|the group))\b/, 'book-club'],
   [/\bcook(?:ing)? (?:together|with (?:others|friends|everyone|the group))\b|\b(?:communal|group) cooking\b|\bcooking (?:class|club)\b/, 'cook-together'],
   [/\bbandstand\b.*\bdanc\w*|\bdanc\w*\b.*\bbandstand\b|\b(?:barn|social|square|line|ballroom) danc\w*|\bdance (?:party|together)\b/, 'social-dance'],
-  [/\byoga (?:class|session|together|group)\b|\b(?:lead|teach|join|take) (?:a |the )?yoga\b/, 'yoga-class'],
+  [/\byoga (?:class|session|together|group)\b|\b(?:lead|teach|join|take) (?:a |the )?yoga(?: (?:class|session|group))?\b/, 'yoga-class'],
   [/\b(?:give|play|perform|put on|hold) (?:a |the )?(?:concert|gig)\b|\bjam session\b|\bperform (?:on|at) (?:the )?stage\b/, 'play-music'],
   [/\b(?:sing|singing|karaoke|open mic|microphone)\b/, 'sing'],
   [/\b(?:listen|listening|concert|audience|watch (?:the )?(?:show|band|performance|concert|musicians?))\b/, 'listen'],
@@ -411,7 +411,7 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       const tiers = [
         ctx.places.filter(p => norm(p.id) === q),
         ctx.places.filter(p => norm(p.name) === q),
-        ctx.places.filter(p => p.aliases?.some(alias => norm(alias) === q)),
+        ctx.places.filter(p => p.aliases?.some(alias => !p.genericAliases?.includes(alias) && norm(alias) === q)),
       ];
       const named = tiers.find(matches => matches.length); if (!named) continue;
       if (named.length > 1) return {kind:'unknown',code:'place.ambiguous',reason:`Several places have that name; use an exact offered ${verb} capability. Nothing else was chosen.`,didYouMean:ctx.caps.filter(c => c.verb === verb && named.some(p => p.id === c.target?.id)).map(c => ({id:c.id,label:c.label}))};
@@ -448,6 +448,7 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   // RESOLVE (SOULSIM-E "go to the bakery" went into its storeroom, 5 m, not in at the shop front): the place a match stands in
   const placeIdOf = (c: EdgeCapability) => c.target?.kind === 'place' ? c.target.id : info.get(c.id)?.t.around[0];
   const one0 = (cs: EdgeCapability[], note: (c: EdgeCapability) => string): VocabResult | null => {
+    cs=[...new Map(cs.map(c=>[c.id,c])).values()];
     if (!cs.length) return null;
     const live = cs.filter(c => c.available), list = live.length ? live : cs;
     if (list.length === 1) return {kind: 'alias', cap: list[0], note: note(list[0])};
@@ -462,7 +463,14 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       const outer = enclosing.find(c => placeOf(c)?.kind === 'building') ?? enclosing.find(c => !enclosing.some(o => o !== c && isAncestor(ctx, o.target!.id, c.target!.id)));
       if (outer) return {kind: 'alias', cap: outer, note: note(outer) + ` (the nearest match, ${n.id}, is in it; ${list.length} matched)`};
     }
-    if (!nearestRequested && verb !== 'sit') return {kind:'unknown',code:'place.ambiguous',reason:`Several destinations match; choose a candidate by its exact capability ID.`,didYouMean:ranked.slice(0,5).map(c=>({id:c.id,label:c.label}))};
+    // An unnamed kind request ("the library stair") can use the nearest instance
+    // of that kind. Actual names and place destinations keep explicit ambiguity.
+    const kindWords=tokens(rest),genericObjectKind=verb==='walk'&&kindWords.length>0&&list.every(c=>{
+      const kind=kindOf(c),words=kind?tokens(kind):[];
+      return c.target?.kind==='object'&&words.length>0&&kindWords.every(w=>tokenHit(w,words))&&kindWords.some(w=>tokenHit(w,words.slice(-1)));
+    });
+    const genericPlaceKind=verb==='walk'&&kindWords.length>0&&list.every(c=>{const p=placeOf(c);return p?.genericAliases?.some(a=>norm(a)===kindWords.join(' '));});
+    if (!nearestRequested && verb !== 'sit' && !genericObjectKind && !genericPlaceKind) return {kind:'unknown',code:'place.ambiguous',reason:`Several destinations match; choose a candidate by its exact capability ID.`,didYouMean:ranked.slice(0,5).map(c=>({id:c.id,label:c.label}))};
     if (!Number.isFinite(dme(n))) return {kind:'unknown',code:'place.position-unknown',reason:'The destination distances are unknown; choose an exact candidate.',didYouMean:ranked.slice(0,5).map(c=>({id:c.id,label:c.label}))};
     return {kind: 'alias', cap: n, note: note(n) + ` (the nearest of ${list.length}; also ${ranked.slice(1, 4).map(c => c.id).join(', ')})`};
   };
@@ -501,7 +509,9 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       if(exact.length)return exact;
       const named=new Set(ctx.places.filter(p=>norm(p.name)===want).map(p=>p.id));
       const titles=matches.filter(c=>c.target?.kind==='place'&&named.has(c.target.id));
-      return titles.length?titles:matches;
+      const preferred=placeMatchTier(tokens(want),ctx.places,ctx.withheld).found;
+      const placeAliases=matches.filter(c=>c.target?.kind==='place'&&preferred.some(p=>p.id===c.target!.id));
+      return titles.length?titles:placeAliases.length?placeAliases:preferred.length?[]:matches;
     };
     const here = pool.find(c => c.id === `${verb}:here`);
     // 0. Verbs with a single non-targeted (or "here") capability: rest:anything, swim:pond, wander:around.
@@ -514,9 +524,11 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
     // Nothing named, or "here"/"down"/"nearby": the verb's own :here capability (sit down → sit:here).
     if (here && (!q.length || ['here', 'nearby', 'near', 'anywhere', 'somewhere', 'down', 'now', 'nearest'].includes(qs))) return {kind: 'alias', cap: here, note: `${input} is ${here.id} (${here.label}).`};
     // CN5: an activity at spots with nothing named: the nearest free one (use a computer, play the drums, sing, play pétanque)
-    if (!q.filter(t => !FILLER.has(t)).length && pool.every(c => c.target?.kind === 'spot')) {
-      const near = pool.filter(c => c.available).sort((a, b) => dme(a) - dme(b) || a.id.localeCompare(b.id));
-      if (near.length) return {kind: 'alias', cap: near[0], note: `${input} is the nearest free one, ${near[0].id} (${near[0].label}, ${Math.round(dme(near[0]))} m).`};
+    const unnamedActivity=!q.filter(t=>!FILLER.has(t)).length||INTENTS.some(([re,v,keep])=>!keep&&v===verb&&re.test(text)&&!tokens(text.replace(re,' ')).filter(t=>!FILLER.has(t)).length);
+    if (unnamedActivity && pool.every(c => c.target?.kind === 'spot')) {
+      const available=pool.filter(c=>c.available);
+      const near = (available.length?available:pool).sort((a, b) => dme(a) - dme(b) || a.id.localeCompare(b.id));
+      if (near.length) return {kind: 'alias', cap: near[0], note: `${input} is the nearest ${available.length?'available':'matching unavailable'} one, ${near[0].id} (${near[0].label}, ${Math.round(dme(near[0]))} m).`};
     }
     // ROUTE-RECHECK ("go for a swim" in the park pond was "Say which"): a swim with no water named is in the water the Soul
     // is in, else the nearest it can swim in
@@ -545,6 +557,13 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
         const t = r.cap.target?.id, other = ctx.places.filter(p => norm(p.name) === s && p.id !== t && !isAncestor(ctx, p.id, t) && !(t && isAncestor(ctx, t, p.id)));
         return other.length ? {...r, note: `${r.note} ("${other[0].name}" also names ${other[0].id}${other[0].walkable ? '' : ', which cannot be reached yet'}.)`} : r;
       };
+      // An exact known place whose offer is omitted for distance still names that
+      // place. Let 3b request its on-demand admission instead of accepting an object
+      // tagged with its alias (a library book is not the distant library).
+      const placeIdentity=PLACE_VERBS.has(verb)?placeMatchTier(words,ctx.places,ctx.withheld):null;
+      if(SPOT_PLACE_VERBS.has(verb)&&placeIdentity?.found.length)break;
+      if(placeIdentity?.tier===0&&placeIdentity.found.length&&!pool.some(c=>norm(c.id.slice(c.id.indexOf(':')+1))===s||norm(c.target?.id??'')===s)
+        && !pool.some(c=>c.target?.kind==='place'&&placeIdentity.found.some(p=>p.id===c.target!.id)))break;
       // 1. Same name as the target, its label or its place name.
       const r1 = also(one(byOwn(s), c => `${input} is ${c.id} (${c.label}).`)); if (r1) return r1;
       // 2. The place an object stands in (sit:commons-deck, warm-by-fire:social-eden-fire-circle).
@@ -558,8 +577,12 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       // ... and a place verb's words that only an offer's "by <neighbours>" names ("go to the south lawn": the quad lawn "by
       // land-campus-south-gate") go to the place whose own name has them (the south lawn, offered on demand when far)
       const byPlace3 = (SPOT_PLACE_VERBS.has(verb) && named3.some(c => c.target?.kind === 'place') && placeMatch(words, ctx.places, ctx.withheld).length > 0)
-        || (PLACE_VERBS.has(verb) && !strict.length && named3.length > 0 && [0, 1].includes(placeMatchTier(words, ctx.places, ctx.withheld).tier));
-      const r3 = byPlace3 ? null : also(one(ownFirst(named3, words), c => `${input} is ${c.id} (${c.label}).`)); if (r3) return r3;
+        || (PLACE_VERBS.has(verb) && [0, 1].includes(placeMatchTier(words, ctx.places, ctx.withheld).tier));
+      // Full public labels now include purpose prose. A field mentioning its
+      // pavilion must not beat the pavilion's own name, even when it encloses it.
+      // Keep all named qualifiers rather than trying a weaker root-stripped pass.
+      if(byPlace3)break;
+      const r3 = also(one(ownFirst(named3, words), c => `${input} is ${c.id} (${c.label}).`)); if (r3) return r3;
     }
     // 3c (SOULSIM-E): a thing's everyday synonyms, after its exact words fail, for verbs at things (places have 3b): Mars's
     // "sit by the campfire" was capability.unknown while "sit by the fire" sat on a fire bench (its benches are "Fire
@@ -651,14 +674,14 @@ export function placeMatch(words: string[], places: VocabPlace[], withheld: read
 export function placeMatchTier(words: string[], places: VocabPlace[], withheld: readonly string[] = []): {found: VocabPlace[]; tier: number} {
   if (!words.length) return {found: [], tier: -1};
   const q=words.join(' ');
-  for(const found of [places.filter(p=>norm(p.id)===q||p.ref&&norm(p.ref)===q),places.filter(p=>norm(p.name)===q),places.filter(p=>p.aliases?.some(a=>norm(a)===q))])if(found.length)return {found,tier:0};
-  const nameT = (p: VocabPlace) => [...tokens(p.name), ...tokens(p.id), ...tokens(p.kind??''), ...(p.aliases??[]).flatMap(tokens)], descT = (p: VocabPlace) => tokens(p.description ?? '');
+  const aliases=(p:VocabPlace)=>(p.aliases??[]).filter(a=>!p.genericAliases?.includes(a));
+  for(const found of [places.filter(p=>norm(p.id)===q||p.ref&&norm(p.ref)===q),places.filter(p=>norm(p.name)===q),places.filter(p=>aliases(p).some(a=>norm(a)===q))])if(found.length)return {found,tier:0};
+  const nameT = (p: VocabPlace) => [...tokens(p.name), ...tokens(p.id), ...aliases(p).flatMap(tokens)], descT = (p: VocabPlace) => tokens(p.description ?? '');
   const hit = (w: string, set: string[]) => tokenHit(w, set) || (SYNONYMS[w] ?? []).some(s => tokenHit(s, set));
   const tiers = [
-    // CN5: a place whose own name is exactly these words comes first ("Artists' studio" is the office studio, not the village's warehouse)
-    places.filter(p => tokens(p.name).join(' ') === words.join(' ') || p.aliases?.some(a=>tokens(a).join(' ')===words.join(' '))),
+    places.filter(p => norm(p.name) === q || aliases(p).some(a=>norm(a)===q)),
     places.filter(p => words.every(w => tokenHit(w, nameT(p))) && !numberConflict(words, [tokens(p.name), tokens(p.id)])),
-    places.filter(p => words.every(w => hit(w, nameT(p))) && !numberConflict(words, [tokens(p.name), tokens(p.id)])),
+    places.filter(p => words.every(w => hit(w, [...nameT(p),...tokens(p.kind??''),...(p.genericAliases??[]).flatMap(tokens)])) && !numberConflict(words, [tokens(p.name), tokens(p.id)])),
     places.filter(p => words.every(w => hit(w, [...nameT(p), ...descT(p)])) && !numberConflict(words, [tokens(p.name), tokens(p.id)])),
   ];
   // knowledge/1: a withheld place's own name is not an everyday word for some other place (the grove is not the orchard)

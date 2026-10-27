@@ -49,6 +49,9 @@ export function decorateMeaning(m: WorldModel, places: GodPlace[], root: string 
     p.aliases = p.of === 'shore'
       ? [...new Set([`${p.ref} shore`, `${p.ref} bank`, ...[a?.title, ...(a?.aliases ?? [])].filter(Boolean).flatMap(name => [`${name} bank`, `${name} shore`])])].slice(0, 64)
       : [...new Set([p.ref, ...(part?.aliases ?? []), ...(room ? [room] : [...(a?.aliases ?? []), ...(a?.kind ? [a.kind] : []), ...(d ? [d.name.replace(/^core[-/]/, '').replace(/^ew-/, '')] : []), ...(d?.tags ?? []), ...(d?.synonyms ?? [])])])].slice(0, 64);
+    // Track type vocabulary separately from authored names for resolution priority.
+    // Public aliases remain the same; names explicitly authored by the god stay identities.
+    p.genericAliases = p.of === 'shore' || room ? [] : [...new Set([...(a?.kind ? [a.kind] : []), ...(d ? [d.name.replace(/^core[-/]/, '').replace(/^ew-/, '')] : []), ...(d?.tags ?? []), ...(d?.synonyms ?? [])])].filter(x => ![p.ref, p.name, ...(a?.aliases ?? [])].some(n => n.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim() === x.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()));
     if (p.of !== 'shore' && !room) {
       if (a?.what) p.description = a.what;
       if (a?.kind) p.semanticKind = a.kind;

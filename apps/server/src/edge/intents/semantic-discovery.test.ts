@@ -49,3 +49,9 @@ test('explore reuses purpose retrieval; bare queries require every term and pres
  assert.equal(run('live music in missing district'),null);
  secret.add('stage');assert.equal(run('live music'),null,'private purpose must not leak through fallback');
 });
+
+test('supported untargeted activity commands remain activities before venue discovery',()=>{
+ const {L}=setup(),caps=[{id:'read:here',verb:'read',available:true},{id:'nap:here',verb:'nap',available:true}] as any;
+ for(const query of ['find somewhere to read a book','find somewhere to take a nap'])assert.equal(semanticDiscovery(L,{soulId:'s'} as any,query,caps,new Map()),null,query);
+ const venue=semanticDiscovery(L,{soulId:'s'} as any,'somewhere to hear live music',caps,new Map()) as any;assert.equal(venue.discovery.kind,'purpose');assert.equal(venue.didYouMean[0].id,'walk:stage');
+});

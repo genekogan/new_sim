@@ -38,6 +38,10 @@ export function semanticDiscovery(L:EdgeLedger,soul:EdgeSoul,text:string,caps:Ed
  const all=[...L.places.byId.values()],known=all.filter(p=>L.knowledge.knows(soul.soulId,p.id));
  const purpose=PURPOSE.exec(text.trim());
  if(purpose){
+  // Preserve established untargeted activity commands (read a book, take a nap).
+  // Venue discovery is a fallback, not a conversion of an executable activity to travel.
+  const existing=parseCapability(text,new Set(caps.map(c=>c.verb)));
+  if(!tokens(existing.rest).length&&!['walk','sit'].includes(existing.verb)&&caps.some(c=>c.verb===existing.verb))return null;
   const requested=(purpose[1]??purpose[2]).trim();
   if(parseCapability(requested,new Set([...caps.map(c=>c.verb),'sit'])).verb==='sit')return semanticDiscovery(L,soul,requested,caps,plans);
   const scope=/\s+(?:in|at)\s+(.+)$/i.exec(requested),activity=scope?requested.slice(0,scope.index):requested;

@@ -597,7 +597,7 @@ export class GodNav {
       const f = q.floor === 'up' ? floors.find((x) => x > cur) : q.floor === 'down' ? [...floors].reverse().find((x) => x < cur) : q.floor === 'top' ? floors.at(-1) : q.floor;
       return f !== undefined && floors.includes(f) && (q.floor === 'top' ? f > 0 || cur > 0 : true) ? f : null;
     };
-    const own = (t: Thing) => [...words(t.name), ...words(t.what)];
+    const own = (t: Thing) => [...words(t.ref), ...words(t.name), ...t.words];
     const near = (cands: Thing[]) => cands.map((t) => ({ t, d: this.distance(t, here) })).sort((a, b) => a.d - b.d || (a.t.ref < b.t.ref ? -1 : 1));
     const preferred = q.prefer ? buildingOf(all.find((t) => this.h.placeOf?.(t.ref) === q.prefer)) : undefined;
     const atDoor = all.find((b) => b.kind === 'building' && (b.stands ?? []).some((s) => Math.hypot(s[0] - here[0], s[1] - here[1]) <= 4));
