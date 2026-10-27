@@ -549,10 +549,13 @@ export class NavConnectivity {
       const { link, ascending } = tasks[k];
       const { entry, approach, exit } = linkApproach(link, ascending), far = linkApproach(link, !ascending).approach;
       const he = hypot(entry.p[0] - approach[0], entry.p[1] - approach[1]) + 0.3;
+      // Arrival validation reads the physical landing as well as its snapped
+      // approach. Include both in the cropped ground grid, just as departure does.
+      const hx = Math.max(0.6, hypot(exit.p[0] - far[0], exit.p[1] - far[1]) + 0.3);
       let mk = '';
       if (ground) {
         const side = (level: number, p: Vec2, half: number) => (level === 0 ? this.patch0Key(p, half) : this.upperAt(level, p, half)?.ck ?? '-');
-        mk = `${link.id}|${ascending}|${JSON.stringify([link.from, link.to, link.heading, link.approach, link.width])}|${side(entry.level, approach, he)}|${side(exit.level, far, 0.6)}`;
+        mk = `${link.id}|${ascending}|${JSON.stringify([link.from, link.to, link.heading, link.approach, link.width])}|${side(entry.level, approach, he)}|${side(exit.level, far, hx)}`;
         const was = this.linkMemo.get(mk);
         if (was !== undefined) {
           memo.set(mk, was); this.stats.linkHits++;
@@ -567,8 +570,8 @@ export class NavConnectivity {
       }
       this.patchTiles = new Map();
       if (entry.level === 0) yield* this.warmPatch(approach, he);
-      if (exit.level === 0) yield* this.warmPatch(far, 0.6);
-      const ge = at(entry.level, approach, he), gx = at(exit.level, far, 0.6);
+      if (exit.level === 0) yield* this.warmPatch(far, hx);
+      const ge = at(entry.level, approach, he), gx = at(exit.level, far, hx);
       this.patchTiles = undefined;
       if (!ge || !gx) { if (ground) memo.set(mk, null); yield 'graph'; continue; }
       const t = linkEdgeTest(link, ascending, ge.g, gx.g, r, radius);

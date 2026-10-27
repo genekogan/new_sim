@@ -165,3 +165,9 @@ test('connectivity: same field id with a new cell size cannot reuse old tile lab
   assert.equal(w.conn.ready, false); drainSlices(w.conn); ref.conn.update(Infinity);
   assert.deepEqual(answers(w.conn), answers(ref.conn));
 });
+
+test('fine ground connectivity includes the physical stair landing beyond its arrival approach patch', () => {
+  const {conn}=fixture(true,.1);
+  const up=conn.check([{id:'upper',p:[10,11],level:1,tol:.5}])[0];
+  assert.equal(up.ok,true,JSON.stringify(up));
+});
