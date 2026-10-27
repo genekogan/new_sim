@@ -15,8 +15,10 @@ test('activities: sit down, stand, lie down, nap, read (anywhere and in the libr
   for (const id of ['sit:here', 'read:here', 'lie:here', 'nap:here', 'sit-ground:here']) assert.ok(obs.doHere.some((d: any) => d.id === id), 'doHere lists ' + id);
   // to the campfire, then "sit down": the nearest free seat there
   await done(a, await act(a, 'walk:social-eden-fire-circle'));
-  const sit = await act(a, 'sit down', {seconds: 5}); assert.equal(sit.resolved?.to, 'sit:here');
+  const sit = await act(a, 'sit down', {seconds: 5});
+  assert.equal(sit.resolved?.to, 'sit:social-eden-fire-bench-south', 'ordinary sitting names the nearby durable fire bench');
   await done(a, sit); assert.equal(body(a).human.activity, 'sit', 'seated on a seat');
+  assert.ok(w.engine.nativeSeatHoldsV1(a.entityId).some((h: {slot: string}) => h.slot.startsWith(`${sit.receipt.chosen?.target}#`)), 'the completed receipt holds its exact chosen fixture');
   assert.ok(Math.hypot(body(a).pose.p[0] - 24, body(a).pose.p[2] + 7) < 8, 'by the fire');
   // reading where you are: on that seat with the book you carry
   const here = await act(a, 'find somewhere to read a book', {seconds: 6}); assert.equal(here.resolved?.to, 'read:here');
