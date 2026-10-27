@@ -287,6 +287,16 @@ export class WorldModel {
     set.add(e.id); this.children.set(e.in.parent, set);
     if (e.name) this.names.set(`${e.in.parent}/${e.name}`, e.id);
   }
+  /** Replace public meaning only, preserving all geometry/name/slot caches. */
+  replaceAbout(e: Entity) {
+    const prev = this.entities.get(e.id);
+    if (!prev) throw new Error('meaning target missing');
+    const { about: _old, v: _v, ...before } = prev, { about: _new, v: _nv, ...after } = e;
+    if (stableStringify(before) !== stableStringify(after)) throw new Error('replaceAbout cannot change structure');
+    const key = this.safetyCacheKey();
+    this.entities.set(e.id, e);
+    const parts = this.safetyParts(); if (parts) this.safetyKey = { parts, key };
+  }
   delete(id: string) {
     this.slotMemo?.clear();
     const e = this.entities.get(id); if (!e) return;

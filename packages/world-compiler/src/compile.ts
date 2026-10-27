@@ -17,6 +17,7 @@ import { worldBudgetFailure } from './budgets.ts';
 import { creationInputFailure } from './input.ts';
 import { signMediaFailure } from './sign-media.ts';
 import { decalFailure, kitFaceFailure } from './faces.ts'; // XP8 hook
+import { canonicalAbout, canonicalWorldAbout, meaningFailure, remapAbout, sameMeaning } from './meaning.ts';
 import { isWetSetting, showerUntil } from './weather-rules.ts';
 
 export type Diff = { upserts: Entity[]; removes: string[]; defs: StoredDef[]; world?: Partial<WorldModel['state']>; constants?: WorldModel['constants']; tiles: string[]; answers: { prayer: string; text: string }[]; /** LAYERS: state.layers changed (wallets, relations, currency; never sent to viewers) */ layers?: true };
@@ -137,11 +138,12 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   const failures: Failure[] = [], warnings: string[] = [], ids: Record<string, string> = {};
   const diff: Diff = { upserts: [], removes: [], defs: [], tiles: [], answers: [] };
   const inverse: Op[] = [];
-  const touched = new Set<string>();
+  const touched = new Set<string>(), geometryTouched = new Set<string>();
   const touchedAt = new Map<string, number>(), tileAt = new Map<string, number>(), removedAt = new Map<string, number>();
   let activeOp = 0;
   let layersTouched = false;
-  const upsert = (e: Entity) => {
+  const upsert = (e: Entity, geometry = true) => {
+    if (geometry) geometryTouched.add(e.id);
     touched.add(e.id); touchedAt.set(e.id, activeOp);
     if (touched.size > CREATION_LIMITS.batchEntityChanges) throw new PlanningFailure({ ...fail(activeOp, 'budget.world', 'batch expansion exceeds the entity-change budget'), field: 'batch.entities', measured: touched.size, limit: CREATION_LIMITS.batchEntityChanges, fix: 'Split the construction into smaller batches.' });
   };
@@ -303,6 +305,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         if (scratch.entities.size >= Math.min(CREATION_LIMITS.worldEntities, scratch.constants.limits.entities)) { failures.push({ ...fail(i, 'budget.world', 'entity count exceeds the world limit'), field: 'entities', measured: scratch.entities.size + 1, limit: Math.min(CREATION_LIMITS.worldEntities, scratch.constants.limits.entities), fix: 'Remove entities or reuse existing construction.' }); return; }
         const id = scratch.nextId();
         const e: Entity = { id, def: def.ref, in: { parent: parentId, ...(op.in.slot ? { slot: op.in.slot } : {}) }, by, born: tick, v: 1, ...(op.name ? { name: op.name } : {}), ...(op.p ? { p: op.p } : {}), ...(op.r !== undefined ? { r: op.r } : {}), ...(op.s !== undefined ? { s: op.s } : {}), ...(op.shape ? { shape: op.shape } : {}), ...(op.anchor ? { anchor: op.anchor } : {}), ...(Object.keys(fieldsOk.values).length ? { params: fieldsOk.values } : {}), ...(Object.keys(stateOk.values).length ? { state: stateOk.values } : {}), ...(op.seed !== undefined ? { seed: op.seed } : {}), ...(op.constraints?.length ? { constraints: op.constraints } : {}) };
+        if (op.about) e.about = canonicalAbout(scratch, op.about, ids);
         contextDef = def; entity = id;
         if (scratch.library?.placementRef || op.def.startsWith('sha:')) e.def = 'sha:' + def.hash;
         { const bad = followProblem(def, op.schedule); if (bad) { failures.push(fail(i, 'state.invalid', bad)); return; } }
@@ -378,6 +381,15 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         const def = scratch.resolvedDef(prev.def)!;
         const next: Entity = { ...prev, v: prev.v + 1 };
         const inv: Extract<Op, { op: 'set' }> = { op: 'set', id };
+        if (op.about !== undefined) {
+          inv.about = prev.about ?? null;
+          if (op.about === null) delete next.about; else next.about = canonicalAbout(scratch, op.about, ids);
+          // Pure meaning edits preserve the terrain, footprint, slot and safety indices.
+          if (Object.keys(op).every(k => k === 'op' || k === 'id' || k === 'about')) {
+            if (sameMeaning(next.about, prev.about)) return;
+            scratch.replaceAbout(next); upsert(next, false); inverse.unshift(inv); return;
+          }
+        }
         if (op.params && inUse(id, i)) return;
         if (op.state) {
           const ok = checkFields(def.state, op.state, false); if (!ok.ok) { failures.push(fail(i, 'state.invalid', ok.detail)); return; }
@@ -444,6 +456,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
           for (const orig of subtree) {
             const isRoot = orig.id === srcId;
             const copy: Entity = { ...structuredClone(orig), id: map.get(orig.id)!, by, born: tick, v: 1, in: isRoot ? { parent: parentId, ...(op.in?.slot ? { slot: op.in.slot } : {}) } : { ...orig.in, parent: map.get(orig.in.parent) ?? orig.in.parent } };
+            if (copy.about) copy.about = remapAbout(canonicalAbout(scratch, copy.about, ids), map);
             if (isRoot) {
               if (rootName) copy.name = rootName; else delete copy.name;
               const x = base[0] + step[0] * (op.p || op.count > 1 ? k : k + 1), z = base[base.length - 1] + step[1] * (op.p || op.count > 1 ? k : k + 1);
@@ -469,8 +482,12 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
       case 'world': {
         // a patch: each key merges into what is there (sky, time, weather, ground field by field); keys it does not name keep their values
         const cur = scratch.state as Record<string, unknown>, next: Record<string, unknown> = { ...cur };
-        for (const [k, v] of Object.entries(op.state)) if (v !== undefined) next[k] = v !== null && typeof v === 'object' ? { ...(cur[k] as object | undefined), ...v } : v;
+        for (const [k, v] of Object.entries(op.state)) if (v !== undefined) {
+          if (k === 'about') { if (v === null) delete next.about; else next.about = canonicalWorldAbout(scratch, v as NonNullable<typeof scratch.state.about>, ids); }
+          else next[k] = v !== null && typeof v === 'object' ? { ...(cur[k] as object | undefined), ...v } : v;
+        }
         const merged = worldStateSchema.parse(next);
+        if (Object.keys(op.state).length === 1 && op.state.about !== undefined && sameMeaning(merged.about, scratch.state.about)) return;
         // WEATHER-RULES: a set rain/storm gets its end tick now (a strike alone leaves the shower as it is)
         const wp = op.state.weather as Record<string, unknown> | undefined;
         // (re-sending the same weather while its shower runs keeps the end: a carried-along weather never stretches a storm)
@@ -482,6 +499,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         }
         const prevPatch: Record<string, unknown> = {}, changed: Record<string, unknown> = {};
         for (const k of Object.keys(op.state)) {
+          if (k === 'about') { prevPatch[k] = cur[k] ?? null; changed[k] = merged.about ?? null; continue; }
           prevPatch[k] = cur[k]; changed[k] = (merged as Record<string, unknown>)[k];
           // a field the patch sets that was absent before (an optional, nullable one: time.set, weather.strike) undoes to null
           const pv = (op.state as Record<string, unknown>)[k], was = cur[k];
@@ -578,6 +596,16 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   });
 
   if (failures.length) return { ok: false, failures: heldBack.length && heldBack[0].op <= failures[0].op ? [heldBack[0]] : failures };
+  // Canonicalize late references after all placements; reject dangling references/cycles atomically.
+  for (const e of [...scratch.entities.values()]) if (e.about) {
+    const about = canonicalAbout(scratch, e.about, ids);
+    if (!sameMeaning(about, e.about)) { const next = { ...e, about }; scratch.replaceAbout(next); upsert(next, false); }
+  }
+  if (scratch.state.about) {
+    const about = canonicalWorldAbout(scratch, scratch.state.about, ids);
+    if (!sameMeaning(about, scratch.state.about)) { scratch.state = { ...scratch.state, about }; if (diff.world) diff.world.about = about; }
+  }
+  { const failure = meaningFailure(scratch, ops.length - 1); if (failure) return { ok: false, failures: [failure] }; }
   // Persistent relationships: re-solve server-maintained constraints whose refs moved or whose ground changed (33 §3.3).
   const sourceOp = (e: Entity) => {
     const indices: number[] = [];
@@ -592,7 +620,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   };
   let resolved: string[];
   try {
-    resolved = resolveDependents(scratch, touched, new Set(diff.removes), new Set(diff.tiles), warnings, diff.tiles, sourceOp);
+    resolved = resolveDependents(scratch, geometryTouched, new Set(diff.removes), new Set(diff.tiles), warnings, diff.tiles, sourceOp);
   } catch (error) {
     return { ok: false, failures: [error instanceof PlanningFailure ? error.failure : generatorFailure(ops.length - 1, error)] };
   }

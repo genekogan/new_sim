@@ -192,6 +192,31 @@ export const constraintSchema = z.discriminatedUnion('kind', [
 export type Constraint = z.infer<typeof constraintSchema>;
 const constraintsSchema = z.array(constraintSchema).max(8);
 
+/** Public world meaning. It describes existing affordances; it never creates them. */
+const publicText = (max: number) => z.string().trim().min(1).max(max).refine(s => !/[\u0000-\u001f\u007f]/.test(s), 'public text must be one line');
+const aliasesSchema = z.array(publicText(80)).max(12);
+export const partAnchorSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('entity'), ref: publicText(200), slot: publicText(100).optional() }),
+  z.object({ kind: z.literal('local'), point: v3, stand: v3, level: z.number().int(), region: z.array(v2).min(3).max(64).optional() }),
+]);
+export const aboutPartSchema = z.object({
+  id: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,39}$/), title: publicText(60), what: publicText(400).optional(),
+  aliases: aliasesSchema.optional(), anchor: partAnchorSchema.optional(),
+});
+export const aboutSchema = z.object({
+  title: publicText(60).optional(), what: publicText(400).optional(), aliases: aliasesSchema.optional(),
+  kind: publicText(40).optional(), role: z.enum(['district', 'quarter', 'landmark', 'part', 'minor']).optional(),
+  in: publicText(200).optional(), salience: z.number().int().min(0).max(3).optional(),
+  parts: z.array(aboutPartSchema).max(16).refine(parts => new Set(parts.map(p => p.id)).size === parts.length, 'part ids must be unique').optional(),
+});
+export const worldAboutSchema = z.object({
+  title: publicText(60).optional(), what: publicText(400).optional(), tour: publicText(1200).optional(),
+  districts: z.array(publicText(200)).max(64).optional(),
+});
+export type About = z.infer<typeof aboutSchema>;
+export type AboutPart = z.infer<typeof aboutPartSchema>;
+export type WorldAbout = z.infer<typeof worldAboutSchema>;
+
 export const entitySchema = z.object({
   /** `e_…` for things; `h_…` for Souls' bodies, whose id is the engine's entity id (spec 31 §3 rule 3). */
   id: z.string().regex(/^[eh]_[a-z0-9]{4,12}$/),
@@ -207,6 +232,7 @@ export const entitySchema = z.object({
   state: z.record(z.string(), value).optional(),
   seed: z.number().int().optional(),
   constraints: constraintsSchema.optional(),
+  about: aboutSchema.optional(),
   /** LAYERS (absent until the god uses them): owner, access, schedule, price. */
   owner: ownerRef.optional(),
   access: z.enum(ACCESS).optional(),
@@ -238,6 +264,7 @@ export const WEATHER_KINDS = ['auto', 'manual', 'clear', 'cloudy', 'rain', 'wind
 export const SKY_PALETTES = ['clear-day', 'golden-hour', 'dawn', 'sunset', 'dusk', 'twilight', 'night', 'midnight', 'mars-desert', 'lm-garden', 'eden-summer'] as const;
 const strikeSchema = z.object({ x: num, z: num, n: z.number().int().min(1), tick: z.number().int().min(0) });
 export const worldStateSchema = z.object({
+  about: worldAboutSchema.optional(),
   sky: z.object({ palette: z.string().default('clear-day'), sun: num.min(0).max(1).default(0.6) }).prefault({}),
   time: z.object({ dayTicks: z.number().int().default(72000), startTick: z.number().int().default(0),
     /** R4-LIVE env setter: set the time of day to `hour` (0–24) once; `n` counts sets (the world clock applies each n once, moving forward). */
@@ -263,6 +290,7 @@ export const worldStateSchema = z.object({
 export type WorldState = z.infer<typeof worldStateSchema>;
 /** A `world` op's state is a patch: no defaults (they would reset what it does not name); compile merges it per key and per field. */
 export const worldPatchSchema = z.object({
+  about: worldAboutSchema.nullable(),
   sky: z.object({ palette: z.string(), sun: num.min(0).max(1) }).partial(),
   time: z.object({ dayTicks: z.number().int(), startTick: z.number().int(), set: z.object({ hour: num.min(0).max(24), n: z.number().int().min(1) }).nullable(), paused: z.boolean(), calendar: z.string().regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/) }).partial(),
   weather: z.object({ clouds: num.min(0).max(1), wind: num.min(0).max(1), rain: num.min(0).max(1), fog: num.min(0).max(1), kind: z.enum(WEATHER_KINDS), intensity: num.min(0).max(1), strike: strikeSchema.nullable(), minutes: num.min(5).max(360).nullable() }).partial(),
@@ -281,6 +309,7 @@ const place = z.object({
   params: z.record(z.string(), value).optional(), state: z.record(z.string(), value).optional(), seed: z.number().int().optional(),
   constraints: constraintsSchema.optional(),
   owner: ownerRef.optional(), access: z.enum(ACCESS).optional(), schedule: scheduleSchema.optional(), price: priceSchema.optional(),
+  about: aboutSchema.optional(),
   mode: z.enum(['strict', 'nudge']).default('strict'),
 });
 const remove = z.object({ op: z.literal('remove'), id: z.string(), cascade: z.boolean().default(true) });
@@ -292,6 +321,7 @@ const move = z.object({
   mode: z.enum(['strict', 'nudge']).default('strict'),
 });
 const set = z.object({ op: z.literal('set'), id: z.string(), state: z.record(z.string(), value).optional(), params: z.record(z.string(), value).optional(), name: z.string().regex(NAME).optional(), constraints: constraintsSchema.optional(),
+  about: aboutSchema.nullable().optional(),
   /** LAYERS: null clears. */
   owner: ownerRef.nullable().optional(), access: z.enum(ACCESS).nullable().optional(), schedule: scheduleSchema.nullable().optional(), price: priceSchema.nullable().optional() });
 /** LAYERS ops. economy: the world's currency name. mint: the god adds (or, negative, takes) money. pay: money moves
