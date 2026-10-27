@@ -258,8 +258,9 @@ try {
   }, (r) => r.accepted && r.phase === 'completed' && r.dist < 4);
   await step('S1b item 6: her arrival names the god\'s plaza (it said "World"/"field"); the Souls\' map lists it', async () => {
     const h = await cli('here'); const m = await cli('map');
-    return { placePath: h.data?.me?.placePath, map: JSON.stringify(m.data ?? m.raw ?? '').includes('plaza') };
-  }, (r) => (r.placePath ?? []).includes('plaza') && r.map);
+    const plaza = m.data?.places?.find((p) => p.id === 'g-plaza');
+    return { place: h.data?.me?.place, placePath: h.data?.me?.placePath, mapPlace: plaza ? { id: plaza.id, name: plaza.name } : null };
+  }, (r) => r.place === 'g-plaza' && r.mapPlace?.id === 'g-plaza' && typeof r.mapPlace.name === 'string' && r.mapPlace.name.length > 0 && (r.placePath ?? []).includes(r.mapPlace.name));
   await step('S2 here.objects lists the fountain, its lamp and the welcome sign as things she sees (readable)', async () => {
     const r = await cli('here'); const objs = r.data?.objects ?? [];
     return { objects: objs.map((o) => `${o.kind}:${o.name}`), has: ['fountain', 'fountain-lamp', 'welcome-sign'].filter((n) => objs.some((o) => o.name === n)) };
@@ -291,9 +292,9 @@ try {
     const a = (await api('/v1/edge/act', { as: 'soul', body: { capability: 'walk:moss-cottage/living' } })).data;
     const r = await follow(a, { maxS: 200 });
     if (from && r.end) await probeRadii('S6', from, 0, r.end.p, 0);
-    const placePath = (await cli('here')).data?.me?.placePath;
-    return { resolveOk: res.data?.ok, available: res.data?.would?.available, accepted: a.accepted, code: a.code ?? r.code, reason: a.reason ?? r.reason, phase: r.phase, room: r.room, placePath, ...(a.accepted ? {} : { reason: String(a.reason ?? a.message ?? '').slice(0, 300), from: (await observe()).self?.position }) };
-  }, (r) => r.accepted && r.phase === 'completed' && r.room?.building === 'moss-cottage' && r.room.room === 'living' && (r.placePath ?? []).includes('moss-cottage/living'));
+    const me = (await cli('here')).data?.me;
+    return { resolveOk: res.data?.ok, available: res.data?.would?.available, accepted: a.accepted, code: a.code ?? r.code, reason: a.reason ?? r.reason, phase: r.phase, room: r.room, place: me?.place, placePath: me?.placePath, ...(a.accepted ? {} : { reason: String(a.reason ?? a.message ?? '').slice(0, 300), from: (await observe()).self?.position }) };
+  }, (r) => r.resolveOk === true && r.available === true && r.accepted && r.phase === 'completed' && r.room?.building === 'moss-cottage' && r.room.room === 'living' && r.place === 'g-moss-cottage.living');
   { const p = f6?.end?.p ?? (await observe()).self.position; if (p) await shots([{ name: 's6-in-the-living-room-roof-hidden', eye: [p[0] + 3, p[1] + 7, p[2] + 4], at: [p[0], p[1] + 0.8, p[2]], wait: 7000, hideRoofs: true }]); }
 
   // ---- 4. the jetty, then the canoe moored alongside it
