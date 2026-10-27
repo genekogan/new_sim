@@ -80,3 +80,20 @@ test('compiler hook (when applied by L1): placing a road with no grade freezes o
   if (!w.get('road')!.params?.grade) { t.skip('compile.ts prepare hook not applied on this branch (patch requested of L1)'); return; }
   assert.ok((w.get('road')!.params!.grade as { h: number[] }).h.length > 10);
 });
+
+test('an explicit deck-supported bench does not build a seabed pad or move nearby fixtures', () => {
+  const w=fresh();
+  ok(applyBatch(w,{ops:[{op:'place',def:coreRef('pond'),name:'water',shape:{area:[[0,140],[40,140],[40,185],[0,185]]},params:{depth:4}}]},'god',0));
+  ok(applyBatch(w,{ops:[{op:'place',def:coreRef('pier'),name:'pier',shape:{path:[[10,139],[10,167]]},params:{width:3,height:4,platform:5,rails:true}}]},'god',1));
+  const pier=w.get('pier')!,baked=w.bake(w.resolvedDef(pier.def)!,pier.params??{},0,pier.shape),y=baked.surfaces!.at(-1)!.y;
+  ok(applyBatch(w,{ops:[{op:'place',def:coreRef('lamp-post'),name:'lamp',p:[10,0,166.5]}]},'god',2));
+  const lamp=structuredClone(w.get('lamp')),ground=structuredClone(w.ground());
+  const r=applyBatch(w,{ops:[{op:'place',def:coreRef('bench'),name:'on-deck',p:[10,y,170]}]},'god',3);ok(r);
+  assert.deepEqual(w.ground(),ground,'deck support needs no fill underneath');
+  assert.deepEqual(w.get('lamp'),lamp,'nearby existing geometry stays unchanged');
+  assert.deepEqual(r.diff!.tiles,[]);
+  // Explicit height alone is insufficient: a bench off the deck still needs its
+  // normal foundation, preventing this from becoming a general floating bypass.
+  ok(applyBatch(w,{ops:[{op:'place',def:coreRef('bench'),name:'off-deck',p:[25,y,170]}]},'god',4));
+  assert.ok(w.ground().landforms.some(l=>l.id===`${w.get('off-deck')!.id}:pad`));
+});

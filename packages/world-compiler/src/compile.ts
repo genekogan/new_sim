@@ -2,7 +2,7 @@
 // committed change with its inverse (spec §5). Two phases: `plan` simulates on
 // a scratch copy and never touches the model; `commit` applies a plan. The god
 // skill runs `plan` locally (dry runs); the server runs both.
-import { footprintOf, padFor, settle, waterLevelAt, SKIRT_MAX_M as SKIRT_MAX, type Landform, type PadDoor } from '@sim/ground';
+import { footprintOf, padFor, pointInPoly, settle, waterLevelAt, SKIRT_MAX_M as SKIRT_MAX, type Landform, type PadDoor } from '@sim/ground';
 import { CREATION_LIMITS, GENERATORS, kitFootprintIssues, prepareFor, queryOf } from '@sim/generators';
 import { z } from 'zod';
 import { hashOf } from './hash.ts';
@@ -864,7 +864,7 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
       const fp = footprintOf(p[0], p[2], (baked.box[0] * s) / 2, (baked.box[2] * s) / 2, yaw);
       const st = settle(w.terrain, fp, 'base'), re = (e as Entity & { _resettle?: 'pad' | 'check' })._resettle;
       const keep = re === 'pad' || (re === 'check' && (st.gap > RESETTLE_TOL_M || Math.abs(st.y - p[1]) > RESETTLE_TOL_M));
-      if (keep || st.needsPad || Math.abs(st.y - p[1]) > SKIRT_MAX) (e as Entity & { _pad?: Landform })._pad = padFor(`${e.id}:pad`, fp, p[1], padGrading(w, baked, p[0], p[2], yaw, s));
+      if ((keep || st.needsPad || Math.abs(st.y - p[1]) > SKIRT_MAX) && !onAbsoluteDeck(w, e, fp, p[1])) (e as Entity & { _pad?: Landform })._pad = padFor(`${e.id}:pad`, fp, p[1], padGrading(w, baked, p[0], p[2], yaw, s));
     }
   }
   // facing: turn the entity's front (+z) toward the ref
@@ -1014,6 +1014,31 @@ function reindexDescendants(w: WorldModel, id: string) {
     const c = w.entities.get(cid), d = c && w.resolvedDef(c.def); if (!c || !d) continue;
     if (d.layer === 'solid' && w.bake(d, c.params ?? {}, c.seed ?? 0, c.shape).colliders.length) w.index(cid, w.footprint(c, d));
   }
+}
+
+/** An explicitly placed fixture on a real deck must not terraform the seabed.
+ * Only existing absolute world-frame surfaces count. One convex polygon must
+ * contain the entire footprint, so a roof bound or a gap between slabs cannot
+ * manufacture support. Ground-relative roads still receive ordinary pads. */
+function onAbsoluteDeck(w: WorldModel, e: Entity, fp: ReturnType<typeof footprintOf>, y: number): boolean {
+  for (const other of w.entities.values()) {
+    if (other.id === e.id || other.in.parent !== 'world' || !other.shape) continue;
+    const def = w.resolvedDef(other.def); if (!def || def.form === 'point') continue;
+    const baked = w.bake(def, other.params ?? {}, other.seed ?? 0, other.shape);
+    for (const surface of baked.surfaces ?? []) {
+      if (!(surface as {abs?: boolean}).abs || Math.abs(surface.y-y) > .002) continue;
+      const p=surface.polygon; if (p.length<3) continue;
+      let sign=0,convex=true;
+      for(let i=0;i<p.length;i++) {
+        const a=p[i],b=p[(i+1)%p.length],c=p[(i+2)%p.length];
+        const cross=(b[0]-a[0])*(c[1]-b[1])-(b[1]-a[1])*(c[0]-b[0]);
+        if(Math.abs(cross)<1e-8) continue;
+        if(sign&&Math.sign(cross)!==sign){convex=false;break;}sign=Math.sign(cross);
+      }
+      if(convex&&sign&&fp.corners.every(([x,z])=>pointInPoly(x,z,p))) return true;
+    }
+  }
+  return false;
 }
 
 /** After admission: index solids, and install any landform / water / foundation pad the entity brings. */
