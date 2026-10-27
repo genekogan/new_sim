@@ -1,0 +1,142 @@
+{
+  "schema": "world-meaning/1",
+  "worldId": "hello-hamlet",
+  "source": {
+    "template": "worlds/templates/hello-hamlet.json",
+    "sha": "347259a99b0949a6ecf91c13561d3161c912be0959c03ac03f3becfd032f99e1",
+    "provenance": [
+      {
+        "path": "worlds/templates/hello-hamlet.json",
+        "sha": "347259a99b0949a6ecf91c13561d3161c912be0959c03ac03f3becfd032f99e1"
+      }
+    ]
+  },
+  "about": {
+    "pond": {
+      "title": "Hamlet Pond",
+      "what": "The small body of water at the hamlet’s center. Its edge is the place to approach for a swim; the cottage stands uphill nearby.",
+      "aliases": [
+        "water",
+        "lake",
+        "swimming pond"
+      ],
+      "kind": "pond",
+      "role": "landmark",
+      "salience": 3
+    },
+    "plaza": {
+      "title": "Plaza Marker",
+      "what": "A flag marking the hamlet’s central meeting point. It labels a proposed plaza rather than a furnished square.",
+      "aliases": [
+        "central flag",
+        "meeting point"
+      ],
+      "kind": "marker",
+      "role": "landmark",
+      "salience": 2
+    },
+    "orchard": {
+      "title": "Orchard Marker",
+      "what": "A flag marking the proposed orchard, away from the cottage. It is a navigation landmark; the marker alone does not establish fruit trees or a harvest.",
+      "aliases": [
+        "orchard flag",
+        "proposed orchard"
+      ],
+      "kind": "marker",
+      "role": "landmark",
+      "salience": 2
+    },
+    "knoll": {
+      "title": "Cottage Knoll",
+      "what": "The grassy rise supporting the cottage. Walk uphill toward the house for the hamlet’s indoor rooms and its outdoor bench.",
+      "aliases": [
+        "rise",
+        "hill",
+        "cottage hill"
+      ],
+      "kind": "hill",
+      "role": "landmark",
+      "salience": 3
+    },
+    "cottage": {
+      "title": "Knoll Cottage",
+      "what": "A small one-story home on the grassy rise, with a living room, kitchen and bedroom. The two-seat bench outside provides a place to sit after visiting the rooms.",
+      "aliases": [
+        "house",
+        "home",
+        "hill cottage"
+      ],
+      "kind": "cottage",
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "living-room",
+          "title": "Living Room",
+          "aliases": [
+            "lounge"
+          ],
+          "what": "The cottage’s main indoor room.",
+          "anchor": {
+            "kind": "entity",
+            "ref": "cottage",
+            "slot": "living"
+          }
+        },
+        {
+          "id": "kitchen",
+          "title": "Kitchen",
+          "aliases": [],
+          "what": "The cottage’s kitchen room.",
+          "anchor": {
+            "kind": "entity",
+            "ref": "cottage",
+            "slot": "kitchen"
+          }
+        },
+        {
+          "id": "bedroom",
+          "title": "Bedroom",
+          "aliases": [],
+          "what": "The cottage’s sleeping room.",
+          "anchor": {
+            "kind": "entity",
+            "ref": "cottage",
+            "slot": "bedroom"
+          }
+        },
+        {
+          "id": "outdoor-bench",
+          "title": "Outdoor Bench",
+          "aliases": [
+            "bench",
+            "porch bench"
+          ],
+          "what": "A real bench seat outside the cottage.",
+          "anchor": {
+            "kind": "entity",
+            "ref": "cottage/bench",
+            "slot": "seat-1"
+          }
+        }
+      ]
+    },
+    "cottage/bench": {
+      "title": "Cottage Bench",
+      "what": "A two-seat wooden bench outside Knoll Cottage, suited to a quiet pause on the hill.",
+      "aliases": [
+        "outdoor bench",
+        "hill bench"
+      ],
+      "kind": "bench",
+      "role": "part",
+      "salience": 1,
+      "in": "cottage"
+    }
+  },
+  "worldAbout": {
+    "title": "Hello Hamlet",
+    "what": "A small starter hamlet with a central pond, a cottage on a grassy knoll, an outdoor bench and two planning markers. It is a compact place for exploring, swimming and entering rooms.",
+    "tour": "Approach Hamlet Pond for water, or climb Cottage Knoll to enter Knoll Cottage and visit its living room, kitchen and bedroom. The outdoor bench provides real seats. The Plaza and Orchard flags mark proposed areas; they do not promise a developed square or fruit trees."
+  }
+}
