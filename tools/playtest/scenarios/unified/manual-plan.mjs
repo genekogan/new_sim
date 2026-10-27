@@ -17,7 +17,7 @@ export function verifyRetained(ref,planned){
  if(annotation.originalScenarioSha256!==sha256(readFileSync(join(runDir,'scenario.json')))||annotation.originalOraclesSha256!==sha256(readFileSync(join(runDir,'oracles.jsonl'))))throw Error('retained original evidence changed');
  if(annotation.correctedScenarioSha256!==sha256(readFileSync(planned.scenario)))throw Error('retained correction targets a different frozen scenario');
  if(JSON.stringify(canonical(correctedScenario(original,current)))!==JSON.stringify(canonical(read(join(rescoreDir,'scenario.json')))))throw Error('retained corrected measurement conditions differ');
- for(const file of ['journey-oracles.mjs','oracles.mjs'])if(annotation.scorerFiles?.[file]!==sha256(readFileSync(new URL('../../review/'+file,import.meta.url))))throw Error('retained control needs offline rescore with current oracles');
+ for(const file of ['journey-oracles.mjs','oracles.mjs','../lib/destination-choice.mjs'])if(annotation.scorerFiles?.[file]!==sha256(readFileSync(new URL('../../review/'+file,import.meta.url))))throw Error('retained control needs offline rescore with current oracles');
  const manifest=read(annotation.sourceManifest),source=manifest.plan.find(r=>resolve(r.out)===runDir&&key(r)===key(ref));
  if(annotation.sourceHeads?.treatment!==manifest.heads?.treatment)throw Error('retained treatment source annotation mismatch');
  if(!source||manifest.heads?.control!=='db68679b747911f2546fc054345e96aa703090ea'||annotation.sourceHeads?.control!==manifest.heads.control)throw Error('retained control source head/provenance mismatch');

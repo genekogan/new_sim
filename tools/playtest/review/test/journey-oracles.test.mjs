@@ -161,3 +161,14 @@ test('bank return requires exact chosen bank identity AND completed known walk w
  for(const r of [{...receipt,chosen:null},{...receipt,chosen:{target:'other-bank'}},{...receipt,chosen:{target:'lake-water'}},{...receipt,capability:'walk:other-lake'},{...receipt,phase:'started'},{...receipt,endedAt:iso(31)}])assert.equal(run(r),'fail');
  for(const s of [{...sample,pos:[0,0]},{...sample,pos:[0,7]},{...sample,posture:'swimming'},{...sample,t:iso(31)}])assert.equal(run(receipt,s),'fail');
 });
+
+test('explicit requested pier approach measures destination choice separately from final seat without changing completion',()=>{
+ const seat={...phase,receipt:{verb:'sit',targetIds:['podium']}};
+ const destination={binding:{ref:'west-pier',entityId:'pier',placeId:'g-west-pier',entitySha256:'frozen'},receipt:{verb:'walk',capabilities:['walk:west-pier','walk:g-west-pier']}};
+ const sit={capability:'sit:podium',chosen:{target:'podium'},acceptedAt:iso(90),phase:'started'};
+ const run=(walk,includeSit=true)=>journeyOracles({ev:{sentAt:iso(0),cutoffAt:iso(120),samples:[{...sample(100),seat:'podium#seat'}]},journey:{fixtureId:'pier',source:'frozen',phases:[seat],firstDestinationChoices:[destination]},receipts:[walk,...(includeSit?[sit]:[])],replies:[],acts:[{cmd:'node eden.mjs explore pier',completedAtMs:epoch+5000},{cmd:'node eden.mjs here',completedAtMs:epoch+70000}],acceptedMs:r=>Date.parse(r.acceptedAt),endedMs:()=>null});
+ const walk={capability:'walk:west-pier',chosen:{target:'g-west-pier'},acceptedAt:iso(15),phase:'completed'};
+ const rows=run(walk),m=rows.find(r=>r.id==='journey-efficiency');assert.equal(m.status,'pass');assert.equal(m.metrics.firstDestinationChoiceSec,15);assert.equal(m.metrics.discoveryCallsBeforeChoice,1);assert.equal(m.metrics.finalAffordanceChoiceSec,90);assert.equal(m.metrics.firstPredicateActionSec,90);
+ assert.equal(rows.find(r=>r.id==='journey-completion').status,'pass');assert.equal(run(walk,false).find(r=>r.id==='journey-completion').status,'fail');
+ for(const bad of[{...walk,capability:'walk:harbour'},{...walk,capability:'walk:east-pier'},{...walk,chosen:{target:'g-east-pier'}},{...walk,phase:'failed'},{...walk,phase:'refused'},{...walk,acceptedAt:iso(-1)}])assert.equal(run(bad).find(r=>r.id==='journey-efficiency').metrics.firstDestinationChoiceSec,90);
+});

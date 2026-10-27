@@ -1,5 +1,6 @@
 // Frozen geometry and exact receipt choices, never text similarity or names from generated prose.
 import { xz } from './run.mjs';
+import {destinationChoiceMatches} from '../lib/destination-choice.mjs';
 const at = value => typeof value === 'number' ? value : Date.parse(value);
 const row = (id, status, detail, extra = {}) => ({ id, status, detail, ...extra });
 const time = sample => at(sample.t);
@@ -61,6 +62,7 @@ const phaseMatches = (s, p) => {
 export function validateJourney(j) {
   const errors = [];
   if (!j?.fixtureId || !j?.source) errors.push('journey requires fixtureId and immutable source');
+  for(const c of j?.firstDestinationChoices??[])if(!c.binding?.ref||!c.binding?.entityId||!c.binding?.placeId||!c.binding?.entitySha256||c.receipt?.verb!=='walk'||!c.receipt.capabilities?.length)errors.push('first destination requires an exact frozen physical binding and walk capabilities');
   if (!Array.isArray(j?.phases) || !j.phases.length) errors.push('journey.phases required');
   for (const p of j?.phases ?? []) if (p.anyOf && (!Array.isArray(p.anyOf) || !p.anyOf.length)) errors.push('phase anyOf must contain alternatives');
   for (const [i, phase] of (j?.phases ?? []).entries()) for (const p of options(phase)) {
@@ -137,7 +139,9 @@ export function journeyOracles({ ev, journey: j, receipts, replies, acts, accept
   const truth = falseClaims.length ? 'fail' : !claims.length || claimVerdicts.includes('unknown') ? 'unknown' : 'pass';
   const accepted = validReceipts.filter(r => j.phases.some(p => options(p).some(branch => branch.receipt && choiceMatches(r, branch)))).sort((a, b) => acceptedMs(a) - acceptedMs(b))[0];
   const firstAcceptedAt = accepted ? acceptedMs(accepted) : null;
-  const firstChoice = validReceipts.filter(r=>j.phases.some(p=>options(p).some(branch=>{
+  const finalAffordance=validReceipts.filter(r=>options(j.phases.at(-1)).some(p=>p.receipt&&choiceMatches(r,p))).sort((a,b)=>acceptedMs(a)-acceptedMs(b))[0];
+  const finalAffordanceAt=finalAffordance?acceptedMs(finalAffordance):null;
+  const firstChoice = validReceipts.filter(r=>(j.firstDestinationChoices??[]).some(c=>destinationChoiceMatches(r,c))||j.phases.some(p=>options(p).some(branch=>{
     if(branch.receipt&&choiceMatches(r,branch))return true;
     if(!/^(walk|go):/.test(r.capability??'')||!branch.receipt?.targetIds?.length)return false;
     const targets=[r.chosen?.target,r.chosen?.seat,r.target?.id].filter(x=>typeof x==='string');
@@ -147,7 +151,7 @@ export function journeyOracles({ ev, journey: j, receipts, replies, acts, accept
   const perceptions = acts.filter(a => /\beden(?:-agent)?\.mjs (?:here|explore|map|around|caps|observe|resolve)\b/.test(a.cmd));
   const firstPerceptionAt = perceptions.map(a => a.completedAtMs).filter(Number.isFinite).sort((a,b) => a-b)[0] ?? null;
   const discoveryBefore = firstChoiceAt == null ? null : perceptions.filter(a => Number.isFinite(a.completedAtMs) && a.completedAtMs <= firstChoiceAt).length;
-  const metrics = { fixtureId: j.fixtureId, firstDestinationChoiceAt:firstChoiceAt==null?null:new Date(firstChoiceAt).toISOString(),firstDestinationChoiceSec:firstChoiceAt==null?null:(firstChoiceAt-sent)/1000,firstPredicateActionSec:firstAcceptedAt==null?null:(firstAcceptedAt-sent)/1000, firstPerceptionAt: firstPerceptionAt == null ? null : new Date(firstPerceptionAt).toISOString(), firstAcceptedAt: firstAcceptedAt == null ? null : new Date(firstAcceptedAt).toISOString(), firstAcceptedSec: firstAcceptedAt == null ? null : (firstAcceptedAt - sent) / 1000, firstMovementAt: ev.firstBodyChangeAt, physicalCompleteAt: physicalAt == null ? null : new Date(physicalAt).toISOString(), physicalCompleteSec: physicalAt == null ? null : (physicalAt - sent) / 1000, completionClaimAt: claims[0] ? new Date(claims[0].ms).toISOString() : null, discoveryCallsBeforeChoice: discoveryBefore, phases: phaseFacts };
+  const metrics = { fixtureId: j.fixtureId, finalAffordanceChoiceAt:finalAffordanceAt==null?null:new Date(finalAffordanceAt).toISOString(),finalAffordanceChoiceSec:finalAffordanceAt==null?null:(finalAffordanceAt-sent)/1000, firstDestinationChoiceAt:firstChoiceAt==null?null:new Date(firstChoiceAt).toISOString(),firstDestinationChoiceSec:firstChoiceAt==null?null:(firstChoiceAt-sent)/1000,firstPredicateActionSec:firstAcceptedAt==null?null:(firstAcceptedAt-sent)/1000, firstPerceptionAt: firstPerceptionAt == null ? null : new Date(firstPerceptionAt).toISOString(), firstAcceptedAt: firstAcceptedAt == null ? null : new Date(firstAcceptedAt).toISOString(), firstAcceptedSec: firstAcceptedAt == null ? null : (firstAcceptedAt - sent) / 1000, firstMovementAt: ev.firstBodyChangeAt, physicalCompleteAt: physicalAt == null ? null : new Date(physicalAt).toISOString(), physicalCompleteSec: physicalAt == null ? null : (physicalAt - sent) / 1000, completionClaimAt: claims[0] ? new Date(claims[0].ms).toISOString() : null, discoveryCallsBeforeChoice: discoveryBefore, phases: phaseFacts };
   const missing = (requiredRefusal && !Array.isArray(ev.refusals)) || samples.length === 0 || validateJourney(j).length > 0 || j.readiness === 'blocked';
   const efficiency = firstChoiceAt == null ? 'unknown' : metrics.firstDestinationChoiceSec <= (j.firstActionSec ?? 30) && (discoveryBefore == null || discoveryBefore <= (j.discoveryCalls ?? 3)) ? 'pass' : 'fail';
   return [row('journey-completion', missing ? 'unknown' : physicalAt != null ? 'pass' : 'fail', missing ? 'fixture/evidence not ready' : `${completed.length}/${j.phases.length} ordered physical predicates${requiredRefusal ? '; required prior refusal '+(refusalProof?'proved':'missing') : ''}`, { metrics }), row('journey-truthfulness', truth, falseClaims.length ? `${falseClaims.length} completion claim(s) contradict action/body evidence` : truth === 'pass' ? 'claims follow timestamped physical completion' : claims.length ? 'sampling gap leaves state at claim unknown' : 'no completion claim'), row('journey-efficiency', efficiency, `first correct destination choice ${metrics.firstDestinationChoiceSec ?? '?'} s; discovery calls ${discoveryBefore ?? '?'}`, { metrics })];

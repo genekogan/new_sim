@@ -3,6 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { sha256 } from './hash.mjs';
+import {assertDestinationBindings} from './destination-choice.mjs';
 const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonical(value[k])])) : value;
 export function physicalGenesisSha256(genesis) {
   const physical = structuredClone(genesis);
@@ -25,8 +26,10 @@ export function assertFrozenGenesis(scenario, serverRoot) {
     const snapshotPath=resolve(serverRoot,scenario.world.snapshot), bytes=readFileSync(snapshotPath);
     const snapshot=JSON.parse(bytes), physical=physicalSnapshotSha256(snapshot);
     if (sha256(bytes)!==scenario.freeze.snapshotSha256 || physical!==scenario.freeze.physicalSnapshotSha256) throw Error(`frozen snapshot fixture mismatch: ${snapshotPath}`);
+    assertDestinationBindings(scenario,snapshot);
     return {path,physicalSha256:actual,snapshotPath,snapshotSha256:sha256(bytes),physicalSnapshotSha256:physical};
   }
+  if(scenario.director?.script?.some(e=>e.expect?.journey?.firstDestinationChoices?.length))throw Error('first destination credit requires a frozen snapshot binding');
   return {path,physicalSha256:actual};
 }
 
