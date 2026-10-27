@@ -37,6 +37,17 @@ and reviewed supplements accept a final source-snapshot path; its hash must matc
 the overlay provenance. Apply the primary overlay first, then its supplement.
 See `worlds/meaning/live/README.md`. New physical fixtures require separate
 reviewed God edits and verification before their descriptions can be applied.
+The approved Mars pond and Eden pier bench have a bounded helper:
+
+```sh
+node --experimental-strip-types tools/meaning/fixtures.mjs plan mars-two /absolute/god-folder /absolute/fixture-receipt.json --expected-world-id ACTUAL_WORLD_ID
+node --experimental-strip-types tools/meaning/fixtures.mjs apply mars-two /absolute/god-folder /absolute/fixture-receipt.json --expected-world-id ACTUAL_WORLD_ID
+```
+
+Use `eden-2026` for the bench. The helper predicts and verifies the exact insertion,
+refuses changes to existing geometry, and treats an exact existing fixture as a
+no-op. Both helpers pass the persisted request reference explicitly to the God
+CLI; a lost-response retry must reuse the original receipt.
 
 Receipts contain exact preimages, revision guards, stable request IDs and the
 exact preview submission. Each new plan has a unique transaction identity and requires an explicit target world ID. Writes use an atomic rename. Retrying `apply` after a
