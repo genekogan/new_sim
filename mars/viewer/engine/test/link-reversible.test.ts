@@ -75,3 +75,16 @@ test('a stair foot whose approach point falls by a stove departs from the room w
   }
   assert.ok(exercised > 0, 'the fixture puts the foot approach by the stove with room within 0.4 m only');
 });
+
+test('a clear snap cell beyond a blocked landing does not admit a collision on arrival', () => {
+  const s=scene(0), link=s.links[0];
+  link.approach={from:[...link.from.p],to:[...link.to.p]};
+  // A narrow cabinet clips the physical landing, while standing room within
+  // 0.4m still exists on its far side. The body must not land inside it first.
+  s.obstacles=[{id:'landing-cabinet',obb:obb([.16,1],[.1,.12]),y0:3,y1:4.5,kind:'component'}];
+  const grids=buildGrids(s), upper=grids.levels.get(1)!, profile=body(.28);
+  assert.ok(snap(upper,link.to.p,profile.radius+.06,.4)>=0,'nearby clear cell exists');
+  assert.ok(clearanceAt(upper,link.to.p)<profile.radius,'physical landing is occupied');
+  const route=findRoute(grids,s,profile,{level:0,p:[0,-4]},{level:1,p:[-2,3]});
+  assert.equal(route.ok,false,'the landing itself must be safe before any onward walk');
+});

@@ -163,7 +163,13 @@ export function linkEdgeTest(link: Link, ascending: boolean, ge: LevelGrid, gx: 
   // only snaps to standing room near the far approach (cx), so a stricter departure test (0.9 x the planning radius)
   // let wider bodies climb past furniture beside a stair top and then strand them up there (Eden 2026 tower: top-entry
   // clearance 0.311 m, a 0.289 m body needed 0.314). Body radius on both sides keeps every link reversible.
-  const ok = ca >= 0 && ge.clearance[ca] >= r && cx >= 0 && segmentClearance(ge, approach, entry.p) >= Math.min(r * 0.9, radius);
+  // A nearby clear arrival cell cannot excuse a blocked physical landing. The
+  // climber reaches exit.p before walking toward that cell; snapping past a table
+  // here used to admit a route which collided at the bottom of the flight.
+  const bodyClearance = Math.min(r * 0.9, radius);
+  const ok = ca >= 0 && ge.clearance[ca] >= r && cx >= 0
+    && segmentClearance(ge, approach, entry.p) >= bodyClearance
+    && segmentClearance(gx, centreOf(gx, cx), own.exit.p) >= bodyClearance;
   return { ok, ca, cx, approach, far };
 }
 
