@@ -40,3 +40,9 @@ test('setup refuses malformed or nonfinite position and heading',()=>{
  for(const pos of [[],[1],[NaN,NaN],[0,Infinity],[0,0,0,0],{x:0,z:NaN}]) assert.equal(checkStart({pos},{pos:[0,0]}).length,1);
  for(const heading of [NaN,Infinity,undefined,'0']) assert.equal(checkStart({heading},{heading:0}).length,1);
 });
+
+test('measurement setup uses frozen transport, leaving the model served CLI unchanged', async()=>{
+ const runDir=mkdtempSync(join(tmpdir(),'sim-setup-')); let calls=0;
+ const r=await runFixtureSetup({runDir,requestKey:'frozen',setup:{steps:[{verb:'turn',heading:90}],expect:{heading:90}},seat:{chain:Promise.resolve(),cliJson:async()=>{throw Error('baseline model CLI must not run setup');},fixtureCliJson:async args=>{calls++;return {ok:true,data:args[0]==='act'?{accepted:true,receipt:{phase:'completed'}}:{me:{heading:90}}};}}});
+ assert.equal(r.ok,true);assert.equal(calls,2);
+});

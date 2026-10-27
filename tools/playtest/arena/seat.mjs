@@ -4,6 +4,7 @@
 import { join } from 'node:path';
 import { mkdirSync, readdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { run, start } from '../lib/proc.mjs';
 import { appendJsonl, writeJson, readJson, readJsonl } from '../lib/jsonl.mjs';
 import { newIdentity } from '../lib/hash.mjs';
@@ -66,6 +67,13 @@ export class Seat {
     return { file, ...(this.cli.parseStatus ?? parseJsonStatus)(r.stdout, r.code, r.stderr) };
   }
   status() { return this.cliJson(this.cli.status); }
+
+  // Measurement setup uses one frozen transport in both arms; the model still receives its world's served CLI.
+  async fixtureCliJson(args, maxWallMs = 20000) {
+    const file = fileURLToPath(new URL('../../../tools/world-launcher/soul/eden.mjs', import.meta.url));
+    const r = await run('node', [file, ...args], { cwd: this.folder, maxWallMs });
+    return { file, ...parseJsonStatus(r.stdout, r.code) };
+  }
 
   /** One agent turn through the adapter; serialized; writes turns/transcript/cost/chat files.
    *  onStart({turn, reason, startedAt, startMono}) is called when this turn actually starts (after any running turn). */
