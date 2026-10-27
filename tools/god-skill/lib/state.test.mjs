@@ -159,3 +159,18 @@ test('a world\'s own 502 JSON answer (not world.unavailable) is returned as befo
   fixture(t, [json({ ok: false, code: 'render.upstream' }, 502)]);
   assert.equal((await call('/v1/god/act', { body: { ops: [] } })).status, 502);
 });
+
+test('explicit requestRef reuses a persisted act identity across commands', async (t) => {
+ const calls=fixture(t,[json(accepted),json({...accepted,replayed:true})]);
+ const body={preview:'pv_exact',clientRef:'persisted-transaction',expect:{one:{id:'one',v:2}}};
+ await call('/v1/god/act',{body,requestRef:body.clientRef});
+ await call('/v1/god/act',{body,requestRef:body.clientRef});
+ assert.equal(JSON.parse(calls[0].body).clientRef,body.clientRef);
+ assert.equal(calls[0].body,calls[1].body);
+});
+test('explicit requestRef cannot silently replace a different envelope identity',async(t)=>{
+ const calls=fixture(t,[]);
+ await assert.rejects(call('/v1/god/act',{body:{clientRef:'different',ops:[]},requestRef:'persisted'}),/same explicit clientRef/);
+ await assert.rejects(call('/v1/god/undo',{body:{clientRef:'persisted'},requestRef:'persisted'}),/same explicit clientRef/);
+ assert.equal(calls.length,0);
+});

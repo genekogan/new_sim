@@ -84,6 +84,7 @@ export function verifyMeaning(before,after,receipt){
  return problems;
 }
 function cli(folder,args){
+ if(args[0]==='act'){const ref=JSON.parse(args[1]).clientRef;if(!ref)throw Error('persisted act clientRef required');args=[...args,'--request-ref',ref];}
  const out=execFileSync(process.execPath,[resolve(ROOT,'tools/god-skill/eden-god.mjs'),...args,'--json'],{cwd:resolve(folder),env:{...process.env,EDEN_GOD_WARM:'0'},encoding:'utf8',timeout:120000,maxBuffer:32*1024*1024});
  return JSON.parse(out);
 }

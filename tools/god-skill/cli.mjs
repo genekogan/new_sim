@@ -353,9 +353,9 @@ export async function freePlots(size, flags = {}) {
 }
 
 // ---------------------------------------------------------------- writing
-export async function act(batch, note) {
+export async function act(batch, note, requestRef) {
   const want = mirrorState(), held = want ? heldMirror() : null; // G2: the answer carries the mirror delta, so the read after an edit costs nothing
-  const r = ok(await call('/v1/god/act', { body: { ...batch, ...(note ? { note } : {}), ...(want ? { mirror: want } : {}) } }), 'act');
+  const r = ok(await call('/v1/god/act', { requestRef, body: { ...batch, ...(note ? { note } : {}), ...(want ? { mirror: want } : {}) } }), 'act');
   invalidate();
   if (r.mirror) { adoptMirror(r.mirror, held); delete r.mirror; }
   return r;
@@ -1405,7 +1405,7 @@ const FLAGS = {
   place: `${REL} path area rect circle name param state about scale dry plan nudge group note`, terrain: `${REL} path area rect circle name param state about scale dry plan nudge group note`,
   move: `${REL} by in local nudge note dry plan`, look: 'at from dist inside floor keep remote out span height width h hide-roofs stop hour weather views site frames every', kit: 'hour weather beside out width h', defs: 'tag all unused remove', where: 'at offset', reach: '', clear: 'size', free: 'near radius count slope',
   select: 'def tag name in area near radius all remove by set-state set-param recolor yaw part note', set: 'state param name constraints about note', about: 'set clear missing kind limit note', recolor: 'part', clone: 'name count step yaw at offset nudge note',
-  sky: 'palette sun list', ...ENV_FLAGS, group: 'off', undo: 'group', map: 'all', furnish: 'style dry group', 'define-kit': 'dry', register: 'identity', mirror: 'fresh', export: 'name', import: 'group', flag: 'at offset', schema: 'md', act: 'note', prayers: 'all',
+  sky: 'palette sun list', ...ENV_FLAGS, group: 'off', undo: 'group', map: 'all', furnish: 'style dry group', 'define-kit': 'dry', register: 'identity', mirror: 'fresh', export: 'name', import: 'group', flag: 'at offset', schema: 'md', act: 'note request-ref', prayers: 'all',
   catalog: 'category has tag page per', find: 'category has tag all', parts: '', recommend: 'per', taxonomy: '',
   ...LAYERS_FLAGS, ...GOV_FLAGS,
 };
@@ -1461,7 +1461,7 @@ export const COMMANDS = { doctor: (r, f) => doctor(f), trace: (r, f) => trace(f)
   map: (r, f) => map({ json: !!f.json, all: !!f.all }), defs: (r, f) => defs(r.join(' ') || undefined, f), schema: (r, f) => schema(f), snapshot,
   about: (r, f) => about(r[0], f), describe: (r, f) => describe(r[0], f), where: (r, f) => where(r[0] ?? f.at, f), reach: (r, f) => reach(r[0], r[1], f), clear: (r, f) => clear(r[0], f), query: (r) => query(readArg(r)), free: (r, f) => freePlots(r[0], f),
   place: (r, f) => place(r[0], f), terrain: (r, f) => place(r[0], f), move: (r, f) => move(r[0], f), set: (r, f) => set(r[0], f), recolor: (r, f) => recolor(r[0], r[1], f), remove: (r) => remove(r), clone: (r, f) => clone(r[0], f),
-  act: (r, f) => act(JSON.parse(readArg(r)), f.note), dryrun: (r) => dryrun(JSON.parse(readArg(r))), plan: (r) => planBatch(readArg(r)), preview: (r) => preview(readArg(r)), commit: (r) => commit(r[0]), request: (r) => request(r[0]),
+  act: (r, f) => act(JSON.parse(readArg(r)), f.note, f['request-ref']), dryrun: (r) => dryrun(JSON.parse(readArg(r))), plan: (r) => planBatch(readArg(r)), preview: (r) => preview(readArg(r)), commit: (r) => commit(r[0]), request: (r) => request(r[0]),
   select: (r, f) => select(f), group: (r, f) => group(r[0], f), undo: (r, f) => undo(f), redo, history: (r, f) => history(r[0] ? Number(r[0]) : 20, f), resolve: (r, f) => resolveCmd(r, f),
   look: (r, f) => look(f), 'look-keeper': (r, f) => keeper(r[0], Number(r[1]), { warm: f.warm !== undefined }), 'look-shot': async (r) => { const res = await shoot(JSON.parse(r[0])); console.log(JSON.stringify(res)); process.exit(0); }, export: (r, f) => exportWorld(r[0], f), import: (r, f) => importWorld(r[0], f), define: (r) => define(readArg(r)), 'define-kit': (r, f) => defineKit(readArg(r), f),
   furnish: (r, f) => furnish(r[0], f), gallery, examples: (r) => examples(r[0]),

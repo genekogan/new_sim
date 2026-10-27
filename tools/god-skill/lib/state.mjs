@@ -114,7 +114,7 @@ const READ_POSTS = new Set(['/v1/god/query', '/v1/god/dryrun', '/v1/god/preview'
 let writes = 0;
 /** How many possibly-writing requests this process has sent (mirror.mjs: a check stays good until the next one). */
 export const writesSent = () => writes;
-export async function call(path, { body, method, as = 'god', noBuild = false, timeoutMs = Number(process.env.EDEN_GOD_TIMEOUT_MS ?? 180_000) } = {}) {
+export async function call(path, { body, method, as = 'god', noBuild = false, requestRef, timeoutMs = Number(process.env.EDEN_GOD_TIMEOUT_MS ?? 180_000) } = {}) {
   const s = load(), world = need(s, 'world', 'Run: node eden-god.mjs register <world-url>'), headers = { 'content-type': 'application/json' };
   if (as === 'god' && s.token) headers.authorization = `Bearer ${s.token}`;
   if (as === 'owner' && s.identity) headers.authorization = `Bearer ${s.identity}`;
@@ -125,7 +125,8 @@ export async function call(path, { body, method, as = 'god', noBuild = false, ti
   if (verb !== 'GET' && !READ_POSTS.has(pathname)) writes++; // G2: the mirror's in-command freshness ends at any write
   // A new command is a new request, even if its input batch carried an old ref.
   // Keep the serialized bytes for the transport retry; never re-create the payload.
-  const clientRef = as === 'god' && verb !== 'GET' && EDIT_PATHS.has(pathname) ? randomUUID() : undefined;
+  if(requestRef!==undefined&&(typeof requestRef!=='string'||!requestRef.trim()||requestRef.length>160||as!=='god'||pathname!=='/v1/god/act'||verb!=='POST'||body?.clientRef!==requestRef))throw Error('requestRef requires an act with the same explicit clientRef');
+  const clientRef = as === 'god' && verb !== 'GET' && EDIT_PATHS.has(pathname) ? requestRef ?? randomUUID() : undefined;
   const payload = body || clientRef ? JSON.stringify(clientRef ? { ...body, clientRef } : body) : undefined;
   const recoverable = clientRef && pathname === '/v1/god/act' && verb === 'POST';
   const retryBudget = { waited: 0, retries: 0 };
