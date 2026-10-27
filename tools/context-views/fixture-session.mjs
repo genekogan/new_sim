@@ -115,7 +115,18 @@ export function createFixtureSessions({ root, out, port = 5980, deadline, signal
       const listing = await (await request('/v1/world/context', undefined, null)).json();
       const bindings = bindCases(cases, baselineSnapshot.entities, listing.targets);
       await sample(); monitor = setInterval(() => { if (!sampling) sampleTask = sample(); }, 500);
-      await callback({ request, out, deadline, signal, bindings, baselineSnapshot, entities: baselineSnapshot.entities, cases, assets, report, save, setPhase: value => { phase = value; setPhase(value); } });
+      await callback({ request, out, deadline, signal, bindings, baselineSnapshot, entities: baselineSnapshot.entities, cases, assets, report, save,
+        base,
+        jobEvents: () => receipt.contextJobs.map(event => ({ ...event })),
+        registerProcess: async pid => { descendants(await processRows(), pid, known); },
+        ownedProcesses: async () => descendants(await processRows(), child.pid, known).map(row => ({ pid: row.pid, start: row.start, server: row.pid === child.pid })),
+        uploadArtwork: async png => {
+          const response = await fetchBounded(base + '/v1/god/assets?name=baseline-artwork&license=CC0', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'image/png' }, body: png });
+          if (!response.ok) throw Error(`fixture image upload HTTP${response.status}`);
+          return response.json();
+        },
+        rawGet: path => fetchBounded(base + path),
+        setPhase: value => { phase = value; setPhase(value); } });
     } catch (error) { receipt.error = String(error); }
     finally {
       clearInterval(monitor); localAbort.abort(new Error('session ended')); await sampleTask;
