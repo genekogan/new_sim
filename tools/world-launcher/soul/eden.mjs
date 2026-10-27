@@ -331,7 +331,11 @@ async function caps(...args) {
 
 async function around(...args) {
   const q = args.length ? "?to=" + encodeURIComponent(args.join(" ")) : "";
-  return clean(ok(await call("/v1/edge/around" + q), "around")).around;
+  const d = clean(ok(await call("/v1/edge/around" + q), "around"));
+  // Directions are a sibling of the local surroundings, not part of them.
+  // Never silently discard a requested destination on an older server either.
+  const route = d.route ?? (args.length ? { query: args.join(" "), found: false, reason: 'This world did not return directions for this query. Use resolve "walk to <destination>" or caps --verb walk --search "<destination>".' } : undefined);
+  return { ...d.around, ...(route ? { route } : {}) };
 }
 
 const map = async () => clean(ok(await call("/v1/edge/map"), "map"));
