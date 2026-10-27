@@ -490,7 +490,19 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   };
   if (pool.length) {
     const rawQ=tokens(rest),identity=PLACE_VERBS.has(verb)&&ctx.places.some(p=>[p.id,p.ref??'',p.name,...(p.aliases??[])].some(n=>norm(n)===rawQ.join(' ')));
-    const q = numberWords(identity?rawQ:rawQ.filter(t => !FILLER.has(t) || !PLACE_VERBS.has(verb) ? true : false), () => [...[...info.values()].flatMap(i => i.ownNames), ...ctx.places.map(p => tokens(p.name))]), qs = q.join(' '), byOwn = (want: string) => pool.filter(c => info.get(c.id)!.own.some(n => norm(n) === want));
+    const q = numberWords(identity?rawQ:rawQ.filter(t => !FILLER.has(t) || !PLACE_VERBS.has(verb) ? true : false), () => [...[...info.values()].flatMap(i => i.ownNames), ...ctx.places.map(p => tokens(p.name))]), qs = q.join(' ');
+    const byOwn = (want:string) => {
+      const matches=pool.filter(c=>info.get(c.id)!.own.some(n=>norm(n)===want));
+      if(!PLACE_VERBS.has(verb))return matches;
+      // Stable refs/IDs outrank inherited part aliases and generic definition tags
+      // (a cup tagged kitchen must not compete with walk:kitchen). Keep unavailable
+      // exact targets so a blocked named entrance is not replaced by a free alias.
+      const exact=matches.filter(c=>norm(c.id.slice(c.id.indexOf(':')+1))===want||norm(c.target?.id??'')===want);
+      if(exact.length)return exact;
+      const named=new Set(ctx.places.filter(p=>norm(p.name)===want).map(p=>p.id));
+      const titles=matches.filter(c=>c.target?.kind==='place'&&named.has(c.target.id));
+      return titles.length?titles:matches;
+    };
     const here = pool.find(c => c.id === `${verb}:here`);
     // 0. Verbs with a single non-targeted (or "here") capability: rest:anything, swim:pond, wander:around.
     if (pool.length === 1 && (!q.length || (!['sit','swim'].includes(verb) && (!pool[0].target || pool[0].id.endsWith(':here'))))) return {kind: 'alias', cap: pool[0], note: `${input} is ${pool[0].id}.`};
