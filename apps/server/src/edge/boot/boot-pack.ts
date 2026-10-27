@@ -15,7 +15,7 @@ const sortId=(a:{id:string},b:{id:string})=>a.id<b.id?-1:a.id>b.id?1:0;
 const pointKey=(p:readonly number[])=>p.join(',');
 const polygonKey=(p:readonly (readonly number[])[])=>p.map(pointKey).sort().join(';');
 const centre=(polygon:readonly (readonly number[])[]):[number,number]=>[0,1].map(i=>Math.round(polygon.reduce((sum,v)=>sum+v[i],0)/polygon.length*10)/10) as [number,number];
-const goodFor=(p:Place)=>p.description?.match(/Good for:\s*([^.!?]+)/i)?.[1].trim().split(/\s+/).slice(0,8).join(' ')??'';
+const goodFor=(p:Place)=>p.semanticKind ? (p.description??p.semanticKind).slice(0,160) : p.description?.match(/Good for:\s*([^.!?]+)/i)?.[1].trim().split(/\s+/).slice(0,8).join(' ')??'';
 export function buildBootStatic(input:BootStaticInput){
  if(!input.worldId||input.worldId.length>200||!Number.isInteger(input.byteBudget??10240)||(input.byteBudget??10240)<1)throw Error('boot-pack.invalid: world/budget');
  const native=new Map(input.nativePlaces.map(p=>[p.id,p])),places=[...input.places].sort(sortId),placeIds=new Set(places.map(p=>p.id));
@@ -40,12 +40,13 @@ export function buildBootStatic(input:BootStaticInput){
  });
  const index:KnownBootPlace[]=places.map(p=>{
   const region=native.get(alias.get(p.id)??p.id),admitted=!!region&&region.level===p.level;
-  return {id:p.id,name:p.name,aliases:[...(input.aliases?.[p.id]??[])].sort(),level:p.level,nativeRegion:admitted?region!.id:null,
+  return {id:p.id,name:p.name,aliases:[...new Set([...(input.aliases?.[p.id]??[]),...(p.aliases??[])])].sort(),level:p.level,nativeRegion:admitted?region!.id:null,
    access:p.carrier?'dynamic-carrier':admitted?'admitted':p.level!==0?'unsupported-floor':'scenery'};
  });
  const fullMap={contract:'boot-place-catalog/1' as const,worldId:input.worldId,places:places.map((p,i)=>({...structuredClone(p),...index[i],centre:p.carrier?null:centre(index[i].nativeRegion?native.get(index[i].nativeRegion!)!.polygon:p.polygon)}))};
  const fullMapHash=hashOf(fullMap),destinations=fullMap.places.filter(p=>p.access==='admitted'&&p.parent!==null&&p.kind!=='sleeping-mat');
- const payload={contract:'boot-static/1' as const,worldId:input.worldId,
+ const worldAbout=places.find(p=>p.parent===null)?.worldAbout;
+ const payload={contract:'boot-static/1' as const,worldId:input.worldId,...(worldAbout?{worldAbout}:{}),
   coverage:{scope:'admitted-static-destinations' as const,totalPlaces:places.length,listedDestinations:destinations.length,
    scenery:index.filter(p=>p.access==='scenery').length,unsupportedFloors:index.filter(p=>p.access==='unsupported-floor').length,dynamicCarriers:index.filter(p=>p.access==='dynamic-carrier').length,
    personalRestPlaces:fullMap.places.filter(p=>p.kind==='sleeping-mat').length},

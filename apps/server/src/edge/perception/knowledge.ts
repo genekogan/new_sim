@@ -23,6 +23,7 @@ export type Known = {visits: number; firstTick: number; lastTick: number; how: '
 /** Secret places within this many metres (edge of the place) are found by looking around. */
 export const FIND_RADIUS = 25;
 const FAR_LISTED = 6;
+const parentOf = (p: Place) => p.semanticParent === undefined ? p.parent : p.semanticParent;
 const area = (p: V2[]) => Math.abs(p.reduce((s, [x, z], i) => {const [x2, z2] = p[(i + 1) % p.length]; return s + x * z2 - x2 * z;}, 0)) / 2;
 
 export class PlaceKnowledge {
@@ -112,7 +113,9 @@ export class PlaceKnowledge {
    *  more, like a god world's "Green field"), whose own children stand in for it. */
   private tops(): {list: Place[]; covers: Set<string>} {
     const all = [...this.L.places.byId.values()], root = all.find(p => p.parent === null); if (!root) return {list: [], covers: new Set()};
-    const kids = (id: string) => all.filter(p => p.parent === id && !p.carrier), whole = area(root.polygon), covers = new Set<string>(), list: Place[] = [];
+    const authored = all.filter(p => p.semanticRole === 'district' || p.semanticRole === 'quarter');
+    if (authored.length) return {list: authored, covers: new Set()};
+    const kids = (id: string) => all.filter(p => parentOf(p) === id && !p.carrier), whole = area(root.polygon), covers = new Set<string>(), list: Place[] = [];
     for (const p of kids(root.id)) {const inner = kids(p.id); if (whole > 0 && area(p.polygon) >= whole / 2 && inner.length) {covers.add(p.id); list.push(...inner);} else list.push(p);}
     return {list, covers};
   }
@@ -120,13 +123,13 @@ export class PlaceKnowledge {
   districtOf(placeId: string | null): Place | null {
     const {list, covers} = this.tops(), ids = new Set(list.map(p => p.id));
     let p = placeId ? this.L.places.byId.get(placeId) : undefined, cover: Place | null = null; const seen = new Set<string>();
-    while (p && !seen.has(p.id)) {seen.add(p.id); if (ids.has(p.id)) return p; if (covers.has(p.id)) cover = p; p = p.parent ? this.L.places.byId.get(p.parent) : undefined;}
+    while (p && !seen.has(p.id)) {seen.add(p.id); if (ids.has(p.id)) return p; if (covers.has(p.id)) cover = p; const parent = parentOf(p); p = parent ? this.L.places.byId.get(parent) : undefined;}
     return cover;
   }
   private districts(): Place[] {return this.tops().list;}
   private within(p: Place, ancestor: string): boolean {
     let q: Place | undefined = p; const seen = new Set<string>();
-    while (q && !seen.has(q.id)) {if (q.id === ancestor) return true; seen.add(q.id); q = q.parent ? this.L.places.byId.get(q.parent) : undefined;}
+    while (q && !seen.has(q.id)) {if (q.id === ancestor) return true; seen.add(q.id); const parent = parentOf(q); q = parent ? this.L.places.byId.get(parent) : undefined;}
     return false;
   }
   /** Who is where, counted: innermost outdoor (not enclosed) place → people. Enclosed rooms are never counted. */
@@ -156,14 +159,18 @@ export class PlaceKnowledge {
       const on = minuteOfDay === null ? [] : happenings(inside, minuteOfDay, pos, 2, 0).filter(h => h.now).map(h => `${h.label} @ ${h.place}`);
       summary = {name: district.name, people, ...(busy.length ? {busy} : {}), ...(on.length ? {on} : {})};
     }
-    const others = this.districts().filter(d => d.id !== district?.id && this.knows(soulId, d.id)).map(d => {const at = centroid(d.polygon); return {d, at, m: pos ? dist2(pos, at) : 0};})
-      .sort((a, b) => a.m - b.m || a.d.id.localeCompare(b.d.id));
+    const landmarks = [...this.L.places.byId.values()].filter(p => p.semanticRole === 'landmark' && (p.salience ?? 0) >= 2);
+    const farPlaces = [...new Map([...this.districts(), ...landmarks].map(p => [p.id,p])).values()];
+    const others = farPlaces.filter(d => d.id !== district?.id && this.knows(soulId, d.id)).map(d => {const at = centroid(d.polygon); return {d, at, m: pos ? dist2(pos, at) : 0};})
+      .sort((a, b) => { const nearA = a.m <= 160, nearB = b.m <= 160; return Number(nearB) - Number(nearA) || (nearA ? a.m - b.m : (b.d.salience ?? 0) - (a.d.salience ?? 0) || a.m - b.m) || a.d.id.localeCompare(b.d.id); });
     const far = others.slice(0, FAR_LISTED).map(({d, at, m}) => {
       const dir = pos ? compassPoint(compassOf(at[0] - pos[0], at[1] - pos[1])) : '?';
-      if (!mem.has(d.id)) return `${d.name} · ${dir}`;
+      const districtName = d.semanticRole === 'landmark' ? this.districtOf(d.id)?.name : undefined;
+      const name = districtName && districtName !== d.name ? `${d.name} (${districtName})` : d.name;
+      if (!mem.has(d.id)) return `${name} · ${dir}`;
       const been = [...mem].filter(([id, k]) => id !== d.id && k.how === 'visited' && this.L.places.byId.get(id) && this.within(this.L.places.byId.get(id)!, d.id))
         .sort((a, b) => b[1].lastTick - a[1].lastTick).slice(0, 2).map(([id]) => this.L.places.byId.get(id)!.name);
-      return `${d.name} · ${dir} ${Math.round(m / 10) * 10}m${been.length ? ` · been: ${been.join(', ')}` : ' · been'}`;
+      return `${name} · ${dir} ${Math.round(m / 10) * 10}m${been.length ? ` · been: ${been.join(', ')}` : ' · been'}`;
     });
     return {...(summary ? {district: summary} : {}), far, ...(others.length > FAR_LISTED ? {farMore: others.length - FAR_LISTED} : {})};
   }

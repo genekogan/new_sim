@@ -17,7 +17,7 @@ export function nativeAliasesOf(L:EdgeLedger){return (L.worldProfile as typeof L
 export function knownBootPlaces(L:EdgeLedger,soulId?:string):KnownBootPlace[]{
  const regions=L.host.engine.world.regions,aliases=new Map(nativeAliasesOf(L).map(a=>[a.place,a.nativeRegion])),names=bootAliases(L);
  return [...L.places.byId.values()].filter(p=>soulId===undefined||(L.knowledge?.knows(soulId,p.id)??true)).map(p=>{const id=aliases.get(p.id)??p.id,r=regions[id] as (typeof regions)[string]&{placeLevel?:number}|undefined,admitted=!!r&&(r.placeLevel??r.level??0)===p.level,god=!r&&!p.carrier&&!!L.placeWalkable?.(p.id);
-  return {id:p.id,name:p.name,aliases:names[p.id]??[],level:p.level,nativeRegion:admitted?id:null,access:p.carrier?'dynamic-carrier':admitted||god?'admitted':p.level!==0?'unsupported-floor':'scenery'};
+  return {id:p.id,name:p.name,aliases:[...new Set([...(names[p.id]??[]),...(p.aliases??[])])],level:p.level,nativeRegion:admitted?id:null,access:p.carrier?'dynamic-carrier':admitted||god?'admitted':p.level!==0?'unsupported-floor':'scenery'};
  });
 }
 export function destinationOffers(caps:readonly EdgeCapability[],verb:string):DestinationCapability[]{return caps.filter(c=>c.verb===verb&&c.target?.kind==='place').map(c=>({id:c.id,placeId:c.target!.id,available:c.available,blocked:c.blocked}));}

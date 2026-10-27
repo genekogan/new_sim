@@ -13,6 +13,7 @@
 import { deckRaised } from '@sim/generators';
 import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
+import { humanTitle } from './meaning.ts';
 import { isShut } from './doors.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -199,6 +200,7 @@ export class GodNav {
       if (hit && hit.e === e && hit.def === def && hit.water === water && hit.chain.length === chain.length && hit.chain.every((x, i) => x === chain[i]) && (hit.kids === undefined || hit.kids === this.kidsOf(e))) return hit.things;
     }
     const things = this.describe(e, def, water);
+    if (e.about?.what) for (const t of things) if (t.kind !== 'room') t.what = e.about.what;
     if (stamp !== undefined) this.memo.set(e.id, { e, chain, def, water, things, ...(things.some((t) => t.kind === 'room') ? { kids: this.kidsOf(e) } : {}) });
     return things;
   }
@@ -208,7 +210,7 @@ export class GodNav {
     const toWorld = (x: number, z: number): Vec2 => [r3(wp.x + (x * c + z * s) * wp.s), r3(wp.z + (-x * s + z * c) * wp.s)];
     const kind0 = shortDef(def), parent = e.in.parent !== 'world' ? m.entities.get(e.in.parent) : undefined;
     const pname = parent?.name ? [parent.name] : [];
-    const base = { id: e.id, name: e.name!, words: [...new Set([...words(e.name!), ...words(kind0), ...def.tags.flatMap(words), ...pname.flatMap(words)])] };
+    const base = { id: e.id, name: e.about?.title ?? humanTitle(e.name!), words: [...new Set([...words(e.name!), ...words(e.about?.title ?? ''), ...words(e.about?.kind ?? ''), ...(e.about?.aliases ?? []).flatMap(words), ...words(kind0), ...def.tags.flatMap(words), ...(def.synonyms ?? []).flatMap(words), ...pname.flatMap(words)])] };
     const sh = e.shape as { area?: Vec2[]; path?: Vec2[]; width?: number } | undefined;
     if (water || (def.form !== 'point' && e.in.parent === 'world' && sh)) {
       const area = (water?.area ?? sh?.area) as Vec2[] | undefined, path = (water?.path ?? sh?.path) as Vec2[] | undefined;
@@ -267,7 +269,7 @@ export class GodNav {
         const ry = wp.y + (r.y ?? 0) * wp.s, at = toWorld(local[0], local[1]);
         const rname = r.name ?? r.id, floor = r.floor ?? 0;
         roomRefs.push(rref);
-        out.push({ id: e.id, room: r.id, ref: rref, name: `${e.name}/${r.id}`, kind: 'room', what: `${rname} of ${e.name}${floor ? `, floor ${floor}` : ''}`,
+        out.push({ id: e.id, room: r.id, ref: rref, name: `${base.name} / ${humanTitle(r.id)}`, kind: 'room', what: `${rname} of ${base.name}${floor ? `, floor ${floor}` : ''}`,
           words: [...new Set([...words(r.id), ...words(rname), ...base.words, 'room', 'inside'])], at, level: this.h.levelAt(at[0], at[1], ry), rise: r3((r.y ?? 0) * wp.s), floor, poly, roomFrame, ...(stands[0] ? { entry: { p: stands[0], level } } : {}) });
       }
       // the room the front door opens into goes first (the entrance)

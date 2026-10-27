@@ -1,0 +1,27 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { CORE_KIT, WorldModel, applyBatch, coreRef } from '@sim/world-compiler';
+import { decorateMeaning, meaningParts } from './meaning.ts';
+import type { GodPlace } from './places.ts';
+const area = [[-20,-20],[20,-20],[20,20],[-20,20]] as [number,number][];
+const place = (entity:string, ref:string, of:GodPlace['of'], polygon=area):GodPlace => ({entity,ref,of,id:'g-'+ref,name:ref,kind:of,parent:'tree-clump',polygon,level:0,enclosed:false,capacity:null,starting:false});
+function setup() {
+ const m=new WorldModel({constants:{extent:200,ground:'land'},seed:'semantic-places'}); for(const d of CORE_KIT)m.defineDef(d,'core',0);
+ const act=(ops:unknown[])=>{const r=applyBatch(m,{ops},'god',1);assert.equal(r.result.accepted,true,JSON.stringify(r.result));};
+ act([{op:'place',def:coreRef('plaza'),name:'land-campus',shape:{area},about:{title:'Campus',what:'A meeting place beside the lecture hall.',role:'district',salience:3}},
+ {op:'place',def:coreRef('bench'),name:'speaker',p:[0,0],about:{title:'Speaker bench',what:'A bench for the speaker.',in:'land-campus',aliases:['podium bench']}},
+ {op:'place',def:coreRef('pond'),name:'land-west-lake',shape:{area:[[30,-10],[50,-10],[50,10],[30,10]]},about:{title:'West Lake',kind:'lake',aliases:['swimming lake']}}]);
+ return {m,act};
+}
+test('meaning changes display and semantic hierarchy without changing physical membership',()=>{
+ const {m}=setup(), ps=[place(m.get('land-campus')!.id,'land-campus','area'),place(m.get('speaker')!.id,'speaker','thing',[[-1,-1],[1,-1],[1,1],[-1,1]]),place(m.get('land-west-lake')!.id,'land-west-lake','water'),place(m.get('land-west-lake')!.id,'land-west-lake','shore')];
+ ps[3].id+='-shore'; const before=ps.map(p=>({parent:p.parent,polygon:structuredClone(p.polygon),kind:p.kind})); decorateMeaning(m,ps,'world');
+ assert.equal(ps[0].name,'Campus');assert.equal(ps[1].description,'A bench for the speaker.');assert.equal(ps[1].semanticParent,'g-land-campus');assert.equal(ps[3].semanticParent,'g-land-west-lake');
+ assert.equal(ps[2].semanticKind,'lake'); assert.equal(ps[3].name,'West Lake bank');assert.ok(ps[2].aliases!.includes('swimming lake'));assert.ok(ps[2].aliases!.includes('pond'));
+ assert.deepEqual(ps.map(p=>({parent:p.parent,polygon:p.polygon,kind:p.kind})),before);
+});
+test('parts preserve real targets; descriptive parts have no target; local points transform with owner',()=>{
+ const {m,act}=setup(); act([{op:'set',id:'speaker',about:{title:'Speaker',parts:[{id:'view',title:'Distant view'},{id:'actual',title:'Campus',anchor:{kind:'entity',ref:'land-campus'}},{id:'spot',title:'Presenter spot',anchor:{kind:'local',point:[1,0,2],stand:[1,0,1],level:0,region:[[0,0],[2,0],[2,2],[0,2]]}}]}},{op:'move',id:'speaker',p:[10,10],r:90}]);
+ const parts=meaningParts(m,m.get('speaker')!.id);assert.equal(parts[0].target,undefined);assert.equal(parts[1].target!.ref,'land-campus');
+ const wp=m.worldPose(m.get('speaker')!);const q=parts[2].target!.point!;assert.ok(Math.abs(q[0]-(wp.x+(Math.cos(wp.yaw)+2*Math.sin(wp.yaw))*wp.s))<1e-8);assert.equal(parts[2].target!.level,0);assert.equal(parts[2].target!.region!.length,4);
+});

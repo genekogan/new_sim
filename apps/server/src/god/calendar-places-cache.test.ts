@@ -9,9 +9,12 @@ import type { CommsCore } from '../edge/comms/core.ts';
 import { PlaceIndex, type Place } from '../edge/ledger/places.ts';
 import { EngineBridge } from './engine-bridge.ts';
 import { GodLayers, type LayersHost } from './layers.ts';
+import { humanTitle } from './meaning.ts';
 import { GodPlaces, type PlacesHost } from './places.ts';
 import { GodPlaces as LegacyPlaces } from './places-membership-reference.fixture.ts';
 import { GodNav, type Thing } from './nav.ts';
+
+const physical = (places: ReturnType<GodPlaces['list']>) => places.map(({name: _n, aliases: _a, semanticParent: _p, semanticRole: _r, semanticKind: _k, salience: _s, parts: _parts, ...p}) => ({...p, ...(p.of === 'shore' ? {description: 'shore'} : {})}));
 
 type Lookup = (e: Entity) => { id: string; name: string } | null;
 function fixture(memo = true) {
@@ -42,7 +45,7 @@ function fixture(memo = true) {
 
 test('calendar own-place identities survive minute changes; ordinary place reads still refresh', () => {
   const f = fixture(), sources = f.sources(), initial = f.places.calendarIdentities(sources, f.bridge.version);
-  assert.deepEqual(initial.get(f.model.get('alpha')!.id), { id: 'g-alpha', name: 'alpha' });
+  assert.deepEqual(initial.get(f.model.get('alpha')!.id), { id: 'g-alpha', name: 'Alpha' });
   const derives = f.places.stats.derives;
   f.engine.world.tick = 2400;
   assert.strictEqual(f.places.calendarIdentities(sources, f.bridge.version), initial);
@@ -62,10 +65,10 @@ test('calendar identities invalidate for model edits, non-map bridge revisions a
   f.defer(true);
   const deferred = f.places.calendarIdentities(f.sources(), f.bridge.version);
   assert.notStrictEqual(deferred, before);
-  assert.deepEqual(deferred.get(alpha.id), { id: 'g-alpha', name: 'alpha' }, 'existing deferred-read semantics remain');
+  assert.deepEqual(deferred.get(alpha.id), { id: 'g-alpha', name: 'Alpha' }, 'existing deferred-read semantics remain');
   f.defer(false); f.places.sync(true);
   const installed = f.places.calendarIdentities(f.sources(), f.bridge.version);
-  assert.deepEqual(installed.get(alpha.id), { id: 'g-renamed', name: 'renamed' }, 'the completed install replaces a deferred identity');
+  assert.deepEqual(installed.get(alpha.id), { id: 'g-renamed', name: 'Renamed' }, 'the completed install replaces a deferred identity');
   before = installed;
   for (const edit of [() => { f.model.state = { ...f.model.state, constitution: 'updated' }; }, () => { const g = f.model.ground(); f.model.terrain.update({ ...g, extent: [-210, -200, 200, 200] }, []); }]) {
     const safetyKey = f.model.safetyCacheKey(); edit(); f.bridge.version++;
@@ -113,7 +116,7 @@ test('new calendar sources entering the horizon reuse primed identities and matc
     assert.equal(f.places.stats.derives, derives, 'even the source first posted later was primed');
     const generated = objects.all().find(o => o.name === 'tomorrow')!;
     const params = objects.creationParams(generated.id)!;
-    assert.equal(params.placeId, 'g-beta'); assert.equal(params.placeName, 'beta');
+    assert.equal(params.placeId, 'g-beta'); assert.equal(params.placeName, 'Beta');
     assert.equal(params.startsAtTick, 73500); assert.equal(params.durationTicks, 3000);
     assert.deepEqual(params.godSchedule, { entity: f.model.get('beta')!.id, event: 'tomorrow', date: new Date(Date.parse(c.day) + 86400_000).toISOString().slice(0, 10) });
     objects.remove(generated.id);
@@ -130,7 +133,7 @@ test('cold identities after an edit skip decoration, and the next full read reus
   const describe = t.mock.method(internals, 'describe'), layer = t.mock.method(internals, 'layer');
   const before = { ...f.places.stats };
   const own = f.places.calendarIdentities(f.sources(), f.bridge.version);
-  assert.deepEqual(own.get(f.model.get('alpha')!.id), { id: 'g-alpha', name: 'alpha' });
+  assert.deepEqual(own.get(f.model.get('alpha')!.id), { id: 'g-alpha', name: 'Alpha' });
   assert.equal(f.places.stats.derives, before.derives);
   assert.equal(f.places.stats.memberships, before.memberships + 1);
   assert.equal(describe.mock.callCount(), 0); assert.equal(layer.mock.callCount(), 0);
@@ -149,7 +152,7 @@ test('mutable public polygons and descriptions cannot contaminate the membership
   f.engine.world.tick = 1200;
   assert.deepEqual(f.places.list(), expected);
   assert.equal(f.places.stats.memberships, builds);
-  assert.deepEqual(f.places.calendarIdentities(f.sources(), f.bridge.version).get(f.model.get('alpha')!.id), { id: 'g-alpha', name: 'alpha' });
+  assert.deepEqual(f.places.calendarIdentities(f.sources(), f.bridge.version).get(f.model.get('alpha')!.id), { id: 'g-alpha', name: 'Alpha' });
 });
 
 test('membership reuse requires a structural host version and tracked model maps', () => {
@@ -181,7 +184,7 @@ test('navigation level changes invalidate cold calendar identities and membershi
   buildingLevel = 1; levels++;
   const added = f.places.calendarIdentities(f.sources(), revision);
   assert.notStrictEqual(added, first);
-  assert.deepEqual(added.get(alpha.id), { id: 'g-alpha', name: 'alpha' });
+  assert.deepEqual(added.get(alpha.id), { id: 'g-alpha', name: 'Alpha' });
   assert.equal(f.places.stats.memberships, 2, 'new levels invalidate membership as well as the identity shortcut');
   buildingLevel = 0; describeEpoch++;
   const reused = f.places.calendarIdentities(f.sources(), revision);
@@ -249,9 +252,9 @@ test('shared membership retains full legacy places, calendar identities, and cur
     const own = f.places.calendarIdentities(sources, f.bridge.version), builds = f.places.stats.memberships;
     for (const e of sources) {
       const p = legacy.ofEntity(e.id);
-      assert.deepEqual(own.get(e.id), p ? { id: p.id, name: p.name } : null);
+      assert.deepEqual(own.get(e.id), p ? { id: p.id, name: humanTitle(p.ref) } : null);
     }
-    assert.deepEqual(f.places.list(), expected, 'every geometry, parent, seat, description and schedule matches the frozen writer');
+    assert.deepEqual(physical(f.places.list()), physical(expected), 'geometry, physical parent, seats and schedules match the frozen writer; labels and shore prose now carry meaning');
     assert.equal(f.places.stats.memberships, builds, 'full decoration uses the completed calendar membership');
     return expected;
   };
@@ -291,11 +294,11 @@ test('calendar membership uses the full index sort and water duplicate-ref prece
   f.nav.things = () => [base, { ...base, id: b.id, kind: 'water' }, { ...base, id: c.id, ref: 'shared/room', kind: 'room', poly: base.area }];
   const legacy = new LegacyPlaces(f.host), own = f.places.calendarIdentities(f.sources(), f.bridge.version);
   for (const e of f.sources()) {
-    const p = legacy.ofEntity(e.id); assert.deepEqual(own.get(e.id), p ? { id: p.id, name: p.name } : null);
+    const p = legacy.ofEntity(e.id); assert.deepEqual(own.get(e.id), p ? { id: p.id, name: humanTitle(p.ref) } : null);
   }
   assert.equal(own.get(b.id), null, 'water cannot overwrite a previous area with the same ref');
   assert.equal(own.get(c.id), null, 'room does not become its entity own-place');
-  assert.deepEqual(f.places.list(), legacy.list());
+  assert.deepEqual(physical(f.places.list()), physical(legacy.list()));
   assert.equal(f.places.forRef('shared')!.of, 'shore');
 });
 

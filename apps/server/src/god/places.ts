@@ -18,6 +18,7 @@
 // Eden/Mars/LM) says they are walkable although they are not native engine regions. Pure reads of the entity model.
 import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
+import { decorateMeaning, humanTitle } from './meaning.ts';
 import type { Place } from '../edge/ledger/places.ts';
 import type { GodNav, Thing } from './nav.ts';
 
@@ -129,7 +130,7 @@ export class GodPlaces {
   list(fresh = false): GodPlace[] { return this.index(fresh).list; }
   /** The place a god thing itself is (a plaza, a house, a gazebo, a lone fountain): its objects stand in it. */
   ofEntity(id: string): GodPlace | undefined { return this.index().byEntity.get(id); }
-  private calendarIdentityCache?: { model: object; revision: number; structuralVersion: number | string | undefined; index: object | null; own: Map<string, { id: string; name: string } | null> };
+  private calendarIdentityCache?: { model: object; revision: number; structuralVersion: number | string | undefined; index: object | null; meaning: Map<string, Entity['about']>; own: Map<string, { id: string; name: string } | null> };
   /** Undecorated, privately owned geometry. Neither public places nor navigation Things alias this memo. */
   private membership?: { stamp: StructureStamp; list: GodPlace[] };
   /** Calendar creation needs stable own-place identities, not minute-dependent descriptions. Prime every scheduled
@@ -138,13 +139,13 @@ export class GodPlaces {
    *  Misses are explicit: callers must resolve containment and native ledger names live. Ordinary reads stay fresh. */
   calendarIdentities(sources: readonly Entity[], revision: number): ReadonlyMap<string, { id: string; name: string } | null> {
     const model = this.h.model.safetyCacheKey(), structuralVersion = this.h.structuralVersion?.(), cached = this.calendarIdentityCache;
-    if (cached?.model === model && cached.revision === revision && cached.structuralVersion === structuralVersion && cached.index === this.cache && sources.length === cached.own.size && sources.every(e => cached.own.has(e.id))) return cached.own;
+    if (cached?.model === model && cached.revision === revision && cached.structuralVersion === structuralVersion && cached.index === this.cache && sources.length === cached.own.size && sources.every(e => cached.own.has(e.id) && cached.meaning.get(e.id) === e.about)) return cached.own;
     // Preserve installed/deferred reads. A cold lookup only needs membership, not descriptions or today's slots.
     const index = this.cache && (this.h.deferred?.() || this.cache.key === this.key()) ? this.cache
       : placeIndex(sortPlaces([...drain(this.membershipGen())]));
     const own = new Map<string, { id: string; name: string } | null>();
-    for (const e of sources) { const p = index.byEntity.get(e.id); own.set(e.id, p ? { id: p.id, name: p.name } : null); }
-    this.calendarIdentityCache = { model, revision, structuralVersion, index: this.cache, own };
+    for (const e of sources) { const p = index.byEntity.get(e.id); own.set(e.id, p ? { id: p.id, name: e.about?.title ?? humanTitle(p.ref) } : null); }
+    this.calendarIdentityCache = { model, revision, structuralVersion, index: this.cache, meaning: new Map(sources.map(e => [e.id,e.about])), own };
     return own;
   }
   /** Walkable (the ledger's hook): every place this layer made. */
@@ -310,6 +311,7 @@ export class GodPlaces {
       try { p.description = this.describe(p, out, things); if (p.of === 'room') { const k = this.seatsIn(p); p.capacity = k || null; } } finally { this.facts = null; }
       if (++n % 16 === 0) yield;
     }
+    decorateMeaning(this.h.model, out, root);
     if (this.h.layers?.active()) this.layer(out);
     return sortPlaces(out);
   }
@@ -320,7 +322,7 @@ export class GodPlaces {
     const m = this.h.model, L = this.h.layers!;
     for (const p of out) {
       const e = m.entities.get(p.entity); if (!e) continue;
-      if (/^core[-/]zone@/.test(m.def(e.def)?.ref ?? e.def)) { p.kind = `${String(e.params?.use ?? 'residential')} zone`; const rest = p.description?.includes(' with ') ? p.description.split(' with ').slice(1).join(' with ') : ''; p.description = `a ${p.kind} the god drew${rest ? `, with ${rest}` : ''}`; }
+      if (!e.about?.what && /^core[-/]zone@/.test(m.def(e.def)?.ref ?? e.def)) { p.kind = `${String(e.params?.use ?? 'residential')} zone`; const rest = p.description?.includes(' with ') ? p.description.split(' with ').slice(1).join(' with ') : ''; p.description = `a ${p.kind} the god drew${rest ? `, with ${rest}` : ''}`; }
       const extra = [L.tag(e), L.peopleAt(e.id)].filter(Boolean).join('; ');
       if (extra && p.of !== 'shore') p.description = `${p.description ?? ''}; ${extra}`.slice(0, 600);
     }
@@ -420,9 +422,15 @@ export class GodPlaces {
     for (const id of [...this.installed]) if (!want.has(id)) { places.byId.delete(id); this.installed.delete(id); }
     for (const [id, p] of want) {
       const cur = places.byId.get(id); if (cur && !this.installed.has(id)) continue;   // a boot place keeps its own
-      const { ref: _r, of: _o, entity: _e, ...place } = p;
+      const { of: _o, entity: _e, ...place } = p;
       if (!cur || JSON.stringify(cur) !== JSON.stringify(place)) places.add(place);
       this.installed.add(id);
+    }
+    const root = [...places.byId.values()].find(p => p.parent === null);
+    if (root) {
+      const { worldAbout: _previous, ...base } = root, about = this.h.model.state.about;
+      const next = { ...base, ...(about ? { worldAbout: about } : {}) };
+      if (JSON.stringify(root) !== JSON.stringify(next)) places.add(next);
     }
     this.published = true;
   }
