@@ -225,6 +225,13 @@ test('target listing is bounded and complete across revision-guarded pages', asy
         assert.equal(next.targets.length, 7);
         assert.equal(next.nextCursor, null);
         assert.equal(new Set([...page.targets, ...next.targets].map(t => t.ref)).size, 107);
+        const moderation = moderationFor(db.db, god.opts.worldId), version = moderation.version.bind(moderation);
+        let frontierReads = 0;
+        moderation.version = () => { frontierReads++; return version(); };
+        try {
+            assert.equal((await app.request('/v1/world/context')).status, 200);
+            assert.ok(frontierReads < 20, `one synchronous page must not repeat DB/log frontier reads for every candidate: ${frontierReads}`);
+        } finally { moderation.version = version; }
         moderationFor(db.db, god.opts.worldId).append({ sha: 'a'.repeat(64), action: 'hide', role: 'creator', actor: 'test' });
         assert.equal((await app.request('/v1/world/context?cursor=' + page.nextCursor)).status, 409, 'moderation invalidates pagination without editSeq change');
         assert.equal((await app.request('/v1/world/context?q=Listed&cursor=' + page.nextCursor)).status, 409, 'query has a separate listing identity');
@@ -235,6 +242,28 @@ test('target listing is bounded and complete across revision-guarded pages', asy
         await service.close();
         db.close();
     }
+});
+test('listing refuses a moderation change while final target metadata is materialized', async () => {
+    const { god, db, act } = fixture();
+    const png = encodeContextPng(1, 1, new Uint8Array([255, 0, 0, 255])), asset = god.assets.put(png);
+    act([{ op: 'place', def: 'core/picture-frame@1', name: 'art', state: { media: `/assets/${asset.sha}.png` } }]);
+    const ref = god.model.get('art')!.id, app = new Hono();
+    app.onError((error, c) => error instanceof ApiError ? c.json({ code: error.code }, error.status as 400) : c.json({ error: String(error) }, 500));
+    const service = mountContextViews(app, { god, edge: { places: { byId: new Map() }, knowledge: { knows: () => true } } as never,
+        contextReady: () => true, waitForContext: async () => {}, levelAt: () => 0, worldUrl: 'http://127.0.0.1:5980', soul: () => null, limit() {} });
+    const moderation = moderationFor(db.db, god.opts.worldId), isHidden = moderation.isHidden.bind(moderation);
+    try {
+        assert.equal((await app.request('/v1/world/context?ref=' + ref)).status, 200);
+        let changed = false;
+        moderation.isHidden = sha => {
+            if (!changed) { changed = true; moderation.append({ sha, action: 'hide', role: 'creator', actor: 'test' }); }
+            return false; // Simulate the old value being read immediately before external log growth.
+        };
+        const response = await app.request('/v1/world/context?ref=' + ref);
+        assert.equal(changed, true);
+        assert.equal(response.status, 503);
+        assert.equal((await response.json()).code, 'context.pending');
+    } finally { moderation.isHidden = isHidden; await service.close(); db.close(); }
 });
 // Run after the coordinator releases the local measurement window.
 test('floor-attached subjects require a real room polygon and matching vertical span', () => {

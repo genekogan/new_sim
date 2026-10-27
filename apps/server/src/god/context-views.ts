@@ -144,13 +144,13 @@ export function mountContextViews(app: Hono, d: Deps) {
         if (!scene || sceneStamp !== token()) throw new ApiError(503, 'context.pending', 'Picture preparation is pending');
         return scene;
     };
-    const resolveTarget = (ref: string) => {
-        current();
+    const resolvePreparedTarget = (ref: string) => {
         const target = byRef.get(ref);
         if (target?.stand && target.level !== undefined && d.levelAt && d.levelAt(target.stand[0], target.stand[2], target.stand[1]) !== target.level)
             return null;
         return target && visibleEntities.has(target.entity) ? target : null;
     };
+    const resolveTarget = (ref: string) => { current(); return resolvePreparedTarget(ref); };
     const cameraFor = (target: ContextTarget, forCapture = false) => {
         const model = preparedModel!;
         const { title, what, original, aliases, kind, role, ...camera } = target;
@@ -292,7 +292,7 @@ export function mountContextViews(app: Hono, d: Deps) {
                     return false;
         return true;
     };
-    const requestAccess = new WeakMap<Context, (ref: string) => ContextTarget | null>();
+    const requestAccess = new WeakMap<Context, (ref: string, prepared?: boolean) => ContextTarget | null>();
     const access = (c: Context) => {
         const cached = requestAccess.get(c);
         if (cached)
@@ -310,8 +310,8 @@ export function mountContextViews(app: Hono, d: Deps) {
             placesByRef: new Map(places.flatMap(place => place.ref ? [[place.ref, place] as const] : [])),
             containing: index.locator(),
         };
-        const known = (ref: string) => {
-            const target = resolveTarget(ref);
+        const known = (ref: string, prepared = false) => {
+            const target = prepared ? resolvePreparedTarget(ref) : resolveTarget(ref);
             return target && canKnow(target, facts) ? target : null;
         };
         requestAccess.set(c, known);
@@ -360,12 +360,17 @@ export function mountContextViews(app: Hono, d: Deps) {
         const semanticRefs = new Set([...edge.places.byId.values()].flatMap(place => place.ref ? [place.ref] : []));
         const discoverable = (target: ContextTarget) => !!(target.part || target.slot || target.original || god.model.entities.get(target.entity)?.about || semanticRefs.has(god.model.pathOf(target.entity)));
         const candidates = contextStage('listing.candidates', () => exact ? (byRef.has(exact) ? [byRef.get(exact)!] : []) : q ? targets : targets.filter(discoverable));
-        const found = contextStage('listing.authorize', () => candidates.filter(target => (!q || textByRef.get(target.ref)!.includes(q)) && known(target.ref)));
+        const found = contextStage('listing.authorize', () => candidates.filter(target => (!q || textByRef.get(target.ref)!.includes(q)) && known(target.ref, true)));
         const listing = contextHash([revision, moderation.version(), q, exact ?? null, found.map(t => t.ref)]);
         if (cursor && (!match || match[1] !== listing))
             throw new ApiError(409, 'context.changed', 'Meaning or listing access changed; start a fresh context query');
         const page = found.slice(offset, offset + 100), next = offset + page.length < found.length ? `${listing}:${offset + page.length}` : null;
-        return c.json({ contract: 'world-context/1', revision, listingRevision: listing, source: 'authored-meaning', scope: exact ? 'exact' : q ? 'search-all' : 'semantic', targets: contextStage('listing.page', () => page.map(safeTarget)), total: found.length, nextCursor: next, presentation: CONTEXT_PRESENTATION }, 200, { 'cache-control': 'no-store' });
+        const pageTargets = contextStage('listing.page', () => page.map(safeTarget));
+        // The whole access/filter/materialization pass is synchronous. Check the
+        // frontier once more here, including external moderation-log changes.
+        current();
+        if (!d.contextReady?.()) throw new ApiError(503, 'context.pending', 'World meaning changed');
+        return c.json({ contract: 'world-context/1', revision, listingRevision: listing, source: 'authored-meaning', scope: exact ? 'exact' : q ? 'search-all' : 'semantic', targets: pageTargets, total: found.length, nextCursor: next, presentation: CONTEXT_PRESENTATION }, 200, { 'cache-control': 'no-store' });
     });
     app.post('/v1/world/context/views', async (c) => {
         d.limit(c);
