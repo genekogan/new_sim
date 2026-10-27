@@ -50,117 +50,117 @@
   "about": {
     "mimos/mimos-coffee-table/coffee-table-ceramic-cup": {
       "title": "Coffee Table Ceramic Cup",
-      "what": "Coffee Table Ceramic Cup in mimos/mimos coffee table. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A ceramic cup on the coffee table in Mimos’s south lounge.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "cup",
       "role": "part",
       "salience": 0,
       "in": "mimos/mimos-coffee-table"
     },
     "mimos/mimos-coffee-table/coffee-table-ceramic-cup-2": {
       "title": "Coffee Table Ceramic Cup 2",
-      "what": "Coffee Table Ceramic Cup 2 in mimos/mimos coffee table. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "Another ceramic cup on the coffee table in Mimos’s south lounge.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "cup",
       "role": "part",
       "salience": 0,
       "in": "mimos/mimos-coffee-table"
     },
     "mimos/mimos-coffee-table/coffee-table-ceramic-cup-3": {
       "title": "Coffee Table Ceramic Cup 3",
-      "what": "Coffee Table Ceramic Cup 3 in mimos/mimos coffee table. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "Another ceramic cup on the coffee table in Mimos’s south lounge.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "cup",
       "role": "part",
       "salience": 0,
       "in": "mimos/mimos-coffee-table"
     },
     "mimos/mimos-coffee-table/coffee-table-ceramic-cup-4": {
       "title": "Coffee Table Ceramic Cup 4",
-      "what": "Coffee Table Ceramic Cup 4 in mimos/mimos coffee table. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "Another ceramic cup on the coffee table in Mimos’s south lounge.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "cup",
       "role": "part",
       "salience": 0,
       "in": "mimos/mimos-coffee-table"
     },
     "kitchen/prep-table-15/prep-mixing-bowl": {
       "title": "Prep Mixing Bowl",
-      "what": "Prep Mixing Bowl in kitchen/prep table 15. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A mixing bowl on the food preparation table in the campus kitchen.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "bowl",
       "role": "part",
       "salience": 0,
       "in": "kitchen/prep-table-15"
     },
     "kitchen/prep-table-15/prep-mixing-bowl-2": {
       "title": "Prep Mixing Bowl 2",
-      "what": "Prep Mixing Bowl 2 in kitchen/prep table 15. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A second mixing bowl on the food preparation table in the campus kitchen.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "bowl",
       "role": "part",
       "salience": 0,
       "in": "kitchen/prep-table-15"
     },
     "mimos/tea-table-2/table-kettle": {
       "title": "Table Kettle",
-      "what": "Table Kettle in mimos/tea table 2. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A tea kettle on the low tea table in Mimos.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "kettle",
       "role": "part",
       "salience": 0,
       "in": "mimos/tea-table-2"
     },
     "mimos/tea-table-2/table-cup": {
       "title": "Table Cup",
-      "what": "Table Cup in mimos/tea table 2. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A tea cup on the low tea table in Mimos.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "cup",
       "role": "part",
       "salience": 0,
       "in": "mimos/tea-table-2"
     },
     "mimos/tea-table-2/table-cup-2": {
       "title": "Table Cup 2",
-      "what": "Table Cup 2 in mimos/tea table 2. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "Another tea cup on the low tea table in Mimos.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "cup",
       "role": "part",
       "salience": 0,
       "in": "mimos/tea-table-2"
     },
     "mimos/study-table-3/ceramic-mug": {
       "title": "Ceramic Mug",
-      "what": "Ceramic Mug in mimos/study table 3. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A ceramic mug on the study table in Mimos’s main bay.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "cup",
       "role": "part",
       "salience": 0,
       "in": "mimos/study-table-3"
     },
     "mimos/study-table-3/ceramic-mug-2": {
       "title": "Ceramic Mug 2",
-      "what": "Ceramic Mug 2 in mimos/study table 3. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "Another ceramic mug on the study table in Mimos’s main bay.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "cup",
       "role": "part",
       "salience": 0,
       "in": "mimos/study-table-3"
     },
     "kitchen/perimeter-counter/rice-cooker": {
       "title": "Rice Cooker",
-      "what": "Rice Cooker in kitchen/perimeter counter. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "The rice cooker on the counter in the campus kitchen.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "rice cooker",
       "role": "part",
       "salience": 0,
       "in": "kitchen/perimeter-counter"
     },
     "kitchen/perimeter-counter/water-urn": {
       "title": "Water Urn",
-      "what": "Water Urn in kitchen/perimeter counter. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "The water urn on the counter in the campus kitchen.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "water urn",
       "role": "part",
       "salience": 0,
       "in": "kitchen/perimeter-counter"
@@ -221,34 +221,34 @@
     },
     "mimos/red-sofa-12": {
       "title": "Red Sofa 12",
-      "what": "Red Sofa 12 in Mimos, with an actual seat for resting or joining the nearby gathering.",
+      "what": "The red sofa in Mimos’s south lounge.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "sofa",
       "role": "part",
       "salience": 1,
       "in": "mimos"
     },
     "mimos/study-chair-5": {
       "title": "Study Chair 5",
-      "what": "Study Chair 5 in Mimos, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A study chair in Mimos’s coffee and study bay.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "chair",
       "role": "part",
       "salience": 1,
       "in": "mimos"
     },
     "mimos/red-mini-refrigerator": {
       "title": "Red Mini Refrigerator",
-      "what": "Red Mini Refrigerator in Mimos. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A red mini-refrigerator in Mimos’s coffee and study bay.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "refrigerator",
       "role": "part",
       "salience": 0,
       "in": "mimos"
     },
     "mimos/mimos-coffee-table": {
       "title": "Mimos Coffee Table",
-      "what": "Mimos Coffee Table in Mimos, providing a surface and a useful meeting landmark.",
+      "what": "The low coffee table in Mimos’s south lounge.",
       "aliases": [],
       "kind": "table",
       "role": "part",
@@ -257,88 +257,88 @@
     },
     "mimos/study-chair-7": {
       "title": "Study Chair 7",
-      "what": "Study Chair 7 in Mimos, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A study chair in Mimos’s coffee and study bay.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "chair",
       "role": "part",
       "salience": 1,
       "in": "mimos"
     },
     "mimos/cream-recliner-14": {
       "title": "Cream Recliner 14",
-      "what": "Cream Recliner 14 in Mimos, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A cream-colored recliner in Mimos’s south lounge.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "recliner",
       "role": "part",
       "salience": 1,
       "in": "mimos"
     },
     "mimos/tea-stool-10": {
       "title": "Tea Stool 10",
-      "what": "Tea Stool 10 in Mimos, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A tea-table stool in Mimos’s tea room.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "stool",
       "role": "part",
       "salience": 1,
       "in": "mimos"
     },
     "mimos/study-chair-6": {
       "title": "Study Chair 6",
-      "what": "Study Chair 6 in Mimos, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A study chair in Mimos’s coffee and study bay.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "chair",
       "role": "part",
       "salience": 1,
       "in": "mimos"
     },
     "mimos/tea-stool-9": {
       "title": "Tea Stool 9",
-      "what": "Tea Stool 9 in Mimos, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A tea-table stool in Mimos’s tea room.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "stool",
       "role": "part",
       "salience": 1,
       "in": "mimos"
     },
     "mimos/study-chair-4": {
       "title": "Study Chair 4",
-      "what": "Study Chair 4 in Mimos, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A study chair in Mimos’s coffee and study bay.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "chair",
       "role": "part",
       "salience": 1,
       "in": "mimos"
     },
     "mimos/coffee-counter-1": {
       "title": "Coffee Counter 1",
-      "what": "Coffee Counter 1 in Mimos, providing a surface and a useful meeting landmark.",
+      "what": "The coffee counter in Mimos’s coffee and study bay.",
       "aliases": [],
-      "kind": "table",
+      "kind": "counter",
       "role": "part",
       "salience": 0,
       "in": "mimos"
     },
     "mimos/papasan-8": {
       "title": "Papasan 8",
-      "what": "Papasan 8 in Mimos, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A round papasan chair in Mimos’s south lounge.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "chair",
       "role": "part",
       "salience": 1,
       "in": "mimos"
     },
     "mimos/tea-stool-11": {
       "title": "Tea Stool 11",
-      "what": "Tea Stool 11 in Mimos, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A tea-table stool in Mimos’s tea room.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "stool",
       "role": "part",
       "salience": 1,
       "in": "mimos"
     },
     "mimos/tea-table-2": {
       "title": "Tea Table 2",
-      "what": "Tea Table 2 in Mimos, providing a surface and a useful meeting landmark.",
+      "what": "The low tea table in Mimos’s tea room.",
       "aliases": [],
       "kind": "table",
       "role": "part",
@@ -347,7 +347,7 @@
     },
     "mimos/study-table-3": {
       "title": "Study Table 3",
-      "what": "Study Table 3 in Mimos, providing a surface and a useful meeting landmark.",
+      "what": "The shared study table in Mimos’s coffee and study bay.",
       "aliases": [],
       "kind": "table",
       "role": "part",
@@ -356,34 +356,34 @@
     },
     "mimos/honey-sofa-13": {
       "title": "Honey Sofa 13",
-      "what": "Honey Sofa 13 in Mimos, with an actual seat for resting or joining the nearby gathering.",
+      "what": "The honey-colored sofa in Mimos’s tea room.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "sofa",
       "role": "part",
       "salience": 1,
       "in": "mimos"
     },
     "kitchen/perimeter-counter": {
       "title": "Perimeter Counter",
-      "what": "Perimeter Counter in the campus kitchen, providing a surface and a useful meeting landmark.",
+      "what": "The perimeter food-preparation counter in the campus working kitchen.",
       "aliases": [],
-      "kind": "table",
+      "kind": "counter",
       "role": "part",
       "salience": 0,
       "in": "kitchen"
     },
     "kitchen/north-perimeter-counter-return": {
       "title": "North Perimeter Counter Return",
-      "what": "North Perimeter Counter Return in the campus kitchen, providing a surface and a useful meeting landmark.",
+      "what": "The return of the perimeter counter in the campus working kitchen.",
       "aliases": [],
-      "kind": "table",
+      "kind": "counter",
       "role": "part",
       "salience": 0,
       "in": "kitchen"
     },
     "kitchen/diner-table-26": {
       "title": "Diner Table 26",
-      "what": "Diner Table 26 in the campus kitchen, providing a surface and a useful meeting landmark.",
+      "what": "A dining table in the campus dining hall.",
       "aliases": [],
       "kind": "table",
       "role": "part",
@@ -392,16 +392,16 @@
     },
     "kitchen/chest-freezer-19": {
       "title": "Chest Freezer 19",
-      "what": "Chest Freezer 19 in the campus kitchen. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A chest freezer in the campus working kitchen.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "freezer",
       "role": "part",
       "salience": 0,
       "in": "kitchen"
     },
     "kitchen/diner-table-27": {
       "title": "Diner Table 27",
-      "what": "Diner Table 27 in the campus kitchen, providing a surface and a useful meeting landmark.",
+      "what": "A dining table in the campus dining hall.",
       "aliases": [],
       "kind": "table",
       "role": "part",
@@ -410,61 +410,55 @@
     },
     "kitchen/white-fridge-29": {
       "title": "White Fridge 29",
-      "what": "White Fridge 29 in the campus kitchen. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A white refrigerator in the campus working kitchen.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "refrigerator",
       "role": "part",
       "salience": 0,
       "in": "kitchen"
     },
     "kitchen/bus-seat-25": {
       "title": "Bus Seat 25",
-      "what": "Bus Seat 25 in the campus kitchen, with an actual seat for resting or joining the nearby gathering.",
       "aliases": [],
-      "kind": "seat",
       "role": "part",
       "salience": 1,
       "in": "kitchen"
     },
     "kitchen/bus-seat-23": {
       "title": "Bus Seat 23",
-      "what": "Bus Seat 23 in the campus kitchen, with an actual seat for resting or joining the nearby gathering.",
       "aliases": [],
-      "kind": "seat",
       "role": "part",
       "salience": 1,
       "in": "kitchen"
     },
     "kitchen/sink-counter-lip-2": {
       "title": "Sink Counter Lip 2",
-      "what": "Sink Counter Lip 2 in the campus kitchen, providing a surface and a useful meeting landmark.",
+      "what": "The sink counter in the campus working kitchen.",
       "aliases": [],
-      "kind": "table",
+      "kind": "counter",
       "role": "part",
       "salience": 0,
       "in": "kitchen"
     },
     "kitchen/bus-seat-20": {
       "title": "Bus Seat 20",
-      "what": "Bus Seat 20 in the campus kitchen, with an actual seat for resting or joining the nearby gathering.",
       "aliases": [],
-      "kind": "seat",
       "role": "part",
       "salience": 1,
       "in": "kitchen"
     },
     "kitchen/exterior-serving-shelf": {
       "title": "Exterior Serving Shelf",
-      "what": "Exterior Serving Shelf in the campus kitchen, providing a surface and a useful meeting landmark.",
+      "what": "The exterior serving shelf in the campus working kitchen.",
       "aliases": [],
-      "kind": "table",
+      "kind": "shelf",
       "role": "part",
       "salience": 0,
       "in": "kitchen"
     },
     "kitchen/prep-table-15": {
       "title": "Prep Table 15",
-      "what": "Prep Table 15 in the campus kitchen, providing a surface and a useful meeting landmark.",
+      "what": "The food preparation table in the campus working kitchen.",
       "aliases": [],
       "kind": "table",
       "role": "part",
@@ -473,7 +467,7 @@
     },
     "kitchen/diner-table-28": {
       "title": "Diner Table 28",
-      "what": "Diner Table 28 in the campus kitchen, providing a surface and a useful meeting landmark.",
+      "what": "A dining table in the campus dining hall.",
       "aliases": [],
       "kind": "table",
       "role": "part",
@@ -482,18 +476,16 @@
     },
     "kitchen/bus-seat-21": {
       "title": "Bus Seat 21",
-      "what": "Bus Seat 21 in the campus kitchen, with an actual seat for resting or joining the nearby gathering.",
       "aliases": [],
-      "kind": "seat",
       "role": "part",
       "salience": 1,
       "in": "kitchen"
     },
     "kitchen/commercial-fridge-18": {
       "title": "Commercial Fridge 18",
-      "what": "Commercial Fridge 18 in the campus kitchen. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A commercial refrigerator in the campus working kitchen.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "refrigerator",
       "role": "part",
       "salience": 0,
       "in": "kitchen"
@@ -561,7 +553,7 @@
           "aliases": [
             "study chair"
           ],
-          "what": "An actual chair in the study bay.",
+          "what": "A chair in the study bay.",
           "anchor": {
             "kind": "entity",
             "ref": "mimos/study-chair-4",
@@ -602,7 +594,7 @@
     },
     "showers": {
       "title": "Campus Showers",
-      "what": "The shared wash building with two separate shower rooms. Choose a room by its number; reaching the room does not itself perform bathing.",
+      "what": "The shared wash building with two separate shower rooms, identified as Shower Room One and Shower Room Two.",
       "aliases": [
         "showers",
         "washrooms",
@@ -745,7 +737,7 @@
           "id": "dj-table",
           "title": "DJ Table",
           "aliases": [],
-          "what": "The table beside the sound equipment; its presence does not promise a controllable music system.",
+          "what": "The table beside the sound equipment in Freeside.",
           "anchor": {
             "kind": "entity",
             "ref": "dj-table"
@@ -766,33 +758,31 @@
     },
     "tool-library-stair": {
       "title": "Tool Library Stair",
-      "what": "Tool Library Stair in Tool Camp. It helps identify this part of the camp; use only the actions the world actually offers here.",
       "aliases": [],
-      "kind": "camp object",
       "role": "part",
       "salience": 0,
       "in": "tool-camp"
     },
     "field-teal-sofa": {
       "title": "Field Teal Sofa",
-      "what": "Field Teal Sofa on the campus, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A teal sofa on the campus.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "sofa",
       "role": "minor",
       "salience": 1
     },
     "tool-library-bookshelf-timber": {
       "title": "Tool Library Bookshelf Timber",
-      "what": "Tool Library Bookshelf Timber in Tool Camp, providing a surface and a useful meeting landmark.",
+      "what": "A timber bookshelf in Tool Camp’s reading corner.",
       "aliases": [],
-      "kind": "table",
+      "kind": "bookshelf",
       "role": "part",
       "salience": 0,
       "in": "tool-camp"
     },
     "tool-library-low-table": {
       "title": "Tool Library Low Table",
-      "what": "Tool Library Low Table in Tool Camp, providing a surface and a useful meeting landmark.",
+      "what": "The reading corner’s low table in Tool Camp’s reading corner.",
       "aliases": [],
       "kind": "table",
       "role": "part",
@@ -801,61 +791,61 @@
     },
     "tool-library-floor-cushion": {
       "title": "Tool Library Floor Cushion",
-      "what": "Tool Library Floor Cushion in Tool Camp, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A floor cushion in Tool Camp’s reading corner.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "cushion",
       "role": "part",
       "salience": 1,
       "in": "tool-camp"
     },
     "tool-library-floor-cushion-2": {
       "title": "Tool Library Floor Cushion 2",
-      "what": "Tool Library Floor Cushion 2 in Tool Camp, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A floor cushion in Tool Camp’s reading corner.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "cushion",
       "role": "part",
       "salience": 1,
       "in": "tool-camp"
     },
     "tool-library-floor-cushion-3": {
       "title": "Tool Library Floor Cushion 3",
-      "what": "Tool Library Floor Cushion 3 in Tool Camp, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A floor cushion in Tool Camp’s reading corner.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "cushion",
       "role": "part",
       "salience": 1,
       "in": "tool-camp"
     },
     "tool-library-floor-cushion-4": {
       "title": "Tool Library Floor Cushion 4",
-      "what": "Tool Library Floor Cushion 4 in Tool Camp, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A floor cushion in Tool Camp’s reading corner.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "cushion",
       "role": "part",
       "salience": 1,
       "in": "tool-camp"
     },
     "tool-ground-bench-lower": {
       "title": "Tool Ground Bench Lower",
-      "what": "Tool Ground Bench Lower in Tool Camp, providing a surface and a useful meeting landmark.",
+      "what": "The lower workbench in Tool Camp’s workshop.",
       "aliases": [],
-      "kind": "table",
+      "kind": "workbench",
       "role": "part",
       "salience": 0,
       "in": "tool-camp"
     },
     "tool-bench-vise": {
       "title": "Tool Bench Vise",
-      "what": "Tool Bench Vise in Tool Camp, providing a surface and a useful meeting landmark.",
+      "what": "The bench vise in Tool Camp’s workshop.",
       "aliases": [],
-      "kind": "table",
+      "kind": "workbench",
       "role": "part",
       "salience": 0,
       "in": "tool-camp"
     },
     "tool-workshop-folding-table": {
       "title": "Tool Workshop Folding Table",
-      "what": "Tool Workshop Folding Table in Tool Camp, providing a surface and a useful meeting landmark.",
+      "what": "A folding work table in Tool Camp’s workshop.",
       "aliases": [],
       "kind": "table",
       "role": "part",
@@ -864,61 +854,61 @@
     },
     "freeside-hydro-cart-chrome": {
       "title": "Freeside Hydro Cart Chrome",
-      "what": "Freeside Hydro Cart Chrome in Freeside. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A chrome utility cart in Freeside’s living area.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "cart",
       "role": "part",
       "salience": 0,
       "in": "freeside"
     },
     "freeside-lime-sofa": {
       "title": "Freeside Lime Sofa",
-      "what": "Freeside Lime Sofa in Freeside, with an actual seat for resting or joining the nearby gathering.",
+      "what": "The lime-colored sofa in Freeside’s living area.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "sofa",
       "role": "part",
       "salience": 1,
       "in": "freeside"
     },
     "freeside-mattress": {
       "title": "Freeside Mattress",
-      "what": "Freeside Mattress in Freeside, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A mattress in Freeside’s living area.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "mattress",
       "role": "part",
       "salience": 1,
       "in": "freeside"
     },
     "freeside-mattress-2": {
       "title": "Freeside Mattress 2",
-      "what": "Freeside Mattress 2 in Freeside, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A mattress in Freeside’s living area.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "mattress",
       "role": "part",
       "salience": 1,
       "in": "freeside"
     },
     "freeside-speaker": {
       "title": "Freeside Speaker",
-      "what": "Freeside Speaker in Freeside. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A speaker in Freeside’s living area.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "speaker",
       "role": "part",
       "salience": 0,
       "in": "freeside"
     },
     "freeside-speaker-2": {
       "title": "Freeside Speaker 2",
-      "what": "Freeside Speaker 2 in Freeside. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A speaker in Freeside’s living area.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "speaker",
       "role": "part",
       "salience": 0,
       "in": "freeside"
     },
     "dj-table": {
       "title": "Dj Table",
-      "what": "Dj Table in Freeside, providing a surface and a useful meeting landmark.",
+      "what": "The DJ table in the Freeside compound.",
       "aliases": [],
       "kind": "table",
       "role": "part",
@@ -927,25 +917,25 @@
     },
     "folding-chair": {
       "title": "Folding Chair",
-      "what": "Folding Chair in Freeside, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A folding chair in the Freeside compound.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "chair",
       "role": "part",
       "salience": 1,
       "in": "freeside"
     },
     "folding-chair-2": {
       "title": "Folding Chair 2",
-      "what": "Folding Chair 2 in Freeside, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A folding chair in the Freeside compound.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "chair",
       "role": "part",
       "salience": 1,
       "in": "freeside"
     },
     "folding-table": {
       "title": "Folding Table",
-      "what": "Folding Table in Freeside, providing a surface and a useful meeting landmark.",
+      "what": "A table in the Freeside compound.",
       "aliases": [],
       "kind": "table",
       "role": "part",
@@ -954,59 +944,57 @@
     },
     "folding-chair-3": {
       "title": "Folding Chair 3",
-      "what": "Folding Chair 3 in Freeside, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A folding chair in the Freeside compound.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "chair",
       "role": "part",
       "salience": 1,
       "in": "freeside"
     },
     "colab-taupe-sofa": {
       "title": "Colab Taupe Sofa",
-      "what": "Colab Taupe Sofa in Freeside, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A taupe sofa in the CoLab area.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "sofa",
       "role": "part",
       "salience": 1,
       "in": "freeside"
     },
     "colab-drawer-coffee": {
       "title": "Colab Drawer Coffee",
-      "what": "Colab Drawer Coffee in Freeside, providing a surface and a useful meeting landmark.",
       "aliases": [],
-      "kind": "table",
       "role": "part",
       "salience": 0,
       "in": "freeside"
     },
     "colab-floor-lamp": {
       "title": "Colab Floor Lamp",
-      "what": "Colab Floor Lamp in Freeside. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A floor lamp in the CoLab area.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "lamp",
       "role": "part",
       "salience": 0,
       "in": "freeside"
     },
     "griddle-cart": {
       "title": "Griddle Cart",
-      "what": "Griddle Cart on the campus. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A griddle cart on the campus.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "cart",
       "role": "minor",
       "salience": 0
     },
     "clubhouse-sofa": {
       "title": "Clubhouse Sofa",
-      "what": "Clubhouse Sofa on the campus, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A clubhouse sofa in the outlying camp.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "sofa",
       "role": "minor",
       "salience": 1
     },
     "clubhouse-low-blue-table": {
       "title": "Clubhouse Low Blue Table",
-      "what": "Clubhouse Low Blue Table on the campus, providing a surface and a useful meeting landmark.",
+      "what": "A low blue table in the outlying camp.",
       "aliases": [],
       "kind": "table",
       "role": "minor",
@@ -1014,31 +1002,31 @@
     },
     "clubhouse-sofa-2": {
       "title": "Clubhouse Sofa 2",
-      "what": "Clubhouse Sofa 2 on the campus, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A clubhouse sofa in the outlying camp.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "sofa",
       "role": "minor",
       "salience": 1
     },
     "og-worktop": {
       "title": "OG Worktop",
-      "what": "OG Worktop on the campus, providing a surface and a useful meeting landmark.",
+      "what": "A worktop in the outlying camp.",
       "aliases": [],
-      "kind": "table",
+      "kind": "worktop",
       "role": "minor",
       "salience": 0
     },
     "og-east-folding-chair": {
       "title": "OG East Folding Chair",
-      "what": "OG East Folding Chair on the campus, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A folding chair in the outlying camp.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "chair",
       "role": "minor",
       "salience": 1
     },
     "og-east-folding-dinner-table": {
       "title": "OG East Folding Dinner Table",
-      "what": "OG East Folding Dinner Table on the campus, providing a surface and a useful meeting landmark.",
+      "what": "A folding dinner table in the outlying camp.",
       "aliases": [],
       "kind": "table",
       "role": "minor",
@@ -1046,23 +1034,23 @@
     },
     "og-east-folding-chair-2": {
       "title": "OG East Folding Chair 2",
-      "what": "OG East Folding Chair 2 on the campus, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A folding chair in the outlying camp.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "chair",
       "role": "minor",
       "salience": 1
     },
     "og-east-folding-chair-3": {
       "title": "OG East Folding Chair 3",
-      "what": "OG East Folding Chair 3 on the campus, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A folding chair in the outlying camp.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "chair",
       "role": "minor",
       "salience": 1
     },
     "vehicle": {
       "title": "Vehicle",
-      "what": "A parked campus vehicle, useful as a landmark. Its presence does not imply an offered driving action.",
+      "what": "A parked vehicle on the campus.",
       "aliases": [
         "parked vehicle"
       ],
@@ -1072,15 +1060,13 @@
     },
     "shelter": {
       "title": "Campus Shelter Element",
-      "what": "A modeled shelter element in the camp; this small structure does not by itself establish an enterable room.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "vehicle-4": {
       "title": "Vehicle 4",
-      "what": "A parked campus vehicle, useful as a landmark. Its presence does not imply an offered driving action.",
+      "what": "A parked vehicle on the campus.",
       "aliases": [
         "parked vehicle"
       ],
@@ -1090,7 +1076,7 @@
     },
     "vehicle-5": {
       "title": "Vehicle 5",
-      "what": "A parked campus vehicle, useful as a landmark. Its presence does not imply an offered driving action.",
+      "what": "A parked vehicle on the campus.",
       "aliases": [
         "parked vehicle"
       ],
@@ -1100,7 +1086,7 @@
     },
     "vehicle-6": {
       "title": "Vehicle 6",
-      "what": "A parked campus vehicle, useful as a landmark. Its presence does not imply an offered driving action.",
+      "what": "A parked vehicle on the campus.",
       "aliases": [
         "parked vehicle"
       ],
@@ -1110,7 +1096,7 @@
     },
     "vehicle-7": {
       "title": "Vehicle 7",
-      "what": "A parked campus vehicle, useful as a landmark. Its presence does not imply an offered driving action.",
+      "what": "A parked vehicle on the campus.",
       "aliases": [
         "parked vehicle"
       ],
@@ -1120,23 +1106,19 @@
     },
     "shelter-2": {
       "title": "Campus Shelter Element 2",
-      "what": "A modeled shelter element in the camp; this small structure does not by itself establish an enterable room.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "shelter-3": {
       "title": "Campus Shelter Element 3",
-      "what": "A modeled shelter element in the camp; this small structure does not by itself establish an enterable room.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "vehicle-8": {
       "title": "Vehicle 8",
-      "what": "A parked campus vehicle, useful as a landmark. Its presence does not imply an offered driving action.",
+      "what": "A parked vehicle on the campus.",
       "aliases": [
         "parked vehicle"
       ],
@@ -1146,7 +1128,7 @@
     },
     "vehicle-9": {
       "title": "Vehicle 9",
-      "what": "A parked campus vehicle, useful as a landmark. Its presence does not imply an offered driving action.",
+      "what": "A parked vehicle on the campus.",
       "aliases": [
         "parked vehicle"
       ],
@@ -1155,16 +1137,14 @@
       "salience": 0
     },
     "site-object": {
-      "title": "Campus Site Object object",
-      "what": "A small fixed site object in the camp, useful only as a local visual landmark.",
+      "title": "Campus Site Object",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "vehicle-10": {
       "title": "Vehicle 10",
-      "what": "A parked campus vehicle, useful as a landmark. Its presence does not imply an offered driving action.",
+      "what": "A parked vehicle on the campus.",
       "aliases": [
         "parked vehicle"
       ],
@@ -1174,41 +1154,37 @@
     },
     "shelter-4": {
       "title": "Campus Shelter Element 4",
-      "what": "A modeled shelter element in the camp; this small structure does not by itself establish an enterable room.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "shelter-5": {
       "title": "Campus Shelter Element 5",
-      "what": "A modeled shelter element in the camp; this small structure does not by itself establish an enterable room.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "toilet": {
       "title": "Toilet",
-      "what": "Toilet on the campus. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A toilet on the campus.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "toilet",
       "role": "minor",
       "salience": 0
     },
     "boat": {
       "title": "Boat",
-      "what": "A boat-shaped camp object. Use an explicitly offered boating action only; the object itself does not establish a usable launch.",
+      "what": "A boat-shaped camp object on the campus.",
       "aliases": [
         "camp boat"
       ],
-      "kind": "camp object",
+      "kind": "boat",
       "role": "minor",
       "salience": 0
     },
     "vehicle-11": {
       "title": "Vehicle 11",
-      "what": "A parked campus vehicle, useful as a landmark. Its presence does not imply an offered driving action.",
+      "what": "A parked vehicle on the campus.",
       "aliases": [
         "parked vehicle"
       ],
@@ -1218,7 +1194,7 @@
     },
     "vehicle-12": {
       "title": "Vehicle 12",
-      "what": "A parked campus vehicle, useful as a landmark. Its presence does not imply an offered driving action.",
+      "what": "A parked vehicle on the campus.",
       "aliases": [
         "parked vehicle"
       ],
@@ -1228,7 +1204,7 @@
     },
     "vehicle-13": {
       "title": "Vehicle 13",
-      "what": "A parked campus vehicle, useful as a landmark. Its presence does not imply an offered driving action.",
+      "what": "A parked vehicle on the campus.",
       "aliases": [
         "parked vehicle"
       ],
@@ -1238,7 +1214,7 @@
     },
     "vehicle-14": {
       "title": "Vehicle 14",
-      "what": "A parked campus vehicle, useful as a landmark. Its presence does not imply an offered driving action.",
+      "what": "A parked vehicle on the campus.",
       "aliases": [
         "parked vehicle"
       ],
@@ -1248,7 +1224,7 @@
     },
     "vehicle-15": {
       "title": "Vehicle 15",
-      "what": "A parked campus vehicle, useful as a landmark. Its presence does not imply an offered driving action.",
+      "what": "A parked vehicle on the campus.",
       "aliases": [
         "parked vehicle"
       ],
@@ -1258,229 +1234,193 @@
     },
     "shelter-6": {
       "title": "Campus Shelter Element 6",
-      "what": "A modeled shelter element in the camp; this small structure does not by itself establish an enterable room.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "shelter-7": {
       "title": "Campus Shelter Element 7",
-      "what": "A modeled shelter element in the camp; this small structure does not by itself establish an enterable room.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "colab-hut": {
       "title": "Colab Hut",
-      "what": "Colab Hut in Freeside. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A small CoLab hut in the CoLab area.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "hut",
       "role": "part",
       "salience": 0,
       "in": "freeside"
     },
     "colab-hut-2": {
       "title": "Colab Hut 2",
-      "what": "Colab Hut 2 in Freeside. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A small CoLab hut in the CoLab area.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "hut",
       "role": "part",
       "salience": 0,
       "in": "freeside"
     },
     "colab-hut-3": {
       "title": "Colab Hut 3",
-      "what": "Colab Hut 3 in Freeside. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A small CoLab hut in the CoLab area.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "hut",
       "role": "part",
       "salience": 0,
       "in": "freeside"
     },
     "colab-hut-4": {
       "title": "Colab Hut 4",
-      "what": "Colab Hut 4 in Freeside. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A small CoLab hut in the CoLab area.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "hut",
       "role": "part",
       "salience": 0,
       "in": "freeside"
     },
     "colab-hut-5": {
       "title": "Colab Hut 5",
-      "what": "Colab Hut 5 in Freeside. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A small CoLab hut in the CoLab area.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "hut",
       "role": "part",
       "salience": 0,
       "in": "freeside"
     },
     "boat-2": {
       "title": "Boat 2",
-      "what": "A boat-shaped camp object. Use an explicitly offered boating action only; the object itself does not establish a usable launch.",
+      "what": "A boat-shaped camp object on the campus.",
       "aliases": [
         "camp boat"
       ],
-      "kind": "camp object",
+      "kind": "boat",
       "role": "minor",
       "salience": 0
     },
     "og-ground": {
       "title": "OG Ground",
-      "what": "OG Ground on the campus. It helps identify this part of the camp; use only the actions the world actually offers here.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "og-clubhouse": {
       "title": "OG Clubhouse",
-      "what": "OG Clubhouse on the campus. It helps identify this part of the camp; use only the actions the world actually offers here.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "og-clubhouse-2": {
       "title": "OG Clubhouse 2",
-      "what": "OG Clubhouse 2 on the campus. It helps identify this part of the camp; use only the actions the world actually offers here.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "og-kitchen": {
       "title": "OG Kitchen",
-      "what": "OG Kitchen on the campus. It helps identify this part of the camp; use only the actions the world actually offers here.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "og-kitchen-2": {
       "title": "OG Kitchen 2",
-      "what": "OG Kitchen 2 on the campus. It helps identify this part of the camp; use only the actions the world actually offers here.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "og-kitchen-3": {
       "title": "OG Kitchen 3",
-      "what": "OG Kitchen 3 on the campus. It helps identify this part of the camp; use only the actions the world actually offers here.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "forklift": {
       "title": "Forklift",
-      "what": "A parked campus vehicle, useful as a landmark. Its presence does not imply an offered driving action.",
+      "what": "A parked forklift on the campus.",
       "aliases": [
         "parked vehicle"
       ],
-      "kind": "vehicle",
+      "kind": "forklift",
       "role": "minor",
       "salience": 0
     },
     "forklift-2": {
       "title": "Forklift 2",
-      "what": "A parked campus vehicle, useful as a landmark. Its presence does not imply an offered driving action.",
+      "what": "A parked forklift on the campus.",
       "aliases": [
         "parked vehicle"
       ],
-      "kind": "vehicle",
+      "kind": "forklift",
       "role": "minor",
       "salience": 0
     },
     "og-east-life": {
       "title": "OG East Life",
-      "what": "OG East Life on the campus. It helps identify this part of the camp; use only the actions the world actually offers here.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "og-east-life-2": {
       "title": "OG East Life 2",
-      "what": "OG East Life 2 on the campus. It helps identify this part of the camp; use only the actions the world actually offers here.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "og-east-life-3": {
       "title": "OG East Life 3",
-      "what": "OG East Life 3 on the campus. It helps identify this part of the camp; use only the actions the world actually offers here.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "og-east-life-4": {
       "title": "OG East Life 4",
-      "what": "OG East Life 4 on the campus. It helps identify this part of the camp; use only the actions the world actually offers here.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "og-east-life-5": {
       "title": "OG East Life 5",
-      "what": "OG East Life 5 on the campus. It helps identify this part of the camp; use only the actions the world actually offers here.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "og-east-life-6": {
       "title": "OG East Life 6",
-      "what": "OG East Life 6 on the campus. It helps identify this part of the camp; use only the actions the world actually offers here.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "og-east-life-7": {
       "title": "OG East Life 7",
-      "what": "OG East Life 7 on the campus. It helps identify this part of the camp; use only the actions the world actually offers here.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "og-east-life-8": {
       "title": "OG East Life 8",
-      "what": "OG East Life 8 on the campus. It helps identify this part of the camp; use only the actions the world actually offers here.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "og-east-life-9": {
       "title": "OG East Life 9",
-      "what": "OG East Life 9 on the campus. It helps identify this part of the camp; use only the actions the world actually offers here.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "chiba/field-fire-bowl": {
       "title": "Field Fire Bowl",
-      "what": "Field Fire Bowl in Chiba. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A bowl in Chiba.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "bowl",
       "role": "part",
       "salience": 0,
       "in": "chiba"
     },
     "chiba/field-beanbag": {
       "title": "Field Beanbag",
-      "what": "Field Beanbag in Chiba, with an actual seat for resting or joining the nearby gathering.",
       "aliases": [],
-      "kind": "seat",
       "role": "part",
       "salience": 1,
       "in": "chiba"
@@ -1535,7 +1475,7 @@
         "projection",
         "screen"
       ],
-      "kind": "camp object",
+      "kind": "projection",
       "role": "part",
       "salience": 0,
       "in": "chiba"
@@ -1546,7 +1486,7 @@
       "aliases": [
         "gallery displays"
       ],
-      "kind": "camp object",
+      "kind": "display",
       "role": "part",
       "salience": 0,
       "in": "chiba"
@@ -1557,14 +1497,14 @@
       "aliases": [
         "tea mat"
       ],
-      "kind": "camp object",
+      "kind": "mat",
       "role": "part",
       "salience": 0,
       "in": "mimos"
     },
     "campus-swimming-pond": {
       "title": "Campus Swimming Pond",
-      "what": "A body of water beside the main campus, provided for swimming. Approach its actual bank before entering the water; it is distinct from the stored water tank.",
+      "what": "A body of water beside the main campus, provided for swimming. Approach its bank before entering the water; it is distinct from the stored water tank.",
       "aliases": [
         "water",
         "swimming pond",
@@ -1612,7 +1552,7 @@
             "presenter seat",
             "podium desk"
           ],
-          "what": "The actual presenter seat at the front of the auditorium; use this seat to prepare a presentation to the bleachers.",
+          "what": "The presenter seat at the front of the auditorium; use this seat to prepare a presentation to the bleachers.",
           "anchor": {
             "kind": "entity",
             "ref": "presenter-timber-box",
@@ -1627,7 +1567,7 @@
             "tiered seating",
             "bleachers"
           ],
-          "what": "A real seat on the first of four audience tiers facing the presentation area.",
+          "what": "A seat on the first of four audience tiers facing the presentation area.",
           "anchor": {
             "kind": "entity",
             "ref": "tier",
@@ -1769,52 +1709,52 @@
     },
     "sink-counter-lip": {
       "title": "Sink Counter Lip",
-      "what": "Sink Counter Lip in the campus kitchen, providing a surface and a useful meeting landmark.",
+      "what": "A counter by the campus kitchen.",
       "aliases": [],
-      "kind": "table",
+      "kind": "counter",
       "role": "part",
       "salience": 0,
       "in": "kitchen"
     },
     "dry-goods-long-shelf": {
       "title": "Dry Goods Long Shelf",
-      "what": "Dry Goods Long Shelf in the campus kitchen, providing a surface and a useful meeting landmark.",
+      "what": "The long dry-goods shelf by the campus kitchen.",
       "aliases": [],
-      "kind": "table",
+      "kind": "shelf",
       "role": "part",
       "salience": 0,
       "in": "kitchen"
     },
     "folding-chair-4": {
       "title": "Folding Chair 4",
-      "what": "Folding Chair 4 in Chiba, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A folding chair in Chiba.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "chair",
       "role": "part",
       "salience": 1,
       "in": "chiba"
     },
     "folding-chair-5": {
       "title": "Folding Chair 5",
-      "what": "Folding Chair 5 in Chiba, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A folding chair in Chiba.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "chair",
       "role": "part",
       "salience": 1,
       "in": "chiba"
     },
     "folding-chair-6": {
       "title": "Folding Chair 6",
-      "what": "Folding Chair 6 in Chiba, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A folding chair in Chiba.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "chair",
       "role": "part",
       "salience": 1,
       "in": "chiba"
     },
     "tier": {
       "title": "First Audience Tier",
-      "what": "A real audience seat on tier 1 of Chiba’s bleachers, facing the presenter’s area.",
+      "what": "An audience seat on tier 1 of Chiba’s bleachers, facing the presenter’s area.",
       "aliases": [
         "bleachers",
         "audience tier",
@@ -1827,7 +1767,7 @@
     },
     "tier-2": {
       "title": "Second Audience Tier",
-      "what": "A real audience seat on tier 2 of Chiba’s bleachers, facing the presenter’s area.",
+      "what": "An audience seat on tier 2 of Chiba’s bleachers, facing the presenter’s area.",
       "aliases": [
         "bleachers",
         "audience tier",
@@ -1840,7 +1780,7 @@
     },
     "tier-3": {
       "title": "Third Audience Tier",
-      "what": "A real audience seat on tier 3 of Chiba’s bleachers, facing the presenter’s area.",
+      "what": "An audience seat on tier 3 of Chiba’s bleachers, facing the presenter’s area.",
       "aliases": [
         "bleachers",
         "audience tier",
@@ -1853,7 +1793,7 @@
     },
     "tier-4": {
       "title": "Fourth Audience Tier",
-      "what": "A real audience seat on tier 4 of Chiba’s bleachers, facing the presenter’s area.",
+      "what": "An audience seat on tier 4 of Chiba’s bleachers, facing the presenter’s area.",
       "aliases": [
         "bleachers",
         "audience tier",
@@ -1866,25 +1806,25 @@
     },
     "navy-sofa": {
       "title": "Navy Sofa",
-      "what": "Navy Sofa in Chiba, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A navy sofa in Chiba.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "sofa",
       "role": "part",
       "salience": 1,
       "in": "chiba"
     },
     "navy-sofa-2": {
       "title": "Navy Sofa 2",
-      "what": "Navy Sofa 2 in Chiba, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A navy sofa in Chiba.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "sofa",
       "role": "part",
       "salience": 1,
       "in": "chiba"
     },
     "projector-table": {
       "title": "Projector Table",
-      "what": "Projector Table in Chiba, providing a surface and a useful meeting landmark.",
+      "what": "The projector table in Chiba.",
       "aliases": [],
       "kind": "table",
       "role": "part",
@@ -1893,7 +1833,7 @@
     },
     "presenter-timber-box": {
       "title": "Chiba Podium Desk Seat",
-      "what": "The presenter’s timber box provides an actual seat at the front of Chiba’s auditorium, facing the audience tiers. Use its seat binding for a presentation; the separate laptop desk is not this podium.",
+      "what": "The presenter’s timber box provides a seat at the front of Chiba’s auditorium, facing the audience tiers. Use its seat binding for a presentation; the separate laptop desk is not this podium.",
       "aliases": [
         "podium desk",
         "presenter seat",
@@ -1931,57 +1871,57 @@
     },
     "field-chair": {
       "title": "Field Chair",
-      "what": "Field Chair on the campus, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A field chair on the campus.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "chair",
       "role": "minor",
       "salience": 1
     },
     "field-chair-2": {
       "title": "Field Chair 2",
-      "what": "Field Chair 2 on the campus, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A field chair on the campus.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "chair",
       "role": "minor",
       "salience": 1
     },
     "field-chair-3": {
       "title": "Field Chair 3",
-      "what": "Field Chair 3 on the campus, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A field chair on the campus.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "chair",
       "role": "minor",
       "salience": 1
     },
     "field-chair-4": {
       "title": "Field Chair 4",
-      "what": "Field Chair 4 on the campus, with an actual seat for resting or joining the nearby gathering.",
+      "what": "A field chair on the campus.",
       "aliases": [],
-      "kind": "seat",
+      "kind": "chair",
       "role": "minor",
       "salience": 1
     },
     "stored-stock-pot": {
       "title": "Stored Stock Pot",
-      "what": "Stored Stock Pot in the campus kitchen. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A stored stock pot by the campus kitchen.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "pot",
       "role": "part",
       "salience": 0,
       "in": "kitchen"
     },
     "fridge-top-electric-kettle": {
       "title": "Fridge Top Electric Kettle",
-      "what": "Fridge Top Electric Kettle in the campus kitchen. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "An electric kettle by the campus kitchen.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "kettle",
       "role": "part",
       "salience": 0,
       "in": "kitchen"
     },
     "vehicle-2": {
       "title": "Vehicle 2",
-      "what": "A parked campus vehicle, useful as a landmark. Its presence does not imply an offered driving action.",
+      "what": "A parked vehicle on the campus.",
       "aliases": [
         "parked vehicle"
       ],
@@ -1991,7 +1931,7 @@
     },
     "vehicle-3": {
       "title": "Vehicle 3",
-      "what": "A parked campus vehicle, useful as a landmark. Its presence does not imply an offered driving action.",
+      "what": "A parked vehicle on the campus.",
       "aliases": [
         "parked vehicle"
       ],
@@ -2001,41 +1941,33 @@
     },
     "site-object-2": {
       "title": "Campus Site Object 2",
-      "what": "A small fixed site object in the camp, useful only as a local visual landmark.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "site-object-3": {
       "title": "Campus Site Object 3",
-      "what": "A small fixed site object in the camp, useful only as a local visual landmark.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "toilet-2": {
       "title": "Toilet 2",
-      "what": "Toilet 2 on the campus. It helps identify this part of the camp; use only the actions the world actually offers here.",
+      "what": "A toilet on the campus.",
       "aliases": [],
-      "kind": "camp object",
+      "kind": "toilet",
       "role": "minor",
       "salience": 0
     },
     "site-object-4": {
       "title": "Campus Site Object 4",
-      "what": "A small fixed site object in the camp, useful only as a local visual landmark.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     },
     "site-object-5": {
       "title": "Campus Site Object 5",
-      "what": "A small fixed site object in the camp, useful only as a local visual landmark.",
       "aliases": [],
-      "kind": "camp object",
       "role": "minor",
       "salience": 0
     }

@@ -112,7 +112,7 @@
             "bench",
             "porch bench"
           ],
-          "what": "A real bench seat outside the cottage.",
+          "what": "A bench seat outside the cottage.",
           "anchor": {
             "kind": "entity",
             "ref": "cottage/bench",
@@ -137,6 +137,6 @@
   "worldAbout": {
     "title": "Hello Hamlet",
     "what": "A small starter hamlet with a central pond, a cottage on a grassy knoll, an outdoor bench and two planning markers. It is a compact place for exploring, swimming and entering rooms.",
-    "tour": "Approach Hamlet Pond for water, or climb Cottage Knoll to enter Knoll Cottage and visit its living room, kitchen and bedroom. The outdoor bench provides real seats. The Plaza and Orchard flags mark proposed areas; they do not promise a developed square or fruit trees."
+    "tour": "Approach Hamlet Pond for water, or climb Cottage Knoll to enter Knoll Cottage and visit its living room, kitchen and bedroom. The outdoor bench offers a place to sit. The Plaza and Orchard flags mark proposed areas; they do not promise a developed square or fruit trees."
   }
 }
