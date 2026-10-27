@@ -529,7 +529,8 @@ export class EngineBridge {
       // raised deck (deck/1 with rails, DECK_RAISED up) is an upper floor of its own that stairs, ramps and ladders reach
       const level = worldFrame && abs && s.level === 0 && !raisedDeck ? 0 : plates.has(s) ? plateLevel(y, c) : levelOn(y, c);
       const sc = worldFrame ? 1 : wp.s, yaw = worldFrame ? r.yaw : wp.yaw + r.yaw;
-      return { id: `${e.id}#f${i}`, level, y: level === 0 && Math.abs(y) <= GROUND_BAND ? 0 : y, obb: { c, half: [r3(r.half[0] * sc), r3(r.half[1] * sc)] as Vec2, yaw: r3(-yaw) }, label: `${this.model.pathOf(e.id)} ${s.tag ?? 'floor'}`.slice(0, 100) };
+      // Level 0 describes connectivity, not elevation: retain the top of a low slab.
+      return { id: `${e.id}#f${i}`, level, y, obb: { c, half: [r3(r.half[0] * sc), r3(r.half[1] * sc)] as Vec2, yaw: r3(-yaw) }, label: `${this.model.pathOf(e.id)} ${s.tag ?? 'floor'}`.slice(0, 100) };
     });
     // doorways of upper storeys: the wall's thickness has no floor polygon under it, so lay a threshold strip
     for (const o of baked.openings ?? []) {
@@ -549,7 +550,7 @@ export class EngineBridge {
       for (let k = 0; k < n; k++) { const t = k / (n - 1); path.push([r3(a[0] + (b[0] - a[0]) * t), r3(ya + (yb - ya) * t), r3(a[1] + (b[1] - a[1]) * t)]); }
       const kind = l.kind === 'float' ? 'climb' : l.kind;
       const la = levelOn(ya, a), lb = levelOn(yb, b);
-      return { id: `${e.id}#${l.id}`, kind: kind as 'stairs' | 'ramp' | 'ladder' | 'climb', from: { level: la, p: a, y: la === 0 && Math.abs(ya) <= GROUND_BAND ? 0 : ya }, to: { level: lb, p: b, y: lb === 0 && Math.abs(yb) <= GROUND_BAND ? 0 : yb }, width: r3(l.width * wp.s), heading: r3(Math.atan2(b[1] - a[1], b[0] - a[0])), path, usable: true,
+      return { id: `${e.id}#${l.id}`, kind: kind as 'stairs' | 'ramp' | 'ladder' | 'climb', from: { level: la, p: a, y: ya }, to: { level: lb, p: b, y: yb }, width: r3(l.width * wp.s), heading: r3(Math.atan2(b[1] - a[1], b[0] - a[0])), path, usable: true,
         ...(helix ? { approach: { from: toWorld(...helix.stepFrom), to: toWorld(...helix.stepTo) } } : {}) };
     });
     // each flight's ends: its under-stair block stops short of the foot (the first tread is stepped onto, not walked

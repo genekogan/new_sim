@@ -3,6 +3,7 @@
 import test, {type TestContext} from 'node:test';
 import assert from 'node:assert/strict';
 import {setImmediate} from 'node:timers/promises';
+import {coreRef} from '@sim/world-compiler';
 import {fixture, factory, invite, accept} from '../../test/native-owner-fixture.ts';
 import {EdgeLedger} from '../edge/ledger/ledger.ts';
 import {GodMode} from './god.ts';
@@ -96,4 +97,23 @@ test('the presenter timber box on the Chiba deck is sat on top (0.41 m); one sta
   assert.ok(around.floors?.some((l: string) => /^The raised gallery floor of chiba: \d+ m .+, a 0\.37 m step up; open on /.test(l)), JSON.stringify(around.floors));
   t.diagnostic(`around.floors ${JSON.stringify(around.floors)} blocked ${off!.blocked!.reason}`);
   assert.equal(bodyEnd(w.edge, s.soulId)!.hasOwnProperty('floor'), false, 'off the deck: no floor in endedAt');
+});
+
+// A navigation level labels connectivity; it is not the slab's world height.
+test('low level-0 decks retain their physical tops through projection and standing placement', {timeout: 180_000}, async t => {
+  const w = world(t); await w.settle(2);
+  for (const [i, y] of [0.1, 0.2, 0.35].entries()) {
+    const x = -40 + i * 10;
+    const r = w.god.act({ops: [{op: 'place', def: coreRef('deck'), name: `low-${i}`,
+      shape: {area: [[x - 2, -42], [x + 2, -42], [x + 2, -38], [x - 2, -38]]}, params: {height: y}}]} as any) as any;
+    assert.equal(r.accepted, true, JSON.stringify(r).slice(0, 600));
+    await w.settle(2);
+    const E = w.host.engine as any, part = E.world.entityPhysicsV1.byEntity[w.god.model.get(`low-${i}`)!.id];
+    const slab = part.surfaces.find((s: any) => s.label.endsWith(' deck'));
+    assert.equal(slab.level, 0);
+    assert.equal(slab.y, y, 'level 0 keeps the actual slab top, not zero');
+    const sp = E.rt.services.spatial; sp.sync(E.world);
+    assert.equal(sp.ground.standY(x, -40), y, 'authoritative feet stand on the top');
+    assert.equal(sp.ground.standY(x, -44), 0, 'adjacent ground is unchanged');
+  }
 });
