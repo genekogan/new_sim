@@ -25,6 +25,11 @@ export interface WorldViewerHandle {
   locations?():readonly WorldLocation[];
   frameLocation?(id:string):boolean;
   locationPreview?(id:string):Promise<string|null>;
+  refreshLocations?():void;
+  locationPage?():import('./WorldLocations.ts').WorldLocationPage|null;
+  searchLocations?(query:string):void;
+  moreLocations?():void;
+  cancelLocationPictures?():void;
   focusSelected(): boolean;
   selectSoul(id: string | null): boolean;
   /** True only when this Soul has a body in the currently depicted live frame. */
@@ -81,6 +86,11 @@ export interface WorldViewerPort {
   locations?():readonly WorldLocation[];
   frameLocation?(id:string):boolean;
   locationPreview?(id:string):Promise<string|null>;
+  refreshLocations?():void;
+  locationPage?():import('./WorldLocations.ts').WorldLocationPage|null;
+  searchLocations?(query:string):void;
+  moreLocations?():void;
+  cancelLocationPictures?():void;
   focusSelected(): boolean;
   hasSoul(id: string): boolean;
   canFollowSoul?(id: string): boolean;
@@ -104,6 +114,11 @@ export function createWorldViewerHandle(current: () => WorldViewerPort): WorldVi
     framePlace: place => current().framePlace?.(place) ?? false,
     placePreview: place => current().placePreview?.(place) ?? Promise.resolve(null),
     locations:()=>current().locations?.()??[],
+    refreshLocations:()=>current().refreshLocations?.(),
+    locationPage:()=>current().locationPage?.()??null,
+    searchLocations:query=>current().searchLocations?.(query),
+    moreLocations:()=>current().moreLocations?.(),
+    cancelLocationPictures:()=>current().cancelLocationPictures?.(),
     frameLocation:id=>current().frameLocation?.(id)??false,
     locationPreview:id=>current().locationPreview?.(id)??Promise.resolve(null),
     focusSelected: () => current().focusSelected(),

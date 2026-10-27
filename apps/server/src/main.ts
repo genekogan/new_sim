@@ -1,3 +1,4 @@
+import {closeContextViews} from './god/context-views.ts';
 import { Attention, unwatchedPace } from './attention.ts';
 import { ClockCatchUp } from './clock-catchup.ts';
 import {edenSteeringModeV1,installEdenSteeringModeV1} from './eden-steering-mode.ts';
@@ -160,7 +161,7 @@ if (god) installWorldEnv(host, god, edge);  // R4-LIVE: Souls perceive the god's
 if (god) installLightning(god, edge, () => host.engine.world.tick);  // GOD-ENV: Souls see the bolts and hear the thunder
 if (god) installGovernance(god, { host, edge });  // GOVERN: versioned constitution, amendments, prayer states (god/governance.ts)
 if (god) console.log(`[god] entity world ready: ${god.model.entities.size} entities, ${new Set(god.model.defs.values()).size} own defs + library ${god.model.library ? `${god.model.library.id}@${god.model.library.version} (${god.model.library.all().length})` : 'none'}, owner ${god.owner ?? '(unclaimed)'}`);
-const app = buildApp({ cfg: config, db, host, auth, hub, brain, souls, takes, intentV2, edge, god });
+const app = buildApp({ cfg: config, db, host, auth, hub, brain, souls, takes, intentV2, edge, god, contextReady: engineBridge ? ()=>engineBridge.contextReady() : undefined, contextWait: engineBridge ? signal=>engineBridge.waitForContext({signal}) : undefined, contextLevelAt: engineBridge ? (x,z,y)=>engineBridge.levelAt(x,z,y) : undefined });
 if(edge)installPuntActivities(host,edge,m=>console.log(`[activities] ${m}`));
 const listener = getRequestListener(app.fetch);
 // G9 (lane Z1): a write in flight when the world is told to stop (a release hands it over, the launcher puts it to sleep)
@@ -274,6 +275,7 @@ const shutdown = async (sig: string) => {
   if (process.env.SIM_BOOT_HASH === '1') console.log(`[world] ${sig}: state at tick ${host.engine.world.tick}: ${host.engine.stateHash()}`);
   console.log(`[world] ${sig}: snapshot saved in ${Math.round(performance.now() - saveAt)} ms (capture ${Math.round(host.snapshotMs.capture)}, write ${Math.round(host.snapshotMs.persist)})`);
   server.close(); void hub.closeClients('server restarting');
+  await closeContextViews();
   auth.close();db.close(); process.exit(0);
 };
 process.on('SIGTERM', () => void shutdown('SIGTERM').catch(()=>console.error('[world] shutdown is incomplete; retain database and inspect')));

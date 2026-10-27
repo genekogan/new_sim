@@ -18,6 +18,10 @@ patches and fixtures, and preserves stable references across replay seeds.
 Enrichment adds final bounded batches and verifies that meaning changes neither
 entity geometry nor the physical genesis hash. Minor paving can intentionally
 have no title; review those lint warnings rather than naming every tile.
+Lint preserves the `warnings` text list and also returns structured `diagnostics`
+with ref, field, stable code and a repair suggestion. Writing warnings are advisory;
+source/schema/binding/physical failures still prevent applying an overlay. No
+retrieval-preview or model call is required for linting or each God edit.
 
 ## Live worlds
 

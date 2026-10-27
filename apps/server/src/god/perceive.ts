@@ -233,6 +233,8 @@ export class GodPerceive {
   private entries = new Map<string, { w: Want; sign?: SignRow; at: Vec2 }>();
   private cells = new Map<number, Set<string>>();
   private roots = new Set<string>();
+  private rootOrigins = new Map<string, number>();
+  private fullOrigin = 4;
   private needFull = true;
   private layersOn = false;
   private regions = new Map<string, Box>();
@@ -243,7 +245,21 @@ export class GodPerceive {
 
   /** An edit (any commit): these entities changed or went; `all` re-derives every thing (terrain moved, a build began
    *  or ended). Cheap: the work happens in `step`. */
-  note(ids: Iterable<string>, all = false) { if (all) this.needFull = true; else for (const id of ids) this.roots.add(id); }
+  note(ids: Iterable<string>, all = false, origin: 'authored' | 'engine' | 'other' = 'other') {
+    const bit = origin === 'authored' ? 1 : origin === 'engine' ? 2 : 4;
+    if (all) { this.needFull = true; this.fullOrigin |= bit; }
+    else for (const id of ids) {
+      this.roots.add(id);
+      if (process.env.SIM_CONTEXT_TIMINGS === '1') this.rootOrigins.set(id, (this.rootOrigins.get(id) ?? 0) | bit);
+    }
+  }
+  /** Bounded diagnostic counters, never object names or payloads. Does not advance maintenance. */
+  pendingSummary() {
+    const values = [...this.rootOrigins.values()];
+    return { full: this.needFull, fullOrigin: this.fullOrigin, roots: this.roots.size,
+      authoredRoots: values.filter(value => value & 1).length, engineRoots: values.filter(value => value & 2).length,
+      otherRoots: values.filter(value => value & 4).length, running: this.run !== null, placesDone: this.placesDone };
+  }
   /** Anything noted and not caught up yet (or a catch-up under way)? */
   pending(): boolean { return this.needFull || this.roots.size > 0 || this.run !== null; }
 
@@ -265,7 +281,7 @@ export class GodPerceive {
     if (!this.sigs.size) for (const o of objs.all()) if (this.kinds.has(o.kind) || (o.state as BuiltState)?.key === o.id) { this.sigs.set(o.id, JSON.stringify(o.state)); if (!this.kinds.has(o.kind)) this.kindFor(o.kind.replace(/^built-/, '')); }
     const layersOn = !!this.h.layers?.active();
     if (layersOn !== this.layersOn) { this.layersOn = layersOn; this.needFull = true; }
-    const full = this.needFull || !this.h.things, roots = this.roots; this.needFull = false; this.roots = new Set();
+    const full = this.needFull || !this.h.things, roots = this.roots; this.needFull = false; this.roots = new Set(); this.rootOrigins.clear(); this.fullOrigin = 0;
     // the named things now (their outlines: what `near` measures to), against the last catch-up's
     const now = new Map<string, Box>();
     for (const t of this.h.things?.() ?? []) { const b = boxOf(t); if (!b) continue; const o = now.get(t.id); now.set(t.id, o ? [Math.min(o[0], b[0]), Math.min(o[1], b[1]), Math.max(o[2], b[2]), Math.max(o[3], b[3])] : b); }

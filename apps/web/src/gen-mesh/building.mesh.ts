@@ -48,7 +48,7 @@ registerMesh({
     }
     const g = tpl.clone(true);
     g.userData = { ...tpl.userData };
-    attachInteriorView(g, L);
+    if (!ctx.canonicalContext) attachInteriorView(g, L);
     return g;
   },
   // no instanceKey: the interior view hides storeys per building per frame, which instancing would lose;

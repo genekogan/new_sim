@@ -1,3 +1,5 @@
+import { chooseContextPhoto, planContextPhoto, type PhotoChoice, type PhotoCandidate } from './context-photographer.ts';
+import { contextPhotoScene, contextPhotoGeometry, type ContextMesh, type ContextPhotoTarget, type ContextGround } from './context-photo-scene.ts';
 import {GRADE_A} from './atmosphere/grade.ts';
 import {cdnRoute} from './cdn-assets.ts';
 import {ShotPacer} from './place-shot-pacer.ts';
@@ -26,6 +28,68 @@ export class WorldPlacePreviews{
  constructor(renderer:THREE.WebGLRenderer,roots:()=>readonly THREE.Object3D[],live:()=>THREE.Scene|null=()=>null,pose:()=>()=>void=()=>()=>{}){this.renderer=renderer;this.roots=roots;this.live=live;this.pose=pose;this.stopListening=typeof window!=='undefined'?this.pacer.listen(window):()=>{};}
  capture(id:WorldPlaceId):Promise<string|null>{return this.request(id,alive=>this.render(id,id,alive));}
  captureLocation(location:WorldLocation,sceneKey:string):Promise<string|null>{const key=sceneKey+':'+location.id;return this.request(key,alive=>this.render(location.id,key,alive,location));}
+ /** Frozen server-owned scene: exact bound geometry, no browser/CDN pixel cache and no live simulation. */
+ async captureContext(target: ContextPhotoTarget, entries: readonly ContextMesh[], detail = false, ground?: ContextGround): Promise<{ url?: string; photo?: PhotoChoice; reason?: string }> {
+  const selection = contextPhotoScene(target, entries);
+  if (!selection) return { reason: 'needs-viewpoint: unsupported or empty subject geometry' };
+  try { return await this.shootContextPhoto(selection, entries, detail ? [640, 448] : [320, 224], ground); }
+  finally { selection.dispose(); }
+ }
+ private async shootContextPhoto(selection: NonNullable<ReturnType<typeof contextPhotoScene>>, entries: readonly ContextMesh[], size: readonly [number, number], ground?: ContextGround) {
+  const { mask, subject, planes } = selection, renderer = this.renderer, world = this.live();
+  if (!world) return { reason: 'immutable scene unavailable' };
+  const [width, height] = size, cw = 80, ch = 56;
+  const white = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8, clippingPlanes: planes });
+  const black = new THREE.MeshBasicMaterial({ color: 0, fog: false, side: THREE.DoubleSide });
+  const check = new THREE.WebGLRenderTarget(cw, ch, { depthBuffer: true }), output = new THREE.WebGLRenderTarget(width, height, { depthBuffer: true });
+  output.texture.colorSpace = THREE.SRGBColorSpace;
+  const prior = { target: renderer.getRenderTarget(), clear: renderer.getClearColor(new THREE.Color()), alpha: renderer.getClearAlpha(), autoClear: renderer.autoClear, clipping: renderer.localClippingEnabled, override: world.overrideMaterial, background: world.background };
+  const pixels = new Uint8Array(cw * ch * 4);
+  const count = () => { renderer.readRenderTargetPixels(check, 0, 0, cw, ch, pixels); let total = 0; for (let i = 0; i < pixels.length; i += 4) if (pixels[i] > 127) total++; return total; };
+  const cameraFor = (candidate: { eye: readonly number[]; at: readonly number[]; fov: number }) => { const camera = new THREE.PerspectiveCamera(candidate.fov, width / height, .01, 10000); camera.position.fromArray(candidate.eye); camera.lookAt(new THREE.Vector3().fromArray(candidate.at)); camera.updateMatrixWorld(true); return camera; };
+  const withCutaway = <T>(candidate: { cutaway?: { occluderIds: string[] } }, work: () => T): T => {
+   const selected = new Set(candidate.cutaway?.occluderIds ?? []), changed = entries.filter(entry => selected.has(entry.id)).map(entry => [entry.mesh, entry.mesh.visible] as const);
+   try { for (const [mesh] of changed) mesh.visible = false; return work(); }
+   finally { for (const [mesh, visible] of changed) mesh.visible = visible; }
+  };
+  try {
+   renderer.localClippingEnabled = true; mask.overrideMaterial = white;
+   const plan = planContextPhoto(subject);
+   if (plan.candidates[0]) {
+    const camera = cameraFor(plan.candidates[0]);
+    await renderer.compileAsync(world, camera);
+    await renderer.compileAsync(mask, camera);
+    world.overrideMaterial = black;
+    try { await renderer.compileAsync(world, camera); } finally { world.overrideMaterial = prior.override; }
+   }
+   const photo = await chooseContextPhoto(plan, async (candidate: PhotoCandidate) => withCutaway(candidate, () => {
+    const camera = cameraFor(candidate), geometry = contextPhotoGeometry(subject, candidate, entries, ground);
+    renderer.setRenderTarget(check); renderer.setClearColor(0, 1); renderer.autoClear = true;
+    renderer.render(mask, camera); const all = count();
+    const transparent = entries.filter(entry => entry.mesh.visible && entry.mesh.userData.cameraTransparent).map(entry => entry.mesh);
+    for (const mesh of transparent) mesh.visible = false;
+    world.background = null; world.overrideMaterial = black;
+    let seen = 0;
+    try { renderer.render(world, camera); renderer.autoClear = false; renderer.render(mask, camera); seen = count(); }
+    finally { for (const mesh of transparent) mesh.visible = true; world.background = prior.background; world.overrideMaterial = prior.override; }
+    return { ...geometry, subjectPresent: all > 0, visibleFraction: all ? Math.min(1, seen / all) : 0, projectedFill: all / (cw * ch) };
+   }));
+   if (photo.status !== 'ready') return { photo, reason: photo.reason };
+   const camera = cameraFor(photo), data = new Uint8Array(width * height * 4);
+   withCutaway(photo, () => { renderer.autoClear = true; renderer.setRenderTarget(output); renderer.render(world, camera); renderer.readRenderTargetPixels(output, 0, 0, width, height, data); });
+   const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
+   const context = canvas.getContext('2d'); if (!context) return { photo, reason: 'canvas unavailable' };
+   const image = context.createImageData(width, height);
+   for (let y = 0; y < height; y++) image.data.set(data.subarray((height - 1 - y) * width * 4, (height - y) * width * 4), y * width * 4);
+   context.putImageData(image, 0, 0);
+   if (photo.cutaway) { context.fillStyle = '#101010'; context.fillRect(0, height - 22, 78, 22); context.font = 'bold 13px sans-serif'; context.fillStyle = '#ffffff'; context.fillText('Cutaway', 7, height - 7); }
+   return { url: canvas.toDataURL('image/png'), photo };
+  } finally {
+   renderer.setRenderTarget(prior.target); renderer.setClearColor(prior.clear, prior.alpha); renderer.autoClear = prior.autoClear; renderer.localClippingEnabled = prior.clipping;
+   world.overrideMaterial = prior.override; world.background = prior.background; mask.overrideMaterial = null;
+   check.dispose(); output.dispose(); white.dispose(); black.dispose();
+  }
+ }
  invalidate(){this.revision++;this.images.clear();this.pending.clear();}
  private request(key:string,render:(alive:()=>boolean)=>Promise<string|null>):Promise<string|null>{
   if(this.closed)return Promise.resolve(null);if(this.images.has(key))return Promise.resolve(this.images.get(key)!);const pending=this.pending.get(key);if(pending)return pending;const revision=this.revision;
@@ -67,11 +131,11 @@ export class WorldPlacePreviews{
   * cut-out of its assets. Rule: frame the place's geometry plus its region at a 35° elevated 3/4 view from its tour side;
   * occlusion check: draw the place alone (white), then the world in black with the place on top, and count how much of the
   * place stays visible; above 40 % hidden, turn 45° and retry, keeping the clearest of the 8 views. */
- private async shoot(mask:THREE.Scene,center:THREE.Vector3,radius:number,view:{readonly p:readonly number[];readonly target:readonly number[]},key:string,alive:()=>boolean,interior=false):Promise<string|null>{
+ private async shoot(mask:THREE.Scene,center:THREE.Vector3,radius:number,view:{readonly p:readonly number[];readonly target:readonly number[]},key:string,alive:()=>boolean,interior=false,exact=false,size:readonly[number,number]=[SHOT_W,SHOT_H]):Promise<string|null>{
   const from=view.p;
   const world=this.live(),live=world??mask;  // no live world (tests, a bare viewer): the place's own geometry
-  const t0=performance.now(),bare=!mask.children.length,box=new THREE.Box3().setFromObject(mask),r=world?radius*.8:0,extent=r<=0?box.clone():box.clone().union(new THREE.Box3(new THREE.Vector3(center.x-r,center.y,center.z-r),new THREE.Vector3(center.x+r,center.y,center.z+r))),aim=extent.getCenter(new THREE.Vector3());
-  const az0=Math.atan2(from[0]-aim.x,from[2]-aim.z),el=35*Math.PI/180,W=SHOT_W,H=SHOT_H,CW=80,CH=56,renderer=this.renderer;
+  const t0=performance.now(),bare=!mask.children.length,box=new THREE.Box3().setFromObject(mask),r=world&&!exact?radius*.8:0,extent=r<=0?box.clone():box.clone().union(new THREE.Box3(new THREE.Vector3(center.x-r,center.y,center.z-r),new THREE.Vector3(center.x+r,center.y,center.z+r))),aim=extent.getCenter(new THREE.Vector3());
+  const az0=Math.atan2(from[0]-aim.x,from[2]-aim.z),el=35*Math.PI/180,W=size[0],H=size[1],CW=80,CH=56,renderer=this.renderer;
   const white=new THREE.MeshBasicMaterial({color:0xffffff,fog:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-8}),black=new THREE.MeshBasicMaterial({color:0,fog:false});
   const check=new THREE.WebGLRenderTarget(CW,CH,{depthBuffer:true}),target=new THREE.WebGLRenderTarget(W,H,{depthBuffer:true});target.texture.colorSpace=THREE.SRGBColorSpace;
   const small=new Uint8Array(CW*CH*4),count=()=>{renderer.readRenderTargetPixels(check,0,0,CW,CH,small);let n=0;for(let i=0;i<small.length;i+=4)if(small[i]>127)n++;return n;};
@@ -104,9 +168,9 @@ export class WorldPlacePreviews{
    }
    mask.overrideMaterial=white;let best:THREE.PerspectiveCamera|null=null,bestHidden=2,turn=0;
    // a room ("Inside: …") is pictured from its own tour eye, standing inside it: from above it would be the roof
-   if(interior&&world){best=new THREE.PerspectiveCamera(64,W/H,.05,3000);best.position.fromArray(from);best.lookAt(new THREE.Vector3().fromArray(view.target));best.updateMatrixWorld(true);bestHidden=0;turn=-1;}
-   for(let k=0;k<8&&bestHidden>.4;k++){
-    const az=az0+k*Math.PI/4,camera=fitPlacePreviewCamera(extent,new THREE.Vector3(Math.sin(az)*Math.cos(el),Math.sin(el),Math.cos(az)*Math.cos(el)),W/H);
+   for(let k=0;k<(interior?1:8)&&bestHidden>.4;k++){
+    const az=az0+k*Math.PI/4,camera=interior?new THREE.PerspectiveCamera(64,W/H,.05,3000):fitPlacePreviewCamera(extent,new THREE.Vector3(Math.sin(az)*Math.cos(el),Math.sin(el),Math.cos(az)*Math.cos(el)),W/H);
+    if(interior){camera.position.fromArray(from);camera.lookAt(new THREE.Vector3().fromArray(view.target));camera.updateMatrixWorld(true);}
     const d=camera.position.distanceTo(aim);camera.near=Math.max(.05,d/400);camera.far=Math.max(3000,d*20);camera.updateProjectionMatrix();
     const seen=await step('check'+k,()=>{
      renderer.setRenderTarget(check);renderer.setClearColor(0,1);renderer.autoClear=true;renderer.render(mask,camera);const all=count();if(!all||!world)return{all,blocked:0};
@@ -119,7 +183,7 @@ export class WorldPlacePreviews{
     if(!seen.v.all){if(bare){best=camera;bestHidden=0;break;}continue;}if(!world){best=camera;bestHidden=0;break;}
     if(seen.v.blocked<bestHidden){bestHidden=seen.v.blocked;best=camera;turn=k;}
    }
-   if(!best)return null;const shotCamera=best;
+   if(!best||bestHidden>.4)return null;const shotCamera=best;
    const rendered=await step('shot',()=>{
     const pixels=new Uint8Array(W*H*4);renderer.setRenderTarget(target);if(!world)GRADE_A.x=0;  // the bare place-only picture stays ungraded
     // the live world in the shot light (Gene #13: never the visitor's night or storm); the shadow map is the main view's, left as it is

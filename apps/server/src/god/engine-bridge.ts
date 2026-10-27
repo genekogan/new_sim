@@ -199,7 +199,7 @@ export class EngineBridge {
     (this.god as unknown as { layers?: GodLayers }).layers = this.layers;
     // P3 (E-life): places follow the god's edits, not the engine's (a carried cup, a duck, a lamp switched on move no place);
     // descriptions that list the things in a place catch up once a minute (1200 ticks)
-    this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, version: () => `${this.godEdits}:${Math.floor(this.host.engine.world.tick / 1200)}` as never, structuralVersion: () => `${this.version}:${this.describeEpoch}:${this.levels.length}`, deferred: () => this.layerPlacesPending !== null || this.perceiveRunning || !!this.perceive?.pending(), engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), layers: this.layers });
+    this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, publicationVersion: () => this.godEdits, version: () => `${this.godEdits}:${Math.floor(this.host.engine.world.tick / 1200)}` as never, structuralVersion: () => `${this.version}:${this.describeEpoch}:${this.levels.length}`, deferred: () => this.layerPlacesPending !== null || this.perceiveRunning || !!this.perceive?.pending(), engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), layers: this.layers });
     this.god.builds.inventoryContext = () => {
       this.places.sync(true);
       return {
@@ -209,7 +209,7 @@ export class EngineBridge {
       };
     };
     this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), things: () => this.nav.things(), places: this.places, levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), commit: (ops, note) => this.god.engineAct(ops as never, note), layers: this.layers });
-    this.god.onCommit((c) => { this.version++; if (c.diff.tiles.length || c.diff.defs.length) this.describeEpoch++; this.notePerceive([...c.diff.upserts.map((e) => e.id), ...c.diff.removes], c.diff.tiles.length > 0); if (c.by !== 'engine') { this.godEdits++; this.editTick = this.host.engine.world.tick; this.onCommit(c.diff); } });
+    this.god.onCommit((c) => { this.version++; if (c.diff.tiles.length || c.diff.defs.length) this.describeEpoch++; this.notePerceive([...c.diff.upserts.map((e) => e.id), ...c.diff.removes], c.diff.tiles.length > 0, c.by === 'engine' ? 'engine' : 'authored'); if (c.by !== 'engine') { this.godEdits++; this.editTick = this.host.engine.world.tick; this.onCommit(c.diff); } });
     this.god.onBuild(e => { if (e.kind === 'started' || e.kind === 'resumed') this.editTick = this.host.engine.world.tick; });
     // LAYERS: "under construction (step)" is part of what an owned or scheduled thing is seen as
     this.god.onBuild(() => { if (this.layers.active()) this.notePerceive([], true); });
@@ -275,9 +275,36 @@ export class EngineBridge {
     return true;
   }
 
+  /** Context metadata joins existing sliced maintenance; it never forces a perception pass. */
+  contextReady(): boolean {
+    // Named targets/access depend on published places, not the separate built-object registry.
+    return this.initialProjectionReady() && this.places.hasCurrentPublication() && this.layerPlacesPending === null;
+  }
+  private contextDiagnosticCount = 0;
+  contextReadinessState() {
+    let projection = false, projectionError = false;
+    try { projection = this.initialProjectionReady(); } catch { projectionError = true; }
+    return { projection, projectionError, tick: this.engine.world.tick, completedTicks: this.completedTicks,
+      authoredRevision: this.godEdits, completedRevision: this.completedEdits, drafts: this.projectionDrafts.size,
+      physicalPending: this.pending.size, places: this.places.publicationState(), perception: this.perceive.pendingSummary(),
+      perceptionRunning: this.perceiveRunning, layerPending: this.layerPlacesPending !== null };
+  }
+  waitForContext(o: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<void> {
+    const trace = (event: string) => {
+      if (process.env.SIM_CONTEXT_TIMINGS === '1' && this.contextDiagnosticCount++ < 20)
+        process.stderr.write(JSON.stringify({ contextReadiness: { event, ...this.contextReadinessState() } }) + '\n');
+    };
+    trace('start');
+    return this.waitForReadiness(() => this.contextReady(), { ...o, timeoutMs: o.timeoutMs ?? 3000 })
+      .then(() => { trace('ready'); }, error => { trace(o.signal?.aborted ? 'aborted' : 'failed'); throw error; });
+  }
+
   /** Optional boot barrier. Deadlines fail closed; they are not a delay or a source of synthetic ticks.
    * No eager promise exists, so installations that do not use this API cannot produce an unhandled rejection. */
   waitForInitialProjection(o: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<void> {
+    return this.waitForReadiness(() => this.initialProjectionReady(), o);
+  }
+  private waitForReadiness(ready: () => boolean, o: { signal?: AbortSignal; timeoutMs?: number }): Promise<void> {
     const timeoutMs = o.timeoutMs ?? 60_000;
     if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return Promise.reject(new Error('bridge.readiness.invalid-deadline'));
     return new Promise<void>((resolve, reject) => {
@@ -288,7 +315,7 @@ export class EngineBridge {
         if (error !== undefined) reject(error); else resolve();
       };
       const abort = () => finish(o.signal?.reason ?? new Error('bridge.readiness.aborted'));
-      const check = () => { try { if (this.initialProjectionReady()) finish(); } catch (error) { finish(error); } };
+      const check = () => { try { if (ready()) finish(); } catch (error) { finish(error); } };
       if (o.signal?.aborted) { abort(); return; }
       this.readinessChecks.add(check);
       o.signal?.addEventListener('abort', abort, { once: true });
@@ -749,9 +776,9 @@ export class EngineBridge {
    *  god keeps editing; a closing site's walk-out still follows each edit within 10 ticks. */
   private rescuedAt = -1;
   private evacuatedEdit = -1;
-  private notePerceive(ids: string[], all: boolean) {
+  private notePerceive(ids: string[], all: boolean, origin: 'authored' | 'engine' | 'other' = 'other') {
     const tick = this.host.engine.world.tick;
-    this.perceive.note(ids, all);
+    this.perceive.note(ids, all, origin);
     if (this.perceiveFirst < 0) this.perceiveFirst = tick; this.perceiveLast = tick;
   }
   private perceiveStep(tick: number) {

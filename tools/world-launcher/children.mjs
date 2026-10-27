@@ -380,7 +380,7 @@ export class ChildPool {
   async closeAll() { this.closing = true; await Promise.all([...this.kids.keys()].map((s) => this.stop(s))); }
 }
 
-export const EYES_ENV = ['EDGE_EYES', 'EDGE_EYES_GPU', 'EDGE_EYES_SOUL_SECONDS', 'EDGE_EYES_GLOBAL_PER_MINUTE', 'EDGE_EYES_TIMEOUT_SECONDS', 'EDGE_EYES_RELOAD_HOURS', 'EDGE_EYES_NICE', 'EDGE_EYES_CPUS', 'EDGE_EYES_CHROME_ARGS', 'PLAYWRIGHT_BROWSERS_PATH'];
+export const EYES_ENV = ['EDGE_EYES', 'EDGE_EYES_GPU', 'EDGE_EYES_SOUL_SECONDS', 'EDGE_EYES_GLOBAL_PER_MINUTE', 'EDGE_EYES_TIMEOUT_SECONDS', 'EDGE_EYES_RELOAD_HOURS', 'EDGE_EYES_NICE', 'EDGE_EYES_CPUS', 'EDGE_EYES_CHROME_ARGS', 'PLAYWRIGHT_BROWSERS_PATH', 'SIM_RENDER_LOCK_DIR', 'GOD_LOOK_CHROME', 'EDEN_GOD_GL'];
 
 /** The Sim server for one entity world (same env as tools/god-skill/dev-world.mjs).
  *  With `o.auth.envFile` (Clerk, production sign-in) the child reads its Clerk settings from that file by path

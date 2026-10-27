@@ -1,3 +1,4 @@
+import {WorldContextViews} from './WorldContextViews.ts';
 import { whenAssetsSettled } from './gen-mesh/gltf-assets.ts';
 import {ALL_OPTIONAL_APPEARANCE_PROFILES,type OptionalAppearanceProfiles} from './optional-appearance-profiles-all.ts';
 import {historyTakePath,historyTakePage} from './WorldTakeTransport.ts';
@@ -86,7 +87,7 @@ import { earlyPosterShown, removeEarlyPoster, takeEarlyLayer, takeEarlyRender } 
 import { WorldWaterDetail, markHeight } from './WorldWaterDetail.ts';
 import { findSeats, surveySeats } from './WorldSeatSurvey.ts';
 import { visitorPreviewHour } from './visitor-hour.ts';
-import { GodWorldLiving, calendarClock, entityWorldState, godRoomViews, godTourViews, parseShotHour, shotClockAt, whenShotClock } from './world-env.ts';
+import { GodWorldLiving, calendarClock, entityWorldState, godTourViews, parseShotHour, shotClockAt, whenShotClock } from './world-env.ts';
 import { setFleeSources, AFLOAT } from './gen-mesh/motion.ts';
 import { WorldLightning } from './WorldLightning.ts';
 import { worldArrivalPose } from './arrival-shot.ts';
@@ -244,7 +245,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     stateSignature.current = signature; context.current.onViewerState(state);
   };
   const seeking = useRef<AbortController | null>(null);
-  const controlsApi = useRef<{ feedbackContext(): import('./WorldViewer.ts').WorldViewContext; overview(): void; frameSouls(ids:readonly string[]):boolean; framePoint(point:THREE.Vector3,radius:number):void; locations():readonly WorldLocation[];frameLocation(id:string):boolean;locationPreview(id:string):Promise<string|null>;framePlace(place:WorldPlaceId): boolean; placePreview(place:WorldPlaceId):Promise<string|null>; focusSelected(): boolean; reset(): boolean; releaseInput(): void; flyToSoul(soulId:string):boolean; move(delta: CameraMove): boolean; inputOwned(): boolean } | null>(null);
+  const controlsApi = useRef<{ feedbackContext(): import('./WorldViewer.ts').WorldViewContext; overview(): void; frameSouls(ids:readonly string[]):boolean; framePoint(point:THREE.Vector3,radius:number):void; locations():readonly WorldLocation[];refreshLocations():void;locationPage():import('./WorldLocations.ts').WorldLocationPage|null;searchLocations(query:string):void;moreLocations():void;cancelLocationPictures():void;frameLocation(id:string):boolean;locationPreview(id:string):Promise<string|null>;framePlace(place:WorldPlaceId): boolean; placePreview(place:WorldPlaceId):Promise<string|null>; focusSelected(): boolean; reset(): boolean; releaseInput(): void; flyToSoul(soulId:string):boolean; move(delta: CameraMove): boolean; inputOwned(): boolean } | null>(null);
   const playbackCommands = useRef<{ seek(tick: number): Promise<void>; live(): void; setPlaying(playing: boolean): boolean } | null>(null);
   const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -356,6 +357,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const seatSurvey=new URLSearchParams(location.search).get('survey')==='seats'?{done:false,since:null as number|null}:null;
     const waterDetail=new WorldWaterDetail(()=>!!reducedMotionQuery?.matches,()=>quality.tier==='phone'),waterDetailOff=new URLSearchParams(location.search).get('water')==='0';  // ?water=0: before/after comparisons
     waterDetail.boats=AFLOAT;(window as unknown as {__simWater?:unknown}).__simWater=waterDetail.stats;    const idleLife=new WorldIdleLife();const bodyPoses=new WorldBodyPoses();const idleSouls:IdleSoul[]=[];let attentionTargets=new Map<string,readonly string[]>();
+    const contextViews=new WorldContextViews(apiPath,abort.signal,()=>{const state=latestViewerState.current;if(state&&!abort.signal.aborted)context.current.onViewerState?.({...state});});
     const edgeItems=new WorldEdgeItems(apiPath('/v1/edge/items'));scene.add(edgeItems.group);edgeItems.start(abort.signal);  // things lying around (together/1)
     const early=newWorld?takeEarlyLayer():null;if(early)abort.signal.addEventListener('abort',()=>early.abort.abort());const entityLayer=early?.layer??new WorldEntityLayer(apiPath);entityLayerRef.current=entityLayer;  // P7b: a phone's layer may have started before this page's code was in (early-layer.ts)
     scene.add(entityLayer.group);let entityWorldFramed=false,rideNames:string[]|null=null,rideNamesAt=0,rideCarriers:CarrierPose[]=[],rideCars:string[]=[],carrierIds:string[]=[];
@@ -382,7 +384,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     if(shotMode){const c=renderer.domElement;Object.assign(c.style,{position:'fixed',inset:'0',width:'100vw',height:'100vh',zIndex:'2147483000'});document.title='loading';}
     // W1: readiness follows startup and two drawn frames, with no 2.5 s floor or timer polling.
     void (newWorld ? early?.started ?? entityLayer.start(abort.signal) : Promise.resolve()).then(async()=>{
-      layerStarted=true;arrivalMark('entity-built');
+      layerStarted=true;arrivalMark('entity-built');if(entityLayer.active){entityLayer.onContextChanged=()=>void contextViews.refresh();void contextViews.refresh();}
       if(abort.signal.aborted)return;frameEntityWorld();setEntityWorld(entityLayer.active);
       // lane W1: link the built world's shaders in parallel (KHR_parallel_shader_compile) before its first frame, instead
       // of the first frame stalling the page on each program (~0.2-0.35 s); frames wait for it, at most 3 s
@@ -479,9 +481,14 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         const shot=conversationFrame(members,camera,visualObstructionRoots(),(x,z)=>cameraGround.heightAt(scene,x,z)??0);
         if(!shot)return false;groupSelection.clear();members.forEach(m=>groupSelection.add(m.id));context.current.onSelect(members[0].id);controls.target.copy(shot.target);camera.position.copy(shot.position);camera.lookAt(shot.target);controls.update();return true;
       },
-      locations:()=>expansion&&!past.current?CURATED_WORLD_LOCATIONS:entityLayer.active?[...depictedLocations,...[...godTourViews(entityLayer,entityLayer.groundAt,120),...godRoomViews(entityLayer,entityLayer.groundAt)].map(v=>({id:v.id,label:v.label,regionId:v.id,p:v.p,target:v.target,radius:v.radius??8,...(v.inside?{inside:v.inside}:{})}))]:depictedLocations,  // R4-LIVE: Explore lists what the god built
+      refreshLocations:()=>void contextViews.refresh(),
+      locationPage:()=>!expansion&&entityLayer.active&&!past.current?contextViews.page():null,
+      searchLocations:query=>void contextViews.search(query),
+      moreLocations:()=>void contextViews.more(),
+      cancelLocationPictures:()=>contextViews.cancelPictures(),
+      locations:()=>expansion&&!past.current?CURATED_WORLD_LOCATIONS:entityLayer.active&&!past.current?contextViews.locations:depictedLocations,
       frameLocation:id=>{if(initialGate?.snapshot().stage!=='ready')return false;const view=controlsApi.current?.locations().find(p=>p.id===id);if(!view)return false;framing.place(camera,()=>controls,view,()=>{context.current.manualNavigation='orbit';context.current.cameraMode='manual';context.current.follow=false;context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');},()=>{rts.release();navigation?.release();});return true;},
-      locationPreview:id=>{if(initialGate?.snapshot().stage!=='ready')return Promise.resolve(null);const location=controlsApi.current?.locations().find(p=>p.id===id);if(!location)return Promise.resolve(null);return location.regionId?placePreviews.captureLocation(location,sceneKey??''):placePreviews.capture(id as WorldPlaceId);},
+      locationPreview:id=>{if(id.startsWith('context:'))return contextViews.picture(id);if(initialGate?.snapshot().stage!=='ready')return Promise.resolve(null);const location=controlsApi.current?.locations().find(p=>p.id===id);if(!location)return Promise.resolve(null);return location.regionId?placePreviews.captureLocation(location,sceneKey??''):placePreviews.capture(id as WorldPlaceId);},
       framePlace: place => {const view=worldPlaceView(place);if(!view||!expansion||past.current)return false;framing.place(camera,()=>controls,view,()=>{context.current.manualNavigation='orbit';context.current.cameraMode='manual';context.current.follow=false;context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');},()=>{rts.release();navigation?.release();});return true;},
       releaseInput: () => {rts.release();navigation?.release();},
       flyToSoul: soulId => {
@@ -1242,6 +1249,11 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       releaseInput: () => controlsApi.current?.releaseInput(),
       moveCamera: delta => controlsApi.current?.move(delta) ?? false,
       locations:()=>controlsApi.current?.locations()??[],
+      refreshLocations:()=>controlsApi.current?.refreshLocations(),
+      locationPage:()=>controlsApi.current?.locationPage()??null,
+      searchLocations:query=>controlsApi.current?.searchLocations(query),
+      moreLocations:()=>controlsApi.current?.moreLocations(),
+      cancelLocationPictures:()=>controlsApi.current?.cancelLocationPictures(),
       frameLocation:id=>controlsApi.current?.frameLocation(id)??false,
       locationPreview:id=>controlsApi.current?.locationPreview(id)??Promise.resolve(null),
       framePlace: place => controlsApi.current?.framePlace(place) ?? false,

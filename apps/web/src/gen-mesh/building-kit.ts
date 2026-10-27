@@ -32,7 +32,7 @@ class F32 {
   view() { return this.a.subarray(0, this.n); }
 }
 /** W2b: vertex ranges [from, to) of a buffer that are a building's outer face (its finish pattern goes there). */
-type Buf = { p: F32; n: F32; c: F32; face?: number[]; pane?: Float32Array };
+type Buf = { p: F32; n: F32; c: F32; face?: number[]; pane?: Float32Array; topCeilingVertices?: number };
 /** E2C: a glass buffer's per-vertex window pane (u, v metres from the pane's lower left, signed width (sign = which side of the
  *  face is outdoors, 0 = not a window pane), sill height above its storey floor), padded with zeros to the vertex count. */
 function paneOf(b: Buf, verts: number): Float32Array {
@@ -46,7 +46,7 @@ const paneView = (b: { p: F32; pane?: Float32Array }) => { const n = (b.p.length
 export type Finish = { wall: number; roof: number };
 const WALLS = ['running brick', 'Flemish brick', 'ashlar', 'clapboard', 'limewash'], ROOFS = ['clay tile', 'slate', 'shingle'];
 /** One (group|layer) soup: positions, normals, colours (and W2b's outer-face vertex ranges). */
-export type RawSoup = { k: string; p: Float32Array; n: Float32Array; c: Float32Array; face?: number[]; pane?: Float32Array };
+export type RawSoup = { k: string; p: Float32Array; n: Float32Array; c: Float32Array; face?: number[]; pane?: Float32Array; topCeilingVertices?: number };
 export class Builder {
   readonly buf = new Map<string, Buf>();
   group = 'level-0';
@@ -178,13 +178,16 @@ export class Builder {
     this.add(g, 0, 0, 0, 1, 1, 1, col, layer); g.dispose(); return this;
   }
   quad(a: THREE.Vector3Tuple, b: THREE.Vector3Tuple, c: THREE.Vector3Tuple, d: THREE.Vector3Tuple, col: Col, layer: Layer = 'roof') { this.tri(a, b, c, col, layer); this.tri(a, c, d, col, layer); return this; }
+  /** Called only at the generator's final ceiling slab emission. Later geometry
+   * appended to this soup invalidates the whole-soup classification. */
+  markTopCeiling() { const b = this.buf.get(`${this.group}|wall`); if (b) b.topCeilingVertices = b.p.length / 3; }
   tris(): number { let n = 0; for (const b of this.buf.values()) n += b.p.length / 9; return n; }
   /** Lane W1: the accumulated soups as plain arrays (to cross to or from a worker), in the order emit takes them. */
-  raw(): RawSoup[] { return [...this.buf].map(([k, b]) => ({ k, p: b.p.view().slice(), n: b.n.view().slice(), c: b.c.view().slice(), ...(b.face ? { face: b.face.slice() } : {}), ...(b.pane ? { pane: paneView(b).slice() } : {}) })); }
+  raw(): RawSoup[] { return [...this.buf].map(([k, b]) => ({ k, p: b.p.view().slice(), n: b.n.view().slice(), c: b.c.view().slice(), ...(b.face ? { face: b.face.slice() } : {}), ...(b.pane ? { pane: paneView(b).slice() } : {}), ...(b.topCeilingVertices !== undefined ? { topCeilingVertices: b.topCeilingVertices } : {}) })); }
   /** A builder holding soups made elsewhere (raw()), ready to emit exactly as the builder that made them would. */
   static fromRaw(raw: readonly RawSoup[]): Builder {
     const b = new Builder(), f = (a: Float32Array) => { const x = new F32(); x.a = a as Float32Array<ArrayBuffer>; x.n = a.length; return x; };
-    for (const r of raw) b.buf.set(r.k, { p: f(r.p), n: f(r.n), c: f(r.c), ...(r.face ? { face: r.face.slice() } : {}), ...(r.pane ? { pane: r.pane.slice() } : {}) });
+    for (const r of raw) b.buf.set(r.k, { p: f(r.p), n: f(r.n), c: f(r.c), ...(r.face ? { face: r.face.slice() } : {}), ...(r.pane ? { pane: r.pane.slice() } : {}), ...(r.topCeilingVertices !== undefined ? { topCeilingVertices: r.topCeilingVertices } : {}) });
     return b;
   }
   /** One mesh per (group, layer) under one THREE.Group per group. */
@@ -199,6 +202,10 @@ export class Builder {
       if (b.pane && layer === 'glass') g.setAttribute('edenPane', new THREE.Float32BufferAttribute(paneView(b), 4));
       g.computeBoundingBox(); g.computeBoundingSphere();
       const mesh = new THREE.Mesh(g, materialFor(materials, layer, this.finish)); mesh.name = `${gname} ${layer}`;
+      // Structural evidence comes from the builder layer, never a display-name guess.
+      // Wall soups combine interior and exterior surfaces, so conservatively protect all facades.
+      if (b.topCeilingVertices === b.p.length / 3) mesh.userData.contextStructure = { classification: 'roof', assembly: 'top-ceiling', exteriorFacade: false };
+      else if (layer === 'roof' || layer === 'wall') mesh.userData.contextStructure = { classification: layer, exteriorFacade: layer === 'wall' };
       mesh.castShadow = layer !== 'glow' && layer !== 'glass'; mesh.receiveShadow = layer !== 'glow';
       if (layer === 'glass' || layer === 'glow') mesh.userData.cameraTransparent = true;
       let grp = groups.get(gname); if (!grp) { grp = new THREE.Group(); grp.name = gname; groups.set(gname, grp); }

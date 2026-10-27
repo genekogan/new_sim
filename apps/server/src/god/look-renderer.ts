@@ -1,12 +1,15 @@
 // Minimal null-delimited CDP pipe transport. No Playwright, downloads, debug listener or persistent profile.
+import {monitorEventLoopDelay} from 'node:perf_hooks';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdtemp, readdir, lstat, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { tmpdir, setPriority } from 'node:os';
+import {eyesBrowserLaunch,eyesNice} from '../edge/eyes/browser-config.mjs';
 import { join } from 'node:path';
 import type { Readable, Writable } from 'node:stream';
 import { ApiError } from '../souls.ts';
 import type { Look } from './look.ts';
+import { hostRenderSlot } from './host-render-slot.ts';
 import { preserveScript, readyExpression, captureExpression } from './look-page.ts';
 
 export const lookAdvice = "This world's host cannot render pictures; take the picture with a local browser (Google Chrome where your agent runs). Never change the world's clock or sky to see night.";
@@ -41,6 +44,12 @@ export function pngSize(bytes: Uint8Array) {
 export function chromeExecutable() {
   if (process.env.GOD_LOOK_CHROME) return existsSync(process.env.GOD_LOOK_CHROME) ? process.env.GOD_LOOK_CHROME : null;
   return ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/opt/google/chrome/chrome', 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'].find(existsSync) ?? null;
+}
+
+/** Short-lived captures share the installed Eyes runtime policy, never its persistent service. */
+export function contextChromeLaunch(profile:string,env=process.env,platform=process.platform){
+ if(platform==='linux'){const requested=env.EDEN_GOD_GL??env.EDGE_EYES_GPU??'swiftshader',mode=requested==='auto'?'swiftshader':requested;const policy=eyesBrowserLaunch(mode,env,platform,profile);return{args:policy.args,env:policy.env??env};}
+ return{args:['--ignore-gpu-blocklist',...(env.EDEN_GOD_GL==='swiftshader'?['--use-angle=swiftshader','--enable-unsafe-swiftshader']:[])],env};
 }
 
 export class PipeCDP {
@@ -93,7 +102,10 @@ async function stopChrome(child: ChildProcess) {
   kill('SIGKILL'); // Dispose remaining helpers even if the browser parent closed first.
 }
 
-export async function renderLook(worldUrl: string, shot: Look, expect: number, signal: AbortSignal): Promise<Uint8Array> {
+export async function renderLook(worldUrl: string, shot: Look, expect: number, signal: AbortSignal, context?:unknown, contextResult?:(metadata:Record<string,unknown>)=>void): Promise<Uint8Array> {
+ const release=await hostRenderSlot(signal);try{return await renderIsolated(worldUrl,shot,expect,signal,context,contextResult);}finally{release();}
+}
+async function renderIsolated(worldUrl:string,shot:Look,expect:number,signal:AbortSignal,context?:unknown,contextResult?:(metadata:Record<string,unknown>)=>void):Promise<Uint8Array>{
   // This is server configuration, never Host/X-Forwarded-Host or a request field.
   const url = new URL(worldUrl);
   if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.username || url.password || url.search || url.hash) throw unavailable('Configure a 127.0.0.1 HTTP URL for the world renderer.');
@@ -101,14 +113,19 @@ export async function renderLook(worldUrl: string, shot: Look, expect: number, s
   signal.throwIfAborted();
   const profile = await mkdtemp(join(tmpdir(), `sim-god-look-${process.pid}-`));
   if (signal.aborted) { await rm(profile, { recursive: true, force: true }); throw signal.reason; }
+  const policy=contextChromeLaunch(profile);
+  const histogram=process.env.SIM_CONTEXT_TRACE==='1'?monitorEventLoopDelay({resolution:5}):null;histogram?.enable();let lastPhase=performance.now();
+  const trace=(phase:string)=>{if(!histogram)return;const now=performance.now();console.info('[context-phase]',JSON.stringify({phase,at:Date.now(),ms:now-lastPhase,eventLoopMaxMs:histogram.max/1e6}));lastPhase=now;histogram.reset();};
   const child = spawn(executable, [
     '--headless=new', '--remote-debugging-pipe', `--user-data-dir=${profile}`,
     '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--disable-component-update',
     '--disable-extensions', '--disable-sync', '--metrics-recording-only', '--password-store=basic', '--use-mock-keychain',
     '--disable-dev-shm-usage', '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1',
-    '--ignore-gpu-blocklist', ...(process.env.EDEN_GOD_GL === 'swiftshader' ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : []),
+    ...policy.args,
     'about:blank',
-  ], { detached: process.platform !== 'win32', stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'] });
+  ], { env:policy.env, detached: process.platform !== 'win32', stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'] });
+  if(child.pid)try{setPriority(child.pid,eyesNice());}catch{/* A host may disallow lowering priority. */}
+  trace('spawned');
   const cdp = new PipeCDP(child.stdio[3] as Writable, child.stdio[4] as Readable);
   let startupFailed = false, disposing = false;
   child.once('error', (e: NodeJS.ErrnoException) => {
@@ -123,7 +140,7 @@ export async function renderLook(worldUrl: string, shot: Look, expect: number, s
   signal.addEventListener('abort', abort, { once: true });
   let started = false;
   try {
-    await cdp.send('Browser.getVersion'); started = true;
+    await cdp.send('Browser.getVersion'); started = true;trace('browser-ready');
     const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
     const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
     const send = (method: string, params: object = {}) => cdp.send(method, params, sessionId);
@@ -146,7 +163,12 @@ export async function renderLook(worldUrl: string, shot: Look, expect: number, s
       ...(shot.hideRoofs ? { hideRoofs: '1', ...(shot.cut !== null ? { cut: String(shot.cut) } : {}) } : {}),
       ...(shot.hour !== undefined ? { hour: shot.hour } : {}), ...(shot.weather !== undefined ? { weather: shot.weather } : {}),
     });
-    await send('Page.navigate', { url: `${url.href}?${q}` });
+    await send('Page.navigate', { url: context?`${url.href.replace(/\/$/,'')}/context-view?shot=1&quality=full&at=${shot.at.join(',')}&eye=${shot.eye.join(',')}`:`${url.href}?${q}` });
+    if(context){
+      while(!await evaluate('typeof window.contextRender === \'function\'').catch(()=>false)){signal.throwIfAborted();await new Promise(r=>setTimeout(r,100));}
+      trace('page-ready');const result=await evaluate(`window.contextRender(${JSON.stringify(context)})`);if(result?.photo&&typeof result.photo==='object')contextResult?.(result.photo);if(!result?.data)throw new ApiError(503,'context.unavailable',String(result?.reason??'empty context capture'));
+      trace('captured');const bytes=Buffer.from(String(result.data).split(',')[1]??'','base64');pngSize(bytes);return bytes;
+    }
     let stable = 0, lastDrawn = -1;
     while (stable < 2) {
       signal.throwIfAborted();
@@ -168,6 +190,6 @@ export async function renderLook(worldUrl: string, shot: Look, expect: number, s
     throw new ApiError(503, 'look.failed', `World screenshot failed: ${String((e as Error).message).split('\n')[0].slice(0, 200)}. Retry the look; check the host viewer if it persists.`);
   } finally {
     disposing = true; signal.removeEventListener('abort', abort); cdp.close();
-    await stopChrome(child); await rm(profile, { recursive: true, force: true });
+    await stopChrome(child); await rm(profile, { recursive: true, force: true });trace('stopped');histogram?.disable();
   }
 }

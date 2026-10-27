@@ -100,6 +100,8 @@ export type PlacesHost = {
   nav: GodNav;
   edge?: EdgeLedger;
   version?: () => number | string;
+  /** Authored meaning/geometry revision only; excludes transient engine writebacks and the clock. */
+  publicationVersion?: () => number | string;
   /** Includes every model/terrain/state edit and navigation level change, without the description clock. Unset: no membership memo reuse. */
   structuralVersion?: () => number | string;
   /** G1: true while the host is catching up with god edits (reads may take the places as they were). */
@@ -114,7 +116,7 @@ export type PlacesHost = {
 /** What is where on a god's world, as the ledger's places. */
 export class GodPlaces {
   private h: PlacesHost;
-  private cache: { key: string; list: GodPlace[]; byRef: Map<string, GodPlace>; byEntity: Map<string, GodPlace> } | null = null;
+  private cache: { key: string; publicationVersion?: number | string; list: GodPlace[]; byRef: Map<string, GodPlace>; byEntity: Map<string, GodPlace> } | null = null;
   private facts: Fact[] | null = null;
   /** Ids of the places this layer put in the ledger's index (and only those: a boot place keeps its own). */
   private installed = new Set<string>();
@@ -123,6 +125,16 @@ export class GodPlaces {
 
   /** A non-deriving readiness read; the provisional ledger index has no god-built rooms. */
   hasPublished(): boolean { return this.published; }
+  private publishedVersion: number | string | undefined;
+  /** Nonderiving: the ledger, not just an intermediate cache, published the current authored revision. */
+  hasCurrentPublication(): boolean {
+    return this.published && (!this.h.publicationVersion || this.publishedVersion === this.h.publicationVersion());
+  }
+
+  publicationState() {
+    return { published: this.published, current: this.hasCurrentPublication(), revision: this.h.publicationVersion?.(),
+      publishedRevision: this.publishedVersion, deriving: !!this.gen, derivingRevision: this.gen?.publicationVersion };
+  }
 
   static idOf(ref: string) { return `g-${ref.toLowerCase().replace(/\//g, '.').replace(/[^a-z0-9._-]+/g, '-').replace(/^[^a-z0-9]+/, '')}`.slice(0, 100); }
   /** The place a nav thing is (its walk targets it), if it is one. */
@@ -159,16 +171,17 @@ export class GodPlaces {
     const key = this.key();
     if (this.cache?.key === key) return this.cache;
     this.gen = null;
-    return this.install(key, this.derive());
+    const publicationVersion = this.h.publicationVersion?.();
+    return this.install(key, this.derive(), publicationVersion);
   }
   /** Derives done (all at once or sliced): tests check edits re-derive and engine writebacks do not. */
   readonly stats = { derives: 0, memberships: 0 };
   private derive(): GodPlace[] { this.stats.derives++; return drain(this.deriveGen()); }
-  private install(key: string, list: GodPlace[]) {
-    this.cache = { key, ...placeIndex(list) };
+  private install(key: string, list: GodPlace[], publicationVersion?: number | string) {
+    this.cache = { key, publicationVersion, ...placeIndex(list) };
     return this.cache;
   }
-  private gen: { key: string; it: Generator<void, GodPlace[], void> } | null = null;
+  private gen: { key: string; publicationVersion?: number | string; it: Generator<void, GodPlace[], void> } | null = null;
   private structure(): StructureStamp {
     const model = this.h.model.safetyCacheKey();
     // Untracked replacement Maps deliberately return a new key on every read: never memoize those inputs.
@@ -181,12 +194,16 @@ export class GodPlaces {
    *  landing mid-way is picked up by the next call (the host notes every edit). */
   syncStep(budgetMs: number): boolean {
     if (!this.h.edge?.places) return true;
-    if (!this.gen) { const key = this.key(); if (this.cache?.key === key) { if (this.installedKey !== key) this.sync(); return true; } this.gen = { key, it: this.deriveGen() }; this.stats.derives++; }
+    if (this.gen && this.gen.publicationVersion !== this.h.publicationVersion?.()) this.gen = null;
+    if (!this.gen) { const key = this.key(); if (this.cache?.key === key) { if (this.installedKey !== key) this.sync(); return true; } this.gen = { key, publicationVersion: this.h.publicationVersion?.(), it: this.deriveGen() }; this.stats.derives++; }
     const t0 = performance.now();
     try {
       for (;;) {
         const r = this.gen.it.next();
-        if (r.done) { this.install(this.gen.key, r.value); this.gen = null; this.sync(); return true; }
+        if (r.done) {
+          if (this.gen.publicationVersion !== this.h.publicationVersion?.()) { this.gen = null; return false; }
+          this.install(this.gen.key, r.value, this.gen.publicationVersion); this.gen = null; this.sync(); return true;
+        }
         if (performance.now() - t0 >= budgetMs) return false;
       }
     } catch (error) {
@@ -433,6 +450,7 @@ export class GodPlaces {
       const next = { ...base, ...(about ? { worldAbout: about } : {}) };
       if (JSON.stringify(root) !== JSON.stringify(next)) places.add(next);
     }
+    this.publishedVersion = this.cache?.publicationVersion;
     this.published = true;
   }
 

@@ -8,6 +8,8 @@ import type { MaterialLib } from './materials.ts';
 import { applyLook, lookKey } from './vocab-look.ts';
 
 export type MeshCtx = {
+  /** Immutable architectural capture: no implicit camera-dependent roof/storey cuts. */
+  canonicalContext?: boolean;
   def: StoredDef;
   entity: Entity;
   /** Instance params with generator and def defaults filled. */

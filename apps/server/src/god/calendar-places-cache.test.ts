@@ -338,3 +338,28 @@ test('cold membership invalidates on definition maps, removals, and bridge-only 
   const ground = f.model.ground(); f.model.terrain.update({ ...ground, extent: [-210, -200, 200, 200] }, []);
   f.bridge.version++; read(); assert.equal(f.places.stats.memberships, ++builds);
 });
+
+test('authored publication guard discards a superseded sliced derive before ledger publication', () => {
+  const f = fixture(); let authored = 0;
+  f.host.publicationVersion = () => authored;
+  f.places.sync();
+  assert.equal(f.places.hasCurrentPublication(), true);
+  f.nav.thingsGen = function* () { const things = structuredClone(f.nav.things()); yield; return things; };
+  f.edited(); authored++;
+  assert.equal(f.places.syncStep(Number.MIN_VALUE), false);
+  f.act([{ op: 'set', id: 'alpha', name: 'renamed', about: { title: 'New assembly court', what: 'A court for public talks.' } }]); f.edited(); authored++;
+  assert.equal(f.places.hasCurrentPublication(), false);
+  const published = [...f.edge.places.byId.keys()];
+  assert.equal(f.places.syncStep(Number.MIN_VALUE), false, 'superseded iterator restarts within one slice');
+  assert.deepEqual([...f.edge.places.byId.keys()], published, 'no mixed old iterator publishes');
+  while (!f.places.syncStep(Number.MIN_VALUE)) { /* finish the stable authored revision */ }
+  assert.equal(f.places.hasCurrentPublication(), true);
+  assert.equal(f.edge.places.byId.has('g-renamed'), true);
+  assert.equal(f.edge.places.byId.has('g-alpha'), false);
+  assert.equal(f.edge.places.byId.get('g-renamed')!.name, 'New assembly court');
+  assert.match(f.edge.places.byId.get('g-renamed')!.description!, /public talks/);
+  f.act([{ op: 'set', id: 'renamed', name: 'final-name' }]); f.edited(); authored++;
+  assert.equal(f.places.hasCurrentPublication(), false);
+  f.places.sync(true);
+  assert.equal(f.places.hasCurrentPublication(), true, 'synchronous publication records the same provenance');
+});

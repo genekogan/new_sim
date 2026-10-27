@@ -6,3 +6,4 @@ export function holder(label?: string): Holder;
 export function parseHolder(raw: unknown): Holder | undefined;
 export function liveness(h?: Holder): 'unknown' | 'alive' | 'dead' | 'recycled';
 export function lockStatus(h: Holder | undefined, heartbeatAt: number, ttlMs?: number, now?: number): { holder: Holder | null; heartbeatAt: number; ttlMs: number; liveness: string; stale: boolean; reason: string };
+export function acquireLock(path:string,options?:{label?:string;ttlMs?:number;detail?:boolean;reentrant?:boolean}):()=>void;

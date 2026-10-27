@@ -6,6 +6,7 @@ import{hashOf}from'../../packages/world-compiler/src/index.ts';
 import{aboutSchema,worldAboutSchema}from'../../packages/world-compiler/src/schemas.ts';
 import{materialize,applyOps}from'./materialize.mjs';
 import{physicalGenesisSha256}from'../playtest/lib/physical-fixture.mjs';
+import{lintMeaning}from'./lint.mjs';
 // Leave room for the protocol envelope beneath the live batch byte limit.
 export function meaningBatches(ops,name){
  const batches=[];let pending=[];
@@ -22,14 +23,14 @@ export function enrich(name,overlay){
  const m=materialize(name),{world,template}=m,sha=hashOf(template);
  if(overlay.source?.template!==`worlds/templates/${name}.json`||overlay.source.sha!==sha)throw Error(`source drift: expected ${sha}; review and refresh overlay provenance`);
  if(!overlay.about||typeof overlay.about!=='object'||Array.isArray(overlay.about))throw Error('about must map stable refs to blocks');
- const warnings=[],ops=[];
+ const warnings=[],diagnostics=[],ops=[];
  for(const[ref,block]of Object.entries(overlay.about)){
   if(!world.get(ref))throw Error(`unknown entity ${ref}`);
   const about=aboutSchema.parse(block);
   if(hashOf(about)!==hashOf(block))throw Error(`${ref}: unknown or noncanonical about fields`);
-  if(!about.title)warnings.push(`${ref}: no title`);
   if((about.salience??0)>=2&&!about.what)throw Error(`${ref}: salient place needs purpose`);
-  if(about.what&&/helps identify this|use only the actions|\b(?:core-|region-|place-)[a-z]/i.test(about.what))warnings.push(`${ref}: boilerplate or build reference in purpose`);
+  const issues=lintMeaning(ref,about);diagnostics.push(...issues);
+  warnings.push(...issues.map(d=>`${d.ref}.${d.field}: ${d.message} ${d.suggestion}`));
   ops.push({op:'set',id:ref,about});
  }
  if(overlay.worldAbout){
@@ -46,7 +47,7 @@ export function enrich(name,overlay){
  }
  if(structural()!==before)throw Error('unexpected structural mutation');
  if(physicalGenesisSha256(template)!==physical)throw Error('meaning changed physical fixture hash');
- return{...m,report:{name,entities:Object.keys(overlay.about).length,parts:Object.values(overlay.about).reduce((n,a)=>n+(a.parts?.length??0),0),warnings,sourceSha:sha,physicalSha256:physical}};
+ return{...m,report:{name,entities:Object.keys(overlay.about).length,parts:Object.values(overlay.about).reduce((n,a)=>n+(a.parts?.length??0),0),warnings,diagnostics,sourceSha:sha,physicalSha256:physical}};
 }
 if(process.argv[1]&&pathToFileURL(resolve(process.argv[1])).href===import.meta.url){
  const[command,name,out]=process.argv.slice(2);if(!['lint','apply'].includes(command)||!name)throw Error('overlay.mjs lint <name> | apply <name> <output.json>');

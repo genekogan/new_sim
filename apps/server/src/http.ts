@@ -1,3 +1,4 @@
+import {mountContextViews} from './god/context-views.ts';
 import {AutoPortraits} from './portrait/auto-portraits.ts';
 import {SoulProfiles} from './soul-profile.ts';
 import {WorldAccounts} from './accounts/service.ts';
@@ -56,7 +57,7 @@ import {soulLink} from './soul-link.ts';
 import {mountOperatorSouls} from './op-souls.ts';
 import { strandedMetrics } from '../../../mars/viewer/engine/spatial/path.ts';
 
-type Deps = { cfg: Config; db: Db; host: WorldHost; auth: Auth; hub: Hub; brain: Brain; souls: Souls; takes?: TakeArchive; station?:CandidateStationV1; stationV2?:CandidateStationV2; intentV2?:IntentControlV2; edge?:EdgeLedger; god?: GodMode };
+type Deps = { cfg: Config; db: Db; host: WorldHost; auth: Auth; hub: Hub; brain: Brain; souls: Souls; takes?: TakeArchive; station?:CandidateStationV1; stationV2?:CandidateStationV2; intentV2?:IntentControlV2; edge?:EdgeLedger; god?: GodMode; contextReady?:()=>boolean; contextWait?:(signal:AbortSignal)=>Promise<void>; contextLevelAt?:(x:number,z:number,y:number)=>number };
 
 export function buildApp(d: Deps) {
   if(d.station&&d.station.host!==d.host)throw new Error('station must belong to selected host');
@@ -132,6 +133,7 @@ export function buildApp(d: Deps) {
   // the world's one skill (/SKILL.md) and who lives here (/v1/world/souls): lane P2
   if (d.god) { mountJoinRoutes(app, { worldName, baseOf, soulCliUrl: (c) => (d.cfg.cliFile ? baseOf(c) + '/eden-agent.mjs' : PUBLISHED_SOUL_CLI), souls: () => d.db.liveSouls(d.host.worldId).filter((s) => !travel?.isAway(s.id)), nowOf: (id) => d.host.nowOf(id), bodyOf: (id) => d.edge?.bodyRule?.view(id) ?? null, poseOf: (id) => { const p = (d.host.engine.world.entities as Record<string, { pose?: { p?: number[] } } | undefined>)[id]?.pose?.p; return p ? { x: p[0], y: p[1], z: p[2] } : null; } }); }
   const godRoutes = d.god ? mountGodRoutes(app, { god: d.god, worldName, requireUser, soulFromBearer: (c) => { const s = d.souls.soulFromToken(bearer(c)); return s ? { id: s.id, name: s.name } : null; }, baseOf, limitIp, verifyUse: new VerifyUse(d.host, d.souls, d.god, d.edge), lookWorldUrl: `http://127.0.0.1:${d.cfg.port}${d.cfg.worldPath}` /* W2 remote looks */ }) : null;
+  if(d.god&&d.edge)mountContextViews(app,{god:d.god,edge:d.edge,build:d.cfg.build,levelAt:d.contextLevelAt,contextReady:d.contextReady,waitForContext:d.contextWait,worldUrl:`http://127.0.0.1:${d.cfg.port}${d.cfg.worldPath}`,soul:c=>{const token=bearer(c);if(!token)return null;return travelGate(edgeSoulResolver(d.host,d.souls,bearer))(c).soulId;},limit:c=>limitIp(c,'context-views',120,60000)});
   if (d.god && d.edge) { const god = d.god; mountSecretPlaceRoutes(app, { ledger: d.edge, requireGod: (c) => { const who = god.godIdentity(bearer(c)); if (!who) throw new ApiError(401, 'unauthorized', 'missing or invalid god token'); if (who.child) throw new ApiError(403, 'helper.scope', 'helper tokens cannot change secret places'); } }); }  // knowledge/1; WD7: helpers refused
   if (d.god) { const god = d.god; mountSharedLibraryRoutes(app, { god, slug: d.cfg.worldKey, dir: process.env.SIM_LIBRARY_DIR, requireGod: (c) => { if (!god.godFromToken(bearer(c))) throw new ApiError(401, 'unauthorized', 'missing or invalid god token'); } }); }  // M4 shared library
   if (d.god) { const god = d.god; mountArtRoutes(app, { model: () => god.model, godAct: (ops, note) => god.act({ ops }, note), engineAct: (ops, note) => god.engineAct(ops, note), isGod: (c) => { const w = god.godIdentity(bearer(c)); return !!w && !w.child; }, soulFromBearer: (c) => { const s = d.souls.soulFromToken(bearer(c)); return s ? { id: s.id, name: s.name } : null; }, owner: () => god.owner, baseOf, limitIp, dir: join(defaultAssetDir(), 'art') }); }  // W6 art: frames, screens, gallery walls

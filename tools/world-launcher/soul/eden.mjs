@@ -386,6 +386,42 @@ async function view(...args) {
   return res;
 }
 
+// Architectural context is explicit; it never replaces current first-person sight.
+export function parseContextViewArgs(args) {
+  const refs = []; let detail = false, original = false, out;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--detail") detail = true;
+    else if (args[i] === "--original") original = true;
+    else if (args[i] === "--out") { out = args[++i]; if (!out || out.startsWith("--")) throw new Error("--out requires a file"); }
+    else if (args[i].startsWith("--")) throw new Error("Unknown views option: " + args[i]);
+    else refs.push(args[i]);
+  }
+  if (refs.length < 1 || refs.length > 6 || new Set(refs).size !== refs.length || refs.some(r => r.length > 220)) throw new Error("views requires one to six distinct stable refs from context");
+  if (original && refs.length !== 1) throw new Error("--original requires one artwork ref");
+  return { refs, detail, original, out };
+}
+async function context(...args) {
+  const at = args.indexOf("--cursor"), query = [...args]; let cursor;
+  if (at >= 0) { cursor = query[at + 1]; if (!cursor) throw new Error("--cursor needs nextCursor from the previous page"); query.splice(at, 2); }
+  const params = new URLSearchParams(); if (query.length) params.set("q", query.join(" ")); if (cursor) params.set("cursor", cursor);
+  return ok(await call("/v1/world/context" + (params.size ? "?" + params : "")), "context");
+}
+async function views(...args) {
+  const { refs, detail, original, out } = parseContextViewArgs(args);
+  const data = original
+    ? ok(await call("/v1/world/context?ref=" + encodeURIComponent(refs[0])), "original context")
+    : ok(await call("/v1/world/context/views", { body: { refs, detail, sheet: refs.length > 1 } }), "views");
+  if (!out) return data;
+  const url = original ? data.targets[0]?.original?.url : refs.length === 1 ? data.views[0]?.url : data.sheet?.url;
+  if (!url) return { ...data, saved: null, note: original ? "No admitted original image for this target." : "Picture pending or unavailable. Request these refs again when useful; text and live queries remain available." };
+  if (!url.startsWith("/v1/world/context/")) throw new Error("Invalid context picture URL");
+  const state = load(), response = await fetch(state.world + url, { headers: state.token ? { authorization: `Bearer ${state.token}` } : {}, redirect: "error", signal: AbortSignal.timeout(30_000) });
+  if (!response.ok) throw new Error(`Picture expired or inaccessible (HTTP ${response.status}); request current views.`);
+  const bytes = Buffer.from(await response.arrayBuffer()); if (bytes.length > 8 * 1024 * 1024) throw new Error("Picture exceeds download limit");
+  const saved = resolvePath(out); writeFileSync(saved, bytes);
+  return { ...data, saved, savedSource: original ? "original-image" : "architectural-context" };
+}
+
 // ---------------------------------------------------------------- acting
 
 /** Parse either one structured intent or words followed by a parameter object. */
@@ -709,6 +745,7 @@ const HELP = `eden ${VERSION} — one Soul, one controller. Commands print JSON.
 setup     register <world-url>            create "<Name>" [--for CODE]    pair <soulId> [--for CODE]
           approval [status|wait|cancel]   status                          guide
 look      here   observe   around|explore [place]   caps [--search w] [--verb v] [--all]   map   view [--map|--alt-only|--out f]
+          context [query] [--cursor nextCursor]   views <ref> [ref…] [--detail] [--original] [--out picture.png]
           receipt [id]   events [--since c_N] [--raw]   conversations
 do        act "<words or offer:id>" [params-json] [--wait [s]] [--for id|none] [--json]   resolve "<words>"   wait [s] [receiptId] [--json]
           say "<text>"   converse <list|turns|start|say|accept|decline|leave|ask> …   object <id> [action] [json]
@@ -717,7 +754,7 @@ owner     listen [--after id] [--once]   ack <id> ["reply"]   result <id> done|f
 self      profile [name|description|photo …]   body [presets|set|look …]   travel [<world>|home]
 `;
 
-const commands = { now: nowLine, register, create, pair, approval, status, guide, here, observe, around, explore: around, caps, capabilities: caps, map, view, receipt, events, conversations, act, resolve, wait, say, converse, object, listen, ack, result, profile, body, travel, version: async () => ({ version: VERSION }), help: async () => HELP };
+const commands = { now: nowLine, register, create, pair, approval, status, guide, here, observe, around, explore: around, caps, capabilities: caps, map, view, context, views, receipt, events, conversations, act, resolve, wait, say, converse, object, listen, ack, result, profile, body, travel, version: async () => ({ version: VERSION }), help: async () => HELP };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [cmd, ...args] = process.argv.slice(2);

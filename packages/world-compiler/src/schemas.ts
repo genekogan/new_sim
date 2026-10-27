@@ -199,13 +199,17 @@ export const partAnchorSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('entity'), ref: publicText(200), slot: publicText(100).optional() }),
   z.object({ kind: z.literal('local'), point: v3, stand: v3, level: z.number().int(), region: z.array(v2).min(3).max(64).optional() }),
 ]);
+/** Camera coordinates belong to the owning entity's local frame; inherited movement carries the view. */
+export const contextViewpointSchema = z.object({eye:v3,at:v3}).strict().refine(v=>Math.hypot(...v.eye.map((n,i)=>n-v.at[i]))>.01,'eye and at must differ');
+export const contextFrontSchema = v2.refine(v=>Math.hypot(...v)>.000001,'front must have a nonzero direction').transform(v=>{const n=Math.hypot(...v);return [v[0]/n,v[1]/n] as [number,number];});
 export const aboutPartSchema = z.object({
   id: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,39}$/), title: publicText(60), what: publicText(400).optional(),
-  aliases: aliasesSchema.optional(), anchor: partAnchorSchema.optional(),
+  aliases: aliasesSchema.optional(), anchor: partAnchorSchema.optional(), viewpoint: contextViewpointSchema.optional(), front: contextFrontSchema.optional(),
 });
 export const aboutSchema = z.object({
   title: publicText(60).optional(), what: publicText(400).optional(), aliases: aliasesSchema.optional(),
   kind: publicText(40).optional(), role: z.enum(['district', 'quarter', 'landmark', 'part', 'minor']).optional(),
+  viewpoint: contextViewpointSchema.optional(), front: contextFrontSchema.optional(),
   in: publicText(200).optional(), salience: z.number().int().min(0).max(3).optional(),
   parts: z.array(aboutPartSchema).max(16).refine(parts => new Set(parts.map(p => p.id)).size === parts.length, 'part ids must be unique').optional(),
 });

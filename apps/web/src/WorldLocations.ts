@@ -1,8 +1,10 @@
 /** Camera-only addresses derived from the actually depicted recording, never a mind's destination catalogue. */
-export type WorldLocation={id:string;label:string;regionId?:string;p:readonly[number,number,number];target:readonly[number,number,number];radius:number;
+export type WorldLocation={id:string;label:string;previewRevision?:number|string;previewLabel?:string;regionId?:string;p:readonly[number,number,number];target:readonly[number,number,number];radius:number;
  /** Picture-only eye inside a one-room building (world-env godTourViews): the card shows the room at eye level. */
  inside?:{readonly p:readonly[number,number,number];readonly target:readonly[number,number,number]}};
 export type DepictedRegion={label?:string;kind?:string;polygon?:readonly(readonly[number,number])[];level?:number};
 export function depictedWorldLocations(regions:Readonly<Record<string,DepictedRegion>>,levels:readonly{id:number;y:number}[],floorOffset?:(x:number,z:number,y:number)=>number):WorldLocation[]{
  const result:WorldLocation[]=[];for(const [regionId,region]of Object.entries(regions)){if(typeof region.label!=='string'||!region.label.trim()||region.kind==='no-go'||!region.polygon||region.polygon.length<3||region.polygon.some(p=>p.length!==2||!p.every(Number.isFinite)))continue;let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;for(const [px,pz]of region.polygon){minX=Math.min(minX,px);maxX=Math.max(maxX,px);minZ=Math.min(minZ,pz);maxZ=Math.max(maxZ,pz);}const x=(minX+maxX)/2,z=(minZ+maxZ)/2,level=region.level??0;const y=levels.find(l=>l.id===level)?.y??levels.find(l=>l.id===0)?.y??0;if(!Number.isFinite(y))continue;const floor=y+(floorOffset?.(x,z,y)??0);if(!Number.isFinite(floor))continue;const radius=Math.max(2,Math.hypot(maxX-minX,maxZ-minZ)/2);result.push({id:'region:'+regionId,regionId,label:region.label.trim(),target:[x,floor+.8,z],p:[x+radius*.9,floor+.8+radius*.8,z+radius*.9],radius});}return result.sort((a,b)=>a.label.localeCompare(b.label)||a.id.localeCompare(b.id));
 }
+
+export type WorldLocationPage = { total: number; more: boolean; loading: boolean; query: string; error: string | null };

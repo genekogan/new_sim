@@ -25,6 +25,7 @@ import { assetBytes } from './asset-bytes.ts';
 import { noteUploadSizes } from './cdn-assets.ts';
 import { eagerShas, planEager } from './gen-mesh/lazy-assets.ts';
 import { progressiveNearM } from './quality-tier.ts';
+import { contextStamp } from './context-stamp.ts';
 import { arrivalOver } from './arrival-marks.ts';
 import { computeVertexNormals } from './gen-mesh/fast-geometry.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
@@ -35,7 +36,7 @@ import { isRideBalloonDef, rideMotionDef } from './gen-mesh/kits/ride-balloon.ts
 import { isRideCarrierDef, carrierIdOf } from './ride-carriers.ts';
 import { holdRainbow, isRainbowDef } from './atmosphere/rainbow-things.ts';
 
-type Snapshot = { contract: string; worldId: string; seq: number; counter?: number; seed?: string; constants: WorldModel['constants']; state: WorldModel['state']; ground: Ground; defs: StoredDef[]; entities: Entity[]; tiles: Record<string, string>; assetBytes?: Record<string, number>; builds?: PublicSite[]; buildsRev?: number; now?: number };
+export type EntitySnapshot = { contract: string; worldId: string; seq: number; counter?: number; seed?: string; constants: WorldModel['constants']; state: WorldModel['state']; ground: Ground; defs: StoredDef[]; entities: Entity[]; tiles: Record<string, string>; assetBytes?: Record<string, number>; builds?: PublicSite[]; buildsRev?: number; now?: number };
 type DiffMsg = { type: 'edge'; kind: 'world-diff'; seq: number; diff: { upserts: Entity[]; removes: string[]; defs: StoredDef[]; tiles: string[]; world?: Partial<WorldModel['state']> }; ground?: Ground; defs?: StoredDef[] };
 
 const SECTOR_TILES = 4;              // 4×4 tiles (256 m) per terrain mesh
@@ -61,6 +62,22 @@ export class WorldEntityLayer {
    *  in small slices between frames. Edge diffs still wait for it (applyEdge). */
   filling = false;
   private model: WorldModel | null = null;
+  private immutable=false;
+  contextObjects(id:string):THREE.Object3D[]{const object=this.drawn.get(id)?.obj;return object?[object]:[];}
+  /** Stable immutable render IDs derive from entity identity and mesh hierarchy, never Three UUIDs. */
+  contextMeshes(): { id: string; entity: string; mesh: THREE.Mesh }[] {
+    if (!this.immutable) throw new Error('context meshes require an immutable layer');
+    const result: { id: string; entity: string; mesh: THREE.Mesh }[] = [];
+    for (const [entity, drawn] of this.drawn) {
+      const walk = (object: THREE.Object3D, path: string, visible: boolean) => {
+        visible &&= object.visible;
+        if (visible && object instanceof THREE.Mesh) result.push({ id: `${entity}:${path}`, entity, mesh: object });
+        object.children.forEach((child, index) => walk(child, `${path}.${index}`, visible));
+      };
+      walk(drawn.obj, '0', true);
+    }
+    return result;
+  }
   private seq = -1;
   private readonly terrainGroup = new THREE.Group();
   private readonly waterGroup = new THREE.Group();
@@ -102,11 +119,11 @@ export class WorldEntityLayer {
   private resyncing = false;
   /** Full resync: refetch the snapshot and redraw everything (no easing). Used after a missed diff. */
   async resync() {
-    if (this.resyncing || !this.signal) return;
+    if (this.immutable || this.resyncing || !this.signal) return;
     this.resyncing = true;
     try {
       const got = await loadSnapshot(this.api('/v1/world/snapshot'), this.signal); if (!got) return; const r = got.response; noteSnapshotVersion(r.headers.get('x-moderation-version'));
-      const snap = got.snap as unknown as Snapshot; if (this.signal.aborted || snap.contract !== 'world/1') return;
+      const snap = got.snap as unknown as EntitySnapshot; if (this.signal.aborted || snap.contract !== 'world/1') return;
       ageNow(snap, r);
       const prevGround = JSON.stringify(this.model?.ground() ?? null);
       noteUploadSizes(snap.assetBytes);   // CDN4: god uploads may come from assets.eden.art (cdn-assets.ts)
@@ -119,19 +136,20 @@ export class WorldEntityLayer {
       for (const id of [...this.drawn.keys()]) if (!keep.has(id)) this.undraw(id);
       this.model.readPass(() => { for (const e of snap.entities) this.draw(e, !this.drawn.has(e.id)); });
       this.stats.resyncs++;
+      this.onContextChanged?.();
     } catch { /* next check retries */ } finally { this.resyncing = false; }
   }
 
   /** `onSnapshot`: P7b, called once the snapshot (and its parts) are in, or the attempt failed (early-layer.ts lets the
    *  page's second loading phase start then). */
-  async start(signal: AbortSignal, onSnapshot?: () => void) {
+  async start(signal: AbortSignal, onSnapshot?: () => void, frozen?:EntitySnapshot) {
     this.signal = signal;
-    let snap: Snapshot;
+    let snap: EntitySnapshot;
     // lane L3h: the first start takes the snapshot GET index.html sent at page entry (snapshot-prefetch.ts), one request
     // lane W1/O2: the page's edge-cacheable snapshot URL when the server named one (its `now` is then as old as the copy)
     // lane W3: in its wire form (snapshot-wire.ts: defs and ground as cached content-addressed parts)
-    try { const got = await loadSnapshot(this.api('/v1/world/snapshot'), signal, true); onSnapshot?.(); if (!got || signal.aborted) return; const r = got.response; noteSnapshotVersion(r.headers.get('x-moderation-version')); snap = got.snap as unknown as Snapshot;
-      ageNow(snap, r); } catch { onSnapshot?.(); return; }
+    try { if(frozen){this.immutable=true;snap=structuredClone(frozen);onSnapshot?.();}else{ const got = await loadSnapshot(this.api('/v1/world/snapshot'), signal, true); onSnapshot?.(); if (!got || signal.aborted) return; const r = got.response; noteSnapshotVersion(r.headers.get('x-moderation-version')); snap = got.snap as unknown as EntitySnapshot;
+      ageNow(snap, r); }} catch { onSnapshot?.(); return; }
     if (signal.aborted || snap.contract !== 'world/1') return;
     noteUploadSizes(snap.assetBytes);   // CDN4
     this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground }, undefined, undefined, { lazyIndex: true });
@@ -224,7 +242,7 @@ export class WorldEntityLayer {
   /** Consume hub messages (the viewer keeps the last 300 edge messages; we only act on newer diffs). */
   readonly stats = { edgeSeen: 0, applied: 0, resyncs: 0, lastError: null as string | null };
   applyEdge(msgs: readonly { type: string; kind?: string; seq?: unknown; rev?: unknown }[]) {
-    if (!this.model || this.building || this.filling) return;
+    if (this.immutable || !this.model || this.building || this.filling) return;
     for (const m of msgs) {
       // CE8: attention hints keep the current rev; the sites layer parses each message once.
       if (m.kind === 'world-build') { if ((m as { event?: unknown }).event === 'attention' || (typeof m.rev === 'number' && m.rev > this.sites.maxRev)) this.sites.apply(m); continue; }
@@ -234,12 +252,15 @@ export class WorldEntityLayer {
       try { this.applyDiff(m as unknown as DiffMsg); this.stats.applied++; } catch (e) { this.stats.lastError = String(e); this.seq = m.seq; }
     }
   }
+  onContextChanged?:()=>void;
   private applyDiff(d: DiffMsg) {
     if (!this.model) return;
     {
+      const contextChanged=!!d.ground||!!d.diff.world||d.diff.defs.length>0||d.diff.removes.some(id=>contextStamp(this.model!.entities.get(id)))||d.diff.upserts.some(e=>contextStamp(e)!==contextStamp(this.model!.entities.get(e.id)));
       this.seq = d.seq;
       const held = this.sites.heldRemovals(d, this.model);
       this.sites.apply(d);
+      if(contextChanged&&(d as DiffMsg&{by?:string}).by!=='engine')this.onContextChanged?.();
       for (const def of [...(d.defs ?? []), ...d.diff.defs]) { this.model.defs.set('sha:' + def.hash, def); this.model.defs.set(def.ref, def); if (def.ref.startsWith('core-')) this.model.defs.set('core/' + def.ref.slice(5), def); }
       for (const id of d.diff.removes) { this.model.delete(id); this.undraw(id, held.has(id) ? SITE_REFINEMENT.removalDelaySeconds : 0); }
       for (const e of d.diff.upserts) { if (this.model.entities.has(e.id)) this.model.delete(e.id); this.model.insert(e); }
@@ -295,12 +316,12 @@ export class WorldEntityLayer {
     this.now = nowMs;
     if (!this.active) return;
     this.sites.update(nowMs);
-    const moving = arrivalOver();
+    const moving = !this.immutable && arrivalOver();
     // W2b: fill old Eden's generated surface patterns (brick, ashlar, clapboard, tile, slate, turf blades) a few rows a
     // frame; until now only old Eden's own layer did, so entity worlds drew the flat placeholders. No-op once complete.
     stepSurfaceKit(2);
     if (this.horizon) this.horizon.visible = this.horizonBy.size === 0;
-    if (nowMs - this.lastSeqCheck > 20_000 && this.signal) {  // cheap heartbeat: did we miss anything while the socket was down?
+    if (!this.immutable && nowMs - this.lastSeqCheck > 20_000 && this.signal) {  // cheap heartbeat: did we miss anything while the socket was down?
       this.lastSeqCheck = nowMs;
       // G8: a changed moderation veto also takes the whole (server-filtered) picture again
       void fetch(this.api('/v1/world/seq'), { signal: this.signal }).then((r) => (r.ok ? r.json() : null)).then((j: { seq: number; builds?: number; moderation?: { version?: unknown; hidden?: unknown } } | null) => { if (!this.signal?.aborted && j) { if (noteModeration(j.moderation) || j.seq !== this.seq) void this.resync(); else this.sites.checkRevision(j.builds); } }).catch(() => {});
@@ -323,7 +344,7 @@ export class WorldEntityLayer {
       if (d.settled && !d.inst && (!d.motion || glowing) && !d.removing && !this.overrides.has(id) && !this.held.has(id)) {
         // phone tier: visibility (interior storeys, far furniture) is checked every other frame
         if (!this.freezeSettled || !d.frozen || ((k + frame) & 1) === 0) d.obj.visible = this.interiorVisible(id, d);
-        if (glowing && d.obj.visible && ((k + frame) & (d.offscreen ? 15 : 3)) === 0) animate(d.obj, d.motion!.entity, d.motion!.def, nowMs / 1000, { y: d.to.p.y, yaw: d.motion!.yaw });
+        if (!this.immutable && glowing && d.obj.visible && ((k + frame) & (d.offscreen ? 15 : 3)) === 0) animate(d.obj, d.motion!.entity, d.motion!.def, nowMs / 1000, { y: d.to.p.y, yaw: d.motion!.yaw });
         if (this.freezeSettled && !d.frozen && !d.noFreeze) this.freeze(d);
         continue;
       }
@@ -494,6 +515,13 @@ export class WorldEntityLayer {
 
   /** C1: the world's ground rectangle [x0, z0, x1, z1] (camera zoom limit and bounds), or null before the model. */
   groundExtent(): readonly [number, number, number, number] | null { return this.model ? this.model.ground().extent : null; }
+
+  /** Raw immutable height field for architectural cameras; water is not solid ground. */
+  contextGroundAt = (x: number, z: number): number | null => {
+    if (!this.immutable || !this.model) return null;
+    const [x0, z0, x1, z1] = this.model.ground().extent;
+    return x < x0 || x > x1 || z < z0 || z > z1 ? null : this.model.terrain.sample(x, z);
+  };
 
   /** Height for the camera clamp and anything else that asks; null outside the extent. */
   groundAt = (x: number, z: number): number | null => {
@@ -706,7 +734,7 @@ export class WorldEntityLayer {
     // a rainbow thing is weather: hidden until the atmosphere shows it after rain (its own meshes, never instanced)
     const rainbow = isRainbowDef(def); if (rainbow) holdRainbow(built);
     // static things with an instance key share one InstancedMesh per part (a few draws for hundreds of props)
-    const instKey = !isWorld && !rainbow && !hasMotion(def) && typeof built.userData.instanceKey === 'string' && instanceable(built) ? built.userData.instanceKey as string : undefined;
+    const instKey = !this.immutable && !isWorld && !rainbow && !hasMotion(def) && typeof built.userData.instanceKey === 'string' && instanceable(built) ? built.userData.instanceKey as string : undefined;
     if (instKey) { this.instancer.ensure(instKey, built); built = new THREE.Object3D(); }
     if (!isWorld) { built.rotation.set(0, wp.yaw, 0); applyTilt(built, e); }
     const fresh = !existing;
@@ -732,7 +760,7 @@ export class WorldEntityLayer {
     if (!builder) return null;
     const params = paramsOf(e, def);
     const ctx: MeshCtx = {
-      def, entity: e, params, args: def.make.kind === 'gen' ? ((def.make.args ?? {}) as Record<string, unknown>) : {},
+      canonicalContext: this.immutable, def, entity: e, params, args: def.make.kind === 'gen' ? ((def.make.args ?? {}) as Record<string, unknown>) : {},
       baked: m.bake(def, e.params ?? {}, e.seed ?? 0, e.shape), model: m, materials: this.lib,
       tint: (key, fallback) => { if (!key) return fallback; const v = params[key]; return typeof v === 'string' && /^#/.test(v) ? v : def.palette?.[key] ?? fallback; },
     };

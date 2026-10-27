@@ -66,7 +66,9 @@ function drawBuilding(L: BuildingLayout, p: Record<string, Value>, presetTrim: u
   }
   // a glass house (greenhouse, palm house) has no ceiling slab under its glass roof: the beds inside show from outside
   if (!L.open && L.roof !== 'none' && !glassWalls) { b.group = `slab-${L.floors}`;   // roof none = open-topped walls (the Mars camp rooms)
-    b.slab(L.round ? ngon(L.round.R + L.t / 2, L.round.sides) : rectPoly(-L.W / 2, -L.D / 2, L.W / 2, L.D / 2), L.wallTop - 0.1, 0.12, '#f4efe6', 'wall'); }
+    b.slab(L.round ? ngon(L.round.R + L.t / 2, L.round.sides) : rectPoly(-L.W / 2, -L.D / 2, L.W / 2, L.D / 2), L.wallTop - 0.1, 0.12, '#f4efe6', 'wall');
+    b.markTopCeiling(); // actual roof assembly; never base/intermediate floor soups
+  }
 
   // ---- walls with openings
   L.walls.forEach((w, wi) => drawWall(b, L, w, L.openings.filter((o) => o.wall === wi), { ext: extOf(w.floor), trim, sillTrim, quoin: F.quoin, roomPaint, glassWalls, shutter, r, detail, mat, F, fy }));

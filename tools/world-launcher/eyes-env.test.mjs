@@ -12,9 +12,10 @@ test('worlds get the EDGE_EYES* settings and the browser path from the launcher 
     for (const k of EYES_ENV) delete process.env[k];
     const off = defaultCommand(world, 6001, o).env;
     for (const k of EYES_ENV) assert.equal(off[k], undefined, k);
-    Object.assign(process.env, { EDGE_EYES: 'world', EDGE_EYES_GPU: 'swiftshader', EDGE_EYES_NICE: '10', PLAYWRIGHT_BROWSERS_PATH: '/srv/sim-eyes/ms-playwright' });
+    Object.assign(process.env, { EDGE_EYES: 'world', EDGE_EYES_GPU: 'swiftshader', EDGE_EYES_NICE: '10', PLAYWRIGHT_BROWSERS_PATH: '/srv/sim-eyes/ms-playwright', SIM_RENDER_LOCK_DIR: '/srv/sim-render-locks', GOD_LOOK_CHROME: '/srv/sim-eyes/chromium/chrome', EDEN_GOD_GL: 'swiftshader' });
     const on = defaultCommand(world, 6001, o).env;
     assert.equal(on.EDGE_EYES, 'world'); assert.equal(on.EDGE_EYES_GPU, 'swiftshader'); assert.equal(on.EDGE_EYES_NICE, '10');
+    assert.equal(on.SIM_RENDER_LOCK_DIR, '/srv/sim-render-locks'); assert.equal(on.GOD_LOOK_CHROME, '/srv/sim-eyes/chromium/chrome'); assert.equal(on.EDEN_GOD_GL, 'swiftshader');
     assert.equal(on.PLAYWRIGHT_BROWSERS_PATH, '/srv/sim-eyes/ms-playwright'); assert.equal(on.EDGE_EYES_SOUL_SECONDS, undefined);
   } finally { for (const [k, v] of Object.entries(saved)) if (v === undefined) delete process.env[k]; else process.env[k] = v; }
 });

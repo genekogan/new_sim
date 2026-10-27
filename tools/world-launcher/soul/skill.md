@@ -65,6 +65,14 @@ A request can require several actions: reaching the auditorium, going to its pre
 
 For “take a seat” without a requested duration, a durable fixture seat can remain occupied after its timed action ends. If its offer supports `seconds`, use `act <exact-seat-offer> '{"seconds":1}' --for none --wait --json`, then verify current `here` posture is `seated` and `seat` matches the receipt's `chosen.slot` before reporting. Keep listening; do not stand or cancel just because the action ended. Preserve any explicitly requested sitting duration. This shortcut does not apply to temporary ground poses. A default sitting action can keep its receipt open for ten minutes even while you are seated; `started` alone does not tell you whether the seating goal is satisfied.
 
+`context [query]` retrieves maintained authored meaning and stable entity/part refs without rendering. Results have `total` and `nextCursor`; use `context [query] --cursor <nextCursor>` for the next page, or refine the query. For a useful
+selected detail, `views <ref> [ref…]` requests at most six cached architectural pictures; `--out context.png` saves
+one picture or a contact sheet with exact tile/ref/key mapping. `--detail` requests the larger picture. Pending or
+unavailable means no current picture; use the text or retry explicitly later. These canonical views omit Souls and
+use disclosed fixed lighting/default doors: use `here`, `observe`, or `view` for current occupants, doors and sight.
+For a wall artwork, `views <ref> --original --out artwork.png` retrieves its admitted original image and exact asset
+version, separately from the contextual rendering. Read the saved image; do not infer its contents from the title.
+
 ## Talking and others
 
 `say "<text>"` is public speech within earshot. `converse start <soulId> "<text>"` invites a private conversation;
