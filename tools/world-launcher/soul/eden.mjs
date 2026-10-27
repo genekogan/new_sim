@@ -367,17 +367,22 @@ async function view(...args) {
 
 // ---------------------------------------------------------------- acting
 
+/** Parse either one structured intent or words followed by a parameter object. */
+export function parseActionArgs(input) {
+  const args = [...input];
+  if (!args.length) throw new Error('action required');
+  if (args.length === 1 && args[0].trim().startsWith("{")) return JSON.parse(args[0]);
+  const params = args.length > 1 && args.at(-1).trim().startsWith("{") ? JSON.parse(args.pop()) : {};
+  return { capability: args.join(" "), params };
+}
+
 // act <offer-id | plain words> [params-json] [--wait [seconds]]
 // The server resolves words to an offer, so this is one POST. With --wait it then
 // long-polls until the receipt is terminal and returns the final receipt.
 async function act(...argv) {
   const { args, wait: waitFor, json, for: forArg } = waitOption(argv);
   if (!args.length) throw new Error('usage: act "<what to do>" [params-json] [--wait [seconds]] [--for <message-id>|none] [--json]');
-  let params = {};
-  if (args.at(-1).trim().startsWith("{")) params = JSON.parse(args.pop());
-  const body = args[0].trim().startsWith("{") && args.length === 1
-    ? { ...JSON.parse(args[0]), clientRef: randomUUID() }
-    : { capability: args.join(" "), params, clientRef: randomUUID() };
+  const body = { ...parseActionArgs(args), clientRef: randomUUID() };
   // D3: the owner message this act serves; the world writes its result line when the act ends, unless you write one first.
   // D3b (cloud fix-r3 trio tam-003: a later walk closed "walk with Mira" as Done): by default only the first act the world
   // accepts after an ack, within IMPLICIT_FOR_MS of it, serves that message; later acts serve one only with --for <id>.
@@ -432,9 +437,7 @@ function waitOption(argv) {
 
 async function resolve(...args) {
   if (!args.length) throw new Error('usage: resolve "<what to do>" [params-json]');
-  let params;
-  if (args.at(-1).trim().startsWith("{")) params = JSON.parse(args.pop());
-  const body = args[0].trim().startsWith("{") ? JSON.parse(args[0]) : { capability: args.join(" "), ...(params ? { params } : {}) };
+  const body = parseActionArgs(args);
   return ok(await call("/v1/edge/resolve", { body }), "resolve").resolve;
 }
 
