@@ -9,6 +9,8 @@ import { pathToFileURL } from 'node:url';
 import { sha256 } from '../lib/hash.mjs';
 import { writeJson } from '../lib/jsonl.mjs';
 import { sleep } from '../lib/clock.mjs';
+import { seedSnapshot } from './snapshot-seed.mjs';
+import { physicalSnapshotSha256 } from '../lib/physical-fixture.mjs';
 
 export const RESERVED_KINDS = ['fork', 'template-eden2', 'live'];
 export function assertKind(kind = 'dev') {
@@ -57,7 +59,7 @@ export function marsWebDir(serverRoot, { env = process.env, home = homedir(), ex
 }
 
 /** startWorld({serverRoot, slug, port, genesis, dataDir, log, fresh}) → {base, pid, build, healthz, child, dataDir} */
-export async function startWorld({ serverRoot, slug, port, genesis, dataDir, log, fresh = true, kind = 'dev', bootTimeoutMs = 900000, natives = false }) {
+export async function startWorld({ serverRoot, slug, port, genesis, snapshot, dataDir, log, fresh = true, kind = 'dev', bootTimeoutMs = 900000, natives = false }) {
   assertKind(kind);
   const root = resolve(serverRoot);
   if (!existsSync(join(root, 'apps/server/src/main.ts'))) throw new Error(`no server under ${root}`);
@@ -65,8 +67,11 @@ export async function startWorld({ serverRoot, slug, port, genesis, dataDir, log
   const env = worldEnv(root);
   for (const [k, v] of Object.entries(env)) if (k !== 'INVITE_REQUIRED' && !existsSync(v)) throw new Error(`${k} missing: ${v}`);
   const data = resolve(dataDir ?? join(root, `.lane/data-${slug}`));
+  if (snapshot && !fresh) throw Error('snapshot seed requires a fresh isolated world');
   if (fresh) rmSync(data, { recursive: true, force: true });
   mkdirSync(data, { recursive: true });
+  const fixture = snapshot ? await seedSnapshot({snapshotPath:resolve(root,snapshot),dataDir:data,worldId:`${slug}-1`}) : null;
+  if(fixture)writeJson(join(data,'fixture-seed.json'),fixture);
   const marsWeb = marsWebDir(root);
   // natives: scenario.world.natives seeds native residents (production worlds have them; dev worlds default to none).
   const base = `http://127.0.0.1:${port}/w/${slug}`;
@@ -85,7 +90,13 @@ export async function startWorld({ serverRoot, slug, port, genesis, dataDir, log
     await sleep(500);
   }
   if (!h) { try { process.kill(-child.pid, 'SIGTERM'); } catch { /* gone */ } throw new Error(`world ${slug} did not come up on :${port} within ${Math.round(bootTimeoutMs / 1000)} s`); }
-  return { base, pid: child.pid, build: h.build ?? null, healthz: h, bootMs: Date.now() - t0, child, dataDir: data, marsWebDir: marsWeb };
+  if(fixture){
+    // Health can answer before the first native reconciliation; validate after startup settles.
+    await sleep(3000);
+    try { const r=await fetch(`${base}/v1/world/snapshot`,{signal:AbortSignal.timeout(30000)});if(!r.ok)throw Error('snapshot unavailable after boot');const actual=physicalSnapshotSha256(await r.json());if(actual!==fixture.physicalSnapshotSha256)throw Error(`snapshot physical state changed during boot: expected ${fixture.physicalSnapshotSha256}, got ${actual}`); }
+    catch(error){await stopWorld({pid:child.pid});throw error;}
+  }
+  return { fixture, base, pid: child.pid, build: h.build ?? null, healthz: h, bootMs: Date.now() - t0, child, dataDir: data, marsWebDir: marsWeb };
 }
 
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
@@ -120,7 +131,7 @@ export async function describeWorld({ base, slug, port, pid, build, kind = 'dev'
 /** Convenience used by the smoke and playtest.mjs: start + describe + write world.json. */
 export async function provision({ runDir, serverRoot, world }) {
   const startedAt = new Date().toISOString();
-  const w = await startWorld({ serverRoot, slug: world.slug, port: world.port, genesis: world.genesis, kind: world.kind, dataDir: join(runDir, 'server', 'data'), log: join(runDir, 'server', 'world.log') });
+  const w = await startWorld({ serverRoot, slug: world.slug, port: world.port, genesis: world.genesis, snapshot:world.snapshot, natives:world.natives===true, kind: world.kind, dataDir: join(runDir, 'server', 'data'), log: join(runDir, 'server', 'world.log') });
   writeJson(join(runDir, 'server', 'healthz-before.json'), w.healthz);
   const desc = await describeWorld({ ...w, slug: world.slug, port: world.port, kind: world.kind ?? 'dev', startedAt });
   writeJson(join(runDir, 'world.json'), desc);

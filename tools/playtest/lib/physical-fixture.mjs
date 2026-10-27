@@ -21,5 +21,28 @@ export function assertFrozenGenesis(scenario, serverRoot) {
   const path = resolve(serverRoot,scenario.world.genesis);
   const actual = physicalGenesisSha256(JSON.parse(readFileSync(path,'utf8')));
   if (actual !== scenario.freeze.physicalSha256) throw Error(`frozen physical fixture mismatch: ${path}; expected ${scenario.freeze.physicalSha256}, got ${actual}`);
+  if (scenario.world.snapshot) {
+    const snapshotPath=resolve(serverRoot,scenario.world.snapshot), bytes=readFileSync(snapshotPath);
+    const snapshot=JSON.parse(bytes), physical=physicalSnapshotSha256(snapshot);
+    if (sha256(bytes)!==scenario.freeze.snapshotSha256 || physical!==scenario.freeze.physicalSnapshotSha256) throw Error(`frozen snapshot fixture mismatch: ${snapshotPath}`);
+    return {path,physicalSha256:actual,snapshotPath,snapshotSha256:sha256(bytes),physicalSnapshotSha256:physical};
+  }
   return {path,physicalSha256:actual};
+}
+
+/** Only compiler model fields enter an isolated seed DB. Public transport metadata is not state. */
+export function compilerSnapshot(snapshot) {
+  if (!snapshot || !Array.isArray(snapshot.entities) || !Array.isArray(snapshot.defs) || !snapshot.ground || !snapshot.constants || typeof snapshot.seed !== 'string') throw Error('invalid compiler snapshot fixture');
+  if (snapshot.entities.some(e=>typeof e.id!=='string'||e.id.startsWith('h_')||/humanoid|soul-body/.test(e.def??''))) throw Error('snapshot fixture must contain no Soul bodies');
+  if (snapshot.state?.layers?.wallets && Object.keys(snapshot.state.layers.wallets).length) throw Error('snapshot fixture must contain no private layer wallets');
+  const seq=snapshot.contract==='world/1'?snapshot.counter:snapshot.seq;
+  if (!Number.isSafeInteger(seq)||seq<0) throw Error('snapshot fixture has invalid entity counter');
+  return structuredClone({constants:snapshot.constants,state:snapshot.state,seed:snapshot.seed,seq,editSeq:0,defs:snapshot.defs,defRefs:snapshot.defRefs,entities:snapshot.entities,ground:snapshot.ground});
+}
+export function physicalSnapshotSha256(snapshot) {
+  const s=compilerSnapshot(snapshot); delete s.seq;delete s.editSeq;delete s.seed;delete s.defRefs;
+  if(s.state)delete s.state.about;
+  s.entities=s.entities.map(e=>{for(const k of ['about','by','born','v'])delete e[k];return e;}).sort((a,b)=>a.id.localeCompare(b.id));
+  s.defs=s.defs.map(d=>{delete d.by;return d;}).sort((a,b)=>a.hash.localeCompare(b.hash));
+  return sha256(JSON.stringify(canonical(s)));
 }

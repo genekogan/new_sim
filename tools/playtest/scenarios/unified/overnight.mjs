@@ -4,9 +4,9 @@ import{readFileSync,writeFileSync,mkdirSync,appendFileSync,existsSync}from'node:
 import{resolve,join}from'node:path';import{fileURLToPath,pathToFileURL}from'node:url';import{spawn,execFileSync}from'node:child_process';
 import{assertMeasurementReady,providerPolicy}from'../../lib/provider-policy.mjs';import{assertFrozenGenesis}from'../../lib/physical-fixture.mjs';
 const read=p=>JSON.parse(readFileSync(p,'utf8'));
-export function comparable(s){const c=structuredClone(s);delete c.freeze;delete c.world.genesis;for(const e of c.director.script)delete e.expect.journey.source;return c;}
+export function comparable(s){const c=structuredClone(s);delete c.freeze;delete c.world.genesis;delete c.world.snapshot;for(const e of c.director.script)delete e.expect.journey.source;return c;}
 export function assertPair(control,treatment){for(const s of[control,treatment]){assertMeasurementReady(s);const p=providerPolicy(s);if(!p.codexOnly||!p.deterministic)throw Error('unified run requires strict Codex and deterministic review');if(s.seats.some(x=>x.effort!==s.freeze.effort))throw Error('effort differs from frozen effort');}
- if(control.freeze.physicalSha256!==treatment.freeze.physicalSha256||control.freeze.physicalPoseSha256!==treatment.freeze.physicalPoseSha256)throw Error('paired physical fixtures differ');
+ if(control.freeze.physicalSha256!==treatment.freeze.physicalSha256||control.freeze.physicalPoseSha256!==treatment.freeze.physicalPoseSha256||control.freeze.physicalSnapshotSha256!==treatment.freeze.physicalSnapshotSha256)throw Error('paired physical fixtures differ');
  if(JSON.stringify(comparable(control))!==JSON.stringify(comparable(treatment)))throw Error('paired instructions, setup, model, budgets or oracles differ');
 }
 const git=(root,...args)=>execFileSync('git',['-C',root,...args],{encoding:'utf8'}).trim();

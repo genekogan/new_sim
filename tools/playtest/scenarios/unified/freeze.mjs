@@ -3,7 +3,7 @@
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {resolve,dirname} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {physicalGenesisSha256} from '../../lib/physical-fixture.mjs';
+import {physicalGenesisSha256,physicalSnapshotSha256} from '../../lib/physical-fixture.mjs';
 import {bindJourneyFixtures} from '../../arena/fixture-bindings.mjs';
 import {validateJourney} from '../../review/journey-oracles.mjs';
 import {sha256} from '../../lib/hash.mjs';
@@ -27,7 +27,7 @@ export function comparePhysicalPoses(a,b){
  const differences=[...new Set([...left.keys(),...right.keys()])].filter(k=>JSON.stringify(left.get(k))!==JSON.stringify(right.get(k)));
  return{same:!differences.length,count:before.length,otherCount:after.length,sha256:sha256(JSON.stringify(before)),differences};
 }
-export function freeze({world,genesis,snapshot,baselineSnapshot,output}){
+export function freeze({world,genesis,snapshot,baselineSnapshot,seedSnapshot,output}){
  if(!['mars','eden','hamlet'].includes(world))throw Error('--world mars|eden|hamlet required');
  for(const [key,value]of Object.entries({genesis,snapshot,baselineSnapshot,output}))if(!value)throw Error(`missing ${key}`);
  const scenario=read(fileURLToPath(new URL(`./${world}.json`,import.meta.url)));
@@ -38,9 +38,10 @@ export function freeze({world,genesis,snapshot,baselineSnapshot,output}){
  // Validate every stable target, without retaining this probe world's generated IDs.
  bindJourneyFixtures(structuredClone(scenario),s);
  scenario.world.genesis=resolve(genesis);
- scenario.freeze={status:'ready',model:'gpt-6-astra',effort:'high',physicalSha256:physicalGenesisSha256(g),physicalPoseSha256:parity.sha256,entities:parity.count,source:{genesis:resolve(genesis),snapshot:resolve(snapshot),baselineSnapshot:resolve(baselineSnapshot)},setupTransport:'harness CLI, same both arms; measured agent uses server-root served CLI and skill'};
+ if(seedSnapshot){const seed=read(seedSnapshot);if(physicalSnapshotSha256(seed)!==physicalSnapshotSha256(s)||physicalSnapshotSha256(seed)!==physicalSnapshotSha256(b))throw Error("seed snapshot does not match both actual boots");scenario.world.snapshot=resolve(seedSnapshot);}
+ scenario.freeze={...(seedSnapshot?{snapshotSha256:sha256(readFileSync(seedSnapshot)),physicalSnapshotSha256:physicalSnapshotSha256(read(seedSnapshot))}:{}),status:'ready',model:'gpt-6-astra',effort:'high',physicalSha256:physicalGenesisSha256(g),physicalPoseSha256:parity.sha256,entities:parity.count,source:{genesis:resolve(genesis),snapshot:resolve(snapshot),baselineSnapshot:resolve(baselineSnapshot)},setupTransport:'harness CLI, same both arms; measured agent uses server-root served CLI and skill'};
  for(const seat of scenario.seats){seat.model=scenario.freeze.model;seat.effort=scenario.freeze.effort;}
  for(const e of scenario.director.script){e.expect.journey.readiness='ready';e.expect.journey.source=`physical:${scenario.freeze.physicalSha256};poses:${parity.sha256}`;}
  mkdirSync(dirname(resolve(output)),{recursive:true});writeFileSync(output,JSON.stringify(scenario,null,2)+'\n');return{output:resolve(output),world,freeze:scenario.freeze};
 }
-if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){const args=process.argv.slice(2),flags={};for(let i=0;i<args.length;i+=2)flags[args[i].replace(/^--/,'')]=args[i+1];console.log(JSON.stringify(freeze({world:flags.world,genesis:flags.genesis,snapshot:flags.snapshot,baselineSnapshot:flags['baseline-snapshot'],output:flags.out}),null,2));}
+if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){const args=process.argv.slice(2),flags={};for(let i=0;i<args.length;i+=2)flags[args[i].replace(/^--/,'')]=args[i+1];console.log(JSON.stringify(freeze({world:flags.world,genesis:flags.genesis,snapshot:flags.snapshot,baselineSnapshot:flags['baseline-snapshot'],seedSnapshot:flags['seed-snapshot'],output:flags.out}),null,2));}
