@@ -4,6 +4,7 @@ import {resolve,join} from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {loadRun} from '../../review/run.mjs';
 import {sha256} from '../../lib/hash.mjs';
+import {verifyClosedEntryRetention} from './closed-entry-retention.mjs';
 import {correctedScenario} from '../../review/rescore-qualified.mjs';
 const read=p=>JSON.parse(readFileSync(p,'utf8'));
 const canonical=v=>Array.isArray(v)?v.map(canonical):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])])):v;
@@ -40,6 +41,7 @@ export function selectManualPlan(selection,fullPlan,{verify=verifyRetained}={}){
 // One reviewed repair can retain demonstrably unaffected Mars paths. This is deliberately
 // narrower than a general treatment reuse mechanism; source identity stays the original head.
 export function verifyTreatmentScope(ref,planned,manifest){
+ if(ref.scopeProof){const p=read(resolve(ref.scopeProof));if(p.schema==='closed-single-room-retention/1')return verifyClosedEntryRetention(ref,planned,manifest,p);}
  if(ref.world!=='mars'||!ref.scopeProof)throw Error('treatment retention requires a Mars source-scoped proof');
  const proof=read(resolve(ref.scopeProof)),root=planned.serverRoot;
  const git=(...args)=>execFileSync('git',['-C',root,...args],{encoding:'utf8'});
