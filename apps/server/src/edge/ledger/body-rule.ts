@@ -31,6 +31,7 @@ export const BODY_KNOBS: Readonly<BodyKnobs> = Object.freeze({
 });
 /** Zombie shuffle and idle drift lengths (m). */
 export const SHUFFLE_M = [2, 6] as const, DRIFT_M = [5, 15] as const;
+export const BODY_PATH_SAMPLE_M = 0.25;
 /** How the body is held right now (read from the engine by the ledger). */
 export type Posture = 'standing' | 'moving' | 'seated' | 'lying' | 'water' | 'basket' | 'other';
 export type BodySoul = {soulId: string; entityId: string; name: string; owner: string};
@@ -51,8 +52,8 @@ export type BodyPort = {
   spatialReady?(): boolean;
   /** Dry standing ground here (no water, no wading). */
   dry(x: number, z: number): boolean;
-  /** Free room for a body here (nav clearance), true when the world has no clearance reader. */
-  clear(x: number, z: number, level: number): boolean;
+  /** Free room for a body here; lying reserves room between path samples too. */
+  clear(x: number, z: number, level: number, lying?: boolean): boolean;
   /** The enclosed places (rooms, buildings) containing this point, as one key. Equal keys = the same room, or both outdoors:
    *  a way between two points with the same key at every step never passes a door. */
   places(x: number, z: number, level: number): string;
@@ -120,7 +121,10 @@ export class BodyRule {
   }
   private jitter(soulId: string, r: Row, lo: number, hi: number) {r.n++; return Math.round(lo + (hi - lo) * mix(soulId, r.n));}
   private inWater(s: BodySoul) {return this.port.posture(s.entityId) === 'water';}
-  private sleepDoing(s: BodySoul): BodyDoing {const p = this.port.posture(s.entityId); return p === 'water' ? 'floating' : p === 'seated' || p === 'basket' ? 'sitting' : 'dozing';}
+  private sleepDoing(s: BodySoul): BodyDoing {
+    const p = this.port.posture(s.entityId);
+    return p === 'water' ? 'floating' : p === 'seated' || p === 'basket' ? 'sitting' : p === 'lying' ? 'dozing' : p === 'moving' ? 'drifting' : 'standing';
+  }
   private set(s: BodySoul, r: Row, state: BodyState, doing: BodyDoing, now: number) {
     const changed = r.state !== state || r.doing !== doing;
     if (r.state !== state) r.since = now;
@@ -194,13 +198,16 @@ export class BodyRule {
       if (doing === 'drifting' && !this.port.agentBusy(s.soulId) && !this.port.running(s.entityId)) this.shuffle(s, r, SHUFFLE_M, k.reflexRadiusM, 'zombie', 'Shuffling about');
       return;
     }
-    // asleep: keep the posture (a pose ends after an hour; a first lie-down may have been refused)
+    // Report the actual posture even when a nap was refused or a pending shuffle is still stopping.
+    const doing = this.sleepDoing(s);
+    if (doing !== r.doing) this.set(s, r, 'asleep', doing, now);
+    // Keep the posture (a pose ends after an hour; a first lie-down may have been refused).
     if (now >= r.next_at) this.settle(s, r, now);
   }
   /** Asleep: lie down where it stands unless seated, in a basket or in water (floating there, still). */
   private settle(s: BodySoul, r: Row, now: number) {
     r.next_at = now + 60_000;
-    const p = this.port.posture(s.entityId), doing = p === 'water' ? 'floating' : p === 'seated' || p === 'basket' ? 'sitting' : 'dozing';
+    const p = this.port.posture(s.entityId), doing = this.sleepDoing(s);
     if (doing !== r.doing) this.set(s, r, 'asleep', doing, now); else this.save(r);
     if (p === 'seated' || p === 'basket' || p === 'lying') return;
     if (p === 'water') {if (this.port.running(s.entityId) && !this.port.agentBusy(s.soulId)) this.port.stop(s); return;}
@@ -239,19 +246,20 @@ export class BodyRule {
       const ang = mix(s.soulId + ':a', ++r.n) * Math.PI * 2, d = len[0] + (len[1] - len[0]) * mix(s.soulId + ':d', r.n);
       const x = Math.round((at.x + Math.cos(ang) * d) * 100) / 100, z = Math.round((at.z + Math.sin(ang) * d) * 100) / 100;
       if (Math.hypot(x - ax, z - az) > radius) continue;
-      if (!this.lineOk(at.x, at.z, x, z, room)) continue;
+      if (!this.lineOk(at.x, at.z, x, z, room, kind === 'zombie')) continue;
       this.save(r);
       this.port.decide(s, `body:${kind}-shuffle`, label, [...before, {verb: 'walk_to', params: {to: [x, z], pace: 'shuffle'}}]);
       return true;
     }
     this.save(r); return false;
   }
-  /** Every quarter metre of the way (and the end): dry, clear for a body, inside exactly the same places. */
-  private lineOk(x0: number, z0: number, x1: number, z1: number, room: string) {
-    const n = Math.max(2, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 0.25));
-    for (let i = 1; i <= n; i++) {
+  /** Every quarter metre of the way (and the end): dry, inside exactly the same places.
+   * Zombies reserve lying room along the whole way: sleep may interrupt a shuffle at any point. */
+  private lineOk(x0: number, z0: number, x1: number, z1: number, room: string, lying: boolean) {
+    const n = Math.max(2, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / BODY_PATH_SAMPLE_M));
+    for (let i = lying ? 0 : 1; i <= n; i++) {
       const x = x0 + (x1 - x0) * i / n, z = z0 + (z1 - z0) * i / n;
-      if (!this.port.dry(x, z) || !this.port.clear(x, z, 0) || this.port.places(x, z, 0) !== room) return false;
+      if (!this.port.dry(x, z) || !this.port.clear(x, z, 0, lying) || this.port.places(x, z, 0) !== room) return false;
     }
     return true;
   }
@@ -259,7 +267,7 @@ export class BodyRule {
   restoreAsleep(s: BodySoul) {
     const now = this.now(), r = this.row(s.soulId) ?? this.fresh(s.soulId, now);
     Object.assign(r, {last_act: 0, woke_at: 0, poke_at: 0, busy_at: 0, next_at: now, anchor_x: null, anchor_z: null});
-    r.state = 'asleep'; r.doing = 'dozing'; r.since = now; this.save(r);
-    this.port.publish(s.soulId, {state: 'asleep', doing: 'dozing', since: now});
+    r.state = 'asleep'; r.doing = this.sleepDoing(s); r.since = now; this.save(r);
+    this.port.publish(s.soulId, {state: 'asleep', doing: r.doing, since: now});
   }
 }

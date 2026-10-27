@@ -53,7 +53,7 @@ import {EDEN_LIBRARY_CATALOGUE} from '../content/eden-library-catalogue.ts';
 import {isVerificationProbe, PROBE_OWNER} from '../../verification-probe.ts';
 import {tx,afterCommit} from '../comms/store.ts';
 import {PlaceKnowledge} from '../perception/knowledge.ts';
-import {BodyRule, type BodyKnobs, type BodySoul, type Posture} from './body-rule.ts';
+import {BodyRule, BODY_PATH_SAMPLE_M, type BodyKnobs, type BodySoul, type Posture} from './body-rule.ts';
 
 type Resolved = {from: string; to: string; note: string};
 const WAIT_CODES = new Set(['program.safe-stop-required', 'program.safe-stop-pending']);
@@ -167,7 +167,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (process.env.SIM_BODY_KNOBS && process.env.DEV_AUTH === '1') try {env = JSON.parse(process.env.SIM_BODY_KNOBS) as Partial<BodyKnobs>;} catch {/* ignored */}
     const live = (m: Mind) => {const row = this.db.soul(m.soulId); return !!row && row.retired_at === null && row.owner === m.owner && row.entity_id === m.entityId && row.world_id === this.host.worldId;};
     const soulOf = (m: Mind): BodySoul => ({soulId: m.soulId, entityId: m.entityId, name: m.name, owner: m.owner});
-    const engine = this.host.engine as unknown as {dryGroundAtV1?: (x: number, z: number) => boolean; clearanceUpToV1?: (x: number, z: number, cap?: number, level?: number) => number};
+    const engine = this.host.engine as unknown as {dryGroundAtV1?: (x: number, z: number) => boolean; clearanceUpToV1?: (x: number, z: number, cap?: number, level?: number) => number; lyingRoomAtV1?: (x: number, z: number, level: number, sampleMargin: number) => boolean};
     this.bodyRule = new BodyRule(this.db.db, this.host.worldId, {
       souls: () => [...this.host.minds.values()].filter(m => !!m.owner && m.owner !== 'system' && !m.native && !this.faded.has(m.soulId) && !!this.body(m.entityId) && live(m)).map(soulOf),
       presence: id => inbox.soulPresence(id),
@@ -178,7 +178,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
       running: id => !!this.host.engine.programOf(id),
       spatialReady: () => this.bodyPlacesReady(),
       dry: (x, z) => engine.dryGroundAtV1?.(x, z) ?? true,
-      clear: (x, z, level) => !(this.host.engine.world as {navV1?: unknown}).navV1 || !engine.clearanceUpToV1 || engine.clearanceUpToV1(x, z, 1, level) >= 0.3,
+      clear: (x, z, level, lying) => lying && engine.lyingRoomAtV1
+        ? engine.lyingRoomAtV1(x, z, level, BODY_PATH_SAMPLE_M / 2)
+        : !(this.host.engine.world as {navV1?: unknown}).navV1 || !engine.clearanceUpToV1 || engine.clearanceUpToV1(x, z, 1, level) >= 0.3,
       places: (x, z, level) => this.places.containing(x, z, this.placeLevel(level)).filter(p => p.enclosed).map(p => p.id).join('|'),
       seat: (soul, radius, seconds) => {
         const {caps, plans} = this.binds(soul), me = this.body(soul.entityId), world = this.host.engine.world as NativeWorld; if (!me) return null;

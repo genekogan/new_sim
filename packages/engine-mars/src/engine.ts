@@ -1,3 +1,4 @@
+import {LIE_CLEARANCE} from '../../../mars/viewer/engine/social/pose.ts';
 import {regionArrivalMask} from './region-arrival.ts';
 import { createHash } from 'node:crypto';
 import { capturePhysicalHashInput, capturedPhysicalHashSteps, physicalHashNeedsLegacyCapture } from './checkpoint-hash.ts';
@@ -2020,6 +2021,13 @@ export class MarsEngine implements Engine {
   /** nav read (L1): clearanceAtV1 capped at `cap` — the same value below it, `cap` at or above it — answered off the paged
    *  windows without building fine nav tiles. For the many "is there standing room here (≥ t ≤ cap)?" reads. */
   clearanceUpToV1(x:number,z:number,cap=1,level=0):number{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const read=spatial.clearanceCapped(level,[x,z],cap);return read?read([x,z]):0;}
+  /** Body-reflex read: leave lying room between quarter-metre path samples too. The cell-distance
+   * field is piecewise constant, so include a cell diagonal as well as the half-step margin. */
+  lyingRoomAtV1(x:number,z:number,level=0,sampleMargin=0):boolean {
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);
+    const need=LIE_CLEARANCE+sampleMargin+Math.SQRT2*spatial.cell;
+    const read=spatial.clearanceCapped(level,[x,z],need);return !!read&&read([x,z])>=need;
+  }
   /** BS3 closest approach (pure): for a plan's first walk_to whose destination no walk reaches, the nearest point to that
    * destination a walk from where the body stands (a seat's standing approach for a seated body) does reach, on the body's
    * own level: rings of 1.5-36 m round the destination, nearest ring first, each starting on the side facing the body.

@@ -54,3 +54,25 @@ test('idle reflex mix: doze dominates after IDLE_DOZE; never speech or goals (on
   const verbs = new Set(f.decisions.flatMap(d => d.steps.map(s => s.verb === 'mars:pose_v1' ? 'pose:' + s.params.activity : s.verb)));
   assert.deepEqual([...verbs].filter(v => !['stand', 'rest', 'walk_to', 'pose:nap', 'pose:sit-ground'].includes(v)), [], 'posture steps only');
 });
+
+test('zombie path checks lying room between clear endpoints; narrow corridors do not become sleeping spots',()=>{
+ const db=new DatabaseSync(':memory:'),f=fake([-3,-5]);let now=1e12,checked=0;
+ const left=now;f.port.presence=()=>({listening:false,at:left});
+ f.port.clear=(x,_z,_level,lying)=>{assert.equal(lying,true);checked++;return Math.abs(x+1)>0.9;};
+ const rule=new BodyRule(db as any,'w',f.port,{now:()=>now,knobs:{zombieWanderMs:3*3600e3}});
+ now+=130e3;rule.sweep();let last={...f.pos};
+ for(let n=0;n<3600;n++){now+=1000;rule.sweep();for(let i=0;i<=40;i++)assert.ok(Math.abs(last.x+(f.pos.x-last.x)*i/40+1)>0.9,'never cross the narrow band even if the endpoint is clear');last={...f.pos};}
+ assert.ok(checked>0);assert.ok(f.decisions.length>=3,'safe shuffling is still available');db.close();
+});
+
+test('asleep doing follows observed posture after refusal, admission, and interrupted movement',()=>{
+ const db=new DatabaseSync(':memory:'),f=fake([20,20]);let now=1e12,posture:Posture='standing';
+ f.port.posture=()=>posture;
+ const rule=new BodyRule(db as any,'w',f.port,{now:()=>now});rule.sweep();
+ assert.equal(rule.view('s_test')!.doing,'standing','a requested nap is not evidence of lying');
+ const attempts=f.decisions.length;now+=1000;rule.sweep();assert.equal(f.decisions.length,attempts,'no immediate retry loop');
+ posture='lying';now+=1000;rule.sweep();assert.equal(rule.view('s_test')!.doing,'dozing','observed native posture updates before the next nap retry');
+ posture='moving';now+=1000;rule.sweep();assert.equal(rule.view('s_test')!.doing,'drifting');
+ posture='water';now+=1000;rule.sweep();assert.equal(rule.view('s_test')!.doing,'floating');
+ posture='seated';now+=1000;rule.sweep();assert.equal(rule.view('s_test')!.doing,'sitting');db.close();
+});
