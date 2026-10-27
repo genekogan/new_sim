@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // Field-scoped live meaning patches. Credentials stay inside the existing God CLI.
-// plan/apply/rollback <overlay.json> <god-folder> <receipt.json> [source-snapshot.json]
-import { readFileSync,writeFileSync,existsSync } from 'node:fs';
+// plan <overlay.json> <god-folder> <receipt.json> [source-snapshot.json] --expected-world-id <live-id>
+// apply/rollback <overlay.json> <god-folder> <receipt.json>
+import { readFileSync,writeFileSync,existsSync,renameSync,unlinkSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { resolve,dirname } from 'node:path';
 import { fileURLToPath,pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
@@ -11,7 +13,7 @@ import { indexWorld } from '../template-upgrade/upgrade.mjs';
 import { materialize } from './materialize.mjs';
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 const read=p=>JSON.parse(readFileSync(p,'utf8'));
-const save=(p,v)=>writeFileSync(p,JSON.stringify(v,null,2)+'\n',{mode:0o600});
+const save=(p,v)=>{const temp=`${p}.${randomUUID()}.tmp`;try{writeFileSync(temp,JSON.stringify(v,null,2)+'\n',{mode:0o600,flag:'wx'});renameSync(temp,p);}finally{if(existsSync(temp))unlinkSync(temp);}};
 const same=(a,b)=>hashOf(a??null)===hashOf(b??null);
 const body=e=>e.by==='engine'||/humanoid/.test(e.def);
 function physical(e,index){
@@ -20,7 +22,16 @@ function physical(e,index){
  for(const c of out.constraints??[])if(c.ref&&index.byId.has(c.ref))c.ref=index.pathOf(index.byId.get(c.ref));
  return out;
 }
-export function planLive(snapshot,overlay,source){
+export function assertLiveTarget(snapshot,overlay,source,expectedWorldId){
+ if(typeof expectedWorldId!=='string'||!expectedWorldId.trim())throw Error('explicit expected live world ID required');
+ if(snapshot.worldId!==expectedWorldId)throw Error(`wrong live world: expected ${expectedWorldId}, received ${snapshot.worldId??'missing'}`);
+ // Snapshot-authored overlays describe a particular lived world. Template
+ // overlays are portable across seeds and instead require the explicit target.
+ if(overlay.source?.snapshotSha&&source?.worldId!==snapshot.worldId)throw Error('live source snapshot belongs to another world');
+}
+export function planLive(snapshot,overlay,source,{expectedWorldId}={}){
+ assertLiveTarget(snapshot,overlay,source,expectedWorldId);
+ const planId=randomUUID();
  if(overlay.schema!=='world-meaning/1')throw Error('overlay schema required');
  const W=indexWorld(snapshot),S=indexWorld(source),report={done:[],kept:[],skipped:[]},changes=[];
  const entity=ref=>{const e=W.byId.get(ref)??W.resolve(ref);if(!e||e.ambiguous)throw Error(`missing or ambiguous ${ref}`);return e;};
@@ -53,7 +64,9 @@ export function planLive(snapshot,overlay,source){
    else worldChange={ref:'world',before:snapshot.state?.about??null,after:about,expect};
   }
  }
- const group=`meaning-${overlay.worldId}-${hashOf(overlay).slice(0,12)}`;
+ // A fresh plan is a new transaction, even after rollback. Reusing this receipt
+ // still reuses its exact saved clientRef/submission for interrupted responses.
+ const group=`meaning-${hashOf(overlay).slice(0,12)}-${planId}`;
  const batches=[];let pending=[];
  function batch(items){const ops=items.map(c=>c.ref==='world'?{op:'world',state:{about:c.after}}:{op:'set',id:c.id,about:c.after});return{group,note:`Reviewed world meaning: ${overlay.worldId}`,ops,expect:Object.assign({},...items.map(c=>c.expect)),...(items.some(c=>c.ref==='world')?{expectWorldAbout:hashOf(worldChange.before)}:{})};}
  const flush=()=>{if(pending.length)batches.push({...batch(pending),clientRef:`${group}-${batches.length}`,changes:pending});pending=[];};
@@ -62,7 +75,7 @@ export function planLive(snapshot,overlay,source){
   if(Buffer.byteLength(JSON.stringify(batch([c])))>52000)throw Error(`meaning block too large ${c.ref}`);
   pending.push(c);
  }
- flush();return{schema:'live-meaning/1',worldId:snapshot.worldId,sourceSeq:snapshot.seq,overlayHash:hashOf(overlay),group,report,batches};
+ flush();return{schema:'live-meaning/1',planId,worldId:snapshot.worldId,sourceSeq:snapshot.seq,overlayHash:hashOf(overlay),group,report,batches};
 }
 export function verifyMeaning(before,after,receipt){
  const A=indexWorld(before),B=indexWorld(after),problems=[];
@@ -74,15 +87,29 @@ function cli(folder,args){
  const out=execFileSync(process.execPath,[resolve(ROOT,'tools/god-skill/eden-god.mjs'),...args,'--json'],{cwd:resolve(folder),env:{...process.env,EDEN_GOD_WARM:'0'},encoding:'utf8',timeout:120000,maxBuffer:32*1024*1024});
  return JSON.parse(out);
 }
+export function parseLiveArgs(args){
+ const positional=[];let expectedWorldId;
+ for(let i=0;i<args.length;i++){
+  if(args[i]==='--expected-world-id'){
+   if(expectedWorldId!==undefined||!args[i+1]||args[i+1].startsWith('--'))throw Error('--expected-world-id requires one live world ID');
+   expectedWorldId=args[++i];
+  }else if(args[i].startsWith('--'))throw Error(`unknown option ${args[i]}`);
+  else positional.push(args[i]);
+ }
+ const[mode,overlayPath,folder,receiptPath,sourcePath]=positional;
+ if(!['plan','apply','rollback'].includes(mode)||!receiptPath||positional.length>5)throw Error('plan|apply|rollback <overlay> <god-folder> <receipt> [source-snapshot] [--expected-world-id <live-id>]');
+ if(mode==='plan'&&!expectedWorldId?.trim())throw Error('plan requires --expected-world-id <live-id>');
+ return{mode,overlayPath,folder,receiptPath,sourcePath,expectedWorldId};
+}
 if(process.argv[1]&&pathToFileURL(resolve(process.argv[1])).href===import.meta.url){
- const[mode,overlayPath,folder,receiptPath,sourcePath]=process.argv.slice(2);
- if(!['plan','apply','rollback'].includes(mode)||!receiptPath)throw Error('plan|apply|rollback <overlay> <god-folder> <receipt> [source-snapshot]');
+ const{mode,overlayPath,folder,receiptPath,sourcePath,expectedWorldId}=parseLiveArgs(process.argv.slice(2));
  const current=cli(folder,['snapshot']);
+ if(expectedWorldId&&current.worldId!==expectedWorldId)throw Error(`wrong live world: expected ${expectedWorldId}, received ${current.worldId}`);
  if(mode==='plan'){
   if(existsSync(receiptPath))throw Error('receipt exists; use a new path');
   const overlay=read(overlayPath),materialized=sourcePath?null:materialize(overlay.worldId),source=sourcePath?read(sourcePath):materialized.world.snapshot();
   if(sourcePath?overlay.source?.snapshotSha!==hashOf(source):overlay.source?.sha!==hashOf(materialized.template))throw Error('overlay source drift');
-  const receipt=planLive(current,overlay,source);save(receiptPath+'.before.json',current);save(receiptPath,receipt);
+  const receipt=planLive(current,overlay,source,{expectedWorldId});save(receiptPath+'.before.json',current);save(receiptPath,receipt);
   console.log(JSON.stringify({worldId:receipt.worldId,batches:receipt.batches.length,changes:receipt.batches.reduce((n,b)=>n+b.changes.length,0),report:receipt.report}));
  }else{
   const receipt=read(receiptPath);if(current.worldId!==receipt.worldId)throw Error('wrong live world');
