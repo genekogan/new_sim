@@ -1,3 +1,4 @@
+import {regionArrivalMask} from './region-arrival.ts';
 import { createHash } from 'node:crypto';
 import { capturePhysicalHashInput, capturedPhysicalHashSteps, physicalHashNeedsLegacyCapture } from './checkpoint-hash.ts';
 import { stableStringify } from '@sim/engine-contract';
@@ -539,10 +540,13 @@ export class MarsEngine implements Engine {
    * retry re-chooses: a spaced spot inside the region away from other bodies and from
    * other running shore/walk targets, first with a currently plannable native route.
    * Absent the parameter, region goals keep the original single-centroid behaviour. */
-  private spreadGoalV1(actor:string,region:string,mode:unknown='pond/1',subjects=false):{x:number;z:number;level:number}|'here'|Diag{
+  private spreadGoalV1(actor:string,region:string,mode:unknown='pond/1',subjects=false,regionOutside?:unknown):{x:number;z:number;level:number}|'here'|Diag{
     const r=this.rt.world.regions[region],e=this.ents[actor];if(!r||!e)return {code:'target.unknown',message:`nothing to walk to: ${region}`};
     const lap=mode==='pond-lap/1'; // pond-lap/1: from inside the water, glide on to a different spaced spot
-    if(!lap&&inPoly(e.pose.p[0],e.pose.p[2],r.polygon))return 'here';
+    // A recorded mask (including []) opts new outdoor walks into physical arrival;
+    // old programs retain their historical X/Z-only no-op for exact replay.
+    const mask=regionArrivalMask(regionOutside,bodyProfile(e).radius+.07);if(!mask)return{code:'route.region-geometry-invalid',message:'The outdoor arrival exclusions are not bounded finite polygons'};
+    if(!lap&&(regionOutside===undefined||(e.human?.level??0)===(r.level??0))&&inPoly(e.pose.p[0],e.pose.p[2],r.polygon)&&mask.outside(e.pose.p[0],e.pose.p[2]))return 'here';
     const level=r.level??0,xs=r.polygon.map((p:number[])=>p[0]),zs=r.polygon.map((p:number[])=>p[1]),taken:number[][]=[];
     for(const o of listEntities(this.ents) as any[])if(o.id!==actor&&o.human)taken.push([o.pose.p[0],o.pose.p[2]]);
     for(const rec of this.rt.records.values() as Iterable<any>){const q=rec.params;if(q&&q.actor!==actor&&(rec.verb==='commons_shore_travel'||rec.verb==='shore_travel'||rec.verb==='walk_to')&&typeof q.x==='number'&&typeof q.z==='number'&&this.rt.isActive(rec.id))taken.push([q.x,q.z]);}
@@ -554,12 +558,12 @@ export class MarsEngine implements Engine {
     // spreadClearV1 (CN5, prospective policy): only spots on clear standing ground are candidates, so a place whose middle
     // is a fountain or a pond still takes arrivals inside it rather than beside it.
     const clearGrid=this.cfg.spreadClearV1===true&&!pond?(()=>{const sp=this.rt.services.spatial as Spatial;sp.sync(this.rt.world);return sp.level(level)??null;})():null;
-    for(let x=Math.min(...xs)+inset[0];x<=Math.max(...xs)-inset[1];x+=step)for(let z=Math.min(...zs)+inset[0];z<=Math.max(...zs)-inset[0];z+=step){const p:[number,number]=[r3(x),r3(z)];if(inPoly(p[0],p[1],r.polygon)&&(!clearGrid||clearanceAt(clearGrid,p)>=HUMAN_RADIUS+.07)&&taken.every(t=>Math.hypot(t[0]-p[0],t[1]-p[1])>=(pond?1.4:1.0))&&(!lap||Math.hypot(p[0]-e.pose.p[0],p[1]-e.pose.p[2])>=4))spots.push(p);}
-    if(!spots.length&&!pond&&taken.every(t=>Math.hypot(t[0]-mid[0],t[1]-mid[1])>=1.0))spots.push(mid); // a place smaller than the grid keeps its single centre
+    for(let x=Math.min(...xs)+inset[0];x<=Math.max(...xs)-inset[1];x+=step)for(let z=Math.min(...zs)+inset[0];z<=Math.max(...zs)-inset[0];z+=step){const p:[number,number]=[r3(x),r3(z)];if(inPoly(p[0],p[1],r.polygon)&&mask.outside(p[0],p[1])&&(!clearGrid||clearanceAt(clearGrid,p)>=HUMAN_RADIUS+.07)&&taken.every(t=>Math.hypot(t[0]-p[0],t[1]-p[1])>=(pond?1.4:1.0))&&(!lap||Math.hypot(p[0]-e.pose.p[0],p[1]-e.pose.p[2])>=4))spots.push(p);}
+    if(!spots.length&&!pond&&mask.outside(mid[0],mid[1])&&taken.every(t=>Math.hypot(t[0]-mid[0],t[1]-mid[1])>=1.0))spots.push(mid); // a place smaller than the grid keeps its single centre
     // spreadV2: when the inside is full (or unreachable) stand just outside it, nearest first, on the ground
     // around a raised place (never mid-air beside a deck). Arriving at a busy place is not a refusal.
     const ring:[number,number][]=[];
-    if(v2){const reach=Math.max(ex,ez)/2;for(const rr of [reach+.8,reach+1.6,reach+2.4])for(let k=0;k<12;k++){const a=k/12*Math.PI*2,p:[number,number]=[r3(mid[0]+Math.cos(a)*rr),r3(mid[1]+Math.sin(a)*rr)];if(!inPoly(p[0],p[1],r.polygon)&&taken.every(t=>Math.hypot(t[0]-p[0],t[1]-p[1])>=1.0))ring.push(p);}}
+    if(v2){const reach=Math.max(ex,ez)/2;for(const rr of [reach+.8,reach+1.6,reach+2.4])for(let k=0;k<12;k++){const a=k/12*Math.PI*2,p:[number,number]=[r3(mid[0]+Math.cos(a)*rr),r3(mid[1]+Math.sin(a)*rr)];if(!inPoly(p[0],p[1],r.polygon)&&mask.outside(p[0],p[1])&&taken.every(t=>Math.hypot(t[0]-p[0],t[1]-p[1])>=1.0))ring.push(p);}}
     if(!spots.length&&!ring.length)return {code:'route.region-full',message:`no spaced free spot remains in ${region}`};
     const offset=[...actor].reduce((h,c)=>(h*31+c.charCodeAt(0))>>>0,7)%spots.length;
     const order=[...spots.slice(offset),...spots.slice(0,offset)].map((p,i)=>({p,i,band:lap?Math.round(Math.abs(Math.hypot(p[0]-e.pose.p[0],p[1]-e.pose.p[2])-6)/2):pond?Math.round(Math.hypot(p[0]-e.pose.p[0],p[1]-e.pose.p[2])/8):Math.round(Math.hypot(p[0]-mid[0],p[1]-mid[1])/2)})).sort((a,b)=>a.band-b.band||a.i-b.i).slice(0,24);
@@ -696,7 +700,7 @@ export class MarsEngine implements Engine {
       case 'control_classroom_v1': return [{verb:'classroom_control',params:{session:a.session,intent:{kind:a.kind}},settle:'done',raw:true}];
       case 'walk_to': {
         const gaitIssue = this.gaitIssue(me, a); if (gaitIssue) return gaitIssue;
-        const g = (a.spread === 'pond/1' || a.spread === 'region/1' || a.spread === 'pond-lap/1') && typeof a.to === 'string' && this.rt.world.regions[a.to] ? this.spreadGoalV1(me, a.to, a.spread,this.sharedWaterStep(step)) : this.goalNear(me, a.to, typeof a.standoff === 'number' ? a.standoff : 0);
+        const g = (a.spread === 'pond/1' || a.spread === 'region/1' || a.spread === 'pond-lap/1') && typeof a.to === 'string' && this.rt.world.regions[a.to] ? this.spreadGoalV1(me, a.to, a.spread,this.sharedWaterStep(step),a.regionOutside) : this.goalNear(me, a.to, typeof a.standoff === 'number' ? a.standoff : 0);
         if (g === 'here') return [];
         if ('code' in g) return g;
         const movement = this.movementVerb(me,g.x,g.z);
@@ -857,7 +861,7 @@ export class MarsEngine implements Engine {
     if (first.verb.startsWith('mars:')) { const r = this.raw(program.actor, first); return 'code' in r ? r : this.plan(r.verb, r.params); }
     if (!BODY.has(first.verb)) return { code: 'action.unknown-verb', message: `no body verb "${first.verb}"` };
     if (first.verb === 'walk_to') {
-      const g = (first.params.spread === 'pond/1' || first.params.spread === 'region/1' || first.params.spread === 'pond-lap/1') && typeof first.params.to === 'string' && this.rt.world.regions[first.params.to] ? this.spreadGoalV1(program.actor, first.params.to, first.params.spread,this.sharedWaterStep(first)) : this.goalNear(program.actor, first.params.to, typeof first.params.standoff === 'number' ? first.params.standoff : 0);
+      const g = (first.params.spread === 'pond/1' || first.params.spread === 'region/1' || first.params.spread === 'pond-lap/1') && typeof first.params.to === 'string' && this.rt.world.regions[first.params.to] ? this.spreadGoalV1(program.actor, first.params.to, first.params.spread,this.sharedWaterStep(first),first.params.regionOutside) : this.goalNear(program.actor, first.params.to, typeof first.params.standoff === 'number' ? first.params.standoff : 0);
       if(g==='here')return null;if('code' in g)return g;
       if(first.params.gait&&first.params.gait!=='walk'){
         if(this.movementVerb(program.actor,g.x,g.z)!=='walk_to')return {code:'gait.dry-ground-required',message:'This shore or water route does not support jogging or running; return to dry ground first.'};

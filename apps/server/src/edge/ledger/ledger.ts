@@ -5,6 +5,7 @@ import {randomUUID} from 'node:crypto';
 import {bodyCapabilityProblem,bodyVerbProblem,isRigidBody,shapeRigidCapabilities} from '../body/actions.ts';
 import {interiorShellPolygon} from './nav.ts';
 import {inPoly} from './places.ts';
+import {outdoorRegionExclusions} from './region-arrival.ts';
 import type {Program} from '@sim/engine-contract';
 import {clockAt} from '@sim/brain';
 import type {WorldState as NativeWorld} from '../../../../../mars/viewer/engine/world/types.ts';
@@ -586,7 +587,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
       const {id, verb} = edgeIdOf(b); const seconds = b.goal === 'sit' || b.goal === 'rest' || b.goal === 'hang_out';
       const target = b.targetId ? {id: b.targetId, kind: this.places.byId.has(b.targetId) ? 'place' : this.host.engine.world.entities[b.targetId] ? 'object' : 'place'} : undefined;
       caps.push({id, verb, label: b.label, available: b.available, ...(target ? {target} : {}), ...(b.available ? {} : {blocked: {code: b.blockedCode ?? 'physical.unavailable', reason: humanBlockedExplanationV1(b.blockedCode, b.label)}}), ...(seconds ? {params: secondsParam} : {})});
-      plans.set(id, {label: b.label, steps: b.steps, seconds});
+      const outside=b.targetId&&(b.goal==='walk'||b.goal==='hang_out')?outdoorRegionExclusions(this.places,b.targetId):undefined;
+      const steps=outside!==undefined?b.steps.map(step=>step.verb==='walk_to'&&step.params.spread==='region/1'?{...step,params:{...step.params,regionOutside:outside}}:step):b.steps;
+      plans.set(id, {label: b.label, steps, seconds});
     }
     caps.push({id: 'stand:here', verb: 'stand', label: 'Stand up / stop what I am doing', available: true});
     plans.set('stand:here', {label: 'Stand up', steps: [], stop: true});
