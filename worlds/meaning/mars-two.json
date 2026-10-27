@@ -492,7 +492,7 @@
     },
     "mimos": {
       "title": "Mimos",
-      "what": "The campus café, study lounge and tea room. Coffee and study occupy the main bay; the south lounge offers relaxed seating, and the separate tea room gathers people around a low table.",
+      "what": "The campus café, study lounge and tea room. Coffee and study occupy the raised main bay; the south lounge offers relaxed seating at ground level, and the separate tea room gathers people around a low table.",
       "aliases": [
         "café",
         "coffee house",
@@ -506,13 +506,16 @@
       "parts": [
         {
           "id": "coffee-study",
-          "title": "Coffee and Study Bay",
+          "title": "Raised Coffee and Study Bay",
           "aliases": [
             "main bay",
+            "raised main room",
+            "raised main bay",
+            "main room",
             "coffee counter",
             "study room"
           ],
-          "what": "The main café bay with a coffee counter and study table.",
+          "what": "The raised wooden-floor café bay with a coffee counter and study table.",
           "anchor": {
             "kind": "entity",
             "ref": "mimos",
