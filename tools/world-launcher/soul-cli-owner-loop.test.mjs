@@ -20,7 +20,9 @@ test('brief: done when the receipt ended, now while it runs; at most 600 charact
   const end = brief({waited: '3s', receipt: {id: 'r_1', capability: 'sit:here', phase: 'completed', outcome: {summary: 'sit completed at commons.'}}, events: [{kind: 'receipt'}]});
   assert.equal(end.done, 'sit completed at commons.'); assert.equal(end.now, undefined);
   const long = brief({receipt: {id: 'r_2', capability: 'walk:x', phase: 'failed', reason: 'r'.repeat(2000)}, events: Array.from({length: 9}, () => ({text: 'e'.repeat(200)}))});
-  assert.ok(JSON.stringify(long).length <= 601, String(JSON.stringify(long).length)); assert.match(long.done, /^walk:x failed: r+…$/);
+  const {events, eventWindow, ...action} = long;
+  assert.ok(JSON.stringify(action).length <= 601, String(JSON.stringify(action).length)); assert.match(long.done, /^walk:x failed: r+…$/);
+  assert.equal(events.length, 4); assert.equal(eventWindow.omitted, 5, 'event omissions are explicit, separate from the compact action summary');
 });
 
 test('act --for: by default the first accepted act within 120 s of an ack serves it; an explicit id, none, and a stale default dropped', async t => {

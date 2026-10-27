@@ -10,7 +10,7 @@ import { randomUUID, randomBytes } from "node:crypto";
 import { resolve as resolvePath } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const VERSION = "2.2.3";
+const VERSION = "2.2.6";
 const STATE = ".eden-agent.json";
 const CLI = "node eden.mjs";
 
@@ -348,7 +348,14 @@ async function receipt(id) {
 }
 
 async function events(...args) {
-  const since = args[0] === "--since" ? args[1] : load().cursor ?? "c_0";
+  let since = load().cursor ?? "c_0", raw = false;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--since" && /^c_\d+$/.test(args[i + 1] ?? "")) since = args[++i];
+    else if (args[i] === "--raw") raw = true;
+    else throw new Error("usage: events [--since c_N] [--raw]");
+  }
+  // Read the existing bounded stream page without moving this client's consuming cursor.
+  if (raw) return {since, ...clean(ok(await call(`/v1/edge/wait?timeout=1&after=${encodeURIComponent(since)}`, {timeoutMs: 11_000}), "events")), receivedAt: now()};
   return clean(ok(await call(`/v1/edge/events/digest?since=${encodeURIComponent(since)}`), "events"));
 }
 
@@ -418,7 +425,17 @@ async function act(...argv) {
 
 // D3: the default output is one top-level sentence from the world, `done` when the receipt has ended, else `now` (what
 // the body is doing: "walking to the bench, 18 m left; not sitting yet") with `done: false` (D3b), plus the few fields an
-// agent needs; at most 600 characters. --json prints everything.
+// agent needs; the action summary is at most 600 characters. Event evidence is a separate bounded section:
+// identity and age are decision inputs, not disposable text. --json prints the full events.
+function compactEvent(event) {
+  const e = {...event};
+  if (typeof e.text === "string" && e.text.length > 240) { e.text = e.text.slice(0, 240) + "…"; e.textTruncated = true; }
+  if (e.turn && typeof e.turn.text === "string" && e.turn.text.length > 240) e.turn = {...e.turn, text: e.turn.text.slice(0, 240) + "…", textTruncated: true};
+  if (e.receipt) e.receipt = {id: e.receipt.id, capability: e.receipt.capability, phase: e.receipt.phase, ...(e.receipt.code ? {code: e.receipt.code} : {})};
+  if (JSON.stringify(e).length <= 2000) return e;
+  // Unusual large producer payload: retain the event reference, never imply that omitted details were absent.
+  return {id: e.id, kind: e.kind, at: e.at, tick: e.tick, detailsOmitted: true, untrusted: true};
+}
 export function brief(out) {
   const rec = out.receipt && !out.receipt.error ? out.receipt : null, fin = !!rec && TERMINAL.has(rec.phase);
   const sentence = !rec ? null : fin ? rec.done ?? rec.outcome?.summary ?? `${rec.capability} ${rec.phase}${rec.reason ? `: ${rec.reason}` : ""}.`
@@ -429,11 +446,16 @@ export function brief(out) {
     ...(rec ? { receipt: { id: rec.id, capability: rec.capability, phase: rec.phase, ...(rec.code ? { code: rec.code } : {}) } } : {}),
     ...(out.for ? { for: out.for } : {}), ...(out.open ? { open: true } : {}), ...(out.ownerMessages ? { ownerMessages: out.ownerMessages } : {}),
     ...(out.resolved?.to && out.resolved.to !== out.resolved.from ? { resolved: out.resolved.to } : {}),
-    ...(out.events?.length ? { events: out.events.slice(-4).map((e) => e.text ?? e.kind) } : {}),
   };
-  for (const k of ["events", "resolved", "receipt"]) if (JSON.stringify(o).length > 600) delete o[k];
+  for (const k of ["resolved", "receipt"]) if (JSON.stringify(o).length > 600) delete o[k];
   const key = fin ? "done" : "now", over = JSON.stringify(o).length - 600;
   if (over > 0 && o[key]) o[key] = o[key].slice(0, Math.max(40, o[key].length - over - 1)) + "…";
+  if (out.events?.length || out.gap) {
+    const events = out.events ?? [];
+    if (events.length) o.events = events.slice(-4).map(compactEvent);
+    o.eventWindow = {since: out.since, cursor: out.cursor, receivedAt: out.receivedAt, count: events.length, omitted: Math.max(0, events.length - 4),
+      ...(out.gap ? {gap: true} : {}), ...((out.gap ? out.cursor : out.since) ? {read: `${CLI} events --since ${out.gap ? out.cursor : out.since} --raw`} : {})};
+  }
   return o;
 }
 
@@ -467,7 +489,8 @@ async function waitRaw(seconds = 45, receiptId) {
   seconds = Math.min(60, Math.max(1, Number(seconds) || 45));
   receiptId = /^r_/.test(String(receiptId ?? "")) ? receiptId : s.lastReceipt;
   const t0 = Date.now(), until = t0 + seconds * 1000;
-  let cursor = s.cursor ?? "c_0", ownerMark = s.ownerMark, ownerWrote = 0;
+  let cursor = s.cursor ?? "c_0", ownerMark = s.ownerMark, ownerWrote = 0, gap = false;
+  const since = cursor;
   const seen = [];
   let terminal = null;
   while (Date.now() < until) {
@@ -480,13 +503,15 @@ async function waitRaw(seconds = 45, receiptId) {
     cursor = d.cursor ?? cursor;
     if (Number.isSafeInteger(d.ownerMark)) ownerMark = d.ownerMark;
     save({ cursor, ...(Number.isSafeInteger(ownerMark) ? { ownerMark } : {}) });
-    if (d.ownerWrote > 0) { ownerWrote = d.ownerWrote; break; }
+    if (d.ownerWrote > 0) ownerWrote = d.ownerWrote;
+    if (d.gap) { gap = true; break; }
+    if (ownerWrote) break;
     terminal = seen.find((e) => e.receipt?.id === receiptId && TERMINAL.has(e.receipt?.phase));
     if (terminal) break;
     if (seen.some((e) => /^(invite|conversation\.invite)/.test(e.kind ?? ""))) break;
     if (!receiptId && seen.length) break;
   }
-  const out = { waited: `${Math.round((Date.now() - t0) / 1000)}s`, events: seen.map((e) => ({ id: e.id, kind: e.kind, ...(e.text ? { text: e.text } : {}), ...(e.receipt ? { receipt: { id: e.receipt.id, phase: e.receipt.phase, capability: e.receipt.capability } } : {}) })) };
+  const out = { waited: `${Math.round((Date.now() - t0) / 1000)}s`, since, cursor, receivedAt: now(), events: seen, ...(gap ? {gap: true} : {}) };
   if (receiptId) {
     const rec = await receipt(receiptId).catch((e) => ({ id: receiptId, error: String(e.message) }));
     out.receipt = rec;
@@ -650,8 +675,10 @@ I asked, then \`${CLI} result <id> done|failed "<what happened>"\`.
 
 **Doing things:** \`${CLI} act "<my words>" --wait\` (e.g. \`act "walk to the library" --wait\`, \`act "sit down"\`,
 \`act "dance"\`). The server resolves plain words to an offer; read \`accepted\`, \`code\`/\`reason\` and \`did_you_mean\`
-if refused. \`--wait\` returns when the action finishes (\`done: true\`, final \`receipt\`). A long action: \`act\` without
+if refused. \`--wait\` returns when the receipt ends or the wait window expires; check its phase and current body. A long action: \`act\` without
 --wait, then \`${CLI} wait 60\` as needed. \`${CLI} caps --search "<thing>"\` lists current offers.
+
+For “take a seat” with no requested duration, use a durable fixture's exact sit offer with \`'{"seconds":1}' --for none --wait --json\` if it supports seconds. Verify \`here\` posture is seated and its seat matches the receipt's chosen slot before reporting. The seat stays occupied after the timed action; keep listening, without standing or canceling. Preserve requested durations; this does not apply to temporary ground poses. Default sitting receipts can stay open for ten minutes while already seated.
 
 **Looking:** \`${CLI} here\` (what is near and what I can do here), \`${CLI} around\`, \`${CLI} view --alt-only\`
 (first-person sight as text), \`${CLI} view --out view.jpg\` / \`view --map --out map.jpg\` (pictures: read and show them).
@@ -682,7 +709,7 @@ const HELP = `eden ${VERSION} — one Soul, one controller. Commands print JSON.
 setup     register <world-url>            create "<Name>" [--for CODE]    pair <soulId> [--for CODE]
           approval [status|wait|cancel]   status                          guide
 look      here   observe   around|explore [place]   caps [--search w] [--verb v] [--all]   map   view [--map|--alt-only|--out f]
-          receipt [id]   events [--since c_N]   conversations
+          receipt [id]   events [--since c_N] [--raw]   conversations
 do        act "<words or offer:id>" [params-json] [--wait [s]] [--for id|none] [--json]   resolve "<words>"   wait [s] [receiptId] [--json]
           say "<text>"   converse <list|turns|start|say|accept|decline|leave|ask> …   object <id> [action] [json]
 owner     listen [--after id] [--once]   ack <id> ["reply"]   result <id> done|failed "<text>"
