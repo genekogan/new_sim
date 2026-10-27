@@ -16,7 +16,7 @@ test('scoped retention rejects runtime, skill, provider or fixture changes outsi
  const runtime='apps/server/src/edge/boot/world-places.ts',changed=[runtime,'tools/playtest/review/journey-oracles.mjs'];
  const diff='reviewed full patch',runtimeDiff='reviewed admission hunk',proof={changedFiles:changed,fullDiffSha256:sha256(diff),runtimeDiffSha256:sha256(runtimeDiff)};
  assert.doesNotThrow(()=>validateScopeDiff(proof,{changed,diff,runtimeDiff}));
- for(const path of ['apps/server/src/edge/engine.ts','tools/agent/eden.mjs','skills/soul/SKILL.md','worlds/templates/mars-two.json','tools/playtest/lib/codex.mjs']){
+ for(const path of ['packages/engine-mars/src/ground.ts','apps/server/src/edge/engine.ts','tools/agent/eden.mjs','skills/soul/SKILL.md','worlds/templates/mars-two.json','tools/playtest/lib/codex.mjs']){
   const bad=[...changed,path].sort();assert.throws(()=>validateScopeDiff({...proof,changedFiles:bad},{changed:bad,diff,runtimeDiff}));
  }
  for(const value of [{changed,diff:diff+'extra',runtimeDiff},{changed,diff,runtimeDiff:runtimeDiff+'extra'},{changed:changed.slice(1),diff,runtimeDiff},{changed,diff,runtimeDiff:''}])assert.throws(()=>validateScopeDiff(proof,value));

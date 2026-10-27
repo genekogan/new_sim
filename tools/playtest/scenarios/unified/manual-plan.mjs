@@ -19,6 +19,7 @@ export function verifyRetained(ref,planned){
  if(JSON.stringify(canonical(correctedScenario(original,current)))!==JSON.stringify(canonical(read(join(rescoreDir,'scenario.json')))))throw Error('retained corrected measurement conditions differ');
  for(const file of ['journey-oracles.mjs','oracles.mjs'])if(annotation.scorerFiles?.[file]!==sha256(readFileSync(new URL('../../review/'+file,import.meta.url))))throw Error('retained control needs offline rescore with current oracles');
  const manifest=read(annotation.sourceManifest),source=manifest.plan.find(r=>resolve(r.out)===runDir&&key(r)===key(ref));
+ if(annotation.sourceHeads?.treatment!==manifest.heads?.treatment)throw Error('retained treatment source annotation mismatch');
  if(!source||manifest.heads?.control!=='db68679b747911f2546fc054345e96aa703090ea'||annotation.sourceHeads?.control!==manifest.heads.control)throw Error('retained control source head/provenance mismatch');
  if(!existsSync(join(runDir,'close.json'))||read(join(runDir,'preflight.json')).ok!==true)throw Error('retained battery did not finish infrastructure');
  const invalid=join(runDir,'infrastructure-invalid.jsonl');if(existsSync(invalid)&&readFileSync(invalid,'utf8').trim())throw Error('retained battery has infrastructure-invalid requests');
@@ -68,7 +69,7 @@ export function verifyTreatmentScope(ref,planned,manifest){
 export function validateScopeDiff(proof,{changed,diff,runtimeDiff}){
  const runtime='apps/server/src/edge/boot/world-places.ts';
  const scorerFiles=['tools/playtest/review/journey-oracles.mjs','tools/playtest/scenarios/unified/manual-plan.mjs','tools/playtest/scenarios/unified/README.md'];
- const allowed=p=>p===runtime||scorerFiles.includes(p)||(/^(apps\/server\/src\/|tools\/playtest\/).+\.test\.(ts|mjs)$/.test(p));
+ const allowed=p=>p===runtime||p==='packages/engine-mars/src/ground.test.ts'||scorerFiles.includes(p)||(/^(apps\/server\/src\/|tools\/playtest\/).+\.test\.(ts|mjs)$/.test(p));
  if(changed.some(p=>!allowed(p))||JSON.stringify(changed)!==JSON.stringify(proof.changedFiles))throw Error('source diff includes unreviewed runtime, CLI, skill, fixture, provider or content changes');
  if(!runtimeDiff||sha256(diff)!==proof.fullDiffSha256||sha256(runtimeDiff)!==proof.runtimeDiffSha256)throw Error('reviewed source diff changed');
 }
