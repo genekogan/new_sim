@@ -18,19 +18,21 @@ const has = (k) => argv.includes(`--${k}`);
 const serverRoot = resolve(flag('server-root', `${homedir()}/Eden/sim-wt/soul3-integration`));
 const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
 const runDir = resolve(flag('out', `${homedir()}/Eden/team/playtest/runs/${stamp}-arena-smoke`));
-const port = Number(flag('port', 4995)), model = flag('model', 'haiku'), resultSec = Number(flag('result-sec', 120));
+const adapter = flag('adapter', 'claude-headless');
+if (!['claude-headless', 'codex-headless'].includes(adapter)) throw new Error('unknown adapter; no substitution allowed');
+const port = Number(flag('port', 4995)), model = flag('model', adapter === 'codex-headless' ? 'gpt-6.1-sol' : 'haiku'), resultSec = Number(flag('result-sec', 120));
 const log = (...a) => console.error(`[smoke ${now().mono}ms]`, ...a);
 
 setAnchor(performance.now());
 const t0 = Date.now(), wall = {};
 let world = null, seat = null;
-const summary = { ok: false, runDir, port, model, assisted: has('assist-onboard') };
+const summary = { ok: false, runDir, port, model, adapter, assisted: has('assist-onboard') };
 try {
   world = await provision({ runDir, serverRoot, world: { kind: 'dev', slug: 'pt-smoke', port, genesis: 'worlds/templates/hello-hamlet.json' } });
   wall.worldMs = Date.now() - t0; log('world up', world.base, 'eden.mjs', world.cli['eden.mjs.version'], 'skill', world.skill.version);
   summary.world = { base: world.base, build: world.build, skill: world.skill.version, cli: world.cli['eden.mjs.version'], instructions2: world.instructions.mentionsEdenMjs };
 
-  seat = createSeat({ runDir, seat: { id: 'pip', adapter: 'claude-headless', model, effort: 'medium', soulName: 'Pip' }, worldBase: world.base, rails: { maxTurnWallSec: 240 } });
+  seat = createSeat({ runDir, seat: { id: 'pip', adapter, model, effort: 'medium', soulName: 'Pip', wake: true }, worldBase: world.base, rails: { maxTurnWallSec: 240 } });
   const tOn = Date.now();
   const on = await seat.onboard({ timeoutSec: 180, assist: has('assist-onboard') });
   wall.onboardMs = Date.now() - tOn; log('onboard', on.ok ? `paired ${on.soulId} (${on.soulName})` : `NOT paired: ${JSON.stringify(on.status).slice(0, 200)}`);
@@ -59,7 +61,7 @@ try {
   const turns = readJsonl(join(runDir, 'seats/pip/turns.jsonl')), cost = readJsonl(join(runDir, 'seats/pip/cost.jsonl'));
   const sum = (k) => cost.reduce((a, c) => a + (c[k] ?? 0), 0);
   Object.assign(summary, {
-    ok: !!done, soulId: on.soulId, messageId: sent.messageId,
+    ok: !!done && /sit|seated/i.test(pub?.self?.state ?? '') && turns.some(t => t.reason === 'wake'), soulId: on.soulId, messageId: sent.messageId,
     resultWithinCutoff: !!done, lateResult: late?.resultText ? { text: late.resultText, outcome: late.outcome, afterSentMs: late.resultAt && late.sentAt ? late.resultAt - late.sentAt : null } : null,
     ackText: card?.ackText ?? null, ackLatencyMs: ackAt ? ackAt - tReq : null, resultText: card?.resultText ?? null, outcome: card?.outcome ?? null,
     publicState: pub?.self?.state ?? pub?.state ?? null, activity: pub?.self?.activity ?? pub?.activity ?? null,

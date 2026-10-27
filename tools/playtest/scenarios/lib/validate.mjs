@@ -6,6 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateExpect } from '../../review/expect-oracles.mjs';
 import { normalizeCast } from '../../director/swarm/cast.mjs';
+import { providerPolicy } from '../../lib/provider-policy.mjs';
 import { templateNames, dist } from './world-names.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -62,7 +63,8 @@ export function validateScenario(s) {
     for (const [seat, es] of Object.entries(bySeat)) { const o = [...es].sort((a, b) => a.atSec - b.atSec); for (let k = 1; k < o.length; k++) if (o[k].atSec < o[k - 1].atSec + (o[k - 1].budgetSec ?? 0)) errs.push(`seat ${seat}: "${o[k].text}" starts before "${o[k - 1].text}" has used its budget`); }
   }
   if (!Array.isArray(s?.observer?.viewport)) errs.push('observer.viewport required');
-  if (!s?.review?.reviewerModel) errs.push('review.reviewerModel required');
+  if (s?.review?.mode !== 'deterministic' && !s?.review?.reviewerModel) errs.push('review.reviewerModel required');
+  try { providerPolicy(s); } catch (e) { errs.push(e.message); }
   if (!s?.rails) errs.push('rails required');
   return errs;
 }
