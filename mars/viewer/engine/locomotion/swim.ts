@@ -45,7 +45,7 @@ function onDeck(rt: Runtime, actor: string): boolean {
   const x = e.pose.p[0], z = e.pose.p[2];
   return nav.field.medium(x, z) !== G_SWIM && nav.base.medium(x, z) === G_SWIM && e.pose.p[1] >= nav.field.height(x, z) - 0.5;
 }
-function bodyIssue(rt: Runtime, actor: string): Diagnostic | null {
+function bodyIssue(rt: Runtime, actor: string, allowDeck = false): Diagnostic | null {
   const e = rt.world.entities[actor];
   if (!e?.human || e.kind !== 'human') return fail('actor', `${actor} is not a person`, [actor]);
   // humanoids swim; of the other bodies only creatures whose species swims (bodies/creatures.ts: duck, dog)
@@ -54,7 +54,7 @@ function bodyIssue(rt: Runtime, actor: string): Diagnostic | null {
     || Object.values(rt.world.entities).some((it) => it.support?.kind === 'in-hand' && it.support.by === actor))
     return fail('occupied-body', `${actor} must put things down and be on their feet before swimming`, [actor]);
   if (e.human.activity.startsWith('sit') || e.human.activity.startsWith('stand-up') || (e.human.level ?? 0) !== 0) return fail('occupied-body', `${actor} must stand on the ground before swimming`, [actor]);
-  if (onDeck(rt, actor)) return fail('on-deck', `${actor} stands on a deck over the water; walk to the shore to get in`, [actor]);
+  if (!allowDeck && onDeck(rt, actor)) return fail('on-deck', `${actor} stands on a deck over the water; walk to the shore to get in`, [actor]);
   return null;
 }
 /** Medium-aware pose: root height and activity at a point. */
@@ -74,7 +74,7 @@ function crowd(rt: Runtime, actor: string, p: Vec2): string | null {
 
 /** Swim routes use actual body-band obstacles, including thin walls that the ordinary
  * land coarse search leaves to its fine planner. Bucket once per plan, not once per tick. */
-function waterPath(rt: Runtime, sp: Spatial, f: GroundField, from: Vec2, to: Vec2) {
+function waterPath(rt: Runtime, sp: Spatial, f: GroundField, from: Vec2, to: Vec2, swimOnly = false, landing = false) {
   sp.sync(rt.world);
   const buckets = new Map<string, typeof sp.scene.obstacles>();
   const x0 = Math.floor((Math.min(from[0], to[0]) - 49) / 8), x1 = Math.floor((Math.max(from[0], to[0]) + 49) / 8);
@@ -87,6 +87,12 @@ function waterPath(rt: Runtime, sp: Spatial, f: GroundField, from: Vec2, to: Vec
       }
   }
   return sp.ground!.coarsePath(from, to, SWIM_COST, 48, 600_000, (x, z) => {
+    // The land leg has its own fine planner. Inflating every thin land object
+    // by a whole coarse cell can seal a perfectly walkable jetty entrance.
+    if (!swimOnly && coarseMedium(f, x, z) === G_WALK) return sp.ground!.coarseSolid(x,z);
+    if (swimOnly && coarseMedium(f, x, z) === G_WALK
+      && hypot(x-from[0], z-from[1]) > STEP_IN_M-1
+      && !(landing && hypot(x-to[0], z-to[1]) <= 1)) return true;
     const y = poseAt(f, [x, z], true).y;
     return !!buckets.get(`${Math.floor(x / 8)},${Math.floor(z / 8)}`)?.some(o => o.y0 < y + 1.8 && o.y1 > y + .05 && pointInObb([x, z], o.obb, HUMAN_RADIUS + .75));
   });
@@ -100,8 +106,12 @@ export function planSwim(rt: Runtime, actor: string, to: Vec2, landing = false):
   const gm = f.medium(to[0], to[1]);
   if (gm === G_OUTSIDE) return { ok: false, diagnostic: fail('outside', `(${fmt(to)}) lies beyond the edge of the world`, [actor]) };
   if (gm !== G_SWIM && gm !== G_WADE && !landing) return { ok: false, diagnostic: fail('not-water', `(${fmt(to)}) is not water; walk there instead`, [actor]) };
-  const path = waterPath(rt, sp, f, from, to);
-  if (!path) return { ok: false, diagnostic: fail('unreachable', `no water connects (${fmt(from)}) to (${fmt(to)})`, [actor]) };
+  const path = waterPath(rt, sp, f, from, to, true, landing);
+  if (!path) {
+    const crossesLand = waterPath(rt, sp, f, from, to) !== null;
+    return {ok:false,diagnostic:fail(crossesLand?'not-connected':'unreachable',
+      `no connected swimming route from (${fmt(from)}) to (${fmt(to)})${crossesLand?'; walk to a connected bank first':''}`, [actor])};
+  }
   // dry ground only to step in: within STEP_IN_M of the start
   let s = 0;
   for (let k = 1; k < path.length; k++) {
@@ -219,7 +229,7 @@ export const swimTo: ActionDef<Params, Vec2[], Exec> = {
 };
 
 type TravelParams = { actor: string; x: number; z: number; level?: number };
-type TravelOp = { verb: 'swim_to' | 'walk_to'; params: Record<string, unknown> };
+type TravelOp = { verb: 'swim_to' | 'walk_to' | 'ground_travel'; params: Record<string, unknown> };
 type TravelExec = { id: string; actor: string; ops: TravelOp[]; index: number; child?: string; stopping?: boolean };
 /** Whether the actor's root is in water too deep to stand in. */
 export function inDeepWater(rt: Runtime, actor: string): boolean {
@@ -240,8 +250,16 @@ export function destinationInDeepWater(rt: Runtime, x: number, z: number): boole
  * the ordinary fine walk planner validates the approach and the swim replans from the actual
  * arrival pose. Bounded candidates prevent a long shoreline from causing unbounded fine searches. */
 function enterWater(rt: Runtime, p: TravelParams): {ok: true; program: TravelOp[]} | {ok: false; diagnostic: Diagnostic} {
-  const issue = bodyIssue(rt, p.actor); if (issue) return {ok: false, diagnostic: issue};
+  const issue = bodyIssue(rt, p.actor, true); if (issue) return {ok: false, diagnostic: issue};
   const {sp, f} = groundOf(rt)!, e = rt.world.entities[p.actor], from: Vec2 = [e.pose.p[0], e.pose.p[2]], to: Vec2 = [p.x, p.z];
+  if (onDeck(rt, p.actor)) {
+    const land = deckLanding(sp, from);
+    if (!land) return {ok: false, diagnostic: fail('no-shore', 'this deck has no walkable connection to the shore', [p.actor])};
+    const walk = rt.registry.get('walk_to')!.plan(rt, {actor:p.actor,x:land[0],z:land[1],level:0});
+    if (!walk.ok) return walk;
+    return {ok:true,program:[{verb:'walk_to',params:{actor:p.actor,x:land[0],z:land[1],level:0}},
+      {verb:'ground_travel',params:{...p}}]};
+  }
   const path = waterPath(rt, sp, f, from, to);
   if (!path) return {ok: false, diagnostic: fail('unreachable', `no traversable bank connects (${fmt(from)}) to (${fmt(to)})`, [p.actor])};
   // Already at a bank: preserve the existing short step-in behaviour.

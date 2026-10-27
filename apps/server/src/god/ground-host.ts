@@ -97,16 +97,10 @@ export function installGroundCapabilities(ledger: Ledger, god: GodMode, host: Wo
     for (const w of god.model.ground().waters) {
       const pts = (w.area ?? w.path) as [number, number][], mid = centroid(pts), named = god.model.entities.get(w.id)?.name ?? w.id, id = `swim:${slug(named)}`;
       if (caps.some((c) => c.id === id)) continue;
-      // the nearest shore point to me on the water's outline, a little outside it, then the middle
-      let best: [number, number] = pts[0], bd = Infinity;
-      for (let i = 0; i < pts.length; i++) {
-        const a = pts[i], b = pts[(i + 1) % pts.length], dx = b[0] - a[0], dz = b[1] - a[1], n = dx * dx + dz * dz;
-        const t = n ? Math.max(0, Math.min(1, ((me.pose.p[0] - a[0]) * dx + (me.pose.p[2] - a[1]) * dz) / n)) : 0, q: [number, number] = [a[0] + dx * t, a[1] + dz * t];
-        const d = Math.hypot(q[0] - me.pose.p[0], q[1] - me.pose.p[2]); if (d < bd) { bd = d; best = q; }
-      }
-      const out = Math.hypot(best[0] - mid[0], best[1] - mid[1]) || 1, shore: [number, number] = [best[0] + ((best[0] - mid[0]) / out) * 1.5, best[1] + ((best[1] - mid[1]) / out) * 1.5];
+      // Native travel validates a real bank and handles walking off a jetty;
+      // an outline point can be many metres from the actual wetted shoreline.
       caps.push({ id, verb: 'swim', label: `Swim in ${named} (walk to its shore, then swim out to the middle)`, available: true, target: { id: w.id, kind: 'object' } });
-      plans.set(id, { label: `Swim in ${named}`, steps: [{ verb: 'walk_to', params: { to: shore } }, { verb: 'mars:swim_to', params: { x: mid[0], z: mid[1] } }] });
+      plans.set(id, { label: `Swim in ${named}`, steps: [{ verb: 'mars:ground_travel', params: { x: mid[0], z: mid[1], level:0 } }] });
     }
   };
 }
