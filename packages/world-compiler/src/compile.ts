@@ -1020,7 +1020,7 @@ function reindexDescendants(w: WorldModel, id: string) {
  * Only existing absolute world-frame surfaces count. One convex polygon must
  * contain the entire footprint, so a roof bound or a gap between slabs cannot
  * manufacture support. Ground-relative roads still receive ordinary pads. */
-function onAbsoluteDeck(w: WorldModel, e: Entity, fp: ReturnType<typeof footprintOf>, y: number): boolean {
+export function onAbsoluteDeck(w: WorldModel, e: Entity, fp: ReturnType<typeof footprintOf>, y: number): boolean {
   for (const other of w.entities.values()) {
     if (other.id === e.id || other.in.parent !== 'world' || !other.shape) continue;
     const def = w.resolvedDef(other.def); if (!def || def.form === 'point') continue;

@@ -5,7 +5,7 @@
 //             not walkable both ways from the main ground: nav.disconnected + nav.one-way + nav.no-standing-room
 //   oneWay    the nav.one-way subset (reachable one way only)
 //   goalless  named things GodNav finds no walk goal for at all (no standing room near them)
-//   float     root things standing more than FLOAT_M above the ground under their origin
+//   float     root things standing more than FLOAT_M above ground without full deck support
 // Nothing here decides walkability itself: it only calls the code the server ships, so the gate measures what Souls get.
 //
 //   node apps/server/src/god/walk-audit.ts --db <world copy .db or .db.gz> [--name n] [--shard k/n] [--out part.json]
@@ -124,7 +124,7 @@ async function buildFuzz(f: FuzzWorld, god: any, host: any, bridge: any): Promis
 }
 
 export async function walkAudit(w: Booted, shard: [number, number] = [0, 1], o: { use?: boolean } = {}): Promise<WalkPart> {
-  const { heightAt } = await import('@sim/ground');
+  const { unsupportedRootGap } = await import('./walk-floats.ts');
   const ms: Record<string, number> = {}, lap = (k: string, t: number) => { ms[k] = Math.round(performance.now() - t); };
   const m = w.god.model, e = w.engine, [k, n] = shard, mine = (at: readonly number[]) => shardOf(at, n) === k;
   const top = (path: string) => path.split('/')[0];
@@ -158,12 +158,11 @@ export async function walkAudit(w: Booted, shard: [number, number] = [0, 1], o: 
   }
   const floats: [string, number, string][] = []; let roots = 0;
   if (k === 0) {
-    const ground = m.ground();
     for (const ent of m.entities.values()) {
       if (ent.in?.parent !== 'world') continue;
       const def = m.resolvedDef(ent.def); if (!def || def.components?.landform || def.layer === 'volume') continue;
       roots++;
-      const p = m.worldPose(ent), gap = p.y - heightAt(ground, p.x, p.z);
+      const gap = unsupportedRootGap(m, ent);
       if (gap > FLOAT_M) { const path = m.pathOf(ent.id); floats.push([path, Math.round(gap * 10) / 10, top(path)]); }
     }
   }
