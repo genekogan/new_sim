@@ -111,6 +111,10 @@ export function materialize(name,{patched=true,fixtures=true,seed=`meaning:${nam
     const path=`worlds/patches/unified-affordances-20261027/${name}.json`,batch=read(path);
     append(batch,batch.note);provenance.push({path,sha:hashOf(batch)});
   }
+  if(fixtures&&name==='hello-hamlet'&&!hasPlace('lab-presentation-hall')){
+    const path=`worlds/patches/unified-affordances-20261027/${name}.json`,batch=read(path);
+    append(batch,batch.note);provenance.push({path,sha:hashOf(batch)});
+  }
   return {template,world,provenance};
 }
 if(process.argv[1]&&pathToFileURL(resolve(process.argv[1])).href===import.meta.url){

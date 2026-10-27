@@ -2,18 +2,700 @@
   "schema": "genesis/1",
   "name": "Hello hamlet",
   "description": "A knoll with a cottage, a pond, a lane of trees, and two flags to build from. The template every example starts with.",
-  "constants": { "extent": 1000, "ground": "land" },
-  "state": { "constitution": "# Hello hamlet\nA small place to start. Build gently; undo freely." },
+  "constants": {
+    "extent": 1000,
+    "ground": "land"
+  },
+  "state": {
+    "constitution": "# Hello hamlet\nA small place to start. Build gently; undo freely."
+  },
   "batches": [
-    { "note": "terrain", "ops": [
-      { "op": "place", "def": "core/knoll@1", "name": "knoll", "p": [40, 10], "params": { "height": 4, "radius": 22 } },
-      { "op": "place", "def": "core/pond@1", "name": "pond", "shape": { "area": [[-30, 36], [-10, 32], [-4, 50], [-24, 56]] } }
-    ] },
-    { "note": "first house and flags", "ops": [
-      { "op": "place", "tmp": "$c", "def": "core/cottage@1", "name": "cottage", "p": [44, 10], "constraints": [{ "kind": "facing", "ref": "pond" }] },
-      { "op": "place", "def": "core/bench@1", "name": "bench", "in": { "parent": "$c" }, "p": [0, 0, 5] },
-      { "op": "place", "def": "core/flag@1", "name": "plaza", "p": [0, 0], "state": { "label": "plaza" } },
-      { "op": "place", "def": "core/flag@1", "name": "orchard", "p": [-40, -30], "state": { "label": "orchard" } }
-    ] }
+    {
+      "note": "terrain",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/knoll@1",
+          "name": "knoll",
+          "p": [
+            40,
+            10
+          ],
+          "params": {
+            "height": 4,
+            "radius": 22
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/pond@1",
+          "name": "pond",
+          "shape": {
+            "area": [
+              [
+                -30,
+                36
+              ],
+              [
+                -10,
+                32
+              ],
+              [
+                -4,
+                50
+              ],
+              [
+                -24,
+                56
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "note": "first house and flags",
+      "ops": [
+        {
+          "op": "place",
+          "tmp": "$c",
+          "def": "core/cottage@1",
+          "name": "cottage",
+          "p": [
+            44,
+            10
+          ],
+          "constraints": [
+            {
+              "kind": "facing",
+              "ref": "pond"
+            }
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "bench",
+          "in": {
+            "parent": "$c"
+          },
+          "p": [
+            0,
+            0,
+            5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/flag@1",
+          "name": "plaza",
+          "p": [
+            0,
+            0
+          ],
+          "state": {
+            "label": "plaza"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/flag@1",
+          "name": "orchard",
+          "p": [
+            -40,
+            -30
+          ],
+          "state": {
+            "label": "orchard"
+          }
+        }
+      ]
+    },
+    {
+      "note": "Hamlet authoring laboratory: supported presentation seat, pond-side hall and closed reading room; common geometry for both semantic arms.",
+      "ops": [
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "lab-closeable-hall",
+            "version": 1,
+            "description": "A meeting hall: one big room (and a kitchen at the back when it is deep).",
+            "tags": [
+              "structure",
+              "building",
+              "hall"
+            ],
+            "form": "point",
+            "make": {
+              "kind": "gen",
+              "gen": "building/1",
+              "args": {
+                "style": "hall"
+              }
+            },
+            "size": {
+              "box": [
+                14,
+                6,
+                12
+              ]
+            },
+            "params": {
+              "w": {
+                "type": "number",
+                "min": 3,
+                "max": 30,
+                "default": 14,
+                "doc": "width (x) in metres"
+              },
+              "d": {
+                "type": "number",
+                "min": 3,
+                "max": 30,
+                "default": 12,
+                "doc": "depth (z) in metres"
+              },
+              "floors": {
+                "type": "int",
+                "min": 1,
+                "max": 3,
+                "default": 1
+              },
+              "floorHeight": {
+                "type": "number",
+                "min": 2.4,
+                "max": 5,
+                "default": 4
+              },
+              "roof": {
+                "type": "enum",
+                "values": [
+                  "gable",
+                  "hip",
+                  "flat",
+                  "shed",
+                  "dome",
+                  "none"
+                ],
+                "default": "hip"
+              },
+              "roofPitch": {
+                "type": "number",
+                "min": 0,
+                "max": 60,
+                "default": 28,
+                "doc": "degrees"
+              },
+              "material": {
+                "type": "enum",
+                "values": [
+                  "plaster",
+                  "brick",
+                  "stone",
+                  "wood",
+                  "glass",
+                  "metal"
+                ],
+                "default": "plaster"
+              },
+              "wall": {
+                "type": "color",
+                "default": "#efe6d4"
+              },
+              "trim": {
+                "type": "color",
+                "default": "#5e412b"
+              },
+              "roofColor": {
+                "type": "color",
+                "default": "#6f4a35"
+              },
+              "front": {
+                "type": "enum",
+                "values": [
+                  "s",
+                  "n",
+                  "e",
+                  "w"
+                ],
+                "default": "s",
+                "doc": "side of the main door (s = +z)"
+              },
+              "porch": {
+                "type": "number",
+                "min": 0,
+                "max": 4,
+                "default": 0,
+                "doc": "porch depth in metres (0 = none)"
+              },
+              "balcony": {
+                "type": "bool",
+                "default": false
+              },
+              "windows": {
+                "type": "number",
+                "min": 0,
+                "max": 1,
+                "default": 0.6,
+                "doc": "window density along exterior walls"
+              },
+              "plan": {
+                "type": "json",
+                "doc": "explicit plan (see building/1 in /v1/god/schema): {floors:[{rooms:[{id,name,rect:[x0,z0,x1,z1]}],doors:[{between:[a,b]}],exterior:[{room,wall,kind}]}],stairs:[{from,to,room,wall}]}"
+              }
+            },
+            "state": {
+              "paint": {
+                "type": "color",
+                "default": "#efe6d4",
+                "doc": "repaint the walls"
+              },
+              "doors": {
+                "type": "json",
+                "default": {}
+              }
+            },
+            "components": {
+              "foundation": {
+                "kind": "pad"
+              },
+              "place": {
+                "kind": "building",
+                "enclosed": true
+              }
+            },
+            "material": "plaster"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/zone@1",
+          "name": "lab-start",
+          "params": {
+            "use": "park"
+          },
+          "shape": {
+            "area": [
+              [
+                -2,
+                -2
+              ],
+              [
+                2,
+                -2
+              ],
+              [
+                2,
+                2
+              ],
+              [
+                -2,
+                2
+              ]
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/hall@1",
+          "name": "lab-presentation-hall",
+          "p": [
+            14,
+            -8
+          ],
+          "params": {
+            "w": 10,
+            "d": 8,
+            "floors": 1,
+            "front": "s"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "presenter-seat",
+          "in": {
+            "parent": "lab-presentation-hall",
+            "slot": "hall"
+          },
+          "p": [
+            0,
+            0,
+            -1.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "presenter-desk",
+          "in": {
+            "parent": "lab-presentation-hall",
+            "slot": "hall"
+          },
+          "p": [
+            1.6,
+            0,
+            -1.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "audience-bench",
+          "in": {
+            "parent": "lab-presentation-hall",
+            "slot": "hall"
+          },
+          "p": [
+            -2,
+            0,
+            2
+          ],
+          "r": 3.141592653589793
+        },
+        {
+          "op": "place",
+          "def": "core/hall@1",
+          "name": "lab-pond-hall",
+          "p": [
+            2,
+            40
+          ],
+          "params": {
+            "w": 8,
+            "d": 8,
+            "floors": 1,
+            "front": "n"
+          }
+        },
+        {
+          "op": "place",
+          "def": "lab-closeable-hall@1",
+          "name": "lab-reading-room",
+          "p": [
+            -18,
+            -12
+          ],
+          "params": {
+            "w": 8,
+            "d": 6,
+            "floors": 1,
+            "front": "s"
+          },
+          "state": {
+            "doors": {
+              "front-door": "closed"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "note": "World meaning v1: hello-hamlet 1",
+      "ops": [
+        {
+          "op": "set",
+          "id": "pond",
+          "about": {
+            "title": "Hamlet Pond",
+            "what": "A small pond southwest of the cottage and west of the waterside hall. Approach its shore for a swim; the cottage stands on the nearby grassy knoll.",
+            "aliases": [
+              "water",
+              "lake",
+              "swimming pond"
+            ],
+            "kind": "pond",
+            "role": "landmark",
+            "salience": 3
+          }
+        },
+        {
+          "op": "set",
+          "id": "plaza",
+          "about": {
+            "title": "Plaza Marker",
+            "what": "A flag marking the hamlet’s central meeting point. It labels a proposed plaza rather than a furnished square.",
+            "aliases": [
+              "central flag",
+              "meeting point"
+            ],
+            "kind": "marker",
+            "role": "landmark",
+            "salience": 2
+          }
+        },
+        {
+          "op": "set",
+          "id": "orchard",
+          "about": {
+            "title": "Orchard Marker",
+            "what": "A flag marking the proposed orchard, away from the cottage. It is a navigation landmark; the marker alone does not establish fruit trees or a harvest.",
+            "aliases": [
+              "orchard flag",
+              "proposed orchard"
+            ],
+            "kind": "marker",
+            "role": "landmark",
+            "salience": 2
+          }
+        },
+        {
+          "op": "set",
+          "id": "knoll",
+          "about": {
+            "title": "Cottage Knoll",
+            "what": "The grassy rise supporting the cottage. Walk uphill toward the house for the hamlet’s indoor rooms and its outdoor bench.",
+            "aliases": [
+              "rise",
+              "hill",
+              "cottage hill"
+            ],
+            "kind": "hill",
+            "role": "landmark",
+            "salience": 3
+          }
+        },
+        {
+          "op": "set",
+          "id": "cottage",
+          "about": {
+            "title": "Knoll Cottage",
+            "what": "A small one-story home on the grassy rise, with a living room, kitchen and bedroom. The two-seat bench outside provides a place to sit after visiting the rooms.",
+            "aliases": [
+              "house",
+              "home",
+              "hill cottage"
+            ],
+            "kind": "cottage",
+            "role": "landmark",
+            "salience": 3,
+            "parts": [
+              {
+                "id": "living-room",
+                "title": "Living Room",
+                "what": "The cottage’s main indoor room.",
+                "aliases": [
+                  "lounge"
+                ],
+                "anchor": {
+                  "kind": "entity",
+                  "ref": "cottage",
+                  "slot": "living"
+                }
+              },
+              {
+                "id": "kitchen",
+                "title": "Kitchen",
+                "what": "The cottage’s kitchen room.",
+                "aliases": [],
+                "anchor": {
+                  "kind": "entity",
+                  "ref": "cottage",
+                  "slot": "kitchen"
+                }
+              },
+              {
+                "id": "bedroom",
+                "title": "Bedroom",
+                "what": "The cottage’s sleeping room.",
+                "aliases": [],
+                "anchor": {
+                  "kind": "entity",
+                  "ref": "cottage",
+                  "slot": "bedroom"
+                }
+              },
+              {
+                "id": "outdoor-bench",
+                "title": "Outdoor Bench",
+                "what": "A bench seat outside the cottage.",
+                "aliases": [
+                  "bench",
+                  "porch bench"
+                ],
+                "anchor": {
+                  "kind": "entity",
+                  "ref": "cottage/bench",
+                  "slot": "seat-1"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "op": "set",
+          "id": "cottage/bench",
+          "about": {
+            "title": "Cottage Bench",
+            "what": "A two-seat wooden bench outside Knoll Cottage, suited to a quiet pause on the hill.",
+            "aliases": [
+              "outdoor bench",
+              "hill bench"
+            ],
+            "kind": "bench",
+            "role": "part",
+            "in": "cottage",
+            "salience": 1
+          }
+        },
+        {
+          "op": "set",
+          "id": "lab-start",
+          "about": {
+            "title": "Village Green",
+            "what": "An open meeting patch at the plaza flag, between the presentation hall to the east and the closed reading room to the northwest.",
+            "aliases": [
+              "starting green",
+              "meeting lawn"
+            ],
+            "kind": "green",
+            "role": "landmark",
+            "salience": 3
+          }
+        },
+        {
+          "op": "set",
+          "id": "lab-presentation-hall",
+          "about": {
+            "title": "Presentation Hall",
+            "what": "A small hall northeast of the green for giving talks. A presenter’s chair stands beside a desk at the back, facing an audience bench. Enter through the south door.",
+            "aliases": [
+              "auditorium",
+              "lecture hall",
+              "talk hall"
+            ],
+            "kind": "hall",
+            "role": "landmark",
+            "salience": 3,
+            "parts": [
+              {
+                "id": "presenter-seat",
+                "title": "Presenter’s Chair",
+                "what": "The chair beside the presenter’s desk, facing the audience bench.",
+                "anchor": {
+                  "kind": "entity",
+                  "ref": "lab-presentation-hall/presenter-seat",
+                  "slot": "seat"
+                }
+              },
+              {
+                "id": "audience",
+                "title": "Audience Bench",
+                "what": "A bench facing the presenter at the back of the hall.",
+                "anchor": {
+                  "kind": "entity",
+                  "ref": "lab-presentation-hall/audience-bench",
+                  "slot": "seat-1"
+                }
+              },
+              {
+                "id": "main-room",
+                "title": "Main Hall",
+                "what": "The single indoor presentation room.",
+                "anchor": {
+                  "kind": "entity",
+                  "ref": "lab-presentation-hall",
+                  "slot": "hall"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "op": "set",
+          "id": "lab-presentation-hall/presenter-seat",
+          "about": {
+            "title": "Presenter’s Chair",
+            "what": "The presentation seat beside the desk at the back of the hall.",
+            "aliases": [
+              "podium chair",
+              "presentation seat",
+              "presenter seat"
+            ],
+            "kind": "chair",
+            "role": "part",
+            "in": "lab-presentation-hall",
+            "salience": 2
+          }
+        },
+        {
+          "op": "set",
+          "id": "lab-presentation-hall/presenter-desk",
+          "about": {
+            "title": "Presenter’s Desk",
+            "what": "A desk beside the presenter’s chair, facing the audience area.",
+            "kind": "desk",
+            "role": "part",
+            "in": "lab-presentation-hall"
+          }
+        },
+        {
+          "op": "set",
+          "id": "lab-presentation-hall/audience-bench",
+          "about": {
+            "title": "Audience Bench",
+            "what": "A two-seat bench for listeners facing the presenter.",
+            "kind": "bench",
+            "role": "part",
+            "in": "lab-presentation-hall"
+          }
+        },
+        {
+          "op": "set",
+          "id": "lab-pond-hall",
+          "about": {
+            "title": "Waterside Hall",
+            "what": "A small gathering hall beside the eastern shore of Hamlet Pond, south of the village green. Its north-facing doorway leads into one room.",
+            "aliases": [
+              "pond hall",
+              "hall beside the pond",
+              "waterside gathering hall"
+            ],
+            "kind": "hall",
+            "role": "landmark",
+            "salience": 3,
+            "parts": [
+              {
+                "id": "main-room",
+                "title": "Waterside Room",
+                "what": "The single indoor room beside the pond.",
+                "anchor": {
+                  "kind": "entity",
+                  "ref": "lab-pond-hall",
+                  "slot": "hall"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "op": "set",
+          "id": "lab-reading-room",
+          "about": {
+            "title": "Closed Reading Room",
+            "what": "A small reading room northwest of the green. Its only door is closed, so entry is unavailable. The outdoor cottage bench is another place to pause.",
+            "aliases": [
+              "reading room",
+              "locked reading room",
+              "library room"
+            ],
+            "kind": "reading room",
+            "role": "landmark",
+            "salience": 3
+          }
+        },
+        {
+          "op": "world",
+          "state": {
+            "about": {
+              "title": "Hello Hamlet",
+              "what": "A small hamlet with a cottage on a grassy knoll, a pond, a presentation hall, a waterside hall and a closed reading room.",
+              "tour": "Start at the Village Green near the plaza flag. The Presentation Hall to the northeast has a presenter’s chair beside a desk and an audience bench. South of the green, Waterside Hall stands beside Hamlet Pond. The closed Reading Room is northwest; Knoll Cottage and its outdoor bench are east of the green. The Orchard flag marks a proposed orchard, not planted fruit trees."
+            }
+          }
+        }
+      ]
+    }
   ]
 }

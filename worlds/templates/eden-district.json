@@ -2368,6 +2368,400 @@
      "r": -1.571
     }
    ]
+  },
+  {
+   "note": "World meaning v1: eden-district 1",
+   "ops": [
+    {
+     "op": "set",
+     "id": "shore-water",
+     "about": {
+      "title": "West Pond",
+      "what": "A small pond at the western end of the commons, with a pebble bank and reeds along the water.",
+      "aliases": [
+       "pond",
+       "western pond",
+       "swimming pond"
+      ],
+      "kind": "water",
+      "role": "landmark",
+      "salience": 2,
+      "parts": [
+       {
+        "id": "bank",
+        "title": "Pond bank",
+        "anchor": {
+         "kind": "entity",
+         "ref": "shore-bank"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "op": "set",
+     "id": "shore-bank",
+     "about": {
+      "title": "West Pond Bank",
+      "what": "The shoreline around West Pond, where the commons meets the water.",
+      "aliases": [
+       "pond shore",
+       "water edge",
+       "pebble bank"
+      ],
+      "kind": "bank",
+      "role": "part",
+      "in": "shore-water",
+      "salience": 1
+     }
+    },
+    {
+     "op": "set",
+     "id": "pond-reeds",
+     "about": {
+      "title": "Pond Reeds",
+      "what": "Reeds along the pond edge, sheltering the water beside the commons.",
+      "kind": "vegetation",
+      "role": "minor",
+      "in": "shore-water",
+      "salience": 0
+     }
+    },
+    {
+     "op": "set",
+     "id": "commons",
+     "about": {
+      "title": "The Commons",
+      "what": "An open lawn joining the western pond to the pavilion and the homes farther east. A place to meet outdoors before heading into Old Town.",
+      "aliases": [
+       "green",
+       "common",
+       "village green"
+      ],
+      "kind": "park",
+      "role": "district",
+      "salience": 3,
+      "parts": [
+       {
+        "id": "pavilion",
+        "title": "Commons Pavilion",
+        "anchor": {
+         "kind": "entity",
+         "ref": "commons-pavilion"
+        }
+       },
+       {
+        "id": "pond",
+        "title": "West Pond",
+        "anchor": {
+         "kind": "entity",
+         "ref": "shore-water"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "op": "set",
+     "id": "commons-pavilion",
+     "about": {
+      "title": "Commons Pavilion",
+      "what": "An open shelter on the eastern side of the commons, overlooking the lawn.",
+      "aliases": [
+       "shelter",
+       "gazebo"
+      ],
+      "kind": "pavilion",
+      "role": "landmark",
+      "in": "commons",
+      "salience": 2,
+      "parts": [
+       {
+        "id": "pavilion",
+        "title": "Sheltered deck",
+        "anchor": {
+         "kind": "entity",
+         "ref": "commons-pavilion",
+         "slot": "pavilion"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "op": "set",
+     "id": "eden-house-1",
+     "about": {
+      "title": "Brick Cottage",
+      "what": "A single-storey brick home at the northwest corner of the four-house neighbourhood, between the commons and Old Town.",
+      "aliases": [
+       "northwest cottage",
+       "brick house",
+       "house one"
+      ],
+      "kind": "building",
+      "role": "landmark",
+      "salience": 2,
+      "parts": [
+       {
+        "id": "living",
+        "title": "Living room",
+        "anchor": {
+         "kind": "entity",
+         "ref": "eden-house-1",
+         "slot": "living"
+        }
+       },
+       {
+        "id": "kitchen",
+        "title": "Kitchen",
+        "anchor": {
+         "kind": "entity",
+         "ref": "eden-house-1",
+         "slot": "kitchen"
+        }
+       },
+       {
+        "id": "bedroom",
+        "title": "Bedroom",
+        "anchor": {
+         "kind": "entity",
+         "ref": "eden-house-1",
+         "slot": "bedroom"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "op": "set",
+     "id": "eden-house-2",
+     "about": {
+      "title": "Balcony House",
+      "what": "The two-storey cream-coloured home northeast of Brick Cottage, with living spaces downstairs and bedrooms upstairs.",
+      "aliases": [
+       "northeast house",
+       "cream house",
+       "house two"
+      ],
+      "kind": "building",
+      "role": "landmark",
+      "salience": 2,
+      "parts": [
+       {
+        "id": "living",
+        "title": "Living room",
+        "anchor": {
+         "kind": "entity",
+         "ref": "eden-house-2",
+         "slot": "living"
+        }
+       },
+       {
+        "id": "kitchen",
+        "title": "Kitchen",
+        "anchor": {
+         "kind": "entity",
+         "ref": "eden-house-2",
+         "slot": "kitchen"
+        }
+       },
+       {
+        "id": "bedroom",
+        "title": "First upstairs bedroom",
+        "anchor": {
+         "kind": "entity",
+         "ref": "eden-house-2",
+         "slot": "bedroom"
+        }
+       },
+       {
+        "id": "bedroom-2",
+        "title": "Second upstairs bedroom",
+        "anchor": {
+         "kind": "entity",
+         "ref": "eden-house-2",
+         "slot": "bedroom-2"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "op": "set",
+     "id": "eden-house-3",
+     "about": {
+      "title": "Wooden Garden House",
+      "what": "A two-storey wooden home south of Brick Cottage, with planters on its flat roof and a furnished living room below.",
+      "aliases": [
+       "wooden house",
+       "southwest house",
+       "house three"
+      ],
+      "kind": "building",
+      "role": "landmark",
+      "salience": 2,
+      "parts": [
+       {
+        "id": "living",
+        "title": "Living room",
+        "anchor": {
+         "kind": "entity",
+         "ref": "eden-house-3",
+         "slot": "living"
+        }
+       },
+       {
+        "id": "kitchen",
+        "title": "Kitchen",
+        "anchor": {
+         "kind": "entity",
+         "ref": "eden-house-3",
+         "slot": "kitchen"
+        }
+       },
+       {
+        "id": "bedroom",
+        "title": "First upstairs bedroom",
+        "anchor": {
+         "kind": "entity",
+         "ref": "eden-house-3",
+         "slot": "bedroom"
+        }
+       },
+       {
+        "id": "bedroom-2",
+        "title": "Second upstairs bedroom",
+        "anchor": {
+         "kind": "entity",
+         "ref": "eden-house-3",
+         "slot": "bedroom-2"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "op": "set",
+     "id": "eden-house-4",
+     "about": {
+      "title": "Stone House",
+      "what": "The two-storey stone home east of Wooden Garden House, at the southeast corner of the neighbourhood.",
+      "aliases": [
+       "southeast house",
+       "house four"
+      ],
+      "kind": "building",
+      "role": "landmark",
+      "salience": 2,
+      "parts": [
+       {
+        "id": "living",
+        "title": "Living room",
+        "anchor": {
+         "kind": "entity",
+         "ref": "eden-house-4",
+         "slot": "living"
+        }
+       },
+       {
+        "id": "kitchen",
+        "title": "Kitchen",
+        "anchor": {
+         "kind": "entity",
+         "ref": "eden-house-4",
+         "slot": "kitchen"
+        }
+       },
+       {
+        "id": "bedroom",
+        "title": "First upstairs bedroom",
+        "anchor": {
+         "kind": "entity",
+         "ref": "eden-house-4",
+         "slot": "bedroom"
+        }
+       },
+       {
+        "id": "bedroom-2",
+        "title": "Second upstairs bedroom",
+        "anchor": {
+         "kind": "entity",
+         "ref": "eden-house-4",
+         "slot": "bedroom-2"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "op": "set",
+     "id": "eden-library-1",
+     "about": {
+      "title": "Old Town Library",
+      "what": "A reading hall north of Old Town Square, beyond the four houses to the east.",
+      "aliases": [
+       "library",
+       "reading hall",
+       "reading room"
+      ],
+      "kind": "building",
+      "role": "landmark",
+      "salience": 2,
+      "parts": [
+       {
+        "id": "hall",
+        "title": "Library hall",
+        "anchor": {
+         "kind": "entity",
+         "ref": "eden-library-1",
+         "slot": "hall"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "op": "set",
+     "id": "region-old-town.plaza",
+     "about": {
+      "title": "Old Town Square",
+      "what": "A cobbled public square east of the residential neighbourhood and south of the library.",
+      "aliases": [
+       "old town",
+       "town square",
+       "plaza"
+      ],
+      "kind": "plaza",
+      "role": "district",
+      "salience": 3,
+      "parts": [
+       {
+        "id": "library",
+        "title": "Old Town Library",
+        "anchor": {
+         "kind": "entity",
+         "ref": "eden-library-1"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "op": "world",
+     "state": {
+      "about": {
+       "title": "Eden District",
+       "what": "A small neighbourhood linking a pond and grassy commons with four homes, a library and an old-town square.",
+       "tour": "Start on the commons. West is the pond and its bank; the pavilion shelters the eastern lawn. Continue east past the four houses to Old Town Square. The library stands just north of the square.",
+       "districts": [
+        "commons",
+        "region-old-town.plaza"
+       ]
+      }
+     }
+    }
+   ]
   }
  ]
 }

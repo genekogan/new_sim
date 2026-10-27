@@ -1,5 +1,6 @@
 {
- "schema": "genesis/1", "hidden": true,
+ "schema": "genesis/1",
+ "hidden": true,
  "name": "Mars camp",
  "description": "The Mars College camp in the new vocabulary: desert floor, low hills and creosote scatter, the kitchen, the living room with its classroom corner and the bunk house as open-topped walled rooms, every fixture and item of the camp manifest at its source position (names kept), the stock piles (pallet racks with their beams in the sockets, timber, plywood), the lookout bay as built, solar panels, a shipping container and water totes. Campfire, chess board, sleeping mats, spoons, book and sketch pad are defined (kit/2) in the template. Generated from worlds/mars/camp/manifest.json + eden-camp.ts (parity proof, docs/god/PARITY.md). Not here: dust in the air and the desert sky (world weather/sky are not rendered yet, B7), the Souls' construction process (B5).",
  "constants": {
@@ -2540,6 +2541,167 @@
       29,
       14
      ]
+    }
+   ]
+  },
+  {
+   "note": "World meaning v1: mars-camp 1",
+   "ops": [
+    {
+     "op": "set",
+     "id": "kitchen",
+     "about": {
+      "title": "Camp Kitchen",
+      "what": "The western building in the camp row, where residents gather for shared meals. The living room is next door to the east.",
+      "aliases": [
+       "dining room",
+       "mess hall",
+       "canteen"
+      ],
+      "kind": "building",
+      "role": "landmark",
+      "salience": 2,
+      "parts": [
+       {
+        "id": "kitchen",
+        "title": "Kitchen and dining room",
+        "anchor": {
+         "kind": "entity",
+         "ref": "kitchen",
+         "slot": "kitchen"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "op": "set",
+     "id": "living-room",
+     "about": {
+      "title": "Camp Living Room",
+      "what": "The communal hall between the kitchen and bunkhouse: classes and presentations occupy one end, with reading, computers and conversation at the other.",
+      "aliases": [
+       "common room",
+       "classroom",
+       "meeting hall",
+       "lounge"
+      ],
+      "kind": "building",
+      "role": "landmark",
+      "salience": 2,
+      "parts": [
+       {
+        "id": "classroom-corner",
+        "title": "Classroom corner",
+        "what": "The teaching end of the hall, with a display and lectern.",
+        "anchor": {
+         "kind": "entity",
+         "ref": "living-room",
+         "slot": "classroom-corner"
+        }
+       },
+       {
+        "id": "living-room",
+        "title": "Living room",
+        "what": "The informal reading and conversation end of the hall.",
+        "anchor": {
+         "kind": "entity",
+         "ref": "living-room",
+         "slot": "living-room"
+        }
+       },
+       {
+        "id": "lectern",
+        "title": "Class lectern",
+        "anchor": {
+         "kind": "entity",
+         "ref": "living-room/class-lectern"
+        }
+       },
+       {
+        "id": "reading-seat",
+        "title": "Reading chair",
+        "anchor": {
+         "kind": "entity",
+         "ref": "living-room/reading-chair",
+         "slot": "seat"
+        }
+       },
+       {
+        "id": "computer-seat",
+        "title": "First computer chair",
+        "anchor": {
+         "kind": "entity",
+         "ref": "living-room/computer-1-chair",
+         "slot": "seat"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "op": "set",
+     "id": "bunkhouse",
+     "about": {
+      "title": "Camp Bunkhouse",
+      "what": "The eastern building in the camp row, providing a shared sleeping room away from the kitchen and classroom.",
+      "aliases": [
+       "sleeping quarters",
+       "dormitory",
+       "sleeping room"
+      ],
+      "kind": "building",
+      "role": "landmark",
+      "salience": 2,
+      "parts": [
+       {
+        "id": "bunkhouse",
+        "title": "Shared sleeping room",
+        "anchor": {
+         "kind": "entity",
+         "ref": "bunkhouse",
+         "slot": "bunkhouse"
+        }
+       },
+       {
+        "id": "first-mat",
+        "title": "First sleeping mat",
+        "anchor": {
+         "kind": "entity",
+         "ref": "bunkhouse/mat-1"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "op": "set",
+     "id": "lookout-bay",
+     "about": {
+      "title": "Desert Lookout",
+      "what": "A small raised wooden viewing deck south of the kitchen, looking out over the open camp terrain.",
+      "aliases": [
+       "lookout",
+       "viewing deck",
+       "observation deck"
+      ],
+      "kind": "deck",
+      "role": "landmark",
+      "salience": 2
+     }
+    },
+    {
+     "op": "world",
+     "state": {
+      "about": {
+       "title": "Mars Camp",
+       "what": "A compact desert camp with a shared kitchen, a learning and living hall, a bunkhouse and a small lookout.",
+       "tour": "The main buildings form a west-to-east row: kitchen, living room, bunkhouse. Classes take place in the classroom corner of the living room. The small lookout lies south of the kitchen.",
+       "districts": [
+        "living-room"
+       ]
+      }
+     }
     }
    ]
   }
