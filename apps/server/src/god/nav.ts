@@ -397,10 +397,13 @@ export class GodNav {
       }
     }
     // D2 (playtest 2026-10-25: 4 of 4 "walk to the pavilion" ended at its closed front door, outside its floor): a building
-    // with a single room is walked into that room, as walk:<building>/<room> is, whenever the room has standing room
+    // with a single room is walked into that room, as walk:<building>/<room> is.
+    // A blocked interior must not retain the earlier exterior approach while the offer promises entry.
     if (t.kind === 'building' && !t.doorOpen && t.rooms?.length === 1) {
       const room = this.things().find((x) => x.kind === 'room' && x.ref === t.rooms![0]), inner = room ? this.goal(room, me, except) : null;
-      if (inner) goal = inner;
+      goal = inner;
+      if (!inner) this.blocked.set(t.ref, `The interior of ${t.ref} is not reachable right now; its entrance or the route inside is blocked.`);
+      else this.blocked.delete(t.ref);
     }
     this.goals.set(key, { tick, key, goal });
     return goal;
