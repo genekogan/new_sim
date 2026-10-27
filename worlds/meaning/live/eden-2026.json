@@ -1,0 +1,870 @@
+{
+  "schema": "world-meaning/1",
+  "worldId": "eden-2026",
+  "source": {
+    "snapshotSha": "8b97b77f6ed421dca5da1fd0c3b7f0af84adda7d1c3e475e3b9ac3e141c70af2"
+  },
+  "about": {
+    "region-abbey-church": {
+      "title": "Abbey Church",
+      "what": "The main church in the Abbey Grounds, distinct from the domestic rooms of the cloister behind it.",
+      "aliases": [
+        "abbey church",
+        "monastery church"
+      ],
+      "kind": "church",
+      "role": "landmark",
+      "salience": 2,
+      "parts": [
+        {
+          "id": "nave",
+          "title": "Nave",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-abbey-church",
+            "slot": "nave"
+          },
+          "aliases": []
+        },
+        {
+          "id": "vestry",
+          "title": "Vestry",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-abbey-church",
+            "slot": "vestry"
+          },
+          "aliases": []
+        }
+      ],
+      "in": "place-region-abbey"
+    },
+    "region-alpine-mountain-station": {
+      "title": "Alpine Mountain Station",
+      "what": "The upper station above the alpine village, beside the mountain restaurant and below the northern peaks.",
+      "aliases": [
+        "mountain station",
+        "upper station"
+      ],
+      "kind": "station",
+      "role": "landmark",
+      "salience": 2,
+      "parts": [
+        {
+          "id": "hall",
+          "title": "Main Hall",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-alpine-mountain-station",
+            "slot": "hall"
+          },
+          "aliases": []
+        }
+      ]
+    },
+    "region-alpine-mountain-restaurant": {
+      "title": "Mountain Restaurant",
+      "what": "The restaurant building near the upper alpine station, with a kitchen, main room and upstairs rooms. The terrace lies alongside it.",
+      "aliases": [
+        "alpine restaurant",
+        "mountain restaurant"
+      ],
+      "kind": "restaurant",
+      "role": "landmark",
+      "salience": 2,
+      "parts": [
+        {
+          "id": "living",
+          "title": "Living Room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-alpine-mountain-restaurant",
+            "slot": "living"
+          },
+          "aliases": []
+        },
+        {
+          "id": "kitchen",
+          "title": "Kitchen",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-alpine-mountain-restaurant",
+            "slot": "kitchen"
+          },
+          "aliases": []
+        },
+        {
+          "id": "bath",
+          "title": "Bathing Room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-alpine-mountain-restaurant",
+            "slot": "bath"
+          },
+          "aliases": []
+        },
+        {
+          "id": "landing",
+          "title": "Upper Landing",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-alpine-mountain-restaurant",
+            "slot": "landing"
+          },
+          "aliases": [],
+          "what": "A room on the upper floor."
+        },
+        {
+          "id": "bedroom",
+          "title": "Bedroom",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-alpine-mountain-restaurant",
+            "slot": "bedroom"
+          },
+          "aliases": [],
+          "what": "A room on the upper floor."
+        },
+        {
+          "id": "bedroom-2",
+          "title": "Second Bedroom",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-alpine-mountain-restaurant",
+            "slot": "bedroom-2"
+          },
+          "aliases": [],
+          "what": "A room on the upper floor."
+        },
+        {
+          "id": "bath-2",
+          "title": "Bathroom 2",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-alpine-mountain-restaurant",
+            "slot": "bath-2"
+          },
+          "aliases": [],
+          "what": "A room on the upper floor."
+        }
+      ]
+    },
+    "region-cliff-village-chapel": {
+      "title": "Cliff Village Chapel",
+      "what": "The small chapel among the cliffside houses, between the village’s two windmills.",
+      "aliases": [
+        "cliff chapel"
+      ],
+      "kind": "chapel",
+      "role": "landmark",
+      "salience": 2,
+      "parts": [
+        {
+          "id": "nave",
+          "title": "Nave",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-cliff-village-chapel",
+            "slot": "nave"
+          },
+          "aliases": []
+        }
+      ]
+    },
+    "region-hillside-village-lookout-temple": {
+      "title": "Hillside Lookout Temple",
+      "what": "An open lookout pavilion among the hillside homes, overlooking the eastern settlements.",
+      "aliases": [
+        "lookout temple",
+        "hillside lookout"
+      ],
+      "kind": "pavilion",
+      "role": "landmark",
+      "salience": 2,
+      "parts": [
+        {
+          "id": "pavilion",
+          "title": "Pavilion",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-hillside-village-lookout-temple",
+            "slot": "pavilion"
+          },
+          "aliases": []
+        }
+      ]
+    },
+    "region-courtyard-quarter-house-4-study": {
+      "title": "Courtyard House 4 Study",
+      "what": "The study belonging to Courtyard House 4.",
+      "aliases": [],
+      "kind": "study",
+      "role": "part",
+      "salience": 1,
+      "in": "region-courtyard-quarter-house-4"
+    },
+    "old-town-north-arcade-1": {
+      "title": "Old Town North Arcade 1",
+      "what": "A arcade in the Old Town’s north arcade.",
+      "aliases": [],
+      "kind": "arcade",
+      "role": "landmark",
+      "salience": 1,
+      "in": "place-region-canal-quarter"
+    },
+    "old-town-north-arcade-2": {
+      "title": "Old Town North Arcade 2",
+      "what": "A arcade in the Old Town’s north arcade.",
+      "aliases": [],
+      "kind": "arcade",
+      "role": "landmark",
+      "salience": 1,
+      "in": "place-region-canal-quarter"
+    },
+    "old-town-north-arcade-3": {
+      "title": "Old Town North Arcade 3",
+      "what": "A arcade in the Old Town’s north arcade.",
+      "aliases": [],
+      "kind": "arcade",
+      "role": "landmark",
+      "salience": 1,
+      "in": "place-region-canal-quarter"
+    },
+    "old-town-north-arcade-4": {
+      "title": "Old Town North Arcade 4",
+      "what": "A arcade in the Old Town’s north arcade.",
+      "aliases": [],
+      "kind": "arcade",
+      "role": "landmark",
+      "salience": 1,
+      "in": "place-region-canal-quarter"
+    },
+    "suburb-house-1": {
+      "title": "Suburban House 1",
+      "what": "A home in the residential streets east of Old Town.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "suburb-house-2": {
+      "title": "Suburban House 2",
+      "what": "A home in the residential streets east of Old Town.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "suburb-house-3": {
+      "title": "Suburban House 3",
+      "what": "A home in the residential streets east of Old Town.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "suburb-house-4": {
+      "title": "Suburban House 4",
+      "what": "A home in the residential streets east of Old Town.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "suburb-house-5": {
+      "title": "Suburban House 5",
+      "what": "A home in the residential streets east of Old Town.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "suburb-house-6": {
+      "title": "Suburban House 6",
+      "what": "A home in the residential streets east of Old Town.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "suburb-house-7": {
+      "title": "Suburban House 7",
+      "what": "A home in the residential streets east of Old Town.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "suburb-house-8": {
+      "title": "Suburban House 8",
+      "what": "A home in the residential streets east of Old Town.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "suburb-house-9": {
+      "title": "Suburban House 9",
+      "what": "A home in the residential streets east of Old Town.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "suburb-house-10": {
+      "title": "Suburban House 10",
+      "what": "A home in the residential streets east of Old Town.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "suburb-house-11": {
+      "title": "Suburban House 11",
+      "what": "A home in the residential streets east of Old Town.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "suburb-house-12": {
+      "title": "Suburban House 12",
+      "what": "A home in the residential streets east of Old Town.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "suburb-house-13": {
+      "title": "Suburban House 13",
+      "what": "A home in the residential streets east of Old Town.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "suburb-house-14": {
+      "title": "Suburban House 14",
+      "what": "A home in the residential streets east of Old Town.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "suburb-house-15": {
+      "title": "Suburban House 15",
+      "what": "A home in the residential streets east of Old Town.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "suburb-house-16": {
+      "title": "Suburban House 16",
+      "what": "A home in the residential streets east of Old Town.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "lake-cabin-1": {
+      "title": "West Lake Cabin 1",
+      "what": "A cabin on the northern shore of West Lake.",
+      "aliases": [],
+      "kind": "cabin",
+      "role": "landmark",
+      "salience": 1
+    },
+    "lake-cabin-2": {
+      "title": "West Lake Cabin 2",
+      "what": "A cabin on the northern shore of West Lake.",
+      "aliases": [],
+      "kind": "cabin",
+      "role": "landmark",
+      "salience": 1
+    },
+    "lake-cabin-3": {
+      "title": "West Lake Cabin 3",
+      "what": "A cabin on the northern shore of West Lake.",
+      "aliases": [],
+      "kind": "cabin",
+      "role": "landmark",
+      "salience": 1
+    },
+    "lake-cabin-4": {
+      "title": "West Lake Cabin 4",
+      "what": "A cabin on the northern shore of West Lake.",
+      "aliases": [],
+      "kind": "cabin",
+      "role": "landmark",
+      "salience": 1
+    },
+    "lake-cabin-5": {
+      "title": "West Lake Cabin 5",
+      "what": "A cabin on the northern shore of West Lake.",
+      "aliases": [],
+      "kind": "cabin",
+      "role": "landmark",
+      "salience": 1
+    },
+    "lake-cabin-6": {
+      "title": "West Lake Cabin 6",
+      "what": "A cabin on the northern shore of West Lake.",
+      "aliases": [],
+      "kind": "cabin",
+      "role": "landmark",
+      "salience": 1
+    },
+    "alpine-chalet-5": {
+      "title": "Alpine Chalet 5",
+      "what": "A chalet in the alpine valley above the lower station.",
+      "aliases": [],
+      "kind": "chalet",
+      "role": "landmark",
+      "salience": 1
+    },
+    "cliff-house-5": {
+      "title": "Cliff Village House 5",
+      "what": "A home in the Cliff Village above its small quay.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "cliff-house-7": {
+      "title": "Cliff Village House 7",
+      "what": "A home in the Cliff Village above its small quay.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "cliff-house-8": {
+      "title": "Cliff Village House 8",
+      "what": "A home in the Cliff Village above its small quay.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "cliff-house-13": {
+      "title": "Cliff Village House 13",
+      "what": "A home in the Cliff Village above its small quay.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "cliff-house-15": {
+      "title": "Cliff Village House 15",
+      "what": "A home in the Cliff Village above its small quay.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "cliff-house-17": {
+      "title": "Cliff Village House 17",
+      "what": "A home in the Cliff Village above its small quay.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "cliff-house-19": {
+      "title": "Cliff Village House 19",
+      "what": "A home in the Cliff Village above its small quay.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "cliff-house-20": {
+      "title": "Cliff Village House 20",
+      "what": "A home in the Cliff Village above its small quay.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "cliff-house-21": {
+      "title": "Cliff Village House 21",
+      "what": "A home in the Cliff Village above its small quay.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "cliff-house-11": {
+      "title": "Cliff Village House 11",
+      "what": "A home in the Cliff Village above its small quay.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "cliff-house-12": {
+      "title": "Cliff Village House 12",
+      "what": "A home in the Cliff Village above its small quay.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "cliff-house-23": {
+      "title": "Cliff Village House 23",
+      "what": "A home in the Cliff Village above its small quay.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "cliff-house-25": {
+      "title": "Cliff Village House 25",
+      "what": "A home in the Cliff Village above its small quay.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "cliff-house-27": {
+      "title": "Cliff Village House 27",
+      "what": "A home in the Cliff Village above its small quay.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "hillside-home-4": {
+      "title": "Hillside Home 4",
+      "what": "A home in the eastern hillside settlement.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "hillside-home-7": {
+      "title": "Hillside Home 7",
+      "what": "A home in the eastern hillside settlement.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "hillside-home-9": {
+      "title": "Hillside Home 9",
+      "what": "A home in the eastern hillside settlement.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "hillside-home-13": {
+      "title": "Hillside Home 13",
+      "what": "A home in the eastern hillside settlement.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "hillside-home-14": {
+      "title": "Hillside Home 14",
+      "what": "A home in the eastern hillside settlement.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "hillside-home-15": {
+      "title": "Hillside Home 15",
+      "what": "A home in the eastern hillside settlement.",
+      "aliases": [],
+      "kind": "home",
+      "role": "landmark",
+      "salience": 1
+    },
+    "alpine-chalet-2": {
+      "title": "Alpine Chalet 2",
+      "what": "A chalet in the alpine valley above the lower station.",
+      "aliases": [],
+      "kind": "chalet",
+      "role": "landmark",
+      "salience": 1
+    },
+    "alpine-chalet-4": {
+      "title": "Alpine Chalet 4",
+      "what": "A chalet in the alpine valley above the lower station.",
+      "aliases": [],
+      "kind": "chalet",
+      "role": "landmark",
+      "salience": 1
+    },
+    "region-abbey-cloister-kitchen": {
+      "title": "Cloister Kitchen",
+      "what": "The kitchen belonging to the Abbey Cloister, beside its domestic rooms.",
+      "kind": "kitchen",
+      "role": "landmark",
+      "salience": 2,
+      "aliases": [
+        "cloister kitchen"
+      ],
+      "in": "region-abbey-cloister",
+      "parts": [
+        {
+          "id": "kitchen",
+          "title": "Kitchen",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-abbey-cloister-kitchen",
+            "slot": "kitchen"
+          }
+        },
+        {
+          "id": "kitchen-1",
+          "title": "Kitchen upstairs 1 (upper floor)",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-abbey-cloister-kitchen",
+            "slot": "kitchen-1"
+          }
+        }
+      ]
+    },
+    "region-abbey-cloister-bedroom": {
+      "title": "Cloister Bedroom",
+      "what": "The sleeping room belonging to the Abbey Cloister.",
+      "kind": "bedroom",
+      "role": "landmark",
+      "salience": 2,
+      "aliases": [
+        "cloister bedroom"
+      ],
+      "in": "region-abbey-cloister",
+      "parts": [
+        {
+          "id": "bedroom",
+          "title": "Bedroom",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-abbey-cloister-bedroom",
+            "slot": "bedroom"
+          }
+        }
+      ]
+    },
+    "region-abbey-cloister-study": {
+      "title": "Cloister Study",
+      "what": "The study belonging to the Abbey Cloister, for a quieter indoor visit.",
+      "kind": "study",
+      "role": "landmark",
+      "salience": 2,
+      "aliases": [
+        "cloister study"
+      ],
+      "in": "region-abbey-cloister",
+      "parts": [
+        {
+          "id": "parlour",
+          "title": "Parlour",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-abbey-cloister-study",
+            "slot": "parlour"
+          }
+        }
+      ]
+    },
+    "region-vineyard-villa": {
+      "title": "Vineyard Villa",
+      "what": "The estate house overlooking the vineyard and orchard, beside the tower and wine cellar.",
+      "kind": "villa",
+      "role": "landmark",
+      "salience": 2,
+      "aliases": [
+        "vineyard villa"
+      ],
+      "in": "place-region-vineyard",
+      "parts": [
+        {
+          "id": "living",
+          "title": "Living room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-vineyard-villa",
+            "slot": "living"
+          }
+        },
+        {
+          "id": "kitchen",
+          "title": "Kitchen",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-vineyard-villa",
+            "slot": "kitchen"
+          }
+        },
+        {
+          "id": "bath",
+          "title": "Bathroom",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-vineyard-villa",
+            "slot": "bath"
+          }
+        },
+        {
+          "id": "landing",
+          "title": "Landing (upper floor)",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-vineyard-villa",
+            "slot": "landing"
+          }
+        },
+        {
+          "id": "bedroom",
+          "title": "Bedroom (upper floor)",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-vineyard-villa",
+            "slot": "bedroom"
+          }
+        },
+        {
+          "id": "bedroom-2",
+          "title": "Bedroom 2 (upper floor)",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-vineyard-villa",
+            "slot": "bedroom-2"
+          }
+        },
+        {
+          "id": "bath-2",
+          "title": "Bathroom 2 (upper floor)",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-vineyard-villa",
+            "slot": "bath-2"
+          }
+        }
+      ]
+    },
+    "region-vineyard-villa-tower": {
+      "title": "Vineyard Villa Tower",
+      "what": "The tower adjoining the vineyard estate, a landmark above the rows of vines.",
+      "kind": "tower",
+      "role": "landmark",
+      "salience": 2,
+      "aliases": [
+        "vineyard villa tower"
+      ],
+      "in": "region-vineyard-villa",
+      "parts": [
+        {
+          "id": "entrance",
+          "title": "Entrance",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-vineyard-villa-tower",
+            "slot": "entrance"
+          }
+        },
+        {
+          "id": "room",
+          "title": "Room 1 (upper floor)",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-vineyard-villa-tower",
+            "slot": "room"
+          }
+        },
+        {
+          "id": "room-2",
+          "title": "Room 2 (upper floor)",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-vineyard-villa-tower",
+            "slot": "room-2"
+          }
+        },
+        {
+          "id": "top",
+          "title": "Top room (upper floor)",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-vineyard-villa-tower",
+            "slot": "top"
+          }
+        }
+      ]
+    },
+    "region-west-river-watermill": {
+      "title": "West River Watermill",
+      "what": "The mill beside the western river, north of the stone bridge.",
+      "kind": "watermill",
+      "role": "landmark",
+      "salience": 2,
+      "aliases": [
+        "west river watermill"
+      ],
+      "in": "place-region-west-river",
+      "parts": [
+        {
+          "id": "living",
+          "title": "Living room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-west-river-watermill",
+            "slot": "living"
+          }
+        },
+        {
+          "id": "kitchen",
+          "title": "Kitchen",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-west-river-watermill",
+            "slot": "kitchen"
+          }
+        },
+        {
+          "id": "bath",
+          "title": "Bathroom",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-west-river-watermill",
+            "slot": "bath"
+          }
+        },
+        {
+          "id": "landing",
+          "title": "Landing (upper floor)",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-west-river-watermill",
+            "slot": "landing"
+          }
+        },
+        {
+          "id": "bedroom",
+          "title": "Bedroom (upper floor)",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-west-river-watermill",
+            "slot": "bedroom"
+          }
+        },
+        {
+          "id": "bedroom-2",
+          "title": "Bedroom 2 (upper floor)",
+          "anchor": {
+            "kind": "entity",
+            "ref": "region-west-river-watermill",
+            "slot": "bedroom-2"
+          }
+        }
+      ]
+    }
+  }
+}

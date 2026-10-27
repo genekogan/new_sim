@@ -1,0 +1,214 @@
+{
+  "schema": "world-meaning/1",
+  "worldId": "mars-two",
+  "source": {
+    "snapshotSha": "da64a73026bebc281ce4a7a261144313bb29d48415e0ae7370736a93dddaa1f7"
+  },
+  "about": {
+    "mimos/mimos-coffee-table/coffee-table-ceramic-cup": {
+      "title": "Coffee Table Ceramic Cup",
+      "what": "A ceramic cup on the coffee table in Mimos’s south lounge.",
+      "aliases": [],
+      "kind": "cup",
+      "role": "part",
+      "salience": 0,
+      "in": "mimos/mimos-coffee-table"
+    },
+    "mimos/mimos-coffee-table/coffee-table-ceramic-cup-2": {
+      "title": "Coffee Table Ceramic Cup 2",
+      "what": "Another ceramic cup on the coffee table in Mimos’s south lounge.",
+      "aliases": [],
+      "kind": "cup",
+      "role": "part",
+      "salience": 0,
+      "in": "mimos/mimos-coffee-table"
+    },
+    "mimos/mimos-coffee-table/coffee-table-ceramic-cup-3": {
+      "title": "Coffee Table Ceramic Cup 3",
+      "what": "Another ceramic cup on the coffee table in Mimos’s south lounge.",
+      "aliases": [],
+      "kind": "cup",
+      "role": "part",
+      "salience": 0,
+      "in": "mimos/mimos-coffee-table"
+    },
+    "mimos/mimos-coffee-table/coffee-table-ceramic-cup-4": {
+      "title": "Coffee Table Ceramic Cup 4",
+      "what": "Another ceramic cup on the coffee table in Mimos’s south lounge.",
+      "aliases": [],
+      "kind": "cup",
+      "role": "part",
+      "salience": 0,
+      "in": "mimos/mimos-coffee-table"
+    },
+    "kitchen/prep-table-15/prep-mixing-bowl": {
+      "title": "Prep Mixing Bowl",
+      "what": "A mixing bowl on the food preparation table in the campus kitchen.",
+      "aliases": [],
+      "kind": "bowl",
+      "role": "part",
+      "salience": 0,
+      "in": "kitchen/prep-table-15"
+    },
+    "kitchen/prep-table-15/prep-mixing-bowl-2": {
+      "title": "Prep Mixing Bowl 2",
+      "what": "A second mixing bowl on the food preparation table in the campus kitchen.",
+      "aliases": [],
+      "kind": "bowl",
+      "role": "part",
+      "salience": 0,
+      "in": "kitchen/prep-table-15"
+    },
+    "mimos/tea-table-2/table-kettle": {
+      "title": "Table Kettle",
+      "what": "A tea kettle on the low tea table in Mimos.",
+      "aliases": [],
+      "kind": "kettle",
+      "role": "part",
+      "salience": 0,
+      "in": "mimos/tea-table-2"
+    },
+    "mimos/tea-table-2/table-cup": {
+      "title": "Table Cup",
+      "what": "A tea cup on the low tea table in Mimos.",
+      "aliases": [],
+      "kind": "cup",
+      "role": "part",
+      "salience": 0,
+      "in": "mimos/tea-table-2"
+    },
+    "mimos/tea-table-2/table-cup-2": {
+      "title": "Table Cup 2",
+      "what": "Another tea cup on the low tea table in Mimos.",
+      "aliases": [],
+      "kind": "cup",
+      "role": "part",
+      "salience": 0,
+      "in": "mimos/tea-table-2"
+    },
+    "mimos/study-table-3/ceramic-mug": {
+      "title": "Ceramic Mug",
+      "what": "A ceramic mug on the study table in Mimos’s main bay.",
+      "aliases": [],
+      "kind": "cup",
+      "role": "part",
+      "salience": 0,
+      "in": "mimos/study-table-3"
+    },
+    "mimos/study-table-3/ceramic-mug-2": {
+      "title": "Ceramic Mug 2",
+      "what": "Another ceramic mug on the study table in Mimos’s main bay.",
+      "aliases": [],
+      "kind": "cup",
+      "role": "part",
+      "salience": 0,
+      "in": "mimos/study-table-3"
+    },
+    "kitchen/perimeter-counter/rice-cooker": {
+      "title": "Rice Cooker",
+      "what": "The rice cooker on the counter in the campus kitchen.",
+      "aliases": [],
+      "kind": "rice cooker",
+      "role": "part",
+      "salience": 0,
+      "in": "kitchen/perimeter-counter"
+    },
+    "kitchen/perimeter-counter/water-urn": {
+      "title": "Water Urn",
+      "what": "The water urn on the counter in the campus kitchen.",
+      "aliases": [],
+      "kind": "water urn",
+      "role": "part",
+      "salience": 0,
+      "in": "kitchen/perimeter-counter"
+    },
+    "mimos/papasan-8": {
+      "title": "Papasan 8",
+      "what": "A round papasan chair in Mimos’s south lounge.",
+      "aliases": [],
+      "kind": "chair",
+      "role": "part",
+      "salience": 1,
+      "in": "mimos"
+    },
+    "kitchen/bus-seat-25": {
+      "title": "Bus Seat 25",
+      "aliases": [],
+      "role": "part",
+      "salience": 1,
+      "in": "kitchen"
+    },
+    "kitchen/bus-seat-23": {
+      "title": "Bus Seat 23",
+      "aliases": [],
+      "role": "part",
+      "salience": 1,
+      "in": "kitchen"
+    },
+    "kitchen/bus-seat-20": {
+      "title": "Bus Seat 20",
+      "aliases": [],
+      "role": "part",
+      "salience": 1,
+      "in": "kitchen"
+    },
+    "kitchen/bus-seat-21": {
+      "title": "Bus Seat 21",
+      "aliases": [],
+      "role": "part",
+      "salience": 1,
+      "in": "kitchen"
+    },
+    "kitchen": {
+      "title": "Campus Kitchen and Dining Hall",
+      "what": "The shared campus meal building: prepare food in the working kitchen and gather around tables in the dining hall. The room names distinguish preparation space from the place to eat.",
+      "aliases": [
+        "kitchen",
+        "dining hall",
+        "canteen",
+        "mess hall"
+      ],
+      "kind": "kitchen",
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "working-kitchen",
+          "title": "Working Kitchen",
+          "aliases": [
+            "prep room"
+          ],
+          "what": "Food preparation room with counters, sink and storage.",
+          "anchor": {
+            "kind": "entity",
+            "ref": "kitchen",
+            "slot": "working-kitchen"
+          }
+        },
+        {
+          "id": "dining-hall",
+          "title": "Dining Hall",
+          "aliases": [
+            "dining room"
+          ],
+          "what": "The communal dining room with tables and reused bus seats.",
+          "anchor": {
+            "kind": "entity",
+            "ref": "kitchen",
+            "slot": "dining-hall"
+          }
+        },
+        {
+          "id": "dining-seat",
+          "title": "Dining Seat",
+          "aliases": [],
+          "anchor": {
+            "kind": "entity",
+            "ref": "kitchen/bus-seat-20",
+            "slot": "seat-1"
+          }
+        }
+      ]
+    }
+  }
+}
