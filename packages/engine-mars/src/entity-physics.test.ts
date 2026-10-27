@@ -161,3 +161,18 @@ test('world-edit: a fixture that names its floor\'s level sits there, not on the
   assert.equal(e.world.entities.h_walker0001.human?.level, 1);
   assert.deepEqual(e.runtime.violations, []);
 });
+
+test('a fixture title edit updates perception without invalidating routes or moving bodies', async () => {
+  const {e, ev} = await built();
+  const spatial = (e as unknown as {rt:{services:{spatial:{sync(w:unknown):void;epoch:number}}}}).rt.services.spatial;
+  spatial.sync(e.world); const epoch = spatial.epoch, before = structuredClone(e.world.entities.h_walker0001.pose);
+  const fixture = {...ev.set.e_chair1!.fixture!, label: 'Presenter’s chair'};
+  const renamed = edit(2, {e_chair1:{fixture}}, phys(e));
+  const result = e.applyWorldEditV1(renamed); spatial.sync(e.world);
+  assert.equal(e.world.entities.e_chair1.label, 'Presenter’s chair');
+  assert.equal(spatial.epoch, epoch, 'metadata does not cause route replanning');
+  assert.deepEqual(result.relocated, []); assert.deepEqual(e.world.entities.h_walker0001.pose, before);
+  const moved = edit(3, {e_chair1:{fixture:{...fixture,p:[8.5,2.85,-1]}}}, phys(e));
+  e.applyWorldEditV1(moved); spatial.sync(e.world);
+  assert.ok(spatial.epoch > epoch, 'a real fixture move still invalidates navigation');
+});

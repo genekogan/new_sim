@@ -25,7 +25,7 @@ import {probeBody,releaseBody,setDownFrom} from './stall.ts';
 import {commonsFoodDeliveryItemsV1} from './food-delivery.ts';
 import {commonsFoodDeliveryV1Schema,type CommonsFoodDeliveryV1} from '@sim/engine-contract';
 import {socialEdenV1} from './social-eden.ts';
-import {applyWorldEdit,type WorldEditV1} from './entity-physics.ts';
+import {applyWorldEdit,worldEditChangesNavigation,type WorldEditV1} from './entity-physics.ts';
 import {applyUpperFloorsV1,placeLevelOf,previewUpperFloorsV1,type UpperFloorsFactV1,type UpperFloorsV1} from './upper-floors.ts';
 import {registerAssets} from './catalog-adapter.ts';
 import {socialEdenTransitionV1Schema,type SocialEdenTransitionV1} from '@sim/engine-contract';
@@ -1823,15 +1823,16 @@ export class MarsEngine implements Engine {
     if(!raw||raw.contract!=='world-edit/1'||typeof raw.set!=='object'||!Array.isArray(raw.levels))throw Error('world-edit.bad-payload');
     if(this.renderPlatformMetadata)this.finishRecorder();
     const baseKey=this.rt.world.entityPhysicsV1?.baseKey;
+    const navigationChanged=worldEditChangesNavigation(this.rt.world,raw);
     const {physics,kept}=applyWorldEdit(this.rt.world,raw);
     this.m.canonicalEntityOrder(this.rt.world);
     // entity-world fixtures are depicted by the viewer's entity layer (entity diffs), not by engine change events or takes
     const spatial=this.rt.services.spatial as Spatial;
     // new levels / wider raster: re-base once; otherwise the next sync patches only the changed cells (incremental)
     if(physics.baseKey!==baseKey&&spatial.source)spatial.refreshForWorld(this.rt.world);
-    else invalidateSpatialV1(spatial);
+    else if(navigationChanged)invalidateSpatialV1(spatial);
     const relocated:string[]=[],trapped:string[]=[];
-    for(const id of Object.keys(this.ents).sort()){
+    for(const id of navigationChanged?Object.keys(this.ents).sort():[]){
       const e=this.ents[id];if(e.kind!=='human'||!e.human||e.human.shore||e.human.carrier||e.human.sleepPose||e.human.on)continue;
       const grid=spatial.levelAt(e.human.level??0,[e.pose.p[0],e.pose.p[2]]);if(!grid||clearanceAt(grid,[e.pose.p[0],e.pose.p[2]])>=HUMAN_RADIUS*0.9)continue;
       if(e.human.activity==='sit'||e.human.baseActivity==='sit')continue; // a seated body's own seat is its support

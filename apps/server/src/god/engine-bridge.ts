@@ -44,6 +44,7 @@ import type { BuildNotice } from './builds.ts';
 import { arrivalNote } from '../arrival-placement.ts';
 import { seatTopsOf } from './use-check.ts';
 /** arrival-search/1: the upserts whose geometry (def, place, size, shape, params) differs from the before-model. */
+const titleOf = (e: Entity): string | undefined => (e as Entity & {about?: {title?: string}}).about?.title;
 const geometryOf = (e: Entity) => JSON.stringify([e.def, e.in, e.p, e.r, e.s, e.shape, e.anchor, e.params, e.seed]);
 function shapedIds(before: WorldModel, diff: Diff): Set<string> {
   const out = new Set<string>();
@@ -572,7 +573,7 @@ export class EngineBridge {
     if (this.seenOnly(e, def)) {
       const facts = factsOf(def, baked, wp.s), aid = assetIdFor(facts, JSON.stringify(e.params ?? {}) + '|seen');
       if (!known[aid] && !assets[aid]) assets[aid] = assetFromDef(aid, facts, { seen: true });
-      part.fixture = { def: aid, kind: 'fixture', label: (e.name ?? def.name.replace(/^core-/, '')).replace(/-/g, ' '), p: [r3(wp.x), r3(wp.y), r3(wp.z)], yaw: r3(-wp.yaw), support: { kind: 'ground' } };
+      part.fixture = { def: aid, kind: 'fixture', label: titleOf(e) ?? (e.name ?? def.name.replace(/^core-/, '')).replace(/-/g, ' '), p: [r3(wp.x), r3(wp.y), r3(wp.z)], yaw: r3(-wp.yaw), support: { kind: 'ground' } };
     }
     if (part.solids || part.surfaces || part.links) withLinkApproaches(part);
     return part.solids || part.surfaces || part.links || part.fixture ? part : null;
@@ -675,7 +676,7 @@ export class EngineBridge {
   }
 
   private fixtureSpec(e: Entity, def: StoredDef, asset: string, a: { surfaceSlots?: { id: string; local: [number, number, number] }[]; category: string }, wp: { x: number; y: number; z: number; yaw: number }): FixtureSpecV1 {
-    const label = (e.name ?? def.name.replace(/^core-/, '')).replace(/-/g, ' ');
+    const label = titleOf(e) ?? (e.name ?? def.name.replace(/^core-/, '')).replace(/-/g, ' ');
     const spec: FixtureSpecV1 = { def: asset, kind: a.category === 'item' ? 'item' : 'fixture', label, p: [r3(wp.x), r3(wp.y), r3(wp.z)], yaw: r3(-wp.yaw) };
     if (spec.kind !== 'item') {
       // E2 (2026-10-19): a fixture standing on raised ground (a hillside, an alpine terrace, or the ground floor of a

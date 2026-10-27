@@ -84,6 +84,24 @@ export function nextEntityPhysics(prev: EntityPhysicsV1 | undefined, e: WorldEdi
   return cur;
 }
 
+/** Labels are public perception metadata, not a reason to rebuild the navigation raster.
+ * Compare only changed parts; fixtures are held separately from entityPhysicsV1. */
+export function worldEditChangesNavigation(world: WorldState, edit: WorldEditV1): boolean {
+  const text = (x: unknown) => stableStringify(JSON.parse(JSON.stringify(x, (key, value) => key === 'label' ? undefined : value)));
+  if (text(edit.levels) !== text(world.entityPhysicsV1?.levels ?? [])) return true;
+  if (Object.keys(edit.assets ?? {}).some(id => !world.entityPhysicsV1?.assets[id])) return true;
+  for (const [id, part] of Object.entries(edit.set)) {
+    const old = world.entityPhysicsV1?.byEntity[id];
+    const geometry = (p: EntityPartV1 | null | undefined) => ({...(p?.solids?.length ? {solids:p.solids} : {}), ...(p?.surfaces?.length ? {surfaces:p.surfaces} : {}), ...(p?.links?.length ? {links:p.links} : {})});
+    if (text(geometry(old)) !== text(geometry(part))) return true;
+    const f = part?.fixture, cur = world.entities[id];
+    if (!f) { if (cur?.tags?.includes('entity-world')) return true; continue; }
+    if (!cur || cur.def !== f.def || cur.kind !== (f.kind === 'item' ? 'component' : 'fixture') || cur.level !== f.level
+      || text(cur.pose.p) !== text(f.p) || cur.pose.yaw !== f.yaw || text(cur.support ?? null) !== text(f.support ?? null)) return true;
+  }
+  return false;
+}
+
 /**
  * Apply a world-edit to world state: physics + fixture entities. Returns the ids of fixtures it could not update
  * because a body holds them (the server refuses such edits first; this is the engine's own guard).
