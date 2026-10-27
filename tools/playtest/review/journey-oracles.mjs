@@ -32,13 +32,13 @@ export function insidePolygon(pos, polygon) {
   return inside;
 }
 const failedOutcome = state => ['failed','refused','declined','cancelled','canceled','error'].includes(String(state??'').toLowerCase());
-function failedPartialReport(reply,ev) {
-  if(failedOutcome(reply.state))return true;
-  const history=Array.isArray(ev.cardResults)?ev.cardResults:ev.resultAt?[{at:ev.resultAt,state:ev.resultState,by:ev.resultBy}]:[];
-  const terminal=history.filter(r=>r.by!=='server'&&at(r.at)<=reply.ms).sort((a,b)=>at(a.at)-at(b.at)).at(-1);
-  // A negative overall outcome may accurately report a successful sub-action. Do not infer overall success
-  // from that sub-action's "completed" word. Explicit earlier done claims remain in cardClaims.
-  return failedOutcome(terminal?.state)&&/\b(failed|unsuccessful|incomplete|could not|couldn't|unable)\b/i.test(reply.text??'');
+function overallCompletionClaim(reply) {
+  if(failedOutcome(reply.state))return false;
+  const text=reply.text??'';
+  // A named sub-action ("return walk completed") is not an overall multi-step success claim.
+  // Stateless replies must actually assert overall completion or the requested current posture.
+  return /\b(I(?:'m| am) (?:still |now )?(?:seated|sitting|inside)|ready to (?:present|give)|(?:now|finally|all) (?:done|finished|completed)|(?:done|finished|completed) now|(?:request|task|everything) (?:is |has been )?(?:done|finished|completed)|I (?:have )?(?:finished|completed))\b/i.test(text)
+    || /(?:^|[.!?]\s*|\bbut\s+)(?:I(?:'m| am)\s+)?(?:done|finished|completed)\b/i.test(text);
 }
 
 const phaseMatches = (s, p) => {
@@ -108,7 +108,7 @@ export function journeyOracles({ ev, journey: j, receipts, replies, acts, accept
   const physicalAt = completed.length === j.phases.length && refusalProof ? after : null;
   const finalPhase = j.phases.at(-1);
   const cardClaims = Array.isArray(ev.cardResults) ? ev.cardResults.filter(r=>r.by!=='server'&&r.state==='done').map(r=>({text:r.text,ms:at(r.at),explicit:true})) : ev.resultBy!=='server'&&ev.resultState==='done'&&ev.resultAt ? [{text:ev.resultText,ms:at(ev.resultAt),explicit:true}] : [];
-  const claims = [...cardClaims, ...(replies ?? []).filter(r=>r.by!=='server'&&!failedPartialReport(r,ev)).filter(r => /\b(done|finished|completed|I(?:'m| am) (?:seated|sitting|inside)|ready to (?:present|give))\b/i.test(r.text ?? '') && !/\b(not|haven't|couldn't|cannot|can't|unable|will|I'll)\b/i.test(r.text ?? '') && !/\bstill (?:walking|trying|working|waiting|on (?:my|the) way)\b/i.test(r.text ?? ''))].filter(r => r.ms >= sent && r.ms <= cutoff).sort((a,b)=>a.ms-b.ms);
+  const claims = [...cardClaims, ...(replies ?? []).filter(r=>r.by!=='server'&&overallCompletionClaim(r)).filter(r => !/\b(not|haven't|couldn't|cannot|can't|unable|will|I'll)\b/i.test(r.text ?? '') && !/\bstill (?:walking|trying|working|waiting|on (?:my|the) way)\b/i.test(r.text ?? ''))].filter(r => r.ms >= sent && r.ms <= cutoff).sort((a,b)=>a.ms-b.ms);
   const claimVerdicts = claims.map(c => {
     const last = samples.filter(s => time(s) <= c.ms).at(-1);
     const fresh = last && c.ms-time(last) <= (j.maxSampleGapSec ?? 5)*1000;

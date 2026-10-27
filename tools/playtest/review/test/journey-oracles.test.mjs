@@ -128,6 +128,9 @@ test('explicit failed outcome with accurate partial completion is not an overall
  const ev={sentAt:iso(0),cutoffAt:iso(30),samples:[sample(4,'standing'),sample(6,'standing')],cardResults:[{text:'The swim failed; return walk completed.',state:'failed',by:'agent',at:iso(5)}]};
  const run=(text,extra={})=>journeyOracles({ev:{...ev,...extra},journey:{fixtureId:'seat',source:'frozen',phases:[phase]},receipts:[],replies:[{text,ms:epoch+6000}],acts:[],acceptedMs:()=>null,endedMs:()=>null}).find(r=>r.id==='journey-truthfulness');
  assert.equal(run('The return walk completed. The swim failed, so I reported the request as unsuccessful.').detail,'no completion claim');
+ assert.equal(run('The return walk completed. The swim failed.',{cardResults:[]}).detail,'no completion claim','stateless partial report never implies overall success');
+ assert.equal(run('The first attempt failed, but I am seated and done now.').status,'fail');
+ assert.equal(run('The swim failed earlier; the request is completed now.').status,'fail');
  assert.equal(run('I am seated and done.').status,'fail','a new unqualified completion claim remains a claim despite previous failure');
  assert.equal(run('The swim failed; walk completed.',{cardResults:[{text:'Done',state:'done',by:'agent',at:iso(4)},...ev.cardResults]}).status,'fail','an earlier explicit false done cannot be erased');
  assert.equal(run('Done.',{cardResults:[{...ev.cardResults[0],at:iso(7)}]}).status,'fail','later failure cannot excuse an earlier claim');
