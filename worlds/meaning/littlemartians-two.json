@@ -1,0 +1,2372 @@
+{
+  "schema": "world-meaning/1",
+  "worldId": "littlemartians-two",
+  "source": {
+    "template": "worlds/templates/littlemartians-two.json",
+    "sha": "95637332b2d677f817e1d688167db2c64422a49ecfe04f0b0dd812194bf3c584",
+    "provenance": [
+      {
+        "path": "worlds/templates/littlemartians-two.json",
+        "sha": "95637332b2d677f817e1d688167db2c64422a49ecfe04f0b0dd812194bf3c584"
+      }
+    ]
+  },
+  "about": {
+    "garden": {
+      "title": "Garden of Ceramic Worlds",
+      "what": "The central sculpture garden, where ceramic landmarks, tiled courts and pools open onto an outdoor archive of scanned places to the south.",
+      "kind": "garden",
+      "role": "district",
+      "salience": 3,
+      "aliases": [
+        "ceramic garden",
+        "sculpture garden",
+        "central garden"
+      ]
+    },
+    "madmaraca-court": {
+      "title": "Madmaraca Court",
+      "what": "The western court around Madmaraca, the tall ceramic library sculpture.",
+      "kind": "court",
+      "role": "quarter",
+      "salience": 2,
+      "in": "garden",
+      "aliases": [
+        "library court"
+      ]
+    },
+    "minarete-court": {
+      "title": "Minarete Court",
+      "what": "The eastern court around Minarete Temple and its ground-level arch.",
+      "kind": "court",
+      "role": "quarter",
+      "salience": 2,
+      "in": "garden",
+      "aliases": [
+        "temple court"
+      ]
+    },
+    "beacon-court": {
+      "title": "Beacon Court",
+      "what": "The northern court around the Celadon Beacon, above the central garden on the map.",
+      "kind": "court",
+      "role": "quarter",
+      "salience": 2,
+      "in": "garden",
+      "aliases": [
+        "celadon court"
+      ]
+    },
+    "eden-garden": {
+      "title": "Verdelis Eden Garden",
+      "what": "A planted garden among the ceramic landmarks, named for Verdelis and the Eden Garden.",
+      "kind": "garden",
+      "role": "quarter",
+      "salience": 2,
+      "in": "garden",
+      "aliases": [
+        "verdelis garden",
+        "eden garden"
+      ]
+    },
+    "grotto-court": {
+      "title": "Grotto Court",
+      "what": "The approach court for the Grotto of Painted Worlds and its pools.",
+      "kind": "court",
+      "role": "quarter",
+      "salience": 2,
+      "in": "garden",
+      "aliases": [
+        "grotto entrance court"
+      ]
+    },
+    "madmaraca": {
+      "title": "Madmaraca Ceramic Library",
+      "what": "Vanessa Rosa’s ceramic library sculpture stands west of the central garden. Its sculpted exterior is the attraction; the interior is closed.",
+      "kind": "landmark",
+      "role": "landmark",
+      "salience": 3,
+      "in": "madmaraca-court",
+      "aliases": [
+        "madmaraca",
+        "ceramic library",
+        "library sculpture"
+      ]
+    },
+    "minarete": {
+      "title": "Minarete Temple",
+      "what": "A tall ceramic temple on the eastern court. A narrow north–south arch passes through its base; the upper interior is closed.",
+      "kind": "building",
+      "role": "landmark",
+      "salience": 3,
+      "in": "minarete-court",
+      "aliases": [
+        "minarete",
+        "ceramic temple"
+      ],
+      "parts": [
+        {
+          "id": "ground-passage",
+          "title": "Ground arch passage",
+          "anchor": {
+            "kind": "entity",
+            "ref": "minarete-passage"
+          }
+        }
+      ]
+    },
+    "celadon-beacon": {
+      "title": "Celadon Beacon",
+      "what": "A green ceramic tower north of the garden. Its ground arch forms a north–south passage beneath the closed upper tower.",
+      "kind": "building",
+      "role": "landmark",
+      "salience": 3,
+      "in": "beacon-court",
+      "aliases": [
+        "beacon",
+        "celadon tower",
+        "green tower"
+      ],
+      "parts": [
+        {
+          "id": "ground-passage",
+          "title": "Ground arch passage",
+          "anchor": {
+            "kind": "entity",
+            "ref": "celadon-passage"
+          }
+        }
+      ]
+    },
+    "minarete-passage": {
+      "title": "Minarete Ground Passage",
+      "what": "The ground-level route through the arch at the base of Minarete Temple.",
+      "kind": "passage",
+      "role": "part",
+      "salience": 1,
+      "in": "minarete",
+      "aliases": [
+        "minarete arch"
+      ]
+    },
+    "celadon-passage": {
+      "title": "Celadon Ground Passage",
+      "what": "The ground-level route through the arch beneath the Celadon Beacon.",
+      "kind": "passage",
+      "role": "part",
+      "salience": 1,
+      "in": "celadon-beacon",
+      "aliases": [
+        "beacon arch"
+      ]
+    },
+    "auxiliary-tower": {
+      "title": "Garden Ceramic Tower",
+      "what": "A smaller stepped ceramic tower south of Madmaraca, with a ground hall and three upper rooms connected by floating shafts.",
+      "kind": "building",
+      "role": "landmark",
+      "salience": 2,
+      "in": "madmaraca-court",
+      "aliases": [
+        "small ceramic tower",
+        "four room tower"
+      ],
+      "parts": [
+        {
+          "id": "tower-l0",
+          "title": "Ground hall",
+          "anchor": {
+            "kind": "entity",
+            "ref": "auxiliary-tower",
+            "slot": "tower-l0"
+          }
+        },
+        {
+          "id": "tower-l1",
+          "title": "Second room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "auxiliary-tower",
+            "slot": "tower-l1"
+          }
+        },
+        {
+          "id": "tower-l2",
+          "title": "Third room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "auxiliary-tower",
+            "slot": "tower-l2"
+          }
+        },
+        {
+          "id": "tower-l3",
+          "title": "Lantern room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "auxiliary-tower",
+            "slot": "tower-l3"
+          }
+        }
+      ]
+    },
+    "auxiliary-temple": {
+      "title": "Garden Minaret Temple",
+      "what": "A smaller blue temple south of Minarete, with a ground pavilion and two upper halls connected by floating shafts.",
+      "kind": "building",
+      "role": "landmark",
+      "salience": 2,
+      "in": "minarete-court",
+      "aliases": [
+        "small minaret temple",
+        "blue garden temple"
+      ],
+      "parts": [
+        {
+          "id": "temple-l0",
+          "title": "Ground pavilion",
+          "anchor": {
+            "kind": "entity",
+            "ref": "auxiliary-temple",
+            "slot": "temple-l0"
+          }
+        },
+        {
+          "id": "temple-l1",
+          "title": "Body hall",
+          "anchor": {
+            "kind": "entity",
+            "ref": "auxiliary-temple",
+            "slot": "temple-l1"
+          }
+        },
+        {
+          "id": "temple-l2",
+          "title": "Upper hall",
+          "anchor": {
+            "kind": "entity",
+            "ref": "auxiliary-temple",
+            "slot": "temple-l2"
+          }
+        }
+      ]
+    },
+    "painted-grotto": {
+      "title": "Grotto of Painted Worlds",
+      "what": "A basalt vault with a broad northern doorway, hanging pale strands and red blossoms. The gentle approach leads down into the grotto beside two pools.",
+      "kind": "landmark",
+      "role": "landmark",
+      "salience": 3,
+      "in": "grotto-court",
+      "aliases": [
+        "painted grotto",
+        "grotto",
+        "basalt vault"
+      ],
+      "parts": [
+        {
+          "id": "approach",
+          "title": "Grotto approach",
+          "anchor": {
+            "kind": "entity",
+            "ref": "grotto-approach"
+          }
+        },
+        {
+          "id": "causeway",
+          "title": "Pool causeway",
+          "anchor": {
+            "kind": "entity",
+            "ref": "grotto-causeway"
+          }
+        }
+      ]
+    },
+    "grotto-approach": {
+      "title": "Grotto Approach",
+      "what": "A gentle descent from the northern doorway to the lower grotto floor.",
+      "kind": "path",
+      "role": "part",
+      "salience": 1,
+      "in": "painted-grotto",
+      "aliases": [
+        "grotto entrance",
+        "grotto ramp"
+      ]
+    },
+    "grotto-causeway": {
+      "title": "Grotto Causeway",
+      "what": "The ground between the grotto pools, connecting their edges within the painted grotto.",
+      "kind": "path",
+      "role": "part",
+      "salience": 1,
+      "in": "painted-grotto",
+      "aliases": [
+        "pool crossing"
+      ]
+    },
+    "grotto-pool-1": {
+      "title": "First Grotto Pool",
+      "what": "One of the two pools beside the causeway in the Grotto of Painted Worlds.",
+      "kind": "water",
+      "role": "landmark",
+      "salience": 2,
+      "in": "painted-grotto",
+      "aliases": [
+        "grotto water",
+        "grotto pool one"
+      ]
+    },
+    "grotto-pool-2": {
+      "title": "Second Grotto Pool",
+      "what": "The companion pool across the causeway from the first grotto pool.",
+      "kind": "water",
+      "role": "landmark",
+      "salience": 2,
+      "in": "painted-grotto",
+      "aliases": [
+        "grotto pool two"
+      ]
+    },
+    "tharsis-plateau": {
+      "title": "Tharsis Plateau",
+      "what": "A raised plateau beyond the ceramic garden, reached by the Tharsis ramp.",
+      "kind": "plateau",
+      "role": "district",
+      "salience": 3,
+      "aliases": [
+        "plateau",
+        "high ground"
+      ],
+      "parts": [
+        {
+          "id": "overlook",
+          "title": "Tharsis Overlook",
+          "anchor": {
+            "kind": "entity",
+            "ref": "tharsis-overlook"
+          }
+        },
+        {
+          "id": "ramp",
+          "title": "Tharsis Ramp",
+          "anchor": {
+            "kind": "entity",
+            "ref": "tharsis-ramp"
+          }
+        }
+      ]
+    },
+    "tharsis-overlook": {
+      "title": "Tharsis Overlook",
+      "what": "An open viewpoint on the Tharsis Plateau, away from the courts and pools of the garden.",
+      "kind": "viewpoint",
+      "role": "landmark",
+      "salience": 2,
+      "in": "tharsis-plateau",
+      "aliases": [
+        "overlook",
+        "plateau viewpoint"
+      ]
+    },
+    "tharsis-ramp": {
+      "title": "Tharsis Ramp",
+      "what": "The footpath leading up to the plateau and its overlook.",
+      "kind": "path",
+      "role": "part",
+      "salience": 1,
+      "in": "tharsis-plateau",
+      "aliases": [
+        "plateau path"
+      ]
+    },
+    "glazed-basin-north-west": {
+      "title": "Northwest Glazed Basin",
+      "what": "The northwest water basin in the central ceramic garden.",
+      "kind": "water",
+      "role": "landmark",
+      "salience": 2,
+      "in": "garden",
+      "aliases": [
+        "northwest pool",
+        "northwest basin"
+      ]
+    },
+    "glazed-basin-north-east": {
+      "title": "Northeast Glazed Basin",
+      "what": "The northeast water basin in the central ceramic garden.",
+      "kind": "water",
+      "role": "landmark",
+      "salience": 2,
+      "in": "garden",
+      "aliases": [
+        "northeast pool",
+        "northeast basin"
+      ]
+    },
+    "glazed-basin-south-west": {
+      "title": "Southwest Glazed Basin",
+      "what": "The southwest water basin in the central ceramic garden.",
+      "kind": "water",
+      "role": "landmark",
+      "salience": 2,
+      "in": "garden",
+      "aliases": [
+        "southwest pool",
+        "southwest basin"
+      ]
+    },
+    "glazed-basin-south-east": {
+      "title": "Southeast Glazed Basin",
+      "what": "The southeast water basin in the central ceramic garden.",
+      "kind": "water",
+      "role": "landmark",
+      "salience": 2,
+      "in": "garden",
+      "aliases": [
+        "southeast pool",
+        "southeast basin"
+      ]
+    },
+    "tile-0-0": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-0-1": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-0-2": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-0-3": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-0-4": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-0-5": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-0-6": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-0-7": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-0-8": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-0-9": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-0-10": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-0-11": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-1-0": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-1-1": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-1-2": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-1-3": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-1-4": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-1-5": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-1-6": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-1-7": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-1-8": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-1-9": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-1-10": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-1-11": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-2-0": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-2-1": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-2-2": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-2-3": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-2-4": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-2-5": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-2-6": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-2-7": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-2-8": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-2-9": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-2-10": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-2-11": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-3-0": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-3-1": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-3-2": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-3-3": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-3-4": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-3-5": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-3-6": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-3-7": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-3-8": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-3-9": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-3-10": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-3-11": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-4-0": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-4-1": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-4-2": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-4-3": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-4-4": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-4-5": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-4-6": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-4-7": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-4-8": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-4-9": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-4-10": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-4-11": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-5-0": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-5-1": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-5-2": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-5-3": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-5-4": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-5-5": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-5-6": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-5-7": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-5-8": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-5-9": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-5-10": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "tile-5-11": {
+      "kind": "paving",
+      "role": "minor",
+      "salience": 0,
+      "in": "garden"
+    },
+    "exhibit-minarete-portal": {
+      "title": "Minarete Spiral Portal",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Minarete Spiral Portal"
+      ],
+      "in": "garden"
+    },
+    "scan-minarete-portal": {
+      "title": "Minarete Spiral Portal display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-minarete-portal"
+    },
+    "exhibit-pupila-corridor": {
+      "title": "Pupila Tiled Corridor",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Pupila Tiled Corridor"
+      ],
+      "in": "garden"
+    },
+    "scan-pupila-corridor": {
+      "title": "Pupila Tiled Corridor display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-pupila-corridor"
+    },
+    "exhibit-chapel-composition": {
+      "title": "Tiled Chapel Composition",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Tiled Chapel Composition"
+      ],
+      "in": "garden"
+    },
+    "scan-chapel-composition": {
+      "title": "Tiled Chapel Composition display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-chapel-composition"
+    },
+    "exhibit-american-base-old": {
+      "title": "American base (old)",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "American base (old)"
+      ],
+      "in": "garden"
+    },
+    "scan-american-base-old": {
+      "title": "American base (old) display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-american-base-old"
+    },
+    "exhibit-asian-art-museum": {
+      "title": "Asian Art Museum SF",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Asian Art Museum SF"
+      ],
+      "in": "garden"
+    },
+    "scan-asian-art-museum": {
+      "title": "Asian Art Museum SF display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-asian-art-museum"
+    },
+    "exhibit-fey-castle": {
+      "title": "Fey Castle",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Fey Castle"
+      ],
+      "in": "garden"
+    },
+    "scan-fey-castle": {
+      "title": "Fey Castle display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-fey-castle"
+    },
+    "exhibit-graffiti-abandoned-room": {
+      "title": "Graffiti — abandoned room in the open",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Graffiti — abandoned room in the open"
+      ],
+      "in": "garden"
+    },
+    "scan-graffiti-abandoned-room": {
+      "title": "Graffiti — abandoned room in the open display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-graffiti-abandoned-room"
+    },
+    "exhibit-randy2": {
+      "title": "Randy #2",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Randy #2"
+      ],
+      "in": "garden"
+    },
+    "scan-randy2": {
+      "title": "Randy #2 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-randy2"
+    },
+    "exhibit-randy3": {
+      "title": "Randy #3",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Randy #3"
+      ],
+      "in": "garden"
+    },
+    "scan-randy3": {
+      "title": "Randy #3 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-randy3"
+    },
+    "exhibit-forte-sao-filipe-chapel": {
+      "title": "Forte de São Filipe — chapel",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Forte de São Filipe — chapel"
+      ],
+      "in": "garden"
+    },
+    "scan-forte-sao-filipe-chapel": {
+      "title": "Forte de São Filipe — chapel display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-forte-sao-filipe-chapel"
+    },
+    "exhibit-forte-sao-filipe-corner": {
+      "title": "Forte de São Filipe — corner",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Forte de São Filipe — corner"
+      ],
+      "in": "garden"
+    },
+    "scan-forte-sao-filipe-corner": {
+      "title": "Forte de São Filipe — corner display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-forte-sao-filipe-corner"
+    },
+    "exhibit-forte-sao-filipe-corner3": {
+      "title": "Forte de São Filipe — corner 3",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Forte de São Filipe — corner 3"
+      ],
+      "in": "garden"
+    },
+    "scan-forte-sao-filipe-corner3": {
+      "title": "Forte de São Filipe — corner 3 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-forte-sao-filipe-corner3"
+    },
+    "exhibit-forte-sao-filipe-corridor": {
+      "title": "Forte de São Filipe — corridor",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Forte de São Filipe — corridor"
+      ],
+      "in": "garden"
+    },
+    "scan-forte-sao-filipe-corridor": {
+      "title": "Forte de São Filipe — corridor display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-forte-sao-filipe-corridor"
+    },
+    "exhibit-forte-sao-filipe-open": {
+      "title": "Forte de São Filipe — open ramparts",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Forte de São Filipe — open ramparts"
+      ],
+      "in": "garden"
+    },
+    "scan-forte-sao-filipe-open": {
+      "title": "Forte de São Filipe — open ramparts display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-forte-sao-filipe-open"
+    },
+    "exhibit-lisbon-archways-corridor": {
+      "title": "Lisbon — archways corridor",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Lisbon — archways corridor"
+      ],
+      "in": "garden"
+    },
+    "scan-lisbon-archways-corridor": {
+      "title": "Lisbon — archways corridor display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-lisbon-archways-corridor"
+    },
+    "exhibit-moorish-entrance": {
+      "title": "Moorish castle — entrance",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Moorish castle — entrance"
+      ],
+      "in": "garden"
+    },
+    "scan-moorish-entrance": {
+      "title": "Moorish castle — entrance display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-moorish-entrance"
+    },
+    "exhibit-moorish-castle-top": {
+      "title": "Moorish castle — top",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Moorish castle — top"
+      ],
+      "in": "garden"
+    },
+    "scan-moorish-castle-top": {
+      "title": "Moorish castle — top display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-moorish-castle-top"
+    },
+    "exhibit-museu-azulejo-corridor": {
+      "title": "Museu Nacional do Azulejo — corridor",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Museu Nacional do Azulejo — corridor"
+      ],
+      "in": "garden"
+    },
+    "scan-museu-azulejo-corridor": {
+      "title": "Museu Nacional do Azulejo — corridor display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-museu-azulejo-corridor"
+    },
+    "exhibit-museu-azulejo-main": {
+      "title": "Museu Nacional do Azulejo — main",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Museu Nacional do Azulejo — main"
+      ],
+      "in": "garden"
+    },
+    "scan-museu-azulejo-main": {
+      "title": "Museu Nacional do Azulejo — main display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-museu-azulejo-main"
+    },
+    "exhibit-museu-azulejo-quad": {
+      "title": "Museu Nacional do Azulejo — quad",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Museu Nacional do Azulejo — quad"
+      ],
+      "in": "garden"
+    },
+    "scan-museu-azulejo-quad": {
+      "title": "Museu Nacional do Azulejo — quad display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-museu-azulejo-quad"
+    },
+    "exhibit-quinta-tower-curly": {
+      "title": "Quinta — curly tower",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Quinta — curly tower"
+      ],
+      "in": "garden"
+    },
+    "scan-quinta-tower-curly": {
+      "title": "Quinta — curly tower display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-quinta-tower-curly"
+    },
+    "exhibit-quinta-fonte": {
+      "title": "Quinta — fountain",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Quinta — fountain"
+      ],
+      "in": "garden"
+    },
+    "scan-quinta-fonte": {
+      "title": "Quinta — fountain display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-quinta-fonte"
+    },
+    "exhibit-quinta-corredor-escada": {
+      "title": "Quinta — long stair corridor",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Quinta — long stair corridor"
+      ],
+      "in": "garden"
+    },
+    "scan-quinta-corredor-escada": {
+      "title": "Quinta — long stair corridor display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-quinta-corredor-escada"
+    },
+    "exhibit-quinta-palacio-interior": {
+      "title": "Quinta — palace interior",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Quinta — palace interior"
+      ],
+      "in": "garden"
+    },
+    "scan-quinta-palacio-interior": {
+      "title": "Quinta — palace interior display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-quinta-palacio-interior"
+    },
+    "exhibit-quinta-poco": {
+      "title": "Quinta — well (poço)",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Quinta — well (poço)"
+      ],
+      "in": "garden"
+    },
+    "scan-quinta-poco": {
+      "title": "Quinta — well (poço) display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-quinta-poco"
+    },
+    "exhibit-rua-fado": {
+      "title": "Rua do Fado — street",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Rua do Fado — street"
+      ],
+      "in": "garden"
+    },
+    "scan-rua-fado": {
+      "title": "Rua do Fado — street display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-rua-fado"
+    },
+    "exhibit-setubal-casa-escadas": {
+      "title": "Setúbal — staircase house",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Setúbal — staircase house"
+      ],
+      "in": "garden"
+    },
+    "scan-setubal-casa-escadas": {
+      "title": "Setúbal — staircase house display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-setubal-casa-escadas"
+    },
+    "exhibit-se-entrada": {
+      "title": "Sé cathedral — entrance",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Sé cathedral — entrance"
+      ],
+      "in": "garden"
+    },
+    "scan-se-entrada": {
+      "title": "Sé cathedral — entrance display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-se-entrada"
+    },
+    "exhibit-gruta-m-republica": {
+      "title": "Gruta — Morro da República",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Gruta — Morro da República"
+      ],
+      "in": "garden"
+    },
+    "scan-gruta-m-republica": {
+      "title": "Gruta — Morro da República display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-gruta-m-republica"
+    },
+    "exhibit-camel-sculpture": {
+      "title": "Camel sculpture (NeRF)",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Camel sculpture (NeRF)"
+      ],
+      "in": "garden"
+    },
+    "scan-camel-sculpture": {
+      "title": "Camel sculpture (NeRF) display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-camel-sculpture"
+    },
+    "exhibit-china-buddha": {
+      "title": "China Buddha (NeRF)",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "China Buddha (NeRF)"
+      ],
+      "in": "garden"
+    },
+    "scan-china-buddha": {
+      "title": "China Buddha (NeRF) display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-china-buddha"
+    },
+    "exhibit-gold-rust-buddha": {
+      "title": "Gold-rust Buddha (NeRF)",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Gold-rust Buddha (NeRF)"
+      ],
+      "in": "garden"
+    },
+    "scan-gold-rust-buddha": {
+      "title": "Gold-rust Buddha (NeRF) display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-gold-rust-buddha"
+    },
+    "exhibit-golden-gate-park-tree": {
+      "title": "Golden Gate Park tree (NeRF)",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Golden Gate Park tree (NeRF)"
+      ],
+      "in": "garden"
+    },
+    "scan-golden-gate-park-tree": {
+      "title": "Golden Gate Park tree (NeRF) display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-golden-gate-park-tree"
+    },
+    "exhibit-golden-woman-standing": {
+      "title": "Golden woman, standing (NeRF)",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Golden woman, standing (NeRF)"
+      ],
+      "in": "garden"
+    },
+    "scan-golden-woman-standing": {
+      "title": "Golden woman, standing (NeRF) display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-golden-woman-standing"
+    },
+    "exhibit-greenman-altar": {
+      "title": "Green Man altar sculpture (NeRF)",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Green Man altar sculpture (NeRF)"
+      ],
+      "in": "garden"
+    },
+    "scan-greenman-altar": {
+      "title": "Green Man altar sculpture (NeRF) display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-greenman-altar"
+    },
+    "exhibit-met-greek-mural": {
+      "title": "MET — Greek mural",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "MET — Greek mural"
+      ],
+      "in": "garden"
+    },
+    "scan-met-greek-mural": {
+      "title": "MET — Greek mural display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-met-greek-mural"
+    },
+    "exhibit-poly-01": {
+      "title": "SF polycam scan #1",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "SF polycam scan #1"
+      ],
+      "in": "garden"
+    },
+    "scan-poly-01": {
+      "title": "SF polycam scan #1 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-poly-01"
+    },
+    "exhibit-poly-10": {
+      "title": "SF polycam scan #10",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "SF polycam scan #10"
+      ],
+      "in": "garden"
+    },
+    "scan-poly-10": {
+      "title": "SF polycam scan #10 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-poly-10"
+    },
+    "exhibit-poly-12": {
+      "title": "SF polycam scan #12",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "SF polycam scan #12"
+      ],
+      "in": "garden"
+    },
+    "scan-poly-12": {
+      "title": "SF polycam scan #12 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-poly-12"
+    },
+    "exhibit-poly-13": {
+      "title": "SF polycam scan #13",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "SF polycam scan #13"
+      ],
+      "in": "garden"
+    },
+    "scan-poly-13": {
+      "title": "SF polycam scan #13 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-poly-13"
+    },
+    "exhibit-poly-14": {
+      "title": "SF polycam scan #14",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "SF polycam scan #14"
+      ],
+      "in": "garden"
+    },
+    "scan-poly-14": {
+      "title": "SF polycam scan #14 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-poly-14"
+    },
+    "exhibit-poly-15": {
+      "title": "SF polycam scan #15",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "SF polycam scan #15"
+      ],
+      "in": "garden"
+    },
+    "scan-poly-15": {
+      "title": "SF polycam scan #15 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-poly-15"
+    },
+    "exhibit-poly-17": {
+      "title": "SF polycam scan #17",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "SF polycam scan #17"
+      ],
+      "in": "garden"
+    },
+    "scan-poly-17": {
+      "title": "SF polycam scan #17 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-poly-17"
+    },
+    "exhibit-poly-18": {
+      "title": "SF polycam scan #18",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "SF polycam scan #18"
+      ],
+      "in": "garden"
+    },
+    "scan-poly-18": {
+      "title": "SF polycam scan #18 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-poly-18"
+    },
+    "exhibit-poly-19": {
+      "title": "SF polycam scan #19",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "SF polycam scan #19"
+      ],
+      "in": "garden"
+    },
+    "scan-poly-19": {
+      "title": "SF polycam scan #19 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-poly-19"
+    },
+    "exhibit-poly-02": {
+      "title": "SF polycam scan #2",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "SF polycam scan #2"
+      ],
+      "in": "garden"
+    },
+    "scan-poly-02": {
+      "title": "SF polycam scan #2 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-poly-02"
+    },
+    "exhibit-poly-05": {
+      "title": "SF polycam scan #5",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "SF polycam scan #5"
+      ],
+      "in": "garden"
+    },
+    "scan-poly-05": {
+      "title": "SF polycam scan #5 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-poly-05"
+    },
+    "exhibit-poly-06": {
+      "title": "SF polycam scan #6",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "SF polycam scan #6"
+      ],
+      "in": "garden"
+    },
+    "scan-poly-06": {
+      "title": "SF polycam scan #6 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-poly-06"
+    },
+    "exhibit-poly-07": {
+      "title": "SF polycam scan #7",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "SF polycam scan #7"
+      ],
+      "in": "garden"
+    },
+    "scan-poly-07": {
+      "title": "SF polycam scan #7 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-poly-07"
+    },
+    "exhibit-poly-08": {
+      "title": "SF polycam scan #8",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "SF polycam scan #8"
+      ],
+      "in": "garden"
+    },
+    "scan-poly-08": {
+      "title": "SF polycam scan #8 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-poly-08"
+    },
+    "exhibit-poly-09": {
+      "title": "SF polycam scan #9",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "SF polycam scan #9"
+      ],
+      "in": "garden"
+    },
+    "scan-poly-09": {
+      "title": "SF polycam scan #9 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-poly-09"
+    },
+    "exhibit-two-warriors": {
+      "title": "Two warriors (NeRF)",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Two warriors (NeRF)"
+      ],
+      "in": "garden"
+    },
+    "scan-two-warriors": {
+      "title": "Two warriors (NeRF) display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-two-warriors"
+    },
+    "exhibit-drive-567d4f0b818f": {
+      "title": "femina",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "femina"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-567d4f0b818f": {
+      "title": "femina display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-567d4f0b818f"
+    },
+    "exhibit-drive-b538ebb36278": {
+      "title": "flower",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "flower"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-b538ebb36278": {
+      "title": "flower  display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-b538ebb36278"
+    },
+    "exhibit-drive-a17ce660742d": {
+      "title": "open mouth",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "open mouth"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-a17ce660742d": {
+      "title": "open mouth display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-a17ce660742d"
+    },
+    "exhibit-drive-72c8fc2f1538": {
+      "title": "verdelis longplant",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "verdelis longplant"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-72c8fc2f1538": {
+      "title": "verdelis longplant display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-72c8fc2f1538"
+    },
+    "exhibit-drive-0f69fd943fc1": {
+      "title": "poly12",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "poly12"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-0f69fd943fc1": {
+      "title": "poly12 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-0f69fd943fc1"
+    },
+    "exhibit-drive-4a96b139a014": {
+      "title": "pillan",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "pillan"
+      ],
+      "in": "garden"
+    },
+    "exhibit-drive-976ab0a7145b": {
+      "title": "guanyin5",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "guanyin5"
+      ],
+      "in": "garden"
+    },
+    "exhibit-drive-09868169ab2d": {
+      "title": "vestige",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "vestige"
+      ],
+      "in": "garden"
+    },
+    "exhibit-drive-e946e0e729d0": {
+      "title": "Xenanthro",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Xenanthro"
+      ],
+      "in": "garden"
+    },
+    "exhibit-drive-94727a7e61b6": {
+      "title": "poly15",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "poly15"
+      ],
+      "in": "garden"
+    },
+    "exhibit-drive-36ac56b5a6f4": {
+      "title": "poly8",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "poly8"
+      ],
+      "in": "garden"
+    },
+    "exhibit-drive-45bcc42c2c58": {
+      "title": "poly9",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "poly9"
+      ],
+      "in": "garden"
+    },
+    "exhibit-drive-c78fc73ba916": {
+      "title": "caboclus",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "caboclus"
+      ],
+      "in": "garden"
+    },
+    "exhibit-drive-1af1c89dd0f6": {
+      "title": "serpent",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "serpent"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-1af1c89dd0f6": {
+      "title": "serpent display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-1af1c89dd0f6"
+    },
+    "exhibit-drive-368878f9b157": {
+      "title": "conga",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "conga"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-368878f9b157": {
+      "title": "conga display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-368878f9b157"
+    },
+    "exhibit-drive-7d0669742c10": {
+      "title": "colorful",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "colorful"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-7d0669742c10": {
+      "title": "colorful display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-7d0669742c10"
+    },
+    "exhibit-drive-ee1676f5c3bc": {
+      "title": "Mycologus",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Mycologus"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-ee1676f5c3bc": {
+      "title": "Mycologus display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-ee1676f5c3bc"
+    },
+    "exhibit-drive-16b887532619": {
+      "title": "poly16",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "poly16"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-16b887532619": {
+      "title": "poly16 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-16b887532619"
+    },
+    "exhibit-drive-02ceabbff643": {
+      "title": "Pyrogeode",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Pyrogeode"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-02ceabbff643": {
+      "title": "Pyrogeode display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-02ceabbff643"
+    },
+    "exhibit-drive-731f06fdb7e6": {
+      "title": "laughting fatman",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "laughting fatman"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-731f06fdb7e6": {
+      "title": "laughting fatman display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-731f06fdb7e6"
+    },
+    "exhibit-drive-b0941d82d98c": {
+      "title": "eclip",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "eclip"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-b0941d82d98c": {
+      "title": "eclip display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-b0941d82d98c"
+    },
+    "exhibit-drive-0d01c1b00980": {
+      "title": "africa basket",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "africa basket"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-0d01c1b00980": {
+      "title": "africa basket display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-0d01c1b00980"
+    },
+    "exhibit-drive-af1046536b8a": {
+      "title": "poly13",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "poly13"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-af1046536b8a": {
+      "title": "poly13 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-af1046536b8a"
+    },
+    "exhibit-drive-97ddf86c47f9": {
+      "title": "solara",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "solara"
+      ],
+      "in": "garden"
+    },
+    "exhibit-drive-566ced3e91e1": {
+      "title": "poly3",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "poly3"
+      ],
+      "in": "garden"
+    },
+    "exhibit-drive-77e7e7424358": {
+      "title": "poly5",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "poly5"
+      ],
+      "in": "garden"
+    },
+    "exhibit-drive-c780e53b578a": {
+      "title": "goldentower",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "goldentower"
+      ],
+      "in": "garden"
+    },
+    "exhibit-drive-88ba2b863400": {
+      "title": "Thaloc",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Thaloc"
+      ],
+      "in": "garden"
+    },
+    "exhibit-drive-c92a3b231c79": {
+      "title": "Astraflora",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "Astraflora"
+      ],
+      "in": "garden"
+    },
+    "exhibit-drive-66009eb80cef": {
+      "title": "poly14",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "poly14"
+      ],
+      "in": "garden"
+    },
+    "exhibit-drive-9207a5e1c4b1": {
+      "title": "poly4",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "poly4"
+      ],
+      "in": "garden"
+    },
+    "exhibit-drive-6c113bb8ae2e": {
+      "title": "poly10",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "poly10"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-6c113bb8ae2e": {
+      "title": "poly10 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-6c113bb8ae2e"
+    },
+    "exhibit-drive-fabce0b97897": {
+      "title": "tower2",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "tower2"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-fabce0b97897": {
+      "title": "tower2 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-fabce0b97897"
+    },
+    "exhibit-drive-5f5e4a9284a4": {
+      "title": "greece vase",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "greece vase"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-5f5e4a9284a4": {
+      "title": "greece vase display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-5f5e4a9284a4"
+    },
+    "exhibit-drive-0b40c69c8244": {
+      "title": "terraqua",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "terraqua"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-0b40c69c8244": {
+      "title": "terraqua display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-0b40c69c8244"
+    },
+    "exhibit-drive-f3f642ac7b15": {
+      "title": "poly6",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "poly6"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-f3f642ac7b15": {
+      "title": "poly6 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-f3f642ac7b15"
+    },
+    "exhibit-drive-40a9797026a2": {
+      "title": "rhino",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "rhino"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-40a9797026a2": {
+      "title": "rhino display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-40a9797026a2"
+    },
+    "exhibit-drive-5f63a6fe6100": {
+      "title": "guardian colorful",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "guardian colorful"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-5f63a6fe6100": {
+      "title": "guardian colorful display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-5f63a6fe6100"
+    },
+    "exhibit-drive-935874799be2": {
+      "title": "ganesha small",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "ganesha small"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-935874799be2": {
+      "title": "ganesha small display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-935874799be2"
+    },
+    "exhibit-drive-a4a6b8bad1e8": {
+      "title": "tower wine",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "tower wine"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-a4a6b8bad1e8": {
+      "title": "tower wine display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-a4a6b8bad1e8"
+    },
+    "exhibit-drive-0734a4679321": {
+      "title": "poly7",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "poly7"
+      ],
+      "in": "garden"
+    },
+    "scan-drive-0734a4679321": {
+      "title": "poly7 display",
+      "kind": "display",
+      "role": "minor",
+      "salience": 0,
+      "in": "exhibit-drive-0734a4679321"
+    },
+    "exhibit-drive-317a837144b2": {
+      "title": "orange vase",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "orange vase"
+      ],
+      "in": "garden"
+    },
+    "exhibit-drive-2bb4733c464d": {
+      "title": "dragon vase",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "dragon vase"
+      ],
+      "in": "garden"
+    },
+    "exhibit-drive-c30ab0ea1037": {
+      "title": "bichroma",
+      "kind": "exhibit",
+      "role": "minor",
+      "salience": 0,
+      "aliases": [
+        "bichroma"
+      ],
+      "in": "garden"
+    }
+  },
+  "worldAbout": {
+    "title": "Little Martians Ceramic Worlds",
+    "what": "A sculpture garden of ceramic libraries, temples and towers, with grotto pools, a plateau overlook and an outdoor archive of scanned places.",
+    "tour": "Madmaraca stands on the west court, Minarete on the east court, and the Celadon Beacon to the north. Smaller roomed towers sit south of the main sculptures. Follow the grotto approach down to the Painted Worlds vault and pools. The Tharsis ramp leads to the plateau overlook. Farther south, rows of named scan exhibits form an open-air archive; their scanned interiors are viewed from outside.",
+    "districts": [
+      "garden",
+      "tharsis-plateau"
+    ]
+  }
+}

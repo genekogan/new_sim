@@ -1,0 +1,159 @@
+{
+  "schema": "world-meaning/1",
+  "worldId": "littlemartians-garden",
+  "source": {
+    "template": "worlds/templates/littlemartians-garden.json",
+    "sha": "a8ab541775f222813455cc9a634c2d03509cd1c4287a4cb3eaf7af9eaea69e1e",
+    "provenance": [
+      {
+        "path": "worlds/templates/littlemartians-garden.json",
+        "sha": "a8ab541775f222813455cc9a634c2d03509cd1c4287a4cb3eaf7af9eaea69e1e"
+      }
+    ]
+  },
+  "about": {
+    "glazed-court": {
+      "title": "Glazed Court",
+      "what": "A tiled square between the Ceramic Tower to the west and the Minaret Temple to the east.",
+      "kind": "plaza",
+      "role": "district",
+      "salience": 3,
+      "aliases": [
+        "central court",
+        "courtyard",
+        "square"
+      ],
+      "parts": [
+        {
+          "id": "tower",
+          "title": "Ceramic Tower",
+          "anchor": {
+            "kind": "entity",
+            "ref": "ceramic-tower"
+          }
+        },
+        {
+          "id": "temple",
+          "title": "Minaret Temple",
+          "anchor": {
+            "kind": "entity",
+            "ref": "minaret-temple"
+          }
+        }
+      ]
+    },
+    "ceramic-tower": {
+      "title": "Ceramic Tower",
+      "what": "A pale blue-green glazed tower west of the court. Its four rooms rise from a ground hall to a lantern room; vertical floating shafts connect the upper levels.",
+      "kind": "building",
+      "role": "landmark",
+      "salience": 3,
+      "in": "glazed-court",
+      "aliases": [
+        "tower",
+        "blue green tower",
+        "lantern tower"
+      ],
+      "parts": [
+        {
+          "id": "tower-l0",
+          "title": "Ground hall",
+          "anchor": {
+            "kind": "entity",
+            "ref": "ceramic-tower",
+            "slot": "tower-l0"
+          }
+        },
+        {
+          "id": "tower-l1",
+          "title": "Second room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "ceramic-tower",
+            "slot": "tower-l1"
+          }
+        },
+        {
+          "id": "tower-l2",
+          "title": "Third room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "ceramic-tower",
+            "slot": "tower-l2"
+          }
+        },
+        {
+          "id": "tower-l3",
+          "title": "Lantern room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "ceramic-tower",
+            "slot": "tower-l3"
+          }
+        }
+      ]
+    },
+    "minaret-temple": {
+      "title": "Minaret Temple",
+      "what": "A dark blue glazed temple east of the court, with an open ground pavilion and two halls above it connected by floating shafts.",
+      "kind": "building",
+      "role": "landmark",
+      "salience": 3,
+      "in": "glazed-court",
+      "aliases": [
+        "temple",
+        "minaret",
+        "blue temple"
+      ],
+      "parts": [
+        {
+          "id": "temple-l0",
+          "title": "Ground pavilion",
+          "anchor": {
+            "kind": "entity",
+            "ref": "minaret-temple",
+            "slot": "temple-l0"
+          }
+        },
+        {
+          "id": "temple-l1",
+          "title": "Domed body hall",
+          "anchor": {
+            "kind": "entity",
+            "ref": "minaret-temple",
+            "slot": "temple-l1"
+          }
+        },
+        {
+          "id": "temple-l2",
+          "title": "Upper lantern hall",
+          "anchor": {
+            "kind": "entity",
+            "ref": "minaret-temple",
+            "slot": "temple-l2"
+          }
+        }
+      ]
+    },
+    "meadow-south": {
+      "title": "South Meadow",
+      "what": "Wildflowers and grasses south of the glazed court, opening away from the two ceramic buildings.",
+      "kind": "meadow",
+      "role": "landmark",
+      "salience": 1,
+      "in": "glazed-court",
+      "aliases": [
+        "wildflower meadow",
+        "flower field"
+      ]
+    }
+  },
+  "worldAbout": {
+    "title": "Little Martians Ceramic Garden",
+    "what": "A garden of glazed architecture: a four-level ceramic tower and a minaret temple face one another across a tiled court.",
+    "tour": "The Glazed Court is the central meeting point. The Ceramic Tower stands west, the Minaret Temple east, and the wildflower meadow south. Both buildings have ground-level spaces; their upper rooms use floating shafts.",
+    "districts": [
+      "glazed-court"
+    ]
+  }
+}

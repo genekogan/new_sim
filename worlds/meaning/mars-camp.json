@@ -1,0 +1,149 @@
+{
+  "schema": "world-meaning/1",
+  "worldId": "mars-camp",
+  "source": {
+    "template": "worlds/templates/mars-camp.json",
+    "sha": "fe955f6d91cb9b73e1c76c5aeb680fd09c625e613214764c6d175a3463101f29",
+    "provenance": [
+      {
+        "path": "worlds/templates/mars-camp.json",
+        "sha": "fe955f6d91cb9b73e1c76c5aeb680fd09c625e613214764c6d175a3463101f29"
+      }
+    ]
+  },
+  "about": {
+    "kitchen": {
+      "title": "Camp Kitchen",
+      "what": "The western building in the camp row, where residents gather for shared meals. The living room is next door to the east.",
+      "kind": "building",
+      "role": "landmark",
+      "salience": 2,
+      "aliases": [
+        "dining room",
+        "mess hall",
+        "canteen"
+      ],
+      "parts": [
+        {
+          "id": "kitchen",
+          "title": "Kitchen and dining room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "kitchen",
+            "slot": "kitchen"
+          }
+        }
+      ]
+    },
+    "living-room": {
+      "title": "Camp Living Room",
+      "what": "The communal hall between the kitchen and bunkhouse: classes and presentations occupy one end, with reading, computers and conversation at the other.",
+      "kind": "building",
+      "role": "landmark",
+      "salience": 2,
+      "aliases": [
+        "common room",
+        "classroom",
+        "meeting hall",
+        "lounge"
+      ],
+      "parts": [
+        {
+          "id": "classroom-corner",
+          "title": "Classroom corner",
+          "what": "The teaching end of the hall, with a display and lectern.",
+          "anchor": {
+            "kind": "entity",
+            "ref": "living-room",
+            "slot": "classroom-corner"
+          }
+        },
+        {
+          "id": "living-room",
+          "title": "Living room",
+          "what": "The informal reading and conversation end of the hall.",
+          "anchor": {
+            "kind": "entity",
+            "ref": "living-room",
+            "slot": "living-room"
+          }
+        },
+        {
+          "id": "lectern",
+          "title": "Class lectern",
+          "anchor": {
+            "kind": "entity",
+            "ref": "living-room/class-lectern"
+          }
+        },
+        {
+          "id": "reading-seat",
+          "title": "Reading chair",
+          "anchor": {
+            "kind": "entity",
+            "ref": "living-room/reading-chair"
+          }
+        },
+        {
+          "id": "computer-seat",
+          "title": "First computer chair",
+          "anchor": {
+            "kind": "entity",
+            "ref": "living-room/computer-1-chair"
+          }
+        }
+      ]
+    },
+    "bunkhouse": {
+      "title": "Camp Bunkhouse",
+      "what": "The eastern building in the camp row, providing a shared sleeping room away from the kitchen and classroom.",
+      "kind": "building",
+      "role": "landmark",
+      "salience": 2,
+      "aliases": [
+        "sleeping quarters",
+        "dormitory",
+        "sleeping room"
+      ],
+      "parts": [
+        {
+          "id": "bunkhouse",
+          "title": "Shared sleeping room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "bunkhouse",
+            "slot": "bunkhouse"
+          }
+        },
+        {
+          "id": "first-mat",
+          "title": "First sleeping mat",
+          "anchor": {
+            "kind": "entity",
+            "ref": "bunkhouse/mat-1"
+          }
+        }
+      ]
+    },
+    "lookout-bay": {
+      "title": "Desert Lookout",
+      "what": "A small raised wooden viewing deck south of the kitchen, looking out over the open camp terrain.",
+      "kind": "deck",
+      "role": "landmark",
+      "salience": 2,
+      "aliases": [
+        "lookout",
+        "viewing deck",
+        "observation deck"
+      ]
+    }
+  },
+  "worldAbout": {
+    "title": "Mars Camp",
+    "what": "A compact desert camp with a shared kitchen, a learning and living hall, a bunkhouse and a small lookout.",
+    "tour": "The main buildings form a west-to-east row: kitchen, living room, bunkhouse. Classes take place in the classroom corner of the living room. The small lookout lies south of the kitchen.",
+    "districts": [
+      "living-room"
+    ]
+  }
+}
