@@ -69,6 +69,9 @@ test('a cliff is refused with a precise code; deep water refuses walking; the ed
   const e = world();
   const cliff = e.canPerform({ actor: 'h_ada', label: 'mesa', steps: [{ verb: 'walk_to', params: { to: [0, 50] } }] }) ?? run(e, [{ verb: 'walk_to', params: { to: [0, 50] } }]).end;
   assert.match(String((cliff as { code?: string })?.code), /ground\.cliff/, JSON.stringify(cliff));
+  // Only destination journeys compose media; the explicitly requested native foot action stays foot-only.
+  const footOnly = e.canPerform({ actor: 'h_ada', label: 'foot-only lake walk', steps: [{ verb: 'mars:walk_to', params: { x: -70, z: -20 } }] });
+  assert.equal(footOnly?.code, 'ground.deep-water', JSON.stringify(footOnly));
   // the old 384 m window refuses a walk to the far edge ('ground.too-far'); paged navigation (lane NAV) plans it
   if (process.env.GROUND_PAGED === '1') assert.equal(e.canPerform({ actor: 'h_ada', label: 'far', steps: [{ verb: 'walk_to', params: { to: [499, 0] } }] }), null);
   else { const far = run(e, [{ verb: 'walk_to', params: { to: [499, 0] } }]).end; assert.ok(far?.kind === 'failed' && /^ground\./.test(far.code ?? ''), JSON.stringify(far)); }

@@ -110,7 +110,7 @@ async function soulDoes(capability, { params, maxS = 240, until: stopWhen } = {}
     await sleep(700);
   }
   const o = await observe();
-  return { accepted: true, phase: rec?.phase, code: rec?.code, reason: rec?.reason, result: r.data.result, samples, fromTick: r.data.receipt?.acceptedTick ?? samples[0]?.tick ?? 0, toTick: o.tick, end: { p: o.self.position, activity: o.self.activity, state: o.self.state } };
+  return { accepted: true, capability: rec?.capability, chosen: rec?.chosen, phase: rec?.phase, code: rec?.code, reason: rec?.reason, result: r.data.result, samples, fromTick: r.data.receipt?.acceptedTick ?? samples[0]?.tick ?? 0, toTick: o.tick, end: { p: o.self.position, activity: o.self.activity, state: o.self.state } };
 }
 const near = (p, q, d) => Math.hypot(p[0] - q[0], p[2] - q[1]) <= d;
 
@@ -280,7 +280,26 @@ try {
   }, (r) => r.n > 10 && r.max > 5.5 && r.min < 1 && r.rises >= 5);
   if (hill?.end) { const p = hill.end.p; await shots([{ name: 's2-on-the-hilltop', eye: [p[0] - 14, p[1] + 6, p[2] + 16], at: [p[0], p[1] + 0.9, p[2]], wait: 8000 }]); }
   await step('S3 the mesa is refused: its flank is steeper than 30° (ground.cliff / ground.steep, named where)', () => soulDoes('walk:flag-mesa-top'), (r) => ['ground.cliff', 'ground.steep'].includes(r.code) && r.phase !== 'completed');
-  await step('S3 walking into the lake is refused: too deep to wade (ground.deep-water)', () => soulDoes('walk:flag-lake-middle'), (r) => r.code === 'ground.deep-water' && r.phase !== 'completed');
+  // Keep the historical gate case ID; document its changed contract: accepted tranche L3 explicitly composes
+  // high-level walk/go into walk → wade → swim. Raw native walk still refuses deep water. This verifies
+  // real arrival at this flag, not merely acceptance or an outside/shore substitute.
+  await step('S3 walking into the lake is refused: too deep to wade (ground.deep-water)', async () => {
+    const flag = (await entity('lake-middle')).entity;
+    const cap = (await caps()).find((c) => c.id === 'walk:flag-lake-middle');
+    const r = await soulDoes('walk:flag-lake-middle');
+    report.samples.lakeEntry = r.samples;
+    const [g] = r.end?.p ? await groundAt([[r.end.p[0], r.end.p[2]]]) : [];
+    return { contract: 'L3 high-level walk composes walk/wade/swim; native foot-only walk still refuses deep water',
+      accepted: r.accepted, phase: r.phase, code: r.code, capability: r.capability, chosen: r.chosen,
+      flag: flag && { id: flag.id, name: flag.name, p: flag.p }, capTarget: cap?.target,
+      end: r.end, acts: [...new Set(r.samples.map((s) => s.activity))], medium: g?.medium,
+      depth: g?.water, surfaceY: g ? g.y + g.water : null };
+  }, (r) => r.accepted && r.phase === 'completed' && r.capability === 'walk:flag-lake-middle'
+    && r.flag?.name === 'lake-middle' && r.flag.p[0] === -72 && r.flag.p.at(-1) === -20
+    && r.capTarget?.id === r.flag.id && r.chosen?.target === r.flag.id
+    && near(r.end.p, [-72, -20], 1.5) && ['walk', 'wade', 'swim'].every((a) => r.acts.includes(a))
+    && r.end.activity === 'tread' && /swimming/.test(r.end.state ?? '') && r.medium === 'swim'
+    && r.depth > 3 && Math.abs(r.surfaceY) < 0.02 && Math.abs(r.end.p[1] - (r.surfaceY - 1.2)) < 0.05);
   const pond = await step('S4 she wades into the pond: shallow water, feet on the bed, wading', async () => {
     const r = await soulDoes('walk:flag-pond-middle');
     report.samples.pond = r.samples;
