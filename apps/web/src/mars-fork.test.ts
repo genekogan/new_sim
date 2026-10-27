@@ -63,3 +63,11 @@ test('land: every land entity draws; the old desert dressing, outside sand and f
   assert.equal(land.dress(camp), 4);
   assert.ok(!floor.visible && !ridge.visible && !shrubs.visible && !outside.visible && wall.visible && marks.visible && desert.visible);
 });
+import {readFileSync} from 'node:fs';
+
+test('legacy backdrop input is exactly the template land, without campus or meaning batches',()=>{
+  const source=JSON.parse(readFileSync(new URL('../../../worlds/templates/mars-two.json',import.meta.url),'utf8'));
+  const render=JSON.parse(readFileSync(new URL('../../../worlds/render/mars-fork-land.json',import.meta.url),'utf8'));
+  assert.deepEqual(render,{constants:source.constants,state:source.state,batches:source.batches.filter((b:{group?:string})=>b.group==='land')});
+  assert.equal(render.batches.length,1);
+});

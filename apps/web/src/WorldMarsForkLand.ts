@@ -15,7 +15,7 @@ import * as THREE from 'three';
 import { WorldModel, applyBatch, type DefInput, type StoredDef, type Entity } from '@sim/world-compiler';
 import desertKit from '../../../packages/world-compiler/src/core-kit/desert.json' with { type: 'json' };
 import sceneryKit from '../../../packages/world-compiler/src/core-kit/scenery.json' with { type: 'json' };
-import template from '../../../worlds/templates/mars-two.json' with { type: 'json' };
+import template from '../../../worlds/render/mars-fork-land.json' with { type: 'json' };
 import { meshFor, type MeshCtx } from './gen-mesh/registry.ts';
 import { MaterialLib } from './gen-mesh/materials.ts';
 import { terrainColorFor } from './gen-mesh/ground-palette.ts';

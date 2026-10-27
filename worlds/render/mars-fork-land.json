@@ -1,0 +1,625 @@
+{
+  "constants": {
+    "extent": 1200,
+    "ground": "land",
+    "limits": {
+      "budget": {
+        "tris": 200000,
+        "bytes": 6000000,
+        "texPx": 2048
+      }
+    }
+  },
+  "state": {
+    "constitution": "# Mars two\nThe Mars College 2026 campus on the low Sonoran desert by the Salton Sea: Mimos (the caf\u00e9 and lounge), the Chiba kitchen and dining hall, the Chiba auditorium, the Dojo, Tool camp and the Freeside compound.\n\nRebuilt in the new engine from the 2026 reference with Gene's Mimos and kitchen corrections.",
+    "sky": {
+      "palette": "mars-desert",
+      "sun": 0.8
+    },
+    "weather": {
+      "kind": "clear",
+      "clouds": 0.05,
+      "wind": 0.25,
+      "rain": 0,
+      "fog": 0
+    },
+    "ground": {
+      "palette": "playa"
+    }
+  },
+  "batches": [
+    {
+      "note": "the land: the playa, the tyre ring of the old race track west of camp, tyre tracks, creosote scrub; beyond the edge the 111, the wash, the salt flats, the Salton Sea and the mountains",
+      "group": "land",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/tire-ring@1",
+          "name": "tire-ring",
+          "p": [
+            -170,
+            -104
+          ],
+          "r": -0.087,
+          "params": {
+            "rx": 52,
+            "rz": 104
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/tire-tracks@1",
+          "name": "race-track-tracks",
+          "shape": {
+            "area": [
+              [
+                -250,
+                -230
+              ],
+              [
+                -80,
+                -230
+              ],
+              [
+                -80,
+                20
+              ],
+              [
+                -250,
+                20
+              ]
+            ]
+          },
+          "params": {
+            "count": 70
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/tire-tracks@1",
+          "name": "camp-tracks",
+          "shape": {
+            "area": [
+              [
+                -80,
+                -180
+              ],
+              [
+                160,
+                -180
+              ],
+              [
+                160,
+                80
+              ],
+              [
+                -80,
+                80
+              ]
+            ]
+          },
+          "params": {
+            "count": 40
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desert-scrub@1",
+          "name": "creosote-scrub",
+          "shape": {
+            "area": [
+              [
+                -600,
+                -600
+              ],
+              [
+                600,
+                -600
+              ],
+              [
+                600,
+                600
+              ],
+              [
+                -600,
+                600
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0008,
+            "toward": "se",
+            "gradient": 0.6,
+            "clear": [
+              [
+                24,
+                -53,
+                120
+              ],
+              [
+                -170,
+                -104,
+                45
+              ]
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desert-scrub@1",
+          "name": "scrub-toward-the-wash",
+          "shape": {
+            "area": [
+              [
+                300,
+                -600
+              ],
+              [
+                600,
+                -600
+              ],
+              [
+                600,
+                600
+              ],
+              [
+                300,
+                600
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.002,
+            "toward": "e"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/far-land@1",
+          "p": [
+            -11.1,
+            -30.2
+          ],
+          "params": {
+            "radius": 2300,
+            "areas": [
+              {
+                "pts": [
+                  [
+                    -2700,
+                    815
+                  ],
+                  [
+                    -1500,
+                    812
+                  ],
+                  [
+                    0,
+                    806
+                  ],
+                  [
+                    1500,
+                    818
+                  ],
+                  [
+                    3200,
+                    830
+                  ],
+                  [
+                    3200,
+                    2300
+                  ],
+                  [
+                    -2700,
+                    2300
+                  ]
+                ],
+                "m": "flats",
+                "edge": 25,
+                "shrubs": 30
+              },
+              {
+                "pts": [
+                  [
+                    1000,
+                    950
+                  ],
+                  [
+                    1450,
+                    860
+                  ],
+                  [
+                    1900,
+                    900
+                  ],
+                  [
+                    2250,
+                    1080
+                  ],
+                  [
+                    2350,
+                    1500
+                  ],
+                  [
+                    2200,
+                    1950
+                  ],
+                  [
+                    1700,
+                    2050
+                  ],
+                  [
+                    1250,
+                    1950
+                  ],
+                  [
+                    1020,
+                    1550
+                  ]
+                ],
+                "m": "delta",
+                "edge": 60,
+                "shrubs": 45
+              }
+            ],
+            "strips": [
+              {
+                "pts": [
+                  [
+                    -2600,
+                    785
+                  ],
+                  [
+                    -1500,
+                    780
+                  ],
+                  [
+                    0,
+                    776
+                  ],
+                  [
+                    1500,
+                    790
+                  ],
+                  [
+                    3000,
+                    802
+                  ],
+                  [
+                    3300,
+                    806
+                  ]
+                ],
+                "w": 90,
+                "m": "scrub",
+                "tracks": [
+                  -18,
+                  20
+                ],
+                "trackW": 3,
+                "shrubs": 45
+              },
+              {
+                "pts": [
+                  [
+                    59,
+                    -2348
+                  ],
+                  [
+                    354,
+                    -1640
+                  ],
+                  [
+                    531,
+                    -1227
+                  ],
+                  [
+                    885,
+                    -578
+                  ],
+                  [
+                    1239,
+                    12
+                  ],
+                  [
+                    1534,
+                    425
+                  ],
+                  [
+                    1711,
+                    779
+                  ],
+                  [
+                    1850,
+                    1100
+                  ],
+                  [
+                    1950,
+                    1500
+                  ]
+                ],
+                "w": 110,
+                "m": "wash",
+                "shrubs": 55
+              },
+              {
+                "pts": [
+                  [
+                    3481,
+                    -2348
+                  ],
+                  [
+                    2773,
+                    -1168
+                  ],
+                  [
+                    2183,
+                    130
+                  ],
+                  [
+                    1947,
+                    602
+                  ],
+                  [
+                    1900,
+                    900
+                  ]
+                ],
+                "w": 80,
+                "m": "wash",
+                "shrubs": 45
+              }
+            ],
+            "roads": [
+              {
+                "pts": [
+                  [
+                    -3127,
+                    767
+                  ],
+                  [
+                    -2540,
+                    600
+                  ],
+                  [
+                    -1947,
+                    425
+                  ],
+                  [
+                    -1357,
+                    41
+                  ],
+                  [
+                    -767,
+                    -372
+                  ],
+                  [
+                    -177,
+                    -755
+                  ],
+                  [
+                    177,
+                    -1000
+                  ],
+                  [
+                    413,
+                    -1286
+                  ],
+                  [
+                    708,
+                    -1470
+                  ],
+                  [
+                    1357,
+                    -1600
+                  ],
+                  [
+                    1888,
+                    -1560
+                  ],
+                  [
+                    2478,
+                    -1404
+                  ],
+                  [
+                    2773,
+                    -1286
+                  ],
+                  [
+                    3540,
+                    -991
+                  ]
+                ],
+                "w": 12,
+                "poles": {
+                  "side": 1,
+                  "every": 60,
+                  "h": 10
+                }
+              }
+            ],
+            "sea": {
+              "pts": [
+                [
+                  -2800,
+                  1640
+                ],
+                [
+                  -1500,
+                  1660
+                ],
+                [
+                  -600,
+                  1720
+                ],
+                [
+                  0,
+                  1780
+                ],
+                [
+                  900,
+                  1880
+                ],
+                [
+                  1800,
+                  2000
+                ],
+                [
+                  2600,
+                  2060
+                ],
+                [
+                  3600,
+                  2120
+                ],
+                [
+                  3600,
+                  30000
+                ],
+                [
+                  -30000,
+                  30000
+                ],
+                [
+                  -30000,
+                  1640
+                ]
+              ],
+              "level": -1.2,
+              "c": "#4f9fd6",
+              "beach": 160
+            }
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/panorama@1",
+          "p": [
+            -11.1,
+            -30.2
+          ],
+          "params": {
+            "haze": "#9fbdd8",
+            "visibility": 90000,
+            "water": {
+              "from": 104,
+              "to": 262,
+              "c": "#5b98c2",
+              "far": "#a3c4da"
+            },
+            "ranges": [
+              {
+                "from": 150,
+                "to": 178,
+                "d": 60000,
+                "h": 700,
+                "rough": 0.3,
+                "c": "#7f9cb8",
+                "haze": 1.1,
+                "foothills": 0,
+                "profile": [
+                  0.1,
+                  0.5,
+                  1,
+                  0.6,
+                  0.2
+                ]
+              },
+              {
+                "from": 228,
+                "to": 306,
+                "d": 40000,
+                "h": 1900,
+                "rough": 0.25,
+                "c": "#2d5a8c",
+                "haze": 0.8,
+                "foothills": 0.3,
+                "profile": [
+                  0.15,
+                  0.35,
+                  0.55,
+                  0.75,
+                  0.9,
+                  1,
+                  0.85,
+                  0.95,
+                  0.8,
+                  0.6,
+                  0.4,
+                  0.2
+                ]
+              },
+              {
+                "from": 300,
+                "to": 334,
+                "d": 90000,
+                "h": 1500,
+                "rough": 0.3,
+                "c": "#6f8db0",
+                "haze": 1,
+                "foothills": 0,
+                "profile": [
+                  0.3,
+                  0.6,
+                  0.45,
+                  0.7,
+                  0.5,
+                  0.3
+                ]
+              },
+              {
+                "from": 326,
+                "to": 14,
+                "d": 22000,
+                "h": 1150,
+                "rough": 0.3,
+                "c": "#2e4a72",
+                "haze": 0.85,
+                "foothills": 0.35,
+                "profile": [
+                  0.2,
+                  0.45,
+                  0.7,
+                  0.85,
+                  1,
+                  0.9,
+                  0.8,
+                  0.72,
+                  0.62,
+                  0.55
+                ]
+              },
+              {
+                "from": 348,
+                "to": 105,
+                "d": 11000,
+                "h": 800,
+                "rough": 0.4,
+                "c": "#5a4c5c",
+                "c2": "#8c5a4c",
+                "bands": 0.35,
+                "haze": 1,
+                "foothills": 0.7,
+                "profile": [
+                  0.5,
+                  0.62,
+                  0.8,
+                  1,
+                  0.95,
+                  0.9,
+                  0.85,
+                  0.8,
+                  0.7,
+                  0.62,
+                  0.55,
+                  0.45,
+                  0.35
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
