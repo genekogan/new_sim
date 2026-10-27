@@ -6,6 +6,7 @@ import { monoMs, sleep as realSleep } from '../lib/clock.mjs';
 import { rng as makeRng } from '../lib/hash.mjs';
 import { appendJsonl, writeJson } from '../lib/jsonl.mjs';
 import { quota, quotaAllows } from '../lib/quota.mjs';
+import { withKinematics } from '../observer/kinematics.mjs';
 import { runFixtureSetup } from '../arena/fixture-setup.mjs';
 import { PersonaSession, loadSheet, parseSheet } from './persona.mjs';
 
@@ -170,8 +171,10 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
     let snap = null, legible = null, shot = null;
     try { if (observer?.truth?.snapshotSoul && ctx.soulId) snap = await observer.truth.snapshotSoul({ base: world?.base, soulId: ctx.soulId, identity: ctx.identity }); } catch (e) { log(ctx.id, 'snapshot failed', e?.message ?? e); }
     if (snap && scenario.observer?.kinematics && ctx.seat.cliJson) {
+      const startedAt = new Date().toISOString();
       const here = await ctx.seat.cliJson(['here']);
-      if (here.ok && here.data?.me) { const me = here.data.me; snap = { ...snap, place: me.place, heading: me.heading, seat: me.seat ?? null, level: me.level ?? null, posture: me.posture, perceptionSampleAt: new Date().toISOString() }; }
+      // Failed/missing fields are unknown; public body fields belong to an earlier observation.
+      snap = withKinematics(snap, here.ok ? here.data : null, {startedAt, endedAt:new Date().toISOString(), mono:clock.now()});
     }
     try { if (cam?.legible) legible = await cam.legible(); } catch { /* best effort */ }
     try { if (cam?.shot) { const mono = Math.round(clock.now() - start); const p = join(shotsDir, ctx.id, `${mono}.png`); mkdirSync(join(shotsDir, ctx.id), { recursive: true }); await cam.shot(p); shot = p; appendJsonl(join(shotsDir, 'index.jsonl'), { cam: ctx.id, mono, t: new Date().toISOString(), path: p }); } } catch (e) { log(ctx.id, 'shot failed', e?.message ?? e); }
