@@ -34,3 +34,10 @@ test('the live fidelity Chiba variant has exactly the extracted core geometry', 
   const live=assets['99d5c2f524280ef10ca5ef88e9095434ff30a177d42bc67ff5e8d451836e89af'];
   assert.equal(live.geometryHash,core.geometryHash);assert.deepEqual(live.surfaces,core.surfaces);
 });
+
+test('compact runtime data reconstructs every extracted surface and link exactly', () => {
+  for(const [hash,entry] of Object.entries(overlays.assets)) {
+    assert.deepEqual(meshFloors(hash,entry.box),entry.surfaces,hash);
+    assert.deepEqual(meshFloorLinks(hash,entry.box),'links' in entry?entry.links:[],hash);
+  }
+});

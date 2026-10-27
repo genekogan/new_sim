@@ -7,6 +7,7 @@ import {readFileSync,writeFileSync,readdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {extractFloorPatches} from './geometry.mjs';
 import {stairAccess} from './steps.mjs';
+import {packFloors} from './pack.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'../..'),req=createRequire(resolve(root,'apps/server/package.json'));
 const {NodeIO}=req('@gltf-transform/core');
 const req2=createRequire(req.resolve('@gltf-transform/functions'));
@@ -40,5 +41,6 @@ for(const name of names)for(const [hash,asset] of Object.entries(assets).filter(
  console.log(JSON.stringify({name,triangles:triangles.length,patches:result.patches.length,accepted:accepted.map(p=>({y:p.y,area:p.area,rectangles:p.polygons.length})),rejected:result.patches.length-accepted.length}));
 }
 const path=resolve(root,'packages/world-compiler/src/mesh-floor-overlays.json'),data=JSON.stringify(output,null,1)+'\n';
-if(process.argv.includes('--check')){if(readFileSync(path,'utf8')!==data)throw Error('mesh floor overlays are stale');}
-else writeFileSync(path,data);
+const runtimePath=resolve(root,'packages/world-compiler/src/mesh-floor-runtime.json'),runtime=JSON.stringify(packFloors(output))+'\n';
+if(process.argv.includes('--check')){if(readFileSync(path,'utf8')!==data||readFileSync(runtimePath,'utf8')!==runtime)throw Error('mesh floor overlays are stale');}
+else {writeFileSync(path,data);writeFileSync(runtimePath,runtime);}
