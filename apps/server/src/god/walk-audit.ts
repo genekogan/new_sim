@@ -17,6 +17,7 @@ import { gunzipSync } from 'node:zlib';
 import { tmpdir, homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Thing } from './nav.ts';
 
 export const WALK_AUDIT_VERSION = 1;
 export const FLOAT_M = 0.3;
@@ -31,6 +32,8 @@ export type WalkPart = {
   bad: [string, string, string][];
   /** [thing path, place]: named things GodNav finds no walk goal for */
   goalless: [string, string][];
+  /** [root entry alias, canonical room, place]: blocked aliases retained for diagnosis, counted once under the room. */
+  goallessAliases?: [string, string, string][];
   /** [path, metres above the ground, place] */
   floats: [string, number, string][];
   /** [code, use:<slot id>, place]: seats and beds a Soul cannot use (walk-use.ts; only worlds audited with --use) */
@@ -42,6 +45,16 @@ export function shardOf(at: readonly number[], n: number): number {
   if (n <= 1) return 0;
   const i = Math.floor(at[0] / SHARD_CELL_M), j = Math.floor(at[1] / SHARD_CELL_M);
   return (((i * 73856093) ^ (j * 19349663)) >>> 0) % n;
+}
+
+/** GodNav's closed/single-room root entry is the same destination as that room. Only collapse
+ * two null goals with this exact structural identity; an open root's approach is a distinct goal. */
+export function goallessEntryAlias(t: Thing, byRef: ReadonlyMap<string, Thing>, hasGoal: (t: Thing) => boolean): string | undefined {
+  if (t.kind !== 'building' || t.doorOpen || t.semanticPart || t.rooms?.length !== 1 || hasGoal(t)) return;
+  const room = byRef.get(t.rooms[0]);
+  if (!room || room.kind !== 'room' || room.semanticPart || room.id !== t.id || !room.room ||
+      room.ref !== `${t.ref}/${room.room}` || hasGoal(room)) return;
+  return room.ref;
 }
 
 type Booted = { name: string; worldId: string; host: any; god: any; bridge: any; engine: any; refused: [string, string, string][]; stop(): void };
@@ -137,11 +150,22 @@ export async function walkAudit(w: Booted, shard: [number, number] = [0, 1], o: 
   t = performance.now();
   // in spatial order (32 m cells), so neighbouring goals share the engine's small fine-tile LRU (same answers, ~5x faster)
   const cell = (v: number) => Math.floor(v / 32);
-  const things = [...w.bridge.nav.things()].filter((th: any) => mine(th.at))
+  const allThings: Thing[] = [...w.bridge.nav.things()], byRef = new Map(allThings.map(th => [th.ref, th]));
+  const goals = new Map<Thing, any>(), goalFor = (th: Thing) => {
+    if (!goals.has(th)) goals.set(th, w.bridge.nav.goal(th, th.at));
+    return goals.get(th);
+  };
+  const goallessAliases: [string, string, string][] = [];
+  const things = allThings.filter((th: Thing) => mine(th.at))
     .sort((a: any, b: any) => cell(a.at[1]) - cell(b.at[1]) || cell(a.at[0]) - cell(b.at[0]) || (a.ref < b.ref ? -1 : a.ref > b.ref ? 1 : 0));
   for (const th of things) {
-    const g = w.bridge.nav.goal(th, th.at);
-    if (!g) goalless.push([th.ref, placeOf(`walk:${th.ref}`)]); else dests.push({ id: `walk:${th.ref}`, p: g.p, level: g.level });
+    const g = goalFor(th);
+    if (!g) {
+      const canonical = goallessEntryAlias(th, byRef, t => !!goalFor(t)), place = placeOf(`walk:${th.ref}`);
+      // The canonical room is scored in its own spatial shard, including when it differs from the root's shard.
+      if (canonical) goallessAliases.push([th.ref, canonical, place]);
+      else goalless.push([th.ref, place]);
+    } else dests.push({ id: `walk:${th.ref}`, p: g.p, level: g.level });
   }
   lap('goals', t); t = performance.now();
   for (const x of e.navTargetsV1(mine)) dests.push({ id: `${x.kind}:${x.id}`, p: x.p, level: x.level, tol: x.tol });
@@ -169,7 +193,7 @@ export async function walkAudit(w: Booted, shard: [number, number] = [0, 1], o: 
   lap('floats', t);
   const by = (a: string[], b: string[]) => (a.join('\t') < b.join('\t') ? -1 : 1);
   return { schemaVersion: 1, version: WALK_AUDIT_VERSION, name: w.name, worldId: w.worldId, shard, dests: dests.length, roots,
-    bad: bad.sort(by), goalless: goalless.sort(by), floats: floats.sort((a, b) => (a[0] < b[0] ? -1 : 1)), ...(unusable ? { unusable: unusable.sort(by) } : {}), ms };
+    bad: bad.sort(by), goalless: goalless.sort(by), goallessAliases: goallessAliases.sort(by), floats: floats.sort((a, b) => (a[0] < b[0] ? -1 : 1)), ...(unusable ? { unusable: unusable.sort(by) } : {}), ms };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
