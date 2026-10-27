@@ -69,7 +69,9 @@ reply"` (≤ 140 characters; add `--failed` if you could not do it), listen agai
 7. `look` once per step and open the PNG it names (see *Seeing*). Fix what is wrong.
 8. **Check the uses** with `describe` (`walk:`, seat slots, doors) and `where`. Trust `walk:` (the engine's routes)
    over "reachable from outside" (design only).
-9. `build done "summary"` prints a checked receipt (no `build check` needed); a group ends `group --off`. Report: what you built, what you
+9. **Say what it is** for each new place: `about <ref> --set '{"title":"Chiba Auditorium","what":"A lecture hall for campus talks.","aliases":["Chiba","auditorium"],"kind":"building","role":"landmark"}'`. Use names a stranger understands, purpose and useful relations, not a furniture inventory. `place --about '{…}'` sets meaning immediately. `about <ref>` reads it; `--set` replaces the whole block, `--clear` removes it. `about --missing --kind building` finds unfinished descriptions.
+   - `in` is the semantic parent's ref, independent of physical nesting. `parts` names useful destinations: `[{"id":"podium","title":"Podium desk","anchor":{"kind":"entity","ref":"presenter-seat"}}]`. Bind to a real entity or declared seat/room slot (`slot`); a part without an anchor is descriptive only. Description never creates sitting, swimming or entry capability. `about world --set '{"title":"…","what":"…","tour":"…","districts":["campus"]}'` describes the whole world.
+10. `build done "summary"` prints a checked receipt (no `build check` needed); a group ends `group --off`. Report: what you built, what you
    approximated, how you checked each use. Put extras in the report as offers instead of doing them.
 
 **Stop when every listed item exists** and its use is checked. Show the owner a first `look` within about 2 minutes

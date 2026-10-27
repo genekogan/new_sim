@@ -3153,6 +3153,11 @@ async function weather(f) {
     if (!(x >= 0 && x <= 1)) throw new Error(`--${k} is 0\u20261`);
     w[k] = x;
   }
+  if (f.minutes !== void 0) {
+    const m = num(f.minutes);
+    if (!(m >= 5 && m <= 360)) throw new Error("--minutes is 5\u2026360 world minutes (how long a rain or storm lasts)");
+    w.minutes = m;
+  }
   if (!Object.keys(w).length) return envText(ok(await call("/v1/world/env", { as: "none" }), "env"));
   if (!w.kind && ["clouds", "wind", "rain", "fog"].some((k) => w[k] !== void 0)) w.kind = "manual";
   return env({ weather: w }, "weather");
@@ -3197,7 +3202,7 @@ async function land(rest, f) {
   return `${r.accepted ? "" : "REFUSED: "}${r.says}${r.warnings?.length ? `
 warnings: ${r.warnings.join("; ")}` : ""}`;
 }
-var ENV_FLAGS = { time: "speed pause resume", weather: "kind intensity clouds wind rain fog", strike: "at", land: LAND_FLAGS };
+var ENV_FLAGS = { time: "speed pause resume", weather: "kind intensity clouds wind rain fog minutes", strike: "at", land: LAND_FLAGS };
 var ENV_BOOLS = ["pause", "resume", "preview", "force"];
 
 // lib/secret.mjs
@@ -3480,6 +3485,43 @@ async function governance(f = {}) {
 var GOV_FLAGS = { amendments: "all", decide: "reason text", governance: "residents-decide" };
 var GOV_POS = { amendments: 0, decide: 2, governance: 0 };
 var GOV_HELP = `govern: amendments [--all] \xB7 decide <id> accept [--text <md|file>] [--reason r] \xB7 decide <id> decline --reason "<why>" \xB7 governance [--residents-decide on|off] (off by default)`;
+
+// lib/about.mjs
+function aboutValue(raw, { clear: clear2 = false } = {}) {
+  if (typeof raw !== "string") throw Error("about takes one JSON object");
+  let value;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    throw Error("about must be valid JSON");
+  }
+  if (clear2 && value === null) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw Error("about must be a JSON object (set --about null clears it)");
+  return value;
+}
+function exactAboutTarget(m, ref) {
+  const exact = m.rows.find((r) => r.id === ref || r.path === ref);
+  const matches = exact ? [exact] : m.rows.filter((r) => r.name === ref);
+  if (matches.length !== 1) throw Error(matches.length ? `ambiguous about target ${ref}; use a full path or id` : `unknown about target ${ref}`);
+  return m.snapshot.entities.find((e) => e.id === matches[0].id) ?? {};
+}
+function missingAbout(m, { kind, limit = 30 } = {}) {
+  limit = Number(limit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 200) throw Error("--limit must be an integer from 1 to 200");
+  const entities = new Map(m.snapshot.entities.map((e) => [e.id, e]));
+  const defs2 = new Map([...m.snapshot.defs ?? [], ...m.snapshot.library ?? []].flatMap((d) => [[d.ref, d], ["sha:" + d.hash, d]]));
+  const rows = m.rows.flatMap((r) => {
+    const e = entities.get(r.id);
+    if (!e) return [];
+    const d = defs2.get(r.def) ?? defs2.get(e.def);
+    const comps = d?.components ?? d?.body?.components ?? {};
+    const inferred = e.about?.kind ?? comps.place?.kind ?? (comps.water ? "water" : "landmark");
+    const missing = ["title", "what"].filter((k) => !e.about?.[k]?.trim());
+    return missing.length && (!kind || inferred === kind) ? [{ id: e.id, path: r.path, kind: inferred, missing }] : [];
+  });
+  rows.sort((a, b) => a.path.localeCompare(b.path));
+  return { total: rows.length, rows: rows.slice(0, limit), remaining: Math.max(0, rows.length - limit) };
+}
 
 // lib/version.mjs
 var SKILL_VERSION = "1.7";
@@ -4122,6 +4164,7 @@ async function commitItems(v, def, info, flags2, params, items, notes, { op = "p
     if (flags2.yaw !== void 0 && c.r === void 0) o.r = num(flags2.yaw);
     if (c.constraints?.length) o.constraints = c.constraints;
     if (op === "place") {
+      if (flags2.about !== void 0) o.about = aboutValue(flags2.about);
       if (c.params ?? params) o.params = c.params ?? params;
       if (state) o.state = state;
       if (flags2.scale) o.s = num(flags2.scale);
@@ -4321,8 +4364,29 @@ async function move(ref, flags2 = {}) {
   }) }));
   return commitItems(v, row.def, info, { ...flags2, name: void 0 }, void 0, items, sol.notes, { op: "move", id: row.path, rowId: row.id });
 }
+async function about(ref, flags2 = {}) {
+  if (flags2.missing) {
+    if (ref || flags2.set !== void 0 || flags2.clear) throw Error("about --missing cannot be combined with a target or edits");
+    const result = missingAbout(await mirror(), flags2);
+    return flags2.json ? result : `${result.total} entities missing title or purpose${result.remaining ? ` (${result.remaining} more; use --limit)` : ""}
+${result.rows.map((r) => `${r.path} [${r.kind}] missing ${r.missing.join(", ")}`).join("\n")}`;
+  }
+  if (!ref) throw Error("usage: about <ref|world> [--set JSON | --clear], or about --missing [--kind building|zone|water|landmark]");
+  if (flags2.kind !== void 0 || flags2.limit !== void 0) throw Error("--kind and --limit apply only to about --missing");
+  if (flags2.set !== void 0 && flags2.clear) throw Error("choose --set or --clear");
+  const value = flags2.clear ? null : flags2.set !== void 0 ? aboutValue(flags2.set) : void 0;
+  if (value !== void 0) {
+    const op = ref === "world" ? { op: "world", state: { about: value } } : { op: "set", id: ref, about: value };
+    const r = await act({ ops: [op] }, flags2.note);
+    return flags2.json ? r : r.accepted ? `about ${ref}: ${value === null ? "cleared" : "replaced"}` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
+  }
+  const m = await mirror();
+  const valueNow = ref === "world" ? m.snapshot.state?.about : exactAboutTarget(m, ref).about;
+  return flags2.json ? { ref, about: valueNow ?? null } : `${ref}: ${valueNow ? JSON.stringify(valueNow, null, 2) : "no about block"}`;
+}
 async function set(id, flags2) {
   const op = { op: "set", id };
+  if (flags2.about !== void 0) op.about = aboutValue(flags2.about, { clear: true });
   if (flags2.state) op.state = JSON.parse(flags2.state);
   if (flags2.param) op.params = parseKV(flags2.param);
   if (flags2.name) op.name = flags2.name;
@@ -4395,7 +4459,7 @@ set with: sky --palette <name> [--sun 0\u20261]`;
   if (!SKY_PALETTES.some((p) => p.id === palette)) throw new Error(`unknown sky palette "${palette}"; palettes: ${SKY_PALETTES.map((p) => p.id).join(", ")}`);
   const sun = flags2.sun !== void 0 ? num(flags2.sun) : st.sky?.sun ?? 0.6;
   if (!(sun >= 0 && sun <= 1)) throw new Error("--sun is 0\u20261 (0 = night, 1 = noon)");
-  const r = await act({ ops: [{ op: "world", state: { sky: { ...st.sky ?? {}, palette, sun }, ...st.weather ? { weather: st.weather } : {} } }] });
+  const r = await act({ ops: [{ op: "world", state: { sky: { ...st.sky ?? {}, palette, sun } } }] });
   return r.accepted ? `${skyText({ ...st, sky: { palette, sun } })} (seq ${r.seq})` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
 }
 async function constitution(text) {
@@ -5189,7 +5253,7 @@ async function status() {
   const v = st.versions;
   return `${s.world} \u2014 you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ""}${s.build ? `; ${buildHeader(s.build, st.builds?.find((b) => b.id === s.build.id))}` : ""}; skill ${SKILL_VERSION}${v ? `; server protocol ${v.protocol}, schema ${v.schema}, skill ${v.skill}, source ${v.source}` : ""}`;
 }
-var BOOL = /* @__PURE__ */ new Set(["fix", "helper", "local", "remote", "no-build", "done", "force", "undo", "float", "dry", "plan", "nudge", "json", "all", "keep", "hide-roofs", "stop", "site", "unused", "off", "md", "fresh", "remove", "free", "list", ...ENV_BOOLS, ...LAYERS_BOOLS]);
+var BOOL = /* @__PURE__ */ new Set(["missing", "clear", "fix", "helper", "local", "remote", "no-build", "done", "force", "undo", "float", "dry", "plan", "nudge", "json", "all", "keep", "hide-roofs", "stop", "site", "unused", "off", "md", "fresh", "remove", "free", "list", ...ENV_BOOLS, ...LAYERS_BOOLS]);
 var boolsFor = (cmd) => cmd === "look" ? /* @__PURE__ */ new Set([...BOOL, "inside"]) : cmd === "listen" ? /* @__PURE__ */ new Set([...BOOL, "once", "follow"]) : cmd === "ack" ? /* @__PURE__ */ new Set([...BOOL, "failed"]) : BOOL;
 function parseFlags(argv, bools = BOOL) {
   const flags2 = {}, rest = [];
@@ -5218,8 +5282,8 @@ var FLAGS = {
   listen: "after timeout once follow",
   ack: "failed",
   "verify-use": "seat from uses",
-  place: `${REL} path area rect circle name param state scale dry plan nudge group note`,
-  terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
+  place: `${REL} path area rect circle name param state about scale dry plan nudge group note`,
+  terrain: `${REL} path area rect circle name param state about scale dry plan nudge group note`,
   move: `${REL} by in local nudge note dry plan`,
   look: "at from dist inside floor keep remote out span height width h hide-roofs stop hour weather views site frames every",
   kit: "hour weather beside out width h",
@@ -5229,7 +5293,8 @@ var FLAGS = {
   clear: "size",
   free: "near radius count slope",
   select: "def tag name in area near radius all remove by set-state set-param recolor yaw part note",
-  set: "state param name constraints note",
+  set: "state param name constraints about note",
+  about: "set clear missing kind limit note",
   recolor: "part",
   clone: "name count step yaw at offset nudge note",
   sky: "palette sun list",
@@ -5255,7 +5320,7 @@ var FLAGS = {
   ...LAYERS_FLAGS,
   ...GOV_FLAGS
 };
-var POS = { ...GOV_POS, listen: 0, ack: 2, doctor: 0, trace: 0, kit: 2, build: 2, "verify-use": 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+var POS = { ...GOV_POS, listen: 0, ack: 2, doctor: 0, trace: 0, kit: 2, build: 2, "verify-use": 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, about: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
 var NUMERIC = /* @__PURE__ */ new Set(["dist", "count", "t", "setback", "row", "spacing", "width", "span", "radius", "sun", "clouds", "wind", "rain", "fog", "intensity", "speed", "amount", "level", "depth", "metres", "peak", "edge", "face", "steps", "scale", "floor", "height", "h", "frames", "every", "slope", "gap", "yaw"]);
 var SIDES = ["left", "right", "both", "center", "centre"];
 function checkArgs(cmd, f, rest) {
@@ -5312,6 +5377,7 @@ var COMMANDS = {
   defs: (r, f) => defs(r.join(" ") || void 0, f),
   schema: (r, f) => schema(f),
   snapshot: snapshot2,
+  about: (r, f) => about(r[0], f),
   describe: (r, f) => describe(r[0], f),
   where: (r, f) => where(r[0] ?? f.at, f),
   reach: (r, f) => reach(r[0], r[1], f),
@@ -5408,12 +5474,13 @@ build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] 
 place:  --against offset is signed metres from the side centre (positive toward e/s/w/n on n/e/s/w sides; rotated sides follow their face tangent). --t runs from 0 to 1 along the full side. Doorways/obstacles cause a reported slide within the side or a refusal. --inside --at uses a world point, including --offset dx,dz; outside, blocked, or conflicting wall/corner/count requests are refused.
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],\u2026]' \xB7 place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],\u2026]'
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen \xB7 set <ref> --param k=v --state '{\u2026}' \xB7 recolor <ref> #hex \xB7 remove <ref>\u2026 \xB7 clone <ref> [--at] [--count n --step dx,dz] \xB7 select [filters] [--remove|--by|--recolor|--set-state|--set-param]
+meaning: about <ref|world> [--set '{"title":"\u2026","what":"\u2026","aliases":["\u2026"]}' | --clear] (exact replacement; no flags reads) \xB7 about --missing [--kind building|zone|water|landmark] [--limit n] \xB7 place/set --about '{\u2026}' (set --about null clears)
 groups: group <name> \xB7 group --off \xB7 undo [--group name] \xB7 redo
 site:   build start <id> --title "\u2026" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path|build] [--asks "item; item"] [--include ref,ref] \xB7 build district <id> [--file plan.json | --delete] (one plan: roads, plots with massing, terrain/water notes, chapters; no flag = show it; --delete frees the id, buildings stay) \xB7 build start <id> --district <d> [--plots p1,p2] [--brief \u2026] (a chapter: site and massing come from the plots) \xB7 build continue <id> --brief "follow-up" \xB7 build check [id] \xB7 build step [label] [--asks "later ask"] [--include ref,ref] [--say "\u2026" [--mass nave,tower]] (announce before designing; without --say stays local) \xB7 build [show [id]] \xB7 build wait [--timeout 15m] \xB7 build resume [id] [--take] \xB7 build claim <part> [--root path | --at ref --size w,d] [--take c_\u2026] [--helper [--ttl min]] (--helper: a scoped token for a sub-agent, EDEN_GOD_HELPER=file) \xB7 build release [--done] \xB7 build pause [note] \xB7 build done [summary] [--force] \xB7 build abandon [--undo] [--force] \xB7 build rewind [id] --to <step> [--dry] [--force] (undo every build edit after that step; stays open; global --no-build skips automatic metadata)
 resume: omit id to resume the only paused build or active build with a dead lead; several open builds or an unknown id list the choices.
 mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' \xB7 preview '<batch>' \xB7 commit <preview-id> \xB7 act '<batch>' \xB7 dryrun '<batch>' \xB7 request <clientRef>
-world:  sky [--palette p --sun s] \xB7 time [19:30|7pm] [--speed h/h] [--pause|--resume] \xB7 weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] \xB7 strike [--at x,z|thing] ${godFeature("constitution") ? "\xB7 constitution <md> " : ""}\xB7 expand <m> \xB7 export [file] \xB7 import <genesis.json> \xB7 define <def.json> \xB7 define-kit <kit.json> \xB7 furnish <house>[/room]
+world:  sky [--palette p --sun s] \xB7 time [19:30|7pm] [--speed h/h] [--pause|--resume] \xB7 weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] [--minutes m] \xB7 strike [--at x,z|thing] ${godFeature("constitution") ? "\xB7 constitution <md> " : ""}\xB7 expand <m> \xB7 export [file] \xB7 import <genesis.json> \xB7 define <def.json> \xB7 define-kit <kit.json> \xB7 furnish <house>[/room]
 inbox:  listen [--after message-id] [--timeout 25] [--once|--follow] \xB7 ack <message-id> [reply] [--failed] (a reply of up to 140 characters; --failed when it could not be done)
 pair:   register <world-url> \xB7 pair \xB7 ${godFeature("flags") ? "flags \xB7 flag <label> --at x,z \xB7 " : ""}prayers [--all] (answered too) \xB7 answer <id> <text> \xB7 status
 ${LAND_HELP}
@@ -5491,6 +5558,7 @@ export {
   EXAMPLES,
   SKILL_VERSION,
   SKY_PALETTES,
+  about,
   ack,
   act,
   answer,

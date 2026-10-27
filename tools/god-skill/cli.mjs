@@ -31,6 +31,7 @@ import { hours, event, own, access, price, currency, give, pay, zone, zoneSugges
 import { amendments, decide, governance, GOV_FLAGS, GOV_POS, GOV_HELP } from './lib/governance.mjs';
 export { schemaMarkdown };
 
+import { aboutValue, missingAbout, exactAboutTarget } from './lib/about.mjs';
 import { SKILL_VERSION } from './lib/version.mjs';
 import { godFeature } from './lib/features.mjs';
 export { SKILL_VERSION };
@@ -521,6 +522,7 @@ async function commitItems(v, def, info, flags, params, items, notes, { op = 'pl
     if (flags.yaw !== undefined && c.r === undefined) o.r = num(flags.yaw);
     if (c.constraints?.length) o.constraints = c.constraints;
     if (op === 'place') {
+      if (flags.about !== undefined) o.about = aboutValue(flags.about);
       if (c.params ?? params) o.params = c.params ?? params; if (state) o.state = state; if (flags.scale) o.s = num(flags.scale);
       const parentId = c.in ? v.get(c.in.parent)?.id ?? c.in.parent : 'world';
       o.name = items.length > 1 || !flags.name ? uniqueName(v, parentId, items.length > 1 && flags.name ? `${stem}-${k + 1}` : stem, taken) : flags.name;
@@ -662,7 +664,28 @@ export async function move(ref, flags = {}) {
   }) }));
   return commitItems(v, row.def, info, { ...flags, name: undefined }, undefined, items, sol.notes, { op: 'move', id: row.path, rowId: row.id });
 }
-export async function set(id, flags) { const op = { op: 'set', id }; if (flags.state) op.state = JSON.parse(flags.state); if (flags.param) op.params = parseKV(flags.param); if (flags.name) op.name = flags.name; if (flags.constraints) op.constraints = JSON.parse(flags.constraints); const r = await act({ ops: [op] }, flags.note); return r.accepted ? `set ${id}: ${Object.keys(op).filter((k) => !['op', 'id'].includes(k)).map((k) => `${k} ${JSON.stringify(op[k])}`).join(', ')}` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
+/** Meaning is an exact block replacement, independent of geometry and physical parenting. */
+export async function about(ref, flags = {}) {
+  if (flags.missing) {
+    if (ref || flags.set !== undefined || flags.clear) throw Error('about --missing cannot be combined with a target or edits');
+    const result = missingAbout(await mirror(), flags);
+    return flags.json ? result : `${result.total} entities missing title or purpose${result.remaining ? ` (${result.remaining} more; use --limit)` : ''}\n${result.rows.map(r => `${r.path} [${r.kind}] missing ${r.missing.join(', ')}`).join('\n')}`;
+  }
+  if (!ref) throw Error('usage: about <ref|world> [--set JSON | --clear], or about --missing [--kind building|zone|water|landmark]');
+  if (flags.kind !== undefined || flags.limit !== undefined) throw Error('--kind and --limit apply only to about --missing');
+  if (flags.set !== undefined && flags.clear) throw Error('choose --set or --clear');
+  const value = flags.clear ? null : flags.set !== undefined ? aboutValue(flags.set) : undefined;
+  // Writes resolve on the server, which rejects ambiguous refs; reads also refuse ambiguity.
+  if (value !== undefined) {
+    const op = ref === 'world' ? { op: 'world', state: { about: value } } : { op: 'set', id: ref, about: value };
+    const r = await act({ ops: [op] }, flags.note);
+    return flags.json ? r : r.accepted ? `about ${ref}: ${value === null ? 'cleared' : 'replaced'}` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
+  }
+  const m = await mirror();
+  const valueNow = ref === 'world' ? m.snapshot.state?.about : exactAboutTarget(m, ref).about;
+  return flags.json ? { ref, about: valueNow ?? null } : `${ref}: ${valueNow ? JSON.stringify(valueNow, null, 2) : 'no about block'}`;
+}
+export async function set(id, flags) { const op = { op: 'set', id }; if (flags.about !== undefined) op.about = aboutValue(flags.about, { clear: true }); if (flags.state) op.state = JSON.parse(flags.state); if (flags.param) op.params = parseKV(flags.param); if (flags.name) op.name = flags.name; if (flags.constraints) op.constraints = JSON.parse(flags.constraints); const r = await act({ ops: [op] }, flags.note); return r.accepted ? `set ${id}: ${Object.keys(op).filter((k) => !['op', 'id'].includes(k)).map((k) => `${k} ${JSON.stringify(op[k])}`).join(', ')}` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
 /** The op that recolours one thing: its `paint` state, else its `color` param, else its main colour param (the first
  *  colour-typed param: a dog's fur, a lamp's iron) or the one named with --part. */
 function recolorOp(d, id, color, part) {
@@ -1352,7 +1375,7 @@ export async function status() { const s = load(); const st = ok(await call('/v1
 
 // ---------------------------------------------------------------- cli
 /** Flags that never take a value (the next word stays a positional argument). */
-const BOOL = new Set(['fix', 'helper', 'local', 'remote' /* W2 remote looks */, 'no-build', 'done', 'force', 'undo', 'float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'site', 'unused', 'off', 'md', 'fresh', 'remove', 'free', 'list', ...ENV_BOOLS, ...LAYERS_BOOLS]);
+const BOOL = new Set(['missing', 'clear', 'fix', 'helper', 'local', 'remote' /* W2 remote looks */, 'no-build', 'done', 'force', 'undo', 'float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'site', 'unused', 'off', 'md', 'fresh', 'remove', 'free', 'list', ...ENV_BOOLS, ...LAYERS_BOOLS]);
 // listen --once/--follow are switches; `hours --follow field@open=…` takes a value, so they are listen-only.
 const boolsFor = (cmd) => (cmd === 'look' ? new Set([...BOOL, 'inside']) : cmd === 'listen' ? new Set([...BOOL, 'once', 'follow']) : cmd === 'ack' ? new Set([...BOOL, 'failed']) : BOOL);
 export function parseFlags(argv, bools = BOOL) {
@@ -1379,15 +1402,15 @@ const FLAGS = {
   build: 'title steps at offset size yaw mass brief root take done force undo say timeout asks include district plots file delete to dry helper ttl',
   listen: 'after timeout once follow', ack: 'failed',
   'verify-use': 'seat from uses',
-  place: `${REL} path area rect circle name param state scale dry plan nudge group note`, terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
+  place: `${REL} path area rect circle name param state about scale dry plan nudge group note`, terrain: `${REL} path area rect circle name param state about scale dry plan nudge group note`,
   move: `${REL} by in local nudge note dry plan`, look: 'at from dist inside floor keep remote out span height width h hide-roofs stop hour weather views site frames every', kit: 'hour weather beside out width h', defs: 'tag all unused remove', where: 'at offset', reach: '', clear: 'size', free: 'near radius count slope',
-  select: 'def tag name in area near radius all remove by set-state set-param recolor yaw part note', set: 'state param name constraints note', recolor: 'part', clone: 'name count step yaw at offset nudge note',
+  select: 'def tag name in area near radius all remove by set-state set-param recolor yaw part note', set: 'state param name constraints about note', about: 'set clear missing kind limit note', recolor: 'part', clone: 'name count step yaw at offset nudge note',
   sky: 'palette sun list', ...ENV_FLAGS, group: 'off', undo: 'group', map: 'all', furnish: 'style dry group', 'define-kit': 'dry', register: 'identity', mirror: 'fresh', export: 'name', import: 'group', flag: 'at offset', schema: 'md', act: 'note', prayers: 'all',
   catalog: 'category has tag page per', find: 'category has tag all', parts: '', recommend: 'per', taxonomy: '',
   ...LAYERS_FLAGS, ...GOV_FLAGS,
 };
 // how many positional words each command takes (Infinity: free text or a list)
-const POS = { ...GOV_POS, listen: 0, ack: 2, doctor: 0, trace: 0, kit: 2, build: 2, 'verify-use': 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+const POS = { ...GOV_POS, listen: 0, ack: 2, doctor: 0, trace: 0, kit: 2, build: 2, 'verify-use': 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, about: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
 // `side` is a word for place/terrain/move (--along road --side left|right|both) and a number only for `land cliff --side 1|-1`.
 const NUMERIC = new Set(['dist', 'count', 't', 'setback', 'row', 'spacing', 'width', 'span', 'radius', 'sun', 'clouds', 'wind', 'rain', 'fog', 'intensity', 'speed', 'amount', 'level', 'depth', 'metres', 'peak', 'edge', 'face', 'steps', 'scale', 'floor', 'height', 'h', 'frames', 'every', 'slope', 'gap', 'yaw']);
 const SIDES = ['left', 'right', 'both', 'center', 'centre'];
@@ -1436,7 +1459,7 @@ export const COMMANDS = { doctor: (r, f) => doctor(f), trace: (r, f) => trace(f)
   'verify-use': (r, f) => verifyUse(r[0], f),
   register: (r, f) => register(r[0], r[1] ?? f.identity), pair: (r) => pair(r[0]), mint: (r) => mint(r[0]), status,
   map: (r, f) => map({ json: !!f.json, all: !!f.all }), defs: (r, f) => defs(r.join(' ') || undefined, f), schema: (r, f) => schema(f), snapshot,
-  describe: (r, f) => describe(r[0], f), where: (r, f) => where(r[0] ?? f.at, f), reach: (r, f) => reach(r[0], r[1], f), clear: (r, f) => clear(r[0], f), query: (r) => query(readArg(r)), free: (r, f) => freePlots(r[0], f),
+  about: (r, f) => about(r[0], f), describe: (r, f) => describe(r[0], f), where: (r, f) => where(r[0] ?? f.at, f), reach: (r, f) => reach(r[0], r[1], f), clear: (r, f) => clear(r[0], f), query: (r) => query(readArg(r)), free: (r, f) => freePlots(r[0], f),
   place: (r, f) => place(r[0], f), terrain: (r, f) => place(r[0], f), move: (r, f) => move(r[0], f), set: (r, f) => set(r[0], f), recolor: (r, f) => recolor(r[0], r[1], f), remove: (r) => remove(r), clone: (r, f) => clone(r[0], f),
   act: (r, f) => act(JSON.parse(readArg(r)), f.note), dryrun: (r) => dryrun(JSON.parse(readArg(r))), plan: (r) => planBatch(readArg(r)), preview: (r) => preview(readArg(r)), commit: (r) => commit(r[0]), request: (r) => request(r[0]),
   select: (r, f) => select(f), group: (r, f) => group(r[0], f), undo: (r, f) => undo(f), redo, history: (r, f) => history(r[0] ? Number(r[0]) : 20, f), resolve: (r, f) => resolveCmd(r, f),
@@ -1467,6 +1490,7 @@ build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] 
 place:  --against offset is signed metres from the side centre (positive toward e/s/w/n on n/e/s/w sides; rotated sides follow their face tangent). --t runs from 0 to 1 along the full side. Doorways/obstacles cause a reported slide within the side or a refusal. --inside --at uses a world point, including --offset dx,dz; outside, blocked, or conflicting wall/corner/count requests are refused.
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],…]' · place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],…]'
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen · set <ref> --param k=v --state '{…}' · recolor <ref> #hex · remove <ref>… · clone <ref> [--at] [--count n --step dx,dz] · select [filters] [--remove|--by|--recolor|--set-state|--set-param]
+meaning: about <ref|world> [--set '{"title":"…","what":"…","aliases":["…"]}' | --clear] (exact replacement; no flags reads) · about --missing [--kind building|zone|water|landmark] [--limit n] · place/set --about '{…}' (set --about null clears)
 groups: group <name> · group --off · undo [--group name] · redo
 site:   build start <id> --title "…" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path|build] [--asks "item; item"] [--include ref,ref] · build district <id> [--file plan.json | --delete] (one plan: roads, plots with massing, terrain/water notes, chapters; no flag = show it; --delete frees the id, buildings stay) · build start <id> --district <d> [--plots p1,p2] [--brief …] (a chapter: site and massing come from the plots) · build continue <id> --brief "follow-up" · build check [id] · build step [label] [--asks "later ask"] [--include ref,ref] [--say "…" [--mass nave,tower]] (announce before designing; without --say stays local) · build [show [id]] · build wait [--timeout 15m] · build resume [id] [--take] · build claim <part> [--root path | --at ref --size w,d] [--take c_…] [--helper [--ttl min]] (--helper: a scoped token for a sub-agent, EDEN_GOD_HELPER=file) · build release [--done] · build pause [note] · build done [summary] [--force] · build abandon [--undo] [--force] · build rewind [id] --to <step> [--dry] [--force] (undo every build edit after that step; stays open; global --no-build skips automatic metadata)
 resume: omit id to resume the only paused build or active build with a dead lead; several open builds or an unknown id list the choices.
