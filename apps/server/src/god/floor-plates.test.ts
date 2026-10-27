@@ -117,3 +117,31 @@ test('low level-0 decks retain their physical tops through projection and standi
     assert.equal(sp.ground.standY(x, -44), 0, 'adjacent ground is unchanged');
   }
 });
+
+for (const [name, height] of [['chiba',.374],['tool-camp',.424],['freeside',.375],['west-racks',.418]] as const) {
+  test(`extracted ${name} support reaches native GroundNav at its real mesh height`, {timeout:180000}, async t => {
+    const w=world(t); await w.settle(2);
+    const r=w.god.act({ops:[{op:'place',def:`core/mars-${name}@${name==='west-racks'?1:2}`,name,p:[0,0,-40]}]} as any) as any;
+    assert.equal(r.accepted,true,JSON.stringify(r).slice(0,400)); await w.settle();
+    const E=w.host.engine as any,part=E.world.entityPhysicsV1.byEntity[w.god.model.get(name)!.id];
+    const floors=(part?.surfaces??[]).filter((s:any)=>s.label.includes('mesh-floor:'));
+    assert.ok(floors.length,`${name}: actual compiler→bridge surfaces`);
+    const sp=E.rt.services.spatial;sp.sync(E.world);
+    const usable=floors.filter((s:any)=>[[0,0],[.3,0],[-.3,0],[0,.3],[0,-.3]].every(([dx,dz])=>Math.abs(sp.ground.standY(s.obb.c[0]+dx,s.obb.c[1]+dz)-height)<.001));
+    assert.ok(usable.length,`${name}: not just hairline triangles`);
+    for(const s of usable){assert.equal(s.level,0);assert.equal(s.y,height);assert.equal(sp.ground.standY(...s.obb.c),height);}
+    assert.equal(sp.ground.standY(40,-40),0,'unrelated terrain is unchanged');
+    const clear=usable.find((s:any)=>E.clearanceAtV1(s.obb.c[0],s.obb.c[1],0)>.7);
+    assert.ok(clear,`${name}: a body-sized accessible patch`);
+    const [x,z]=clear.obb.c;
+    const placed=w.god.act({ops:[{op:'place',def:coreRef('stool'),name:'floor-seat',p:[x,height,z]}]} as any) as any;
+    assert.equal(placed.accepted,true,JSON.stringify(placed).slice(0,400)); await w.settle();
+    await invite(w,'floor-probe');
+    const row:any=await accept(w.host,w.souls.create('dev:floor-probe',{name:'Floor Probe',description:'support verification'}));
+    await w.settle();
+    const s={soulId:row.id,entityId:row.entity_id,name:row.name,owner:row.owner};
+    const seat=w.edge.capabilities(s as any).find(c=>c.id===`sit:${w.god.model.get('floor-seat')!.id}`);
+    assert.ok(seat?.available,`${name}: elevated seat is usable rather than seat.inside: ${JSON.stringify(seat)}`);
+
+  });
+}

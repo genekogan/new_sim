@@ -528,7 +528,7 @@ export class EngineBridge {
       const c = toWorld(r.c[0], r.c[1]), y = heightAt(s.y, c, abs);
       // decks and bridges of world-frame shapes are walked from the ground: level 0 at their own height (L8 slabs); a
       // raised deck (deck/1 with rails, DECK_RAISED up) is an upper floor of its own that stairs, ramps and ladders reach
-      const level = worldFrame && abs && s.level === 0 && !raisedDeck ? 0 : plates.has(s) ? plateLevel(y, c) : levelOn(y, c);
+      const level = worldFrame && abs && s.level === 0 && !raisedDeck ? 0 : (plates.has(s) || s.tag?.startsWith('mesh-floor:')) ? plateLevel(y, c) : levelOn(y, c);
       const sc = worldFrame ? 1 : wp.s, yaw = worldFrame ? r.yaw : wp.yaw + r.yaw;
       // Level 0 describes connectivity, not elevation: retain the top of a low slab.
       return { id: `${e.id}#f${i}`, level, y, obb: { c, half: [r3(r.half[0] * sc), r3(r.half[1] * sc)] as Vec2, yaw: r3(-yaw) }, label: `${this.model.pathOf(e.id)} ${s.tag ?? 'floor'}`.slice(0, 100) };
