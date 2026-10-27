@@ -3,18 +3,22 @@
   "worldId": "hello-hamlet",
   "source": {
     "template": "worlds/templates/hello-hamlet.json",
-    "sha": "347259a99b0949a6ecf91c13561d3161c912be0959c03ac03f3becfd032f99e1",
+    "sha": "aae83c55011afb035388376f6ab35c5b6014201d86b28cb708d0553fda67099c",
     "provenance": [
       {
         "path": "worlds/templates/hello-hamlet.json",
         "sha": "347259a99b0949a6ecf91c13561d3161c912be0959c03ac03f3becfd032f99e1"
+      },
+      {
+        "path": "worlds/patches/unified-affordances-20261027/hello-hamlet.json",
+        "sha": "381df940708f7f45a83e0c044cbcc048e6be060e026ff6ece16529c6a9493928"
       }
     ]
   },
   "about": {
     "pond": {
       "title": "Hamlet Pond",
-      "what": "The small body of water at the hamlet’s center. Its edge is the place to approach for a swim; the cottage stands uphill nearby.",
+      "what": "A small pond southwest of the cottage and west of the waterside hall. Approach its shore for a swim; the cottage stands on the nearby grassy knoll.",
       "aliases": [
         "water",
         "lake",
@@ -132,11 +136,129 @@
       "role": "part",
       "salience": 1,
       "in": "cottage"
+    },
+    "lab-start": {
+      "title": "Village Green",
+      "what": "An open meeting patch at the plaza flag, between the presentation hall to the east and the closed reading room to the northwest.",
+      "kind": "green",
+      "aliases": [
+        "starting green",
+        "meeting lawn"
+      ],
+      "role": "landmark",
+      "salience": 3
+    },
+    "lab-presentation-hall": {
+      "title": "Presentation Hall",
+      "what": "A small hall northeast of the green for giving talks. A presenter’s chair stands beside a desk at the back, facing an audience bench. Enter through the south door.",
+      "kind": "hall",
+      "aliases": [
+        "auditorium",
+        "lecture hall",
+        "talk hall"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "presenter-seat",
+          "title": "Presenter’s Chair",
+          "what": "The chair beside the presenter’s desk, facing the audience bench.",
+          "anchor": {
+            "kind": "entity",
+            "ref": "lab-presentation-hall/presenter-seat",
+            "slot": "seat"
+          }
+        },
+        {
+          "id": "audience",
+          "title": "Audience Bench",
+          "what": "A bench facing the presenter at the back of the hall.",
+          "anchor": {
+            "kind": "entity",
+            "ref": "lab-presentation-hall/audience-bench",
+            "slot": "seat-1"
+          }
+        },
+        {
+          "id": "main-room",
+          "title": "Main Hall",
+          "what": "The single indoor presentation room.",
+          "anchor": {
+            "kind": "entity",
+            "ref": "lab-presentation-hall",
+            "slot": "hall"
+          }
+        }
+      ]
+    },
+    "lab-presentation-hall/presenter-seat": {
+      "title": "Presenter’s Chair",
+      "what": "The presentation seat beside the desk at the back of the hall.",
+      "aliases": [
+        "podium chair",
+        "presentation seat",
+        "presenter seat"
+      ],
+      "kind": "chair",
+      "role": "part",
+      "salience": 2,
+      "in": "lab-presentation-hall"
+    },
+    "lab-presentation-hall/presenter-desk": {
+      "title": "Presenter’s Desk",
+      "what": "A desk beside the presenter’s chair, facing the audience area.",
+      "kind": "desk",
+      "role": "part",
+      "in": "lab-presentation-hall"
+    },
+    "lab-presentation-hall/audience-bench": {
+      "title": "Audience Bench",
+      "what": "A two-seat bench for listeners facing the presenter.",
+      "kind": "bench",
+      "role": "part",
+      "in": "lab-presentation-hall"
+    },
+    "lab-pond-hall": {
+      "title": "Waterside Hall",
+      "what": "A small gathering hall beside the eastern shore of Hamlet Pond, south of the village green. Its north-facing doorway leads into one room.",
+      "kind": "hall",
+      "aliases": [
+        "pond hall",
+        "hall beside the pond",
+        "waterside gathering hall"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "main-room",
+          "title": "Waterside Room",
+          "what": "The single indoor room beside the pond.",
+          "anchor": {
+            "kind": "entity",
+            "ref": "lab-pond-hall",
+            "slot": "hall"
+          }
+        }
+      ]
+    },
+    "lab-reading-room": {
+      "title": "Closed Reading Room",
+      "what": "A small reading room northwest of the green. Its only door is closed, so entry is unavailable. The outdoor cottage bench is another place to pause.",
+      "kind": "reading room",
+      "aliases": [
+        "reading room",
+        "locked reading room",
+        "library room"
+      ],
+      "role": "landmark",
+      "salience": 3
     }
   },
   "worldAbout": {
     "title": "Hello Hamlet",
-    "what": "A small starter hamlet with a central pond, a cottage on a grassy knoll, an outdoor bench and two planning markers. It is a compact place for exploring, swimming and entering rooms.",
-    "tour": "Approach Hamlet Pond for water, or climb Cottage Knoll to enter Knoll Cottage and visit its living room, kitchen and bedroom. The outdoor bench offers a place to sit. The Plaza and Orchard flags mark proposed areas; they do not promise a developed square or fruit trees."
+    "what": "A small hamlet with a cottage on a grassy knoll, a pond, a presentation hall, a waterside hall and a closed reading room.",
+    "tour": "Start at the Village Green near the plaza flag. The Presentation Hall to the northeast has a presenter’s chair beside a desk and an audience bench. South of the green, Waterside Hall stands beside Hamlet Pond. The closed Reading Room is northwest; Knoll Cottage and its outdoor bench are east of the green. The Orchard flag marks a proposed orchard, not planted fruit trees."
   }
 }
