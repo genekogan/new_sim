@@ -102,3 +102,12 @@ test('persistent relationships: the bench keeps facing the fountain when it move
   ok(applyBatch(w, { ops: [{ op: 'set', id: 'pond', params: { level: 0.5 } }] }, 'god', 5));
   assert.equal(w.get('duck')!.p![1], 0.5, 'duck rose with the water');
 });
+
+
+test('an unrelated pond in the same terrain tile preserves explicit slab-supported height', () => {
+  const w = fresh();
+  ok(applyBatch(w,{ops:[{op:'place',def:coreRef('bench'),name:'deck-bench',p:[-12,.373,-18]}]},'god',1));
+  const before = structuredClone(w.get('deck-bench'));
+  ok(applyBatch(w,{ops:[{op:'place',def:coreRef('pond'),name:'distant-pond',shape:{area:[[-48,-48],[-40,-48],[-40,-40],[-48,-40]]},params:{depth:2}}]},'god',2));
+  assert.deepEqual(w.get('deck-bench'),before,'coarse tile invalidation is not a change to this support');
+});

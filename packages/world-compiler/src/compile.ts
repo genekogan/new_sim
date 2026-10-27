@@ -624,7 +624,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   };
   let resolved: string[];
   try {
-    resolved = resolveDependents(scratch, geometryTouched, new Set(diff.removes), new Set(diff.tiles), warnings, diff.tiles, sourceOp);
+    resolved = resolveDependents(scratch, geometryTouched, new Set(diff.removes), new Set(diff.tiles), warnings, diff.tiles, sourceOp, world);
   } catch (error) {
     return { ok: false, failures: [error instanceof PlanningFailure ? error.failure : generatorFailure(ops.length - 1, error)] };
   }
@@ -1152,7 +1152,7 @@ function crossesTiles(path: [number, number][], tiles: Set<string>, tileOf: (x: 
   return false;
 }
 /** Re-solve `float`, `facing`, `along` and ground settling for entities affected by this batch. Returns ids changed. */
-function resolveDependents(w: WorldModel, touched: Set<string>, removed: Set<string>, tiles: Set<string>, warnings: string[], outTiles: string[] = [], sourceOp: (e: Entity) => number = () => -1): string[] {
+function resolveDependents(w: WorldModel, touched: Set<string>, removed: Set<string>, tiles: Set<string>, warnings: string[], outTiles: string[] = [], sourceOp: (e: Entity) => number = () => -1, before?: WorldModel): string[] {
   const changed: string[] = [];
   if (!touched.size && !tiles.size && !removed.size) return changed;
   const tileOfXZ = (x: number, z: number) => `${Math.floor(x / 64)},${Math.floor(z / 64)}`;
@@ -1191,7 +1191,18 @@ function resolveDependents(w: WorldModel, touched: Set<string>, removed: Set<str
     // ground: root things on changed tiles settle again (float re-reads the water level)
     if (e.in.parent === 'world' && e.p && tiles.size && !def.components.landform && def.layer !== 'volume') {
       const x = e.p[0], z = e.p[e.p.length - 1];
-      if (tiles.has(tileOfXZ(x, z))) next = { ...(next ?? e), p: [x, z] };
+      if (tiles.has(tileOfXZ(x, z))) {
+        // Tiles are cache invalidation bounds, not evidence that this support moved.
+        // Compare the same five samples used by settle before discarding explicit Y
+        // (e.g. a chair on a mesh slab, with a new pond 30 m away in the same tile).
+        const baked = w.bake(def, e.params ?? {}, e.seed ?? 0, e.shape), s = e.s ?? 1;
+        const yaw = typeof e.r === 'number' ? e.r : e.r?.[0] ?? 0;
+        const fp = footprintOf(x, z, baked.box[0] * s / 2, baked.box[2] * s / 2, yaw);
+        const terrainChanged = !before || [...fp.corners, fp.center].some(([a,b]) => Math.abs(w.terrain.sample(a,b) - before.terrain.sample(a,b)) > 1e-5);
+        const floats = (e.anchor ?? def.anchor) === 'float' || e.constraints?.some(c => c.kind === 'float');
+        const waterChanged = floats && (!before || waterLevelAt(w.ground(),x,z) !== waterLevelAt(before.ground(),x,z));
+        if (terrainChanged || waterChanged) next = { ...(next ?? e), p: [x, z] };
+      }
     }
     if (!next) continue;
     // keep a pre-existing pad-free settle: re-admit (settles y, re-applies float/facing); skip if it no longer fits
