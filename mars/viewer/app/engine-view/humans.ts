@@ -41,6 +41,7 @@ import { seatHeight } from './fixtures.ts';
 import {blendWaterFoot} from './water-foot-blend.ts';
 import { BODY_MODEL, UP, ankleLocal, armLen, armTo, armsOf, clamp01, contact, curlHand, legTo, legsOf, palm, place, setWorldQuat, smooth, spineOf, swing, turn, type Arm, type Leg, type Spine } from './rig.ts';
 import { BEND_SHARE, KNEE_Y, KNEEL_SIDE, NEUTRAL, approach, kneelDrop, shoulderAt, solvePosture, styleFor, type Dims, type Posture, type Target } from './posture.ts';
+import { groundFootLift } from './ground-foot-fit.ts';
 import { flightOf, gaitAt, stairFootTarget, type Flight, type Gait } from './stair-gait.ts';
 import { frameCtx, framePose, stanceFacing, type FrameCtx, type FramePose } from './frame-gait.ts';
 import { GIRDLE, LIP, PRONE_ACTS, engineTurn, lipAlong, RISE_STEP, approachProne, lerpProne, proneFrame, riseOf, solveProne, type ProneState } from './prone.ts';
@@ -760,7 +761,8 @@ export class HumanViews {
     // a carried item (engine human.prop) shows in the hand whenever it is set; an activity's own prop while it runs
     const wantProp = !hasHands && !gripping && proneW === 0 ? propFor(act || clipBody || lib.cur ? v.activity : '', v.propWanted,v.instrument) : null;
     if (v.prop && v.prop.kind !== wantProp) v.prop.obj.visible = false;
-    if (!(runFallback || waterFrom || water || expression || Math.abs(gaze) > 1e-5 || sitW > 0 || warmW > 0 || gripping || hasHands || posed || gait || fp || proneW > 0 || act || lib.cur || lib.prev || wantProp)) return;
+    const footFit = !water && !waterFrom && !lib.water && sitW <= 0 && !gait && !fp?.feet && !posed && !runFallback && !gripping && !hasHands && ['idle', 'walk', 'run', 'jog'].includes(v.activity);
+    if (!(footFit || runFallback || waterFrom || water || expression || Math.abs(gaze) > 1e-5 || sitW > 0 || warmW > 0 || gripping || hasHands || posed || gait || fp || proneW > 0 || act || lib.cur || lib.prev || wantProp)) return;
     for (const s of v.saved) { s.p.copy(s.o.position); s.q.copy(s.o.quaternion); }
     v.layered = true;
     _fwd.set(Math.cos(yaw), 0, Math.sin(yaw)); // engine yaw 0 faces +x; holder.rotation.y = -yaw
@@ -799,6 +801,9 @@ export class HumanViews {
         v.legs.forEach((leg,i)=>{const f=runFallback.legs[leg.side>0?0:1],target=V().copy(h.position).addScaledVector(_fwd,f.forward).addScaledVector(_right,v.footLat[i]).addScaledVector(UP,v.dims!.ankleH+f.up);
           legTo(leg,v.ankle[i],target,V().copy(_fwd).addScaledVector(UP,.2),.97,footPitch(v,i,0));});
       }
+      // Only ordinary grounded locomotion: stairs, poses, water, seats and grips
+      // retain their dedicated contacts. Preserve the root and the clip's foot pitch.
+      if (footFit && !seatClip) fitGroundFeet(v, h);
       if (sitW <= 0 && pz.bend > 1e-4 && v.spine) bendTorso(v.spine, pz.bend);
     }
     if (keep) {
@@ -1691,6 +1696,18 @@ function footPitch(v: View, i: number, pitch: number) {
   _qf.copy(_qh).multiply(v.footRest[i]);
   if (pitch) _qf.premultiply(_qt.setFromAxisAngle(_right, pitch));
   return _qf.clone();
+}
+
+function fitGroundFeet(v: View, holder: THREE.Object3D) {
+  if (!v.dims || v.legs.length < 2) return;
+  holder.updateMatrixWorld(true);
+  for (const [i, leg] of v.legs.entries()) {
+    const ankle = leg.foot.getWorldPosition(V());
+    const lift = groundFootLift(holder.position.y, lowestY(v.surf.foot.get(leg.side)), humanGroundSampler()?.(ankle.x, ankle.z));
+    if (lift < .001) continue;
+    const rotation = leg.foot.getWorldQuaternion(new THREE.Quaternion());
+    legTo(leg, v.ankle[i], ankle.setY(ankle.y + lift), V().copy(_fwd).addScaledVector(UP, .1), .999, rotation);
+  }
 }
 
 /**
