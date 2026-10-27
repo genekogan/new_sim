@@ -1,0 +1,16 @@
+{
+  "note": "A real two-seat bench on the west pier end platform, supported at the existing deck surface (0.15m).",
+  "ops": [
+    {
+      "op": "place",
+      "def": "core/bench@1",
+      "name": "harbour-west-pier-bench",
+      "p": [
+        10,
+        0.15,
+        170
+      ],
+      "r": 0
+    }
+  ]
+}

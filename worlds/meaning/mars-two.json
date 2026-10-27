@@ -3,11 +3,15 @@
   "worldId": "mars-two",
   "source": {
     "template": "worlds/templates/mars-two.json",
-    "sha": "5eac1012869d6bc410255f52e763ffb8cfeaa52fac2547d63348a9cb4e470dec",
+    "sha": "573dea2d9c57f2331bf7d2bb067eaffe7a132ad5fe2d227c01441f356f220924",
     "provenance": [
       {
         "path": "worlds/templates/mars-two.json",
         "sha": "266ea0eba0806956430ec22b464af1fb54a8325176ffb24574df232eebd1aa95"
+      },
+      {
+        "path": "worlds/patches/unified-affordances-20261027/mars-two.json",
+        "sha": "696ba06214955f231e03db29774a1cfe8567b720cc8730e61315d6ad1604dcec"
       },
       {
         "path": "tools/mars-fidelity/patch.mjs",
@@ -40,10 +44,6 @@
       {
         "path": "worlds/patches/mars-mimos-mat-20261017/spec.json",
         "sha": "4624e3ef92f8cf34e8c35f854257b79af542fac0a816484aca0ad87a42a77e95"
-      },
-      {
-        "path": "worlds/patches/unified-affordances-20261027/mars-two.json",
-        "sha": "696ba06214955f231e03db29774a1cfe8567b720cc8730e61315d6ad1604dcec"
       }
     ]
   },
