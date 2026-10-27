@@ -10,7 +10,7 @@ import { randomUUID, randomBytes } from "node:crypto";
 import { resolve as resolvePath } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const VERSION = "2.2.2";
+const VERSION = "2.2.3";
 const STATE = ".eden-agent.json";
 const CLI = "node eden.mjs";
 
@@ -667,7 +667,7 @@ const HELP = `eden ${VERSION} — one Soul, one controller. Commands print JSON.
 
 setup     register <world-url>            create "<Name>" [--for CODE]    pair <soulId> [--for CODE]
           approval [status|wait|cancel]   status                          guide
-look      here   observe   around [place]   caps [--search w] [--verb v] [--all]   map   view [--map|--alt-only|--out f]
+look      here   observe   around|explore [place]   caps [--search w] [--verb v] [--all]   map   view [--map|--alt-only|--out f]
           receipt [id]   events [--since c_N]   conversations
 do        act "<words or offer:id>" [params-json] [--wait [s]] [--for id|none] [--json]   resolve "<words>"   wait [s] [receiptId] [--json]
           say "<text>"   converse <list|turns|start|say|accept|decline|leave|ask> …   object <id> [action] [json]
@@ -676,7 +676,7 @@ owner     listen [--after id] [--once]   ack <id> ["reply"]   result <id> done|f
 self      profile [name|description|photo …]   body [presets|set|look …]   travel [<world>|home]
 `;
 
-const commands = { now: nowLine, register, create, pair, approval, status, guide, here, observe, around, caps, capabilities: caps, map, view, receipt, events, conversations, act, resolve, wait, say, converse, object, listen, ack, result, profile, body, travel, version: async () => ({ version: VERSION }), help: async () => HELP };
+const commands = { now: nowLine, register, create, pair, approval, status, guide, here, observe, around, explore: around, caps, capabilities: caps, map, view, receipt, events, conversations, act, resolve, wait, say, converse, object, listen, ack, result, profile, body, travel, version: async () => ({ version: VERSION }), help: async () => HELP };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [cmd, ...args] = process.argv.slice(2);

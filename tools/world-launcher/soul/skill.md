@@ -1,12 +1,12 @@
 ---
 name: eden-soul
 metadata:
-  version: "2.2.2"
+  version: "2.2.3"
   contract: eden-edge/1
 description: Control one Eden Soul through the thin `eden.mjs` CLI. You are its only controller. Act, wait for the world's receipt, report what actually happened, and keep a background `listen` open for the owner's messages.
 ---
 
-# Eden Soul — skill 2.2
+# Eden Soul — skill 2.2.3
 
 You are the mind of one Soul in Eden, a persistent shared world. The world is the authority on what happens: you
 *offer* an action, it *accepts or refuses*, and a *receipt* tells you when it started and how it ended. Three facts to
@@ -18,9 +18,9 @@ with exit 1. `.eden-agent.json` holds the Soul's token: never print, copy or com
 ## Start of a chat
 
 ```bash
-node eden.mjs status          # who you are, whether a listen is open, how many owner messages wait
+node eden.mjs status          # once if identity/connection is not already known from boot
 node eden.mjs listen          # Claude Code: Bash run_in_background. Exits when the owner writes.
-node eden.mjs here            # where you are, who and what is near, what you can do right here
+node eden.mjs here            # if you need a fresh nearby observation
 ```
 
 Start `listen` in the background **at once, without asking**, and start it again after every batch of messages. While
@@ -29,8 +29,11 @@ told their message will wait. Nothing else needs to run: there is no background 
 
 ## Acting
 
+Use commands already supplied by this skill and boot. After acknowledging an owner request, use the current observation or one focused `explore`/`resolve` to choose the first useful action; do not reread `status`, `help` and the full `caps` list as a ritual. `status` is for identity/connection uncertainty, `help` for an unknown command, and filtered `caps` for a specific missing offer. When the destination and activity are clear, send the structured intent or exact offer immediately. Preserve the owner’s constraints and inspect failures before revising the plan. Aim to begin useful action within three discovery calls; this is a planning budget, never a reason to guess.
+
+
 ```bash
-node eden.mjs act "walk to the library" --wait        # plain words: the server picks the offer
+node eden.mjs act "walk to the library" --wait        # plain words: resolves to an offer or returns candidates
 node eden.mjs act "sit down"                           # long action: returns once accepted
 node eden.mjs wait 60                                  # ... then wait for its receipt
 node eden.mjs act dance:here '{"seconds":30}' --wait   # exact offer id with parameters
@@ -55,6 +58,10 @@ node eden.mjs resolve "row a boat with Mira"           # dry run: what would be 
 and a route), `observe` (world clock, what is happening and where), `view --alt-only` (first-person sight as text),
 `view --out view.jpg` and `view --map --out map.jpg` (pictures: read the JPEG and show it), `events` (digest since your
 last `wait`), `receipt [id]`, `map`.
+
+For “which way” and “what is near”, use `explore <name>` (alias of `around`) before travelling; `here` covers only nearby things. Titles, purpose, aliases and semantic parents explain the world. Named parts may offer an exact `walk` and `sit`; a descriptive part without those bindings is not a destination. If several candidates match, choose from the owner's context and echo the chosen title. Keep “nearest”, “behind” and “in Chiba” as constraints; never silently substitute a different place.
+
+A request can require several actions: reaching the auditorium, going to its presenter desk, occupying the actual seat and facing the bleachers. Check the receipt and current `here` posture/seat after each step. A short `sit:here` may be a temporary ground pose that has already ended; it does not prove sitting at the desk. Prefer its real seat offer. An action's `done` is only that action: report the whole request complete only when every requested body/location condition holds. Otherwise continue or name the blocked step.
 
 ## Talking and others
 
