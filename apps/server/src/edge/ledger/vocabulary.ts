@@ -13,7 +13,7 @@ export type VocabTarget = {
   /** Target position [x, z], when known. */
   at: [number, number] | null;
 };
-export type VocabPlace = {id: string; name: string; center: [number, number];
+export type VocabPlace = {id: string; ref?:string; name: string; center: [number, number];
   /** Declared place aliases, distinct from descriptive words and fuzzy matching. */
   aliases?: readonly string[];
   /** Optional richer facts (live ledger): parent id, kind, description words and whether a walk reaches it natively. */
@@ -50,7 +50,7 @@ export type VocabResult =
     inside?: string}
   | {kind: 'unknown'; reason: string; didYouMean: {id: string; label: string}[]; seek?: string[];
     /** Refusal code when it is not capability.unknown (place.unreachable: a named place exists but cannot be reached). */
-    code?: string;
+    code?: string; discovery?: Record<string,unknown>;
     /** place.unreachable: the named place (a host may offer a walk to it on demand and resolve again). gait.unavailable:
      *  the named place with no faster-gait offer (a host may offer that gait on demand: lane RT, run to a building's door). */
     place?: string;
@@ -486,7 +486,8 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
     return places.length ? places : cs;
   };
   if (pool.length) {
-    const q = numberWords(tokens(rest).filter(t => !FILLER.has(t) || !PLACE_VERBS.has(verb) ? true : false), () => [...[...info.values()].flatMap(i => i.ownNames), ...ctx.places.map(p => tokens(p.name))]), qs = q.join(' '), byOwn = (want: string) => pool.filter(c => info.get(c.id)!.own.some(n => norm(n) === want));
+    const rawQ=tokens(rest),identity=PLACE_VERBS.has(verb)&&ctx.places.some(p=>[p.id,p.ref??'',p.name,...(p.aliases??[])].some(n=>norm(n)===rawQ.join(' ')));
+    const q = numberWords(identity?rawQ:rawQ.filter(t => !FILLER.has(t) || !PLACE_VERBS.has(verb) ? true : false), () => [...[...info.values()].flatMap(i => i.ownNames), ...ctx.places.map(p => tokens(p.name))]), qs = q.join(' '), byOwn = (want: string) => pool.filter(c => info.get(c.id)!.own.some(n => norm(n) === want));
     const here = pool.find(c => c.id === `${verb}:here`);
     // 0. Verbs with a single non-targeted (or "here") capability: rest:anything, swim:pond, wander:around.
     if (pool.length === 1 && (!q.length || (!['sit','swim'].includes(verb) && (!pool[0].target || pool[0].id.endsWith(':here'))))) return {kind: 'alias', cap: pool[0], note: `${input} is ${pool[0].id}.`};
@@ -576,7 +577,7 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       const best = SPOT_PLACE_VERBS.has(verb) && spotted.length ? reach.filter(p => extra(p) === extra(found[0])) : SPOT_PLACE_VERBS.has(verb) && reach.length ? reach.filter(p => extra(p) === extra(reach[0])) : reach;
       if (best.length) {const r = one(best.map(p => capOf.get(p.id)!), c => `${input} is ${c.id} (${c.label}).`); if (r) return r;}
       const place = found[0], inner = pool.filter(c => c.available && c.target && isAncestor(ctx, place.id, c.target.id));
-      if (inner.length) {const r = one(inner, c => `${place.name} itself is not a ${verb} target; ${c.id} (${c.label}) is in it.`); if (r) return r;}
+      if (inner.length) {const r = one(inner, c => `${place.name} itself is not a ${verb} target; ${c.id} (${c.label}) is in it.`); if (r) return r.kind==='unknown'&&r.code==='place.ambiguous'&&found.length===1?{...r,code:'place.unreachable',place:place.id,verb,places:[place.id],reason:`${place.name} has no direct ${verb} offer; choose one of its reachable parts. No part was selected.`}:r;}
       // the nearest containing place this verb reaches (the harbour for its lighthouse), never the world root
       const byId = new Map(ctx.places.map(p => [p.id, p]));
       for (let q = place.parent ? byId.get(place.parent) : undefined, n = 0; q && n < 20; q = q.parent ? byId.get(q.parent) : undefined, n++) {
@@ -634,6 +635,8 @@ export function placeMatch(words: string[], places: VocabPlace[], withheld: read
 /** placeMatch, and which tier matched: 0 own name exactly, 1 own name/id words, 2 everyday synonyms, 3 description words. */
 export function placeMatchTier(words: string[], places: VocabPlace[], withheld: readonly string[] = []): {found: VocabPlace[]; tier: number} {
   if (!words.length) return {found: [], tier: -1};
+  const q=words.join(' ');
+  for(const found of [places.filter(p=>norm(p.id)===q||p.ref&&norm(p.ref)===q),places.filter(p=>norm(p.name)===q),places.filter(p=>p.aliases?.some(a=>norm(a)===q))])if(found.length)return {found,tier:0};
   const nameT = (p: VocabPlace) => [...tokens(p.name), ...tokens(p.id), ...tokens(p.kind??''), ...(p.aliases??[]).flatMap(tokens)], descT = (p: VocabPlace) => tokens(p.description ?? '');
   const hit = (w: string, set: string[]) => tokenHit(w, set) || (SYNONYMS[w] ?? []).some(s => tokenHit(s, set));
   const tiers = [

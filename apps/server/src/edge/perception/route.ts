@@ -4,6 +4,7 @@
 // never moves anyone. A Soul elsewhere is placed by its building or outdoor place, never by the room it is in.
 import type {EdgeLedger} from '../ledger/ledger.ts';
 import type {EdgeSoul} from '../contract.ts';
+import {knownPart} from '../intents/resolved-parts.ts';
 import {tokens} from '../ledger/vocabulary.ts';
 import type {MeaningPart} from '../../god/meaning.ts';
 import {centroid, inPoly} from '../ledger/places.ts';
@@ -55,13 +56,13 @@ export function routeFrame(ledger: EdgeLedger, soul: EdgeSoul, query: string) {
   // Names/aliases are authored vocabulary; shared aliases return a bounded choice rather than a silent nearest.
   const ask=tokens(query),matches=(names:string[])=>{const exact=names.some(n=>tokens(n).join(' ')===ask.join(' '));const all=names.flatMap(tokens);return exact?0:ask.length&&ask.every(w=>all.includes(w))?1:9;};
   const scored=known.map(p=>{const tier=matches([p.name,p.id,...(p.aliases??[]),...(p.semanticKind?[p.semanticKind]:[])]),at=placeAt(p);return{p,at,tier:tier+(p.name.includes('/')?0.5:0),d:inPoly(pos[0],pos[1],p.polygon)?0:dist2(pos,at)};}).filter(x=>x.tier<9).sort((a,b)=>a.tier-b.tier||a.d-b.d);
-  const parts=known.flatMap(p=>(p.parts??[]).map(part=>({p,part,tier:matches([part.title,...(part.aliases??[])])<9?matches([part.title,...(part.aliases??[])]):matches([part.title,...(part.aliases??[]),p.name,...(p.aliases??[])])+0.5}))).filter(x=>x.tier<9).sort((a,b)=>a.tier-b.tier);
+  const parts=known.flatMap(p=>(p.parts??[]).filter(part=>knownPart(ledger,soul,ledger.places.byId.get(p.id)!,part)).map(part=>({p,part,tier:matches([part.title,...(part.aliases??[])])<9?matches([part.title,...(part.aliases??[])]):matches([part.title,...(part.aliases??[]),p.name,...(p.aliases??[])])+0.5}))).filter(x=>x.tier<9).sort((a,b)=>a.tier-b.tier);
   if(parts.length&&(!scored.length||parts[0].tier<scored[0].tier)){
     const tied=parts.filter(x=>x.tier===parts[0].tier);
     if(tied.length>1)return{query,found:false,code:'place.ambiguous',reason:'Several named parts match; choose one by its owner and name.',candidates:tied.slice(0,5).map(({p,part})=>({name:part.title,in:p.name,walk:part.walk}))};
     const {p,part}=parts[0],target=part.target,at=target?.point?[target.point[0],target.point[2]] as V2:target?.entity?ledger.thingAt?.(target.entity):null;
     if(!part.walk||!at)return{query,found:true,part:{id:part.id,name:part.title,in:p.name},what:part.what,navigable:false,reason:'This is a descriptive part without an actionable spatial binding.'};
-    const l=leg(at,false),cap=ledger.capabilities(soul).find(c=>c.id===part.walk);
+    const l=leg(at,false),bound=ledger.coreA.binds(soul),resolved=ledger.resolveOnDemand(soul,part.walk,bound.caps,bound.plans).v,cap=resolved.kind!=='unknown'&&resolved.cap.id===part.walk?resolved.cap:undefined;
     return{query,found:true,part:{id:part.id,name:part.title,in:p.name},what:part.what,...l,walk:part.walk,...(part.sit?{sit:part.sit}:{}),...(cap?.available?{reachable:true}:{reachable:false,why:cap?.blocked?.code??'part.not-offered',via:`walk:${p.id}`}),say:`${part.title} in ${p.name}: ${l.m} m ${l.dir}. ${part.what??''}`.trim()};
   }
   const tied=scored.filter(x=>x.tier===scored[0]?.tier);

@@ -38,6 +38,7 @@ import {resolveCapability, tokens, placeMatch, placeMatchTier, typoFix, type Voc
 import {isCampfire} from './fire.ts';
 import {activityCapabilities, loadSpots, ACTIVITY_SECONDS_MAX, SPOT_ACTIVITIES, type SpotsData} from './activities.ts';
 import {Together, PAIRED, type TogetherPlan} from './together.ts';
+import {semanticDiscovery} from '../intents/semantic-discovery.ts';
 import {knownPart} from '../intents/resolved-parts.ts';
 import {Intents,walkWithDestinationWords,walkWithFallback, attentionWords, type IntentInput} from '../intents/intents.ts';
 import {classWords} from '../intents/class-words.ts';
@@ -1500,7 +1501,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       return set.has(placeId);
     };
     return {caps, me: here, ...(me ? {yaw:me.pose.yaw} : {}), root: root ? [...tokens(root.id), ...tokens(root.name)] : [], elsewhere, hasSpot,
-      withheld, places: known.map(p => ({id: p.id, name: p.name, aliases: [...new Set([...(aliases[p.id] ?? []),...(p.aliases??[])])], center: centroid(p.polygon), polygon:p.polygon, level:p.level, parent: p.semanticParent === undefined ? p.parent : p.semanticParent, kind: p.kind, description: p.description, walkable: !!(w.regions as Record<string, unknown>)[p.id] || !!this.placeWalkable?.(p.id)})),
+      withheld, places: known.map(p => ({id: p.id, ref:p.ref, name: p.name, aliases: [...new Set([...(aliases[p.id] ?? []),...(p.aliases??[])])], center: centroid(p.polygon), polygon:p.polygon, level:p.level, parent: p.semanticParent === undefined ? p.parent : p.semanticParent, kind: p.kind, description: p.description, walkable: !!(w.regions as Record<string, unknown>)[p.id] || !!this.placeWalkable?.(p.id)})),
       target: c => {
         const t = c.target; if (!t) return {names: [], around: [], at: null};
         if (t.kind === 'spot') {
@@ -1719,6 +1720,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
   resolveOnDemand(soul: EdgeSoul, text: string, caps: EdgeCapability[], plans: Plans, typos = true): {v: VocabResult; caps: EdgeCapability[]; plans: Plans} {
     const exact = caps.find(c => c.id === text);
     if(exact && this.secretOffer(soul,exact))return {v:{kind:'unknown',code:'capability.unknown',reason:'That action is not known here.',didYouMean:[]},caps,plans};
+    if(!exact){const discovery=semanticDiscovery(this,soul,text,caps,plans);if(discovery)return {v:discovery,caps,plans};}
     // RESOLVE: a building's floor ("go upstairs", "go inside the cottage and go upstairs", "the top floor of the tower")
     const fl = exact || !this.floorOnDemand ? null : floorWords(text);
     if (fl) {

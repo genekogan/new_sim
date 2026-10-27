@@ -6,6 +6,7 @@ import {fixture,factory,invite,accept} from '../../test/native-owner-fixture.ts'
 import {EdgeLedger} from '../edge/ledger/ledger.ts';
 import {GodMode} from './god.ts';
 import {installEngineBridge} from './engine-bridge.ts';
+import {routeFrame} from '../edge/perception/route.ts';
 import {resolvedParts} from '../edge/intents/resolved-parts.ts';
 import {GroundHost} from './ground-host.ts';
 
@@ -27,6 +28,9 @@ test('resolve exposes a real distant bound seat and exact selection reaches it; 
  const out=edge.intents.dryRun(soul,{capability:'go to the harbour and sit on the west pier'}) as any;
  assert.equal(out.ok,true,JSON.stringify(out));assert.equal(out.would.capability,'walk:west-pier','discovery does not choose seat for agent');
  const part=out.would.parts.find((p:any)=>p.id==='sea-view-seat');assert.equal(part.target.entity,bench.id);assert.equal(part.target.slot,slot.id);assert.equal(part.affordances.find((a:any)=>a.capability===exact).available,true);
+ for(const query of ['sit on the harbour west pier','take a seat at the west pier','sit at the sea view bench on the west pier']){const d=edge.intents.dryRun(soul,{capability:query}) as any;assert.equal(d.code,'capability.choose',JSON.stringify(d));assert.deepEqual(d.did_you_mean.map((c:any)=>c.id),[exact]);assert.equal(d.did_you_mean[0].target.entity,bench.id);}
+ const choose=await edge.act(soul,{capability:'sit on the harbour west pier'});assert.equal(choose.accepted,false,'natural discovery asks agent to choose; no action is silently issued');
+ assert.equal((edge.intents.dryRun(soul,{capability:'sit at the west pier sunset view'}) as any).did_you_mean.length,0,'descriptive part is not a seat');
  assert.equal(out.would.parts.find((p:any)=>p.id==='sunset').affordances,undefined);assert.equal(out.would.parts.find((p:any)=>p.id==='gallery').affordances[0].available,false);
  assert.equal(edge.knowledge.setSecret('g-west-pier',true),true);
  assert.deepEqual(resolvedParts(edge,soul,'walk:west-pier'),{});
@@ -39,6 +43,7 @@ test('resolve exposes a real distant bound seat and exact selection reaches it; 
  assert.equal(edge.resolveOnDemand(soul,exact,[{id:exact,verb:'sit',label:'stale public offer',available:true,target:{kind:'object',id:bench.id}}],new Map()).v.kind,'unknown','a stale exact object offer cannot bypass ancestor privacy');
  edge.knowledge.setSecret('g-private-room',false);
  const invented='walk:west-pier/part-missing';assert.equal((edge.intents.dryRun(soul,{capability:invented}) as any).ok,false);assert.equal((await edge.act(soul,{capability:invented})).accepted,false,'unknown qualified refs stay refused');
+ const route=routeFrame(edge,soul,'sea view bench') as any;assert.equal(route.reachable,true,JSON.stringify(route));assert.equal(route.walk,exact.replace('sit:','walk:'));
  const advertised=part.affordances.filter((a:any)=>a.available);
  for(const offer of advertised){const resolved=edge.intents.dryRun(soul,{capability:offer.capability}) as any;assert.equal(resolved.ok,true,JSON.stringify({offer,resolved}));assert.equal(resolved.would.capability,offer.capability);}
  const walkId=advertised.find((a:any)=>a.capability.startsWith('walk:')).capability;

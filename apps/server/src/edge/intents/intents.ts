@@ -362,7 +362,7 @@ export class Intents {
       if (social && 'code' in social) return {ok: false, code: social.code, reason: social.reason, did_you_mean: social.did_you_mean};
       const text = social ? social.capability || social.rest || asked : asked, extra = social?.params;
       const r = text === asked ? this.L.coreA.resolveText(soul, asked, caps) : caps.some(c => c.id === text) ? {kind: 'exact' as const, cap: caps.find(c => c.id === text)!} : this.L.coreA.resolveText(soul, text, caps);
-      if (r.kind === 'unknown') return {ok: false, code: (r as {code?: string}).code ?? 'capability.unknown', reason: r.reason, did_you_mean: r.didYouMean};
+      if (r.kind === 'unknown') return {ok: false, code: (r as {code?: string}).code ?? 'capability.unknown', reason: r.reason, did_you_mean: r.didYouMean,...(r.discovery?{discovery:r.discovery}:{})};
       const params = {...(r.kind === 'alias' && r.params ? r.params : {}), ...(extra ?? {})};
       const P = new Perception(this.L, soul), at = this.L.coreA.targetPoint(soul, r.cap), note = [social?.note, r.kind === 'alias' ? r.note : null].filter(Boolean).join('; ');
       return {ok: true, would: {capability: r.cap.id, label: r.cap.label, available: r.cap.available, ...(r.cap.blocked ? {blocked: r.cap.blocked} : {}), ...(Object.keys(params).length ? {params} : {}), channel: r.cap.verb === 'face' ? 'attention' : 'body',
@@ -374,7 +374,7 @@ export class Intents {
       // the concrete capability must itself be offered (or resolve) right now
       const {caps} = this.L.coreA.binds(soul), strict = strictCheck(this.L, soul, r.capability, caps); if (strict && !this.L.onDemandId(soul, r.capability, caps)) return {ok: false, ...strict};
       const v = this.L.coreA.resolveText(soul, r.capability, caps);
-      if (v.kind === 'unknown') return {ok: false, code: (v as {code?: string}).code ?? 'capability.unknown', reason: v.reason, did_you_mean: v.didYouMean};
+      if (v.kind === 'unknown') return {ok: false, code: (v as {code?: string}).code ?? 'capability.unknown', reason: v.reason, did_you_mean: v.didYouMean,...(v.discovery?{discovery:v.discovery}:{})};
       if (!v.cap.available && v.cap.blocked) return {ok: false, code: v.cap.blocked.code, reason: v.cap.blocked.reason};
       return {ok: true, would: {capability: v.cap.id, ...(r.params ? {params: r.params} : {}), channel: 'body', chosen: r.chosen,...resolvedParts(this.L,soul,v.cap)}};
     }
