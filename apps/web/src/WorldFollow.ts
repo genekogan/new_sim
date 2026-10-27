@@ -202,6 +202,7 @@ export class WorldFollow {
       this.rendered.setLength(this.fit(this.rendered.length(),reach));
       return this.inOpening(target,dt).clone();
     }
+    const previous=this.rendered?.clone();
     // Search again every .2 s, or at once when a clear viewpoint is cut (one with no clear view waits for the next search).
     if(!this.chosen||this.clock-this.lastSearch>=.2||this.chosenClear&&!this.clear(target,this.chosen,roots)){
       this.chosen=this.choose(target,wanted,roots).clone();this.lastSearch=this.clock;this.chosenClear=this.clear(target,this.chosen,roots);}
@@ -220,6 +221,18 @@ export class WorldFollow {
       if(!blocked){const length=this.rendered.length(),fitted=this.fit(length,this.limit(target,this.rendered,roots));
         if(fitted<length&&length-fitted<=.2)this.rendered.setLength(fitted);}
     }
-    return this.inOpening(target,dt).clone();
+    const result=this.inOpening(target,dt);
+    // Angular easing alone can travel metres in one frame on a wide orbit or
+    // when the visibility search switches sides. Bound automatic motion in
+    // metres/second as well; actual viewer gestures above remain immediate.
+    if(previous&&dt>0){
+      const limit=12*dt;
+      if(previous.distanceTo(result)>limit){
+        const from=previous.length(),to=result.length(),rotation=new THREE.Quaternion().setFromUnitVectors(previous.clone().normalize(),result.clone().normalize());
+        const arc=previous.angleTo(result)*Math.max(from,to)+Math.abs(to-from),fraction=Math.min(1,limit/arc);
+        result.copy(previous).normalize().applyQuaternion(new THREE.Quaternion().slerp(rotation,fraction)).multiplyScalar(from+(to-from)*fraction);
+      }
+    }
+    return result.clone();
   }
 }

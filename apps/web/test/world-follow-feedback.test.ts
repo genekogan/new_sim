@@ -29,3 +29,18 @@ test('walking beside a wall has bounded frame motion and restores the original z
   for(let frame=0;frame<600;frame++)offset=follow.resolve(new THREE.Vector3(5,1,0),offset,[],1/60);
   assert.ok(Math.abs(offset.length()-asked.length())<.01,`restored ${offset.length()} m, expected ${asked.length()} m`);
 });
+
+test('a newly obstructed wide orbit moves at a bounded speed while finding a clear view',()=>{
+  const follow=new WorldFollow(),target=new THREE.Vector3(0,1,0);
+  let offset=follow.resolve(target,new THREE.Vector3(0,5,35),[],1/60);
+  const wall=new THREE.Mesh(new THREE.BoxGeometry(25,18,1),new THREE.MeshBasicMaterial());
+  wall.position.set(0,9,10);wall.updateWorldMatrix(true,true);
+  let largest=0;
+  for(let i=0;i<180;i++){
+    const next=follow.resolve(target,offset,[wall],1/60);
+    largest=Math.max(largest,next.distanceTo(offset));offset=next;
+  }
+  assert.ok(largest<.35,`wide-orbit obstruction caused ${largest} m frame movement`);
+  const ray=new THREE.Raycaster(target,offset.clone().normalize(),.05,offset.length());
+  assert.equal(ray.intersectObject(wall).length,0,'bounded glide still finds a clear view');
+});
