@@ -633,7 +633,7 @@ async function call(path, { body, method, as = "god", noBuild = false, requestRe
   const revertPath = ["/v1/god/undo", "/v1/god/redo"].includes(pathname);
   body = decorate(s, pathname, verb, body, { as, noBuild });
   if (verb !== "GET" && !READ_POSTS.has(pathname)) writes++;
-  if (requestRef !== void 0 && (typeof requestRef !== "string" || !requestRef.trim() || requestRef.length > 160 || as !== "god" || pathname !== "/v1/god/act" || verb !== "POST" || body?.clientRef !== requestRef)) throw Error("requestRef requires an act with the same explicit clientRef");
+  if (requestRef !== void 0 && (typeof requestRef !== "string" || !requestRef.trim() || requestRef.length > 100 || as !== "god" || pathname !== "/v1/god/act" || verb !== "POST" || body?.clientRef !== requestRef)) throw Error("requestRef requires an act with the same explicit clientRef");
   const clientRef = as === "god" && verb !== "GET" && EDIT_PATHS.has(pathname) ? requestRef ?? randomUUID2() : void 0;
   const payload = body || clientRef ? JSON.stringify(clientRef ? { ...body, clientRef } : body) : void 0;
   const recoverable = clientRef && pathname === "/v1/god/act" && verb === "POST";
