@@ -1,7 +1,7 @@
 // 1.9.17 (LINK): the Soul's public `now` line. --now "<line>" rides on act, say, ack, result (JSON body) and wait (query);
 // `now "<line>"` / `now --clear` set it alone; status shows `now` and the owner's link state; the fade guard is gone.
 import test from 'node:test';import assert from 'node:assert/strict';import {createServer} from 'node:http';import {spawn} from 'node:child_process';import {mkdtempSync,writeFileSync,rmSync} from 'node:fs';import {tmpdir} from 'node:os';import {resolve,join} from 'node:path';
-import {takeNowFlag,cleanNowText,NOW_MAX} from './eden-agent.mjs';
+import {takeNowFlag,cleanNowText,NOW_MAX,SKILL_VERSION} from './eden-agent.mjs';
 const json=(res,x,status=200)=>{res.statusCode=status;res.setHeader('content-type','application/json');res.end(JSON.stringify(x));};
 const body=req=>new Promise(r=>{let b='';req.on('data',c=>b+=c);req.on('end',()=>r(b?JSON.parse(b):null));});
 async function mounted(t){const seen=[];const dir=mkdtempSync(join(tmpdir(),'now-'));
@@ -59,5 +59,5 @@ test('status shows link and now, and no fade colour or keep-alive advice',async 
  const m=await mounted(t);const {d}=await m.run(['status']);
  assert.deepEqual(d.link,{state:'connected',reason:'listening',since:3,holder:{label:'eden-agent 1.9.17',since:2}});
  assert.deepEqual(d.now,{text:'Rowing',at:7});
- assert.equal(d.fade,undefined);assert.equal(d.keepAlive,undefined);assert.equal(d.skillVersion,'1.9.17');
+ assert.equal(d.fade,undefined);assert.equal(d.keepAlive,undefined);assert.equal(d.skillVersion,SKILL_VERSION);
 });

@@ -11,7 +11,13 @@ void test('conversation start keeps the old single form and adds explicit unique
  const ids=Array.from({length:8},(_,i)=>'s_'+i);assert.deepEqual(conversationStartBody('--with',ids.join(',')).with,ids);
  const backend=readFileSync(new URL('./edge/comms/converse.ts',import.meta.url),'utf8');
  assert.equal(Number(/MAX_INVITEES\s*=\s*(\d+)/.exec(backend)![1]),CONVERSATION_MAX_INVITEES,'CLI limit matches existing backend');
- assert.equal(SKILL_VERSION,'1.9.17');const skill=readFileSync(new URL('../../../tools/edge-skill/SKILL.md',import.meta.url),'utf8');assert.match(skill,/^metadata:\n  version: "1\.9\.17"\n  contract: eden-edge\/1\n  apiContract: eden-edge\/1\.1$/m);assert.match(skill,/wire contract remains `eden-edge\/1`/);
+ const skill=readFileSync(new URL('../../../tools/edge-skill/SKILL.md',import.meta.url),'utf8');
+ const metadata=/^metadata:\n  version: "(\d+\.\d+\.\d+)"\n  contract: (\S+)\n  apiContract: (\S+)$/m.exec(skill);
+ assert.ok(metadata,'published skill has versioned wire-contract metadata');
+ assert.equal(metadata[1],SKILL_VERSION,'served CLI and skill advertise the same release');
+ assert.equal(metadata[2],'eden-edge/1');assert.equal(metadata[3],'eden-edge/1.1');
+ assert.ok(skill.includes(`# Eden — skill ${SKILL_VERSION}\n`),'guide heading agrees with the served version');
+ assert.match(skill,/wire contract remains `eden-edge\/1`/);
 });
 
 void test('invalid group entries refuse rather than losing a recipient or inventing a target',()=>{
