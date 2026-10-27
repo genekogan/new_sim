@@ -229,7 +229,11 @@ export function inDeepWater(rt: Runtime, actor: string): boolean {
 /** The destination lies in deep water, rather than on a bridge above it. */
 export function destinationInDeepWater(rt: Runtime, x: number, z: number): boolean {
   const sp = rt.services.spatial as Spatial | undefined;
-  return !!sp?.ground && sp.ground.field.medium(x, z) === G_SWIM;
+  if (!sp?.ground) return false;
+  // Rebuild the effective field after a just-applied deck edit before classifying
+  // the target. `base` is water below a pier; `field` includes its walking deck.
+  sp.sync(rt.world);
+  return sp.ground.field.medium(x, z) === G_SWIM;
 }
 
 /** Native walk to a reachable bank, then native swim. The coarse media path chooses the bank;

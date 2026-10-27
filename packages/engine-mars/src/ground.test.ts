@@ -291,6 +291,12 @@ test('a pier over the lake: a swimmer heading for its end lands at the real shor
   } } };
   ev.hash = nextEntityPhysics(undefined, ev).hash;
   e.applyWorldEditV1(ev);
+  // Classify the just-installed target using the effective deck field, before any
+  // unrelated movement has warmed spatial state. A pier is not water below it.
+  const onto = run(e, [{verb: 'walk_to', params: {to: [-64, -20]}}], 20 * 400);
+  assert.equal(onto.end?.kind, 'completed', JSON.stringify(onto.end));
+  assert.ok(!onto.acts.has('swim'), [...onto.acts].join(',')); // a shallow pond on the land approach may be waded
+  assert.ok(Math.abs(body(e).pose.p[1] - .7) < 1e-9);
   assert.equal(run(e, [{ verb: 'walk_to', params: { to: [-49, -26] } }]).end?.kind, 'completed');
   const sw = run(e, [{ verb: 'mars:swim_to', params: { x: -72, z: -16 } }], 20 * 400);
   assert.equal(sw.end?.kind, 'completed', JSON.stringify(sw.end));
