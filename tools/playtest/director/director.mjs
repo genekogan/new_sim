@@ -202,6 +202,12 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
       req.evidence?.recordCard?.(latest, new Date().toISOString());
     }
     if(req.journey && req.budgetFrom!=null && clock.now()-req.budgetFrom>=req.budgetMs)cutoffReason='budget';
+    if(req.journey && cutoffReason==='turn-complete') {
+      // An async act or a new wake can start after checkOpen's previous observation.
+      // The terminal refresh is authoritative; keep collecting if it found ongoing or unknown work.
+      const receipts=ctx.latestSample?.receipts;
+      if(ctx.seat.inTurn || ctx.pending>0 || !Array.isArray(receipts) || receipts.some(r=>['accepted','waiting','started','running'].includes(r.phase)))return;
+    }
     ctx.open.delete(req.requestId);
     const rec = { t: new Date().toISOString(), mono: clock.now(), requestId: req.requestId, cutoffReason, openSec: (clock.now() - req.openedAt) / 1000, ...extra };
     appendJsonl(join(ctx.dir, 'requests.jsonl'), rec);
