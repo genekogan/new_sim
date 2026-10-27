@@ -63,12 +63,10 @@ test('a Soul is born standing on the ground and walks up the knoll; its y follow
   assert.deepEqual(e.runtime.violations, []);
 });
 
-test('a cliff is refused with a precise code; deep water refuses walking; the edge of the world is refused', () => {
+test('a cliff and the edge of the world are refused with precise codes', () => {
   const e = world();
   const cliff = e.canPerform({ actor: 'h_ada', label: 'mesa', steps: [{ verb: 'walk_to', params: { to: [0, 50] } }] }) ?? run(e, [{ verb: 'walk_to', params: { to: [0, 50] } }]).end;
   assert.match(String((cliff as { code?: string })?.code), /ground\.cliff/, JSON.stringify(cliff));
-  const lake = run(e, [{ verb: 'walk_to', params: { to: [-70, -20] } }]).end;
-  assert.equal(lake?.code, 'ground.deep-water', JSON.stringify(lake));
   // the old 384 m window refuses a walk to the far edge ('ground.too-far'); paged navigation (lane NAV) plans it
   if (process.env.GROUND_PAGED === '1') assert.equal(e.canPerform({ actor: 'h_ada', label: 'far', steps: [{ verb: 'walk_to', params: { to: [499, 0] } }] }), null);
   else { const far = run(e, [{ verb: 'walk_to', params: { to: [499, 0] } }]).end; assert.ok(far?.kind === 'failed' && /^ground\./.test(far.code ?? ''), JSON.stringify(far)); }
@@ -276,9 +274,11 @@ test('a footbridge deck over a deep river is walkable in ground mode (decks: hei
   for (const s of mid) assert.ok(Math.abs(s.y - 0.6) < 1e-9 && Math.abs(s.z) < 1.2, `on the deck at ${s.x},${s.y},${s.z}`);
   assert.ok(!across.acts.has('swim') && !across.acts.has('wade'), [...across.acts].join());
   assert.ok(Math.abs(body(e).pose.p[1] - rfield.height(10, 0)) < 1e-9, 'off the far end on the bank');
-  // the river beside the bridge is still deep water: walking into it is refused
+  // The river beside the bridge is deep: an ordinary journey now walks to its bank and swims.
   const into = run(e, [{ verb: 'walk_to', params: { to: [0, 8] } }]);
-  assert.equal(into.end?.code, 'ground.deep-water', JSON.stringify(into.end));
+  assert.equal(into.end?.kind, 'completed', JSON.stringify(into.end));
+  assert.ok(into.acts.has('swim'));
+  assert.equal(body(e).human.activity, 'tread');
   assert.deepEqual(e.runtime.violations, []);
 });
 
@@ -328,4 +328,66 @@ test('fault recovery restores a body to its last valid pose on the ground; from 
   const adm = e.perform({ actor: 'h_ada', label: 'walk', steps: [{ verb: 'walk_to', params: { to: [0, 0] } }] }); assert.ok(adm.ok);
   e.step();
   assert.equal(e.restoreHumanPoseV1('h_ada', { p: [24, 0, 3], level: 0 }), false);
+});
+
+test('one ordinary destination journey walks to the bank, wades, swims, then returns to dry ground', () => {
+  const e = world('land-water-journey');
+  const into = run(e, [{verb: 'walk_to', params: {to: [-70, -20]}}], 20 * 400);
+  assert.equal(into.end?.kind, 'completed', JSON.stringify(into.end));
+  assert.ok(into.acts.has('walk') && into.acts.has('wade') && into.acts.has('swim'), [...into.acts].join(','));
+  assert.equal(body(e).human.activity, 'tread');
+  assert.ok(Math.hypot(body(e).pose.p[0] + 70, body(e).pose.p[2] + 20) < .1);
+  const out = run(e, [{verb: 'walk_to', params: {to: [0, -5]}}], 20 * 400);
+  assert.equal(out.end?.kind, 'completed', JSON.stringify(out.end));
+  assert.equal(body(e).human.activity, 'idle');
+  assert.deepEqual(e.runtime.violations, []);
+});
+
+test('a composed land-to-water journey restores during its walk and during its swim', () => {
+  for (const at of ['walk', 'swim']) {
+    const a = world(`journey-snap-${at}`);
+    a.perform({actor: 'h_ada', label: 'lake', steps: [{verb: 'walk_to', params: {to: [-70, -20]}}]});
+    for (let n = 0; n < 6000 && (n < 40 || body(a).human.activity !== at); n++) a.step();
+    assert.equal(body(a).human.activity, at);
+    const b = factory.restore(a.snapshot());
+    for (let n = 0; n < 100; n++) { a.step(); b.step(); }
+    assert.equal(a.stateHash(), b.stateHash());
+    assert.deepEqual(a.runtime.violations, []);
+  }
+});
+
+test('stopping a composed journey on land or in water releases its child without moving again', () => {
+  for (const at of ['walk', 'swim']) {
+    const e = world(`journey-stop-${at}`);
+    const admitted = e.perform({actor: 'h_ada', label: 'lake', steps: [{verb: 'walk_to', params: {to: [-70, -20]}}]});
+    assert.equal(admitted.ok, true); if (!admitted.ok) continue;
+    for (let n = 0; n < 6000 && (n < 40 || body(e).human.activity !== at); n++) e.step();
+    assert.equal(body(e).human.activity, at);
+    e.stop(admitted.id);
+    let cancelled = false;
+    for (let n = 0; n < 100; n++) cancelled ||= e.step().programs.some(p => p.id === admitted.id && p.kind === 'cancelled');
+    assert.ok(cancelled);
+    const stopped = [...body(e).pose.p];
+    for (let n = 0; n < 40; n++) e.step();
+    assert.deepEqual(body(e).pose.p, stopped);
+    assert.equal(body(e).human.activity, at === 'swim' ? 'tread' : 'idle');
+    assert.deepEqual(e.runtime.violations, []);
+  }
+});
+
+test('a thin barrier added mid-swim fails truthfully before any crossing', () => {
+  const e = world('journey-barrier') as ReturnType<typeof world> & {applyWorldEditV1(ev: WorldEditV1): unknown};
+  const admitted = e.perform({actor: 'h_ada', label: 'lake', steps: [{verb: 'walk_to', params: {to: [-70, -20]}}]});
+  assert.equal(admitted.ok, true); if (!admitted.ok) return;
+  for (let n = 0; n < 6000 && body(e).human.activity !== 'swim'; n++) e.step();
+  assert.equal(body(e).human.activity, 'swim');
+  const [x,,z] = body(e).pose.p;
+  const edit: WorldEditV1 = {contract: 'world-edit/1', seq: 1, hash: '', levels: [], assets: {}, set: {barrier: {solids: [{id: 'thin-water-wall', obb: {c: [x - 2, z], half: [.05, 8], yaw: 0}, y0: -4, y1: 2, kind: 'fixture', label: 'new water barrier'}]}}};
+  edit.hash = nextEntityPhysics(undefined, edit).hash; e.applyWorldEditV1(edit);
+  let failed: {kind: string; code?: string} | undefined;
+  for (let n = 0; n < 200 && !failed; n++) failed = e.step().programs.find(p => p.id === admitted.id && p.kind === 'failed');
+  assert.equal(failed?.code, 'swim.blocked');
+  assert.ok(body(e).pose.p[0] > x - 1, 'never crosses the new wall');
+  assert.equal(body(e).human.activity, 'tread');
+  assert.deepEqual(e.runtime.violations, []);
 });

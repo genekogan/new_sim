@@ -11,11 +11,11 @@ import type { Runtime } from '../runtime/runtime.ts';
 import type { Spatial } from '../spatial/service.ts';
 import { SWIM_COST, rectOf } from '../spatial/tiled.ts';
 import { G_STEEP, G_OUTSIDE, G_SWIM, G_WADE, G_WALK, coarseMedium, swimRootY, type GroundField } from '../spatial/ground.ts';
-import { angleDelta, heading, hypot, wrapAngle, type Vec2 } from '../core/math.ts';
+import { angleDelta, heading, hypot, wrapAngle, pointInObb, type Vec2 } from '../core/math.ts';
 import { HUMAN_RADIUS } from '../world/catalog.ts';
 import { creatureOf } from '../bodies/creatures.ts';
 import type { Body } from '../world/types.ts';
-import { MAX_LEVEL_ID } from '../spatial/types.ts';
+import { HUMAN_PROFILE, MAX_LEVEL_ID, type SpatialScene } from '../spatial/types.ts';
 
 /** m/s while swimming (the shallows: wading pace). */
 export const SWIM_SPEED = 0.8;
@@ -25,6 +25,8 @@ const TURN_RATE = 4;
 const STEP_IN_M = 6;
 type Params = { actor: string; x: number; z: number; landing?: boolean };
 type Exec = { actor: string; id: string; points: Vec2[]; index: number };
+// Derived validation only; restore rechecks against its newly rebuilt scene.
+const swimScenes = new WeakMap<Exec, SpatialScene>();
 
 /** A body's swimming pace: SWIM_SPEED for humanoids, a creature's own (never faster than SWIM_SPEED). */
 export function swimSpeedOf(body: Body | undefined): number { const c = creatureOf(body)?.swimSpeed; return c ? Math.min(c, SWIM_SPEED) : SWIM_SPEED; }
@@ -70,6 +72,26 @@ function crowd(rt: Runtime, actor: string, p: Vec2): string | null {
   return null;
 }
 
+/** Swim routes use actual body-band obstacles, including thin walls that the ordinary
+ * land coarse search leaves to its fine planner. Bucket once per plan, not once per tick. */
+function waterPath(rt: Runtime, sp: Spatial, f: GroundField, from: Vec2, to: Vec2) {
+  sp.sync(rt.world);
+  const buckets = new Map<string, typeof sp.scene.obstacles>();
+  const x0 = Math.floor((Math.min(from[0], to[0]) - 49) / 8), x1 = Math.floor((Math.max(from[0], to[0]) + 49) / 8);
+  const z0 = Math.floor((Math.min(from[1], to[1]) - 49) / 8), z1 = Math.floor((Math.max(from[1], to[1]) + 49) / 8);
+  for (const o of sp.scene.obstacles) {
+    const r = hypot(...o.obb.half) + HUMAN_RADIUS + .8;
+    for (let x = Math.max(x0, Math.floor((o.obb.c[0] - r) / 8)); x <= Math.min(x1, Math.floor((o.obb.c[0] + r) / 8)); x++)
+      for (let z = Math.max(z0, Math.floor((o.obb.c[1] - r) / 8)); z <= Math.min(z1, Math.floor((o.obb.c[1] + r) / 8)); z++) {
+        const key = `${x},${z}`, b = buckets.get(key); if (b) b.push(o); else buckets.set(key, [o]);
+      }
+  }
+  return sp.ground!.coarsePath(from, to, SWIM_COST, 48, 600_000, (x, z) => {
+    const y = poseAt(f, [x, z], true).y;
+    return !!buckets.get(`${Math.floor(x / 8)},${Math.floor(z / 8)}`)?.some(o => o.y0 < y + 1.8 && o.y1 > y + .05 && pointInObb([x, z], o.obb, HUMAN_RADIUS + .75));
+  });
+}
+
 /** Plan a swim from where the actor is to (x, z): a route through water (pure; also used to find the shore). */
 export function planSwim(rt: Runtime, actor: string, to: Vec2, landing = false): { ok: true; points: Vec2[] } | { ok: false; diagnostic: Diagnostic } {
   const g = groundOf(rt);
@@ -78,7 +100,7 @@ export function planSwim(rt: Runtime, actor: string, to: Vec2, landing = false):
   const gm = f.medium(to[0], to[1]);
   if (gm === G_OUTSIDE) return { ok: false, diagnostic: fail('outside', `(${fmt(to)}) lies beyond the edge of the world`, [actor]) };
   if (gm !== G_SWIM && gm !== G_WADE && !landing) return { ok: false, diagnostic: fail('not-water', `(${fmt(to)}) is not water; walk there instead`, [actor]) };
-  const path = sp.ground!.coarsePath(from, to, SWIM_COST);
+  const path = waterPath(rt, sp, f, from, to);
   if (!path) return { ok: false, diagnostic: fail('unreachable', `no water connects (${fmt(from)}) to (${fmt(to)})`, [actor]) };
   // dry ground only to step in: within STEP_IN_M of the start
   let s = 0;
@@ -95,14 +117,36 @@ export function planSwim(rt: Runtime, actor: string, to: Vec2, landing = false):
     if ((b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]) !== 0) pts.push(b);
   }
   pts.push([to[0], to[1]]);
+  // The media grid alone does not see thin walls or piers. Refuse any segment whose
+  // swept body meets one rather than allowing a new composed journey to cross solids.
+  sp.sync(rt.world);
+  const blocked = swimBlocker(sp, f, pts);
+  if (blocked) return {ok: false, diagnostic: fail('blocked', `the swim meets ${blocked.label ?? blocked.id}; choose a clear water route`, [actor, blocked.id])};
   if (!sp.groundInclude(rt.world, rectOf(pts))) return { ok: false, diagnostic: fail('too-far', `(${fmt(to)}) is too far to swim to in one go`, [actor]) };
   return { ok: true, points: pts };
+}
+
+/** Conservative swept body check on the short native swim legs, including edited thin barriers. */
+function swimBlocker(sp: Spatial, f: GroundField, points: Vec2[]) {
+  for (let k = 1; k < points.length; k++) {
+    const a = points[k - 1], b = points[k], n = Math.max(1, Math.ceil(hypot(b[0] - a[0], b[1] - a[1]) / .15));
+    const near = sp.scene.obstacles.filter(o => {
+      const r = hypot(...o.obb.half) + HUMAN_RADIUS;
+      return o.obb.c[0] + r >= Math.min(a[0], b[0]) && o.obb.c[0] - r <= Math.max(a[0], b[0]) && o.obb.c[1] + r >= Math.min(a[1], b[1]) && o.obb.c[1] - r <= Math.max(a[1], b[1]);
+    });
+    for (let i = 0; i <= n; i++) {
+      const q: Vec2 = [a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n], y = poseAt(f, q, true).y;
+      const hit = near.find(o => o.y0 < y + 1.8 && o.y1 > y + .05 && pointInObb(q, o.obb, HUMAN_RADIUS + .075));
+      if (hit) return hit;
+    }
+  }
+  return null;
 }
 
 /** Where a swimmer reaches the shore heading for `to`: the first dry or shallow 1 m cell on its water route (null: none). */
 export function shoreToward(rt: Runtime, actor: string, to: Vec2): Vec2 | null {
   const g = groundOf(rt); if (!g) return null;
-  const e = rt.world.entities[actor], path = g.sp.ground!.coarsePath([e.pose.p[0], e.pose.p[2]], to, SWIM_COST);
+  const e = rt.world.entities[actor], path = waterPath(rt, g.sp, g.f, [e.pose.p[0], e.pose.p[2]], to);
   if (!path) return null;
   for (const q of path) { const m = coarseMedium(g.f, q[0], q[1]); if (m === G_WALK) return q; }
   // the destination is on a deck over the water (a pier's end): head for where the deck meets dry ground instead
@@ -155,6 +199,12 @@ export const swimTo: ActionDef<Params, Vec2[], Exec> = {
     if (Math.abs(turn) > 0.6) { const at = poseAt(f, cur, false); h.activity = at.activity; h.speed = 0; return { status: 'running', phase: 'turning' }; }
     const speed = f.medium(cur[0], cur[1]) === G_SWIM ? swimSpeedOf(e.body) : WADE_SPEED, step = Math.min(d, speed * dt);
     const next: Vec2 = [cur[0] + ((target[0] - cur[0]) * step) / d, cur[1] + ((target[1] - cur[1]) * step) / d];
+    g.sp.sync(rt.world);
+    if (swimScenes.get(ex) !== g.sp.scene) {
+      const blocked = swimBlocker(g.sp, f, [cur, ...ex.points.slice(ex.index)]);
+      if (blocked) { const at = poseAt(f, cur, false); h.activity = at.activity; delete h.speed; delete h.task; return {status: 'failed', diagnostic: fail('blocked', `the swim meets ${blocked.label ?? blocked.id}`, [ex.actor, blocked.id])}; }
+      swimScenes.set(ex, g.sp.scene);
+    }
     const who = crowd(rt, ex.actor, next);
     if (who) { const at = poseAt(f, cur, false); h.activity = at.activity; h.speed = 0; return { status: 'blocked', diagnostic: fail('occupied', `${ex.actor} waits for ${who} in the water`, [ex.actor, who]) }; }
     const at = poseAt(f, next, true);
@@ -176,24 +226,60 @@ export function inDeepWater(rt: Runtime, actor: string): boolean {
   const g = groundOf(rt), e = rt.world.entities[actor];
   return !!g && !!e?.human && (e.human.level ?? 0) === 0 && g.f.medium(e.pose.p[0], e.pose.p[2]) === G_SWIM && !onDeck(rt, actor);
 }
+/** The destination lies in deep water, rather than on a bridge above it. */
+export function destinationInDeepWater(rt: Runtime, x: number, z: number): boolean {
+  const sp = rt.services.spatial as Spatial | undefined;
+  return !!sp?.ground && sp.ground.field.medium(x, z) === G_SWIM;
+}
+
+/** Native walk to a reachable bank, then native swim. The coarse media path chooses the bank;
+ * the ordinary fine walk planner validates the approach and the swim replans from the actual
+ * arrival pose. Bounded candidates prevent a long shoreline from causing unbounded fine searches. */
+function enterWater(rt: Runtime, p: TravelParams): {ok: true; program: TravelOp[]} | {ok: false; diagnostic: Diagnostic} {
+  const issue = bodyIssue(rt, p.actor); if (issue) return {ok: false, diagnostic: issue};
+  const {sp, f} = groundOf(rt)!, e = rt.world.entities[p.actor], from: Vec2 = [e.pose.p[0], e.pose.p[2]], to: Vec2 = [p.x, p.z];
+  const path = waterPath(rt, sp, f, from, to);
+  if (!path) return {ok: false, diagnostic: fail('unreachable', `no traversable bank connects (${fmt(from)}) to (${fmt(to)})`, [p.actor])};
+  // Already at a bank: preserve the existing short step-in behaviour.
+  const direct = planSwim(rt, p.actor, to);
+  if (direct.ok) return {ok: true, program: [{verb: 'swim_to', params: {actor: p.actor, x: p.x, z: p.z}}]};
+  const wet = path.findIndex(q => coarseMedium(f, q[0], q[1]) === G_SWIM);
+  if (wet < 0) return {ok: false, diagnostic: fail('no-shore', `no usable bank toward (${fmt(to)})`, [p.actor])};
+  let tried = 0;
+  for (let k = wet - 1; k >= 0 && tried < 6; k--) {
+    const q = path[k], m = coarseMedium(f, q[0], q[1]);
+    if (m !== G_WALK && m !== G_WADE) continue;
+    // A water-side approach must be within the swim action's existing step-in range.
+    if (hypot(q[0] - path[wet][0], q[1] - path[wet][1]) > STEP_IN_M - 1) break;
+    tried++;
+    const walk = rt.registry.get('walk_to')!.plan(rt, {actor: p.actor, x: q[0], z: q[1], level: 0});
+    if (!walk.ok) continue;
+    return {ok: true, program: [
+      {verb: 'walk_to', params: {actor: p.actor, x: q[0], z: q[1], level: 0}},
+      {verb: 'swim_to', params: {actor: p.actor, x: p.x, z: p.z}},
+    ]};
+  }
+  return {ok: false, diagnostic: fail('no-shore', `no reachable bank toward (${fmt(to)}); the land approach is blocked`, [p.actor])};
+}
 /**
  * Going somewhere on foot from the water (ground worlds): swim to where the water route toward the destination
  * reaches dry ground, then walk. Each part is the native action (swim_to, walk_to) as a child; on land it is walk_to.
  */
 export const groundTravel: ActionDef<TravelParams, TravelOp[], TravelExec> = {
   verb: 'ground_travel',
-  description: 'Go to (x, z) on a terrain world from wherever the body is: from deep water it swims to the shore toward the destination, then walks.',
+  description: 'Go to (x, z) on a terrain world: walk to a reachable bank and swim into deep water, or swim to shore and walk onto land.',
   schema: z.object({ actor: z.string().min(1).max(80), x: z.number().min(-10000).max(10000), z: z.number().min(-10000).max(10000), level: z.number().int().min(0).max(MAX_LEVEL_ID).optional() }).strict(),
   resumable: true,
   reservations: (_w, p) => [{ resource: `actor:${p.actor}`, mode: 'exclusive' }],
   plan(rt, p) {
     const walk = rt.registry.get('walk_to')!, swim = rt.registry.get('swim_to')!;
+    if (destinationInDeepWater(rt, p.x, p.z) && (p.level ?? 0) === 0) return enterWater(rt, p);
     if (!inDeepWater(rt, p.actor)) { const r = walk.plan(rt, p); return r.ok ? { ok: true, program: [{ verb: 'walk_to', params: { ...p } }] } : r; }
     const issue = bodyIssue(rt, p.actor); if (issue) return { ok: false, diagnostic: issue };
     const shore = shoreToward(rt, p.actor, [p.x, p.z]);
     if (!shore) return { ok: false, diagnostic: fail('no-shore', `no shore toward (${fmt([p.x, p.z])}) from this water`, [p.actor]) };
     const sp = groundOf(rt)!.sp, e = rt.world.entities[p.actor];
-    const onward = sp.route(rt.world, { id: 'human', radius: HUMAN_RADIUS, height: 1.8, speed: 1.35, turnRate: 4, stepHeight: 0.22 }, { level: 0, p: shore }, { level: p.level ?? 0, p: [p.x, p.z] });
+    const onward = sp.route(rt.world, HUMAN_PROFILE, { level: 0, p: shore }, { level: p.level ?? 0, p: [p.x, p.z] });
     if (!onward.ok) return { ok: false, diagnostic: { ...onward.diagnostic, subjects: [p.actor, ...(onward.diagnostic.subjects ?? [])] } };
     const first = swim.plan(rt, { actor: p.actor, x: shore[0], z: shore[1], landing: true });
     if (!first.ok) return first;

@@ -549,7 +549,7 @@ export class GroundNav {
    * A* over 1 m cells (8-connected, no corner cutting) inside `box` (cells), with a cost per medium
    * (Infinity = impassable). Returns cell-centre waypoints from start to goal, or null.
    */
-  coarsePath(from: Vec2, to: Vec2, cost: readonly number[], marginM = 48, maxExpand = 600_000): Vec2[] | null {
+  coarsePath(from: Vec2, to: Vec2, cost: readonly number[], marginM = 48, maxExpand = 600_000, blocked?: (x: number, z: number) => boolean): Vec2[] | null {
     const e = this.field.extent;
     const bx0 = Math.max(Math.floor(e[0]), Math.floor(Math.min(from[0], to[0]) - marginM)), bz0 = Math.max(Math.floor(e[1]), Math.floor(Math.min(from[1], to[1]) - marginM));
     const bx1 = Math.min(Math.ceil(e[2]) - 1, Math.floor(Math.max(from[0], to[0]) + marginM)), bz1 = Math.min(Math.ceil(e[3]) - 1, Math.floor(Math.max(from[1], to[1]) + marginM));
@@ -559,7 +559,7 @@ export class GroundNav {
     const s = idx(from[0], from[1]), g = idx(to[0], to[1]);
     if (s < 0 || g < 0 || s >= W * H || g >= W * H) return null;
     const med = new Uint8Array(W * H).fill(255);
-    const m = (k: number) => { let v = med[k]; if (v === 255) { const x = bx0 + (k % W) + 0.5, z = bz0 + Math.floor(k / W) + 0.5; v = med[k] = this.coarseSolid(x, z) ? G_SOLID : coarseMedium(this.field, x, z); } return v; };
+    const m = (k: number) => { let v = med[k]; if (v === 255) { const x = bx0 + (k % W) + 0.5, z = bz0 + Math.floor(k / W) + 0.5; v = med[k] = (blocked ? blocked(x, z) : this.coarseSolid(x, z)) ? G_SOLID : coarseMedium(this.field, x, z); } return v; };
     const gs = new Float64Array(W * H).fill(Infinity), came = new Int32Array(W * H).fill(-1), shut = new Uint8Array(W * H);
     const gxC = g % W, gzC = Math.floor(g / W);
     const h = (k: number) => { const dx = Math.abs((k % W) - gxC), dz = Math.abs(Math.floor(k / W) - gzC); return Math.max(dx, dz) + (Math.SQRT2 - 1) * Math.min(dx, dz); };
@@ -577,7 +577,7 @@ export class GroundNav {
         const ni = ci + di, nj = cj + dj; if (ni < 0 || nj < 0 || ni >= W || nj >= H) continue;
         // the goal's own 1 m cell is always enterable: the fine check already admitted the exact point (a cell's centre may
         // read steep or deep where the goal itself, at its edge, is fine)
-        const n = nj * W + ni, c = n === g ? Math.min(cost[m(n)], 2) : cost[m(n)];
+        const n = nj * W + ni, c = n === g && (!blocked || m(n) !== G_SOLID) ? Math.min(cost[m(n)], 2) : cost[m(n)];
         if (!(c < Infinity)) continue;
         if (di && dj && (!(cost[m(cj * W + ni)] < Infinity) || !(cost[m(nj * W + ci)] < Infinity))) continue;
         const t = gs[cur] + (di && dj ? Math.SQRT2 : 1) * c;

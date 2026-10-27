@@ -30,7 +30,7 @@ import {applyUpperFloorsV1,placeLevelOf,previewUpperFloorsV1,type UpperFloorsFac
 import {registerAssets} from './catalog-adapter.ts';
 import {socialEdenTransitionV1Schema,type SocialEdenTransitionV1} from '@sim/engine-contract';
 import {searchArrival,arrivalPocket,type ArrivalGround,type ArrivalPocket,type ArrivalSpot} from './arrival-search.ts';
-import {attachGround,groundRegistry,installGroundV1 as installGround,previewGroundV1,standOn,groundArrival,inDeepWater} from './ground-bridge.ts';
+import {attachGround,groundRegistry,installGroundV1 as installGround,previewGroundV1,standOn,groundArrival,inDeepWater,destinationInDeepWater} from './ground-bridge.ts';
 // The Mars engine behind Sim's engine contract.
 //
 // The shell speaks a small BODY LANGUAGE (walk_to, sit, stand, rest, wave,
@@ -646,7 +646,7 @@ export class MarsEngine implements Engine {
     if ((p.trafficTries = (p.trafficTries ?? 0) + 1) > 6) return this.end(p, 'failed', why);
     p.index--; p.ops = [{ wait: (waiters.length ? 80 : 20) + this.stagger(p.actor) * 10 }];
   }
-  private movementVerb(actor:string,x:number,z:number){const a=this.ents[actor];if(this.rt.world.groundV1&&inDeepWater(this.rt,actor))return 'ground_travel';return this.physical&&(inShoreDomain(this.rt.world,x,z)||!!a&&inShoreDomain(this.rt.world,a.pose.p[0],a.pose.p[2]))?'commons_shore_travel':'walk_to';}
+  private movementVerb(actor:string,x:number,z:number){const a=this.ents[actor];if(this.rt.world.groundV1&&(inDeepWater(this.rt,actor)||destinationInDeepWater(this.rt,x,z)))return 'ground_travel';return this.physical&&(inShoreDomain(this.rt.world,x,z)||!!a&&inShoreDomain(this.rt.world,a.pose.p[0],a.pose.p[2]))?'commons_shore_travel':'walk_to';}
   private free(id: string): boolean { return !!this.ents[id] && this.holders(id).length === 0 && !this.byActor.has(id) && ![...this.programs.values()].some(p=>p.build?.crew.includes(id)); }
 
   /** A raw Mars verb, with the actor filled in where the verb takes one (`actor`, or `actors` when none are given). */

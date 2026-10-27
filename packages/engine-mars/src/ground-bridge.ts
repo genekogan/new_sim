@@ -66,14 +66,14 @@ export function groundFact(g: Ground, editSeq: number, opts: { paged?: boolean }
 
 // ---------------------------------------------------------------- the engine side
 
-import { swimTo, shoreToward, groundTravel, inDeepWater } from '../../../mars/viewer/engine/locomotion/swim.ts';
+import { swimTo, shoreToward, groundTravel, inDeepWater, destinationInDeepWater } from '../../../mars/viewer/engine/locomotion/swim.ts';
 import { acknowledgeRelocation, humanStaticClearance, humanStaticClearanceWithOverlay, speedWithinCap, SPEED_CAPS } from '../../../mars/viewer/engine/runtime/invariants.ts';
 import { entityList } from '../../../mars/viewer/engine/world/entity-list.ts';
 import { WALK_SPEED_CAP, setWalkReach } from '../../../mars/viewer/engine/locomotion/walk.ts';
 import { G_SWIM, swimRootY } from '../../../mars/viewer/engine/spatial/ground.ts';
 import type { Spatial } from '../../../mars/viewer/engine/spatial/service.ts';
 import { dcos, dsin } from '../../../mars/viewer/engine/core/math.ts';
-export { shoreToward, inDeepWater };
+export { shoreToward, inDeepWater, destinationInDeepWater };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Rt = { world: any; registry: Map<string, any>; services: Record<string, any>; invariants: any[]; records: Map<string, any>; isActive(id: string): boolean };
