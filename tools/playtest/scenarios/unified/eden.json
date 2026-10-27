@@ -15,16 +15,16 @@
     "kind": "dev",
     "genesis": "worlds/templates/eden-2026.json",
     "slug": "pt-unified-eden",
-    "port": 4994,
+    "port": 4993,
     "natives": false
   },
-  "durationSec": 1205,
+  "durationSec": 1830,
   "seats": [
     {
       "id": "sol",
       "adapter": "codex-headless",
-      "model": null,
-      "effort": "medium",
+      "model": "gpt-6-astra",
+      "effort": "high",
       "soulName": "Sol",
       "wake": true
     }
@@ -39,18 +39,14 @@
         "seat": "sol",
         "atSec": 5,
         "channel": "card",
-        "text": "Head to the nearest body of water and swim for ten seconds, then return safely to its bank.",
+        "text": "Head to the nearest body of water and take a swim, then return safely to its bank. Tell me when you are back on dry ground.",
         "budgetSec": 180,
         "setup": {
-          "maxWallSec": 120,
+          "maxWallSec": 240,
           "steps": [
             "stand:here",
-            {
-              "verb": "go",
-              "target": {
-                "place": "land-west-lake-pebble-shore"
-              }
-            },
+            "walk:field",
+            "walk:g-land-west-lake.shore-bank",
             {
               "verb": "turn",
               "heading": 0
@@ -65,6 +61,9 @@
             "heading": 0,
             "posture": [
               "standing"
+            ],
+            "places": [
+              "g-land-west-lake.shore-bank"
             ]
           }
         },
@@ -85,7 +84,7 @@
                     -148,
                     2
                   ],
-                  "radiusM": 42
+                  "radiusM": 47
                 },
                 "postures": [
                   "swimming"
@@ -93,22 +92,35 @@
                 "receipt": {
                   "verb": "swim",
                   "capabilities": [
-                    "swim:land-west-lake"
+                    "swim:land-west-lake",
+                    "swim:g-land-west-lake"
                   ]
-                }
+                },
+                "holdSec": 4
               },
               {
                 "name": "west lake bank",
                 "region": {
                   "pos": [
-                    -100,
+                    -148,
                     2
                   ],
-                  "radiusM": 5
+                  "radiusM": 55
                 },
                 "postures": [
                   "standing"
-                ]
+                ],
+                "places": [
+                  "g-land-west-lake.shore-bank"
+                ],
+                "receipt": {
+                  "verb": "walk",
+                  "capabilities": [
+                    "walk:land-west-lake",
+                    "walk:g-land-west-lake.shore-bank",
+                    "walk:land-west-lake/shore-bank"
+                  ]
+                }
               }
             ]
           }
@@ -117,12 +129,12 @@
       {
         "id": "eden-cafe",
         "seat": "sol",
-        "atSec": 310,
+        "atSec": 5,
         "channel": "card",
         "text": "Find the cafe and go inside.",
         "budgetSec": 180,
         "setup": {
-          "maxWallSec": 120,
+          "maxWallSec": 240,
           "steps": [
             "stand:here",
             {
@@ -185,12 +197,12 @@
       {
         "id": "eden-music",
         "seat": "sol",
-        "atSec": 615,
+        "atSec": 5,
         "channel": "card",
         "text": "Find somewhere to hear live music and go there.",
-        "budgetSec": 150,
+        "budgetSec": 240,
         "setup": {
-          "maxWallSec": 120,
+          "maxWallSec": 240,
           "steps": [
             "stand:here",
             {
@@ -227,23 +239,110 @@
             "maxSampleGapSec": 6,
             "phases": [
               {
-                "name": "bandstand",
-                "region": {
-                  "pos": [
-                    38.5,
-                    -26
-                  ],
-                  "radiusM": 4
-                },
+                "name": "live music venue",
                 "postures": [
                   "standing"
                 ],
-                "receipt": {
-                  "verb": "walk",
-                  "capabilities": [
-                    "walk:eden-bandstand"
-                  ]
-                }
+                "anyOf": [
+                  {
+                    "region": {
+                      "pos": [
+                        38.5,
+                        -26
+                      ],
+                      "radiusM": 4
+                    },
+                    "receipt": {
+                      "verb": "walk",
+                      "capabilities": [
+                        "walk:eden-bandstand",
+                        "walk:eden-bandstand/pavilion",
+                        "walk:g-eden-bandstand"
+                      ]
+                    }
+                  },
+                  {
+                    "region": {
+                      "pos": [
+                        92,
+                        -27.75
+                      ],
+                      "radiusM": 6
+                    },
+                    "receipt": {
+                      "verb": "walk",
+                      "capabilities": [
+                        "walk:place-eden-performance-stage",
+                        "walk:g-place-eden-performance-stage"
+                      ]
+                    }
+                  },
+                  {
+                    "region": {
+                      "pos": [
+                        101.1,
+                        59
+                      ],
+                      "radiusM": 3.5
+                    },
+                    "receipt": {
+                      "verb": "walk",
+                      "capabilities": [
+                        "walk:int-music-room",
+                        "walk:int-music-room/hall",
+                        "walk:int-music-room/gallery",
+                        "walk:g-int-music-room"
+                      ]
+                    }
+                  },
+                  {
+                    "region": {
+                      "pos": [
+                        76,
+                        80.6
+                      ],
+                      "radiusM": 5
+                    },
+                    "receipt": {
+                      "verb": "walk",
+                      "capabilities": [
+                        "walk:amphitheatre-stage-floor",
+                        "walk:place-eden-amphitheatre"
+                      ]
+                    }
+                  },
+                  {
+                    "region": {
+                      "pos": [
+                        265,
+                        34
+                      ],
+                      "radiusM": 6
+                    },
+                    "receipt": {
+                      "verb": "walk",
+                      "capabilities": [
+                        "walk:festival-stage"
+                      ]
+                    }
+                  },
+                  {
+                    "region": {
+                      "pos": [
+                        294,
+                        38
+                      ],
+                      "radiusM": 6
+                    },
+                    "receipt": {
+                      "verb": "walk",
+                      "capabilities": [
+                        "walk:place-region-festival-meadow-stage",
+                        "walk:g-place-region-festival-meadow-stage"
+                      ]
+                    }
+                  }
+                ]
               }
             ]
           }
@@ -252,12 +351,12 @@
       {
         "id": "eden-pier",
         "seat": "sol",
-        "atSec": 890,
+        "atSec": 5,
         "channel": "card",
         "text": "Go to the harbour and sit on the west pier. Tell me when seated.",
-        "budgetSec": 180,
+        "budgetSec": 240,
         "setup": {
-          "maxWallSec": 120,
+          "maxWallSec": 240,
           "steps": [
             "stand:here",
             {
@@ -298,9 +397,9 @@
                 "region": {
                   "pos": [
                     10,
-                    165
+                    170
                   ],
-                  "radiusM": 2
+                  "radiusM": 1.5
                 },
                 "postures": [
                   "seated",
@@ -309,7 +408,7 @@
                 "receipt": {
                   "verb": "sit",
                   "targetRefs": [
-                    "harbour-west-pier-seat"
+                    "harbour-west-pier-bench"
                   ]
                 }
               }
@@ -334,7 +433,7 @@
     "developer": false
   },
   "rails": {
-    "maxTurnWallSec": 180,
+    "maxTurnWallSec": 240,
     "onboardWallSec": 300,
     "onboardTimeoutSec": 270,
     "maxTurnsPerRequest": 6

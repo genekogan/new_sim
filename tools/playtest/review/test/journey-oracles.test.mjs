@@ -73,3 +73,11 @@ test('still seated is an affirmative completion claim, while still walking is no
  assert.equal(run('I am still seated and ready to present.').status,'pass');
  assert.equal(run('I am still walking and not ready to present.').detail,'no completion claim');
 });
+
+test('recovery requires structured target refusal before physical arrival, never prose or just the bench',()=>{
+ const run=refusals=>journeyOracles({ev:{sentAt:iso(0),cutoffAt:iso(10),samples:[sample(4),sample(6)],refusals},journey:{fixtureId:'recovery',source:'frozen',phases:[phase],refusalBeforeCompletion:{codes:['route.unreachable'],capabilities:['walk:closed/hall']}},receipts:[{capability:'sit:podium-seat',acceptedAt:iso(2),phase:'completed'}],replies:[],acts:[],acceptedMs:r=>Date.parse(r.acceptedAt),endedMs:()=>epoch+3000}).find(r=>r.id==='journey-completion').status;
+ assert.equal(run(undefined),'unknown');assert.equal(run([]),'fail');
+ assert.equal(run([{at:epoch+1000,capability:'walk:other/hall',code:'route.unreachable'}]),'fail');
+ assert.equal(run([{at:epoch+9000,capability:'walk:closed/hall',code:'route.unreachable'}]),'fail');
+ assert.equal(run([{at:epoch+1000,capability:'walk:closed/hall',code:'route.unreachable'}]),'pass');
+});

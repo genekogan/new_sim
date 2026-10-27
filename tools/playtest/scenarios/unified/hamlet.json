@@ -15,16 +15,16 @@
     "kind": "dev",
     "genesis": "worlds/templates/hello-hamlet.json",
     "slug": "pt-unified-hamlet",
-    "port": 4996,
+    "port": 4993,
     "natives": false
   },
-  "durationSec": 1115,
+  "durationSec": 1110,
   "seats": [
     {
       "id": "sol",
       "adapter": "codex-headless",
-      "model": null,
-      "effort": "medium",
+      "model": "gpt-6-astra",
+      "effort": "high",
       "soulName": "Sol",
       "wake": true
     }
@@ -39,18 +39,13 @@
         "seat": "sol",
         "atSec": 5,
         "channel": "card",
-        "text": "Find the place for giving village presentations, go inside and sit at the presenter desk.",
+        "text": "Find the place for giving village presentations, go inside and sit at the presenter desk. Tell me when ready, while still seated.",
         "budgetSec": 150,
         "setup": {
           "maxWallSec": 120,
           "steps": [
             "stand:here",
-            {
-              "verb": "go",
-              "target": {
-                "place": "field"
-              }
-            },
+            "walk:lab-start",
             {
               "verb": "turn",
               "heading": 0
@@ -61,7 +56,7 @@
               0,
               0
             ],
-            "radiusM": 3,
+            "radiusM": 1.5,
             "heading": 0,
             "posture": [
               "standing"
@@ -82,10 +77,10 @@
                 "name": "lab presenter seat",
                 "region": {
                   "pos": [
-                    30,
-                    0
+                    14,
+                    -9.4
                   ],
-                  "radiusM": 1.5
+                  "radiusM": 1
                 },
                 "postures": [
                   "seated",
@@ -105,7 +100,7 @@
       {
         "id": "lab-related-hall",
         "seat": "sol",
-        "atSec": 280,
+        "atSec": 5,
         "channel": "card",
         "text": "Go into the hall beside the pond, not the hall by the flags.",
         "budgetSec": 150,
@@ -113,12 +108,7 @@
           "maxWallSec": 120,
           "steps": [
             "stand:here",
-            {
-              "verb": "go",
-              "target": {
-                "place": "field"
-              }
-            },
+            "walk:lab-start",
             {
               "verb": "turn",
               "heading": 0
@@ -129,7 +119,7 @@
               0,
               0
             ],
-            "radiusM": 3,
+            "radiusM": 1.5,
             "heading": 0,
             "posture": [
               "standing"
@@ -150,10 +140,10 @@
                 "name": "pond-side hall",
                 "region": {
                   "pos": [
-                    0,
-                    35
+                    2,
+                    40
                   ],
-                  "radiusM": 3
+                  "radiusM": 3.5
                 },
                 "postures": [
                   "standing"
@@ -161,9 +151,15 @@
                 "receipt": {
                   "verb": "walk",
                   "capabilities": [
-                    "walk:lab-pond-hall"
+                    "walk:lab-pond-hall",
+                    "walk:lab-pond-hall/hall",
+                    "walk:g-lab-pond-hall",
+                    "walk:g-lab-pond-hall.hall"
                   ]
-                }
+                },
+                "places": [
+                  "g-lab-pond-hall.hall"
+                ]
               }
             ]
           }
@@ -172,7 +168,7 @@
       {
         "id": "lab-behind",
         "seat": "sol",
-        "atSec": 555,
+        "atSec": 5,
         "channel": "card",
         "text": "Enter the nearest building behind you.",
         "budgetSec": 150,
@@ -180,12 +176,7 @@
           "maxWallSec": 120,
           "steps": [
             "stand:here",
-            {
-              "verb": "go",
-              "target": {
-                "place": "field"
-              }
-            },
+            "walk:lab-start",
             {
               "verb": "turn",
               "heading": 270
@@ -196,7 +187,7 @@
               0,
               0
             ],
-            "radiusM": 3,
+            "radiusM": 1.5,
             "heading": 270,
             "posture": [
               "standing"
@@ -217,10 +208,10 @@
                 "name": "rear building",
                 "region": {
                   "pos": [
-                    30,
-                    0
+                    14,
+                    -8
                   ],
-                  "radiusM": 3
+                  "radiusM": 3.5
                 },
                 "postures": [
                   "standing"
@@ -228,9 +219,15 @@
                 "receipt": {
                   "verb": "walk",
                   "capabilities": [
-                    "walk:lab-presentation-hall"
+                    "walk:lab-presentation-hall",
+                    "walk:lab-presentation-hall/hall",
+                    "walk:g-lab-presentation-hall",
+                    "walk:g-lab-presentation-hall.hall"
                   ]
-                }
+                },
+                "places": [
+                  "g-lab-presentation-hall.hall"
+                ]
               }
             ]
           }
@@ -239,20 +236,15 @@
       {
         "id": "lab-recovery",
         "seat": "sol",
-        "atSec": 830,
+        "atSec": 5,
         "channel": "card",
-        "text": "Try entering the locked reading room. If it is blocked, stop that attempt and sit on the bench outside the cottage. Tell me where you ended up.",
+        "text": "Try entering the closed reading room. If it is blocked, stop that attempt and sit on the bench outside the cottage. Tell me where you ended up.",
         "budgetSec": 150,
         "setup": {
           "maxWallSec": 120,
           "steps": [
             "stand:here",
-            {
-              "verb": "go",
-              "target": {
-                "place": "field"
-              }
-            },
+            "walk:lab-start",
             {
               "verb": "turn",
               "heading": 0
@@ -263,7 +255,7 @@
               0,
               0
             ],
-            "radiusM": 3,
+            "radiusM": 1.5,
             "heading": 0,
             "posture": [
               "standing"
@@ -284,8 +276,8 @@
                 "name": "recovery bench",
                 "region": {
                   "pos": [
-                    44,
-                    15
+                    39.6174,
+                    12.4068
                   ],
                   "radiusM": 1.5
                 },
@@ -300,7 +292,18 @@
                   ]
                 }
               }
-            ]
+            ],
+            "refusalBeforeCompletion": {
+              "codes": [
+                "route.unreachable"
+              ],
+              "capabilities": [
+                "walk:lab-reading-room/hall",
+                "walk:g-lab-reading-room.hall",
+                "walk:lab-reading-room",
+                "walk:g-lab-reading-room"
+              ]
+            }
           }
         }
       }
@@ -321,7 +324,7 @@
     "developer": false
   },
   "rails": {
-    "maxTurnWallSec": 180,
+    "maxTurnWallSec": 240,
     "onboardWallSec": 300,
     "onboardTimeoutSec": 270,
     "maxTurnsPerRequest": 6

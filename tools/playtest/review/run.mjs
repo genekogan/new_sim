@@ -2,6 +2,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readJson, readJsonl } from '../lib/jsonl.mjs';
+import {attachRefusals} from './refusals.mjs';
 
 const list = (d) => (existsSync(d) ? readdirSync(d) : []);
 const text = (f) => { try { return readFileSync(f, 'utf8'); } catch { return null; } };
@@ -42,6 +43,7 @@ export function loadRun(runDir) {
     .map((e) => ({ ...e, sentMono: e.sentMono ?? (Date.parse(e.sentAt) - anchorMs) }))
     .sort((a, b) => a.sentMono - b.sentMono || String(a.requestId).localeCompare(String(b.requestId)));
   linkTurns(seats, evidence);
+  attachRefusals(runDir,evidence,seats);
   return {
     runDir, scenario, world, anchorMs, seats, personas, evidence,
     session: readJson(join(runDir, 'evidence/session.json'), null),

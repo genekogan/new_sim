@@ -18,13 +18,13 @@
     "port": 4993,
     "natives": false
   },
-  "durationSec": 1205,
+  "durationSec": 1440,
   "seats": [
     {
       "id": "sol",
       "adapter": "codex-headless",
-      "model": null,
-      "effort": "medium",
+      "model": "gpt-6-astra",
+      "effort": "high",
       "soulName": "Sol",
       "wake": true
     }
@@ -42,7 +42,7 @@
         "text": "Go to the auditorium in Chiba and sit down at the podium desk to prepare to give everyone on the bleachers a presentation. Tell me when you are ready, while still seated.",
         "budgetSec": 180,
         "setup": {
-          "maxWallSec": 120,
+          "maxWallSec": 180,
           "steps": [
             "stand:here",
             {
@@ -105,20 +105,16 @@
       {
         "id": "mars-swim",
         "seat": "sol",
-        "atSec": 310,
+        "atSec": 5,
         "channel": "card",
-        "text": "Head over to the nearest body of water and take a swim for ten seconds, then get back onto its bank.",
+        "text": "Head over to the nearest body of water and take a swim, then get back onto its bank. Tell me when you are back on dry ground.",
         "budgetSec": 180,
         "setup": {
-          "maxWallSec": 120,
+          "maxWallSec": 180,
           "steps": [
             "stand:here",
-            {
-              "verb": "go",
-              "target": {
-                "place": "campus-swimming-pond-bank"
-              }
-            },
+            "walk:field",
+            "walk:g-campus-swimming-pond.shore-bank",
             {
               "verb": "turn",
               "heading": 0
@@ -126,13 +122,16 @@
           ],
           "expect": {
             "pos": [
-              0,
-              0
+              -32.9,
+              -17.5
             ],
             "radiusM": 3,
             "heading": 0,
             "posture": [
               "standing"
+            ],
+            "places": [
+              "g-campus-swimming-pond.shore-bank"
             ]
           }
         },
@@ -150,18 +149,20 @@
                 "name": "swimming",
                 "region": {
                   "pos": [
-                    0,
-                    0
+                    -44,
+                    -20
                   ],
-                  "radiusM": 1
+                  "radiusM": 13
                 },
                 "postures": [
                   "swimming"
                 ],
+                "holdSec": 4,
                 "receipt": {
                   "verb": "swim",
                   "capabilities": [
-                    "swim:campus-swimming-pond"
+                    "swim:campus-swimming-pond",
+                    "swim:g-campus-swimming-pond"
                   ]
                 }
               },
@@ -169,14 +170,25 @@
                 "name": "safe bank",
                 "region": {
                   "pos": [
-                    0,
-                    0
+                    -44,
+                    -20
                   ],
-                  "radiusM": 1
+                  "radiusM": 16
                 },
                 "postures": [
                   "standing"
-                ]
+                ],
+                "places": [
+                  "g-campus-swimming-pond.shore-bank"
+                ],
+                "receipt": {
+                  "verb": "walk",
+                  "capabilities": [
+                    "walk:campus-swimming-pond",
+                    "walk:g-campus-swimming-pond.shore-bank",
+                    "walk:campus-swimming-pond/shore-bank"
+                  ]
+                }
               }
             ]
           }
@@ -185,12 +197,12 @@
       {
         "id": "mars-behind",
         "seat": "sol",
-        "atSec": 615,
+        "atSec": 5,
         "channel": "card",
         "text": "Enter the nearest building behind you.",
         "budgetSec": 150,
         "setup": {
-          "maxWallSec": 120,
+          "maxWallSec": 180,
           "steps": [
             "stand:here",
             {
@@ -242,7 +254,9 @@
                   "verb": "walk",
                   "capabilities": [
                     "walk:chiba",
-                    "walk:chiba/floor"
+                    "walk:chiba/floor",
+                    "walk:g-chiba",
+                    "walk:g-chiba.floor"
                   ]
                 }
               }
@@ -253,12 +267,12 @@
       {
         "id": "mars-mimos",
         "seat": "sol",
-        "atSec": 890,
+        "atSec": 5,
         "channel": "card",
         "text": "Go into Mimos and sit in a study chair in the raised main room. Tell me when seated.",
         "budgetSec": 180,
         "setup": {
-          "maxWallSec": 120,
+          "maxWallSec": 180,
           "steps": [
             "stand:here",
             {
@@ -295,24 +309,73 @@
             "maxSampleGapSec": 6,
             "phases": [
               {
-                "name": "Mimos raised room chair",
-                "region": {
-                  "pos": [
-                    -1.4775,
-                    -39.7843
-                  ],
-                  "radiusM": 1.2
-                },
+                "name": "Mimos raised room study chair",
                 "postures": [
                   "seated",
                   "sitting"
                 ],
-                "receipt": {
-                  "verb": "sit",
-                  "targetRefs": [
-                    "mimos/study-chair-4"
-                  ]
-                }
+                "anyOf": [
+                  {
+                    "region": {
+                      "pos": [
+                        -1.4775174,
+                        -39.7842503
+                      ],
+                      "radiusM": 1.2
+                    },
+                    "receipt": {
+                      "verb": "sit",
+                      "targetRefs": [
+                        "mimos/study-chair-4"
+                      ]
+                    }
+                  },
+                  {
+                    "region": {
+                      "pos": [
+                        -0.3585413,
+                        -39.9417061
+                      ],
+                      "radiusM": 1.2
+                    },
+                    "receipt": {
+                      "verb": "sit",
+                      "targetRefs": [
+                        "mimos/study-chair-5"
+                      ]
+                    }
+                  },
+                  {
+                    "region": {
+                      "pos": [
+                        -1.0080354,
+                        -41.1126277
+                      ],
+                      "radiusM": 1.2
+                    },
+                    "receipt": {
+                      "verb": "sit",
+                      "targetRefs": [
+                        "mimos/study-chair-6"
+                      ]
+                    }
+                  },
+                  {
+                    "region": {
+                      "pos": [
+                        0.1167195,
+                        -40.6548871
+                      ],
+                      "radiusM": 1.2
+                    },
+                    "receipt": {
+                      "verb": "sit",
+                      "targetRefs": [
+                        "mimos/study-chair-7"
+                      ]
+                    }
+                  }
+                ]
               }
             ]
           }
@@ -335,9 +398,10 @@
     "developer": false
   },
   "rails": {
-    "maxTurnWallSec": 180,
+    "maxTurnWallSec": 240,
     "onboardWallSec": 300,
     "onboardTimeoutSec": 270,
     "maxTurnsPerRequest": 6
-  }
+  },
+  "fixtureStatus": "verified"
 }
