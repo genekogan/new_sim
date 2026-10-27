@@ -44,7 +44,11 @@ export function decorateMeaning(m: WorldModel, places: GodPlace[], root: string 
     const main = own.get(e.id), room = p.of === 'room' ? p.ref.slice(m.pathOf(e.id).length + 1) : undefined;
     const part = room ? a?.parts?.find(part => part.anchor?.kind === 'entity' && part.anchor.ref === e.id && part.anchor.slot === room) : undefined;
     p.name = p.of === 'shore' ? `${a?.title ?? humanTitle(p.ref)} bank` : room ? part?.title ?? `${a?.title ?? humanTitle(m.pathOf(e.id))} / ${humanTitle(room)}` : a?.title ?? humanTitle(p.ref);
-    p.aliases = [...new Set([p.ref, ...(part?.aliases ?? []), ...(room ? [room] : [...(a?.aliases ?? []), ...(a?.kind ? [a.kind] : []), ...(d ? [d.name.replace(/^core[-/]/, '').replace(/^ew-/, '')] : []), ...(d?.tags ?? []), ...(d?.synonyms ?? [])])])].slice(0, 64);
+    // A derived bank is a related destination, not another exact identity for its
+    // water. Sharing the bare source ref made even walk:<lake-ref> ambiguous.
+    p.aliases = p.of === 'shore'
+      ? [...new Set([`${p.ref} shore`, `${p.ref} bank`, ...[a?.title, ...(a?.aliases ?? [])].filter(Boolean).flatMap(name => [`${name} bank`, `${name} shore`])])].slice(0, 64)
+      : [...new Set([p.ref, ...(part?.aliases ?? []), ...(room ? [room] : [...(a?.aliases ?? []), ...(a?.kind ? [a.kind] : []), ...(d ? [d.name.replace(/^core[-/]/, '').replace(/^ew-/, '')] : []), ...(d?.tags ?? []), ...(d?.synonyms ?? [])])])].slice(0, 64);
     if (p.of !== 'shore' && !room) {
       if (a?.what) p.description = a.what;
       if (a?.kind) p.semanticKind = a.kind;

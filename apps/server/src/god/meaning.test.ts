@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CORE_KIT, WorldModel, applyBatch, coreRef } from '@sim/world-compiler';
+import { resolveBootPlace } from '../edge/boot/place-resolution.ts';
 import { decorateMeaning, meaningParts } from './meaning.ts';
 import type { GodPlace } from './places.ts';
 const area = [[-20,-20],[20,-20],[20,20],[-20,20]] as [number,number][];
@@ -18,6 +19,10 @@ test('meaning changes display and semantic hierarchy without changing physical m
  ps[3].id+='-shore'; const before=ps.map(p=>({parent:p.parent,polygon:structuredClone(p.polygon),kind:p.kind})); decorateMeaning(m,ps,'world');
  assert.equal(ps[0].name,'Campus');assert.equal(ps[1].description,'A bench for the speaker.');assert.equal(ps[1].semanticParent,'g-land-campus');assert.equal(ps[3].semanticParent,'g-land-west-lake');
  assert.equal(ps[2].semanticKind,'lake'); assert.equal(ps[3].name,'West Lake bank');assert.ok(ps[2].aliases!.includes('swimming lake'));assert.ok(ps[2].aliases!.includes('pond'));
+ const waterPlaces=ps.slice(2).map(p=>({id:p.id,name:p.name,aliases:p.aliases!,level:0,nativeRegion:p.id,access:'admitted' as const}));
+ const offers=waterPlaces.map(p=>({placeId:p.id,id:`walk:${p.id}`,available:true}));
+ for(const ref of ['land-west-lake','swimming lake']){const r=resolveBootPlace(ref,waterPlaces,offers);assert.ok(r.ok);assert.equal(r.chosen.place,ps[2].id);}
+ const bank=resolveBootPlace('swimming lake bank',waterPlaces,offers);assert.ok(bank.ok);assert.equal(bank.chosen.place,ps[3].id);
  assert.deepEqual(ps.map(p=>({parent:p.parent,polygon:p.polygon,kind:p.kind})),before);
 });
 test('parts preserve real targets; descriptive parts have no target; local points transform with owner',()=>{
