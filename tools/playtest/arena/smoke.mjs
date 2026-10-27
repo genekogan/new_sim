@@ -45,12 +45,19 @@ try {
   log('presence before send', listening ? 'listening' : cardSummary(await cardView(who)).presence);
 
   const tReq = Date.now();
-  const sent = await sendCard({ ...who, text: 'sit down' });
+  const requestText = flag('text', 'Sit down on the bench by the cottage and remain seated for at least 60 seconds. Tell me when you are seated, while still sitting.');
+  const snapshot = await (await fetch(`${world.base}/v1/world/snapshot`)).json();
+  const bench = snapshot.entities.find(e => e.name === 'bench');
+  if (!bench) throw new Error('smoke fixture has no bench');
+  const sent = await sendCard({ ...who, text: requestText });
   log('sent', sent.messageId);
-  let card = null, ackAt = null;
+  let card = null, ackAt = null, atResult = null; const postureSamples = [];
   const done = await until(async () => {
     card = cardSummary(await cardView(who));
     if (card.ackText && !ackAt) { ackAt = Date.now(); log('ack', card.ackText); }
+    const body = await publicSoul(who);
+    postureSamples.push({ t: new Date().toISOString(), state: body?.self?.state, receipts: body?.receipts ?? [] });
+    if (card.resultText && !atResult) atResult = body;
     return card.resultText ? card : null;
   }, { timeoutMs: resultSec * 1000, everyMs: 2000 });
   wall.requestMs = Date.now() - tReq;
@@ -61,7 +68,8 @@ try {
   const turns = readJsonl(join(runDir, 'seats/pip/turns.jsonl')), cost = readJsonl(join(runDir, 'seats/pip/cost.jsonl'));
   const sum = (k) => cost.reduce((a, c) => a + (c[k] ?? 0), 0);
   Object.assign(summary, {
-    ok: !!done && /sit|seated/i.test(pub?.self?.state ?? '') && turns.some(t => t.reason === 'wake'), soulId: on.soulId, messageId: sent.messageId,
+    ok: !!done && /sit|seated/i.test(atResult?.self?.state ?? '') && (atResult?.receipts ?? []).some(r => r.capability === `sit:${bench.id}` || r.chosen?.seat === bench.id) && /sit|seated/i.test(pub?.self?.state ?? '') && turns.some(t => t.reason === 'wake'),
+    requestText, expectedBench: { id: bench.id, name: bench.name }, stateAtFirstResult: atResult?.self?.state ?? null, postureSamples, soulId: on.soulId, messageId: sent.messageId,
     resultWithinCutoff: !!done, lateResult: late?.resultText ? { text: late.resultText, outcome: late.outcome, afterSentMs: late.resultAt && late.sentAt ? late.resultAt - late.sentAt : null } : null,
     ackText: card?.ackText ?? null, ackLatencyMs: ackAt ? ackAt - tReq : null, resultText: card?.resultText ?? null, outcome: card?.outcome ?? null,
     publicState: pub?.self?.state ?? pub?.state ?? null, activity: pub?.self?.activity ?? pub?.activity ?? null,
