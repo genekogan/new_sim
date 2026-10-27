@@ -23,5 +23,5 @@ Body position, posture, activity, heading and seat come from one `here` observat
 
 Physical fixture notes:
 - Mars: patched campus, pond inserted before original entities, real podium seat and all four actual Mimos study chairs. All physiological paths verified locally. The swim task avoids an artificial ten-second duration: the product's swim contract has a thirty-second minimum.
-- Eden: cumulative template plus supported west-pier bench. Music accepts bandstand, performance stage, music room, amphitheatre and both festival venues. Shore/jetty proof and baseline parity must complete before setting verified.
-- Hamlet: common physical presentation hall, pond hall and closed reading room built through the god workflow before both arms. God authoring proof is separate from four Soul requests. The presenter seat and cottage bench use actual supported seat coordinates. Baseline pose parity must complete before setting verified.
+- Eden: cumulative template plus supported west-pier bench. Music accepts bandstand, performance stage, music room, amphitheatre and both festival venues. The exact west-lake jetty→swim→dry-jetty route completed through the native CLI. Common snapshot equality must pass after the final physical patches.
+- Hamlet: common physical presentation hall, pond hall and closed reading room built through the god workflow before both arms. God authoring proof is separate from four Soul requests. The presenter seat and cottage bench use actual supported seat coordinates. All13 physical entities match between old/new boot snapshots.

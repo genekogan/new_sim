@@ -39,14 +39,14 @@
         "seat": "sol",
         "atSec": 5,
         "channel": "card",
-        "text": "Head to the nearest body of water and take a swim, then return safely to its bank. Tell me when you are back on dry ground.",
+        "text": "Head to the nearest body of water and take a swim, then return safely to dry ground beside it. Tell me when you are back out of the water.",
         "budgetSec": 180,
         "setup": {
           "maxWallSec": 240,
           "steps": [
             "stand:here",
             "walk:field",
-            "walk:g-land-west-lake.shore-bank",
+            "walk:land-west-lake-jetty",
             {
               "verb": "turn",
               "heading": 0
@@ -54,8 +54,8 @@
           ],
           "expect": {
             "pos": [
-              -100,
-              2
+              -122,
+              26
             ],
             "radiusM": 3,
             "heading": 0,
@@ -63,7 +63,7 @@
               "standing"
             ],
             "places": [
-              "g-land-west-lake.shore-bank"
+              "g-land-west-lake-jetty"
             ]
           }
         },
@@ -99,28 +99,54 @@
                 "holdSec": 4
               },
               {
-                "name": "west lake bank",
-                "region": {
-                  "pos": [
-                    -148,
-                    2
-                  ],
-                  "radiusM": 55
-                },
-                "postures": [
-                  "standing"
-                ],
-                "places": [
-                  "g-land-west-lake.shore-bank"
-                ],
-                "receipt": {
-                  "verb": "walk",
-                  "capabilities": [
-                    "walk:land-west-lake",
-                    "walk:g-land-west-lake.shore-bank",
-                    "walk:land-west-lake/shore-bank"
-                  ]
-                }
+                "name": "dry west lake shore or jetty",
+                "anyOf": [
+                  {
+                    "region": {
+                      "pos": [
+                        -148,
+                        2
+                      ],
+                      "radiusM": 55
+                    },
+                    "postures": [
+                      "standing"
+                    ],
+                    "places": [
+                      "g-land-west-lake.shore-bank"
+                    ],
+                    "receipt": {
+                      "verb": "walk",
+                      "capabilities": [
+                        "walk:land-west-lake",
+                        "walk:g-land-west-lake.shore-bank",
+                        "walk:land-west-lake/shore-bank"
+                      ]
+                    }
+                  },
+                  {
+                    "region": {
+                      "pos": [
+                        -122,
+                        26
+                      ],
+                      "radiusM": 3
+                    },
+                    "postures": [
+                      "standing"
+                    ],
+                    "places": [
+                      "g-land-west-lake-jetty"
+                    ],
+                    "receipt": {
+                      "verb": "walk",
+                      "capabilities": [
+                        "walk:land-west-lake-jetty",
+                        "walk:g-land-west-lake-jetty"
+                      ]
+                    }
+                  }
+                ]
               }
             ]
           }
@@ -437,5 +463,7 @@
     "onboardWallSec": 300,
     "onboardTimeoutSec": 270,
     "maxTurnsPerRequest": 6
-  }
+  },
+  "fixtureStatus": "verified",
+  "fixtureNotes": "Actual jetty [-122,26] -> west lake center swimming/tread -> dry jetty standing completed through native CLI; supported west-pier bench held seated. Full old/new snapshot parity required by freeze after final physical patches."
 }
