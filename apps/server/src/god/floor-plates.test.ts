@@ -198,6 +198,10 @@ test('semantic seat receipts freeze the real entity and exact slot through compl
   await invite(w,'semantic');const row:any=await accept(w.host,w.souls.create('dev:semantic',{name:'Semantic Presenter',description:'a speaker'}));await w.settle();
   const soul={soulId:row.id,entityId:row.entity_id,name:row.name,owner:row.owner};
   await accept(w.host,w.host.enqueue('edge-relocate','test:semantic-seat',{soulId:soul.soulId,entityId:soul.entityId,to:[-3,-28],why:'near presenter'}));await w.settle();
+  const walk:any=await accept(w.host,w.edge.act(soul,{capability:'walk:auditorium/part-podium-desk'}));assert.equal(walk.accepted,true,JSON.stringify(walk));
+  assert.deepEqual(walk.receipt.chosen,{capability:'walk:auditorium/part-podium-desk',target:bench.id,kind:'object'},'semantic walk identifies its physical entity');
+  let walked:any;for(let i=0;i<3000;i++){walked=w.edge.receipt(soul.soulId,walk.receipt.id);if(walked&&['completed','failed'].includes(walked.phase))break;w.host.tickOnce();if(i%20===0){await setImmediate();w.host.drainInputs();}}
+  assert.equal(walked.phase,'completed',JSON.stringify(walked));assert.equal(walked.chosen.target,bench.id);
   const input={capability:'sit:auditorium/part-podium-desk',params:{seconds:1},clientRef:'semantic-seat-regression'};
   const published:any[]=[];w.edge.onReceipt(r=>{if(r.soulId===soul.soulId)published.push(r);});
   const accepted:any=await accept(w.host,w.edge.act(soul,input));assert.equal(accepted.accepted,true,JSON.stringify(accepted));

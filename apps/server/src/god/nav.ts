@@ -59,7 +59,7 @@ export type Thing = {
   id: string;
   room?: string;
   /** A semantic alias/stand target; excluded from physical place membership. */
-  semanticPart?: {owner:string; part:string; local?:true; seat?:{entity:string;slot:string}};
+  semanticPart?: {owner:string; part:string; entity?:string; local?:true; seat?:{entity:string;slot:string}};
   name: string;
   aliases?: string[];
   kind: ThingKind;
@@ -193,7 +193,7 @@ export class GodNav {
       if(p.anchor.kind==='entity') {
         const t=p.target.ref?byRef.get(p.target.ref):undefined; if(!t)continue;
         const slot=p.target.slot?m.slotsOf(m.entities.get(p.target.entity!)!).find(s=>s.id===p.target!.slot):undefined;
-        byRef.set(ref,{...t,ref,id:`${e.id}#meaning-${p.id}`,name:p.title,aliases:partAliases,what:p.what??t.what,words:[...new Set([...names,...t.words])],semanticPart:{owner:e.id,part:p.id,...(slot?.kind==='seat'?{seat:{entity:p.target.entity!,slot:slot.id}}:{})}});
+        byRef.set(ref,{...t,ref,id:`${e.id}#meaning-${p.id}`,name:p.title,aliases:partAliases,what:p.what??t.what,words:[...new Set([...names,...t.words])],semanticPart:{owner:e.id,part:p.id,entity:p.target.entity!,...(slot?.kind==='seat'?{seat:{entity:p.target.entity!,slot:slot.id}}:{})}});
       } else {
         const point=p.target.point!,stand=p.target.stand!,level=p.target.level!;
         // A stale authored floor number must not send a Soul to an unrelated floor at the same X/Z.
@@ -663,7 +663,7 @@ export class GodNav {
     // (a roof bench with no stair: the walk 'completed' in the lobby below)
     const E = this.h.engine, cut = !!g0 && (g0.level > 0 || !!t.semanticPart) && !!E.navCheckV1 && !!E.navWarmV1?.(0) && E.navCheckV1([{ id, ...g0 }])[0]?.ok === false;
     const goal = cut ? null : g0;
-    const cap: EdgeCapability = { id, verb: 'walk', label: where, ...(t.aliases?.length?{aliases:t.aliases}:{}), target: place ? { id: place, kind: 'place' } : { id: t.id, kind: 'object' }, available: !!goal,
+    const cap: EdgeCapability = { id, verb: 'walk', label: where, ...(t.aliases?.length?{aliases:t.aliases}:{}), target: t.semanticPart?.entity ? { id: t.semanticPart.entity, kind: 'object' } : place ? { id: place, kind: 'place' } : { id: t.id, kind: 'object' }, available: !!goal,
       ...(goal ? {} : { blocked: cut ? { code: 'route.unreachable', reason: `${t.ref} is up where no stair or ramp from the ground reaches.` } : this.blocked.has(t.ref) ? { code: 'route.unreachable', reason: this.blocked.get(t.ref)! } : { code: 'place.no-standing-room', reason: `There is no clear standing room at ${t.ref} right now.` } }) };
     caps.push(cap);
     if (!goal) return;
