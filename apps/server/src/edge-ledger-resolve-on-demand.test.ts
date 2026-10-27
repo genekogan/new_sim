@@ -17,8 +17,8 @@ test('Eden 2026: resolve answers far named places as act does, and a run goes wh
   t.after(() => w.close());
   const listed = new Set(w.edge.capabilities(w.soul).map((c) => c.id));
   const dry = (text: string) => w.edge.intents.dryRun(w.soul, { capability: text }) as Would;
-  // the cases: far places the listing leaves out (the lighthouse's breakwater, the big top)
-  for (const [text, cap] of [['go to the lighthouse', 'walk:land-lighthouse-breakwater'], ['go to the big top', 'walk:region-festival-meadow-big-top'], ['walk to the pier', 'walk:land-harbour-east-pier']]) {
+  // the cases: far places the listing leaves out (the authored lighthouse building, the big top)
+  for (const [text, cap] of [['go to the lighthouse', 'walk:region-harbour-lighthouse'], ['go to the big top', 'walk:region-festival-meadow-big-top'], ['walk to the pier', 'walk:land-harbour-east-pier']]) {
     assert.ok(!listed.has(cap), `${cap} is beyond the listing (the case this covers)`);
     const r = dry(text);
     assert.equal(r.ok, true, `${text}: ${r.code ?? ''} ${r.reason ?? ''}`);
@@ -28,7 +28,7 @@ test('Eden 2026: resolve answers far named places as act does, and a run goes wh
   // a far place at a gait: its walk, then that gait
   const run = dry('run to the lighthouse');
   assert.equal(run.ok, true, `run to the lighthouse: ${run.code ?? ''} ${run.reason ?? ''}`);
-  assert.equal(run.would?.capability, 'run:g-land-lighthouse-breakwater');
+  assert.equal(run.would?.capability, 'run:g-region-harbour-lighthouse');
   // a run goes where the same words walk (a cottage, not a woodland whose description lists one)
   const walk = dry('walk to the cottage'), toCottage = dry('run to the cottage');
   assert.equal(walk.ok, true); assert.equal(toCottage.ok, true, `run to the cottage: ${toCottage.code ?? ''} ${toCottage.reason ?? ''}`);
