@@ -184,7 +184,7 @@ async function startApproval(input, code) {
   const s = load();
   const pending = s.pendingApproval?.input && JSON.stringify(s.pendingApproval.input) === JSON.stringify({ ...s.pendingApproval.input, ...input })
     ? s.pendingApproval
-    : { worldId: s.worldId, input: { ...input, agentLabel: "eden " + VERSION, idempotencyKey: randomUUID(), pollSecret: randomBytes(16).toString("hex") } };
+    : { worldId: s.worldId, input: { ...input, agentLabel: "eden " + VERSION, idempotencyKey: randomUUID(), pollSecret: randomBytes(32).toString("base64url") } };
   const r = ok(await call("/v1/agent/approval/start", { as: "none", body: { ...pending.input, ...(code ? { for: code } : {}) } }), "approval start");
   const a = r.approval ?? r;
   pending.approvalId = a.id;

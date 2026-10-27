@@ -1,0 +1,54 @@
+// The published eden.mjs, run as a child process against the real server app on an account world: register,
+// create --for, the owner approves, approval wait, status. 2.0.0–2.2.2 sent a 32-hex pollSecret the server's
+// strict schema refuses, so every create on sim.eden.art failed with "Approval request format is invalid";
+// playtests run on dev-identity worlds and never reached this path.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
+import { execFile } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { getRequestListener } from '@hono/node-server';
+import { fixture } from '../test/native-owner-fixture.ts';
+import { buildApp } from './http.ts';
+import type { Hub } from './hub.ts';
+import type { AccountIdentity } from './accounts/store.ts';
+import { marsFactory, GREEN_FIELD_WORLD } from '@sim/engine-mars';
+
+const CLI = fileURLToPath(new URL('../../../tools/world-launcher/soul/eden.mjs', import.meta.url));
+
+test('eden.mjs creates a Soul on an account world: create --for, owner approves, approval wait, status', async t => {
+  const f = fixture(':memory:', await marsFactory({ ...GREEN_FIELD_WORLD, safeCrewRemoval: true })); f.brain.quiesce(); f.souls.enableLifecycle();
+  f.souls.cfg.accountAuthRequired = true; f.souls.cfg.inviteRequired = false;
+  const identity: AccountIdentity = { id: 'account-cli-owner', issuer: 'fixture', subject: 'account-cli-owner', verifiedAt: Date.now(), expiresAt: Date.now() + 3_600_000 };
+  f.db.upsertUser({ id: identity.id, email: null, wallet: null, role: 'user' });
+  // Only the sign-in provider is synthetic; the window code, approval, Soul and token are real.
+  f.auth.accountFromToken = async token => token === 'owner' ? { identity, user: f.db.user(identity.id)! } : null;
+  const app = buildApp({ cfg: f.souls.cfg, db: f.db, host: f.host, souls: f.souls, brain: f.brain, auth: f.auth,
+    hub: { clients: new Map(), refreshMe() {} } as unknown as Hub });
+  const listener = getRequestListener(app.fetch);
+  // The world lives under /w/test, as on sim.eden.art.
+  const server = createServer((req, res) => { req.url = req.url!.replace(/^\/w\/test/, '') || '/'; listener(req, res); });
+  await new Promise<void>(r => server.listen(0, '127.0.0.1', r));
+  const dir = mkdtempSync(join(tmpdir(), 'cli-create-'));
+  t.after(async () => { server.closeAllConnections(); await new Promise(r => server.close(r)); rmSync(dir, { recursive: true, force: true }); f.host.stop(); f.db.close(); });
+  const world = `http://127.0.0.1:${(server.address() as { port: number }).port}/w/test`;
+  const run = (...args: string[]) => new Promise<Record<string, any>>((resolve, reject) => execFile(process.execPath, [CLI, ...args], { cwd: dir },
+    (err, out, errText) => err ? reject(new Error(`${args.join(' ')}: ${errText || out}`)) : resolve(JSON.parse(out))));
+  const owner = (path: string) => app.request(path, { method: 'POST', headers: { host: '127.0.0.1', 'content-type': 'application/json', authorization: 'Bearer owner' }, body: '{}' });
+
+  const { code } = await (await owner('/v1/account/window-code')).json() as { code: string };
+  assert.match(code, /^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
+  assert.equal((await run('register', world)).registered, true);
+  const asked = await run('create', 'Wren', '--for', code);
+  assert.equal(asked.status, 'pending'); assert.equal(asked.name, 'Wren'); assert.equal(asked.delivery, 'window', 'the request reaches the open window');
+  const approved = await owner(`/v1/account/approvals/${asked.approvalId}/approve`);
+  assert.equal(approved.status, 200, await approved.text());
+  const ready = await run('approval', 'wait');
+  assert.equal(ready.status, 'ready'); assert.equal(ready.paired, true); assert.equal(ready.soul.name, 'Wren');
+  const st = await run('status');
+  assert.equal(st.paired, true);
+  assert.equal(f.db.soul(ready.soul.id)?.name, 'Wren');
+});
