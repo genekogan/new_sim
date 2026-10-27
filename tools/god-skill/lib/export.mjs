@@ -90,6 +90,26 @@ export function exportGenesis(snapshot, { name } = {}) {
     const local = new Set(batch.ops.map((op) => op.tmp).filter(Boolean));
     for (const op of batch.ops) if (op.in?.parent?.startsWith('$') && !local.has(op.in.parent)) op.in.parent = pathOf(byId, order[Number(op.in.parent.slice(2))]);
   }
+  // Semantic references may point forward or into generated prefabs. Apply them after all physical
+  // placement batches, using portable full paths rather than source IDs or batch-local temp refs.
+  const portableRef = (ref) => {
+    const e = byId.get(ref) ?? byPath.get(ref);
+    if (!e) throw new Error(`export missing semantic reference: ${ref}`);
+    return pathOf(byId, e);
+  };
+  const meaning = (about) => {
+    const value = structuredClone(about);
+    if (value.in !== undefined) value.in = portableRef(value.in);
+    for (const part of value.parts ?? []) if (part.anchor?.kind === 'entity') part.anchor.ref = portableRef(part.anchor.ref);
+    return value;
+  };
+  const meaningOps = order.filter(e => e.about !== undefined).map(e => ({op:'set',id:pathOf(byId,e),about:meaning(e.about)}));
+  if (s.state.about !== undefined) {
+    const about = structuredClone(s.state.about);
+    if (about.districts) about.districts = about.districts.map(portableRef);
+    meaningOps.push({op:'world',state:{about}});
+  }
+  for (let i=0;i<meaningOps.length;i+=200) batches.push({note:'meaning',ops:meaningOps.slice(i,i+200)});
   return { schema: 'genesis/1', name: name ?? s.worldId, description: `exported from ${s.worldId} at seq ${s.seq}`,
     constants: { extent: s.constants.extent, ground: s.constants.ground, ...(s.constants.seaLevel !== undefined ? { seaLevel: s.constants.seaLevel } : {}) },
     state: { sky: s.state.sky, weather: s.state.weather, ...(s.state.constitution ? { constitution: s.state.constitution } : {}) }, batches };

@@ -59,3 +59,22 @@ test('legacy native core refs keep template behavior and batch parent paths', ()
   assert.equal(g.batches[1].ops[0].in.parent, 'item0');
   assert.deepEqual(g.batches[1].ops[0].p, [1, 2, 3]);
 });
+
+test('semantic blocks round-trip after placement with portable parents, parts and world districts', () => {
+  const source=world(); const d=source.defineDef(definition('meaning-item'),'human',0);
+  const entities=[entity('district-id',d.ref,{name:'campus',about:{title:'Campus',what:'A place to learn',role:'district'}}),entity('hall-id',d.ref,{name:'hall',about:{title:'Hall',in:'district-id',parts:[{id:'desk',title:'Presenter desk',anchor:{kind:'entity',ref:'seat-id'}}]}}),entity('seat-id',d.ref,{name:'desk',in:{parent:'hall-id'},p:[1,0,1]})];
+  const input=snapshot([d],entities,{state:{about:{title:'School',districts:['district-id']}}});
+  const before=JSON.stringify(input),g=exportGenesis(input),destination=world();
+  for(const batch of g.batches){const r=applyBatch(destination,batch,'god',1).result;assert.equal(r.accepted,true,JSON.stringify(r));}
+  assert.equal(destination.get('hall').about.in,destination.get('campus').id);
+  assert.equal(destination.get('hall').about.parts[0].anchor.ref,destination.get('hall/desk').id);
+  assert.deepEqual(destination.state.about.districts,[destination.get('campus').id]);
+  assert.equal(JSON.stringify(input),before);
+  assert.ok(operations(g).filter(o=>o.about).every(o=>o.op==='set'));
+});
+test('export preserves meaning on generated children and fails on dangling semantic refs', () => {
+  const w=world(),part=w.defineDef(definition('part'),'human',0),prefab=w.defineDef(definition('prefab',{make:{kind:'parts',parts:[{id:'chair',def:part.ref}]}}),'human',0);
+  const s=snapshot([part,prefab],[entity('parent',prefab.ref),entity('child',part.ref,{name:'chair',in:{parent:'parent'},about:{title:'Chair',what:'A reading seat'}})]);
+  assert.deepEqual(operations(exportGenesis(s)).filter(o=>o.about),[{op:'set',id:'parent/chair',about:{title:'Chair',what:'A reading seat'}}]);
+  s.entities[0].about={in:'missing'};assert.throws(()=>exportGenesis(s),/missing semantic reference/);
+});

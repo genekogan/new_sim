@@ -7,7 +7,7 @@ import { aboutValue, missingAbout, exactAboutTarget } from './lib/about.mjs';
 import { about, set, checkArgs, parseFlags, COMMANDS } from './cli.mjs';
 import { invalidate } from './lib/mirror.mjs';
 
-const m = { rows: [{id:'a',path:'hall',name:'hall',def:'hall@1'},{id:'b',path:'hall/chair',name:'chair',def:'chair@1'},{id:'c',path:'other/chair',name:'chair',def:'chair@1'}], snapshot:{ entities:[{id:'a',about:{title:'Hall'}},{id:'b',about:{title:'Seat',what:'A study seat'}},{id:'c'}], defs:[{ref:'hall@1',components:{place:{kind:'building'}}}], library:[] } };
+const m = { rows: [{id:'a',path:'hall',name:'hall',def:'hall@1'},{id:'b',path:'hall/chair',name:'chair',def:'chair@1'},{id:'c',path:'other/chair',name:'chair',def:'chair@1'}], snapshot:{ entities:[{id:'a',about:{title:'Hall'}},{id:'b',about:{title:'Seat',what:'A study seat'}},{id:'c'}], defs:[{ref:'hall@1',components:{place:{kind:'building'}}},{ref:'chair@1',components:{seat:{height:0.4}}}], library:[] } };
 test('about missing reports missing purpose, filters kinds, bounds output and refuses ambiguous names', () => {
   assert.deepEqual(missingAbout(m,{kind:'building'}).rows[0].missing,['what']);
   assert.equal(missingAbout(m,{limit:1}).remaining,1);
@@ -48,4 +48,11 @@ test('about flags and help are discoverable without opening a world', () => {
   checkArgs('place',{about:'{}'},['hall']);checkArgs('set',{about:'null'},['hall']);
   assert.deepEqual(parseFlags(['--missing','--kind','building']),{rest:[],flags:{missing:true,kind:'building'}});
   assert.match(COMMANDS.help(),/about <ref\|world>/);
+});
+
+test('missing meaning recognizes generated water but skips arbitrary decoration', () => {
+  const snapshot={entities:[{id:'water'},{id:'decor'}],defs:[{ref:'pond@1',make:{kind:'gen',gen:'lake/1'},layer:'volume',tags:['water'],components:{}},{ref:'bowl@1',layer:'decor'}]};
+  const rows=[{id:'water',path:'pond',def:'pond@1'},{id:'decor',path:'bowl',def:'bowl@1'}];
+  assert.deepEqual(missingAbout({snapshot,rows},{kind:'water'}).rows.map(r=>r.path),['pond']);
+  assert.equal(missingAbout({snapshot,rows}).total,1);
 });

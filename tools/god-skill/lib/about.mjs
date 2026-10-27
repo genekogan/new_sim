@@ -22,7 +22,10 @@ export function missingAbout(m, { kind, limit = 30 } = {}) {
     const e = entities.get(r.id); if (!e) return [];
     const d = defs.get(r.def) ?? defs.get(e.def);
     const comps = d?.components ?? d?.body?.components ?? {};
-    const inferred = e.about?.kind ?? comps.place?.kind ?? (comps.water ? 'water' : 'landmark');
+    const tags = new Set(d?.tags ?? []);
+    const water = d?.layer === 'volume' && (tags.has('water') || /^(?:lake|river|ocean)\//.test(d?.make?.gen ?? ''));
+    const inferred = e.about?.kind ?? (water ? 'water' : comps.place?.kind) ?? (tags.has('building') ? 'building' : tags.has('zone') ? 'zone' : tags.has('landmark') ? 'landmark' : comps.seat ? 'seat' : comps.bed ? 'bed' : null);
+    if (!inferred) return []; // Decorations do not become landmarks merely by lacking prose.
     const missing = ['title', 'what'].filter(k => !e.about?.[k]?.trim());
     return missing.length && (!kind || inferred === kind) ? [{ id: e.id, path: r.path, kind: inferred, missing }] : [];
   });

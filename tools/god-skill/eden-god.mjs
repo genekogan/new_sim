@@ -2199,6 +2199,24 @@ function exportGenesis(snapshot3, { name } = {}) {
     const local = new Set(batch.ops.map((op) => op.tmp).filter(Boolean));
     for (const op of batch.ops) if (op.in?.parent?.startsWith("$") && !local.has(op.in.parent)) op.in.parent = pathOf(byId, order[Number(op.in.parent.slice(2))]);
   }
+  const portableRef = (ref) => {
+    const e = byId.get(ref) ?? byPath.get(ref);
+    if (!e) throw new Error(`export missing semantic reference: ${ref}`);
+    return pathOf(byId, e);
+  };
+  const meaning = (about2) => {
+    const value = structuredClone(about2);
+    if (value.in !== void 0) value.in = portableRef(value.in);
+    for (const part of value.parts ?? []) if (part.anchor?.kind === "entity") part.anchor.ref = portableRef(part.anchor.ref);
+    return value;
+  };
+  const meaningOps = order.filter((e) => e.about !== void 0).map((e) => ({ op: "set", id: pathOf(byId, e), about: meaning(e.about) }));
+  if (s.state.about !== void 0) {
+    const about2 = structuredClone(s.state.about);
+    if (about2.districts) about2.districts = about2.districts.map(portableRef);
+    meaningOps.push({ op: "world", state: { about: about2 } });
+  }
+  for (let i = 0; i < meaningOps.length; i += 200) batches.push({ note: "meaning", ops: meaningOps.slice(i, i + 200) });
   return {
     schema: "genesis/1",
     name: name ?? s.worldId,
@@ -3515,7 +3533,10 @@ function missingAbout(m, { kind, limit = 30 } = {}) {
     if (!e) return [];
     const d = defs2.get(r.def) ?? defs2.get(e.def);
     const comps = d?.components ?? d?.body?.components ?? {};
-    const inferred = e.about?.kind ?? comps.place?.kind ?? (comps.water ? "water" : "landmark");
+    const tags = new Set(d?.tags ?? []);
+    const water = d?.layer === "volume" && (tags.has("water") || /^(?:lake|river|ocean)\//.test(d?.make?.gen ?? ""));
+    const inferred = e.about?.kind ?? (water ? "water" : comps.place?.kind) ?? (tags.has("building") ? "building" : tags.has("zone") ? "zone" : tags.has("landmark") ? "landmark" : comps.seat ? "seat" : comps.bed ? "bed" : null);
+    if (!inferred) return [];
     const missing = ["title", "what"].filter((k) => !e.about?.[k]?.trim());
     return missing.length && (!kind || inferred === kind) ? [{ id: e.id, path: r.path, kind: inferred, missing }] : [];
   });
