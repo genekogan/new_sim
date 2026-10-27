@@ -20,6 +20,8 @@
 //   node tools/god-skill/e2e/nav.mjs [--port 5260] [--keep] [--no-shots]
 //
 // Harness from souls-r2.mjs. Report under .lane/e2e-nav/<stamp>/.
+import {replay} from '../../meaning/materialize.mjs';
+import {indexWorld} from '../../template-upgrade/upgrade.mjs';
 import { toWorld, toBuild, rot } from '../scripts/mars-two/frame.mjs';
 import { ROOMS as LAYOUT_ROOMS } from '../scripts/mars-two/layout.mjs';
 import { spawn } from 'node:child_process';
@@ -208,7 +210,12 @@ const ROOMS = Object.fromEntries(Object.entries(LAYOUT_ROOMS).flatMap(([b, list]
 const inRoom = (p, k) => { const r = ROOMS[k]; if (!p) return false; const [x, z] = toBuild(p[0], p[2]); return x >= r.x0 - 0.1 && x <= r.x1 + 0.1 && z >= r.z0 - 0.1 && z <= r.z1 + 0.1; };
 const T = JSON.parse((await import('node:fs')).readFileSync(resolve(root, 'worlds/templates/mars-two.json'), 'utf8'));
 const placed = T.batches.flatMap((b) => b.ops).filter((o) => o.op === 'place');
-let soul = null, bootMs = 0;
+// Source batches include remove-and-replace fidelity edits; count the final scene,
+// not every historical placement (185 place operations produce 177 entities).
+const expectedScene = replay(T, {seed:'mars-gate-final-scene'});
+const inventory=(entities,pathOf,defOf)=>entities.map(e=>({path:e.name?pathOf(e):null,definition:defOf(e.def)?.hash??e.def})).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
+const expectedInventory=inventory([...expectedScene.entities.values()],e=>expectedScene.pathOf(e.id),ref=>expectedScene.def(ref));
+let soul = null, bootMs = 0, bowlId = null;
 const walkTo = async (cap, maxS = 300) => { const a = (await api('/v1/edge/act', { as: 'soul', body: { capability: cap } })).data; const r = await follow(a, { maxS }); return { accepted: a.accepted, code: a.code, reason: a.reason, phase: r.phase, rcode: r.code, rreason: r.reason, end: r.end, room: r.room, walked: +walked(r.samples).toFixed(1), maxY: Math.max(...r.samples.map((s) => s.p?.[1] ?? 0)) }; };
 const sitOn = async (cap, maxS = 300) => { const a = (await api('/v1/edge/act', { as: 'soul', body: { capability: cap, params: { seconds: 600 } } })).data; const r = await follow(a, { maxS, until: (me) => me.activity === 'sit' }); return { accepted: a.accepted, code: a.code, reason: a.reason, end: r.end }; };
 const capList = async () => (await caps());
@@ -219,8 +226,13 @@ try {
   await step(`G1 the template built every thing (${placed.length} placed) from the library's core/mars-* defs`, async () => {
     const s = (await api('/v1/god/snapshot')).data; const ents = s.entities ?? [];
     const defs = new Set(ents.map((e) => e.def)); const mars = [...defs].filter((d) => /^core[-/]mars-/.test(d));
-    return { entities: ents.length, marsDefs: mars.length, missing: placed.filter((o) => !ents.some((e) => e.name === o.name)).map((o) => o.name).slice(0, 10) };
-  }, (r) => r.entities >= placed.length && r.missing.length === 0 && r.marsDefs >= 80);
+    const index=indexWorld(s),defsByRef=new Map([...(s.library??[]),...s.defs].flatMap(d=>[[d.ref,d],['sha:'+d.hash,d],[d.ref.replace(/^core-/, 'core/'),d]]));
+    const actualInventory=inventory(ents,e=>index.pathOf(e),ref=>defsByRef.get(ref));
+    const actualEntries=new Set(actualInventory.map(e=>JSON.stringify(e))),expectedEntries=new Set(expectedInventory.map(e=>JSON.stringify(e)));
+    return { entities: ents.length, sourcePlacements: placed.length, expectedFinalEntities: expectedScene.entities.size,
+      sourceRemovals: T.batches.flatMap(b=>b.ops).filter(o=>o.op==='remove').map(o=>o.id),
+      marsDefs: mars.length, missing: expectedInventory.filter(e=>!actualEntries.has(JSON.stringify(e))), unexpected: actualInventory.filter(e=>!expectedEntries.has(JSON.stringify(e))), inventoryEqual:JSON.stringify(actualInventory)===JSON.stringify(expectedInventory) };
+  }, (r) => r.entities === r.expectedFinalEntities && r.inventoryEqual && r.missing.length === 0 && r.unexpected.length === 0 && r.marsDefs >= 80);
   await step('G2 Gene\'s Mimos (true compass): the L of main (raised north at .53 m, ground south) and the floor (south-east, flooring), the outdoor north-east has no room, the poster wall closes the floor on the north, three risers', async () => {
     const d = (await api('/v1/god/query', { body: { describe: 'mimos' } })).data.describe;
     const rooms = Object.fromEntries((d?.rooms ?? []).map((r) => [r.id, r]));
@@ -258,9 +270,11 @@ try {
     return { ok: want.every((w) => c.includes(w)), missing: want.filter((w) => !c.includes(w)), walks: c.filter((x) => x.startsWith('walk:')).length };
   }, 30000), (r) => r?.ok);
   await step('S1 the Soul CLI (unchanged) sees them: its map lists the rooms mimos/main, mimos/floor, kitchen/working-kitchen, kitchen/dining-hall, showers/shower-1', async () => {
-    const r = await cli('map'); const names = (r.data?.places ?? []).map((p) => p.name);
-    const want = ['mimos/main', 'mimos/floor', 'kitchen/working-kitchen', 'kitchen/dining-hall', 'showers/shower-1'];
-    return { code: r.code, places: names.length, missing: want.filter((w) => !names.includes(w)), err: r.stderr || r.raw };
+    const r = await cli('map'); const places = r.data?.places ?? [];
+    const want = ['g-mimos.main', 'g-mimos.floor', 'g-kitchen.working-kitchen', 'g-kitchen.dining-hall', 'g-showers.shower-1'];
+    const rooms=want.map(id=>places.find(p=>p.id===id)).filter(Boolean);
+    return { code: r.code, places: places.length, rooms:rooms.map(p=>({id:p.id,name:p.name})),
+      missing: want.filter(id=>!places.some(p=>p.id===id&&typeof p.name==='string'&&p.name.trim().length)), err: r.stderr || r.raw };
   }, (r) => r.code === 0 && r.missing.length === 0);
 
   const m1 = await step('S2 CLI: act "walk to Mimos" → walk:mimos; she walks round to its open front and in, into main south', async () => {
@@ -282,9 +296,15 @@ try {
   await step('S5b the raised main is reached both ways by the three risers from main south, and main south from the yard through the front door — god reach', async () => {
     const q = async (from, to) => (await api('/v1/god/query', { body: { reach: { from, to } } })).data.reach;
     const main = W3(X0 - 6.6, 0.53, -1.45), yard = toWorld(X0 + 1.9, 2.6), south = toWorld(X0 - 2.8, -1.5);
-    const r = { downRisers: await q(main, south), upRisers: await q(south, main), inFront: await q(yard, south), outFront: await q(south, yard) };
-    return Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v?.reachable ? `${v.length} m via levels ${v.levels}` : v?.code]));
-  }, (r) => Object.values(r).every((v) => /levels/.test(v)));
+    // The authored proof points are in the original 90° campus frame. The final
+    // template rotates that same building to 82°; transform the points with it.
+    const actual=(await entity('mimos')).entity, original=placed.find(o=>o.name==='mimos'&&!o.in);
+    const yaw=(Array.isArray(actual.r)?actual.r[0]:actual.r??0)-(Array.isArray(original.r)?original.r[0]:original.r??0), c=Math.cos(yaw), s=Math.sin(yaw);
+    const at=p=>{const dx=p[0]-original.p[0],dz=p.at(-1)-original.p.at(-1),xz=[actual.p[0]+dx*c+dz*s,actual.p.at(-1)-dx*s+dz*c];return p.length===3?[xz[0],p[1]+actual.p[1]-original.p[1],xz[1]]:xz;};
+    const points={main:at(main),south:at(south),yard:at(yard)};
+    const routes = { downRisers: await q(points.main, points.south), upRisers: await q(points.south, points.main), inFront: await q(points.yard, points.south), outFront: await q(points.south, points.yard) };
+    return {frames:{original:{p:original.p,r:original.r},actual:{p:actual.p,r:actual.r}},points,routes:Object.fromEntries(Object.entries(routes).map(([k, v]) => [k, v?.reachable ? `${v.length} m via levels ${v.levels}` : v?.code]))};
+  }, (r) => Object.values(r.routes).every((v) => /levels/.test(v)));
   await step('S6 sit on the red sofa (#12) in the lounge of main south', async () => {
     const c = (await capList()).find((x) => x.verb === 'sit' && /red.sofa/.test(`${x.id} ${x.label}`));
     const r = c ? await sitOn(c.id) : { accepted: false, reason: 'no sit capability for the red sofa' };
@@ -299,19 +319,24 @@ try {
   }, (r) => r.cli?.accepted && r.inKitchen && r.y > 0.45);
   { const p = k1?.then?.end?.p ?? k1?.end?.p; if (p) await shots([{ name: 's7-in-the-kitchen', eye: ofs(p, 0.3, 2.3, 2.8), at: ofs(p, 0, 1.0, -3), wait: 5000 }]); }
   await step('S8 kitchen use: she takes a mixing bowl from the prep table (#15)', async () => {
-    const c = (await capList()).filter((x) => /take|pick/.test(x.verb ?? x.id) && /bowl/.test(`${x.id} ${x.label}`));
-    if (!c.length) return { accepted: false, caps: (await capList()).filter((x) => /bowl|take/.test(`${x.id} ${x.label}`)).map((x) => x.id).slice(0, 12) };
-    const a = (await api('/v1/edge/act', { as: 'soul', body: { capability: c[0].id } })).data; const r = await follow(a, { maxS: 120 });
-    const o = await observe();
-    return { cap: c[0].id, accepted: a.accepted, reason: a.reason, phase: r.phase, code: r.code, rreason: r.reason, holding: o.self?.holding ?? o.self?.carrying ?? o.self?.state };
-  }, (r) => r.accepted && r.phase === 'completed');
+    // Pin the authored original bowl, not the arbitrary generated-ID ordering of
+    // two bowls. The second, counter-side bowl has a pre-existing reach defect.
+    const original=(await entity('kitchen/prep-table-15/prep-mixing-bowl')).entity;bowlId=original?.id;
+    const c=(await capList()).find(x=>x.id===`pick-up:${bowlId}`);
+    if (!c) return { accepted: false, bowlId, reason:'original prep mixing bowl has no pick-up capability' };
+    const a = (await api('/v1/edge/act', { as: 'soul', body: { capability: c.id } })).data; const r = await follow(a, { maxS: 120 });
+    const held=(await entity(bowlId)).entity;
+    return { cap: c.id, bowlId, accepted: a.accepted, reason: a.reason, phase: r.phase, code: r.code, rreason: r.reason, holding:held?.in, heldBySoul:held?.id===bowlId&&held?.in?.parent===soul.entityId };
+  }, (r) => r.accepted && r.phase === 'completed' && r.heldBySoul);
   await step('S9 into the dining hall and put the bowl on a blue diner table (#26–28)', async () => {
     const w = await walkTo('walk:kitchen/dining-hall');
     const c = (await capList()).filter((x) => /put|place|set/.test(x.verb ?? x.id) && /diner.table/.test(`${x.id} ${x.label}`));
     if (!c.length) return { walked: w, accepted: false, caps: (await capList()).filter((x) => /put|table/.test(`${x.id} ${x.label}`)).map((x) => x.id).slice(0, 12) };
     const a = (await api('/v1/edge/act', { as: 'soul', body: { capability: c[0].id } })).data; const r = await follow(a, { maxS: 120 });
-    return { inDiner: inRoom(w.end?.p, 'kitchen/dining-hall'), cap: c[0].id, accepted: a.accepted, reason: a.reason, phase: r.phase, code: r.code, rreason: r.reason };
-  }, (r) => r.inDiner && r.accepted && r.phase === 'completed');
+    const placed=(await entity(bowlId)).entity, tables=await Promise.all([26,27,28].map(async n=>(await entity(`kitchen/diner-table-${n}`)).entity?.id));
+    return { inDiner: inRoom(w.end?.p, 'kitchen/dining-hall'), cap: c[0].id, accepted: a.accepted, reason: a.reason, phase: r.phase, code: r.code, rreason: r.reason,
+      bowlId,in:placed?.in,onDinerTable:placed?.id===bowlId&&tables.includes(placed?.in?.parent)&&!!placed?.in?.slot };
+  }, (r) => r.inDiner && r.accepted && r.phase === 'completed' && r.onDinerTable);
   const d1 = await step('S10 sit in a diner bus seat (#20–25) against the blue wall', async () => {
     const c = (await capList()).find((x) => x.verb === 'sit' && /bus.seat/.test(`${x.id} ${x.label}`));
     const r = c ? await sitOn(c.id) : { accepted: false, reason: 'no bus-seat sit capability' };
