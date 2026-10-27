@@ -56,6 +56,9 @@ export function explicitPlaceCapability(L:EdgeLedger,soul:EdgeSoul,asked:string)
  if(caps.some(c=>c.id===asked)||target==='here')return null;
  // Never route a Soul, fixture, spot, item or object ID through place matching.
  if(!['walk','stroll','hang-out','gather','swim','read','lie','nap','sit-ground'].includes(verb))return null;
+ // A qualified entity/room/semantic-part ref is not a Place identity. Its exact
+ // on-demand binding must reach the same normal admission path as a listed offer.
+ if(verb==='walk'&&target.includes('/')&&L.onDemandId?.(soul,asked))return null;
  if(verb==='walk'){const object=offeredWalkObject(L,soul,target);if(object)return object.ok?null:object;}
  const q=normalizedPlaceName(target),named=knownBootPlaces(L,soul.soulId).some(p=>p.id===target||normalizedPlaceName(p.name)===q||p.aliases.some(a=>normalizedPlaceName(a)===q));
  // Preserve strict/1 unknown-ID diagnostics without blocking declared idlike aliases.

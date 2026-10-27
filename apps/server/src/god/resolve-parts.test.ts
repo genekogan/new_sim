@@ -35,8 +35,17 @@ test('resolve exposes a real distant bound seat and exact selection reaches it; 
  assert.equal(edge.knowledge.setSecret('g-private-room',true),true);
  assert.ok(!(resolvedParts(edge,soul,'walk:west-pier') as any).parts.some((p:any)=>p.id==='sea-view-seat'),'secret ancestor hides its bound descendant');
  assert.equal(edge.resolveOnDemand(soul,exact,[],new Map()).v.kind,'unknown','secret descendant cannot be admitted on demand');
+ assert.equal((edge.intents.dryRun(soul,{capability:exact.replace('sit:','walk:')}) as any).ok,false,'exact part walk cannot bypass secret ancestor');
  assert.equal(edge.resolveOnDemand(soul,exact,[{id:exact,verb:'sit',label:'stale public offer',available:true,target:{kind:'object',id:bench.id}}],new Map()).v.kind,'unknown','a stale exact object offer cannot bypass ancestor privacy');
  edge.knowledge.setSecret('g-private-room',false);
+ const invented='walk:west-pier/part-missing';assert.equal((edge.intents.dryRun(soul,{capability:invented}) as any).ok,false);assert.equal((await edge.act(soul,{capability:invented})).accepted,false,'unknown qualified refs stay refused');
+ const advertised=part.affordances.filter((a:any)=>a.available);
+ for(const offer of advertised){const resolved=edge.intents.dryRun(soul,{capability:offer.capability}) as any;assert.equal(resolved.ok,true,JSON.stringify({offer,resolved}));assert.equal(resolved.would.capability,offer.capability);}
+ const walkId=advertised.find((a:any)=>a.capability.startsWith('walk:')).capability;
+ const walk=await accept(w.host,Promise.resolve(edge.act(soul,{capability:walkId}))) as any;assert.equal(walk.accepted,true,JSON.stringify(walk));assert.equal(walk.receipt.chosen.target,bench.id,'first accepted receipt identifies exact fixture');
+ let walkReceipt:any;for(let i=0;i<4000;i++){w.host.tickOnce();if(i%20===0){await setImmediate();w.host.drainInputs();}walkReceipt=edge.receipt(soul.soulId,walk.receipt.id);if(['completed','failed'].includes(walkReceipt.phase))break;}
+ assert.equal(walkReceipt.phase,'completed',JSON.stringify(walkReceipt));assert.equal(walkReceipt.chosen.target,bench.id);assert.ok(Math.abs(w.host.engine.world.entities[soul.entityId].pose.p[2]-145)<3,'exact part walk physically arrives');
+ await accept(w.host,w.host.enqueue('edge-relocate','test:parts-return',{...soul,to:[0,0],why:'independent far sit admission'}));await settle();
  const exactResolve=edge.intents.dryRun(soul,{capability:exact}) as any;assert.equal(exactResolve.ok,true,JSON.stringify(exactResolve));
  const act=await accept(w.host,Promise.resolve(edge.act(soul,{capability:exact}))) as any;assert.equal(act.accepted,true,JSON.stringify(act));
  let seated=false;for(let i=0;i<4000;i++){w.host.tickOnce();if(i%20===0){await setImmediate();w.host.drainInputs();}if((w.host.engine.world.entities[soul.entityId] as any).human?.activity==='sit' && w.host.engine.nativeSeatHoldsV1?.(soul.entityId).some(h=>h.slot===`${bench.id}#${slot.id}`)){seated=true;break;}assert.notEqual(edge.receipt(soul.soulId,act.receipt.id)?.phase,'failed',JSON.stringify(edge.receipt(soul.soulId,act.receipt.id)));}
@@ -45,5 +54,5 @@ test('resolve exposes a real distant bound seat and exact selection reaches it; 
  assert.ok(seated,JSON.stringify({human:body.human,receipt:edge.receipt(soul.soulId,act.receipt.id)}));assert.ok(Math.abs(body.pose.p[2]-145)<3,'body actually reaches far fixture');
  const receipt=edge.receipt(soul.soulId,act.receipt.id) as any;assert.equal(receipt.chosen?.target,bench.id,JSON.stringify(receipt));
  assert.equal(receipt.chosen.slot,`${bench.id}#${slot.id}`);
- if(process.env.PARTS_PROOF)writeFileSync(process.env.PARTS_PROOF,JSON.stringify({resolve:out,exactResolve,receipt,held,body:{pose:body.pose,human:body.human}},null,2)+'\n');
+ if(process.env.PARTS_PROOF)writeFileSync(process.env.PARTS_PROOF,JSON.stringify({resolve:out,exactResolve,walkAccepted:walk.receipt,walkReceipt,receipt,held,body:{pose:body.pose,human:body.human}},null,2)+'\n');
 });
