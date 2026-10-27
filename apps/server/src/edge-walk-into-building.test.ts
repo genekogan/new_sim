@@ -19,6 +19,7 @@ test('D2 Eden 2026: "walk to the pavilion on the commons" ends inside the pavili
   assert.match(cap.label, /inside, into commons-pavilion\/pavilion/);
   const out = await accept(w.host, Promise.resolve(L.act(w.soul, {capability: 'walk to the pavilion on the commons'}))) as {accepted?: boolean; receipt?: {id: string; capability: string}};
   assert.equal(out.accepted, true, JSON.stringify(out));
+  assert.equal(out.receipt?.capability, 'walk:commons-pavilion', JSON.stringify(out));
   const t0 = w.host.engine.world.tick;
   let phase = 'started';
   while (w.host.engine.world.tick - t0 < 60 * 20 && ['accepted', 'started'].includes(phase)) {await w.settle(20); phase = L.receipt(w.soul.soulId, out.receipt!.id)!.phase;}
