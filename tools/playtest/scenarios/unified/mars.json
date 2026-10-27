@@ -1,0 +1,343 @@
+{
+  "name": "unified-mars",
+  "version": 1,
+  "seed": 2710,
+  "freeze": {
+    "status": "draft",
+    "reason": "physical fixtures, starts and CLI model require final verification before baseline"
+  },
+  "providers": {
+    "allowed": [
+      "codex"
+    ]
+  },
+  "world": {
+    "kind": "dev",
+    "genesis": "worlds/templates/mars-two.json",
+    "slug": "pt-unified-mars",
+    "port": 4993,
+    "natives": false
+  },
+  "durationSec": 1205,
+  "seats": [
+    {
+      "id": "sol",
+      "adapter": "codex-headless",
+      "model": null,
+      "effort": "medium",
+      "soulName": "Sol",
+      "wake": true
+    }
+  ],
+  "god": null,
+  "director": {
+    "mode": "scripted",
+    "sequential": true,
+    "script": [
+      {
+        "id": "mars-podium",
+        "seat": "sol",
+        "atSec": 5,
+        "channel": "card",
+        "text": "Go to the auditorium in Chiba and sit down at the podium desk to prepare to give everyone on the bleachers a presentation. Tell me when you are ready, while still seated.",
+        "budgetSec": 180,
+        "setup": {
+          "maxWallSec": 120,
+          "steps": [
+            "stand:here",
+            {
+              "verb": "go",
+              "target": {
+                "place": "field"
+              }
+            },
+            {
+              "verb": "turn",
+              "heading": 0
+            }
+          ],
+          "expect": {
+            "pos": [
+              0,
+              0
+            ],
+            "radiusM": 3,
+            "heading": 0,
+            "posture": [
+              "standing"
+            ]
+          }
+        },
+        "expect": {
+          "kind": "journey",
+          "journey": {
+            "fixtureId": "mars-podium-v1",
+            "source": "coordinator-reviewed patched physical fixture (freeze pending)",
+            "readiness": "blocked",
+            "firstActionSec": 30,
+            "discoveryCalls": 3,
+            "maxSampleGapSec": 6,
+            "phases": [
+              {
+                "name": "presenter seated",
+                "region": {
+                  "pos": [
+                    -14.412,
+                    -18.447
+                  ],
+                  "radiusM": 1.5
+                },
+                "postures": [
+                  "seated",
+                  "sitting"
+                ],
+                "receipt": {
+                  "verb": "sit",
+                  "targetRefs": [
+                    "presenter-timber-box"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "mars-swim",
+        "seat": "sol",
+        "atSec": 310,
+        "channel": "card",
+        "text": "Head over to the nearest body of water and take a swim for ten seconds, then get back onto its bank.",
+        "budgetSec": 180,
+        "setup": {
+          "maxWallSec": 120,
+          "steps": [
+            "stand:here",
+            {
+              "verb": "go",
+              "target": {
+                "place": "campus-swimming-pond-bank"
+              }
+            },
+            {
+              "verb": "turn",
+              "heading": 0
+            }
+          ],
+          "expect": {
+            "pos": [
+              0,
+              0
+            ],
+            "radiusM": 3,
+            "heading": 0,
+            "posture": [
+              "standing"
+            ]
+          }
+        },
+        "expect": {
+          "kind": "journey",
+          "journey": {
+            "fixtureId": "mars-swim-v1",
+            "source": "coordinator-reviewed patched physical fixture (freeze pending)",
+            "readiness": "blocked",
+            "firstActionSec": 30,
+            "discoveryCalls": 3,
+            "maxSampleGapSec": 6,
+            "phases": [
+              {
+                "name": "swimming",
+                "region": {
+                  "pos": [
+                    0,
+                    0
+                  ],
+                  "radiusM": 1
+                },
+                "postures": [
+                  "swimming"
+                ],
+                "receipt": {
+                  "verb": "walk",
+                  "capabilities": [
+                    "swim:campus-swimming-pond"
+                  ]
+                }
+              },
+              {
+                "name": "safe bank",
+                "region": {
+                  "pos": [
+                    0,
+                    0
+                  ],
+                  "radiusM": 1
+                },
+                "postures": [
+                  "standing"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "mars-behind",
+        "seat": "sol",
+        "atSec": 615,
+        "channel": "card",
+        "text": "Enter the nearest building behind you.",
+        "budgetSec": 150,
+        "setup": {
+          "maxWallSec": 120,
+          "steps": [
+            "stand:here",
+            {
+              "verb": "go",
+              "target": {
+                "place": "field"
+              }
+            },
+            {
+              "verb": "turn",
+              "heading": 90
+            }
+          ],
+          "expect": {
+            "pos": [
+              0,
+              0
+            ],
+            "radiusM": 3,
+            "heading": 90,
+            "posture": [
+              "standing"
+            ]
+          }
+        },
+        "expect": {
+          "kind": "journey",
+          "journey": {
+            "fixtureId": "mars-behind-v1",
+            "source": "coordinator-reviewed patched physical fixture (freeze pending)",
+            "readiness": "blocked",
+            "firstActionSec": 30,
+            "discoveryCalls": 3,
+            "maxSampleGapSec": 6,
+            "phases": [
+              {
+                "name": "inside nearest rear building",
+                "region": {
+                  "pos": [
+                    -14.643,
+                    -28.174
+                  ],
+                  "radiusM": 3
+                },
+                "postures": [
+                  "standing"
+                ],
+                "receipt": {
+                  "verb": "walk",
+                  "capabilities": [
+                    "walk:chiba",
+                    "walk:chiba/floor"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "mars-mimos",
+        "seat": "sol",
+        "atSec": 890,
+        "channel": "card",
+        "text": "Go into Mimos and sit in a study chair in the raised main room. Tell me when seated.",
+        "budgetSec": 180,
+        "setup": {
+          "maxWallSec": 120,
+          "steps": [
+            "stand:here",
+            {
+              "verb": "go",
+              "target": {
+                "place": "field"
+              }
+            },
+            {
+              "verb": "turn",
+              "heading": 0
+            }
+          ],
+          "expect": {
+            "pos": [
+              0,
+              0
+            ],
+            "radiusM": 3,
+            "heading": 0,
+            "posture": [
+              "standing"
+            ]
+          }
+        },
+        "expect": {
+          "kind": "journey",
+          "journey": {
+            "fixtureId": "mars-mimos-v1",
+            "source": "coordinator-reviewed patched physical fixture (freeze pending)",
+            "readiness": "blocked",
+            "firstActionSec": 30,
+            "discoveryCalls": 3,
+            "maxSampleGapSec": 6,
+            "phases": [
+              {
+                "name": "Mimos raised room chair",
+                "region": {
+                  "pos": [
+                    -1.4775,
+                    -39.7843
+                  ],
+                  "radiusM": 1.2
+                },
+                "postures": [
+                  "seated",
+                  "sitting"
+                ],
+                "receipt": {
+                  "verb": "sit",
+                  "targetRefs": [
+                    "mimos/study-chair-4"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "observer": {
+    "sampleSec": 2,
+    "viewport": [
+      1280,
+      800
+    ],
+    "dpr": 1,
+    "cameras": [],
+    "kinematics": true
+  },
+  "review": {
+    "mode": "deterministic",
+    "developer": false
+  },
+  "rails": {
+    "maxTurnWallSec": 180,
+    "onboardWallSec": 300,
+    "onboardTimeoutSec": 270,
+    "maxTurnsPerRequest": 6
+  }
+}

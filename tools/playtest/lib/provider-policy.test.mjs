@@ -34,3 +34,11 @@ test('deterministic review writes actual oracles, metrics and report, with no re
   assert.match(readFileSync(join(main, 'REPORT.md'), 'utf8'), /Deterministic oracles/);
   assert.ok(JSON.parse(readFileSync(join(main, 'metrics.json'))).cost);
 });
+
+test('draft and incompletely frozen measurement fixtures fail before spending', async () => {
+  const { assertMeasurementReady } = await import('./provider-policy.mjs');
+  assert.throws(() => assertMeasurementReady({ freeze: { status: 'draft' } }), /draft/);
+  assert.throws(() => assertMeasurementReady({ freeze: { status: 'ready' } }), /physicalSha256/);
+  assert.throws(() => assertMeasurementReady({ freeze: { status: 'ready', physicalSha256: 'x', model: 'pinned' }, seats: [{ model: null }] }), /model differs/);
+  assert.doesNotThrow(() => assertMeasurementReady({ freeze: { status: 'ready', physicalSha256: 'x', model: 'pinned' }, seats: [{ model: 'pinned' }], director: { script: [{ expect: { journey: { readiness: 'ready' } } }] } }));
+});

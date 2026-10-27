@@ -26,3 +26,12 @@ export function providerPolicy(scenario = {}) {
 export function requireProviders(policy, versions) {
   for (const provider of policy.required) if (!versions[provider]) throw new Error(`${provider} unavailable; provider substitution is disabled`);
 }
+
+/** Draft fixtures must never accidentally spend inference or be mistaken for frozen measurements. */
+export function assertMeasurementReady(scenario) {
+  if (!scenario.freeze) return;
+  if (scenario.freeze.status !== 'ready') throw new Error('measurement fixture is draft; verify and freeze physical geometry, starts and model before baseline');
+  if (!scenario.freeze.physicalSha256 || !scenario.freeze.model) throw new Error('frozen measurement requires physicalSha256 and verified model');
+  if ((scenario.seats ?? []).some(s => s.model !== scenario.freeze.model)) throw new Error('seat model differs from frozen model');
+  if (scenario.director?.script?.some(e => e.expect?.journey?.readiness !== 'ready')) throw new Error('journey fixtures are not all ready');
+}

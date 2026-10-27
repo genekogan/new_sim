@@ -5,7 +5,7 @@ import { resolve, join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 import { bindJourneyFixtures } from './arena/fixture-bindings.mjs';
-import { providerPolicy, requireProviders } from './lib/provider-policy.mjs';
+import { providerPolicy, requireProviders, assertMeasurementReady } from './lib/provider-policy.mjs';
 import { now, setAnchor, sleep, monoMs } from './lib/clock.mjs';
 import { writeJson, readJson, appendJsonl } from './lib/jsonl.mjs';
 import { quota, quotaAllows } from './lib/quota.mjs';
@@ -80,6 +80,7 @@ async function cmdRun(a) {
   const scenarioPath = resolve(a._[1]);
   const scenario = JSON.parse(readFileSync(scenarioPath, 'utf8'));
   const policy = providerPolicy(scenario);
+  assertMeasurementReady(scenario);
   const seed = Number(a.seed ?? scenario.seed ?? 1);
   const serverRoot = resolve(a['server-root'] ?? scenario.serverRoot ?? DEFAULT_SERVER_ROOT);
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..*/, '').replace('T', '-');
@@ -127,6 +128,7 @@ async function cmdRun(a) {
         log(`seat ${s.id}: ${ob.ok ? 'paired ' + ob.soulId : 'NOT PAIRED'}`);
         if (ob.ok) { const w = seat.wakeLoop?.(); log(`seat ${s.id}: wake loop ${w ? 'on' : 'off'}`); }
         ctx.seats.push(seat);
+        if (!ob.ok) { appendJsonl(join(runDir, 'infrastructure-invalid.jsonl'), { seat: s.id, reason: 'onboarding did not pair' }); throw new Error(`seat ${s.id} onboarding invalid; no product requests sent`); }
       }
       if (scenario.god && m.godSeat) {
         ctx.god = await m.godSeat.createGodSeat({ runDir, god: scenario.god, worldBase: ctx.world.base, serverRoot, rails: scenario.rails ?? {} });

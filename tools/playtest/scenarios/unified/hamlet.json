@@ -1,0 +1,329 @@
+{
+  "name": "unified-hamlet",
+  "version": 1,
+  "seed": 2710,
+  "freeze": {
+    "status": "draft",
+    "reason": "physical fixtures, starts and CLI model require final verification before baseline"
+  },
+  "providers": {
+    "allowed": [
+      "codex"
+    ]
+  },
+  "world": {
+    "kind": "dev",
+    "genesis": "worlds/templates/hello-hamlet.json",
+    "slug": "pt-unified-hamlet",
+    "port": 4996,
+    "natives": false
+  },
+  "durationSec": 1115,
+  "seats": [
+    {
+      "id": "sol",
+      "adapter": "codex-headless",
+      "model": null,
+      "effort": "medium",
+      "soulName": "Sol",
+      "wake": true
+    }
+  ],
+  "god": null,
+  "director": {
+    "mode": "scripted",
+    "sequential": true,
+    "script": [
+      {
+        "id": "lab-purpose-seat",
+        "seat": "sol",
+        "atSec": 5,
+        "channel": "card",
+        "text": "Find the place for giving village presentations, go inside and sit at the presenter desk.",
+        "budgetSec": 150,
+        "setup": {
+          "maxWallSec": 120,
+          "steps": [
+            "stand:here",
+            {
+              "verb": "go",
+              "target": {
+                "place": "field"
+              }
+            },
+            {
+              "verb": "turn",
+              "heading": 0
+            }
+          ],
+          "expect": {
+            "pos": [
+              0,
+              0
+            ],
+            "radiusM": 3,
+            "heading": 0,
+            "posture": [
+              "standing"
+            ]
+          }
+        },
+        "expect": {
+          "kind": "journey",
+          "journey": {
+            "fixtureId": "lab-purpose-seat-v1",
+            "source": "coordinator-reviewed patched physical fixture (freeze pending)",
+            "readiness": "blocked",
+            "firstActionSec": 30,
+            "discoveryCalls": 3,
+            "maxSampleGapSec": 6,
+            "phases": [
+              {
+                "name": "lab presenter seat",
+                "region": {
+                  "pos": [
+                    30,
+                    0
+                  ],
+                  "radiusM": 1.5
+                },
+                "postures": [
+                  "seated",
+                  "sitting"
+                ],
+                "receipt": {
+                  "verb": "sit",
+                  "targetRefs": [
+                    "lab-presentation-hall/presenter-seat"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "lab-related-hall",
+        "seat": "sol",
+        "atSec": 280,
+        "channel": "card",
+        "text": "Go into the hall beside the pond, not the hall by the flags.",
+        "budgetSec": 150,
+        "setup": {
+          "maxWallSec": 120,
+          "steps": [
+            "stand:here",
+            {
+              "verb": "go",
+              "target": {
+                "place": "field"
+              }
+            },
+            {
+              "verb": "turn",
+              "heading": 0
+            }
+          ],
+          "expect": {
+            "pos": [
+              0,
+              0
+            ],
+            "radiusM": 3,
+            "heading": 0,
+            "posture": [
+              "standing"
+            ]
+          }
+        },
+        "expect": {
+          "kind": "journey",
+          "journey": {
+            "fixtureId": "lab-related-hall-v1",
+            "source": "coordinator-reviewed patched physical fixture (freeze pending)",
+            "readiness": "blocked",
+            "firstActionSec": 30,
+            "discoveryCalls": 3,
+            "maxSampleGapSec": 6,
+            "phases": [
+              {
+                "name": "pond-side hall",
+                "region": {
+                  "pos": [
+                    0,
+                    35
+                  ],
+                  "radiusM": 3
+                },
+                "postures": [
+                  "standing"
+                ],
+                "receipt": {
+                  "verb": "walk",
+                  "capabilities": [
+                    "walk:lab-pond-hall"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "lab-behind",
+        "seat": "sol",
+        "atSec": 555,
+        "channel": "card",
+        "text": "Enter the nearest building behind you.",
+        "budgetSec": 150,
+        "setup": {
+          "maxWallSec": 120,
+          "steps": [
+            "stand:here",
+            {
+              "verb": "go",
+              "target": {
+                "place": "field"
+              }
+            },
+            {
+              "verb": "turn",
+              "heading": 270
+            }
+          ],
+          "expect": {
+            "pos": [
+              0,
+              0
+            ],
+            "radiusM": 3,
+            "heading": 270,
+            "posture": [
+              "standing"
+            ]
+          }
+        },
+        "expect": {
+          "kind": "journey",
+          "journey": {
+            "fixtureId": "lab-behind-v1",
+            "source": "coordinator-reviewed patched physical fixture (freeze pending)",
+            "readiness": "blocked",
+            "firstActionSec": 30,
+            "discoveryCalls": 3,
+            "maxSampleGapSec": 6,
+            "phases": [
+              {
+                "name": "rear building",
+                "region": {
+                  "pos": [
+                    30,
+                    0
+                  ],
+                  "radiusM": 3
+                },
+                "postures": [
+                  "standing"
+                ],
+                "receipt": {
+                  "verb": "walk",
+                  "capabilities": [
+                    "walk:lab-presentation-hall"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "lab-recovery",
+        "seat": "sol",
+        "atSec": 830,
+        "channel": "card",
+        "text": "Try entering the locked reading room. If it is blocked, stop that attempt and sit on the bench outside the cottage. Tell me where you ended up.",
+        "budgetSec": 150,
+        "setup": {
+          "maxWallSec": 120,
+          "steps": [
+            "stand:here",
+            {
+              "verb": "go",
+              "target": {
+                "place": "field"
+              }
+            },
+            {
+              "verb": "turn",
+              "heading": 0
+            }
+          ],
+          "expect": {
+            "pos": [
+              0,
+              0
+            ],
+            "radiusM": 3,
+            "heading": 0,
+            "posture": [
+              "standing"
+            ]
+          }
+        },
+        "expect": {
+          "kind": "journey",
+          "journey": {
+            "fixtureId": "lab-recovery-v1",
+            "source": "coordinator-reviewed patched physical fixture (freeze pending)",
+            "readiness": "blocked",
+            "firstActionSec": 30,
+            "discoveryCalls": 3,
+            "maxSampleGapSec": 6,
+            "phases": [
+              {
+                "name": "recovery bench",
+                "region": {
+                  "pos": [
+                    44,
+                    15
+                  ],
+                  "radiusM": 1.5
+                },
+                "postures": [
+                  "seated",
+                  "sitting"
+                ],
+                "receipt": {
+                  "verb": "sit",
+                  "targetRefs": [
+                    "cottage/bench"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "observer": {
+    "sampleSec": 2,
+    "viewport": [
+      1280,
+      800
+    ],
+    "dpr": 1,
+    "cameras": [],
+    "kinematics": true
+  },
+  "review": {
+    "mode": "deterministic",
+    "developer": false
+  },
+  "rails": {
+    "maxTurnWallSec": 180,
+    "onboardWallSec": 300,
+    "onboardTimeoutSec": 270,
+    "maxTurnsPerRequest": 6
+  }
+}

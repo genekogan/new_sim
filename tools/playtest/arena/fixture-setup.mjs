@@ -17,7 +17,11 @@ export async function runFixtureSetup({ seat, setup, runDir, requestKey, now = D
     await Promise.race([seat.chain, new Promise((_, reject) => { const t = setTimeout(() => reject(new Error('previous seat turn did not finish')), Math.max(1, end - now())); t.unref?.(); })]);
     for (const intent of setup.steps ?? []) {
       const left = end - now(); if (left <= 0) throw new Error('setup wall budget exhausted');
-      const r = await seat.cliJson(['act', typeof intent === 'string' ? intent : JSON.stringify(intent), '--for', 'none', '--json', '--wait', String(Math.max(1, Math.floor(left / 1000)))], left);
+      let r = await seat.cliJson(['act', typeof intent === 'string' ? intent : JSON.stringify(intent), '--for', 'none', '--json', '--wait', String(Math.max(1, Math.floor(left / 1000)))], left);
+      while (r.ok && r.data?.accepted && r.data.receipt?.id && ['accepted', 'started', 'running'].includes(r.data.receipt.phase) && now() < end) {
+        const wait = await seat.cliJson(['wait', String(Math.max(1, Math.min(60, Math.floor((end-now())/1000)))), r.data.receipt.id, '--json'], Math.max(1,end-now()));
+        r = wait.ok ? { ...wait, data: { ...r.data, ...wait.data } } : wait;
+      }
       rows.push(r.data ?? { error: r.reason });
       if (!r.ok || !r.data?.accepted || (r.data.receipt && r.data.receipt.phase !== 'completed')) throw new Error(`setup action not completed: ${r.data?.code ?? r.data?.receipt?.phase ?? r.reason ?? 'unknown'}`);
     }
