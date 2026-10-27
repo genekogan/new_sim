@@ -124,7 +124,14 @@ export async function runUiLifecycleProof({ root, withFixtureSession, report, sa
       for (const target of listing.targets) {
         const button = dialog.getByRole('button', { name: target.title, exact: true });
         await button.scrollIntoViewIfNeeded();
-        await button.locator('img').waitFor({ state: 'visible', timeout: 15000 });
+        if (expectedRefs.includes(target.ref)) await button.locator('img').waitFor({ state: 'visible', timeout: 15000 });
+        else {
+          const started = Date.now(); let terminal;
+          while (!(terminal = browserViews.flatMap(v => v.views ?? []).findLast(v => v.ref === target.ref && v.status !== 'pending'))) {
+            budget(); assert.ok(Date.now() - started < 17000, 'extra wall card reaches a terminal state'); await wait(100);
+          }
+          check('extra wall card remains usable as text', ['ready', 'unavailable'].includes(terminal.status), { ref: target.ref, status: terminal.status, reason: terminal.reason });
+        }
         const label = await button.getAttribute('aria-description');
         check('architectural disclosure ' + target.ref, /Architectural context.*fixed daylight.*default doors.*no Souls/.test(label ?? ''), { label });
       }
@@ -154,11 +161,15 @@ export async function runUiLifecycleProof({ root, withFixtureSession, report, sa
       const beforeCamera = await page.evaluate(() => globalThis.__simCamera ?? null);
       await roomButton.click();
       await dialog.waitFor({ state: 'hidden' });
-      await page.waitForFunction(before => JSON.stringify(globalThis.__simCamera?.p) !== JSON.stringify(before?.p), beforeCamera);
-      await wait(1500);
+      const expectedCamera = roomTarget.viewpoint ?? roomTarget.camera;
+      assert.ok(expectedCamera, 'room publishes an inspection camera');
+      await page.waitForFunction(expected => {
+        const actual = globalThis.__simCamera;
+        const distance = (a, b) => a && b ? Math.hypot(...a.map((v, i) => v - b[i])) : Infinity;
+        return distance(actual?.p, expected.eye) < .05 && distance(actual?.pivot, expected.at) < .05;
+      }, expectedCamera);
       const afterCamera = await page.evaluate(() => globalThis.__simCamera ?? null);
       await snapshot('ui-room-selected');
-      const expectedCamera = roomTarget.viewpoint ?? roomTarget.camera;
       const distance = (a, b) => a && b ? Math.hypot(...a.map((v, i) => v - b[i])) : Infinity;
       check('room selection reaches published inspection eye and target', !!afterCamera && !!expectedCamera && distance(afterCamera.p, expectedCamera.eye) < .05 && distance(afterCamera.pivot, expectedCamera.at) < .05,
         { beforeCamera, afterCamera, expectedCamera, roomRef: room });
