@@ -1,0 +1,916 @@
+{
+  "schema": "world-meaning/1",
+  "worldId": "godmode-lab",
+  "source": {
+    "snapshotSha": "f5e11b43c37f1fd8e7cca552846d5dbe245a69b7f146aee9d273b919a6fd6d4c"
+  },
+  "about": {
+    "village-square": {
+      "title": "Village Square",
+      "what": "A paved meeting square in the southeast village. The bakery is at its north side, the bookshop to the east, the flower shop to the south and a tea shop to the west.",
+      "kind": "square",
+      "aliases": [
+        "village plaza",
+        "meeting square"
+      ],
+      "role": "landmark",
+      "salience": 3
+    },
+    "pond": {
+      "title": "Teahouse Pond",
+      "what": "The pond south of the teahouse, with ducks, geese and a chain of wooden market walkways across the water. The lighthouse and keeper’s cottage stand to the east. Approach the shore for a swim.",
+      "kind": "pond",
+      "aliases": [
+        "water",
+        "lake",
+        "swimming pond"
+      ],
+      "role": "landmark",
+      "salience": 3
+    },
+    "teahouse": {
+      "title": "Pondside Teahouse",
+      "what": "A low teahouse on the north shore of the pond. Four floor cushions surround a low tea table; a veranda faces the water, and a stone garden lies to the east.",
+      "kind": "teahouse",
+      "aliases": [
+        "tea house",
+        "pond teahouse"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "tearoom",
+          "title": "Tea Room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "teahouse",
+            "slot": "tearoom"
+          }
+        },
+        {
+          "id": "tea-cushion",
+          "title": "Tea Cushion",
+          "anchor": {
+            "kind": "entity",
+            "ref": "teahouse/cushion-1",
+            "slot": "seat"
+          },
+          "what": "A floor cushion beside the low tea table."
+        }
+      ]
+    },
+    "veranda": {
+      "title": "Teahouse Veranda",
+      "what": "A wooden deck between the teahouse and the pond, overlooking the water and market walkways.",
+      "kind": "deck",
+      "aliases": [
+        "pond veranda",
+        "teahouse deck"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "in": "teahouse"
+    },
+    "stone-garden": {
+      "title": "Teahouse Stone Garden",
+      "what": "Raked gravel and stones beside the teahouse’s eastern wall, a small garden for quiet contemplation.",
+      "kind": "garden",
+      "aliases": [
+        "gravel garden",
+        "raked garden"
+      ],
+      "role": "landmark",
+      "salience": 3
+    },
+    "tea-path": {
+      "title": "Teahouse Approach",
+      "what": "A stone footpath leading southwest from the central open ground to the teahouse entrance.",
+      "kind": "path",
+      "aliases": [
+        "path to teahouse"
+      ],
+      "role": "landmark",
+      "salience": 1
+    },
+    "hill-path": {
+      "title": "Orchard Hill Path",
+      "what": "A winding gravel path from the teahouse approach westward up Tea Hill.",
+      "kind": "path",
+      "aliases": [
+        "path up tea hill"
+      ],
+      "role": "landmark",
+      "salience": 1
+    },
+    "tea-hill": {
+      "title": "Tea Hill",
+      "what": "The rise west of the pond and teahouse, with a winding approach and an apple orchard on its southern slope.",
+      "kind": "hill",
+      "aliases": [
+        "orchard hill"
+      ],
+      "role": "landmark",
+      "salience": 3
+    },
+    "hill-orchard": {
+      "title": "Tea Hill Orchard",
+      "what": "An apple orchard on the southern slope of Tea Hill, west of the pond.",
+      "kind": "orchard",
+      "aliases": [
+        "apple orchard"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "in": "tea-hill"
+    },
+    "lighthouse": {
+      "title": "Pond Lighthouse",
+      "what": "A round lighthouse east of the pond, beside the keeper’s cottage. A spiral stair links its entrance and three intermediate rooms to a high lantern room.",
+      "kind": "lighthouse",
+      "aliases": [
+        "beacon tower"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "entrance",
+          "title": "Lighthouse Entrance",
+          "anchor": {
+            "kind": "entity",
+            "ref": "lighthouse",
+            "slot": "entrance"
+          }
+        },
+        {
+          "id": "lantern",
+          "title": "Lantern Room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "lighthouse",
+            "slot": "lantern"
+          }
+        }
+      ]
+    },
+    "keepers-cottage": {
+      "title": "Lighthouse Keeper’s Cottage",
+      "what": "A furnished home east of the lighthouse. Its living room has a fireplace, bookshelves, sofa and armchair; the kitchen and bedroom are separate rooms. A porch bench and vegetable garden are outside.",
+      "kind": "cottage",
+      "aliases": [
+        "keeper cottage",
+        "keeper home"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "living",
+          "title": "Keeper’s Living Room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "keepers-cottage",
+            "slot": "living"
+          }
+        },
+        {
+          "id": "kitchen",
+          "title": "Keeper’s Kitchen",
+          "anchor": {
+            "kind": "entity",
+            "ref": "keepers-cottage",
+            "slot": "kitchen"
+          }
+        },
+        {
+          "id": "bedroom",
+          "title": "Keeper’s Bedroom",
+          "anchor": {
+            "kind": "entity",
+            "ref": "keepers-cottage",
+            "slot": "bedroom"
+          }
+        },
+        {
+          "id": "reading-chair",
+          "title": "Fireside Armchair",
+          "anchor": {
+            "kind": "entity",
+            "ref": "keepers-cottage/living-armchair",
+            "slot": "seat"
+          }
+        },
+        {
+          "id": "sofa",
+          "title": "Living Room Sofa",
+          "anchor": {
+            "kind": "entity",
+            "ref": "keepers-cottage/living-sofa",
+            "slot": "seat-1"
+          }
+        },
+        {
+          "id": "porch-bench",
+          "title": "Porch Bench",
+          "anchor": {
+            "kind": "entity",
+            "ref": "porch-bench",
+            "slot": "seat-1"
+          }
+        }
+      ]
+    },
+    "porch-bench": {
+      "title": "Keeper’s Porch Bench",
+      "what": "An outdoor bench at the keeper’s cottage, east of the lighthouse.",
+      "kind": "bench",
+      "aliases": [
+        "keeper bench"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "in": "keepers-cottage"
+    },
+    "keeper-jetty": {
+      "title": "Keeper’s Jetty",
+      "what": "A short wooden jetty at the pond’s southeastern shore, near the keeper’s rowing boat.",
+      "kind": "pier",
+      "aliases": [
+        "keeper pier",
+        "rowing jetty"
+      ],
+      "role": "landmark",
+      "salience": 3
+    },
+    "cottage": {
+      "title": "Knoll Cottage",
+      "what": "A small home on the eastern grassy knoll, above the village’s shops. Its living room, kitchen and bedroom share one floor; a bench stands outside.",
+      "kind": "cottage",
+      "aliases": [
+        "hill cottage",
+        "original cottage"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "living",
+          "title": "Cottage Living Room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "cottage",
+            "slot": "living"
+          }
+        },
+        {
+          "id": "kitchen",
+          "title": "Cottage Kitchen",
+          "anchor": {
+            "kind": "entity",
+            "ref": "cottage",
+            "slot": "kitchen"
+          }
+        },
+        {
+          "id": "bedroom",
+          "title": "Cottage Bedroom",
+          "anchor": {
+            "kind": "entity",
+            "ref": "cottage",
+            "slot": "bedroom"
+          }
+        },
+        {
+          "id": "bench",
+          "title": "Hill Cottage Bench",
+          "anchor": {
+            "kind": "entity",
+            "ref": "cottage/bench",
+            "slot": "seat-1"
+          }
+        }
+      ]
+    },
+    "knoll": {
+      "title": "Cottage Knoll",
+      "what": "The grassy rise beneath Knoll Cottage, east of the village and southeast of the chapel.",
+      "kind": "hill",
+      "aliases": [
+        "cottage hill"
+      ],
+      "role": "landmark",
+      "salience": 3
+    },
+    "bookshop": {
+      "title": "Village Bookshop",
+      "what": "A small shop on the east side of Village Square, with a shop room, rear storeroom and upstairs bedroom. The larger multistory library is farther north.",
+      "kind": "bookshop",
+      "aliases": [
+        "book shop"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "shop",
+          "title": "Bookshop Room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "bookshop",
+            "slot": "shop"
+          }
+        }
+      ]
+    },
+    "bakery": {
+      "title": "Village Bakery",
+      "what": "A small bakery building just north of Village Square, with a ground-floor shop and storeroom and a bedroom above.",
+      "kind": "bakery",
+      "aliases": [
+        "bake shop"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "shop",
+          "title": "Bakery Shop Room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "bakery",
+            "slot": "shop"
+          }
+        }
+      ]
+    },
+    "flower-shop": {
+      "title": "Village Flower Shop",
+      "what": "A small shop on the south side of Village Square, with a shop room, storeroom and upstairs bedroom.",
+      "kind": "shop",
+      "aliases": [
+        "florist",
+        "flower shop"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "shop",
+          "title": "Flower Shop Room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "flower-shop",
+            "slot": "shop"
+          }
+        }
+      ]
+    },
+    "tea-shop": {
+      "title": "Village Tea Shop",
+      "what": "A two-story tea shop west of Village Square. The shop and back hall are downstairs, with a tea room upstairs. This is separate from the cushion-furnished teahouse beside the pond.",
+      "kind": "tea shop",
+      "aliases": [
+        "square tea shop"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "shop",
+          "title": "Tea Shop Room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "tea-shop",
+            "slot": "shop"
+          }
+        },
+        {
+          "id": "tea-room",
+          "title": "Upstairs Tea Room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "tea-shop",
+            "slot": "tea-room"
+          }
+        }
+      ]
+    },
+    "clockmakers": {
+      "title": "Clockmaker’s Townhouse",
+      "what": "A narrow three-story townhouse north of Village Square: a clock shop below, workshop on the middle floor and parlour above. Clocks, shelves and a workbench distinguish it from the nearby chapel.",
+      "kind": "workshop",
+      "aliases": [
+        "clock shop",
+        "clockmaker",
+        "clockmakers"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "shop",
+          "title": "Clock Shop",
+          "anchor": {
+            "kind": "entity",
+            "ref": "clockmakers",
+            "slot": "shop"
+          }
+        },
+        {
+          "id": "workshop",
+          "title": "Clock Workshop",
+          "anchor": {
+            "kind": "entity",
+            "ref": "clockmakers",
+            "slot": "workshop"
+          }
+        },
+        {
+          "id": "parlour",
+          "title": "Clockmaker’s Parlour",
+          "anchor": {
+            "kind": "entity",
+            "ref": "clockmakers",
+            "slot": "parlour"
+          }
+        }
+      ]
+    },
+    "chapel": {
+      "title": "Village Chapel",
+      "what": "A small chapel east of the clockmaker’s shop. Rows of pews face an altar in the tall nave, with a vestry at the back; the bell tower stands just northwest.",
+      "kind": "chapel",
+      "aliases": [
+        "church",
+        "nave"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "nave",
+          "title": "Chapel Nave",
+          "anchor": {
+            "kind": "entity",
+            "ref": "chapel",
+            "slot": "nave"
+          }
+        },
+        {
+          "id": "vestry",
+          "title": "Chapel Vestry",
+          "anchor": {
+            "kind": "entity",
+            "ref": "chapel",
+            "slot": "vestry"
+          }
+        },
+        {
+          "id": "pew",
+          "title": "Chapel Pew",
+          "anchor": {
+            "kind": "entity",
+            "ref": "chapel/pew-n1",
+            "slot": "seat-1"
+          }
+        }
+      ]
+    },
+    "bell-tower": {
+      "title": "Chapel Bell Tower",
+      "what": "A three-level tower beside the chapel, with a bell and clock. A spiral stair joins the entrance, middle room and upper room beneath the spire.",
+      "kind": "tower",
+      "aliases": [
+        "clock tower",
+        "chapel tower"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "entrance",
+          "title": "Bell Tower Entrance",
+          "anchor": {
+            "kind": "entity",
+            "ref": "bell-tower",
+            "slot": "entrance"
+          }
+        },
+        {
+          "id": "top",
+          "title": "Bell Tower Upper Room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "bell-tower",
+            "slot": "top"
+          }
+        }
+      ]
+    },
+    "book-library": {
+      "title": "Stacked Book Library",
+      "what": "A tall library northeast of the village, decorated as a stack of books. Three floors of bookcases and reading armchairs are connected by a side stair, leading to a roof terrace with benches and a telescope.",
+      "kind": "library",
+      "aliases": [
+        "library",
+        "book tower",
+        "reading library"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "book-1",
+          "title": "Ground Floor Reading Room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "book-library",
+            "slot": "book-1"
+          }
+        },
+        {
+          "id": "book-2",
+          "title": "Middle Reading Room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "book-library",
+            "slot": "book-2"
+          }
+        },
+        {
+          "id": "book-3",
+          "title": "Upper Reading Room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "book-library",
+            "slot": "book-3"
+          }
+        },
+        {
+          "id": "terrace",
+          "title": "Library Roof Terrace",
+          "anchor": {
+            "kind": "entity",
+            "ref": "book-library",
+            "slot": "terrace"
+          }
+        },
+        {
+          "id": "reading-chair",
+          "title": "Ground Floor Reading Chair",
+          "anchor": {
+            "kind": "entity",
+            "ref": "book-library/armchair-r1-13",
+            "slot": "seat"
+          }
+        },
+        {
+          "id": "terrace-bench",
+          "title": "Roof Terrace Bench",
+          "anchor": {
+            "kind": "entity",
+            "ref": "book-library/terrace-bench-39",
+            "slot": "seat-1"
+          }
+        }
+      ]
+    },
+    "crescent-cafe": {
+      "title": "Crescent Café",
+      "what": "A curved glass café north of the village, wrapping around a sunken garden. Four tables have chairs beneath hanging lights; doors at the horns and garden side connect the single café room to outside.",
+      "kind": "cafe",
+      "aliases": [
+        "crescent cafe",
+        "glass cafe",
+        "coffee house"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "cafe",
+          "title": "Café Room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "crescent-cafe",
+            "slot": "cafe"
+          }
+        },
+        {
+          "id": "table-seat",
+          "title": "Café Table Chair",
+          "anchor": {
+            "kind": "entity",
+            "ref": "crescent-cafe/chair-1-1",
+            "slot": "seat"
+          }
+        }
+      ]
+    },
+    "terrace": {
+      "title": "Crescent Sunken Garden",
+      "what": "A lowered garden terrace within the open curve of Crescent Café, with herb beds, a rain barrel and strings of lights.",
+      "kind": "garden",
+      "aliases": [
+        "sunken garden",
+        "cafe garden"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "in": "crescent-cafe"
+    },
+    "gallery": {
+      "title": "Zigzag Gallery",
+      "what": "A long white art gallery west of the village. Four connected wings fold back and forth beneath skylights, with entrances at both ends and wave, ring and twist sculptures inside.",
+      "kind": "gallery",
+      "aliases": [
+        "art gallery",
+        "accordion gallery",
+        "sculpture gallery"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "gallery",
+          "title": "Gallery Interior",
+          "anchor": {
+            "kind": "entity",
+            "ref": "gallery",
+            "slot": "gallery"
+          }
+        }
+      ]
+    },
+    "gallery-lawn": {
+      "title": "Gallery Lawn",
+      "what": "A broad lawn around Zigzag Gallery, with outdoor benches and framed displays. It is a place to pause before or after visiting the gallery.",
+      "kind": "lawn",
+      "aliases": [
+        "art lawn",
+        "gallery grounds"
+      ],
+      "role": "landmark",
+      "salience": 3
+    },
+    "screen": {
+      "title": "Open-Air Cinema",
+      "what": "An outdoor cinema west of the clockmaker’s shop. Rows of benches face a screen at the north end, with festoon lights overhead and a popcorn kiosk to the east.",
+      "kind": "cinema",
+      "aliases": [
+        "outdoor cinema",
+        "movie screen",
+        "screening area"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "audience-bench",
+          "title": "Cinema Audience Bench",
+          "anchor": {
+            "kind": "entity",
+            "ref": "bench-r2-2",
+            "slot": "seat-1"
+          }
+        }
+      ]
+    },
+    "popcorn-kiosk": {
+      "title": "Cinema Popcorn Kiosk",
+      "what": "A kiosk beside the eastern edge of the cinema seating, marked by a popcorn sign.",
+      "kind": "kiosk",
+      "aliases": [
+        "popcorn stand"
+      ],
+      "role": "landmark",
+      "salience": 3,
+      "in": "screen"
+    },
+    "treehouse-a": {
+      "title": "Western Treehouse",
+      "what": "The western tower in the three-treehouse cluster northwest of the gallery, with an entrance and upper room.",
+      "kind": "treehouse",
+      "aliases": [],
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "entrance",
+          "title": "Treehouse Entrance",
+          "anchor": {
+            "kind": "entity",
+            "ref": "treehouse-a",
+            "slot": "entrance"
+          }
+        },
+        {
+          "id": "top",
+          "title": "Upper Treehouse Room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "treehouse-a",
+            "slot": "top"
+          }
+        }
+      ]
+    },
+    "treehouse-b": {
+      "title": "Northern Treehouse",
+      "what": "The tallest, northernmost tower in the treehouse cluster, with an entrance, middle room and top room.",
+      "kind": "treehouse",
+      "aliases": [],
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "entrance",
+          "title": "Treehouse Entrance",
+          "anchor": {
+            "kind": "entity",
+            "ref": "treehouse-b",
+            "slot": "entrance"
+          }
+        },
+        {
+          "id": "top",
+          "title": "Upper Treehouse Room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "treehouse-b",
+            "slot": "top"
+          }
+        }
+      ]
+    },
+    "treehouse-c": {
+      "title": "Eastern Treehouse",
+      "what": "The southeastern tower in the treehouse cluster, with an entrance and upper room.",
+      "kind": "treehouse",
+      "aliases": [],
+      "role": "landmark",
+      "salience": 3,
+      "parts": [
+        {
+          "id": "entrance",
+          "title": "Treehouse Entrance",
+          "anchor": {
+            "kind": "entity",
+            "ref": "treehouse-c",
+            "slot": "entrance"
+          }
+        },
+        {
+          "id": "top",
+          "title": "Upper Treehouse Room",
+          "anchor": {
+            "kind": "entity",
+            "ref": "treehouse-c",
+            "slot": "top"
+          }
+        }
+      ]
+    },
+    "walk-1": {
+      "title": "Pond Market Walkway 1",
+      "what": "A wooden walkway from the western bank toward the first market platform.",
+      "kind": "walkway",
+      "aliases": [
+        "pond boardwalk"
+      ],
+      "role": "landmark",
+      "salience": 1,
+      "parts": [
+        {
+          "id": "stall",
+          "title": "Pond Market Stall 1",
+          "anchor": {
+            "kind": "entity",
+            "ref": "walk-1/stall-1"
+          }
+        }
+      ]
+    },
+    "walk-2": {
+      "title": "Pond Market Walkway 2",
+      "what": "A wooden walkway between the western and northern market platforms.",
+      "kind": "walkway",
+      "aliases": [],
+      "role": "landmark",
+      "salience": 1,
+      "parts": [
+        {
+          "id": "stall",
+          "title": "Pond Market Stall 2",
+          "anchor": {
+            "kind": "entity",
+            "ref": "walk-2/stall-2"
+          }
+        }
+      ]
+    },
+    "walk-3": {
+      "title": "Pond Market Walkway 3",
+      "what": "A wooden walkway between the northern and eastern market platforms.",
+      "kind": "walkway",
+      "aliases": [],
+      "role": "landmark",
+      "salience": 1,
+      "parts": [
+        {
+          "id": "stall",
+          "title": "Pond Market Stall 3",
+          "anchor": {
+            "kind": "entity",
+            "ref": "walk-3/stall-3"
+          }
+        }
+      ]
+    },
+    "walk-4": {
+      "title": "Pond Market Walkway 4",
+      "what": "A wooden walkway along the eastern side of the pond.",
+      "kind": "walkway",
+      "aliases": [],
+      "role": "landmark",
+      "salience": 1,
+      "parts": [
+        {
+          "id": "stall",
+          "title": "Pond Market Stall 4",
+          "anchor": {
+            "kind": "entity",
+            "ref": "walk-4/stall-4"
+          }
+        }
+      ]
+    },
+    "walk-5": {
+      "title": "Pond Market Walkway 5",
+      "what": "A wooden walkway from the eastern to the southern market platform.",
+      "kind": "walkway",
+      "aliases": [],
+      "role": "landmark",
+      "salience": 1,
+      "parts": [
+        {
+          "id": "stall",
+          "title": "Pond Market Stall 5",
+          "anchor": {
+            "kind": "entity",
+            "ref": "walk-5/stall-5"
+          }
+        }
+      ]
+    },
+    "walk-6": {
+      "title": "Pond Market Walkway 6",
+      "what": "A wooden walkway from the southern market platform toward the south bank.",
+      "kind": "walkway",
+      "aliases": [],
+      "role": "landmark",
+      "salience": 1
+    },
+    "cottage/bench": {
+      "title": "Knoll Cottage Bench",
+      "kind": "seat",
+      "role": "part",
+      "salience": 1,
+      "in": "cottage"
+    },
+    "teahouse/cushion-1": {
+      "title": "Teahouse Cushion",
+      "kind": "seat",
+      "role": "part",
+      "salience": 1,
+      "in": "teahouse"
+    },
+    "book-library/armchair-r1-13": {
+      "title": "Library Ground Floor Armchair",
+      "kind": "seat",
+      "role": "part",
+      "salience": 1,
+      "in": "book-library"
+    },
+    "crescent-cafe/chair-1-1": {
+      "title": "Crescent Café Chair",
+      "kind": "seat",
+      "role": "part",
+      "salience": 1,
+      "in": "crescent-cafe"
+    },
+    "bench-r2-2": {
+      "title": "Cinema Audience Bench",
+      "kind": "seat",
+      "role": "part",
+      "salience": 1,
+      "in": "screen"
+    }
+  },
+  "worldAbout": {
+    "title": "Godmode Village",
+    "what": "A hand-built village of distinctive places: pondside tea rooms, shops, a chapel and bell tower, a stacked-book library, a crescent glass café, a zigzag art gallery and a treehouse cluster.",
+    "tour": "Village Square is the southeast meeting place, bordered by the bakery, bookshop, tea shop and florist. North are the clockmaker’s townhouse and chapel, then the library and Crescent Café. West are the outdoor cinema and Zigzag Gallery; the treehouses stand farther northwest. Southwest, the Teahouse overlooks a pond crossed by wooden market walkways. The lighthouse and keeper’s cottage stand east of the water. Knoll Cottage is the hilltop home east of the square."
+  }
+}
