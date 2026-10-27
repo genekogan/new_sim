@@ -117,5 +117,9 @@ export function notYet(capability: string, phase: string, running: boolean, b: B
   if (verb === 'sit' || verb === 'sit-ground') return b.posture === 'seated' ? 'not finished yet' : 'not sitting yet';
   if (verb === 'lie' || verb === 'nap') return b.posture === 'lying' || b.posture === 'sleeping' ? 'not finished yet' : 'not lying yet';
   if (verb === 'stand') return b.posture === 'standing' ? 'not finished yet' : 'not standing yet';
+  // A named-water journey keeps its travel step while already swimming toward
+  // the destination. The broader swimming posture also covers wading, so use
+  // the actual activity; reaching the water does not complete the receipt.
+  if (verb === 'swim') return b.activity === 'swim' || b.activity === 'tread' ? 'not finished yet' : 'not swimming yet';
   return b.step && MAIN_POSE[verb] ? `not ${MAIN_POSE[verb]} yet` : 'not finished yet';
 }

@@ -100,6 +100,11 @@ test('D3b: an open receipt says what it has not done yet; a body already in a ti
   assert.equal(notYet('lie:here', 'started', true, b('lying')), 'not finished yet');
   assert.equal(notYet('dance', 'started', true, b('busy')), 'not finished yet');
   assert.equal(notYet('read:library', 'started', true, b('walking', {step: 'walking to the library, 12 m left'})), 'not reading yet');
+  assert.equal(notYet('swim:lake', 'started', true, b('walking', {activity: 'walk', step: 'walking to lake, 20 m left'})), 'not swimming yet');
+  assert.equal(notYet('swim:lake', 'started', true, b('swimming', {activity: 'wade', inWater: true})), 'not swimming yet', 'wading is not yet swimming despite sharing the posture');
+  assert.equal(notYet('swim:lake', 'started', true, b('swimming', {activity: 'swim', inWater: true, step: 'swimming to lake, 14 m left'})), 'not finished yet');
+  assert.equal(notYet('swim:lake', 'started', true, b('swimming', {activity: 'tread', inWater: true})), 'not finished yet');
+  assert.equal(notYet('swim:lake', 'waiting', false, b('swimming', {activity: 'swim', inWater: true})), 'not started yet', 'an unstarted receipt does not inherit another action\'s progress');
   assert.equal(notYet('sit:here', 'waiting', false, b('standing')), 'not started yet');
   assert.equal(notYet('object:ride-wheel:join', 'started', true, b('walking')), 'not aboard yet');
 });

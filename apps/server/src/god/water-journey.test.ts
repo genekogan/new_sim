@@ -10,6 +10,38 @@ import {GroundHost,installGroundCapabilities} from './ground-host.ts';
 import {installEngineBridge} from './engine-bridge.ts';
 import {EdgeLedger} from '../edge/ledger/ledger.ts';
 /* eslint-disable @typescript-eslint/no-explicit-any */
+test('named-water progress reports actual swimming without prematurely completing the receipt', {timeout:30000}, async t=>{
+ const w=fixture(':memory:',factory,{durableClockV1:true});w.brain.quiesce();
+ const god=new GodMode(w.db,{worldId:w.host.worldId,ownerId:'owner',tick:()=>w.host.engine.world.tick,emit(){}});
+ new GroundHost(w.db,w.host,god);const edge=new EdgeLedger(w.host,w.db);
+ installGroundCapabilities(edge as never,god,w.host);installEngineBridge({host:w.host,god,edge,log(){},worldClock:false,worldLore:false});
+ t.after(()=>{w.brain.quiesce();w.host.stop();edge.comms?.close();w.db.close();});
+ const tick=async(n:number)=>{for(let i=0;i<n;i++){w.host.tickOnce();if(i%20===0){await setImmediate();w.host.drainInputs();}}};
+ await tick(4);
+ const placed:any=god.act({ops:[{op:'place',def:'core/pond@1',name:'progress-pond',params:{depth:3},shape:{area:[[-22,-36],[-10,-36],[-10,-24],[-22,-24]]}}]} as any);
+ assert.equal(placed.accepted,true,JSON.stringify(placed));await tick(4);
+ await invite(w,'swimmer');const row:any=await accept(w.host,w.souls.create('dev:swimmer',{name:'Swimmer',description:'takes a lake swim'}));await tick(4);
+ const s={soulId:row.id,entityId:row.entity_id,name:row.name,owner:row.owner},E=w.host.engine as any;
+ await accept(w.host,w.host.enqueue('edge-relocate','test:dry-bank',{soulId:row.id,entityId:row.entity_id,to:[-4,-30],why:'start on dry ground outside the pond'}));await tick(4);
+ const a:any=await accept(w.host,edge.act(s,{capability:'swim:progress-pond'}));assert.equal(a.accepted,true,JSON.stringify(a));
+ let receipt:any,sawApproach=false,sawSwimming=false;
+ for(let i=0;i<5000;i++){
+  receipt=edge.receipt(row.id,a.receipt.id);
+  if(['completed','failed','cancelled'].includes(receipt?.phase))break;
+  if(receipt?.body?.activity==='walk'){
+   sawApproach=true;assert.match(receipt.now,/^walking to progress-pond, \d+ m left; not swimming yet$/);
+  }
+  if(receipt?.body?.activity==='swim'){
+   sawSwimming=true;assert.equal(receipt.phase,'started');assert.equal(receipt.body.inWater,true);
+   assert.match(receipt.now,/^swimming to progress-pond, \d+ m left; not finished yet$/);
+   assert.ok(E.programOf(row.entity_id),'swimming progress is still an active journey');
+  }
+  await tick(1);
+ }
+ assert.ok(sawApproach,'observed the real dry-ground approach');assert.ok(sawSwimming,'observed actual swimming before completion');
+ assert.equal(receipt?.phase,'completed',JSON.stringify(receipt));assert.equal(E.world.entities[row.entity_id].human.activity,'tread');
+ assert.deepEqual(E.runtime.violations,[]);
+});
 test('Eden west-lake jetty to swimming and back uses a real bank and finishes both legs', {timeout:180000}, async t=>{
  const genesis=JSON.parse(readFileSync(new URL('../../../../worlds/templates/eden-2026.json',import.meta.url),'utf8'));
  const w=fixture(':memory:',factory,{durableClockV1:true});w.brain.quiesce();
