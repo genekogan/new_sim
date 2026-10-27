@@ -40,7 +40,8 @@ export function compilerSnapshot(snapshot) {
   return structuredClone({constants:snapshot.constants,state:snapshot.state,seed:snapshot.seed,seq,editSeq:0,defs:snapshot.defs,defRefs:snapshot.defRefs,entities:snapshot.entities,ground:snapshot.ground});
 }
 export function physicalSnapshotSha256(snapshot) {
-  const s=compilerSnapshot(snapshot); delete s.seq;delete s.editSeq;delete s.seed;delete s.defRefs;
+  const s=compilerSnapshot(snapshot); delete s.seq;delete s.editSeq;delete s.seed;
+  if(!s.defRefs){s.defRefs={};for(const d of s.defs){s.defRefs[d.ref]=d.hash;if(d.ref.startsWith('core-'))s.defRefs['core/'+d.ref.slice(5)]=d.hash;}}
   if(s.state)delete s.state.about;
   s.entities=s.entities.map(e=>{for(const k of ['about','by','born','v'])delete e[k];return e;}).sort((a,b)=>a.id.localeCompare(b.id));
   s.defs=s.defs.map(d=>{delete d.by;return d;}).sort((a,b)=>a.hash.localeCompare(b.hash));
