@@ -68,7 +68,8 @@ export function journeyOracles({ ev, journey: j, receipts, replies, acts, accept
   const refusalProof=!requiredRefusal || (ev.refusals??[]).some(r=>requiredRefusal.codes.includes(r.code)&&requiredRefusal.capabilities.includes(r.capability)&&r.at>=sent&&r.at<=after);
   const physicalAt = completed.length === j.phases.length && refusalProof ? after : null;
   const finalPhase = j.phases.at(-1);
-  const claims = [...(ev.resultState === 'done' && ev.resultAt ? [{ text: ev.resultText, ms: at(ev.resultAt), explicit: true }] : []), ...(replies ?? []).filter(r => /\b(done|finished|completed|I(?:'m| am) (?:seated|sitting|inside)|ready to (?:present|give))\b/i.test(r.text ?? '') && !/\b(not|haven't|couldn't|cannot|can't|unable|will|I'll)\b/i.test(r.text ?? '') && !/\bstill (?:walking|trying|working|waiting|on (?:my|the) way)\b/i.test(r.text ?? ''))].filter(r => r.ms >= sent && r.ms <= cutoff);
+  const cardClaims = Array.isArray(ev.cardResults) ? ev.cardResults.filter(r=>r.by!=='server'&&r.state==='done').map(r=>({text:r.text,ms:at(r.at),explicit:true})) : ev.resultBy!=='server'&&ev.resultState==='done'&&ev.resultAt ? [{text:ev.resultText,ms:at(ev.resultAt),explicit:true}] : [];
+  const claims = [...cardClaims, ...(replies ?? []).filter(r=>r.by!=='server').filter(r => /\b(done|finished|completed|I(?:'m| am) (?:seated|sitting|inside)|ready to (?:present|give))\b/i.test(r.text ?? '') && !/\b(not|haven't|couldn't|cannot|can't|unable|will|I'll)\b/i.test(r.text ?? '') && !/\bstill (?:walking|trying|working|waiting|on (?:my|the) way)\b/i.test(r.text ?? ''))].filter(r => r.ms >= sent && r.ms <= cutoff).sort((a,b)=>a.ms-b.ms);
   const claimVerdicts = claims.map(c => {
     const last = samples.filter(s => time(s) <= c.ms).at(-1);
     const fresh = last && c.ms-time(last) <= (j.maxSampleGapSec ?? 5)*1000;

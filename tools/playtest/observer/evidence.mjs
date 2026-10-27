@@ -34,27 +34,33 @@ export function spill(value, { runDir, limit = MAX_INLINE, path, omitted }) {
 
 /** openRequest({runDir, seat, soulId, requestId, text, channel, sentAt, budgetSec?}) → RequestEvidence
  *  sentAt: epoch ms or ISO. requestId: the inbox message id (msg_…) when the channel is the card. */
-export function openRequest({ runDir, seat, soulId = null, requestId, text, channel = 'card', sentAt = Date.now(), budgetSec = null, limit = MAX_INLINE }) {
+export function openRequest({ runDir, seat, soulId = null, requestId, messageId = null, text, channel = 'card', sentAt = Date.now(), budgetSec = null, limit = MAX_INLINE }) {
   const sentMs = typeof sentAt === 'number' ? sentAt : Date.parse(sentAt);
   const ev = { requestId, seat, soulId, text, channel, sentAt: iso(sentMs), budgetSec, queuedSec: null, budgetStartAt: null, ackAt: null, ackText: null, resultAt: null, resultText: null,
-    resultState: null, cutoffAt: null, cutoffReason: null, samples: [], receipts: [], shots: [], chatTurns: [], legible: [],
+    resultState: null, resultBy: null, firstResultAt: null, firstResultText: null, cardResults: [], cutoffAt: null, cutoffReason: null, samples: [], receipts: [], shots: [], chatTurns: [], legible: [],
     firstBodyChangeAt: null, firstBodyChangeMono: null, serverErrors: 0, cost: {}, cardSeen: { ackAt: null, resultAt: null } };
   const seenReceipts = new Map();
   let baseKey = null, closed = false;
-  const mine = (latest) => latest && (latest.id === requestId || (!String(requestId).startsWith('msg_') && latest.text === text));
+  const mine = (latest) => latest && (messageId ? latest.id===messageId : latest.id === requestId || (!String(requestId).startsWith('msg_') && latest.text === text));
+  const recordCard = (latest, observedAt) => {
+    if (closed || !mine(latest)) return;
+    if (latest.reply && !ev.ackText) { ev.ackText=latest.reply;ev.ackAt=iso(latest.acknowledgedAt)??observedAt; }
+    if (!latest.result) return;
+    const result={text:latest.result,at:iso(latest.resultAt)??observedAt,state:latest.outcome??null,by:latest.resultBy??'agent'};
+    if (!ev.cardResults.length || JSON.stringify(ev.cardResults.at(-1))!==JSON.stringify(result))ev.cardResults.push(result);
+    if(!ev.firstResultAt){ev.firstResultAt=result.at;ev.firstResultText=result.text;}
+    ev.resultText=result.text;ev.resultAt=result.at;ev.resultState=result.state;ev.resultBy=result.by;
+  };
   const api = {
     evidence: ev,
+    recordCard,
     /** sample({snap?, legible?, shot?}) — on each sampler tick and on card changes. Any part may be missing. */
     sample({ snap = null, legible = null, shot = null } = {}) {
       if (closed) return;
       if (snap) {
         ev.samples.push(snap);
         const latest = snap.inbox?.latest;
-        if (mine(latest)) {
-          if (latest.reply && !ev.ackText) { ev.ackText = latest.reply; ev.ackAt = iso(latest.acknowledgedAt) ?? snap.t; }
-          if (latest.result && !ev.resultText) { ev.resultText = latest.result; ev.resultAt = iso(latest.resultAt) ?? snap.t; }
-          if (latest.outcome) ev.resultState = latest.outcome;
-        }
+        recordCard(latest,snap.t);
         for (const r of snap.receipts ?? []) if (!seenReceipts.has(r.id) || seenReceipts.get(r.id).phase !== r.phase) seenReceipts.set(r.id, r);
         const k = bodyKey(snap);
         if (baseKey == null) baseKey = k; else if (!ev.firstBodyChangeAt && k !== baseKey) { ev.firstBodyChangeAt = snap.t; ev.firstBodyChangeMono = snap.mono; }

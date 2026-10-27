@@ -15,6 +15,10 @@ const realClock = { now: monoMs, sleep: realSleep };
 const log = (...a) => process.stderr.write(`[director] ${a.join(' ')}\n`);
 
 /** The message for `messageId` in an owner card view, if it carries a result: {resultText, state} | null. */
+function cardMessageFor(view, messageId) {
+  if (!view || messageId == null) return null;
+  return [view.latest,view.message,...(Array.isArray(view.messages)?view.messages:[]),...(Array.isArray(view.history)?view.history:[])].find(x=>x&&(x.id??x.messageId)===messageId)??null;
+}
 export function cardResultFor(view, messageId) {
   if (!view || messageId == null) return null;
   const pool = [view.latest, view.message, ...(Array.isArray(view.messages) ? view.messages : []), ...(Array.isArray(view.history) ? view.history : [])].filter(Boolean);
@@ -115,10 +119,11 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
     return { elapsedSec: Math.round((mono - start) / 100) / 10, screenshotPath, legible, cardView: view, chatRendered: chat.text, lastRequests: ctx.requests.map(({ atSec, channel, text }) => ({ atSec, channel, text })) };
   }
 
-  async function deliver(ctx, say, { quick = false, budgetSec = null } = {}) {
+  async function deliver(ctx, say, { quick = false, budgetSec = null, journey = false } = {}) {
     if (!live()) return { skipped: 'stopped' };
     const requestId = `${ctx.id}-${String(++ctx.reqN).padStart(3, '0')}`;
     const sentMono = clock.now(); const sentAt = new Date().toISOString();
+    const turnsAtOpen = turnCountOf(ctx.seat);
     let messageId = null;
     try { ctx.seat.noteRequest?.(); } catch { /* optional: arena's per-request wake counter */ }
     try {
@@ -135,7 +140,7 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
     catch (e) { log(ctx.id, 'openRequest failed', e?.message ?? e); }
     const lv = ctx.lastView;
     const req = { requestId, channel: say.channel, messageId, evidence, openedAt: sentMono, budgetMs, budgetFrom: say.channel === 'chat' ? null : sentMono,
-      turnsAtOpen: turnCountOf(ctx.seat), directorTurnsAtOpen: ctx.directorTurns, resultSigAtOpen: resultSig(lv) };
+      journey, sentAt, turnsAtOpen, observedTurn: false, directorTurnsAtOpen: ctx.directorTurns, resultSigAtOpen: resultSig(lv) };
     ctx.open.set(requestId, req);
     if (say.channel === 'chat') {
       // The chat message waits for the seat's running turn (wake or earlier chat): Claude Code queues typed input until the
@@ -178,6 +183,7 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
     }
     try { if (cam?.legible) legible = await cam.legible(); } catch { /* best effort */ }
     try { if (cam?.shot) { const mono = Math.round(clock.now() - start); const p = join(shotsDir, ctx.id, `${mono}.png`); mkdirSync(join(shotsDir, ctx.id), { recursive: true }); await cam.shot(p); shot = p; appendJsonl(join(shotsDir, 'index.jsonl'), { cam: ctx.id, mono, t: new Date().toISOString(), path: p }); } } catch (e) { log(ctx.id, 'shot failed', e?.message ?? e); }
+    ctx.latestSample = snap;
     for (const r of ctx.open.values()) { try { r.evidence?.sample?.({ snap, legible, shot }); } catch { /* sampling is best effort */ } }
   }
   async function sampleLoop(ctx) {
@@ -190,10 +196,16 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
   }
 
   async function closeReq(ctx, req, cutoffReason, extra = {}) {
+    if (req.journey) {
+      await sampleOnce(ctx); // terminal body and receipts, including failures after an intermediate result
+      const latest = cardMessageFor(await cardView(ctx), req.messageId);
+      req.evidence?.recordCard?.(latest, new Date().toISOString());
+    }
+    if(req.journey && req.budgetFrom!=null && clock.now()-req.budgetFrom>=req.budgetMs)cutoffReason='budget';
     ctx.open.delete(req.requestId);
     const rec = { t: new Date().toISOString(), mono: clock.now(), requestId: req.requestId, cutoffReason, openSec: (clock.now() - req.openedAt) / 1000, ...extra };
     appendJsonl(join(ctx.dir, 'requests.jsonl'), rec);
-    try { await req.evidence?.close?.({ cutoffReason }); } catch (e) { log(ctx.id, 'evidence close failed', e?.message ?? e); }
+    try { await req.evidence?.close?.({ cutoffReason, ...(req.journey ? {cutoffAt:new Date(cutoffReason==='budget'?Date.parse(req.sentAt)+req.budgetMs:Math.min(Date.now(),Date.parse(req.sentAt)+req.budgetMs)).toISOString()} : {}) }); } catch (e) { log(ctx.id, 'evidence close failed', e?.message ?? e); }
   }
 
   async function checkOpen(ctx, view) {
@@ -202,6 +214,19 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
       const tc = turnCountOf(ctx.seat);
       const turns = tc != null && req.turnsAtOpen != null ? tc - req.turnsAtOpen : ctx.directorTurns - req.directorTurnsAtOpen;
       const res = req.channel === 'card' ? cardResultFor(view, req.messageId) : null;
+      if (req.journey) {
+        req.observedTurn ||= ctx.seat.inTurn === true;
+        req.evidence?.recordCard?.(cardMessageFor(view,req.messageId),new Date().toISOString());
+        // A native action may write an automatic card result in the middle of a longer owner request.
+        // A finished model turn is necessary; an action still running after that turn keeps the window open.
+        const turnFinished = tc != null && req.turnsAtOpen != null ? tc > req.turnsAtOpen : req.observedTurn && ctx.seat.inTurn === false;
+        const receipts = ctx.latestSample?.receipts;
+        const actionPending = !Array.isArray(receipts) || receipts.some(r=>['accepted','waiting','started','running'].includes(r.phase));
+        if (req.budgetFrom != null && now-req.budgetFrom >= req.budgetMs) await closeReq(ctx,req,'budget');
+        else if (turns > maxTurns) await closeReq(ctx,req,'max-turns',{turns});
+        else if (turnFinished && !ctx.seat.inTurn && ctx.pending===0 && !actionPending) await closeReq(ctx,req,'turn-complete',res??{});
+        continue;
+      }
       if (res) await closeReq(ctx, req, 'result', res);
       else if (req.channel === 'chat' && ctx.pending === 0 && resultSig(view) && resultSig(view) !== req.resultSigAtOpen) await closeReq(ctx, req, 'result', { via: 'card-after-chat' });
       else if (turns > maxTurns) await closeReq(ctx, req, 'max-turns', { turns });
@@ -262,7 +287,7 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
       }
       const shown = await gatherShown(ctx);
       saveShown(ctx, shown);
-      const delivered = await deliver(ctx, { channel: e.channel ?? 'card', text: e.text }, { budgetSec: e.budgetSec ?? null });
+      const delivered = await deliver(ctx, { channel: e.channel ?? 'card', text: e.text }, { budgetSec: e.budgetSec ?? null, journey: !!e.expect?.journey });
       record(ctx, { step: ctx.step, scripted: { atSec: e.atSec, channel: e.channel, text: e.text, budgetSec: e.budgetSec ?? null }, delivered });
     }
   }

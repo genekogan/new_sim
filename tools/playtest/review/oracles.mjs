@@ -116,6 +116,7 @@ export function claimsIn(text, { soulName = null, others = [] } = {}) {
  *  of expect-oracles.mjs after the fifteen ORACLE_IDS; requests without one get exactly ORACLE_IDS. */
 export function runOracles(ev, ctx = {}) {
   const P = `evidence/${ev.requestId}.json`;
+  const expect = ctx.expect !== undefined ? ctx.expect : expectFor(ctx.run, ev);
   const acts = ctx.acts ?? (ctx.run ? seatActs(ctx.run, ev.seat, ev.chatTurns) : []);
   const sent = ms(ev.sentAt), cutoff = ms(ev.cutoffAt) ?? Infinity;
   const all = (ev.samples ?? []).map((s, i) => ({ ...s, i, ms: ms(s.t), p: xz(s.pos) }));
@@ -133,7 +134,7 @@ export function runOracles(ev, ctx = {}) {
   const accepted = acted.some((a) => a.output?.accepted) || winReceipts.length > 0;
   // Owner-visible replies: the card ack/result, and on the chat channel the final text of the turn(s) that carried it.
   const turnRows = ctx.turns ?? ctx.run?.seats?.[ev.seat]?.turns ?? [];
-  const chatReplies = ev.channel === 'chat' ? turnRows.filter((t) => (ev.chatTurns ?? []).includes(t.turn) && String(t.finalText ?? '').trim()).map((t) => ({ text: t.finalText, ms: ms(t.endedAt), ptr: `seats/${ev.seat}/turns.jsonl#turn${t.turn}` })) : [];
+  const chatReplies = ev.channel === 'chat' || expect?.journey ? turnRows.filter((t) => (ev.chatTurns ?? []).includes(t.turn) && String(t.finalText ?? '').trim()).map((t) => ({ text: t.finalText, ms: ms(t.endedAt), ptr: `seats/${ev.seat}/turns.jsonl#turn${t.turn}` })) : [];
   const out = [];
 
   // protocol
@@ -199,7 +200,7 @@ export function runOracles(ev, ctx = {}) {
   // truthfulness: owner-facing claims (card ack/result; chat replies) vs the body facts when each was written
   const replies = [
     ...(ev.ackText ? [{ text: ev.ackText, ms: ms(ev.ackAt) ?? sent, ptr: `${P}#ackText` }] : []),
-    ...(ev.resultText && !chatReplies.length ? [{ text: ev.resultText, ms: ms(ev.resultAt) ?? cutoff, ptr: `${P}#resultText` }] : []),
+    ...(ev.resultText && !chatReplies.length ? [{ text: ev.resultText, ms: ms(ev.resultAt) ?? cutoff, ptr: `${P}#resultText`, by:ev.resultBy }] : []),
     ...chatReplies,
   ];
   // A reply can be written after the cutoff: its facts come from the seat's samples and receipts across the run, and from
@@ -248,7 +249,6 @@ export function runOracles(ev, ctx = {}) {
   out.push(errs ? o('server-errors', 'fail', `${errs} server error(s)/unreachable`, [`${P}#serverErrors`]) : o('server-errors', 'pass', 'none'));
   const fb = ms(ev.firstBodyChangeAt);
   out.push(fb && fb <= cutoff ? o('first-body-change', 'pass', `first visible body change after ${secs(sent, fb)} s`, [`${P}#firstBodyChangeAt`]) : accepted ? o('first-body-change', 'fail', 'an action was accepted but no visible body change before cutoff', [`${P}#firstBodyChangeAt`]) : o('first-body-change', 'unknown', 'no body action was started'));
-  const expect = ctx.expect !== undefined ? ctx.expect : expectFor(ctx.run, ev);
   if (expect?.journey) out.push(...journeyOracles({ ev, journey: expect.journey, receipts, replies, acts, acceptedMs: r => acceptedMs(r, clk), endedMs: r => endedMs(r, clk) }));
   if (expect && expect.kind !== 'journey') out.push(...expectOracles({ ev, expect, timely, replies, receipts, acts, inWindow, P }));
   if (late) out.forEach((r) => { r.lateSamplesExcluded = late; });

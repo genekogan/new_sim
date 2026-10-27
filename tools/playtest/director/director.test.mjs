@@ -141,8 +141,34 @@ test('scenario defaults: persona scenarios seed natives; the scripted basics bat
   const dir = new URL('../scenarios/', import.meta.url);
   for (const f of readdirSync(dir).filter((x) => x.endsWith('.json'))) {
     const s = JSON.parse(readFileSync(new URL(f, dir), 'utf8'));
+    if (!s.world) continue; // catalogue/manifests are not runnable scenarios
     if ((s.director?.mode ?? 'persona') === 'persona') assert.equal(s.world.natives, true, f);
     else assert.notEqual(s.world.natives, true, f);
   }
   assert.equal(budgetMsFor({ scenario: {}, god: true }), 600000);
+});
+
+// Owner-card native autoresults are sub-action progress, not a multi-step journey boundary.
+async function journeyRig({ turnEnd=30000, actionEnd=30000, observeTurn=true, budgetSec=60 }={}) {
+ const r=rig({ownerOpts:{resultMs:5000},turnMs:30000});const seat=r.seats[0];
+ const sent=()=>r.owner.sent[0]?.sentAt??Infinity;
+ Object.defineProperty(seat,'inTurn',{get:()=>observeTurn&&r.clock.now()>=sent()&&r.clock.now()<sent()+turnEnd});
+ seat.turnCount=()=>observeTurn&&r.clock.now()>=sent()+turnEnd?1:0;
+ r.observer.truth={snapshotSoul:async()=>({t:new Date(r.clock.now()).toISOString(),receipts:r.clock.now()<sent()+actionEnd?[{id:'act',phase:'running'}]:[{id:'act',phase:'failed',code:'seat.inside'}],posture:'standing'})};
+ const original=r.owner.cardView;r.owner.cardView=async args=>{const v=await original(args);if(v.latest?.result){Object.assign(v.latest,{outcome:'done',resultBy:'server',resultAt:sent()+5000});if(r.clock.now()>=sent()+turnEnd)Object.assign(v.latest,{result:'Unable to sit: seat.inside; I remain standing.',outcome:'failed',resultBy:undefined,resultAt:sent()+turnEnd});}return v;};
+ const recorded=[];r.observer.evidence.openRequest=args=>{const ev={...args,recorded,samples:[]};r.observer.opened.push(ev);return{evidence:ev,sample({snap}){ev.samples.push(snap)},recordCard(m){if(m?.result)recorded.push({at:r.clock.now(),text:m.result,by:m.resultBy})},close({cutoffReason}){r.observer.closed.push({requestId:args.requestId,cutoffReason,at:r.clock.now()});}};};
+ const scenario=scen({durationSec:90,observer:{sampleSec:2},director:{mode:'scripted',script:[{id:'podium',seat:'a',atSec:0,channel:'card',text:'Walk to the podium and sit',budgetSec,expect:{journey:{}}}]}});
+ await runPlay({...r,scenario,world,quotaCheck:noQuota});return r;
+}
+test('journey waits through intermediate native done until requesting turn ends; terminal failure and final sample retained',async()=>{
+ const r=await journeyRig();const closed=r.observer.closed[0];assert.equal(closed.cutoffReason,'turn-complete');assert.ok(closed.at>=30000&&closed.at<=35000);
+ assert.ok(r.observer.opened[0].recorded.some(x=>x.by==='server'&&x.at<30000));assert.match(r.observer.opened[0].recorded.at(-1).text,/Unable to sit/);
+ assert.equal(r.observer.opened[0].samples.at(-1).receipts[0].code,'seat.inside');
+});
+test('journey keeps an asynchronous action open beyond the model turn, but never extends frozen budget',async()=>{
+ let r=await journeyRig({turnEnd:10000,actionEnd:40000});assert.equal(r.observer.closed[0].cutoffReason,'turn-complete');assert.ok(r.observer.closed[0].at>=40000);
+ r=await journeyRig({turnEnd:80000,actionEnd:80000,budgetSec:20});assert.equal(r.observer.closed[0].cutoffReason,'budget');assert.ok(r.observer.closed[0].at>=20000&&r.observer.closed[0].at<=25000);
+});
+test('journey with automatic result but no observed agent turn stays open to budget',async()=>{
+ const r=await journeyRig({observeTurn:false,actionEnd:0,budgetSec:20});assert.equal(r.observer.closed[0].cutoffReason,'budget');assert.ok(r.observer.closed[0].at>=20000);
 });

@@ -58,3 +58,11 @@ test('bodies over 256 KB spill to raw/<sha>.json.gz with a projection and omitte
   const back = JSON.parse(gunzipSync(readFileSync(join(runDir, 'evidence', w.raw))));
   assert.equal(back.snapshot.entities.length, 4000);
 });
+
+test('card history preserves intermediate server result and later explicit failure, with latest result timestamps',()=>{
+ const runDir=mkdtempSync(join(tmpdir(),'pt-history-'));const ev=openRequest({runDir,seat:'a',requestId:'a-001',messageId:'msg_actual',text:'walk then sit',sentAt:0});
+ ev.recordCard({id:'msg_actual',result:'walk completed',outcome:'done',resultBy:'server',resultAt:5000},new Date(5000).toISOString());
+ ev.recordCard({id:'msg_other',text:'walk then sit',result:'wrong repeated text',resultAt:6000},new Date(6000).toISOString());
+ ev.recordCard({id:'msg_actual',result:'Cannot sit: seat.inside',outcome:'failed',resultAt:30000},new Date(30000).toISOString());
+ const out=ev.close({cutoffReason:'turn-complete',cutoffAt:new Date(31000).toISOString()});assert.equal(out.cardResults.length,2);assert.equal(out.firstResultAt,new Date(5000).toISOString());assert.equal(out.resultAt,new Date(30000).toISOString());assert.equal(out.resultBy,'agent');assert.equal(out.resultState,'failed');assert.equal(out.cardResults[0].by,'server');
+});
