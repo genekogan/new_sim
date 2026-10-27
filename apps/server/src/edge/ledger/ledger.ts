@@ -1490,8 +1490,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
       if (!set) {set = new Set(); for (const s of this.spots.spots) if (s.place && (s.activity === verb || s.also?.includes(verb))) for (let p: string | undefined = s.place, n = 0; p && n < 20; p = this.places.byId.get(p)?.parent ?? undefined, n++) set.add(p); spotPlaces.set(verb, set);}
       return set.has(placeId);
     };
-    return {caps, me: here, root: root ? [...tokens(root.id), ...tokens(root.name)] : [], elsewhere, hasSpot,
-      withheld, places: known.map(p => ({id: p.id, name: p.name, aliases: aliases[p.id] ?? [], center: centroid(p.polygon), parent: p.parent, kind: p.kind, description: p.description, walkable: !!(w.regions as Record<string, unknown>)[p.id] || !!this.placeWalkable?.(p.id)})),
+    return {caps, me: here, ...(me ? {yaw:me.pose.yaw} : {}), root: root ? [...tokens(root.id), ...tokens(root.name)] : [], elsewhere, hasSpot,
+      withheld, places: known.map(p => ({id: p.id, name: p.name, aliases: [...new Set([...(aliases[p.id] ?? []),...(p.aliases??[])])], center: centroid(p.polygon), polygon:p.polygon, level:p.level, parent: p.semanticParent === undefined ? p.parent : p.semanticParent, kind: p.kind, description: p.description, walkable: !!(w.regions as Record<string, unknown>)[p.id] || !!this.placeWalkable?.(p.id)})),
       target: c => {
         const t = c.target; if (!t) return {names: [], around: [], at: null};
         if (t.kind === 'spot') {
@@ -1500,7 +1500,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
           return {names: [...(sp?.label ? [sp.label] : []), ...(sp?.instrument ? [sp.instrument] : [])], around: pl ? [pl.id, pl.name] : [], at: sp ? sp.at : null};
         }
         if (t.kind === 'soul') {const m = this.host.minds.get(t.id), e = m ? this.body(m.entityId) : undefined; return {names: m ? [m.name] : [], around: [], at: e ? [e.pose.p[0], e.pose.p[2]] : null};}
-        const place = this.places.byId.get(t.id); if (place) return {names: [place.name], around: [], at: centroid(place.polygon)};
+        const place = this.places.byId.get(t.id); if (place) return {names: [place.name,place.kind,...(place.semanticKind?[place.semanticKind]:[]),...(place.aliases??[])], around: [], at: centroid(place.polygon)};
         const e = w.entities[t.id]; if (e) return {names: [], around: around(e.pose.p[0], e.pose.p[2]), at: [e.pose.p[0], e.pose.p[2]]};
         const o = objects.get(t.id), op = o ? this.places.byId.get(o.placeId) : undefined; if (op) return {names: [], around: [op.id, op.name], at: centroid(op.polygon)};
         // RESOLVE: a named thing that is no engine body (a horse, a duck: decor), where nav says it stands

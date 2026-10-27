@@ -2,6 +2,7 @@
 // perceive from where it stands. Strictly local: Souls and things in the same enclosed place (or, outdoors, not
 // inside one) within sight radius and with a clear sightline (nav/1 solids); never other places, never conversation
 // content, never owner data. Read-only; deterministic for a given world state. No model calls.
+import {whereLine} from './semantic-location.ts';
 import {isCampfire} from '../ledger/fire.ts';
 import {clockAt} from '@sim/brain';
 import type {WorldState as NativeWorld} from '../../../../../mars/viewer/engine/world/types.ts';
@@ -127,7 +128,7 @@ export class Perception {
     }
     if (opts.places !== false) {
       const known = (x: {id: string} | undefined) => !!x && (this.L.knowledge?.knows(this.soul.soulId, x.id) ?? true);   // knowledge/1: secret places stay unnamed until known
-      const byId = this.L.places.byId.get(q), p = known(byId) ? byId : [...this.L.places.byId.values()].find(x => x.parent !== null && named(x.name) && known(x));
+      const byId = this.L.places.byId.get(q), p = known(byId) ? byId : [...this.L.places.byId.values()].find(x => x.parent !== null && (named(x.name)||(x.aliases??[]).some(named)) && known(x));
       if (p) {const at = p.carrier ? (() => {const e = this.w.entities[p.carrier!.entity]; return e ? [e.pose.p[0], e.pose.p[2]] as V2 : centroid(p.polygon);})() : centroid(p.polygon); return {kind: 'place', id: p.id, name: p.name, at, distance: this.dist(at)};}
     }
     return null;
@@ -255,9 +256,11 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
       // RT: an exit the body cannot walk from here says so (no eta), instead of an eta for a walk that is refused
       const problem = ledger.routeProblem(soul, x.c.id);
       return problem ? {...base, reachable: false, why: problem.code} : {...base, eta: '~' + durationWord(walkSeconds(x.d * 1.25))};}) : [];
+  const where=whereLine([...ledger.places.byId.values()].filter(p=>ledger.knowledge.knows(soul.soulId,p.id)),ledger.placePathOf(soul.soulId).map(p=>p.id),P.pos);
   const frame = {
     ...(c ? {now: worldNow(c)} : {}), tick, ...(c ? {clock: `${String(c.hour).padStart(2, '0')}:${String(c.minute).padStart(2, '0')}`, day: WEEKDAYS[new Date(c.datetime).getUTCDay()], light: lightOf(c.hour, c.minute)} : {}),
     ...(weather ? {weather: (() => {const l = P.pos ? ledger.lightningNear?.(P.pos[0], P.pos[1]) : null; return l ? {...weather, lightning: l} : weather;})()} : {}),
+    ...(where?{where}:{}),
     me: {soulId:soul.soulId,name:host.minds.get(soul.soulId)?.name??soul.name,profileRevision:host.profileFact(soul.soulId)?.revision??0,place: me.place, placePath: me.placePath, pos: me.pos, heading: me.heading, facing: compassPoint(me.heading), posture: me.posture, body:P.w.entities[soul.entityId]?.body??{family:'humanoid'}, ...(me.seat ? {seat: me.seat} : {}),
       activity: inviting ? {kind: 'inviting', what: inviting.what, with: inviting.waitingFor.map(g => g.name), answerWithin: durationWord(inviting.expiresInSeconds)} : {kind: activityKind, ...(endsIn ? {endsIn} : {})},
       ...(gaze ? {gaze: {kind: gaze.kind, ...(gaze.target ? {at: nameOfEntity(gaze.target)} : gaze.at && P.pos ? {bearing: P.bearing(gaze.at)} : {})}} : {}),

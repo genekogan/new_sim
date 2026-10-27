@@ -34,7 +34,7 @@ export function aroundFrame(ledger: EdgeLedger, soul: EdgeSoul) {
     .filter(x => x.d <= PLACES_RADIUS && !inside.has(x.p.id)).sort((a, b) => a.d - b.d || a.p.id.localeCompare(b.p.id)).slice(0, 10)
     .map(({p, at, d}) => {const k = mem.get(p.id);
       return {id: p.id, name: p.name, ...(walks.has(p.id) ? {walk: walks.get(p.id)} : {}), dir: compassPoint(compassOf(at[0] - pos[0], at[1] - pos[1])), m: Math.round(d), eta: '~' + durationWord(walkSeconds(d * 1.25)),
-        ...(p.description ? {what: clip(p.description, 110)} : {}), ...(k ? {been: k.how === 'visited' ? k.visits : 'found'} : {}), ...(K.isSecret(p.id) ? {secret: true} : {})};});
+        ...(p.description ? {what: clip(p.description, 160)} : {}), ...(p.semanticKind?{kind:p.semanticKind}:{}), ...(p.parts?.length?{parts:p.parts.map(part=>({id:part.id,name:part.title,...(part.walk?{walk:part.walk}:{}),...(part.sit?{sit:part.sit}:{})}))}:{}), ...(k ? {been: k.how === 'visited' ? k.visits : 'found'} : {}), ...(K.isSecret(p.id) ? {secret: true} : {})};});
   const unvisited = places.filter(p => !mem.has(p.id) && p.walk).slice(0, 3).map(p => p.walk!);
   return {tick, ...(found.length ? {found: found.map(p => ({id: p.id, name: p.name, ...(walks.has(p.id) ? {walk: walks.get(p.id)} : {}), ...(p.description ? {what: clip(p.description, 110)} : {})}))} : {}),
     people, things, places, ...(() => {const f = floorLines(ledger, P, 60); return f.length ? {floors: f} : {};})(), ...(unvisited.length ? {unvisited} : {}), untrusted: true};
