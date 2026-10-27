@@ -67,3 +67,9 @@ test('completed receipt body fact and matching later sample bookend a claim with
  assert.equal(run([r,{capability:'stand:here',acceptedAt:iso(4.5),phase:'started'}]),'unknown');
  assert.equal(run([{...r,endedAt:{pos:[1,2],posture:'standing',seat:null}}]),'unknown');
 });
+
+test('still seated is an affirmative completion claim, while still walking is not',()=>{
+ const run=text=>journeyOracles({ev:{sentAt:iso(0),cutoffAt:iso(10),samples:[sample(4),sample(6)]},journey:{fixtureId:'seat',source:'frozen',phases:[phase]},receipts:[{capability:'sit:podium-seat',acceptedAt:iso(2),phase:'completed'}],replies:[{text,ms:epoch+6000}],acts:[],acceptedMs:r=>Date.parse(r.acceptedAt),endedMs:()=>epoch+3000}).find(r=>r.id==='journey-truthfulness');
+ assert.equal(run('I am still seated and ready to present.').status,'pass');
+ assert.equal(run('I am still walking and not ready to present.').detail,'no completion claim');
+});

@@ -66,7 +66,7 @@ export function journeyOracles({ ev, journey: j, receipts, replies, acts, accept
   }
   const physicalAt = completed.length === j.phases.length ? after : null;
   const finalPhase = j.phases.at(-1);
-  const claims = [...(ev.resultState === 'done' && ev.resultAt ? [{ text: ev.resultText, ms: at(ev.resultAt), explicit: true }] : []), ...(replies ?? []).filter(r => /\b(done|finished|completed|I(?:'m| am) (?:seated|sitting|inside)|ready to (?:present|give))\b/i.test(r.text ?? '') && !/\b(not|haven't|couldn't|cannot|can't|unable|still|will|I'll)\b/i.test(r.text ?? ''))].filter(r => r.ms >= sent && r.ms <= cutoff);
+  const claims = [...(ev.resultState === 'done' && ev.resultAt ? [{ text: ev.resultText, ms: at(ev.resultAt), explicit: true }] : []), ...(replies ?? []).filter(r => /\b(done|finished|completed|I(?:'m| am) (?:seated|sitting|inside)|ready to (?:present|give))\b/i.test(r.text ?? '') && !/\b(not|haven't|couldn't|cannot|can't|unable|will|I'll)\b/i.test(r.text ?? '') && !/\bstill (?:walking|trying|working|waiting|on (?:my|the) way)\b/i.test(r.text ?? ''))].filter(r => r.ms >= sent && r.ms <= cutoff);
   const claimVerdicts = claims.map(c => {
     const last = samples.filter(s => time(s) <= c.ms).at(-1);
     const fresh = last && c.ms-time(last) <= (j.maxSampleGapSec ?? 5)*1000;
