@@ -34,7 +34,7 @@ const normCode = (c: string) => c.toUpperCase().replace(/[^A-Z0-9]/g, '').replac
 export const newGodToken = (worldId: string) => `god_${worldId}_${randomBytes(24).toString('base64url')}`;
 
 type Pairing = { code: string; poll: string; agent: string; expires: number; token?: string };
-type Preview = { viewKeyHash: string; at: number; baseEditSeq: number; expect: Expectations; subtrees: Record<string, string[]>; affected: string[]; diff: Diff; ops: Batch; build?: BuildField; failures?: Failure[] };
+type Preview = { viewKeyHash: string; at: number; baseEditSeq: number; expect: Expectations; expectWorldAbout?: string; subtrees: Record<string, string[]>; affected: string[]; diff: Diff; ops: Batch; build?: BuildField; failures?: Failure[] };
 export type WorldDiffMessage = { type: 'edge'; kind: 'world-diff'; seq: number; tick: number; at: number; now: number; builds?: SiteDelta[]; diff: Diff; by: 'god' | 'undo' | 'redo' | 'engine'; ground?: ReturnType<WorldModel['ground']>; /** every def the upserts reference (viewers only hold defs in use) */ defs: ReturnType<typeof publicDef>[] };
 /** Called for every committed batch, in order, synchronously, before viewers hear of it (Stage B: the engine patches its Spatial here). */
 export type CommitListener = (c: { seq: number; diff: Diff; kind: 'edit' | 'undo' | 'redo'; by: string; group?: string }) => void;
@@ -399,12 +399,13 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const gate = this.helperGate(field, normalized.ops); if (gate) return { accepted: false, failures: [gate] };
     const retirement = this.retirementFailure(normalized.ops); if (retirement) return { accepted: false, failures: [retirement] };
     const stale = [...this.stale(preview?.expect ?? {}), ...this.staleSubtrees(preview), ...this.stale(input.expect ?? {})];
+    for (const expected of [input.expectWorldAbout, preview?.expectWorldAbout]) if (expected !== undefined && expected !== hashOf(this.model.state.about ?? null)) stale.push({ op: -1, code: 'revision.stale', field: 'expectWorldAbout', detail: 'World meaning changed since it was read. Read it again before replacing it.' });
     if (stale.length) return { accepted: false, failures: [...new Map(stale.map(f => [f.entity, f])).values()] };
     for (const [i, op] of normalized.ops.entries()) if (op.op === 'answer' && !this.store.prayer(op.prayer)) return { accepted: false, failures: [{ op: i, code: 'params.invalid', field: 'prayer', detail: `Unknown prayer ${op.prayer}.`, fix: 'Use an id from GET /v1/god/prayers.' }] };
     const admission = this.builds.admit(field, normalized, this.caller.identity); if (admission.failures) return { accepted: false, failures: admission.failures };
     normalized.group = admission.group;
     const journalNote = note ?? normalized.note;
-    const payloadHash = hashOf({ batch: normalized, build: field ?? null, expect: input.expect, preview: input.preview, note: journalNote ?? null });
+    const payloadHash = hashOf({ batch: normalized, build: field ?? null, expect: input.expect, expectWorldAbout: input.expectWorldAbout, preview: input.preview, note: journalNote ?? null });
     const guard = this.actGuard?.(normalized); if (guard) return guard;
     const off = deferredOp(normalized); if (off) return { accepted: false, failures: [off] } as Result;
     const tick = this.opts.tick();
@@ -719,7 +720,8 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const diff: Diff = p.ok ? p.diff : { upserts: [], removes: [], defs: [], tiles: [], answers: [] };
     const { expect, subtrees } = this.captureRevisions(parsed.data, diff);
     const affected = [...new Set([...diff.upserts.map(e => e.id), ...diff.removes])].filter(id => this.model.entities.has(id));
-    this.previews.set(id, { viewKeyHash: hashToken(viewKey), at: this.now(), baseEditSeq, expect, subtrees, affected, diff, ops: batchSchema.parse(parsed.data), build: structuredClone(build), ...(!p.ok ? { failures: p.failures } : {}) });
+    const expectWorldAbout = parsed.data.ops.some(op => op.op === 'world' && Object.hasOwn(op.state, 'about')) ? hashOf(this.model.state.about ?? null) : undefined;
+    this.previews.set(id, { viewKeyHash: hashToken(viewKey), at: this.now(), baseEditSeq, expect, expectWorldAbout, subtrees, affected, diff, ops: batchSchema.parse(parsed.data), build: structuredClone(build), ...(!p.ok ? { failures: p.failures } : {}) });
     if (!p.ok) return { id, accepted: false as const, failures: p.failures };
     const moving = this.bodies?.prepare?.(this.model, safe.next, p.diff, safe.batch.ops as Op[], { dry: true }) ?? NO_WALKOUTS;
     const warnings = [...kit.warnings, ...(safe.repair?.lines ?? [])];

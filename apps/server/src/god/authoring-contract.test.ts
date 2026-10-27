@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Hono } from 'hono';
-import { coreLibrary, coreRef, type ResidentMove, type Result } from '@sim/world-compiler';
+import { coreLibrary, coreRef, hashOf, type ResidentMove, type Result } from '@sim/world-compiler';
 import { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
 import { GodMode } from './god.ts';
@@ -239,6 +239,23 @@ test('explicit expectations guard only changed refs and are bound to the retry p
   const first = accepted(f.god.act(batch)); assert.deepEqual(f.god.act(batch), { ...first, replayed: true });
   const conflict = f.god.act({ ...batch, expect: { b: { id: b.id, v: b.v + 1 } } });
   assert.equal(conflict.accepted, false); if (!conflict.accepted) assert.equal(conflict.failures[0].code, 'request.conflict');
+});
+
+test('world meaning guards and previews refuse a concurrent description without blocking unrelated weather', t => {
+  const f = fixture(t), empty = hashOf(null);
+  const ops = [{ op: 'world', state: { about: { title: 'Reviewed world' } } }];
+  const pv = f.god.preview({ ops }); assert.equal(pv.accepted, true);
+  accepted(f.god.act({ ops: [{ op: 'world', state: { about: { title: 'Owner description' } } }] }));
+  for (const batch of [{ preview: pv.id }, { ops, expectWorldAbout: empty }]) {
+    const r = f.god.act(batch); assert.equal(r.accepted, false);
+    if (!r.accepted) assert.equal(r.failures[0].code, 'revision.stale');
+  }
+  const expected = hashOf(f.god.model.state.about);
+  accepted(f.god.act({ ops: [{ op: 'world', state: { weather: { kind: 'clear' } } }] }));
+  const batch = { ops, expectWorldAbout: expected, clientRef: 'meaning-retry' };
+  const first = accepted(f.god.act(batch));
+  assert.deepEqual(f.god.act(batch), { ...first, replayed: true });
+  assert.equal(f.god.model.state.about?.title, 'Reviewed world');
 });
 
 test('preview tracks parent paths, subtree children, and facing references', t => {

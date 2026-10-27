@@ -10,5 +10,6 @@ export const submissionSchema = batchSchema.extend({
   ops: batchSchema.shape.ops.optional(),
   preview: z.string().min(1).max(100).optional(),
   expect: expectationsSchema.optional(),
+  expectWorldAbout: z.string().regex(/^[0-9a-f]{64}$/).optional(),
   build: buildFieldSchema.optional(),
 }).refine(b => b.ops !== undefined || b.preview !== undefined, { path: ['ops'], message: 'Supply ops or a preview id.' });
