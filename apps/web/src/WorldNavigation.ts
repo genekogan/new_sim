@@ -47,7 +47,15 @@ export function createWorldOrbitControls(camera: PerspectiveCamera,canvas: HTMLC
   // fires on programmatic updates, so `start`/`end` (a held pointer) alone cannot
   // distinguish a real drag from the moving target or a collision clamp.
   let inputBefore:Vector3|null=null;
-  const beginInput=()=>{inputBefore=camera.position.clone().sub(controls.target);queueMicrotask(()=>{inputBefore=null;});};
+  let clearInput:ReturnType<typeof setTimeout>|undefined;
+  const beginInput=(event:Event)=>{
+    if(event.type==='pointermove'&&!(event as PointerEvent).buttons)return;
+    if(clearInput!==undefined)clearTimeout(clearInput);
+    inputBefore=camera.position.clone().sub(controls.target);
+    // Native browser dispatch runs microtasks between listeners. A microtask
+    // here clears the capture before OrbitControls receives the same event.
+    clearInput=setTimeout(()=>{inputBefore=null;clearInput=undefined;},0);
+  };
   const inputs:[EventTarget,string][]=[[canvas.ownerDocument,'pointermove'],[canvas,'wheel']];
   if(onUserInput)for(const [surface,name] of inputs)surface.addEventListener(name,beginInput,{capture:true,passive:true});
   const controls=new OrbitControls(camera,canvas);
@@ -65,10 +73,11 @@ export function createWorldOrbitControls(camera: PerspectiveCamera,canvas: HTMLC
   if(onUserInput){
     controls.addEventListener('change',()=>{
       if(!inputBefore||context.mode!=='follow')return;
-      const after=camera.position.clone().sub(controls.target);onUserInput(inputBefore,after);inputBefore=after;
+      const before=inputBefore;inputBefore=null;
+      const after=camera.position.clone().sub(controls.target);onUserInput(before,after);
     });
     const dispose=controls.dispose.bind(controls);
-    controls.dispose=()=>{for(const [surface,name] of inputs)surface.removeEventListener(name,beginInput,true);inputBefore=null;dispose();};
+    controls.dispose=()=>{for(const [surface,name] of inputs)surface.removeEventListener(name,beginInput,true);if(clearInput!==undefined)clearTimeout(clearInput);inputBefore=null;dispose();};
   }
   return controls;
 }

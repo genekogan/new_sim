@@ -53,7 +53,7 @@ test('Follow consumes real wheel and drag deltas, never programmatic controls up
     f.event('pointerdown',{pointerId:8,clientX:100,clientY:100});await Promise.resolve();
     // A held but still pointer grants no permission to treat frame corrections as input.
     f.camera.position.y+=.02;controls.update();assert.equal(inputs.length,1);
-    const e=new Event('pointermove',{cancelable:true});Object.assign(e,{pointerId:8,pointerType:'mouse',clientX:180,clientY:100,button:0});f.doc.dispatchEvent(e);await Promise.resolve();
+    const e=new Event('pointermove',{cancelable:true});Object.assign(e,{pointerId:8,pointerType:'mouse',clientX:180,clientY:100,button:0,buttons:1});f.doc.dispatchEvent(e);await Promise.resolve();
     assert.equal(inputs.length,2);assert.ok(inputs[1].before.angleTo(inputs[1].after)>.01);
     f.camera.position.y+=.02;controls.update();assert.equal(inputs.length,2);
     controls.dispose();f.event('wheel',{deltaY:120});assert.equal(inputs.length,2,'disposed bindings do not consume input');
