@@ -45,7 +45,7 @@ node eden.mjs resolve "row a boat with Mira"           # dry run: what would be 
   reason; pick an alternative only if the owner's request allows it. Never substitute a different activity silently
   (lying down is not sitting; walking is not running; a solo dance is not dancing *with* someone).
 - `act` and `wait` print `done: "…"` (the world's verdict) once the action ended, else `now: "…"` (what the body is
-  doing right now). Until `done` appears the request is not done; say so. Quote it; `--json` shows everything.
+  doing right now). That verdict covers one action, not a whole multi-step request. Until every requested final condition holds, the request is not done; say so. Quote the receipt; `--json` shows everything.
   `--wait [s]` (max 60); then `wait 60` again if needed.
 - Receipt phases: `waiting` (accepted, not begun) → `started` → `completed` | `failed` | `replaced`. Acceptance is not
   arrival.
@@ -82,10 +82,9 @@ When `listen` exits it prints `{messages:[{id,text,sentAt}…]}`, oldest first. 
 
 1. `node eden.mjs ack <id> "Got it: …"` for **every** message, at most 140 characters each (the first line the owner sees).
 2. Start `node eden.mjs listen --after <last id>` in the background again, before doing the work.
-3. Do them in order with `act … --wait` (the first act after an ack serves it, the next too after `open`; else
-   `--for <id>`). A newer message that contradicts an older one wins: `result <old id> failed "Replaced: …"`.
+3. For one action, use `act … --wait` (the first act after an ack serves it; later use `--for <id>`). For a multi-step request, use `act … --for none --wait` for each step, then verify every final condition and send `result <id> done|failed "…"` (at most 140 characters). Never attach the whole request to an intermediate walk. A newer contradictory message wins: `result <old id> failed "Replaced: …"`.
 
-The server closes your owner's message when the act ends. When no act is needed (already done, a question), close it
+An act linked to the message closes it when that action ends. When no act is needed (already done, a question), close it
 yourself: `result <id> done|failed "…"`. An ack says what you will try, never what happened. A question is answered in the ack, then `result <id> done`. Any command may print `OWNER: n message(s)
 waiting` on stderr, and `wait` returns early with `ownerMessages` when the owner writes: handle them the same way. If
 `listen` exits without messages (killed, network), start it again. If it fails twice with the same error, tell the owner.

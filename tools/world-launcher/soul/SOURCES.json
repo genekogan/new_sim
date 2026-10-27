@@ -18,9 +18,9 @@
   "skill": {
     "file": "skill.md",
     "version": "2.2.3",
-    "sha256": "2f32de165d3060ade16d47de71835add6799d075f97f392d00ee3f3403a3b9a2",
+    "sha256": "b08c2d81d220e16d8d373ce5f803c0c4dde295640f4bcefb9bb76c8587277b11",
     "from": "authorized laptop 2 handover, copied from <team>/scratch/soul3/client-handover/SKILL-v2.md",
-    "note": "SOUL3 guide for eden.mjs, published byte for byte; no {{}} templates (the world serves it as is). Replaces the 1.9 skill below. 2.1.0 (soul fix round 1, D3): owner step 4 and the long-activity advice became one sentence (the server closes the message), one rule added (an ack says what you will try, never what happened); net 0 lines, 5,970 bytes. 2.2.0: adds the public `now` line section (LINK). 2.2.0 also says to close an owner message yourself when no act is needed (ride-check I-2). 2.2.1 (D3b): \"Until `done` appears the request is not done; say so.\" in Acting; owner step 3 says only the first act after an ack serves it; 6,390 bytes. 2.2.2 (D3c): owner step 3 says the next act serves it too after `open` (net 0 lines); 6,412 bytes. 2.2.3 (unified semantics): explore aliases around; guidance uses semantic candidates and verifies every final body/seat condition."
+    "note": "SOUL3 guide for eden.mjs, published byte for byte; no {{}} templates (the world serves it as is). Replaces the 1.9 skill below. 2.1.0 (soul fix round 1, D3): owner step 4 and the long-activity advice became one sentence (the server closes the message), one rule added (an ack says what you will try, never what happened); net 0 lines, 5,970 bytes. 2.2.0: adds the public `now` line section (LINK). 2.2.0 also says to close an owner message yourself when no act is needed (ride-check I-2). 2.2.1 (D3b): \"Until `done` appears the request is not done; say so.\" in Acting; owner step 3 says only the first act after an ack serves it; 6,390 bytes. 2.2.2 (D3c): owner step 3 says the next act serves it too after `open` (net 0 lines); 6,412 bytes. 2.2.3 (unified semantics): explore aliases around; guidance uses semantic candidates and verifies every final body/seat condition. Multi-step requests keep intermediate acts unlinked and close explicitly after all final predicates; a native receipt is a step verdict."
   },
   "instructions": {
     "file": "instructions.md",

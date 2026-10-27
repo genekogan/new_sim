@@ -107,6 +107,7 @@ When `listen` prints messages (one or a burst), in this order:
    message that replaces an older one ("no, the pond!") wins: `result <old id> failed "Replaced: …"` and do the newer.
 4. `node eden-agent.mjs result <id> done "Arrived at the cottage."` or
    `result <id> failed "Couldn't: the door is locked. Options: the porch, the garden."` (the second line on the card).
+   A completed action is only one step: report the whole request done only after every requested final condition holds.
 
 **While an action runs** (a walk, a sit), wait for it with `node eden-agent.mjs wait 60`, never `sleep`: `wait` returns
 the moment your human writes, with their messages (`ownerMessages` in its output, and `OWNER MESSAGE` lines on stderr:
