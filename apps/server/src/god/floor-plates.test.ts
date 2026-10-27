@@ -186,3 +186,30 @@ test('full patched and rotated Mars keeps the presenter supported and persistent
   assert.equal(E.bodyUsesV1(box.id)?.body,s.entityId,'the exact presenter fixture is held');
   assert.deepEqual(E.runtime.violations,[],'both stair directions and the seat approach remain collision free');
 });
+
+test('semantic seat receipts freeze the real entity and exact slot through completion and replay', {timeout:60000}, async t=>{
+  const w=world(t);await w.settle(2);
+  const built:any=w.god.act({ops:[
+    {op:'place',def:coreRef('plaza'),name:'auditorium',shape:{area:[[-10,-40],[10,-40],[10,-20],[-10,-20]]}},
+    {op:'place',def:coreRef('bench'),name:'presenter',p:[0,-30]},
+  ]} as any);assert.equal(built.accepted,true,JSON.stringify(built));await w.settle();
+  const bench=w.god.model.get('presenter')!,slots=w.god.model.slotsOf(bench).filter(s=>s.kind==='seat'),slot=slots.at(-1)!;assert.ok(slot);
+  const labelled:any=w.god.act({ops:[{op:'set',id:'auditorium',about:{title:'Auditorium',parts:[{id:'podium-desk',title:'Presenter desk',anchor:{kind:'entity',ref:'presenter',slot:slot.id}}]}}]} as any);assert.equal(labelled.accepted,true,JSON.stringify(labelled));await w.settle();
+  await invite(w,'semantic');const row:any=await accept(w.host,w.souls.create('dev:semantic',{name:'Semantic Presenter',description:'a speaker'}));await w.settle();
+  const soul={soulId:row.id,entityId:row.entity_id,name:row.name,owner:row.owner};
+  await accept(w.host,w.host.enqueue('edge-relocate','test:semantic-seat',{soulId:soul.soulId,entityId:soul.entityId,to:[-3,-28],why:'near presenter'}));await w.settle();
+  const input={capability:'sit:auditorium/part-podium-desk',params:{seconds:1},clientRef:'semantic-seat-regression'};
+  const published:any[]=[];w.edge.onReceipt(r=>{if(r.soulId===soul.soulId)published.push(r);});
+  const accepted:any=await accept(w.host,w.edge.act(soul,input));assert.equal(accepted.accepted,true,JSON.stringify(accepted));
+  const chosen={capability:input.capability,target:bench.id,kind:'object',seat:bench.id,slot:`${bench.id}#${slot.id}`};
+  assert.deepEqual(accepted.receipt.chosen,chosen,'selection identifies the real slot at acceptance');
+  assert.deepEqual(published.find(r=>r.id===accepted.receipt.id)?.chosen,chosen,'first receipt publication already carries its binding');
+  assert.notEqual(accepted.receipt.phase,'completed','a selected slot is not completed seating');
+  const rebound:any=w.god.act({ops:[{op:'set',id:'auditorium',about:{title:'Auditorium',parts:[{id:'podium-desk',title:'Presenter desk',anchor:{kind:'entity',ref:'presenter',slot:slots[0].id}}]}}]} as any);assert.equal(rebound.accepted,true,JSON.stringify(rebound));
+  let terminal:any;
+  for(let i=0;i<3000;i++){terminal=w.edge.receipt(soul.soulId,accepted.receipt.id);if(terminal&&['completed','failed'].includes(terminal.phase))break;w.host.tickOnce();if(i%20===0){await setImmediate();w.host.drainInputs();}}
+  assert.equal(terminal.phase,'completed',JSON.stringify(terminal));assert.deepEqual(terminal.chosen,chosen,'receipt polling retains frozen choice');
+  const held=(w.host.engine as any).nativeSeatHoldsV1(soul.entityId);assert.ok(JSON.stringify(held).includes(`${bench.id}#${slot.id}`),JSON.stringify(held));
+  const replay:any=await w.edge.act(soul,input);assert.equal(replay.receipt.id,accepted.receipt.id);assert.deepEqual(replay.receipt.chosen,chosen,'clientRef replay returns persisted choice');
+  const detail=w.db.db.prepare('SELECT detail FROM edge_receipts_v1 WHERE receipt_id=?').get(accepted.receipt.id) as {detail:string};assert.deepEqual(JSON.parse(detail.detail).chosen,chosen,'history is durable receipt detail');
+});

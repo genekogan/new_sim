@@ -293,8 +293,9 @@ export class Intents {
     if (r.kind === 'capability') {
       const out = await this.L.act(soul, {capability: r.capability, params: {...extra, ...(r.params ?? {})}, ...(clientRef ? {clientRef} : {})});
       if (!out.accepted) return {...out, ...(r.chosen.seat ? {} : {})} as Refused;
-      const receipt = this.L.coreA.setDetail(out.receipt.id, {chosen: r.chosen, intent: intentOf(input)}) ?? out.receipt;
-      return {accepted: true, receipt, chosen: r.chosen, channel: (receipt as {channel?: string}).channel ?? 'body', ...(out.resolved ? {resolved: out.resolved} : {})};
+      const chosen={...r.chosen,...(out.receipt.chosen as Chosen??{})};
+      const receipt = this.L.coreA.setDetail(out.receipt.id, {chosen, intent: intentOf(input)}) ?? out.receipt;
+      return {accepted: true, receipt, chosen, channel: (receipt as {channel?: string}).channel ?? 'body', ...(out.resolved ? {resolved: out.resolved} : {})};
     }
     if (r.kind === 'plan') {
       const out = await this.L.coreA.launchPlan(soul, r.capability, r.label, r.steps, clientRef,input.params&&typeof input.params==='object'&&!Array.isArray(input.params)?input.params as Record<string,unknown>:{});

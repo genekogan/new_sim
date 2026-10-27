@@ -398,7 +398,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       if(seats.length)this.setDetail(id,{standReleaseV1:{actor:soul.entityId,owner:soul.owner,seats} satisfies StandReleaseV1});
     }
     if(phase==='completed'&&capability==='stand:here')this.ownerControlGrace(soul.soulId);
-    if (keepActivity || !OPEN.includes(phase)) this.setDetail(id, {...detail, ...(keepActivity ? {channel: this.nextChannel ?? 'none'} : {}), ...(!OPEN.includes(phase) ? {endedAt: bodyEnd(this, soul.soulId)} : {})});
+    if (Object.keys(detail).length || keepActivity || !OPEN.includes(phase)) this.setDetail(id, {...detail, ...(keepActivity ? {channel: this.nextChannel ?? 'none'} : {}), ...(!OPEN.includes(phase) ? {endedAt: bodyEnd(this, soul.soulId)} : {})});
     if(!OPEN.includes(phase))this.finishOutcome(this.rows('receipt_id=?',id)[0]);});
     const r = this.receipt(soul.soulId, id)!; this.emit(r); return r;
   }
@@ -814,7 +814,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
         if(!place.ok){this.recordRefusal(soul.soulId,'act',input.capability,place.code,place.reason);const {ok:_ok,...refusal}=place;return this.withInPlaceAlternative(soul,{accepted:false as const,capability:input.capability,...refusal});}
         const out=await this.act(soul,{...input,capability:place.chosen.capability});
         if(!out.accepted)return out;
-        const receipt=this.coreA.setDetail(out.receipt.id,{chosen:place.chosen})??out.receipt;return {...out,receipt};
+        const receipt=this.coreA.setDetail(out.receipt.id,{chosen:{...place.chosen,...(out.receipt.chosen as Record<string,unknown>??{})}})??out.receipt;return {...out,receipt};
       }
     }
     if(typeof input.capability==='string'){const walk=walkWithDestinationWords(input.capability,[...this.host.minds.values()].map(m=>m.name));if(walk){const out=await this.intents.act(soul,{...walk,...(input.params?{params:input.params}:{}),clientRef:input.clientRef});if(out.accepted){this.capCache.clear();return {...out,resolved:{from:input.capability,to:out.receipt.capability,note:'Walk to the named destination; companions receive an invitation and choose whether to join.'}};}
@@ -1004,7 +1004,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       return {accepted: true, receipt: this.receipt(soul.soulId, r.id)!, ...resolved};
     }
     if (!cap.available && cap.blocked && !WAIT_CODES.has(cap.blocked.code) && !this.host.quietBarrier) return {...refuse(cap.blocked.code, cap.blocked.reason), ...resolved};
-    return this.launch(soul, capability, plan.label, this.standIfSeated(soul, steps), clientRef, resolved, refuse, prep.commit,params);
+    return this.launch(soul, capability, plan.label, this.standIfSeated(soul, steps), clientRef, resolved, refuse, prep.commit,params,cap.target?{capability:cap.id,target:cap.target.id,kind:cap.target.kind,...(cap.target.kind==='place'?{place:cap.target.id}:{})}:undefined);
   }
   /** CN5 (acceptance: reservation.conflict on the Soul's own seat): a seated body that is going somewhere or doing
    *  something with its whole body gets up first; overlays done on the seat (read, eat, wave…) keep it. */
@@ -1013,14 +1013,19 @@ export class EdgeLedger implements EdgeLedgerHooks {
     return [{verb: 'stand', params: {}}, ...steps];
   }
   /** Start a body plan as the Soul's act: queued through a quiet renewal or a safe stop, else decided now. */
-  private async launch(soul: EdgeSoul, capability: string, label: string, steps: Program['steps'], clientRef: string | undefined, resolved: {resolved?: Resolved}, refuse: (code: string, reason: string) => {accepted: false; code: string; reason: string; capability: string}, commit?: (receipt: string) => void,contentParams:Record<string,unknown>={}) {
+  private async launch(soul: EdgeSoul, capability: string, label: string, steps: Program['steps'], clientRef: string | undefined, resolved: {resolved?: Resolved}, refuse: (code: string, reason: string) => {accepted: false; code: string; reason: string; capability: string}, commit?: (receipt: string) => void,contentParams:Record<string,unknown>={},chosen?:Record<string,unknown>) {
+    // Freeze the binding before dispatch: semantic capability names are not
+    // identities of the real native fixtures they invoke. This is selection,
+    // not a claim that the body has reached or used the target.
+    const seatSlot=steps.find(s=>s.verb==='mars:sit'&&typeof s.params.slot==='string')?.params.slot;
+    const detail={...((chosen||typeof seatSlot==='string')?{chosen:{...structuredClone(chosen??{}),...(typeof seatSlot==='string'?{seat:seatSlot.split('#')[0],slot:seatSlot}:{})}}:{})};
     const nativeUse = this.nativeUseRefusal?.(capability, steps);
     if (nativeUse) return {...refuse(nativeUse.code, nativeUse.reason), ...resolved};
     const stepOut = this.stepOutRefusal(soul.entityId); if (stepOut) return {...refuse(stepOut.code, stepOut.reason), ...resolved};
     const unsupported=bodyCapabilityProblem(this.body(soul.entityId),{id:capability,verb:capability.split(':')[0]!,label,available:true},steps);if(unsupported)return refuse(unsupported.code,unsupported.reason);
     if (this.host.quietBarrier) {
       // Quiet renewal is brief and always ends (stall release): accept and start at first light, receipt 'waiting'.
-      const r = this.insert(soul, capability, 'waiting', clientRef,false,{},contentParams); commit?.(r.id);
+      const r = this.insert(soul, capability, 'waiting', clientRef,false,detail,contentParams); commit?.(r.id);
       this.arm({receipt: r.id, soul, steps, label, deadline: this.host.engine.world.tick + WAIT_LIMIT_TICKS, capability});
       return {accepted: true as const, receipt: this.receipt(soul.soulId, r.id)!, ...resolved};
     }
@@ -1111,12 +1116,12 @@ export class EdgeLedger implements EdgeLedgerHooks {
     };
     if (issue) {
       // Asleep or mid-step: stop safely first, then start (receipt `waiting`).
-      const r = this.insert(soul, capability, 'waiting', clientRef,false,{},contentParams); commit?.(r.id); remember(r.id);
+      const r = this.insert(soul, capability, 'waiting', clientRef,false,detail,contentParams); commit?.(r.id); remember(r.id);
       this.arm({receipt: r.id, soul, steps, label, deadline: this.host.engine.world.tick + WAIT_LIMIT_TICKS, capability});
       if (issue.code === 'program.safe-stop-required') await this.host.enqueue('edge-stop', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, receipt: r.id});
       return {accepted: true as const, receipt: this.receipt(soul.soulId, r.id)!, ...resolved};
     }
-    const r = this.insert(soul, capability, 'waiting', clientRef,false,{},contentParams); commit?.(r.id); remember(r.id);
+    const r = this.insert(soul, capability, 'waiting', clientRef,false,detail,contentParams); commit?.(r.id); remember(r.id);
     await this.decide(soul, r.id, capability, label, steps);
     return {accepted: true as const, receipt: this.receipt(soul.soulId, r.id)!, ...resolved};
   }
