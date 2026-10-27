@@ -5,7 +5,7 @@ export function bindJourneyFixtures(scenario, snapshot) {
   const path = e => { const names = []; const seen = new Set(); while (e) { if (seen.has(e.id)) throw new Error('fixture parent cycle'); seen.add(e.id); names.unshift(e.name ?? e.id); e = byId.get(e.in?.parent); } return names.join('/'); };
   const byPath = new Map((snapshot.entities ?? []).map(e => [path(e), e]));
   const bindings = [];
-  for (const entry of scenario.director?.script ?? []) for (const p of entry.expect?.journey?.phases ?? []) {
+  for (const entry of scenario.director?.script ?? []) for (const phase of entry.expect?.journey?.phases ?? []) for (const p of phase.anyOf ?? [phase]) {
     if (!p.receipt?.targetRefs) continue;
     p.receipt.targetIds = p.receipt.targetRefs.map(ref => {
       const entity = byPath.get(ref); if (!entity) throw new Error(`fixture ${entry.id}: required entity ${ref} missing`);

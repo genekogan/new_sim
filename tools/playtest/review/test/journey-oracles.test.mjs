@@ -27,3 +27,18 @@ test('swim then exit must occur in order, and hold cannot bridge standing sample
   assert.equal(score({ samples: [sample(2, 'swimming'), sample(4, 'standing')] }, [swim, exit])['journey-completion'].status, 'pass');
   assert.equal(score({ samples: [sample(2),sample(3,'standing'),sample(6)] }, [{ ...phase, holdSec: 3 }])['journey-completion'].status, 'fail');
 });
+
+test('legitimate alternatives bind each physical region to its own receipt', () => {
+  const alternatives={name:'study seat',postures:['seated'],anyOf:[{region:{pos:[1,2],radiusM:0.5},receipt:{capabilities:['sit:chair-a']}},{region:{pos:[10,2],radiusM:0.5},receipt:{capabilities:['sit:chair-b']}}]};
+  const receipt=capability=>[{capability,acceptedAt:iso(2)}];
+  assert.equal(score({},[alternatives],receipt('sit:chair-a'))['journey-completion'].status,'pass');
+  assert.equal(score({samples:[sample(6,'seated',10)]},[alternatives],receipt('sit:chair-b'))['journey-completion'].status,'pass');
+  assert.equal(score({},[alternatives],receipt('sit:chair-b'))['journey-completion'].status,'fail');
+  assert.equal(score({samples:[sample(4),sample(6,'seated',10)]},[{...alternatives,holdSec:2}],receipt('sit:chair-a'))['journey-completion'].status,'fail');
+});
+
+test('shore return needs the real bank place as well as standing near the lake',()=>{
+ const bank={name:'bank',region:{pos:[1,2],radiusM:20},postures:['standing'],places:['lake.bank']};
+ assert.equal(score({samples:[{...sample(6,'standing'),place:'lake.water'}]},[bank])['journey-completion'].status,'fail');
+ assert.equal(score({samples:[{...sample(6,'standing'),place:'lake.bank'}]},[bank])['journey-completion'].status,'pass');
+});

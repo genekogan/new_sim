@@ -28,3 +28,10 @@ test('stable-path binding ignores prose aliases and fails for missing fixture ta
   assert.deepEqual(s.director.script[0].expect.journey.phases[0].receipt.targetIds, ['true-chair']);
   assert.throws(() => bindJourneyFixtures(s, { entities: [] }), /required entity/);
 });
+
+test('alternative fixture receipt targets bind independently', async () => {
+  const {bindJourneyFixtures}=await import('./fixture-bindings.mjs');
+  const phases=[{anyOf:[{receipt:{targetRefs:['chair-a']}},{receipt:{targetRefs:['chair-b']}}]}];
+  bindJourneyFixtures({director:{script:[{id:'seats',expect:{journey:{phases}}}]}},{entities:[{id:'a',name:'chair-a'},{id:'b',name:'chair-b'}]});
+  assert.deepEqual(phases[0].anyOf.map(p=>p.receipt.targetIds),[['a'],['b']]);
+});

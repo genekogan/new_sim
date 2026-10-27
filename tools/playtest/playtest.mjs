@@ -4,6 +4,7 @@ import { mkdirSync, existsSync, readFileSync, writeFileSync, copyFileSync, cpSyn
 import { resolve, join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
+import { assertFrozenGenesis } from './lib/physical-fixture.mjs';
 import { bindJourneyFixtures } from './arena/fixture-bindings.mjs';
 import { providerPolicy, requireProviders, assertMeasurementReady } from './lib/provider-policy.mjs';
 import { now, setAnchor, sleep, monoMs } from './lib/clock.mjs';
@@ -83,6 +84,7 @@ async function cmdRun(a) {
   assertMeasurementReady(scenario);
   const seed = Number(a.seed ?? scenario.seed ?? 1);
   const serverRoot = resolve(a['server-root'] ?? scenario.serverRoot ?? DEFAULT_SERVER_ROOT);
+  assertFrozenGenesis(scenario, serverRoot);
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..*/, '').replace('T', '-');
   const runDir = a.out ? resolve(a.out) : join(RUNS_ROOT, `${stamp}-${scenario.name}-${seed}`);
   mkdirSync(join(runDir, 'receipts'), { recursive: true });

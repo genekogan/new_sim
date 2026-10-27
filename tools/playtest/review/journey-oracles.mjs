@@ -3,9 +3,12 @@ import { xz } from './run.mjs';
 const at = value => typeof value === 'number' ? value : Date.parse(value);
 const row = (id, status, detail, extra = {}) => ({ id, status, detail, ...extra });
 const time = sample => at(sample.t);
+const options = p => Array.isArray(p.anyOf) ? p.anyOf.map(branch => ({...p, ...branch, anyOf: undefined})) : [p];
 const phaseMatches = (s, p) => {
+  if (p.anyOf) return options(p).some(branch => phaseMatches(s, branch));
   const pos = xz(s.pos);
   if (p.region && (!pos || Math.hypot(pos[0] - p.region.pos[0], pos[1] - p.region.pos[1]) > p.region.radiusM)) return false;
+  if (p.places && !p.places.includes(s.place)) return false;
   if (p.postures && !p.postures.includes(s.posture)) return false;
   const activity = typeof s.activity === 'object' ? s.activity?.kind : s.activity;
   if (p.activities && !p.activities.includes(activity)) return false;
@@ -17,7 +20,8 @@ export function validateJourney(j) {
   const errors = [];
   if (!j?.fixtureId || !j?.source) errors.push('journey requires fixtureId and immutable source');
   if (!Array.isArray(j?.phases) || !j.phases.length) errors.push('journey.phases required');
-  for (const [i, p] of (j?.phases ?? []).entries()) {
+  for (const p of j?.phases ?? []) if (p.anyOf && (!Array.isArray(p.anyOf) || !p.anyOf.length)) errors.push('phase anyOf must contain alternatives');
+  for (const [i, phase] of (j?.phases ?? []).entries()) for (const p of options(phase)) {
     if (!p.region || !Array.isArray(p.region.pos) || p.region.pos.length !== 2 || !p.region.pos.every(Number.isFinite) || !(p.region.radiusM > 0)) errors.push(`phase ${i} needs frozen region`);
     if (p.receipt && !p.receipt.capabilities?.length && !p.receipt.targetIds?.length && !p.receipt.targetRefs?.length) errors.push(`phase ${i} receipt needs exact capabilities/targets`);
   }
@@ -34,21 +38,24 @@ export function journeyOracles({ ev, journey: j, receipts, replies, acts, accept
     return rule.capabilities?.includes(r.capability) || rule.targetIds?.some(id => target.includes(id) || r.capability === `${rule.verb}:${id}`);
   };
   const completed = [], phaseFacts = []; let after = sent;
-  for (const p of j.phases) {
-    const eligible = samples.filter(s => time(s) >= after && phaseMatches(s, p));
+  for (const phase of j.phases) {
     let found = null;
-    for (const s of eligible) {
-      const end = time(s) + (p.holdSec ?? 0) * 1000;
-      const held = samples.filter(q => time(q) >= time(s) && time(q) <= end);
-      const endSample = eligible.find(q => time(q) >= end);
-      if (!endSample || held.some(q => !phaseMatches(q, p))) continue;
-      const holdSamples = samples.filter(q => time(q) >= time(s) && time(q) <= time(endSample));
-      if (holdSamples.some((q,i) => i > 0 && time(q)-time(holdSamples[i-1]) > (j.maxSampleGapSec ?? 5)*1000)) continue;
-      const receipt = p.receipt ? validReceipts.find(r => choiceMatches(r, p) && acceptedMs(r) <= time(endSample) && (!p.receipt.completed || (r.phase === 'completed' && endedMs(r) != null && endedMs(r) <= time(endSample)))) : null;
-      if (p.receipt && !receipt) continue;
-      found = { at: time(endSample), sample: endSample, receipt }; break;
+    for (const p of options(phase)) {
+      const eligible = samples.filter(s => time(s) >= after && phaseMatches(s, p));
+      for (const s of eligible) {
+        const end = time(s) + (p.holdSec ?? 0) * 1000;
+        const held = samples.filter(q => time(q) >= time(s) && time(q) <= end);
+        const endSample = eligible.find(q => time(q) >= end);
+        if (!endSample || held.some(q => !phaseMatches(q, p))) continue;
+        const holdSamples = samples.filter(q => time(q) >= time(s) && time(q) <= time(endSample));
+        if (holdSamples.some(q => !phaseMatches(q,p))) continue;
+        if (holdSamples.some((q,i) => i > 0 && time(q)-time(holdSamples[i-1]) > (j.maxSampleGapSec ?? 5)*1000)) continue;
+        const receipt = p.receipt ? validReceipts.find(r => choiceMatches(r, p) && acceptedMs(r) <= time(endSample) && (!p.receipt.completed || (r.phase === 'completed' && endedMs(r) != null && endedMs(r) <= time(endSample)))) : null;
+        if (p.receipt && !receipt) continue;
+        if (!found || time(endSample) < found.at) found = { at: time(endSample), sample: endSample, receipt }; break;
+      }
     }
-    phaseFacts.push({ name: p.name, passed: !!found, at: found ? new Date(found.at).toISOString() : null, receiptId: found?.receipt?.id ?? null });
+    phaseFacts.push({ name: phase.name, passed: !!found, at: found ? new Date(found.at).toISOString() : null, receiptId: found?.receipt?.id ?? null });
     if (!found) break;
     completed.push(found); after = found.at;
   }
@@ -61,7 +68,7 @@ export function journeyOracles({ ev, journey: j, receipts, replies, acts, accept
     const last = samples.filter(s => time(s) <= c.ms).at(-1);
     return !last || c.ms - time(last) > (j.maxSampleGapSec ?? 5) * 1000 || !phaseMatches(last, finalPhase);
   });
-  const accepted = validReceipts.filter(r => j.phases.some(p => p.receipt && choiceMatches(r, p))).sort((a, b) => acceptedMs(a) - acceptedMs(b))[0];
+  const accepted = validReceipts.filter(r => j.phases.some(p => options(p).some(branch => branch.receipt && choiceMatches(r, branch)))).sort((a, b) => acceptedMs(a) - acceptedMs(b))[0];
   const firstAcceptedAt = accepted ? acceptedMs(accepted) : null;
   const perceptions = acts.filter(a => /\beden(?:-agent)?\.mjs (?:here|explore|map|around|caps|observe|resolve)\b/.test(a.cmd));
   const firstPerceptionAt = perceptions.map(a => a.completedAtMs).filter(Number.isFinite).sort((a,b) => a-b)[0] ?? null;
