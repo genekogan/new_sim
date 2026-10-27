@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { PerspectiveCamera, Vector3 } from 'three';
 import { WorldNavigation, createWorldOrbitControls, type NavigationContext } from '../src/WorldNavigation.ts';
 import { WorldRtsCamera } from '../src/WorldRtsCamera.ts';
+import { WorldFollow, FOLLOW_NEAR } from '../src/WorldFollow.ts';
 
 class Surface extends EventTarget {
   tagName='CANVAS'; isContentEditable=false; tabIndex=-1;
@@ -34,6 +35,30 @@ function fixture(){
   return {nav,camera,target,context,canvas,window,doc,event,ownership,released:()=>released};
 }
 const close=(a:number,b:number)=>assert.ok(Math.abs(a-b)<1e-8,`${a} != ${b}`);
+
+test('Follow consumes real wheel and drag deltas, never programmatic controls updates',async()=>{
+  const f=fixture();f.nav.dispose();f.context.mode='follow';f.context.navigation='orbit';
+  const follow=new WorldFollow(),inputs:{before:Vector3;after:Vector3}[]=[];
+  const controls=createWorldOrbitControls(f.camera,f.canvas as never,f.target,f.context,(before,after)=>{
+    inputs.push({before:before.clone(),after:after.clone()});follow.userInput(before,after);
+  });
+  try{
+    assert.equal(controls.minDistance,FOLLOW_NEAR);assert.equal(controls.enableDamping,false);
+    follow.resolve(controls.target,f.camera.position.clone().sub(controls.target),[],1/60);
+    for(let i=0;i<30;i++){f.camera.position.y+=.02;controls.update();}
+    assert.equal(inputs.length,0);
+    f.event('wheel',{deltaY:120});await Promise.resolve();
+    assert.equal(inputs.length,1);assert.ok(inputs[0].after.length()>inputs[0].before.length());
+    assert.equal(follow.userActive,true);
+    f.event('pointerdown',{pointerId:8,clientX:100,clientY:100});await Promise.resolve();
+    // A held but still pointer grants no permission to treat frame corrections as input.
+    f.camera.position.y+=.02;controls.update();assert.equal(inputs.length,1);
+    const e=new Event('pointermove',{cancelable:true});Object.assign(e,{pointerId:8,pointerType:'mouse',clientX:180,clientY:100,button:0});f.doc.dispatchEvent(e);await Promise.resolve();
+    assert.equal(inputs.length,2);assert.ok(inputs[1].before.angleTo(inputs[1].after)>.01);
+    f.camera.position.y+=.02;controls.update();assert.equal(inputs.length,2);
+    controls.dispose();f.event('wheel',{deltaY:120});assert.equal(inputs.length,2,'disposed bindings do not consume input');
+  }finally{controls.dispose();}
+});
 
 test('WASD and Q/E move an explicitly focused scene at frame-independent speed; no keys outside scene ownership',()=>{
   const distance=(fps:number)=>{

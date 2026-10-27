@@ -1,6 +1,7 @@
 import { Vector3, type PerspectiveCamera } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { WorldCameraMode } from './WorldBroadcast.ts';
+import { FOLLOW_NEAR, FOLLOW_MAX } from './WorldFollow.ts';
 export type ManualNavigation = 'orbit' | 'free';
 /** C1: the farthest your camera's eye may be from its pivot (metres). The wheel stops sooner on a small world
  * (WorldRtsCamera.farLimit); this bounds OrbitControls (touch pinch) and keeps the 2400 m far plane beyond the map. */
@@ -40,17 +41,35 @@ export function editableEvent(event: KeyboardEvent): boolean {
 
 /** Recreate through the public API to discard latent drag/damping state.
  * Preserve the current camera pose and pivot across input release. */
-export function createWorldOrbitControls(camera: PerspectiveCamera,canvas: HTMLCanvasElement,target: Vector3 | undefined,context:NavigationContext): OrbitControls {
+export function createWorldOrbitControls(camera: PerspectiveCamera,canvas: HTMLCanvasElement,target: Vector3 | undefined,context:NavigationContext,onUserInput?:(before:Vector3,after:Vector3)=>void): OrbitControls {
   const position=camera.position.clone(),rotation=camera.quaternion.clone();
+  // Capture before OrbitControls handles the DOM event. Its `change` event also
+  // fires on programmatic updates, so `start`/`end` (a held pointer) alone cannot
+  // distinguish a real drag from the moving target or a collision clamp.
+  let inputBefore:Vector3|null=null;
+  const beginInput=()=>{inputBefore=camera.position.clone().sub(controls.target);queueMicrotask(()=>{inputBefore=null;});};
+  const inputs:[EventTarget,string][]=[[canvas.ownerDocument,'pointermove'],[canvas,'wheel']];
+  if(onUserInput)for(const [surface,name] of inputs)surface.addEventListener(name,beginInput,{capture:true,passive:true});
   const controls=new OrbitControls(camera,canvas);
-  controls.enableDamping=true;controls.maxPolarAngle=context.mode==='follow'?Math.PI*.48:Math.PI*.99;controls.minDistance=2;controls.maxDistance=MANUAL_FAR_LIMIT;
+  // Follow already glides its collision solution; residual OrbitControls damping
+  // must not become a second, unlabelled source of camera movement.
+  controls.enableDamping=context.mode!=='follow';controls.maxPolarAngle=context.mode==='follow'?Math.PI*.48:Math.PI*.99;controls.minDistance=2;controls.maxDistance=MANUAL_FAR_LIMIT;
   controls.enabled=!(context.mode==='manual'&&context.navigation==='free');controls.enablePan=context.mode!=='follow';
   // VF2 (Gene): your camera pans along the ground and zooms toward the point under the cursor; Follow keeps its Soul centred.
   controls.mouseButtons.RIGHT=null; // RMB is owned by look-in-place, never OrbitControls pan.
   controls.screenSpacePanning=false;controls.zoomToCursor=context.mode==='manual';
-  // Follow keeps left-drag orbit and 2.4–40m zoom; RMB deliberately takes over to look in place.
-  if(context.mode==='follow'){controls.minDistance=2.4;controls.maxDistance=40;}
+  // The displayed camera may fit to 1 m in a doorway; never push it back out to
+  // the preferred user zoom floor. RMB deliberately takes over to look in place.
+  if(context.mode==='follow'){controls.minDistance=FOLLOW_NEAR;controls.maxDistance=FOLLOW_MAX;}
   if(target){controls.target.copy(target);camera.position.copy(position);camera.quaternion.copy(rotation);}
+  if(onUserInput){
+    controls.addEventListener('change',()=>{
+      if(!inputBefore||context.mode!=='follow')return;
+      const after=camera.position.clone().sub(controls.target);onUserInput(inputBefore,after);inputBefore=after;
+    });
+    const dispose=controls.dispose.bind(controls);
+    controls.dispose=()=>{for(const [surface,name] of inputs)surface.removeEventListener(name,beginInput,true);inputBefore=null;dispose();};
+  }
   return controls;
 }
 

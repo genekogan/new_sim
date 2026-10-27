@@ -49,6 +49,7 @@ test('VF6: a drag/zoom in Follow is the view: kept as drawn, not glided back, no
   // The viewer orbits 70° and zooms out by 1.5×, in small per-frame steps (OrbitControls output).
   for(let i=0;i<20;i++){
     const target=new THREE.Vector3((60+i)/60*1.4,1,0),dragged=offset.clone().applyAxisAngle(new THREE.Vector3(0,1,0),70/20*Math.PI/180).multiplyScalar(Math.pow(1.5,1/20));
+    follow.userInput(offset,dragged);
     const next=follow.resolve(target,dragged,[root],1/60);
     assert.ok(next.distanceTo(dragged)<1e-6,`frame ${i}: drawn as dragged (${next.distanceTo(dragged).toFixed(4)} m off)`);
     offset=next;
@@ -64,10 +65,10 @@ test('VF6: a wall behind the camera while dragging pulls it in, and the asked-fo
   const follow=new WorldFollow(),target=new THREE.Vector3(0,1,0);let offset=new THREE.Vector3(0,2,8);
   for(let i=0;i<30;i++)offset=follow.resolve(target,offset,[g],1/60);
   // Orbit 180° in 30 frames: the camera passes behind the wall.
-  let minR=Infinity;for(let i=0;i<30;i++){const dragged=offset.clone().applyAxisAngle(new THREE.Vector3(0,1,0),Math.PI/30);offset=follow.resolve(target,dragged,[g],1/60);minR=Math.min(minR,offset.length());}
+  let minR=Infinity;for(let i=0;i<30;i++){const dragged=offset.clone().applyAxisAngle(new THREE.Vector3(0,1,0),Math.PI/30);follow.userInput(offset,dragged);offset=follow.resolve(target,dragged,[g],1/60);minR=Math.min(minR,offset.length());}
   assert.ok(offset.z<0&&offset.length()<5.2,`behind the wall the camera is in front of it (r=${offset.length().toFixed(2)})`);
   assert.ok(minR>=2.39,'never into the body');
-  for(let i=0;i<30;i++){const dragged=offset.clone().applyAxisAngle(new THREE.Vector3(0,1,0),Math.PI/30);offset=follow.resolve(target,dragged,[g],1/60);}
+  for(let i=0;i<30;i++){const dragged=offset.clone().applyAxisAngle(new THREE.Vector3(0,1,0),Math.PI/30);follow.userInput(offset,dragged);offset=follow.resolve(target,dragged,[g],1/60);}
   assert.ok(offset.length()>7.5,`back out of the wall the asked-for distance returns (r=${offset.length().toFixed(2)})`);
 });
 

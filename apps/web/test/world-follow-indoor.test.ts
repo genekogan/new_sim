@@ -59,7 +59,8 @@ test('Dragging the camera out through a one-sided room wall pulls it back inside
   let offset=follow.resolve(target,new THREE.Vector3(5,3,7),[root],1/60);
   for(let i=0;i<120;i++)offset=follow.resolve(target,offset,[root],1/60);
   // The viewer orbits toward the back wall (2 m away, nearer than the 2.4 m zoom floor) and zooms out.
-  offset=follow.resolve(target,new THREE.Vector3(0,.6,-6),[root],1/60);
+  const dragged=new THREE.Vector3(0,.6,-6);follow.userInput(offset,dragged);
+  offset=follow.resolve(target,dragged,[root],1/60);
   assert.ok(follow.userActive);
   assert.ok(inRoom(target.clone().add(offset))&&seen(root,target,offset),`camera ${target.clone().add(offset).toArray()} kept inside`);
   // After the hand leaves the camera, the search keeps it inside too.

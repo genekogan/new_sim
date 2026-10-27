@@ -5,7 +5,8 @@ import {WorldVisibilityInstances} from './WorldVisibilityInstances.ts';
 /** VF6: Follow zoom bounds (metres from the Soul) and how long after the last drag/zoom the viewer's view is kept as is. */
 export const FOLLOW_MIN=2.4,FOLLOW_MAX=40;const USER_HOLD=.6;
 /** Nearest the camera comes to the Soul when walls (a narrow room, a stair) leave no clear view farther out. */
-const NEAR=1;
+export const FOLLOW_NEAR=1;
+const NEAR=FOLLOW_NEAR;
 export class WorldFollow {
   private requested:THREE.Vector3|null=null;
   private rendered:THREE.Vector3|null=null;
@@ -105,21 +106,22 @@ export class WorldFollow {
   /** Length for an offset whose sight reaches only `reach`: in to the nearest wall (the camera never sits behind
    * one), not nearer than NEAR to the body; a Soul pressed into a solid keeps a readable FOLLOW_MIN instead. */
   private fit(length:number,reach:number){return reach>=NEAR?Math.min(length,reach):Math.min(length,FOLLOW_MIN);}
+  /** Only actual control input changes the preferred view. Use the two offsets
+   * around that input event, so ground fitting and collision correction are not
+   * mistaken for a zoom, even when the viewer drags while near a wall. */
+  userInput(before:THREE.Vector3,after:THREE.Vector3){
+    if(![...before.toArray(),...after.toArray()].every(Number.isFinite)||before.length()<.01||after.length()<.01||before.distanceTo(after)<1e-5)return;
+    this.requested??=before.clone();
+    const length=Math.max(FOLLOW_MIN,Math.min(FOLLOW_MAX,this.requested.length()*after.length()/before.length()));
+    // The gesture chooses the displayed direction, including when a previous
+    // collision search had moved it away from the old preferred direction.
+    this.requested.copy(after).setLength(length);
+    this.rendered=after.clone().setLength(this.requested.length());
+    this.chosen=null;this.userAt=this.clock;this.userOrbited=true;
+  }
   resolve(target:THREE.Vector3,actualOffset:THREE.Vector3,roots:readonly THREE.Object3D[],seconds:number):THREE.Vector3 {
     if(!actualOffset.toArray().every(Number.isFinite)||actualOffset.length()<.01)return actualOffset.clone();
     if(!this.requested||!this.rendered)this.requested=actualOffset.clone();
-    else if(actualOffset.distanceTo(this.rendered)>1e-5){
-      // OrbitControls changes the displayed offset. Apply its rotation and
-      // zoom ratio to the requested offset rather than losing the hidden zoom.
-      const rotation=new THREE.Quaternion().setFromUnitVectors(this.rendered.clone().normalize(),actualOffset.clone().normalize());
-      this.requested.applyQuaternion(rotation).multiplyScalar(actualOffset.length()/this.rendered.length());
-      const wantedLength=Math.max(FOLLOW_MIN,Math.min(FOLLOW_MAX,this.requested.length()));
-      this.requested.copy(actualOffset).setLength(wantedLength);  // VF6: exactly the direction the viewer chose
-      // VF6 (Gene: "use the mouse to adjust your viewpoint but always facing the subject"): the user's orbit/zoom
-      // IS the view. Take it as drawn (no glide back to the old viewpoint) and make it the preferred offset the
-      // occlusion search starts from; the gentle behind-the-walk drift stops for this follow.
-      this.rendered=actualOffset.clone().setLength(this.requested.length());this.chosen=null;this.userAt=this.clock;this.userOrbited=true;
-    }
     for(const root of roots)root.updateWorldMatrix(true,true);
     this.collect(roots);
     return this.instances.withQuery(this.objects,()=>this.resolveCollected(target,roots,seconds));

@@ -325,10 +325,11 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     // Far plane covers the whole ±900 m terrain from anywhere in Eden: a nearer far plane slices the distant
     // ranges and the slice moves with the camera (ridges seemed to rise and recede). Depth precision is set by near.
     const camera = (adopted?.camera as THREE.PerspectiveCamera|undefined) ?? new THREE.PerspectiveCamera(45, 1, 0.1, 2400);
+    const followView=new WorldFollow();
     let down: { x: number; y: number } | null = null;
     const newControls = (target?: THREE.Vector3) => createWorldOrbitControls(camera,renderer.domElement,target,{
       mode:context.current.cameraMode,navigation:context.current.manualNavigation,lifecycle:'',
-    });
+    },(before,after)=>followView.userInput(before,after));
     let controls=newControls();
     navigation=new WorldNavigation(renderer.domElement,camera,()=>controls.target,()=>({
       mode:context.current.cameraMode,navigation:context.current.manualNavigation,
@@ -432,7 +433,6 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const light = (adopted?.light as Daylight|undefined) ?? new Daylight(scene);if(quality.shadowMapSize!==light.sun.shadow.mapSize.x)light.sun.shadow.mapSize.set(quality.shadowMapSize,quality.shadowMapSize);
     const broadcast = new WorldBroadcast();
     broadcast.hints=()=>({soulEntity:id=>context.current.sim.conn.replica.souls.get(id)?.entityId??null,eden:!!expansion&&!past.current,daylight:light.daylight,carriers:rideCarriers,...(entityLayer.active&&!expansion?{views:godTourViews(entityLayer,entityLayer.groundAt)}:{})});  // R4-LIVE: a god world's own landmarks  // VF1/VF5: who speaks; Eden town views; time of day
-    const followView=new WorldFollow();
     const followMotion=new WorldFollowMotion();
     let followTick:number|null=null,followEpoch:string|null=null;
     let previousCameraMode: WorldCameraMode = 'broadcast';
