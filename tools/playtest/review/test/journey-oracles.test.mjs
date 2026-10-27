@@ -5,7 +5,7 @@ const epoch = Date.parse('2026-10-27T12:00:00Z');
 const iso = n => new Date(epoch + n * 1000).toISOString();
 const sample = (n, posture = 'seated', x = 1) => ({ t: iso(n), pos: [x, 2], posture });
 const phase = { name: 'podium seat', region: { pos: [1, 2], radiusM: 0.5 }, postures: ['seated'], receipt: { capabilities: ['sit:podium-seat'] } };
-function score(extra = {}, phases = [phase], receipts = [{ id: 'r', capability: 'sit:podium-seat', acceptedAt: iso(2), phase: 'completed' }]) {
+function score(extra = {}, phases = [phase], receipts = [{ id: 'r', capability: 'sit:podium-seat', acceptedAt: iso(2), endedAt: iso(3), phase: 'completed' }]) {
   return Object.fromEntries(journeyOracles({ ev: { sentAt: iso(0), cutoffAt: iso(30), samples: [sample(4), sample(6)], resultAt: iso(6), resultState: 'done', ...extra }, journey: { fixtureId: 'podium-v1', source: 'immutable geometry fixture', phases }, receipts, replies: [], acts: [], acceptedMs: r => Date.parse(r.acceptedAt), endedMs: r => Date.parse(r.endedAt) }).map(r => [r.id, r]));
 }
 test('exact seat receipt plus physical region and posture completes; prose and nearby ground sit cannot', () => {
@@ -50,4 +50,20 @@ test('bound seat requires a sit receipt, actual held seat and nonfailed action',
  assert.equal(score(ev,[seat],[r])['journey-completion'].status,'pass');
  for(const bad of [{...r,capability:'walk:podium'},{...r,phase:'failed'},{...r,phase:'replaced'},{...r,phase:undefined}]) assert.equal(score(ev,[seat],[bad])['journey-completion'].status,'fail');
  for(const held of [null,'other-seat']){const result=score({samples:[{...sample(6),seat:held}]},[seat],[r]);assert.equal(result['journey-completion'].status,'fail');assert.equal(result['journey-truthfulness'].status,'fail');}
+});
+
+test('sampling gap is unknown; later sitting alone cannot prove or refute an earlier claim',()=>{
+ const seat={...phase,receipt:{verb:'sit',targetIds:['podium']}};
+ const r={capability:'sit:podium',phase:'started',acceptedAt:iso(2)};
+ const result=score({samples:[{...sample(4,'standing'),seat:null},{...sample(6),seat:'podium'}],resultAt:iso(5)},[seat],[r]);
+ assert.equal(result['journey-truthfulness'].status,'unknown');
+});
+test('completed receipt body fact and matching later sample bookend a claim without backdating later body',()=>{
+ const seat={...phase,receipt:{verb:'sit',targetIds:['podium']}};
+ const r={capability:'sit:podium',phase:'completed',acceptedAt:iso(2),endedAt:{pos:[1,2],posture:'seated',seat:'podium'}};
+ const ev={sentAt:iso(0),cutoffAt:iso(10),samples:[{...sample(6),seat:'podium'}],resultAt:iso(5),resultState:'done'};
+ const run=receipts=>journeyOracles({ev,journey:{fixtureId:'seat',source:'frozen',phases:[seat]},receipts,replies:[],acts:[],acceptedMs:r=>Date.parse(r.acceptedAt),endedMs:r=>r===receipts[0]?epoch+4000:null}).find(r=>r.id==='journey-truthfulness').status;
+ assert.equal(run([r]),'pass');
+ assert.equal(run([r,{capability:'stand:here',acceptedAt:iso(4.5),phase:'started'}]),'unknown');
+ assert.equal(run([{...r,endedAt:{pos:[1,2],posture:'standing',seat:null}}]),'unknown');
 });
