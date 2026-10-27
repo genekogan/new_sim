@@ -376,6 +376,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
         if (Array.isArray(v) && v.length === 2 && v.every(Number.isFinite)) return {name: target ?? (fromLabel !== plan.label ? fromLabel : `the spot to ${plan.label.toLowerCase()}`), to: [v[0] as number, v[1] as number]};
       }
       if (Number.isFinite(p.x) && Number.isFinite(p.z)) return {name: target ?? (fromLabel !== plan.label ? fromLabel : `the spot to ${plan.label.toLowerCase()}`), to: [p.x as number, p.z as number]};
+      if(st.verb==='mars:swim_in'&&typeof p.water==='string')return {name:target??fromLabel,to:null};
     }
     return null;
   }

@@ -8,7 +8,7 @@
 //
 // It also offers Souls the ground's reference points through the edge:
 // `walk:flag-<name>` for every god flag, `swim:<water>` for every water body
-// (walk to its nearest shore, then swim to its middle).
+// (enter nearby reachable deep water; an explicit middle target is also offered).
 import type { DatabaseSync } from 'node:sqlite';
 import type { Db } from '../db.ts';
 import type { WorldHost } from '../world.ts';
@@ -73,7 +73,7 @@ import { groundField as groundFieldOf } from '@sim/engine-mars';
 
 // ---------------------------------------------------------------- edge capabilities
 
-type Cap = { id: string; verb: string; label: string; available: boolean; target?: { id: string; kind: string }; params?: Record<string, unknown> };
+type Cap = { id: string; verb: string; label: string; available: boolean; target?: { id: string; kind: string }; params?: Record<string, unknown>; blocked?: {code:string;reason:string} };
 type Plan = { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean; stop?: boolean };
 type Ledger = { worldProfile?: (soul: { soulId: string; entityId: string }, caps: Cap[], plans: Map<string, Plan>) => void };
 
@@ -94,13 +94,17 @@ export function installGroundCapabilities(ledger: Ledger, god: GodMode, host: Wo
       caps.push({ id, verb: 'walk', label: `Walk to the flag "${label}" (${Math.round(Math.hypot(wp.x - me.pose.p[0], wp.z - me.pose.p[2]))} m)`, available: true, target: { id: e.id, kind: 'object' } });
       plans.set(id, { label: `Walk to ${label}`, steps: [{ verb: 'walk_to', params: { to: [wp.x, wp.z], standoff: 0.8 } }] });
     }
-    for (const w of god.model.ground().waters) {
+    const ground=god.model.ground(),recipe=(host.engine.world as unknown as {groundV1?:{recipeHash:string}}).groundV1?.recipeHash,field=recipe?groundFieldOf(recipe):null;
+    for (const w of ground.waters) {
       const pts = (w.area ?? w.path) as [number, number][], mid = centroid(pts), named = god.model.entities.get(w.id)?.name ?? w.id, id = `swim:${slug(named)}`;
       if (caps.some((c) => c.id === id)) continue;
       // Native travel validates a real bank and handles walking off a jetty;
       // an outline point can be many metres from the actual wetted shoreline.
-      caps.push({ id, verb: 'swim', label: `Swim in ${named} (walk to its shore, then swim out to the middle)`, available: true, target: { id: w.id, kind: 'object' } });
-      plans.set(id, { label: `Swim in ${named}`, steps: [{ verb: 'mars:ground_travel', params: { x: mid[0], z: mid[1], level:0 } }] });
+      caps.push({ id, verb: 'swim', label: `Swim in ${named} (enter nearby reachable deep water)`, available: true, target: { id: w.id, kind: 'object' } });
+      plans.set(id, { label: `Swim in ${named}`, steps: [{ verb: 'mars:swim_in', params: { water:w.id } }] });
+      const middle=field?.waterId?.(mid[0],mid[1])===w.id&&field.medium(mid[0],mid[1])===2&&(host.engine as unknown as {deepWaterTargetV1?:(x:number,z:number)=>boolean}).deepWaterTargetV1?.(mid[0],mid[1])===true;
+      caps.push({id:`${id}/middle`,verb:'swim',label:`Swim to the middle of ${named}`,available:middle,target:{id:w.id,kind:'object'},...(!middle?{blocked:{code:'swim.no-deep-middle',reason:'The centre point is not deep water in this body; choose its generic swim action.'}}:{})});
+      if(middle)plans.set(`${id}/middle`,{label:`Swim to the middle of ${named}`,steps:[{verb:'mars:swim_in',params:{water:w.id,x:mid[0],z:mid[1]}}]});
     }
   };
 }

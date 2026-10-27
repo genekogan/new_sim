@@ -430,7 +430,10 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       return {kind:'unknown',code:'gait.no-bank-loop',reason:'That pond has no full loop on reachable dry ground; nothing else was chosen.',didYouMean:[]};
     }
   }
-  const pool = ctx.caps.filter(c => c.verb === verb || (c.verb === 'object' && c.action === verb && /^e_/.test(c.object ?? '')));
+  // A specifically offered water-centre journey is never the default generic swim.
+  const explicitMiddle=verb==='swim'&&/\b(?:middle|cent(?:er|re))\s+of\b|\b(?:middle|cent(?:er|re))\s*$/i.test(rest);
+  const middleParents=new Set(ctx.caps.filter(c=>c.verb==='swim'&&c.id.endsWith('/middle')).map(c=>c.id.slice(0,-7)));
+  const pool = ctx.caps.filter(c => (c.verb === verb || (c.verb === 'object' && c.action === verb && /^e_/.test(c.object ?? ''))) && !(verb==='swim'&&(explicitMiddle?middleParents.has(c.id):c.id.endsWith('/middle'))));
   // RESOLVE: a world-engine label's ", by <neighbours> (16 m)" names the neighbours, not the thing ("go to the pond" was a tree
   // by the pond reeds): step 3 tries the names before it first (strict), then the whole label ("the bench by the pond")
   const info = new Map(pool.map(c => {const raw=ctx.target(c), t={...raw,names:[...raw.names,...(c.aliases??[])]}, own = [c.target?.id ?? '', c.id.slice(c.id.indexOf(':') + 1), c.label, ...t.names].filter(Boolean);

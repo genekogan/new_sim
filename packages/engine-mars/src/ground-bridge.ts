@@ -6,7 +6,7 @@
 // bakes, and enters ground mode: Souls stand on the tiles, route over slope
 // and water media, swim deep water. Replay re-derives every height from the
 // journal of facts. Worlds without the fact are untouched.
-import { HUMANOID_MEDIA, TILE_M, Terrain, TileSampler, groundRecipeHash, groundSchema, mediaTile, mediumOf, waterLevelCell, watersNear, type Ground } from '../../ground/src/index.ts';
+import { areaMask, pathMask, HUMANOID_MEDIA, TILE_M, Terrain, TileSampler, groundRecipeHash, groundSchema, mediaTile, mediumOf, waterLevelCell, watersNear, type Ground } from '../../ground/src/index.ts';
 import type { GroundField, GroundV1 } from '../../../mars/viewer/engine/spatial/ground.ts';
 
 /** Content-addressed recipes this process can resolve (filled by the host from its table, and on every commit). */
@@ -48,6 +48,8 @@ function fieldOf(g: Ground, id: string): GroundField {
   return {
     id, extent: g.extent, wadeMax: HUMANOID_MEDIA.wadeMax, maxSlope: HUMANOID_MEDIA.maxSlope,
     height: (x, z) => t.sample(x, z),
+    waterId: (x,z) => { let id: string|null=null; for(const w of watersAt(x,z))if((w.area?areaMask(x,z,w.area,1e-9):pathMask(x,z,w.path!,w.w!))>0)id=w.id; return id; },
+    waterBounds: id => { const w=g.waters.find(w=>w.id===id);if(!w)return null;const pts=w.area??w.path!,pad=w.area?0:w.w!;return [Math.min(...pts.map(p=>p[0]))-pad,Math.min(...pts.map(p=>p[1]))-pad,Math.max(...pts.map(p=>p[0]))+pad,Math.max(...pts.map(p=>p[1]))+pad]; },
     waterLevel: (x, z) => {
       // L1 (speed): per 1 m cell, levelAmong compiled once (waterLevelCell: the same answers); a nav tile asks every 0.1 m cell
       const cx = Math.floor(x), cz = Math.floor(z), k = (cx + 1048576) * 2097152 + (cz + 1048576);
@@ -66,7 +68,7 @@ export function groundFact(g: Ground, editSeq: number, opts: { paged?: boolean }
 
 // ---------------------------------------------------------------- the engine side
 
-import { swimTo, shoreToward, groundTravel, inDeepWater, destinationInDeepWater } from '../../../mars/viewer/engine/locomotion/swim.ts';
+import { swimTo, swimIn, shoreToward, groundTravel, inDeepWater, destinationInDeepWater } from '../../../mars/viewer/engine/locomotion/swim.ts';
 import { acknowledgeRelocation, humanStaticClearance, humanStaticClearanceWithOverlay, speedWithinCap, SPEED_CAPS } from '../../../mars/viewer/engine/runtime/invariants.ts';
 import { entityList } from '../../../mars/viewer/engine/world/entity-list.ts';
 import { WALK_SPEED_CAP, setWalkReach } from '../../../mars/viewer/engine/locomotion/walk.ts';
@@ -79,7 +81,7 @@ export { shoreToward, inDeepWater, destinationInDeepWater };
 type Rt = { world: any; registry: Map<string, any>; services: Record<string, any>; invariants: any[]; records: Map<string, any>; isActive(id: string): boolean };
 
 /** Verbs a ground world adds to its registry. */
-export const GROUND_VERBS = [swimTo, groundTravel];
+export const GROUND_VERBS = [swimTo, groundTravel, swimIn];
 /** The registry with the ground verbs (the same map when they are there already). */
 export function groundRegistry(base: Map<string, any>): Map<string, any> {
   if (GROUND_VERBS.every((v) => base.get(v.verb) === v)) return base;

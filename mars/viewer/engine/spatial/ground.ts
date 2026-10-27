@@ -29,6 +29,10 @@ export interface GroundField {
   height(x: number, z: number): number;
   /** Water surface at (x, z), or null. */
   waterLevel(x: number, z: number): number | null;
+  /** Authored water whose surface wins here (overlaps use recipe order), or null. */
+  waterId?(x: number, z: number): string | null;
+  /** Bounds of one authored water; used only by an explicitly requested swim planner. */
+  waterBounds?(id: string): readonly [number, number, number, number] | null;
   /** Medium code of one point (fine: bilinear depth, the 1 m cell's slope). */
   medium(x: number, z: number): number;
   /** Coarse media of one tile: 64 × 64 codes of 1 m cells (row-major), cached by the field. */

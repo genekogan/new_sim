@@ -99,10 +99,10 @@ function waterPath(rt: Runtime, sp: Spatial, f: GroundField, from: Vec2, to: Vec
 }
 
 /** Plan a swim from where the actor is to (x, z): a route through water (pure; also used to find the shore). */
-export function planSwim(rt: Runtime, actor: string, to: Vec2, landing = false): { ok: true; points: Vec2[] } | { ok: false; diagnostic: Diagnostic } {
+export function planSwim(rt: Runtime, actor: string, to: Vec2, landing = false, fromOverride?: Vec2): { ok: true; points: Vec2[] } | { ok: false; diagnostic: Diagnostic } {
   const g = groundOf(rt);
   if (!g) return { ok: false, diagnostic: fail('no-water', 'there is no water to swim in here') };
-  const { sp, f } = g, e = rt.world.entities[actor], from: Vec2 = [e.pose.p[0], e.pose.p[2]];
+  const { sp, f } = g, e = rt.world.entities[actor], from: Vec2 = fromOverride ?? [e.pose.p[0], e.pose.p[2]];
   const gm = f.medium(to[0], to[1]);
   if (gm === G_OUTSIDE) return { ok: false, diagnostic: fail('outside', `(${fmt(to)}) lies beyond the edge of the world`, [actor]) };
   if (gm !== G_SWIM && gm !== G_WADE && !landing) return { ok: false, diagnostic: fail('not-water', `(${fmt(to)}) is not water; walk there instead`, [actor]) };
@@ -249,21 +249,22 @@ export function destinationInDeepWater(rt: Runtime, x: number, z: number): boole
 /** Native walk to a reachable bank, then native swim. The coarse media path chooses the bank;
  * the ordinary fine walk planner validates the approach and the swim replans from the actual
  * arrival pose. Bounded candidates prevent a long shoreline from causing unbounded fine searches. */
-function enterWater(rt: Runtime, p: TravelParams): {ok: true; program: TravelOp[]} | {ok: false; diagnostic: Diagnostic} {
+function enterWater(rt: Runtime, p: TravelParams, validateEntry = false, fromOverride?: Vec2): {ok: true; program: TravelOp[]} | {ok: false; diagnostic: Diagnostic} {
   const issue = bodyIssue(rt, p.actor, true); if (issue) return {ok: false, diagnostic: issue};
-  const {sp, f} = groundOf(rt)!, e = rt.world.entities[p.actor], from: Vec2 = [e.pose.p[0], e.pose.p[2]], to: Vec2 = [p.x, p.z];
-  if (onDeck(rt, p.actor)) {
+  const {sp, f} = groundOf(rt)!, e = rt.world.entities[p.actor], from: Vec2 = fromOverride??[e.pose.p[0], e.pose.p[2]], to: Vec2 = [p.x, p.z];
+  if (!fromOverride && onDeck(rt, p.actor)) {
     const land = deckLanding(sp, from);
     if (!land) return {ok: false, diagnostic: fail('no-shore', 'this deck has no walkable connection to the shore', [p.actor])};
     const walk = rt.registry.get('walk_to')!.plan(rt, {actor:p.actor,x:land[0],z:land[1],level:0});
     if (!walk.ok) return walk;
+    if(validateEntry){const r=enterWater(rt,p,true,land);if(!r.ok)return r;return {ok:true,program:[{verb:'walk_to',params:{actor:p.actor,x:land[0],z:land[1],level:0}},...r.program]};}
     return {ok:true,program:[{verb:'walk_to',params:{actor:p.actor,x:land[0],z:land[1],level:0}},
       {verb:'ground_travel',params:{...p}}]};
   }
   const path = waterPath(rt, sp, f, from, to);
   if (!path) return {ok: false, diagnostic: fail('unreachable', `no traversable bank connects (${fmt(from)}) to (${fmt(to)})`, [p.actor])};
   // Already at a bank: preserve the existing short step-in behaviour.
-  const direct = planSwim(rt, p.actor, to);
+  const direct = planSwim(rt, p.actor, to,false,fromOverride);
   if (direct.ok) return {ok: true, program: [{verb: 'swim_to', params: {actor: p.actor, x: p.x, z: p.z}}]};
   const wet = path.findIndex(q => coarseMedium(f, q[0], q[1]) === G_SWIM);
   if (wet < 0) return {ok: false, diagnostic: fail('no-shore', `no usable bank toward (${fmt(to)})`, [p.actor])};
@@ -276,6 +277,7 @@ function enterWater(rt: Runtime, p: TravelParams): {ok: true; program: TravelOp[
     tried++;
     const walk = rt.registry.get('walk_to')!.plan(rt, {actor: p.actor, x: q[0], z: q[1], level: 0});
     if (!walk.ok) continue;
+    if(validateEntry && !planSwim(rt,p.actor,to,false,q).ok)continue;
     return {ok: true, program: [
       {verb: 'walk_to', params: {actor: p.actor, x: q[0], z: q[1], level: 0}},
       {verb: 'swim_to', params: {actor: p.actor, x: p.x, z: p.z}},
@@ -325,4 +327,63 @@ export const groundTravel: ActionDef<TravelParams, TravelOp[], TravelExec> = {
     return { status: 'running', phase: op.verb };
   },
   cancel(rt, ex) { ex.stopping = true; if (ex.child && rt.isActive(ex.child)) { rt.cancel(ex.child, { code: 'ground.stopped', message: 'stopping where the body is' }); return { ok: true, deferred: rt.isActive(ex.child) }; } return { ok: true }; },
+};
+
+
+/** A generic swim means entering a specific water, not crossing it to its centroid.
+ * New verb: historical ground_travel programs and their recorded points are untouched. */
+type SwimInParams={actor:string;water:string;x?:number;z?:number};
+type SwimInExec=TravelExec&{water:string};
+const SWIM_IN_MARGIN=2.5;
+export const swimIn: ActionDef<SwimInParams,TravelOp[],SwimInExec>={
+ resumable:true,
+ reservations:(_w,p)=>[{resource:`actor:${p.actor}`,mode:'exclusive'}],
+ cancel:(rt,ex)=>groundTravel.cancel!(rt,ex),
+ verb:'swim_in',
+ description:'Take a swim in the selected named water: enter nearby reachable deep water and finish treading there.',
+ schema:z.object({actor:z.string().min(1).max(80),water:z.string().min(1).max(160),x:z.number().min(-10000).max(10000).optional(),z:z.number().min(-10000).max(10000).optional()}).strict().refine(p=>(p.x===undefined)===(p.z===undefined),'explicit swim points require x and z'),
+ plan(rt,p){
+  const issue=bodyIssue(rt,p.actor,true);if(issue)return {ok:false,diagnostic:issue};
+  const g=groundOf(rt);if(!g)return {ok:false,diagnostic:fail('no-water','there is no water to swim in here')};
+  const {sp,f}=g;sp.sync(rt.world);
+  const waterBounds=f.waterBounds?.(p.water);if(!waterBounds)return {ok:false,diagnostic:fail('water-missing',`the selected water ${p.water} is no longer present`,[p.actor,p.water])};
+  const e=rt.world.entities[p.actor],from:Vec2=[e.pose.p[0],e.pose.p[2]];
+  if(p.x!==undefined&&p.z!==undefined){
+   if(f.waterId?.(p.x,p.z)!==p.water||!destinationInDeepWater(rt,p.x,p.z))return {ok:false,diagnostic:fail('not-deep-target','the explicit destination is not uncovered deep water in the selected body',[p.actor,p.water])};
+   return enterWater(rt,{actor:p.actor,x:p.x,z:p.z,level:0},true);
+  }
+  const bounds=[Math.max(waterBounds[0],f.extent[0]),Math.max(waterBounds[1],f.extent[1]),Math.min(waterBounds[2],f.extent[2]),Math.min(waterBounds[3],f.extent[3])];
+  if(bounds[0]>=bounds[2]||bounds[1]>=bounds[3])return {ok:false,diagnostic:fail('no-deep-water','the selected water lies outside the world',[p.actor,p.water])};
+  // Grid bounds are the actual selected water, capped at 65,536 probes. Larger
+  // bodies use a coarser deterministic grid; no unbounded per-capability routing.
+  let stride=Math.max(1,Math.ceil(Math.sqrt((bounds[2]-bounds[0]+1)*(bounds[3]-bounds[1]+1)/65536)));
+  const count=(lo:number,hi:number)=>Math.max(0,Math.ceil((hi-(Math.ceil(lo/stride)*stride+.5))/stride));
+  while(count(bounds[0],bounds[2])*count(bounds[1],bounds[3])>65536)stride*=2;
+  const candidates:Vec2[]=[];
+  const deep=(x:number,z:number)=>f.waterId?.(x,z)===p.water&&f.medium(x,z)===G_SWIM&&sp.ground!.field.medium(x,z)===G_SWIM;
+  for(let x=Math.ceil(bounds[0]/stride)*stride+.5;x<bounds[2];x+=stride)for(let z=Math.ceil(bounds[1]/stride)*stride+.5;z<bounds[3];z+=stride){
+   if(!deep(x,z))continue;
+   // A real swimming leg beyond the wading threshold. Sample a near-bank
+   // margin in eight directions, excluding other waters and bridge decks.
+   if(![[1,0],[-1,0],[0,1],[0,-1],[.707,.707],[.707,-.707],[-.707,.707],[-.707,-.707]].every(([dx,dz])=>deep(x+dx*SWIM_IN_MARGIN,z+dz*SWIM_IN_MARGIN)))continue;
+   if(hypot(x-from[0],z-from[1])<SWIM_IN_MARGIN)continue;
+   candidates.push([x,z]);
+  }
+  candidates.sort((a,b)=>(a[0]-from[0])**2+(a[1]-from[1])**2-((b[0]-from[0])**2+(b[1]-from[1])**2)||a[0]-b[0]||a[1]-b[1]);
+  const tried:Vec2[]=[];
+  for(const to of candidates){
+   if(tried.some(q=>hypot(q[0]-to[0],q[1]-to[1])<3))continue;
+   if(tried.length>=12)break;tried.push(to);
+   if(swimBlocker(sp,f,[to,to]))continue;
+   const r=enterWater(rt,{actor:p.actor,x:to[0],z:to[1],level:0},true);
+   if(r.ok)return r;
+  }
+  return {ok:false,diagnostic:fail(candidates.length?'no-reachable-entry':'no-deep-water',candidates.length?`no safe reachable entry to nearby deep water in ${p.water} was found in the bounded search`:`the bounded search found no uncovered deep swimming area in ${p.water} with a ${SWIM_IN_MARGIN} m margin`,[p.actor,p.water])};
+ },
+ start(rt,p,ops,id){return {...groundTravel.start(rt,{actor:p.actor,x:0,z:0},ops,id),water:p.water};},
+ step(rt,ex,dt){
+  const r=groundTravel.step(rt,ex,dt);
+  if(r.status==='completed'&&!ex.stopping){const g=groundOf(rt),e=rt.world.entities[ex.actor];if(!g||!e||g.f.waterId?.(e.pose.p[0],e.pose.p[2])!==ex.water||!inDeepWater(rt,ex.actor)||!destinationInDeepWater(rt,e.pose.p[0],e.pose.p[2])||e.human?.activity!=='tread')return {status:'failed',diagnostic:fail('destination-changed','the journey did not finish swimming in the selected water',[ex.actor,ex.water])};}
+  return r;
+ },
 };

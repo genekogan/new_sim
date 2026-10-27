@@ -983,6 +983,8 @@ export class MarsEngine implements Engine {
   }
   /** Seconds of the rest step a program is on (0 when it is not resting). */
   private restSecondsOf(actor:string):number { const id=this.byActor.get(actor),p=id?this.programs.get(id):undefined,s=p?.steps[p.index]; return s?.verb==='rest'?Number(s.params?.seconds??0):0; }
+  /** Effective deep-water target, excluding a walking deck above the base water. */
+  deepWaterTargetV1(x:number,z:number):boolean {return destinationInDeepWater(this.rt,x,z);}
   /** D1 body state: metres of water over the ground at the body's root (the recipe's base water; 0 aboard a carrier, on a
    *  deck over the water, upstairs, or on a world without ground/1). Read-only. */
   bodyWaterDepthV1(actor:string):number {
@@ -1011,7 +1013,7 @@ export class MarsEngine implements Engine {
     if(body?.family!=='floater'||body.type===undefined&&body.modelUrl===undefined)return null;
     // creatures (bodies/creatures.ts) whose species swims may also swim and come ashore
     const swims=!!creatureOf(body)?.swimSpeed;
-    for(const s of program.steps){const verb=s.verb.replace(/^mars:/,'');if(!['walk_to','ambient_wander','face','wave','rest','gather','stand','converse'].includes(verb)&&!(swims&&['swim_to','ground_travel'].includes(verb)))return {code:'body.unsupported',message:creatureOf(body)?(['swim_to','ground_travel'].includes(verb)&&creatureOf(body)!.cannot.swim||`A ${creatureOf(body)!.id} cannot do that; it can ${creatureOf(body)!.moves}, settle, turn and follow.`):'Rigid ceramic/floater bodies cannot do that limb activity; try glide, hover, settle or turn.'};}
+    for(const s of program.steps){const verb=s.verb.replace(/^mars:/,'');if(!['walk_to','ambient_wander','face','wave','rest','gather','stand','converse'].includes(verb)&&!(swims&&['swim_to','ground_travel','swim_in'].includes(verb)))return {code:'body.unsupported',message:creatureOf(body)?(['swim_to','ground_travel','swim_in'].includes(verb)&&creatureOf(body)!.cannot.swim||`A ${creatureOf(body)!.id} cannot do that; it can ${creatureOf(body)!.moves}, settle, turn and follow.`):'Rigid ceramic/floater bodies cannot do that limb activity; try glide, hover, settle or turn.'};}
     return null;
   }
   /** BODY-v1: never interrupt holders, commitments or unsafe postures to swap a body. */
