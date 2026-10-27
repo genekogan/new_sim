@@ -9,22 +9,24 @@ export function humanTitle(ref: string): string {
 }
 export type MeaningPart = Omit<AboutPart, 'anchor'> & {
   anchor?: AboutPart['anchor'];
+  /** IDs to request; availability remains a live capability/route check. */
+  walk?: string; sit?: string;
   /** A real navigation reference, not an invented area around a centroid. */
   target?: { ref?: string; entity?: string; slot?: string; point?: [number, number, number]; stand?: [number, number, number]; level?: number; region?: [number, number][] };
 };
 export function meaningParts(m: WorldModel, entity: string): MeaningPart[] {
-  const e = m.entities.get(entity); if (!e) return [];
+  const e = m.entities.get(entity); if (!e?.about?.parts?.length) return [];
   const wp = m.worldPose(e), c = Math.cos(wp.yaw), s = Math.sin(wp.yaw);
   const point = ([x, y, z]: [number, number, number]): [number, number, number] => [wp.x + (x * c + z * s) * wp.s, wp.y + y * wp.s, wp.z + (-x * s + z * c) * wp.s];
   return (e.about?.parts ?? []).map(p => {
-    const a = p.anchor;
+    const a = p.anchor, walk=`walk:${m.pathOf(e.id)}/part-${p.id}`;
     if (!a) return { ...p };
     if (a.kind === 'entity') {
       const target = m.entities.get(a.ref); if (!target) return { ...p };
       const slot = a.slot ? m.slotsOf(target).find(s => s.id === a.slot) : undefined;
-      return { ...p, target: { entity: target.id, ref: m.pathOf(target.id) + (slot?.kind === 'room' ? '/' + slot.id : ''), ...(slot ? { slot: slot.id } : {}) } };
+      return { ...p, walk, ...(slot?.kind==='seat'?{sit:`sit:${m.pathOf(e.id)}/part-${p.id}`} : {}), target: { entity: target.id, ref: m.pathOf(target.id) + (slot?.kind === 'room' ? '/' + slot.id : ''), ...(slot ? { slot: slot.id } : {}) } };
     }
-    return { ...p, target: { point: point(a.point), stand: point(a.stand), level: a.level, ...(a.region ? { region: a.region.map(([x, z]) => { const p = point([x, 0, z]); return [p[0], p[2]] as [number, number]; }) } : {}) } };
+    return { ...p, walk, target: { point: point(a.point), stand: point(a.stand), level: a.level, ...(a.region ? { region: a.region.map(([x, z]) => { const p = point([x, 0, z]); return [p[0], p[2]] as [number, number]; }) } : {}) } };
   });
 }
 export function decorateMeaning(m: WorldModel, places: GodPlace[], root: string | null) {

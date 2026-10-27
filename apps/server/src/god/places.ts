@@ -211,6 +211,7 @@ export class GodPlaces {
   private *buildMembershipGen(things?: Thing[]): Generator<void, GodPlace[], void> {
     const m = this.h.model;
     things ??= this.h.nav.thingsGen ? yield* this.h.nav.thingsGen() : this.h.nav.things();
+    things = things.filter(t => !t.semanticPart);
     let n = 0;
     const out: GodPlace[] = [];
     const base = { parent: null as string | null, enclosed: false, capacity: null as number | null, starting: false };

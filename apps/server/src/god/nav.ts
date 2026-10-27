@@ -13,7 +13,7 @@
 import { deckRaised } from '@sim/generators';
 import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
-import { humanTitle } from './meaning.ts';
+import { humanTitle, meaningParts } from './meaning.ts';
 import { isShut } from './doors.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -58,7 +58,10 @@ export type Thing = {
   ref: string;
   id: string;
   room?: string;
+  /** A semantic alias/stand target; excluded from physical place membership. */
+  semanticPart?: {owner:string; part:string; local?:true; seat?:{entity:string;slot:string}};
   name: string;
+  aliases?: string[];
   kind: ThingKind;
   /** A stand-alone structure big enough to head for from anywhere nearby, like a building. */
   big?: boolean;
@@ -181,6 +184,23 @@ export class GodNav {
     for (const id of this.memo.keys()) if (!seen.has(id)) this.memo.delete(id);
     const byRef = new Map<string, Thing>();
     for (const t of things) if (!byRef.has(t.ref)) byRef.set(t.ref, t);
+    // Named parts reuse a real entity/room or an explicit transformed stand point. Descriptive parts stay prose.
+    for (const e of m.entities.values()) for (const p of meaningParts(m,e.id)) {
+      if (!p.anchor || !p.target) continue;
+      const ref=`${m.pathOf(e.id)}/part-${p.id}`; if(byRef.has(ref)) continue;
+      const partAliases=[...new Set([...(p.aliases??[]),...(e.about?.title?[e.about.title]:[]),...(e.about?.aliases??[]),...(e.about?.kind?[e.about.kind]:[])])].slice(0,24);
+      const names=[...words(p.title),...(p.aliases??[]).flatMap(words),...words(e.about?.title??e.name??'')];
+      if(p.anchor.kind==='entity') {
+        const t=p.target.ref?byRef.get(p.target.ref):undefined; if(!t)continue;
+        const slot=p.target.slot?m.slotsOf(m.entities.get(p.target.entity!)!).find(s=>s.id===p.target!.slot):undefined;
+        byRef.set(ref,{...t,ref,id:`${e.id}#meaning-${p.id}`,name:p.title,aliases:partAliases,what:p.what??t.what,words:[...new Set([...names,...t.words])],semanticPart:{owner:e.id,part:p.id,...(slot?.kind==='seat'?{seat:{entity:p.target.entity!,slot:slot.id}}:{})}});
+      } else {
+        const point=p.target.point!,stand=p.target.stand!,level=p.target.level!;
+        // A stale authored floor number must not send a Soul to an unrelated floor at the same X/Z.
+        if(this.h.levelAt(stand[0],stand[2],stand[1])!==level)continue;
+        byRef.set(ref,{ref,id:`${e.id}#meaning-${p.id}`,name:p.title,aliases:partAliases,what:p.what??`A named part of ${e.about?.title??humanTitle(m.pathOf(e.id))}`,words:names,kind:'thing',at:[point[0],point[2]],stands:[[stand[0],stand[2]]],level,...(p.target.region?{poly:p.target.region}:{}),semanticPart:{owner:e.id,part:p.id,local:true}});
+      }
+    }
     this.cache = { key, things: [...byRef.values()], byRef };
     this.goals.clear();
     return this.cache;
@@ -210,7 +230,7 @@ export class GodNav {
     const toWorld = (x: number, z: number): Vec2 => [r3(wp.x + (x * c + z * s) * wp.s), r3(wp.z + (-x * s + z * c) * wp.s)];
     const kind0 = shortDef(def), parent = e.in.parent !== 'world' ? m.entities.get(e.in.parent) : undefined;
     const pname = parent?.name ? [parent.name] : [];
-    const base = { id: e.id, name: e.about?.title ?? humanTitle(e.name!), words: [...new Set([...words(e.name!), ...words(e.about?.title ?? ''), ...words(e.about?.kind ?? ''), ...(e.about?.aliases ?? []).flatMap(words), ...words(kind0), ...def.tags.flatMap(words), ...(def.synonyms ?? []).flatMap(words), ...pname.flatMap(words)])] };
+    const base = { id: e.id, name: e.about?.title ?? humanTitle(e.name!), ...(e.about ? {aliases:[...new Set([...(e.about.aliases??[]),...(e.about.kind?[e.about.kind]:[]),...def.tags,...(def.synonyms??[])])].slice(0,24)} : {}), words: [...new Set([...words(e.name!), ...words(e.about?.title ?? ''), ...words(e.about?.kind ?? ''), ...(e.about?.aliases ?? []).flatMap(words), ...words(kind0), ...def.tags.flatMap(words), ...(def.synonyms ?? []).flatMap(words), ...pname.flatMap(words)])] };
     const sh = e.shape as { area?: Vec2[]; path?: Vec2[]; width?: number } | undefined;
     if (water || (def.form !== 'point' && e.in.parent === 'world' && sh)) {
       const area = (water?.area ?? sh?.area) as Vec2[] | undefined, path = (water?.path ?? sh?.path) as Vec2[] | undefined;
@@ -322,7 +342,13 @@ export class GodNav {
       return q ? { p: [r2(q[0]), r2(q[1])] as Vec2, level: 0 } : g;
     };
     let goal: { p: Vec2; level: number } | null = null;
-    if (t.kind === 'water') {
+    if (t.semanticPart?.local) {
+      const stand=t.stands?.[0];
+      if(stand) {
+        const candidate=near(stand,t.level,1);
+        if(candidate && Math.hypot(candidate.p[0]-stand[0],candidate.p[1]-stand[1])<=0.75 && (!t.poly||inPoly(candidate.p[0],candidate.p[1],t.poly))) goal=candidate;
+      }
+    } else if (t.kind === 'water') {
       // the nearest shore to me, a little outside the water's edge
       const edge = t.area ? nearestOn(t.area, me, true) : nearestOn(t.path!, me, false);
       const away: Vec2 = t.area ? (() => { const c = centroid(t.area!), dx = edge.q[0] - c[0], dz = edge.q[1] - c[1], n = Math.hypot(dx, dz) || 1; return [dx / n, dz / n] as Vec2; })()
@@ -450,7 +476,7 @@ export class GodNav {
     const all = this.things();
     // on a raised floor: the ground-level front of the building whose room I stand in (walked to first for far ground goals)
     const exit = myLevel === 0 ? null : all.find((t) => t.kind === 'room' && t.level === myLevel && t.poly && inPoly(here[0], here[1], t.poly) && t.entry && t.entry.level === 0)?.entry ?? null;
-    const ranked = all.filter((t) => t.kind !== 'room').map((t) => ({ t, d: this.distance(t, here) })).sort((a, b) => a.d - b.d || (a.t.ref < b.t.ref ? -1 : 1));
+    const ranked = all.filter((t) => t.kind !== 'room' || !!t.semanticPart).map((t) => ({ t, d: this.distance(t, here) })).sort((a, b) => a.d - b.d || (a.t.ref < b.t.ref ? -1 : 1));
     const pick: { t: Thing; d: number }[] = ranked.slice(0, SHOW);
     // SOULFIX2: a furnished town has more named things near than SHOW (each chair is one): buildings within
     // BUILDINGS_WITHIN stay offered however many pieces of furniture are nearer, so a Soul can always head for one
@@ -461,7 +487,8 @@ export class GodNav {
     // costs a reach check: uncapped, a capabilities sweep built 160 fine tiles and a warm /here in the café took 21 s)
     let places = 0;
     for (const x of ranked.slice(SHOW)) {
-      if ((x.t.kind === 'building' || x.t.big) && x.d <= BUILDINGS_WITHIN) pick.push(x);
+      if (x.t.semanticPart && x.d <= ROOMS_WITHIN) pick.push(x);
+      else if ((x.t.kind === 'building' || x.t.big) && x.d <= BUILDINGS_WITHIN) pick.push(x);
       else if (places < PLACES_MAX && x.d <= PLACES_WITHIN && !!x.t.area && polyArea(x.t.area) >= PLACE_M2 && !!this.h.placeOf?.(x.t.ref)) { pick.push(x); places++; }
     }
     // E-life: an upper storey's rooms are offered from close by (or from inside the building) only: each needs a multi-floor
@@ -634,9 +661,9 @@ export class GodNav {
     const g0 = this.goal(t, here, soul.entityId), where = this.label(t, Math.round(d)), place = this.h.placeOf?.(t.ref);
     // RESOLVE2: a goal up on a roof (or a raised floor) the main ground has no way up to is never offered as available
     // (a roof bench with no stair: the walk 'completed' in the lobby below)
-    const E = this.h.engine, cut = !!g0 && g0.level > 0 && !!E.navCheckV1 && !!E.navWarmV1?.(0) && E.navCheckV1([{ id, ...g0 }])[0]?.ok === false;
+    const E = this.h.engine, cut = !!g0 && (g0.level > 0 || !!t.semanticPart) && !!E.navCheckV1 && !!E.navWarmV1?.(0) && E.navCheckV1([{ id, ...g0 }])[0]?.ok === false;
     const goal = cut ? null : g0;
-    const cap: EdgeCapability = { id, verb: 'walk', label: where, target: place ? { id: place, kind: 'place' } : { id: t.id, kind: 'object' }, available: !!goal,
+    const cap: EdgeCapability = { id, verb: 'walk', label: where, ...(t.aliases?.length?{aliases:t.aliases}:{}), target: place ? { id: place, kind: 'place' } : { id: t.id, kind: 'object' }, available: !!goal,
       ...(goal ? {} : { blocked: cut ? { code: 'route.unreachable', reason: `${t.ref} is up where no stair or ramp from the ground reaches.` } : this.blocked.has(t.ref) ? { code: 'route.unreachable', reason: this.blocked.get(t.ref)! } : { code: 'place.no-standing-room', reason: `There is no clear standing room at ${t.ref} right now.` } }) };
     caps.push(cap);
     if (!goal) return;
@@ -646,7 +673,13 @@ export class GodNav {
     // from a raised floor to somewhere far on the ground, first walk out of the building (the engine plans long walks
     // on the ground only: "too far to plan from an upper floor; walk down first" — Mars: kitchen dining hall -> Freeside)
     const down: Step[] = exit && goal.level === 0 && Math.hypot(goal.p[0] - here[0], goal.p[1] - here[1]) > DOWN_FIRST_M ? [{ verb: 'mars:walk_to', params: { x: exit.p[0], z: exit.p[1], level: exit.level } }] : [];
-    plans.set(id, { label: `Walk to ${t.ref}`, steps: [...stand, ...down, go] });
+    plans.set(id, { label: `Walk to ${t.name}`, steps: [...stand, ...down, go] });
+    if (t.semanticPart?.seat) {
+      const target=t.semanticPart.seat, sid=`sit:${t.ref}`;
+      // This invokes the engine's actual slot reservation/approach; the semantic name cannot create a seat.
+      caps.push({id:sid,verb:'sit',label:`Sit at ${t.name} [${t.ref}]`,...(t.aliases?.length?{aliases:t.aliases}:{}),target:{id:target.entity,kind:'object'},available:true,params:{seconds:{type:'integer',min:1,max:600,default:600}}});
+      plans.set(sid,{label:`Sit at ${t.name}`,steps:[...stand,...down,go,{verb:'mars:sit',params:{slot:`${target.entity}#${target.slot}`}},{verb:'rest',params:{seconds:600}}],seconds:true});
+    }
     if (place) this.placeCapabilities(t, place, here, d, [...stand, ...down, go], myLevel, caps, plans);
   }
 
@@ -690,10 +723,10 @@ export class GodNav {
   }
   private label(t: Thing, d: number): string {
     const by = this.landmarks(t).map((x) => x.ref);
-    if (t.kind === 'room') return `Go into ${t.what} (${t.ref}; ${d} m)`;
-    if (t.kind === 'building') return `Walk to ${t.ref}, ${t.what}: ${t.doorOpen ? 'in at its front door' : t.rooms?.length === 1 ? `inside, into ${t.rooms[0]}` : 'to its front door (closed)'} (${t.rooms?.length ?? 0} rooms, each walk:${t.ref}/<room>; ${d} m)`;
-    if (t.kind === 'water') return `Walk to the shore of ${t.ref}, ${t.what} (${d} m)`;
-    return `Walk to ${t.ref}, ${t.what}${by.length ? `, by ${by.join(' and ')}` : ''} (${d} m)`;
+    if (t.kind === 'room') return `Go into ${t.name}, ${t.what} (${t.ref}; ${d} m)`;
+    if (t.kind === 'building') return `Walk to ${t.name} [${t.ref}], ${t.what}: ${t.doorOpen ? 'in at its front door' : t.rooms?.length === 1 ? `inside, into ${t.rooms[0]}` : 'to its front door (closed)'} (${t.rooms?.length ?? 0} rooms, each walk:${t.ref}/<room>; ${d} m)`;
+    if (t.kind === 'water') return `Walk to the shore of ${t.name} [${t.ref}], ${t.what} (${d} m)`;
+    return `Walk to ${t.name} [${t.ref}], ${t.what}${by.length ? `, by ${by.join(' and ')}` : ''} (${d} m)`;
   }
   /** Named things within 15 m of a thing (its "by the X"), nearest first. */
   landmarks(t: Thing, n = 2): Thing[] {

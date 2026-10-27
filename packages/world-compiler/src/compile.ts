@@ -596,16 +596,20 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   });
 
   if (failures.length) return { ok: false, failures: heldBack.length && heldBack[0].op <= failures[0].op ? [heldBack[0]] : failures };
+  // Body/state writebacks do not scan every meaning record; structural/meaning edits validate the final graph.
+  const meaningTouched = ops.some(op => ['place','clone','remove','restore','define','restore-def'].includes(op.op) || (op.op==='set' && (op.about!==undefined||op.name!==undefined||op.params!==undefined)) || (op.op==='world' && op.state.about!==undefined));
   // Canonicalize late references after all placements; reject dangling references/cycles atomically.
-  for (const e of [...scratch.entities.values()]) if (e.about) {
-    const about = canonicalAbout(scratch, e.about, ids);
-    if (!sameMeaning(about, e.about)) { const next = { ...e, about }; scratch.replaceAbout(next); upsert(next, false); }
+  if (meaningTouched) {
+    for (const e of [...scratch.entities.values()]) if (e.about) {
+      const about = canonicalAbout(scratch, e.about, ids);
+      if (!sameMeaning(about, e.about)) { const next = { ...e, about }; scratch.replaceAbout(next); upsert(next, false); }
+    }
+    if (scratch.state.about) {
+      const about = canonicalWorldAbout(scratch, scratch.state.about, ids);
+      if (!sameMeaning(about, scratch.state.about)) { scratch.state = { ...scratch.state, about }; if (diff.world) diff.world.about = about; }
+    }
+    { const failure = meaningFailure(scratch, ops.length - 1); if (failure) return { ok: false, failures: [failure] }; }
   }
-  if (scratch.state.about) {
-    const about = canonicalWorldAbout(scratch, scratch.state.about, ids);
-    if (!sameMeaning(about, scratch.state.about)) { scratch.state = { ...scratch.state, about }; if (diff.world) diff.world.about = about; }
-  }
-  { const failure = meaningFailure(scratch, ops.length - 1); if (failure) return { ok: false, failures: [failure] }; }
   // Persistent relationships: re-solve server-maintained constraints whose refs moved or whose ground changed (33 §3.3).
   const sourceOp = (e: Entity) => {
     const indices: number[] = [];

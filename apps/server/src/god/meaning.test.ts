@@ -25,3 +25,16 @@ test('parts preserve real targets; descriptive parts have no target; local point
  const parts=meaningParts(m,m.get('speaker')!.id);assert.equal(parts[0].target,undefined);assert.equal(parts[1].target!.ref,'land-campus');
  const wp=m.worldPose(m.get('speaker')!);const q=parts[2].target!.point!;assert.ok(Math.abs(q[0]-(wp.x+(Math.cos(wp.yaw)+2*Math.sin(wp.yaw))*wp.s))<1e-8);assert.equal(parts[2].target!.level,0);assert.equal(parts[2].target!.region!.length,4);
 });
+
+test('named part walks use real bindings, exact seats and bounded local stands without new membership',async()=>{
+ const {GodNav}=await import('./nav.ts'),{GodPlaces}=await import('./places.ts');const {m,act}=setup();
+ const speaker=m.get('speaker')!,slot=m.slotsOf(speaker).find(s=>s.kind==='seat')!;assert.ok(slot);
+ act([{op:'set',id:'land-campus',about:{title:'Campus',parts:[{id:'speaker',title:'Presenter desk',aliases:['podium desk'],anchor:{kind:'entity',ref:'speaker',slot:slot.id}},{id:'bay',title:'Centre bay',anchor:{kind:'local',point:[-5,0,-5],stand:[-5,0,-5],level:0,region:[[-7,-7],[-3,-7],[-3,-3],[-7,-3]]}},{id:'view',title:'Great view'},{id:'wrong-floor',title:'Missing gallery',anchor:{kind:'local',point:[1,9,1],stand:[1,9,1],level:9}}]}}]);
+ let blocked=false;const engine={world:{tick:1,entities:{soul:{pose:{p:[-6,0,-6]},human:{level:0}}}},standableNearV1:(p:[number,number])=>p,navWarmV1:()=>true,navCheckV1:()=>[{ok:!blocked}]};
+ const nav=new GodNav({model:m,engine:engine as never,levelAt:()=>0,engineOwned:()=>false});
+ const bay=nav.thing('land-campus/part-bay')!;assert.ok(bay);assert.deepEqual(nav.goal(bay,[-6,-6]),{p:[-5,-5],level:0});assert.equal(nav.thing('land-campus/part-view'),undefined);assert.equal(nav.thing('land-campus/part-wrong-floor'),undefined);
+ const caps:any[]=[],plans=new Map();nav.capabilities({entityId:'soul'} as never,caps,plans);
+ const seat=caps.find(c=>c.id==='sit:land-campus/part-speaker');assert.ok(seat?.available);assert.ok(seat.aliases.includes('podium desk'));assert.ok(plans.get(seat.id).steps.some((s:any)=>s.verb==='mars:sit'&&s.params.slot===`${speaker.id}#${slot.id}`));
+ const places=new GodPlaces({model:m,nav,engineOwned:()=>false,levelAt:()=>0,log:()=>{}});assert.equal(places.list().some(p=>p.ref.includes('/part-')),false,'semantic targets never add physical membership polygons');
+ blocked=true;engine.world.tick++;const blockedCaps:any[]=[];nav.capabilities({entityId:'soul'} as never,blockedCaps,new Map());assert.equal(blockedCaps.find(c=>c.id==='walk:land-campus/part-bay')?.available,false,'reachability refusal does not substitute a nearby floor');
+});

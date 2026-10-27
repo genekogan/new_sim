@@ -46,7 +46,7 @@ export interface EdgeLedgerHooks {
   postureHold?(soulId: string): string | null;
   performBodies?(soul: EdgeSoul, capability: string, label: string, steps: {verb: string; params: Record<string, unknown>}[], clientRef?: string,effects?:unknown,admission?:ObjectBodyAdmission): Promise<{accepted: true; receipt: EdgeReceipt} | {accepted: false; code: string; reason: string}>;
 }
-export type EdgeCapability = {id: string; verb: string; label: string; available: boolean; target?: {id: string; kind: string}; blocked?: {code: string; reason: string}; params?: Record<string, unknown>; object?: string; action?: string};
+export type EdgeCapability = {id: string; verb: string; label: string; aliases?: readonly string[]; available: boolean; target?: {id: string; kind: string}; blocked?: {code: string; reason: string}; params?: Record<string, unknown>; object?: string; action?: string};
 export type EdgeDeps = {host: WorldHost; db: Db; souls: Souls; build?: string; soul(c: Context): EdgeSoul; ledger: EdgeLedgerHooks;
   /** The signed-in owner's Soul `id` (owner routes such as PUT /v1/souls/:id/look); throws when not theirs. */
   ownerSoul?(c: Context, id: string): Promise<EdgeSoul>;
