@@ -7,7 +7,7 @@
 //       leaf: walkers pass it; an existing closed door or gate is the god's own choice and counts as a way in);
 // The repairs are extra ops appended to the same batch, so they are journaled, previewed by undo and replayed with it.
 // What cannot be repaired goes back to the god as ONE line per thing: what, why, and an op that fixes it (tested here
-// when one is found). Model-only and local: a 0.1 m raster round the edit (<= 60 m a side), the edit's things before
+// when one is found). Model-only and local: a 0.1 m raster round the edit (<= 60 m a side; closed gateable enclosures <= 96 m), the edit's things before
 // and after; the engine's nav-connect check after the commit still steps out Souls and names what this did not see.
 import { obbOverlap, type Diff, type Entity, type Op, type StoredDef, type WorldModel } from '@sim/world-compiler';
 import { BAND, BODY_R, CELL, approachOf, type ApproachKey, type Vec2 } from './buildsafe-rule.ts';
@@ -16,7 +16,7 @@ type OBB = { c: Vec2; half: Vec2 | number[]; yaw: number; y0: number; y1: number
 type Key = { id: string; label: string; owner?: string; key: ApproachKey };
 export type Repair = { ops: Op[]; lines: string[]; named: string[]; ms: number };
 
-const MARGIN = 4, MAX_SIDE = 60, GATE_W = 1;
+const MARGIN = 4, MAX_SIDE = 60, MAX_ENCLOSURE_SIDE = 96, GATE_W = 1;
 /** A nudged piece is judged 0.15 m wider than it is: a way it leaves is never a hair's breadth (the engine's walk
  *  is stricter than this raster in a 0.9 m doorway). */
 const SLACK = 0.15;
@@ -97,7 +97,11 @@ function blocking(m: WorldModel, id: string, boxes?: OBB[]): OBB[] {
 }
 function rectOf(boxes: OBB[]): [number, number, number, number] {
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
-  for (const b of boxes) { const R = Math.hypot(b.half[0], b.half[1]); x0 = Math.min(x0, b.c[0] - R); z0 = Math.min(z0, b.c[1] - R); x1 = Math.max(x1, b.c[0] + R); z1 = Math.max(z1, b.c[1] + R); }
+  for (const b of boxes) {
+    const c = Math.abs(Math.cos(b.yaw)), s = Math.abs(Math.sin(b.yaw));
+    const rx = c * b.half[0] + s * b.half[1], rz = s * b.half[0] + c * b.half[1];
+    x0 = Math.min(x0, b.c[0] - rx); z0 = Math.min(z0, b.c[1] - rz); x1 = Math.max(x1, b.c[0] + rx); z1 = Math.max(z1, b.c[1] + rz);
+  }
   return [x0, z0, x1, z1];
 }
 const inRect = (r: number[], x: number, z: number) => x >= r[0] && x <= r[2] && z >= r[1] && z <= r[3];
@@ -223,8 +227,15 @@ export function repairBatch(before: WorldModel, after: WorldModel, diff: Diff, i
     let r: [number, number, number, number];
     const fp = after.footprint(e) as OBB[];
     if (fp.length) r = rectOf(fp); else { try { const p = after.worldPose(e); r = [p.x - 0.5, p.z - 0.5, p.x + 0.5, p.z + 0.5]; } catch { continue; } }
-    if (r[2] - r[0] > MAX_SIDE - 2 * MARGIN || r[3] - r[1] > MAX_SIDE - 2 * MARGIN) continue;   // a quarter-sized wall: a place, not a trap
+    // A newly closed authored enclosure is not an intentional pre-existing island.
+    // Allow a bounded larger window only for paths that can receive a real gate.
+    // The before/after cut test below still leaves existing sealed courtyards alone.
+    const def = after.resolvedDef(e.def), pts = (e.shape as {path?: Vec2[]})?.path;
+    const closed = def && isPath(def, e) && gated(def) && pts && pts.length >= 4 && Math.hypot(pts[0][0] - pts.at(-1)![0], pts[0][1] - pts.at(-1)![1]) < .01;
+    const maxSide = closed ? MAX_ENCLOSURE_SIDE : MAX_SIDE;
+    if (r[2] - r[0] > maxSide - 2 * MARGIN || r[3] - r[1] > maxSide - 2 * MARGIN) continue;
     r = withRooms([before, after], [r[0] - MARGIN, r[1] - MARGIN, r[2] + MARGIN, r[3] + MARGIN]);
+    if (r[2] - r[0] > maxSide || r[3] - r[1] > maxSide) continue;
     const hit = rects.find((x) => { const u = [Math.min(x.r[0], r[0]), Math.min(x.r[1], r[1]), Math.max(x.r[2], r[2]), Math.max(x.r[3], r[3])]; return !(r[0] > x.r[2] || r[2] < x.r[0] || r[1] > x.r[3] || r[3] < x.r[1]) && u[2] - u[0] <= MAX_SIDE && u[3] - u[1] <= MAX_SIDE; });
     if (hit) { hit.r = [Math.min(hit.r[0], r[0]), Math.min(hit.r[1], r[1]), Math.max(hit.r[2], r[2]), Math.max(hit.r[3], r[3])]; hit.ids.push(id); } else rects.push({ r, ids: [id] });
   }

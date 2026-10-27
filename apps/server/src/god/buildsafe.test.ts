@@ -135,3 +135,18 @@ test('dry run and preview answer as the commit does: the same repair lines; the 
   assert.equal(sealed.accepted, true, JSON.stringify(sealed.failures));
   assert.match(buildsafeLines(sealed).join('\n'), /Kept a way open \(buildsafe\/1\): step-crate moved/);
 });
+
+test('a newly sealed 55 m courtyard gets a journaled gate without relocating its occupants', {timeout: 120000}, async t => {
+  const w = await world(t);
+  ok(w.god.act({ops:[{op:'place',def:coreRef('bench'),name:'court-bench',p:[0,0]}]}));
+  await w.settle();
+  const before = structuredClone(w.god.model.get('court-bench'));
+  const r = ok(w.god.act({ops:[{op:'place',def:coreRef('garden-wall'),name:'court-wall',shape:{path:[[-27.5,-27.5],[27.5,-27.5],[27.5,27.5],[-27.5,27.5],[-27.5,-27.5]]}}]}));
+  assert.equal(kept(r).length, 1, JSON.stringify(r.warnings));
+  assert.equal((w.god.model.get('court-wall')!.params?.gates as any[])?.length, 1);
+  assert.deepEqual(w.god.model.get('court-bench'), before, 'the courtyard is opened, its occupant is not moved');
+  await w.settle();
+  const q = reach(w,[0,-29],'court-bench'); assert.equal(q.reachable,true,JSON.stringify(q));
+  ok(w.god.undo()); assert.equal(w.god.model.get('court-wall'),undefined);
+  assert.deepEqual(w.god.model.get('court-bench'),before);
+});
