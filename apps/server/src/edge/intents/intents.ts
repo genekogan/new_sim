@@ -9,6 +9,7 @@ import type {EdgeCapability, EdgeReceipt, EdgeSoul} from '../contract.ts';
 import {Perception, type Located} from '../perception/here.ts';
 import {centroid, inPoly} from '../ledger/places.ts';
 import {dist2, durationWord, headingOfYaw, round1, walkSeconds, yawOfHeading, yawTowards} from '../perception/geometry.ts';
+import {resolvedParts} from './resolved-parts.ts';
 import {strictCheck} from './strict.ts';
 import {resolvePlaceForVerb,lookupPlaceIdentity,explicitPlaceCapability,knownBootPlaces,offeredWalkObject} from '../boot/world-places.ts';
 
@@ -350,7 +351,7 @@ export class Intents {
       // Social approaches may add an on-demand plan. Keep the dry run's additions local, just as act does.
       const bound = this.L.coreA.binds(soul), caps = [...bound.caps], plans = new Map(bound.plans), asked = input.capability.trim();
       // SOULSIM-E: a far place's id the listing leaves out resolves on demand below, as act walks it (resolveText)
-      const place=explicitPlaceCapability(this.L,soul,asked),onDemand=!!place&&!place.ok&&place.code==='place.unwalkable'&&this.L.onDemandId(soul,asked);if(place&&!onDemand){if(!place.ok)return place;return {ok:true,would:{capability:place.chosen.capability,channel:'body',chosen:place.chosen}};}
+      const place=explicitPlaceCapability(this.L,soul,asked),onDemand=!!place&&!place.ok&&place.code==='place.unwalkable'&&this.L.onDemandId(soul,asked);if(place&&!onDemand){if(!place.ok)return place;return {ok:true,would:{capability:place.chosen.capability,channel:'body',chosen:place.chosen,...resolvedParts(this.L,soul,place.chosen.capability,asked)}};}
       const bodyIssue=asked.startsWith('object:')?null:this.L.bodyVerbProblem(soul,asked.split(/[:\s]/)[0]!);if(bodyIssue)return {ok:false,...bodyIssue};
       if (!asked || asked.length > 200) return {ok: false, code: 'capability.params', reason: 'capability must be 1..200 characters.'};
       const plain = attentionWords(asked); if (plain) return this.dryRun(soul, plain);
@@ -365,7 +366,7 @@ export class Intents {
       const params = {...(r.kind === 'alias' && r.params ? r.params : {}), ...(extra ?? {})};
       const P = new Perception(this.L, soul), at = this.L.coreA.targetPoint(soul, r.cap), note = [social?.note, r.kind === 'alias' ? r.note : null].filter(Boolean).join('; ');
       return {ok: true, would: {capability: r.cap.id, label: r.cap.label, available: r.cap.available, ...(r.cap.blocked ? {blocked: r.cap.blocked} : {}), ...(Object.keys(params).length ? {params} : {}), channel: r.cap.verb === 'face' ? 'attention' : 'body',
-        ...(note ? {resolved: note + (extra?.with ? `. Act it with these params (act ${r.cap.id} '${JSON.stringify(extra)}'), or act the same words; an act without "with" is solo.` : '')} : {}), ...(at && P.pos ? this.eta(P, at) : {})}};
+        ...resolvedParts(this.L,soul,r.cap,asked), ...(note ? {resolved: note + (extra?.with ? `. Act it with these params (act ${r.cap.id} '${JSON.stringify(extra)}'), or act the same words; an act without "with" is solo.` : '')} : {}), ...(at && P.pos ? this.eta(P, at) : {})}};
     }
     const r = this.resolve(soul, input);
     if (!r.ok) return {...r};
@@ -375,7 +376,7 @@ export class Intents {
       const v = this.L.coreA.resolveText(soul, r.capability, caps);
       if (v.kind === 'unknown') return {ok: false, code: (v as {code?: string}).code ?? 'capability.unknown', reason: v.reason, did_you_mean: v.didYouMean};
       if (!v.cap.available && v.cap.blocked) return {ok: false, code: v.cap.blocked.code, reason: v.cap.blocked.reason};
-      return {ok: true, would: {capability: v.cap.id, ...(r.params ? {params: r.params} : {}), channel: 'body', chosen: r.chosen}};
+      return {ok: true, would: {capability: v.cap.id, ...(r.params ? {params: r.params} : {}), channel: 'body', chosen: r.chosen,...resolvedParts(this.L,soul,v.cap)}};
     }
     if (r.kind === 'plan') {
       const issue = this.L.host.engine.canPerform({actor: soul.entityId, label: r.label, steps: r.steps});

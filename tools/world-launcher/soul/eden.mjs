@@ -295,6 +295,18 @@ async function observe() {
   return d;
 }
 
+/** Phrase and all-term matches precede the legacy partial-term fallback. */
+export function rankCapabilities(list, search) {
+  const terms = [...new Set(search.toLowerCase().split(/[\s,|]+/).filter(Boolean))];
+  const normalize = value => String(value ?? '').toLowerCase().replace(/[-_/]+/g, ' ').replace(/\s+/g, ' ');
+  const phrase = normalize(search).trim();
+  return list.map((c, i) => {
+    const hay = normalize([c.id, c.label, c.verb, ...(c.aliases ?? [])].join(' '));
+    const count = terms.filter(t => hay.includes(normalize(t))).length;
+    return {c, i, count, tier: phrase && hay.includes(phrase) ? 2 : terms.length && count === terms.length ? 1 : 0};
+  }).filter(x => x.count > 0).sort((a,b) => b.tier-a.tier || b.count-a.count || a.i-b.i).map(x => x.c);
+}
+
 async function caps(...args) {
   let search, verb, all = false, limit = 60;
   for (let i = 0; i < args.length; i++) {
@@ -309,9 +321,7 @@ async function caps(...args) {
   if (!all) list = list.filter((c) => c.available);
   if (verb) list = list.filter((c) => c.verb === verb);
   if (search) {
-    const terms = search.toLowerCase().split(/[\s,|]+/).filter(Boolean);
-    const score = (c) => terms.reduce((n, t) => n + ((c.id + " " + c.label + " " + c.verb).toLowerCase().includes(t) ? 1 : 0), 0);
-    list = list.map((c) => [score(c), c]).filter(([n]) => n > 0).sort((a, b) => b[0] - a[0]).map(([, c]) => c);
+    list = rankCapabilities(list, search);
   }
   return {
     total: (d.capabilities ?? []).length, matching: list.length, shown: Math.min(list.length, limit),

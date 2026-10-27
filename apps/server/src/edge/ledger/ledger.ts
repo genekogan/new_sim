@@ -38,6 +38,7 @@ import {resolveCapability, tokens, placeMatch, placeMatchTier, typoFix, type Voc
 import {isCampfire} from './fire.ts';
 import {activityCapabilities, loadSpots, ACTIVITY_SECONDS_MAX, SPOT_ACTIVITIES, type SpotsData} from './activities.ts';
 import {Together, PAIRED, type TogetherPlan} from './together.ts';
+import {knownPart} from '../intents/resolved-parts.ts';
 import {Intents,walkWithDestinationWords,walkWithFallback, attentionWords, type IntentInput} from '../intents/intents.ts';
 import {classWords} from '../intents/class-words.ts';
 import {strictCheck} from '../intents/strict.ts';
@@ -1740,9 +1741,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
       const cap = added ? more.find(c => c.id === text.trim()) ?? more.find(c => c.verb === verb && c.target?.kind === 'place' && (c.target.id === placeId || sub(c.target.id))) : undefined;
       if (cap && !this.secretOffer(soul, cap)) return {v: cap.id === text.trim() ? {kind: 'exact', cap} : {kind: 'alias', cap, note: `${text} is ${cap.id} (${cap.label}).`}, caps: more, plans: morePlans};
     }
-    // RESOLVE2: a named thing's or room's walk id, re-sent as resolve answered it (`walk:hotel/hotel-roof-bench`): offered again
-    const byRef = exact || !this.walkRefOnDemand ? null : /^walk:([^\s:]+)$/.exec(text.trim());
-    if (byRef) {
+    // Re-offer an exact named walk, or an explicitly selected real semantic seat.
+    // The normal GodNav plan, route checks and launch admission remain authoritative.
+    const byRef = exact || !this.walkRefOnDemand ? null : /^(?:walk|sit):([^\s:]+)$/.exec(text.trim());
+    if (byRef && (!text.trim().startsWith('sit:') || [...this.places.byId.values()].some(p => p.parts?.some(part => part.sit === text.trim() && knownPart(this,soul,p,part))))) {
       const more = [...caps], morePlans = new Map(plans), cap = this.walkRefOnDemand!(soul, byRef[1]!, more, morePlans) ? more.find(c => c.id === text.trim()) : undefined;
       if (cap && !this.secretOffer(soul, cap)) return {v: {kind: 'exact', cap}, caps: more, plans: morePlans};
     }
@@ -1818,7 +1820,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** SOULSIM-E: true when `asked` is an id the listing leaves out that resolveOnDemand offers (a far place's walk/run). Act
    *  and resolve let such an id through their place and strict/1 checks, which read the listing only. */
   onDemandId(soul: EdgeSoul, asked: string, caps?: EdgeCapability[], plans?: Plans): boolean {
-    if (!/^(?:walk|jog|run):/.test(asked)) return false;
+    if (!/^(?:walk|jog|run|sit):/.test(asked)) return false;
     const b = caps && plans ? {caps, plans} : this.binds(soul); if (b.caps.some(c => c.id === asked)) return false;
     const od = this.resolveOnDemand(soul, asked, b.caps, b.plans); return od.caps !== b.caps && od.v.kind !== 'unknown';
   }

@@ -1,0 +1,43 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {setImmediate} from 'node:timers/promises';
+import {writeFileSync} from 'node:fs';
+import {fixture,factory,invite,accept} from '../../test/native-owner-fixture.ts';
+import {EdgeLedger} from '../edge/ledger/ledger.ts';
+import {GodMode} from './god.ts';
+import {installEngineBridge} from './engine-bridge.ts';
+import {resolvedParts} from '../edge/intents/resolved-parts.ts';
+import {GroundHost} from './ground-host.ts';
+
+test('resolve exposes a real distant bound seat and exact selection reaches it; description invents no action',{timeout:120000},async t=>{
+ const w=fixture(':memory:',factory,{durableClockV1:true});w.brain.quiesce();
+ const god=new GodMode(w.db,{worldId:w.host.worldId,ownerId:'owner',tick:()=>w.host.engine.world.tick,emit(){}});
+ new GroundHost(w.db,w.host,god);const edge=new EdgeLedger(w.host,w.db);
+ const bridge=installEngineBridge({host:w.host,god,edge,log(){},worldClock:false,worldLore:false});
+ t.after(()=>{w.brain.quiesce();w.host.stop();edge.comms?.close();w.db.close();});
+ const settle=async(n=3)=>{for(let i=0;i<n;i++){w.host.tickOnce();await setImmediate();w.host.drainInputs();}};await settle();
+ const built=god.act({ops:[{op:'place',def:'core/plaza@1',name:'west-pier',shape:{area:[[-5,130],[5,130],[5,150],[-5,150]]}},{op:'place',def:'core/bench@1',name:'pier-bench',p:[0,145]}]});assert.equal(built.accepted,true,JSON.stringify(built));await settle();
+ const bench=god.model.get('pier-bench')!,slot=god.model.slotsOf(bench).find(s=>s.kind==='seat')!;
+ const labeled=god.act({ops:[{op:'set',id:'west-pier',about:{title:'Harbour West Pier',aliases:['west pier'],parts:[{id:'sea-view-seat',title:'Sea-View Bench',anchor:{kind:'entity',ref:'pier-bench',slot:slot.id}},{id:'sunset',title:'Sunset view'},{id:'gallery',title:'Unreachable gallery',anchor:{kind:'local',point:[0,10,0],stand:[0,10,0],level:9}}]}}]});assert.equal(labeled.accepted,true,JSON.stringify(labeled));await settle();
+ for(let start=0;start<125;start+=25){const noise=god.act({ops:Array.from({length:25},(_,j)=>({op:'place',def:'core/bench@1',name:`noise-${start+j}`,p:[20+((start+j)%13)*2,-20-Math.floor((start+j)/13)*2]}))});assert.equal(noise.accepted,true,JSON.stringify(noise));await settle();}
+ await invite(w,'walker');const row=await accept(w.host,w.souls.create('dev:walker',{name:'Walker',description:'Local discovery test'})) as {id:string;entity_id:string;name:string;owner:string};
+ const soul={soulId:row.id,entityId:row.entity_id,name:row.name,owner:row.owner};await settle();
+ await accept(w.host,w.host.enqueue('edge-relocate','test:parts',{...soul,to:[0,0],why:'far discovery'}));await settle();bridge.perceive.sync(true);edge.map();
+ const exact='sit:west-pier/part-sea-view-seat';assert.equal(edge.coreA.binds(soul).caps.some(c=>c.id===exact),false,'far part omitted from compact listing');
+ const out=edge.intents.dryRun(soul,{capability:'go to the harbour and sit on the west pier'}) as any;
+ assert.equal(out.ok,true,JSON.stringify(out));assert.equal(out.would.capability,'walk:west-pier','discovery does not choose seat for agent');
+ const part=out.would.parts.find((p:any)=>p.id==='sea-view-seat');assert.equal(part.target.entity,bench.id);assert.equal(part.target.slot,slot.id);assert.equal(part.affordances.find((a:any)=>a.capability===exact).available,true);
+ assert.equal(out.would.parts.find((p:any)=>p.id==='sunset').affordances,undefined);assert.equal(out.would.parts.find((p:any)=>p.id==='gallery').affordances[0].available,false);
+ assert.equal(edge.knowledge.setSecret('g-west-pier',true),true);
+ assert.deepEqual(resolvedParts(edge,soul,'walk:west-pier'),{});
+ const hidden=edge.resolveOnDemand(soul,exact,[],new Map()).v;assert.equal(hidden.kind,'unknown','explicit far seat cannot reveal an unknown secret owner');
+ edge.knowledge.setSecret('g-west-pier',false);
+ const exactResolve=edge.intents.dryRun(soul,{capability:exact}) as any;assert.equal(exactResolve.ok,true,JSON.stringify(exactResolve));
+ const act=await accept(w.host,Promise.resolve(edge.act(soul,{capability:exact}))) as any;assert.equal(act.accepted,true,JSON.stringify(act));
+ let seated=false;for(let i=0;i<4000;i++){w.host.tickOnce();if(i%20===0){await setImmediate();w.host.drainInputs();}const body=w.host.engine.world.entities[soul.entityId] as any;if(body.human?.seat?.entity===bench.id||body.human?.seat?.entityId===bench.id){seated=true;break;}assert.notEqual(edge.receipt(soul.soulId,act.receipt.id)?.phase,'failed',JSON.stringify(edge.receipt(soul.soulId,act.receipt.id)));}
+ const body=w.host.engine.world.entities[soul.entityId] as any;
+ assert.ok(seated||body.human?.activity==='sit',JSON.stringify({human:body.human,receipt:edge.receipt(soul.soulId,act.receipt.id)}));assert.ok(Math.abs(body.pose.p[2]-145)<3,'body actually reaches far fixture');
+ const receipt=edge.receipt(soul.soulId,act.receipt.id) as any;assert.equal(receipt.chosen?.target,bench.id,JSON.stringify(receipt));
+ assert.equal(receipt.chosen.slot,`${bench.id}#${slot.id}`);
+ if(process.env.PARTS_PROOF)writeFileSync(process.env.PARTS_PROOF,JSON.stringify({resolve:out,exactResolve,receipt,body:{pose:body.pose,human:body.human}},null,2)+'\n');
+});
