@@ -379,6 +379,7 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   for (const [k, v] of Object.entries(ACT_ALIASES)) if (verbs.has(v) && !verbs.has(k)) verbs.add(k);
   let {verb, rest} = parseCapability(input, verbs);
   const nearestRequested = /\b(?:nearest|closest|nearby|anywhere|somewhere)\b|^(?:find|look for|search for)\b|\b(?:a|an)\s/.test(input.toLowerCase());
+  const nearestBuilding=verb==='walk'&&/\b(?:nearest|closest)\b/i.test(rest)&&norm(rest.replace(/\bbehind(?:\s+(?:you|me|us))?\b/ig,' ').replace(/\b(?:nearest|closest)\b/ig,' '))==='building';
   const behind = /\bbehind(?:\s+(?:you|me|us))?\b/i.test(rest);
   if (behind) {
     if (!ctx.me || !Number.isFinite(ctx.yaw)) return {kind:'unknown',code:'place.position-unknown',reason:'Your position or heading is unknown; behind cannot be resolved.',didYouMean:[]};
@@ -391,8 +392,20 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
     }).map(c => c.id));
     ctx = {...ctx,caps:ctx.caps.filter(c=>allowed.has(c.id)),places:ctx.places.filter(p=>(p.center[0]-me[0])*Math.cos(yaw)+(p.center[1]-me[1])*Math.sin(yaw)<-0.05 && (!buildings||p.kind==='building'))};
     rest = rest.replace(/\bbehind(?:\s+(?:you|me|us))?\b/ig,' ').replace(/\b(?:nearest|closest)\b/ig,' ').trim();
-    if (!ctx.caps.some(c=>c.verb===verb)) return {kind:'unknown',code:'place.unreachable',reason:'No eligible destination is offered behind your current heading; nothing in front was substituted.',didYouMean:[]};
+    if (!ctx.caps.some(c=>c.verb===verb) && !nearestBuilding) return {kind:'unknown',code:'place.unreachable',reason:'No eligible destination is offered behind your current heading; nothing in front was substituted.',didYouMean:[]};
   } else if (nearestRequested) rest = rest.replace(/\b(?:nearest|closest)\b/ig,' ').trim();
+  // An explicit nearest structural class is a geometric request, not a search for
+  // the class noun in authored names ("West Rack Building" must not beat Chiba).
+  // Rank known physical buildings before offer-list limits; exact admission still
+  // decides whether that nearest building can be entered, including a closed door.
+  if(nearestBuilding){
+    if(!ctx.me)return {kind:'unknown',code:'place.position-unknown',reason:'Your position is unknown; the nearest building cannot be ranked.',didYouMean:[]};
+    const here=ctx.me,place=ctx.places.filter(p=>p.kind==='building').sort((a,b)=>placeEdgeDistance(a,here)-placeEdgeDistance(b,here)||a.id.localeCompare(b.id))[0];
+    if(!place)return {kind:'unknown',code:'place.unreachable',reason:'No known building satisfies the requested direction; nothing else was substituted.',didYouMean:[]};
+    const offered=ctx.caps.find(c=>c.verb==='walk'&&c.target?.kind==='place'&&c.target.id===place.id);
+    if(offered)return {kind:'alias',cap:offered,note:`${input} is ${offered.id} (${place.name}), the nearest building by its edge within the requested direction.`};
+    return {kind:'unknown',code:'place.unreachable',place:place.id,verb:'walk',places:[place.id],reason:`The nearest building is ${place.name}; its exact entry must be checked on demand. No farther building was substituted.`,didYouMean:[]};
+  }
   if (ACT_ALIASES[verb] && !ctx.caps.some(c => c.verb === verb)) verb = ACT_ALIASES[verb];
   // A real fire is a qualifier of the existing fire request, not a new seat name.
   // Keep explicit/named IDs intact and require an offered actual fire before dropping it.

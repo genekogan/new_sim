@@ -1,0 +1,34 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync} from 'node:fs';
+import {setImmediate} from 'node:timers/promises';
+import {fixture,invite,accept} from '../../test/native-owner-fixture.ts';
+import {GodMode} from './god.ts';
+import {GroundHost,installGroundCapabilities,loadGroundRecipes} from './ground-host.ts';
+import {installEngineBridge} from './engine-bridge.ts';
+import {installWorldEnv} from './world-env.ts';
+import {EdgeLedger} from '../edge/ledger/ledger.ts';
+
+test('Mars nearest building behind uses physical class and reaches Chiba from the frozen east-facing start',{timeout:120000},async t=>{
+ const w=fixture(':memory:');loadGroundRecipes(w.db,w.host.worldId);const edge=new EdgeLedger(w.host,w.db);
+ const genesis=JSON.parse(readFileSync(new URL('../../../../worlds/templates/mars-two.json',import.meta.url),'utf8'));
+ const god=new GodMode(w.db,{genesis,worldId:w.host.worldId,ownerId:'dev:admin',tick:()=>w.host.engine.world.tick,emit(){}});
+ new GroundHost(w.db,w.host,god);installGroundCapabilities(edge as never,god,w.host);
+ const bridge=installEngineBridge({host:w.host,god,edge,log(){}});installWorldEnv(w.host,god,edge);
+ t.after(()=>{w.brain.quiesce();w.host.stop();edge.comms?.close();w.db.close();});
+ const settle=async(n=3)=>{for(let i=0;i<n;i++){w.host.tickOnce();await setImmediate();w.host.drainInputs();}};await settle();
+ await invite(w,'walker');const row=await accept(w.host,w.souls.create('dev:walker',{name:'Walker',description:'Native class selection proof'})) as {id:string;entity_id:string;name:string;owner:string};
+ const soul={soulId:row.id,entityId:row.entity_id,name:row.name,owner:row.owner};await settle();
+ const body=()=>w.host.engine.world.entities[soul.entityId]!;body().pose.p=[-.4,body().pose.p[1],-.4];await settle();
+ await accept(w.host,Promise.resolve(edge.intents.act(soul,{verb:'turn',heading:90})));bridge.perceive.sync(true);edge.map();
+ const query='enter the nearest building behind me',start=structuredClone(body().pose),resolved=edge.intents.dryRun(soul,{capability:query}) as any;
+ console.log(JSON.stringify({start,capability:resolved.would?.capability}));assert.equal(start.yaw,0,'heading 90 faces east in native yaw');assert.equal(resolved.ok,true);assert.equal(resolved.would.capability,'walk:chiba');
+ const binds=edge.coreA.binds(soul),omitted=binds.caps.filter(c=>c.verb!=='walk'||c.target?.kind!=='place'||edge.places.byId.get(c.target.id)?.kind!=='building');
+ const onDemand=edge.resolveOnDemand(soul,query,omitted,new Map(binds.plans)).v;assert.notEqual(onDemand.kind,'unknown',JSON.stringify(onDemand));if(onDemand.kind!=='unknown')assert.equal(onDemand.cap.id,'walk:chiba');
+ const accepted=await accept(w.host,Promise.resolve(edge.act(soul,{capability:query}))) as any;assert.equal(accepted.accepted,true,JSON.stringify(accepted));assert.equal(accepted.receipt.capability,'walk:chiba');
+ let receipt:any;const began=w.host.engine.world.tick;do{await settle(20);receipt=edge.receipt(soul.soulId,accepted.receipt.id);}while(['accepted','started'].includes(receipt.phase)&&w.host.engine.world.tick-began<180*20);
+ assert.equal(receipt.phase,'completed',JSON.stringify(receipt));const pos=body().pose.p,path=edge.placePathOf(soul.soulId).map(p=>p.id);
+ assert.ok(path.includes('g-chiba'),JSON.stringify({pos,path}));assert.ok(Math.hypot(pos[0]+14.643,pos[2]+28.174)<2,JSON.stringify(pos));
+ const proof={query,start,resolved,onDemand,accepted,receipt,path,pose:structuredClone(body().pose)};
+ if(process.env.MEANING_NATIVE_PROOF)writeFileSync(process.env.MEANING_NATIVE_PROOF,JSON.stringify(proof,null,2),{mode:0o600});
+});

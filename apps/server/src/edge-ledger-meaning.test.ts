@@ -36,3 +36,13 @@ test('relational where names the actual bank and stays silent without position',
  const bank={...water,id:'bank',name:'West Lake bank',kind:'shore',semanticParent:'lake'};
  assert.equal(whereLine([water,bank] as never,['bank'],[-1,10]),'On the bank of West Lake');assert.equal(whereLine([water,bank] as never,['lake','bank'],[2,10]),'In West Lake');assert.equal(whereLine([water,bank] as never,['bank'],null),undefined);
 });
+
+test('nearest building class outranks incidental name words and keeps heading, exact qualifiers and blocked admission',()=>{
+ const near:VocabPlace={id:'chiba',name:'Chiba',kind:'building',center:[-20,0],polygon:[[-30,-3],[-5,-3],[-5,3],[-30,3]]},far:VocabPlace={id:'racks',name:'West Racks',aliases:['west rack building'],kind:'building',center:[-80,0]},front:VocabPlace={id:'front',name:'Front Building',kind:'building',center:[2,0]};
+ const ps=[near,far,front],caps=ps.map(p=>cap('walk',p.id)),ctx=context(ps,caps),query='enter the nearest building behind me';
+ assert.equal(chosen(query,ctx),'walk:chiba');assert.equal(chosen('enter the closest building behind me',ctx),'walk:chiba');
+ assert.equal(chosen('enter the nearest west rack building behind me',ctx),'walk:racks','named qualifiers remain hard');
+ for(const offered of [[caps[1]],[]]){const r=resolveCapability(query,{...ctx,caps:offered});assert.equal(r.kind,'unknown');if(r.kind==='unknown'){assert.equal(r.code,'place.unreachable');assert.equal(r.place,'chiba','omitted nearest target is offered on demand, never swapped for farther offered');}}
+ const blocked=resolveCapability(query,{...ctx,caps:caps.map(c=>c.target?.id==='chiba'?{...c,available:false,blocked:{code:'route.unreachable',reason:'Closed entrance.'}}:c)});assert.notEqual(blocked.kind,'unknown');if(blocked.kind!=='unknown'){assert.equal(blocked.cap.id,'walk:chiba');assert.equal(blocked.cap.available,false);}
+ const wide={...near,center:[-200,0] as [number,number],polygon:[[-300,-3],[-3,-3],[-3,3],[-300,3]] as [number,number][]};assert.equal(chosen(query,context([wide,far],[caps[0],caps[1]])),'walk:chiba','edge distance outranks centroid distance');
+});
