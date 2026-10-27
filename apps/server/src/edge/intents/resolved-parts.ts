@@ -4,7 +4,7 @@ import type {Place} from '../ledger/places.ts';
 import type {EdgeCapability, EdgeSoul} from '../contract.ts';
 
 export function knownPart(L:EdgeLedger,soul:EdgeSoul,owner:Place,part:MeaningPart):boolean {
-  return L.knowledge.knows(soul.soulId,owner.id) && (!part.target?.ref || ![...L.places.byId.values()].some(p=>p.ref===part.target!.ref&&!L.knowledge.knows(soul.soulId,p.id)));
+  return L.knowledge.knows(soul.soulId,owner.id) && (!part.target?.ref || ![...L.places.byId.values()].some(p=>p.ref && (p.ref===part.target!.ref || part.target!.ref!.startsWith(p.ref+'/')) && !L.knowledge.knows(soul.soulId,p.id)));
 }
 
 /** Discovery only: the caller still chooses every action. Never infer an affordance from prose. */

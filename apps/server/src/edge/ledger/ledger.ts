@@ -719,7 +719,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (ride && !stepping) {const seated = this.rideStandRefusal(soul.entityId, caps), st = seated && caps.find(c => c.id === 'stand:here'); if (st) {st.available = false; st.blocked = seated!;}}
     shapeRigidCapabilities(me,caps,plans as never,secondsParam);
     // knowledge/1: an offer that leads to (or names) a secret place this Soul has not been to or found is not offered
-    if (this.knowledge.marked().size) for (let i = caps.length - 1; i >= 0; i--) {const t = caps[i]!.target; if (t?.kind === 'place' && !this.knowledge.knows(soul.soulId, t.id)) {plans.delete(caps[i]!.id); caps.splice(i, 1);}}
+    if (this.knowledge.marked().size) for (let i = caps.length - 1; i >= 0; i--) {if (this.secretOffer(soul,caps[i]!)) {plans.delete(caps[i]!.id); caps.splice(i, 1);}}
     const value = {caps, plans}; this.capCache.set(soul.soulId, {tick, value}); return value;
   }
   invalidateBodies(){this.capCache.clear();}
@@ -1718,6 +1718,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
    *  and a Soul that resolves first (as the skill says) told its human it could not go. */
   resolveOnDemand(soul: EdgeSoul, text: string, caps: EdgeCapability[], plans: Plans, typos = true): {v: VocabResult; caps: EdgeCapability[]; plans: Plans} {
     const exact = caps.find(c => c.id === text);
+    if(exact && this.secretOffer(soul,exact))return {v:{kind:'unknown',code:'capability.unknown',reason:'That action is not known here.',didYouMean:[]},caps,plans};
     // RESOLVE: a building's floor ("go upstairs", "go inside the cottage and go upstairs", "the top floor of the tower")
     const fl = exact || !this.floorOnDemand ? null : floorWords(text);
     if (fl) {
@@ -1815,7 +1816,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** knowledge/1 (as the listing filters its offers): an on-demand offer that leads to a secret place this Soul has not been
    *  to or found (or into one: knows() reads the secret ancestor), is not offered either. */
   private secretOffer(soul: EdgeSoul, cap: EdgeCapability): boolean {
-    return !!this.knowledge.marked().size && cap.target?.kind === 'place' && !this.knowledge.knows(soul.soulId, cap.target.id);
+    if(!this.knowledge.marked().size)return false;
+    if(cap.target?.kind==='place'&&!this.knowledge.knows(soul.soulId,cap.target.id))return true;
+    return [...this.places.byId.values()].some(p=>p.parts?.some(part=>(part.walk===cap.id||part.sit===cap.id)&&!knownPart(this,soul,p,part)));
   }
   /** SOULSIM-E: true when `asked` is an id the listing leaves out that resolveOnDemand offers (a far place's walk/run). Act
    *  and resolve let such an id through their place and strict/1 checks, which read the listing only. */
