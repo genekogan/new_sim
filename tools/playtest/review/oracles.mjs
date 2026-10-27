@@ -96,7 +96,7 @@ const bodyNames = (s) => [s.place, ...(s.placePath ?? []), ...(s.near ?? []).fil
 const CLAIMS = [['arrived', /\b(arrived|made it to|reached|got to|i'?m (now )?(at|in) the|i am (now )?(at|in) the|here at the)\b/i], ['sitting', /\b(sat|sitting|seated)\b/i], ['lying', /\b(lying|lay down|lain|napping|asleep)\b/i], ['swimming', /\b(swim(ming|s)?|swam)\b/i], ['riding', /\b(riding|rode)\b/i], ['done', /\b(done|finished|completed)\b/i]];
 const PAST = /\b(sat|lay down|lain|swam|rode)\b/i;
 const esc = (x) => String(x).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const NOT_A_CLAIM = /n't\b|\b(got it|on it|not|no|no longer|never|yet to|cannot|without|until|once|if|will|going to|about to|on (the|its|her|his|my) way|soon|try|trying|should|could|would)\b|'ll\b|\?\s*$/i;
+const NOT_A_CLAIM = /n't\b|\b(got it|on it|failed|unsuccessful|refused|not|no|no longer|never|yet to|cannot|without|until|once|if|will|going to|about to|on (the|its|her|his|my) way|soon|try|trying|should|could|would)\b|'ll\b|\?\s*$/i;
 /** Claims in an owner-facing text → [{id, clause, named, past}]. `soulName` adds "<name>/she/he/they is (now) at|in X". */
 export function claimsIn(text, { soulName = null, others = [] } = {}) {
   const other = others.length ? new RegExp(`\\b(${others.map(esc).join('|')})\\b`) : null;

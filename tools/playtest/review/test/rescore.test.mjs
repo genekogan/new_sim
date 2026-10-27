@@ -107,3 +107,9 @@ test('rescore-oracles rewrites oracles.jsonl and metrics.json and keeps the orig
   rescoreRun(main); assert.equal(readFileSync(join(main, 'oracles.jsonl.v1'), 'utf8'), '{"old":true}\n', 'v1 is never overwritten');
   assert.equal(r.requests, 3);
 });
+
+test('failed action reports are not positive body claims, while a later but-clause remains scoreable',()=>{
+ assert.deepEqual(claimsIn('The swim itself failed with `swim.steep`, so I reported the request as unsuccessful.'),[]);
+ assert.deepEqual(claimsIn('The first swim failed, but I am swimming now.').map(c=>c.id),['swimming']);
+ assert.deepEqual(claimsIn('Sitting was refused; I am seated now.').map(c=>c.id),['sitting']);
+});
