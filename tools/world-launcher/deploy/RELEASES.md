@@ -31,6 +31,7 @@ handover, and the probe's exit 3 says it happened.
 
 - `--dry-run` prints every step with its exact commands. Nothing runs, and eden2 is not contacted. It exits 1 when
   preflight would stop a real run.
+- `--exclude-world <slug>` omits that registered world from desktop and phone arrival walks when the user has explicitly excluded it. It prints the exclusion and recalculates the arrival count; unknown/duplicate slugs fail. Record the reduced coverage in SHIP-LOG. Other release steps remain mandatory.
 - `--from <step>` resumes after a fix (same `--label`, same outputs). `--no-probe` skips the three probe steps.
 - The legacy handover itself is `activate.sh`'s job. ship.sh only calls it, so changes to the handover (keeper,
   `children.mjs`) reach ship.sh without touching it.

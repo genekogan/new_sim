@@ -8,6 +8,7 @@
 #     --dry-run  prints every step and its exact commands; nothing runs, nothing is written, eden2 is not contacted
 #     --from     resume at <step> after a stop (same --label, so the same <out>); earlier steps are skipped
 #     --no-probe skip the live release probe (probe-start, released, probe-check)
+#     --exclude-world <slug>  omit an explicitly excluded /worlds/w/<slug>/ from arrival walks; repeatable
 #     --out      outputs (default <team>/scratch/ship/<label>)
 #
 # Run it from the release worktree, clean, at the exact gated head (release.sh ships HEAD). Steps, in order:
@@ -54,13 +55,30 @@ STEPS="preflight backup legacy-upload probe-start release legacy-activate releas
 NSTEPS=12
 
 usage() { sed -n '6,11p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
-LABEL=""; DRY=0; FROM=""; PROBE=1; OUT=""
+LABEL=""; DRY=0; FROM=""; PROBE=1; OUT=""; EXCLUDED_WORLDS=""
 while [ $# -gt 0 ]; do case "$1" in
+  --exclude-world) EXCLUDED_WORLDS="$EXCLUDED_WORLDS ${2:-}"; [ -n "${2:-}" ] || usage; shift;;
   --label) LABEL="${2:-}"; shift;; --dry-run) DRY=1;; --from) FROM="${2:-}"; shift;; --no-probe) PROBE=0;; --out) OUT="${2:-}"; shift;;
   *) usage;; esac; shift; done
 [ -n "$LABEL" ] || usage
 case "$LABEL" in *[!A-Za-z0-9_-]*) echo "--label: letters, digits, - and _ only (353 for 3.53)"; exit 2;; esac
 if [ -n "$FROM" ]; then case " $STEPS " in *" $FROM "*) ;; *) echo "--from: one of $STEPS"; exit 2;; esac; fi
+# A human scope exclusion changes only arrival coverage, never backup, probe or activation.
+for slug in $EXCLUDED_WORLDS; do
+  case "$slug" in *[!a-z0-9-]*|'') echo "--exclude-world: invalid slug"; exit 2;; esac
+  found=0; filtered=""; IFS='|' read -r -a paths <<< "$WALK_DESKTOP"
+  for path in "${paths[@]}"; do
+    if [ "$path" = "/worlds/w/$slug/" ]; then found=1; else filtered="$filtered|$path"; fi
+  done
+  [ "$found" = 1 ] || { echo "--exclude-world: unknown or duplicate world $slug"; exit 2; }
+  WALK_DESKTOP="${filtered#|}"; filtered=""; IFS='|' read -r -a paths <<< "$WALK_PHONE"
+  for path in "${paths[@]}"; do [ "$path" = "/worlds/w/$slug/" ] || filtered="$filtered|$path"; done
+  WALK_PHONE="${filtered#|}"
+  echo "Explicit arrival-walk exclusion: $slug"
+done
+IFS='|' read -r -a paths <<< "$WALK_DESKTOP"; WALK_DESKTOP_COUNT=${#paths[@]}
+IFS='|' read -r -a paths <<< "$WALK_PHONE"; WALK_PHONE_COUNT=${#paths[@]}
+WALK_EXPECT=$((WALK_DESKTOP_COUNT * 2 + WALK_PHONE_COUNT))
 OUT="${OUT:-$OUT_ROOT/$LABEL}"; PDIR="$OUT/probe"
 if [ "${SHIP_TEST:-}" = 1 ]; then
   [ -n "${SHIP_SSH:-}" ] && [ -n "${SHIP_SCP:-}" ] && [ -n "${SHIP_NODE:-}" ] && [ -n "${SHIP_PYTHON:-}" ] && [ -n "${SHIP_RELEASE_SH:-}" ] || { echo "SHIP_TEST=1 needs every SHIP_ command stubbed"; exit 2; }
@@ -228,7 +246,7 @@ if [ "$PROBE" = 1 ] && step probe-check "wait for the probe: 0 pass, 1 visitor b
 elif [ "$PROBE" = 0 ]; then N=$((N + 1)); say "== [$N/$NSTEPS] probe-check: off (--no-probe)"; fi
 
 # ---- 9 walks --------------------------------------------------------------------------------------------------------
-if step walks "stranger walks: desktop 7 worlds dpr 1+2, phone 3 worlds; $WALK_EXPECT arrivals, 0 errors, 0 resync"; then
+if step walks "stranger walks: desktop $WALK_DESKTOP_COUNT worlds dpr 1+2, phone $WALK_PHONE_COUNT worlds; $WALK_EXPECT arrivals, 0 errors, 0 resync"; then
   IFS='|'; set -- $WALK_DESKTOP; unset IFS; d=""; for w in "$@"; do d="$d|$ORIGIN$w"; done
   IFS='|'; set -- $WALK_PHONE; unset IFS; ph=""; for w in "$@"; do ph="$ph|$ORIGIN$w"; done
   IFS='|'; set -- ${d#|}; unset IFS

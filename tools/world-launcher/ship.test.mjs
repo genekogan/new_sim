@@ -230,3 +230,20 @@ test('walk.mjs zoomStep keeps the orbit eye in open space', () => {
   for (let s; (s = zoomStep(d, h, zin)) && out < 8;) { if (s === 'in') { zin++; d *= NOTCH_FACTOR; h *= NOTCH_FACTOR; } else { out++; d /= NOTCH_FACTOR; h /= NOTCH_FACTOR; } }
   assert.ok(d >= 25 && h >= 10, `ended d=${d.toFixed(1)} h=${h.toFixed(1)} after ${out} out`);
 });
+
+// Scope exclusions must be visible and cannot quietly weaken the expected arrival count.
+test('explicit excluded world is absent from both arrival walks and adjusts the bar', () => {
+  const s = setup(), r = s.run(['--dry-run', '--exclude-world', 'little-martians-arium']);
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /Explicit arrival-walk exclusion: little-martians-arium/);
+  assert.match(r.out, /desktop 6 worlds dpr 1\+2, phone 2 worlds; 14 arrivals/);
+  assert.doesNotMatch(r.out, /https:\/\/sim\.stub\/worlds\/w\/little-martians-arium/);
+  assert.match(r.out, /checks\.mjs walks 14 /);
+  assert.deepEqual(r.calls, []);
+});
+test('unknown or duplicate arrival exclusions fail before any release action', () => {
+  for (const exclusions of [['not-a-world'], ['little-martians-arium', 'little-martians-arium']]) {
+    const s = setup(), r = s.run(exclusions.flatMap(x => ['--exclude-world', x]));
+    assert.equal(r.code, 2, r.out); assert.deepEqual(r.calls, []);
+  }
+});
