@@ -164,7 +164,12 @@ test('stress-30: exact planner keeps the pinned result; deterministic work bound
   // shifts arrival ticks and so the shared goal-RNG draws of this soak; 0 violations before and after (PLANNING_BUDGET.md).
   // Re-pinned again (was 0ec4d884…ecf58): splined turns + immediate block reaction, 2026-09-28 (walk.ts; MOVEMENT.md).
   // Re-pinned again (was 1298e2e5…5ee6b): no walker jumps: snaps walked, teleport 0.15 m, overspeed invariant, 2026-09-28 (MOVEMENT.md "No jumps"); 0 violations.
-  assert.equal(exact.rt.stateHash(), '5c3a3355257850f2316b92902451c144981486262211d86de4881047ca8a194e', 'stress-30 final state unchanged by the planning-budget work');
+  // Arrival-clearance repair (2026-10-27): previous pin 5c3a3355…194e admitted
+  // w09's tick-971 crowd replan past a 0.25 m landing for its 0.28 m body.
+  // Worlds match through tick 971; refusing that unsafe stair first changes tick 972.
+  // link-reversible.test.ts pins the actual blocker/landing; stress-work.ts documents
+  // the bounded extra refusal work. Profile/fast-path equivalence remains required.
+  assert.equal(exact.rt.stateHash(), '2cdef2016a5cb1b51140f9a8dc0e565b4a354b334587fe1d8e4a6832ecfb923b', 'stress-30 final state with safe physical stair landings');
   const corr = stressWork('corridor');
   assert.equal(corr.rt.violations.length, 0);
   assert.equal(exact.rt.prof?.stats.get('invariants')?.calls, 1200, 'counter instrumentation covers every tick');

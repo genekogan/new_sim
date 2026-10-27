@@ -4,8 +4,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildGrids, clearanceAt, segmentClearance } from '../spatial/grid.ts';
-import { findRoute, linkApproach, snap } from '../spatial/path.ts';
+import { findRoute, linkApproach, linkEdgeTest, snap } from '../spatial/path.ts';
 import { HUMAN_PROFILE, type Link, type SpatialScene } from '../spatial/types.ts';
+import { provingGround } from '../scenes/proving-ground.ts';
+import { Spatial } from '../spatial/service.ts';
+import { emptyWorld } from '../world/factory.ts';
 
 const obb = (c: [number, number], half: [number, number]) => ({ c, half, yaw: 0 });
 function scene(gap: number): SpatialScene {
@@ -87,4 +90,29 @@ test('a clear snap cell beyond a blocked landing does not admit a collision on a
   assert.ok(clearanceAt(upper,link.to.p)<profile.radius,'physical landing is occupied');
   const route=findRoute(grids,s,profile,{level:0,p:[0,-4]},{level:1,p:[-2,3]});
   assert.equal(route.ok,false,'the landing itself must be safe before any onward walk');
+});
+
+// stress-30 tick 971: w09's crowd replan formerly snapped beyond w20 at the
+// stair head. The physical landing has 0.25 m of raster clearance for a 0.28 m
+// body, despite the clear far cell. This is why the corrected run first differs
+// at tick 972; it must wait rather than accept the old undersized corridor.
+test('a person at the stair head blocks arrival even when the far snap cell is clear', () => {
+  const base=provingGround(), p=HUMAN_PROFILE, r=p.radius+.06;
+  const start={level:0,p:[2.8211091197471294,11.866886239573127] as [number,number]};
+  const goal={level:1,p:[9.866312313545494,11.135340875759722] as [number,number]};
+  assert.equal(findRoute(buildGrids(base),base,p,start,goal).ok,true,'the unoccupied stair is usable');
+  for(const half of [.3,.22]) {
+    // Both ordinary crowd avoidance and its narrower fallback must respect the landing.
+    const sp=new Spatial(base), world=emptyWorld('crowded-stair',base);
+    const {scene:s,grids}=sp.gridsAround(world,[{id:'w20',p:[5.851999999999995,10],y:2.888999999999996,...(half===.22?{half}:{})}]);
+    const link=s.links.find(l=>l.id==='stairs-a')!;
+    const own=linkApproach(link,true), lower=grids.levels.get(0)!, upper=grids.levels.get(1)!;
+    const edge=linkEdgeTest(link,true,lower,upper,r,p.radius);
+    assert.ok(edge.cx>=0,'a clear snapped arrival cell still exists');
+    assert.ok(segmentClearance(lower,edge.approach,own.entry.p)>=p.radius,'departure itself is clear');
+    assert.equal(clearanceAt(upper,own.exit.p),.25,'the actual landing is too narrow');
+    assert.equal(edge.ok,false,'the physical arrival cannot be skipped');
+    assert.equal(findRoute(grids,s,p,start,goal).ok,false,'wait until the person clears the landing');
+  }
+  assert.equal(findRoute(buildGrids(base),base,p,start,goal).ok,true,'removing the temporary blocker reopens the same route');
 });

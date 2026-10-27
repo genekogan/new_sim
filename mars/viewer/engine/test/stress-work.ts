@@ -31,14 +31,21 @@ export function stressWork(planner: Planner, profile = true) {
   return { rt, work, sample };
 }
 
-// Measured on unchanged stress-30 at 60deba6: same final state, zero violations. See REPORT/PLANNING_BUDGET.
+// Original stress-30 ceilings: 60deba6 (REPORT/PLANNING_BUDGET).
+// 2026-10-27 physical landing safety: a refused crowd landing starts the ordinary
+// plus squeezed replan fallbacks at tick 971 (exact) instead of admitting a
+// 0.25 m corridor for a 0.28 m body. Both versions complete 45 of 75 actions with
+// zero violations. This is an explicit safety/work tradeoff, not neutral work:
+// exact routeAround 9→14 (peak 1→2), gridsAround 18→20, sync 37097→37099;
+// corridor routeAround 5→8 (peak 1→2). All other ceilings stay unchanged.
+// link-reversible.test.ts fixes the actual occupied landing and its reopening.
 // These are ceilings, so an optimization can do less work without an arbitrary percentage allowance.
 export const STRESS_WORK_BUDGET: Record<Planner, Work> = {
   exact: {
     'spatial.route': { total: 75, peak: 27 },
-    'spatial.routeAround': { total: 9, peak: 1 },
-    'spatial.gridsAround': { total: 18, peak: 2 },
-    'spatial.sync': { total: 37097, peak: 58 },
+    'spatial.routeAround': { total: 14, peak: 2 },
+    'spatial.gridsAround': { total: 20, peak: 2 },
+    'spatial.sync': { total: 37099, peak: 58 },
     'spatial.sync.rebuild': { total: 1, peak: 1 },
     'spatial.sync.grids': { total: 1, peak: 1 },
     'walk_to.plan': { total: 75, peak: 27 },
@@ -46,7 +53,7 @@ export const STRESS_WORK_BUDGET: Record<Planner, Work> = {
   },
   corridor: {
     'spatial.route': { total: 75, peak: 27 },
-    'spatial.routeAround': { total: 5, peak: 1 },
+    'spatial.routeAround': { total: 8, peak: 2 },
     'spatial.gridsAround': { total: 10, peak: 2 },
     'spatial.sync': { total: 37087, peak: 58 },
     'spatial.sync.rebuild': { total: 1, peak: 1 },

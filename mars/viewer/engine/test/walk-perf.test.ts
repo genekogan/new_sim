@@ -109,7 +109,11 @@ function stressHash(fast: boolean, planner: 'exact' | 'corridor', ticks: number)
 
 test('walker fast paths off === on: stress-30 (exact: the pin; corridor: its failing people-replan at tick 1126) and the meal', () => {
   const on = stressHash(true, 'exact', 1200);
-  assert.equal(on, '5c3a3355257850f2316b92902451c144981486262211d86de4881047ca8a194e');
+  // Arrival-clearance repair (2026-10-27): previous pin 5c3a3355…194e admitted
+  // w09's tick-971 crowd replan past a 0.25 m landing for its 0.28 m body.
+  // Worlds match through tick 971; refusing that unsafe stair first changes tick 972.
+  // link-reversible.test.ts pins the actual blocker/landing; fast-path equality remains.
+  assert.equal(on, '2cdef2016a5cb1b51140f9a8dc0e565b4a354b334587fe1d8e4a6832ecfb923b');
   assert.equal(stressHash(false, 'exact', 1200), on);
   assert.equal(stressHash(true, 'corridor', 1200), stressHash(false, 'corridor', 1200));
   const meal = (fast: boolean) => {
