@@ -6,7 +6,7 @@ import overlays from './mesh-floor-overlays.json' with {type:'json'};
 
 test('content-addressed floor supplements survive pinned-definition reloads and respect authored overrides', () => {
   const w = new WorldModel({constants:{extent:1000,ground:'land'},seed:'mesh-floors'}); w.library=coreLibrary();
-  assert.equal(Object.keys(overlays.assets).length,7,'current and legacy shipped meshes');
+  assert.equal(Object.keys(overlays.assets).length,9,'current, legacy and fidelity shipped meshes');
   for (const [hash, entry] of Object.entries(overlays.assets)) {
     const base=w.def(`${entry.name}@${entry.name.endsWith('west-racks')?1:2}`)!; assert.ok(base,entry.name);
     assert.equal(base.make.kind,'mesh');
@@ -22,4 +22,12 @@ test('content-addressed floor supplements survive pinned-definition reloads and 
     assert.equal(meshFloors(hash,entry.box,[authored]).some(s=>Math.abs(s.y-first.y)<.02),false);
     assert.deepEqual(meshFloors(hash,entry.box.map(v=>v*2)),[],'a different mesh fit requires extraction of its own');
   }
+});
+
+
+test('the live fidelity Chiba variant has exactly the extracted core geometry', () => {
+  const assets=overlays.assets as Record<string,{geometryHash:string;surfaces:unknown}>;
+  const core=assets['4b5e4508f40b98c7d30c5d7c4a45564bf09541032122104eef6c60ca209057be'];
+  const live=assets['99d5c2f524280ef10ca5ef88e9095434ff30a177d42bc67ff5e8d451836e89af'];
+  assert.equal(live.geometryHash,core.geometryHash);assert.deepEqual(live.surfaces,core.surfaces);
 });

@@ -509,7 +509,7 @@ export class EngineBridge {
     const surfaces = [...(baked.surfaces ?? [])];
     // floors (2026-10-26): a mesh def's measured floor plates (floor-plates.ts: the Chiba deck), walked onto as a step
     const plates = new Set<object>();
-    if (!worldFrame && def.make.kind === 'mesh') for (const f of floorPlatesOf(def.name)) { const s = { level: 0, y: f.y, polygon: f.polygon, tag: f.id }; plates.add(s); surfaces.push(s); }
+    if (!worldFrame && def.make.kind === 'mesh') for (const f of floorPlatesOf(def.name, def.make.asset)) { const s = { level: 0, y: f.y, polygon: f.polygon, tag: f.id }; plates.add(s); surfaces.push(s); }
     if (!surfaces.length && def.components.floor) { const [w, , d] = baked.box; surfaces.push({ level: 0, y: def.components.floor.y ?? baked.box[1], polygon: [[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]] }); }
     // ground cover (roads, lawns, plazas: ground-relative level-0 surfaces of world-frame shapes) is the ground itself
     const floors = surfaces.filter((x) => !(worldFrame && !(x as { abs?: boolean }).abs && x.level === 0));
@@ -584,7 +584,7 @@ export class EngineBridge {
     const out: FloorNear[] = [], eng = this.engine as unknown as { clearanceAtV1?: (x: number, z: number, level?: number) => number }, epoch = (this.engine.world as { entityPhysicsV1?: { hash?: string } }).entityPhysicsV1?.hash ?? '';
     for (const e of this.model.entities.values()) {
       const def = this.model.resolvedDef(e.def); if (!def || def.make.kind !== 'mesh') continue;
-      const plates = floorPlatesOf(def.name); if (!plates.length) continue;
+      const plates = floorPlatesOf(def.name, def.make.asset); if (!plates.length) continue;
       const wp = this.model.worldPose(e), c = Math.cos(wp.yaw), s = Math.sin(wp.yaw), k = wp.s;
       const toW = (x: number, z: number): Vec2 => [wp.x + (x * c + z * s) * k, wp.z + (-x * s + z * c) * k];
       const dx = (at[0] - wp.x) / k, dz = (at[1] - wp.z) / k, lx = dx * c - dz * s, lz = dx * s + dz * c;

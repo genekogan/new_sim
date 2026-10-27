@@ -25,4 +25,9 @@ export const STEP_UP = 0.45;
 export function plateIsStep(y: number, ground: number): boolean { const d = y - ground; return d >= -0.35 && d <= STEP_UP + 1e-9; }
 
 /** The floor plates of a def (by name, every revision); empty when it has none listed. */
-export function floorPlatesOf(defName: string): readonly FloorPlate[] { return FLOOR_PLATES[defName] ?? []; }
+export function floorPlatesOf(defName: string, asset?: string): readonly FloorPlate[] {
+  // The live Mars fidelity patch gives Chiba a local def name while changing UVs
+  // only. Its content-addressed geometry is checked by mesh-floors extraction.
+  if (asset === '99d5c2f524280ef10ca5ef88e9095434ff30a177d42bc67ff5e8d451836e89af') return FLOOR_PLATES['core-mars-chiba'];
+  return FLOOR_PLATES[defName] ?? [];
+}

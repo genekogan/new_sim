@@ -1,6 +1,6 @@
 # Mesh support extraction
 
-`node tools/mesh-floors/extract.mjs` reads the seven content-addressed, shipped GLBs for Chiba, tool camp, Freeside and west racks (including legacy assets). It emits `packages/world-compiler/src/mesh-floor-overlays.json`. `--check` checks regeneration without writing. This is offline work; no GLBs, definitions, or live data are changed.
+`node tools/mesh-floors/extract.mjs` reads the nine content-addressed, shipped GLBs for Chiba, tool camp, Freeside and west racks (including legacy and live fidelity variants). It emits `packages/world-compiler/src/mesh-floor-overlays.json`. `--check` checks regeneration without writing. This is offline work; no GLBs, definitions, or live data are changed.
 
 The extractor follows the viewer's actual fitting rule: world transforms, precise mesh bounds, base centering and uniform scale on the mesh's largest axis. Asset-index boxes can have stale dimensions and are not used as mesh geometry. Hash and fitting-axis checks prevent applying a supplement to unrelated or differently scaled geometry. Existing pinned definitions acquire the supplement through compilation; they do not need to adopt a new catalogue revision.
 

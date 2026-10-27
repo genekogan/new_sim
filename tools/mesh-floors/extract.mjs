@@ -16,7 +16,7 @@ const {MeshoptDecoder}=await import(resolve(pnpm,meshopt,'node_modules/meshoptim
 const io=new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({'meshopt.decoder':MeshoptDecoder});
 const mul=(m,v)=>[m[0]*v[0]+m[4]*v[1]+m[8]*v[2]+m[12],m[1]*v[0]+m[5]*v[1]+m[9]*v[2]+m[13],m[2]*v[0]+m[6]*v[1]+m[10]*v[2]+m[14]];
 const sha=b=>createHash('sha256').update(b).digest('hex'),names=['chiba','tool-camp','freeside','west-racks'];
-const defs=JSON.parse(readFileSync(resolve(root,'packages/world-compiler/src/core-kit/mars.json'))),assets=JSON.parse(readFileSync(resolve(root,'worlds/core-assets/index.json'))).assets;
+const defs=JSON.parse(readFileSync(resolve(root,'packages/world-compiler/src/core-kit/mars.json'))),assets={...JSON.parse(readFileSync(resolve(root,'worlds/core-assets/index.json'))).assets,...JSON.parse(readFileSync(resolve(root,'worlds/core-assets/mars-fidelity.index.json'))).assets};
 const output={policy:'mesh-floors/1',assets:{}};
 for(const name of names)for(const [hash,asset] of Object.entries(assets).filter(([,a])=>a.kind==='mesh'&&a.name===`mars-${name}`)){
  const def=defs.find(d=>d.name===`core-mars-${name}`);

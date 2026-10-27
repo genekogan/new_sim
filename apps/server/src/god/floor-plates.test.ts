@@ -3,6 +3,7 @@
 import test, {type TestContext} from 'node:test';
 import assert from 'node:assert/strict';
 import {setImmediate} from 'node:timers/promises';
+import {readFileSync} from 'node:fs';
 import {coreRef} from '@sim/world-compiler';
 import {fixture, factory, invite, accept} from '../../test/native-owner-fixture.ts';
 import {EdgeLedger} from '../edge/ledger/ledger.ts';
@@ -24,10 +25,10 @@ test('the step rule: a plate up to 0.45 m above the terrain is a step (level 0);
   assert.equal(deck.y, 0.374);
 });
 
-function world(t: TestContext) {
+function world(t: TestContext, genesis?: any) {
   const w = fixture(':memory:', factory, {durableClockV1: true});
   w.brain.quiesce();
-  const god = new GodMode(w.db, {worldId: w.host.worldId, ownerId: 'owner', tick: () => w.host.engine.world.tick, emit() {}});
+  const god = new GodMode(w.db, {genesis, worldId: w.host.worldId, ownerId: 'owner', tick: () => w.host.engine.world.tick, emit() {}});
   new GroundHost(w.db, w.host, god);
   const edge = new EdgeLedger(w.host, w.db), bridge = installEngineBridge({host: w.host, god, edge, log() {}, worldClock: false, worldLore: false});
   t.after(() => {w.brain.quiesce(); w.host.stop(); edge.comms?.close(); w.db.close();});
@@ -145,3 +146,33 @@ for (const [name, height] of [['chiba',.374],['tool-camp',.424],['freeside',.375
 
   });
 }
+
+
+test('full patched and rotated Mars keeps the presenter supported and persistently seated after completion', {timeout:180000}, async t => {
+  const template=JSON.parse(readFileSync(new URL('../../../../worlds/templates/mars-two.json',import.meta.url),'utf8'));
+  const w=world(t,template);await w.settle();
+  const {makePatch:fidelity,originalDefs}=await import(new URL('../../../../tools/mars-fidelity/patch.mjs',import.meta.url).href);
+  const {makePatch:rotate}=await import(new URL('../../../../tools/mars-rotation/patch.mjs',import.meta.url).href);
+  const historical:any={...w.god.model.snapshot(),worldId:w.host.worldId};
+  for(const d of historical.defs)if(originalDefs.some((o:any)=>o.name===d.name&&o.version===d.version)&&d.make.lod1)delete d.make.lod1;
+  const a=w.god.act(fidelity(historical,{group:'mars-fidelity-20261015-floor-regression'}).batch as any) as any;
+  assert.equal(a.accepted,true,JSON.stringify(a).slice(0,600));await w.settle();
+  const b=w.god.act(rotate({...w.god.model.snapshot(),worldId:w.host.worldId},{template,bearing:82,group:'floor-bearing'}).batch as any) as any;
+  assert.equal(b.accepted,true,JSON.stringify(b).slice(0,600));await w.settle();
+  const box=w.god.model.get('presenter-timber-box')!, chiba=w.god.model.get('chiba')!,E=w.host.engine as any;
+  assert.equal(w.god.model.resolvedDef(chiba.def)!.name,'mars-fidelity-chiba');
+  const at=w.god.model.worldPose(box);assert.equal(at.y,.373);
+  assert.equal(E.standYAtV1(at.x,at.z,0),.374,'actual live fidelity mesh supports the presenter');
+  await invite(w,'presenter');const row:any=await accept(w.host,w.souls.create('dev:presenter',{name:'Presenter',description:'giving a presentation'}));await w.settle();
+  const s={soulId:row.id,entityId:row.entity_id,name:row.name,owner:row.owner};
+  const receipt=async(capability:string,params?:any)=>{
+    const a:any=await accept(w.host,w.edge.act(s,{capability,params}));assert.equal(a.accepted,true,JSON.stringify(a));
+    for(let i=0;i<10000;i++){const r=w.edge.receipt(s.soulId,a.receipt.id);if(r&&['completed','failed','cancelled'].includes(r.phase)){assert.equal(r.phase,'completed',JSON.stringify(r));return r;}w.host.tickOnce();if(i%20===0){await setImmediate();w.host.drainInputs();}}
+    assert.fail(`receipt did not finish: ${capability}`);
+  };
+  await receipt('walk:chiba');
+  await receipt(`sit:${box.id}`,{seconds:1});
+  for(let i=0;i<1200;i++){w.host.tickOnce();if(i%20===0){await setImmediate();w.host.drainInputs();}}
+  assert.equal(E.world.entities[s.entityId].human.activity,'sit','completion leaves the presenter seated after sixty seconds');
+  assert.equal(E.bodyUsesV1(box.id)?.body,s.entityId,'the exact presenter fixture is held');
+});
