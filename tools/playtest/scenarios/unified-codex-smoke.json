@@ -5,7 +5,7 @@
   "providers": { "allowed": ["codex"] },
   "world": { "kind": "dev", "genesis": "worlds/templates/hello-hamlet.json", "slug": "pt-unified-smoke", "port": 4992, "natives": false },
   "durationSec": 100,
-  "seats": [{ "id": "pip", "adapter": "codex-headless", "model": "gpt-6.1-sol", "effort": "medium", "soulName": "Pip", "wake": true }],
+  "seats": [{ "id": "pip", "adapter": "codex-headless", "model": null, "effort": "medium", "soulName": "Pip", "wake": true }],
   "god": null,
   "director": { "mode": "scripted", "sequential": true, "script": [{ "seat": "pip", "atSec": 5, "channel": "card", "text": "sit down", "budgetSec": 90 }] },
   "observer": { "sampleSec": 2, "viewport": [1280, 800], "dpr": 1, "cameras": [] },

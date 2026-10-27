@@ -26,7 +26,7 @@ export function joinTurns(run) {
     const costBy = new Map((s.cost ?? []).map((c) => [c.turn, c]));
     const reqs = run.evidence.filter((e) => e.seat === seat);
     for (const t of s.turns ?? []) {
-      if (t.reason === 'onboard') continue;
+      if (t.reason?.startsWith('onboard')) continue;
       const a = Date.parse(t.startedAt), b = Date.parse(t.endedAt ?? t.startedAt);
       const served = reqs.filter((e) => (e.chatTurns ?? []).includes(t.turn) || (Number.isFinite(a) && a < (Date.parse(e.cutoffAt) || Infinity) && b > Date.parse(e.sentAt)));
       if (!served.length) continue;
@@ -105,6 +105,7 @@ export function computeMetrics(run, { ledger = [], oracles = null, emergence = n
       chatReplyChars: stats(allTurns.filter((t) => t.reason === 'chat').map((t) => t.finalText?.length)),
       basis: 'cost.jsonl per seat turn; a turn serves the requests whose window (sentAt..cutoffAt) it overlaps or that it carried (chatTurns); its tokens and CLI calls are split evenly over them; requests served by no turn count 0 turns and no tokens',
     },
+    journeys: { rows: ors.filter(r => r.id.startsWith('journey-')), basis: 'ordered frozen geometry/posture predicates and exact receipt target IDs; unknown is never a pass' },
     fidelity: { counts: fid, wrong: fid.W, classes: cls, hitRate: ledger.length ? fid.H / ledger.length : null, truthfulnessPassRate: truth.length ? truth.filter((r) => r.status === 'pass').length / truth.length : null, vocabularyMisses: count(ors, 'vocabulary'), vetoed: ledger.filter((r) => r.vetoed).length, basis: 'ledger.tsv (Reviewer, oracle-vetoed); P never counts as H' },
     physical: { insideSolid: count(ors, 'inside-solid'), noProgress: count(ors, 'no-progress'), stuckReceipts: count(ors, 'stuck-receipt'), oscillations: count(ors, 'oscillation'), basis: 'oracle fails per request' },
     emergence: emergence?.metric ? { coLocationRatio: emergence.metric.coLocation?.ratio ?? null, conversations: emergence.metric.conversations?.started ?? 0, unpromptedShared: emergence.metric.sharedActivities?.unprompted ?? 0, imitation: emergence.metric.imitationWithin2min ?? 0, meanActivityEntropyBits: emergence.metric.individuality?.meanActivityEntropyBits ?? null, chainsGe2: emergence.metric.chainsGe2 ?? 0, storyRating: emergence.narrative?.storyRating ?? null, o5Count: emergence.narrative?.o5Count ?? null } : null,
@@ -115,6 +116,8 @@ export function computeMetrics(run, { ledger = [], oracles = null, emergence = n
 export function metricsRun(runDir) {
   const run = loadRun(runDir);
   const m = computeMetrics(run, { ledger: readLedger(join(runDir, 'ledger.tsv')), oracles: readJsonl(join(runDir, 'oracles.jsonl')).length ? readJsonl(join(runDir, 'oracles.jsonl')) : null, emergence: readJson(join(runDir, 'emergence.json'), null) });
+  m.journeys.setup = readJsonl(join(runDir, 'fixture-setup.jsonl'));
+  m.journeys.infrastructureInvalid = readJsonl(join(runDir, 'infrastructure-invalid.jsonl'));
   writeJson(join(runDir, 'metrics.json'), m);
   return m;
 }

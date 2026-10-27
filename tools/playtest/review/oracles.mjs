@@ -1,6 +1,7 @@
 // Deterministic oracles over one request's evidence pack (DESIGN §4.4, spec §2.4). Code only: pass | fail | unknown
 // with pointers, never a score. Facts after the request's cutoff are excluded (late diagnostics never grant hits).
 import { seatActs, xz } from './run.mjs';
+import { journeyOracles } from './journey-oracles.mjs';
 import { expectFor, expectOracles } from './expect-oracles.mjs';
 
 export const ORACLE_IDS = ['ack-latency', 'result-sent', 'listen-open', 'arrival', 'posture', 'duration-held', 'inside-solid', 'no-progress', 'oscillation', 'stuck-receipt', 'truthfulness-basic', 'vocabulary', 'duplicate-acts', 'server-errors', 'first-body-change'];
@@ -248,7 +249,8 @@ export function runOracles(ev, ctx = {}) {
   const fb = ms(ev.firstBodyChangeAt);
   out.push(fb && fb <= cutoff ? o('first-body-change', 'pass', `first visible body change after ${secs(sent, fb)} s`, [`${P}#firstBodyChangeAt`]) : accepted ? o('first-body-change', 'fail', 'an action was accepted but no visible body change before cutoff', [`${P}#firstBodyChangeAt`]) : o('first-body-change', 'unknown', 'no body action was started'));
   const expect = ctx.expect !== undefined ? ctx.expect : expectFor(ctx.run, ev);
-  if (expect) out.push(...expectOracles({ ev, expect, timely, replies, receipts, acts, inWindow, P }));
+  if (expect?.journey) out.push(...journeyOracles({ ev, journey: expect.journey, receipts, replies, acts, acceptedMs: r => acceptedMs(r, clk), endedMs: r => endedMs(r, clk) }));
+  if (expect && expect.kind !== 'journey') out.push(...expectOracles({ ev, expect, timely, replies, receipts, acts, inWindow, P }));
   if (late) out.forEach((r) => { r.lateSamplesExcluded = late; });
   return out.map((r) => ({ requestId: ev.requestId, ...r }));
 }

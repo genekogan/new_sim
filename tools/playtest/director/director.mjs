@@ -6,6 +6,7 @@ import { monoMs, sleep as realSleep } from '../lib/clock.mjs';
 import { rng as makeRng } from '../lib/hash.mjs';
 import { appendJsonl, writeJson } from '../lib/jsonl.mjs';
 import { quota, quotaAllows } from '../lib/quota.mjs';
+import { runFixtureSetup } from '../arena/fixture-setup.mjs';
 import { PersonaSession, loadSheet, parseSheet } from './persona.mjs';
 
 const RESULT_STATES = new Set(['done', 'completed', 'complete', 'failed', 'refused', 'declined', 'cancelled', 'canceled', 'replaced', 'result', 'error']);
@@ -168,6 +169,10 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
     const cam = camOf(ctx);
     let snap = null, legible = null, shot = null;
     try { if (observer?.truth?.snapshotSoul && ctx.soulId) snap = await observer.truth.snapshotSoul({ base: world?.base, soulId: ctx.soulId, identity: ctx.identity }); } catch (e) { log(ctx.id, 'snapshot failed', e?.message ?? e); }
+    if (snap && scenario.observer?.kinematics && ctx.seat.cliJson) {
+      const here = await ctx.seat.cliJson(['here']);
+      if (here.ok && here.data?.me) { const me = here.data.me; snap = { ...snap, heading: me.heading, seat: me.seat ?? null, level: me.level ?? null, posture: me.posture, perceptionSampleAt: new Date().toISOString() }; }
+    }
     try { if (cam?.legible) legible = await cam.legible(); } catch { /* best effort */ }
     try { if (cam?.shot) { const mono = Math.round(clock.now() - start); const p = join(shotsDir, ctx.id, `${mono}.png`); mkdirSync(join(shotsDir, ctx.id), { recursive: true }); await cam.shot(p); shot = p; appendJsonl(join(shotsDir, 'index.jsonl'), { cam: ctx.id, mono, t: new Date().toISOString(), path: p }); } } catch (e) { log(ctx.id, 'shot failed', e?.message ?? e); }
     for (const r of ctx.open.values()) { try { r.evidence?.sample?.({ snap, legible, shot }); } catch { /* sampling is best effort */ } }
@@ -245,6 +250,13 @@ export async function runPlay({ runDir, scenario, world, seats, god = null, obse
       if (sequential) { while (live() && (ctx.open.size > 0 || ctx.pending > 0)) await clock.sleep(Math.min(pollMs, Math.max(1, endAt - clock.now()))); }
       if (!live()) break;
       ctx.step += 1;
+      if (e.setup) {
+        const setup = await runFixtureSetup({ seat: ctx.seat, setup: e.setup, runDir, requestKey: e.id ?? `${ctx.id}-${ctx.step}` });
+        if (!setup.ok) {
+          appendJsonl(join(runDir, 'infrastructure-invalid.jsonl'), { requestKey: e.id ?? `${ctx.id}-${ctx.step}`, text: e.text, reason: setup.error });
+          continue;
+        }
+      }
       const shown = await gatherShown(ctx);
       saveShown(ctx, shown);
       const delivered = await deliver(ctx, { channel: e.channel ?? 'card', text: e.text }, { budgetSec: e.budgetSec ?? null });

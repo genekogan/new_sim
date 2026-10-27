@@ -1,0 +1,32 @@
+// Deterministic, physical setup outside the owner's measured request. Never teleports a body.
+import { appendJsonl } from '../lib/jsonl.mjs';
+import { join } from 'node:path';
+export function checkStart(me, expected = {}) {
+  const problems = [];
+  const p = Array.isArray(me?.pos) ? me.pos : me?.pos && [me.pos.x, me.pos.z];
+  if (expected.pos && (!p || Math.hypot(p[0] - expected.pos[0], p[p.length - 1] - expected.pos[1]) > (expected.radiusM ?? 2))) problems.push('initial position outside frozen region');
+  if (expected.heading != null && (me?.heading == null || Math.abs(((me.heading - expected.heading + 540) % 360) - 180) > (expected.headingToleranceDeg ?? 5))) problems.push('initial heading differs');
+  if (expected.posture && !expected.posture.includes(me?.posture)) problems.push('initial posture differs');
+  return problems;
+}
+export async function runFixtureSetup({ seat, setup, runDir, requestKey, now = Date.now }) {
+  const started = now(), end = started + (setup.maxWallSec ?? 120) * 1000;
+  const rows = []; let error = null, me = null;
+  try {
+    // Let the previous model turn finish before moving its body, including a turn that outlived its request.
+    await Promise.race([seat.chain, new Promise((_, reject) => { const t = setTimeout(() => reject(new Error('previous seat turn did not finish')), Math.max(1, end - now())); t.unref?.(); })]);
+    for (const intent of setup.steps ?? []) {
+      const left = end - now(); if (left <= 0) throw new Error('setup wall budget exhausted');
+      const r = await seat.cliJson(['act', typeof intent === 'string' ? intent : JSON.stringify(intent), '--for', 'none', '--json', '--wait', String(Math.max(1, Math.floor(left / 1000)))], left);
+      rows.push(r.data ?? { error: r.reason });
+      if (!r.ok || !r.data?.accepted || (r.data.receipt && r.data.receipt.phase !== 'completed')) throw new Error(`setup action not completed: ${r.data?.code ?? r.data?.receipt?.phase ?? r.reason ?? 'unknown'}`);
+    }
+    const r = await seat.cliJson(['here'], Math.max(1, end - now()));
+    if (!r.ok) throw new Error('cannot verify setup perception');
+    me = r.data?.me;
+    const problems = checkStart(me, setup.expect); if (problems.length) throw new Error(problems.join('; '));
+  } catch (e) { error = e.message; }
+  const result = { requestKey, ok: error == null, startedAt: new Date(started).toISOString(), elapsedMs: now() - started, expected: setup.expect, me, actions: rows, error };
+  appendJsonl(join(runDir, 'fixture-setup.jsonl'), result);
+  return result;
+}

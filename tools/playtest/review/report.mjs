@@ -60,6 +60,11 @@ export function renderReport(run, { metrics, prevMetrics = null, prevName = null
     `| Cost (seats) | ${cost.input} in / ${cost.cached} cached / ${cost.output} out tokens |`,
     `| Review | ${s.review?.mode === 'deterministic' ? 'Deterministic oracles; no model reviewer or developer' : `Reviewer ${s.review?.reviewerModel ?? 'opus'}, Developer ${s.review?.developerModel ?? 'opus'}`}, rubric \`RUBRIC.md\` \`${rubricHash().slice(0, 12)}\` |`, '');
   L.push('## 1b. Basics scorecard', '', 'Plain walking and acting first; everything subjective comes after.', '', '| walks asked | arrived | arrival rate | body moved in budget | ack median (s) | first body change median (s) | stuck / no progress | inside solid | wrong | hits |', '|---|---|---|---|---|---|---|---|---|---|', `| ${b.walkRequests ?? 0} | ${b.walksArrived ?? 0} of ${b.walksArrivalKnown ?? 0} known | ${fmt(b.walkArrivalRate)} | ${b.bodyMovedInBudget ?? 0} of ${b.requests ?? 0} (${fmt(b.bodyMovedRate)}) | ${fmt(b.ackMedianSec)} | ${fmt(b.firstBodyChangeMedianSec)} | ${b.stuck ?? 0} | ${b.insideSolid ?? 0} | ${b.wrong ?? 0} | ${b.hits ?? 0} |`, '');
+  if (metrics.journeys?.rows?.length) {
+    L.push('## Complete journeys', '', '| request | oracle | result | evidence |', '|---|---|---|---|');
+    for (const r of metrics.journeys.rows) L.push(`| ${r.requestId} | ${r.id} | ${r.status} | ${r.detail} |`);
+    L.push('', `Infrastructure-invalid setups: ${metrics.journeys.infrastructureInvalid?.length ?? 0}. Setup time is separate from owner request budgets. Unknown predicates never pass.`, '');
+  }
   L.push('## 2. What happened', '');
   if (emergence?.narrative?.strangerReading) L.push(emergence.narrative.strangerReading, '');
   // --- story (worker S): one line per important moment, the director's view beside each in story.html

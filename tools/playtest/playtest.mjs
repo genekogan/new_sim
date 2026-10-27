@@ -4,6 +4,7 @@ import { mkdirSync, existsSync, readFileSync, writeFileSync, copyFileSync, cpSyn
 import { resolve, join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
+import { bindJourneyFixtures } from './arena/fixture-bindings.mjs';
 import { providerPolicy, requireProviders } from './lib/provider-policy.mjs';
 import { now, setAnchor, sleep, monoMs } from './lib/clock.mjs';
 import { writeJson, readJson, appendJsonl } from './lib/jsonl.mjs';
@@ -103,10 +104,17 @@ async function cmdRun(a) {
     writeJson(join(runDir, 'world.json'), { ...ctx.world, child: undefined, healthz: undefined });
     try { writeJson(join(runDir, 'server', 'healthz-before.json'), await m.provision.healthz(ctx.world.base)); } catch { /* recorded as missing */ }
     receipt(runDir, 1, 'provision', { ok: true, base: ctx.world.base, build: ctx.world.build });
+
   } else { ctx.world = readJson(join(runDir, 'world.json')); }
 
   let exitCode = 0;
   try {
+    if (scenario.director?.script?.some(e => e.expect?.journey)) {
+      const response = await fetch(`${ctx.world.base}/v1/world/snapshot`);
+      if (!response.ok) throw new Error('fixture snapshot unavailable');
+      writeJson(join(runDir, 'fixture-bindings.json'), bindJourneyFixtures(scenario, await response.json()));
+      writeJson(join(runDir, 'scenario.json'), { ...scenario, seed, serverRoot, scenarioPath, scenarioSha256: sha256(readFileSync(scenarioPath)) });
+    }
     // 2 seats
     if (from <= 2) {
       if (!m.seat || !m.owner) throw new Error('arena/seat.mjs or owner.mjs missing');

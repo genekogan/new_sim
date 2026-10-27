@@ -9,6 +9,7 @@
 //   view: 'any' | 'out' | 'alt',  toleranceDeg: 45,  source: 'worlds/templates/… (op name)' } }
 // kind → oracles: go/find → target-arrival · near → answer-names · which-way → answer-direction · face → facing ·
 // look → view-used + named-in-description. Positions are world x/z (x east, z south; north is −z, as perception speaks).
+import { validateJourney } from './journey-oracles.mjs';
 import { xz } from './run.mjs';
 
 export const EXPECT_ORACLE_IDS = ['target-arrival', 'answer-names', 'answer-direction', 'facing', 'view-used', 'named-in-description'];
@@ -56,6 +57,7 @@ export function expectFor(run, ev) {
 export function validateExpect(x) {
   const errs = [];
   if (!x || typeof x !== 'object') return ['expect must be an object'];
+  if (x.kind === 'journey') return validateJourney(x.journey);
   if (!EXPECT_KINDS[x.kind]) errs.push(`expect.kind must be one of ${Object.keys(EXPECT_KINDS).join(', ')}`);
   for (const need of KIND_NEEDS[x.kind] ?? []) if (need === 'targets' ? !(Array.isArray(x.targets) && x.targets.length) : !(Array.isArray(x.answer?.anyOf) && x.answer.anyOf.length)) errs.push(`expect.${need === 'targets' ? 'targets[]' : 'answer.anyOf[]'} required for ${x.kind}`);
   for (const [i, t] of (x.targets ?? []).entries()) {

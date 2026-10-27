@@ -20,7 +20,7 @@ const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').sl
 const runDir = resolve(flag('out', `${homedir()}/Eden/team/playtest/runs/${stamp}-arena-smoke`));
 const adapter = flag('adapter', 'claude-headless');
 if (!['claude-headless', 'codex-headless'].includes(adapter)) throw new Error('unknown adapter; no substitution allowed');
-const port = Number(flag('port', 4995)), model = flag('model', adapter === 'codex-headless' ? 'gpt-6.1-sol' : 'haiku'), resultSec = Number(flag('result-sec', 120));
+const port = Number(flag('port', 4995)), model = flag('model', adapter === 'codex-headless' ? '' : 'haiku'), resultSec = Number(flag('result-sec', 120));
 const log = (...a) => console.error(`[smoke ${now().mono}ms]`, ...a);
 
 setAnchor(performance.now());
@@ -74,7 +74,7 @@ try {
     ackText: card?.ackText ?? null, ackLatencyMs: ackAt ? ackAt - tReq : null, resultText: card?.resultText ?? null, outcome: card?.outcome ?? null,
     publicState: pub?.self?.state ?? pub?.state ?? null, activity: pub?.self?.activity ?? pub?.activity ?? null,
     turns: turns.map((t) => ({ turn: t.turn, reason: t.reason, wallMs: t.wallMs, tools: t.toolCalls.length, exit: t.exit, timedOut: t.timedOut, tokensOut: t.usage?.outputTokens ?? null })),
-    tokens: { input: sum('inputTokens'), cached: sum('cachedTokens'), cacheCreation: sum('cacheCreationTokens'), output: sum('outputTokens'), costUsd: Math.round(sum('costUsd') * 10000) / 10000 },
+    tokens: { input: sum('inputTokens'), cached: sum('cachedTokens'), cacheCreation: sum('cacheCreationTokens'), output: sum('outputTokens'), costUsd: cost.some(c => c.costUsd != null) ? Math.round(sum('costUsd') * 10000) / 10000 : null, billing: adapter === 'codex-headless' ? 'subscription; dollar cost unavailable' : 'reported API-equivalent' },
     wakes: readJsonl(join(runDir, 'seats/pip/listen.jsonl')).filter((l) => l.messages?.length).length,
   });
 } catch (e) {
