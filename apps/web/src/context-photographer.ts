@@ -1,7 +1,7 @@
 import { PerspectiveCamera, Vector3 } from 'three';
 
 /** Bump when recipes, admissibility or ranking changes; callers bind this to cached pixels. */
-export const CONTEXT_PHOTO_RECIPE = 'context-photo/2';
+export const CONTEXT_PHOTO_RECIPE = 'context-photo/3';
 export const MAX_PHOTO_EVALUATIONS = 8;
 export type PhotoPoint = readonly [number, number, number];
 export type PhotoBounds = { min: PhotoPoint; max: PhotoPoint };
@@ -14,6 +14,7 @@ export type PhotoOccluder = {
 };
 export type PhotoSubject = {
   ref: string; kind: 'exterior' | 'room' | 'part' | 'landscape' | 'wall-image';
+  /** Semantic subject point; a room's navigation point may be on its floor. */
   bounds: PhotoBounds; target: PhotoPoint; objectIds: readonly string[];
   authoredCamera?: { eye: PhotoPoint; at: PhotoPoint };
   front?: PhotoFront;
@@ -86,8 +87,8 @@ function inRoom(point: PhotoPoint, room: NonNullable<PhotoSubject['room']>): boo
 }
 
 /** Fits all eight corners in camera space, including depth and off-centre target points. */
-function fit(s: PhotoSubject, direction: Vector3, fov: number): PhotoPoint {
-  const camera = new PerspectiveCamera(fov, s.aspect ?? 10 / 7), target = vector(s.target);
+function fit(s: PhotoSubject, direction: Vector3, fov: number, aim = s.target): PhotoPoint {
+  const camera = new PerspectiveCamera(fov, s.aspect ?? 10 / 7), target = vector(aim);
   camera.position.copy(target).add(direction); camera.lookAt(target);
   const inverse = camera.quaternion.clone().invert(), vertical = Math.tan(fov * Math.PI / 360);
   const horizontal = vertical * camera.aspect, margin = s.kind === 'landscape' ? .72 : .84;
@@ -110,7 +111,13 @@ export function planContextPhoto(subject: PhotoSubject): PhotoPlan {
     plan.invalid = 'invalid-subject'; return plan;
   }
   const evidence = front(subject), provenance: PhotoProvenance = { camera: 'geometric', front: evidence.source };
-  const add = (eye: PhotoPoint, fov: number, ordinaryAllowed: boolean, authored = false, at = subject.target) => {
+  // Room parts often name a walk-to point at floorY, whereas room slots already
+  // name an elevated centre. Frame the occupied room volume rather than staring
+  // at that floor point. Preserve higher semantic aims and exact object/artwork
+  // aims, including objects that merely happen to be enclosed by this room.
+  const aim: PhotoPoint = subject.kind === 'room' && room ? [subject.target[0],
+    Math.max(subject.target[1], room.floor + Math.min(1.2, (room.ceiling - room.floor) * .5)), subject.target[2]] : subject.target;
+  const add = (eye: PhotoPoint, fov: number, ordinaryAllowed: boolean, authored = false, at = aim) => {
     if (plan.candidates.length >= 6 || !validCamera({ eye, at })) return;
     if (plan.candidates.some(c => vector(c.eye).distanceToSquared(vector(eye)) < 1e-8 && vector(c.at).distanceToSquared(vector(at)) < 1e-8)) return;
     plan.candidates.push({ id: `view-${plan.candidates.length}`, eye, at, fov, ordinaryAllowed,
@@ -145,7 +152,7 @@ export function planContextPhoto(subject: PhotoSubject): PhotoPlan {
     const direction = base.clone().applyAxisAngle(new Vector3(0, 1, 0), angle);
     if (subject.kind !== 'wall-image') direction.y = subject.kind === 'landscape' ? .95 : .45;
     direction.normalize();
-    const eye = fit(subject, direction, subject.kind === 'landscape' ? 48 : 38);
+    const eye = fit(subject, direction, subject.kind === 'landscape' ? 48 : 38, aim);
     add(eye, subject.kind === 'landscape' ? 48 : 38, !interior(subject) || !!room && inRoom(eye, room));
   }
   return plan;

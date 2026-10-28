@@ -129,6 +129,57 @@ test('room recipe provides multiple real interior positions; an exterior probe c
   if (invalidRoom.status === 'unavailable') assert.equal(invalidRoom.reason, 'invalid-authored-camera');
 });
 
+test('floor navigation points frame the occupied room rather than filling the image with its floor', () => {
+  // Raised and translated room, rotated in world space. This is a room target,
+  // not an object whose deliberately low centre should be raised.
+  const floor = .5303, ceiling = 2.9303, yaw = .37;
+  const transform = (x: number, z: number): [number, number] => [12 + x * Math.cos(yaw) - z * Math.sin(yaw), -36 + x * Math.sin(yaw) + z * Math.cos(yaw)];
+  const polygon = [[-3,-3],[3,-3],[3,3],[-3,3]].map(([x,z]) => transform(x!,z!));
+  const room = { polygon, floor, ceiling };
+  const s = subject({ kind: 'room', target: [12, floor, -36], bounds: { min: [8,floor,-40], max: [16,ceiling,-32] }, room });
+  const before = structuredClone(s), plan = planContextPhoto(s);
+  const shell = new THREE.Group();
+  for (const [id, min, max] of [
+    ['floor', [-3,floor-.2,-3], [3,floor,3]], ['left', [-3.2,floor,-3], [-3,ceiling,3]],
+    ['right', [3,floor,-3], [3.2,ceiling,3]], ['back', [-3,floor,-3.2], [3,ceiling,-3]],
+    ['front', [-3,floor,3], [3,ceiling,3.2]],
+  ] as const) shell.add(box(id,min,max).mesh);
+  shell.position.set(12,0,-36); shell.rotation.y = -yaw; shell.updateMatrixWorld(true);
+  const ordinary = plan.candidates.filter(c => c.ordinaryAllowed);
+  assert.ok(ordinary.length >= 4);
+  const floorCoverage = (candidate: PhotoCandidate) => {
+    const camera = new THREE.PerspectiveCamera(candidate.fov, s.aspect ?? 10/7, .01, 100);
+    camera.position.fromArray(candidate.eye); camera.lookAt(point(candidate.at)); camera.updateMatrixWorld(true);
+    let floorPixels = 0, pixels = 0;
+    // Independent triangle intersections count visible floor at pixel centres.
+    for (let y = 0; y < 14; y++) for (let x = 0; x < 20; x++) {
+      const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2((x+.5)/10-1,(y+.5)/7-1),camera);
+      const hit = ray.intersectObject(shell,true)[0]; pixels++;
+      if (hit?.object.name === 'floor') floorPixels++;
+    }
+    return floorPixels/pixels;
+  };
+  for (const candidate of ordinary)
+    assert.ok(floorCoverage(candidate) < .6, `${candidate.id}: floor fills ${floorCoverage(candidate)}`);
+  assert.ok(floorCoverage({...ordinary[0]!,at:s.target}) > .6,'the previous floor-point aim fails this composition oracle');
+  assert.deepEqual(s,before,'navigation and geometry remain untouched');
+  const slot = { ...s, target: [12,floor+1.2,-36] as const };
+  assert.deepEqual(plan.candidates,planContextPhoto(slot).candidates,'equivalent elevated room slot and floor part share composition');
+});
+
+test('room aim respects low ceilings, authored framing and enclosed object centres', () => {
+  const room = { polygon: [[-3,-3],[3,-3],[3,3],[-3,3]] as const, floor: -4, ceiling: -3.2 };
+  const s = subject({ kind: 'room', target: [0,-4,0], bounds: { min: [-3,-4,-3],max: [3,-3.2,3] }, room });
+  for (const camera of planContextPhoto(s).candidates.filter(c => c.ordinaryAllowed))
+    assert.ok(camera.at[1] > room.floor && camera.at[1] < room.ceiling,'aim stays inside the resolved room height');
+  const authoredCamera = { eye: [0,-3.5,-2] as const,at: [0,-3.95,0] as const };
+  assert.deepEqual(planContextPhoto({...s,authoredCamera}).candidates[0]!.at,authoredCamera.at);
+  for (const kind of ['part','wall-image','exterior','landscape'] as const) {
+    const object = { ...s,kind };
+    assert.ok(planContextPhoto(object).candidates.every(camera => camera.at === object.target),`${kind} retains its semantic aim`);
+  }
+});
+
 test('room filling its enclosure uses only classified render blockers in a labelled cutaway', async () => {
   const s = subject({ kind: 'room', bounds: { min: [-2, 0, -2], max: [2, 2.8, 2] }, target: [0, 1.4, 0],
     occluders: [{ id: 'front', classification: 'wall' }, { id: 'back', classification: 'wall' }, { id: 'roof', classification: 'roof' }] });
