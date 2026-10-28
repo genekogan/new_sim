@@ -6,7 +6,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
 import {WorldModel,type Entity} from '@sim/world-compiler';
 import {mergeStatic} from './gen-mesh/static-merge.ts';
-import {WorldEntityStairs,loadedStairGeometry,stairNativeDef} from './WorldEntityStairs.ts';
+import {WorldEntityStairs,loadedStairGeometry,stairNativeDef,pendingStairDiff} from './WorldEntityStairs.ts';
 import {stairGeometryDigest,type MeshStairProfile} from '../../../mars/viewer/app/engine-view/stair-mesh-profile.ts';
 import manifest from '../../../mars/viewer/app/engine-view/stair-mesh-profiles.json' with {type:'json'};
 import {assetIdFor} from '../../../packages/engine-mars/src/catalog-adapter.ts';
@@ -37,6 +37,7 @@ test('loaded registry admits matching geometry; revision, removal, resync and ch
  assert.equal(get().length,1);assert.equal(get()[0].flight.treads.length,3);
  const facts={ref:d.ref,hash:d.hash,box:d.size.box,slots:[],components:{}};
  assert.equal(stairNativeDef(d,e,d.size.box,1),assetIdFor(facts,JSON.stringify(e.params)+'|seen'));
+ asset.visible=false;assert.equal(get().length,0);asset.visible=true;assert.equal(get().length,1);
  drawn.get('mimos')!.removing=true;assert.equal(get().length,0);drawn.get('mimos')!.removing=false;
  drawn.get('mimos')!.settled=false;assert.equal(get().length,0);drawn.get('mimos')!.settled=true;
  const changed=await loaded(p);changed.scale.setScalar(fit);const mesh=changed.getObjectByProperty('isMesh',true) as THREE.Mesh;mesh.geometry=mesh.geometry.clone();mesh.geometry.attributes.position.setX(0,mesh.geometry.attributes.position.getX(0)+.02);
@@ -44,4 +45,8 @@ test('loaded registry admits matching geometry; revision, removal, resync and ch
  obj.remove(changed);obj.add(asset);assert.equal(get().length,1);
  model.delete(e.id);assert.equal(get().length,0);model.insert(e);registry.reset();assert.equal(get().length,1);
  assert.equal(registry.contacts(model,drawn,()=>2).length,0,'mismatched lower terrain is not snapped');
+});
+test('pending fixture edits clear contacts before the existing layer update pass',()=>{
+ assert.equal(pendingStairDiff(10,[{kind:'world-diff',seq:11}]),true);
+ assert.equal(pendingStairDiff(10,[{kind:'world-diff',seq:9},{kind:'world-diff',seq:10},{kind:'world-build',seq:11}]),false);
 });

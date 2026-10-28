@@ -44,6 +44,7 @@ import { BEND_SHARE, KNEE_Y, KNEEL_SIDE, NEUTRAL, approach, kneelDrop, shoulderA
 import { groundFootLift } from './ground-foot-fit.ts';
 import { flightOf, gaitAt, stairFootTarget, type Flight, type Gait } from './stair-gait.ts';
 import {stairSoleFit} from './stair-sole.ts';
+import {stairShoeRefs} from './stair-shoe-refs.ts';
 import { frameCtx, framePose, stanceFacing, type FrameCtx, type FramePose } from './frame-gait.ts';
 import { GIRDLE, LIP, PRONE_ACTS, engineTurn, lipAlong, RISE_STEP, approachProne, lerpProne, proneFrame, riseOf, solveProne, type ProneState } from './prone.ts';
 import { expressionAt, type Expression } from './expression.ts';
@@ -97,6 +98,8 @@ type View = {
   footLat: number[];
   /** Skinned vertices of each foot / hand (by the side the leg / arm has: +1 left): the prone layer keeps them on the deck. */
   surf: { foot: Map<number, VertexRefs>; hand: Map<number, VertexRefs>; body?: VertexRefs };
+  stairShoes?:ReturnType<typeof stairShoeRefs>;
+  stairGoals?:[number,number,number][];
   /** Sitting-surface height of the occupied seat (m). */
   seat: number;
   /** Lying on a bench (bench press, sit-ups on a bench): the bench top height from the spot's seatHeight; 0 = the ground. */
@@ -141,6 +144,8 @@ type View = {
 export type Diag = {
   expression?: Expression;
   water?: WaterMotion;
+  stairShoeCoverage?:{vertices:number;complete:boolean};
+  stairContacts?:{goals:[number,number,number][];ankleErrors:number[]};
   gait: { flight: string; u: number; weight: number; feet: { planted: boolean; k: number; top: number }[] } | null;
   /** Foot bones (ankles) and their soles (ankle − rest ankle height), left first. */
   feet: [number, number, number][];
@@ -745,6 +750,7 @@ export class HumanViews {
     if (v.layered) for (const s of v.saved) { s.o.position.copy(s.p); s.o.quaternion.copy(s.q); }
     v.layered = false;
     v.diag = undefined;
+    v.stairGoals=undefined;
     mixer.update(0);
     const sitW = a.sitW + (b.sitW - a.sitW) * alpha, warmW = a.warmW + (b.warmW - a.warmW) * alpha;
     const pz: Posture = { drop: lerp(a.pose.drop, b.pose.drop, alpha), bend: lerp(a.pose.bend, b.pose.bend, alpha), rise: lerp(a.pose.rise, b.pose.rise, alpha), kneel: lerp(a.pose.kneel, b.pose.kneel, alpha) };
@@ -1330,6 +1336,7 @@ function measure(v: View) {
   v.footRest = legs.map((l) => l.foot.getWorldQuaternion(new THREE.Quaternion()));
   v.footLat = feet.map((f) => f.z);
   v.surf = surfaceRefs(rig);
+  v.stairShoes=stairShoeRefs(rig,v.legs);
   h.position.copy(p0);
   h.rotation.y = r0;
   h.updateMatrixWorld(true);
@@ -1750,20 +1757,23 @@ function stairLegs(v: View, g: Gait, f: Flight, holder: THREE.Object3D) {
   place(v.spine.body, _c.clone());
   const pole = _tmp.copy(_fwd).addScaledVector(UP, 0.1).clone();
   v.legs.forEach((l, i) => legTo(l, v.ankle[i], goals[i], pole, 0.999, w > 0.5 ? footPitch(v, i, pitches[i]) : undefined));
-  // Mesh contacts use every actual sole point. A long boot may overhang the
+  // Composed shoes include every vertex, including shin-weighted boot uppers.
+  // A long boot may overhang the
   // lower side of a tread; shift it clear of the higher riser before fitting its
   // sole to the real top triangles. The native holder/root never moves.
   if(f.supports&&w>0)for(let pass=0;pass<2;pass++){
     holder.updateMatrixWorld(true);
     v.legs.forEach((l,i)=>{
       const points:THREE.Vector3[]=[];
-      for(const r of v.surf.foot.get(l.side)??[])for(const idx of r.idx)points.push(r.mesh.getVertexPosition(idx,V()).applyMatrix4(r.mesh.matrixWorld));
+      const refs=v.stairShoes?(v.stairShoes.complete?v.stairShoes.refs.get(l.side):undefined):v.surf.foot.get(l.side);
+      for(const r of refs??[])for(const idx of r.idx)points.push(r.mesh.getVertexPosition(idx,V()).applyMatrix4(r.mesh.matrixWorld));
       const fit=stairSoleFit(f,g.feet[l.side>0?0:1],points);
       if(Math.abs(fit.along)<.0001&&fit.lift<.0001)return;
       goals[i].x+=f.dir[0]*fit.along;goals[i].z+=f.dir[1]*fit.along;goals[i].y+=fit.lift;
       legTo(l,v.ankle[i],goals[i],pole,.999,w>.5?footPitch(v,i,pitches[i]):l.foot.getWorldQuaternion(new THREE.Quaternion()));
     });
   }
+  if(f.supports)v.stairGoals=goals.map(p=>[p.x,p.y,p.z]);
 }
 
 /**
@@ -1944,6 +1954,8 @@ function diagOf(v: View, g: Gait | null, flight: string, pz: Posture, targets: (
   const feet = v.legs.map((l) => a3(l.foot.getWorldPosition(V())));
   const order = [...v.legs.keys()].sort((i, j) => v.legs[j].side - v.legs[i].side); // left first
   return {
+    ...(v.stairShoes?{stairShoeCoverage:{vertices:v.stairShoes.vertices,complete:v.stairShoes.complete}}:{}),
+    ...(v.stairGoals?{stairContacts:{goals:order.map(i=>v.stairGoals![i]),ankleErrors:order.map(i=>v.legs[i].foot.getWorldPosition(V()).distanceTo(new THREE.Vector3(...v.stairGoals![i])))}}:{}),
     gait: g ? { flight, u: r4(g.u), weight: r4(g.weight), feet: g.feet.map((f) => ({ planted: f.planted, k: f.k, top: r4(f.top) })) } : null,
     feet: order.map((i) => feet[i]),
     soles: order.map((i) => r4(feet[i][1] - ankleH)),

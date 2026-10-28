@@ -5,7 +5,8 @@ export function stairSoleFit(f:Flight,foot:FootState,vertices:readonly {x:number
   if(!f.supports||!f.contactTops||!vertices.length)return {along:0,lift:0};
   const points=vertices.map(p=>{const x=p.x-f.o[0],z=p.z-f.o[1];return {s:x*f.dir[0]+z*f.dir[1],lat:-x*f.dir[1]+z*f.dir[0],y:p.y};});
   const next=foot.k<=0?f.supports[0]:f.supports[foot.k];
-  const along=foot.planted&&next?Math.min(0,next.lo-.004-Math.max(...points.map(p=>p.s))):0;
+  const low=next?points.filter(p=>p.y<next.y+.003&&p.lat>=next.left&&p.lat<=next.right):[];
+  const along=foot.planted&&next&&low.length?Math.min(0,next.lo-.004-Math.max(...low.map(p=>p.s))):0;
   let lift=0;
   for(const p of points){
     const s=p.s+along,z=p.lat;

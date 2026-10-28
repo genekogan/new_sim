@@ -35,7 +35,7 @@ import { GroundCover, coverSetting } from './gen-mesh/ground-cover.ts';
 import { isRideBalloonDef, rideMotionDef } from './gen-mesh/kits/ride-balloon.ts';
 import { isRideCarrierDef, carrierIdOf } from './ride-carriers.ts';
 import { holdRainbow, isRainbowDef } from './atmosphere/rainbow-things.ts';
-import {WorldEntityStairs} from './WorldEntityStairs.ts';
+import {WorldEntityStairs,pendingStairDiff} from './WorldEntityStairs.ts';
 
 export type EntitySnapshot = { contract: string; worldId: string; seq: number; counter?: number; seed?: string; constants: WorldModel['constants']; state: WorldModel['state']; ground: Ground; defs: StoredDef[]; entities: Entity[]; tiles: Record<string, string>; assetBytes?: Record<string, number>; builds?: PublicSite[]; buildsRev?: number; now?: number };
 type DiffMsg = { type: 'edge'; kind: 'world-diff'; seq: number; diff: { upserts: Entity[]; removes: string[]; defs: StoredDef[]; tiles: string[]; world?: Partial<WorldModel['state']> }; ground?: Ground; defs?: StoredDef[] };
@@ -64,7 +64,7 @@ export class WorldEntityLayer {
   filling = false;
   private model: WorldModel | null = null;
   private readonly stairContacts=new WorldEntityStairs();
-  supplementalStairs(){return this.model?this.stairContacts.contacts(this.model,this.drawn,this.groundAt):[];}
+  supplementalStairs(messages:readonly {kind?:string;seq?:unknown}[]=[]){return this.model&&!this.resyncing&&!pendingStairDiff(this.seq,messages)?this.stairContacts.contacts(this.model,this.drawn,this.groundAt):[];}
   stairDiagnostics(){return this.stairContacts.diagnostics();}
   private immutable=false;
   contextObjects(id:string):THREE.Object3D[]{const object=this.drawn.get(id)?.obj;return object?[object]:[];}

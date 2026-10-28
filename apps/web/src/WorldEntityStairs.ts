@@ -9,6 +9,9 @@ const profiles=manifest.profiles as MeshStairProfile[];
 type DrawnStair={obj:THREE.Object3D;settled?:boolean;removing?:boolean};
 type Candidate={entity:Entity;def:StoredDef;pose:ReturnType<WorldModel['worldPose']>;nativeDef:string;profiles:MeshStairProfile[]};
 const point=new THREE.Vector3();
+/** People are posed before the layer's existing end-of-frame diff/update pass.
+ * Refuse metadata for that transition frame instead of reordering that pipeline. */
+export function pendingStairDiff(seq:number,messages:readonly {kind?:string;seq?:unknown}[]):boolean{return messages.some(m=>m.kind==='world-diff'&&typeof m.seq==='number'&&m.seq>seq);}
 /** Loaded source geometry in its base-centred, unscaled canonical frame.
  * Material merges and shadow proxies do not create extra physical support. */
 export function loadedStairGeometry(asset:THREE.Object3D):Triangle[]{
@@ -43,6 +46,7 @@ export class WorldEntityStairs{
       for(const e of model.entities.values()){
         const d=model.resolvedDef(e.def);if(d?.make.kind!=='mesh')continue;
         const make=d.make,matches=profiles.filter(p=>p.asset===make.asset);if(!matches.length)continue;
+        if(make.lod1){this.notices.set(e.id,'stair.lod-representation-unqualified');continue;}
         const pose=model.worldPose(e),nativeDef=stairNativeDef(d,e,model.bake(d,e.params??{},e.seed??0,e.shape).box,pose.s);
         if(!nativeDef){this.notices.set(e.id,'stair.native-provenance-unsupported');continue;}
         if(Array.isArray(e.r)&&(e.r[1]||e.r[2])||Object.keys(e.params??{}).some(k=>['sx','sy','sz'].includes(k))){this.notices.set(e.id,'stair.nonuniform-or-tilted');continue;}
@@ -54,6 +58,8 @@ export class WorldEntityStairs{
       const d=drawn.get(c.entity.id);if(!d||d.removing||!d.settled){this.notices.set(c.entity.id,'stair.representation-unsettled');continue;}
       if(d.obj.position.distanceTo(new THREE.Vector3(c.pose.x,c.pose.y,c.pose.z))>.001||Math.abs(d.obj.rotation.y-c.pose.yaw)>.001||Math.abs(d.obj.rotation.x)>.001||Math.abs(d.obj.rotation.z)>.001||[d.obj.scale.x,d.obj.scale.y,d.obj.scale.z].some(s=>Math.abs(s-c.pose.s)>.001)){this.notices.set(c.entity.id,'stair.drawn-pose-mismatch');continue;}
       const asset=d.obj.getObjectByName('asset');if(!asset){this.notices.set(c.entity.id,'stair.representation-not-loaded');continue;}
+      let shown=true;for(let o:THREE.Object3D|null=asset;o;o=o.parent){if(!o.visible){shown=false;break;}if(o===d.obj)break;}
+      if(!shown){this.notices.set(c.entity.id,'stair.representation-hidden');continue;}
       let cached=this.loaded.get(d.obj);
       if(!cached||cached.asset!==asset){
         const geometry=stairGeometryDigest(loadedStairGeometry(asset)),profile=c.profiles.find(p=>p.geometry===geometry)??null;

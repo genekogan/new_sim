@@ -32,6 +32,7 @@ test('all sole points clear higher solids while lower-side boot overhang stays l
  const foot={s:support.s,y:support.y,planted:true,k:1,top:support.y};
  const boot=[at(support.lo-.08,support.y+.003),at(support.hi-.02,support.y+.003)];
  assert.deepEqual(stairSoleFit(f,foot,boot),{along:0,lift:0},'lower overhang is not discarded or clamped');
+ assert.deepEqual(stairSoleFit(f,foot,[...boot,at(support.hi+.1,f.supports![1].y+.08)]),{along:0,lift:0},'boot upper already above the next tread does not force an artificial foot shift');
  const intrusion=[...boot,at(support.hi+.03,support.y+.003)];const fit=stairSoleFit(f,foot,intrusion);
  assert.ok(fit.along<-.03&&fit.along>-.04);assert.ok(fit.lift<1e-8,'move clear of higher riser without floating off planted tread');
  const dipped=boot.map(p=>({...p,y:p.y-.025}));assert.ok(Math.abs(stairSoleFit(f,foot,dipped).lift-.025)<1e-8);
