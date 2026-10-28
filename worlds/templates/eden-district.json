@@ -1,7 +1,7 @@
 {
  "schema": "genesis/1",
  "name": "Eden district",
- "description": "A representative Eden district in the new vocabulary: the four homes of the housing street at their source footprints (brick courtyard house, two-storey balcony house, timber and stone two-storey houses) with furnished interiors, the lamp-lit street, the commons pavilion, the pond with its sloping bank, reeds and a family of ducks, the library, and the old-town plaza with its fountain, café tables and benches brought to the end of the street, plus the hot-air balloon (from the festival meadow) and the ferris wheel (from the seaside resort) brought into view. Place names kept from worlds/eden/places.v1.json (parity proof, docs/god/PARITY.md). Courtyards are drawn as plain rooms (courtyard plans are a gap).",
+ "description": "Homes, a library and a plaza around a village pond.",
  "constants": {
   "extent": 600,
   "ground": "land"

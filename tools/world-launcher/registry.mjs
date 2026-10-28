@@ -66,7 +66,7 @@ export class Registry {
  *  `"hidden": true` (a retired one: mars-camp, superseded by mars-two) is left out of the dialog and cannot start a new
  *  world; `{ all: true }` still finds it, so worlds already made from it keep their genesis file. */
 export function listTemplates(dir, { all = false } = {}) {
-  const out = [{ id: 'empty', name: 'Empty plain', description: 'A flat, empty kilometre of grass. Nothing on it but the sky; your agent starts from zero.', file: null, batches: 0 }];
+  const out = [{ id: 'empty', name: 'Empty plain', description: 'An open grass plain to build from scratch.', file: null, batches: 0 }];
   let files = [];
   try { files = readdirSync(dir).filter((f) => f.endsWith('.json')).sort(); } catch { /* no templates */ }
   const found = [];

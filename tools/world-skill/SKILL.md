@@ -44,7 +44,7 @@ node --version                                   # v20 or newer
 node eden-god.mjs help
 ```
 
-If `.eden-god.json` already exists here, you are already paired. Run `node eden-god.mjs status` and skip step 2.
+If `.eden-god.json` already exists here, you are already paired. Run `node eden-god.mjs status`, skip only the pairing operation in step 2, and go directly to the mandatory listener step below. Do not announce readiness yet.
 
 ### 2. Pair (once per folder)
 
@@ -55,16 +55,34 @@ node eden-god.mjs pair      # prints a code and a link
 
 Tell your human, in one short line: *"Open the world page, check the code says `<code>`, and press Approve."*
 They click **Approve** next to that code in the god panel (signed in), or open the link. `pair` waits for the
-approval, then saves the token. Once paired, say so and ask what they'd like built first. Only the world's owner can approve. If somebody else
+approval, then saves the token. Start the mandatory listener below before announcing readiness or asking what to build. Only the world's owner can approve. If somebody else
 already owns the world, you can't be its god; Soul mode is open to you instead.
 
-Your human's god-panel message box reaches your paired agent. Keep
-`node eden-god.mjs listen --json` in a Claude Code background Monitor; it returns
-`inbox.latest` JSON when a message arrives. Read it, handle the request, then
-`node eden-god.mjs ack <id> "Short reply"` (reply optional, at most 140 characters)
-and listen again. `/loop` can use `listen --once --json`. Other authenticated
-commands surface pending messages without extra calls; acknowledgement means read.
-`node eden-god.mjs listen --follow` never exits: one JSON line per new message, so the Monitor needs no re-arming.
+### Start listening before announcing readiness (mandatory)
+
+Immediately after pairing **or reconnecting an existing pairing**, start exactly one
+`node eden-god.mjs listen --json` in this world's paired folder. Pairing grants credentials; it does **not** start
+listening. Do this before saying you are ready or asking for the first instruction. Check your existing task/session
+handle first; reuse a live listener instead of starting a duplicate.
+
+- **Claude Code:** use the Bash tool with `run_in_background: true`. Its completion notification returns the next
+  message to you. Do not use an expiring Monitor.
+- **Codex:** a detached background process cannot wake you. Run `node eden-god.mjs listen --json` in the foreground
+  as the last command of each turn; retain and wait on its tool/session handle until it returns. Handle its output
+  before ending the turn. Messages reach you only while this session remains open and waiting.
+- `listen --follow` is for scripts with a real stream consumer that dispatches and handles messages. It is **not**
+  the default agent setup; a running stream alone does not mean you will handle commands.
+
+When a command arrives, carry out the request and inspect the actual result. Only then run
+`node eden-god.mjs ack <id> "Short outcome"` (at most 140 characters), adding `--failed` when you could not complete it.
+A God acknowledgement means **completed or failed**, never merely received. Keep an unfinished command pending
+while you work; do not copy the Soul's receipt-only acknowledgement workflow.
+
+Resume `listen --json` after handling and acknowledging the command, and after an empty exit or recoverable
+interruption. Reuse a still-running handle; a `superseded` response means another listener owns the inbox, so do not
+start competing listeners. If you cannot maintain listening, say plainly: **God Mode UI commands remain queued
+until this agent resumes listening; you can give instructions directly in this agent's chat.** Never describe a
+successful pairing alone as an active listener.
 
 ### 3. Build
 
