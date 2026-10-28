@@ -1,8 +1,9 @@
 // The launcher homepage (`<base>/`, new worlds): its own lazy chunk with its Clerk, so a world page never downloads
 // either (P1 phones: main.tsx loads it only on the homepage).
 import { ClerkProvider, useAuth, useClerk, useUser } from '@clerk/clerk-react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { clerkHomeRoute } from './auth-ui.ts';
+import { signOutAndReturn } from './clerk-sign-out.ts';
 import { BASE } from './base-path.ts';
 import { publishSession, type Session } from './auth-session.ts';
 import { LauncherHome, type LauncherList } from './god-ui/LauncherHome.tsx';
@@ -24,7 +25,9 @@ function HomeWith({ list, session }: { list: LauncherList; session: Session }) {
 }
 function HomeClerk({ list }: { list: LauncherList }) {
   const session = useAuth(), clerk = useClerk(), profile = useUser();
+  const signingOut = useRef(false);
   return <HomeWith list={list} session={{ mode: 'clerk', ready: session.isLoaded, authed: session.isLoaded && !!session.isSignedIn, label: profile.user?.primaryEmailAddress?.emailAddress ?? profile.user?.firstName ?? null,
     getToken: async () => session.isLoaded && session.isSignedIn ? session.getToken({ skipCache: true }) : null,
-    login: () => clerk.openSignIn({ afterSignInUrl: location.href, afterSignUpUrl: location.href }), logout: () => clerk.signOut() }} />;
+    login: () => { if (!signingOut.current) clerk.openSignIn({ afterSignInUrl: location.href, afterSignUpUrl: location.href }); },
+    logout: async () => { if (signingOut.current) return; signingOut.current = true; try { await signOutAndReturn(clerk); } catch (error) { signingOut.current = false; throw error; } } }} />;
 }
