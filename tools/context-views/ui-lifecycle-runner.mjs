@@ -16,18 +16,18 @@ const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 
 /** Browser and CLI use the actual public endpoints; the owner's job trace cap
  * includes their requests, not only session.request calls. No route mocks. */
-export async function runUiLifecycleProof({ root, withFixtureSession, report, save, out }) {
+export async function runUiLifecycleProof({ root, withFixtureSession, report, save, out, remainder = false }) {
   const evidence = report.ui = { startedAt: new Date().toISOString(), checks: [], notes: [
-    'Asset and wall edits precede opening Explore; this proves the UI displays the latest revision, not an in-place media refresh.',
+    remainder ? 'Media-only replacement occurs while the actual Explore dialog remains open; no manual refresh or route mocks.' : 'Asset and wall edits precede opening Explore; this proves the UI displays the latest revision, not an in-place media refresh.',
     'The standalone Soul CLI retrieves public context without creating or moving a Soul.',
     'No mocked pagination, inference, extra scenes, or camera battery.',
   ] };
   const check = (name, ok, data = {}) => { evidence.checks.push({ name, ok: !!ok, ...data }); save(); assert.ok(ok, name); };
-  const receipt = await withFixtureSession({ variant: 'ui-lifecycle' }, async session => {
+  const receipt = await withFixtureSession({ variant: remainder ? 'ui-live-media' : 'ui-lifecycle' }, async session => {
     const { request, signal, deadline, base, bindings, setPhase } = session;
     const ref = id => bindings.find(row => row.id === id).ref;
     const landmark = ref('landmark'), art = ref('wall-artwork'), room = ref('enclosed-room');
-    const budget = () => { signal.throwIfAborted(); assert.ok(Date.now() < deadline, 'absolute deadline'); assert.ok(session.jobEvents().filter(e => e.phase === 'start').length <= 22, 'actual job cap'); };
+    const budget = () => { signal.throwIfAborted(); assert.ok(Date.now() < deadline, 'absolute deadline'); assert.ok(session.jobEvents().filter(e => e.phase === 'start').length <= (remainder ? 46 : 22), 'actual job cap'); };
     const wait = ms => delay(ms, undefined, { signal });
     const views = async refs => (await request('/v1/world/context/views', { refs, detail: false, sheet: false }, null)).json();
     const ready = async (refs, label) => {
@@ -35,6 +35,7 @@ export async function runUiLifecycleProof({ root, withFixtureSession, report, sa
       for (;;) {
         budget(); data = await views(refs);
         if (data.views.every(v => v.status !== 'pending')) break;
+        if (performance.now() - start >= 15000) break;
         await wait(200);
       }
       const ms = performance.now() - start;
@@ -53,6 +54,7 @@ export async function runUiLifecycleProof({ root, withFixtureSession, report, sa
     evidence.initialListing = firstListing.targets.map(t => ({ ref: t.ref, title: t.title }));
     const expectedRefs = [...new Set([...bindings.map(b => b.ref), bindings.find(b => b.id === 'enclosed-room').entity])].sort();
     check('initial default listing has six exact fixture records', firstListing.total === 6 && JSON.stringify(firstListing.targets.map(t => t.ref).sort()) === JSON.stringify(expectedRefs), { expectedRefs });
+    if (!remainder) {
     const first = await ready([landmark, art], 'prime-two-nondetail');
     const artBefore = first.find(v => v.ref === art);
     const bytes = artwork(1), uploaded = await session.uploadArtwork(bytes), asset = uploaded.asset ?? uploaded;
@@ -89,6 +91,7 @@ export async function runUiLifecycleProof({ root, withFixtureSession, report, sa
     const oldFountain = await session.rawGet(second.find(v => v.ref === landmark).url);
     check('old cached fountain URL refused after wall', oldFountain.status === 404, { status: oldFountain.status });
     await settled();
+    }
     const listing = await (await request('/v1/world/context', undefined, null)).json();
     evidence.uiListing = listing.targets.map(t => ({ ref: t.ref, title: t.title }));
     check('bounded real default listing before opening UI', listing.total >= 6 && listing.total <= 7 && !listing.nextCursor);
@@ -150,6 +153,42 @@ export async function runUiLifecycleProof({ root, withFixtureSession, report, sa
       }
       await Promise.all([...responseTasks]); await settled();
       await snapshot('ui-explore-ready');
+      if (remainder) {
+        const artTarget = listing.targets.find(t => t.ref === art);
+        const artButton = dialog.getByRole('button', { name: artTarget.title, exact: true });
+        const oldSrc = await artButton.locator('img').getAttribute('src');
+        const oldView = browserViews.flatMap(v => v.views ?? []).findLast(v => v.ref === art && v.status === 'ready');
+        check('open Explore displays initial artwork', !!oldView && new URL(oldSrc, base).href === base + oldView.url);
+        const bytes = artwork(1), uploaded = await session.uploadArtwork(bytes), asset = uploaded.asset ?? uploaded;
+        check('live replacement bytes match frozen artwork', (asset.sha ?? asset.hash) === sha(bytes));
+        setPhase('explore-open-media-edit'); const editedAt = performance.now();
+        const changed = await (await request('/v1/god/act', { ops: [{ op: 'set', id: 'hall/artwork', state: { media: `/assets/${sha(bytes)}.png` } }] })).json();
+        evidence.liveMediaAct = { accepted: changed.accepted, seq: changed.seq, failures: changed.failures }; save();
+        check('open-dialog media-only edit accepted', changed.accepted);
+        await artButton.scrollIntoViewIfNeeded();
+        // Observe the same live UI; never call views(), reload, or reopen here.
+        await page.waitForFunction(({ title, oldSrc }) => {
+          const dialog = document.querySelector('dialog[open], [role="dialog"]');
+          const button = [...(dialog?.querySelectorAll('button') ?? [])].find(b => b.getAttribute('aria-label') === title || b.textContent?.trim() === title);
+          const img = button?.querySelector('img');
+          return !!img && img.getAttribute('src') !== oldSrc && img.complete && img.naturalWidth > 0;
+        }, { title: artTarget.title, oldSrc }, { timeout: Math.max(1, 15000 - (performance.now() - editedAt)) });
+        await Promise.all([...responseTasks]);
+        const newSrc = await artButton.locator('img').getAttribute('src');
+        const newView = browserViews.flatMap(v => v.views ?? []).findLast(v => v.ref === art && v.status === 'ready');
+        check('open Explore refreshes stable artwork ref and new pixels within 15s', await dialog.isVisible() && newView?.key !== oldView.key && newView?.revision !== oldView.revision && new URL(newSrc, base).href === base + newView.url && performance.now() - editedAt <= 15000,
+          { elapsedMs: performance.now() - editedAt, oldView, newView, oldSrc, newSrc });
+        const oldImage = await session.rawGet(oldView.url), oldOriginal = await session.rawGet(oldView.original.url);
+        check('live media edit refuses old image and original', oldImage.status === 404 && oldOriginal.status === 404, { imageStatus: oldImage.status, originalStatus: oldOriginal.status });
+        const exact = await (await request('/v1/world/context?ref=' + encodeURIComponent(art), undefined, null)).json();
+        const original = exact.targets[0].original, originalBytes = Buffer.from(await (await session.rawGet(original.url)).arrayBuffer());
+        check('live media original matches exact replacement', sha(originalBytes) === sha(bytes), { original });
+        await snapshot('ui-explore-live-media');
+        // Let visible UI finish its shared refresh before testing CLI cache reuse.
+        for (const target of listing.targets) await dialog.getByRole('button', { name: target.title, exact: true }).locator('img').waitFor({ state: 'visible', timeout: 15000 });
+        await settled();
+      }
+
       const roomTarget = listing.targets.find(t => t.ref === room);
       const roomButton = dialog.getByRole('button', { name: roomTarget.title, exact: true });
       const imageUrl = await roomButton.locator('img').getAttribute('src');
@@ -169,8 +208,20 @@ export async function runUiLifecycleProof({ root, withFixtureSession, report, sa
       check('CLI reuses exact non-detail UI image without a render', cliView.key === uiView.key && cliView.revision === uiView.revision && cliView.url === uiView.url && sha(readFileSync(cliImage)) === sha(uiBytes) && session.jobEvents().filter(e => e.phase === 'start').length === startsBefore,
         { ref: room, key: cliView.key, revision: cliView.revision, url: cliView.url, imageSha: sha(uiBytes), cliPath });
       await snapshot('ui-before-room-selection');
-      const soulsBefore = (await (await request('/v1/world', undefined, null)).json()).souls;
-      check('fixture has no Souls before selection', Array.isArray(soulsBefore) && soulsBefore.length === 0);
+      let createdSoul;
+      if (remainder) {
+        const created = await (await request('/v1/souls', { name: 'Camera Witness', description: 'Isolated explicit camera proof; no model or directive.' }, 'dev:context-ui')).json();
+        createdSoul = created.soul;
+        check('one real local Soul created', !!createdSoul?.entityId, { soulId: createdSoul?.id, entityId: createdSoul?.entityId });
+      }
+      const physicalBody = async () => {
+        const snapshot = await (await request('/v1/world/snapshot', undefined, null)).json();
+        const body = snapshot.entities.find(e => e.id === createdSoul?.entityId);
+        return body ? { id: body.id, p: body.p, r: body.r, in: body.in } : null;
+      };
+      const bodyBefore = remainder ? await physicalBody() : null;
+      const worldBefore = await (await request('/v1/world', undefined, null)).json(), soulsBefore = worldBefore.souls;
+      check(remainder ? 'populated fixture before selection' : 'fixture has no Souls before selection', Array.isArray(soulsBefore) && soulsBefore.length === (remainder ? 1 : 0) && (!remainder || !!bodyBefore));
       const beforeCamera = await page.evaluate(() => globalThis.__simCamera ?? null);
       await roomButton.click();
       await dialog.waitFor({ state: 'hidden' });
@@ -186,8 +237,11 @@ export async function runUiLifecycleProof({ root, withFixtureSession, report, sa
       const distance = (a, b) => a && b ? Math.hypot(...a.map((v, i) => v - b[i])) : Infinity;
       check('room selection reaches published inspection eye and target', !!afterCamera && !!expectedCamera && distance(afterCamera.p, expectedCamera.eye) < .05 && distance(afterCamera.pivot, expectedCamera.at) < .05,
         { beforeCamera, afterCamera, expectedCamera, roomRef: room });
-      const soulsAfter = (await (await request('/v1/world', undefined, null)).json()).souls;
-      check('Explore never creates or moves a Soul in the empty fixture', JSON.stringify(soulsBefore) === JSON.stringify(soulsAfter), { before: soulsBefore.length, after: soulsAfter.length });
+      const worldAfter = await (await request('/v1/world', undefined, null)).json(), soulsAfter = worldAfter.souls;
+      const bodyAfter = remainder ? await physicalBody() : null;
+      check(remainder ? 'camera selection leaves populated Soul body unmoved' : 'Explore never creates or moves a Soul in the empty fixture',
+        remainder ? soulsAfter.length === 1 && soulsAfter[0].id === soulsBefore[0].id && JSON.stringify(bodyBefore) === JSON.stringify(bodyAfter) : JSON.stringify(soulsBefore) === JSON.stringify(soulsAfter),
+        { before: soulsBefore.length, after: soulsAfter.length, tickBefore: worldBefore.tick, tickAfter: worldAfter.tick, rosterBefore: soulsBefore, rosterAfter: soulsAfter, bodyBefore, bodyAfter, limitation: 'Any change fails; this does not automatically attribute independent autonomous motion to the camera.' });
       evidence.browserErrors = errors;
     } finally { signal.removeEventListener('abort', onAbort); await closeBrowser(); await Promise.race([Promise.all([...responseTasks]), delay(250)]); }
     await settled();
@@ -199,7 +253,9 @@ export async function runUiLifecycleProof({ root, withFixtureSession, report, sa
   });
   evidence.receipt = receipt;
   evidence.finishedAt = new Date().toISOString();
-  evidence.pass = !receipt.error && receipt.cleanup.complete && evidence.checks.every(c => c.ok);
+  evidence.functionalPass = !receipt.error && receipt.cleanup.complete && evidence.checks.every(c => c.ok);
+  evidence.resourcePass = receipt.resources?.combinedWithinBound === true;
+  evidence.pass = evidence.functionalPass && evidence.resourcePass;
   evidence.error = receipt.error;
   save();
   return evidence;

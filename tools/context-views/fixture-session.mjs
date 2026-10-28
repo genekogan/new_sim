@@ -12,13 +12,14 @@ import { freeMemGb } from '../playtest/lib/platform.mjs';
 import { genesis, cases } from './fixture.mjs';
 import { bindCases } from './bindings.mjs';
 import { artwork } from './fixture-artwork.mjs';
+import { processRoles, resourceSummary } from './process-roles.mjs';
 const exec = promisify(execFile);
 
 async function processRows() {
-  const { stdout } = await exec('ps', ['-axo', 'pid=,ppid=,pgid=,lstart=,rss=,%cpu='], { timeout: 500, env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' } });
+  const { stdout } = await exec('ps', ['-axo', 'pid=,ppid=,pgid=,lstart=,rss=,%cpu=,comm='], { timeout: 500, env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' } });
   return stdout.trim().split('\n').flatMap(line => {
-    const match = line.trim().match(/^(\d+)\s+(\d+)\s+(\d+)\s+(.{24})\s+(\d+)\s+([\d.]+)$/);
-    return match ? [{ pid: +match[1], parent: +match[2], group: +match[3], start: match[4], rssMiB: +match[5] / 1024, cpu: +match[6] }] : [];
+    const match = line.trim().match(/^(\d+)\s+(\d+)\s+(\d+)\s+(.{24})\s+(\d+)\s+([\d.]+)\s+(.+)$/);
+    return match ? [{ pid: +match[1], parent: +match[2], group: +match[3], start: match[4], rssMiB: +match[5] / 1024, cpu: +match[6], executable: match[7] }] : [];
   });
 }
 function descendants(rows, root, known) {
@@ -36,12 +37,13 @@ const freePort = port => new Promise((yes, no) => {
   const server = createServer(); server.once('error', no);
   server.listen(port, '127.0.0.1', () => server.close(yes));
 });
-export function createFixtureSessions({ root, out, port = 5980, deadline, signal, abort, report, save, setPhase }) {
+export function createFixtureSessions({ root, out, port = 5980, deadline, signal, abort, report, save, setPhase, maxStarts = 22, maxDownloads = 10 }) {
   let totalStarts = 0, reservedAttempts = 0;
   const downloaded = new Set();
   return async function withFixtureSession({ variant }, callback) {
     const output = resolve(out, `session-${variant}`), base = `http://127.0.0.1:${port}/w/context-baseline`;
-    const receipt = { variant, startedAt: new Date().toISOString(), contextJobs: [], cleanup: { complete: false }, samples: [] };
+    const receipt = { variant, startedAt: new Date().toISOString(), contextJobs: [], cleanup: { complete: false }, samples: [], phases: ['startup'] };
+    const roles = new Map();
     const known = new Map(), admitted = new Set(), downloadsBefore = downloaded.size;
     let child, token, monitor, sampling = false, sampleTask, created = false, phase = 'startup';
     const tails = { stdout: '', stderr: '' }, localAbort = new AbortController();
@@ -54,7 +56,7 @@ export function createFixtureSessions({ root, out, port = 5980, deadline, signal
         const keys = body.refs.map(ref => `${ref}:${!!body.detail}`);
         if (body.sheet) keys.push(`sheet:${keys.join(',')}`);
         for (const key of keys) if (!admitted.has(key)) {
-          if (reservedAttempts + 2 > 22) throw Error('insufficient two-attempt budget for selected result');
+          if (reservedAttempts + 2 > maxStarts) throw Error('insufficient two-attempt budget for selected result');
           admitted.add(key); reservedAttempts += 2;
         }
       }
@@ -62,7 +64,7 @@ export function createFixtureSessions({ root, out, port = 5980, deadline, signal
       if (!response.ok) throw Error(`${path} HTTP ${response.status}: ${(await response.text()).slice(0, 300)}`);
       if (body === undefined && response.headers.get('content-type')?.includes('image/png')) {
         downloaded.add(`${variant}:${path}`);
-        if (downloaded.size > 10) throw Error('photographer PNG ceiling exceeded');
+        if (downloaded.size > maxDownloads) throw Error('photographer PNG ceiling exceeded');
       }
       return response;
     };
@@ -74,7 +76,7 @@ export function createFixtureSessions({ root, out, port = 5980, deadline, signal
         const at = line.indexOf('[context-job] '); if (at < 0) continue;
         try {
           const event = JSON.parse(line.slice(at + 14)); receipt.contextJobs.push(event);
-          if (event.phase === 'start' && ++totalStarts > 22) abort(new Error('actual renderer job starts exceeded22'));
+          if (event.phase === 'start' && ++totalStarts > maxStarts) abort(new Error(`actual renderer job starts exceeded${maxStarts}`));
         } catch (error) { receipt.traceError = String(error); abort(error); }
       }
     };
@@ -85,8 +87,9 @@ export function createFixtureSessions({ root, out, port = 5980, deadline, signal
         const query = await fetchBounded(base + '/v1/edge/platforms'); const state = await query.json();
         const queryMs = performance.now() - started;
         const owned = descendants(await processRows(), child.pid, known);
-        receipt.samples.push({ at: Date.now(), phase: startedPhase, tick: state.tick, queryMs, load: loadavg(), freeGiB: freeMemGb(), rssMiB: owned.reduce((n, row) => n + row.rssMiB, 0), cpuPercent: owned.reduce((n, row) => n + row.cpu, 0) });
-      } catch (error) { receipt.samples.push({ phase: startedPhase, error: String(error) }); }
+        const accounting = processRoles(owned, child.pid, roles);
+        receipt.samples.push({ ...accounting, at: Date.now(), phase: startedPhase, tick: state.tick, queryMs, load: loadavg(), freeGiB: freeMemGb(), rssMiB: owned.reduce((n, row) => n + row.rssMiB, 0), cpuPercent: owned.reduce((n, row) => n + row.cpu, 0) });
+      } catch (error) { receipt.samples.push({ phase: startedPhase, error: String(error), abortedForCleanup: localAbort.signal.aborted }); }
       finally { sampling = false; }
     };
     try {
@@ -118,7 +121,7 @@ export function createFixtureSessions({ root, out, port = 5980, deadline, signal
       await callback({ request, out, deadline, signal, bindings, baselineSnapshot, entities: baselineSnapshot.entities, cases, assets, report, save,
         base,
         jobEvents: () => receipt.contextJobs.map(event => ({ ...event })),
-        registerProcess: async pid => { descendants(await processRows(), pid, known); },
+        registerProcess: async (pid, role = 'viewer') => { const owned = descendants(await processRows(), pid, known); processRoles(owned, child.pid, roles, [{ pid, role }]); },
         ownedProcesses: async () => descendants(await processRows(), child.pid, known).map(row => ({ pid: row.pid, start: row.start, server: row.pid === child.pid })),
         uploadArtwork: async png => {
           const response = await fetchBounded(base + '/v1/god/assets?name=baseline-artwork&license=CC0', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'image/png' }, body: png });
@@ -126,7 +129,7 @@ export function createFixtureSessions({ root, out, port = 5980, deadline, signal
           return response.json();
         },
         rawGet: path => fetchBounded(base + path),
-        setPhase: value => { phase = value; setPhase(value); } });
+        setPhase: value => { phase = value; receipt.phases.push(value); setPhase(value); } });
     } catch (error) { receipt.error = String(error); }
     finally {
       clearInterval(monitor); localAbort.abort(new Error('session ended')); await sampleTask;
@@ -153,9 +156,11 @@ export function createFixtureSessions({ root, out, port = 5980, deadline, signal
       } else receipt.cleanup.remaining = [];
       try { await freePort(port); receipt.cleanup.portClosed = true; } catch { receipt.cleanup.portClosed = false; }
       receipt.cleanup.complete = !receipt.cleanup.remaining?.length && receipt.cleanup.portClosed && !receipt.cleanup.error && !receipt.cleanup.scanError;
-      receipt.cleanup.owned = [...known].map(([pid, start]) => ({ pid, start }));
+      receipt.cleanup.owned = [...known].map(([pid, start]) => ({ pid, start, role: roles.get(`${pid}:${start}`) ?? 'other' }));
       const starts = receipt.contextJobs.filter(event => event.phase === 'start').length;
       if (starts < downloaded.size - downloadsBefore) receipt.error ??= 'renderer start traces missing for downloaded PNGs';
+      receipt.resources = resourceSummary(receipt.samples, receipt.phases);
+      receipt.producedPngs = receipt.contextJobs.filter(event => event.phase === 'finish' && event.ready).length;
       receipt.endedAt = new Date().toISOString(); receipt.totalActualStarts = totalStarts; receipt.reservedAttempts = reservedAttempts;
       if (!receipt.cleanup.complete) { receipt.error ??= 'fixture cleanup incomplete'; abort(new Error(receipt.error)); }
       if (created) writeFileSync(resolve(output, 'receipt.json'), JSON.stringify(receipt, null, 2));

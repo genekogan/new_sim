@@ -15,10 +15,12 @@ import {bindCases} from './bindings.mjs';
 import {sourceReceipt} from './source-receipt.mjs';
 import {createFixtureSessions} from './fixture-session.mjs';
 import {runPhotographerQualification} from './photographer-runner.mjs';
+import {runLifecycleRemainder} from './lifecycle-remainder.mjs';
 import {runUiLifecycleProof} from './ui-lifecycle-runner.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'../..'),launchedAt=Date.now();
 const photographer=process.env.CONTEXT_PHOTOGRAPHER==='1';
-const uiProof=process.env.CONTEXT_UI_PROOF==='1';
+const remainder=process.env.CONTEXT_REMAINDER==='1';
+const uiProof=process.env.CONTEXT_UI_PROOF==='1'||remainder;
 const treatment=process.env.CONTEXT_VIEW_QUALIFY==='1'||photographer||uiProof;
 const out=resolve(process.argv[2]??'.lane/context-baseline'),port=5980,base=`http://127.0.0.1:${port}/w/context-baseline`;
 if(!process.env.WEB_DIR)throw Error('WEB_DIR must select the verified baseline artifact');
@@ -41,9 +43,11 @@ try{
  await new Promise((yes,no)=>{const p=createServer();p.once('error',no);p.listen(port,'127.0.0.1',()=>p.close(yes));});
  release=await chromeLease('context-views baseline',{slots:1,waitMs:1000});
  if(photographer||uiProof){
-  const withFixtureSession=createFixtureSessions({root,out,port,deadline,signal:hardStop.signal,abort:reason=>hardStop.abort(reason),report,save,setPhase});
-  const evidence=uiProof?await runUiLifecycleProof({root,withFixtureSession,report,save,out}):await runPhotographerQualification({withFixtureSession,out,deadline,signal:hardStop.signal,report,save,setPhase,cases});
-  if(!(uiProof?evidence.pass:evidence.machinePass))process.exitCode=1;
+  const withFixtureSession=createFixtureSessions({root,out,port,deadline,signal:hardStop.signal,abort:reason=>hardStop.abort(reason),report,save,setPhase,maxStarts:remainder?46:22,maxDownloads:remainder?23:10});
+  if(remainder){const lifecycle=await runLifecycleRemainder({withFixtureSession,report,save});if(!lifecycle.functionalPass)throw Error('lifecycle remainder failed; no automatic retry');}
+  const evidence=uiProof?await runUiLifecycleProof({root,withFixtureSession,report,save,out,remainder}):await runPhotographerQualification({withFixtureSession,out,deadline,signal:hardStop.signal,report,save,setPhase,cases});
+  if(uiProof){report.functionalPass=evidence.functionalPass&&(!remainder||report.lifecycleRemainder.functionalPass);report.resourcePass=evidence.resourcePass&&(!remainder||report.lifecycleRemainder.resourcePass);report.pass=report.functionalPass&&report.resourcePass;save();}
+  if(!(uiProof?report.pass:evidence.machinePass))process.exitCode=1;
  }else{
  const fd=openSync(resolve(out,'server.log'),'a');
  child=spawn(process.execPath,['apps/server/src/main.ts'],{cwd:root,env:{...process.env,HOST:'127.0.0.1',PORT:String(port),WORLD_KEY:'context-baseline',WORLD_ID:'context-baseline-1',WORLD_OWNER_ID:'dev:admin',PUBLIC_URL:`http://127.0.0.1:${port}`,GENESIS_FILE:resolve(out,'genesis.json'),DATA_DIR:resolve(out,'data'),ASSET_DIR:resolve(out,'assets'),ENGINE:'mars',DEV_AUTH:'1',AUTH_PROVIDER:'none',SEED_NATIVES:'0',BRAIN_MODE:'fake',MIND_DRIVER:'edge',INVITE_REQUIRED:'0',ARCHIVE_TAKES:'0',TAKES_PERSIST:'0',ANTHROPIC_API_KEY:'',OPENAI_API_KEY:'',EDEN_GOD_NO_NPX:'1'},stdio:['ignore',fd,fd]});closeSync(fd);report.pid=child.pid;save();
