@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { validateSeatCall } from './agent-usefulness-cli.mjs';
 import { rawUsage, toolInventory, redact, promptFor, USEFULNESS_PROTOCOL as P } from './agent-usefulness-protocol.mjs';
 import { auditCommands, auditImages } from './agent-usefulness.mjs';
+import { createCustodyTracker, killTargets, parseProcessRows } from './agent-usefulness-process.mjs';
 const event = (id, type, extra = {}) => ({ type: 'item.completed', item: { id, type, ...extra } });
 test('readonly admission refuses movement, text images and path escapes', () => {
   for (const args of [['move', 'fountain'], ['views', 'e_abc', '--out', '../image.png'], ['views', 'e_abc', '--out', '/tmp/image.png'], ['views', 'e_abc', '--out', 'image.png', '--world', 'other']])
@@ -40,4 +41,25 @@ test('redaction preserves accounting and seat prompt omits fixture answers', () 
   assert.deepEqual(redact({ token: 'secret', input_tokens: 10, usage: { output_tokens: 3 } }), { token: '[REDACTED]', input_tokens: 10, usage: { output_tokens: 3 } });
   assert.doesNotMatch(promptFor('visual'), /red square|blue circle|cream|e_f883/);
   assert.match(promptFor('visual'), /Images are optional/);
+});
+test('custody ignores repeated sampler ps/zombies and owns only observed Codex tree identities', () => {
+  const binary = '/pinned/codex', start = 'Wed Oct 28 01:46:00 2026';
+  const row = (pid, parent, executable, state = 'S', group = pid, stamp = start) => ({ pid, parent, group, state, start: stamp, executable });
+  const harness = row(100, 1, 'node'), fixture = row(110, 100, 'node'), existingCodex = row(120, 100, binary);
+  const tracker = createCustodyTracker({ rootPid: 100, codexBinary: binary, baselineRows: [harness, fixture, existingCodex] });
+  const launcher = row(200, 100, 'node'), codex = row(201, 200, binary, 'S', 200), command = row(202, 201, 'node', 'S', 200);
+  const sampled = [harness, fixture, existingCodex, row(111, 110, 'chrome'), launcher, codex, command,
+    row(300, 100, '/bin/ps', 'R', 100), row(301, 100, '(ps) <defunct>', 'Z', 100), row(302, 100, 'node')];
+  const first = tracker.update(sampled);
+  assert.deepEqual(first.added.map(process => process.pid), [200, 201, 202]); assert.equal(first.sawCodex, true);
+  assert.deepEqual(killTargets(first.live), [-200]);
+  // Each registration launches another measurement ps: it must never feed a
+  // new registration, even if its defunct form survives to the following scan.
+  for (let i = 0; i < 20; i++) assert.equal(tracker.update([...sampled, row(400 + i, 100, i % 2 ? '/bin/ps' : '(ps)', i % 2 ? 'R' : 'Z')]).added.length, 0);
+  const reusedLauncher = row(200, 1, 'unrelated', 'S', 200, 'Wed Oct 28 01:46:01 2026');
+  const reparented = tracker.update([harness, fixture, existingCodex, reusedLauncher, { ...codex, parent: 1 }, { ...command, parent: 1 }]);
+  assert.deepEqual(reparented.live.map(process => process.pid), [201, 202]); assert.deepEqual(killTargets(reparented.live), [201, 202]);
+  assert.equal(tracker.update([harness, fixture, existingCodex, reusedLauncher, { ...codex, parent: 1, state: 'Z', executable: '(codex) <defunct>' }]).live.length, 0);
+  const parsed = parseProcessRows(`301 100 100 Z ${start} (ps) <defunct>\n201 200 200 S ${start} ${binary}`);
+  assert.equal(parsed[0].state, 'Z'); assert.equal(parsed[1].executable, binary);
 });

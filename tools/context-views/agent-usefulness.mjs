@@ -13,6 +13,7 @@ import { USEFULNESS_PROTOCOL as P, TARGETS, promptFor, rawUsage, toolInventory, 
 import { validateSeatCall } from './agent-usefulness-cli.mjs';
 import { watchAdapter } from './agent-usefulness-process.mjs';
 import { physicalFingerprint } from './photographer-runner.mjs';
+import { pinCodexRuntime } from './agent-usefulness-runtime.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const jsonHash = value => sha(JSON.stringify(value));
@@ -70,7 +71,7 @@ export async function runAgentUsefulness(owner) {
   const files = { 'eden.mjs': readFileSync(join(here, 'agent-usefulness-cli.mjs')), 'eden-served.mjs': readFileSync(cliFile), 'skill.md': readFileSync(skillFile) };
   if (!cliSha256 || sha(files['eden-served.mjs']) !== cliSha256 || !skillSha256 || sha(files['skill.md']) !== skillSha256) throw Error('served CLI/skill pin mismatch');
   receipt.bootstrapHashes = Object.fromEntries(Object.entries(files).map(([name, bytes]) => [name, sha(bytes)]));
-  receipt.runnerHashes = Object.fromEntries(['agent-usefulness.mjs', 'agent-usefulness-protocol.mjs', 'agent-usefulness-cli.mjs', 'agent-usefulness-process.mjs'].map(name => [name, sha(readFileSync(join(here, name)))]));
+  receipt.runnerHashes = Object.fromEntries(['agent-usefulness.mjs', 'agent-usefulness-owner.mjs', 'agent-usefulness-protocol.mjs', 'agent-usefulness-cli.mjs', 'agent-usefulness-process.mjs', 'agent-usefulness-runtime.mjs'].map(name => [name, sha(readFileSync(join(here, name)))]));
   const refs = Object.fromEntries(Object.entries(TARGETS).map(([name, id]) => {
     const found = session.bindings.find(binding => binding.id === id); if (!found?.ref) throw Error(`missing actual fixture binding ${id}`); return [name, found.ref];
   }));
@@ -78,10 +79,12 @@ export async function runAgentUsefulness(owner) {
   try {
     for (const key of ['OPENAI_API_KEY', 'CODEX_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_BASE_URL', 'OPENAI_API_BASE', 'CODEX_API_BASE_URL'])
       if (process.env[key]) throw Error(`provider override present: ${key}; no value recorded`);
+    receipt.codexRuntime = pinCodexRuntime();
     const policy = providerPolicy({ providers: { allowed: ['codex'] }, seats: [{ adapter: 'codex-headless' }], director: { mode: 'scripted' }, review: { mode: 'deterministic' } });
     const version = await run('codex', ['--version'], { maxWallMs: 3000 });
     const login = await run('codex', ['login', 'status'], { maxWallMs: 3000 });
     requireProviders(policy, { codex: version.code === 0 ? String(version.stdout).trim() : null });
+    if (String(version.stdout).trim() !== receipt.codexRuntime.version) throw Error('pinned Codex version mismatch; no fallback');
     if (login.code !== 0 || !/Logged in using ChatGPT/.test(String(login.stdout) + String(login.stderr))) throw Error('Codex subscription login unavailable; no fallback');
     receipt.provider = { policy, version: String(version.stdout).trim(), login: 'ChatGPT subscription verified' };
     receipt.physicalBefore = await snapshot();
@@ -135,7 +138,7 @@ export async function runAgentUsefulness(owner) {
       writeFileSync(join(cwd, '.eden-agent.json'), JSON.stringify(publicState));
       const row = { index: index + 1, arm, cwd, startedAt: Date.now(), status: 'running' }; receipt.seats.push(row); save();
       session.setPhase(`usefulness:${index + 1}:${arm}`);
-      const custody = watchAdapter({ signal, deadline: row.startedAt + 119000, registerProcess: session.registerProcess });
+      const custody = watchAdapter({ signal, deadline: row.startedAt + 119000, codexBinary: receipt.codexRuntime.binary, registerProcess: session.registerProcess });
       let result; try { result = await turn({ cwd, model: P.model, effort: P.effort, text: promptFor(arm), maxWallSec: P.adapterWallSeconds }); }
       finally { row.cleanup = await custody.close(); }
       row.wallMs = Date.now() - row.startedAt; row.adapterWallMs = result.wallMs;
@@ -167,7 +170,7 @@ export async function runAgentUsefulness(owner) {
       if (row.ledger.length !== row.commands.cliCalls || row.ledger.length > P.cliCalls) row.errors.push('CLI ledger differs from observed calls');
       if (result.exit !== 0 || result.timedOut || row.wallMs > 120000 || !row.answer || row.answerWords > P.answerWords) row.errors.push('answer/turn/time limit failed');
       if (row.usage.totalAccountedTokens === null || row.usage.totalAccountedTokens > P.maxAccountedTokens) row.errors.push('post-turn token gate failed or missing');
-      if (row.cleanup.remaining.length || row.cleanup.samplingError) row.errors.push('Codex process cleanup unproven');
+      if (!row.cleanup.sawCodex || row.cleanup.remaining.length || row.cleanup.samplingError) row.errors.push('Codex process cleanup unproven');
       if (jsonHash(jobStarts()) !== jsonHash(prewarmJobs)) row.errors.push('unexpected capture work during seats');
       if (await snapshot() !== receipt.physicalBefore) row.errors.push('world changed during seat');
       row.status = row.errors.length ? 'invalid' : 'valid';

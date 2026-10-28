@@ -37,7 +37,7 @@ const setPhase = phase => { report.phases.push({ phase, at: Date.now() }); save(
 const slot = '<team>/lanes/MEASURE.slot';
 const claim = `${new Date().toISOString()} context-usefulness pid=${process.pid} until${new Date(outerDeadline).toISOString()}`;
 let release, claimed = false, fixtureEntered = false;
-const priorEnv = Object.fromEntries(['WEB_DIR', 'EDGE_CONTROLLER_CLI_FILE', 'EDGE_SKILL_FILE'].map(key => [key, process.env[key]]));
+const priorEnv = Object.fromEntries(['WEB_DIR', 'EDGE_CONTROLLER_CLI_FILE', 'EDGE_SKILL_FILE', 'PATH'].map(key => [key, process.env[key]]));
 try {
   if (loadavg()[0] >= 10 || freeMemGb() < 6) throw Error('ambient admission requires load1<10 and free>=6GiB');
   const current = readFileSync(slot, 'utf8').split('\n').filter(line => line !== process.env.CONTEXT_RESERVED_CLAIM).join('\n');
