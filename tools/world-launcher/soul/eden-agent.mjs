@@ -3894,7 +3894,7 @@ async function travelCommand(args, { load: load2, save: save2, live: live2 = () 
 }
 
 // tools/edge-skill/eden-agent.mjs
-var SKILL_VERSION = "1.9.17";
+var SKILL_VERSION = "1.9.19";
 var CONTRACT = "eden-edge/1";
 var API_CONTRACT = "eden-edge/1.1";
 var STATE = ".eden-agent.json";
@@ -4373,7 +4373,7 @@ function summarise(caps, filters = {}) {
   const pick = (list2) => list2.map((c, i) => ({ c, i, s: !filters.verb || c.verb === filters.verb ? score(c) : 0 })).filter((x) => x.s > 0).sort((a, b) => b.s - a.s || a.i - b.i).map((x) => x.c);
   const matchingAvail = pick(avail), matchingBlocked = pick(blocked), truncated = { available: matchingAvail.length > 80, blocked: matchingBlocked.length > 15 };
   return {
-    available: matchingAvail.slice(0, 80).map((c) => ({ id: c.id, verb: c.verb, label: c.label, ...c.params ? { params: Object.keys(c.params) } : {} })),
+    available: matchingAvail.slice(0, 80).map((c) => ({ id: c.id, verb: c.verb, label: c.label, ...c.params ? { params: Object.keys(c.params) } : {}, ...c.verb === "paint" && c.params?.painting ? { painting: c.params.painting } : {} })),
     blocked: matchingBlocked.slice(0, 15).map((c) => ({ id: c.id, label: c.label, why: c.blocked?.code })),
     totals: { available: avail.length, blocked: blocked.length },
     matchingTotals: { available: matchingAvail.length, blocked: matchingBlocked.length },

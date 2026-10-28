@@ -80,7 +80,7 @@ function fixture(t: TestContext, longHours = false, initiallyPainted = false) {
   return { f, target, seen, finish, clear, errors };
 }
 
-test('READY: painting credit preserves parent, landmarks and ownership/access/price/hours in actual perception', t => {
+test('painting credit preserves parent, landmarks and ownership/access/price/hours in actual perception', t => {
   const { f, target, seen, finish, errors } = fixture(t);
   const blank = seen();
   assert.ok(blank.public.what.length <= 120, 'ordinary unpainted projection retains its original bound');
@@ -114,9 +114,8 @@ test('READY: painting credit preserves parent, landmarks and ownership/access/pr
   assert.deepEqual(errors, []);
 });
 
-// Proposed acceptance: deliberately RED against the prepared prefix-only adapter.
-// Requires the explicit painting-only 230-character initialization extension, not shortened-away credit.
-test('ACCEPTANCE PENDING: ordinary longer painting credit must retain the complete existing metadata suffix', t => {
+// Painted descriptions use the explicit 230-character bound, preserving full credit and existing metadata.
+test('ordinary longer painting credit must retain the complete existing metadata suffix', t => {
   const { seen, finish, errors } = fixture(t);
   const blank = seen();
   assert.match(blank.public.what, /^an easel in inn, by /);
@@ -134,7 +133,7 @@ test('ACCEPTANCE PENDING: ordinary longer painting credit must retain the comple
   assert.deepEqual(errors, []);
 });
 
-test('ACCEPTANCE PENDING: a painting must not worsen metadata visibility when the blank description already clips', t => {
+test('a painting must not worsen metadata visibility when the blank description already clips', t => {
   const { f, target, seen, finish, clear, errors } = fixture(t, true, true);
   const initial = seen();
   const created = f.runtime.objects.all().find(row => row.id === target)!;

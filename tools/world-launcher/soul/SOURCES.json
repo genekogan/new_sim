@@ -10,10 +10,10 @@
   "cli": {
     "file": "eden-agent.mjs",
     "version": "1.9",
-    "sha256": "c26f51576a06107b47b91783cb5c644b572fa611391d67da061d174da493632f",
-    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-e7635775.manifest.json)",
-    "source": "e76357759687a06c87512cb94a1c1654420d8ec2",
-    "note": "retained legacy CLI (1.9 line, build 1.9.17 LINK shipped in 3.93), served unchanged at /eden-agent.mjs for existing Soul folders."
+    "sha256": "5a09e2f5885698acac4a9834fe65ea962f724423cabcd061e452af782cc17058",
+    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-aeada3b2.manifest.json)",
+    "source": "aeada3b2921210df4501a4b4a893a7823a63c849",
+    "note": "Retained legacy CLI, 1.9 line, build 1.9.19: includes integrated semantics/context guidance and bounded optional painting help only on paint offers. Served at /eden-agent.mjs for existing Soul folders; source and bundled input hashes recorded in the build manifest."
   },
   "skill": {
     "file": "skill.md",
