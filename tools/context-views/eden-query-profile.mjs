@@ -18,12 +18,14 @@ const slot = '<team>/lanes/MEASURE.slot';
 const started = Date.now(), deadline = started + 75000;
 const claim = `${new Date(started).toISOString()} eden-query-profile pid=${process.pid} until=${new Date(deadline + 5000).toISOString()}`;
 const abort = new AbortController();
+const settleMs = Number(process.env.EDEN_PROFILE_SETTLE_MS ?? 8000);
+if (![8000, 30000].includes(settleMs)) throw Error('settle must be the original8s or observed-nav-warmup30s protocol');
 const report = { source: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
   startedAt: new Date(started).toISOString(), runnerPid: process.pid, node: process.version,
   scriptSha256: createHash('sha256').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex'),
   scope: 'Actual local main, existing Eden template, fake minds. Same-process temporal comparison of no context requests versus metadata requests; not randomized causal proof or rendering-capacity qualification. CPU profiling adds overhead to both phases.',
   phases: [], queries: [], contextRequests: [], health: [], cleanup: {},
-  ambient: { load: loadavg(), freeGiB: freeMemGb() } };
+  settleMs, ambient: { load: loadavg(), freeGiB: freeMemGb() } };
 mkdirSync(out); // Never overwrite a previous measurement.
 const save = () => writeFileSync(resolve(out, 'summary.json'), JSON.stringify(report, null, 2) + '\n');
 const hashFile = path => createHash('sha256').update(readFileSync(path)).digest('hex');
@@ -109,7 +111,7 @@ try {
       if (sampling && !abort.signal.aborted) await delay(100, undefined, { signal: abort.signal }).catch(() => {});
     }
   })();
-  await runPhase('startup-settle', () => delay(8000, undefined, { signal: abort.signal }));
+  await runPhase('startup-settle', () => delay(settleMs, undefined, { signal: abort.signal }));
   await runPhase('idle-before', () => delay(8000, undefined, { signal: abort.signal }));
   let first;
   const context = async path => {
