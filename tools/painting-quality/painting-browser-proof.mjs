@@ -1,5 +1,5 @@
 // Source-only suite: root supplies the admitted fixture, browser and custody.
-// Q runs first. No launcher, process ownership, teleport, model, forced event or retry.
+// May run alone or after Q restores its fixture. No launcher, process ownership, teleport, model, forced event or retry.
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, isAbsolute } from 'node:path';
@@ -35,7 +35,7 @@ function pixels(bytes) {
   return [[25, 25], [256, 256]].map(([x, y]) => [...raw.subarray(y * stride + 1 + x * 3, y * stride + 4 + x * 3)]);
 }
 
-/** Call once after Q on root's existing createFixtureSessions callback.
+/** Call once on root's fresh createFixtureSessions callback, optionally after Q restores its fixture.
  * owner={browser,session,deadline,signal,out,identity:{sourceSha,build,webReceiptPath,webReceiptSha256}}
  * Root owns shared browser/server, registration, render cap and final cleanup.
  * Dev-owner authentication is confined to the already isolated local fixture.
@@ -93,7 +93,8 @@ export async function runPaintingBrowserProof(owner) {
     page.on('console', message => { if (message.type() === 'error') visitor.errors.push(safeError(message.text())); });
     page.on('response', response => { if (/\/art\/[a-f0-9]{64}\.png/.test(response.url())) visitor.resources.push({ url: response.url(), status: response.status() }); });
     const url = new URL(base.href + '/');
-    url.search = new URLSearchParams({ eye: [position[0], position[1] + 1.5, position[2] + 3.5].join(','), at: [position[0], position[1] + 1.15, position[2]].join(',') }).toString();
+    // View the canvas obliquely from inside the room, clear of the resident's native painting position.
+    url.search = new URLSearchParams({ eye: [position[0] + 2.5, position[1] + 1.6, position[2] + 3.5].join(','), at: [position[0], position[1] + 1.15, position[2] + .205].join(',') }).toString();
     await bound(page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: Math.min(20000, deadline - Date.now()) }));
     return visitor;
   };
@@ -144,7 +145,7 @@ export async function runPaintingBrowserProof(owner) {
     await bound((async () => {
       session.setPhase?.('painting-browser-proof');
       const health = await publicJson('/healthz'); check('runtime matches admitted build', health.build === identity.build, { build: health.build, worldId: health.worldId });
-      const initial = await snap(); check('Q ran first on unchanged five-subject fixture', initial.entities.length === 5 && ['hall', 'podium', 'artwork', 'landmark', 'lake'].every(name => initial.entities.some(e => e.name === name)));
+      const initial = await snap(); check('fresh five-subject fixture admitted', initial.entities.length === 5 && ['hall', 'podium', 'artwork', 'landmark', 'lake'].every(name => initial.entities.some(e => e.name === name)));
       const created = await json('/v1/souls', { name: 'Painting Witness', description: 'Isolated native painting proof. No model or directive.' }, 'dev:painting-proof');
       const soul = created.soul; check('ordinary Soul birth admitted', !!soul?.id && !!soul?.entityId, { soulId: soul?.id, entityId: soul?.entityId });
       const pairing = await json(`/v1/souls/${encodeURIComponent(soul.id)}/pair`, {}, 'dev:painting-proof'); sensitive.push(pairing.code);

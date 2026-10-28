@@ -7,6 +7,7 @@ export const PAINTING_EASEL_DEF: DefInput = /* @__PURE__ */ (() => {
   const old = structuredClone(furniture.find(d => d.name === 'core-easel')!) as unknown as DefInput;
   if (old.make.kind !== 'gen') throw new Error('core/easel@1 must remain a kit definition');
   return { ...old, version: 2,
+    tags: [...(old.tags ?? []), 'sign-text'],
     description: 'A painter’s easel. Finish painting to leave a picture on its canvas, with the Soul’s title and credit.',
     make: { ...old.make, args: { ...(old.make.args as Record<string, unknown>),
       // Square preserves the full 512-square recipe; portrait canvas is a mat.
