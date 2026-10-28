@@ -35,13 +35,14 @@ export async function runQualityGroundCoverProof(owner) {
   const before = qualityBeforeReceipt(beforeBytes, expected), contexts = new Set(), closing = new Map();
   for (const [path, pin] of Object.entries(expected.sourcePins)) {
     const bytes = readFileSync(fileURLToPath(new URL('../../' + path, import.meta.url)));
-    assert.equal(createHash('sha256').update(bytes).digest('hex'), pin, 'unchanged retained geometry/material source: ' + path);
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), pin, 'reviewed candidate geometry/material source pin: ' + path);
   }
   let accepting = true, openingContexts = 0;
   let alignment, alignmentTask;
   const report = { schema: 'quality-ground-cover-browser/1', identity, browserVersion: browser.version(), base: base.href, startedAt: new Date(now).toISOString(),
     deadline: new Date(deadline).toISOString(), limits: QUALITY_BROWSER_LIMITS, fixtureSha256: hash({ genesis, cases }),
-    before: { source: before.source, receiptSha256: createHash('sha256').update(beforeBytes).digest('hex'), sourcePins: expected.sourcePins, expectedFactsSha256: qualityHash(expected.facts), cases: [] },
+    before: { source: before.source, receiptSha256: createHash('sha256').update(beforeBytes).digest('hex'), sourcePins: expected.baselineSourcePins, expectedFactsSha256: qualityHash(expected.facts), cases: [] },
+    candidateSourcePins: expected.sourcePins, sourceExceptions: expected.sourceExceptions,
     checks: [], architectural: [], live: [], cleanup: { complete: false }, visualQualification: 'pending-root-review',
     scope: 'First contextRender invocation per fresh renderer; the normal architecture pipeline may perform occlusion passes. No warmup capture and no throughput/performance claim.' };
   const save = () => writeFileSync(resolve(out, 'summary.json'), JSON.stringify(report, null, 2));

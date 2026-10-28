@@ -51,7 +51,7 @@ test('first-frame instance uploads contain the cover actually drawn, including o
     for (const [x, y] of [[7, 1.7], [-12, 5.7]]) {
       const camera = new THREE.PerspectiveCamera(); camera.position.set(x, y, 0); camera.updateMatrixWorld();
       // Mirror the real renderer order using Three's actual upload coordinator, without a WebGL context.
-      scene.onBeforeRender({} as never, scene, camera, null);
+      scene.onBeforeRender({} as never, scene, camera, null as never, null as never, null as never);
       const meshes = cover.group.children as THREE.InstancedMesh[];
       for (const mesh of meshes) objects.update(mesh);
       for (const mesh of meshes) {
@@ -76,22 +76,22 @@ test('scene binding chains the prior callback, is idempotent, and restores on re
   const cover = new GroundCover(() => null, { enabled: true, reason: 'test' });
   const first = new THREE.Scene(), second = new THREE.Scene(), camera = new THREE.PerspectiveCamera();
   const events: string[] = [];
-  const priorFirst: THREE.Scene['onBeforeRender'] = function () { assert.equal(this, first); events.push('first'); };
-  const priorSecond: THREE.Scene['onBeforeRender'] = function () { assert.equal(this, second); events.push('second'); };
+  const priorFirst: THREE.Scene['onBeforeRender'] = function (this: THREE.Scene) { assert.equal(this, first); events.push('first'); };
+  const priorSecond: THREE.Scene['onBeforeRender'] = function (this: THREE.Scene) { assert.equal(this, second); events.push('second'); };
   first.onBeforeRender = priorFirst; second.onBeforeRender = priorSecond;
   cover.prepare = received => { assert.equal(received, camera); events.push('cover'); };
   try {
     cover.bindScene(first); const hook = first.onBeforeRender;
     cover.bindScene(first); assert.equal(first.onBeforeRender, hook);
-    first.onBeforeRender({} as never, first, camera, null);
+    first.onBeforeRender({} as never, first, camera, null as never, null as never, null as never);
     assert.deepEqual(events, ['first', 'cover']);
     cover.bindScene(second);
     assert.equal(first.onBeforeRender, priorFirst);
-    second.onBeforeRender({} as never, second, camera, null);
+    second.onBeforeRender({} as never, second, camera, null as never, null as never, null as never);
     assert.deepEqual(events, ['first', 'cover', 'second', 'cover']);
     cover.dispose(); assert.equal(second.onBeforeRender, priorSecond);
     // A retained old wrapper must not prepare a disposed or rebound cover.
-    hook({} as never, first, camera, null);
+    hook({} as never, first, camera, null as never, null as never, null as never);
     assert.deepEqual(events, ['first', 'cover', 'second', 'cover', 'first']);
   } finally { cover.dispose(); }
 });

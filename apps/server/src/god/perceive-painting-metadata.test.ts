@@ -24,9 +24,9 @@ function fixture(t: TestContext, longHours = false, initiallyPainted = false) {
     assert.equal(result.result.accepted, true, JSON.stringify(result.result));
   };
   act([
-    { op: 'place', def: coreRef('cottage'), name: 'inn', p: [0, 0] },
-    { op: 'place', def: coreRef('sign'), name: 'map', p: [7, 0] },
-    { op: 'place', def: coreRef('easel', 2), name: 'canvas', in: { parent: 'inn' }, p: [0, 0],
+    { op: 'place', def: coreRef('cottage'), name: 'inn', in: { parent: 'world' }, mode: 'strict', p: [0, 0] },
+    { op: 'place', def: coreRef('sign'), name: 'map', in: { parent: 'world' }, mode: 'strict', p: [7, 0] },
+    { op: 'place', def: coreRef('easel', 2), name: 'canvas', in: { parent: 'inn' }, mode: 'strict', p: [0, 0],
       owner: 'soul:s_ana', access: 'private', price: { amount: 2 },
       ...(initiallyPainted ? { state: { media: `/art/${'a'.repeat(64)}.png`,
         title: 'After the Summer Rain', maker: 'soul:s_artist:Alexandra Montgomery' } } : {}),

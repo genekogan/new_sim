@@ -43,7 +43,7 @@ test('isolated capture retires only idle building workers and preserves geometry
   const def = model.def('core/cottage@1')!, materials = new MaterialLib();
   let serial = 0;
   function fixture() {
-    const params = Object.fromEntries(Object.entries({ ...GENERATORS['building/1'].params, ...def.params }).filter(([, f]) => f.default !== undefined).map(([k, f]) => [k, f.default]));
+    const params = Object.fromEntries(Object.entries({ ...GENERATORS['building/1'].params, ...def.params }).filter(([, f]) => f.default !== undefined).map(([k, f]) => [k, f.default!]));
     params.w = 8 + serial++;
     const entity = { id: `b${serial}`, def: def.ref, in: { parent: 'world' }, by: 'test', born: 0, v: 1, params } as Entity;
     return { def, params, entity, args: def.make.kind === 'gen' ? def.make.args ?? {} : {}, baked: model.bake(def, params, 7), model, materials, tint: (_k: string, f: string) => f } as unknown as MeshCtx;

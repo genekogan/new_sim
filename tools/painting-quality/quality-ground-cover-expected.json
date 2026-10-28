@@ -6,7 +6,7 @@
   },
   "sourcePins": {
     "tools/context-views/fixture.mjs": "afa6f2ab92625461f2d49e18b9636f7b8a3f61e738916b312764636f7157e51f",
-    "apps/web/src/gen-mesh/building.mesh.ts": "07a733dc3a775677b44824b8e00c2675ff824e5777928135b91c1c27d98f20a0",
+    "apps/web/src/gen-mesh/building.mesh.ts": "f4eb1fc8fea77f68a237f1e65883376debd8d324a8e091bdc556e6f89d39bf93",
     "apps/web/src/gen-mesh/building-kit.ts": "b3d382a3d8f5258ce98105898e73b43760e74f701dc2c202b3e1855f2f0fd828",
     "apps/web/src/gen-mesh/building-buffers.ts": "875b4a0d32f04cb39d194f8297376e61f89c7172b7d6ab4a27ae6bc1e14aa88b",
     "apps/web/src/gen-mesh/building-looks.json": "d053be8fa7cddb445f7f4986b55c71438a9544375bd9997f39b01c93236baa74",
@@ -247,5 +247,30 @@
       "palette": "grass"
     }
   },
-  "baselineReceiptSha256": "b48d30c80480121539410695748879c5b31fd9ac4d0d47ed396e0dc7ac3b3466"
+  "baselineReceiptSha256": "b48d30c80480121539410695748879c5b31fd9ac4d0d47ed396e0dc7ac3b3466",
+  "baselineSourcePins": {
+    "tools/context-views/fixture.mjs": "afa6f2ab92625461f2d49e18b9636f7b8a3f61e738916b312764636f7157e51f",
+    "apps/web/src/gen-mesh/building.mesh.ts": "07a733dc3a775677b44824b8e00c2675ff824e5777928135b91c1c27d98f20a0",
+    "apps/web/src/gen-mesh/building-kit.ts": "b3d382a3d8f5258ce98105898e73b43760e74f701dc2c202b3e1855f2f0fd828",
+    "apps/web/src/gen-mesh/building-buffers.ts": "875b4a0d32f04cb39d194f8297376e61f89c7172b7d6ab4a27ae6bc1e14aa88b",
+    "apps/web/src/gen-mesh/building-looks.json": "d053be8fa7cddb445f7f4986b55c71438a9544375bd9997f39b01c93236baa74",
+    "apps/web/src/gen-mesh/kit.mesh.ts": "bd97dfdc08706291be0f7e5016ae02a77a779cd73db1049ec70c43c0eb401959",
+    "apps/web/src/gen-mesh/kit-surfaces.ts": "5e5c6305d7ed7885ec48f1af2bfb438f0fb4bdf7e4888d353e2a4a20d70aee25",
+    "apps/web/src/gen-mesh/faces.ts": "d2bf1d7ba551a679de57fde5025b2cdd84f83ea08a07d4d15aaf3020820f3212",
+    "apps/web/src/gen-mesh/materials.ts": "79a0b9b9867ad8a46d5fe247da0c2eb43e8c9d85bf160ad430dff6aeb9822734",
+    "apps/web/src/gen-mesh/soup.ts": "caefed9a1fc087ff26c6e8277e85e5d2774db99849368edebb2f95380a33a242",
+    "apps/web/src/gen-mesh/ground-palette.ts": "b12d16197c9165ed283fe9f6b797fa7da2547ba1ddaf5f1ad62077b7478ca5e4",
+    "apps/web/src/fx/water.ts": "51df0824ca3a17cbc44673e6c4f45a403d5e318e7fb5f126c4ab1555d6405d40",
+    "packages/generators/src/building.ts": "0472d421bd75bace7430286c9864b292df2e826a06498d1913ec56534c28550f"
+  },
+  "sourceExceptions": [
+    {
+      "path": "apps/web/src/gen-mesh/building.mesh.ts",
+      "baselineSha256": "07a733dc3a775677b44824b8e00c2675ff824e5777928135b91c1c27d98f20a0",
+      "candidateSha256": "f4eb1fc8fea77f68a237f1e65883376debd8d324a8e091bdc556e6f89d39bf93",
+      "originalCommit": "4b398325d3a4731393efcea7a310183d210328de",
+      "integratedCommit": "84eac557a",
+      "reason": "Reviewed worker lifecycle-only change: idle retirement, reply/error bookkeeping and partial construction cleanup. Geometry generation, material selection, template key and emission are unchanged. Completed templates are retained; unused prefetched buffers regenerate through the same buildingBuffers job. Scene equivalence remains pending actual fixed-camera visual inspection."
+    }
+  ]
 }
