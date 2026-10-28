@@ -557,7 +557,8 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   }
 
   /** A trusted edit the engine made (a Soul moved a thing, a body was born or retired): journaled by 'engine',
-   *  never the god's to undo (and it does not clear the redo stack), published to viewers, not sent to onCommit. */
+   *  never the god's to undo (and it does not clear the redo stack), published to viewers. Ordinary engine edits
+   *  skip onCommit; an atomic painting participant also notifies context/perception before receipt observers. */
   engineAct(ops: Op[], note: string, complete?: () => void, durable?: () => void): Result {
     const tick = this.opts.tick();
     const next = this.model.fork();
@@ -576,6 +577,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
       durable?.();
       const deltas = this.builds.accepted(updates.writes);
       this.publish(r.result.seq, tick, r.diff!, 'engine', deltas);
+      if (complete) this.notify(r.result.seq, r.diff!, 'edit', undefined, 'engine');
       this.builds.announceCommitted(updates.writes);
     } finally { notify?.(); }
     return r.result;
@@ -790,8 +792,8 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   }
   /** The god's recent previews, newest first (the panel lists them to show as ghosts). */
   listPreviews() { const now = this.now(); return [...this.previews].filter(([, v]) => now - v.at < 600_000).sort((a, b) => b[1].at - a[1].at).slice(0, 20).map(([id, v]) => ({ id, at: v.at, accepted: !v.failures, summary: v.failures ? null : summarize(v.diff) })); }
-  private notify(seq: number, diff: Diff, kind: 'edit' | 'undo' | 'redo', group?: string) {
-    for (const fn of this.commitListeners) fn({ seq, diff, kind, by: 'god', group });
+  private notify(seq: number, diff: Diff, kind: 'edit' | 'undo' | 'redo', group?: string, by: 'god' | 'engine' = 'god') {
+    for (const fn of this.commitListeners) fn({ seq, diff, kind, by, group });
   }
   private publish(seq: number, tick: number, diff: Diff, by: WorldDiffMessage['by'], builds: SiteDelta[] = [], source = this.model) {
     const referenced = new Map<string, StoredDef>();
