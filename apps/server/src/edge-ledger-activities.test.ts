@@ -15,8 +15,21 @@ test('activities: sit down, stand, lie down, nap, read (anywhere and in the libr
   for (const id of ['sit:here', 'read:here', 'lie:here', 'nap:here', 'sit-ground:here']) assert.ok(obs.doHere.some((d: any) => d.id === id), 'doHere lists ' + id);
   // to the campfire, then "sit down": the nearest free seat there
   await done(a, await act(a, 'walk:social-eden-fire-circle'));
+  // Native region arrival varies with the random Soul identity. Judge the nearest
+  // actual free fixture from that arrival, rather than hardcoding one side of the fire.
+  const fireSeats = ['social-eden-fire-bench-north', 'social-eden-fire-bench-south'].map(id => {
+    const e = w.engine.world.entities[(w.f.host.kernel.things[id]?.traits.entity as string | undefined) ?? id];
+    assert.ok(e, 'actual native fire bench ' + id);
+    return {id, at: [...e.pose.p], distance: Math.hypot(body(a).pose.p[0] - e.pose.p[0], body(a).pose.p[2] - e.pose.p[2])};
+  });
+  const fireOffers = w.ledger.capabilities(a).filter(c => fireSeats.some(s => c.id === 'sit:' + s.id));
+  const nearest = fireSeats.filter(s => fireOffers.some(c => c.id === 'sit:' + s.id && c.available))
+    .sort((a, b) => a.distance - b.distance || a.id.localeCompare(b.id))[0];
+  assert.ok(nearest && nearest.distance <= 8, 'an available fire bench is nearby');
+  t.diagnostic(JSON.stringify({soulId: a.soulId, arrival: body(a).pose.p, fireSeats, expected: nearest.id}));
   const sit = await act(a, 'sit down', {seconds: 5});
-  assert.equal(sit.resolved?.to, 'sit:social-eden-fire-bench-south', 'ordinary sitting names the nearby durable fire bench');
+  assert.equal(sit.resolved?.to, 'sit:' + nearest.id, 'ordinary sitting names the nearest available durable fire bench');
+  assert.equal(sit.receipt.chosen?.target, nearest.id, 'receipt commits the exact nearest fixture');
   await done(a, sit); assert.equal(body(a).human.activity, 'sit', 'seated on a seat');
   assert.ok(w.engine.nativeSeatHoldsV1(a.entityId).some((h: {slot: string}) => h.slot.startsWith(`${sit.receipt.chosen?.target}#`)), 'the completed receipt holds its exact chosen fixture');
   assert.ok(Math.hypot(body(a).pose.p[0] - 24, body(a).pose.p[2] + 7) < 8, 'by the fire');
