@@ -4,6 +4,9 @@
  *  not match the selected world." (sim.eden.art/nope, the retired /l/* lab links). */
 export type PageRoute = 'list' | 'world' | 'missing';
 export function pageRoute(pathname: string, base: string, hash: string): PageRoute {
+  // The launcher owns the public homepage; the original world list lives at /old.
+  if (base === '/worlds' && pathname === '/') return 'list';
+  if (!base && (pathname === '/old' || pathname === '/old/')) return 'list';
   const rel = base && (pathname === base || pathname.startsWith(base + '/')) ? pathname.slice(base.length) || '/' : base ? null : pathname;
   if (rel === null) return 'missing';
   if (rel === '/' || rel === '/index.html') return hash ? 'world' : 'list';
