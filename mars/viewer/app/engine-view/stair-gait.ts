@@ -30,6 +30,10 @@ export type Flight = {
   width: number;
   yBottom: number;
   yTop: number;
+  /** Actual mesh support extents, when independently proven. Path-only flights retain their existing gait. */
+  supports?: {s:number;y:number;lo:number;hi:number;left:number;right:number}[];
+  /** Actual horizontal contact triangles in flight coordinates [s, worldY, lateral]. */
+  contactTops?: [number,number,number][][];
 };
 
 export function flightOf(link: Link): Flight | null {
@@ -54,7 +58,7 @@ export function flightOf(link: Link): Flight | null {
 export function spot(f: Flight, k: number): { s: number; y: number } {
   const n = f.treads.length;
   if (k <= 0) return { s: f.treads[0].s + (k - 1) * f.going, y: f.yBottom };
-  if (k > n) return { s: f.treads[n - 1].s + (k - n) * f.going, y: f.yTop };
+  if (k > n) return { s: f.treads[n - 1].s + (k - n) * (f.supports&&n>1?f.treads[n-1].s-f.treads[n-2].s:f.going), y: f.yTop };
   return f.treads[k - 1];
 }
 
@@ -113,7 +117,12 @@ export function gaitAt(f: Flight, x: number, z: number, bodyY: number): Gait | n
   const lateral = -rx * f.dir[1] + rz * f.dir[0];
   if (Math.abs(lateral) > f.width / 2 + 0.25) return null;
   const n = f.treads.length;
-  const u = 1 + (s - f.treads[0].s) / f.going;
+  let u = 1 + (s - f.treads[0].s) / f.going;
+  if(f.supports){
+    const next=f.treads.findIndex(t=>t.s>s);
+    if(next>0){const a=f.treads[next-1],b=f.treads[next];u=next+(s-a.s)/(b.s-a.s);}
+    else if(next<0)u=n+(s-f.treads[n-1].s)/(f.treads[n-1].s-f.treads[n-2].s);
+  }
   if (u < -1 || u > n + 2) return null;
   // the body must be on this flight's height band (not walking under or over it)
   const yAt = u <= 1 ? f.yBottom : u >= n ? f.yTop : spot(f, Math.floor(u)).y + (spot(f, Math.floor(u) + 1).y - spot(f, Math.floor(u)).y) * (u - Math.floor(u));

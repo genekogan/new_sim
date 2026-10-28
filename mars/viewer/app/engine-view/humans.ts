@@ -43,6 +43,7 @@ import { BODY_MODEL, UP, ankleLocal, armLen, armTo, armsOf, clamp01, contact, cu
 import { BEND_SHARE, KNEE_Y, KNEEL_SIDE, NEUTRAL, approach, kneelDrop, shoulderAt, solvePosture, styleFor, type Dims, type Posture, type Target } from './posture.ts';
 import { groundFootLift } from './ground-foot-fit.ts';
 import { flightOf, gaitAt, stairFootTarget, type Flight, type Gait } from './stair-gait.ts';
+import {stairSoleFit} from './stair-sole.ts';
 import { frameCtx, framePose, stanceFacing, type FrameCtx, type FramePose } from './frame-gait.ts';
 import { GIRDLE, LIP, PRONE_ACTS, engineTurn, lipAlong, RISE_STEP, approachProne, lerpProne, proneFrame, riseOf, solveProne, type ProneState } from './prone.ts';
 import { expressionAt, type Expression } from './expression.ts';
@@ -313,6 +314,8 @@ export class HumanViews {
     this.flights = links.map(flightOf).filter((f): f is Flight => !!f);
     this.climbs = links.filter((l) => l.kind === 'climb').map((l) => ({ id: l.id, path: l.path as [number, number, number][] }));
   }
+  private supplementalFlights:readonly Flight[]=[];
+  setSupplementalStairs(flights:readonly Flight[]){this.supplementalFlights=flights;}
 
   /** Lab activity attention; a bounded head turn, never rotates a claimed seated body. Call once per tick. */
   setAttention(targets: Record<string, [number, number]>) {
@@ -329,7 +332,7 @@ export class HumanViews {
 
   /** The flights in use (tests: tread tops). */
   stairs() {
-    return this.flights.map((f) => ({ id: f.id, o: f.o, dir: f.dir, going: f.going, width: f.width, yBottom: f.yBottom, yTop: f.yTop, treads: f.treads.map((t) => ({ ...t })) }));
+    return [...this.flights,...this.supplementalFlights].map((f) => ({ id: f.id, o: f.o, dir: f.dir, going: f.going, width: f.width, yBottom: f.yBottom, yTop: f.yTop, treads: f.treads.map((t) => ({ ...t })) }));
   }
 
   clear() {
@@ -1147,7 +1150,7 @@ export class HumanViews {
   }
 
   private gaitOf(p: THREE.Vector3): { g: Gait; f: Flight } | null {
-    for (const f of this.flights) {
+    for (const f of [...this.supplementalFlights,...this.flights]) {
       const g = gaitAt(f, p.x, p.z, p.y);
       if (g && g.weight > 0) return { g, f };
     }
@@ -1747,6 +1750,20 @@ function stairLegs(v: View, g: Gait, f: Flight, holder: THREE.Object3D) {
   place(v.spine.body, _c.clone());
   const pole = _tmp.copy(_fwd).addScaledVector(UP, 0.1).clone();
   v.legs.forEach((l, i) => legTo(l, v.ankle[i], goals[i], pole, 0.999, w > 0.5 ? footPitch(v, i, pitches[i]) : undefined));
+  // Mesh contacts use every actual sole point. A long boot may overhang the
+  // lower side of a tread; shift it clear of the higher riser before fitting its
+  // sole to the real top triangles. The native holder/root never moves.
+  if(f.supports&&w>0)for(let pass=0;pass<2;pass++){
+    holder.updateMatrixWorld(true);
+    v.legs.forEach((l,i)=>{
+      const points:THREE.Vector3[]=[];
+      for(const r of v.surf.foot.get(l.side)??[])for(const idx of r.idx)points.push(r.mesh.getVertexPosition(idx,V()).applyMatrix4(r.mesh.matrixWorld));
+      const fit=stairSoleFit(f,g.feet[l.side>0?0:1],points);
+      if(Math.abs(fit.along)<.0001&&fit.lift<.0001)return;
+      goals[i].x+=f.dir[0]*fit.along;goals[i].z+=f.dir[1]*fit.along;goals[i].y+=fit.lift;
+      legTo(l,v.ankle[i],goals[i],pole,.999,w>.5?footPitch(v,i,pitches[i]):l.foot.getWorldQuaternion(new THREE.Quaternion()));
+    });
+  }
 }
 
 /**

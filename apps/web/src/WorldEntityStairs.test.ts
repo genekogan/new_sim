@@ -1,0 +1,47 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
+import {WorldModel,type Entity} from '@sim/world-compiler';
+import {mergeStatic} from './gen-mesh/static-merge.ts';
+import {WorldEntityStairs,loadedStairGeometry,stairNativeDef} from './WorldEntityStairs.ts';
+import {stairGeometryDigest,type MeshStairProfile} from '../../../mars/viewer/app/engine-view/stair-mesh-profile.ts';
+import manifest from '../../../mars/viewer/app/engine-view/stair-mesh-profiles.json' with {type:'json'};
+import {assetIdFor} from '../../../packages/engine-mars/src/catalog-adapter.ts';
+const root=new URL('../../../',import.meta.url),profiles=manifest.profiles as MeshStairProfile[];
+async function loaded(profile:MeshStairProfile,merge=true){
+ const loader=new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+ // Geometry-only parser: textures are irrelevant and no network, DOM or renderer is used.
+ loader.register(parser=>{const get=parser.getDependency.bind(parser);parser.getDependency=(kind,index)=>kind==='texture'?Promise.resolve(null):get(kind,index);return{name:'offline-geometry-only'};});
+ const b=readFileSync(new URL(profile.source.mesh,root)),g=await loader.parseAsync(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength),'');
+ if(merge)mergeStatic(g.scene,false);
+ const bounds=new THREE.Box3().setFromObject(g.scene,true),centre=bounds.getCenter(new THREE.Vector3());g.scene.position.set(-centre.x,-bounds.min.y,-centre.z);
+ const asset=new THREE.Group();asset.name='asset';asset.add(g.scene);return asset;
+}
+test('actual Three decoder and material merge preserve each verified representation digest',async()=>{
+ for(const p of profiles)for(const merged of [false,true]){
+  const asset=await loaded(p,merged);assert.equal(stairGeometryDigest(loadedStairGeometry(asset)),p.geometry);
+  asset.scale.setScalar(1.3);asset.position.set(8,2,-3);asset.rotation.y=.7;
+  assert.equal(stairGeometryDigest(loadedStairGeometry(asset)),p.geometry,'fitting/placement is outside source digest');
+ }
+});
+test('loaded registry admits matching geometry; revision, removal, resync and changed representation invalidate it',async()=>{
+ const p=profiles[1],model=new WorldModel({constants:{ground:'land',extent:64},seed:'stairs'});
+ const d=model.defineDef({schema:'def/1',name:'test-mimos',version:1,description:'exact source mesh',form:'point',make:{kind:'mesh',asset:p.asset,footprint:'ded8451db3e217609bff9bbdcab84a861225990b9a5cf5cac039cd693d62fa9c'},size:{box:[15.553,6.465,7.919]},slots:[],components:{},tags:['building'],params:{},state:{},actions:[],layer:'solid'},'test',0);
+ const e={id:'mimos',def:'sha:'+d.hash,in:{parent:'world'},p:[1,-p.bottom,3],r:.7,anchor:'base',params:{},by:'test',born:0,v:1} as Entity;model.insert(e);
+ const asset=await loaded(p),fit=d.size.box[0]/p.extent[0];asset.scale.setScalar(fit);const obj=new THREE.Group();obj.position.set(1,-p.bottom,3);obj.rotation.y=.7;obj.add(asset);
+ const drawn=new Map([['mimos',{obj,settled:true,removing:false}]]),registry=new WorldEntityStairs();
+ const get=()=>registry.contacts(model,drawn,()=>fit*p.bottom-p.bottom);
+ assert.equal(get().length,1);assert.equal(get()[0].flight.treads.length,3);
+ const facts={ref:d.ref,hash:d.hash,box:d.size.box,slots:[],components:{}};
+ assert.equal(stairNativeDef(d,e,d.size.box,1),assetIdFor(facts,JSON.stringify(e.params)+'|seen'));
+ drawn.get('mimos')!.removing=true;assert.equal(get().length,0);drawn.get('mimos')!.removing=false;
+ drawn.get('mimos')!.settled=false;assert.equal(get().length,0);drawn.get('mimos')!.settled=true;
+ const changed=await loaded(p);changed.scale.setScalar(fit);const mesh=changed.getObjectByProperty('isMesh',true) as THREE.Mesh;mesh.geometry=mesh.geometry.clone();mesh.geometry.attributes.position.setX(0,mesh.geometry.attributes.position.getX(0)+.02);
+ obj.remove(asset);obj.add(changed);assert.equal(get().length,0);assert.equal(registry.diagnostics()[0].reason,'stair.loaded-geometry-mismatch');
+ obj.remove(changed);obj.add(asset);assert.equal(get().length,1);
+ model.delete(e.id);assert.equal(get().length,0);model.insert(e);registry.reset();assert.equal(get().length,1);
+ assert.equal(registry.contacts(model,drawn,()=>2).length,0,'mismatched lower terrain is not snapped');
+});

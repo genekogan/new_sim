@@ -798,6 +798,9 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
             }
           }
           const local = Math.max(0, Math.min(take.ticks, depictedTick - take.startTick));
+          // A historical/nearest frame never borrows the current God layer's stair metadata.
+          // TakePeople additionally verifies each selected native fixture's exact identity and pose.
+          if(!(people instanceof WorldLightPeople))people.setSupplementalStairs(!past.current&&pick.exact&&entityLayer.active?entityLayer.supplementalStairs():[]);
           people.setWaterHistory(chunks.map(c=>c.take));
           const floors=capturedPlatforms??(!past.current&&currentPlatforms&&currentPlatforms.worldId===s.conn.welcome?.worldId?currentPlatforms.platforms:[]);
           platformDraw.set(floors,base?.levels.find(l=>l.id===0)?.y??0,!!expansion&&!past.current);
