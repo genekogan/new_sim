@@ -29,6 +29,7 @@ import type { Template } from './people.ts';
 import { walkCum } from './take-walk.ts';
 import type { DepictionBeat } from './station-depiction.ts';
 import {shoreDepiction} from './recorded-shore.ts';
+import {matchedStairFlights,type SupplementalStair} from './stair-frame.ts';
 import {NativeBoatViews} from './native-boat.ts';
 import type {NativeBoatLayoutV1} from '../../../../packages/engine-contract/src/boat.ts';
 import type {ShoreDesign} from './shore-preview.ts';
@@ -166,6 +167,9 @@ export class TakePeople {
   private acts = new Map<string, { t: number[]; v: string[]; bt: number[]; bv: (string | null)[] }>();
   private base: SpatialScene;
   private stairKey = '';
+  private supplementalStairs:readonly SupplementalStair[]=[];
+  private supplementalLiveTakeId:string|null=null;
+  setSupplementalStairs(contacts:readonly SupplementalStair[],selection?:{liveTakeId:string}){this.supplementalStairs=contacts;this.supplementalLiveTakeId=selection?.liveTakeId??null;}
   /** Metres each walker had already walked before this take began (a chapter set: Σ over the earlier chapters). */
   private walkOffsets: Record<string, number> = {};
   /** Per person at the last show(): metres walked (offset included) and the Walk weight. */
@@ -219,6 +223,7 @@ export class TakePeople {
   setTake(take: Take, walkOffsets: Record<string, number> = {}) {
     this.walkOffsets = walkOffsets;
     if (take === this.take) return;
+    this.setSupplementalStairs([]);
     this.take = take;
     this.indexWalks();
     this.stairKey = '';
@@ -311,6 +316,7 @@ export class TakePeople {
   show(t: number, clock = t,stationBeat:DepictionBeat|null=null) {
     const s0 = performance.now();
     const nativeFrame=sampleTake(this.take,t);
+    this.humans.setSupplementalStairs(matchedStairFlights(this.supplementalStairs,nativeFrame,this.allRecords(),this.take.entities0??{},this.supplementalLiveTakeId?{liveTakeId:this.supplementalLiveTakeId,take:this.take}:undefined));
     const boatAppearance=this.nativeBoat?.show(nativeFrame);
     const frame=(this.frame=this.platformFloors.length?projectPlatformFrame(nativeFrame,this.allRecords(),this.platformFloors,this.platformBaseY):nativeFrame);
     this.sampleMs = performance.now() - s0;

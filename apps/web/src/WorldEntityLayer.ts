@@ -35,6 +35,7 @@ import { GroundCover, coverSetting } from './gen-mesh/ground-cover.ts';
 import { isRideBalloonDef, rideMotionDef } from './gen-mesh/kits/ride-balloon.ts';
 import { isRideCarrierDef, carrierIdOf } from './ride-carriers.ts';
 import { holdRainbow, isRainbowDef } from './atmosphere/rainbow-things.ts';
+import {WorldEntityStairs,pendingStairDiff} from './WorldEntityStairs.ts';
 
 export type EntitySnapshot = { contract: string; worldId: string; seq: number; counter?: number; seed?: string; constants: WorldModel['constants']; state: WorldModel['state']; ground: Ground; defs: StoredDef[]; entities: Entity[]; tiles: Record<string, string>; assetBytes?: Record<string, number>; builds?: PublicSite[]; buildsRev?: number; now?: number };
 type DiffMsg = { type: 'edge'; kind: 'world-diff'; seq: number; diff: { upserts: Entity[]; removes: string[]; defs: StoredDef[]; tiles: string[]; world?: Partial<WorldModel['state']> }; ground?: Ground; defs?: StoredDef[] };
@@ -62,6 +63,13 @@ export class WorldEntityLayer {
    *  in small slices between frames. Edge diffs still wait for it (applyEdge). */
   filling = false;
   private model: WorldModel | null = null;
+  private readonly stairContacts=new WorldEntityStairs();
+  clearSupplementalStairs(){this.stairContacts.clearObservation();}
+  supplementalStairs(messages:readonly {kind?:string;seq?:unknown}[]=[],nativeTick:number|null=null){
+    if(!this.model||this.resyncing||pendingStairDiff(this.seq,messages,m=>this.stairContacts.affectsDiff(m))){this.clearSupplementalStairs();return [];}
+    return this.stairContacts.contacts(this.model,this.drawn,this.groundAt,nativeTick);
+  }
+  stairDiagnostics(){return this.stairContacts.diagnostics();}
   private immutable=false;
   contextObjects(id:string):THREE.Object3D[]{const object=this.drawn.get(id)?.obj;return object?[object]:[];}
   /** Stable immutable render IDs derive from entity identity and mesh hierarchy, never Three UUIDs. */
@@ -120,6 +128,7 @@ export class WorldEntityLayer {
   /** Full resync: refetch the snapshot and redraw everything (no easing). Used after a missed diff. */
   async resync() {
     if (this.immutable || this.resyncing || !this.signal) return;
+    this.clearSupplementalStairs();
     this.resyncing = true;
     try {
       const got = await loadSnapshot(this.api('/v1/world/snapshot'), this.signal); if (!got) return; const r = got.response; noteSnapshotVersion(r.headers.get('x-moderation-version'));
@@ -143,6 +152,7 @@ export class WorldEntityLayer {
   /** `onSnapshot`: P7b, called once the snapshot (and its parts) are in, or the attempt failed (early-layer.ts lets the
    *  page's second loading phase start then). */
   async start(signal: AbortSignal, onSnapshot?: () => void, frozen?:EntitySnapshot) {
+    this.clearSupplementalStairs();
     this.signal = signal;
     let snap: EntitySnapshot;
     // lane L3h: the first start takes the snapshot GET index.html sent at page entry (snapshot-prefetch.ts), one request
@@ -255,6 +265,9 @@ export class WorldEntityLayer {
   onContextChanged?:()=>void;
   private applyDiff(d: DiffMsg) {
     if (!this.model) return;
+    // Edits may arrive while no native frame/people renderer is available.
+    // Invalidate the observed fixture/old ancestry even for equal reinsertion.
+    this.stairContacts.invalidateDiff(d);
     {
       const contextChanged=!!d.ground||!!d.diff.world||d.diff.defs.length>0||d.diff.removes.some(id=>contextStamp(this.model!.entities.get(id)))||d.diff.upserts.some(e=>contextStamp(e)!==contextStamp(this.model!.entities.get(e.id)));
       this.seq = d.seq;

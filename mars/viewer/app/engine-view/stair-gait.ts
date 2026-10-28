@@ -30,6 +30,10 @@ export type Flight = {
   width: number;
   yBottom: number;
   yTop: number;
+  /** Actual mesh support extents, when independently proven. Path-only flights retain their existing gait. */
+  supports?: {s:number;y:number;lo:number;hi:number;left:number;right:number}[];
+  /** Actual horizontal contact triangles in flight coordinates [s, worldY, lateral]. */
+  contactTops?: [number,number,number][][];
 };
 
 export function flightOf(link: Link): Flight | null {
@@ -54,7 +58,7 @@ export function flightOf(link: Link): Flight | null {
 export function spot(f: Flight, k: number): { s: number; y: number } {
   const n = f.treads.length;
   if (k <= 0) return { s: f.treads[0].s + (k - 1) * f.going, y: f.yBottom };
-  if (k > n) return { s: f.treads[n - 1].s + (k - n) * f.going, y: f.yTop };
+  if (k > n) return { s: f.treads[n - 1].s + (k - n) * (f.supports&&n>1?f.treads[n-1].s-f.treads[n-2].s:f.going), y: f.yTop };
   return f.treads[k - 1];
 }
 
@@ -107,21 +111,31 @@ function footAt(f: Flight, u: number, par: number): FootState {
 }
 
 /** Gait on flight `f` for a body at world (x, z); null when not near the flight. */
-export function gaitAt(f: Flight, x: number, z: number, bodyY: number): Gait | null {
+export function gaitAt(f: Flight, x: number, z: number, bodyY: number,envelope?:{reach:number;blend:number}): Gait | null {
   const rx = x - f.o[0], rz = z - f.o[1];
   const s = rx * f.dir[0] + rz * f.dir[1];
   const lateral = -rx * f.dir[1] + rz * f.dir[0];
   if (Math.abs(lateral) > f.width / 2 + 0.25) return null;
   const n = f.treads.length;
-  const u = 1 + (s - f.treads[0].s) / f.going;
-  if (u < -1 || u > n + 2) return null;
+  let u = 1 + (s - f.treads[0].s) / f.going;
+  if(f.supports){
+    const next=f.treads.findIndex(t=>t.s>s);
+    if(next>0){const a=f.treads[next-1],b=f.treads[next];u=next+(s-a.s)/(b.s-a.s);}
+    else if(next<0)u=n+(s-f.treads[n-1].s)/(f.treads[n-1].s-f.treads[n-2].s);
+  }
+  const ramp = (v: number) => Math.max(0, Math.min(1, v));
+  const sm = (w: number) => w * w * (3 - 2 * w);
+  let contactWeight=0;
+  if(f.supports&&envelope&&envelope.reach>0&&envelope.blend>0){
+    const enter=f.supports[0].lo-envelope.reach,exit=f.supports[n-1].hi+envelope.reach;
+    contactWeight=sm(ramp((s-enter+envelope.blend)/envelope.blend))*sm(ramp((exit+envelope.blend-s)/envelope.blend));
+  }
+  if ((u < -1 || u > n + 2)&&contactWeight<=0) return null;
   // the body must be on this flight's height band (not walking under or over it)
   const yAt = u <= 1 ? f.yBottom : u >= n ? f.yTop : spot(f, Math.floor(u)).y + (spot(f, Math.floor(u) + 1).y - spot(f, Math.floor(u)).y) * (u - Math.floor(u));
   if (Math.abs(bodyY - yAt) > 0.35) return null;
-  const ramp = (v: number) => Math.max(0, Math.min(1, v));
   const weight = ramp(u + 0.5) * ramp(n + 1.5 - u);
-  const sm = (w: number) => w * w * (3 - 2 * w);
-  return { u, s, lateral, weight: sm(weight), feet: [footAt(f, u, 1), footAt(f, u, 0)] };
+  return { u, s, lateral, weight: Math.max(sm(weight),contactWeight), feet: [footAt(f, u, 1), footAt(f, u, 0)] };
 }
 
 /** World (x, z) of an axis position `s` at lateral offset `lat` (+ = right of the ascent direction). */
@@ -134,9 +148,14 @@ export function axisPoint(f: Flight, s: number, lat: number): [number, number] {
  * `spread` is the current rig's measured half stance width, never activity state.
  */
 export function stairFootTarget(f: Flight, g: Gait, side: 'left' | 'right', spread: number, bodyYaw: number) {
-  const facing = Math.sign(Math.cos(bodyYaw) * f.dir[0] + Math.sin(bodyYaw) * f.dir[1]) || 1;
+  const alignment=Math.cos(bodyYaw)*f.dir[0]+Math.sin(bodyYaw)*f.dir[1];
+  const facing = Math.sign(alignment) || 1;
   const foot = g.feet[side === 'left' ? 0 : 1];
-  const lat = g.lateral + (side === 'left' ? -1 : 1) * Math.max(0.08, Math.abs(spread)) * facing;
-  const point = axisPoint(f, foot.s - 0.04 * facing, lat);
+  const stance=(side==='left'?-1:1)*Math.max(.08,Math.abs(spread));
+  const rightAlong=-Math.sin(bodyYaw)*f.dir[0]+Math.cos(bodyYaw)*f.dir[1];
+  const lat = g.lateral + stance * (f.supports?alignment:facing);
+  // A measured approach can include the native turn on its landing. Rotate the
+  // stance continuously rather than flipping both feet at cos(yaw)==0.
+  const point = axisPoint(f, foot.s - 0.04 * (f.supports?alignment:facing)+(f.supports?stance*rightAlong:0), lat);
   return { foot, point, facing };
 }
