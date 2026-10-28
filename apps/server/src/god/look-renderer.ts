@@ -92,6 +92,20 @@ export class PipeCDP {
   close(error = new Error('Renderer closed')) { this.ended = error; this.buffer = Buffer.alloc(0); for (const p of this.pending.values()) p.reject(error); this.pending.clear(); }
 }
 
+/** Chrome's fresh, owned profile already opens about:blank. Reuse it when unambiguous;
+ * a missing/changed initial page or failed attach falls back to an owned new page. */
+export async function attachLookPage(cdp: Pick<PipeCDP, 'send'>): Promise<{ sessionId: string }> {
+  try {
+    const { targetInfos = [] } = await cdp.send('Target.getTargets');
+    const pages = targetInfos.filter((t: { type: string }) => t.type === 'page');
+    if (pages.length === 1 && pages[0].url === 'about:blank' && !pages[0].attached) {
+      return await cdp.send('Target.attachToTarget', { targetId: pages[0].targetId, flatten: true });
+    }
+  } catch { /* The initial target may close before attach, or discovery may be unavailable. */ }
+  const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
+  return cdp.send('Target.attachToTarget', { targetId, flatten: true });
+}
+
 async function stopChrome(child: ChildProcess) {
   const kill = (signal: NodeJS.Signals) => { try { if (process.platform !== 'win32' && child.pid) process.kill(-child.pid, signal); else child.kill(signal); } catch { /* exited */ } };
   kill('SIGTERM');
@@ -141,8 +155,7 @@ async function renderIsolated(worldUrl:string,shot:Look,expect:number,signal:Abo
   let started = false;
   try {
     await cdp.send('Browser.getVersion'); started = true;trace('browser-ready');
-    const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
-    const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
+    const { sessionId } = await attachLookPage(cdp);
     const send = (method: string, params: object = {}) => cdp.send(method, params, sessionId);
     const evaluate = async (expression: string) => {
       const r = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
