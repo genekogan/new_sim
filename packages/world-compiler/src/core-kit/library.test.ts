@@ -11,10 +11,11 @@ import { FAMILY_KITS } from './index.ts';
 const kit = FAMILY_KITS.filter((d) => d.make.kind === 'gen' && d.make.gen === 'kit/2');
 
 test('family defs parse, are unique, described, tagged, and within the Eden budgets', () => {
-  const names = new Set<string>();
+  const identities = new Set<string>();
   for (const d of kit) {
     const def = defSchema.parse(d);
-    assert.ok(!names.has(def.name), `duplicate ${def.name}`); names.add(def.name);
+    const identity = `${def.name}@${def.version}`;
+    assert.ok(!identities.has(identity), `duplicate ${identity}`); identities.add(identity);
     assert.ok(def.description.length > 20, `${def.name}: one-line description`);
     assert.ok(def.tags.length >= 2, `${def.name}: tags`);
     const tris = kitPhysics(kitArgs.parse((def.make as { args: unknown }).args)).tris;
@@ -54,9 +55,11 @@ test('every point def places in a world (water things on a pond), nudged apart',
   assert.equal(pond.result.accepted, true);
   let x = -300, fx = -180, prevHalf = 0;   // centre to centre = both half widths + 3 m (a wide vault no longer swallows its neighbour)
   const ops = kit.filter((d) => (d.form ?? 'point') === 'point').map((d) => {
-    const ref = `core/${d.name.slice(5)}@1`;
-    if (d.anchor === 'float') { fx += 4; return { op: 'place', def: ref, name: `t-${d.name.slice(5)}`, p: [fx, 200] }; }
-    const half = (d.size?.box[0] ?? 1) / 2; x += Math.max(4, prevHalf + half + 3); prevHalf = half; return { op: 'place', def: ref, name: `t-${d.name.slice(5)}`, p: [((x + 300) % 560) - 280, -300 + Math.floor((x + 300) / 560) * 60], mode: 'nudge' };   // rows 60 m apart: deep things (a grotto vault) clear the next row
+    const version = defSchema.parse(d).version;
+    const ref = `core/${d.name.slice(5)}@${version}`;
+    const name = `t-${d.name.slice(5)}${version === 1 ? '' : `-v${version}`}`;
+    if (d.anchor === 'float') { fx += 4; return { op: 'place', def: ref, name, p: [fx, 200] }; }
+    const half = (d.size?.box[0] ?? 1) / 2; x += Math.max(4, prevHalf + half + 3); prevHalf = half; return { op: 'place', def: ref, name, p: [((x + 300) % 560) - 280, -300 + Math.floor((x + 300) / 560) * 60], mode: 'nudge' };   // rows 60 m apart: deep things (a grotto vault) clear the next row
   });
   for (let i = 0; i < ops.length; i += 200) {
     const r = applyBatch(w, { ops: ops.slice(i, i + 200) }, 'god', 2 + i);

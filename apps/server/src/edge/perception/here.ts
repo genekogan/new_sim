@@ -21,7 +21,7 @@ export const SIGHT_RADIUS = 30;
 export const OBJECT_RADIUS = 15;
 const LIMITS = {near: 6, objects: 6, seats: 3, exits: 5, conversations: 3};
 
-export type Located = {kind: 'soul' | 'seat' | 'fire' | 'spot' | 'object' | 'item' | 'fixture' | 'place'; id: string; name: string; at: V2; entityId?: string; free?: boolean; capability?: string; distance: number;level?:number};
+export type Located = {kind: 'soul' | 'seat' | 'fire' | 'spot' | 'object' | 'item' | 'fixture' | 'place'; id: string; name: string; at: V2; entityId?: string; free?: boolean; capability?: string; distance: number;level?:number; what?: string};
 
 /** One read of the world for one Soul (built per request). */
 export class Perception {
@@ -90,14 +90,18 @@ export class Perception {
     }
     let mine: Set<string> | undefined;   // the places I am in: the same for every object, so read once
     for (const o of this.L.comms?.objects.all() ?? []) {
-      const st = o.state as {at?: V2; removed?: boolean; carrier?: string}; if (st?.removed) continue;
+      const st = o.state as {at?: V2; removed?: boolean; carrier?: string; def?: string; what?: unknown}; if (st?.removed) continue;
       // RIDE-LABELS: a ride is where its carrier is now (the boat or basket), never its place's centroid
       const body = this.w.entities[o.id] ?? (o.kind === 'ride' && typeof st?.carrier === 'string' ? this.w.entities[st.carrier] : undefined);
       const at = Array.isArray(st?.at) ? st.at : body ? [body.pose.p[0], body.pose.p[2]] as V2 : null;
       const place = this.L.places.byId.get(o.placeId), here = mine ??= new Set(this.L.placePathOf(this.soul.soulId).map(p => p.id));
       const point = at ?? (place && here.has(o.placeId) ? centroid(place.polygon) : null); if (!point) continue;
       const d = this.dist(point); if (d > radius && !(here.has(o.placeId) && !at)) continue;
-      out.push({kind: 'object', id: o.id, name: (o as {name?: string}).name ?? o.kind, at: point, distance: d});
+      // GodPerceive advances this public built state after completion/overwrite. Carry only its
+      // painting line, never the immutable definition description or private drawing recipe.
+      const what = st?.def === 'core-easel@2' && typeof st.what === 'string' && st.what.startsWith('an easel with ')
+        ? st.what.replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]+/g, ' ').slice(0, 230) : undefined;
+      out.push({kind: 'object', id: o.id, name: (o as {name?: string}).name ?? o.kind, at: point, distance: d, ...(what ? {what} : {})});
     }
     for (const i of this.L.together.publicItems()) {
       if (i.state !== 'placed' || !Array.isArray(i.at)) continue; const at = i.at as V2, d = this.dist(at);
@@ -242,6 +246,7 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
   const objects = picked.map(t => ({
     id: t.id, kind: kindOf(t),
     ...(t.kind === 'seat' || t.kind === 'object' || t.kind === 'spot' || t.kind === 'item' ? {name: t.name} : {}),
+    ...(t.what ? {what: t.what} : {}),
     ...(t.kind === 'seat' ? {free: !!t.free} : {}), ...(t.kind === 'object' ? {readable: true} : {}),
     dist: t.distance, bearing: P.bearing(t.at)}));
   const conversations = talks.filter(t => t.members.some(id => id === soul.soulId || (seenIds.has(id) && earshot(seen.find(s => s.soulId === id)!.distance))))
