@@ -64,7 +64,11 @@ export class WorldEntityLayer {
   filling = false;
   private model: WorldModel | null = null;
   private readonly stairContacts=new WorldEntityStairs();
-  supplementalStairs(messages:readonly {kind?:string;seq?:unknown}[]=[]){return this.model&&!this.resyncing&&!pendingStairDiff(this.seq,messages)?this.stairContacts.contacts(this.model,this.drawn,this.groundAt):[];}
+  clearSupplementalStairs(){this.stairContacts.clearObservation();}
+  supplementalStairs(messages:readonly {kind?:string;seq?:unknown}[]=[],nativeTick:number|null=null){
+    if(!this.model||this.resyncing||pendingStairDiff(this.seq,messages,m=>this.stairContacts.affectsDiff(m))){this.clearSupplementalStairs();return [];}
+    return this.stairContacts.contacts(this.model,this.drawn,this.groundAt,nativeTick);
+  }
   stairDiagnostics(){return this.stairContacts.diagnostics();}
   private immutable=false;
   contextObjects(id:string):THREE.Object3D[]{const object=this.drawn.get(id)?.obj;return object?[object]:[];}
@@ -124,6 +128,7 @@ export class WorldEntityLayer {
   /** Full resync: refetch the snapshot and redraw everything (no easing). Used after a missed diff. */
   async resync() {
     if (this.immutable || this.resyncing || !this.signal) return;
+    this.clearSupplementalStairs();
     this.resyncing = true;
     try {
       const got = await loadSnapshot(this.api('/v1/world/snapshot'), this.signal); if (!got) return; const r = got.response; noteSnapshotVersion(r.headers.get('x-moderation-version'));
@@ -147,6 +152,7 @@ export class WorldEntityLayer {
   /** `onSnapshot`: P7b, called once the snapshot (and its parts) are in, or the attempt failed (early-layer.ts lets the
    *  page's second loading phase start then). */
   async start(signal: AbortSignal, onSnapshot?: () => void, frozen?:EntitySnapshot) {
+    this.clearSupplementalStairs();
     this.signal = signal;
     let snap: EntitySnapshot;
     // lane L3h: the first start takes the snapshot GET index.html sent at page entry (snapshot-prefetch.ts), one request
@@ -259,6 +265,9 @@ export class WorldEntityLayer {
   onContextChanged?:()=>void;
   private applyDiff(d: DiffMsg) {
     if (!this.model) return;
+    // Edits may arrive while no native frame/people renderer is available.
+    // Invalidate the observed fixture/old ancestry even for equal reinsertion.
+    this.stairContacts.invalidateDiff(d);
     {
       const contextChanged=!!d.ground||!!d.diff.world||d.diff.defs.length>0||d.diff.removes.some(id=>contextStamp(this.model!.entities.get(id)))||d.diff.upserts.some(e=>contextStamp(e)!==contextStamp(this.model!.entities.get(e.id)));
       this.seq = d.seq;

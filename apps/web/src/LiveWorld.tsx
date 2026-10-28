@@ -759,6 +759,10 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(!peopleKit&&(!peopleLater||arrivalOver())&&now>=peopleKitRetryAt){peopleKitRetryAt=now+5000;void loadPeopleKit().catch(()=>{});}
       const pick = candidate && ensureScene(candidate.chunk,!!past.current,now) && (peopleKit!==null||peopleLater) ? candidate : null;
       frameGap = !!pick && !pick.exact;
+      if(!pick||past.current||!pick.exact||!entityLayer.active||people instanceof WorldLightPeople){
+        entityLayer.clearSupplementalStairs();
+        if(people&&!(people instanceof WorldLightPeople))people.setSupplementalStairs([]);
+      }
       if (pick) {
         const chunk = pick.chunk, take = chunk.take;
         const depictedTick = recordingTick(chunk, tick);
@@ -800,7 +804,13 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           const local = Math.max(0, Math.min(take.ticks, depictedTick - take.startTick));
           // A historical/nearest frame never borrows the current God layer's stair metadata.
           // TakePeople additionally verifies each selected native fixture's exact identity and pose.
-          if(!(people instanceof WorldLightPeople))people.setSupplementalStairs(!past.current&&pick.exact&&entityLayer.active?entityLayer.supplementalStairs(s.edge??[]):[]);
+          if(!(people instanceof WorldLightPeople)){
+            if(!past.current&&pick.exact&&entityLayer.active){
+              // serverNow is absolute native ticks: serverTick + seconds * ticks/second.
+              // Its first observation cannot certify an already-started take.
+              people.setSupplementalStairs(entityLayer.supplementalStairs(s.edge??[],serverNow(s)),{liveTakeId:take.id});
+            }else{entityLayer.clearSupplementalStairs();people.setSupplementalStairs([]);}
+          }
           people.setWaterHistory(chunks.map(c=>c.take));
           const floors=capturedPlatforms??(!past.current&&currentPlatforms&&currentPlatforms.worldId===s.conn.welcome?.worldId?currentPlatforms.platforms:[]);
           platformDraw.set(floors,base?.levels.find(l=>l.id===0)?.y??0,!!expansion&&!past.current);
@@ -855,6 +865,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           shown.current = { tick: depictedTick, datetime, take, entities: sampled.entities };
           brokenTake = null;
         } catch (e) {
+          entityLayer.clearSupplementalStairs();
+          if(people&&!(people instanceof WorldLightPeople))people.setSupplementalStairs([]);
           if (brokenTake !== take.id) { brokenTake = take.id; console.warn('live view: a recorded moment could not be drawn', e); }
         }
       }

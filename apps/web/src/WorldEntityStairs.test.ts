@@ -45,8 +45,27 @@ test('loaded registry admits matching geometry; revision, removal, resync and ch
  obj.remove(changed);obj.add(asset);assert.equal(get().length,1);
  model.delete(e.id);assert.equal(get().length,0);model.insert(e);registry.reset();assert.equal(get().length,1);
  assert.equal(registry.contacts(model,drawn,()=>2).length,0,'mismatched lower terrain is not snapped');
+ const timed=(tick:number)=>registry.contacts(model,drawn,()=>fit*p.bottom-p.bottom,tick);
+ assert.equal(timed(400)[0].observedSinceTick,400);assert.equal(timed(410)[0].observedSinceTick,400);
+ registry.clearObservation();assert.equal(timed(420)[0].observedSinceTick,420,'resync/history gate clears lifetime');
+ const reloaded=await loaded(p);reloaded.scale.setScalar(fit);obj.remove(asset);obj.add(reloaded);
+ assert.equal(timed(430)[0].observedSinceTick,430,'even equal geometry from a newly loaded representation starts a new epoch');
+ const diff=(upserts:{id:string}[]=[],removes:string[]=[],defs:{ref:string;hash:string}[]=[])=>({kind:'world-diff',diff:{upserts,removes,defs,tiles:[]}});
+ registry.invalidateDiff(diff([{id:'unrelated-soul'}]));assert.equal(timed(440)[0].observedSinceTick,430,'ordinary Soul writeback preserves fixture eligibility');
+ registry.invalidateDiff(diff([{id:e.id}],[e.id]));assert.equal(timed(450)[0].observedSinceTick,450,'equal delete/reinsert invalidates');
+ const {hash:_h,ref:_r,born:_b,by:_by,...rawParent}=d;
+ const parentDef=model.defineDef({...rawParent,name:'test-stair-parent',make:{kind:'mesh',asset:'f'.repeat(64)}},'test',0);
+ const parent={...e,id:'stair-parent',def:'sha:'+parentDef.hash,in:{parent:'world'},p:[0,0,0],r:0} as Entity;
+ model.insert(parent);model.delete(e.id);model.insert({...e,in:{parent:parent.id}});registry.clearObservation();
+ assert.equal(timed(460)[0].observedSinceTick,460);
+ assert.equal(registry.affectsDiff(diff([{id:parent.id}])),true,'old ancestor pose is a fixture dependency');
+ registry.invalidateDiff(diff([],[],[{ref:parentDef.ref,hash:parentDef.hash}]));assert.equal(timed(470)[0].observedSinceTick,470,'ancestor definition is a fixture dependency');
+ registry.invalidateDiff({diff:{world:{day:2}}});assert.equal(timed(480)[0].observedSinceTick,480,'world/terrain change remains conservative');
 });
 test('pending fixture edits clear contacts before the existing layer update pass',()=>{
  assert.equal(pendingStairDiff(10,[{kind:'world-diff',seq:11}]),true);
  assert.equal(pendingStairDiff(10,[{kind:'world-diff',seq:9},{kind:'world-diff',seq:10},{kind:'world-build',seq:11}]),false);
+ assert.equal(pendingStairDiff(10,[{kind:'world-diff',seq:11},{kind:'world-diff',seq:12}],()=>false),false,'contiguous unrelated writebacks do not starve admission');
+ assert.equal(pendingStairDiff(10,[{kind:'world-diff',seq:12}],()=>false),true,'sequence gap resets all observations');
+ assert.equal(pendingStairDiff(10,[{kind:'world-diff',seq:NaN}],()=>false),true,'malformed sequence cannot certify stability');
 });

@@ -4,8 +4,9 @@ import manifest from './stair-mesh-profiles.json' with {type:'json'};
 import {extractStairSupports,meshStairFlight,type MeshStairProfile,type Triangle} from './stair-mesh-profile.ts';
 import {gaitAt,axisPoint,flightOf} from './stair-gait.ts';
 import {stairSoleFit} from './stair-sole.ts';
-import {matchedStairFlights} from './stair-frame.ts';
+import {matchedStairFlights,StairObservation} from './stair-frame.ts';
 import type {TakeFrame} from '../../engine/take/replay.ts';
+import type {Take} from '../../engine/take/types.ts';
 const profile=manifest.profiles[1] as MeshStairProfile;
 const rectangle=(x0:number,x1:number,y:number):Triangle[]=>[[[x0,y,-.5],[x0,y,.5],[x1,y,.5]],[[x0,y,-.5],[x1,y,.5],[x1,y,-.5]]];
 function fixture(){return [...rectangle(.35,.61,.177),...rectangle(.61,.87,.354),...rectangle(.87,1.13,.53),...rectangle(1.13,2,.53)];}
@@ -49,4 +50,31 @@ test('selected native fixture provenance is mandatory; deleted, moved, replaced 
  assert.deepEqual(matchedStairFlights([contact],frame,exact,{}),[],'missing original identity cannot borrow a final fixture');
  assert.deepEqual(matchedStairFlights([contact],{entities:{}} as TakeFrame,exact,exact),[]);
  for(const entity of [{p:[1.02,2,3],yaw:.7},{p:[1,2,3],yaw:.73},{p:[1,2,3],yaw:.7,pitch:.01}])assert.deepEqual(matchedStairFlights([contact],{entities:{building:entity}} as unknown as TakeFrame,exact,exact),[]);
+});
+test('untracked entity-world statics require a live selection and observation before the entire take',()=>{
+ const f=meshStairFlight(profile,'known',{x:0,y:0,z:0,yaw:0,s:1})!;
+ const contact={entity:'building',nativeDef:'ew:exact',pose:{p:[1,2,3],yaw:.7},flight:f,geometry:profile.geometry};
+ const staticRecord={kind:'fixture',tags:['entity-world'],def:'ew:exact',pose:{p:[1,2,3],yaw:.7}};
+ const take={id:'native-1',startTick:400,dt:.05,tracks:{},entities0:{},finalState:{entities:{building:staticRecord}}} as unknown as Take;
+ const frame={entities:{}} as TakeFrame,observer=new StairObservation(),select={liveTakeId:take.id,take};
+ // Native tick 405 is 20.25 simulation seconds, not a seconds watermark.
+ const midway=observer.observe([contact],405);
+ assert.deepEqual(matchedStairFlights(midway,frame,{}, {},select),[],'first seen halfway through a take proves no earlier presence');
+ const next={...take,id:'native-2',startTick:410};const observed=observer.observe([contact],415);
+ assert.equal(matchedStairFlights(observed,frame,{}, {},{liveTakeId:next.id,take:next}).length,1);
+ assert.deepEqual(matchedStairFlights(observed,frame,{}, {}),[],'history/no explicit live capability');
+ assert.deepEqual(matchedStairFlights(observed,frame,{}, {},{liveTakeId:take.id,take:next}),[],'stale capability after take switch');
+ for(const record of [{...staticRecord,def:'ew:changed'},{...staticRecord,tags:[]},{...staticRecord,pose:{p:[1.02,2,3],yaw:.7}},{...staticRecord,pose:{p:[1,2,3],yaw:.7,pitch:.01}}]){
+  const changed={...next,finalState:{entities:{building:record}}} as unknown as Take;
+  assert.deepEqual(matchedStairFlights(observed,frame,{}, {},{liveTakeId:changed.id,take:changed}),[]);
+ }
+ observer.clear();const resynced=observer.observe([contact],420);
+ assert.deepEqual(matchedStairFlights(resynced,frame,{}, {},{liveTakeId:next.id,take:next}),[],'resync has no assumed earlier lifetime');
+ const changed=observer.observe([{...contact,geometry:'new-loaded-geometry'}],425);assert.equal(changed[0].observedSinceTick,425);
+ observer.observe([],426);assert.equal(observer.observe([contact],427)[0].observedSinceTick,427,'removal resets the epoch');
+ observer.clear(); // no selected native frame/lightweight fallback; edits occur in the gap
+ const reinserted=observer.observe([contact],500);
+ assert.deepEqual(matchedStairFlights(reinserted,frame,{}, {},{liveTakeId:next.id,take:next}),[],'equal fixture reinserted during a frame gap cannot reuse its old lifetime');
+ assert.equal(observer.observe([contact],100)[0].observedSinceTick,100,'backward native clock resets epoch');
+ assert.equal(observer.observe([contact],null)[0].observedSinceTick,undefined,'missing native clock cannot certify lifetime');
 });

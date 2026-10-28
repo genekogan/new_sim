@@ -3,15 +3,25 @@ import * as THREE from 'three';
 import type {WorldModel,Entity,StoredDef} from '@sim/world-compiler';
 import {sha256} from '../../../mars/viewer/engine/core/hash.ts';
 import {meshStairFlight,stairGeometryDigest,type MeshStairProfile,type Triangle} from '../../../mars/viewer/app/engine-view/stair-mesh-profile.ts';
-import type {SupplementalStair} from '../../../mars/viewer/app/engine-view/stair-frame.ts';
+import {StairObservation,type SupplementalStair} from '../../../mars/viewer/app/engine-view/stair-frame.ts';
 import manifest from '../../../mars/viewer/app/engine-view/stair-mesh-profiles.json' with {type:'json'};
 const profiles=manifest.profiles as MeshStairProfile[];
 type DrawnStair={obj:THREE.Object3D;settled?:boolean;removing?:boolean};
-type Candidate={entity:Entity;def:StoredDef;pose:ReturnType<WorldModel['worldPose']>;nativeDef:string;profiles:MeshStairProfile[]};
+type Candidate={entity:Entity;def:StoredDef;pose:ReturnType<WorldModel['worldPose']>;nativeDef:string;profiles:MeshStairProfile[];lineage:Set<string>;definitions:Set<string>};
 const point=new THREE.Vector3();
 /** People are posed before the layer's existing end-of-frame diff/update pass.
  * Refuse metadata for that transition frame instead of reordering that pipeline. */
-export function pendingStairDiff(seq:number,messages:readonly {kind?:string;seq?:unknown}[]):boolean{return messages.some(m=>m.kind==='world-diff'&&typeof m.seq==='number'&&m.seq>seq);}
+export function pendingStairDiff(seq:number,messages:readonly {kind?:string;seq?:unknown}[],affects:(m:unknown)=>boolean=()=>true):boolean{
+  let through=seq;
+  for(const m of messages){
+    if(m.kind!=='world-diff')continue;
+    if(typeof m.seq!=='number'||!Number.isSafeInteger(m.seq))return true;
+    if(m.seq<=through)continue;
+    if(m.seq!==through+1||affects(m))return true;
+    through=m.seq;
+  }
+  return false;
+}
 /** Loaded source geometry in its base-centred, unscaled canonical frame.
  * Material merges and shadow proxies do not create extra physical support. */
 export function loadedStairGeometry(asset:THREE.Object3D):Triangle[]{
@@ -33,13 +43,26 @@ export function stairNativeDef(d:StoredDef,e:Entity,box:readonly number[],scale:
   return `ew:${d.ref.replace(/[^a-z0-9/@._-]/gi,'').slice(0,48)}:${sha256(text).slice(0,10)}`;
 }
 export class WorldEntityStairs{
+  private observation=new StairObservation();
   private key:object|null=null;
   private candidates:Candidate[]=[];
   private loaded=new WeakMap<THREE.Object3D,{asset:THREE.Object3D;profile:MeshStairProfile|null;diagnostic:string|null}>();
   private notices=new Map<string,string>();
   diagnostics(){return [...this.notices].map(([entity,reason])=>({entity,reason}));}
-  reset(){this.key=null;this.candidates=[];this.loaded=new WeakMap();this.notices.clear();}
-  contacts(model:WorldModel,drawn:ReadonlyMap<string,DrawnStair>,ground:(x:number,z:number)=>number|null):SupplementalStair[]{
+  /** Uses the previously observed lineage, before an edit can delete/reparent it.
+   * Normal Soul writebacks cannot erase a static fixture's lifetime evidence. */
+  affectsDiff(message:unknown):boolean{
+    const m=message as {ground?:unknown;defs?:{ref?:string;hash?:string}[];diff?:{upserts?:{id:string}[];removes?:string[];defs?:{ref?:string;hash?:string}[];tiles?:string[];world?:unknown;constants?:unknown}};
+    const d=m?.diff;if(!d||typeof d!=='object'||Array.isArray(d)||m.ground!==undefined||d.world!==undefined||d.constants!==undefined||d.tiles?.length)return true;
+    if([d.upserts,d.removes,d.defs,d.tiles,m.defs].some(v=>v!==undefined&&!Array.isArray(v)))return true;
+    if(d.upserts?.some(e=>!e||typeof e.id!=='string')||d.removes?.some(id=>typeof id!=='string')||[...(m.defs??[]),...(d.defs??[])].some(d=>!d||typeof d.ref!=='string'||typeof d.hash!=='string'))return true;
+    const ids=[...(d.upserts??[]).map(e=>e.id),...(d.removes??[])],defs=[...(m.defs??[]),...(d.defs??[])];
+    return this.candidates.some(c=>ids.some(id=>c.lineage.has(id))||defs.some(d=>(!!d.ref&&c.definitions.has(d.ref))|| (!!d.hash&&c.definitions.has(d.hash))));
+  }
+  invalidateDiff(message:unknown){if(this.affectsDiff(message))this.clearObservation();}
+  clearObservation(){this.observation.clear();}
+  reset(){this.key=null;this.candidates=[];this.loaded=new WeakMap();this.notices.clear();this.clearObservation();}
+  contacts(model:WorldModel,drawn:ReadonlyMap<string,DrawnStair>,ground:(x:number,z:number)=>number|null,nativeTick:number|null=null):SupplementalStair[]{
     const key=model.safetyCacheKey();
     if(this.key!==key){
       this.key=key;this.candidates=[];this.notices.clear();
@@ -50,7 +73,9 @@ export class WorldEntityStairs{
         const pose=model.worldPose(e),nativeDef=stairNativeDef(d,e,model.bake(d,e.params??{},e.seed??0,e.shape).box,pose.s);
         if(!nativeDef){this.notices.set(e.id,'stair.native-provenance-unsupported');continue;}
         if(Array.isArray(e.r)&&(e.r[1]||e.r[2])||Object.keys(e.params??{}).some(k=>['sx','sy','sz'].includes(k))){this.notices.set(e.id,'stair.nonuniform-or-tilted');continue;}
-        this.candidates.push({entity:e,def:d,pose,nativeDef,profiles:matches});
+        const lineage=new Set([e.id,...model.ancestors(e.id)]),definitions=new Set<string>();
+        for(const id of lineage){const parent=model.entities.get(id),def=parent&&model.resolvedDef(parent.def);if(def){definitions.add(def.ref);definitions.add(def.hash);}}
+        this.candidates.push({entity:e,def:d,pose,nativeDef,profiles:matches,lineage,definitions});
       }
     }
     const contacts:SupplementalStair[]=[];
@@ -62,6 +87,7 @@ export class WorldEntityStairs{
       if(!shown){this.notices.set(c.entity.id,'stair.representation-hidden');continue;}
       let cached=this.loaded.get(d.obj);
       if(!cached||cached.asset!==asset){
+        this.clearObservation();
         const geometry=stairGeometryDigest(loadedStairGeometry(asset)),profile=c.profiles.find(p=>p.geometry===geometry)??null;
         cached={asset,profile,diagnostic:profile?null:'stair.loaded-geometry-mismatch'};this.loaded.set(d.obj,cached);
       }
@@ -76,6 +102,6 @@ export class WorldEntityStairs{
       this.notices.delete(c.entity.id);
       contacts.push({entity:c.entity.id,nativeDef:c.nativeDef,pose:{p:[c.pose.x,c.pose.y,c.pose.z],yaw:-c.pose.yaw},flight:f,geometry:p.geometry});
     }
-    return contacts;
+    return this.observation.observe(contacts,nativeTick);
   }
 }
