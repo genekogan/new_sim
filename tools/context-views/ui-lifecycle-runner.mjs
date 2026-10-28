@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { artwork } from './fixture-artwork.mjs';
 import { edits } from './fixture.mjs';
+import { correctedWallOps, createdWallBox, segmentIntersectsWall } from './wall-correction.mjs';
 
 const exec = promisify(execFile);
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -37,7 +38,8 @@ export async function runUiLifecycleProof({ root, withFixtureSession, report, sa
         await wait(200);
       }
       const ms = performance.now() - start;
-      check(label, data.views.every(v => v.status === 'ready') && ms <= 15000, { ms, views: data.views.map(v => ({ ref: v.ref, key: v.key, revision: v.revision, url: v.url, status: v.status })) });
+      check(label, data.views.every(v => v.status === 'ready') && ms <= 15000, { ms, views: data.views.map(v => ({ ref: v.ref, key: v.key, revision: v.revision, url: v.url, status: v.status,
+        photo: v.photo ? { eye: v.photo.eye, at: v.photo.at, provenance: v.photo.provenance, cutaway: v.photo.cutaway } : null })) });
       return data.views;
     };
     const settled = async () => {
@@ -57,6 +59,7 @@ export async function runUiLifecycleProof({ root, withFixtureSession, report, sa
     check('replacement asset uses frozen exact bytes', (asset.sha ?? asset.hash) === sha(bytes));
     setPhase('asset-replace');
     const changed = await (await request('/v1/god/act', { ops: [{ op: 'set', id: 'hall/artwork', state: { media: `/assets/${sha(bytes)}.png` } }] })).json();
+    evidence.mediaAct = { accepted: changed.accepted, seq: changed.seq, failures: changed.failures }; save();
     check('media-only edit accepted', changed.accepted);
     const second = await ready([art, landmark], 'asset-refresh');
     const artAfter = second.find(v => v.ref === art);
@@ -69,10 +72,20 @@ export async function runUiLifecycleProof({ root, withFixtureSession, report, sa
     const original = exact.targets[0].original, originalBytes = Buffer.from(await (await session.rawGet(original.url)).arrayBuffer());
     check('current original is exact replacement', sha(originalBytes) === sha(bytes), { original });
     setPhase('intervening-wall');
-    const wall = await (await request('/v1/god/act', { ops: edits.find(e => e.id === 'intervening-wall').ops })).json();
-    check('frozen intervening wall accepted', wall.accepted);
+    const ops = correctedWallOps();
+    evidence.wallCorrection = { original: edits.find(e => e.id === 'intervening-wall').ops, originalFailure: { code: 'overlap.solid', detail: 'overlaps landmark', suggest: { p: [-19.14, 6.48] } }, corrected: ops,
+      reason: 'Original wall overlaps the subject. Corrected real wall crosses the qualified initial eye-to-target ray without changing the subject. God yaw is radians: PI/2 expresses the intended perpendicular wall.' }; save();
+    const wall = await (await request('/v1/god/act', { ops })).json();
+    evidence.wallAct = { accepted: wall.accepted, seq: wall.seq, failures: wall.failures }; save();
+    check('reviewed corrected intervening wall accepted', wall.accepted);
+    const wallSnapshot = await (await request('/v1/world/snapshot', undefined, null)).json();
+    const actualWall = wallSnapshot.entities.find(e => e.name === 'occluder');
+    const wallDefinition = wallSnapshot.defs.find(d => d.ref === actualWall?.def || 'sha:' + d.hash === actualWall?.def);
+    const box = createdWallBox(actualWall, wallDefinition);
+    const initialPhoto = second.find(v => v.ref === landmark).photo, intersection = segmentIntersectsWall(initialPhoto.eye, initialPhoto.at, box);
+    check('actual new wall blocks the prior actual camera-to-subject ray', !!intersection, { box, definition: { ref: wallDefinition.ref, hash: wallDefinition.hash }, eye: initialPhoto.eye, at: initialPhoto.at, intersection });
     const third = await ready([landmark, art], 'wall-refresh');
-    check('neighbour wall invalidates landmark key', third.find(v => v.ref === landmark).key !== second.find(v => v.ref === landmark).key);
+    check('neighbour wall invalidates landmark key with stable subject ref', third.find(v => v.ref === landmark)?.key !== second.find(v => v.ref === landmark).key && third.some(v => v.ref === landmark));
     const oldFountain = await session.rawGet(second.find(v => v.ref === landmark).url);
     check('old cached fountain URL refused after wall', oldFountain.status === 404, { status: oldFountain.status });
     await settled();
