@@ -63,15 +63,30 @@ registerMesh({
 const made = new Map<string, BuildingBuffers>(), waiting = new Map<string, Promise<void>>();
 let workers: Worker[] | null | undefined, nextJob = 0;
 const replies = new Map<number, (m: BuildingBuffers | null) => void>();
+let releaseWhenIdle = false;
+function releaseIdleBuildingWorkers() {
+  if (!releaseWhenIdle || replies.size) return;
+  for (const w of workers ?? []) w.terminate();
+  workers = undefined;
+  made.clear();
+  releaseWhenIdle = false;
+}
+function buildingReply(id: number, out: BuildingBuffers | null) {
+  const f = replies.get(id); replies.delete(id); f?.(out);
+  releaseIdleBuildingWorkers();
+}
 function buildingWorkers(): Worker[] | null {
   if (workers !== undefined) return workers;
+  const created: Worker[] = [];
   try {
     const off = typeof location !== 'undefined' && new URLSearchParams(location.search).get('buildingWorker') === '0';
-    workers = off || typeof Worker === 'undefined' ? null : [0, 1].map(() => new Worker(new URL('./building.worker.ts', import.meta.url), { type: 'module' }));
-  } catch { workers = null; }
-  for (const w of workers ?? []) {
-    w.onmessage = (ev: MessageEvent<{ id: number; out: BuildingBuffers | null }>) => { const f = replies.get(ev.data.id); replies.delete(ev.data.id); f?.(ev.data.out); };
-    w.onerror = () => { for (const f of replies.values()) f(null); replies.clear(); for (const x of workers ?? []) x.terminate(); workers = null; };
+    if (off || typeof Worker === 'undefined') workers = null;
+    else { for (let i = 0; i < 2; i++) created.push(new Worker(new URL('./building.worker.ts', import.meta.url), { type: 'module' })); workers = created; }
+  } catch { for (const w of created) w.terminate(); workers = null; }
+  const pool = workers;
+  for (const w of pool ?? []) {
+    w.onmessage = (ev: MessageEvent<{ id: number; out: BuildingBuffers | null }>) => { if (workers === pool) buildingReply(ev.data.id, ev.data.out); };
+    w.onerror = () => { if (workers !== pool) return; for (const f of replies.values()) f(null); replies.clear(); for (const x of pool ?? []) x.terminate(); workers = null; releaseIdleBuildingWorkers(); };
   }
   return workers;
 }
@@ -79,6 +94,8 @@ function takeBuilt(key: string): BuildingBuffers | null { const m = made.get(key
 /** Start this building's geometry in a worker; the promise settles when build() can take it (or must make it itself).
  *  null: nothing to wait for (already built, not a worker page, or the same building is already on its way). */
 export function prefetchBuilding(ctx: Pick<MeshCtx, 'def' | 'entity' | 'params' | 'args'>): Promise<void> | null {
+  // A later build owns the pool again, including any still-running earlier jobs.
+  releaseWhenIdle = false;
   const ws = buildingWorkers(); if (!ws) return null;
   const gen = GENERATORS['building/1'] as unknown as { layout(p: Record<string, unknown>, a: Record<string, unknown>): BuildingLayout };
   const L = gen.layout(ctx.params as Record<string, unknown>, ctx.args), paint = paintOf(ctx), key = templateKey(ctx, paint);
@@ -87,13 +104,21 @@ export function prefetchBuilding(ctx: Pick<MeshCtx, 'def' | 'entity' | 'params' 
   const id = ++nextJob, job = buildingJob(ctx, L, paint);
   const p = new Promise<void>((done) => {
     replies.set(id, (out) => { if (out) made.set(key, out); waiting.delete(key); done(); });
-    try { ws[id % ws.length].postMessage({ id, job }); } catch { replies.delete(id); waiting.delete(key); done(); }
   });
   waiting.set(key, p);
+  try { ws[id % ws.length].postMessage({ id, job }); } catch { buildingReply(id, null); }
   return p;
 }
 /** Drop geometry that was made but never taken (a world's first build is over). */
 export function clearBuildingPrefetch() { made.clear(); }
+/** For an isolated context page after layer.start/fill, never a live viewer: retire the
+ * geometry pool when all replies have arrived. Timed-out jobs may still finish, so do
+ * not terminate them or delay capture. Built template geometry stays intact; a later
+ * prefetch cancels pending retirement or creates a fresh pool after retirement. */
+export function releaseBuildingWorkersWhenIdle() {
+  releaseWhenIdle = true;
+  releaseIdleBuildingWorkers();
+}
 // state.paint repaints the walls; while it still holds the def's default, the `wall` param decides
 function paintOf(ctx: Pick<MeshCtx, 'def' | 'entity' | 'params'>): string {
   const paintDefault = (ctx.def.state?.paint as { default?: string } | undefined)?.default;
