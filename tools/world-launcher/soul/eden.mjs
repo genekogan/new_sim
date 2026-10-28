@@ -10,7 +10,7 @@ import { randomUUID, randomBytes } from "node:crypto";
 import { resolve as resolvePath } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const VERSION = "2.3.0";
+const VERSION = "2.4.0";
 const STATE = ".eden-agent.json";
 const CLI = "node eden.mjs";
 
@@ -325,7 +325,7 @@ async function caps(...args) {
   }
   return {
     total: (d.capabilities ?? []).length, matching: list.length, shown: Math.min(list.length, limit),
-    offers: list.slice(0, limit).map((c) => ({ id: c.id, label: c.label, ...(c.params && Object.keys(c.params).length ? { params: Object.keys(c.params) } : {}), ...(c.available ? {} : { available: false }) })),
+    offers: list.slice(0, limit).map((c) => ({ id: c.id, label: c.label, ...(c.params && Object.keys(c.params).length ? { params: Object.keys(c.params) } : {}), ...(c.verb === "paint" && c.params?.painting ? { painting: c.params.painting } : {}), ...(c.available ? {} : { available: false }) })),
   };
 }
 

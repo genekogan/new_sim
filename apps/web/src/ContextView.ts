@@ -7,6 +7,7 @@ import { WorldPlacePreviews } from './WorldPlacePreviews.ts';
 import { Daylight } from './daylight.ts';
 import { apiPath } from './world-path.ts';
 import { whenAssetsSettled, assetFailed } from './gen-mesh/gltf-assets.ts';
+import { releaseBuildingWorkersWhenIdle } from './gen-mesh/building.mesh.ts';
 type Target = ContextPhotoTarget;
 const global = window as unknown as {
     contextRender: (p: {
@@ -26,6 +27,7 @@ global.contextRender = async ({ snapshot, target, detail }) => {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     const scene = new THREE.Scene(), layer = new WorldEntityLayer(apiPath), light = new Daylight(scene), ac = new AbortController();
     scene.add(layer.group);
+    layer.cover.bindScene(scene);
     light.update('2026-06-21T10:30:00');
     let pending = 0, failed = false;
     const manager = THREE.DefaultLoadingManager, oldStart = manager.onStart, oldLoad = manager.onLoad, oldError = manager.onError;
@@ -36,6 +38,7 @@ global.contextRender = async ({ snapshot, target, detail }) => {
     try {
         await layer.start(ac.signal, undefined, snapshot);
         await layer.fill;
+        releaseBuildingWorkersWhenIdle();
         await whenAssetsSettled();
         // TextureLoader completes through the shared manager. Never label a partially loaded image current.
         const deadline = performance.now() + 15000;

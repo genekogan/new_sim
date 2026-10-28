@@ -30,7 +30,7 @@ reply"` (≤ 140 characters; add `--failed` if you could not do it), listen agai
   is `<name>@<v>`** (`stone-bench@1`, never `core/…`); `defs <word>` shows which. A def has a **form** (`point`: a position; `path`: a polyline, e.g. road, river,
   wall, range; `area`: a polygon, e.g. lake, plaza, woodland) and a **layer** (`solid` collides, `surface` drapes on the
   ground, `volume` is water, `decor` never collides). **Params** shape it (`w`, `floors`, `roof`); **state** changes in
-  play (`paint`, a lamp's `on`, a door's `open`).
+  play (`paint`, a lamp's `on`, a door's `open`). For a canvas that keeps a Soul's finished painting, place `core/easel@2` explicitly; existing `@1` easels retain their earlier behavior.
 - **Entities** have a path of names: `house`, `house/table`, `house/table/bowl`. Name what you place (`--name`), using the owner's
   words. **A thing placed `--on X` or `--inside X/room` is a child: its name is `X/<name>` (`pier/bell`,
   `hall/nave/pew-3`)**; `set`, `remove` and `hours` need that full path (the `place` answer prints it; a `move`

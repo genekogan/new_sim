@@ -13,6 +13,7 @@
 // No edge file changes: the kind registers on the ledger's comms objects when they exist; the read capability goes in
 // through the ledger's world-profile hook (as nav.ts's `walk:<path>`).
 import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
+import { paintingLine } from '../art/art.ts';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
 import { readOnlyObjectAdvance } from '../edge/comms/objects/framework.ts';
@@ -25,7 +26,7 @@ import { supportY } from './nav.ts';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
 type Plans = Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>;
-type Want = { name: string; kind: string; description: string; params: BuiltState };
+type Want = { name: string; kind: string; description: string; params: BuiltState & { paintingWhat?: true } };
 type SignRow = { id: string; at: Vec2; front: Vec2; name: string; text: string };
 /** x0, z0, x1, z1 */
 type Box = [number, number, number, number];
@@ -57,7 +58,7 @@ export const builtKind = {
     what: { type: 'string', visibility: 'public' }, text: { type: 'string', visibility: 'public' }, near: { type: 'string[]', visibility: 'public' },
     at: { type: 'json', visibility: 'public' }, def: { type: 'string', visibility: 'public' },
   },
-  initial: (p: Record<string, unknown>): BuiltState => ({ what: clip(p.what, 120), text: clip(p.text, 600), near: Array.isArray(p.near) ? p.near.map((x) => clip(x, 80)).slice(0, 4) : [], at: Array.isArray(p.at) && p.at.length === 2 ? [Number(p.at[0]), Number(p.at[1])] : null, def: clip(p.def, 80), ...(p.removed ? { removed: true } : {}), ...(typeof p.key === 'string' ? { key: p.key } : {}), ...(p.state && typeof p.state === 'object' ? { state: { ...(p.state as Record<string, unknown>) } } : {}), ...(Array.isArray(p.front) && p.front.length === 2 ? { front: [Number(p.front[0]), Number(p.front[1])] as Vec2 } : {}) }),
+  initial: (p: Record<string, unknown>): BuiltState => ({ what: clip(p.what, p.paintingWhat === true ? 230 : 120), text: clip(p.text, 600), near: Array.isArray(p.near) ? p.near.map((x) => clip(x, 80)).slice(0, 4) : [], at: Array.isArray(p.at) && p.at.length === 2 ? [Number(p.at[0]), Number(p.at[1])] : null, def: clip(p.def, 80), ...(p.removed ? { removed: true } : {}), ...(typeof p.key === 'string' ? { key: p.key } : {}), ...(p.state && typeof p.state === 'object' ? { state: { ...(p.state as Record<string, unknown>) } } : {}), ...(Array.isArray(p.front) && p.front.length === 2 ? { front: [Number(p.front[0]), Number(p.front[1])] as Vec2 } : {}) }),
   rolesOf: () => [] as string[],
   actions: {},
 };
@@ -203,9 +204,14 @@ export class GodPerceive {
     const kind = shortDef(def), parent = e.in.parent !== 'world' ? m.entities.get(e.in.parent) : undefined;
     const name = e.name ? m.pathOf(e.id) : `${kind} ${e.id.slice(2, 6)}`;
     const near = this.h.namesNear(at, e.id).filter((n) => n !== name).slice(0, 2);
-    const what = `${article(kind)}${parent?.name ? ` in ${m.pathOf(parent.id)}` : ''}${near.length ? `, by ${near.join(' and ')}` : ''}${lay ? `; ${lay}` : ''}`;
+    const prefix = article(kind);
+    const suffix = `${parent?.name ? ` in ${m.pathOf(parent.id)}` : ''}${near.length ? `, by ${near.join(' and ')}` : ''}${lay ? `; ${lay}` : ''}`;
+    const painting = paintingLine(e, def);
+    // Keep the complete bounded painting credit plus exactly the suffix visible before it was painted.
+    // Unpainted input is unchanged; only painted initialization opts into the 230-character bound.
+    const what = painting ? painting + clip(prefix + suffix, 120).slice(prefix.length) : prefix + suffix;
     const wp0 = m.worldPose(e), front: Vec2 | null = acts ? [Math.round((at[0] + Math.sin(wp0.yaw) * (0.6 + def.size.box[2] * (wp0.s || 1) / 2)) * 100) / 100, Math.round((at[1] + Math.cos(wp0.yaw) * (0.6 + def.size.box[2] * (wp0.s || 1) / 2)) * 100) / 100] : null;
-    const w: Want = { name, kind: this.kindFor(text !== null ? 'sign' : kind, def), description: clip(def.description || kind, 400), params: { what, text: text ?? '', near, at: [Math.round(at[0] * 100) / 100, Math.round(at[1] * 100) / 100], def: def.ref, ...(acts ? { state: actuatedState(e, def), front } : {}) } };
+    const w: Want = { name, kind: this.kindFor(text !== null ? 'sign' : kind, def), description: clip(def.description || kind, 400), params: { what, ...(painting ? { paintingWhat: true as const } : {}), text: text ?? '', near, at: [Math.round(at[0] * 100) / 100, Math.round(at[1] * 100) / 100], def: def.ref, ...(acts ? { state: actuatedState(e, def), front } : {}) } };
     if (text === null) return { w };
     // read from in front of its face (entity frame: the front is +z, turned by the yaw)
     const d = 1.4; return { w, sign: { id: e.id, at, front: [at[0] + Math.sin(wp0.yaw) * d, at[1] + Math.cos(wp0.yaw) * d], name, text } };

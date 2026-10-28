@@ -36,7 +36,7 @@ import {publishCompletedOwnerQueue} from './client-owner-result.mjs';
 import {openClientMemory} from './client-memory.mjs';
 import {travelCommand} from './client-travel.mjs';
 
-export const SKILL_VERSION='1.9.18';
+export const SKILL_VERSION='1.9.19';
 export const CONTRACT='eden-edge/1';
 export const API_CONTRACT='eden-edge/1.1'; // Additive support; preserve legacy wire contract.
 const STATE='.eden-agent.json';
@@ -292,7 +292,7 @@ function summarise(caps,filters={}){
  const score=c=>{if(!q)return 1;const hay=[c.id,c.verb,c.label].map(v=>String(v??'').toLowerCase()).join('\n');return (hay.includes(q.whole)?100:0)+q.terms.filter(t=>hay.includes(t)).length;};
  const pick=list=>list.map((c,i)=>({c,i,s:(!filters.verb||c.verb===filters.verb)?score(c):0})).filter(x=>x.s>0).sort((a,b)=>b.s-a.s||a.i-b.i).map(x=>x.c);
  const matchingAvail=pick(avail),matchingBlocked=pick(blocked),truncated={available:matchingAvail.length>80,blocked:matchingBlocked.length>15};
- return {available:matchingAvail.slice(0,80).map(c=>({id:c.id,verb:c.verb,label:c.label,...(c.params?{params:Object.keys(c.params)}:{})})),
+ return {available:matchingAvail.slice(0,80).map(c=>({id:c.id,verb:c.verb,label:c.label,...(c.params?{params:Object.keys(c.params)}:{}),...(c.verb==='paint'&&c.params?.painting?{painting:c.params.painting}:{})})),
   blocked:matchingBlocked.slice(0,15).map(c=>({id:c.id,label:c.label,why:c.blocked?.code})),
   totals:{available:avail.length,blocked:blocked.length},matchingTotals:{available:matchingAvail.length,blocked:matchingBlocked.length},truncated,
   ...(q&&q.terms.length>1?{searchTerms:q.terms,searchNote:'Any of these terms matches; best matches first.'}:{}),

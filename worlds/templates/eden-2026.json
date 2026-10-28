@@ -53160,7 +53160,7 @@
         },
         {
           "op": "place",
-          "def": "core/easel@1",
+          "def": "core/easel@2",
           "name": "office-f1-easel-1",
           "in": {
             "parent": "eden-office-1",
@@ -53174,7 +53174,7 @@
         },
         {
           "op": "place",
-          "def": "core/easel@1",
+          "def": "core/easel@2",
           "name": "office-f1-easel-2",
           "in": {
             "parent": "eden-office-1",
@@ -53188,7 +53188,7 @@
         },
         {
           "op": "place",
-          "def": "core/easel@1",
+          "def": "core/easel@2",
           "name": "office-f1-easel-3",
           "in": {
             "parent": "eden-office-1",
@@ -53202,7 +53202,7 @@
         },
         {
           "op": "place",
-          "def": "core/easel@1",
+          "def": "core/easel@2",
           "name": "office-f1-easel-4",
           "in": {
             "parent": "eden-office-1",
@@ -54378,7 +54378,7 @@
         },
         {
           "op": "place",
-          "def": "core/easel@1",
+          "def": "core/easel@2",
           "name": "eden-house-4-easel",
           "in": {
             "parent": "eden-house-4",
@@ -78441,7 +78441,7 @@
         },
         {
           "op": "place",
-          "def": "core/easel@1",
+          "def": "core/easel@2",
           "name": "street-easel-1",
           "p": [
             62.77,
@@ -78451,7 +78451,7 @@
         },
         {
           "op": "place",
-          "def": "core/easel@1",
+          "def": "core/easel@2",
           "name": "street-easel-2",
           "p": [
             61.6,
@@ -78461,7 +78461,7 @@
         },
         {
           "op": "place",
-          "def": "core/easel@1",
+          "def": "core/easel@2",
           "name": "street-easel-3",
           "p": [
             81,
@@ -80422,7 +80422,7 @@
         },
         {
           "op": "place",
-          "def": "core/easel@1",
+          "def": "core/easel@2",
           "name": "artists-green-easel-1",
           "p": [
             -82,
@@ -80432,7 +80432,7 @@
         },
         {
           "op": "place",
-          "def": "core/easel@1",
+          "def": "core/easel@2",
           "name": "artists-green-easel-2",
           "p": [
             -77,
@@ -80442,7 +80442,7 @@
         },
         {
           "op": "place",
-          "def": "core/easel@1",
+          "def": "core/easel@2",
           "name": "artists-green-easel-3",
           "p": [
             -66,
