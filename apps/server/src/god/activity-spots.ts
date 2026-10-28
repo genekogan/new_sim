@@ -10,6 +10,7 @@
 import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
 import type { SpotsData, Spot, Shelf } from '../edge/ledger/activities.ts';
 import { CATALOG } from '../../../../mars/viewer/engine/world/catalog.ts';
+import { paintingEasel } from '../art/art.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type V2 = [number, number];
@@ -171,7 +172,7 @@ export class GodActivitySpots {
     // B4 paint at easels; other workstations by kind
     for (const t of all) {
       const k = t.c.workstation?.kind;
-      if (k === 'painting' || is(t, 'easel')) standSpot(t, 'paint');
+      if (k === 'painting' || is(t, 'easel')) standSpot(t, 'paint', paintingEasel(t.def) ? { paintingTarget: t.id } : {});
       else if (k === 'cooking' || is(t, 'stove', 'hearth')) standSpot(t, 'cook');
       else if (is(t, 'arcade-cabinet', 'pool-table', 'dartboard', 'foosball')) standSpot(t, 'play-game', {}, t.slots.find(s => s.kind === 'stand')?.id);
       // a workbench (old Eden's barn and workshop): make something by hand

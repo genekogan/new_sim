@@ -8,10 +8,14 @@ import { CREATION_LIMITS as L } from '@sim/generators';
 import { buildBodyFailure, buildFailure, type BuildBody } from './builds.ts';
 import type { BuildReceipt } from './build-integrity.ts';
 import type { DefOrigin } from './parts.ts';
+import { tx as trackedTx } from '../edge/comms/store.ts';
 
 export const GOD_EDIT_RECEIPTS = L.requestReceipts;
 export const GOD_EDIT_OUTCOME_BYTES = L.requestOutcomeBytes;
 export type EditRequest = { clientRef: string; requestHash: string; payloadHash: string; result: Accepted };
+/** A painting's terminal receipt shares the world edit's durable commit. Its
+ * observers must run only after GodMode has installed and published that model. */
+export type EngineCommitParticipant = { apply(): void; deferNotifications(notify: () => void): void };
 export type CommittedReceipt = { world: string; clientRef: string; payloadHash: string; seq: number; result: Accepted };
 export type BuildRow = { id: string; status: 'active' | 'paused' | 'done' | 'abandoned'; rev: number; created_at: number; last_at: number; body: string };
 export type BuildWrite = { id: string; expectRev: number; status: BuildRow['status']; lastAt: number; body: string; echo?: true; rev?: number; receipt?: BuildReceipt };
@@ -137,8 +141,9 @@ export class WorldStore {
     this.tx(() => { const prior = this.buildRefusals(id); this.db.db.prepare('INSERT INTO god_build_refusals_v1(world_id,build,count,body) VALUES(?,?,?,?) ON CONFLICT(world_id,build) DO UPDATE SET count=excluded.count,body=excluded.body').run(this.worldId, id, prior.count + 1, JSON.stringify([...prior.recent, ...recent].slice(-16))); });
   }
   /** One committed batch: entity rows, defs, meta, and the edit with its inverse. */
-  commit(model: WorldModel, owner: string | null, diff: Diff, edit: CommitEdit, request?: EditRequest): Result | null {
-    try { return this.tx(() => {
+  commit(model: WorldModel, owner: string | null, diff: Diff, edit: CommitEdit, request?: EditRequest, participant?: EngineCommitParticipant): Result | null {
+    const atomic = <T>(fn: () => T): T => participant ? trackedTx(this.db.db, fn, { immediate: true, deferNotifications: participant.deferNotifications }) : this.tx(fn);
+    try { return atomic(() => {
       // Recheck under the write lock: another connection may have committed while this owner planned.
       if (request) { const replay = this.retry(request.clientRef, request.requestHash); if (replay) return replay; }
       if (this.meta()?.editSeq !== edit.seq - 1) return { accepted: false, failures: [{ op: -1, code: 'revision.stale', detail: 'The durable world changed while this owner planned. Reload the world before submitting another edit.', field: 'editSeq', fix: 'Reload the current world and re-plan the edit.' }] } as Result;
@@ -169,6 +174,7 @@ export class WorldStore {
         this.db.db.prepare('INSERT INTO god_edit_receipts_v1(world_id,client_ref,request_hash,payload_hash,seq,result) VALUES(?,?,?,?,?,?)').run(this.worldId, request.clientRef, request.requestHash, request.payloadHash, edit.seq, JSON.stringify(request.result));
         this.db.db.prepare('DELETE FROM god_edit_receipts_v1 WHERE world_id=? AND client_ref IN (SELECT client_ref FROM god_edit_receipts_v1 WHERE world_id=? ORDER BY seq DESC LIMIT -1 OFFSET ?)').run(this.worldId, this.worldId, GOD_EDIT_RECEIPTS);
       }
+      participant?.apply();
       return null;
     }); } catch (e) { if (e instanceof StaleBuild) return staleBuild(); if (e instanceof BuildLimit) return buildLimitResult(e.failure); if (buildConstraint(e)) return buildLimitResult(buildFailure('build.limit', 'Build body exceeds the durable body bound.')); throw e; }
   }

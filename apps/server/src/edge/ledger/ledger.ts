@@ -37,6 +37,7 @@ const area = (p: [number, number][]) => Math.abs(p.reduce((s, [x, z], i) => {con
 import {resolveCapability, tokens, placeMatch, placeMatchTier, typoFix, type VocabContext, type VocabResult} from './vocabulary.ts';
 import {isCampfire} from './fire.ts';
 import {activityCapabilities, loadSpots, ACTIVITY_SECONDS_MAX, SPOT_ACTIVITIES, type SpotsData} from './activities.ts';
+import type {PaintingIntent, PaintingService} from '../../art/painting-completion.ts';
 import {Together, PAIRED, type TogetherPlan} from './together.ts';
 import {semanticDiscovery} from '../intents/semantic-discovery.ts';
 import {knownPart} from '../intents/resolved-parts.ts';
@@ -83,6 +84,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
    * Checked on admission/dispatch/completion, never by a per-tick world scan. Historical terminal receipts stay immutable. */
   /** `steps`, when known, is the body plan about to run for the capability (beds/1: a bed is used only by its native berth). */
   nativeUseRefusal?: (capability: string, steps?: Program['steps']) => {code: string; reason: string} | null;
+  /** World-engine easels only; installed alongside the existing art media routes. */
+  painting?: PaintingService;
   /** World-engine worlds only (god/places.ts): places walkable without being native engine regions (a god's plaza, a
    *  room of a god's house). Unset on Eden/Mars/LM, where walkability stays `id in regions` exactly. */
   placeWalkable?: (placeId: string) => boolean;
@@ -462,6 +465,27 @@ export class EdgeLedger implements EdgeLedgerHooks {
       if(warmTarget){const body=m?this.body(m.entityId):undefined,fire=this.body(warmTarget),live=new Set(this.host.engine.runtime.liveIds());
         const occupied=!!m&&[...this.host.engine.runtime.records.values()].some(record=>{const p=record.params as {actor?:string;slot?:string};return live.has(record.id)&&record.verb==='take_slot'&&record.phase==='occupied'&&p.actor===m.entityId&&typeof p.slot==='string'&&p.slot.startsWith(warmTarget+'#');});
         if(!body?.human||!fire||body.human.shore?.mode==='buoyant'||!occupied||Math.hypot(body.pose.p[0]-fire.pose.p[0],body.pose.p[2]-fire.pose.p[2])>2){this.update(r.receipt_id,{phase:'failed',code:'activity.not-reached',reason:'No place at the named fire was reached; this did not warm your body.'});return;}
+      }
+      const painting = r.detail ? (JSON.parse(r.detail) as {paintingV1?: PaintingIntent}).paintingV1 : undefined;
+      if (painting) {
+        const row = this.db.soul(r.soul_id);
+        const identity = !!m && row?.world_id === this.host.worldId && row.retired_at === null && row.entity_id === painting.actor && row.owner === painting.owner && m.entityId === painting.actor && m.owner === painting.owner;
+        if (!identity || !this.painting || ['sleeping', 'absent'].includes(stateOf(this.host, painting.actor))) { this.update(r.receipt_id, {phase: 'failed', code: 'painting.identity-changed', reason: 'The original awake Soul/body is no longer painting; the previous canvas has been preserved.'}); return; }
+        try {
+          const result = this.painting.complete({soulId: m.soulId, entityId: m.entityId, name: m.name, owner: m.owner}, r.receipt_id, painting, published => {
+            // Both the world edit and this terminal receipt/outcome commit or roll back together.
+            this.setDetail(r.receipt_id, {paintingPublishedV1: published});
+            this.outcomes.confirmPainting(r.receipt_id, published);
+            this.update(r.receipt_id, {phase: 'completed'});
+          });
+          if (!result.ok) this.update(r.receipt_id, {phase: 'failed', code: result.code, reason: result.message});
+        } catch (e) {
+          // engineAct may throw after durable publication. update() preserves a
+          // terminal receipt in that case; rolled-back participants stay open.
+          this.update(r.receipt_id, {phase: 'failed', code: 'painting.failed', reason: 'The finished painting could not be published; the previous canvas has been preserved.'});
+          console.error('[painting] completion failed', e);
+        }
+        return;
       }
       this.update(r.receipt_id, {phase: 'completed'});
     }
@@ -920,9 +944,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
       const r = tx(this.db.db,()=>{prepared.commit();return this.insert(soul, capability, 'completed', clientRef, true,{confirmedEffects:effects});});this.comms.fading.touch?.(soul.soulId);
       return {accepted: true, receipt: {...this.receipt(soul.soulId, r.id)!, object: cap.object} as EdgeReceipt, ...(out.result ? {result: out.result} : {}), ...resolved};
     }
-    const plan = plans.get(capability) as TogetherPlan & {stop?: boolean} | undefined;
+    const plan = plans.get(capability) as TogetherPlan & {stop?: boolean; paintingTarget?: string} | undefined;
     if (!plan) return cap && cap.available === false && cap.blocked ? refuse(cap.blocked.code, cap.blocked.reason)
       : refuse('capability.unknown', 'That capability is not offered to this Soul right now; read capabilities again.');
+    if (params.painting !== undefined && (cap.verb !== 'paint' || !plan.paintingTarget || !this.painting)) return refuse('painting.no-easel', 'The optional painting field is offered only at a real painting easel.');
     let steps = structuredClone(plan.steps);
     if (steps.length > 40) return refuse('capability.params', 'that plan is too long; act in shorter legs.');
     // CN5 (acceptance): a capability that takes no seconds (a swim) ignores them instead of refusing
@@ -1026,7 +1051,15 @@ export class EdgeLedger implements EdgeLedgerHooks {
     // identities of the real native fixtures they invoke. This is selection,
     // not a claim that the body has reached or used the target.
     const seatSlot=steps.find(s=>s.verb==='mars:sit'&&typeof s.params.slot==='string')?.params.slot;
-    const detail={...((chosen||typeof seatSlot==='string')?{chosen:{...structuredClone(chosen??{}),...(typeof seatSlot==='string'?{seat:seatSlot.split('#')[0],slot:seatSlot}:{})}}:{})};
+    let painting: PaintingIntent | undefined;
+    if (contentParams.painting !== undefined) {
+      const plan = this.binds(soul).plans.get(capability) as {paintingTarget?: string} | undefined;
+      if (!capability.startsWith('paint:') || !plan?.paintingTarget || !this.painting) return refuse('painting.no-easel', 'This capability has no real painting easel.');
+      const prepared = this.painting.prepare(soul, plan.paintingTarget, contentParams.painting);
+      if ('ok' in prepared) return refuse(prepared.code, prepared.message);
+      painting = prepared;
+    }
+    const detail={...((chosen||typeof seatSlot==='string')?{chosen:{...structuredClone(chosen??{}),...(typeof seatSlot==='string'?{seat:seatSlot.split('#')[0],slot:seatSlot}:{})}}:{}), ...(painting ? {paintingV1: painting} : {})};
     const nativeUse = this.nativeUseRefusal?.(capability, steps);
     if (nativeUse) return {...refuse(nativeUse.code, nativeUse.reason), ...resolved};
     const stepOut = this.stepOutRefusal(soul.entityId); if (stepOut) return {...refuse(stepOut.code, stepOut.reason), ...resolved};

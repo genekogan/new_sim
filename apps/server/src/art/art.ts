@@ -39,6 +39,35 @@ const ownsIt = (e: Entity, c: Extract<Caller, { kind: 'soul' }>) => e.owner === 
 
 /** The edit that hangs (or, with media null/'', clears) one slot, or why the caller may not. */
 export function planHang(model: WorldModel, caller: Caller, req: HangRequest): ArtPlan | ArtFailure {
+  return hang(model, caller, req, false);
+}
+
+/** Completion-only permission seam. The activity service checks its original
+ * target/canvas binding before calling this; the public hang API never calls it. */
+export function planFinishedPainting(model: WorldModel, caller: Extract<Caller, { kind: 'soul' }>, req: HangRequest): ArtPlan | ArtFailure {
+  const e = model.entities.get(req.frame);
+  if (!e || !paintingEasel(model.resolvedDef(e.def))) return fail(409, 'painting.target-changed', 'The original painting easel is no longer available.');
+  if (!req.media || !/^\/(?!\/)(?:[^\s?#]*\/)?art\/[0-9a-f]{64}\.png$/.test(req.media)) return fail(400, 'painting.media', 'A completed painting must use its server-rendered PNG.');
+  return hang(model, caller, { ...req, slot: 0 }, true);
+}
+
+/** Only actual single-canvas painting workstations opt in. */
+export function paintingEasel(def: StoredDef | undefined): boolean {
+  const disp = displayOf(def);
+  return !!disp && disp.slots === 1 && disp.withMaker && (def?.components as { workstation?: { kind?: string } } | undefined)?.workstation?.kind === 'painting';
+}
+
+/** Compact nearby projection; the private drawing recipe is never perception. */
+export function paintingLine(e: Entity, def: StoredDef | undefined): string | null {
+  if (!paintingEasel(def) || typeof e.state?.media !== 'string' || !e.state.media || typeof e.state.maker !== 'string') return null;
+  const parts = e.state.maker.split(':');
+  if (parts[0] !== 'soul' || parts.length < 3) return null;
+  const oneLine = (v: unknown, max: number) => clean(String(v ?? '').replace(/[\u0085\u2028\u2029]/g, ' '), max);
+  const maker = oneLine(parts.slice(2).join(':'), 32) || 'a Soul', title = oneLine(e.state.title, 50) || 'Untitled';
+  return `an easel with ${maker}’s painting “${title}”`;
+}
+
+function hang(model: WorldModel, caller: Caller, req: HangRequest, painting: boolean): ArtPlan | ArtFailure {
   const e = model.entities.get(req.frame) ?? (model as unknown as { get?(n: string): Entity | undefined }).get?.(req.frame);
   if (!e) return fail(404, 'art.no-frame', `no display ${req.frame}`);
   const def = model.resolvedDef(e.def), disp = displayOf(def);
@@ -49,7 +78,7 @@ export function planHang(model: WorldModel, caller: Caller, req: HangRequest): A
   const clear = req.media === null || req.media === '' || req.media === undefined;
   if (!clear && !mediaKind(req.media!)) return fail(400, 'art.media', 'media must be an https URL or a same-site path (images, or .mp4/.webm/.mov/.m4v video), at most 480 characters, no spaces');
   const st = e.state ?? {}, media = lines(st.media, disp.slots), title = lines(st.title, disp.slots), maker = lines(st.maker, disp.slots);
-  if (caller.kind === 'soul' && !ownsIt(e, caller)) {
+  if (caller.kind === 'soul' && !painting && !ownsIt(e, caller)) {
     const mine = maker[slot].startsWith(`soul:${encodeURIComponent(caller.id)}:`);
     if (media[slot].trim() && !mine) return fail(403, 'art.not-yours', `slot ${slot} of ${req.frame} holds someone else's art; residents may fill empty slots and change their own`);
     if (clear && !mine) return fail(403, 'art.not-yours', 'you may only clear art you hung');

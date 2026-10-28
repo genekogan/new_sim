@@ -558,19 +558,26 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
 
   /** A trusted edit the engine made (a Soul moved a thing, a body was born or retired): journaled by 'engine',
    *  never the god's to undo (and it does not clear the redo stack), published to viewers, not sent to onCommit. */
-  engineAct(ops: Op[], note: string): Result {
+  engineAct(ops: Op[], note: string, complete?: () => void, durable?: () => void): Result {
     const tick = this.opts.tick();
     const next = this.model.fork();
     const r = applyBatch(next, { ops }, 'engine', tick, { trusted: true });
     if (!r.result.accepted) return r.result;
     const roots = this.builds.rootsDelta(this.model, next, r.diff!, 'engine'), updates = this.builds.writes({ warnings: [] }, roots, r.result.seq, this.now());
     if (updates.failures) return { accepted: false, failures: updates.failures };
-    const refused = this.store.commit(next, this.owner, r.diff!, { seq: r.result.seq, by: 'engine', at: this.now(), note, ops, inverse: [], kind: 'engine', builds: updates.writes, who: { hash8: null, label: 'engine' } });
+    let notify: (() => void) | undefined;
+    const refused = this.store.commit(next, this.owner, r.diff!, { seq: r.result.seq, by: 'engine', at: this.now(), note, ops, inverse: [], kind: 'engine', builds: updates.writes, who: { hash8: null, label: 'engine' } }, undefined,
+      complete ? { apply: complete, deferNotifications: flush => { notify = flush; } } : undefined);
     if (refused) return refused;
     Object.assign(this.model, next);
-    const deltas = this.builds.accepted(updates.writes);
-    this.publish(r.result.seq, tick, r.diff!, 'engine', deltas);
-    this.builds.announceCommitted(updates.writes);
+    try {
+      // The internal participant's witness runs after COMMIT, before any world
+      // or receipt observer. Media cleanup must distinguish committed throws.
+      durable?.();
+      const deltas = this.builds.accepted(updates.writes);
+      this.publish(r.result.seq, tick, r.diff!, 'engine', deltas);
+      this.builds.announceCommitted(updates.writes);
+    } finally { notify?.(); }
     return r.result;
   }
 

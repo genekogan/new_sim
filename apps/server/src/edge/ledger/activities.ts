@@ -6,6 +6,7 @@ import type {EdgeCapability} from '../contract.ts';
 import type {Interior, Platform, Ring, Solid} from './nav.ts';
 import {POSE_INSTRUMENTS} from '../../../../../mars/viewer/engine/social/pose.ts';
 import {validInteriorShellBounds} from './nav.ts';
+import {paintingParam} from '../../art/painting.ts';
 
 type V2 = [number, number];
 export type Spot = {id: string; place?: string; activity: string; base: 'sit' | 'idle' | 'lie'; at: V2; faceTo?: V2; seatHeight?: number; prop?: string; label?: string;
@@ -21,7 +22,9 @@ export type Spot = {id: string; place?: string; activity: string; base: 'sit' | 
    *  activity is then done on that seat. `level`: the engine level the spot stands on (a desk upstairs). */
   seat?: string; level?: number;
   /** E-life: the activity's own title at this spot when the default does not fit ("Feed the ducks and swans"). */
-  title?: string};
+  title?: string;
+  /** Bound only by the world adapter for a real painting easel. Never inferred from a label. */
+  paintingTarget?: string};
 export type Shelf = {id: string; place?: string; at: V2; faceTo?: V2; level?: number};
 /** todo (leisure): a bicycle dock: `bikes` bicycles stand in it; a ride takes one and brings it back. */
 export type Dock = {id: string; place?: string; at: V2; faceTo?: V2; bikes: number; label?: string};
@@ -32,7 +35,7 @@ export type SpotsData = {contract: 'activity-spots/1'; spots: Spot[]; shelves: S
   /** ROUTE-RECHECK (on demand, one act): places named by the Soul's words ("read a book in the library") whose read:<place>
    *  is offered beyond the nearest-N cap and the 200 m listing limit (still only spots within reach). */
   readFor?: string[]};
-export type Plan = {label: string; steps: Program['steps']; seconds?: boolean};
+export type Plan = {label: string; steps: Program['steps']; seconds?: boolean; paintingTarget?: string};
 
 /** Activities a spot may offer, with their default prop and seconds. */
 /** `pose`: the body pose an activity is done in, when it is not its own name (a book club reads, a yoga class does yoga). */
@@ -265,7 +268,8 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
       // R5: a listener's seat is offered once someone is telling the story (its required spot is in use)
       const needs = s.requires ? data.spots.find(x => x.id === s.requires) : undefined, missing = !!needs && !w.taken(needs.at, needs.id);
       const waiting = s.together ? w.groupSize(s.together.group) : 0, withWho = s.together ? (waiting ? `; ${waiting} waiting on the other end, join them` : (s.together.alone === 'start' ? `; starts after ${s.together.wait} s, others may join` : `; waits up to ${s.together.wait} s for someone to join`)) : '';
-      add({id, verb: activity, label: labelOf(s, activity) + withWho, available: !missing, ...(missing ? {blocked: {code: 'together.nobody-leading', reason: `Nobody is at ${needs!.label ?? needs!.id} yet; nothing to join. Start it yourself, or ask again later.`}} : {}), target: {id: s.id, kind: 'spot'}, params: secondsParam(def.seconds)}, {label: def.label, steps: activity === 'read' ? readAt(s) : spotSteps(s, undefined, activity), seconds: true});
+      const painting = activity === 'paint' && s.paintingTarget ? {paintingTarget: s.paintingTarget} : {};
+      add({id, verb: activity, label: labelOf(s, activity) + withWho, available: !missing, ...(missing ? {blocked: {code: 'together.nobody-leading', reason: `Nobody is at ${needs!.label ?? needs!.id} yet; nothing to join. Start it yourself, or ask again later.`}} : {}), target: {id: s.id, kind: 'spot'}, params: {...secondsParam(def.seconds), ...('paintingTarget' in painting ? {painting: paintingParam()} : {})}}, {label: def.label, steps: activity === 'read' ? readAt(s) : spotSteps(s, undefined, activity), seconds: true, ...painting});
     }
   }
   // ---- CN5 choreographed games: each court's free places (its spots, then extra places beside them up to 6 players)

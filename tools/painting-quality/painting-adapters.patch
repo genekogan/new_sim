@@ -1,0 +1,31 @@
+--- a/apps/server/src/http.ts
++++ b/apps/server/src/http.ts
+@@ -46,2 +46,3 @@
+ import { mountArtRoutes } from './art/routes.ts';
++import { createPaintingService } from './art/painting-completion.ts';
+ import { defaultAssetDir } from './god/assets.ts';
+@@ -139,2 +140,6 @@
+   if (d.god) { const god = d.god; mountArtRoutes(app, { model: () => god.model, godAct: (ops, note) => god.act({ ops }, note), engineAct: (ops, note) => god.engineAct(ops, note), isGod: (c) => { const w = god.godIdentity(bearer(c)); return !!w && !w.child; }, soulFromBearer: (c) => { const s = d.souls.soulFromToken(bearer(c)); return s ? { id: s.id, name: s.name } : null; }, owner: () => god.owner, baseOf, limitIp, dir: join(defaultAssetDir(), 'art') }); }  // W6 art: frames, screens, gallery walls
++  if (d.god && d.edge) {
++    const god = d.god;
++    d.edge.painting = createPaintingService({ model: () => god.model, dir: join(defaultAssetDir(), 'art'), basePath: d.cfg.worldPath, worldId: d.host.worldId, commit: (ops, note, complete, durable) => god.engineAct(ops, note, complete, durable) });
++  }
+   if (d.god) { const god = d.god; mountEnvRoutes(app, { host: d.host, god, requireGod: (c) => { const who = god.godIdentity(bearer(c)); if (!who) throw new ApiError(401, 'unauthorized', 'missing or invalid god token'); if (who.child) throw new ApiError(403, 'helper.scope', 'helper tokens cannot change the environment'); return who; } }); }  // R4-LIVE env setter; WD7: helpers refused, edits attributed
+--- a/tools/edge-skill/eden-agent.mjs
++++ b/tools/edge-skill/eden-agent.mjs
+@@ -294,3 +294,3 @@
+  const matchingAvail=pick(avail),matchingBlocked=pick(blocked),truncated={available:matchingAvail.length>80,blocked:matchingBlocked.length>15};
+- return {available:matchingAvail.slice(0,80).map(c=>({id:c.id,verb:c.verb,label:c.label,...(c.params?{params:Object.keys(c.params)}:{})})),
++ return {available:matchingAvail.slice(0,80).map(c=>({id:c.id,verb:c.verb,label:c.label,...(c.params?{params:Object.keys(c.params)}:{}),...(c.verb==='paint'&&c.params?.painting?{painting:c.params.painting}:{})})),
+   blocked:matchingBlocked.slice(0,15).map(c=>({id:c.id,label:c.label,why:c.blocked?.code})),
+--- a/apps/server/src/god/perceive.ts
++++ b/apps/server/src/god/perceive.ts
+@@ -15,2 +15,3 @@
+ import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
++import { paintingLine } from '../art/art.ts';
+ import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
+@@ -204,3 +205,3 @@
+     const near = this.h.namesNear(at, e.id).filter((n) => n !== name).slice(0, 2);
+-    const what = `${article(kind)}${parent?.name ? ` in ${m.pathOf(parent.id)}` : ''}${near.length ? `, by ${near.join(' and ')}` : ''}${lay ? `; ${lay}` : ''}`;
++    const what = paintingLine(e, def) ?? `${article(kind)}${parent?.name ? ` in ${m.pathOf(parent.id)}` : ''}${near.length ? `, by ${near.join(' and ')}` : ''}${lay ? `; ${lay}` : ''}`;
+     const wp0 = m.worldPose(e), front: Vec2 | null = acts ? [Math.round((at[0] + Math.sin(wp0.yaw) * (0.6 + def.size.box[2] * (wp0.s || 1) / 2)) * 100) / 100, Math.round((at[1] + Math.cos(wp0.yaw) * (0.6 + def.size.box[2] * (wp0.s || 1) / 2)) * 100) / 100] : null;
