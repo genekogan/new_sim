@@ -11,6 +11,7 @@ import { ApiError } from '../souls.ts';
 import type { Look } from './look.ts';
 import { hostRenderSlot } from './host-render-slot.ts';
 import { preserveScript, readyExpression, captureExpression } from './look-page.ts';
+import { rendererWorldUrl } from './look-renderer-url.ts';
 
 export const lookAdvice = "This world's host cannot render pictures; take the picture with a local browser (Google Chrome where your agent runs). Never change the world's clock or sky to see night.";
 const unavailable = (reason: string) => new ApiError(503, 'look.unavailable', `${reason} ${lookAdvice}`);
@@ -121,8 +122,9 @@ export async function renderLook(worldUrl: string, shot: Look, expect: number, s
 }
 async function renderIsolated(worldUrl:string,shot:Look,expect:number,signal:AbortSignal,context?:unknown,contextResult?:(metadata:Record<string,unknown>)=>void):Promise<Uint8Array>{
   // This is server configuration, never Host/X-Forwarded-Host or a request field.
-  const url = new URL(worldUrl);
-  if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.username || url.password || url.search || url.hash) throw unavailable('Configure a 127.0.0.1 HTTP URL for the world renderer.');
+  let url: URL;
+  try { url = rendererWorldUrl(worldUrl, Boolean(context), process.env.SIM_SITE_URL); }
+  catch (e) { throw unavailable((e as Error).message); }
   const executable = chromeExecutable(); if (!executable) throw unavailable('No Google Chrome executable was found on the world host.');
   signal.throwIfAborted();
   const profile = await mkdtemp(join(tmpdir(), `sim-god-look-${process.pid}-`));
