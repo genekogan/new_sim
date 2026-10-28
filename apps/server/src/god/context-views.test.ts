@@ -1,7 +1,7 @@
 import { totemGlb } from '../../../../tools/library/fixture-glb.mjs';
-import test from 'node:test';
+import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Hono } from 'hono';
@@ -14,6 +14,19 @@ import { contextSheet, decodeContextPng, encodeContextPng } from './context-shee
 import { contextChromeLaunch } from './look-renderer.ts';
 import { hostRenderLockPath } from './host-render-slot.ts';
 import { moderationFor } from '../moderation/store.ts';
+// Mocked captures still assemble real sheets, which share the host render slot.
+// Own a lock directory on every platform; never contend with a running world.
+let renderLockDir: string, previousRenderLockDir: string | undefined;
+before(() => {
+    previousRenderLockDir = process.env.SIM_RENDER_LOCK_DIR;
+    renderLockDir = mkdtempSync(join(tmpdir(), 'sim-context-test-lock-'));
+    process.env.SIM_RENDER_LOCK_DIR = renderLockDir;
+});
+after(() => {
+    if (previousRenderLockDir === undefined) delete process.env.SIM_RENDER_LOCK_DIR;
+    else process.env.SIM_RENDER_LOCK_DIR = previousRenderLockDir;
+    rmSync(renderLockDir, { recursive: true, force: true });
+});
 function fixture() {
     const db = new Db(':memory:'), dir = mkdtempSync(join(tmpdir(), 'sim-context-test-'));
     const god = new GodMode(db, { worldId: 'context-test', ownerId: null, tick: () => 1, emit() { }, assetDir: dir });
@@ -340,6 +353,8 @@ test('point, region and entity parts use actual target level and membership, not
             await request(part);
             await service.cache.settled();
             const ready = await (await request(part)).json();
+            assert.equal(ready.views[0].status, 'ready', JSON.stringify(ready.views[0]));
+            assert.equal(ready.sheet.status, 'ready', JSON.stringify(ready.sheet));
             urls.push(ready.views[0].url, ready.sheet.url);
         }
         knows = false;
