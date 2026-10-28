@@ -6,6 +6,7 @@ import { createServer } from 'node:net';
 import { createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { cgroupHeadroomMb, memAvailableMb, PREWARM_MB, prewarmBlocked, rotateLog } from './production.mjs';
+import { SLUG_RE } from './registry.mjs';
 const STRIP_HOOK = 'apps/server/src/strip-cache.mjs'; // lane BOOT2 (defaultCommand)
 
 /** Printed by a world process started with SIM_STANDBY=1 once its code is loaded (apps/server/src/standby.ts). */
@@ -382,6 +383,21 @@ export class ChildPool {
 
 export const EYES_ENV = ['EDGE_EYES', 'EDGE_EYES_GPU', 'EDGE_EYES_SOUL_SECONDS', 'EDGE_EYES_GLOBAL_PER_MINUTE', 'EDGE_EYES_TIMEOUT_SECONDS', 'EDGE_EYES_RELOAD_HOURS', 'EDGE_EYES_NICE', 'EDGE_EYES_CPUS', 'EDGE_EYES_CHROME_ARGS', 'PLAYWRIGHT_BROWSERS_PATH', 'SIM_RENDER_LOCK_DIR', 'GOD_LOOK_CHROME', 'EDEN_GOD_GL'];
 
+/** Launcher-only exact world allowlist; the server still checks its own viewer URL and world path.
+ *  Unset keeps the legacy env bytes. Empty disables all; enabling members requires EDGE_EYES=world.
+ *  Explicit off wins, and excluded children get off so --env-file cannot enable them. */
+function eyesEnv(slug) {
+  const env = Object.fromEntries(EYES_ENV.filter((k) => process.env[k] !== undefined).map((k) => [k, process.env[k]]));
+  const raw = process.env.EDGE_EYES_WORLDS;
+  if (raw === undefined) return env;
+  const tokens = raw.trim() === '' ? [] : raw.split(',').map((s) => s.trim());
+  if (tokens.some((s) => !SLUG_RE.test(s))) throw new Error('EDGE_EYES_WORLDS must be comma-separated exact world slugs');
+  const worlds = new Set(tokens);
+  if (env.EDGE_EYES === 'off' || worlds.size === 0) return { ...env, EDGE_EYES: 'off' };
+  if (env.EDGE_EYES && env.EDGE_EYES !== 'world') throw new Error('EDGE_EYES_WORLDS with a nonempty list requires EDGE_EYES=world or off; explicit viewer URLs are ambiguous');
+  return { ...env, EDGE_EYES: env.EDGE_EYES === 'world' && worlds.has(slug) ? 'world' : 'off' };
+}
+
 /** The Sim server for one entity world (same env as tools/god-skill/dev-world.mjs).
  *  With `o.auth.envFile` (Clerk, production sign-in) the child reads its Clerk settings from that file by path
  *  (`node --env-file`); dev auth is off and every world shares one account registry, so a person is the same
@@ -410,8 +426,9 @@ export function defaultCommand(world, port, o) {
     // Nobody watching or acting here for 30 s: the clock runs at a quarter of its wall pace (apps/server/src/attention.ts)
     SIM_UNWATCHED_PACE: process.env.SIM_UNWATCHED_PACE ?? '0.25',
     // Eyes (apps/server/src/edge/eyes): a Soul's first-person picture. Off unless the launcher's own environment sets EDGE_EYES
-    // (`world` = each world renders its own public page); the browser path, GPU mode, budgets and nice level come with it.
-    ...Object.fromEntries(EYES_ENV.filter((k) => process.env[k] !== undefined).map((k) => [k, process.env[k]])),
+    // (`world` = each world renders its own public page), optionally scoped by EDGE_EYES_WORLDS. The browser path,
+    // GPU mode, budgets and nice level come with it; the allowlist itself is not a server setting.
+    ...eyesEnv(world.slug),
     // measurement only (lane SLEEP): log the engine state hash at boot and at stop
     ...(process.env.SIM_BOOT_HASH === '1' ? { SIM_BOOT_HASH: '1' } : {}),
     // Soul mode of the world's one skill (/SKILL.md) points at Codex's Soul skill (/skill.md) and CLI (/eden-agent.mjs),
