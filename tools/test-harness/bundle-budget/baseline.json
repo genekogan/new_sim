@@ -4,7 +4,8 @@
   "Reviewed web bundle baseline for the release-gate step V3-bundle (tools/test-harness/bundle-budget/budget.mjs has the rules).",
   "Update ONLY as its own reviewed commit: node tools/test-harness/bundle-budget/budget.mjs --build --write (or --from <gate>/candidate/out/suite/bundle/current.json --write).",
   "The gate never writes this file. Sizes are of a plain `pnpm --filter @sim/web build`, as the gate builds it.",
-  "2026-10-22 (lane BUDGET): written from main 41a5b530e (live 3.62). Lane DEPS is removing the ~460 KB viem chunk (assets/toViemAccount-moo9TJem.js) in parallel; the integrator (STACK) re-runs --write as its own reviewed commit after DEPS merges, so the smaller sizes become the budget."
+  "2026-10-22 (lane BUDGET): written from main 41a5b530e (live 3.62). Lane DEPS is removing the ~460 KB viem chunk (assets/toViemAccount-moo9TJem.js) in parallel; the integrator (STACK) re-runs --write as its own reviewed commit after DEPS merges, so the smaller sizes become the budget.",
+  "2026-10-28: register only the previously unbudgeted shared assets/WorldEntityLayer.js key for final source 4742530bdf9b0996423f5016ef2e347e064c468c. Existing sealed root/worlds assets measure 109616/109623 raw bytes and 40742/40744 gzip-9 bytes; use their exact maxima (109623/40744). Qualified A497 already emitted this shared key at 94009 raw bytes in its retained plain-gate report, below the 100 KB new-key threshold; reviewed measured-stair/renderer additions now cross that threshold. Preserve the original total and every existing chunk limit, all 10%/4 KB/100 KB rules, and original source metadata. This is a narrow release-artifact budget registration, not a wholesale plain-build rebaseline; final plain-build qualification remains required."
  ],
  "source": {
   "sha": "995c95aa49d4ac089e0b505e62e67df94786986d",
@@ -110,6 +111,7 @@
   "assets/velour.js": {"files":1,"bytes":15597,"gzip":6546},
   "assets/vendor.js": {"files":1,"bytes":807030,"gzip":207240},
   "assets/workbench.js": {"files":1,"bytes":9119,"gzip":4466},
+  "assets/WorldEntityLayer.js": {"files":1,"bytes":109623,"gzip":40744},
   "assets/WorldMarsForkLand.js": {"files":1,"bytes":26231,"gzip":7781}
  }
 }
