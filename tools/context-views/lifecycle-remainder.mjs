@@ -37,12 +37,21 @@ export async function runLifecycleRemainder({ withFixtureSession, report, save }
     check('move keeps ref and changes pixels', moved[0].ref === refs[0] && moved[0].key !== initial[0].key);
     const old = await session.rawGet(initial[0].url);
     check('pre-move image refused', old.status === 404, { status: old.status });
+    session.setPhase('delete-and-undo');
     started = performance.now();
     const removed = await (await session.request('/v1/god/act', { ops: edits.find(e => e.id === 'delete').ops })).json();
     check('original delete accepted', removed.accepted, { failures: removed.failures });
     const missing = await session.rawGet('/v1/world/context?ref=' + encodeURIComponent(refs[0]));
+    const missingBody = await missing.json();
+    const listing = await (await session.request('/v1/world/context', undefined, null)).json();
     const stale = await session.rawGet(moved[0].url);
-    check('deleted target and cached image refused promptly', missing.status === 404 && stale.status === 404 && performance.now() - started <= 15000, { metadataStatus: missing.status, imageStatus: stale.status, elapsedMs: performance.now() - started });
+    evidence.deletion = { exactStatus: missing.status, exact: missingBody, defaultRefs: listing.targets.map(t => t.ref), defaultNextCursor: listing.nextCursor, oldImageStatus: stale.status }; save();
+    // GET context is a listing/filter contract: absent exact refs are 200+empty.
+    // Actual image retrieval remains a refusal (404), not an empty success.
+    check('deleted target absent from exact/default listing and cached image refused promptly',
+      missing.status === 200 && missingBody.contract === 'world-context/1' && missingBody.scope === 'exact' && missingBody.total === 0 && Array.isArray(missingBody.targets) && missingBody.targets.length === 0 && missingBody.nextCursor === null &&
+      listing.nextCursor === null && !listing.targets.some(t => t.ref === refs[0]) && stale.status === 404 && performance.now() - started <= 15000,
+      { metadataStatus: missing.status, imageStatus: stale.status, elapsedMs: performance.now() - started });
     const undo = await (await session.request('/v1/god/undo', {})).json();
     check('delete undo accepted', undo.accepted, { failures: undo.failures });
     const restored = await ready([refs[0]], 'delete-and-undo-requested-first', started);
