@@ -22,7 +22,7 @@ test('Mars nearest building behind uses physical class and reaches Chiba from th
  const body=()=>w.host.engine.world.entities[soul.entityId]!;body().pose.p=[-.4,body().pose.p[1],-.4];await settle();
  await accept(w.host,Promise.resolve(edge.intents.act(soul,{verb:'turn',heading:90})));bridge.perceive.sync(true);edge.map();
  const query='enter the nearest building behind me',start=structuredClone(body().pose),resolved=edge.intents.dryRun(soul,{capability:query}) as any;
- console.log(JSON.stringify({start,capability:resolved.would?.capability}));assert.equal(start.yaw,0,'heading 90 faces east in native yaw');assert.equal(resolved.ok,true);assert.equal(resolved.would.capability,'walk:chiba');
+ console.log(JSON.stringify({start,capability:resolved.would?.capability}));assert.equal(Math.abs(start.yaw),0,'heading 90 faces east in native yaw (either sign of zero)');assert.equal(resolved.ok,true);assert.equal(resolved.would.capability,'walk:chiba');
  const binds=edge.coreA.binds(soul),omitted=binds.caps.filter(c=>c.verb!=='walk'||c.target?.kind!=='place'||edge.places.byId.get(c.target.id)?.kind!=='building');
  const onDemand=edge.resolveOnDemand(soul,query,omitted,new Map(binds.plans)).v;assert.notEqual(onDemand.kind,'unknown',JSON.stringify(onDemand));if(onDemand.kind!=='unknown')assert.equal(onDemand.cap.id,'walk:chiba');
  const accepted=await accept(w.host,Promise.resolve(edge.act(soul,{capability:query}))) as any;assert.equal(accepted.accepted,true,JSON.stringify(accepted));assert.equal(accepted.receipt.capability,'walk:chiba');

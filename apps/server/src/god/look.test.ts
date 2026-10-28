@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { PassThrough } from 'node:stream';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync, mkdirSync, utimesSync } from 'node:fs';
@@ -13,6 +13,20 @@ import { mountGodRoutes } from './routes.ts';
 import { LOOK_LIMITS, LookQueue, drawableEntities, lookSchema, mountLookRoutes, type LookRenderer } from './look.ts';
 import { PipeCDP, renderLook, pngSize, sweepLookProfiles } from './look-renderer.ts';
 import { readyExpression, captureExpression } from './look-page.ts';
+
+// These renderer tests use real lock acquisition even when Chrome is stubbed.
+// Keep their slot isolated from live worlds and explicit on Linux.
+let renderLockDir: string, previousRenderLockDir: string | undefined;
+before(() => {
+  previousRenderLockDir = process.env.SIM_RENDER_LOCK_DIR;
+  renderLockDir = mkdtempSync(join(tmpdir(), 'sim-look-test-lock-'));
+  process.env.SIM_RENDER_LOCK_DIR = renderLockDir;
+});
+after(() => {
+  if (previousRenderLockDir === undefined) delete process.env.SIM_RENDER_LOCK_DIR;
+  else process.env.SIM_RENDER_LOCK_DIR = previousRenderLockDir;
+  rmSync(renderLockDir, { recursive: true, force: true });
+});
 
 const shot = { eye: [0, 10, 20], at: [0, 0, 0] };
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=', 'base64');
