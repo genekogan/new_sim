@@ -51,7 +51,8 @@ export class WorldContextViews {
     private api: (path: string) => string;
     private signal: AbortSignal;
     private changed: () => void;
-    constructor(api: (path: string) => string, signal: AbortSignal, changed: () => void = () => { }) { this.api = api; this.signal = signal; this.changed = changed; }
+    private supported: boolean;
+    constructor(api: (path: string) => string, signal: AbortSignal, changed: () => void = () => { }, supported = true) { this.api = api; this.signal = signal; this.changed = changed; this.supported = supported; }
     page(): WorldLocationPage {
         return { total: this.total, more: !!this.nextCursor, loading: this.loading, query: this.query, error: this.error };
     }
@@ -72,7 +73,8 @@ export class WorldContextViews {
             await this.load(true);
     }
     private async load(append: boolean, restarts = 0): Promise<void> {
-        if (this.signal.aborted)
+        // Legacy worlds use their depicted/curated Explore locations; they have no context routes.
+        if (!this.supported || this.signal.aborted)
             return;
         const generation = ++this.generation, query = this.query;
         const cursor = append ? this.nextCursor : null;
@@ -139,7 +141,7 @@ export class WorldContextViews {
         this.pending.clear();
     }
     picture(id: string): Promise<string | null> {
-        if (this.signal.aborted || !id.startsWith('context:'))
+        if (!this.supported || this.signal.aborted || !id.startsWith('context:'))
             return Promise.resolve(null);
         return new Promise(resolve => { const ref = id.slice(8), previous = this.pending.get(ref); this.pending.set(ref, url => { previous?.(url); resolve(url); }); if (!this.scheduled) {
             this.scheduled = true;
