@@ -52055,7 +52055,7 @@
         },
         {
           "op": "place",
-          "def": "core/office-desk@1",
+          "def": "core/office-desk@2",
           "name": "library-desk-east",
           "in": {
             "parent": "eden-library-1",
@@ -52813,7 +52813,7 @@
         },
         {
           "op": "place",
-          "def": "core/office-desk@1",
+          "def": "core/office-desk@2",
           "name": "office-f0-desk-2",
           "in": {
             "parent": "eden-office-1",
@@ -53056,7 +53056,7 @@
         },
         {
           "op": "place",
-          "def": "core/office-desk@1",
+          "def": "core/office-desk@2",
           "name": "office-f1-desk-2",
           "in": {
             "parent": "eden-office-1",
@@ -53297,7 +53297,7 @@
         },
         {
           "op": "place",
-          "def": "core/office-desk@1",
+          "def": "core/office-desk@2",
           "name": "office-f2-desk-2",
           "in": {
             "parent": "eden-office-1",

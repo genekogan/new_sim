@@ -1,0 +1,14 @@
+{
+  "schema": "catalog-conformance-supplement/1",
+  "note": "2026-10-28 reading/computer chair quality: immutable core-office-desk@2 removes only v1's eight scenery-chair shapes and shrinks size.box Z to the actual desk depth .7m; the separate functional seat is retained. Frozen v1 d1639b7357bef81463874090868c25984d9d66ca13cbeece43c1711591214bdd is unchanged. A narrow production K=2 conformance run across v1+v2 baked, placed and rendered all 34 samples. The v2 construction view retains exactly v1's documented gallery draw overrun (9 > 4); its changed random samples do not fail. This new-version record pins that existing finding to exact v2 hash 6583bddfe6454990c9611d4c9d3c267eee8cde061a1378c00ceccddbea4e9f0a. No new failure code/detail or rendering gap, no budgets or samples relaxed. Default and endpoint bake/placement pass. Real activity and browser qualification remain separate evidence.",
+  "findings": [
+    {
+      "def": "core-office-desk@2",
+      "hash": "6583bddfe6454990c9611d4c9d3c267eee8cde061a1378c00ceccddbea4e9f0a",
+      "stage": "gallery-budget",
+      "code": "draws",
+      "detail": "9 > 4",
+      "fields": ["params.condition=construction"]
+    }
+  ]
+}

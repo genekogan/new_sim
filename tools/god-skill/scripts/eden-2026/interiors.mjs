@@ -30,7 +30,7 @@ export const LIBRARY = [
   L('reading-chair-east-1', 'chair', [76.2, -5.6], S, { params: { wood: C.walnut, cushion: C.sage } }), L('reading-chair-east-2', 'chair', [76.8, -7.2], N, { params: { wood: C.walnut, cushion: C.sage } }),
   L('armchair-sage', 'armchair', [75.9, -3.9], S, { params: { fabric: C.sage, wood: C.walnut } }), L('armchair-rose', 'armchair', [77.95, -3.9], S, { params: { fabric: C.rose, wood: C.walnut } }),
   L('floor-lamp', 'floor-lamp', [69.7, -3.7], N, { state: { on: false } }), L('tall-plant', 'potted-plant', [71.6, -3.7], N, { params: { sy: 1.6 } }),
-  L('desk-west', 'desk', [71.5, -9.3], N, { params: { top: C.walnut } }), L('desk-east', 'office-desk', [76.5, -9.4], N),
+  L('desk-west', 'desk', [71.5, -9.3], N, { params: { top: C.walnut } }), L('desk-east', 'core/office-desk@2', [76.5, -9.4], N),
   L('desk-chair-west', 'chair', [71.5, -8.4], S, { params: { wood: C.walnut, cushion: C.sage } }), L('desk-chair-east', 'office-chair', [76.5, -8.4], S),
   ...[[71.5, -6.6], [76.5, -6.6], [71.3, -9], [76.3, -9], [74, -5]].map(([x, z], i) => L(`pendant-${i + 1}`, 'eden-pendant@1', [x, z], N)),
 ];
@@ -70,7 +70,7 @@ export const oneRoom = (w, d, id) => ({ floors: [{ rooms: [{ id, name: id[0].toU
 // four pendants; the ground floor is the post room and lounge, the first the artists' studio, the second the meeting room.
 const O = (room, name, def, [x, z], r, extra) => piece(room, 'eden-office-1', `office-${name}`, def, [x - 92, 0, z - 15], r, extra);
 const officeFloor = (room, tag) => [
-  O(room, `${tag}-desk-1`, 'desk', [91.6, 15.1], N), O(room, `${tag}-desk-2`, 'office-desk', [94.9, 15.1], N),
+  O(room, `${tag}-desk-1`, 'desk', [91.6, 15.1], N), O(room, `${tag}-desk-2`, 'core/office-desk@2', [94.9, 15.1], N),
   O(room, `${tag}-desk-chair-1`, 'chair', [91.6, 15.95], S, { params: { wood: C.iron, cushion: '#5a6670' } }), O(room, `${tag}-desk-chair-2`, 'office-chair', [94.9, 16.0], S),
   ...[[91.5, 13], [94.6, 13], [91.5, 16.9], [94.6, 16.9]].map(([x, z], i) => O(room, `${tag}-pendant-${i + 1}`, 'eden-pendant@1', [x, z], N)),
 ];

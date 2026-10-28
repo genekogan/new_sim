@@ -37,7 +37,7 @@ export function propFor(activity: string, prop?: string, instrument?:string): Pr
 }
 /** Extra inputs of a frame: seconds since the activity began (one-shot gestures; undefined = cycle on take time) and
  *  the distance to the partner of a paired gesture (body points; undefined = the contract gap). */
-export type FrameOpts = { since?: number; gap?: number;instrument?:string;game?:RecordedGame;gameTick?:number;gameDt?:number;actorId?:string };
+export type FrameOpts = { groundSeat?: boolean; since?: number; gap?: number;instrument?:string;game?:RecordedGame;gameTick?:number;gameDt?:number;actorId?:string };
 const GAP: Record<string, number> = { hug: 0.52, handshake: 0.85, 'high-five': 0.75, give: 0.9, take: 0.9 };
 /** Shoulder height and half width the hand goals below are written for (BODY_MODEL: shoulders at 1.34 m). */
 const SH = 1.34, HALF = 0.19;
@@ -118,7 +118,10 @@ export function activityFrame(activity: string, base: string, seconds: number, i
     case 'hammock': f.lying = { face: 'back', raise: 0.22 }; f.hands = [[0.28, -0.1, 0.04], [0.3, -0.06, 0.04]]; f.look = 0.1; return f;
     case 'stargaze': f.lying = { face: 'back', raise: 0 }; f.hands = [[-0.04, 0.02, 0.3], [-0.04, 0.02, 0.3]]; f.look = -0.2; return f;
     case 'read': { const turn = Math.max(0, Math.sin(t * 0.21) - 0.96) * 6; // now and then a page turns
-      f.hands = [[0.33, -0.13, down + 0.04], [0.33 + 0.04 * turn, -0.13 + 0.1 * turn, down + 0.04 + 0.03 * turn]]; f.look = 0.38; f.lean = seated ? 0.06 : 0.03; return f; }
+      // The open pages extend below the palms. Lift seated hands together so the whole book clears the lap,
+      // including the shorter woman's shoulders; its prop still follows the actual palms after reach-honest IK.
+      const bookUp = down + (opts.groundSeat || base === 'sit-ground' ? 0.46 : seated ? 0.26 : 0.04);
+      f.hands = [[0.33, -0.13, bookUp], [0.33 + 0.04 * turn, -0.13 + 0.1 * turn, bookUp + 0.03 * turn]]; f.look = 0.38; f.lean = seated ? 0.06 : 0.03; return f; }
     case 'browse': { const k = S(tri(t * 0.45));
       f.hands = [null, [0.42 + 0.06 * k, 0.04, -0.02 - 0.2 * k]]; f.look = 0.1; return f; }
     case 'write': { const s = Math.sin(t * 7) * 0.02, r = tri(t * 0.25) * 0.08;
