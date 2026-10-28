@@ -35,7 +35,7 @@ export type SpotsData = {contract: 'activity-spots/1'; spots: Spot[]; shelves: S
   /** ROUTE-RECHECK (on demand, one act): places named by the Soul's words ("read a book in the library") whose read:<place>
    *  is offered beyond the nearest-N cap and the 200 m listing limit (still only spots within reach). */
   readFor?: string[]};
-export type Plan = {label: string; steps: Program['steps']; seconds?: boolean; paintingTarget?: string};
+export type Plan = {label: string; steps: Program['steps']; seconds?: boolean; paintingTarget?: string; paintingLevel?: number};
 
 /** Activities a spot may offer, with their default prop and seconds. */
 /** `pose`: the body pose an activity is done in, when it is not its own name (a book club reads, a yoga class does yoga). */
@@ -268,7 +268,7 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
       // R5: a listener's seat is offered once someone is telling the story (its required spot is in use)
       const needs = s.requires ? data.spots.find(x => x.id === s.requires) : undefined, missing = !!needs && !w.taken(needs.at, needs.id);
       const waiting = s.together ? w.groupSize(s.together.group) : 0, withWho = s.together ? (waiting ? `; ${waiting} waiting on the other end, join them` : (s.together.alone === 'start' ? `; starts after ${s.together.wait} s, others may join` : `; waits up to ${s.together.wait} s for someone to join`)) : '';
-      const painting = activity === 'paint' && s.paintingTarget ? {paintingTarget: s.paintingTarget} : {};
+      const painting = activity === 'paint' && s.paintingTarget ? {paintingTarget: s.paintingTarget,paintingLevel:s.level??0} : {};
       add({id, verb: activity, label: labelOf(s, activity) + withWho, available: !missing, ...(missing ? {blocked: {code: 'together.nobody-leading', reason: `Nobody is at ${needs!.label ?? needs!.id} yet; nothing to join. Start it yourself, or ask again later.`}} : {}), target: {id: s.id, kind: 'spot'}, params: {...secondsParam(def.seconds), ...('paintingTarget' in painting ? {painting: paintingParam()} : {})}}, {label: def.label, steps: activity === 'read' ? readAt(s) : spotSteps(s, undefined, activity), seconds: true, ...painting});
     }
   }

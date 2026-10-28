@@ -38,6 +38,7 @@ import {resolveCapability, tokens, placeMatch, placeMatchTier, typoFix, type Voc
 import {isCampfire} from './fire.ts';
 import {activityCapabilities, loadSpots, ACTIVITY_SECONDS_MAX, SPOT_ACTIVITIES, type SpotsData} from './activities.ts';
 import type {PaintingIntent, PaintingService} from '../../art/painting-completion.ts';
+import {humanoidDims} from '../../../../../mars/viewer/engine/bodies/humanoid.ts';
 import {Together, PAIRED, type TogetherPlan} from './together.ts';
 import {semanticDiscovery} from '../intents/semantic-discovery.ts';
 import {knownPart} from '../intents/resolved-parts.ts';
@@ -471,6 +472,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
         const row = this.db.soul(r.soul_id);
         const identity = !!m && row?.world_id === this.host.worldId && row.retired_at === null && row.entity_id === painting.actor && row.owner === painting.owner && m.entityId === painting.actor && m.owner === painting.owner;
         if (!identity || !this.painting || ['sleeping', 'absent'].includes(stateOf(this.host, painting.actor))) { this.update(r.receipt_id, {phase: 'failed', code: 'painting.identity-changed', reason: 'The original awake Soul/body is no longer painting; the previous canvas has been preserved.'}); return; }
+        const body=this.body(painting.actor)!,reach=this.painting.reached(painting,{position:body.pose.p,level:body.human?.level??0,scale:humanoidDims(body.body).scale});
+        if(reach){this.update(r.receipt_id,{phase:'failed',code:reach.code,reason:reach.message});return;}
         try {
           const result = this.painting.complete({soulId: m.soulId, entityId: m.entityId, name: m.name, owner: m.owner}, r.receipt_id, painting, published => {
             // Both the world edit and this terminal receipt/outcome commit or roll back together.
@@ -1053,9 +1056,11 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const seatSlot=steps.find(s=>s.verb==='mars:sit'&&typeof s.params.slot==='string')?.params.slot;
     let painting: PaintingIntent | undefined;
     if (contentParams.painting !== undefined) {
-      const plan = this.binds(soul).plans.get(capability) as {paintingTarget?: string} | undefined;
+      const plan = this.binds(soul).plans.get(capability) as {paintingTarget?: string;paintingLevel?:number} | undefined;
       if (!capability.startsWith('paint:') || !plan?.paintingTarget || !this.painting) return refuse('painting.no-easel', 'This capability has no real painting easel.');
-      const prepared = this.painting.prepare(soul, plan.paintingTarget, contentParams.painting);
+      const posed=steps.find(s=>s.verb==='mars:pose_v1'&&s.params.activity==='paint');
+      const approach=steps.filter(s=>s.verb==='walk_to'||s.verb==='mars:walk_to').at(-1),stand=approach?.verb==='mars:walk_to'?[approach.params.x,approach.params.z]:approach?.params.to;
+      const prepared = this.painting.prepare(soul, plan.paintingTarget, contentParams.painting,{face:posed?.params.face,stand,level:plan.paintingLevel??0});
       if ('ok' in prepared) return refuse(prepared.code, prepared.message);
       painting = prepared;
     }
