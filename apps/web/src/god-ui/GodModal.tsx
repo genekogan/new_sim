@@ -90,7 +90,7 @@ function GodConsole({ paired, tools, prayers }: { paired: boolean; tools: ReactN
   const box = useRef<HTMLTextAreaElement>(null);
   // phones: no focus on open, so the keyboard does not cover the sheet
   useEffect(() => { if (open && !(typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches)) box.current?.focus(); }, [open]);
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 15_000); return () => clearInterval(t); }, []);
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
   const send = async () => {
     const t = text.trim(); if (sending || !t) return;
     setSending(true); setError('');
@@ -107,20 +107,21 @@ function GodConsole({ paired, tools, prayers }: { paired: boolean; tools: ReactN
         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />
       <button type="submit" className="gm-send" disabled={sending || !text.trim()}>{sending ? 'Sending…' : 'Send'}</button>
     </form>
+    <p className="gm-under" data-direct-chat="1">You can also give instructions directly in your agent’s chat.</p>
     <p className="gm-under">
       {waiting > 0 ? <b data-queued={waiting}>{waiting === 1 ? '1 command' : `${waiting} commands`} {connected ? 'in the queue' : 'waiting for your agent'}</b>
-        : <span>{connected ? 'Your agent takes commands one at a time, in order.' : paired ? 'Commands wait here, in order, until your agent is back.' : 'Commands wait here, in order, until your agent connects.'}</span>}
+        : <span>{connected ? 'Your agent takes commands one at a time, in order.' : paired ? 'Commands wait here, in order, until your agent reconnects and starts listening.' : 'Commands wait here, in order, until your agent pairs and starts listening.'}</span>}
     </p>
     {error && <p className="gm-error" role="alert">{error}</p>}
     {inboxError && !inbox && <p className="gm-error">Your agent's commands could not be loaded. Retrying…</p>}
     <div className="gm-tools" data-god-tools="1">{tools}</div>
     {prayers}
     {inbox && !log.length && <p className="gm-empty">Nothing sent yet. Each command you send shows here with what happened to it.</p>}
-    {log.length > 0 && <ol className="gm-log" data-god-log="1" aria-label="Commands, newest first">{log.map((t) => <TicketRow key={t.id} t={t} now={now} />)}</ol>}
+    {log.length > 0 && <ol className="gm-log" data-god-log="1" aria-label="Commands, newest first">{log.map((t) => <TicketRow key={t.id} t={t} now={now} unavailable={!connected} />)}</ol>}
   </div>;
 }
 
-function TicketRow({ t, now }: { t: Ticket; now: number }) {
+function TicketRow({ t, now, unavailable }: { t: Ticket; now: number; unavailable: boolean }) {
   const s = ticketStatus(t), [busy, setBusy] = useState(false);
   const go = t.focus ? () => { const f = t.focus!; closeGod(); flyTo(f.x, f.y, f.z, { distance: Math.max(18, f.span * 1.6) }); } : null;
   const when = t.acknowledgedAt ?? t.deliveredAt ?? t.sentAt;
@@ -131,6 +132,7 @@ function TicketRow({ t, now }: { t: Ticket; now: number }) {
     <div className="gm-tbody">
       <p className="gm-cmd">{t.text}</p>
       {t.reply && <p className="gm-reply">{t.reply}</p>}
+      {s.key === 'pending' && unavailable && now - t.sentAt >= 8000 && <ListenerNotice />}
       <div className="gm-tmeta">
         <span className="gm-status">{s.word}</span><span className="gm-when" title={new Date(when).toLocaleString()}>{ago(when, now)}</span>
         {go && <button type="button" className="gm-go" data-ticket-go={t.id} onClick={go} title="Fly the camera to it">{GO}<span>{t.focus!.label ? `Go to ${t.focus!.label}` : 'Go there'}{t.focus!.count > 1 ? ` +${t.focus!.count - 1}` : ''}</span></button>}
@@ -138,4 +140,16 @@ function TicketRow({ t, now }: { t: Ticket; now: number }) {
       </div>
     </div>
   </li>;
+}
+
+/** A queued command stays intact; this only explains how to resume the agent's listener. */
+function ListenerNotice() {
+  const instruction = 'Start listening for this world’s God Mode commands.';
+  const [copied, setCopied] = useState(false), [manual, setManual] = useState(false);
+  useEffect(() => { if (!copied) return; const timer = setTimeout(() => setCopied(false), 2000); return () => clearTimeout(timer); }, [copied]);
+  return <div className="gm-listener-notice" role="status">
+    <p>Your command is queued, but your agent doesn’t appear to be listening. In your agent’s chat, ask: ‘Start listening for this world’s God Mode commands.’</p>
+    <button type="button" className="gm-textbtn" onClick={async () => { if (await copyText(instruction)) setCopied(true); else setManual(true); }}>{copied ? 'Copied' : 'Copy instruction'}</button>
+    {manual && <input className="gm-prompt" aria-label="Instruction for your agent" value={instruction} readOnly onFocus={(e) => e.target.select()} />}
+  </div>;
 }

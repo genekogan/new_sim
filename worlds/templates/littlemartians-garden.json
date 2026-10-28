@@ -1,7 +1,7 @@
 {
  "schema": "genesis/1",
  "name": "Little Martians garden",
- "description": "The Little Martians garden in the new vocabulary: Vanessa's Ceramic Tower and Minaret Temple (imported glazed meshes whose footprints carry the rooms and the float-only shafts), the six kin hovering in their row, a glazed-tile court between the two buildings, ceramic pots and moss. Generated from worlds/littlemartians/scene.json (parity proof, docs/god/PARITY.md).",
+ "description": "Ceramic towers, a tiled courtyard and a mossy garden.",
  "constants": {
   "extent": 240,
   "ground": "land"

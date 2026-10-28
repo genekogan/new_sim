@@ -22,17 +22,19 @@ export type InboxMessage = {id: string; text: string; state: 'sent' | 'delivered
 /** Where a finished command's edits are: the camera's target and the span to frame. */
 export type TicketFocus = {x: number; y: number; z: number; span: number; label?: string; count: number};
 export type Ticket = InboxMessage & {focus?: TicketFocus; touched?: number};
-/** listening = a listener is waiting now; working = it holds a message and called recently; recent = it called within the
- *  last half minute; away = none of these. PRESENCE (SOUL3): a Soul's box is only ever listening (a listen open, or one
+/** God listening requires a fresh inbox poll lease; working holds a delivered command and called within GOD_WORKING_MS.
+ *  `recent` remains in the wire type for older clients. PRESENCE (SOUL3): a Soul's box is only ever listening (a listen open, or one
  *  closed within SOUL_LISTEN_GRACE_MS), working (that grace, holding messages it took) or away; its other calls never count. */
 export type Presence = 'listening' | 'working' | 'recent' | 'away';
-/** `listenedAt` (a Soul's box only): when its agent last had a listen open (now while one is), null = never; durable. */
-export type InboxView = {connected: boolean; lastSeenAt: number | null; listenedAt?: number | null; latest: InboxMessage | null; queued?: number; presence?: Presence; log?: Ticket[]};
+/** `listenedAt`: a God's last poll start; a Soul's last open/close (now while open). Both durable; null = never.
+ *  God lease deadlines let the owner page expire stale responses without confusing listening with command work. */
+export type InboxView = {connected: boolean; lastSeenAt: number | null; listenedAt?: number | null; listenerExpiresAt?: number | null; workingUntil?: number | null; latest: InboxMessage | null; queued?: number; presence?: Presence; log?: Ticket[]};
 type QRow = {n: number; id: string; text: string; sent_at: number; delivered_at: number | null; acknowledged_at: number | null; reply: string | null; outcome: Outcome | null; touched: string | null; focus: string | null; result: string | null; result_by?: string | null; result_at: number | null; progress?: string | null};
 export const INBOX_CONNECTED_MS = 120_000;
 export const INBOX_TEXT_MAX = 1000;
-/** God presence: a call within this long counts as connected; a god holding a command, within WORKING_MS. */
-export const GOD_RECENT_MS = 30_000, GOD_WORKING_MS = 600_000;
+/** A God poll can wait at most 55 s; its 75 s lease includes room to re-poll. General calls never renew it.
+ *  Command work retains its separate ten-minute activity allowance, only while a delivered command is unfinished. */
+export const GOD_LISTEN_LEASE_MS = 75_000, GOD_WORKING_MS = 600_000;
 /** PRESENCE (SOUL3): a Soul stays listening this long after its last listen closed (the CLI re-polls within ~50 ms; an
  *  agent working through what it took listens again soon). Only a listen counts: ordinary calls never keep it here. */
 export const SOUL_LISTEN_GRACE_MS = 60_000;
@@ -119,22 +121,31 @@ export class AgentInbox {
     const touched = r.touched ? (JSON.parse(r.touched) as string[]).length : 0;
     return {...this.message(r), ...(r.focus ? {focus: JSON.parse(r.focus) as TicketFocus} : {}), ...(touched ? {touched} : {})};
   }
+  private godLeases(lastSeenAt: number | null, listenedAt: number | null, head: QRow | undefined) {
+    const now = this.now();
+    return {
+      listenerExpiresAt: listenedAt !== null && listenedAt <= now ? listenedAt + GOD_LISTEN_LEASE_MS : null,
+      workingUntil: head?.delivered_at != null && lastSeenAt !== null && lastSeenAt >= head.delivered_at && lastSeenAt <= now ? lastSeenAt + GOD_WORKING_MS : null,
+    };
+  }
   private presence(s: InboxScope, lastSeenAt: number | null, listenedAt: number | null, head: QRow | undefined): Presence {
-    if ((this.listeners.get(this.key(s)) ?? 0) > 0) return 'listening';
     if (!this.god(s)) {
+      if ((this.listeners.get(this.key(s)) ?? 0) > 0) return 'listening';
       const gap = listenedAt === null ? Infinity : this.now() - listenedAt;   // a clock stepped back (gap < 0) claims nothing
       return gap < 0 || gap > SOUL_LISTEN_GRACE_MS ? 'away' : head?.delivered_at != null ? 'working' : 'listening';
     }
-    const age = lastSeenAt === null ? Infinity : this.now() - lastSeenAt;
-    if (age < 0) return 'away';
-    if (head?.delivered_at != null && age <= GOD_WORKING_MS) return 'working';
-    return age <= GOD_RECENT_MS ? 'recent' : 'away';
+    const {listenerExpiresAt, workingUntil} = this.godLeases(lastSeenAt, listenedAt, head), now = this.now();
+    const listening = listenerExpiresAt !== null && now <= listenerExpiresAt;
+    // A leaked open request cannot extend the lease; only another poll start can do so.
+    if (listening && (this.listeners.get(this.key(s)) ?? 0) > 0) return 'listening';
+    if (workingUntil !== null && now <= workingUntil) return 'working';
+    return listening ? 'listening' : 'away';
   }
   /** What the agent sees (and every generic caller): one message, the oldest not acknowledged (else the newest), with
    *  `queued` = how many wait, this one included. */
   view(s: InboxScope): InboxView {
     const {lastSeenAt, listenedAt} = this.seen(s), head = this.head(s), shown = head ?? this.newest(s), presence = this.presence(s, lastSeenAt, listenedAt, head);
-    const listened = this.god(s) ? {} : {listenedAt: this.listeners.get(this.key(s)) ? this.now() : listenedAt};
+    const listened = this.god(s) ? {listenedAt, ...this.godLeases(lastSeenAt, listenedAt, head)} : {listenedAt: this.listeners.get(this.key(s)) ? this.now() : listenedAt};
     return {connected: presence !== 'away', lastSeenAt, ...listened, latest: shown ? this.message(shown) : null, queued: head ? this.waiting(s) : 0, presence};
   }
   /** What the owner sees: `latest` = the newest message (its state and reply); the god's adds its recent log, newest first. */
@@ -267,8 +278,8 @@ export class AgentInbox {
     for (const id of ids) { if (have.length >= GOD_TOUCHED_MAX) break; if (!seen.has(id)) { seen.add(id); have.push(id); } }
     if (have.length !== before) this.set(s, 'touched=?', head.n, JSON.stringify(have));
   }
-  /** A listener is waiting for this scope (presence); the returned function ends it. A Soul's open and close are stamped
-   *  durably (`listened_at`), so its grace and "away since" survive a restart. (`handed` is kept for the routes' call.) */
+  /** Poll starts are stamped durably. A Soul also stamps close; a God close never renews a stale poll's lease.
+   *  (`handed` is kept for the routes' call.) */
   listening(s: InboxScope) {
     const key = this.key(s);
     // LINK: when this listen turns an away Soul connected, the owner's `link.since` starts here (in memory; a restart
@@ -281,7 +292,7 @@ export class AgentInbox {
     let ended = false;
     return (_handed = false) => { if (ended) return; ended = true; const n = (this.listeners.get(key) ?? 1) - 1; if (n > 0) this.listeners.set(key, n); else this.listeners.delete(key);
       if (soul) { const k = (this.soulOpen.get(soul) ?? 1) - 1; if (k > 0) this.soulOpen.set(soul, k); else this.soulOpen.delete(soul); }
-      this.listened(s); };
+      if (!this.god(s)) this.listened(s); };
   }
   /** LINK BODY: open listens per Soul id (any owner), and who is told when one opens (the body rule wakes the body). */
   private soulOpen = new Map<string, number>();
@@ -294,7 +305,6 @@ export class AgentInbox {
     return {listening: false, at: r?.at ?? null};
   }
   private listened(s: InboxScope) {
-    if (this.god(s)) return;
     this.db.db.prepare(`INSERT INTO agent_inbox_v1(world_id,scope,owner,listened_at) VALUES(?,?,?,?)
       ON CONFLICT(world_id,scope,owner) DO UPDATE SET listened_at=excluded.listened_at`).run(this.worldId, s.scope, s.owner, this.now());
   }

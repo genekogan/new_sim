@@ -1,4 +1,5 @@
 {
+  "hidden": true,
  "schema": "genesis/1",
  "name": "Mars two",
  "description": "The Mars College 2026 campus in the new engine, built from the library (core/mars-* defs any god can place): Mimos and the Chiba kitchen and dining hall laid out as Gene corrected them (the L-shaped Mimos with the raised main and the glazed tea room, the outdoor gap, the kitchen west of the diner with its perimeter counters, sinks and prep table, the two northeast shower bays), Chiba with the auditorium, the Dojo, Tool camp, the Freeside compound, the west rack building, and every van, bus, trailer, toilet and hut where the reference (sim.mars.college, 2026) has them. Furniture is the reference's own: Souls sit on the sofas, chairs, stools and bus seats and put things on the tables and counters.",

@@ -1,7 +1,7 @@
 {
   "schema": "genesis/1",
-  "name": "Hello hamlet",
-  "description": "A knoll with a cottage, a pond, a lane of trees, and two flags to build from. The template every example starts with.",
+  "name": "Hello Hamlet",
+  "description": "A cottage, pond and tree-lined lane.",
   "constants": {
     "extent": 1000,
     "ground": "land"

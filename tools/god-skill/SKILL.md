@@ -17,9 +17,34 @@ node eden-god.mjs register <world-url>       # the page's address without ?… o
 node eden-god.mjs pair                       # prints a link; the owner approves in the browser
 # local dev server only:  register <url> dev:admin  then  mint
 ```
-`.eden-god.json` holds the token: never print it. Owner messages: `node eden-god.mjs listen --json` as a background Bash
-command (`run_in_background: true`; not a Monitor, which expires) returns the next message; handle it, `ack <id> "short
-reply"` (≤ 140 characters; add `--failed` if you could not do it), listen again (also, silently, if it exits without one). `listen --follow` is for scripts.
+`.eden-god.json` holds the token: never print it. For an existing pairing, run `node eden-god.mjs status` instead of
+pairing again, then perform the mandatory listener step below. Existing credentials are not a readiness shortcut.
+
+### Start listening before announcing readiness (mandatory)
+
+Immediately after pairing **or reconnecting an existing pairing**, start exactly one
+`node eden-god.mjs listen --json` in this world's paired folder. Pairing grants credentials; it does **not** start
+listening. Do this before saying you are ready or asking for the first instruction. Check your existing task/session
+handle first; reuse a live listener instead of starting a duplicate.
+
+- **Claude Code:** use the Bash tool with `run_in_background: true`. Its completion notification returns the next
+  message to you. Do not use an expiring Monitor.
+- **Codex:** a detached background process cannot wake you. Run `node eden-god.mjs listen --json` in the foreground
+  as the last command of each turn; retain and wait on its tool/session handle until it returns. Handle its output
+  before ending the turn. Messages reach you only while this session remains open and waiting.
+- `listen --follow` is for scripts with a real stream consumer that dispatches and handles messages. It is **not**
+  the default agent setup; a running stream alone does not mean you will handle commands.
+
+When a command arrives, carry out the request and inspect the actual result. Only then run
+`node eden-god.mjs ack <id> "Short outcome"` (at most 140 characters), adding `--failed` when you could not complete it.
+A God acknowledgement means **completed or failed**, never merely received. Keep an unfinished command pending
+while you work; do not copy the Soul's receipt-only acknowledgement workflow.
+
+Resume `listen --json` after handling and acknowledging the command, and after an empty exit or recoverable
+interruption. Reuse a still-running handle; a `superseded` response means another listener owns the inbox, so do not
+start competing listeners. If you cannot maintain listening, say plainly: **God Mode UI commands remain queued
+until this agent resumes listening; you can give instructions directly in this agent's chat.** Never describe a
+successful pairing alone as an active listener.
 
 ## The world in one page
 

@@ -4,7 +4,7 @@ import {mkdtempSync, rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {Db} from './db.ts';
-import {AgentInbox, INBOX_CONNECTED_MS, SOUL_LISTEN_GRACE_MS} from './inbox.ts';
+import {AgentInbox, INBOX_CONNECTED_MS, SOUL_LISTEN_GRACE_MS, GOD_LISTEN_LEASE_MS} from './inbox.ts';
 import {fixture, invite, accept} from '../test/native-owner-fixture.ts';
 import {buildApp} from './http.ts';
 import {config} from './config.ts';
@@ -133,8 +133,8 @@ test('PRESENCE: a Soul listens while a listen is open or closed <= 60 s ago; oth
   assert.equal(inbox.view(a).presence, 'working'); assert.equal(inbox.ownerView(a).queued, 1, 'unacked count');
   now += SOUL_LISTEN_GRACE_MS; assert.equal(inbox.view(a).presence, 'away');
   inbox.result(a, m.id, 'Arrived.', 'done'); assert.equal(inbox.ownerView(a).queued, 0);
-  // the god box is unchanged: a call within 30 s is recent, with no listenedAt field
-  inbox.touch(g); assert.equal(inbox.view(g).presence, 'recent'); assert.equal('listenedAt' in inbox.view(g), false);
+  // The God box now also requires an inbox poll: generic calls grant no listener lease.
+  inbox.touch(g); assert.equal(inbox.view(g).presence, 'away'); assert.equal(inbox.view(g).listenedAt, null);
   now += 31_000; assert.equal(inbox.view(g).presence, 'away');
 });
 
@@ -378,9 +378,9 @@ test('god queue: commands typed while away wait in order; tickets move pending -
   assert.deepEqual(log[2].focus, focus); assert.equal(log[2].touched, 2); assert.equal(log[1].focus, undefined);
   seen = inbox.view(g); assert.equal(seen.queued, 0); assert.equal(seen.latest!.id, c.id, 'with nothing waiting the agent sees the newest, finished');
   await inbox.listen(g, undefined, 5, new AbortController().signal);
-  // presence: a listener waiting now; a call within 30 s; else away
+  // Presence follows the poll-start lease across re-polls; generic calls do not renew it.
   const end = inbox.listening(g); assert.equal(inbox.view(g).presence, 'listening'); assert.equal(inbox.listenerCount(g), 1); end(); end(); assert.equal(inbox.listenerCount(g), 0);
-  inbox.touch(g); now += 29_000; assert.equal(inbox.view(g).presence, 'recent'); now += 2_000; assert.equal(inbox.view(g).presence, 'away');
+  inbox.touch(g); now += 29_000; assert.equal(inbox.view(g).presence, 'listening'); now += GOD_LISTEN_LEASE_MS - 29_000 + 1; assert.equal(inbox.view(g).presence, 'away');
   // the queue is bounded, and it survives a restart
   for (let i = 0; i < 50; i++) inbox.send(g, `cmd ${i}`);
   assert.throws(() => inbox.send(g, 'one too many'), (e: {status?: number; code?: string}) => e.status === 429 && e.code === 'queue-full');
@@ -432,10 +432,10 @@ test('god queue over HTTP: a real build links its ticket to where it stands; fai
   assert.equal((await req(`/v1/god/inbox/${third.id}/withdraw`, godToken, {})).status >= 400, true, 'the agent cannot withdraw');
   assert.equal((await req(`/v1/god/inbox/${third.id}/withdraw`, 'dev:alice', {})).data.inbox.log[0].outcome, 'withdrawn');
   box = await ownerBox(); assert.deepEqual(box.log.map((x: any) => x.outcome), ['withdrawn', 'failed', 'done']); assert.equal(box.queued, 0);
-  // presence flips to listening while a long-poll is open, and back when it ends
+  // Presence stays listening through the poll-start lease after a long-poll ends.
   const ac = new AbortController(), open = app.request(`/v1/god/inbox/listen?after=${third.id}&timeoutMs=300`, {headers: {authorization: `Bearer ${godToken}`}, signal: ac.signal});
   await new Promise(r => setTimeout(r, 30)); assert.equal((await ownerBox()).presence, 'listening');
-  await (await open).arrayBuffer(); assert.equal((await ownerBox()).presence, 'recent');
+  await (await open).arrayBuffer(); assert.equal((await ownerBox()).presence, 'listening');
   // LISTEN-LEAK: the god's box too: a second listen supersedes the first (409) and is the one live listener.
   const g1 = req(`/v1/god/inbox/listen?after=${third.id}&timeoutMs=25000`, godToken); await new Promise(r => setTimeout(r, 20));
   const g2 = req(`/v1/god/inbox/listen?after=${third.id}&timeoutMs=300`, godToken);

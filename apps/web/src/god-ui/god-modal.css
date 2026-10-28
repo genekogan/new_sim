@@ -218,3 +218,6 @@
   .god-open kbd { display: none; }
 }
 @media (max-width: 460px) { .hud-explore-group .god-open > span { display: none; } }
+
+.gm-listener-notice { margin: 8px 0; font-size: .85rem; line-height: 1.45; opacity: .85; }
+.gm-listener-notice p { margin: 0 0 4px; }
