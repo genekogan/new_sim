@@ -199,7 +199,8 @@ try {
 
   // H. the agent goes away
   listen.kill(); listen = null;
-  await page.locator('[data-connect]').waitFor({ timeout: 70_000 }).catch(() => {});
+  // God poll-start lease lasts 75 s; allow its expiry plus the owner UI poll.
+  await page.locator('[data-connect]').waitFor({ timeout: 90_000 }).catch(() => {});
   await check('H1 the agent goes away: the pill says away and the Connect block is back', (await page.locator('[data-connect]').count()) === 1 && (await page.locator('[data-agent-pill="away"]').count()) === 1);
   await shot('10-away');
   await check('Z no page errors', report.pageErrors.length === 0, { errors: report.pageErrors });
