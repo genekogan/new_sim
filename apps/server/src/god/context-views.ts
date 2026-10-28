@@ -174,7 +174,7 @@ export function mountContextViews(app: Hono, d: Deps) {
         if (!target)
             return null;
         const s = renderScene(), renderTarget = contextStage('capture.camera', () => cameraFor(target, true));
-        return { key: contextStage('capture.key', () => contextHash(['context-render/2', 'context-photo/2', d.build ?? 'dev', s.key, renderTarget, detail])), revision: s.revision, payload: { snapshot: s.snapshot, target: renderTarget, detail } };
+        return { key: contextStage('capture.key', () => contextHash(['context-render/2', 'context-photo/3', d.build ?? 'dev', s.key, renderTarget, detail])), revision: s.revision, payload: { snapshot: s.snapshot, target: renderTarget, detail } };
     };
     const capture = d.renderer ?? (async (i: ContextInput, signal: AbortSignal) => {
         const payload = i.payload as {
