@@ -58,3 +58,16 @@ test('a refused trailing operation never applies a partial desk replacement', ()
   const result = applyBatch(m, { ops: [...plan.ops, { op: 'place', def: 'core/does-not-exist@1', name: 'refuse', p: [30, 0] }] }, 'god', 3);
   assert.equal(result.result.accepted, false); assert.deepEqual(m.snapshot(), before);
 });
+
+test('an occupied retained office chair is allowed and remains byte-identical while only its unused desk is replaced', () => {
+  const { m, input } = fixture(), expected = input(), chair = structuredClone(m.get(EDEN_DESK_PAIRS[0][1]));
+  const actualUse = { body: 'h_reader01', soul: 'Reader', how: 'occupied', thing: EDEN_DESK_PAIRS[0][1] };
+  expected.audit.uses.find(row => row.id === chair.id).inUse = actualUse;
+  const plan = planEdenDeskRepair(m, expected);
+  assert.deepEqual(plan.mapping[0].observedChairUse, actualUse, 'real observed claim retained in plan evidence');
+  assert.ok(!plan.ops.some(op => op.id === chair.id), 'no ordinary operation touches this chair');
+  assert.deepEqual(plan.expect[chair.id], { id: chair.id, v: chair.v });
+  const result = applyBatch(m, { ops: plan.ops }, 'god', 3); assert.ok(result.result.accepted, JSON.stringify(result.result));
+  assert.deepEqual(m.entities.get(chair.id), chair, 'same exact functional chair identity, pose, state and geometry');
+  assert.equal(m.resolvedDef(m.get(EDEN_DESK_PAIRS[0][0]).def).version, 2);
+});
