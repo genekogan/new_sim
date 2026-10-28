@@ -5,7 +5,8 @@ import { existsSync, mkdtempSync, mkdirSync, writeFileSync, renameSync, readFile
 import { tmpdir, homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cacheAdd, cacheKey, compareRuns, lookupCache, suiteTree, DRIVER_ONLY, main, parseArgs, parseTap, readRun, scopeFor, storeCache, validateQuarantine, REQUIRED_PACKAGES, REQUIRED_STEPS } from './release-gate.mjs';
+import { cacheAdd, cacheKey, compareRuns, lookupCache, prepareBundleBaselineCarry, suiteTree, DRIVER_ONLY, main, parseArgs, parseTap, readRun, scopeFor, storeCache, validateQuarantine, REQUIRED_PACKAGES, REQUIRED_STEPS } from './release-gate.mjs';
+import { combineReceipts } from './ship-receipt.mjs';
 
 // Preserve fixture artifacts under the same no-delete rule as release work.
 const retireFixture = dir => { const trash = join(homedir(), '.Trash'); mkdirSync(trash, { recursive: true }); renameSync(dir, join(trash, dir.split('/').at(-1) + '-' + Date.now())); };
@@ -562,4 +563,151 @@ test('against a cached baseline with other driver files, only their own removed 
   assert.equal(renamed.status, 'pass'); assert.equal(renamed.driverTestsRemoved[0].id, 'old name');
   assert.equal(compareRuns(harness(['old name'], driver), harness(['new name'], driver), manifest()).status, 'blocked');
   assert.equal(compareRuns(harness(['old name'], other), harness(['new name'], other), manifest(), new Set(), { driverTestsChanged: true }).status, 'blocked');
+});
+
+// A carry fixture models a genuinely qualified full run and keeps its executed
+// TAP separate from the deliberately new bundle expectation assertion.
+const carryOldBudget = () => ({ schema: 'bundle-budget/1', note: ['fixture original limits'], source: { sha: 'original' },
+  total: { files: 2, bytes: 200000, gzip: 100000 }, chunks: { 'assets/old.js': { files: 1, bytes: 150000, gzip: 75000 } } });
+const carryMeasurement = () => ({ total: { files: 2, bytes: 190000, gzip: 90000 }, chunks: {
+  'assets/old.js': { files: 1, bytes: 100000, gzip: 50000 }, 'assets/shared.js': { files: 1, bytes: 90000, gzip: 40000 } } });
+function writeCarryRun(out, meta, budget, current, nodeVersion = 'v22.23.0') {
+  writeFullRun(out, meta, { nodeVersion });
+  const names = ['budget comparator behavior', 'bundle total within +10% of baseline',
+    'bundle: no new chunk of 100 KB or more without a baseline entry',
+    ...Object.keys(budget.chunks).map(key => `bundle chunk ${key} within +10% of baseline`)];
+  writeFileSync(join(out, 'out/suite/V3-bundle.log'), tap(names.map(name => ({ name }))));
+  mkdirSync(join(out, 'out/suite/bundle'), { recursive: true });
+  writeFileSync(join(out, 'out/suite/bundle/current.json'), JSON.stringify(current));
+}
+function carryFixture(t) {
+  const repo = gateRepo(t), prefix = 'tools/test-harness/bundle-budget/';
+  for (const name of ['budget.mjs', 'bundle-gate.test.mjs']) repo.commit(prefix + name, readFileSync(new URL('./bundle-budget/' + name, import.meta.url), 'utf8'));
+  const before = carryOldBudget(), source = repo.commit(prefix + 'baseline.json', JSON.stringify(before));
+  const originalGate = join(repo.dir, '.lane/original-gate'), originalOut = join(originalGate, 'candidate');
+  const meta = { schemaVersion: 1, sourceSha: source, harnessRef: source,
+    harnessTree: gitIn(repo.dir, 'rev-parse', `${source}:tools/test-harness`),
+    harnessArchiveSha256: shaOf(execFileSync('git', ['-C', repo.dir, 'archive', '--format=tar.gz', source, 'tools/test-harness'])),
+    sourceArchiveSha256: shaOf('original-source-archive-' + source), node: '22' };
+  writeCarryRun(originalOut, meta, before, carryMeasurement());
+  const original = readRun(originalOut, meta, manifest()); assert.deepEqual(original.errors, []);
+  writeFileSync(join(originalGate, 'receipt.json'), JSON.stringify({ schemaVersion: 1, status: 'pass', refs: { candidate: { sha: source } },
+    scope: { resolved: 'full', steps: REQUIRED_STEPS }, blockers: [], newFailures: [], removed: [], unexpectedSkips: [], runs: { candidate: original } }));
+  const cacheRoot = mkdtempSync(join(dirname(repo.dir), 'sim-carry-cache-')); t.after(() => retireFixture(cacheRoot));
+  const stored = storeCache(cacheRoot, original, { via: 'gate', label: 'candidate', gate: originalGate, status: 'pass' }, repo.dir);
+  assert.equal(stored.stored, true, stored.reason);
+  const after = structuredClone(before); after.note.push('reviewed new-key registration');
+  after.chunks['assets/shared.js'] = { files: 1, bytes: 110000, gzip: 45000 };
+  const head = repo.commit(prefix + 'baseline.json', JSON.stringify(after));
+  const options = () => ({ sourceSha: source, harnessRef: gitIn(repo.dir, 'rev-parse', 'HEAD'), node: '22', manifest: manifest(), root: repo.dir });
+  const runRemote = (calls, runtime = 'v22.23.0', mutate = () => {}) => async (out, sourceSha, harnessRef, node) => {
+    calls.push(sourceSha);
+    writeCarryRun(out, { schemaVersion: 1, sourceSha, harnessRef, harnessTree: gitIn(repo.dir, 'rev-parse', `${harnessRef}:tools/test-harness`),
+      harnessArchiveSha256: shaOf(execFileSync('git', ['-C', repo.dir, 'archive', '--format=tar.gz', harnessRef, 'tools/test-harness'])),
+      sourceArchiveSha256: shaOf('candidate-source-archive-' + sourceSha), node }, after, carryMeasurement(), runtime);
+    mutate(); return { exit: 0, timedOut: false, log: 'fixture', logSha256: '' };
+  };
+  return { repo, source, head, before, after, dir: stored.dir, cacheRoot, options, runRemote };
+}
+
+test('bundle baseline carry: original full execution stays immutable and candidate alone executes', async t => {
+  const f = carryFixture(t), manifestPath = join(f.dir, 'CACHE.json'), cacheBefore = readFileSync(manifestPath),
+    rawTapPath = join(f.dir, 'out/suite/V3-bundle.log'), tapBefore = readFileSync(rawTapPath);
+  const proof = await prepareBundleBaselineCarry(f.dir, f.options());
+  assert.equal(proof.provenance.unchangedStages.length, 18);
+  assert.equal(proof.originalRun.metadata.harnessRef, f.source);
+  assert.equal(proof.originalRun.metadata.harnessTree, gitIn(f.repo.dir, 'rev-parse', `${f.source}:tools/test-harness`));
+  assert.equal(proof.originalRun.steps['V3-bundle'].tests.some(x => x.id.includes('assets/shared.js')), false);
+  assert.ok(proof.comparisonRun.steps['V3-bundle'].tests.find(x => x.id.includes('assets/shared.js')).executed === false);
+  assert.equal(proof.provenance.derivedAssertionsExecuted, false);
+  const calls = [], out = join(f.repo.dir, '.lane/carry-gate');
+  const result = await gate(f.repo, [f.head, '--baseline', f.source, '--baseline-bundle-carry', f.dir, '--cache', f.cacheRoot, '--out', out], f.runRemote(calls));
+  const receipt = receiptOf(out);
+  assert.equal(result.rc, 0, receipt.blockers.join('\n')); assert.deepEqual(calls, [f.head]);
+  assert.equal(receipt.baseline.source, 'cached'); assert.equal(receipt.baseline.suiteTree, suiteTree(f.repo.dir, f.source));
+  assert.notEqual(receipt.baseline.suiteTree, receipt.harness.suiteTree);
+  assert.equal(receipt.baseline.bundleExpectationCarry.originalExecutionMetadata.harnessRef, f.source);
+  assert.equal(receipt.runs.baseline.steps['V3-bundle'].tests.some(x => x.id.includes('assets/shared.js')), false);
+  assert.deepEqual(readFileSync(manifestPath), cacheBefore); assert.deepEqual(readFileSync(rawTapPath), tapBefore);
+  assert.deepEqual(receipt.cache.stored.map(x => x.label), ['candidate']);
+  const ship = combineReceipts(receipt, { schemaVersion: 1, step: 'V7', status: 'pass', dirty: false, source: f.head, checks: [{ ok: true }] });
+  assert.equal(ship.status, 'pass'); assert.deepEqual(ship.blockers, []);
+  assert.equal(ship.baseline, f.source);
+});
+
+test('bundle baseline carry: opt-in forbids imports, disabled cache and partial scope', () => {
+  for (const args of [['--baseline-results', '/x'], ['--candidate-results', '/x', '--baseline-results', '/y'], ['--no-cache'], ['--scope', 'auto']])
+    assert.throws(() => parseArgs(['HEAD', '--baseline-bundle-carry', '/cache', ...args]), /requires full scope\/cache/);
+});
+
+test('bundle baseline carry: only the original qualified full-gate candidate is eligible', async t => {
+  for (const change of ['bare-cache', 'partial-gate', 'execution-metadata']) {
+    const f = carryFixture(t), cachePath = join(f.dir, 'CACHE.json'), entry = JSON.parse(readFileSync(cachePath));
+    if (change === 'bare-cache') {
+      entry.provenance.via = 'cache-add'; writeFileSync(cachePath, JSON.stringify(entry));
+    } else {
+      const path = join(entry.provenance.gate, 'receipt.json'), receipt = JSON.parse(readFileSync(path));
+      if (change === 'partial-gate') receipt.scope.resolved = 'scoped';
+      else receipt.runs.candidate.metadata.sourceArchiveSha256 = 'f'.repeat(64);
+      writeFileSync(path, JSON.stringify(receipt));
+    }
+    const calls = [], out = join(f.repo.dir, '.lane/provenance-refused');
+    const result = await gate(f.repo, ['HEAD', '--baseline', f.source, '--baseline-bundle-carry', f.dir, '--out', out], f.runRemote(calls));
+    assert.equal(result.rc, 1); assert.deepEqual(calls, []);
+    assert.match(receiptOf(out).blockers.join('\n'), /provenance required|full baseline|metadata differs/);
+  }
+});
+
+test('bundle baseline carry: any other executed harness byte or quarantine change refuses before a candidate call', async t => {
+  for (const file of ['one-validation.sh', 'quarantine.json', 'bundle-budget/budget.mjs', 'bundle-budget/bundle-gate.test.mjs']) {
+    const f = carryFixture(t), path = 'tools/test-harness/' + file;
+    const previous = existsSync(join(f.repo.dir, path)) ? readFileSync(join(f.repo.dir, path), 'utf8') : '';
+    f.repo.commit(path, file === 'quarantine.json' ? JSON.stringify({ ...manifest(), unrelated: true }) : previous + '\n// changed suite byte\n');
+    const calls = [], out = join(f.repo.dir, '.lane/refused');
+    const result = await gate(f.repo, ['HEAD', '--baseline', f.source, '--baseline-bundle-carry', f.dir, '--out', out], f.runRemote(calls));
+    assert.equal(result.rc, 1); assert.deepEqual(calls, []); assert.match(receiptOf(out).blockers.join('\n'), /only bundle-budget\/baseline.json/);
+  }
+});
+
+test('bundle baseline carry: existing limits cannot be relaxed or removed, including the total', async t => {
+  for (const change of ['total', 'old-chunk', 'removed-chunk', 'source']) {
+    const f = carryFixture(t), budget = structuredClone(f.after);
+    if (change === 'total') budget.total.bytes++;
+    if (change === 'old-chunk') budget.chunks['assets/old.js'].bytes++;
+    if (change === 'removed-chunk') delete budget.chunks['assets/old.js'];
+    if (change === 'source') budget.source.sha = 'relabelled';
+    f.repo.commit('tools/test-harness/bundle-budget/baseline.json', JSON.stringify(budget));
+    await assert.rejects(prepareBundleBaselineCarry(f.dir, f.options()), /existing baseline|existing chunk/);
+  }
+});
+
+test('bundle baseline carry: changed raw files or failed new expectations refuse, never relabelled as a valid cache', async t => {
+  const badRaw = carryFixture(t);
+  writeFileSync(join(badRaw.dir, 'out/suite/bundle/current.json'), '{}');
+  await assert.rejects(prepareBundleBaselineCarry(badRaw.dir, badRaw.options()), /original cache invalid/);
+  const badBudget = carryFixture(t), next = structuredClone(badBudget.after); next.chunks['assets/shared.js'] = { files: 1, bytes: 100, gzip: 100 };
+  badBudget.repo.commit('tools/test-harness/bundle-budget/baseline.json', JSON.stringify(next));
+  await assert.rejects(prepareBundleBaselineCarry(badBudget.dir, badBudget.options()), /does not satisfy/);
+});
+
+test('bundle baseline carry: runtime mismatch after candidate has no fallback baseline invocation', async t => {
+  const f = carryFixture(t), calls = [], out = join(f.repo.dir, '.lane/runtime-mismatch');
+  const result = await gate(f.repo, [f.head, '--baseline', f.source, '--baseline-bundle-carry', f.dir, '--out', out], f.runRemote(calls, 'v22.24.0'));
+  assert.equal(result.rc, 1); assert.deepEqual(calls, [f.head]);
+  assert.match(receiptOf(out).blockers.join('\n'), /runtime.*baseline fallback forbidden/);
+});
+
+test('bundle baseline carry: original evidence changing during candidate execution blocks without a baseline retry', async t => {
+  const f = carryFixture(t), calls = [], out = join(f.repo.dir, '.lane/changed-during-candidate');
+  const result = await gate(f.repo, [f.head, '--baseline', f.source, '--baseline-bundle-carry', f.dir, '--out', out],
+    f.runRemote(calls, 'v22.23.0', () => writeFileSync(join(f.dir, 'out/suite/bundle/current.json'), '{}')));
+  assert.equal(result.rc, 1); assert.deepEqual(calls, [f.head]); assert.match(receiptOf(out).blockers.join('\n'), /original cache invalid/);
+});
+
+test('bundle baseline carry: dry-run validates provenance but executes and writes nothing', async t => {
+  const f = carryFixture(t), calls = [], out = join(f.repo.dir, '.lane/carry-dry-run');
+  const result = await gate(f.repo, [f.head, '--baseline', f.source, '--baseline-bundle-carry', f.dir, '--out', out, '--dry-run'], f.runRemote(calls));
+  assert.equal(result.rc, 0); assert.deepEqual(calls, []); assert.equal(existsSync(out), false);
+  const plan = JSON.parse(result.lines[0]); assert.deepEqual(plan.modalRuns, ['candidate']);
+  assert.equal(plan.baseline.bundleExpectationCarry.derivedAssertionsExecuted, false);
 });

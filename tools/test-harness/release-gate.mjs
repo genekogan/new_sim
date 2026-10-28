@@ -4,7 +4,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { closeSync, constants, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, renameSync, writeFileSync, writeSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 // This is the CPU-only contract, not a discovery list supplied by a candidate.
 export const REQUIRED_STEPS = [
@@ -393,6 +393,101 @@ export function lookupCache(cacheDir, identity, manifest, requiredSteps = REQUIR
   return { hit: true, key, dir, run, entry };
 }
 
+const BUNDLE_BASELINE = 'bundle-budget/baseline.json';
+const BUNDLE_COMPARATOR = 'bundle-budget/budget.mjs';
+const BUNDLE_TEST = 'bundle-budget/bundle-gate.test.mjs';
+const equalJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const carryRequire = (value, message) => { if (!value) throw Error(`bundle baseline carry: ${message}`); };
+const harnessEntries = (root, ref) => new Map(gitAt(root, 'ls-tree', '-r', '--full-tree', ref, '--', 'tools/test-harness')
+  .split('\n').filter(Boolean).map(line => { const [meta, path] = line.split('\t'); return [path.slice('tools/test-harness/'.length), meta]; }));
+
+/** Explicit, narrowly bounded reuse of an executed full baseline. Its raw run,
+ * metadata, TAP and cache are never rewritten or stored under another identity.
+ * Only new bundle-key expectations are evaluated from its original measurement;
+ * the separate comparison view labels every derived assertion. */
+export async function prepareBundleBaselineCarry(dir, { sourceSha, harnessRef, node, manifest, root = ROOT }) {
+  dir = resolve(dir);
+  const manifestPath = join(dir, 'CACHE.json'), manifestBytes = readFileSync(manifestPath), entry = JSON.parse(manifestBytes);
+  carryRequire(entry.sourceSha === sourceSha && entry.node === node, 'cached source/Node major differs from the named baseline');
+  const cached = lookupCache(dirname(dir), { sourceSha, suiteTree: entry.suiteTree, node }, manifest, REQUIRED_STEPS, {}, root);
+  carryRequire(cached.hit && resolve(cached.dir) === dir, `original cache invalid: ${cached.reason || 'directory/key mismatch'}`);
+  const original = cached.run, m = original.metadata;
+  for (const field of ['sourceSha', 'harnessRef', 'harnessTree', 'harnessArchiveSha256', 'sourceArchiveSha256', 'node', 'nodeVersion', 'pnpmVersion'])
+    carryRequire(entry[field] === m[field], `original cache/metadata differs: ${field}`);
+  carryRequire(/^[0-9a-f]{40}$/.test(sourceSha) && /^[0-9a-f]{64}$/.test(m.sourceArchiveSha256 || ''), 'exact original source/archive identity required');
+  gitAt(root, 'cat-file', '-e', `${sourceSha}^{commit}`);
+  const oldArchive = execFileSync('git', ['-C', root, 'archive', '--format=tar.gz', m.harnessRef, 'tools/test-harness'], { maxBuffer: MAX_BUFFER });
+  carryRequire(sha256(oldArchive) === m.harnessArchiveSha256, 'original harness archive differs');
+  carryRequire(entry.provenance?.via === 'gate' && entry.provenance.label === 'candidate' && SUCCESS.has(entry.provenance.status), 'passing full-gate candidate provenance required');
+  const qualificationPath = join(entry.provenance.gate, 'receipt.json'), qualificationBytes = readFileSync(qualificationPath), qualification = JSON.parse(qualificationBytes);
+  carryRequire(SUCCESS.has(qualification.status) && qualification.refs?.candidate?.sha === sourceSha && qualification.scope?.resolved === 'full'
+    && equalJson(qualification.scope.steps, REQUIRED_STEPS), 'original qualification does not name this full baseline');
+  for (const field of ['blockers', 'newFailures', 'removed', 'unexpectedSkips'])
+    carryRequire(Array.isArray(qualification[field]) && !qualification[field].length, `original qualification has ${field}`);
+  carryRequire(equalJson(qualification.runs?.candidate?.metadata, m), 'qualified execution metadata differs from original cached execution');
+  const ownSourceFiles = new Set(gitAt(root, 'ls-tree', '-r', '--name-only', sourceSha).split('\n'));
+  carryRequire(!compareRuns(original, original, manifest, ownSourceFiles).blockers.length, 'original full run does not pass on its own terms');
+
+  const oldEntries = harnessEntries(root, m.harnessRef), newEntries = harnessEntries(root, harnessRef);
+  const changed = [...new Set([...oldEntries.keys(), ...newEntries.keys()])].filter(path => oldEntries.get(path) !== newEntries.get(path)).sort();
+  const suiteChanges = changed.filter(path => !DRIVER_ONLY.includes(path));
+  carryRequire(equalJson(suiteChanges, [BUNDLE_BASELINE]), 'only bundle-budget/baseline.json may change in the executed suite');
+  const gitBytes = (ref, path) => execFileSync('git', ['-C', root, 'show', `${ref}:tools/test-harness/${path}`], { maxBuffer: MAX_BUFFER });
+  const beforeBytes = gitBytes(m.harnessRef, BUNDLE_BASELINE), afterBytes = gitBytes(harnessRef, BUNDLE_BASELINE);
+  const before = JSON.parse(beforeBytes), after = JSON.parse(afterBytes);
+  carryRequire(equalJson(Object.keys(before).sort(), Object.keys(after).sort()) && before.schema === 'bundle-budget/1' && after.schema === before.schema,
+    'baseline schema/fields changed');
+  for (const field of Object.keys(before).filter(field => !['note', 'chunks'].includes(field)))
+    carryRequire(equalJson(before[field], after[field]), `existing baseline ${field} changed`);
+  carryRequire(Array.isArray(after.note) && after.note.every(note => typeof note === 'string'), 'baseline notes must remain data');
+  const addedKeys = Object.keys(after.chunks).filter(key => !(key in before.chunks));
+  carryRequire(addedKeys.length > 0, 'at least one explicit new-key registration required');
+  for (const [key, value] of Object.entries(before.chunks))
+    carryRequire(equalJson(value, after.chunks[key]), `existing chunk removed or budget changed: ${key}`);
+  for (const key of addedKeys) {
+    const value = after.chunks[key];
+    carryRequire(equalJson(Object.keys(value).sort(), ['bytes', 'files', 'gzip']) && ['bytes', 'files', 'gzip'].every(k => Number.isSafeInteger(value[k]) && value[k] > 0),
+      `invalid new-key budget: ${key}`);
+  }
+  const comparatorBytes = gitBytes(harnessRef, BUNDLE_COMPARATOR), testBytes = gitBytes(harnessRef, BUNDLE_TEST);
+  carryRequire(sha256(readFileSync(join(root, 'tools/test-harness', BUNDLE_COMPARATOR))) === sha256(comparatorBytes), 'local comparator differs from committed unchanged code');
+  const budget = await import(pathToFileURL(join(root, 'tools/test-harness', BUNDLE_COMPARATOR)));
+  carryRequire(sha256(readFileSync(join(root, 'tools/test-harness', BUNDLE_COMPARATOR))) === sha256(comparatorBytes), 'comparator changed while loading');
+  const measurementPath = join(dir, 'out/suite/bundle/current.json'), measurementBytes = readFileSync(measurementPath), current = JSON.parse(measurementBytes);
+  carryRequire(entry.files['suite/bundle/current.json'] === sha256(measurementBytes), 'original measurement is not pinned by original cache');
+  const validSize = value => value && ['files', 'bytes', 'gzip'].every(k => Number.isSafeInteger(value[k]) && value[k] >= 0);
+  carryRequire(validSize(current.total) && current.total.files > 0 && current.chunks && Object.values(current.chunks).every(validSize), 'malformed original measurement');
+  for (const metric of ['files', 'bytes', 'gzip']) carryRequire(Object.values(current.chunks).reduce((sum, value) => sum + value[metric], 0) === current.total[metric], `measurement total differs: ${metric}`);
+  const gateAssertions = baseline => [
+    { id: `bundle total within +${budget.THRESHOLD_PCT}% of baseline`, pass: !budget.over(baseline.total, current.total, { slack: 0 }).length },
+    { id: `bundle: no new chunk of ${budget.NEW_CHUNK_BYTES / 1024} KB or more without a baseline entry`, pass: !budget.compare(baseline, current).offenders.some(o => o.kind === 'new') },
+    ...Object.entries(baseline.chunks).map(([key, value]) => ({ id: `bundle chunk ${key} within +${budget.THRESHOLD_PCT}% of baseline`, pass: !budget.over(value, current.chunks[key], { slack: budget.SLACK_BYTES }).length })),
+  ];
+  const oldAssertions = gateAssertions(before), derived = gateAssertions(after);
+  for (const assertion of oldAssertions) {
+    const found = original.steps['V3-bundle'].tests.filter(t => t.id === assertion.id);
+    carryRequire(assertion.pass && found.length === 1 && found[0].status === 'pass' && !found[0].loader, `original bundle assertion/measurement disagrees: ${assertion.id}`);
+  }
+  carryRequire(derived.every(assertion => assertion.pass), 'original raw bundle does not satisfy the new expectations');
+  const oldIds = new Set(oldAssertions.map(assertion => assertion.id));
+  const derivedAssertions = derived.map(assertion => ({ id: assertion.id, status: 'pass', aggregate: false, loader: false, directive: '',
+    evidenceKind: 'derived-bundle-expectation', executed: false }));
+  const comparisonRun = { ...original, steps: { ...original.steps, 'V3-bundle': { ...original.steps['V3-bundle'],
+    tests: [...original.steps['V3-bundle'].tests.filter(t => !oldIds.has(t.id)), ...derivedAssertions] } } };
+  const unchangedStages = REQUIRED_STEPS.filter(step => step !== 'V3-bundle').map(step => ({ step, evidenceKind: 'original-executed', exit: original.steps[step].exit,
+    assertionInventorySha256: sha256(JSON.stringify(original.steps[step].tests)),
+    log: { path: original.steps[step].log, sha256: original.evidence[original.steps[step].log] } }));
+  carryRequire(unchangedStages.length === 18 && unchangedStages.every(stage => stage.exit === '0' && stage.log.sha256), 'all 18 unchanged executed stages must be present and successful');
+  const provenance = { schema: 'bundle-baseline-carry/1', originalCacheDir: dir, originalCacheKey: entry.key, originalCacheManifestSha256: sha256(manifestBytes),
+    originalQualification: { path: qualificationPath, sha256: sha256(qualificationBytes) }, originalExecutionMetadata: m,
+    originalSuiteTree: entry.suiteTree, expectationSuiteTree: suiteTree(root, harnessRef), expectationHarnessRef: harnessRef,
+    expectationHarnessTree: gitAt(root, 'rev-parse', `${harnessRef}:tools/test-harness`), changedSuiteFiles: suiteChanges, existingDriverOnlyChanges: changed.filter(path => DRIVER_ONLY.includes(path)),
+    originalBaselineSha256: sha256(beforeBytes), newBaselineSha256: sha256(afterBytes), comparatorSha256: sha256(comparatorBytes), unchangedBundleTestSha256: sha256(testBytes),
+    originalMeasurement: { path: measurementPath, sha256: sha256(measurementBytes) }, addedKeys, unchangedStages, derivedAssertions,
+    rawExecutionUnmodified: true, derivedAssertionsExecuted: false, baselineRerunAllowed: false };
+  return { originalRun: original, comparisonRun, provenance, pinsSha256: sha256(JSON.stringify(provenance)) };
+}
+
 /** Copy a validated run into the cache (APFS clone where possible). Never overwrites an entry. */
 export function storeCache(cacheDir, run, provenance = {}, root = ROOT) {
   const m = run.metadata;
@@ -494,13 +589,16 @@ export function scopeFor(files) {
 
 export const USAGE = `usage: release-gate.sh <candidate-ref> [--baseline <ref>] [--out <dir>] [--node 22|26]
          [--baseline-results <dir> [--candidate-results <dir>]] [--cache <dir> | --no-cache] [--scope full|auto] [--dry-run]
+         [--baseline-bundle-carry <qualified-cache-dir>]
        release-gate.sh cache-add <completed-run-dir> [--cache <dir>]
 The baseline (default main) comes from the gate cache when a validated run of it exists for this harness tree and Node
 major; otherwise it runs once on Modal beside the candidate and is cached. A passing gate caches its candidate run.
 --scope auto (lane candidates) runs only the steps the baseline..candidate diff touches (docs/tools only: no gate, exit 0,
 status not-gated); the default --scope full is the release head's gate. Only full gates qualify a ship or fill the cache.
+--baseline-bundle-carry explicitly retains an original qualified cache across only new bundle-key registrations;
+old execution stays unchanged, derived expectations are labelled separately, and no baseline fallback is allowed.
 --dry-run prints the plan (refs, scope, cache hit/miss, Modal runs) without contacting Modal or writing anything.`;
-const VALUE_OPTIONS = ['--out', '--baseline', '--baseline-results', '--candidate-results', '--node', '--cache', '--scope'];
+const VALUE_OPTIONS = ['--out', '--baseline', '--baseline-results', '--candidate-results', '--node', '--cache', '--scope', '--baseline-bundle-carry'];
 const FLAG_OPTIONS = ['--dry-run', '--no-cache'];
 export function parseArgs(args) {
   args = [...args];
@@ -517,6 +615,8 @@ export function parseArgs(args) {
   if (options['--candidate-results'] && !options['--baseline-results']) throw Error('--candidate-results needs --baseline-results');
   if (options['--cache'] && flags.has('--no-cache')) throw Error('--cache and --no-cache conflict');
   if (options['--scope'] && !['full', 'auto'].includes(options['--scope'])) throw Error('--scope is full or auto');
+  if (options['--baseline-bundle-carry'] && (options['--baseline-results'] || options['--candidate-results'] || flags.has('--no-cache') || options['--scope'] === 'auto'))
+    throw Error('--baseline-bundle-carry requires full scope/cache and cannot combine with result imports');
   return { candidateRef, options, flags };
 }
 
@@ -577,13 +677,19 @@ export async function main(args = process.argv.slice(2), deps = {}) {
     const useCache = !flags.has('--no-cache'), cacheDir = resolve(options['--cache'] || defaultCacheDir(root));
     const pairImport = Boolean(options['--candidate-results']);
     // Where the baseline comes from: an audited import, the cache, or one fresh Modal run (which is then cached).
-    let base, cached;
-    if (options['--baseline-results']) base = { source: 'imported', dir: resolve(options['--baseline-results']), exact: pairImport };
+    let base, cached, bundleCarry;
+    const carryOptions = { sourceSha: baselineSha, harnessRef, node, manifest, root };
+    if (options['--baseline-bundle-carry']) {
+      bundleCarry = await prepareBundleBaselineCarry(options['--baseline-bundle-carry'], carryOptions);
+      base = { source: 'cached', dir: bundleCarry.provenance.originalCacheDir, cacheKey: bundleCarry.provenance.originalCacheKey,
+        bundleExpectationCarry: bundleCarry.provenance };
+    } else if (options['--baseline-results']) base = { source: 'imported', dir: resolve(options['--baseline-results']), exact: pairImport };
     else if (useCache && (cached = lookupCache(cacheDir, { sourceSha: baselineSha, suiteTree: suite, node }, manifest, REQUIRED_STEPS, {}, root)).hit) base = { source: 'cached', dir: cached.dir, cacheKey: cached.key };
     else base = { source: 'run', dir: join(out, 'baseline'), exact: true, cacheKey: cacheKey({ sourceSha: baselineSha, suiteTree: suite, node }), cacheMiss: useCache ? cached.reason : 'cache disabled (--no-cache)' };
     const candidateDir = pairImport ? resolve(options['--candidate-results']) : join(out, 'candidate');
     const plan = { refs: receipt.refs, harness: { ...receipt.harness, clean: harnessClean }, node, scope: receipt.scope, cache: useCache ? cacheDir : null,
-      baseline: { source: base.source, dir: base.dir, cacheKey: base.cacheKey, cacheMiss: base.cacheMiss },
+      baseline: { source: base.source, dir: base.dir, cacheKey: base.cacheKey, cacheMiss: base.cacheMiss,
+        ...(bundleCarry && { bundleExpectationCarry: bundleCarry.provenance }) },
       candidate: { source: pairImport ? 'imported' : 'run', dir: candidateDir },
       modalRuns: [...(pairImport ? [] : ['candidate']), ...(base.source === 'run' ? ['baseline'] : [])] };
     if (dryRun) {
@@ -592,13 +698,19 @@ export async function main(args = process.argv.slice(2), deps = {}) {
       return 0;
     }
     receipt.importedResults = pairImport;
-    receipt.baseline = { source: base.source, dir: base.dir, ...(base.cacheKey && { cacheKey: base.cacheKey }), ...(base.cacheMiss && { cacheMiss: base.cacheMiss }) };
+    receipt.baseline = { source: base.source, dir: base.dir, ...(base.cacheKey && { cacheKey: base.cacheKey }), ...(base.cacheMiss && { cacheMiss: base.cacheMiss }),
+      ...(bundleCarry && { bundleExpectationCarry: bundleCarry.provenance }) };
     const drivers = {};
     const runs = [];
     if (!pairImport) runs.push(runRemote(candidateDir, candidateSha, harnessRef, node, root, only).then(d => { drivers.candidate = d; }));
     if (base.source === 'run') runs.push(runRemote(base.dir, baselineSha, harnessRef, node, root).then(d => { drivers.baseline = d; }));
     await Promise.all(runs);
-    const readBaseline = () => base.source === 'cached' ? readSuiteRun(base.dir, { sourceSha: baselineSha, suiteTree: suite, node }, manifest, root)
+    if (bundleCarry) {
+      const rechecked = await prepareBundleBaselineCarry(base.dir, carryOptions);
+      if (rechecked.pinsSha256 !== bundleCarry.pinsSha256) throw Error('bundle baseline carry: original evidence or expectations changed during candidate execution; no baseline fallback allowed');
+      bundleCarry = rechecked;
+    }
+    const readBaseline = () => bundleCarry ? bundleCarry.originalRun : base.source === 'cached' ? readSuiteRun(base.dir, { sourceSha: baselineSha, suiteTree: suite, node }, manifest, root)
       : readRun(base.dir, base.exact ? { ...identity, sourceSha: baselineSha } : reuseIdentity({ sourceSha: baselineSha, harnessTree, node }), manifest);
     let baseline = readBaseline();
     const candidate = readRun(candidateDir, candidateIdentity, manifest, scope.steps);
@@ -606,16 +718,19 @@ export async function main(args = process.argv.slice(2), deps = {}) {
     // A cached baseline is only comparable on the candidate's exact runtime (the node:<major> image can move its patch).
     const runtime = r => r.metadata && `${r.metadata.nodeVersion}/${r.metadata.pnpmVersion}`;
     if (base.source === 'cached' && candidate.metadata && runtime(baseline) !== runtime(candidate)) {
-      receipt.baseline = { ...receipt.baseline, source: 'run', cacheRejected: `runtime ${runtime(baseline)} differs from the candidate's ${runtime(candidate)}`, cachedDir: base.dir, dir: join(out, 'baseline') };
-      base = { source: 'run', dir: join(out, 'baseline'), exact: true };
-      drivers.baseline = await runRemote(base.dir, baselineSha, harnessRef, node, root);
-      baseline = readBaseline();
+      if (bundleCarry) baseline.errors.push(`bundle baseline carry: runtime ${runtime(baseline)} differs from the candidate's ${runtime(candidate)}; baseline fallback forbidden`);
+      else {
+        receipt.baseline = { ...receipt.baseline, source: 'run', cacheRejected: `runtime ${runtime(baseline)} differs from the candidate's ${runtime(candidate)}`, cachedDir: base.dir, dir: join(out, 'baseline') };
+        base = { source: 'run', dir: join(out, 'baseline'), exact: true };
+        drivers.baseline = await runRemote(base.dir, baselineSha, harnessRef, node, root);
+        baseline = readBaseline();
+      }
     }
     if (drivers.baseline && (drivers.baseline.exit !== 0 || drivers.baseline.timedOut)) baseline.errors.push(`Modal driver failed (${drivers.baseline.timedOut ? 'timeout' : drivers.baseline.exit})`);
     const candidateSourceFiles = new Set(git('ls-tree', '-r', '--name-only', candidateSha).split('\n'));
     const driverTestsChanged = base.source === 'cached' && baseline.metadata?.harnessTree !== harnessTree;
     if (base.source === 'cached') receipt.baseline = { ...receipt.baseline, harnessRef: baseline.metadata?.harnessRef, harnessTree: baseline.metadata?.harnessTree, suiteTree: baseline.suiteTree, driverTestsChanged };
-    receipt = { ...receipt, ...compareRuns(baseline, candidate, manifest, candidateSourceFiles, { driverTestsChanged }), drivers,
+    receipt = { ...receipt, ...compareRuns(bundleCarry ? bundleCarry.comparisonRun : baseline, candidate, manifest, candidateSourceFiles, { driverTestsChanged }), drivers,
       runs: { baseline, candidate } };
     // Cache what this gate proved: a fresh baseline run that validated, and the candidate of a passing gate
     // (the next gate's baseline once it becomes main).
