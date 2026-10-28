@@ -86,6 +86,12 @@ export function videoTexture(url: string, mesh: THREE.Mesh, onFail?: () => void)
 // ------------------------------------------------------------------ images that cannot be shown
 const brokenImages = new Set<string>(), loadedImages = new Set<string>();
 const imageWaiters = new Map<string, Set<() => void>>();
+const imageFallbackListeners = new Set<(url: string) => void>();
+/** Observe completed visible replacements, once per failed image request. */
+export function onRenderedImageFallback(listener: (url: string) => void): () => void {
+  imageFallbackListeners.add(listener);
+  return () => { imageFallbackListeners.delete(listener); };
+}
 /** Whether an image link already failed to load in this page (no CORS header, gone, not an image). */
 export const imageBroken = (url: string) => brokenImages.has(url);
 /** Call `onFail` once if the image at `url` fails to load (now or later). */
@@ -99,6 +105,9 @@ export function imageFailed(url: string) {
   brokenImages.add(url);
   const w = imageWaiters.get(url); imageWaiters.delete(url);
   for (const f of w ?? []) f();
+  // A failed URL alone is not recovery: every registered face must have
+  // installed its replacement successfully before capture can accept it.
+  if (w?.size) for (const listener of imageFallbackListeners) listener(url);
 }
 /** The image loader's success callback: nothing waits on `url` any more. */
 export function imageLoaded(url: string) { loadedImages.add(url); imageWaiters.delete(url); }
