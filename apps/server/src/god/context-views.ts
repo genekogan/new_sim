@@ -16,6 +16,7 @@ import { lookSchema } from './look.ts';
 import { supportY } from './nav.ts';
 import { contextRegionsOverlap } from './context-view-access.ts';
 import { PlaceIndex, type Place } from '../edge/ledger/places.ts';
+import { checkArtOriginals, readArtOriginal, type ArtOriginals } from './context-original-art.ts';
 export const CONTEXT_PRESENTATION = { source: 'architectural-context', lighting: 'fixed clear late morning (2026-06-21 10:30)', doors: 'definition default', omitted: ['Souls', 'carried and carryable items', 'live wildlife', 'live simulation clock'], live: false } as const;
 const live = new Map<ContextViewCache, () => Promise<void>>();
 /** Pending rows already live in SQLite. Bound cleanup even if a renderer fails to honor abort. */
@@ -35,6 +36,8 @@ type Deps = {
     edge: EdgeLedger;
     worldUrl: string;
     build?: string;
+    /** Trusted local art store. Absent preserves legacy asset-only originals. */
+    artOriginals?: ArtOriginals;
     levelAt?: (x: number, z: number, y: number) => number;
     contextReady?: () => boolean;
     waitForContext?: (signal: AbortSignal) => Promise<void>;
@@ -57,6 +60,7 @@ const imageRef = (r: Selection) => r.ref + (r.detail ? ':detail' : '');
 const sheetRef = (refs: Selection[]) => 'sheet:' + JSON.stringify(refs.map(({ ref, detail }) => ({ ref, detail })));
 const sheetKey = (refs: Tile[]) => contextHash(['context-sheet/2', refs.map(({ ref, detail, key }) => ({ ref, detail: detail === true, key }))]);
 export function mountContextViews(app: Hono, d: Deps) {
+    checkArtOriginals(d.artOriginals);
     const { god, edge } = d, moderation = moderationFor(god.db.db, god.opts.worldId);
     let committedRevision = god.model.editSeq, stamp = '';
     let scene: ReturnType<typeof contextScene> | undefined;
@@ -109,7 +113,7 @@ export function mountContextViews(app: Hono, d: Deps) {
                     // A new visual scene needs its own target/camera frontier, even if
                     // metadata was prepared earlier and engine-only writes intervened.
                     const rebuildTargets = stamp !== wanted || capturesScene;
-                    const nextTargets = rebuildTargets ? await prepareContextTargets(captured.model, job) : targets;
+                    const nextTargets = rebuildTargets ? await prepareContextTargets(captured.model, job, d.artOriginals?.basePath) : targets;
                     job.guard();
                     const nextByRef = new Map<string, ContextTarget>(), nextText = new Map<string, string>();
                     for (const target of nextTargets) {
@@ -323,7 +327,7 @@ export function mountContextViews(app: Hono, d: Deps) {
             throw new ApiError(404, 'context.not-found', 'No known visual target with that ref');
         return target;
     };
-    const originalFor = (t: ContextTarget) => t.original && !moderation.isHidden(t.original.sha) ? { ...t.original, source: 'original-image', version: t.original.sha, url: `/v1/world/context/original?ref=${encodeURIComponent(t.ref)}&version=${t.original.sha}` } : undefined;
+    const originalFor = (t: ContextTarget) => t.original && !moderation.isHidden(t.original.sha) ? { sha: t.original.sha, ext: t.original.ext, source: 'original-image', version: t.original.sha, url: `/v1/world/context/original?ref=${encodeURIComponent(t.ref)}&version=${t.original.sha}` } : undefined;
     const safeTarget = (t: ContextTarget) => ({ ...t, enclosed: contextEnclosed(preparedModel!, t), camera: cameraFor(t).viewpoint, original: originalFor(t) });
     const manifest = (t: ContextTarget, detail = false) => {
         const record = cache.request(imageRef({ ref: t.ref, detail }))!, { ref: _ref, ...r } = record;
@@ -420,7 +424,14 @@ export function mountContextViews(app: Hono, d: Deps) {
     });
     app.get('/v1/world/context/original', c => {
         const t = authorized(c, c.req.query('ref') ?? ''), asset = t.original;
-        if (!asset || asset.sha !== c.req.query('version') || moderation.isHidden(asset.sha) || !god.assets.lookup(asset.sha)?.image)
+        if (!asset || asset.sha !== c.req.query('version') || moderation.isHidden(asset.sha))
+            throw new ApiError(404, 'context.not-found', 'Original image unavailable');
+        if (asset.storage === 'art') {
+            const art = d.artOriginals && readArtOriginal(d.artOriginals, asset);
+            if (!art) throw new ApiError(404, 'context.not-found', 'Original image unavailable');
+            return c.body(art.bytes as never, 200, { 'content-type': art.type, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+        }
+        if (!god.assets.lookup(asset.sha)?.image)
             throw new ApiError(404, 'context.not-found', 'Original image unavailable');
         const path = god.assets.file(asset.sha, asset.ext);
         if (!path)

@@ -4,6 +4,7 @@ import { contextHash } from './context-view-cache.ts';
 import { humanTitle, meaningParts } from './meaning.ts';
 import { withoutHidden } from '../moderation/routes.ts';
 import { inPoly } from './places.ts';
+import { contextOriginal, type ContextOriginal } from './context-original-art.ts';
 export type ContextTarget = {
     ref: string;
     entity: string;
@@ -44,10 +45,7 @@ export type ContextTarget = {
         number
     ][];
     front?: { direction: [number, number, number]; source: 'declared-front' | 'entrance'; ambiguous?: boolean; alternatives?: [number, number, number][] };
-    original?: {
-        sha: string;
-        ext: string;
-    };
+    original?: ContextOriginal;
 };
 export function localContextPoint(m: WorldModel, e: Entity, p: readonly number[]): [
     number,
@@ -74,7 +72,7 @@ export function contextFront(m: WorldModel, owner: Entity, declared = owner.abou
 }
 /** Stable refs use entity ids, never rename-sensitive paths. No invented binding for an unanchored description. */
 export function transientDef(d: ReturnType<WorldModel['resolvedDef']>) { return !!d && (!!d.components.body || !!d.components.carryable || d.tags?.some(t => ['creature', 'animal', 'animals', 'creature-group'].includes(t)) || d.make?.kind === 'gen' && d.make.gen === 'animals/1'); }
-export function* contextTargetRows(m: WorldModel): Generator<ContextTarget> {
+export function* contextTargetRows(m: WorldModel, artBasePath?: string): Generator<ContextTarget> {
     for (const e of m.entities.values()) {
         const d = m.resolvedDef(e.def);
         if (!d || e.id.startsWith('h_') || transientDef(d))
@@ -96,8 +94,8 @@ export function* contextTargetRows(m: WorldModel): Generator<ContextTarget> {
             eye: number[];
             at: number[];
         } | undefined) => v ? { eye: localContextPoint(m, e, v.eye), at: localContextPoint(m, e, v.at) } : undefined;
-        const media = typeof e.state?.media === 'string' ? /^\/assets\/([a-f0-9]{64})\.(png|jpg)$/.exec(e.state.media) : null;
-        const base: ContextTarget = { front: e.about?.front ? contextFront(m, e) : undefined, ref: e.id, entity: e.id, title: e.about?.title ?? humanTitle(m.pathOf(e.id)), ...(e.about?.what ? { what: e.about.what } : {}), aliases: e.about?.aliases, kind: e.about?.kind, role: e.about?.role, point, radius, ...(area ? { region: area } : {}), ...(e.about?.viewpoint ? { viewpoint: view(e.about.viewpoint) } : {}), ...(media ? { original: { sha: media[1], ext: media[2] } } : {}) };
+        const original = contextOriginal(e.state?.media, artBasePath);
+        const base: ContextTarget = { front: e.about?.front ? contextFront(m, e) : undefined, ref: e.id, entity: e.id, title: e.about?.title ?? humanTitle(m.pathOf(e.id)), ...(e.about?.what ? { what: e.about.what } : {}), aliases: e.about?.aliases, kind: e.about?.kind, role: e.about?.role, point, radius, ...(area ? { region: area } : {}), ...(e.about?.viewpoint ? { viewpoint: view(e.about.viewpoint) } : {}), ...(original ? { original } : {}) };
         yield base;
         for (const part of meaningParts(m, e.id)) {
             if (!part.target)
@@ -119,7 +117,7 @@ export function* contextTargetRows(m: WorldModel): Generator<ContextTarget> {
         }
     }
 }
-export function contextTargets(m: WorldModel): ContextTarget[] { return [...contextTargetRows(m)]; }
+export function contextTargets(m: WorldModel, artBasePath?: string): ContextTarget[] { return [...contextTargetRows(m, artBasePath)]; }
 export type ContextRoom = { polygon: [number, number][]; floor: number; ceiling: number };
 /** Real room polygon and vertical span in world coordinates; grouping alone is not enclosure. */
 export function contextRoom(m: WorldModel, target: ContextTarget): ContextRoom | undefined {

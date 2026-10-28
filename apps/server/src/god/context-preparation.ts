@@ -36,10 +36,10 @@ export class ContextPreparation {
     }
 }
 
-export async function prepareContextTargets(model: WorldModel, job: ContextPreparation) {
+export async function prepareContextTargets(model: WorldModel, job: ContextPreparation, artBasePath?: string) {
     job.guard();
     const targets: ContextTarget[] = [];
-    const rows = contextTargetRows(model);
+    const rows = contextTargetRows(model, artBasePath);
     for (;;) {
         const next = job.work(() => rows.next());
         if (next.done) break;
