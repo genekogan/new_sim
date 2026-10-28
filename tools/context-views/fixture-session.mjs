@@ -119,7 +119,7 @@ export function createFixtureSessions({ root, out, port = 5980, deadline, signal
       const bindings = bindCases(cases, baselineSnapshot.entities, listing.targets);
       await sample(); monitor = setInterval(() => { if (!sampling) sampleTask = sample(); }, 500);
       await callback({ request, out, deadline, signal, bindings, baselineSnapshot, entities: baselineSnapshot.entities, cases, assets, report, save,
-        base,
+        base, jobStartLimit: maxStarts,
         jobEvents: () => receipt.contextJobs.map(event => ({ ...event })),
         registerProcess: async (pid, role = 'viewer') => { const owned = descendants(await processRows(), pid, known); processRoles(owned, child.pid, roles, [{ pid, role }]); },
         ownedProcesses: async () => descendants(await processRows(), child.pid, known).map(row => ({ pid: row.pid, start: row.start, server: row.pid === child.pid })),

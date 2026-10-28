@@ -27,7 +27,7 @@ export async function runUiLifecycleProof({ root, withFixtureSession, report, sa
     const { request, signal, deadline, base, bindings, setPhase } = session;
     const ref = id => bindings.find(row => row.id === id).ref;
     const landmark = ref('landmark'), art = ref('wall-artwork'), room = ref('enclosed-room');
-    const budget = () => { signal.throwIfAborted(); assert.ok(Date.now() < deadline, 'absolute deadline'); assert.ok(session.jobEvents().filter(e => e.phase === 'start').length <= (remainder ? 46 : 22), 'actual job cap'); };
+    const budget = () => { signal.throwIfAborted(); assert.ok(Date.now() < deadline, 'absolute deadline'); assert.ok(session.jobEvents().filter(e => e.phase === 'start').length <= session.jobStartLimit, 'actual job cap'); };
     const wait = ms => delay(ms, undefined, { signal });
     const views = async refs => (await request('/v1/world/context/views', { refs, detail: false, sheet: false }, null)).json();
     const ready = async (refs, label) => {
@@ -156,6 +156,7 @@ export async function runUiLifecycleProof({ root, withFixtureSession, report, sa
       if (remainder) {
         const artTarget = listing.targets.find(t => t.ref === art);
         const artButton = dialog.getByRole('button', { name: artTarget.title, exact: true });
+        await artButton.scrollIntoViewIfNeeded();
         const oldSrc = await artButton.locator('img').getAttribute('src');
         const oldView = browserViews.flatMap(v => v.views ?? []).findLast(v => v.ref === art && v.status === 'ready');
         check('open Explore displays initial artwork', !!oldView && new URL(oldSrc, base).href === base + oldView.url);
@@ -165,7 +166,6 @@ export async function runUiLifecycleProof({ root, withFixtureSession, report, sa
         const changed = await (await request('/v1/god/act', { ops: [{ op: 'set', id: 'hall/artwork', state: { media: `/assets/${sha(bytes)}.png` } }] })).json();
         evidence.liveMediaAct = { accepted: changed.accepted, seq: changed.seq, failures: changed.failures }; save();
         check('open-dialog media-only edit accepted', changed.accepted);
-        await artButton.scrollIntoViewIfNeeded();
         // Observe the same live UI; never call views(), reload, or reopen here.
         await page.waitForFunction(({ title, oldSrc }) => {
           const dialog = document.querySelector('dialog[open], [role="dialog"]');
