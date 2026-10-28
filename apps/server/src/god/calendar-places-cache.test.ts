@@ -14,7 +14,9 @@ import { GodPlaces, type PlacesHost } from './places.ts';
 import { GodPlaces as LegacyPlaces } from './places-membership-reference.fixture.ts';
 import { GodNav, type Thing } from './nav.ts';
 
-const physical = (places: ReturnType<GodPlaces['list']>) => places.map(({name: _n, aliases: _a, semanticParent: _p, semanticRole: _r, semanticKind: _k, salience: _s, parts: _parts, ...p}) => ({...p, ...(p.of === 'shore' ? {description: 'shore'} : {})}));
+// The frozen writer predates meaning. Compare every physical field, then assert
+// the new generic-vocabulary classification explicitly below.
+const physical = (places: ReturnType<GodPlaces['list']>) => places.map(({name: _n, aliases: _a, genericAliases: _g, semanticParent: _p, semanticRole: _r, semanticKind: _k, salience: _s, parts: _parts, ...p}) => ({...p, ...(p.of === 'shore' ? {description: 'shore'} : {})}));
 
 type Lookup = (e: Entity) => { id: string; name: string } | null;
 function fixture(memo = true) {
@@ -254,7 +256,13 @@ test('shared membership retains full legacy places, calendar identities, and cur
       const p = legacy.ofEntity(e.id);
       assert.deepEqual(own.get(e.id), p ? { id: p.id, name: humanTitle(p.ref) } : null);
     }
-    assert.deepEqual(physical(f.places.list()), physical(expected), 'geometry, physical parent, seats and schedules match the frozen writer; labels and shore prose now carry meaning');
+    const actual = f.places.list();
+    assert.deepEqual(physical(actual), physical(expected), 'geometry, physical parent, seats and schedules match the frozen writer; labels and shore prose now carry meaning');
+    for (const ref of ['alpha', 'beta']) assert.deepEqual(actual.find(p => p.ref === ref)!.genericAliases, ['plaza', 'paving', 'place']);
+    assert.deepEqual(actual.find(p => p.ref === 'gazebo')!.genericAliases, ['civic', 'garden', 'shade', 'park', 'structure']);
+    for (const p of actual.filter(p => p.of === 'room' || p.of === 'shore')) {
+      assert.deepEqual(p.genericAliases, [], `${p.ref}: rooms and banks cannot inherit their owner's generic identity`);
+    }
     assert.equal(f.places.stats.memberships, builds, 'full decoration uses the completed calendar membership');
     return expected;
   };
@@ -298,8 +306,26 @@ test('calendar membership uses the full index sort and water duplicate-ref prece
   }
   assert.equal(own.get(b.id), null, 'water cannot overwrite a previous area with the same ref');
   assert.equal(own.get(c.id), null, 'room does not become its entity own-place');
-  assert.deepEqual(physical(f.places.list()), physical(legacy.list()));
+  const actual = f.places.list();
+  assert.deepEqual(physical(actual), physical(legacy.list()));
+  assert.deepEqual(actual.find(p => p.ref === 'shared' && p.of === 'area')!.genericAliases, ['plaza', 'paving', 'place']);
+  for (const p of actual.filter(p => p.of === 'room' || p.of === 'shore')) assert.deepEqual(p.genericAliases, []);
   assert.equal(f.places.forRef('shared')!.of, 'shore');
+});
+
+test('calendar place decoration reclassifies authored identities without changing physical membership', () => {
+  const f = fixture(), initial = f.places.list();
+  assert.deepEqual(initial.find(p => p.ref === 'alpha')!.genericAliases, ['plaza', 'paving', 'place']);
+  f.act([{ op: 'set', id: 'alpha', about: { title: 'Paving', aliases: ['PLACE'] } }]); f.edited();
+  const authored = f.places.list(), alpha = authored.find(p => p.ref === 'alpha')!;
+  assert.equal(alpha.name, 'Paving');
+  assert.ok(alpha.aliases!.includes('PLACE'), 'authored aliases remain publicly available');
+  assert.deepEqual(alpha.genericAliases, ['plaza'], 'authored title and alias are identities, even when they match type vocabulary case-insensitively');
+  assert.deepEqual(physical(authored), physical(initial));
+  f.act([{ op: 'set', id: 'alpha', about: null }]); f.edited();
+  const cleared = f.places.list();
+  assert.deepEqual(cleared.find(p => p.ref === 'alpha')!.genericAliases, ['plaza', 'paving', 'place'], 'clearing meaning restores generic vocabulary on publication');
+  assert.deepEqual(physical(cleared), physical(initial));
 });
 
 test('an edit after membership completes preserves deferred publication and subsequent catchup', () => {
