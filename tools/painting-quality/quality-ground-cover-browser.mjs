@@ -4,8 +4,10 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'node:fs';
 import { resolve, isAbsolute } from 'node:path';
 import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { genesis, cases } from '../context-views/fixture.mjs';
-import { bindCases } from '../context-views/bindings.mjs';
+import expected from './quality-ground-cover-expected.json' with { type: 'json' };
+import { alignQualityFixture, qualityBindings, qualityHash, qualityBeforeReceipt, qualityBeforeImage } from './quality-ground-cover-fixture.mjs';
 
 const hash = value => createHash('sha256').update(Buffer.isBuffer(value) ? value : JSON.stringify(value)).digest('hex');
 const samePoint = (a, b) => Array.isArray(a) && Array.isArray(b) && Math.hypot(...a.map((v, i) => v - b[i])) < .0001;
@@ -22,7 +24,7 @@ export async function runQualityGroundCoverProof(owner) {
   assert.ok(browser?.newContext && session?.request && signal, 'owner browser/session/signal required');
   assert.ok(/^[a-f0-9]{40}$/.test(identity?.sourceSha) && identity.build, 'exact source and expected runtime build required');
   assert.ok(isAbsolute(owner.out) && isAbsolute(owner.beforeDir) && isAbsolute(identity.webReceiptPath), 'absolute artifact paths required');
-  const now = Date.now(), deadline = Math.min(owner.deadline, now + QUALITY_BROWSER_LIMITS.workMs);
+  const now = Date.now(), deadline = Math.min(owner.deadline - QUALITY_BROWSER_LIMITS.cleanupMs, now + QUALITY_BROWSER_LIMITS.workMs);
   assert.ok(Number.isFinite(deadline) && deadline - now >= 30000, 'at least 30s of owner work budget required');
   const base = new URL(session.base);
   assert.ok(['127.0.0.1', 'localhost', '[::1]'].includes(base.hostname) && /^\/w\/context-(baseline|linux-[ab])$/.test(base.pathname) && !base.search && !base.hash, 'existing loopback context fixture only');
@@ -30,11 +32,16 @@ export async function runQualityGroundCoverProof(owner) {
   assert.equal(createHash('sha256').update(webReceipt).digest('hex'), identity.webReceiptSha256, 'admitted browser build receipt hash');
   const out = resolve(owner.out); mkdirSync(out); // Refuse overwriting any prior proof.
   const beforeBytes = readFileSync(resolve(owner.beforeDir, 'receipt.json'));
-  const before = JSON.parse(beforeBytes), contexts = new Set(), closing = new Map();
+  const before = qualityBeforeReceipt(beforeBytes, expected), contexts = new Set(), closing = new Map();
+  for (const [path, pin] of Object.entries(expected.sourcePins)) {
+    const bytes = readFileSync(fileURLToPath(new URL('../../' + path, import.meta.url)));
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), pin, 'unchanged retained geometry/material source: ' + path);
+  }
   let accepting = true, openingContexts = 0;
+  let alignment, alignmentTask;
   const report = { schema: 'quality-ground-cover-browser/1', identity, browserVersion: browser.version(), base: base.href, startedAt: new Date(now).toISOString(),
     deadline: new Date(deadline).toISOString(), limits: QUALITY_BROWSER_LIMITS, fixtureSha256: hash({ genesis, cases }),
-    before: { source: before.source, receiptSha256: createHash('sha256').update(beforeBytes).digest('hex'), cases: [] },
+    before: { source: before.source, receiptSha256: createHash('sha256').update(beforeBytes).digest('hex'), sourcePins: expected.sourcePins, expectedFactsSha256: qualityHash(expected.facts), cases: [] },
     checks: [], architectural: [], live: [], cleanup: { complete: false }, visualQualification: 'pending-root-review',
     scope: 'First contextRender invocation per fresh renderer; the normal architecture pipeline may perform occlusion passes. No warmup capture and no throughput/performance claim.' };
   const save = () => writeFileSync(resolve(out, 'summary.json'), JSON.stringify(report, null, 2));
@@ -78,18 +85,24 @@ export async function runQualityGroundCoverProof(owner) {
       budget(); session.setPhase?.('quality-ground-cover');
       const health = await (await session.request('/healthz', undefined, null)).json();
       check('runtime matches admitted build', health.build === identity.build, { build: health.build, worldId: health.worldId });
-      const sourceSnapshot = await (await session.request('/v1/world/snapshot', undefined, null)).json();
+      const originalSnapshot = await (await session.request('/v1/world/snapshot', undefined, null)).json();
+      alignmentTask = alignQualityFixture(session, originalSnapshot, expected.facts);
+      alignment = await alignmentTask;
+      report.mediaAlignment = alignment.evidence; save();
+      const sourceSnapshot = alignment.snapshot;
       check('shared fixture still has exactly the five frozen subjects', sourceSnapshot.entities.length === 5 && ['hall', 'podium', 'artwork', 'landmark', 'lake'].every(name => sourceSnapshot.entities.some(e => e.name === name)));
       writeFileSync(resolve(out, 'snapshot.json'), JSON.stringify(sourceSnapshot)); report.snapshotSha256 = hash(sourceSnapshot);
       // Reuse production architectural snapshot and room/frame derivation, never freeze the running simulation.
       const [{ WorldModel }, scene] = await Promise.all([import('../../packages/world-compiler/src/index.ts'), import('../../apps/server/src/god/context-view-scene.ts')]);
       const model = WorldModel.fromSnapshot({ ...sourceSnapshot, seq: sourceSnapshot.counter ?? 0, editSeq: sourceSnapshot.seq });
       const immutable = scene.contextScene({ model, publicSnapshot: () => sourceSnapshot }, new Set()).snapshot;
-      const targets = scene.contextTargets(model), bindings = bindCases(cases, sourceSnapshot.entities, targets);
+      const { targets, bindings } = qualityBindings(model);
       for (const [role, id] of [['a', 'enclosed-room'], ['b', 'landmark']]) {
         budget(); const prior = before.units?.find(unit => unit.role === role);
         assert.ok(prior?.view?.photo?.status === 'ready', 'retained before camera metadata required');
         const priorImage = readFileSync(resolve(owner.beforeDir, role, 'context.png'));
+        qualityBeforeImage(role, priorImage, before, expected);
+        check(id + ' before PNG matches pinned hash and retained receipt', true, { sha256: hash(priorImage) });
         copyFileSync(resolve(owner.beforeDir, role, 'context.png'), resolve(out, `before-${id}.png`));
         report.before.cases.push({ id, imageSha256: hash(priorImage), camera: prior.view.photo, target: prior.target }); save();
         const binding = bindings.find(row => row.id === id), target = targets.find(row => row.ref === binding.ref);
@@ -150,13 +163,14 @@ export async function runQualityGroundCoverProof(owner) {
       report.machinePass = report.checks.every(row => row.pass); save();
     };
     await Promise.race([work(), aborted]);
-  } catch (error) { report.error = String(error); report.machinePass = false; }
+  } catch (error) { report.error = String(error); report.machinePass = false; if (error.restorationFailed) report.mediaRestore = { restored: false, error: String(error) }; }
   finally {
     accepting = false; clearTimeout(timer); signal.removeEventListener('abort', onAbort);
     let cleanupTimer;
-    const settled = await Promise.race([closeAll().then(results => ({ results })), new Promise(resolve => { cleanupTimer = setTimeout(() => resolve({ timeout: true }), QUALITY_BROWSER_LIMITS.cleanupMs); })]);
+    const restore = alignmentTask ? alignmentTask.then(value => value.restore()).then(result => { report.mediaRestore = result; }).catch(error => { report.mediaRestore = { restored: !error.restorationFailed && !alignment, error: String(error) }; }) : Promise.resolve();
+    const settled = await Promise.race([Promise.all([closeAll(), restore]).then(results => ({ results })), new Promise(resolve => { cleanupTimer = setTimeout(() => resolve({ timeout: true }), QUALITY_BROWSER_LIMITS.cleanupMs); })]);
     clearTimeout(cleanupTimer);
-    report.cleanup = { complete: contexts.size === 0 && openingContexts === 0 && !settled.timeout, remainingOwnedContexts: contexts.size, openingContexts, ownerBrowserAndRuntimeUntouched: true };
+    report.cleanup = { complete: contexts.size === 0 && openingContexts === 0 && !settled.timeout && report.mediaRestore?.restored !== false && (!alignment || report.mediaRestore?.restored === true), remainingOwnedContexts: contexts.size, openingContexts, ownerBrowserAndServerLifetimeUntouched: true };
     report.finishedAt = new Date().toISOString(); report.machinePass &&= report.cleanup.complete; report.status = report.machinePass ? 'partial' : 'fail'; save();
     writeFileSync(resolve(out, 'run.md'), '# Ground-cover browser proof\n\nStatus: ' + report.status.toUpperCase() + '. Visual acceptance remains pending root review.\n\nSource: `' + identity.sourceSha + '`; expected runtime build: `' + identity.build + '`.\n\nThe runner used two first-invocation architectural captures at retained cameras and two ordinary live viewer viewport checks. Normal architectural occlusion passes remain enabled. No performance claim.\n\n| Assertion | Result |\n| --- | --- |\n' + report.checks.map(row => '| ' + row.name + ' | ' + (row.pass ? 'pass' : 'fail') + ' |').join('\n') + '\n\nCleanup: ' + JSON.stringify(report.cleanup) + '.\n\n' + (report.error ? 'Failure: ' + report.error + '\n\n' : '') + 'Evidence: [gallery](index.html), [machine receipt](summary.json), exact input/snapshot files and before/after PNGs. Root must separately review origin grass absence, legitimate outdoor grass and live viewport usability.\n');
     const cards = ['before-enclosed-room', 'after-enclosed-room', 'before-landmark', 'after-landmark', 'desktop-before-input', 'desktop-after-input', 'phone-before-input', 'phone-after-input'];

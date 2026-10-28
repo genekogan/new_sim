@@ -1,0 +1,251 @@
+{
+  "baselineSource": "33cefaf029db4ef9904743ff39874a368c56c1f9",
+  "baselinePngs": {
+    "a": "75fee140c9ad5cb7cd5d56ff7ac3f15e64c5b204240a1982ce7362e8f86de599",
+    "b": "47adddaf4a5d192a89ee98efc7bc4c70e5c905b7a75cded053c56451fe09129c"
+  },
+  "sourcePins": {
+    "tools/context-views/fixture.mjs": "afa6f2ab92625461f2d49e18b9636f7b8a3f61e738916b312764636f7157e51f",
+    "apps/web/src/gen-mesh/building.mesh.ts": "07a733dc3a775677b44824b8e00c2675ff824e5777928135b91c1c27d98f20a0",
+    "apps/web/src/gen-mesh/building-kit.ts": "b3d382a3d8f5258ce98105898e73b43760e74f701dc2c202b3e1855f2f0fd828",
+    "apps/web/src/gen-mesh/building-buffers.ts": "875b4a0d32f04cb39d194f8297376e61f89c7172b7d6ab4a27ae6bc1e14aa88b",
+    "apps/web/src/gen-mesh/building-looks.json": "d053be8fa7cddb445f7f4986b55c71438a9544375bd9997f39b01c93236baa74",
+    "apps/web/src/gen-mesh/kit.mesh.ts": "bd97dfdc08706291be0f7e5016ae02a77a779cd73db1049ec70c43c0eb401959",
+    "apps/web/src/gen-mesh/kit-surfaces.ts": "5e5c6305d7ed7885ec48f1af2bfb438f0fb4bdf7e4888d353e2a4a20d70aee25",
+    "apps/web/src/gen-mesh/faces.ts": "d2bf1d7ba551a679de57fde5025b2cdd84f83ea08a07d4d15aaf3020820f3212",
+    "apps/web/src/gen-mesh/materials.ts": "79a0b9b9867ad8a46d5fe247da0c2eb43e8c9d85bf160ad430dff6aeb9822734",
+    "apps/web/src/gen-mesh/soup.ts": "caefed9a1fc087ff26c6e8277e85e5d2774db99849368edebb2f95380a33a242",
+    "apps/web/src/gen-mesh/ground-palette.ts": "b12d16197c9165ed283fe9f6b797fa7da2547ba1ddaf5f1ad62077b7478ca5e4",
+    "apps/web/src/fx/water.ts": "51df0824ca3a17cbc44673e6c4f45a403d5e318e7fb5f126c4ab1555d6405d40",
+    "packages/generators/src/building.ts": "0472d421bd75bace7430286c9864b292df2e826a06498d1913ec56534c28550f"
+  },
+  "facts": {
+    "constants": {
+      "base": 0,
+      "extent": 160,
+      "ground": "land",
+      "limits": {
+        "budget": {
+          "bytes": 3000000,
+          "texPx": 2048,
+          "tris": 80000
+        },
+        "entities": 20000,
+        "sizeMax": [
+          400,
+          120,
+          400
+        ],
+        "sizeMin": 0.05
+      }
+    },
+    "entities": [
+      {
+        "bakedSha256": "90b05ff17c91163cac47657fbdd5284ee3affb81fba0eabd9c7d7025337fa9ca",
+        "def": "core-picture-frame@1",
+        "defHash": "935234e6d11b75cac9efe809a79265a895206b77969372eed91aa78fa33ff620",
+        "in": {
+          "parent": "hall",
+          "slot": "ground"
+        },
+        "name": "artwork",
+        "p": [
+          -3,
+          1.7,
+          -4.7
+        ],
+        "params": {
+          "frame": "#b8913f"
+        },
+        "state": {
+          "maker": "",
+          "media": "",
+          "title": ""
+        }
+      },
+      {
+        "bakedSha256": "69fc947ed8df76da727a761343a54a451c132df81ab112c48b90b0ea923d4040",
+        "def": "context-hall@1",
+        "defHash": "33532fc8410f8e143efed18236e59f65c52b4826835b72f9130fd1a35e593518",
+        "in": {
+          "parent": "world"
+        },
+        "name": "hall",
+        "p": [
+          0,
+          0,
+          0
+        ],
+        "params": {
+          "balcony": false,
+          "chimney": true,
+          "d": 10,
+          "doorLamp": true,
+          "floorHeight": 4,
+          "floors": 1,
+          "flowerBoxes": true,
+          "front": "s",
+          "hood": true,
+          "material": "plaster",
+          "porch": 0,
+          "quoins": true,
+          "roof": "gable",
+          "roofColor": "#8a3b2a",
+          "roofPitch": 32,
+          "shutters": true,
+          "style": "cottage",
+          "trim": "#6b4a2b",
+          "w": 12,
+          "wall": "#f1e7d2",
+          "wallThickness": 0.22,
+          "windows": 0.6
+        },
+        "state": {
+          "doors": {}
+        }
+      },
+      {
+        "bakedSha256": "d25476329facdb6aeb569e7d13d8fbdca555e7ef5b751932794c5181bb1f1237",
+        "def": "core-pond@1",
+        "defHash": "cf6e3db99c809d4f2d60ddcbcb948be149c56ffb8b09bc0fd088372ba389eb80",
+        "in": {
+          "parent": "world"
+        },
+        "name": "lake",
+        "p": [
+          0,
+          0,
+          0
+        ],
+        "params": {
+          "depth": 1.2,
+          "edge": 2,
+          "level": -0.2
+        },
+        "shape": {
+          "area": [
+            [
+              20,
+              -8
+            ],
+            [
+              36,
+              -8
+            ],
+            [
+              36,
+              8
+            ],
+            [
+              20,
+              8
+            ]
+          ]
+        }
+      },
+      {
+        "bakedSha256": "29291f083f6917dad3cbc954bad828febf3c04fc47bd3023e7b96388c540793c",
+        "def": "core-fountain@1",
+        "defHash": "840a6f717bc7d33a0f114a4e9af6f24a8ab656b9fc094ae5820219c65cd25402",
+        "in": {
+          "parent": "world"
+        },
+        "name": "landmark",
+        "p": [
+          -24,
+          0,
+          0
+        ],
+        "params": {
+          "stone": "#b9b3a6",
+          "stone2": "#a39b8c",
+          "water": "#5d8fa6"
+        }
+      },
+      {
+        "bakedSha256": "17629fc570e2c5f0cae1929ee950dadfedeb0a62b6bd90ada214c336a35e1350",
+        "def": "core-bench@1",
+        "defHash": "56d594e2e8ff5c129672b0e5cf90b5abb73574eb2ca75cd09bd451562dc1f809",
+        "in": {
+          "parent": "hall",
+          "slot": "ground"
+        },
+        "name": "podium",
+        "p": [
+          0,
+          0,
+          -2
+        ],
+        "params": {
+          "iron": "#2f3633",
+          "wood": "#9a6b46"
+        }
+      }
+    ],
+    "fixtureSha256": "68df03c47cc1b895f7f25c0717e8a661dbb380c8937fb9b6ade8b64a7aeff239",
+    "ground": {
+      "base": 0,
+      "extent": [
+        -80,
+        -80,
+        80,
+        80
+      ],
+      "landforms": [
+        {
+          "area": [
+            [
+              20,
+              -8
+            ],
+            [
+              36,
+              -8
+            ],
+            [
+              36,
+              8
+            ],
+            [
+              20,
+              8
+            ]
+          ],
+          "bed": -1.4,
+          "edge": 2,
+          "id": "lake",
+          "kind": "carve"
+        }
+      ],
+      "schema": "ground/1",
+      "waters": [
+        {
+          "area": [
+            [
+              20,
+              -8
+            ],
+            [
+              36,
+              -8
+            ],
+            [
+              36,
+              8
+            ],
+            [
+              20,
+              8
+            ]
+          ],
+          "id": "lake",
+          "level": -0.2
+        }
+      ]
+    },
+    "groundAppearance": {
+      "palette": "grass"
+    }
+  },
+  "baselineReceiptSha256": "b48d30c80480121539410695748879c5b31fd9ac4d0d47ed396e0dc7ac3b3466"
+}
