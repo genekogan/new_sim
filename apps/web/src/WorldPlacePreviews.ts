@@ -133,7 +133,7 @@ export class WorldPlacePreviews{
   * place stays visible; above 40 % hidden, turn 45° and retry, keeping the clearest of the 8 views. */
  private async shoot(mask:THREE.Scene,center:THREE.Vector3,radius:number,view:{readonly p:readonly number[];readonly target:readonly number[]},key:string,alive:()=>boolean,interior=false,exact=false,size:readonly[number,number]=[SHOT_W,SHOT_H]):Promise<string|null>{
   const from=view.p;
-  const world=this.live(),live=world??mask;  // no live world (tests, a bare viewer): the place's own geometry
+  const world=this.live(),live=world??mask,insideWorld=interior&&!!world;  // isolated whole-building thumbnails must fit their geometry, even for a room card
   const t0=performance.now(),bare=!mask.children.length,box=new THREE.Box3().setFromObject(mask),r=world&&!exact?radius*.8:0,extent=r<=0?box.clone():box.clone().union(new THREE.Box3(new THREE.Vector3(center.x-r,center.y,center.z-r),new THREE.Vector3(center.x+r,center.y,center.z+r))),aim=extent.getCenter(new THREE.Vector3());
   const az0=Math.atan2(from[0]-aim.x,from[2]-aim.z),el=35*Math.PI/180,W=size[0],H=size[1],CW=80,CH=56,renderer=this.renderer;
   const white=new THREE.MeshBasicMaterial({color:0xffffff,fog:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-8}),black=new THREE.MeshBasicMaterial({color:0,fog:false});
@@ -168,9 +168,9 @@ export class WorldPlacePreviews{
    }
    mask.overrideMaterial=white;let best:THREE.PerspectiveCamera|null=null,bestHidden=2,turn=0;
    // a room ("Inside: …") is pictured from its own tour eye, standing inside it: from above it would be the roof
-   for(let k=0;k<(interior?1:8)&&bestHidden>.4;k++){
-    const az=az0+k*Math.PI/4,camera=interior?new THREE.PerspectiveCamera(64,W/H,.05,3000):fitPlacePreviewCamera(extent,new THREE.Vector3(Math.sin(az)*Math.cos(el),Math.sin(el),Math.cos(az)*Math.cos(el)),W/H);
-    if(interior){camera.position.fromArray(from);camera.lookAt(new THREE.Vector3().fromArray(view.target));camera.updateMatrixWorld(true);}
+   for(let k=0;k<(insideWorld?1:8)&&bestHidden>.4;k++){
+    const az=az0+k*Math.PI/4,camera=insideWorld?new THREE.PerspectiveCamera(64,W/H,.05,3000):fitPlacePreviewCamera(extent,new THREE.Vector3(Math.sin(az)*Math.cos(el),Math.sin(el),Math.cos(az)*Math.cos(el)),W/H);
+    if(insideWorld){camera.position.fromArray(from);camera.lookAt(new THREE.Vector3().fromArray(view.target));camera.updateMatrixWorld(true);}
     const d=camera.position.distanceTo(aim);camera.near=Math.max(.05,d/400);camera.far=Math.max(3000,d*20);camera.updateProjectionMatrix();
     const seen=await step('check'+k,()=>{
      renderer.setRenderTarget(check);renderer.setClearColor(0,1);renderer.autoClear=true;renderer.render(mask,camera);const all=count();if(!all||!world)return{all,blocked:0};

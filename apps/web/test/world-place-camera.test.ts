@@ -64,3 +64,34 @@ void test('actual library and office preview meshes fill the transparent thumbna
  const previews=new WorldPlacePreviews(renderer as unknown as THREE.WebGLRenderer,()=>[quarter.group,interiors.group]);
  try{for(const id of ['gallery','library','int-office-studio'] as const)await previews.capture(id);assert.equal(rendered,3);for(const {points,box} of captures){assert.ok(box.min.x>68&&box.max.x<100&&box.max.y<10,'selected actual building has no origin ghost, high background, or hidden-child outlier');assert.ok(points.every(p=>Math.abs(p.x)<=.881&&Math.abs(p.y)<=.881&&p.z>-1&&p.z<1),JSON.stringify(points.map(p=>p.toArray())));const width=Math.max(...points.map(p=>p.x))-Math.min(...points.map(p=>p.x)),height=Math.max(...points.map(p=>p.y))-Math.min(...points.map(p=>p.y));assert.ok(Math.max(width,height)>=1.4,JSON.stringify({width,height,points:points.map(p=>p.toArray())}));}}finally{previews.dispose();interiors.dispose();quarter.dispose();unit.dispose();outlierGeometry.dispose();material.dispose();}
 });
+
+void test('live interior previews retain the authored room eye and refuse an occluded view', async () => {
+ const view = worldPlaceView('int-office-studio')!;
+ const world = new THREE.Scene(), owner = new THREE.Group(); owner.name = 'eden-office-1';
+ const geometry = new THREE.BoxGeometry(2, 2, 2), material = new THREE.MeshBasicMaterial();
+ const mesh = new THREE.Mesh(geometry, material); mesh.position.fromArray(view.target); owner.add(mesh); world.add(owner);
+ const cameras: THREE.PerspectiveCamera[] = []; let reads = 0, compiled = 0;
+ const renderer = {
+  autoClear: false, getRenderTarget: () => null, setRenderTarget() {},
+  getViewport: (v: THREE.Vector4) => v, setViewport() {},
+  getScissor: (v: THREE.Vector4) => v, setScissor() {}, getScissorTest: () => false, setScissorTest() {},
+  getClearColor: (v: THREE.Color) => v, getClearAlpha: () => 1, setClearColor() {},
+  async compileAsync() { compiled++; },
+  render(_scene: THREE.Scene, camera: THREE.PerspectiveCamera) { cameras.push(camera.clone()); },
+  readRenderTargetPixels(_target: unknown, _x: number, _y: number, _w: number, _h: number, pixels: Uint8Array) {
+   // The isolated subject exists, but the live scene fully occludes it.
+   pixels.fill(reads++ === 0 ? 255 : 0);
+  },
+ };
+ const previews = new WorldPlacePreviews(renderer as unknown as THREE.WebGLRenderer, () => [owner], () => world);
+ try {
+  assert.equal(await previews.capture('int-office-studio'), null, 'a blocked room photograph is not published');
+  assert.equal(compiled, 3); assert.equal(reads, 2); assert.equal(cameras.length, 3, 'one room-eye visibility check; no exterior fallback');
+  for (const camera of cameras) {
+   assert.deepEqual(camera.position.toArray(), view.p);
+   const direction = new THREE.Vector3().fromArray(view.target).sub(camera.position).normalize();
+   assert.ok(camera.getWorldDirection(new THREE.Vector3()).distanceTo(direction) < 1e-10);
+   assert.equal(camera.fov, 64);
+  }
+ } finally { previews.dispose(); geometry.dispose(); material.dispose(); }
+});
