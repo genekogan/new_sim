@@ -144,6 +144,7 @@ export class GroundCover {
   private frame = 0;
   readonly stats: GroundCoverStats;
   private readonly v = new THREE.Vector3();
+  private sceneBinding: { scene: THREE.Scene; previous: THREE.Scene['onBeforeRender']; hook: THREE.Scene['onBeforeRender'] } | null = null;
 
   constructor(getModel: () => WorldModel | null, opts: { enabled: boolean; reason: string }, getSeq: () => number = () => 0) {
     this.getModel = getModel; this.getSeq = getSeq; this.enabled = opts.enabled; this.reason = opts.reason;
@@ -160,12 +161,28 @@ export class GroundCover {
       this.group.add(mesh);
       return { kind, k, mesh, rank };
     });
-    const self = this; this.layers[0].mesh.onBeforeRender = function (_r, _s, camera) { self.follow(camera); };
     this.stats = { enabled: this.enabled, reason: this.reason, cells: 0, dealt: 0, instances: {}, dealMs: 0, rebuilds: 0, pending: 0 };
     this.group.visible = this.enabled;
   }
 
   setEnabled(on: boolean) { this.enabled = on; this.stats.enabled = on; this.group.visible = on; this.dirty = true; }
+
+  /** Bind the scene used by both the live camera and offscreen world captures. Rebinding releases the old scene. */
+  bindScene(scene: THREE.Scene) {
+    if (this.sceneBinding?.scene === scene) return;
+    this.unbindScene();
+    const previous = scene.onBeforeRender;
+    const hook: THREE.Scene['onBeforeRender'] = (...args) => {
+      previous.call(scene, ...args);
+      if (this.sceneBinding?.hook === hook) this.prepare(args[2]);
+    };
+    this.sceneBinding = { scene, previous, hook }; scene.onBeforeRender = hook;
+  }
+  private unbindScene() {
+    const binding = this.sceneBinding;
+    if (binding && binding.scene.onBeforeRender === binding.hook) binding.scene.onBeforeRender = binding.previous;
+    this.sceneBinding = null;
+  }
 
   /** The cover index for the current model: checked once per world edit (the layer's seq), rebuilt only when the
    *  ground, areas or footprints actually changed (bodies moving don't count). */
@@ -187,7 +204,10 @@ export class GroundCover {
     return false;
   }
 
-  private follow(camera: THREE.Camera) {
+  /** Prepare this camera's cover from Scene.onBeforeRender, before WebGLRenderer uploads instance buffers.
+   * A mesh's onBeforeRender is too late: its newly set count would draw the previous GPU transforms/colours
+   * (identity transforms and black colours on the first frame), including inside otherwise blocked floors. */
+  prepare(camera: THREE.Camera) {
     if (!this.enabled || !(camera as THREE.PerspectiveCamera).isPerspectiveCamera) return;
     const model = this.getModel(); this.frame++;
     if (!model || !this.ensureIndex(model)) { this.clear(); return; }
@@ -262,6 +282,7 @@ export class GroundCover {
   private clear() { for (const L of this.layers) { L.mesh.count = 0; this.stats.instances[L.kind] = 0; } this.last.set(Infinity, Infinity, Infinity); }
 
   dispose() {
+    this.unbindScene();
     this.group.removeFromParent(); this.cells.clear();
     for (const L of this.layers) { L.mesh.geometry.dispose(); (L.mesh.material as THREE.Material).dispose(); L.mesh.dispose(); }
   }
