@@ -35,7 +35,8 @@ export function planEdenDeskRepair(model, expected) {
     assert.equal(seat.id, pair.seatId, 'functional seat ID must remain exact');
     assert.ok(uses.has(desk.id) && uses.get(desk.id) === null && uses.has(seat.id) && uses.get(seat.id) === null, 'desk and seat independently audited unused');
     assert.equal(model.resolvedDef(seat.def)?.name, 'core-office-chair');
-    assert.equal(desk.in.parent, seat.in.parent, 'authored pair shares room');
+    assert.equal(desk.in.parent, seat.in.parent, 'authored pair shares building');
+    assert.equal(desk.in.slot, seat.in.slot, 'authored pair shares exact room/floor slot');
     const def = model.resolvedDef(desk.def); assert.ok(def && [old.hash, next.hash].includes(def.hash), 'exact old or new immutable definition');
     if (def.hash === old.hash) assert.equal(desk.id, pair.deskId, 'reviewed old desk identity');
     assert.ok(Object.keys(desk).every(key => placeFields.has(key)), 'no unsupported metadata');

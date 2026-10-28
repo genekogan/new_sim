@@ -36,7 +36,7 @@ test('bounded desk replacement is atomic, preserves all chair and semantic bytes
   assert.equal(m.get(EDEN_DESK_PAIRS[1][1]).v, before.entities.find(entity => entity.name === EDEN_DESK_PAIRS[1][1]).v + 2);
 });
 test('changed snapshots, occupancy, children, unknown metadata and external references refuse before returning a plan', () => {
-  for (const blocker of ['snapshot', 'occupied', 'child', 'metadata', 'external', 'constraint', 'relationship']) {
+  for (const blocker of ['snapshot', 'occupied', 'child', 'metadata', 'external', 'constraint', 'relationship', 'room_slot', 'suffix']) {
     const { m, input } = fixture(); let expected = input(); const desk = m.get(EDEN_DESK_PAIRS[0][0]);
     if (blocker === 'snapshot') expected.snapshotSha256 = '0'.repeat(64);
     if (blocker === 'occupied') expected.audit.uses.find(row => row.id === desk.id).inUse = 'h_soul';
@@ -44,6 +44,8 @@ test('changed snapshots, occupancy, children, unknown metadata and external refe
     if (blocker === 'metadata') desk.customBinding = 'unknown';
     if (blocker === 'external') expected.audit.externalReferences.push({ kind: 'ledger', id: desk.id });
     if (blocker === 'constraint') desk.constraints = [{ kind: 'facing', ref: 'other', offset: 0 }];
+    if (blocker === 'room_slot') m.get(EDEN_DESK_PAIRS[0][1]).in.slot = 'other-floor';
+    if (blocker === 'suffix') m.get(EDEN_DESK_PAIRS[0][1]).constraints = [{ kind: 'facing', ref: desk.id + '/part/computer', offset: 0 }];
     if (blocker === 'relationship') m.state.layers = { relationships: [{ a: desk.id, b: 'world', rel: 'in' }] };
     if (!['snapshot', 'occupied', 'external'].includes(blocker)) expected.snapshotSha256 = repairHash(m.snapshot());
     assert.throws(() => planEdenDeskRepair(m, expected), undefined, blocker);
