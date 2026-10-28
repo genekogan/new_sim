@@ -698,7 +698,7 @@ export class HumanViews {
     const clipBody = !!lib.cur && CLIP_BODY.has(v.activity) && lib.cur.pick.body !== 'seat' && !(lib.cur.pick.body === 'ground-seat' && v.activity !== 'sit-ground');
     const pairPhase = v.partner && v.partner < h.name ? v.partner : h.name; // partners move in step
     const act: ActivityFrame | null = freeBody && !engineHands && w < 0.5 && !waveClip && !interactClip && !clipBody && !lib.sleep
-      ? activityFrame(v.activity, v.base, tSec, pairPhase, { since: v.since, gap: v.partnerP ? Math.hypot(v.partnerP.x - h.position.x, v.partnerP.z - h.position.z) : undefined,instrument:v.instrument,game:v.game,gameTick:v.gameTick,gameDt:v.gameDt,actorId:h.name }) : null;
+      ? activityFrame(v.activity, v.base, tSec, pairPhase, { groundSeat: v.groundSeat, since: v.since, gap: v.partnerP ? Math.hypot(v.partnerP.x - h.position.x, v.partnerP.z - h.position.z) : undefined,instrument:v.instrument,game:v.game,gameTick:v.gameTick,gameDt:v.gameDt,actorId:h.name }) : null;
     h.rotation.z = 0; h.rotation.x = 0;
     let lieFloor = h.position.y;
     if (act?.lying) {
