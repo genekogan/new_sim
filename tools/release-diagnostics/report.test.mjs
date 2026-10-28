@@ -30,6 +30,38 @@ test('complete passing CPU receipt never becomes release-qualified or deployed',
   assert.ok(r.retainedEvidence.every(a => /^[0-9a-f]{64}$/.test(a.sha256)));
 });
 
+test('complete quarantined receipt reports clean CPU scope with accounted failure and TODO retained', t => {
+  const f = fixture(t, { status: 'quarantined', exit: '1' });
+  f.receipt.quarantined = [{ step: 'V5-server-full', id: 'known defect', status: 'fail' }, { step: 'V5-server-full', id: 'suite > parked work', status: 'todo' }];
+  f.put('run/receipt.json', f.receipt);
+  f.put('run/candidate/modal.log', 'Stopping app - local entrypoint completed.\n');
+  f.put('run/candidate/out/suite/V5-server-full.log', "not ok 1 - known defect\n  error: 'Error: expected defect'\nnot ok 2 - parked work # TODO already parked\n  name: 'AssertionError'\n");
+  const r = generateReport({ run: f.run });
+  assert.equal(r.outcome.status, 'receipt-reports-clean-cpu-scope'); assert.equal(r.outcome.cpuReceiptClean, true);
+  assert.equal(r.outcome.observedDistinctFailingAssertions, 2); assert.equal(r.outcome.observedAccountedAssertions, 2); assert.equal(r.outcome.observedUnaccountedAssertions, 0);
+  assert.equal(r.outcome.firstUsefulError, null); assert.deepEqual(r.outcome.failureCategory, []);
+  assert.match(r.nextAction, /no reason to rerun/);
+  assert.equal(r.observations.filter(o => o.accounting === 'accounted-by-receipt').length, 2);
+  assert.match(formatMarkdown(r), /2 accounted by receipt, 0 unaccounted/);
+});
+
+test('an unaccounted failure or TODO still overrides a quarantined passing receipt', t => {
+  const f = fixture(t, { status: 'quarantined', exit: '1' });
+  f.receipt.quarantined = [{ step: 'V5-server-full', id: 'known defect', status: 'fail' }]; f.put('run/receipt.json', f.receipt);
+  for (const suffix of ['', ' # TODO newly introduced']) {
+    f.put('run/candidate/out/suite/V5-server-full.log', `not ok 1 - known defect\nnot ok 2 - unaccounted failure${suffix}\n`);
+    const r = generateReport({ run: f.run }); assert.equal(r.outcome.status, 'failure-observed'); assert.equal(r.outcome.cpuReceiptClean, false);
+    assert.equal(r.outcome.observedAccountedAssertions, 1); assert.equal(r.outcome.observedUnaccountedAssertions, 1); assert.match(r.outcome.firstUsefulError.text, /unaccounted failure/);
+  }
+});
+
+test('a quarantine entry in another stage cannot account for the same assertion title', t => {
+  const f = fixture(t, { status: 'quarantined', exit: '1' });
+  f.receipt.quarantined = [{ step: 'V3-mars-engine', id: 'same title', status: 'todo' }]; f.put('run/receipt.json', f.receipt);
+  f.put('run/candidate/out/suite/V5-server-full.log', 'not ok 1 - same title # TODO parked elsewhere\n');
+  const r = generateReport({ run: f.run }); assert.equal(r.outcome.observedAccountedAssertions, 0); assert.equal(r.outcome.cpuReceiptClean, false);
+});
+
 test('stopped incomplete V5 with zero newFailures retains two real failed assertions', t => {
   const f = fixture(t, { complete: false, status: 'blocked', exit: 'SHARDS-MISSING' });
   const failures = [

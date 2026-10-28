@@ -42,11 +42,12 @@ export function generateReport({ run, evidence = [], costLedger, releaseEvidence
   function observe(text, stage, path, line, context = {}) {
     if (typeof text !== 'string') return;
     text = strip(text).trim();
+    stage ||= 'unknown';
     if (/^(?:ok \d+\b|# Subtest:|== )/.test(text)) return;
     if (!failure.test(text) && !infrastructure.test(text) && !/Stopping app|user stopped|SHARDS-MISSING|MERGE PROBLEM/i.test(text)) return;
     const definiteFailure = /^not ok \d+/.test(text) || /\berror TS\d+\b/.test(text) || (stage && /^[1-9]\d*$/.test(String(stages.get(stage)?.exit)));
-    const kind = infrastructure.test(text) ? 'infrastructure' : /Stopping app|user stopped/i.test(text) ? 'operator-stop' : failure.test(text) ? definiteFailure ? 'test-or-build-failure' : 'log-message' : 'incomplete-artifact';
-    if (!observations.some(o => o.stage === stage && o.text === text && o.kind === kind)) observations.push({ stage: stage || 'unknown', kind, text, path, line, ...context });
+    const kind = /Stopping app - local entrypoint completed\.?$/i.test(text) ? 'completion-message' : infrastructure.test(text) ? 'infrastructure' : /Stopping app|user stopped/i.test(text) ? 'operator-stop' : failure.test(text) ? definiteFailure ? 'test-or-build-failure' : 'log-message' : 'incomplete-artifact';
+    if (!observations.some(o => o.stage === stage && o.text === text && o.kind === kind)) observations.push({ stage, kind, text, path, line, ...context });
   }
   const receipt = json(join(root, 'receipt.json'), 'gate-receipt', true);
   const candidateDir = existsSync(join(root, 'candidate')) ? join(root, 'candidate') : root;
@@ -134,17 +135,32 @@ export function generateReport({ run, evidence = [], costLedger, releaseEvidence
   const incompleteStages = [...stages.values()].filter(s => !/^\d+$/.test(String(s.exit)) && s.exit !== 'SKIP').map(s => s.stage);
   const missingLogs = [...stages.values()].filter(s => s.log && !existsSync(s.log)).map(s => s.log);
   const complete = Boolean(receipt && meta?.suiteCompleted === true && summary && required.length && !missingStages.length && !incompleteStages.length && !missingLogs.length);
-  const assertionFailures = observations.filter(o => o.kind === 'test-or-build-failure');
-  // Repeated snapshots/log copies are observations, not additional failing assertions.
-  const assertionKeys = new Set(assertionFailures.filter(o => /not ok \d+\s*-/.test(o.text)).map(o => `${o.stage}\0${o.text.replace(/^.*?not ok \d+\s*-\s*/, '')}`));
-  const infra = observations.some(o => o.kind === 'infrastructure') || (meta?.fanout?.problems || []).some(v => infrastructure.test(v));
-  const stopped = observations.some(o => o.kind === 'operator-stop');
-  const knownFailed = assertionFailures.length > 0 || [...stages.values()].some(s => /^\d+$/.test(String(s.exit)) && Number(s.exit) !== 0) || (receipt?.newFailures?.length || 0) > 0;
   const receiptPassed = ['pass', 'quarantined'].includes(receipt?.status);
-  const quarantinedTitles = (receipt?.quarantined || []).map(q => q.id || '');
-  const unaccountedAssertions = assertionFailures.filter(o => /not ok \d+/.test(o.text) && !quarantinedTitles.some(title => title && o.text.endsWith(title)));
-  const cpuReceiptClean = complete && receiptPassed && !blockers.length && !identityMismatches.length && !issues.length && !unaccountedAssertions.length && receipt?.newFailures?.length === 0 && receipt?.unexpectedSkips?.length === 0;
-  const firstUsefulError = assertionFailures.find(o => /^not ok \d+/.test(o.text)) || assertionFailures[0] || observations.find(o => o.kind === 'infrastructure') || observations.find(o => o.kind !== 'log-message') || (blockers[0] ? { stage: 'receipt', text: blockers[0] } : null);
+  const observedAssertions = observations.filter(o => /^not ok \d+\s*-/.test(o.text));
+  for (const observation of observedAssertions) {
+    const match = /^not ok \d+\s*-\s*(.*?)(?:\s+# (TODO|SKIP)(?:\s+.*)?)?$/.exec(observation.text);
+    observation.assertionTitle = match[1]; observation.directive = match[2]?.toLowerCase() || null;
+    // Describe accounting already present in this receipt; do not read/alter the quarantine manifest.
+    const entry = (receipt?.quarantined || []).find(q => q.step === observation.stage &&
+      (q.id === observation.assertionTitle || q.id?.endsWith(` > ${observation.assertionTitle}`)) &&
+      (q.status || 'fail') === (observation.directive || 'fail'));
+    observation.accounting = entry ? 'accounted-by-receipt' : 'unaccounted';
+    if (entry) observation.receiptEntry = { step: entry.step, id: entry.id, status: entry.status || 'fail', reason: entry.reason || null };
+  }
+  // Repeated snapshots/log copies are observations, not additional failing assertions.
+  const distinct = rows => new Set(rows.map(o => `${o.stage}\0${o.assertionTitle}`)).size;
+  const accountedAssertions = observedAssertions.filter(o => o.accounting === 'accounted-by-receipt');
+  const unaccountedAssertions = observedAssertions.filter(o => o.accounting === 'unaccounted');
+  const accountedStage = stage => receiptPassed && accountedAssertions.some(o => o.stage === stage) && !unaccountedAssertions.some(o => o.stage === stage);
+  const unaccountedStageExits = [...stages.values()].filter(s => /^[1-9]\d*$/.test(String(s.exit)) && !accountedStage(s.stage)).map(s => s.stage);
+  const actionableObservations = observations.filter(o => o.accounting !== 'accounted-by-receipt' &&
+    !(accountedStage(o.stage) && ['test-or-build-failure', 'log-message'].includes(o.kind)) && !['log-message', 'completion-message'].includes(o.kind));
+  const infra = actionableObservations.some(o => o.kind === 'infrastructure') || (meta?.fanout?.problems || []).some(v => infrastructure.test(v));
+  const stopped = observations.some(o => o.kind === 'operator-stop');
+  const unaccountedErrors = actionableObservations.filter(o => o.kind === 'test-or-build-failure');
+  const knownFailed = unaccountedAssertions.length > 0 || unaccountedErrors.length > 0 || unaccountedStageExits.length > 0 || (receipt?.newFailures?.length || 0) > 0;
+  const cpuReceiptClean = complete && receiptPassed && !blockers.length && !identityMismatches.length && !issues.length && !unaccountedAssertions.length && !unaccountedStageExits.length && receipt?.newFailures?.length === 0 && receipt?.unexpectedSkips?.length === 0;
+  const firstUsefulError = unaccountedAssertions[0] || unaccountedErrors[0] || actionableObservations.find(o => o.kind === 'infrastructure') || actionableObservations.find(o => o.kind !== 'log-message') || (blockers[0] ? { stage: 'receipt', text: blockers[0] } : null);
   const groups = Object.entries(meta?.fanout?.groups || {}).map(([group, value]) => ({ group, suiteExit: value.suiteExit ?? null, shard: value.shard || null, requestedCpu: null, requestedMemoryGiB: null, elapsedContainerSeconds: null }));
   let cost = { estimateUsd: null, actualInvoiceUsd: null, method: 'No cost evidence supplied; no estimate invented.' };
   if (costLedger) {
@@ -185,25 +201,27 @@ export function generateReport({ run, evidence = [], costLedger, releaseEvidence
       }
     }
   }
-  const perStage = [...stages.values()].map(s => ({ ...s, firstUsefulError: observations.find(o => o.stage === s.stage && o.kind === 'test-or-build-failure' && /^not ok \d+/.test(o.text)) || observations.find(o => o.stage === s.stage && o.kind === 'test-or-build-failure') || observations.find(o => o.stage === s.stage && o.kind !== 'log-message') || null }));
+  const perStage = [...stages.values()].map(s => ({ ...s, observedAccountedAssertions: distinct(accountedAssertions.filter(o => o.stage === s.stage)),
+    firstUsefulError: unaccountedAssertions.find(o => o.stage === s.stage) || actionableObservations.find(o => o.stage === s.stage && o.kind === 'test-or-build-failure') || actionableObservations.find(o => o.stage === s.stage && o.kind !== 'log-message') || null }));
   return { schemaVersion: 1, kind: 'release-diagnostic-report', generatedAt: now, run: root,
     outcome: { status: knownFailed ? (complete ? 'failure-observed' : 'failure-observed-incomplete') : cpuReceiptClean ? 'receipt-reports-clean-cpu-scope' : 'incomplete-or-blocked',
       complete, receiptStatus: receipt?.status || null, cpuReceiptClean,
-      comparisonNewFailures: count(receipt?.newFailures), observedDistinctFailingAssertions: assertionKeys.size,
+      comparisonNewFailures: count(receipt?.newFailures), observedDistinctFailingAssertions: distinct(observedAssertions),
+      observedAccountedAssertions: distinct(accountedAssertions), observedUnaccountedAssertions: distinct(unaccountedAssertions),
       failureCategory: [knownFailed ? 'test-or-build-failure (product cause requires diagnosis)' : null, infra ? 'infrastructure-interruption-observed' : null, stopped ? 'operator-stop-observed' : null].filter(Boolean),
-      firstUsefulError, missingStages, incompleteStages, missingLogs, blockers: [...new Set(blockers)] },
+      firstUsefulError, missingStages, incompleteStages, missingLogs, unaccountedStageExits, blockers: [...new Set(blockers)] },
     identity, identityMismatches: [...new Set(identityMismatches)], stages: perStage, observations,
     elapsed: { start: receipt?.startedAt || null, end: receipt?.endedAt || null,
       driverWallSeconds: zoned(receipt?.startedAt) && zoned(receipt?.endedAt) ? (Date.parse(receipt.endedAt) - Date.parse(receipt.startedAt)) / 1000 : null,
       containerElapsedNote: 'Step elapsed excludes install/preparation. Snapshot durations are lower bounds, not billed lifetimes. Missing container lifetimes/resources remain unknown.' },
     groups, containers: [...containers.values()], cost, release, issues,
     retainedEvidence: artifacts,
-    nextAction: 'Review the retained errors and artifacts before deciding whether another run is necessary. No rerun is launched or recommended automatically.' };
+    nextAction: cpuReceiptClean ? 'Retain the existing clean CPU receipt and its accounted observations for the release owner. This diagnostic supplies no reason to rerun it and launches nothing.' : 'Review the retained errors and artifacts before deciding whether another run is necessary. No rerun is launched or recommended automatically.' };
 }
 
 export function formatMarkdown(report) {
   const r = report, show = v => v === null || v === undefined ? 'unknown' : String(v), escape = v => show(v).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
-  return [`# Release run diagnostic`, '', `**${r.outcome.status}**; complete=${r.outcome.complete}; receipt=${show(r.outcome.receiptStatus)}; comparison newFailures=${show(r.outcome.comparisonNewFailures)}; observed distinct failing assertions=${r.outcome.observedDistinctFailingAssertions}.`,
+  return [`# Release run diagnostic`, '', `**${r.outcome.status}**; complete=${r.outcome.complete}; receipt=${show(r.outcome.receiptStatus)}; comparison newFailures=${show(r.outcome.comparisonNewFailures)}; observed assertions: ${r.outcome.observedAccountedAssertions} accounted by receipt, ${r.outcome.observedUnaccountedAssertions} unaccounted (${r.outcome.observedDistinctFailingAssertions} raw failing/TODO assertions retained).`,
     '', `First useful error: ${r.outcome.firstUsefulError ? `${r.outcome.firstUsefulError.stage}: ${r.outcome.firstUsefulError.text} (${r.outcome.firstUsefulError.path || 'receipt'}${r.outcome.firstUsefulError.line ? ':' + r.outcome.firstUsefulError.line : ''})` : 'none retained'}`,
     '', `Category: ${r.outcome.failureCategory.join('; ') || 'undetermined'}.`,
     '', `Source: ${show(r.identity.sourceSha)}. Harness ref: ${show(r.identity.harnessRef)}; tree: ${show(r.identity.harnessTree)}; suite tree: ${show(r.identity.suiteTree)}. Runtime: Node ${show(r.identity.nodeVersion)}, pnpm ${show(r.identity.pnpmVersion)}.`,
@@ -212,8 +230,8 @@ export function formatMarkdown(report) {
     ...(r.cost.requestedResources ? ['', `Ledger request plan: ${show(r.cost.requestedResources.totalCpu)} CPU, ${show(r.cost.requestedResources.totalMemoryGiB)} GiB across the planned containers; allocation to observed container IDs is unknown. Estimate method: ${r.cost.method}`] : []),
     '', `Build: ${show(r.release.build)}. Deployed at (as evidenced, timezone retained): ${show(r.release.deployedAt)}.`,
     ...['implemented', 'locallyVerified', 'releaseQualified', 'liveVerified'].map(k => `- ${k}: ${r.release[k].status}`), '',
-    '| Stage | Exit | Step seconds | First retained error |', '| --- | --- | --- | --- |',
-    ...r.stages.map(s => `| ${escape(s.stage)} | ${escape(s.exit)} | ${show(s.elapsedStepSeconds)} | ${escape(s.firstUsefulError?.text || '')} |`), '',
+    '| Stage | Exit | Step seconds | Accounted assertions | First unaccounted error |', '| --- | --- | --- | --- | --- |',
+    ...r.stages.map(s => `| ${escape(s.stage)} | ${escape(s.exit)} | ${show(s.elapsedStepSeconds)} | ${s.observedAccountedAssertions} | ${escape(s.firstUsefulError?.text || '')} |`), '',
     `Missing stages: ${r.outcome.missingStages.join(', ') || 'none listed'}. Incomplete stage statuses: ${r.outcome.incompleteStages.join(', ') || 'none listed'}.`,
     ...[...r.outcome.blockers, ...r.identityMismatches, ...r.issues].map(v => `- ${v}`), '',
     'Retained evidence (full hashes, resources, provenance and observations are in report.json):', '',
