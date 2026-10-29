@@ -405,7 +405,7 @@ export class GodNav {
     const entrance = t.kind === 'building' && !t.inside ? t.stands?.[0] : undefined;
     if (t.kind === 'building' && !t.doorOpen && (t.rooms?.length === 1 || !!entrance)) {
       const rooms = this.things().filter((x) => x.kind === 'room' && t.rooms?.includes(x.ref));
-      const room = t.rooms?.length === 1 ? rooms[0] : rooms.filter((x) => (x.rise ?? Infinity) < LOW_RISE_M && x.poly?.length)
+      const room = t.rooms?.length === 1 ? rooms[0] : rooms.filter((x) => x.rise !== undefined && x.rise >= 0 && x.rise < LOW_RISE_M && x.poly?.length)
         .sort((a, b) => (a.rise! - b.rise!) || polyDist(a.poly!, entrance!) - polyDist(b.poly!, entrance!) || a.ref.localeCompare(b.ref))[0];
       const inner = room ? this.goal(room, me, except) : null;
       goal = inner;

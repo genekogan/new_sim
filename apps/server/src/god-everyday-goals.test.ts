@@ -12,13 +12,13 @@ test('a mesh entrance with no reachable low room refuses instead of choosing a r
       {id:'entry',kind:'room',p:[0,0,0],yaw:0},
       {id:'diner',kind:'room',p:[0,0.53,0],yaw:0},
       {id:'upstairs',kind:'room',p:[0,3,0],yaw:0}]};
-  let upperChecks=0,mezzanineChecks=0;
+  let upperChecks=0,mezzanineChecks=0,basementChecks=0;
   const model={entities:new Map([['house',entity]]),editSeq:1,ground:()=>({waters:[]}),
     resolvedDef:()=>def,bake:()=>baked,worldPose:()=>({x:0,y:0,z:0,yaw:0,s:1}),pathOf:()=> 'house',get:()=>undefined};
   const nav=new GodNav({model,
     engine:{world:{tick:0,entities:{}},standableNearV1:(at:[number,number])=>at,
-      reachV1:(_from:unknown,to:{level:number})=>{if(to.level===2)upperChecks++;if(to.level===1)mezzanineChecks++;return {ok:to.level>0};}},
-    levelAt:(_x:number,_z:number,y:number)=>y>1.5?2:y>0.3?1:0,engineOwned:()=>false,
+      reachV1:(_from:unknown,to:{level:number})=>{if(to.level===3)basementChecks++;if(to.level===2)upperChecks++;if(to.level===1)mezzanineChecks++;return {ok:to.level>0};}},
+    levelAt:(_x:number,_z:number,y:number)=>y<0?3:y>1.5?2:y>0.3?1:0,engineOwned:()=>false,
   } as unknown as NavHost);
   const building=nav.thing('house')!;
   const upstairs=nav.thing('house/upstairs')!;
@@ -34,4 +34,10 @@ test('a mesh entrance with no reachable low room refuses instead of choosing a r
   model.editSeq++;
   assert.equal(nav.goal(nav.thing('house')!,[0,8]),null,'an upper-only footprint with omitted floor ids has no entrance goal');
   assert.equal(upperChecks,0,'upper-only rooms are never tried despite default floor zero');
+  // Imported footprint validation allows negative y0; a reachable basement must not become the default entrance.
+  baked.rooms=[room('cellar',-3,-1),room('entry',0,0)];
+  baked.slots=[{id:'front',kind:'stand',p:[0,0,4],yaw:0},{id:'cellar',kind:'room',p:[0,-3,0],yaw:0},{id:'entry',kind:'room',p:[0,0,0],yaw:0}];
+  model.editSeq++;
+  assert.equal(nav.goal(nav.thing('house')!,[0,8]),null,'a reachable basement does not replace the blocked ground entrance');
+  assert.equal(basementChecks,0,'negative-rise rooms are never tried as the default entrance');
 });
