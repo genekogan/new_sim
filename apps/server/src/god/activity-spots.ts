@@ -49,7 +49,7 @@ type Thing = { on?: string; id: string; e: Entity; def: StoredDef; name: string;
 const kinds = new WeakMap<StoredDef, string>();
 const kindOf = (t: Thing) => { let k = kinds.get(t.def); if (k === undefined) kinds.set(t.def, (k = t.def.name.replace(/^core-/, ''))); return k; };
 const is = (t: Thing, ...words: string[]) => words.some(w => t.tags.has(w) || kindOf(t) === w);
-const SEAT_KINDS = new Set(['chair', 'armchair', 'sofa', 'stool', 'bench-seat', 'bench', 'pew', 'office-chair', 'dining-chair', 'bar-stool', 'loveseat']);
+const SEAT_KINDS = ['chair', 'armchair', 'sofa', 'stool', 'bench-seat', 'bench', 'pew', 'office-chair', 'dining-chair', 'bar-stool', 'loveseat'];
 
 /** A two-person spot (see-saw, book club, cooking together) waits this long for the other end: a partner is offered the
  *  waiting seat from anywhere within SPOT_REACH (200 m), about 150 s on foot, so a shorter wait (the see-saw had 60 s) let
@@ -125,7 +125,9 @@ export class GodActivitySpots {
 
   private derive(): SpotsData {
     const all = this.things(), spots: Spot[] = [], shelves: Shelf[] = [], used = new Set<string>();
-    const seats = all.filter(t => SEAT_KINDS.has(kindOf(t)) && t.slots.some(s => s.kind === 'seat'));
+    // Authored mesh furniture (e.g. mars-study-chair) carries its kind in tags rather than the exact def name.
+    // Keep the real seat-slot requirement: a bed or a merely chair-labelled decoration is not an activity seat.
+    const seats = all.filter(t => is(t, ...SEAT_KINDS) && t.slots.some(s => s.kind === 'seat'));
     const seatHeight = (t: Thing) => { const h = Number(t.c.seat?.height); return Number.isFinite(h) && h >= 0.2 && h <= 1.2 ? h : undefined; };
     const add = (s: Spot) => { if (!used.has(s.id)) { used.add(s.id); spots.push(s); } };
     const standSpot = (t: Thing, activity: string, extra: Partial<Spot> = {}, slot?: string) => {

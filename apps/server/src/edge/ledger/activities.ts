@@ -228,10 +228,13 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
     add({id: `${act}:here`, verb: act, label, available: can, ...(can ? {} : {blocked: {code: 'pose.no-room', reason: 'No open ground within 15 m; walk to a lawn or garden first.'}}), params: secondsParam(sec, 600)},
       {label, steps: [...standFirst(w), ...(spot ? [walk(spot)] : []), pose(act, sec)], seconds: true});
   }
-  // ---- reading: a reading spot (with a shelf) nearby, else a free seat, else standing with the book you carry
+  // ---- reading: a reading spot (with a shelf) nearby, else keep the current seat, else a free seat, else standing
   const readers = live.filter(s => s.activity === 'read' && !w.taken(s.at, s.id)).sort((a, b) => d2(a.at, w.me) - d2(b.at, w.me) || a.id.localeCompare(b.id));
   const near = readers.find(s => d2(s.at, w.me) <= 40 && (!data.nearest || ok(s)));
   if (near) add({id: 'read:here', verb: 'read', label: `Read a book (${near.label ?? near.id}, ${Math.round(d2(near.at, w.me))} m; takes a book from the shelf and puts it back)`, available: true, target: {id: near.id, kind: 'spot'}, params: secondsParam(180)}, {label: 'Read a book', steps: readAt(near), seconds: true});
+  // An occupied native seat is absent from the free-seat capabilities. The read overlay already preserves its
+  // lasting claim and facing; standing first discards that chair and unexpectedly makes its occupant read standing.
+  else if (w.seated) add({id: 'read:here', verb: 'read', label: 'Read the book you carry on your current seat', available: true, params: secondsParam(180)}, {label: 'Read a book', steps: [pose('read', 180, {prop: 'book'})], seconds: true});
   else if (seat) add({id: 'read:here', verb: 'read', label: `Read a book on the nearest free seat (${seat.cap.label})`, available: true, params: secondsParam(180)}, {label: 'Read a book', steps: [...seat.plan.steps.filter(s => s.verb !== 'rest'), pose('read', 180, {prop: 'book'})], seconds: true});
   else add({id: 'read:here', verb: 'read', label: 'Read the book you carry, standing here', available: true, params: secondsParam(180)}, {label: 'Read a book', steps: [...standFirst(w), pose('read', 180, {prop: 'book'})], seconds: true});
   // read:<place>: every place that has reading spots (the room and its building), nearest free spot in it
