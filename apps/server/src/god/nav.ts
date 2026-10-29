@@ -399,8 +399,15 @@ export class GodNav {
     // D2 (playtest 2026-10-25: 4 of 4 "walk to the pavilion" ended at its closed front door, outside its floor): a building
     // with a single room is walked into that room, as walk:<building>/<room> is.
     // A blocked interior must not retain the earlier exterior approach while the offer promises entry.
-    if (t.kind === 'building' && !t.doorOpen && t.rooms?.length === 1) {
-      const room = this.things().find((x) => x.kind === 'room' && x.ref === t.rooms![0]), inner = room ? this.goal(room, me, except) : null;
+    // Retained mesh buildings can have an entrance stand without a ground-level door opening (Mars kitchen).
+    // Use the lowest room within the low-rise limit, nearest that entrance, on its actual engine floor.
+    // An explicit closed door keeps its existing exterior-approach behavior for multi-room buildings.
+    const entrance = t.kind === 'building' && !t.inside ? t.stands?.[0] : undefined;
+    if (t.kind === 'building' && !t.doorOpen && (t.rooms?.length === 1 || !!entrance)) {
+      const rooms = this.things().filter((x) => x.kind === 'room' && t.rooms?.includes(x.ref));
+      const room = t.rooms?.length === 1 ? rooms[0] : rooms.filter((x) => (x.rise ?? Infinity) < LOW_RISE_M && x.poly?.length)
+        .sort((a, b) => (a.rise! - b.rise!) || polyDist(a.poly!, entrance!) - polyDist(b.poly!, entrance!) || a.ref.localeCompare(b.ref))[0];
+      const inner = room ? this.goal(room, me, except) : null;
       goal = inner;
       if (!inner) this.blocked.set(t.ref, `The interior of ${t.ref} is not reachable right now; its entrance or the route inside is blocked.`);
       else this.blocked.delete(t.ref);
@@ -727,7 +734,7 @@ export class GodNav {
   private label(t: Thing, d: number): string {
     const by = this.landmarks(t).map((x) => x.ref);
     if (t.kind === 'room') return `Go into ${t.name}, ${t.what} (${t.ref}; ${d} m)`;
-    if (t.kind === 'building') return `Walk to ${t.name} [${t.ref}], ${t.what}: ${t.doorOpen ? 'in at its front door' : t.rooms?.length === 1 ? `inside, into ${t.rooms[0]}` : 'to its front door (closed)'} (${t.rooms?.length ?? 0} rooms, each walk:${t.ref}/<room>; ${d} m)`;
+    if (t.kind === 'building') return `Walk to ${t.name} [${t.ref}], ${t.what}: ${t.doorOpen ? 'in at its front door' : t.rooms?.length === 1 ? `inside, into ${t.rooms[0]}` : !t.inside && t.stands?.length ? 'inside via its entrance' : 'to its front door (closed)'} (${t.rooms?.length ?? 0} rooms, each walk:${t.ref}/<room>; ${d} m)`;
     if (t.kind === 'water') return `Walk to the shore of ${t.name} [${t.ref}], ${t.what} (${d} m)`;
     return `Walk to ${t.name} [${t.ref}], ${t.what}${by.length ? `, by ${by.join(' and ')}` : ''} (${d} m)`;
   }
