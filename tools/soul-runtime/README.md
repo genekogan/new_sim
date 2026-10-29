@@ -32,7 +32,7 @@ server envelopes), `control.mjs` (controller lease and effect journal),
 `decision.mjs`, and `supervisor.mjs`. Model turns return structured decisions;
 the credential stays outside model context. World and owner intake continue
 while a turn is thinking. The native server's salience controls waking; lower
-salience facts remain available for the next natural decision. No new server
+salience facts remain available for the next natural decision. Agents are told this distinction: they may choose a native conversation for an ongoing exchange, or retain a timed wakeup when awaiting public speech. Invitation acceptance and responses remain agent decisions; ambient speech does not trigger unconditional model polling. No new server
 importance classifier or LLM is introduced.
 
 A new owner message during a turn invalidates its eventual action. Ordinary
