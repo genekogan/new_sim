@@ -1,0 +1,1828 @@
+{
+  "schema": "continuity-fixtures/1",
+  "status": "concrete-proposal; NOT baseline-ready",
+  "authoredAt": "2026-10-29",
+  "matrix": "matrix.json",
+  "sources": {
+    "eden-2026": {
+      "template": "worlds/templates/eden-2026.json",
+      "sha256": "85465ccfab04681fb697ae289faf4e82083c096ebd05b3227b70625d8deee00f",
+      "sliceEvidence": "<team>/scratch/continuity-20261029/fixtures/eden-2026-slices.json"
+    },
+    "mars-two": {
+      "template": "worlds/templates/mars-two.json",
+      "sha256": "73601d6d0a05f4566071ecb362a61fc1542aaf6b18b497a9ac18059ca276e7c8",
+      "sliceEvidence": "<team>/scratch/continuity-20261029/fixtures/mars-two-slices.json",
+      "originalSha256": "f8e589f1b9c1fc508073cf0a23d254d8387b4676836bbfe928625629fc0a2f24",
+      "repair": "worlds/patches/mars-chiba-seating-20261029/layout.json; original filtered slices predate the appended seating repair. Fresh per-arm binding and geometry hash remain mandatory."
+    }
+  },
+  "policy": {
+    "arms": [
+      "existing-headless-seat",
+      "managed-continuity-runtime"
+    ],
+    "trialsPerArm": 2,
+    "sameModelAndEffort": true,
+    "model": "must pin one actually advertised model before either arm; gpt-5.6-sol is current local development probe only",
+    "effort": "same explicit value both arms; no default inference",
+    "holdoutTranscriptTuning": false,
+    "soak": {
+      "count": 1,
+      "minimumRealSeconds": 7200,
+      "onlyAfterShortScenariosPass": true
+    },
+    "baselineRunsCompleted": 0,
+    "comparisonRunsCompleted": 0
+  },
+  "scenarios": [
+    {
+      "id": "eden-reading-duo",
+      "role": "development",
+      "world": "eden-2026",
+      "fixtureStatus": "blocked-before-comparison",
+      "timeDomain": "real UTC; T0 set after all setup receipts and initial poses pass",
+      "soulIds": "bind fresh per run; never publish or reuse probe Soul IDs",
+      "agentInformation": "matrix instructions plus the declared initial owner supplements; no oracle entity IDs/coordinates or other agent state in model prompts",
+      "setupTransport": "tools/playtest/arena/fixture-setup.mjs through fixtureCliJson, identical both arms",
+      "sourceStatus": "template names/ordered final poses plus limited Eden read-only native discovery; no action/navigation certification",
+      "bodySampleSec": 1,
+      "maxSampleGapSec": 2,
+      "clockSource": "observer wall UTC and monotonic samples; do not infer real elapsed time from simulation ticks",
+      "freezeRequirements": [
+        "fresh boot geometry hash for both arms",
+        "stable ref -> generated entity ID bindings before inference",
+        "initial pose and occupied-seat receipt verification",
+        "actual supported capability resolution",
+        "same advertised model and effort pinned in both arms",
+        "measurement host quiet and no concurrent workers/tests",
+        "seal numeric proposal and semantic rubric before comparison; no holdout-driven tuning"
+      ],
+      "venue": {
+        "ref": "eden-library-1",
+        "roomRef": "eden-library-1/reading",
+        "region": {
+          "pos": [
+            74,
+            -7
+          ],
+          "radiusM": 6
+        },
+        "placeCandidates": [
+          "g-eden-library-1.reading",
+          "g-eden-library-1"
+        ],
+        "walkCapability": "walk:eden-library-1",
+        "walkStatus": "native-read-only-verified"
+      },
+      "timing": {
+        "meetingOffsetSec": 240,
+        "arrivalToleranceSec": 30,
+        "endOffsetSec": 720,
+        "minimumSimultaneousReadingSec": 30,
+        "resumeWithinSecAfterClosure": 180
+      },
+      "actors": [
+        {
+          "id": "reader-a",
+          "role": "reader",
+          "releaseOffsetSec": 0,
+          "setup": {
+            "status": "proposed; setup receipt and initial pose not yet verified",
+            "maxWallSec": 240,
+            "steps": [
+              "stand:here",
+              {
+                "verb": "go",
+                "target": {
+                  "place": "field"
+                }
+              },
+              {
+                "verb": "turn",
+                "heading": 0
+              }
+            ],
+            "expect": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3,
+              "heading": 0,
+              "headingToleranceDeg": 5,
+              "posture": [
+                "standing"
+              ]
+            },
+            "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
+          },
+          "originalErrand": {
+            "initialOwnerSupplement": "Your original errand is to go to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
+            "returnRegion": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 43,
+              "includePolygon": [
+                [
+                  -30,
+                  -30
+                ],
+                [
+                  30,
+                  -30
+                ],
+                [
+                  30,
+                  30
+                ],
+                [
+                  -30,
+                  30
+                ]
+              ]
+            },
+            "postures": [
+              "standing"
+            ],
+            "requiresReadAfterReturn": [
+              "here",
+              "observe"
+            ],
+            "requiresGroundedObservation": true,
+            "returnRegionSource": "worlds/eden/places.v1.json#field polygon; verify against fresh native world before comparison seal",
+            "note": "Pre-freeze correction after developmentduo1: named semantic destination replaces an exact starting coordinate not exposed as a movement capability. Original run remains partial, not rescored."
+          },
+          "soulName": "ContinuityReaderA"
+        },
+        {
+          "id": "reader-b",
+          "role": "reader",
+          "releaseOffsetSec": 0,
+          "setup": {
+            "status": "proposed; setup receipt and initial pose not yet verified",
+            "maxWallSec": 240,
+            "steps": [
+              "stand:here",
+              {
+                "verb": "go",
+                "target": {
+                  "place": "field"
+                }
+              },
+              {
+                "verb": "turn",
+                "heading": 0
+              }
+            ],
+            "expect": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3,
+              "heading": 0,
+              "headingToleranceDeg": 5,
+              "posture": [
+                "standing"
+              ]
+            },
+            "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
+          },
+          "originalErrand": {
+            "initialOwnerSupplement": "Your original errand is to go to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
+            "returnRegion": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 43,
+              "includePolygon": [
+                [
+                  -30,
+                  -30
+                ],
+                [
+                  30,
+                  -30
+                ],
+                [
+                  30,
+                  30
+                ],
+                [
+                  -30,
+                  30
+                ]
+              ]
+            },
+            "postures": [
+              "standing"
+            ],
+            "requiresReadAfterReturn": [
+              "here",
+              "observe"
+            ],
+            "requiresGroundedObservation": true,
+            "returnRegionSource": "worlds/eden/places.v1.json#field polygon; verify against fresh native world before comparison seal",
+            "note": "Pre-freeze correction after developmentduo1: named semantic destination replaces an exact starting coordinate not exposed as a movement capability. Original run remains partial, not rescored."
+          },
+          "soulName": "ContinuityReaderB"
+        }
+      ],
+      "seatPool": [
+        {
+          "ref": "eden-library-1/library-armchair-sage",
+          "worldXZCandidate": [
+            75.9,
+            -3.9
+          ],
+          "status": "template-only; exact usable seat binding and reachability pending"
+        },
+        {
+          "ref": "eden-library-1/library-armchair-rose",
+          "worldXZCandidate": [
+            77.95,
+            -3.9
+          ],
+          "status": "template-only; exact usable seat binding and reachability pending"
+        },
+        {
+          "ref": "eden-library-1/library-reading-chair-west-1",
+          "worldXZCandidate": [
+            71.2,
+            -5.6
+          ],
+          "status": "template-only; exact usable seat binding and reachability pending"
+        },
+        {
+          "ref": "eden-library-1/library-reading-chair-west-2",
+          "worldXZCandidate": [
+            71.8,
+            -7.2
+          ],
+          "status": "template-only; exact usable seat binding and reachability pending"
+        },
+        {
+          "ref": "eden-library-1/library-reading-chair-east-1",
+          "worldXZCandidate": [
+            76.2,
+            -5.6
+          ],
+          "status": "template-only; exact usable seat binding and reachability pending"
+        },
+        {
+          "ref": "eden-library-1/library-reading-chair-east-2",
+          "worldXZCandidate": [
+            76.8,
+            -7.2
+          ],
+          "status": "template-only; exact usable seat binding and reachability pending"
+        },
+        {
+          "ref": "eden-library-1/library-desk-chair-west",
+          "worldXZCandidate": [
+            71.5,
+            -8.4
+          ],
+          "status": "template-only; exact usable seat binding and reachability pending"
+        }
+      ],
+      "occupiedSeat": {
+        "ref": "eden-library-1/library-armchair-sage",
+        "slot": "seat",
+        "occupant": "fixture-only non-model body, not counted among two agents",
+        "status": "not executed; keep occupied through seating phase"
+      },
+      "activity": {
+        "verb": "read",
+        "capabilityTemplates": [
+          "read:read.{seatEntityId}",
+          "read:{libraryPlaceId}",
+          "read:here"
+        ],
+        "readOnlyVerified": "read:g-eden-library-1 available; reading-chair part targets library-reading-chair-west-1",
+        "holdPostures": [
+          "seated",
+          "sitting"
+        ],
+        "holdActivities": [
+          "read"
+        ],
+        "seatMustBelongToPool": true,
+        "sameReceiptOrContinuousReadRequired": true
+      },
+      "disturbances": [
+        {
+          "id": "occupied-seat",
+          "when": "before T0",
+          "action": "fixture occupancy only; maintain one occupied frozen seat; do not assign free seats to agents",
+          "trigger": {
+            "maximumDelaySec": 240,
+            "kind": "occupied-seat",
+            "recipients": [
+              "reader-a",
+              "reader-b"
+            ],
+            "deliveryKind": "fixture-body",
+            "fixtureActor": "seat-occupant",
+            "seatRef": "eden-library-1/library-armchair-sage",
+            "slot": "seat",
+            "holdUntil": "trial-end"
+          }
+        },
+        {
+          "id": "travel-greeting",
+          "when": "reader-a first native navigation or compound read/sit journey with current moving body, at least 5 real seconds after observed motion onset",
+          "once": true,
+          "text": "ContinuityReaderA, hello! What brings you this way today?",
+          "delivery": "addressed in-world speech from fixture-only body within native hearing range",
+          "maximumTriggerWaitSec": 180,
+          "unmet": "disturbance-not-delivered; never silently pass",
+          "trigger": {
+            "maximumDelaySec": 2,
+            "kind": "moving-body-journey",
+            "recipients": [
+              "reader-a"
+            ],
+            "deliveryKind": "world",
+            "minimumOnsetSec": 5,
+            "maximumTriggerWaitSec": 180,
+            "capabilityVerbs": [
+              "walk",
+              "read",
+              "sit"
+            ]
+          }
+        },
+        {
+          "id": "controller-restart",
+          "when": "reader-b first strategic wait with a future meeting timer at least 20 seconds away",
+          "once": true,
+          "action": "kill whole owned controller process after durable checkpoint, restart after 1 second with same state",
+          "unmet": "restart coverage unknown; no replacement trigger after observing behavior",
+          "trigger": {
+            "maximumDelaySec": 5,
+            "kind": "checkpoint-future-wake",
+            "recipients": [
+              "reader-b"
+            ],
+            "deliveryKind": "process-control",
+            "minimumFutureWakeSec": 20
+          }
+        }
+      ],
+      "journeyTemplates": [
+        {
+          "name": "library arrival",
+          "region": {
+            "pos": [
+              74,
+              -7
+            ],
+            "radiusM": 6
+          },
+          "holdSec": 0,
+          "evidenceRule": "Current native body arrival; a compound read/sit journey is valid without a separate walk receipt."
+        },
+        {
+          "name": "sustained seated reading",
+          "region": {
+            "pos": [
+              74,
+              -7
+            ],
+            "radiusM": 6
+          },
+          "holdSec": 30,
+          "receipt": {
+            "verb": "read",
+            "targetRefs": [
+              "eden-library-1/library-armchair-sage",
+              "eden-library-1/library-armchair-rose",
+              "eden-library-1/library-reading-chair-west-1",
+              "eden-library-1/library-reading-chair-west-2",
+              "eden-library-1/library-reading-chair-east-1",
+              "eden-library-1/library-reading-chair-east-2",
+              "eden-library-1/library-desk-chair-west"
+            ]
+          },
+          "postures": [
+            "seated",
+            "sitting"
+          ],
+          "activities": [
+            "read"
+          ]
+        },
+        {
+          "name": "original errand return",
+          "region": {
+            "pos": [
+              0,
+              0
+            ],
+            "radiusM": 3
+          },
+          "holdSec": 0,
+          "receipt": {
+            "verb": "walk",
+            "targetRefs": [
+              "place-field"
+            ],
+            "completed": true
+          },
+          "postures": [
+            "standing"
+          ]
+        }
+      ],
+      "additionalMechanical": [
+        "distinct held seat entity+slot for both actors during overlapping reading window",
+        "occupied seat never held by either test actor",
+        "world-observed reciprocal speech, semantic relevance scored separately",
+        "exact operation->effect IDs around restart; no duplicate effects"
+      ],
+      "initialConstraintSupplement": "The meeting is at {meetingUTC}; finish the gathering and your original errand by {completionUTC}. These are real UTC deadlines even if the world clock differs. Once you are both seated and reading, read together for at least 30 real seconds, exchange observations, then return to your original errand before the completion deadline."
+    },
+    {
+      "id": "mars-presentation-four",
+      "role": "development",
+      "world": "mars-two",
+      "fixtureStatus": "blocked-before-comparison",
+      "timeDomain": "real UTC; T0 set after all setup receipts and initial poses pass",
+      "soulIds": "bind fresh per run; never publish or reuse probe Soul IDs",
+      "agentInformation": "matrix instructions plus the declared initial owner supplements; no oracle entity IDs/coordinates or other agent state in model prompts",
+      "setupTransport": "tools/playtest/arena/fixture-setup.mjs through fixtureCliJson, identical both arms",
+      "sourceStatus": "template names/ordered final poses plus limited Eden read-only native discovery; no action/navigation certification",
+      "bodySampleSec": 1,
+      "maxSampleGapSec": 2,
+      "clockSource": "observer wall UTC and monotonic samples; do not infer real elapsed time from simulation ticks",
+      "freezeRequirements": [
+        "fresh boot geometry hash for both arms",
+        "stable ref -> generated entity ID bindings before inference",
+        "initial pose and occupied-seat receipt verification",
+        "actual supported capability resolution",
+        "same advertised model and effort pinned in both arms",
+        "measurement host quiet and no concurrent workers/tests",
+        "seal numeric proposal and semantic rubric before comparison; no holdout-driven tuning"
+      ],
+      "venue": {
+        "ref": "chiba",
+        "finalWorldXZ": [
+          -14.643,
+          -28.174
+        ],
+        "region": {
+          "pos": [
+            -14.412,
+            -18.447
+          ],
+          "radiusM": 9
+        },
+        "note": "Chiba semantic membership alone is too broad; use exact podium/tier seat bindings. Final moved geometry supersedes old podium-mars-room cast."
+      },
+      "timing": {
+        "meetingOffsetSec": 300,
+        "arrivalToleranceSec": 30,
+        "lateActorArrivalToleranceSec": 150,
+        "endOffsetSec": 1080,
+        "minimumPresenterHoldSec": 30,
+        "minimumAudienceHoldSec": 30,
+        "resumeWithinSecAfterClosure": 180
+      },
+      "actors": [
+        {
+          "id": "presenter",
+          "role": "presenter",
+          "releaseOffsetSec": 0,
+          "setup": {
+            "status": "proposed; setup receipt and initial pose not yet verified",
+            "maxWallSec": 240,
+            "steps": [
+              "stand:here",
+              {
+                "verb": "go",
+                "target": {
+                  "place": "field"
+                }
+              },
+              {
+                "verb": "turn",
+                "heading": 0
+              }
+            ],
+            "expect": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3,
+              "heading": 0,
+              "headingToleranceDeg": 5,
+              "posture": [
+                "standing"
+              ]
+            },
+            "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
+          },
+          "originalErrand": {
+            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "returnRegion": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3
+            },
+            "postures": [
+              "standing"
+            ],
+            "requiresReadAfterReturn": [
+              "here",
+              "observe"
+            ],
+            "requiresGroundedObservation": true
+          },
+          "soulName": "ChibaSpeaker"
+        },
+        {
+          "id": "attendee-1",
+          "role": "audience",
+          "releaseOffsetSec": 0,
+          "setup": {
+            "status": "proposed; setup receipt and initial pose not yet verified",
+            "maxWallSec": 240,
+            "steps": [
+              "stand:here",
+              {
+                "verb": "go",
+                "target": {
+                  "place": "field"
+                }
+              },
+              {
+                "verb": "turn",
+                "heading": 0
+              }
+            ],
+            "expect": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3,
+              "heading": 0,
+              "headingToleranceDeg": 5,
+              "posture": [
+                "standing"
+              ]
+            },
+            "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
+          },
+          "originalErrand": {
+            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "returnRegion": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3
+            },
+            "postures": [
+              "standing"
+            ],
+            "requiresReadAfterReturn": [
+              "here",
+              "observe"
+            ],
+            "requiresGroundedObservation": true
+          },
+          "soulName": "ChibaGuest1"
+        },
+        {
+          "id": "attendee-2",
+          "role": "audience",
+          "releaseOffsetSec": 0,
+          "setup": {
+            "status": "proposed; setup receipt and initial pose not yet verified",
+            "maxWallSec": 240,
+            "steps": [
+              "stand:here",
+              {
+                "verb": "go",
+                "target": {
+                  "place": "field"
+                }
+              },
+              {
+                "verb": "turn",
+                "heading": 0
+              }
+            ],
+            "expect": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3,
+              "heading": 0,
+              "headingToleranceDeg": 5,
+              "posture": [
+                "standing"
+              ]
+            },
+            "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
+          },
+          "originalErrand": {
+            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "returnRegion": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3
+            },
+            "postures": [
+              "standing"
+            ],
+            "requiresReadAfterReturn": [
+              "here",
+              "observe"
+            ],
+            "requiresGroundedObservation": true
+          },
+          "soulName": "ChibaGuest2"
+        },
+        {
+          "id": "attendee-3",
+          "role": "audience",
+          "releaseOffsetSec": 330,
+          "setup": {
+            "status": "proposed; setup receipt and initial pose not yet verified",
+            "maxWallSec": 240,
+            "steps": [
+              "stand:here",
+              {
+                "verb": "go",
+                "target": {
+                  "place": "field"
+                }
+              },
+              {
+                "verb": "turn",
+                "heading": 0
+              }
+            ],
+            "expect": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3,
+              "heading": 0,
+              "headingToleranceDeg": 5,
+              "posture": [
+                "standing"
+              ]
+            },
+            "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
+          },
+          "originalErrand": {
+            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "returnRegion": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3
+            },
+            "postures": [
+              "standing"
+            ],
+            "requiresReadAfterReturn": [
+              "here",
+              "observe"
+            ],
+            "requiresGroundedObservation": true
+          },
+          "soulName": "ChibaGuest3"
+        }
+      ],
+      "presenterSeat": {
+        "ref": "presenter-timber-box",
+        "slot": "seat",
+        "worldXZCandidate": [
+          -14.412,
+          -18.447
+        ],
+        "radiusM": 1.5,
+        "status": "final-template-pose only; native sit availability not yet verified"
+      },
+      "audienceSeats": [
+        {
+          "ref": "tier",
+          "slot": "seat",
+          "worldXZCandidate": [
+            -13.132,
+            -20.04
+          ],
+          "radiusM": 1.5,
+          "status": "template-only; native reachability pending; high tiers may refuse"
+        },
+        {
+          "ref": "tier-2",
+          "slot": "seat",
+          "worldXZCandidate": [
+            -14.411,
+            -20.881
+          ],
+          "radiusM": 1.5,
+          "status": "template-only; native reachability pending; high tiers may refuse"
+        },
+        {
+          "ref": "tier-3",
+          "slot": "seat",
+          "worldXZCandidate": [
+            -12.919,
+            -22.12
+          ],
+          "radiusM": 1.5,
+          "status": "template-only; native reachability pending; high tiers may refuse"
+        },
+        {
+          "ref": "tier-4",
+          "slot": "seat",
+          "worldXZCandidate": [
+            -14.241,
+            -23.984
+          ],
+          "radiusM": 1.5,
+          "status": "template-only; native reachability pending; high tiers may refuse"
+        }
+      ],
+      "occupiedSeat": {
+        "ref": "tier",
+        "slot": "seat",
+        "status": "not executed; fixture occupant persists through audience seating"
+      },
+      "presentationMode": {
+        "primary": "native seated presenter plus world-visible say and audience questions",
+        "supportedSources": [
+          "tools/world-launcher/soul/eden.mjs say",
+          "apps/server/src/edge/comms/speech.ts"
+        ],
+        "nativeLectureCapability": "not verified at Chiba; never infer from venue label",
+        "ticketedPresentationObject": "existing API, creation/placement unverified; not required by this spoken-presentation fixture",
+        "speechRequirements": {
+          "opening": 1,
+          "substantiveTalkSegments": 2,
+          "distinctAudienceQuestioners": 2,
+          "relevantAnsweredQuestions": 2,
+          "closure": 1
+        },
+        "automaticScheduledObjectStartIsNotObservedPresentation": true
+      },
+      "disturbances": [
+        {
+          "id": "occupied-seat",
+          "when": "before T0",
+          "action": "occupy tier with fixture-only body",
+          "trigger": {
+            "maximumDelaySec": 240,
+            "kind": "occupied-seat",
+            "recipients": [
+              "presenter",
+              "attendee-1",
+              "attendee-2",
+              "attendee-3"
+            ],
+            "deliveryKind": "fixture-body",
+            "fixtureActor": "seat-occupant",
+            "seatRef": "tier",
+            "slot": "seat",
+            "holdUntil": "trial-end"
+          }
+        },
+        {
+          "id": "late-attendee",
+          "when": "T0+330s",
+          "action": "release attendee-3 with the same initial instruction; do not announce location privately to others",
+          "trigger": {
+            "maximumDelaySec": 2,
+            "kind": "scheduled-release",
+            "recipients": [
+              "attendee-3"
+            ],
+            "deliveryKind": "controller-release",
+            "offsetSec": 330
+          }
+        },
+        {
+          "id": "prestart-interruption",
+          "when": "T0+280s",
+          "actor": "presenter",
+          "text": "ChibaSpeaker, hello \u2014 what are you planning to discuss today?",
+          "delivery": "addressed world speech from a nearby fixture-only body",
+          "trigger": {
+            "maximumDelaySec": 2,
+            "kind": "scheduled-event",
+            "recipients": [
+              "presenter"
+            ],
+            "deliveryKind": "world",
+            "offsetSec": 280
+          }
+        }
+      ],
+      "journeyTemplates": {
+        "presenter": [
+          {
+            "name": "presenter seat",
+            "region": {
+              "pos": [
+                -14.412,
+                -18.447
+              ],
+              "radiusM": 1.5
+            },
+            "holdSec": 30,
+            "receipt": {
+              "verb": "sit",
+              "targetRefs": [
+                "presenter-timber-box"
+              ]
+            },
+            "postures": [
+              "seated",
+              "sitting"
+            ]
+          },
+          {
+            "name": "original errand return",
+            "region": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3
+            },
+            "holdSec": 0,
+            "receipt": {
+              "verb": "walk",
+              "targetRefs": [],
+              "completed": true
+            },
+            "postures": [
+              "standing"
+            ]
+          }
+        ],
+        "audience": [
+          {
+            "name": "audience seat",
+            "region": {
+              "pos": [
+                -14.412,
+                -18.447
+              ],
+              "radiusM": 9
+            },
+            "holdSec": 30,
+            "receipt": {
+              "verb": "sit",
+              "targetRefs": [
+                "tier-2",
+                "tier-3",
+                "tier-4"
+              ]
+            },
+            "postures": [
+              "seated",
+              "sitting"
+            ]
+          },
+          {
+            "name": "original errand return",
+            "region": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3
+            },
+            "holdSec": 0,
+            "receipt": {
+              "verb": "walk",
+              "targetRefs": [],
+              "completed": true
+            },
+            "postures": [
+              "standing"
+            ]
+          }
+        ]
+      },
+      "additionalMechanical": [
+        "three distinct free audience seats, no tier occupancy by test actors",
+        "presenter speech occurs while physically at presenter seat",
+        "at least two audience questions linked to subsequent presenter speech",
+        "late actor physically seated; acceptance/RSVP alone fails attendance",
+        "each actor returns and reads current facts after observed closure"
+      ],
+      "blocking": [
+        "Mars isolated world not running in this scope; no native route/seat resolution performed",
+        "field place identity/capability must be bound from actual Mars boot before filling return receipt targets",
+        "do not silently replace inaccessible high tiers after any comparison run"
+      ],
+      "initialConstraintSupplement": "The meeting is at {meetingUTC}; finish the gathering and your original errand by {completionUTC}. These are real UTC deadlines even if the world clock differs."
+    },
+    {
+      "id": "eden-walk-three",
+      "role": "holdout",
+      "world": "eden-2026",
+      "fixtureStatus": "blocked-before-comparison",
+      "timeDomain": "real UTC; T0 set after all setup receipts and initial poses pass",
+      "soulIds": "bind fresh per run; never publish or reuse probe Soul IDs",
+      "agentInformation": "matrix instructions plus the declared initial owner supplements; no oracle entity IDs/coordinates or other agent state in model prompts",
+      "setupTransport": "tools/playtest/arena/fixture-setup.mjs through fixtureCliJson, identical both arms",
+      "sourceStatus": "template names/ordered final poses plus limited Eden read-only native discovery; no action/navigation certification",
+      "bodySampleSec": 1,
+      "maxSampleGapSec": 2,
+      "clockSource": "observer wall UTC and monotonic samples; do not infer real elapsed time from simulation ticks",
+      "freezeRequirements": [
+        "fresh boot geometry hash for both arms",
+        "stable ref -> generated entity ID bindings before inference",
+        "initial pose and occupied-seat receipt verification",
+        "actual supported capability resolution",
+        "same advertised model and effort pinned in both arms",
+        "measurement host quiet and no concurrent workers/tests",
+        "seal numeric proposal and semantic rubric before comparison; no holdout-driven tuning"
+      ],
+      "venue": {
+        "meetingRef": "place-field",
+        "meetingRegion": {
+          "pos": [
+            0,
+            0
+          ],
+          "radiusM": 6
+        },
+        "gardenRef": "place-eden-stone-garden",
+        "gardenRegion": {
+          "pos": [
+            57,
+            -10
+          ],
+          "radiusM": 4
+        },
+        "gardenWalkCapability": "walk:g-place-eden-stone-garden",
+        "nativeRouteStatus": "read-only verified"
+      },
+      "timing": {
+        "meetingOffsetSec": 240,
+        "arrivalToleranceSec": 30,
+        "lateActorArrivalToleranceSec": 90,
+        "endOffsetSec": 960,
+        "minimumGroupOverlapSec": 10,
+        "resumeWithinSecAfterClosure": 180
+      },
+      "actors": [
+        {
+          "id": "walker-1",
+          "role": "walker",
+          "releaseOffsetSec": 0,
+          "setup": {
+            "status": "proposed; setup receipt and initial pose not yet verified",
+            "maxWallSec": 240,
+            "steps": [
+              "stand:here",
+              {
+                "verb": "go",
+                "target": {
+                  "place": "field"
+                }
+              },
+              {
+                "verb": "turn",
+                "heading": 0
+              }
+            ],
+            "expect": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3,
+              "heading": 0,
+              "headingToleranceDeg": 5,
+              "posture": [
+                "standing"
+              ]
+            },
+            "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
+          },
+          "originalErrand": {
+            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "returnRegion": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3
+            },
+            "postures": [
+              "standing"
+            ],
+            "requiresReadAfterReturn": [
+              "here",
+              "observe"
+            ],
+            "requiresGroundedObservation": true
+          },
+          "soulName": "WalkA"
+        },
+        {
+          "id": "walker-2",
+          "role": "walker",
+          "releaseOffsetSec": 0,
+          "setup": {
+            "status": "proposed; setup receipt and initial pose not yet verified",
+            "maxWallSec": 240,
+            "steps": [
+              "stand:here",
+              {
+                "verb": "go",
+                "target": {
+                  "place": "field"
+                }
+              },
+              {
+                "verb": "turn",
+                "heading": 0
+              }
+            ],
+            "expect": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3,
+              "heading": 0,
+              "headingToleranceDeg": 5,
+              "posture": [
+                "standing"
+              ]
+            },
+            "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
+          },
+          "originalErrand": {
+            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "returnRegion": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3
+            },
+            "postures": [
+              "standing"
+            ],
+            "requiresReadAfterReturn": [
+              "here",
+              "observe"
+            ],
+            "requiresGroundedObservation": true
+          },
+          "soulName": "WalkB"
+        },
+        {
+          "id": "walker-3",
+          "role": "walker",
+          "releaseOffsetSec": 270,
+          "setup": {
+            "status": "proposed; setup receipt and initial pose not yet verified",
+            "maxWallSec": 240,
+            "steps": [
+              "stand:here",
+              {
+                "verb": "go",
+                "target": {
+                  "place": "field"
+                }
+              },
+              {
+                "verb": "turn",
+                "heading": 0
+              }
+            ],
+            "expect": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3,
+              "heading": 0,
+              "headingToleranceDeg": 5,
+              "posture": [
+                "standing"
+              ]
+            },
+            "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
+          },
+          "originalErrand": {
+            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "returnRegion": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3
+            },
+            "postures": [
+              "standing"
+            ],
+            "requiresReadAfterReturn": [
+              "here",
+              "observe"
+            ],
+            "requiresGroundedObservation": true
+          },
+          "initialOwnerSupplement": "During the garden visit, propose changing the final meeting point to another landmark you can discover. Discuss this through in-world speech; do not assume the others agreed.",
+          "soulName": "WalkC"
+        }
+      ],
+      "endpointCandidates": [
+        {
+          "ref": "eden-library-1",
+          "region": {
+            "pos": [
+              74,
+              -7
+            ],
+            "radiusM": 6
+          },
+          "walkCapability": "walk:eden-library-1"
+        },
+        {
+          "ref": "eden-bandstand",
+          "region": {
+            "pos": [
+              38.5,
+              -26
+            ],
+            "radiusM": 6
+          },
+          "walkCapability": "walk:eden-bandstand"
+        }
+      ],
+      "agreementRule": "Agents choose their original endpoint from discovered landmarks. The final endpoint must differ from their original agreement and be visibly accepted by all three. Allowed pool sealed before trials; a different discoverable choice is reported out-of-fixture, never quietly scored as failure or success.",
+      "disturbances": [
+        {
+          "id": "late-walker",
+          "when": "T0+270s",
+          "actor": "walker-3",
+          "action": "release initial instruction",
+          "trigger": {
+            "maximumDelaySec": 2,
+            "kind": "scheduled-release",
+            "recipients": [
+              "walker-3"
+            ],
+            "deliveryKind": "controller-release",
+            "offsetSec": 270
+          }
+        },
+        {
+          "id": "independent-errand",
+          "when": "first observed 10-second all-three garden overlap",
+          "actor": "walker-2",
+          "once": true,
+          "text": "Please briefly inspect Commons Pavilion, then rejoin your walking companions using what you can learn from the world. Keep your original errand for afterward.",
+          "channel": "authenticated owner; fixed permitted disturbance, no other-agent facts",
+          "errandRef": "commons-pavilion",
+          "errandRegion": {
+            "pos": [
+              9,
+              -5
+            ],
+            "radiusM": 4
+          },
+          "trigger": {
+            "maximumDelaySec": 2,
+            "kind": "garden-group-overlap",
+            "recipients": [
+              "walker-2"
+            ],
+            "deliveryKind": "owner",
+            "minimumOverlapSec": 10
+          }
+        },
+        {
+          "id": "revised-endpoint-proposal",
+          "when": "initial owner supplement at the declared walker-3 release; subsequent speaking is the agent's own choice",
+          "action": "initial role supplement only; harness sends no timed speaking prompt",
+          "trigger": {
+            "maximumDelaySec": 2,
+            "kind": "initial-supplement",
+            "recipients": [
+              "walker-3"
+            ],
+            "deliveryKind": "controller-release",
+            "offsetSec": 270
+          }
+        }
+      ],
+      "journeyTemplates": [
+        {
+          "name": "garden visit",
+          "region": {
+            "pos": [
+              57,
+              -10
+            ],
+            "radiusM": 4
+          },
+          "holdSec": 10,
+          "receipt": {
+            "verb": "walk",
+            "targetRefs": [
+              "place-eden-stone-garden"
+            ],
+            "completed": true
+          }
+        },
+        {
+          "name": "agreed revised endpoint",
+          "region": {
+            "pos": [
+              38.5,
+              -26
+            ],
+            "radiusM": 6
+          },
+          "holdSec": 10,
+          "receipt": {
+            "verb": "walk",
+            "targetRefs": [
+              "eden-bandstand"
+            ],
+            "completed": true
+          }
+        },
+        {
+          "name": "original errand return",
+          "region": {
+            "pos": [
+              0,
+              0
+            ],
+            "radiusM": 3
+          },
+          "holdSec": 0,
+          "receipt": {
+            "verb": "walk",
+            "targetRefs": [
+              "place-field"
+            ],
+            "completed": true
+          },
+          "postures": [
+            "standing"
+          ]
+        }
+      ],
+      "journeyTemplateNote": "Endpoint phase is an example branch. Bind exactly the final semantically verified agreed endpoint from the sealed candidate pool before scoring; do not force bandstand or inject its coordinates into prompts.",
+      "additionalMechanical": [
+        "all-three overlap at initial meeting, garden and final agreed endpoint",
+        "walker-2 physically reaches independent errand then rejoins",
+        "separation demonstrated by >=12m distance from both peers for >=10s",
+        "all end at the same revised endpoint before resuming",
+        "no private cross-agent communication or harness coaching"
+      ],
+      "holdoutStatus": "intent/instructions/disturbances sealed proposal; no holdout transcripts inspected or used",
+      "initialConstraintSupplement": "The meeting is at {meetingUTC}; finish the gathering and your original errand by {completionUTC}. These are real UTC deadlines even if the world clock differs."
+    },
+    {
+      "id": "eden-bandstand-five",
+      "role": "holdout",
+      "world": "eden-2026",
+      "fixtureStatus": "blocked-before-comparison",
+      "timeDomain": "real UTC; T0 set after all setup receipts and initial poses pass",
+      "soulIds": "bind fresh per run; never publish or reuse probe Soul IDs",
+      "agentInformation": "matrix instructions plus the declared initial owner supplements; no oracle entity IDs/coordinates or other agent state in model prompts",
+      "setupTransport": "tools/playtest/arena/fixture-setup.mjs through fixtureCliJson, identical both arms",
+      "sourceStatus": "template names/ordered final poses plus limited Eden read-only native discovery; no action/navigation certification",
+      "bodySampleSec": 1,
+      "maxSampleGapSec": 2,
+      "clockSource": "observer wall UTC and monotonic samples; do not infer real elapsed time from simulation ticks",
+      "freezeRequirements": [
+        "fresh boot geometry hash for both arms",
+        "stable ref -> generated entity ID bindings before inference",
+        "initial pose and occupied-seat receipt verification",
+        "actual supported capability resolution",
+        "same advertised model and effort pinned in both arms",
+        "measurement host quiet and no concurrent workers/tests",
+        "seal numeric proposal and semantic rubric before comparison; no holdout-driven tuning"
+      ],
+      "venue": {
+        "ref": "eden-bandstand",
+        "region": {
+          "pos": [
+            38.5,
+            -26
+          ],
+          "radiusM": 6
+        },
+        "walkCapability": "walk:eden-bandstand",
+        "activityRef": "bandstand-violin-1",
+        "activityRegion": {
+          "pos": [
+            37.6,
+            -25.4
+          ],
+          "radiusM": 2
+        },
+        "audienceRegion": {
+          "pos": [
+            38.5,
+            -26
+          ],
+          "radiusM": 10,
+          "excludePolygon": [
+            [
+              36.6,
+              -26.4
+            ],
+            [
+              38.6,
+              -26.4
+            ],
+            [
+              38.6,
+              -24.4
+            ],
+            [
+              36.6,
+              -24.4
+            ]
+          ]
+        },
+        "status": "route and violin resolve native-read-only verified; audience clear ground not yet action-verified"
+      },
+      "timing": {
+        "meetingOffsetSec": 240,
+        "arrivalToleranceSec": 30,
+        "lateActorArrivalToleranceSec": 120,
+        "endOffsetSec": 900,
+        "minimumPerformanceHoldSec": 30,
+        "minimumAudienceOverlapSec": 15,
+        "resumeWithinSecAfterClosure": 180
+      },
+      "actors": [
+        {
+          "id": "performer",
+          "role": "performer",
+          "releaseOffsetSec": 0,
+          "setup": {
+            "status": "proposed; setup receipt and initial pose not yet verified",
+            "maxWallSec": 240,
+            "steps": [
+              "stand:here",
+              {
+                "verb": "go",
+                "target": {
+                  "place": "field"
+                }
+              },
+              {
+                "verb": "turn",
+                "heading": 0
+              }
+            ],
+            "expect": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3,
+              "heading": 0,
+              "headingToleranceDeg": 5,
+              "posture": [
+                "standing"
+              ]
+            },
+            "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
+          },
+          "originalErrand": {
+            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "returnRegion": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3
+            },
+            "postures": [
+              "standing"
+            ],
+            "requiresReadAfterReturn": [
+              "here",
+              "observe"
+            ],
+            "requiresGroundedObservation": true
+          },
+          "soulName": "BandHost"
+        },
+        {
+          "id": "guest-1",
+          "role": "audience",
+          "releaseOffsetSec": 15,
+          "setup": {
+            "status": "proposed; setup receipt and initial pose not yet verified",
+            "maxWallSec": 240,
+            "steps": [
+              "stand:here",
+              {
+                "verb": "go",
+                "target": {
+                  "place": "field"
+                }
+              },
+              {
+                "verb": "turn",
+                "heading": 0
+              }
+            ],
+            "expect": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3,
+              "heading": 0,
+              "headingToleranceDeg": 5,
+              "posture": [
+                "standing"
+              ]
+            },
+            "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
+          },
+          "originalErrand": {
+            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "returnRegion": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3
+            },
+            "postures": [
+              "standing"
+            ],
+            "requiresReadAfterReturn": [
+              "here",
+              "observe"
+            ],
+            "requiresGroundedObservation": true
+          },
+          "soulName": "BandGuest1",
+          "initialOwnerSupplement": "Ask one relevant question about what you actually observe, at an appropriate moment. Coordinate through the world."
+        },
+        {
+          "id": "guest-2",
+          "role": "audience",
+          "releaseOffsetSec": 30,
+          "setup": {
+            "status": "proposed; setup receipt and initial pose not yet verified",
+            "maxWallSec": 240,
+            "steps": [
+              "stand:here",
+              {
+                "verb": "go",
+                "target": {
+                  "place": "field"
+                }
+              },
+              {
+                "verb": "turn",
+                "heading": 0
+              }
+            ],
+            "expect": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3,
+              "heading": 0,
+              "headingToleranceDeg": 5,
+              "posture": [
+                "standing"
+              ]
+            },
+            "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
+          },
+          "originalErrand": {
+            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "returnRegion": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3
+            },
+            "postures": [
+              "standing"
+            ],
+            "requiresReadAfterReturn": [
+              "here",
+              "observe"
+            ],
+            "requiresGroundedObservation": true
+          },
+          "soulName": "BandGuest2"
+        },
+        {
+          "id": "guest-3",
+          "role": "audience",
+          "releaseOffsetSec": 60,
+          "setup": {
+            "status": "proposed; setup receipt and initial pose not yet verified",
+            "maxWallSec": 240,
+            "steps": [
+              "stand:here",
+              {
+                "verb": "go",
+                "target": {
+                  "place": "field"
+                }
+              },
+              {
+                "verb": "turn",
+                "heading": 0
+              }
+            ],
+            "expect": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3,
+              "heading": 0,
+              "headingToleranceDeg": 5,
+              "posture": [
+                "standing"
+              ]
+            },
+            "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
+          },
+          "originalErrand": {
+            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "returnRegion": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3
+            },
+            "postures": [
+              "standing"
+            ],
+            "requiresReadAfterReturn": [
+              "here",
+              "observe"
+            ],
+            "requiresGroundedObservation": true
+          },
+          "soulName": "BandGuest3"
+        },
+        {
+          "id": "guest-4",
+          "role": "audience",
+          "releaseOffsetSec": 270,
+          "setup": {
+            "status": "proposed; setup receipt and initial pose not yet verified",
+            "maxWallSec": 240,
+            "steps": [
+              "stand:here",
+              {
+                "verb": "go",
+                "target": {
+                  "place": "field"
+                }
+              },
+              {
+                "verb": "turn",
+                "heading": 0
+              }
+            ],
+            "expect": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3,
+              "heading": 0,
+              "headingToleranceDeg": 5,
+              "posture": [
+                "standing"
+              ]
+            },
+            "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
+          },
+          "originalErrand": {
+            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "returnRegion": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3
+            },
+            "postures": [
+              "standing"
+            ],
+            "requiresReadAfterReturn": [
+              "here",
+              "observe"
+            ],
+            "requiresGroundedObservation": true
+          },
+          "soulName": "BandGuest4"
+        }
+      ],
+      "activity": {
+        "verb": "play-music",
+        "instrument": "violin",
+        "targetRef": "bandstand-violin-1",
+        "capabilityTemplate": "play-music:play-music.{entityId}",
+        "nativeReadOnlyProbeCapability": "play-music:play-music.e_7a344a7e",
+        "probeIdIsNotPortable": true,
+        "postures": [
+          "busy"
+        ],
+        "activities": [
+          "play-music"
+        ],
+        "scopePreservingFallback": "none after comparison; spoken performance permitted by accepted intent only if declared in a new precomparison fixture version",
+        "instruments": [
+          "violin"
+        ],
+        "nativePoseNote": "Pre-freeze native preflight: here posture is busy during actual human.activity play-music; require native actualActivity instrument violin, never receipt intent. Source apps/server/src/edge/body-state.ts and fixtures/holdout-native-1793312212796-64536.json."
+      },
+      "disturbances": [
+        {
+          "id": "staggered-starts",
+          "when": "release offsets above",
+          "action": "same initial instructions, no subsequent speaking synchronization",
+          "trigger": {
+            "maximumDelaySec": 2,
+            "kind": "staggered-releases",
+            "recipients": [
+              "performer",
+              "guest-1",
+              "guest-2",
+              "guest-3",
+              "guest-4"
+            ],
+            "deliveryKind": "controller-release"
+          }
+        },
+        {
+          "id": "unrelated-waiting-conversation",
+          "when": "T0+150s",
+          "actor": "guest-2",
+          "text": "BandGuest2, hello! How has your day been?",
+          "delivery": "nearby fixture-only body via addressed in-world speech",
+          "trigger": {
+            "maximumDelaySec": 2,
+            "kind": "scheduled-event",
+            "recipients": [
+              "guest-2"
+            ],
+            "deliveryKind": "world",
+            "offsetSec": 150
+          }
+        },
+        {
+          "id": "audience-question",
+          "when": "initial owner supplement at the declared guest-1 release; subsequent speaking is the agent's own choice",
+          "action": "initial owner supplement only: Ask one relevant question about what you observed, at an appropriate moment. No harness-triggered speaking order.",
+          "trigger": {
+            "maximumDelaySec": 2,
+            "kind": "initial-supplement",
+            "recipients": [
+              "guest-1"
+            ],
+            "deliveryKind": "controller-release",
+            "offsetSec": 15
+          }
+        }
+      ],
+      "journeyTemplates": {
+        "performer": [
+          {
+            "name": "native violin performance",
+            "region": {
+              "pos": [
+                37.6,
+                -25.4
+              ],
+              "radiusM": 2
+            },
+            "holdSec": 30,
+            "receipt": {
+              "verb": "play-music",
+              "targetRefs": [
+                "bandstand-violin-1"
+              ]
+            },
+            "postures": [
+              "busy"
+            ],
+            "activities": [
+              "play-music"
+            ],
+            "instruments": [
+              "violin"
+            ]
+          },
+          {
+            "name": "original errand return",
+            "region": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3
+            },
+            "holdSec": 0,
+            "receipt": {
+              "verb": "walk",
+              "targetRefs": [
+                "place-field"
+              ],
+              "completed": true
+            },
+            "postures": [
+              "standing"
+            ]
+          }
+        ],
+        "audience": [
+          {
+            "name": "audience attendance",
+            "region": {
+              "pos": [
+                38.5,
+                -26
+              ],
+              "radiusM": 10
+            },
+            "holdSec": 15,
+            "receipt": {
+              "verb": "walk",
+              "targetRefs": [
+                "eden-bandstand"
+              ],
+              "completed": true
+            }
+          },
+          {
+            "name": "original errand return",
+            "region": {
+              "pos": [
+                0,
+                0
+              ],
+              "radiusM": 3
+            },
+            "holdSec": 0,
+            "receipt": {
+              "verb": "walk",
+              "targetRefs": [
+                "place-field"
+              ],
+              "completed": true
+            },
+            "postures": [
+              "standing"
+            ]
+          }
+        ]
+      },
+      "additionalMechanical": [
+        "performer active native music >=30s from matching body samples, not receipt initiation",
+        "all four guests have >=15s observed overlap with actual performer activity, including late guest",
+        "audience remains clear of instrument exclusion polygon",
+        "relevant question and performer reply have world speech IDs",
+        "closure precedes voluntary dispersal and resumed errands"
+      ],
+      "holdoutStatus": "intent/instructions/disturbances sealed proposal; no holdout transcripts inspected or used",
+      "initialConstraintSupplement": "The meeting is at {meetingUTC}; finish the gathering and your original errand by {completionUTC}. These are real UTC deadlines even if the world clock differs."
+    }
+  ]
+}

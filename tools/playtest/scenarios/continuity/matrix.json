@@ -2,6 +2,7 @@
   "version": 1,
   "status": "intent-frozen; exact physical fixtures pending verification before baseline",
   "date": "2026-10-29",
+  "proposalArtifacts": {"fixtures":"fixtures.json","oracles":"oracles.json","scorer":"oracle.mjs","status":"not baseline-ready; physical verification and numeric seal pending"},
   "policy": {
     "independentAgents": true,
     "privateCrossAgentMessages": false,

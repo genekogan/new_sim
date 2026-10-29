@@ -1,0 +1,195 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {observedHolds,scoreContinuity,scoreDisturbance} from './oracle.mjs';
+const bindings={chair:{entityId:'e_chair',slot:'seat',capabilities:{read:['read:read.e_chair']}}};
+const phase={region:{pos:[0,0],radiusM:2},holdSec:30,postures:['seated'],activities:['read'],requireSeatRefs:['chair'],receipt:{verb:'read',targetRefs:['chair']}};
+const receipt={id:'r1',capability:'read:read.e_chair',acceptedAtUtc:0,phase:'started'};
+const samples=Array.from({length:31},(_,i)=>({t:i*1000,pos:{x:0,z:0,src:'here'},posture:'seated',activity:{kind:'read'},seat:'e_chair#seat'}));
+test('accepted activity and elapsed receipt time cannot substitute for sustained body evidence',()=>{
+ assert.equal(observedHolds({receipts:[receipt],bindings,phase}).status,'unknown');
+ assert.equal(observedHolds({receipts:[receipt],samples:[samples[0],samples.at(-1)],bindings,phase}).status,'unknown');
+ assert.equal(observedHolds({receipts:[receipt],samples:[samples[0],samples.at(-1)],bindings,phase,coverageComplete:true}).status,'unknown');
+ assert.equal(observedHolds({receipts:[receipt],samples:samples.map(s=>({...s,pos:{...s.pos,src:'lastReceipt'}})),bindings,phase}).status,'unknown');
+});
+test('current body hold must span duration with same exact seat and no gaps or intervening activity',()=>{
+ assert.equal(observedHolds({receipts:[receipt],samples,bindings,phase}).status,'pass');
+ assert.equal(observedHolds({receipts:[receipt],samples:samples.map((s,i)=>i===15?{...s,activity:'standing'}:s),bindings,phase}).status,'unknown');
+ assert.equal(observedHolds({receipts:[receipt],samples:samples.map((s,i)=>i===15?{...s,seat:'e_chair-other#seat'}:s),bindings,phase}).status,'unknown');
+ assert.equal(observedHolds({receipts:[{...receipt,phase:'completed',endedAtUtc:20000}],samples,bindings,phase}).status,'unknown');
+});
+test('complete coverage can report physical failure while missing bindings remain unknown',()=>{
+ assert.equal(observedHolds({receipts:[],samples,bindings,phase,coverageComplete:true}).status,'fail');
+ assert.equal(observedHolds({receipts:[receipt],samples,bindings:{},phase,coverageComplete:true}).status,'unknown');
+});
+test('complete position coverage cannot establish missing native activity or instrument',()=>{
+ const unknown=samples.map(s=>({...s,activity:null,reportedIntentActivity:'read'}));
+ assert.equal(observedHolds({receipts:[receipt],samples:unknown,bindings,phase,coverageComplete:true}).status,'unknown');
+ const music={...phase,activities:['play-music'],instruments:['violin']};
+ const playing=samples.map(s=>({...s,activity:'play-music'}));
+ assert.equal(observedHolds({receipts:[receipt],samples:playing,bindings,phase:music,coverageComplete:true}).status,'unknown');
+ assert.equal(observedHolds({receipts:[receipt],samples:playing.map(s=>({...s,instrument:'violin'})),bindings,phase:music,coverageComplete:true}).status,'pass');
+ assert.equal(observedHolds({receipts:[receipt],samples:playing.map(s=>({...s,instrument:'drums'})),bindings,phase:music,coverageComplete:true}).status,'fail');
+});
+test('empty proposal evidence cannot pass fixture, semantic, notification or duplicate-effect checks',()=>{
+ const fixtures=JSON.parse(readFileSync(new URL('./fixtures.json',import.meta.url))),oracles=JSON.parse(readFileSync(new URL('./oracles.json',import.meta.url)));
+ const result=scoreContinuity({fixtures,oracles,evidence:{scenarioId:'eden-reading-duo',t0:'2026-10-29T00:00:00Z'}});
+ assert.equal(result.status,'unknown');
+ for(const id of ['fixture-readiness','simultaneous-distinct-seat-reading','notification-latency','duplicate-public-effects','semantic:reading-reciprocity'])assert.equal(result.rows.find(r=>r.id===id).status,'unknown');
+});
+const frozenFixtures=JSON.parse(readFileSync(new URL('./fixtures.json',import.meta.url))),frozenOracles=JSON.parse(readFileSync(new URL('./oracles.json',import.meta.url)));
+const score=evidence=>scoreContinuity({fixtures:frozenFixtures,oracles:frozenOracles,evidence:{t0:0,fixtureVerified:true,...evidence}});
+const resultRow=(result,id)=>{const r=result.rows.find(r=>r.id===id);assert.ok(r,'missing '+id);return r;};
+function readingEvidence({returnAcceptedSec=200,a=[0,60],b=[0,60]}={}){
+ const scenario=frozenFixtures.scenarios.find(s=>s.id==='eden-reading-duo'),bindings=Object.fromEntries(scenario.seatPool.map((s,i)=>[s.ref,{entityId:'chair-'+i,slot:'seat',capabilities:{read:['read:chair-'+i]}}]));
+ bindings['eden-library-1']={entityId:'library',capabilities:{walk:['walk:library']}};bindings['place-field']={entityId:'field',capabilities:{walk:['walk:field']}};
+ const participants={};
+ for(const [actor,window,chair]of [['reader-a',a,1],['reader-b',b,2]]){
+  const [start,end]=window;
+  participants[actor]={coverageComplete:true,samples:Array.from({length:721},(_,i)=>({t:i*1000,pos:{x:i>=start&&i<=end?74:0,z:i>=start&&i<=end?-7:0,src:'here'},posture:i>=start&&i<=end?'seated':'standing',activity:i>=start&&i<=end?'read':'idle',seat:i>=start&&i<=end?'chair-'+chair+'#seat':null})),receipts:[{id:actor+'-arrive',capability:'walk:library',acceptedAtUtc:0,endedAtUtc:0,phase:'completed'},{id:actor+'-read',capability:'read:chair-'+chair,acceptedAtUtc:start*1000,endedAtUtc:end*1000,phase:'completed'},{id:actor+'-return',capability:'walk:field',acceptedAtUtc:returnAcceptedSec*1000,endedAtUtc:201000,phase:'completed'}],reads:[{command:'here',at:202000}]};
+ }
+ return {scenarioId:scenario.id,bindings,participants,semantic:{closureAt:25000}};
+}
+test('phase ordering uses observed hold/completion, allowing compound acceptance before arrival',()=>{
+ const evidence=readingEvidence({returnAcceptedSec:10});for(const ev of Object.values(evidence.participants))ev.receipts.at(-1).endedAtUtc=26000;
+ const early=score(evidence);assert.equal(resultRow(early,'reader-a:original errand return').status,'fail');
+ const valid=score(readingEvidence({returnAcceptedSec:10}));assert.equal(resultRow(valid,'reader-a:original errand return').status,'pass','early acceptance is valid when native completion follows the prerequisite');
+ const compound=readingEvidence({a:[10,60],b:[10,60]});for(const ev of Object.values(compound.participants)){ev.receipts=ev.receipts.filter(r=>!r.id.endsWith('-arrive'));ev.receipts[0].acceptedAtUtc=0;}
+ const arrived=score(compound);assert.equal(resultRow(arrived,'reader-a:library arrival').status,'pass');assert.equal(resultRow(arrived,'reader-a:sustained seated reading').status,'pass','one native read may approach, seat and read without a separate walk');
+ compound.participants['reader-a'].receipts[0].endedAtUtc=5000;assert.equal(resultRow(score(compound),'reader-a:sustained seated reading').status,'fail','an earlier ended activity does not prove a later hold');
+});
+test('complete non-overlapping reading windows fail; missing body coverage remains unknown',()=>{
+ const evidence=readingEvidence({a:[0,40],b:[60,100]});
+ assert.equal(resultRow(score(evidence),'simultaneous-distinct-seat-reading').status,'fail');
+ evidence.participants['reader-b'].coverageComplete=false;assert.equal(resultRow(score(evidence),'simultaneous-distinct-seat-reading').status,'unknown');
+ evidence.participants['reader-b'].coverageComplete=true;delete evidence.bindings[frozenFixtures.scenarios[0].seatPool[1].ref];assert.equal(resultRow(score(evidence),'simultaneous-distinct-seat-reading').status,'unknown','missing native binding is not complete contradictory evidence');
+});
+const notification={eventId:'event-1',actor:'reader-a',createdAt:0,persistedAt:100,notifiedAt:200,firstRelevantEffectAt:300,relevantEffectId:'speech-1',relevanceEvidence:['native speech-1 answers event-1'],healthyRunning:true};
+const effect={id:'speech-1',operationId:'op-1',actor:'reader-a',type:'speech',at:300,respondsToEventId:'event-1'};
+const notificationScore=(n=notification,e=effect)=>score({scenarioId:'eden-reading-duo',notifications:[n],effects:[e]});
+test('visible response requires actor/event linkage, source-cited relevance and causal timestamps',()=>{
+ const id='notification:event-1:visible-response';
+ assert.equal(resultRow(notificationScore(),id).status,'pass');
+ for(const n of [{...notification,actor:undefined},{...notification,relevanceEvidence:[]},{...notification,notifiedAt:null}])assert.equal(resultRow(notificationScore(n),id).status,'unknown');
+ for(const e of [{...effect,actor:undefined},{...effect,respondsToEventId:undefined}])assert.equal(resultRow(notificationScore(notification,e),id).status,'unknown');
+ for(const e of [{...effect,actor:'reader-b'},{...effect,respondsToEventId:'other-event'},{...effect,at:301}])assert.equal(resultRow(notificationScore(notification,e),id).status,'fail');
+ const early={...notification,firstRelevantEffectAt:50};assert.equal(resultRow(notificationScore(early,{...effect,at:50}),id).status,'fail','an unrelated earlier effect cannot count as a response');
+ assert.equal(resultRow(notificationScore({...early,notifiedAt:null},{...effect,at:50}),id).status,'fail','a missing middle timestamp cannot hide an observed causal inversion');
+ const backwards=notificationScore({...notification,persistedAt:-1});assert.equal(resultRow(backwards,'notification:event-1:receive').status,'fail');
+});
+function presentationEvidence(){
+ const scenario=frozenFixtures.scenarios.find(s=>s.id==='mars-presentation-four'),refs=['presenter-timber-box','tier-2','tier-3','tier-4'],bindings=Object.fromEntries(refs.map(ref=>[ref,{entityId:ref,slot:'seat',capabilities:{sit:['sit:'+ref]}}]));bindings.field={entityId:'field',capabilities:{walk:['walk:field']}};
+ const participants={};
+ for(const [index,actor]of scenario.actors.entries()){
+  const start=index===3?400:320,ref=refs[index];
+  participants[actor.id]={coverageComplete:true,samples:Array.from({length:1081-actor.releaseOffsetSec},(_,n)=>{const i=n+actor.releaseOffsetSec,seated=i>=start&&i<=450;return {t:i*1000,pos:{x:seated?-14.412:0,z:seated?-18.447:0,src:'world'},posture:seated?'seated':'standing',seat:seated?ref+'#seat':null};}),receipts:[{id:actor.id+'-sit',capability:'sit:'+ref,acceptedAtUtc:start*1000,phase:'started'},{id:actor.id+'-return',capability:'walk:field',acceptedAtUtc:500000,endedAtUtc:550000,phase:'completed'}],reads:[{command:'here',at:551000}]};
+ }
+ return {scenarioId:scenario.id,bindings,participants,marsReturnTargetRefs:['field'],semantic:{closureAt:440000},effects:[{id:'talk-1',actor:'presenter',type:'speech',at:410000},{id:'talk-2',actor:'presenter',type:'speech',at:430000}],presentation:{startedAt:400000,endedAt:440000,speechIds:['talk-1','talk-2'],evidence:['native speech timeline'],coverageComplete:true}};
+}
+test('Mars attendance needs all four distinct seats during actual source-cited talk',()=>{
+ const id='presentation-simultaneous-distinct-seat-attendance',evidence=presentationEvidence();
+ assert.equal(resultRow(score(evidence),id).status,'pass');
+ const missing=structuredClone(evidence);delete missing.presentation;assert.equal(resultRow(score(missing),id).status,'unknown');
+ const absentSpeech=structuredClone(evidence);absentSpeech.presentation.speechIds.push('missing');assert.equal(resultRow(score(absentSpeech),id).status,'unknown');
+ const wrongSpeaker=structuredClone(evidence);wrongSpeaker.effects[0].actor='attendee-1';assert.equal(resultRow(score(wrongSpeaker),id).status,'fail');
+ const duplicateSeat=structuredClone(evidence);duplicateSeat.participants['attendee-2'].samples=duplicateSeat.participants['attendee-2'].samples.map(s=>s.seat?{...s,seat:'tier-2#seat'}:s);assert.equal(resultRow(score(duplicateSeat),id).status,'fail');
+ const missingBinding=structuredClone(evidence);delete missingBinding.bindings['tier-4'];assert.equal(resultRow(score(missingBinding),id).status,'unknown');
+ const afterTalk=structuredClone(evidence),late=afterTalk.participants['attendee-3'];late.samples=late.samples.map(s=>s.seat?{...s,pos:{x:0,z:0,src:'world'},seat:null,posture:'standing'}:s);for(const s of late.samples)if(s.t>=500000&&s.t<=540000)Object.assign(s,{pos:{x:-14.412,z:-18.447,src:'world'},posture:'seated',seat:'tier-4#seat'});
+ assert.equal(resultRow(score(afterTalk),id).status,'fail','an individually sufficient seat hold after the talk is not attendance');
+ late.coverageComplete=false;assert.equal(resultRow(score(afterTalk),id).status,'unknown');
+});
+test('complete audience attendance outside actual native performance fails instead of unknown',()=>{
+ const scenario=frozenFixtures.scenarios.find(s=>s.id==='eden-bandstand-five'),bindings={'bandstand-violin-1':{entityId:'violin',capabilities:{'play-music':['play-music:violin']}},'eden-bandstand':{entityId:'bandstand',capabilities:{walk:['walk:bandstand']}},'place-field':{entityId:'field',capabilities:{walk:['walk:field']}}},participants={};
+ for(const actor of scenario.actors){
+  const performer=actor.role==='performer',start=performer?300:400,end=performer?340:430;
+  participants[actor.id]={coverageComplete:true,samples:Array.from({length:901-actor.releaseOffsetSec},(_,n)=>{const i=n+actor.releaseOffsetSec,present=i>=start&&i<=end;return {t:i*1000,pos:{x:present?performer?37.6:40:0,z:present?performer?-25.4:-30:0,src:'here'},posture:present&&performer?'busy':'standing',activity:present&&performer?'play-music':'idle',instrument:present&&performer?'violin':null};}),receipts:[performer?{id:actor.id+'-play',capability:'play-music:violin',acceptedAtUtc:300000,endedAtUtc:340000,phase:'completed'}:{id:actor.id+'-arrive',capability:'walk:bandstand',acceptedAtUtc:300000,endedAtUtc:350000,phase:'completed'},{id:actor.id+'-return',capability:'walk:field',acceptedAtUtc:500000,endedAtUtc:550000,phase:'completed'}]};
+ }
+ const evidence={scenarioId:scenario.id,bindings,participants,semantic:{closureAt:450000}};
+ assert.equal(resultRow(score(evidence),'guest-1:actual-performance-overlap').status,'fail');
+ delete bindings['bandstand-violin-1'];assert.equal(resultRow(score(evidence),'guest-1:actual-performance-overlap').status,'unknown');
+});
+function disturbanceScore(scenarioId,id,evidence){
+ const scenario=frozenFixtures.scenarios.find(s=>s.id===scenarioId),disturbance=scenario.disturbances.find(d=>d.id===id);
+ return scoreDisturbance({scenario,disturbance,evidence,t0:0,cutoff:scenario.timing.endOffsetSec*1000,maxGapSec:2,bindings:evidence.bindings??{}});
+}
+const nativeDelivery=(actor,source,time)=>({actor,eventId:'native-event',source,createdAt:time,evidence:['native per-Soul event record']});
+const deliveredDisturbance=(kind,recipients,scheduled,delivered,typed={})=>({delivered:true,recipients,scheduledAt:scheduled,deliveredAt:delivered,evidence:['native delivery source'],triggerProof:{kind,observedAt:scheduled,evidence:['native trigger source'],...typed}});
+function motionEvidence(){
+ const d=deliveredDisturbance('moving-body-journey',['reader-a'],6000,6000,{receiptId:'journey',motionOnsetFromAt:0,motionOnsetAt:1000,motionFromAt:5000,motionToAt:6000});d.deliveryEvents=[nativeDelivery('reader-a','world',6000)];
+ return {participants:{'reader-a':{samples:[0,1000,5000,6000].map(t=>({t,pos:{x:t/1000,z:0,src:'here'}})),receipts:[{id:'journey',capability:'read:library',acceptedAtUtc:0,endedAtUtc:10000,phase:'completed'}]}},disturbances:{'travel-greeting':d},notifications:[{eventId:'native-event',actor:'reader-a',source:'world',createdAt:6000}]};
+}
+test('travel disturbance requires native heard-recipient proof under a current moving compound journey',()=>{
+ const e=motionEvidence(),run=e=>disturbanceScore('eden-reading-duo','travel-greeting',e);assert.equal(run(e).status,'pass');
+ const acceptedOnly=structuredClone(e);delete acceptedOnly.disturbances['travel-greeting'].deliveryEvents;acceptedOnly.disturbances['travel-greeting'].actionAcceptedAt=6000;assert.equal(run(acceptedOnly).status,'unknown');
+ const wrongRecipient=structuredClone(e);wrongRecipient.disturbances['travel-greeting'].deliveryEvents[0].actor='reader-b';assert.equal(run(wrongRecipient).status,'fail');
+ const late=structuredClone(e);late.disturbances['travel-greeting'].deliveredAt=9000;late.disturbances['travel-greeting'].deliveryEvents[0].createdAt=9000;late.notifications[0].createdAt=9000;assert.equal(run(late).status,'fail');
+ const stationary=structuredClone(e);stationary.participants['reader-a'].samples.at(-1).pos.x=5;assert.equal(run(stationary).status,'fail');
+ const missingSource=structuredClone(e);missingSource.disturbances['travel-greeting'].triggerProof.evidence=[];assert.equal(run(missingSource).status,'unknown');
+});
+test('fixed disturbances and initial releases enforce frozen schedules and exact recipients',()=>{
+ const d=deliveredDisturbance('scheduled-event',['presenter'],280000,280500);d.deliveryEvents=[nativeDelivery('presenter','world',280500)];
+ const e={disturbances:{'prestart-interruption':d},notifications:[{actor:'presenter',source:'world',eventId:'native-event',createdAt:280500}]},run=e=>disturbanceScore('mars-presentation-four','prestart-interruption',e);
+ assert.equal(run(e).status,'pass');const early=structuredClone(e);early.disturbances['prestart-interruption'].scheduledAt=279000;assert.equal(run(early).status,'fail');
+ const wrong=structuredClone(e);wrong.disturbances['prestart-interruption'].recipients=['attendee-1'];assert.equal(run(wrong).status,'fail');
+ const missing=structuredClone(e);delete missing.disturbances['prestart-interruption'].scheduledAt;assert.equal(run(missing).status,'unknown');
+ const release=deliveredDisturbance('scheduled-release',['attendee-3'],330000,330500,{releasedAt:330500,initialInstructionId:'initial-attendee-3'});
+ assert.equal(disturbanceScore('mars-presentation-four','late-attendee',{disturbances:{'late-attendee':release}}).status,'pass','controller initial release does not pretend to be native world speech');
+ const supplement=deliveredDisturbance('initial-supplement',['walker-3'],270000,270100,{releasedAt:270100,initialInstructionId:'initial-walker-3'});
+ assert.equal(disturbanceScore('eden-walk-three','revised-endpoint-proposal',{disturbances:{'revised-endpoint-proposal':supplement}}).status,'pass');
+});
+test('staggered releases prove every actor schedule without imposing a dialogue order',()=>{
+ const scenario=frozenFixtures.scenarios.find(s=>s.id==='eden-bandstand-five'),releases=scenario.actors.map(a=>({actor:a.id,scheduledAt:a.releaseOffsetSec*1000,deliveredAt:a.releaseOffsetSec*1000+500,initialInstructionId:'initial-'+a.id,evidence:['controller release '+a.id]}));
+ const d=deliveredDisturbance('staggered-releases',scenario.actors.map(a=>a.id),0,270500,{observedAt:270500,releases}),e={disturbances:{'staggered-starts':d}};
+ assert.equal(disturbanceScore(scenario.id,'staggered-starts',e).status,'pass');releases[2].deliveredAt=releases[2].scheduledAt-1000;assert.equal(disturbanceScore(scenario.id,'staggered-starts',e).status,'fail');
+});
+test('garden errand trigger requires a timestamped actual three-body overlap before owner delivery',()=>{
+ const participants=Object.fromEntries(['walker-1','walker-2','walker-3'].map(id=>[id,{coverageComplete:true,samples:Array.from({length:11},(_,n)=>({t:300000+n*1000,pos:{x:57,z:-10,src:'world'}}))}]));
+ const d=deliveredDisturbance('garden-group-overlap',['walker-2'],310000,310500,{overlapFrom:300000,overlapTo:310000});d.deliveryEvents=[nativeDelivery('walker-2','owner',310500)];
+ const e={participants,disturbances:{'independent-errand':d},notifications:[{actor:'walker-2',eventId:'native-event',source:'owner',createdAt:310500}]},run=e=>disturbanceScore('eden-walk-three','independent-errand',e);
+ assert.equal(run(e).status,'pass');
+ const absent=structuredClone(e);delete absent.participants['walker-3'];assert.equal(run(absent).status,'unknown');
+ const apart=structuredClone(e);apart.participants['walker-3'].samples.forEach(s=>s.pos.x=0);assert.equal(run(apart).status,'fail');
+ const premature=structuredClone(e);premature.disturbances['independent-errand'].triggerProof.overlapTo=305000;assert.equal(run(premature).status,'fail');
+ const postponed=structuredClone(e);for(const ev of Object.values(postponed.participants))ev.samples=Array.from({length:31},(_,n)=>({t:300000+n*1000,pos:{x:57,z:-10,src:'world'}}));const later=postponed.disturbances['independent-errand'];Object.assign(later,{scheduledAt:320000,deliveredAt:320500});Object.assign(later.triggerProof,{observedAt:320000,overlapFrom:310000,overlapTo:320000});later.deliveryEvents[0].createdAt=320500;postponed.notifications[0].createdAt=320500;assert.equal(run(postponed).status,'fail','cannot postpone a frozen first-observed trigger to a convenient later window');
+});
+function occupiedEvidence(){
+ const scenario=frozenFixtures.scenarios[0],seat=scenario.occupiedSeat.ref,binding={entityId:'occupied',slot:'seat',capabilities:{sit:['sit:occupied']}};
+ const fixture={coverageComplete:true,receipts:[{id:'occupy',capability:'sit:occupied',acceptedAtUtc:-2000,endedAtUtc:-1000,phase:'completed'}],samples:Array.from({length:722},(_,n)=>({t:(n-1)*1000,pos:{x:74,z:-7,src:'here'},posture:'seated',seat:'occupied#seat'}))};
+ const d=deliveredDisturbance('occupied-seat',scenario.actors.map(a=>a.id),-2000,-1000,{observedAt:-1000,receiptId:'occupy',seatRef:seat});return {bindings:{[seat]:binding},fixtureActors:{'seat-occupant':fixture},disturbances:{'occupied-seat':d}};
+}
+test('occupied-seat disturbance uses a fixture-only native body and continuous exact seat proof',()=>{
+ const e=occupiedEvidence(),run=e=>disturbanceScore('eden-reading-duo','occupied-seat',e);
+ assert.equal(run(e).status,'pass','no model thread is required for the fixture occupant');
+ const left=structuredClone(e);left.fixtureActors['seat-occupant'].samples[300].seat='different#seat';assert.equal(run(left).status,'fail');
+ const oldPose=structuredClone(e);oldPose.fixtureActors['seat-occupant'].samples.forEach(s=>s.pos.src='lastReceipt');assert.equal(run(oldPose).status,'unknown');
+});
+test('occupied seat brackets a jittered cutoff with fixture-only post-cutoff verification',()=>{
+ const e=occupiedEvidence(),fixture=e.fixtureActors['seat-occupant'],run=e=>disturbanceScore('eden-reading-duo','occupied-seat',e);
+ fixture.samples.forEach((s,i)=>{if(i)s.t+=250});assert.equal(fixture.samples.at(-1).t,720250);assert.equal(run(e).status,'pass','same seat on both sides proves sampled continuity without an exact-cutoff timestamp');
+ const missingEnd=structuredClone(e);missingEnd.fixtureActors['seat-occupant'].samples.pop();assert.equal(run(missingEnd).status,'unknown','a coverageComplete flag cannot replace an actual cutoff bracket');
+ const tooLate=structuredClone(e);tooLate.fixtureActors['seat-occupant'].samples.at(-1).t+=2000;assert.equal(run(tooLate).status,'unknown','a late verification sample cannot fill an excessive cutoff gap');
+ const missingStart=structuredClone(e);missingStart.fixtureActors['seat-occupant'].samples[0].t++;assert.equal(run(missingStart).status,'unknown','setup timestamp must bind an actual current seat sample');
+ const afterOnly=structuredClone(e);afterOnly.fixtureActors['seat-occupant'].samples=afterOnly.fixtureActors['seat-occupant'].samples.filter(s=>s.t>720000);assert.equal(run(afterOnly).status,'unknown','a post-cutoff witness alone cannot prove the trial interval');
+});
+test('occupied-seat gaps stay unknown and contrary in-trial native states fail without post-cutoff overreach',()=>{
+ const e=occupiedEvidence(),run=e=>disturbanceScore('eden-reading-duo','occupied-seat',e);e.fixtureActors['seat-occupant'].samples.forEach((s,i)=>{if(i)s.t+=250});
+ const gap=structuredClone(e);gap.fixtureActors['seat-occupant'].samples=gap.fixtureActors['seat-occupant'].samples.filter(s=>s.t<200250||s.t>201250);assert.equal(run(gap).status,'unknown','a 3s internal gap is not continuous occupancy');
+ const missingState=structuredClone(e);delete missingState.fixtureActors['seat-occupant'].samples[300].seat;assert.equal(run(missingState).status,'unknown','missing seat state is not proof of departure');
+ for(const change of [{seat:null},{seat:'other#seat'},{posture:'standing'},{pos:{x:0,z:0,src:'here'}}]){const contrary=structuredClone(e);Object.assign(contrary.fixtureActors['seat-occupant'].samples[300],change);contrary.fixtureActors['seat-occupant'].coverageComplete=false;assert.equal(run(contrary).status,'fail','native contrary occupancy disproves the interval even if another observation is absent');}
+ const after=structuredClone(e);after.fixtureActors['seat-occupant'].samples.at(-1).seat=null;assert.equal(run(after).status,'unknown','departure first seen after cutoff does not prove departure during trial');
+ const exact=occupiedEvidence();exact.fixtureActors['seat-occupant'].samples.push({t:720250,pos:{x:0,z:0,src:'here'},posture:'standing',seat:null});assert.equal(run(exact).status,'pass','an exact cutoff witness remains valid when fixture cleanup occurs later');
+});
+function restartEvidence(){
+ const restart={actor:'reader-b',setupId:'setup-1',worldId:'world-1',soulId:'soul-b',journalBefore:'journal-b',journalAfter:'journal-b',threadBefore:'thread-b',threadAfter:'thread-b',threadResumed:true,wholeControllerKilled:true,deathAt:2000,recoveredAt:16000,sameJournal:true,originalIntentRetained:true,operationReconciled:true,evidence:['process and scoped recovery sources']};
+ const d=deliveredDisturbance('checkpoint-future-wake',['reader-b'],1000,2000,{checkpointId:'checkpoint-1',checkpointAt:500,wakeAt:25000});
+ return {scenarioId:'eden-reading-duo',setup:{id:'setup-1',worldId:'world-1',actors:{'reader-b':{soulId:'soul-b',journalId:'journal-b',threadId:'thread-b'}},evidence:['original setup sources']},restart,disturbances:{'controller-restart':d}};
+}
+test('restart proof binds original setup, world/Soul/journal and actual same-thread versus fresh-thread recovery',()=>{
+ const e=restartEvidence(),run=e=>disturbanceScore(e.scenarioId,'controller-restart',e);assert.equal(run(e).status,'pass');
+ assert.match(resultRow(score(e),'whole-controller-recovery').detail,/resumed host thread/);
+ const fresh=structuredClone(e);fresh.restart.threadAfter='new-thread';fresh.restart.threadResumed=false;assert.equal(run(fresh).status,'pass');assert.match(resultRow(score(fresh),'whole-controller-recovery').detail,/fresh host thread/);
+ for(const key of ['worldId','soulId','journalAfter','setupId']){const wrong=structuredClone(e);wrong.restart[key]='different';assert.equal(run(wrong).status,'fail');}
+ const falseResume=structuredClone(e);falseResume.restart.threadResumed=false;assert.equal(run(falseResume).status,'fail');
+ const missing=structuredClone(e);delete missing.setup;assert.equal(run(missing).status,'unknown');
+ const tooLate=structuredClone(e);tooLate.disturbances['controller-restart'].triggerProof.wakeAt=20000;assert.equal(run(tooLate).status,'fail');
+});
