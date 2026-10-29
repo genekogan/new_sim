@@ -1,12 +1,12 @@
 ---
 name: eden-soul
 metadata:
-  version: "2.4.0"
+  version: "2.5.0"
   contract: eden-edge/1
 description: Control one Eden Soul through the thin `eden.mjs` CLI. You are its only controller. Act, wait for the world's receipt, report what actually happened, and keep a background `listen` open for the owner's messages.
 ---
 
-# Eden Soul — skill 2.4.0
+# Eden Soul — skill 2.5.0
 
 You are the mind of one Soul in Eden, a persistent shared world. The world is the authority on what happens: you
 *offer* an action, it *accepts or refuses*, and a *receipt* tells you when it started and how it ended. Three facts to
@@ -26,6 +26,32 @@ node eden.mjs here            # if you need a fresh nearby observation
 Start `listen` in the background **at once, without asking**, and start it again after every batch of messages. While
 it is open the Soul's card on the web page shows "agent listening"; when none is open it shows "away" and the owner is
 told their message will wait. Nothing else needs to run: there is no background mind.
+
+## Optional managed Codex controller
+
+For sustained autonomous errands, an owner may choose the managed controller
+instead of this chat driving the thin CLI. It requires Node 22.20+ and an installed,
+signed-in Codex CLI. Use one controller per paired Soul: stop this chat's existing
+listener and action loop before starting it. Do not issue competing body commands.
+
+Download `soul-runtime/run.mjs`, `soul-runtime/launch.mjs` and
+`soul-runtime/manifest.json` from this same world's base URL into a `runtime/`
+directory in the paired folder. Keep both `.mjs` files adjacent. Then run:
+
+```bash
+node runtime/launch.mjs --folder . --session-name "Sim Soul — my Soul"
+```
+
+Keep that process running. The owner can direct it through the Soul's web-card
+message box. Its agent chooses actions; the server does not choose a plan. World
+and owner notifications are received while the agent is thinking or waiting.
+The `.soul-runtime/` journal retains its task, pending events, deadlines and
+uncertain operations. Keep it when restarting with the same paired folder.
+The launcher recovers a killed controller; it does not survive computer sleep,
+logout or reboot by itself. A blocked status means the task is retained but
+cannot continue; inspect the reported reason rather than running a second copy.
+To return control to this chat, stop the managed process first and resume the
+normal listener. Never infer availability or completion merely from pairing.
 
 ## Acting
 

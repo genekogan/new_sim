@@ -1,3 +1,4 @@
+import {mountSoulRuntimePublication} from './soul-runtime-publication.ts';
 import {mountContextViews} from './god/context-views.ts';
 import {AutoPortraits} from './portrait/auto-portraits.ts';
 import {SoulProfiles} from './soul-profile.ts';
@@ -251,6 +252,7 @@ export function buildApp(d: Deps) {
   });
   app.get('/eden-agent.mjs', c => { if (!d.cfg.cliFile) throw new ApiError(404, 'not-found', 'no agent CLI is published on this world'); let js: string; try { js = readFileSync(d.cfg.cliFile, 'utf8'); } catch { throw new ApiError(404, 'not-found', 'agent CLI unavailable'); } return c.body(js, 200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=60' }); });
   app.get('/eden.mjs', c => { if (!d.cfg.controllerCliFile) throw new ApiError(404, 'not-found', 'no controller CLI is published on this world'); let js: string; try { js = readFileSync(d.cfg.controllerCliFile, 'utf8'); } catch { throw new ApiError(404, 'not-found', 'controller CLI unavailable'); } return c.body(js, 200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=60' }); });
+  mountSoulRuntimePublication(app,()=>d.cfg.controllerCliFile);
   app.get('/v1/skill.md', skill);
   // Selected-world text producer, before the SPA fallback. Origin/prefix come
   // from approved server configuration, never forwarded or caller headers.

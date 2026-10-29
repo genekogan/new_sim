@@ -10,7 +10,7 @@ import { randomUUID, randomBytes } from "node:crypto";
 import { resolve as resolvePath } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const VERSION = "2.4.0";
+const VERSION = "2.5.0";
 const STATE = ".eden-agent.json";
 const CLI = "node eden.mjs";
 
@@ -442,7 +442,7 @@ export function parseActionArgs(input) {
 
 // act <offer-id | plain words> [params-json] [--wait [seconds]]
 // The server resolves words to an offer, so this is one POST. With --wait it then
-// long-polls until the receipt is terminal and returns the final receipt.
+// long-polls until the receipt ends or an owner/social notification interrupts.
 async function act(...argv) {
   const { args, wait: waitFor, json, for: forArg } = waitOption(argv);
   if (!args.length) throw new Error('usage: act "<what to do>" [params-json] [--wait [seconds]] [--for <message-id>|none] [--json]');
@@ -521,7 +521,7 @@ async function resolve(...args) {
 }
 
 // wait [seconds] [receiptId]: long-poll world events (max 60 s) until the receipt is terminal,
-// the owner writes, or an invitation arrives. Saves the event cursor.
+// the owner writes, or an invitation/conversation turn arrives. Saves the event cursor.
 async function wait(...argv) {
   const json = argv.includes("--json"), [secArg, idArg] = argv.filter((a) => a !== "--json");
   const out = await waitRaw(secArg, idArg);
@@ -551,7 +551,7 @@ async function waitRaw(seconds = 45, receiptId) {
     if (ownerWrote) break;
     terminal = seen.find((e) => e.receipt?.id === receiptId && TERMINAL.has(e.receipt?.phase));
     if (terminal) break;
-    if (seen.some((e) => /^(invite|conversation\.invite)/.test(e.kind ?? ""))) break;
+    if (seen.some((e) => /^(invite|conversation\.(invite|turn))/.test(e.kind ?? ""))) break;
     if (!receiptId && seen.length) break;
   }
   const out = { waited: `${Math.round((Date.now() - t0) / 1000)}s`, since, cursor, receivedAt: now(), events: seen, ...(gap ? {gap: true} : {}) };
