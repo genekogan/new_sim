@@ -164,9 +164,9 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
   // nearest few per activity), not every spot within reach (1.5 s of a 4 s first sweep on Eden 2026); old worlds unchanged
   const reach0 = data.spots.filter(s => d2(s.at, w.me) <= SPOT_REACH && w.enterable(s.place)), ok = (s: Spot) => !!clearAt(s);
   const live = data.nearest ? reach0 : reach0.filter(ok);
-  const spotSteps = (s: Spot, seconds?: number, activity = s.activity): Program['steps'] => {
+  const spotSteps = (s: Spot, seconds?: number, activity = s.activity, fromLevel = w.level): Program['steps'] => {
     const def = SPOT_ACTIVITIES[activity], body = def.pose ?? activity, lying = s.base === 'lie', act = lying && !LYING_SPOT.has(body) ? 'lie' : body, prop = s.prop ?? def.prop;
-    const reach = s.seat ? {verb: 'sit', params: {on: s.seat, seconds: 1}} : walk(clearAt(s) ?? s.at, s.level, w.level);
+    const reach = s.seat ? {verb: 'sit', params: {on: s.seat, seconds: 1}} : walk(clearAt(s) ?? s.at, s.level, fromLevel);
     return [...standFirst(w), reach, pose(act, seconds ?? def.seconds, {...(prop && !lying ? {prop} : {}), ...(s.base === 'sit' ? {base: 'sit', ...(s.seatHeight ? {seatHeight: s.seatHeight, seatTogether: true} : {})} : {}),
       // CN5: lying on furniture (a gym bench) at its top; the instrument played at a music spot
       ...(lying && s.seatHeight ? {seatHeight: s.seatHeight, seatTogether: true} : {}), ...(s.instrument && (act === 'play-music' || act === 'play-piano') ? {instrument: s.instrument} : {}), ...(s.faceTo ? {face: s.faceTo} : {}),
@@ -190,8 +190,11 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
   const shelfNear = (at: V2) => data.shelves.filter(s => w.enterable(s.place) && d2(s.at, at) <= 15 && !!shelfStand(s)).sort((a, b) => d2(a.at, at) - d2(b.at, at) || a.id.localeCompare(b.id))[0];
   /** Reading at a spot: take a book from the nearest shelf, read, put it back. */
   const readAt = (s: Spot): Program['steps'] => {
-    const shelf = shelfNear(s.at), browse = (sec: number) => shelf ? [walk(shelfStand(shelf)!, shelf.level, w.level), pose('browse', sec, {prop: 'book', ...(shelf.faceTo ? {face: shelf.faceTo} : {})})] : [];
-    return [...standFirst(w), ...browse(4), ...spotSteps(s).filter(x => x.verb !== 'stand'), ...(s.seat && shelf ? [{verb: 'stand', params: {}}] : []), ...browse(3)];
+    // Omitted shelf levels mean ground. Fetch starts on the body's current floor; return starts on the reading spot's
+    // floor, which may differ. A plain walk_to would otherwise retain that upper floor when targeting a ground shelf.
+    const shelf = shelfNear(s.at), browse = (sec: number, from: number) => shelf ? [walk(shelfStand(shelf)!, shelf.level ?? 0, from), pose('browse', sec, {prop: 'book', ...(shelf.faceTo ? {face: shelf.faceTo} : {})})] : [];
+    const reading = spotSteps({...s, level: s.level ?? 0}, undefined, s.activity, shelf ? shelf.level ?? 0 : w.level);
+    return [...standFirst(w), ...browse(4, w.level ?? 0), ...reading.filter(x => x.verb !== 'stand'), ...(s.seat && shelf ? [{verb: 'stand', params: {}}] : []), ...browse(3, s.level ?? 0)];
   };
   // ---- sitting and lying, anywhere
   // D2 (playtest 2026-10-25: "sit down" walked 30 m to a kitchen chair in another house, 3 of 3 batteries): sit:here sits
@@ -228,13 +231,13 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
     add({id: `${act}:here`, verb: act, label, available: can, ...(can ? {} : {blocked: {code: 'pose.no-room', reason: 'No open ground within 15 m; walk to a lawn or garden first.'}}), params: secondsParam(sec, 600)},
       {label, steps: [...standFirst(w), ...(spot ? [walk(spot)] : []), pose(act, sec)], seconds: true});
   }
-  // ---- reading: a reading spot (with a shelf) nearby, else keep the current seat, else a free seat, else standing
+  // ---- reading here: keep the current seat, else a reading spot (with a shelf) nearby, else a free seat, else standing
   const readers = live.filter(s => s.activity === 'read' && !w.taken(s.at, s.id)).sort((a, b) => d2(a.at, w.me) - d2(b.at, w.me) || a.id.localeCompare(b.id));
   const near = readers.find(s => d2(s.at, w.me) <= 40 && (!data.nearest || ok(s)));
-  if (near) add({id: 'read:here', verb: 'read', label: `Read a book (${near.label ?? near.id}, ${Math.round(d2(near.at, w.me))} m; takes a book from the shelf and puts it back)`, available: true, target: {id: near.id, kind: 'spot'}, params: secondsParam(180)}, {label: 'Read a book', steps: readAt(near), seconds: true});
   // An occupied native seat is absent from the free-seat capabilities. The read overlay already preserves its
-  // lasting claim and facing; standing first discards that chair and unexpectedly makes its occupant read standing.
-  else if (w.seated) add({id: 'read:here', verb: 'read', label: 'Read the book you carry on your current seat', available: true, params: secondsParam(180)}, {label: 'Read a book', steps: [pose('read', 180, {prop: 'book'})], seconds: true});
+  // lasting claim and facing. "Here" honors it before unrelated shelves; explicit spot/place reads still fetch/return.
+  if (w.seated) add({id: 'read:here', verb: 'read', label: 'Read the book you carry on your current seat', available: true, params: secondsParam(180)}, {label: 'Read a book', steps: [pose('read', 180, {prop: 'book'})], seconds: true});
+  else if (near) add({id: 'read:here', verb: 'read', label: `Read a book (${near.label ?? near.id}, ${Math.round(d2(near.at, w.me))} m; takes a book from the shelf and puts it back)`, available: true, target: {id: near.id, kind: 'spot'}, params: secondsParam(180)}, {label: 'Read a book', steps: readAt(near), seconds: true});
   else if (seat) add({id: 'read:here', verb: 'read', label: `Read a book on the nearest free seat (${seat.cap.label})`, available: true, params: secondsParam(180)}, {label: 'Read a book', steps: [...seat.plan.steps.filter(s => s.verb !== 'rest'), pose('read', 180, {prop: 'book'})], seconds: true});
   else add({id: 'read:here', verb: 'read', label: 'Read the book you carry, standing here', available: true, params: secondsParam(180)}, {label: 'Read a book', steps: [...standFirst(w), pose('read', 180, {prop: 'book'})], seconds: true});
   // read:<place>: every place that has reading spots (the room and its building), nearest free spot in it
