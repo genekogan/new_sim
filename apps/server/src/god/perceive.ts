@@ -118,6 +118,7 @@ export class GodPerceive {
     if (!o.kindOf(BUILT_KIND)) { o.register(builtKindFor((key) => this.desired.get(key))); this.kinds.add(BUILT_KIND); }
     this.objs = o;
     this.wrapVisible(o as never);
+    this.wrapCapabilities(o as never);
     if (this.h.commit) wrapAct(o as never, (id) => { const e = this.h.model.entities.get(id), def = e && this.h.model.resolvedDef(e.def); return e && def ? { def, state: actuatedState(e, def), name: e.name ? this.h.model.pathOf(e.id) : shortDef(def) } : null; }, this.actHost(), this.h.log);
     return o;
   }
@@ -129,6 +130,9 @@ export class GodPerceive {
    *  a single kind would show only the two nearest god things. A name the framework already uses gets `built-`. */
   private kindFor(short: string, def?: StoredDef): string {
     const o = this.objs!; let k = short.toLowerCase().replace(/[^a-z0-9-]+/g, '-').slice(0, 40) || BUILT_KIND;
+    // Different published revisions may expose different actions. Never give a frozen v1
+    // object v2 actions (or hide v2 actions) because another revision registered first.
+    if (def && def.version > 1) k = `${k}-v${def.version}`.slice(0, 48);
     if (!this.kinds.has(k) && o.kindOf(k)) k = `built-${k}`.slice(0, 48);
     // VOCAB-MECH: a def with actions (actuators) gives its kind those actions (one kind per kind of thing)
     if (!this.kinds.has(k)) { if (!o.kindOf(k)) o.register(builtKindFor((key) => this.desired.get(key), k, def && actionsOf(def).length && this.h.commit ? kindActions(def, this.actHost(), (st) => { const id = (st as BuiltState).key; const e = id ? this.h.model.entities.get(id) : undefined; return e?.name ? this.h.model.pathOf(e.id) : short; }) : {})); this.kinds.add(k); }
@@ -397,6 +401,15 @@ export class GodPerceive {
       built.sort((a, b) => a.dist - b.dist || (a.id < b.id ? -1 : 1));
       return [...rest, ...built.slice(0, LISTED)];
     };
+  }
+
+  /** Unreachable built-object actuators do not belong in discovery. Keep direct admission's
+   * honest refusal and nearby state/permission refusals; do not affect other object kinds. */
+  private wrapCapabilities(o: { capabilities(soul: EdgeSoul): EdgeCapability[]; __godCaps?: boolean }) {
+    if (o.__godCaps) return; o.__godCaps = true;
+    const original = o.capabilities.bind(o);
+    o.capabilities = soul => original(soul).filter(cap =>
+      !(cap.object && this.desired.has(cap.object) && cap.blocked?.code === 'object.out-of-reach'));
   }
 
   /** `read:<sign>` for signs near this Soul: walk up to it and face it; the label carries its words. */
