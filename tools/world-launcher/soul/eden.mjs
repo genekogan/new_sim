@@ -89,7 +89,7 @@ const TERMINAL = new Set(["completed", "failed", "replaced"]);
 
 // as: "soul" (default, the Soul's delegated token), "owner" (account routes under /v1/agent, same token),
 // "dev" (legacy self-made identity), "none".
-async function call(path, { method, body, as = "soul", timeoutMs = 90_000 } = {}) {
+async function call(path, { method, body, as = "soul", timeoutMs = 90_000, recoverRead = false } = {}) {
   const s = load();
   if (as === "soul") ({ path, body } = withNow(path, body));
   const url = need(s, "world", `Run: ${CLI} register <world-url>`) + path;
@@ -107,7 +107,14 @@ async function call(path, { method, body, as = "soul", timeoutMs = 90_000 } = {}
   } catch (e) {
     return { status: 0, data: { error: { code: "unreachable", message: String(e.message) } } };
   }
-  const text = await r.text();
+  let text;
+  try { text = await r.text(); }
+  catch (e) {
+    // Only listen opts in: a dropped read is safe to re-poll. A write's lost answer
+    // must keep its existing semantics rather than encouraging an action retry.
+    if (!recoverRead || (r.status >= 300 && r.status < 500 && r.status !== 429)) throw e;
+    return { status: 0, data: { error: { code: "unreachable", message: String(e.message) } } };
+  }
   let data;
   try { data = JSON.parse(text); } catch { data = { raw: text.slice(0, 200) }; }
   if (headers.authorization && !path.startsWith("/v1/edge/inbox/")) noticeInbox(data);
@@ -609,7 +616,7 @@ async function listen(...args) {
   let backoff = 0;
   for (;;) {
     const q = new URLSearchParams({ timeoutMs: once ? "0" : "50000", ...(after ? { after } : {}) });
-    const r = await call(`/v1/edge/inbox/listen?${q}`, { timeoutMs: 60_000 });
+    const r = await call(`/v1/edge/inbox/listen?${q}`, { timeoutMs: 60_000, recoverRead: !once });
     if (r.status === 0 || r.status === 429 || r.status >= 500) {
       backoff = Math.min(30_000, backoff ? backoff * 2 : 1000);
       process.stderr.write(`listen: ${r.data?.error?.code ?? r.status}, retrying in ${backoff / 1000}s\n`);
