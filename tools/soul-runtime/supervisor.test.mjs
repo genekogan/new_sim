@@ -120,6 +120,40 @@ test('ordinary 35984-byte startup observation arrives whole in the first model p
 });
 const ambient=(id,speaker='s_presenter')=>({id,kind:'speech.ambient',raw:'speech',salience:1,about:{soulId:speaker,name:'Observed participant'},data:{from:{soulId:speaker,name:'Observed participant'},text:'Untrusted native public speech'}});
 const listeningWait=(listenTo,wakeAt=null)=>({...waitDecision,call:{type:'wait',command:'wait',arguments:JSON.stringify({listenTo})},wakeAt});
+test('a preexisting latest owner cancellation survives prompt byte bounds without consuming omitted older intent',async t=>{
+ const f=setup(t);let writes=0;f.world.write=async()=>{writes++;return {accepted:true}};
+ const messages=[...Array.from({length:100},(_,i)=>({id:'old'+i,text:'Continue the original errand. '+ 'x'.repeat(900)})),{id:'latest-cancel',text:'Cancel the original errand now. Stay here.'}];
+ f.journal.ingest({source:'owner',after:null,cursor:'latest-cancel',events:messages});
+ const running=runSupervisor({...f,signal:f.stop.signal});
+ try{
+  await until(()=>f.host.calls.length===1);const prompt=f.host.calls[0];
+  assert.equal(prompt.pending[0].event.id,'latest-cancel');assert.equal(prompt.pending[0].sequence,101);
+  assert.ok(prompt.pending.length<messages.length,'bounded prompt retains omissions');assert.equal(prompt.openOwnerTasks.totalOpen,101);
+  f.host.finish(prompt.pending.some(p=>p.event.id==='latest-cancel')?waitDecision:{...waitDecision,call:{type:'write',command:'say',arguments:'{"text":"obsolete errand"}'}});
+  await until(()=>f.host.calls.length===2);assert.equal(writes,0);
+  const remaining=f.journal.pending(1000);assert.ok(remaining.length>0);assert.equal(remaining.length,messages.length-prompt.pending.length);
+  assert.ok(!remaining.some(p=>p.event.id==='latest-cancel'));assert.equal(f.journal.openOwnerTasks().totalOpen,101,'incorporation never closes owner tasks');
+ }finally{f.stop.abort();await running;}
+});
+test('a busy bounded steer includes the newest owner update ahead of a large older backlog',async t=>{
+ const f=setup(t),running=runSupervisor({...f,signal:f.stop.signal});
+ try{
+  await until(()=>f.host.calls.length===1);
+  f.journal.ingest({source:'owner',after:null,cursor:'cancel',events:[...Array.from({length:100},(_,i)=>({id:'older'+i,text:'Keep the previous plan. '+ 'x'.repeat(900)})),{id:'cancel',text:'Stop the previous plan now.'}]});
+  await until(()=>f.host.steers.length===1);assert.equal(f.host.steers[0].pending[0].event.id,'cancel');
+  assert.ok(f.host.steers[0].pending.length<=20);assert.equal(f.journal.pending(1000).length,101,'steering alone does not mark handling');
+ }finally{f.stop.abort();await running;}
+});
+test('immediate replan reads latest owner authority before the dispatcher hint cache catches up',async t=>{
+ const f=setup(t);let writes=0;f.world.write=async()=>{writes++;return {accepted:true}};
+ f.journal.ingest({source:'owner',after:null,cursor:'old99',events:Array.from({length:100},(_,i)=>({id:'old'+i,text:'Continue previous errand. '+ 'x'.repeat(900)}))});
+ const begin=f.host.begin.bind(f.host);let count=0;
+ f.host.begin=async(...args)=>{const turn=await begin(...args);if(++count===1)f.journal.ingest({source:'owner',after:'old99',cursor:'cancel',events:[{id:'cancel',text:'Cancel the previous errand now.'}]});
+  if(count<=2)f.host.finish(count===2&&!f.host.calls.at(-1).pending.some(p=>p.event.id==='cancel')?{...waitDecision,call:{type:'write',command:'say',arguments:'{"text":"obsolete"}'}}:waitDecision);return turn;};
+ const running=runSupervisor({...f,signal:f.stop.signal});
+ try{await until(()=>f.host.calls.length>=3);assert.equal(f.host.calls[1].pending[0].event.id,'cancel');assert.equal(writes,0);assert.ok(f.journal.pendingOwner(1000).length>0,'undelivered older intent remains pending');}
+ finally{f.stop.abort();await running;}
+});
 test('listening matches exact native ambient speaker identities without inferring relevance from text',()=>{
  const event=ambient('c_1'),fact={source:'world',event};assert.equal(attentionPriority(fact,['s_presenter']),1);assert.equal(attentionPriority(fact,[]),0);assert.equal(attentionPriority(fact,['s_other']),0);assert.equal(attentionPriority(fact,'nearby'),1);
  assert.equal(attentionPriority({source:'world',event:{...event,raw:'receipt'}},'nearby'),0);assert.equal(attentionPriority({source:'world',event:{...event,data:{from:{soulId:'s_other'},text:'s_presenter'}}},['s_presenter']),0);assert.equal(attentionPriority({source:'world',event:{...event,kind:'world.narration'}},'nearby'),0);assert.equal(attentionPriority({source:'world',event:{id:'direct',salience:3}},[]),3);assert.equal(attentionPriority({source:'owner',event:{id:'m1',salience:0}},[]),4);

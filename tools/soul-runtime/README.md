@@ -65,7 +65,7 @@ A new owner message during a turn invalidates its eventual action. Ordinary
 world observations trigger up to two consecutive replans, then remain pending
 for the next decision so a busy venue cannot indefinitely prevent a reply or
 departure. The server still validates every selected action.
-Urgent events are prioritized before a bounded steer, and attention arriving
+The newest pending owner observation comes first before prompt and steer bounds; sequence metadata preserves ordering, and older constraints remain available through the durable task ledger. Only observations actually included in the committed decision are marked incorporated. Urgent events are prioritized before a bounded steer, and attention arriving
 while a begin acknowledgement is pending is queued for that exact turn. A full
 journal requests one bounded decision to drain retained facts; transport retries
 cannot repeatedly trigger inference without actual incorporation progress.

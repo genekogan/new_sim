@@ -191,6 +191,11 @@ export function openJournal(directory, {worldId, soulId, now = Date.now,retentio
       if(!Number.isSafeInteger(afterSequence)||afterSequence<0)throw Error('Invalid pending sequence');
       return db.prepare('SELECT seq,source,event_id,payload,received_at FROM events WHERE handled_at IS NULL AND seq>? ORDER BY seq LIMIT ?').all(afterSequence,limit).map(r=>({sequence:r.seq,source:r.source,event:JSON.parse(r.payload),receivedAt:r.received_at}));
     },
+    pendingOwner(limit=100) {
+      if(!Number.isInteger(limit)||limit<1||limit>1000)throw Error('Invalid pending owner limit');
+      return db.prepare(`SELECT seq,source,event_id,payload,received_at FROM events WHERE handled_at IS NULL AND source='owner' ORDER BY seq DESC LIMIT ?`).all(limit)
+        .map(r=>({sequence:r.seq,source:r.source,event:JSON.parse(r.payload),receivedAt:r.received_at}));
+    },
     attention(limit=100) {
       if(!Number.isInteger(limit)||limit<1||limit>1000)throw Error('Invalid attention limit');
       return db.prepare(`SELECT seq,source,event_id,payload,received_at FROM events WHERE handled_at IS NULL
