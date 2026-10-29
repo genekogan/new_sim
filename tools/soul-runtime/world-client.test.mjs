@@ -2,6 +2,24 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createWorldClient,isTransientRead} from './world-client.mjs';
 const mock=(fn)=>createWorldClient({world:'http://127.0.0.1:1234/world',token:'synthetic-fixture-only',fetchImpl:fn});
+test('conversation help and refused ignored text avoid silent acceptance-as-speech',async()=>{
+ let requests=0;const client=mock(async()=>{requests++;return Response.json({accepted:true});});
+ const help=await client.read('help',{command:'converse'});assert.match(help.operations.accept.description,/does not publish speech/);assert.match(help.operations.say.description,/Publish a turn/);
+ assert.match(help.operations.ask.description,/not a spoken question/);assert.deepEqual((await client.read('help')).commands,['converse']);
+ for(const op of ['accept','decline','ask','leave'])await assert.rejects(client.write('converse',{op,conversation:'cv_example',text:'My actual question'},'op-'+op),e=>e.code==='invalid'&&e.status===400&&!e.uncertain&&/Unexpected arguments/.test(e.message));
+ assert.equal(requests,0,'neither local help nor rejected calls contact the world');
+ await assert.rejects(client.read('help',{command:'unknown'}),e=>e.status===400);
+});
+test('conversation admission preserves target Soul and a real speech call publishes text',async()=>{
+ const requests=[];const client=mock(async(url,opts)=>{requests.push({url,body:JSON.parse(opts.body)});return Response.json({accepted:true});});
+ await client.write('converse',{op:'accept',conversation:'cv_example',soul:'s_joiner'},'admit');
+ await client.write('converse',{op:'say',conversation:'cv_example',text:'What did you observe?'},'say');
+ await client.write('converse',{op:'start',with:['s_peer'],text:'Welcome'},'start');
+ assert.deepEqual(requests.map(r=>r.body),[{op:'accept',conversation:'cv_example',soul:'s_joiner'},{op:'say',conversation:'cv_example',text:'What did you observe?'},{op:'start',with:['s_peer'],text:'Welcome'}]);
+ assert.ok(requests.every(r=>r.url.endsWith('/v1/edge/converse')));
+ for(const args of [{op:'say',conversation:'cv_example'},{op:'accept',conversation:'cv_example',with:'cv_example'},{op:'constructor'}])await assert.rejects(client.write('converse',args,'bad'),e=>e.status===400);
+ assert.equal(requests.length,3);
+});
 test('native flat validation messages survive transport and invalid completion reports never POST',async()=>{
  let writes=0;const client=mock(async()=>{writes++;return Response.json({ok:false,code:'invalid',message:'result must be one line of 1–140 characters'},{status:400})});
  for(const args of [{id:'m',outcome:'completed',text:'Returned'},{id:'m',outcome:'done',text:'x'.repeat(141)}])await assert.rejects(client.write('result',args,'op-validation'),e=>e.status===400&&e.uncertain===false&&/result/.test(e.message));

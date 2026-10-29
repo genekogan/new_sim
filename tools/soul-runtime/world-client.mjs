@@ -1,6 +1,7 @@
 // Narrow authenticated world transport. Credentials stay in this closure, never
 // in model context, journal entries, URLs or diagnostics. No automatic write retry.
 import {createEventReader} from './sse.mjs';
+import {commandHelp,validateConversationArgs} from './command-help.mjs';
 const segment=v=>encodeURIComponent(String(v));
 const error=(code,message,extra={})=>Object.assign(Error(message),{code,...extra});
 const record=v=>!!v&&typeof v==='object'&&!Array.isArray(v);
@@ -79,6 +80,7 @@ export function createWorldClient({world,token,fetchImpl=fetch,timeoutMs=65000})
    return {cursor:events.at(-1)?.id??after,events};
   },
   async read(command,args={},signal){
+   if(command==='help')return commandHelp(args.command);
    if(command==='resync'){const observation=await request('/v1/edge/observe',{signal}),conversations=await request('/v1/edge/conversations',{signal});return {observation,conversations,historyIncomplete:true,note:'Current facts refreshed; missing historical events were not reconstructed.'};}
    if(command==='here')return request('/v1/edge/here?include=doHere',{signal});
    if(command==='observe')return request('/v1/edge/observe',{signal});
@@ -94,6 +96,7 @@ export function createWorldClient({world,token,fetchImpl=fetch,timeoutMs=65000})
   },
   async write(command,args,operationId,signal){
    if(typeof operationId!=='string'||!/^[A-Za-z0-9._:-]{1,100}$/.test(operationId))throw Error('Stable operation identity required');
+   if(command==='converse')validateConversationArgs(args);
    if(command==='result'){
     if(!['done','failed'].includes(args.outcome))throw error('invalid','result outcome must be done or failed',{status:400,uncertain:false});
     if(typeof args.text!=='string'||!args.text.trim()||args.text.length>140||/[\r\n]/.test(args.text))throw error('invalid','result text must be one line of 1–140 characters; shorten it without changing the outcome',{status:400,uncertain:false});
@@ -102,7 +105,7 @@ export function createWorldClient({world,token,fetchImpl=fetch,timeoutMs=65000})
    let path,body;
    if(command==='act'){path='/v1/edge/act';body={capability:args.capability,params:args.params??{},clientRef:operationId};}
    else if(command==='say'){path='/v1/edge/say';body={text:args.text};}
-   else if(command==='converse'){path='/v1/edge/converse';body={op:args.op,...(args.with?{with:args.with}:{}),...(args.conversation?{conversation:args.conversation}:{}),...(args.text?{text:args.text}:{})};}
+   else if(command==='converse'){path='/v1/edge/converse';body={...args};}
    else if(command==='ack'){path='/v1/edge/inbox/'+segment(args.id)+'/ack';body={reply:args.reply};}
    else if(command==='result'){path='/v1/edge/inbox/'+segment(args.id)+'/result';body={outcome:args.outcome,text:args.text};}
    else if(command==='remind'){path='/v1/edge/reminders';body={clientRef:operationId,text:args.text,at:args.at};}

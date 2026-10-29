@@ -27,7 +27,7 @@ export async function runReceiver({journal,source,read,signal,onState=()=>{},ret
         throw error;
       }
       backoff=Math.min(maxBackoffMs,backoff?backoff*2:1000);
-      onState({source,state:'retrying',delayMs:backoff,reason:String(error.message)});
+      onState({source,state:'retrying',delayMs:backoff,reason:String(error.message),...(typeof error.code==='string'?{code:error.code}:{})});
       await sleep(backoff,signal);
     }
   }

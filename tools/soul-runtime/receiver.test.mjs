@@ -56,3 +56,17 @@ test('durable intake telemetry follows commit and never reports refused intake',
  await assert.rejects(receivePage(j,'world',async()=>({cursor:'bad',events:[{...page.events[0],kind:'different'}]}),{onCommitted:e=>proof.push(e)}));
  assert.equal(proof.length,1);
 });
+
+test('journal pressure exposes structured retry cause without advancing refused intake',async t=>{
+ const dir=mkdtempSync(join(tmpdir(),'sim-receiver-pressure-'));
+ const j=openJournal(dir,{worldId:'w',soulId:'s',retention:{worldPendingEvents:1}});
+ t.after(()=>{j.close();rmSync(dir,{recursive:true,force:true});});
+ j.ingest({source:'world',after:null,cursor:'quiet',events:[{id:'quiet',salience:1}]});
+ const stop=new AbortController(),states=[];
+ await runReceiver({journal:j,source:'world',signal:stop.signal,retryable:e=>e.transient===true,
+  read:async({after})=>{assert.equal(after,'quiet');return {cursor:'urgent',events:[{id:'urgent',kind:'conversation.turn',salience:3}]};},
+  onState:s=>states.push(s),sleep:async()=>stop.abort()});
+ const retry=states.find(s=>s.state==='retrying');assert.equal(retry.code,'JOURNAL_BACKLOG_FULL');assert.equal(retry.source,'world');assert.equal(retry.delayMs,1000);
+ assert.equal(j.cursor('world'),'quiet');assert.deepEqual(j.pending().map(p=>p.event.id),['quiet']);
+ assert.equal(states.some(s=>s.state==='events-persisted'),false);
+});
