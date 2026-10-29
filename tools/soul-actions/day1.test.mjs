@@ -29,11 +29,14 @@ test('switchable floor lamp and carryable lantern: ordinary Soul actions, refusa
  assert.ok(!edge.capabilities(soul).some(c=>c.object===god.model.get('old-floor-lamp').id),'v2 registration does not add actions to v1');const farIds=new Set(distant.map(d=>god.model.get(d.name).id));assert.deepEqual(edge.capabilities(soul).filter(c=>farIds.has(c.object)),[],'no distant lamp actuator capabilities');assert.deepEqual(edge.capabilities(soul).filter(c=>['stand:here','wave:here','rest:here'].includes(c.id)).map(c=>({id:c.id,available:c.available})),baselineOrdinary,'ordinary capabilities unchanged');
  const body=f.host.engine.world.entities[soul.entityId];const at=[body.pose.p[0],body.pose.p[2]];
  assert.equal(god.act({ops:[{op:'place',def:'core/floor-lamp@2',name:'reading-light',p:[at[0]+1,at[1]]},{op:'place',def:'core/lantern@2',name:'small-lantern',p:[at[0],at[1]+1]},{op:'place',def:'core/bowl@1',name:'bowl',p:[at[0]-1,at[1]]}]}).accepted,true);await tick(45);
- const act=async(id,verb,accepted=true)=>{const p=app.request('/v1/edge/act',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({capability:`object:${id}:${verb}`})});const r=await accept(f.host,p);const b=await r.json();assert.equal(b.accepted,accepted,JSON.stringify(b));return b;};
+ const act=async(id,verb,accepted=true)=>{const direct=id==='small-lantern';const p=app.request(direct?`/v1/edge/objects/${god.model.get(id).id}/act`:'/v1/edge/act',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(direct?{action:verb}:{capability:`object:${id}:${verb}`})});const r=await accept(f.host,p);const b=await r.json();assert.equal(b.accepted,accepted,JSON.stringify(b));return b;};
  const save=name=>{if(out){mkdirSync(out,{recursive:true});writeFileSync(`${out}/${name}.json`,JSON.stringify(god.model.snapshot()));}};
  save('lights-on');const receipts=[];
+ const abandoned=await act('reading-light','switch-off');const stop=await accept(f.host,edge.act(soul,{capability:'stand:here'}));assert.equal(stop.accepted,true);await tick(10);assert.equal(edge.receipt(soul.soulId,abandoned.receipt.id).phase,'replaced');assert.equal(god.model.get('reading-light').state.on,true,'interruption before contact leaves light unchanged');
  for(const id of ['reading-light','small-lantern']){
-  receipts.push(await act(id,'switch-off'));await tick(90);assert.equal(god.model.get(id).state.on,false);
+  receipts.push(await act(id,'switch-off'));assert.equal(god.model.get(id).state.on,true,'admission does not switch the light remotely');let sawContact=false;
+  for(let n=0;n<300;n++){const b=f.host.engine.world.entities[soul.entityId];if(b.human?.activity==='operate'){sawContact=true;assert.equal(god.model.get(id).state.on,true,'light stays unchanged throughout approach/reach');}if(edge.receipt(soul.soulId,receipts.at(-1).receipt.id)?.phase==='completed')break;await tick(1);}
+  assert.ok(sawContact,'actual native arm-operation pose ran');assert.equal(god.model.get(id).state.on,false);
   assert.equal(edge.receipt(soul.soulId,receipts.at(-1).receipt.id).phase,'completed');
   await act(id,'switch-off',false);
  }

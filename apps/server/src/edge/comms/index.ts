@@ -175,7 +175,8 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
     const {bodies, ...rest} = out;
     if(!bodies?.length){const accepted=prepared.commit();fading.touch(soul.soulId);return accepted;}
     if(!deps.ledger.performBodies)return {accepted:false,code:'object.body-unavailable',reason:'Body admission is unavailable.',object:id,action:out.action};
-    const b = await deps.ledger.performBodies(soul, cap, bodies[0]!.label, bodies[0]!.steps as never, typeof body.clientRef === 'string' ? `obj:${body.clientRef}` : undefined,undefined,{guard:prepared.guard,commit:()=>{prepared.commit();}});
+    const contact=deps.ledger.contactSwitchDetail?.(soul,id,out.action);
+    const b = await deps.ledger.performBodies(soul, cap, bodies[0]!.label, bodies[0]!.steps as never, typeof body.clientRef === 'string' ? `obj:${body.clientRef}` : undefined,undefined,{guard:prepared.guard,commit:()=>{if(contact)return contact;prepared.commit();}});
     if(b.accepted)fading.touch(soul.soulId);
     return b.accepted ? {...rest, receipt: b.receipt} : {accepted: false, code: b.code, reason: b.reason, object: id, action: out.action};
   }));

@@ -152,6 +152,7 @@ export class GodWorldLiving {
   readonly group = new THREE.Group();
   private signature = '';
   private checkedAt = -Infinity;
+  private checkedSource: {model:unknown;seq:unknown}|null = null;
   /** P1 phones: the light scan's inputs (the layer's model and its diff seq); unchanged inputs skip the scan. */
   private scanned: { model: unknown; seq: number; at: number } | null = null;
   private patterns: PatternNightMap | null = null;
@@ -176,8 +177,10 @@ export class GodWorldLiving {
     if (this.patterns && this.renderer && (!reducedMotion || reducedMotion !== this.reduced)) this.patterns.render(this.renderer, worldSeconds(nowMs / 1000), reducedMotion);
     this.reduced = reducedMotion;
     if (daylight !== null && this.clockless) { this.clockless = false; this.checkedAt = -Infinity; }
-    if (nowMs - this.checkedAt < 500) return;
-    this.checkedAt = nowMs;
+    const source={model:this.model,seq:(this.layer as unknown as {seq?:unknown}).seq};
+    const changed=source.model!==this.checkedSource?.model||source.seq!==this.checkedSource?.seq;
+    if (nowMs - this.checkedAt < 500 && !changed) return;
+    this.checkedSource=source; this.checkedAt = nowMs;
     // MARSLAND-FAR: the sky palette, for the atmosphere's scene scan (atmosphere/palettes.ts)
     this.group.userData.edenSkyPalette = (entityWorldState(this.layer) as { sky?: { palette?: string } } | null)?.sky?.palette ?? null;
     const m = this.model; if (!m) return;

@@ -21,7 +21,7 @@ import type { Spatial } from '../spatial/service.ts';
 import { clearanceAt } from '../spatial/grid.ts';
 
 /** Overlay activities (upper body; drawn on top of baseActivity). */
-export const POSE_OVERLAYS = ['read', 'browse', 'write', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'post-letter', 'wave',
+export const POSE_OVERLAYS = ['read', 'browse', 'write', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'post-letter', 'wave', 'operate',
   // gestures (core-next4): solo, and the hand-over pair give/take; pick-up/put-down an item
   'bow', 'clap', 'nod', 'shake-head', 'point', 'cheer', 'give', 'take', 'pick-up', 'put-down',
   // CN5: at a desk computer, at a microphone, in an audience, with dumbbells

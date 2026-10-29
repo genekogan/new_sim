@@ -1,10 +1,10 @@
 import {startWorld} from '../god-skill/dev-world.mjs';
 import {writeFileSync,mkdirSync} from 'node:fs';
 import {resolve} from 'node:path';
-const out='<team>/soul-actions/day-01/acceptance';mkdirSync(out,{recursive:true});
+const out=process.env.SOUL_ACTIONS_ACCEPTANCE_OUT??'<team>/soul-actions/day-01/acceptance';mkdirSync(out,{recursive:true});
 const genesis={schema:'genesis/1',name:'Soul Actions Day 1',constants:{extent:350,ground:'land'},batches:[{note:'Isolated light acceptance scene',ops:[
 {op:'place',def:'core/floor-lamp@2',name:'reading-light',p:[3,0]},
-{op:'place',def:'core/lantern@2',name:'small-lantern',p:[3,2]},
+...(process.env.SOUL_ACTIONS_MIXED_LIGHTS==='1'?[{op:'place',def:'core/floor-lamp@2',name:'night-light',p:[3,2.8],state:{on:false}}]:[{op:'place',def:'core/lantern@2',name:'small-lantern',p:[3,2]}]),
 {op:'place',def:'core/floor-lamp@2',name:'private-light',p:[-3,0],owner:'soul:someone-else',access:'private'},
 {op:'place',def:'core/bench@1',name:'garden-bench',p:[0,5]},
 {op:'place',def:'core/bowl@1',name:'bowl',p:[2,-2]},

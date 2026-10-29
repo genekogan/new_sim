@@ -148,6 +148,7 @@ export class GodPerceive {
   }
   private actHost() {
     return {
+      deferSwitches: !!this.h.edge?.contactSwitch,
       bodyAt: (soul: EdgeSoul): Vec2 | null => { const b = this.h.engine.world.entities[soul.entityId]; return b?.pose?.p ? [b.pose.p[0], b.pose.p[2]] : null; },
       commit: (id: string, patch: Record<string, unknown>, note: string) => this.h.commit!([{ op: 'set', id, state: patch }], note),
       stateOf: (id: string) => { const e = this.h.model.entities.get(id), def = e && this.h.model.resolvedDef(e.def); return e && def ? actuatedState(e, def) : null; },
@@ -169,7 +170,7 @@ export class GodPerceive {
       },
       // SOULFIX: where to stand to operate it: a clear spot within reach (1.5 m) on its level that the body can walk to,
       // nearest its front first, else nearest the thing (bars across a cell work from either side); deterministic order
-      approach: (id: string, soul: EdgeSoul, front: Vec2 | null) => {
+      approach: (id: string, soul: EdgeSoul, front: Vec2 | null, radius = 1.5) => {
         const E = this.h.engine as unknown as { clearanceAtV1?: (x: number, z: number, level?: number) => number; reachV1?: (a: { p: Vec2; level?: number }, b: { p: Vec2; level?: number }) => { ok: boolean } };
         const e = this.h.model.entities.get(id), b = this.h.engine.world.entities[soul.entityId];
         if (!e || !b?.pose?.p || !E.clearanceAtV1 || !E.reachV1) return null;
@@ -178,7 +179,7 @@ export class GodPerceive {
         const cands: { p: Vec2; d: number }[] = [];
         for (let i = -6; i <= 6; i++) for (let j = -6; j <= 6; j++) {
           const p: Vec2 = [Math.round((at[0] + i * 0.25) * 100) / 100, Math.round((at[1] + j * 0.25) * 100) / 100], r = Math.hypot(p[0] - at[0], p[1] - at[1]);
-          if (r < 0.3 || r > 1.5 || E.clearanceAtV1(p[0], p[1], level) < 0.4) continue;
+          if (r < 0.3 || r > radius || E.clearanceAtV1(p[0], p[1], level) < 0.4) continue;
           cands.push({ p, d: front ? Math.hypot(p[0] - front[0], p[1] - front[1]) : r });
         }
         cands.sort((x, y) => x.d - y.d || x.p[0] - y.p[0] || x.p[1] - y.p[1]);

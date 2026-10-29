@@ -117,3 +117,12 @@ test('switching a published light updates halos before the next expensive atmosp
   frame(.04);assert.equal(halos.count,1,'unchanged publications stay stable');assert.equal(atmosphere.inspect().scans,scans,'light changes do not trigger expensive scene scans');
  } finally {atmosphere.dispose();}
 });
+
+
+test('a light-state world diff bypasses the half-second pool throttle and refreshes mesh/pools/halos in one frame',()=>{
+ const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(),atmosphere=createWorldAtmosphere(scene);
+ const entity={id:'lamp',def:'lamp@1',state:{on:true}},model={state:{datetime:'2026-10-15T21:00:00'},entities:new Map([['lamp',entity]]),resolvedDef:()=>({components:{light:{color:'#ffe9c4',range:8}}}),worldPose:()=>({x:0,y:0,z:0})};
+ const layer={active:true,group:new THREE.Group(),groundAt:()=>0,model,seq:1};const living=new GodWorldLiving(layer);scene.add(living.group);
+ const frame=(ms:number)=>{living.update(ms,0);atmosphere.update({seconds:ms/1000,dt:1/30,clock:model.state.datetime,daylight:0,camera,eden:true,profile:'world',reducedMotion:true});};
+ try{frame(0);assert.equal(living.lights,1);const halos=scene.getObjectByName('atmosphere: lamp glow') as THREE.InstancedMesh;assert.equal(halos.count,1);entity.state.on=false;layer.seq++;frame(16);assert.equal(living.lights,0,'pool disappears on diff frame, not 500 ms later');assert.equal(halos.count,0,'halo disappears on the same frame');entity.state.on=true;layer.seq++;frame(32);assert.equal(living.lights,1);assert.equal(halos.count,1);}finally{living.dispose();atmosphere.dispose();}
+});
