@@ -11,14 +11,15 @@ export async function superviseProcess({args=[],signal,seconds=null,onState=()=>
  const timer=seconds===null?null:setTimeout(abort,seconds*1000);let deaths=0,child;
  try{while(!stop.signal.aborted){
   const started=Date.now();child=spawnProcess(node,[script,...args],{stdio:'inherit'});
-  onState({state:'controller-started',pid:child.pid});
-  let killTimer;
+  let killTimer,hasExited=false;
+  const completion=new Promise((resolve,reject)=>{child.once('error',e=>{hasExited=true;reject(e);});child.once('exit',(code,signal)=>{hasExited=true;resolve({code,signal});});});
+  completion.catch(()=>{});
   const terminate=()=>{child.kill('SIGTERM');killTimer=setTimeout(()=>child.kill('SIGKILL'),10000);};
   stop.signal.addEventListener('abort',terminate,{once:true});
   if(stop.signal.aborted)terminate();
   let ended;
-  try{ended=await new Promise((resolve,reject)=>{child.once('error',reject);child.once('exit',(code,signal)=>resolve({code,signal}));});}
-  finally{clearTimeout(killTimer);stop.signal.removeEventListener('abort',terminate);}
+  try{onState({state:'controller-started',pid:child.pid});ended=await completion;}
+  finally{if(!hasExited){terminate();await completion.catch(()=>{});}clearTimeout(killTimer);stop.signal.removeEventListener('abort',terminate);}
   if(stop.signal.aborted||ended.code===0)return;
   if(!ended.signal)throw Object.assign(Error('Controller exited with an explicit failure; state retained'),{code:'CONTROLLER_FAILED',exitCode:ended.code});
   if(Date.now()-started>=60000)deaths=0;

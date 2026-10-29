@@ -81,6 +81,15 @@ stops on explicit failures. `--seconds` bounds the entire launcher lifetime,
 including restarts. This does not start a login service or promise availability
 through OS sleep/reboot. Stop any legacy CLI/controller before starting it.
 
+Persistent sessions have readable names (`--session-name` overrides the
+default Soul label). Internal disposable host probes may opt into
+`CodexHost({ephemeral:true})`; this cannot resume a retained thread. Ephemeral
+names stay in local evidence because Codex rejects metadata updates on those
+threads. Recovery probes keep their durable host thread and journal until the
+run ends; ordinary close/restart never archives them. The internal playtest
+runner records terminal process cleanup and archives completed probe threads
+without deleting logs, journals or evidence. Failed archival remains retryable.
+
 A future scheduled wake survives conversational replies and reads. A new
 non-null `wakeAt` replaces it; `wait` with `{"cancelWake":true}` explicitly
 cancels it. Due wakes are consumed only by a committed decision retained after

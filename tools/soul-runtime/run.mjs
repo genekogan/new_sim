@@ -28,7 +28,7 @@ export async function claimStartupLease(control,{signal,maxWaitMs=65000,pollMs=2
  return null;
 }
 export async function main(argv=process.argv.slice(2),{signal,leaseWaitMs=65000}={}){
- const {values}=parseArgs({args:argv,options:{folder:{type:'string'},state:{type:'string'},instruction:{type:'string'},model:{type:'string'},effort:{type:'string',default:'low'},seconds:{type:'string'},help:{type:'boolean'}}});
+ const {values}=parseArgs({args:argv,options:{folder:{type:'string'},state:{type:'string'},instruction:{type:'string'},model:{type:'string'},effort:{type:'string',default:'low'},seconds:{type:'string'},'session-name':{type:'string'},help:{type:'boolean'}}});
  if(values.help){console.log('node tools/soul-runtime/run.mjs --folder <paired-folder> [--instruction <text-file>] [--model <advertised-model>] [--seconds <bounded-run>]');return;}
  const folder=resolve(values.folder??process.cwd()),state=resolve(values.state??join(folder,'.soul-runtime'));
  const seconds=values.seconds===undefined?null:Number(values.seconds);if(seconds!==null&&(!Number.isFinite(seconds)||seconds<1||seconds>7*86400))throw Error('seconds must be1..604800');
@@ -57,7 +57,7 @@ export async function main(argv=process.argv.slice(2),{signal,leaseWaitMs=65000}
  ownerRenewal=setInterval(()=>{try{owner=ownership.control.renew(owner);}catch(e){ownershipFailure=e;stop.abort(e);}},5000);
  const cwd=join(state,'host');mkdirSync(cwd,{recursive:true,mode:0o700});
   await runManaged({journal,world,instruction,signal:stop.signal,onState:saveStatus,createHost:()=>{
-   const host=new CodexHost({cwd,model,effort:values.effort});
+   const host=new CodexHost({cwd,model,effort:values.effort,name:values['session-name']??`Sim Soul — ${paired.soul}`});
    host.on('event',e=>{if(e.method==='thread/tokenUsage/updated'){writeFileSync(join(state,'usage.json'),JSON.stringify({at:new Date().toISOString(),threadId:host.threadId,model:host.model,usage:e.params.tokenUsage},null,2),{mode:0o600});}if(host.model)model=host.model;});
    return host;
   }});

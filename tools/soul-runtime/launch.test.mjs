@@ -10,3 +10,6 @@ test('outer process owner restarts killed controller but never replays explicit 
 test('stop terminates owned controller and never launches a replacement',async()=>{
  const f=fakeSpawner([]),stop=new AbortController();const p=superviseProcess({...f,signal:stop.signal});stop.abort();await p;assert.deepEqual(f.kills,['SIGTERM']);assert.equal(f.count(),1);
 });
+test('reporting failure still terminates and reaps the owned controller',async()=>{
+ const f=fakeSpawner([]);await assert.rejects(superviseProcess({...f,onState:()=>{throw Error('status unavailable')}}),/status unavailable/);assert.deepEqual(f.kills,['SIGTERM']);assert.equal(f.count(),1);
+});

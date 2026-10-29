@@ -6,9 +6,13 @@ import {EventEmitter} from 'node:events';
 const fault=(code,message)=>Object.assign(Error(message),{code});
 const input=text=>[{type:'text',text}];
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const threadName=value=>{if(value===null)return null;if(typeof value!=='string'||!value.trim()||value.length>200||/[\u0000-\u001f\u007f]/.test(value))throw fault('HOST_INVALID_NAME','Thread name must be readable text of1..200characters');return value.trim();};
+const booleanOption=(name,value)=>{if(typeof value!=='boolean')throw fault('HOST_INVALID_OPTION',name+' must be boolean');return value;};
 export class CodexHost extends EventEmitter {
-  constructor({cwd,model=null,effort='low',command='codex',args=['app-server','--listen','stdio://'],requestTimeoutMs=30000,spawnProcess=spawn}={}) {
+  constructor({cwd,model=null,effort='low',command='codex',args=['app-server','--listen','stdio://'],requestTimeoutMs=30000,spawnProcess=spawn,ephemeral=false,name=null,internalProbe=false}={}) {
     super();this.cwd=cwd;this.model=model;this.effort=effort;this.requestTimeoutMs=requestTimeoutMs;
+    this.ephemeral=booleanOption('ephemeral',ephemeral);this.name=threadName(name);this.internalProbe=booleanOption('internalProbe',internalProbe);
+    this.connected=false;this.connecting=false;this.archiving=null;this.archived=false;
     this.pending=new Map();this.turns=new Map();this.sequence=0;this.threadId=null;this.activeTurnId=null;this.closed=false;this.closing=false;this.buffer='';
     this.child=spawnProcess(command,args,{cwd,stdio:['pipe','pipe','pipe'],detached:true});
     this.pid=this.child.pid;this.exit=new Promise(resolve=>{
@@ -77,9 +81,17 @@ export class CodexHost extends EventEmitter {
       // Keep a small recent window for acknowledgement/completion races.
       for(const [id,old] of this.turns){if(this.turns.size<=32)break;if(old.terminal&&id!==t.id)this.turns.delete(id);}
     }
-    if(['turn/started','turn/completed','item/started','item/completed','thread/tokenUsage/updated'].includes(m.method))this.emit('event',{method:m.method,params:p,receivedAt:Date.now()});
+    if(['turn/started','turn/completed','item/started','item/completed','thread/tokenUsage/updated','thread/name/updated','thread/archived'].includes(m.method))this.emit('event',{method:m.method,params:p,receivedAt:Date.now()});
   }
-  async connect({threadId=null,instructions='',baseInstructions=null,config={}}={}){
+  async connect({threadId=null,instructions='',baseInstructions=null,config={},ephemeral=this.ephemeral,name=this.name}={}){
+    ephemeral=booleanOption('ephemeral',ephemeral);name=threadName(name);
+    if(threadId!==null&&(typeof threadId!=='string'||!threadId))throw fault('HOST_INVALID_THREAD','Resume needs a nonempty thread ID');
+    // Ephemeral work has no persistent history to resume. Never reinterpret a
+    // retained durable thread ID as permission to drop or replace its history.
+    if(ephemeral&&threadId!==null)throw fault('HOST_EPHEMERAL_RESUME','Ephemeral mode cannot resume a retained thread');
+    if(this.connecting||this.connected||this.threadId)throw fault('HOST_ALREADY_CONNECTED','Host already has a thread connection');
+    this.connecting=true;this.ephemeral=ephemeral;this.name=name;
+    try{
     await this.request('initialize',{clientInfo:{name:'sim_soul_continuity',version:'0.1.0'}});this.send({method:'initialized',params:{}});
     if(!this.model){
       const listed=await this.request('model/list',{});
@@ -87,10 +99,17 @@ export class CodexHost extends EventEmitter {
       if(!this.model)throw fault('HOST_MODEL_UNAVAILABLE','Host did not advertise a default model');
     }
     const params={cwd:this.cwd,model:this.model,approvalPolicy:'never',sandbox:'read-only',developerInstructions:instructions,...(baseInstructions?{baseInstructions}:{}),config};
-    const r=await this.request(threadId?'thread/resume':'thread/start',threadId?{...params,threadId}:{...params,ephemeral:false});
-    this.threadId=r.thread.id;return {threadId:this.threadId,model:r.model??this.model};
+    const r=await this.request(threadId?'thread/resume':'thread/start',threadId?{...params,threadId}:{...params,ephemeral});
+    this.threadId=r.thread.id;
+    // Installed app-server refuses metadata updates for ephemeral threads. Keep
+    // their readable name in local lifecycle evidence, without a persistence fallback.
+    if(name!==null&&!ephemeral)await this.request('thread/name/set',{threadId:this.threadId,name});
+    this.connected=true;return {threadId:this.threadId,model:r.model??this.model,ephemeral,name};
+    }finally{this.connecting=false;}
   }
   async begin(text,{outputSchema}={}){
+    if(this.archiving||this.archived)throw fault('HOST_ARCHIVED','Thread is being archived or already archived');
+    if(!this.connected)throw fault('HOST_NOT_CONNECTED','Await thread connection and naming before starting a turn');
     if(this.activeTurnId||this.starting)throw fault('HOST_BUSY','A decision turn is already active');
     this.starting=true;
     try{
@@ -107,6 +126,19 @@ export class CodexHost extends EventEmitter {
     const turnId=this.activeTurnId;if(!turnId)return {status:'idle'};
     await this.request('turn/interrupt',{threadId:this.threadId,turnId});
     return this.turnRecord(turnId).completed;
+  }
+  // Caller must establish terminal *run* completion and ownership separately;
+  // model-turn completion, routine close, and recovery never trigger archival.
+  async archiveCompleted({expectedThreadId=this.threadId}={}){
+    if(!this.internalProbe)throw fault('HOST_ARCHIVE_NOT_OWNED','Archival requires an explicitly owned internal probe host');
+    if(!this.connected||!this.threadId)throw fault('HOST_NOT_CONNECTED','No connected thread to archive');
+    if(expectedThreadId!==this.threadId)throw fault('HOST_THREAD_MISMATCH','Archive target differs from this host thread');
+    if(this.activeTurnId||this.starting)throw fault('HOST_BUSY','Cannot archive an active or starting turn');
+    if(this.archived)return {threadId:this.threadId,archived:true,alreadyArchived:true};
+    if(this.ephemeral)return {threadId:this.threadId,archived:false,ephemeral:true};
+    if(this.archiving)return this.archiving;
+    this.archiving=this.request('thread/archive',{threadId:this.threadId}).then(()=>{this.archived=true;return {threadId:this.threadId,archived:true};}).finally(()=>{this.archiving=null;});
+    return this.archiving;
   }
   async close(){
     if(this.closing)return this.closing;
