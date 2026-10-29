@@ -13,3 +13,8 @@ test('uncommitted cursor causes reconnect from old durable position',async()=>{
 test('gap is explicit and stream closure is retryable rather than data loss',async()=>{
  const read=createEventReader({open:async()=>stream(['event: gap\ndata: {"oldest":"c_50"}\n\n'])});assert.deepEqual(await read({after:'c_0'}),{cursor:'c_50',events:[],gap:true});await assert.rejects(read({after:'c_50'}),e=>e.transient===true);
 });
+test('aborting an idle stream does not wait for a heartbeat or a stalled cancel acknowledgement',async()=>{
+ const stop=new AbortController();const read=createEventReader({open:async()=>new Response(new ReadableStream({pull(){return new Promise(()=>{});},cancel(){return new Promise(()=>{});}}))});
+ const pending=read({after:'c_0',signal:stop.signal});await new Promise(r=>setImmediate(r));stop.abort();
+ await Promise.race([assert.rejects(pending,/interrupted/),new Promise((_,reject)=>{const timer=setTimeout(()=>reject(Error('abort waited for transport')),100);timer.unref();})]);
+});

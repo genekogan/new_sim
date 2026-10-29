@@ -3,12 +3,12 @@
 import {randomUUID} from 'node:crypto';
 export const DECISION_SCHEMA={type:'object',additionalProperties:false,required:['plan','call','wakeAt'],properties:{
  plan:{type:'string',description:'Compact durable task state: current goal and original constraints, completed receipt IDs, current step, suspended work, deadlines and next step. Do not claim unobserved completion.'},
- call:{type:'object',additionalProperties:false,required:['type','command','arguments'],properties:{type:{type:'string',enum:['read','write','wait']},command:{type:'string'},arguments:{type:'string',description:'A JSON object of arguments for the selected command, or {} for wait.'}}},
+ call:{type:'object',additionalProperties:false,required:['type','command','arguments'],properties:{type:{type:'string',enum:['read','write','wait']},command:{type:'string'},arguments:{type:'string',description:'A JSON object of arguments. For wait use {} for event-only or {seconds:N} for a relative wall-clock wakeup.'}}},
  wakeAt:{type:['string','null'],description:'ISO8601 wall-clock wakeup with timezone, or null to wait for messages or action results.'},
 }};
-const READS=new Set(['here','observe','explore','resolve','receipt','conversations','turns','calendar','reminders','object']);
+const READS=new Set(['resync','here','observe','explore','resolve','receipt','conversations','turns','calendar','reminders','object']);
 const WRITES=new Set(['act','say','converse','ack','result','remind','object']);
-export function parseDecision(text){
+export function parseDecision(text,{now=Date.now}={}){
  const value=JSON.parse(text);
  if(!value||Object.keys(value).sort().join(',')!=='call,plan,wakeAt')throw Error('Decision fields differ from contract');
  if(typeof value.plan!=='string'||value.plan.length>16000)throw Error('Invalid durable plan');
@@ -17,7 +17,12 @@ export function parseDecision(text){
  const args=JSON.parse(call.arguments);if(!args||typeof args!=='object'||Array.isArray(args))throw Error('Call arguments must be an object');
  if(call.type==='read'?!READS.has(call.command):call.type==='write'?!WRITES.has(call.command):call.type!=='wait')throw Error('Unsupported decision command');
  if(value.wakeAt!==null&&(typeof value.wakeAt!=='string'||!/(Z|[+-]\d{2}:\d{2})$/.test(value.wakeAt)||!Number.isFinite(Date.parse(value.wakeAt))))throw Error('Wakeup needs explicit wall clock/timezone');
- return {...value,call:{type:call.type,command:call.command,args}};
+ let wakeAt=value.wakeAt;
+ if(call.type==='wait'&&args.seconds!==undefined){
+  if(!Number.isFinite(args.seconds)||args.seconds<1||args.seconds>86400)throw Error('Relative wait must be1..86400 seconds');
+  const relative=now()+Math.round(args.seconds*1000);wakeAt=new Date(wakeAt===null?relative:Math.min(relative,Date.parse(wakeAt))).toISOString();
+ }
+ return {...value,wakeAt,call:{type:call.type,command:call.command,args}};
 }
 export function retainDecision(journal,fence,decision,{events=[],threadId,initialInstruction}={}){
  const c=journal.control.checkpoint();if(c.value?.pendingDecision)throw Error('Previous decision must be reconciled first');
@@ -29,7 +34,14 @@ export async function applyPendingDecision(journal,fence,world,{signal}={}){
  const c=journal.control.checkpoint(),pending=c.value?.pendingDecision;if(!pending)return {applied:false};
  journal.control.assertOwner(fence);
  const {id,decision}=pending,call=decision.call;let response=null;
- if(call.type==='read')response=await world.read(call.command,call.args,signal);
+ if(call.type==='read'){
+  const gaps=call.command==='resync'?journal.gaps():[];
+  response=await world.read(call.command,call.args,signal);
+  if(call.command==='resync')for(const gap of gaps)journal.reconcileGap(gap.seq,'Current observation/conversations refreshed; past missing events remain incomplete. Decision '+id);
+ }
+ else if(call.type==='write'&&journal.gaps().length&&!journal.control.hasOperation(id)){
+  response={accepted:false,error:{code:'continuity.resync-required',message:'World event history has a gap. Read resync before writing; retain uncertainty about missing history.'}};
+ }
  else if(call.type==='write'){
   let op=journal.control.prepare(fence,id,call);
   if(op.status==='prepared'){

@@ -2,7 +2,7 @@
 // One connection is retained between pages. No token, header or URL is logged.
 export function createEventReader({open}){
  let reader=null,buffer='',decoder=new TextDecoder(),expected=null;
- const close=async()=>{try{await reader?.cancel()}catch{}reader=null;buffer='';decoder=new TextDecoder();};
+ const close=()=>{const old=reader;reader=null;buffer='';decoder=new TextDecoder();try{void old?.cancel().catch(()=>{});}catch{}};
  return async function page({after,signal}){
   if(reader&&after!==expected)await close();
   try{
@@ -10,7 +10,7 @@ export function createEventReader({open}){
    for(;;){
     if(signal?.aborted)throw Error('Event read aborted');
     let at=buffer.indexOf('\n\n');
-    if(at<0){let chunk;try{chunk=await reader.read();}catch{throw Object.assign(Error('Event stream interrupted'),{transient:!signal?.aborted});}if(chunk.done)throw Object.assign(Error('Event stream ended'),{transient:true});buffer=(buffer+decoder.decode(chunk.value,{stream:true})).replace(/\r\n/g,'\n');if(buffer.length>1024*1024)throw Error('Event stream frame exceeded bound');continue;}
+    if(at<0){let chunk;try{chunk=await readAbortable(reader,signal);}catch{throw Object.assign(Error('Event stream interrupted'),{transient:!signal?.aborted});}if(chunk.done)throw Object.assign(Error('Event stream ended'),{transient:true});buffer=(buffer+decoder.decode(chunk.value,{stream:true})).replace(/\r\n/g,'\n');if(buffer.length>1024*1024)throw Error('Event stream frame exceeded bound');continue;}
     const frame=buffer.slice(0,at);buffer=buffer.slice(at+2);let kind='message',id=null,data=[];
     for(const line of frame.split('\n')){const colon=line.indexOf(':');if(colon<0)continue;const name=line.slice(0,colon),value=line.slice(colon+1).replace(/^ /,'');if(name==='event')kind=value;else if(name==='id')id=value;else if(name==='data')data.push(value);}
     if(!data.length||kind==='hello')continue;
@@ -23,4 +23,11 @@ export function createEventReader({open}){
    }
   }catch(e){await close();throw e;}
  };
+}
+
+async function readAbortable(reader,signal){
+ if(!signal)return reader.read();
+ if(signal.aborted)throw Error('Event read aborted');
+ let cancel;const aborted=new Promise((_,reject)=>{cancel=()=>reject(Error('Event read aborted'));signal.addEventListener('abort',cancel,{once:true});});
+ try{return await Promise.race([reader.read(),aborted]);}finally{signal.removeEventListener('abort',cancel);}
 }

@@ -42,6 +42,7 @@ export function createWorldClient({world,token,fetchImpl=fetch,timeoutMs=65000})
    return {cursor:events.at(-1)?.id??after,events};
   },
   async read(command,args={},signal){
+   if(command==='resync'){const observation=await request('/v1/edge/observe',{signal}),conversations=await request('/v1/edge/conversations',{signal});return {observation,conversations,historyIncomplete:true,note:'Current facts refreshed; missing historical events were not reconstructed.'};}
    if(command==='here')return request('/v1/edge/here?include=doHere',{signal});
    if(command==='observe')return request('/v1/edge/observe',{signal});
    if(command==='explore')return request('/v1/edge/around'+(args.query?'?to='+segment(args.query):''),{signal});

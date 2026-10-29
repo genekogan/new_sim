@@ -25,5 +25,6 @@ export function attachControl(db,{now,transaction}){
   settle(fence,id,response){const payload=json(response);return transaction(()=>{guard(fence);const r=op(id);if(!['dispatching','uncertain'].includes(r.status))throw Error('Operation is not awaiting a result');db.prepare("UPDATE operations SET status='settled',response=?,at=? WHERE id=?").run(payload,now(),id);});},
   operations(){return db.prepare("SELECT * FROM operations WHERE status<>'settled' ORDER BY at,id").all().map(unpack);},
   operation(id){return unpack(op(id));},
+  hasOperation(id){return !!db.prepare('SELECT id FROM operations WHERE id=?').get(key(id));},
  };
 }

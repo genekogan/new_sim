@@ -56,3 +56,17 @@ action receipts; a missing result remains unknown and cannot authorize replay.
 Still required: retry/restart policy for this recovery, bounded retention,
 robust retry/restart supervision, activity acceptance and long soak. App-server
 is experimental; this runtime remains opt-in and unpublished until qualified.
+
+`run.mjs --folder <already-paired-folder> --instruction <text-file>` starts the
+opt-in controller; `--seconds N` bounds a development run. Ctrl-C/SIGTERM closes
+owned hosts and listeners. `managed.mjs` backs off and restarts understood host
+or transport failures, reconciling pending effects before inference; repeated
+failure produces an explicit blocked status with task state retained. It does
+not retry authentication failures or silently discard an uncertain operation.
+
+Finite body actions and sustained activities differ. Walking has a terminal
+receipt; reading/sitting can continue until replaced. A duration-based wait
+uses `call.arguments={"seconds":30}`; the client records the calculated UTC
+deadline, avoiding timezone arithmetic by the model. Retention gaps require an
+explicit current-state resync before new writes. Resync never claims to recreate
+missing history, and cannot erase an already-dispatched uncertain effect.
