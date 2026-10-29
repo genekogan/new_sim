@@ -1,10 +1,11 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,writeFileSync,readFileSync,rmSync,existsSync} from 'node:fs';
+import {mkdtempSync,writeFileSync,readFileSync,rmSync,existsSync,statSync,symlinkSync,linkSync,chmodSync,fsyncSync} from 'node:fs';
+import {EventEmitter} from 'node:events';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {openJournal} from './journal.mjs';
-import {main,claimStartupLease} from './run.mjs';
+import {main,claimStartupLease,openEvidenceRecorder} from './run.mjs';
 test('different task-state directories cannot start two controllers for the same paired folder',async t=>{
  const folder=mkdtempSync(join(tmpdir(),'sim-run-'));
  writeFileSync(join(folder,'.eden-agent.json'),JSON.stringify({world:'http://127.0.0.1:1/w/test',soul:'test-soul',token:'synthetic-test-only'}),{mode:0o600});
@@ -50,4 +51,45 @@ test('startup setup failure removes signal handlers and releases an acquired own
  await assert.rejects(main(['--folder',folder,'--state',state]),{code:'EEXIST'});
  assert.deepEqual(['SIGINT','SIGTERM'].map(s=>process.listenerCount(s)),listeners);
  const ownership=openJournal(join(folder,'.soul-runtime-owner'),{worldId:'test-world',soulId:'test-soul'}),owner=ownership.control.claim('after-failure');ownership.control.release(owner);ownership.close();
+});
+test('initial instruction limit counts JSON encoding and rejects escape expansion before starting a host',async t=>{
+ const folder=mkdtempSync(join(tmpdir(),'sim-run-instruction-')),instruction=join(folder,'instruction.txt');
+ writeFileSync(join(folder,'.eden-agent.json'),JSON.stringify({world:'http://127.0.0.1:1/w/test',soul:'test-soul',token:'synthetic-test-only'}),{mode:0o600});
+ const lock=openJournal(join(folder,'.soul-runtime-owner'),{worldId:'test-world',soulId:'test-soul'}),owner=lock.control.claim();
+ const original=globalThis.fetch;globalThis.fetch=async()=>Response.json({worldId:'test-world'});t.after(()=>{globalThis.fetch=original;lock.control.release(owner);lock.close();rmSync(folder,{recursive:true,force:true});});
+ writeFileSync(instruction,'i'.repeat(15998));await assert.rejects(main(['--folder',folder,'--instruction',instruction],{leaseWaitMs:0}),{code:'CONTROLLER_BUSY_TIMEOUT'});
+ writeFileSync(instruction,'\n'.repeat(8000));await assert.rejects(main(['--folder',folder,'--instruction',instruction],{leaseWaitMs:0}),/Initial instruction exceeds16000 JSON-encoded bytes/);
+ writeFileSync(instruction,'界'.repeat(5333));await assert.rejects(main(['--folder',folder,'--instruction',instruction],{leaseWaitMs:0}),/Initial instruction exceeds16000 JSON-encoded bytes/);
+ assert.equal(existsSync(join(folder,'.soul-runtime','host')),false);lock.control.assertOwner(owner);
+});
+test('opt-in evidence preserves read returns/errors and receivers without recording credentials or arguments',async t=>{
+ const directory=mkdtempSync(join(tmpdir(),'sim-evidence-')),file=join(directory,'agent-evidence.jsonl');t.after(()=>rmSync(directory,{recursive:true,force:true}));let clock=100,calls=0,syncs=0;
+ const recorder=openEvidenceRecorder(file,{scope:{worldId:'world-native',soulId:'soul-native'},now:()=>++clock,syncFile:fd=>{syncs++;fsyncSync(fd);}}),native={body:'LOCAL_RESPONSE_ONLY'},refusal=Object.assign(Error('CREDENTIAL_CANARY in error message'),{code:'not-found',status:404,config:'CREDENTIAL_CANARY'}),args={token:'CREDENTIAL_CANARY'},signal=new AbortController().signal;
+ const world={async read(command,receivedArgs,receivedSignal){assert.equal(this,world);assert.equal(receivedArgs,args);assert.equal(receivedSignal,signal);calls++;if(command==='object')throw refusal;return native;},ownerPage:async()=>({events:[]}),worldPage:async()=>({events:[]}),write:async()=>({accepted:true})};
+ const wrapped=recorder.wrapWorld(world);assert.equal(wrapped.ownerPage,world.ownerPage);assert.equal(wrapped.worldPage,world.worldPage);assert.equal(wrapped.write,world.write);assert.equal(await wrapped.read('observe',args,signal),native);await assert.rejects(wrapped.read('object',args,signal),error=>error===refusal);await wrapped.ownerPage();await wrapped.worldPage();assert.equal(calls,2);assert.equal(syncs,0,'no per-row fsync in measured path');recorder.close();assert.equal(syncs,1);
+ const raw=readFileSync(file,'utf8'),rows=raw.trim().split('\n').map(JSON.parse),reads=rows.filter(r=>r.kind==='world-read');assert.equal(reads.length,2);assert.deepEqual(reads[0].response,native);assert.deepEqual(reads[1].error,{code:'not-found',status:404});assert.equal(reads[1].response,undefined);assert.ok(reads.every(r=>r.origin==='agent'&&r.requestedAt<r.receivedAt));assert.ok(rows.every(r=>r.worldId==='world-native'&&r.soulId==='soul-native'));assert.ok(!raw.includes('CREDENTIAL_CANARY'));assert.equal(statSync(file).mode&0o777,0o600);
+ chmodSync(file,0o644);const before=raw,second=openEvidenceRecorder(file,{scope:{worldId:'world-native',soulId:'soul-native'}});second.close();assert.ok(readFileSync(file,'utf8').startsWith(before));assert.equal(statSync(file).mode&0o777,0o600);const sessions=readFileSync(file,'utf8').trim().split('\n').map(JSON.parse).filter(r=>r.kind==='evidence-session'&&r.state==='started');assert.equal(sessions.length,2);assert.notEqual(sessions[0].sessionId,sessions[1].sessionId);
+});
+test('evidence records every selected host event with observed model/thread and no turn output or config',async t=>{
+ const directory=mkdtempSync(join(tmpdir(),'sim-evidence-host-')),file=join(directory,'agent-evidence.jsonl');t.after(()=>rmSync(directory,{recursive:true,force:true}));
+ const recorder=openEvidenceRecorder(file,{scope:{worldId:'w',soulId:'s'}}),host=new EventEmitter(),connected={threadId:'thread-actual',model:'model-actual'},options={config:{secret:'CONFIG_CANARY'}};host.pid=4242;host.model='requested-alias';host.connect=async function(received){assert.equal(received,options);this.threadId='thread-actual';return connected;};const original=host.connect;
+ recorder.bindHost(host);assert.equal(await host.connect(options),connected);
+ host.emit('event',{method:'turn/started',params:{threadId:'thread-actual',turn:{id:'turn-1',status:'inProgress',items:[{text:'OUTPUT_CANARY'}]}},receivedAt:123});
+ const usage={total:{inputTokens:12,outputTokens:4,cachedInputTokens:3},last:{inputTokens:8,outputTokens:4}};host.emit('event',{method:'thread/tokenUsage/updated',params:{threadId:'thread-actual',turnId:'turn-1',tokenUsage:usage},receivedAt:124});
+ host.emit('event',{method:'item/completed',params:{item:{text:'OUTPUT_CANARY'}}});host.emit('event',{method:'turn/completed',params:{threadId:'thread-actual',turn:{id:'turn-1',status:'completed',error:{code:'native-error',message:'CONFIG_CANARY'},items:[{text:'OUTPUT_CANARY'}]}},receivedAt:125});recorder.close();assert.equal(host.connect,original);assert.equal(host.listenerCount('event'),0);
+ const raw=readFileSync(file,'utf8'),events=raw.trim().split('\n').map(JSON.parse).filter(r=>r.kind==='host-event');assert.deepEqual(events.map(r=>r.method),['turn/started','thread/tokenUsage/updated','turn/completed']);assert.deepEqual(events.map(r=>r.at),[123,124,125]);assert.ok(events.every(r=>r.model==='model-actual'&&r.threadId==='thread-actual'&&r.turnId==='turn-1'));assert.deepEqual(events[1].tokenUsage,usage);assert.deepEqual(events[2].error,{code:'native-error',status:null});assert.ok(!raw.includes('OUTPUT_CANARY'));assert.ok(!raw.includes('CONFIG_CANARY'));assert.ok(!raw.includes('requested-alias'));
+});
+test('evidence refuses linked/nonregular targets and reports write/sync failures explicitly',async t=>{
+ const directory=mkdtempSync(join(tmpdir(),'sim-evidence-fail-'));t.after(()=>rmSync(directory,{recursive:true,force:true}));const target=join(directory,'target'),link=join(directory,'link'),hard=join(directory,'hard');writeFileSync(target,'UNTOUCHED');symlinkSync(target,link);linkSync(target,hard);
+ for(const path of [link,hard,directory])assert.throws(()=>openEvidenceRecorder(path),{code:'EVIDENCE_IO'});assert.equal(readFileSync(target,'utf8'),'UNTOUCHED');
+ let failWrites=false,failures=0,reads=0;const file=join(directory,'write-failure.jsonl'),recorder=openEvidenceRecorder(file,{onFailure:()=>failures++,writeRecord:(fd,data)=>{if(failWrites)throw Object.assign(Error('disk full'),{code:'ENOSPC'});writeFileSync(fd,data);}}),wrapped=recorder.wrapWorld({read:async()=>{reads++;return {native:true}}});failWrites=true;
+ await assert.rejects(wrapped.read('observe',{}),{code:'EVIDENCE_IO'});await assert.rejects(wrapped.read('observe',{}),{code:'EVIDENCE_IO'});assert.equal(reads,1);assert.equal(failures,1);assert.throws(()=>recorder.close(),{code:'EVIDENCE_IO'});assert.ok(!readFileSync(file,'utf8').includes('"state":"closed"'));
+ const hostFile=join(directory,'host-failure.jsonl');let hostFailure;const hostRecorder=openEvidenceRecorder(hostFile,{onFailure:e=>{hostFailure=e;},writeRecord:(fd,data)=>{if(data.includes('host-event'))throw Error('write failed');writeFileSync(fd,data);}}),host=new EventEmitter();host.connect=async()=>({model:'actual'});hostRecorder.bindHost(host);host.emit('event',{method:'turn/started',params:{turn:{id:'turn-1'}}});assert.equal(hostFailure.code,'EVIDENCE_IO');assert.throws(()=>hostRecorder.close(),{code:'EVIDENCE_IO'});
+ const syncRecorder=openEvidenceRecorder(join(directory,'sync-failure.jsonl'),{syncFile:()=>{throw Error('flush failed')}});assert.throws(()=>syncRecorder.close(),{code:'EVIDENCE_IO'});
+});
+test('--evidence appends scoped lifecycle records across failed startups without stdout payloads or extra world calls',async t=>{
+ const folder=mkdtempSync(join(tmpdir(),'sim-run-evidence-')),file=join(folder,'agent-evidence.jsonl');writeFileSync(join(folder,'.eden-agent.json'),JSON.stringify({world:'http://127.0.0.1:1/w/test',soul:'test-soul',token:'CREDENTIAL_CANARY'}),{mode:0o600});
+ const lock=openJournal(join(folder,'.soul-runtime-owner'),{worldId:'test-world',soulId:'test-soul'}),owner=lock.control.claim();let calls=0;const fetch=globalThis.fetch,log=console.log,stdout=[];globalThis.fetch=async url=>{calls++;assert.ok(url.endsWith('/v1/config'));return Response.json({worldId:'test-world',privateConfig:'CONFIG_CANARY'});};console.log=text=>stdout.push(text);t.after(()=>{globalThis.fetch=fetch;console.log=log;lock.control.release(owner);lock.close();rmSync(folder,{recursive:true,force:true});});
+ for(let attempt=0;attempt<2;attempt++)await assert.rejects(main(['--folder',folder,'--evidence',file],{leaseWaitMs:0}),{code:'CONTROLLER_BUSY_TIMEOUT'});
+ assert.equal(calls,2);const raw=readFileSync(file,'utf8'),rows=raw.trim().split('\n').map(JSON.parse);assert.deepEqual(rows.map(r=>r.state),['started','closed','started','closed']);assert.ok(rows.every(r=>r.worldId==='test-world'&&r.soulId==='test-soul'));assert.ok(rows.filter(r=>r.state==='closed').every(r=>r.failed));assert.ok(!raw.includes('CREDENTIAL_CANARY')&&!raw.includes('CONFIG_CANARY'));assert.ok(!stdout.join('').includes('CREDENTIAL_CANARY')&&!stdout.join('').includes('CONFIG_CANARY'));assert.equal(existsSync(join(folder,'.soul-runtime','host')),false);lock.control.assertOwner(owner);
 });
