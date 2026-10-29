@@ -137,10 +137,12 @@ export class Perception {
     }
     return null;
   }
-  /** The seat (fixture id, as in sit:<id>) this body holds, from the engine's live sit action. */
+  /** The actor-owned native seat slot; legacy engines fall back to the live request's fixture. */
   seat(): string | null {
+    const held = this.L.host.engine.nativeSeatHoldsV1?.(this.soul.entityId);
+    if (held?.length) return held[0]!.slot;
     const rt = this.L.host.engine.runtime, live = new Set(rt.liveIds());
-    for (const r of rt.records.values()) {const p = r.params as {actor?: string; fixture?: unknown; slot?: unknown; on?: unknown}; if (live.has(r.id) && r.verb === 'sit' && p.actor === this.soul.entityId) return typeof p.fixture === 'string' ? p.fixture : typeof p.on === 'string' ? p.on : typeof p.slot === 'string' ? p.slot : null;}
+    for (const r of rt.records.values()) {const p = r.params as {actor?: string; fixture?: unknown; slot?: unknown; on?: unknown}; if (live.has(r.id) && r.verb === 'sit' && p.actor === this.soul.entityId) return typeof p.slot === 'string' ? p.slot : typeof p.fixture === 'string' ? p.fixture : typeof p.on === 'string' ? p.on : null;}
     return null;
   }
   /** Where the Soul is and how it is (also used for receipts' endedAt). */

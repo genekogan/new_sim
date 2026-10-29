@@ -30,7 +30,8 @@ export function routeFrame(ledger: EdgeLedger, soul: EdgeSoul, query: string) {
     .filter(p => p.parent !== null && !p.carrier && p.kind !== 'sleeping-mat' && !/(^|-)mat-\d+$/.test(p.id) && K.knows(soul.soulId, p.id));
   const placeAt = (p: Place) => centroid(p.polygon) as V2;
   const leg = (to: V2, inside: boolean) => {const m = inside ? 0 : Math.round(dist2(pos, to)); return {m, dir: compassWord(compassOf(to[0] - pos[0], to[1] - pos[1])), eta: '~' + durationWord(walkSeconds(m * 1.25)) + ' walk'};};
-  const mine = new Set(ledger.placePathOf(soul.soulId).map(p => p.id));
+  const path = ledger.placePathOf(soul.soulId).filter(p => p.kind !== 'occupier'), currentPlace = path[0];
+  const mine = new Set(path.map(p => p.id));
   // a landmark along the way (between 15% and 85% of the line, close to it), else the nearest landmark to where you are going
   const landmark = (to: V2, skip: Set<string>) => {
     const len = dist2(pos, to); if (len < 12) return null;
@@ -74,9 +75,10 @@ export function routeFrame(ledger: EdgeLedger, soul: EdgeSoul, query: string) {
     return {query, found: false, reason: `No place or Soul you know is called "${query}". Try a word from its name; explore shows what is close by.`};
   }
   const walks = new Map(ledger.capabilities(soul).filter(c => c.verb === 'walk' && c.target?.kind === 'place').map(c => [c.target!.id, c.id]));
-  const {p, at, d} = scored[0]!, inside = mine.has(p.id), l = leg(at, inside || d === 0), lm = landmark(at, new Set([p.id]));
+  const {p, at, d} = scored[0]!, within = mine.has(p.id), inside = currentPlace?.id === p.id, ancestor = within && !inside;
+  const l = leg(at, inside || !ancestor && d === 0), lm = landmark(at, new Set([p.id]));
   const walk = walks.get(p.id) ?? `walk:${p.id}`, problem = inside ? null : ledger.routeProblem(soul, walk);
   const also = scored.slice(1).filter(x => x.tier <= scored[0]!.tier + 0.5).slice(0, 3).map(x => {const o = leg(x.at, x.d === 0); return `${x.p.name} · ${o.m} m ${o.dir}`;});
-  return {query, found: true, place: {id: p.id, name: p.name}, ...l, ...(lm ? {[lm.how]: lm.name} : {}), ...(inside ? {here: true} : {walk, ...(problem ? {reachable: false, why: problem.code} : {})}),
-    say: inside ? `You are at ${p.name} now.` : `${p.name}: ${l.m} m ${l.dir} (${l.eta})${lm ? `, ${lm.how} ${lm.name}` : ''}. To go: act ${walk}.`, ...(also.length ? {also} : {})};
+  return {query, found: true, place: {id: p.id, name: p.name}, ...l, ...(currentPlace ? {currentPlace: {id: currentPlace.id, name: currentPlace.name}} : {}), ...(within ? {within: true} : {}), ...(lm ? {[lm.how]: lm.name} : {}), ...(inside ? {here: true} : {walk, ...(problem ? {reachable: false, why: problem.code} : {})}),
+    say: inside ? `You are at ${p.name} now.` : ancestor ? `You are in ${currentPlace!.name}, within ${p.name}. To go to ${p.name}'s destination: act ${walk}.` : `${p.name}: ${l.m} m ${l.dir} (${l.eta})${lm ? `, ${lm.how} ${lm.name}` : ''}. To go: act ${walk}.`, ...(also.length ? {also} : {})};
 }
