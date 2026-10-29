@@ -86,3 +86,13 @@ non-null `wakeAt` replaces it; `wait` with `{"cancelWake":true}` explicitly
 cancels it. Due wakes are consumed only by a committed decision retained after
 the deadline. The model still authors goals, activity choices and appointments;
 this timer mechanism does not infer or schedule a social plan on its behalf.
+
+Journal retention reserves separate pending capacity for owner messages
+(1,000 events/8MiB) and world traffic (20,000/64MiB). A full page is rejected
+atomically with its cursor unchanged; intake backs off while handling drains
+space. Handled payloads target24h/2,000 records/16MiB, using periodic bounded
+compaction. Pending-decision references are protected. Digests, event IDs,
+handling outcomes and sequences survive compaction, so replay cannot turn an
+already handled fact into new work. `storageStats()` and `maintenance()` expose
+pressure and remaining maintenance. Identity/outcome, control and gap history
+are still unbounded; these limits are not a total-disk-size guarantee.

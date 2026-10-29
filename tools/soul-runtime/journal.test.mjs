@@ -4,10 +4,12 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {openJournal} from './journal.mjs';
+import {DatabaseSync} from 'node:sqlite';
+import {openJournal,DEFAULT_JOURNAL_RETENTION} from './journal.mjs';
 const identity={worldId:'test-world',soulId:'test-soul'};
 const event={id:'c_1',kind:'conversation.turn',text:'Are you coming?'};
-function fixture(t){const directory=mkdtempSync(join(tmpdir(),'sim-journal-'));const handles=[];t.after(()=>{for(const h of handles)try{h.close()}catch{}rmSync(directory,{recursive:true,force:true})});return {directory,open(){const h=openJournal(directory,identity);handles.push(h);return h;}};}
+function fixture(t){const directory=mkdtempSync(join(tmpdir(),'sim-journal-'));const handles=[];t.after(()=>{for(const h of handles)try{h.close()}catch{}rmSync(directory,{recursive:true,force:true})});return {directory,open(options={}){const h=openJournal(directory,{...identity,...options});handles.push(h);return h;}};}
+const stored=f=>{const db=new DatabaseSync(join(f.directory,'continuity.sqlite'),{readOnly:true});try{return db.prepare('SELECT * FROM events ORDER BY seq').all();}finally{db.close();}};
 
 test('process death after ingest retains an unhandled message and matching cursor',t=>{
  const f=fixture(t);const moduleUrl=new URL('./journal.mjs',import.meta.url).href;
@@ -40,4 +42,71 @@ test('urgent addressed speech is not buried behind an old ambient backlog',t=>{
  j.ingest({source:'world',after:null,cursor:'c_1000',events:Array.from({length:1000},(_,i)=>({id:'c_'+(i+1),salience:1,text:'ambient'}))});
  j.ingest({source:'world',after:'c_1000',cursor:'c_1001',events:[{id:'c_1001',salience:3,text:'Hello reader'}]});
  assert.equal(j.attention(1)[0].event.id,'c_1001');assert.equal(j.pending(1)[0].event.id,'c_1');
+});
+test('compaction preserves handled identity/outcome, rejects conflicting replay and retains all unhandled payloads across restart',t=>{
+ const f=fixture(t),options={retention:{handledEvents:0,handledBytes:0}},j=f.open(options);
+ j.ingest({source:'world',after:null,cursor:'c_3',events:[event,{id:'c_2',text:'Never handled'},{id:'c_3',text:'Already incorporated'}]});
+ j.ingest({source:'owner',after:null,cursor:'m1',events:[{id:'m1',text:'Cancel the old goal'}]});
+ const pendingBefore=j.pending();j.handled('world','c_1','responded');j.handled('world','c_3','incorporated');
+ const before=stored(f),result=j.maintenance();assert.equal(result.compactedEvents,2);assert.equal(result.moreWork,false);assert.equal(result.storage.compactedEvents,2);assert.equal(result.storage.identityEvents,4);
+ const after=stored(f);for(const i of [0,2]){assert.equal(after[i].payload,'null');assert.equal(after[i].digest,before[i].digest);assert.equal(after[i].outcome,before[i].outcome);assert.equal(after[i].seq,before[i].seq);assert.notEqual(after[i].compacted_at,null);}
+ assert.deepEqual(j.pending(),pendingBefore.filter(p=>!['c_1','c_3'].includes(p.event.id)));
+ assert.equal(j.ingest({source:'world',after:'c_3',cursor:'c_3',events:[event]}).inserted,0);assert.deepEqual(j.handled('world','c_1','responded'),{alreadyHandled:true});
+ assert.throws(()=>j.ingest({source:'world',after:'c_3',cursor:'c_5',events:[{id:'c_4'}, {...event,text:'Different history'}]}),/different content/);assert.equal(j.cursor('world'),'c_3');assert.equal(j.storageStats().identityEvents,4);
+ j.close();const reopened=f.open(options);assert.equal(reopened.ingest({source:'world',after:'c_3',cursor:'c_4',events:[event,{id:'c_4',text:'New'}]}).inserted,1);
+ assert.deepEqual(reopened.pending().map(p=>[p.sequence,p.event.id]),[[2,'c_2'],[4,'m1'],[5,'c_4']]);assert.deepEqual(reopened.handled('world','c_1','responded'),{alreadyHandled:true});assert.throws(()=>reopened.handled('world','c_1','execute again'),/already recorded/);
+});
+test('hard pending ceilings roll the entire page/cursor/gap back and reserve independent owner capacity',t=>{
+ const j=fixture(t).open({retention:{worldPendingEvents:2,worldPendingBytes:1000,ownerPendingEvents:1,ownerPendingBytes:1000}});
+ j.ingest({source:'world',after:null,cursor:'c_1',events:[event]});
+ assert.throws(()=>j.ingest({source:'world',after:'c_1',cursor:'c_3',events:[{id:'c_2'},{id:'c_3'}],gap:true}),e=>e.code==='JOURNAL_BACKLOG_FULL'&&e.transient===true&&e.bucket==='world');
+ assert.equal(j.cursor('world'),'c_1');assert.equal(j.pending().length,1);assert.equal(j.gaps().length,0);assert.equal(j.storageStats().identityEvents,1);
+ j.ingest({source:'world',after:'c_1',cursor:'c_2',events:[{id:'c_2'}]});
+ assert.throws(()=>j.ingest({source:'other-world-stream',after:null,cursor:'x',events:[{id:'x'}]}),e=>e.code==='JOURNAL_BACKLOG_FULL');
+ j.ingest({source:'owner',after:null,cursor:'m1',events:[{id:'m1',text:'Stop now'}]});assert.equal(j.attention(1)[0].event.id,'m1');
+ assert.throws(()=>j.ingest({source:'owner',after:'m1',cursor:'m2',events:[{id:'m2'}]}),e=>e.code==='JOURNAL_BACKLOG_FULL'&&e.bucket==='owner');assert.equal(j.cursor('owner'),'m1');
+ j.handled('world','c_1','incorporated');j.ingest({source:'world',after:'c_2',cursor:'c_3',events:[{id:'c_3'}]});assert.equal(j.storageStats().pending.world.events,2);assert.equal(j.storageStats().pending.owner.events,1);
+ assert.equal(j.ingest({source:'owner',after:'m1',cursor:'m1',events:[{id:'m1',text:'Stop now'}]}).inserted,0,'exact replay consumes no capacity');
+});
+test('pending byte ceilings count UTF-8 payloads and handling frees capacity before compaction',t=>{
+ const f=fixture(t),message={id:'m1',text:'é'.repeat(50)},bytes=Buffer.byteLength(JSON.stringify(message)),j=f.open({retention:{ownerPendingBytes:bytes}});
+ j.ingest({source:'owner',after:null,cursor:'m1',events:[message]});assert.equal(j.storageStats().pending.owner.bytes,bytes);
+ assert.throws(()=>j.ingest({source:'owner',after:'m1',cursor:'m2',events:[{id:'m2'}]}),e=>e.code==='JOURNAL_BACKLOG_FULL');assert.equal(j.cursor('owner'),'m1');
+ j.handled('owner','m1','incorporated');assert.equal(j.storageStats().pending.owner.bytes,0);assert.equal(j.storageStats().handled.bytes,bytes);
+ j.ingest({source:'owner',after:'m1',cursor:'m2',events:[{id:'m2'}]});assert.equal(j.pending()[0].event.id,'m2');
+});
+test('pending decisions protect already-handled payloads through restart until final checkpoint',t=>{
+ const f=fixture(t),options={now:()=>1000,retention:{handledEvents:0,handledBytes:0,handledAgeMs:0,maintenanceEvery:1}},j=f.open(options),fence=j.control.claim('controller');
+ j.ingest({source:'world',after:null,cursor:'c_1',events:[event]});
+ j.control.save(fence,0,{pendingDecision:{id:'decision-1',eventIds:[{source:'world',id:'c_1'}]}});
+ j.handled('world','c_1','incorporated:decision-1');assert.equal(j.maintenance().protectedEvents,1);assert.equal(stored(f)[0].payload.includes('Are you coming'),true);assert.equal(j.storageStats().compactedEvents,0);
+ j.close();const reopened=f.open(options);assert.equal(reopened.maintenance().compactedEvents,0);assert.equal(reopened.storageStats().handled.protectedEvents,1);assert.deepEqual(reopened.handled('world','c_1','incorporated:decision-1'),{alreadyHandled:true});
+ reopened.control.save(fence,1,{pendingDecision:null,lastDecisionId:'decision-1'});const compacted=reopened.maintenance();assert.equal(compacted.compactedEvents,1);assert.equal(compacted.storage.handled.bytes,0);assert.equal(reopened.cursor('world'),'c_1');
+});
+test('periodic compaction bounds handled payload targets and maintenance batches preserve newest rows and stable sequences',t=>{
+ const f=fixture(t);let time=1000;const j=f.open({now:()=>time,retention:{handledEvents:2,handledBytes:100000,handledAgeMs:50,maintenanceEvery:2}});
+ j.ingest({source:'world',after:null,cursor:'c_6',events:Array.from({length:6},(_,i)=>({id:'c_'+(i+1),text:'x'.repeat(100)}))});
+ for(let n=1;n<=5;n++){j.handled('world','c_'+n,'incorporated');time++;}
+ assert.equal(j.storageStats().handled.events,2);assert.equal(j.storageStats().compactedEvents,3);assert.equal(j.pending()[0].sequence,6);
+ time+=100;const first=j.maintenance({maxCompactions:1});assert.equal(first.compactedEvents,1);assert.equal(first.moreWork,true);const last=j.maintenance({maxCompactions:1,vacuum:true});assert.equal(last.compactedEvents,1);assert.equal(last.moreWork,false);
+ assert.equal(last.storage.handled.events,0);assert.equal(last.storage.identityEvents,6);assert.deepEqual(j.pending().map(p=>p.sequence),[6]);
+ j.close();const reopened=f.open();reopened.ingest({source:'world',after:'c_6',cursor:'c_7',events:[{id:'c_7'}]});assert.deepEqual(reopened.pending().map(p=>p.sequence),[6,7]);
+});
+test('handled byte budget compacts oldest payloads, while legacy migration preserves digest and sequence',t=>{
+ const f=fixture(t),db=new DatabaseSync(join(f.directory,'continuity.sqlite'));
+ db.exec('CREATE TABLE events(seq INTEGER PRIMARY KEY,source TEXT NOT NULL,event_id TEXT NOT NULL,payload TEXT NOT NULL,digest TEXT NOT NULL,received_at INTEGER NOT NULL,handled_at INTEGER,outcome TEXT,UNIQUE(source,event_id))');
+ db.prepare('INSERT INTO events VALUES(41,?,?,?,?,?,?,?)').run('world','legacy','{"id":"legacy","text":"old"}','original-digest',100,200,'original outcome');db.close();
+ const j=f.open({now:()=>1000,retention:{handledBytes:0,handledEvents:10}});assert.equal(j.storageStats().handled.bytes,28);assert.equal(j.maintenance().compactedEvents,1);const row=stored(f)[0];assert.equal(row.seq,41);assert.equal(row.digest,'original-digest');assert.equal(row.outcome,'original outcome');
+ j.ingest({source:'world',after:null,cursor:'next',events:[{id:'next'}]});assert.equal(j.pending()[0].sequence,42);assert.equal(j.storageStats().identityEvents,2);
+});
+test('automatic maintenance cadence is durable across restarts and shared by connections',t=>{
+ const f=fixture(t),options={retention:{handledEvents:0,maintenanceEvery:3}},j=f.open(options);
+ j.ingest({source:'world',after:null,cursor:'c_1',events:[event]});j.handled('world','c_1','incorporated');assert.equal(j.storageStats().writesSinceMaintenance,2);j.close();
+ const reopened=f.open(options),other=f.open(options);assert.equal(reopened.storageStats().writesSinceMaintenance,2);other.ingest({source:'world',after:'c_1',cursor:'c_2',events:[{id:'c_2'}]});
+ assert.equal(reopened.storageStats().compactedEvents,1);assert.equal(reopened.storageStats().writesSinceMaintenance,0);assert.deepEqual(reopened.pending().map(p=>p.sequence),[2]);
+});
+test('retention defaults are explicit and invalid policies/maintenance options are refused',t=>{
+ const f=fixture(t);assert.equal(DEFAULT_JOURNAL_RETENTION.worldPendingEvents,20000);assert.equal(DEFAULT_JOURNAL_RETENTION.ownerPendingBytes,8*1024*1024);
+ for(const retention of [{handledEvents:-1},{maintenanceEvery:0},{maintenanceEvery:1001},{worldPendingBytes:1.5},{unknownLimit:1},null])assert.throws(()=>f.open({retention}),/retention|maintenanceEvery/);
+ const j=f.open();for(const options of [{maxCompactions:0},{maxCompactions:10001},{vacuum:'yes'}])assert.throws(()=>j.maintenance(options),/maintenance/);
 });
