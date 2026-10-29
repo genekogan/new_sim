@@ -135,8 +135,16 @@ export class GodPerceive {
     if (def && def.version > 1) k = `${k}-v${def.version}`.slice(0, 48);
     if (!this.kinds.has(k) && o.kindOf(k)) k = `built-${k}`.slice(0, 48);
     // VOCAB-MECH: a def with actions (actuators) gives its kind those actions (one kind per kind of thing)
-    if (!this.kinds.has(k)) { if (!o.kindOf(k)) o.register(builtKindFor((key) => this.desired.get(key), k, def && actionsOf(def).length && this.h.commit ? kindActions(def, this.actHost(), (st) => { const id = (st as BuiltState).key; const e = id ? this.h.model.entities.get(id) : undefined; return e?.name ? this.h.model.pathOf(e.id) : short; }) : {})); this.kinds.add(k); }
+    if (!this.kinds.has(k)) this.registerBuiltKind(k, def, short);
     return k;
+  }
+  private registerBuiltKind(k: string, def?: StoredDef, short = k) {
+    if (!this.objs!.kindOf(k)) this.objs!.register(builtKindFor(key => this.desired.get(key), k,
+      def && actionsOf(def).length && this.h.commit ? kindActions(def, this.actHost(), st => {
+        const id = (st as BuiltState).key, e = id ? this.h.model.entities.get(id) : undefined;
+        return e?.name ? this.h.model.pathOf(e.id) : short;
+      }) : {}));
+    this.kinds.add(k);
   }
   private actHost() {
     return {
@@ -289,7 +297,7 @@ export class GodPerceive {
   private begin(): Run | null {
     const objs = this.objects(); if (!objs) return null;
     const root = this.rootPlace(); if (!root) return null;
-    if (!this.sigs.size) for (const o of objs.all()) if (this.kinds.has(o.kind) || (o.state as BuiltState)?.key === o.id) { this.sigs.set(o.id, JSON.stringify(o.state)); if (!this.kinds.has(o.kind)) this.kindFor(o.kind.replace(/^built-/, '')); }
+    if (!this.sigs.size) for (const o of objs.all()) if (this.kinds.has(o.kind) || (o.state as BuiltState)?.key === o.id) { this.sigs.set(o.id, JSON.stringify(o.state)); if (!this.kinds.has(o.kind)) { const e = this.h.model.entities.get(o.id), def = e && this.h.model.resolvedDef(e.def); this.registerBuiltKind(o.kind, def ?? undefined); } }
     const layersOn = !!this.h.layers?.active();
     if (layersOn !== this.layersOn) { this.layersOn = layersOn; this.needFull = true; }
     const full = this.needFull || !this.h.things, roots = this.roots; this.needFull = false; this.roots = new Set(); this.rootOrigins.clear(); this.fullOrigin = 0;
