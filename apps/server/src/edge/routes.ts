@@ -8,6 +8,7 @@ import {aroundFrame} from './perception/around.ts';
 import {routeFrame} from './perception/route.ts';
 import {registerEdgeEvents} from './events/index.ts';
 import {mountIdempotency} from './events/idempotency.ts';
+import {mountOperationLookup} from './events/operations.ts';
 import {mountSchema,EDGE_ACT_VERBS} from './events/schema.ts';
 import {mountBootRoutes} from './boot/routes.ts';
 import {INTENT_VERBS} from './intents/intents.ts';
@@ -43,6 +44,7 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
   mountOwnerDay(app,{ledger:L,db:deps.db,ownerSoul:deps.ownerSoul});
   // EVENTS-v1: idempotency keys guard act/say/converse/plan writes; it must be mounted before those routes.
   mountIdempotency(app, deps);
+  mountOperationLookup(app,deps,(soulId,key)=>L.coreA.byClientRef(soulId,key));
   const wrap = (fn: (c: Context) => unknown | Promise<unknown>) => async (c: Context) => {
     c.header('Cache-Control', 'no-store');
     try {return c.json(edgeBody(await fn(c) as object));}

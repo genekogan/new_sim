@@ -1,6 +1,7 @@
 // Local event handoff for one Soul. No tokens, model calls or world writes.
 // Receipt into this journal and handling by the decision owner are distinct facts.
 import {DatabaseSync} from 'node:sqlite';
+import {attachControl} from './control.mjs';
 import {mkdirSync, lstatSync, chmodSync} from 'node:fs';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
@@ -57,6 +58,7 @@ export function openJournal(directory, {worldId, soulId, now = Date.now}) {
   const cursorValue = cursor => cursor===null ? null : text(cursor,200,'cursor');
   const getCursor = source => db.prepare('SELECT cursor FROM sources WHERE source=?').get(source)?.cursor ?? null;
   return {
+    control:attachControl(db,{now,transaction}),
     cursor(source) {return getCursor(sourceName(source));},
     ingest({source, after, cursor, events, gap=false}) {
       sourceName(source); cursorValue(after);cursorValue(cursor);
@@ -83,6 +85,12 @@ export function openJournal(directory, {worldId, soulId, now = Date.now}) {
       if(!Number.isInteger(limit)||limit<1||limit>1000)throw Error('Invalid pending limit');
       if(!Number.isSafeInteger(afterSequence)||afterSequence<0)throw Error('Invalid pending sequence');
       return db.prepare('SELECT seq,source,event_id,payload,received_at FROM events WHERE handled_at IS NULL AND seq>? ORDER BY seq LIMIT ?').all(afterSequence,limit).map(r=>({sequence:r.seq,source:r.source,event:JSON.parse(r.payload),receivedAt:r.received_at}));
+    },
+    attention(limit=100) {
+      if(!Number.isInteger(limit)||limit<1||limit>1000)throw Error('Invalid attention limit');
+      return db.prepare(`SELECT seq,source,event_id,payload,received_at FROM events WHERE handled_at IS NULL
+        ORDER BY CASE WHEN source='owner' THEN 4 ELSE COALESCE(json_extract(payload,'$.salience'),2) END DESC,seq LIMIT ?`).all(limit)
+        .map(r=>({sequence:r.seq,source:r.source,event:JSON.parse(r.payload),receivedAt:r.received_at}));
     },
     handled(source,id,outcome) {
       sourceName(source);text(id,200,'event id');text(outcome,2000,'handling outcome');

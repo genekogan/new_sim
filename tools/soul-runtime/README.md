@@ -21,10 +21,38 @@ Current tests inject process death after commit, stale concurrent cursor writes,
 conflicting duplicate events, host notification failure, terminal revocation,
 retention gaps, a blocked notification and a backlog larger than one page.
 
-Still required before use: transport integration, fenced controller ownership,
-host delivery reconciliation, durable tasks/uncertain action reconciliation,
-permission-constrained world tools, bounded journal retention, and real-agent
-scenario acceptance. No connection to production should be made from this
-foundation alone. A filesystem path is private runtime storage; never put a
-credential or raw host transcript into the event journal. OS sleep stops local
-execution; a durable record does not make a sleeping host available.
+Before production use, complete recovery/retention and real-agent acceptance.
+A filesystem path is private runtime storage; never put a credential or raw
+host transcript into the event journal. OS sleep stops local execution; a
+durable record does not make a sleeping host available.
+
+The managed prototype now includes `codex-host.mjs` (owned stdio app-server),
+`world-client.mjs` (narrow authenticated transport), `sse.mjs` (resumable native
+server envelopes), `control.mjs` (controller lease and effect journal),
+`decision.mjs`, and `supervisor.mjs`. Model turns return structured decisions;
+the credential stays outside model context. World and owner intake continue
+while a turn is thinking. The native server's salience controls waking; lower
+salience facts remain available for the next natural decision. No new server
+importance classifier or LLM is introduced.
+
+An event arriving during a turn conservatively invalidates its eventual action
+and causes re-planning, even when steering was accepted. This currently adds
+latency but prevents a completion race from executing an obsolete action.
+Readiness is not completion. Explicit refusals return to the agent; unknown
+write outcomes remain blocked for reconciliation rather than auto-replaying.
+Fresh adoption starts at the observed world cursor; reconnecting an existing
+journal retains its own cursor and pending facts. Owner messages are separate.
+
+Early local development proof: a managed test Soul spoke once, waited without
+model polling, answered an addressed greeting, and resumed waiting. A native travel/read/return probe completed with receipt evidence and an
+independent final location check (19 decisions over a 247-second bounded run). These are infrastructure probes,
+not the frozen four-activity A/B evaluation. The local CLI currently advertises
+`gpt-5.6-sol`; an unavailable `gpt-6.1-sol` request was refused. The adapter now
+queries the host default when no model is explicitly selected; comparison arms
+must pin the same successfully verified model and effort.
+
+A read-only operation lookup now recovers retained HTTP outcomes and accepted
+action receipts; a missing result remains unknown and cannot authorize replay.
+Still required: retry/restart policy for this recovery, bounded retention,
+robust retry/restart supervision, activity acceptance and long soak. App-server
+is experimental; this runtime remains opt-in and unpublished until qualified.

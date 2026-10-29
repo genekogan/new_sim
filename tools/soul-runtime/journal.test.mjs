@@ -35,3 +35,9 @@ test('handling requires a known event and cannot silently revise its outcome',t=
  const j=fixture(t).open();assert.throws(()=>j.handled('world','c_1','done'),/unknown/);j.ingest({source:'world',after:null,cursor:'c_1',events:[event]});
  assert.deepEqual(j.handled('world','c_1','responded'),{alreadyHandled:false});assert.deepEqual(j.handled('world','c_1','responded'),{alreadyHandled:true});assert.throws(()=>j.handled('world','c_1','ignored'),/already recorded/);
 });
+test('urgent addressed speech is not buried behind an old ambient backlog',t=>{
+ const dir=mkdtempSync(join(tmpdir(),'sim-priority-'));const j=openJournal(dir,{worldId:'w',soulId:'s'});t.after(()=>{j.close();rmSync(dir,{recursive:true,force:true});});
+ j.ingest({source:'world',after:null,cursor:'c_1000',events:Array.from({length:1000},(_,i)=>({id:'c_'+(i+1),salience:1,text:'ambient'}))});
+ j.ingest({source:'world',after:'c_1000',cursor:'c_1001',events:[{id:'c_1001',salience:3,text:'Hello reader'}]});
+ assert.equal(j.attention(1)[0].event.id,'c_1001');assert.equal(j.pending(1)[0].event.id,'c_1');
+});
