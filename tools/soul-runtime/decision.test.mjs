@@ -5,7 +5,8 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {openJournal} from './journal.mjs';
 import {parseDecision,retainDecision,applyPendingDecision} from './decision.mjs';
-function fixture(t){const dir=mkdtempSync(join(tmpdir(),'sim-decision-'));const j=openJournal(dir,{worldId:'w',soulId:'s'});t.after(()=>{j.close();rmSync(dir,{recursive:true,force:true})});return {j,fence:j.control.claim('test')};}
+import {boundedFacts} from './context.mjs';
+function fixture(t){const dir=mkdtempSync(join(tmpdir(),'sim-decision-'));const j=openJournal(dir,{worldId:'w',soulId:'s'});t.after(()=>{j.close();rmSync(dir,{recursive:true,force:true})});return {j,dir,fence:j.control.claim('test')};}
 const decision=()=>parseDecision(JSON.stringify({plan:'Go read, then return. Still pending.',call:{type:'write',command:'act',arguments:'{"capability":"read:here"}'},wakeAt:null}));
 test('retained decision survives before execution and replay of settled result does not repeat effect',async t=>{
  const {j,fence}=fixture(t);j.ingest({source:'owner',after:null,cursor:'m1',events:[{id:'m1',text:'Read then return'}]});const events=j.pending();const id=retainDecision(j,fence,decision(),{events,initialInstruction:'Read then return'});
@@ -104,11 +105,11 @@ test('local owner task reads never reach the world and cannot close a task',asyn
 test('a maximum local text chunk can be incorporated with full instruction and plan budgets across restart',async t=>{
  const dir=mkdtempSync(join(tmpdir(),'sim-decision-budget-'));let j=openJournal(dir,{worldId:'w',soulId:'s'});
  t.after(()=>{j.close();rmSync(dir,{recursive:true,force:true})});
- let fence=j.control.claim('test');const initialInstruction='i'.repeat(16000),plan='p'.repeat(15998);
+ let fence=j.control.claim('test');const initialInstruction='i'.repeat(15998),plan='p'.repeat(15998);
  j.ingest({source:'owner',after:null,cursor:'large',events:[{id:'large',text:'x'.repeat(60000),sentAt:1}]});
  const read=parseDecision(JSON.stringify({plan,call:{type:'read',command:'task',arguments:'{"id":"large"}'},wakeAt:null}));
  retainDecision(j,fence,read,{events:j.pending(),initialInstruction});const observed=await applyPendingDecision(j,fence,{});
- assert.equal(Buffer.byteLength(JSON.stringify(observed.response)),32768);assert.equal(j.control.checkpoint().value.lastResult.task.nextOffset!==null,true);
+ assert.equal(Buffer.byteLength(JSON.stringify(observed.response)),32768);assert.deepEqual(j.control.checkpoint().value.lastResult,observed.response);assert.equal(observed.response.task.nextOffset!==null,true);
  const report=parseDecision(JSON.stringify({plan,call:{type:'write',command:'result',arguments:'{"id":"large","outcome":"failed","text":"Owner cancelled this request"}'},wakeAt:null}));
  const id=retainDecision(j,fence,report);const retained=j.control.checkpoint().value;
  assert.equal(retained.lastResult,undefined);assert.equal(retained.plan,plan);assert.equal(retained.pendingDecision.decision.plan,undefined);
@@ -129,4 +130,98 @@ test('unknown lost result preserves task and native readback closes only when au
  const world={write:async()=>{writes++;throw Error('lost')},reconcile:async()=>known?{state:'recorded',status:200,response:{...reportResponse(d),reconciliation:{evidence:'observed-native-state'}}}:{state:'unknown'}};
  await assert.rejects(applyPendingDecision(j,fence,world),{code:'OPERATION_UNCERTAIN'});assert.equal(j.openOwnerTasks().totalOpen,1);await assert.rejects(applyPendingDecision(j,fence,world),{code:'OPERATION_UNCERTAIN'});assert.equal(j.openOwnerTasks().totalOpen,1);
  known=true;await applyPendingDecision(j,fence,world);assert.equal(writes,1);assert.equal(j.openOwnerTasks().totalOpen,0);
+});
+test('large native write response survives checkpoint crash and restart without another POST',async t=>{
+ const {j,dir,fence}=fixture(t);j.ingest({source:'owner',after:null,cursor:'m1',events:[{id:'m1',text:'Report the observed result'}]});
+ const d=report(),id=retainDecision(j,fence,d,{events:j.pending()}),native={...reportResponse(d),receipt:{id:'r_1',phase:'completed',content:'界'.repeat(30000)}};
+ const save=j.control.save;j.control.save=()=>{throw Error('crash after native response retained')};let writes=0;
+ await assert.rejects(applyPendingDecision(j,fence,{write:async()=>{writes++;return native}}),/crash after native/);
+ assert.deepEqual(j.control.operation(id).response,native);assert.equal(j.openOwnerTasks().totalOpen,0,'closure inspects complete native proof');j.control.save=save;j.control.release(fence);
+ const recovered=openJournal(dir,{worldId:'w',soulId:'s'});t.after(()=>recovered.close());const next=recovered.control.claim('recovered');
+ const applied=await applyPendingDecision(recovered,next,{write:async()=>{writes++;throw Error('duplicate POST')}});
+ assert.equal(writes,1);assert.deepEqual(applied.response,native);const checkpoint=recovered.control.checkpoint().value;
+ assert.equal(checkpoint.pendingDecision,null);assert.equal(checkpoint.lastResult.responseOmitted,true);assert.equal(checkpoint.lastResult.responseRef.kind,'operation');assert.equal(checkpoint.lastResult.responseRef.id,id);assert.equal(checkpoint.lastResult.accepted,undefined);assert.equal(checkpoint.lastReceipt.detailsOmitted,true);assert.equal(checkpoint.lastReceipt.id,'r_1');
+ assert.ok(Buffer.byteLength(JSON.stringify(checkpoint))<65536);
+});
+test('large read response survives restart and local chunk decisions never overwrite its saved slot',async t=>{
+ const {j,dir,fence}=fixture(t),native={text:'🌎\\\n'.repeat(10000),source:'first native read'};
+ const d=parseDecision(JSON.stringify({plan:'Inspect the complete native response',call:{type:'read',command:'observe',arguments:'{}'},wakeAt:null})),id=retainDecision(j,fence,d);
+ const save=j.control.save;j.control.save=()=>{throw Error('crash after read retained')};let nativeReads=0;
+ await assert.rejects(applyPendingDecision(j,fence,{read:async()=>{nativeReads++;return native}}),/crash after read/);j.control.save=save;j.control.release(fence);
+ const recovered=openJournal(dir,{worldId:'w',soulId:'s'});t.after(()=>recovered.close());const next=recovered.control.claim('recovered');
+ const world={read:async()=>{nativeReads++;throw Error('must reuse durable read')}};await applyPendingDecision(recovered,next,world);assert.equal(nativeReads,1);
+ const reference=recovered.control.checkpoint().value.lastResult.responseRef;assert.equal(reference.kind,'read');assert.equal(reference.id,id);
+ let offset=0,raw='';do{
+  const chunkDecision=parseDecision(JSON.stringify({plan:'Read saved native JSON chunks',call:{type:'read',command:'response',arguments:JSON.stringify({kind:'read',id,offset})},wakeAt:null}));
+  retainDecision(recovered,next,chunkDecision);const applied=await applyPendingDecision(recovered,next,world);assert.ok(Buffer.byteLength(JSON.stringify(applied.response))<=24576);raw+=applied.response.text;offset=applied.response.nextOffset;
+ }while(offset!==null);
+ assert.equal(nativeReads,1);assert.deepEqual(JSON.parse(raw),native);assert.deepEqual(recovered.control.readResult(id).response,native);
+ retainDecision(recovered,next,{plan:'Get a new observation',call:{type:'read',command:'here',args:{}},wakeAt:null});await applyPendingDecision(recovered,next,{read:async()=>({place:'garden'})});
+ assert.equal(recovered.control.response({kind:'read',id}).responseUnavailable,true);
+});
+test('saved resync observation does not reconcile gaps received after its native snapshot',async t=>{
+ const {j,fence}=fixture(t);j.ingest({source:'world',after:null,cursor:'c_1',events:[],gap:true});retainDecision(j,fence,{plan:'Refresh current facts',call:{type:'read',command:'resync',args:{}},wakeAt:null});
+ const reconcile=j.reconcileGap;j.reconcileGap=()=>{throw Error('crash before reconciling gap')};let reads=0;
+ await assert.rejects(applyPendingDecision(j,fence,{read:async()=>{reads++;return {historyIncomplete:true,observation:{place:'library'}}}}),/crash before reconciling/);
+ j.reconcileGap=reconcile;j.ingest({source:'world',after:'c_1',cursor:'c_2',events:[],gap:true});
+ await applyPendingDecision(j,fence,{read:async()=>{reads++;throw Error('must reuse saved resync')}});assert.equal(reads,1);assert.deepEqual(j.gaps().map(g=>g.after_cursor),['c_2']);
+});
+test('an old pending object read observes native 404 after restart and can replan instead of exiting',async t=>{
+ const {j,dir,fence}=fixture(t);j.ingest({source:'owner',after:null,cursor:'m1',events:[{id:'m1',text:'Read and report'}]});
+ retainDecision(j,fence,{plan:'Inspect object',call:{type:'read',command:'object',args:{id:'e_27c5567d'}},wakeAt:null},{events:j.pending()});j.control.release(fence);
+ const recovered=openJournal(dir,{worldId:'w',soulId:'s'});t.after(()=>recovered.close());const next=recovered.control.claim('recovery');let reads=0;
+ const applied=await applyPendingDecision(recovered,next,{read:async()=>{reads++;throw Object.assign(Error('no such object here'),{code:'not-found',status:404,uncertain:false})}});
+ assert.equal(reads,1);assert.deepEqual(applied.response,{accepted:false,error:{code:'not-found',message:'no such object here',status:404}});assert.equal(recovered.control.checkpoint().value.pendingDecision,null);assert.deepEqual(recovered.control.checkpoint().value.lastResult,applied.response);assert.equal(recovered.pending().length,0);assert.equal(recovered.openOwnerTasks().totalOpen,1);
+ retainDecision(recovered,next,{plan:'Reobserve after object refusal',call:{type:'read',command:'here',args:{}},wakeAt:null});await applyPendingDecision(recovered,next,{read:async()=>({place:'library'})});assert.equal(recovered.control.checkpoint().value.lastResult.place,'library');
+});
+test('read validation conflicts are observations, while auth and transport keep the pending decision',async t=>{
+ for(const status of [400,409,422]){
+  const {j,fence}=fixture(t);j.ingest({source:'world',after:null,cursor:'c_1',events:[],gap:true});retainDecision(j,fence,{plan:'Resync',call:{type:'read',command:'resync',args:{}},wakeAt:null});
+  const result=await applyPendingDecision(j,fence,{read:async()=>{throw Object.assign(Error('Read refused'),{code:'invalid',status,uncertain:false})}});assert.equal(result.response.accepted,false);assert.equal(result.response.error.status,status);assert.equal(j.gaps().length,1,'a refused resync cannot clear gaps');
+ }
+ for(const status of [401,403,500]){
+  const {j,fence}=fixture(t);retainDecision(j,fence,{plan:'Read',call:{type:'read',command:'here',args:{}},wakeAt:null});
+  await assert.rejects(applyPendingDecision(j,fence,{read:async()=>{throw Object.assign(Error('Read failed'),{status,uncertain:false})}}),/Read failed/);assert.ok(j.control.checkpoint().value.pendingDecision);
+ }
+});
+test('full encoded instruction, plan and call arguments fit consecutive durable decisions',async t=>{
+ const {j,fence}=fixture(t),initialInstruction='i'.repeat(15998),plan='p'.repeat(15998),args=JSON.stringify({text:'x'.repeat(15983)});
+ assert.equal(Buffer.byteLength(JSON.stringify(args)),16000);
+ const d=parseDecision(JSON.stringify({plan,call:{type:'write',command:'say',arguments:args},wakeAt:null}));
+ retainDecision(j,fence,d,{initialInstruction});await applyPendingDecision(j,fence,{write:async()=>({accepted:true,text:'界'.repeat(10000)})});
+ assert.equal(j.control.checkpoint().value.lastResult.responseOmitted,true);
+ retainDecision(j,fence,d);assert.equal(j.control.checkpoint().value.lastCall,undefined);assert.equal(j.control.checkpoint().value.lastResult,undefined);
+ await applyPendingDecision(j,fence,{write:async()=>({accepted:true})});assert.equal(j.control.checkpoint().value.lastResult.accepted,true);assert.equal(j.control.checkpoint().value.plan,plan);assert.equal(j.control.checkpoint().value.initialInstruction,initialInstruction);
+});
+test('uncertain write 404 remains uncertain and local response arguments are strict',async t=>{
+ const {j,fence}=fixture(t);retainDecision(j,fence,decision());
+ await assert.rejects(applyPendingDecision(j,fence,{write:async()=>{throw Object.assign(Error('Lost write response'),{status:404,uncertain:true})}}),{code:'OPERATION_UNCERTAIN'});assert.ok(j.control.checkpoint().value.pendingDecision);assert.equal(j.control.operations()[0].status,'uncertain');
+ for(const args of [{kind:'read',id:'abc',offset:-1},{kind:'read',id:'abc',offset:1.5},{kind:'bad',id:'abc'},{kind:'read'},{kind:'read',id:'abc',unexpected:true}])assert.throws(()=>parseDecision(JSON.stringify({plan:'Inspect',call:{type:'read',command:'response',arguments:JSON.stringify(args)},wakeAt:null})),/Local response/);
+});
+test('actual checkpoint budget fits whole observations and 24KiB chunks with full instruction, plan and argument limits',async t=>{
+ const {j,fence}=fixture(t),initialInstruction='i'.repeat(15998),plan='p'.repeat(15998),args=JSON.stringify({text:'x'.repeat(15983)}),receipt={id:'r-budget',detail:'r'.repeat(980)};
+ const d=parseDecision(JSON.stringify({plan,call:{type:'write',command:'say',arguments:args},wakeAt:null})),small={accepted:true,text:'x'.repeat(12000),receipt};
+ retainDecision(j,fence,d,{initialInstruction});await applyPendingDecision(j,fence,{write:async()=>small});assert.deepEqual(j.control.checkpoint().value.lastResult,small);assert.ok(Buffer.byteLength(JSON.stringify(j.control.checkpoint().value))<=65536-128);
+ const large={accepted:true,text:'x'.repeat(24000),receipt},id=retainDecision(j,fence,d);await applyPendingDecision(j,fence,{write:async()=>large});
+ assert.equal(j.control.checkpoint().value.lastResult.responseOmitted,true);assert.ok(Buffer.byteLength(JSON.stringify(j.control.checkpoint().value))<=65536-128);
+ let offset=0,raw='',chunks=0;do{
+  const read=parseDecision(JSON.stringify({plan,call:{type:'read',command:'response',arguments:JSON.stringify({kind:'operation',id,offset})},wakeAt:null}));
+  retainDecision(j,fence,read);const applied=await applyPendingDecision(j,fence,{}),checkpoint=j.control.checkpoint().value;
+  assert.deepEqual(checkpoint.lastResult,applied.response);assert.ok(Buffer.byteLength(JSON.stringify(checkpoint))<=65536-128);assert.ok(Buffer.byteLength(JSON.stringify(applied.response))<=24576);
+  if(chunks===0)assert.ok(Buffer.byteLength(JSON.stringify(applied.response))>24000,'use the larger chunk instead of another 8KiB turn');raw+=applied.response.text;offset=applied.response.nextOffset;chunks++;
+ }while(offset!==null);
+ assert.deepEqual(JSON.parse(raw),large);assert.equal(chunks,2);assert.equal(j.control.checkpoint().value.initialInstruction,initialInstruction);assert.equal(j.control.checkpoint().value.plan,plan);
+});
+test('100 maximum-length event identities drain in bounded pages with full retained decision budgets',async t=>{
+ const {j,fence}=fixture(t),source='界'.repeat(100),initialInstruction='i'.repeat(15998),plan='p'.repeat(15998),args=JSON.stringify({text:'x'.repeat(15983)});
+ const events=Array.from({length:100},(_,i)=>({id:'\ud800'.repeat(197)+String(i).padStart(3,'0'),text:'Preserve the whole observation '+i}));
+ j.ingest({source,after:null,cursor:'c_100',events});assert.equal(j.pending(100).length,100);
+ const d=parseDecision(JSON.stringify({plan,call:{type:'write',command:'say',arguments:args},wakeAt:null})),receipt={id:'r-budget',detail:'r'.repeat(980)};let pages=0,handled=0;
+ while(j.pending(1).length){
+  const page=boundedFacts(j.attention(100));assert.ok(page.length>0&&page.length<100);assert.ok(Buffer.byteLength(JSON.stringify(page.map(f=>({source:f.source,id:f.event.id}))))<=8192);
+  retainDecision(j,fence,d,{events:page,initialInstruction});assert.ok(Buffer.byteLength(JSON.stringify(j.control.checkpoint().value))<=65536);assert.equal(j.control.checkpoint().value.pendingDecision.eventIds.length,page.length);
+  await applyPendingDecision(j,fence,{write:async()=>({accepted:true,receipt})});handled+=page.length;pages++;assert.ok(Buffer.byteLength(JSON.stringify(j.control.checkpoint().value))<=65536);
+  assert.equal(j.pending(100).length,100-handled);assert.ok(pages<=100);
+ }
+ assert.equal(handled,100);assert.ok(pages>1);assert.equal(j.control.checkpoint().value.plan,plan);assert.equal(j.control.checkpoint().value.initialInstruction,initialInstruction);
 });

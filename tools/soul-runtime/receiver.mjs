@@ -1,11 +1,12 @@
 // A receiver persists facts. It never acknowledges owner instructions, decides
 // priorities, starts inference, or writes to a world. Transport is injected so
 // the same contract applies to SSE, long-poll and synthetic fault injection.
-export async function receivePage(journal, source, read, {signal} = {}) {
+export async function receivePage(journal, source, read, {signal,onCommitted=()=>{}} = {}) {
   const after=journal.cursor(source);
   const page=await read({after,signal});
   if(signal?.aborted) return {aborted:true}; // cursor unchanged: safe to replay
   const result=journal.ingest({source,after,cursor:page.cursor,events:page.events,gap:page.gap??false});
+  if(page.events.length)onCommitted({source,state:'events-persisted',events:page.events.map(event=>({source,id:event.id})),committedAt:Date.now()});
   return {...result,pending:journal.pending().length};
 }
 
@@ -16,7 +17,7 @@ export async function runReceiver({journal,source,read,signal,onState=()=>{},ret
   while(!signal?.aborted){
     try {
       onState({source,state:'receiving'});
-      const result=await receivePage(journal,source,read,{signal});
+      const result=await receivePage(journal,source,read,{signal,onCommitted:onState});
       if(result.aborted)break;
       backoff=0;
     }catch(error){

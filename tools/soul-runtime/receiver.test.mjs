@@ -48,3 +48,11 @@ test('more than a page of unhandled events does not starve newer alerts',async t
  await runWakeDispatcher({journal:j,signal:abort.signal,sleep:async()=>{},notify:async({pending})=>{batches.push(pending.length);if(pending.some(e=>e.event.id==='c_1001'))abort.abort();}});
  assert.deepEqual(batches,[1000,1]);assert.equal(j.pending(1000,1000)[0].event.id,'c_1001');
 });
+
+test('durable intake telemetry follows commit and never reports refused intake',async t=>{
+ const j=fixture(t),proof=[];
+ await receivePage(j,'world',async()=>page,{onCommitted:e=>{assert.equal(j.cursor('world'),page.cursor);assert.equal(j.pending()[0].event.id,page.events[0].id);proof.push(e);}});
+ assert.equal(proof[0].state,'events-persisted');assert.equal(proof[0].events[0].id,page.events[0].id);assert.ok(Number.isFinite(proof[0].committedAt));
+ await assert.rejects(receivePage(j,'world',async()=>({cursor:'bad',events:[{...page.events[0],kind:'different'}]}),{onCommitted:e=>proof.push(e)}));
+ assert.equal(proof.length,1);
+});

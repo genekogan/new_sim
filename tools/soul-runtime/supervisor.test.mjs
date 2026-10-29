@@ -7,6 +7,7 @@ import {join} from 'node:path';
 import {openJournal} from './journal.mjs';
 import {runSupervisor} from './supervisor.mjs';
 import {abortableSleep} from './receiver.mjs';
+import {parseDecision,retainDecision,applyPendingDecision} from './decision.mjs';
 const waitDecision={plan:'Resume the reading appointment after interruption',call:{type:'wait',command:'',arguments:'{}'},wakeAt:null};
 class Host extends EventEmitter{
  constructor(){super();this.threadId='thread';this.calls=[];this.steers=[];this.closed=false;}
@@ -90,4 +91,30 @@ test('failed steer acknowledgement never claims host delivery',async t=>{
  try{
   await until(()=>f.host.calls.length===1);f.journal.ingest({source:'world',after:null,cursor:'c1',events:[{id:'c1',kind:'conversation.turn'}]});await new Promise(r=>setTimeout(r,150));assert.equal(states.some(s=>s.state==='host-notified'&&s.mode==='steer'),false);assert.equal(f.journal.pending().length,1);
  }finally{f.stop.abort();await running;}
+});
+test('large startup observation is persisted separately and delivered as a bounded retrievable reference',async t=>{
+ const f=setup(t),owner=f.journal.control.claim('previous'),prior={text:'saved native read '.repeat(3000)};
+ const read=parseDecision(JSON.stringify({...waitDecision,call:{type:'read',command:'observe',arguments:'{}'}}));
+ const readId=retainDecision(f.journal,owner,read);await applyPendingDecision(f.journal,owner,{read:async()=>prior});f.journal.control.release(owner);
+ const native={streamCursor:'c_88',description:'界'.repeat(50000)};let reads=0;
+ f.world.read=async command=>{reads++;assert.equal(command,'observe');return native;};
+ const running=runSupervisor({...f,signal:f.stop.signal});
+ try{
+  await until(()=>f.host.calls.length===1);const prompt=f.host.calls[0];assert.ok(Buffer.byteLength(JSON.stringify(prompt))<16384);assert.equal(prompt.observation.responseOmitted,true);assert.equal(prompt.observation.responseRef.kind,'startup');assert.equal(prompt.lastResult.responseRef.id,readId);assert.deepEqual(f.journal.control.readResult(readId).response,prior);assert.equal(f.journal.cursor('world'),'c_88');
+  f.host.finish({...waitDecision,call:{type:'read',command:'response',arguments:JSON.stringify(prompt.observation.retrieve.args)}});
+  await until(()=>f.host.calls.length===2);const chunk=f.host.calls[1].lastResult;assert.equal(chunk.responseRef.id,prompt.observation.responseRef.id);assert.ok(Buffer.byteLength(JSON.stringify(chunk))<=24576);assert.ok(JSON.stringify(native).startsWith(chunk.text));assert.equal(reads,1);assert.deepEqual(f.journal.control.readResult(readId).response,prior);
+ }finally{f.stop.abort();await running;}
+});
+test('startup recovery gives the model a pending read refusal instead of terminating the controller',async t=>{
+ const f=setup(t),owner=f.journal.control.claim('previous');retainDecision(f.journal,owner,{plan:'Inspect a remembered object',call:{type:'read',command:'object',args:{id:'missing'}},wakeAt:null});f.journal.control.release(owner);
+ f.world.read=async command=>{if(command==='object')throw Object.assign(Error('no such object here'),{code:'not-found',status:404,uncertain:false});return {here:'library'};};
+ const running=runSupervisor({...f,signal:f.stop.signal});
+ try{await until(()=>f.host.calls.length===1);assert.equal(f.host.calls[0].lastCall.command,'object');assert.deepEqual(f.host.calls[0].lastResult,{accepted:false,error:{code:'not-found',message:'no such object here',status:404}});assert.equal(f.journal.control.checkpoint().value.pendingDecision,null);}
+ finally{f.stop.abort();await running;}
+});
+test('ordinary 35984-byte startup observation arrives whole in the first model prompt',async t=>{
+ const f=setup(t),empty={streamCursor:'c_88',description:''},native={...empty,description:'x'.repeat(35984-Buffer.byteLength(JSON.stringify(empty)))};let reads=0;
+ f.world.read=async command=>{reads++;assert.equal(command,'observe');return native;};const running=runSupervisor({...f,signal:f.stop.signal});
+ try{await until(()=>f.host.calls.length===1);assert.equal(Buffer.byteLength(JSON.stringify(native)),35984);assert.deepEqual(f.host.calls[0].observation,native);assert.equal(reads,1);assert.equal(f.journal.cursor('world'),'c_88');}
+ finally{f.stop.abort();await running;}
 });
