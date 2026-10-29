@@ -35,9 +35,10 @@ while a turn is thinking. The native server's salience controls waking; lower
 salience facts remain available for the next natural decision. No new server
 importance classifier or LLM is introduced.
 
-An event arriving during a turn conservatively invalidates its eventual action
-and causes re-planning, even when steering was accepted. This currently adds
-latency but prevents a completion race from executing an obsolete action.
+A new owner message during a turn invalidates its eventual action. Ordinary
+world observations trigger up to two consecutive replans, then remain pending
+for the next decision so a busy venue cannot indefinitely prevent a reply or
+departure. The server still validates every selected action.
 Readiness is not completion. Explicit refusals return to the agent; unknown
 write outcomes remain blocked for reconciliation rather than auto-replaying.
 Fresh adoption starts at the observed world cursor; reconnecting an existing
@@ -53,8 +54,10 @@ must pin the same successfully verified model and effort.
 
 A read-only operation lookup now recovers retained HTTP outcomes and accepted
 action receipts; a missing result remains unknown and cannot authorize replay.
-Still required: retry/restart policy for this recovery, bounded retention,
-robust retry/restart supervision, activity acceptance and long soak. App-server
+Still required: bounded retention integration, four-activity acceptance and
+long soak. Native inbox/reminder readback can establish that a requested effect
+is present without claiming which HTTP operation produced it. Mismatched or
+missing evidence remains unknown. App-server
 is experimental; this runtime remains opt-in and unpublished until qualified.
 
 `run.mjs --folder <already-paired-folder> --instruction <text-file>` starts the
@@ -70,3 +73,16 @@ uses `call.arguments={"seconds":30}`; the client records the calculated UTC
 deadline, avoiding timezone arithmetic by the model. Retention gaps require an
 explicit current-state resync before new writes. Resync never claims to recreate
 missing history, and cannot erase an already-dispatched uncertain effect.
+
+`launch.mjs` accepts the same controller arguments and adds a small outer
+process owner. It restarts a killed controller with the same durable state,
+waits for an abandoned lease to expire without stealing live ownership, and
+stops on explicit failures. `--seconds` bounds the entire launcher lifetime,
+including restarts. This does not start a login service or promise availability
+through OS sleep/reboot. Stop any legacy CLI/controller before starting it.
+
+A future scheduled wake survives conversational replies and reads. A new
+non-null `wakeAt` replaces it; `wait` with `{"cancelWake":true}` explicitly
+cancels it. Due wakes are consumed only by a committed decision retained after
+the deadline. The model still authors goals, activity choices and appointments;
+this timer mechanism does not infer or schedule a social plan on its behalf.

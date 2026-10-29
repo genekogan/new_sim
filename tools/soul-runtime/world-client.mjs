@@ -3,6 +3,23 @@
 import {createEventReader} from './sse.mjs';
 const segment=v=>encodeURIComponent(String(v));
 const error=(code,message,extra={})=>Object.assign(Error(message),{code,...extra});
+const record=v=>!!v&&typeof v==='object'&&!Array.isArray(v);
+// Match the native explicit-clock request normalization, including rejecting
+// dates that JS Date.parse would silently roll into a different calendar day.
+const reminderAt=at=>{
+ if(!record(at))return null;
+ if(at.clock==='world')return Object.keys(at).every(k=>['clock','worldDayIndex','time'].includes(k))&&Number.isSafeInteger(at.worldDayIndex)&&at.worldDayIndex>=0&&at.worldDayIndex<=1000000&&typeof at.time==='string'&&/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(at.time)?at:null;
+ if(at.clock!=='real'||!Object.keys(at).every(k=>['clock','time'].includes(k)))return null;
+ const m=typeof at.time==='string'?/^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.(\d{1,3}))?(Z|[+-]\d\d:\d\d)$/.exec(at.time):null;if(!m)return null;
+ const [year,month,day,hour,minute,second]=m.slice(1,7).map(Number),zone=m[8];
+ if(year<1970||month<1||month>12||day<1||day>new Date(Date.UTC(year,month,0)).getUTCDate()||hour>23||minute>59||second>59||zone!=='Z'&&(Number(zone.slice(1,3))>14||Number(zone.slice(4,6))>59||Number(zone.slice(1,3))===14&&Number(zone.slice(4,6))!==0))return null;
+ const ms=Date.parse(at.time);return Number.isSafeInteger(ms)?{clock:'real',time:new Date(ms).toISOString()}:null;
+};
+const unknown=()=>({state:'unknown',note:'No matching retained outcome found. The operation may still have executed; do not automatically replay it.'});
+const observed=response=>{
+ const reconciliation={evidence:'observed-native-state',note:'The requested effect is present in native state; this does not prove this operation executed.'};
+ return {state:'recorded',evidence:reconciliation.evidence,status:200,response:{...response,reconciliation}};
+};
 export const isTransientRead=e=>e?.transient===true;
 export function createWorldClient({world,token,fetchImpl=fetch,timeoutMs=65000}){
  const base=new URL(world);
@@ -31,6 +48,26 @@ export function createWorldClient({world,token,fetchImpl=fetch,timeoutMs=65000})
  return {
   eventPage,
   async reconcile(call,operationId,signal){
+   // Inbox routes precede edge idempotency middleware. Read the retained native
+   // effect instead: absence/mismatch never authorizes replay of the POST.
+   if(call.command==='ack'||call.command==='result'){
+    let data;try{data=await request('/v1/edge/inbox/'+segment(call.args.id),{signal});}catch(e){if(e.status===404)return unknown();throw e;}
+    const m=data.message;
+    if(!m||m.id!==call.args.id||m.state!=='acknowledged')return unknown();
+    if(call.command==='ack'){
+     if(call.args.reply!==undefined&&(typeof call.args.reply!=='string'||call.args.reply.length>140||/[\r\n]/.test(call.args.reply)))return unknown();
+     if((m.reply??null)!==(call.args.reply?.trim()||null))return unknown();
+    }else if(typeof call.args.text!=='string'||!call.args.text.trim()||call.args.text.length>140||/[\r\n]/.test(call.args.text)||!['done','failed'].includes(call.args.outcome)||m.resultBy==='server'||!Number.isFinite(m.resultAt)||m.result!==call.args.text.trim()||m.outcome!==call.args.outcome)return unknown();
+    return observed({inbox:{latest:m}});
+   }
+   if(call.command==='remind'){
+    let data;try{data=await request('/v1/edge/reminders/by-client-ref/'+segment(operationId),{signal});}catch(e){if(e.status===404)return unknown();throw e;}
+    const r=data.reminder,at=reminderAt(call.args.at);
+    const sameAt=at?.clock==='world'?r?.at?.clock==='world'&&r.at.worldDayIndex===at.worldDayIndex&&r.at.time===at.time:
+     at?.clock==='real'&&r?.at?.clock==='real'&&r.at.time===at.time;
+    if(!r||r.clientRef!==operationId||typeof call.args.text!=='string'||!call.args.text.trim()||call.args.text.length>500||Buffer.byteLength(call.args.text)>2000||r.text!==call.args.text.replace(/\s+/g,' ').trim()||!sameAt)return unknown();
+    return observed({reminder:r});
+   }
    const route=call.command==='act'?'/v1/edge/act':call.command==='say'?'/v1/edge/say':call.command==='converse'?'/v1/edge/converse':call.command==='object'?'/v1/edge/objects/'+segment(call.args.id)+'/act':null;
    if(!route)return {state:'unknown',note:'No authoritative lookup for this operation'};
    return request('/v1/edge/operations/'+segment(operationId)+'?'+new URLSearchParams({route:'POST '+route}),{signal});

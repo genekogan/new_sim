@@ -46,3 +46,20 @@ test('fresh adoption starts at observed head rather than replying to old histori
  f.world.worldPage=async({after,signal})=>{firstCursor=after;await abortableSleep(10000,signal);return {cursor:after,events:[]};};
  const running=runSupervisor({...f,instruction:'Read',signal:f.stop.signal});await until(()=>f.host.calls.length===1);assert.equal(firstCursor,'c_88');f.stop.abort();await running;
 });
+test('continuing world chatter cannot starve effects, but a new owner cancellation always invalidates them',async t=>{
+ const f=setup(t);let effects=0;f.world.write=async()=>{effects++;return {accepted:true}};
+ const running=runSupervisor({...f,instruction:'Reply then leave',signal:f.stop.signal});
+ const say={...waitDecision,call:{type:'write',command:'say',arguments:'{"text":"I must go now"}'}};
+ for(let n=1;n<=2;n++){
+  await until(()=>f.host.calls.length===n);f.journal.ingest({source:'world',after:n===1?null:'c_'+(n-1),cursor:'c_'+n,events:[{id:'c_'+n,kind:'speech.to-me',salience:3}]});
+  await until(()=>f.host.steers.length===n);f.host.finish(say);
+ }
+ await until(()=>f.host.calls.length===3);f.journal.ingest({source:'owner',after:null,cursor:'cancel',events:[{id:'cancel',text:'Stop; do not speak'}]});
+ await until(()=>f.host.steers.length===3);f.host.finish(say);await until(()=>f.host.calls.length===4);assert.equal(effects,0);
+ f.journal.ingest({source:'world',after:'c_2',cursor:'c_3',events:[{id:'c_3',kind:'speech.to-me',salience:3}]});await until(()=>f.host.steers.length===4);
+ // The fourth turn includes cancellation and chooses a read, which may proceed
+ // despite continuing chatter. The late chatter remains pending for next turn.
+ f.host.finish({...waitDecision,call:{type:'read',command:'here',arguments:'{}'}});await until(()=>f.host.calls.length===5);
+ assert.equal(f.host.calls[4].lastCall.command,'here');assert.equal(f.host.calls[4].pending.some(e=>e.event.id==='c_3'),true);assert.equal(effects,0);
+ f.stop.abort();await running;
+});

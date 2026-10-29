@@ -3,7 +3,7 @@
 import {randomUUID} from 'node:crypto';
 export const DECISION_SCHEMA={type:'object',additionalProperties:false,required:['plan','call','wakeAt'],properties:{
  plan:{type:'string',description:'Compact durable task state: current goal and original constraints, completed receipt IDs, current step, suspended work, deadlines and next step. Do not claim unobserved completion.'},
- call:{type:'object',additionalProperties:false,required:['type','command','arguments'],properties:{type:{type:'string',enum:['read','write','wait']},command:{type:'string'},arguments:{type:'string',description:'A JSON object of arguments. For wait use {} for event-only or {seconds:N} for a relative wall-clock wakeup.'}}},
+ call:{type:'object',additionalProperties:false,required:['type','command','arguments'],properties:{type:{type:'string',enum:['read','write','wait']},command:{type:'string'},arguments:{type:'string',description:'A JSON object of arguments. For wait use {} for event-only or {seconds:N} for a relative wall-clock wakeup. Existing future wakeups survive other calls. Use {cancelWake:true} only to explicitly cancel the saved wakeup.'}}},
  wakeAt:{type:['string','null'],description:'ISO8601 wall-clock wakeup with timezone, or null to wait for messages or action results.'},
 }};
 const READS=new Set(['resync','here','observe','explore','resolve','receipt','conversations','turns','calendar','reminders','object']);
@@ -76,6 +76,11 @@ export async function applyPendingDecision(journal,fence,world,{signal}={}){
  const latest=journal.control.checkpoint();
  if(latest.value?.pendingDecision?.id!==id)throw Error('Pending decision changed while applying');
  const receipt=response?.receipt??null;
- journal.control.save(fence,latest.revision,{...latest.value,pendingDecision:null,lastDecisionId:id,lastCall:call,lastResult:response,wakeAt:decision.wakeAt,lastReceipt:receipt??latest.value.lastReceipt??null});
- return {applied:true,id,call,response,wakeAt:decision.wakeAt};
+ // Null means no newly scheduled wake, not cancellation of suspended work.
+ // A due wake is consumed only by a committed decision that was retained
+ // after its deadline, so an interruption/restart cannot silently drop it.
+ const priorWake=latest.value.wakeAt;
+ const wakeAt=decision.wakeAt??(call.type==='wait'&&call.args.cancelWake===true?null:priorWake&&Date.parse(priorWake)>pending.retainedAt?priorWake:null);
+ journal.control.save(fence,latest.revision,{...latest.value,pendingDecision:null,lastDecisionId:id,lastCall:call,lastResult:response,wakeAt,lastReceipt:receipt??latest.value.lastReceipt??null});
+ return {applied:true,id,call,response,wakeAt};
 }

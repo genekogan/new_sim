@@ -56,3 +56,20 @@ test('relative activity waits calculate a durable UTC deadline and preserve an e
  assert.equal(parseDecision(JSON.stringify({...payload,wakeAt:'2026-10-29T16:00:10-04:00'}),{now}).wakeAt,'2026-10-29T20:00:10.000Z');
  assert.throws(()=>parseDecision(JSON.stringify({...payload,call:{...payload.call,arguments:'{"seconds":-1}'}})),/Relative wait/);
 });
+test('conversation and reobservation retain a future activity wake across checkpoint recovery',async t=>{
+ const {j,fence}=fixture(t),wakeAt=new Date(Date.now()+60000).toISOString();
+ retainDecision(j,fence,{plan:'Read then leave',call:{type:'wait',command:'wait',args:{}},wakeAt});await applyPendingDecision(j,fence,{});
+ retainDecision(j,fence,{plan:'Reply briefly then resume reading',call:{type:'write',command:'say',args:{text:'Hello'}},wakeAt:null});
+ await applyPendingDecision(j,fence,{write:async()=>({said:{id:'s1'}})});assert.equal(j.control.checkpoint().value.wakeAt,wakeAt);
+ retainDecision(j,fence,{plan:'Reobserve after greeting',call:{type:'read',command:'here',args:{}},wakeAt:null});
+ await applyPendingDecision(j,fence,{read:async()=>({activity:'read'})});assert.equal(j.control.checkpoint().value.wakeAt,wakeAt);
+ retainDecision(j,fence,{plan:'Owner cancelled the errand',call:{type:'wait',command:'wait',args:{cancelWake:true}},wakeAt:null});
+ await applyPendingDecision(j,fence,{});assert.equal(j.control.checkpoint().value.wakeAt,null);
+});
+test('a due wake survives an earlier retained decision but is consumed by a later decision',async t=>{
+ const {j,fence}=fixture(t),wakeAt=new Date(Date.now()-1000).toISOString();
+ j.control.save(fence,0,{wakeAt});retainDecision(j,fence,{plan:'Handle due appointment',call:{type:'wait',command:'wait',args:{}},wakeAt:null});
+ const c=j.control.checkpoint();j.control.save(fence,c.revision,{...c.value,pendingDecision:{...c.value.pendingDecision,retainedAt:Date.now()-2000}});
+ await applyPendingDecision(j,fence,{});assert.equal(j.control.checkpoint().value.wakeAt,wakeAt);
+ retainDecision(j,fence,{plan:'Due wake handled',call:{type:'wait',command:'wait',args:{}},wakeAt:null});await applyPendingDecision(j,fence,{});assert.equal(j.control.checkpoint().value.wakeAt,null);
+});
