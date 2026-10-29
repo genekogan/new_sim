@@ -14,9 +14,14 @@ const activity=s=>typeof s.activity==='string'?s.activity:s.activity?.kind;
 const accepted=r=>at(r.acceptedAtUtc??r.observedAcceptedAt??r.acceptedAt??r.startedAt);
 const ended=r=>at(r.endedAtUtc??r.observedEndedAt??(typeof r.endedAt==='string'?r.endedAt:null));
 const held=s=>{const h=seatIdentity(s.seat);return h?`${h.entity}#${h.slot??'seat'}`:null;};
-const refOfSeat=(s,bindings)=>{const h=seatIdentity(s.seat);return h?Object.keys(bindings).find(k=>bindings[k].entityId===h.entity&&(!bindings[k].slot||bindings[k].slot===(h.slot??'seat'))):null;};
+const refOfSeat=(s,bindings,refs=Object.keys(bindings))=>{
+ const h=seatIdentity(s.seat);if(!h)return null;
+ const matching=refs.filter(k=>bindings[k]?.entityId===h.entity);
+ return matching.find(k=>bindings[k].slot===(h.slot??'seat'))??matching.find(k=>!bindings[k].slot);
+};
 function receiptMatches(r,rule,bindings){
  if(rule.verb&&!r.capability?.startsWith(rule.verb+':'))return false;
+ if(r.capability==='read:here')return false; // local receipt, never a seat target
  if(rule.capabilities?.includes(r.capability))return true;
  return (rule.targetRefs??[]).some(ref=>{const b=bindings[ref];if(!b)return false;
   if(b.capabilities?.[rule.verb]?.includes(r.capability))return true;
@@ -31,20 +36,42 @@ export function observedHolds({samples=[],receipts=[],phase,bindings={},from=-In
  if(phase.receipt&&refs.some(ref=>!bindings[ref]))return {status:'unknown',detail:'missing native target binding',windows:[]};
  const all=samples.filter(s=>at(s.t)>=from&&at(s.t)<=to).sort((a,b)=>at(a.t)-at(b.t));
  if(!all.some(current))return {status:'unknown',detail:'no current body samples',windows:[]};
- const incomplete=all.some((s,i)=>!current(s)||phase.activities&&!activity(s)||phase.instruments&&(!phase.activities||phase.activities.includes(activity(s)))&&!s.instrument||i>0&&at(s.t)-at(all[i-1].t)>maxGapSec*1000),miss=coverageComplete&&!incomplete?'fail':'unknown';
- const eligible=r=>receiptMatches(r,phase.receipt,bindings)&&Number.isFinite(accepted(r))&&accepted(r)<=to;
+ const missingSeat=s=>{
+  if(!phase.requireSeatRefs||s.seat===null)return false;
+  const h=seatIdentity(s.seat);if(!h)return true;
+  return !h.slot&&phase.requireSeatRefs.some(ref=>bindings[ref]?.entityId===h.entity&&bindings[ref].slot&&bindings[ref].slot!=='seat');
+ };
+ const incomplete=all.some((s,i)=>!current(s)||missingSeat(s)||phase.activities&&!activity(s)||phase.instruments&&(!phase.activities||phase.activities.includes(activity(s)))&&!s.instrument||i>0&&at(s.t)-at(all[i-1].t)>maxGapSec*1000),miss=coverageComplete&&!incomplete?'fail':'unknown';
+ // A local read has no seat target. Its native lifecycle must be audited,
+ // while the independently observed exact seat establishes where reading
+ // actually occurs. Never make read:here a wildcard bound-target match.
+ const local=r=>phase.receipt?.verb==='read'&&phase.receipt.localCapabilities?.includes(r.capability);
+ const unboundedLocal=r=>{
+  if(!local(r))return false;
+  return !coverageComplete||!Number.isFinite(from)||!Number.isFinite(to)||!Number.isFinite(accepted(r))||typeof r.id!=='string'||!r.id
+   ||!['accepted','waiting','started','running','completed','failed','replaced','cancelled','canceled'].includes(r.phase)
+   ||['completed','failed','replaced','cancelled','canceled'].includes(r.phase)&&!Number.isFinite(ended(r))
+   ||receipts.some(other=>other.id!==r.id&&accepted(other)===accepted(r));
+ };
+ const localUnknown=receipts.some(unboundedLocal);
+ const eligible=r=>(local(r)?!unboundedLocal(r):receiptMatches(r,phase.receipt,bindings))&&Number.isFinite(accepted(r))&&accepted(r)<=to;
  const candidates=phase.receipt?receipts.filter(eligible):[null];
- if(phase.receipt&&!candidates.length)return {status:miss,detail:'no timestamped native receipt matching bound target',windows:[]};
+ if(phase.receipt&&!candidates.length)return {status:localUnknown?'unknown':miss,detail:'no timestamped native receipt matching bound target or audited local read lifecycle',windows:[]};
  const windows=[];
  for(const r of candidates){
+  const nextAction=r&&local(r)?Math.min(...receipts.filter(other=>other.id!==r.id&&Number.isFinite(accepted(other))&&accepted(other)>=accepted(r)).map(accepted)):Infinity;
   let run=[];
-  const finish=()=>{const requiredMs=(phase.holdSec??0)*1000;if(run.length&&at(run.at(-1).t)-at(run[0].t)>=requiredMs)windows.push({from:at(run[0].t),to:at(run.at(-1).t),completedAt:at(run.find(s=>at(s.t)-at(run[0].t)>=requiredMs).t),receiptId:r?.id??null,seat:held(run[0]),seatRef:refOfSeat(run[0],bindings)});run=[];};
+  const finish=()=>{const requiredMs=(phase.holdSec??0)*1000;if(run.length&&at(run.at(-1).t)-at(run[0].t)>=requiredMs)windows.push({from:at(run[0].t),to:at(run.at(-1).t),completedAt:at(run.find(s=>at(s.t)-at(run[0].t)>=requiredMs).t),receiptId:r?.id??null,seat:held(run[0]),seatRef:refOfSeat(run[0],bindings,phase.requireSeatRefs)});run=[];};
   for(const s of all){
-   const time=at(s.t),seat=held(s),ref=refOfSeat(s,bindings);
+   const time=at(s.t),seat=held(s),ref=refOfSeat(s,bindings,phase.requireSeatRefs);
    let good=current(s)&&inside(s,phase.region)&&(!phase.postures||phase.postures.includes(s.posture))&&(!phase.activities||phase.activities.includes(activity(s)))&&(!phase.instruments||phase.instruments.includes(s.instrument));
    if(phase.requireSeatRefs)good=good&&phase.requireSeatRefs.includes(ref);
    if(r){
     good=good&&accepted(r)<=time;
+    if(local(r))good=good&&time<nextAction;
+    else if(phase.requireSeatRefs)good=good&&!!ref&&receiptMatches(r,{...phase.receipt,targetRefs:[ref]},bindings);
+    const chosenSlot=seatIdentity(r.chosen?.slot);
+    if(phase.requireSeatRefs&&chosenSlot?.slot)good=good&&seat===`${chosenSlot.entity}#${chosenSlot.slot}`;
     if(phase.receipt.completed)good=good&&r.phase==='completed'&&Number.isFinite(ended(r))&&ended(r)>=from&&ended(r)<=time;
     if(phase.activities)good=good&&(!Number.isFinite(ended(r))||ended(r)>=time)&&(!['completed','failed','cancelled','canceled','replaced'].includes(r.phase)||Number.isFinite(ended(r)));
    }
@@ -54,7 +81,20 @@ export function observedHolds({samples=[],receipts=[],phase,bindings={},from=-In
   finish();
  }
  windows.sort((a,b)=>a.completedAt-b.completedAt||a.from-b.from);
- return {status:windows.length?'pass':miss,detail:windows.length?'current body samples and native receipt agree':'no uninterrupted sampled hold; missing/contrary samples are retained',windows};
+ return {status:windows.length?'pass':localUnknown?'unknown':miss,detail:windows.length?'current body samples and native receipt agree':'no uninterrupted sampled hold; missing/contrary samples are retained',windows};
+}
+function errandInspection(r,{samples,region,returned,cutoff,maxGapSec}){
+ const request=at(r.requestedAt),response=at(r.at),gap=maxGapSec*1000;
+ if(!['here','observe','explore'].includes(r.command)||r.origin!=='agent'||!cited(r.evidence)||!Number.isFinite(request)||!Number.isFinite(response)||request<returned||request>response||response>cutoff)return false;
+ // Explore's route query is not an inspection. Require a source-cited native
+ // local around payload. All inspection commands also need current destination
+ // coverage across the complete request/response, retaining contrary samples.
+ if(r.command==='explore'&&(r.inspection?.kind!=='native-local-around'||!cited(r.inspection.evidence)||!Array.isArray(r.inspection.facts)||!r.inspection.facts.length))return false;
+ const all=(samples??[]).filter(s=>Number.isFinite(at(s.t))).sort((a,b)=>at(a.t)-at(b.t));
+ const before=all.filter(s=>at(s.t)<=request).at(-1),after=all.find(s=>at(s.t)>=response&&at(s.t)<=cutoff);
+ if(!before||!after||request-at(before.t)>gap||at(after.t)-response>gap)return false;
+ const proof=all.filter(s=>at(s.t)>=at(before.t)&&at(s.t)<=at(after.t));
+ return proof.every((s,i)=>current(s)&&inside(s,region)&&(!i||at(s.t)-at(proof[i-1].t)<=gap));
 }
 const bodyCoverageComplete=(ev,from,to,maxGapSec)=>{
  if(ev?.coverageComplete!==true)return false;
@@ -244,7 +284,7 @@ export function scoreContinuity({fixtures,oracles,evidence}){
    if(result.windows.length)previous=result.windows[0].completedAt;
    if(['sustained seated reading','native violin performance','audience attendance','garden visit','presenter seat','audience seat'].includes(phase.name))holds.push({actor:actor.id,phase:phase.name,status:result.status,windows:result.windows});
    if(phase.name==='original errand return'&&result.windows.length){
-    const returned=result.windows[0].from,close=at(evidence.semantic.closureAt),reads=(ev.reads??[]).filter(r=>['here','observe'].includes(r.command)&&at(r.at)>=returned&&at(r.at)<=cutoff);
+    const returned=result.windows[0].from,close=at(evidence.semantic.closureAt),allowed=actor.originalErrand?.requiresReadAfterReturn??['here','observe'],reads=(ev.reads??[]).filter(r=>allowed.includes(r.command)&&errandInspection(r,{samples:ev.samples,region:phase.region,returned,cutoff,maxGapSec:maxGap}));
     rows.push(row(actor.id+':resumption-time',returned-close<=oracles.numeric.resumeWithinSecAfterObservedClosure*1000?'pass':'fail','Physical return follows observed closure within frozen bound'));
     rows.push(row(actor.id+':errand-read',reads.length?'pass':'unknown','Current read after physical return',reads));
    }
@@ -326,7 +366,7 @@ export function scoreContinuity({fixtures,oracles,evidence}){
  const review=evidence.semantic,required=[...oracles.semanticRubric.common,...oracles.semanticRubric.scenarios[scenario.id]];
  for(const item of required){const r=review?.rubricVersion===oracles.semanticRubric.version?review.reviews?.find(r=>r.id===item.id):null;rows.push(row('semantic:'+item.id,r&&['pass','fail'].includes(r.status)&&r.evidence?.length?r.status:'unknown',r?.reason??item.pass,r?.evidence));}
  const status=evidence.fixtureVerified!==true?'unknown':rows.some(r=>r.status==='fail')?'fail':rows.every(r=>r.status==='pass')?'pass':'unknown';
- return {schema:'continuity-score/1',scenarioId:scenario.id,status,readiness:scenario.fixtureStatus,rows,limits:'Proposal scorer. Missing group integration/coverage remains unknown; this output does not certify baseline, holdout or soak acceptance.'};
+ return {schema:'continuity-score/1',proposalRevision:fixtures.proposalRevision??null,scenarioId:scenario.id,status,readiness:scenario.fixtureStatus,rows,limits:'Proposal scorer. Missing group integration/coverage remains unknown; this output does not certify baseline, holdout or soak acceptance.'};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  const evidence=JSON.parse(readFileSync(process.argv[2],'utf8'));

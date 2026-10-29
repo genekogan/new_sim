@@ -31,6 +31,27 @@ test('complete position coverage cannot establish missing native activity or ins
  assert.equal(observedHolds({receipts:[receipt],samples:playing.map(s=>({...s,instrument:'violin'})),bindings,phase:music,coverageComplete:true}).status,'pass');
  assert.equal(observedHolds({receipts:[receipt],samples:playing.map(s=>({...s,instrument:'drums'})),bindings,phase:music,coverageComplete:true}).status,'fail');
 });
+test('local read:here needs an audited bounded lifecycle and the unchanged physical read hold',()=>{
+ const p=structuredClone(phase);p.receipt.localCapabilities=['read:here'];
+ const r={id:'local',capability:'read:here',acceptedAtUtc:0,endedAtUtc:31000,phase:'completed'};
+ const run=(changes={})=>observedHolds({samples,receipts:[r],bindings,phase:p,from:0,to:31000,coverageComplete:true,...changes});
+ assert.equal(run().status,'pass','generic local target is established by actual permitted held seat, not invented chosen target');
+ assert.equal(run({coverageComplete:false}).status,'unknown','body samples do not certify full native receipt enumeration');
+ assert.equal(run({coverageComplete:false,bindings:{chair:{...bindings.chair,capabilities:{read:['read:here']}}}}).status,'unknown','a generic capability in a binding cannot bypass the local lifecycle audit');
+ for(const change of [{endedAtUtc:undefined},{acceptedAtUtc:undefined},{id:undefined}])assert.equal(run({receipts:[{...r,...change}]}).status,'unknown');
+ assert.equal(run({from:-Infinity}).status,'unknown','local receipt must belong to a bounded observation interval');
+ assert.equal(run({receipts:[{...r,capability:'read:remote'}]}).status,'fail');
+ assert.equal(run({receipts:[{...r,phase:'replaced',endedAtUtc:15000}]}).status,'fail');
+ assert.equal(run({receipts:[{...r,phase:'started',endedAtUtc:undefined},{id:'replacement',capability:'walk:field',acceptedAtUtc:15000,phase:'started'}]}).status,'fail','a missing old terminal cannot bridge a newer accepted native action');
+ assert.equal(run({receipts:[{...r,phase:'started',endedAtUtc:undefined},{...r,id:'new-read',acceptedAtUtc:15000}]}).status,'fail','unchanged pose cannot stitch two individually short receipt lifetimes');
+ assert.equal(run({receipts:[r,{id:'same-ms',capability:'walk:field',acceptedAtUtc:0,phase:'started'}]}).status,'unknown','ambiguous same-clock receipt ordering is not invented');
+ assert.equal(run({samples:samples.map((s,i)=>i===15?{...s,activity:'walk'}:s)}).status,'fail');
+ assert.equal(run({samples:samples.map((s,i)=>i===15?{...s,pos:{x:20,z:0,src:'here'}}:s)}).status,'fail');
+ assert.equal(run({samples:samples.map((s,i)=>i===15?{...s,seat:undefined}:s)}).status,'unknown');
+ const two={...bindings,other:{entityId:'e_other',slot:'seat',capabilities:{read:['read:other']}}},twoPhase={...p,requireSeatRefs:['chair','other'],receipt:{...p.receipt,targetRefs:['chair','other']}};
+ assert.equal(run({bindings:two,phase:twoPhase,samples:samples.map((s,i)=>i>=15?{...s,seat:'e_other#seat'}:s)}).status,'fail','two short holds cannot be stitched across a seat switch');
+ assert.equal(run({bindings:two,phase:twoPhase,receipts:[receipt],samples:samples.map(s=>({...s,seat:'e_other#seat'}))}).status,'fail','an unrelated named-seat receipt cannot support a different permitted seat');
+});
 test('empty proposal evidence cannot pass fixture, semantic, notification or duplicate-effect checks',()=>{
  const fixtures=JSON.parse(readFileSync(new URL('./fixtures.json',import.meta.url))),oracles=JSON.parse(readFileSync(new URL('./oracles.json',import.meta.url)));
  const result=scoreContinuity({fixtures,oracles,evidence:{scenarioId:'eden-reading-duo',t0:'2026-10-29T00:00:00Z'}});
@@ -50,6 +71,23 @@ function readingEvidence({returnAcceptedSec=200,a=[0,60],b=[0,60]}={}){
  }
  return {scenarioId:scenario.id,bindings,participants,semantic:{closureAt:25000}};
 }
+test('prospective fixture permits local read:here only with complete native lifecycle evidence',()=>{
+ const e=readingEvidence({a:[250,300],b:[250,300]});e.participants['reader-b'].receipts[1].capability='read:here';
+ assert.equal(resultRow(score(e),'reader-b:sustained seated reading').status,'pass');assert.equal(resultRow(score(e),'simultaneous-distinct-seat-reading').status,'pass');
+ e.participants['reader-b'].coverageComplete=false;assert.equal(resultRow(score(e),'reader-b:sustained seated reading').status,'unknown');assert.equal(resultRow(score(e),'simultaneous-distinct-seat-reading').status,'unknown');
+});
+test('fresh local explore inspection requires agent provenance and current destination body bracketing',()=>{
+ const make=()=>{const e=readingEvidence();e.participants['reader-a'].reads=[{command:'explore',origin:'agent',requestedAt:201500,at:202500,inspection:{kind:'native-local-around',tick:99,facts:[{kind:'things',text:'podium · 9m ahead'}],evidence:['agent evidence#/response/around']},evidence:['agent evidence']}];return e;};
+ const id='reader-a:errand-read',e=make();assert.equal(resultRow(score(e),id).status,'pass');
+ for(const command of ['here','observe']){const x=make();x.participants['reader-a'].reads[0].command=command;assert.equal(resultRow(score(x),id).status,'pass');x.participants['reader-a'].samples.find(s=>s.t===202000).pos.x=74;assert.equal(resultRow(score(x),id).status,'unknown','an unrelated current read after leaving the destination cannot count');}
+ for(const change of [{origin:'observer'},{inspection:undefined},{requestedAt:200000},{at:721000},{inspection:{kind:'native-local-around',facts:[],evidence:['source']}},{inspection:{kind:'remote-view',facts:['route'],evidence:['source']}}]){
+  const x=make();Object.assign(x.participants['reader-a'].reads[0],change);assert.equal(resultRow(score(x),id).status,'unknown');
+ }
+ const contrary=make();contrary.participants['reader-a'].samples.find(s=>s.t===202000).pos.x=74;assert.equal(resultRow(score(contrary),id).status,'unknown','physical return receipt cannot replace current location during inspection');
+ const gap=make();gap.participants['reader-a'].samples=gap.participants['reader-a'].samples.filter(s=>s.t<202000||s.t>204000);assert.equal(resultRow(score(gap),id).status,'unknown');
+ const oldManifest=structuredClone(frozenFixtures);oldManifest.scenarios[0].actors[0].originalErrand.requiresReadAfterReturn=['here','observe'];assert.equal(resultRow(scoreContinuity({fixtures:oldManifest,oracles:frozenOracles,evidence:{t0:0,...e}}),id).status,'unknown','explore permission is an explicit prospective fixture declaration');
+ for(const command of ['here','observe']){const observer=make();Object.assign(observer.participants['reader-a'].reads[0],{command,origin:'observer'});assert.equal(resultRow(score(observer),id).status,'unknown','observer read is not the agent inspecting');const stale=make();Object.assign(stale.participants['reader-a'].reads[0],{command,requestedAt:200000});assert.equal(resultRow(score(stale),id).status,'unknown','a request before return cannot become fresh by a late response');}
+});
 test('phase ordering uses observed hold/completion, allowing compound acceptance before arrival',()=>{
  const evidence=readingEvidence({returnAcceptedSec:10});for(const ev of Object.values(evidence.participants))ev.receipts.at(-1).endedAtUtc=26000;
  const early=score(evidence);assert.equal(resultRow(early,'reader-a:original errand return').status,'fail');
@@ -79,6 +117,7 @@ test('visible response requires actor/event linkage, source-cited relevance and 
 });
 function presentationEvidence(){
  const scenario=frozenFixtures.scenarios.find(s=>s.id==='mars-presentation-four'),refs=['presenter-timber-box','tier-2','tier-3','tier-4'],bindings=Object.fromEntries(refs.map(ref=>[ref,{entityId:ref,slot:'seat',capabilities:{sit:['sit:'+ref]}}]));bindings.field={entityId:'field',capabilities:{walk:['walk:field']}};
+ for(const seat of scenario.audienceSeats)if(seat.entityRef)bindings[seat.ref]={entityId:seat.entityRef,slot:seat.slot,capabilities:{sit:['sit:'+seat.entityRef]}};
  const participants={};
  for(const [index,actor]of scenario.actors.entries()){
   const start=index===3?400:320,ref=refs[index];
@@ -97,6 +136,27 @@ test('Mars attendance needs all four distinct seats during actual source-cited t
  const afterTalk=structuredClone(evidence),late=afterTalk.participants['attendee-3'];late.samples=late.samples.map(s=>s.seat?{...s,pos:{x:0,z:0,src:'world'},seat:null,posture:'standing'}:s);for(const s of late.samples)if(s.t>=500000&&s.t<=540000)Object.assign(s,{pos:{x:-14.412,z:-18.447,src:'world'},posture:'seated',seat:'tier-4#seat'});
  assert.equal(resultRow(score(afterTalk),id).status,'fail','an individually sufficient seat hold after the talk is not attendance');
  late.coverageComplete=false;assert.equal(resultRow(score(afterTalk),id).status,'unknown');
+});
+test('authored Navy Sofa subslots qualify without collapsing distinct slots or allowing occupied first tier',()=>{
+ const e=presentationEvidence(),id='presentation-simultaneous-distinct-seat-attendance';
+ for(const [actor,slot]of [['attendee-1','seat-1'],['attendee-2','seat-2']]){
+  const p=e.participants[actor];p.samples=p.samples.map(s=>s.seat?{...s,seat:'navy-sofa#'+slot}:s);p.receipts[0]={...p.receipts[0],capability:'sit:navy-sofa',chosen:{target:'navy-sofa',slot:'navy-sofa#'+slot}};
+ }
+ assert.equal(resultRow(score(e),id).status,'pass');
+ const aliases=structuredClone(e);aliases.bindings={sofaAlias:{entityId:'navy-sofa'},...aliases.bindings};assert.equal(resultRow(score(aliases),id).status,'pass','an entity alias cannot shadow the exact permitted subslot binding');
+ const bare=structuredClone(e);for(const actor of ['attendee-1','attendee-2'])bare.participants[actor].samples.forEach(s=>{if(s.seat)s.seat='navy-sofa'});assert.equal(resultRow(score(bare),id).status,'unknown','a bare multi-seat entity cannot invent its held subslot');
+ const same=structuredClone(e);same.participants['attendee-2'].samples.forEach(s=>{if(s.seat)s.seat='navy-sofa#seat-1'});same.participants['attendee-2'].receipts[0].chosen.slot='navy-sofa#seat-1';assert.equal(resultRow(score(same),id).status,'fail');
+ const wrongReceipt=structuredClone(e);wrongReceipt.participants['attendee-2'].receipts[0].chosen.slot='navy-sofa#seat-3';assert.equal(resultRow(score(wrongReceipt),id).status,'fail','explicit native chosen slot cannot be ignored');
+ const occupied=structuredClone(e);occupied.participants['attendee-1'].samples.forEach(s=>{if(s.seat)s.seat='tier#seat'});assert.equal(resultRow(score(occupied),id).status,'fail');
+ const tooFar=structuredClone(e);tooFar.participants['attendee-1'].samples.forEach(s=>{if(s.seat)s.pos={x:0,z:0,src:'here'}});assert.equal(resultRow(score(tooFar),id).status,'fail','sofa addition does not change venue radius');
+});
+test('prospective sofa pool matches all authored capacity-one slots and final poses without changing numeric thresholds',()=>{
+ const scenario=frozenFixtures.scenarios.find(s=>s.id==='mars-presentation-four'),sofas=scenario.audienceSeats.filter(s=>s.entityRef),template=JSON.parse(readFileSync(new URL('../../../../worlds/templates/mars-two.json',import.meta.url))),historical=JSON.parse(readFileSync(new URL('../../../../worlds/templates/unified-mars-live-proof-20261027.json',import.meta.url)));
+ const flatten=v=>Array.isArray(v)?v.flatMap(flatten):v&&typeof v==='object'?[v,...Object.values(v).flatMap(flatten)]:[];
+ const ops=flatten(template),definition=flatten(historical).find(v=>v.name==='core-mars-navy-sofa'&&v.version===2);
+ assert.equal(sofas.length,6);assert.deepEqual(new Set(sofas.map(s=>s.entityRef)),new Set(['navy-sofa','navy-sofa-2']));
+ for(const seat of sofas){const pose=ops.filter(o=>o.op==='move'&&o.id===seat.entityRef).at(-1),slot=definition.slots.find(s=>s.id===seat.slot);assert.equal(slot.capacity,1);assert.deepEqual(seat.localSeatPos,slot.p);assert.deepEqual(seat.entityWorldPose,pose.p);assert.equal(seat.entityAuthoredRotation,pose.r);const [x,,z]=slot.p;assert.ok(Math.abs(seat.worldXZCandidate[0]-(pose.p[0]+x*Math.cos(pose.r)+z*Math.sin(pose.r)))<1e-9);assert.ok(Math.abs(seat.worldXZCandidate[1]-(pose.p[2]-x*Math.sin(pose.r)+z*Math.cos(pose.r)))<1e-9);}
+ assert.equal(scenario.venue.region.radiusM,9);assert.equal(scenario.timing.minimumAudienceHoldSec,30);assert.equal(scenario.timing.minimumPresenterHoldSec,30);assert.equal(scenario.occupiedSeat.ref,'tier');assert.ok(!scenario.journeyTemplates.audience[0].receipt.targetRefs.includes('tier'));for(const actor of scenario.actors)assert.deepEqual(actor.originalErrand.returnRegion,{pos:[0,0],radiusM:3});
 });
 test('complete audience attendance outside actual native performance fails instead of unknown',()=>{
  const scenario=frozenFixtures.scenarios.find(s=>s.id==='eden-bandstand-five'),bindings={'bandstand-violin-1':{entityId:'violin',capabilities:{'play-music':['play-music:violin']}},'eden-bandstand':{entityId:'bandstand',capabilities:{walk:['walk:bandstand']}},'place-field':{entityId:'field',capabilities:{walk:['walk:field']}}},participants={};

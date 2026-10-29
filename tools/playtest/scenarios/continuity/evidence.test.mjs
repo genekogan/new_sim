@@ -64,6 +64,15 @@ test('observer body polling is not an agent errand read and mutable dispatch tim
  x.journals[a].operations.push({id:'uncertain-op',status:'uncertain',at:4500,request:{type:'write',command:'say',args:{text:'maybe spoken'}},response:null},{id:'dispatch-record',status:'dispatching',at:4600,request:{type:'write',command:'act',args:{}},response:null});
  const e=adaptIndependentProbe(x);assert.deepEqual(e.participants[a].reads.map(r=>[r.command,r.at]),[['observe',4110]]);assert.equal(e.adaptation.operations.find(o=>o.id==='uncertain-op').dispatchRecordedAt,null);assert.equal(e.adaptation.operations.find(o=>o.id==='dispatch-record').dispatchRecordedAt,4600);assert.ok(!e.effects.some(e=>e.operationId==='uncertain-op'));
 });
+test('explore adapter distinguishes native local surroundings from route-only, remote and observer evidence without request arguments',()=>{
+ const response={contract:'eden-edge/1',tick:88,around:{tick:88,people:[],things:['Commons podium (object) · 9m ahead'],places:[{id:'deck',name:'Commons Deck',m:9,dir:'E'}],untrusted:true},route:{query:'faraway destination',found:false}},native={kind:'world-read',actor:a,origin:'agent',command:'explore',requestedAt:4000,receivedAt:4010,response};
+ const x=input();x.timeline.push(native);const r=adaptIndependentProbe(x).participants[a].reads[0];
+ assert.equal(r.origin,'agent');assert.equal(r.inspection.kind,'native-local-around');assert.equal(r.inspection.tick,88);assert.equal(r.inspection.facts.length,2);assert.match(r.inspection.evidence[0],/timeline.jsonl#L\d+\/response\/around$/);assert.ok(!JSON.stringify(r.inspection).includes('faraway destination'),'remote route query is never a local observation fact');
+ for(const change of [{response:{contract:'eden-edge/1',tick:88,route:{query:'field',found:true}}},{response:{...response,view:{place:'remote'}}},{response:{...response,around:{...response.around,remote:true}}},{response:{...response,around:{...response.around,things:[],places:[]}}},{response:{...response,tick:89}}]){
+  const bad=input();bad.timeline.push({...native,...change});assert.equal(adaptIndependentProbe(bad).participants[a].reads[0].inspection,undefined);
+ }
+ for(const change of [{origin:'observer'},{response:{error:{code:'unavailable'}}},{requestedAt:4020}]){const bad=input();bad.timeline.push({...native,...change});assert.equal(adaptIndependentProbe(bad).participants[a].reads.length,0);}
+});
 test('fixture body endpoint samples and explicitly sourced setup receipts survive without inventing a model thread',()=>{
  const x=input();x.run.fixtureActors=[{id:'occupant',soulId:'fixture-soul'}];x.timeline.push({ ...body('occupant',950,'setup-body'),soulId:'fixture-soul'},...Array.from({length:5},(_,i)=>({...body('occupant',1100+i*1000,'fixture-body'),soulId:'fixture-soul'})));
  x.nativeReceipts=[{actor:'occupant',observedAt:940,receipt:{id:'seat-setup',capability:'sit:fixture-seat',phase:'completed'},evidence:['setup.json#/fixture-receipt']}];const e=adaptIndependentProbe(x),fixture=e.fixtureActors.occupant;assert.equal(e.t0,1000);assert.equal(fixture.samples.at(-1).t,5100);assert.equal(fixture.receipts[0].id,'seat-setup');assert.equal(fixture.coverageComplete,false);assert.equal(fixture.threadId,undefined);
@@ -89,7 +98,7 @@ test('agent read sidecar keeps its source and refuses foreign Soul evidence',t=>
  const path=join(out,a,'agent-evidence.jsonl'),row={kind:'world-read',origin:'agent',worldId:'w',soulId:'soul-'+a,command:'here',requestedAt:1100,receivedAt:1200,response:{here:{me:{pos:[0,0]}}}};
  writeFileSync(path,JSON.stringify(row)+'\n');
  const e=readIndependentProbeEvidence(out,{scenarioId:'eden-reading-duo'});
- assert.deepEqual(e.participants[a].reads,[{command:'here',at:1200,requestedAt:1100,evidence:[a+'/agent-evidence.jsonl#L1']}]);
+ assert.deepEqual(e.participants[a].reads,[{command:'here',origin:'agent',at:1200,requestedAt:1100,evidence:[a+'/agent-evidence.jsonl#L1']}]);
  assert.equal(e.participants[a].samples.length,0,'agent reads are not invented observer body samples');
  writeFileSync(path,JSON.stringify({...row,soulId:'foreign'})+'\n');
  assert.throws(()=>readIndependentProbeEvidence(out),/world\/Soul scope mismatch/);

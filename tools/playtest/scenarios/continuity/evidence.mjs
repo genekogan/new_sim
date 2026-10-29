@@ -13,6 +13,18 @@ const object=v=>v&&typeof v==='object'&&!Array.isArray(v);
 const decode=v=>typeof v==='string'?JSON.parse(v):v;
 const unique=v=>[...new Set(v)];
 const actorId=id=>{if(typeof id!=='string'||!/^[-A-Za-z0-9_]+$/.test(id))throw Error('Invalid evidence actor id');return id;};
+// In this native contract explore always calls authenticated /around. Its
+// optional route query is separate: only around's current local facts count.
+// No request arguments or model text are needed to establish that distinction.
+function localAround(response,source){
+ const around=response?.around,keys=['tick','people','things','places','found','floors','unvisited','untrusted'];
+ if(response?.error||response?.accepted===false||response?.remote!==undefined||response?.view!==undefined||response?.contract!=='eden-edge/1'||!object(around)||Object.keys(around).some(k=>!keys.includes(k))||!Number.isSafeInteger(around.tick)||around.tick<0||response.tick!==undefined&&response.tick!==around.tick)return null;
+ if(!['people','things','places'].every(k=>Array.isArray(around[k])))return null;
+ const facts=[];
+ for(const kind of ['people','things'])for(const text of around[kind])if(typeof text==='string'&&text.trim())facts.push({kind,text});
+ for(const place of around.places)if(object(place)&&typeof place.id==='string'&&typeof place.name==='string'&&Number.isFinite(place.m)&&place.m>=0&&typeof place.dir==='string')facts.push({kind:'place',id:place.id,name:place.name,m:place.m,dir:place.dir});
+ return facts.length?{kind:'native-local-around',tick:around.tick,facts,evidence:[source+'/response/around']}:null;
+}
 const nativeBody=(r,source)=>{
  const observed=time(r.receivedAt)??time(r.at),start=time(r.requestedAt),explicit=r.source==='here',legacy=r.source===undefined&&r.kind==='body';
  const sample=withKinematics({source}, {me:r.me,tick:r.tick},{startedAt:start,endedAt:observed,mono:r.mono});
@@ -63,7 +75,10 @@ export function adaptIndependentProbe({run,timeline=[],journals={},scenarioId=ru
   if(['body','fixture-body','setup-body'].includes(r.kind))target.samples.push(nativeBody(r,source));
   if(r.kind==='observation-error')target.samples.push({t:time(r.receivedAt)??time(r.at),pos:null,currentBody:false,source,observationError:r.code??r.message??'missing native body'});
   if(r.kind==='controller-release')releases.push({actor:r.actor,scheduledAt:time(r.scheduledAt),releasedAt:time(r.releasedAt),initialInstructionId:r.instructionId??null,pid:r.pid??null,evidence:[source]});
-  if(r.kind==='world-read'&&r.origin==='agent'&&typeof r.command==='string'&&time(r.receivedAt)!==null&&time(r.requestedAt)!==null&&object(r.response))target.reads.push({command:r.command,at:time(r.receivedAt),requestedAt:time(r.requestedAt),evidence:[source]});
+  if(r.kind==='world-read'&&r.origin==='agent'&&typeof r.command==='string'&&time(r.receivedAt)!==null&&time(r.requestedAt)!==null&&time(r.requestedAt)<=time(r.receivedAt)&&object(r.response)&&!r.response.error&&r.response.accepted!==false){
+   const inspection=r.command==='explore'?localAround(r.response,source):null;
+   target.reads.push({command:r.command,origin:'agent',at:time(r.receivedAt),requestedAt:time(r.requestedAt),evidence:[source],...(inspection?{inspection}:{})});
+  }
  }
  const worlds=new Set();
  for(const a of run.actors){

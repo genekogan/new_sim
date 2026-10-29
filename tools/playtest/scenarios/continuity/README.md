@@ -126,3 +126,52 @@ writes slices/manifests; it performs no world requests, actions or inference.
 Native discovery JSON in that directory came from the existing credential-opaque
 repository `eden.mjs` with the paired scratch folder as cwd. Credentials were not
 printed or copied. No native actions were performed.
+
+Prospective revision `2026-10-29-precomparison-2` supersedes the strict proposal
+at Git `6960c41f6`. The JSON transport remains schema `/1`; fixture revision
+metadata is included in scorer output. Existing development reports, especially
+Eden duo 3 and Mars four 1, retain their original findings. These corrections do
+not retroactively turn any old run into acceptance evidence, and no comparison
+has been started.
+
+- `read:here` is an explicitly permitted local capability in the reading phase,
+  not a wildcard seat-target binding. It requires a finite observation interval,
+  complete audited native receipt enumeration, native acceptance timing and an
+  activity lifetime covering the hold. Terminal state without a terminal time is
+  unknown. A newer accepted action ends the earlier local receipt's usable
+  interval; ambiguous same-clock ordering is unknown. The unchanged 30-second
+  actual reading, venue, stable permitted exact held-seat and simultaneous
+  distinct-seat predicates still apply. A named-seat receipt must match the held
+  seat; an explicit chosen native slot cannot be ignored. Native read completion
+  and delivered content remain separate evidence for grounded passage claims.
+- Fresh agent-origin `explore` can inspect the original errand destination. The
+  adapter emits `reads[].origin='agent'` and an optional `inspection` object with
+  `kind:'native-local-around'`, native `tick`, `facts`, and exact source `evidence`.
+  It derives this only from the successful authenticated local `around` response,
+  not the optional `route` query. Source contracts are
+  `tools/soul-runtime/world-client.mjs` (`explore` calls `/v1/edge/around`) and
+  `apps/server/src/edge/routes.ts` plus `perception/around.ts` (local Soul
+  perception is returned independently of route lookup). Request arguments need
+  not be recorded to make this distinction. Route-only, remote-view, failed,
+  empty-surroundings and observer reads do not qualify. All inspection commands require agent provenance and a request after physical
+  return, response before cutoff, and current body evidence bracketing the whole request/response at the destination with gaps
+  <=2 seconds. This establishes inspection only; a source-grounded later report
+  remains a separate semantic requirement.
+- Mars audience supports now include all three authored capacity-one slots on
+  each of `navy-sofa` and `navy-sofa-2`, alongside the original free tiers. Stable
+  refs are `<entity-ref>#seat-1`, `#seat-2`, and `#seat-3`; each fresh binding must
+  retain the shared generated entity ID and its exact slot. Ordered Mars template
+  moves and the historical `core-mars-navy-sofa@2` definition establish final
+  poses and local slot geometry; these are also recorded in `audienceSofaSource`.
+  This includes all six authored slots, not just development-selected seats. The
+  9 m venue, 30-second holds, arrival tolerances, occupied first tier and presenter
+  support are unchanged. A bare multi-seat furniture ID is missing exact-slot
+  evidence, not proof of a collision or permission to invent a slot. Fresh native
+  reachability, both-arm geometry and exact-slot preflight remain mandatory.
+- Original errands explicitly name `Commons Field` in Eden and `Green field` on
+  Mars. They do not ask for an unsupported recalled initial coordinate. The
+  physical return predicate stays [0,0] with radius 3 m and current standing body
+  evidence, plus completed native navigation and fresh inspection. Encompassing
+  place-path ancestry alone does not establish that return. Exact setup still
+  needs fresh native verification; the development named-field setup substitution
+  is not a passed frozen setup.

@@ -118,7 +118,7 @@
             "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
           },
           "originalErrand": {
-            "initialOwnerSupplement": "Your original errand is to go to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
+            "initialOwnerSupplement": "Your original errand is to return to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
               "pos": [
                 0,
@@ -149,11 +149,13 @@
             ],
             "requiresReadAfterReturn": [
               "here",
-              "observe"
+              "observe",
+              "explore"
             ],
             "requiresGroundedObservation": true,
             "returnRegionSource": "worlds/eden/places.v1.json#field polygon; verify against fresh native world before comparison seal",
-            "note": "Pre-freeze correction after developmentduo1: named semantic destination replaces an exact starting coordinate not exposed as a movement capability. Original run remains partial, not rescored."
+            "note": "Pre-freeze correction after developmentduo1: named semantic destination replaces an exact starting coordinate not exposed as a movement capability. Original run remains partial, not rescored.",
+            "destinationName": "Commons Field"
           },
           "soulName": "ContinuityReaderA"
         },
@@ -192,7 +194,7 @@
             "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
           },
           "originalErrand": {
-            "initialOwnerSupplement": "Your original errand is to go to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
+            "initialOwnerSupplement": "Your original errand is to return to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
               "pos": [
                 0,
@@ -223,11 +225,13 @@
             ],
             "requiresReadAfterReturn": [
               "here",
-              "observe"
+              "observe",
+              "explore"
             ],
             "requiresGroundedObservation": true,
             "returnRegionSource": "worlds/eden/places.v1.json#field polygon; verify against fresh native world before comparison seal",
-            "note": "Pre-freeze correction after developmentduo1: named semantic destination replaces an exact starting coordinate not exposed as a movement capability. Original run remains partial, not rescored."
+            "note": "Pre-freeze correction after developmentduo1: named semantic destination replaces an exact starting coordinate not exposed as a movement capability. Original run remains partial, not rescored.",
+            "destinationName": "Commons Field"
           },
           "soulName": "ContinuityReaderB"
         }
@@ -407,6 +411,9 @@
               "eden-library-1/library-reading-chair-east-1",
               "eden-library-1/library-reading-chair-east-2",
               "eden-library-1/library-desk-chair-west"
+            ],
+            "localCapabilities": [
+              "read:here"
             ]
           },
           "postures": [
@@ -415,7 +422,8 @@
           ],
           "activities": [
             "read"
-          ]
+          ],
+          "evidenceRule": "A native read:here receipt may lack a seat target; require a bounded audited native lifecycle, no intervening accepted action, actual current read activity and a stable permitted exact held seat throughout the unchanged 30-second hold."
         },
         {
           "name": "original errand return",
@@ -529,7 +537,7 @@
             "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
           },
           "originalErrand": {
-            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "initialOwnerSupplement": "Your original errand is to return to Green field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
               "pos": [
                 0,
@@ -542,9 +550,11 @@
             ],
             "requiresReadAfterReturn": [
               "here",
-              "observe"
+              "observe",
+              "explore"
             ],
-            "requiresGroundedObservation": true
+            "requiresGroundedObservation": true,
+            "destinationName": "Green field"
           },
           "soulName": "ChibaSpeaker"
         },
@@ -583,7 +593,7 @@
             "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
           },
           "originalErrand": {
-            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "initialOwnerSupplement": "Your original errand is to return to Green field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
               "pos": [
                 0,
@@ -596,9 +606,11 @@
             ],
             "requiresReadAfterReturn": [
               "here",
-              "observe"
+              "observe",
+              "explore"
             ],
-            "requiresGroundedObservation": true
+            "requiresGroundedObservation": true,
+            "destinationName": "Green field"
           },
           "soulName": "ChibaGuest1"
         },
@@ -637,7 +649,7 @@
             "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
           },
           "originalErrand": {
-            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "initialOwnerSupplement": "Your original errand is to return to Green field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
               "pos": [
                 0,
@@ -650,9 +662,11 @@
             ],
             "requiresReadAfterReturn": [
               "here",
-              "observe"
+              "observe",
+              "explore"
             ],
-            "requiresGroundedObservation": true
+            "requiresGroundedObservation": true,
+            "destinationName": "Green field"
           },
           "soulName": "ChibaGuest2"
         },
@@ -691,7 +705,7 @@
             "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
           },
           "originalErrand": {
-            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "initialOwnerSupplement": "Your original errand is to return to Green field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
               "pos": [
                 0,
@@ -704,9 +718,11 @@
             ],
             "requiresReadAfterReturn": [
               "here",
-              "observe"
+              "observe",
+              "explore"
             ],
-            "requiresGroundedObservation": true
+            "requiresGroundedObservation": true,
+            "destinationName": "Green field"
           },
           "soulName": "ChibaGuest3"
         }
@@ -761,6 +777,144 @@
           ],
           "radiusM": 1.5,
           "status": "template-only; native reachability pending; high tiers may refuse"
+        },
+        {
+          "ref": "navy-sofa#seat-1",
+          "entityRef": "navy-sofa",
+          "slot": "seat-1",
+          "worldXZCandidate": [
+            -11.424852414138174,
+            -24.544647608808933
+          ],
+          "entityWorldPose": [
+            -10.812,
+            0.373,
+            -24.732
+          ],
+          "entityAuthoredRotation": 0.14,
+          "localSeatPos": [
+            -0.633,
+            0.56,
+            0.1
+          ],
+          "capacity": 1,
+          "radiusM": 1.5,
+          "status": "authored source and native slot definition verified; fresh per-arm physical preflight and exact held-slot binding required"
+        },
+        {
+          "ref": "navy-sofa#seat-2",
+          "entityRef": "navy-sofa",
+          "slot": "seat-2",
+          "worldXZCandidate": [
+            -10.798045688535575,
+            -24.632978400378736
+          ],
+          "entityWorldPose": [
+            -10.812,
+            0.373,
+            -24.732
+          ],
+          "entityAuthoredRotation": 0.14,
+          "localSeatPos": [
+            0,
+            0.56,
+            0.1
+          ],
+          "capacity": 1,
+          "radiusM": 1.5,
+          "status": "authored source and native slot definition verified; fresh per-arm physical preflight and exact held-slot binding required"
+        },
+        {
+          "ref": "navy-sofa#seat-3",
+          "entityRef": "navy-sofa",
+          "slot": "seat-3",
+          "worldXZCandidate": [
+            -10.171238962932977,
+            -24.72130919194854
+          ],
+          "entityWorldPose": [
+            -10.812,
+            0.373,
+            -24.732
+          ],
+          "entityAuthoredRotation": 0.14,
+          "localSeatPos": [
+            0.633,
+            0.56,
+            0.1
+          ],
+          "capacity": 1,
+          "radiusM": 1.5,
+          "status": "authored source and native slot definition verified; fresh per-arm physical preflight and exact held-slot binding required"
+        },
+        {
+          "ref": "navy-sofa-2#seat-1",
+          "entityRef": "navy-sofa-2",
+          "slot": "seat-1",
+          "worldXZCandidate": [
+            -11.097852414138174,
+            -22.217647608808935
+          ],
+          "entityWorldPose": [
+            -10.485,
+            0.373,
+            -22.405
+          ],
+          "entityAuthoredRotation": 0.14,
+          "localSeatPos": [
+            -0.633,
+            0.56,
+            0.1
+          ],
+          "capacity": 1,
+          "radiusM": 1.5,
+          "status": "authored source and native slot definition verified; fresh per-arm physical preflight and exact held-slot binding required"
+        },
+        {
+          "ref": "navy-sofa-2#seat-2",
+          "entityRef": "navy-sofa-2",
+          "slot": "seat-2",
+          "worldXZCandidate": [
+            -10.471045688535575,
+            -22.305978400378738
+          ],
+          "entityWorldPose": [
+            -10.485,
+            0.373,
+            -22.405
+          ],
+          "entityAuthoredRotation": 0.14,
+          "localSeatPos": [
+            0,
+            0.56,
+            0.1
+          ],
+          "capacity": 1,
+          "radiusM": 1.5,
+          "status": "authored source and native slot definition verified; fresh per-arm physical preflight and exact held-slot binding required"
+        },
+        {
+          "ref": "navy-sofa-2#seat-3",
+          "entityRef": "navy-sofa-2",
+          "slot": "seat-3",
+          "worldXZCandidate": [
+            -9.844238962932977,
+            -22.39430919194854
+          ],
+          "entityWorldPose": [
+            -10.485,
+            0.373,
+            -22.405
+          ],
+          "entityAuthoredRotation": 0.14,
+          "localSeatPos": [
+            0.633,
+            0.56,
+            0.1
+          ],
+          "capacity": 1,
+          "radiusM": 1.5,
+          "status": "authored source and native slot definition verified; fresh per-arm physical preflight and exact held-slot binding required"
         }
       ],
       "occupiedSeat": {
@@ -824,7 +978,7 @@
           "id": "prestart-interruption",
           "when": "T0+280s",
           "actor": "presenter",
-          "text": "ChibaSpeaker, hello \u2014 what are you planning to discuss today?",
+          "text": "ChibaSpeaker, hello — what are you planning to discuss today?",
           "delivery": "addressed world speech from a nearby fixture-only body",
           "trigger": {
             "maximumDelaySec": 2,
@@ -896,7 +1050,13 @@
               "targetRefs": [
                 "tier-2",
                 "tier-3",
-                "tier-4"
+                "tier-4",
+                "navy-sofa#seat-1",
+                "navy-sofa#seat-2",
+                "navy-sofa#seat-3",
+                "navy-sofa-2#seat-1",
+                "navy-sofa-2#seat-2",
+                "navy-sofa-2#seat-3"
               ]
             },
             "postures": [
@@ -926,7 +1086,7 @@
         ]
       },
       "additionalMechanical": [
-        "three distinct free audience seats, no tier occupancy by test actors",
+        "three distinct exact free audience slots from the declared tier/sofa pool; occupied first tier remains excluded; bare multi-seat support identity cannot establish a sofa slot",
         "presenter speech occurs while physically at presenter seat",
         "at least two audience questions linked to subsequent presenter speech",
         "late actor physically seated; acceptance/RSVP alone fails attendance",
@@ -937,7 +1097,15 @@
         "field place identity/capability must be bound from actual Mars boot before filling return receipt targets",
         "do not silently replace inaccessible high tiers after any comparison run"
       ],
-      "initialConstraintSupplement": "The meeting is at {meetingUTC}; finish the gathering and your original errand by {completionUTC}. These are real UTC deadlines even if the world clock differs."
+      "initialConstraintSupplement": "The meeting is at {meetingUTC}; finish the gathering and your original errand by {completionUTC}. These are real UTC deadlines even if the world clock differs.",
+      "audienceSofaSource": {
+        "template": "worlds/templates/mars-two.json",
+        "sha256": "73601d6d0a05f4566071ecb362a61fc1542aaf6b18b497a9ac18059ca276e7c8",
+        "definition": "packages/world-compiler/src/core-kit/mars.json#core-mars-navy-sofa@2",
+        "historicalDefinition": "worlds/templates/unified-mars-live-proof-20261027.json#sha:4ff53d3e9f797a89e46feb333daf5d5649a4e94a3175d7d18e8755056181380f",
+        "meaning": "worlds/meaning/mars-two.json#navy-sofa",
+        "note": "Source verification covers both authored sofas and all three capacity-one slots, independently of which slots development agents selected. Fresh native per-arm reachability, exact ref/slot bindings and geometry parity remain required."
+      }
     },
     {
       "id": "eden-walk-three",
@@ -1025,7 +1193,7 @@
             "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
           },
           "originalErrand": {
-            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "initialOwnerSupplement": "Your original errand is to return to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
               "pos": [
                 0,
@@ -1038,9 +1206,11 @@
             ],
             "requiresReadAfterReturn": [
               "here",
-              "observe"
+              "observe",
+              "explore"
             ],
-            "requiresGroundedObservation": true
+            "requiresGroundedObservation": true,
+            "destinationName": "Commons Field"
           },
           "soulName": "WalkA"
         },
@@ -1079,7 +1249,7 @@
             "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
           },
           "originalErrand": {
-            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "initialOwnerSupplement": "Your original errand is to return to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
               "pos": [
                 0,
@@ -1092,9 +1262,11 @@
             ],
             "requiresReadAfterReturn": [
               "here",
-              "observe"
+              "observe",
+              "explore"
             ],
-            "requiresGroundedObservation": true
+            "requiresGroundedObservation": true,
+            "destinationName": "Commons Field"
           },
           "soulName": "WalkB"
         },
@@ -1133,7 +1305,7 @@
             "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
           },
           "originalErrand": {
-            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "initialOwnerSupplement": "Your original errand is to return to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
               "pos": [
                 0,
@@ -1146,9 +1318,11 @@
             ],
             "requiresReadAfterReturn": [
               "here",
-              "observe"
+              "observe",
+              "explore"
             ],
-            "requiresGroundedObservation": true
+            "requiresGroundedObservation": true,
+            "destinationName": "Commons Field"
           },
           "initialOwnerSupplement": "During the garden visit, propose changing the final meeting point to another landmark you can discover. Discuss this through in-world speech; do not assume the others agreed.",
           "soulName": "WalkC"
@@ -1417,7 +1591,7 @@
             "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
           },
           "originalErrand": {
-            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "initialOwnerSupplement": "Your original errand is to return to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
               "pos": [
                 0,
@@ -1430,9 +1604,11 @@
             ],
             "requiresReadAfterReturn": [
               "here",
-              "observe"
+              "observe",
+              "explore"
             ],
-            "requiresGroundedObservation": true
+            "requiresGroundedObservation": true,
+            "destinationName": "Commons Field"
           },
           "soulName": "BandHost"
         },
@@ -1471,7 +1647,7 @@
             "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
           },
           "originalErrand": {
-            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "initialOwnerSupplement": "Your original errand is to return to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
               "pos": [
                 0,
@@ -1484,9 +1660,11 @@
             ],
             "requiresReadAfterReturn": [
               "here",
-              "observe"
+              "observe",
+              "explore"
             ],
-            "requiresGroundedObservation": true
+            "requiresGroundedObservation": true,
+            "destinationName": "Commons Field"
           },
           "soulName": "BandGuest1",
           "initialOwnerSupplement": "Ask one relevant question about what you actually observe, at an appropriate moment. Coordinate through the world."
@@ -1526,7 +1704,7 @@
             "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
           },
           "originalErrand": {
-            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "initialOwnerSupplement": "Your original errand is to return to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
               "pos": [
                 0,
@@ -1539,9 +1717,11 @@
             ],
             "requiresReadAfterReturn": [
               "here",
-              "observe"
+              "observe",
+              "explore"
             ],
-            "requiresGroundedObservation": true
+            "requiresGroundedObservation": true,
+            "destinationName": "Commons Field"
           },
           "soulName": "BandGuest2"
         },
@@ -1580,7 +1760,7 @@
             "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
           },
           "originalErrand": {
-            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "initialOwnerSupplement": "Your original errand is to return to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
               "pos": [
                 0,
@@ -1593,9 +1773,11 @@
             ],
             "requiresReadAfterReturn": [
               "here",
-              "observe"
+              "observe",
+              "explore"
             ],
-            "requiresGroundedObservation": true
+            "requiresGroundedObservation": true,
+            "destinationName": "Commons Field"
           },
           "soulName": "BandGuest3"
         },
@@ -1634,7 +1816,7 @@
             "note": "Existing unified fixture setup form; execute with the same frozen fixture CLI in both arms before T0. No teleport. Record each actor separately; overlapping default spawn must be physically checked."
           },
           "originalErrand": {
-            "initialOwnerSupplement": "Your original errand is to return to your starting spot in the field where you began and inspect your surroundings. Keep this errand suspended during the gathering; afterward return there, observe, and report one grounded observation.",
+            "initialOwnerSupplement": "Your original errand is to return to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
               "pos": [
                 0,
@@ -1647,9 +1829,11 @@
             ],
             "requiresReadAfterReturn": [
               "here",
-              "observe"
+              "observe",
+              "explore"
             ],
-            "requiresGroundedObservation": true
+            "requiresGroundedObservation": true,
+            "destinationName": "Commons Field"
           },
           "soulName": "BandGuest4"
         }
@@ -1824,5 +2008,10 @@
       "holdoutStatus": "intent/instructions/disturbances sealed proposal; no holdout transcripts inspected or used",
       "initialConstraintSupplement": "The meeting is at {meetingUTC}; finish the gathering and your original errand by {completionUTC}. These are real UTC deadlines even if the world clock differs."
     }
-  ]
+  ],
+  "proposalRevision": "2026-10-29-precomparison-2",
+  "supersedes": {
+    "git": "6960c41f6",
+    "policy": "Prospective precomparison corrections only. Preserve existing development reports and original strict scorer in Git; never relabel old runs as acceptance."
+  }
 }
