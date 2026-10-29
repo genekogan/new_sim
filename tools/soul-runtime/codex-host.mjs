@@ -9,9 +9,9 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const threadName=value=>{if(value===null)return null;if(typeof value!=='string'||!value.trim()||value.length>200||/[\u0000-\u001f\u007f]/.test(value))throw fault('HOST_INVALID_NAME','Thread name must be readable text of1..200characters');return value.trim();};
 const booleanOption=(name,value)=>{if(typeof value!=='boolean')throw fault('HOST_INVALID_OPTION',name+' must be boolean');return value;};
 export class CodexHost extends EventEmitter {
-  constructor({cwd,model=null,effort='low',command='codex',args=['app-server','--listen','stdio://'],requestTimeoutMs=30000,spawnProcess=spawn,ephemeral=false,name=null,internalProbe=false}={}) {
+  constructor({cwd,model=null,effort='low',command='codex',args=['app-server','--listen','stdio://'],requestTimeoutMs=30000,spawnProcess=spawn,killProcess=process.kill,ephemeral=false,name=null,internalProbe=false}={}) {
     super();this.cwd=cwd;this.model=model;this.effort=effort;this.requestTimeoutMs=requestTimeoutMs;
-    this.ephemeral=booleanOption('ephemeral',ephemeral);this.name=threadName(name);this.internalProbe=booleanOption('internalProbe',internalProbe);
+    this.ephemeral=booleanOption('ephemeral',ephemeral);this.name=threadName(name);this.internalProbe=booleanOption('internalProbe',internalProbe);this.killProcess=killProcess;
     this.connected=false;this.connecting=false;this.archiving=null;this.archived=false;
     this.pending=new Map();this.turns=new Map();this.sequence=0;this.threadId=null;this.activeTurnId=null;this.closed=false;this.closing=false;this.buffer='';
     this.child=spawnProcess(command,args,{cwd,stdio:['pipe','pipe','pipe'],detached:true});
@@ -92,6 +92,7 @@ export class CodexHost extends EventEmitter {
     if(this.connecting||this.connected||this.threadId)throw fault('HOST_ALREADY_CONNECTED','Host already has a thread connection');
     this.connecting=true;this.ephemeral=ephemeral;this.name=name;
     try{
+    this.emit('lifecycle',{state:'host-started',hostPid:this.pid??null,cwd:this.cwd});
     await this.request('initialize',{clientInfo:{name:'sim_soul_continuity',version:'0.1.0'}});this.send({method:'initialized',params:{}});
     if(!this.model){
       const listed=await this.request('model/list',{});
@@ -101,6 +102,9 @@ export class CodexHost extends EventEmitter {
     const params={cwd:this.cwd,model:this.model,approvalPolicy:'never',sandbox:'read-only',developerInstructions:instructions,...(baseInstructions?{baseInstructions}:{}),config};
     const r=await this.request(threadId?'thread/resume':'thread/start',threadId?{...params,threadId}:{...params,ephemeral});
     this.threadId=r.thread.id;
+    // Publish ownership as soon as the authoritative ID exists, even if naming
+    // or the supervisor's first world observation subsequently fails.
+    this.emit('lifecycle',{state:'session-created',threadId:this.threadId,hostPid:this.pid??null,cwd:this.cwd,ephemeral,resumed:threadId!==null});
     // Installed app-server refuses metadata updates for ephemeral threads. Keep
     // their readable name in local lifecycle evidence, without a persistence fallback.
     if(name!==null&&!ephemeral)await this.request('thread/name/set',{threadId:this.threadId,name});
@@ -147,12 +151,19 @@ export class CodexHost extends EventEmitter {
       await Promise.race([this.exit,delay(1000)]);
       // Owned process group can outlive its parent; always clean the group.
       if(this.pid){
-        try{process.kill(-this.pid,'SIGTERM')}catch{}
+        try{this.killProcess(-this.pid,'SIGTERM')}catch{}
         await Promise.race([this.exit,delay(1000)]);
-        try{process.kill(-this.pid,'SIGKILL')}catch{}
+        try{this.killProcess(-this.pid,'SIGKILL')}catch{}
         await Promise.race([this.exit,delay(1000)]);
       }
-      return this.exitStatus;
+      let groupClosed=this.exitStatus?.startFailed===true&&!this.pid;
+      if(this.pid)for(let n=0;n<40;n++){
+        try{this.killProcess(-this.pid,0);}catch(e){if(e.code==='ESRCH')groupClosed=true;break;}
+        await delay(25);
+      }
+      this.closeProof={...this.exitStatus,hostPid:this.pid??null,threadId:this.threadId,groupClosed,groupVerification:groupClosed?'absent':'unverified'};
+      this.emit('lifecycle',{state:'host-closed',...this.closeProof});
+      return this.closeProof;
     })();return this.closing;
   }
 }

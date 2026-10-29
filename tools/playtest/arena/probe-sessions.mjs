@@ -4,6 +4,25 @@ import {mkdirSync,writeFileSync,readFileSync,renameSync,openSync,closeSync,unlin
 import {resolve,join} from 'node:path';
 import {CodexHost} from '../../soul-runtime/codex-host.mjs';
 
+// Exit code alone cannot prove a killed controller cleaned its detached host.
+// Require a final certificate from every launched controller and independently
+// check all recorded owned groups. Unknown/EPERM is not evidence of absence.
+export function verifyOwnedProbeExit({exit,controllers},killProcess=process.kill){
+ if(!Number.isInteger(exit?.code)||exit.signal||!Array.isArray(controllers)||!controllers.length)return false;
+ return controllers.every(c=>{
+  const proof=c.closed;
+  if(!Number.isInteger(c.pid)||c.pid<1||c.started!==true||proof?.controllerPid!==c.pid||proof.ownedProcessesExited!==true||!Array.isArray(proof.ownedHosts))return false;
+  const pids=new Set();
+  for(const host of proof.ownedHosts){
+   if(host.groupClosed!==true||host.groupVerification!=='absent')return false;
+   if(!Number.isInteger(host.hostPid)||host.hostPid<1){if(host.hostPid===null&&host.startFailed===true)continue;return false;}
+   pids.add(host.hostPid);
+   try{killProcess(-host.hostPid,0);return false;}catch(e){if(e.code!=='ESRCH')return false;}
+  }
+  return [...(c.hostPids??[])].every(pid=>pids.has(pid));
+ });
+}
+
 export function probeSessions(directory,{createHost=opts=>new CodexHost(opts)}={}){
  const root=resolve(directory),file=join(root,'probe-sessions.json');
  mkdirSync(root,{recursive:true});
@@ -41,9 +60,17 @@ export function probeSessions(directory,{createHost=opts=>new CodexHost(opts)}={
       const status=result.thread.status?.type??result.thread.status;
       if(!['idle','notLoaded'].includes(status))throw Error('Probe thread is not idle');
       await host.request('thread/archive',{threadId:row.threadId});
-      row.archivedAt=new Date().toISOString();delete row.archiveError;results.push({threadId:row.threadId,archived:true});
-     }catch(error){row.archiveError=String(error.message);results.push({threadId:row.threadId,archived:false,error:row.archiveError});}
-     mutate(()=>{const current=state.sessions.find(x=>x.threadId===row.threadId);if(!current||current.cwd!==row.cwd)throw Error('Probe registry changed identity');Object.assign(current,row);});
+      row.archivedAt=new Date().toISOString();delete row.archiveError;
+     }catch(error){row.archiveError=String(error.message);}
+     const result=mutate(()=>{
+      const current=state.sessions.find(x=>x.threadId===row.threadId);
+      if(!current||current.cwd!==row.cwd||current.ephemeral!==row.ephemeral||!current.terminal)throw Error('Probe registry changed identity or terminal ownership');
+      // RPC awaited against a snapshot. Preserve concurrently updated completion
+      // outcome/evidence; merge only archive facts, never the stale whole row.
+      if(row.archivedAt){current.archivedAt=row.archivedAt;delete current.archiveError;}
+      else if(!current.archivedAt)current.archiveError=row.archiveError;
+      return current.archivedAt?{threadId:row.threadId,archived:true}:{threadId:row.threadId,archived:false,error:current.archiveError};
+     });results.push(result);
     }
    }finally{try{await host.close();}finally{archiving=false;}}
    return results;

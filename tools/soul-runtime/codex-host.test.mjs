@@ -30,6 +30,7 @@ test('missing executable fails connection and cleanup terminates without waiting
 // Lifecycle tests use an in-memory protocol peer, never Codex or inference.
 function protocol(t,options={},reply=()=>false){
  const requests=[],child=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.stdin=new EventEmitter();let turn=0,ended=false;
+ if(options.childPid!==undefined)child.pid=options.childPid;
  const deliver=message=>child.stdout.emit('data',Buffer.from(JSON.stringify(message)+'\n'));
  child.stdin.write=line=>{const message=JSON.parse(line);requests.push(message);if(message.id!==undefined)queueMicrotask(()=>{
   const respond=result=>deliver({id:message.id,result}),refuse=(code,messageText)=>deliver({id:message.id,error:{code,message:messageText}});
@@ -106,4 +107,18 @@ test('invalid lifecycle options fail before a subprocess could be spawned',()=>{
  let spawned=0;const spawnProcess=()=>{spawned++;throw Error('must not spawn');};
  for(const options of [{ephemeral:'true'},{internalProbe:'yes'},{name:'\nsecret'},{name:'   '}])assert.throws(()=>new CodexHost({spawnProcess,...options}),e=>['HOST_INVALID_NAME','HOST_INVALID_OPTION'].includes(e.code));
  assert.equal(spawned,0);
+});
+test('owned session identity is emitted before naming can fail, without starting inference',async t=>{
+ const p=protocol(t,{name:'Sim naming refusal'},(m,_respond,refuse)=>{if(m.method==='thread/name/set'){refuse(-32600,'synthetic name refusal');return true;}return false;}),events=[];
+ p.host.on('lifecycle',event=>{events.push(event);if(event.state==='session-created')assert.equal(p.requests.some(r=>r.method==='thread/name/set'),false);});
+ await assert.rejects(p.host.connect(),/synthetic name refusal/);
+ assert.deepEqual(events.map(e=>e.state),['host-started','session-created']);assert.equal(events[1].threadId,'owned-thread');assert.equal(events[1].resumed,false);
+ assert.equal(p.requests.some(r=>r.method==='turn/start'),false);
+});
+test('close verifies the entire owned group after leader exit and reports unknown on permission failure',async t=>{
+ let alive=true;const calls=[],p=protocol(t,{childPid:900001,killProcess:(pid,signal)=>{calls.push([pid,signal]);if(signal==='SIGKILL')alive=false;if(signal===0&&!alive)throw Object.assign(Error('gone'),{code:'ESRCH'});}}),events=[];
+ p.host.on('lifecycle',e=>events.push(e));await p.host.connect();
+ const proof=await p.host.close();assert.equal(proof.groupClosed,true);assert.equal(proof.hostPid,900001);assert.equal(proof.threadId,'owned-thread');assert.equal(proof.groupVerification,'absent');
+ assert.deepEqual(calls,[[-900001,'SIGTERM'],[-900001,'SIGKILL'],[-900001,0]]);assert.equal(events.at(-1).state,'host-closed');assert.equal(events.at(-1).groupClosed,true);
+ const denied=protocol(t,{childPid:900002,killProcess:()=>{throw Object.assign(Error('permission'),{code:'EPERM'});}});await denied.host.connect();const unknown=await denied.host.close();assert.equal(unknown.groupClosed,false);assert.equal(unknown.groupVerification,'unverified');
 });
