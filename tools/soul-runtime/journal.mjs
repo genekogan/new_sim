@@ -2,6 +2,7 @@
 // Receipt into this journal and handling by the decision owner are distinct facts.
 import {DatabaseSync} from 'node:sqlite';
 import {attachControl} from './control.mjs';
+import {attachOwnerTasks} from './owner-tasks.mjs';
 import {mkdirSync, lstatSync, chmodSync} from 'node:fs';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
@@ -42,7 +43,7 @@ function refuseLink(path) {
  * claims delivery of an event whose payload wasn't retained in the same commit.
  * Source cursor equality is an optimistic guard, not an ordering comparison.
  */
-export function openJournal(directory, {worldId, soulId, now = Date.now,retention={}}) {
+export function openJournal(directory, {worldId, soulId, now = Date.now,retention={},ownerTaskLimits={}}) {
   text(worldId, 200, 'world'); text(soulId, 200, 'Soul');
   const policy=retentionPolicy(retention);
   refuseLink(directory); mkdirSync(directory, {recursive:true, mode:0o700});
@@ -97,6 +98,8 @@ export function openJournal(directory, {worldId, soulId, now = Date.now,retentio
   const cursorValue = cursor => cursor===null ? null : text(cursor,200,'cursor');
   const getCursor = source => db.prepare('SELECT cursor FROM sources WHERE source=?').get(source)?.cursor ?? null;
   const control=attachControl(db,{now,transaction});
+  let ownerTasks;
+  try{ownerTasks=attachOwnerTasks(db,{now,transaction,control,limits:ownerTaskLimits});}catch(e){db.close();throw e;}
   const counts=()=>db.prepare('SELECT * FROM journal_storage_v1 WHERE singleton=1').get();
   const identityKey=(source,id)=>JSON.stringify([source,id]);
   const protection=()=>{
@@ -136,12 +139,19 @@ export function openJournal(directory, {worldId, soulId, now = Date.now,retentio
   };
   return {
     control,
+    // These are private local task records, never world artifacts. Handling an
+    // event (or acking receipt) does not remove its original owner intent.
+    openOwnerTasks(options){return transaction(()=>ownerTasks.page(options));},
+    ownerTask(options){return ownerTasks.task(options);},
+    ownerTaskStats(){return ownerTasks.stats();},
+    closeOwnerTaskFromOperation(fence,id){return ownerTasks.closeFromOperation(fence,id);},
     storageStats(){return transaction(storageStats);},
     /** Compacts only handled payloads; identity/digest/outcome/sequence remain.
      * Targets exclude pendingDecision references and may be exceeded by up to
      * maintenanceEvery-1 newly handled payloads between automatic passes. A
-     * migrated backlog can need repeated passes (moreWork). Identity, outcome,
-     * gap and control history remain unbounded. Freed SQLite pages are reused;
+     * migrated backlog can need repeated passes (moreWork). Open owner intent
+     * is separately bounded and survives payload compaction. Identity, outcome,
+     * closed-task proof, gap and control history remain unbounded. Freed SQLite pages are reused;
      * vacuum is explicit, never part of automatic maintenance. */
     maintenance({maxCompactions=1000,vacuum=false}={}){
       if(!Number.isSafeInteger(maxCompactions)||maxCompactions<1||maxCompactions>10000||typeof vacuum!=='boolean')throw Error('Invalid journal maintenance options');
@@ -163,10 +173,12 @@ export function openJournal(directory, {worldId, soulId, now = Date.now,retentio
         for(const event of batch){
           const old=db.prepare('SELECT digest FROM events WHERE source=? AND event_id=?').get(source,event.id);
           if(old){if(old.digest!==event.digest)throw Error('Event identity reused with different content');continue;}
-          db.prepare('INSERT INTO events(source,event_id,payload,digest,received_at,payload_bytes) VALUES (?,?,?,?,?,?)').run(source,event.id,event.payload,event.digest,now(),Buffer.byteLength(event.payload));inserted++;
+          const insertedRow=db.prepare('INSERT INTO events(source,event_id,payload,digest,received_at,payload_bytes) VALUES (?,?,?,?,?,?)').run(source,event.id,event.payload,event.digest,now(),Buffer.byteLength(event.payload));inserted++;
+          if(source==='owner')ownerTasks.capture({seq:Number(insertedRow.lastInsertRowid),event_id:event.id,payload:event.payload,compacted_at:null});
         }
         const bucket=source==='owner'?'owner':'world',state=counts();
         if(state[bucket+'_pending_events']>policy[bucket+'PendingEvents']||state[bucket+'_pending_bytes']>policy[bucket+'PendingBytes'])throw Object.assign(Error(`Journal ${bucket} backlog full; retain cursor and retry after pending events are handled`),{code:'JOURNAL_BACKLOG_FULL',transient:true,source,bucket});
+        if(source==='owner')ownerTasks.assertCapacity();
         let gapId=null;
         if(gap)gapId=Number(db.prepare('INSERT INTO gaps(source,before_cursor,after_cursor,noticed_at) VALUES (?,?,?,?)').run(source,after,cursor,now()).lastInsertRowid);
         db.prepare('INSERT INTO sources(source,cursor) VALUES (?,?) ON CONFLICT(source) DO UPDATE SET cursor=excluded.cursor').run(source,cursor);

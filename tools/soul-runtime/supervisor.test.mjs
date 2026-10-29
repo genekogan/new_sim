@@ -63,3 +63,31 @@ test('continuing world chatter cannot starve effects, but a new owner cancellati
  assert.equal(f.host.calls[4].lastCall.command,'here');assert.equal(f.host.calls[4].pending.some(e=>e.event.id==='c_3'),true);assert.equal(effects,0);
  f.stop.abort();await running;
 });
+test('handled original owner identity reaches every recovery prompt even when saved plan forgot it',async t=>{
+ const f=setup(t),id='msg_original';f.journal.ingest({source:'owner',after:null,cursor:id,events:[{id,text:'Read, return, and report the outcome',sentAt:42}]});f.journal.handled('owner',id,'incorporated:old-decision');
+ const fence=f.journal.control.claim('old');f.journal.control.save(fence,0,{plan:'I cannot see a reportable request ID',threadId:'thread'});f.journal.control.release(fence);
+ const running=runSupervisor({...f,signal:f.stop.signal});
+ try{
+  await until(()=>f.host.calls.length===1);const prompt=f.host.calls[0];assert.equal(prompt.pending.length,0);assert.equal(prompt.openOwnerTasks.tasks[0].id,id);assert.equal(prompt.openOwnerTasks.tasks[0].text,'Read, return, and report the outcome');assert.match(prompt.plan,/cannot see/);
+  f.host.finish({...waitDecision,call:{type:'read',command:'tasks',arguments:'{}'}});await until(()=>f.host.calls.length===2);assert.equal(f.host.calls[1].lastResult.tasks[0].id,id);assert.equal(f.host.calls[1].openOwnerTasks.tasks[0].id,id);
+ }finally{f.stop.abort();await running;}
+});
+test('host-notified start and steer are emitted only after acknowledgement and list exactly bounded delivered facts',async t=>{
+ const f=setup(t),states=[];f.journal.ingest({source:'world',after:null,cursor:'old30',events:Array.from({length:30},(_,i)=>({id:'old'+(i+1),text:'x'.repeat(3000),salience:3}))});
+ const begin=f.host.begin.bind(f.host),steer=f.host.steer.bind(f.host);let acceptStart,acceptSteer;
+ const startGate=new Promise(r=>acceptStart=r),steerGate=new Promise(r=>acceptSteer=r);
+ f.host.begin=async(...args)=>{const turn=await begin(...args);await startGate;return turn;};f.host.steer=async(...args)=>{await steer(...args);await steerGate;};
+ const running=runSupervisor({...f,signal:f.stop.signal,onState:s=>states.push(s)});
+ try{
+  await until(()=>f.host.calls.length===1);assert.equal(states.some(s=>s.state==='host-notified'),false);acceptStart();await until(()=>states.some(s=>s.state==='host-notified'));
+  const started=states.find(s=>s.state==='host-notified');assert.equal(started.mode,'start');assert.deepEqual(started.events,f.host.calls[0].pending.map(p=>({source:p.source,id:p.event.id})));assert.ok(started.events.length<30);assert.equal(started.turnId,'t1');assert.equal(started.threadId,'thread');assert.ok(Number.isFinite(started.at));
+  f.journal.ingest({source:'world',after:'old30',cursor:'new30',events:Array.from({length:30},(_,i)=>({id:'new'+(i+1),text:'x'.repeat(3000),salience:3}))});await until(()=>f.host.steers.length===1);assert.equal(states.filter(s=>s.state==='host-notified').length,1);
+  acceptSteer();await until(()=>states.filter(s=>s.state==='host-notified').length===2);const steered=states.filter(s=>s.state==='host-notified')[1];assert.equal(steered.mode,'steer');assert.deepEqual(steered.events,f.host.steers[0].pending.map(p=>({source:p.source,id:p.event.id})));assert.ok(steered.events.length<30);assert.equal(f.journal.pending().length,60,'delivery telemetry never marks incorporation');
+ }finally{acceptStart();acceptSteer();f.stop.abort();await running;}
+});
+test('failed steer acknowledgement never claims host delivery',async t=>{
+ const f=setup(t),states=[];f.host.steer=async()=>{throw Error('stale turn')};const running=runSupervisor({...f,signal:f.stop.signal,onState:s=>states.push(s)});
+ try{
+  await until(()=>f.host.calls.length===1);f.journal.ingest({source:'world',after:null,cursor:'c1',events:[{id:'c1',kind:'conversation.turn'}]});await new Promise(r=>setTimeout(r,150));assert.equal(states.some(s=>s.state==='host-notified'&&s.mode==='steer'),false);assert.equal(f.journal.pending().length,1);
+ }finally{f.stop.abort();await running;}
+});

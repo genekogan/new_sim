@@ -2,6 +2,13 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createWorldClient,isTransientRead} from './world-client.mjs';
 const mock=(fn)=>createWorldClient({world:'http://127.0.0.1:1234/world',token:'synthetic-fixture-only',fetchImpl:fn});
+test('native flat validation messages survive transport and invalid completion reports never POST',async()=>{
+ let writes=0;const client=mock(async()=>{writes++;return Response.json({ok:false,code:'invalid',message:'result must be one line of 1–140 characters'},{status:400})});
+ for(const args of [{id:'m',outcome:'completed',text:'Returned'},{id:'m',outcome:'done',text:'x'.repeat(141)}])await assert.rejects(client.write('result',args,'op-validation'),e=>e.status===400&&e.uncertain===false&&/result/.test(e.message));
+ assert.equal(writes,0);
+ await assert.rejects(client.write('result',{id:'m',outcome:'done',text:'Returned'},'op-native'),e=>e.message==='result must be one line of 1–140 characters'&&e.uncertain===false);
+ assert.equal(writes,1,'native refusal is not retried');
+});
 test('raw world page returns conversation turns immediately without a body receipt filter',async()=>{
  const client=mock(async(url,opts)=>{assert.match(url,/after=c_7/);assert.equal(opts.redirect,'error');return Response.json({cursor:'c_8',events:[{id:'c_8',kind:'conversation.turn'}]})});
  const page=await client.worldPage({after:'c_7'});assert.equal(page.events[0].kind,'conversation.turn');assert.equal(page.cursor,'c_8');

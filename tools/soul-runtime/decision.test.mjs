@@ -24,6 +24,15 @@ test('decision rejects arbitrary commands and timezone-free deadlines',()=>{
  assert.throws(()=>parseDecision(JSON.stringify({plan:'',call:{type:'write',command:'shell',arguments:'{}'},wakeAt:null})),/Unsupported/);
  assert.throws(()=>parseDecision(JSON.stringify({plan:'',call:{type:'wait',command:'',arguments:'{}'},wakeAt:'2026-10-30T10:00:00'})),/timezone/);
 });
+test('decision text budgets count encoded Unicode and escapes before durable retention',()=>{
+ const payload={plan:'界'.repeat(5332),call:{type:'wait',command:'wait',arguments:'{}'},wakeAt:null};
+ assert.equal(parseDecision(JSON.stringify(payload)).plan,payload.plan);
+ assert.throws(()=>parseDecision(JSON.stringify({...payload,plan:'界'.repeat(5333)})),/durable plan.*JSON-encoded/);
+ assert.throws(()=>parseDecision(JSON.stringify({...payload,plan:'\n'.repeat(8000)})),/durable plan.*JSON-encoded/);
+ const allowed=JSON.stringify({text:'界'.repeat(5300)}),oversized=JSON.stringify({text:'界'.repeat(5333)});
+ assert.equal(parseDecision(JSON.stringify({...payload,call:{...payload.call,arguments:allowed}})).call.args.text,'界'.repeat(5300));
+ assert.throws(()=>parseDecision(JSON.stringify({...payload,call:{...payload.call,arguments:oversized}})),/call arguments.*JSON-encoded/);
+});
 test('explicit refusal is observed and recoverable without replaying the operation',async t=>{
  const {j,fence}=fixture(t);retainDecision(j,fence,decision());let calls=0;
  const r=await applyPendingDecision(j,fence,{write:async()=>{calls++;throw Object.assign(Error('Seat occupied'),{code:'seat.occupied',status:409,uncertain:false});}});
@@ -72,4 +81,52 @@ test('a due wake survives an earlier retained decision but is consumed by a late
  const c=j.control.checkpoint();j.control.save(fence,c.revision,{...c.value,pendingDecision:{...c.value.pendingDecision,retainedAt:Date.now()-2000}});
  await applyPendingDecision(j,fence,{});assert.equal(j.control.checkpoint().value.wakeAt,wakeAt);
  retainDecision(j,fence,{plan:'Due wake handled',call:{type:'wait',command:'wait',args:{}},wakeAt:null});await applyPendingDecision(j,fence,{});assert.equal(j.control.checkpoint().value.wakeAt,null);
+});
+const report=(id='m1')=>({plan:'Report actual outcome',call:{type:'write',command:'result',args:{id,outcome:'failed',text:'Could not complete before the appointment ended'}},wakeAt:null});
+const reportResponse=d=>({inbox:{latest:{id:d.call.args.id,state:'acknowledged',result:d.call.args.text,outcome:d.call.args.outcome,resultAt:123}}});
+test('rejected owner result and later plan loss do not erase original task; exact native result closes it',async t=>{
+ const {j,fence}=fixture(t);j.ingest({source:'owner',after:null,cursor:'m1',events:[{id:'m1',text:'Read then return and report',sentAt:42}]});
+ retainDecision(j,fence,report(),{events:j.pending()});await applyPendingDecision(j,fence,{write:async()=>{throw Object.assign(Error('result must be <=140 characters'),{status:400,uncertain:false});}});
+ assert.equal(j.pending().length,0);assert.equal(j.openOwnerTasks().tasks[0].id,'m1');
+ retainDecision(j,fence,{plan:'No task ID in my remembered plan',call:{type:'wait',command:'wait',args:{}},wakeAt:null});await applyPendingDecision(j,fence,{});
+ assert.equal(j.openOwnerTasks().tasks[0].text,'Read then return and report');
+ retainDecision(j,fence,report());await applyPendingDecision(j,fence,{write:async()=>reportResponse(report())});assert.equal(j.openOwnerTasks().totalOpen,0);
+});
+test('local owner task reads never reach the world and cannot close a task',async t=>{
+ const {j,fence}=fixture(t);j.ingest({source:'owner',after:null,cursor:'m1',events:[{id:'m1',text:'Private intent',sentAt:1}]});let network=0;
+ const world={read:async()=>{network++;throw Error('must stay local')}};
+ for(const [command,args] of [['tasks',{after:0,limit:20}],['task',{id:'m1',offset:0}]]){
+  const parsed=parseDecision(JSON.stringify({plan:'Inspect local outstanding owner intent',call:{type:'read',command,arguments:JSON.stringify(args)},wakeAt:null}));retainDecision(j,fence,parsed);const applied=await applyPendingDecision(j,fence,world);assert.equal(command==='tasks'?applied.response.tasks[0].text:applied.response.task.text,'Private intent');
+ }
+ assert.equal(network,0);assert.equal(j.openOwnerTasks().totalOpen,1);
+ for(const [command,args] of [['tasks',{limit:21}],['tasks',{after:-1}],['task',{id:'m1',offset:-1}],['task',{}],['tasks',{unexpected:'field'}]])assert.throws(()=>parseDecision(JSON.stringify({plan:'',call:{type:'read',command,arguments:JSON.stringify(args)},wakeAt:null})),/Local|local/);
+});
+test('a maximum local text chunk can be incorporated with full instruction and plan budgets across restart',async t=>{
+ const dir=mkdtempSync(join(tmpdir(),'sim-decision-budget-'));let j=openJournal(dir,{worldId:'w',soulId:'s'});
+ t.after(()=>{j.close();rmSync(dir,{recursive:true,force:true})});
+ let fence=j.control.claim('test');const initialInstruction='i'.repeat(16000),plan='p'.repeat(15998);
+ j.ingest({source:'owner',after:null,cursor:'large',events:[{id:'large',text:'x'.repeat(60000),sentAt:1}]});
+ const read=parseDecision(JSON.stringify({plan,call:{type:'read',command:'task',arguments:'{"id":"large"}'},wakeAt:null}));
+ retainDecision(j,fence,read,{events:j.pending(),initialInstruction});const observed=await applyPendingDecision(j,fence,{});
+ assert.equal(Buffer.byteLength(JSON.stringify(observed.response)),32768);assert.equal(j.control.checkpoint().value.lastResult.task.nextOffset!==null,true);
+ const report=parseDecision(JSON.stringify({plan,call:{type:'write',command:'result',arguments:'{"id":"large","outcome":"failed","text":"Owner cancelled this request"}'},wakeAt:null}));
+ const id=retainDecision(j,fence,report);const retained=j.control.checkpoint().value;
+ assert.equal(retained.lastResult,undefined);assert.equal(retained.plan,plan);assert.equal(retained.pendingDecision.decision.plan,undefined);
+ j.control.prepare(fence,id,report.call);j.control.dispatch(fence,id);j.control.settle(fence,id,{inbox:{latest:{id:'large',state:'acknowledged',outcome:'failed',result:report.call.args.text,resultAt:123}}});
+ j.control.release(fence);j.close();j=openJournal(dir,{worldId:'w',soulId:'s'});fence=j.control.claim('recovery');
+ let writes=0;await applyPendingDecision(j,fence,{write:async()=>{writes++;throw Error('must not reissue settled result')}});
+ assert.equal(writes,0);assert.equal(j.openOwnerTasks().totalOpen,0);assert.equal(j.control.checkpoint().value.initialInstruction,initialInstruction);assert.equal(j.control.checkpoint().value.plan,plan);assert.equal(j.control.checkpoint().value.pendingDecision,null);
+});
+test('settled result recovery closes owner task before checkpoint without reissuing public write',async t=>{
+ const {j,fence}=fixture(t);j.ingest({source:'owner',after:null,cursor:'m1',events:[{id:'m1',text:'Read',sentAt:1}]});const d=report(),id=retainDecision(j,fence,d,{events:j.pending()});
+ j.control.prepare(fence,id,d.call);j.control.dispatch(fence,id);j.control.settle(fence,id,reportResponse(d));
+ const save=j.control.save;j.control.save=()=>{throw Error('crash before checkpoint')};let writes=0;
+ await assert.rejects(applyPendingDecision(j,fence,{write:async()=>{writes++}}),/crash before checkpoint/);assert.equal(j.openOwnerTasks().totalOpen,0);assert.ok(j.control.checkpoint().value.pendingDecision);
+ j.control.save=save;await applyPendingDecision(j,fence,{write:async()=>{writes++}});assert.equal(writes,0);assert.equal(j.openOwnerTasks().totalOpen,0);assert.equal(j.control.checkpoint().value.pendingDecision,null);
+});
+test('unknown lost result preserves task and native readback closes only when authoritatively satisfied',async t=>{
+ const {j,fence}=fixture(t);j.ingest({source:'owner',after:null,cursor:'m1',events:[{id:'m1',text:'Read',sentAt:1}]});const d=report();retainDecision(j,fence,d);let writes=0,known=false;
+ const world={write:async()=>{writes++;throw Error('lost')},reconcile:async()=>known?{state:'recorded',status:200,response:{...reportResponse(d),reconciliation:{evidence:'observed-native-state'}}}:{state:'unknown'}};
+ await assert.rejects(applyPendingDecision(j,fence,world),{code:'OPERATION_UNCERTAIN'});assert.equal(j.openOwnerTasks().totalOpen,1);await assert.rejects(applyPendingDecision(j,fence,world),{code:'OPERATION_UNCERTAIN'});assert.equal(j.openOwnerTasks().totalOpen,1);
+ known=true;await applyPendingDecision(j,fence,world);assert.equal(writes,1);assert.equal(j.openOwnerTasks().totalOpen,0);
 });

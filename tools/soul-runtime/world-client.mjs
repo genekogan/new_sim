@@ -35,7 +35,7 @@ export function createWorldClient({world,token,fetchImpl=fetch,timeoutMs=65000})
   let data;
   try{const text=await response.text();if(Buffer.byteLength(text)>4*1024*1024)throw Error();data=JSON.parse(text);}
   catch{throw error('transport.body','World response body was incomplete or invalid',{transient:readOnly&&(response.status>=500||response.status<300),uncertain:!readOnly,status:response.status});}
-  if(!response.ok)throw error(data.error?.code??data.code??`http.${response.status}`,data.error?.message??'World request refused',{status:response.status,transient:readOnly&&(response.status===429||response.status>=500),uncertain:!readOnly&&response.status>=500});
+  if(!response.ok)throw error(data.error?.code??data.code??`http.${response.status}`,data.error?.message??data.message??'World request refused',{status:response.status,transient:readOnly&&(response.status===429||response.status>=500),uncertain:!readOnly&&response.status>=500});
   return data;
  }
  const eventPage=createEventReader({open:async(after,signal)=>{
@@ -94,6 +94,11 @@ export function createWorldClient({world,token,fetchImpl=fetch,timeoutMs=65000})
   },
   async write(command,args,operationId,signal){
    if(typeof operationId!=='string'||!/^[A-Za-z0-9._:-]{1,100}$/.test(operationId))throw Error('Stable operation identity required');
+   if(command==='result'){
+    if(!['done','failed'].includes(args.outcome))throw error('invalid','result outcome must be done or failed',{status:400,uncertain:false});
+    if(typeof args.text!=='string'||!args.text.trim()||args.text.length>140||/[\r\n]/.test(args.text))throw error('invalid','result text must be one line of 1–140 characters; shorten it without changing the outcome',{status:400,uncertain:false});
+   }
+   if(command==='ack'&&args.reply!==undefined&&(typeof args.reply!=='string'||args.reply.length>140||/[\r\n]/.test(args.reply)))throw error('invalid','ack reply must be one line of at most 140 characters',{status:400,uncertain:false});
    let path,body;
    if(command==='act'){path='/v1/edge/act';body={capability:args.capability,params:args.params??{},clientRef:operationId};}
    else if(command==='say'){path='/v1/edge/say';body={text:args.text};}

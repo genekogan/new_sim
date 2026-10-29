@@ -110,3 +110,64 @@ test('retention defaults are explicit and invalid policies/maintenance options a
  for(const retention of [{handledEvents:-1},{maintenanceEvery:0},{maintenanceEvery:1001},{worldPendingBytes:1.5},{unknownLimit:1},null])assert.throws(()=>f.open({retention}),/retention|maintenanceEvery/);
  const j=f.open();for(const options of [{maxCompactions:0},{maxCompactions:10001},{vacuum:'yes'}])assert.throws(()=>j.maintenance(options),/maintenance/);
 });
+
+const ownerResult=(id='m1',outcome='done',text='Read and returned')=>({type:'write',command:'result',args:{id,outcome,text}});
+const nativeResult=call=>({inbox:{latest:{id:call.args.id,state:'acknowledged',result:call.args.text.trim(),outcome:call.args.outcome,resultAt:100}}});
+function settle(j,fence,id,call,response){j.control.prepare(fence,id,call);j.control.dispatch(fence,id);j.control.settle(fence,id,response);}
+test('owner identity and original intent survive handling, plan loss, compaction, replay and restart until exact native result',t=>{
+ const f=fixture(t),options={retention:{handledEvents:0,handledBytes:0}},j=f.open(options),original={id:'m1',kind:'owner.message',text:'Read then return and report',sentAt:42};
+ j.ingest({source:'owner',after:null,cursor:'m1',events:[original]});j.handled('owner','m1','incorporated:forgotten');j.maintenance();
+ assert.equal(stored(f)[0].payload,'null');assert.deepEqual(j.openOwnerTasks().tasks,[{id:'m1',sourceEventSequence:1,text:original.text,sentAt:42,intentUnknown:false}]);
+ j.close();const reopened=f.open(options),fence=reopened.control.claim('recovery');
+ assert.equal(reopened.openOwnerTasks().tasks[0].text,original.text);assert.equal(reopened.ingest({source:'owner',after:'m1',cursor:'m1',events:[original]}).inserted,0);
+ const ack={type:'write',command:'ack',args:{id:'m1',reply:'Received'}};settle(reopened,fence,'ack',ack,nativeResult(ownerResult()));assert.equal(reopened.closeOwnerTaskFromOperation(fence,'ack').closed,false);
+ const call=ownerResult();settle(reopened,fence,'terminal',call,nativeResult(call));assert.equal(reopened.closeOwnerTaskFromOperation(fence,'terminal').closed,true);assert.equal(reopened.openOwnerTasks().totalOpen,0);assert.equal(reopened.ownerTaskStats().openBytes,0);
+ assert.equal(reopened.closeOwnerTaskFromOperation(fence,'terminal').alreadyClosed,true);reopened.close();const again=f.open();assert.equal(again.openOwnerTasks().totalOpen,0);assert.equal(again.ingest({source:'owner',after:'m1',cursor:'m1',events:[original]}).inserted,0);assert.equal(again.openOwnerTasks().totalOpen,0);
+});
+test('owner task capacity remains reserved after event handling and entire over-cap intake rolls back',t=>{
+ const j=fixture(t).open({ownerTaskLimits:{tasks:1},retention:{handledEvents:0,handledBytes:0}}),fence=j.control.claim('test');
+ j.ingest({source:'world',after:null,cursor:'c1',events:[{id:'c1'}]});j.ingest({source:'owner',after:null,cursor:'m1',events:[{id:'m1',text:'Original',sentAt:1}]});j.handled('owner','m1','incorporated');j.maintenance();
+ assert.throws(()=>j.ingest({source:'owner',after:'m1',cursor:'m3',events:[{id:'m2',text:'Cancel original'},{id:'m3',text:'Replacement'}],gap:true}),e=>e.code==='OWNER_TASK_BACKLOG_FULL'&&e.transient===true);
+ assert.equal(j.cursor('owner'),'m1');assert.equal(j.gaps().length,0);assert.equal(j.storageStats().identityEvents,2);assert.deepEqual(j.openOwnerTasks().tasks.map(x=>x.id),['m1']);
+ const call=ownerResult('m1','failed','Cancelled by newer owner instruction');settle(j,fence,'cancelled',call,nativeResult(call));j.closeOwnerTaskFromOperation(fence,'cancelled');
+ j.ingest({source:'owner',after:'m1',cursor:'m2',events:[{id:'m2',text:'Replacement',sentAt:2}]});assert.deepEqual(j.openOwnerTasks().tasks.map(x=>[x.id,x.sourceEventSequence]),[['m2',3]]);
+});
+test('owner task byte ceiling and independently supplied cancellation preserve both old and new intent',t=>{
+ const j=fixture(t).open({ownerTaskLimits:{bytes:300}});
+ j.ingest({source:'owner',after:null,cursor:'m1',events:[{id:'m1',text:'Read together',sentAt:1}]});j.handled('owner','m1','incorporated');
+ j.ingest({source:'owner',after:'m1',cursor:'m2',events:[{id:'m2',text:'Cancel reading',sentAt:2}]});
+ assert.deepEqual(j.openOwnerTasks().tasks.map(x=>x.text),['Read together','Cancel reading']);
+ assert.throws(()=>j.ingest({source:'owner',after:'m2',cursor:'m3',events:[{id:'m3',text:'é'.repeat(100)}]}),{code:'OWNER_TASK_BACKLOG_FULL'});assert.equal(j.cursor('owner'),'m2');assert.equal(j.ownerTaskStats().totalOpen,2);assert.ok(j.ownerTaskStats().openBytes<=300);
+});
+test('owner task closure rejects refused, non-native, server-only, mismatched and unsettled outcomes',t=>{
+ const j=fixture(t).open(),fence=j.control.claim('test'),call=ownerResult();j.ingest({source:'owner',after:null,cursor:'m1',events:[{id:'m1',text:'Read',sentAt:1}]});
+ const valid=nativeResult(call),m=valid.inbox.latest;
+ const cases=[{accepted:true},{accepted:false,...valid},{error:{message:'refused'},...valid},{inbox:{latest:{...m,id:'other'}}},{inbox:{latest:{...m,state:'delivered'}}},{inbox:{latest:{...m,resultBy:'server'}}},{inbox:{latest:{...m,outcome:'failed'}}},{inbox:{latest:{...m,result:'Different'}}},{inbox:{latest:{...m,resultAt:undefined}}}];
+ for(const [n,response] of cases.entries()){const id='rejected-'+n;settle(j,fence,id,call,response);assert.equal(j.closeOwnerTaskFromOperation(fence,id).closed,false);}
+ j.control.prepare(fence,'pending',call);j.control.dispatch(fence,'pending');assert.equal(j.closeOwnerTaskFromOperation(fence,'pending').closed,false);j.control.uncertain(fence,'pending');assert.equal(j.closeOwnerTaskFromOperation(fence,'pending').closed,false);
+ assert.equal(j.openOwnerTasks().totalOpen,1);assert.throws(()=>j.closeOwnerTaskFromOperation({...fence,generation:999},'rejected-0'),/lease lost/);
+ j.control.settle(fence,'pending',{...valid,reconciliation:{evidence:'observed-native-state',note:'effect satisfaction only'}});assert.equal(j.closeOwnerTaskFromOperation(fence,'pending').evidence,'observed-native-state');assert.equal(j.openOwnerTasks().totalOpen,0);
+});
+test('legacy owner migration restores handled intent, honors settled completion and exposes compacted unknown intent',t=>{
+ const f=fixture(t),j=f.open(),fence=j.control.claim('old');
+ j.ingest({source:'owner',after:null,cursor:'m3',events:[{id:'m1',text:'Original task',sentAt:1},{id:'m2',text:'Already complete',sentAt:2},{id:'m3',text:'Compacted original',sentAt:3}]});for(const id of ['m1','m2','m3'])j.handled('owner',id,'incorporated');
+ const done=ownerResult('m2'),orphan=ownerResult('later');settle(j,fence,'done',done,nativeResult(done));settle(j,fence,'completed-before-intake',orphan,nativeResult(orphan));settle(j,fence,'refused',ownerResult('m1'),{accepted:false,error:{message:'too long'}});j.close();
+ const db=new DatabaseSync(join(f.directory,'continuity.sqlite'));db.exec('DROP TABLE owner_tasks_v1; DROP TABLE owner_task_storage_v1');db.prepare("UPDATE events SET payload='null',payload_bytes=0,compacted_at=100 WHERE event_id='m3'").run();db.close();
+ const restored=f.open();assert.deepEqual(restored.openOwnerTasks().tasks,[{id:'m1',sourceEventSequence:1,text:'Original task',sentAt:1,intentUnknown:false},{id:'m3',sourceEventSequence:3,text:null,sentAt:null,intentUnknown:true,unknownReason:'compacted-before-owner-task-ledger'}]);
+ assert.equal(restored.openOwnerTasks().unknownIntentCount,1);assert.equal(restored.ownerTaskStats().closedIdentities,2);
+ restored.ingest({source:'owner',after:'m3',cursor:'later',events:[{id:'later',text:'Completed before intake',sentAt:4}]});assert.equal(restored.openOwnerTasks().totalOpen,2,'a proven result tombstone cannot reopen on later intake');restored.close();assert.equal(f.open().openOwnerTasks().totalOpen,2);
+});
+test('over-cap legacy owner migration rolls back instead of silently dropping intent or treating handled as complete',t=>{
+ const f=fixture(t),j=f.open();j.ingest({source:'owner',after:null,cursor:'m2',events:[{id:'m1',text:'One'},{id:'m2',text:'Two'}]});j.handled('owner','m1','incorporated');j.close();
+ const db=new DatabaseSync(join(f.directory,'continuity.sqlite'));db.exec('DROP TABLE owner_tasks_v1; DROP TABLE owner_task_storage_v1');db.close();
+ assert.throws(()=>f.open({ownerTaskLimits:{tasks:1}}),{code:'OWNER_TASK_BACKLOG_FULL'});
+ const check=new DatabaseSync(join(f.directory,'continuity.sqlite'));assert.equal(check.prepare("SELECT name FROM sqlite_master WHERE name='owner_tasks_v1'").get(),undefined);check.close();assert.equal(f.open().openOwnerTasks().totalOpen,2);
+});
+test('owner task prompt pages bound bytes, preserve oldest identities and provide exact local text chunk retrieval',t=>{
+ const j=fixture(t).open(),events=Array.from({length:25},(_,i)=>({id:'m'+(i+1),text:'🌎'.repeat(1000),sentAt:i}));j.ingest({source:'owner',after:null,cursor:'m25',events});
+ const first=j.openOwnerTasks();assert.equal(first.tasks.length,20);assert.equal(first.tasks[0].id,'m1');assert.equal(first.tasks[19].id,'m20');assert.equal(first.omitted,5);assert.equal(first.nextCursor,20);assert.ok(Buffer.byteLength(JSON.stringify(first))<=32768);assert.ok(first.tasks.some(x=>x.textOmitted));
+ const omitted=first.tasks.find(x=>x.textOmitted);assert.equal(j.ownerTask({id:omitted.id}).task.text,events[0].text);assert.equal(j.openOwnerTasks({after:first.nextCursor}).tasks[0].id,'m21');
+ j.ingest({source:'owner',after:'m25',cursor:'large',events:[{id:'large',text:'🌎'.repeat(16000),sentAt:26}]});const large=j.openOwnerTasks({after:25});assert.equal(large.tasks[0].textOmitted,true);
+ let offset=0,text='';do{const chunk=j.ownerTask({id:'large',offset});assert.ok(Buffer.byteLength(JSON.stringify(chunk))<=32768);text+=chunk.task.text;offset=chunk.task.nextOffset;}while(offset!==null);assert.equal(text,'🌎'.repeat(16000));
+ assert.throws(()=>j.openOwnerTasks({limit:21}),/page limit/);assert.throws(()=>j.openOwnerTasks({after:-1}),/cursor/);assert.throws(()=>j.ownerTask({id:'large',offset:20000}),/exceeds length/);
+});

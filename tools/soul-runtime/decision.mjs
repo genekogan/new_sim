@@ -6,16 +6,22 @@ export const DECISION_SCHEMA={type:'object',additionalProperties:false,required:
  call:{type:'object',additionalProperties:false,required:['type','command','arguments'],properties:{type:{type:'string',enum:['read','write','wait']},command:{type:'string'},arguments:{type:'string',description:'A JSON object of arguments. For wait use {} for event-only or {seconds:N} for a relative wall-clock wakeup. Existing future wakeups survive other calls. Use {cancelWake:true} only to explicitly cancel the saved wakeup.'}}},
  wakeAt:{type:['string','null'],description:'ISO8601 wall-clock wakeup with timezone, or null to wait for messages or action results.'},
 }};
-const READS=new Set(['resync','here','observe','explore','resolve','receipt','conversations','turns','calendar','reminders','object']);
+const READS=new Set(['tasks','task','resync','here','observe','explore','resolve','receipt','conversations','turns','calendar','reminders','object']);
 const WRITES=new Set(['act','say','converse','ack','result','remind','object']);
 export function parseDecision(text,{now=Date.now}={}){
  const value=JSON.parse(text);
  if(!value||Object.keys(value).sort().join(',')!=='call,plan,wakeAt')throw Error('Decision fields differ from contract');
- if(typeof value.plan!=='string'||value.plan.length>16000)throw Error('Invalid durable plan');
+ if(typeof value.plan!=='string'||value.plan.length>16000||Buffer.byteLength(JSON.stringify(value.plan))>16000)throw Error('Invalid durable plan: JSON-encoded text must be <=16000 bytes');
  const call=value.call;if(!call||Object.keys(call).sort().join(',')!=='arguments,command,type')throw Error('Invalid call');
- if(typeof call.arguments!=='string'||call.arguments.length>16000)throw Error('Invalid call arguments');
+ if(typeof call.arguments!=='string'||call.arguments.length>16000||Buffer.byteLength(JSON.stringify(call.arguments))>16000)throw Error('Invalid call arguments: JSON-encoded text must be <=16000 bytes');
  const args=JSON.parse(call.arguments);if(!args||typeof args!=='object'||Array.isArray(args))throw Error('Call arguments must be an object');
  if(call.type==='read'?!READS.has(call.command):call.type==='write'?!WRITES.has(call.command):call.type!=='wait')throw Error('Unsupported decision command');
+ if(call.type==='read'&&['tasks','task'].includes(call.command)){
+  const fields=call.command==='tasks'?['after','limit']:['id','offset'];
+  if(Object.keys(args).some(k=>!fields.includes(k)))throw Error('Invalid local owner task arguments');
+  if(call.command==='tasks'&&(args.after!==undefined&&(!Number.isSafeInteger(args.after)||args.after<0)||args.limit!==undefined&&(!Number.isInteger(args.limit)||args.limit<1||args.limit>20)))throw Error('Local tasks needs nonnegative sequence after and limit 1..20');
+  if(call.command==='task'&&(typeof args.id!=='string'||!args.id.length||args.id.length>200||args.offset!==undefined&&(!Number.isSafeInteger(args.offset)||args.offset<0||args.offset>65536)))throw Error('Local task needs id and nonnegative text offset');
+ }
  if(value.wakeAt!==null&&(typeof value.wakeAt!=='string'||!/(Z|[+-]\d{2}:\d{2})$/.test(value.wakeAt)||!Number.isFinite(Date.parse(value.wakeAt))))throw Error('Wakeup needs explicit wall clock/timezone');
  let wakeAt=value.wakeAt;
  if(call.type==='wait'&&args.seconds!==undefined){
@@ -26,8 +32,13 @@ export function parseDecision(text,{now=Date.now}={}){
 }
 export function retainDecision(journal,fence,decision,{events=[],threadId,initialInstruction}={}){
  const c=journal.control.checkpoint();if(c.value?.pendingDecision)throw Error('Previous decision must be reconciled first');
- const id=randomUUID();const pendingDecision={id,decision,eventIds:events.map(e=>({source:e.source,id:e.event.id})),retainedAt:Date.now()};
- journal.control.save(fence,c.revision,{...c.value,threadId:threadId??c.value?.threadId,initialInstruction:c.value?.initialInstruction??initialInstruction??null,plan:decision.plan,pendingDecision});
+ // The next choice incorporates the preceding observation. Drop that response
+ // atomically with retaining the choice, and store its plan only once: recovery
+ // needs the call/wake and checkpoint plan, not another copy of the old result.
+ const {plan,...execution}=decision;
+ const id=randomUUID();const pendingDecision={id,decision:execution,eventIds:events.map(e=>({source:e.source,id:e.event.id})),retainedAt:Date.now()};
+ const {lastResult,...previous}=c.value??{};
+ journal.control.save(fence,c.revision,{...previous,threadId:threadId??c.value?.threadId,initialInstruction:c.value?.initialInstruction??initialInstruction??null,plan,pendingDecision});
  return id;
 }
 export async function applyPendingDecision(journal,fence,world,{signal}={}){
@@ -36,7 +47,7 @@ export async function applyPendingDecision(journal,fence,world,{signal}={}){
  const {id,decision}=pending,call=decision.call;let response=null;
  if(call.type==='read'){
   const gaps=call.command==='resync'?journal.gaps():[];
-  response=await world.read(call.command,call.args,signal);
+  response=call.command==='tasks'?journal.openOwnerTasks(call.args):call.command==='task'?journal.ownerTask(call.args):await world.read(call.command,call.args,signal);
   if(call.command==='resync')for(const gap of gaps)journal.reconcileGap(gap.seq,'Current observation/conversations refreshed; past missing events remain incomplete. Decision '+id);
  }
  else if(call.type==='write'&&journal.gaps().length&&!journal.control.hasOperation(id)){
@@ -68,6 +79,10 @@ export async function applyPendingDecision(journal,fence,world,{signal}={}){
   }
   if(op.status!=='settled')throw Object.assign(Error('Earlier operation needs reconciliation'),{code:'OPERATION_UNCERTAIN',operationId:id});
   response=op.response;
+  // Closure inspects the durable settled operation's exact native result.
+  // Do this before finalizing the decision: a settle->crash recovery repeats
+  // this idempotently and cannot lose the original task between checkpoints.
+  if(call.command==='result')journal.closeOwnerTaskFromOperation(fence,id);
  }
  journal.control.assertOwner(fence);
  // Mark incorporation only after decision and result are durable. It is NOT
