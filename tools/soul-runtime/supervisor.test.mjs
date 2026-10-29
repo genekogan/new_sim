@@ -5,7 +5,7 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {openJournal} from './journal.mjs';
-import {runSupervisor} from './supervisor.mjs';
+import {runSupervisor,attentionPriority} from './supervisor.mjs';
 import {abortableSleep} from './receiver.mjs';
 import {parseDecision,retainDecision,applyPendingDecision} from './decision.mjs';
 const waitDecision={plan:'Resume the reading appointment after interruption',call:{type:'wait',command:'',arguments:'{}'},wakeAt:null};
@@ -17,7 +17,7 @@ class Host extends EventEmitter{
  async close(){this.closed=true;this.rejectTurn?.();}
 }
 async function until(fn){for(let n=0;n<200;n++){if(fn())return;await new Promise(r=>setTimeout(r,5));}throw Error('Condition timed out');}
-function setup(t){const dir=mkdtempSync(join(tmpdir(),'sim-supervisor-'));const journal=openJournal(dir,{worldId:'w',soulId:'s'});const host=new Host(),stop=new AbortController();t.after(()=>{journal.close();rmSync(dir,{recursive:true,force:true});});let reads=0;const world={read:async()=>({here:'library'}),worldPage:async({after,signal})=>{reads++;await abortableSleep(10000,signal);return {cursor:after,events:[]};},ownerPage:async({after,signal})=>{await abortableSleep(10000,signal);return {cursor:after,events:[]};}};return {journal,host,stop,world,reads:()=>reads};}
+function setup(t,options={}){const dir=mkdtempSync(join(tmpdir(),'sim-supervisor-'));const journal=openJournal(dir,{worldId:'w',soulId:'s',...options});const host=new Host(),stop=new AbortController();t.after(()=>{journal.close();rmSync(dir,{recursive:true,force:true});});let reads=0;const world={read:async()=>({here:'library'}),worldPage:async({after,signal})=>{reads++;await abortableSleep(10000,signal);return {cursor:after,events:[]};},ownerPage:async({after,signal})=>{await abortableSleep(10000,signal);return {cursor:after,events:[]};}};return {dir,journal,host,stop,world,reads:()=>reads};}
 test('event during inference is durably steered and obsolete action is discarded',async t=>{
  const f=setup(t);let effects=0;f.world.write=async()=>{effects++;return {accepted:true};};
  const running=runSupervisor({...f,instruction:'Read then attend appointment',signal:f.stop.signal});
@@ -117,4 +117,86 @@ test('ordinary 35984-byte startup observation arrives whole in the first model p
  f.world.read=async command=>{reads++;assert.equal(command,'observe');return native;};const running=runSupervisor({...f,signal:f.stop.signal});
  try{await until(()=>f.host.calls.length===1);assert.equal(Buffer.byteLength(JSON.stringify(native)),35984);assert.deepEqual(f.host.calls[0].observation,native);assert.equal(reads,1);assert.equal(f.journal.cursor('world'),'c_88');}
  finally{f.stop.abort();await running;}
+});
+const ambient=(id,speaker='s_presenter')=>({id,kind:'speech.ambient',raw:'speech',salience:1,about:{soulId:speaker,name:'Observed participant'},data:{from:{soulId:speaker,name:'Observed participant'},text:'Untrusted native public speech'}});
+const listeningWait=(listenTo,wakeAt=null)=>({...waitDecision,call:{type:'wait',command:'wait',arguments:JSON.stringify({listenTo})},wakeAt});
+test('listening matches exact native ambient speaker identities without inferring relevance from text',()=>{
+ const event=ambient('c_1'),fact={source:'world',event};assert.equal(attentionPriority(fact,['s_presenter']),1);assert.equal(attentionPriority(fact,[]),0);assert.equal(attentionPriority(fact,['s_other']),0);assert.equal(attentionPriority(fact,'nearby'),1);
+ assert.equal(attentionPriority({source:'world',event:{...event,raw:'receipt'}},'nearby'),0);assert.equal(attentionPriority({source:'world',event:{...event,data:{from:{soulId:'s_other'},text:'s_presenter'}}},['s_presenter']),0);assert.equal(attentionPriority({source:'world',event:{...event,kind:'world.narration'}},'nearby'),0);assert.equal(attentionPriority({source:'world',event:{id:'direct',salience:3}},[]),3);assert.equal(attentionPriority({source:'owner',event:{id:'m1',salience:0}},[]),4);
+});
+test('ambient remains quiet by default and is delivered with the next urgent owner prompt',async t=>{
+ const f=setup(t),states=[],running=runSupervisor({...f,signal:f.stop.signal,onState:s=>states.push(s),ambientWakeMs:30});
+ try{
+  await until(()=>f.host.calls.length===1);f.host.finish(waitDecision);await until(()=>f.journal.control.checkpoint().value.lastCall?.type==='wait');
+  f.journal.ingest({source:'world',after:null,cursor:'ambient',events:[ambient('ambient')]});await new Promise(r=>setTimeout(r,180));assert.equal(f.host.calls.length,1);assert.equal(f.host.steers.length,0);assert.equal(f.journal.pending().length,1);
+  f.journal.ingest({source:'owner',after:null,cursor:'m1',events:[{id:'m1',text:'Reconsider the current plan'}]});await until(()=>f.host.calls.length===2);assert.equal(f.host.calls[1].pending[0].event.id,'m1');assert.ok(f.host.calls[1].pending.some(f=>f.event.id==='ambient'));assert.deepEqual(f.host.calls[1].listenTo,[]);assert.ok(states.some(s=>s.state==='host-notified'&&s.events.some(e=>e.id==='m1')));
+ }finally{f.stop.abort();await running;}
+});
+test('a newly chosen listening scope finds ambient speech behind quiet rows and retains the departure deadline',async t=>{
+ const f=setup(t),states=[],wakeAt=new Date(Date.now()+60000).toISOString();
+ f.journal.ingest({source:'world',after:null,cursor:'speech',events:[...Array.from({length:200},(_,i)=>({id:'quiet'+i,kind:'receipt.started',salience:1,text:'Quiet bookkeeping'})),ambient('speech')]});
+ const running=runSupervisor({...f,signal:f.stop.signal,onState:s=>states.push(s),ambientWakeMs:30});
+ try{
+  await until(()=>f.host.calls.length===1);assert.ok(!f.host.calls[0].pending.some(e=>e.event.id==='speech'));f.host.finish(listeningWait(['s_presenter'],wakeAt));
+  await until(()=>f.host.calls.length===2);const prompt=f.host.calls[1];assert.equal(prompt.pending[0].event.id,'speech');assert.deepEqual(prompt.listenTo,['s_presenter']);assert.equal(prompt.scheduledWakeAt,wakeAt);assert.equal(f.journal.control.checkpoint().value.wakeAt,wakeAt);assert.ok(Number.isFinite(f.journal.control.checkpoint().value.lastAmbientDeliveryAt));
+  const delivery=states.filter(s=>s.state==='host-notified'&&s.mode==='start')[1];assert.deepEqual(delivery.events,prompt.pending.map(f=>({source:f.source,id:f.event.id})));
+ }finally{f.stop.abort();await running;}
+});
+test('busy ambient input never restarts inference; idle bursts are coalesced and empty listening never polls the model',async t=>{
+ const f=setup(t),owner=f.journal.control.claim('setup');f.journal.control.save(owner,0,{listenTo:['s_presenter']});f.journal.control.release(owner);let writes=0;f.world.write=async()=>{writes++;return {accepted:true}};
+ const running=runSupervisor({...f,signal:f.stop.signal,ambientWakeMs:300});
+ try{
+  await until(()=>f.host.calls.length===1);f.journal.ingest({source:'world',after:null,cursor:'a9',events:Array.from({length:10},(_,i)=>ambient('a'+i))});await new Promise(r=>setTimeout(r,150));assert.equal(f.host.calls.length,1);assert.equal(f.host.steers.length,0);
+  f.host.finish({...waitDecision,call:{type:'write',command:'say',arguments:'{"text":"A freely chosen reply"}'}});await until(()=>f.host.calls.length===2);assert.equal(writes,1);assert.equal(f.host.calls[1].pending.filter(f=>f.event.kind==='speech.ambient').length,10);
+  f.host.finish(waitDecision);await until(()=>f.journal.pending().length===0);f.journal.ingest({source:'world',after:'a9',cursor:'b49',events:Array.from({length:50},(_,i)=>ambient('b'+i))});await new Promise(r=>setTimeout(r,100));assert.equal(f.host.calls.length,2);
+  await until(()=>f.host.calls.length===3);assert.equal(f.host.calls[2].pending.filter(f=>f.event.kind==='speech.ambient').length,50);assert.equal(f.host.steers.length,0);f.host.finish(waitDecision);await until(()=>f.journal.pending().length===0);await new Promise(r=>setTimeout(r,350));assert.equal(f.host.calls.length,3);
+ }finally{f.stop.abort();await running;}
+});
+test('owner/direct events steer first after a delayed begin acknowledgement, with exact delivered IDs',async t=>{
+ const f=setup(t),states=[],owner=f.journal.control.claim('setup');f.journal.control.save(owner,0,{listenTo:'nearby'});f.journal.control.release(owner);let accept;const gate=new Promise(r=>accept=r),begin=f.host.begin.bind(f.host);f.host.begin=async(...args)=>{const turn=await begin(...args);await gate;return turn;};let writes=0;f.world.write=async()=>{writes++;return {accepted:true}};
+ const running=runSupervisor({...f,signal:f.stop.signal,onState:s=>states.push(s),ambientWakeMs:300});
+ try{
+  await until(()=>f.host.calls.length===1);f.journal.ingest({source:'world',after:null,cursor:'direct',events:[...Array.from({length:30},(_,i)=>({id:'quiet'+i,kind:'receipt.started',salience:1,text:'x'.repeat(1000)})),ambient('ambient'),{id:'direct',kind:'speech.to-me',raw:'speech',salience:3}]});f.journal.ingest({source:'owner',after:null,cursor:'m1',events:[{id:'m1',text:'New owner instruction'}]});await new Promise(r=>setTimeout(r,150));assert.equal(f.host.steers.length,0);assert.equal(states.some(s=>s.state==='host-notified'),false);
+  accept();await until(()=>f.host.steers.length===1);assert.deepEqual(f.host.steers[0].pending.map(f=>f.event.id),['m1','direct']);const proof=states.find(s=>s.state==='host-notified'&&s.mode==='steer');assert.deepEqual(proof.events,[{source:'owner',id:'m1'},{source:'world',id:'direct'}]);
+  f.host.finish({...waitDecision,call:{type:'write',command:'say',arguments:'{"text":"obsolete"}'}});await until(()=>f.host.calls.length===2);assert.equal(writes,0);assert.equal(f.host.calls[1].pending[0].event.id,'m1');assert.equal(f.host.calls[1].pending[1].event.id,'direct');assert.equal(f.host.calls[1].pending[2].event.id,'ambient');
+ }finally{accept();f.stop.abort();await running;}
+});
+test('listening scope and batch timestamp survive connection restart; explicit clear stops ambient wakes',async t=>{
+ const f=setup(t),owner=f.journal.control.claim('previous'),wakeAt=new Date(Date.now()+60000).toISOString(),lastAmbientDeliveryAt=Date.now();f.journal.control.save(owner,0,{listenTo:['s_presenter'],wakeAt,lastAmbientDeliveryAt});f.journal.control.release(owner);
+ const reopened=openJournal(f.dir,{worldId:'w',soulId:'s'});t.after(()=>reopened.close());const running=runSupervisor({...f,journal:reopened,signal:f.stop.signal,ambientWakeMs:30});
+ try{
+  await until(()=>f.host.calls.length===1);assert.deepEqual(f.host.calls[0].listenTo,['s_presenter']);assert.equal(f.host.calls[0].scheduledWakeAt,wakeAt);assert.equal(reopened.control.checkpoint().value.lastAmbientDeliveryAt,lastAmbientDeliveryAt);f.host.finish(waitDecision);await until(()=>reopened.control.checkpoint().value.lastCall?.type==='wait');
+  reopened.ingest({source:'world',after:null,cursor:'first',events:[ambient('first')]});await until(()=>f.host.calls.length===2);f.host.finish(listeningWait([]));await until(()=>reopened.control.checkpoint().value.listenTo?.length===0);assert.equal(reopened.control.checkpoint().value.wakeAt,wakeAt);
+  reopened.ingest({source:'world',after:'first',cursor:'second',events:[ambient('second')]});await new Promise(r=>setTimeout(r,200));assert.equal(f.host.calls.length,2);
+ }finally{f.stop.abort();await running;}
+});
+test('coalesced journal pressure drains quiet capacity and admits the later urgent event',async t=>{
+ const f=setup(t,{retention:{worldPendingEvents:1}}),states=[];f.journal.ingest({source:'world',after:null,cursor:'quiet',events:[{id:'quiet',kind:'receipt.started',salience:1}]});
+ f.world.worldPage=async({after,signal})=>{if(after==='quiet')return {cursor:'urgent',events:[{id:'urgent',kind:'conversation.turn',salience:3}]};await abortableSleep(10000,signal);return {cursor:after,events:[]};};
+ const running=runSupervisor({...f,signal:f.stop.signal,onState:s=>states.push(s),receiverSleep:(_ms,signal)=>abortableSleep(15,signal)});
+ try{
+  await until(()=>f.host.calls.length===1);await until(()=>states.some(s=>s.code==='JOURNAL_BACKLOG_FULL'));assert.equal(f.journal.cursor('world'),'quiet');f.host.finish(waitDecision);await until(()=>f.host.calls.length===2);f.host.finish(waitDecision);await until(()=>f.journal.cursor('world')==='urgent');await until(()=>f.host.calls.length===3);assert.ok(f.host.calls[2].pending.some(f=>f.event.id==='urgent'));f.host.finish(waitDecision);await until(()=>f.journal.pending().length===0);assert.equal(f.host.calls.length,3);
+ }finally{f.stop.abort();await running;}
+});
+test('repeated pressure without incorporation progress cannot create an inference loop',async t=>{
+ const f=setup(t),states=[];f.world.worldPage=async()=>{throw Object.assign(Error('Synthetic full journal'),{code:'JOURNAL_BACKLOG_FULL',transient:true})};const running=runSupervisor({...f,signal:f.stop.signal,onState:s=>states.push(s),receiverSleep:(_ms,signal)=>abortableSleep(10,signal)});
+ try{
+  await until(()=>f.host.calls.length===1);await until(()=>states.filter(s=>s.code==='JOURNAL_BACKLOG_FULL').length>=3);f.host.finish(waitDecision);await until(()=>f.host.calls.length===2||f.journal.control.checkpoint().value.lastCall?.type==='wait');if(f.host.calls.length===2)f.host.finish(waitDecision);await until(()=>f.journal.control.checkpoint().value.lastCall?.type==='wait');const calls=f.host.calls.length;await new Promise(r=>setTimeout(r,150));assert.equal(f.host.calls.length,calls);assert.ok(calls<=2);assert.ok(states.filter(s=>s.code==='JOURNAL_BACKLOG_FULL').length>3);
+ }finally{f.stop.abort();await running;}
+});
+test('unselected speakers stay quiet until the model explicitly chooses nearby speech',async t=>{
+ const f=setup(t),running=runSupervisor({...f,signal:f.stop.signal,ambientWakeMs:30});
+ try{
+  await until(()=>f.host.calls.length===1);f.host.finish(listeningWait(['s_presenter']));await until(()=>Array.isArray(f.journal.control.checkpoint().value.listenTo)&&f.journal.control.checkpoint().value.listenTo.length===1);
+  const unrelated=ambient('other','s_other');unrelated.data.text='A phrase mentioning s_presenter cannot change its native speaker';f.journal.ingest({source:'world',after:null,cursor:'other',events:[unrelated]});await new Promise(r=>setTimeout(r,180));assert.equal(f.host.calls.length,1);
+  f.journal.ingest({source:'world',after:'other',cursor:'selected',events:[ambient('selected')]});await until(()=>f.host.calls.length===2);assert.equal(f.host.calls[1].pending[0].event.id,'selected');f.host.finish(listeningWait('nearby'));await until(()=>f.journal.control.checkpoint().value.listenTo==='nearby');
+  f.journal.ingest({source:'world',after:'selected',cursor:'now-selected',events:[ambient('now-selected','s_other')]});await until(()=>f.host.calls.length===3);assert.equal(f.host.calls[2].pending[0].event.id,'now-selected');assert.equal(f.host.calls[2].listenTo,'nearby');assert.equal(f.host.steers.length,0);
+ }finally{f.stop.abort();await running;}
+});
+test('the earlier deadline wakes a listener before its ambient batch cadence',async t=>{
+ const f=setup(t),owner=f.journal.control.claim('setup'),started=Date.now(),wakeAt=new Date(started+200).toISOString();f.journal.control.save(owner,0,{listenTo:['s_presenter'],wakeAt,lastAmbientDeliveryAt:started});f.journal.control.release(owner);
+ const running=runSupervisor({...f,signal:f.stop.signal,ambientWakeMs:1000});
+ try{
+  await until(()=>f.host.calls.length===1);f.host.finish(waitDecision);await until(()=>f.journal.control.checkpoint().value.lastCall?.type==='wait');f.journal.ingest({source:'world',after:null,cursor:'ambient',events:[ambient('ambient')]});await until(()=>f.host.calls.length===2);assert.ok(Date.now()-started<800);assert.equal(f.host.calls[1].scheduledWakeAt,wakeAt);assert.ok(f.host.calls[1].pending.some(f=>f.event.id==='ambient'));assert.deepEqual(f.host.calls[1].listenTo,['s_presenter']);
+ }finally{f.stop.abort();await running;}
 });

@@ -4,11 +4,16 @@ import {randomUUID} from 'node:crypto';
 import {responseReference,responseProjection,receiptProjection,validateResponseArguments} from './responses.mjs';
 export const DECISION_SCHEMA={type:'object',additionalProperties:false,required:['plan','call','wakeAt'],properties:{
  plan:{type:'string',description:'Compact durable task state: current goal and original constraints, completed receipt IDs, current step, suspended work, deadlines and next step. Do not claim unobserved completion.'},
- call:{type:'object',additionalProperties:false,required:['type','command','arguments'],properties:{type:{type:'string',enum:['read','write','wait']},command:{type:'string'},arguments:{type:'string',description:'A JSON object of arguments. For wait use {} for event-only or {seconds:N} for a relative wall-clock wakeup. Existing future wakeups survive other calls. Use {cancelWake:true} only to explicitly cancel the saved wakeup.'}}},
+ call:{type:'object',additionalProperties:false,required:['type','command','arguments'],properties:{type:{type:'string',enum:['read','write','wait']},command:{type:'string'},arguments:{type:'string',description:'A JSON object of arguments. Wait: {} for events, {seconds:N} for a relative wake, {listenTo:[observed Soul IDs]} or {listenTo:"nearby"} for durable ambient-speech attention, {listenTo:[]} to clear attention. Wakeup and listening survive other calls independently. Use {cancelWake:true} only to cancel the saved wakeup.'}}},
  wakeAt:{type:['string','null'],description:'ISO8601 wall-clock wakeup with timezone, or null to wait for messages or action results.'},
 }};
-const READS=new Set(['response','tasks','task','resync','here','observe','explore','resolve','receipt','conversations','turns','calendar','reminders','object']);
+const READS=new Set(['help','response','tasks','task','resync','here','observe','explore','resolve','receipt','conversations','turns','calendar','reminders','object']);
 const WRITES=new Set(['act','say','converse','ack','result','remind','object']);
+export function listeningScope(value){
+ if(value==='nearby')return value;
+ if(!Array.isArray(value)||value.length>12||value.some(id=>typeof id!=='string'||!/^s_[A-Za-z0-9_-]{1,198}$/.test(id)))throw Error('listenTo needs up to12 observed Soul IDs, "nearby", or [] to clear');
+ return [...new Set(value)].sort();
+}
 export function parseDecision(text,{now=Date.now}={}){
  const value=JSON.parse(text);
  if(!value||Object.keys(value).sort().join(',')!=='call,plan,wakeAt')throw Error('Decision fields differ from contract');
@@ -24,6 +29,7 @@ export function parseDecision(text,{now=Date.now}={}){
   if(call.command==='task'&&(typeof args.id!=='string'||!args.id.length||args.id.length>200||args.offset!==undefined&&(!Number.isSafeInteger(args.offset)||args.offset<0||args.offset>65536)))throw Error('Local task needs id and nonnegative text offset');
  }
  if(call.type==='read'&&call.command==='response')validateResponseArguments(args);
+ if(Object.hasOwn(args,'listenTo')){if(call.type!=='wait')throw Error('Only wait can change listenTo');args.listenTo=listeningScope(args.listenTo);}
  if(value.wakeAt!==null&&(typeof value.wakeAt!=='string'||!/(Z|[+-]\d{2}:\d{2})$/.test(value.wakeAt)||!Number.isFinite(Date.parse(value.wakeAt))))throw Error('Wakeup needs explicit wall clock/timezone');
  let wakeAt=value.wakeAt;
  if(call.type==='wait'&&args.seconds!==undefined){
@@ -107,7 +113,8 @@ export async function applyPendingDecision(journal,fence,world,{signal}={}){
  journal.control.assertOwner(fence);
  // Mark incorporation only after decision and result are durable. It is NOT
  // the public owner ack/result, and does not assert goal completion.
- for(const event of pending.eventIds)journal.handled(event.source,event.id,'incorporated:'+id);
+ let incorporated=0;
+ for(const event of pending.eventIds)if(!journal.handled(event.source,event.id,'incorporated:'+id).alreadyHandled)incorporated++;
  const latest=journal.control.checkpoint();
  if(latest.value?.pendingDecision?.id!==id)throw Error('Pending decision changed while applying');
  const receipt=response?.receipt==null?null:receiptProjection(response.receipt,reference);
@@ -117,11 +124,12 @@ export async function applyPendingDecision(journal,fence,world,{signal}={}){
  const priorWake=latest.value.wakeAt;
  const wakeAt=decision.wakeAt??(call.type==='wait'&&call.args.cancelWake===true?null:priorWake&&Date.parse(priorWake)>pending.retainedAt?priorWake:null);
  const {lastResult,...previous}=latest.value;
- const finalized={...previous,pendingDecision:null,lastDecisionId:id,lastCall:call,wakeAt,lastReceipt:receipt??receiptProjection(latest.value.lastReceipt)??null};
+ const listenTo=call.type==='wait'&&Object.hasOwn(call.args,'listenTo')?listeningScope(call.args.listenTo):latest.value.listenTo??[];
+ const finalized={...previous,pendingDecision:null,lastDecisionId:id,lastCall:call,wakeAt,listenTo,lastReceipt:receipt??receiptProjection(latest.value.lastReceipt)??null};
  // Count the actual surrounding checkpoint, including the lastResult key and
  // comma, before deciding whether this complete observation fits inline.
  const envelopeBytes=Buffer.byteLength(JSON.stringify({...finalized,lastResult:null}))-4;
  const bytesLimit=Math.max(0,Math.min(32768,65536-envelopeBytes-128));
  journal.control.save(fence,latest.revision,{...finalized,lastResult:responseProjection(response,reference,{bytesLimit})});
- return {applied:true,id,call,response,wakeAt};
+ return {applied:true,id,call,response,wakeAt,incorporated};
 }

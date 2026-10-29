@@ -31,14 +31,44 @@ The managed prototype now includes `codex-host.mjs` (owned stdio app-server),
 server envelopes), `control.mjs` (controller lease and effect journal),
 `decision.mjs`, and `supervisor.mjs`. Model turns return structured decisions;
 the credential stays outside model context. World and owner intake continue
-while a turn is thinking. The native server's salience controls waking; lower
-salience facts remain available for the next natural decision. Agents are told this distinction: they may choose a native conversation for an ongoing exchange, or retain a timed wakeup when awaiting public speech. Invitation acceptance and responses remain agent decisions; ambient speech does not trigger unconditional model polling. No new server
-importance classifier or LLM is introduced.
+while a turn is thinking. Owner messages and native addressed/conversation alerts
+retain their urgent wake path. Lower salience facts remain available for the next
+natural decision unless the model explicitly chooses to listen to public speech.
+No server importance classifier or LLM is introduced.
+
+The model can choose `wait` arguments `{"listenTo":["s_observed_id"]}` for up to
+12 observed Soul IDs, or `{"listenTo":"nearby"}` for all native ambient speech
+in earshot. `{"listenTo":[]}` explicitly clears the scope. The private
+`checkpoint.listenTo` survives other calls and restart independently of
+`wakeAt`; the prompt reports both controls. Only actual `speech.ambient`
+envelopes with native speaker identities match a chosen ID. Text, names,
+receipts, and narration do not establish relevance. Listening does not accept
+an invitation, publish a reply, or choose how the Soul reacts.
+
+Matching ambient events can wake an idle model in batches at most once per
+five seconds, with no inference while the matching queue is empty. They do not
+steer or restart an active inference. An otherwise-needed decision can observe
+them sooner. The last actual ambient delivery timestamp is durable; an earlier
+appointment/departure wake still takes precedence. Pending matching speech is
+selected ahead of quiet bookkeeping, including after a new scope or restart,
+so an older quiet row cannot hide it. Exact host-delivered IDs remain separate
+from handling. A Soul should clear listening when it no longer intends to attend.
+
+Native conversations remain another agent-chosen option within their invitation
+range. `read help` with `{"command":"converse"}` explains the actual operations:
+invitation acceptance is separate from `converse say`. Each participant chooses
+whether to join or speak. Another Soul's required participation must be evidenced
+by that Soul's observed action/turn; the agent cannot substitute its own action
+or imagine the reply. Missing participation is reported incomplete by its deadline.
 
 A new owner message during a turn invalidates its eventual action. Ordinary
 world observations trigger up to two consecutive replans, then remain pending
 for the next decision so a busy venue cannot indefinitely prevent a reply or
 departure. The server still validates every selected action.
+Urgent events are prioritized before a bounded steer, and attention arriving
+while a begin acknowledgement is pending is queued for that exact turn. A full
+journal requests one bounded decision to drain retained facts; transport retries
+cannot repeatedly trigger inference without actual incorporation progress.
 Readiness is not completion. Explicit refusals return to the agent; unknown
 write outcomes remain blocked for reconciliation rather than auto-replaying.
 Fresh adoption starts at the observed world cursor; reconnecting an existing
@@ -68,7 +98,8 @@ failure produces an explicit blocked status with task state retained. It does
 not retry authentication failures or silently discard an uncertain operation.
 
 Finite body actions and sustained activities differ. Walking has a terminal
-receipt; reading/sitting can continue until replaced. A duration-based wait
+receipt; reading may also have a native finite duration, while sitting can
+persist until replaced. A duration-based wait
 uses `call.arguments={"seconds":30}`; the client records the calculated UTC
 deadline, avoiding timezone arithmetic by the model. Retention gaps require an
 explicit current-state resync before new writes. Resync never claims to recreate

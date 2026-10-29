@@ -225,3 +225,20 @@ test('100 maximum-length event identities drain in bounded pages with full retai
  }
  assert.equal(handled,100);assert.ok(pages>1);assert.equal(j.control.checkpoint().value.plan,plan);assert.equal(j.control.checkpoint().value.initialInstruction,initialInstruction);
 });
+test('model-chosen listening persists across reads, replies and restart independently of the deadline',async t=>{
+ const {j,dir,fence}=fixture(t),wakeAt=new Date(Date.now()+60000).toISOString();
+ const wait=listenTo=>parseDecision(JSON.stringify({plan:'Attend to observed participants without losing departure',call:{type:'wait',command:'wait',arguments:JSON.stringify({listenTo})},wakeAt:null}));
+ retainDecision(j,fence,{...wait(['s_second','s_first','s_first']),wakeAt});await applyPendingDecision(j,fence,{});assert.deepEqual(j.control.checkpoint().value.listenTo,['s_first','s_second']);j.control.release(fence);
+ const recovered=openJournal(dir,{worldId:'w',soulId:'s'});t.after(()=>recovered.close());const next=recovered.control.claim('recovered');assert.deepEqual(recovered.control.checkpoint().value.listenTo,['s_first','s_second']);assert.equal(recovered.control.checkpoint().value.wakeAt,wakeAt);
+ const help=parseDecision(JSON.stringify({plan:'Inspect the actual conversation API',call:{type:'read',command:'help',arguments:'{"command":"converse"}'},wakeAt:null}));retainDecision(recovered,next,help);await applyPendingDecision(recovered,next,{read:async(command,args)=>{assert.equal(command,'help');assert.deepEqual(args,{command:'converse'});return {command:'converse',ops:['start','accept','say']}}});
+ retainDecision(recovered,next,{plan:'Reply briefly then resume attention',call:{type:'write',command:'say',args:{text:'Hello'}},wakeAt:null});await applyPendingDecision(recovered,next,{write:async()=>({said:{id:'sp_reply'}})});
+ assert.deepEqual(recovered.control.checkpoint().value.listenTo,['s_first','s_second']);assert.equal(recovered.control.checkpoint().value.wakeAt,wakeAt);
+ retainDecision(recovered,next,wait([]));await applyPendingDecision(recovered,next,{});assert.deepEqual(recovered.control.checkpoint().value.listenTo,[]);assert.equal(recovered.control.checkpoint().value.wakeAt,wakeAt);
+ retainDecision(recovered,next,{...wait('nearby'),call:{...wait('nearby').call,args:{listenTo:'nearby',cancelWake:true}}});await applyPendingDecision(recovered,next,{});assert.equal(recovered.control.checkpoint().value.listenTo,'nearby');assert.equal(recovered.control.checkpoint().value.wakeAt,null);
+});
+test('listening arguments are explicit and bounded; pending listening choice recovers after restart',async t=>{
+ const payload=listenTo=>JSON.stringify({plan:'Choose attention',call:{type:'wait',command:'wait',arguments:JSON.stringify({listenTo})},wakeAt:null});
+ for(const scope of [null,true,'all',['unknown'],Array.from({length:13},(_,i)=>'s_'+i),['s_'+'x'.repeat(199)]])assert.throws(()=>parseDecision(payload(scope)),/listenTo/);
+ assert.throws(()=>parseDecision(JSON.stringify({plan:'Wrong scope location',call:{type:'read',command:'here',arguments:'{"listenTo":"nearby"}'},wakeAt:null})),/Only wait/);
+ const {j,dir,fence}=fixture(t);retainDecision(j,fence,parseDecision(payload('nearby')));j.control.release(fence);const recovered=openJournal(dir,{worldId:'w',soulId:'s'});t.after(()=>recovered.close());const next=recovered.control.claim('recovery');await applyPendingDecision(recovered,next,{});assert.equal(recovered.control.checkpoint().value.listenTo,'nearby');assert.equal(recovered.control.checkpoint().value.pendingDecision,null);
+});
