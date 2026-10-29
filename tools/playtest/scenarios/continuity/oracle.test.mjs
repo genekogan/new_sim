@@ -102,6 +102,18 @@ test('complete non-overlapping reading windows fail; missing body coverage remai
  evidence.participants['reader-b'].coverageComplete=false;assert.equal(resultRow(score(evidence),'simultaneous-distinct-seat-reading').status,'unknown');
  evidence.participants['reader-b'].coverageComplete=true;delete evidence.bindings[frozenFixtures.scenarios[0].seatPool[1].ref];assert.equal(resultRow(score(evidence),'simultaneous-distinct-seat-reading').status,'unknown','missing native binding is not complete contradictory evidence');
 });
+test('appointment reading counts only the shared duration at or after meeting, retaining early arrival and cutoff',()=>{
+ const id='simultaneous-distinct-seat-reading',early=readingEvidence({a:[0,60],b:[0,60]}),result=score(early);
+ assert.equal(resultRow(result,'reader-a:arrival').status,'pass');assert.equal(resultRow(result,'reader-a:sustained seated reading').status,'pass');assert.equal(resultRow(result,id).status,'fail','early arrival and a complete early read cannot wholly satisfy the later appointment');
+ early.participants['reader-b'].coverageComplete=false;assert.equal(resultRow(score(early),id).status,'unknown','missing coverage remains unknown rather than invented failure');
+ assert.equal(resultRow(score(readingEvidence({a:[180,259],b:[200,259]})),id).status,'fail','long straddling holds have only 19 seconds after meeting');
+ const exact=resultRow(score(readingEvidence({a:[180,270],b:[200,280]})),id);assert.equal(exact.status,'pass');assert.equal(exact.evidence[0].from,240000);assert.equal(exact.evidence[0].to,270000);assert.ok(exact.evidence[0].windows.every(w=>w.from>=240000));
+ assert.ok(exact.evidence[0].windows.every(w=>w.completedAt>=w.from+30000),'credited completion belongs to the postmeeting window');
+ assert.equal(resultRow(score(readingEvidence({a:[180,269],b:[200,300]})),id).status,'fail','29 postmeeting seconds is insufficient even with much earlier reading');
+ const jitter=readingEvidence({a:[180,270],b:[200,270]});for(const ev of Object.values(jitter.participants))ev.samples.find(s=>s.t===240000).t=240500;assert.equal(resultRow(score(jitter),id).status,'fail','the first native sample after meeting starts the credited interval; do not invent a boundary sample');
+ const cutoff=resultRow(score(readingEvidence({a:[690,721],b:[690,721]})),id);assert.equal(cutoff.status,'pass');assert.equal(cutoff.evidence[0].to,720000);
+ assert.equal(resultRow(score(readingEvidence({a:[691,730],b:[691,730]})),id).status,'fail','after-cutoff time cannot fill a short appointment hold');
+});
 const notification={eventId:'event-1',actor:'reader-a',createdAt:0,persistedAt:100,notifiedAt:200,firstRelevantEffectAt:300,relevantEffectId:'speech-1',relevanceEvidence:['native speech-1 answers event-1'],healthyRunning:true};
 const effect={id:'speech-1',operationId:'op-1',actor:'reader-a',type:'speech',at:300,respondsToEventId:'event-1'};
 const notificationScore=(n=notification,e=effect)=>score({scenarioId:'eden-reading-duo',notifications:[n],effects:[e]});

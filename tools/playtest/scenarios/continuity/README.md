@@ -175,3 +175,13 @@ has been started.
   place-path ancestry alone does not establish that return. Exact setup still
   needs fresh native verification; the development named-field setup substitution
   is not a passed frozen setup.
+
+Prospective revision `2026-10-29-precomparison-3` separately tightens the reading
+appointment clock after revision 2 (Git `23d97248f`). Early arrival and reading
+remain permitted, but the required shared 30 real seconds must occur at or after
+the declared meeting and no later than the existing cutoff. For a straddling
+hold, only its postmeeting portion counts, starting with the first native sample
+at/after the meeting; no boundary sample or premeeting time is backfilled.
+Venue, held seats, sampling gap, receipt evidence, arrival tolerances and numeric
+duration are unchanged. Missing coverage stays unknown. Existing development
+reports remain unchanged and are not rescored as acceptance.

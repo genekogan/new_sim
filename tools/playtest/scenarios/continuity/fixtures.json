@@ -80,7 +80,8 @@
         "arrivalToleranceSec": 30,
         "endOffsetSec": 720,
         "minimumSimultaneousReadingSec": 30,
-        "resumeWithinSecAfterClosure": 180
+        "resumeWithinSecAfterClosure": 180,
+        "simultaneousReadingNotBefore": "declared-meeting"
       },
       "actors": [
         {
@@ -451,9 +452,10 @@
         "distinct held seat entity+slot for both actors during overlapping reading window",
         "occupied seat never held by either test actor",
         "world-observed reciprocal speech, semantic relevance scored separately",
-        "exact operation->effect IDs around restart; no duplicate effects"
+        "exact operation->effect IDs around restart; no duplicate effects",
+        "required simultaneous reading duration counts only at/after declared meeting and before existing cutoff; early arrival or reading alone cannot satisfy the appointment"
       ],
-      "initialConstraintSupplement": "The meeting is at {meetingUTC}; finish the gathering and your original errand by {completionUTC}. These are real UTC deadlines even if the world clock differs. Once you are both seated and reading, read together for at least 30 real seconds, exchange observations, then return to your original errand before the completion deadline."
+      "initialConstraintSupplement": "The meeting is at {meetingUTC}; finish the gathering and your original errand by {completionUTC}. These are real UTC deadlines even if the world clock differs. At or after the meeting time, once you are both seated and reading, read together for at least 30 real seconds, exchange observations, then return to your original errand before the completion deadline."
     },
     {
       "id": "mars-presentation-four",
@@ -2009,9 +2011,14 @@
       "initialConstraintSupplement": "The meeting is at {meetingUTC}; finish the gathering and your original errand by {completionUTC}. These are real UTC deadlines even if the world clock differs."
     }
   ],
-  "proposalRevision": "2026-10-29-precomparison-2",
+  "proposalRevision": "2026-10-29-precomparison-3",
   "supersedes": {
     "git": "6960c41f6",
     "policy": "Prospective precomparison corrections only. Preserve existing development reports and original strict scorer in Git; never relabel old runs as acceptance."
+  },
+  "previousProposal": {
+    "git": "23d97248f",
+    "revision": "2026-10-29-precomparison-2",
+    "change": "Count the unchanged 30-second simultaneous reading requirement only at/after declared meeting and within existing cutoff. Early arrival/reading remains permitted; old reports are not rescored as acceptance."
   }
 }

@@ -291,10 +291,17 @@ export function scoreContinuity({fixtures,oracles,evidence}){
   }
  }
  if(scenario.id==='eden-reading-duo'){
-  const group=scenario.actors.map(a=>holds.find(h=>h.actor===a.id&&h.phase==='sustained seated reading')?.windows??[]);
+  // Arriving/reading early remains valid behavior, but only the part of each
+  // native hold at/after the appointment can satisfy the shared reading time.
+  const duration=scenario.timing.minimumSimultaneousReadingSec*1000;
+  const group=scenario.actors.map(a=>(holds.find(h=>h.actor===a.id&&h.phase==='sustained seated reading')?.windows??[]).flatMap(w=>{
+   const times=(actors[a.id]?.samples??[]).map(s=>at(s.t)).filter(t=>t>=Math.max(w.from,meeting)&&t<=Math.min(w.to,cutoff)).sort((a,b)=>a-b);
+   const completedAt=times.find(t=>t-times[0]>=duration);
+   return completedAt===undefined?[]:[{...w,from:times[0],to:times.at(-1),completedAt}];
+  }));
   const together=overlap(group,scenario.timing.minimumSimultaneousReadingSec,{distinctSeats:true});
   const complete=scenario.actors.every(a=>holds.find(h=>h.actor===a.id&&h.phase==='sustained seated reading')?.status!=='unknown'&&bodyCoverageComplete(actors[a.id],t0+a.releaseOffsetSec*1000,cutoff,maxGap));
-  rows.push(row('simultaneous-distinct-seat-reading',together?'pass':complete?'fail':'unknown','Both current sampled reading holds overlap >=30 real seconds on different permitted seat identities',together?[together]:[]));
+  rows.push(row('simultaneous-distinct-seat-reading',together?'pass':complete?'fail':'unknown','Both current sampled reading holds overlap >=30 real seconds at/after the declared meeting and before cutoff on different permitted seat identities',together?[together]:[]));
  }
  if(scenario.id==='eden-bandstand-five'){
   const performer=holds.find(h=>h.phase==='native violin performance')?.windows??[];
