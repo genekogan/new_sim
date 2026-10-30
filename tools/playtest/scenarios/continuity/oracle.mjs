@@ -250,9 +250,20 @@ export function scoreDisturbance({scenario,disturbance,evidence,t0,cutoff,maxGap
   const from=at(p?.overlapFrom),to=at(p?.overlapTo);need(Number.isFinite(from)&&Number.isFinite(to),'garden overlap timestamps');
   if(Number.isFinite(from)&&Number.isFinite(to)){
    check(from>=t0+scenario.timing.meetingOffsetSec*1000&&to-from>=spec.minimumOverlapSec*1000,'garden overlap duration/order');
-   const groups=scenario.actors.map(a=>observedHolds({samples:actor(a.id).samples,phase:{region:scenario.venue.gardenRegion,holdSec:spec.minimumOverlapSec},from,to,maxGapSec}).windows),together=overlap(groups,(to-from)/1000);
+   // Retain each independently sampled run's bracketing endpoints. Slicing
+   // every actor to a common timestamp drops valid boundary observations and
+   // falsely shortens an asynchronous intersection. Gaps still break runs.
+   const groups=scenario.actors.map(a=>observedHolds({samples:actor(a.id).samples,phase:{region:scenario.venue.gardenRegion,holdSec:spec.minimumOverlapSec},from:Math.max(t0+scenario.timing.meetingOffsetSec*1000,t0+a.releaseOffsetSec*1000),to:cutoff,maxGapSec}).windows),together=groups.every(windows=>windows.some(w=>w.from<=from&&w.to>=to));
    if(!together){if(scenario.actors.every(a=>bodyCoverageComplete(actor(a.id),from,to,maxGapSec)))check(false,'three current bodies do not share declared garden interval');else need(false,'complete current garden overlap proof');}
-   const first=overlap(scenario.actors.map(a=>observedHolds({samples:actor(a.id).samples,phase:{region:scenario.venue.gardenRegion,holdSec:spec.minimumOverlapSec},from:Math.max(t0+scenario.timing.meetingOffsetSec*1000,t0+a.releaseOffsetSec*1000),to:cutoff,maxGapSec}).windows),spec.minimumOverlapSec);
+   if(together){
+    const available=Math.max(...scenario.actors.map((a,i)=>{
+     const w=groups[i].find(w=>w.from<=from&&w.to>=to);
+     return Math.min(...(actor(a.id).samples??[]).map(s=>at(s.t)).filter(t=>t>=to&&t<=w.to));
+    }));
+    check(Number.isFinite(available)&&available<=delivered,'garden overlap evidence became available after delivery');
+    if(p?.proofAvailableAt!==undefined){const reported=at(p.proofAvailableAt);check(Number.isFinite(reported)&&reported>=available&&reported<=delivered,'garden proof availability contradicts source samples or delivery');}
+   }
+   const first=overlap(groups,spec.minimumOverlapSec);
    if(first){exact(from,first.from,'not the first observed garden overlap');exact(to,first.from+spec.minimumOverlapSec*1000,'garden trigger postponed past first required overlap');}else need(false,'first garden overlap proof');
    exact(observed,to,'garden trigger timestamp mismatch');exact(scheduled,to,'garden delivery schedule mismatch');
   }

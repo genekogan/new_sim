@@ -223,6 +223,11 @@ test('garden errand trigger requires a timestamped actual three-body overlap bef
  const d=deliveredDisturbance('garden-group-overlap',['walker-2'],310000,310500,{overlapFrom:300000,overlapTo:310000});d.deliveryEvents=[nativeDelivery('walker-2','owner',310500)];
  const e={participants,disturbances:{'independent-errand':d},notifications:[{actor:'walker-2',eventId:'native-event',source:'owner',createdAt:310500}]},run=e=>disturbanceScore('eden-walk-three','independent-errand',e);
  assert.equal(run(e).status,'pass');
+ const skewed=structuredClone(e);Object.values(skewed.participants).forEach((p,i)=>{p.samples=Array.from({length:12},(_,n)=>({t:300000+i*300+n*1000,pos:{x:57,z:-10,src:'world'}}));});
+ const sd=skewed.disturbances['independent-errand'];Object.assign(sd,{scheduledAt:310600,deliveredAt:311500});Object.assign(sd.triggerProof,{observedAt:310600,overlapFrom:300600,overlapTo:310600});sd.deliveryEvents[0].createdAt=311500;skewed.notifications[0].createdAt=311500;
+ assert.equal(run(skewed).status,'pass','actual independently sampled bracketing intervals establish the same ten-second shared hold');
+ const future=structuredClone(e);for(const p of Object.values(future.participants))p.samples=[...p.samples.filter(s=>s.t<310000),{t:311000,pos:{x:57,z:-10,src:'world'}}];future.disturbances['independent-errand'].triggerProof.proofAvailableAt=311000;assert.equal(run(future).status,'fail','later bracketing samples cannot prove a trigger was known before delivery');
+ const gap=structuredClone(skewed);gap.participants['walker-1'].samples=gap.participants['walker-1'].samples.filter(s=>s.t<304000||s.t>307000);assert.notEqual(run(gap).status,'pass','asynchronous boundaries cannot fill a real observation gap');
  const absent=structuredClone(e);delete absent.participants['walker-3'];assert.equal(run(absent).status,'unknown');
  const apart=structuredClone(e);apart.participants['walker-3'].samples.forEach(s=>s.pos.x=0);assert.equal(run(apart).status,'fail');
  const premature=structuredClone(e);premature.disturbances['independent-errand'].triggerProof.overlapTo=305000;assert.equal(run(premature).status,'fail');
