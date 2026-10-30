@@ -2,9 +2,9 @@
 
 // tools/soul-runtime/run.mjs
 import { parseArgs } from "node:util";
-import { readFileSync, mkdirSync as mkdirSync2, writeFileSync, renameSync, lstatSync as lstatSync2, openSync, closeSync, fstatSync, fchmodSync, fsyncSync, constants } from "node:fs";
-import { randomUUID as randomUUID4 } from "node:crypto";
-import { resolve, join as join2 } from "node:path";
+import { readFileSync as readFileSync2, mkdirSync as mkdirSync3, writeFileSync as writeFileSync2, renameSync as renameSync2, lstatSync as lstatSync3, openSync as openSync2, closeSync as closeSync2, fstatSync as fstatSync2, fchmodSync, fsyncSync as fsyncSync2, constants as constants2 } from "node:fs";
+import { randomUUID as randomUUID5 } from "node:crypto";
+import { resolve as resolve2, join as join3 } from "node:path";
 import { pathToFileURL } from "node:url";
 import { performance as performance2 } from "node:perf_hooks";
 
@@ -14,7 +14,7 @@ import { EventEmitter } from "node:events";
 import { performance } from "node:perf_hooks";
 var fault = (code, message) => Object.assign(Error(message), { code });
 var input = (text2) => [{ type: "text", text: text2 }];
-var delay = (ms) => new Promise((resolve2) => setTimeout(resolve2, ms));
+var delay = (ms) => new Promise((resolve3) => setTimeout(resolve3, ms));
 var GROUP_REAP_POLLS = 200;
 var GROUP_REAP_POLL_MS = 25;
 var probeErrorCode = (value) => typeof value === "string" && /^[A-Z][A-Z0-9_]{0,63}$/.test(value) ? value : "UNKNOWN";
@@ -52,16 +52,16 @@ var CodexHost = class extends EventEmitter {
     this.buffer = "";
     this.child = spawnProcess(command, args, { cwd, stdio: ["pipe", "pipe", "pipe"], detached: true });
     this.pid = this.child.pid;
-    this.exit = new Promise((resolve2) => {
+    this.exit = new Promise((resolve3) => {
       this.child.once("exit", (code, signal) => {
         this.exitStatus = { code, signal };
         this.fail(fault("HOST_EXITED", "Codex host exited"));
-        resolve2(this.exitStatus);
+        resolve3(this.exitStatus);
       });
       this.child.once("error", (e) => {
         this.exitStatus = { code: null, signal: null, startFailed: true };
         this.fail(fault("HOST_START_FAILED", e.message));
-        resolve2(this.exitStatus);
+        resolve3(this.exitStatus);
       });
     });
     this.child.stdin.on("error", (e) => this.fail(fault("HOST_INPUT_FAILED", e.message)));
@@ -102,12 +102,12 @@ var CodexHost = class extends EventEmitter {
   }
   request(method, params) {
     if (this.closed) return Promise.reject(this.failure);
-    return new Promise((resolve2, reject) => {
+    return new Promise((resolve3, reject) => {
       const id = ++this.sequence;
       const timer = setTimeout(() => {
         this.fail(fault("HOST_REQUEST_TIMEOUT", `Host request timed out: ${method}`));
       }, this.requestTimeoutMs);
-      this.pending.set(id, { resolve: resolve2, reject, timer });
+      this.pending.set(id, { resolve: resolve3, reject, timer });
       try {
         this.send({ id, method, params });
       } catch (e) {
@@ -120,14 +120,14 @@ var CodexHost = class extends EventEmitter {
   turnRecord(id) {
     let t = this.turns.get(id);
     if (t) return t;
-    let resolve2, reject;
+    let resolve3, reject;
     const completed = new Promise((a, b) => {
-      resolve2 = a;
+      resolve3 = a;
       reject = b;
     });
     completed.catch(() => {
     });
-    t = { id, text: [], characters: 0, terminal: false, completed, resolve: resolve2, reject };
+    t = { id, text: [], characters: 0, terminal: false, completed, resolve: resolve3, reject };
     this.turns.set(id, t);
     return t;
   }
@@ -304,14 +304,254 @@ var CodexHost = class extends EventEmitter {
   }
 };
 
-// tools/soul-runtime/journal.mjs
+// tools/soul-runtime/controller-ownership.mjs
+import { execFileSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
+import { mkdirSync, lstatSync, fstatSync, realpathSync, readFileSync, writeFileSync, openSync, closeSync, fsyncSync, renameSync, unlinkSync, constants } from "node:fs";
+import { join, dirname, resolve } from "node:path";
+import { createHash, randomUUID } from "node:crypto";
 
-// tools/soul-runtime/control.mjs
-import { randomUUID } from "node:crypto";
+// tools/soul-runtime/receiver.mjs
+async function receivePage(journal, source, read, { signal, onCommitted = () => {
+}, initial = false, onReady } = {}) {
+  const after = journal.cursor(source);
+  const page = await read({ after, signal, initial, onReady });
+  if (signal?.aborted) return { aborted: true };
+  const result = journal.ingest({ source, after, cursor: page.cursor, events: page.events, gap: page.gap ?? false });
+  if (page.events.length) onCommitted({ source, state: "events-persisted", events: page.events.map((event) => ({ source, id: event.id })), committedAt: Date.now() });
+  return { ...result, pending: journal.pending().length };
+}
+async function runReceiver({ journal, source, read, signal, onState = () => {
+}, retryable = () => false, sleep = abortableSleep, maxBackoffMs = 3e4 }) {
+  let backoff = 0, ready = false;
+  const markReady = (mode) => {
+    if (!ready && !signal?.aborted) {
+      ready = true;
+      onState({ source, state: "receiver-ready", successful: true, mode, at: Date.now() });
+    }
+  };
+  while (!signal?.aborted) {
+    try {
+      onState({ source, state: "receiving" });
+      const result = await receivePage(journal, source, read, { signal, onCommitted: onState, initial: !ready, onReady: (proof) => {
+        if (proof?.mode === "stream-adopted" && proof.successful === true) markReady("stream-adopted");
+      } });
+      if (result.aborted) break;
+      markReady("page-committed");
+      backoff = 0;
+    } catch (error2) {
+      if (signal?.aborted) break;
+      if (!retryable(error2)) {
+        onState({ source, state: "blocked", reason: String(error2.message) });
+        throw error2;
+      }
+      backoff = Math.min(maxBackoffMs, backoff ? backoff * 2 : 1e3);
+      onState({ source, state: "retrying", delayMs: backoff, reason: String(error2.message), ...typeof error2.code === "string" ? { code: error2.code } : {} });
+      await sleep(backoff, signal);
+    }
+  }
+  onState({ source, state: "stopped" });
+}
+async function runWakeDispatcher({ journal, notify, signal, retryable = () => false, sleep = abortableSleep, pollMs = 100 }) {
+  const deliveredGaps = /* @__PURE__ */ new Set();
+  let backoff = 0, lastDeliveredSequence = 0;
+  while (!signal?.aborted) {
+    const fresh = journal.pending(1e3, lastDeliveredSequence), gaps = journal.gaps();
+    const liveGaps = new Set(gaps.map((g) => g.seq));
+    for (const id of deliveredGaps) if (!liveGaps.has(id)) deliveredGaps.delete(id);
+    const freshGaps = gaps.filter((g) => !deliveredGaps.has(g.seq));
+    if (fresh.length || freshGaps.length) {
+      try {
+        await notify({ pending: fresh, gaps: freshGaps });
+        if (fresh.length) lastDeliveredSequence = fresh.at(-1).sequence;
+        freshGaps.forEach((g) => deliveredGaps.add(g.seq));
+        backoff = 0;
+      } catch (error2) {
+        if (signal?.aborted) break;
+        if (!retryable(error2)) throw error2;
+        backoff = Math.min(3e4, backoff ? backoff * 2 : 1e3);
+        await sleep(backoff, signal);
+        continue;
+      }
+    }
+    await sleep(pollMs, signal);
+  }
+}
+function abortableSleep(ms, signal) {
+  if (signal?.aborted) return Promise.resolve();
+  return new Promise((resolve3) => {
+    const done = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", done);
+      resolve3();
+    };
+    const timer = setTimeout(done, ms);
+    signal?.addEventListener("abort", done, { once: true });
+  });
+}
+
+// tools/soul-runtime/controller-ownership.mjs
+var fault2 = (code) => Object.assign(Error(code + "; ownership/state retained"), { code });
+var sha = (value) => createHash("sha256").update(value).digest("hex");
+var validPid = (n) => Number.isSafeInteger(n) && n > 1;
+var same = (a, b) => a && b && a.pid === b.pid && a.pgid === b.pgid && a.startToken === b.startToken;
+var MAX_BYTES = 262144;
+var MAX_CONTROLLERS = 16;
+var MAX_HOSTS = 128;
+function readPrivate(path) {
+  const s = lstatSync(path);
+  if (!s.isFile() || s.isSymbolicLink() || s.nlink !== 1 || s.size > MAX_BYTES || s.mode & 63) throw fault2("CONTROLLER_INVENTORY_UNSAFE");
+  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const actual = fstatSync(fd);
+    if (actual.dev !== s.dev || actual.ino !== s.ino || !actual.isFile() || actual.nlink !== 1 || actual.size > MAX_BYTES || actual.mode & 63) throw fault2("CONTROLLER_INVENTORY_UNSAFE");
+    return JSON.parse(readFileSync(fd, "utf8"));
+  } finally {
+    closeSync(fd);
+  }
+}
+function writePrivate(path, value, { exclusive = false } = {}) {
+  const bytes2 = JSON.stringify(value);
+  if (Buffer.byteLength(bytes2) > MAX_BYTES) throw fault2("CONTROLLER_INVENTORY_CAPACITY");
+  const tmp = exclusive ? path : path + "." + randomUUID() + ".tmp";
+  const fd = openSync(tmp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 384);
+  try {
+    writeFileSync(fd, bytes2);
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+  if (!exclusive) renameSync(tmp, path);
+  const dir = openSync(dirname(path), constants.O_RDONLY);
+  try {
+    fsyncSync(dir);
+  } finally {
+    closeSync(dir);
+  }
+}
+function inspectOwnedProcess(pid) {
+  if (!validPid(pid)) throw fault2("CONTROLLER_PROCESS_INVALID");
+  let output;
+  try {
+    output = execFileSync("ps", ["-p", String(pid), "-o", "pid=,ppid=,pgid=,lstart="], { encoding: "utf8", timeout: 500, maxBuffer: 4096, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, LC_ALL: "C" } });
+  } catch (e) {
+    if (e.status === 1 && !String(e.stdout ?? "").trim()) return null;
+    throw fault2("CONTROLLER_PROCESS_UNKNOWN");
+  }
+  const m = output.trim().match(/^(\d+)\s+(\d+)\s+(\d+)\s+(.+)$/);
+  if (!m || Number(m[1]) !== pid) throw fault2("CONTROLLER_PROCESS_UNKNOWN");
+  return { pid, ppid: Number(m[2]), pgid: Number(m[3]), startToken: m[4] };
+}
+function strictProcessAbsent(target, killProcess = process.kill) {
+  try {
+    killProcess(target, 0);
+    return false;
+  } catch (e) {
+    if (e.code === "ESRCH") return true;
+    throw fault2("CONTROLLER_ABSENCE_UNKNOWN");
+  }
+}
+function readControllerSnapshot(path) {
+  let db;
+  const before = lstatSync(path);
+  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1) throw fault2("CONTROLLER_JOURNAL_UNSAFE");
+  try {
+    db = new DatabaseSync(path, { readOnly: true });
+    db.exec("PRAGMA busy_timeout=100; BEGIN");
+    const identity = db.prepare("SELECT world,soul FROM identity WHERE singleton=1").get(), c = db.prepare("SELECT revision,payload FROM checkpoint WHERE singleton=1").get(), owner = db.prepare("SELECT owner,generation FROM controller WHERE singleton=1").get();
+    if (!identity || c && Buffer.byteLength(c.payload) > 65536) throw fault2("CONTROLLER_SNAPSHOT_INVALID");
+    const value = c ? JSON.parse(c.payload) : null, ops = db.prepare("SELECT id,status,generation FROM operations WHERE status<>'settled' ORDER BY id LIMIT 65").all();
+    if (ops.length > 64) throw fault2("CONTROLLER_OPERATION_CAPACITY");
+    db.exec("COMMIT");
+    const after = lstatSync(path);
+    if (before.dev !== after.dev || before.ino !== after.ino) throw fault2("CONTROLLER_JOURNAL_CHANGED");
+    return { journalIdentity: sha(`${realpathSync(path)}:${before.dev}:${before.ino}`), worldId: identity.world, soulId: identity.soul, revision: c?.revision ?? 0, valueSha256: sha(JSON.stringify(value)), threadId: value?.threadId ?? null, instructionSha256: sha(JSON.stringify(value?.initialInstruction ?? null)), generation: owner?.generation ?? 0, ownerSha256: owner ? sha(owner.owner) : null, recoveryPending: !!(value?.pendingDecision || value?.decisionProgressV1 || value?.urgentRecoveryV1 || ops.length), operations: ops.map((o) => ({ ...o })) };
+  } finally {
+    db?.close();
+  }
+}
+function validateLedger(ledger, path) {
+  if (ledger?.version !== 1 || typeof ledger.id !== "string" || ledger.path !== path || !Array.isArray(ledger.controllers) || ledger.controllers.length > MAX_CONTROLLERS || ledger.controllers.reduce((n, c) => n + (c.hosts?.length ?? MAX_HOSTS + 1), 0) > MAX_HOSTS) throw fault2("CONTROLLER_INVENTORY_INVALID");
+  return ledger;
+}
+async function openControllerInventory({ path = process.env.SIM_SOUL_CONTROLLER_INVENTORY, epoch = process.env.SIM_SOUL_CONTROLLER_EPOCH, inspectProcess = inspectOwnedProcess, sleep = abortableSleep, now = Date.now } = {}) {
+  if (!path || !epoch) return null;
+  path = resolve(path);
+  const deadline = now() + 2e3;
+  let ledger, c;
+  while (true) {
+    ledger = validateLedger(readPrivate(path), path);
+    c = ledger.controllers.find((c2) => c2.epoch === epoch);
+    if (!c) throw fault2("CONTROLLER_RESERVATION_INVALID");
+    if (c.state === "running") break;
+    if (c.state !== "starting" || now() >= deadline) throw fault2("CONTROLLER_BIRTH_UNPROVEN");
+    await sleep(10);
+  }
+  const actual = inspectProcess(process.pid);
+  if (!same(c.birth, actual) || actual.ppid !== c.launcher.pid || !same(c.launcher, inspectProcess(c.launcher.pid))) throw fault2("CONTROLLER_BIRTH_UNPROVEN");
+  let failure = null;
+  const update = (fn) => {
+    if (failure) throw failure;
+    try {
+      const next = validateLedger(readPrivate(path), path), row = next.controllers.find((x) => x.epoch === epoch);
+      if (row?.state !== "running" || !same(row.birth, actual)) throw fault2("CONTROLLER_RESERVATION_INVALID");
+      fn(row, next);
+      writePrivate(path, next);
+    } catch (e) {
+      failure = e;
+      throw e;
+    }
+  };
+  let reentryProof = null;
+  if (c.reentryPath) {
+    const previous = ledger.controllers.find((row) => row.proofPath === c.reentryPath);
+    reentryProof = readPrivate(c.reentryPath);
+    if (previous?.state !== "closed" || previous.proofSha256 !== sha(JSON.stringify(reentryProof)) || reentryProof.inventoryId !== ledger.id || reentryProof.epoch !== previous.epoch) throw fault2("CONTROLLER_REENTRY_PROOF_INVALID");
+  }
+  return {
+    reentryProof,
+    reserveHost() {
+      const id = randomUUID();
+      update((row, all) => {
+        if (all.controllers.reduce((n, c2) => n + c2.hosts.length, 0) >= MAX_HOSTS) throw fault2("CONTROLLER_INVENTORY_CAPACITY");
+        row.hosts.push({ id, state: "starting", at: now() });
+      });
+      return id;
+    },
+    registerHost(id, pid) {
+      update((row) => {
+        const host = row.hosts.find((h) => h.id === id), birth = inspectProcess(pid);
+        if (host?.state !== "starting" || !birth || birth.ppid !== actual.pid || birth.pid !== birth.pgid) throw fault2("CONTROLLER_HOST_BIRTH_UNPROVEN");
+        host.birth = birth;
+        host.state = "registered";
+      });
+    },
+    hostClosed(id, proof) {
+      update((row) => {
+        const h = row.hosts.find((h2) => h2.id === id);
+        if (!h?.birth || proof?.hostPid !== h.birth.pid) throw fault2("CONTROLLER_HOST_CLOSURE_INVALID");
+        h.closeProof = { hostPid: proof.hostPid, threadId: proof.threadId ?? null, groupClosed: proof.groupClosed === true, groupVerification: proof.groupVerification, at: now() };
+        if (proof.groupClosed === true && proof.groupVerification === "absent") h.state = "closed";
+      });
+    }
+  };
+}
+function verifyControllerReentry(proof, { journalPath, scope, fence, killProcess = process.kill } = {}) {
+  if (proof?.version !== 1 || typeof proof.id !== "string" || !Array.isArray(proof.hosts) || proof.hosts.length > MAX_HOSTS || !validPid(proof.controller?.pid) || !proof.exit || !proof.snapshot || proof.hosts.some((h) => !validPid(h.birth?.pid) || h.birth.pgid !== h.birth.pid)) throw fault2("CONTROLLER_REENTRY_PROOF_INVALID");
+  const before = proof.snapshot, actual = readControllerSnapshot(journalPath);
+  if (before.worldId !== scope.worldId || before.soulId !== scope.soulId || before.journalIdentity !== actual.journalIdentity || before.revision !== actual.revision || before.valueSha256 !== actual.valueSha256 || before.threadId !== actual.threadId || before.instructionSha256 !== actual.instructionSha256 || JSON.stringify(before.operations) !== JSON.stringify(actual.operations) || fence.generation !== before.generation + 1 || actual.generation !== fence.generation || before.ownerSha256 === actual.ownerSha256) throw fault2("CONTROLLER_REENTRY_BINDING_CHANGED");
+  if (!strictProcessAbsent(proof.controller.pid, killProcess)) throw fault2("CONTROLLER_REENTRY_WRITER_PRESENT");
+  for (const h of proof.hosts) {
+    if (!h.birth || h.closeProof?.hostPid !== h.birth.pid || h.closeProof.groupClosed !== true || h.closeProof.groupVerification !== "absent" || !["prior-verified", "post-exit"].includes(h.closure) || h.closure === "post-exit" && !strictProcessAbsent(-h.birth.pgid, killProcess)) throw fault2("CONTROLLER_REENTRY_GROUP_UNVERIFIED");
+  }
+  return proof.id;
+}
+
+// tools/soul-runtime/decision.mjs
+import { randomUUID as randomUUID2 } from "node:crypto";
 
 // tools/soul-runtime/responses.mjs
-import { createHash } from "node:crypto";
+import { createHash as createHash2 } from "node:crypto";
 var MAX_RESPONSE_BYTES = 4 * 1024 * 1024 + 8192;
 var RESPONSE_DELIVERY_BYTES = 24 * 1024;
 var bytes = (value) => Buffer.byteLength(JSON.stringify(value));
@@ -321,7 +561,7 @@ function encodeResponse(value) {
   return raw;
 }
 function responseReference(kind, id, raw) {
-  return { kind, id, bytes: Buffer.byteLength(raw), sha256: createHash("sha256").update(raw).digest("hex") };
+  return { kind, id, bytes: Buffer.byteLength(raw), sha256: createHash2("sha256").update(raw).digest("hex") };
 }
 function responseProjection(value, reference, { bytesLimit = 8192 } = {}) {
   if (!Number.isSafeInteger(bytesLimit) || bytesLimit < 0 || bytesLimit > 65536) throw Error("Invalid response projection byte budget");
@@ -356,7 +596,197 @@ function receiptProjection(receipt, reference) {
   return result;
 }
 
+// tools/soul-runtime/decision.mjs
+var RECOVERY_METADATA_BYTES = 2048;
+var size = (value) => Buffer.byteLength(JSON.stringify(value));
+var progressFault = (message) => Object.assign(Error(message), { code: "DECISION_PROGRESS_STATE_INVALID" });
+function decisionProgress(value) {
+  const p = value?.decisionProgressV1;
+  if (p == null) return null;
+  if (!p || typeof p !== "object" || typeof p.id !== "string" || !/^[-A-Za-z0-9._:]{1,200}$/.test(p.id) || !["ready", "active", "soft-pending", "fallback-reserved", "blocked"].includes(p.phase) || !Number.isInteger(p.window) || p.window < 1 || p.window > 3 || !Number.isInteger(p.worldReplans) || p.worldReplans < 0 || p.worldReplans > 2 || !Number.isFinite(p.deadlineAt) || typeof p.softUsed !== "boolean" || typeof p.fallbackUsed !== "boolean" || p.turnId !== null && (typeof p.turnId !== "string" || !/^[-A-Za-z0-9._:]{1,200}$/.test(p.turnId)) || p.hostPid !== null && (!Number.isSafeInteger(p.hostPid) || p.hostPid < 1) || p.grant != null && (!["urgent", "progress"].includes(p.grant.kind) || typeof p.grant.id !== "string" || !/^[-A-Za-z0-9._:]{1,200}$/.test(p.grant.id) || p.grant.turnId !== null && (typeof p.grant.turnId !== "string" || !/^[-A-Za-z0-9._:]{1,200}$/.test(p.grant.turnId)) || p.grant.hostPid !== null && (!Number.isSafeInteger(p.grant.hostPid) || p.grant.hostPid < 1))) throw progressFault("Invalid persisted active-decision recovery state; task retained");
+  if (p.window > 1 + Number(p.softUsed) + Number(p.fallbackUsed) || p.phase === "soft-pending" && !p.softUsed || p.phase === "fallback-reserved" && (!p.fallbackUsed || !p.grant)) throw progressFault("Inconsistent persisted decision recovery credits");
+  if (size({ urgentRecoveryV1: value.urgentRecoveryV1, decisionProgressV1: p }) > RECOVERY_METADATA_BYTES) throw progressFault("Recovery metadata exceeds its bounded envelope");
+  return p;
+}
+function saveRecoveryCheckpoint(journal, fence, revision, value) {
+  decisionProgress(value);
+  const { urgentRecoveryV1, decisionProgressV1, ...body } = value;
+  if (size({ urgentRecoveryV1, decisionProgressV1 }) > RECOVERY_METADATA_BYTES) throw progressFault("Recovery metadata exceeds its bounded envelope");
+  if (size(body) > 65536 - RECOVERY_METADATA_BYTES - 128) {
+    const id = body.lastDecisionId;
+    let response, reference;
+    if (body.lastCall?.type === "read" && id) {
+      const saved = journal.control.readResult(id);
+      if (saved) ({ response, reference } = saved);
+    } else if (body.lastCall?.type === "write" && id && journal.control.hasOperation(id)) {
+      const op = journal.control.operation(id);
+      if (op.status === "settled") {
+        response = op.response;
+        reference = responseReference("operation", id, JSON.stringify(response));
+      }
+    }
+    if (!reference || JSON.stringify(response) !== JSON.stringify(body.lastResult)) throw progressFault("Legacy checkpoint needs verified durable response projection before recovery metadata fits");
+    body.lastResult = responseProjection(response, reference, { bytesLimit: 0 });
+    if (size(body) > 65536 - RECOVERY_METADATA_BYTES - 128) throw progressFault("Checkpoint intent exceeds reserved recovery envelope; state retained");
+  }
+  return journal.control.save(fence, revision, { ...body, ...urgentRecoveryV1 === void 0 ? {} : { urgentRecoveryV1 }, ...decisionProgressV1 === void 0 ? {} : { decisionProgressV1 } });
+}
+function admitControllerReentry(journal, fence, proof, { journalPath, scope, activeDecisionMs = 3e4 } = {}) {
+  journal.control.assertOwner(fence);
+  if (!Number.isSafeInteger(activeDecisionMs) || activeDecisionMs < 1 || activeDecisionMs > 3e5) throw progressFault("Invalid active recovery window");
+  const proofId = verifyControllerReentry(proof, { journalPath, scope, fence });
+  const c = journal.control.checkpoint(), p = decisionProgress(c.value);
+  if (c.value?.pendingDecision || !p) return { admitted: true, proofId, charged: false };
+  if (p.phase === "blocked" || p.window >= 3 || p.phase !== "fallback-reserved" && (p.fallbackUsed || c.value.urgentRecoveryV1?.fallbackUsed)) throw Object.assign(Error("Killed controller has no remaining shared fallback; state retained"), { code: "DECISION_PROGRESS_BUDGET_EXHAUSTED" });
+  if (p.phase === "fallback-reserved" && (!p.fallbackUsed || !p.grant || !proof.hosts.some((h) => h.birth.pid === p.grant.hostPid))) throw progressFault("Reserved fallback does not match the proven old host inventory");
+  if (p.hostPid !== null && !proof.hosts.some((h) => h.birth.pid === p.hostPid)) throw progressFault("Active host is missing from complete ownership proof");
+  const grant = p.phase === "fallback-reserved" ? p.grant : { id: proofId, kind: "progress", turnId: p.turnId, hostPid: p.hostPid };
+  saveRecoveryCheckpoint(journal, fence, c.revision, { ...c.value, ...c.value.urgentRecoveryV1 ? { urgentRecoveryV1: { ...c.value.urgentRecoveryV1, fallbackUsed: true } } : {}, decisionProgressV1: { ...p, phase: "ready", fallbackUsed: true, window: p.window + 1, deadlineAt: Date.now() + activeDecisionMs, turnId: null, hostPid: null, grant: { ...grant, oldGroupAbsent: true, threadId: c.value.threadId } } });
+  return { admitted: true, proofId, charged: true };
+}
+var DECISION_SCHEMA = { type: "object", additionalProperties: false, required: ["plan", "call", "wakeAt"], properties: {
+  plan: { type: "string", description: "Compact durable task state: current goal and original constraints, completed receipt IDs, current step, suspended work, deadlines and next step. Do not claim unobserved completion." },
+  call: { type: "object", additionalProperties: false, required: ["type", "command", "arguments"], properties: { type: { type: "string", enum: ["read", "write", "listen", "wait"] }, command: { type: "string" }, arguments: { type: "string", description: 'A JSON object of arguments. Local type listen, command listen: exactly {listenTo:[observed Soul IDs]}, {listenTo:"nearby"}, or {listenTo:[]} to durably configure attention and immediately continue to the next decision. Wait sleeps: {} for events, {seconds:N} for a relative wake; wait may also configure listenTo before sleeping. Wakeup and listening survive other calls independently. Use wait {cancelWake:true} only to cancel the saved wakeup.' } } },
+  wakeAt: { type: ["string", "null"], description: "ISO8601 wall-clock wakeup with timezone, or null for no new wakeup. A listen configuration preserves the saved wakeup when null and immediately continues; it never sleeps." }
+} };
+var READS = /* @__PURE__ */ new Set(["help", "response", "tasks", "task", "resync", "here", "observe", "explore", "resolve", "receipt", "conversations", "turns", "calendar", "reminders", "object"]);
+var WRITES = /* @__PURE__ */ new Set(["act", "say", "converse", "ack", "result", "remind", "object"]);
+function listeningScope(value) {
+  if (value === "nearby") return value;
+  if (!Array.isArray(value) || value.length > 12 || value.some((id) => typeof id !== "string" || !/^s_[A-Za-z0-9_-]{1,198}$/.test(id))) throw Error('listenTo needs up to12 observed Soul IDs, "nearby", or [] to clear');
+  return [...new Set(value)].sort();
+}
+function parseDecision(text2, { now = Date.now } = {}) {
+  const value = JSON.parse(text2);
+  if (!value || Object.keys(value).sort().join(",") !== "call,plan,wakeAt") throw Error("Decision fields differ from contract");
+  if (typeof value.plan !== "string" || value.plan.length > 16e3 || Buffer.byteLength(JSON.stringify(value.plan)) > 16e3) throw Error("Invalid durable plan: JSON-encoded text must be <=16000 bytes");
+  const call = value.call;
+  if (!call || Object.keys(call).sort().join(",") !== "arguments,command,type") throw Error("Invalid call");
+  if (typeof call.arguments !== "string" || call.arguments.length > 16e3 || Buffer.byteLength(JSON.stringify(call.arguments)) > 16e3) throw Error("Invalid call arguments: JSON-encoded text must be <=16000 bytes");
+  const args = JSON.parse(call.arguments);
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw Error("Call arguments must be an object");
+  if (call.type === "read" ? !READS.has(call.command) : call.type === "write" ? !WRITES.has(call.command) : call.type === "listen" ? call.command !== "listen" : call.type !== "wait") throw Error("Unsupported decision command");
+  if (call.type === "listen" && Object.keys(args).sort().join(",") !== "listenTo") throw Error("Listen needs exactly listenTo; use wait for sleeping or cancelling a wakeup");
+  if (call.type === "read" && ["tasks", "task"].includes(call.command)) {
+    const fields = call.command === "tasks" ? ["after", "limit"] : ["id", "offset"];
+    if (Object.keys(args).some((k) => !fields.includes(k))) throw Error("Invalid local owner task arguments");
+    if (call.command === "tasks" && (args.after !== void 0 && (!Number.isSafeInteger(args.after) || args.after < 0) || args.limit !== void 0 && (!Number.isInteger(args.limit) || args.limit < 1 || args.limit > 20))) throw Error("Local tasks needs nonnegative sequence after and limit 1..20");
+    if (call.command === "task" && (typeof args.id !== "string" || !args.id.length || args.id.length > 200 || args.offset !== void 0 && (!Number.isSafeInteger(args.offset) || args.offset < 0 || args.offset > 65536))) throw Error("Local task needs id and nonnegative text offset");
+  }
+  if (call.type === "read" && call.command === "response") validateResponseArguments(args);
+  if (Object.hasOwn(args, "listenTo")) {
+    if (!["listen", "wait"].includes(call.type)) throw Error("Only wait or listen can change listenTo");
+    args.listenTo = listeningScope(args.listenTo);
+  }
+  if (value.wakeAt !== null && (typeof value.wakeAt !== "string" || !/(Z|[+-]\d{2}:\d{2})$/.test(value.wakeAt) || !Number.isFinite(Date.parse(value.wakeAt)))) throw Error("Wakeup needs explicit wall clock/timezone");
+  let wakeAt = value.wakeAt;
+  if (call.type === "wait" && args.seconds !== void 0) {
+    if (!Number.isFinite(args.seconds) || args.seconds < 1 || args.seconds > 86400) throw Error("Relative wait must be1..86400 seconds");
+    const relative = now() + Math.round(args.seconds * 1e3);
+    wakeAt = new Date(wakeAt === null ? relative : Math.min(relative, Date.parse(wakeAt))).toISOString();
+  }
+  return { ...value, wakeAt, call: { type: call.type, command: call.command, args } };
+}
+function retainDecision(journal, fence, decision, { events = [], threadId, initialInstruction, deadlineAt = Infinity } = {}) {
+  const c = journal.control.checkpoint();
+  if (c.value?.pendingDecision) throw Error("Previous decision must be reconciled first");
+  const { plan, ...execution } = decision;
+  const retainedAt = Date.now();
+  if (deadlineAt !== Infinity && !Number.isFinite(deadlineAt)) throw Error("Invalid decision retention deadline");
+  if (retainedAt >= deadlineAt) throw Object.assign(Error("Decision window expired before retention; no effect retained"), { code: "DECISION_WINDOW_EXPIRED" });
+  const id = randomUUID2();
+  const pendingDecision = { id, decision: execution, eventIds: events.map((e) => ({ source: e.source, id: e.event.id })), retainedAt };
+  const { lastResult, lastCall, ...previous } = c.value ?? {};
+  if (previous.lastReceipt) previous.lastReceipt = receiptProjection(previous.lastReceipt);
+  journal.control.save(fence, c.revision, { ...previous, threadId: threadId ?? c.value?.threadId, initialInstruction: c.value?.initialInstruction ?? initialInstruction ?? null, plan, pendingDecision });
+  return id;
+}
+async function applyPendingDecision(journal, fence, world, { signal } = {}) {
+  const c = journal.control.checkpoint(), pending = c.value?.pendingDecision;
+  if (!pending) return { applied: false };
+  journal.control.assertOwner(fence);
+  const { id, decision } = pending, call = decision.call;
+  let response = null, reference = null;
+  if (!["read", "write", "listen", "wait"].includes(call?.type) || call.type === "read" && !READS.has(call.command) || call.type === "write" && !WRITES.has(call.command) || call.type === "listen" && call.command !== "listen") throw Object.assign(Error("Retained decision requires a compatible runtime; state preserved"), { code: "UNSUPPORTED_RETAINED_DECISION" });
+  if (call.type === "listen") response = { local: true, listenTo: listeningScope(call.args.listenTo) };
+  else if (call.type === "read") {
+    if (call.command === "response") response = journal.control.response(call.args);
+    else {
+      let saved = journal.control.readResult(id);
+      if (!saved) {
+        const gaps = call.command === "resync" ? journal.gaps() : [];
+        let resyncThrough = call.command === "resync" ? gaps.reduce((last, g) => Math.max(last, g.seq), 0) : null;
+        if (call.command === "tasks") response = journal.openOwnerTasks(call.args);
+        else if (call.command === "task") response = journal.ownerTask(call.args);
+        else try {
+          response = await world.read(call.command, call.args, signal);
+        } catch (e) {
+          if (![400, 404, 409, 422].includes(e.status) || e.uncertain !== false) throw e;
+          response = { accepted: false, error: { code: e.code ?? "read-refused", message: e.message, status: e.status } };
+          resyncThrough = null;
+        }
+        reference = journal.control.retainReadResult(fence, id, response, { resyncThrough });
+        saved = { response, reference, resyncThrough };
+      }
+      ({ response, reference } = saved);
+      if (call.command === "resync") {
+        for (const gap of journal.gaps()) if (gap.seq <= saved.resyncThrough) journal.reconcileGap(gap.seq, "Current observation/conversations refreshed; past missing events remain incomplete. Decision " + id);
+      }
+    }
+  } else if (call.type === "write" && journal.gaps().length && !journal.control.hasOperation(id)) {
+    response = { accepted: false, error: { code: "continuity.resync-required", message: "World event history has a gap. Read resync before writing; retain uncertainty about missing history." } };
+  } else if (call.type === "write") {
+    let op = journal.control.prepare(fence, id, call);
+    if (op.status === "prepared") {
+      journal.control.dispatch(fence, id);
+      try {
+        response = await world.write(call.command, call.args, id, signal);
+      } catch (e) {
+        if (e.uncertain === false && e.status >= 400 && e.status < 500) {
+          response = { accepted: false, error: { code: e.code ?? "refused", message: e.message, status: e.status } };
+        } else {
+          journal.control.uncertain(fence, id);
+          throw Object.assign(Error("World operation needs reconciliation"), { code: "OPERATION_UNCERTAIN", operationId: id, cause: e });
+        }
+      }
+      journal.control.settle(fence, id, response);
+      op = journal.control.operation(id);
+    }
+    if (op.status !== "settled" && world.reconcile) {
+      const known = await world.reconcile(call, id, signal);
+      if (known.state === "recorded") {
+        const observed2 = known.status >= 400 ? { accepted: false, error: known.response?.error ?? { code: "refused", status: known.status } } : known.response;
+        journal.control.settle(fence, id, observed2);
+        op = journal.control.operation(id);
+      }
+    }
+    if (op.status !== "settled") throw Object.assign(Error("Earlier operation needs reconciliation"), { code: "OPERATION_UNCERTAIN", operationId: id });
+    response = op.response;
+    reference = responseReference("operation", id, JSON.stringify(response));
+    if (call.command === "result") journal.closeOwnerTaskFromOperation(fence, id);
+  }
+  journal.control.assertOwner(fence);
+  let incorporated = 0;
+  for (const event of pending.eventIds) if (!journal.handled(event.source, event.id, "incorporated:" + id).alreadyHandled) incorporated++;
+  const latest = journal.control.checkpoint();
+  if (latest.value?.pendingDecision?.id !== id) throw Error("Pending decision changed while applying");
+  const receipt = response?.receipt == null ? null : receiptProjection(response.receipt, reference);
+  const priorWake = latest.value.wakeAt;
+  const wakeAt = decision.wakeAt ?? (call.type === "listen" ? priorWake ?? null : call.type === "wait" && call.args.cancelWake === true ? null : priorWake && Date.parse(priorWake) > pending.retainedAt ? priorWake : null);
+  const { lastResult, urgentRecoveryV1, decisionProgressV1, ...previous } = latest.value;
+  const listenTo = ["listen", "wait"].includes(call.type) && Object.hasOwn(call.args, "listenTo") ? listeningScope(call.args.listenTo) : latest.value.listenTo ?? [];
+  const finalized = { ...previous, pendingDecision: null, lastDecisionId: id, lastCall: call, wakeAt, listenTo, lastReceipt: receipt ?? receiptProjection(latest.value.lastReceipt) ?? null };
+  const envelopeBytes = Buffer.byteLength(JSON.stringify({ ...finalized, lastResult: null })) - 4;
+  const bytesLimit = Math.max(0, Math.min(32768, 65536 - envelopeBytes - RECOVERY_METADATA_BYTES - 128));
+  journal.control.save(fence, latest.revision, { ...finalized, lastResult: responseProjection(response, reference, { bytesLimit }) });
+  return { applied: true, id, call, response, wakeAt, incorporated };
+}
+
+// tools/soul-runtime/journal.mjs
+import { DatabaseSync as DatabaseSync2 } from "node:sqlite";
+
 // tools/soul-runtime/control.mjs
+import { randomUUID as randomUUID3 } from "node:crypto";
 var json = (value) => {
   const s = JSON.stringify(value);
   if (s === void 0 || Buffer.byteLength(s) > 65536) throw Error("Control record must be JSON <=64KiB");
@@ -390,7 +820,7 @@ function attachControl(db, { now, transaction }) {
   };
   const unpack = (r) => r ? { id: r.id, request: JSON.parse(r.request), status: r.status, response: r.response ? JSON.parse(r.response) : null, at: r.at, generation: r.generation } : null;
   return {
-    claim(owner = randomUUID(), leaseMs = 15e3) {
+    claim(owner = randomUUID3(), leaseMs = 15e3) {
       key(owner);
       ttl(leaseMs);
       return transaction(() => {
@@ -635,9 +1065,9 @@ function attachOwnerTasks(db, { now, transaction, control, limits = {} }) {
 }
 
 // tools/soul-runtime/journal.mjs
-import { mkdirSync, lstatSync, chmodSync } from "node:fs";
-import { join } from "node:path";
-import { createHash as createHash2 } from "node:crypto";
+import { mkdirSync as mkdirSync2, lstatSync as lstatSync2, chmodSync } from "node:fs";
+import { join as join2 } from "node:path";
+import { createHash as createHash3 } from "node:crypto";
 var text = (value, max, name) => {
   if (typeof value !== "string" || !value.length || value.length > max || /[\u0000-\u001f]/.test(value)) throw Error(`Invalid ${name}`);
   return value;
@@ -652,7 +1082,7 @@ var encode = (value) => {
   if (raw === void 0 || Buffer.byteLength(raw) > 65536) throw Error("Event must be JSON <=64KiB");
   return raw;
 };
-var hash = (value) => createHash2("sha256").update(value).digest("hex");
+var hash = (value) => createHash3("sha256").update(value).digest("hex");
 var DEFAULT_JOURNAL_RETENTION = Object.freeze({ worldPendingEvents: 2e4, worldPendingBytes: 64 * 1024 * 1024, ownerPendingEvents: 1e3, ownerPendingBytes: 8 * 1024 * 1024, handledAgeMs: 24 * 36e5, handledEvents: 2e3, handledBytes: 16 * 1024 * 1024, maintenanceEvery: 128 });
 var retentionPolicy = (input2) => {
   if (!input2 || typeof input2 !== "object" || Array.isArray(input2) || Object.keys(input2).some((k) => !(k in DEFAULT_JOURNAL_RETENTION))) throw Error("Invalid journal retention policy");
@@ -663,7 +1093,7 @@ var retentionPolicy = (input2) => {
 };
 function refuseLink(path) {
   try {
-    if (lstatSync(path).isSymbolicLink()) throw Error("Linked journal path refused");
+    if (lstatSync2(path).isSymbolicLink()) throw Error("Linked journal path refused");
   } catch (e) {
     if (e.code !== "ENOENT") throw e;
   }
@@ -673,11 +1103,11 @@ function openJournal(directory, { worldId, soulId, now = Date.now, retention = {
   text(soulId, 200, "Soul");
   const policy = retentionPolicy(retention);
   refuseLink(directory);
-  mkdirSync(directory, { recursive: true, mode: 448 });
-  const file = join(directory, "continuity.sqlite");
+  mkdirSync2(directory, { recursive: true, mode: 448 });
+  const file = join2(directory, "continuity.sqlite");
   refuseLink(file);
   for (const suffix of ["-wal", "-shm", "-journal"]) refuseLink(file + suffix);
-  const db = new DatabaseSync(file);
+  const db = new DatabaseSync2(file);
   chmodSync(file, 384);
   db.exec(`PRAGMA busy_timeout=2000; PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL;
     CREATE TABLE IF NOT EXISTS identity (singleton INTEGER PRIMARY KEY CHECK(singleton=1), world TEXT NOT NULL, soul TEXT NOT NULL);
@@ -1219,261 +1649,8 @@ function boundedFacts(facts, { bytes: bytes2 = 65536, limit = 100 } = {}) {
   return selected;
 }
 
-// tools/soul-runtime/decision.mjs
-import { randomUUID as randomUUID2 } from "node:crypto";
-var RECOVERY_METADATA_BYTES = 2048;
-var size = (value) => Buffer.byteLength(JSON.stringify(value));
-var progressFault = (message) => Object.assign(Error(message), { code: "DECISION_PROGRESS_STATE_INVALID" });
-function decisionProgress(value) {
-  const p = value?.decisionProgressV1;
-  if (p == null) return null;
-  if (!p || typeof p !== "object" || typeof p.id !== "string" || !/^[-A-Za-z0-9._:]{1,200}$/.test(p.id) || !["ready", "active", "soft-pending", "fallback-reserved", "blocked"].includes(p.phase) || !Number.isInteger(p.window) || p.window < 1 || p.window > 3 || !Number.isInteger(p.worldReplans) || p.worldReplans < 0 || p.worldReplans > 2 || !Number.isFinite(p.deadlineAt) || typeof p.softUsed !== "boolean" || typeof p.fallbackUsed !== "boolean" || p.turnId !== null && (typeof p.turnId !== "string" || !/^[-A-Za-z0-9._:]{1,200}$/.test(p.turnId)) || p.hostPid !== null && (!Number.isSafeInteger(p.hostPid) || p.hostPid < 1) || p.grant != null && (!["urgent", "progress"].includes(p.grant.kind) || typeof p.grant.id !== "string" || !/^[-A-Za-z0-9._:]{1,200}$/.test(p.grant.id) || p.grant.turnId !== null && (typeof p.grant.turnId !== "string" || !/^[-A-Za-z0-9._:]{1,200}$/.test(p.grant.turnId)) || p.grant.hostPid !== null && (!Number.isSafeInteger(p.grant.hostPid) || p.grant.hostPid < 1))) throw progressFault("Invalid persisted active-decision recovery state; task retained");
-  if (p.window > 1 + Number(p.softUsed) + Number(p.fallbackUsed) || p.phase === "soft-pending" && !p.softUsed || p.phase === "fallback-reserved" && (!p.fallbackUsed || !p.grant)) throw progressFault("Inconsistent persisted decision recovery credits");
-  if (size({ urgentRecoveryV1: value.urgentRecoveryV1, decisionProgressV1: p }) > RECOVERY_METADATA_BYTES) throw progressFault("Recovery metadata exceeds its bounded envelope");
-  return p;
-}
-function saveRecoveryCheckpoint(journal, fence, revision, value) {
-  decisionProgress(value);
-  const { urgentRecoveryV1, decisionProgressV1, ...body } = value;
-  if (size({ urgentRecoveryV1, decisionProgressV1 }) > RECOVERY_METADATA_BYTES) throw progressFault("Recovery metadata exceeds its bounded envelope");
-  if (size(body) > 65536 - RECOVERY_METADATA_BYTES - 128) {
-    const id = body.lastDecisionId;
-    let response, reference;
-    if (body.lastCall?.type === "read" && id) {
-      const saved = journal.control.readResult(id);
-      if (saved) ({ response, reference } = saved);
-    } else if (body.lastCall?.type === "write" && id && journal.control.hasOperation(id)) {
-      const op = journal.control.operation(id);
-      if (op.status === "settled") {
-        response = op.response;
-        reference = responseReference("operation", id, JSON.stringify(response));
-      }
-    }
-    if (!reference || JSON.stringify(response) !== JSON.stringify(body.lastResult)) throw progressFault("Legacy checkpoint needs verified durable response projection before recovery metadata fits");
-    body.lastResult = responseProjection(response, reference, { bytesLimit: 0 });
-    if (size(body) > 65536 - RECOVERY_METADATA_BYTES - 128) throw progressFault("Checkpoint intent exceeds reserved recovery envelope; state retained");
-  }
-  return journal.control.save(fence, revision, { ...body, ...urgentRecoveryV1 === void 0 ? {} : { urgentRecoveryV1 }, ...decisionProgressV1 === void 0 ? {} : { decisionProgressV1 } });
-}
-var DECISION_SCHEMA = { type: "object", additionalProperties: false, required: ["plan", "call", "wakeAt"], properties: {
-  plan: { type: "string", description: "Compact durable task state: current goal and original constraints, completed receipt IDs, current step, suspended work, deadlines and next step. Do not claim unobserved completion." },
-  call: { type: "object", additionalProperties: false, required: ["type", "command", "arguments"], properties: { type: { type: "string", enum: ["read", "write", "listen", "wait"] }, command: { type: "string" }, arguments: { type: "string", description: 'A JSON object of arguments. Local type listen, command listen: exactly {listenTo:[observed Soul IDs]}, {listenTo:"nearby"}, or {listenTo:[]} to durably configure attention and immediately continue to the next decision. Wait sleeps: {} for events, {seconds:N} for a relative wake; wait may also configure listenTo before sleeping. Wakeup and listening survive other calls independently. Use wait {cancelWake:true} only to cancel the saved wakeup.' } } },
-  wakeAt: { type: ["string", "null"], description: "ISO8601 wall-clock wakeup with timezone, or null for no new wakeup. A listen configuration preserves the saved wakeup when null and immediately continues; it never sleeps." }
-} };
-var READS = /* @__PURE__ */ new Set(["help", "response", "tasks", "task", "resync", "here", "observe", "explore", "resolve", "receipt", "conversations", "turns", "calendar", "reminders", "object"]);
-var WRITES = /* @__PURE__ */ new Set(["act", "say", "converse", "ack", "result", "remind", "object"]);
-function listeningScope(value) {
-  if (value === "nearby") return value;
-  if (!Array.isArray(value) || value.length > 12 || value.some((id) => typeof id !== "string" || !/^s_[A-Za-z0-9_-]{1,198}$/.test(id))) throw Error('listenTo needs up to12 observed Soul IDs, "nearby", or [] to clear');
-  return [...new Set(value)].sort();
-}
-function parseDecision(text2, { now = Date.now } = {}) {
-  const value = JSON.parse(text2);
-  if (!value || Object.keys(value).sort().join(",") !== "call,plan,wakeAt") throw Error("Decision fields differ from contract");
-  if (typeof value.plan !== "string" || value.plan.length > 16e3 || Buffer.byteLength(JSON.stringify(value.plan)) > 16e3) throw Error("Invalid durable plan: JSON-encoded text must be <=16000 bytes");
-  const call = value.call;
-  if (!call || Object.keys(call).sort().join(",") !== "arguments,command,type") throw Error("Invalid call");
-  if (typeof call.arguments !== "string" || call.arguments.length > 16e3 || Buffer.byteLength(JSON.stringify(call.arguments)) > 16e3) throw Error("Invalid call arguments: JSON-encoded text must be <=16000 bytes");
-  const args = JSON.parse(call.arguments);
-  if (!args || typeof args !== "object" || Array.isArray(args)) throw Error("Call arguments must be an object");
-  if (call.type === "read" ? !READS.has(call.command) : call.type === "write" ? !WRITES.has(call.command) : call.type === "listen" ? call.command !== "listen" : call.type !== "wait") throw Error("Unsupported decision command");
-  if (call.type === "listen" && Object.keys(args).sort().join(",") !== "listenTo") throw Error("Listen needs exactly listenTo; use wait for sleeping or cancelling a wakeup");
-  if (call.type === "read" && ["tasks", "task"].includes(call.command)) {
-    const fields = call.command === "tasks" ? ["after", "limit"] : ["id", "offset"];
-    if (Object.keys(args).some((k) => !fields.includes(k))) throw Error("Invalid local owner task arguments");
-    if (call.command === "tasks" && (args.after !== void 0 && (!Number.isSafeInteger(args.after) || args.after < 0) || args.limit !== void 0 && (!Number.isInteger(args.limit) || args.limit < 1 || args.limit > 20))) throw Error("Local tasks needs nonnegative sequence after and limit 1..20");
-    if (call.command === "task" && (typeof args.id !== "string" || !args.id.length || args.id.length > 200 || args.offset !== void 0 && (!Number.isSafeInteger(args.offset) || args.offset < 0 || args.offset > 65536))) throw Error("Local task needs id and nonnegative text offset");
-  }
-  if (call.type === "read" && call.command === "response") validateResponseArguments(args);
-  if (Object.hasOwn(args, "listenTo")) {
-    if (!["listen", "wait"].includes(call.type)) throw Error("Only wait or listen can change listenTo");
-    args.listenTo = listeningScope(args.listenTo);
-  }
-  if (value.wakeAt !== null && (typeof value.wakeAt !== "string" || !/(Z|[+-]\d{2}:\d{2})$/.test(value.wakeAt) || !Number.isFinite(Date.parse(value.wakeAt)))) throw Error("Wakeup needs explicit wall clock/timezone");
-  let wakeAt = value.wakeAt;
-  if (call.type === "wait" && args.seconds !== void 0) {
-    if (!Number.isFinite(args.seconds) || args.seconds < 1 || args.seconds > 86400) throw Error("Relative wait must be1..86400 seconds");
-    const relative = now() + Math.round(args.seconds * 1e3);
-    wakeAt = new Date(wakeAt === null ? relative : Math.min(relative, Date.parse(wakeAt))).toISOString();
-  }
-  return { ...value, wakeAt, call: { type: call.type, command: call.command, args } };
-}
-function retainDecision(journal, fence, decision, { events = [], threadId, initialInstruction, deadlineAt = Infinity } = {}) {
-  const c = journal.control.checkpoint();
-  if (c.value?.pendingDecision) throw Error("Previous decision must be reconciled first");
-  const { plan, ...execution } = decision;
-  const retainedAt = Date.now();
-  if (deadlineAt !== Infinity && !Number.isFinite(deadlineAt)) throw Error("Invalid decision retention deadline");
-  if (retainedAt >= deadlineAt) throw Object.assign(Error("Decision window expired before retention; no effect retained"), { code: "DECISION_WINDOW_EXPIRED" });
-  const id = randomUUID2();
-  const pendingDecision = { id, decision: execution, eventIds: events.map((e) => ({ source: e.source, id: e.event.id })), retainedAt };
-  const { lastResult, lastCall, ...previous } = c.value ?? {};
-  if (previous.lastReceipt) previous.lastReceipt = receiptProjection(previous.lastReceipt);
-  journal.control.save(fence, c.revision, { ...previous, threadId: threadId ?? c.value?.threadId, initialInstruction: c.value?.initialInstruction ?? initialInstruction ?? null, plan, pendingDecision });
-  return id;
-}
-async function applyPendingDecision(journal, fence, world, { signal } = {}) {
-  const c = journal.control.checkpoint(), pending = c.value?.pendingDecision;
-  if (!pending) return { applied: false };
-  journal.control.assertOwner(fence);
-  const { id, decision } = pending, call = decision.call;
-  let response = null, reference = null;
-  if (!["read", "write", "listen", "wait"].includes(call?.type) || call.type === "read" && !READS.has(call.command) || call.type === "write" && !WRITES.has(call.command) || call.type === "listen" && call.command !== "listen") throw Object.assign(Error("Retained decision requires a compatible runtime; state preserved"), { code: "UNSUPPORTED_RETAINED_DECISION" });
-  if (call.type === "listen") response = { local: true, listenTo: listeningScope(call.args.listenTo) };
-  else if (call.type === "read") {
-    if (call.command === "response") response = journal.control.response(call.args);
-    else {
-      let saved = journal.control.readResult(id);
-      if (!saved) {
-        const gaps = call.command === "resync" ? journal.gaps() : [];
-        let resyncThrough = call.command === "resync" ? gaps.reduce((last, g) => Math.max(last, g.seq), 0) : null;
-        if (call.command === "tasks") response = journal.openOwnerTasks(call.args);
-        else if (call.command === "task") response = journal.ownerTask(call.args);
-        else try {
-          response = await world.read(call.command, call.args, signal);
-        } catch (e) {
-          if (![400, 404, 409, 422].includes(e.status) || e.uncertain !== false) throw e;
-          response = { accepted: false, error: { code: e.code ?? "read-refused", message: e.message, status: e.status } };
-          resyncThrough = null;
-        }
-        reference = journal.control.retainReadResult(fence, id, response, { resyncThrough });
-        saved = { response, reference, resyncThrough };
-      }
-      ({ response, reference } = saved);
-      if (call.command === "resync") {
-        for (const gap of journal.gaps()) if (gap.seq <= saved.resyncThrough) journal.reconcileGap(gap.seq, "Current observation/conversations refreshed; past missing events remain incomplete. Decision " + id);
-      }
-    }
-  } else if (call.type === "write" && journal.gaps().length && !journal.control.hasOperation(id)) {
-    response = { accepted: false, error: { code: "continuity.resync-required", message: "World event history has a gap. Read resync before writing; retain uncertainty about missing history." } };
-  } else if (call.type === "write") {
-    let op = journal.control.prepare(fence, id, call);
-    if (op.status === "prepared") {
-      journal.control.dispatch(fence, id);
-      try {
-        response = await world.write(call.command, call.args, id, signal);
-      } catch (e) {
-        if (e.uncertain === false && e.status >= 400 && e.status < 500) {
-          response = { accepted: false, error: { code: e.code ?? "refused", message: e.message, status: e.status } };
-        } else {
-          journal.control.uncertain(fence, id);
-          throw Object.assign(Error("World operation needs reconciliation"), { code: "OPERATION_UNCERTAIN", operationId: id, cause: e });
-        }
-      }
-      journal.control.settle(fence, id, response);
-      op = journal.control.operation(id);
-    }
-    if (op.status !== "settled" && world.reconcile) {
-      const known = await world.reconcile(call, id, signal);
-      if (known.state === "recorded") {
-        const observed2 = known.status >= 400 ? { accepted: false, error: known.response?.error ?? { code: "refused", status: known.status } } : known.response;
-        journal.control.settle(fence, id, observed2);
-        op = journal.control.operation(id);
-      }
-    }
-    if (op.status !== "settled") throw Object.assign(Error("Earlier operation needs reconciliation"), { code: "OPERATION_UNCERTAIN", operationId: id });
-    response = op.response;
-    reference = responseReference("operation", id, JSON.stringify(response));
-    if (call.command === "result") journal.closeOwnerTaskFromOperation(fence, id);
-  }
-  journal.control.assertOwner(fence);
-  let incorporated = 0;
-  for (const event of pending.eventIds) if (!journal.handled(event.source, event.id, "incorporated:" + id).alreadyHandled) incorporated++;
-  const latest = journal.control.checkpoint();
-  if (latest.value?.pendingDecision?.id !== id) throw Error("Pending decision changed while applying");
-  const receipt = response?.receipt == null ? null : receiptProjection(response.receipt, reference);
-  const priorWake = latest.value.wakeAt;
-  const wakeAt = decision.wakeAt ?? (call.type === "listen" ? priorWake ?? null : call.type === "wait" && call.args.cancelWake === true ? null : priorWake && Date.parse(priorWake) > pending.retainedAt ? priorWake : null);
-  const { lastResult, urgentRecoveryV1, decisionProgressV1, ...previous } = latest.value;
-  const listenTo = ["listen", "wait"].includes(call.type) && Object.hasOwn(call.args, "listenTo") ? listeningScope(call.args.listenTo) : latest.value.listenTo ?? [];
-  const finalized = { ...previous, pendingDecision: null, lastDecisionId: id, lastCall: call, wakeAt, listenTo, lastReceipt: receipt ?? receiptProjection(latest.value.lastReceipt) ?? null };
-  const envelopeBytes = Buffer.byteLength(JSON.stringify({ ...finalized, lastResult: null })) - 4;
-  const bytesLimit = Math.max(0, Math.min(32768, 65536 - envelopeBytes - RECOVERY_METADATA_BYTES - 128));
-  journal.control.save(fence, latest.revision, { ...finalized, lastResult: responseProjection(response, reference, { bytesLimit }) });
-  return { applied: true, id, call, response, wakeAt, incorporated };
-}
-
-// tools/soul-runtime/receiver.mjs
-async function receivePage(journal, source, read, { signal, onCommitted = () => {
-}, initial = false, onReady } = {}) {
-  const after = journal.cursor(source);
-  const page = await read({ after, signal, initial, onReady });
-  if (signal?.aborted) return { aborted: true };
-  const result = journal.ingest({ source, after, cursor: page.cursor, events: page.events, gap: page.gap ?? false });
-  if (page.events.length) onCommitted({ source, state: "events-persisted", events: page.events.map((event) => ({ source, id: event.id })), committedAt: Date.now() });
-  return { ...result, pending: journal.pending().length };
-}
-async function runReceiver({ journal, source, read, signal, onState = () => {
-}, retryable = () => false, sleep = abortableSleep, maxBackoffMs = 3e4 }) {
-  let backoff = 0, ready = false;
-  const markReady = (mode) => {
-    if (!ready && !signal?.aborted) {
-      ready = true;
-      onState({ source, state: "receiver-ready", successful: true, mode, at: Date.now() });
-    }
-  };
-  while (!signal?.aborted) {
-    try {
-      onState({ source, state: "receiving" });
-      const result = await receivePage(journal, source, read, { signal, onCommitted: onState, initial: !ready, onReady: (proof) => {
-        if (proof?.mode === "stream-adopted" && proof.successful === true) markReady("stream-adopted");
-      } });
-      if (result.aborted) break;
-      markReady("page-committed");
-      backoff = 0;
-    } catch (error2) {
-      if (signal?.aborted) break;
-      if (!retryable(error2)) {
-        onState({ source, state: "blocked", reason: String(error2.message) });
-        throw error2;
-      }
-      backoff = Math.min(maxBackoffMs, backoff ? backoff * 2 : 1e3);
-      onState({ source, state: "retrying", delayMs: backoff, reason: String(error2.message), ...typeof error2.code === "string" ? { code: error2.code } : {} });
-      await sleep(backoff, signal);
-    }
-  }
-  onState({ source, state: "stopped" });
-}
-async function runWakeDispatcher({ journal, notify, signal, retryable = () => false, sleep = abortableSleep, pollMs = 100 }) {
-  const deliveredGaps = /* @__PURE__ */ new Set();
-  let backoff = 0, lastDeliveredSequence = 0;
-  while (!signal?.aborted) {
-    const fresh = journal.pending(1e3, lastDeliveredSequence), gaps = journal.gaps();
-    const liveGaps = new Set(gaps.map((g) => g.seq));
-    for (const id of deliveredGaps) if (!liveGaps.has(id)) deliveredGaps.delete(id);
-    const freshGaps = gaps.filter((g) => !deliveredGaps.has(g.seq));
-    if (fresh.length || freshGaps.length) {
-      try {
-        await notify({ pending: fresh, gaps: freshGaps });
-        if (fresh.length) lastDeliveredSequence = fresh.at(-1).sequence;
-        freshGaps.forEach((g) => deliveredGaps.add(g.seq));
-        backoff = 0;
-      } catch (error2) {
-        if (signal?.aborted) break;
-        if (!retryable(error2)) throw error2;
-        backoff = Math.min(3e4, backoff ? backoff * 2 : 1e3);
-        await sleep(backoff, signal);
-        continue;
-      }
-    }
-    await sleep(pollMs, signal);
-  }
-}
-function abortableSleep(ms, signal) {
-  if (signal?.aborted) return Promise.resolve();
-  return new Promise((resolve2) => {
-    const done = () => {
-      clearTimeout(timer);
-      signal?.removeEventListener("abort", done);
-      resolve2();
-    };
-    const timer = setTimeout(done, ms);
-    signal?.addEventListener("abort", done, { once: true });
-  });
-}
-
 // tools/soul-runtime/supervisor.mjs
-import { randomUUID as randomUUID3, createHash as createHash3 } from "node:crypto";
+import { randomUUID as randomUUID4, createHash as createHash4 } from "node:crypto";
 var HOST_CONFIG = { "features.shell_tool": false, "features.apps": false, "features.plugins": false, "features.memories": false, "skills.include_instructions": false, web_search: "disabled", project_doc_max_bytes: 0 };
 var AMBIENT_WAKE_MS = 5e3;
 function urgentRecovery(checkpoint) {
@@ -1610,7 +1787,7 @@ async function runSupervisor({ journal, host, world, instruction, signal, onStat
     saveRecoveryCheckpoint(journal, fence, current.revision, { ...current.value, ...freshAttention ? { listenTo: "nearby" } : {}, threadId: host.threadId, initialInstruction: current.value?.initialInstruction ?? instruction ?? null });
     refreshScope(journal.control.checkpoint().value);
     const observation = await world.read("observe", {}, stop.signal);
-    const observationReference = journal.control.retainStartupResult(fence, randomUUID3(), observation);
+    const observationReference = journal.control.retainStartupResult(fence, randomUUID4(), observation);
     if (journal.cursor("world") === null && observation.streamCursor) journal.ingest({ source: "world", after: null, cursor: observation.streamCursor, events: [] });
     const startup = journal.control.checkpoint();
     onState({
@@ -1619,7 +1796,7 @@ async function runSupervisor({ journal, host, world, instruction, signal, onStat
       generation: fence.generation,
       checkpointRevision: startup.revision,
       threadId: host.threadId,
-      initialInstructionSha256: createHash3("sha256").update(startup.value.initialInstruction ?? "").digest("hex"),
+      initialInstructionSha256: createHash4("sha256").update(startup.value.initialInstruction ?? "").digest("hex"),
       wakeAt: startup.value.wakeAt ?? null,
       pendingDecision: !!startup.value.pendingDecision,
       unreconciledOperations: journal.control.operations().length,
@@ -1684,7 +1861,7 @@ async function runSupervisor({ journal, host, world, instruction, signal, onStat
       const before = revision, ownerCursor = journal.cursor("owner");
       const events = promptFacts(), gaps = journal.gaps().slice(0, 20);
       let progress = decisionProgress(checkpoint);
-      if (!progress) progress = { id: randomUUID3(), phase: "ready", window: 1, deadlineAt: Date.now() + activeDecisionMs, softUsed: false, fallbackUsed: urgentRecovery(checkpoint)?.fallbackUsed ?? false, worldReplans: Math.min(2, observationReplans), turnId: null, hostPid: host.pid ?? null };
+      if (!progress) progress = { id: randomUUID4(), phase: "ready", window: 1, deadlineAt: Date.now() + activeDecisionMs, softUsed: false, fallbackUsed: urgentRecovery(checkpoint)?.fallbackUsed ?? false, worldReplans: Math.min(2, observationReplans), turnId: null, hostPid: host.pid ?? null };
       if (progress.phase !== "ready") throw Object.assign(Error("Incomplete decision recovery phase; task retained"), { code: "DECISION_PROGRESS_STATE_INVALID" });
       if (Date.now() >= progress.deadlineAt) {
         if (progress.softUsed) {
@@ -1704,8 +1881,8 @@ async function runSupervisor({ journal, host, world, instruction, signal, onStat
       });
       aborted.catch(() => {
       });
-      const active = { ready: new Promise((resolve2) => {
-        ready = resolve2;
+      const active = { ready: new Promise((resolve3) => {
+        ready = resolve3;
       }), finished: false, baselineSequence: Math.max(0, ...wakeHints.keys(), ...events.map((e) => e.sequence)) };
       turn = active;
       const futureWake = Number.isFinite(wakeMs) && promptAt < wakeMs;
@@ -1714,7 +1891,7 @@ async function runSupervisor({ journal, host, world, instruction, signal, onStat
         if (!active.turnId || turn !== active || active.interruptionDone || stop.signal.aborted) return;
         const c = journal.control.checkpoint(), old = urgentRecovery(c.value);
         if (c.value.pendingDecision) throw Error("Urgent interruption cannot replace an applying decision");
-        const marker = { id: old?.id ?? randomUUID3(), triggerAt: active.urgency.triggerAt, reason: active.urgency.reason, turnId: active.turnId, fallbackUsed: old?.fallbackUsed ?? false, worldReplans: Math.min(2, observationReplans) };
+        const marker = { id: old?.id ?? randomUUID4(), triggerAt: active.urgency.triggerAt, reason: active.urgency.reason, turnId: active.turnId, fallbackUsed: old?.fallbackUsed ?? false, worldReplans: Math.min(2, observationReplans) };
         saveRecoveryCheckpoint(journal, fence, c.revision, { ...c.value, urgentRecoveryV1: marker });
       };
       const escalate = () => {
@@ -2022,9 +2199,9 @@ var hostErrorMetadata = (error2) => {
   return { category: "unknown" };
 };
 function openEvidenceRecorder(path, { scope = {}, now = Date.now, onFailure = () => {
-}, writeRecord = writeFileSync, syncFile = fsyncSync } = {}) {
+}, writeRecord = writeFileSync2, syncFile = fsyncSync2 } = {}) {
   let fd, closed = false, failure = null;
-  const detach = [], sessionId = randomUUID4(), base = { sessionId, controllerPid: process.pid, worldId: scope.worldId ?? null, soulId: scope.soulId ?? null };
+  const detach = [], sessionId = randomUUID5(), base = { sessionId, controllerPid: process.pid, worldId: scope.worldId ?? null, soulId: scope.soulId ?? null };
   const fail = (cause) => {
     if (!failure) {
       failure = Object.assign(Error("Local evidence recording failed"), { code: "EVIDENCE_IO", cause });
@@ -2042,22 +2219,22 @@ function openEvidenceRecorder(path, { scope = {}, now = Date.now, onFailure = ()
     }
   };
   try {
-    const file = resolve(path);
+    const file = resolve2(path);
     let old;
     try {
-      old = lstatSync2(file);
+      old = lstatSync3(file);
     } catch (e) {
       if (e.code !== "ENOENT") throw e;
     }
     if (old && (old.isSymbolicLink() || !old.isFile() || old.nlink !== 1)) throw Error("Evidence path must be a regular unlinked file");
-    fd = openSync(file, constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW | constants.O_NONBLOCK, 384);
-    const stat = fstatSync(fd);
+    fd = openSync2(file, constants2.O_WRONLY | constants2.O_APPEND | constants2.O_CREAT | constants2.O_NOFOLLOW | constants2.O_NONBLOCK, 384);
+    const stat = fstatSync2(fd);
     if (!stat.isFile() || stat.nlink !== 1) throw Error("Evidence path must be a regular unlinked file");
     fchmodSync(fd, 384);
     append({ kind: "evidence-session", state: "started" });
   } catch (e) {
     if (fd !== void 0) try {
-      closeSync(fd);
+      closeSync2(fd);
     } catch {
     }
     throw fail(e);
@@ -2084,7 +2261,7 @@ function openEvidenceRecorder(path, { scope = {}, now = Date.now, onFailure = ()
       } };
     },
     bindHost(host) {
-      const hostId = randomUUID4(), connect = host.connect;
+      const hostId = randomUUID5(), connect = host.connect;
       let actualModel = null;
       const identity = (threadId = host.threadId, turnId = null) => ({ hostId, hostPid: Number.isSafeInteger(host.pid) ? host.pid : null, threadId: metadataId(threadId), turnId: metadataId(turnId) });
       const record2 = (row) => {
@@ -2162,7 +2339,7 @@ function openEvidenceRecorder(path, { scope = {}, now = Date.now, onFailure = ()
         closed = true;
         for (const stop of detach) stop();
         try {
-          closeSync(fd);
+          closeSync2(fd);
         } catch (e) {
           fail(e);
         }
@@ -2193,13 +2370,13 @@ async function claimStartupLease(control, { signal, maxWaitMs = 65e3, pollMs = 2
   }
   return null;
 }
-async function main(argv = process.argv.slice(2), { signal, leaseWaitMs = 65e3 } = {}) {
+async function main(argv = process.argv.slice(2), { signal, leaseWaitMs = 65e3, Host = CodexHost } = {}) {
   const { values } = parseArgs({ args: argv, options: { folder: { type: "string" }, state: { type: "string" }, instruction: { type: "string" }, model: { type: "string" }, effort: { type: "string", default: "low" }, seconds: { type: "string" }, "session-name": { type: "string" }, evidence: { type: "string" }, help: { type: "boolean" } } });
   if (values.help) {
     console.log("node tools/soul-runtime/run.mjs --folder <paired-folder> [--instruction <text-file>] [--model <advertised-model>] [--seconds <bounded-run>] [--evidence <local-jsonl>]");
     return;
   }
-  const folder = resolve(values.folder ?? process.cwd()), state = resolve(values.state ?? join2(folder, ".soul-runtime"));
+  const folder = resolve2(values.folder ?? process.cwd()), state = resolve2(values.state ?? join3(folder, ".soul-runtime"));
   const seconds = values.seconds === void 0 ? null : Number(values.seconds);
   if (seconds !== null && (!Number.isFinite(seconds) || seconds < 1 || seconds > 7 * 86400)) throw Error("seconds must be1..604800");
   const stop = new AbortController(), quit = () => stop.abort(), externalAbort = () => stop.abort(signal?.reason);
@@ -2211,16 +2388,16 @@ async function main(argv = process.argv.slice(2), { signal, leaseWaitMs = 65e3 }
   const ownedHosts = /* @__PURE__ */ new Set();
   try {
     if (stop.signal.aborted) return;
-    const credential = join2(folder, ".eden-agent.json");
-    if (lstatSync2(credential).isSymbolicLink()) throw Error("Linked pairing file refused");
-    const paired = JSON.parse(readFileSync(credential, "utf8"));
+    const credential = join3(folder, ".eden-agent.json");
+    if (lstatSync3(credential).isSymbolicLink()) throw Error("Linked pairing file refused");
+    const paired = JSON.parse(readFileSync2(credential, "utf8"));
     if (!paired.world || !paired.soul || !paired.token) throw Error("Folder must already be paired to one Soul");
     let world = createWorldClient({ world: paired.world, token: paired.token, expectedSoulId: paired.soul });
     const cfg = await fetch(paired.world.replace(/\/$/, "") + "/v1/config", { redirect: "error", signal: AbortSignal.any([stop.signal, AbortSignal.timeout(15e3)]) });
     if (!cfg.ok) throw Error("Cannot verify world identity");
     const config = await cfg.json();
     if (!config.worldId) throw Error("World identity unavailable");
-    const instruction = values.instruction ? readFileSync(resolve(values.instruction), "utf8") : void 0;
+    const instruction = values.instruction ? readFileSync2(resolve2(values.instruction), "utf8") : void 0;
     if (instruction && Buffer.byteLength(JSON.stringify(instruction)) > 16e3) throw Error("Initial instruction exceeds16000 JSON-encoded bytes");
     const scope = { worldId: config.worldId, soulId: paired.soul };
     if (values.evidence) {
@@ -2231,15 +2408,15 @@ async function main(argv = process.argv.slice(2), { signal, leaseWaitMs = 65e3 }
       world = evidence.wrapWorld(world);
     }
     journal = openJournal(state, scope);
-    ownership = openJournal(join2(folder, ".soul-runtime-owner"), scope);
+    ownership = openJournal(join3(folder, ".soul-runtime-owner"), scope);
     timer = seconds ? setTimeout(quit, seconds * 1e3) : null;
     const startedAt = (/* @__PURE__ */ new Date()).toISOString();
     let model = values.model ?? null;
     const saveStatus = (s) => {
       const out = { at: (/* @__PURE__ */ new Date()).toISOString(), startedAt, controllerPid: process.pid, soulId: paired.soul, worldId: config.worldId, ...s }, early = ["host-started", "session-created", "host-closed"].includes(s.state);
       if (early) console.log(JSON.stringify(out));
-      writeFileSync(join2(state, "status.json.tmp"), JSON.stringify(out, null, 2), { mode: 384 });
-      renameSync(join2(state, "status.json.tmp"), join2(state, "status.json"));
+      writeFileSync2(join3(state, "status.json.tmp"), JSON.stringify(out, null, 2), { mode: 384 });
+      renameSync2(join3(state, "status.json.tmp"), join3(state, "status.json"));
       if (!early && s.state !== "receiving") console.log(JSON.stringify(out));
     };
     try {
@@ -2260,16 +2437,40 @@ async function main(argv = process.argv.slice(2), { signal, leaseWaitMs = 65e3 }
         stop.abort(e);
       }
     }, 5e3);
-    const cwd = join2(state, "host");
-    mkdirSync2(cwd, { recursive: true, mode: 448 });
+    const inventory = await openControllerInventory();
+    if (inventory?.reentryProof?.snapshot) {
+      const recoveryFence = await claimStartupLease(journal.control, { signal: stop.signal, maxWaitMs: leaseWaitMs, onWait: saveStatus });
+      if (!recoveryFence) return;
+      try {
+        const admitted = admitControllerReentry(journal, recoveryFence, inventory.reentryProof, { journalPath: join3(state, "continuity.sqlite"), scope });
+        saveStatus({ state: "controller-reentry", proofId: admitted.proofId, charged: admitted.charged });
+      } finally {
+        journal.control.release(recoveryFence);
+      }
+    }
+    const cwd = join3(state, "host");
+    mkdirSync3(cwd, { recursive: true, mode: 448 });
     await runManaged({ journal, world, instruction, signal: stop.signal, onState: saveStatus, createHost: () => {
-      const host = new CodexHost({ cwd, model, effort: values.effort, name: values["session-name"] ?? `Sim Soul \u2014 ${paired.soul}` });
-      evidence?.bindHost(host);
+      const reservation = inventory?.reserveHost();
+      const host = new Host({ cwd, model, effort: values.effort, name: values["session-name"] ?? `Sim Soul \u2014 ${paired.soul}` });
       ownedHosts.add(host);
+      if (inventory) {
+        try {
+          inventory.registerHost(reservation, host.pid);
+        } catch (e) {
+          void host.close().catch(() => {
+          });
+          throw e;
+        }
+        host.on("lifecycle", (s) => {
+          if (s.state === "host-closed") inventory.hostClosed(reservation, s);
+        });
+      }
+      evidence?.bindHost(host);
       host.on("lifecycle", saveStatus);
       host.on("event", (e) => {
         if (e.method === "thread/tokenUsage/updated") {
-          writeFileSync(join2(state, "usage.json"), JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), threadId: host.threadId, model: host.model, usage: e.params.tokenUsage }, null, 2), { mode: 384 });
+          writeFileSync2(join3(state, "usage.json"), JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), threadId: host.threadId, model: host.model, usage: e.params.tokenUsage }, null, 2), { mode: 384 });
         }
         if (host.model) model = host.model;
       });
@@ -2298,7 +2499,7 @@ async function main(argv = process.argv.slice(2), { signal, leaseWaitMs = 65e3 }
     evidence?.close({ failed: !!runFailure, ownedProcessesExited: proofs.every((p) => p.groupClosed === true) });
   }
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main().catch((e) => {
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve2(process.argv[1])).href) main().catch((e) => {
   console.error(JSON.stringify({ state: "blocked", code: e.code ?? "runtime.failure", reason: e.message }));
   process.exitCode = 1;
 });

@@ -53,18 +53,18 @@
   "runtime": {
     "directory": "runtime",
     "version": "0.1.0",
-    "source": "204306bfcc3f3266390be9ca757472eff7f215c2",
-    "manifestSha256": "8d19f8c66d73173cf0fc2461f439975792a9d4f9b21fb026a6d0b6908c005f22",
+    "source": "191d8c0f5f4133feff49cd405b9bd468181438a1",
+    "manifestSha256": "96c3593b3541f926a175f77ac0e1ab6c02e7e91539eb8d5e06b4c0310e7b7f94",
     "artifacts": [
       {
         "file": "run.mjs",
-        "bytes": 148472,
-        "sha256": "df890a548eb4a51cca4c109b947ca02d2e5b696c4f86cd26921d58da4dbb7c88"
+        "bytes": 161182,
+        "sha256": "82171bbfdf136698ad6618cfd06c06654ec957e2f497ffef74ed9278fd71d8de"
       },
       {
         "file": "launch.mjs",
-        "bytes": 4151,
-        "sha256": "2073cc2cc9ba7a7a846e7a0ebd25e4a068248af82533f9447ce32e4e314a7493"
+        "bytes": 19010,
+        "sha256": "31b9c66dbb38d79716a35021e65d7edb4fb5c84f2abbb6f28b6403ed4e80c029"
       }
     ],
     "note": "First managed runtime publication candidate. Built from the clean source commit with tools/soul-runtime/build.mjs; manifest pins every bundled input. Qualification and deployment remain pending."
