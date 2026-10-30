@@ -509,3 +509,23 @@ test('requested ephemeral cannot hide a durable or missing-mode session from arc
  assert.ok(result.actors.every(r=>r.failureCode==='SESSION_PERSISTENCE_MODE_MISMATCH'&&r.ephemeralThreads.length===0));
  assert.equal(result.archival.status,'incomplete');assert.deepEqual(result.archival.failedThreadIds,['thread-a','thread-b']);
 });
+
+
+test('early timer resolution cannot release a late actor before its original absolute deadline',async t=>{
+ const f=fixture(t,{seconds:4,actors:[{id:'a',folder:'/test/a',instruction:'A'},{id:'b',folder:'/test/b',instruction:'B',releaseOffsetSec:1.5}]});
+ let early=true;const sleep=f.deps.sleep;
+ f.deps.sleep=(ms,signal)=>{if(early&&ms===1500){early=false;return sleep(ms-9,signal);}return sleep(ms,signal);};
+ const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(1491);
+ assert.equal(f.calls.length,1,'the early wake is not authority to release B');
+ await f.clock.tick(9);assert.equal(f.calls.length,2);assert.equal(f.calls[1].remainingSeconds,2.5);
+ const release=f.rows().find(r=>r.kind==='actor-release'&&r.actor==='b');assert.equal(release.scheduledAt,101500);assert.equal(release.releasedAt,101500);
+ await f.clock.tick(2500);const result=await pending;assert.equal(result.cutoffAt,104000);assert.equal(result.endReason,'cutoff');
+});
+
+
+test('cancellation during an early-release recheck cannot launch the delayed actor',async t=>{
+ const stop=new AbortController(),f=fixture(t,{signal:stop.signal,seconds:4,actors:[{id:'a',folder:'/test/a',instruction:'A'},{id:'b',folder:'/test/b',instruction:'B',releaseOffsetSec:1.5}]});
+ let early=true;const sleep=f.deps.sleep;f.deps.sleep=(ms,signal)=>{if(early&&ms===1500){early=false;return sleep(ms-9,signal);}return sleep(ms,signal);};
+ const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(1491);assert.equal(f.calls.length,1);stop.abort();await flush();const result=await pending;
+ assert.equal(f.calls.length,1);assert.ok(!f.rows().some(r=>r.kind==='actor-release'&&r.actor==='b'));assert.equal(result.cutoffAt,104000);
+});

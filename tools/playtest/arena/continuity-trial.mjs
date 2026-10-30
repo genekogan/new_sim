@@ -331,8 +331,13 @@ export async function runContinuityTrial(config,deps={}){
   privateJson(join(out,'run.json'),manifest);
   for(const row of rows)tasks.push((async()=>{
    const scheduledAt=startedAt+(row.actor.releaseOffsetSec??0)*1000;
-   await sleep(Math.max(0,scheduledAt-now()),stop.signal);if(stop.signal.aborted||now()>=cutoffAt)return;
-   const remainingSeconds=(cutoffAt-now())/1000,name=`Sim continuity — ${arm} — ${row.actor.id}`;
+   await sleep(Math.max(0,scheduledAt-now()),stop.signal);
+   // Timers can resolve early; only the original absolute clock authorizes a
+   // release. Recheck after every wake without shifting the trial deadline.
+   let releasedAt=now();
+   while(!stop.signal.aborted&&releasedAt<scheduledAt){await sleep(Math.max(1,Math.ceil(scheduledAt-releasedAt)),stop.signal);releasedAt=now();}
+   if(stop.signal.aborted||releasedAt>=cutoffAt)return;
+   const remainingSeconds=(cutoffAt-releasedAt)/1000,name=`Sim continuity — ${arm} — ${row.actor.id}`;
    const state=s=>{
     // This callback deliberately stays synchronous: baseline names only after it returns.
     if(['thread-created','session-created','session-recovered','running','host-closed'].includes(s.state)&&s.threadId){
@@ -345,8 +350,8 @@ export async function runContinuityTrial(config,deps={}){
     if(restartProbe&&row.actor.id===config.restart.actorId)restartProbe.observe(s);
     record('runtime',{actor:row.actor.id,...s});onState({actor:row.actor.id,...s});
    };
-   record('actor-release',{actor:row.actor.id,scheduledAt,releasedAt:now(),remainingSeconds});
-   row.releasedAt=now();
+   record('actor-release',{actor:row.actor.id,scheduledAt,releasedAt,remainingSeconds});
+   row.releasedAt=releasedAt;
    usageGuard?.activate(row.actor.id);
    row.result=await (arm===CONTINUITY_ARMS[0]?launchBaseline({cwd:row.baseline.cwd,directory:join(row.directory,'baseline'),text:row.instruction,model,effort,remainingSeconds,name,ephemeral:baselineEphemeral,cliVersion:config.cliVersion??null,signal:stop.signal,onState:state}):launchCandidate({folder:resolve(row.actor.folder),directory:row.directory,text:row.instruction,model,effort,remainingSeconds,name,signal:stop.signal,onState:state}));
    if(arm===CONTINUITY_ARMS[0]&&(row.result.ephemeral===true)!==baselineEphemeral)row.failureCode='SESSION_PERSISTENCE_MODE_MISMATCH';

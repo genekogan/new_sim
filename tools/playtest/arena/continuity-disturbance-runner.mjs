@@ -1,8 +1,9 @@
 // Passive connection to the common trial's actual files. No actor reads, model
 // prompts, relocation, credential access or replacement trial orchestration.
 import {createHash} from 'node:crypto';
-import {readFileSync,lstatSync,mkdirSync,writeFileSync,renameSync,appendFileSync,realpathSync} from 'node:fs';
-import {join,resolve,isAbsolute} from 'node:path';
+import * as sourceFs from 'node:fs';
+import {mkdirSync,writeFileSync,renameSync,appendFileSync,realpathSync} from 'node:fs';
+import {join,resolve,isAbsolute,basename} from 'node:path';
 import {createUsageTail} from './continuity-usage.mjs';
 import {createContinuityDisturbances} from './continuity-disturbances.mjs';
 const fault=code=>Object.assign(Error(code),{code});
@@ -13,11 +14,37 @@ const cited=x=>Array.isArray(x)&&x.length>0&&x.length<=16&&x.every(s=>typeof s==
 const stamp=x=>typeof x==='number'&&Number.isFinite(x)?x:typeof x==='string'&&/(Z|[+-]\d\d:\d\d)$/.test(x)&&Number.isFinite(Date.parse(x))?Date.parse(x):NaN;
 const same=(a,b)=>JSON.stringify([...a].sort())===JSON.stringify([...b].sort());
 const clone=x=>structuredClone(x);
-function readJson(path,{optional=false,maxBytes=256*1024,partial=false}={}){
- let s;try{s=lstatSync(path);}catch(e){if(optional&&e.code==='ENOENT')return null;throw fault('DISTURBANCE_SOURCE_MISSING');}
- if(!s.isFile()||s.isSymbolicLink()||s.nlink!==1||s.size>maxBytes||realpathSync(path)!==path)throw fault('DISTURBANCE_SOURCE_UNSAFE');
- const raw=readFileSync(path);if(partial&&!raw.toString('utf8').endsWith('\n'))return null;
- try{return JSON.parse(raw);}catch{throw fault('DISTURBANCE_SOURCE_JSON_INVALID');}
+// Snapshot only one opened regular file. Atomic status replacement can unlink
+// an old inode between lookup/stat/read; reopen at most twice, never accept a
+// symlink, hardlink, oversized file or unproved/torn snapshot.
+export function readDisturbanceJson(path,{optional=false,maxBytes=256*1024,partial=false,onRetry=()=>{}}={},io=sourceFs){
+ const source=['run.json','capture-status.json','export-status.json','native-evidence.json','summary.json'].includes(basename(path))?basename(path):'json-source';
+ if(!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>256*1024)throw fault('INVALID_DISTURBANCE_SOURCE_BOUND');
+ for(let attempt=1;attempt<=3;attempt++){
+  let fd,step='open';
+  const failed=(code,check,extra={})=>Object.assign(fault(code),{sourceFacts:{source,check,attempt,...extra}});
+  const changed=check=>{if(attempt===3)throw failed('DISTURBANCE_SOURCE_UNSAFE',check);onRetry({source,check,attempt});};
+  try{
+   fd=io.openSync(path,io.constants.O_RDONLY|io.constants.O_NOFOLLOW|io.constants.O_NONBLOCK);
+   step='canonical-path';if(io.realpathSync(path)!==path)throw failed('DISTURBANCE_SOURCE_UNSAFE',step);
+   step='initial-stat';const before=io.fstatSync(fd);
+   if(before.nlink===0){changed('unlinked-before-read');continue;}
+   if(!before.isFile()||before.nlink!==1||before.size>maxBytes)throw failed('DISTURBANCE_SOURCE_UNSAFE','initial-file-type-links-or-size',{nlink:before.nlink,bytes:before.size});
+   step='read';const buffer=Buffer.alloc(maxBytes+1);let bytes=0,n;
+   while(bytes<buffer.length&&(n=io.readSync(fd,buffer,bytes,buffer.length-bytes,null))>0)bytes+=n;
+   if(bytes>maxBytes)throw failed('DISTURBANCE_SOURCE_UNSAFE','read-size',{bytes});
+   step='final-stat';const after=io.fstatSync(fd);
+   if(after.nlink===0){changed('unlinked-after-read');continue;}
+   if(!after.isFile()||after.nlink!==1||after.size>maxBytes)throw failed('DISTURBANCE_SOURCE_UNSAFE','final-file-type-links-or-size',{nlink:after.nlink,bytes:after.size});
+   if(before.size!==after.size||before.mtimeMs!==after.mtimeMs||before.ctimeMs!==after.ctimeMs||bytes!==after.size){changed('modified-during-read');continue;}
+   const raw=buffer.subarray(0,bytes);if(partial&&!raw.toString('utf8').endsWith('\n'))return null;
+   try{return JSON.parse(raw);}catch{throw failed('DISTURBANCE_SOURCE_JSON_INVALID','json-parse');}
+  }catch(error){
+   if(error.sourceFacts)throw error;
+   if(optional&&fd===undefined&&error.code==='ENOENT')return null;
+   throw failed(error.code==='ELOOP'?'DISTURBANCE_SOURCE_UNSAFE':'DISTURBANCE_SOURCE_MISSING',step,{errno:/^[A-Z0-9_]{1,40}$/.test(error.code??'')?error.code:'UNKNOWN'});
+  }finally{if(fd!==undefined)io.closeSync(fd);}
+ }
 }
 const tail=path=>createUsageTail(path,{maxLineBytes:256*1024,maxPollBytes:4*1024*1024,maxFileBytes:128*1024*1024,maxLinesPerPoll:10000});
 function pollTail(reader,consume,options){let callbackError;try{return reader.poll((row,line)=>{try{consume(row,line);}catch(e){callbackError=e;throw e;}},options);}catch(e){throw callbackError??e;}}
@@ -42,9 +69,10 @@ export function createContinuityDisturbanceRunner({trialDirectory,outputDirector
  let run=null,runDigest=null,dispatcher=null,failure=null,closed=false,stopping=false,started=false,timer=null,active=null,finishPromise=null,lastPollAt=null,eventLines=0,captureEpoch=null,captureGeneration=0,captureIndex=0,captureHash='',captureScopeHash=null,parsedCaptureIndex=0,parsedCaptureHash='',exportBytes=0,committedExportBytes=0,ownerSourceSeen=false,nativeSourceStatus='unknown';
  const sendAbort=new AbortController();
  const capturePending=[],exportPending=[],bindings=new Map(),sequences=new Map(),receipts=new Map(),deliveryFacts=new Map(),lastBodies=new Map();
- const counts={timeline:0,capture:0,export:0};
+ const counts={timeline:0,capture:0,export:0},sourceReadRetries={count:0,last:null};
+ const readJson=(path,options={})=>readDisturbanceJson(path,{...options,onRetry:fact=>{sourceReadRetries.count++;sourceReadRetries.last={...fact,at:now()};if(sourceReadRetries.count<=32)record({kind:'source-read-retry',...sourceReadRetries.last});}});
  const persist=()=>{writeFileSync(join(out,'disturbances.json.tmp'),JSON.stringify(snapshot(),null,2)+'\n',{mode:0o600});renameSync(join(out,'disturbances.json.tmp'),join(out,'disturbances.json'));};
- const fail=code=>{if(!failure){failure={code:/^[A-Z0-9_]{1,100}$/.test(code??'')?code:'DISTURBANCE_RUNNER_UNKNOWN',at:now()};try{onFailure(clone(failure));}catch{}}};
+ const fail=value=>{if(!failure){const code=typeof value==='string'?value:value?.code;failure={code:/^[A-Z0-9_]{1,100}$/.test(code??'')?code:'DISTURBANCE_RUNNER_UNKNOWN',at:now(),...(value?.sourceFacts?{sourceFacts:clone(value.sourceFacts)}:{})};try{onFailure(clone(failure));}catch{}}};
  const record=r=>{appendFileSync(join(out,'events.jsonl'),JSON.stringify(r)+'\n');eventLines++;};
  const scoped=actorId=>({worldId,actorId,soulId:participants.get(actorId)});
  function rememberDelivery(value){const key=JSON.stringify([value.actorId,value.source,value.eventId]),old=deliveryFacts.get(key);if(old&&['actorId','source','eventId','createdAt','effectId','senderSoulId'].some(k=>old[k]!==value[k]))throw fault('NATIVE_DELIVERY_IDENTITY_CHANGED');if(old)return;if(deliveryFacts.size>=4096)throw fault('NATIVE_DELIVERY_HISTORY_BOUND');deliveryFacts.set(key,value);}
@@ -159,12 +187,12 @@ export function createContinuityDisturbanceRunner({trialDirectory,outputDirector
    loadRun();pollCapture(final);
    if(run){for(const r of receipts.values())if(!r.forwarded){dispatcher.observeReceipt({...scoped(r.actorId),observedAt:now(),receipt:r,evidence:r.evidence});r.forwarded=true;}
     pollTail(timelineTail,timelineRow,{required:true,final});pollOwner(final);linkDeliveries();
-    if(!failure&&!stopping&&!active&&now()<run.cutoffAt)active=dispatcher.tick().then(()=>{linkDeliveries();persist();}).catch(e=>{fail(e.code);try{persist();}catch{fail('DISTURBANCE_RUNNER_EVIDENCE_FAILED');}}).finally(()=>{active=null;});
+    if(!failure&&!stopping&&!active&&now()<run.cutoffAt)active=dispatcher.tick().then(()=>{linkDeliveries();persist();}).catch(e=>{fail(e);try{persist();}catch{fail('DISTURBANCE_RUNNER_EVIDENCE_FAILED');}}).finally(()=>{active=null;});
    }
-  }catch(error){fail(error.code);}
+  }catch(error){fail(error);}
   try{persist();}catch{fail('DISTURBANCE_RUNNER_EVIDENCE_FAILED');}return snapshot();
  }
- function snapshot(){return {schema:'continuity-disturbance-runner/1',runId,worldId,scenarioId:spec.id,createdAt,started,closed,status:failure?'unknown':!run?'awaiting-trial-manifest':closed?'closed':'observing',failure:clone(failure),pollMs,lastPollAt,sourceCounts:{...counts},capture:{epoch:captureEpoch,index:captureIndex,hash:captureHash},ownerSourceSeen,nativeSourceStatus,dispatchPending:!!active,dispatcher:dispatcher?.snapshot()??null,evidence:{manifest:join(trial,'run.json'),timeline:join(trial,'timeline.jsonl'),capture:join(capture,'native-capture.jsonl'),output:join(out,'events.jsonl')},limits:'Observed native trigger and dispatch evidence only. Original dispatcher invalid/firstMotionContradiction is retained; delivered alone is not a pass. No actor assistance or qualification claim.'};}
+ function snapshot(){return {schema:'continuity-disturbance-runner/1',runId,worldId,scenarioId:spec.id,createdAt,started,closed,status:failure?'unknown':!run?'awaiting-trial-manifest':closed?'closed':'observing',failure:clone(failure),pollMs,lastPollAt,sourceCounts:{...counts},sourceReadRetries:clone(sourceReadRetries),capture:{epoch:captureEpoch,index:captureIndex,hash:captureHash},ownerSourceSeen,nativeSourceStatus,dispatchPending:!!active,dispatcher:dispatcher?.snapshot()??null,evidence:{manifest:join(trial,'run.json'),timeline:join(trial,'timeline.jsonl'),capture:join(capture,'native-capture.jsonl'),output:join(out,'events.jsonl')},limits:'Observed native trigger and dispatch evidence only. Original dispatcher invalid/firstMotionContradiction is retained; delivered alone is not a pass. No actor assistance or qualification claim.'};}
  const start=()=>{if(started||closed)return snapshot();started=true;const again=()=>{if(closed)return;poll();if(!failure&&(!run||now()<run.cutoffAt))timer=schedule(again,pollMs);};again();return snapshot();};
  const settle=async()=>{if(active)await active;return snapshot();};
  const finish=()=>{if(finishPromise)return finishPromise;stopping=true;sendAbort.abort();finishPromise=(async()=>{cancel(timer);poll({final:true});if(active)await active;try{
@@ -172,6 +200,6 @@ export function createContinuityDisturbanceRunner({trialDirectory,outputDirector
   const native=readJson(join(trial,'native-evidence.json'),{optional:true}),summary=readJson(join(trial,'summary.json'),{optional:true}),coverage=native?.coverage;
   if(native?.schema!=='continuity-native-lifecycle/1'||native.status!=='pass'||native.failure||coverage?.status!=='pass'||coverage.runId!==runId||coverage.worldId!==worldId||coverage.from!==run.startedAt||coverage.to!==run.cutoffAt||summary?.schema!=='sim-continuity-trial-result/1'||summary.coverage?.nativeSources!=='pass'||hash(JSON.stringify(summary.nativeEvidence))!==hash(JSON.stringify(native)))throw fault('COMMON_NATIVE_SOURCE_COVERAGE_UNKNOWN');
   nativeSourceStatus='pass';
- }catch(error){fail(error.code);}closed=true;try{persist();}catch{fail('DISTURBANCE_RUNNER_EVIDENCE_FAILED');}return snapshot();})();return finishPromise;};
+ }catch(error){fail(error);}closed=true;try{persist();}catch{fail('DISTURBANCE_RUNNER_EVIDENCE_FAILED');}return snapshot();})();return finishPromise;};
  persist();return {start,poll,settle,finish,snapshot};
 }

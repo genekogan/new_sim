@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
 import {mkdtempSync,mkdirSync,readFileSync,writeFileSync,appendFileSync,rmSync,realpathSync,existsSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
-import {createContinuityDisturbanceRunner} from './continuity-disturbance-runner.mjs';
+import * as sourceFs from 'node:fs';
+import {createContinuityDisturbanceRunner,readDisturbanceJson} from './continuity-disturbance-runner.mjs';
 const fixtures=JSON.parse(readFileSync(new URL('../scenarios/continuity/fixtures.json',import.meta.url)));
 const T0=1793400000000,sha=x=>createHash('sha256').update(x).digest('hex');
 const json=(p,v)=>writeFileSync(p,JSON.stringify(v)+'\n',{mode:0o600});
@@ -90,4 +92,64 @@ test('finish requires authoritative common native lifecycle/summary, not stale e
 
 test('automatic poll is bounded to500ms, and finish cancels without dispatching a due late event',async t=>{
  const scheduled=[],cancelled=[];const f=fixture(t,'mars-presentation-four',{pollMs:500,schedule:(fn,ms)=>{scheduled.push({fn,ms});return scheduled.length;},cancel:id=>cancelled.push(id)});f.runner.start();assert.equal(scheduled[0].ms,500);f.launch();f.setNow(T0+280000);const result=await f.runner.finish();assert.equal(f.sent.length,0);assert.equal(result.status,'unknown');assert.ok(cancelled.length>0);scheduled[0].fn();assert.equal(f.sent.length,0);
+});
+
+
+test('atomic status replacement retries an unlinked descriptor and reads only a bounded coherent snapshot',t=>{
+ const parent=realpathSync(mkdtempSync(join(tmpdir(),'continuity-json-replace-')));t.after(()=>rmSync(parent,{recursive:true,force:true}));
+ const path=join(parent,'capture-status.json');json(path,{generation:1});let replaced=false,opened=0,closed=0;
+ const replace=()=>{if(replaced)return;replaced=true;json(path+'.tmp',{generation:2});sourceFs.renameSync(path+'.tmp',path);};
+ const io={...sourceFs,
+  lstatSync:p=>{const stat=sourceFs.lstatSync(p);replace();return {...stat,nlink:0,isFile:()=>true,isSymbolicLink:()=>false};},
+  openSync:(p,flags)=>{const fd=sourceFs.openSync(p,flags);opened++;replace();return fd;},
+  closeSync:fd=>{closed++;sourceFs.closeSync(fd);},
+ };
+ assert.deepEqual(readDisturbanceJson(path,{},io),{generation:2});
+ assert.equal(opened,2,'one bounded retry after actual atomic replacement');assert.equal(closed,opened,'all source descriptors close');
+});
+
+
+test('JSON reader refuses symlink/hardlink/oversize and preserves typed bounded source facts',t=>{
+ const parent=realpathSync(mkdtempSync(join(tmpdir(),'continuity-json-unsafe-')));t.after(()=>rmSync(parent,{recursive:true,force:true}));
+ const path=join(parent,'capture-status.json'),target=join(parent,'target.json');json(target,{safe:'not a permission to follow'});
+ sourceFs.symlinkSync(target,path);
+ assert.throws(()=>readDisturbanceJson(path),error=>error.code==='DISTURBANCE_SOURCE_UNSAFE'&&error.sourceFacts.source==='capture-status.json'&&error.sourceFacts.check==='open'&&error.sourceFacts.errno==='ELOOP');
+ sourceFs.unlinkSync(path);sourceFs.linkSync(target,path);
+ assert.throws(()=>readDisturbanceJson(path),error=>error.code==='DISTURBANCE_SOURCE_UNSAFE'&&error.sourceFacts.nlink===2&&error.sourceFacts.attempt===1);
+ sourceFs.unlinkSync(path);json(path,{long:'x'.repeat(100)});
+ assert.throws(()=>readDisturbanceJson(path,{maxBytes:16}),error=>error.code==='DISTURBANCE_SOURCE_UNSAFE'&&error.sourceFacts.bytes>16);
+ assert.equal(readDisturbanceJson(join(parent,'absent.json'),{optional:true}),null);
+ writeFileSync(path,'{"partial":');assert.equal(readDisturbanceJson(path,{partial:true}),null);
+ assert.throws(()=>readDisturbanceJson(path),error=>error.code==='DISTURBANCE_SOURCE_JSON_INVALID'&&error.sourceFacts.check==='json-parse');
+});
+
+test('persistent unlinked/changed sources exhaust three attempts, close every FD and remain unsafe',t=>{
+ const parent=realpathSync(mkdtempSync(join(tmpdir(),'continuity-json-exhaust-')));t.after(()=>rmSync(parent,{recursive:true,force:true}));
+ const path=join(parent,'capture-status.json');json(path,{generation:1});let opened=0,closed=0;const retries=[];
+ const io={...sourceFs,openSync:(...args)=>{opened++;return sourceFs.openSync(...args);},closeSync:fd=>{closed++;sourceFs.closeSync(fd);},fstatSync:fd=>Object.assign(sourceFs.fstatSync(fd),{nlink:0})};
+ assert.throws(()=>readDisturbanceJson(path,{onRetry:e=>retries.push(e)},io),error=>error.code==='DISTURBANCE_SOURCE_UNSAFE'&&error.sourceFacts.check==='unlinked-before-read'&&error.sourceFacts.attempt===3);
+ assert.equal(opened,3);assert.equal(closed,3);assert.equal(retries.length,2);
+});
+
+test('JSON read remains byte-bounded if a source grows after its initial fstat',t=>{
+ const parent=realpathSync(mkdtempSync(join(tmpdir(),'continuity-json-grow-')));t.after(()=>rmSync(parent,{recursive:true,force:true}));
+ const path=join(parent,'capture-status.json');json(path,{n:1});let grown=false,total=0,closed=0;
+ const io={...sourceFs,readSync:(fd,buf,offset,length,position)=>{if(!grown){grown=true;appendFileSync(path,'x'.repeat(1024));}const n=sourceFs.readSync(fd,buf,offset,length,position);total+=n;return n;},closeSync:fd=>{closed++;sourceFs.closeSync(fd);}};
+ assert.throws(()=>readDisturbanceJson(path,{maxBytes:32},io),error=>error.code==='DISTURBANCE_SOURCE_UNSAFE'&&error.sourceFacts.check==='read-size');
+ assert.equal(total,33);assert.equal(closed,1);
+});
+
+test('runner retains exact source failure metadata without raw path/content and suppresses later sends',async t=>{
+ const f=fixture(t);f.launch();await f.poll();const path=join(f.capture,'capture-status.json');sourceFs.renameSync(path,path+'.saved');sourceFs.symlinkSync(path+'.saved',path);
+ f.setNow(T0+280000);f.runner.poll();await f.runner.settle();const failed=f.runner.snapshot().failure;
+ assert.equal(failed.code,'DISTURBANCE_SOURCE_UNSAFE');assert.deepEqual(failed.sourceFacts,{source:'capture-status.json',check:'open',attempt:1,errno:'ELOOP'});assert.equal(failed.at,T0+280000);assert.equal(f.sent.length,0);assert.deepEqual(f.failures,[failed]);
+ assert.ok(!JSON.stringify(failed).includes(f.parent));assert.deepEqual(JSON.parse(readFileSync(join(f.out,'disturbances.json'),'utf8')).failure,failed);
+});
+
+
+test('nonregular FIFO source cannot block open before regular-file safety validation',t=>{
+ const parent=realpathSync(mkdtempSync(join(tmpdir(),'continuity-json-fifo-')));t.after(()=>rmSync(parent,{recursive:true,force:true}));
+ const path=join(parent,'capture-status.json');execFileSync('mkfifo',[path]);let closed=0;
+ const io={...sourceFs,openSync:(p,flags)=>{assert.ok(flags&sourceFs.constants.O_NONBLOCK);return sourceFs.openSync(p,flags);},closeSync:fd=>{closed++;sourceFs.closeSync(fd);}};
+ assert.throws(()=>readDisturbanceJson(path,{},io),error=>error.code==='DISTURBANCE_SOURCE_UNSAFE'&&error.sourceFacts.check==='initial-file-type-links-or-size');assert.equal(closed,1);
 });
