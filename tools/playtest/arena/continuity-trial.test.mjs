@@ -381,3 +381,25 @@ test('fresh host-tail read after ps validation blocks dispatch when an urgent de
  const f=managedRestartFixture(t,{turnDuringInspection:true});const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(40000);const result=await pending;
  assert.deepEqual(f.signals,[]);assert.equal(result.restart.state,'unknown');assert.equal(result.restart.failure.code,'RESTART_TRIGGER_CHANGED');assert.equal(result.restart.dispatchAttempted,false);assert.equal(result.restart.preDispatchObservation.hostTail.lines,3);assert.match(result.restart.preDispatchObservation.semantics,/not atomic/);assert.equal(result.actors[0].cleanupVerified,true);
 });
+
+ test('native capture brackets the same cutoff and finalizes after owned actors close',async t=>{
+ const f=fixture(t,{runId:'native-1',nativeEvidence:{databasePath:'/owned/sim.db',captureDirectory:'/owned/capture'},fixtureActors:[{id:'occupant',folder:'/test/occupant'}]});let finished;
+ f.deps.createNativeEvidence=(scope,deps)=>{assert.deepEqual(scope.soulIds,['s_a','s_b','s_occupant']);assert.equal(scope.runId,'native-1');return {start(){assert.equal(f.calls.length,0);return {first:{requestedAt:deps.now()},failure:null};},async finish(interval){finished=interval;assert(f.lifecycle.some(r=>r[0]==='closed'));assert.equal(deps.now(),103000);return {status:'unknown',failure:'CLOSE_FSYNC_FAILED',coverage:{status:'pass'}};}};};
+ const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(3000);const result=await pending;
+ assert.deepEqual(finished,{t0:100000,cutoffAt:103000});assert.equal(result.coverage.nativeSources,'unknown','wrapper failure outranks stale source coverage');assert.equal(result.cutoffAt,103000);assert.equal(result.qualification,'not assessed');
+});
+ test('native source preflight failure closes collector without launching models',async t=>{
+ const f=fixture(t,{runId:'native-1',nativeEvidence:{databasePath:'/owned/sim.db',captureDirectory:'/owned/capture'}});let closed=false;
+ f.deps.createNativeEvidence=()=>({start:()=>({failure:'CAPTURE_SCOPE_MISMATCH'}),async finish(x){assert.equal(x.t0,null);closed=true;return {status:'unknown',coverage:null};}});
+ const r=await runContinuityTrial(f.config,f.deps);assert.equal(r.failureCode,'CAPTURE_SCOPE_MISMATCH');assert.equal(f.calls.length,0);assert.equal(closed,true);
+ assert.throws(()=>validateContinuityTrial({...f.config,runId:undefined}),/INVALID_NATIVE_EVIDENCE_CONFIG/);
+});
+
+for(const mode of ['finish-rejected','result-write-refused'])test('native finalization failure preserves unknown and still verifies/archives owned actors: '+mode,async t=>{
+ const f=fixture(t,{runId:'native-failure',nativeEvidence:{databasePath:'/owned/sim.db',captureDirectory:'/owned/capture'}});let verified=0,finished=0;
+ f.deps.verifyBaseline=()=>{verified++;return true;};
+ f.deps.createNativeEvidence=()=>({start(){if(mode==='result-write-refused')writeFileSync(join(f.config.directory,'native-evidence.json'),'existing private artifact');return {failure:null};},async finish(){finished++;assert.equal(f.lifecycle.filter(r=>r[0]==='closed').length,2);if(mode==='finish-rejected')throw Object.assign(Error('SOURCE_DETAIL_MUST_NOT_ESCAPE'),{code:'NATIVE_FINAL_FAILED'});return {status:'pass',coverage:{status:'pass'}};}});
+ const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(3000);const result=await pending;
+ assert.equal(finished,1);assert.equal(verified,2);assert.equal(result.failureCode,'NATIVE_EVIDENCE_FINALIZATION_FAILED');assert.equal(result.nativeEvidence.status,'unknown');assert.equal(result.nativeEvidence.coverage,null);assert.equal(result.coverage.nativeSources,'unknown');assert.equal(result.cutoffAt,103000);assert.equal(result.endReason,'cutoff');assert.equal(result.qualification,'not assessed');assert.equal(f.lifecycle.filter(r=>r[0]==='complete').length,2);assert.ok(f.lifecycle.some(r=>r[0]==='archive'));assert.ok(result.actors.every(r=>r.cleanupVerified));assert.ok(!JSON.stringify(result).includes('SOURCE_DETAIL_MUST_NOT_ESCAPE'));
+ if(mode==='result-write-refused')assert.equal(readFileSync(join(f.config.directory,'native-evidence.json'),'utf8'),'existing private artifact','do not overwrite prior evidence to hide the write error');
+});

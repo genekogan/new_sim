@@ -5,7 +5,7 @@ import {spawn,execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {StringDecoder} from 'node:string_decoder';
 import {mkdirSync,readFileSync,writeFileSync,appendFileSync,lstatSync,renameSync} from 'node:fs';
-import {resolve,join,basename} from 'node:path';
+import {resolve,join,basename,isAbsolute} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createWorldClient} from '../../soul-runtime/world-client.mjs';
 import {abortableSleep} from '../../soul-runtime/receiver.mjs';
@@ -13,6 +13,7 @@ import {probeSessions,verifyOwnedProbeExit} from './probe-sessions.mjs';
 import {runContinuityBaseline} from './adapters/continuity-baseline.mjs';
 import {buildArgs} from './adapters/codex-headless.mjs';
 import {createContinuityUsageGuard,validateUsageLimits,createUsageTail} from './continuity-usage.mjs';
+import {createTrialNativeEvidence} from './continuity-native-lifecycle.mjs';
 import {createManagedRestartObserver,inspectRestartProcess,baselineAutomaticRestartCapability} from './continuity-restart.mjs';
 
 export const CONTINUITY_ARMS=['existing-headless-seat','managed-continuity-runtime'];
@@ -36,6 +37,7 @@ export function validateContinuityTrial(config){
  if(purpose==='soak'&&config.usageGuard===undefined)throw fault('SOAK_USAGE_GUARD_REQUIRED');
  if(config.usageGuard!==undefined)validateUsageLimits(config.usageGuard);
  if(config.runId!==undefined&&!identifier(config.runId))throw fault('INVALID_RUN_ID');
+ if(config.nativeEvidence!==undefined&&(!config.nativeEvidence||Object.keys(config.nativeEvidence).sort().join(',')!=='captureDirectory,databasePath'||!identifier(config.runId)||![config.nativeEvidence.databasePath,config.nativeEvidence.captureDirectory].every(p=>typeof p==='string'&&isAbsolute(p))))throw fault('INVALID_NATIVE_EVIDENCE_CONFIG');
  if(config.restart!==undefined&&(!config.restart||Object.keys(config.restart).sort().join(',')!=='actorId,setupId'||!identifier(config.restart.actorId)||!identifier(config.restart.setupId)||!identifier(worldId)||!Number.isSafeInteger(seconds*1000)||!actors.some(a=>a?.id===config.restart.actorId)))throw fault('INVALID_RESTART_CONFIG');
  if(config.cliVersion!==undefined&&config.cliVersion!==null&&!label(config.cliVersion))throw fault('INVALID_CLI_VERSION');
  const ids=new Set();
@@ -268,7 +270,7 @@ export async function runContinuityTrial(config,deps={}){
  const out=resolve(directory);mkdirSync(out,{mode:0o700}); // Atomic refusal of every existing output, even empty.
  const registry=(deps.registryFactory??probeSessions)(out),stop=new AbortController(),abort=()=>stop.abort();
  signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)abort();
- let startedAt=null,cutoffAt=null,endReason=null,failureCode=null,cutoffTimer,usageTimer,restartTimer,usageGuard=null,usageState=null,restartProbe=null,restartResult=null;const rows=[],fixtures=[],tasks=[];
+ let startedAt=null,cutoffAt=null,endReason=null,failureCode=null,cutoffTimer,usageTimer,restartTimer,usageGuard=null,usageState=null,restartProbe=null,restartResult=null,nativeProbe=null,nativeResult=null;const rows=[],fixtures=[],tasks=[];
  writeFileSync(join(out,'timeline.jsonl'),'',{flag:'wx',mode:0o600});
  const record=(kind,data={})=>{try{appendFileSync(join(out,'timeline.jsonl'),JSON.stringify({at:now(),kind,...data})+'\n');}catch{failureCode='TRIAL_EVIDENCE_WRITE_FAILED';abort();throw fault(failureCode);}};
  const checkUsage=(finalActorIds=[],finish=false)=>{
@@ -307,6 +309,10 @@ export async function runContinuityTrial(config,deps={}){
   if(verified.devAuth!==true)throw fault('LOOPBACK_DEVAUTH_REQUIRED');
   if(verified.worldId!==worldId)throw fault('WORLD_ID_MISMATCH');
   for(const row of [...rows,...fixtures])await sample(row,'setup-body');
+  if(config.nativeEvidence){
+   nativeProbe=(deps.createNativeEvidence??createTrialNativeEvidence)({...config.nativeEvidence,directory:join(out,'native-export'),runId:config.runId,worldId,soulIds:[...rows,...fixtures].map(r=>r.paired.soul)}, {now,sleep,schedule:deps.schedule??setTimeout,cancel:deps.cancelSchedule??clearTimeout,onFailure:reason=>{failureCode??=reason;endReason??='native-evidence-error';abort();}});
+   const first=nativeProbe.start();if(first.failure)throw fault(first.failure);
+  }
   if(stop.signal.aborted)throw fault('TRIAL_CANCELLED');
   startedAt=now();cutoffAt=startedAt+seconds*1000;
   for(const row of rows)row.instruction=renderTrialInstruction(row.actor.instruction,{startedAt,seconds,meetingOffsetSec:config.meetingOffsetSec});
@@ -318,6 +324,7 @@ export async function runContinuityTrial(config,deps={}){
    else {restartProbe=createTrialRestartProbe({...config.restart,directory:target.directory,worldId,soulId:target.paired.soul,originalInstructionSha256:sha(target.instruction),cutoffAt},{now,...(deps.restart??{})});scheduleRestart();}
   }
   const manifest={schema:'sim-continuity-trial/1',...(config.runId?{runId:config.runId}:{}),arm,purpose,seconds,startedAt,cutoffAt,meetingAt:config.meetingOffsetSec===undefined?null:startedAt+config.meetingOffsetSec*1000,modelRequested:model,effortRequested:effort,cliVersion:config.cliVersion??null,cliVersionSource:config.cliVersion?'caller-preflight':null,world,worldId,baselineWake:false,disturbances:'unsupported: not dispatched by this runner',restartCoverage:config.restart?{...config.restart,kind:'checkpoint-future-wake',minimumFutureWakeMs:20000,triggerMaxDelayMs:5000,recoveryMaxMs:25000,pollMs:1000,proof:arm===CONTINUITY_ARMS[0]?'restart-proof.json':`${config.restart.actorId}/restart-proof.json`,baselineAssistedResume:false}:'unknown: no restart contract requested',qualification:'not assessed; orchestration evidence only',actors:rows.map(row=>({id:row.actor.id,soulId:row.paired.soul,releaseOffsetSec:row.actor.releaseOffsetSec??0,instructionTemplateSha256:sha(row.actor.instruction),instructionSha256:sha(row.instruction),...(row.baseline?{baseline:row.baseline,promptArgsSha256:sha(JSON.stringify(buildArgs({model,effort,text:row.instruction})))}:{agentEvidence:'agent-evidence.jsonl',launchSourceSha256:sha(readFileSync(new URL('../../soul-runtime/launch.mjs',import.meta.url)))} )})),fixtureActors:fixtures.map(row=>({id:row.actor.id,soulId:row.paired.soul})),registration:'baseline synchronous callback before naming; candidate emitted creation before naming, parent durability occurs on receipt'};
+  manifest.nativeEvidence=config.nativeEvidence?{kind:'allowlisted-native-capture',runId:config.runId,pollMs:1000,exportDirectory:'native-export',limits:'Capture is started before this runner; identical settings both arms. No inferred behavioral completeness.'}:null;
   manifest.usageGuard=config.usageGuard?{kind:'observed-usage-guard',limits:config.usageGuard,pollMs:1000,possibleInFlightOvershoot:true,billing:'not measured'}:null;
   privateJson(join(out,'run.json'),manifest);
   for(const row of rows)tasks.push((async()=>{
@@ -357,6 +364,11 @@ export async function runContinuityTrial(config,deps={}){
  finally{
   abort();(deps.cancelSchedule??clearTimeout)(cutoffTimer);(deps.cancelSchedule??clearTimeout)(usageTimer);(deps.cancelSchedule??clearTimeout)(restartTimer);await Promise.allSettled(tasks);checkUsage([],true);
   if(restartProbe){const target=rows.find(row=>row.actor.id===config.restart.actorId);restartResult=restartProbe.finish({required:target.releasedAt!==undefined});if(target.result)restartProbe.attach(target.result);}
+  if(nativeProbe){
+   const nativeError=error=>{failureCode??='NATIVE_EVIDENCE_FINALIZATION_FAILED';nativeResult={schema:'continuity-native-lifecycle/1',status:'unknown',failure:code(error),coverage:null,priorSourceStatus:nativeResult?.coverage?.status??null,limits:'Native evidence finalization/persistence failed; no source completeness or qualification inferred.'};};
+   try{nativeResult=await nativeProbe.finish({t0:startedAt,cutoffAt});if(!nativeResult||!['pass','unknown'].includes(nativeResult.status))throw fault('NATIVE_EVIDENCE_RESULT_INVALID');}catch(error){nativeError(error);}
+   try{privateJson(join(out,'native-evidence.json'),nativeResult);}catch(error){nativeError(error);}
+  }
   if(config.restart&&arm===CONTINUITY_ARMS[0]&&restartResult)privateJson(join(out,'restart-proof.json'),restartResult);signal?.removeEventListener('abort',abort);
  }
  const verifyCandidate=deps.verifyCandidate??(result=>verifyOwnedProbeExit(result)),verifyBaseline=deps.verifyBaseline??verifyBaselineTrialExit;
@@ -368,6 +380,8 @@ export async function runContinuityTrial(config,deps={}){
  const summary={schema:'sim-continuity-trial-result/1',arm,purpose,startedAt,cutoffAt,endedAt:now(),endReason,failureCode,qualification:'not assessed',coverage:{disturbances:'unknown',restart:'unknown',semanticOutcome:'not scored',actualEffort:'only authoritative host metadata; otherwise unknown'},actors:rows.map(row=>({id:row.actor.id,soulId:row.paired.soul,releasedAt:row.releasedAt??null,threads:[...row.threads],cleanupVerified:row.cleanupVerified,failureCode:row.failureCode??row.result?.failureCode??null,exit:row.result?.exit??null,actualModel:row.result?.actualModel??null,actualEffort:row.result?.actualEffort??null,endedBeforeCutoff:row.result?.endedAt!==undefined?row.result.endedAt<cutoffAt:null}))};
  summary.usageGuard=usageState;
  summary.restart=restartResult;
+ summary.nativeEvidence=nativeResult;
+ summary.coverage.nativeSources=nativeResult?.status??'unknown';
  if(config.restart)summary.coverage.restart=arm===CONTINUITY_ARMS[0]?'unsupported':restartResult?.integration?.status??'unknown';
  privateJson(join(out,'summary.json'),summary);
  for(const row of rows)if(row.cleanupVerified)for(const threadId of row.threads)registry.complete(threadId,{outcome:endReason==='cancelled'?'cancelled':failureCode||row.failureCode||row.result?.failureCode||row.result?.exit?.code!==0?'failed':'bounded-end',ownedProcessesExited:true,evidence:'summary.json;timeline.jsonl; exact owned process-group absence verified before archival'});

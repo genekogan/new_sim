@@ -59,6 +59,8 @@ export function createNativeEvidenceExporter({databasePath,captureDirectory,dire
   try{
    const sourceStat=lstatSync(databasePath);if(sourceStat.dev!==stat.dev||sourceStat.ino!==stat.ino)throw fail('NATIVE_DATABASE_REPLACED');
    const capture=readNativeCapture(captureDirectory);if(capture.status.epoch!==epoch||capture.status.worldId!==worldId||capture.status.runId!==runId||!same(capture.status.soulIds,soulIds))throw fail('CAPTURE_SCOPE_CHANGED');
+   if(capture.status.closed)throw fail('NATIVE_CAPTURE_CLOSED');
+   if(capture.status.healthy!==true||capture.status.failure)throw fail('NATIVE_CAPTURE_UNHEALTHY');
    const turnRefs=new Map(),conversationIds=new Set();
    const learn=e=>{if(typeof e?.conversation==='string'){conversationIds.add(e.conversation);if(Number.isSafeInteger(e.turn?.seq)){const list=turnRefs.get(e.conversation)??new Set();list.add(e.turn.seq);turnRefs.set(e.conversation,list);}}};
    for(const r of capture.records)if(r.kind==='recipient-event'&&ids.has(r.soulId))learn(r.event);

@@ -7,6 +7,7 @@ import {eventsFixture} from '../../../apps/server/src/edge/events/testing.ts';
 import {AgentInbox} from '../../../apps/server/src/inbox.ts';
 import {captureNativeEvidence} from '../../../apps/server/src/edge/events/evidence-capture.ts';
 import {createNativeEvidenceExporter,readNativeCapture} from './continuity-native-evidence.mjs';
+import {createTrialNativeEvidence} from './continuity-native-lifecycle.mjs';
 async function setup(t,{limits={},writer}={}){
  const f=eventsFixture(['A','B','Foreign'],{comms:{retainEvents:2,fetch:null,sweepMs:0}}),root=realpathSync(mkdtempSync(join(tmpdir(),'native-export-'))),captureDirectory=join(root,'capture'),directory=join(root,'export'),configPath=join(root,'scope.json');
  f.db.db.exec('ALTER TABLE edge_receipts_v1 ADD COLUMN detail TEXT;CREATE TABLE edge_refusals_v1(world_id TEXT,at INTEGER,tick INTEGER,soul_id TEXT,verb TEXT,capability TEXT,code TEXT,reason TEXT,x REAL,z REAL)');new AgentInbox(f.db,f.host.worldId);
@@ -39,9 +40,9 @@ test('all committed recipient sequences survive pruning; a final snapshot needs 
  const snapshot=exporter.poll();assert.ok(snapshot.heads.find(h=>h.soul_id===f.id('A')).floor>0);assert.equal(exporter.audit(snapshot,{t0:f.clock.now,cutoffAt:f.clock.now}).status,'unknown');
  await f.heartbeat();const audit=exporter.audit(snapshot,{t0:f.clock.now,cutoffAt:f.clock.now});assert.equal(audit.status,'pass',JSON.stringify(audit));assert.equal(readNativeCapture(f.captureDirectory).records.filter(r=>r.kind==='recipient-event').length,50);
 });
-test('writer overflow or a pruned uncaptured interval invalidates coverage even if some native rows remain',async t=>{
- const f=await setup(t,{limits:{maxEvents:2}}),exporter=f.start();for(let n=1;n<=50;n++)f.runtime.streams.deliver(f.id('A'),'world',n,{text:'event-'+n});
- assert.equal(f.capture.status().healthy,false);const snapshot=exporter.poll();await f.heartbeat();const audit=exporter.audit(snapshot,{t0:f.clock.now,cutoffAt:f.clock.now});assert.equal(audit.status,'unknown');assert.ok(audit.missing.some(s=>s.includes('sticky capture failure')));assert.ok(audit.missing.some(s=>s.includes('stream gap')));
+test('writer overflow immediately fails polling and invalidates an earlier snapshot even when native rows remain',async t=>{
+ const f=await setup(t,{limits:{maxEvents:2}}),exporter=f.start(),snapshot=exporter.poll();for(let n=1;n<=50;n++)f.runtime.streams.deliver(f.id('A'),'world',n,{text:'event-'+n});
+ assert.equal(f.capture.status().healthy,false);assert.throws(()=>exporter.poll(),/NATIVE_CAPTURE_UNHEALTHY/);await f.heartbeat();const audit=exporter.audit(snapshot,{t0:f.clock.now,cutoffAt:f.clock.now});assert.equal(audit.status,'unknown');assert.ok(audit.missing.some(s=>s.includes('sticky capture failure')));assert.ok(audit.missing.includes('NATIVE_CAPTURE_UNHEALTHY'));assert.ok(f.capture.status().heads.some(h=>h.floor>0));
 });
 test('equal timestamps do not drop canonical rows or mutable versions; missing sources never silently certify completeness',async t=>{
  const f=await setup(t),exporter=f.start();const one=await f.post('A','/v1/edge/say',{text:'first same-time effect'});f.db.db.prepare('INSERT INTO edge_receipts_v1(world_id,receipt_id,soul_id,capability,phase,accepted_tick,created_at,detail) VALUES(?,?,?,?,?,?,?,?)').run(f.scope.worldId,'r-version',f.id('A'),'read:here','started',1,f.clock.now,null);exporter.poll();f.db.db.prepare("UPDATE edge_receipts_v1 SET phase='completed' WHERE receipt_id='r-version'").run();const two=await f.post('A','/v1/edge/say',{text:'second same-time effect'});const snapshot=exporter.poll();await f.heartbeat();assert.equal(exporter.audit(snapshot,{t0:f.clock.now,cutoffAt:f.clock.now}).status,'pass');
@@ -71,14 +72,24 @@ test('historical heartbeat gap is sticky after later regular heartbeats; paused 
  const f=await setup(t),exporter=f.start(),t0=f.clock.now;
  for(let i=0;i<6;i++){f.clock.now+=1000;await f.heartbeat();}
  assert.equal(f.capture.status().healthy,true,'capture health does not require native tick progress');
- const healthy=readNativeCapture(f.captureDirectory);assert.ok(healthy.records.filter(r=>r.kind==='capture-heartbeat').length>=6);
+ const healthy=readNativeCapture(f.captureDirectory),snapshot=exporter.poll();assert.ok(healthy.records.filter(r=>r.kind==='capture-heartbeat').length>=6);
  f.clock.now+=6000;await f.heartbeat();assert.equal(f.capture.status().failure,'CAPTURE_HEARTBEAT_GAP');
  for(let i=0;i<2;i++){f.clock.now+=1000;await f.heartbeat();}
- assert.equal(f.capture.status().failure,'CAPTURE_HEARTBEAT_GAP');const snapshot=exporter.poll();await f.heartbeat();const audit=exporter.audit(snapshot,{t0,cutoffAt:f.clock.now});assert.equal(audit.status,'unknown');assert.ok(audit.missing.includes('sticky capture failure'));assert.ok(audit.missing.includes('continuous capture heartbeat interval missing'));
+ assert.equal(f.capture.status().failure,'CAPTURE_HEARTBEAT_GAP');assert.throws(()=>exporter.poll(),/NATIVE_CAPTURE_UNHEALTHY/);await f.heartbeat();const audit=exporter.audit(snapshot,{t0,cutoffAt:f.clock.now});assert.equal(audit.status,'unknown');assert.ok(audit.missing.includes('sticky capture failure'));assert.ok(audit.missing.includes('continuous capture heartbeat interval missing'));
 });
 
 test('owner boundary detects observed tail reset without blaming messages arriving after the snapshot',async t=>{
  const f=await setup(t),exporter=f.start(),insert=f.db.db.prepare('INSERT INTO soul_inbox_queue_v1(world_id,scope,owner,n,id,text,sent_at) VALUES(?,?,?,?,?,?,?)'),first=exporter.poll();
  insert.run(f.scope.worldId,'soul:'+f.id('A'),'dev:A',1,'msg-1','native owner task',f.clock.now);await f.heartbeat();assert.equal(exporter.audit(first,{t0:f.clock.now,cutoffAt:f.clock.now}).status,'pass','post-snapshot owner arrival is not a counter reset');
  f.db.db.prepare('DELETE FROM soul_inbox_queue_v1 WHERE world_id=? AND scope=?').run(f.scope.worldId,'soul:'+f.id('A'));const reset=exporter.poll();await f.heartbeat();const audit=exporter.audit(reset,{t0:f.clock.now,cutoffAt:f.clock.now});assert.equal(audit.status,'unknown');assert.ok(audit.missing.some(s=>s.includes('owner queue counter reset')));
+});
+
+
+test('already failed capture aborts real lifecycle preflight and closed capture invalidates later polls',async t=>{
+ const f=await setup(t,{limits:{maxEvents:2}});for(let n=1;n<=3;n++)f.runtime.streams.deliver(f.id('A'),'world',n,{text:'event-'+n});const failures=[];
+ const lifecycle=createTrialNativeEvidence({}, {createExporter:()=>f.start(),now:()=>f.clock.now,onFailure:code=>failures.push(code),schedule(){assert.fail('unhealthy source must not schedule more polling');}});
+ assert.equal(lifecycle.start().failure,'NATIVE_CAPTURE_UNHEALTHY');assert.deepEqual(failures,['NATIVE_CAPTURE_UNHEALTHY']);const final=await lifecycle.finish({t0:null,cutoffAt:null});assert.equal(final.status,'unknown');assert.equal(final.coverage,null);
+});
+test('capture closure is rejected before exporting any more canonical rows',async t=>{
+ const f=await setup(t),exporter=f.start();exporter.poll();const before=readFileSync(join(f.directory,'native-snapshots.jsonl'),'utf8');f.capture.close();assert.throws(()=>exporter.poll(),/NATIVE_CAPTURE_CLOSED/);assert.equal(readFileSync(join(f.directory,'native-snapshots.jsonl'),'utf8'),before);
 });
