@@ -144,6 +144,22 @@ test('read-only journal snapshot is bounded, scoped and hashes private intent wi
 });
 
 
+test('real initial journal without a decision plan stays observable until a committed wait',t=>{
+ const directory=mkdtempSync(join(tmpdir(),'continuity-startup-'));t.after(()=>rmSync(directory,{recursive:true,force:true}));const path=join(directory,'continuity.sqlite');const db=new DatabaseSync(path);t.after(()=>db.close());
+ db.exec("CREATE TABLE identity(singleton INTEGER PRIMARY KEY,world TEXT,soul TEXT);CREATE TABLE checkpoint(singleton INTEGER PRIMARY KEY,revision INTEGER,payload TEXT,at INTEGER);CREATE TABLE controller(singleton INTEGER PRIMARY KEY,owner TEXT,generation INTEGER,expires_at INTEGER);CREATE TABLE operations(id TEXT,status TEXT,generation INTEGER,at INTEGER);CREATE TABLE startup_response_v1(singleton INTEGER PRIMARY KEY,id TEXT);");
+ db.exec("INSERT INTO identity VALUES(1,'world-1','s_reader');INSERT INTO controller VALUES(1,'owner-1',1,115000);INSERT INTO startup_response_v1 VALUES(1,'startup-1');");
+ const startup={threadId:'thread-1',initialInstruction:'mission'};
+ db.prepare('INSERT INTO checkpoint VALUES(1,1,?,99000)').run(JSON.stringify(startup));
+ const initial=readManagedRestartSnapshot(path);assert.equal(initial.checkpoint.planSha256,null);assert.equal(initial.checkpoint.lastCallType,null);
+ const f=fixture();f.current=initial;f.arm();assert.equal(f.observer.tick().state,'watching');assert.equal(f.calls.length,0);
+ const wait={...startup,plan:'private plan',lastCall:{type:'wait'},wakeAt:new Date(160000).toISOString(),lastDecisionId:'decision-1',pendingDecision:null};
+ const save=value=>db.prepare('UPDATE checkpoint SET revision=2,payload=?').run(JSON.stringify(value));
+ save(wait);f.current=readManagedRestartSnapshot(path);assert.equal(f.observer.tick().triggerExercised,true);
+ for(const invalid of [{...wait,plan:undefined},{...startup,plan:null},{...startup,pendingDecision:{id:'decision-1'}},{...startup,wakeAt:wait.wakeAt}]){
+  save(invalid);assert.throws(()=>readManagedRestartSnapshot(path),{code:'RESTART_CHECKPOINT_INVALID'});
+ }
+});
+
 test('pre-dispatch refresh after process validation rejects a newly active host turn',()=>{
  const f=fixture();f.arm();f.setPreDispatch(()=>{f.observer.observeLifecycle(row('turn-started',1001,100000,{turnId:'urgent-new-turn'}));return {at:100000,evidence:['host-tail:99']};});
  const result=f.observer.tick();assert.equal(result.failure.code,'RESTART_TRIGGER_CHANGED');assert.equal(result.triggerExercised,false);assert.equal(result.dispatchAttempted,false);assert.equal(f.calls.some(c=>c.signal==='SIGKILL'),false);assert.match(result.preDispatchObservation.semantics,/not atomic/);

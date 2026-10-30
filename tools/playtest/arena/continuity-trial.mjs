@@ -347,12 +347,20 @@ export async function runContinuityTrial(config,deps={}){
    // to manufacture another turn. Keep observing every actor until cutoff.
    record('actor-ended',{actor:row.actor.id,endedAt:now(),beforeCutoff:now()<cutoffAt,exit:row.result.exit,stopReason:row.result.stopReason??null,failureCode:row.result.failureCode??null});
   })().catch(error=>{row.failureCode=code(error);record('actor-error',{actor:row.actor.id,code:row.failureCode});}));
-  let nextSample=startedAt;
-  while(!stop.signal.aborted&&now()<cutoffAt){
-   await Promise.all([...rows,...fixtures].map(async row=>{try{await sample(row,fixtures.includes(row)?'fixture-body':'body');}catch(error){if(!stop.signal.aborted)record('observation-error',{actor:row.actor.id,code:code(error)});}}));
-   nextSample=Math.max(nextSample+1000,now());
-   await sleep(Math.max(0,Math.min(nextSample,cutoffAt)-now()),stop.signal);
-  }
+  // One sequential reader per body: a slow fixture must not hold every other
+  // observer behind its response. Own slow reads still leave real gaps; neither
+  // timestamps nor missing samples are reconstructed to meet the oracle bound.
+  const samplers=[...rows,...fixtures].map(row=>(async()=>{
+   let nextSample=startedAt;
+   while(!stop.signal.aborted&&now()<cutoffAt){
+    try{await sample(row,fixtures.includes(row)?'fixture-body':'body');}catch(error){if(!stop.signal.aborted)record('observation-error',{actor:row.actor.id,code:code(error)});}
+    nextSample=Math.max(nextSample+1000,now());
+    await sleep(Math.max(0,Math.min(nextSample,cutoffAt)-now()),stop.signal);
+   }
+  })());
+  // Existing final cleanup also drains every sampler if a peer rejects. Normal
+  // completion joins all readers before the independent fixture cutoff bracket.
+  tasks.push(...samplers);await Promise.all(samplers);
   endReason??=stop.signal.aborted?'cancelled':'cutoff';
   // Verification-only fixture bracket uses a fresh bounded signal; participants
   // receive no extra action time or credit after the original cutoff.

@@ -45,11 +45,15 @@ export function readManagedRestartSnapshot(path){
   const startup=db.prepare('SELECT id FROM startup_response_v1 WHERE singleton=1').get();
   db.exec('COMMIT');
   const after=lstatSync(path);if(before.dev!==after.dev||before.ino!==after.ino)throw fault('RESTART_JOURNAL_REPLACED');
-  if(typeof identity.world!=='string'||identity.world.length>200||typeof identity.soul!=='string'||identity.soul.length>200||typeof value.initialInstruction!=='string'||Buffer.byteLength(value.initialInstruction)>16384||typeof value.plan!=='string'||Buffer.byteLength(value.plan)>16384||!controller||!identifier(controller.owner))throw fault('RESTART_CHECKPOINT_INVALID');
+  // The real supervisor first saves thread/instruction identity, before the
+  // first model decision supplies a plan. This is a valid, ineligible startup
+  // observation, not a permanent failure of the later wait/death probe.
+  const preDecision=value.plan===undefined&&value.lastDecisionId==null&&value.lastCall==null&&value.pendingDecision==null&&value.wakeAt==null&&operations.length===0;
+  if(typeof identity.world!=='string'||identity.world.length>200||typeof identity.soul!=='string'||identity.soul.length>200||typeof value.initialInstruction!=='string'||Buffer.byteLength(value.initialInstruction)>16384||!preDecision&&(typeof value.plan!=='string'||Buffer.byteLength(value.plan)>16384)||!controller||!identifier(controller.owner))throw fault('RESTART_CHECKPOINT_INVALID');
   if(!identifier(value.threadId)||value.wakeAt!=null&&!iso(value.wakeAt)||value.lastDecisionId!=null&&!identifier(value.lastDecisionId)||value.lastCall?.type!=null&&!['read','write','wait','listen'].includes(value.lastCall.type)||startup&&!identifier(startup.id)||operations.some(o=>!identifier(o.id)||!['prepared','dispatching','uncertain'].includes(o.status)||!Number.isSafeInteger(o.generation)))throw fault('RESTART_CHECKPOINT_INVALID');
   return {
    journalIdentity:sha(`${realpathSync(path)}:${before.dev}:${before.ino}`),worldId:identity.world,soulId:identity.soul,
-   checkpoint:{revision:meta.revision,at:meta.at,threadId:value.threadId,pendingDecision:value.pendingDecision!==null&&value.pendingDecision!==undefined,wakeAt:value.wakeAt??null,lastCallType:value.lastCall?.type??null,lastDecisionId:value.lastDecisionId??null,initialInstructionSha256:sha(value.initialInstruction),planSha256:sha(value.plan)},
+   checkpoint:{revision:meta.revision,at:meta.at,threadId:value.threadId,pendingDecision:value.pendingDecision!==null&&value.pendingDecision!==undefined,wakeAt:value.wakeAt??null,lastCallType:value.lastCall?.type??null,lastDecisionId:value.lastDecisionId??null,initialInstructionSha256:sha(value.initialInstruction),planSha256:preDecision?null:sha(value.plan)},
    controller:{generation:controller.generation,ownerSha256:sha(controller.owner),expiresAt:controller.expires_at},
    operations:operations.map(o=>({id:o.id,status:o.status,generation:o.generation})),startupResponseId:startup?.id??null,
   };

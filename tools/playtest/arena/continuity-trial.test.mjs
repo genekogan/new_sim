@@ -137,6 +137,45 @@ test('fixture-only cutoff bracket uses a fresh signal and never extends particip
  assert(f.rows().filter(row=>row.kind==='body').every(row=>row.requestedAt<result.cutoffAt));
 });
 
+test('a slow fixture cannot hold fast participant observers behind a shared batch',async t=>{
+ const f=fixture(t,{seconds:4,fixtureActors:[{id:'occupied',folder:'/test/occupied'}]}),normal=f.deps.createWorld,counts=new Map(),active=new Map(),maxActive=new Map();
+ f.deps.createWorld=paired=>{const client=normal(paired);return {async read(command,args,signal){
+  const id=paired.soul,n=(counts.get(id)??0)+1;counts.set(id,n);active.set(id,(active.get(id)??0)+1);maxActive.set(id,Math.max(maxActive.get(id)??0,active.get(id)));
+  try{if(id==='s_occupied'&&n===2)await f.clock.sleep(2500,signal);return await client.read(command,args,signal);}finally{active.set(id,active.get(id)-1);}
+ }};};
+ const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(2000);
+ for(const actor of ['a','b'])assert.deepEqual(f.rows().filter(r=>r.kind==='body'&&r.actor===actor).map(r=>r.requestedAt),[100000,101000,102000]);
+ assert.equal(f.rows().filter(r=>r.kind==='fixture-body').length,0,'the actual fixture response remains pending');
+ await f.clock.tick(2000);const result=await pending;
+ assert.equal(result.cutoffAt,104000);assert.equal(result.endedAt,104000);assert([...maxActive.values()].every(n=>n===1));assert([...active.values()].every(n=>n===0));
+ assert.equal(f.rows().find(r=>r.kind==='fixture-body'&&r.phase===undefined).receivedAt,102500,'no synthetic on-time fixture sample');
+});
+
+test('slow own observations remain nonoverlapping and retain gaps beyond the frozen two-second bound',async t=>{
+ const f=fixture(t,{seconds:5}),normal=f.deps.createWorld,counts=new Map(),active=new Map(),maxActive=new Map();
+ f.deps.createWorld=paired=>{const client=normal(paired);return {async read(command,args,signal){
+  const id=paired.soul,n=(counts.get(id)??0)+1;counts.set(id,n);active.set(id,(active.get(id)??0)+1);maxActive.set(id,Math.max(maxActive.get(id)??0,active.get(id)));
+  try{if(id==='s_a'&&n===3)await f.clock.sleep(2500,signal);return await client.read(command,args,signal);}finally{active.set(id,active.get(id)-1);}
+ }};};
+ const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(5000);const result=await pending;
+ const a=f.rows().filter(r=>r.kind==='body'&&r.actor==='a'),b=f.rows().filter(r=>r.kind==='body'&&r.actor==='b');
+ assert.deepEqual(a.slice(0,2).map(r=>[r.requestedAt,r.receivedAt]),[[100000,100000],[101000,103500]]);
+ assert.equal(a[1].receivedAt-a[0].receivedAt,3500,'own unavailable interval stays visible instead of being normalized');
+ assert.deepEqual(b.map(r=>r.receivedAt),[100000,101000,102000,103000,104000]);
+ assert([...maxActive.values()].every(n=>n===1));assert([...active.values()].every(n=>n===0));assert.equal(result.endedAt,result.cutoffAt);
+});
+
+test('cutoff joins a cancelled fixture observation before its verification-only bracket',async t=>{
+ const f=fixture(t,{fixtureActors:[{id:'occupied',folder:'/test/occupied'}]}),normal=f.deps.createWorld;let count=0,inflight=0,maxInflight=0,cancelledReadFinished=false,bracketAfterDrain=false;
+ f.deps.createWorld=paired=>{const client=normal(paired);if(paired.soul!=='s_occupied')return client;return {async read(command,args,signal){
+  count++;inflight++;maxInflight=Math.max(maxInflight,inflight);
+  try{if(count===2){await new Promise(resolve=>signal.addEventListener('abort',resolve,{once:true}));cancelledReadFinished=true;}else if(count===3)bracketAfterDrain=cancelledReadFinished&&inflight===1;return await client.read(command,args,signal);}finally{inflight--;}
+ }};};
+ const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(3000);const result=await pending;
+ assert.equal(maxInflight,1);assert.equal(inflight,0);assert.equal(bracketAfterDrain,true);assert.equal(result.endedAt,result.cutoffAt);
+ const bracket=f.rows().find(r=>r.phase==='cutoff-bracket');assert.equal(bracket.participantCredit,false);assert.equal(bracket.requestedAt,result.cutoffAt);
+});
+
 test('late managed release keeps the original subsecond cutoff',async t=>{
  const f=fixture(t,{arm:CONTINUITY_ARMS[1],seconds:1,actors:[{id:'a',folder:'/test/a',instruction:'Late mission',releaseOffsetSec:0.75}]});
  const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(750);assert.equal(f.calls.length,1);assert.equal(f.calls[0].remainingSeconds,0.25);
