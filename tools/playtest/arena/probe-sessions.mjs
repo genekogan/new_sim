@@ -87,7 +87,7 @@ export function probeSessions(directory,{createHost=opts=>new CodexHost(opts),sl
  const mutate=fn=>{const lock=file+'.lock',fd=openSync(lock,'wx',0o600);try{writeFileSync(fd,String(process.pid));state=load();const result=fn();save();return result;}finally{closeSync(fd);unlinkSync(lock);}};
  return {
   register({threadId,cwd,name,ephemeral=false,recoveryMechanism}){
-   if(!threadId||!name?.trim()||!recoveryMechanism)throw Error('Probe identity, readable name and recovery mechanism required');
+   if(!threadId||!name?.trim()||!recoveryMechanism||typeof ephemeral!=='boolean')throw Error('Probe identity, readable name, recovery mechanism and boolean ephemeral mode required');
    const absolute=resolve(cwd);if(!absolute.startsWith(root+'/'))throw Error('Probe host must be inside its evidence directory');
    return mutate(()=>{const existing=state.sessions.find(x=>x.threadId===threadId);
    if(existing){if(existing.cwd!==absolute||existing.ephemeral!==ephemeral)throw Error('Probe identity changed');return;}
@@ -170,12 +170,14 @@ export function probeSessions(directory,{createHost=opts=>new CodexHost(opts),sl
 
 // Native archive acknowledgement and sidebar absence are distinct facts. The
 // latter requires the separate exact-scoped native list verification.
-export function probeArchivalStatus(results,{error=null,expectedThreadIds=[]}={}){
+export function probeArchivalStatus(results,{error=null,expectedThreadIds=[],ephemeralThreadIds=[]}={}){
+ if(!Array.isArray(ephemeralThreadIds)||ephemeralThreadIds.some(id=>!expectedThreadIds.includes(id)))throw Error('Ephemeral archival exemption requires a recorded expected thread');
+ const ephemeral=new Set(ephemeralThreadIds);
  const rows=Array.isArray(results)?results:[],acknowledged=new Set(rows.filter(row=>row.archived===true).map(row=>row.threadId));
- const failedThreadIds=[...new Set([...rows.filter(row=>row.archived!==true).map(row=>row.threadId),...expectedThreadIds.filter(id=>!acknowledged.has(id))])];
+ const failedThreadIds=[...new Set([...rows.filter(row=>row.archived!==true||ephemeral.has(row.threadId)).map(row=>row.threadId),...expectedThreadIds.filter(id=>!ephemeral.has(id)&&!acknowledged.has(id))])];
  const metadataCleanupVerified=rows.every(row=>{
   const proofs=row.metadataHostCloseProofs??[row.metadataHostCloseProof];
   return proofs.length>0&&proofs.every(proof=>proof?.groupClosed===true&&proof.groupVerification==='absent');
  });
- return {status:error||failedThreadIds.length||!metadataCleanupVerified||rows.some(row=>row.persistenceError||row.blockedReason)?'incomplete':'acknowledged',acknowledgedThreadIds:rows.filter(row=>row.archived===true).map(row=>row.threadId),failedThreadIds,metadataCleanupVerified,sidebarVerification:'not-checked',...(error?{error:String(error.message??error)}:{})};
+ return {status:error||failedThreadIds.length||!metadataCleanupVerified||rows.some(row=>row.persistenceError||row.blockedReason)?'incomplete':ephemeral.size>0&&expectedThreadIds.every(id=>ephemeral.has(id))?'not-applicable':'acknowledged',...(ephemeral.size?{notApplicableThreadIds:[...ephemeral],notApplicableReason:'ephemeral; no persistent thread archival',persistenceVerification:'not-checked'}:{}),acknowledgedThreadIds:rows.filter(row=>row.archived===true).map(row=>row.threadId),failedThreadIds,metadataCleanupVerified,sidebarVerification:'not-checked',...(error?{error:String(error.message??error)}:{})};
 }

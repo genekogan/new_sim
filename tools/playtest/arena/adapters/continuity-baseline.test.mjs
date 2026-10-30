@@ -5,7 +5,7 @@ import {EventEmitter} from 'node:events';
 import {mkdtempSync,mkdirSync,readFileSync,statSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {runContinuityBaseline,nameBaselineThread} from './continuity-baseline.mjs';
+import {runContinuityBaseline,nameBaselineThread,buildContinuityBaselineArgs} from './continuity-baseline.mjs';
 import {buildArgs,COMMAND_DISCIPLINE} from './codex-headless.mjs';
 
 const line=e=>`process.stdout.write(${JSON.stringify(JSON.stringify(e)+'\n')});`;
@@ -157,9 +157,46 @@ test('default five-second verification exhausts without certifying a surviving g
  assert.deepEqual(calls.filter(([,sig])=>sig!==0),[[-900005,'SIGTERM'],[-900005,'SIGKILL']]);assert.equal(result.stopReason,'exited');assert.equal(result.deadlineAt-result.startedAt,10);
 });
 
-test('invalid or nonfresh options fail before a process and ephemeral is not silently substituted',async t=>{
+test('invalid or nonfresh options fail before a process and invalid persistence combinations never substitute',async t=>{
  const f=fixture(t);
- for(const options of [{remainingSeconds:undefined},{remainingSeconds:0},{resumeThreadId:''},{ephemeral:true}])await assert.rejects(f.run('',options),{code:'INVALID_BASELINE_OPTIONS'});
+ for(const options of [{remainingSeconds:undefined},{remainingSeconds:0},{resumeThreadId:''},{ephemeral:'true'},{ephemeral:true,resumeThreadId:'prior-thread'},{ephemeral:true,prevCumulative:{inputTokens:1}}])await assert.rejects(f.run('',options),{code:'INVALID_BASELINE_OPTIONS'});
  assert.equal(f.calls.length,0);mkdirSync(f.directory);
  await assert.rejects(f.run(''),{code:'EEXIST'});assert.equal(f.calls.length,0);
+});
+
+
+test('explicit ephemeral initial exec preserves instruction and evidence, registers mode before skipping all metadata',async t=>{
+ const f=fixture(t),name='Sim ephemeral — Reader',text='The same complete mission and original cutoff.',events=[];
+ const result=await f.run(line({type:'thread.started',thread_id:'temporary-thread'})+line({type:'turn.completed',usage:{input_tokens:10,cached_input_tokens:3,output_tokens:2}}),
+  {ephemeral:true,name,text,onState:s=>{events.push(s);if(s.state==='thread-created'){assert.equal(s.ephemeral,true);assert.equal(s.name,name);assert.ok(f.rows().some(r=>r.type==='thread.started'));}}},
+  {createMetadataHost:()=>assert.fail('ephemeral must not initialize/read/name/archive a metadata host')});
+ const args=buildArgs({model:'requested-model',effort:'low',text});
+ assert.deepEqual(f.calls[0].args.slice(3),[args[0],'--ephemeral',...args.slice(1)]);
+ assert.equal(f.calls.length,1);assert.equal(result.ephemeral,true);assert.equal(result.name,name);assert.equal(result.resumeThreadId,null);
+ assert.deepEqual(result.naming,{status:'not-applicable',attempts:0,reason:'ephemeral'});assert.deepEqual(result.metadataGroups,[]);
+ assert.equal(result.ownedProcessesExited,true);assert.equal(gone(result.pid),true);assert.equal(result.usage.inputTokens,10);
+ assert.ok(events.findIndex(s=>s.state==='thread-created')<events.findIndex(s=>s.state==='thread-name-not-applicable'));
+ assert.equal(f.rows().find(r=>r.type==='baseline.config').ephemeral,true);assert.equal(f.rows().at(-1).type,'baseline.result');assert.equal(f.rows().at(-1).ephemeral,true);
+ assert.equal(statSync(join(f.directory,'stream.ndjson')).mode&0o777,0o600);
+});
+
+test('ephemeral flag rejection is retained with no durable fallback or metadata attempt',async t=>{
+ const f=fixture(t),result=await f.run('process.exit(2);',{ephemeral:true,name:'Local ephemeral label'}, {createMetadataHost:()=>assert.fail('no admin process')});
+ assert.equal(f.calls.length,1);assert.equal(f.calls[0].args.filter(x=>x==='--ephemeral').length,1);
+ assert.equal(result.exit.code,2);assert.equal(result.ephemeral,true);assert.equal(result.threadObserved,false);assert.equal(result.ownedProcessesExited,true);
+ assert.equal(f.rows().at(-1).type,'baseline.result');assert.equal(result.naming,null);
+});
+
+test('ephemeral cutoff still closes exactly the owned group and retains the original deadline',async t=>{
+ const f=fixture(t),result=await f.run(line({type:'thread.started',thread_id:'temporary-thread'})+'setInterval(()=>{},1000);',
+  {ephemeral:true,remainingSeconds:.1,name:'Local ephemeral'}, {createMetadataHost:()=>assert.fail('no admin process')});
+ assert.equal(result.stopReason,'cutoff');assert.equal(result.deadlineAt-result.startedAt,100);assert.equal(result.ownedProcessesExited,true);assert.equal(gone(result.pid),true);
+ assert.equal(f.calls.length,1);assert.equal(result.ephemeral,true);assert.ok(f.rows().some(r=>r.type==='baseline.result'));
+});
+
+test('durable argv is identical and ephemeral argv cannot express resume',()=>{
+ const options={model:'model',effort:'low',text:'Whole instruction'};
+ assert.deepEqual(buildContinuityBaselineArgs(options),buildArgs(options));
+ assert.deepEqual(buildContinuityBaselineArgs({...options,resume:true,threadId:'saved'}),buildArgs({...options,resume:true,threadId:'saved'}));
+ for(const extra of [{resume:true},{threadId:'saved'},{resume:true,threadId:'saved'}])assert.throws(()=>buildContinuityBaselineArgs({...options,...extra,ephemeral:true}),{code:'INVALID_BASELINE_OPTIONS'});
 });

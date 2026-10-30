@@ -263,3 +263,37 @@ test('an archive ACK and helper proof survive registry persistence failure witho
   const rows=await registry.archiveCompleted();assert.equal(helpers,1);assert.equal(rows[0].archived,true);assert.equal(rows[0].attempts[0].acknowledged,true);assert.ok(rows[0].persistenceError);assert.equal(rows[0].metadataHostCloseProof.groupClosed,true);assert.equal(probeArchivalStatus(rows).status,'incomplete');assert.ok(!registry.snapshot().sessions[0].archivedAt,'native ACK is not misrepresented as a successful durable registry update');assert.equal(registry.snapshot().sessions[0].evidence,'original-failed-outcome.json');
  }finally{rmSync(root,{recursive:true,force:true});}
 });
+
+
+test('ephemeral archival exemptions are explicit N/A and never native archive acknowledgements',async()=>{
+ const root=mkdtempSync(join(tmpdir(),'sim-probe-ephemeral-'));let helpers=0;
+ try{
+  const registry=probeSessions(root,{createHost:()=>{helpers++;assert.fail('no ephemeral metadata/archive');}});
+  registry.register({threadId:'temporary',cwd:join(root,'seat'),name:'Local readable label',ephemeral:true,recoveryMechanism:'singleexec ephemeral; no resume'});
+  registry.complete('temporary',{outcome:'failed',ownedProcessesExited:true,evidence:'unchanged-summary.json'});
+  const rows=await registry.archiveCompleted(),status=probeArchivalStatus(rows,{expectedThreadIds:['temporary'],ephemeralThreadIds:['temporary']});
+  assert.deepEqual(rows,[]);assert.equal(helpers,0);assert.equal(status.status,'not-applicable');assert.deepEqual(status.notApplicableThreadIds,['temporary']);assert.deepEqual(status.acknowledgedThreadIds,[]);assert.equal(status.persistenceVerification,'not-checked');assert.equal(status.sidebarVerification,'not-checked');
+  const saved=registry.snapshot().sessions[0];assert.equal(saved.ephemeral,true);assert.equal(saved.outcome,'failed');assert.equal(saved.evidence,'unchanged-summary.json');assert.ok(!saved.archivedAt);
+  assert.throws(()=>registry.register({threadId:'temporary',cwd:join(root,'seat'),name:'Local readable label',ephemeral:false,recoveryMechanism:'durable'}),/identity changed/);
+ }finally{rmSync(root,{recursive:true,force:true});}
+});
+
+test('mixed durable/ephemeral archival still requires every durable ACK and helper closure',()=>{
+ const options={expectedThreadIds:['durable','temporary'],ephemeralThreadIds:['temporary']};
+ assert.deepEqual(probeArchivalStatus([],options).failedThreadIds,['durable']);
+ const row={threadId:'durable',archived:true,metadataHostCloseProof:{groupClosed:true,groupVerification:'absent'}};
+ assert.equal(probeArchivalStatus([row],options).status,'acknowledged');assert.deepEqual(probeArchivalStatus([row],options).acknowledgedThreadIds,['durable']);
+ assert.equal(probeArchivalStatus([{...row,metadataHostCloseProof:{groupClosed:false,groupVerification:'unverified'}}],options).status,'incomplete');
+ assert.equal(probeArchivalStatus([{...row,threadId:'temporary'}],{expectedThreadIds:['temporary'],ephemeralThreadIds:['temporary']}).status,'incomplete','a contradictory native archive row is not ephemeral N/A');
+ assert.throws(()=>probeArchivalStatus([],{expectedThreadIds:[],ephemeralThreadIds:['unrecorded']}),/recorded expected thread/);
+});
+
+
+test('registry refuses truthy nonboolean ephemeral exemptions before recording ownership',()=>{
+ const root=mkdtempSync(join(tmpdir(),'sim-probe-mode-'));
+ try{
+  const registry=probeSessions(root);
+  for(const ephemeral of ['true','false',1,null])assert.throws(()=>registry.register({threadId:'owned',cwd:join(root,'seat'),name:'Sim owned',recoveryMechanism:'single exec',ephemeral}),/boolean ephemeral mode/);
+  assert.deepEqual(registry.snapshot().sessions,[]);
+ }finally{rmSync(root,{recursive:true,force:true});}
+});

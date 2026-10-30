@@ -10,8 +10,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createWorldClient} from '../../soul-runtime/world-client.mjs';
 import {abortableSleep} from '../../soul-runtime/receiver.mjs';
 import {probeSessions,verifyOwnedProbeExit,probeArchivalStatus} from './probe-sessions.mjs';
-import {runContinuityBaseline} from './adapters/continuity-baseline.mjs';
-import {buildArgs} from './adapters/codex-headless.mjs';
+import {runContinuityBaseline,buildContinuityBaselineArgs} from './adapters/continuity-baseline.mjs';
 import {createContinuityUsageGuard,validateUsageLimits,createUsageTail} from './continuity-usage.mjs';
 import {createTrialNativeEvidence} from './continuity-native-lifecycle.mjs';
 import {createManagedRestartObserver,inspectRestartProcess,baselineAutomaticRestartCapability} from './continuity-restart.mjs';
@@ -33,6 +32,7 @@ const privateJson=(path,value)=>writeFileSync(path,JSON.stringify(value,null,2)+
 export function validateContinuityTrial(config){
  const {directory,arm,purpose,seconds,model,effort,worldId,actors,fixtureActors=[]}=config;
  if(typeof directory!=='string'||!directory.trim()||!CONTINUITY_ARMS.includes(arm)||!['short','soak'].includes(purpose)||!Number.isFinite(seconds)||seconds<1||seconds>604800||purpose==='soak'&&seconds<7200||!label(model)||!label(effort)||!label(worldId)||!Array.isArray(actors)||actors.length<1||actors.length>5||!Array.isArray(fixtureActors)||fixtureActors.length>5)throw fault('INVALID_TRIAL_CONFIG');
+ if(config.baselineEphemeral!==undefined&&(typeof config.baselineEphemeral!=='boolean'||config.baselineEphemeral&&(arm!==CONTINUITY_ARMS[0]||config.restart!==undefined)))throw fault('INVALID_BASELINE_EPHEMERAL_CONFIG');
  if(config.meetingOffsetSec!==undefined&&(!Number.isFinite(config.meetingOffsetSec)||config.meetingOffsetSec<0||config.meetingOffsetSec>=seconds))throw fault('INVALID_MEETING_OFFSET');
  if(purpose==='soak'&&config.usageGuard===undefined)throw fault('SOAK_USAGE_GUARD_REQUIRED');
  if(config.usageGuard!==undefined)validateUsageLimits(config.usageGuard);
@@ -267,6 +267,7 @@ export async function runContinuityTrial(config,deps={}){
  const {directory,arm,purpose,seconds,model,effort,worldId,actors,fixtureActors=[],signal,onState=()=>{}}=config;
  const now=deps.now??Date.now,sleep=deps.sleep??abortableSleep,readPairing=deps.loadPairing??loadPairing,createWorld=deps.createWorld??(paired=>createWorldClient({world:paired.world,token:paired.token,timeoutMs:10000})),verifyWorld=deps.verifyWorld??verifyDevWorld;
  const launchCandidate=deps.launchCandidate??runManagedTrialActor,launchBaseline=deps.launchBaseline??runContinuityBaseline,prepareBaseline=deps.prepareBaseline??prepareR400Seat;
+ const baselineEphemeral=config.baselineEphemeral===true;
  const out=resolve(directory);mkdirSync(out,{mode:0o700}); // Atomic refusal of every existing output, even empty.
  const registry=(deps.registryFactory??probeSessions)(out),stop=new AbortController(),abort=()=>stop.abort();
  signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)abort();
@@ -298,7 +299,7 @@ export async function runContinuityTrial(config,deps={}){
    const url=new URL(paired.world);if(url.protocol!=='http:'||!['127.0.0.1','localhost','[::1]'].includes(url.hostname)||url.username||url.password||url.search||url.hash)throw fault('LOOPBACK_DEVAUTH_REQUIRED');
    if(config.restart&&actor.id===config.restart.actorId&&!identifier(paired.soul))throw fault('INVALID_RESTART_SCOPE');
    if(souls.has(paired.soul))throw fault('SHARED_SOUL_REFUSED');souls.add(paired.soul);worlds.add(paired.world);
-   const row={actor,paired,world:createWorld(paired),threads:new Set(),result:null,cleanupVerified:false};
+   const row={actor,paired,world:createWorld(paired),threads:new Set(),ephemeralThreads:new Set(),result:null,cleanupVerified:false};
    if(actors.includes(actor)){
     row.directory=join(out,actor.id);mkdirSync(row.directory,{mode:0o700});
     if(arm===CONTINUITY_ARMS[0])row.baseline=prepareBaseline(resolve(actor.folder),join(row.directory,'seat'));
@@ -324,7 +325,7 @@ export async function runContinuityTrial(config,deps={}){
    if(arm===CONTINUITY_ARMS[0])restartResult={...baselineAutomaticRestartCapability(),actor:target.actor.id,setupId:config.restart.setupId,worldId,soulId:target.paired.soul,source:'existing-headless-seat single-exec workflow; no synthetic disturbance dispatched'};
    else {restartProbe=createTrialRestartProbe({...config.restart,directory:target.directory,worldId,soulId:target.paired.soul,originalInstructionSha256:sha(target.instruction),cutoffAt},{now,...(deps.restart??{})});scheduleRestart();}
   }
-  const manifest={schema:'sim-continuity-trial/1',...(config.runId?{runId:config.runId}:{}),arm,purpose,seconds,startedAt,cutoffAt,meetingAt:config.meetingOffsetSec===undefined?null:startedAt+config.meetingOffsetSec*1000,modelRequested:model,effortRequested:effort,cliVersion:config.cliVersion??null,cliVersionSource:config.cliVersion?'caller-preflight':null,world,worldId,baselineWake:false,disturbances:'unsupported: not dispatched by this runner',restartCoverage:config.restart?{...config.restart,kind:'checkpoint-future-wake',minimumFutureWakeMs:20000,triggerMaxDelayMs:5000,recoveryMaxMs:25000,pollMs:1000,proof:arm===CONTINUITY_ARMS[0]?'restart-proof.json':`${config.restart.actorId}/restart-proof.json`,baselineAssistedResume:false}:'unknown: no restart contract requested',qualification:'not assessed; orchestration evidence only',actors:rows.map(row=>({id:row.actor.id,soulId:row.paired.soul,releaseOffsetSec:row.actor.releaseOffsetSec??0,instructionTemplateSha256:sha(row.actor.instruction),instructionSha256:sha(row.instruction),...(row.baseline?{baseline:row.baseline,promptArgsSha256:sha(JSON.stringify(buildArgs({model,effort,text:row.instruction})))}:{agentEvidence:'agent-evidence.jsonl',launchSourceSha256:sha(readFileSync(new URL('../../soul-runtime/launch.mjs',import.meta.url)))} )})),fixtureActors:fixtures.map(row=>({id:row.actor.id,soulId:row.paired.soul})),registration:'baseline synchronous callback before naming; candidate emitted creation before naming, parent durability occurs on receipt'};
+  const manifest={schema:'sim-continuity-trial/1',...(config.runId?{runId:config.runId}:{}),arm,purpose,seconds,startedAt,cutoffAt,meetingAt:config.meetingOffsetSec===undefined?null:startedAt+config.meetingOffsetSec*1000,modelRequested:model,effortRequested:effort,cliVersion:config.cliVersion??null,cliVersionSource:config.cliVersion?'caller-preflight':null,world,worldId,baselineEphemeral,baselineWake:false,disturbances:'unsupported: not dispatched by this runner',restartCoverage:config.restart?{...config.restart,kind:'checkpoint-future-wake',minimumFutureWakeMs:20000,triggerMaxDelayMs:5000,recoveryMaxMs:25000,pollMs:1000,proof:arm===CONTINUITY_ARMS[0]?'restart-proof.json':`${config.restart.actorId}/restart-proof.json`,baselineAssistedResume:false}:'unknown: no restart contract requested',qualification:'not assessed; orchestration evidence only',actors:rows.map(row=>({id:row.actor.id,soulId:row.paired.soul,releaseOffsetSec:row.actor.releaseOffsetSec??0,instructionTemplateSha256:sha(row.actor.instruction),instructionSha256:sha(row.instruction),...(row.baseline?{baseline:row.baseline,promptArgsSha256:sha(JSON.stringify(buildContinuityBaselineArgs({model,effort,text:row.instruction,ephemeral:baselineEphemeral})))}:{agentEvidence:'agent-evidence.jsonl',launchSourceSha256:sha(readFileSync(new URL('../../soul-runtime/launch.mjs',import.meta.url)))} )})),fixtureActors:fixtures.map(row=>({id:row.actor.id,soulId:row.paired.soul})),registration:'baseline synchronous callback before naming; candidate emitted creation before naming, parent durability occurs on receipt'};
   manifest.nativeEvidence=config.nativeEvidence?{kind:'allowlisted-native-capture',runId:config.runId,pollMs:1000,exportDirectory:'native-export',limits:'Capture is started before this runner; identical settings both arms. No inferred behavioral completeness.'}:null;
   manifest.usageGuard=config.usageGuard?{kind:'observed-usage-guard',limits:config.usageGuard,pollMs:1000,possibleInFlightOvershoot:true,billing:'not measured'}:null;
   privateJson(join(out,'run.json'),manifest);
@@ -334,14 +335,21 @@ export async function runContinuityTrial(config,deps={}){
    const remainingSeconds=(cutoffAt-now())/1000,name=`Sim continuity — ${arm} — ${row.actor.id}`;
    const state=s=>{
     // This callback deliberately stays synchronous: baseline names only after it returns.
-    if(['thread-created','session-created','session-recovered','running','host-closed'].includes(s.state)&&s.threadId){registry.register({threadId:s.threadId,cwd:s.cwd??join(row.directory,'runtime','host'),name,recoveryMechanism:arm===CONTINUITY_ARMS[0]?'native retained Codex exec thread; no journal or automatic restart':'durable Codex thread plus durable Soul journal'});row.threads.add(s.threadId);}
+    if(['thread-created','session-created','session-recovered','running','host-closed'].includes(s.state)&&s.threadId){
+     const ephemeral=s.ephemeral===true;
+     registry.register({threadId:s.threadId,cwd:s.cwd??join(row.directory,'runtime','host'),name,ephemeral,recoveryMechanism:ephemeral?'ephemeral single Codex exec; no persistence, resume or automatic restart':arm===CONTINUITY_ARMS[0]?'native retained Codex exec thread; no journal or automatic restart':'durable Codex thread plus durable Soul journal'});
+     row.threads.add(s.threadId);if(ephemeral)row.ephemeralThreads.add(s.threadId);
+     // Retain actual ownership before rejecting a missing/contradictory mode.
+     if(ephemeral!==baselineEphemeral||ephemeral&&s.resumed===true)throw fault('SESSION_PERSISTENCE_MODE_MISMATCH');
+    }
     if(restartProbe&&row.actor.id===config.restart.actorId)restartProbe.observe(s);
     record('runtime',{actor:row.actor.id,...s});onState({actor:row.actor.id,...s});
    };
    record('actor-release',{actor:row.actor.id,scheduledAt,releasedAt:now(),remainingSeconds});
    row.releasedAt=now();
    usageGuard?.activate(row.actor.id);
-   row.result=await (arm===CONTINUITY_ARMS[0]?launchBaseline({cwd:row.baseline.cwd,directory:join(row.directory,'baseline'),text:row.instruction,model,effort,remainingSeconds,name,cliVersion:config.cliVersion??null,signal:stop.signal,onState:state}):launchCandidate({folder:resolve(row.actor.folder),directory:row.directory,text:row.instruction,model,effort,remainingSeconds,name,signal:stop.signal,onState:state}));
+   row.result=await (arm===CONTINUITY_ARMS[0]?launchBaseline({cwd:row.baseline.cwd,directory:join(row.directory,'baseline'),text:row.instruction,model,effort,remainingSeconds,name,ephemeral:baselineEphemeral,cliVersion:config.cliVersion??null,signal:stop.signal,onState:state}):launchCandidate({folder:resolve(row.actor.folder),directory:row.directory,text:row.instruction,model,effort,remainingSeconds,name,signal:stop.signal,onState:state}));
+   if(arm===CONTINUITY_ARMS[0]&&(row.result.ephemeral===true)!==baselineEphemeral)row.failureCode='SESSION_PERSISTENCE_MODE_MISMATCH';
    if(row.result.evidenceComplete===false)row.failureCode='ACTOR_EVIDENCE_INCOMPLETE';
    checkUsage([row.actor.id]);
    // Ordinary completion is behavior, not an infrastructure abort or permission
@@ -384,9 +392,9 @@ export async function runContinuityTrial(config,deps={}){
  for(const row of rows){
   if(row.result)row.cleanupVerified=arm===CONTINUITY_ARMS[0]?verifyBaseline(row.result):verifyCandidate(row.result);
   if(row.threads.size&&!row.cleanupVerified)failureCode??='OWNED_CLEANUP_UNVERIFIED';
-  if(row.result)privateJson(join(row.directory,'actor-result.json'),{exit:row.result.exit,failureCode:row.failureCode??row.result.failureCode??null,cleanupVerified:row.cleanupVerified,execProof:row.result.execProof??null,metadataGroups:row.result.metadataGroups??null,controllers:row.result.controllers?.map(controller=>({...controller,hostPids:[...(controller.hostPids??[])]}))??null,usage:row.result.usage??null,evidenceComplete:row.result.evidenceComplete??null,restartProofs:row.result.restartProofs??null});
+  if(row.result)privateJson(join(row.directory,'actor-result.json'),{exit:row.result.exit,failureCode:row.failureCode??row.result.failureCode??null,cleanupVerified:row.cleanupVerified,execProof:row.result.execProof??null,metadataGroups:row.result.metadataGroups??null,ephemeral:row.result.ephemeral===true,controllers:row.result.controllers?.map(controller=>({...controller,hostPids:[...(controller.hostPids??[])]}))??null,usage:row.result.usage??null,evidenceComplete:row.result.evidenceComplete??null,restartProofs:row.result.restartProofs??null});
  }
- const summary={schema:'sim-continuity-trial-result/1',arm,purpose,startedAt,cutoffAt,endedAt:now(),endReason,failureCode,qualification:'not assessed',coverage:{disturbances:'unknown',restart:'unknown',semanticOutcome:'not scored',actualEffort:'only authoritative host metadata; otherwise unknown'},actors:rows.map(row=>({id:row.actor.id,soulId:row.paired.soul,releasedAt:row.releasedAt??null,threads:[...row.threads],cleanupVerified:row.cleanupVerified,failureCode:row.failureCode??row.result?.failureCode??null,exit:row.result?.exit??null,actualModel:row.result?.actualModel??null,actualEffort:row.result?.actualEffort??null,endedBeforeCutoff:row.result?.endedAt!==undefined?row.result.endedAt<cutoffAt:null}))};
+ const summary={schema:'sim-continuity-trial-result/1',arm,purpose,startedAt,cutoffAt,endedAt:now(),endReason,failureCode,qualification:'not assessed',coverage:{disturbances:'unknown',restart:'unknown',semanticOutcome:'not scored',actualEffort:'only authoritative host metadata; otherwise unknown'},actors:rows.map(row=>({id:row.actor.id,soulId:row.paired.soul,releasedAt:row.releasedAt??null,threads:[...row.threads],ephemeralThreads:[...row.ephemeralThreads],cleanupVerified:row.cleanupVerified,failureCode:row.failureCode??row.result?.failureCode??null,exit:row.result?.exit??null,actualModel:row.result?.actualModel??null,actualEffort:row.result?.actualEffort??null,endedBeforeCutoff:row.result?.endedAt!==undefined?row.result.endedAt<cutoffAt:null}))};
  summary.usageGuard=usageState;
  summary.restart=restartResult;
  summary.nativeEvidence=nativeResult;
@@ -397,7 +405,7 @@ export async function runContinuityTrial(config,deps={}){
  let archived=[],archiveError=null;
  try{archived=await registry.archiveCompleted();}catch(error){archiveError=error;}
  privateJson(join(out,'archive-results.json'),archived);
- summary.archival=probeArchivalStatus(archived,{error:archiveError,expectedThreadIds:rows.flatMap(row=>[...row.threads])});
+ summary.archival=probeArchivalStatus(archived,{error:archiveError,expectedThreadIds:rows.flatMap(row=>[...row.threads]),ephemeralThreadIds:rows.flatMap(row=>[...row.ephemeralThreads])});
  privateJson(join(out,'summary-archival.tmp'),summary);renameSync(join(out,'summary-archival.tmp'),join(out,'summary.json'));
  return {...summary,archived};
 }

@@ -36,6 +36,14 @@ export async function nameBaselineThread({threadId,cwd,name},{createHost=options
  return {...result,closeProof:proof??{hostPid:null,groupClosed:false,groupVerification:'unverified'}};
 }
 
+// Keep the shipped durable argv identical. Ephemeral is a prospective explicit
+// initial-exec option, never a fallback or a resumable persistence mode.
+export function buildContinuityBaselineArgs({ephemeral=false,...options}){
+ if(typeof ephemeral!=='boolean'||ephemeral&&(options.resume||options.threadId))throw fault('INVALID_BASELINE_OPTIONS');
+ const args=buildArgs(options);
+ return ephemeral?[args[0],'--ephemeral',...args.slice(1)]:args;
+}
+
 /** One process, one complete owner instruction, one absolute remaining bound.
  * directory must be fresh; its files are private and may contain raw model/tool
  * output. Synchronous onState receives bounded identifiers/counts/hashes, never text,
@@ -45,7 +53,7 @@ export async function nameBaselineThread({threadId,cwd,name},{createHost=options
  */
 export async function runContinuityBaseline({cwd,directory,text,model,effort,remainingSeconds,resumeThreadId=null,name=null,cliVersion=null,prevCumulative=null,signal,onState=()=>{},ephemeral=false},
  {command='codex',commandArgs=[],spawnProcess=spawn,killProcess=process.kill,createMetadataHost,termGraceMs=1000,verifyMs=5000,maxLineBytes=1024*1024,maxStdoutBytes=64*1024*1024,maxStderrBytes=64*1024}={}){
- if(typeof cwd!=='string'||typeof directory!=='string'||typeof text!=='string'||!text.trim()||text.length>64000||!label(model)||!label(effort)||!Number.isFinite(remainingSeconds)||remainingSeconds<=0||remainingSeconds>604800||resumeThreadId!==null&&!identifier(resumeThreadId)||name!==null&&!label(name)||cliVersion!==null&&!label(cliVersion)||ephemeral!==false||typeof onState!=='function'||typeof command!=='string'||!command||!Array.isArray(commandArgs)||!commandArgs.every(a=>typeof a==='string'))throw fault('INVALID_BASELINE_OPTIONS');
+ if(typeof cwd!=='string'||typeof directory!=='string'||typeof text!=='string'||!text.trim()||text.length>64000||!label(model)||!label(effort)||!Number.isFinite(remainingSeconds)||remainingSeconds<=0||remainingSeconds>604800||resumeThreadId!==null&&!identifier(resumeThreadId)||name!==null&&!label(name)||cliVersion!==null&&!label(cliVersion)||typeof ephemeral!=='boolean'||ephemeral&&(resumeThreadId!==null||prevCumulative!==null)||typeof onState!=='function'||typeof command!=='string'||!command||!Array.isArray(commandArgs)||!commandArgs.every(a=>typeof a==='string'))throw fault('INVALID_BASELINE_OPTIONS');
  for(const n of [termGraceMs,verifyMs,maxLineBytes,maxStdoutBytes,maxStderrBytes])if(!Number.isFinite(n)||n<1)throw fault('INVALID_BASELINE_BOUNDS');
  const folder=realpathSync(cwd);if(!statSync(folder).isDirectory())throw fault('INVALID_BASELINE_CWD');
  const root=resolve(directory);mkdirSync(root,{mode:0o700});
@@ -66,7 +74,7 @@ export async function runContinuityBaseline({cwd,directory,text,model,effort,rem
  const signalGroup=sig=>{if(pid)try{killProcess(-pid,sig);}catch{}};
  const waitGroup=async ms=>{const until=Date.now()+ms;let state;do{state=groupStatus();if(state!=='alive')return state;await delay(Math.min(25,Math.max(1,until-Date.now())));}while(Date.now()<until);return groupStatus();};
  const nameThread=()=>{
-  if(!name||!threadObserved)return null;
+  if(ephemeral||!name||!threadObserved)return null;
   const ownedThreadId=threadId;
   namingAttempts++;notify('thread-naming',{threadId:ownedThreadId,attempt:namingAttempts});
   return nameBaselineThread({threadId:ownedThreadId,cwd:folder,name},{...(createMetadataHost?{createHost:createMetadataHost}:{})}).then(result=>{
@@ -82,7 +90,8 @@ export async function runContinuityBaseline({cwd,directory,text,model,effort,rem
    if(!identifier(e.thread_id)){stop('protocol-error','INVALID_THREAD_ID');return;}
    const previous=threadId;threadId=e.thread_id;threadObserved=true;
    // The outer owner registers this identity synchronously before any naming RPC.
-   notify('thread-created',{threadId,cwd:folder,resumed:resumeThreadId!==null});
+   notify('thread-created',{threadId,cwd:folder,resumed:resumeThreadId!==null,ephemeral,name});
+   if(ephemeral){nameResult={status:'not-applicable',reason:'ephemeral',threadId};notify('thread-name-not-applicable',{threadId,ephemeral:true,name});}
    if(previous&&previous!==threadId){stop('protocol-error','THREAD_ID_CHANGED');return;}
    if(!naming&&!stopReason)naming=nameThread();
   }
@@ -97,12 +106,12 @@ export async function runContinuityBaseline({cwd,directory,text,model,effort,rem
  const canRead=()=>!closed&&!['output-limit','evidence-error','protocol-error'].includes(stopReason);
  let execProof,result;
  try{
-  record({type:'baseline.config',at:startedAt,cwd:folder,modelRequested:model,effortRequested:effort,actualEffort:null,cliVersion,cliVersionSource:cliVersion?'caller-preflight':null,remainingSeconds,deadlineAt,resumeThreadId,name,instructionSha256:hash(text),recoveryMechanism:'native retained Codex exec thread; no Soul journal or automatic restart',ephemeral:false});
+  record({type:'baseline.config',at:startedAt,cwd:folder,modelRequested:model,effortRequested:effort,actualEffort:null,cliVersion,cliVersionSource:cliVersion?'caller-preflight':null,remainingSeconds,deadlineAt,resumeThreadId,name,instructionSha256:hash(text),recoveryMechanism:ephemeral?'ephemeral single Codex exec; no persistence, resume or automatic restart':'native retained Codex exec thread; no Soul journal or automatic restart',ephemeral});
   record({type:'harness_user',text,_rx:startedAt});
   signal?.addEventListener('abort',abort,{once:true});
   if(signal?.aborted){exit={code:null,signal:null,startFailed:true,notStarted:true};stop('aborted');}
   else{
-   const args=buildArgs({threadId:resumeThreadId,resume:resumeThreadId!==null,model,effort,text});
+   const args=buildContinuityBaselineArgs({threadId:resumeThreadId,resume:resumeThreadId!==null,model,effort,text,ephemeral});
    try{
     child=spawnProcess(command,[...commandArgs,...args],{cwd:folder,stdio:['ignore','pipe','pipe'],detached:true});pid=Number.isInteger(child.pid)&&child.pid>1?child.pid:null;
     child.once('error',error=>{exit={code:null,signal:null,startFailed:true};stop('start-failed',errorCode(error));});
@@ -142,7 +151,7 @@ export async function runContinuityBaseline({cwd,directory,text,model,effort,rem
   if(naming)await naming;
   if(nameResult?.status==='failed'&&failureCode!=='THREAD_ID_CHANGED'&&execProof.groupClosed&&metadataGroups.every(closedGroup))await nameThread();
   let summary;try{summary=summarize(stream,prevCumulative);}catch{failureCode??='STREAM_SUMMARY_FAILED';summary={usage:null,cumulative:prevCumulative,finalText:null,toolCalls:[]};}
-  result={kind:'existing-headless-seat',cwd:folder,directory:root,pid,threadId,threadObserved,resumeThreadId,startedAt,endedAt:Date.now(),deadlineAt,stopReason:stopReason??'exited',failureCode,exit,modelRequested:model,effortRequested:effort,actualModel,actualEffort:reportedEffort,cliVersion,ephemeral:false,naming:nameResult?{status:nameResult.status,attempts:namingAttempts,...(nameResult.code?{code:nameResult.code}:{})}:null,execProof,metadataGroups,ownedProcessesExited:execProof.groupClosed&&metadataGroups.every(closedGroup),stdoutBytes,stderrBytes,stderrTruncated,stderrRetainedBytes:0,usage:summary.usage,cumulative:summary.cumulative,finalText:summary.finalText,toolCalls:summary.toolCalls};
+  result={kind:'existing-headless-seat',cwd:folder,directory:root,pid,threadId,threadObserved,resumeThreadId,startedAt,endedAt:Date.now(),deadlineAt,stopReason:stopReason??'exited',failureCode,exit,modelRequested:model,effortRequested:effort,actualModel,actualEffort:reportedEffort,cliVersion,ephemeral,name,naming:nameResult?{status:nameResult.status,attempts:namingAttempts,...(nameResult.code?{code:nameResult.code}:{}),...(nameResult.reason?{reason:nameResult.reason}:{})}:null,execProof,metadataGroups,ownedProcessesExited:execProof.groupClosed&&metadataGroups.every(closedGroup),stdoutBytes,stderrBytes,stderrTruncated,stderrRetainedBytes:0,usage:summary.usage,cumulative:summary.cumulative,finalText:summary.finalText,toolCalls:summary.toolCalls};
   result.evidenceComplete=evidence({type:'baseline.result',...result,evidenceComplete:true});
   if(!result.evidenceComplete){result.failureCode=failureCode;result.stopReason='evidence-error';}
   closeSync(fd);

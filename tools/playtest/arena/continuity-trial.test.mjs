@@ -7,7 +7,8 @@ import {mkdtempSync,mkdirSync,readFileSync,writeFileSync,appendFileSync,statSync
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {CONTINUITY_ARMS,validateContinuityTrial,prepareR400Seat,runContinuityTrial,runManagedTrialActor,verifyBaselineTrialExit} from './continuity-trial.mjs';
-import {verifyOwnedProbeExit} from './probe-sessions.mjs';
+import {verifyOwnedProbeExit,probeSessions} from './probe-sessions.mjs';
+import {buildContinuityBaselineArgs} from './adapters/continuity-baseline.mjs';
 
 const flush=async()=>{for(let i=0;i<20;i++)await Promise.resolve();};
 const usageLimits={perActor:{totalTokens:1000000,outputTokens:100000},aggregate:{totalTokens:2000000,outputTokens:200000}};
@@ -458,4 +459,53 @@ for(const outcome of ['acknowledged','read-refused','metadata-close-unverified',
  const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(3000);const result=await pending;
  assert.equal(result.failureCode,null);assert.equal(result.qualification,'not assessed');assert.equal(result.endReason,'cutoff');assert.equal(result.archival.status,outcome==='acknowledged'?'acknowledged':'incomplete');assert.equal(result.archival.sidebarVerification,'not-checked');
  const stored=JSON.parse(readFileSync(join(f.config.directory,'summary.json'),'utf8'));assert.deepEqual(stored.archival,result.archival);assert.equal(stored.failureCode,null);assert.deepEqual(JSON.parse(readFileSync(join(f.config.directory,'archive-results.json'),'utf8')),outcome==='metadata-setup-threw'?[]:rows);
+});
+
+
+test('ephemeral is an explicit no-restart baseline-only configuration',()=>{
+ const good={directory:'/unused',arm:CONTINUITY_ARMS[0],purpose:'short',seconds:3,model:'chosen',effort:'low',worldId:'w',actors:[{id:'a',folder:'/unused/a',instruction:'mission'}]};
+ assert.equal(validateContinuityTrial({...good,baselineEphemeral:true}).baselineEphemeral,true);
+ for(const change of [{baselineEphemeral:'true'},{baselineEphemeral:true,arm:CONTINUITY_ARMS[1]},{baselineEphemeral:true,restart:{actorId:'a',setupId:'setup'}}])assert.throws(()=>validateContinuityTrial({...good,...change}),{code:'INVALID_BASELINE_EPHEMERAL_CONFIG'});
+ assert.doesNotThrow(()=>validateContinuityTrial({...good,restart:{actorId:'a',setupId:'setup'}}));
+});
+
+test('ephemeral common trial registers exact mode, completes cleanup, skips metadata/archive and preserves passive lifetime',async t=>{
+ const f=fixture(t,{baselineEphemeral:true});let registry,helpers=0;
+ f.deps.registryFactory=directory=>(registry=probeSessions(directory,{createHost:()=>{helpers++;assert.fail('ephemeral has no metadata/archive helper');}}));
+ f.deps.launchBaseline=async args=>{
+  f.calls.push(args);assert.equal(args.ephemeral,true);
+  const id=args.cwd.includes('/a/')?'a':'b',threadId='temporary-'+id;
+  args.onState({state:'thread-created',threadId,cwd:args.cwd,ephemeral:true,resumed:false,name:args.name});
+  assert.equal(registry.snapshot().sessions.find(r=>r.threadId===threadId).ephemeral,true,'mode is durable in registry on first creation callback');
+  await f.clock.sleep(3000,args.signal);
+  return {ephemeral:true,exit:{code:0,signal:null},endedAt:f.clock.now(),ownedProcessesExited:true,evidenceComplete:true};
+ };
+ const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(3000);const result=await pending;
+ assert.equal(result.failureCode,null);assert.equal(result.endReason,'cutoff');assert.equal(result.cutoffAt-result.startedAt,3000);assert.equal(f.calls.length,2);assert.equal(helpers,0);
+ assert.equal(result.archival.status,'not-applicable');assert.deepEqual(result.archival.notApplicableThreadIds,['temporary-a','temporary-b']);assert.deepEqual(result.archival.acknowledgedThreadIds,[]);assert.equal(result.archival.sidebarVerification,'not-checked');assert.deepEqual(result.archived,[]);
+ assert.ok(registry.snapshot().sessions.every(r=>r.ephemeral&&r.terminal&&!r.archivedAt));assert.ok(result.actors.every(r=>r.cleanupVerified&&r.ephemeralThreads.length===1));
+ assert.equal(f.rows().filter(r=>r.kind==='body'&&r.actor==='a').length,3);
+ const manifest=JSON.parse(readFileSync(join(f.config.directory,'run.json'),'utf8'));
+ assert.equal(manifest.baselineEphemeral,true);
+ assert.equal(manifest.actors[0].promptArgsSha256,createHash('sha256').update(JSON.stringify(buildContinuityBaselineArgs({ephemeral:true,model:f.config.model,effort:f.config.effort,text:f.calls[0].text}))).digest('hex'));
+ assert.equal(JSON.parse(readFileSync(join(f.config.directory,'a','actor-result.json'),'utf8')).ephemeral,true);
+ assert.equal(JSON.parse(readFileSync(join(f.config.directory,'summary.json'),'utf8')).archival.status,'not-applicable');
+});
+
+test('ephemeral does not exempt unverified process cleanup from failure',async t=>{
+ const f=fixture(t,{baselineEphemeral:true});
+ f.deps.launchBaseline=async args=>{args.onState({state:'thread-created',threadId:'temporary-'+(args.cwd.includes('/a/')?'a':'b'),cwd:args.cwd,ephemeral:true});return {ephemeral:true,exit:{code:0},ownedProcessesExited:false};};
+ f.deps.verifyBaseline=()=>false;
+ const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(3000);const result=await pending;
+ assert.equal(result.failureCode,'OWNED_CLEANUP_UNVERIFIED');assert.ok(result.actors.every(r=>!r.cleanupVerified));assert.equal(f.lifecycle.filter(r=>r[0]==='complete').length,0);
+});
+
+test('requested ephemeral cannot hide a durable or missing-mode session from archive accounting',async t=>{
+ const f=fixture(t,{baselineEphemeral:true});
+ // The existing synthetic durable backend omits ephemeral, so it must not gain
+ // an exemption just because the requested config said ephemeral.
+ const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(3000);const result=await pending;
+ assert.ok(f.lifecycle.filter(r=>r[0]==='register').every(r=>r[1].ephemeral===false));
+ assert.ok(result.actors.every(r=>r.failureCode==='SESSION_PERSISTENCE_MODE_MISMATCH'&&r.ephemeralThreads.length===0));
+ assert.equal(result.archival.status,'incomplete');assert.deepEqual(result.archival.failedThreadIds,['thread-a','thread-b']);
 });

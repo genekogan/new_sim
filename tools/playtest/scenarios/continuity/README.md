@@ -249,3 +249,31 @@ automatic-restart capability failure; neither is converted to a native behavior
 pass or a claim that a death probe ran. A measured late recovery fails. These
 reporting dimensions do not qualify a release, waive missing native evidence,
 or replace the activity, semantic, duplicate-effect, holdout or soak checks.
+
+
+### Prospective ephemeral baseline option
+
+`runContinuityTrial({baselineEphemeral:true,...})` explicitly opts only the
+`existing-headless-seat` arm into a single initial `codex exec --ephemeral`.
+The default remains durable. A restart declaration is rejected with this option;
+managed continuity and original reading/restart comparisons retain their durable
+thread and journal mechanisms. The direct baseline adapter also rejects any
+resume ID or previous cumulative usage when ephemeral. Unsupported CLI flags
+fail that one process; there is no durable/fresh-thread fallback or continuation.
+Freeze this declared mode before a future pair; do not alter an active pair.
+
+The exact installed CLI version and `exec --help` flag support must be checked
+before use. Model-free adapter tests establish argv/lifecycle behavior, not actual
+Codex storage or sidebar absence. An independently authorized exact-CLI probe is
+still needed for that persistence/sidebar claim. Requested model/effort and the
+full task/deadline remain unchanged; actual model/effort need their normal host
+evidence. No ephemeral run earns durable automatic-restart coverage.
+
+Thread creation registers the configured mode immediately, retaining the
+readable name in local evidence and the private registry. Ephemeral threads skip
+administrative read/name/archive RPCs entirely. Their archival status is
+`not-applicable`, with explicit IDs and no archive ACK; actual sidebar and
+persistence verification remain `not-checked`. Durable rows still require native
+archive ACKs plus metadata helper closure. Private incremental NDJSON, usage,
+native outcomes and exact process-group cleanup are preserved in both modes;
+ephemeral does not excuse unverified cleanup or erase the behavioral summary.
