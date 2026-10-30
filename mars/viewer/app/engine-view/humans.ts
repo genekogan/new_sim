@@ -733,8 +733,9 @@ export class HumanViews {
     const libShare = lib.cur || lib.prev ? 1 - w : 0;
     const curW = lib.cur ? libShare * lib.fade : 0, prevW = lib.prev ? libShare * (1 - lib.fade) : 0;
     const waveW = waveClip && !lib.cur ? 1 - w : 0, interactW = interactClip && !lib.cur ? 1 - w : 0;
-    const idleFree = v.activity === 'idle' && b.sitW === 0 && !engineHands && freeBody && !lib.cur;
-    const idleHandoff=v.handActuator?handActuatorFrame(v.handActuator,(v.handActuatorTime??tSec)-v.handActuator.startTick*DT).idleBlend:1;
+    // Preserve and fade an existing idle gesture beneath a newly reaching hand.
+    const idleFree = (v.activity === 'idle' || !!v.handActuator) && b.sitW === 0 && (!engineHands || !!v.handActuator) && freeBody && !lib.cur;
+    const idleHandoff=v.handActuator?handActuatorFrame(v.handActuator,(v.handActuatorTime??tSec)-v.handActuator.startTick*DT).idleWeight:1;
     const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, tSec) * idleHandoff : 0;
     const variant = idleFree ? idleVariant(h.name, tSec) : null, variantA = variant ? libAction(v.rig, variant.clip) : null;
     const variantW = variantA ? (1 - w - neutralW) * variant!.w * idleHandoff : 0;

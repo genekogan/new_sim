@@ -10,7 +10,7 @@ export const HAND_REACH_SECONDS=.65,HAND_SWING_SECONDS=2.2,HAND_RELEASE_SECONDS=
 export const HAND_IDLE_HANDOFF_SECONDS=1.2;
 export const HAND_OPEN_ANGLE=-Math.PI*.48;
 const vec=z.tuple([z.number().finite(),z.number().finite(),z.number().finite()]);
-const opening=z.object({hinge:vec,yaw:z.number().finite(),radius:z.number().min(.2).max(2),height:z.number().min(.3).max(3),handleY:z.number().min(.3).max(2),from:z.number().min(-1.6).max(0),to:z.number().min(-1.6).max(0),side:z.union([z.literal(1),z.literal(-1)])}).strict();
+const opening=z.object({floorY:z.number().finite().optional(),hinge:vec,yaw:z.number().finite(),radius:z.number().min(.2).max(2),height:z.number().min(.3).max(3),handleY:z.number().min(.3).max(2),from:z.number().min(-1.6).max(0),to:z.number().min(-1.6).max(0),side:z.union([z.literal(1),z.literal(-1)])}).strict();
 export const handActuatorParams=z.object({actor:z.string(),target:z.string(),at:vec,opening:opening.optional()}).strict();
 export type HandActuatorParams=z.infer<typeof handActuatorParams>;
 export type HandActuatorMotion=Omit<HandActuatorParams,'actor'> & {startTick:number;actionId?:string;abortedAt?:number;abortWeight?:number};
@@ -28,7 +28,8 @@ export function handActuatorFrame(m:HandActuatorMotion,seconds:number){
  const weight=m.abortedAt!==undefined?(m.abortWeight??0)*(1-smooth((seconds-m.abortedAt)/HAND_RELEASE_SECONDS))
    :smooth(seconds/HAND_REACH_SECONDS)*(1-smooth((seconds-releaseAt)/HAND_RELEASE_SECONDS));
  const armDownAt=(m.abortedAt??releaseAt)+HAND_RELEASE_SECONDS,idleBlend=smooth((seconds-armDownAt)/HAND_IDLE_HANDOFF_SECONDS);
- return {angle,weight,idleBlend,armDown:seconds>=armDownAt,commitAt,done:seconds>=armDownAt+HAND_IDLE_HANDOFF_SECONDS,contact:m.abortedAt===undefined&&seconds>=commitAt};
+ const idleWeight=m.abortedAt!==undefined||seconds<HAND_REACH_SECONDS?1-weight:idleBlend;
+ return {angle,weight,idleBlend,idleWeight,armDown:seconds>=armDownAt,commitAt,done:seconds>=armDownAt+HAND_IDLE_HANDOFF_SECONDS,contact:m.abortedAt===undefined&&seconds>=commitAt};
 }
 /** Three's local-Y rotation convention, converted to the native world frame. */
 export function actuatorPoint(o:NonNullable<HandActuatorParams['opening']>,angle:number){
@@ -38,7 +39,7 @@ export function actuatorPoint(o:NonNullable<HandActuatorParams['opening']>,angle
  // On the push side, use the near (left) hand and keep the root nearer the
  // hinge than the handle, so the shoulder and hips clear the latch jamb.
  const along=o.side<0?-.5:0;
- const root:Vec3=[centre[0]+s*.42*o.side+c*along,y,centre[2]+c*.42*o.side-s*along];
+ const root:Vec3=[centre[0]+s*.42*o.side+c*along,o.floorY??y,centre[2]+c*.42*o.side-s*along];
  return {hand,root};
 }
 const issue=(code:string,message:string,subjects:string[]):Diagnostic=>({code:'contact.'+code,message,subjects});
