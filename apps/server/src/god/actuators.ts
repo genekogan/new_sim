@@ -65,7 +65,7 @@ export type ActuatorHost = {
   /** The Soul's body position (x, z), or null. */
   bodyAt(soul: EdgeSoul): Vec2 | null;
   deferContacts?: boolean;
-  contactPlan?(soul:EdgeSoul,target:string,action:string):{params:Record<string,unknown>;root:[number,number,number];level?:number}|null;
+  contactPlan?(soul:EdgeSoul,target:string,action:string,params?:Record<string,unknown>):{params:Record<string,unknown>;root:[number,number,number];level?:number}|null;
   /** Commit a state change of a god thing as an engine edit. */
   commit(id: string, patch: Record<string, unknown>, note: string): { accepted: boolean };
   /** The thing's actuator state as the world has it now (the object's copy may lag a sync behind). */
@@ -106,6 +106,22 @@ export function waterPlan(a: Action, id: string, soul: EdgeSoul, host: ActuatorH
 const isRefusal = (x: Transfer | Refusal | null): x is Refusal => !!x && 'code' in x;
 type BuiltLike = { at: Vec2 | null; state?: Record<string, unknown>; removed?: boolean; key?: string; front?: Vec2 | null };
 
+/** Soul-written board text (entry 13): short, at most three lines, printable. Null = acceptable. */
+export function boardTextProblem(v: unknown, max = 100, lines = 3): Refusal | null {
+  if (typeof v !== 'string' || !v.trim()) return { code: 'capability.params', reason: 'Say what to write: text is required.' };
+  const t = v.trim();
+  if (/[\u0000-\u0009\u000b-\u001f\u007f]/.test(t)) return { code: 'capability.params', reason: 'Board text cannot contain control characters.' };
+  if (t.length > max) return { code: 'capability.params', reason: `That is too long for the board: at most ${max} characters (yours is ${t.length}).` };
+  if (t.split('\n').length > lines) return { code: 'capability.params', reason: `At most ${lines} lines fit on the board.` };
+  return null;
+}
+/** The Soul-facing params of a def action: its declared string params (board text). */
+function actionParams(a: Action): Record<string, { type: 'string'; maxLength: number; description?: string }> {
+  const out: Record<string, { type: 'string'; maxLength: number; description?: string }> = {};
+  for (const [k, f] of Object.entries(a.params ?? {})) if (f.type === 'string') out[k] = { type: 'string', maxLength: f.max, ...(f.doc ? { description: f.doc } : {}) };
+  return out;
+}
+
 /** Object-kind actions for a def's actions (the `built` kind of things of that def). */
 export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: BuiltLike) => string) {
   const out: Record<string, any> = {};
@@ -121,12 +137,12 @@ export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: Buil
       return whenRefusal(a, (s.key && host.stateOf?.(s.key)) || s.state || {}, nameOf(s));
     };
     out[a.name] = {
-      label: a.label, roles: 'anyone', reach: 'anywhere', params: {}, movesBody: true,
+      label: a.label, roles: 'anyone', reach: 'anywhere', params: actionParams(a), movesBody: true,
       available: (s: BuiltLike, ctx: any) => check(s, ctx),
-      validate: (s: BuiltLike, _p: unknown, ctx: any) => check(s, ctx),
+      validate: (s: BuiltLike, p: Record<string, unknown>, ctx: any) => check(s, ctx) ?? (a.name === 'write' && 'text' in actionParams(a) ? boardTextProblem(p?.text, actionParams(a).text.maxLength) : null),
       apply: (s: BuiltLike, params: Record<string, unknown>, ctx: any) => {
         const contact = host.deferContacts && isContactActuator(def, a);
-        const motion=contact&&s.key?host.contactPlan?.(ctx.soul,s.key,a.name):null;
+        const motion=contact&&s.key?host.contactPlan?.(ctx.soul,s.key,a.name,params):null;
         if(motion){const me=host.bodyAt(ctx.soul)!,far=(motion.level??0)>0||Math.hypot(me[0]-motion.root[0],me[1]-motion.root[2])>.1;
           return {state:s,result:{action:a.name,set:thenPatch(a,(s.key&&host.stateOf?.(s.key))||s.state||{},params)},bodies:[{label:a.label,steps:[{verb:'stand',params:{}},...(far?[(motion.level??0)>0?{verb:'mars:walk_to',params:{x:motion.root[0],z:motion.root[2],level:motion.level}}:{verb:'walk_to',params:{to:[motion.root[0],motion.root[2]],standoff:0}}]:[]),{verb:'mars:hand_actuator_v1',params:motion.params}]}]};}
 

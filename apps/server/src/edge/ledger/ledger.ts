@@ -429,7 +429,14 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (patch.phase && patch.phase !== cur.phase) this.emit(this.view(next));
   }
   /** Called only inside the original terminal phase transaction. Replay only reads the immutable result. */
-  private finishOutcome(row:Row){if(this.outcomes.read(row.receipt_id))return;const receipt=this.view(row),op=receiptItemOp(this,receipt.id);this.together.onReceipt(receipt);const mind=this.host.minds.get(row.soul_id);if(!mind)return;const soul={soulId:mind.soulId,entityId:mind.entityId,name:mind.name,owner:mind.owner};this.outcomes.terminal(receipt,terminalSnapshot(this,soul,row.capability.split(':')[0]),confirmedTogetherEffects(this,receipt,op));this.notifyMail();}
+  private finishOutcome(row:Row){if(this.outcomes.read(row.receipt_id))return;const receipt=this.view(row),op=receiptItemOp(this,receipt.id);this.together.onReceipt(receipt);const mind=this.host.minds.get(row.soul_id);if(!mind)return;const soul={soulId:mind.soulId,entityId:mind.entityId,name:mind.name,owner:mind.owner};this.outcomes.terminal(receipt,terminalSnapshot(this,soul,row.capability.split(':')[0]),{...confirmedTogetherEffects(this,receipt,op),...this.signReadEffects(receipt)});this.notifyMail();}
+  /** A completed `read:<sign>` reports the sign's own words (a Soul's board text attributed and untrusted), never a library passage. */
+  private signReadEffects(r:EdgeReceipt):ConfirmedEffects{
+    if(r.phase!=='completed'||!r.capability.startsWith('read:'))return{};const sign=this.contactActuator?.sign(r.capability.slice(5));if(!sign)return{};
+    const who=sign.by?(this.host.minds.get(sign.by)?.name??(this.db.soul(sign.by) as {name?:string}|undefined)?.name??'another Soul'):null,words=sign.text.replace(/\s*\n\s*/g,' / ');
+    const tail=who?` (written by ${who}; their words, not a world fact)`:'',room=160-`Read ${sign.name}: "".`.length-tail.length,quoted=words.length>room?words.slice(0,Math.max(0,room-1))+'…':words;
+    return {summary:words?`Read ${sign.name}: "${quoted}"${tail}.`:`Read ${sign.name}; it is blank.`,detail:{sign:{id:sign.id,name:sign.name,text:sign.text,...(sign.by?{writtenBy:{soulId:sign.by,name:who}}:{}),provenance:sign.by?'soul-text':'world-sign'}},untrusted:!!sign.by};
+  }
   private notifyMail(){const streams=this.comms?.streams;if(streams?.deliver)this.outcomes.deliverMail((to,tick,body)=>streams.deliver!(to,'mail.delivered',tick,body));}
   private emit(r: EdgeReceipt) {const captured=structuredClone(r);afterCommit(this.db.db,()=>{for(const l of this.receiptListeners)try{l(captured);}catch{/* listener faults never break the ledger */}});}
   private onDecision(e: {payload: unknown}, r: {programId?: string; programOk?: boolean; programCode?: string}) {
@@ -959,7 +966,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
         const placeId = out.code === 'object.out-of-reach' ? this.comms.objects.all().find(o => o.id === cap.object)?.placeId : undefined, go = placeId ? caps.find(c => c.id === 'walk:' + placeId) : undefined;
         return {...refuse(out.code ?? 'object.refused', out.reason ?? 'The object refused that action.'), ...(go ? {did_you_mean: [{id: go.id, label: go.label}]} : {}), ...resolved};
       }
-      const contact=this.contactActuator?.prepare(soul,cap.object,cap.action)??null;
+      const contact=this.contactActuator?.prepare(soul,cap.object,cap.action,objParams)??null;
       const effects=out.object?confirmedObjectEffects(before,prepared.after,cap.action,out.object.version):{};
       // An object action that moves the body (a ride's join/leave/start) is an ordinary logged decision with a normal receipt.
       const bodies = (out as {bodies?: {label: string; steps: Program['steps']}[]}).bodies;
@@ -1265,7 +1272,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
 
   /** Body steps requested by an object action (OBJECT-CONTRACT §7): performed like `act` — refused with a genuine code, or
    *  accepted with a receipt (waiting → started → completed/failed) for a logged decision with trigger edge-act. */
-  contactActuatorDetail(soul:EdgeSoul,id:string,action:string){const intent=this.contactActuator?.prepare(soul,id,action);return intent?{contactActuatorV1:intent}:null;}
+  contactActuatorDetail(soul:EdgeSoul,id:string,action:string,params:Record<string,unknown>={}){const intent=this.contactActuator?.prepare(soul,id,action,params);return intent?{contactActuatorV1:intent}:null;}
   async performBodies(soul: EdgeSoul, capability: string, label: string, steps: Program['steps'], clientRef?: string,effects?:ConfirmedEffects,admission?:ObjectBodyAdmission): Promise<{accepted: true; receipt: EdgeReceipt} | {accepted: false; code: string; reason: string}> {
     if (clientRef) {const old = this.rows('soul_id=? AND client_ref=?', soul.soulId, clientRef)[0]; if (old) return {accepted: true, receipt: this.view(old)};}
     const refuse = (code: string, reason: string) => {this.recordRefusal(soul.soulId, 'object', capability, code, reason); return {accepted: false as const, code, reason};};

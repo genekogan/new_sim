@@ -1,22 +1,30 @@
 // Contact effects commit at the recorded hand contact, with release still owned by the native action.
 // Durable receipt intent, no per-tick object scan and no effect from an interrupted walk.
-import {actuatorPoint,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
+import {actuatorPoint,strokePoint,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
 import { createHash } from 'node:crypto';
 import { opSchema, contactStateKey, type WorldModel, type Op, type StoredDef } from '@sim/world-compiler';
 import type { EdgeSoul } from '../edge/contract.ts';
-import { actionsOf, actuatedState, thenPatch, whenRefusal } from './actuators.ts';
+import { actionsOf, actuatedState, boardTextProblem, thenPatch, whenRefusal } from './actuators.ts';
 export const CONTACT_REACH = .8;
-export type ContactActuatorIntent = { target:string; action:string; actor:string; owner:string; binding:string; motionV1?:true };
+export type ContactActuatorIntent = { target:string; action:string; actor:string; owner:string; binding:string; motionV1?:true; params?:Record<string,string> };
 export const isContactActuator = (def:StoredDef, action:{name:string}) => contactStateKey(def,action.name)!==null;
 const fail=(code:string,reason:string)=>({ok:false as const,code,reason});
-export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:number)=>number;model:()=>WorldModel;body:(id:string)=>{pose:{p:number[]};human?:{hands?:{left?:number[];right?:number[]};handActuator?:import('../../../../mars/viewer/engine/social/hand-actuator.ts').HandActuatorMotion}}|undefined;access:(id:string,soul:EdgeSoul)=>{code:string;reason:string}|null;record:(soul:EdgeSoul,id:string,action:string)=>void;commit:(ops:Op[],note:string,done:()=>void)=>{accepted:boolean}}){
+export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:number)=>number;model:()=>WorldModel;body:(id:string)=>{pose:{p:number[]};human?:{hands?:{left?:number[];right?:number[]};handActuator?:import('../../../../mars/viewer/engine/social/hand-actuator.ts').HandActuatorMotion}}|undefined;access:(id:string,soul:EdgeSoul)=>{code:string;reason:string}|null;record:(soul:EdgeSoul,id:string,action:string,params?:Record<string,unknown>)=>void;commit:(ops:Op[],note:string,done:()=>void)=>{accepted:boolean}}){
  const binding=(id:string)=>{const m=d.model(),e=m.entities.get(id);return e?createHash('sha256').update(JSON.stringify([e,m.worldPose(e),m.resolvedDef(e.def)?.hash])).digest('hex'):null;};
  return {
-  plan(soul:EdgeSoul,target:string,action:string){
+  plan(soul:EdgeSoul,target:string,action:string,input:Record<string,unknown>={}){
    const m=d.model(),e=m.entities.get(target),def=e&&m.resolvedDef(e.def),body=d.body(soul.entityId);if(!e||!def||!body)return null;
    const wp=m.worldPose(e),me=body.pose.p,at:[number,number,number]=[wp.x,wp.y+1.04*wp.s,wp.z];
    const params:Omit<HandActuatorParams,'actor'>={target,at};let root:[number,number,number];
-   if(def.components.opening){
+   if(contactStateKey(def,action)==='text'){
+    // Stand square in front of the board's face; the hand works across the face from its centre.
+    const face=(def.make.kind==='gen'?(def.make.args as {faces?:{at?:number[];w?:number;h?:number}[]})?.faces?.[0]:undefined);if(!face?.at)return null;
+    const c=Math.cos(wp.yaw),s=Math.sin(wp.yaw),[fx,fy,fz]=face.at.map(v=>v*wp.s),centre:[number,number,number]=[wp.x+fx*c+fz*s,wp.y+fy,wp.z-fx*s+fz*c];
+    const text=typeof input.text==='string'?input.text.trim():'',lines=action==='write'?Math.min(3,Math.max(text.split('\n').length,Math.ceil(text.length/34),1)):1;
+    params.at=[centre[0]+s*.04,centre[1],centre[2]+c*.04];
+    params.stroke={kind:action==='erase'?'wipe':'write',yaw:wp.yaw,width:Math.min(.55,(face.w??.6)*wp.s*.6),height:Math.min(.3,(face.h??.4)*wp.s*.5),lines,seconds:action==='erase'?2.4:1.2+1.6*lines};
+    root=[centre[0]+s*.42,wp.y,centre[2]+c*.42];
+   }else if(def.components.opening){
     const shapes=def.make.kind==='gen'?(def.make.args as {shapes?:{role?:string;pivot?:number[];at?:number[];tint?:string}[]})?.shapes:undefined;
     const leaf=shapes?.find(s=>s.role==='door'&&s.pivot),knob=shapes?.find(s=>s.role==='door'&&s.tint==='brass');if(!leaf?.pivot)return null;
     const number=(key:string)=>Number(e.params?.[key]??def.params[key]?.default??1),sx=wp.s*number('sx'),sy=wp.s*number('sy');
@@ -27,6 +35,12 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
    }else{const dx=me[0]-wp.x,dz=me[2]-wp.z,n=Math.hypot(dx,dz)||1;root=[wp.x+dx/n*.5,wp.y,wp.z+dz/n*.5];}
    return {params,root,level:d.levelAt?.(root[0],root[2],root[1])??0};
   },
+  /** What a Soul reads when it completes `read:<sign>` (never in ambient perception for Soul-written boards). */
+  sign(target:string){
+   const m=d.model(),e=m.entities.get(target),def=e&&m.resolvedDef(e.def),sign=def?.components.sign as {lines?:string[]}|undefined;if(!e||!def||!sign)return null;
+   const text=typeof e.state?.text==='string'&&e.state.text.trim()?e.state.text:(sign.lines??[]).join('\n');
+   return {id:e.id,name:e.name??def.name.replace(/^core-/,''),text,by:typeof e.state?.textBy==='string'&&e.state.textBy?e.state.textBy:null,writable:!!def.tags?.includes('hand-writable')};
+  },
   /** A few current public facts for compact nearby perception, never the full state. */
   facts(target:string){
    const m=d.model(),e=m.entities.get(target),def=e&&m.resolvedDef(e.def),key=def&&contactStateKey(def);
@@ -35,9 +49,12 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
    if(key==='open'&&typeof state.locked==='boolean')facts.locked=state.locked;
    return facts;
   },
-  prepare(soul:EdgeSoul,target:string,action:string):ContactActuatorIntent|null{
+  prepare(soul:EdgeSoul,target:string,action:string,input:Record<string,unknown>={}):ContactActuatorIntent|null{
    const m=d.model(),e=m.entities.get(target),def=e&&m.resolvedDef(e.def),a=def&&actionsOf(def).find(a=>a.name===action);
-   return def&&a&&isContactActuator(def,a)?{target,action,actor:soul.entityId,owner:soul.owner,binding:binding(target)!,motionV1:true}:null;
+   if(!def||!a||!isContactActuator(def,a))return null;
+   // Only the action's declared string params travel with the bound intent (board text, already validated at admission).
+   const params=Object.fromEntries(Object.keys(a.params??{}).filter(k=>typeof input[k]==='string').map(k=>[k,(input[k] as string).trim()]));
+   return {target,action,actor:soul.entityId,owner:soul.owner,binding:binding(target)!,motionV1:true,...(Object.keys(params).length?{params}:{})};
   },
   complete(soul:EdgeSoul,intent:ContactActuatorIntent,done:()=>void){
    if(intent.actor!==soul.entityId||intent.owner!==soul.owner)return fail('contact.identity-changed','The original Soul/body binding changed.');
@@ -46,10 +63,12 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
    const denied=d.access(intent.target,soul);if(denied)return fail(denied.code,denied.reason);
    const b=d.body(soul.entityId),p=m.worldPose(e),motion=b?.human?.handActuator;
    const hand=b?.human?.hands?.left??b?.human?.hands?.right;
-   const expected=motion?.opening?actuatorPoint(motion.opening,intent.action==='close'?motion.opening.to:motion.opening.from).hand:motion?.at;
+   const expected=motion?.opening?actuatorPoint(motion.opening,intent.action==='close'?motion.opening.to:motion.opening.from).hand:motion?.stroke?strokePoint(motion.at,motion.stroke,1):motion?.at;
    const reached=intent.motionV1?!!motion&&motion.target===intent.target&&!!hand&&!!expected&&Math.hypot(...hand.map((v,i)=>v-expected[i]))<.1&&Math.hypot(b!.pose.p[0]-hand[0],b!.pose.p[2]-hand[2])<.9&&Math.abs(b!.pose.p[1]-p.y)<1.2:!!b&&Math.hypot(b.pose.p[0]-p.x,b.pose.p[2]-p.z)<=CONTACT_REACH&&Math.abs(b.pose.p[1]-p.y)<=1.2;if(!b?.human||!reached)return fail('contact.not-reached','Your hand did not reach the target; no action was applied.');
    const state=actuatedState(e,def),bad=whenRefusal(a,state,e.name??'object');if(bad)return fail(bad.code,bad.reason);
-   const r=d.commit([opSchema.parse({op:'set',id:e.id,state:thenPatch(a,state)})],`${soul.soulId} ${a.name} ${e.name??e.id}`,()=>{d.record(soul,e.id,a.name);done();});
+   const text=contactStateKey(def,a.name)==='text'&&a.name==='write'?boardTextProblem(intent.params?.text):null;if(text)return fail(text.code,text.reason);
+   const patch=thenPatch(a,state,intent.params??{});if(contactStateKey(def,a.name)==='text'&&a.name==='write')patch.textBy=soul.soulId;
+   const r=d.commit([opSchema.parse({op:'set',id:e.id,state:patch})],`${soul.soulId} ${a.name} ${e.name??e.id}`,()=>{d.record(soul,e.id,a.name,intent.params??{});done();});
    return r.accepted?{ok:true as const}:fail('contact.commit-refused','The world refused the interaction.');
   }
  };

@@ -11,19 +11,21 @@ export const HAND_IDLE_HANDOFF_SECONDS=1.2;
 export const HAND_OPEN_ANGLE=-Math.PI*.48;
 const vec=z.tuple([z.number().finite(),z.number().finite(),z.number().finite()]);
 const opening=z.object({hinge:vec,yaw:z.number().finite(),radius:z.number().min(.2).max(2),height:z.number().min(.3).max(3),handleY:z.number().min(.3).max(2),from:z.number().min(-1.6).max(0),to:z.number().min(-1.6).max(0),side:z.union([z.literal(1),z.literal(-1)]),bodyPolicy:z.literal('door-natural-v2').optional()}).strict();
-export const handActuatorParams=z.object({actor:z.string(),target:z.string(),at:vec,opening:opening.optional()}).strict();
+// A hand that writes or wipes across a flat face (a board): `at` is the face centre, `yaw` its facing.
+const stroke=z.object({kind:z.union([z.literal('write'),z.literal('wipe')]),yaw:z.number().finite(),width:z.number().min(.1).max(1.2),height:z.number().min(.05).max(.8),lines:z.number().int().min(1).max(3),seconds:z.number().min(.8).max(6)}).strict();
+export const handActuatorParams=z.object({actor:z.string(),target:z.string(),at:vec,opening:opening.optional(),stroke:stroke.optional()}).strict();
 export type HandActuatorParams=z.infer<typeof handActuatorParams>;
 export type HandActuatorMotion=Omit<HandActuatorParams,'actor'> & {startTick:number;actionId?:string;abortedAt?:number;abortWeight?:number};
 const smooth=(v:number)=>{const k=Math.max(0,Math.min(1,v));return k*k*(3-2*k);};
-export function handSwingSeconds(m:Pick<HandActuatorMotion,'opening'>){
- const o=m.opening;if(!o)return 0;
+export function handSwingSeconds(m:Pick<HandActuatorMotion,'opening'|'stroke'>){
+ const o=m.opening;if(!o)return m.stroke?.seconds??0;
  if(o.bodyPolicy==='door-natural-v2')return Math.max(HAND_SWING_SECONDS,(Math.abs(o.to-o.from)*(o.radius+.42)+.35)*1.5/1.2);
  // Slow a larger opted-in leaf rather than exceeding ordinary walking speed.
  return Math.max(HAND_SWING_SECONDS,Math.abs(o.to-o.from)*Math.hypot(o.radius+(o.side<0?-.5:0),.42)*1.5/1.2);
 }
 export function handActuatorFrame(m:HandActuatorMotion,seconds:number){
  const swing=handSwingSeconds(m),releaseAt=HAND_REACH_SECONDS+swing;
- const commitAt=m.opening?.to===0?releaseAt:HAND_REACH_SECONDS;
+ const commitAt=m.opening?.to===0||m.stroke?releaseAt:HAND_REACH_SECONDS;
  const k=smooth(((m.abortedAt??seconds)-HAND_REACH_SECONDS)/(swing||1));
  const angle=m.opening?m.opening.from+(m.opening.to-m.opening.from)*k:0;
  const weight=m.abortedAt!==undefined?(m.abortWeight??0)*(1-smooth((seconds-m.abortedAt)/HAND_RELEASE_SECONDS))
@@ -47,6 +49,18 @@ export function actuatorPoint(o:NonNullable<HandActuatorParams['opening']>,angle
  const along=o.side<0?(o.bodyPolicy==='door-natural-v2'?-.35:-.5):0;
  const root:Vec3=[centre[0]+s*(o.bodyPolicy==='door-natural-v2'?.37:.42)*o.side+c*along,y,centre[2]+c*(o.bodyPolicy==='door-natural-v2'?.37:.42)*o.side-s*along];
  return {hand,root};
+}
+/** Where a writing or wiping hand is on the face at stroke progress `u` (0..1): rows of small letter strokes, left to
+ *  right, with a slight lift back to the next row; a wipe is three overlapping sweeps. Continuous at u=0 and u=1. */
+export function strokePoint(at:Vec3,s:NonNullable<HandActuatorParams['stroke']>,u:number):Vec3 {
+ const k=Math.max(0,Math.min(1,u)),right:[number,number]=[dcos(s.yaw),-dsin(s.yaw)],out:[number,number]=[dsin(s.yaw),dcos(s.yaw)];
+ let x:number,y:number,lift=0;
+ if(s.kind==='wipe'){const pass=Math.min(2,Math.floor(k*3)),f=k*3-pass,dir=pass%2?-1:1;x=dir*(f-.5)*s.width;y=s.height*.3*(1-2*k)+.03*Math.sin(f*Math.PI*6);}
+ else{const row=Math.min(s.lines-1,Math.floor(k*s.lines)),f=k*s.lines-row,top=s.lines>1?s.height/2:0,step=s.lines>1?s.height/(s.lines-1):0;
+  const writing=f<.75,g=writing?f/.75:(f-.75)/.25;
+  x=writing?(g-.5)*s.width:(.5-smooth(g))*s.width;y=top-row*step-(writing?0:step*smooth(g))+(writing?.012*Math.sin(g*Math.PI*14):0);lift=writing?0:.035*Math.sin(g*Math.PI);
+  if(row===s.lines-1&&!writing){x=.5*s.width;y=top-row*step;lift=0;}}
+ return [at[0]+right[0]*x+out[0]*lift,at[1]+y,at[2]+right[1]*x+out[1]*lift];
 }
 export const actuatorHand=(o?:HandActuatorParams['opening']):'left'|'right'=>o?.bodyPolicy==='door-natural-v2'?'left':(o?.side===-1?'left':'right');
 const issue=(code:string,message:string,subjects:string[]):Diagnostic=>({code:'contact.'+code,message,subjects});
@@ -90,7 +104,7 @@ export const handActuator:ActionDef<HandActuatorParams,true,Exec>={
  start(rt,p,_plan,_id){const a=rt.world.entities[p.actor];return {p:structuredClone(p),motion:{...structuredClone(p),startTick:rt.tick,actionId:_id},t:0,root:[...a.pose.p],yaw:a.pose.yaw};},
  step(rt,ex,dt){
   const a=rt.world.entities[ex.p.actor],h=a?.human;if(!h)return {status:'failed',diagnostic:issue('body-gone','The original body is gone.',[ex.p.actor])};
-  ex.t+=dt;const f=handActuatorFrame(ex.motion,ex.t),point=ex.p.opening?actuatorPoint(ex.p.opening,f.angle):{hand:ex.p.at,root:ex.root};
+  ex.t+=dt;const f=handActuatorFrame(ex.motion,ex.t),point=ex.p.opening?actuatorPoint(ex.p.opening,f.angle):{hand:ex.p.stroke?strokePoint(ex.p.at,ex.p.stroke,(ex.t-HAND_REACH_SECONDS)/ex.p.stroke.seconds):ex.p.at,root:ex.root};
   if(ex.p.opening&&Math.hypot(ex.root[0]-actuatorPoint(ex.p.opening,ex.p.opening.from).root[0],ex.root[2]-actuatorPoint(ex.p.opening,ex.p.opening.from).root[2])>.22){clear(rt,ex);return {status:'failed',diagnostic:issue('not-at-handle','Walk to the actual handle before operating it.',[ex.p.target])};}
   if(ex.p.opening&&ex.t<HAND_REACH_SECONDS){const k=smooth(ex.t/HAND_REACH_SECONDS);point.root=[ex.root[0]+(point.root[0]-ex.root[0])*k,ex.root[1]+(point.root[1]-ex.root[1])*k,ex.root[2]+(point.root[2]-ex.root[2])*k];}
   const bad=blocked(rt,ex,point.root,f.angle);if(bad){clear(rt,ex);return {status:'failed',diagnostic:bad};}

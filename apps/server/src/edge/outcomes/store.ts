@@ -43,7 +43,7 @@ export class ActionOutcomes{
   const context=JSON.parse(row.body) as OutcomeContext;
   return tx(this.db,()=>{
    const kind=context.capability.split(':')[0],completed=receipt.phase==='completed',out:EdgeOutcomeV1={contract:EDGE_OUTCOME_CONTRACT,kind,summary:clip(`${kind} ${receipt.phase}${snapshot.place?` at ${snapshot.place}`:''}${receipt.code?` (${receipt.code})`:''}.`,160),learned:[],produced:[],changed:[],met:[],detail:{phase:receipt.phase,sourceTick:snapshot.tick},untrusted:false};
-   if(completed&&kind==='read')this.readPassage(context,out);
+   if(completed&&kind==='read'&&!effects.detail?.sign)this.readPassage(context,out);
    if(completed&&kind==='use-computer'){
     const query=context.params.query??'',terms=query.toLowerCase(),wanted=terms.includes('letter')?['letters']:terms.includes('project')||terms.includes('help')?['projects']:terms.includes('who')||terms.includes('people')||terms.includes('directory')?['directory']:terms.includes('schedule')||terms.includes('today')||terms.includes("what's on")?['schedule']:terms.includes('lost')||terms.includes('found')?['lost-found']:terms.includes('notice')?['notices']:terms.includes('digest')?['digest']:snapshot.sections.map(s=>s.section);
     const sections=snapshot.sections.filter(s=>wanted.includes(s.section));out.learned=sections.flatMap(s=>s.learned).slice(0,5);out.detail={...out.detail,terminal:context.capability.slice('use-computer:'.length),query,sections:sections.map(s=>s.section),results:sections.map(s=>({section:s.section,rows:s.rows}))};out.summary=clip(`Checked the town terminal: ${sections.map(s=>s.section).join(', ')}.`,160);out.untrusted=!!query||out.learned.some(f=>f.untrusted)||sections.some(s=>s.rows.some(r=>r.untrusted===true));

@@ -27,7 +27,7 @@ import { supportY } from './nav.ts';
 type Vec2 = [number, number];
 type Plans = Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>;
 type Want = { name: string; kind: string; description: string; params: BuiltState & { paintingWhat?: true } };
-type SignRow = { id: string; at: Vec2; front: Vec2; name: string; text: string };
+type SignRow = { id: string; at: Vec2; front: Vec2; name: string; text: string; writable?: boolean };
 /** x0, z0, x1, z1 */
 type Box = [number, number, number, number];
 type Run = { queue: string[]; i: number; changed: string[]; made: number; root: string; layersOn: boolean; full: boolean; ms: number };
@@ -149,7 +149,7 @@ export class GodPerceive {
   private actHost() {
     return {
       deferContacts: !!this.h.edge?.contactActuator,
-      contactPlan:(soul:EdgeSoul,id:string,action:string)=>this.h.edge?.contactActuator?.plan(soul,id,action)??null,
+      contactPlan:(soul:EdgeSoul,id:string,action:string,params?:Record<string,unknown>)=>this.h.edge?.contactActuator?.plan(soul,id,action,params)??null,
       bodyAt: (soul: EdgeSoul): Vec2 | null => { const b = this.h.engine.world.entities[soul.entityId]; return b?.pose?.p ? [b.pose.p[0], b.pose.p[2]] : null; },
       commit: (id: string, patch: Record<string, unknown>, note: string) => this.h.commit!([{ op: 'set', id, state: patch }], note),
       stateOf: (id: string) => { const e = this.h.model.entities.get(id), def = e && this.h.model.resolvedDef(e.def); return e && def ? actuatedState(e, def) : null; },
@@ -228,7 +228,7 @@ export class GodPerceive {
     const w: Want = { name, kind: this.kindFor(text !== null ? 'sign' : kind, def), description: clip(def.description || kind, 400), params: { what, ...(painting ? { paintingWhat: true as const } : {}), text: text ?? '', near, at: [Math.round(at[0] * 100) / 100, Math.round(at[1] * 100) / 100], def: def.ref, ...(acts ? { state: actuatedState(e, def), front } : {}) } };
     if (text === null) return { w };
     // read from in front of its face (entity frame: the front is +z, turned by the yaw)
-    const d = 1.4; return { w, sign: { id: e.id, at, front: [at[0] + Math.sin(wp0.yaw) * d, at[1] + Math.cos(wp0.yaw) * d], name, text } };
+    const d = 1.4; return { w, sign: { id: e.id, at, front: [at[0] + Math.sin(wp0.yaw) * d, at[1] + Math.cos(wp0.yaw) * d], name, text, ...(def.tags.includes('hand-writable') ? { writable: true } : {}) } };
   }
   private at(e: Entity, def: StoredDef): Vec2 | null {
     const sh = e.shape as { area?: Vec2[]; path?: Vec2[] } | undefined;
@@ -432,7 +432,9 @@ export class GodPerceive {
       const d = Math.hypot(s.at[0] - here[0], s.at[1] - here[1]); if (d > SIGN_READ_RADIUS) continue;
       const id = `read:${s.id}`; if (caps.some((c) => c.id === id)) continue;
       const words = s.text.replace(/\s*\n\s*/g, ' / ');
-      const label = `Read ${s.name} (a sign, ${Math.round(d)} m): "${words.length > 160 ? words.slice(0, 157) + '…' : words}"`;
+      // A Soul-written board offers a read only when written on, and never carries its words: they come with the read.
+      if (s.writable && !words) continue;
+      const label = s.writable ? `Read ${s.name} (a board with writing on it, ${Math.round(d)} m)` : `Read ${s.name} (a sign, ${Math.round(d)} m): "${words.length > 160 ? words.slice(0, 157) + '…' : words}"`;
       caps.push({ id, verb: 'read', label, target: { id: s.id, kind: 'object' }, available: true });
       plans.set(id, { label: `Read ${s.name}`, steps: [...(seated ? [{ verb: 'stand', params: {} }] : []), ...(Math.hypot(s.front[0] - here[0], s.front[1] - here[1]) > 0.8 ? [{ verb: 'walk_to', params: { to: s.front, standoff: 0 } }] : []), { verb: 'wave', params: { at: s.id, seconds: 1 } }] });
     }

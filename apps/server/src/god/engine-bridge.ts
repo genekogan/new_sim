@@ -211,7 +211,7 @@ export class EngineBridge {
     };
     if(this.edge)this.edge.contactActuator=createContactActuatorService({model:()=>this.god.model,levelAt:(x,z,y)=>this.levelAt(x,z,y),
       body:id=>this.host.engine.world.entities[id] as never,access:(id,soul)=>this.layers.refusal(id,soul),
-      record:(soul,id,action)=>{const r=this.edge!.comms?.objects.act?.(id,soul,{action,params:{}}) as {accepted?:boolean}|undefined;if(!r?.accepted)throw Error('switch.object-record-refused');},
+      record:(soul,id,action,params={})=>{const r=this.edge!.comms?.objects.act?.(id,soul,{action,params}) as {accepted?:boolean}|undefined;if(!r?.accepted)throw Error('switch.object-record-refused');},
       commit:(ops,note,done)=>this.god.engineAct(ops,note,done)});
     this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), things: () => this.nav.things(), places: this.places, levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), commit: (ops, note) => this.god.engineAct(ops as never, note), layers: this.layers });
     this.god.onCommit((c) => { this.version++; if (c.diff.tiles.length || c.diff.defs.length) this.describeEpoch++; this.notePerceive([...c.diff.upserts.map((e) => e.id), ...c.diff.removes], c.diff.tiles.length > 0, c.by === 'engine' ? 'engine' : 'authored'); if (c.by !== 'engine') { this.godEdits++; this.editTick = this.host.engine.world.tick; this.onCommit(c.diff); } else if (c.diff.upserts.some(e => { const d=this.model.resolvedDef(e.def); return d?.components.opening && d.tags.includes('hand-operated'); })) { this.onCommit(c.diff); } });
