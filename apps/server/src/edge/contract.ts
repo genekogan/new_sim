@@ -30,7 +30,7 @@ export interface EdgeLedgerHooks {
   /** A Soul's innermost place changed. */
   onPlaceChange(listener: (e: {soulId: string; from: string | null; to: string | null; tick: number}) => void): void;
   /** Opaque capability providers (Comms objects) are merged into capabilities. */
-  addCapabilityProvider(p: (soul: EdgeSoul) => EdgeCapability[]): void;
+  addCapabilityProvider(p: (soul: EdgeSoul) => EdgeCapability[], projection?: {exactWalk:'objects-only'}): void;
   /** Persist a refusal for measurement (no text from agents). */
   recordRefusal?(soulId: string, verb: string, capability: string, code: string, reason?: string): void;
   /** carrier/1: a native ride's public state, for ride objects (null when there is no such carrier). */
