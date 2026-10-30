@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { pianoHands } from './piano-score.ts';
 import {gameContact,type RecordedGame} from './recorded-games.ts';
 import {rowingStroke} from './rowing-motion.ts';
 import {seesawAngle, swingAngle} from './play-motion.ts';
@@ -126,8 +127,10 @@ export function activityFrame(activity: string, base: string, seconds: number, i
       f.hands = [null, [0.42 + 0.06 * k, 0.04, -0.02 - 0.2 * k]]; f.look = 0.1; return f; }
     case 'write': { const s = Math.sin(t * 7) * 0.02, r = tri(t * 0.25) * 0.08;
       f.hands = [[0.36, -0.16, -0.44], [0.4 + s, -0.05 + r, -0.42]]; f.lean = 0.16; f.look = 0.45; return f; }
-    case 'play-piano': { const a = Math.sin(t * 5.3) * 0.035, b = Math.sin(t * 4.1 + 1) * 0.035;
-      f.hands = [[0.42, -0.02 + a, -0.36 + Math.max(0, Math.sin(t * 9)) * 0.03], [0.42, -0.02 + b, -0.36 + Math.max(0, Math.sin(t * 8 + 2)) * 0.03]]; f.lean = 0.1; f.look = 0.3; return f; }
+    // Entry 14: the hands strike the keys at the score's own onsets (the same notes the visitor hears), moving along the
+    // keys with pitch; between notes they lift a little. Clocked by world seconds, not the per-person phase.
+    case 'play-piano': { const [l, r] = pianoHands(opts.actorId ?? id, seconds);
+      f.hands = [[0.42, -0.02 + l.along, -0.36 + 0.028 * (1 - l.press)], [0.42, -0.02 - r.along, -0.36 + 0.028 * (1 - r.press)]]; f.lean = 0.1; f.look = 0.3; return f; }
     case 'play-music': { const s = Math.sin(t * 6) * 0.06;
       if(opts.instrument==='drums'){f.hands=[[.38,.05,-.26+Math.max(0,Math.sin(t*7))*.22],[.38,.05,-.26+Math.max(0,Math.sin(t*7+Math.PI))*.22]];f.look=.18;}
       else if(opts.instrument==='keyboard'||opts.instrument==='piano')return activityFrame('play-piano',base,seconds,id,opts);

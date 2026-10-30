@@ -20,6 +20,7 @@
 // was if it is heard again, a source that follows the listener (the sea) is heard wherever the camera is, and a voice's
 // event clock never fires a backlog of notes when it comes back.
 import type { WorldModel } from '@sim/world-compiler';
+import { pianoNotes } from '../../../../mars/viewer/app/engine-view/piano-score.ts';
 import { ambienceAt, condition, DEFAULT_SETTINGS, distanceTo, emittersOf, exposureAt, falloff, loadSettings, Movement, saveSettings, treeIndex, treesOf, type Emitter, type Resident, type SoundKind, type SoundSettings, type Source, type TreeIndex } from './sound-plan.ts';
 import { nightOf } from './motion.ts';
 import { sharedCoverProbe, type CoverProbe } from '../world-env.ts';
@@ -32,7 +33,7 @@ export { condition, distanceTo, falloff, emittersOf } from './sound-plan.ts';
 export type { SoundKind, SoundSpec } from './sound-plan.ts';
 
 type Cam = { position: { x: number; y: number; z: number }; matrixWorld?: { elements: ArrayLike<number> } };
-type Host = { layer: { model?: WorldModel | null; group?: THREE.Object3D; groundAt?(x: number, z: number): number | null }; camera: Cam; residents?: () => Resident[] };
+type Host = { layer: { model?: WorldModel | null; group?: THREE.Object3D; groundAt?(x: number, z: number): number | null }; camera: Cam; residents?: () => Resident[]; worldSeconds?: number | null };
 
 const MAX_VOICES = 12, TICK_MS = 100;
 /** A voice no longer heard stays alive (silent) this long before it stops, so a camera move does not restart it. */
@@ -64,6 +65,29 @@ function burst(c: AudioContext, out: AudioNode, at: number, dur: number, peak: n
   const s = c.createBufferSource(); s.buffer = noiseBuf; const f = filt(c, type, hp), g = c.createGain();
   g.gain.setValueAtTime(peak, at); g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
   s.connect(f).connect(g).connect(out); s.start(at, Math.random()); s.stop(at + dur + 0.02);
+}
+/** A piano key: a triangle fundamental with a quieter octave, struck and decaying. */
+function pianoKey(c: AudioContext, out: AudioNode, at: number, midi: number, peak: number) {
+  const f = 440 * 2 ** ((midi - 69) / 12);
+  tone(c, out, at, f, f, midi < 60 ? 1.8 : 1.3, peak, 'triangle'); tone(c, out, at, f * 2, f * 2, 0.6, peak * 0.22, 'sine');
+}
+// Entry 14: Souls playing the piano, heard where they are. Notes come from the shared score at depicted world seconds
+// (the hands strike the same onsets); scheduled a short way ahead, each note once.
+const PIANO_RADIUS = 24, PIANO_VOLUME = 0.55, PIANO_AHEAD = 0.35, pianoDone = new Map<string, number>();
+let pianoNear = false;
+function playPianos(host: Host, x: number, y: number, z: number) {
+  pianoNear = false;
+  const now = host.worldSeconds; if (typeof now !== 'number' || !ctx || !master) return;
+  for (const r of host.residents?.() ?? []) {
+    if (r.activity !== 'play-piano' || !r.body) continue;
+    const g = falloff(Math.hypot(r.p[0] - x, r.p[1] - y, r.p[2] - z), PIANO_RADIUS, PIANO_VOLUME); if (g <= 0.001) continue;
+    pianoNear = true;
+    for (const n of pianoNotes(r.body, now - 0.05, now + PIANO_AHEAD)) {
+      const key = `${r.body}:${n.t}`; if (pianoDone.has(key)) continue; pianoDone.set(key, n.t);
+      pianoKey(ctx, master, ctx.currentTime + Math.max(0, n.t - now), n.midi, g * n.vel * 0.5);
+    }
+  }
+  for (const [k, t] of pianoDone) if (t < now - 2) pianoDone.delete(k);
 }
 function bell(c: AudioContext, out: AudioNode, at: number, f = 1180, peak = 0.35) {
   for (const [m, a, d] of [[1, 1, 1.4], [2.0, 0.5, 0.9], [2.76, 0.35, 0.6], [5.4, 0.15, 0.3]] as const) tone(c, out, at, f * m, f * m * 0.995, d, peak * a);
@@ -240,6 +264,7 @@ function step(host: Host) {
     ambient = ambienceAt({ x, y, z, ground, night, covered, waters, seaLevel, trees, exposure });
   }
   people = movement.emitters(host.residents?.() ?? [], { x, y, z, ground }, now / 1000);
+  if (!settings.muted) playPianos(host, x, y, z); else pianoNear = false;
   const heard: Heard[] = [], playlist = musicPlaying();
   for (const e of [...objects, ...ambient, ...people]) {
     if (playlist && e.spec.kind === 'music') continue;   // a world's own music things stay quiet under the playlist
@@ -328,7 +353,7 @@ export function startSoundLayer() {
   settings = loadSettings(store());
   const w = window as unknown as { __simEntity?: Host; __edenSound?: unknown };
   w.__edenSound = {
-    state: () => ({ ctx: ctx?.state ?? 'none', muted: settings.muted, music: settings.music, volume: settings.volume, covered,
+    state: () => ({ ctx: ctx?.state ?? 'none', muted: settings.muted, music: settings.music, volume: settings.volume, covered, piano: { near: pianoNear, scheduled: pianoDone.size },
       world: { trees: trees.count, exposure: +exposure.toFixed(2), night: +night.toFixed(2), typicalGround: +typicalGround.toFixed(1) },
       emitters: [...objects, ...ambient, ...people].map((e) => ({ id: e.id, kind: e.spec.kind, variant: e.spec.variant ?? 0, source: e.source, when: e.spec.when ?? null, on: condition(e.spec.when, e.state, night) })),
       heard: lastHeard.map(({ e: _e, ...h }) => ({ ...h, gain: +h.gain.toFixed(3), d: +h.d.toFixed(1) })),
@@ -352,7 +377,7 @@ export function startSoundLayer() {
   };
   (window as unknown as { __edenMusic?: unknown }).__edenMusic = { state: musicState, log: musicLog, level: musicLevel, next: nextPiece, trackSeconds: musicTrackSeconds };
   // another tab took the sound, or this one came back: act now, not on the next (throttled, when hidden) tick
-  audioFocus()?.subscribe(() => { applyMaster(); syncMusic({ on: musicOn(), volume: settings.volume, unlocked: !!ctx && ctx.state === 'running' }); });
+  audioFocus()?.subscribe(() => { applyMaster(); syncMusic({ on: musicOn(), volume: settings.volume * (pianoNear ? 0.2 : 1), unlocked: !!ctx && ctx.state === 'running' }); });
   const gesture = () => { unlock(); musicGesture(); };
   for (const ev of ['pointerdown', 'keydown', 'touchstart', 'touchend', 'click'] as const) window.addEventListener(ev, gesture, { capture: true, passive: true });
   // lane W1: the first scan of the world's sound sources (~0.2 s at 2x CPU on Eden 2026) waits until the arrival is over.
@@ -360,7 +385,7 @@ export function startSoundLayer() {
   setInterval(() => {
     if (!arrivalOver() || !document.querySelector('.world-scene canvas')) return;
     mountUi();
-    syncMusic({ on: musicOn(), volume: settings.volume, unlocked: !!ctx && ctx.state === 'running' });
+    syncMusic({ on: musicOn(), volume: settings.volume * (pianoNear ? 0.2 : 1), unlocked: !!ctx && ctx.state === 'running' });
     const host = w.__simEntity; if (host?.camera && host.layer) { const t0 = performance.now(); try { step(host); } catch { /* a world mid-reload */ } cost.ticks++; cost.tickMs += performance.now() - t0; }
   }, TICK_MS);
 }

@@ -255,7 +255,7 @@ export function ambienceAt(L: Listener): Emitter[] {
 // ---------------------------------------------------------------- residents and the visitor
 
 /** `speaking`: the resident is saying something right now (a speech line shown in the last few seconds). */
-export type Resident = { id: string; p: readonly [number, number, number]; speaking?: boolean };
+export type Resident = { id: string; p: readonly [number, number, number]; speaking?: boolean; body?: string; activity?: string };
 type Track = { p: readonly [number, number, number]; t: number; speed: number };
 
 /** Footsteps where residents walk, a resident's murmur while they speak, and chatter where two or more stand within 4 m of each other; the visitor's own
