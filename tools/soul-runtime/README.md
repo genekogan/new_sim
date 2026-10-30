@@ -1,7 +1,8 @@
 # Soul continuity runtime (in development)
 
 This directory is an opt-in client-side foundation, not the published Soul CLI
-or an enabled controller. No live Soul uses it yet. Node22.20+ is required for
+or a released controller. Local development Souls have used it; multi-Soul qualification
+and production release remain pending. Node22.20+ is required for
 `node:sqlite` (experimental on Node22); the existing thin CLI keeps its existing
 runtime requirements.
 
