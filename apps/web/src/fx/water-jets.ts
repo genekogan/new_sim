@@ -22,10 +22,10 @@ export function nozzleOf(def: Def): [number, number, number] | null {
 }
 
 // per kind: droplet count, life (s), droplet size (m), and the shader body that places a droplet of age `a`
-const KINDS: Record<WaterJetKind, { n: number; life: number; size: number; glsl: string }> = {
+const KINDS: Record<WaterJetKind, { n: number; life: number; size: number; streak: number; glsl: string }> = {
   // An oscillating garden sprinkler: the jet sweeps ±60° about the forward axis every 6 s; each droplet keeps the
   // direction it was launched in and falls under gravity to the ground (uDrop below the nozzle), then splashes.
-  sprinkler: { n: 1400, life: 1.7, size: 0.03, glsl: `
+  sprinkler: { n: 2400, life: 1.7, size: 0.034, streak: 0.25, glsl: `
     float tb = t - a;
     float az = 1.05 * sin(6.2831853 * tb / 6.0) + (r1 - 0.5) * 0.16;
     float el = 0.62 + (r2 - 0.5) * 0.30;
@@ -37,7 +37,7 @@ const KINDS: Record<WaterJetKind, { n: number; life: number; size: number; glsl:
     if (a > tl) { float s = a - tl; p += vec3((r4 - 0.5) * 0.25, 0.0, (r1 - 0.5) * 0.25) * s * 2.0 + vec3(0.0, 0.9 * s - 4.9 * s * s, 0.0); alpha = clamp(1.0 - s / 0.28, 0.0, 1.0) * 0.8; size *= 0.7; }
     else alpha = 0.9;` },
   // A tap: a stream leaves the spout gently forward and falls into the basin; drops scatter where it lands.
-  stream: { n: 420, life: 0.55, size: 0.016, glsl: `
+  stream: { n: 900, life: 0.55, size: 0.024, streak: 0.65, glsl: `
     vec3 v = vec3((r1 - 0.5) * 0.03, -0.25, 0.32 + (r2 - 0.5) * 0.05);
     float tl = (v.y + sqrt(v.y * v.y + 2.0 * 9.8 * uDrop)) / 9.8;
     float fa = min(a, tl);
@@ -45,7 +45,7 @@ const KINDS: Record<WaterJetKind, { n: number; life: number; size: number; glsl:
     if (a > tl) { float s = a - tl, ang = r3 * 6.2831853; p += vec3(cos(ang), 0.0, sin(ang)) * (0.25 + 0.5 * r4) * s + vec3(0.0, 0.6 * s - 4.9 * s * s, 0.0); alpha = clamp(1.0 - s / 0.18, 0.0, 1.0) * 0.75; size *= 0.8; }
     else alpha = 0.95;` },
   // A shower head: drops leave the rose spread over its face and fall to the tray.
-  shower: { n: 700, life: 0.8, size: 0.018, glsl: `
+  shower: { n: 1500, life: 0.8, size: 0.03, streak: 0.8, glsl: `
     float ang = r1 * 6.2831853, rad = 0.09 * sqrt(r2);
     vec3 v = vec3(cos(ang) * (0.15 + 0.35 * r3), -0.8, sin(ang) * (0.15 + 0.35 * r3));
     float tl = (v.y + sqrt(v.y * v.y + 2.0 * 9.8 * uDrop)) / 9.8;
@@ -73,10 +73,11 @@ function material(kind: WaterJetKind) {
         gl_Position = projectionMatrix * mv;
         gl_PointSize = clamp(size * 900.0 / max(0.1, -mv.z), 1.5, 24.0);
       }`,
+    // falling water reads as short vertical streaks; airborne sprinkler drops as nearly round beads
     fragmentShader: /* glsl */`varying float vAlpha;
-      void main(){ vec2 c = gl_PointCoord - 0.5; float d = length(c); if (d > 0.5) discard;
-        float body = smoothstep(0.5, 0.15, d), glint = smoothstep(0.22, 0.0, length(c - vec2(-0.12, -0.12)));
-        gl_FragColor = vec4(mix(vec3(0.70, 0.84, 0.93), vec3(1.0), glint * 0.8), body * vAlpha * 0.85); }`,
+      void main(){ vec2 c = gl_PointCoord - 0.5; float d = length(vec2(c.x * ${(1 + 2.6 * k.streak).toFixed(2)}, c.y)); if (d > 0.5) discard;
+        float body = smoothstep(0.5, 0.12, d), glint = smoothstep(0.2, 0.0, length(c - vec2(-0.06, -0.14)));
+        gl_FragColor = vec4(mix(vec3(0.56, 0.74, 0.88), vec3(1.0), glint * 0.85), body * vAlpha * 0.95); }`,
   });
   materials.set(kind, m); return m;
 }
