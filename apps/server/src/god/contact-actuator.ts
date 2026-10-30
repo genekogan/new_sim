@@ -2,6 +2,7 @@
 // Durable receipt intent, no per-tick object scan and no effect from an interrupted walk.
 import {actuatorPoint,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
 import { createHash } from 'node:crypto';
+import { HUMAN_RADIUS } from '../../../../mars/viewer/engine/world/catalog.ts';
 import { opSchema, contactStateKey, type WorldModel, type Op, type StoredDef } from '@sim/world-compiler';
 import type { EdgeSoul } from '../edge/contract.ts';
 import { actionsOf, actuatedState, thenPatch, whenRefusal } from './actuators.ts';
@@ -28,7 +29,14 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     // A def's part tinted `valve` (a tap handle) is where the hand goes; otherwise the old switch height at the centre.
     const shapes=def.make.kind==='gen'?(def.make.args as {shapes?:{tint?:string;at?:number[]}[]})?.shapes:undefined,valve=shapes?.find(s=>s.tint==='valve'&&s.at);
     if(valve?.at){const c=Math.cos(wp.yaw),s=Math.sin(wp.yaw),[vx,vy,vz]=valve.at.map(v=>v*wp.s);params.at=[wp.x+vx*c+vz*s,wp.y+vy,wp.z-vx*s+vz*c];}
-    const dx=me[0]-params.at[0],dz=me[2]-params.at[2],n=Math.hypot(dx,dz)||1;root=[params.at[0]+dx/n*.5,wp.y,params.at[2]+dz/n*.5];}
+    const dx=me[0]-params.at[0],dz=me[2]-params.at[2],n=Math.hypot(dx,dz)||1;root=[params.at[0]+dx/n*.5,wp.y,params.at[2]+dz/n*.5];
+    if(valve?.at){
+     // Stand beside the valve, clear of the thing's own footprint (a basin, a tray) by a body radius: of eight
+     // directions around the valve, the one nearest the Soul's approach whose stand point is outside.
+     const c=Math.cos(wp.yaw),s=Math.sin(wp.yaw),[hx,,hz]=def.size.box.map(v=>v*wp.s/2),outside=(p:number[])=>{const lx=(p[0]-wp.x)*c-(p[2]-wp.z)*s,lz=(p[0]-wp.x)*s+(p[2]-wp.z)*c;return Math.abs(lx)>hx+HUMAN_RADIUS||Math.abs(lz)>hz+HUMAN_RADIUS;};
+     const want=Math.atan2(dz,dx),best=Array.from({length:8},(_,i)=>i*Math.PI/4).map(a=>[params.at[0]+Math.cos(a)*.55,wp.y,params.at[2]+Math.sin(a)*.55,Math.abs(((a-want+Math.PI*3)%(Math.PI*2))-Math.PI)]).filter(outside).sort((p,q)=>p[3]-q[3])[0];
+     if(best)root=[best[0],best[1],best[2]];
+    }}
    return {params,root,level:d.levelAt?.(root[0],root[2],root[1])??0};
   },
   /** A few current public facts for compact nearby perception, never the full state. */

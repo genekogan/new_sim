@@ -23,7 +23,7 @@ const gardenTap: DefInput = {
   params: params as DefInput['params'], palette,
   state: { on: { type: 'bool', default: false } } as DefInput['state'],
   components: water('water', 8, 0.35) as DefInput['components'],
-  size: { box: [0.44, 0.95, 0.44] },
+  size: { box: [0.44, 0.95, 0.88] },   // covers the basin in front of the spout, so nobody stands in it
   actions: switches('Turn on the tap', 'Turn off the tap') as DefInput['actions'],
 } as DefInput;
 
