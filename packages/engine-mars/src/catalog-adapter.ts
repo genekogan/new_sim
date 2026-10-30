@@ -141,6 +141,7 @@ export function assetFromDef(id: string, d: DefFacts, o: { seen?: boolean } = {}
   if (tops.length) out.surfaceSlots = tops.flatMap((s) => surfaceLattice(s.id, tops.length === 1 ? w : Math.min(w, 1.2), tops.length === 1 ? dd : Math.min(dd, 0.8), s.height ?? s.p[1] ?? c.surface?.height ?? h, tops.length === 1 ? 0 : s.p[0], tops.length === 1 ? 0 : s.p[2]));
   else if (c.surface) out.surfaceSlots = surfaceLattice('top', w, dd, c.surface.height ?? h);
   const caps: NonNullable<AssetDef['capabilities']> = {};
+  if (c.carryable && d.tags.includes('recorded-item')) caps.recordedItemPoseV1 = true;
   if (c.readable) caps.readable = { pages: Math.max(1, Math.round(c.readable.pages ?? 4)), maxSeatDistance: 0.65 };
   if (c.display) caps.display = { accepts: 'text', maxChars: 280 };
   if (c.boardGame?.game === 'chess') caps.boardGame = 'chess';

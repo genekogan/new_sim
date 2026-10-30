@@ -1,4 +1,5 @@
 import {handActuatorFrame,type HandActuatorMotion} from '../../engine/social/hand-actuator.ts';
+import {itemPresentation,type ItemPresentation} from '../../engine/items/presentation.ts';
 // Engine humans → animated rigs. Renderers only read world state (guide):
 // after every fixed tick we snapshot pose + derive clip state; frames
 // interpolate between the last two ticks, so visuals are a deterministic
@@ -75,6 +76,7 @@ type View = {
   activity: string;
   handActuator?:HandActuatorMotion;
   handActuatorTime?:number;
+  itemPose?:ItemPresentation;
   sleepPose?: NonNullable<Entity['human']>['sleepPose'];
   shore?: ShoreContactV1;
   shoreTime?: number;
@@ -202,6 +204,7 @@ export type SampledHuman = {
   phaseK?: number;
   handActuator?:HandActuatorMotion;
   handActuatorTime?:number;
+  itemPose?:ItemPresentation;
   sleepPose?: NonNullable<Entity['human']>['sleepPose'];
   shore?: ShoreContactV1;
   shoreTime?: number;
@@ -427,6 +430,7 @@ export class HumanViews {
       v.shoreTime = undefined;
       v.waterTransition = undefined;
       v.handActuator=e.human?.handActuator;v.handActuatorTime=world.tick*DT;
+      v.itemPose=itemPresentation(e.human?.itemTransferV1,e.human?.heldItemsV1,world.tick,DT);
       v.sleepPose = e.human?.sleepPose;
       v.base = base;
       v.propWanted = (e.human as { prop?: string }).prop;
@@ -516,7 +520,7 @@ export class HumanViews {
         }
       }
     }
-    const pz = solvePosture(d, ts, styleFor(v.activity, walking));
+    const pz = solvePosture(d, ts, styleFor(v.activity, walking),!!v.itemPose);
     // A low latch may need a small bend as well as a hand reach. Ease the whole
     // solved posture on the same timeline so the torso cannot pop in/out.
     if(v.handActuator){const k=handActuatorFrame(v.handActuator,(v.handActuatorTime??0)-v.handActuator.startTick*DT).weight;for(const key of ['drop','bend','rise','kneel'] as const)pz[key]*=k;}
@@ -607,6 +611,7 @@ export class HumanViews {
       const walkDur = v.rig.walk.getClip().duration, idleDur = v.rig.idle.getClip().duration;
       v.activity = act;
       v.handActuator=f.handActuator;v.handActuatorTime=f.handActuatorTime;
+      v.itemPose=f.itemPose;
       v.sleepPose = f.sleepPose;
       v.shore = f.shore;
       v.shoreTime = f.shoreTime;
@@ -634,7 +639,7 @@ export class HumanViews {
       const transition=f.waterTransition,targetWeight=transition?.weight??1,priorWater=transition?.origins.reduce((sum,x)=>sum+(x.pose?x.weight:0),0)??0;
       const free=!f.hands?.left&&!f.hands?.right&&!f.grip&&!f.on;
       const waterWeight=free?clamp01((water?targetWeight:0)+(1-targetWeight)*priorWater):0;
-      const walk = SEATED.has(base) ? 0 : f.walk * (1-waterWeight);
+      const walk = SEATED.has(base) ? 0 : f.walk * (1-waterWeight)*(f.itemPose?.walkBlend??1);
       const e = { id: f.id, def: 'human', kind: 'human', pose: { p: f.p, yaw: f.yaw }, human: { activity: act, level: 0, hands: f.hands, proneYaw: f.proneYaw, phaseK: f.phaseK, sleepPose: f.sleepPose } } as unknown as Entity;
       const snap: Snap = {
         p: [...f.p],
@@ -733,8 +738,8 @@ export class HumanViews {
     const libShare = lib.cur || lib.prev ? 1 - w : 0;
     const curW = lib.cur ? libShare * lib.fade : 0, prevW = lib.prev ? libShare * (1 - lib.fade) : 0;
     const waveW = waveClip && !lib.cur ? 1 - w : 0, interactW = interactClip && !lib.cur ? 1 - w : 0;
-    const idleFree = v.activity === 'idle' && b.sitW === 0 && !engineHands && freeBody && !lib.cur;
-    const idleHandoff=v.handActuator?handActuatorFrame(v.handActuator,(v.handActuatorTime??tSec)-v.handActuator.startTick*DT).idleBlend:1;
+    const idleFree = (v.activity === 'idle'||(!!v.itemPose&&v.activity==='reach')) && b.sitW === 0 && (!engineHands||(v.itemPose?.weight??1)<1) && freeBody && !lib.cur;
+    const idleHandoff=v.itemPose?.idleBlend??(v.handActuator?handActuatorFrame(v.handActuator,(v.handActuatorTime??tSec)-v.handActuator.startTick*DT).idleBlend:1);
     const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, tSec) * idleHandoff : 0;
     const variant = idleFree ? idleVariant(h.name, tSec) : null, variantA = variant ? libAction(v.rig, variant.clip) : null;
     const variantW = variantA ? (1 - w - neutralW) * variant!.w * idleHandoff : 0;
@@ -926,7 +931,7 @@ export class HumanViews {
       } } : expression?.kind === 'planted-dance' ? {girdle:0,pole:arm=>V().copy(_right).multiplyScalar(-arm.side*(.35+expression.elbowLift)).addScaledVector(UP,-.5+expression.elbowLift).addScaledVector(_fwd,.15)} : undefined;
       // Blend the actual arm bones to/from the existing idle/walk clip; lowering a
       // Cartesian hand target alone leaves the elbow/shoulder snapping at release.
-      const weight=v.handActuator?handActuatorFrame(v.handActuator,(v.handActuatorTime??tSec)-v.handActuator.startTick*DT).weight:1;
+      const weight=v.itemPose?.weight??(v.handActuator?handActuatorFrame(v.handActuator,(v.handActuatorTime??tSec)-v.handActuator.startTick*DT).weight:1);
       const armBase=weight<1?v.arms.flatMap(arm=>[...(arm.shoulder?[arm.shoulder]:[]),arm.upper,arm.lower,arm.hand]).map(o=>({o,q:o.quaternion.clone(),p:o.position.clone()})):[];
       const k = reachTo(v, targets, pz.rise > 0, BODY_MODEL.maxExtension, undefined, pa);
       v.arms.forEach((arm, i) => {

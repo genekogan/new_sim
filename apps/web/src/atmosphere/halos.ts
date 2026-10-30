@@ -43,11 +43,13 @@ const KINDS:Record<string,Kind>={
  // festival kit (anchors at the lantern / bulb itself)
  'paper-lantern':{height:()=>0,size:.6,color:'#ffd9a0',intensity:.55,flicker:false},
  'festoon':{height:()=>0,size:.32,color:'#ffe2a8',intensity:.7,flicker:false},
+ 'portable':{height:()=>0,size:.32,color:'#ffe2a8',intensity:.7,flicker:false},
 };
 export class Halos{
  readonly mesh:THREE.InstancedMesh;
  readonly uniforms={uHalo:{value:new THREE.Vector4(0,0,800,0)},uPatternTime:{value:new THREE.Vector2()}};
  private count=0;private key='';
+ private sourceIndices:number[]=[];private sourceHeights:number[]=[];private moveMatrix=new THREE.Matrix4();
  constructor(max=640){
   const g=new THREE.PlaneGeometry(1,1);g.setAttribute('aHalo',new THREE.InstancedBufferAttribute(new Float32Array(max*4),4));
   g.setAttribute('aPattern',new THREE.InstancedBufferAttribute(new Float32Array(max*2),2));
@@ -59,12 +61,21 @@ export class Halos{
  setSources(list:readonly HaloSource[]){
   const key=JSON.stringify(list);if(key===this.key)return;this.key=key;
   const attr=this.mesh.geometry.getAttribute('aHalo') as THREE.InstancedBufferAttribute,patterns=this.mesh.geometry.getAttribute('aPattern') as THREE.InstancedBufferAttribute,m=new THREE.Matrix4(),c=new THREE.Color();let n=0;
-  const placed:number[][]=[];
-  for(const [x,y,z,kind,scale,pattern,phase,color] of list){const k=KINDS[kind];if(!k||n>=attr.count)continue;const s=Number.isFinite(scale)?scale:1,hy=y+k.height(s);
-   if(placed.some(p=>Math.abs(p[0]-x)<.3&&Math.abs(p[1]-hy)<.3&&Math.abs(p[2]-z)<.3))continue;placed.push([x,hy,z]);
+  const placed:number[][]=[];this.sourceIndices=[];this.sourceHeights=[];let input=-1;
+  for(const [x,y,z,kind,scale,pattern,phase,color] of list){input++;this.sourceIndices[input]=-1;const k=KINDS[kind];if(!k||n>=attr.count)continue;const s=Number.isFinite(scale)?scale:1,hy=y+k.height(s);
+   // Each portable anchor is one actual emitter; colocated physical emitters may
+   // later separate, so they must not be folded into a scenery duplicate.
+   if(kind!=='portable'&&placed.some(p=>Math.abs(p[0]-x)<.3&&Math.abs(p[1]-hy)<.3&&Math.abs(p[2]-z)<.3))continue;if(kind!=='portable')placed.push([x,hy,z]);
+   this.sourceIndices[input]=n;this.sourceHeights[input]=hy-y;
    const size=k.size*Math.max(.6,Math.min(1.5,s));m.makeScale(size,size,size).setPosition(x,hy,z);this.mesh.setMatrixAt(n,m);
    c.set(color??k.color).multiplyScalar(k.intensity);attr.setXYZW(n,c.r,c.g,c.b,k.flicker&&pattern===undefined?(n*.618)%1:-1);patterns.setXY(n,Math.max(0,LIGHT_PATTERNS.indexOf(pattern??'steady')),phase??0);n++;}
-  this.count=n;this.mesh.count=n;this.mesh.instanceMatrix.needsUpdate=true;attr.needsUpdate=true;patterns.needsUpdate=true;
+  this.count=n;this.mesh.count=n;this.mesh.instanceMatrix.clearUpdateRanges();attr.clearUpdateRanges();patterns.clearUpdateRanges();this.mesh.instanceMatrix.needsUpdate=true;attr.needsUpdate=true;patterns.needsUpdate=true;
+ }
+ /** Sparse movement by published input index; colour/shape and static sprites stay intact. */
+ moveSource(input:number,x:number,y:number,z:number){
+  const index=this.sourceIndices[input];if(index===undefined||index<0)return;
+  this.mesh.getMatrixAt(index,this.moveMatrix);this.moveMatrix.setPosition(x,y+this.sourceHeights[input],z);
+  this.mesh.setMatrixAt(index,this.moveMatrix);if(!this.mesh.instanceMatrix.updateRanges.some(r=>r.start===index*16))this.mesh.instanceMatrix.addUpdateRange(index*16,16);this.mesh.instanceMatrix.needsUpdate=true;
  }
  get size(){return this.count;}
  /** Night strength 0..1; the pixel scale (uHalo.z) is set per render from the renderer and camera. */

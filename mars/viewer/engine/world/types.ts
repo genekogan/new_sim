@@ -75,6 +75,9 @@ export type HumanState = {
    * at rest. Absent when neither hand is published. ITEMS.md "Hand points".
    */
   hands?: { left?: Vec3; right?: Vec3 };
+  /** Only opted-in world items; bounded to the two actual occupied hands. */
+  heldItemsV1?: { left?: string; right?: string };
+  itemTransferV1?: import('../items/presentation.ts').ItemTransferV1;
   /** While an overlay activity (`eat`) runs: the activity it is layered on ('sit' = seated, 'talk', 'idle'…). */
   baseActivity?: string;
   /**

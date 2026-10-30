@@ -108,7 +108,7 @@ type ModelLike = {
   ground?(): { extent?: readonly number[] };
   editSeq?: number;
 };
-type LayerLike = { active: boolean; groundAt(x: number, z: number): number | null; groundPeek?(x: number, z: number): number | null; group: THREE.Object3D };
+type LayerLike = { active: boolean; groundAt(x: number, z: number): number | null; groundPeek?(x: number, z: number): number | null; group: THREE.Object3D; movingLights?():Iterable<string>; lightObject?(id:string):THREE.Object3D|undefined };
 
 /** God worlds get Eden's living presentation: lamps that light at dusk with warm pools and halos, the sky, weather
  *  (scheduled, or the god's), and rain that stays out of god-built rooms. One per live view. */
@@ -156,6 +156,13 @@ export class GodWorldLiving {
   /** P1 phones: the light scan's inputs (the layer's model and its diff seq); unchanged inputs skip the scan. */
   private scanned: { model: unknown; seq: number; at: number } | null = null;
   private patterns: PatternNightMap | null = null;
+  private patterned = false;
+  private portable = new Map<string,{index:number;at:readonly number[]}[]>();
+  private sourcePools:NightSource[]=[];
+  private sourceHalos:HaloSource[]=[];
+  private moveVersion=0;
+  private sourceScans=0;
+  lightFrame(){return{portable:this.portable.size,scans:this.sourceScans,moves:this.group.userData.edenLightMoves??[],moveVersion:this.moveVersion,map:this.patterns?.inspect()??null};}
   private reduced = false;
   private clockless = false;
   lights = 0;
@@ -169,12 +176,28 @@ export class GodWorldLiving {
     this.group.name = 'god-world lights (presentation)'; this.group.userData.cameraTransparent = true;
   }
   private get model(): ModelLike | null { return (this.layer as unknown as { model?: ModelLike | null }).model ?? null; }
+  private portablePose(id:string){const o=this.layer.lightObject?.(id);return o?{x:o.position.x,y:o.position.y,z:o.position.z,yaw:o.rotation.y,s:o.scale.x}:null;}
+  private movePortable(){
+    const moves:{index:number;at:HaloSource}[]=[];
+    for(const id of this.layer.movingLights?.()??[]){const entries=this.portable.get(id),p=entries&&this.portablePose(id);if(!entries||!p)continue;
+      const c=Math.cos(p.yaw),s=Math.sin(p.yaw);
+      for(const e of entries){const [dx,dy,dz]=e.at,x=p.x+(dx*c+dz*s)*p.s,z=p.z+(-dx*s+dz*c)*p.s,y=p.y+dy*p.s,old=this.sourceHalos[e.index],pool=this.sourcePools[e.index];
+        if(!old||!pool||Math.abs(x-old[0])+Math.abs(y-old[1])+Math.abs(z-old[2])<.00001)continue;
+        const base=(this.layer.groundPeek?.(x,z)??this.layer.groundAt(x,z))??0;
+        pool.x=x;pool.z=z;pool.base=base;this.patterns?.moveSource(e.index,x,z,base);
+        const at:HaloSource=[x,y,z,old[3],old[4],old[5],old[6],old[7]];this.sourceHalos[e.index]=at;moves.push({index:e.index,at});
+      }
+    }
+    if(moves.length){this.group.userData.edenLightMoves=moves;this.group.userData.edenLightMoveVersion=++this.moveVersion;}
+    return moves.length>0;
+  }
   /** Every frame: lamps follow the world clock; the night map is repainted when the god's lights change (checked 2×/s). */
   update(nowMs: number, daylight: number | null, reducedMotion = false) {
     if (!this.layer.active) { setClockNight(null); return; }
     setClockNight(daylight === null ? null : 1 - Math.max(0, Math.min(1, daylight)));
     setNightLightStrength(daylight, this.pools.gain);
-    if (this.patterns && this.renderer && (!reducedMotion || reducedMotion !== this.reduced)) this.patterns.render(this.renderer, worldSeconds(nowMs / 1000), reducedMotion);
+    const moved=this.movePortable();
+    if (this.patterns && this.renderer && (moved||(this.patterned&&(!reducedMotion || reducedMotion !== this.reduced)))) this.patterns.render(this.renderer, worldSeconds(nowMs / 1000), reducedMotion);
     this.reduced = reducedMotion;
     if (daylight !== null && this.clockless) { this.clockless = false; this.checkedAt = -Infinity; }
     const source={model:this.model,seq:(this.layer as unknown as {seq?:unknown}).seq};
@@ -194,13 +217,16 @@ export class GodWorldLiving {
     if (typeof seq === 'number' && s && s.model === m && s.seq === seq && nowMs - s.at < 10_000) return;
     this.scanned = typeof seq === 'number' ? { model: m, seq, at: nowMs } : null;
     const sources: NightSource[] = [], marks: HaloSource[] = [], beacons: [number, number, number][] = [];
+    this.sourceScans++;
+    const portable=new Map<string,{index:number;at:readonly number[]}[]>();
     const scan = () => { for (const e of m.entities.values()) {
       if (e.state?.on === false) continue;
       const def = m.resolvedDef(e.def), components = def?.components, lights = defLights(components);
       // W2: any lighthouse sweeps its beams at night from its lantern room (near the top of its box)
       if (def?.tags?.includes('lighthouse')) { const p = m.worldPose(e), h = (def.size?.box?.[1] ?? 16) * (p.s ?? 1); beacons.push([p.x, p.y + h * 0.83, p.z]); }
       if (!lights.length) continue;
-      const p = m.worldPose(e), yaw = p.yaw ?? 0, scale = p.s ?? 1, cos = Math.cos(yaw), sin = Math.sin(yaw);
+      const moving=def?.tags?.includes('recorded-item')===true;
+      const p = (moving&&this.portablePose(e.id))||m.worldPose(e), yaw = p.yaw ?? 0, scale = p.s ?? 1, cos = Math.cos(yaw), sin = Math.sin(yaw);
       const fire = /fire|hearth|brazier|campfire|torch/.test(e.def);
       const flame = flickers(e.def); // W2: fire pools and halos flicker (an authored pattern wins)
       for (const [i, light] of lights.entries()) {
@@ -211,15 +237,19 @@ export class GodWorldLiving {
         const pattern = light.pattern ?? (flame ? 'flicker' as const : undefined);
         const phase = lightPhase(e.id, i, lights.length, pattern);
         sources.push({ x, z, base, radius: range * (fire ? 0.4 : POOL_RADIUS) * this.pools.radius, intensity: fire ? 1.1 : POOL_LAMP, color: light.color ?? '#ffe9c4', halo: range * POOL_HALO * this.pools.radius, pattern, phase });
-        marks.push([x, at ? p.y + (at.length === 3 ? at[1] * scale : 0) : base, z, at ? 'festoon' : fire ? 'fire' : 'lamp', range / 8, pattern, phase, at || light.pattern || components?.lights ? light.color : undefined]);
+        marks.push([x, at ? p.y + (at.length === 3 ? at[1] * scale : 0) : base, z, moving ? 'portable' : at ? 'festoon' : fire ? 'fire' : 'lamp', range / 8, pattern, phase, at || light.pattern || components?.lights ? light.color : undefined]);
+        if(moving){const entries=portable.get(e.id)??[];entries.push({index:sources.length-1,at:[at?.[0]??0,at?.length===3?at[1]:0,at?.[at.length-1]??0]});portable.set(e.id,entries);}
       }
     } };
     if (m.readPass) m.readPass(scan); else scan();
     const bounds = worldNightBounds(m.constants?.extent, m.ground?.().extent);
     const sig = JSON.stringify([sources, marks, bounds, beacons]);
+    this.portable=portable;
     if (sig === this.signature) return;
     this.signature = sig; this.lights = sources.length;
-    if (this.renderer && sources.some(s => s.pattern && s.pattern !== 'steady')) {
+    this.sourcePools=sources;this.sourceHalos=marks;
+    this.patterned=sources.some(s => s.pattern && s.pattern !== 'steady');
+    if (this.renderer && (this.patterned||portable.size>0)) {
       this.patterns ??= new PatternNightMap(); this.patterns.setSources(sources, bounds);
       this.patterns.render(this.renderer, worldSeconds(nowMs / 1000), reducedMotion);
     } else { this.patterns?.dispose(); this.patterns = null; paintOnlySources(sources, bounds); }

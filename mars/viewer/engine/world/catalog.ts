@@ -94,6 +94,8 @@ export type AssetDef = {
   equipment?: { kind: EquipmentKind; defaults: Record<string, number | string> };
   /** Usable activity affordances, independent of mesh appearance and per-entity state. */
   capabilities?: {
+    /** Opt-in small world items whose poses share the recorded hand clock. */
+    recordedItemPoseV1?: true;
     /** Upright ground fixture transport; handling geometry is defined only here. */
     /** Chess token semantics are independent of its appearance. */
     gameToken?: { game: 'chess'; color: Color; kind: Kind };

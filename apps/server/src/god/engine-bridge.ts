@@ -1610,7 +1610,8 @@ export class EngineBridge {
       if (asset.category === 'item' && x.support?.kind !== 'in-hand' && !held) {
         const id = `pick-up:${x.id}`, label = `Pick up ${name(x.id)} (${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
         caps.push({ id, verb: 'pick-up', label, target: { id: x.id, kind: 'item' }, available: true });
-        plans.set(id, { label, steps: [...stand, ...approach(x), { verb: 'mars:take_item', params: { item: x.id, hand: 'right' } }] });
+        const precise=(this.physics?.assets[x.def] as {capabilities?:{recordedItemPoseV1?:boolean}})?.capabilities?.recordedItemPoseV1&&levelOf(x)===(me.human.level??0);
+        plans.set(id, { label, steps: [...stand, ...(precise?[]:approach(x)), { verb: 'mars:take_item', params: { item: x.id, hand: 'right' } }] });
       }
       if (held && asset.surfaceSlots?.length) {
         const taken = new Set(Object.values(ents).filter((o: any) => o.support?.kind === 'resting-on' && o.support.on === x.id).map((o: any) => o.support.slot));
@@ -1622,7 +1623,10 @@ export class EngineBridge {
         const free = (asset.surfaceSlots as { id: string; local?: number[] }[]).filter((s) => !taken.has(s.id)).sort((a, b) => { const pa = at(a), pb = at(b); return Math.hypot(pa[0] - here[0], pa[1] - here[1]) - Math.hypot(pb[0] - here[0], pb[1] - here[1]); })[0];
         const id = `put-on:${x.id}`, label = `Put ${name(held.id)} on ${name(x.id)} (${d} m)`;
         caps.push({ id, verb: 'put-on', label, target: { id: x.id, kind: 'object' }, available: !!free, ...(free ? {} : { blocked: { code: 'surface.full', reason: `${name(x.id)} has no free place.` } }) });
-        if (free) plans.set(id, { label, steps: [...stand, ...approach(x), { verb: 'mars:put_item', params: { item: held.id, surfaceSlot: `${x.id}#${free.id}` } }] });
+        // The native item action already plans a slot-specific station. A generic
+        // walk to the table can first put the body opposite the selected slot.
+        const precise=(this.physics?.assets[held.def] as {capabilities?:{recordedItemPoseV1?:boolean}})?.capabilities?.recordedItemPoseV1&&levelOf(x)===(me.human.level??0);
+        if (free) plans.set(id, { label, steps: [...stand, ...(precise?[]:approach(x)), { verb: 'mars:put_item', params: { item: held.id, surfaceSlot: `${x.id}#${free.id}` } }] });
       }
     }
     const alt = usable.sort((a, b) => a.d - b.d || a.id.localeCompare(b.id))[0];
