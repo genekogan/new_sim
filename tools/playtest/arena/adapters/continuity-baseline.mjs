@@ -44,7 +44,7 @@ export async function nameBaselineThread({threadId,cwd,name},{createHost=options
  * Explicit resume uses the existing exec resume path; no fresh-thread fallback.
  */
 export async function runContinuityBaseline({cwd,directory,text,model,effort,remainingSeconds,resumeThreadId=null,name=null,cliVersion=null,prevCumulative=null,signal,onState=()=>{},ephemeral=false},
- {command='codex',commandArgs=[],spawnProcess=spawn,killProcess=process.kill,createMetadataHost,termGraceMs=1000,verifyMs=1000,maxLineBytes=1024*1024,maxStdoutBytes=64*1024*1024,maxStderrBytes=64*1024}={}){
+ {command='codex',commandArgs=[],spawnProcess=spawn,killProcess=process.kill,createMetadataHost,termGraceMs=1000,verifyMs=5000,maxLineBytes=1024*1024,maxStdoutBytes=64*1024*1024,maxStderrBytes=64*1024}={}){
  if(typeof cwd!=='string'||typeof directory!=='string'||typeof text!=='string'||!text.trim()||text.length>64000||!label(model)||!label(effort)||!Number.isFinite(remainingSeconds)||remainingSeconds<=0||remainingSeconds>604800||resumeThreadId!==null&&!identifier(resumeThreadId)||name!==null&&!label(name)||cliVersion!==null&&!label(cliVersion)||ephemeral!==false||typeof onState!=='function'||typeof command!=='string'||!command||!Array.isArray(commandArgs)||!commandArgs.every(a=>typeof a==='string'))throw fault('INVALID_BASELINE_OPTIONS');
  for(const n of [termGraceMs,verifyMs,maxLineBytes,maxStdoutBytes,maxStderrBytes])if(!Number.isFinite(n)||n<1)throw fault('INVALID_BASELINE_BOUNDS');
  const folder=realpathSync(cwd);if(!statSync(folder).isDirectory())throw fault('INVALID_BASELINE_CWD');
@@ -129,6 +129,9 @@ export async function runContinuityBaseline({cwd,directory,text,model,effort,rem
   clearTimeout(timer);signal?.removeEventListener('abort',abort);
   // Even a normally exited leader can leave children behind in its owned group.
   if(groupStatus()!=='absent'){signalGroup('SIGTERM');if(await waitGroup(termGraceMs)!=='absent')signalGroup('SIGKILL');}
+  // Descendant reaping can lag SIGKILL/leader exit. This grace verifies cleanup
+  // after teardown signals, without extending the inference deadline. Only
+  // ESRCH certifies group absence.
   const groupVerification=await waitGroup(verifyMs);
   execProof={pid,cwd:folder,threadId,exit,groupClosed:groupVerification==='absent',groupVerification:groupVerification==='absent'?'absent':'unverified'};
   // Drain any remaining pipe data after group teardown without waiting forever

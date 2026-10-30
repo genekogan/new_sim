@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
+import {EventEmitter} from 'node:events';
 import {mkdtempSync,mkdirSync,readFileSync,statSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -13,7 +14,7 @@ function fixture(t){
  const root=mkdtempSync(join(tmpdir(),'continuity-baseline-')),cwd=join(root,'seat'),directory=join(root,'evidence'),children=[];mkdirSync(cwd,{mode:0o700});
  t.after(()=>{for(const child of children)try{process.kill(-child.pid,'SIGKILL');}catch{}rmSync(root,{recursive:true,force:true});});
  const calls=[],states=[];
- const run=(script,options={},deps={})=>runContinuityBaseline({cwd,directory,text:'Meet at the declared UTC, then finish the original errand.',model:'requested-model',effort:'low',remainingSeconds:5,onState:s=>states.push(s),...options},{command:process.execPath,commandArgs:['-e',script,'--'],termGraceMs:30,verifyMs:1000,...deps,spawnProcess:(command,args,opts)=>{calls.push({command,args,opts});const child=spawn(command,args,opts);children.push(child);return child;}});
+ const run=(script,options={},deps={})=>runContinuityBaseline({cwd,directory,text:'Meet at the declared UTC, then finish the original errand.',model:'requested-model',effort:'low',remainingSeconds:5,onState:s=>states.push(s),...options},{command:process.execPath,commandArgs:['-e',script,'--'],termGraceMs:30,...deps,spawnProcess:(command,args,opts)=>{calls.push({command,args,opts});const child=spawn(command,args,opts);children.push(child);return child;}});
  return {root,cwd,directory,calls,states,children,run,rows:()=>readFileSync(join(directory,'stream.ndjson'),'utf8').trim().split('\n').map(JSON.parse)};
 }
 function metadata(cwd,{nameError=null,readCwd=cwd,readId='thread-one',closeProof={hostPid:null,startFailed:true,groupClosed:true,groupVerification:'absent'},onRequest=()=>{}}={}){
@@ -59,7 +60,8 @@ test('cutoff terminates the exact group including a TERM-resistant child; no aut
  const result=await f.run(script,{remainingSeconds:.3});
  assert.equal(result.stopReason,'cutoff');assert.equal(f.calls.length,1);assert.equal(result.ownedProcessesExited,true);assert.equal(gone(result.pid),true);
  assert.ok(f.rows().some(r=>r.type==='synthetic.child'));assert.equal(result.actualEffort,null,'requested effort alone is not verification');
- assert.ok(result.endedAt-result.startedAt<2000);
+ assert.equal(result.deadlineAt-result.startedAt,300,'inference cutoff is unchanged by cleanup grace');
+ assert.ok(result.endedAt-result.startedAt<6500,'cutoff plus bounded post-kill cleanup');
 });
 
 test('a normally exited leader still cleans an inherited child group',async t=>{
@@ -122,6 +124,37 @@ test('uncertain exec or administrative group closure is never called verified',a
  assert.equal(result.execProof.groupClosed,false);assert.equal(result.execProof.groupVerification,'unverified');assert.equal(result.ownedProcessesExited,false);
  const g=fixture(t),r=await g.run(line({type:'thread.started',thread_id:'thread-one'}),{name:'Sim baseline'},{createMetadataHost:()=>metadata(g.cwd,{closeProof:{hostPid:123,groupClosed:false,groupVerification:'unverified'}}).host});
  assert.equal(r.execProof.groupClosed,true);assert.equal(r.ownedProcessesExited,false);assert.equal(r.metadataGroups[0].groupClosed,false);
+});
+
+// In-memory process fixtures exercise reaping without Codex, inference or a
+// real descendant. Leader exit zero is intentionally independent of the group.
+function reapingFixture(t,killProcess){
+ const f=fixture(t),child=new EventEmitter();child.pid=900005;
+ for(const name of ['stdout','stderr']){child[name]=new EventEmitter();child[name].readableEnded=true;child[name].destroy=()=>{};}
+ return {f,run:()=>runContinuityBaseline({cwd:f.cwd,directory:f.directory,text:'Synthetic cleanup only.',model:'synthetic-model',effort:'low',remainingSeconds:.01},
+  {termGraceMs:1,killProcess,spawnProcess:()=>{queueMicrotask(()=>child.emit('exit',0,null));return child;}})};
+}
+test('default group verification accepts delayed post-kill reaping beyond the old one-second bound',async t=>{
+ let killed=false,probes=0;const calls=[],p=reapingFixture(t,(pid,sig)=>{
+  calls.push([pid,sig]);if(sig==='SIGKILL')killed=true;
+  if(sig===0&&killed&&++probes===51)throw Object.assign(Error('reaped'),{code:'ESRCH'});
+ });
+ const result=await p.run();
+ assert.equal(probes,51,'ESRCH appears only after 50 post-kill delays (1.25 seconds)');
+ assert.equal(result.exit.code,0);assert.equal(result.execProof.groupClosed,true);assert.equal(result.execProof.groupVerification,'absent');assert.equal(result.ownedProcessesExited,true);
+ assert.deepEqual(calls.filter(([,sig])=>sig!==0),[[-900005,'SIGTERM'],[-900005,'SIGKILL']]);assert.ok(calls.every(([pid])=>pid===-900005));
+ assert.equal(result.stopReason,'exited');assert.equal(result.deadlineAt-result.startedAt,10,'cleanup does not extend the original inference deadline');
+});
+test('default five-second verification exhausts without certifying a surviving group',async t=>{
+ let killed=false;const calls=[],p=reapingFixture(t,(pid,sig)=>{calls.push([pid,sig]);if(sig==='SIGKILL')killed=true;});
+ t.mock.timers.enable({apis:['Date','setTimeout'],now:100000});
+ const running=p.run();await new Promise(setImmediate);
+ t.mock.timers.tick(1);await new Promise(setImmediate);assert.equal(killed,true);
+ const verificationStartedAt=Date.now();
+ for(let n=0;n<200;n++){t.mock.timers.tick(25);await new Promise(setImmediate);}
+ const result=await running;
+ assert.equal(result.endedAt-verificationStartedAt,5000);assert.equal(result.exit.code,0);assert.equal(result.execProof.groupClosed,false);assert.equal(result.execProof.groupVerification,'unverified');assert.equal(result.ownedProcessesExited,false);
+ assert.deepEqual(calls.filter(([,sig])=>sig!==0),[[-900005,'SIGTERM'],[-900005,'SIGKILL']]);assert.equal(result.stopReason,'exited');assert.equal(result.deadlineAt-result.startedAt,10);
 });
 
 test('invalid or nonfresh options fail before a process and ephemeral is not silently substituted',async t=>{
