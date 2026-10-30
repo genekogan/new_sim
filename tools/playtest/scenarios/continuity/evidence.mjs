@@ -68,11 +68,13 @@ export function adaptIndependentProbe({run,timeline=[],journals={},scenarioId=ru
  if(t0===null)missing.push('authoritative post-setup T0');if(cutoff===null)missing.push('trial cutoff');
  const participants=Object.create(null),fixtureActors=Object.create(null),received=new Map(),receipts=new Map(),operations=[],releases=[];
  for(const a of people){const target=run.actors.some(p=>p.id===a.id)?participants:fixtureActors;target[a.id]={samples:[],receipts:[],reads:[],coverageComplete:false};receipts.set(a.id,new Map());}
- const addReceipt=(actor,r,observedAt,source,kind)=>{
+ const addReceipt=(actor,r,observedAt,source,kind,nativeReadLifecycles=[])=>{
   if(!object(r)||typeof r.id!=='string'||typeof r.capability!=='string')return;
   const map=receipts.get(actor),list=map.get(r.id)??[];
   if(r.soulId!==undefined&&r.soulId!==inventory.get(actor).soulId||list.some(x=>x.receipt.capability!==r.capability))throw Error('Native receipt identity/scope conflict');
-  list.push({receipt:r,at:observedAt,source,kind});map.set(r.id,list);
+  // Journal/response fields cannot self-certify a native body lifecycle.
+  const {nativeReadLifecycles:unverified,...receipt}=r;
+  list.push({receipt,at:observedAt,source,kind,nativeReadLifecycles});map.set(r.id,list);
  };
  for(const {r,source} of entries){
   const target=participants[r.actor]??fixtureActors[r.actor];if(!target)continue;
@@ -107,7 +109,7 @@ export function adaptIndependentProbe({run,timeline=[],journals={},scenarioId=ru
  if(worlds.size>1)throw Error('Participant journals belong to different worlds');
  for(const n of nativeReceipts){
   if(!inventory.has(n.actor)||!cited(n.evidence)){issues.push('Native receipt lacks actor scope or source citation');continue;}
-  for(const source of n.evidence)addReceipt(n.actor,n.receipt,time(n.observedAt),source,n.kind==='native-receipt-event'?'native-receipt-event':'explicit-native-observation');
+  for(const source of n.evidence)addReceipt(n.actor,n.receipt,time(n.observedAt),source,n.kind==='native-receipt-event'?'native-receipt-event':'explicit-native-observation',n.receipt?.nativeReadLifecycles??[]);
  }
  // Each phase's first native observation is retained. Neither world ticks nor
  // receipt.endedAt (a terminal body pose) are interpreted as UTC timestamps.
@@ -117,7 +119,11 @@ export function adaptIndependentProbe({run,timeline=[],journals={},scenarioId=ru
    const dated=list.filter(x=>x.at!==null).sort((a,b)=>a.at-b.at),ends=dated.filter(x=>terminal(x.receipt)),chosen=ends.at(-1)??dated.at(-1)??list.at(-1),first=dated[0],end=ends.find(x=>x.kind==='native-receipt-event');
    // A late readback proves the terminal state was observed by then. It does
    // not date the actual completion and cannot extend an activity's interval.
-   target.receipts.push({...chosen.receipt,observedAcceptedAt:first?.at??null,observedEndedAt:end?.at??null,terminalStateObservedAt:ends[0]?.at??null,timestampEvidence:{accepted:first?{at:first.at,kind:first.kind,source:first.source}:null,terminal:end?{at:end.at,kind:end.kind,source:end.source}:null},evidence:unique(list.map(x=>x.source))});
+   const programs=unique(list.map(x=>x.receipt.programId).filter(x=>typeof x==='string'&&x)),programId=programs.length===1?programs[0]:null;
+   // Terminal public receipt events omit programId; retain it only when the
+   // captured ledger versions agree. Contradictory identities grant no proof.
+   const nativeReadLifecycles=[...new Map(list.flatMap(x=>Array.isArray(x.nativeReadLifecycles)?x.nativeReadLifecycles:[]).filter(p=>p?.schema==='native-read-lifecycle/1'&&cited(p.evidence)&&cited(p.receiptEvidence)&&p.event?.worldId===run.worldId&&p.event?.soulId===inventory.get(actor).soulId&&p.event?.receipt?.id===chosen.receipt.id&&p.event?.receipt?.capability===chosen.receipt.capability&&p.event?.programId===programId).map(p=>[JSON.stringify(p),p])).values()];
+   target.receipts.push({...chosen.receipt,worldId:run.worldId,soulId:inventory.get(actor).soulId,programId,nativeReadLifecycles,observedAcceptedAt:first?.at??null,observedEndedAt:end?.at??null,terminalStateObservedAt:ends[0]?.at??null,timestampEvidence:{accepted:first?{at:first.at,kind:first.kind,source:first.source}:null,terminal:end?{at:end.at,kind:end.kind,source:end.source}:null},evidence:unique(list.map(x=>x.source))});
   }
  }
  const acknowledgements=new Map(),hostDeliveries=new Map();

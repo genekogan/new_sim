@@ -5,6 +5,8 @@ import {mkdtempSync,realpathSync,mkdirSync,writeFileSync,rmSync,readFileSync} fr
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {readNativeExportInputs} from './native-export-adapter.mjs';
+import {adaptIndependentProbe} from './evidence.mjs';
+import {observedHolds} from './oracle.mjs';
 const sha=x=>createHash('sha256').update(x).digest('hex');
 const keys={edge_comms_speech:['id'],edge_comms_turns:['conversation_id','seq'],edge_comms_conversations:['id'],edge_comms_stream:['soul_id','seq'],edge_comms_object_log:['object_id','version'],edge_receipts_v1:['receipt_id'],soul_inbox_queue_v1:['scope','owner','n'],edge_idempotency_v1:['soul_id','route','key']};
 function fixture(t){
@@ -17,7 +19,7 @@ function fixture(t){
  const publicEvent=event=>events.push({kind:'public-effect',event});
  const write=()=>{
   const all=[{kind:'capture-start'},...events,{kind:'capture-heartbeat'}];let last='';const lines=all.map((r,i)=>{const record={schema:'continuity-native-record/1',runId:run.runId,worldId:run.worldId,epoch:scope.epoch,index:i+1,observedAt:900+i,kind:r.kind,...r,previousHash:last};last=sha(JSON.stringify(record));return JSON.stringify({...record,hash:last});});writeFileSync(join(captureDirectory,'native-capture.jsonl'),lines.join('\n')+'\n');writeFileSync(join(captureDirectory,'capture-status.json'),JSON.stringify({...scope,index:lines.length,lastHash:last}));
-  const output=rows.map(({table,row,snapshotId})=>({schema:'continuity-native-row/1',snapshotId,requestedAt:snapshotId==='early'?1800:3000,observedAt:snapshotId==='early'?1850:3100,table,key:JSON.stringify([run.worldId,...keys[table].map(k=>row[k])]),row,sha256:sha(JSON.stringify(row))}));output.push({schema:'continuity-native-snapshot/1',snapshotId:'early',requestedAt:1800,receivedAt:1900},{schema:'continuity-native-snapshot/1',snapshotId:'final',requestedAt:3000,receivedAt:3200});
+  const output=rows.map(({table,row,snapshotId})=>({schema:'continuity-native-row/1',snapshotId,requestedAt:snapshotId==='early'?1800:run.cutoffAt,observedAt:snapshotId==='early'?1850:run.cutoffAt+100,table,key:JSON.stringify([run.worldId,...keys[table].map(k=>row[k])]),row,sha256:sha(JSON.stringify(row))}));output.push({schema:'continuity-native-snapshot/1',snapshotId:'early',requestedAt:1800,receivedAt:1900},{schema:'continuity-native-snapshot/1',snapshotId:'final',requestedAt:run.cutoffAt,receivedAt:run.cutoffAt+200});
   const data=output.map(r=>JSON.stringify(r)).join('\n')+'\n';writeFileSync(join(exportDirectory,'native-snapshots.jsonl'),data);writeFileSync(join(exportDirectory,'export-status.json'),JSON.stringify({schema:'continuity-native-export/1',runId:run.runId,worldId:run.worldId,epoch:scope.epoch,bytes:Buffer.byteLength(data),rows:new Set(output.filter(r=>r.table).map(r=>r.table+':'+r.key)).size,coverage}));
  };
  const read=options=>{write();return readNativeExportInputs({run,captureDirectory,exportDirectory,coverage,...options});};
@@ -70,4 +72,37 @@ test('native owner messages retain immutable IDs and outcome versions without in
 test('exported stream rows retain exact native cursor and time and reject reserved body overrides',t=>{
  const f=fixture(t);f.row('edge_comms_stream',{soul_id:'soul-a',seq:2,tick:3,at:1600,kind:'conversation.turn',body:'{"conversation":"cv-one","turn":{"seq":1,"at":1600,"from":{"soulId":"soul-b"},"text":"Actual turn"}}'});const r=f.read();assert.equal(r.inputs.expectedNotifications[0].eventId,'c_2');assert.equal(r.inputs.expectedNotifications[0].createdAt,1600);
  f.rows[0].row.body='{"at":100,"id":"c_999"}';assert.throws(()=>f.read(),/RESERVED_FIELD_CONFLICT/);
+});
+
+function compoundRead(f){
+ const capability='book-club:book-club.chair',id='r-club';
+ f.row('edge_receipts_v1',{receipt_id:id,soul_id:'soul-a',capability,phase:'started',program_id:'p1',created_at:1100,detail:'{"chosen":{"target":"book-club.chair"}}'});
+ f.event('soul-a',{id:'c_1',kind:'receipt',tick:1,at:1200,receipt:{id,capability,phase:'started'}});
+ const event={id:'c_2',kind:'activity.observed',tick:2,at:1501,observedAt:1500,worldId:'world-1',soulId:'soul-a',bodyId:'body-a',observation:'native-current-body',untrusted:false,receipt:{id,capability,phase:'started'},programId:'p1',action:{id:'a1',verb:'pose_v1',status:'executing',phase:'together'},body:{activity:'read',posture:'seated',occupiedSeats:['chair#seat']}};
+ f.event('soul-a',event);
+ f.event('soul-a',{id:'c_3',kind:'receipt',tick:3,at:2900,receipt:{id,capability,phase:'completed'}});
+ return event;
+}
+test('compound reading preserves raw identity and joins only exact native body/receipt/program/slot proof',t=>{
+ const f=fixture(t),event=compoundRead(f),r=f.read(),versions=r.inputs.nativeReceipts;
+ assert.equal(r.mechanical.readingNormalization,'native-reading-lifecycle/2');
+ assert.ok(versions.every(v=>v.receipt.capability==='book-club:book-club.chair'));
+ assert.equal(versions.flatMap(v=>v.receipt.nativeReadLifecycles).length,1,'proof is attached once across mutable receipt versions');
+ const proof=versions[0].receipt.nativeReadLifecycles[0];assert.deepEqual(proof.event,event);assert.ok(proof.evidence[0].includes('native-capture.jsonl#L'));assert.ok(proof.receiptEvidence[0].includes('native-snapshots.jsonl#L'));
+ assert.equal(r.native.receiptVersions[0].receipt.programId,'p1');assert.ok(r.native.receiptVersions.every(v=>v.receipt.nativeReadLifecycles===undefined),'raw captured versions remain separate from normalized proof');
+ assert.deepEqual(r.native.recipientEvents.find(f=>f.event.id==='c_2').event,event,'raw event is preserved');
+});
+test('compound reading rejects wrong native identity, program, nonread or ambiguous/unqualified slot rather than guessing capability aliases',t=>{
+ const mutations=[e=>e.receipt.id='wrong',e=>e.receipt.capability='read:chair',e=>e.programId='wrong',e=>e.soulId='soul-b',e=>e.worldId='other',e=>e.bodyId='body-b',e=>e.body.activity='sit',e=>e.body.posture='standing',e=>e.body.occupiedSeats=['chair'],e=>e.body.occupiedSeats={length:1,0:'chair#seat'},e=>e.body.occupiedSeats=['chair#seat','other#seat'],e=>e.untrusted=true,e=>e.observation='model-text',e=>e.action.status='done',e=>e.action.verb='say',e=>e.observedAt=1600];
+ for(const mutate of mutations){const f=fixture(t),event=compoundRead(f);mutate(event);assert.ok(f.read().inputs.nativeReceipts.every(v=>!v.receipt.nativeReadLifecycles.length));}
+ const f=fixture(t);compoundRead(f);f.rows[0].row.program_id=null;assert.ok(f.read().inputs.nativeReceipts.every(v=>!v.receipt.nativeReadLifecycles.length),'an event program is not its own ledger corroboration');
+ f.rows[0].row.program_id='p1';f.row('edge_receipts_v1',{...f.rows[0].row,program_id:'p2'});assert.ok(f.read().inputs.nativeReceipts.every(v=>!v.receipt.nativeReadLifecycles.length),'contradictory ledger programs grant no lifecycle');
+});
+test('captured compound read survives terminal events omitting program and reaches unchanged body-hold oracle',t=>{
+ const f=fixture(t);f.run.t0=1000;f.run.cutoffAt=40000;f.coverage.to=40000;compoundRead(f);f.events.find(r=>r.event.id==='c_3').event.at=38000;
+ const native=f.read(),timeline=Array.from({length:40},(_,i)=>({kind:'body',source:'here',actor:'a',soulId:'soul-a',requestedAt:1000+i*1000,receivedAt:1000+i*1000,me:{pos:[0,0],posture:'seated',seat:'chair#seat',activity:'book-club',actualActivity:{kind:i>0&&i<37?'read':'sit'}}}));
+ const e=adaptIndependentProbe({run:f.run,timeline,nativeReceipts:native.inputs.nativeReceipts,audits:{participants:{a:{complete:true,from:1000,to:40000,receiptsComplete:true,evidence:['audit.json#/a']}}}}),r=e.participants.a.receipts[0];
+ assert.equal(r.phase,'completed');assert.equal(r.programId,'p1');assert.equal(r.observedAcceptedAt,1200);assert.equal(r.observedEndedAt,38000);assert.equal(r.nativeReadLifecycles.length,1);assert.equal(r.capability,'book-club:book-club.chair');assert.equal(e.participants.a.coverageComplete,true);
+ const holds=observedHolds({...e.participants.a,bindings:{chair:{entityId:'chair',slot:'seat'}},phase:{region:{pos:[0,0],radiusM:2},holdSec:30,postures:['seated'],activities:['read'],requireSeatRefs:['chair'],receipt:{verb:'read',targetRefs:['chair']}},from:1000,to:40000});
+ assert.equal(holds.status,'pass');assert.equal(holds.windows[0].from,2000);assert.equal(holds.windows[0].to,37000);
 });

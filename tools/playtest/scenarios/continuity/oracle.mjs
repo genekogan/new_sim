@@ -22,7 +22,22 @@ const refOfSeat=(s,bindings,refs=Object.keys(bindings))=>{
  const matching=refs.filter(k=>bindings[k]?.entityId===h.entity);
  return matching.find(k=>bindings[k].slot===(h.slot??'seat'))??matching.find(k=>!bindings[k].slot);
 };
+// Prospective correction of the native compound-read false negative. This is
+// an implementation version, not a change to frozen durations or criteria.
+export const READING_MATCH_VERSION='native-reading-lifecycle/2';
+const nativeReads=r=>(Array.isArray(r.nativeReadLifecycles)?r.nativeReadLifecycles:[]).filter(p=>{
+ const e=p?.event;
+ return p?.schema==='native-read-lifecycle/1'&&cited(p.evidence)&&cited(p.receiptEvidence)&&e?.kind==='activity.observed'&&/^c_[0-9]+$/.test(e.id)&&Number.isFinite(e.at)&&Number.isFinite(e.observedAt)&&e.observedAt<=e.at
+  &&e.observation==='native-current-body'&&e.untrusted===false&&typeof r.worldId==='string'&&e.worldId===r.worldId&&typeof r.soulId==='string'&&e.soulId===r.soulId&&typeof e.bodyId==='string'&&!!e.bodyId
+  &&e.receipt?.id===r.id&&e.receipt?.capability===r.capability&&e.receipt?.phase==='started'&&typeof r.programId==='string'&&!!r.programId&&e.programId===r.programId
+  &&e.body?.activity==='read'&&['seated','sitting'].includes(e.body?.posture)&&Array.isArray(e.body?.occupiedSeats)&&e.body.occupiedSeats.length===1&&typeof e.body.occupiedSeats[0]==='string'&&/^([^#\s]+)#([^#\s]+)$/.test(e.body.occupiedSeats[0])
+  &&typeof e.action?.id==='string'&&!!e.action.id&&e.action.verb==='pose_v1'&&e.action.status==='executing';
+});
+const nativeReadMatches=(r,rule,bindings,time=Infinity)=>rule.verb==='read'&&nativeReads(r).some(p=>p.event.at<=time&&(rule.targetRefs??[]).some(ref=>{
+ const b=bindings[ref];return b&&p.event.body.occupiedSeats[0]===`${b.entityId}#${b.slot??'seat'}`;
+}));
 function receiptMatches(r,rule,bindings){
+ if(nativeReadMatches(r,rule,bindings))return true;
  if(rule.verb&&!r.capability?.startsWith(rule.verb+':'))return false;
  if(rule.navigation){const ids=[r.chosen?.target,r.chosen?.place].filter(id=>typeof id==='string');return ids.length>0&&rule.navigation.some(n=>r.capability===n.capability&&ids.every(id=>id===n.targetPlaceId));}
  if(r.capability==='read:here')return false; // local receipt, never a seat target
@@ -46,25 +61,26 @@ export function observedHolds({samples=[],receipts=[],phase,bindings={},from=-In
   return !h.slot&&phase.requireSeatRefs.some(ref=>bindings[ref]?.entityId===h.entity&&bindings[ref].slot&&bindings[ref].slot!=='seat');
  };
  const incomplete=all.some((s,i)=>!current(s)||locationMissing(s,phase)||missingSeat(s)||phase.activities&&!activity(s)||phase.instruments&&(!phase.activities||phase.activities.includes(activity(s)))&&!s.instrument||i>0&&at(s.t)-at(all[i-1].t)>maxGapSec*1000),miss=coverageComplete&&!incomplete?'fail':'unknown';
- // A local read has no seat target. Its native lifecycle must be audited,
- // while the independently observed exact seat establishes where reading
- // actually occurs. Never make read:here a wildcard bound-target match.
+ // Local and compound reads need a bounded audited lifecycle. A local
+ // receipt has no target; a compound read additionally requires its exact
+ // native program/body transition and occupied slot. Neither name is an alias.
  const local=r=>phase.receipt?.verb==='read'&&phase.receipt.localCapabilities?.includes(r.capability);
- const unboundedLocal=r=>{
-  if(!local(r))return false;
+ const lifecycle=r=>local(r)||phase.receipt?.verb==='read'&&nativeReads(r).length>0;
+ const unboundedLifecycle=r=>{
+  if(!lifecycle(r))return false;
   return !coverageComplete||!Number.isFinite(from)||!Number.isFinite(to)||!Number.isFinite(accepted(r))||typeof r.id!=='string'||!r.id
    ||!['accepted','waiting','started','running','completed','failed','replaced','cancelled','canceled'].includes(r.phase)
    ||['completed','failed','replaced','cancelled','canceled'].includes(r.phase)&&!Number.isFinite(ended(r))
    ||receipts.some(other=>other.id!==r.id&&accepted(other)===accepted(r));
  };
- const localUnknown=receipts.some(unboundedLocal);
+ const lifecycleUnknown=receipts.some(unboundedLifecycle);
  const navigationUnknown=phase.receipt?.navigation&&receipts.some(r=>phase.receipt.navigation.some(n=>n.capability===r.capability)&&(!Number.isFinite(accepted(r))||!r.chosen||![r.chosen.target,r.chosen.place].some(id=>typeof id==='string')||r.phase==='completed'&&!Number.isFinite(ended(r))));
- const eligible=r=>(local(r)?!unboundedLocal(r):receiptMatches(r,phase.receipt,bindings))&&Number.isFinite(accepted(r))&&accepted(r)<=to;
+ const eligible=r=>(local(r)?!unboundedLifecycle(r):!unboundedLifecycle(r)&&receiptMatches(r,phase.receipt,bindings))&&Number.isFinite(accepted(r))&&accepted(r)<=to;
  const candidates=phase.receipt?receipts.filter(eligible):[null];
- if(phase.receipt&&!candidates.length)return {status:localUnknown||navigationUnknown?'unknown':miss,detail:'no timestamped native receipt matching bound target or audited local read lifecycle',windows:[]};
+ if(phase.receipt&&!candidates.length)return {status:lifecycleUnknown||navigationUnknown?'unknown':miss,detail:'no timestamped native receipt matching bound target or audited local read lifecycle',windows:[]};
  const windows=[];
  for(const r of candidates){
-  const nextAction=r&&local(r)?Math.min(...receipts.filter(other=>other.id!==r.id&&Number.isFinite(accepted(other))&&accepted(other)>=accepted(r)).map(accepted)):Infinity;
+  const nextAction=r&&lifecycle(r)?Math.min(...receipts.filter(other=>other.id!==r.id&&Number.isFinite(accepted(other))&&accepted(other)>=accepted(r)).map(accepted)):Infinity;
   let run=[];
   const finish=()=>{const requiredMs=(phase.holdSec??0)*1000;if(run.length&&at(run.at(-1).t)-at(run[0].t)>=requiredMs)windows.push({from:at(run[0].t),to:at(run.at(-1).t),completedAt:at(run.find(s=>at(s.t)-at(run[0].t)>=requiredMs).t),receiptId:r?.id??null,seat:held(run[0]),seatRef:refOfSeat(run[0],bindings,phase.requireSeatRefs)});run=[];};
   for(const s of all){
@@ -73,8 +89,11 @@ export function observedHolds({samples=[],receipts=[],phase,bindings={},from=-In
    if(phase.requireSeatRefs)good=good&&phase.requireSeatRefs.includes(ref);
    if(r){
     good=good&&accepted(r)<=time;
-    if(local(r))good=good&&time<nextAction;
-    else if(phase.requireSeatRefs)good=good&&!!ref&&receiptMatches(r,{...phase.receipt,targetRefs:[ref]},bindings);
+    if(lifecycle(r))good=good&&time<nextAction;
+    if(!local(r)){
+     if(phase.receipt.verb==='read'&&nativeReads(r).length)good=good&&!!ref&&nativeReadMatches(r,{...phase.receipt,targetRefs:[ref]},bindings,time);
+     else if(phase.requireSeatRefs)good=good&&!!ref&&receiptMatches(r,{...phase.receipt,targetRefs:[ref]},bindings);
+    }
     const chosenSlot=seatIdentity(r.chosen?.slot);
     if(phase.requireSeatRefs&&chosenSlot?.slot)good=good&&seat===`${chosenSlot.entity}#${chosenSlot.slot}`;
     if(phase.receipt.completed)good=good&&r.phase==='completed'&&Number.isFinite(ended(r))&&ended(r)>=from&&ended(r)<=time;
@@ -86,7 +105,7 @@ export function observedHolds({samples=[],receipts=[],phase,bindings={},from=-In
   finish();
  }
  windows.sort((a,b)=>a.completedAt-b.completedAt||a.from-b.from);
- return {status:windows.length?'pass':localUnknown||navigationUnknown?'unknown':miss,detail:windows.length?'current body samples and native receipt agree':'no uninterrupted sampled hold; missing/contrary samples are retained',windows};
+ return {status:windows.length?'pass':lifecycleUnknown||navigationUnknown?'unknown':miss,detail:windows.length?'current body samples and native receipt agree':'no uninterrupted sampled hold; missing/contrary samples are retained',windows};
 }
 function errandInspection(r,{samples,phase,returned,cutoff,maxGapSec}){
  const request=at(r.requestedAt),response=at(r.at),gap=maxGapSec*1000;
@@ -448,7 +467,7 @@ export function scoreContinuity({fixtures,oracles,evidence}){
  const review=evidence.semantic,required=[...oracles.semanticRubric.common,...oracles.semanticRubric.scenarios[scenario.id]];
  for(const item of required){const r=review?.rubricVersion===oracles.semanticRubric.version?review.reviews?.find(r=>r.id===item.id):null;rows.push(row('semantic:'+item.id,r&&['pass','fail'].includes(r.status)&&r.evidence?.length?r.status:'unknown',r?.reason??item.pass,r?.evidence));}
  const status=evidence.fixtureVerified!==true?'unknown':rows.some(r=>r.status==='fail')?'fail':rows.every(r=>r.status==='pass')?'pass':'unknown';
- return {schema:'continuity-score/1',proposalRevision:fixtures.proposalRevision??null,scenarioId:scenario.id,status,readiness:scenario.fixtureStatus,rows,limits:'Proposal scorer. Missing group integration/coverage remains unknown; this output does not certify baseline, holdout or soak acceptance.'};
+ return {schema:'continuity-score/1',readingMatchVersion:READING_MATCH_VERSION,proposalRevision:fixtures.proposalRevision??null,scenarioId:scenario.id,status,readiness:scenario.fixtureStatus,rows,limits:'Proposal scorer. Missing group integration/coverage remains unknown; this output does not certify baseline, holdout or soak acceptance.'};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  const evidence=JSON.parse(readFileSync(process.argv[2],'utf8'));

@@ -306,3 +306,35 @@ test('initial Mars task facts expose genuine participation constraints without a
  assert.equal(s.initialTaskFacts.invitedGuestCount,3);assert.equal(s.initialTaskFacts.minimumSharedRealSeconds,30);assert.equal(s.initialTaskFacts.distinctGuestQuestioners,2);assert.equal(s.initialTaskFacts.fixtureOccupantCountsAsGuest,false);
  for(const phrase of ['three invited guests','One guest may arrive late','at least 30 real seconds','two different guests','no assigned speaking order'])assert.ok(s.initialConstraintSupplement.includes(phrase),phrase);
 });
+
+function compoundReceipt({id='club',seat='e_chair#seat',at=0}={}){
+ const capability='book-club:book-club.chair';
+ return {id,worldId:'world-test',soulId:'soul-test',programId:'p1',capability,acceptedAtUtc:0,endedAtUtc:35000,phase:'completed',nativeReadLifecycles:[{schema:'native-read-lifecycle/1',evidence:['native-capture.jsonl#L2'],receiptEvidence:['native-snapshots.jsonl#L1'],event:{id:'c_2',kind:'activity.observed',tick:10,at,observedAt:at,worldId:'world-test',soulId:'soul-test',bodyId:'body-test',observation:'native-current-body',untrusted:false,receipt:{id,capability,phase:'started'},programId:'p1',action:{id:'a1',verb:'pose_v1',status:'executing'},body:{activity:'read',posture:'seated',occupiedSeats:[seat]}}}]};
+}
+test('source-backed compound lifecycle supports only its actual exact-slot read hold without aliasing the native capability',()=>{
+ const r=compoundReceipt(),run=(changes={})=>observedHolds({samples,receipts:[r],bindings,phase,from:0,to:35000,coverageComplete:true,...changes});
+ assert.equal(run().status,'pass');assert.equal(run().windows[0].receiptId,'club');assert.equal(r.capability,'book-club:book-club.chair');
+ assert.equal(run({coverageComplete:false}).status,'unknown');assert.equal(run({from:-Infinity}).status,'unknown');
+ for(const mutate of [p=>p.evidence=[],p=>p.receiptEvidence=[],p=>p.event.receipt.id='other',p=>p.event.receipt.capability='read:chair',p=>p.event.programId='other',p=>p.event.body.activity='sit',p=>p.event.body.occupiedSeats=['other#seat'],p=>p.event.body.occupiedSeats=['e_chair'],p=>p.event.soulId='other',p=>p.event.worldId='other',p=>p.event.untrusted=true,p=>p.event.action.verb='say']){
+  const wrong=structuredClone(r);mutate(wrong.nativeReadLifecycles[0]);assert.equal(run({receipts:[wrong]}).status,'fail');
+ }
+ assert.equal(run({receipts:[{...r,nativeReadLifecycles:[]}],bindings:{chair:{...bindings.chair,capabilities:{read:[r.capability]}}}}).status,'fail','a caller capability alias alone cannot convert book-club to read');
+ assert.equal(run({receipts:[compoundReceipt({at:1000})]}).status,'fail','a transition after the first sample cannot backdate a 30-second hold');
+ assert.equal(run({receipts:[r,{id:'later',capability:'walk:field',acceptedAtUtc:15000,phase:'started'}]}).status,'fail');
+ assert.equal(run({receipts:[r,{id:'same',capability:'walk:field',acceptedAtUtc:0,phase:'started'}]}).status,'unknown');
+ assert.equal(run({receipts:[{...r,endedAtUtc:20000}]}).status,'fail');
+ assert.equal(run({samples:samples.filter((s,i)=>i<14||i>17)}).status,'unknown','unchanged two-second maximum gap still applies');
+ assert.equal(run({samples:samples.map((s,i)=>i===15?{...s,activity:'sit'}:s)}).status,'fail');
+ const two={...bindings,other:{entityId:'e_other',slot:'seat'}},twoPhase={...phase,requireSeatRefs:['chair','other'],receipt:{verb:'read',targetRefs:['chair','other']}};
+ assert.equal(run({bindings:two,phase:twoPhase,samples:samples.map(s=>({...s,seat:'e_other#seat'}))}).status,'fail','another permitted seat does not match this native lifecycle');
+});
+test('compound native reading retains simultaneous distinct-seat overlap requirement and explicit matcher version',()=>{
+ const e=readingEvidence({a:[250,285],b:[251,286]});
+ for(const [i,actor]of ['reader-a','reader-b'].entries()){
+  const ev=e.participants[actor],old=ev.receipts[1],r=compoundReceipt({id:old.id,seat:'chair-'+(i+1)+'#seat',at:old.acceptedAtUtc});
+  ev.receipts=ev.receipts.filter(r=>!r.id.endsWith('-return'));ev.receipts[1]={...r,acceptedAtUtc:old.acceptedAtUtc,endedAtUtc:old.endedAtUtc};
+ }
+ const result=score(e);assert.equal(result.readingMatchVersion,'native-reading-lifecycle/2');assert.equal(resultRow(result,'simultaneous-distinct-seat-reading').status,'pass');
+ e.participants['reader-b'].receipts[1].nativeReadLifecycles[0].event.at=260000;e.participants['reader-b'].receipts[1].nativeReadLifecycles[0].event.observedAt=260000;
+ assert.equal(resultRow(score(e),'simultaneous-distinct-seat-reading').status,'fail','late actual read transition cannot manufacture thirty seconds overlap');
+});

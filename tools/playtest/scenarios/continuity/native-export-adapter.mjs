@@ -15,6 +15,8 @@ const time=x=>typeof x==='number'&&Number.isFinite(x)?x:typeof x==='string'&&/(Z
 const decode=x=>typeof x==='string'?JSON.parse(x):x;
 const equal=(a,b)=>isDeepStrictEqual(a,b);
 const unique=x=>[...new Set(x)];
+// Prospective matcher correction; raw historical receipts/capabilities stay intact.
+export const NATIVE_READING_NORMALIZATION='native-reading-lifecycle/2';
 const KEYS={souls:['id'],edge_comms_heads:['soul_id'],edge_comms_stream:['soul_id','seq'],edge_comms_speech:['id'],edge_comms_turns:['conversation_id','seq'],edge_comms_conversations:['id'],edge_comms_object_log:['object_id','version'],edge_comms_object_refs:['soul_id','client_ref'],edge_receipts_v1:['receipt_id'],edge_refusals_v1:['rowid'],edge_idempotency_v1:['soul_id','route','key'],soul_inbox_queue_v1:['scope','owner','n']};
 // Frozen exporter projection; unexpected columns are refused rather than
 // accidentally forwarding a dump/credential-bearing source under this schema.
@@ -91,7 +93,7 @@ export function readNativeExportInputs({run,captureDirectory,exportDirectory,cov
  const addReceipt=(soulId,receipt,observedAt,source,kind)=>{
   if(!actors.has(soulId)||!obj(receipt)||typeof receipt.id!=='string'||typeof receipt.capability!=='string'||receipt.soulId!==undefined&&receipt.soulId!==soulId)throw fail('NATIVE_RECEIPT_IDENTITY_INVALID');
   const identity=receiptIdentity.get(receipt.id),expected=[soulId,receipt.capability];if(identity&&!equal(identity,expected))throw fail('NATIVE_RECEIPT_IDENTITY_CONFLICT');receiptIdentity.set(receipt.id,expected);
-  native.receiptVersions.push({actor:actors.get(soulId).id,receipt:{...receipt,soulId},observedAt,kind,evidence:[source]});
+  native.receiptVersions.push({actor:actors.get(soulId).id,receipt:{...receipt,soulId,worldId:run.worldId},observedAt,kind,evidence:[source]});
   effect(soulId,{id:receipt.id,type:'action',at:null,capability:receipt.capability,nativeIdentity:[run.worldId,receipt.id],evidence:[source]});
  };
  for(const r of capture.records){
@@ -108,7 +110,7 @@ export function readNativeExportInputs({run,captureDirectory,exportDirectory,cov
    // Partial raw ledger history, not ledger.view(): a stored started phase may
    // be presented publicly as waiting for an invitation. Outcomes are not in
    // this projection. Actual activity comes from body samples, not this phase.
-   const receipt={...decode(row.detail??'{}'),id:row.receipt_id,capability:row.capability,phase:row.phase,acceptedTick:row.accepted_tick,startedTick:row.started_tick,endedTick:row.ended_tick,code:row.code,reason:row.reason,clientRef:row.client_ref};
+   const receipt={...decode(row.detail??'{}'),id:row.receipt_id,capability:row.capability,phase:row.phase,acceptedTick:row.accepted_tick,startedTick:row.started_tick,endedTick:row.ended_tick,code:row.code,reason:row.reason,programId:row.program_id,clientRef:row.client_ref};
    addReceipt(row.soul_id,receipt,r.observedAt,source,'explicit-native-observation');effect(row.soul_id,{id:row.receipt_id,type:'action',at:row.created_at,capability:row.capability,nativeIdentity:[run.worldId,row.receipt_id],evidence:[source]});
   }
   if(r.table==='soul_inbox_queue_v1'){
@@ -135,6 +137,30 @@ export function readNativeExportInputs({run,captureDirectory,exportDirectory,cov
   const receipt=e.receipt??e.data?.receipt;if(receipt&&e.kind==='receipt')addReceipt(soulId,receipt,e.at,evidence[0],'native-receipt-event');
   if(participants.has(actor)&&inWindow(actor,e.at)&&['speech.to-me','mention','conversation.invite','conversation.turn','invite'].includes(classified))expected.set(JSON.stringify([actor,'world',e.id]),{actor,source:'world',eventId:e.id,createdAt:e.at,evidence:unique([...evidence,...fact.classificationEvidence])});
  }
+ // Only an exact native body transition joined to the ledger's program can
+ // establish a read lifecycle for a compound activity (not its capability name).
+ // Keep raw facts unchanged; typed proofs are attached only to normalized copies.
+ const receiptPrograms=new Map();
+ for(const r of native.receiptVersions){const key=JSON.stringify([r.receipt.soulId,r.receipt.id]),entry=receiptPrograms.get(key)??{programs:new Set(),evidence:[]};
+  if(typeof r.receipt.programId==='string'&&r.receipt.programId){entry.programs.add(r.receipt.programId);if(!entry.evidence.length)entry.evidence.push(r.evidence[0]);}receiptPrograms.set(key,entry);
+ }
+ const readLifecycles=new Map();
+ for(const fact of native.recipientEvents){const {event:e,soulId,evidence}=fact,entry=receiptPrograms.get(JSON.stringify([soulId,e.receipt?.id]));
+  if(e.kind!=='activity.observed'||e.observation!=='native-current-body'||e.untrusted!==false||e.worldId!==run.worldId||e.soulId!==soulId||e.bodyId!==bindings.get(soulId).bodyId||(!Number.isFinite(e.observedAt)||e.observedAt>e.at)||e.at>cutoff
+   ||e.receipt?.phase!=='started'||typeof e.programId!=='string'||entry?.programs.size!==1||!entry.programs.has(e.programId)||receiptIdentity.get(e.receipt.id)?.[1]!==e.receipt.capability
+   ||e.body?.activity!=='read'||!['seated','sitting'].includes(e.body?.posture)||!Array.isArray(e.body?.occupiedSeats)||e.body.occupiedSeats.length!==1||typeof e.body.occupiedSeats[0]!=='string'||!/^([^#\s]+)#([^#\s]+)$/.test(e.body.occupiedSeats[0])
+   ||typeof e.action?.id!=='string'||!e.action.id||e.action.verb!=='pose_v1'||e.action.status!=='executing')continue;
+  const key=JSON.stringify([soulId,e.receipt.id]),proofs=readLifecycles.get(key)??[];
+  proofs.push({schema:'native-read-lifecycle/1',event:e,evidence:[...evidence],receiptEvidence:unique(entry.evidence)});readLifecycles.set(key,proofs);
+ }
+ const attached=new Set();
+ const nativeReceipts=native.receiptVersions.filter(r=>r.observedAt<=cutoff).map(r=>{
+  const {nativeReadLifecycles:unverified,...receipt}=r.receipt,key=JSON.stringify([receipt.soulId,receipt.id]);
+  // Attach once per receipt, not once per mutable version: normalization
+  // remains linear in the bounded captured facts even for many transitions.
+  const proofs=attached.has(key)?[]:readLifecycles.get(key)??[];attached.add(key);
+  return {...r,receipt:{...receipt,nativeReadLifecycles:proofs}};
+ });
  for(const {actor,row,evidence}of native.ownerMessages)if(participants.has(actor)&&inWindow(actor,row.sent_at))expected.set(JSON.stringify([actor,'owner',row.id]),{actor,source:'owner',eventId:row.id,createdAt:row.sent_at,evidence});
  native.foreignAuthorFacts=[...effectMap.values()].filter(e=>!e.actor);
  const nativeEffects=[...effectMap.values()].filter(e=>e.actor&&inWindow(e.actor,e.at));
@@ -142,5 +168,5 @@ export function readNativeExportInputs({run,captureDirectory,exportDirectory,cov
  // behavioral timing merely from collector observation time.
  const undated=[...effectMap.values()].filter(e=>!Number.isFinite(e.at));if(undated.length)missing.push('native effect timestamps for '+undated.map(e=>e.id).join(','));
  missing.push('complete endpoint/operation enumeration and cardinality audit','source-cited causal response linkage and cross-key intent review','fixture/body/agent-read/semantic audits');
- return {schema:'continuity-native-inputs/1',inputs:{nativeEffects,nativeReceipts:native.receiptVersions.filter(r=>r.observedAt<=cutoff),expectedNotifications:[...expected.values()]},native:{...native,undatedEffects:undated},mechanical:{runId:run.runId,worldId:run.worldId,epoch:s.epoch,interval:{from:t0,to:cutoff},sourceCoverage:coverage.status,status:missing.length?'unknown':'pass',missing:unique(missing),issues:unique(issues),sourceCoverageEvidence:[statusPath,`${exportPath}#L${records.indexOf(final)+1}`,paths(captureDirectory,'capture-status.json')],limits:'Source coverage is not effectsComplete, notificationsComplete, model incorporation or qualification. Captured events prove native delivery, not client persistence or host receipt. Pre-release/post-cutoff facts remain raw only; receipt history may establish initial ongoing activity without crediting early behavior.'},sources:{capture:capturePath,export:exportPath,status:statusPath}};
+ return {schema:'continuity-native-inputs/1',inputs:{nativeEffects,nativeReceipts,expectedNotifications:[...expected.values()]},native:{...native,undatedEffects:undated},mechanical:{readingNormalization:NATIVE_READING_NORMALIZATION,runId:run.runId,worldId:run.worldId,epoch:s.epoch,interval:{from:t0,to:cutoff},sourceCoverage:coverage.status,status:missing.length?'unknown':'pass',missing:unique(missing),issues:unique(issues),sourceCoverageEvidence:[statusPath,`${exportPath}#L${records.indexOf(final)+1}`,paths(captureDirectory,'capture-status.json')],limits:'Source coverage is not effectsComplete, notificationsComplete, model incorporation or qualification. Captured events prove native delivery, not client persistence or host receipt. Pre-release/post-cutoff facts remain raw only; receipt history may establish initial ongoing activity without crediting early behavior.'},sources:{capture:capturePath,export:exportPath,status:statusPath}};
 }

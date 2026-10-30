@@ -138,3 +138,13 @@ test('captured receipt events preserve native terminal time while later database
  const r=adaptIndependentProbe(x).participants[a].receipts[0];assert.equal(r.observedEndedAt,4200);assert.equal(r.timestampEvidence.terminal.kind,'native-receipt-event');assert.equal(r.timestampEvidence.terminal.source,'native-capture.jsonl#L9');
  x.nativeReceipts[1].evidence=[];assert.equal(adaptIndependentProbe(x).participants[a].receipts[0].observedEndedAt,null);
 });
+
+test('only cited native inputs carry exact lifecycle and unambiguous program across terminal receipt versions',()=>{
+ const x=input(),base={id:'club',capability:'book-club:book-club.chair',soulId:'soul-'+a},proof={schema:'native-read-lifecycle/1',event:{worldId:x.run.worldId,soulId:base.soulId,receipt:{id:base.id,capability:base.capability},programId:'p1'},evidence:['capture.jsonl#L1'],receiptEvidence:['snapshots.jsonl#L1']};
+ x.nativeReceipts=[{actor:a,receipt:{...base,phase:'started',programId:'p1',nativeReadLifecycles:[proof]},observedAt:2000,evidence:['snapshots.jsonl#L1']},{actor:a,receipt:{...base,phase:'completed'},observedAt:4000,kind:'native-receipt-event',evidence:['capture.jsonl#L2']}];
+ const club=()=>adaptIndependentProbe(x).participants[a].receipts.find(r=>r.id==='club');
+ assert.equal(club().programId,'p1');assert.deepEqual(club().nativeReadLifecycles,[proof]);assert.equal(club().observedEndedAt,4000);
+ x.nativeReceipts.push({actor:a,receipt:{...base,phase:'started',programId:'p2'},observedAt:2500,evidence:['snapshots.jsonl#L3']});assert.equal(club().programId,null);assert.deepEqual(club().nativeReadLifecycles,[]);
+ x.nativeReceipts.pop();proof.evidence=[];assert.deepEqual(club().nativeReadLifecycles,[],'uncited lifecycle cannot survive normalization');
+ proof.evidence=['capture.jsonl#L1'];x.nativeReceipts=[];x.journals[a].operations.push({id:'narrated-club',status:'settled',at:2000,request:{command:'act'},response:{receipt:{...base,programId:'p1',phase:'started',nativeReadLifecycles:[proof]}}});assert.deepEqual(club().nativeReadLifecycles,[],'a model/journal response cannot self-certify a native activity event');
+});
