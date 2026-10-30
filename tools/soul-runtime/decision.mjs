@@ -55,6 +55,7 @@ export async function applyPendingDecision(journal,fence,world,{signal}={}){
  const c=journal.control.checkpoint(),pending=c.value?.pendingDecision;if(!pending)return {applied:false};
  journal.control.assertOwner(fence);
  const {id,decision}=pending,call=decision.call;let response=null,reference=null;
+ if(!['read','write','listen','wait'].includes(call?.type)||call.type==='read'&&!READS.has(call.command)||call.type==='write'&&!WRITES.has(call.command)||call.type==='listen'&&call.command!=='listen')throw Object.assign(Error('Retained decision requires a compatible runtime; state preserved'),{code:'UNSUPPORTED_RETAINED_DECISION'});
  if(call.type==='listen')response={local:true,listenTo:listeningScope(call.args.listenTo)};
  else if(call.type==='read'){
   if(call.command==='response')response=journal.control.response(call.args);

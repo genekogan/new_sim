@@ -267,3 +267,10 @@ test('local listening configuration preserves a due wake for the immediate next 
  retainDecision(j,fence,listenDecision([]));await applyPendingDecision(j,fence,{});assert.deepEqual(j.control.checkpoint().value.listenTo,[]);assert.equal(j.control.checkpoint().value.wakeAt,wakeAt);
  retainDecision(j,fence,{plan:'Handle the due departure now',call:{type:'write',command:'act',args:{capability:'observed_departure'}},wakeAt:null});await applyPendingDecision(j,fence,{write:async()=>({accepted:true})});assert.equal(j.control.checkpoint().value.wakeAt,null);
 });
+
+for(const type of ['future-local-type','read','write','listen'])test('unknown retained decision fails closed without losing intent: '+type,async t=>{
+ const {j,fence}=fixture(t);j.ingest({source:'owner',after:null,cursor:'m_future',events:[{id:'m_future',text:'Keep my task pending'}]});
+ const id=retainDecision(j,fence,{plan:'Retained by a newer runtime',call:{type,command:'future',args:{}},wakeAt:null},{events:j.pending()});
+ let calls=0;await assert.rejects(applyPendingDecision(j,fence,{read:async()=>calls++,write:async()=>calls++}),{code:'UNSUPPORTED_RETAINED_DECISION'});
+ assert.equal(calls,0);assert.equal(j.control.checkpoint().value.pendingDecision.id,id);assert.equal(j.pending().length,1);assert.equal(j.openOwnerTasks().totalOpen,1);assert.equal(j.control.operations().length,0);
+});
