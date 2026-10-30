@@ -17,7 +17,7 @@ export function reportArmDimensions({score,arm,restartObservation=null,restartEv
   if(!managed)automatic={status:'fail',supported:false,triggerExercised:false,reason:'The frozen one-exec baseline has no automatic controller restart. No death probe or assisted resume is inferred.'};
   else {
    const r=restartObservation,typed=r?.schema==='sim-continuity-managed-restart/1'&&['actor','setupId','worldId','soulId'].every(k=>typeof expectedRestart?.[k]==='string'&&expectedRestart[k].length>0&&r[k]===expectedRestart[k])&&Array.isArray(restartEvidence)&&restartEvidence.length>0&&restartEvidence.every(s=>typeof s==='string'&&s.trim());
-   automatic={status:typed&&r.failure?.status==='fail'?'fail':typed&&r.state==='ready'&&r.triggerExercised===true&&r.threadResumed===true&&Number.isFinite(r.recoveryLatencyMs)?r.recoveryLatencyMs>=0&&r.recoveryLatencyMs<=25000?'pass':'fail':'unknown',triggerExercised:typed&&r.triggerExercised===true,evidence:typed?restartEvidence:[],reason:'Readiness is separate from retained intent, native task completion and duplicate-effect review.'};
+   automatic={status:typed&&r.failure?.status==='fail'?'fail':typed&&(r.integration===undefined||r.integration?.status==='ready')&&r.state==='ready'&&r.triggerExercised===true&&r.threadResumed===true&&Number.isFinite(r.recoveryLatencyMs)?r.recoveryLatencyMs>=0&&r.recoveryLatencyMs<=25000?'pass':'fail':'unknown',triggerExercised:typed&&r.triggerExercised===true,evidence:typed?restartEvidence:[],reason:'Readiness is separate from retained intent, native task completion and duplicate-effect review.'};
   }
  }
  return {schema:'continuity-arm-dimensions/1',arm,scenarioId:score.scenarioId,originalStatus:score.status,

@@ -30,3 +30,11 @@ test('a valid cited restart for another run or Soul cannot supply this target re
  const observation={...scope,schema:'sim-continuity-managed-restart/1',state:'ready',triggerExercised:true,threadResumed:true,recoveryLatencyMs:12000};
  for(const expectedRestart of [null,{...scope,actor:'reader-a'},{...scope,setupId:'run-2'},{...scope,worldId:'world-2'},{...scope,soulId:'s_other'}])assert.equal(reportArmDimensions({score,arm:'managed-continuity-runtime',expectedRestart,restartEvidence:['restart-proof.json'],restartObservation:observation}).automaticRestart.status,'unknown');
 });
+
+ test('runner integration failure cannot inherit raw observer readiness',()=>{
+ const observation={...scope,schema:'sim-continuity-managed-restart/1',state:'ready',triggerExercised:true,threadResumed:true,recoveryLatencyMs:12000};
+ for(const integration of [{status:'unknown',failureCode:'RESTART_EVIDENCE_UNKNOWN'},null,{status:'ready'}]){
+ const r=reportArmDimensions({score,arm:'managed-continuity-runtime',expectedRestart:scope,restartEvidence:['restart-proof.json'],restartObservation:{...observation,integration}});
+ assert.equal(r.automaticRestart.status,integration?.status==='ready'?'pass':'unknown');
+ }
+});
