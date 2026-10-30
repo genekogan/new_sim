@@ -24,7 +24,11 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     const localZ=(me[0]-wp.x)*s+(me[2]-wp.z)*c;
     params.opening={bodyPolicy:'door-natural-v2',hinge:[wp.x+hx*c+hz*s,wp.y,wp.z-hx*s+hz*c],yaw:wp.yaw,radius:((knob?.at?.[0]??(Number(def.components.opening.width)/2-.1))-leaf.pivot[0])*sx,height:Number(def.components.opening.height)*sy,handleY:(knob?.at?.[1]??.85)*sy,from:actuatedState(e,def).open===true?HAND_OPEN_ANGLE:0,to:action==='open'?HAND_OPEN_ANGLE:0,side:localZ<0?-1:1};
     root=actuatorPoint(params.opening,params.opening.from).root;
-   }else{const dx=me[0]-wp.x,dz=me[2]-wp.z,n=Math.hypot(dx,dz)||1;root=[wp.x+dx/n*.5,wp.y,wp.z+dz/n*.5];}
+   }else{
+    // A def's part tinted `valve` (a tap handle) is where the hand goes; otherwise the old switch height at the centre.
+    const shapes=def.make.kind==='gen'?(def.make.args as {shapes?:{tint?:string;at?:number[]}[]})?.shapes:undefined,valve=shapes?.find(s=>s.tint==='valve'&&s.at);
+    if(valve?.at){const c=Math.cos(wp.yaw),s=Math.sin(wp.yaw),[vx,vy,vz]=valve.at.map(v=>v*wp.s);params.at=[wp.x+vx*c+vz*s,wp.y+vy,wp.z-vx*s+vz*c];}
+    const dx=me[0]-params.at[0],dz=me[2]-params.at[2],n=Math.hypot(dx,dz)||1;root=[params.at[0]+dx/n*.5,wp.y,params.at[2]+dz/n*.5];}
    return {params,root,level:d.levelAt?.(root[0],root[2],root[1])??0};
   },
   /** A few current public facts for compact nearby perception, never the full state. */
