@@ -107,7 +107,7 @@ export function adaptIndependentProbe({run,timeline=[],journals={},scenarioId=ru
  if(worlds.size>1)throw Error('Participant journals belong to different worlds');
  for(const n of nativeReceipts){
   if(!inventory.has(n.actor)||!cited(n.evidence)){issues.push('Native receipt lacks actor scope or source citation');continue;}
-  for(const source of n.evidence)addReceipt(n.actor,n.receipt,time(n.observedAt),source,'explicit-native-observation');
+  for(const source of n.evidence)addReceipt(n.actor,n.receipt,time(n.observedAt),source,n.kind==='native-receipt-event'?'native-receipt-event':'explicit-native-observation');
  }
  // Each phase's first native observation is retained. Neither world ticks nor
  // receipt.endedAt (a terminal body pose) are interpreted as UTC timestamps.

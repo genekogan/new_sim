@@ -127,7 +127,12 @@ export async function runSupervisor({journal,host,world,instruction,signal,onSta
    handledProgress+=applied.incorporated??0;
    for(const event of events)wakeHints.delete(event.sequence);
    observationReplans=0;
-   onState({state:'decision',call:applied.call.type,command:applied.call.command});
+   // Bounded committed metadata lets passive observers distinguish a strategic
+   // timer from model narration without exposing the private plan or arguments.
+   const committed=journal.control.checkpoint();
+   onState({state:'decision',call:applied.call.type,command:applied.call.command,
+    checkpointRevision:committed.revision,committedAt:committed.at,decisionId:committed.value.lastDecisionId,
+    wakeAt:committed.value.wakeAt??null,listenTo:committed.value.listenTo??[]});
    // Reads, writes and local listening configuration continue to the next choice. A wait sleeps
    // without inference until a new fact or the requested deadline arrives.
    dirty=dirty||applied.call.type!=='wait'||!!firstLive(h=>h.priority>=2);

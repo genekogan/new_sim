@@ -129,3 +129,12 @@ test('common runner release and native-only response stay observable without a m
  assert.equal(score.rows.find(r=>r.id==='notification:c_native:receive').status,'unknown');
  x.expectedNotifications[0].evidence=[];assert.equal(adaptIndependentProbe(x).notifications[0].healthyRunning,undefined);
 });
+
+test('captured receipt events preserve native terminal time while later database snapshots remain observation-only',()=>{
+ const x=input();x.journals={};const receipt={id:'native-receipt',capability:'read:here',phase:'completed'};
+ x.nativeReceipts=[{actor:a,receipt,observedAt:4800,evidence:['native-snapshots.jsonl#L2']}];
+ assert.equal(adaptIndependentProbe(x).participants[a].receipts[0].observedEndedAt,null);
+ x.nativeReceipts.push({actor:a,receipt,kind:'native-receipt-event',observedAt:4200,evidence:['native-capture.jsonl#L9']});
+ const r=adaptIndependentProbe(x).participants[a].receipts[0];assert.equal(r.observedEndedAt,4200);assert.equal(r.timestampEvidence.terminal.kind,'native-receipt-event');assert.equal(r.timestampEvidence.terminal.source,'native-capture.jsonl#L9');
+ x.nativeReceipts[1].evidence=[];assert.equal(adaptIndependentProbe(x).participants[a].receipts[0].observedEndedAt,null);
+});

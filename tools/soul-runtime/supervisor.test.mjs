@@ -286,3 +286,13 @@ test('actual native activity observation wakes a waiting host without model poll
   f.host.finish(waitDecision);await until(()=>f.journal.pending().length===0);await new Promise(r=>setTimeout(r,150));assert.equal(f.host.calls.length,2,'unchanged activity does not poll the model');
  }finally{release();f.stop.abort();await running;}
 });
+
+test('decision timing evidence comes from the committed checkpoint without exposing private plans',async t=>{
+ const f=setup(t),states=[],running=runSupervisor({...f,instruction:'Private mission',signal:f.stop.signal,onState:s=>states.push(s)});
+ try{
+  await until(()=>f.host.calls.length===1);const wakeAt=new Date(Date.now()+60000).toISOString();
+  f.host.finish({...waitDecision,plan:'PRIVATE_PLAN_CANARY',call:{type:'wait',command:'wait',arguments:'{"listenTo":"nearby"}'},wakeAt});
+  await until(()=>states.some(s=>s.state==='decision'));const row=states.find(s=>s.state==='decision'),checkpoint=f.journal.control.checkpoint();
+  assert.equal(row.call,'wait');assert.equal(row.checkpointRevision,checkpoint.revision);assert.equal(row.committedAt,checkpoint.at);assert.equal(row.decisionId,checkpoint.value.lastDecisionId);assert.equal(row.wakeAt,wakeAt);assert.equal(row.listenTo,'nearby');assert(!JSON.stringify(row).includes('PRIVATE_PLAN_CANARY'));assert.equal(row.arguments,undefined);assert.equal(f.host.calls.length,1);
+ }finally{f.stop.abort();await running;}
+});
