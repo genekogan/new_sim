@@ -807,6 +807,13 @@ export class EdgeLedger implements EdgeLedgerHooks {
       return cap?.available&&plans.has(asked)?{caps,plans,tick}:null;
     }catch{return null;}
   }
+  /** exactWalkBindings for an offer the full listing itself contains (native, profile or bounded GodNav listing), never
+   * the canonical-area on-demand projection: an area the listing omits answers resolve through place matching over the
+   * whole listing, so only listed exact walks can skip it with an identical answer. Synchronous, restored in finally. */
+  private exactListedWalkBindings(soul:EdgeSoul,input:{capability?:unknown;params?:unknown}):ExactWalkBindings|null {
+    const area=this.exactAuthoredAreaWalkRef;this.exactAuthoredAreaWalkRef=()=>false;
+    try{return this.exactWalkBindings(soul,input);}finally{this.exactAuthoredAreaWalkRef=area;}
+  }
   invalidateBodies(){this.capCache.clear();}
   bodyAssignmentReady(soul:EdgeSoul){return !this.faded.has(soul.soulId)&&!this.pending.has(soul.soulId)&&!this.openReceipts(soul.soulId).length&&!this.together.awaiting(soul.soulId)&&!this.together.heldBy(soul.soulId);}
   bodyVerbProblem(soul:EdgeSoul,verb:string){return bodyVerbProblem(this.body(soul.entityId),verb);}
@@ -1931,6 +1938,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const self = this;
     return {
       binds: (s: EdgeSoul) => self.binds(s),
+      /** Resolve's exact-walk fast path: the narrow bindings act uses, listed offers only (see exactListedWalkBindings). */
+      exactListedWalk: (s: EdgeSoul, input: {capability?: unknown; params?: unknown}) => self.exactListedWalkBindings(s, input),
       body: (entityId: string) => self.body(entityId),
       resolveText: (s: EdgeSoul, text: string, caps: EdgeCapability[]) => self.resolveOnDemand(s, text, caps, self.binds(s).plans).v,
       isAncestor: (ancestor: string, id: string) => {for (let p = self.places.byId.get(id), n = 0; p?.parent && n < 20; p = self.places.byId.get(p.parent), n++) if (p.parent === ancestor) return true; return false;},
