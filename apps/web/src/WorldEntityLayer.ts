@@ -103,9 +103,13 @@ export class WorldEntityLayer {
   readonly cover = new GroundCover(() => (this.active ? this.model : null), coverSetting(), () => this.seq);
   /** Recorded contact drives the leaf on the same depicted tick as the body,
    * including reach, swing and release. No wall-clock tween during native operation. */
+  private tugged=new Set<THREE.Object3D>();
   drawHandActuators(entities:Record<string,{state:Record<string,unknown>}>,tick:number,dt:number){
+    for(const rope of this.tugged)rope.rotation.x=0;this.tugged.clear();
     for(const e of Object.values(entities)){
-      const m=e.state.handActuator as HandActuatorMotion|undefined;if(!m?.opening)continue;
+      const m=e.state.handActuator as HandActuatorMotion|undefined;if(!m)continue;
+      if(m.tug){const rope=this.drawn.get(m.target)?.obj.getObjectByName('role:rope');if(rope){rope.rotation.x=-handActuatorFrame(m,(tick-m.startTick)*dt).tug*m.tug.angle;this.tugged.add(rope);}continue;}
+      if(!m.opening)continue;
       const d=this.drawn.get(m.target);if(!d)continue;
       const angle=handActuatorFrame(m,(tick-m.startTick)*dt).angle;
       if(d.frozen)this.thaw(d);d.opening=undefined;
@@ -581,7 +585,7 @@ export class WorldEntityLayer {
     for (const m of this.sectors.values()) { m.geometry.dispose(); }
     this.sectors.clear();
     for (const d of this.drawn.values()) disposeObject(d.obj);
-    this.drawn.clear();
+    this.drawn.clear();this.tugged.clear();
     for (const m of this.materials.values()) m.dispose();
     this.materials.clear();
     this.waterGroup.clear(); this.terrainGroup.clear(); this.thingsGroup.clear();

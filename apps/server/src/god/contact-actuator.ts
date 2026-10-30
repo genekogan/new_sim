@@ -1,6 +1,6 @@
 // Contact effects commit at the recorded hand contact, with release still owned by the native action.
 // Durable receipt intent, no per-tick object scan and no effect from an interrupted walk.
-import {actuatorPoint,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
+import {actuatorPoint,tugPoint,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
 import { createHash } from 'node:crypto';
 import { opSchema, contactStateKey, type WorldModel, type Op, type StoredDef } from '@sim/world-compiler';
 import type { EdgeSoul } from '../edge/contract.ts';
@@ -24,6 +24,10 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     const localZ=(me[0]-wp.x)*s+(me[2]-wp.z)*c;
     params.opening={bodyPolicy:'door-natural-v2',hinge:[wp.x+hx*c+hz*s,wp.y,wp.z-hx*s+hz*c],yaw:wp.yaw,radius:((knob?.at?.[0]??(Number(def.components.opening.width)/2-.1))-leaf.pivot[0])*sx,height:Number(def.components.opening.height)*sy,handleY:(knob?.at?.[1]??.85)*sy,from:actuatedState(e,def).open===true?HAND_OPEN_ANGLE:0,to:action==='open'?HAND_OPEN_ANGLE:0,side:localZ<0?-1:1};
     root=actuatorPoint(params.opening,params.opening.from).root;
+   }else if(def.components.bell&&def.tags.includes('hand-rung')){
+    const [x,y,z]=def.components.bell.gripAt,stretch=(key:string)=>Number(e.params?.[key]??def.params[key]?.default??1),sx=wp.s*stretch('sx'),sy=wp.s*stretch('sy'),sz=wp.s*stretch('sz'),c=Math.cos(wp.yaw),s=Math.sin(wp.yaw);
+    at[0]=wp.x+x*sx*c+z*sz*s;at[1]=wp.y+y*sy;at[2]=wp.z-x*sx*s+z*sz*c;params.tug={length:.45*sy,angle:def.components.bell.pullAngle,yaw:wp.yaw,seconds:.6};
+    root=[at[0]+s*.55,m.terrain.sample(at[0]+s*.55,at[2]+c*.55),at[2]+c*.55];
    }else{const dx=me[0]-wp.x,dz=me[2]-wp.z,n=Math.hypot(dx,dz)||1;root=[wp.x+dx/n*.5,wp.y,wp.z+dz/n*.5];}
    return {params,root,level:d.levelAt?.(root[0],root[2],root[1])??0};
   },
@@ -46,7 +50,7 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
    const denied=d.access(intent.target,soul);if(denied)return fail(denied.code,denied.reason);
    const b=d.body(soul.entityId),p=m.worldPose(e),motion=b?.human?.handActuator;
    const hand=b?.human?.hands?.left??b?.human?.hands?.right;
-   const expected=motion?.opening?actuatorPoint(motion.opening,intent.action==='close'?motion.opening.to:motion.opening.from).hand:motion?.at;
+   const expected=motion?.opening?actuatorPoint(motion.opening,intent.action==='close'?motion.opening.to:motion.opening.from).hand:motion?.tug?tugPoint(motion.at,motion.tug,1):motion?.at;
    const reached=intent.motionV1?!!motion&&motion.target===intent.target&&!!hand&&!!expected&&Math.hypot(...hand.map((v,i)=>v-expected[i]))<.1&&Math.hypot(b!.pose.p[0]-hand[0],b!.pose.p[2]-hand[2])<.9&&Math.abs(b!.pose.p[1]-p.y)<1.2:!!b&&Math.hypot(b.pose.p[0]-p.x,b.pose.p[2]-p.z)<=CONTACT_REACH&&Math.abs(b.pose.p[1]-p.y)<=1.2;if(!b?.human||!reached)return fail('contact.not-reached','Your hand did not reach the target; no action was applied.');
    const state=actuatedState(e,def),bad=whenRefusal(a,state,e.name??'object');if(bad)return fail(bad.code,bad.reason);
    const r=d.commit([opSchema.parse({op:'set',id:e.id,state:thenPatch(a,state)})],`${soul.soulId} ${a.name} ${e.name??e.id}`,()=>{d.record(soul,e.id,a.name);done();});

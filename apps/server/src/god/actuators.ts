@@ -56,6 +56,7 @@ export function thenPatch(a: Action, state: Record<string, unknown>, params: Rec
   const out: Record<string, unknown> = {};
   for (const t of a.then) {
     if (t.op === 'set') out[t.field] = typeof t.value === 'object' && t.value !== null && 'param' in (t.value as object) ? params[(t.value as { param: string }).param] : t.value;
+    else if (t.op === 'increment') out[t.field] = Number(out[t.field] ?? state[t.field] ?? 0) + t.by;
     else if (t.op === 'toggle') out[t.field] = !(out[t.field] ?? state[t.field]);
   }
   return out;

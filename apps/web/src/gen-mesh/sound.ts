@@ -245,6 +245,9 @@ function step(host: Host) {
     if (playlist && e.spec.kind === 'music') continue;   // a world's own music things stay quiet under the playlist
     const d = e.follow ? 0 : distanceTo(e, x, y, z);
     if (e.spec.mode === 'change') {
+      // Native diffs advance the layer's depicted state without model.editSeq.
+      // Read only already cached change emitters; do not rescan the world.
+      if(e.source==='object'){const live=model.entities.get(e.id.replace(/#\d+$/, ''));if(!live)continue;e.state={...e.state,...live.state};}
       const k = (e.spec.when ?? '').replace(/^!/, ''), v = e.state[k], prev = lastValue.get(e.id);
       lastValue.set(e.id, v);
       if (prev !== undefined && prev !== v && condition(e.spec.when, e.state, night) && ctx) { const g = falloff(d, e.spec.radius, e.spec.volume); if (g > 0.001) oneShot(ctx, e.spec.kind, g); }
