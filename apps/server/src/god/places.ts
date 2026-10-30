@@ -294,7 +294,7 @@ export class GodPlaces {
       if (++n % 48 === 0) yield;
       if (t.kind !== 'thing' || t.level !== 0 || firstByRef.has(t.ref)) continue;
       const e = m.entities.get(t.id); if (!e || e.in.parent !== 'world') continue;
-      const def = m.resolvedDef(e.def); if (!def || NOT_LANDMARKS.test(shortDef(def))) continue;
+      const def = m.resolvedDef(e.def); if (!def || def.tags.includes('local-fixture') || NOT_LANDMARKS.test(shortDef(def))) continue;
       const c = def.components as Record<string, unknown>; if (c.carryable || c.seat || c.item) continue;
       let w = 0; try { const b = m.bake(def, e.params ?? {}, e.seed ?? 0, e.shape).box, s = m.worldPose(e).s; w = Math.max(b[0], b[2]) * s; } catch { continue; }
       if (w < LANDMARK_MIN || outer.some((o) => inBoxPoly(t.at[0], t.at[1], o.box, o.p.polygon))) continue;

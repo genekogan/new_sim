@@ -45,4 +45,42 @@ const beachShower: DefInput = {
   actions: switches('Turn on the shower', 'Turn off the shower') as DefInput['actions'],
 } as DefInput;
 
-export const HAND_WATER: DefInput[] = [gardenTap, beachShower];
+
+// Entry 16: a sprinkler that soaks the garden planters within its reach when a Soul turns it on by hand.
+export const SPRINKLER_REACH = 3.5;
+const gardenSprinkler: DefInput = {
+  schema: 'def/1', name: 'core-garden-sprinkler', version: 1,
+  description: `A garden sprinkler on a short standpipe. A Soul turns it on and off by hand at its valve; while it is on it sprays water over the planters within ${SPRINKLER_REACH} m.`,
+  tags: ['water', 'garden', 'sprinkler', 'hand-operated', 'local-fixture'], form: 'point',
+  make: { kind: 'gen', gen: 'kit/2', args: { round: 0.01, shapes: [
+    { kind: 'box', at: [0, 0.3, 0], size: [0.06, 0.6, 0.06], round: 0.01, tint: 'metal' },
+    { kind: 'cyl', at: [0, 0.62, 0], r: 0.07, h: 0.05, segments: 10, tint: 'metal' },
+    { kind: 'cyl', at: [0, 0.42, 0.05], r: 0.04, h: 0.03, segments: 6, tint: 'valve', pitch: Math.PI / 2 },
+    { kind: 'cone', at: [0, 1.05, 0], r: 1.6, h: 0.8, segments: 16, tint: 'water', material: 'water', when: '@on' },
+    { kind: 'cyl', at: [0, 0.02, 0], r: SPRINKLER_REACH * 0.85, h: 0.01, segments: 24, tint: 'water', material: 'water', when: '@on' }] } } as unknown as DefInput['make'],
+  params: { ...params, reach: { type: 'number', min: 1, max: 8, default: SPRINKLER_REACH, doc: 'metres of garden it waters' } } as DefInput['params'], palette,
+  state: { on: { type: 'bool', default: false } } as DefInput['state'],
+  components: water('water', 9, 0.3) as DefInput['components'],
+  size: { box: [0.2, 0.65, 0.2] },
+  actions: switches('Turn on the sprinkler', 'Turn off the sprinkler') as DefInput['actions'],
+} as DefInput;
+const plantPalette = { wood: '#7a5a3c', soil: '#5b4632', fill: '#2f2418', leaf: '#4f8f3a', bloom: '#e8b6c8' };
+const gardenPlanter: DefInput = {
+  schema: 'def/1', name: 'core-garden-planter', version: 1,
+  description: 'A wooden garden planter with soil and a flowering plant. It droops and browns when dry and stands up green and flowering when watered (moisture 0..1).',
+  tags: ['garden', 'planter', 'plant', 'local-fixture'], form: 'point',
+  make: { kind: 'gen', gen: 'kit/2', args: { round: 0.01, shapes: [
+    { kind: 'box', at: [0, 0.18, 0], size: [0.9, 0.36, 0.5], round: 0.02, tint: 'wood' },
+    { kind: 'box', at: [0, 0.36, 0], size: [0.82, 0.02, 0.42], round: 0, tint: 'soil' },
+    { kind: 'cyl', at: [0, 0.372, 0], r: 0.38, h: 0.006, segments: 12, tint: 'fill', role: 'fill' },
+    { kind: 'sphere', at: [-0.2, 0.62, 0], r: 0.2, segments: 8, tint: 'leaf', role: 'head', pivot: [0, -0.25, 0] },
+    { kind: 'sphere', at: [0.2, 0.6, 0.02], r: 0.18, segments: 8, tint: 'leaf', role: 'head', pivot: [0, -0.23, 0] },
+    { kind: 'sphere', at: [0, 0.72, -0.03], r: 0.17, segments: 8, tint: 'leaf', role: 'head', pivot: [0, -0.35, 0] },
+    { kind: 'sphere', at: [-0.12, 0.84, 0.08], r: 0.06, segments: 6, tint: 'bloom', role: 'head', pivot: [0, -0.47, 0] },
+    { kind: 'sphere', at: [0.15, 0.78, 0.1], r: 0.055, segments: 6, tint: 'bloom', role: 'head', pivot: [0, -0.41, 0] }] } } as unknown as DefInput['make'],
+  params: Object.fromEntries(Object.entries(plantPalette).map(([k, v]) => [k, { type: 'color', default: v, doc: `${k} colour` }])) as DefInput['params'], palette: plantPalette,
+  state: { moisture: { type: 'number', min: 0, max: 1, default: 0.1 } } as DefInput['state'],
+  size: { box: [0.9, 0.9, 0.5] },
+} as DefInput;
+
+export const HAND_WATER: DefInput[] = [gardenTap, beachShower, gardenSprinkler, gardenPlanter];
