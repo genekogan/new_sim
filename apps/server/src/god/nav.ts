@@ -15,6 +15,8 @@ import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import { humanTitle, meaningParts } from './meaning.ts';
 import { isShut } from './doors.ts';
+import type {ActivityServicePoint} from './activity-spots.ts';
+import {HUMAN_RADIUS} from '../../../../mars/viewer/engine/world/catalog.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -40,6 +42,11 @@ export type NavHost = {
    *  writebacks (a carried cup, a duck) that used to re-route every room near the Soul. Unset: `version`. */
   staticVersion?: () => number;
   engine: Engine;
+  /** Derived work positions, independent of whether someone is using them.
+   * Stable array identity until their authored geometry changes. */
+  serviceStandingPoints?(): readonly ActivityServicePoint[] | undefined;
+  /** Physical same-level interior outlines for this outdoor destination. */
+  outdoorRegionExclusions?(ref: string): Vec2[][] | undefined;
   /** Engine level of a standing height at (x, z): 0 on the ground (any terrain height), else a floor's level. */
   levelAt(x: number, z: number, y: number): number;
   /** Things the engine owns (bodies and what they carry). */
@@ -98,6 +105,9 @@ export type Thing = {
   entry?: { p: Vec2; level: number };
 };
 
+const NO_SERVICE_POINTS: readonly ActivityServicePoint[] = [];
+// Same distance at which the activity layer considers another body to take a spot.
+const SERVICE_STAND_DISTANCE = 0.7;
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
 const SHOW = 120;            // walk capabilities offered: the nearest this many named things (plus rooms of near buildings)
@@ -153,6 +163,14 @@ export class GodNav {
   private cache: { key: string; things: Thing[]; byRef: Map<string, Thing> } | null = null;
   private goals = new Map<string, { tick: number; key: string; goal: { p: Vec2; level: number } | null }>();
   constructor(h: NavHost) { this.h = h; }
+  private servicePoints: readonly ActivityServicePoint[] = NO_SERVICE_POINTS;
+  private refreshServicePoints() {
+    const points = this.h.serviceStandingPoints?.() ?? NO_SERVICE_POINTS;
+    if (points !== this.servicePoints) {
+      this.servicePoints = points;
+      this.goals.clear(); this.rooms.clear();
+    }
+  }
 
   // ------------------------------------------------------------------ what is there
 
@@ -323,12 +341,16 @@ export class GodNav {
 
   /** Where a Soul standing at `me` goes for this thing: a clear standing point on a level (null: no standing room). */
   goal(t: Thing, me: Vec2, except?: string): { p: Vec2; level: number } | null {
+    this.refreshServicePoints();
     const E = this.h.engine, tick = E.world.tick;
     // a Soul-dependent goal (the shore nearest me, the nearest point of a road) is never cached
     // MARSLIVED: a room's goal is refined live round whoever already stands there (roomGoal itself is cached per version)
     const mine = t.kind === 'water' || t.kind === 'room' || (t.kind === 'path' && !t.deck?.length) || (t.stands?.length ?? 0) > 1 || t.level > 0;
-    const key = `${t.ref}|${mine ? `${Math.round(me[0])},${Math.round(me[1])}` : ''}`;
-    const hit = this.goals.get(key); if (hit && tick - hit.tick < 50) return hit.goal;
+    const key = `${t.ref}|${t.kind === 'area' ? `area|${except ?? ''}` : mine ? `${Math.round(me[0])},${Math.round(me[1])}` : ''}`;
+    // Area arrivals depend on exact current position, but movement must replace
+    // the actor's entry rather than retain a new cache entry for every position.
+    const positionKey = t.kind === 'area' ? `${me[0]},${me[1]}` : key;
+    const hit = this.goals.get(key); if (hit && hit.key === positionKey && tick - hit.tick < 50) return hit.goal;
     const near = (at: Vec2, level: number, ring = 24) => { const p = E.standableNearV1(at, level, except, 0.4, ring); return p ? { p: [r2(p[0]), r2(p[1])] as Vec2, level } : null; };
     // WALK3: a ground goal off the main walkable ground (a fenced court, a dense wood, a mountain band, a hill) moves to the
     // nearest open spot of the main ground within r of it, else of `alt`; only once the engine's labels are ready (a
@@ -362,10 +384,30 @@ export class GodNav {
     } else if (t.kind === 'area') {
       // WALK3: standing room near me when I am inside it; a pond, a tree or a wheel at that spot widens the search, and an
       // area whose middle has none (a lake with its shore, a dense forest) is reached at its edge
-      goal = inPoly(me[0], me[1], t.area!) ? (near(me, 0, 8) ?? near(me, 0, 40)) : near(t.at, 0, 40);
-      goal ??= near(nearestOn(t.area!, me, true).q, 0, 16);
+      const exclusions = this.h.outdoorRegionExclusions?.(t.ref);
+      const valid = (g: {p: Vec2; level: number} | null) => !!g && (exclusions === undefined || g.level === 0 && inPoly(g.p[0], g.p[1], t.area!) && exclusions.every(poly => polyDist(poly, g.p) >= HUMAN_RADIUS + .07));
+      const outdoorNear = (p: Vec2, ring: number) => {const g = near(p, 0, ring);return valid(g) ? g : null;};
+      goal = inPoly(me[0], me[1], t.area!) ? (outdoorNear(me, 8) ?? outdoorNear(me, 40)) : outdoorNear(t.at, 40);
+      goal ??= outdoorNear(nearestOn(t.area!, me, true).q, 16);
       // its edge spot can be a pocket (a slope wood) while open main ground lies nearer its middle: try both
       goal = toMain(goal, 80, nearestOn(t.area!, me, true).q, t.at);
+      if (!valid(goal)) goal = null;
+      if (!goal && exclusions !== undefined) {
+        // A clear room floor is not the outdoor area around it. Search a bounded
+        // set of area points, checking the actual displaced standing result and
+        // any main-ground adjustment. Never fall back to an excluded interior.
+        const seeds: Vec2[] = [t.at];
+        for (const radius of [1, 2, 4, 8, 16]) for (let i = 0; i < 8; i++) seeds.push([me[0] + Math.cos(i * Math.PI / 4) * radius, me[1] + Math.sin(i * Math.PI / 4) * radius]);
+        const xs = t.area!.map(p => p[0]), zs = t.area!.map(p => p[1]);
+        for (let x = 0; x < 5; x++) for (let z = 0; z < 5; z++) seeds.push([Math.min(...xs) + (Math.max(...xs) - Math.min(...xs)) * (x + .5) / 5, Math.min(...zs) + (Math.max(...zs) - Math.min(...zs)) * (z + .5) / 5]);
+        let tried = 0;
+        for (const p of seeds) {
+          if (!inPoly(p[0], p[1], t.area!) || !exclusions.every(poly => polyDist(poly, p) >= HUMAN_RADIUS + .07)) continue;
+          if (++tried > 32) break;
+          const g = toMain(outdoorNear(p, 3), 80, nearestOn(t.area!, me, true).q, t.at);
+          if (valid(g)) {goal = g;break;}
+        }
+      }
     } else if (t.kind === 'room') {
       // the room's reachable standing point, moved aside when another body already stands on it (two Souls told to go
       // into the tea room do not queue for one spot)
@@ -412,7 +454,13 @@ export class GodNav {
       if (!inner) this.blocked.set(t.ref, `The interior of ${t.ref} is not reachable right now; its entrance or the route inside is blocked.`);
       else this.blocked.delete(t.ref);
     }
-    this.goals.set(key, { tick, key, goal });
+    // Only generic room/building visits avoid work positions. A walk to a
+    // named instrument/stand, or the activity's own approach, keeps its target.
+    if (goal && (t.kind === 'room' || t.kind === 'building')) {
+      const room = t.kind === 'room' ? t : this.things().find(r => r.kind === 'room' && t.rooms?.includes(r.ref) && r.level === goal!.level && r.poly && inPoly(goal!.p[0], goal!.p[1], r.poly));
+      if (room) goal = this.visitorGoal(room, goal, near);
+    }
+    this.goals.set(key, { tick, key: positionKey, goal });
     return goal;
   }
 
@@ -426,6 +474,31 @@ export class GodNav {
       if (d < bd) { bd = d; best = [r2(g.p[0] + dx), r2(g.p[1] + dz)]; }
     }
     return best ? { p: best, level: g.level } : null;
+  }
+
+  /** Prefer an equally reachable visitor point outside an activity's work
+   * position. Retain the original goal if this bounded search has no alternative. */
+  private visitorGoal(room: Thing, original: {p: Vec2; level: number}, near: (at: Vec2, level: number, ring?: number) => {p: Vec2; level: number} | null) {
+    if (!room.poly) return original;
+    const services = this.servicePoints.filter(s => s.level === original.level && inPoly(s.at[0], s.at[1], room.poly!));
+    const free = (p: Vec2) => services.every(s => Math.hypot(p[0] - s.at[0], p[1] - s.at[1]) >= SERVICE_STAND_DISTANCE);
+    if (!services.length || free(original.p)) return original;
+    const frame = room.roomFrame;
+    const candidates = frame ? roomSamples(frame.poly, frame.at, 0.6 / frame.scale).map(([x, z]): Vec2 => {
+      const c = Math.cos(frame.yaw), s = Math.sin(frame.yaw);
+      return [r3(frame.origin[0] + (x * c + z * s) * frame.scale), r3(frame.origin[1] + (-x * s + z * c) * frame.scale)];
+    }) : roomSamples(room.poly, room.at);
+    // Test actual standing points, not just sample seeds: native occupancy can
+    // displace a seed back onto a station or outside this room.
+    const tried = new Set<string>();
+    for (const seed of candidates.slice(0, 32)) {
+      const q = near(seed, original.level, 3);
+      if (!q || !inPoly(q.p[0], q.p[1], room.poly) || !free(q.p)) continue;
+      const key = `${q.p[0]},${q.p[1]}`; if (tried.has(key)) continue;
+      if (tried.size >= 14) break; tried.add(key);
+      if (!room.entry || this.entryReaches(room, q.p)) return q;
+    }
+    return original;
   }
 
   /** F1: a room's goal is standing room inside it that the front door reaches (furniture can close off its middle):

@@ -55,6 +55,11 @@ const SEAT_KINDS = ['chair', 'armchair', 'sofa', 'stool', 'bench-seat', 'bench',
  *  waiting seat from anywhere within SPOT_REACH (200 m), about 150 s on foot, so a shorter wait (the see-saw had 60 s) let
  *  the first rider give up while the second was still walking over (both failed partner-absent). */
 export const TOGETHER_WAIT = 150;
+/** Standing work positions that ordinary room visitors should leave usable.
+ * These are geometric hints, not claims: explicit activity plans still use them. */
+export type ActivityServicePoint = {id: string; at: V2; level: number};
+const SERVICE_ACTIVITIES = new Set(['read', 'write', 'paint', 'use-computer', 'craft', 'cook', 'post-letter', 'play-music', 'play-piano']);
+
 export class GodActivitySpots {
   private h: SpotsHost;
   private cache: { key: string; value: SpotsData } | null = null;
@@ -64,6 +69,16 @@ export class GodActivitySpots {
 
   /** A reader asked for the spots since the last warm(): worth deriving them ahead of the next read. */
   private wanted = false;
+  private services: {from: SpotsData; points: readonly ActivityServicePoint[]} | null = null;
+  /** Same authored/derived positions as activities, before per-Soul distance or
+   * occupancy filtering. Seated, social and roaming activities are not stations. */
+  serviceStandingPoints(): readonly ActivityServicePoint[] {
+    const data = this.data();
+    if (this.services?.from !== data) this.services = {from: data, points: data.spots
+      .filter(s => s.base === 'idle' && SERVICE_ACTIVITIES.has(s.activity))
+      .map(s => ({id: s.id, at: [...s.at] as V2, level: s.level ?? 0}))};
+    return this.services.points;
+  }
   data(): SpotsData { this.wanted = true; return this.get(); }
   /** Derive now, off a Soul's listing, if the spots are stale and someone reads them (the host calls it once a god
    *  edit has been caught up with). Same derive and cache as data(): the next read finds them. True when it derived. */

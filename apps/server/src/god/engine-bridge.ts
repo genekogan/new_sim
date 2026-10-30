@@ -19,6 +19,7 @@ import { reachProviders, seatProviders, syncProviders, usesProviders, type Reach
 import { GodNav } from './nav.ts';
 import { hasStraightLandings, railRaster } from './rail-raster.ts';
 import { tokenHit } from '../edge/ledger/vocabulary.ts';
+import {outdoorRegionExclusions} from '../edge/ledger/region-arrival.ts';
 import { doorInGap, freeDoorOpening, isDoorDef, isShut } from './doors.ts';
 import { GodPerceive } from './perceive.ts';
 import { GodPlaces, inPoly } from './places.ts';
@@ -194,7 +195,7 @@ export class EngineBridge {
     this.host = o.host; this.god = o.god; this.edge = o.edge; this.maxLevel = Math.min(o.maxLevel ?? MAX_LEVEL_ID, MAX_LEVEL_ID); this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
     this.initialEngine = this.host.engine;
     engineBridges.set(this.god.model, this);
-    this.nav = new GodNav({ model: this.god.model, version: () => this.version, staticVersion: () => this.godEdits, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e), placeOf: (ref) => (this.edge ? this.places.forRef(ref)?.id : undefined), describeStamp: () => `${this.describeEpoch}:${this.levels.length}` });
+    this.nav = new GodNav({ model: this.god.model, serviceStandingPoints: () => this.activitySpots?.serviceStandingPoints(), outdoorRegionExclusions: ref => {const id = this.places.forRef(ref)?.id;return this.edge && id ? outdoorRegionExclusions(this.edge.places, id) : undefined;}, version: () => this.version, staticVersion: () => this.godEdits, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e), placeOf: (ref) => (this.edge ? this.places.forRef(ref)?.id : undefined), describeStamp: () => `${this.describeEpoch}:${this.levels.length}` });
     this.layers = new GodLayers({ model: this.god.model, edge: this.edge, get engine() { return o.host.engine as never; }, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), calendarPlaces: (sources) => this.calendarPlaces(sources), building: id => this.god.builds.closing(id, this.model), buildingActive: () => this.god.builds.hasClosure(), closingSites: () => this.god.builds.closingSites(), log: (m) => this.log(m) });
     (this.god as unknown as { layers?: GodLayers }).layers = this.layers;
     // P3 (E-life): places follow the god's edits, not the engine's (a carried cup, a duck, a lamp switched on move no place);
