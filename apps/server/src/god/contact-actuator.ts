@@ -2,6 +2,7 @@
 // Durable receipt intent, no per-tick object scan and no effect from an interrupted walk.
 import {actuatorPoint,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
 import { createHash } from 'node:crypto';
+import { isDry } from './garden.ts';
 import { HUMAN_RADIUS } from '../../../../mars/viewer/engine/world/catalog.ts';
 import { opSchema, contactStateKey, type WorldModel, type Op, type StoredDef } from '@sim/world-compiler';
 import type { EdgeSoul } from '../edge/contract.ts';
@@ -42,6 +43,8 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
   /** A few current public facts for compact nearby perception, never the full state. */
   facts(target:string){
    const m=d.model(),e=m.entities.get(target),def=e&&m.resolvedDef(e.def),key=def&&contactStateKey(def);
+   // Entry 18: a thirsty planter says so (only when dry; a watered garden adds nothing)
+   if(e&&def&&!key&&(def.state as Record<string,{type?:string}>).moisture?.type==='number')return isDry(e.state?.moisture??(def.state as Record<string,{default?:unknown}>).moisture?.default)?{dry:true}:null;
    if(!e||!def||!key)return null;const state=actuatedState(e,def),facts:Record<string,boolean>={};
    if(typeof state[key]==='boolean')facts[key]=state[key] as boolean;
    if(key==='open'&&typeof state.locked==='boolean')facts.locked=state.locked;
