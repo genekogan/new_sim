@@ -326,10 +326,13 @@ test('otherwise dropped notifications become bounded per-turn method-only notice
  assert.deepEqual(notices.map(n=>Object.keys(n).sort().join()),['method,receivedAt','method,receivedAt']);assert.deepEqual(notices.map(n=>n.method),['warning','account/rateLimits/updated']);
  assert.equal(JSON.stringify(notices).includes('synthetic private'),false);assert.deepEqual(events.map(e=>e.method),['turn/started'],'forwarded events are unchanged');
  for(let n=0;n<30;n++)p.deliver({method:'item/agentMessage/delta',params:{threadId:'owned-thread',delta:'x'}});
- assert.equal(notices.filter(n=>n.method==='item/agentMessage/delta').length,5,'per-turn per-method bound');
+ p.deliver({method:'item/reasoning/summaryTextDelta',params:{threadId:'owned-thread',delta:'x'}});
+ assert.equal(notices.some(n=>/(\/delta|Delta)$/.test(n.method)),false,'streaming deltas never spend the budget');
+ for(let n=0;n<30;n++)p.deliver({method:'thread/status/changed',params:{threadId:'owned-thread'}});
+ assert.equal(notices.filter(n=>n.method==='thread/status/changed').length,5,'per-turn per-method bound');
  p.host.activeTurnId=null;p.deliver({method:'turn/started',params:{threadId:'owned-thread',turn:{id:'turn-y',status:'inProgress'}}});
- for(let n=0;n<30;n++)p.deliver({method:'item/agentMessage/delta',params:{threadId:'owned-thread',delta:'x'}});
- assert.equal(notices.filter(n=>n.method==='item/agentMessage/delta').length,10,'a later turn records its own stall attribution');
+ for(let n=0;n<30;n++)p.deliver({method:'thread/status/changed',params:{threadId:'owned-thread'}});
+ assert.equal(notices.filter(n=>n.method==='thread/status/changed').length,10,'a later turn records its own stall attribution');
  for(let n=0;n<2500;n++)p.deliver({method:'synthetic/method'+n,params:{}});assert.equal(notices.length,2000,'per-host bound');
  assert.equal(p.host.closed,false);
 });

@@ -120,6 +120,8 @@ export class CodexHost extends EventEmitter {
     t={id,text:[],characters:0,terminal:false,completed,resolve,reject,inputs:[],started:new Map(),final:null,unmatched:false};this.turns.set(id,t);return t;
   }
   notice(method){
+    // Streaming deltas say nothing about stalls; keep the lifetime budget for the rest.
+    if(/(\/delta|Delta)$/.test(method))return;
     const n=this.notices,count=n.methods.get(method)??0;
     if(n.emitted>=NOTICE_LIMIT||count>=NOTICE_TURN_METHOD_LIMIT)return;
     n.methods.set(method,count+1);n.emitted++;this.emit('notice',{method,receivedAt:Date.now()});
