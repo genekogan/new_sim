@@ -2,11 +2,13 @@
 // world writes occur here. A turn finishing is not completion of a Soul goal.
 import {spawn} from 'node:child_process';
 import {EventEmitter} from 'node:events';
+import {performance} from 'node:perf_hooks';
 
 const fault=(code,message)=>Object.assign(Error(message),{code});
 const input=text=>[{type:'text',text}];
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const GROUP_REAP_POLLS=200,GROUP_REAP_POLL_MS=25;
+const probeErrorCode=value=>typeof value==='string'&&/^[A-Z][A-Z0-9_]{0,63}$/.test(value)?value:'UNKNOWN';
 const threadName=value=>{if(value===null)return null;if(typeof value!=='string'||!value.trim()||value.length>200||/[\u0000-\u001f\u007f]/.test(value))throw fault('HOST_INVALID_NAME','Thread name must be readable text of1..200characters');return value.trim();};
 const booleanOption=(name,value)=>{if(typeof value!=='boolean')throw fault('HOST_INVALID_OPTION',name+' must be boolean');return value;};
 export class CodexHost extends EventEmitter {
@@ -82,7 +84,7 @@ export class CodexHost extends EventEmitter {
       // Keep a small recent window for acknowledgement/completion races.
       for(const [id,old] of this.turns){if(this.turns.size<=32)break;if(old.terminal&&id!==t.id)this.turns.delete(id);}
     }
-    if(['turn/started','turn/completed','item/started','item/completed','thread/tokenUsage/updated','thread/name/updated','thread/archived'].includes(m.method))this.emit('event',{method:m.method,params:p,receivedAt:Date.now()});
+    if(['turn/started','turn/completed','item/started','item/completed','thread/tokenUsage/updated','thread/name/updated','thread/archived','error'].includes(m.method))this.emit('event',{method:m.method,params:p,receivedAt:Date.now()});
   }
   async connect({threadId=null,instructions='',baseInstructions=null,config={},ephemeral=this.ephemeral,name=this.name}={}){
     ephemeral=booleanOption('ephemeral',ephemeral);name=threadName(name);
@@ -158,13 +160,24 @@ export class CodexHost extends EventEmitter {
         await Promise.race([this.exit,delay(1000)]);
       }
       let groupClosed=this.exitStatus?.startFailed===true&&!this.pid;
-      // A leader's exit can precede descendant reaping. Allow five seconds
-      // after cleanup signals, but only ESRCH proves the group is absent.
+      let groupProbeCount=0,groupProbeFirstErrorCode=null,groupProbeLastErrorCode=null;
+      const groupProbeStarted=performance.now();
+      // A leader's exit can precede descendant reaping. Keep the existing
+      // bounded probe budget after cleanup signals. A transient probe error
+      // remains unknown and may recover; only actual ESRCH establishes absence.
       if(this.pid)for(let n=0;n<GROUP_REAP_POLLS;n++){
-        try{this.killProcess(-this.pid,0);}catch(e){if(e.code==='ESRCH')groupClosed=true;break;}
+        groupProbeCount++;
+        try{this.killProcess(-this.pid,0);}catch(e){
+          const code=probeErrorCode(e?.code);
+          groupProbeFirstErrorCode??=code;groupProbeLastErrorCode=code;
+          if(e?.code==='ESRCH'){groupClosed=true;break;}
+        }
         await delay(GROUP_REAP_POLL_MS);
       }
-      this.closeProof={...this.exitStatus,hostPid:this.pid??null,threadId:this.threadId,groupClosed,groupVerification:groupClosed?'absent':'unverified'};
+      // Codes include the expected ESRCH absence result; never retain arbitrary
+      // error messages or error properties in lifecycle/cleanup evidence.
+      const groupProbeElapsedMs=Math.round(performance.now()-groupProbeStarted);
+      this.closeProof={...this.exitStatus,hostPid:this.pid??null,threadId:this.threadId,groupClosed,groupVerification:groupClosed?'absent':'unverified',groupProbeCount,groupProbeElapsedMs,groupProbeFirstErrorCode,groupProbeLastErrorCode};
       this.emit('lifecycle',{state:'host-closed',...this.closeProof});
       return this.closeProof;
     })();return this.closing;

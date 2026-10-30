@@ -25,7 +25,7 @@ test('ambiguous request timeout invalidates connection and never replays start',
 test('missing executable fails connection and cleanup terminates without waiting for an exit event',async()=>{
  const host=new CodexHost({command:'/nonexistent-sim-codex-executable',requestTimeoutMs:200});
  await assert.rejects(host.connect(),{code:'HOST_START_FAILED'});
- const status=await host.close();assert.equal(status.startFailed,true);
+ const status=await host.close();assert.equal(status.startFailed,true);assert.equal(status.groupProbeCount,0);assert.equal(status.groupProbeFirstErrorCode,null);assert.equal(status.groupProbeLastErrorCode,null);
 });
 // Lifecycle tests use an in-memory protocol peer, never Codex or inference.
 function protocol(t,options={},reply=()=>false){
@@ -115,12 +115,11 @@ test('owned session identity is emitted before naming can fail, without starting
  assert.deepEqual(events.map(e=>e.state),['host-started','session-created']);assert.equal(events[1].threadId,'owned-thread');assert.equal(events[1].resumed,false);
  assert.equal(p.requests.some(r=>r.method==='turn/start'),false);
 });
-test('close verifies the entire owned group after leader exit and reports unknown on permission failure',async t=>{
+test('close verifies the entire owned group after leader exit',async t=>{
  let alive=true;const calls=[],p=protocol(t,{childPid:900001,killProcess:(pid,signal)=>{calls.push([pid,signal]);if(signal==='SIGKILL')alive=false;if(signal===0&&!alive)throw Object.assign(Error('gone'),{code:'ESRCH'});}}),events=[];
  p.host.on('lifecycle',e=>events.push(e));await p.host.connect();
  const proof=await p.host.close();assert.equal(proof.groupClosed,true);assert.equal(proof.hostPid,900001);assert.equal(proof.threadId,'owned-thread');assert.equal(proof.groupVerification,'absent');
- assert.deepEqual(calls,[[-900001,'SIGTERM'],[-900001,'SIGKILL'],[-900001,0]]);assert.equal(events.at(-1).state,'host-closed');assert.equal(events.at(-1).groupClosed,true);
- const denied=protocol(t,{childPid:900002,killProcess:()=>{throw Object.assign(Error('permission'),{code:'EPERM'});}});await denied.host.connect();const unknown=await denied.host.close();assert.equal(unknown.groupClosed,false);assert.equal(unknown.groupVerification,'unverified');
+ assert.deepEqual(calls,[[-900001,'SIGTERM'],[-900001,'SIGKILL'],[-900001,0]]);assert.equal(events.at(-1).state,'host-closed');assert.equal(events.at(-1).groupClosed,true);assert.equal(proof.groupProbeCount,1);assert.equal(proof.groupProbeFirstErrorCode,'ESRCH');assert.equal(proof.groupProbeLastErrorCode,'ESRCH');
 });
 test('close tolerates group reaping beyond the former one-second grace without resending signals',async t=>{
  let probes=0;const calls=[],p=protocol(t,{childPid:900003,killProcess:(pid,signal)=>{
@@ -138,5 +137,55 @@ test('close keeps a live group unverified after the bounded five-second grace de
  const closing=p.host.close();await until(()=>probes>0);
  for(let n=0;n<200;n++){t.mock.timers.tick(25);await new Promise(setImmediate);}
  const proof=await closing;
- assert.equal(probes,200);assert.equal(proof.code,0);assert.equal(proof.groupClosed,false);assert.equal(proof.groupVerification,'unverified');
+ assert.equal(probes,200);assert.equal(proof.code,0);assert.equal(proof.groupClosed,false);assert.equal(proof.groupVerification,'unverified');assert.equal(proof.groupProbeCount,200);assert.equal(proof.groupProbeFirstErrorCode,null);assert.equal(proof.groupProbeLastErrorCode,null);
+});
+
+test('close retries a transient group probe error and verifies only subsequent ESRCH',async t=>{
+ let probes=0,settled=false;const calls=[],events=[],p=protocol(t,{childPid:900005,killProcess:(pid,signal)=>{
+  calls.push([pid,signal]);if(signal!==0)return;
+  probes++;if(probes===1)throw Object.assign(Error('synthetic transient permission error'),{code:'EPERM'});
+  if(probes===3)throw Object.assign(Error('gone'),{code:'ESRCH'});
+ }});await p.host.connect();p.host.on('lifecycle',e=>events.push(e));
+ t.mock.timers.enable({apis:['setTimeout']});
+ const closing=p.host.close();void closing.then(()=>settled=true);await until(()=>probes>0);await new Promise(setImmediate);
+ assert.equal(settled,false,'a probe error does not establish either absence or exhausted verification');
+ t.mock.timers.tick(25);await until(()=>probes===2);assert.equal(settled,false,'a live group still cannot qualify');
+ t.mock.timers.tick(25);const proof=await closing;
+ assert.equal(probes,3);assert.equal(proof.groupClosed,true);assert.equal(proof.groupVerification,'absent');
+ assert.equal(proof.groupProbeCount,3);assert.equal(proof.groupProbeFirstErrorCode,'EPERM');assert.equal(proof.groupProbeLastErrorCode,'ESRCH');
+ assert.ok(Number.isSafeInteger(proof.groupProbeElapsedMs)&&proof.groupProbeElapsedMs>=0);
+ assert.deepEqual(calls.filter(([,signal])=>signal!==0),[[-900005,'SIGTERM'],[-900005,'SIGKILL']]);assert.ok(calls.every(([pid])=>pid===-900005));
+ assert.deepEqual(events.at(-1),{state:'host-closed',...proof});
+ assert.deepEqual(await p.host.close(),proof,'repeated close returns the same certificate without more signals/probes');assert.equal(probes,3);
+});
+test('close exhausts bounded probes on persistent errors and retains unknown despite exit zero',async t=>{
+ let probes=0;const calls=[],p=protocol(t,{childPid:900006,killProcess:(pid,signal)=>{
+  calls.push([pid,signal]);if(signal===0){probes++;throw Object.assign(Error('synthetic denied'),{code:'EPERM'});}
+ }});await p.host.connect();t.mock.timers.enable({apis:['setTimeout']});
+ const closing=p.host.close();await until(()=>probes>0);
+ for(let n=0;n<200;n++){t.mock.timers.tick(25);await new Promise(setImmediate);}
+ const proof=await closing;assert.equal(probes,200);assert.equal(proof.code,0);assert.equal(proof.groupClosed,false);assert.equal(proof.groupVerification,'unverified');
+ assert.equal(proof.groupProbeCount,200);assert.equal(proof.groupProbeFirstErrorCode,'EPERM');assert.equal(proof.groupProbeLastErrorCode,'EPERM');assert.ok(Number.isSafeInteger(proof.groupProbeElapsedMs)&&proof.groupProbeElapsedMs>=0);
+ assert.deepEqual(calls.filter(([,signal])=>signal!==0),[[-900006,'SIGTERM'],[-900006,'SIGKILL']]);assert.ok(calls.every(([pid])=>pid===-900006));
+});
+test('close retains bounded error codes without arbitrary probe error messages or invalid code text',async t=>{
+ let probes=0;const privateText='synthetic/private/probe-details',p=protocol(t,{childPid:900007,killProcess:(_pid,signal)=>{
+  if(signal!==0)return;if(++probes===1)throw Object.assign(Error(privateText),{code:privateText});throw Object.assign(Error(privateText),{code:'ESRCH'});
+ }});await p.host.connect();t.mock.timers.enable({apis:['setTimeout']});
+ const closing=p.host.close();await until(()=>probes>0);t.mock.timers.tick(25);const proof=await closing;
+ assert.equal(proof.groupClosed,true);assert.equal(proof.groupProbeCount,2);assert.equal(proof.groupProbeFirstErrorCode,'UNKNOWN');assert.equal(proof.groupProbeLastErrorCode,'ESRCH');assert.equal(JSON.stringify(proof).includes(privateText),false);
+});
+
+test('schema error notification is forwarded for the owned thread without ending or retrying its active turn',async t=>{
+ const p=protocol(t),events=[];await p.host.connect();p.host.on('event',event=>events.push(event));
+ const active=await p.host.begin('synthetic');let completed=false;void active.completed.then(()=>completed=true);
+ const params={threadId:'owned-thread',turnId:active.turnId,willRetry:true,error:{message:'synthetic provider message',codexErrorInfo:{httpConnectionFailed:{httpStatusCode:503}},additionalDetails:'synthetic diagnostic details'}};
+ p.deliver({method:'error',params});await new Promise(setImmediate);
+ assert.equal(events.length,1);assert.equal(events[0].method,'error');assert.deepEqual(events[0].params,params);assert.ok(Number.isSafeInteger(events[0].receivedAt));
+ assert.equal(p.host.closed,false);assert.equal(p.host.failure,undefined);assert.equal(p.host.activeTurnId,active.turnId);assert.equal(completed,false);
+ p.deliver({method:'error',params:{...params,threadId:'foreign-thread'}});assert.equal(events.length,1,'foreign thread error is not forwarded');
+ assert.equal(p.requests.filter(r=>r.method==='turn/start').length,1);assert.equal(p.requests.some(r=>r.method==='turn/interrupt'),false);
+ // Only the actual terminal host notification resolves the turn.
+ p.deliver({method:'turn/completed',params:{threadId:'owned-thread',turn:{id:active.turnId,status:'completed'}}});
+ assert.equal((await active.completed).status,'completed');assert.equal(p.host.activeTurnId,null);
 });
