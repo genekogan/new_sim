@@ -4,7 +4,7 @@
 import {spawn} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {StringDecoder} from 'node:string_decoder';
-import {mkdirSync,readFileSync,writeFileSync,appendFileSync,lstatSync} from 'node:fs';
+import {mkdirSync,readFileSync,writeFileSync,appendFileSync,lstatSync,renameSync} from 'node:fs';
 import {resolve,join} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createWorldClient} from '../../soul-runtime/world-client.mjs';
@@ -12,6 +12,7 @@ import {abortableSleep} from '../../soul-runtime/receiver.mjs';
 import {probeSessions,verifyOwnedProbeExit} from './probe-sessions.mjs';
 import {runContinuityBaseline} from './adapters/continuity-baseline.mjs';
 import {buildArgs} from './adapters/codex-headless.mjs';
+import {createContinuityUsageGuard,validateUsageLimits} from './continuity-usage.mjs';
 
 export const CONTINUITY_ARMS=['existing-headless-seat','managed-continuity-runtime'];
 export const R400_ARTIFACTS=Object.freeze({
@@ -31,6 +32,8 @@ export function validateContinuityTrial(config){
  const {directory,arm,purpose,seconds,model,effort,worldId,actors,fixtureActors=[]}=config;
  if(typeof directory!=='string'||!directory.trim()||!CONTINUITY_ARMS.includes(arm)||!['short','soak'].includes(purpose)||!Number.isFinite(seconds)||seconds<1||seconds>604800||purpose==='soak'&&seconds<7200||!label(model)||!label(effort)||!label(worldId)||!Array.isArray(actors)||actors.length<1||actors.length>5||!Array.isArray(fixtureActors)||fixtureActors.length>5)throw fault('INVALID_TRIAL_CONFIG');
  if(config.meetingOffsetSec!==undefined&&(!Number.isFinite(config.meetingOffsetSec)||config.meetingOffsetSec<0||config.meetingOffsetSec>=seconds))throw fault('INVALID_MEETING_OFFSET');
+ if(purpose==='soak'&&config.usageGuard===undefined)throw fault('SOAK_USAGE_GUARD_REQUIRED');
+ if(config.usageGuard!==undefined)validateUsageLimits(config.usageGuard);
  if(config.cliVersion!==undefined&&config.cliVersion!==null&&!label(config.cliVersion))throw fault('INVALID_CLI_VERSION');
  const ids=new Set();
  for(const actor of [...actors,...fixtureActors]){
@@ -162,9 +165,18 @@ export async function runContinuityTrial(config,deps={}){
  const out=resolve(directory);mkdirSync(out,{mode:0o700}); // Atomic refusal of every existing output, even empty.
  const registry=(deps.registryFactory??probeSessions)(out),stop=new AbortController(),abort=()=>stop.abort();
  signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)abort();
- let startedAt=null,cutoffAt=null,endReason=null,failureCode=null,cutoffTimer;const rows=[],fixtures=[],tasks=[];
+ let startedAt=null,cutoffAt=null,endReason=null,failureCode=null,cutoffTimer,usageTimer,usageGuard=null,usageState=null;const rows=[],fixtures=[],tasks=[];
  writeFileSync(join(out,'timeline.jsonl'),'',{flag:'wx',mode:0o600});
  const record=(kind,data={})=>{try{appendFileSync(join(out,'timeline.jsonl'),JSON.stringify({at:now(),kind,...data})+'\n');}catch{failureCode='TRIAL_EVIDENCE_WRITE_FAILED';abort();throw fault(failureCode);}};
+ const checkUsage=(finalActorIds=[],finish=false)=>{
+  if(!usageGuard)return;
+  try{
+   usageState=usageGuard.poll({finalActorIds,finish});
+   writeFileSync(join(out,'usage-guard.json.tmp'),JSON.stringify(usageState,null,2)+'\n',{mode:0o600});renameSync(join(out,'usage-guard.json.tmp'),join(out,'usage-guard.json'));
+   if(usageState.trigger){failureCode??=usageState.trigger.code;endReason??='usage-guard';abort();}
+  }catch{failureCode??='USAGE_GUARD_EVIDENCE_FAILED';endReason??='usage-guard';abort();}
+ };
+ const scheduleUsage=()=>{usageTimer=(deps.schedule??setTimeout)(()=>{checkUsage();if(!stop.signal.aborted)scheduleUsage();},1000);};
  const sample=async(row,kind,sampleSignal=stop.signal,phase=null)=>{
   const requestedAt=now(),response=await row.world.read('here',{},sampleSignal),me=response.here?.me;
   if(!me?.pos)throw fault('NATIVE_BODY_MISSING');
@@ -192,8 +204,10 @@ export async function runContinuityTrial(config,deps={}){
   if(stop.signal.aborted)throw fault('TRIAL_CANCELLED');
   startedAt=now();cutoffAt=startedAt+seconds*1000;
   for(const row of rows)row.instruction=renderTrialInstruction(row.actor.instruction,{startedAt,seconds,meetingOffsetSec:config.meetingOffsetSec});
-  cutoffTimer=(deps.schedule??setTimeout)(()=>{endReason='cutoff';abort();},Math.max(0,cutoffAt-now()));
+  if(config.usageGuard){usageGuard=createContinuityUsageGuard({actors:rows.map(row=>({id:row.actor.id,kind:arm===CONTINUITY_ARMS[0]?'baseline':'managed',path:arm===CONTINUITY_ARMS[0]?join(row.directory,'baseline','stream.ndjson'):join(row.directory,'agent-evidence.jsonl')})),limits:config.usageGuard,now});checkUsage();scheduleUsage();}
+  cutoffTimer=(deps.schedule??setTimeout)(()=>{endReason??='cutoff';abort();},Math.max(0,cutoffAt-now()));
   const manifest={schema:'sim-continuity-trial/1',arm,purpose,seconds,startedAt,cutoffAt,meetingAt:config.meetingOffsetSec===undefined?null:startedAt+config.meetingOffsetSec*1000,modelRequested:model,effortRequested:effort,cliVersion:config.cliVersion??null,cliVersionSource:config.cliVersion?'caller-preflight':null,world,worldId,baselineWake:false,disturbances:'unsupported: not dispatched by this runner',restartCoverage:'unknown: no typed restart contract implemented',qualification:'not assessed; orchestration evidence only',actors:rows.map(row=>({id:row.actor.id,soulId:row.paired.soul,releaseOffsetSec:row.actor.releaseOffsetSec??0,instructionTemplateSha256:sha(row.actor.instruction),instructionSha256:sha(row.instruction),...(row.baseline?{baseline:row.baseline,promptArgsSha256:sha(JSON.stringify(buildArgs({model,effort,text:row.instruction})))}:{agentEvidence:'agent-evidence.jsonl',launchSourceSha256:sha(readFileSync(new URL('../../soul-runtime/launch.mjs',import.meta.url)))} )})),fixtureActors:fixtures.map(row=>({id:row.actor.id,soulId:row.paired.soul})),registration:'baseline synchronous callback before naming; candidate emitted creation before naming, parent durability occurs on receipt'};
+  manifest.usageGuard=config.usageGuard?{kind:'observed-usage-guard',limits:config.usageGuard,pollMs:1000,possibleInFlightOvershoot:true,billing:'not measured'}:null;
   privateJson(join(out,'run.json'),manifest);
   for(const row of rows)tasks.push((async()=>{
    const scheduledAt=startedAt+(row.actor.releaseOffsetSec??0)*1000;
@@ -206,8 +220,10 @@ export async function runContinuityTrial(config,deps={}){
    };
    record('actor-release',{actor:row.actor.id,scheduledAt,releasedAt:now(),remainingSeconds});
    row.releasedAt=now();
+   usageGuard?.activate(row.actor.id);
    row.result=await (arm===CONTINUITY_ARMS[0]?launchBaseline({cwd:row.baseline.cwd,directory:join(row.directory,'baseline'),text:row.instruction,model,effort,remainingSeconds,name,cliVersion:config.cliVersion??null,signal:stop.signal,onState:state}):launchCandidate({folder:resolve(row.actor.folder),directory:row.directory,text:row.instruction,model,effort,remainingSeconds,name,signal:stop.signal,onState:state}));
    if(row.result.evidenceComplete===false)row.failureCode='ACTOR_EVIDENCE_INCOMPLETE';
+   checkUsage([row.actor.id]);
    // Ordinary completion is behavior, not an infrastructure abort or permission
    // to manufacture another turn. Keep observing every actor until cutoff.
    record('actor-ended',{actor:row.actor.id,endedAt:now(),beforeCutoff:now()<cutoffAt,exit:row.result.exit,stopReason:row.result.stopReason??null,failureCode:row.result.failureCode??null});
@@ -225,9 +241,9 @@ export async function runContinuityTrial(config,deps={}){
    try{await sample(row,'fixture-body',AbortSignal.timeout(10000),'cutoff-bracket');}
    catch(error){record('observation-error',{actor:row.actor.id,phase:'cutoff-bracket',code:code(error)});}
   }));
- }catch(error){failureCode=code(error);endReason=stop.signal.aborted?'cancelled':'infrastructure-error';}
+ }catch(error){failureCode??=code(error);endReason??=stop.signal.aborted?'cancelled':'infrastructure-error';}
  finally{
-  abort();(deps.cancelSchedule??clearTimeout)(cutoffTimer);await Promise.allSettled(tasks);signal?.removeEventListener('abort',abort);
+  abort();(deps.cancelSchedule??clearTimeout)(cutoffTimer);(deps.cancelSchedule??clearTimeout)(usageTimer);await Promise.allSettled(tasks);checkUsage([],true);signal?.removeEventListener('abort',abort);
  }
  const verifyCandidate=deps.verifyCandidate??(result=>verifyOwnedProbeExit(result)),verifyBaseline=deps.verifyBaseline??verifyBaselineTrialExit;
  for(const row of rows){
@@ -236,8 +252,9 @@ export async function runContinuityTrial(config,deps={}){
   if(row.result)privateJson(join(row.directory,'actor-result.json'),{exit:row.result.exit,failureCode:row.failureCode??row.result.failureCode??null,cleanupVerified:row.cleanupVerified,execProof:row.result.execProof??null,metadataGroups:row.result.metadataGroups??null,controllers:row.result.controllers?.map(controller=>({...controller,hostPids:[...(controller.hostPids??[])]}))??null,usage:row.result.usage??null,evidenceComplete:row.result.evidenceComplete??null});
  }
  const summary={schema:'sim-continuity-trial-result/1',arm,purpose,startedAt,cutoffAt,endedAt:now(),endReason,failureCode,qualification:'not assessed',coverage:{disturbances:'unknown',restart:'unknown',semanticOutcome:'not scored',actualEffort:'only authoritative host metadata; otherwise unknown'},actors:rows.map(row=>({id:row.actor.id,soulId:row.paired.soul,releasedAt:row.releasedAt??null,threads:[...row.threads],cleanupVerified:row.cleanupVerified,failureCode:row.failureCode??row.result?.failureCode??null,exit:row.result?.exit??null,actualModel:row.result?.actualModel??null,actualEffort:row.result?.actualEffort??null,endedBeforeCutoff:row.result?.endedAt!==undefined?row.result.endedAt<cutoffAt:null}))};
+ summary.usageGuard=usageState;
  privateJson(join(out,'summary.json'),summary);
- for(const row of rows)if(row.cleanupVerified)for(const threadId of row.threads)registry.complete(threadId,{outcome:endReason==='cancelled'?'cancelled':row.failureCode||row.result?.failureCode||row.result?.exit?.code!==0?'failed':'bounded-end',ownedProcessesExited:true,evidence:'summary.json;timeline.jsonl; exact owned process-group absence verified before archival'});
+ for(const row of rows)if(row.cleanupVerified)for(const threadId of row.threads)registry.complete(threadId,{outcome:endReason==='cancelled'?'cancelled':failureCode||row.failureCode||row.result?.failureCode||row.result?.exit?.code!==0?'failed':'bounded-end',ownedProcessesExited:true,evidence:'summary.json;timeline.jsonl; exact owned process-group absence verified before archival'});
  const archived=await registry.archiveCompleted();privateJson(join(out,'archive-results.json'),archived);
  return {...summary,archived};
 }

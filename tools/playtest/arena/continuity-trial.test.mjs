@@ -2,13 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {EventEmitter} from 'node:events';
 import {PassThrough} from 'node:stream';
-import {mkdtempSync,mkdirSync,readFileSync,writeFileSync,statSync,symlinkSync,rmSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,readFileSync,writeFileSync,appendFileSync,statSync,symlinkSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {CONTINUITY_ARMS,validateContinuityTrial,prepareR400Seat,runContinuityTrial,runManagedTrialActor,verifyBaselineTrialExit} from './continuity-trial.mjs';
 import {verifyOwnedProbeExit} from './probe-sessions.mjs';
 
 const flush=async()=>{for(let i=0;i<20;i++)await Promise.resolve();};
+const usageLimits={perActor:{totalTokens:1000000,outputTokens:100000},aggregate:{totalTokens:2000000,outputTokens:200000}};
+function usageEvidence(args,arm){
+ const baseline=arm===CONTINUITY_ARMS[0];mkdirSync(args.directory,{recursive:true});
+ const rows=baseline?[{type:'thread.started',thread_id:'usage-thread'},{type:'turn.started'},{type:'turn.completed',usage:{input_tokens:50,cached_input_tokens:20,output_tokens:5}}]:[{kind:'host-session',state:'connected',threadId:'usage-thread',resumed:false},{kind:'host-event',method:'turn/started',threadId:'usage-thread',turnId:'turn-1'},{kind:'host-event',method:'thread/tokenUsage/updated',threadId:'usage-thread',tokenUsage:{total:{inputTokens:50,cachedInputTokens:20,outputTokens:5,totalTokens:55}}},{kind:'host-event',method:'turn/completed',threadId:'usage-thread',turnId:'turn-1'}];
+ writeFileSync(join(args.directory,baseline?'stream.ndjson':'agent-evidence.jsonl'),rows.map(x=>JSON.stringify(x)+'\n').join(''));
+}
 class Clock{
  time=100000;sequence=0;timers=new Map();
  now=()=>this.time;
@@ -26,6 +32,7 @@ function fixture(t,overrides={}){
   calls.push(args);const id=args.cwd?.includes('/a/')?'a':args.directory.includes('/a/')?'a':'b';
   args.onState({state:config.arm===CONTINUITY_ARMS[0]?'thread-created':'session-created',threadId:'thread-'+id,cwd:args.cwd??join(args.directory,'runtime','host')});
   lifecycle.push(['name','thread-'+id]);
+  if(config.usageGuard)usageEvidence(args,config.arm);
   await clock.sleep(config.seconds*1000,args.signal);
   lifecycle.push(['closed','thread-'+id]);
   return {exit:{code:0,signal:null},endedAt:clock.now(),ownedProcessesExited:true,evidenceComplete:true};
@@ -35,7 +42,7 @@ function fixture(t,overrides={}){
 }
 
 test('explicit arm/model/effort, bounded instructions, and a continuous >=7200-second soak',()=>{
- const good={directory:'/unused',arm:CONTINUITY_ARMS[1],purpose:'soak',seconds:7200,model:'chosen',effort:'low',worldId:'w',actors:[{id:'a',folder:'/unused/a',instruction:'mission'}]};
+ const good={directory:'/unused',arm:CONTINUITY_ARMS[1],purpose:'soak',seconds:7200,usageGuard:usageLimits,model:'chosen',effort:'low',worldId:'w',actors:[{id:'a',folder:'/unused/a',instruction:'mission'}]};
  assert.equal(validateContinuityTrial(good),good);
  assert.doesNotThrow(()=>validateContinuityTrial({...good,seconds:604800}));
  for(const change of [{seconds:7199},{seconds:604801},{model:undefined},{effort:undefined},{arm:undefined},{actors:[{...good.actors[0],releaseOffsetSec:7200}]},{actors:[{...good.actors[0],instruction:'😀'.repeat(4096)}]}])assert.throws(()=>validateContinuityTrial({...good,...change}));
@@ -79,10 +86,11 @@ test('setup precedes T0 and delayed releases get only the original remaining lif
 });
 
 test('soak is one uninterrupted two-hour state lifetime, with one launch per actor',async t=>{
- const f=fixture(t,{purpose:'soak',seconds:7200,actors:[{id:'a',folder:'/test/a',instruction:'Long strategic wait'}]});
+ const f=fixture(t,{purpose:'soak',seconds:7200,usageGuard:usageLimits,actors:[{id:'a',folder:'/test/a',instruction:'Long strategic wait'}]});
  const pending=runContinuityTrial(f.config,f.deps);await flush();assert.equal(f.calls[0].remainingSeconds,7200);
  await f.clock.tick(7200000);const result=await pending;
  assert.equal(result.cutoffAt-result.startedAt,7200000);assert.equal(f.calls.length,1);assert.equal(f.rows().filter(row=>row.kind==='body').length,7200);
+ assert.equal(result.usageGuard.status,'complete');assert.equal(result.usageGuard.aggregate.totalTokens,55,'cumulative counters are not summed per sample');
 });
 
 test('unverified cleanup is retained and never completed or archived as a terminal session',async t=>{
@@ -202,4 +210,45 @@ test('unbound meeting clock and invalid appointment fail before creating any run
  const f=fixture(t);
  assert.throws(()=>validateContinuityTrial({...f.config,actors:[{...f.config.actors[0],instruction:'Meet {meetingUTC}'}]}),{code:'UNBOUND_INSTRUCTION_CLOCK'});
  for(const meetingOffsetSec of [-1,3,NaN])assert.throws(()=>validateContinuityTrial({...f.config,meetingOffsetSec}),{code:'INVALID_MEETING_OFFSET'});
+});
+
+test('prospective soaks require explicit finite observed usage limits',t=>{
+ const f=fixture(t,{purpose:'soak',seconds:7200});
+ assert.throws(()=>validateContinuityTrial(f.config),{code:'SOAK_USAGE_GUARD_REQUIRED'});
+ assert.throws(()=>validateContinuityTrial({...f.config,usageGuard:{...usageLimits,aggregate:{totalTokens:null,outputTokens:10}}}),{code:'INVALID_USAGE_GUARD'});
+ assert.doesNotThrow(()=>validateContinuityTrial({...f.config,usageGuard:usageLimits}));
+});
+
+for(const arm of CONTINUITY_ARMS)test('observed aggregate guard stops both owned actors and preserves cleanup: '+arm,async t=>{
+ const f=fixture(t,{arm,seconds:10,usageGuard:{perActor:{totalTokens:1000,outputTokens:100},aggregate:{totalTokens:100,outputTokens:100}}});
+ // Both body reads hang after setup. Usage still polls on its independent timer.
+ let count=0;f.deps.createWorld=()=>({async read(command,args,signal){if(++count>2)await new Promise(r=>signal.addEventListener('abort',r,{once:true}));return {here:{me:{pos:[0,0]}}};}});
+ const pending=runContinuityTrial(f.config,f.deps);await flush();assert.equal(f.calls.length,2);
+ await f.clock.tick(1000);const result=await pending;
+ assert.equal(result.endReason,'usage-guard');assert.equal(result.failureCode,'USAGE_LIMIT_REACHED');assert.equal(result.endedAt,101000);assert(result.actors.every(a=>a.cleanupVerified));
+ assert(f.calls.every(c=>c.signal.aborted));assert.equal(f.lifecycle.filter(x=>x[0]==='closed').length,2);assert.equal(f.lifecycle.filter(x=>x[0]==='complete').length,2);assert(f.lifecycle.filter(x=>x[0]==='complete').every(x=>x[2].outcome==='failed'));
+ const persisted=JSON.parse(readFileSync(join(f.config.directory,'usage-guard.json'),'utf8'));assert.equal(persisted.aggregate.totalTokens,110);assert.equal(persisted.status,'limit-reached');assert.equal(persisted.possibleInFlightOvershoot,true);assert.equal(persisted.billing,'not measured');assert.equal(statSync(join(f.config.directory,'usage-guard.json')).mode&0o777,0o600);
+ const manifest=JSON.parse(readFileSync(join(f.config.directory,'run.json'),'utf8'));assert.equal(manifest.usageGuard.kind,'observed-usage-guard');assert.deepEqual(manifest.usageGuard.limits,f.config.usageGuard);
+});
+
+test('unknown final tail remains a failed guard result after owned cleanup, without exposing raw content',async t=>{
+ const f=fixture(t,{usageGuard:usageLimits});const normal=f.deps.launchBaseline;
+ f.deps.launchBaseline=async args=>{const result=await normal(args);appendFileSync(join(args.directory,'stream.ndjson'),'{"SECRET_RAW_TAIL":');return result;};
+ const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(3000);const result=await pending;
+ assert.equal(result.failureCode,'USAGE_EVIDENCE_UNKNOWN');assert.equal(result.usageGuard.status,'unknown');assert(result.usageGuard.actors.every(a=>a.unknowns.includes('USAGE_TRUNCATED_TAIL')));assert(result.actors.every(a=>a.cleanupVerified));
+ assert(!JSON.stringify(result.usageGuard).includes('SECRET_RAW_TAIL'));assert(f.lifecycle.filter(x=>x[0]==='complete').every(x=>x[2].outcome==='failed'));
+});
+
+test('an abort rejection cannot overwrite the guard stop reason or budget failure',async t=>{
+ const f=fixture(t,{seconds:10,usageGuard:{perActor:{totalTokens:1000,outputTokens:100},aggregate:{totalTokens:100,outputTokens:100}}});
+ f.deps.sleep=async(ms,signal)=>{await f.clock.sleep(ms,signal);if(signal.aborted)throw Object.assign(Error('synthetic abort'),{code:'ABORT_ERR'});};
+ const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(1000);const result=await pending;
+ assert.equal(result.endReason,'usage-guard');assert.equal(result.failureCode,'USAGE_LIMIT_REACHED');assert(result.actors.every(a=>a.cleanupVerified));
+});
+
+test('original cutoff cannot overwrite a prior guard stop while an observation drains',async t=>{
+ const f=fixture(t,{seconds:2,usageGuard:{perActor:{totalTokens:1000,outputTokens:100},aggregate:{totalTokens:100,outputTokens:100}}});
+ let count=0;f.deps.createWorld=()=>({async read(){if(++count>2)await f.clock.sleep(3000);return {here:{me:{pos:[0,0]}}};}});
+ const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(3000);const result=await pending;
+ assert.equal(result.endReason,'usage-guard');assert.equal(result.failureCode,'USAGE_LIMIT_REACHED');assert.equal(result.usageGuard.trigger.at,101000);assert(f.calls.every(c=>c.signal.aborted));
 });
