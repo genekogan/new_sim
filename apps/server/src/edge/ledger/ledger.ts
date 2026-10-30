@@ -1,3 +1,4 @@
+import {handActuatorFrame} from '../../../../../mars/viewer/engine/social/hand-actuator.ts';
 // Core-Ledger: capabilities v2, direct act with durable receipts, Tier 1 observe, map,
 // and the read-only hooks Core-Comms routes events and speech with. No model calls.
 import {StallGuard} from './stall-guard.ts';
@@ -331,6 +332,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     // Open receipts from a previous process: a started one whose programme the snapshot carries is still followed;
     // a waiting one with its plan is re-armed (fresh one-minute wait); anything else cannot be followed honestly.
     for (const r of this.rows("phase IN ('waiting','started')")) {
+      const detail=r.detail?JSON.parse(r.detail):{};if(detail.contactActuatorV1?.motionV1&&!detail.contactAppliedV1)this.contactPending.add(r.receipt_id);
       const m = host.minds.get(r.soul_id);
       if (r.phase === 'started' && r.program_id && m && host.engine.programOf(m.entityId) === r.program_id) continue;
       const plan = r.phase === 'waiting' && r.plan ? JSON.parse(r.plan) as {label: string; steps: Program['steps']} : null;
@@ -471,6 +473,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       }
       const contact=r.detail?((d: {contactActuatorV1?:ContactActuatorIntent;contactSwitchV1?:ContactActuatorIntent})=>d.contactActuatorV1??d.contactSwitchV1)(JSON.parse(r.detail)):undefined;
       if(contact){
+        if(contact.motionV1){const detail=r.detail?JSON.parse(r.detail):{};this.contactPending.delete(r.receipt_id);if(detail.contactAppliedV1)this.update(r.receipt_id,{phase:'completed'});else this.update(r.receipt_id,{phase:'failed',code:'contact.not-applied',reason:'The hand interaction ended without applying the bound effect.'});return;}
         const row=this.db.soul(r.soul_id);
         if(!m||!row||row.retired_at!==null||row.entity_id!==contact.actor||row.owner!==contact.owner||['sleeping','absent'].includes(stateOf(this.host,contact.actor))||!this.contactActuator){this.update(r.receipt_id,{phase:'failed',code:'contact.identity-changed',reason:'The original awake Soul/body is no longer operating this object.'});return;}
         try{const result=this.contactActuator.complete({soulId:m.soulId,entityId:m.entityId,name:m.name,owner:m.owner},contact,()=>this.update(r.receipt_id,{phase:'completed'}));if(!result.ok)this.update(r.receipt_id,{phase:'failed',code:result.code,reason:result.reason});}
@@ -508,7 +511,26 @@ export class EdgeLedger implements EdgeLedgerHooks {
     else if (ev.code === 'walk.stuck') {if (!this.relaunchStuck(r)) this.update(r.receipt_id, {phase: 'failed', code: 'walk.stuck', reason: STUCK_REASON});}
     else this.update(r.receipt_id, {phase: 'failed', code: ev.code ?? 'action.failed', reason: ev.message ?? humanBlockedExplanationV1(ev.code, 'That action')});
   }
+  private contactPending=new Set<string>();
+  private contactTicks(tick:number){
+    for(const id of this.contactPending){
+      const r=this.rows('receipt_id=?',id)[0],detail=r?.detail?JSON.parse(r.detail):{},intent=detail.contactActuatorV1 as ContactActuatorIntent|undefined;
+      if(!r||!intent||detail.contactAppliedV1){this.contactPending.delete(id);continue;}
+      const m=this.host.minds.get(r.soul_id),body=m&&this.body(m.entityId),motion=body?.human?.handActuator;
+      if(!motion||motion.target!==intent.target){if(!OPEN.includes(r.phase))this.contactPending.delete(id);continue;}
+      if(motion.actionId&&(!r.program_id||this.host.engine.programAction?.(r.program_id)?.action.id!==motion.actionId))continue;
+      const frame=handActuatorFrame(motion,(tick-motion.startTick)*this.host.engine.dt);
+      if(!frame.contact)continue;
+      const row=this.db.soul(r.soul_id);
+      const identity=m&&row&&row.retired_at===null&&row.entity_id===intent.actor&&row.owner===intent.owner&&!['sleeping','absent'].includes(stateOf(this.host,intent.actor));
+      if(!identity||!this.contactActuator){this.contactPending.delete(id);this.update(id,{phase:'failed',code:'contact.identity-changed',reason:'The original awake Soul/body changed before contact.'});continue;}
+      try{const result=this.contactActuator.complete({soulId:m.soulId,entityId:m.entityId,name:m.name,owner:m.owner},intent,()=>this.setDetail(id,{contactAppliedV1:{tick}}));
+        this.contactPending.delete(id);if(!result.ok){this.update(id,{phase:'failed',code:result.code,reason:result.reason});if(r.program_id)this.host.engine.stop(r.program_id);}
+      }catch{this.contactPending.delete(id);this.update(id,{phase:'failed',code:'contact.failed',reason:'The world could not apply the bound contact.'});}
+    }
+  }
   private afterTick(tick: number) {
+    if(this.contactPending.size)this.contactTicks(tick);
     for (const [soulId, p] of this.pending) {
       if (this.host.quietBarrier) {p.deadline = Math.max(p.deadline, tick + WAIT_LIMIT_TICKS); continue;}   // the wait clock pauses during renewal
       if (tick > p.deadline) {this.pending.delete(soulId); this.update(p.receipt, {phase: 'failed', code: 'state.safe-stop-timeout', reason: 'The body could not reach a safe stop within a minute.'}); continue;}
@@ -1759,6 +1781,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** Merge into a receipt's detail {channel, chosen, endedAt}; returns the stored JSON. */
   private setDetail(id: string, patch: Record<string, unknown>): string | null {
     const row = this.db.db.prepare('SELECT detail FROM edge_receipts_v1 WHERE world_id=? AND receipt_id=?').get(this.host.worldId, id) as {detail: string | null} | undefined; if (!row) return null;
+    if((patch.contactActuatorV1 as ContactActuatorIntent|undefined)?.motionV1)this.contactPending.add(id);
     const next = JSON.stringify({...(row.detail ? JSON.parse(row.detail) : {}), ...patch});
     this.db.db.prepare('UPDATE edge_receipts_v1 SET detail=? WHERE world_id=? AND receipt_id=?').run(next, this.host.worldId, id);
     return next;

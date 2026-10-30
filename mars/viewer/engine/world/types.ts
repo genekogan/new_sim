@@ -61,6 +61,7 @@ export type HumanState = {
     mode: 'bed' | 'buoyant'; bedY: number; datumY: number;
     depthMetres: number; submergedHeightMetres: number; normal: Vec3;
   };
+  handActuator?: import('../social/hand-actuator.ts').HandActuatorMotion;
   activity: string; // 'idle' | 'walk' | 'carry' | 'support' | 'climb' | 'sit' | ...
   task?: string; // action id currently owning this actor
   grip?: { entity: string; slot: string };

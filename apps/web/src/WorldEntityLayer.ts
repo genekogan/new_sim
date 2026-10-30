@@ -1,3 +1,4 @@
+import {handActuatorFrame,type HandActuatorMotion} from '../../../mars/viewer/engine/social/hand-actuator.ts';
 // The entity world's picture (spec <eden4>/28 §8): terrain baked from the
 // same ground recipe the server uses, water, a horizon ring, and one mesh per
 // placed entity drawn from its def. Diffs arrive over the hub as
@@ -100,6 +101,17 @@ export class WorldEntityLayer {
   readonly sites: WorldBuildSites;
   /** W4: old Eden's tall grass, tufts and wildflowers, drawn around the camera from the ground recipe. */
   readonly cover = new GroundCover(() => (this.active ? this.model : null), coverSetting(), () => this.seq);
+  /** Recorded contact drives the leaf on the same depicted tick as the body,
+   * including reach, swing and release. No wall-clock tween during native operation. */
+  drawHandActuators(entities:Record<string,{state:Record<string,unknown>}>,tick:number,dt:number){
+    for(const e of Object.values(entities)){
+      const m=e.state.handActuator as HandActuatorMotion|undefined;if(!m?.opening)continue;
+      const d=this.drawn.get(m.target);if(!d)continue;
+      const angle=handActuatorFrame(m,(tick-m.startTick)*dt).angle;
+      if(d.frozen)this.thaw(d);d.opening=undefined;
+      d.obj.traverse(o=>{if(o.userData.role==='door')o.rotation.y=angle;});d.obj.updateMatrixWorld(true);
+    }
+  }
   get entityCount() { return this.model?.entities.size ?? 0; }
   /** The placed entities once this layer's picture has reached edit `seq` (else null): GodPanel's flags read them here
    *  instead of downloading the public snapshot again on every edit (lane L3h). */
@@ -126,6 +138,7 @@ export class WorldEntityLayer {
 
   private signal: AbortSignal | null = null;
   private lastSeqCheck = 0;
+  private bufferedSeq = -1; // received stream head, including native effects awaiting depiction
   private resyncing = false;
   /** Full resync: refetch the snapshot and redraw everything (no easing). Used after a missed diff. */
   async resync() {
@@ -255,6 +268,7 @@ export class WorldEntityLayer {
   readonly stats = { edgeSeen: 0, applied: 0, resyncs: 0, lastError: null as string | null };
   applyEdge(msgs: readonly { type: string; kind?: string; seq?: unknown; rev?: unknown }[], depictedTick=Infinity) {
     if (this.immutable || !this.model || this.building || this.filling) return;
+    for(const m of msgs)if(m.kind==='world-diff'&&typeof m.seq==='number')this.bufferedSeq=Math.max(this.bufferedSeq,m.seq);
     for (const m of msgs) {
       // CE8: attention hints keep the current rev; the sites layer parses each message once.
       if (m.kind === 'world-build') { if ((m as { event?: unknown }).event === 'attention' || (typeof m.rev === 'number' && m.rev > this.sites.maxRev)) this.sites.apply(m); continue; }
@@ -340,7 +354,7 @@ export class WorldEntityLayer {
     if (!this.immutable && nowMs - this.lastSeqCheck > 20_000 && this.signal) {  // cheap heartbeat: did we miss anything while the socket was down?
       this.lastSeqCheck = nowMs;
       // G8: a changed moderation veto also takes the whole (server-filtered) picture again
-      void fetch(this.api('/v1/world/seq'), { signal: this.signal }).then((r) => (r.ok ? r.json() : null)).then((j: { seq: number; builds?: number; moderation?: { version?: unknown; hidden?: unknown } } | null) => { if (!this.signal?.aborted && j) { if (noteModeration(j.moderation) || j.seq !== this.seq) void this.resync(); else this.sites.checkRevision(j.builds); } }).catch(() => {});
+      void fetch(this.api('/v1/world/seq'), { signal: this.signal }).then((r) => (r.ok ? r.json() : null)).then((j: { seq: number; builds?: number; moderation?: { version?: unknown; hidden?: unknown } } | null) => { if (!this.signal?.aborted && j) { if (noteModeration(j.moderation) || j.seq > Math.max(this.seq,this.bufferedSeq)) void this.resync(); else this.sites.checkRevision(j.builds); } }).catch(() => {});
     }
     // the entity terrain is the only ground: hide the native backdrop and the native floor planes (a flat
     // plane at y ≈ 0 would cover every pond, river and cut below it)

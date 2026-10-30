@@ -149,6 +149,7 @@ export class GodPerceive {
   private actHost() {
     return {
       deferContacts: !!this.h.edge?.contactActuator,
+      contactPlan:(soul:EdgeSoul,id:string,action:string)=>this.h.edge?.contactActuator?.plan(soul,id,action)??null,
       bodyAt: (soul: EdgeSoul): Vec2 | null => { const b = this.h.engine.world.entities[soul.entityId]; return b?.pose?.p ? [b.pose.p[0], b.pose.p[2]] : null; },
       commit: (id: string, patch: Record<string, unknown>, note: string) => this.h.commit!([{ op: 'set', id, state: patch }], note),
       stateOf: (id: string) => { const e = this.h.model.entities.get(id), def = e && this.h.model.resolvedDef(e.def); return e && def ? actuatedState(e, def) : null; },

@@ -32,3 +32,12 @@ test('owner changes, untimed legacy messages and non-light native changes keep i
  assert.equal(lightDiffAhead(f.model,{...f.message(1,true),diff:{upserts:[{...f.lamp,state:{...f.lamp.state,on:true}}]}},0),false);
  f.layer.applyEdge([f.message(1,false,100,'god')],0);assert.equal(f.layer.seq,1);assert.equal(f.glow(),0);f.living.dispose();
 });
+
+test('periodic seq refresh never overtakes a received contact diff waiting for its depicted tick',async()=>{
+ const f=await fixture(),off=f.message(1,false,500),inner=f.layer as unknown as {signal:AbortSignal;resync:()=>Promise<void>};inner.signal=new AbortController().signal;
+ const beforeFetch=globalThis.fetch;let serverSeq=1,resyncs=0;inner.resync=async()=>{resyncs++;};globalThis.fetch=async()=>new Response(JSON.stringify({seq:serverSeq}),{headers:{'content-type':'application/json'}});
+ try{f.layer.applyEdge([off],499);f.layer.update(.016,20001);await new Promise(r=>setImmediate(r));assert.equal(resyncs,0,'already received future diff is buffered, not missing');assert.equal(f.layer.seq,0);assert.equal(f.model.get('lamp')!.state.on,true);
+ serverSeq=2;f.layer.update(.016,40002);await new Promise(r=>setImmediate(r));assert.equal(resyncs,1,'a genuinely missing newer seq still resyncs');
+ f.layer.applyEdge([off],500);assert.equal(f.model.get('lamp')!.state.on,false);serverSeq=0;f.layer.update(.016,60003);await new Promise(r=>setImmediate(r));assert.equal(resyncs,1,'a stale heartbeat cannot roll back an applied stream');
+ }finally{globalThis.fetch=beforeFetch;f.living.dispose();}
+});

@@ -1,3 +1,4 @@
+import {handActuatorFrame,type HandActuatorMotion} from '../../engine/social/hand-actuator.ts';
 // Engine humans → animated rigs. Renderers only read world state (guide):
 // after every fixed tick we snapshot pose + derive clip state; frames
 // interpolate between the last two ticks, so visuals are a deterministic
@@ -72,6 +73,8 @@ type View = {
   cur: Snap;
   speed: number;
   activity: string;
+  handActuator?:HandActuatorMotion;
+  handActuatorTime?:number;
   sleepPose?: NonNullable<Entity['human']>['sleepPose'];
   shore?: ShoreContactV1;
   shoreTime?: number;
@@ -197,6 +200,8 @@ export type SampledHuman = {
    *  within the engine phase — the prone layer's body turn and exact rise mid-phase (else each phase's end pose). */
   proneYaw?: number;
   phaseK?: number;
+  handActuator?:HandActuatorMotion;
+  handActuatorTime?:number;
   sleepPose?: NonNullable<Entity['human']>['sleepPose'];
   shore?: ShoreContactV1;
   shoreTime?: number;
@@ -421,6 +426,7 @@ export class HumanViews {
       v.shore = undefined;
       v.shoreTime = undefined;
       v.waterTransition = undefined;
+      v.handActuator=e.human?.handActuator;v.handActuatorTime=world.tick*DT;
       v.sleepPose = e.human?.sleepPose;
       v.base = base;
       v.propWanted = (e.human as { prop?: string }).prop;
@@ -511,6 +517,10 @@ export class HumanViews {
       }
     }
     const pz = solvePosture(d, ts, styleFor(v.activity, walking));
+    // A low latch may need a small bend as well as a hand reach. Ease the whole
+    // solved posture on the same timeline so the torso cannot pop in/out.
+    if(v.handActuator){const k=handActuatorFrame(v.handActuator,(v.handActuatorTime??0)-v.handActuator.startTick*DT).weight;for(const key of ['drop','bend','rise','kneel'] as const)pz[key]*=k;}
+
     // on a frame's bracing: crouch / bend on the rod, never kneel or rise onto the toes
     return v.frame?.kind === 'stance' ? { ...pz, kneel: 0, rise: 0 } : pz;
   }
@@ -596,6 +606,7 @@ export class HumanViews {
       if(!f.bodyModel)this.syncAppearance(v,f.publicSoulKey);
       const walkDur = v.rig.walk.getClip().duration, idleDur = v.rig.idle.getClip().duration;
       v.activity = act;
+      v.handActuator=f.handActuator;v.handActuatorTime=f.handActuatorTime;
       v.sleepPose = f.sleepPose;
       v.shore = f.shore;
       v.shoreTime = f.shoreTime;
@@ -687,7 +698,9 @@ export class HumanViews {
     const w = (a.walkW + (b.walkW - a.walkW) * alpha) * (fp?.kind === 'beam' ? BEAM_WALK_W : 1) * (lib.still ? 0 : 1);
     const { walk, idle, mixer, extra } = v.rig;
     const wt = b.walkT >= a.walkT ? a.walkT + (b.walkT - a.walkT) * alpha : b.walkT;
-    walk.time = wt;
+    const opening=v.handActuator?.opening;
+    const backwards=opening&&opening.side*(opening.to-opening.from)<0;
+    walk.time=backwards?(walk.getClip().duration-wt%walk.getClip().duration)%walk.getClip().duration:wt;
     idle.time = b.idleT;
     // Body activity layer (activity-poses.ts): free hands only (engine hand points / grips win), never on a frame or prone.
     const tSec = lerp(a.expressionT, b.expressionT, alpha);
@@ -721,9 +734,10 @@ export class HumanViews {
     const curW = lib.cur ? libShare * lib.fade : 0, prevW = lib.prev ? libShare * (1 - lib.fade) : 0;
     const waveW = waveClip && !lib.cur ? 1 - w : 0, interactW = interactClip && !lib.cur ? 1 - w : 0;
     const idleFree = v.activity === 'idle' && b.sitW === 0 && !engineHands && freeBody && !lib.cur;
-    const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, tSec) : 0;
+    const idleHandoff=v.handActuator?handActuatorFrame(v.handActuator,(v.handActuatorTime??tSec)-v.handActuator.startTick*DT).idleBlend:1;
+    const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, tSec) * idleHandoff : 0;
     const variant = idleFree ? idleVariant(h.name, tSec) : null, variantA = variant ? libAction(v.rig, variant.clip) : null;
-    const variantW = variantA ? (1 - w - neutralW) * variant!.w : 0;
+    const variantW = variantA ? (1 - w - neutralW) * variant!.w * idleHandoff : 0;
     const libOn = new Set<THREE.AnimationAction>();
     const libAt = (act: THREE.AnimationAction | null, weight: number, time: number) => {
       if (!act || weight <= 1e-4) return;
@@ -910,13 +924,18 @@ export class HumanViews {
         const f = (t.x - h.position.x) * Math.cos(engineYaw) + (t.z - h.position.z) * Math.sin(engineYaw);
         return f < LIP ? out.add(UP) : out.add(_fwd).addScaledVector(UP, -0.2);
       } } : expression?.kind === 'planted-dance' ? {girdle:0,pole:arm=>V().copy(_right).multiplyScalar(-arm.side*(.35+expression.elbowLift)).addScaledVector(UP,-.5+expression.elbowLift).addScaledVector(_fwd,.15)} : undefined;
+      // Blend the actual arm bones to/from the existing idle/walk clip; lowering a
+      // Cartesian hand target alone leaves the elbow/shoulder snapping at release.
+      const weight=v.handActuator?handActuatorFrame(v.handActuator,(v.handActuatorTime??tSec)-v.handActuator.startTick*DT).weight:1;
+      const armBase=weight<1?v.arms.flatMap(arm=>[...(arm.shoulder?[arm.shoulder]:[]),arm.upper,arm.lower,arm.hand]).map(o=>({o,q:o.quaternion.clone(),p:o.position.clone()})):[];
       const k = reachTo(v, targets, pz.rise > 0, BODY_MODEL.maxExtension, undefined, pa);
       v.arms.forEach((arm, i) => {
         if (!targets[i] && sitW > 0 && !seatClip) handOnThigh(v, i, sitW);
       });
       if (sitW <= 0) dangle(v, proneW > 0 ? Math.max(pz.bend * (1 - proneW), pr!.bend * proneW) : pz.bend, k);
       v.arms.forEach((arm, i) => flat[i] > 0 && k[i] > 0 && flatHand(v, arm, targets[i]!, h.position.y, flat[i] * k[i], pa!.pole(arm, targets[i]!)));
-      closeHands(v, k.map((c, i) => expression?.kind === 'planted-dance' ? 0 : c * (1 - flat[i])));
+      for(const b of armBase){b.o.quaternion.slerp(b.q,1-weight);b.o.position.lerp(b.p,1-weight);}if(armBase.length)h.updateMatrixWorld(true);
+      closeHands(v, k.map((c, i) => weight*(expression?.kind === 'planted-dance' ? 0 : c * (1 - flat[i]))));
     } else if (v.sleepPose && pr && v.dims && proneW > 0) {
       // Free contact expression is private to the current rig, never authoritative hands/grips.
       source = 'sleep';

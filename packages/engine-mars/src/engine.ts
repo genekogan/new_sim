@@ -273,7 +273,7 @@ export class MarsEngine implements Engine {
   get world(): WorldState { return this.rt.world as WorldState; }
   private get ents(): Record<string, any> { return this.rt.world.entities; }
   describeVerbs(): VerbInfo[] {
-    return [...BODY_VERBS, ...(this.cfg.disassemblyV1?[UNBUILD_VERB]:[]), ...this.m.describeVerbs(this.registry).map((v) => ({ ...v, verb: `mars:${v.verb}`, description: `[Mars verb] ${v.description}`, scope: 'world' as const }))];
+    return [...BODY_VERBS, ...(this.cfg.disassemblyV1?[UNBUILD_VERB]:[]), ...this.m.describeVerbs(this.registry).filter(v=>v.verb!=='hand_actuator_v1').map((v) => ({ ...v, verb: `mars:${v.verb}`, description: `[Mars verb] ${v.description}`, scope: 'world' as const }))];
   }
   /** Pay the recorder's cold copy/text preparation before HTTP opens, without finishing or replacing a take.
    * Discard the result: every real cut still calls finalStateOf against the then-current live world. */

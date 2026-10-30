@@ -60,6 +60,7 @@ const FIELDS: [string, (e: Entity) => unknown][] = [
   ['equipment', (e) => e.equipment], // construction/solar.ts place_equipment (kind + config)
   ['paint', (e) => e.paint], // work/paint.ts: colour / texture, coverage (0.01 steps), per band
   // mars-take/2 (BODY_MODEL.md "take fields"): what a replay needs to pose people exactly as the engine did
+  ['handActuator', e=>e.human?.handActuator], // one finite native contact timeline; never controller context
   ['hands', takeHands], // human.hands, integer mm (hand-up, items, eating, paint)
   ['baseActivity', (e) => e.human?.baseActivity], // the activity an overlay (eat) is layered on: 'sit' = seated
   ['prop', (e) => e.human?.prop], // activities/1: the small object in the hands (book, cup, flower…; ACTIVITIES-v1)

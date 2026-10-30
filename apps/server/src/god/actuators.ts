@@ -65,6 +65,7 @@ export type ActuatorHost = {
   /** The Soul's body position (x, z), or null. */
   bodyAt(soul: EdgeSoul): Vec2 | null;
   deferContacts?: boolean;
+  contactPlan?(soul:EdgeSoul,target:string,action:string):{params:Record<string,unknown>;root:[number,number,number];level?:number}|null;
   /** Commit a state change of a god thing as an engine edit. */
   commit(id: string, patch: Record<string, unknown>, note: string): { accepted: boolean };
   /** The thing's actuator state as the world has it now (the object's copy may lag a sync behind). */
@@ -125,6 +126,10 @@ export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: Buil
       validate: (s: BuiltLike, _p: unknown, ctx: any) => check(s, ctx),
       apply: (s: BuiltLike, params: Record<string, unknown>, ctx: any) => {
         const contact = host.deferContacts && isContactActuator(def, a);
+        const motion=contact&&s.key?host.contactPlan?.(ctx.soul,s.key,a.name):null;
+        if(motion){const me=host.bodyAt(ctx.soul)!,far=(motion.level??0)>0||Math.hypot(me[0]-motion.root[0],me[1]-motion.root[2])>.1;
+          return {state:s,result:{action:a.name,set:thenPatch(a,(s.key&&host.stateOf?.(s.key))||s.state||{},params)},bodies:[{label:a.label,steps:[{verb:'stand',params:{}},...(far?[(motion.level??0)>0?{verb:'mars:walk_to',params:{x:motion.root[0],z:motion.root[2],level:motion.level}}:{verb:'walk_to',params:{to:[motion.root[0],motion.root[2]],standoff:0}}]:[]),{verb:'mars:hand_actuator_v1',params:motion.params}]}]};}
+
         const me = host.bodyAt(ctx.soul)!, to = s.front ?? s.at!, far = Math.hypot(s.at![0] - me[0], s.at![1] - me[1]) > (contact ? CONTACT_REACH : ACT_REACH);
         const water = s.key ? waterPlan(a, s.key, ctx.soul, host) : null;
         const patch = water && !isRefusal(water) ? { litres: water.litres } : thenPatch(a, (s.key && host.stateOf?.(s.key)) || s.state || {}, params);

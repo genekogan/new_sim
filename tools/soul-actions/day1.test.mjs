@@ -12,7 +12,7 @@ import {WorldModel} from '../../packages/world-compiler/src/model.ts';
 
 const out=process.env.SOUL_ACTIONS_OUT;
 test('switchable floor lamp and carryable lantern: ordinary Soul actions, refusal, persistence and bounded discovery', {timeout:60000}, async t=>{
- const f=fixture(':memory:',factory,{durableClockV1:true});f.brain.quiesce();
+ const f=fixture(':memory:',factory,{durableClockV1:true});f.brain.quiesce();assert.ok(!f.host.engine.describeVerbs().some(v=>v.verb==='mars:hand_actuator_v1'),'internal contact geometry is absent from global controller/card schemas');
  const edge=new EdgeLedger(f.host,f.db,undefined,{ambient:false});const app=new Hono();let soul;
  const comms=mountEdgeRoutes(app,{host:f.host,db:f.db,souls:f.souls,ledger:edge,soul:()=>soul});
  t.after(()=>{comms.close();f.host.stop();f.db.close();});
@@ -35,8 +35,8 @@ test('switchable floor lamp and carryable lantern: ordinary Soul actions, refusa
  const abandoned=await act('reading-light','switch-off');const stop=await accept(f.host,edge.act(soul,{capability:'stand:here'}));assert.equal(stop.accepted,true);await tick(10);assert.equal(edge.receipt(soul.soulId,abandoned.receipt.id).phase,'replaced');assert.equal(god.model.get('reading-light').state.on,true,'interruption before contact leaves light unchanged');
  for(const id of ['reading-light','small-lantern']){
   receipts.push(await act(id,'switch-off'));assert.equal(god.model.get(id).state.on,true,'admission does not switch the light remotely');let sawContact=false;
-  for(let n=0;n<300;n++){const b=f.host.engine.world.entities[soul.entityId];if(b.human?.activity==='operate'){sawContact=true;assert.equal(god.model.get(id).state.on,true,'light stays unchanged throughout approach/reach');}if(edge.receipt(soul.soulId,receipts.at(-1).receipt.id)?.phase==='completed')break;await tick(1);}
-  assert.ok(sawContact,'actual native arm-operation pose ran');assert.equal(god.model.get(id).state.on,false);
+  for(let n=0;n<300;n++){const b=f.host.engine.world.entities[soul.entityId];if(b.human?.handActuator){sawContact=true;if(f.host.engine.world.tick-b.human.handActuator.startTick<13)assert.equal(god.model.get(id).state.on,true,'light stays unchanged until hand contact');}if(edge.receipt(soul.soulId,receipts.at(-1).receipt.id)?.phase==='completed')break;await tick(1);}
+  assert.ok(sawContact,'actual native arm-operation pose ran '+JSON.stringify(edge.receipt(soul.soulId,receipts.at(-1).receipt.id)));assert.equal(god.model.get(id).state.on,false);
   assert.equal(edge.receipt(soul.soulId,receipts.at(-1).receipt.id).phase,'completed');
   await act(id,'switch-off',false);
  }
