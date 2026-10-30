@@ -41,6 +41,22 @@ async function setup(t:test.TestContext){
  const full=(capability:string)=>{edge.invalidateBodies();const b=edge.coreA.binds(soul);return {cap:structuredClone(b.caps.find(c=>c.id===capability)),plan:structuredClone(b.plans.get(capability))};};
  return {f,god,edge,bridge,comms,soul,tick,sparse,full};
 }
+// Exercise the real SHOW=120 plus six-extra-area bounds, rather than mocking
+// selection: nearer tiny named zones fill SHOW, then six larger named areas
+// consume the outdoor-place allowance ahead of place-field.
+async function omitFieldFromListing(w:Awaited<ReturnType<typeof setup>>){
+ const body=w.f.host.engine.world.entities[w.soul.entityId]!,x=body.pose.p[0],z=body.pose.p[2];
+ const ops=Array.from({length:126},(_,i)=>({op:'place',def:coreRef('zone'),name:`a-tiny-${String(i).padStart(3,'0')}`,shape:{area:[[x-.1,z-.1],[x+.1,z-.1],[x+.1,z+.1],[x-.1,z+.1]]},params:{use:'park'}}));
+ ops.push(...Array.from({length:6},(_,i)=>({op:'place',def:coreRef('zone'),name:`b-area-${i}`,shape:{area:[[x-12,z-12],[x+12,z-12],[x+12,z+12],[x-12,z+12]]},params:{use:'park'}})));
+ const out=w.god.act({ops} as never);assert.equal(out.accepted,true,JSON.stringify(out));await w.tick(8);w.bridge.perceive.sync(true);w.edge.map();
+ assert.equal(w.full('walk:place-field').cap,undefined,'real bounded listing must omit the area');
+ assert.equal(w.bridge.nav.exactListedWalk(w.soul,'place-field',[],new Map()),false);
+}
+function fullOnDemand(w:Awaited<ReturnType<typeof setup>>,asked:string){
+ w.edge.invalidateBodies();const b=w.edge.coreA.binds(w.soul),od=w.edge.resolveOnDemand(w.soul,asked,b.caps,b.plans);
+ assert.notEqual(od.v.kind,'unknown',JSON.stringify(od.v));
+ return {cap:structuredClone(od.caps.find(c=>c.id===asked)),plan:structuredClone(od.plans.get(asked))};
+}
 test('default native fixture uses exact walk projection with capability/plan parity and no unrelated enumeration',async t=>{
  const w=await setup(t),{edge,bridge,soul,f}=w;
  assert.equal((edge as any).providers.length,1,'actual Comms object provider remains installed');
@@ -117,14 +133,62 @@ test('far rooms keep legacy on-demand planning and ride/body masks stay authorit
  const body=f.host.engine.world.entities[soul.entityId]!,original=body.body;body.body={family:'floater',type:'ceramic'} as never;
  const projected=w.sparse('walk:eden-library-1'),full=w.full('walk:eden-library-1');assert.ok(projected);assert.deepEqual(projected.caps.find((c:any)=>c.id==='walk:eden-library-1'),full.cap);assert.match(full.cap!.label,/Glide/);assert.deepEqual(projected.plans.get('walk:eden-library-1'),full.plan);body.body=original;assert.ok(base.cap);
 });
-test('a real occupied native seat is released through normal walk admission',async t=>{
+test('a real occupied native seat is released through omitted-area normal walk admission',async t=>{
  const w=await setup(t),{f,edge,soul,bridge,tick}=w,chair=bridge.god.model.get('chair')!;
  const sit=await accept(f.host,edge.act(soul,{capability:'sit:'+chair.id,params:{seconds:600}}));assert.equal(sit.accepted,true,JSON.stringify(sit));if(!sit.accepted)return;
  const occupied=()=>f.host.engine.world.entities[soul.entityId]!.human?.activity==='sit'&&f.host.engine.nativeSeatHoldsV1?.(soul.entityId).some(hold=>f.host.engine.runtime.records.get(hold.action)?.phase==='occupied');
  for(let i=0;i<800&&!occupied();i++)await tick(1);
- assert.ok(occupied(),'fixture must actually occupy a native slot, not merely reserve/approach it');
- const full=w.full('walk:eden-library-1'),projected=w.sparse('walk:eden-library-1');assert.ok(projected);assert.deepEqual(projected.plans.get('walk:eden-library-1'),full.plan);assert.equal(full.plan!.steps[0].verb,'stand');
- const walk=await accept(f.host,edge.act(soul,{capability:'walk:eden-library-1'}));assert.equal(walk.accepted,true,JSON.stringify(walk));if(!walk.accepted)return;
+ assert.ok(occupied(),'fixture must actually occupy a native slot, not merely reserve/approach it');await omitFieldFromListing(w);
+ const full=fullOnDemand(w,'walk:place-field'),projected=w.sparse('walk:place-field');assert.ok(projected);assert.deepEqual(projected.plans.get('walk:place-field'),full.plan);assert.equal(full.plan!.steps[0].verb,'stand');
+ const walk=await accept(f.host,edge.act(soul,{capability:'walk:place-field'}));assert.equal(walk.accepted,true,JSON.stringify(walk));if(!walk.accepted)return;
  for(let i=0;i<1200&&edge.receipt(soul.soulId,walk.receipt.id)?.phase!=='completed';i++)await tick(1);
  assert.equal(edge.receipt(soul.soulId,walk.receipt.id)?.phase,'completed');assert.equal(f.host.engine.nativeSeatHoldsV1?.(soul.entityId).length,0);assert.deepEqual(f.host.engine.runtime.violations,[]);
+});
+
+test('canonical omitted area keeps exact legacy on-demand cap/plan and native receipt without full enumeration',async t=>{
+ const w=await setup(t),{edge,soul,bridge,f}=w;await omitFieldFromListing(w);
+ const original=fullOnDemand(w,'walk:place-field');assert.equal(original.cap?.target?.id,'g-place-field');assert.ok(original.cap?.available);assert.ok(original.plan);
+ const projected=w.sparse('walk:place-field');assert.ok(projected);assert.deepEqual(projected.caps.find((c:any)=>c.id==='walk:place-field'),original.cap);assert.deepEqual(projected.plans.get('walk:place-field'),original.plan);
+ assert.equal(projected.caps.some((c:any)=>c.verb!=='walk'),false,'no sibling area activity offers');assert.equal((edge as any).capCache.size,0);
+ // Reading the full listing first must neither disable on-demand admission nor
+ // install the sparse result in the cache.
+ edge.invalidateBodies();const full=edge.coreA.binds(soul),cache=(edge as any).capCache.get(soul.soulId);assert.equal(full.caps.some(c=>c.id==='walk:place-field'),false);
+ const after=(edge as any).exactWalkBindings(soul,{capability:'walk:place-field'});assert.ok(after);assert.deepEqual(after.plans.get('walk:place-field'),original.plan);assert.equal((edge as any).capCache.get(soul.soulId),cache);assert.equal(full.caps.some(c=>c.id==='walk:place-field'),false);
+ // Existing native exact-ID and preceding ground/profile offers still win.
+ for(const id of ['walk:field','walk:flag-marker']){const legacy=fullOnDemand(w,id),sparse=w.sparse(id);assert.ok(sparse);assert.deepEqual(sparse.caps.find((c:any)=>c.id===id),legacy.cap);assert.deepEqual(sparse.plans.get(id),legacy.plan);}
+ assert.equal(w.sparse('walk:field').caps.find((c:any)=>c.id==='walk:field').target.id,'field');
+ // [ref,g-ref] chooses the native/authored exact place ID first. Do not take
+ // the canonical-area shortcut if that identity is owned by another place.
+ const place=edge.places.byId.get('field')!;edge.places.byId.set('place-field',{...place,id:'place-field'});
+ assert.equal(w.sparse('walk:place-field'),null,'a first-ID collision retains complete resolution');edge.places.byId.delete('place-field');
+ assert.ok(w.sparse('walk:place-field'));
+ // Normal act admission still creates the native receipt and no full listing.
+ edge.invalidateBodies();let lists=0;const binds=(edge as any).binds.bind(edge);(edge as any).binds=(...a:any[])=>{lists++;return binds(...a);};
+ const out=await accept(f.host,edge.act(soul,{capability:'walk:place-field',clientRef:'omitted-area'}));assert.equal(out.accepted,true,JSON.stringify(out));if(!out.accepted)return;assert.equal(lists,0);
+ assert.deepEqual(out.receipt.chosen,{capability:'walk:place-field',target:'g-place-field',kind:'place',place:'g-place-field'});
+ const prior=(edge as any).exactWalkBindings;(edge as any).exactWalkBindings=()=>null;
+ const legacy=await accept(f.host,edge.act(soul,{capability:'walk:place-field',clientRef:'legacy-area'}));assert.equal(legacy.accepted,true,JSON.stringify(legacy));if(legacy.accepted)assert.deepEqual(legacy.receipt.chosen,out.receipt.chosen);
+ (edge as any).exactWalkBindings=prior;(edge as any).binds=binds;
+ edge.knowledge.setSecret('g-place-field',true);const replay=await edge.act(soul,{capability:'walk:place-field',clientRef:'omitted-area'});assert.equal(replay.accepted,true);if(replay.accepted)assert.equal(replay.receipt.id,out.receipt.id);
+ assert.equal(w.sparse('walk:place-field'),null,'unknown secret area cannot use sparse admission');edge.knowledge.setSecret('g-place-field',false);
+ const active=bridge.layers.active.bind(bridge.layers),refuse=bridge.layers.constructionRefusal.bind(bridge.layers);bridge.layers.active=()=>true;bridge.layers.constructionRefusal=()=>({code:'site.under-construction',reason:'Native fixture closes this route'});
+ assert.equal(w.sparse('walk:place-field'),null,'on-demand area still runs coordinate construction safety');bridge.layers.active=active;bridge.layers.constructionRefusal=refuse;
+ const aboard=(edge as any).aboard,stepOut=(edge as any).stepOutRefusal;(edge as any).aboard=()=>({phase:'aloft',label:'native ride'});(edge as any).stepOutRefusal=()=>null;assert.equal(w.sparse('walk:place-field'),null);(edge as any).aboard=aboard;(edge as any).stepOutRefusal=stepOut;
+});
+
+test('unlisted room, water/shore and area-shaped landform retain full legacy resolution',async t=>{
+ const w=await setup(t),{god,bridge,edge}=w;
+ const out=god.act({ops:[
+  {op:'place',def:coreRef('pond'),name:'pond',shape:{area:[[70,40],[80,40],[80,50],[70,50]]},params:{depth:.3,level:0,edge:1}},
+  {op:'place',def:coreRef('plateau'),name:'terrace',shape:{area:[[100,40],[110,40],[110,50],[100,50]]},params:{height:1.6,edge:1}},
+ ]});assert.equal(out.accepted,true,JSON.stringify(out));await w.tick(8);await omitFieldFromListing(w);
+ assert.equal(bridge.nav.thing('terrace')?.kind,'area','landforms can share the area-shaped navigation class');
+ assert.equal(bridge.places.forRef('terrace')?.of,'landform');assert.equal(bridge.places.forRef('pond')?.of,'shore');
+ const room=bridge.nav.things().find(x=>x.ref.startsWith('far-house/')&&x.kind==='room')!;
+ for(const ref of ['pond','terrace',room.ref]){
+  assert.equal(bridge.nav.exactListedWalk(w.soul,ref,[],new Map()),false,ref);
+  assert.equal(edge.exactAuthoredAreaWalkRef!(ref),false,ref);
+  assert.equal(w.sparse('walk:'+ref),null,ref);
+  edge.coreA.binds(w.soul);assert.equal((edge as any).exactWalkBindings(w.soul,{capability:'walk:'+ref}),null,'full-cache miss must not broaden '+ref);
+ }
 });

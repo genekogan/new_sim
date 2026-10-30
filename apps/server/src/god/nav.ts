@@ -607,13 +607,36 @@ export class GodNav {
    *  multi-floor reach check; walk to the building first). True when a capability was added. */
   walkOnDemand(soul: EdgeSoul, placeId: string, caps: EdgeCapability[], plans: Plans): boolean {
     const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human || !this.h.placeOf) return false;
+    const t = this.placeWalkThing(placeId); if (!t) return false;
+    return this.offerOnDemand(soul, t, caps, plans);
+  }
+
+  /** The existing place-ID representative, shared by ordinary on-demand resolution
+   * and the narrowly projected canonical area walk. Never pick a different ref. */
+  private placeWalkThing(placeId: string): Thing | undefined {
+    if (!this.h.placeOf) return undefined;
     // RESOLVE2: an upstairs room is walked to as well (in at the front door, up its stair): ground-floor rooms first
     const low = (t: Thing) => t.kind !== 'room' || t.level === 0 || (t.rise ?? 0) < LOW_RISE_M;
     const all = this.things(), mine = all.filter((t) => this.h.placeOf!(t.ref) === placeId).sort((a, b) => +low(b) - +low(a));
     // F6: a room's own place is that room (not a piece of furniture standing in it)
     const room = mine.some((x) => x.kind === 'building') ? undefined : mine.find((x) => x.kind === 'room');
-    const t = room ?? mine.find((x) => x.kind !== 'room') ?? mine[0]; if (!t) return false;
-    return this.offerOnDemand(soul, t, caps, plans);
+    return room ?? mine.find((x) => x.kind !== 'room') ?? mine[0];
+  }
+
+  /** Only a canonical authored area whose place-ID resolution picks this exact
+   * Thing may bypass listing truncation. Rooms, shores and other place kinds
+   * retain their complete legacy resolution and on-demand admission. */
+  exactAreaWalkRef(ref: string, placeId: string): boolean {
+    const t = this.thing(ref);
+    return !!t && t.kind === 'area' && !t.semanticPart && !!t.area && t.area.length >= 3
+      && this.h.placeOf?.(ref) === placeId && this.placeWalkThing(placeId) === t;
+  }
+
+  exactAreaWalkOnDemand(soul: EdgeSoul, ref: string, placeId: string, caps: EdgeCapability[], plans: Plans): boolean {
+    if (!this.h.engine.world.entities[soul.entityId]?.human || !this.exactAreaWalkRef(ref, placeId)) return false;
+    const t = this.placeWalkThing(placeId)!;
+    this.offerOnDemand(soul, t, caps, plans, true);
+    return caps.some(c => c.id === `walk:${ref}`);
   }
 
   /** RESOLVE2: a re-sent walk id of a named thing or room (`walk:seafront-hotel-4/seafront-hotel-4-roof-bench`, offered by
@@ -624,12 +647,12 @@ export class GodNav {
     return this.offerOnDemand(soul, t, caps, plans);
   }
 
-  private offerOnDemand(soul: EdgeSoul, t: Thing, caps: EdgeCapability[], plans: Plans): boolean {
+  private offerOnDemand(soul: EdgeSoul, t: Thing, caps: EdgeCapability[], plans: Plans, onlyWalk = false): boolean {
     const me = this.h.engine.world.entities[soul.entityId]!, all = this.things();
     const here: Vec2 = [me.pose.p[0], me.pose.p[2]], myLevel = me.human!.level ?? 0;
     const exit = myLevel === 0 ? null : all.find((r) => r.kind === 'room' && r.level === myLevel && r.poly && inPoly(here[0], here[1], r.poly) && r.entry && r.entry.level === 0)?.entry ?? null;
     const seated = me.human!.activity === 'sit' || me.human!.baseActivity === 'sit', n = caps.length;
-    this.offerWalk(soul, t, this.distance(t, here), { here, myLevel, seated, exit }, caps, plans);
+    this.offerWalk(soul, t, this.distance(t, here), { here, myLevel, seated, exit }, caps, plans, onlyWalk);
     // F6 (SOULSIM-H): a room of a far building is walked to in at its front door, in one walk: to the door's approach
     // outside, then onto the room's floor (it was refused, so the Soul walked to the building first, then in: ~10 s more)
     const id = `walk:${t.ref}`, plan = plans.get(id), door = t.kind === 'room' ? t.entry : undefined;

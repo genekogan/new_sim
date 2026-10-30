@@ -82,6 +82,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
   private exactWalkProfiles=new WeakMap<WalkProfile,ExactWalkProfile>();
   /** Installed only by the native authored-place bridge; no names/aliases. */
   exactAuthoredWalkRef?: (ref:string)=>boolean;
+  /** Canonical AREA only: missing from a full listing can mean bounded listing
+   * truncation; this hook certifies the identical ordinary on-demand choice. */
+  exactAuthoredAreaWalkRef?: (ref:string)=>boolean;
   /** Explicitly opt a known profile wrapper into exact-walk projection. Any
    * unknown wrapper/provider keeps the full authoritative listing path. */
   registerExactWalkProfile(profile:WalkProfile,previous:WalkProfile|undefined,extend?:ExactWalkProfile){
@@ -782,7 +785,12 @@ export class EdgeLedger implements EdgeLedgerHooks {
       if(!this.exactAuthoredWalkRef?.(ref))return null;
       // Reuse an already-authoritative full same-tick listing, never cache sparse data.
       const tick=this.host.engine.world.tick,hit=this.capCache.get(soul.soulId);
-      if(hit?.tick===tick)return hit.value.caps.some(c=>c.id===asked)?{...hit.value,tick}:null;
+      if(hit?.tick===tick){
+        if(hit.value.caps.some(c=>c.id===asked))return {...hit.value,tick};
+        if(!this.exactAuthoredAreaWalkRef?.(ref))return null;
+        // Keep the authoritative full cache intact; the on-demand area binding
+        // below is local to this request, never a replacement listing.
+      }
       const read=readHumanCapabilitiesV1(this.host,this.mind(soul),{registeredActivitiesV1:true,deferRouteChecks:true,skipRegisteredCards:true,onlyWalkTarget:ref}),caps:EdgeCapability[]=[],plans:Plans=new Map();
       for(const b of read.bindings.values())if(b.id===asked&&b.goal==='walk')this.addNativeBinding(b,caps,plans);
       if(!project(soul,asked,caps,plans))return null;

@@ -1463,11 +1463,17 @@ export class EngineBridge {
     const prev = L.worldProfile;
     L.worldProfile = (soul, caps, plans) => { prev?.(soul, caps, plans); try { this.capabilities(soul, caps, plans as never); } catch (e) { this.log(`capabilities: ${(e as Error).message}`); } };
     L.exactAuthoredWalkRef=ref=>this.nav.exactPlaceWalkRef(ref);
+    // Match resolveOnDemand's exact place-ID precedence, before its by-ref
+    // fallback. A colliding native/authored place ID must keep full resolution.
+    const exactAreaPlace=(ref:string)=>[ref,'g-'+ref].find(id=>L.places.byId.has(id));
+    L.exactAuthoredAreaWalkRef=ref=>{const id=exactAreaPlace(ref);return !!id&&this.places.forRef(ref)?.of==='area'&&this.nav.exactAreaWalkRef(ref,id);};
     L.registerExactWalkProfile(L.worldProfile,prev,(soul,asked,caps,plans)=>{
       let selected=false;
       const read=()=>{
         // Native bindings/profile precede GodNav exactly as in the full list.
-        selected=caps.some(c=>c.id===asked)||this.nav.exactListedWalk(soul,asked.slice(5),caps,plans);
+        const ref=asked.slice(5),areaPlace=exactAreaPlace(ref);
+        selected=caps.some(c=>c.id===asked)||this.nav.exactListedWalk(soul,ref,caps,plans)
+          || (!!areaPlace&&L.exactAuthoredAreaWalkRef!(ref)&&this.nav.exactAreaWalkOnDemand(soul,ref,areaPlace,caps,plans));
         if(!selected)return;
         const me=this.engine.world.entities[soul.entityId];
         if(this.layers.active())this.layers.capabilities(soul,caps,plans as never,me?[me.pose.p[0],me.pose.p[2]]:null);
