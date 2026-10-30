@@ -136,6 +136,32 @@ due wake for the immediate next choice. The model still authors goals, activity
 choices and appointments; this timer mechanism does not infer or schedule a
 social plan on its behalf.
 
+An urgent owner/addressed/conversation observation arriving after a prompt, or
+a saved future wake becoming due during that turn, first steers the same host.
+If that obsolete turn remains active for five seconds after the first trigger,
+the controller requests interruption of that exact turn. Later observations or
+ACKs do not postpone the grace. A fresh prompt starts only after the old terminal
+and the interrupt/control requests settle. Already included facts and an already
+due wake in a fresh prompt do not arm another interruption merely because the
+fresh decision is slow. Ordinary world replans retain their two-replan cap;
+owner revisions and saved deadlines remain mandatory freshness boundaries.
+A pending start ACK has no verified turn ID yet and retains the existing host
+request timeout; the controller never guesses an interrupt target. Notification
+queueing does not mark an event delivered or handled: delivery telemetry follows
+the actual host ACK, and facts remain pending for a committed decision.
+
+Interrupt ACK plus terminal/control-chain confirmation has a total five-second
+bound. Failure reserves one durable `urgentRecoveryV1` fallback ticket before
+closing the owned host. Managed recovery accepts that exact ticket only after
+the entire old owned host group is authoritatively absent, then resumes the same
+thread and journal. A second unconfirmed urgent interruption blocks until an
+actual decision is applied and its final checkpoint commits. Retaining a choice,
+startup observations or an uncertain write never refill this budget. Task,
+listening, wake and pending effects remain durable; no native body activity is
+cancelled or potentially accepted write replayed by this policy. The five-plus-
+five policy is a bounded control policy, not a fifteen-second visible-response
+guarantee: provider latency, cleanup and fresh inference remain variable.
+
 Journal retention reserves separate pending capacity for owner messages
 (1,000 events/8MiB) and world traffic (20,000/64MiB). A full page is rejected
 atomically with its cursor unchanged; intake backs off while handling drains

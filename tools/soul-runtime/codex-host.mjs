@@ -129,10 +129,12 @@ export class CodexHost extends EventEmitter {
     if(!expectedTurnId)throw fault('HOST_IDLE','No active turn to steer');
     return this.request('turn/steer',{threadId:this.threadId,expectedTurnId,input:input(text)});
   }
-  async interrupt(){
-    const turnId=this.activeTurnId;if(!turnId)return {status:'idle'};
+  async interrupt(expectedTurnId=this.activeTurnId){
+    const turnId=expectedTurnId;if(!turnId)return {status:'idle'};
+    if(turnId!==this.activeTurnId)throw fault('HOST_TURN_MISMATCH','Interrupt target differs from the active turn');
+    const turn=this.turnRecord(turnId);
     await this.request('turn/interrupt',{threadId:this.threadId,turnId});
-    return this.turnRecord(turnId).completed;
+    return turn.completed;
   }
   // Caller must establish terminal *run* completion and ownership separately;
   // model-turn completion, routine close, and recovery never trigger archival.

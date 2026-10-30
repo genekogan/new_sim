@@ -127,7 +127,9 @@ export async function applyPendingDecision(journal,fence,world,{signal}={}){
  // it, so the immediate next choice still sees the outstanding reminder.
  const priorWake=latest.value.wakeAt;
  const wakeAt=decision.wakeAt??(call.type==='listen'?priorWake??null:call.type==='wait'&&call.args.cancelWake===true?null:priorWake&&Date.parse(priorWake)>pending.retainedAt?priorWake:null);
- const {lastResult,...previous}=latest.value;
+ // A real applied decision, including an explicit refusal, is the progress
+ // boundary. Retention, inference and uncertain effects never refill this budget.
+ const {lastResult,urgentRecoveryV1,...previous}=latest.value;
  const listenTo=['listen','wait'].includes(call.type)&&Object.hasOwn(call.args,'listenTo')?listeningScope(call.args.listenTo):latest.value.listenTo??[];
  const finalized={...previous,pendingDecision:null,lastDecisionId:id,lastCall:call,wakeAt,listenTo,lastReceipt:receipt??receiptProjection(latest.value.lastReceipt)??null};
  // Count the actual surrounding checkpoint, including the lastResult key and

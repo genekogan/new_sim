@@ -8,6 +8,23 @@ import {DECISION_SCHEMA,parseDecision,retainDecision,applyPendingDecision} from 
 import {boundedFacts} from './context.mjs';
 function fixture(t){const dir=mkdtempSync(join(tmpdir(),'sim-decision-'));const j=openJournal(dir,{worldId:'w',soulId:'s'});t.after(()=>{j.close();rmSync(dir,{recursive:true,force:true})});return {j,dir,fence:j.control.claim('test')};}
 const decision=()=>parseDecision(JSON.stringify({plan:'Go read, then return. Still pending.',call:{type:'write',command:'act',arguments:'{"capability":"read:here"}'},wakeAt:null}));
+test('urgent fallback budget survives uncertain effects and clears only with committed finalization',async t=>{
+ const {j,fence}=fixture(t),marker={id:'episode-1',triggerAt:1000,reason:'owner',turnId:'old-turn',fallbackUsed:true,worldReplans:2};
+ j.control.save(fence,0,{initialInstruction:'Original goal',urgentRecoveryV1:marker});const id=retainDecision(j,fence,decision());let writes=0;
+ await assert.rejects(applyPendingDecision(j,fence,{write:async()=>{writes++;throw Error('uncertain response');}}),{code:'OPERATION_UNCERTAIN'});
+ assert.deepEqual(j.control.checkpoint().value.urgentRecoveryV1,marker);assert.equal(j.control.operation(id).status,'uncertain');
+ const save=j.control.save;j.control.save=(...args)=>{if(args[2].pendingDecision===null)throw Error('simulated final checkpoint failure');return save(...args);};
+ await assert.rejects(applyPendingDecision(j,fence,{reconcile:async()=>({state:'recorded',status:200,response:{accepted:true,receipt:{id:'native-existing'}}})}),/final checkpoint failure/);
+ assert.deepEqual(j.control.checkpoint().value.urgentRecoveryV1,marker);assert.equal(j.control.operation(id).status,'settled');
+ j.control.save=save;await applyPendingDecision(j,fence,{write:async()=>{writes++;throw Error('duplicate effect');}});
+ assert.equal(writes,1);assert.equal(j.control.checkpoint().value.urgentRecoveryV1,undefined);assert.equal(j.control.checkpoint().value.pendingDecision,null);
+});
+test('retained urgent fallback budget survives journal reopen until an actual local decision applies',async t=>{
+ const {j,dir,fence}=fixture(t),marker={id:'retained-episode',triggerAt:1000,reason:'deadline',turnId:'old-turn',fallbackUsed:true,worldReplans:1};j.control.save(fence,0,{urgentRecoveryV1:marker});
+ retainDecision(j,fence,parseDecision(JSON.stringify({plan:'Continue original work',call:{type:'wait',command:'wait',arguments:'{}'},wakeAt:null})));j.control.release(fence);
+ const recovered=openJournal(dir,{worldId:'w',soulId:'s'});t.after(()=>recovered.close());const next=recovered.control.claim('next');assert.deepEqual(recovered.control.checkpoint().value.urgentRecoveryV1,marker);
+ await applyPendingDecision(recovered,next,{});assert.equal(recovered.control.checkpoint().value.urgentRecoveryV1,undefined);
+});
 test('retained decision survives before execution and replay of settled result does not repeat effect',async t=>{
  const {j,fence}=fixture(t);j.ingest({source:'owner',after:null,cursor:'m1',events:[{id:'m1',text:'Read then return'}]});const events=j.pending();const id=retainDecision(j,fence,decision(),{events,initialInstruction:'Read then return'});
  j.control.prepare(fence,id,decision().call);j.control.dispatch(fence,id);j.control.settle(fence,id,{accepted:true,receipt:{id:'r_1',phase:'started'}});

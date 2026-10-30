@@ -28,3 +28,8 @@ test('repeated host failure is bounded and leaves an explicit blocked status',as
  await assert.rejects(runManaged({journal,world:{},instruction:'Keep goal',maxConsecutiveRestarts:2,sleep:async()=>{},createHost:()=>{starts++;const h=new Host();h.connect=async()=>{throw Object.assign(Error('Host exited'),{code:'HOST_EXITED'});};return h;},onState:s=>states.push(s)}),{code:'HOST_EXITED'});
  assert.equal(starts,3);assert.equal(states.at(-1).state,'blocked');assert.equal(states.at(-1).pendingPreserved,true);
 });
+test('an unreserved urgent timeout cannot enter the ordinary restart path',async t=>{
+ const journal=fixture(t),states=[];let hosts=0;
+ await assert.rejects(runManaged({journal,world:{read:async()=>{throw Object.assign(Error('unreserved timeout'),{code:'HOST_URGENT_TURN_TIMEOUT',urgentFallbackGranted:true,urgentRecoveryId:'not-reserved'});}},createHost:()=>{hosts++;return new Host();},sleep:async()=>{},onState:s=>states.push(s)}),{code:'URGENT_RECOVERY_TICKET_INVALID'});
+ assert.equal(hosts,1);assert.equal(states.at(-1).state,'blocked');assert.equal(journal.control.checkpoint().value.urgentRecoveryV1,undefined);
+});

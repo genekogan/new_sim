@@ -44,6 +44,17 @@ function protocol(t,options={},reply=()=>false){
  return {host,requests,deliver};
 }
 async function until(predicate){for(let n=0;n<30;n++){if(predicate())return;await new Promise(setImmediate);}throw Error('Synthetic protocol condition not reached');}
+test('interrupt rejects a different exact turn without emitting a cancellation request',async t=>{
+ const p=protocol(t);await p.host.connect();const active=await p.host.begin('synthetic');
+ await assert.rejects(p.host.interrupt('unrelated-turn'),{code:'HOST_TURN_MISMATCH'});assert.equal(p.host.activeTurnId,active.turnId);assert.equal(p.requests.some(r=>r.method==='turn/interrupt'),false);
+});
+test('interrupt ACK is not terminal proof and late ACK remains bound to its original turn',async t=>{
+ let ack;const p=protocol(t,{},(m,respond)=>{if(m.method==='turn/interrupt'){ack=()=>respond({});return true;}return false;});await p.host.connect();const old=await p.host.begin('synthetic');let done=false;
+ const interrupted=p.host.interrupt(old.turnId);interrupted.then(()=>{done=true;});await until(()=>ack);assert.equal(done,false);assert.equal(p.host.activeTurnId,old.turnId);
+ p.deliver({method:'turn/completed',params:{threadId:p.host.threadId,turn:{id:old.turnId,status:'completed'}}});await old.completed;assert.equal(done,false,'terminal arriving first does not fabricate the RPC ACK');
+ const fresh=await p.host.begin('fresh synthetic');ack();assert.equal((await interrupted).turnId,old.turnId);assert.equal(p.host.activeTurnId,fresh.turnId);assert.equal(p.requests.filter(r=>r.method==='turn/interrupt').length,1);
+ p.deliver({method:'turn/completed',params:{threadId:p.host.threadId,turn:{id:fresh.turnId,status:'completed'}}});await fresh.completed;
+});
 test('durable start remains default and routine close never archives its thread',async t=>{
  const p=protocol(t);const connected=await p.host.connect();
  assert.equal(p.requests.find(r=>r.method==='thread/start').params.ephemeral,false);assert.equal(connected.ephemeral,false);assert.equal(connected.name,null);
