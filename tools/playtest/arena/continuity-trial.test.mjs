@@ -451,3 +451,11 @@ test('physical sampler requires explicit native body projection and never silent
  assert.equal(f.calls.length,0,'an old or ignored query fails mechanical setup before any actor launch');
  assert.equal(f.rows().filter(r=>['setup-body','body','fixture-body'].includes(r.kind)).length,0);
 });
+
+for(const outcome of ['acknowledged','read-refused','metadata-close-unverified','metadata-setup-threw'])test('archival postcondition is separate from behavioral qualification: '+outcome,async t=>{
+ const f=fixture(t),rows=['thread-a','thread-b'].map(threadId=>({threadId,archived:outcome!=='read-refused',metadataHostCloseProof:{hostPid:900,groupClosed:outcome!=='metadata-close-unverified',groupVerification:outcome==='metadata-close-unverified'?'unverified':'absent'}}));
+ f.deps.registryFactory=()=>({register(){},complete(){},async archiveCompleted(){if(outcome==='metadata-setup-threw')throw Error('metadata setup failure');return rows;}});
+ const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(3000);const result=await pending;
+ assert.equal(result.failureCode,null);assert.equal(result.qualification,'not assessed');assert.equal(result.endReason,'cutoff');assert.equal(result.archival.status,outcome==='acknowledged'?'acknowledged':'incomplete');assert.equal(result.archival.sidebarVerification,'not-checked');
+ const stored=JSON.parse(readFileSync(join(f.config.directory,'summary.json'),'utf8'));assert.deepEqual(stored.archival,result.archival);assert.equal(stored.failureCode,null);assert.deepEqual(JSON.parse(readFileSync(join(f.config.directory,'archive-results.json'),'utf8')),outcome==='metadata-setup-threw'?[]:rows);
+});

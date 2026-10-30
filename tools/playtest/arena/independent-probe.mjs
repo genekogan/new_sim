@@ -2,12 +2,12 @@
 // process and private journal per Soul; no speaking order or cross-agent relay.
 import {spawn} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {mkdirSync,readFileSync,writeFileSync,appendFileSync,existsSync} from 'node:fs';
+import {mkdirSync,readFileSync,writeFileSync,appendFileSync,existsSync,renameSync} from 'node:fs';
 import {resolve,join,dirname} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createWorldClient} from '../../soul-runtime/world-client.mjs';
 import {abortableSleep} from '../../soul-runtime/receiver.mjs';
-import {probeSessions,verifyOwnedProbeExit} from './probe-sessions.mjs';
+import {probeSessions,verifyOwnedProbeExit,probeArchivalStatus} from './probe-sessions.mjs';
 
 export async function runIndependentProbe({directory,actors,fixtureActors=[],seconds,model,effort='low',signal,onState=()=>{}}){
  if(!Number.isFinite(seconds)||seconds<1||seconds>3600||!model||!Array.isArray(actors)||actors.length<2||actors.length>5)throw Error('Require bounded2..5-Soul probe and explicit model');
@@ -107,12 +107,16 @@ export async function runIndependentProbe({directory,actors,fixtureActors=[],sec
   const summary={kind:'development-only',startedAt:started===null?null:new Date(started).toISOString(),endedAt:new Date().toISOString(),failure,actors:rows.map(r=>({id:r.actor.id,soulId:r.paired.soul,threads:[...r.threadIds],exit:r.exit,cleanupVerified:r.cleanupVerified,controllers:[...r.controllers.values()].map(c=>({...c,hostPids:[...c.hostPids]}))})),limits:'Bounded independent-agent exercise; no sealed A/B, latency SLA, or automatic semantic pass claim.'};
   writeFileSync(join(out,'summary.json'),JSON.stringify(summary,null,2));
   for(const row of rows)if(row.cleanupVerified)for(const threadId of row.threadIds)registry.complete(threadId,{outcome:failure||row.exit.code!==0?'failed':'bounded-end',ownedProcessesExited:true,evidence:'summary.json;timeline.jsonl: every controller and owned host group verified closed'});
-  const archived=await registry.archiveCompleted();writeFileSync(join(out,'archive-results.json'),JSON.stringify(archived,null,2));
+  let archived=[],archiveError=null;
+  try{archived=await registry.archiveCompleted();}catch(error){archiveError=error;}
+  writeFileSync(join(out,'archive-results.json'),JSON.stringify(archived,null,2));
+  summary.archival=probeArchivalStatus(archived,{error:archiveError,expectedThreadIds:rows.flatMap(row=>[...row.threadIds])});
+  writeFileSync(join(out,'summary-archival.tmp'),JSON.stringify(summary,null,2),{flag:'wx',mode:0o600});renameSync(join(out,'summary-archival.tmp'),join(out,'summary.json'));
   return {...summary,archived};
  }
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  const config=JSON.parse(readFileSync(resolve(process.argv[2]),'utf8')),stop=new AbortController();
  process.once('SIGINT',()=>stop.abort());process.once('SIGTERM',()=>stop.abort());
- runIndependentProbe({...config,signal:stop.signal,onState:s=>{if(['running','blocked','recovering'].includes(s.state))console.log(JSON.stringify(s));}}).then(r=>{console.log(JSON.stringify(r));if(r.failure)process.exitCode=1;}).catch(e=>{console.error(e.message);process.exitCode=1});
+ runIndependentProbe({...config,signal:stop.signal,onState:s=>{if(['running','blocked','recovering'].includes(s.state))console.log(JSON.stringify(s));}}).then(r=>{console.log(JSON.stringify(r));if(r.failure||r.archival?.status==='incomplete')process.exitCode=1;}).catch(e=>{console.error(e.message);process.exitCode=1});
 }

@@ -76,7 +76,7 @@ export function verifyRestartTermination(controller,proof,killProcess=process.ki
  return true;
 }
 
-export function probeSessions(directory,{createHost=opts=>new CodexHost(opts)}={}){
+export function probeSessions(directory,{createHost=opts=>new CodexHost(opts),sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}){
  const root=resolve(directory),file=join(root,'probe-sessions.json');
  mkdirSync(root,{recursive:true});
  const load=()=>{let state;try{state=JSON.parse(readFileSync(file,'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;state={schema:'sim-internal-probe-sessions/1',sessions:[]};}if(state.schema!=='sim-internal-probe-sessions/1')throw Error('Unknown probe session manifest');return state;};
@@ -100,40 +100,82 @@ export function probeSessions(directory,{createHost=opts=>new CodexHost(opts)}={
   },
   async archiveCompleted(){
    if(archiving)throw Error('Probe archival already in progress');
-   const pending=load().sessions.filter(x=>x.terminal&&!x.archivedAt&&!x.ephemeral);
+   const initial=load(),terminal=initial.sessions.filter(x=>x.terminal&&!x.ephemeral),pending=terminal.filter(x=>!x.archivedAt);
+   // Only the release owner may clear this marker after retaining exact owned
+   // PID/group absence evidence under the manual reconciliation procedure. Do
+   // not signal, resume, or infer cleanup from a later successful metadata RPC.
+   if(initial.metadataCleanupPending)return terminal.map(row=>({threadId:row.threadId,archived:!!row.archivedAt,attempts:[],metadataHostCloseProof:structuredClone(initial.metadataCleanupPending),metadataHostCloseProofs:[structuredClone(initial.metadataCleanupPending)],blockedReason:'METADATA_CLEANUP_PENDING',sidebarVerification:'not-checked'}));
    if(!pending.length)return [];
-   const host=createHost({cwd:root});const results=[];archiving=true;
+   const results=pending.map(row=>({threadId:row.threadId,archived:false,attempts:[],metadataHostCloseProofs:[],sidebarVerification:'not-checked'}));
+   const retry=new Set(pending.map(row=>row.threadId));archiving=true;
    try{
-    await host.request('initialize',{clientInfo:{name:'sim_internal_probe_cleanup',version:'1'}});host.send({method:'initialized',params:{}});
-    for(const row of pending){
+    // Administrative metadata only: three finite passes, no start/resume/turn.
+    // A timed-out connection is never reused. Its entire owned group must be
+    // verified absent before another helper can be created.
+    for(let attempt=1;attempt<=3&&retry.size;attempt++){
+     let host,setupError,proof,persistenceFailed=false;
      try{
-      // No resume/start: never creates a chat or starts inference for cleanup.
-      const result=await host.request('thread/read',{threadId:row.threadId,includeTurns:false});
-      if(resolve(result.thread.cwd)!==row.cwd)throw Error('Stored thread does not match registered probe folder');
-      const status=result.thread.status?.type??result.thread.status;
-      if(!['idle','notLoaded'].includes(status))throw Error('Probe thread is not idle');
-      await host.request('thread/archive',{threadId:row.threadId});
-      row.archivedAt=new Date().toISOString();delete row.archiveError;
-     }catch(error){row.archiveError=String(error.message);}
-     const result=mutate(()=>{
-      const current=state.sessions.find(x=>x.threadId===row.threadId);
-      if(!current||current.cwd!==row.cwd||current.ephemeral!==row.ephemeral||!current.terminal)throw Error('Probe registry changed identity or terminal ownership');
-      // RPC awaited against a snapshot. Preserve concurrently updated completion
-      // outcome/evidence; merge only archive facts, never the stale whole row.
-      if(row.archivedAt){current.archivedAt=row.archivedAt;delete current.archiveError;}
-      else if(!current.archivedAt)current.archiveError=row.archiveError;
-      return current.archivedAt?{threadId:row.threadId,archived:true}:{threadId:row.threadId,archived:false,error:current.archiveError};
-     });results.push(result);
+      host=createHost({cwd:root,requestTimeoutMs:3000});
+      await host.request('initialize',{clientInfo:{name:'sim_internal_probe_cleanup',version:'1'}});host.send({method:'initialized',params:{}});
+     }catch(error){setupError=error;}
+     try{
+      for(const row of pending.filter(row=>retry.has(row.threadId))){
+       const output=results.find(result=>result.threadId===row.threadId),entry={attempt,acknowledged:false};output.attempts.push(entry);
+       try{
+        if(setupError)throw setupError;
+        const current=load().sessions.find(x=>x.threadId===row.threadId);
+        if(!current||current.cwd!==row.cwd||current.ephemeral!==row.ephemeral||!current.terminal)throw Object.assign(Error('Probe registry changed identity or terminal ownership'),{archiveBlocked:true});
+        if(current.archivedAt){output.archived=true;retry.delete(row.threadId);continue;}
+        const result=await host.request('thread/read',{threadId:row.threadId,includeTurns:false});
+        if(result.thread.id!==row.threadId||resolve(result.thread.cwd)!==row.cwd)throw Object.assign(Error('Stored thread does not match registered probe identity and folder'),{archiveBlocked:true});
+        const status=result.thread.status?.type??result.thread.status;
+        if(!['idle','notLoaded'].includes(status))throw Object.assign(Error('Probe thread is not idle'),{archiveBlocked:true});
+        await host.request('thread/archive',{threadId:row.threadId});
+        row.archivedAt=new Date().toISOString();delete row.archiveError;entry.acknowledged=true;output.archived=true;retry.delete(row.threadId);
+       }catch(error){row.archiveError=String(error.message);entry.error=row.archiveError;if(error.archiveBlocked){entry.blocked=true;retry.delete(row.threadId);}}
+       try{const saved=mutate(()=>{
+        const current=state.sessions.find(x=>x.threadId===row.threadId);
+        if(!current||current.cwd!==row.cwd||current.ephemeral!==row.ephemeral||!current.terminal)throw Error('Probe registry changed identity or terminal ownership');
+        // Merge only archive facts: concurrent completion audits remain intact.
+        if(row.archivedAt){current.archivedAt=row.archivedAt;delete current.archiveError;}
+        else if(!current.archivedAt)current.archiveError=row.archiveError;
+        return structuredClone(current);
+       });
+       output.archived=!!saved.archivedAt;if(saved.archiveError)output.error=saved.archiveError;else delete output.error;
+       }catch(error){output.persistenceError=String(error.message);persistenceFailed=true;break;}
+      }
+     }finally{
+      try{proof=host?await host.close():null;}
+      catch(error){proof={hostPid:host?.pid??null,groupClosed:false,groupVerification:'unverified',closeError:String(error.message)};}
+      proof??={hostPid:host?.pid??null,groupClosed:false,groupVerification:'unverified'};
+      // An actual archive ACK survives helper-cleanup failure, but overall
+      // archival completion remains incomplete until cleanup is proven.
+      for(const result of results){result.metadataHostCloseProof=structuredClone(proof);result.metadataHostCloseProofs.push(structuredClone(proof));}
+      try{mutate(()=>{
+       if(proof.groupClosed!==true||proof.groupVerification!=='absent')state.metadataCleanupPending={hostPid:proof.hostPid??null,groupClosed:false,groupVerification:'unverified',recordedAt:new Date().toISOString(),reason:'metadata-helper-cleanup-unverified'};
+      });}catch(error){for(const result of results)result.persistenceError=String(error.message);persistenceFailed=true;}
+     }
+     // If storage refused the cleanup marker, the returned failure/proof still
+     // requires owner reconciliation before any reopened-registry retry; a
+     // missing durable write cannot enforce that boundary after process death.
+     if(persistenceFailed||proof.groupClosed!==true||proof.groupVerification!=='absent')break;
+     if(retry.size&&attempt<3)await sleep(100);
     }
-   }finally{try{
-    // Archive acknowledgement and helper cleanup are separate facts. Keep the
-    // exact close certificate in the returned rows so archive-results.json
-    // retains it without changing an already acknowledged archive outcome.
-    const proof=await host.close(),metadataHostCloseProof=proof??{hostPid:host.pid??null,groupClosed:false,groupVerification:'unverified'};
-    for(const result of results)result.metadataHostCloseProof=structuredClone(metadataHostCloseProof);
-   }finally{archiving=false;}}
+   }finally{archiving=false;}
    return results;
   },
   snapshot:()=>structuredClone(load()),
  };
+}
+
+// Native archive acknowledgement and sidebar absence are distinct facts. The
+// latter requires the separate exact-scoped native list verification.
+export function probeArchivalStatus(results,{error=null,expectedThreadIds=[]}={}){
+ const rows=Array.isArray(results)?results:[],acknowledged=new Set(rows.filter(row=>row.archived===true).map(row=>row.threadId));
+ const failedThreadIds=[...new Set([...rows.filter(row=>row.archived!==true).map(row=>row.threadId),...expectedThreadIds.filter(id=>!acknowledged.has(id))])];
+ const metadataCleanupVerified=rows.every(row=>{
+  const proofs=row.metadataHostCloseProofs??[row.metadataHostCloseProof];
+  return proofs.length>0&&proofs.every(proof=>proof?.groupClosed===true&&proof.groupVerification==='absent');
+ });
+ return {status:error||failedThreadIds.length||!metadataCleanupVerified||rows.some(row=>row.persistenceError||row.blockedReason)?'incomplete':'acknowledged',acknowledgedThreadIds:rows.filter(row=>row.archived===true).map(row=>row.threadId),failedThreadIds,metadataCleanupVerified,sidebarVerification:'not-checked',...(error?{error:String(error.message??error)}:{})};
 }

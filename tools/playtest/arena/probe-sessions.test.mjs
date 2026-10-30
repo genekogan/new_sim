@@ -1,9 +1,9 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,rmSync} from 'node:fs';
+import {mkdtempSync,rmSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {probeSessions,verifyOwnedProbeExit} from './probe-sessions.mjs';
+import {probeSessions,verifyOwnedProbeExit,probeArchivalStatus} from './probe-sessions.mjs';
 
 test('separately opened registries preserve each others registrations',()=>{
  const root=mkdtempSync(join(tmpdir(),'sim-probes-'));
@@ -17,7 +17,7 @@ test('separately opened registries preserve each others registrations',()=>{
 test('cleanup preserves unfinished/ephemeral sessions and refuses active or mismatched durable threads',async()=>{
  const root=mkdtempSync(join(tmpdir(),'sim-probes-')),calls=[];let closed=false;
  const host={send(){},close:async()=>{closed=true},request:async(method,args)=>{
-  calls.push({method,args});if(method==='thread/read')return {thread:{cwd:args.threadId==='foreign'?'/unrelated':join(root,args.threadId),status:{type:args.threadId==='busy'?'active':'notLoaded'}}};return {};
+  calls.push({method,args});if(method==='thread/read')return {thread:{id:args.threadId,cwd:args.threadId==='foreign'?'/unrelated':join(root,args.threadId),status:{type:args.threadId==='busy'?'active':'notLoaded'}}};return {};
  }};
  try{
   const registry=probeSessions(root,{createHost:()=>host});
@@ -38,8 +38,8 @@ test('cleanup preserves unfinished/ephemeral sessions and refuses active or mism
 test('failed archival remains retryable without deleting probe evidence',async()=>{
  const root=mkdtempSync(join(tmpdir(),'sim-probes-'));let blocked=true;
  try{
-  const registry=probeSessions(root,{createHost:()=>({send(){},close:async()=>{},request:async(method)=>{
-   if(method==='thread/read')return {thread:{cwd:join(root,'host'),status:{type:'notLoaded'}}};
+  const registry=probeSessions(root,{sleep:async()=>{},createHost:()=>({send(){},close:async()=>({hostPid:444,groupClosed:true,groupVerification:'absent'}),request:async(method)=>{
+   if(method==='thread/read')return {thread:{id:'owned',cwd:join(root,'host'),status:{type:'notLoaded'}}};
    if(method==='thread/archive'&&blocked)throw Error('active writer');return {};
   }})});
   registry.register({threadId:'owned',cwd:join(root,'host'),name:'Sim probe',recoveryMechanism:'same durable host and Soul journal'});
@@ -53,7 +53,7 @@ test('archive RPC cannot overwrite a concurrent completion audit or another regi
  const root=mkdtempSync(join(tmpdir(),'sim-probe-race-'));let finishRead;
  try{
   const first=probeSessions(root,{createHost:()=>({send(){},close:async()=>{},request:async(method)=>{
-   if(method==='thread/read')return new Promise(resolve=>{finishRead=()=>resolve({thread:{cwd:join(root,'host'),status:{type:'idle'}}});});return {};
+   if(method==='thread/read')return new Promise(resolve=>{finishRead=()=>resolve({thread:{id:'owned',cwd:join(root,'host'),status:{type:'idle'}}});});return {};
   }})}),second=probeSessions(root);
   first.register({threadId:'owned',cwd:join(root,'host'),name:'Sim owned',recoveryMechanism:'durable'});first.complete('owned',{outcome:'passed',ownedProcessesExited:true,evidence:'old-audit.json'});
   const archiving=first.archiveCompleted();for(let i=0;i<20&&!finishRead;i++)await new Promise(setImmediate);assert.ok(finishRead);
@@ -165,7 +165,7 @@ test('archive results retain metadata helper closure independently of archive ac
   const root=mkdtempSync(join(tmpdir(),'sim-probe-metadata-close-')),calls=[];
   try{
    const host={pid:444,send(){},close:async()=>proof,request:async(method,args)=>{
-    calls.push({method,args});if(method==='thread/read')return {thread:{cwd:join(root,'host'),status:{type:'notLoaded'}}};return {};
+    calls.push({method,args});if(method==='thread/read')return {thread:{id:'owned',cwd:join(root,'host'),status:{type:'notLoaded'}}};return {};
    }},registry=probeSessions(root,{createHost:()=>host});
    registry.register({threadId:'owned',cwd:join(root,'host'),name:'Sim completed probe',recoveryMechanism:'durable'});
    registry.complete('owned',{outcome:'failed',ownedProcessesExited:true,evidence:'summary.json'});
@@ -179,13 +179,87 @@ test('archive results retain metadata helper closure independently of archive ac
  }
 });
 
-test('a thrown archival helper close still propagates after preserving native acknowledgement',async()=>{
+test('a thrown archival helper close reports incomplete after preserving native acknowledgement',async()=>{
  const root=mkdtempSync(join(tmpdir(),'sim-probe-metadata-close-error-')),closeError=Error('synthetic metadata close failure');
  try{
-  const registry=probeSessions(root,{createHost:()=>({send(){},close:async()=>{throw closeError;},request:async(method)=>method==='thread/read'?{thread:{cwd:join(root,'host'),status:{type:'idle'}}}:{}})});
+  const registry=probeSessions(root,{createHost:()=>({send(){},close:async()=>{throw closeError;},request:async(method)=>method==='thread/read'?{thread:{id:'owned',cwd:join(root,'host'),status:{type:'idle'}}}:{}})});
   registry.register({threadId:'owned',cwd:join(root,'host'),name:'Sim completed probe',recoveryMechanism:'durable'});
   registry.complete('owned',{outcome:'passed',ownedProcessesExited:true,evidence:'summary.json'});
-  await assert.rejects(registry.archiveCompleted(),error=>error===closeError);
+  const rows=await registry.archiveCompleted();assert.equal(rows[0].archived,true);assert.equal(probeArchivalStatus(rows).status,'incomplete');assert.equal(rows[0].metadataHostCloseProof.closeError,closeError.message);
   assert.ok(registry.snapshot().sessions[0].archivedAt,'the acknowledged native archive remains a fact despite helper-close failure');
+ }finally{rmSync(root,{recursive:true,force:true});}
+});
+
+const metadataProof=pid=>({hostPid:pid,groupClosed:true,groupVerification:'absent'});
+function completedRegistry(root,options){const registry=probeSessions(root,options);registry.register({threadId:'owned',cwd:join(root,'host'),name:'Sim exact completed probe',recoveryMechanism:'durable original thread and journal'});registry.complete('owned',{outcome:'failed',ownedProcessesExited:true,evidence:'original-failed-outcome.json'});return registry;}
+test('bounded archive retries use fresh verified-closed helpers and preserve original failure evidence',async()=>{
+ const root=mkdtempSync(join(tmpdir(),'sim-probe-retry-')),calls=[],sleeps=[];let helpers=0;
+ try{
+  const registry=completedRegistry(root,{sleep:async ms=>sleeps.push(ms),createHost:options=>{
+   const attempt=++helpers;assert.equal(options.requestTimeoutMs,3000);
+   return {pid:400+attempt,send(){},close:async()=>{calls.push([attempt,'close']);return metadataProof(400+attempt);},request:async(method,args)=>{
+    calls.push([attempt,method,args]);if(method==='thread/read')return {thread:{id:'owned',cwd:join(root,'host'),status:{type:'notLoaded'}}};if(method==='thread/archive'&&attempt===1)throw Error('temporary native metadata failure');return {};
+   }};
+  }});
+  const rows=await registry.archiveCompleted();assert.equal(helpers,2);assert.deepEqual(sleeps,[100]);assert.equal(rows[0].archived,true);assert.equal(rows[0].attempts.length,2);
+  assert.ok(calls.findIndex(c=>c[0]===1&&c[1]==='close')<calls.findIndex(c=>c[0]===2&&c[1]==='initialize'));
+  assert.deepEqual(probeArchivalStatus(rows),{status:'acknowledged',acknowledgedThreadIds:['owned'],failedThreadIds:[],metadataCleanupVerified:true,sidebarVerification:'not-checked'});
+  const saved=registry.snapshot().sessions[0];assert.equal(saved.outcome,'failed');assert.equal(saved.evidence,'original-failed-outcome.json');assert.equal(saved.name,'Sim exact completed probe');assert.ok(saved.archivedAt);assert.equal(saved.archiveError,undefined);
+  assert.equal(calls.some(c=>['thread/start','thread/resume','turn/start'].includes(c[1])),false);
+ }finally{rmSync(root,{recursive:true,force:true});}
+});
+test('metadata setup failure exhausts exactly three closed-helper passes and remains retryable',async()=>{
+ const root=mkdtempSync(join(tmpdir(),'sim-probe-retry-')),sleeps=[];let helpers=0;
+ try{
+  const registry=completedRegistry(root,{sleep:async ms=>sleeps.push(ms),createHost:()=>{const pid=500+(++helpers);return {pid,send(){},close:async()=>metadataProof(pid),request:async()=>{throw Error('initialize unavailable');}};}});
+  const rows=await registry.archiveCompleted();assert.equal(helpers,3);assert.deepEqual(sleeps,[100,100]);assert.equal(rows[0].attempts.length,3);assert.equal(rows[0].archived,false);assert.equal(probeArchivalStatus(rows).status,'incomplete');assert.deepEqual(probeArchivalStatus(rows).failedThreadIds,['owned']);assert.ok(!registry.snapshot().sessions[0].archivedAt);assert.equal(registry.snapshot().sessions[0].evidence,'original-failed-outcome.json');
+ }finally{rmSync(root,{recursive:true,force:true});}
+});
+test('unverified helper closure prevents another retry even after a native archive acknowledgement',async()=>{
+ for(const acknowledged of [true,false]){
+  const root=mkdtempSync(join(tmpdir(),'sim-probe-retry-'));let helpers=0;
+  try{
+   const registry=completedRegistry(root,{sleep:async()=>assert.fail('no retry gap after unverified cleanup'),createHost:()=>{helpers++;return {pid:600,send(){},close:async()=>({hostPid:600,groupClosed:false,groupVerification:'unverified'}),request:async method=>{if(method==='thread/read')return {thread:{id:'owned',cwd:join(root,'host'),status:{type:'idle'}}};if(method==='thread/archive'&&!acknowledged)throw Error('archive refused');return {};}};}});
+   const rows=await registry.archiveCompleted();assert.equal(helpers,1);assert.equal(rows[0].archived,acknowledged);assert.equal(probeArchivalStatus(rows).status,'incomplete');assert.equal(probeArchivalStatus(rows).metadataCleanupVerified,false);assert.equal(!!registry.snapshot().sessions[0].archivedAt,acknowledged);
+  }finally{rmSync(root,{recursive:true,force:true});}
+ }
+});
+test('a retry rechecks native status and never archives a now-active or mismatched thread',async()=>{
+ for(const blocked of ['active','foreign','foreign-id']){
+  const root=mkdtempSync(join(tmpdir(),'sim-probe-retry-'));let helpers=0,archives=0;
+  try{
+   const registry=completedRegistry(root,{sleep:async()=>{},createHost:()=>{const pass=++helpers;return {send(){},close:async()=>metadataProof(700+pass),request:async method=>{
+    if(method==='thread/read'){if(pass===1)throw Error('transient read unavailable');return {thread:{id:blocked==='foreign-id'?'other':'owned',cwd:blocked==='foreign'?'/unrelated':join(root,'host'),status:{type:blocked==='active'?'active':'idle'}}};}
+    if(method==='thread/archive')archives++;return {};
+   }};}});
+   const rows=await registry.archiveCompleted();assert.equal(helpers,2);assert.equal(archives,0);assert.equal(rows[0].attempts.at(-1).blocked,true);assert.equal(probeArchivalStatus(rows).status,'incomplete');
+  }finally{rmSync(root,{recursive:true,force:true});}
+ }
+});
+
+test('missing expected archive rows cannot certify a completed sidebar cleanup',()=>{
+ const status=probeArchivalStatus([],{expectedThreadIds:['exact-owned-thread']});assert.equal(status.status,'incomplete');assert.deepEqual(status.failedThreadIds,['exact-owned-thread']);assert.equal(status.sidebarVerification,'not-checked');
+});
+
+test('unverified metadata cleanup blocks fresh helpers across registry invocations and restart',async()=>{
+ const root=mkdtempSync(join(tmpdir(),'sim-probe-cleanup-marker-'));let helpers=0;
+ const options={createHost:()=>{helpers++;return {pid:811,send(){},close:async()=>({hostPid:811,groupClosed:false,groupVerification:'unverified'}),request:async method=>{if(method==='thread/read')return {thread:{id:'owned',cwd:join(root,'host'),status:{type:'idle'}}};return {};}};}};
+ try{
+  const registry=completedRegistry(root,options),first=await registry.archiveCompleted();assert.equal(first[0].archived,true);assert.equal(probeArchivalStatus(first).status,'incomplete');
+  const marker=registry.snapshot().metadataCleanupPending;assert.equal(marker.hostPid,811);assert.equal(marker.groupVerification,'unverified');
+  for(const reopened of [registry,probeSessions(root,options)]){
+   const rows=await reopened.archiveCompleted();assert.equal(helpers,1,'unknown prior group must not accumulate another helper');assert.equal(rows[0].archived,true,'retain original archive ACK');assert.equal(rows[0].blockedReason,'METADATA_CLEANUP_PENDING');assert.equal(probeArchivalStatus(rows).status,'incomplete');assert.deepEqual(reopened.snapshot().metadataCleanupPending,marker);
+  }
+ }finally{rmSync(root,{recursive:true,force:true});}
+});
+
+test('an archive ACK and helper proof survive registry persistence failure without another retry',async()=>{
+ const root=mkdtempSync(join(tmpdir(),'sim-probe-persist-failure-'));let helpers=0;
+ try{
+  const registry=completedRegistry(root,{sleep:async()=>assert.fail('storage failure must stop retries'),createHost:()=>{helpers++;return {pid:812,send(){},close:async()=>metadataProof(812),request:async method=>{
+   if(method==='thread/read')return {thread:{id:'owned',cwd:join(root,'host'),status:{type:'idle'}}};
+   if(method==='thread/archive')writeFileSync(join(root,'probe-sessions.json.lock'),'synthetic contention',{flag:'wx'});return {};
+  }};}});
+  const rows=await registry.archiveCompleted();assert.equal(helpers,1);assert.equal(rows[0].archived,true);assert.equal(rows[0].attempts[0].acknowledged,true);assert.ok(rows[0].persistenceError);assert.equal(rows[0].metadataHostCloseProof.groupClosed,true);assert.equal(probeArchivalStatus(rows).status,'incomplete');assert.ok(!registry.snapshot().sessions[0].archivedAt,'native ACK is not misrepresented as a successful durable registry update');assert.equal(registry.snapshot().sessions[0].evidence,'original-failed-outcome.json');
  }finally{rmSync(root,{recursive:true,force:true});}
 });

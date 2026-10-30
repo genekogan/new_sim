@@ -9,7 +9,7 @@ import {resolve,join,basename,isAbsolute} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createWorldClient} from '../../soul-runtime/world-client.mjs';
 import {abortableSleep} from '../../soul-runtime/receiver.mjs';
-import {probeSessions,verifyOwnedProbeExit} from './probe-sessions.mjs';
+import {probeSessions,verifyOwnedProbeExit,probeArchivalStatus} from './probe-sessions.mjs';
 import {runContinuityBaseline} from './adapters/continuity-baseline.mjs';
 import {buildArgs} from './adapters/codex-headless.mjs';
 import {createContinuityUsageGuard,validateUsageLimits,createUsageTail} from './continuity-usage.mjs';
@@ -394,11 +394,15 @@ export async function runContinuityTrial(config,deps={}){
  if(config.restart)summary.coverage.restart=arm===CONTINUITY_ARMS[0]?'unsupported':restartResult?.integration?.status??'unknown';
  privateJson(join(out,'summary.json'),summary);
  for(const row of rows)if(row.cleanupVerified)for(const threadId of row.threads)registry.complete(threadId,{outcome:endReason==='cancelled'?'cancelled':failureCode||row.failureCode||row.result?.failureCode||row.result?.exit?.code!==0?'failed':'bounded-end',ownedProcessesExited:true,evidence:'summary.json;timeline.jsonl; exact owned process-group absence verified before archival'});
- const archived=await registry.archiveCompleted();privateJson(join(out,'archive-results.json'),archived);
+ let archived=[],archiveError=null;
+ try{archived=await registry.archiveCompleted();}catch(error){archiveError=error;}
+ privateJson(join(out,'archive-results.json'),archived);
+ summary.archival=probeArchivalStatus(archived,{error:archiveError,expectedThreadIds:rows.flatMap(row=>[...row.threads])});
+ privateJson(join(out,'summary-archival.tmp'),summary);renameSync(join(out,'summary-archival.tmp'),join(out,'summary.json'));
  return {...summary,archived};
 }
 
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  const stop=new AbortController(),abort=()=>stop.abort();process.once('SIGINT',abort);process.once('SIGTERM',abort);
- runContinuityTrial({...JSON.parse(readFileSync(resolve(process.argv[2]),'utf8')),signal:stop.signal}).then(result=>{console.log(JSON.stringify({arm:result.arm,endReason:result.endReason,failureCode:result.failureCode,qualification:result.qualification}));if(result.failureCode)process.exitCode=1;}).catch(error=>{console.error(JSON.stringify({code:code(error)}));process.exitCode=1;}).finally(()=>{process.removeListener('SIGINT',abort);process.removeListener('SIGTERM',abort);});
+ runContinuityTrial({...JSON.parse(readFileSync(resolve(process.argv[2]),'utf8')),signal:stop.signal}).then(result=>{console.log(JSON.stringify({arm:result.arm,endReason:result.endReason,failureCode:result.failureCode,qualification:result.qualification}));if(result.failureCode||result.archival?.status==='incomplete')process.exitCode=1;}).catch(error=>{console.error(JSON.stringify({code:code(error)}));process.exitCode=1;}).finally(()=>{process.removeListener('SIGINT',abort);process.removeListener('SIGTERM',abort);});
 }
