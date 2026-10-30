@@ -14,6 +14,7 @@ try{
  timer=setInterval(async()=>{if(busy)return;busy=true;try{const s=await sample();if(s)samples.push(s);}finally{busy=false;}},50);
  await camera([4.4,1.6,3.0],[-0.4,0.8,5.6]);await page.waitForTimeout(1500);
  // the owner waters the two beds, then lets three world days pass (1440 = one world day per real minute)
+ const snap=await(await fetch(base+'/v1/world/snapshot')).json(),bed=n=>snap.entities.find(e=>e.name===n).id;
  await post('/v1/god/act',{ops:[{op:'set',id:bed('rose-bed'),state:{moisture:1}},{op:'set',id:bed('herb-bed'),state:{moisture:1}}]});await page.waitForTimeout(4000);
  await post('/v1/god/env',{timeScale:1440});await page.waitForTimeout(195000);
  await post('/v1/god/env',{timeOfDay:'15:00',timeScale:0});await page.waitForTimeout(4000);
