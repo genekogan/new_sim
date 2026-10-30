@@ -1,18 +1,20 @@
-# Continuity fixture and oracle proposal
+# Continuity fixture and oracle contract
 
-The four intents in `matrix.json` remain unchanged. `fixtures.json` binds proposed
+The four intents in `matrix.json` remain unchanged. `fixtures.json` binds
 physical fixtures, actor roles, original errands, starts, real UTC offsets and
 disturbances. `oracles.json` declares numeric thresholds and a source-cited
-semantic rubric. **No baseline or comparison has run. These artifacts are not
-baseline-ready.** Two trials per arm, the same verified model and effort, two
-development scenarios, two untouched holdouts and one subsequent >=7200-real-second
+semantic rubric. **As of 2026-10-30, baseline and candidate comparisons have run;
+overall qualification remains incomplete.** Failed and unknown observations are
+retained. Two trials per arm, the same verified model and effort, two
+development scenarios, two holdouts and one subsequent >=7200-real-second
 soak remain the accepted evaluation design.
 
-The accepted audit calls 2-second receive, 5-second host delivery and 15-second
-visible-response values provisional. These files propose those values as explicit
-scoring bounds; additional arrival, duration and resumption values are new
-precomparison proposals. Seal them after physical/instrumentation preflight and
-before the first comparison. Keep this proposal version and every failed trial.
+The initial accepted audit treated 2-second receive, 5-second host delivery and
+15-second visible-response values as provisional. These files declared explicit
+scoring bounds, including arrival, duration and resumption predicates, before
+comparison. Each run must seal its contract after physical/instrumentation
+preflight and before inference. Any future revision must be declared
+prospectively; preserve the prior version and every failed or unknown trial.
 Do not choose thresholds from treatment or holdout behavior. Actual model/effort
 must be pinned before either arm; development's advertised `gpt-5.6-sol` is not an
 implicit requirement or evidence that a requested different model ran.
@@ -37,12 +39,21 @@ Verified source facts:
   Filtered ordered-operation slices retain the exact source hashes and final
   selected poses under the scratch evidence directory named in `fixtures.json`.
 
-Remaining blockers:
+Preflight and per-run requirements:
 
-- Native physical preflight now covers garden routes, Pavilion separation, both
-  candidate endpoints, four audience positions and actual violin performance.
-  The native performer posture is `busy`; its explicit current activity and
-  instrument must establish playing, rather than the open receipt intent.
+- The 2026-10-29 scoped in-memory witness in `native-fixtures.test.mjs` and
+  `<team>/scratch/continuity-20261029/fixtures/holdout-native-1793312212796-64536.json`
+  covers garden routes, Pavilion separation, both candidate endpoints, four
+  audience positions and actual violin performance using accelerated native
+  ticks and synthetic bodies. It establishes physical feasibility only, not
+  real-UTC holds or connected native release readiness. The 2026-10-30 garden
+  connected-native r3 report records named route/hold/owner-delivery feasibility
+  positives, but overall body coverage is UNKNOWN: initial gaps 2694/2651/2675 ms
+  exceed the unchanged 2-second bound. See
+  `<team>/scratch/continuity-20261029/garden-native-readiness-r3/REPORT.md`.
+  Full readiness is not established. The native performer posture is `busy`; its
+  explicit current activity and instrument must establish playing, rather than
+  the open receipt intent.
 - The isolated Mars world now seats the presenter and all four original tiers
   simultaneously through their original semantic capabilities after the guarded
   cushion repair and prospective occupied-link routing fix. All 24 seating
@@ -51,9 +62,10 @@ Remaining blockers:
   and public receipt bindings still must be recorded before comparison.
 - Verify geometry parity and ref-to-ID/capability bindings for both arms before
   any inference. These JSON files are manifests, not ordinary `playtest.mjs run`
-  scenario files; the existing independent-seat harness needs a bounded adapter
-  to supply their multi-actor evidence. They deliberately do not add a social
-  planner, speaking order or private cross-agent channel.
+  scenario files. `tools/playtest/arena/continuity-trial.mjs` supplies independent
+  actor orchestration; `evidence.mjs` and `native-export-adapter.mjs` adapt its
+  source-cited evidence. These do not add a social planner, speaking order or
+  private cross-agent channel, and missing evidence still stays unknown.
 - One-second current-body samples must use `withKinematics`/authenticated `here`
   or another current source. `snapshotSoul` can fall back to a receipt's old end
   position; that fallback is explicitly rejected by this scorer.
@@ -62,7 +74,7 @@ Remaining blockers:
   failed triggers and unavailable windows. No timeline/model narration substitutes
   for world response/receipt/body evidence.
 
-`oracle.mjs <normalized-evidence.json>` is a read-only executable proposal scorer.
+`oracle.mjs <normalized-evidence.json>` is a read-only executable scorer.
 It accepts the `continuity-evidence/1` contract in `oracles.json`, reuses native
 seat identity/polygon helpers and emits `pass`, `fail` or `unknown` rows. Exit codes
 are 0, 1 and 2 respectively. Missing binding/instrumentation/semantic evidence is
@@ -89,9 +101,9 @@ arbitrarily long maximal observation window.
 Every disturbance now has a frozen typed trigger, exact required recipients and
 maximum delivery delay in `fixtures.json`. Fixed releases and timer events allow
 2 seconds; checkpoint-triggered restart allows 5 seconds; setup seat occupancy
-allows 240 seconds, matching setup's wall bound. These are explicit new
-precomparison fixture proposals. Source-backed trigger proof binds motion to
-current body samples/native journey receipt, the garden errand to three-way
+allows 240 seconds, matching setup's wall bound. These fixture constraints were
+declared prospectively before comparison. Source-backed trigger proof binds
+motion to current body samples/native journey receipt, the garden errand to three-way
 overlap, and restart to a durable checkpoint with at least 20 seconds before its
 wake. Occupancy uses a fixture-only body and is retained through trial end.
 Model-chosen questions and endpoint revisions remain initial supplements.
@@ -125,14 +137,16 @@ when intentionally creating a new declared proposal. It filters template ops and
 writes slices/manifests; it performs no world requests, actions or inference.
 Native discovery JSON in that directory came from the existing credential-opaque
 repository `eden.mjs` with the paired scratch folder as cwd. Credentials were not
-printed or copied. No native actions were performed.
+printed or copied. That source-discovery collection performed no native actions;
+later model-free native fixture actions and comparison runs are separate evidence.
 
 Prospective revision `2026-10-29-precomparison-2` supersedes the strict proposal
 at Git `6960c41f6`. The JSON transport remains schema `/1`; fixture revision
 metadata is included in scorer output. Existing development reports, especially
 Eden duo 3 and Mars four 1, retain their original findings. These corrections do
-not retroactively turn any old run into acceptance evidence, and no comparison
-has been started.
+not retroactively turn any old run into acceptance evidence. No comparison had
+started at that revision; subsequent comparisons retain their own sealed versions
+and original outcomes.
 
 - `read:here` is an explicitly permitted local capability in the reading phase,
   not a wildcard seat-target binding. It requires a finite observation interval,
@@ -251,7 +265,7 @@ reporting dimensions do not qualify a release, waive missing native evidence,
 or replace the activity, semantic, duplicate-effect, holdout or soak checks.
 
 
-### Prospective ephemeral baseline option
+### Declared ephemeral baseline option
 
 `runContinuityTrial({baselineEphemeral:true,...})` explicitly opts only the
 `existing-headless-seat` arm into a single initial `codex exec --ephemeral`.
@@ -264,15 +278,20 @@ Freeze this declared mode before a future pair; do not alter an active pair.
 
 The exact installed CLI version and `exec --help` flag support must be checked
 before use. Model-free adapter tests establish argv/lifecycle behavior, not actual
-Codex storage or sidebar absence. An independently authorized exact-CLI probe is
-still needed for that persistence/sidebar claim. Requested model/effort and the
-full task/deadline remain unchanged; actual model/effort need their normal host
+Codex storage or sidebar absence. A separate CLI 0.163.0 READY probe and complete
+active/archived cwd-filtered stateDB inventory verified its exact ephemeral
+thread absent from the native sidebar projection; see
+`<team>/scratch/continuity-20261029/ephemeral-cli-sidebar-proof/followup-state-db-verification.json`.
+That is scoped metadata evidence, not rollout/filesystem absence or a guarantee
+for another version or run. Per-run verification remains separate. Requested
+model/effort and the full task/deadline remain unchanged; actual model/effort need their normal host
 evidence. No ephemeral run earns durable automatic-restart coverage.
 
 Thread creation registers the configured mode immediately, retaining the
-readable name in local evidence and the private registry. Ephemeral threads skip
-administrative read/name/archive RPCs entirely. Their archival status is
-`not-applicable`, with explicit IDs and no archive ACK; actual sidebar and
+readable name in local evidence and the private registry. Automatic registry
+archival skips administrative read/name/archive RPCs for ephemeral threads.
+Separate terminal-only metadata verification does not start or resume a turn.
+Their archival status is `not-applicable`, with explicit IDs and no archive ACK; actual sidebar and
 persistence verification remain `not-checked`. Durable rows still require native
 archive ACKs plus metadata helper closure. Private incremental NDJSON, usage,
 native outcomes and exact process-group cleanup are preserved in both modes;
