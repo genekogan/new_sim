@@ -1602,27 +1602,63 @@ async function runSupervisor({ journal, host, world, instruction, signal, onStat
       dirty = false;
       const before = revision, ownerCursor = journal.cursor("owner");
       const events = promptFacts(), gaps = journal.gaps().slice(0, 20);
-      const prompt = JSON.stringify({ now: (/* @__PURE__ */ new Date()).toISOString(), initialInstruction: checkpoint.initialInstruction, plan: checkpoint.plan ?? null, openOwnerTasks: journal.openOwnerTasks(), listenTo, listeningBatchMs: ambientWakeMs, scheduledWakeAt: checkpoint.wakeAt ?? null, lastCall: checkpoint.lastCall ?? null, lastResult: checkpoint.lastResult ?? null, observation: startupObservation, feedback: nextFeedback, pending: events, gaps });
+      const promptAt = Date.now(), wakeMs = checkpoint.wakeAt ? Date.parse(checkpoint.wakeAt) : Infinity;
+      const prompt = JSON.stringify({ now: new Date(promptAt).toISOString(), initialInstruction: checkpoint.initialInstruction, plan: checkpoint.plan ?? null, openOwnerTasks: journal.openOwnerTasks(), listenTo, listeningBatchMs: ambientWakeMs, scheduledWakeAt: checkpoint.wakeAt ?? null, lastCall: checkpoint.lastCall ?? null, lastResult: checkpoint.lastResult ?? null, observation: startupObservation, feedback: nextFeedback, pending: events, gaps });
       startupObservation = null;
       nextFeedback = null;
-      let ready;
+      let ready, wakeTimer, result;
       const active = { ready: new Promise((resolve2) => {
         ready = resolve2;
-      }) };
+      }), finished: false };
       turn = active;
+      const futureWake = Number.isFinite(wakeMs) && promptAt < wakeMs;
+      const currentWake = () => journal.control.checkpoint().value.wakeAt === checkpoint.wakeAt;
+      const cancelTimer = () => {
+        clearTimeout(wakeTimer);
+        ready(false);
+      };
+      const notifyDeadline = () => {
+        if (stop.signal.aborted || turn !== active || active.finished || !currentWake()) return;
+        const remaining = wakeMs - Date.now();
+        if (remaining > 0) {
+          wakeTimer = setTimeout(notifyDeadline, Math.min(remaining, 2147483647));
+          return;
+        }
+        steering = steering.then(async () => {
+          if (!await active.ready || stop.signal.aborted || turn !== active || active.finished || host.activeTurnId !== active.turnId || !currentWake()) return;
+          const now = Date.now();
+          if (now < wakeMs) return;
+          const timer = { kind: "scheduled-wake", wakeAt: checkpoint.wakeAt };
+          try {
+            await host.steer(JSON.stringify({ notice: "Scheduled wakeup is due; reconsider your next call using current UTC", now: new Date(now).toISOString(), scheduledWakeAt: checkpoint.wakeAt, timer }), active.turnId);
+            onState({ state: "host-notified", mode: "steer", threadId: host.threadId, turnId: active.turnId, events: [], timer, at: Date.now() });
+          } catch (e) {
+            if (host.closed && !stop.signal.aborted) throw e;
+          }
+        });
+        void steering.catch(fail);
+      };
+      stop.signal.addEventListener("abort", cancelTimer, { once: true });
+      if (futureWake) notifyDeadline();
       try {
         Object.assign(active, await host.begin(prompt, { outputSchema: DECISION_SCHEMA }));
         ready(true);
-      } catch (e) {
-        ready(false);
-        turn = null;
-        throw e;
+        if (stop.signal.aborted) break;
+        onState({ state: "host-notified", mode: "start", threadId: host.threadId, turnId: active.turnId, events: events.map((f) => ({ source: f.source, id: f.event.id })), at: delivered(events) });
+        result = await active.completed;
+      } finally {
+        active.finished = true;
+        cancelTimer();
+        stop.signal.removeEventListener("abort", cancelTimer);
       }
-      onState({ state: "host-notified", mode: "start", threadId: host.threadId, turnId: active.turnId, events: events.map((f) => ({ source: f.source, id: f.event.id })), at: delivered(events) });
-      const result = await active.completed;
       await steering;
       turn = null;
       if (stop.signal.aborted) break;
+      if (futureWake && Date.now() >= wakeMs && currentWake()) {
+        nextFeedback = { notice: "The saved wakeup became due during the previous decision; reconsider with current UTC", now: (/* @__PURE__ */ new Date()).toISOString(), scheduledWakeAt: checkpoint.wakeAt, timer: { kind: "scheduled-wake", wakeAt: checkpoint.wakeAt } };
+        dirty = true;
+        continue;
+      }
       const newOwner = journal.cursor("owner") !== ownerCursor;
       if (newOwner || revision !== before && observationReplans < 2) {
         observationReplans++;
