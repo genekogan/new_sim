@@ -111,3 +111,21 @@ test('adapter preserves explicit most-specific field membership and level proven
  const plain=adaptIndependentProbe(input());assert.equal(plain.fieldReturnBinding,undefined);assert.equal(plain.errandReports,undefined);assert.equal(plain.worldId,'world-1');
  x.annotations={fieldReturnBinding:{worldId:'world-1',evidence:['preflight#field']},errandReports:[{actor:a,effectId:'sp_canonical',readSource:'source',grounded:true,evidence:['review#report']}]};const annotated=adaptIndependentProbe(x);assert.deepEqual(annotated.fieldReturnBinding,x.annotations.fieldReturnBinding);assert.deepEqual(annotated.errandReports,x.annotations.errandReports);
 });
+
+test('common runner release and native-only response stay observable without a managed journal',()=>{
+ const x=input();x.run.arm='existing-headless-seat';x.journals={};
+ x.timeline.find(r=>r.kind==='controller-release').kind='actor-release';
+ x.expectedNotifications=[{actor:a,source:'world',eventId:'c_native',createdAt:1200,evidence:['native.jsonl#L1']}];
+ x.nativeEffects=[{actor:a,id:'reply-native',type:'speech',at:2400,evidence:['native.jsonl#L2']}];
+ x.responses=[{actor:a,source:'world',eventId:'c_native',effectId:'reply-native',evidence:['review.json#/reply']}];
+ x.audits={healthyWindows:[{actor:a,from:1000,to:5000,evidence:['health.json#/window']}]};
+ x.annotations={effectAudit:{version:'explicit-audit',evidence:['review.json#/effects']}};
+ const e=adaptIndependentProbe(x),n=e.notifications[0];
+ assert.equal(e.adaptation.controllerReleases.length,1);assert.equal(n.healthyRunning,true);
+ assert.equal(n.createdAt,1200);assert.equal(n.firstRelevantEffectAt,2400);assert.equal(n.persistedAt,null);assert.equal(n.notifiedAt,null);
+ assert.deepEqual(e.effectAudit,x.annotations.effectAudit);
+ const score=scoreContinuity({fixtures,oracles,evidence:e});
+ assert.equal(score.rows.find(r=>r.id==='notification:c_native:visible-response').status,'pass');
+ assert.equal(score.rows.find(r=>r.id==='notification:c_native:receive').status,'unknown');
+ x.expectedNotifications[0].evidence=[];assert.equal(adaptIndependentProbe(x).notifications[0].healthyRunning,undefined);
+});
