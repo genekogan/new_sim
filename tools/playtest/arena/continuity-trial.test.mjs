@@ -187,3 +187,19 @@ test('managed abort also bounds a launcher which never reports exit or close',as
  stop.abort();const result=await pending;
  assert.deepEqual(signals,['SIGTERM','SIGKILL']);assert.equal(result.exit,null);assert.equal(result.pipeDrainTimedOut,true);assert.equal(child.stdout.destroyed,true);
 });
+
+for(const arm of CONTINUITY_ARMS)test('clock templates freeze after setup and remain shared for late actor: '+arm,async t=>{
+ const f=fixture(t,{arm,seconds:4,meetingOffsetSec:2,actors:[{id:'a',folder:'/test/a',instruction:'Meet {meetingUTC}; done {completionUTC}.'},{id:'b',folder:'/test/b',instruction:'Meet {meetingUTC}; done {completionUTC}.',releaseOffsetSec:1.5}]});
+ const verify=f.deps.verifyWorld;f.deps.verifyWorld=async()=>{f.clock.time+=2000;return verify();};
+ const pending=runContinuityTrial(f.config,f.deps);await flush();
+ assert.equal(f.calls[0].text,'Meet 1970-01-01T00:01:44.000Z; done 1970-01-01T00:01:46.000Z.');
+ await f.clock.tick(1500);assert.equal(f.calls[1].text,f.calls[0].text);
+ await f.clock.tick(2500);await pending;
+ const manifest=JSON.parse(readFileSync(join(f.config.directory,'run.json'),'utf8'));
+ assert.equal(manifest.meetingAt,104000);assert.notEqual(manifest.actors[0].instructionTemplateSha256,manifest.actors[0].instructionSha256);
+});
+test('unbound meeting clock and invalid appointment fail before creating any run',t=>{
+ const f=fixture(t);
+ assert.throws(()=>validateContinuityTrial({...f.config,actors:[{...f.config.actors[0],instruction:'Meet {meetingUTC}'}]}),{code:'UNBOUND_INSTRUCTION_CLOCK'});
+ for(const meetingOffsetSec of [-1,3,NaN])assert.throws(()=>validateContinuityTrial({...f.config,meetingOffsetSec}),{code:'INVALID_MEETING_OFFSET'});
+});

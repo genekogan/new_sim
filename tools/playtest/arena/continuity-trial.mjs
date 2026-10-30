@@ -30,6 +30,7 @@ const privateJson=(path,value)=>writeFileSync(path,JSON.stringify(value,null,2)+
 export function validateContinuityTrial(config){
  const {directory,arm,purpose,seconds,model,effort,worldId,actors,fixtureActors=[]}=config;
  if(typeof directory!=='string'||!directory.trim()||!CONTINUITY_ARMS.includes(arm)||!['short','soak'].includes(purpose)||!Number.isFinite(seconds)||seconds<1||seconds>604800||purpose==='soak'&&seconds<7200||!label(model)||!label(effort)||!label(worldId)||!Array.isArray(actors)||actors.length<1||actors.length>5||!Array.isArray(fixtureActors)||fixtureActors.length>5)throw fault('INVALID_TRIAL_CONFIG');
+ if(config.meetingOffsetSec!==undefined&&(!Number.isFinite(config.meetingOffsetSec)||config.meetingOffsetSec<0||config.meetingOffsetSec>=seconds))throw fault('INVALID_MEETING_OFFSET');
  if(config.cliVersion!==undefined&&config.cliVersion!==null&&!label(config.cliVersion))throw fault('INVALID_CLI_VERSION');
  const ids=new Set();
  for(const actor of [...actors,...fixtureActors]){
@@ -37,7 +38,18 @@ export function validateContinuityTrial(config){
   ids.add(actor.id);
  }
  for(const actor of actors)if(typeof actor.instruction!=='string'||!actor.instruction.trim()||Buffer.byteLength(JSON.stringify(actor.instruction))>16384||!Number.isFinite(actor.releaseOffsetSec??0)||(actor.releaseOffsetSec??0)<0||(actor.releaseOffsetSec??0)>=seconds)throw fault('INVALID_TRIAL_INSTRUCTION');
+ for(const actor of actors)renderTrialInstruction(actor.instruction,{startedAt:0,seconds,meetingOffsetSec:config.meetingOffsetSec});
  return config;
+}
+
+// Expand only declared clock placeholders, once after setup. Late actors receive
+// the same appointment/cutoff, never a newly shifted deadline.
+export function renderTrialInstruction(text,{startedAt,seconds,meetingOffsetSec}){
+ const values={startUTC:new Date(startedAt).toISOString(),completionUTC:new Date(startedAt+seconds*1000).toISOString()};
+ if(meetingOffsetSec!==undefined)values.meetingUTC=new Date(startedAt+meetingOffsetSec*1000).toISOString();
+ const result=text.replace(/\{(startUTC|meetingUTC|completionUTC)\}/g,(_,key)=>{if(!values[key])throw fault('UNBOUND_INSTRUCTION_CLOCK');return values[key];});
+ if(Buffer.byteLength(JSON.stringify(result))>16384)throw fault('INVALID_TRIAL_INSTRUCTION');
+ return result;
 }
 
 // Baseline onboarding must already be complete. Never fetch today's served
@@ -179,8 +191,9 @@ export async function runContinuityTrial(config,deps={}){
   for(const row of [...rows,...fixtures])await sample(row,'setup-body');
   if(stop.signal.aborted)throw fault('TRIAL_CANCELLED');
   startedAt=now();cutoffAt=startedAt+seconds*1000;
+  for(const row of rows)row.instruction=renderTrialInstruction(row.actor.instruction,{startedAt,seconds,meetingOffsetSec:config.meetingOffsetSec});
   cutoffTimer=(deps.schedule??setTimeout)(()=>{endReason='cutoff';abort();},Math.max(0,cutoffAt-now()));
-  const manifest={schema:'sim-continuity-trial/1',arm,purpose,seconds,startedAt,cutoffAt,modelRequested:model,effortRequested:effort,cliVersion:config.cliVersion??null,cliVersionSource:config.cliVersion?'caller-preflight':null,world,worldId,baselineWake:false,disturbances:'unsupported: not dispatched by this runner',restartCoverage:'unknown: no typed restart contract implemented',qualification:'not assessed; orchestration evidence only',actors:rows.map(row=>({id:row.actor.id,soulId:row.paired.soul,releaseOffsetSec:row.actor.releaseOffsetSec??0,instructionSha256:sha(row.actor.instruction),...(row.baseline?{baseline:row.baseline,promptArgsSha256:sha(JSON.stringify(buildArgs({model,effort,text:row.actor.instruction})))}:{agentEvidence:'agent-evidence.jsonl',launchSourceSha256:sha(readFileSync(new URL('../../soul-runtime/launch.mjs',import.meta.url)))} )})),fixtureActors:fixtures.map(row=>({id:row.actor.id,soulId:row.paired.soul})),registration:'baseline synchronous callback before naming; candidate emitted creation before naming, parent durability occurs on receipt'};
+  const manifest={schema:'sim-continuity-trial/1',arm,purpose,seconds,startedAt,cutoffAt,meetingAt:config.meetingOffsetSec===undefined?null:startedAt+config.meetingOffsetSec*1000,modelRequested:model,effortRequested:effort,cliVersion:config.cliVersion??null,cliVersionSource:config.cliVersion?'caller-preflight':null,world,worldId,baselineWake:false,disturbances:'unsupported: not dispatched by this runner',restartCoverage:'unknown: no typed restart contract implemented',qualification:'not assessed; orchestration evidence only',actors:rows.map(row=>({id:row.actor.id,soulId:row.paired.soul,releaseOffsetSec:row.actor.releaseOffsetSec??0,instructionTemplateSha256:sha(row.actor.instruction),instructionSha256:sha(row.instruction),...(row.baseline?{baseline:row.baseline,promptArgsSha256:sha(JSON.stringify(buildArgs({model,effort,text:row.instruction})))}:{agentEvidence:'agent-evidence.jsonl',launchSourceSha256:sha(readFileSync(new URL('../../soul-runtime/launch.mjs',import.meta.url)))} )})),fixtureActors:fixtures.map(row=>({id:row.actor.id,soulId:row.paired.soul})),registration:'baseline synchronous callback before naming; candidate emitted creation before naming, parent durability occurs on receipt'};
   privateJson(join(out,'run.json'),manifest);
   for(const row of rows)tasks.push((async()=>{
    const scheduledAt=startedAt+(row.actor.releaseOffsetSec??0)*1000;
@@ -193,7 +206,7 @@ export async function runContinuityTrial(config,deps={}){
    };
    record('actor-release',{actor:row.actor.id,scheduledAt,releasedAt:now(),remainingSeconds});
    row.releasedAt=now();
-   row.result=await (arm===CONTINUITY_ARMS[0]?launchBaseline({cwd:row.baseline.cwd,directory:join(row.directory,'baseline'),text:row.actor.instruction,model,effort,remainingSeconds,name,cliVersion:config.cliVersion??null,signal:stop.signal,onState:state}):launchCandidate({folder:resolve(row.actor.folder),directory:row.directory,text:row.actor.instruction,model,effort,remainingSeconds,name,signal:stop.signal,onState:state}));
+   row.result=await (arm===CONTINUITY_ARMS[0]?launchBaseline({cwd:row.baseline.cwd,directory:join(row.directory,'baseline'),text:row.instruction,model,effort,remainingSeconds,name,cliVersion:config.cliVersion??null,signal:stop.signal,onState:state}):launchCandidate({folder:resolve(row.actor.folder),directory:row.directory,text:row.instruction,model,effort,remainingSeconds,name,signal:stop.signal,onState:state}));
    if(row.result.evidenceComplete===false)row.failureCode='ACTOR_EVIDENCE_INCOMPLETE';
    // Ordinary completion is behavior, not an infrastructure abort or permission
    // to manufacture another turn. Keep observing every actor until cutoff.
