@@ -159,6 +159,8 @@ export class GodWorldLiving {
   private reduced = false;
   private clockless = false;
   lights = 0;
+  /** M01 counter: full entity scans for lamp pools (each visits every placed entity). */
+  scans = 0;
   // explicit fields (not parameter properties): lane bugs' tests load this file under Node's strip-only TypeScript
   private layer: LayerLike;
   private renderer?: THREE.WebGLRenderer;
@@ -177,7 +179,10 @@ export class GodWorldLiving {
     if (this.patterns && this.renderer && (!reducedMotion || reducedMotion !== this.reduced)) this.patterns.render(this.renderer, worldSeconds(nowMs / 1000), reducedMotion);
     this.reduced = reducedMotion;
     if (daylight !== null && this.clockless) { this.clockless = false; this.checkedAt = -Infinity; }
-    const source={model:this.model,seq:(this.layer as unknown as {seq?:unknown}).seq};
+    // M01: only a lamp-relevant diff (the entity layer's lightSeq) skips the 2 Hz gate; other edits wait for it,
+    // as before the contact lamps. A layer without lightSeq keeps the conservative per-diff refresh.
+    const tracked=this.layer as unknown as {seq?:unknown;lightSeq?:unknown};
+    const source={model:this.model,seq:typeof tracked.lightSeq==='number'?tracked.lightSeq:tracked.seq};
     const changed=source.model!==this.checkedSource?.model||source.seq!==this.checkedSource?.seq;
     if (nowMs - this.checkedAt < 500 && !changed) return;
     this.checkedSource=source; this.checkedAt = nowMs;
@@ -193,6 +198,7 @@ export class GodWorldLiving {
     const seq = (this.layer as unknown as { seq?: unknown }).seq, s = this.scanned;
     if (typeof seq === 'number' && s && s.model === m && s.seq === seq && nowMs - s.at < 10_000) return;
     this.scanned = typeof seq === 'number' ? { model: m, seq, at: nowMs } : null;
+    this.scans++;
     const sources: NightSource[] = [], marks: HaloSource[] = [], beacons: [number, number, number][] = [];
     const scan = () => { for (const e of m.entities.values()) {
       if (e.state?.on === false) continue;
