@@ -5,22 +5,67 @@ import {resolve,join} from 'node:path';
 import {CodexHost} from '../../soul-runtime/codex-host.mjs';
 
 // Exit code alone cannot prove a killed controller cleaned its detached host.
-// Require a final certificate from every launched controller and independently
-// check all recorded owned groups. Unknown/EPERM is not evidence of absence.
-export function verifyOwnedProbeExit({exit,controllers},killProcess=process.kill){
+// Require each controller's final certificate or its exact declared-death proof,
+// and independently check owned processes. Unknown/EPERM is not absence.
+export function verifyOwnedProbeExit({exit,controllers,restartProofs=[]},killProcess=process.kill){
  if(!Number.isInteger(exit?.code)||exit.signal||!Array.isArray(controllers)||!controllers.length)return false;
+ const seen=new Set();
+ for(const c of controllers){if(!processId(c?.pid)||c.identityAmbiguous===true||seen.has(c.pid))return false;seen.add(c.pid);}
  return controllers.every(c=>{
   const proof=c.closed;
-  if(!Number.isInteger(c.pid)||c.pid<1||c.started!==true||proof?.controllerPid!==c.pid||proof.ownedProcessesExited!==true||!Array.isArray(proof.ownedHosts))return false;
+  if(proof==null&&Array.isArray(restartProofs)&&restartProofs.some(p=>verifyRestartTermination(c,p,killProcess)))return true;
+  if(c.started!==true||proof?.controllerPid!==c.pid||proof.ownedProcessesExited!==true||!Array.isArray(proof.ownedHosts)||!absentProcess(c.pid,killProcess))return false;
   const pids=new Set();
   for(const host of proof.ownedHosts){
    if(host.groupClosed!==true||host.groupVerification!=='absent')return false;
-   if(!Number.isInteger(host.hostPid)||host.hostPid<1){if(host.hostPid===null&&host.startFailed===true)continue;return false;}
+   if(!processId(host.hostPid)){if(host.hostPid===null&&host.startFailed===true)continue;return false;}
    pids.add(host.hostPid);
    try{killProcess(-host.hostPid,0);return false;}catch(e){if(e.code!=='ESRCH')return false;}
   }
   return [...(c.hostPids??[])].every(pid=>pids.has(pid));
  });
+}
+
+const processId=n=>Number.isSafeInteger(n)&&n>1;
+const identifier=s=>typeof s==='string'&&/^[-a-zA-Z0-9_]{1,200}$/.test(s);
+const evidence=e=>Array.isArray(e)&&e.length>0&&e.length<=8&&e.every(s=>typeof s==='string'&&s.length>0&&s.length<=300&&!/[\u0000-\u001f\u007f]/.test(s));
+const processIdentity=p=>p&&processId(p.pid)&&Number.isSafeInteger(p.ppid)&&p.ppid>0&&processId(p.pgid)&&typeof p.startToken==='string'&&p.startToken.length>0&&p.startToken.length<=100&&!/[\u0000-\u001f\u007f]/.test(p.startToken);
+const identity=p=>[p.pid,p.ppid,p.pgid,p.startToken];
+const absentProcess=(target,killProcess)=>{try{killProcess(target,0);return false;}catch(e){return e.code==='ESRCH';}};
+
+// Mirror the observer's bounded ownership graph contract, without inspecting or
+// signaling processes. The trusted per-launch snapshot supplies birth/scope
+// binding; a persisted proof with only the same numeric PID is insufficient.
+function restartOwnership(owned){
+ if(!owned||!['actorId','setupId','worldId','soulId'].every(k=>identifier(owned[k]))||owned.descendantsComplete!==true||!evidence(owned.evidence)||!processIdentity(owned.launcher)||!processIdentity(owned.controller)||owned.controller.pid===owned.launcher.pid||owned.controller.ppid!==owned.launcher.pid||!Array.isArray(owned.groups)||owned.groups.length<1||owned.groups.length>16)return null;
+ const groups=new Set(),members=new Map([[owned.controller.pid,owned.controller]]);
+ for(const group of owned.groups){
+  if(!processId(group.pgid)||groups.has(group.pgid)||group.pgid===owned.controller.pgid||group.pgid===owned.launcher.pgid||!Array.isArray(group.members)||group.members.length<1||group.members.length>128)return null;
+  groups.add(group.pgid);
+  for(const member of group.members){if(!processIdentity(member)||member.pgid!==group.pgid||members.has(member.pid)||member.pid===owned.launcher.pid)return null;members.set(member.pid,member);}
+ }
+ for(const group of owned.groups)for(const member of group.members){
+  const visited=new Set();let current=member;
+  while(current.pid!==owned.controller.pid){if(visited.has(current.pid)||!members.has(current.ppid))return null;visited.add(current.pid);current=members.get(current.ppid);}
+ }
+ const binding=JSON.stringify({scope:['actorId','setupId','worldId','soulId'].map(k=>owned[k]),launcher:identity(owned.launcher),controller:identity(owned.controller),groups:[...owned.groups].sort((a,b)=>a.pgid-b.pgid).map(g=>[g.pgid,[...g.members].sort((a,b)=>a.pid-b.pid).map(identity)])});
+ return {groups,members,binding};
+}
+
+// An intentionally killed controller cannot write its own final certificate.
+// Accept only the typed observer's exact external termination evidence for that
+// controller, then independently recheck every old writer's absence. This does
+// not certify successful recovery, behavior, or any later controller's cleanup.
+export function verifyRestartTermination(controller,proof,killProcess=process.kill){
+ const at=n=>Number.isSafeInteger(n)&&n>=0;
+ const owned=proof?.oldOwnership;
+ if(controller?.started!==true||controller.identityAmbiguous===true||!processId(controller.pid)||proof?.schema!=='sim-continuity-managed-restart/1'||proof.dispatchAttempted!==true||proof.triggerExercised!==true||!at(proof.deathAt)||!at(proof.controllerExitAt)||!at(proof.oldGroupsAbsentAt)||proof.controllerExitAt<proof.deathAt||proof.oldGroupsAbsentAt<proof.controllerExitAt||owned?.controller?.pid!==controller.pid||!Array.isArray(proof.signals)||!proof.signals.some(s=>s?.target===controller.pid&&s.role==='controller'&&s.signal==='SIGKILL'&&s.delivered===true&&s.at===proof.deathAt))return false;
+ const expected=restartOwnership(controller.restartOwnership),actual=restartOwnership(owned);
+ if(!expected||!actual||expected.binding!==actual.binding||proof.actor!==owned.actorId||proof.setupId!==owned.setupId||proof.worldId!==owned.worldId||proof.soulId!==owned.soulId)return false;
+ const {groups,members}=actual;
+ if(![...(controller.hostPids??[])].every(p=>groups.has(p)))return false;
+ for(const target of [...members.keys(),...[...groups].map(p=>-p)])if(!absentProcess(target,killProcess))return false;
+ return true;
 }
 
 export function probeSessions(directory,{createHost=opts=>new CodexHost(opts)}={}){
