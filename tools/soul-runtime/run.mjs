@@ -6,12 +6,30 @@ import {readFileSync,mkdirSync,writeFileSync,renameSync,lstatSync,openSync,close
 import {randomUUID} from 'node:crypto';
 import {resolve,join} from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {performance} from 'node:perf_hooks';
 import {CodexHost} from './codex-host.mjs';
 import {openJournal} from './journal.mjs';
 import {createWorldClient} from './world-client.mjs';
 import {runManaged} from './managed.mjs';
 import {abortableSleep} from './receiver.mjs';
 const evidenceError=e=>({code:typeof e?.code==='string'&&/^[A-Za-z0-9._:-]{1,100}$/.test(e.code)?e.code:'unclassified',status:Number.isInteger(e?.status)&&e.status>=100&&e.status<=599?e.status:null});
+const metadataId=value=>typeof value==='string'&&/^[A-Za-z0-9._:-]{1,200}$/.test(value)?value:null;
+const itemTypes=new Set(['userMessage','agentMessage','reasoning','commandExecution','fileChange','mcpToolCall','dynamicToolCall','webSearch','imageView','collabAgentToolCall','enteredReviewMode','exitedReviewMode','contextCompaction']);
+const requestMethods=new Set(['item/commandExecution/requestApproval','item/fileChange/requestApproval','item/tool/call']);
+const errorCategories=new Set(['contextWindowExceeded','sessionBudgetExceeded','usageLimitExceeded','rateLimitExceeded','flexUnavailable','serverOverloaded','cyberPolicy','misalignmentPolicyViolation','tooManyDenials','internalServerError','unauthorized','badRequest','threadRollbackFailed','sandboxError','other']);
+const httpErrorVariants=new Set(['httpConnectionFailed','responseStreamConnectionFailed','responseStreamDisconnected','responseTooManyFailedAttempts']);
+// CLI0.163 ErrorNotification's tagged union only. Never retain message,
+// additionalDetails or arbitrary object keys/values, even when syntactically safe.
+const hostErrorMetadata=error=>{
+ const info=error?.codexErrorInfo;
+ if(typeof info==='string')return {category:errorCategories.has(info)?info:'unknown'};
+ if(info&&typeof info==='object'&&!Array.isArray(info)&&Object.keys(info).length===1){
+  const [category]=Object.keys(info),details=info[category];
+  if(httpErrorVariants.has(category))return {category,httpStatusCode:Number.isInteger(details?.httpStatusCode)&&details.httpStatusCode>=100&&details.httpStatusCode<=599?details.httpStatusCode:null};
+  if(category==='activeTurnNotSteerable')return {category,turnKind:['review','compact'].includes(details?.turnKind)?details.turnKind:null};
+ }
+ return {category:'unknown'};
+};
 // Probe-only append evidence. No receiver wrapping, request arguments, config,
 // credentials, model output or error messages. Writes happen per record; fsync
 // is deferred to closure so observation latency excludes a per-row disk flush.
@@ -40,13 +58,36 @@ export function openEvidenceRecorder(path,{scope={},now=Date.now,onFailure=()=>{
   }};},
   bindHost(host){
    const hostId=randomUUID(),connect=host.connect;let actualModel=null;
+   const identity=(threadId=host.threadId,turnId=null)=>({hostId,hostPid:Number.isSafeInteger(host.pid)?host.pid:null,threadId:metadataId(threadId),turnId:metadataId(turnId)});
+   const record=row=>{try{append(row);}catch{}};
    host.connect=async function(...args){const connected=await Reflect.apply(connect,this,args);actualModel=typeof connected?.model==='string'?connected.model:null;append({kind:'host-session',state:'connected',hostId,hostPid:host.pid??null,threadId:host.threadId??null,model:actualModel,resumed:typeof args[0]?.threadId==='string'});return connected;};
+   // Only the existing begin/steer ACK is timed; never await completed, change
+   // arguments, introduce a timeout, retry, interrupt or replace an error/result.
+   for(const operation of ['begin','steer']){
+    const original=host[operation];if(typeof original!=='function')continue;
+    host[operation]=async function(...args){
+     const requestedAt=now(),started=performance.now(),promptBytes=typeof args[0]==='string'?Buffer.byteLength(args[0]):null,expectedTurnId=operation==='steer'?metadataId(args[1]??this.activeTurnId):null;
+     let result;
+     try{result=await Reflect.apply(original,this,args);}
+     catch(error){record({kind:'host-rpc',operation,...identity(this.threadId,expectedTurnId),requestedAt,failedAt:now(),durationMs:Math.max(0,performance.now()-started),promptBytes,status:'rejected'});throw error;}
+     record({kind:'host-rpc',operation,...identity(this.threadId,operation==='begin'?result?.turnId:expectedTurnId),requestedAt,acknowledgedAt:now(),durationMs:Math.max(0,performance.now()-started),promptBytes,status:'acknowledged'});return result;
+    };
+    detach.push(()=>{host[operation]=original;});
+   }
    const event=e=>{
+    const p=e.params??{},at=Number.isFinite(e.receivedAt)?e.receivedAt:now();
+    if(['item/started','item/completed'].includes(e.method)){
+     record({kind:'host-item',method:e.method,at,...identity(p.threadId??host.threadId,p.turnId),itemId:metadataId(p.item?.id),itemType:itemTypes.has(p.item?.type)?p.item.type:'unknown'});return;
+    }
+    if(e.method==='error'){
+     record({kind:'host-error',method:'error',at,...identity(p.threadId??host.threadId,p.turnId),willRetry:typeof p.willRetry==='boolean'?p.willRetry:null,error:hostErrorMetadata(p.error)});return;
+    }
     if(!['turn/started','turn/completed','thread/tokenUsage/updated'].includes(e.method))return;
-    const p=e.params??{},reportedModel=p.model??p.turn?.model;if(typeof reportedModel==='string')actualModel=reportedModel;
+    const reportedModel=p.model??p.turn?.model;if(typeof reportedModel==='string')actualModel=reportedModel;
     try{append({kind:'host-event',method:e.method,at:Number.isFinite(e.receivedAt)?e.receivedAt:now(),hostId,hostPid:host.pid??null,threadId:typeof p.threadId==='string'?p.threadId:host.threadId??null,turnId:p.turn?.id??p.turnId??null,model:actualModel,status:p.turn?.status??null,...(e.method==='thread/tokenUsage/updated'?{tokenUsage:p.tokenUsage??null}:{}),...(p.turn?.error?{error:evidenceError(p.turn.error)}:{})});}catch{}
    };
-   host.on('event',event);detach.push(()=>{host.off('event',event);host.connect=connect;});return host;
+   const unsupported=e=>record({kind:'host-unsupported-request',at:now(),...identity(host.threadId,host.activeTurnId),method:requestMethods.has(e?.method)?e.method:'unknown'});
+   host.on('event',event);host.on('unsupportedRequest',unsupported);detach.push(()=>{host.off('event',event);host.off('unsupportedRequest',unsupported);host.connect=connect;});return host;
   },
   close(details={}){
    if(closed){if(failure)throw failure;return;}
