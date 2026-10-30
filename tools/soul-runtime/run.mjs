@@ -8,6 +8,8 @@ import {resolve,join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {performance} from 'node:perf_hooks';
 import {CodexHost} from './codex-host.mjs';
+import {openControllerInventory} from './controller-ownership.mjs';
+import {admitControllerReentry} from './decision.mjs';
 import {openJournal} from './journal.mjs';
 import {createWorldClient} from './world-client.mjs';
 import {runManaged} from './managed.mjs';
@@ -114,7 +116,7 @@ export async function claimStartupLease(control,{signal,maxWaitMs=65000,pollMs=2
  }
  return null;
 }
-export async function main(argv=process.argv.slice(2),{signal,leaseWaitMs=65000}={}){
+export async function main(argv=process.argv.slice(2),{signal,leaseWaitMs=65000,Host=CodexHost}={}){
  const {values}=parseArgs({args:argv,options:{folder:{type:'string'},state:{type:'string'},instruction:{type:'string'},model:{type:'string'},effort:{type:'string',default:'low'},seconds:{type:'string'},'session-name':{type:'string'},evidence:{type:'string'},help:{type:'boolean'}}});
  if(values.help){console.log('node tools/soul-runtime/run.mjs --folder <paired-folder> [--instruction <text-file>] [--model <advertised-model>] [--seconds <bounded-run>] [--evidence <local-jsonl>]');return;}
  const folder=resolve(values.folder??process.cwd()),state=resolve(values.state??join(folder,'.soul-runtime'));
@@ -143,11 +145,16 @@ export async function main(argv=process.argv.slice(2),{signal,leaseWaitMs=65000}
  catch(error){saveStatus({state:'blocked',code:error.code??'runtime.failure',reason:error.message});throw error;}
  if(!owner){saveStatus({state:'stopped'});return;}
  ownerRenewal=setInterval(()=>{try{owner=ownership.control.renew(owner);}catch(e){ownershipFailure=e;stop.abort(e);}},5000);
+ const inventory=await openControllerInventory();
+ if(inventory?.reentryProof?.snapshot){const recoveryFence=await claimStartupLease(journal.control,{signal:stop.signal,maxWaitMs:leaseWaitMs,onWait:saveStatus});if(!recoveryFence)return;try{const admitted=admitControllerReentry(journal,recoveryFence,inventory.reentryProof,{journalPath:join(state,'continuity.sqlite'),scope});saveStatus({state:'controller-reentry',proofId:admitted.proofId,charged:admitted.charged});}finally{journal.control.release(recoveryFence);}}
  const cwd=join(state,'host');mkdirSync(cwd,{recursive:true,mode:0o700});
   await runManaged({journal,world,instruction,signal:stop.signal,onState:saveStatus,createHost:()=>{
-   const host=new CodexHost({cwd,model,effort:values.effort,name:values['session-name']??`Sim Soul — ${paired.soul}`});
+   const reservation=inventory?.reserveHost();
+   const host=new Host({cwd,model,effort:values.effort,name:values['session-name']??`Sim Soul — ${paired.soul}`});
+   ownedHosts.add(host);
+   if(inventory){try{inventory.registerHost(reservation,host.pid);}catch(e){void host.close().catch(()=>{});throw e;}host.on('lifecycle',s=>{if(s.state==='host-closed')inventory.hostClosed(reservation,s);});}
    evidence?.bindHost(host);
-   ownedHosts.add(host);host.on('lifecycle',saveStatus);
+   host.on('lifecycle',saveStatus);
    host.on('event',e=>{if(e.method==='thread/tokenUsage/updated'){writeFileSync(join(state,'usage.json'),JSON.stringify({at:new Date().toISOString(),threadId:host.threadId,model:host.model,usage:e.params.tokenUsage},null,2),{mode:0o600});}if(host.model)model=host.model;});
    return host;
   }});

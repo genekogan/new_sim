@@ -120,9 +120,10 @@ explicit current-state resync before new writes. Resync never claims to recreate
 missing history, and cannot erase an already-dispatched uncertain effect.
 
 `launch.mjs` accepts the same controller arguments and adds a small outer
-process owner. It restarts a killed controller with the same durable state,
-waits for an abandoned lease to expire without stealing live ownership, and
-stops on explicit failures. `--seconds` bounds the entire launcher lifetime,
+process owner. On supported local POSIX hosts it can restart a killed controller
+with the same durable thread and journal only after proving its old registered
+host groups absent. It waits for an abandoned lease without stealing live
+ownership and stops on explicit failures or unverified ownership. `--seconds` bounds the entire launcher lifetime,
 including restarts. This does not start a login service or promise availability
 through OS sleep/reboot. Stop any legacy CLI/controller before starting it.
 
@@ -187,12 +188,12 @@ Spent credits and absolute deadlines survive restart. Generic host retries
 cannot bypass them. Exhaustion or unverifiable cleanup blocks with task state
 retained. No arriving notice or automatic restart refills the episode.
 
-An external controller death during an active or unconfirmed decision is
-currently blocked as `DECISION_PROGRESS_RESTART_UNCONFIRMED`: a new process
-cannot invent the old terminal or host-closure proof. Managed recovery in the
-same controller uses its matching reserved grant and verified old-group absence.
-The original restart after a committed strategic wait remains supported: idle
-wait has no active budget and creates no polling inference. Applying or
+An active or unconfirmed controller death remains blocked as
+`DECISION_PROGRESS_RESTART_UNCONFIRMED` without the launcher's exact ownership
+proof. Standalone `run.mjs` cannot invent that proof. Managed recovery in the
+same controller still uses its matching reserved grant and old-group absence.
+The original restart after a committed strategic wait is unchanged: idle wait
+has no active budget and creates no polling inference. Applying or
 reconciling an already retained world effect precedes this policy, so a long or
 uncertain write is never interrupted or replayed by the timer.
 
@@ -212,3 +213,53 @@ handling outcomes and sequences survive compaction, so replay cannot turn an
 already handled fact into new work. `storageStats()` and `maintenance()` expose
 pressure and remaining maintenance. Identity/outcome, control and gap history
 are still unbounded; these limits are not a total-disk-size guarantee.
+
+
+The launcher records private controller reservations before spawn and host
+reservations before the CodexHost constructor. Exact PID/parent/process-group
+and native `ps` birth metadata are registered before any host connect or turn.
+The supported birth token uses second-resolution `ps lstart`; it is not an
+unforgeable or subsecond process generation. The birth/ancestry and actual
+owned-child provenance reject observable reuse but do not eliminate the residual
+same-second PID reuse ambiguity.
+Every earlier host and its original strict closure remain in the inventory.
+Previously verified closed groups are historical proof, never fresh numeric
+PID/PGID signal or absence targets after those numbers may have been reused. After actual child exit, only the exact registered groups
+may receive bounded cleanup signals: a live matching birth and current member
+ancestry are rechecked before TERM/KILL. Only ESRCH proves absence; EPERM,
+inspection failure, detectable PID reuse or incomplete reservations block.
+Without a proven live leader, cleanup may only wait read-only for strict absence
+within the same grace; a still-nonempty group then blocks. No numeric PID alone authorizes cleanup.
+Cleanup has one shared six-second signal/reaping grace across the dead
+controller's hosts; filesystem and process-inspection time remain variable.
+
+A private immutable proof binds that complete inventory and actual exit to the
+canonical journal inode, world/Soul, original thread/instruction hash, exact
+post-death checkpoint hash/revision, old fence generation and unsettled
+operation IDs/states. Startup rechecks absence and bindings before constructing
+another host. The next journal fence generation consumes the proof once. An
+active/soft-pending episode spends its existing one shared fallback; an exact
+fallback-reserved grant finishes once. This legitimately charges one next
+window with its new deadline, retaining spent soft credit, world-replan credit,
+owner intent, listening and scheduled wake. It never refills an already-spent
+fallback. Pending effects retain their original operation IDs and the existing
+apply/reconcile-before-inference path; unknown outcomes are never resent.
+
+The inventory is bounded to 16 controller registrations and 128 total host
+reservations per launcher ownership epoch, with each private JSON artifact
+capped at 256KiB. Capacity blocks before another spawn. A later clean invocation
+can start a new bounded epoch only when every old row has its original verified
+closure and intact proof, and the current journal has no pending/uncertain effect
+or recovery episode. The old ledger is copied to immutable id-named evidence;
+its proof files remain intact. This rollover never changes the journal or resets
+decision credits. Retained closed-epoch evidence can grow across clean launches;
+there is no automatic pruning or strict total-disk bound. A stale lock
+or an unresolved reservation requires explicit owner reconciliation of exact
+process identities/absence and retained evidence before starting another
+launcher. Launcher death, OS sleep/reboot and unsupported process inspection do
+not acquire new orphan-cleanup authority. Normal completion releases the lock;
+failed ownership stays visible. No model calls, periodic inference, native
+body cancellation or world-policy change are introduced by these records.
+Pre-spawn synchronous fsync adds local I/O cost; no performance-neutrality claim
+is made. The model-free active-crash regression is separate from the original
+strategic-wait restart evidence and does not upgrade historical qualification.

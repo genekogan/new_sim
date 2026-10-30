@@ -1,6 +1,7 @@
 // Durable boundary between model decisions and public effects. Planning text is
 // private agent state; only a world response/receipt proves an external effect.
 import {randomUUID} from 'node:crypto';
+import {verifyControllerReentry} from './controller-ownership.mjs';
 import {responseReference,responseProjection,receiptProjection,validateResponseArguments} from './responses.mjs';
 // Reserve one finite envelope for both recovery markers. Native observations
 // remain exact in their durable response slots when a legacy checkpoint needs
@@ -28,6 +29,23 @@ export function saveRecoveryCheckpoint(journal,fence,revision,value){
   if(size(body)>65536-RECOVERY_METADATA_BYTES-128)throw progressFault('Checkpoint intent exceeds reserved recovery envelope; state retained');
  }
  return journal.control.save(fence,revision,{...body,...(urgentRecoveryV1===undefined?{}:{urgentRecoveryV1}),...(decisionProgressV1===undefined?{}:{decisionProgressV1})});
+}
+// Only the trusted launcher's complete post-death ownership proof admits this
+// path. Claim generation is the durable one-use token, even without a choice.
+export function admitControllerReentry(journal,fence,proof,{journalPath,scope,activeDecisionMs=30000}={}){
+ journal.control.assertOwner(fence);
+ if(!Number.isSafeInteger(activeDecisionMs)||activeDecisionMs<1||activeDecisionMs>300000)throw progressFault('Invalid active recovery window');
+ const proofId=verifyControllerReentry(proof,{journalPath,scope,fence});
+ const c=journal.control.checkpoint(),p=decisionProgress(c.value);
+ // Reconciliation keeps its original operation IDs; absence never authorizes
+ // dispatching an uncertain effect or discarding a retained decision.
+ if(c.value?.pendingDecision||!p)return {admitted:true,proofId,charged:false};
+ if(p.phase==='blocked'||p.window>=3||p.phase!=='fallback-reserved'&&(p.fallbackUsed||c.value.urgentRecoveryV1?.fallbackUsed))throw Object.assign(Error('Killed controller has no remaining shared fallback; state retained'),{code:'DECISION_PROGRESS_BUDGET_EXHAUSTED'});
+ if(p.phase==='fallback-reserved'&&(!p.fallbackUsed||!p.grant||!proof.hosts.some(h=>h.birth.pid===p.grant.hostPid)))throw progressFault('Reserved fallback does not match the proven old host inventory');
+ if(p.hostPid!==null&&!proof.hosts.some(h=>h.birth.pid===p.hostPid))throw progressFault('Active host is missing from complete ownership proof');
+ const grant=p.phase==='fallback-reserved'?p.grant:{id:proofId,kind:'progress',turnId:p.turnId,hostPid:p.hostPid};
+ saveRecoveryCheckpoint(journal,fence,c.revision,{...c.value,...(c.value.urgentRecoveryV1?{urgentRecoveryV1:{...c.value.urgentRecoveryV1,fallbackUsed:true}}:{}),decisionProgressV1:{...p,phase:'ready',fallbackUsed:true,window:p.window+1,deadlineAt:Date.now()+activeDecisionMs,turnId:null,hostPid:null,grant:{...grant,oldGroupAbsent:true,threadId:c.value.threadId}}});
+ return {admitted:true,proofId,charged:true};
 }
 export const DECISION_SCHEMA={type:'object',additionalProperties:false,required:['plan','call','wakeAt'],properties:{
  plan:{type:'string',description:'Compact durable task state: current goal and original constraints, completed receipt IDs, current step, suspended work, deadlines and next step. Do not claim unobserved completion.'},
