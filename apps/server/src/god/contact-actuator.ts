@@ -36,7 +36,18 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     const localZ=(me[0]-wp.x)*s+(me[2]-wp.z)*c;
     params.opening={bodyPolicy:'door-natural-v2',hinge:[wp.x+hx*c+hz*s,wp.y,wp.z-hx*s+hz*c],yaw:wp.yaw,radius:((knob?.at?.[0]??(Number(def.components.opening.width)/2-.1))-leaf.pivot[0])*sx,height:Number(def.components.opening.height)*sy,handleY:(knob?.at?.[1]??.85)*sy,from:actuatedState(e,def).open===true?HAND_OPEN_ANGLE:0,to:action==='open'?HAND_OPEN_ANGLE:0,side:localZ<0?-1:1};
     root=actuatorPoint(params.opening,params.opening.from).root;
-   }else{const dx=me[0]-wp.x,dz=me[2]-wp.z,n=Math.hypot(dx,dz)||1;root=[wp.x+dx/n*.5,wp.y,wp.z+dz/n*.5];}
+   }else{
+    // A def's part tinted `valve` (a tap handle) is where the hand goes; otherwise the old switch height at the centre.
+    const shapes=def.make.kind==='gen'?(def.make.args as {shapes?:{tint?:string;at?:number[]}[]})?.shapes:undefined,valve=shapes?.find(s=>s.tint==='valve'&&s.at);
+    if(valve?.at){const c=Math.cos(wp.yaw),s=Math.sin(wp.yaw),[vx,vy,vz]=valve.at.map(v=>v*wp.s);params.at=[wp.x+vx*c+vz*s,wp.y+vy,wp.z-vx*s+vz*c];}
+    const dx=me[0]-params.at[0],dz=me[2]-params.at[2],n=Math.hypot(dx,dz)||1;root=[params.at[0]+dx/n*.5,wp.y,params.at[2]+dz/n*.5];
+    if(valve?.at){
+     // Stand beside the valve, clear of the thing's own footprint (a basin, a tray) by a body radius: of eight
+     // directions around the valve, the one nearest the Soul's approach whose stand point is outside.
+     const c=Math.cos(wp.yaw),s=Math.sin(wp.yaw),[hx,,hz]=def.size.box.map(v=>v*wp.s/2),outside=(p:number[])=>{const lx=(p[0]-wp.x)*c-(p[2]-wp.z)*s,lz=(p[0]-wp.x)*s+(p[2]-wp.z)*c;return Math.abs(lx)>hx+HUMAN_RADIUS||Math.abs(lz)>hz+HUMAN_RADIUS;};
+     const want=Math.atan2(dz,dx),best=Array.from({length:8},(_,i)=>i*Math.PI/4).map(a=>[params.at[0]+Math.cos(a)*.55,wp.y,params.at[2]+Math.sin(a)*.55,Math.abs(((a-want+Math.PI*3)%(Math.PI*2))-Math.PI)]).filter(outside).sort((p,q)=>p[3]-q[3])[0];
+     if(best)root=[best[0],best[1],best[2]];
+    }}
    return {params,root,level:d.levelAt?.(root[0],root[2],root[1])??0};
   },
   /** What a Soul reads when it completes `read:<sign>` (never in ambient perception for Soul-written boards). */
@@ -72,7 +83,12 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
    const state=actuatedState(e,def),bad=whenRefusal(a,state,e.name??'object');if(bad)return fail(bad.code,bad.reason);
    const text=contactStateKey(def,a.name)==='text'&&a.name==='write'?boardTextProblem(intent.params?.text):null;if(text)return fail(text.code,text.reason);
    const patch=thenPatch(a,state,intent.params??{});if(contactStateKey(def,a.name)==='text'&&a.name==='write')patch.textBy=soul.soulId;
-   const r=d.commit([opSchema.parse({op:'set',id:e.id,state:patch})],`${soul.soulId} ${a.name} ${e.name??e.id}`,()=>{d.record(soul,e.id,a.name,intent.params??{});done();});
+   // A sprinkler coming on soaks the planters (things with numeric moisture) in its forward arc within reach, in the same commit:
+   // one pass over the world at this event, never per tick.
+   const soak:Op[]=[];
+   if(def.tags?.includes('sprinkler')&&a.name==='switch-on'){const reach=Number(e.params?.reach??(def.params.reach as {default?:number}|undefined)?.default??3.5);
+    for(const o of m.entities.values()){const od=o.id!==e.id&&m.resolvedDef(o.def);if(!od||(od.state as Record<string,{type?:string}>).moisture?.type!=='number')continue;const op=m.worldPose(o);const fx=Math.sin(p.yaw),fz=Math.cos(p.yaw);if(Math.hypot(op.x-p.x,op.z-p.z)<=reach&&(op.x-p.x)*fx+(op.z-p.z)*fz>0&&o.state?.moisture!==1)soak.push(opSchema.parse({op:'set',id:o.id,state:{moisture:1}}));}}
+   const r=d.commit([opSchema.parse({op:'set',id:e.id,state:patch}),...soak],`${soul.soulId} ${a.name} ${e.name??e.id}`,()=>{d.record(soul,e.id,a.name,intent.params??{});done();});
    return r.accepted?{ok:true as const}:fail('contact.commit-refused','The world refused the interaction.');
   }
  };
