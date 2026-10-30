@@ -4,7 +4,7 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {openJournal} from './journal.mjs';
-import {parseDecision,retainDecision,applyPendingDecision} from './decision.mjs';
+import {DECISION_SCHEMA,parseDecision,retainDecision,applyPendingDecision} from './decision.mjs';
 import {boundedFacts} from './context.mjs';
 function fixture(t){const dir=mkdtempSync(join(tmpdir(),'sim-decision-'));const j=openJournal(dir,{worldId:'w',soulId:'s'});t.after(()=>{j.close();rmSync(dir,{recursive:true,force:true})});return {j,dir,fence:j.control.claim('test')};}
 const decision=()=>parseDecision(JSON.stringify({plan:'Go read, then return. Still pending.',call:{type:'write',command:'act',arguments:'{"capability":"read:here"}'},wakeAt:null}));
@@ -241,4 +241,29 @@ test('listening arguments are explicit and bounded; pending listening choice rec
  for(const scope of [null,true,'all',['unknown'],Array.from({length:13},(_,i)=>'s_'+i),['s_'+'x'.repeat(199)]])assert.throws(()=>parseDecision(payload(scope)),/listenTo/);
  assert.throws(()=>parseDecision(JSON.stringify({plan:'Wrong scope location',call:{type:'read',command:'here',arguments:'{"listenTo":"nearby"}'},wakeAt:null})),/Only wait/);
  const {j,dir,fence}=fixture(t);retainDecision(j,fence,parseDecision(payload('nearby')));j.control.release(fence);const recovered=openJournal(dir,{worldId:'w',soulId:'s'});t.after(()=>recovered.close());const next=recovered.control.claim('recovery');await applyPendingDecision(recovered,next,{});assert.equal(recovered.control.checkpoint().value.listenTo,'nearby');assert.equal(recovered.control.checkpoint().value.pendingDecision,null);
+});
+const listenDecision=listenTo=>parseDecision(JSON.stringify({plan:'Configure attention, then continue the original errand',call:{type:'listen',command:'listen',arguments:JSON.stringify({listenTo})},wakeAt:null}));
+test('nonblocking listen is an explicit local command with exactly one bounded scope argument',()=>{
+ assert.ok(DECISION_SCHEMA.properties.call.properties.type.enum.includes('listen'));
+ assert.deepEqual(listenDecision(['s_second','s_first','s_first']).call,{type:'listen',command:'listen',args:{listenTo:['s_first','s_second']}});
+ const value={plan:'Configure only',call:{type:'listen',command:'listen',arguments:'{"listenTo":[]}'},wakeAt:null};
+ for(const args of [{},{listenTo:[],seconds:1},{listenTo:[],cancelWake:true},{listenTo:[],text:'say this'}])assert.throws(()=>parseDecision(JSON.stringify({...value,call:{...value.call,arguments:JSON.stringify(args)}})),/exactly listenTo/);
+ assert.throws(()=>parseDecision(JSON.stringify({...value,call:{...value.call,command:'say'}})),/Unsupported/);
+ assert.throws(()=>listenDecision('all'),/listenTo/);
+});
+test('pending local listening configuration reconciles after a checkpoint crash without world calls or owner acknowledgement',async t=>{
+ const {j,dir,fence}=fixture(t),wakeAt=new Date(Date.now()+60000).toISOString();j.control.save(fence,0,{listenTo:['s_old'],wakeAt});
+ j.ingest({source:'owner',after:null,cursor:'m_original',events:[{id:'m_original',text:'Return and report the actual outcome'}]});
+ const id=retainDecision(j,fence,listenDecision('nearby'),{events:j.pending()});
+ const save=j.control.save.bind(j.control);j.control.save=(...args)=>{if(args[2].pendingDecision===null)throw Error('crash before local configuration checkpoint');return save(...args);};
+ let nativeCalls=0;const world={read:async()=>{nativeCalls++;throw Error('unexpected read');},write:async()=>{nativeCalls++;throw Error('unexpected write or ack');}};
+ await assert.rejects(applyPendingDecision(j,fence,world),/crash before local configuration/);assert.equal(nativeCalls,0);assert.equal(j.control.checkpoint().value.pendingDecision.id,id);assert.deepEqual(j.control.checkpoint().value.listenTo,['s_old']);assert.equal(j.openOwnerTasks().totalOpen,1);
+ j.control.save=save;j.control.release(fence);const recovered=openJournal(dir,{worldId:'w',soulId:'s'});t.after(()=>recovered.close());const next=recovered.control.claim('recovery');
+ const result=await applyPendingDecision(recovered,next,world);assert.deepEqual(result.response,{local:true,listenTo:'nearby'});assert.equal(result.call.type,'listen');assert.equal(recovered.control.checkpoint().value.listenTo,'nearby');assert.equal(recovered.control.checkpoint().value.wakeAt,wakeAt);assert.equal(recovered.control.checkpoint().value.pendingDecision,null);assert.equal(recovered.control.operations().length,0);assert.equal(recovered.openOwnerTasks().totalOpen,1);assert.equal(nativeCalls,0);
+ recovered.control.release(next);const reopened=openJournal(dir,{worldId:'w',soulId:'s'});t.after(()=>reopened.close());assert.equal(reopened.control.checkpoint().value.listenTo,'nearby');assert.equal(reopened.control.checkpoint().value.wakeAt,wakeAt);
+});
+test('local listening configuration preserves a due wake for the immediate next action',async t=>{
+ const {j,fence}=fixture(t),wakeAt=new Date(Date.now()-1000).toISOString();j.control.save(fence,0,{listenTo:'nearby',wakeAt});
+ retainDecision(j,fence,listenDecision([]));await applyPendingDecision(j,fence,{});assert.deepEqual(j.control.checkpoint().value.listenTo,[]);assert.equal(j.control.checkpoint().value.wakeAt,wakeAt);
+ retainDecision(j,fence,{plan:'Handle the due departure now',call:{type:'write',command:'act',args:{capability:'observed_departure'}},wakeAt:null});await applyPendingDecision(j,fence,{write:async()=>({accepted:true})});assert.equal(j.control.checkpoint().value.wakeAt,null);
 });

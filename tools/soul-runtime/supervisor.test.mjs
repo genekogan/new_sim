@@ -234,3 +234,18 @@ test('the earlier deadline wakes a listener before its ambient batch cadence',as
   await until(()=>f.host.calls.length===1);f.host.finish(waitDecision);await until(()=>f.journal.control.checkpoint().value.lastCall?.type==='wait');f.journal.ingest({source:'world',after:null,cursor:'ambient',events:[ambient('ambient')]});await until(()=>f.host.calls.length===2);assert.ok(Date.now()-started<800);assert.equal(f.host.calls[1].scheduledWakeAt,wakeAt);assert.ok(f.host.calls[1].pending.some(f=>f.event.id==='ambient'));assert.deepEqual(f.host.calls[1].listenTo,['s_presenter']);
  }finally{f.stop.abort();await running;}
 });
+test('nonblocking listen clear immediately reaches the next action while retaining the saved deadline and owner task',async t=>{
+ const f=setup(t),owner=f.journal.control.claim('setup'),wakeAt=new Date(Date.now()+60000).toISOString(),commands=[];
+ f.journal.control.save(owner,0,{listenTo:'nearby',wakeAt});f.journal.control.release(owner);
+ f.journal.ingest({source:'owner',after:null,cursor:'original',events:[{id:'original',text:'Return and report the outcome'}]});f.journal.handled('owner','original','incorporated:previous');
+ f.world.write=async command=>{commands.push(command);return {accepted:true,receipt:{id:'r_departure',phase:'started'}};};
+ const running=runSupervisor({...f,signal:f.stop.signal,ambientWakeMs:30});
+ try{
+  await until(()=>f.host.calls.length===1);f.host.finish({plan:'Stop attending; depart immediately and keep the report deadline',call:{type:'listen',command:'listen',arguments:'{"listenTo":[]}'},wakeAt:null});
+  await until(()=>f.host.calls.length===2);assert.deepEqual(f.host.calls[1].listenTo,[]);assert.deepEqual(f.host.calls[1].lastResult,{local:true,listenTo:[]});assert.equal(f.host.calls[1].scheduledWakeAt,wakeAt);assert.equal(f.host.calls[1].openOwnerTasks.tasks[0].id,'original');assert.deepEqual(commands,[]);
+  f.host.finish({plan:'Depart via the observed capability; report still pending',call:{type:'write',command:'act',arguments:'{"capability":"observed_departure"}'},wakeAt:null});
+  await until(()=>f.host.calls.length===3);assert.deepEqual(commands,['act']);assert.equal(f.host.calls[2].scheduledWakeAt,wakeAt);assert.equal(f.journal.openOwnerTasks().totalOpen,1);
+  f.host.finish(waitDecision);await until(()=>f.journal.control.checkpoint().value.lastCall?.type==='wait');
+  f.journal.ingest({source:'world',after:null,cursor:'ignored',events:[ambient('ignored')]});await new Promise(r=>setTimeout(r,180));assert.equal(f.host.calls.length,3,'cleared listening and an ordinary wait must not poll the model');assert.deepEqual(commands,['act'],'configuration never acknowledges the owner or writes to the world');
+ }finally{f.stop.abort();await running;}
+});

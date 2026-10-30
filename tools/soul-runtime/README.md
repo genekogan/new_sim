@@ -36,9 +36,15 @@ retain their urgent wake path. Lower salience facts remain available for the nex
 natural decision unless the model explicitly chooses to listen to public speech.
 No server importance classifier or LLM is introduced.
 
-The model can choose `wait` arguments `{"listenTo":["s_observed_id"]}` for up to
-12 observed Soul IDs, or `{"listenTo":"nearby"}` for all native ambient speech
-in earshot. `{"listenTo":[]}` explicitly clears the scope. The private
+The model can choose local call `type: "listen", command: "listen"` with arguments
+`{"listenTo":["s_observed_id"]}` for up to 12 observed Soul IDs, or
+`{"listenTo":"nearby"}` for all native ambient speech in earshot.
+`{"listenTo":[]}` explicitly clears the scope. This call durably configures
+attention and immediately returns to the model for its next action, without a
+world call or a sleep. Its arguments must contain exactly `listenTo`.
+Use `wait` when the model intends to sleep; `wait` arguments may still configure
+`listenTo` before sleeping. Clearing listening before departing therefore uses
+`listen`, followed by the model's chosen departure action. The private
 `checkpoint.listenTo` survives other calls and restart independently of
 `wakeAt`; the prompt reports both controls. Only actual `speech.ambient`
 envelopes with native speaker identities match a chosen ID. Text, names,
@@ -123,9 +129,11 @@ without deleting logs, journals or evidence. Failed archival remains retryable.
 
 A future scheduled wake survives conversational replies and reads. A new
 non-null `wakeAt` replaces it; `wait` with `{"cancelWake":true}` explicitly
-cancels it. Due wakes are consumed only by a committed decision retained after
-the deadline. The model still authors goals, activity choices and appointments;
-this timer mechanism does not infer or schedule a social plan on its behalf.
+cancels it. Due wakes are consumed only by a committed non-configuration decision
+retained after the deadline. A `listen` call with null `wakeAt` preserves even a
+due wake for the immediate next choice. The model still authors goals, activity
+choices and appointments; this timer mechanism does not infer or schedule a
+social plan on its behalf.
 
 Journal retention reserves separate pending capacity for owner messages
 (1,000 events/8MiB) and world traffic (20,000/64MiB). A full page is rejected
