@@ -10,13 +10,14 @@ export const HAND_REACH_SECONDS=.65,HAND_SWING_SECONDS=2.2,HAND_RELEASE_SECONDS=
 export const HAND_IDLE_HANDOFF_SECONDS=1.2;
 export const HAND_OPEN_ANGLE=-Math.PI*.48;
 const vec=z.tuple([z.number().finite(),z.number().finite(),z.number().finite()]);
-const opening=z.object({floorY:z.number().finite().optional(),hinge:vec,yaw:z.number().finite(),radius:z.number().min(.2).max(2),height:z.number().min(.3).max(3),handleY:z.number().min(.3).max(2),from:z.number().min(-1.6).max(0),to:z.number().min(-1.6).max(0),side:z.union([z.literal(1),z.literal(-1)])}).strict();
+const opening=z.object({floorY:z.number().finite().optional(),hinge:vec,yaw:z.number().finite(),radius:z.number().min(.2).max(2),height:z.number().min(.3).max(3),handleY:z.number().min(.3).max(2),from:z.number().min(-1.6).max(0),to:z.number().min(-1.6).max(0),side:z.union([z.literal(1),z.literal(-1)]),bodyPolicy:z.literal('door-natural-v2').optional()}).strict();
 export const handActuatorParams=z.object({actor:z.string(),target:z.string(),at:vec,opening:opening.optional()}).strict();
 export type HandActuatorParams=z.infer<typeof handActuatorParams>;
 export type HandActuatorMotion=Omit<HandActuatorParams,'actor'> & {startTick:number;actionId?:string;abortedAt?:number;abortWeight?:number};
 const smooth=(v:number)=>{const k=Math.max(0,Math.min(1,v));return k*k*(3-2*k);};
 export function handSwingSeconds(m:Pick<HandActuatorMotion,'opening'>){
  const o=m.opening;if(!o)return 0;
+ if(o.bodyPolicy==='door-natural-v2')return Math.max(HAND_SWING_SECONDS,(Math.abs(o.to-o.from)*(o.radius+.42)+.35)*1.5/1.2);
  // Slow a larger opted-in leaf rather than exceeding ordinary walking speed.
  return Math.max(HAND_SWING_SECONDS,Math.abs(o.to-o.from)*Math.hypot(o.radius+(o.side<0?-.5:0),.42)*1.5/1.2);
 }
@@ -38,10 +39,17 @@ export function actuatorPoint(o:NonNullable<HandActuatorParams['opening']>,angle
  const hand:Vec3=[centre[0]+s*.06*o.side,centre[1],centre[2]+c*.06*o.side];
  // On the push side, use the near (left) hand and keep the root nearer the
  // hinge than the handle, so the shoulder and hips clear the latch jamb.
- const along=o.side<0?-.5:0;
- const root:Vec3=[centre[0]+s*.42*o.side+c*along,o.floorY??y,centre[2]+c*.42*o.side-s*along];
+ if(o.bodyPolicy==='door-natural-v2'&&o.side===1){
+  // Stay beyond the free edge while pulling, rather than orbiting around the
+  // hinge. The torso keeps facing the doorway; the hand follows the leaf.
+  const u=Math.max(0,Math.min(1,angle/HAND_OPEN_ANGLE)),ox=.35*u,oz=.45;
+  return {hand,root:[centre[0]+dcos(o.yaw)*ox+dsin(o.yaw)*oz,o.floorY??y,centre[2]-dsin(o.yaw)*ox+dcos(o.yaw)*oz] as Vec3};
+ }
+ const along=o.side<0?(o.bodyPolicy==='door-natural-v2'?-.35:-.5):0;
+ const root:Vec3=[centre[0]+s*(o.bodyPolicy==='door-natural-v2'?.37:.42)*o.side+c*along,o.floorY??y,centre[2]+c*(o.bodyPolicy==='door-natural-v2'?.37:.42)*o.side-s*along];
  return {hand,root};
 }
+export const actuatorHand=(o?:HandActuatorParams['opening']):'left'|'right'=>o?.bodyPolicy==='door-natural-v2'?'left':(o?.side===-1?'left':'right');
 const issue=(code:string,message:string,subjects:string[]):Diagnostic=>({code:'contact.'+code,message,subjects});
 function blocked(rt:Runtime,p:HandActuatorParams,root:Vec3,angle:number):Diagnostic|null{
  const actor=rt.world.entities[p.actor],sp=rt.services.spatial as Spatial|undefined;
@@ -66,7 +74,7 @@ type Exec={p:HandActuatorParams;motion:HandActuatorMotion;t:number;root:Vec3;yaw
 function clear(rt:Runtime,ex:Exec){const h=rt.world.entities[ex.p.actor]?.human;if(!h)return;delete h.handActuator;delete h.hands;delete h.speed;h.activity='idle';}
 export const handActuator:ActionDef<HandActuatorParams,true,Exec>={
  verb:'hand_actuator_v1',description:'Reach, operate a switch or hinged opening with continuous hand contact, and lower the arm before releasing the body.',schema:handActuatorParams,
- reservations:(_w,p)=>[{resource:'actor:'+p.actor,mode:'exclusive'},{resource:'hand:'+p.actor+(p.opening?.side===-1?':left':':right'),mode:'exclusive'},{resource:'entity:'+p.target,mode:'exclusive'}],
+ reservations:(_w,p)=>[{resource:'actor:'+p.actor,mode:'exclusive'},{resource:'hand:'+p.actor+(':'+actuatorHand(p.opening)),mode:'exclusive'},{resource:'entity:'+p.target,mode:'exclusive'}],
  plan(rt,p){const actor=rt.world.entities[p.actor],h=actor?.human;if(actor?.body?.family==='floater')return {ok:false,diagnostic:issue('no-arms','This body has no humanoid hand actuator.',[p.actor])};if(!h||h.grip||h.hands||h.on||h.carrier||h.riding||h.shore||h.holding||h.activity==='sit')return {ok:false,diagnostic:issue('body-busy','Stand with a free hand on stable ground first.',[p.actor])};return {ok:true,program:true};},
  start(rt,p,_plan,_id){const a=rt.world.entities[p.actor];return {p:structuredClone(p),motion:{...structuredClone(p),startTick:rt.tick,actionId:_id},t:0,root:[...a.pose.p],yaw:a.pose.yaw};},
  step(rt,ex,dt){
@@ -76,10 +84,10 @@ export const handActuator:ActionDef<HandActuatorParams,true,Exec>={
   if(ex.p.opening&&ex.t<HAND_REACH_SECONDS){const k=smooth(ex.t/HAND_REACH_SECONDS);point.root=[ex.root[0]+(point.root[0]-ex.root[0])*k,ex.root[1]+(point.root[1]-ex.root[1])*k,ex.root[2]+(point.root[2]-ex.root[2])*k];}
   const bad=blocked(rt,ex.p,point.root,f.angle);if(bad){clear(rt,ex);return {status:'failed',diagnostic:bad};}
   const before=[...a.pose.p];a.pose.p=[...point.root];
-  const face=ex.p.opening?heading([-dsin(ex.p.opening.yaw+f.angle)*ex.p.opening.side,-dcos(ex.p.opening.yaw+f.angle)*ex.p.opening.side]):heading([point.hand[0]-a.pose.p[0],point.hand[2]-a.pose.p[2]]),turn=((face-ex.yaw+Math.PI*3)%(Math.PI*2))-Math.PI;
+  const face=ex.p.opening?heading([-dsin(ex.p.opening.yaw+(ex.p.opening.bodyPolicy==='door-natural-v2'?(ex.p.opening.side===-1?f.angle*.34:0):f.angle))*ex.p.opening.side,-dcos(ex.p.opening.yaw+(ex.p.opening.bodyPolicy==='door-natural-v2'?(ex.p.opening.side===-1?f.angle*.34:0):f.angle))*ex.p.opening.side]):heading([point.hand[0]-a.pose.p[0],point.hand[2]-a.pose.p[2]]),turn=((face-ex.yaw+Math.PI*3)%(Math.PI*2))-Math.PI;
   a.pose.yaw=ex.yaw+turn*smooth(ex.t/.4);
   const speed=Math.hypot(a.pose.p[0]-before[0],a.pose.p[2]-before[2])/dt;h.activity=speed>.08?'walk':'operate';if(speed>.08)h.speed=speed;else delete h.speed;
-  if(f.armDown){delete h.hands;h.activity='idle';delete h.speed;}else h.hands=ex.p.opening?.side===-1?{left:[...point.hand]}:{right:[...point.hand]};h.handActuator=ex.motion;
+  if(f.armDown){delete h.hands;h.activity='idle';delete h.speed;}else h.hands=actuatorHand(ex.p.opening)==='left'?{left:[...point.hand]}:{right:[...point.hand]};h.handActuator=ex.motion;
   if(f.done){clear(rt,ex);return {status:'completed'};}return {status:'running',phase:ex.t<HAND_REACH_SECONDS?'reaching':ex.t<HAND_REACH_SECONDS+handSwingSeconds(ex.motion)?'operating':'releasing'};
  },
  cancel(rt,ex){
