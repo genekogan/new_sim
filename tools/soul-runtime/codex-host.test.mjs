@@ -122,3 +122,21 @@ test('close verifies the entire owned group after leader exit and reports unknow
  assert.deepEqual(calls,[[-900001,'SIGTERM'],[-900001,'SIGKILL'],[-900001,0]]);assert.equal(events.at(-1).state,'host-closed');assert.equal(events.at(-1).groupClosed,true);
  const denied=protocol(t,{childPid:900002,killProcess:()=>{throw Object.assign(Error('permission'),{code:'EPERM'});}});await denied.host.connect();const unknown=await denied.host.close();assert.equal(unknown.groupClosed,false);assert.equal(unknown.groupVerification,'unverified');
 });
+test('close tolerates group reaping beyond the former one-second grace without resending signals',async t=>{
+ let probes=0;const calls=[],p=protocol(t,{childPid:900003,killProcess:(pid,signal)=>{
+  calls.push([pid,signal]);if(signal===0&&++probes===51)throw Object.assign(Error('finally reaped'),{code:'ESRCH'});
+ }});await p.host.connect();
+ const proof=await p.host.close();
+ assert.equal(proof.code,0);assert.equal(probes,51,'absence becomes observable after 50 polling delays (1.25 seconds)');
+ assert.equal(proof.groupClosed,true);assert.equal(proof.groupVerification,'absent');
+ assert.deepEqual(calls.filter(([,signal])=>signal!==0),[[-900003,'SIGTERM'],[-900003,'SIGKILL']]);
+ assert.ok(calls.every(([pid])=>pid===-900003));
+});
+test('close keeps a live group unverified after the bounded five-second grace despite leader exit zero',async t=>{
+ let probes=0;const p=protocol(t,{childPid:900004,killProcess:(_pid,signal)=>{if(signal===0)probes++;}});await p.host.connect();
+ t.mock.timers.enable({apis:['setTimeout']});
+ const closing=p.host.close();await until(()=>probes>0);
+ for(let n=0;n<200;n++){t.mock.timers.tick(25);await new Promise(setImmediate);}
+ const proof=await closing;
+ assert.equal(probes,200);assert.equal(proof.code,0);assert.equal(proof.groupClosed,false);assert.equal(proof.groupVerification,'unverified');
+});

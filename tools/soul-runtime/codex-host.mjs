@@ -6,6 +6,7 @@ import {EventEmitter} from 'node:events';
 const fault=(code,message)=>Object.assign(Error(message),{code});
 const input=text=>[{type:'text',text}];
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const GROUP_REAP_POLLS=200,GROUP_REAP_POLL_MS=25;
 const threadName=value=>{if(value===null)return null;if(typeof value!=='string'||!value.trim()||value.length>200||/[\u0000-\u001f\u007f]/.test(value))throw fault('HOST_INVALID_NAME','Thread name must be readable text of1..200characters');return value.trim();};
 const booleanOption=(name,value)=>{if(typeof value!=='boolean')throw fault('HOST_INVALID_OPTION',name+' must be boolean');return value;};
 export class CodexHost extends EventEmitter {
@@ -157,9 +158,11 @@ export class CodexHost extends EventEmitter {
         await Promise.race([this.exit,delay(1000)]);
       }
       let groupClosed=this.exitStatus?.startFailed===true&&!this.pid;
-      if(this.pid)for(let n=0;n<40;n++){
+      // A leader's exit can precede descendant reaping. Allow five seconds
+      // after cleanup signals, but only ESRCH proves the group is absent.
+      if(this.pid)for(let n=0;n<GROUP_REAP_POLLS;n++){
         try{this.killProcess(-this.pid,0);}catch(e){if(e.code==='ESRCH')groupClosed=true;break;}
-        await delay(25);
+        await delay(GROUP_REAP_POLL_MS);
       }
       this.closeProof={...this.exitStatus,hostPid:this.pid??null,threadId:this.threadId,groupClosed,groupVerification:groupClosed?'absent':'unverified'};
       this.emit('lifecycle',{state:'host-closed',...this.closeProof});
