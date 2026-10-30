@@ -48,6 +48,7 @@ function describeState(field: string, v: unknown) {
   if (field === 'lit') return v ? 'already lit' : 'not lit';
   if (field === 'playing') return v ? 'already playing' : 'not playing';
   if (field === 'level') return v === 1 ? 'full' : v === 0 ? 'empty' : `at ${v}`;
+  if (field === 'text') return v ? 'already written on' : 'blank';
   if (field === 'moisture') return v === 1 ? 'well watered' : v === 0 ? 'dry' : `at moisture ${v}`;
   return `${field} ${JSON.stringify(v)}`;
 }
@@ -144,7 +145,7 @@ export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: Buil
         const contact = host.deferContacts && isContactActuator(def, a);
         const motion=contact&&s.key?host.contactPlan?.(ctx.soul,s.key,a.name,params):null;
         if(motion){const me=host.bodyAt(ctx.soul)!,far=(motion.level??0)>0||Math.hypot(me[0]-motion.root[0],me[1]-motion.root[2])>.1;
-          return {state:s,result:{action:a.name,set:thenPatch(a,(s.key&&host.stateOf?.(s.key))||s.state||{},params)},bodies:[{label:a.label,steps:[{verb:'stand',params:{}},...(far?[(motion.level??0)>0?{verb:'mars:walk_to',params:{x:motion.root[0],z:motion.root[2],level:motion.level}}:{verb:'walk_to',params:{to:[motion.root[0],motion.root[2]],standoff:0}}]:[]),{verb:'mars:hand_actuator_v1',params:motion.params}]}]};}
+          return {state:s,result:{action:a.name,set:thenPatch(a,(s.key&&host.stateOf?.(s.key))||s.state||{},params)},bodies:[{label:a.label,steps:[{verb:'stand',params:{}},...(far?[(motion.level??0)>0||motion.params.stroke?{verb:'mars:walk_to',params:{x:motion.root[0],z:motion.root[2],level:motion.level}}:{verb:'walk_to',params:{to:[motion.root[0],motion.root[2]],standoff:0}}]:[]),{verb:'mars:hand_actuator_v1',params:motion.params}]}]};}
 
         const me = host.bodyAt(ctx.soul)!, to = s.front ?? s.at!, far = Math.hypot(s.at![0] - me[0], s.at![1] - me[1]) > (contact ? CONTACT_REACH : ACT_REACH);
         const water = s.key ? waterPlan(a, s.key, ctx.soul, host) : null;

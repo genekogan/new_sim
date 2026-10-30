@@ -12,7 +12,7 @@ export const HAND_OPEN_ANGLE=-Math.PI*.48;
 const vec=z.tuple([z.number().finite(),z.number().finite(),z.number().finite()]);
 const opening=z.object({hinge:vec,yaw:z.number().finite(),radius:z.number().min(.2).max(2),height:z.number().min(.3).max(3),handleY:z.number().min(.3).max(2),from:z.number().min(-1.6).max(0),to:z.number().min(-1.6).max(0),side:z.union([z.literal(1),z.literal(-1)]),bodyPolicy:z.literal('door-natural-v2').optional()}).strict();
 // A hand that writes or wipes across a flat face (a board): `at` is the face centre, `yaw` its facing.
-const stroke=z.object({kind:z.union([z.literal('write'),z.literal('wipe')]),yaw:z.number().finite(),width:z.number().min(.1).max(1.2),height:z.number().min(.05).max(.8),lines:z.number().int().min(1).max(3),seconds:z.number().min(.8).max(6)}).strict();
+const stroke=z.object({kind:z.union([z.literal('write'),z.literal('wipe')]),yaw:z.number().finite(),stand:z.number().min(.3).max(.7).optional(),width:z.number().min(.1).max(1.2),height:z.number().min(.05).max(.8),lines:z.number().int().min(1).max(3),seconds:z.number().min(.8).max(6)}).strict();
 export const handActuatorParams=z.object({actor:z.string(),target:z.string(),at:vec,opening:opening.optional(),stroke:stroke.optional()}).strict();
 export type HandActuatorParams=z.infer<typeof handActuatorParams>;
 export type HandActuatorMotion=Omit<HandActuatorParams,'actor'> & {startTick:number;actionId?:string;abortedAt?:number;abortWeight?:number};
@@ -62,6 +62,9 @@ export function strokePoint(at:Vec3,s:NonNullable<HandActuatorParams['stroke']>,
   if(row===s.lines-1&&!writing){x=.5*s.width;y=top-row*step;lift=0;}}
  return [at[0]+right[0]*x+out[0]*lift,at[1]+y,at[2]+right[1]*x+out[1]*lift];
 }
+/** Where a body stands to write on a face: square in front of `at`, `STROKE_STAND` metres out along the face's facing. */
+export const STROKE_STAND=.38;
+export const strokeRoot=(at:Vec3,s:NonNullable<HandActuatorParams['stroke']>,y:number):Vec3=>{const d=s.stand??STROKE_STAND;return [at[0]+dsin(s.yaw)*d,y,at[2]+dcos(s.yaw)*d];};
 export const actuatorHand=(o?:HandActuatorParams['opening']):'left'|'right'=>o?.bodyPolicy==='door-natural-v2'?'left':(o?.side===-1?'left':'right');
 const issue=(code:string,message:string,subjects:string[]):Diagnostic=>({code:'contact.'+code,message,subjects});
 type Obstacle=Spatial['scene']['obstacles'][number];
@@ -71,7 +74,7 @@ const nearOps=new WeakMap<Exec,{of:readonly Obstacle[];near:Obstacle[]}>();
 export const handClearanceStats={obstaclesVisited:0,candidateBuilds:0};
 function nearObstacles(ex:Exec,all:readonly Obstacle[]){
  const was=nearOps.get(ex);if(was?.of===all)return was.near;
- const o=ex.p.opening,centre=o?o.hinge:ex.root,reach=o?o.radius+2:.5,near:Obstacle[]=[];
+ const o=ex.p.opening,centre=o?o.hinge:ex.root,reach=o?o.radius+2:ex.p.stroke?1:.5,near:Obstacle[]=[];
  for(const b of all){if(b.id===ex.p.target||b.id.startsWith(ex.p.target+'#'))continue;if(Math.hypot(b.obb.c[0]-centre[0],b.obb.c[1]-centre[2])<=reach+Math.hypot(b.obb.half[0],b.obb.half[1])+HUMAN_RADIUS+.1)near.push(b);}
  nearOps.set(ex,{of:all,near});handClearanceStats.candidateBuilds++;return near;
 }
@@ -106,6 +109,8 @@ export const handActuator:ActionDef<HandActuatorParams,true,Exec>={
   const a=rt.world.entities[ex.p.actor],h=a?.human;if(!h)return {status:'failed',diagnostic:issue('body-gone','The original body is gone.',[ex.p.actor])};
   ex.t+=dt;const f=handActuatorFrame(ex.motion,ex.t),point=ex.p.opening?actuatorPoint(ex.p.opening,f.angle):{hand:ex.p.stroke?strokePoint(ex.p.at,ex.p.stroke,(ex.t-HAND_REACH_SECONDS)/ex.p.stroke.seconds):ex.p.at,root:ex.root};
   if(ex.p.opening&&Math.hypot(ex.root[0]-actuatorPoint(ex.p.opening,ex.p.opening.from).root[0],ex.root[2]-actuatorPoint(ex.p.opening,ex.p.opening.from).root[2])>.22){clear(rt,ex);return {status:'failed',diagnostic:issue('not-at-handle','Walk to the actual handle before operating it.',[ex.p.target])};}
+  if(ex.p.stroke){const goal=strokeRoot(ex.p.at,ex.p.stroke,ex.root[1]);if(Math.hypot(goal[0]-ex.root[0],goal[2]-ex.root[2])>.5){clear(rt,ex);return {status:'failed',diagnostic:issue('not-at-board','Walk up to the board before writing on it.',[ex.p.target])};}
+   const k=smooth(Math.min(1,ex.t/HAND_REACH_SECONDS));point.root=[ex.root[0]+(goal[0]-ex.root[0])*k,ex.root[1],ex.root[2]+(goal[2]-ex.root[2])*k];}
   if(ex.p.opening&&ex.t<HAND_REACH_SECONDS){const k=smooth(ex.t/HAND_REACH_SECONDS);point.root=[ex.root[0]+(point.root[0]-ex.root[0])*k,ex.root[1]+(point.root[1]-ex.root[1])*k,ex.root[2]+(point.root[2]-ex.root[2])*k];}
   const bad=blocked(rt,ex,point.root,f.angle);if(bad){clear(rt,ex);return {status:'failed',diagnostic:bad};}
   const before=[...a.pose.p];a.pose.p=[...point.root];

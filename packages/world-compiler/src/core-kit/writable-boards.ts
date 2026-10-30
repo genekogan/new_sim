@@ -19,7 +19,7 @@ const noticeBoard: DefInput = { ...structuredClone(noticeV1), version: 2, tags: 
   state: boardState as DefInput['state'], components: { ...structuredClone(noticeV1.components), sign: { lines: [] } }, actions: boardActions('notice board') };
 
 const post = (x: number) => ({ kind: 'extrude', at: [x, 0.012, 0], polygon: [[-0.025, -0.025], [0.025, -0.025], [0.025, 0.025], [-0.025, 0.025]], h: 1.66, tint: 'frame' });
-const foot = (x: number) => ({ kind: 'box', at: [x, 0.02, 0], size: [0.06, 0.04, 0.5], round: 0.01, tint: 'frame' });
+const foot = (x: number) => ({ kind: 'box', at: [x, 0.02, 0], size: [0.06, 0.04, 0.3], round: 0.01, tint: 'frame' });
 const whiteboard: DefInput = {
   schema: 'def/1', name: 'core-whiteboard', version: 1,
   description: 'A whiteboard on a wheeled stand. A Soul can write a short note on it by hand, or wipe it clean.',
@@ -33,7 +33,7 @@ const whiteboard: DefInput = {
   state: boardState as DefInput['state'],
   components: { readable: { pages: 1 }, sign: { lines: [] } } as DefInput['components'],
   palette: { frame: '#b9bec4', board: '#f6f7f4' },
-  size: { box: [1.16, 1.68, 0.5] },
+  size: { box: [1.16, 1.68, 0.3] },
   actions: boardActions('whiteboard'),
 } as DefInput;
 

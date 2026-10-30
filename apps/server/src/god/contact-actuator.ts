@@ -1,7 +1,8 @@
 // Contact effects commit at the recorded hand contact, with release still owned by the native action.
 // Durable receipt intent, no per-tick object scan and no effect from an interrupted walk.
-import {actuatorPoint,strokePoint,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
+import {actuatorPoint,strokePoint,strokeRoot,STROKE_STAND,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
 import { createHash } from 'node:crypto';
+import { HUMAN_RADIUS } from '../../../../mars/viewer/engine/world/catalog.ts';
 import { opSchema, contactStateKey, type WorldModel, type Op, type StoredDef } from '@sim/world-compiler';
 import type { EdgeSoul } from '../edge/contract.ts';
 import { actionsOf, actuatedState, boardTextProblem, thenPatch, whenRefusal } from './actuators.ts';
@@ -21,9 +22,12 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     const face=(def.make.kind==='gen'?(def.make.args as {faces?:{at?:number[];w?:number;h?:number}[]})?.faces?.[0]:undefined);if(!face?.at)return null;
     const c=Math.cos(wp.yaw),s=Math.sin(wp.yaw),[fx,fy,fz]=face.at.map(v=>v*wp.s),centre:[number,number,number]=[wp.x+fx*c+fz*s,wp.y+fy,wp.z-fx*s+fz*c];
     const text=typeof input.text==='string'?input.text.trim():'',lines=action==='write'?Math.min(3,Math.max(text.split('\n').length,Math.ceil(text.length/34),1)):1;
-    params.at=[centre[0]+s*.04,centre[1],centre[2]+c*.04];
-    params.stroke={kind:action==='erase'?'wipe':'write',yaw:wp.yaw,width:Math.min(.55,(face.w??.6)*wp.s*.6),height:Math.min(.3,(face.h??.4)*wp.s*.5),lines,seconds:action==='erase'?2.4:1.2+1.6*lines};
-    root=[centre[0]+s*.42,wp.y,centre[2]+c*.42];
+    // Work across the upper part of the face, near shoulder height, not at the hip.
+    const lift=Math.min(.12,(face.h??.4)*wp.s*.2);params.at=[centre[0]+s*.04,centre[1]+lift,centre[2]+c*.04];
+    // Stand clear of the board's own footprint (its depth beyond the face) with a body radius to spare.
+    const stand=Math.min(.7,Math.max(STROKE_STAND,(def.size.box[2]/2-(face.at[2]??0))*wp.s+HUMAN_RADIUS+.06-.04));
+    params.stroke={kind:action==='erase'?'wipe':'write',yaw:wp.yaw,stand,width:Math.min(.55,(face.w??.6)*wp.s*.6),height:Math.min(.3,(face.h??.4)*wp.s*.5),lines,seconds:action==='erase'?2.4:1.2+1.6*lines};
+    root=strokeRoot(params.at,params.stroke,wp.y);
    }else if(def.components.opening){
     const shapes=def.make.kind==='gen'?(def.make.args as {shapes?:{role?:string;pivot?:number[];at?:number[];tint?:string}[]})?.shapes:undefined;
     const leaf=shapes?.find(s=>s.role==='door'&&s.pivot),knob=shapes?.find(s=>s.role==='door'&&s.tint==='brass');if(!leaf?.pivot)return null;

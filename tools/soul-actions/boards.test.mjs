@@ -58,7 +58,7 @@ test('writable boards: hand-timed write/erase, attributed read, bounded context,
  assert.equal(earlyText,false,'no text before the stroke ends');
  const wr=await finish(ana,w);assert.equal(wr.phase,'completed',JSON.stringify(edge.receipt(ana.soulId,w.receipt.id)).slice(0,600));
  assert.equal(state('whiteboard').text,note);assert.equal(state('whiteboard').textBy,ana.soulId);
- const wr2=await act(ana,'object:notice-board:write',{text:'Lost: blue scarf'});const nr=await finish(ana,wr2);assert.equal(nr.phase,'completed');assert.equal(state('notice-board').text,'Lost: blue scarf');
+ const wr2=await act(ana,'object:notice-board:write',{text:'Lost: blue scarf'});const nr=await finish(ana,wr2);assert.equal(nr.phase,'completed',JSON.stringify(edge.receipt(ana.soulId,wr2.receipt.id)).slice(0,500));assert.equal(state('notice-board').text,'Lost: blue scarf');
  assert.ok(wr.sawStroke===false||true);
  // unsupported frozen v1 board and a private board
  assert.ok(!edge.capabilities(ana).some(c=>c.id===`object:${id('menu-chalkboard')}:write`),'v1 chalkboard is not writable');
