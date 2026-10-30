@@ -81,6 +81,16 @@ A new owner message during a turn invalidates its eventual action. Ordinary
 world observations trigger up to two consecutive replans, then remain pending
 for the next decision so a busy venue cannot indefinitely prevent a reply or
 departure. The server still validates every selected action.
+A completed choice is current despite those revisions only when the host proves
+it saw them: every revision since the prompt was delivered whole (not truncated,
+gaps included) by an acknowledged steer, and Codex recorded that steer's
+userMessage item before the turn's final agentMessage began. Steers, including
+scheduled-wake steers, are indexed in ACK order after the prompt item. The final
+agentMessage is then the choice, its steered facts are retained with it and not
+presented again, and no replan credit is spent. Owner revisions still invalidate
+first; missing item events, an unmatched item count, a failed steer, intake
+pressure without a steer or a reference set beyond the prompt bounds keep the
+ordinary replan rule.
 The newest pending owner observation comes first before prompt and steer bounds; sequence metadata preserves ordering, and older constraints remain available through the durable task ledger. Only observations actually included in the committed decision are marked incorporated. Urgent events are prioritized before a bounded steer, and attention arriving
 while a begin acknowledgement is pending is queued for that exact turn. A full
 journal requests one bounded decision to drain retained facts; transport retries
@@ -211,6 +221,23 @@ same absolute window and their existing direct-message replan cap; they do not
 spend an ordinary soft-replan credit or reset its clock. An expired choice is
 never applied, including when completion beats its timer callback. Urgent and
 ordinary timers share one exact-turn interruption and confirmation chain.
+
+The managed supervisor opts its host into a Soul transport (`codex-host.mjs`
+`soulTransport`; other CodexHost users, including the baseline arm, send
+unchanged params and no extra queries). A fresh thread then uses provider
+`sim_soul_openai`: the built-in OpenAI transport (same backend, websockets,
+default retries, org/project headers) with `stream_idle_timeout_ms` 10000, so
+Codex's own retry fires on a silent stream inside the window. Built-in ids cannot
+be overridden on Codex 0.163. It applies only when the effective provider is the
+built-in `openai`, `OPENAI_BASE_URL` is unset and `account/read` gives ChatGPT
+auth on the default backend (`chatgpt.com/backend-api/codex`) or API-key auth
+(`api.openai.com/v1`); a retained thread keeps the provider it was created with,
+since resuming under another provider rewrites its recorded provider. The host
+and `session-created` disclose `transport` (provider id, idle timeout, auth
+class, reason) without account identity. Threads created on this provider are
+omitted from provider-filtered default thread lists. The window, credits and
+interruption rules are unchanged. Other host notifications are surfaced only as
+bounded `notice` events (method and receipt time; 20 per method, 200 per host).
 
 A durable `decisionProgressV1` episode permits one ordinary soft interruption
 and replacement window, plus at most one host fallback shared with urgent

@@ -89,7 +89,9 @@ export function openEvidenceRecorder(path,{scope={},now=Date.now,onFailure=()=>{
     try{append({kind:'host-event',method:e.method,at:Number.isFinite(e.receivedAt)?e.receivedAt:now(),hostId,hostPid:host.pid??null,threadId:typeof p.threadId==='string'?p.threadId:host.threadId??null,turnId:p.turn?.id??p.turnId??null,model:actualModel,status:p.turn?.status??null,...(e.method==='thread/tokenUsage/updated'?{tokenUsage:p.tokenUsage??null}:{}),...(p.turn?.error?{error:evidenceError(p.turn.error)}:{})});}catch{}
    };
    const unsupported=e=>record({kind:'host-unsupported-request',at:now(),...identity(host.threadId,host.activeTurnId),method:requestMethods.has(e?.method)?e.method:'unknown'});
-   host.on('event',event);host.on('unsupportedRequest',unsupported);detach.push(()=>{host.off('event',event);host.off('unsupportedRequest',unsupported);host.connect=connect;});return host;
+   // Method names only: bounded host notices let evidence attribute stalls without bodies.
+   const notice=n=>record({kind:'host-notice',at:Number.isFinite(n?.receivedAt)?n.receivedAt:now(),...identity(host.threadId,host.activeTurnId),method:typeof n?.method==='string'&&/^[A-Za-z0-9_./-]{1,100}$/.test(n.method)?n.method:'unknown'});
+   host.on('event',event);host.on('notice',notice);host.on('unsupportedRequest',unsupported);detach.push(()=>{host.off('event',event);host.off('notice',notice);host.off('unsupportedRequest',unsupported);host.connect=connect;});return host;
   },
   close(details={}){
    if(closed){if(failure)throw failure;return;}

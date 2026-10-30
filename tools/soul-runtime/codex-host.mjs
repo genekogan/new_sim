@@ -11,12 +11,29 @@ const GROUP_REAP_POLLS=200,GROUP_REAP_POLL_MS=25;
 const probeErrorCode=value=>typeof value==='string'&&/^[A-Z][A-Z0-9_]{0,63}$/.test(value)?value:'UNKNOWN';
 const threadName=value=>{if(value===null)return null;if(typeof value!=='string'||!value.trim()||value.length>200||/[\u0000-\u001f\u007f]/.test(value))throw fault('HOST_INVALID_NAME','Thread name must be readable text of1..200characters');return value.trim();};
 const booleanOption=(name,value)=>{if(typeof value!=='boolean')throw fault('HOST_INVALID_OPTION',name+' must be boolean');return value;};
+// Soul transport: the built-in OpenAI transport (same backend, websockets,
+// default retries and org/project headers) with a short stream idle timeout, so
+// Codex's own retry fires on a silent stream within the same turn. Built-in IDs
+// cannot be overridden, so it is a distinct provider entry. Applied only when the
+// effective provider is the built-in one and the auth class is determinable.
+// Opt-in only (managed Soul connect): a default host sends no account/config
+// queries and its thread/start|resume params are unchanged.
+export const SOUL_STREAM_IDLE_TIMEOUT_MS=10000;
+export const SOUL_PROVIDER_ID='sim_soul_openai';
+const OPENAI_BASE_URLS={chatgpt:'https://chatgpt.com/backend-api/codex',apiKey:'https://api.openai.com/v1'};
+export const soulProvider=authMode=>({name:'OpenAI',base_url:OPENAI_BASE_URLS[authMode],wire_api:'responses',requires_openai_auth:true,supports_websockets:true,env_http_headers:{'OpenAI-Organization':'OPENAI_ORGANIZATION','OpenAI-Project':'OPENAI_PROJECT'},stream_idle_timeout_ms:SOUL_STREAM_IDLE_TIMEOUT_MS});
+const providerKey=key=>key==='model_provider'||key==='model_providers'||key.startsWith('model_providers.');
+// Diagnostic notices for otherwise dropped notifications: method name and
+// receipt time only, never params. Bounded per host and per method.
+const FORWARDED=['turn/started','turn/completed','item/started','item/completed','thread/tokenUsage/updated','thread/name/updated','thread/archived','error'];
+const NOTICE_LIMIT=200,NOTICE_METHOD_LIMIT=20;
 export class CodexHost extends EventEmitter {
-  constructor({cwd,model=null,effort='low',command='codex',args=['app-server','--listen','stdio://'],requestTimeoutMs=30000,spawnProcess=spawn,killProcess=process.kill,ephemeral=false,name=null,internalProbe=false}={}) {
+  constructor({cwd,model=null,effort='low',command='codex',args=['app-server','--listen','stdio://'],requestTimeoutMs=30000,spawnProcess=spawn,killProcess=process.kill,ephemeral=false,name=null,internalProbe=false,soulTransport=false,env=process.env}={}) {
     super();this.cwd=cwd;this.model=model;this.effort=effort;this.requestTimeoutMs=requestTimeoutMs;
-    this.ephemeral=booleanOption('ephemeral',ephemeral);this.name=threadName(name);this.internalProbe=booleanOption('internalProbe',internalProbe);this.killProcess=killProcess;
+    this.ephemeral=booleanOption('ephemeral',ephemeral);this.name=threadName(name);this.internalProbe=booleanOption('internalProbe',internalProbe);this.soulTransport=booleanOption('soulTransport',soulTransport);this.killProcess=killProcess;this.env=env;
     this.connected=false;this.connecting=false;this.archiving=null;this.archived=false;
     this.pending=new Map();this.turns=new Map();this.sequence=0;this.threadId=null;this.activeTurnId=null;this.closed=false;this.closing=false;this.buffer='';
+    this.transport={providerId:null,idleTimeoutMs:null,authMode:null,reason:'not-connected'};this.notices={emitted:0,methods:new Map()};
     this.child=spawnProcess(command,args,{cwd,stdio:['pipe','pipe','pipe'],detached:true});
     this.pid=this.child.pid;this.exit=new Promise(resolve=>{
       this.child.once('exit',(code,signal)=>{this.exitStatus={code,signal};this.fail(fault('HOST_EXITED','Codex host exited'));resolve(this.exitStatus)});
@@ -52,10 +69,48 @@ export class CodexHost extends EventEmitter {
       try{this.send({id,method,params});}catch(e){clearTimeout(timer);this.pending.delete(id);reject(e);}
     });
   }
+  // Read-only metadata query: a refusal or timeout is "unknown", never a host
+  // failure; a late answer finds no pending entry and is ignored.
+  query(method,params,timeoutMs=Math.min(this.requestTimeoutMs,5000)){
+    if(this.closed)return Promise.resolve(null);
+    return new Promise(resolve=>{
+      const id=++this.sequence,timer=setTimeout(()=>{this.pending.delete(id);resolve(null);},timeoutMs);
+      this.pending.set(id,{resolve,reject:()=>resolve(null),timer});
+      try{this.send({id,method,params});}catch{clearTimeout(timer);this.pending.delete(id);resolve(null);}
+    });
+  }
+  async selectTransport(config,enabled,threadId=null){
+    const off=reason=>({providerId:null,idleTimeoutMs:null,authMode:null,reason});
+    if(!enabled)return off('disabled');
+    if(Object.keys(config??{}).some(providerKey))return off('caller-provider');
+    if(this.env?.OPENAI_BASE_URL)return off('base-url-environment');
+    const [settings,account]=await Promise.all([this.query('config/read',{cwd:this.cwd??null}),this.query('account/read',{})]);
+    if(!settings?.config||typeof settings.config!=='object')return off('config-unknown');
+    if((settings.config.model_provider??'openai')!=='openai')return off('configured-provider');
+    const type=account?.account?.type,routing=account?.workspaceRouting;
+    if(account?.requiresOpenaiAuth!==true||!Object.hasOwn(OPENAI_BASE_URLS,type??''))return off('auth-unknown');
+    // Workspace/regional routing selects another backend origin; never guess it.
+    if(type==='chatgpt'&&routing!=null&&(routing.backendOrigin!=='https://chatgpt.com'||routing.accountRoutingOverride!=='NO_CONSTRAINT'))return off('routed-backend');
+    // Resuming under another provider rewrites the thread's recorded provider
+    // (probed on 0.163), which changes provider-filtered thread lists. A retained
+    // thread keeps the transport it was created with.
+    if(threadId!==null){
+      const recorded=(await this.query('thread/read',{threadId,includeTurns:false}))?.thread?.modelProvider;
+      if(recorded!==SOUL_PROVIDER_ID)return off(typeof recorded==='string'?'retained-thread-provider':'thread-provider-unknown');
+    }
+    return {providerId:SOUL_PROVIDER_ID,idleTimeoutMs:SOUL_STREAM_IDLE_TIMEOUT_MS,authMode:type,reason:'applied'};
+  }
   turnRecord(id){
     let t=this.turns.get(id);if(t)return t;
     let resolve,reject;const completed=new Promise((a,b)=>{resolve=a;reject=b});completed.catch(()=>{});
-    t={id,text:[],characters:0,terminal:false,completed,resolve,reject};this.turns.set(id,t);return t;
+    // userMessages counts recorded input items (prompt, then each steer). Each
+    // agentMessage start notes how many inputs preceded it; final is the last.
+    t={id,text:[],characters:0,terminal:false,completed,resolve,reject,userMessages:0,started:new Map(),final:null,unmatched:false};this.turns.set(id,t);return t;
+  }
+  notice(method){
+    const n=this.notices,count=n.methods.get(method)??0;
+    if(n.emitted>=NOTICE_LIMIT||count>=NOTICE_METHOD_LIMIT)return;
+    n.methods.set(method,count+1);n.emitted++;this.emit('notice',{method,receivedAt:Date.now()});
   }
   receive(line){
     let m;try{m=JSON.parse(line)}catch{this.fail(fault('HOST_PROTOCOL','Malformed host JSON'));return;}
@@ -74,20 +129,30 @@ export class CodexHost extends EventEmitter {
       const id=p.turn?.id;if(!id)return;
       if(this.activeTurnId&&this.activeTurnId!==id){this.fail(fault('HOST_OVERLAPPING_TURNS','Host started a second decision turn'));return;}
       this.activeTurnId=id;this.turnRecord(id);
+    }else if(m.method==='item/started'&&p.item?.type==='agentMessage'&&p.turnId){
+      const t=this.turnRecord(p.turnId);if(typeof p.item.id==='string'&&!t.started.has(p.item.id))t.started.set(p.item.id,t.userMessages);else t.unmatched=true;
+    }else if(m.method==='item/completed'&&p.item?.type==='userMessage'&&p.turnId){
+      this.turnRecord(p.turnId).userMessages++;
     }else if(m.method==='item/completed'&&p.item?.type==='agentMessage'&&p.turnId){
       const t=this.turnRecord(p.turnId),text=p.item.text??'';t.characters+=text.length;
       if(t.characters>512*1024){this.fail(fault('HOST_OUTPUT_LIMIT','Decision output exceeded bound'));return;}
       t.text.push(text);
+      if(t.started.has(p.item.id))t.final={id:p.item.id,after:t.started.get(p.item.id),text};else t.unmatched=true;
     }else if(m.method==='turn/completed'&&p.turn?.id){
-      const t=this.turnRecord(p.turn.id);t.terminal=true;t.result={turnId:t.id,status:p.turn.status,error:p.turn.error??null,text:t.text.join('\n')};
+      const t=this.turnRecord(p.turn.id);t.terminal=true;
+      // finalAfter is null when the final message's start is unknown or another
+      // agentMessage began after it: callers then keep their ordinary rule.
+      const last=[...t.started.keys()].at(-1),finalAfter=!t.unmatched&&t.final&&t.final.id===last?t.final.after:null;
+      t.result={turnId:t.id,status:p.turn.status,error:p.turn.error??null,text:t.text.join('\n'),finalText:t.final?.text??null,inputs:{userMessages:t.userMessages,agentMessages:t.text.length,finalAfter}};
       if(this.activeTurnId===t.id)this.activeTurnId=null;t.resolve(t.result);
       // Keep a small recent window for acknowledgement/completion races.
       for(const [id,old] of this.turns){if(this.turns.size<=32)break;if(old.terminal&&id!==t.id)this.turns.delete(id);}
     }
-    if(['turn/started','turn/completed','item/started','item/completed','thread/tokenUsage/updated','thread/name/updated','thread/archived','error'].includes(m.method))this.emit('event',{method:m.method,params:p,receivedAt:Date.now()});
+    if(FORWARDED.includes(m.method))this.emit('event',{method:m.method,params:p,receivedAt:Date.now()});
+    else if(typeof m.method==='string')this.notice(/^[A-Za-z0-9_./-]{1,100}$/.test(m.method)?m.method:'unknown');
   }
-  async connect({threadId=null,instructions='',baseInstructions=null,config={},ephemeral=this.ephemeral,name=this.name}={}){
-    ephemeral=booleanOption('ephemeral',ephemeral);name=threadName(name);
+  async connect({threadId=null,instructions='',baseInstructions=null,config={},ephemeral=this.ephemeral,name=this.name,soulTransport=this.soulTransport}={}){
+    ephemeral=booleanOption('ephemeral',ephemeral);name=threadName(name);soulTransport=booleanOption('soulTransport',soulTransport);
     if(threadId!==null&&(typeof threadId!=='string'||!threadId))throw fault('HOST_INVALID_THREAD','Resume needs a nonempty thread ID');
     // Ephemeral work has no persistent history to resume. Never reinterpret a
     // retained durable thread ID as permission to drop or replace its history.
@@ -102,16 +167,20 @@ export class CodexHost extends EventEmitter {
       this.model=listed.data?.find(m=>m.isDefault)?.model;
       if(!this.model)throw fault('HOST_MODEL_UNAVAILABLE','Host did not advertise a default model');
     }
-    const params={cwd:this.cwd,model:this.model,approvalPolicy:'never',sandbox:'read-only',developerInstructions:instructions,...(baseInstructions?{baseInstructions}:{}),config};
+    const transport=await this.selectTransport(config,soulTransport,threadId);
+    const effective=transport.providerId?{...config,model_provider:transport.providerId,['model_providers.'+transport.providerId]:soulProvider(transport.authMode)}:config;
+    const params={cwd:this.cwd,model:this.model,approvalPolicy:'never',sandbox:'read-only',developerInstructions:instructions,...(baseInstructions?{baseInstructions}:{}),config:effective};
     const r=await this.request(threadId?'thread/resume':'thread/start',threadId?{...params,threadId}:{...params,ephemeral});
     this.threadId=r.thread.id;
+    // The host's reported provider is the applied fact; a mismatch is disclosed, never assumed.
+    this.transport=transport.providerId&&r.modelProvider!==undefined&&r.modelProvider!==transport.providerId?{...transport,reason:'host-provider-mismatch'}:transport;
     // Publish ownership as soon as the authoritative ID exists, even if naming
     // or the supervisor's first world observation subsequently fails.
-    this.emit('lifecycle',{state:'session-created',threadId:this.threadId,hostPid:this.pid??null,cwd:this.cwd,ephemeral,resumed:threadId!==null});
+    this.emit('lifecycle',{state:'session-created',threadId:this.threadId,hostPid:this.pid??null,cwd:this.cwd,ephemeral,resumed:threadId!==null,transport:{...this.transport}});
     // Installed app-server refuses metadata updates for ephemeral threads. Keep
     // their readable name in local lifecycle evidence, without a persistence fallback.
     if(name!==null&&!ephemeral)await this.request('thread/name/set',{threadId:this.threadId,name});
-    this.connected=true;return {threadId:this.threadId,model:r.model??this.model,ephemeral,name};
+    this.connected=true;return {threadId:this.threadId,model:r.model??this.model,ephemeral,name,transport:{...this.transport}};
     }finally{this.connecting=false;}
   }
   async begin(text,{outputSchema}={}){
