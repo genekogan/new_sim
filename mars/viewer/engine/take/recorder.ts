@@ -53,6 +53,7 @@ const FIELDS: [string, (e: Entity) => unknown][] = [
   ['level', (e) => e.human?.level],
   ['task', (e) => e.human?.task],
   ['grip', (e) => e.human?.grip],
+  ['carryContactV1', e => e.human?.carryContactV1],
   ['phase', (e) => e.phase],
   ['support', (e) => e.support],
   ['reservedBy', (e) => e.reservedBy],
@@ -213,12 +214,13 @@ export class TakeRecorder implements RuntimeObserver {
     const t = this.rt.tick - this.startTick;
     const ents = this.rt.world.entities;
     // entity-world fixtures/items (world-edit/1, lane L9) are drawn by the viewer's entity layer from the entity
-    // world's own diffs; the take carries only what the engine moves (bodies). Absent in every authored world.
+    // world's own diffs. Explicitly opted-in transport loads need recorded poses too,
+    // so the entity mesh and the gripping hands follow the same native clock.
     // S1 V7b: only those are sorted (by id, as the sorted id list was), from the tick's shared entity list.
     // S1 r2: found again from the last scan while the table holds the same objects under the same keys (stableIndices:
     // an entity's tags never change), so an idle world does not read ~4,500 entities' tags every tick (shared: read-only)
     const list = entityList(this.rt.world), keys = entityKeys(this.rt.world);
-    const dynamic = stableIndices(ents, 'take sample', list, keys, (e) => !e.tags?.includes('entity-world'), (idx) => idx.map((i) => keys[i]).sort()).derived;
+    const dynamic = stableIndices(ents, 'take sample', list, keys, (e) => !e.tags?.includes('entity-world') || !!e.tags?.includes('entity-world-transport'), (idx) => idx.map((i) => keys[i]).sort()).derived;
     for (const id of dynamic) {
       const e = ents[id];
       const s = quantize(e, t);

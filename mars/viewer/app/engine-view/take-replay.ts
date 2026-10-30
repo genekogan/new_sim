@@ -16,6 +16,7 @@ import type { CameraPose } from '../../engine/camera/shots.ts';
 import type { Vec3 } from '../../engine/core/math.ts';
 import type { Entity, WorldState } from '../../engine/world/types.ts';
 import type { SpatialScene } from '../../engine/spatial/types.ts';
+import {carryContactWeight, type CarryContact} from '../../engine/carry/contact.ts';
 import { def } from '../../engine/world/catalog.ts';
 import { progressiveContributor } from '../../engine/construction/contributor.ts';
 import {waterTransitions,type WaterTransition} from './water-transition.ts';
@@ -200,6 +201,9 @@ export class TakePeople {
   private indexWalks() {
     this.walks.clear();
     this.acts.clear();
+    const physics = this.take.finalState.entityPhysicsV1 as {assets?: Record<string, import('../../engine/world/catalog.ts').AssetDef>} | undefined;
+    const handling = Object.fromEntries(Object.entries(physics?.assets ?? {}).flatMap(([id, asset]) => asset.capabilities?.fixtureCarry ? [[id, asset.capabilities.fixtureCarry.handling]] : []));
+    this.humans.setFixtureHandling({...handling, ...this.take.fixtureCarryHandlingV1});
     for (const [tick, id, field, value] of this.take.changes) {
       if (field !== 'activity' && field !== 'baseActivity') continue;
       let a = this.acts.get(id);
@@ -349,7 +353,9 @@ export class TakePeople {
       const carriedRide = e.activity === 'ride' || e.activity === 'row';
       const speed = w && !carriedRide ? (this.walked(w, frame.tick + span) - this.walked(w, frame.tick - span)) / (2 * span * dt) : 0;
       const climbing = !!e.activity?.startsWith('climb');
-      const g = st.grip;
+      const contact = e.state.carryContactV1 as CarryContact | undefined;
+      const g = st.grip ?? (contact ? {entity:contact.item,slot:contact.slot} : undefined);
+      const carryWeight = contact ? carryContactWeight(contact, this.take.startTick + frame.tick, dt) : undefined;
       const walk = climbing ? 1 : clamp01((speed - 0.06) / 0.25);
       this.lastGait.set(id, { dist, walk });
       // prone receiver (mars-take/4, W32): the lying heading in integer mrad and the phase progress in integer % → rad, 0–1
@@ -360,12 +366,12 @@ export class TakePeople {
       const seatHeight=this.nativeBoat?.seatHeightFor(frame,id)??(typeof st.seatHeight==='number'&&Number.isFinite(st.seatHeight)?st.seatHeight:undefined);
       const publicSoulKey=(src.human as {soul?:unknown}|undefined)?.soul;
       const game=recordedGame(e.state.game);
-      people.push({ ...(body?.modelUrl?{bodyModel:admittedBodyUrl(body.modelUrl)??body.modelUrl}:body?.params&&typeof body.model==='string'?{bodyModel:body.model}:{}),...(typeof publicSoulKey==='string'?{publicSoulKey}:{}), ...(seatHeight!==undefined?{seatHeight}:{}), ...(shore.status==='recorded'?{shore:shore.contact}:{}), shoreTime:(this.take.startTick+t/this.take.dt)*this.take.dt,waterTransition:this.waterTransition(id,t), id, p: e.p, yaw: e.yaw, walk, walkDist: dist, activity: e.activity, grip: g?.entity, gripSlot: g?.slot, hands: e.hands, baseActivity: st.baseActivity ?? undefined, ...this.activityHistory(id, frame.tick), ...(typeof (st as {partner?: unknown}).partner==='string'?{partner:(st as {partner:string}).partner}:{}), ...(typeof st.prop==='string'?{prop:st.prop}:{}), ...(typeof e.state.instrument==='string'?{instrument:e.state.instrument}:{}),...(game?{game,gameTick:this.take.startTick+frame.tick,gameDt:this.take.dt}:{}),...(Number.isFinite(speed)?{speed:Math.abs(speed)}:{}), on: st.on ?? undefined, ...(proneYaw !== undefined ? { proneYaw } : {}), ...(phaseK !== undefined ? { phaseK } : {}), ...(st.sleepPose ? { sleepPose: recordedSleepPose(this.take,id,frame.tick,st.sleepPose) } : {}) });
+      people.push({ ...(body?.modelUrl?{bodyModel:admittedBodyUrl(body.modelUrl)??body.modelUrl}:body?.params&&typeof body.model==='string'?{bodyModel:body.model}:{}),...(typeof publicSoulKey==='string'?{publicSoulKey}:{}), ...(seatHeight!==undefined?{seatHeight}:{}), ...(shore.status==='recorded'?{shore:shore.contact}:{}), shoreTime:(this.take.startTick+t/this.take.dt)*this.take.dt,waterTransition:this.waterTransition(id,t), id, p: e.p, yaw: e.yaw, walk, walkDist: dist, activity: e.activity, grip: g?.entity, gripSlot: g?.slot, carryWeight, hands: e.hands, baseActivity: st.baseActivity ?? undefined, ...this.activityHistory(id, frame.tick), ...(typeof (st as {partner?: unknown}).partner==='string'?{partner:(st as {partner:string}).partner}:{}), ...(typeof st.prop==='string'?{prop:st.prop}:{}), ...(typeof e.state.instrument==='string'?{instrument:e.state.instrument}:{}),...(game?{game,gameTick:this.take.startTick+frame.tick,gameDt:this.take.dt}:{}),...(Number.isFinite(speed)?{speed:Math.abs(speed)}:{}), on: st.on ?? undefined, ...(proneYaw !== undefined ? { proneYaw } : {}), ...(phaseK !== undefined ? { phaseK } : {}), ...(st.sleepPose ? { sleepPose: recordedSleepPose(this.take,id,frame.tick,st.sleepPose) } : {}) });
     }
     this.stairs(comps);
     this.comps.onTick({ entities: comps });
     this.comps.render(1);
-    this.fixtures.onTick({ entities: fixtures });
+    this.fixtures.onTick({ entities: Object.fromEntries(Object.entries(fixtures).filter(([, e]) => !e.tags?.includes('entity-world'))) });
     this.fixtures.render(clock);
     this.humans.setStationBeat(stationBeat);
     this.humans.setFrame(people, clock, { ...comps, ...fixtures }); // seats / fires come from the fixtures

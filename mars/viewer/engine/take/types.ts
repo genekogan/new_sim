@@ -83,6 +83,9 @@ export type Take = {
   /** mars-take/4: every tracked entity as first recorded (tick of its first `present: true`), minus provenance / label /
    *  tags. The replay draws an entity from it when the final state no longer has it. Absent in older takes. */
   entities0?: Record<string, TakeEntity0>;
+  /** Display-only metadata on slim live chunks: grip geometry for recorded
+   * world transports, never the omitted multi-megabyte static physics. */
+  fixtureCarryHandlingV1?: Record<string, import('../world/catalog.ts').Handling>;
   /** mars-take/4: entities removed during the take and the tick (the `present: false` change), in tick order. */
   removed?: { id: string; t: number }[];
 };

@@ -325,6 +325,28 @@ export class WorldEntityLayer {
     if (yaw === undefined) this.overrideYaw.delete(e.id); else this.overrideYaw.set(e.id, yaw);
   }
 
+  private transported = new Set<string>();
+  /** The recorded native load owns its airborne pose, not the slower world-edit
+   * stream. Only active human grips and their settling loads are visited. */
+  transportPoses(entities: Record<string, {p: readonly number[]; yaw: number; state: Record<string, unknown>}>, bodies: readonly string[]) {
+    const held = new Set<string>();
+    for (const body of bodies) {
+      const grip = entities[body]?.state.grip as {entity?: string} | undefined;
+      const id = grip?.entity, e = id && this.model?.entities.get(id);
+      if (e && this.model?.resolvedDef(e.def)?.tags.includes('upright-carry')) { held.add(e.id); this.transported.add(e.id); }
+    }
+    for (const id of this.transported) {
+      const e = entities[id], d = this.drawn.get(id);
+      if (!e || !d) { this.transported.delete(id); this.overrides.delete(id); this.overrideYaw.delete(id); continue; }
+      const p = e.p;
+      if (!held.has(id) && d.to.p.distanceToSquared(new THREE.Vector3(p[0], p[1], p[2])) < .0001) {
+        this.transported.delete(id); this.overrides.delete(id); this.overrideYaw.delete(id); d.settled = false; continue;
+      }
+      const pose = this.overrides.get(id) ?? new THREE.Vector3();
+      pose.set(p[0], p[1], p[2]); this.overrides.set(id, pose); this.overrideYaw.set(id, e.yaw);
+    }
+  }
+
   update(dt: number, nowMs: number, baseGround?: THREE.Object3D) {
     this.now = nowMs;
     if (!this.active) return;
