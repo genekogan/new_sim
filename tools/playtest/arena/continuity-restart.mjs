@@ -63,12 +63,13 @@ export function baselineAutomaticRestartCapability(){return {arm:'existing-headl
  * group/member must be an identified descendant of this exact controller; the
  * caller attests the registered tool-group inventory is complete. */
 export function createManagedRestartObserver(config,{
- now=Date.now,readSnapshot=readManagedRestartSnapshot,inspectProcess=inspectRestartProcess,killProcess=process.kill,
+ now=Date.now,readSnapshot=readManagedRestartSnapshot,inspectProcess=inspectRestartProcess,killProcess=process.kill,preDispatch=null,
 }={}){
  const {actorId,setupId,journalPath,worldId,soulId,originalInstructionSha256,cutoffAt}=config;
  const minimumFutureWakeMs=config.minimumFutureWakeMs??20000,triggerMaxDelayMs=config.triggerMaxDelayMs??5000,recoveryMaxMs=config.recoveryMaxMs??25000;
+ if(preDispatch!==null&&typeof preDispatch!=='function')throw fault('INVALID_RESTART_REFRESH');
  if(!identifier(actorId)||!identifier(setupId)||typeof journalPath!=='string'||!identifier(worldId)||!identifier(soulId)||!hash(originalInstructionSha256)||!time(cutoffAt)||minimumFutureWakeMs!==20000||triggerMaxDelayMs!==5000||recoveryMaxMs!==25000)throw fault('INVALID_RESTART_CONTRACT');
- let state='watching',failure=null,ownership=null,before=null,triggerAt=null,deathAt=null,controllerExitAt=null,oldGroupsAbsentAt=null,readyAt=null,recoveryStartedAt=null,oldOwnership=null,after=null,dispatchAttempted=false;
+ let state='watching',failure=null,ownership=null,before=null,triggerAt=null,deathAt=null,controllerExitAt=null,oldGroupsAbsentAt=null,readyAt=null,recoveryStartedAt=null,oldOwnership=null,after=null,dispatchAttempted=false,preDispatchObservation=null;
  const signals=[],proofs=new Map(),lifecycle=[];
  const fail=(code,unknown=false)=>{failure??={code,at:now(),status:unknown?'unknown':'fail'};state=failure.status;};
  const scope=s=>s?.worldId===worldId&&s?.soulId===soulId&&s?.checkpoint?.initialInstructionSha256===originalInstructionSha256;
@@ -167,6 +168,15 @@ export function createManagedRestartObserver(config,{
      if(!ownership)return this.snapshot();
      if(!eligible(current)||!initialOwnerProved(current)||current.journalIdentity!==before.journalIdentity||current.controller.generation!==before.controller.generation||current.controller.ownerSha256!==before.controller.ownerSha256||current.checkpoint.threadId!==before.checkpoint.threadId||current.checkpoint.lastDecisionId!==before.checkpoint.lastDecisionId||current.checkpoint.wakeAt!==before.checkpoint.wakeAt)throw fault('RESTART_TRIGGER_CHANGED');
      validateOwnership(ownership,{initial:true});
+     // Cross-process evidence is sampled, never an atomic idle-at-signal lock.
+     // Drain the exact source after potentially slow ps calls, then reread the
+     // durable boundary. No model/controller cooperation is introduced.
+     const refresh=preDispatch?.();
+     if(failure)throw fault('RESTART_DISPATCH_REFRESH_UNKNOWN');
+     if(refresh&&typeof refresh.then==='function'||preDispatch&&(!refresh||!time(refresh.at)||refresh.at>now()||!evidence(refresh.evidence)))throw fault('RESTART_DISPATCH_REFRESH_UNKNOWN');
+     const latest=readSnapshot(journalPath);
+     preDispatchObservation={sampledAt:now(),hostTailRefreshedAt:refresh?.at??null,hostTail:refresh?.reader?{bytes:refresh.reader.bytes,lines:refresh.reader.lines,pendingBytes:refresh.reader.pendingBytes,missing:refresh.reader.missing}:null,evidence:refresh?.evidence??[],checkpointRevision:latest?.checkpoint?.revision??null,checkpointAt:latest?.checkpoint?.at??null,semantics:'Host tail and durable checkpoint sampled after process validation, immediately before dispatch checks; not atomic with SIGKILL or another process.'};
+     if(!eligible(latest)||!initialOwnerProved(latest)||latest.journalIdentity!==before.journalIdentity||latest.controller.generation!==before.controller.generation||latest.controller.ownerSha256!==before.controller.ownerSha256||latest.checkpoint.threadId!==before.checkpoint.threadId||latest.checkpoint.revision!==current.checkpoint.revision||latest.checkpoint.lastDecisionId!==before.checkpoint.lastDecisionId||latest.checkpoint.wakeAt!==before.checkpoint.wakeAt)throw fault('RESTART_TRIGGER_CHANGED');
      if(dispatchAttempted)throw fault('RESTART_ALREADY_DISPATCHED');dispatchAttempted=true;oldOwnership=structuredClone(ownership);
      // Kill run first: the unchanged launcher must see signal death, not the
      // explicit configuration failure that a lost host can otherwise provoke.
@@ -200,7 +210,7 @@ export function createManagedRestartObserver(config,{
    contract:{kind:'checkpoint-future-wake',minimumFutureWakeMs,triggerMaxDelayMs,recoveryMaxMs,cutoffAt,dispatcherRestarts:false,baselineAssistedResume:false},
    triggerAt,deathAt,controllerExitAt,oldGroupsAbsentAt,recoveryStartedAt,readyAt,recoveryLatencyMs:readyAt===null?null:readyAt-deathAt,
    timestampSemantics:{deathAt:'first successfully delivered destructive signal',controllerExitAt:'first observed exact old controller PID absence',oldGroupsAbsentAt:'first observed absence of all identified old writer groups',readyAt:'maximum source startup/session/running/receiver proof time and old-writer absence observation; never spawn time'},
-   triggerExercised:deathAt!==null,dispatchAttempted,signals:structuredClone(signals),before:before?structuredClone(before):null,after:after?structuredClone(after):null,
+   triggerExercised:deathAt!==null,dispatchAttempted,preDispatchObservation:structuredClone(preDispatchObservation),signals:structuredClone(signals),before:before?structuredClone(before):null,after:after?structuredClone(after):null,
    oldOwnership:oldOwnership?structuredClone(oldOwnership):null,lifecycle:structuredClone(lifecycle),
    threadResumed:readyAt===null?null:after.checkpoint.threadId===before.checkpoint.threadId,
    hostTurns:[...proofs].filter(([,p])=>p.lastTurn).map(([controllerPid,p])=>({controllerPid,activeTurn:p.activeTurn,lastTurn:structuredClone(p.lastTurn)})),

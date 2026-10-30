@@ -13,7 +13,7 @@ const row=(state,controllerPid,at,extra={})=>({state,actorId:'reader-b',worldId:
 function fixture(overrides={}){
  let time=100000,current={journalIdentity:sha('original-file'),worldId:'world-1',soulId:'s_reader',checkpoint:{revision:10,at:99000,threadId:'thread-1',pendingDecision:false,wakeAt:new Date(160000).toISOString(),lastCallType:'wait',lastDecisionId:'decision-1',initialInstructionSha256:sha('mission'),planSha256:sha('private plan')},controller:{generation:1,ownerSha256:sha('owner-1'),expiresAt:115000},operations:[],startupResponseId:'startup-1'};
  const launcher=identity(1000,999,900),controller=identity(1001,1000,900),host=identity(1100,1001,1100),tool=identity(1200,1100,1200);
- const processes=new Map([launcher,controller,host,tool].map(p=>[p.pid,p]));const calls=[];let sticky=false,inspectDelay=0,denied=false;
+ const processes=new Map([launcher,controller,host,tool].map(p=>[p.pid,p]));const calls=[];let sticky=false,inspectDelay=0,denied=false,refresh=null;
  const inspect=p=>{time+=inspectDelay;return processes.get(p)??null;};
  const kill=(target,signal)=>{
   calls.push({target,signal,at:time});const present=target>0?processes.has(target):[...processes.values()].some(p=>p.pgid===-target);
@@ -26,7 +26,7 @@ function fixture(overrides={}){
  };
  const ownership={actorId:'reader-b',setupId:'setup-1',worldId:'world-1',soulId:'s_reader',descendantsComplete:true,evidence:['owned-spawn-registry:1'],launcher:structuredClone(launcher),controller:structuredClone(controller),groups:[{pgid:1100,members:[structuredClone(host)]},{pgid:1200,members:[structuredClone(tool)]}]};
  const config={actorId:'reader-b',setupId:'setup-1',journalPath:'/synthetic/continuity.sqlite',worldId:'world-1',soulId:'s_reader',originalInstructionSha256:sha('mission'),cutoffAt:200000,...overrides};
- const observer=createManagedRestartObserver(config,{now:()=>time,readSnapshot:()=>structuredClone(current),inspectProcess:inspect,killProcess:kill});
+ const observer=createManagedRestartObserver(config,{now:()=>time,readSnapshot:()=>structuredClone(current),inspectProcess:inspect,killProcess:kill,preDispatch:()=>refresh?refresh():{at:time,evidence:['synthetic-host-tail:1']}});
  const arm=()=>{
   observer.registerOwnership(ownership);
   observer.observeLifecycle(row('session-created',1001,98000,{threadId:'thread-1',hostPid:1100,resumed:false}));
@@ -45,7 +45,7 @@ function fixture(overrides={}){
   observer.observeLifecycle(row('receiver-ready',2001,103000,{source:'world',successful:true}));
   if(!omitOwner)observer.observeLifecycle(row('receiver-ready',2001,103500,{source:'owner',successful:true}));
  };
- return {observer,arm,recover,calls,ownership,processes,get current(){return current;},set current(v){current=v;},setTime:n=>{time=n;},setSticky:value=>{sticky=value;},setInspectDelay:n=>{inspectDelay=n;},setDenied:value=>{denied=value;}};
+ return {observer,arm,recover,calls,ownership,processes,get current(){return current;},set current(v){current=v;},setTime:n=>{time=n;},setSticky:value=>{sticky=value;},setInspectDelay:n=>{inspectDelay=n;},setDenied:value=>{denied=value;},setPreDispatch:value=>{refresh=value;}};
 }
 
 test('wait trigger kills exact controller then identified host/tool groups once; launcher survives',()=>{
@@ -141,4 +141,24 @@ test('read-only journal snapshot is bounded, scoped and hashes private intent wi
  const bytes=readFileSync(path),before=lstatSync(path);const result=readManagedRestartSnapshot(path);const after=lstatSync(path);
  assert.equal(result.worldId,'world-1');assert.equal(result.checkpoint.initialInstructionSha256,sha('SECRET_PRIVATE_MISSION'));assert(!JSON.stringify(result).includes('SECRET_PRIVATE'));assert.equal(after.ino,before.ino);assert.deepEqual(readFileSync(path),bytes);
  const check=new DatabaseSync(path,{readOnly:true});assert.equal(check.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE type='table'").get().n,5);check.close();
+});
+
+
+test('pre-dispatch refresh after process validation rejects a newly active host turn',()=>{
+ const f=fixture();f.arm();f.setPreDispatch(()=>{f.observer.observeLifecycle(row('turn-started',1001,100000,{turnId:'urgent-new-turn'}));return {at:100000,evidence:['host-tail:99']};});
+ const result=f.observer.tick();assert.equal(result.failure.code,'RESTART_TRIGGER_CHANGED');assert.equal(result.triggerExercised,false);assert.equal(result.dispatchAttempted,false);assert.equal(f.calls.some(c=>c.signal==='SIGKILL'),false);assert.match(result.preDispatchObservation.semantics,/not atomic/);
+});
+test('fresh checkpoint changes and malformed/asynchronous refresh cannot dispatch a stale wait',()=>{
+ for(const mode of ['checkpoint','async','bad-host-proof']){
+  const f=fixture();f.arm();f.setPreDispatch(()=>{
+   if(mode==='async')return Promise.resolve({at:100000,evidence:['host-tail:99']});
+   if(mode==='checkpoint')f.current={...f.current,checkpoint:{...f.current.checkpoint,revision:11,lastDecisionId:'new-decision'}};
+   else f.observer.observeLifecycle(row('turn-completed',1001,100000,{turnId:'unobserved-start'}));
+   return {at:100000,evidence:['host-tail:99']};
+  });
+  const result=f.observer.tick();assert.equal(result.triggerExercised,false);assert.equal(result.dispatchAttempted,false);assert.equal(f.calls.some(c=>c.signal==='SIGKILL'),false);
+ }
+});
+test('successful dispatch records the refreshed sampled boundary without an atomic-idle claim',()=>{
+ const f=fixture();f.arm();f.observer.tick();const sample=f.observer.snapshot().preDispatchObservation;assert.equal(sample.sampledAt,100000);assert.equal(sample.hostTailRefreshedAt,100000);assert.equal(sample.checkpointRevision,10);assert.deepEqual(sample.evidence,['synthetic-host-tail:1']);assert.match(sample.semantics,/not atomic/);
 });

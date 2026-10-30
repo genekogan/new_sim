@@ -63,7 +63,15 @@ export function verifyRestartTermination(controller,proof,killProcess=process.ki
  const expected=restartOwnership(controller.restartOwnership),actual=restartOwnership(owned);
  if(!expected||!actual||expected.binding!==actual.binding||proof.actor!==owned.actorId||proof.setupId!==owned.setupId||proof.worldId!==owned.worldId||proof.soulId!==owned.soulId)return false;
  const {groups,members}=actual;
- if(![...(controller.hostPids??[])].every(p=>groups.has(p)))return false;
+ if(controller.restartClosedHosts!==undefined&&(!Array.isArray(controller.restartClosedHosts)||controller.restartClosedHosts.length>16)||controller.closedHosts!==undefined&&!Array.isArray(controller.closedHosts))return false;
+ const closedHosts=new Map();
+ for(const host of controller.restartClosedHosts??[]){
+  const closedAt=typeof host?.at==='string'?Date.parse(host.at):host?.at,original=(controller.closedHosts??[]).find(h=>h.state==='host-closed'&&h.controllerPid===controller.pid&&h.hostPid===host?.hostPid&&h.threadId===host.threadId&&h.groupClosed===true&&h.groupVerification==='absent'&&h.at===host.at&&evidence(h.evidence)&&h.evidence.every(p=>host.evidence?.includes(p)));
+  if(!original)return false;
+  if(!at(closedAt)||closedAt>proof.deathAt||!processId(host?.hostPid)||closedHosts.has(host.hostPid)||groups.has(host.hostPid)||host.groupClosed!==true||host.groupVerification!=='absent'||!evidence(host.evidence)||!processIdentity(host.identity)||host.identity.pid!==host.hostPid||host.identity.pgid!==host.hostPid||host.identity.ppid!==controller.pid)return false;
+  if(!absentProcess(host.hostPid,killProcess)||!absentProcess(-host.hostPid,killProcess))return false;closedHosts.set(host.hostPid,host);
+ }
+ if(![...(controller.hostPids??[])].every(p=>groups.has(p)||closedHosts.has(p)))return false;
  for(const target of [...members.keys(),...[...groups].map(p=>-p)])if(!absentProcess(target,killProcess))return false;
  return true;
 }

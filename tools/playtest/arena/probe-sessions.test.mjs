@@ -144,3 +144,13 @@ test('external ownership must be a bounded complete ancestry graph even when exp
  }
  const {controller,proof,input}=restartFixture();proof.oldOwnership.groups[0].members.reverse();assert.equal(verifyOwnedProbeExit(input,absent),true,'inventory ordering is not process identity');assert.equal(controller.closed,null);
 });
+
+test('prior closed hosts need original source certificate, birth binding and fresh PID/group absence',()=>{
+ const {controller,input}=restartFixture(),closed={state:'host-closed',controllerPid:111,hostPid:333,threadId:'thread-old',groupClosed:true,groupVerification:'absent',at:90,evidence:['controller.ndjson:4']};
+ controller.hostPids.add(333);controller.closedHosts=[closed];controller.restartClosedHosts=[{...closed,identity:{pid:333,ppid:111,pgid:333,startToken:'birth-old-host'}}];
+ assert.equal(verifyOwnedProbeExit(input,absent),true);assert.equal(controller.closed,null);
+ for(const target of [333,-333])assert.equal(verifyOwnedProbeExit(input,pid=>pid===target?undefined:absent()),false);
+ for(const mutate of [c=>c.closedHosts=[],c=>c.restartClosedHosts={},c=>c.closedHosts={},c=>c.restartClosedHosts[0].evidence=[],c=>c.restartClosedHosts[0].identity.ppid=999,c=>c.restartClosedHosts[0].groupClosed=false,c=>c.restartClosedHosts[0].at=101]){
+  const copy=structuredClone(input);mutate(copy.controllers[0]);assert.equal(verifyOwnedProbeExit(copy,absent),false);
+ }
+});

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {EventEmitter} from 'node:events';
+import {createHash} from 'node:crypto';
 import {PassThrough} from 'node:stream';
 import {mkdtempSync,mkdirSync,readFileSync,writeFileSync,appendFileSync,statSync,symlinkSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
@@ -251,4 +252,132 @@ test('original cutoff cannot overwrite a prior guard stop while an observation d
  let count=0;f.deps.createWorld=()=>({async read(){if(++count>2)await f.clock.sleep(3000);return {here:{me:{pos:[0,0]}}};}});
  const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(3000);const result=await pending;
  assert.equal(result.endReason,'usage-guard');assert.equal(result.failureCode,'USAGE_LIMIT_REACHED');assert.equal(result.usageGuard.trigger.at,101000);assert(f.calls.every(c=>c.signal.aborted));
+});
+
+// Even an apparently clean final close cannot disambiguate two launches that
+// reused one PID. Keep their evidence and refuse automatic archival.
+test('managed adapter preserves duplicate launch ambiguity instead of collapsing cleanup identity',async t=>{
+ const f=fixture(t),directory=join(f.root,'reused-pid');mkdirSync(directory);
+ const child=new EventEmitter();child.pid=521;child.stdout=new PassThrough();child.stderr=new PassThrough();child.kill=()=>true;
+ const pending=runManagedTrialActor({folder:'/paired/current',directory,text:'mission',model:'declared-model',effort:'low',remainingSeconds:10,name:'Readable trial',signal:new AbortController().signal},{spawnProcess:()=>child});
+ for(const row of [{state:'controller-started',pid:522},{state:'controller-started',pid:522},{state:'controller-closed',controllerPid:522,ownedProcessesExited:true,ownedHosts:[]}])child.stdout.write(JSON.stringify(row)+'\n');
+ child.emit('exit',0,null);child.emit('close',0,null);const result=await pending;
+ assert.equal(result.controllers[0].identityAmbiguous,true);
+ assert.equal(verifyOwnedProbeExit(result,()=>{throw Object.assign(Error(),{code:'ESRCH'});}),false);
+});
+
+
+test('restart scope and runId are explicit prospective configuration',t=>{
+ const f=fixture(t),restart={actorId:'a',setupId:'declared-setup'};
+ assert.doesNotThrow(()=>validateContinuityTrial({...f.config,restart,runId:'explicit-run'}));
+ for(const change of [{restart:null},{restart:{...restart,actorId:'missing'}},{restart:{...restart,minimumFutureWakeMs:1}},{restart:{...restart,setupId:''}},{runId:''},{runId:'x'.repeat(101)},{restart,seconds:3.00001}])assert.throws(()=>validateContinuityTrial({...f.config,...change}));
+});
+
+test('baseline restart declaration records unsupported/unexercised without another launch or assistance',async t=>{
+ const f=fixture(t,{restart:{actorId:'a',setupId:'declared-setup'},runId:'explicit-run'});
+ f.deps.restart={killProcess(){assert.fail('baseline never dispatches a death');},inspectProcess(){assert.fail('baseline never inventories managed ownership');}};
+ const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(3000);const result=await pending;
+ assert.equal(f.calls.length,2);assert.equal(result.coverage.restart,'unsupported');assert.equal(result.restart.supported,false);assert.equal(result.restart.triggerExercised,false);assert.equal(result.restart.assistedResume,false);assert.equal(result.failureCode,null);
+ const manifest=JSON.parse(readFileSync(join(f.config.directory,'run.json'),'utf8'));assert.equal(manifest.runId,'explicit-run');assert.equal(manifest.restartCoverage.minimumFutureWakeMs,20000);assert.equal(manifest.restartCoverage.recoveryMaxMs,25000);assert.equal(manifest.restartCoverage.triggerMaxDelayMs,5000);
+ assert.equal(JSON.parse(readFileSync(join(f.config.directory,'restart-proof.json'),'utf8')).triggerExercised,false);
+});
+
+function managedRestartFixture(t,{eligible=true,omitOwner=false,missingEvidence=false,unknownInventory=false,slowObservation=false,missingLaterClose=false,wrongEvidenceScope=false,priorHostRestart=false,priorHostUnverified=false,reusedHostPid=false,turnDuringInspection=false,...overrides}={}){
+ const f=fixture(t,{arm:CONTINUITY_ARMS[1],seconds:40,actors:[{id:'a',folder:'/synthetic/a',instruction:'Retain original strategic task'}],restart:{actorId:'a',setupId:'frozen-setup'},...overrides});
+ const sha=s=>createHash('sha256').update(s).digest('hex'),processes=new Map(),signals=[];let current,child,args,activeController=1001,activeHost=1100,controllerInspections=0;
+ const identity=(pid,ppid,pgid)=>({pid,ppid,pgid,startToken:'birth-'+pid});
+ const add=(controller,host)=>{for(const p of [identity(controller,1000,900),identity(host,controller,host),identity(host+1,host,host)])processes.set(p.pid,p);};
+ processes.set(1000,identity(1000,999,900));add(1001,1100);
+ const emit=s=>child.stdout.write(JSON.stringify({at:f.clock.now(),worldId:'fresh-world',soulId:'s_a',...s})+'\n');
+ const startup=(controller,host,resumed=false,sameController=false)=>{
+  if(!sameController)emit({state:'controller-started',pid:controller});emit({state:'host-started',controllerPid:controller,hostPid:host});emit({state:'session-created',controllerPid:controller,hostPid:host,threadId:'thread-a',resumed});
+  emit({state:'startup-reconciled',controllerPid:controller,generation:current.controller.generation,checkpointRevision:current.checkpoint.revision,threadId:'thread-a',initialInstructionSha256:sha(args.text),wakeAt:resumed?current.checkpoint.wakeAt:null,pendingDecision:false,unreconciledOperations:0,startupResponseId:current.startupResponseId});
+  emit({state:'running',controllerPid:controller,threadId:'thread-a'});emit({state:'receiver-ready',controllerPid:controller,source:'world',successful:true});if(!resumed||!omitOwner)emit({state:'receiver-ready',controllerPid:controller,source:'owner',successful:true});
+ };
+ const kill=(target,signal)=>{
+  const found=target>0?processes.has(target):[...processes.values()].some(p=>p.pgid===-target);
+  if(!found)throw Object.assign(Error('absent'),{code:'ESRCH'});
+  if(signal===0)return;
+  signals.push({target,signal,at:f.clock.now()});assert.equal(signal,'SIGKILL');
+  if(target>0){processes.delete(target);for(const p of processes.values())if(p.ppid===target)p.ppid=1;
+   f.clock.schedule(()=>{activeController=2001;activeHost=2100;add(activeController,activeHost);current={...current,checkpoint:{...current.checkpoint,revision:current.checkpoint.revision+1,at:f.clock.now()},controller:{generation:current.controller.generation+1,ownerSha256:sha('owner-'+(current.controller.generation+1)),expiresAt:f.clock.now()+15000},startupResponseId:'startup-'+(current.controller.generation+1)};startup(activeController,activeHost,true);},1000);
+  }else for(const [id,p]of processes)if(p.pgid===-target)processes.delete(id);
+ };
+ f.deps.restart={inspectProcess:pid=>{if(turnDuringInspection&&pid===1001&&++controllerInspections===3)appendFileSync(join(args.directory,'agent-evidence.jsonl'),JSON.stringify({kind:'host-event',method:'turn/started',controllerPid:1001,hostPid:activeHost,worldId:'fresh-world',soulId:'s_a',threadId:'thread-a',turnId:'urgent-new-turn',at:f.clock.now()})+'\n');return processes.has(pid)?structuredClone(processes.get(pid)):null;},inspectGroup:pgid=>{if(unknownInventory)throw Object.assign(Error('unknown'),{code:'RESTART_GROUP_INSPECTION_UNKNOWN'});return [...processes.values()].filter(p=>p.pgid===pgid).map(p=>structuredClone(p));},readSnapshot:()=>structuredClone(current),killProcess:kill};
+ f.deps.verifyCandidate=result=>verifyOwnedProbeExit(result,kill);
+ f.deps.launchCandidate=call=>{
+  args=call;f.calls.push(call);child=new EventEmitter();child.pid=1000;child.stdout=new PassThrough();child.stderr=new PassThrough();child.kill=signal=>{assert.equal(signal,'SIGTERM');for(const [id,p]of processes)if(id===1000||id===activeController||p.pgid===activeHost)processes.delete(id);if(!missingLaterClose)emit({state:'controller-closed',controllerPid:activeController,ownedProcessesExited:true,ownedHosts:[{hostPid:activeHost,threadId:'thread-a',groupClosed:true,groupVerification:'absent'}]});child.emit('exit',0,null);child.emit('close',0,null);return true;};
+  current={journalIdentity:sha('same-journal'),worldId:'fresh-world',soulId:'s_a',checkpoint:{revision:1,at:f.clock.now(),threadId:'thread-a',pendingDecision:false,wakeAt:new Date(f.clock.now()+(eligible?60000:10000)).toISOString(),lastCallType:'wait',lastDecisionId:'decision-1',initialInstructionSha256:sha(call.text),planSha256:sha('private plan')},controller:{generation:1,ownerSha256:sha('owner-1'),expiresAt:f.clock.now()+15000},operations:[],startupResponseId:'startup-1'};
+  const result=runManagedTrialActor(call,{spawnProcess:()=>child,termGraceMs:2,drainMs:2});
+  startup(activeController,activeHost);
+  if(priorHostRestart){
+   emit({state:'host-closed',controllerPid:activeController,hostPid:activeHost,threadId:'thread-a',groupClosed:!priorHostUnverified,groupVerification:priorHostUnverified?'unverified':'absent'});
+   for(const [id,p]of processes)if(p.pgid===activeHost)processes.delete(id);
+   activeHost=reusedHostPid?activeHost:1200;add(activeController,activeHost);
+   current={...current,checkpoint:{...current.checkpoint,revision:2},controller:{generation:2,ownerSha256:sha('host-restart-owner'),expiresAt:f.clock.now()+15000},startupResponseId:'startup-host-restart'};
+   startup(activeController,activeHost,true,true);
+  }
+  if(!missingEvidence)writeFileSync(join(call.directory,'agent-evidence.jsonl'),['turn/started','turn/completed'].map((method,i)=>JSON.stringify({kind:'host-event',method,controllerPid:1001,hostPid:activeHost,worldId:wrongEvidenceScope?'foreign-world':'fresh-world',soulId:'s_a',threadId:'thread-a',turnId:'turn-1',at:f.clock.now(),status:i?'completed':null})+'\n').join(''),{mode:0o600});
+  return result;
+ };
+ if(slowObservation){let reads=0;f.deps.createWorld=()=>({async read(command,params,signal){if(++reads>1)await new Promise(resolve=>signal.addEventListener('abort',resolve,{once:true}));return {here:{tick:reads,me:{pos:[0,0],actualActivity:null}}};}});}
+ return {...f,signals,processes};
+}
+
+test('managed restart wires actual lifecycle, bounded evidence tail, exact ownership and original cutoff',async t=>{
+ const f=managedRestartFixture(t,{slowObservation:true});const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(2000);
+ assert.deepEqual(f.signals.map(s=>s.target),[1001,-1100]);assert(f.processes.has(1000),'observer never kills the launcher');
+ await f.clock.tick(38000);const result=await pending;
+ assert.equal(result.cutoffAt,140000);assert.equal(result.endedAt,140000);assert.equal(result.qualification,'not assessed');assert.equal(result.restart.state,'ready');assert.equal(result.restart.integration.status,'ready');assert.equal(result.restart.readyAt,102000);assert.equal(result.restart.deathAt,101000);assert.equal(result.restart.threadResumed,true);assert.equal(result.actors[0].cleanupVerified,true);
+ assert.equal(f.calls.length,1,'only the existing launcher performs the automatic recovery');assert.equal(result.restart.contract.cutoffAt,result.cutoffAt);assert.equal(f.signals.length,2,'once-only dispatch even during a blocked passive read');
+ const actor=JSON.parse(readFileSync(join(f.config.directory,'a','actor-result.json'),'utf8'));assert.equal(actor.controllers[0].closed,null);assert.equal(actor.controllers[0].restartOwnership.controller.startToken,'birth-1001');assert.equal(actor.controllers[1].closed.controllerPid,2001);assert.equal(actor.restartProofs.length,1);
+ const raw=readFileSync(join(f.config.directory,'a','restart-proof.json'),'utf8');assert(!raw.includes('private plan'));assert(!raw.includes('Retain original strategic task'));assert(result.restart.hostTurns[0].lastTurn.evidence[0].includes('agent-evidence.jsonl:2'));assert.equal(statSync(join(f.config.directory,'a','restart-proof.json')).mode&0o777,0o600);
+});
+
+test('managed no-eligible-wait run remains unexercised without manufactured death or wake',async t=>{
+ const f=managedRestartFixture(t,{eligible:false});const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(40000);const result=await pending;
+ assert.deepEqual(f.signals,[]);assert.equal(result.restart.state,'unexercised');assert.equal(result.restart.triggerExercised,false);assert.equal(result.restart.integration.status,'unexercised');assert.equal(result.actors[0].cleanupVerified,true);assert.equal(f.calls.length,1);
+});
+
+for(const missing of ['owner readiness','host evidence','process inventory'])test('managed restart preserves explicit missing/unknown evidence: '+missing,async t=>{
+ const f=managedRestartFixture(t,{omitOwner:missing==='owner readiness',missingEvidence:missing==='host evidence',unknownInventory:missing==='process inventory'});
+ const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(40000);const result=await pending;
+ assert.equal(result.endReason,'cutoff');assert.equal(result.endedAt,140000);assert.equal(result.qualification,'not assessed');assert.equal(result.actors[0].cleanupVerified,true);
+ if(missing==='owner readiness'){assert.equal(result.restart.state,'fail');assert.equal(result.restart.failure.code,'RESTART_RECOVERY_TIMEOUT');assert.equal(result.restart.readyAt,null);assert.equal(f.signals.length,2);}
+ else {assert.equal(result.restart.integration.status,'unknown');assert(result.restart.integration.failureCode);assert.deepEqual(f.signals,[]);}
+});
+
+
+test('restart eligibility never shifts the cutoff for a late release',async t=>{
+ const f=managedRestartFixture(t,{actors:[{id:'a',folder:'/synthetic/a',instruction:'Retain original strategic task',releaseOffsetSec:20}]});
+ const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(40000);const result=await pending;
+ assert.equal(result.actors[0].releasedAt,120000);assert.equal(result.cutoffAt,140000);assert.equal(result.restart.contract.cutoffAt,140000);assert.equal(result.restart.state,'unexercised');assert.deepEqual(f.signals,[]);assert.equal(f.calls[0].remainingSeconds,20);
+});
+
+test('restart cannot credit host turns from another native world',async t=>{
+ const f=managedRestartFixture(t,{wrongEvidenceScope:true});const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(40000);const result=await pending;
+ assert.equal(result.restart.integration.status,'unknown');assert.equal(result.restart.integration.failureCode,'RESTART_HOST_TURN_UNKNOWN');assert.deepEqual(f.signals,[]);
+});
+
+test('intentional old-controller proof never fabricates replacement-controller normal closure',async t=>{
+ const f=managedRestartFixture(t,{missingLaterClose:true});const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(40000);const result=await pending;
+ assert.equal(result.restart.state,'ready');assert.equal(result.actors[0].cleanupVerified,false);assert.equal(result.failureCode,'OWNED_CLEANUP_UNVERIFIED');assert.equal(f.lifecycle.filter(e=>e[0]==='complete').length,0);
+});
+
+
+test('closed prior host before first poll does not close its controller or poison later dispatch/cleanup',async t=>{
+ const f=managedRestartFixture(t,{priorHostRestart:true});const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(40000);const result=await pending;
+ assert.deepEqual(f.signals.map(s=>s.target),[1001,-1200]);assert.equal(result.restart.state,'ready');assert.equal(result.actors[0].cleanupVerified,true);
+ const actor=JSON.parse(readFileSync(join(f.config.directory,'a','actor-result.json'),'utf8')),old=actor.controllers[0];
+ assert.deepEqual(old.hostPids,[1100,1200]);assert.equal(old.closed,null);assert.equal(old.closedHosts[0].hostPid,1100);assert.deepEqual(old.restartOwnership.groups.map(g=>g.pgid),[1200]);assert.equal(old.restartClosedHosts[0].hostPid,1100);assert.ok(old.restartClosedHosts[0].evidence.every(s=>s.includes('controller.ndjson:')));
+});
+for(const variation of [{priorHostUnverified:true},{reusedHostPid:true}])test('prior host lifecycle ambiguity remains unknown without dispatch: '+JSON.stringify(variation),async t=>{
+ const f=managedRestartFixture(t,{priorHostRestart:true,...variation});const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(40000);const result=await pending;
+ assert.equal(result.restart.integration.status,'unknown');assert.deepEqual(f.signals,[]);
+});
+
+
+test('fresh host-tail read after ps validation blocks dispatch when an urgent decision starts during inspection',async t=>{
+ const f=managedRestartFixture(t,{turnDuringInspection:true});const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(40000);const result=await pending;
+ assert.deepEqual(f.signals,[]);assert.equal(result.restart.state,'unknown');assert.equal(result.restart.failure.code,'RESTART_TRIGGER_CHANGED');assert.equal(result.restart.dispatchAttempted,false);assert.equal(result.restart.preDispatchObservation.hostTail.lines,3);assert.match(result.restart.preDispatchObservation.semantics,/not atomic/);assert.equal(result.actors[0].cleanupVerified,true);
 });

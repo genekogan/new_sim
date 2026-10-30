@@ -1,18 +1,19 @@
 #!/usr/bin/env node
 // Common mechanical trial lifetime. This is not a scorer or a qualification
 // certificate. No continuation prompts, world writes, or cross-Soul relay.
-import {spawn} from 'node:child_process';
+import {spawn,execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {StringDecoder} from 'node:string_decoder';
 import {mkdirSync,readFileSync,writeFileSync,appendFileSync,lstatSync,renameSync} from 'node:fs';
-import {resolve,join} from 'node:path';
+import {resolve,join,basename} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createWorldClient} from '../../soul-runtime/world-client.mjs';
 import {abortableSleep} from '../../soul-runtime/receiver.mjs';
 import {probeSessions,verifyOwnedProbeExit} from './probe-sessions.mjs';
 import {runContinuityBaseline} from './adapters/continuity-baseline.mjs';
 import {buildArgs} from './adapters/codex-headless.mjs';
-import {createContinuityUsageGuard,validateUsageLimits} from './continuity-usage.mjs';
+import {createContinuityUsageGuard,validateUsageLimits,createUsageTail} from './continuity-usage.mjs';
+import {createManagedRestartObserver,inspectRestartProcess,baselineAutomaticRestartCapability} from './continuity-restart.mjs';
 
 export const CONTINUITY_ARMS=['existing-headless-seat','managed-continuity-runtime'];
 export const R400_ARTIFACTS=Object.freeze({
@@ -34,6 +35,8 @@ export function validateContinuityTrial(config){
  if(config.meetingOffsetSec!==undefined&&(!Number.isFinite(config.meetingOffsetSec)||config.meetingOffsetSec<0||config.meetingOffsetSec>=seconds))throw fault('INVALID_MEETING_OFFSET');
  if(purpose==='soak'&&config.usageGuard===undefined)throw fault('SOAK_USAGE_GUARD_REQUIRED');
  if(config.usageGuard!==undefined)validateUsageLimits(config.usageGuard);
+ if(config.runId!==undefined&&!identifier(config.runId))throw fault('INVALID_RUN_ID');
+ if(config.restart!==undefined&&(!config.restart||Object.keys(config.restart).sort().join(',')!=='actorId,setupId'||!identifier(config.restart.actorId)||!identifier(config.restart.setupId)||!identifier(worldId)||!Number.isSafeInteger(seconds*1000)||!actors.some(a=>a?.id===config.restart.actorId)))throw fault('INVALID_RESTART_CONFIG');
  if(config.cliVersion!==undefined&&config.cliVersion!==null&&!label(config.cliVersion))throw fault('INVALID_CLI_VERSION');
  const ids=new Set();
  for(const actor of [...actors,...fixtureActors]){
@@ -101,7 +104,7 @@ export async function runManagedTrialActor({folder,directory,text,model,effort,r
  const args=[script,'--folder',folder,'--state',state,'--instruction',instruction,'--model',model,'--effort',effort,'--session-name',name,'--evidence',join(directory,'agent-evidence.jsonl'),'--seconds',String(localSeconds)];
  writeFileSync(join(directory,'controller.ndjson'),'',{flag:'wx',mode:0o600});
  const child=spawnProcess(process.execPath,args,{stdio:['ignore','pipe','pipe']});
- const controllers=new Map(),decoder=new StringDecoder('utf8');let exit=null,buffer='',failureCode=null,killTimer,drainTimer,shutdownTimer,leaderExited=false,stopping=false,pipeDrainTimedOut=false,finished=false,resolveDone,stderrBytes=0,stdoutBytes=0;
+ const controllers=new Map(),decoder=new StringDecoder('utf8');let sourceLine=0,exit=null,buffer='',failureCode=null,killTimer,drainTimer,shutdownTimer,leaderExited=false,stopping=false,pipeDrainTimedOut=false,finished=false,resolveDone,stderrBytes=0,stdoutBytes=0;
  const done=()=>{if(finished)return;finished=true;resolveDone();};
  const forceDrain=()=>{
   if(finished)return;
@@ -115,10 +118,10 @@ export async function runManagedTrialActor({folder,directory,text,model,effort,r
   if(!leaderExited){child.kill('SIGTERM');killTimer=setTimeout(()=>{if(!leaderExited)child.kill('SIGKILL');},termGraceMs);}
   shutdownTimer=setTimeout(forceDrain,termGraceMs+drainMs);
  };
- const emit=s=>{
+ const emit=(s,source)=>{
   const pid=s.state==='controller-started'?s.pid:s.controllerPid;
-  if(Number.isInteger(pid)&&pid>0){const c=controllers.get(pid)??{pid,started:false,hostPids:new Set(),closed:null};controllers.set(pid,c);if(s.state==='controller-started')c.started=true;if(Number.isInteger(s.hostPid)&&s.hostPid>0)c.hostPids.add(s.hostPid);if(s.state==='controller-closed')c.closed=s;}
-  onState({...s,...(s.threadId?{cwd:join(state,'host')}:{})});
+  if(Number.isInteger(pid)&&pid>0){const c=controllers.get(pid)??{pid,started:false,hostPids:new Set(),closed:null,closedHosts:[]};controllers.set(pid,c);if(s.state==='controller-started'){if(c.started)c.identityAmbiguous=true;c.started=true;}if(Number.isInteger(s.hostPid)&&s.hostPid>0)c.hostPids.add(s.hostPid);if(s.state==='controller-closed')c.closed=s;if(s.state==='host-closed')c.closedHosts.push({...s,evidence:[source]});}
+  onState({...s,...(s.threadId?{cwd:join(state,'host')}:{ }),evidence:[source]});
   if(s.state==='controller-closed')for(const host of s.ownedHosts??[])if(host.threadId)onState({state:'session-recovered',threadId:host.threadId,cwd:join(state,'host')});
  };
  const completed=new Promise(resolve=>{
@@ -132,14 +135,114 @@ export async function runManagedTrialActor({folder,directory,text,model,effort,r
   try{
    stdoutBytes+=chunk.length;if(stdoutBytes>64*1024*1024)throw fault('CONTROLLER_OUTPUT_LIMIT');
    buffer+=decoder.write(chunk);if(Buffer.byteLength(buffer)>1024*1024)throw fault('CONTROLLER_LINE_LIMIT');
-   let at;while((at=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,at);buffer=buffer.slice(at+1);let state;try{state=JSON.parse(line);}catch{continue;}appendFileSync(join(directory,'controller.ndjson'),JSON.stringify(state)+'\n');emit(state);}
+   let at;while((at=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,at);buffer=buffer.slice(at+1);let state;try{state=JSON.parse(line);}catch{continue;}appendFileSync(join(directory,'controller.ndjson'),JSON.stringify(state)+'\n');emit(state,`${basename(directory)}/controller.ndjson:${++sourceLine}`);}
   }catch(error){failureCode=code(error);terminate();}
  });
  // Unstructured stderr may contain host configuration. Retain counts only.
  child.stderr.on('data',chunk=>{stderrBytes=Math.min(Number.MAX_SAFE_INTEGER,stderrBytes+chunk.length);});
  signal.addEventListener('abort',terminate,{once:true});if(signal.aborted)terminate();
- try{await completed;}finally{clearTimeout(killTimer);clearTimeout(drainTimer);clearTimeout(shutdownTimer);signal.removeEventListener('abort',terminate);}
- return {kind:'managed-continuity-runtime',exit,failureCode,stderrBytes,stdoutBytes,pipeDrainTimedOut,evidenceComplete:!pipeDrainTimedOut,localSeconds,controllers:[...controllers.values()],endedAt:Date.now(),modelRequested:model,effortRequested:effort,actualModel:null,actualEffort:null,registrationOrdering:'emitted-before-child-name-rpc; parent-receipt registration is not synchronous durability'};
+ try{
+  const creation={state:'launcher-spawned',launcherPid:child.pid,at:Date.now()};appendFileSync(join(directory,'controller.ndjson'),JSON.stringify(creation)+'\n');emit(creation,`${basename(directory)}/controller.ndjson:${++sourceLine}`);
+  await completed;
+ }catch(error){failureCode??=code(error);terminate();await completed;}finally{clearTimeout(killTimer);clearTimeout(drainTimer);clearTimeout(shutdownTimer);signal.removeEventListener('abort',terminate);}
+ return {kind:'managed-continuity-runtime',launcherPid:child.pid,exit,failureCode,stderrBytes,stdoutBytes,pipeDrainTimedOut,evidenceComplete:!pipeDrainTimedOut,localSeconds,controllers:[...controllers.values()],endedAt:Date.now(),modelRequested:model,effortRequested:effort,actualModel:null,actualEffort:null,registrationOrdering:'emitted-before-child-name-rpc; parent-receipt registration is not synchronous durability'};
+}
+
+
+/** Inventory only a registered detached host group. No argv/environment or
+ * whole-machine census. Independent tool groups are disabled by HOST_CONFIG. */
+export function inspectTrialHostGroup(pgid){
+ if(!Number.isSafeInteger(pgid)||pgid<2)throw fault('RESTART_GROUP_UNSAFE');
+ let output;
+ try{output=execFileSync('ps',['-x','-g',String(pgid),'-o','pid=,ppid=,pgid=,lstart='],{encoding:'utf8',timeout:250,maxBuffer:65536,stdio:['ignore','pipe','pipe']});}
+ catch{throw fault('RESTART_GROUP_INSPECTION_UNKNOWN');}
+ const lines=output.trim().split('\n');if(!output.trim()||lines.length>128)throw fault('RESTART_GROUP_INSPECTION_UNKNOWN');
+ return lines.map(line=>{const m=line.trim().match(/^(\d+)\s+(\d+)\s+(\d+)\s+(.+)$/);if(!m||Number(m[3])!==pgid)throw fault('RESTART_GROUP_INSPECTION_UNKNOWN');return {pid:Number(m[1]),ppid:Number(m[2]),pgid:Number(m[3]),startToken:m[4]};});
+}
+
+// Mechanical measurement only. Its only signals are those dispatched by the
+// frozen observer. It neither restarts a controller nor sends agent/world input.
+export function createTrialRestartProbe(config,deps={}){
+ const {actorId,setupId,directory,worldId,soulId,originalInstructionSha256,cutoffAt}=config,now=deps.now??Date.now;
+ const inspect=deps.inspectProcess??inspectRestartProcess,inspectGroup=deps.inspectGroup??inspectTrialHostGroup,killProcess=deps.killProcess??process.kill;
+ const groupAbsent=pgid=>{try{killProcess(-pgid,0);return false;}catch(e){if(e.code==='ESRCH')return true;throw fault('RESTART_GROUP_ABSENCE_UNKNOWN');}};
+ const observer=createManagedRestartObserver({actorId,setupId,journalPath:join(directory,'runtime','continuity.sqlite'),worldId,soulId,originalInstructionSha256,cutoffAt},{now,...(deps.readSnapshot?{readSnapshot:deps.readSnapshot}:{}),inspectProcess:inspect,...(deps.killProcess?{killProcess:deps.killProcess}:{}),preDispatch:()=>{const fresh=drainTurns({required:true});if(pending.length||fresh.pendingBytes||fresh.missing)throw fault('RESTART_HOST_TURN_REFRESH_INCOMPLETE');return {at:now(),reader:fresh,evidence:[`${basename(directory)}/agent-evidence.jsonl:${fresh.lines}`]};}});
+ const tail=createUsageTail(join(directory,'agent-evidence.jsonl'),{maxLineBytes:4*1024*1024+8192,maxPollBytes:8*1024*1024});
+ const controllers=new Map(),registered=new Map(),pending=[];let launcher=null,failureCode=null,reasonCode=null,ownershipLines=0,lastBinding=null,finished=false,reader=null;
+ const sourceFile=`${basename(directory)}/restart-ownership.jsonl`,proofPath=join(directory,'restart-proof.json');
+ writeFileSync(join(directory,'restart-ownership.jsonl'),'',{flag:'wx',mode:0o600});
+ const fail=error=>{if(!failureCode){failureCode=/^RESTART_[A-Z_]+$/.test(error?.code??'')?error.code:'RESTART_EVIDENCE_UNKNOWN';reasonCode=code(error);}};
+ const terminal=()=>['ready','fail','unknown','unexercised'].includes(observer.snapshot().state);
+ const persist=()=>{const proof=snapshot();writeFileSync(proofPath+'.tmp',JSON.stringify(proof,null,2)+'\n',{mode:0o600});renameSync(proofPath+'.tmp',proofPath);return proof;};
+ const snapshot=()=>({...observer.snapshot(),integration:{status:failureCode?'unknown':observer.snapshot().state,failureCode,reasonCode,pollMs:1000,hostInventory:'only explicitly registered detached host groups; runtime HOST_CONFIG disables tool/app/plugin execution',reader,proofSource:`${basename(directory)}/restart-proof.json`,ownershipSource:sourceFile}});
+ const eventTime=s=>{const t=typeof s.at==='string'?Date.parse(s.at):s.at;if(!Number.isSafeInteger(t)||t<0)throw fault('RESTART_LIFECYCLE_TIME_UNKNOWN');return t;};
+ const consumeTurn=(e,line)=>{
+  if(e.kind!=='host-event'||!['turn/started','turn/completed'].includes(e.method))return;
+  if(e.method==='turn/completed'&&['failed','interrupted'].includes(e.status))return;
+  if(e.worldId!==worldId||e.soulId!==soulId||!Number.isSafeInteger(e.controllerPid)||!Number.isSafeInteger(e.hostPid)||!identifier(e.threadId)||!identifier(e.turnId)||!Number.isSafeInteger(e.at)||e.at<0||e.method==='turn/completed'&&e.status!=='completed')throw fault('RESTART_HOST_TURN_UNKNOWN');
+  if(pending.length>=64)throw fault('RESTART_HOST_TURN_BACKLOG');
+  pending.push({controllerPid:e.controllerPid,hostPid:e.hostPid,threadId:e.threadId,turnId:e.turnId,at:e.at,state:e.method==='turn/started'?'turn-started':'turn-completed',evidence:[`${basename(directory)}/agent-evidence.jsonl:${line}`]});
+ };
+ const drainTurns=({final=false,required=false}={})=>{
+  reader=tail.poll((row,line)=>{try{consumeTurn(row,line);}catch(error){fail(error);}},{final,required});
+  if(failureCode)throw fault(failureCode);
+  for(let i=0;i<pending.length;){const e=pending[i],c=controllers.get(e.controllerPid);if(c?.started&&c.hosts.has(e.hostPid)&&c.threadId===e.threadId){observer.observeLifecycle({...e,actorId,worldId,soulId});pending.splice(i,1);}else i++;}
+  if(final&&pending.length)throw fault('RESTART_HOST_TURN_OWNERSHIP_UNKNOWN');return reader;
+ };
+ return {
+  observe(s){
+   if(finished||failureCode||terminal()||!['launcher-spawned','controller-started','host-started','session-created','running','startup-reconciled','receiver-ready','controller-closed','host-closed'].includes(s.state))return;
+   try{
+    if(!Array.isArray(s.evidence)||!s.evidence.length)throw fault('RESTART_SOURCE_CITATION_MISSING');
+    if(s.worldId!==undefined&&s.worldId!==worldId||s.soulId!==undefined&&s.soulId!==soulId)throw fault('RESTART_LIFECYCLE_SCOPE_UNKNOWN');
+    if(s.state==='launcher-spawned'){if(launcher)throw fault('RESTART_LAUNCHER_AMBIGUOUS');launcher=inspect(s.launcherPid);if(!launcher)throw fault('RESTART_PROCESS_IDENTITY_UNKNOWN');return;}
+    const pid=s.state==='controller-started'?s.pid:s.controllerPid;if(!Number.isSafeInteger(pid)||pid<2)return;
+    if(!controllers.has(pid)){if(controllers.size>=16)throw fault('RESTART_CONTROLLER_LIMIT');controllers.set(pid,{pid,started:false,hosts:new Map(),closed:false});}
+    const c=controllers.get(pid);
+    if(s.state==='controller-started'){if(c.started)throw fault('RESTART_CONTROLLER_IDENTITY_AMBIGUOUS');c.started=true;c.birth=inspect(pid);c.source=s.evidence[0];if(!c.birth)throw fault('RESTART_PROCESS_IDENTITY_UNKNOWN');}
+    if(['host-started','session-created'].includes(s.state)&&Number.isSafeInteger(s.hostPid)){
+     const prior=c.hosts.get(s.hostPid);if(prior?.closed)throw fault('RESTART_GROUP_IDENTITY_AMBIGUOUS');
+     if(!prior){if(c.hosts.size>=16)throw fault('RESTART_GROUP_LIMIT');const birth=inspect(s.hostPid);if(!birth||birth.pgid!==s.hostPid)throw fault('RESTART_GROUP_IDENTITY_UNKNOWN');c.hosts.set(s.hostPid,{birth,source:s.evidence[0],closed:false});}
+     if(s.state==='session-created'){c.threadId=s.threadId;c.sessionHostPid=s.hostPid;}
+    }
+    if(s.state==='controller-closed')c.closed=true;
+    if(s.state==='host-closed'){const host=c.hosts.get(s.hostPid);if(!host)throw fault('RESTART_CLOSED_HOST_IDENTITY_UNKNOWN');host.closed=true;host.closeProof={hostPid:s.hostPid,threadId:s.threadId??null,groupClosed:s.groupClosed,groupVerification:s.groupVerification,at:s.at,evidence:[host.source,...s.evidence],identity:structuredClone(host.birth)};}
+    if(['controller-started','session-created','running','startup-reconciled','receiver-ready'].includes(s.state))observer.observeLifecycle({...s,actorId,worldId,soulId,controllerPid:pid,at:eventTime(s)});
+   }catch(error){fail(error);}
+  },
+  poll({final=false,required=false}={}){
+   if(finished)return snapshot();
+   try{
+    if(!failureCode&&!terminal()){
+     drainTurns({final,required});
+     const c=[...controllers.values()].filter(c=>c.started&&!c.closed).at(-1);
+     const dead=observer.snapshot().oldOwnership?.controller.pid;
+     const activeHosts=c?[...c.hosts].filter(([,h])=>!h.closed):[];
+     if(c&&c.pid!==dead&&launcher){
+      for(const [pgid,h]of c.hosts)if(h.closed&&(h.closeProof?.groupClosed!==true||h.closeProof?.groupVerification!=='absent'||!groupAbsent(pgid)))throw fault('RESTART_PRIOR_HOST_CLOSURE_UNPROVEN');
+     }
+     if(c&&c.pid!==dead&&launcher&&activeHosts.length){
+      const groups=activeHosts.map(([pgid,h])=>{const members=inspectGroup(pgid).sort((a,b)=>a.pid-b.pid),leader=members.find(p=>p.pid===pgid);if(!leader||['pid','ppid','pgid','startToken'].some(k=>leader[k]!==h.birth[k]))throw fault('RESTART_GROUP_IDENTITY_CHANGED');return {pgid,members};}).sort((a,b)=>a.pgid-b.pgid);
+      const binding=JSON.stringify({launcher,controller:c.birth,groups});
+      if(binding!==lastBinding){
+       if(ownershipLines>=64)throw fault('RESTART_OWNERSHIP_LIMIT');
+       const ownership={actorId,setupId,worldId,soulId,launcher,controller:c.birth,groups,descendantsComplete:true,evidence:[c.source,...[...c.hosts.values()].map(h=>h.source).slice(0,5),`${sourceFile}:${ownershipLines+1}`]};
+       appendFileSync(join(directory,'restart-ownership.jsonl'),JSON.stringify({at:now(),ownership})+'\n');ownershipLines++;lastBinding=binding;registered.set(c.pid,structuredClone(ownership));observer.registerOwnership(ownership);
+      }
+     }
+     if(observer.snapshot().deathAt!==null||c&&activeHosts.some(([pid])=>pid===c.sessionHostPid))observer.tick();
+    }
+   }catch(error){fail(error);}
+   try{return persist();}catch(error){fail(error);return snapshot();}
+  },
+  finish({required=false}={}){this.poll({final:true,required});finished=true;observer.finish();try{return persist();}catch(error){fail(error);return snapshot();}},
+  attach(result){
+   const proof=snapshot(),old=proof.oldOwnership;
+   if(old&&proof.triggerExercised===true){const c=result.controllers?.find(c=>c.pid===old.controller.pid);const owned=registered.get(old.controller.pid);if(c&&owned){c.restartOwnership=structuredClone(owned);c.restartClosedHosts=[...(controllers.get(c.pid)?.hosts.values()??[])].filter(h=>h.closed).map(h=>structuredClone(h.closeProof));}result.restartProofs=[proof];}
+   return result;
+  },
+  snapshot,
+ };
 }
 
 export function verifyBaselineTrialExit(result,killProcess=process.kill){
@@ -165,7 +268,7 @@ export async function runContinuityTrial(config,deps={}){
  const out=resolve(directory);mkdirSync(out,{mode:0o700}); // Atomic refusal of every existing output, even empty.
  const registry=(deps.registryFactory??probeSessions)(out),stop=new AbortController(),abort=()=>stop.abort();
  signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)abort();
- let startedAt=null,cutoffAt=null,endReason=null,failureCode=null,cutoffTimer,usageTimer,usageGuard=null,usageState=null;const rows=[],fixtures=[],tasks=[];
+ let startedAt=null,cutoffAt=null,endReason=null,failureCode=null,cutoffTimer,usageTimer,restartTimer,usageGuard=null,usageState=null,restartProbe=null,restartResult=null;const rows=[],fixtures=[],tasks=[];
  writeFileSync(join(out,'timeline.jsonl'),'',{flag:'wx',mode:0o600});
  const record=(kind,data={})=>{try{appendFileSync(join(out,'timeline.jsonl'),JSON.stringify({at:now(),kind,...data})+'\n');}catch{failureCode='TRIAL_EVIDENCE_WRITE_FAILED';abort();throw fault(failureCode);}};
  const checkUsage=(finalActorIds=[],finish=false)=>{
@@ -176,6 +279,8 @@ export async function runContinuityTrial(config,deps={}){
    if(usageState.trigger){failureCode??=usageState.trigger.code;endReason??='usage-guard';abort();}
   }catch{failureCode??='USAGE_GUARD_EVIDENCE_FAILED';endReason??='usage-guard';abort();}
  };
+ const pollRestart=()=>{if(restartProbe)return restartProbe.poll({required:false});};
+ const scheduleRestart=()=>{restartTimer=(deps.schedule??setTimeout)(()=>{pollRestart();if(!stop.signal.aborted&&!['ready','fail','unknown','unexercised'].includes(restartProbe.snapshot().integration.status))scheduleRestart();},1000);};
  const scheduleUsage=()=>{usageTimer=(deps.schedule??setTimeout)(()=>{checkUsage();if(!stop.signal.aborted)scheduleUsage();},1000);};
  const sample=async(row,kind,sampleSignal=stop.signal,phase=null)=>{
   const requestedAt=now(),response=await row.world.read('here',{},sampleSignal),me=response.here?.me;
@@ -188,6 +293,7 @@ export async function runContinuityTrial(config,deps={}){
    const paired=readPairing(resolve(actor.folder));
    // Validate loopback before constructing a client, even with injected config verification.
    const url=new URL(paired.world);if(url.protocol!=='http:'||!['127.0.0.1','localhost','[::1]'].includes(url.hostname)||url.username||url.password||url.search||url.hash)throw fault('LOOPBACK_DEVAUTH_REQUIRED');
+   if(config.restart&&actor.id===config.restart.actorId&&!identifier(paired.soul))throw fault('INVALID_RESTART_SCOPE');
    if(souls.has(paired.soul))throw fault('SHARED_SOUL_REFUSED');souls.add(paired.soul);worlds.add(paired.world);
    const row={actor,paired,world:createWorld(paired),threads:new Set(),result:null,cleanupVerified:false};
    if(actors.includes(actor)){
@@ -206,7 +312,12 @@ export async function runContinuityTrial(config,deps={}){
   for(const row of rows)row.instruction=renderTrialInstruction(row.actor.instruction,{startedAt,seconds,meetingOffsetSec:config.meetingOffsetSec});
   if(config.usageGuard){usageGuard=createContinuityUsageGuard({actors:rows.map(row=>({id:row.actor.id,kind:arm===CONTINUITY_ARMS[0]?'baseline':'managed',path:arm===CONTINUITY_ARMS[0]?join(row.directory,'baseline','stream.ndjson'):join(row.directory,'agent-evidence.jsonl')})),limits:config.usageGuard,now});checkUsage();scheduleUsage();}
   cutoffTimer=(deps.schedule??setTimeout)(()=>{endReason??='cutoff';abort();},Math.max(0,cutoffAt-now()));
-  const manifest={schema:'sim-continuity-trial/1',arm,purpose,seconds,startedAt,cutoffAt,meetingAt:config.meetingOffsetSec===undefined?null:startedAt+config.meetingOffsetSec*1000,modelRequested:model,effortRequested:effort,cliVersion:config.cliVersion??null,cliVersionSource:config.cliVersion?'caller-preflight':null,world,worldId,baselineWake:false,disturbances:'unsupported: not dispatched by this runner',restartCoverage:'unknown: no typed restart contract implemented',qualification:'not assessed; orchestration evidence only',actors:rows.map(row=>({id:row.actor.id,soulId:row.paired.soul,releaseOffsetSec:row.actor.releaseOffsetSec??0,instructionTemplateSha256:sha(row.actor.instruction),instructionSha256:sha(row.instruction),...(row.baseline?{baseline:row.baseline,promptArgsSha256:sha(JSON.stringify(buildArgs({model,effort,text:row.instruction})))}:{agentEvidence:'agent-evidence.jsonl',launchSourceSha256:sha(readFileSync(new URL('../../soul-runtime/launch.mjs',import.meta.url)))} )})),fixtureActors:fixtures.map(row=>({id:row.actor.id,soulId:row.paired.soul})),registration:'baseline synchronous callback before naming; candidate emitted creation before naming, parent durability occurs on receipt'};
+  if(config.restart){
+   const target=rows.find(row=>row.actor.id===config.restart.actorId);
+   if(arm===CONTINUITY_ARMS[0])restartResult={...baselineAutomaticRestartCapability(),actor:target.actor.id,setupId:config.restart.setupId,worldId,soulId:target.paired.soul,source:'existing-headless-seat single-exec workflow; no synthetic disturbance dispatched'};
+   else {restartProbe=createTrialRestartProbe({...config.restart,directory:target.directory,worldId,soulId:target.paired.soul,originalInstructionSha256:sha(target.instruction),cutoffAt},{now,...(deps.restart??{})});scheduleRestart();}
+  }
+  const manifest={schema:'sim-continuity-trial/1',...(config.runId?{runId:config.runId}:{}),arm,purpose,seconds,startedAt,cutoffAt,meetingAt:config.meetingOffsetSec===undefined?null:startedAt+config.meetingOffsetSec*1000,modelRequested:model,effortRequested:effort,cliVersion:config.cliVersion??null,cliVersionSource:config.cliVersion?'caller-preflight':null,world,worldId,baselineWake:false,disturbances:'unsupported: not dispatched by this runner',restartCoverage:config.restart?{...config.restart,kind:'checkpoint-future-wake',minimumFutureWakeMs:20000,triggerMaxDelayMs:5000,recoveryMaxMs:25000,pollMs:1000,proof:arm===CONTINUITY_ARMS[0]?'restart-proof.json':`${config.restart.actorId}/restart-proof.json`,baselineAssistedResume:false}:'unknown: no restart contract requested',qualification:'not assessed; orchestration evidence only',actors:rows.map(row=>({id:row.actor.id,soulId:row.paired.soul,releaseOffsetSec:row.actor.releaseOffsetSec??0,instructionTemplateSha256:sha(row.actor.instruction),instructionSha256:sha(row.instruction),...(row.baseline?{baseline:row.baseline,promptArgsSha256:sha(JSON.stringify(buildArgs({model,effort,text:row.instruction})))}:{agentEvidence:'agent-evidence.jsonl',launchSourceSha256:sha(readFileSync(new URL('../../soul-runtime/launch.mjs',import.meta.url)))} )})),fixtureActors:fixtures.map(row=>({id:row.actor.id,soulId:row.paired.soul})),registration:'baseline synchronous callback before naming; candidate emitted creation before naming, parent durability occurs on receipt'};
   manifest.usageGuard=config.usageGuard?{kind:'observed-usage-guard',limits:config.usageGuard,pollMs:1000,possibleInFlightOvershoot:true,billing:'not measured'}:null;
   privateJson(join(out,'run.json'),manifest);
   for(const row of rows)tasks.push((async()=>{
@@ -216,6 +327,7 @@ export async function runContinuityTrial(config,deps={}){
    const state=s=>{
     // This callback deliberately stays synchronous: baseline names only after it returns.
     if(['thread-created','session-created','session-recovered','running','host-closed'].includes(s.state)&&s.threadId){registry.register({threadId:s.threadId,cwd:s.cwd??join(row.directory,'runtime','host'),name,recoveryMechanism:arm===CONTINUITY_ARMS[0]?'native retained Codex exec thread; no journal or automatic restart':'durable Codex thread plus durable Soul journal'});row.threads.add(s.threadId);}
+    if(restartProbe&&row.actor.id===config.restart.actorId)restartProbe.observe(s);
     record('runtime',{actor:row.actor.id,...s});onState({actor:row.actor.id,...s});
    };
    record('actor-release',{actor:row.actor.id,scheduledAt,releasedAt:now(),remainingSeconds});
@@ -243,16 +355,20 @@ export async function runContinuityTrial(config,deps={}){
   }));
  }catch(error){failureCode??=code(error);endReason??=stop.signal.aborted?'cancelled':'infrastructure-error';}
  finally{
-  abort();(deps.cancelSchedule??clearTimeout)(cutoffTimer);(deps.cancelSchedule??clearTimeout)(usageTimer);await Promise.allSettled(tasks);checkUsage([],true);signal?.removeEventListener('abort',abort);
+  abort();(deps.cancelSchedule??clearTimeout)(cutoffTimer);(deps.cancelSchedule??clearTimeout)(usageTimer);(deps.cancelSchedule??clearTimeout)(restartTimer);await Promise.allSettled(tasks);checkUsage([],true);
+  if(restartProbe){const target=rows.find(row=>row.actor.id===config.restart.actorId);restartResult=restartProbe.finish({required:target.releasedAt!==undefined});if(target.result)restartProbe.attach(target.result);}
+  if(config.restart&&arm===CONTINUITY_ARMS[0]&&restartResult)privateJson(join(out,'restart-proof.json'),restartResult);signal?.removeEventListener('abort',abort);
  }
  const verifyCandidate=deps.verifyCandidate??(result=>verifyOwnedProbeExit(result)),verifyBaseline=deps.verifyBaseline??verifyBaselineTrialExit;
  for(const row of rows){
   if(row.result)row.cleanupVerified=arm===CONTINUITY_ARMS[0]?verifyBaseline(row.result):verifyCandidate(row.result);
   if(row.threads.size&&!row.cleanupVerified)failureCode??='OWNED_CLEANUP_UNVERIFIED';
-  if(row.result)privateJson(join(row.directory,'actor-result.json'),{exit:row.result.exit,failureCode:row.failureCode??row.result.failureCode??null,cleanupVerified:row.cleanupVerified,execProof:row.result.execProof??null,metadataGroups:row.result.metadataGroups??null,controllers:row.result.controllers?.map(controller=>({...controller,hostPids:[...(controller.hostPids??[])]}))??null,usage:row.result.usage??null,evidenceComplete:row.result.evidenceComplete??null});
+  if(row.result)privateJson(join(row.directory,'actor-result.json'),{exit:row.result.exit,failureCode:row.failureCode??row.result.failureCode??null,cleanupVerified:row.cleanupVerified,execProof:row.result.execProof??null,metadataGroups:row.result.metadataGroups??null,controllers:row.result.controllers?.map(controller=>({...controller,hostPids:[...(controller.hostPids??[])]}))??null,usage:row.result.usage??null,evidenceComplete:row.result.evidenceComplete??null,restartProofs:row.result.restartProofs??null});
  }
  const summary={schema:'sim-continuity-trial-result/1',arm,purpose,startedAt,cutoffAt,endedAt:now(),endReason,failureCode,qualification:'not assessed',coverage:{disturbances:'unknown',restart:'unknown',semanticOutcome:'not scored',actualEffort:'only authoritative host metadata; otherwise unknown'},actors:rows.map(row=>({id:row.actor.id,soulId:row.paired.soul,releasedAt:row.releasedAt??null,threads:[...row.threads],cleanupVerified:row.cleanupVerified,failureCode:row.failureCode??row.result?.failureCode??null,exit:row.result?.exit??null,actualModel:row.result?.actualModel??null,actualEffort:row.result?.actualEffort??null,endedBeforeCutoff:row.result?.endedAt!==undefined?row.result.endedAt<cutoffAt:null}))};
  summary.usageGuard=usageState;
+ summary.restart=restartResult;
+ if(config.restart)summary.coverage.restart=arm===CONTINUITY_ARMS[0]?'unsupported':restartResult?.integration?.status??'unknown';
  privateJson(join(out,'summary.json'),summary);
  for(const row of rows)if(row.cleanupVerified)for(const threadId of row.threads)registry.complete(threadId,{outcome:endReason==='cancelled'?'cancelled':failureCode||row.failureCode||row.result?.failureCode||row.result?.exit?.code!==0?'failed':'bounded-end',ownedProcessesExited:true,evidence:'summary.json;timeline.jsonl; exact owned process-group absence verified before archival'});
  const archived=await registry.archiveCompleted();privateJson(join(out,'archive-results.json'),archived);
