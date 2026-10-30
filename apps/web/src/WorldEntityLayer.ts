@@ -13,7 +13,8 @@ import { GENERATORS } from '@sim/generators';
 import { meshFor, type MeshCtx } from './gen-mesh/index.ts';
 import { clearBuildingPrefetch, prefetchBuilding } from './gen-mesh/building.mesh.ts';
 import { MaterialLib } from './gen-mesh/materials.ts';
-import { animate, hasMotion } from './gen-mesh/motion.ts';
+import { animate, hasMotion, syncLightGlow } from './gen-mesh/motion.ts';
+import {lightDiffAhead} from './light-diff-clock.ts';
 import { EntityInstancer, instanceable } from './EntityInstancer.ts';
 import { terrainColorFor, terrainColorDeferred, groundRealismFor } from './gen-mesh/ground-palette.ts';
 import { mottleSector } from './gen-mesh/terrain-mottle.ts';
@@ -251,12 +252,13 @@ export class WorldEntityLayer {
 
   /** Consume hub messages (the viewer keeps the last 300 edge messages; we only act on newer diffs). */
   readonly stats = { edgeSeen: 0, applied: 0, resyncs: 0, lastError: null as string | null };
-  applyEdge(msgs: readonly { type: string; kind?: string; seq?: unknown; rev?: unknown }[]) {
+  applyEdge(msgs: readonly { type: string; kind?: string; seq?: unknown; rev?: unknown }[], depictedTick=Infinity) {
     if (this.immutable || !this.model || this.building || this.filling) return;
     for (const m of msgs) {
       // CE8: attention hints keep the current rev; the sites layer parses each message once.
       if (m.kind === 'world-build') { if ((m as { event?: unknown }).event === 'attention' || (typeof m.rev === 'number' && m.rev > this.sites.maxRev)) this.sites.apply(m); continue; }
       if (m.kind !== 'world-diff' || typeof m.seq !== 'number' || m.seq <= this.seq) continue;
+      if (lightDiffAhead(this.model,m,depictedTick)) return;
       this.stats.edgeSeen++;
       if (m.seq > this.seq + 1) { void this.resync(); return; }  // a gap: something was missed; take the whole picture again
       try { this.applyDiff(m as unknown as DiffMsg); this.stats.applied++; } catch (e) { this.stats.lastError = String(e); this.seq = m.seq; }
@@ -743,6 +745,9 @@ export class WorldEntityLayer {
     }
     let built = this.build(e, def);
     if (!built) { if (existing) this.undraw(e.id); return; }
+    // State is visible on this frame, including during the generic edit easing.
+    // Waiting for animate()'s settled transform left an OFF bulb glowing for 2.5 s.
+    if (def.components.light || def.components.lights) syncLightGlow(built,e,def,m,this.now/1000);
     if (existing) { if (existing.inst) this.instancer.remove(existing.inst, e.id); else { this.thingsGroup.remove(existing.obj); disposeObject(existing.obj); } this.drawn.delete(e.id); }
     // a rainbow thing is weather: hidden until the atmosphere shows it after rain (its own meshes, never instanced)
     const rainbow = isRainbowDef(def); if (rainbow) holdRainbow(built);
