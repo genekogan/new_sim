@@ -303,15 +303,24 @@ test('near-full legacy checkpoint migrates only its exact durable observation an
  const {j,dir,fence}=fixture(t),call={type:'write',command:'say',args:{text:'x'.repeat(15900)}},body={threadId:'original-thread',initialInstruction:'i'.repeat(15998),plan:'p'.repeat(15998),lastDecisionId:'settled-old',lastCall:call,lastResult:null};
  const response={accepted:true,data:''};body.lastResult=response;response.data='v'.repeat(65536-128-Buffer.byteLength(JSON.stringify(body)));assert.equal(Buffer.byteLength(JSON.stringify(body)),65536-128);
  j.control.prepare(fence,'settled-old',call);j.control.dispatch(fence,'settled-old');j.control.settle(fence,'settled-old',response);j.control.save(fence,0,body);
- const urgent={id:'urgent',triggerAt:1,reason:'owner',turnId:'old-turn',fallbackUsed:false,worldReplans:2},progress=progressMarker();saveRecoveryCheckpoint(j,fence,j.control.checkpoint().revision,{...body,urgentRecoveryV1:urgent,decisionProgressV1:progress});
+ const urgent={id:'urgent',triggerAt:1,reason:'owner',turnId:'old-turn',fallbackUsed:false,worldReplans:2},progress={...progressMarker(),includedUrgency:{source:'world',eventId:'native-direct',sequence:1,reason:'direct',triggerAt:1,deadlineAt:5001,spent:true}};saveRecoveryCheckpoint(j,fence,j.control.checkpoint().revision,{...body,urgentRecoveryV1:urgent,decisionProgressV1:progress});
  let saved=j.control.checkpoint().value;assert.equal(saved.lastResult.responseOmitted,true);assert.equal(saved.lastResult.responseRef.kind,'operation');assert.equal(saved.initialInstruction,body.initialInstruction);assert.equal(saved.plan,body.plan);assert.equal(saved.lastCall.args.text,call.args.text);assert.ok(Buffer.byteLength(JSON.stringify(saved))<=65536);
  let raw='',offset=0;for(;;){const part=j.control.response({kind:'operation',id:'settled-old',offset});raw+=part.text;if(part.nextOffset===null)break;offset=part.nextOffset;}assert.deepEqual(JSON.parse(raw),response);
  j.control.release(fence);const reopened=openJournal(dir,{worldId:'w',soulId:'s'});t.after(()=>reopened.close());const next=reopened.control.claim('next');saved=reopened.control.checkpoint().value;
- saveRecoveryCheckpoint(reopened,next,reopened.control.checkpoint().revision,{...saved,decisionProgressV1:{...progress,phase:'soft-pending',softUsed:true}});assert.equal(decisionProgress(reopened.control.checkpoint().value).softUsed,true);assert.ok(Buffer.byteLength(JSON.stringify(reopened.control.checkpoint().value))<=65536);
+ saveRecoveryCheckpoint(reopened,next,reopened.control.checkpoint().revision,{...saved,decisionProgressV1:{...progress,phase:'soft-pending',softUsed:true}});assert.equal(decisionProgress(reopened.control.checkpoint().value).softUsed,true);assert.deepEqual(decisionProgress(reopened.control.checkpoint().value).includedUrgency,progress.includedUrgency);assert.ok(Buffer.byteLength(JSON.stringify(reopened.control.checkpoint().value))<=65536);
  retainDecision(reopened,next,{plan:body.plan,call:{type:'wait',command:'wait',args:{}},wakeAt:null});await applyPendingDecision(reopened,next,{write:async()=>assert.fail('settled old world write must not replay')});assert.equal(reopened.control.checkpoint().value.decisionProgressV1,undefined);assert.equal(reopened.control.checkpoint().value.urgentRecoveryV1,undefined);
 });
 test('unprovable legacy projection and oversized recovery metadata block without dropping intent',t=>{
  const {j,fence}=fixture(t),body={initialInstruction:'i'.repeat(16000),plan:'p'.repeat(16000),lastResult:'x'.repeat(32000)};j.control.save(fence,0,body);const before=j.control.checkpoint();assert.ok(Buffer.byteLength(JSON.stringify(body))>65536-RECOVERY_METADATA_BYTES-128);
  assert.throws(()=>saveRecoveryCheckpoint(j,fence,before.revision,{...body,decisionProgressV1:progressMarker()}),{code:'DECISION_PROGRESS_STATE_INVALID'});assert.deepEqual(j.control.checkpoint(),before);
  assert.throws(()=>saveRecoveryCheckpoint(j,fence,before.revision,{...body,decisionProgressV1:{...progressMarker(),unexpected:'x'.repeat(2048)}}),{code:'DECISION_PROGRESS_STATE_INVALID'});assert.deepEqual(j.control.checkpoint(),before);
+});
+
+test('included-alert metadata validates exact identity, coherent reason/clock, spent state and shared envelope',t=>{
+ const base={source:'world',eventId:'native-direct',sequence:1,reason:'direct',triggerAt:100,deadlineAt:5100,spent:false};
+ const validate=a=>decisionProgress({decisionProgressV1:{...progressMarker(),includedUrgency:a}});
+ assert.deepEqual(validate(base).includedUrgency,base);assert.equal(validate({...base,eventId:'界'.repeat(200)}).includedUrgency.eventId,'界'.repeat(200));
+ for(const bad of [null,{...base,source:'remote'},{...base,source:'owner'},{...base,reason:'deadline'},{...base,eventId:''},{...base,eventId:'control\ncharacter'},{...base,eventId:'x'.repeat(201)},{...base,sequence:0},{...base,triggerAt:-1},{...base,deadlineAt:100},{...base,deadlineAt:60101},{...base,spent:1},{...base,extra:true}])assert.throws(()=>validate(bad),{code:'DECISION_PROGRESS_STATE_INVALID'});
+ const {j,fence}=fixture(t),value={decisionProgressV1:{...progressMarker(),includedUrgency:base,other:'x'.repeat(RECOVERY_METADATA_BYTES)}};
+ assert.throws(()=>saveRecoveryCheckpoint(j,fence,0,value),{code:'DECISION_PROGRESS_STATE_INVALID'});assert.equal(j.control.checkpoint().revision,0);
 });

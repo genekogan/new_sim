@@ -149,14 +149,41 @@ a saved future wake becoming due during that turn, first steers the same host.
 If that obsolete turn remains active for five seconds after the first trigger,
 the controller requests interruption of that exact turn. Later observations or
 ACKs do not postpone the grace. A fresh prompt starts only after the old terminal
-and the interrupt/control requests settle. Already included facts and an already
-due wake in a fresh prompt do not arm another interruption merely because the
-fresh decision is slow. Ordinary world replans retain their two-replan cap;
+and the interrupt/control requests settle. An already due wake in a fresh
+prompt does not rearm merely because the fresh decision is slow. Ordinary world replans retain their two-replan cap;
 owner revisions and saved deadlines remain mandatory freshness boundaries.
 A pending start ACK has no verified turn ID yet and retains the existing host
 request timeout; the controller never guesses an interrupt target. Notification
 queueing does not mark an event delivered or handled: delivery telemetry follows
 the actual host ACK, and facts remain pending for a committed decision.
+
+A fresh prompt that actually includes a pending owner/addressed/conversation
+alert also receives one five-second response grace per applied-decision epoch.
+This is separate from stale-context urgency: an alert included at the start does
+not itself invalidate a prompt-informed choice. A valid choice completed and
+retained during grace applies normally, spending no replan credit. If grace
+expires, its exact old choice is discarded and the same interruption/control
+confirmation policy applies; a known terminal needs no interrupt RPC. Expiry
+spends a replan, not an RPC billing credit: a direct alert uses one of the existing
+two world-replan credits even if terminal completion won the timer race. Owner
+handling retains its existing precedence. If two existing world replans consume
+the direct cap before grace expires, the included-direct attempt is durably
+disabled before the next fresh prompt; explicit `world-replan-cap` metadata
+records that no extra interruption or credit was spent. That current choice
+continues under the unchanged ordinary deadline; pending facts stay pending.
+Native ordinary receipts, activity
+observations and ambient speech do not acquire this response timer.
+
+The optional bounded `decisionProgressV1.includedUrgency` records the exact
+included fact and absolute response deadline before begin. Once an interruption
+or deadline consumes the attempt, the spent marker survives soft replans,
+verified host fallback and controller recovery; the same pending fact cannot
+rearm a replacement. Incidental replans do not refresh either response or ordinary
+deadline. Existing post-prompt urgency already supervises its replacement and
+does not mint another included-alert attempt. All timers coalesce on one exact
+turn and retain the earliest control confirmation bound. Only actual applied
+finalization clears the epoch. No uncertain world write is retried, and no model
+participation, reply text or public action is prescribed by this policy.
 
 Interrupt ACK plus terminal/control-chain confirmation has a total five-second
 bound. Failure reserves one durable `urgentRecoveryV1` fallback ticket before

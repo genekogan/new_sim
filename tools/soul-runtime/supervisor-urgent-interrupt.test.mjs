@@ -71,11 +71,12 @@ for(const scenario of [{kind:'owner',terminal:'interrupted'},{kind:'timer',termi
   }finally{await f.cleanup();}
  });
 }
-test('owner facts included at prompt start do not arm an urgency interruption',async t=>{
+test('owner facts included at prompt start have one finite response attempt',async t=>{
  const f=fixture(t,{includedOwner:true});
  try{
   await flush();assert.ok(f.host.calls[0].pending.some(x=>x.event.id==='original-owner'));
-  t.mock.timers.tick(urgentInterruptMs+interruptTerminalMs+100);await flush();assert.equal(f.host.interrupts.length,0);assert.equal(f.host.calls.length,1);assert.equal(f.host.closed,false);f.retained();
+  t.mock.timers.tick(urgentInterruptMs);await flush();assert.equal(f.host.interrupts.length,1);assert.equal(f.host.calls.length,1);assert.equal(f.host.closed,false);f.retained();
+  f.host.finish('turn-1');await flush();t.mock.timers.tick(urgentInterruptMs+interruptTerminalMs);await flush();assert.equal(f.host.interrupts.length,1);assert.equal(f.host.calls.length,2);f.retained();
  }finally{await f.cleanup();}
 });
 for(const verified of [true,false])test('unconfirmed interrupt permits one same-thread fallback only with verified group absence: '+verified,async t=>{
