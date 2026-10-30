@@ -18,6 +18,8 @@ class Host extends EventEmitter{
  async close(){this.closed=true;this.rejectTurn?.();}
 }
 async function until(fn){for(let n=0;n<200;n++){if(fn())return;await new Promise(r=>setTimeout(r,5));}throw Error('Condition timed out');}
+// Drain asynchronous receiver/host continuations without advancing mocked time.
+async function flushTurns(){for(let i=0;i<20;i++)await new Promise(resolve=>setImmediate(resolve));}
 function setup(t,options={}){const dir=mkdtempSync(join(tmpdir(),'sim-supervisor-'));const journal=openJournal(dir,{worldId:'w',soulId:'s',...options});const host=new Host(),stop=new AbortController();t.after(()=>{journal.close();rmSync(dir,{recursive:true,force:true});});let reads=0;const world={read:async()=>({here:'library'}),worldPage:async({after,signal})=>{reads++;await abortableSleep(10000,signal);return {cursor:after,events:[]};},ownerPage:async({after,signal})=>{await abortableSleep(10000,signal);return {cursor:after,events:[]};}};return {dir,journal,host,stop,world,reads:()=>reads};}
 test('event during inference is durably steered and obsolete action is discarded',async t=>{
  const f=setup(t);let effects=0;f.world.write=async()=>{effects++;return {accepted:true};};
@@ -257,6 +259,96 @@ test('the earlier deadline wakes a listener before its ambient batch cadence',as
  try{
   await until(()=>f.host.calls.length===1);f.host.finish(waitDecision);await until(()=>f.journal.control.checkpoint().value.lastCall?.type==='wait');f.journal.ingest({source:'world',after:null,cursor:'ambient',events:[ambient('ambient')]});await until(()=>f.host.calls.length===2);assert.ok(Date.now()-started<800);assert.equal(f.host.calls[1].scheduledWakeAt,wakeAt);assert.ok(f.host.calls[1].pending.some(f=>f.event.id==='ambient'));assert.deepEqual(f.host.calls[1].listenTo,['s_presenter']);
  }finally{f.stop.abort();await running;}
+});
+test('saved future deadline steers active inference before completion without replacing owner intent',async t=>{
+ const start=Date.parse('2026-10-30T05:00:00.000Z');
+ t.mock.timers.enable({apis:['Date','setTimeout','setInterval'],now:start});
+ const f=setup(t),states=[],commands=[],wakeAt=new Date(start+2000).toISOString(),plan='Keep the original errand and reconsider it at its saved deadline';
+ f.journal.ingest({source:'owner',after:null,cursor:'original-task',events:[{id:'original-task',text:'Finish the original errand before its deadline.'}]});
+ f.journal.handled('owner','original-task','Initial instruction incorporated; task remains open');
+ const previous=f.journal.control.claim('previous');f.journal.control.save(previous,0,{initialInstruction:'Original authenticated owner errand',plan,wakeAt,listenTo:['s_observed']});f.journal.control.release(previous);
+ f.world.read=async command=>{commands.push(['read',command]);return {here:'current place'};};
+ f.world.write=async command=>{commands.push(['write',command]);return {accepted:true};};
+ const running=runSupervisor({...f,signal:f.stop.signal,onState:s=>states.push(s)});
+ try{
+  await flushTurns();assert.equal(f.host.calls.length,1);assert.equal(f.host.activeTurnId,'t1');assert.equal(f.host.calls[0].scheduledWakeAt,wakeAt);
+  t.mock.timers.tick(1999);await flushTurns();assert.equal(f.host.steers.length,0,'a future wake must not steer early');
+  t.mock.timers.tick(101);await flushTurns();
+  assert.equal(f.host.steers.length,1,'saved wake must reach the still-active host without waiting for inference completion');
+  const notice=f.host.steers[0];assert.equal(notice.scheduledWakeAt,wakeAt);assert.ok(Date.parse(notice.now)>=Date.parse(wakeAt),'deadline notice carries fresh authoritative UTC');assert.deepEqual(notice.timer,{kind:'scheduled-wake',wakeAt});
+  assert.equal(f.host.activeTurnId,'t1');assert.equal(f.host.calls.length,1,'deadline notice does not start a competing model turn');
+  assert.deepEqual(commands,[['read','observe']],'notifying a deadline makes no world call or extra perception poll');
+  const saved=f.journal.control.checkpoint().value;assert.equal(saved.plan,plan);assert.equal(saved.wakeAt,wakeAt);assert.equal(saved.pendingDecision,undefined);assert.deepEqual(saved.listenTo,['s_observed']);
+  const proof=states.filter(s=>s.state==='host-notified'&&s.timer);assert.equal(proof.length,1);assert.deepEqual(proof[0].events,[]);assert.deepEqual(proof[0].timer,notice.timer);assert.ok(proof[0].at>=Date.parse(wakeAt));
+  assert.deepEqual(f.journal.openOwnerTasks().tasks.map(({id,text})=>({id,text})),[{id:'original-task',text:'Finish the original errand before its deadline.'}]);
+  t.mock.timers.tick(1000);await flushTurns();assert.equal(f.host.steers.length,1,'same deadline is coalesced for this active turn');
+  f.host.finish({...waitDecision,plan:'Obsolete pre-deadline choice',call:{type:'write',command:'say',arguments:'{"text":"obsolete action"}'}});
+  await flushTurns();assert.equal(f.host.calls.length,2,'a stale pre-deadline result replans after completion');assert.deepEqual(commands,[['read','observe']],'stale inference cannot publish a write after the deadline');
+  assert.equal(f.host.calls[1].plan,plan);assert.equal(f.host.calls[1].scheduledWakeAt,wakeAt);assert.equal(f.journal.openOwnerTasks().totalOpen,1);
+ }finally{f.stop.abort();await running;}
+});
+test('crossed deadline discards completion even when its timer callback has not run',async t=>{
+ const start=Date.parse('2026-10-30T06:00:00.000Z');t.mock.timers.enable({apis:['Date','setTimeout','setInterval'],now:start});
+ const f=setup(t),owner=f.journal.control.claim('previous'),wakeAt=new Date(start+2000).toISOString();f.journal.control.save(owner,0,{plan:'Original timed errand',wakeAt});f.journal.control.release(owner);
+ let writes=0;f.world.write=async()=>{writes++;return {accepted:true};};const running=runSupervisor({...f,signal:f.stop.signal});
+ try{
+  await flushTurns();assert.equal(f.host.calls.length,1);
+  // setTime moves Date without executing scheduled timer callbacks. The model
+  // completion wins that race; freshness must still be checked synchronously.
+  t.mock.timers.setTime(start+2100);f.host.finish({...waitDecision,call:{type:'write',command:'say',arguments:'{"text":"obsolete"}'}});
+  await flushTurns();assert.equal(f.host.steers.length,0);assert.equal(writes,0);assert.equal(f.host.calls.length,2);assert.equal(f.host.calls[1].plan,'Original timed errand');assert.equal(f.host.calls[1].scheduledWakeAt,wakeAt);
+  f.host.finish(waitDecision);await flushTurns();assert.equal(f.journal.control.checkpoint().value.wakeAt,null);
+  t.mock.timers.tick(1000);await flushTurns();assert.equal(f.host.calls.length,2,'due-time prompt must not rearm the same deadline or spin');assert.equal(f.host.steers.length,0,'finished turn timer was removed');
+ }finally{f.stop.abort();await running;}
+});
+test('deadline freshness overrides the world replan cap even when deadline steer is rejected',async t=>{
+ const start=Date.parse('2026-10-30T07:00:00.000Z');t.mock.timers.enable({apis:['Date','setTimeout','setInterval'],now:start});
+ const f=setup(t),states=[],owner=f.journal.control.claim('previous'),wakeAt=new Date(start+5000).toISOString();f.journal.control.save(owner,0,{plan:'Preserve timed owner work',wakeAt});f.journal.control.release(owner);
+ let writes=0,attempts=0;f.world.write=async()=>{writes++;return {accepted:true};};const steer=f.host.steer.bind(f.host);f.host.steer=async text=>{if(JSON.parse(text).timer){attempts++;throw Error('stale steer acknowledgement');}return steer(text);};
+ const running=runSupervisor({...f,signal:f.stop.signal,onState:s=>states.push(s)});
+ try{
+  await flushTurns();
+  for(let i=1;i<=2;i++){
+   f.journal.ingest({source:'world',after:i===1?null:'c1',cursor:'c'+i,events:[{id:'c'+i,kind:'conversation.turn',salience:3}]});t.mock.timers.tick(100);await flushTurns();assert.equal(f.host.steers.length,i);
+   f.host.finish(waitDecision);await flushTurns();assert.equal(f.host.calls.length,i+1);
+  }
+  t.mock.timers.tick(4801);await flushTurns();assert.equal(attempts,1);assert.equal(states.some(s=>s.state==='host-notified'&&s.timer),false,'rejected steer is not host-delivery proof');
+  f.host.finish({...waitDecision,call:{type:'write',command:'say',arguments:'{"text":"obsolete after capped replans"}'}});await flushTurns();assert.equal(writes,0);assert.equal(f.host.calls.length,4,'deadline causes a mandatory fresh prompt after the two ordinary replans');
+  assert.equal(f.host.calls[3].plan,'Preserve timed owner work');assert.equal(f.host.calls[3].scheduledWakeAt,wakeAt);assert.equal(f.journal.pending().length,2,'deadline notice does not handle native events');
+  f.host.finish(waitDecision);await flushTurns();t.mock.timers.tick(1000);await flushTurns();assert.equal(f.host.calls.length,4);assert.equal(attempts,1);
+ }finally{f.stop.abort();await running;}
+});
+test('deadline waits for begin acknowledgement and abort removes a pending-begin timer',async t=>{
+ const start=Date.parse('2026-10-30T08:00:00.000Z');t.mock.timers.enable({apis:['Date','setTimeout','setInterval'],now:start});
+ const f=setup(t),states=[],owner=f.journal.control.claim('previous'),wakeAt=new Date(start+2000).toISOString();f.journal.control.save(owner,0,{plan:'Retained intent',wakeAt});f.journal.control.release(owner);
+ let release;const gate=new Promise(resolve=>{release=resolve;}),begin=f.host.begin.bind(f.host);f.host.begin=async(...args)=>{const active=await begin(...args);await gate;return active;};
+ const running=runSupervisor({...f,signal:f.stop.signal,onState:s=>states.push(s)});
+ try{
+  await flushTurns();assert.equal(f.host.calls.length,1);t.mock.timers.tick(2100);await flushTurns();assert.equal(f.host.steers.length,0,'deadline may not target an unacknowledged begin');
+  f.stop.abort();t.mock.timers.tick(1000);await flushTurns();release();await running;assert.equal(f.host.steers.length,0);assert.equal(states.some(s=>s.state==='host-notified'),false,'abort while begin is pending acknowledges no host delivery');assert.equal(f.journal.control.checkpoint().value.wakeAt,wakeAt);
+ }finally{release();f.stop.abort();await running;}
+});
+test('a deadline crossed during pending begin is delivered after its acknowledgement',async t=>{
+ const start=Date.parse('2026-10-30T09:00:00.000Z');t.mock.timers.enable({apis:['Date','setTimeout','setInterval'],now:start});
+ const f=setup(t),owner=f.journal.control.claim('previous'),wakeAt=new Date(start+2000).toISOString();f.journal.control.save(owner,0,{wakeAt});f.journal.control.release(owner);
+ let release;const gate=new Promise(resolve=>{release=resolve;}),begin=f.host.begin.bind(f.host);f.host.begin=async(...args)=>{const active=await begin(...args);await gate;return active;};
+ const running=runSupervisor({...f,signal:f.stop.signal});
+ try{
+  await flushTurns();t.mock.timers.tick(2100);await flushTurns();assert.equal(f.host.steers.length,0);
+  release();await flushTurns();assert.equal(f.host.calls.length,1);assert.equal(f.host.steers.length,1);assert.equal(f.host.steers[0].scheduledWakeAt,wakeAt);assert.equal(f.host.steers[0].now,new Date(start+2100).toISOString());
+ }finally{release();f.stop.abort();await running;}
+});
+test('deadline steer serializes behind observations and timestamps actual host send',async t=>{
+ const start=Date.parse('2026-10-30T10:00:00.000Z');t.mock.timers.enable({apis:['Date','setTimeout','setInterval'],now:start});
+ const f=setup(t),states=[],owner=f.journal.control.claim('previous'),wakeAt=new Date(start+2000).toISOString();f.journal.control.save(owner,0,{wakeAt});f.journal.control.release(owner);
+ let release;const gate=new Promise(resolve=>{release=resolve;}),steer=f.host.steer.bind(f.host);f.host.steer=async text=>{await steer(text);if(!JSON.parse(text).timer)await gate;};
+ const running=runSupervisor({...f,signal:f.stop.signal,onState:s=>states.push(s)});
+ try{
+  await flushTurns();f.journal.ingest({source:'world',after:null,cursor:'direct',events:[{id:'direct',kind:'conversation.turn',salience:3}]});t.mock.timers.tick(100);await flushTurns();assert.equal(f.host.steers.length,1);
+  t.mock.timers.tick(2000);await flushTurns();assert.equal(f.host.steers.length,1,'deadline must wait for the preceding observation delivery acknowledgement');assert.equal(states.some(s=>s.state==='host-notified'&&s.mode==='steer'),false);
+  t.mock.timers.tick(500);release();await flushTurns();assert.equal(f.host.steers.length,2);assert.equal(f.host.steers[1].now,new Date(start+2600).toISOString(),'time is sampled at actual send, not when the deadline queued');
+  const proofs=states.filter(s=>s.state==='host-notified'&&s.mode==='steer');assert.deepEqual(proofs.map(s=>s.events),[[{source:'world',id:'direct'}],[]]);assert.equal(proofs[1].timer.wakeAt,wakeAt);assert.equal(f.journal.pending().length,1);
+ }finally{release();f.stop.abort();await running;}
 });
 test('nonblocking listen clear immediately reaches the next action while retaining the saved deadline and owner task',async t=>{
  const f=setup(t),owner=f.journal.control.claim('setup'),wakeAt=new Date(Date.now()+60000).toISOString(),commands=[];
