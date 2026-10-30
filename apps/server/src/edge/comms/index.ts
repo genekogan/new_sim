@@ -56,7 +56,7 @@ export type CommsRuntime = {
   /** Narration/world text to one Soul, some Souls, or every live Soul. */
   publishWorld(text: string, to?: string[]): void;
   /** Spectator `edge` messages (§7) for the hub to broadcast. */
-  onSpectator(listener: (m: SpectatorEdgeMessage) => void): void;
+  onSpectator(listener: (m: SpectatorEdgeMessage) => void): () => void;
   /** Standing spectator state a newly joined viewer needs: the fade roster (also re-broadcast each sweep), then the
    *  recent dialogue (`speech` / `conversation.turn`, marked `replay: true`; see dialogue-replay.ts). */
   spectatorJoin(): SpectatorEdgeMessage[];
@@ -80,7 +80,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
     nameMetadata:id=>deps.host.publicNameMetadata?.(id)??{},
     liveSoulIds: () => deps.db.liveSouls(worldId).map(s => s.id),
     isLive: id => { const s = deps.db.soul(id); return !!s && s.world_id === worldId && s.retired_at === null; },
-    spectate: m => { if (!spectators.length) return; const msg = structuredClone({type:'edge',at:now(),...m}) as SpectatorEdgeMessage;afterCommit(db,()=>{for(const l of spectators)try{l(msg);}catch{/* never break comms */}}); },
+    spectate: m => { if (!spectators.length) return; const msg = structuredClone({type:'edge',at:now(),...m}) as SpectatorEdgeMessage;afterCommit(db,()=>{for(const l of [...spectators])try{l(msg);}catch{/* never break comms */}}); },
   };
   const conversations = new Conversations(core, options.conversationTimeoutMs ?? 10 * 60_000, options.inviteTimeoutMs ?? 2 * 60_000);
   const webhooks = new Webhooks(core, options.fetch === null ? undefined : options.fetch ?? (globalThis.fetch as unknown as Fetch));
@@ -275,7 +275,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
       for (const id of to ?? core.liveSoulIds()) streams.deliver(id, 'world', tick, {text});
       core.spectate({kind: 'world', tick, text});
     },
-    onSpectator(l) { spectators.push(l); },
+    onSpectator(l) { spectators.push(l); return () => {const i=spectators.indexOf(l);if(i>=0)spectators.splice(i,1);}; },
     spectatorJoin: () => { let replay: SpectatorEdgeMessage[] = []; try { replay = dialogueReplay(core); } catch { /* history is optional */ } return [...roster(), ...replay]; },
     sweep,
     close() { closed = true; if (timer) clearInterval(timer); cancelSweep(); webhooks.close(); streams.wakeAll(); },

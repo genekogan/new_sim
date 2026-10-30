@@ -7,6 +7,7 @@ import {hereFrame} from './perception/here.ts';
 import {aroundFrame} from './perception/around.ts';
 import {routeFrame} from './perception/route.ts';
 import {registerEdgeEvents} from './events/index.ts';
+import {captureNativeEvidence,type CaptureGate} from './events/evidence-capture.ts';
 import {mountIdempotency} from './events/idempotency.ts';
 import {mountOperationLookup} from './events/operations.ts';
 import {mountSchema,EDGE_ACT_VERBS} from './events/schema.ts';
@@ -32,7 +33,7 @@ export function edgeSoulResolver(host: WorldHost, souls: Souls, bearer: (c: Cont
     return {soulId: s.id, entityId: m.entityId, name: m.name, owner: s.owner};
   };
 }
-export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}) {
+export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}, options:{evidenceCapture?:CaptureGate}={}) {
   const L = deps.ledger;
   // D3: an act names the owner message it serves (`for`); the world closes that message when the act ends
   const box = deps.ownerInbox as Partial<OwnerLoopInbox> | undefined;
@@ -92,6 +93,7 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
   plans = registerEdgePlans(app, deps, comms, events, L);
   const reminders=mountPersonalReminders(app,deps,comms);
   mountSchema(app);
+  const capture=options.evidenceCapture?captureNativeEvidence({gate:options.evidenceCapture,db:deps.db,worldId:deps.host.worldId,comms}):null;
   const close = comms.close;
-  return Object.assign(comms, {events, plans, close() { reminders.close(); plans?.close(); events.close(); eyes.close(); close(); }});
+  return Object.assign(comms, {events, plans, close() { capture?.close(); reminders.close(); plans?.close(); events.close(); eyes.close(); close(); }});
 }
