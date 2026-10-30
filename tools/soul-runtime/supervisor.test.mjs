@@ -184,8 +184,9 @@ test('listening matches exact native ambient speaker identities without inferrin
  const event=ambient('c_1'),fact={source:'world',event};assert.equal(attentionPriority(fact,['s_presenter']),1);assert.equal(attentionPriority(fact,[]),0);assert.equal(attentionPriority(fact,['s_other']),0);assert.equal(attentionPriority(fact,'nearby'),1);
  assert.equal(attentionPriority({source:'world',event:{...event,raw:'receipt'}},'nearby'),0);assert.equal(attentionPriority({source:'world',event:{...event,data:{from:{soulId:'s_other'},text:'s_presenter'}}},['s_presenter']),0);assert.equal(attentionPriority({source:'world',event:{...event,kind:'world.narration'}},'nearby'),0);assert.equal(attentionPriority({source:'world',event:{id:'direct',salience:3}},[]),3);assert.equal(attentionPriority({source:'owner',event:{id:'m1',salience:0}},[]),4);
 });
-test('ambient remains quiet by default and is delivered with the next urgent owner prompt',async t=>{
- const f=setup(t),states=[],running=runSupervisor({...f,signal:f.stop.signal,onState:s=>states.push(s),ambientWakeMs:30});
+test('saved mute remains quiet and is delivered with the next urgent owner prompt',async t=>{
+ const f=setup(t),owner=f.journal.control.claim('setup');f.journal.control.save(owner,0,{listenTo:[]});f.journal.control.release(owner);
+ const states=[],running=runSupervisor({...f,signal:f.stop.signal,onState:s=>states.push(s),ambientWakeMs:30});
  try{
   await until(()=>f.host.calls.length===1);f.host.finish(waitDecision);await until(()=>f.journal.control.checkpoint().value.lastCall?.type==='wait');
   f.journal.ingest({source:'world',after:null,cursor:'ambient',events:[ambient('ambient')]});await new Promise(r=>setTimeout(r,180));assert.equal(f.host.calls.length,1);assert.equal(f.host.steers.length,0);assert.equal(f.journal.pending().length,1);
@@ -193,7 +194,7 @@ test('ambient remains quiet by default and is delivered with the next urgent own
  }finally{f.stop.abort();await running;}
 });
 test('a newly chosen listening scope finds ambient speech behind quiet rows and retains the departure deadline',async t=>{
- const f=setup(t),states=[],wakeAt=new Date(Date.now()+60000).toISOString();
+ const f=setup(t),states=[],wakeAt=new Date(Date.now()+60000).toISOString(),owner=f.journal.control.claim('setup');f.journal.control.save(owner,0,{listenTo:[]});f.journal.control.release(owner);
  f.journal.ingest({source:'world',after:null,cursor:'speech',events:[...Array.from({length:200},(_,i)=>({id:'quiet'+i,kind:'receipt.started',salience:1,text:'Quiet bookkeeping'})),ambient('speech')]});
  const running=runSupervisor({...f,signal:f.stop.signal,onState:s=>states.push(s),ambientWakeMs:30});
  try{

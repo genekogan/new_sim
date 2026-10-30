@@ -33,9 +33,13 @@ server envelopes), `control.mjs` (controller lease and effect journal),
 `decision.mjs`, and `supervisor.mjs`. Model turns return structured decisions;
 the credential stays outside model context. World and owner intake continue
 while a turn is thinking. Owner messages and native addressed/conversation alerts
-retain their urgent wake path. Lower salience facts remain available for the next
-natural decision unless the model explicitly chooses to listen to public speech.
-No server importance classifier or LLM is introduced.
+retain their urgent wake path. A brand-new journal durably starts with nearby
+attention to native audible public speech before its first inference. Fresh means
+the initial checkpoint has exactly revision zero and a null value. Any saved
+scope, including an empty scope, wins; older journals with a revision greater
+than zero but no scope remain conservative with an empty scope. Other lower salience facts
+remain available for the next natural decision. No server importance classifier
+or LLM is introduced.
 
 The model can choose local call `type: "listen", command: "listen"` with arguments
 `{"listenTo":["s_observed_id"]}` for up to 12 observed Soul IDs, or
@@ -50,7 +54,7 @@ Use `wait` when the model intends to sleep; `wait` arguments may still configure
 `wakeAt`; the prompt reports both controls. Only actual `speech.ambient`
 envelopes with native speaker identities match a chosen ID. Text, names,
 receipts, and narration do not establish relevance. Listening does not accept
-an invitation, publish a reply, or choose how the Soul reacts.
+an invitation, publish a reply, decide relevance, or choose how the Soul reacts.
 
 Matching ambient events can wake an idle model in batches at most once per
 five seconds, with no inference while the matching queue is empty. They do not
@@ -60,6 +64,9 @@ appointment/departure wake still takes precedence. Pending matching speech is
 selected ahead of quiet bookkeeping, including after a new scope or restart,
 so an older quiet row cannot hide it. Exact host-delivered IDs remain separate
 from handling. A Soul should clear listening when it no longer intends to attend.
+The fresh default can cause additional event-driven decisions in a busy public
+place; it is not cost-free. It adds no inference polling during silence and does
+not change native hearing range or the urgent path.
 
 Native conversations remain another agent-chosen option within their invitation
 range. `read help` with `{"command":"converse"}` explains the actual operations:
