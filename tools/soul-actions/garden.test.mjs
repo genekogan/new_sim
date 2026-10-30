@@ -28,7 +28,7 @@ test('garden sprinkler: hand contact soaks planters in reach only, at contact; p
  const farIds=new Set(distant.map(d=>god.model.get(d.name).id));
  assert.deepEqual(edge.capabilities(soul).filter(c=>c.object&&farIds.has(c.object)).map(c=>c.id),[],'no distant sprinkler offers');
  const body=()=>f.host.engine.world.entities[soul.entityId],[ax,az]=[body().pose.p[0],body().pose.p[2]];
- assert.equal(god.act({ops:[{op:'place',def:'core/garden-sprinkler@1',name:'sprinkler',p:[ax+1.5,az+2]},{op:'place',def:'core/garden-planter@1',name:'bed-a',p:[ax+3.2,az+2.8]},{op:'place',def:'core/garden-planter@1',name:'bed-b',p:[ax+0.2,az+4.4]},{op:'place',def:'core/garden-planter@1',name:'bed-far',p:[ax+7,az+2]}]}).accepted,true);await tick(45);
+ assert.equal(god.act({ops:[{op:'place',def:'core/garden-sprinkler@1',name:'sprinkler',p:[ax+1.5,az+2]},{op:'place',def:'core/garden-planter@1',name:'bed-a',p:[ax+2.9,az+4.2]},{op:'place',def:'core/garden-planter@1',name:'bed-b',p:[ax+0.2,az+4.4]},{op:'place',def:'core/garden-planter@1',name:'bed-far',p:[ax+7,az+2]},{op:'place',def:'core/garden-planter@1',name:'bed-behind',p:[ax+1.5,az+0.2]}]}).accepted,true);await tick(45);
  const near=await here(),state=n=>god.model.get(n).state;
  assert.ok(!JSON.stringify(near).includes('moisture'),'no moisture facts in here');
  const act=async(cap,accepted=true)=>{const r=await accept(f.host,app.request('/v1/edge/act',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({capability:cap})}));const b=await r.json();assert.equal(b.accepted,accepted,JSON.stringify(b));return b;};
@@ -38,11 +38,11 @@ test('garden sprinkler: hand contact soaks planters in reach only, at contact; p
  const r=await act('object:sprinkler:switch-on');let early=false,contact=false;
  for(let n=0;n<500;n++){const m=body().human?.handActuator;if(m){contact=true;if((f.host.engine.world.tick-m.startTick)*f.host.engine.dt<0.6&&state('bed-a').moisture===1)early=true;}if(['completed','failed'].includes(edge.receipt(soul.soulId,r.receipt.id).phase))break;await tick(1);}
  assert.equal(edge.receipt(soul.soulId,r.receipt.id).phase,'completed');assert.ok(contact);assert.equal(early,false,'no soaking before contact');
- assert.equal(state('sprinkler').on,true);assert.equal(state('bed-a').moisture,1);assert.equal(state('bed-b').moisture,1);dry('bed-far');
+ assert.equal(state('sprinkler').on,true);assert.equal(state('bed-a').moisture,1);assert.equal(state('bed-b').moisture,1);dry('bed-far');dry('bed-behind');
  const restored=WorldModel.fromSnapshot(JSON.parse(JSON.stringify(god.model.snapshot())),undefined,god.model.library);assert.equal(restored.get('bed-a').state.moisture,1);
  const off=await act('object:sprinkler:switch-off');for(let n=0;n<500&&!['completed','failed'].includes(edge.receipt(soul.soulId,off.receipt.id).phase);n++)await tick(1);assert.equal(state('sprinkler').on,false);assert.equal(state('bed-a').moisture,1,'turning off keeps the soil wet');
  if(out){mkdirSync(out,{recursive:true});writeFileSync(`${out}/garden.json`,JSON.stringify(god.model.snapshot()));}
  assert.deepEqual(f.host.engine.runtime.violations,[]);
- const report={status:'pass',hereBytes:{absent:JSON.stringify(absent).length,distant100:JSON.stringify(far).length,nearby:JSON.stringify(near).length},checks:['interruption before contact: no spray, no soaking','in-reach planters soak at contact only','out-of-reach planter stays dry','persistence','turning off keeps the soil wet','no distant offers','no moisture facts in here','zero native violations']};
+ const report={status:'pass',hereBytes:{absent:JSON.stringify(absent).length,distant100:JSON.stringify(far).length,nearby:JSON.stringify(near).length},checks:['interruption before contact: no spray, no soaking','in-reach planters soak at contact only','out-of-reach and behind-the-arc planters stay dry','persistence','turning off keeps the soil wet','no distant offers','no moisture facts in here','zero native violations']};
  if(out)writeFileSync(`${out}/summary.json`,JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 });
