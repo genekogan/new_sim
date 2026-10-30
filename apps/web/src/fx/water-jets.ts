@@ -46,7 +46,7 @@ const KINDS: Record<WaterJetKind, { n: number; life: number; size: number; strea
     if (a > tl) { float s = a - tl, ang = r3 * 6.2831853; p += vec3(cos(ang), 0.0, sin(ang)) * (0.25 + 0.5 * r4) * s + vec3(0.0, 0.6 * s - 4.9 * s * s, 0.0); alpha = clamp(1.0 - s / 0.18, 0.0, 1.0) * 0.75; size *= 0.8; }
     else alpha = 0.95;` },
   // A shower head: drops leave the rose spread over its face and fall to the tray.
-  shower: { n: 1500, life: 0.8, size: 0.03, streak: 0.8, glsl: `
+  shower: { n: 2400, life: 0.8, size: 0.032, streak: 0.8, glsl: `
     float ang = r1 * 6.2831853, rad = 0.09 * sqrt(r2);
     vec3 v = vec3(cos(ang) * (0.15 + 0.35 * r3), -0.8, sin(ang) * (0.15 + 0.35 * r3));
     float tl = (v.y + sqrt(v.y * v.y + 2.0 * 9.8 * uDrop)) / 9.8;
@@ -78,7 +78,7 @@ function material(kind: WaterJetKind) {
     fragmentShader: /* glsl */`varying float vAlpha;
       void main(){ vec2 c = gl_PointCoord - 0.5; float d = length(vec2(c.x * ${(1 + 2.6 * k.streak).toFixed(2)}, c.y)); if (d > 0.5) discard;
         float body = smoothstep(0.5, 0.12, d), glint = smoothstep(0.2, 0.0, length(c - vec2(-0.06, -0.14)));
-        gl_FragColor = vec4(mix(vec3(0.56, 0.74, 0.88), vec3(1.0), glint * 0.85), body * vAlpha * 0.95); }`,
+        gl_FragColor = vec4(mix(mix(vec3(0.36, 0.55, 0.72), vec3(0.62, 0.80, 0.92), smoothstep(0.5, 0.0, d)), vec3(1.0), glint * 0.85), body * vAlpha * 0.95); }`,
   });
   materials.set(kind, m); return m;
 }
