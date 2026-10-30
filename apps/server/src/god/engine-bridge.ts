@@ -196,7 +196,11 @@ export class EngineBridge {
     this.initialEngine = this.host.engine;
     engineBridges.set(this.god.model, this);
     this.nav = new GodNav({ model: this.god.model, serviceStandingPoints: () => this.activitySpots?.serviceStandingPoints(), outdoorRegionExclusions: ref => {const id = this.places.forRef(ref)?.id;return this.edge && id ? outdoorRegionExclusions(this.edge.places, id) : undefined;}, version: () => this.version, staticVersion: () => this.godEdits, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e), placeOf: (ref) => (this.edge ? this.places.forRef(ref)?.id : undefined), describeStamp: () => `${this.describeEpoch}:${this.levels.length}` });
-    this.layers = new GodLayers({ model: this.god.model, edge: this.edge, get engine() { return o.host.engine as never; }, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), calendarPlaces: (sources) => this.calendarPlaces(sources), building: id => this.god.builds.closing(id, this.model), buildingActive: () => this.god.builds.hasClosure(), closingSites: () => this.god.builds.closingSites(), log: (m) => this.log(m) });
+    this.layers = new GodLayers({ model: this.god.model, edge: this.edge, get engine() { return o.host.engine as never; }, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), authoredPlaceRef: id => {
+      if(!this.edge||!this.places.walkable(id))return undefined;
+      const ref=(this.edge.places.byId.get(id) as {ref?:unknown}|undefined)?.ref;
+      return typeof ref==='string'&&this.places.forRef(ref)?.id===id?ref:undefined;
+    }, calendarPlaces: (sources) => this.calendarPlaces(sources), building: id => this.god.builds.closing(id, this.model), buildingActive: () => this.god.builds.hasClosure(), closingSites: () => this.god.builds.closingSites(), log: (m) => this.log(m) });
     (this.god as unknown as { layers?: GodLayers }).layers = this.layers;
     // P3 (E-life): places follow the god's edits, not the engine's (a carried cup, a duck, a lamp switched on move no place);
     // descriptions that list the things in a place catch up once a minute (1200 ticks)
@@ -1447,15 +1451,31 @@ export class EngineBridge {
     L.nativeUseRefusal = (capability, steps) => priorUseRefusal?.(capability, steps) ?? this.bedUseRefusal(capability, steps);
     // R4-INFO: god-built places are walkable (map, plain-words resolution, `via`), and the map follows the god's edits
     L.placeWalkable = (id) => this.places.walkable(id);
-    // a far named place asked for by name ("go to the big top" from across town): its walk, offered for that act only
-    L.gaitOnDemand = (soul, id, gait, caps, plans) => { let added = false; try { const go = () => { added = this.nav.gaitOnDemand(soul, id, gait, caps, plans); }, eng = this.engine as unknown as { readPassV1?: (f: () => void) => void }; if (eng.readPassV1) eng.readPassV1(go); else go(); } catch (e) { this.log(`gait on demand: ${(e as Error).message}`); } releaseBigScratch(); return added; };
-    L.walkOnDemand = (soul, id, caps, plans) => { let added = false; try { const go = () => { added = this.nav.walkOnDemand(soul, id, caps, plans); }, eng = this.engine as unknown as { readPassV1?: (f: () => void) => void }; if (eng.readPassV1) eng.readPassV1(go); else go(); } catch (e) { this.log(`walk on demand: ${(e as Error).message}`); } releaseBigScratch(); return added; };
-    // RESOLVE: a named thing beyond the listing (the horse, a boat), a building's floor ("go upstairs"), and the words of
-    // named things for reading a misspelt name; offered for that resolution only, like walkOnDemand
+    // On-demand plans are appended after the full profile's layer pass. Apply
+    // the same admission to just those new offers, with no economy enumeration.
+    // Keep blocked offers and the builder's result: resolution must report that
+    // exact refusal rather than silently try another destination.
     const pass = <T>(what: string, f: () => T, none: T): T => { let out = none; try { const go = () => { out = f(); }, eng = this.engine as unknown as { readPassV1?: (f: () => void) => void }; if (eng.readPassV1) eng.readPassV1(go); else go(); } catch (e) { this.log(`${what}: ${(e as Error).message}`); } releaseBigScratch(); return out; };
-    L.thingOnDemand = (soul, ask, caps, plans) => pass('thing on demand', () => this.nav.thingOnDemand(soul, ask, caps, plans, tokenHit), null);
-    L.walkRefOnDemand = (soul, ref, caps, plans) => pass('walk ref on demand', () => this.nav.walkRefOnDemand(soul, ref, caps, plans), false);
-    L.floorOnDemand = (soul, q, caps, plans) => pass('floor on demand', () => this.nav.floorOnDemand(soul, q, caps, plans, tokenHit), null);
+    const offer = <T>(what:string,soul:EdgeSoul,caps:EdgeCapability[],plans:Parameters<GodNav['walkOnDemand']>[3],f:()=>T,none:T):T => pass(what,()=>{
+      const start=caps.length;
+      try {
+        const out=f();
+        if(caps.length>start&&this.layers.active())this.layers.capabilities(soul,caps.slice(start),plans as never,null);
+        return out;
+      } catch(error) {
+        // A failed admission pass cannot leave an unmasked offer reachable by
+        // the resolver's later exact-ID or vocabulary fallback.
+        for(const c of caps.splice(start))plans.delete(c.id);
+        throw error;
+      }
+    },none);
+    // A far named place asked for by name, by exact ID/ref, as a floor or
+    // a named thing gets one ordinary offer with the same layer admission.
+    L.gaitOnDemand = (soul,id,gait,caps,plans) => offer('gait on demand',soul,caps,plans,()=>this.nav.gaitOnDemand(soul,id,gait,caps,plans),false);
+    L.walkOnDemand = (soul,id,caps,plans) => offer('walk on demand',soul,caps,plans,()=>this.nav.walkOnDemand(soul,id,caps,plans),false);
+    L.thingOnDemand = (soul,ask,caps,plans) => offer('thing on demand',soul,caps,plans,()=>this.nav.thingOnDemand(soul,ask,caps,plans,tokenHit),null);
+    L.walkRefOnDemand = (soul,ref,caps,plans) => offer('walk ref on demand',soul,caps,plans,()=>this.nav.walkRefOnDemand(soul,ref,caps,plans),false);
+    L.floorOnDemand = (soul,q,caps,plans) => offer('floor on demand',soul,caps,plans,()=>this.nav.floorOnDemand(soul,q,caps,plans,tokenHit),null);
     L.floorsNear = (at, radius) => pass('floors near', () => this.floorsNear(at, radius), []);
     L.thingAt = (id) => { const t = this.nav.thingById(id); return t ? [t.at[0], t.at[1]] : null; };
     L.thingWords = () => pass('thing words', () => this.nav.thingWords(), [] as string[]);
