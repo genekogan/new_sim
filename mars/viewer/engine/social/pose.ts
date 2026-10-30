@@ -54,7 +54,7 @@ export const POSE_INSTRUMENTS = ['drums', 'keyboard', 'guitar', 'bass', 'violin'
 export const GAMES = { frisbee: { period: 3.2, windup: 0.7, flight: 1.5 }, volleyball: { period: 2.6, windup: 0.4, flight: 1.4 }, petanque: { period: 7, windup: 1.6, flight: 1.4 } } as const;
 export type GameKind = keyof typeof GAMES;
 /** Public game state on each player's body (human.game); the viewer draws the disc/ball/boules from it. */
-export type GameState = { kind: GameKind; group: string; players: string[]; flightPolicy?: 'clear-v1'; releaseTick?: number; releaseFrameTick?: number; releaseFrom?: number; waiting?: boolean; since?: number; turn?: number; from?: string; to?: string | null; throwTick?: number; landTick?: number;
+export type GameState = { kind: GameKind; group: string; players: string[]; flightPolicy?: 'clear-v1'; releaseTick?: number; releaseFrameTick?: number; releaseFrom?: number; joinedAt?:number; waiting?: boolean; since?: number; turn?: number; from?: string; to?: string | null; throwTick?: number; landTick?: number;
   /** petanque: the jack, where this turn's boule lands, this end's landed boules, the last end's winner, and this body's ends won. */
   jack?: [number, number]; at?: [number, number]; boules?: { by: string; at: [number, number] }[]; end?: number; lastWinner?: string | null; wins?: number };
 /** together/1: speed of the short step-in to the paired distance (m/s). */
@@ -80,7 +80,7 @@ type Exec = { id: string; p: Params; base: string; at: number[]; t: number; yaw:
   /** together/1: 'waiting' for partners, then 'active' until the shared end tick. */
   phase?: 'waiting' | 'active'; readyAt?: number; waited?: number; until?: number; mobile?: boolean; close?: boolean;
   /** CN5 games: ticks with nobody to play with, the last petanque end seen and the ends this body won. */
-  lonely?: number; end?: number; wins?: number; since?: number;
+  lonely?: number; end?: number; wins?: number; since?: number; joinedAt?:number;
   /** once-v1: this body arrived after its group's window had closed and does the pose alone. */
   late?: boolean; gameRelease?: {at:number; frame:number; from:number; diagnostic?:Diagnostic} };
 /** together/1 public body state while a grouped pose runs (the viewer may draw open arms while waiting). */
@@ -180,7 +180,7 @@ export const poseV1: ActionDef<Params, true, Exec> = {
 function beginGameRelease(rt:Runtime,ex:Exec,dt:number,diagnostic?:Diagnostic):boolean{
  const h=rt.world.entities[ex.p.actor]?.human,g=h?.game;
  if(ex.p.game?.flightPolicy!=='clear-v1'||!h||!g||g.waiting||g.throwTick===undefined)return false;
- const frame=rt.tick-1,age=Math.max(0,(frame-(g.since??frame))*dt)/1.2,x=Math.min(1,age),from=x*x*(3-2*x);
+ const frame=rt.tick-1,age=Math.max(0,(frame-(g.joinedAt??g.since??frame))*dt)/1.2,x=Math.min(1,age),from=x*x*(3-2*x);
  ex.gameRelease={at:rt.tick,frame,from,...(diagnostic?{diagnostic}:{})};
  h.game={...g,waiting:true,releaseTick:rt.tick,releaseFrameTick:frame,releaseFrom:from};delete h.together;
  return true;
@@ -331,16 +331,17 @@ function playGame(rt: Runtime, ex: Exec, a: NonNullable<Runtime['world']['entiti
   if (new Set(players).size < 2) {
     if(clearFrisbee&&beginGameRelease(rt,ex,dt))return releaseGameStep(rt,ex,dt);
     // nobody (left) to play with: wait up to 30 s for someone to join, then the game ends
-    h.game = { kind: g.kind, group: ex.p.group!, players: roster, waiting: true, ...(g.jack ? { jack: g.jack } : {}), ...(ex.wins ? { wins: ex.wins } : {}) };
+    h.game = { kind: g.kind, group: ex.p.group!, players: roster, ...(clearFrisbee?{flightPolicy:'clear-v1' as const}:{}), waiting: true, ...(g.jack ? { jack: g.jack } : {}), ...(ex.wins ? { wins: ex.wins } : {}) };
     if (h.holding) h.prop = h.holding; else delete h.prop;
     if ((ex.lonely = (ex.lonely ?? 0) + 1) > ticks(30)) return finish(rt, ex);
     return done();
   }
   ex.lonely = 0;
+  if(clearFrisbee)ex.joinedAt??=tick;
   // turns count from the game's start: the earliest start any player shows (a joiner takes the running game's)
   const since = Math.min(ex.since ?? tick, ...playing.map((o) => o.human!.game?.since ?? Infinity)); ex.since = since;
   const P = ticks(spec.period), k = Math.floor((tick - since) / P), n = players.length, from = players[k % n], throwTick = since + k * P + ticks(clearFrisbee?FRISBEE_CLEAR_WINDUP:spec.windup), landTick = throwTick + ticks(spec.flight);
-  const state: GameState = { kind: g.kind, group: ex.p.group!, players: roster, ...(clearFrisbee?{flightPolicy:'clear-v1' as const}:{}), since, turn: k, from, throwTick, landTick };
+  const state: GameState = { kind: g.kind, group: ex.p.group!, players: roster, ...(clearFrisbee?{flightPolicy:'clear-v1' as const,joinedAt:ex.joinedAt}:{}), since, turn: k, from, throwTick, landTick };
   delete h.prop;
   if (g.kind === 'petanque' && g.jack) {
     // two boules each per end; each end's jack lies a little differently; the nearest boule wins the end

@@ -1,5 +1,5 @@
 import type {SampledEntity} from '../../engine/take/replay.ts';
-export type RecordedGame={kind:'frisbee'|'petanque'|'volleyball';group:string;players:string[];flightPolicy?:'clear-v1';since?:number;releaseTick?:number;releaseFrameTick?:number;releaseFrom?:number;waiting?:boolean;from?:string;to?:string|null;throwTick?:number;landTick?:number;turn?:number;end?:number;jack?:[number,number];at?:[number,number];boules?:{by:string;at:[number,number]}[]};
+export type RecordedGame={kind:'frisbee'|'petanque'|'volleyball';group:string;players:string[];flightPolicy?:'clear-v1';since?:number;joinedAt?:number;releaseTick?:number;releaseFrameTick?:number;releaseFrom?:number;waiting?:boolean;from?:string;to?:string|null;throwTick?:number;landTick?:number;turn?:number;end?:number;jack?:[number,number];at?:[number,number];boules?:{by:string;at:[number,number]}[]};
 const obj=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v);
 const finite=(v:unknown):v is number=>typeof v==='number'&&Number.isFinite(v);
 const v2=(v:unknown):v is [number,number]=>Array.isArray(v)&&v.length===2&&v.every(finite);
@@ -7,7 +7,7 @@ const v2=(v:unknown):v is [number,number]=>Array.isArray(v)&&v.length===2&&v.eve
 export function recordedGame(value:unknown):RecordedGame|null{
  if(!obj(value)||!['frisbee','petanque','volleyball'].includes(String(value.kind))||typeof value.group!=='string'||!value.group||!Array.isArray(value.players)||!value.players.every(p=>typeof p==='string')||value.players.length>50)return null;
  if(value.waiting!==true&&(!finite(value.throwTick)||!finite(value.landTick)||value.landTick<=value.throwTick||typeof value.from!=='string'||!value.players.includes(value.from)))return null;
- for(const key of ['since','releaseTick','releaseFrameTick','releaseFrom'])if(value[key]!==undefined&&!finite(value[key]))return null;
+ for(const key of ['since','joinedAt','releaseTick','releaseFrameTick','releaseFrom'])if(value[key]!==undefined&&!finite(value[key]))return null;
  if(value.flightPolicy!==undefined&&value.flightPolicy!=='clear-v1')return null;
  if(value.to!==undefined&&value.to!==null&&(typeof value.to!=='string'||!value.players.includes(value.to)))return null;
  for(const key of ['jack','at'])if(value[key]!==undefined&&!v2(value[key]))return null;
