@@ -49,5 +49,24 @@
       "note": "template; the world fills {{BASE}} and {{WORLD}}. Release 3 adds one \"Your resident's look\" paragraph (lane D); otherwise as publication-20be-001. 1.9.4 (lane PUX): the New Soul prompt fills --for <window code> (instructions.md?for=CODE). 1.9.5 (lane MSG): step 4 starts listening at once, without asking; the mode question is step 5. 1.9.6 (lane SOULSIM-H + QA2 F9): step 3 names the CLI URL (curl -fsSo eden-agent.mjs {{BASE}}/eden-agent.mjs); step 4 follows the batch/wait order. 1.9.8 (lane SOULSIM-E): step 3 runs approval wait in the background and says how to rename. 1.9.10 (JOIN-PROMPT): the world's name is not the Soul's; straight through to a living Soul; where a later session starts; detach live with nohup. 1.9.11: published from the matching OWNER-FIRST source commit. 1.9.12: matching publication provenance for owner-answer truth and stale-request metadata correction. 1.9.13: matching publication provenance for preserved project guides and Soul relay instructions. 1.9.14: matching publication provenance for prompt owner replies without claiming physical completion. 1.9.15 (GUIDE parent): conventional eden-soul folders append a safe parent pointer; paired status refreshes guidance while preserving owner text and linked files."
     }
   },
-  "appendix": "The per-world entry skill (/SKILL.md: God mode + Soul mode) stays tools/world-skill/SKILL.md; its Soul mode points here. It is not changed by SOUL3: uppercase /SKILL.md stays the legacy world skill; the new client uses lowercase /skill.md and /instructions.md."
+  "appendix": "The per-world entry skill (/SKILL.md: God mode + Soul mode) stays tools/world-skill/SKILL.md; its Soul mode points here. It is not changed by SOUL3: uppercase /SKILL.md stays the legacy world skill; the new client uses lowercase /skill.md and /instructions.md.",
+  "runtime": {
+    "directory": "runtime",
+    "version": "0.1.0",
+    "source": "da525ad14a00c725b65a20c44156fbae352876af",
+    "manifestSha256": "1f90e519ca8dbc73477583b5882bc7ca303e5bc76b0ba44b5631c95b7afb1c01",
+    "artifacts": [
+      {
+        "file": "run.mjs",
+        "bytes": 121987,
+        "sha256": "b50fc77ebe60ec4d603c31dec7d565b4437edb26a60881464d7441694d8ffb25"
+      },
+      {
+        "file": "launch.mjs",
+        "bytes": 4151,
+        "sha256": "2073cc2cc9ba7a7a846e7a0ebd25e4a068248af82533f9447ce32e4e314a7493"
+      }
+    ],
+    "note": "First managed runtime publication candidate. Built from the clean source commit with tools/soul-runtime/build.mjs; manifest pins every bundled input. Qualification and deployment remain pending."
+  }
 }
