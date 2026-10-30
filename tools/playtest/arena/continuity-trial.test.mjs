@@ -556,3 +556,35 @@ for(const existingFailure of [null,'CAPTURE_HEARTBEAT_GAP'])test('requested nati
  assert.equal(result.failureCode,existingFailure??'NATIVE_SOURCE_COVERAGE_UNKNOWN');assert.equal(result.coverage.nativeSources,'unknown');assert.deepEqual(result.nativeEvidence,{status:'unknown',coverage:null,failure:null});assert.equal(result.qualification,'not assessed');
  assert.ok(result.actors.every(a=>a.cleanupVerified&&a.exit.code===0&&a.failureCode===null),'clean actor exits remain actual facts, not proof of native coverage');assert.ok(f.lifecycle.filter(r=>r[0]==='complete').every(r=>r[2].outcome==='failed'));
 });
+
+test('a failed actor row makes the trial summary fail and lists bounded per-actor identity',async t=>{
+ const f=fixture(t);
+ f.deps.launchBaseline=async args=>{
+  const id=args.cwd.includes('/a/')?'a':'b';f.calls.push(args);args.onState({state:'thread-created',threadId:'thread-'+id,cwd:args.cwd});
+  return id==='a'?{exit:{code:1,signal:null},failureCode:'DECISION_PROGRESS_BUDGET_EXHAUSTED',endedAt:f.clock.now(),ownedProcessesExited:true,evidenceComplete:true}:{exit:{code:null,signal:'SIGKILL'},endedAt:f.clock.now(),ownedProcessesExited:true,evidenceComplete:true};
+ };
+ const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(3000);const result=await pending;
+ assert.equal(result.failureCode,'ACTOR_FAILED');assert.equal(result.endReason,'cutoff');
+ assert.deepEqual(result.failedActors,[{id:'a',exit:{code:1,signal:null},failureCode:'DECISION_PROGRESS_BUDGET_EXHAUSTED'},{id:'b',exit:{code:null,signal:'SIGKILL'},failureCode:null}]);
+ assert.equal(result.actors[0].failureCode,'DECISION_PROGRESS_BUDGET_EXHAUSTED');assert.deepEqual(result.actors[0].exit,{code:1,signal:null});
+ const stored=JSON.parse(readFileSync(join(f.config.directory,'summary.json'),'utf8'));assert.equal(stored.failureCode,'ACTOR_FAILED');assert.deepEqual(stored.failedActors,result.failedActors);
+ assert.equal(JSON.parse(readFileSync(join(f.config.directory,'a','actor-result.json'),'utf8')).failureCode,'DECISION_PROGRESS_BUDGET_EXHAUSTED');
+ assert.ok(f.lifecycle.filter(r=>r[0]==='complete').every(r=>r[2].outcome==='failed'));
+});
+
+test('an earlier runner failure code is preserved when actors also fail',async t=>{
+ const f=fixture(t);f.deps.verifyBaseline=()=>false;
+ f.deps.launchBaseline=async args=>{
+  const id=args.cwd.includes('/a/')?'a':'b';f.calls.push(args);args.onState({state:'thread-created',threadId:'thread-'+id,cwd:args.cwd});
+  return {exit:{code:id==='a'?1:0,signal:null},failureCode:id==='a'?'DECISION_PROGRESS_BUDGET_EXHAUSTED':undefined,endedAt:f.clock.now(),ownedProcessesExited:true,evidenceComplete:true};
+ };
+ const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(3000);const result=await pending;
+ assert.equal(result.failureCode,'OWNED_CLEANUP_UNVERIFIED');assert.deepEqual(result.failedActors.map(a=>a.id),['a']);
+});
+
+test('all actors exiting zero keep a null trial failure and an empty failed-actor list',async t=>{
+ const f=fixture(t);
+ const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(3000);const result=await pending;
+ assert.equal(result.failureCode,null);assert.deepEqual(result.failedActors,[]);
+ assert.ok(f.lifecycle.filter(r=>r[0]==='complete').every(r=>r[2].outcome==='bounded-end'));
+});

@@ -407,6 +407,10 @@ export async function runContinuityTrial(config,deps={}){
   if(row.result)privateJson(join(row.directory,'actor-result.json'),{exit:row.result.exit,failureCode:row.failureCode??row.result.failureCode??null,cleanupVerified:row.cleanupVerified,execProof:row.result.execProof??null,metadataGroups:row.result.metadataGroups??null,ephemeral:row.result.ephemeral===true,controllers:row.result.controllers?.map(controller=>({...controller,hostPids:[...(controller.hostPids??[])]}))??null,usage:row.result.usage??null,evidenceComplete:row.result.evidenceComplete??null,restartProofs:row.result.restartProofs??null});
  }
  const summary={schema:'sim-continuity-trial-result/1',arm,purpose,startedAt,cutoffAt,endedAt:now(),endReason,failureCode,qualification:'not assessed',coverage:{disturbances:'unknown',restart:'unknown',semanticOutcome:'not scored',actualEffort:'only authoritative host metadata; otherwise unknown'},actors:rows.map(row=>({id:row.actor.id,soulId:row.paired.soul,releasedAt:row.releasedAt??null,threads:[...row.threads],ephemeralThreads:[...row.ephemeralThreads],cleanupVerified:row.cleanupVerified,failureCode:row.failureCode??row.result?.failureCode??null,exit:row.result?.exit??null,actualModel:row.result?.actualModel??null,actualEffort:row.result?.actualEffort??null,endedBeforeCutoff:row.result?.endedAt!==undefined?row.result.endedAt<cutoffAt:null}))};
+ // Any actor's own failure (code, nonzero exit, or signal death) fails the trial
+ // summary without overwriting an earlier runner/native/cleanup failure code.
+ summary.failedActors=summary.actors.filter(a=>a.failureCode||a.exit&&(a.exit.code!==0&&a.exit.code!=null||a.exit.code==null&&a.exit.signal!=null)).slice(0,64).map(a=>({id:a.id,exit:a.exit,failureCode:a.failureCode}));
+ if(summary.failedActors.length)summary.failureCode??='ACTOR_FAILED';
  summary.usageGuard=usageState;
  summary.restart=restartResult;
  summary.nativeEvidence=nativeResult;
