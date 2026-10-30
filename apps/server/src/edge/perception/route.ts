@@ -44,9 +44,17 @@ export function routeFrame(ledger: EdgeLedger, soul: EdgeSoul, query: string) {
     }
     return best ? {how: best.how, name: best.p.name, id: best.p.id} : null;
   };
+  // Names/aliases are authored vocabulary; shared aliases return a bounded choice rather than a silent nearest.
+  const ask=tokens(query),matches=(names:string[])=>{const exact=names.some(n=>tokens(n).join(' ')===ask.join(' '));const all=names.flatMap(tokens);return exact?0:ask.length&&ask.every(w=>all.includes(w))?1:9;};
+  const scored=known.map(p=>{const tier=matches([p.name,p.id,...(p.aliases??[]),...(p.semanticKind?[p.semanticKind]:[])]),at=placeAt(p);return{p,at,exact:tier===0,tier:tier+(p.name.includes('/')?0.5:0),d:inPoly(pos[0],pos[1],p.polygon)?0:dist2(pos,at)};}).filter(x=>x.tier<9).sort((a,b)=>a.tier-b.tier||a.d-b.d);
+  const parts=known.flatMap(p=>(p.parts??[]).filter(part=>knownPart(ledger,soul,ledger.places.byId.get(p.id)!,part)).map(part=>{const named=matches([part.title,...(part.aliases??[])]);return{p,part,exact:named===0,tier:named<9?named:matches([part.title,...(part.aliases??[]),p.name,...(p.aliases??[])])+0.5};})).filter(x=>x.tier<9).sort((a,b)=>a.tier-b.tier);
+  // Keep exact Soul lookup, but a known exact destination must not be stolen by
+  // a Soul whose longer name merely contains it. Withheld places/parts do not
+  // participate in this choice; their names must not change a visible result.
+  const souls = [...ledger.host.minds.values()].filter(m => m.soulId !== soul.soulId);
+  const exactDestination=scored.some(x=>x.exact)||parts.some(x=>x.exact);
+  const soulHit = souls.find(m=>norm(m.name)===q) ?? (!exactDestination&&q.length>=4?souls.find(m=>norm(m.name).includes(q)):undefined);
   // a Soul by name: where it is (its building or outdoor place, never the room)
-  const soulHit = [...ledger.host.minds.values()].filter(m => m.soulId !== soul.soulId && norm(m.name) === q || (q.length >= 4 && m.soulId !== soul.soulId && norm(m.name).includes(q)))
-    .sort((a, b) => Number(norm(b.name) === q) - Number(norm(a.name) === q))[0];
   if (soulHit) {
     const b = P.w.entities[soulHit.entityId]; if (!b) return {query, found: false, reason: `${soulHit.name} is not in the world right now.`};
     const at: V2 = [b.pose.p[0], b.pose.p[2]], where = ledger.placePathOf(soulHit.soulId).find(p => p.kind !== 'occupier' && p.kind !== 'room' && plainName(p.name) && !K.isSecret(p.id))
@@ -55,10 +63,6 @@ export function routeFrame(ledger: EdgeLedger, soul: EdgeSoul, query: string) {
     return {query, found: true, soul: {id: soulHit.soulId, name: soulHit.name}, at: where?.name ?? 'out in the open', ...l, ...(lm ? {[lm.how]: lm.name} : {}),
       say: `${soulHit.name} is at ${where?.name ?? 'an open spot'}, ${l.m} m ${l.dir} of you (${l.eta})${lm ? `, ${lm.how} ${lm.name}` : ''}.`};
   }
-  // Names/aliases are authored vocabulary; shared aliases return a bounded choice rather than a silent nearest.
-  const ask=tokens(query),matches=(names:string[])=>{const exact=names.some(n=>tokens(n).join(' ')===ask.join(' '));const all=names.flatMap(tokens);return exact?0:ask.length&&ask.every(w=>all.includes(w))?1:9;};
-  const scored=known.map(p=>{const tier=matches([p.name,p.id,...(p.aliases??[]),...(p.semanticKind?[p.semanticKind]:[])]),at=placeAt(p);return{p,at,tier:tier+(p.name.includes('/')?0.5:0),d:inPoly(pos[0],pos[1],p.polygon)?0:dist2(pos,at)};}).filter(x=>x.tier<9).sort((a,b)=>a.tier-b.tier||a.d-b.d);
-  const parts=known.flatMap(p=>(p.parts??[]).filter(part=>knownPart(ledger,soul,ledger.places.byId.get(p.id)!,part)).map(part=>({p,part,tier:matches([part.title,...(part.aliases??[])])<9?matches([part.title,...(part.aliases??[])]):matches([part.title,...(part.aliases??[]),p.name,...(p.aliases??[])])+0.5}))).filter(x=>x.tier<9).sort((a,b)=>a.tier-b.tier);
   if(parts.length&&(!scored.length||parts[0].tier<scored[0].tier)){
     const tied=parts.filter(x=>x.tier===parts[0].tier);
     if(tied.length>1)return{query,found:false,code:'place.ambiguous',reason:'Several named parts match; choose one by its owner and name.',candidates:tied.slice(0,5).map(({p,part})=>({name:part.title,in:p.name,walk:part.walk}))};
