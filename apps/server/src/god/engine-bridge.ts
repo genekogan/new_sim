@@ -1462,6 +1462,20 @@ export class EngineBridge {
     L.beforeMap = () => { this.flush(); this.perceiveSync(); };
     const prev = L.worldProfile;
     L.worldProfile = (soul, caps, plans) => { prev?.(soul, caps, plans); try { this.capabilities(soul, caps, plans as never); } catch (e) { this.log(`capabilities: ${(e as Error).message}`); } };
+    L.exactAuthoredWalkRef=ref=>this.nav.exactPlaceWalkRef(ref);
+    L.registerExactWalkProfile(L.worldProfile,prev,(soul,asked,caps,plans)=>{
+      let selected=false;
+      const read=()=>{
+        // Native bindings/profile precede GodNav exactly as in the full list.
+        selected=caps.some(c=>c.id===asked)||this.nav.exactListedWalk(soul,asked.slice(5),caps,plans);
+        if(!selected)return;
+        const me=this.engine.world.entities[soul.entityId];
+        if(this.layers.active())this.layers.capabilities(soul,caps,plans as never,me?[me.pose.p[0],me.pose.p[2]]:null);
+      };
+      const eng=this.engine as unknown as {readPassV1?:(f:()=>void)=>void};
+      try{if(eng.readPassV1)eng.readPassV1(read);else read();}finally{releaseBigScratch();}
+      return selected;
+    });
     const act = L.act.bind(L), self = this;
     (L as any).act = async function (soul: EdgeSoul, input: { capability?: unknown; params?: unknown; clientRef?: unknown }) {
       if (input?.capability === 'pray' || (typeof input?.capability === 'string' && /^pray(\s|:|$)/.test(input.capability))) return self.pray(L, soul, input);

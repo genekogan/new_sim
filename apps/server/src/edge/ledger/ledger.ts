@@ -70,10 +70,24 @@ type StandReleaseV1={actor:string;owner:string;seats:{action:string;slot:string}
 /** The body plans behind a Soul's offered capabilities, by capability id. */
 type Plans = Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>;
 
+type WalkProfile=(soul:EdgeSoul,caps:EdgeCapability[],plans:Plans)=>void;
+type ExactWalkProfile=(soul:EdgeSoul,asked:string,caps:EdgeCapability[],plans:Plans)=>boolean;
+type ExactWalkBindings={caps:EdgeCapability[];plans:Plans;tick:number};
+
 export class EdgeLedger implements EdgeLedgerHooks {
   places: PlaceIndex;
   private receiptListeners: ((r: EdgeReceipt) => void)[] = [];
   private placeListeners: ((e: {soulId: string; from: string | null; to: string | null; tick: number}) => void)[] = [];
+  private exactWalkObjectProviders=new WeakSet<(soul:EdgeSoul)=>EdgeCapability[]>();
+  private exactWalkProfiles=new WeakMap<WalkProfile,ExactWalkProfile>();
+  /** Installed only by the native authored-place bridge; no names/aliases. */
+  exactAuthoredWalkRef?: (ref:string)=>boolean;
+  /** Explicitly opt a known profile wrapper into exact-walk projection. Any
+   * unknown wrapper/provider keeps the full authoritative listing path. */
+  registerExactWalkProfile(profile:WalkProfile,previous:WalkProfile|undefined,extend?:ExactWalkProfile){
+    const prior=previous?this.exactWalkProfiles.get(previous):()=>true;if(!prior)return;
+    this.exactWalkProfiles.set(profile,(soul,asked,caps,plans)=>prior(soul,asked,caps,plans)&&(extend?.(soul,asked,caps,plans)??true));
+  }
   private providers: ((s: EdgeSoul) => EdgeCapability[])[] = [];
   /** MW: a world profile (worlds/*: Mars camp work, floater bodies) adds planned capabilities and drops ones its bodies cannot do. */
   /** R4-LIVE (god worlds only): the weather now, for `here` and Eyes; unset on the live worlds (engine env.weather). */
@@ -615,14 +629,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const m = this.mind(soul), read = readHumanCapabilitiesV1(this.host, m, {registeredActivitiesV1: true, deferRouteChecks: true, skipRegisteredCards: true});
     const caps: EdgeCapability[] = [], plans = new Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>();
     const secondsParam = {seconds: {type: 'integer', min: 1, max: 600, default: 60}};
-    for (const b of read.bindings.values()) {
-      const {id, verb} = edgeIdOf(b); const seconds = b.goal === 'sit' || b.goal === 'rest' || b.goal === 'hang_out';
-      const target = b.targetId ? {id: b.targetId, kind: this.places.byId.has(b.targetId) ? 'place' : this.host.engine.world.entities[b.targetId] ? 'object' : 'place'} : undefined;
-      caps.push({id, verb, label: b.label, available: b.available, ...(target ? {target} : {}), ...(b.available ? {} : {blocked: {code: b.blockedCode ?? 'physical.unavailable', reason: humanBlockedExplanationV1(b.blockedCode, b.label)}}), ...(seconds ? {params: secondsParam} : {})});
-      const outside=b.targetId&&(b.goal==='walk'||b.goal==='hang_out')?outdoorRegionExclusions(this.places,b.targetId):undefined;
-      const steps=outside!==undefined?b.steps.map(step=>step.verb==='walk_to'&&step.params.spread==='region/1'?{...step,params:{...step.params,regionOutside:outside}}:step):b.steps;
-      plans.set(id, {label: b.label, steps, seconds});
-    }
+    for (const b of read.bindings.values()) this.addNativeBinding(b,caps,plans,secondsParam);
     caps.push({id: 'stand:here', verb: 'stand', label: 'Stand up / stop what I am doing', available: true});
     plans.set('stand:here', {label: 'Stand up', steps: [], stop: true});
     // CN5 (acceptance): go near anyone in sight within 60 m (a gesture to someone farther off offers this first)
@@ -741,17 +748,52 @@ export class EdgeLedger implements EdgeLedgerHooks {
         this.bikeRide(soul, me, caps, plans, `cycle:${place.id}`, 'cycle', place.id, `Ride a bicycle to ${place.name} and back`, legs, bikesOut);
       }
     }
+    this.finishBindings(soul,caps,plans,true);
+    const value = {caps, plans}; this.capCache.set(soul.soulId, {tick, value}); return value;
+  }
+  private addNativeBinding(b:HumanBindingV1,caps:EdgeCapability[],plans:Plans,secondsParam:EdgeCapability['params']={seconds:{type:'integer',min:1,max:600,default:60}}){
+    const {id, verb} = edgeIdOf(b); const seconds = b.goal === 'sit' || b.goal === 'rest' || b.goal === 'hang_out';
+    const target = b.targetId ? {id: b.targetId, kind: this.places.byId.has(b.targetId) ? 'place' : this.host.engine.world.entities[b.targetId] ? 'object' : 'place'} : undefined;
+    caps.push({id, verb, label: b.label, available: b.available, ...(target ? {target} : {}), ...(b.available ? {} : {blocked: {code: b.blockedCode ?? 'physical.unavailable', reason: humanBlockedExplanationV1(b.blockedCode, b.label)}}), ...(seconds ? {params: secondsParam} : {})});
+    const outside=b.targetId&&(b.goal==='walk'||b.goal==='hang_out')?outdoorRegionExclusions(this.places,b.targetId):undefined;
+    const steps=outside!==undefined?b.steps.map(step=>step.verb==='walk_to'&&step.params.spread==='region/1'?{...step,params:{...step.params,regionOutside:outside}}:step):b.steps;
+    plans.set(id, {label: b.label, steps, seconds});
+  }
+  private finishBindings(soul:EdgeSoul,caps:EdgeCapability[],plans:Plans,includeProviders=false){
+    const me=this.body(soul.entityId),secondsParam={seconds:{type:'integer',min:1,max:600,default:60}};
     // A moving carrier retains its riders until it returns, regardless of which world supplied the offer.
     const ride = this.aboard(soul.entityId);
     const stepping = this.stepOutRefusal(soul.entityId);
     if (ride && stepping) for (const c of caps) if (!/^object:[^:]+:leave$/.test(c.id) && !['accept', 'decline', 'ask-to-stop'].includes(c.verb)) {c.available = false; c.blocked = stepping;}
     if (ride && !stepping) for (const c of caps) if (c.verb === 'make' || (ride.phase === 'aloft' && !['rest:here', 'stand:here'].includes(c.id) && !['accept', 'decline', 'ask-to-stop'].includes(c.verb))) {c.available = false; c.blocked = {code: 'ride.aboard', reason: ride.phase === 'aloft' ? `You are travelling in ${ride.label}; it returns by itself and you step out then.` : `You are in ${ride.label}; leave it first.`};}
-    for (const p of this.providers) try {caps.push(...p(soul));} catch {/* a provider fault hides only its own entries */}
+    for (const p of includeProviders?this.providers:[]) try {caps.push(...p(soul));} catch {/* a provider fault hides only its own entries */}
     if (ride && !stepping) {const seated = this.rideStandRefusal(soul.entityId, caps), st = seated && caps.find(c => c.id === 'stand:here'); if (st) {st.available = false; st.blocked = seated!;}}
     shapeRigidCapabilities(me,caps,plans as never,secondsParam);
     // knowledge/1: an offer that leads to (or names) a secret place this Soul has not been to or found is not offered
     if (this.knowledge.marked().size) for (let i = caps.length - 1; i >= 0; i--) {if (this.secretOffer(soul,caps[i]!)) {plans.delete(caps[i]!.id); caps.splice(i, 1);}}
-    const value = {caps, plans}; this.capCache.set(soul.soulId, {tick, value}); return value;
+  }
+  private exactWalkBindings(soul:EdgeSoul,input:{capability?:unknown;params?:unknown}):ExactWalkBindings|null {
+    const asked=input.capability;
+    if(typeof asked!=='string'||asked.length>200||!/^walk:[^\s:#]+$/.test(asked)||this.faded.has(soul.soulId)||this.providers.some(p=>!this.exactWalkObjectProviders.has(p))||!this.worldProfile)return null;
+    if(input.params!==undefined&&input.params!==null&&(typeof input.params!=='object'||Array.isArray(input.params)||Object.keys(input.params).length))return null;
+    const project=this.exactWalkProfiles.get(this.worldProfile),ref=asked.slice(5);
+    if(!project)return null;
+    try {
+      if(!this.exactAuthoredWalkRef?.(ref))return null;
+      // Reuse an already-authoritative full same-tick listing, never cache sparse data.
+      const tick=this.host.engine.world.tick,hit=this.capCache.get(soul.soulId);
+      if(hit?.tick===tick)return hit.value.caps.some(c=>c.id===asked)?{...hit.value,tick}:null;
+      const read=readHumanCapabilitiesV1(this.host,this.mind(soul),{registeredActivitiesV1:true,deferRouteChecks:true,skipRegisteredCards:true,onlyWalkTarget:ref}),caps:EdgeCapability[]=[],plans:Plans=new Map();
+      for(const b of read.bindings.values())if(b.id===asked&&b.goal==='walk')this.addNativeBinding(b,caps,plans);
+      if(!project(soul,asked,caps,plans))return null;
+      // Evaluate known providers rather than trust a stale namespace promise.
+      // Drift to any non-object offer disables projection before admission.
+      for(const provider of this.providers)if(provider(soul).some(c=>c.verb!=='object'||!c.id.startsWith('object:')))return null;
+      this.finishBindings(soul,caps,plans);
+      const cap=caps.find(c=>c.id===asked);
+      // Refusals need the original complete diagnostics/alternatives too.
+      return cap?.available&&plans.has(asked)?{caps,plans,tick}:null;
+    }catch{return null;}
   }
   invalidateBodies(){this.capCache.clear();}
   bodyAssignmentReady(soul:EdgeSoul){return !this.faded.has(soul.soulId)&&!this.pending.has(soul.soulId)&&!this.openReceipts(soul.soulId).length&&!this.together.awaiting(soul.soulId)&&!this.together.heldBy(soul.soulId);}
@@ -789,7 +831,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     };
     return engine.readPassV1 ? engine.readPassV1(read) : read();
   }
-  addCapabilityProvider(p: (soul: EdgeSoul) => EdgeCapability[]) {this.providers.push(p);}
+  addCapabilityProvider(p: (soul: EdgeSoul) => EdgeCapability[],projection?:{exactWalk:'objects-only'}) {this.providers.push(p);if(projection?.exactWalk==='objects-only')this.exactWalkObjectProviders.add(p);}
 
   /** OWNER-DAY: the world's reason and where the body stood are kept so its owner can read the refusal on the "Today" timeline. */
   recordRefusal(soulId: string, verb: string, capability: string, code: string, reason = '') {
@@ -837,11 +879,13 @@ export class EdgeLedger implements EdgeLedgerHooks {
   async act(soul: EdgeSoul, input: {capability?: unknown; params?: unknown; clientRef?: unknown; verb?: unknown; target?: unknown}): Promise<{accepted: true; receipt: EdgeReceipt; resolved?: Resolved; result?: unknown} | {accepted: false; code: string; reason: string; capability: string; retry_after?: number; did_you_mean?: {id: string; label: string}[]; resolved?: Resolved}> {
     // intents/1 (Core-A): {verb, target} is resolved now and acted on as the concrete choice it reports
     if (input.capability === undefined && input.verb !== undefined) {const out = await this.intents.act(soul, input as IntentInput); if (out.accepted) this.capCache.clear(); return out;}
+    let exactWalk:ExactWalkBindings|null=null;
     if(typeof input.capability==='string'){
       if(input.capability.length>=1&&input.capability.length<=200&&typeof input.clientRef==='string'&&input.clientRef.length<=100){const old=this.coreA.byClientRef(soul.soulId,input.clientRef);if(old)return {accepted:true,receipt:old};}
       // BODY refusals precede place/alias diagnostics, as in the original actOnce path.
       const bodyIssue=this.bodyVerbProblem(soul,input.capability.split(/[:\s]/)[0]!);
-      const place=bodyIssue?null:explicitPlaceCapability(this,soul,input.capability.trim());
+      exactWalk=bodyIssue?null:this.exactWalkBindings(soul,input);
+      const place=bodyIssue?null:explicitPlaceCapability(this,soul,input.capability.trim(),exactWalk?.caps);
       // SOULSIM-E (real-agent run on 3.60, 2026-10-21): resolve offers a far place's walk on demand and the agent acts on
       // that id, as the skill says; the id was refused place.unwalkable here. actOnce below walks it on demand, as words.
       const onDemand=!!place&&!place.ok&&place.code==='place.unwalkable'&&this.onDemandId(soul,input.capability.trim());
@@ -856,11 +900,11 @@ export class EdgeLedger implements EdgeLedgerHooks {
       // quality case 27: an ambiguous destination ("the library") falls back to the walk its plain words resolve to, still inviting
       const alt=walkWithFallback(this,soul,walk);if(alt){const again=await this.actOnce(soul,{capability:alt.cap.id,params:{...(input.params&&typeof input.params==='object'?input.params as Record<string,unknown>:{}),with:walk.with},clientRef:input.clientRef});if(again.accepted){this.capCache.clear();return {...again,resolved:{from:input.capability,to:alt.cap.id,note:`Walk to ${alt.cap.label}; ${(walk.with as string[]).join(', ')} receive an invitation and choose whether to join.`}};}}
       return out;}}
-    const out = await this.actOnce(soul, input);
+    const out = await this.actOnce(soul, input,exactWalk);
     if (out.accepted) this.capCache.clear();     // invitations, items and follows change what others can do this tick
     return out;
   }
-  private async actOnce(soul: EdgeSoul, input: {capability?: unknown; params?: unknown; clientRef?: unknown}): Promise<{accepted: true; receipt: EdgeReceipt; resolved?: Resolved; result?: unknown} | {accepted: false; code: string; reason: string; capability: string; retry_after?: number; did_you_mean?: {id: string; label: string}[]; resolved?: Resolved}> {
+  private async actOnce(soul: EdgeSoul, input: {capability?: unknown; params?: unknown; clientRef?: unknown},exactWalk:ExactWalkBindings|null=null): Promise<{accepted: true; receipt: EdgeReceipt; resolved?: Resolved; result?: unknown} | {accepted: false; code: string; reason: string; capability: string; retry_after?: number; did_you_mean?: {id: string; label: string}[]; resolved?: Resolved}> {
     const asked = typeof input.capability === 'string' ? input.capability : '';
     if (!asked || asked.length > 200) throw new EdgeError(400, 'invalid', 'body must be {capability, params?, clientRef?}');
     let capability = asked;
@@ -874,7 +918,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       await this.host.enqueue('edge-relocate', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, to: this.startingPoint(soul.soulId), why: 'reclaimed after fading'});
       this.capCache.delete(soul.soulId);
     }
-    let {caps, plans} = this.binds(soul);
+    let {caps, plans} = exactWalk?.tick===this.host.engine.world.tick?exactWalk:this.binds(soul);
     let params = (input.params && typeof input.params === 'object' && !Array.isArray(input.params) ? {...input.params as Record<string, unknown>} : {}) as Record<string, unknown>;
     if(['read','write','use-computer','listen','paint','craft','post-letter'].includes(askedVerb)){try{outcomeParams(params);}catch{return refuse('capability.params','Content parameters must be bounded strings (book100, query200, title100, text2000).');}if(params.book!==undefined&&!EDEN_LIBRARY_CATALOGUE.some(b=>b.id===params.book))return refuse('content.book-unknown','Choose a book id from the published catalogue.');}
     // intents/1: plain words for the attention channel ("look at the fire", "turn to Bill") and face:<soul> never touch the body

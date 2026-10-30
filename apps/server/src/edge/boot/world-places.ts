@@ -50,9 +50,9 @@ export function offeredWalkObject(L:EdgeLedger,soul:EdgeSoul,input:string){
  const cap=objects[0];if(!cap.available)return {ok:false as const,code:cap.blocked?.code??'physical.unavailable',reason:cap.blocked?.reason??'The current native destination capability is unavailable.',did_you_mean:[]};
  return {ok:true as const,cap,matchedBy:exact.length?'name' as const:'alias' as const};
 }
-export function explicitPlaceCapability(L:EdgeLedger,soul:EdgeSoul,asked:string){
+export function explicitPlaceCapability(L:EdgeLedger,soul:EdgeSoul,asked:string,currentCaps?:EdgeCapability[]){
  const i=asked.indexOf(':');if(i<=0)return null;const verb=asked.slice(0,i),target=asked.slice(i+1);
- const caps=L.coreA.binds(soul).caps;
+ const caps=currentCaps??L.coreA.binds(soul).caps;
  if(caps.some(c=>c.id===asked)||target==='here')return null;
  // Never route a Soul, fixture, spot, item or object ID through place matching.
  if(!['walk','stroll','hang-out','gather','swim','read','lie','nap','sit-ground'].includes(verb))return null;

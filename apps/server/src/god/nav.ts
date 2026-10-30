@@ -552,8 +552,8 @@ export class GodNav {
   // ------------------------------------------------------------------ capabilities
 
   /** `walk:<path>` for the nearest named things and the rooms of near buildings (plus any this Soul asked for). */
-  capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Plans) {
-    const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human) return;
+  private selectedWalks(soul: EdgeSoul) {
+    const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human) return null;
     const here: Vec2 = [me.pose.p[0], me.pose.p[2]], myLevel = me.human.level ?? 0;
     const seated = me.human.activity === 'sit' || me.human.baseActivity === 'sit';
     const all = this.things();
@@ -582,7 +582,24 @@ export class GodNav {
       const inside = d <= UPPER_ROOMS_WITHIN || myLevel !== 0 || rooms.some((r) => r.level === 0 && !!r.poly && inPoly(here[0], here[1], r.poly));
       for (const rt of rooms) if (rt.level === 0 || (rt.rise ?? 0) < LOW_RISE_M || inside) pick.push({ t: rt, d: this.distance(rt, here) });
     }
-    for (const { t, d } of pick) this.offerWalk(soul, t, d, { here, myLevel, seated, exit }, caps, plans);
+    return {pick, here, myLevel, seated, exit};
+  }
+
+  capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Plans) {
+    const selected=this.selectedWalks(soul);if(!selected)return;
+    for(const {t,d} of selected.pick)this.offerWalk(soul,t,d,selected,caps,plans);
+  }
+  /** Exact authored place refs only. Unlisted/on-demand refs retain the full
+   * resolver, whose far-room door leg differs from the ordinary listing. */
+  exactPlaceWalkRef(ref:string):boolean {
+    const t=this.thing(ref);return !!t&&!t.semanticPart&&!!this.h.placeOf?.(ref);
+  }
+  exactListedWalk(soul:EdgeSoul,ref:string,caps:EdgeCapability[],plans:Plans):boolean {
+    if(!this.exactPlaceWalkRef(ref))return false;
+    const selected=this.selectedWalks(soul),entry=selected?.pick.find(({t})=>t.ref===ref);
+    if(!selected||!entry)return false;
+    this.offerWalk(soul,entry.t,entry.d,selected,caps,plans,true);
+    return caps.some(c=>c.id==='walk:'+ref);
   }
 
   /** A walk to one named place the listing leaves out for distance (the far big top, asked for by name): the same
@@ -738,7 +755,7 @@ export class GodNav {
     return true;
   }
 
-  private offerWalk(soul: EdgeSoul, t: Thing, d: number, at: { here: Vec2; myLevel: number; seated: boolean; exit: { p: Vec2; level: number } | null }, caps: EdgeCapability[], plans: Plans) {
+  private offerWalk(soul: EdgeSoul, t: Thing, d: number, at: { here: Vec2; myLevel: number; seated: boolean; exit: { p: Vec2; level: number } | null }, caps: EdgeCapability[], plans: Plans, onlyWalk=false) {
     const { here, myLevel, seated, exit } = at;
     const id = `walk:${t.ref}`; if (caps.some((c) => c.id === id)) return;
     const g0 = this.goal(t, here, soul.entityId), where = this.label(t, Math.round(d)), place = this.h.placeOf?.(t.ref);
@@ -763,7 +780,7 @@ export class GodNav {
       caps.push({id:sid,verb:'sit',label:`Sit at ${t.name} [${t.ref}]`,...(t.aliases?.length?{aliases:t.aliases}:{}),target:{id:target.entity,kind:'object'},available:true,params:{seconds:{type:'integer',min:1,max:600,default:600}}});
       plans.set(sid,{label:`Sit at ${t.name}`,steps:[...stand,...down,go,{verb:'mars:sit',params:{slot:`${target.entity}#${target.slot}`}},{verb:'rest',params:{seconds:600}}],seconds:true});
     }
-    if (place) this.placeCapabilities(t, place, here, d, [...stand, ...down, go], myLevel, caps, plans);
+    if (place&&!onlyWalk) this.placeCapabilities(t, place, here, d, [...stand, ...down, go], myLevel, caps, plans);
   }
 
   /** R4-INFO: what Eden offers at each of its places, at a god-built place too: hang out there (walk there, then spend

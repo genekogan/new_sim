@@ -67,4 +67,6 @@ export function installWorldLore(L: EdgeLedger, god: GodMode) {
       const p = plans.get(c.id); if (p) p.label = p.label.replace(/a book/i, god.model.state.constitution ? "this world's constitution" : 'about this world');
     }
   };
+  // This wrapper changes read labels only; exact walk cap/plan remain unchanged.
+  L.registerExactWalkProfile(L.worldProfile!,prev);
 }

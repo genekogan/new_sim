@@ -91,7 +91,9 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   objects.register(projectKind);
   objects.register(calendarKind);
   objects.register(rideKind);
-  deps.ledger.addCapabilityProvider(soul => objects.capabilities(soul));
+  // Audited read-only object offers cannot replace a walk. The ledger still
+  // evaluates/validates this projection; a future non-object offer falls back.
+  deps.ledger.addCapabilityProvider(soul => objects.capabilities(soul),{exactWalk:'objects-only'});
   const steward = new Steward(core, options.stewardToken);
   const fading = new Fading(core, steward, options.fading === true, options.beam);
   core.isFaded = id => fading.status(id)?.colour === 'gone';
