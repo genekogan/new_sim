@@ -56,12 +56,8 @@ const gardenSprinkler: DefInput = {
     { kind: 'box', at: [0, 0.3, 0], size: [0.06, 0.6, 0.06], round: 0.01, tint: 'metal' },
     { kind: 'cyl', at: [0, 0.64, 0], r: 0.05, h: 0.05, segments: 10, tint: 'metal' },
     { kind: 'cyl', at: [0, 0.42, -0.05], r: 0.04, h: 0.03, segments: 6, tint: 'valve', pitch: -Math.PI / 2 },
-    // an arc sprinkler: thin jets fan forward and up from the head; the valve is on the back, where the Soul stands
-    { kind: 'cyl', at: [-0.7, 1.358, 0.68], r: 0.012, r2: 0.05, h: 2.4, segments: 6, pitch: 0.95, yaw: -0.8, tint: 'water', material: 'water', when: '@on' },
-    { kind: 'cyl', at: [-0.38, 1.358, 0.899], r: 0.012, r2: 0.05, h: 2.4, segments: 6, pitch: 0.95, yaw: -0.4, tint: 'water', material: 'water', when: '@on' },
-    { kind: 'cyl', at: [0.0, 1.358, 0.976], r: 0.012, r2: 0.05, h: 2.4, segments: 6, pitch: 0.95, yaw: 0, tint: 'water', material: 'water', when: '@on' },
-    { kind: 'cyl', at: [0.38, 1.358, 0.899], r: 0.012, r2: 0.05, h: 2.4, segments: 6, pitch: 0.95, yaw: 0.4, tint: 'water', material: 'water', when: '@on' },
-    { kind: 'cyl', at: [0.7, 1.358, 0.68], r: 0.012, r2: 0.05, h: 2.4, segments: 6, pitch: 0.95, yaw: 0.8, tint: 'water', material: 'water', when: '@on' }] } } as unknown as DefInput['make'],
+    // an oscillating sprinkler: the viewer's droplets (fx/water-jets.ts) sweep forward from the nozzle; the valve is on the back
+    { kind: 'cyl', at: [0, 0.69, 0.04], r: 0.02, h: 0.03, segments: 6, tint: 'nozzle', pitch: Math.PI / 3 }] } } as unknown as DefInput['make'],
   params: { ...params, reach: { type: 'number', min: 1, max: 8, default: SPRINKLER_REACH, doc: 'metres of garden it waters' } } as DefInput['params'], palette,
   state: { on: { type: 'bool', default: false } } as DefInput['state'],
   components: water('water', 9, 0.3) as DefInput['components'],
