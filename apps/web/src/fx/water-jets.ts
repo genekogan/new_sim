@@ -23,11 +23,12 @@ export function nozzleOf(def: Def): [number, number, number] | null {
 
 // per kind: droplet count, life (s), droplet size (m), and the shader body that places a droplet of age `a`
 const KINDS: Record<WaterJetKind, { n: number; life: number; size: number; streak: number; glsl: string }> = {
-  // An oscillating garden sprinkler: the jet sweeps ±60° about the forward axis every 6 s; each droplet keeps the
+  // An oscillating garden sprinkler: a fan of twelve jets sweeps ±45° about the forward axis every 6 s; each droplet keeps the
   // direction it was launched in and falls under gravity to the ground (uDrop below the nozzle), then splashes.
-  sprinkler: { n: 2400, life: 1.7, size: 0.034, streak: 0.25, glsl: `
+  sprinkler: { n: 4800, life: 1.7, size: 0.04, streak: 0.25, glsl: `
     float tb = t - a;
-    float az = 1.05 * sin(6.2831853 * tb / 6.0) + (r1 - 0.5) * 0.16;
+    // twelve holes along the sprinkler bar spread the jets sideways; the whole fan sweeps ±45° every 6 s
+    float hole = floor(aSeed.y * 12.0 / 100.0), az = 0.8 * sin(6.2831853 * tb / 6.0) + (hole - 5.5) * 0.06 + (r1 - 0.5) * 0.05;
     float el = 0.62 + (r2 - 0.5) * 0.30;
     float v = uSpeed * (0.62 + 0.38 * r3);
     vec3 d = vec3(sin(az) * cos(el), sin(el), cos(az) * cos(el));
