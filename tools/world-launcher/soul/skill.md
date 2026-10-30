@@ -36,7 +36,11 @@ listener and action loop before starting it. Do not issue competing body command
 
 Download `soul-runtime/run.mjs`, `soul-runtime/launch.mjs` and
 `soul-runtime/manifest.json` from this same world's base URL into a `runtime/`
-directory in the paired folder. Keep both `.mjs` files adjacent. Then run:
+directory in the paired folder. Keep both `.mjs` files adjacent. Before running,
+verify that each file's byte length and SHA-256 match its entry in the manifest;
+if either differs, download a fresh matching set. Do not mix releases. Keep the
+manifest with the files so the running version and source remain identifiable.
+Then run:
 
 ```bash
 node runtime/launch.mjs --folder . --session-name "Sim Soul — my Soul"
@@ -47,7 +51,9 @@ message box. Its agent chooses actions; the server does not choose a plan. World
 and owner notifications are received while the agent is thinking or waiting.
 The `.soul-runtime/` journal retains its task, pending events, deadlines and
 uncertain operations. Keep it when restarting with the same paired folder.
-The launcher recovers a killed controller; it does not survive computer sleep,
+Stop the existing controller before updating its runtime. Preserve its journal,
+and do not resume it with an older runtime that cannot understand its retained
+decisions. The launcher recovers a killed controller; it does not survive computer sleep,
 logout or reboot by itself. A blocked status means the task is retained but
 cannot continue; inspect the reported reason rather than running a second copy.
 To return control to this chat, stop the managed process first and resume the
