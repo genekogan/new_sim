@@ -285,9 +285,10 @@ export async function runContinuityTrial(config,deps={}){
  const scheduleRestart=()=>{restartTimer=(deps.schedule??setTimeout)(()=>{pollRestart();if(!stop.signal.aborted&&!['ready','fail','unknown','unexercised'].includes(restartProbe.snapshot().integration.status))scheduleRestart();},1000);};
  const scheduleUsage=()=>{usageTimer=(deps.schedule??setTimeout)(()=>{checkUsage();if(!stop.signal.aborted)scheduleUsage();},1000);};
  const sample=async(row,kind,sampleSignal=stop.signal,phase=null)=>{
-  const requestedAt=now(),response=await row.world.read('here',{},sampleSignal),me=response.here?.me;
+  const requestedAt=now(),response=await row.world.read('here',{view:'body'},sampleSignal),me=response.here?.me;
+  if(response.here?.view!=='body')throw fault('BODY_PROJECTION_UNVERIFIED');
   if(!me?.pos)throw fault('NATIVE_BODY_MISSING');
-  record(kind,{actor:row.actor.id,soulId:row.paired.soul,requestedAt,receivedAt:now(),source:'here',...(phase?{phase,participantCredit:false}:{}),tick:response.here.tick,me:{place:me.place,pos:me.pos,posture:me.posture,seat:me.seat,activity:me.activity,actualActivity:me.actualActivity??null}});
+  record(kind,{actor:row.actor.id,soulId:row.paired.soul,requestedAt,receivedAt:now(),source:'here',view:'body',...(phase?{phase,participantCredit:false}:{}),tick:response.here.tick,me:{place:me.place,pos:me.pos,posture:me.posture,seat:me.seat,activity:me.activity,actualActivity:me.actualActivity??null}});
  };
  try{
   const worlds=new Set(),souls=new Set();

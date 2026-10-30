@@ -103,3 +103,16 @@ test('reminder recovery matches canonical request and stable ref across later na
  const absent=mock(async()=>Response.json({error:{code:'not-found'}},{status:404}));assert.equal((await absent.reconcile({command:'remind',args:worldArgs},'op-world')).state,'unknown');
  const rolledDate=mock(async()=>Response.json({reminder:{...native,at:{clock:'real',time:'2027-03-02T09:00:00.000Z'}}}));assert.equal((await rolledDate.reconcile({command:'remind',args:{text:'note',at:{clock:'real',time:'2027-02-30T09:00:00Z'}}},'op-world')).state,'unknown','invalid dates must not match a JS-normalized later day');
 });
+
+
+test('here physical view is explicit while default agent here keeps rich offers and transport semantics',async()=>{
+ const calls=[],stop=new AbortController(),payload={here:{view:'body',tick:7,me:{pos:[1,2],activity:{kind:'read'},actualActivity:{kind:'walk'}}}};
+ const client=mock(async(url,opts)=>{calls.push({url,opts});return Response.json(payload);});
+ assert.deepEqual(await client.read('here',{view:'body'},stop.signal),payload);
+ await client.read('here',{},stop.signal);
+ assert.equal(new URL(calls[0].url).search,'?view=body');assert.equal(new URL(calls[1].url).search,'?include=doHere');
+ assert(calls.every(c=>c.opts.method==='GET'&&c.opts.redirect==='error'&&c.opts.signal));
+ await assert.rejects(client.read('here',{view:'unknown'}),e=>e.code==='invalid'&&e.status===400&&e.uncertain===false);assert.equal(calls.length,2);
+ const refused=mock(async()=>Response.json({error:{code:'unauthorized'}},{status:401}));
+ await assert.rejects(refused.read('here',{view:'body'}),e=>e.status===401&&!e.transient);
+});

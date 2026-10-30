@@ -38,7 +38,7 @@ function fixture(t,overrides={}){
   lifecycle.push(['closed','thread-'+id]);
   return {exit:{code:0,signal:null},endedAt:clock.now(),ownedProcessesExited:true,evidenceComplete:true};
  };
- const deps={now:clock.now,sleep:clock.sleep,schedule:clock.schedule,cancelSchedule:clock.cancelSchedule,loadPairing:folder=>({world:'http://127.0.0.1:19999',soul:'s_'+folder.split('/').at(-1),token:'opaque-never-logged'}),createWorld:paired=>({async read(command,args,signal){assert.equal(command,'here');assert.deepEqual(args,{});samples.push({soul:paired.soul,at:clock.now(),aborted:signal.aborted});return {here:{tick:samples.length,me:{pos:{x:1,z:2},place:'p_native',activity:{kind:'read'},actualActivity:{kind:'walk'},posture:'stand',seat:null}}};}}),verifyWorld:async()=>({devAuth:true,worldId:'fresh-world'}),registryFactory:()=>registry,prepareBaseline:(folder,cwd)=>{mkdirSync(cwd);return {cwd,revision:'verified-test',artifacts:{}};},launchBaseline:launch,launchCandidate:launch,verifyBaseline:()=>true,verifyCandidate:()=>true};
+ const deps={now:clock.now,sleep:clock.sleep,schedule:clock.schedule,cancelSchedule:clock.cancelSchedule,loadPairing:folder=>({world:'http://127.0.0.1:19999',soul:'s_'+folder.split('/').at(-1),token:'opaque-never-logged'}),createWorld:paired=>({async read(command,args,signal){assert.equal(command,'here');assert.deepEqual(args,{view:'body'});samples.push({soul:paired.soul,at:clock.now(),aborted:signal.aborted});return {here:{view:'body',tick:samples.length,me:{pos:{x:1,z:2},place:'p_native',activity:{kind:'read'},actualActivity:{kind:'walk'},posture:'stand',seat:null}}};}}),verifyWorld:async()=>({devAuth:true,worldId:'fresh-world'}),registryFactory:()=>registry,prepareBaseline:(folder,cwd)=>{mkdirSync(cwd);return {cwd,revision:'verified-test',artifacts:{}};},launchBaseline:launch,launchCandidate:launch,verifyBaseline:()=>true,verifyCandidate:()=>true};
  return {root,clock,calls,lifecycle,samples,config,deps,rows:()=>readFileSync(join(config.directory,'timeline.jsonl'),'utf8').trim().split('\n').filter(Boolean).map(JSON.parse)};
 }
 
@@ -72,7 +72,7 @@ test('ordinary early baseline exit preserves peers and every passive sample thro
  assert.equal(manifest.modelRequested,'declared-model');assert.equal(manifest.effortRequested,'high');assert.equal(manifest.baselineWake,false);
  assert.equal(manifest.actors[0].instructionSha256.length,64);assert.equal(manifest.actors[0].promptArgsSha256.length,64);
  assert.equal(result.actors[0].actualEffort,null);
- const native=f.rows().find(row=>row.kind==='body');assert.equal(native.me.activity.kind,'read');assert.equal(native.me.actualActivity.kind,'walk');
+ const native=f.rows().find(row=>row.kind==='body');assert.equal(native.me.activity.kind,'read');assert.equal(native.me.actualActivity.kind,'walk');assert.equal(native.source,'here');assert.equal(native.view,'body');
  assert(!readFileSync(join(f.config.directory,'timeline.jsonl'),'utf8').includes('opaque-never-logged'));
  assert.equal(statSync(f.config.directory).mode&0o777,0o700);assert.equal(statSync(join(f.config.directory,'timeline.jsonl')).mode&0o777,0o600);
 });
@@ -121,7 +121,7 @@ test('the absolute cutoff aborts slow native observations as well as actors',asy
  const f=fixture(t);let observations=0;
  f.deps.createWorld=()=>({async read(command,args,signal){
   if(++observations>2)await new Promise(resolve=>signal.addEventListener('abort',resolve,{once:true}));
-  return {here:{tick:observations,me:{pos:{x:0,z:0},actualActivity:null}}};
+  return {here:{view:'body',tick:observations,me:{pos:{x:0,z:0},actualActivity:null}}};
  }});
  const pending=runContinuityTrial(f.config,f.deps);await flush();assert.equal(f.calls.length,2);
  await f.clock.tick(3000);const result=await pending;
@@ -262,7 +262,7 @@ test('prospective soaks require explicit finite observed usage limits',t=>{
 for(const arm of CONTINUITY_ARMS)test('observed aggregate guard stops both owned actors and preserves cleanup: '+arm,async t=>{
  const f=fixture(t,{arm,seconds:10,usageGuard:{perActor:{totalTokens:1000,outputTokens:100},aggregate:{totalTokens:100,outputTokens:100}}});
  // Both body reads hang after setup. Usage still polls on its independent timer.
- let count=0;f.deps.createWorld=()=>({async read(command,args,signal){if(++count>2)await new Promise(r=>signal.addEventListener('abort',r,{once:true}));return {here:{me:{pos:[0,0]}}};}});
+ let count=0;f.deps.createWorld=()=>({async read(command,args,signal){if(++count>2)await new Promise(r=>signal.addEventListener('abort',r,{once:true}));return {here:{view:'body',me:{pos:[0,0]}}};}});
  const pending=runContinuityTrial(f.config,f.deps);await flush();assert.equal(f.calls.length,2);
  await f.clock.tick(1000);const result=await pending;
  assert.equal(result.endReason,'usage-guard');assert.equal(result.failureCode,'USAGE_LIMIT_REACHED');assert.equal(result.endedAt,101000);assert(result.actors.every(a=>a.cleanupVerified));
@@ -288,7 +288,7 @@ test('an abort rejection cannot overwrite the guard stop reason or budget failur
 
 test('original cutoff cannot overwrite a prior guard stop while an observation drains',async t=>{
  const f=fixture(t,{seconds:2,usageGuard:{perActor:{totalTokens:1000,outputTokens:100},aggregate:{totalTokens:100,outputTokens:100}}});
- let count=0;f.deps.createWorld=()=>({async read(){if(++count>2)await f.clock.sleep(3000);return {here:{me:{pos:[0,0]}}};}});
+ let count=0;f.deps.createWorld=()=>({async read(){if(++count>2)await f.clock.sleep(3000);return {here:{view:'body',me:{pos:[0,0]}}};}});
  const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(3000);const result=await pending;
  assert.equal(result.endReason,'usage-guard');assert.equal(result.failureCode,'USAGE_LIMIT_REACHED');assert.equal(result.usageGuard.trigger.at,101000);assert(f.calls.every(c=>c.signal.aborted));
 });
@@ -359,7 +359,7 @@ function managedRestartFixture(t,{eligible=true,omitOwner=false,missingEvidence=
   if(!missingEvidence)writeFileSync(join(call.directory,'agent-evidence.jsonl'),['turn/started','turn/completed'].map((method,i)=>JSON.stringify({kind:'host-event',method,controllerPid:1001,hostPid:activeHost,worldId:wrongEvidenceScope?'foreign-world':'fresh-world',soulId:'s_a',threadId:'thread-a',turnId:'turn-1',at:f.clock.now(),status:i?'completed':null})+'\n').join(''),{mode:0o600});
   return result;
  };
- if(slowObservation){let reads=0;f.deps.createWorld=()=>({async read(command,params,signal){if(++reads>1)await new Promise(resolve=>signal.addEventListener('abort',resolve,{once:true}));return {here:{tick:reads,me:{pos:[0,0],actualActivity:null}}};}});}
+ if(slowObservation){let reads=0;f.deps.createWorld=()=>({async read(command,params,signal){if(++reads>1)await new Promise(resolve=>signal.addEventListener('abort',resolve,{once:true}));return {here:{view:'body',tick:reads,me:{pos:[0,0],actualActivity:null}}};}});}
  return {...f,signals,processes};
 }
 
@@ -441,4 +441,13 @@ for(const mode of ['finish-rejected','result-write-refused'])test('native finali
  const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(3000);const result=await pending;
  assert.equal(finished,1);assert.equal(verified,2);assert.equal(result.failureCode,'NATIVE_EVIDENCE_FINALIZATION_FAILED');assert.equal(result.nativeEvidence.status,'unknown');assert.equal(result.nativeEvidence.coverage,null);assert.equal(result.coverage.nativeSources,'unknown');assert.equal(result.cutoffAt,103000);assert.equal(result.endReason,'cutoff');assert.equal(result.qualification,'not assessed');assert.equal(f.lifecycle.filter(r=>r[0]==='complete').length,2);assert.ok(f.lifecycle.some(r=>r[0]==='archive'));assert.ok(result.actors.every(r=>r.cleanupVerified));assert.ok(!JSON.stringify(result).includes('SOURCE_DETAIL_MUST_NOT_ESCAPE'));
  if(mode==='result-write-refused')assert.equal(readFileSync(join(f.config.directory,'native-evidence.json'),'utf8'),'existing private artifact','do not overwrite prior evidence to hide the write error');
+});
+
+
+test('physical sampler requires explicit native body projection and never silently accepts rich fallback',async t=>{
+ const f=fixture(t),normal=f.deps.createWorld;
+ f.deps.createWorld=paired=>{const client=normal(paired);return {async read(command,args,signal){const result=await client.read(command,args,signal);delete result.here.view;return result;}};};
+ const result=await runContinuityTrial(f.config,f.deps);assert.equal(result.failureCode,'BODY_PROJECTION_UNVERIFIED');assert.equal(result.startedAt,null);
+ assert.equal(f.calls.length,0,'an old or ignored query fails mechanical setup before any actor launch');
+ assert.equal(f.rows().filter(r=>['setup-body','body','fixture-body'].includes(r.kind)).length,0);
 });
