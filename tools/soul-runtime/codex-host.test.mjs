@@ -205,7 +205,9 @@ test('schema error notification is forwarded for the owned thread without ending
 // email and workspace account id are canaries that must never leave the host.
 const caller={'features.shell_tool':false,web_search:'disabled'};
 const chatgpt={account:{type:'chatgpt',email:'canary@example.invalid',planType:'pro'},requiresOpenaiAuth:true,workspaceRouting:{chatgptAccountId:'acct-canary',backendOrigin:'https://chatgpt.com',accountRoutingOverride:'NO_CONSTRAINT'}};
-function selection(t,{account=chatgpt,settings={config:{model_provider:null}},provider,recorded=SOUL_PROVIDER_ID,options={}}={}){
+// Mirrors laptop1's effective config/read: built-in chatgpt_base_url default, null others.
+const effective={model_provider:null,profile:null,openai_base_url:null,chatgpt_base_url:'https://chatgpt.com/backend-api/',profiles:{}};
+function selection(t,{account=chatgpt,settings={config:effective},provider,recorded=SOUL_PROVIDER_ID,options={}}={}){
  return protocol(t,options,(m,respond,refuse)=>{
   if(m.method==='thread/read'){if(recorded===null)refuse(-32600,'synthetic read refusal');else respond({thread:{id:m.params.threadId,modelProvider:recorded}});return true;}
   if(m.method==='account/read'){if(account==='silent')return true;if(account===null)refuse(-32600,'synthetic account refusal');else respond(account);return true;}
@@ -253,14 +255,39 @@ for(const [label,options,reason] of [
  ['unreadable config',{settings:{}},'config-unknown'],
  ['workspace-routed backend',{account:{...chatgpt,workspaceRouting:{...chatgpt.workspaceRouting,backendOrigin:'https://gov.chatgpt.com'}}},'routed-backend'],
  ['base URL environment override',{options:{env:{OPENAI_BASE_URL:'https://proxy.invalid/v1'}}},'base-url-environment'],
+ // A profile can select a provider while top-level model_provider stays null.
+ ['active profile selecting a gateway',{settings:{config:{model_provider:null,profile:'work',profiles:{work:{model_provider:'corp_gw'}}}}},'configured-profile'],
+ ['active profile even when it names openai',{settings:{config:{model_provider:null,profile:'plain',profiles:{plain:{model_provider:'openai'}}}}},'configured-profile'],
+ ['non-default chatgpt_base_url',{settings:{config:{...effective,chatgpt_base_url:'https://gw.invalid/backend-api/'}}},'configured-base-url'],
+ ['top-level openai_base_url',{settings:{config:{model_provider:null,openai_base_url:'https://gw.invalid/v1'}}},'configured-base-url'],
+ ['base URL only inside the active profile',{settings:{config:{model_provider:null,profile:'work',profiles:{work:{openai_base_url:'https://gw.invalid/v1'}}}}},'configured-profile'],
 ])test('opted-in selection leaves config untouched for '+label,async t=>{
  const p=selection(t,options);const connected=await p.host.connect({config:caller,soulTransport:true});
  assert.deepEqual(p.requests.find(r=>r.method==='thread/start').params.config,caller);assert.deepEqual(connected.transport,{providerId:null,idleTimeoutMs:null,authMode:null,reason});
  assert.equal(p.host.closed,false,'a metadata query never fails the host');await p.host.begin('synthetic');
 });
-test('a caller-selected provider is never replaced and needs no auth query',async t=>{
- const p=selection(t),config={...caller,model_provider:'caller-provider'};await p.host.connect({config,soulTransport:true});
- assert.deepEqual(p.requests.find(r=>r.method==='thread/start').params.config,config);assert.equal(p.requests.some(r=>['account/read','config/read'].includes(r.method)),false);assert.equal(p.host.transport.reason,'caller-provider');
+test('a caller-selected provider, profile or base URL is never replaced and needs no auth query',async t=>{
+ for(const extra of [{model_provider:'caller-provider'},{'model_providers.caller':{name:'x'}},{profile:'work'},{'profiles.work.model_provider':'corp_gw'},{chatgpt_base_url:'https://gw.invalid/'},{openai_base_url:'https://gw.invalid/v1'}]){
+  const p=selection(t),config={...caller,...extra};await p.host.connect({config,soulTransport:true});
+  assert.deepEqual(p.requests.find(r=>r.method==='thread/start').params.config,config);assert.equal(p.requests.some(r=>['account/read','config/read','thread/read'].includes(r.method)),false);assert.equal(p.host.transport.reason,'caller-provider');
+ }
+});
+test('resume metadata queries run in one parallel budget',async t=>{
+ const held=[];let released=false;
+ const p=protocol(t,{requestTimeoutMs:400},(m,respond)=>{
+  const answers={'config/read':{config:{model_provider:null}},'account/read':chatgpt,'thread/read':{thread:{id:'retained-thread',modelProvider:SOUL_PROVIDER_ID}}};
+  if(!(m.method in answers))return false;held.push(()=>respond(answers[m.method]));
+  // Answer only once all three are outstanding: a sequential read would time out.
+  if(held.length===3&&!released){released=true;held.forEach(f=>f());}return true;
+ });
+ await p.host.connect({threadId:'retained-thread',config:caller,soulTransport:true});
+ assert.deepEqual(p.requests.filter(r=>['config/read','account/read','thread/read'].includes(r.method)).map(r=>r.method).sort(),['account/read','config/read','thread/read']);assert.equal(p.host.transport.reason,'applied');
+});
+test('a Soul-provider thread that cannot keep its provider is disclosed with the cause',async t=>{
+ for(const [options,cause] of [[{account:null},'auth-unknown'],[{settings:{}},'config-unknown'],[{settings:{config:{profile:'work'}}},'configured-profile']]){
+  const p=selection(t,options);const connected=await p.host.connect({threadId:'soul-thread',config:caller,soulTransport:true});
+  assert.deepEqual(connected.transport,{providerId:null,idleTimeoutMs:null,authMode:null,reason:'retained-soul-thread-fallback',cause});
+ }
 });
 test('a host-reported provider other than the requested one is disclosed',async t=>{
  const p=selection(t,{provider:'openai'});await p.host.connect({config:caller,soulTransport:true});assert.equal(p.host.transport.reason,'host-provider-mismatch');assert.equal(p.host.transport.providerId,SOUL_PROVIDER_ID);
@@ -268,18 +295,20 @@ test('a host-reported provider other than the requested one is disclosed',async 
 // Item accounting mirrors the presenter turns …4f94 (one message after the
 // steer item) and …9a4c (a draft before the steer item, then a final message).
 const item=(p,method,turnId,type,id,text)=>p.deliver({method,params:{threadId:'owned-thread',turnId,item:{type,id,...(text===undefined?{}:{text})}}});
+const input=(p,turnId,id,text)=>p.deliver({method:'item/completed',params:{threadId:'owned-thread',turnId,item:{type:'userMessage',id,content:[{type:'text',text,text_elements:[]}]}}});
 test('turn result reports userMessage items recorded before the final agentMessage started',async t=>{
  const p=protocol(t);await p.host.connect();
  const one=await p.host.begin('synthetic');item(p,'item/started',one.turnId,'userMessage','u1');item(p,'item/completed',one.turnId,'userMessage','u1');
- item(p,'item/started',one.turnId,'userMessage','u2');item(p,'item/completed',one.turnId,'userMessage','u2');item(p,'item/started',one.turnId,'reasoning','r1');
+ item(p,'item/started',one.turnId,'userMessage','u2');input(p,one.turnId,'u2',JSON.stringify({notice:'private steer text canary',steerId:'steer00000000001',pending:[{event:{steerId:'nested-is-ignored'}}]}));item(p,'item/started',one.turnId,'reasoning','r1');
  item(p,'item/started',one.turnId,'agentMessage','m1');item(p,'item/completed',one.turnId,'agentMessage','m1','{"choice":1}');
  p.deliver({method:'turn/completed',params:{threadId:'owned-thread',turn:{id:one.turnId,status:'completed'}}});
- assert.deepEqual(await one.completed,{turnId:one.turnId,status:'completed',error:null,text:'{"choice":1}',finalText:'{"choice":1}',inputs:{userMessages:2,agentMessages:1,finalAfter:2}});
+ assert.deepEqual(await one.completed,{turnId:one.turnId,status:'completed',error:null,text:'{"choice":1}',finalText:'{"choice":1}',inputs:{userMessages:2,agentMessages:1,finalAfter:2,steerIds:[null,'steer00000000001']}});
+ assert.equal(JSON.stringify(await one.completed).includes('canary'),false,'item text is never retained');
  const two=await p.host.begin('synthetic');item(p,'item/completed',two.turnId,'userMessage','u1');
- item(p,'item/started',two.turnId,'agentMessage','m1');item(p,'item/completed',two.turnId,'agentMessage','m1','draft');item(p,'item/completed',two.turnId,'userMessage','u2');
+ item(p,'item/started',two.turnId,'agentMessage','m1');item(p,'item/completed',two.turnId,'agentMessage','m1','draft');input(p,two.turnId,'u2',JSON.stringify({steerId:'bad id'}));
  item(p,'item/started',two.turnId,'agentMessage','m2');item(p,'item/completed',two.turnId,'agentMessage','m2','final');
  p.deliver({method:'turn/completed',params:{threadId:'owned-thread',turn:{id:two.turnId,status:'completed'}}});
- const r=await two.completed;assert.equal(r.text,'draft\nfinal');assert.equal(r.finalText,'final');assert.deepEqual(r.inputs,{userMessages:2,agentMessages:2,finalAfter:2});
+ const r=await two.completed;assert.equal(r.text,'draft\nfinal');assert.equal(r.finalText,'final');assert.deepEqual(r.inputs,{userMessages:2,agentMessages:2,finalAfter:2,steerIds:[null,null]},'an invalid steerId is no identity');
 });
 test('missing or out-of-order agentMessage starts report an unknown final position',async t=>{
  const p=protocol(t);await p.host.connect();
@@ -288,7 +317,7 @@ test('missing or out-of-order agentMessage starts report an unknown final positi
  const dangling=await p.host.begin('synthetic');item(p,'item/completed',dangling.turnId,'userMessage','u1');item(p,'item/started',dangling.turnId,'agentMessage','m1');item(p,'item/completed',dangling.turnId,'agentMessage','m1','{}');item(p,'item/started',dangling.turnId,'agentMessage','m2');
  p.deliver({method:'turn/completed',params:{threadId:'owned-thread',turn:{id:dangling.turnId,status:'completed'}}});assert.equal((await dangling.completed).inputs.finalAfter,null,'a later started message supersedes the completed one');
 });
-test('otherwise dropped notifications become bounded method-only notices',async t=>{
+test('otherwise dropped notifications become bounded per-turn method-only notices',async t=>{
  const p=protocol(t),notices=[],events=[];await p.host.connect();p.host.on('notice',n=>notices.push(n));p.host.on('event',e=>events.push(e));
  p.deliver({method:'warning',params:{threadId:'owned-thread',message:'synthetic private warning body'}});
  p.deliver({method:'account/rateLimits/updated',params:{rateLimits:{primary:{usedPercent:1}}}});
@@ -297,7 +326,10 @@ test('otherwise dropped notifications become bounded method-only notices',async 
  assert.deepEqual(notices.map(n=>Object.keys(n).sort().join()),['method,receivedAt','method,receivedAt']);assert.deepEqual(notices.map(n=>n.method),['warning','account/rateLimits/updated']);
  assert.equal(JSON.stringify(notices).includes('synthetic private'),false);assert.deepEqual(events.map(e=>e.method),['turn/started'],'forwarded events are unchanged');
  for(let n=0;n<30;n++)p.deliver({method:'item/agentMessage/delta',params:{threadId:'owned-thread',delta:'x'}});
- assert.equal(notices.filter(n=>n.method==='item/agentMessage/delta').length,20,'per-method bound');
- for(let n=0;n<400;n++)p.deliver({method:'synthetic/method'+n,params:{}});assert.equal(notices.length,200,'per-host bound');
+ assert.equal(notices.filter(n=>n.method==='item/agentMessage/delta').length,5,'per-turn per-method bound');
+ p.host.activeTurnId=null;p.deliver({method:'turn/started',params:{threadId:'owned-thread',turn:{id:'turn-y',status:'inProgress'}}});
+ for(let n=0;n<30;n++)p.deliver({method:'item/agentMessage/delta',params:{threadId:'owned-thread',delta:'x'}});
+ assert.equal(notices.filter(n=>n.method==='item/agentMessage/delta').length,10,'a later turn records its own stall attribution');
+ for(let n=0;n<2500;n++)p.deliver({method:'synthetic/method'+n,params:{}});assert.equal(notices.length,2000,'per-host bound');
  assert.equal(p.host.closed,false);
 });

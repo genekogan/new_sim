@@ -22,11 +22,22 @@ export const SOUL_STREAM_IDLE_TIMEOUT_MS=10000;
 export const SOUL_PROVIDER_ID='sim_soul_openai';
 const OPENAI_BASE_URLS={chatgpt:'https://chatgpt.com/backend-api/codex',apiKey:'https://api.openai.com/v1'};
 export const soulProvider=authMode=>({name:'OpenAI',base_url:OPENAI_BASE_URLS[authMode],wire_api:'responses',requires_openai_auth:true,supports_websockets:true,env_http_headers:{'OpenAI-Organization':'OPENAI_ORGANIZATION','OpenAI-Project':'OPENAI_PROJECT'},stream_idle_timeout_ms:SOUL_STREAM_IDLE_TIMEOUT_MS});
-const providerKey=key=>key==='model_provider'||key==='model_providers'||key.startsWith('model_providers.');
+// Keys that can select or redirect a provider. Any of them in caller or effective
+// config means the built-in transport is not provable: fail closed.
+const providerKey=key=>['model_provider','model_providers','profile','profiles','chatgpt_base_url','openai_base_url'].includes(key)||/^(model_providers|profiles)\./.test(key);
+// Effective config/read reports this built-in default even with no user setting.
+const CHATGPT_DEFAULT_BASE='https://chatgpt.com/backend-api';
+const STEER_ID=/^[A-Za-z0-9_-]{8,64}$/;
+// A steer input is one text element whose JSON carries a top-level steerId.
+// Only that identifier is retained; item text is never stored or emitted.
+const steerIdOf=content=>{
+  const texts=Array.isArray(content)?content.filter(c=>c?.type==='text'):[];if(texts.length!==1||typeof texts[0].text!=='string')return null;
+  try{const v=JSON.parse(texts[0].text);return v&&typeof v==='object'&&!Array.isArray(v)&&typeof v.steerId==='string'&&STEER_ID.test(v.steerId)?v.steerId:null;}catch{return null;}
+};
 // Diagnostic notices for otherwise dropped notifications: method name and
-// receipt time only, never params. Bounded per host and per method.
+// receipt time only, never params. Bounded per turn per method and per host.
 const FORWARDED=['turn/started','turn/completed','item/started','item/completed','thread/tokenUsage/updated','thread/name/updated','thread/archived','error'];
-const NOTICE_LIMIT=200,NOTICE_METHOD_LIMIT=20;
+const NOTICE_LIMIT=2000,NOTICE_TURN_METHOD_LIMIT=5;
 export class CodexHost extends EventEmitter {
   constructor({cwd,model=null,effort='low',command='codex',args=['app-server','--listen','stdio://'],requestTimeoutMs=30000,spawnProcess=spawn,killProcess=process.kill,ephemeral=false,name=null,internalProbe=false,soulTransport=false,env=process.env}={}) {
     super();this.cwd=cwd;this.model=model;this.effort=effort;this.requestTimeoutMs=requestTimeoutMs;
@@ -80,36 +91,37 @@ export class CodexHost extends EventEmitter {
     });
   }
   async selectTransport(config,enabled,threadId=null){
-    const off=reason=>({providerId:null,idleTimeoutMs:null,authMode:null,reason});
+    const off=(reason,cause)=>({providerId:null,idleTimeoutMs:null,authMode:null,reason,...(cause?{cause}:{})});
     if(!enabled)return off('disabled');
     if(Object.keys(config??{}).some(providerKey))return off('caller-provider');
-    if(this.env?.OPENAI_BASE_URL)return off('base-url-environment');
-    const [settings,account]=await Promise.all([this.query('config/read',{cwd:this.cwd??null}),this.query('account/read',{})]);
-    if(!settings?.config||typeof settings.config!=='object')return off('config-unknown');
-    if((settings.config.model_provider??'openai')!=='openai')return off('configured-provider');
-    const type=account?.account?.type,routing=account?.workspaceRouting;
-    if(account?.requiresOpenaiAuth!==true||!Object.hasOwn(OPENAI_BASE_URLS,type??''))return off('auth-unknown');
-    // Workspace/regional routing selects another backend origin; never guess it.
-    if(type==='chatgpt'&&routing!=null&&(routing.backendOrigin!=='https://chatgpt.com'||routing.accountRoutingOverride!=='NO_CONSTRAINT'))return off('routed-backend');
+    // One parallel metadata budget (each query is capped at 5s).
+    const [settings,account,thread]=await Promise.all([this.query('config/read',{cwd:this.cwd??null}),this.query('account/read',{}),threadId===null?null:this.query('thread/read',{threadId,includeTurns:false})]);
+    const c=settings?.config,type=account?.account?.type,routing=account?.workspaceRouting;
+    const blocked=this.env?.OPENAI_BASE_URL?'base-url-environment':!c||typeof c!=='object'?'config-unknown':c.profile!=null?'configured-profile':(c.model_provider??'openai')!=='openai'?'configured-provider':c.chatgpt_base_url!=null&&String(c.chatgpt_base_url).replace(/\/+$/,'')!==CHATGPT_DEFAULT_BASE||c.openai_base_url!=null?'configured-base-url'
+      :account?.requiresOpenaiAuth!==true||!Object.hasOwn(OPENAI_BASE_URLS,type??'')?'auth-unknown'
+      // Workspace/regional routing selects another backend origin; never guess it.
+      :type==='chatgpt'&&routing!=null&&(routing.backendOrigin!=='https://chatgpt.com'||routing.accountRoutingOverride!=='NO_CONSTRAINT')?'routed-backend':null;
     // Resuming under another provider rewrites the thread's recorded provider
-    // (probed on 0.163), which changes provider-filtered thread lists. A retained
-    // thread keeps the transport it was created with.
+    // (probed on 0.163), so a retained thread keeps the transport it was created
+    // with. A Soul thread that cannot provably keep it is disclosed, never hidden.
     if(threadId!==null){
-      const recorded=(await this.query('thread/read',{threadId,includeTurns:false}))?.thread?.modelProvider;
-      if(recorded!==SOUL_PROVIDER_ID)return off(typeof recorded==='string'?'retained-thread-provider':'thread-provider-unknown');
+      const recorded=thread?.thread?.modelProvider;
+      if(recorded!==SOUL_PROVIDER_ID)return off(typeof recorded==='string'?'retained-thread-provider':'thread-provider-unknown',blocked??undefined);
+      if(blocked)return off('retained-soul-thread-fallback',blocked);
     }
+    if(blocked)return off(blocked);
     return {providerId:SOUL_PROVIDER_ID,idleTimeoutMs:SOUL_STREAM_IDLE_TIMEOUT_MS,authMode:type,reason:'applied'};
   }
   turnRecord(id){
     let t=this.turns.get(id);if(t)return t;
     let resolve,reject;const completed=new Promise((a,b)=>{resolve=a;reject=b});completed.catch(()=>{});
-    // userMessages counts recorded input items (prompt, then each steer). Each
+    // inputs lists recorded userMessage items in order (steerId or null). Each
     // agentMessage start notes how many inputs preceded it; final is the last.
-    t={id,text:[],characters:0,terminal:false,completed,resolve,reject,userMessages:0,started:new Map(),final:null,unmatched:false};this.turns.set(id,t);return t;
+    t={id,text:[],characters:0,terminal:false,completed,resolve,reject,inputs:[],started:new Map(),final:null,unmatched:false};this.turns.set(id,t);return t;
   }
   notice(method){
     const n=this.notices,count=n.methods.get(method)??0;
-    if(n.emitted>=NOTICE_LIMIT||count>=NOTICE_METHOD_LIMIT)return;
+    if(n.emitted>=NOTICE_LIMIT||count>=NOTICE_TURN_METHOD_LIMIT)return;
     n.methods.set(method,count+1);n.emitted++;this.emit('notice',{method,receivedAt:Date.now()});
   }
   receive(line){
@@ -128,11 +140,11 @@ export class CodexHost extends EventEmitter {
     if(m.method==='turn/started'){
       const id=p.turn?.id;if(!id)return;
       if(this.activeTurnId&&this.activeTurnId!==id){this.fail(fault('HOST_OVERLAPPING_TURNS','Host started a second decision turn'));return;}
-      this.activeTurnId=id;this.turnRecord(id);
+      this.activeTurnId=id;this.turnRecord(id);this.notices.methods.clear();
     }else if(m.method==='item/started'&&p.item?.type==='agentMessage'&&p.turnId){
-      const t=this.turnRecord(p.turnId);if(typeof p.item.id==='string'&&!t.started.has(p.item.id))t.started.set(p.item.id,t.userMessages);else t.unmatched=true;
+      const t=this.turnRecord(p.turnId);if(typeof p.item.id==='string'&&!t.started.has(p.item.id))t.started.set(p.item.id,t.inputs.length);else t.unmatched=true;
     }else if(m.method==='item/completed'&&p.item?.type==='userMessage'&&p.turnId){
-      this.turnRecord(p.turnId).userMessages++;
+      this.turnRecord(p.turnId).inputs.push(steerIdOf(p.item.content));
     }else if(m.method==='item/completed'&&p.item?.type==='agentMessage'&&p.turnId){
       const t=this.turnRecord(p.turnId),text=p.item.text??'';t.characters+=text.length;
       if(t.characters>512*1024){this.fail(fault('HOST_OUTPUT_LIMIT','Decision output exceeded bound'));return;}
@@ -143,7 +155,7 @@ export class CodexHost extends EventEmitter {
       // finalAfter is null when the final message's start is unknown or another
       // agentMessage began after it: callers then keep their ordinary rule.
       const last=[...t.started.keys()].at(-1),finalAfter=!t.unmatched&&t.final&&t.final.id===last?t.final.after:null;
-      t.result={turnId:t.id,status:p.turn.status,error:p.turn.error??null,text:t.text.join('\n'),finalText:t.final?.text??null,inputs:{userMessages:t.userMessages,agentMessages:t.text.length,finalAfter}};
+      t.result={turnId:t.id,status:p.turn.status,error:p.turn.error??null,text:t.text.join('\n'),finalText:t.final?.text??null,inputs:{userMessages:t.inputs.length,agentMessages:t.text.length,finalAfter,steerIds:[...t.inputs]}};
       if(this.activeTurnId===t.id)this.activeTurnId=null;t.resolve(t.result);
       // Keep a small recent window for acknowledgement/completion races.
       for(const [id,old] of this.turns){if(this.turns.size<=32)break;if(old.terminal&&id!==t.id)this.turns.delete(id);}

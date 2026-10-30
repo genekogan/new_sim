@@ -47,6 +47,9 @@ function fixture(t){
  f.cleanup=async()=>{stop.abort();await running.catch(()=>{});try{journal.close();}catch{}rmSync(directory,{recursive:true,force:true});};
  return f;
 }
+// Recorded userMessage items as CodexHost reports them: the prompt (no steerId)
+// then the steerIds found in each steer item, in recorded order.
+const ids=(f,...n)=>[null,...n.map(k=>f.host.steers[k].text.steerId)];
 const replanned=(f,id)=>{
  assert.deepEqual(f.commands,[['read','observe']],'a stale choice must never reach the world');assert.equal(f.host.calls.length,2);
  assert.equal(f.host.calls[1].lastCall,null);assert.ok(f.host.calls[1].pending.some(x=>x.event.id===id),'the unincorporated fact is presented again');
@@ -57,7 +60,7 @@ test('(a) presenter pattern: a fact steered before the final agent message began
  try{
   await flush();assert.equal(f.host.calls.length,1);assert.deepEqual(f.host.calls[0].pending,[]);
   f.world('c_62');t.mock.timers.tick(100);await flush();assert.equal(f.host.steers.length,1);assert.deepEqual(f.host.steers[0].text.pending.map(x=>x.event.id),['c_62']);
-  f.host.finish('turn-1',{text:say('Welcome, I am here'),inputs:{userMessages:2,agentMessages:1,finalAfter:2}});await flush();
+  assert.match(f.host.steers[0].text.steerId,/^[0-9a-f]{16}$/);f.host.finish('turn-1',{text:say('Welcome, I am here'),inputs:{userMessages:2,agentMessages:1,finalAfter:2,steerIds:ids(f,0)}});await flush();
   assert.deepEqual(f.commands,[['read','observe'],['write','say']],'the prompt-plus-steer informed choice is current');
   assert.equal(f.host.calls.length,2);assert.equal(f.host.calls[1].lastCall.command,'say');assert.equal(f.host.calls[1].pending.some(x=>x.event.id==='c_62'),false,'an incorporated steered fact is not presented twice');
   assert.equal(f.pending().includes('c_62'),false,'the steered fact is retained with the decision');assert.equal(f.replans(),0,'no world-replan credit is charged');
@@ -69,7 +72,7 @@ test('(a2) a steer recorded before a superseding final agent message applies tha
  try{
   await flush();f.world('c_63');t.mock.timers.tick(100);await flush();assert.equal(f.host.steers.length,1);
   const stale=say('stale draft before the steer'),current=say('reply after the steer');
-  f.host.finish('turn-1',{text:stale+'\n'+current,finalText:current,inputs:{userMessages:2,agentMessages:2,finalAfter:2}});await flush();
+  f.host.finish('turn-1',{text:stale+'\n'+current,finalText:current,inputs:{userMessages:2,agentMessages:2,finalAfter:2,steerIds:ids(f,0)}});await flush();
   assert.deepEqual(f.commands,[['read','observe'],['write','say']]);assert.equal(f.host.calls[1].lastCall.args.text,'reply after the steer');assert.equal(f.pending().includes('c_63'),false);assert.equal(f.replans(),0);
  }finally{await f.cleanup();}
 });
@@ -77,7 +80,7 @@ test('(b) a steer item recorded after the final agent message started still repl
  const f=fixture(t);
  try{
   await flush();f.world('c_63');t.mock.timers.tick(100);await flush();assert.equal(f.host.steers.length,1);
-  f.host.finish('turn-1',{text:say('decided before the steer'),inputs:{userMessages:2,agentMessages:1,finalAfter:1}});await flush();replanned(f,'c_63');
+  f.host.finish('turn-1',{text:say('decided before the steer'),inputs:{userMessages:2,agentMessages:1,finalAfter:1,steerIds:ids(f,0)}});await flush();replanned(f,'c_63');
  }finally{await f.cleanup();}
 });
 test('(c) a truncated steer replans even when its item preceded the final message',async t=>{
@@ -85,14 +88,14 @@ test('(c) a truncated steer replans even when its item preceded the final messag
  try{
   await flush();f.journal.ingest({source:'world',after:f.journal.cursor('world'),cursor:'burst',events:Array.from({length:21},(_,i)=>({id:'burst-'+(i+1),kind:'receipt',salience:3}))});t.mock.timers.tick(100);await flush();
   assert.equal(f.host.steers.length,1);assert.equal(f.host.steers[0].text.pending.length,20,'boundedFacts limits the steer');
-  f.host.finish('turn-1',{text:say('saw twenty of twenty-one'),inputs:{userMessages:2,agentMessages:1,finalAfter:2}});await flush();replanned(f,'burst-21');
+  f.host.finish('turn-1',{text:say('saw twenty of twenty-one'),inputs:{userMessages:2,agentMessages:1,finalAfter:2,steerIds:ids(f,0)}});await flush();replanned(f,'burst-21');
  }finally{await f.cleanup();}
 });
 test('(d) an owner revision steered before the final message still invalidates the choice',async t=>{
  const f=fixture(t);
  try{
   await flush();f.journal.ingest({source:'owner',after:f.journal.cursor('owner'),cursor:'cancel',events:[{id:'cancel',text:'Stop; do not speak.'}]});t.mock.timers.tick(100);await flush();assert.equal(f.host.steers.length,1);
-  f.host.finish('turn-1',{text:say('speaking anyway'),inputs:{userMessages:2,agentMessages:1,finalAfter:2}});await flush();
+  f.host.finish('turn-1',{text:say('speaking anyway'),inputs:{userMessages:2,agentMessages:1,finalAfter:2,steerIds:ids(f,0)}});await flush();
   assert.deepEqual(f.commands,[['read','observe']]);assert.equal(f.host.calls.length,2);assert.ok(f.pending().includes('cancel'));assert.equal(f.replans(),0,'owner revisions do not use the world-replan credit');assert.equal(f.states.some(s=>s.state==='steer-incorporated'),false);
  }finally{await f.cleanup();}
 });
@@ -101,21 +104,21 @@ test('(e) an unsteered intake-pressure pulse replans',async t=>{
  try{
   await flush();assert.ok(f.page);f.page.reject(Object.assign(Error('Journal world backlog full'),{code:'JOURNAL_BACKLOG_FULL',transient:true}));await flush();assert.equal(f.host.steers.length,0);assert.ok(f.states.some(x=>x.state==='retrying'&&x.code==='JOURNAL_BACKLOG_FULL'));
   f.world('c_64');t.mock.timers.tick(100);await flush();assert.equal(f.host.steers.length,1);
-  f.host.finish('turn-1',{text:say('pressure was never steered'),inputs:{userMessages:2,agentMessages:1,finalAfter:2}});await flush();replanned(f,'c_64');
+  f.host.finish('turn-1',{text:say('pressure was never steered'),inputs:{userMessages:2,agentMessages:1,finalAfter:2,steerIds:ids(f,0)}});await flush();replanned(f,'c_64');
  }finally{await f.cleanup();}
 });
 test('(f) an acknowledged steer without its recorded item replans',async t=>{
  const f=fixture(t);
  try{
   await flush();f.world('c_65');t.mock.timers.tick(100);await flush();assert.equal(f.host.steers.length,1);
-  f.host.finish('turn-1',{text:say('the steer item never appeared'),inputs:{userMessages:1,agentMessages:1,finalAfter:1}});await flush();replanned(f,'c_65');
+  f.host.finish('turn-1',{text:say('the steer item never appeared'),inputs:{userMessages:1,agentMessages:1,finalAfter:1,steerIds:[null]}});await flush();replanned(f,'c_65');
  }finally{await f.cleanup();}
 });
 test('(g) steer items are indexed in ACK order: a later steer after the final message replans',async t=>{
  const f=fixture(t);
  try{
   await flush();f.world('c_66');t.mock.timers.tick(100);await flush();f.world('c_67');t.mock.timers.tick(100);await flush();assert.equal(f.host.steers.length,2);
-  f.host.finish('turn-1',{text:say('only the first steer was seen'),inputs:{userMessages:3,agentMessages:1,finalAfter:2}});await flush();replanned(f,'c_67');assert.ok(f.pending().includes('c_66'),'nothing is retained when the choice is stale');
+  f.host.finish('turn-1',{text:say('only the first steer was seen'),inputs:{userMessages:3,agentMessages:1,finalAfter:2,steerIds:ids(f,0,1)}});await flush();replanned(f,'c_67');assert.ok(f.pending().includes('c_66'),'nothing is retained when the choice is stale');
  }finally{await f.cleanup();}
 });
 test('(h) a host without item accounting keeps the ordinary replan',async t=>{
@@ -125,15 +128,41 @@ test('(h) a host without item accounting keeps the ordinary replan',async t=>{
   f.host.finish('turn-1',{text:say('legacy host result')});await flush();replanned(f,'c_68');
  }finally{await f.cleanup();}
 });
-test('timer steers occupy userMessage indexes and merged references stay within prompt bounds',()=>{
- const fact=n=>({sequence:n,source:'world',event:{id:'f'+n}}),done=(userMessages,finalAfter)=>({status:'completed',finalText:'{}',inputs:{userMessages,agentMessages:1,finalAfter}});
+test('(i) matching counts with a foreign recorded steer identity replan',async t=>{
+ const f=fixture(t);
+ try{
+  await flush();f.world('c_69');t.mock.timers.tick(100);await flush();assert.equal(f.host.steers.length,1);
+  // A leftover item from an earlier turn plus a lost steer item cancel out by count.
+  f.host.finish('turn-1',{text:say('never saw this turn steer'),inputs:{userMessages:2,agentMessages:1,finalAfter:2,steerIds:[null,'leftover00000001']}});await flush();replanned(f,'c_69');
+ }finally{await f.cleanup();}
+});
+test('(j) steer items recorded out of ACK order replan',async t=>{
+ const f=fixture(t);
+ try{
+  await flush();f.world('c_70');t.mock.timers.tick(100);await flush();f.world('c_71');t.mock.timers.tick(100);await flush();assert.equal(f.host.steers.length,2);
+  f.host.finish('turn-1',{text:say('order is not provable'),inputs:{userMessages:3,agentMessages:1,finalAfter:3,steerIds:ids(f,1,0)}});await flush();replanned(f,'c_70');
+ }finally{await f.cleanup();}
+});
+test('(k) both steers recorded before the final message apply together',async t=>{
+ const f=fixture(t);
+ try{
+  await flush();f.world('c_72');t.mock.timers.tick(100);await flush();f.world('c_73');t.mock.timers.tick(100);await flush();assert.equal(f.host.steers.length,2);
+  f.host.finish('turn-1',{text:say('saw both'),inputs:{userMessages:3,agentMessages:1,finalAfter:3,steerIds:ids(f,0,1)}});await flush();
+  assert.deepEqual(f.commands,[['read','observe'],['write','say']]);assert.equal(f.pending().some(id=>['c_72','c_73'].includes(id)),false);assert.deepEqual(f.states.find(s=>s.state==='steer-incorporated').events.map(e=>e.id),['c_72','c_73']);
+ }finally{await f.cleanup();}
+});
+test('timer steers occupy item positions and merged references stay within prompt bounds',()=>{
+ const fact=n=>({sequence:n,source:'world',event:{id:'f'+n}}),done=(steerIds,finalAfter)=>({status:'completed',finalText:'{}',inputs:{userMessages:steerIds.length,agentMessages:1,finalAfter,steerIds}});
  // A scheduled-wake steer was ACKed first (item 2); the fact steer is item 3.
- const active={steers:2,pulses:[{carried:{index:2,facts:[fact(7)]}}]};
- assert.equal(steerIncorporation(active,done(3,2),[],1),null,'the fact steer item began after the final message');
- assert.deepEqual(steerIncorporation(active,done(3,3),[fact(7)],1),{events:[fact(7)],steered:[]},'prompt and steer duplicates merge by sequence');
- assert.equal(steerIncorporation({...active,steerFailed:true},done(3,3),[],1),null,'a failed steer request leaves item accounting ambiguous');
- assert.equal(steerIncorporation(active,done(3,3),[],2),null,'a pulse not attributed to this turn is unsteered');
- assert.equal(steerIncorporation(active,{...done(3,3),status:'interrupted'},[],1),null);
- const wide={steers:1,pulses:[{carried:{index:1,facts:Array.from({length:20},(_,i)=>fact(200+i))}}]};
- assert.equal(steerIncorporation(wide,done(2,2),Array.from({length:90},(_,i)=>fact(i+1)),1),null,'more than the prompt fact bound keeps the replan');
+ const active={steerIds:['wake000000000001','fact000000000002'],pulses:[{carried:{steerId:'fact000000000002',facts:[fact(7)]}}]},items=[null,'wake000000000001','fact000000000002'];
+ assert.equal(steerIncorporation(active,done(items,2),[],1),null,'the fact steer item began after the final message');
+ assert.deepEqual(steerIncorporation(active,done(items,3),[fact(7)],1),{events:[fact(7)],steered:[]},'prompt and steer duplicates merge by sequence');
+ assert.equal(steerIncorporation(active,done([null,'fact000000000002','wake000000000001'],3),[],1),null,'recorded order must equal ACK order');
+ assert.equal(steerIncorporation(active,done(['prompt-has-none0',...items.slice(1)],3),[],1),null,'the prompt item carries no steerId');
+ assert.equal(steerIncorporation(active,{...done(items,3),inputs:{...done(items,3).inputs,steerIds:undefined}},[],1),null,'counts alone are not identity proof');
+ assert.equal(steerIncorporation({...active,steerFailed:true},done(items,3),[],1),null,'a failed steer request leaves item accounting ambiguous');
+ assert.equal(steerIncorporation(active,done(items,3),[],2),null,'a pulse not attributed to this turn is unsteered');
+ assert.equal(steerIncorporation(active,{...done(items,3),status:'interrupted'},[],1),null);
+ const wide={steerIds:['wide000000000001'],pulses:[{carried:{steerId:'wide000000000001',facts:Array.from({length:20},(_,i)=>fact(200+i))}}]};
+ assert.equal(steerIncorporation(wide,done([null,'wide000000000001'],2),Array.from({length:90},(_,i)=>fact(i+1)),1),null,'more than the prompt fact bound keeps the replan');
 });

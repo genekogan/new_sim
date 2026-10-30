@@ -8,17 +8,22 @@ import {responseProjection} from './responses.mjs';
 export const HOST_CONFIG={'features.shell_tool':false,'features.apps':false,'features.plugins':false,'features.memories':false,'skills.include_instructions':false,web_search:'disabled',project_doc_max_bytes:0};
 export const AMBIENT_WAKE_MS=5000;
 // A completed choice already saw every revision since its prompt only when each
-// pulse was delivered whole by an acknowledged steer whose userMessage item the
-// host recorded before the final agentMessage began. Item 1 is the prompt; steer
-// k in ACK order (timer steers included) is item k+1. Any ambiguity returns null
-// and the ordinary replan rule applies. Merged references keep the prompt bounds.
+// pulse was delivered whole by an acknowledged steer whose own userMessage item,
+// matched by its random steerId, the host recorded before the final agentMessage
+// began. The prompt item carries no steerId; every ACKed steer (timer steers
+// included) must appear exactly once, in ACK order, and the item count must match.
+// Any ambiguity returns null and the ordinary replan rule applies. Merged
+// references keep the prompt bounds.
+export const steerId=()=>randomUUID().replaceAll('-','').slice(0,16);
 export function steerIncorporation(active,result,events,pulses){
- const i=result?.inputs;
- if(!pulses||result.status!=='completed'||active.steerFailed||active.pulses.length!==pulses||typeof result.finalText!=='string'||!i||!Number.isSafeInteger(i.userMessages)||!Number.isSafeInteger(i.finalAfter))return null;
- if(i.userMessages!==1+active.steers||i.finalAfter<1||i.finalAfter>i.userMessages)return null;
+ const i=result?.inputs,ids=i?.steerIds,acked=active.steerIds;
+ if(!pulses||result.status!=='completed'||active.steerFailed||active.pulses.length!==pulses||typeof result.finalText!=='string'||!i||!Number.isSafeInteger(i.userMessages)||!Number.isSafeInteger(i.finalAfter)||!Array.isArray(ids))return null;
+ if(i.userMessages!==1+acked.length||ids.length!==i.userMessages||ids[0]!==null||i.finalAfter<1||i.finalAfter>i.userMessages)return null;
+ const recorded=ids.slice(1);if(recorded.some((id,n)=>id!==acked[n]))return null;
  const merged=[...events],seen=new Set(events.map(f=>f.sequence));
  for(const pulse of active.pulses){
-  if(!pulse.carried||pulse.carried.index+1>i.finalAfter)return null;
+  if(!pulse.carried)return null;
+  const at=ids.indexOf(pulse.carried.steerId);if(at<1||at+1>i.finalAfter)return null;
   for(const fact of pulse.carried.facts)if(!seen.has(fact.sequence)){seen.add(fact.sequence);merged.push(fact);}
  }
  return boundedFacts(merged,{bytes:Infinity}).length===merged.length?{events:merged,steered:merged.slice(events.length)}:null;
@@ -117,10 +122,10 @@ export async function runSupervisor({journal,host,world,instruction,signal,onSta
    // and causes another decision; it must never consume an event.
    steering=steering.then(async()=>{
     if(!await active.ready||turn!==active||active.finished||!host.activeTurnId)return;
-    const facts=boundedFacts(urgent,{bytes:32768,limit:20}),gaps=batch.gaps.slice(0,20);
+    const facts=boundedFacts(urgent,{bytes:32768,limit:20}),gaps=batch.gaps.slice(0,20),id=steerId();
     try{
-     await host.steer(JSON.stringify({notice:'New observations; reconsider your next call',pending:facts,gaps,additionalFactsRetained:batch.pending.length}),active.turnId);
-     const index=++active.steers;if(facts.length===urgent.length&&gaps.length===batch.gaps.length)entry.carried={index,facts};
+     await host.steer(JSON.stringify({notice:'New observations; reconsider your next call',steerId:id,pending:facts,gaps,additionalFactsRetained:batch.pending.length}),active.turnId);
+     active.steerIds.push(id);if(facts.length===urgent.length&&gaps.length===batch.gaps.length)entry.carried={steerId:id,facts};
      onState({state:'host-notified',mode:'steer',threadId:host.threadId,turnId:active.turnId,events:facts.map(f=>({source:f.source,id:f.event.id})),at:Date.now()});
     }
     catch(e){active.steerFailed=true;if(host.closed)throw e;}
@@ -179,7 +184,7 @@ export async function runSupervisor({journal,host,world,instruction,signal,onSta
    startupObservation=null;nextFeedback=null;
    let ready,wakeTimer,graceTimer,terminalTimer,progressTimer,includedTimer,result,rejectAborted;
    const aborted=new Promise((_,reject)=>{rejectAborted=reject;});aborted.catch(()=>{});
-   const active={ready:new Promise(resolve=>{ready=resolve;}),finished:false,pulses:[],steers:0,baselineSequence:Math.max(0,...wakeHints.keys(),...events.map(e=>e.sequence))};turn=active;
+   const active={ready:new Promise(resolve=>{ready=resolve;}),finished:false,pulses:[],steerIds:[],baselineSequence:Math.max(0,...wakeHints.keys(),...events.map(e=>e.sequence))};turn=active;
    const futureWake=Number.isFinite(wakeMs)&&promptAt<wakeMs;
    const currentWake=()=>journal.control.checkpoint().value.wakeAt===checkpoint.wakeAt;
    const persistUrgency=()=>{
@@ -251,9 +256,9 @@ export async function runSupervisor({journal,host,world,instruction,signal,onSta
     steering=steering.then(async()=>{
      if(!await active.ready||stop.signal.aborted||turn!==active||active.finished||host.activeTurnId!==active.turnId||!currentWake())return;
      const now=Date.now();if(now<wakeMs)return;
-     const timer={kind:'scheduled-wake',wakeAt:checkpoint.wakeAt};
+     const timer={kind:'scheduled-wake',wakeAt:checkpoint.wakeAt},id=steerId();
      try{
-      await host.steer(JSON.stringify({notice:'Scheduled wakeup is due; reconsider your next call using current UTC',now:new Date(now).toISOString(),scheduledWakeAt:checkpoint.wakeAt,timer}),active.turnId);active.steers++;
+      await host.steer(JSON.stringify({notice:'Scheduled wakeup is due; reconsider your next call using current UTC',steerId:id,now:new Date(now).toISOString(),scheduledWakeAt:checkpoint.wakeAt,timer}),active.turnId);active.steerIds.push(id);
       onState({state:'host-notified',mode:'steer',threadId:host.threadId,turnId:active.turnId,events:[],timer,at:Date.now()});
      }catch(e){active.steerFailed=true;if(host.closed&&!stop.signal.aborted)throw e;}
     });
@@ -313,7 +318,7 @@ export async function runSupervisor({journal,host,world,instruction,signal,onSta
    const retained=incorporated?.events??events;
    try{retainDecision(journal,fence,decision,{events:retained,threadId:host.threadId,deadlineAt:retentionDeadline});}
    catch(error){if(error.code!=='DECISION_WINDOW_EXPIRED')throw error;nextFeedback={notice:'The decision window expired before retention; reconsider with current UTC',now:new Date().toISOString()};dirty=true;continue;}
-   if(incorporated)onState({state:'steer-incorporated',threadId:host.threadId,turnId:active.turnId,pulses:active.pulses.length,steers:active.steers,events:incorporated.steered.map(f=>({source:f.source,id:f.event.id})),at:Date.now()});
+   if(incorporated)onState({state:'steer-incorporated',threadId:host.threadId,turnId:active.turnId,pulses:active.pulses.length,steers:active.steerIds.length,events:incorporated.steered.map(f=>({source:f.source,id:f.event.id})),at:Date.now()});
    const applied=await applyPendingDecision(journal,fence,world,{signal:stop.signal});
    handledProgress+=applied.incorporated??0;
    for(const event of retained)wakeHints.delete(event.sequence);
