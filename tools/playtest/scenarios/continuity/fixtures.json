@@ -56,7 +56,8 @@
         "actual supported capability resolution",
         "same advertised model and effort pinned in both arms",
         "measurement host quiet and no concurrent workers/tests",
-        "seal numeric proposal and semantic rubric before comparison; no holdout-driven tuning"
+        "seal numeric proposal and semantic rubric before comparison; no holdout-driven tuning",
+        "source-cited fieldReturnBinding: same world, pre-T0 freeze, exact field polygon/level, coextensive open-field native place IDs and field walk targets; record comparable actual initial poses separately"
       ],
       "venue": {
         "ref": "eden-library-1",
@@ -121,11 +122,6 @@
           "originalErrand": {
             "initialOwnerSupplement": "Your original errand is to return to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
-              "pos": [
-                0,
-                0
-              ],
-              "radiusM": 43,
               "includePolygon": [
                 [
                   -30,
@@ -154,9 +150,10 @@
               "explore"
             ],
             "requiresGroundedObservation": true,
-            "returnRegionSource": "worlds/eden/places.v1.json#field polygon; verify against fresh native world before comparison seal",
-            "note": "Pre-freeze correction after developmentduo1: named semantic destination replaces an exact starting coordinate not exposed as a movement capability. Original run remains partial, not rescored.",
-            "destinationName": "Commons Field"
+            "returnRegionSource": "scenario.fieldReturn plus fresh fieldReturnBinding; center-radius3 proposal superseded prospectively",
+            "note": "Named-field destination; use frozen polygon and exact native field identity, not a recalled initial coordinate. Old development reports remain unchanged.",
+            "destinationName": "Commons Field",
+            "locationRule": "native-field-return/1"
           },
           "soulName": "ContinuityReaderA"
         },
@@ -197,11 +194,6 @@
           "originalErrand": {
             "initialOwnerSupplement": "Your original errand is to return to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
-              "pos": [
-                0,
-                0
-              ],
-              "radiusM": 43,
               "includePolygon": [
                 [
                   -30,
@@ -230,9 +222,10 @@
               "explore"
             ],
             "requiresGroundedObservation": true,
-            "returnRegionSource": "worlds/eden/places.v1.json#field polygon; verify against fresh native world before comparison seal",
-            "note": "Pre-freeze correction after developmentduo1: named semantic destination replaces an exact starting coordinate not exposed as a movement capability. Original run remains partial, not rescored.",
-            "destinationName": "Commons Field"
+            "returnRegionSource": "scenario.fieldReturn plus fresh fieldReturnBinding; center-radius3 proposal superseded prospectively",
+            "note": "Named-field destination; use frozen polygon and exact native field identity, not a recalled initial coordinate. Old development reports remain unchanged.",
+            "destinationName": "Commons Field",
+            "locationRule": "native-field-return/1"
           },
           "soulName": "ContinuityReaderB"
         }
@@ -429,23 +422,18 @@
         {
           "name": "original errand return",
           "region": {
-            "pos": [
-              0,
-              0
-            ],
-            "radiusM": 3
+            "includePolygon": [[-30, -30], [30, -30], [30, 30], [-30, 30]]
           },
           "holdSec": 0,
           "receipt": {
             "verb": "walk",
-            "targetRefs": [
-              "place-field"
-            ],
+            "targetRefs": [],
             "completed": true
           },
           "postures": [
             "standing"
-          ]
+          ],
+          "fieldReturn": true
         }
       ],
       "additionalMechanical": [
@@ -455,7 +443,25 @@
         "exact operation->effect IDs around restart; no duplicate effects",
         "required simultaneous reading duration counts only at/after declared meeting and before existing cutoff; early arrival or reading alone cannot satisfy the appointment"
       ],
-      "initialConstraintSupplement": "The meeting is at {meetingUTC}; finish the gathering and your original errand by {completionUTC}. These are real UTC deadlines even if the world clock differs. At or after the meeting time, once you are both seated and reading, read together for at least 30 real seconds, exchange observations, then return to your original errand before the completion deadline."
+      "initialConstraintSupplement": "The meeting is at {meetingUTC}; finish the gathering and your original errand by {completionUTC}. These are real UTC deadlines even if the world clock differs. At or after the meeting time, once you are both seated and reading, read together for at least 30 real seconds, exchange observations, then return to your original errand before the completion deadline.",
+      "fieldReturn": {
+        "contract": "native-field-return/1",
+        "ref": "field",
+        "name": "Commons Field",
+        "polygon": [[-30, -30], [30, -30], [30, 30], [-30, 30]],
+        "level": 0,
+        "equivalentPlaceRefs": [
+          "field",
+          "place-field",
+          "commons-mown-lawn"
+        ],
+        "equivalenceRule": "Fresh source-cited world binding frozen before T0; only listed coextensive open-field refs. Current most-specific native place and physical level, not containing ancestry.",
+        "sources": [
+          "worlds/eden/places.v1.json#field",
+          "worlds/templates/eden-2026.json#place-field,commons-mown-lawn",
+          "worlds/meaning/eden-2026.json#place-field"
+        ]
+      }
     },
     {
       "id": "mars-presentation-four",
@@ -477,7 +483,8 @@
         "actual supported capability resolution",
         "same advertised model and effort pinned in both arms",
         "measurement host quiet and no concurrent workers/tests",
-        "seal numeric proposal and semantic rubric before comparison; no holdout-driven tuning"
+        "seal numeric proposal and semantic rubric before comparison; no holdout-driven tuning",
+        "source-cited fieldReturnBinding: same world, pre-T0 freeze, exact field polygon/level, coextensive open-field native place IDs and field walk targets; record comparable actual initial poses separately"
       ],
       "venue": {
         "ref": "chiba",
@@ -541,11 +548,24 @@
           "originalErrand": {
             "initialOwnerSupplement": "Your original errand is to return to Green field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
-              "pos": [
-                0,
-                0
-              ],
-              "radiusM": 3
+              "includePolygon": [
+                [
+                  -30,
+                  -30
+                ],
+                [
+                  30,
+                  -30
+                ],
+                [
+                  30,
+                  30
+                ],
+                [
+                  -30,
+                  30
+                ]
+              ]
             },
             "postures": [
               "standing"
@@ -556,7 +576,9 @@
               "explore"
             ],
             "requiresGroundedObservation": true,
-            "destinationName": "Green field"
+            "destinationName": "Green field",
+            "locationRule": "native-field-return/1",
+            "returnRegionSource": "scenario.fieldReturn plus fresh fieldReturnBinding; center-radius3 proposal superseded prospectively"
           },
           "soulName": "ChibaSpeaker"
         },
@@ -597,11 +619,24 @@
           "originalErrand": {
             "initialOwnerSupplement": "Your original errand is to return to Green field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
-              "pos": [
-                0,
-                0
-              ],
-              "radiusM": 3
+              "includePolygon": [
+                [
+                  -30,
+                  -30
+                ],
+                [
+                  30,
+                  -30
+                ],
+                [
+                  30,
+                  30
+                ],
+                [
+                  -30,
+                  30
+                ]
+              ]
             },
             "postures": [
               "standing"
@@ -612,7 +647,9 @@
               "explore"
             ],
             "requiresGroundedObservation": true,
-            "destinationName": "Green field"
+            "destinationName": "Green field",
+            "locationRule": "native-field-return/1",
+            "returnRegionSource": "scenario.fieldReturn plus fresh fieldReturnBinding; center-radius3 proposal superseded prospectively"
           },
           "soulName": "ChibaGuest1"
         },
@@ -653,11 +690,24 @@
           "originalErrand": {
             "initialOwnerSupplement": "Your original errand is to return to Green field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
-              "pos": [
-                0,
-                0
-              ],
-              "radiusM": 3
+              "includePolygon": [
+                [
+                  -30,
+                  -30
+                ],
+                [
+                  30,
+                  -30
+                ],
+                [
+                  30,
+                  30
+                ],
+                [
+                  -30,
+                  30
+                ]
+              ]
             },
             "postures": [
               "standing"
@@ -668,7 +718,9 @@
               "explore"
             ],
             "requiresGroundedObservation": true,
-            "destinationName": "Green field"
+            "destinationName": "Green field",
+            "locationRule": "native-field-return/1",
+            "returnRegionSource": "scenario.fieldReturn plus fresh fieldReturnBinding; center-radius3 proposal superseded prospectively"
           },
           "soulName": "ChibaGuest2"
         },
@@ -709,11 +761,24 @@
           "originalErrand": {
             "initialOwnerSupplement": "Your original errand is to return to Green field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
-              "pos": [
-                0,
-                0
-              ],
-              "radiusM": 3
+              "includePolygon": [
+                [
+                  -30,
+                  -30
+                ],
+                [
+                  30,
+                  -30
+                ],
+                [
+                  30,
+                  30
+                ],
+                [
+                  -30,
+                  30
+                ]
+              ]
             },
             "postures": [
               "standing"
@@ -724,7 +789,9 @@
               "explore"
             ],
             "requiresGroundedObservation": true,
-            "destinationName": "Green field"
+            "destinationName": "Green field",
+            "locationRule": "native-field-return/1",
+            "returnRegionSource": "scenario.fieldReturn plus fresh fieldReturnBinding; center-radius3 proposal superseded prospectively"
           },
           "soulName": "ChibaGuest3"
         }
@@ -1019,11 +1086,7 @@
           {
             "name": "original errand return",
             "region": {
-              "pos": [
-                0,
-                0
-              ],
-              "radiusM": 3
+              "includePolygon": [[-30, -30], [30, -30], [30, 30], [-30, 30]]
             },
             "holdSec": 0,
             "receipt": {
@@ -1033,7 +1096,8 @@
             },
             "postures": [
               "standing"
-            ]
+            ],
+            "fieldReturn": true
           }
         ],
         "audience": [
@@ -1069,11 +1133,7 @@
           {
             "name": "original errand return",
             "region": {
-              "pos": [
-                0,
-                0
-              ],
-              "radiusM": 3
+              "includePolygon": [[-30, -30], [30, -30], [30, 30], [-30, 30]]
             },
             "holdSec": 0,
             "receipt": {
@@ -1083,7 +1143,8 @@
             },
             "postures": [
               "standing"
-            ]
+            ],
+            "fieldReturn": true
           }
         ]
       },
@@ -1099,7 +1160,7 @@
         "field place identity/capability must be bound from actual Mars boot before filling return receipt targets",
         "do not silently replace inaccessible high tiers after any comparison run"
       ],
-      "initialConstraintSupplement": "The meeting is at {meetingUTC}; finish the gathering and your original errand by {completionUTC}. These are real UTC deadlines even if the world clock differs.",
+      "initialConstraintSupplement": "The meeting is at {meetingUTC}; finish the gathering and your original errand by {completionUTC}. These are real UTC deadlines even if the world clock differs. This gathering has one presenter and three invited guests; the fixture-only seat occupant is not an invited guest. One guest may arrive late. Keep the presentation open with the presenter at the presenter place and all three guests in their own audience places together for at least 30 real seconds during the presentation. The presenter should give at least two substantive grounded observation segments, invite questions, and answer at least two real relevant questions from two different guests before closing. Guests should listen and choose when to ask their own relevant questions through what they perceive in the world; there is no assigned speaking order. Then complete the field errand before the deadline. If participation or timing prevents completion, report what remains incomplete honestly.",
       "audienceSofaSource": {
         "template": "worlds/templates/mars-two.json",
         "sha256": "73601d6d0a05f4566071ecb362a61fc1542aaf6b18b497a9ac18059ca276e7c8",
@@ -1107,6 +1168,31 @@
         "historicalDefinition": "worlds/templates/unified-mars-live-proof-20261027.json#sha:4ff53d3e9f797a89e46feb333daf5d5649a4e94a3175d7d18e8755056181380f",
         "meaning": "worlds/meaning/mars-two.json#navy-sofa",
         "note": "Source verification covers both authored sofas and all three capacity-one slots, independently of which slots development agents selected. Fresh native per-arm reachability, exact ref/slot bindings and geometry parity remain required."
+      },
+      "fieldReturn": {
+        "contract": "native-field-return/1",
+        "ref": "field",
+        "name": "Green field",
+        "polygon": [[-30, -30], [30, -30], [30, 30], [-30, 30]],
+        "level": 0,
+        "equivalentPlaceRefs": [
+          "field"
+        ],
+        "equivalenceRule": "Fresh source-cited world binding frozen before T0; only listed coextensive open-field refs. Current most-specific native place and physical level, not containing ancestry.",
+        "sources": [
+          "mars/viewer/engine/scenarios/greenfield.ts#field",
+          "apps/server/src/edge/ledger/region-arrival.ts"
+        ]
+      },
+      "initialTaskFacts": {
+        "presenterCount": 1,
+        "invitedGuestCount": 3,
+        "fixtureOccupantCountsAsGuest": false,
+        "possibleLateGuest": true,
+        "minimumSharedRealSeconds": 30,
+        "distinctGuestQuestioners": 2,
+        "substantiveGroundedTalkSegments": 2,
+        "delivery": "same shared initial supplement in both arms; public guest roster/fixture label bound before either trial, never post-start coordination"
       }
     },
     {
@@ -1129,7 +1215,8 @@
         "actual supported capability resolution",
         "same advertised model and effort pinned in both arms",
         "measurement host quiet and no concurrent workers/tests",
-        "seal numeric proposal and semantic rubric before comparison; no holdout-driven tuning"
+        "seal numeric proposal and semantic rubric before comparison; no holdout-driven tuning",
+        "source-cited fieldReturnBinding: same world, pre-T0 freeze, exact field polygon/level, coextensive open-field native place IDs and field walk targets; record comparable actual initial poses separately"
       ],
       "venue": {
         "meetingRef": "place-field",
@@ -1197,11 +1284,24 @@
           "originalErrand": {
             "initialOwnerSupplement": "Your original errand is to return to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
-              "pos": [
-                0,
-                0
-              ],
-              "radiusM": 3
+              "includePolygon": [
+                [
+                  -30,
+                  -30
+                ],
+                [
+                  30,
+                  -30
+                ],
+                [
+                  30,
+                  30
+                ],
+                [
+                  -30,
+                  30
+                ]
+              ]
             },
             "postures": [
               "standing"
@@ -1212,7 +1312,9 @@
               "explore"
             ],
             "requiresGroundedObservation": true,
-            "destinationName": "Commons Field"
+            "destinationName": "Commons Field",
+            "locationRule": "native-field-return/1",
+            "returnRegionSource": "scenario.fieldReturn plus fresh fieldReturnBinding; center-radius3 proposal superseded prospectively"
           },
           "soulName": "WalkA"
         },
@@ -1253,11 +1355,24 @@
           "originalErrand": {
             "initialOwnerSupplement": "Your original errand is to return to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
-              "pos": [
-                0,
-                0
-              ],
-              "radiusM": 3
+              "includePolygon": [
+                [
+                  -30,
+                  -30
+                ],
+                [
+                  30,
+                  -30
+                ],
+                [
+                  30,
+                  30
+                ],
+                [
+                  -30,
+                  30
+                ]
+              ]
             },
             "postures": [
               "standing"
@@ -1268,7 +1383,9 @@
               "explore"
             ],
             "requiresGroundedObservation": true,
-            "destinationName": "Commons Field"
+            "destinationName": "Commons Field",
+            "locationRule": "native-field-return/1",
+            "returnRegionSource": "scenario.fieldReturn plus fresh fieldReturnBinding; center-radius3 proposal superseded prospectively"
           },
           "soulName": "WalkB"
         },
@@ -1309,11 +1426,24 @@
           "originalErrand": {
             "initialOwnerSupplement": "Your original errand is to return to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
-              "pos": [
-                0,
-                0
-              ],
-              "radiusM": 3
+              "includePolygon": [
+                [
+                  -30,
+                  -30
+                ],
+                [
+                  30,
+                  -30
+                ],
+                [
+                  30,
+                  30
+                ],
+                [
+                  -30,
+                  30
+                ]
+              ]
             },
             "postures": [
               "standing"
@@ -1324,7 +1454,9 @@
               "explore"
             ],
             "requiresGroundedObservation": true,
-            "destinationName": "Commons Field"
+            "destinationName": "Commons Field",
+            "locationRule": "native-field-return/1",
+            "returnRegionSource": "scenario.fieldReturn plus fresh fieldReturnBinding; center-radius3 proposal superseded prospectively"
           },
           "initialOwnerSupplement": "During the garden visit, propose changing the final meeting point to another landmark you can discover. Discuss this through in-world speech; do not assume the others agreed.",
           "soulName": "WalkC"
@@ -1451,23 +1583,18 @@
         {
           "name": "original errand return",
           "region": {
-            "pos": [
-              0,
-              0
-            ],
-            "radiusM": 3
+            "includePolygon": [[-30, -30], [30, -30], [30, 30], [-30, 30]]
           },
           "holdSec": 0,
           "receipt": {
             "verb": "walk",
-            "targetRefs": [
-              "place-field"
-            ],
+            "targetRefs": [],
             "completed": true
           },
           "postures": [
             "standing"
-          ]
+          ],
+          "fieldReturn": true
         }
       ],
       "journeyTemplateNote": "Endpoint phase is an example branch. Bind exactly the final semantically verified agreed endpoint from the sealed candidate pool before scoring; do not force bandstand or inject its coordinates into prompts.",
@@ -1479,7 +1606,25 @@
         "no private cross-agent communication or harness coaching"
       ],
       "holdoutStatus": "intent/instructions/disturbances sealed proposal; no holdout transcripts inspected or used",
-      "initialConstraintSupplement": "The meeting is at {meetingUTC}; finish the gathering and your original errand by {completionUTC}. These are real UTC deadlines even if the world clock differs."
+      "initialConstraintSupplement": "The meeting is at {meetingUTC}; finish the gathering and your original errand by {completionUTC}. These are real UTC deadlines even if the world clock differs.",
+      "fieldReturn": {
+        "contract": "native-field-return/1",
+        "ref": "field",
+        "name": "Commons Field",
+        "polygon": [[-30, -30], [30, -30], [30, 30], [-30, 30]],
+        "level": 0,
+        "equivalentPlaceRefs": [
+          "field",
+          "place-field",
+          "commons-mown-lawn"
+        ],
+        "equivalenceRule": "Fresh source-cited world binding frozen before T0; only listed coextensive open-field refs. Current most-specific native place and physical level, not containing ancestry.",
+        "sources": [
+          "worlds/eden/places.v1.json#field",
+          "worlds/templates/eden-2026.json#place-field,commons-mown-lawn",
+          "worlds/meaning/eden-2026.json#place-field"
+        ]
+      }
     },
     {
       "id": "eden-bandstand-five",
@@ -1501,7 +1646,8 @@
         "actual supported capability resolution",
         "same advertised model and effort pinned in both arms",
         "measurement host quiet and no concurrent workers/tests",
-        "seal numeric proposal and semantic rubric before comparison; no holdout-driven tuning"
+        "seal numeric proposal and semantic rubric before comparison; no holdout-driven tuning",
+        "source-cited fieldReturnBinding: same world, pre-T0 freeze, exact field polygon/level, coextensive open-field native place IDs and field walk targets; record comparable actual initial poses separately"
       ],
       "venue": {
         "ref": "eden-bandstand",
@@ -1595,11 +1741,24 @@
           "originalErrand": {
             "initialOwnerSupplement": "Your original errand is to return to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
-              "pos": [
-                0,
-                0
-              ],
-              "radiusM": 3
+              "includePolygon": [
+                [
+                  -30,
+                  -30
+                ],
+                [
+                  30,
+                  -30
+                ],
+                [
+                  30,
+                  30
+                ],
+                [
+                  -30,
+                  30
+                ]
+              ]
             },
             "postures": [
               "standing"
@@ -1610,7 +1769,9 @@
               "explore"
             ],
             "requiresGroundedObservation": true,
-            "destinationName": "Commons Field"
+            "destinationName": "Commons Field",
+            "locationRule": "native-field-return/1",
+            "returnRegionSource": "scenario.fieldReturn plus fresh fieldReturnBinding; center-radius3 proposal superseded prospectively"
           },
           "soulName": "BandHost"
         },
@@ -1651,11 +1812,24 @@
           "originalErrand": {
             "initialOwnerSupplement": "Your original errand is to return to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
-              "pos": [
-                0,
-                0
-              ],
-              "radiusM": 3
+              "includePolygon": [
+                [
+                  -30,
+                  -30
+                ],
+                [
+                  30,
+                  -30
+                ],
+                [
+                  30,
+                  30
+                ],
+                [
+                  -30,
+                  30
+                ]
+              ]
             },
             "postures": [
               "standing"
@@ -1666,7 +1840,9 @@
               "explore"
             ],
             "requiresGroundedObservation": true,
-            "destinationName": "Commons Field"
+            "destinationName": "Commons Field",
+            "locationRule": "native-field-return/1",
+            "returnRegionSource": "scenario.fieldReturn plus fresh fieldReturnBinding; center-radius3 proposal superseded prospectively"
           },
           "soulName": "BandGuest1",
           "initialOwnerSupplement": "Ask one relevant question about what you actually observe, at an appropriate moment. Coordinate through the world."
@@ -1708,11 +1884,24 @@
           "originalErrand": {
             "initialOwnerSupplement": "Your original errand is to return to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
-              "pos": [
-                0,
-                0
-              ],
-              "radiusM": 3
+              "includePolygon": [
+                [
+                  -30,
+                  -30
+                ],
+                [
+                  30,
+                  -30
+                ],
+                [
+                  30,
+                  30
+                ],
+                [
+                  -30,
+                  30
+                ]
+              ]
             },
             "postures": [
               "standing"
@@ -1723,7 +1912,9 @@
               "explore"
             ],
             "requiresGroundedObservation": true,
-            "destinationName": "Commons Field"
+            "destinationName": "Commons Field",
+            "locationRule": "native-field-return/1",
+            "returnRegionSource": "scenario.fieldReturn plus fresh fieldReturnBinding; center-radius3 proposal superseded prospectively"
           },
           "soulName": "BandGuest2"
         },
@@ -1764,11 +1955,24 @@
           "originalErrand": {
             "initialOwnerSupplement": "Your original errand is to return to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
-              "pos": [
-                0,
-                0
-              ],
-              "radiusM": 3
+              "includePolygon": [
+                [
+                  -30,
+                  -30
+                ],
+                [
+                  30,
+                  -30
+                ],
+                [
+                  30,
+                  30
+                ],
+                [
+                  -30,
+                  30
+                ]
+              ]
             },
             "postures": [
               "standing"
@@ -1779,7 +1983,9 @@
               "explore"
             ],
             "requiresGroundedObservation": true,
-            "destinationName": "Commons Field"
+            "destinationName": "Commons Field",
+            "locationRule": "native-field-return/1",
+            "returnRegionSource": "scenario.fieldReturn plus fresh fieldReturnBinding; center-radius3 proposal superseded prospectively"
           },
           "soulName": "BandGuest3"
         },
@@ -1820,11 +2026,24 @@
           "originalErrand": {
             "initialOwnerSupplement": "Your original errand is to return to Commons Field, inspect your surroundings there, and report one grounded observation. Keep this errand suspended during the gathering; afterward finish it before the completion deadline.",
             "returnRegion": {
-              "pos": [
-                0,
-                0
-              ],
-              "radiusM": 3
+              "includePolygon": [
+                [
+                  -30,
+                  -30
+                ],
+                [
+                  30,
+                  -30
+                ],
+                [
+                  30,
+                  30
+                ],
+                [
+                  -30,
+                  30
+                ]
+              ]
             },
             "postures": [
               "standing"
@@ -1835,7 +2054,9 @@
               "explore"
             ],
             "requiresGroundedObservation": true,
-            "destinationName": "Commons Field"
+            "destinationName": "Commons Field",
+            "locationRule": "native-field-return/1",
+            "returnRegionSource": "scenario.fieldReturn plus fresh fieldReturnBinding; center-radius3 proposal superseded prospectively"
           },
           "soulName": "BandGuest4"
         }
@@ -1939,23 +2160,18 @@
           {
             "name": "original errand return",
             "region": {
-              "pos": [
-                0,
-                0
-              ],
-              "radiusM": 3
+              "includePolygon": [[-30, -30], [30, -30], [30, 30], [-30, 30]]
             },
             "holdSec": 0,
             "receipt": {
               "verb": "walk",
-              "targetRefs": [
-                "place-field"
-              ],
+              "targetRefs": [],
               "completed": true
             },
             "postures": [
               "standing"
-            ]
+            ],
+            "fieldReturn": true
           }
         ],
         "audience": [
@@ -1980,23 +2196,18 @@
           {
             "name": "original errand return",
             "region": {
-              "pos": [
-                0,
-                0
-              ],
-              "radiusM": 3
+              "includePolygon": [[-30, -30], [30, -30], [30, 30], [-30, 30]]
             },
             "holdSec": 0,
             "receipt": {
               "verb": "walk",
-              "targetRefs": [
-                "place-field"
-              ],
+              "targetRefs": [],
               "completed": true
             },
             "postures": [
               "standing"
-            ]
+            ],
+            "fieldReturn": true
           }
         ]
       },
@@ -2008,17 +2219,34 @@
         "closure precedes voluntary dispersal and resumed errands"
       ],
       "holdoutStatus": "intent/instructions/disturbances sealed proposal; no holdout transcripts inspected or used",
-      "initialConstraintSupplement": "The meeting is at {meetingUTC}; finish the gathering and your original errand by {completionUTC}. These are real UTC deadlines even if the world clock differs."
+      "initialConstraintSupplement": "The meeting is at {meetingUTC}; finish the gathering and your original errand by {completionUTC}. These are real UTC deadlines even if the world clock differs.",
+      "fieldReturn": {
+        "contract": "native-field-return/1",
+        "ref": "field",
+        "name": "Commons Field",
+        "polygon": [[-30, -30], [30, -30], [30, 30], [-30, 30]],
+        "level": 0,
+        "equivalentPlaceRefs": [
+          "field",
+          "place-field",
+          "commons-mown-lawn"
+        ],
+        "equivalenceRule": "Fresh source-cited world binding frozen before T0; only listed coextensive open-field refs. Current most-specific native place and physical level, not containing ancestry.",
+        "sources": [
+          "worlds/eden/places.v1.json#field",
+          "worlds/templates/eden-2026.json#place-field,commons-mown-lawn",
+          "worlds/meaning/eden-2026.json#place-field"
+        ]
+      }
     }
   ],
-  "proposalRevision": "2026-10-29-precomparison-3",
+  "proposalRevision": "2026-10-29-precomparison-4",
   "supersedes": {
     "git": "6960c41f6",
     "policy": "Prospective precomparison corrections only. Preserve existing development reports and original strict scorer in Git; never relabel old runs as acceptance."
   },
   "previousProposal": {
-    "git": "23d97248f",
-    "revision": "2026-10-29-precomparison-2",
-    "change": "Count the unchanged 30-second simultaneous reading requirement only at/after declared meeting and within existing cutoff. Early arrival/reading remains permitted; old reports are not rescored as acceptance."
+    "revision": "2026-10-29-precomparison-3",
+    "change": "Prospective named-field polygon/most-specific membership contract and explicit common Mars expected audience/shared duration/distinct questioners. Preserve all old reports; no acceptance rescore."
   }
 }

@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {observedHolds,scoreContinuity,scoreDisturbance} from './oracle.mjs';
+import {observedHolds,scoreContinuity,scoreDisturbance,fieldReturnLocation} from './oracle.mjs';
 const bindings={chair:{entityId:'e_chair',slot:'seat',capabilities:{read:['read:read.e_chair']}}};
 const phase={region:{pos:[0,0],radiusM:2},holdSec:30,postures:['seated'],activities:['read'],requireSeatRefs:['chair'],receipt:{verb:'read',targetRefs:['chair']}};
 const receipt={id:'r1',capability:'read:read.e_chair',acceptedAtUtc:0,phase:'started'};
@@ -61,15 +61,17 @@ test('empty proposal evidence cannot pass fixture, semantic, notification or dup
 const frozenFixtures=JSON.parse(readFileSync(new URL('./fixtures.json',import.meta.url))),frozenOracles=JSON.parse(readFileSync(new URL('./oracles.json',import.meta.url)));
 const score=evidence=>scoreContinuity({fixtures:frozenFixtures,oracles:frozenOracles,evidence:{t0:0,fixtureVerified:true,...evidence}});
 const resultRow=(result,id)=>{const r=result.rows.find(r=>r.id===id);assert.ok(r,'missing '+id);return r;};
+const fieldPolygon=[[-30,-30],[30,-30],[30,30],[-30,30]];
+const fieldBinding=()=>({ref:'field',worldId:'world-test',boundAt:-1000,polygon:structuredClone(fieldPolygon),level:0,places:[{ref:'field',placeId:'field',polygon:structuredClone(fieldPolygon),level:0,kind:'walkable',enclosed:false}],navigation:[{capability:'walk:field',targetPlaceId:'field'}],evidence:['preflight.json#native-field-before-T0']});
 function readingEvidence({returnAcceptedSec=200,a=[0,60],b=[0,60]}={}){
  const scenario=frozenFixtures.scenarios.find(s=>s.id==='eden-reading-duo'),bindings=Object.fromEntries(scenario.seatPool.map((s,i)=>[s.ref,{entityId:'chair-'+i,slot:'seat',capabilities:{read:['read:chair-'+i]}}]));
  bindings['eden-library-1']={entityId:'library',capabilities:{walk:['walk:library']}};bindings['place-field']={entityId:'field',capabilities:{walk:['walk:field']}};
  const participants={};
  for(const [actor,window,chair]of [['reader-a',a,1],['reader-b',b,2]]){
   const [start,end]=window;
-  participants[actor]={coverageComplete:true,samples:Array.from({length:721},(_,i)=>({t:i*1000,pos:{x:i>=start&&i<=end?74:0,z:i>=start&&i<=end?-7:0,src:'here'},posture:i>=start&&i<=end?'seated':'standing',activity:i>=start&&i<=end?'read':'idle',seat:i>=start&&i<=end?'chair-'+chair+'#seat':null})),receipts:[{id:actor+'-arrive',capability:'walk:library',acceptedAtUtc:0,endedAtUtc:0,phase:'completed'},{id:actor+'-read',capability:'read:chair-'+chair,acceptedAtUtc:start*1000,endedAtUtc:end*1000,phase:'completed'},{id:actor+'-return',capability:'walk:field',acceptedAtUtc:returnAcceptedSec*1000,endedAtUtc:201000,phase:'completed'}],reads:[{command:'here',at:202000}]};
+  participants[actor]={coverageComplete:true,samples:Array.from({length:721},(_,i)=>({t:i*1000,pos:{x:i>=start&&i<=end?74:0,z:i>=start&&i<=end?-7:0,src:'here'},place:i>=start&&i<=end?'library':'field',placeProvenance:'explicit-native-most-specific-place',level:0,posture:i>=start&&i<=end?'seated':'standing',activity:i>=start&&i<=end?'read':'idle',seat:i>=start&&i<=end?'chair-'+chair+'#seat':null})),receipts:[{id:actor+'-arrive',capability:'walk:library',acceptedAtUtc:0,endedAtUtc:0,phase:'completed'},{id:actor+'-read',capability:'read:chair-'+chair,acceptedAtUtc:start*1000,endedAtUtc:end*1000,phase:'completed'},{id:actor+'-return',capability:'walk:field',chosen:{target:'field',place:'field'},acceptedAtUtc:returnAcceptedSec*1000,endedAtUtc:201000,phase:'completed'}],reads:[{command:'here',origin:'agent',requestedAt:201500,at:202000,evidence:['agent here after return']}]};
  }
- return {scenarioId:scenario.id,bindings,participants,semantic:{closureAt:25000}};
+ return {scenarioId:scenario.id,worldId:'world-test',fieldReturnBinding:fieldBinding(),bindings,participants,semantic:{closureAt:25000}};
 }
 test('prospective fixture permits local read:here only with complete native lifecycle evidence',()=>{
  const e=readingEvidence({a:[250,300],b:[250,300]});e.participants['reader-b'].receipts[1].capability='read:here';
@@ -133,9 +135,9 @@ function presentationEvidence(){
  const participants={};
  for(const [index,actor]of scenario.actors.entries()){
   const start=index===3?400:320,ref=refs[index];
-  participants[actor.id]={coverageComplete:true,samples:Array.from({length:1081-actor.releaseOffsetSec},(_,n)=>{const i=n+actor.releaseOffsetSec,seated=i>=start&&i<=450;return {t:i*1000,pos:{x:seated?-14.412:0,z:seated?-18.447:0,src:'world'},posture:seated?'seated':'standing',seat:seated?ref+'#seat':null};}),receipts:[{id:actor.id+'-sit',capability:'sit:'+ref,acceptedAtUtc:start*1000,phase:'started'},{id:actor.id+'-return',capability:'walk:field',acceptedAtUtc:500000,endedAtUtc:550000,phase:'completed'}],reads:[{command:'here',at:551000}]};
+  participants[actor.id]={coverageComplete:true,samples:Array.from({length:1081-actor.releaseOffsetSec},(_,n)=>{const i=n+actor.releaseOffsetSec,seated=i>=start&&i<=450;return {t:i*1000,pos:{x:seated?-14.412:0,z:seated?-18.447:0,src:'world'},place:seated?'chiba':'field',placeProvenance:'explicit-native-most-specific-place',level:0,posture:seated?'seated':'standing',seat:seated?ref+'#seat':null};}),receipts:[{id:actor.id+'-sit',capability:'sit:'+ref,acceptedAtUtc:start*1000,phase:'started'},{id:actor.id+'-return',capability:'walk:field',chosen:{target:'field',place:'field'},acceptedAtUtc:500000,endedAtUtc:550000,phase:'completed'}],reads:[{command:'here',origin:'agent',requestedAt:550500,at:551000,evidence:['agent here after return']}]};
  }
- return {scenarioId:scenario.id,bindings,participants,marsReturnTargetRefs:['field'],semantic:{closureAt:440000},effects:[{id:'talk-1',actor:'presenter',type:'speech',at:410000},{id:'talk-2',actor:'presenter',type:'speech',at:430000}],presentation:{startedAt:400000,endedAt:440000,speechIds:['talk-1','talk-2'],evidence:['native speech timeline'],coverageComplete:true}};
+ return {scenarioId:scenario.id,worldId:'world-test',fieldReturnBinding:fieldBinding(),bindings,participants,marsReturnTargetRefs:['field'],semantic:{closureAt:440000},effects:[{id:'talk-1',actor:'presenter',type:'speech',at:410000},{id:'talk-2',actor:'presenter',type:'speech',at:430000}],presentation:{startedAt:400000,endedAt:440000,speechIds:['talk-1','talk-2'],evidence:['native speech timeline'],coverageComplete:true}};
 }
 test('Mars attendance needs all four distinct seats during actual source-cited talk',()=>{
  const id='presentation-simultaneous-distinct-seat-attendance',evidence=presentationEvidence();
@@ -168,7 +170,7 @@ test('prospective sofa pool matches all authored capacity-one slots and final po
  const ops=flatten(template),definition=flatten(historical).find(v=>v.name==='core-mars-navy-sofa'&&v.version===2);
  assert.equal(sofas.length,6);assert.deepEqual(new Set(sofas.map(s=>s.entityRef)),new Set(['navy-sofa','navy-sofa-2']));
  for(const seat of sofas){const pose=ops.filter(o=>o.op==='move'&&o.id===seat.entityRef).at(-1),slot=definition.slots.find(s=>s.id===seat.slot);assert.equal(slot.capacity,1);assert.deepEqual(seat.localSeatPos,slot.p);assert.deepEqual(seat.entityWorldPose,pose.p);assert.equal(seat.entityAuthoredRotation,pose.r);const [x,,z]=slot.p;assert.ok(Math.abs(seat.worldXZCandidate[0]-(pose.p[0]+x*Math.cos(pose.r)+z*Math.sin(pose.r)))<1e-9);assert.ok(Math.abs(seat.worldXZCandidate[1]-(pose.p[2]-x*Math.sin(pose.r)+z*Math.cos(pose.r)))<1e-9);}
- assert.equal(scenario.venue.region.radiusM,9);assert.equal(scenario.timing.minimumAudienceHoldSec,30);assert.equal(scenario.timing.minimumPresenterHoldSec,30);assert.equal(scenario.occupiedSeat.ref,'tier');assert.ok(!scenario.journeyTemplates.audience[0].receipt.targetRefs.includes('tier'));for(const actor of scenario.actors)assert.deepEqual(actor.originalErrand.returnRegion,{pos:[0,0],radiusM:3});
+ assert.equal(scenario.venue.region.radiusM,9);assert.equal(scenario.timing.minimumAudienceHoldSec,30);assert.equal(scenario.timing.minimumPresenterHoldSec,30);assert.equal(scenario.occupiedSeat.ref,'tier');assert.ok(!scenario.journeyTemplates.audience[0].receipt.targetRefs.includes('tier'));for(const actor of scenario.actors)assert.deepEqual(actor.originalErrand.returnRegion,{includePolygon:fieldPolygon});
 });
 test('complete audience attendance outside actual native performance fails instead of unknown',()=>{
  const scenario=frozenFixtures.scenarios.find(s=>s.id==='eden-bandstand-five'),bindings={'bandstand-violin-1':{entityId:'violin',capabilities:{'play-music':['play-music:violin']}},'eden-bandstand':{entityId:'bandstand',capabilities:{walk:['walk:bandstand']}},'place-field':{entityId:'field',capabilities:{walk:['walk:field']}}},participants={};
@@ -264,4 +266,36 @@ test('restart proof binds original setup, world/Soul/journal and actual same-thr
  const falseResume=structuredClone(e);falseResume.restart.threadResumed=false;assert.equal(run(falseResume).status,'fail');
  const missing=structuredClone(e);delete missing.setup;assert.equal(run(missing).status,'unknown');
  const tooLate=structuredClone(e);tooLate.disturbances['controller-restart'].triggerProof.wakeAt=20000;assert.equal(run(tooLate).status,'fail');
+});
+test('field return binding is source-frozen exact open ground, never a convenient ancestor',()=>{
+ const scenario=frozenFixtures.scenarios.find(s=>s.id==='mars-presentation-four');
+ const run=(binding=fieldBinding(),worldId='world-test')=>fieldReturnLocation({scenario,evidence:{worldId,fieldReturnBinding:binding},t0:0});
+ assert.equal(run().status,'pass');
+ const reversed=fieldBinding();reversed.polygon.reverse();assert.equal(run(reversed).status,'pass');
+ for(const key of ['evidence','worldId','boundAt','level','places','navigation']){const x=fieldBinding();delete x[key];assert.equal(run(x).status,'unknown',key);}
+ for(const mutate of [b=>b.worldId='other',b=>b.boundAt=1,b=>b.level=1,b=>b.polygon[0][0]=-31,b=>b.places[0].ref='chiba',b=>b.places[0].kind='building',b=>b.places[0].enclosed=true,b=>b.places[0].level=1,b=>b.navigation[0].targetPlaceId='mimos',b=>b.navigation[0].capability='stroll:field']){const x=fieldBinding();mutate(x);assert.equal(run(x).status,'fail');}
+ assert.equal(fieldReturnLocation({scenario,evidence:{fieldReturnBinding:fieldBinding()},t0:0}).status,'unknown');
+ const incomplete=fieldBinding();delete incomplete.places[0].placeId;assert.equal(run(incomplete).status,'unknown');
+ const x=fieldBinding();x.places[0].polygon[0][0]=-29;assert.equal(run(x).status,'fail');
+});
+test('native field edge return requires completed exact walk, current most-specific field and physical level',()=>{
+ const id='presenter:original errand return',make=()=>{const e=presentationEvidence();e.participants.presenter.samples.forEach(s=>{if(s.t>=550000){s.pos={x:-29.6,z:15.3,src:'here'};s.place='field';delete s.level;}});return e;};
+ assert.equal(resultRow(score(make()),id).status,'pass','source-frozen native membership proves the level when here omits its numeric level');
+ for(const change of [{place:'chiba'},{place:'mimos'},{level:1},{pos:{x:-30.1,z:15.3,src:'here'}}]){const e=make();e.participants.presenter.samples.forEach(s=>{if(s.t>=550000)Object.assign(s,change);});assert.equal(resultRow(score(e),id).status,'fail');}
+ for(const change of [{place:undefined},{placeProvenance:'unknown'}]){const e=make();e.participants.presenter.samples.forEach(s=>{if(s.t>=550000)Object.assign(s,change);});assert.equal(resultRow(score(e),id).status,'unknown');}
+ for(const change of [{phase:'started'},{capability:'walk:mimos'},{chosen:{target:'mimos',place:'field'}}]){const e=make();Object.assign(e.participants.presenter.receipts[1],change);assert.equal(resultRow(score(e),id).status,'fail');}
+ for(const change of [{endedAtUtc:undefined},{chosen:undefined},{acceptedAtUtc:undefined}]){const e=make();Object.assign(e.participants.presenter.receipts[1],change);assert.equal(resultRow(score(e),id).status,'unknown');}
+ const unbound=make();delete unbound.fieldReturnBinding;assert.equal(resultRow(score(unbound),id).status,'unknown');
+ const left=make();left.participants.presenter.samples.find(s=>s.t===551000).place='mimos';assert.equal(resultRow(score(left),'presenter:errand-read').status,'unknown','polygon ancestry cannot substitute for current field membership during inspection');
+});
+test('field errand report needs an exact reviewed inspection to native public effect link',()=>{
+ const id='presenter:errand-report',make=()=>{const e=presentationEvidence();e.effects.push({id:'field-report',actor:'presenter',type:'speech',at:551500,evidence:['native-public.json#/field-report']});e.errandReports=[{actor:'presenter',readSource:'agent here after return',effectId:'field-report',grounded:true,evidence:['review.json#/field-report-grounding']}];return e;};
+ assert.equal(resultRow(score(make()),id).status,'pass');
+ for(const mutate of [e=>delete e.errandReports,e=>delete e.effects.at(-1).at,e=>e.errandReports[0].readSource='unrelated read',e=>e.errandReports[0].evidence=[]]){const e=make();mutate(e);assert.equal(resultRow(score(e),id).status,'unknown');}
+ for(const mutate of [e=>e.effects.at(-1).actor='attendee-1',e=>e.effects.at(-1).at=550999,e=>e.errandReports[0].grounded=false,e=>e.effects.at(-1).type='narration']){const e=make();mutate(e);assert.equal(resultRow(score(e),id).status,'fail');}
+});
+test('initial Mars task facts expose genuine participation constraints without assigning a speaking order',()=>{
+ const s=frozenFixtures.scenarios.find(s=>s.id==='mars-presentation-four');
+ assert.equal(s.initialTaskFacts.invitedGuestCount,3);assert.equal(s.initialTaskFacts.minimumSharedRealSeconds,30);assert.equal(s.initialTaskFacts.distinctGuestQuestioners,2);assert.equal(s.initialTaskFacts.fixtureOccupantCountsAsGuest,false);
+ for(const phrase of ['three invited guests','One guest may arrive late','at least 30 real seconds','two different guests','no assigned speaking order'])assert.ok(s.initialConstraintSupplement.includes(phrase),phrase);
 });

@@ -185,3 +185,50 @@ at/after the meeting; no boundary sample or premeeting time is backfilled.
 Venue, held seats, sampling gap, receipt evidence, arrival tolerances and numeric
 duration are unchanged. Missing coverage stays unknown. Existing development
 reports remain unchanged and are not rescored as acceptance.
+
+Prospective revision `2026-10-29-precomparison-4` supersedes revision 2's 3 m
+return predicate. Native `walk:field` can legitimately end at an open field edge;
+the owner asked for the named field, not its center. The source-authored Eden
+and Mars field polygon remains the square [-30,30] by [-30,30], level 0. A
+completed native walk to a frozen field target, current standing body inside
+that polygon, and explicit most-specific native open-field membership are all
+required. Chiba, Mimos and other building descendants cannot qualify through a
+`field` ancestor. Initial setup comparability and its existing 3 m setup checks
+are separate and unchanged. Previous failed/partial development reports remain
+unchanged; this is not retrospective acceptance.
+
+The required source-cited `fieldReturnBinding` annotation is frozen before T0:
+`{ref,worldId,boundAt,polygon,level,places,navigation,evidence}`. Each `places[]`
+record has `{ref,placeId,polygon,level,enclosed:false,evidence?}`; only the
+fixture's enumerated coextensive open-field refs are permitted. Each
+`navigation[]` has `{capability:'walk:…',targetPlaceId,evidence?}` and targets one
+of those native place IDs. Per-record sources may inherit the binding sources.
+Bind the fresh world's actual IDs and exact supported walk targets; do not infer
+aliases from a successful-looking trial. Missing bindings stay unknown;
+contradictory world, geometry, physical level, freeze time or target fails.
+
+The evidence adapter retains `placeProvenance:'explicit-native-most-specific-place'`
+only for explicit native `here.me.place`. Numeric native level, when present,
+is preserved with `levelProvenance:'explicit-native-level'` and must match. When
+`here` omits numeric level, `levelProvenance:'native-place-membership'` plus the
+source-frozen native place level supplies the proof: native `PlaceIndex.containing`
+selects membership using the body's actual physical level. Legacy/ancestor-only
+place labels cannot supply that proof. The scorer still requires fresh
+agent-origin inspection, body coverage bracketing the request and response at
+the exact field, and a source-grounded report before cutoff. An explicit
+`errandReports[]` review annotation links `{actor,readSource,effectId,grounded,
+evidence}` to the qualifying inspection's exact source pointer and an exact
+native speech or conversation-turn effect with native UTC/source evidence.
+Missing report links or timing stay unknown; supplied wrong actor, inverted
+timing, non-public effect or source-cited negative grounding fails. The adapter
+never fabricates these preflight or semantic annotations from narration.
+
+Mars's shared `initialConstraintSupplement` now states one presenter and three
+invited guests (excluding the fixture occupant), possible late arrival, all
+four at their respective supports for at least 30 real seconds during the
+presentation, two substantive grounded segments, and answers to two real
+relevant questions from two different guests. These previously hidden measured
+constraints must be observable initial task facts in both arms. The common
+caller composes this same supplement and the prebound public guest roster before
+either trial. No speaking order, dialogue content or mid-run coaching is added.
+Numeric venue, hold, arrival and cutoff thresholds are unchanged.

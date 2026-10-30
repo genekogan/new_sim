@@ -34,6 +34,10 @@ const nativeBody=(r,source)=>{
  sample.reportedIntentActivity=r.me?.activity??null;
  sample.activity=actual?.kind??null;sample.instrument=typeof actual?.instrument==='string'?actual.instrument:null;
  sample.activityProvenance=actual?'explicit-native-actual-activity':'unknown';
+ // here.me.place is the first non-occupier returned by native, same-level
+ // PlaceIndex membership. A district/ancestor label is never substituted.
+ sample.placeProvenance=explicit&&typeof r.me?.place==='string'&&r.me.place?'explicit-native-most-specific-place':'unknown';
+ sample.levelProvenance=Number.isFinite(r.me?.level)?'explicit-native-level':sample.placeProvenance==='explicit-native-most-specific-place'?'native-place-membership':'unknown';
  if(!explicit&&!legacy){sample.pos=sample.pos?{...sample.pos,src:'unknown'}:null;}
  return {...sample,currentBody:!!sample.pos&&(explicit||legacy),provenance:explicit?'explicit-native-here':legacy?'legacy-body-row-here':'unverified-source'};
 };
@@ -155,10 +159,10 @@ export function adaptIndependentProbe({run,timeline=[],journals={},scenarioId=ru
  for(const a of run.actors){const from=t0===null?null:t0+(a.releaseOffsetSec??0)*1000,ev=participants[a.id],audit=audits.participants?.[a.id];ev.coverageComplete=scopedAudit(audit,from,cutoff)&&audit.receiptsComplete===true&&dense(ev.samples,from,cutoff,maxSampleGapSec*1000);}
  for(const a of run.fixtureActors??[]){const ev=fixtureActors[a.id],audit=audits.fixtureActors?.[a.id];ev.coverageComplete=scopedAudit(audit,t0,cutoff)&&audit.receiptsComplete===true&&dense(ev.samples,t0,cutoff,maxSampleGapSec*1000);}
  const effectsComplete=scopedAudit(audits.effects,t0,cutoff),notificationsComplete=scopedAudit(audits.notifications,t0,cutoff)&&Array.isArray(audits.notifications.expected)&&Array.isArray(audits.notifications.lostAddressedEventIds)&&audits.notifications.expected.every(n=>declared.has(key(n.actor,n.source,n.eventId)));
- const supplied={};for(const name of ['bindings','disturbances','setup','restart','presentation','semantic','completionAudit','marsReturnTargetRefs'])if(annotations[name]!==undefined)supplied[name]=annotations[name];
+ const supplied={};for(const name of ['bindings','fieldReturnBinding','errandReports','disturbances','setup','restart','presentation','semantic','completionAudit','marsReturnTargetRefs'])if(annotations[name]!==undefined)supplied[name]=annotations[name];
  if(!scopedAudit(audits.fixture,t0,cutoff)||audits.fixture?.verified!==true)missing.push('both-arm fixture preflight audit');
  if(!acknowledgements.size)missing.push('post-commit event acknowledgements');if(!hostDeliveries.size)missing.push('acknowledged host notifications');
- return {schema:'continuity-evidence/1',scenarioId,t0, ...supplied,participants,fixtureActors,effects:[...effects.values()],notifications,effectsComplete,notificationsComplete,fixtureVerified:scopedAudit(audits.fixture,t0,cutoff)&&audits.fixture.verified===true,...(notificationsComplete?{lostAddressedEventIds:audits.notifications.lostAddressedEventIds}:{}),adaptation:{schema:'independent-probe-adaptation/1',cutoff,missing,issues,controllerReleases:releases,receivedEvents:[...received.values()].map(({payload,...e})=>e),operations:operations.map(({request,response,...op})=>op),sources:{run:runSource,timeline:timelineSource},limits:'No inferred semantic review, event causality, completeness, native effect timestamp, sealed comparison or soak acceptance. receivedAt is pre-commit intake time; persistedAt is an explicit durable-by acknowledgement. Native receipt timestamps are first observations, not tick-to-UTC conversions.'}};
+ return {schema:'continuity-evidence/1',scenarioId,worldId:run.worldId??[...worlds][0]??null,t0, ...supplied,participants,fixtureActors,effects:[...effects.values()],notifications,effectsComplete,notificationsComplete,fixtureVerified:scopedAudit(audits.fixture,t0,cutoff)&&audits.fixture.verified===true,...(notificationsComplete?{lostAddressedEventIds:audits.notifications.lostAddressedEventIds}:{}),adaptation:{schema:'independent-probe-adaptation/1',cutoff,missing,issues,controllerReleases:releases,receivedEvents:[...received.values()].map(({payload,...e})=>e),operations:operations.map(({request,response,...op})=>op),sources:{run:runSource,timeline:timelineSource},limits:'No inferred semantic review, event causality, completeness, native effect timestamp, sealed comparison or soak acceptance. receivedAt is pre-commit intake time; persistedAt is an explicit durable-by acknowledgement. Native receipt timestamps are first observations, not tick-to-UTC conversions.'}};
 }
 
 /** Reads exactly the run artifacts and declared participant journals. Opening a

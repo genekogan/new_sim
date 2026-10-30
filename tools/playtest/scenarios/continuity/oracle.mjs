@@ -9,7 +9,9 @@ const at=v=>typeof v==='number'&&Number.isFinite(v)?v:typeof v==='string'?Date.p
 const row=(id,status,detail,evidence=[])=>({id,status,detail,evidence});
 const xz=p=>Array.isArray(p)?p.length===3?[p[0],p[2]]:p.length===2?p:null:p&&[p.x,p.z];
 const current=s=>s?.pos?.src!=='lastReceipt'&&(s?.currentBody===true||['here','owner','world'].includes(s?.pos?.src));
-const inside=(s,r)=>{const p=xz(s.pos);return p?.every(Number.isFinite)&&Math.hypot(p[0]-r.pos[0],p[1]-r.pos[1])<=r.radiusM&&(!r.includePolygon||insidePolygon(p,r.includePolygon))&&(!r.excludePolygon||!insidePolygon(p,r.excludePolygon));};
+const inside=(s,r)=>{const p=xz(s.pos),circle=Array.isArray(r.pos)&&Number.isFinite(r.radiusM);return p?.every(Number.isFinite)&&(circle||r.includePolygon)&&(!circle||Math.hypot(p[0]-r.pos[0],p[1]-r.pos[1])<=r.radiusM)&&(!r.includePolygon||insidePolygon(p,r.includePolygon))&&(!r.excludePolygon||!insidePolygon(p,r.excludePolygon));};
+const locationMissing=(s,p)=>p.placeIds&&(!xz(s.pos)?.every(Number.isFinite)||typeof s.place!=='string'||s.placeProvenance!=='explicit-native-most-specific-place');
+const locationMatches=(s,p)=>inside(s,p.region)&&(!p.placeIds||!locationMissing(s,p)&&p.placeIds.includes(s.place)&&(Number.isFinite(s.level)?s.level===p.level:p.placeLevels?.[s.place]===p.level));
 const activity=s=>typeof s.activity==='string'?s.activity:s.activity?.kind;
 const accepted=r=>at(r.acceptedAtUtc??r.observedAcceptedAt??r.acceptedAt??r.startedAt);
 const ended=r=>at(r.endedAtUtc??r.observedEndedAt??(typeof r.endedAt==='string'?r.endedAt:null));
@@ -21,6 +23,7 @@ const refOfSeat=(s,bindings,refs=Object.keys(bindings))=>{
 };
 function receiptMatches(r,rule,bindings){
  if(rule.verb&&!r.capability?.startsWith(rule.verb+':'))return false;
+ if(rule.navigation){const ids=[r.chosen?.target,r.chosen?.place].filter(id=>typeof id==='string');return ids.length>0&&rule.navigation.some(n=>r.capability===n.capability&&ids.every(id=>id===n.targetPlaceId));}
  if(r.capability==='read:here')return false; // local receipt, never a seat target
  if(rule.capabilities?.includes(r.capability))return true;
  return (rule.targetRefs??[]).some(ref=>{const b=bindings[ref];if(!b)return false;
@@ -41,7 +44,7 @@ export function observedHolds({samples=[],receipts=[],phase,bindings={},from=-In
   const h=seatIdentity(s.seat);if(!h)return true;
   return !h.slot&&phase.requireSeatRefs.some(ref=>bindings[ref]?.entityId===h.entity&&bindings[ref].slot&&bindings[ref].slot!=='seat');
  };
- const incomplete=all.some((s,i)=>!current(s)||missingSeat(s)||phase.activities&&!activity(s)||phase.instruments&&(!phase.activities||phase.activities.includes(activity(s)))&&!s.instrument||i>0&&at(s.t)-at(all[i-1].t)>maxGapSec*1000),miss=coverageComplete&&!incomplete?'fail':'unknown';
+ const incomplete=all.some((s,i)=>!current(s)||locationMissing(s,phase)||missingSeat(s)||phase.activities&&!activity(s)||phase.instruments&&(!phase.activities||phase.activities.includes(activity(s)))&&!s.instrument||i>0&&at(s.t)-at(all[i-1].t)>maxGapSec*1000),miss=coverageComplete&&!incomplete?'fail':'unknown';
  // A local read has no seat target. Its native lifecycle must be audited,
  // while the independently observed exact seat establishes where reading
  // actually occurs. Never make read:here a wildcard bound-target match.
@@ -54,9 +57,10 @@ export function observedHolds({samples=[],receipts=[],phase,bindings={},from=-In
    ||receipts.some(other=>other.id!==r.id&&accepted(other)===accepted(r));
  };
  const localUnknown=receipts.some(unboundedLocal);
+ const navigationUnknown=phase.receipt?.navigation&&receipts.some(r=>phase.receipt.navigation.some(n=>n.capability===r.capability)&&(!Number.isFinite(accepted(r))||!r.chosen||![r.chosen.target,r.chosen.place].some(id=>typeof id==='string')||r.phase==='completed'&&!Number.isFinite(ended(r))));
  const eligible=r=>(local(r)?!unboundedLocal(r):receiptMatches(r,phase.receipt,bindings))&&Number.isFinite(accepted(r))&&accepted(r)<=to;
  const candidates=phase.receipt?receipts.filter(eligible):[null];
- if(phase.receipt&&!candidates.length)return {status:localUnknown?'unknown':miss,detail:'no timestamped native receipt matching bound target or audited local read lifecycle',windows:[]};
+ if(phase.receipt&&!candidates.length)return {status:localUnknown||navigationUnknown?'unknown':miss,detail:'no timestamped native receipt matching bound target or audited local read lifecycle',windows:[]};
  const windows=[];
  for(const r of candidates){
   const nextAction=r&&local(r)?Math.min(...receipts.filter(other=>other.id!==r.id&&Number.isFinite(accepted(other))&&accepted(other)>=accepted(r)).map(accepted)):Infinity;
@@ -64,7 +68,7 @@ export function observedHolds({samples=[],receipts=[],phase,bindings={},from=-In
   const finish=()=>{const requiredMs=(phase.holdSec??0)*1000;if(run.length&&at(run.at(-1).t)-at(run[0].t)>=requiredMs)windows.push({from:at(run[0].t),to:at(run.at(-1).t),completedAt:at(run.find(s=>at(s.t)-at(run[0].t)>=requiredMs).t),receiptId:r?.id??null,seat:held(run[0]),seatRef:refOfSeat(run[0],bindings,phase.requireSeatRefs)});run=[];};
   for(const s of all){
    const time=at(s.t),seat=held(s),ref=refOfSeat(s,bindings,phase.requireSeatRefs);
-   let good=current(s)&&inside(s,phase.region)&&(!phase.postures||phase.postures.includes(s.posture))&&(!phase.activities||phase.activities.includes(activity(s)))&&(!phase.instruments||phase.instruments.includes(s.instrument));
+   let good=current(s)&&locationMatches(s,phase)&&(!phase.postures||phase.postures.includes(s.posture))&&(!phase.activities||phase.activities.includes(activity(s)))&&(!phase.instruments||phase.instruments.includes(s.instrument));
    if(phase.requireSeatRefs)good=good&&phase.requireSeatRefs.includes(ref);
    if(r){
     good=good&&accepted(r)<=time;
@@ -81,9 +85,9 @@ export function observedHolds({samples=[],receipts=[],phase,bindings={},from=-In
   finish();
  }
  windows.sort((a,b)=>a.completedAt-b.completedAt||a.from-b.from);
- return {status:windows.length?'pass':localUnknown?'unknown':miss,detail:windows.length?'current body samples and native receipt agree':'no uninterrupted sampled hold; missing/contrary samples are retained',windows};
+ return {status:windows.length?'pass':localUnknown||navigationUnknown?'unknown':miss,detail:windows.length?'current body samples and native receipt agree':'no uninterrupted sampled hold; missing/contrary samples are retained',windows};
 }
-function errandInspection(r,{samples,region,returned,cutoff,maxGapSec}){
+function errandInspection(r,{samples,phase,returned,cutoff,maxGapSec}){
  const request=at(r.requestedAt),response=at(r.at),gap=maxGapSec*1000;
  if(!['here','observe','explore'].includes(r.command)||r.origin!=='agent'||!cited(r.evidence)||!Number.isFinite(request)||!Number.isFinite(response)||request<returned||request>response||response>cutoff)return false;
  // Explore's route query is not an inspection. Require a source-cited native
@@ -94,7 +98,7 @@ function errandInspection(r,{samples,region,returned,cutoff,maxGapSec}){
  const before=all.filter(s=>at(s.t)<=request).at(-1),after=all.find(s=>at(s.t)>=response&&at(s.t)<=cutoff);
  if(!before||!after||request-at(before.t)>gap||at(after.t)-response>gap)return false;
  const proof=all.filter(s=>at(s.t)>=at(before.t)&&at(s.t)<=at(after.t));
- return proof.every((s,i)=>current(s)&&inside(s,region)&&(!i||at(s.t)-at(proof[i-1].t)<=gap));
+ return proof.every((s,i)=>current(s)&&locationMatches(s,phase)&&(!i||at(s.t)-at(proof[i-1].t)<=gap));
 }
 const bodyCoverageComplete=(ev,from,to,maxGapSec)=>{
  if(ev?.coverageComplete!==true)return false;
@@ -129,6 +133,57 @@ function overlap(groups,seconds,{distinctSeats=false}={}){
 }
 const cited=v=>Array.isArray(v)&&v.length>0&&v.every(s=>typeof s==='string'&&s.trim());
 const sameActors=(a,b)=>Array.isArray(a)&&a.every(x=>typeof x==='string')&&new Set(a).size===a.length&&[...a].sort().join('\0')===[...b].sort().join('\0');
+function samePolygon(a,b){
+ if(!Array.isArray(a)||!Array.isArray(b)||a.length<3||a.length!==b.length||[...a,...b].some(p=>!Array.isArray(p)||p.length!==2||!p.every(Number.isFinite)))return false;
+ return [b,[...b].reverse()].some(points=>points.some((_,shift)=>a.every((p,i)=>p.every((v,k)=>v===points[(i+shift)%points.length][k]))));
+}
+// The preflight binding is data frozen before inference, never an equivalence
+// guessed from whichever ancestor/position a successful-looking run supplies.
+export function fieldReturnLocation({scenario,evidence,t0}){
+ const spec=scenario.fieldReturn,b=evidence.fieldReturnBinding,missing=[],bad=[];
+ if(!spec||!b)return {status:'unknown',detail:'Frozen source-cited native field binding missing'};
+ const required=(value,condition,label)=>{if(value===undefined||value===null)missing.push(label);else if(!condition)bad.push(label);};
+ required(b.ref,b.ref===spec.ref,'field ref mismatch');
+ required(evidence.worldId,typeof evidence.worldId==='string'&&!!evidence.worldId,'current world identity');
+ if(typeof evidence.worldId==='string'&&evidence.worldId)required(b.worldId,b.worldId===evidence.worldId,'field binding world mismatch');
+ else if(b.worldId===undefined)missing.push('field binding world identity');
+ required(b.boundAt,Number.isFinite(at(b.boundAt))&&at(b.boundAt)<=t0,'field binding was not frozen by T0');
+ required(b.polygon,samePolygon(b.polygon,spec.polygon),'field polygon mismatch');required(b.level,b.level===spec.level,'field level mismatch');
+ if(!cited(b.evidence))missing.push('field binding sources');
+ if(!Array.isArray(b.places)||!b.places.length)missing.push('native field place equivalence');
+ const places=Array.isArray(b.places)?b.places.filter(p=>p&&typeof p==='object'):[];
+ if(places.length!==b.places?.length)missing.push('native field place records');
+ for(const p of places){
+  required(p.ref,spec.equivalentPlaceRefs.includes(p.ref),'unfrozen field equivalent ref');required(p.placeId,typeof p.placeId==='string'&&!!p.placeId,'native field place ID');
+  required(p.polygon,samePolygon(p.polygon,spec.polygon),'equivalent field polygon mismatch');required(p.level,p.level===spec.level,'equivalent field level mismatch');
+  required(p.enclosed,p.enclosed===false,'field equivalent is enclosed');
+  if(['building','room','water'].includes(p.kind))bad.push('field equivalent is a non-field venue');
+  if(!cited(p.evidence??b.evidence))missing.push('native place source');
+ }
+ if(new Set(places.map(p=>p.placeId)).size!==places.length)bad.push('duplicate native field place identity');
+ const navigation=Array.isArray(b.navigation)?b.navigation.filter(n=>n&&typeof n==='object'):[];
+ if(!navigation.length||navigation.length!==b.navigation?.length)missing.push('native field walk binding');
+ for(const n of navigation){
+  required(n.capability,typeof n.capability==='string'&&n.capability.startsWith('walk:'),'field navigation is not a walk');
+  if(places.length&&places.every(p=>typeof p.placeId==='string'&&p.placeId))required(n.targetPlaceId,places.some(p=>p.placeId===n.targetPlaceId),'walk target is not a bound open field');
+  else missing.push('field walk target binding');
+  if(!cited(n.evidence??b.evidence))missing.push('native walk source');
+ }
+ const status=bad.length?'fail':missing.length?'unknown':'pass';
+ return {status,detail:bad.length?bad.join('; '):missing.length?'Missing '+missing.join(', '):'Native field polygon, level, equivalence and walk targets frozen before T0',evidence:b.evidence,
+  ...(status==='pass'?{region:{includePolygon:spec.polygon},level:spec.level,placeIds:places.map(p=>p.placeId),placeLevels:Object.fromEntries(places.map(p=>[p.placeId,p.level])),navigation}:{} )};
+}
+function errandReport(actor,reads,evidence,cutoff){
+ const reports=(evidence.errandReports??[]).filter(r=>r?.actor===actor),failures=[];
+ for(const r of reports){
+  if(!cited(r.evidence))continue;
+  const read=reads.find(read=>read.evidence?.includes(r.readSource)),effect=(evidence.effects??[]).find(e=>e.id===r.effectId);
+  if(r.grounded===false||effect&&(effect.actor!==actor||!['speech','conversation-turn'].includes(effect.type)||Number.isFinite(at(effect.at))&&(at(effect.at)>cutoff||read&&at(effect.at)<at(read.at)))){failures.push(r);continue;}
+  if(!read||!effect||!cited(effect.evidence)||!Number.isFinite(at(effect.at))||r.grounded!==true)continue;
+  return row(actor+':errand-report','pass','Exact native report follows the source-cited fresh destination inspection; grounding separately reviewed',[...r.evidence,...effect.evidence]);
+ }
+ return row(actor+':errand-report',failures.length?'fail':'unknown',failures.length?'Native report actor/timing or source-cited grounding contradicts the errand':'Source-cited grounded report linked to an exact inspection and native effect required',failures);
+}
 /** Frozen disturbances are delivered facts, not an authorization to direct
  * dialogue. Native per-recipient event records, not a successful speech POST,
  * establish that the required Soul actually heard the disturbance. */
@@ -248,6 +303,8 @@ export function scoreContinuity({fixtures,oracles,evidence}){
  const cutoff=t0+scenario.timing.endOffsetSec*1000,meeting=t0+scenario.timing.meetingOffsetSec*1000;
  const bindings=evidence.bindings??{},rows=[],actors=evidence.participants??{},maxGap=oracles.numeric.maxSampleGapSec;
  rows.push(row('fixture-readiness',evidence.fixtureVerified===true?'pass':'unknown','Both-arm boot, setup, occupancy, binding and model/effort checks must be independently verified'));
+ const field=scenario.fieldReturn?fieldReturnLocation({scenario,evidence,t0}):null;
+ if(field)rows.push(row('field-return-binding',field.status,field.detail,field.evidence));
  for(const disturbance of scenario.disturbances)rows.push(scoreDisturbance({scenario,disturbance,evidence,t0,cutoff,maxGapSec:maxGap,bindings}));
  const holds=[];
  for(const actor of scenario.actors){
@@ -276,17 +333,23 @@ export function scoreContinuity({fixtures,oracles,evidence}){
     const close=at(evidence.semantic?.closureAt);
     if(!Number.isFinite(close)){rows.push(row(actor.id+':'+phase.name,'unknown','Observed social closure timestamp missing'));continue;}
     previous=Math.max(previous,close);
-    if(!phase.receipt.targetRefs.length)phase.receipt.targetRefs=evidence.marsReturnTargetRefs??[];
-    if(!phase.receipt.targetRefs.length){rows.push(row(actor.id+':'+phase.name,'unknown','Mars field return target unbound'));continue;}
+    if(phase.fieldReturn){
+     if(field?.status!=='pass'){rows.push(row(actor.id+':'+phase.name,field?.status??'unknown',field?.detail??'Native field location unbound'));continue;}
+     Object.assign(phase,{region:field.region,level:field.level,placeIds:field.placeIds,placeLevels:field.placeLevels});phase.receipt.navigation=field.navigation;
+    }else{
+     if(!phase.receipt.targetRefs.length)phase.receipt.targetRefs=evidence.marsReturnTargetRefs??[];
+     if(!phase.receipt.targetRefs.length){rows.push(row(actor.id+':'+phase.name,'unknown','Mars field return target unbound'));continue;}
+    }
    }
    const result=observedHolds({samples:ev.samples,receipts:ev.receipts,phase,bindings,from:previous,to:cutoff,maxGapSec:maxGap,coverageComplete:ev.coverageComplete===true});
    rows.push(row(actor.id+':'+phase.name,result.status,result.detail,result.windows));
    if(result.windows.length)previous=result.windows[0].completedAt;
    if(['sustained seated reading','native violin performance','audience attendance','garden visit','presenter seat','audience seat'].includes(phase.name))holds.push({actor:actor.id,phase:phase.name,status:result.status,windows:result.windows});
    if(phase.name==='original errand return'&&result.windows.length){
-    const returned=result.windows[0].from,close=at(evidence.semantic.closureAt),allowed=actor.originalErrand?.requiresReadAfterReturn??['here','observe'],reads=(ev.reads??[]).filter(r=>allowed.includes(r.command)&&errandInspection(r,{samples:ev.samples,region:phase.region,returned,cutoff,maxGapSec:maxGap}));
+    const returned=result.windows[0].from,close=at(evidence.semantic.closureAt),allowed=actor.originalErrand?.requiresReadAfterReturn??['here','observe'],reads=(ev.reads??[]).filter(r=>allowed.includes(r.command)&&errandInspection(r,{samples:ev.samples,phase,returned,cutoff,maxGapSec:maxGap}));
     rows.push(row(actor.id+':resumption-time',returned-close<=oracles.numeric.resumeWithinSecAfterObservedClosure*1000?'pass':'fail','Physical return follows observed closure within frozen bound'));
     rows.push(row(actor.id+':errand-read',reads.length?'pass':'unknown','Current read after physical return',reads));
+    if(phase.fieldReturn)rows.push(errandReport(actor.id,reads,evidence,cutoff));
    }
   }
  }

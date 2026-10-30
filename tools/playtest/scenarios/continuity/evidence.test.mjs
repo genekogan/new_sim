@@ -103,3 +103,11 @@ test('agent read sidecar keeps its source and refuses foreign Soul evidence',t=>
  writeFileSync(path,JSON.stringify({...row,soulId:'foreign'})+'\n');
  assert.throws(()=>readIndependentProbeEvidence(out),/world\/Soul scope mismatch/);
 });
+test('adapter preserves explicit most-specific field membership and level provenance without promoting ancestry',()=>{
+ const x=input(),row=x.timeline.find(r=>r.actor===a&&r.kind==='body'&&r.receivedAt===1000);row.me.place='mimos';row.me.placePath=['mimos','field'];
+ let s=adaptIndependentProbe(x).participants[a].samples.find(s=>s.t===1000);assert.equal(s.place,'mimos');assert.equal(s.placeProvenance,'explicit-native-most-specific-place');assert.equal(s.levelProvenance,'native-place-membership');assert.equal(s.level,null);
+ row.me.level=1;s=adaptIndependentProbe(x).participants[a].samples.find(s=>s.t===1000);assert.equal(s.level,1);assert.equal(s.levelProvenance,'explicit-native-level');
+ delete row.source;s=adaptIndependentProbe(x).participants[a].samples.find(s=>s.t===1000);assert.equal(s.placeProvenance,'unknown');
+ const plain=adaptIndependentProbe(input());assert.equal(plain.fieldReturnBinding,undefined);assert.equal(plain.errandReports,undefined);assert.equal(plain.worldId,'world-1');
+ x.annotations={fieldReturnBinding:{worldId:'world-1',evidence:['preflight#field']},errandReports:[{actor:a,effectId:'sp_canonical',readSource:'source',grounded:true,evidence:['review#report']}]};const annotated=adaptIndependentProbe(x);assert.deepEqual(annotated.fieldReturnBinding,x.annotations.fieldReturnBinding);assert.deepEqual(annotated.errandReports,x.annotations.errandReports);
+});
