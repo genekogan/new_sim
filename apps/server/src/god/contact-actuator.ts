@@ -24,6 +24,12 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     const localZ=(me[0]-wp.x)*s+(me[2]-wp.z)*c;
     params.opening={bodyPolicy:'door-natural-v2',hinge:[wp.x+hx*c+hz*s,wp.y,wp.z-hx*s+hz*c],yaw:wp.yaw,radius:((knob?.at?.[0]??(Number(def.components.opening.width)/2-.1))-leaf.pivot[0])*sx,height:Number(def.components.opening.height)*sy,handleY:(knob?.at?.[1]??.85)*sy,from:actuatedState(e,def).open===true?HAND_OPEN_ANGLE:0,to:action==='open'?HAND_OPEN_ANGLE:0,side:localZ<0?-1:1};
     root=actuatorPoint(params.opening,params.opening.from).root;
+   }else if(def.tags.includes('hand-powered-display')&&def.components.display?.controlAt){
+    const [x,y,z]=def.components.display.controlAt,c=Math.cos(wp.yaw),s=Math.sin(wp.yaw);
+    at[0]=wp.x+(x*c+z*s)*wp.s;at[1]=wp.y+y*wp.s;at[2]=wp.z+(-x*s+z*c)*wp.s;
+    // Stand on the ground in front of the control, including mounted displays.
+    root=[at[0]+s*.55,me[1],at[2]+c*.55];
+    if((d.levelAt?.(me[0],me[2],me[1])??0)===0)root[1]=m.terrain.sample(root[0],root[2]);
    }else{const dx=me[0]-wp.x,dz=me[2]-wp.z,n=Math.hypot(dx,dz)||1;root=[wp.x+dx/n*.5,wp.y,wp.z+dz/n*.5];}
    return {params,root,level:d.levelAt?.(root[0],root[2],root[1])??0};
   },
