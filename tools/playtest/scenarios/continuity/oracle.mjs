@@ -4,6 +4,7 @@
 import {readFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {resolve} from 'node:path';
+import {auditPublicEffects} from './effect-audit.mjs';
 import {seatIdentity,insidePolygon} from '../../review/journey-oracles.mjs';
 const at=v=>typeof v==='number'&&Number.isFinite(v)?v:typeof v==='string'?Date.parse(v):NaN;
 const row=(id,status,detail,evidence=[])=>({id,status,detail,evidence});
@@ -431,10 +432,8 @@ export function scoreContinuity({fixtures,oracles,evidence}){
   const status=trigger?.status==='fail'?'fail':trigger?.status!=='pass'||!Number.isFinite(delay)?'unknown':delay>=0&&delay<=oracles.numeric.wholeControllerRecoveryMaxMs?'pass':'fail';
   rows.push(row('whole-controller-recovery',status,`Whole process death with original setup/Soul/world and same journal verified; ${mode}; retained intent and reconciled effects required`,r?.evidence));
  }
- const effects=evidence.effects??[],byOperation=new Map();
- for(const effect of effects){if(!effect.operationId||!effect.id)continue;const key=effect.actor+':'+effect.operationId,ids=byOperation.get(key)??new Set();ids.add(effect.id);byOperation.set(key,ids);}
- const duplicates=[...byOperation].filter(([,ids])=>ids.size>1);
- rows.push(row('duplicate-public-effects',duplicates.length?'fail':evidence.effectsComplete===true&&effects.every(e=>e.id&&e.operationId)?'pass':'unknown','Enumerated authoritative operation->effect IDs required; repeated capability names are not duplicate proof',duplicates.map(([operation,ids])=>({operation,ids:[...ids]}))));
+ const publicEffects=auditPublicEffects(evidence.effects??[],evidence.effectsComplete,evidence.effectAudit);
+ rows.push(row('duplicate-public-effects',publicEffects.status,publicEffects.detail,publicEffects.evidence));
  const review=evidence.semantic,required=[...oracles.semanticRubric.common,...oracles.semanticRubric.scenarios[scenario.id]];
  for(const item of required){const r=review?.rubricVersion===oracles.semanticRubric.version?review.reviews?.find(r=>r.id===item.id):null;rows.push(row('semantic:'+item.id,r&&['pass','fail'].includes(r.status)&&r.evidence?.length?r.status:'unknown',r?.reason??item.pass,r?.evidence));}
  const status=evidence.fixtureVerified!==true?'unknown':rows.some(r=>r.status==='fail')?'fail':rows.every(r=>r.status==='pass')?'pass':'unknown';
