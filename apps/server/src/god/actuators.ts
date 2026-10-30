@@ -6,7 +6,7 @@
 // capabilities, admission, receipts and body plans carry it.
 import type { Entity, StoredDef } from '@sim/world-compiler';
 import type { EdgeSoul } from '../edge/contract.ts';
-import { isContactSwitch, SWITCH_REACH } from './contact-switch.ts';
+import { isContactActuator, CONTACT_REACH } from './contact-actuator.ts';
 import { afterCommit } from '../edge/comms/store.ts';
 import { SOURCE_NEAR_VESSEL, asPlant, asTank, drawWater, isWaterAction, waterActions, waterFields, waterPlant, waterRole, type Transfer } from './water.ts';
 
@@ -64,7 +64,7 @@ export function thenPatch(a: Action, state: Record<string, unknown>, params: Rec
 export type ActuatorHost = {
   /** The Soul's body position (x, z), or null. */
   bodyAt(soul: EdgeSoul): Vec2 | null;
-  deferSwitches?: boolean;
+  deferContacts?: boolean;
   /** Commit a state change of a god thing as an engine edit. */
   commit(id: string, patch: Record<string, unknown>, note: string): { accepted: boolean };
   /** The thing's actuator state as the world has it now (the object's copy may lag a sync behind). */
@@ -124,11 +124,16 @@ export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: Buil
       available: (s: BuiltLike, ctx: any) => check(s, ctx),
       validate: (s: BuiltLike, _p: unknown, ctx: any) => check(s, ctx),
       apply: (s: BuiltLike, params: Record<string, unknown>, ctx: any) => {
-        const contact = host.deferSwitches && isContactSwitch(def, a);
-        const me = host.bodyAt(ctx.soul)!, to = s.front ?? s.at!, far = Math.hypot(s.at![0] - me[0], s.at![1] - me[1]) > (contact ? SWITCH_REACH : ACT_REACH);
+        const contact = host.deferContacts && isContactActuator(def, a);
+        const me = host.bodyAt(ctx.soul)!, to = s.front ?? s.at!, far = Math.hypot(s.at![0] - me[0], s.at![1] - me[1]) > (contact ? CONTACT_REACH : ACT_REACH);
         const water = s.key ? waterPlan(a, s.key, ctx.soul, host) : null;
         const patch = water && !isRefusal(water) ? { litres: water.litres } : thenPatch(a, (s.key && host.stateOf?.(s.key)) || s.state || {}, params);
-        const ap = far && s.key ? host.approach?.(s.key, ctx.soul, s.front ?? null, contact ? .75 : undefined) : null;
+        // A door works from either side. Prefer the side the Soul already occupies,
+        // so "close behind me" cannot silently walk it back out of the room.
+        const front=contact&&def.components.opening&&s.front&&s.at
+          &&(me[0]-s.at[0])*(s.front[0]-s.at[0])+(me[1]-s.at[1])*(s.front[1]-s.at[1])<0
+          ? [2*s.at[0]-s.front[0],2*s.at[1]-s.front[1]] as Vec2 : s.front??null;
+        const ap = far && s.key ? host.approach?.(s.key, ctx.soul, front, contact ? .75 : undefined) : null;
         const walk = !far ? [] : ap ? [ap.level === 0 ? { verb: 'walk_to', params: { to: ap.p, standoff: 0 } } : { verb: 'mars:walk_to', params: { x: ap.p[0], z: ap.p[1], level: ap.level } }] : [{ verb: 'walk_to', params: { to, standoff: 0.5 } }];
         return { state: s, result: { action: a.name, set: patch, ...(water && !isRefusal(water) ? { summary: water.summary } : {}) }, bodies: [{ label: `${a.label}`, steps: contact ? [{verb:'stand',params:{}},...walk,{verb:'mars:pose_v1',params:{activity:'operate',seconds:1.2,face:s.at!}}] : [...walk, { verb: 'wave', params: { at: s.key, seconds: 1 } }] }] };
       },
@@ -146,7 +151,7 @@ export function wrapAct(objects: { act(id: string, soul: EdgeSoul, input: Record
     if (!out?.accepted) return out;
     const t = find(id), a = t ? actionsOf(t.def).find((x) => x.name === input.action) : undefined;
     if (!t || !a) return out;
-    if (host.deferSwitches && isContactSwitch(t.def, a)) return out;
+    if (host.deferContacts && isContactActuator(t.def, a)) return out;
     // W5: water moves between two things (tank → can, can → planter) in one commit, planned again at commit time
     const water = waterPlan(a, id, soul, host);
     if (water) {

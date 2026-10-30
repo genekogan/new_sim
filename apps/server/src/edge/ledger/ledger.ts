@@ -37,7 +37,7 @@ const area = (p: [number, number][]) => Math.abs(p.reduce((s, [x, z], i) => {con
 import {resolveCapability, tokens, placeMatch, placeMatchTier, typoFix, type VocabContext, type VocabResult} from './vocabulary.ts';
 import {isCampfire} from './fire.ts';
 import {activityCapabilities, loadSpots, ACTIVITY_SECONDS_MAX, SPOT_ACTIVITIES, type SpotsData} from './activities.ts';
-import type {ContactSwitchIntent,ContactSwitchService} from '../../god/contact-switch.ts';
+import type {ContactActuatorIntent,ContactActuatorService} from '../../god/contact-actuator.ts';
 import type {PaintingIntent, PaintingService} from '../../art/painting-completion.ts';
 import {humanoidDims} from '../../../../../mars/viewer/engine/bodies/humanoid.ts';
 import {Together, PAIRED, type TogetherPlan} from './together.ts';
@@ -88,7 +88,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
   nativeUseRefusal?: (capability: string, steps?: Program['steps']) => {code: string; reason: string} | null;
   /** World-engine easels only; installed alongside the existing art media routes. */
   painting?: PaintingService;
-  contactSwitch?: ContactSwitchService;
+  contactActuator?: ContactActuatorService;
   /** World-engine worlds only (god/places.ts): places walkable without being native engine regions (a god's plaza, a
    *  room of a god's house). Unset on Eden/Mars/LM, where walkability stays `id in regions` exactly. */
   placeWalkable?: (placeId: string) => boolean;
@@ -469,12 +469,12 @@ export class EdgeLedger implements EdgeLedgerHooks {
         const occupied=!!m&&[...this.host.engine.runtime.records.values()].some(record=>{const p=record.params as {actor?:string;slot?:string};return live.has(record.id)&&record.verb==='take_slot'&&record.phase==='occupied'&&p.actor===m.entityId&&typeof p.slot==='string'&&p.slot.startsWith(warmTarget+'#');});
         if(!body?.human||!fire||body.human.shore?.mode==='buoyant'||!occupied||Math.hypot(body.pose.p[0]-fire.pose.p[0],body.pose.p[2]-fire.pose.p[2])>2){this.update(r.receipt_id,{phase:'failed',code:'activity.not-reached',reason:'No place at the named fire was reached; this did not warm your body.'});return;}
       }
-      const contact=r.detail?(JSON.parse(r.detail) as {contactSwitchV1?:ContactSwitchIntent}).contactSwitchV1:undefined;
+      const contact=r.detail?((d: {contactActuatorV1?:ContactActuatorIntent;contactSwitchV1?:ContactActuatorIntent})=>d.contactActuatorV1??d.contactSwitchV1)(JSON.parse(r.detail)):undefined;
       if(contact){
         const row=this.db.soul(r.soul_id);
-        if(!m||!row||row.retired_at!==null||row.entity_id!==contact.actor||row.owner!==contact.owner||['sleeping','absent'].includes(stateOf(this.host,contact.actor))||!this.contactSwitch){this.update(r.receipt_id,{phase:'failed',code:'switch.identity-changed',reason:'The original awake Soul/body is no longer operating this light.'});return;}
-        try{const result=this.contactSwitch.complete({soulId:m.soulId,entityId:m.entityId,name:m.name,owner:m.owner},contact,()=>this.update(r.receipt_id,{phase:'completed'}));if(!result.ok)this.update(r.receipt_id,{phase:'failed',code:result.code,reason:result.reason});}
-        catch{this.update(r.receipt_id,{phase:'failed',code:'switch.failed',reason:'The light could not be switched; observe its current state.'});}
+        if(!m||!row||row.retired_at!==null||row.entity_id!==contact.actor||row.owner!==contact.owner||['sleeping','absent'].includes(stateOf(this.host,contact.actor))||!this.contactActuator){this.update(r.receipt_id,{phase:'failed',code:'contact.identity-changed',reason:'The original awake Soul/body is no longer operating this object.'});return;}
+        try{const result=this.contactActuator.complete({soulId:m.soulId,entityId:m.entityId,name:m.name,owner:m.owner},contact,()=>this.update(r.receipt_id,{phase:'completed'}));if(!result.ok)this.update(r.receipt_id,{phase:'failed',code:result.code,reason:result.reason});}
+        catch{this.update(r.receipt_id,{phase:'failed',code:'contact.failed',reason:'The object could not be operated; observe its current state.'});}
         return;
       }
       const painting = r.detail ? (JSON.parse(r.detail) as {paintingV1?: PaintingIntent}).paintingV1 : undefined;
@@ -937,7 +937,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
         const placeId = out.code === 'object.out-of-reach' ? this.comms.objects.all().find(o => o.id === cap.object)?.placeId : undefined, go = placeId ? caps.find(c => c.id === 'walk:' + placeId) : undefined;
         return {...refuse(out.code ?? 'object.refused', out.reason ?? 'The object refused that action.'), ...(go ? {did_you_mean: [{id: go.id, label: go.label}]} : {}), ...resolved};
       }
-      const contact=this.contactSwitch?.prepare(soul,cap.object,cap.action)??null;
+      const contact=this.contactActuator?.prepare(soul,cap.object,cap.action)??null;
       const effects=out.object?confirmedObjectEffects(before,prepared.after,cap.action,out.object.version):{};
       // An object action that moves the body (a ride's join/leave/start) is an ordinary logged decision with a normal receipt.
       const bodies = (out as {bodies?: {label: string; steps: Program['steps']}[]}).bodies;
@@ -950,7 +950,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
           steps = prep.steps; commit = prep.commit;
         }
         const bodyGuard=():true=>{prepared.guard();if(invited!==undefined){const current=this.together.prepare(soul,cap,{label:bodies[0].label,steps:bodies[0].steps},{with:invited},bodies[0].steps);if('code'in current)throw new EdgeError(409,current.code,current.reason);}return true;};
-        const b = await this.performBodies(soul, capability, bodies[0].label, steps, clientRef,undefined,{guard:bodyGuard,commit:id=>{if(!contact)prepared.commit();commit?.(id);return contact?{contactSwitchV1:contact}:{confirmedEffects:effects};}});
+        const b = await this.performBodies(soul, capability, bodies[0].label, steps, clientRef,undefined,{guard:bodyGuard,commit:id=>{if(!contact)prepared.commit();commit?.(id);return contact?{contactActuatorV1:contact}:{confirmedEffects:effects};}});
         if (!b.accepted) return {...refuse(b.code, b.reason), ...resolved};
         this.comms.fading.touch?.(soul.soulId);
         return {accepted: true, receipt: {...this.receipt(soul.soulId, b.receipt.id)!, object: cap.object} as EdgeReceipt, ...(out.result ? {result: out.result} : {}), ...resolved};
@@ -1243,7 +1243,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
 
   /** Body steps requested by an object action (OBJECT-CONTRACT §7): performed like `act` — refused with a genuine code, or
    *  accepted with a receipt (waiting → started → completed/failed) for a logged decision with trigger edge-act. */
-  contactSwitchDetail(soul:EdgeSoul,id:string,action:string){const intent=this.contactSwitch?.prepare(soul,id,action);return intent?{contactSwitchV1:intent}:null;}
+  contactActuatorDetail(soul:EdgeSoul,id:string,action:string){const intent=this.contactActuator?.prepare(soul,id,action);return intent?{contactActuatorV1:intent}:null;}
   async performBodies(soul: EdgeSoul, capability: string, label: string, steps: Program['steps'], clientRef?: string,effects?:ConfirmedEffects,admission?:ObjectBodyAdmission): Promise<{accepted: true; receipt: EdgeReceipt} | {accepted: false; code: string; reason: string}> {
     if (clientRef) {const old = this.rows('soul_id=? AND client_ref=?', soul.soulId, clientRef)[0]; if (old) return {accepted: true, receipt: this.view(old)};}
     const refuse = (code: string, reason: string) => {this.recordRefusal(soul.soulId, 'object', capability, code, reason); return {accepted: false as const, code, reason};};

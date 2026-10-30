@@ -2,6 +2,7 @@
 // perceive from where it stands. Strictly local: Souls and things in the same enclosed place (or, outdoors, not
 // inside one) within sight radius and with a clear sightline (nav/1 solids); never other places, never conversation
 // content, never owner data. Read-only; deterministic for a given world state. No model calls.
+import {entityPhysicsContribution} from '../../../../../mars/viewer/engine/spatial/edits.ts';
 import {whereLine} from './semantic-location.ts';
 import {isCampfire} from '../ledger/fire.ts';
 import {clockAt} from '@sim/brain';
@@ -26,7 +27,7 @@ export type Located = {kind: 'soul' | 'seat' | 'fire' | 'spot' | 'object' | 'ite
 /** One read of the world for one Soul (built per request). */
 export class Perception {
   readonly L: EdgeLedger; readonly soul: EdgeSoul; readonly w: NativeWorld; readonly tick: number;
-  readonly pos: V2 | null; readonly heading: number; readonly enclosure: string | null; private solidsCache?: readonly Solid[];
+  readonly pos: V2 | null; readonly heading: number; readonly enclosure: string | null; private solidsCache?: readonly Solid[]; private actuatorSolidsCache?:readonly Solid[];
   constructor(ledger: EdgeLedger, soul: EdgeSoul) {
     this.L = ledger; this.soul = soul; this.w = ledger.host.engine.world as NativeWorld; this.tick = ledger.host.engine.world.tick;
     const b = this.w.entities[soul.entityId];
@@ -39,7 +40,12 @@ export class Perception {
       .flatMap(x => {const o = x.obb ?? (x.c && x.half ? {c: x.c, half: x.half, yaw: x.yaw ?? 0} : null); return o ? [{id: x.id, ...(x.label ? {label: x.label} : {}), c: o.c, half: o.half, yaw: o.yaw, height: x.y1 ?? x.height}] : [];});
   }
   /** Sightline from me to a point (enclosure is checked by the caller). */
-  sees(at: V2): boolean {return !!this.pos && clearSight(this.pos, at, this.solids()).clear;}
+  sees(at: V2, target?:string): boolean {
+    // Existing general perception stays unchanged. Actuator facts also honour the
+    // entity-world walls (the native nav/1 map alone omits those contributions).
+    const solids=target?(this.actuatorSolidsCache??=[...this.solids(),...(entityPhysicsContribution(this.w).obstacles??[]).map(o=>({id:o.id,c:o.obb.c,half:o.obb.half,yaw:o.obb.yaw,height:o.y1}))]):this.solids();
+    return !!this.pos && clearSight(this.pos,at,target?solids.filter(s=>s.id!==target&&!s.id.startsWith(target+'#')):solids).clear;
+  }
   /** Is a point in my enclosure (or, when I am outdoors, not inside any enclosed place)? */
   sameEnclosure(at: V2, level = 0): boolean {
     const enc = this.L.enclosureAtPoint(at[0],at[1],level);
@@ -243,12 +249,16 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
   const all = P.things(), kindOf = (t: Located) => t.kind === 'spot' ? (t.capability?.split(':')[0] ?? 'spot') : t.kind === 'object' ? (ledger.comms?.objects.all().find(o => o.id === t.id)?.kind ?? 'object') : t.kind;
   const taken = new Map<string, number>(), picked: Located[] = [], more: Record<string, number> = {};
   for (const t of all) {const k = kindOf(t), n = taken.get(k) ?? 0; if (n < (k === 'seat' ? LIMITS.seats : 2) && picked.length < LIMITS.objects) {picked.push(t); taken.set(k, n + 1);} else more[k] = (more[k] ?? 0) + 1;}
-  const objects = picked.map(t => ({
+  // Only six selected objects, at most 4 m away and in sight. No stored-state dump.
+  const objects = picked.map(t => {
+    const state=t.kind==='object'&&t.distance<=4&&P.sameEnclosure(t.at)&&P.sees(t.at,t.id)?ledger.contactActuator?.facts(t.id):null;
+    return ({
     id: t.id, kind: kindOf(t),
     ...(t.kind === 'seat' || t.kind === 'object' || t.kind === 'spot' || t.kind === 'item' ? {name: t.name} : {}),
     ...(t.what ? {what: t.what} : {}),
+    ...(state&&Object.keys(state).length ? {state} : {}),
     ...(t.kind === 'seat' ? {free: !!t.free} : {}), ...(t.kind === 'object' ? {readable: true} : {}),
-    dist: t.distance, bearing: P.bearing(t.at)}));
+    dist: t.distance, bearing: P.bearing(t.at)});});
   const conversations = talks.filter(t => t.members.some(id => id === soul.soulId || (seenIds.has(id) && earshot(seen.find(s => s.soulId === id)!.distance))))
     .slice(0, LIMITS.conversations).map(t => {const mine = t.members.includes(soul.soulId), heard = t.members.filter(id => id === soul.soulId || seenIds.has(id));
       return {...(mine ? {id: t.id} : {}), members: heard.map(id => id === soul.soulId ? 'you' : host.minds.get(id)?.name ?? 'someone'), ...(t.members.length > heard.length ? {others: t.members.length - heard.length} : {}), public: false};});

@@ -1,4 +1,4 @@
-import type {WorldModel,Entity} from '@sim/world-compiler';
+import {contactStateKey,type WorldModel,type Entity} from '@sim/world-compiler';
 
 /** Native interactions use the same depicted tick as the Soul performing them.
  * The ordered diff stream waits here; it must not show a lamp's result ahead of
@@ -8,6 +8,7 @@ export function lightDiffAhead(model:WorldModel, message:unknown, depictedTick:n
   if(d.by!=='engine'||typeof d.tick!=='number'||!Number.isFinite(d.tick)||d.tick<=depictedTick)return false;
   return !!d.diff?.upserts?.some(e=>{
     const before=model.entities.get(e.id),def=model.resolvedDef(e.def);
-    return before&&before.state?.on!==e.state?.on&&!!(def?.components.light||def?.components.lights);
+    const key=def&&contactStateKey(def);
+    return before&&key&&before.state?.[key]!==e.state?.[key];
   });
 }

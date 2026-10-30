@@ -44,7 +44,7 @@ export interface EdgeLedgerHooks {
   poseOf?(soulId: string): {x: number; z: number; yaw: number} | null;
   /** EVENTS-v1 fade-by-abandonment: what the body holds that its own agent chose (an activity in progress, seated, lying, riding…), or null. */
   postureHold?(soulId: string): string | null;
-  contactSwitchDetail?(soul:EdgeSoul,id:string,action:string):Record<string,unknown>|null;
+  contactActuatorDetail?(soul:EdgeSoul,id:string,action:string):Record<string,unknown>|null;
   performBodies?(soul: EdgeSoul, capability: string, label: string, steps: {verb: string; params: Record<string, unknown>}[], clientRef?: string,effects?:unknown,admission?:ObjectBodyAdmission): Promise<{accepted: true; receipt: EdgeReceipt} | {accepted: false; code: string; reason: string}>;
 }
 export type EdgeCapability = {id: string; verb: string; label: string; aliases?: readonly string[]; available: boolean; target?: {id: string; kind: string}; blocked?: {code: string; reason: string}; params?: Record<string, unknown>; object?: string; action?: string};
