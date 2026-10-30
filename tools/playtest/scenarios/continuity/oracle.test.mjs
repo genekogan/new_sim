@@ -122,7 +122,9 @@ const notificationScore=(n=notification,e=effect)=>score({scenarioId:'eden-readi
 test('visible response requires actor/event linkage, source-cited relevance and causal timestamps',()=>{
  const id='notification:event-1:visible-response';
  assert.equal(resultRow(notificationScore(),id).status,'pass');
- for(const n of [{...notification,actor:undefined},{...notification,relevanceEvidence:[]},{...notification,notifiedAt:null}])assert.equal(resultRow(notificationScore(n),id).status,'unknown');
+ for(const n of [{...notification,persistedAt:null,notifiedAt:null},{...notification,notifiedAt:null}])assert.equal(resultRow(notificationScore(n),id).status,'pass','native response is measurable without managed persistence or host-stage telemetry');
+ assert.equal(resultRow(notificationScore({...notification,persistedAt:null,notifiedAt:null,firstRelevantEffectAt:20000},{...effect,at:20000}),id).status,'fail','missing client stages cannot hide a slow native response');
+ for(const n of [{...notification,actor:undefined},{...notification,relevanceEvidence:[]}])assert.equal(resultRow(notificationScore(n),id).status,'unknown');
  for(const e of [{...effect,actor:undefined},{...effect,respondsToEventId:undefined}])assert.equal(resultRow(notificationScore(notification,e),id).status,'unknown');
  for(const e of [{...effect,actor:'reader-b'},{...effect,respondsToEventId:'other-event'},{...effect,at:301}])assert.equal(resultRow(notificationScore(notification,e),id).status,'fail');
  const early={...notification,firstRelevantEffectAt:50};assert.equal(resultRow(notificationScore(early,{...effect,at:50}),id).status,'fail','an unrelated earlier effect cannot count as a response');

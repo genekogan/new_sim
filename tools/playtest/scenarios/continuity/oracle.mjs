@@ -412,6 +412,8 @@ export function scoreContinuity({fixtures,oracles,evidence}){
  rows.push(row('addressed-message-coverage',evidence.notificationsComplete===true&&Array.isArray(evidence.lostAddressedEventIds)?evidence.lostAddressedEventIds.length?'fail':'pass':'unknown','All injected addressed events enumerated; no missing event can be omitted from the denominator',evidence.lostAddressedEventIds));
  for(const n of notifications){
   if(n.healthyRunning!==true){rows.push(row('notification:'+n.eventId,'unknown','Unavailable-window timing reported separately; not a healthy-running pass'));continue;}
+  // Common native response latency does not require a client journal. Optional
+  // observed stages still cannot contradict the native causal order.
   for(const [id,a,b,bound]of [['receive',n.createdAt,n.persistedAt,oracles.numeric.eventCreatedToDurablyPersistedMs],['host-delivery',n.persistedAt,n.notifiedAt,oracles.numeric.persistedToHostNotifiedMs],['visible-response',n.createdAt,n.firstRelevantEffectAt,oracles.numeric.eventCreatedToFirstRelevantPublicEffectMs]]){
    const delta=at(b)-at(a);let status=Number.isFinite(delta)?delta<0?'fail':delta<=bound?'pass':'fail':'unknown';
    if(id==='visible-response'){
@@ -419,7 +421,7 @@ export function scoreContinuity({fixtures,oracles,evidence}){
     const suppliedActor=typeof n.actor==='string'&&n.actor.length>0,effectActor=typeof effect?.actor==='string'&&effect.actor.length>0,suppliedEvent=typeof effect?.respondsToEventId==='string'&&effect.respondsToEventId.length>0,eventId=typeof n.eventId==='string'&&n.eventId.length>0;
     const contradiction=suppliedActor&&!scenario.actors.some(a=>a.id===n.actor)||effect&&((suppliedActor&&effectActor&&effect.actor!==n.actor)||(suppliedEvent&&eventId&&effect.respondsToEventId!==n.eventId)||(Number.isFinite(at(effect.at))&&Number.isFinite(at(n.firstRelevantEffectAt))&&at(effect.at)!==at(n.firstRelevantEffectAt)))||timestamps.some((t,i)=>Number.isFinite(t)&&timestamps.slice(i+1).some(later=>Number.isFinite(later)&&later<t));
     if(contradiction)status='fail';
-    else if(!effect||!suppliedActor||!effectActor||!suppliedEvent||!eventId||!Array.isArray(n.relevanceEvidence)||!n.relevanceEvidence.length||!timestamps.every(Number.isFinite)||!Number.isFinite(at(effect.at)))status='unknown';
+    else if(!effect||!suppliedActor||!effectActor||!suppliedEvent||!eventId||!Array.isArray(n.relevanceEvidence)||!n.relevanceEvidence.length||!Number.isFinite(timestamps[0])||!Number.isFinite(timestamps[3])||!Number.isFinite(at(effect.at)))status='unknown';
    }
    rows.push(row(`notification:${n.eventId}:${id}`,status,`observed ${Number.isFinite(delta)?delta:'?'}ms; bound ${bound}ms`,id==='visible-response'?n.relevanceEvidence:[]));
   }
