@@ -210,6 +210,8 @@ export class TakeRecorder implements RuntimeObserver {
     this.sample();
   }
 
+  private readonly transportTracks = new Set<string>();
+
   private sample() {
     const t = this.rt.tick - this.startTick;
     const ents = this.rt.world.entities;
@@ -220,7 +222,19 @@ export class TakeRecorder implements RuntimeObserver {
     // S1 r2: found again from the last scan while the table holds the same objects under the same keys (stableIndices:
     // an entity's tags never change), so an idle world does not read ~4,500 entities' tags every tick (shared: read-only)
     const list = entityList(this.rt.world), keys = entityKeys(this.rt.world);
-    const dynamic = stableIndices(ents, 'take sample', list, keys, (e) => !e.tags?.includes('entity-world') || !!e.tags?.includes('entity-world-transport'), (idx) => idx.map((i) => keys[i]).sort()).derived;
+    const base = stableIndices(ents, 'take sample', list, keys, (e) => !e.tags?.includes('entity-world'), (idx) => idx.map((i) => keys[i]).sort()).derived;
+    const transports = stableIndices(ents, 'take transports', list, keys, e => !!e.tags?.includes('entity-world-transport'), idx => new Set(idx.map(i => keys[i]))).derived;
+    let dynamic = base;
+    if (transports.size) {
+      // Only bodies' active contacts select load tracks. A hundred unused chairs
+      // add no per-tick pose/field samples or repeated live grip payloads.
+      for (const id of base) {
+        const h=ents[id].human;
+        for (const load of [h?.grip?.entity,h?.carryContactV1?.item]) if (load && transports.has(load)) this.transportTracks.add(load);
+      }
+      dynamic=[...new Set([...base,...[...this.transportTracks].filter(id=>!!ents[id])])].sort();
+    }
+
     for (const id of dynamic) {
       const e = ents[id];
       const s = quantize(e, t);
