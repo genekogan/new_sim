@@ -12,10 +12,13 @@ try{
  await post('/v1/god/env',{timeOfDay:'14:00',timeScale:0,weather:{kind:'clear'}});
  await page.goto(base+'/?eye=-1.5,1.7,2.4&at=0.05,1.3,3.95');await page.waitForFunction(()=>window.__simEntity?.contactFrame()?.bones&&Object.keys(window.__simEntity.contactFrame().bones).length>=2,null,{timeout:120000});await page.waitForFunction(()=>!document.querySelector('.viewer-arrival-title'),null,{timeout:300000});await page.waitForTimeout(3000);await installFrameStamp(page);
  timer=setInterval(async()=>{if(busy)return;busy=true;try{const s=await sample();if(s)samples.push(s);}finally{busy=false;}},50);
+ let read=null;
+ if(process.env.BOARDS_ONLY==='notice'){await post('/v1/god/act',{ops:[{op:'set',id:'notice-board',state:{text:'',textBy:''}}]});await camera([2.1,1.8,2.4],[3.65,1.4,3.95]);await page.waitForTimeout(2500);await act('ada','write on the notice board',{text:'Choir practice\nThursday at six'});read=await act('ben','read the notice board');}
+ else{
  await act('ada','write on the whiteboard',{text:'Picnic at noon\nby the pond - Ada'});
- const read=await act('ben','read the whiteboard');
+ read=await act('ben','read the whiteboard');
  await camera([2.1,1.8,2.4],[3.65,1.4,3.95]);await act('ada','write on the notice board',{text:'Lost: blue scarf'});
- await camera([-1.5,1.7,2.4],[0.05,1.3,3.95]);await act('ada','wipe the whiteboard clean');
+ await camera([-1.5,1.7,2.4],[0.05,1.3,3.95]);await act('ada','wipe the whiteboard clean');}
  assert.deepEqual(errors,[]);
  // depicted text never appears before the depicted stroke end
  const early=[];for(const s of samples)for(const b of s.bodies){const m=b.motion;if(!m?.stroke)continue;const t=(s.tick-m.startTick)*s.dt,board=s.boards.find(x=>x.id===m.target),endAt=.65+m.stroke.seconds;if(t<endAt-.06&&m.stroke.kind==='write'&&board?.text&&!samples.some(p=>p.tick<m.startTick&&p.boards.find(x=>x.id===m.target)?.text===board.text))early.push({tick:s.tick,t,text:board.text});}
