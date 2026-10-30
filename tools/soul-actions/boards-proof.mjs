@@ -10,12 +10,12 @@ const sample=()=>page.evaluate(()=>{const api=window.__simEntity,f=api?.contactF
 const act=async(seat,words,params)=>{const start=Date.now(),args=['eden.mjs','act',words,...(params?[JSON.stringify(params)]:[]),'--wait','--json'],r=await promisify(execFile)(process.execPath,args,{cwd:scene+'/'+seat,timeout:90000}),result=JSON.parse(r.stdout);commands.push({seat,words,params,start,end:Date.now(),result});writeFileSync(out+'/commands.json',JSON.stringify(commands,null,2));assert.equal(result.accepted,true,JSON.stringify(result));assert.equal(result.receipt.phase,'completed',JSON.stringify(result));await page.waitForTimeout(2200);await page.screenshot({path:out+'/'+String(commands.length).padStart(2,'0')+'.png'});return result;};
 try{
  await post('/v1/god/env',{timeOfDay:'14:00',timeScale:0,weather:{kind:'clear'}});
- await page.goto(base+'/?eye=1.7,1.75,2.2&at=-0.05,1.3,3.95');await page.waitForFunction(()=>window.__simEntity?.contactFrame()?.bones&&Object.keys(window.__simEntity.contactFrame().bones).length>=2,null,{timeout:120000});await page.waitForFunction(()=>!document.querySelector('.viewer-arrival-title'),null,{timeout:300000});await page.waitForTimeout(3000);await installFrameStamp(page);
+ await page.goto(base+'/?eye=-1.5,1.7,2.4&at=0.05,1.3,3.95');await page.waitForFunction(()=>window.__simEntity?.contactFrame()?.bones&&Object.keys(window.__simEntity.contactFrame().bones).length>=2,null,{timeout:120000});await page.waitForFunction(()=>!document.querySelector('.viewer-arrival-title'),null,{timeout:300000});await page.waitForTimeout(3000);await installFrameStamp(page);
  timer=setInterval(async()=>{if(busy)return;busy=true;try{const s=await sample();if(s)samples.push(s);}finally{busy=false;}},50);
  await act('ada','write on the whiteboard',{text:'Picnic at noon\nby the pond - Ada'});
  const read=await act('ben','read the whiteboard');
- await camera([5.3,1.8,2.2],[3.55,1.4,3.95]);await act('ada','write on the notice board',{text:'Lost: blue scarf'});
- await camera([1.7,1.75,2.2],[-0.05,1.3,3.95]);await act('ada','wipe the whiteboard clean');
+ await camera([2.1,1.8,2.4],[3.65,1.4,3.95]);await act('ada','write on the notice board',{text:'Lost: blue scarf'});
+ await camera([-1.5,1.7,2.4],[0.05,1.3,3.95]);await act('ada','wipe the whiteboard clean');
  assert.deepEqual(errors,[]);
  // depicted text never appears before the depicted stroke end
  const early=[];for(const s of samples)for(const b of s.bodies){const m=b.motion;if(!m?.stroke)continue;const t=(s.tick-m.startTick)*s.dt,board=s.boards.find(x=>x.id===m.target),endAt=.65+m.stroke.seconds;if(t<endAt-.06&&m.stroke.kind==='write'&&board?.text&&!samples.some(p=>p.tick<m.startTick&&p.boards.find(x=>x.id===m.target)?.text===board.text))early.push({tick:s.tick,t,text:board.text});}
