@@ -6,10 +6,12 @@ import {PassThrough} from 'node:stream';
 import {mkdtempSync,mkdirSync,readFileSync,writeFileSync,appendFileSync,statSync,symlinkSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import * as trialModule from './continuity-trial.mjs';
 import {CONTINUITY_ARMS,validateContinuityTrial,prepareR400Seat,runContinuityTrial,runManagedTrialActor,verifyBaselineTrialExit} from './continuity-trial.mjs';
 import {verifyOwnedProbeExit,probeSessions} from './probe-sessions.mjs';
 import {buildContinuityBaselineArgs} from './adapters/continuity-baseline.mjs';
 
+const {SETTLE_GATE_DEFAULTS,settleGateConfig}=trialModule;
 const flush=async()=>{for(let i=0;i<20;i++)await Promise.resolve();};
 const usageLimits={perActor:{totalTokens:1000000,outputTokens:100000},aggregate:{totalTokens:2000000,outputTokens:200000}};
 function usageEvidence(args,arm){
@@ -28,7 +30,7 @@ class Clock{
 function fixture(t,overrides={}){
  const root=mkdtempSync(join(tmpdir(),'continuity-trial-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
  const clock=new Clock(),calls=[],lifecycle=[],samples=[];
- const config={directory:join(root,'trial'),arm:CONTINUITY_ARMS[0],purpose:'short',seconds:3,model:'declared-model',effort:'high',worldId:'fresh-world',actors:[{id:'a',folder:join(root,'a'),instruction:'Whole original mission A'},{id:'b',folder:join(root,'b'),instruction:'Whole original mission B'}],...overrides};
+ const config={directory:join(root,'trial'),arm:CONTINUITY_ARMS[0],purpose:'short',seconds:3,model:'declared-model',effort:'high',worldId:'fresh-world',settleGate:false,actors:[{id:'a',folder:join(root,'a'),instruction:'Whole original mission A'},{id:'b',folder:join(root,'b'),instruction:'Whole original mission B'}],...overrides};
  const registry={register(row){lifecycle.push(['register',row]);},complete(id,row){lifecycle.push(['complete',id,row]);},async archiveCompleted(){lifecycle.push(['archive']);return [];}};
  const launch=async args=>{
   calls.push(args);const id=args.cwd?.includes('/a/')?'a':args.directory.includes('/a/')?'a':'b';
@@ -587,4 +589,76 @@ test('all actors exiting zero keep a null trial failure and an empty failed-acto
  const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(3000);const result=await pending;
  assert.equal(result.failureCode,null);assert.deepEqual(result.failedActors,[]);
  assert.ok(f.lifecycle.filter(r=>r[0]==='complete').every(r=>r[2].outcome==='bounded-end'));
+});
+
+// Served-world settle gate. The fake world advances `rate(t)` ticks/s on the
+// injected clock and answers after `latency(n)` ms; T0 is fixed only after it.
+const settlingWorld=(f,{rate=()=>20,latency=()=>0}={})=>{let tick=5000,last=f.clock.now(),n=0;const advance=()=>{const at=f.clock.now();tick+=Math.floor(rate(last-100000)*(at-last)/1000);last=at;};return paired=>({async read(command,args,signal){
+ assert.equal(command,'here');assert.deepEqual(args,{view:'body'});const delay=latency(++n);if(delay)await f.clock.sleep(delay,signal);advance();
+ f.samples.push({soul:paired.soul,at:f.clock.now()});return {here:{view:'body',tick,me:{pos:{x:1,z:2},place:'p_native',posture:'stand',seat:null,actualActivity:null}}};
+}});};
+
+test('settle gate defaults are explicit exported constants and invalid gate configuration refuses before any run',t=>{
+ assert.deepEqual(SETTLE_GATE_DEFAULTS,{minTickAdvance:200,probes:5,intervalMs:1000,maxLatencyMs:100,minTicksPerSec:18,timeoutMs:120000});assert.ok(Object.isFrozen(SETTLE_GATE_DEFAULTS));
+ assert.deepEqual(settleGateConfig(undefined),SETTLE_GATE_DEFAULTS);assert.equal(settleGateConfig(false),null);assert.equal(settleGateConfig({timeoutMs:5000}).timeoutMs,5000);
+ const f=fixture(t);
+ for(const settleGate of [true,null,[],{probes:1},{probes:2.5},{maxLatencyMs:0},{minTicksPerSec:-1},{timeoutMs:Infinity},{unknown:1},{timeoutMs:1000,intervalMs:1000,probes:5}])assert.throws(()=>validateContinuityTrial({...f.config,settleGate}),{code:'INVALID_SETTLE_GATE_CONFIG'});
+});
+
+test('default-on settle gate fixes T0 only after enough fast served probes and records every probe',async t=>{
+ const f=fixture(t,{settleGate:undefined,fixtureActors:[{id:'seated',folder:'/test/seated'}]});f.deps.createWorld=settlingWorld(f);
+ const pending=runContinuityTrial(f.config,f.deps);await flush();assert.equal(f.calls.length,0,'no release while the gate observes');
+ await f.clock.tick(9999);assert.equal(f.calls.length,0);
+ await f.clock.tick(1);assert.equal(f.calls.length,2);
+ await f.clock.tick(3000);const result=await pending;
+ assert.equal(result.failureCode,null);assert.equal(result.startedAt,110000);assert.equal(result.cutoffAt-result.startedAt,3000);
+ const rows=f.rows(),probes=rows.filter(r=>r.kind==='settle-probe'),settled=rows.filter(r=>r.kind==='world-settled');
+ assert.equal(probes.length,11);assert.equal(settled.length,1);
+ assert.ok(probes.every(p=>p.actor==='seated'&&p.soulId==='s_seated'&&p.source==='here'&&p.view==='body'&&Number.isFinite(p.requestedAt)&&Number.isFinite(p.receivedAt)&&Number.isFinite(p.tick)&&p.latencyMs===p.receivedAt-p.requestedAt));
+ assert.deepEqual(probes.map(p=>p.requestedAt),Array.from({length:11},(_,i)=>100000+i*1000));
+ assert.ok(probes.every(p=>p.receivedAt<=result.startedAt));
+ const first=rows.findIndex(r=>r.kind==='actor-release'||r.kind==='body'),settledAt=rows.findIndex(r=>r.kind==='world-settled');assert.ok(settledAt>=0&&settledAt<first,'world-settled precedes every release and T0 sample');
+ assert.equal(settled[0].tickAdvance,200);assert.equal(settled[0].streak,11);
+ assert.equal(result.settleGate.status,'settled');assert.deepEqual(result.settleGate.config,SETTLE_GATE_DEFAULTS);assert.equal(result.settleGate.probes,11);assert.equal(result.settleGate.settledAt,110000);assert.equal(result.settleGate.tickAdvance,200);assert.equal(result.settleGate.tickReference,'first-gate-probe');
+ assert.deepEqual(JSON.parse(readFileSync(join(f.config.directory,'run.json'),'utf8')).settleGate,result.settleGate);
+});
+
+test('slow or low-tick probes reset the streak and keep T0 waiting until the served world settles',async t=>{
+ // First 4s: 10 ticks/s; probes 6-7 answer in 150ms; then 25 ticks/s and fast.
+ // A fast world would settle at +10s; this one needs probes 8-12 (+7s..+11s).
+ const f=fixture(t,{settleGate:undefined});f.deps.createWorld=settlingWorld(f,{rate:t=>t<4000?10:25,latency:n=>n===6||n===7?150:0});
+ const pending=runContinuityTrial(f.config,f.deps);
+ await f.clock.tick(10999);assert.equal(f.calls.length,0,'still waiting for five consecutive fast probes');
+ await f.clock.tick(1);assert.equal(f.calls.length,2);
+ const rows=f.rows(),probes=rows.filter(r=>r.kind==='settle-probe'),settled=rows.find(r=>r.kind==='world-settled');
+ assert.ok(probes.some(p=>p.latencyMs>=100&&p.fast===false),'slow probes recorded as not fast');
+ assert.ok(probes.some(p=>p.ticksPerSec!==null&&p.ticksPerSec<18&&p.fast===false),'low tick-rate probes recorded as not fast');
+ assert.ok(probes.slice(-5).every(p=>p.fast===true&&p.latencyMs<100&&p.ticksPerSec>=18));
+ assert.equal(settled.at,probes.at(-1).receivedAt);
+ await f.clock.tick(3000);const result=await pending;assert.equal(result.failureCode,null);assert.equal(result.startedAt,settled.at);assert.equal(result.startedAt,111000);assert.equal(result.cutoffAt-result.startedAt,3000);
+ assert.equal(result.settleGate.status,'settled');assert.ok(result.settleGate.tickAdvance>=200);
+});
+
+test('a world that never settles within the bound refuses with WORLD_NOT_SETTLED: no T0, run manifest or release',async t=>{
+ const f=fixture(t,{settleGate:undefined});f.deps.createWorld=settlingWorld(f,{rate:()=>10});
+ const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(120000);const result=await pending;
+ assert.equal(result.failureCode,'WORLD_NOT_SETTLED');assert.equal(result.endReason,'infrastructure-error');assert.equal(result.startedAt,null);assert.equal(result.cutoffAt,null);
+ assert.equal(f.calls.length,0);assert.ok(!f.rows().some(r=>['actor-release','body','world-settled'].includes(r.kind)));
+ const probes=f.rows().filter(r=>r.kind==='settle-probe');assert.equal(probes.length,121);assert.ok(probes.every(p=>p.fast===false||p.ticksPerSec===null));
+ assert.equal(f.rows().filter(r=>r.kind==='world-not-settled').length,1);
+ assert.equal(result.settleGate.status,'not-settled');assert.equal(result.settleGate.probes,121);assert.equal(result.settleGate.settledAt,null);
+ assert.throws(()=>readFileSync(join(f.config.directory,'run.json')),{code:'ENOENT'});
+ assert.equal(JSON.parse(readFileSync(join(f.config.directory,'summary.json'),'utf8')).settleGate.status,'not-settled');
+});
+
+for(const arm of CONTINUITY_ARMS)test('settle gate moves only boot-to-T0; every T0-relative schedule is unchanged: '+arm,async t=>{
+ const run=async settleGate=>{
+  const f=fixture(t,{arm,settleGate,seconds:4,meetingOffsetSec:2,actors:[{id:'a',folder:'/test/a',instruction:'Meet {meetingUTC}; done {completionUTC}.'},{id:'b',folder:'/test/b',instruction:'Meet {meetingUTC}; done {completionUTC}.',releaseOffsetSec:1.5}]});
+  f.deps.createWorld=settlingWorld(f);const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(20000);const result=await pending;
+  const m=JSON.parse(readFileSync(join(f.config.directory,'run.json'),'utf8')),rel=f.rows().filter(r=>r.kind==='actor-release');
+  return {result,shape:{cutoff:result.cutoffAt-result.startedAt,meeting:m.meetingAt-m.startedAt,offsets:m.actors.map(a=>a.releaseOffsetSec),releases:rel.map(r=>[r.actor,r.scheduledAt-result.startedAt,r.releasedAt-result.startedAt,r.remainingSeconds]),remaining:f.calls.map(c=>c.remainingSeconds),firstBody:f.rows().find(r=>r.kind==='body').requestedAt-result.startedAt,text:f.calls.map(c=>c.text.replace(/\d{4}-\d\d-\d\dT[\d:.]+Z/g,iso=>String(Date.parse(iso)-result.startedAt)))}};
+ };
+ const off=await run(false),on=await run(undefined);
+ assert.equal(off.result.startedAt,100000);assert.equal(on.result.startedAt,110000);assert.equal(off.result.settleGate.status,'disabled');assert.equal(on.result.settleGate.status,'settled');
+ assert.deepEqual(on.shape,off.shape);assert.deepEqual(on.shape.releases,[['a',0,0,4],['b',1500,1500,2.5]]);assert.deepEqual(on.shape.text,['Meet 2000; done 4000.','Meet 2000; done 4000.']);
 });

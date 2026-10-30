@@ -29,6 +29,19 @@ const fault=value=>Object.assign(Error(value),{code:value});
 const regularBytes=(path,maxBytes)=>{const stat=lstatSync(path);if(!stat.isFile()||stat.isSymbolicLink()||stat.size>maxBytes)throw fault('INVALID_LOCAL_ARTIFACT');return readFileSync(path);};
 const privateJson=(path,value)=>writeFileSync(path,JSON.stringify(value,null,2)+'\n',{flag:'wx',mode:0o600});
 
+// Pre-T0 served-world settle gate (garden r3 repair 1). Identical in both arms;
+// on unless a config explicitly sets settleGate:false. It moves only boot->T0.
+export const SETTLE_GATE_DEFAULTS=Object.freeze({minTickAdvance:200,probes:5,intervalMs:1000,maxLatencyMs:100,minTicksPerSec:18,timeoutMs:120000});
+const SETTLE_GATE_BOUNDS={minTickAdvance:[0,1e6,true],probes:[2,100,true],intervalMs:[100,60000,true],maxLatencyMs:[1,10000,true],minTicksPerSec:[0.001,1000,false],timeoutMs:[1000,3600000,true]};
+export function settleGateConfig(value){
+ if(value===false)return null;
+ if(value!==undefined&&(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!Object.hasOwn(SETTLE_GATE_BOUNDS,k))))throw fault('INVALID_SETTLE_GATE_CONFIG');
+ const gate={...SETTLE_GATE_DEFAULTS,...value};
+ for(const [k,[min,max,integer]]of Object.entries(SETTLE_GATE_BOUNDS))if(!Number.isFinite(gate[k])||gate[k]<min||gate[k]>max||integer&&!Number.isInteger(gate[k]))throw fault('INVALID_SETTLE_GATE_CONFIG');
+ if(gate.timeoutMs<=gate.intervalMs*(gate.probes-1))throw fault('INVALID_SETTLE_GATE_CONFIG');
+ return gate;
+}
+
 export function validateContinuityTrial(config){
  const {directory,arm,purpose,seconds,model,effort,worldId,actors,fixtureActors=[]}=config;
  if(typeof directory!=='string'||!directory.trim()||!CONTINUITY_ARMS.includes(arm)||!['short','soak'].includes(purpose)||!Number.isFinite(seconds)||seconds<1||seconds>604800||purpose==='soak'&&seconds<7200||!label(model)||!label(effort)||!label(worldId)||!Array.isArray(actors)||actors.length<1||actors.length>5||!Array.isArray(fixtureActors)||fixtureActors.length>5)throw fault('INVALID_TRIAL_CONFIG');
@@ -40,6 +53,7 @@ export function validateContinuityTrial(config){
  if(config.nativeEvidence!==undefined&&(!config.nativeEvidence||Object.keys(config.nativeEvidence).sort().join(',')!=='captureDirectory,databasePath'||!identifier(config.runId)||![config.nativeEvidence.databasePath,config.nativeEvidence.captureDirectory].every(p=>typeof p==='string'&&isAbsolute(p))))throw fault('INVALID_NATIVE_EVIDENCE_CONFIG');
  if(config.restart!==undefined&&(!config.restart||Object.keys(config.restart).sort().join(',')!=='actorId,setupId'||!identifier(config.restart.actorId)||!identifier(config.restart.setupId)||!identifier(worldId)||!Number.isSafeInteger(seconds*1000)||!actors.some(a=>a?.id===config.restart.actorId)))throw fault('INVALID_RESTART_CONFIG');
  if(config.cliVersion!==undefined&&config.cliVersion!==null&&!label(config.cliVersion))throw fault('INVALID_CLI_VERSION');
+ settleGateConfig(config.settleGate);
  const ids=new Set();
  for(const actor of [...actors,...fixtureActors]){
   if(!actor||!identifier(actor.id)||ids.has(actor.id)||typeof actor.folder!=='string'||!actor.folder.trim())throw fault('INVALID_TRIAL_ACTOR');
@@ -267,7 +281,8 @@ export async function runContinuityTrial(config,deps={}){
  const {directory,arm,purpose,seconds,model,effort,worldId,actors,fixtureActors=[],signal,onState=()=>{}}=config;
  const now=deps.now??Date.now,sleep=deps.sleep??abortableSleep,readPairing=deps.loadPairing??loadPairing,createWorld=deps.createWorld??(paired=>createWorldClient({world:paired.world,token:paired.token,timeoutMs:10000})),verifyWorld=deps.verifyWorld??verifyDevWorld;
  const launchCandidate=deps.launchCandidate??runManagedTrialActor,launchBaseline=deps.launchBaseline??runContinuityBaseline,prepareBaseline=deps.prepareBaseline??prepareR400Seat;
- const baselineEphemeral=config.baselineEphemeral===true;
+ const baselineEphemeral=config.baselineEphemeral===true,gate=settleGateConfig(config.settleGate);
+ let settleGate=gate?{status:'not-reached',config:gate}:{status:'disabled',config:null};
  const out=resolve(directory);mkdirSync(out,{mode:0o700}); // Atomic refusal of every existing output, even empty.
  const registry=(deps.registryFactory??probeSessions)(out),stop=new AbortController(),abort=()=>stop.abort();
  signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)abort();
@@ -285,11 +300,44 @@ export async function runContinuityTrial(config,deps={}){
  const pollRestart=()=>{if(restartProbe)return restartProbe.poll({required:false});};
  const scheduleRestart=()=>{restartTimer=(deps.schedule??setTimeout)(()=>{pollRestart();if(!stop.signal.aborted&&!['ready','fail','unknown','unexercised'].includes(restartProbe.snapshot().integration.status))scheduleRestart();},1000);};
  const scheduleUsage=()=>{usageTimer=(deps.schedule??setTimeout)(()=>{checkUsage();if(!stop.signal.aborted)scheduleUsage();},1000);};
- const sample=async(row,kind,sampleSignal=stop.signal,phase=null)=>{
+ // The sampler and the settle gate share this one native body read path.
+ const observe=async(row,sampleSignal)=>{
   const requestedAt=now(),response=await row.world.read('here',{view:'body'},sampleSignal),me=response.here?.me;
   if(response.here?.view!=='body')throw fault('BODY_PROJECTION_UNVERIFIED');
   if(!me?.pos)throw fault('NATIVE_BODY_MISSING');
-  record(kind,{actor:row.actor.id,soulId:row.paired.soul,requestedAt,receivedAt:now(),source:'here',view:'body',...(phase?{phase,participantCredit:false}:{}),tick:response.here.tick,me:{place:me.place,pos:me.pos,posture:me.posture,seat:me.seat,activity:me.activity,actualActivity:me.actualActivity??null}});
+  return {requestedAt,receivedAt:now(),tick:response.here.tick,me};
+ };
+ const sample=async(row,kind,sampleSignal=stop.signal,phase=null)=>{
+  const {requestedAt,receivedAt,tick,me}=await observe(row,sampleSignal);
+  record(kind,{actor:row.actor.id,soulId:row.paired.soul,requestedAt,receivedAt,source:'here',view:'body',...(phase?{phase,participantCredit:false}:{}),tick,me:{place:me.place,pos:me.pos,posture:me.posture,seat:me.seat,activity:me.activity,actualActivity:me.actualActivity??null}});
+ };
+ // ~1Hz probes of one existing body until `probes` consecutive reads are each
+ // <maxLatencyMs and (after the first) imply >=minTicksPerSec from the previous
+ // receipt, and the served tick advanced >=minTickAdvance since the first gate
+ // probe (the served world reports no boot tick). Failed reads reset the streak.
+ // Not settled within timeoutMs refuses the trial: no T0, run.json or release.
+ const settleWorld=async row=>{
+  const startedGate=now(),deadline=startedGate+gate.timeoutMs;let probes=0,streak=0,firstTick=null,previous=null,last=null;
+  const snapshot=status=>({status,config:gate,actor:row.actor.id,soulId:row.paired.soul,gateStartedAt:startedGate,settledAt:status==='settled'?last.receivedAt:null,waitMs:now()-startedGate,probes,streak,firstTick,lastTick:last?.tick??null,tickAdvance:last&&firstTick!==null?last.tick-firstTick:null,tickReference:'first-gate-probe'});
+  settleGate=snapshot('waiting');
+  for(;;){
+   if(stop.signal.aborted){settleGate=snapshot('cancelled');throw fault('TRIAL_CANCELLED');}
+   let probe=null,error=null;const requestedAt=now();
+   try{probe=await observe(row,AbortSignal.any([stop.signal,AbortSignal.timeout(Math.max(1,deadline-now()))]));if(!Number.isSafeInteger(probe.tick))throw fault('SETTLE_TICK_UNKNOWN');}catch(e){error=code(e);}
+   if(stop.signal.aborted){settleGate=snapshot('cancelled');throw fault('TRIAL_CANCELLED');}
+   probes++;
+   if(probe){
+    firstTick??=probe.tick;
+    const ticksPerSec=previous&&probe.receivedAt>previous.receivedAt?(probe.tick-previous.tick)*1000/(probe.receivedAt-previous.receivedAt):null,latencyMs=probe.receivedAt-probe.requestedAt,quick=latencyMs<gate.maxLatencyMs;
+    const fast=quick&&ticksPerSec!==null&&ticksPerSec>=gate.minTicksPerSec;
+    streak=fast?streak+1:quick?1:0;previous=quick?probe:null;last=probe;
+    record('settle-probe',{actor:row.actor.id,soulId:row.paired.soul,requestedAt:probe.requestedAt,receivedAt:probe.receivedAt,source:'here',view:'body',tick:probe.tick,latencyMs,ticksPerSec,fast,streak,tickAdvance:probe.tick-firstTick});
+   }else{streak=0;previous=null;record('settle-probe',{actor:row.actor.id,soulId:row.paired.soul,requestedAt,receivedAt:now(),source:'here',view:'body',tick:null,latencyMs:now()-requestedAt,ticksPerSec:null,fast:false,streak,code:error});}
+   if(streak>=gate.probes&&last.tick-firstTick>=gate.minTickAdvance){settleGate=snapshot('settled');record('world-settled',{...settleGate,config:undefined});return;}
+   const nextAt=Math.max(requestedAt+gate.intervalMs,now());
+   if(nextAt>deadline){settleGate=snapshot('not-settled');record('world-not-settled',{...settleGate,config:undefined});throw fault('WORLD_NOT_SETTLED');}
+   await sleep(nextAt-now(),stop.signal);
+  }
  };
  try{
   const worlds=new Set(),souls=new Set();
@@ -311,6 +359,7 @@ export async function runContinuityTrial(config,deps={}){
   if(verified.devAuth!==true)throw fault('LOOPBACK_DEVAUTH_REQUIRED');
   if(verified.worldId!==worldId)throw fault('WORLD_ID_MISMATCH');
   for(const row of [...rows,...fixtures])await sample(row,'setup-body');
+  if(gate)await settleWorld(fixtures[0]??rows[0]);
   if(config.nativeEvidence){
    nativeProbe=(deps.createNativeEvidence??createTrialNativeEvidence)({...config.nativeEvidence,directory:join(out,'native-export'),runId:config.runId,worldId,soulIds:[...rows,...fixtures].map(r=>r.paired.soul)}, {now,sleep,schedule:deps.schedule??setTimeout,cancel:deps.cancelSchedule??clearTimeout,onFailure:reason=>{failureCode??=reason;endReason??='native-evidence-error';abort();}});
    const first=nativeProbe.start();if(first.failure)throw fault(first.failure);
@@ -333,6 +382,7 @@ export async function runContinuityTrial(config,deps={}){
   }
   const manifest={schema:'sim-continuity-trial/1',...(config.runId?{runId:config.runId}:{}),arm,purpose,seconds,startedAt,cutoffAt,meetingAt:config.meetingOffsetSec===undefined?null:startedAt+config.meetingOffsetSec*1000,modelRequested:model,effortRequested:effort,cliVersion:config.cliVersion??null,cliVersionSource:config.cliVersion?'caller-preflight':null,world,worldId,baselineEphemeral,baselineWake:false,disturbances:'unsupported: not dispatched by this runner',restartCoverage:config.restart?{...config.restart,kind:'checkpoint-future-wake',minimumFutureWakeMs:20000,triggerMaxDelayMs:5000,recoveryMaxMs:25000,pollMs:1000,proof:arm===CONTINUITY_ARMS[0]?'restart-proof.json':`${config.restart.actorId}/restart-proof.json`,baselineAssistedResume:false}:'unknown: no restart contract requested',qualification:'not assessed; orchestration evidence only',actors:rows.map(row=>({id:row.actor.id,soulId:row.paired.soul,releaseOffsetSec:row.actor.releaseOffsetSec??0,instructionTemplateSha256:sha(row.actor.instruction),instructionSha256:sha(row.instruction),...(row.baseline?{baseline:row.baseline,promptArgsSha256:sha(JSON.stringify(buildContinuityBaselineArgs({model,effort,text:row.instruction,ephemeral:baselineEphemeral})))}:{agentEvidence:'agent-evidence.jsonl',launchSourceSha256:sha(readFileSync(new URL('../../soul-runtime/launch.mjs',import.meta.url)))} )})),fixtureActors:fixtures.map(row=>({id:row.actor.id,soulId:row.paired.soul})),registration:'baseline synchronous callback before naming; candidate emitted creation before naming, parent durability occurs on receipt'};
   manifest.nativeEvidence=config.nativeEvidence?{kind:'allowlisted-native-capture',runId:config.runId,pollMs:1000,exportDirectory:'native-export',limits:'Capture is started before this runner; identical settings both arms. No inferred behavioral completeness.'}:null;
+  manifest.settleGate=settleGate;
   manifest.usageGuard=config.usageGuard?{kind:'observed-usage-guard',limits:config.usageGuard,pollMs:1000,possibleInFlightOvershoot:true,billing:'not measured'}:null;
   privateJson(join(out,'run.json'),manifest);
   for(const row of rows)tasks.push((async()=>{
@@ -411,6 +461,7 @@ export async function runContinuityTrial(config,deps={}){
  // summary without overwriting an earlier runner/native/cleanup failure code.
  summary.failedActors=summary.actors.filter(a=>a.failureCode||a.exit&&(a.exit.code!==0&&a.exit.code!=null||a.exit.code==null&&a.exit.signal!=null)).slice(0,64).map(a=>({id:a.id,exit:a.exit,failureCode:a.failureCode}));
  if(summary.failedActors.length)summary.failureCode??='ACTOR_FAILED';
+ summary.settleGate=settleGate;
  summary.usageGuard=usageState;
  summary.restart=restartResult;
  summary.nativeEvidence=nativeResult;
