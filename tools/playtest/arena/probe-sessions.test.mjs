@@ -154,3 +154,38 @@ test('prior closed hosts need original source certificate, birth binding and fre
   const copy=structuredClone(input);mutate(copy.controllers[0]);assert.equal(verifyOwnedProbeExit(copy,absent),false);
  }
 });
+
+
+test('archive results retain metadata helper closure independently of archive acknowledgement',async()=>{
+ for(const proof of [
+  {code:0,signal:null,hostPid:444,threadId:null,groupClosed:true,groupVerification:'absent'},
+  {code:0,signal:null,hostPid:444,threadId:null,groupClosed:false,groupVerification:'unverified'},
+  undefined,
+ ]){
+  const root=mkdtempSync(join(tmpdir(),'sim-probe-metadata-close-')),calls=[];
+  try{
+   const host={pid:444,send(){},close:async()=>proof,request:async(method,args)=>{
+    calls.push({method,args});if(method==='thread/read')return {thread:{cwd:join(root,'host'),status:{type:'notLoaded'}}};return {};
+   }},registry=probeSessions(root,{createHost:()=>host});
+   registry.register({threadId:'owned',cwd:join(root,'host'),name:'Sim completed probe',recoveryMechanism:'durable'});
+   registry.complete('owned',{outcome:'failed',ownedProcessesExited:true,evidence:'summary.json'});
+   const rows=await registry.archiveCompleted(),serialized=JSON.parse(JSON.stringify(rows));
+   assert.equal(rows[0].archived,true,'unknown helper cleanup does not undo an actual native archive acknowledgement');
+   assert.deepEqual(serialized[0].metadataHostCloseProof,proof??{hostPid:444,groupClosed:false,groupVerification:'unverified'},'the existing array JSON output retains both verified and unknown cleanup evidence');
+   const session=registry.snapshot().sessions[0];assert.ok(session.archivedAt);assert.equal(session.outcome,'failed');assert.equal(session.evidence,'summary.json');
+   assert.deepEqual(calls.filter(c=>c.method==='thread/archive').map(c=>c.args.threadId),['owned']);
+   assert.equal(calls.some(c=>['thread/start','thread/resume'].includes(c.method)),false);
+  }finally{rmSync(root,{recursive:true,force:true});}
+ }
+});
+
+test('a thrown archival helper close still propagates after preserving native acknowledgement',async()=>{
+ const root=mkdtempSync(join(tmpdir(),'sim-probe-metadata-close-error-')),closeError=Error('synthetic metadata close failure');
+ try{
+  const registry=probeSessions(root,{createHost:()=>({send(){},close:async()=>{throw closeError;},request:async(method)=>method==='thread/read'?{thread:{cwd:join(root,'host'),status:{type:'idle'}}}:{}})});
+  registry.register({threadId:'owned',cwd:join(root,'host'),name:'Sim completed probe',recoveryMechanism:'durable'});
+  registry.complete('owned',{outcome:'passed',ownedProcessesExited:true,evidence:'summary.json'});
+  await assert.rejects(registry.archiveCompleted(),error=>error===closeError);
+  assert.ok(registry.snapshot().sessions[0].archivedAt,'the acknowledged native archive remains a fact despite helper-close failure');
+ }finally{rmSync(root,{recursive:true,force:true});}
+});

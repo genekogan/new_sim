@@ -125,7 +125,13 @@ export function probeSessions(directory,{createHost=opts=>new CodexHost(opts)}={
       return current.archivedAt?{threadId:row.threadId,archived:true}:{threadId:row.threadId,archived:false,error:current.archiveError};
      });results.push(result);
     }
-   }finally{try{await host.close();}finally{archiving=false;}}
+   }finally{try{
+    // Archive acknowledgement and helper cleanup are separate facts. Keep the
+    // exact close certificate in the returned rows so archive-results.json
+    // retains it without changing an already acknowledged archive outcome.
+    const proof=await host.close(),metadataHostCloseProof=proof??{hostPid:host.pid??null,groupClosed:false,groupVerification:'unverified'};
+    for(const result of results)result.metadataHostCloseProof=structuredClone(metadataHostCloseProof);
+   }finally{archiving=false;}}
    return results;
   },
   snapshot:()=>structuredClone(load()),
