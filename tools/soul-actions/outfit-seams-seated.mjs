@@ -1,0 +1,14 @@
+import{createRequire}from'node:module';import{readFileSync,mkdirSync,writeFileSync}from'node:fs';import{execFile}from'node:child_process';import{promisify}from'node:util';import assert from'node:assert/strict';
+const root='<team>/soul-actions/day-11',out=root+'/seated-angles',seat=root+'/scene/seat';mkdirSync(out,{recursive:true});
+const cli=async(...args)=>JSON.parse((await promisify(execFile)(process.execPath,['eden.mjs',...args],{cwd:seat,timeout:45000})).stdout);
+const original=JSON.parse(readFileSync('<team>/soul-actions/day-09/scene/body-look.json')).look;
+const require=createRequire(new URL('../../mars/viewer/package.json',import.meta.url)),{chromium}=require('@playwright/test'),browser=await chromium.launch({channel:'chrome',headless:true}),ctx=await browser.newContext({viewport:{width:1440,height:1080},recordVideo:{dir:out+'/raw',size:{width:1440,height:1080}}}),page=await ctx.newPage();const errors=[],cases=[];page.on('pageerror',e=>errors.push(String(e)));
+async function camera(offset){await page.evaluate(off=>{const a=window.__simEntity,r=a.residents()[0];a.controls.target.set(r.p[0],r.p[1]+.7,r.p[2]);a.camera.position.set(r.p[0]+off[0],r.p[1]+off[1],r.p[2]+off[2]);a.camera.lookAt(a.controls.target);a.controls.update();},offset)}
+try{await page.goto('http://127.0.0.1:7866/w/soul-outfit-seams/?eye=3,2,6&at=0,.8,2');await page.waitForFunction(()=>window.__simEntity?.scene.getObjectByName('bottom')?.isSkinnedMesh);await page.waitForTimeout(2000);
+ for(const[label,look]of [['boots',original],['flats',{...original,shoes:'flats'}],['masc',{...original,frame:'masc',shoes:'flats'}],['coherent',{preset:'woman'}]]){
+  const start=Date.now();await cli('body','look','--set',...Object.entries(look).map(([k,v])=>k+'='+v));await page.waitForTimeout(1200);const sit=await cli('act','sit on inspection-bench','{"seconds":1}','--wait','--json');assert.equal(sit.receipt.phase,'completed');
+  await camera([2,1.5,3]);await page.waitForTimeout(500);const pictures=[];
+  for(let i=0;i<8;i++){const p=out+'/'+label+'-front-'+i+'.png';await page.screenshot({path:p});pictures.push(p);await page.waitForTimeout(120)}
+  await camera([3,1.3,.2]);await page.waitForTimeout(450);await page.screenshot({path:out+'/'+label+'-side.png'});await page.waitForTimeout(800);const stand=await cli('act','stand up','--wait','--json');assert.equal(stand.receipt.phase,'completed');cases.push({label,start,end:Date.now(),sit,stand,pictures});writeFileSync(out+'/cases.json',JSON.stringify(cases,null,2));
+ }assert.deepEqual(errors,[]);
+}finally{writeFileSync(out+'/proof.json',JSON.stringify({cases,errors,reason:'Supplemental front/side seated inspection: original continuous journey camera occluded bent legs behind bench. No passing journey/assertion rerun.'}));const v=page.video();await ctx.close();await v.saveAs(out+'/continuous.webm');await browser.close();console.log(JSON.stringify({cases:cases.length,errors}));}

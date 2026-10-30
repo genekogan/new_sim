@@ -8,6 +8,7 @@ import {clone as cloneSkinned} from 'three/addons/utils/SkeletonUtils.js';
 import {templateFromParts, type Template} from '../../../../mars/viewer/app/engine-view/people.ts';
 import {resolveLook, lookKey, paletteOf, HEADGEAR_FACES, SHAPE_KEYS, type Look, type Slot} from './look.ts';
 import {humanoidMaterial} from './material.ts';
+import {legSkinBand, withoutSkin} from './leg-skin.ts';
 import {BASE} from '../base-path.ts';
 import {withRetry, type RetryOptions} from '../../../../mars/viewer/lib/retry.ts';
 import {hatPieces, glassesPieces, bagPieces, skinned, facialHairLayers, mustachePieces, maskLayer, scarfWrap, scarfEndPieces, gloveLayer, earringPieces, necklacePieces, type HeadFit} from './props.ts';
@@ -224,6 +225,27 @@ export class HumanoidKit {
       return mergeParts([top, ...pieces, ...layers]);
     });
   }
+  private async bottom(look: Look): Promise<THREE.BufferGeometry> {
+    const m = await this.manifest(), frame = look.frame, bottom = await this.part('bottom', look.bottom, frame);
+    const low = m.parts.shoes[look.shoes].landmarks[frame].max[1], high = m.parts.bottom[look.bottom].landmarks[frame].min[1];
+    if (high - low <= .002) return bottom;
+    return this.cache(this.merged, ['bottom-skin', frame, look.bottom, look.shoes].join(':'), async () => {
+      // This existing coherent pair supplies skin from ankle to knee on either frame.
+      // Keep its authored (nonplanar) ankle seam; a new horizontal split leaves holes.
+      const [leg, foot] = await Promise.all([this.part('bottom', 'beach', frame), this.part('shoes', 'beach', frame)]);
+      // Include its own ankle skin as well: native shoes have different calf widths,
+      // so a clipped graft at the shoe's highest skin point makes a visible collar.
+      const pieces = [legSkinBand(leg, 0, high + .003), legSkinBand(foot, 0, high + .003)];
+      const merged = mergeParts([bottom, ...pieces]);
+      pieces.forEach(g => g.dispose());
+      return merged;
+    });
+  }
+  private async shoes(look: Look): Promise<THREE.BufferGeometry> {
+    const m = await this.manifest(), frame = look.frame, shoes = await this.part('shoes', look.shoes, frame);
+    const gap = m.parts.bottom[look.bottom].landmarks[frame].min[1] - m.parts.shoes[look.shoes].landmarks[frame].max[1];
+    return gap <= .002 ? shoes : this.cache(this.merged, ['shoe-without-skin', frame, look.shoes].join(':'), async () => withoutSkin(shoes));
+  }
   /** The look's template (cached by look key). */
   template(params: unknown): Promise<Template> {
     const look = resolveLook(params), key = lookKey(look);
@@ -232,10 +254,10 @@ export class HumanoidKit {
   /** Tris of a look (budget checks), from the manifest plus prop geometry. */
   async tris(params: unknown) { const look = resolveLook(params), [head, top, b, s] = await this.geometries(look); return [head, top, b, s].reduce((a, g) => a + g.index!.count / 3, 0); }
   private async geometries(look: Look) {
-    const base = await Promise.all([this.head(look), this.top(look), this.part('bottom', look.bottom, look.frame), this.part('shoes', look.shoes, look.frame)]);
+    const base = await Promise.all([this.head(look), this.top(look), this.bottom(look), this.shoes(look)]);
     const shaped = SHAPE_KEYS.some(k => look[k] !== 1);
     if (look.build === 1 && !shaped) return base;
-    const rig = await this.rig(look.frame), keys = [headKey(look), topKey(look), ['bottom', look.frame, look.bottom], ['shoes', look.frame, look.shoes]];
+    const rig = await this.rig(look.frame), keys = [headKey(look), topKey(look), ['bottom', look.frame, look.bottom, look.shoes], ['shoes', look.frame, look.shoes, look.bottom]];
     return Promise.all(base.map((g, i) => { const key = [...keys[i], 'build', look.build, ...SHAPE_KEYS.map(k => look[k])].join(':'); let p = this.merged.get(key); if (!p) this.merged.set(key, p = Promise.resolve(withShape(withGirth(g, look.build, rig), look, rig))); return p; }));
   }
   private async compose(look: Look, key: string): Promise<Template> {
