@@ -17,6 +17,7 @@ import { MaterialLib } from './gen-mesh/materials.ts';
 import { animate, hasMotion, syncLightGlow } from './gen-mesh/motion.ts';
 import {lightDiffAhead} from './light-diff-clock.ts';
 import {defLights} from './WorldNightLights.ts';
+import {waterJets} from './fx/water-jets.ts';
 import {beginOpeningMotion,stepOpeningMotion,type OpeningMotion} from './opening-motion.ts';
 import { EntityInstancer, instanceable } from './EntityInstancer.ts';
 import { terrainColorFor, terrainColorDeferred, groundRealismFor } from './gen-mesh/ground-palette.ts';
@@ -777,6 +778,8 @@ export class WorldEntityLayer {
     }
     let built = this.build(e, def);
     if (!built) { if (existing) this.undraw(e.id); return; }
+    // Soul Actions: moving water (sprinkler fan, tap stream, shower) while the thing is on; GPU points, never instanced
+    { const jets = waterJets(def as never, e.state, e.params ?? {}); if (jets) { built.add(jets); delete built.userData.instanceKey; } }
     // State is visible on this frame, including during the generic edit easing.
     // Waiting for animate()'s settled transform left an OFF bulb glowing for 2.5 s.
     if (def.components.light || def.components.lights) syncLightGlow(built,e,def,m,this.now/1000);
