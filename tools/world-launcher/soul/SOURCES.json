@@ -53,13 +53,13 @@
   "runtime": {
     "directory": "runtime",
     "version": "0.1.0",
-    "source": "2e4b137dcc205e73cb2da3b41295bc4d84682440",
-    "manifestSha256": "fda5d59906a7abae90c6c589caf75c0970bcc88a850a4375cfedd93bcb6aa33b",
+    "source": "d04b028861e6a85391883b1b3594b1a2cd93b4da",
+    "manifestSha256": "95124a2d1140a904437b63902eb49fa2385f610a0db038ce4ec80e42b41fa6f9",
     "artifacts": [
       {
         "file": "run.mjs",
-        "bytes": 165079,
-        "sha256": "b3fc0d062a4dbecc4406208cd4a3e4b321c9b57d99db30c521e619f02f81b71d"
+        "bytes": 173903,
+        "sha256": "ecc2e64693c8af3d8674ab5757cbeb7dd699077396ecfa7504ff95c68fa69338"
       },
       {
         "file": "launch.mjs",

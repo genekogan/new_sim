@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "nodeMinimum": "22.20.0",
   "host": "codex app-server (experimental)",
-  "source": "2e4b137dcc205e73cb2da3b41295bc4d84682440",
+  "source": "d04b028861e6a85391883b1b3594b1a2cd93b4da",
   "esbuild": "0.28.1",
   "artifacts": [
     {
       "file": "run.mjs",
-      "bytes": 165079,
-      "sha256": "b3fc0d062a4dbecc4406208cd4a3e4b321c9b57d99db30c521e619f02f81b71d"
+      "bytes": 173903,
+      "sha256": "ecc2e64693c8af3d8674ab5757cbeb7dd699077396ecfa7504ff95c68fa69338"
     },
     {
       "file": "launch.mjs",
@@ -20,7 +20,7 @@
   "inputs": [
     {
       "path": "tools/soul-runtime/codex-host.mjs",
-      "sha256": "6a9d4eb09e9c5909306cf3ce60131519b5f2ea9ee452eccd52c82bc04d6b6620"
+      "sha256": "fe36d2dbd735c65bae6331d4c66cfd1a683cc6f8ff1e8ff35fd15525b80121d4"
     },
     {
       "path": "tools/soul-runtime/receiver.mjs",
@@ -68,7 +68,7 @@
     },
     {
       "path": "tools/soul-runtime/supervisor.mjs",
-      "sha256": "2ccc9b7543e4824f39941a3a783b0bc471089f47532ae4aca5a1b356abfa36ee"
+      "sha256": "3edaf951e09df03ec9de4fcc958fc432c66872c0ff805221c612c9717424cd99"
     },
     {
       "path": "tools/soul-runtime/managed.mjs",
@@ -76,7 +76,7 @@
     },
     {
       "path": "tools/soul-runtime/run.mjs",
-      "sha256": "82f5ce7466048858223de07782ad24006ab31d500c74df431a072f1a0bf593e7"
+      "sha256": "f65c1ab538558333e5d1706ad4be021a36d9dc482312d6b7d97bfc10b7f68a17"
     },
     {
       "path": "tools/soul-runtime/launch.mjs",
