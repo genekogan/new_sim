@@ -319,7 +319,13 @@ export async function runContinuityTrial(config,deps={}){
   startedAt=now();cutoffAt=startedAt+seconds*1000;
   for(const row of rows)row.instruction=renderTrialInstruction(row.actor.instruction,{startedAt,seconds,meetingOffsetSec:config.meetingOffsetSec});
   if(config.usageGuard){usageGuard=createContinuityUsageGuard({actors:rows.map(row=>({id:row.actor.id,kind:arm===CONTINUITY_ARMS[0]?'baseline':'managed',path:arm===CONTINUITY_ARMS[0]?join(row.directory,'baseline','stream.ndjson'):join(row.directory,'agent-evidence.jsonl')})),limits:config.usageGuard,now});checkUsage();scheduleUsage();}
-  cutoffTimer=(deps.schedule??setTimeout)(()=>{endReason??='cutoff';abort();},Math.max(0,cutoffAt-now()));
+  const checkCutoff=()=>{
+   if(stop.signal.aborted)return;
+   const remaining=cutoffAt-now();
+   if(remaining>0){cutoffTimer=(deps.schedule??setTimeout)(checkCutoff,Math.max(1,Math.ceil(remaining)));return;}
+   endReason??='cutoff';abort();
+  };
+  cutoffTimer=(deps.schedule??setTimeout)(checkCutoff,Math.max(0,cutoffAt-now()));
   if(config.restart){
    const target=rows.find(row=>row.actor.id===config.restart.actorId);
    if(arm===CONTINUITY_ARMS[0])restartResult={...baselineAutomaticRestartCapability(),actor:target.actor.id,setupId:config.restart.setupId,worldId,soulId:target.paired.soul,source:'existing-headless-seat single-exec workflow; no synthetic disturbance dispatched'};
@@ -390,6 +396,7 @@ export async function runContinuityTrial(config,deps={}){
    const nativeError=error=>{failureCode??='NATIVE_EVIDENCE_FINALIZATION_FAILED';nativeResult={schema:'continuity-native-lifecycle/1',status:'unknown',failure:code(error),coverage:null,priorSourceStatus:nativeResult?.coverage?.status??null,limits:'Native evidence finalization/persistence failed; no source completeness or qualification inferred.'};};
    try{nativeResult=await nativeProbe.finish({t0:startedAt,cutoffAt});if(!nativeResult||!['pass','unknown'].includes(nativeResult.status))throw fault('NATIVE_EVIDENCE_RESULT_INVALID');}catch(error){nativeError(error);}
    try{privateJson(join(out,'native-evidence.json'),nativeResult);}catch(error){nativeError(error);}
+   if(nativeResult?.status!=='pass')failureCode??='NATIVE_SOURCE_COVERAGE_UNKNOWN';
   }
   if(config.restart&&arm===CONTINUITY_ARMS[0]&&restartResult)privateJson(join(out,'restart-proof.json'),restartResult);signal?.removeEventListener('abort',abort);
  }

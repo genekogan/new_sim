@@ -529,3 +529,30 @@ test('cancellation during an early-release recheck cannot launch the delayed act
  const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(1491);assert.equal(f.calls.length,1);stop.abort();await flush();const result=await pending;
  assert.equal(f.calls.length,1);assert.ok(!f.rows().some(r=>r.kind==='actor-release'&&r.actor==='b'));assert.equal(result.cutoffAt,104000);
 });
+
+test('an early cutoff callback rearms against the original absolute deadline before abort or native finalization',async t=>{
+ const f=fixture(t,{runId:'cutoff-early',nativeEvidence:{databasePath:'/owned/sim.db',captureDirectory:'/owned/capture'}});let early=true,finalizedAt=null;
+ f.deps.schedule=(fn,ms)=>{if(early&&ms===3000){early=false;return f.clock.schedule(fn,ms-18);}return f.clock.schedule(fn,ms);};
+ f.deps.createNativeEvidence=()=>({start:()=>({failure:null}),async finish({cutoffAt}){finalizedAt=f.clock.now();return finalizedAt>=cutoffAt?{status:'pass',coverage:{status:'pass'}}:{status:'unknown',coverage:null};}});
+ const pending=runContinuityTrial(f.config,f.deps);await flush();assert.equal(f.calls.length,2);
+ await f.clock.tick(2982);assert.equal(early,false);assert.ok(f.calls.every(c=>!c.signal.aborted),'an early timer wake cannot end the declared observation interval');assert.equal(finalizedAt,null);
+ await f.clock.tick(17);assert.ok(f.calls.every(c=>!c.signal.aborted));assert.equal(finalizedAt,null);
+ await f.clock.tick(1);const result=await pending;
+ assert.equal(result.startedAt,100000);assert.equal(result.cutoffAt,103000);assert.equal(result.endedAt,result.cutoffAt);assert.equal(result.endReason,'cutoff');assert.equal(finalizedAt,result.cutoffAt);assert.equal(result.nativeEvidence.status,'pass');assert.equal(result.failureCode,null);assert.ok(f.calls.every(c=>c.remainingSeconds===3));
+});
+
+test('external cancellation during early cutoff rearm remains cancelled without extending actor deadlines',async t=>{
+ const stop=new AbortController(),f=fixture(t,{signal:stop.signal});let early=true,callbacks=0;
+ f.deps.schedule=(fn,ms)=>f.clock.schedule(()=>{callbacks++;fn();},early&&ms===3000?(early=false,ms-18):ms);
+ const pending=runContinuityTrial(f.config,f.deps);await flush();await f.clock.tick(2982);assert.equal(callbacks,1);assert.ok(f.calls.every(c=>!c.signal.aborted));
+ stop.abort();await flush();const result=await pending;assert.equal(result.endReason,'cancelled');assert.equal(result.endedAt,102982);assert.equal(result.cutoffAt,103000);assert.ok(f.calls.every(c=>c.remainingSeconds===3));
+ await f.clock.tick(18);assert.equal(callbacks,1,'the pending rearm is cleared after external cancellation');assert.equal(result.endReason,'cancelled');
+});
+
+for(const existingFailure of [null,'CAPTURE_HEARTBEAT_GAP'])test('requested native coverage unknown returns a nonclean result and preserves prior failure: '+existingFailure,async t=>{
+ const f=fixture(t,{runId:'native-unknown',nativeEvidence:{databasePath:'/owned/sim.db',captureDirectory:'/owned/capture'}});
+ f.deps.createNativeEvidence=(scope,deps)=>({start:()=>({failure:null}),async finish(){if(existingFailure)deps.onFailure(existingFailure);return {status:'unknown',coverage:null,failure:null};}});
+ const pending=runContinuityTrial(f.config,f.deps);await flush();await f.clock.tick(3000);const result=await pending;
+ assert.equal(result.failureCode,existingFailure??'NATIVE_SOURCE_COVERAGE_UNKNOWN');assert.equal(result.coverage.nativeSources,'unknown');assert.deepEqual(result.nativeEvidence,{status:'unknown',coverage:null,failure:null});assert.equal(result.qualification,'not assessed');
+ assert.ok(result.actors.every(a=>a.cleanupVerified&&a.exit.code===0&&a.failureCode===null),'clean actor exits remain actual facts, not proof of native coverage');assert.ok(f.lifecycle.filter(r=>r[0]==='complete').every(r=>r[2].outcome==='failed'));
+});
