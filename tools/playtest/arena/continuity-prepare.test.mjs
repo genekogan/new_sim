@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,existsSync,realpathSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,existsSync,realpathSync,symlinkSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
@@ -38,6 +38,51 @@ test('body-bearing initial state fails before any pairing and cleans only its ex
  const s=source(t),stopped=[],bad=snapshot();bad.entities.push({id:'h_old',def:'core-humanoid'});
  await assert.rejects(provisionContinuityPreparation({directory:join(s.parent,'bad'),pin:s.pin,world:{slug:'pt-fresh',port:4999,genesis:s.pin.genesisPath}}, {readGit:s.readGit,provisionWorld:async()=>({base:'http://127.0.0.1:4999/w/pt-fresh',pid:777}),readSnapshot:async()=>bad,stopOwnedWorld:async({pid})=>{stopped.push(pid);return {stopped:true};}}),/no Soul bodies/);
  assert.deepEqual(stopped,[777]);assert.equal(JSON.parse(readFileSync(join(s.parent,'bad','preparation-failure.json'))).ownedWorldStopped,true);
+});
+
+function frozenSource(s,value=snapshot()){
+ const path=join(s.parent,'frozen-source.json'),bytes=JSON.stringify(value,null,2)+'\n';writeFileSync(path,bytes);
+ return {path,sha256:sha(bytes),physicalSha256:physicalSnapshotSha256(value)};
+}
+test('explicit frozen snapshot seeds only pinned body-free compiler state and retains genesis provenance',async t=>{
+ const s=source(t),raw={...snapshot(),unrelatedCredential:'RAW_METADATA_NOT_FOR_SEED'},frozenSnapshot=frozenSource(s,raw),directory=join(s.parent,'snapshot-trial');let passed;
+ const r=await provisionContinuityPreparation({directory,pin:s.pin,world:{slug:'pt-fresh',port:4999,genesis:s.pin.genesisPath},frozenSnapshot},{readGit:s.readGit,now:()=>1000,provisionWorld:async input=>{
+  passed=input;assert.equal(existsSync(join(directory,'server/data/sim.db')),false);
+  const seed=readFileSync(input.world.snapshot,'utf8');assert.ok(!seed.includes('RAW_METADATA_NOT_FOR_SEED'));assert.equal(physicalSnapshotSha256(JSON.parse(seed)),frozenSnapshot.physicalSha256);
+  return {base:'http://127.0.0.1:4999/w/pt-fresh',pid:1234};
+ },readSnapshot:async()=>snapshot()});
+ assert.equal(passed.world.snapshot,join(directory,'frozen-body-free.json'));assert.equal(passed.world.genesis,s.pin.genesisPath);assert.equal(passed.world.natives,false);
+ assert.deepEqual(r.manifest.sourcePin,s.pin);assert.equal(r.manifest.pairingStartedAt,null);
+ assert.deepEqual(r.manifest.frozenSnapshot,{...frozenSnapshot,seedPath:passed.world.snapshot,seedSha256:sha(readFileSync(passed.world.snapshot))});
+ assert.equal(sha(readFileSync(frozenSnapshot.path)),frozenSnapshot.sha256,'original source unchanged');assert.equal(r.manifest.initialSnapshot.physicalSha256,frozenSnapshot.physicalSha256);
+});
+test('invalid raw/physical pins, unsafe paths and direct unpinned snapshot cannot provision',async t=>{
+ const s=source(t),valid=frozenSource(s),link=join(s.parent,'linked-snapshot.json');symlinkSync(valid.path,link);let calls=0;
+ const cases=[
+  [{...valid,path:'relative.json'},'INVALID_FROZEN_SNAPSHOT_PIN'],
+  [{...valid,path:link},'UNSAFE_PREPARATION_FILE'],
+  [{...valid,sha256:'0'.repeat(64)},'FROZEN_SNAPSHOT_HASH_MISMATCH'],
+  [{...valid,physicalSha256:'0'.repeat(64)},'FROZEN_SNAPSHOT_PHYSICAL_MISMATCH'],
+ ];
+ for(const [i,[frozenSnapshot,code]]of cases.entries()){
+  const directory=join(s.parent,'rejected-'+i);await assert.rejects(provisionContinuityPreparation({directory,pin:s.pin,world:{slug:'pt-fresh',port:4999,genesis:s.pin.genesisPath},frozenSnapshot},{readGit:s.readGit,provisionWorld:async()=>{calls++;},readSnapshot:async()=>snapshot()}),{code});assert.equal(existsSync(directory),false);
+ }
+ await assert.rejects(provisionContinuityPreparation({directory:join(s.parent,'unpinned'),pin:s.pin,world:{slug:'pt-fresh',port:4999,genesis:s.pin.genesisPath,snapshot:valid.path}},{readGit:s.readGit,provisionWorld:async()=>{calls++;},readSnapshot:async()=>snapshot()}),{code:'INVALID_PREPARATION_WORLD'});assert.equal(calls,0);
+});
+test('body definitions and private wallet state are rejected from the pinned source before boot',async t=>{
+ for(const kind of ['body','wallet']){
+  const s=source(t),bad=snapshot();if(kind==='body')bad.defs[0].components={body:{}};else bad.state.layers={wallets:{private:'NOT_FOR_COPY'}};
+  const path=join(s.parent,'bad.json'),bytes=JSON.stringify(bad);writeFileSync(path,bytes);let called=false;
+  const physical=kind==='body'?physicalSnapshotSha256(bad):'a'.repeat(64),directory=join(s.parent,'rejected');
+  await assert.rejects(provisionContinuityPreparation({directory,pin:s.pin,world:{slug:'pt-fresh',port:4999,genesis:s.pin.genesisPath},frozenSnapshot:{path,sha256:sha(bytes),physicalSha256:physical}},{readGit:s.readGit,provisionWorld:async()=>{called=true;},readSnapshot:async()=>snapshot()}),kind==='body'?{code:'INITIAL_SNAPSHOT_HAS_BODY'}:/no private layer wallets/);
+  assert.equal(called,false);assert.equal(existsSync(directory),false);
+ }
+});
+test('postboot physical drift remains failure, retains actual snapshot and stops only its owned world',async t=>{
+ const s=source(t),frozenSnapshot=frozenSource(s),directory=join(s.parent,'drift'),changed=snapshot(),stopped=[];changed.entities[1].p=[2,0,1];
+ await assert.rejects(provisionContinuityPreparation({directory,pin:s.pin,world:{slug:'pt-fresh',port:4999,genesis:s.pin.genesisPath},frozenSnapshot},{readGit:s.readGit,provisionWorld:async()=>({base:'http://127.0.0.1:4999/w/pt-fresh',pid:7654}),readSnapshot:async()=>changed,stopOwnedWorld:async({pid})=>{stopped.push(pid);return {stopped:true};}}),{code:'FROZEN_SNAPSHOT_POSTBOOT_MISMATCH'});
+ assert.deepEqual(stopped,[7654]);assert.equal(existsSync(join(directory,'preparation.json')),false);assert.equal(physicalSnapshotSha256(JSON.parse(readFileSync(join(directory,'initial-body-free.json')))),physicalSnapshotSha256(changed));
+ assert.deepEqual(JSON.parse(readFileSync(join(directory,'preparation-failure.json'))),{code:'FROZEN_SNAPSHOT_POSTBOOT_MISMATCH',ownedWorldPid:7654,ownedWorldStopped:true});
 });
 
 test('static binding preserves shared sofa entity with three distinct slots and unknown discovery',()=>{

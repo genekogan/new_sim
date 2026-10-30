@@ -45,16 +45,28 @@ export function pinContinuityPreparation({serverRoot,revision,files,genesisPath,
 
 /** A new owned directory makes provision's destructive fresh reset safe. Save
  * compiler geometry before ANY createSeat/pair call; never seed old Souls. */
-export async function provisionContinuityPreparation({directory,pin,world},{provisionWorld=provision,stopOwnedWorld=stopWorld,readSnapshot,readGit=git,now=Date.now}={}){
+export async function provisionContinuityPreparation({directory,pin,world,frozenSnapshot},{provisionWorld=provision,stopOwnedWorld=stopWorld,readSnapshot,readGit=git,now=Date.now}={}){
  if(typeof directory!=='string'||!isAbsolute(directory)||!pin||world?.genesis!==pin.genesisPath||world?.snapshot||world?.kind&&world.kind!=='dev'||world?.natives===true||! /^[a-z][a-z0-9-]{0,31}$/.test(world?.slug??'')||!Number.isInteger(world?.port)||world.port<1024||world.port>65535||typeof readSnapshot!=='function')throw fault('INVALID_PREPARATION_WORLD');
  const verified=pinContinuityPreparation(pin,{readGit}),out=resolve(directory);if(realpathSync(resolve(out,'..'))!==resolve(out,'..')||existsSync(out))throw fault('PREPARATION_DIRECTORY_EXISTS');
+ let frozen=null,seedBytes=null;
+ if(frozenSnapshot!==undefined){
+  if(!frozenSnapshot||typeof frozenSnapshot.path!=='string'||!isAbsolute(frozenSnapshot.path)||resolve(frozenSnapshot.path)!==frozenSnapshot.path||!hash(frozenSnapshot.sha256)||!hash(frozenSnapshot.physicalSha256))throw fault('INVALID_FROZEN_SNAPSHOT_PIN');
+  const bytes=safeFile(frozenSnapshot.path);if(sha(bytes)!==frozenSnapshot.sha256)throw fault('FROZEN_SNAPSHOT_HASH_MISMATCH');
+  const snapshot=bodyFree(JSON.parse(bytes));if(physicalSnapshotSha256(snapshot)!==frozenSnapshot.physicalSha256)throw fault('FROZEN_SNAPSHOT_PHYSICAL_MISMATCH');
+  // Only compiler state enters the fresh seed; never copy an earlier database,
+  // Soul/account rows, pairing files or unrelated raw response metadata.
+  seedBytes=Buffer.from(JSON.stringify(snapshot,null,2)+'\n');
+  frozen={path:frozenSnapshot.path,sha256:frozenSnapshot.sha256,physicalSha256:frozenSnapshot.physicalSha256,seedPath:join(out,'frozen-body-free.json'),seedSha256:sha(seedBytes)};
+ }
  mkdirSync(out,{mode:0o700});json(join(out,'source-pin.json'),verified);let started=null;
  try{
-  started=await provisionWorld({runDir:out,serverRoot:verified.serverRoot,world:{...copy(world),kind:'dev',natives:false}});
+  if(frozen)writeFileSync(frozen.seedPath,seedBytes,{flag:'wx',mode:0o600});
+  started=await provisionWorld({runDir:out,serverRoot:verified.serverRoot,world:{...copy(world),...(frozen?{snapshot:frozen.seedPath}:{}),kind:'dev',natives:false}});
   const base=new URL(started.base);if(base.protocol!=='http:'||!['127.0.0.1','localhost','[::1]'].includes(base.hostname)||base.username||base.password||base.search||base.hash)throw fault('PREPARATION_WORLD_NOT_LOOPBACK');
   const snapshot=bodyFree(await readSnapshot(started));
   const physicalSha256=physicalSnapshotSha256(snapshot),snapshotPath=join(out,'initial-body-free.json');json(snapshotPath,snapshot);
-  const savedAt=now(),manifest={schema:'continuity-preparation/1',status:'body-free-saved; not qualification-ready',worldId:world.slug+'-1',base:started.base,pid:started.pid,sourcePin:verified,initialSnapshot:{path:snapshotPath,sha256:sha(readFileSync(snapshotPath)),physicalSha256,savedAt},pairingStartedAt:null,missing:['native capability and exact-slot discovery','per-actor physical setup and occupancy','field-return place binding','both-arm model/effort evidence','policy activation and visual review','capture readiness and numeric/source seal']};
+  if(frozen&&physicalSha256!==frozen.physicalSha256)throw fault('FROZEN_SNAPSHOT_POSTBOOT_MISMATCH');
+  const savedAt=now(),manifest={schema:'continuity-preparation/1',status:'body-free-saved; not qualification-ready',worldId:world.slug+'-1',base:started.base,pid:started.pid,sourcePin:verified,...(frozen?{frozenSnapshot:frozen}:{}),initialSnapshot:{path:snapshotPath,sha256:sha(readFileSync(snapshotPath)),physicalSha256,savedAt},pairingStartedAt:null,missing:['native capability and exact-slot discovery','per-actor physical setup and occupancy','field-return place binding','both-arm model/effort evidence','policy activation and visual review','capture readiness and numeric/source seal']};
   json(join(out,'preparation.json'),manifest);return {directory:out,world:started,manifest,snapshot};
  }catch(error){let stopped=false;if(started?.pid)try{stopped=(await stopOwnedWorld({pid:started.pid})).stopped===true;}catch{}
   json(join(out,'preparation-failure.json'),{code:typeof error?.code==='string'?error.code:'PREPARATION_FAILED',ownedWorldPid:started?.pid??null,ownedWorldStopped:stopped});throw error;
