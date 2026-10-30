@@ -52,11 +52,11 @@ test('fresh adoption starts at observed head rather than replying to old histori
 });
 
 test('startup reconciliation proof binds the live fence and retained state without exposing private task text',async t=>{
- const f=setup(t),states=[],instruction='PRIVATE_INSTRUCTION_CANARY';
- const running=runSupervisor({...f,instruction,signal:f.stop.signal,onState:s=>states.push(s)});
+ const f=setup(t),states=[],instruction='PRIVATE_INSTRUCTION_CANARY';let reconciledCheckpoint;
+ const running=runSupervisor({...f,instruction,signal:f.stop.signal,onState:s=>{states.push(s);if(s.state==='startup-reconciled')reconciledCheckpoint=f.journal.control.checkpoint();}});
  try{
   await until(()=>f.host.calls.length===1);const proof=states.find(s=>s.state==='startup-reconciled'),checkpoint=f.journal.control.checkpoint();
-  assert.equal(proof.initialInstructionSha256,createHash('sha256').update(instruction).digest('hex'));assert.equal(proof.threadId,'thread');assert.equal(proof.checkpointRevision,checkpoint.revision);assert.equal(proof.generation,1);assert.equal(proof.pendingDecision,false);assert.equal(proof.unreconciledOperations,0);assert.equal(proof.wakeAt,null);assert.deepEqual(JSON.parse(f.journal.control.response({kind:'startup',id:proof.startupResponseId}).text),f.host.calls[0].observation);assert(!JSON.stringify(proof).includes(instruction));assert(states.indexOf(proof)<states.findIndex(s=>s.state==='running'));
+  assert.equal(proof.initialInstructionSha256,createHash('sha256').update(instruction).digest('hex'));assert.equal(proof.threadId,'thread');assert.equal(proof.checkpointRevision,reconciledCheckpoint.revision);assert.ok(checkpoint.revision>proof.checkpointRevision);assert.equal(checkpoint.value.decisionProgressV1.phase,'active');assert.equal(proof.generation,1);assert.equal(proof.pendingDecision,false);assert.equal(proof.unreconciledOperations,0);assert.equal(proof.wakeAt,null);assert.deepEqual(JSON.parse(f.journal.control.response({kind:'startup',id:proof.startupResponseId}).text),f.host.calls[0].observation);assert(!JSON.stringify(proof).includes(instruction));assert(states.indexOf(proof)<states.findIndex(s=>s.state==='running'));
  }finally{f.stop.abort();await running;}
 });
 

@@ -162,6 +162,40 @@ cancelled or potentially accepted write replayed by this policy. The five-plus-
 five policy is a bounded control policy, not a fifteen-second visible-response
 guarantee: provider latency, cleanup and fresh inference remain variable.
 
+Each active decision also has an ordinary thirty-second window, even when no
+new urgent message or future wake is eligible. Item/token metadata, retry
+notifications and steer ACKs do not count as progress. Urgent replans retain the
+same absolute window and their existing direct-message replan cap; they do not
+spend an ordinary soft-replan credit or reset its clock. An expired choice is
+never applied, including when completion beats its timer callback. Urgent and
+ordinary timers share one exact-turn interruption and confirmation chain.
+
+A durable `decisionProgressV1` episode permits one ordinary soft interruption
+and replacement window, plus at most one host fallback shared with urgent
+recovery. Each additional window is recorded once, after exact terminal/control
+confirmation or matching verified old-group absence. At most three ordinary
+windows are available before an applied decision commits; this is not a limit on
+all turns or tokens inside a window, nor a ninety-second completion guarantee.
+Spent credits and absolute deadlines survive restart. Generic host retries
+cannot bypass them. Exhaustion or unverifiable cleanup blocks with task state
+retained. No arriving notice or automatic restart refills the episode.
+
+An external controller death during an active or unconfirmed decision is
+currently blocked as `DECISION_PROGRESS_RESTART_UNCONFIRMED`: a new process
+cannot invent the old terminal or host-closure proof. Managed recovery in the
+same controller uses its matching reserved grant and verified old-group absence.
+The original restart after a committed strategic wait remains supported: idle
+wait has no active budget and creates no polling inference. Applying or
+reconciling an already retained world effect precedes this policy, so a long or
+uncertain write is never interrupted or replayed by the timer.
+
+Both recovery markers share a bounded 2KiB checkpoint envelope. Final response
+projection reserves that capacity while retaining complete native responses
+locally. A near-full legacy checkpoint may replace only an exactly matched
+stored observation with its durable response reference; otherwise recovery
+blocks without trimming intent. Only actual apply-finalization clears the
+markers; retention, startup and uncertain effects preserve them.
+
 Journal retention reserves separate pending capacity for owner messages
 (1,000 events/8MiB) and world traffic (20,000/64MiB). A full page is rejected
 atomically with its cursor unchanged; intake backs off while handling drains

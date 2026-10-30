@@ -4,7 +4,7 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {openJournal} from './journal.mjs';
-import {DECISION_SCHEMA,parseDecision,retainDecision,applyPendingDecision} from './decision.mjs';
+import {DECISION_SCHEMA,parseDecision,retainDecision,applyPendingDecision,decisionProgress,saveRecoveryCheckpoint,RECOVERY_METADATA_BYTES} from './decision.mjs';
 import {boundedFacts} from './context.mjs';
 function fixture(t){const dir=mkdtempSync(join(tmpdir(),'sim-decision-'));const j=openJournal(dir,{worldId:'w',soulId:'s'});t.after(()=>{j.close();rmSync(dir,{recursive:true,force:true})});return {j,dir,fence:j.control.claim('test')};}
 const decision=()=>parseDecision(JSON.stringify({plan:'Go read, then return. Still pending.',call:{type:'write',command:'act',arguments:'{"capability":"read:here"}'},wakeAt:null}));
@@ -126,7 +126,7 @@ test('a maximum local text chunk can be incorporated with full instruction and p
  j.ingest({source:'owner',after:null,cursor:'large',events:[{id:'large',text:'x'.repeat(60000),sentAt:1}]});
  const read=parseDecision(JSON.stringify({plan,call:{type:'read',command:'task',arguments:'{"id":"large"}'},wakeAt:null}));
  retainDecision(j,fence,read,{events:j.pending(),initialInstruction});const observed=await applyPendingDecision(j,fence,{});
- assert.equal(Buffer.byteLength(JSON.stringify(observed.response)),32768);assert.deepEqual(j.control.checkpoint().value.lastResult,observed.response);assert.equal(observed.response.task.nextOffset!==null,true);
+ assert.equal(Buffer.byteLength(JSON.stringify(observed.response)),32768);assert.equal(j.control.checkpoint().value.lastResult.responseOmitted,true);assert.equal(j.control.checkpoint().value.lastResult.responseRef.id,observed.id);assert.deepEqual(j.control.readResult(observed.id).response,observed.response);assert.equal(observed.response.task.nextOffset!==null,true);
  const report=parseDecision(JSON.stringify({plan,call:{type:'write',command:'result',arguments:'{"id":"large","outcome":"failed","text":"Owner cancelled this request"}'},wakeAt:null}));
  const id=retainDecision(j,fence,report);const retained=j.control.checkpoint().value;
  assert.equal(retained.lastResult,undefined);assert.equal(retained.plan,plan);assert.equal(retained.pendingDecision.decision.plan,undefined);
@@ -290,4 +290,28 @@ for(const type of ['future-local-type','read','write','listen'])test('unknown re
  const id=retainDecision(j,fence,{plan:'Retained by a newer runtime',call:{type,command:'future',args:{}},wakeAt:null},{events:j.pending()});
  let calls=0;await assert.rejects(applyPendingDecision(j,fence,{read:async()=>calls++,write:async()=>calls++}),{code:'UNSUPPORTED_RETAINED_DECISION'});
  assert.equal(calls,0);assert.equal(j.control.checkpoint().value.pendingDecision.id,id);assert.equal(j.pending().length,1);assert.equal(j.openOwnerTasks().totalOpen,1);assert.equal(j.control.operations().length,0);
+});
+
+function progressMarker(){return {id:'progress-epoch',phase:'active',window:1,deadlineAt:100000,softUsed:false,fallbackUsed:false,worldReplans:0,turnId:'old-turn',hostPid:1234};}
+test('both recovery markers survive uncertain writes and clear only with actual committed finalization',async t=>{
+ const {j,fence}=fixture(t),progress={...progressMarker(),softUsed:true,fallbackUsed:true,window:3};j.control.save(fence,0,{decisionProgressV1:progress,urgentRecoveryV1:{id:'urgent',triggerAt:1,reason:'owner',turnId:'old-turn',fallbackUsed:true,worldReplans:2}});retainDecision(j,fence,decision());let writes=0;
+ await assert.rejects(applyPendingDecision(j,fence,{write:async()=>{writes++;throw Error('lost accepted reply');}}),{code:'OPERATION_UNCERTAIN'});assert.deepEqual(decisionProgress(j.control.checkpoint().value),progress);
+ await assert.rejects(applyPendingDecision(j,fence,{reconcile:async()=>({state:'unknown'})}),{code:'OPERATION_UNCERTAIN'});assert.equal(writes,1);assert.deepEqual(decisionProgress(j.control.checkpoint().value),progress);
+ await applyPendingDecision(j,fence,{write:async()=>assert.fail('no replay'),reconcile:async()=>({state:'recorded',status:200,response:{accepted:true}})});assert.equal(writes,1);assert.equal(j.control.checkpoint().value.decisionProgressV1,undefined);assert.equal(j.control.checkpoint().value.urgentRecoveryV1,undefined);
+});
+test('near-full legacy checkpoint migrates only its exact durable observation and retains room for both markers across restart',async t=>{
+ const {j,dir,fence}=fixture(t),call={type:'write',command:'say',args:{text:'x'.repeat(15900)}},body={threadId:'original-thread',initialInstruction:'i'.repeat(15998),plan:'p'.repeat(15998),lastDecisionId:'settled-old',lastCall:call,lastResult:null};
+ const response={accepted:true,data:''};body.lastResult=response;response.data='v'.repeat(65536-128-Buffer.byteLength(JSON.stringify(body)));assert.equal(Buffer.byteLength(JSON.stringify(body)),65536-128);
+ j.control.prepare(fence,'settled-old',call);j.control.dispatch(fence,'settled-old');j.control.settle(fence,'settled-old',response);j.control.save(fence,0,body);
+ const urgent={id:'urgent',triggerAt:1,reason:'owner',turnId:'old-turn',fallbackUsed:false,worldReplans:2},progress=progressMarker();saveRecoveryCheckpoint(j,fence,j.control.checkpoint().revision,{...body,urgentRecoveryV1:urgent,decisionProgressV1:progress});
+ let saved=j.control.checkpoint().value;assert.equal(saved.lastResult.responseOmitted,true);assert.equal(saved.lastResult.responseRef.kind,'operation');assert.equal(saved.initialInstruction,body.initialInstruction);assert.equal(saved.plan,body.plan);assert.equal(saved.lastCall.args.text,call.args.text);assert.ok(Buffer.byteLength(JSON.stringify(saved))<=65536);
+ let raw='',offset=0;for(;;){const part=j.control.response({kind:'operation',id:'settled-old',offset});raw+=part.text;if(part.nextOffset===null)break;offset=part.nextOffset;}assert.deepEqual(JSON.parse(raw),response);
+ j.control.release(fence);const reopened=openJournal(dir,{worldId:'w',soulId:'s'});t.after(()=>reopened.close());const next=reopened.control.claim('next');saved=reopened.control.checkpoint().value;
+ saveRecoveryCheckpoint(reopened,next,reopened.control.checkpoint().revision,{...saved,decisionProgressV1:{...progress,phase:'soft-pending',softUsed:true}});assert.equal(decisionProgress(reopened.control.checkpoint().value).softUsed,true);assert.ok(Buffer.byteLength(JSON.stringify(reopened.control.checkpoint().value))<=65536);
+ retainDecision(reopened,next,{plan:body.plan,call:{type:'wait',command:'wait',args:{}},wakeAt:null});await applyPendingDecision(reopened,next,{write:async()=>assert.fail('settled old world write must not replay')});assert.equal(reopened.control.checkpoint().value.decisionProgressV1,undefined);assert.equal(reopened.control.checkpoint().value.urgentRecoveryV1,undefined);
+});
+test('unprovable legacy projection and oversized recovery metadata block without dropping intent',t=>{
+ const {j,fence}=fixture(t),body={initialInstruction:'i'.repeat(16000),plan:'p'.repeat(16000),lastResult:'x'.repeat(32000)};j.control.save(fence,0,body);const before=j.control.checkpoint();assert.ok(Buffer.byteLength(JSON.stringify(body))>65536-RECOVERY_METADATA_BYTES-128);
+ assert.throws(()=>saveRecoveryCheckpoint(j,fence,before.revision,{...body,decisionProgressV1:progressMarker()}),{code:'DECISION_PROGRESS_STATE_INVALID'});assert.deepEqual(j.control.checkpoint(),before);
+ assert.throws(()=>saveRecoveryCheckpoint(j,fence,before.revision,{...body,decisionProgressV1:{...progressMarker(),unexpected:'x'.repeat(2048)}}),{code:'DECISION_PROGRESS_STATE_INVALID'});assert.deepEqual(j.control.checkpoint(),before);
 });

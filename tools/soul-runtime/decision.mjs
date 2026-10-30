@@ -2,6 +2,33 @@
 // private agent state; only a world response/receipt proves an external effect.
 import {randomUUID} from 'node:crypto';
 import {responseReference,responseProjection,receiptProjection,validateResponseArguments} from './responses.mjs';
+// Reserve one finite envelope for both recovery markers. Native observations
+// remain exact in their durable response slots when a legacy checkpoint needs
+// projection; private plan/task state is never trimmed to make recovery fit.
+export const RECOVERY_METADATA_BYTES=2048;
+const size=value=>Buffer.byteLength(JSON.stringify(value));
+const progressFault=message=>Object.assign(Error(message),{code:'DECISION_PROGRESS_STATE_INVALID'});
+export function decisionProgress(value){
+ const p=value?.decisionProgressV1;if(p==null)return null;
+ if(!p||typeof p!=='object'||typeof p.id!=='string'||!/^[-A-Za-z0-9._:]{1,200}$/.test(p.id)||!['ready','active','soft-pending','fallback-reserved','blocked'].includes(p.phase)||!Number.isInteger(p.window)||p.window<1||p.window>3||!Number.isInteger(p.worldReplans)||p.worldReplans<0||p.worldReplans>2||!Number.isFinite(p.deadlineAt)||typeof p.softUsed!=='boolean'||typeof p.fallbackUsed!=='boolean'||p.turnId!==null&&(typeof p.turnId!=='string'||!/^[-A-Za-z0-9._:]{1,200}$/.test(p.turnId))||p.hostPid!==null&&(!Number.isSafeInteger(p.hostPid)||p.hostPid<1)||p.grant!=null&&(!['urgent','progress'].includes(p.grant.kind)||typeof p.grant.id!=='string'||!/^[-A-Za-z0-9._:]{1,200}$/.test(p.grant.id)||p.grant.turnId!==null&&(typeof p.grant.turnId!=='string'||!/^[-A-Za-z0-9._:]{1,200}$/.test(p.grant.turnId))||p.grant.hostPid!==null&&(!Number.isSafeInteger(p.grant.hostPid)||p.grant.hostPid<1)))throw progressFault('Invalid persisted active-decision recovery state; task retained');
+ if(p.window>1+Number(p.softUsed)+Number(p.fallbackUsed)||p.phase==='soft-pending'&&!p.softUsed||p.phase==='fallback-reserved'&&(!p.fallbackUsed||!p.grant))throw progressFault('Inconsistent persisted decision recovery credits');
+ if(size({urgentRecoveryV1:value.urgentRecoveryV1,decisionProgressV1:p})>RECOVERY_METADATA_BYTES)throw progressFault('Recovery metadata exceeds its bounded envelope');
+ return p;
+}
+export function saveRecoveryCheckpoint(journal,fence,revision,value){
+ decisionProgress(value);
+ const {urgentRecoveryV1,decisionProgressV1,...body}=value;
+ if(size({urgentRecoveryV1,decisionProgressV1})>RECOVERY_METADATA_BYTES)throw progressFault('Recovery metadata exceeds its bounded envelope');
+ if(size(body)>65536-RECOVERY_METADATA_BYTES-128){
+  const id=body.lastDecisionId;let response,reference;
+  if(body.lastCall?.type==='read'&&id){const saved=journal.control.readResult(id);if(saved)({response,reference}=saved);}
+  else if(body.lastCall?.type==='write'&&id&&journal.control.hasOperation(id)){const op=journal.control.operation(id);if(op.status==='settled'){response=op.response;reference=responseReference('operation',id,JSON.stringify(response));}}
+  if(!reference||JSON.stringify(response)!==JSON.stringify(body.lastResult))throw progressFault('Legacy checkpoint needs verified durable response projection before recovery metadata fits');
+  body.lastResult=responseProjection(response,reference,{bytesLimit:0});
+  if(size(body)>65536-RECOVERY_METADATA_BYTES-128)throw progressFault('Checkpoint intent exceeds reserved recovery envelope; state retained');
+ }
+ return journal.control.save(fence,revision,{...body,...(urgentRecoveryV1===undefined?{}:{urgentRecoveryV1}),...(decisionProgressV1===undefined?{}:{decisionProgressV1})});
+}
 export const DECISION_SCHEMA={type:'object',additionalProperties:false,required:['plan','call','wakeAt'],properties:{
  plan:{type:'string',description:'Compact durable task state: current goal and original constraints, completed receipt IDs, current step, suspended work, deadlines and next step. Do not claim unobserved completion.'},
  call:{type:'object',additionalProperties:false,required:['type','command','arguments'],properties:{type:{type:'string',enum:['read','write','listen','wait']},command:{type:'string'},arguments:{type:'string',description:'A JSON object of arguments. Local type listen, command listen: exactly {listenTo:[observed Soul IDs]}, {listenTo:"nearby"}, or {listenTo:[]} to durably configure attention and immediately continue to the next decision. Wait sleeps: {} for events, {seconds:N} for a relative wake; wait may also configure listenTo before sleeping. Wakeup and listening survive other calls independently. Use wait {cancelWake:true} only to cancel the saved wakeup.'}}},
@@ -39,13 +66,16 @@ export function parseDecision(text,{now=Date.now}={}){
  }
  return {...value,wakeAt,call:{type:call.type,command:call.command,args}};
 }
-export function retainDecision(journal,fence,decision,{events=[],threadId,initialInstruction}={}){
+export function retainDecision(journal,fence,decision,{events=[],threadId,initialInstruction,deadlineAt=Infinity}={}){
  const c=journal.control.checkpoint();if(c.value?.pendingDecision)throw Error('Previous decision must be reconciled first');
  // The next choice incorporates the preceding observation. Drop that call/result
  // atomically with retaining the choice, and store its plan only once: recovery
  // needs the call/wake and checkpoint plan, not another copy of the old result.
  const {plan,...execution}=decision;
- const id=randomUUID();const pendingDecision={id,decision:execution,eventIds:events.map(e=>({source:e.source,id:e.event.id})),retainedAt:Date.now()};
+ const retainedAt=Date.now();
+ if(deadlineAt!==Infinity&&!Number.isFinite(deadlineAt))throw Error('Invalid decision retention deadline');
+ if(retainedAt>=deadlineAt)throw Object.assign(Error('Decision window expired before retention; no effect retained'),{code:'DECISION_WINDOW_EXPIRED'});
+ const id=randomUUID();const pendingDecision={id,decision:execution,eventIds:events.map(e=>({source:e.source,id:e.event.id})),retainedAt};
  const {lastResult,lastCall,...previous}=c.value??{};
  if(previous.lastReceipt)previous.lastReceipt=receiptProjection(previous.lastReceipt);
  journal.control.save(fence,c.revision,{...previous,threadId:threadId??c.value?.threadId,initialInstruction:c.value?.initialInstruction??initialInstruction??null,plan,pendingDecision});
@@ -129,13 +159,13 @@ export async function applyPendingDecision(journal,fence,world,{signal}={}){
  const wakeAt=decision.wakeAt??(call.type==='listen'?priorWake??null:call.type==='wait'&&call.args.cancelWake===true?null:priorWake&&Date.parse(priorWake)>pending.retainedAt?priorWake:null);
  // A real applied decision, including an explicit refusal, is the progress
  // boundary. Retention, inference and uncertain effects never refill this budget.
- const {lastResult,urgentRecoveryV1,...previous}=latest.value;
+ const {lastResult,urgentRecoveryV1,decisionProgressV1,...previous}=latest.value;
  const listenTo=['listen','wait'].includes(call.type)&&Object.hasOwn(call.args,'listenTo')?listeningScope(call.args.listenTo):latest.value.listenTo??[];
  const finalized={...previous,pendingDecision:null,lastDecisionId:id,lastCall:call,wakeAt,listenTo,lastReceipt:receipt??receiptProjection(latest.value.lastReceipt)??null};
  // Count the actual surrounding checkpoint, including the lastResult key and
  // comma, before deciding whether this complete observation fits inline.
  const envelopeBytes=Buffer.byteLength(JSON.stringify({...finalized,lastResult:null}))-4;
- const bytesLimit=Math.max(0,Math.min(32768,65536-envelopeBytes-128));
+ const bytesLimit=Math.max(0,Math.min(32768,65536-envelopeBytes-RECOVERY_METADATA_BYTES-128));
  journal.control.save(fence,latest.revision,{...finalized,lastResult:responseProjection(response,reference,{bytesLimit})});
  return {applied:true,id,call,response,wakeAt,incorporated};
 }
