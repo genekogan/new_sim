@@ -74,7 +74,7 @@ export function createManagedRestartObserver(config,{
  if(preDispatch!==null&&typeof preDispatch!=='function')throw fault('INVALID_RESTART_REFRESH');
  if(!identifier(actorId)||!identifier(setupId)||typeof journalPath!=='string'||!identifier(worldId)||!identifier(soulId)||!hash(originalInstructionSha256)||!time(cutoffAt)||minimumFutureWakeMs!==20000||triggerMaxDelayMs!==5000||recoveryMaxMs!==25000)throw fault('INVALID_RESTART_CONTRACT');
  let state='watching',failure=null,ownership=null,before=null,triggerAt=null,deathAt=null,controllerExitAt=null,oldGroupsAbsentAt=null,readyAt=null,recoveryStartedAt=null,oldOwnership=null,after=null,dispatchAttempted=false,preDispatchObservation=null;
- const signals=[],proofs=new Map(),lifecycle=[];
+ const signals=[],proofs=new Map(),lifecycle=[],absenceProbes=new Map();
  const fail=(code,unknown=false)=>{failure??={code,at:now(),status:unknown?'unknown':'fail'};state=failure.status;};
  const scope=s=>s?.worldId===worldId&&s?.soulId===soulId&&s?.checkpoint?.initialInstructionSha256===originalInstructionSha256;
  const validSnapshot=s=>scope(s)&&hash(s.journalIdentity)&&time(s.checkpoint.at)&&Number.isSafeInteger(s.checkpoint.revision)&&s.checkpoint.revision>0&&identifier(s.checkpoint.threadId)&&Number.isSafeInteger(s.controller?.generation)&&s.controller.generation>0&&hash(s.controller.ownerSha256)&&time(s.controller.expiresAt)&&Array.isArray(s.operations)&&s.operations.length<=64;
@@ -85,6 +85,20 @@ export function createManagedRestartObserver(config,{
   return startup&&session&&running&&row.activeTurn===null&&row.lastTurn?.state==='turn-completed'&&session.at<=startup.at&&startup.at<=running.at&&running.at<=row.lastTurn.at&&row.lastTurn.at<=s.checkpoint.at&&s.checkpoint.at<=now()&&startup.generation===s.controller.generation&&startup.checkpointRevision<=s.checkpoint.revision&&startup.initialInstructionSha256===originalInstructionSha256&&startup.threadId===s.checkpoint.threadId&&startup.startupResponseId===s.startupResponseId&&startup.pendingDecision===false&&startup.unreconciledOperations===0&&session.threadId===s.checkpoint.threadId&&running.threadId===s.checkpoint.threadId&&ownership.groups.some(g=>g.members.some(p=>p.pid===session.hostPid));
  };
  const absent=target=>{try{killProcess(target,0);return false;}catch(e){if(e.code==='ESRCH')return true;throw fault('RESTART_ABSENCE_UNKNOWN');}};
+ // Post-dispatch measurement only. A transient probe error is neither presence
+ // nor absence; the caller's next existing tick may retry within the old bound.
+ // Keep pre-dispatch absent() strict and never retry a destructive signal here.
+ const probeAbsence=(target,role)=>{
+  let status='present',errno=null;
+  try{killProcess(target,0);}catch(e){
+   if(e?.code==='ESRCH'){status='absent';errno='ESRCH';}
+   else{status='unknown';errno=typeof e?.code==='string'&&/^[A-Z][A-Z0-9_]{0,31}$/.test(e.code)?e.code:'UNKNOWN';}
+  }
+  const at=now(),record=absenceProbes.get(target)??{target,role,attempts:0,firstAt:at,unknownCount:0,firstUnknownAt:null,lastUnknownAt:null,lastUnknownErrno:null};
+  Object.assign(record,{status,errno,attempts:Math.min(65535,record.attempts+1),lastAt:at});
+  if(status==='unknown'){record.unknownCount=Math.min(65535,record.unknownCount+1);record.firstUnknownAt??=at;record.lastUnknownAt=at;record.lastUnknownErrno=errno;}
+  absenceProbes.set(target,record);return status;
+ };
  const inspect=p=>{const observed=inspectProcess(p.pid);if(!sameProcess(observed,p))throw fault('RESTART_PROCESS_IDENTITY_CHANGED');return observed;};
  const validateOwnership=(p,{initial=false}={})=>{
   if(!p||p.actorId!==actorId||p.setupId!==setupId||p.worldId!==worldId||p.soulId!==soulId||p.descendantsComplete!==true||!evidence(p.evidence)||!processIdentity(p.launcher)||!processIdentity(p.controller)||p.controller.ppid!==p.launcher.pid||p.controller.pid===process.pid||p.launcher.pid===p.controller.pid||!Array.isArray(p.groups)||p.groups.length<1||p.groups.length>16)throw fault('RESTART_OWNERSHIP_UNPROVEN');
@@ -195,10 +209,25 @@ export function createManagedRestartObserver(config,{
      }
      state='recovering';
     }
-    if(absent(oldOwnership.controller.pid))controllerExitAt??=now();
-    const gone=controllerExitAt!==null&&oldOwnership.groups.every(g=>absent(-g.pgid));
-    if(gone)oldGroupsAbsentAt??=now();
-    if(!gone&&now()-triggerAt>triggerMaxDelayMs){fail('RESTART_OLD_WRITERS_REMAIN');return this.snapshot();}
+    // A late observer tick cannot extend an unresolved probe's retry window or
+    // establish the first old-writer absence proof after that window expired.
+    if(oldGroupsAbsentAt===null&&now()-triggerAt>triggerMaxDelayMs){
+     const unknown=absenceProbes.size===0||[...absenceProbes.values()].some(p=>p.status==='unknown');
+     fail(unknown?'RESTART_ABSENCE_UNKNOWN':'RESTART_OLD_WRITERS_REMAIN',unknown);return this.snapshot();
+    }
+    const controllerStatus=probeAbsence(oldOwnership.controller.pid,'controller');
+    if(controllerStatus==='absent')controllerExitAt??=now();
+    const groupStatuses=oldOwnership.groups.map(g=>probeAbsence(-g.pgid,'host-or-tool-group'));
+    const gone=controllerStatus==='absent'&&groupStatuses.every(s=>s==='absent');
+    if(gone&&oldGroupsAbsentAt===null){
+     const proofAt=now();
+     if(proofAt-triggerAt>triggerMaxDelayMs){fail('RESTART_ABSENCE_UNKNOWN',true);return this.snapshot();}
+     oldGroupsAbsentAt=proofAt;
+    }
+    if(!gone&&now()-triggerAt>triggerMaxDelayMs){
+     const unknown=controllerStatus==='unknown'||groupStatuses.includes('unknown');
+     fail(unknown?'RESTART_ABSENCE_UNKNOWN':'RESTART_OLD_WRITERS_REMAIN',unknown);return this.snapshot();
+    }
     if(gone)ready();
     if(state!=='ready'&&(now()-deathAt>recoveryMaxMs||now()>cutoffAt)){fail('RESTART_RECOVERY_TIMEOUT');return this.snapshot();}
    }catch(e){
@@ -214,7 +243,7 @@ export function createManagedRestartObserver(config,{
    contract:{kind:'checkpoint-future-wake',minimumFutureWakeMs,triggerMaxDelayMs,recoveryMaxMs,cutoffAt,dispatcherRestarts:false,baselineAssistedResume:false},
    triggerAt,deathAt,controllerExitAt,oldGroupsAbsentAt,recoveryStartedAt,readyAt,recoveryLatencyMs:readyAt===null?null:readyAt-deathAt,
    timestampSemantics:{deathAt:'first successfully delivered destructive signal',controllerExitAt:'first observed exact old controller PID absence',oldGroupsAbsentAt:'first observed absence of all identified old writer groups',readyAt:'maximum source startup/session/running/receiver proof time and old-writer absence observation; never spawn time'},
-   triggerExercised:deathAt!==null,dispatchAttempted,preDispatchObservation:structuredClone(preDispatchObservation),signals:structuredClone(signals),before:before?structuredClone(before):null,after:after?structuredClone(after):null,
+   triggerExercised:deathAt!==null,dispatchAttempted,preDispatchObservation:structuredClone(preDispatchObservation),signals:structuredClone(signals),absenceProbes:[...absenceProbes.values()].map(p=>structuredClone(p)),before:before?structuredClone(before):null,after:after?structuredClone(after):null,
    oldOwnership:oldOwnership?structuredClone(oldOwnership):null,lifecycle:structuredClone(lifecycle),
    threadResumed:readyAt===null?null:after.checkpoint.threadId===before.checkpoint.threadId,
    hostTurns:[...proofs].filter(([,p])=>p.lastTurn).map(([controllerPid,p])=>({controllerPid,activeTurn:p.activeTurn,lastTurn:structuredClone(p.lastTurn)})),
