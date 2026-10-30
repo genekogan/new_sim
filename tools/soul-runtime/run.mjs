@@ -86,7 +86,7 @@ export async function main(argv=process.argv.slice(2),{signal,leaseWaitMs=65000}
  const credential=join(folder,'.eden-agent.json');if(lstatSync(credential).isSymbolicLink())throw Error('Linked pairing file refused');
  const paired=JSON.parse(readFileSync(credential,'utf8'));
  if(!paired.world||!paired.soul||!paired.token)throw Error('Folder must already be paired to one Soul');
- let world=createWorldClient({world:paired.world,token:paired.token});
+ let world=createWorldClient({world:paired.world,token:paired.token,expectedSoulId:paired.soul});
  const cfg=await fetch(paired.world.replace(/\/$/,'')+'/v1/config',{redirect:'error',signal:AbortSignal.any([stop.signal,AbortSignal.timeout(15000)])});
  if(!cfg.ok)throw Error('Cannot verify world identity');const config=await cfg.json();if(!config.worldId)throw Error('World identity unavailable');
  const instruction=values.instruction?readFileSync(resolve(values.instruction),'utf8'):undefined;

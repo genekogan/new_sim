@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {EventEmitter} from 'node:events';
+import {createHash} from 'node:crypto';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -46,6 +47,29 @@ test('fresh adoption starts at observed head rather than replying to old histori
  const f=setup(t);f.world.read=async()=>({streamCursor:'c_88'});let firstCursor;
  f.world.worldPage=async({after,signal})=>{firstCursor=after;await abortableSleep(10000,signal);return {cursor:after,events:[]};};
  const running=runSupervisor({...f,instruction:'Read',signal:f.stop.signal});await until(()=>f.host.calls.length===1);assert.equal(firstCursor,'c_88');f.stop.abort();await running;
+});
+
+test('startup reconciliation proof binds the live fence and retained state without exposing private task text',async t=>{
+ const f=setup(t),states=[],instruction='PRIVATE_INSTRUCTION_CANARY';
+ const running=runSupervisor({...f,instruction,signal:f.stop.signal,onState:s=>states.push(s)});
+ try{
+  await until(()=>f.host.calls.length===1);const proof=states.find(s=>s.state==='startup-reconciled'),checkpoint=f.journal.control.checkpoint();
+  assert.equal(proof.initialInstructionSha256,createHash('sha256').update(instruction).digest('hex'));assert.equal(proof.threadId,'thread');assert.equal(proof.checkpointRevision,checkpoint.revision);assert.equal(proof.generation,1);assert.equal(proof.pendingDecision,false);assert.equal(proof.unreconciledOperations,0);assert.equal(proof.wakeAt,null);assert.deepEqual(JSON.parse(f.journal.control.response({kind:'startup',id:proof.startupResponseId}).text),f.host.calls[0].observation);assert(!JSON.stringify(proof).includes(instruction));assert(states.indexOf(proof)<states.findIndex(s=>s.state==='running'));
+ }finally{f.stop.abort();await running;}
+});
+
+test('pending effect reconciliation must complete before startup proof or inference; receiver metadata does not wake inference',async t=>{
+ const f=setup(t),states=[],fence=f.journal.control.claim('old');
+ const decision=parseDecision(JSON.stringify({plan:'Preserve suspended task',call:{type:'write',command:'say',arguments:'{"text":"one effect"}'},wakeAt:new Date(Date.now()+60000).toISOString()}));
+ const operationId=retainDecision(f.journal,fence,decision,{threadId:'thread',initialInstruction:'Original mission'});f.journal.control.prepare(fence,operationId,decision.call);f.journal.control.dispatch(fence,operationId);f.journal.control.uncertain(fence,operationId);f.journal.control.release(fence);
+ let entered,release;const reconciling=new Promise(r=>entered=r),gate=new Promise(r=>release=r);f.world.reconcile=async()=>{entered();await gate;return {state:'recorded',response:{said:{id:'speech-original'}}};};
+ for(const method of ['worldPage','ownerPage']){let first=true;f.world[method]=async({after,signal})=>{if(first){first=false;return {cursor:after,events:[]};}await abortableSleep(10000,signal);return {cursor:after,events:[]};};}
+ const running=runSupervisor({...f,signal:f.stop.signal,onState:s=>states.push(s)});
+ try{
+  await reconciling;assert.equal(states.some(s=>s.state==='startup-reconciled'),false);assert.equal(f.host.calls.length,0);release();await until(()=>f.host.calls.length===1);
+  const proof=states.find(s=>s.state==='startup-reconciled');assert.equal(proof.generation,2);assert.equal(proof.pendingDecision,false);assert.equal(proof.unreconciledOperations,0);assert.equal(f.journal.control.operation(operationId).status,'settled');await until(()=>states.filter(s=>s.state==='receiver-ready').length===2);
+  f.host.finish(waitDecision);await until(()=>f.journal.control.checkpoint().value.lastCall?.type==='wait');await new Promise(r=>setTimeout(r,150));assert.equal(f.host.calls.length,1,'empty receiver adoption metadata must not trigger model inference');
+ }finally{release();f.stop.abort();await running;}
 });
 test('continuing world chatter cannot starve effects, but a new owner cancellation always invalidates them',async t=>{
  const f=setup(t);let effects=0;f.world.write=async()=>{effects++;return {accepted:true}};

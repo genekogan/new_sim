@@ -1,9 +1,9 @@
 // A receiver persists facts. It never acknowledges owner instructions, decides
 // priorities, starts inference, or writes to a world. Transport is injected so
 // the same contract applies to SSE, long-poll and synthetic fault injection.
-export async function receivePage(journal, source, read, {signal,onCommitted=()=>{}} = {}) {
+export async function receivePage(journal, source, read, {signal,onCommitted=()=>{},initial=false,onReady} = {}) {
   const after=journal.cursor(source);
-  const page=await read({after,signal});
+  const page=await read({after,signal,initial,onReady});
   if(signal?.aborted) return {aborted:true}; // cursor unchanged: safe to replay
   const result=journal.ingest({source,after,cursor:page.cursor,events:page.events,gap:page.gap??false});
   if(page.events.length)onCommitted({source,state:'events-persisted',events:page.events.map(event=>({source,id:event.id})),committedAt:Date.now()});
@@ -13,12 +13,14 @@ export async function receivePage(journal, source, read, {signal,onCommitted=()=
 /** Receiver never waits for a host notification or model response. Terminal
  * auth/supersession propagates; only explicitly classified errors retry. */
 export async function runReceiver({journal,source,read,signal,onState=()=>{},retryable=()=>false,sleep=abortableSleep,maxBackoffMs=30000}) {
-  let backoff=0;
+  let backoff=0,ready=false;
+  const markReady=mode=>{if(!ready&&!signal?.aborted){ready=true;onState({source,state:'receiver-ready',successful:true,mode,at:Date.now()});}};
   while(!signal?.aborted){
     try {
       onState({source,state:'receiving'});
-      const result=await receivePage(journal,source,read,{signal,onCommitted:onState});
+      const result=await receivePage(journal,source,read,{signal,onCommitted:onState,initial:!ready,onReady:proof=>{if(proof?.mode==='stream-adopted'&&proof.successful===true)markReady('stream-adopted');}});
       if(result.aborted)break;
+      markReady('page-committed');
       backoff=0;
     }catch(error){
       if(signal?.aborted)break;

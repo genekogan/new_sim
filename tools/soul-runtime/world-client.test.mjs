@@ -35,6 +35,25 @@ test('owner delivery normalizes immutable content and does not acknowledge it',a
  const calls=[];const client=mock(async(url,opts)=>{calls.push({url,method:opts.method});return Response.json({backlog:[{id:'m1',text:'Come here',sentAt:12,state:'pending',internal:'omit'}]})});
  assert.deepEqual(await client.ownerPage({after:null}),{cursor:'m1',events:[{id:'m1',kind:'owner.message',text:'Come here',sentAt:12}]});assert.equal(calls.length,1);assert.equal(calls[0].method,'GET');
 });
+
+test('owner startup adopts one actual nonblocking page then retains the existing long poll and cursor',async()=>{
+ const calls=[];const client=mock(async(url,opts)=>{calls.push({url,method:opts.method});return Response.json({backlog:[{id:'owner_1',text:'Original task',state:'pending',sentAt:12}]});});
+ assert.equal((await client.ownerPage({after:null,initial:true})).cursor,'owner_1');await client.ownerPage({after:'owner_1'});
+ assert.equal(new URL(calls[0].url).searchParams.get('timeoutMs'),'0');assert.equal(new URL(calls[1].url).searchParams.get('timeoutMs'),'50000');assert.equal(new URL(calls[1].url).searchParams.get('after'),'owner_1');assert(calls.every(c=>c.method==='GET'));
+ const malformed=mock(async()=>Response.json({}));await assert.rejects(malformed.ownerPage({after:null,initial:true}),e=>e.code==='owner.invalid');
+});
+
+test('world stream adoption requires a successful authenticated native hello matching expected Soul/cursor',async()=>{
+ const hello={contract:'eden-edge/1',soulId:'s_expected',cursor:'c_7',head:'c_9',format:'envelope'};let send,accepted;const ready=new Promise(r=>accepted=r),stop=new AbortController();let readiness=0;
+ const client=createWorldClient({world:'http://127.0.0.1:1234/world',token:'CREDENTIAL_CANARY',expectedSoulId:'s_expected',fetchImpl:async()=>new Response(new ReadableStream({start(c){send=c;}}),{headers:{'content-type':'text/event-stream'}})});
+ const pending=client.eventPage({after:'c_7',signal:stop.signal,onReady:proof=>{readiness++;assert.equal(JSON.stringify(proof).includes('CREDENTIAL_CANARY'),false);accepted();}});
+ await new Promise(r=>setImmediate(r));assert.equal(readiness,0);send.enqueue(new TextEncoder().encode('event: hello\ndata: '+JSON.stringify(hello)+'\n\n'));await ready;assert.equal(readiness,1);stop.abort();await assert.rejects(pending);
+ for(const bad of [{...hello,soulId:'s_other'},{...hello,cursor:'c_6'},{...hello,contract:'wrong'},{}]){
+  const denied=createWorldClient({world:'http://127.0.0.1:1234/world',token:'synthetic',expectedSoulId:'s_expected',fetchImpl:async()=>new Response('event: hello\ndata: '+JSON.stringify(bad)+'\n\n',{headers:{'content-type':'text/event-stream'}})});
+  await assert.rejects(denied.eventPage({after:'c_7',onReady:()=>readiness++}),e=>e.code==='stream.identity');
+ }
+ const refused=mock(async()=>Response.json({error:{code:'forbidden'}},{status:403}));await assert.rejects(refused.eventPage({after:'c_7',onReady:()=>readiness++}),e=>e.code==='stream.refused');assert.equal(readiness,1);
+});
 test('write uses stable key and clientRef but never retries a dropped response',async()=>{
  let calls=0;const client=mock(async(url,opts)=>{calls++;assert.equal(opts.headers['idempotency-key'],'op-1');assert.equal(JSON.parse(opts.body).clientRef,'op-1');throw Error('lost response')});
  await assert.rejects(client.write('act',{capability:'sit:chair'},'op-1'),e=>e.uncertain&&!e.transient);assert.equal(calls,1);

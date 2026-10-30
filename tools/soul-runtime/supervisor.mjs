@@ -3,7 +3,7 @@
 import {boundedFacts} from './context.mjs';
 import {DECISION_SCHEMA,parseDecision,retainDecision,applyPendingDecision,listeningScope} from './decision.mjs';
 import {runReceiver,runWakeDispatcher,abortableSleep} from './receiver.mjs';
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
 import {responseProjection} from './responses.mjs';
 export const HOST_CONFIG={'features.shell_tool':false,'features.apps':false,'features.plugins':false,'features.memories':false,'skills.include_instructions':false,web_search:'disabled',project_doc_max_bytes:0};
 export const AMBIENT_WAKE_MS=5000;
@@ -64,6 +64,10 @@ export async function runSupervisor({journal,host,world,instruction,signal,onSta
   const observation=await world.read('observe',{},stop.signal);
   const observationReference=journal.control.retainStartupResult(fence,randomUUID(),observation);
   if(journal.cursor('world')===null&&observation.streamCursor)journal.ingest({source:'world',after:null,cursor:observation.streamCursor,events:[]});
+  const startup=journal.control.checkpoint();
+  onState({state:'startup-reconciled',at:Date.now(),generation:fence.generation,checkpointRevision:startup.revision,threadId:host.threadId,
+   initialInstructionSha256:createHash('sha256').update(startup.value.initialInstruction??'').digest('hex'),wakeAt:startup.value.wakeAt??null,
+   pendingDecision:!!startup.value.pendingDecision,unreconciledOperations:journal.control.operations().length,startupResponseId:observationReference.id});
   onState({state:'running',threadId:host.threadId,model:host.model});
   const launch=p=>{const watched=p.catch(fail);background.push(watched);};
   for(const [source,method] of [['world',world.eventPage?'eventPage':'worldPage'],['owner','ownerPage']]){

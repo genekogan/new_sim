@@ -70,3 +70,25 @@ test('journal pressure exposes structured retry cause without advancing refused 
  assert.equal(j.cursor('world'),'quiet');assert.deepEqual(j.pending().map(p=>p.event.id),['quiet']);
  assert.equal(states.some(s=>s.state==='events-persisted'),false);
 });
+
+test('receiver readiness follows actual initial page commit, retries startup adoption and never acknowledges work',async t=>{
+ const j=fixture(t),stop=new AbortController(),states=[],initials=[];let calls=0;
+ await runReceiver({journal:j,source:'owner',signal:stop.signal,retryable:e=>e.transient===true,sleep:async()=>{},
+  read:async({after,initial})=>{initials.push(initial);if(++calls===1)throw Object.assign(Error('offline'),{transient:true});if(calls===2)return {cursor:'owner_1',events:[{id:'owner_1',kind:'owner.message',text:'Keep original task'}]};assert.equal(after,'owner_1');stop.abort();return {cursor:after,events:[]};},
+  onState:s=>{if(s.state==='receiver-ready'){assert.equal(j.cursor('owner'),'owner_1');assert.equal(j.pending()[0].event.id,'owner_1');}states.push(s);}});
+ assert.deepEqual(initials,[true,true,false]);const ready=states.filter(s=>s.state==='receiver-ready');assert.equal(ready.length,1);assert.equal(ready[0].successful,true);assert.equal(ready[0].mode,'page-committed');assert.equal(j.pending().length,1);
+});
+
+test('validated stream adoption can establish transport readiness while the event read stays pending',async t=>{
+ const j=fixture(t),stop=new AbortController(),states=[];let entered,release;const waiting=new Promise(r=>entered=r),gate=new Promise(r=>release=r);
+ const running=runReceiver({journal:j,source:'world',signal:stop.signal,read:async({onReady,after})=>{onReady({mode:'stream-adopted',successful:true});entered();await gate;return {cursor:after,events:[]};},onState:s=>states.push(s)});
+ await waiting;assert.equal(states.filter(s=>s.state==='receiver-ready').length,1);assert.equal(states.find(s=>s.state==='receiver-ready').mode,'stream-adopted');assert.equal(j.cursor('world'),null);assert.equal(j.pending().length,0);
+ stop.abort();release();await running;assert.equal(j.cursor('world'),null,'adoption never advances a cursor or manufactures a page');
+});
+
+test('pre-request state, aborted pages and refused ingestion never produce successful page readiness',async t=>{
+ const j=fixture(t),stop=new AbortController(),states=[];
+ await runReceiver({journal:j,source:'owner',signal:stop.signal,read:async()=>{assert.equal(states.some(s=>s.state==='receiver-ready'),false);stop.abort();return {cursor:'ignored',events:[]};},onState:s=>states.push(s)});
+ assert.equal(states.some(s=>s.state==='receiver-ready'),false);assert.equal(j.cursor('owner'),null);
+ const rejected=[];await assert.rejects(runReceiver({journal:j,source:'world',read:async()=>({cursor:null,gap:true,events:[]}),onState:s=>rejected.push(s)}),/Gap needs/);assert.equal(rejected.some(s=>s.state==='receiver-ready'),false);
+});

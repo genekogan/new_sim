@@ -22,10 +22,11 @@ const observed=response=>{
  return {state:'recorded',evidence:reconciliation.evidence,status:200,response:{...response,reconciliation}};
 };
 export const isTransientRead=e=>e?.transient===true;
-export function createWorldClient({world,token,fetchImpl=fetch,timeoutMs=65000}){
+export function createWorldClient({world,token,fetchImpl=fetch,timeoutMs=65000,expectedSoulId=null}){
  const base=new URL(world);
  if(base.username||base.password||base.search||base.hash||!(base.protocol==='https:'||(base.protocol==='http:'&&['localhost','127.0.0.1','[::1]'].includes(base.hostname))))throw Error('World must be HTTPS or loopback HTTP without credentials/query');
  if(typeof token!=='string'||!token)throw Error('Missing paired Soul credential');
+ if(expectedSoulId!==null&&(typeof expectedSoulId!=='string'||!/^[-a-zA-Z0-9_]{1,200}$/.test(expectedSoulId)))throw Error('Invalid expected Soul identity');
  const origin=base.href.replace(/\/$/,'');
  async function request(path,{method='GET',body,operationId,signal,readOnly=method==='GET'}={}){
   const headers={'content-type':'application/json',authorization:`Bearer ${token}`};
@@ -44,7 +45,10 @@ export function createWorldClient({world,token,fetchImpl=fetch,timeoutMs=65000})
   try{response=await fetchImpl(origin+'/v1/edge/events?'+new URLSearchParams({cursor:after??'c_0',format:'envelope'}),{headers:{authorization:`Bearer ${token}`,accept:'text/event-stream'},redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(timeoutMs)]):AbortSignal.timeout(timeoutMs)});}
   catch{throw error('transport.unreachable','Event stream unavailable',{transient:!signal?.aborted});}
   if(!response.ok)throw error('stream.refused','Event stream refused',{status:response.status,transient:response.status===429||response.status>=500});
+  if(!response.headers.get('content-type')?.toLowerCase().includes('text/event-stream'))throw error('stream.invalid','Event stream content type unavailable');
   return response;
+ },validateHello:(hello,{after})=>{
+  if(!record(hello)||hello.contract!=='eden-edge/1'||hello.format!=='envelope'||typeof hello.soulId!=='string'||!/^[-a-zA-Z0-9_]{1,200}$/.test(hello.soulId)||expectedSoulId!==null&&hello.soulId!==expectedSoulId||hello.cursor!==(after??'c_0')||!/^c_(0|[1-9][0-9]{0,15})$/.test(hello.cursor)||typeof hello.head!=='string'||!/^c_(0|[1-9][0-9]{0,15})$/.test(hello.head))throw error('stream.identity','Event stream hello did not match the authenticated Soul/cursor contract');
  }});
  return {
   eventPage,
@@ -74,7 +78,10 @@ export function createWorldClient({world,token,fetchImpl=fetch,timeoutMs=65000})
    return request('/v1/edge/operations/'+segment(operationId)+'?'+new URLSearchParams({route:'POST '+route}),{signal});
   },
   async worldPage({after,signal}){const d=await request('/v1/edge/wait?'+new URLSearchParams({after:after??'c_0',timeout:'50'}),{signal});return {cursor:d.cursor,events:d.events??[],gap:d.gap??false};},
-  async ownerPage({after,signal}){const d=await request('/v1/edge/inbox/listen?'+new URLSearchParams({timeoutMs:'50000',...(after?{after}:{})}),{signal});
+  // One successful nonblocking startup read drains existing owner work before
+  // adopting the usual long poll. This is an explicit startup transport change.
+  async ownerPage({after,signal,initial=false}){const d=await request('/v1/edge/inbox/listen?'+new URLSearchParams({timeoutMs:initial?'0':'50000',...(after?{after}:{})}),{signal});
+   if(initial&&!Array.isArray(d.backlog)&&!record(d.inbox))throw error('owner.invalid','Initial owner page did not match the inbox contract');
    const list=Array.isArray(d.backlog)?d.backlog:d.inbox?.latest?[d.inbox.latest]:[];
    const events=list.filter(m=>m?.id&&m.state!=='acknowledged').map(m=>({id:m.id,kind:'owner.message',text:m.text,sentAt:m.sentAt}));
    return {cursor:events.at(-1)?.id??after,events};

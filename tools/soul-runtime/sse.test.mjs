@@ -18,3 +18,18 @@ test('aborting an idle stream does not wait for a heartbeat or a stalled cancel 
  const pending=read({after:'c_0',signal:stop.signal});await new Promise(r=>setImmediate(r));stop.abort();
  await Promise.race([assert.rejects(pending,/interrupted/),new Promise((_,reject)=>{const timer=setTimeout(()=>reject(Error('abort waited for transport')),100);timer.unref();})]);
 });
+
+test('validated hello reports adoption before any event without manufacturing a page or advancing a cursor',async()=>{
+ let transport,ready,settled=false;const accepted=new Promise(r=>ready=r),stop=new AbortController();
+ const read=createEventReader({open:async()=>new Response(new ReadableStream({start(c){transport=c;}})),validateHello:(hello,{after})=>{assert.deepEqual(hello,{cursor:'c_7'});assert.equal(after,'c_7');}});
+ const pending=read({after:'c_7',signal:stop.signal,onReady:proof=>{assert.equal(proof.mode,'stream-adopted');assert.equal(proof.successful,true);ready();}}).finally(()=>{settled=true;});
+ await new Promise(r=>setImmediate(r));assert.equal(settled,false);transport.enqueue(new TextEncoder().encode('event: hello\ndata: {"cursor":"c_7"}\n\n'));await accepted;assert.equal(settled,false);
+ transport.enqueue(new TextEncoder().encode('id: c_8\nevent: speech\ndata: {"id":"c_8"}\n\n'));assert.deepEqual(await pending,{cursor:'c_8',events:[{id:'c_8'}]});stop.abort();
+});
+
+test('failed hello validation, missing hello and aborted adoption never report readiness',async()=>{
+ let ready=0;const invalid=createEventReader({open:async()=>stream(['event: hello\ndata: {}\n\n']),validateHello:()=>{throw Error('wrong Soul');}});
+ await assert.rejects(invalid({after:'c_0',onReady:()=>ready++}),/wrong Soul/);
+ const missing=createEventReader({open:async()=>stream(['id: c_1\nevent: speech\ndata: {"id":"c_1"}\n\n']),validateHello:()=>{}});await assert.rejects(missing({after:'c_0',onReady:()=>ready++}),/preceded validated hello/);
+ const stop=new AbortController();stop.abort();const aborted=createEventReader({open:async()=>stream(['event: hello\ndata: {}\n\n']),validateHello:()=>{}});await assert.rejects(aborted({after:'c_0',signal:stop.signal,onReady:()=>ready++}));assert.equal(ready,0);
+});
