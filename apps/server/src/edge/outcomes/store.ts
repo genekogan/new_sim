@@ -8,7 +8,7 @@ import {tx} from '../comms/store.ts';
 import type {PaintingPublished} from '../../art/painting-completion.ts';
 export type HoldingFact={id:string;kind:string;name:string;state:string;holder:string|null;placeId:string|null};
 export type ConfirmedEffects={changed?:EdgeOutcomeV1['changed'];met?:EdgeOutcomeV1['met'];detail?:Record<string,unknown>;summary?:string;untrusted?:boolean};
-export type OutcomeContext={soulId:string;capability:string;params:Record<string,string>;acceptedTick:number;confirmedProduced?:EdgeOutcomeV1['produced'];confirmedChanges?:EdgeOutcomeV1['changed'];holdingBefore?:HoldingFact|null;confirmedEffects?:ConfirmedEffects};
+export type OutcomeContext={soulId:string;capability:string;params:Record<string,string>;acceptedTick:number;readSpot?:`read.${string}`;confirmedProduced?:EdgeOutcomeV1['produced'];confirmedChanges?:EdgeOutcomeV1['changed'];holdingBefore?:HoldingFact|null;confirmedEffects?:ConfirmedEffects};
 export type TerminalSection={section:string;rows:Record<string,unknown>[];learned:EdgeOutcomeV1['learned']};
 export type OutcomeSnapshot={worldId:string;tick:number;place:string|null;placePath:string[];pos:readonly number[]|null;walkable:string[];sections:TerminalSection[];materials:{id:string;version:number;title:string;text:string;source:string}[]};
 const clip=(value:unknown,max:number)=>typeof value==='string'?value.replace(/\s+/g,' ').trim().slice(0,max):'';
