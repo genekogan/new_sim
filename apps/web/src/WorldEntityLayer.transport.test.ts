@@ -8,6 +8,6 @@ test('two-hand transport follows recorded native pose until persisted arrival, t
  const frame:any={body:{p:[0,0,0],yaw:0,state:{grip:{entity:'load'}}},load:{p:[3,.6,2],yaw:.8,state:{}}};
  layer.transportPoses(frame,['body']);layer.update(.016,30000);assert.deepEqual(obj.position.toArray(),[3,.6,2]);assert.ok(Math.abs(obj.rotation.y+.8)<1e-8);
  delete frame.body.state.grip;frame.load.p=[4,0,2];layer.transportPoses(frame,['body']);layer.update(.016,30016);assert.deepEqual(obj.position.toArray(),[4,0,2],'no snap back during final write-back lag');
- a.drawn.get('load').to.p.set(4,0,2);a.drawn.get('load').from.p.set(4,0,2);layer.transportPoses(frame,['body']);layer.update(.016,30032);assert.equal(a.transported.size,0);assert.equal(a.overrides.size,0);assert.deepEqual(obj.position.toArray(),[4,0,2]);
+ a.drawn.get('load').to.p.set(4,0,2);a.drawn.get('load').from.p.set(4,.07,2);frame.body.state.carryContactV1={item:'load'};layer.transportPoses(frame,['body']);layer.update(.016,30024);assert.equal(a.overrides.size,1,'release contact keeps native ownership even when world destination has arrived');assert.deepEqual(obj.position.toArray(),[4,0,2]);delete frame.body.state.carryContactV1;a.drawn.get('load').from.p.set(4,0,2);layer.transportPoses(frame,['body']);layer.update(.016,30032);assert.equal(a.transported.size,0);assert.equal(a.overrides.size,0);assert.deepEqual(obj.position.toArray(),[4,0,2]);
  layer.dispose();
 });

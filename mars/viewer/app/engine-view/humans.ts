@@ -614,7 +614,7 @@ export class HumanViews {
       v.carryWeight = f.carryWeight;
       v.on = f.on;
       v.frame = frameCtx(f.on, act, (id) => parts[id], this.climbs);
-      v.seat = act==='cycle'?BIKE_SADDLE:base==='sit'&&!f.on&&!f.grip&&!f.hands?.left&&!f.hands?.right&&typeof f.seatHeight==='number'&&Number.isFinite(f.seatHeight)&&f.seatHeight>0&&f.seatHeight<=1.2?f.seatHeight:SEAT_DEFAULT;
+      v.seat = act==='cycle'?BIKE_SADDLE:SEATED.has(base)&&!f.on&&!f.grip&&!f.hands?.left&&!f.hands?.right&&typeof f.seatHeight==='number'&&Number.isFinite(f.seatHeight)&&f.seatHeight>0&&f.seatHeight<=1.2?f.seatHeight:SEAT_DEFAULT;
       v.bench = LYING.has(act)||act==='bench-press'?(typeof f.seatHeight==='number'&&Number.isFinite(f.seatHeight)&&f.seatHeight>0&&f.seatHeight<=1.2?f.seatHeight:0):0;
       v.groundSeat = onGround(act, f.baseActivity);
       if (v.groundSeat) v.seat = GROUND_SEAT;
@@ -729,10 +729,14 @@ export class HumanViews {
     const libShare = lib.cur || lib.prev ? 1 - w : 0;
     const curW = lib.cur ? libShare * lib.fade : 0, prevW = lib.prev ? libShare * (1 - lib.fade) : 0;
     const waveW = waveClip && !lib.cur ? 1 - w : 0, interactW = interactClip && !lib.cur ? 1 - w : 0;
-    const idleFree = v.activity === 'idle' && b.sitW === 0 && !engineHands && freeBody && !lib.cur;
-    const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, tSec) : 0;
+    // Carry reach/release converges to the same idle clip underneath the IK.
+    // Otherwise an idle variation (e.g. hands on hips) appears in one frame at release end.
+    const carryIdle = v.carryWeight !== undefined;
+    const idleFree = (v.activity === 'idle' || carryIdle) && b.sitW === 0 && !engineHands && (freeBody || carryIdle) && !lib.cur;
+    const idleShare = carryIdle ? 1 - v.carryWeight! : 1;
+    const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, tSec) * idleShare : 0;
     const variant = idleFree ? idleVariant(h.name, tSec) : null, variantA = variant ? libAction(v.rig, variant.clip) : null;
-    const variantW = variantA ? (1 - w - neutralW) * variant!.w : 0;
+    const variantW = variantA ? (1 - w - neutralW) * variant!.w * idleShare : 0;
     const libOn = new Set<THREE.AnimationAction>();
     const libAt = (act: THREE.AnimationAction | null, weight: number, time: number) => {
       if (!act || weight <= 1e-4) return;

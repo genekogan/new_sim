@@ -332,7 +332,8 @@ export class WorldEntityLayer {
     const held = new Set<string>();
     for (const body of bodies) {
       const grip = entities[body]?.state.grip as {entity?: string} | undefined;
-      const id = grip?.entity, e = id && this.model?.entities.get(id);
+      const contact = entities[body]?.state.carryContactV1 as {item?: string} | undefined;
+      const id = grip?.entity ?? contact?.item, e = id && this.model?.entities.get(id);
       if (e && this.model?.resolvedDef(e.def)?.tags.includes('upright-carry')) { held.add(e.id); this.transported.add(e.id); }
     }
     for (const id of this.transported) {

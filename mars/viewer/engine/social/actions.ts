@@ -196,6 +196,19 @@ function slotAction(verb: string, description: string, kinds: SlotKind[] | null,
               // Sit/stand moves directly between this point and the seat (slotTransitionIssue: never through a wall or table).
               const issue = slotTransitionIssue(rt, slot, point, profile);
               if (issue) { if (issue.code !== 'slot.no-floor') routeIssue ??= issue; return false; }
+              // New movable seats need a genuinely clear exit, not just a raster
+              // clearance sample (small adjacent props can fall between cells).
+              if (rt.world.entities[slot.owner]?.tags?.includes('entity-world-transport')) {
+                const spatial=rt.services.spatial as Spatial, floor=rt.world.entities[slot.owner].pose.p[1];
+                for (const obstacle of spatial.scene.obstacles) {
+                  if (obstacle.y1<=floor || obstacle.y0>=floor+profile.height) continue;
+                  const local=rot2(sub2(point,obstacle.obb.c),-obstacle.obb.yaw);
+                  if (hypot(Math.max(0,Math.abs(local[0])-obstacle.obb.half[0]),Math.max(0,Math.abs(local[1])-obstacle.obb.half[1]))<profile.radius+.01) {
+                    routeIssue??={code:'slot.exit-blocked',message:'This seat has no clear standing exit beside the adjacent objects.',subjects:[slot.id,obstacle.id]};
+                    return false;
+                  }
+                }
+              }
               const route = planWalk(rt, a, { level: slot.level, p: point });
               if (!route.ok) { routeIssue ??= route.diagnostic; return false; }
               routeChecked = true; return true;
@@ -250,6 +263,7 @@ function slotAction(verb: string, description: string, kinds: SlotKind[] | null,
         a.human!.task = ex.id;
         a.human!.activity = 'stand-up';
         if (!transition(rt, ex, ex.approach!, dt)) return { status: 'running', phase: 'stand-up' };
+        if (rt.world.entities[ex.slot.owner]?.tags?.includes('entity-world-transport')) delete a.human!.seatHeight;
         idle(rt, [ex.actor], ex.id);
         return { status: 'completed', outputs: { stoodAt: ex.approach } };
       }
@@ -261,6 +275,7 @@ function slotAction(verb: string, description: string, kinds: SlotKind[] | null,
       }
       if (ex.phase === 'turn') {
         a.human!.task = ex.id;
+        if (ex.slot.kind==='seat' && ex.slot.height!==undefined && rt.world.entities[ex.slot.owner]?.tags?.includes('entity-world-transport')) a.human!.seatHeight=ex.slot.height;
         if (Math.abs(angleDelta(a.pose.yaw, ex.slot.yaw)) > FACE_DONE) {
           a.pose.yaw = turnToward(a.pose.yaw, ex.slot.yaw, HUMAN_PROFILE.turnRate * dt);
           return { status: 'running', phase: 'turn' };
@@ -291,6 +306,7 @@ function slotAction(verb: string, description: string, kinds: SlotKind[] | null,
           return { ok: true, deferred: true };
         }
       }
+      if (rt.world.entities[ex.slot.owner]?.tags?.includes('entity-world-transport')) delete rt.world.entities[ex.actor].human!.seatHeight;
       idle(rt, [ex.actor], ex.id);
       return { ok: true };
     },

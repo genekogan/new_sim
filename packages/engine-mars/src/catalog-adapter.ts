@@ -134,7 +134,7 @@ export function assetFromDef(id: string, d: DefFacts, o: { seen?: boolean } = {}
   // B6: a fire's box spans its logs; its stone ring and logs are the entity's own solids, so the box is no obstacle
   // (people stand inside it, round the fire)
   } else if (!isFloatingDef(d) && !isFireCircleDef(d)) out.obstacle = true;
-  const seats: SlotDef[] = d.slots.filter((s) => s.kind === 'seat').map((s) => ({ id: s.id, kind: 'seat' as const, local: [r4(s.p[0]), r4(s.p[2])], yaw: r4(Math.PI / 2 - s.yaw), approachPolicy: 'reachable/1' }));
+  const seats: SlotDef[] = d.slots.filter((s) => s.kind === 'seat').map((s) => ({ id: s.id, kind: 'seat' as const, local: [r4(s.p[0]), r4(s.p[2])], yaw: r4(Math.PI / 2 - s.yaw), approachPolicy: 'reachable/1', ...(d.tags.includes('front-seat') ? {height:r4(s.height ?? s.p[1])} : {}) }));
   const stands: SlotDef[] = d.slots.filter((s) => s.kind === 'stand').map((s) => ({ id: s.id, kind: 'stand' as const, local: [r4(s.p[0]), r4(s.p[2])], yaw: r4(Math.PI / 2 - s.yaw) }));
   // B6: the stone ring is the def's description's size when it says so ("a ring of stones (1.6 m)"), else 1 m
   const ring = Number(/ring of stones \((\d+(?:\.\d+)?) m\)/.exec(d.description ?? '')?.[1] ?? 1);
@@ -142,6 +142,7 @@ export function assetFromDef(id: string, d: DefFacts, o: { seen?: boolean } = {}
   const berths = berthSlots(d);
   if (seats.length || stands.length || fire.length || berths.length) out.slots = [...seats, ...stands, ...fire, ...berths];
   if (seats.length && crossSeated(d)) out.seatApproach = 'slot';
+  if (seats.length && d.tags.includes('front-seat')) out.seatApproach = 'front-arc';
   const tops = d.slots.filter((s) => s.kind === 'surface' || s.kind === 'shelf');
   if (tops.length) out.surfaceSlots = tops.flatMap((s) => surfaceLattice(s.id, tops.length === 1 ? w : Math.min(w, 1.2), tops.length === 1 ? dd : Math.min(dd, 0.8), s.height ?? s.p[1] ?? c.surface?.height ?? h, tops.length === 1 ? 0 : s.p[0], tops.length === 1 ? 0 : s.p[2]));
   else if (c.surface) out.surfaceSlots = surfaceLattice('top', w, dd, c.surface.height ?? h);
