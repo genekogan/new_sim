@@ -39,10 +39,13 @@ export function installWorldLore(L: EdgeLedger, god: GodMode) {
     return terminal(receipt, snapshot ? { ...snapshot, placePath: [] } : snapshot, eff);
   };
   const libraryRead = typeof o.readPassage === 'function' ? o.readPassage.bind(o) : null;
+  const librarySource = (capability: string, readSpot?: string) =>
+    /^\s*#?\s*Eden\b/.test(String(god.model.state.constitution ?? '')) &&
+    (/^read:(?:read\.|g-)/.test(capability) || (capability === 'read:here' && /^read\..+$/.test(readSpot ?? '')));
   o.readPassage = (context: any, out: any) => {
     // E-life: a book taken from a god-built bookcase (a derived reading spot, read:read.<seat>, or reading in a place with
     // shelves, read:g-<place>) on Eden 2026 is a book of the Eden library, as on old Eden; elsewhere it reads the lore
-    if (libraryRead && /^read:(?:read\.|g-)/.test(String(context.capability ?? '')) && /^\s*#?\s*Eden\b/.test(String(god.model.state.constitution ?? ''))) return libraryRead(context, out);
+    if (libraryRead && librarySource(String(context.capability ?? ''), context.readSpot)) return libraryRead(context, out);
     const target = String(context.capability ?? '').slice('read:'.length), e: any = target ? god.model.entities.get(target) : undefined;
     const def = e ? god.model.resolvedDef(e.def) : undefined, words = (e && def ? signText(e, def) ?? '' : '').trim();
     if (words) {
@@ -63,7 +66,8 @@ export function installWorldLore(L: EdgeLedger, god: GodMode) {
   L.worldProfile = (soul, caps, plans) => {
     prev?.(soul, caps, plans);
     for (const c of caps) if (c.verb === 'read' && !god.model.entities.get(c.id.slice('read:'.length))) {
-      c.label = String(c.label).replace(/the book you carry/i, god.model.state.constitution ? "this world's constitution" : 'about this world');
+      if (libraryRead && librarySource(c.id, c.target?.kind === 'spot' ? c.target.id : undefined)) continue;
+      c.label = String(c.label).replace(/the book you carry|a book/i, god.model.state.constitution ? "this world's constitution" : 'about this world');
       const p = plans.get(c.id); if (p) p.label = p.label.replace(/a book/i, god.model.state.constitution ? "this world's constitution" : 'about this world');
     }
   };
