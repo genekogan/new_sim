@@ -1140,7 +1140,10 @@ function createWorldClient({ world, token, fetchImpl = fetch, timeoutMs = 65e3, 
         const observation = await request("/v1/edge/observe", { signal }), conversations = await request("/v1/edge/conversations", { signal });
         return { observation, conversations, historyIncomplete: true, note: "Current facts refreshed; missing historical events were not reconstructed." };
       }
-      if (command === "here") return request("/v1/edge/here?include=doHere", { signal });
+      if (command === "here") {
+        if (args.view !== void 0 && args.view !== "body") throw error("invalid", "here view must be body when supplied", { status: 400, uncertain: false });
+        return request(args.view === "body" ? "/v1/edge/here?view=body" : "/v1/edge/here?include=doHere", { signal });
+      }
       if (command === "observe") return request("/v1/edge/observe", { signal });
       if (command === "explore") return request("/v1/edge/around" + (args.query ? "?to=" + segment(args.query) : ""), { signal });
       if (command === "resolve") return request("/v1/edge/resolve", { method: "POST", body: { capability: args.capability, params: args.params ?? {} }, signal, readOnly: true });

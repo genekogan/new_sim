@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "nodeMinimum": "22.20.0",
   "host": "codex app-server (experimental)",
-  "source": "da525ad14a00c725b65a20c44156fbae352876af",
+  "source": "eeb3cb3c6c47be6d568731373f379b0c0150694e",
   "esbuild": "0.28.1",
   "artifacts": [
     {
       "file": "run.mjs",
-      "bytes": 121987,
-      "sha256": "b50fc77ebe60ec4d603c31dec7d565b4437edb26a60881464d7441694d8ffb25"
+      "bytes": 122213,
+      "sha256": "ffab09299bcc81cc9a8eb839e5769b1fc5f375b884e451af77b4db3c49a01670"
     },
     {
       "file": "launch.mjs",
@@ -48,7 +48,7 @@
     },
     {
       "path": "tools/soul-runtime/world-client.mjs",
-      "sha256": "6a9065b1b632ca3cdea6cf707f540bc6401d4df7749c527521b67028d464186d"
+      "sha256": "40d5b24c83d92a545a3273aead87766099386eceff1d1b7992857c17db8fb9f9"
     },
     {
       "path": "tools/soul-runtime/context.mjs",
