@@ -232,3 +232,20 @@ constraints must be observable initial task facts in both arms. The common
 caller composes this same supplement and the prebound public guest roster before
 either trial. No speaking order, dialogue content or mid-run coaching is added.
 Numeric venue, hold, arrival and cutoff thresholds are unchanged.
+
+## Prospective arm reporting
+
+`reportArmDimensions` in `arm-score.mjs` reports common native behavior,
+managed intake stages, automatic restart capability, and realized restart
+separately. Pass the untouched `scoreContinuity` output and the frozen arm.
+For managed restart, also supply the actual `restartObservation`, cited
+`restartEvidence`, and expected `{actor,setupId,worldId,soulId}` from preflight.
+A different run or Soul cannot supply readiness. Every original row remains
+addressable by its original ID and row index (recipient cursors can repeat
+across Souls). Original aggregate status is preserved.
+
+The R400 baseline has unsupported managed intake stages and an explicit
+automatic-restart capability failure; neither is converted to a native behavior
+pass or a claim that a death probe ran. A measured late recovery fails. These
+reporting dimensions do not qualify a release, waive missing native evidence,
+or replace the activity, semantic, duplicate-effect, holdout or soak checks.
