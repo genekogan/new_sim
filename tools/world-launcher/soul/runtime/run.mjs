@@ -6,15 +6,18 @@ import { readFileSync, mkdirSync as mkdirSync2, writeFileSync, renameSync, lstat
 import { randomUUID as randomUUID4 } from "node:crypto";
 import { resolve, join as join2 } from "node:path";
 import { pathToFileURL } from "node:url";
+import { performance as performance2 } from "node:perf_hooks";
 
 // tools/soul-runtime/codex-host.mjs
 import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
+import { performance } from "node:perf_hooks";
 var fault = (code, message) => Object.assign(Error(message), { code });
 var input = (text2) => [{ type: "text", text: text2 }];
 var delay = (ms) => new Promise((resolve2) => setTimeout(resolve2, ms));
 var GROUP_REAP_POLLS = 200;
 var GROUP_REAP_POLL_MS = 25;
+var probeErrorCode = (value) => typeof value === "string" && /^[A-Z][A-Z0-9_]{0,63}$/.test(value) ? value : "UNKNOWN";
 var threadName = (value) => {
   if (value === null) return null;
   if (typeof value !== "string" || !value.trim() || value.length > 200 || /[\u0000-\u001f\u007f]/.test(value)) throw fault("HOST_INVALID_NAME", "Thread name must be readable text of1..200characters");
@@ -182,7 +185,7 @@ var CodexHost = class extends EventEmitter {
         if (old.terminal && id !== t.id) this.turns.delete(id);
       }
     }
-    if (["turn/started", "turn/completed", "item/started", "item/completed", "thread/tokenUsage/updated", "thread/name/updated", "thread/archived"].includes(m.method)) this.emit("event", { method: m.method, params: p, receivedAt: Date.now() });
+    if (["turn/started", "turn/completed", "item/started", "item/completed", "thread/tokenUsage/updated", "thread/name/updated", "thread/archived", "error"].includes(m.method)) this.emit("event", { method: m.method, params: p, receivedAt: Date.now() });
   }
   async connect({ threadId = null, instructions = "", baseInstructions = null, config = {}, ephemeral = this.ephemeral, name = this.name } = {}) {
     ephemeral = booleanOption("ephemeral", ephemeral);
@@ -273,16 +276,25 @@ var CodexHost = class extends EventEmitter {
         await Promise.race([this.exit, delay(1e3)]);
       }
       let groupClosed = this.exitStatus?.startFailed === true && !this.pid;
+      let groupProbeCount = 0, groupProbeFirstErrorCode = null, groupProbeLastErrorCode = null;
+      const groupProbeStarted = performance.now();
       if (this.pid) for (let n = 0; n < GROUP_REAP_POLLS; n++) {
+        groupProbeCount++;
         try {
           this.killProcess(-this.pid, 0);
         } catch (e) {
-          if (e.code === "ESRCH") groupClosed = true;
-          break;
+          const code = probeErrorCode(e?.code);
+          groupProbeFirstErrorCode ??= code;
+          groupProbeLastErrorCode = code;
+          if (e?.code === "ESRCH") {
+            groupClosed = true;
+            break;
+          }
         }
         await delay(GROUP_REAP_POLL_MS);
       }
-      this.closeProof = { ...this.exitStatus, hostPid: this.pid ?? null, threadId: this.threadId, groupClosed, groupVerification: groupClosed ? "absent" : "unverified" };
+      const groupProbeElapsedMs = Math.round(performance.now() - groupProbeStarted);
+      this.closeProof = { ...this.exitStatus, hostPid: this.pid ?? null, threadId: this.threadId, groupClosed, groupVerification: groupClosed ? "absent" : "unverified", groupProbeCount, groupProbeElapsedMs, groupProbeFirstErrorCode, groupProbeLastErrorCode };
       this.emit("lifecycle", { state: "host-closed", ...this.closeProof });
       return this.closeProof;
     })();
@@ -1747,6 +1759,21 @@ async function runManaged({ createHost, signal, onState = () => {
 
 // tools/soul-runtime/run.mjs
 var evidenceError = (e) => ({ code: typeof e?.code === "string" && /^[A-Za-z0-9._:-]{1,100}$/.test(e.code) ? e.code : "unclassified", status: Number.isInteger(e?.status) && e.status >= 100 && e.status <= 599 ? e.status : null });
+var metadataId = (value) => typeof value === "string" && /^[A-Za-z0-9._:-]{1,200}$/.test(value) ? value : null;
+var itemTypes = /* @__PURE__ */ new Set(["userMessage", "agentMessage", "reasoning", "commandExecution", "fileChange", "mcpToolCall", "dynamicToolCall", "webSearch", "imageView", "collabAgentToolCall", "enteredReviewMode", "exitedReviewMode", "contextCompaction"]);
+var requestMethods = /* @__PURE__ */ new Set(["item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/tool/call"]);
+var errorCategories = /* @__PURE__ */ new Set(["contextWindowExceeded", "sessionBudgetExceeded", "usageLimitExceeded", "rateLimitExceeded", "flexUnavailable", "serverOverloaded", "cyberPolicy", "misalignmentPolicyViolation", "tooManyDenials", "internalServerError", "unauthorized", "badRequest", "threadRollbackFailed", "sandboxError", "other"]);
+var httpErrorVariants = /* @__PURE__ */ new Set(["httpConnectionFailed", "responseStreamConnectionFailed", "responseStreamDisconnected", "responseTooManyFailedAttempts"]);
+var hostErrorMetadata = (error2) => {
+  const info = error2?.codexErrorInfo;
+  if (typeof info === "string") return { category: errorCategories.has(info) ? info : "unknown" };
+  if (info && typeof info === "object" && !Array.isArray(info) && Object.keys(info).length === 1) {
+    const [category] = Object.keys(info), details = info[category];
+    if (httpErrorVariants.has(category)) return { category, httpStatusCode: Number.isInteger(details?.httpStatusCode) && details.httpStatusCode >= 100 && details.httpStatusCode <= 599 ? details.httpStatusCode : null };
+    if (category === "activeTurnNotSteerable") return { category, turnKind: ["review", "compact"].includes(details?.turnKind) ? details.turnKind : null };
+  }
+  return { category: "unknown" };
+};
 function openEvidenceRecorder(path, { scope = {}, now = Date.now, onFailure = () => {
 }, writeRecord = writeFileSync, syncFile = fsyncSync } = {}) {
   let fd, closed = false, failure = null;
@@ -1812,24 +1839,62 @@ function openEvidenceRecorder(path, { scope = {}, now = Date.now, onFailure = ()
     bindHost(host) {
       const hostId = randomUUID4(), connect = host.connect;
       let actualModel = null;
+      const identity = (threadId = host.threadId, turnId = null) => ({ hostId, hostPid: Number.isSafeInteger(host.pid) ? host.pid : null, threadId: metadataId(threadId), turnId: metadataId(turnId) });
+      const record2 = (row) => {
+        try {
+          append(row);
+        } catch {
+        }
+      };
       host.connect = async function(...args) {
         const connected = await Reflect.apply(connect, this, args);
         actualModel = typeof connected?.model === "string" ? connected.model : null;
         append({ kind: "host-session", state: "connected", hostId, hostPid: host.pid ?? null, threadId: host.threadId ?? null, model: actualModel, resumed: typeof args[0]?.threadId === "string" });
         return connected;
       };
+      for (const operation of ["begin", "steer"]) {
+        const original = host[operation];
+        if (typeof original !== "function") continue;
+        host[operation] = async function(...args) {
+          const requestedAt = now(), started = performance2.now(), promptBytes = typeof args[0] === "string" ? Buffer.byteLength(args[0]) : null, expectedTurnId = operation === "steer" ? metadataId(args[1] ?? this.activeTurnId) : null;
+          let result;
+          try {
+            result = await Reflect.apply(original, this, args);
+          } catch (error2) {
+            record2({ kind: "host-rpc", operation, ...identity(this.threadId, expectedTurnId), requestedAt, failedAt: now(), durationMs: Math.max(0, performance2.now() - started), promptBytes, status: "rejected" });
+            throw error2;
+          }
+          record2({ kind: "host-rpc", operation, ...identity(this.threadId, operation === "begin" ? result?.turnId : expectedTurnId), requestedAt, acknowledgedAt: now(), durationMs: Math.max(0, performance2.now() - started), promptBytes, status: "acknowledged" });
+          return result;
+        };
+        detach.push(() => {
+          host[operation] = original;
+        });
+      }
       const event = (e) => {
+        const p = e.params ?? {}, at = Number.isFinite(e.receivedAt) ? e.receivedAt : now();
+        if (["item/started", "item/completed"].includes(e.method)) {
+          record2({ kind: "host-item", method: e.method, at, ...identity(p.threadId ?? host.threadId, p.turnId), itemId: metadataId(p.item?.id), itemType: itemTypes.has(p.item?.type) ? p.item.type : "unknown" });
+          return;
+        }
+        if (e.method === "error") {
+          record2({ kind: "host-error", method: "error", at, ...identity(p.threadId ?? host.threadId, p.turnId), willRetry: typeof p.willRetry === "boolean" ? p.willRetry : null, error: hostErrorMetadata(p.error) });
+          return;
+        }
         if (!["turn/started", "turn/completed", "thread/tokenUsage/updated"].includes(e.method)) return;
-        const p = e.params ?? {}, reportedModel = p.model ?? p.turn?.model;
+        const reportedModel = p.model ?? p.turn?.model;
         if (typeof reportedModel === "string") actualModel = reportedModel;
         try {
           append({ kind: "host-event", method: e.method, at: Number.isFinite(e.receivedAt) ? e.receivedAt : now(), hostId, hostPid: host.pid ?? null, threadId: typeof p.threadId === "string" ? p.threadId : host.threadId ?? null, turnId: p.turn?.id ?? p.turnId ?? null, model: actualModel, status: p.turn?.status ?? null, ...e.method === "thread/tokenUsage/updated" ? { tokenUsage: p.tokenUsage ?? null } : {}, ...p.turn?.error ? { error: evidenceError(p.turn.error) } : {} });
         } catch {
         }
       };
+      const unsupported = (e) => record2({ kind: "host-unsupported-request", at: now(), ...identity(host.threadId, host.activeTurnId), method: requestMethods.has(e?.method) ? e.method : "unknown" });
       host.on("event", event);
+      host.on("unsupportedRequest", unsupported);
       detach.push(() => {
         host.off("event", event);
+        host.off("unsupportedRequest", unsupported);
         host.connect = connect;
       });
       return host;
