@@ -249,3 +249,16 @@ test('nonblocking listen clear immediately reaches the next action while retaini
   f.journal.ingest({source:'world',after:null,cursor:'ignored',events:[ambient('ignored')]});await new Promise(r=>setTimeout(r,180));assert.equal(f.host.calls.length,3,'cleared listening and an ordinary wait must not poll the model');assert.deepEqual(commands,['act'],'configuration never acknowledges the owner or writes to the world');
  }finally{f.stop.abort();await running;}
 });
+test('actual native activity observation wakes a waiting host without model polling or declaring terminal completion',async t=>{
+ const f=setup(t),states=[];let worldReads=0,published=false,release;const gate=new Promise(r=>release=r);
+ const event={id:'c_activity',kind:'activity.observed',raw:'activity.observed',salience:2,data:{receipt:{id:'r',capability:'sit:chair',phase:'started'},body:{posture:'seated',activity:'sit',occupiedSeats:['chair#seat']}}};
+ f.world.read=async()=>{worldReads++;return {self:{state:'walking'}};};
+ f.world.eventPage=async({after,signal})=>{if(!published){await Promise.race([gate,abortableSleep(10000,signal)]);published=true;return {cursor:event.id,events:[event]};}await abortableSleep(10000,signal);return {cursor:after,events:[]};};
+ const running=runSupervisor({...f,instruction:'Use observed native activity state',signal:f.stop.signal,onState:s=>states.push(s)});
+ try{
+  await until(()=>f.host.calls.length===1);f.host.finish(waitDecision);await new Promise(r=>setTimeout(r,150));assert.equal(f.host.calls.length,1);
+  assert.equal(attentionPriority({source:'world',event}),2);release();
+  await until(()=>f.host.calls.length===2);const fact=f.host.calls[1].pending[0].event;assert.deepEqual(fact.data,event.data);assert.equal(fact.data.receipt.phase,'started');assert.equal(f.journal.pending().length,1,'host notification does not mark incorporation');assert.equal(worldReads,1,'native event needs no here/receipt polling');assert.equal(f.journal.cursor('world'),event.id);assert.ok(states.some(s=>s.state==='events-persisted'&&s.events.some(e=>e.id===event.id)));assert.ok(states.some(s=>s.state==='host-notified'&&s.events.some(e=>e.id===event.id)));
+  f.host.finish(waitDecision);await until(()=>f.journal.pending().length===0);await new Promise(r=>setTimeout(r,150));assert.equal(f.host.calls.length,2,'unchanged activity does not poll the model');
+ }finally{release();f.stop.abort();await running;}
+});
