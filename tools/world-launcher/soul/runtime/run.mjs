@@ -403,7 +403,7 @@ async function receivePage(journal, source, read, { signal, onCommitted = () => 
   return { ...result, pending: journal.pending().length };
 }
 async function runReceiver({ journal, source, read, signal, onState = () => {
-}, retryable = () => false, sleep = abortableSleep, maxBackoffMs = 3e4, healthyReconnectMs = 1e3, minHealthyMs = 5e3, maxRetryAfterMs = 12e4, random = Math.random, now = Date.now }) {
+}, retryable = () => false, sleep = abortableSleep, maxBackoffMs = 3e4, healthyReconnectMs = 1e3, minHealthyMs = 5e3, maxRetryAfterMs = 6e4, random = Math.random, now = Date.now }) {
   let backoff = 0, ready = false, connectedAt = null;
   const markReady = (mode) => {
     if (!ready && !signal?.aborted) {
@@ -428,19 +428,20 @@ async function runReceiver({ journal, source, read, signal, onState = () => {
         onState({ source, state: "blocked", reason: String(error2.message) });
         throw error2;
       }
-      const statedMs = Number.isFinite(error2?.retryAfterMs) && error2.retryAfterMs > 0 ? Math.min(maxRetryAfterMs, error2.retryAfterMs) : 0;
+      const statedMs = Number.isFinite(error2?.retryAfterMs) && error2.retryAfterMs > 0 ? error2.retryAfterMs : 0;
       const lived = connectedAt === null ? null : now() - connectedAt;
       connectedAt = null;
       const extra = { reason: String(error2.message), ...typeof error2.code === "string" ? { code: error2.code } : {}, ...statedMs ? { retryAfterMs: statedMs } : {} };
       let delayMs;
-      if (lived !== null && lived >= minHealthyMs && !statedMs) {
+      if (error2?.streamClosed === true && typeof error2.code !== "string" && lived !== null && lived >= minHealthyMs && !statedMs) {
         backoff = 0;
         delayMs = Math.floor(random() * healthyReconnectMs);
         onState({ source, state: "reconnecting", delayMs, connectedMs: lived, ...extra });
       } else {
         backoff = Math.min(maxBackoffMs, backoff ? backoff * 2 : 1e3);
-        delayMs = statedMs ? Math.max(backoff, statedMs + Math.floor(random() * statedMs * 0.2)) : backoff;
-        onState({ source, state: "retrying", delayMs, ...extra });
+        delayMs = Math.floor(random() * backoff);
+        if (statedMs) delayMs = Math.max(delayMs, Math.min(maxRetryAfterMs, statedMs + Math.floor(random() * statedMs * 0.2)));
+        onState({ source, state: "retrying", delayMs, backoffMs: backoff, ...extra });
       }
       await sleep(delayMs, signal);
     }
@@ -1513,9 +1514,9 @@ function createEventReader({ open, validateHello }) {
           try {
             chunk = await readAbortable(reader, signal);
           } catch {
-            throw Object.assign(Error("Event stream interrupted"), { transient: !signal?.aborted });
+            throw Object.assign(Error("Event stream interrupted"), { transient: !signal?.aborted, streamClosed: true });
           }
-          if (chunk.done) throw Object.assign(Error("Event stream ended"), { transient: true });
+          if (chunk.done) throw Object.assign(Error("Event stream ended"), { transient: true, streamClosed: true });
           buffer = (buffer + decoder.decode(chunk.value, { stream: true })).replace(/\r\n/g, "\n");
           if (buffer.length > 1024 * 1024) throw Error("Event stream frame exceeded bound");
           continue;
