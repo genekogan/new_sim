@@ -60,6 +60,10 @@ test('radio: power and tuning knobs by hand, station cycle, refusal, interruptio
  await run('object:radio:switch-on','radio','on',true,'valve');
  const onRow=(await here()).objects.find(o=>o.id===id('radio'));assert.deepEqual(onRow?.state,{on:true,station:'quiet piano'},'on: the station in a few words');
  await run('object:tap:switch-on','tap','on',true,null);
+ // plain words the way a Soul says them resolve to the tuning knob of this radio
+ const words={};for(const w of ['change the station','change the radio station','tune the radio','change station on the radio','turn off the radio']){const r=await (await app.request('/v1/edge/resolve',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({capability:w,params:{}})})).json();words[w]=r.resolve?.would?.capability??r.resolve?.code??JSON.stringify(r).slice(0,200);}
+ for(const w of ['change the station','change the radio station','tune the radio','change station on the radio'])assert.equal(words[w],`object:${id('radio')}:change-station`,`"${w}": ${words[w]}`);
+ assert.equal(words['turn off the radio'],`object:${id('radio')}:switch-off`);
  const tuned=[];
  for(const want of ['dance band','evening talk','quiet piano','dance band']){const x=await run('object:radio:change-station','radio','station',want,'tuner');tuned.push(x);assert.equal(x.motion.hold,0.9,'the hand holds the tuning knob while it turns');}
  const nearOn=await here(),onRow2=nearOn.objects.find(o=>o.id===id('radio'));assert.deepEqual(onRow2?.state,{on:true,station:'dance band'});
@@ -72,7 +76,7 @@ test('radio: power and tuning knobs by hand, station cycle, refusal, interruptio
  const restored=WorldModel.fromSnapshot(JSON.parse(JSON.stringify(god.model.snapshot())),undefined,god.model.library);
  assert.equal(restored.get('radio').state.on,false);assert.equal(restored.get('radio').state.station,'dance band');assert.equal(restored.get('tap').state.on,true);
  assert.deepEqual(f.host.engine.runtime.violations,[]);
- const report={status:'pass',hereBytes:{absent:JSON.stringify(absent).length,distant100Radios:JSON.stringify(far).length,nearbyOff:JSON.stringify(near).length,nearbyOn:JSON.stringify(nearOn).length},rows:{off:row0,on:onRow2},standSpread:+spread.toFixed(3),results,
+ const report={status:'pass',plainWords:words,hereBytes:{absent:JSON.stringify(absent).length,distant100Radios:JSON.stringify(far).length,nearbyOff:JSON.stringify(near).length,nearbyOn:JSON.stringify(nearOn).length},rows:{off:row0,on:onRow2},standSpread:+spread.toFixed(3),results,
   checks:['off radio: switch-off and change-station refused','interruption before contact keeps it off','power knob for on/off, tuning knob for the station (hand target within 1 cm)','tuning hand holds 0.9 s','station cycles quiet piano > dance band > evening talk > quiet piano','one stand point for both knobs','no change before contact','radio and tap via the same hand contact','nearby: {on:false} / {on:true, station}','snapshot persistence (on, station)','core/radio@1 unchanged','100 distant radios (all on, mixed stations): no offers, +0 here bytes','zero native violations']};
  if(out){mkdirSync(out,{recursive:true});writeFileSync(`${out}/summary.json`,JSON.stringify(report,null,2));}console.log(JSON.stringify(report));
 });

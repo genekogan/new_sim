@@ -518,8 +518,9 @@ export function startSoundLayer() {
   setInterval(() => {
     if (!arrivalOver() || !document.querySelector('.world-scene canvas')) return;
     mountUi();
-    syncMusic({ on: musicOn(), volume: settings.volume * (pianoNear || jukeboxNear || radioNear ? 0.2 : 1), unlocked: !!ctx && ctx.state === 'running' });
+    // entry 37: the step first, so the playlist ducks in the same tick a radio (or piano, jukebox) becomes audible
     const host = w.__simEntity; if (host?.camera && host.layer) { const t0 = performance.now(); try { step(host); } catch { /* a world mid-reload */ } cost.ticks++; cost.tickMs += performance.now() - t0; }
+    syncMusic({ on: musicOn(), volume: settings.volume * (pianoNear || jukeboxNear || radioNear ? 0.2 : 1), unlocked: !!ctx && ctx.state === 'running' });
   }, TICK_MS);
 }
 startSoundLayer();
