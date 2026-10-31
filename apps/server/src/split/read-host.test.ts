@@ -131,7 +131,7 @@ test('read worker mode 2: here?view= is main\'s (body view answered by main\'s h
   // main: the real edge routes (as main.ts runs a forwarded job through its app)
   const app = new Hono();
   const comms = mountEdgeRoutes(app, {host: f.host, db: f.db, souls: f.souls, ledger: edge,
-    soul: c => {if (c.req.header('authorization') !== 'Bearer sim_mira') throw new EdgeError(401, 'unauthorized', 'test token'); return soul;}} as never);
+    soul: (c: {req: {header(name: string): string | undefined}}) => {if (c.req.header('authorization') !== 'Bearer sim_mira') throw new EdgeError(401, 'unauthorized', 'test token'); return soul;}} as never);
   const source = await deltaSource(f.host, edge, {SIM_READ_WORKER: '1'});
   const forwarded: string[] = [];
   const p = new ReadPool({workers: 1, mode: 2, worldPath: '/w/eden', init: source.init, ask: source.ask, writes: source.writes, world: {dbPath: path, worldId: f.host.worldId},
