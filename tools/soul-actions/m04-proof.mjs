@@ -19,8 +19,9 @@ function gesture(id,t){const h=hashId(id),out=[];
 const sample=()=>page.evaluate(()=>{const api=window.__simEntity,f=api?.contactFrame();if(!f)return null;const bodies=[];for(const [id,e]of Object.entries(f.entities)){const b=f.bones?.[id];if(!b)continue;bodies.push({id,p:e.p,yaw:e.yaw,activity:e.activity,hands:e.hands,frame:api.renderer?.info?.render?.frame??null,motion:e.state?.handActuator??null,bones:{activity:b.activity,walkW:b.walkW,hipY:b.hipY,feet:b.feet,head:b.head,pose:b.pose,variety:b.variety??null,arms:b.arms.map(a=>({side:a.side,palm:a.palm,target:a.target,err:a.err}))}});}let on=null;for(const e of api.layer.model.entities.values())if(e.name==='garden-tap')on=!!e.state.on;return {at:Date.now(),tick:f.tick,dt:f.dt,bodies,on};});
 const act=async(seat,words)=>{const start=Date.now(),tick=await page.evaluate(()=>window.__simEntity.depictedTick),r=await promisify(execFile)(process.execPath,['eden.mjs','act',words,'--wait','120','--json'],{cwd:scene+'/'+seat,timeout:180000}),result=JSON.parse(r.stdout);commands.push({seat,words,start,sentTick:tick,end:Date.now(),result});writeFileSync(out+'/commands.json',JSON.stringify(commands,null,2));assert.equal(result.accepted,true,JSON.stringify(result));assert.equal(result.receipt?.phase,'completed',JSON.stringify(result));return result;};
 const body=()=>samples.filter(Boolean).at(-1)?.bodies[0];
-/** Wait (≥ minMs) until the depicted body plays a hand gesture with ≥ 5 s left, at most maxMs; records what it waited for. */
-async function waitGesture(label,minMs,maxMs){await page.waitForTimeout(minMs);const t0=Date.now();while(Date.now()-t0<maxMs){const s=samples.filter(Boolean).at(-1);if(s&&s.bodies[0]){const g=gesture(s.bodies[0].id,s.tick*s.dt);if(g&&g.kind!=='Idle_LookAround_Loop'&&g.left>=5){marks.push({label,tick:s.tick,gesture:g});return g;}}await page.waitForTimeout(100);}marks.push({label,tick:samples.at(-1)?.tick,gesture:null,timeout:true});return null;}
+/** Wait (≥ minMs) until the depicted body holds a hand up in a gesture (a palm > 1.05 m above its feet; ≥ 2 s of the
+ *  gesture window left), at most maxMs; records what it waited for. */
+async function waitGesture(label,minMs,maxMs){await page.waitForTimeout(minMs);const t0=Date.now();while(Date.now()-t0<maxMs){const s=samples.filter(Boolean).at(-1);if(s&&s.bodies[0]){const g=gesture(s.bodies[0].id,s.tick*s.dt);const b=s.bodies[0],up=Math.max(...b.bones.arms.map(a=>a.palm[1]-b.p[1]));if(g&&g.kind!=='Idle_LookAround_Loop'&&g.left>=2&&up>1.05){marks.push({label,tick:s.tick,gesture:g,palmUp:up});return g;}}await page.waitForTimeout(100);}marks.push({label,tick:samples.at(-1)?.tick,gesture:null,timeout:true});return null;}
 try{
  await post('/v1/god/env',{timeOfDay:'15:30',timeScale:0,weather:{kind:'clear'}});
  await page.goto(base+(process.env.SOUL_M04_EYE??'/?eye=-1.6,2.1,-0.6&at=2.2,0.85,5.4'));await page.waitForFunction(()=>window.__simEntity?.contactFrame()?.bones&&Object.keys(window.__simEntity.contactFrame().bones).length>=1,null,{timeout:180000});
@@ -30,7 +31,7 @@ try{
  // the first walk starts out of a gesture too, when one is playing within 25 s
  await waitGesture('walk-start-1',3000,40000);
  await act('ada','turn on the garden tap');
- await waitGesture('reach-out-of-gesture',3500,75000);
+ await waitGesture('reach-out-of-gesture',3500,90000);
  await act('ada','turn off the garden tap');
  await waitGesture('walk-start-2',3500,60000);
  await act('ada',process.env.SOUL_M04_WALK??'walk to the garden deck');
