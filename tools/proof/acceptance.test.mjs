@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  checkPr, issueNumberFromPath, linkedIssues, loadChecks, parseAudit, parseChecklist, prMode, renderComment, sections, skeleton, validateProof, MARKER, SCHEMA,
+  checkPr, clipPreviews, issueNumberFromPath, linkedIssues, loadChecks, parseAudit, parseChecklist, prMode, renderComment, sections, skeleton, validateProof, MARKER, SCHEMA,
 } from './acceptance.mjs';
 
 const policy = loadChecks();
@@ -233,4 +233,18 @@ test('prMode: a T3 PR needs the maintainer\'s sign-off in proof-ok; T0-T2 do not
     assert.ok(!r.result.rows.some(x => x.name === 'maintainer sign-off'), files[0]);
     assert.ok(!r.result.problems.some(p => /maintainer sign-off/.test(p)), files[0]);
   }
+});
+
+test('the comment embeds each clip\'s preview, linked to the clip (proof.json first, else a GIF named after it)', () => {
+  const GIF = VIDEO.replace('.mp4', '.preview.gif');
+  assert.deepEqual(clipPreviews([VIDEO], [], { media: [{ url: VIDEO, preview: GIF }] }), [{ video: VIDEO, preview: GIF }]);
+  assert.deepEqual(clipPreviews([VIDEO], [VIDEO.replace('.mp4', '.preview-2.gif')]), [{ video: VIDEO, preview: VIDEO.replace('.mp4', '.preview-2.gif') }]);
+  assert.deepEqual(clipPreviews([VIDEO], ['https://h/other.preview.gif', 'https://h/pr-7.desktop.png']), [{ video: VIDEO, preview: null }]);
+  const r = checkPr({ body: body({ proof: `- clips: [![desktop](${GIF})](${VIDEO})` }), tier: 'T1', policy });
+  assert.deepEqual(r.clips[0], { video: VIDEO, preview: GIF });
+  assert.equal(r.clips[1].preview, null, 'the kept failed take has no preview');
+  const c = renderComment(r, { required: [] });
+  assert.ok(c.includes(`[![pr-7.desktop.mp4](${GIF})](${VIDEO})`), c);
+  const plain = renderComment(checkPr({ body: body(), tier: 'T1', policy }), { required: [] });
+  assert.match(plain, /\[pr-7\.desktop\.mp4\]\(.*\) \(no inline preview/);
 });

@@ -296,7 +296,21 @@ export function checkPr({ body = '', tier = 'T0', issueBody = null, proof = unde
     }
   }
   const uniq = [...new Set(problems)];
-  return { ok: uniq.length === 0, tier, checks: [...need], rows, problems: uniq, warnings: [...new Set(warnings)], checklist, links: { videos, images, proofJson: proofLinks } };
+  const clips = clipPreviews(videos, images, proof);
+  return { ok: uniq.length === 0, tier, checks: [...need], rows, problems: uniq, warnings: [...new Set(warnings)], checklist, links: { videos, images, proofJson: proofLinks }, clips };
+}
+
+/** Each clip with its inline preview (tools/proof/upload.mjs uploads `<clip>.preview.gif` beside it): from proof.json
+ *  `media[].preview`, else an image link in the PR named after the clip. GitHub serves release mp4s as downloads, so the
+ *  comment embeds the preview and links it to the clip. */
+export function clipPreviews(videos = [], images = [], proof = null) {
+  const media = Array.isArray(proof?.media) ? proof.media : [];
+  const stem = u => decodeURIComponent(String(u).split(/[?#]/)[0].split('/').pop() ?? '').replace(/\.[^.]+$/, '');
+  return videos.map(video => {
+    const fromProof = media.find(m => m?.url === video && typeof m.preview === 'string' && /^https:\/\//.test(m.preview))?.preview;
+    const s = stem(video), fromBody = images.find(i => /\.gif(\?|#|$)/i.test(i) && new RegExp(`^${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.preview(-\\d+)?$`).test(stem(i)));
+    return { video, preview: fromProof ?? fromBody ?? null };
+  });
 }
 
 /** The bot comment (updated in place by proof-check.yml). */
@@ -316,6 +330,12 @@ export function renderComment(result, { required = [], files = [], raisedByLabel
   }
   const { videos, images, proofJson } = result.links;
   out.push('', `Proof links: ${videos.length} video, ${images.length} image, ${proofJson.length ? 'proof.json linked' : 'no proof.json'}.`);
+  const clips = result.clips ?? [];
+  if (clips.length) {
+    const name = u => decodeURIComponent(String(u).split(/[?#]/)[0].split('/').pop());
+    out.push('', '**Clips** (a preview plays here; click it for the full, uncut clip):', '');
+    for (const c of clips) out.push(c.preview ? `[![${name(c.video)}](${c.preview})](${c.video})` : `- [${name(c.video)}](${c.video}) (no inline preview: \`tools/proof/upload.mjs\` makes one)`);
+  }
   if (result.problems.length) out.push('', '**To fix**', ...result.problems.map(p => `- ${p}`));
   if (result.warnings.length) out.push('', '**Warnings**', ...result.warnings.map(w => `- ${w}`));
   out.push('', '<sub>Updated on every edit, push, label and review. How to fill it: `.claude/skills/journal/SKILL.md`. T3-T4 also need the maintainer\'s sign-off (`tools/proof/gate.mjs`). A maintainer can waive with the `proof:waived` label.</sub>');
