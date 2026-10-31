@@ -1,7 +1,7 @@
-# Coordinated carrying (`carry`) — engine notes
+# Coordinated carrying (`carry`)
 
-Spec: SPEC.md §11, §13, §28 (long load around corner, reservation conflict,
-graceful cancellation). Code `viewer/engine/carry/`; tests `engine/test/carry.test.ts`.
+Spec: [spec.md](spec.md) §11, §13, §28 (long load around a corner, reservation conflict, graceful cancellation).
+Code: `engine/carry/`; tests: `engine/test/carry.test.ts`, `carry-stairs.test.ts`.
 
 ## Modules
 | File | Role |
@@ -14,6 +14,7 @@ graceful cancellation). Code `viewer/engine/carry/`; tests `engine/test/carry.te
 | `invariants.ts` | `carryIntegrity` end-of-tick invariant (`CARRY_INVARIANTS`) |
 | `climb.ts` | Between levels: flight traversal geometry (tilted load, lateral offsets), step-profile clearance |
 | `scenes.ts` | Carry proving scene: yard + 2.5 m L corridor (A), yard + 1.5 m L corridor + far yard (B) |
+| `fragile.ts`, `fixture.ts` | Fragile-load tilt rules ([construction.md](construction.md#solar-and-paint)); carrying fixtures |
 
 ## Formation model
 - Frame: SE(2) pose `(x, z, θ)`; origin = load centre on the ground, +along = the
@@ -107,7 +108,7 @@ graceful cancellation). Code `viewer/engine/carry/`; tests `engine/test/carry.te
   `staged`, support `ground`), **release** (0.4 s).
 - Construction mid-carry: on a spatial epoch change the rest of the trajectory
   is re-checked; if blocked the action reports `blocked` / `carry.route-blocked`
-  and the crew holds the load (no replan yet).
+  and the crew holds the load (see Persistent waits for the one bounded retry).
 - Cancellation: gather → immediate. Lift → deferred: the load is lowered back
   onto its original pose. Move → if the laid footprint at the current pose is
   clear, deferred controlled set-down there (record ends `cancelled`), else
@@ -136,21 +137,19 @@ are exactly the set gripping it (`carry.support`); while the crew's activity is
 `carry` (not lifting/setting down), every carrier is within 0.05 m of its
 slot-derived spot (`carry.grip-drift`) and the load's disc cover clears static geometry (`carry.load-static`).
 
-## Shared-file edits (additive)
-- `actions/types.ts`: `CancelResult` gains `deferred?: boolean`.
-- `runtime/runtime.ts`: a deferred cancel marks the live action `cancelling`
-  (emits phase `cancelling`); its later `completed` is recorded as `cancelled`.
+## Deferred cancellation
+`CancelResult.deferred` (`actions/types.ts`) marks the live action `cancelling` (phase `cancelling`); its later
+`completed` is recorded as `cancelled`.
 
-## Measured (M-series laptop, Node 22)
+## Behaviour on the carry scene
+
 | Case | Result |
 | --- | --- |
-| 12 ft beam, 2 people, 2.5 m L corridor (19.5 m, 90° turn) | planner 10 ms, 53 expansions; submit incl. approach walks 45–46 ms; 32.6 s simulated (gather 3.4, lift 1.2, move 26.5, set-down 1.2, release 0.4); 0 violations; exact SAT audit finds no wall overlap; reach error ≤ 0.05 m |
-| 19 ft upright, 4 people, 1.5 m corridor | rejected `carry.clearance` in ~60 ms (5.3 k poses); the 4 people walk the corridor individually |
-| 19 ft upright, 4 people, 2.5 m corridor | straight run accepted; around the corner rejected `carry.clearance` in ~65 ms |
-| 12 ft beam, 2 people, 1.5 m corridor | fits straight, cannot turn the corner (~110 ms) |
+| 12 ft beam, 2 people, 2.5 m L corridor (19.5 m, 90° turn) | planned in about 10 ms; 0 violations; exact SAT audit finds no wall overlap |
+| 19 ft upright, 4 people, 1.5 m corridor | refused `carry.clearance`; the 4 people could walk it individually |
+| 19 ft upright, 4 people, 2.5 m corridor | straight run accepted; around the corner refused `carry.clearance` |
+| 12 ft beam, 2 people, 1.5 m corridor | fits straight, cannot turn the corner |
 | Determinism | identical final state hash across runs |
-
-<sub>Submit timing re-measured 2026-09-27 (two runs) with `cd viewer && node --test --test-name-pattern="12 ft beam around the L corner" engine/test/carry.test.ts` (prints `plan+validate`); other rows not re-measured.</sub>
 
 ## Known limitations
 - Loads stay level on floors (they tilt only along a flight, see *Between levels*): no tilting a
@@ -162,22 +161,14 @@ slot-derived spot (`carry.grip-drift`) and the load's disc cover clears static g
 - Height is only the 0.22–1.8 m body band: overhead obstacles below 1.8 m
   block, low obstacles (< 0.22 m) are ignored while moving (they only matter
   for set-down, checked exactly).
-- Route blocked mid-carry → hold and wait; no replanning yet.
+- Route blocked mid-carry → hold and wait, with at most one bounded retry per episode.
 - Lift/set-down interpolate Euler angles (visual only; e.g. plywood tilting
   from flat to edge); no ground-contact modelling during the tilt.
-- `walk_to` issues seen (not changed here): `face` oscillates with turn-in-place
-  (gather turns carriers itself); two walkers arriving close can deadlock.
 
 
-### Persistent gather and formation waits (LM-024)
+## Persistent waits
 
-Carry waits participate in the mover graph described in [MOVEMENT](MOVEMENT.md#persistent-waits-and-bounded-recovery-lm-024-staged).
-Each gathering walker remains a distinct node even though they share the carry
-action id. Recovery addresses that sub-walker directly; it never uses the
-shared-id `walkExecs` lookup to select a crew member. A stopped floor formation
-can request one existing augmented-grid retry per unchanged episode, with planner
-budget admission. Unsupported phases explicitly refuse recovery. A parent is
-never certified quiescent while a gathering member is still approaching; early
-blocked results preserve live held support and cannot be committed by execute.
-The checked physical fixtures and conservative remaining cases are in
-[the recovery report](briefs/deadlock-recovery.REPORT.md).
+Carry waits join the mover graph described in [movement.md](movement.md#persistent-waits-and-bounded-recovery). Each
+gathering walker is its own node; recovery addresses that walker directly. A stopped floor formation may request one
+augmented-grid retry per unchanged episode within the planner budget. A parent is never certified quiescent while a
+member is still approaching, and an early blocked result keeps its held support and cannot be committed.

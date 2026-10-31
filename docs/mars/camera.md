@@ -1,8 +1,9 @@
-# Camera and cinematography layer (`viewer/engine/camera/`)
+# Camera and cinematography (`engine/camera/`)
 
 This is pure, deterministic TypeScript with no three.js, DOM, wall-clock or randomness.
 Cameras **only read** the world and the spatial scene. A camera track is a separate
-object that points at a take by id, so re-shooting a take can never change it (SPEC §18, §21, §28; `RESEARCH.md` §9).
+object that points at a take by id, so re-shooting a take can never change it ([spec.md](spec.md) §18, §21, §28).
+Typed direction from words and self-correction: [camera-direction.md](camera-direction.md).
 
 ## Model
 
@@ -138,7 +139,6 @@ it or fly through it. A frosted-glass policy makes it occlude too (tested).
 | Framing (`camera-framing`) | A bystander in front lowers readability and the planner swings; behind the subject or as its carrier it does not. Orbiting a lying 3.66 m frame at 8 m keeps every corner in frame (≥ 0.8, never "too small"). A 0.17 safe area keeps a tight group's feet above the band. |
 | Perf | A 60 s track at 10 Hz with 3 subjects plans in about 60–80 ms (budget 1 s). |
 
-<sub>Perf row re-checked 2026-09-27: 69 ms, via `cd viewer && node --test --test-name-pattern="perf" engine/test/camera-replay.test.ts` (camera.test.ts has no perf test).</sub>
 
 ## Limitations and next steps
 - **Visibility uses obstacle prisms only.** It is not the full-resolution render mesh: beams,
@@ -163,58 +163,23 @@ it or fly through it. A frosted-glass policy makes it occlude too (tested).
   the top toolbars cover ~0.18 — not modelled); the track stores it as `data.safeArea`, and the studio applies stored
   poses as-is, so restyling that bar means re-recording with a matching fraction.
 
-## Campus take + studio replay (2026-09-27)
-`node deploy/record-campus-take.mjs` rehearses the flagship on a fork of Mars 2026 (as `campus-flagship.test.ts`),
-plans a 10-shot list with `planShotList` + `takeSampler` against the ±40 m campus crop plus the finished bay as
-collision-only obstacles (`component: {collide, !occlude}`), and writes `public/engine/takes/flagship-campus-2026.json`
-(`mars-take-replay/1`: take + camera track + step timeline + moments; 1.39 MB, gzip 235 KB — take 448 KB, camera 938 KB,
-so no thinning was needed) and `manifest.json`. `--check` re-records and compares. Result (people as occluders, safe
-area 0.17, `cutCost` 2.5 s, raise orbit on `A` + its crew; take `c531eaf4…`): 5976 samples at 10 Hz, 14 cuts (9 shot
-boundaries + 5 that dodge passing crews; raise orbit 3 → 2), 0 invalid, 0 crossings, readability min 0.67 / mean 0.97.
-The previous camera code on the same take (12 cuts) scores min 0.24, 84 samples < 0.6, under the new evaluator. The studio (`/studio`, 2026) replays it via "Replay take"
-(`app/engine-view/take-replay.ts`, `app/studio/take-{host,panel}`); the camera track only drives the view when "Engine
-camera" is on, and the take's poses at any t are identical either way (`e2e/studio-take.spec.ts`).
+## Recorded takes and chapter shot lists
 
-**Parts as occluders (2026-09-27):** re-planned on the same take (`c531eaf4…`, world unchanged): 16 cuts (was 14),
-readability min 0.60 / mean 0.95 (was 0.67 / 0.97 under the looser model), 0 invalid; the track now stores
-`data.subjects` (scored ids per sample + points when they change, `subjectReader`), payload 1.70 MB (limit raised to 2 MB).
+`node deploy/record-campus-take.mjs` rehearses a scenario, plans its shot list with `planShotList` + `takeSampler`,
+and writes a `mars-take-replay/1` file (take + camera track + step timeline + moments) and the takes manifest;
+`--check` re-records and compares. Cameras are planned from an exact re-run (1 mm tracks) and attached to the shipped
+take id. Finished parts can be passed as collision-only obstacles. The studio replays the file
+([studio-replay.md](studio-replay.md)); the camera track drives the view only when "Engine camera" is on, and the
+take's poses are identical either way (`e2e/studio-take.spec.ts`).
 
-## Verified against the render mesh (2026-09-27, `CAMERA_VERIFY.md`)
-`window.__marsStudio.verifyCamera(fromT, toT, hz)` (`app/studio/camera-verify.ts`; e2e `camera-verify.spec.ts`)
-ray-casts each planned pose's subject points against the rendered GLB, take parts and skinned people. Flagship take @
-2 Hz: meanPlanner 0.973 vs meanReal 0.942, 0 samples hidden by the real mesh (planner ≥ 0.8, real ≤ 0.3), 9
-over-conservative (bystander capsules). The gaps are take parts (not occluders here) and crew bodies (exempt), worst on
-"wide on the deck" (475–478 s: p3/p4 under the seated sheets, upright A's posts). Static campus never disagrees on
-this take. After per-tick part occluders, contact-only crew exemption and 0.2 m capsules: meanReal 0.963, maxAbsDiff 0.20,
-1 sample differing by ≥ 0.2 (was 40).
+Long build takes get their shot list from the take itself (`chapter-shots.ts`, `chapterShots(opts)`, pure): an activity
+grid per person and camera sample; a ranking of telling steps (work at the structure above carries and fetching); a shot
+on the most telling step in progress with its working actors, ending on the next telling step, after a maximum
+length, when the group splits or goes idle; a periodic wide establishing shot; candidate angles rated by
+readability, with shots under 0.6 split or reframed. `shotActivityReport` audits mid-chapter wides and idle stretches.
+Tested in `camera-chapter-shots.test.ts`.
 
-## Chapter shot lists (W39, `chapter-shots.ts`)
-The long year-build chapter takes (the 2022 east-house A+B: 13–98 min each) get their shot list from the take itself,
-not from a fixed rhythm. `chapterShots(opts)` is pure and deterministic (core/math, sorted iteration); the recorder
-(`deploy/record-campus-take.mjs` `chapterSpec`) calls it with the take, its step timeline, the plan steps (for each
-step's actors: the crew ids in its bound params), the house footprint, the yard region and a `rate` function.
-- **Activity grid** (`activityGrid`): per person, per camera sample (0.5 Hz), working = a recorded `activity` other than
-  `idle` / `wait` at any tick of the sample; plus the feet position.
-- **Telling steps** (`STEP_INTEREST`): work at the house (raise, pass-up, wall, stringer, tread, rail, panel) 5, beams
-  4, climbing / holding 3, a cut at the station 3, carries and fetching 1; the first of each kind in the chapter +2.
-- **Shots.** At each cut: the most telling step in progress (or starting within 6 s) whose actors work now; its working
-  actors plus anyone working within 6 m of them. The shot ends at the next telling step after 40 s (`event`), after 90 s
-  (`long`), when one of them is 9 m from the group's centre (`apart`; a group that parts within 12 s drops its farthest
-  member instead), or 12 s after all of them went idle while someone else works (`idle`). Nobody working anywhere: a
-  wide of the house. Every 5 min the next cut is a **wide from the yard side** (establishing over the piles, the
-  cutting station and the house, alternately ±25° off the house→yard line), 12 s.
-- **Angles.** The group is framed from outside the house on its side (the line from the house centre to the group),
-  low for people on the ground (10°), higher on the decks. Candidates: ±30°, 0°, ±65°, ±105°, ±145°, 180° off that line
-  (a repeat of the same group starts at ±65°: no jump cut) at the preferred height, 10°, 5°, 22° and +15°. With `rate`
-  (`shotRater`: the desired pose every sample of the shot, 0 if the camera position is invalid, else `readability` of
-  the subjects; the minimum) the first candidate rated ≥ 0.8 wins, else the best. A shot whose best is < 0.6 is split in
-  two (≥ 12 s each) and each half chooses again; if a piece still reads < 0.6, the most readable one of its people (or
-  someone working elsewhere) who works ≥ half the piece is framed alone, else the house wide. Identical consecutive
-  shots merge (no cut to the same frame). `planShotList` then plans the list as for every take.
-- **Moments** (the studio's jump buttons): the first of each named telling step — "first raise", "first beam",
-  "first hand-up", "first relay" (a beam by its label), "first cut", "first pass-up", "first stringer", "first tread",
-  "first post", "first wall", "first rail", "first panel", "up the frame" — at most four, plus `done`. They replace
-  W31's generic `work` / `middle` / `done`.
-- **Audit** (`shotActivityReport`, any shot list, also W31's): mid-chapter wides and the longest gap between them,
-  frameGroup mean / max length, stretches > 20 s in which every framed person is idle while someone else works.
-  `camera-chapter-shots.test.ts` checks the mechanism on a hand-made take and the shipped chapter cameras.
+## Render-side verification
+
+`window.__marsStudio.verifyCamera(fromT, toT, hz)` (`app/studio/camera-verify.ts`) ray-casts each planned pose's
+subject points against the meshes the studio actually draws. See [camera-direction.md](camera-direction.md#render-side-verification).

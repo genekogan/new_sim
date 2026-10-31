@@ -1,38 +1,38 @@
-# Mars College campus — reconstruction and modular design
+# mars/ — the Mars world engine
 
-Private, local project. Source media is never modified. Generated datasets, intermediate models, and validation evidence live at `../../docs/media/reconstruction/2026-campus/`.
+A vendored, deterministic world and activity engine (pure TypeScript, fixed 1/20 s tick) with a three.js viewer, built
+for a model of a desert campus and its pallet-rack buildings. Sim runs it behind the engine contract through
+`packages/engine-mars` (`ENGINE=mars`). It is slated for deprecation: useful parts are being generalized into Sim.
 
-## Objective
-Reconstruct the built campus from actual overlapping drone images, preserve observation provenance, and evaluate against images withheld from reconstruction. Do not invent unobserved structures or call an unconstrained model survey accurate.
+Docs: [../docs/mars/README.md](../docs/mars/README.md). Invariants and test commands: [AGENTS.md](AGENTS.md).
 
-The photogrammetric meshes are the reference layer, not the final design tool. An editable first-pass campus replica is now saved and available at `/studio`, with a nominal component library, source textures and interior evidence. Its dimensions and hidden interiors remain provisional. A separate 2027 workspace and verified inventory will follow. See [MODULAR_STATUS.md](MODULAR_STATUS.md). See [ROADMAP.md](ROADMAP.md) and [components/catalog.json](components/catalog.json).
+## Layout
 
-## Working method
-1. Search the existing media catalog, probe candidates, and inspect temporal storyboards.
-2. Group footage by capture date and campus state. Exclude dismantling, night scenes, unrelated footage, duplicates, and edited historical clips from the built-campus solve.
-3. Begin with the March 23 4K orbit. Keep camera samples and geometry from native Apple RealityKit photogrammetry; independently solve sparse geometry with COLMAP for diagnostics.
-4. Add compatible wide/overhead views after evaluating change and registration.
-5. Export the textured mesh to GLB and retain USDZ plus original reconstruction data.
-6. Compare renders to held-out source frames. Report holes, thin-structure losses, registration residuals, and scale uncertainty.
-7. View locally in Three.js. No publication or upload of private archive media.
+| Path | Contents |
+| --- | --- |
+| `viewer/engine/` | The engine: runtime, world model, spatial planning, verbs, sequences, takes, camera ([engine guide](../docs/mars/engine-guide.md)) |
+| `viewer/app/` | React + three.js app: `/studio` (campus scenes by year, take replay), `/lab` (live engine sandbox) |
+| `viewer/simulation/` | Cloudflare Worker + Durable Object host with MCP tools ([README](viewer/simulation/README.md)) |
+| `viewer/cinematography/` | Autonomous activity camera ([README](viewer/cinematography/README.md)) |
+| `viewer/e2e/` | Playwright browser tests and visual baselines ([README](viewer/e2e/README.md)) |
+| `viewer/deploy/` | Build, gate, take recording, scene extraction and other Node tools |
+| `viewer/public/engine/` | Generated campus scenes (`campus-<year>.json`) |
+| `components/catalog.json` | Nominal stock dimensions of the rack building components |
+| `scripts/` | Python/Blender asset-preparation scripts; they expect source media that is not in this repository |
 
-## Commands
-- `python3 scripts/inventory.py`: metadata + contact sheets
-- `python3 scripts/storyboards.py`: temporal review sheets
-- `swiftc -parse-as-library scripts/reconstruct.swift -o scripts/reconstruct`: native local photogrammetry
-- `scripts/reconstruct IMAGE_FOLDER OUTPUT_FOLDER`: textured USDZ, camera poses, sparse cloud
+## Run
 
-## Interpretation
-Video photogrammetry can recover visible exterior geometry. It cannot establish hidden interiors, fine dimensions, or absolute scale without independent constraints. A low pixel residual is an image-consistency diagnostic, not a centimetre accuracy certificate.
+```sh
+pnpm install
+pnpm --filter mars-campus-viewer dev     # Vite dev server: /studio, /lab
+pnpm test:mars                           # engine tests
+```
 
-## Open the local viewer
-Run `./scripts/start_viewer.sh`, then open http://localhost:4326/studio for the component model or http://localhost:4326/ for aerial references.
-The `viewer/public/data` symlink points to the canonical generated deliverables. No archive images are uploaded. The server binds to loopback only.
+3D models and other media are not stored in git; they are served from assets.eden.art. The building names used in the
+scenes (Chiba and the other assemblies) are scene data.
 
-## Files
-- `docs/media/reconstruction/2026-campus/inventory/SOURCE_REVIEW.md` (under the Mars root): dated source-selection audit.
-- `docs/media/reconstruction/2026-campus/deliverable/`: browser assets, GLB meshes, packed Blender projects, and report.
-- `docs/media/reconstruction/2026-campus/models/`: original USDZ reconstructions, camera poses, sparse clouds, and independent COLMAP solutions.
-- `docs/media/reconstruction/2026-campus/validation/`: withheld photographs, calibrated renders, and diagnostic residuals.
+## Credits
 
-The two dated reconstructions are separate observations of a changing campus, with separate coordinate systems. Do not superimpose their movable objects or use the files as construction drawings.
+- People: Quaternius animated characters, CC0.
+- Electric unicycle: Thingiverse model 3001166 by Qwertzu1029, CC BY 4.0 (assembled, scaled and recoloured).
+- Retro computer and monitor: JasperTobias on Sketchfab, CC BY 4.0 (`viewer/public/models/retro-computer-monitor.credit.json`).

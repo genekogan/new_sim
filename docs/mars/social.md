@@ -1,10 +1,10 @@
-# Social / inhabited-scene vocabulary (spec §17, milestone H)
+# Social vocabulary: seats, groups, pre-emption
 
-First pass at people *living* on campus, built on the same action runtime as walking and
-construction. Code: `viewer/engine/social/` (`slots.ts`, `actions.ts`, `ambient.ts`); tests:
-`viewer/engine/test/social.test.ts`; verbs are in the one registry (`api/registry.ts`).
+People living in a place, on the same action runtime as walking and construction ([spec.md](spec.md) §17).
+Code: `engine/social/` (`slots.ts`, `actions.ts`, `ambient.ts`); tests:
+`engine/test/social.test.ts`; verbs are in the one registry (`api/registry.ts`).
 
-## Interaction slots (Smart Object claims, RESEARCH §8)
+## Interaction slots (smart-object claims)
 A `Slot { id, owner, kind: seat|stand|audience|fire-circle, p, yaw, level, claimedBy? }` is a
 place a body occupies, facing `yaw`. Slots are **derived, never stored**:
 - **Fixtures** whose catalog def lists `slots` (`world/catalog.ts` `SlotDef`, local x/z + yaw):
@@ -19,7 +19,7 @@ place a body occupies, facing `yaw`. Slots are **derived, never stored**:
   the full grid so they stay stable when a point drops out.
 
 A claim is a runtime reservation on `slot:<id>` (exclusive), so two actions can never own one
-seat (spec §28 "Reservation conflict"); `claimedBy` is read back from `rt.holder`. A slot is
+seat ([spec.md](spec.md) §28 "Reservation conflict"); `claimedBy` is read back from `rt.holder`. A slot is
 *free* when unclaimed **and** nobody's body is on it (`occupantOf`). Assignment for groups is
 deterministic nearest-first (all actor×slot pairs sorted by distance, ties by list order).
 
@@ -48,7 +48,7 @@ back to the approach point, then idle; the action ends `cancelled` and the seat 
 the body is off the seat. `stand` completes when that stand-up has finished.
 
 Invariant exemption (`runtime/invariants.ts` `SEATED_ACTIVITIES`): like `climb-*`, a person whose
-activity is `sit`, `sit-down` or `stand-up` (or the item overlays `eat` / `serve`, ITEMS.md) is exempt from `collision.human-static` — the seated
+activity is `sit`, `sit-down` or `stand-up` (or the item overlays `eat` / `serve`, [items.md](items.md)) is exempt from `collision.human-static` — the seated
 body is inside its own chair's footprint by design. The exemption is by activity, so it relies on
 the social verbs only setting those activities on a seat or its approach line.
 
@@ -72,7 +72,7 @@ seated person, who first stands up to the approach point (0.6 s deferred stop, a
 | `gather` | `actors, region \| fixture, activity?` | one child `take_slot` per assigned person; people left over get a child that fails `slot.none-free` naming the owner. Ends when all children end |
 | `campfire_circle` | `actors, fire` | gather on the fire's fire-circle slots, activity `warm`; `campfire.not-a-fire` otherwise |
 | `ambient_wander` | `actors, region, seed?, duration?` | background strolls (below) |
-| `eat` (ITEMS.md) | `actor, bowl, spoon, cycles?` | overlay — no `actor:` claim, so it runs inside `sit` / `take_slot` / `gather` / `converse`: activity `eat`, `human.baseActivity` = the group's activity (`sit`, `talk`, …), 2.4 s spoon cycles with per-tick `human.hands` until the bowl is empty; `eat.not-still` while walking / transitioning. `take_item` / `put_item` / `serve` are in ITEMS.md |
+| `eat` ([items.md](items.md)) | `actor, bowl, spoon, cycles?` | overlay — no `actor:` claim, so it runs inside `sit` / `take_slot` / `gather` / `converse`: activity `eat`, `human.baseActivity` = the group's activity (`sit`, `talk`, …), 2.4 s spoon cycles with per-tick `human.hands` until the bowl is empty; `eat.not-still` while walking / transitioning. `take_item` / `put_item` / `serve`: [items.md](items.md) |
 
 ## Ambient autonomy
 `ambient_wander` **reserves nothing**. Each tick, in list order, an idle unclaimed person whose
@@ -88,7 +88,7 @@ Manual cancellation of an ambient walk and unrecorded foreign ownership still re
 that person permanently; `walk.ts` make-way nudges are transient and do not count. Cancel stops new walks; in-flight walks
 are cancelled by the runtime (people stop in place).
 
-## Pre-emption (spec §17): directed tasks release social holds automatically
+## Pre-emption: directed tasks release social holds
 Explicit director commands outrank social life. A social action owns its people's `actor:<id>`
 reservations; every social verb declares a `yieldTo` hook (`actions/types.ts` `ActionDef.yieldTo`),
 and `Runtime.submit` uses it:
@@ -124,9 +124,7 @@ and `Runtime.submit` uses it:
   `rt.submit(verb, params, { preempt: false })`.
 
 `releaseForDirective(rt, actor, reason?)` does the same release by hand; `socialHolder(rt, actor)` reports
-which social action owns someone. **Hash safety:** nothing new runs unless a live action has `yieldTo`
-(fast path), and no pinned scenario submits a directive for a socially held person (perf-walk 5/5 and the
-year-build first bay unchanged).
+which social action owns someone. **Hash safety:** nothing new runs unless a live action has `yieldTo` (fast path).
 
 ## Tests (`engine/test/social.test.ts`)
 Registry wiring; catalog slot geometry; two sitters on one camp-chair (conflict / none-free /
@@ -153,10 +151,7 @@ refused; determinism (hash + event log).
   walk yield/replan, not fail at plan time.
 - The seated exemption is by activity (`SEATED_ACTIVITIES`), not per fixture.
 - No conversation turn-taking, gaze or gestures. A formed group can now retain two members and rejoin a returning member (below).
-- **Resumption is staged:** occupied standalone `sit` / seated `take_slot` holds return to their exact
-  slot after a successful directive (see below). Formed conversations retain remaining
-  members and return a directed member; group-owned fixture seats do not yet resume.
-  Ambient re-adoption follows the successful-directive rules above. An `eat` / `serve` overlay (ITEMS.md)
+- Resumption after a directive is covered below; group-owned fixture seats do not resume. An `eat` / `serve` overlay
   on a pre-empted sitter is not released by pre-emption (it holds hands, not the actor): it fails
   `eat.not-still` as soon as the stand-up moves them, and a directive that needs free hands is then
   refused at its plan (`actor.holding`) while they still hold the bowl.
@@ -167,91 +162,26 @@ refused; determinism (hash + event log).
   standing Idle pose (no gestures or gaze).
 
 
-## Exact-seat return after a directive (LM-026 stage 1)
+## Resumption after a directive
 
-An occupied standalone `sit` or seated `take_slot` records its resolved slot and
-activity before yielding. Once the pre-empting directive completes successfully,
-the runtime submits a new social action for that exact slot with pre-emption
-disabled. The actor walks back through ordinary planning and seat reservations;
-the old cancelled action stays cancelled. If a child pre-empts the seat, return
-waits for the outer directive to finish, so it cannot interrupt sibling work.
+Pending return intents are plain data (`services.socialReturns`, conversation and ambient execs), captured by the
+snapshot graph and absent when unused. One return attempt is made per release, marked `social.resume-started`,
+`social.resume-refused` or `social.resume-skipped`.
 
-A failed or cancelled directive skips returning and leaves the actor at its
-stopping position. Any newer explicit actor-reserving command (including a
-refused command, or `stand`) supersedes the pending return; children of the
-original directive do not. Autonomous make-way and social-child activity do not
-supersede it. Occupied, deleted or unreachable seats and held actors are refused
-by normal admission; the runtime never steals a seat or releases a load to sit.
-One attempt is made, with `social.resume-started`, `social.resume-refused`, or
-`social.resume-skipped` marks recording the result and source/directive ids.
-
-Pending intents are plain-data `services.socialReturns`, captured by the existing
-snapshot graph and absent when unused. Queue-free version-1 snapshots restore
-without inventing any return. A pending return during a resumable walk survives
-pause/resume and emits exactly one identical continuation. A waiting directive during stand-up also survives pause/resume, including cancellation
-and newer-directive controls (LM-029). Returned seats are
-ordinary indefinite social holds: `runUntilIdle` over all actions does not treat
-an occupied seat as idle; use the directive id when waiting only for its work.
-
-The LM-026 conversation acceptance now has focused proof below; return to
-parent-owned group fixture seats remains separate. Integrated gate/visual proof is pending. LM-027 ambient re-adoption and LM-028
-item-overlay release are unchanged. See `briefs/social-resume.REPORT.md`.
-
-
-Waiting directives use an optional version-1 graph `waiting` array (id, params,
-parent, holds); an absent array restores the original empty queue. Definitions
-come from the restore registry, while action-record and parameter aliases remain
-in the graph. Restore refuses invalid/missing/cyclic provenance, unknown verbs,
-invalid parameters, duplicate wait ids and reservations already owned by a waiting
-intent. `allowDrop` cannot discard a waiting intent's hold or parent chain
-(`snapshot.waiting-dependency`). A pending carry is only plain, unstarted intent;
-once it starts, its existing live-state codec refusal still applies. No live verb
-was added to the resumable set. See `briefs/preempt-snapshot.REPORT.md`.
-
-Restore also requires every requested/pre-empting record to have its waiting entry.
-Social-return data is constrained to the original standalone sit/take_slot action,
-actor, slot/owner and activity, with occupied/pre-emption history and an existing
-top-level directive. Corrupt return queues fail `snapshot.return-invalid`; they
-cannot inject arbitrary registered verbs. This validates graph consistency, not
-snapshot authenticity (see the report for auto-selected local-slot limitations).
-
-
-## Conversation member return (LM-026)
-
-A directed instruction can release members of a formed conversation if at least two
-remain. The runtime previews every conflicting reservation before releasing any
-new member. Only the directed members' actor claims are removed; others keep talking
-at their original positions with their original ownership. No group movement or
-teleportation is needed. Two-person and still-gathering conversations retain their
-previous whole-group cancellation behavior. The manual `releaseForDirective` helper
-remains an explicit cancellation helper, without an automatic return directive.
-
-The group records a plain departure intent for each member and original circle
-station. After the outer directive completes successfully, a normal non-preempting
-child `walk_to` returns the person to that station. Only after that walk completes
-and clearance, held-load and ownership checks pass does the group reclaim the actor.
-Walk arrival tolerance remains unchanged (5 cm); no pose is assigned by rejoining.
-Failed/cancelled/newer directives, ended groups, missing actors, occupied stations,
-unreachable paths or held loads refuse/skip return with `converse.return-refused`.
-New explicit instructions supersede a pending or walking return even if the new
-instruction later refuses. Original directive child work does not supersede it.
-Finite group duration cancels unfinished return walks before completion.
-
-Departure and retired-member state lives in the conversation exec, not the world.
-Snapshot validation requires its member partition, original stations, directive and
-walk-child provenance; omitted/duplicate/corrupt entries refuse with
-`snapshot.converse-return-invalid`. Before-departure and during-return snapshots
-continue with identical world hashes every tick and identical event suffixes.
-See `briefs/converse-return.REPORT.md` for focused proof and remaining limitations.
-
-
-Ambient snapshots now use the verified default graph codec: per-member pauses,
-child-record aliases, deterministic RNG and optional return intents continue exactly.
-Four tested pause points cover ordinary walks, initial pause, waiting for directed work,
-and the accepted return walk. A pending-state marker makes an omitted return payload
-refuse rather than silently drop the intent; member/child/directive provenance checks
-use `snapshot.ambient-invalid`. No closures or new snapshot format are introduced.
-Target selection and RNG draws are unchanged without pre-emption. Return admission
-is bounded: no eligible target or a failed route gives a named `ambient.return-skipped`
-mark instead of forcing relocation. An admitted physical walk marks `ambient.readopted`;
-it still has to finish its normal collision-checked path. See `briefs/ambient-return.REPORT.md`.
+- **Seats.** An occupied standalone `sit` or seated `take_slot` records its slot and activity before yielding. After the
+  directive completes successfully, the runtime submits a new non-preempting social action for that exact slot; the
+  actor walks back through ordinary planning and reservations. A failed or cancelled directive, or any newer explicit
+  command for the actor, skips the return. Occupied, deleted or unreachable seats and held actors are refused by normal
+  admission; the runtime never steals a seat or releases a load to sit. Group-owned fixture seats do not resume.
+- **Conversations.** A directive may release members of a formed conversation while at least two remain; the others keep
+  talking in place. The group records each departing member's station; after the directive succeeds, an ordinary
+  non-preempting `walk_to` returns them, and only then does the group reclaim the actor. Refusals:
+  `converse.return-refused`.
+- **Ambient.** After a successful directive, a still-live `ambient_wander` may re-adopt an eligible person through a
+  normal walk to its region (`ambient.readopted`), or skip with `ambient.return-skipped`.
+- **Snapshots.** Waiting directives are stored as unstarted intent in the graph's `waiting` array. Restore validates
+  provenance, parameters and reservations and refuses corrupt return data (`snapshot.waiting-dependency`,
+  `snapshot.return-invalid`, `snapshot.converse-return-invalid`, `snapshot.ambient-invalid`). Before-departure and
+  during-return snapshots continue with identical world hashes.
+- Returned seats are ordinary indefinite holds: `runUntilIdle` over all actions does not treat an occupied seat as idle;
+  wait on the directive id instead.

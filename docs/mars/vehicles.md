@@ -1,6 +1,6 @@
-# Vehicles: EUC and bicycle riders (spec §10, §17)
+# Vehicles: EUC, bicycle and forklift
 
-Code: `viewer/engine/vehicles/` (`profiles.ts`, `curve.ts`, `actions.ts`, `invariants.ts`).
+Spec: [spec.md](spec.md) §10, §12, §17. Code: `engine/vehicles/` (`profiles.ts`, `curve.ts`, `actions.ts`, `invariants.ts`).
 Tests: `engine/test/vehicles.test.ts`. The verbs and invariants are registered in `api/registry.ts`.
 
 ## Model
@@ -130,10 +130,9 @@ obstacles in the grids, as before), so single-vehicle scenes run the old code pa
   other's braking); yield zones use the yielder's `reach` disc, so a long vehicle (a bicycle, a loaded
   forklift) keeps more than 1 m on its narrow side; the forklift's reach / side-shift / fork-raise
   steps are not checked against other vehicles (only its square-up and creep), and the empty fork
-  height is assumed ≤ 0.45 m. A physical three-EUC cycle is now detected and safely reported
-  blocked (proof below); this is not a general deadlock-freedom guarantee. Invalid overlap tests
-  deliberately inject corruption after `edit_world` refuses it; legitimate parked vehicle setup
-  uses the public edit path (LM-005).
+  height is assumed ≤ 0.45 m. A physical three-EUC cycle is detected and reported blocked; this is not a general
+  deadlock-freedom guarantee. Invalid-overlap tests inject corruption after `edit_world` refuses it; legitimate
+  parked-vehicle setup uses the public edit path.
 
 ## Limits (not modelled yet)
 - Vehicles are discs (the bicycle's 1.75 m length is not swept); no lean, wheel or balance
@@ -144,8 +143,8 @@ obstacles in the grids, as before), so single-vehicle scenes run the old code pa
 - No charging, battery or range model; overhead clearance uses the grids' 1.8 m body height.
 - The curve is G1 only (no clothoids); pure pursuit absorbs the curvature jump within 0.08 m.
 
-## Forklift (spec §7, §12)
-Code: `viewer/engine/vehicles/forklift.ts` (verbs `forklift_pick`, `forklift_deliver`, invariant
+## Forklift
+Code: `engine/vehicles/forklift.ts` (verbs `forklift_pick`, `forklift_deliver`, invariant
 `forkliftLoad`; registered in `api/registry.ts`). Tests: `engine/test/forklift.test.ts`.
 
 - **Truck.** Catalog def `forklift` (2.6 × 1.2 m, lowered mast 2.2 m, `obstacle`, 2600 kg; forks at
@@ -197,19 +196,10 @@ Code: `viewer/engine/vehicles/forklift.ts` (verbs `forklift_pick`, `forklift_del
   must be square to a deck edge. Other vehicles: see "Vehicle–vehicle collision" above.
 
 
-### Persistent ride waits (LM-024 staged)
+## Persistent ride waits
 
-Ride person/vehicle waits publish a vehicle mover with its rider as an alias.
-After the reporting grace period, a stopped ordinary ride may request one existing
-validated route retry within its existing replan cap and the shared per-tick
-budget. Pull-over/resume recovery is explicitly unavailable to this hook. An
-exhausted, stationary mid-pull-over can nevertheless certify a stopped wait if it
-is in the ride phase, has no pending replan/cancel, and both remaining arc length
-and distance to the endpoint exceed 0.06 m (plus a conservative 1e-9 boundary
-guard). Endpoint/resume waits retain their independent retry/failure clock and
-prevent early termination. No vehicle pose or resource is forced free. See
-[MOVEMENT](MOVEMENT.md#persistent-waits-and-bounded-recovery-lm-024-staged).
-The [physical three-EUC proof](briefs/vehicle-deadlock.REPORT.md) covers a real
-footprint/lane cycle, future cancel, external blocker movement, ownership and
-snapshot refusal. Forklift manipulation waits, mixed loaded-vehicle cycles and
-general deadlock freedom are not claimed.
+Ride waits publish a vehicle mover with its rider as an alias in the wait graph
+([movement.md](movement.md#persistent-waits-and-bounded-recovery)). After the grace period, a stopped ordinary ride may
+request one validated route retry within its replan cap and the shared per-tick budget; pull-over and resume phases
+report recovery unavailable. No vehicle pose or resource is forced free. Forklift manipulation waits, mixed
+loaded-vehicle cycles and general deadlock freedom are not covered.

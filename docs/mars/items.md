@@ -1,9 +1,8 @@
-# Tables, hand-held items and eating (owner feedback §12, 80/20)
+# Tables, hand-held items and eating
 
-Code: `viewer/engine/world/catalog-items.ts` (defs), `viewer/engine/items/` (`body.ts` eat landmarks over the one
-body model `engine/body/model.ts` — BODY_MODEL.md; arm 0.62 m, was 0.75,
-`model.ts` support / surfaces / standing points, `actions.ts` verbs), `viewer/engine/scenarios/meal.ts`;
-tests `viewer/engine/test/meal.test.ts`. Verbs are in the one registry (`api/registry.ts` `ITEM_ACTIONS`).
+Code: `engine/world/catalog-items.ts` (defs), `engine/items/` (`body.ts` eat landmarks over the body model,
+[body-model.md](body-model.md); `model.ts` support, surfaces and standing points; `actions.ts` verbs),
+`engine/scenarios/meal.ts`; tests `engine/test/meal.test.ts`. Verbs are in the one registry (`api/registry.ts` `ITEM_ACTIONS`).
 
 ## Catalog (`catalog-items.ts`, all dimensions provisional)
 | def | size x·y·z (m) | kg | notes |
@@ -30,7 +29,7 @@ An item entity (`kind: 'component'`) is exactly one of:
   runner all require `human.grip` for it.)
 
 A surface slot is free when nothing rests on it (`slotOccupant`). Lap support (item on a seated person's knee)
-is **not implemented** (spec mentions it; `resting-on.slot` was left general enough for `'lap'`).
+is **not implemented** (`resting-on.slot` was left general enough for `'lap'`).
 `physicalView()` needed no change: it already includes every entity field except label/tags/provenance, so
 item `pose`, `support`, `contents` and `human.hands` / `human.baseActivity` are part of what plans depend on.
 
@@ -72,7 +71,7 @@ Per tick, world frame (metres, Y up, same frame as `pose.p`):
   (`CATALOG[def].handling.grips[1][0].local`), or use `pose` directly (it is exactly hand − rot(grip, yaw),
   yaw = the holder's yaw). `resting-on` / `ground` → render at `pose`. `contents.fraction` → food level.
 - Body landmarks (`body/model.ts` via `items/body.ts`, forward f = (cos yaw, sin yaw), right r = (−sin yaw, cos yaw) in x,z;
-  heights above the ground point, −0.45 m seated): chest 1.22 m (+0.08 fwd), shoulders 1.34 m ±0.15 m (measured rig, 2026-09-28; were 1.30 / 1.42 ±0.19),
+  heights above the ground point, −0.45 m seated): chest 1.22 m (+0.08 fwd), shoulders 1.34 m ±0.15 m,
   mouth point 1.58 m +0.15 m fwd, carry point 1.00 m +0.28 fwd ±0.16, bowl hand = chest + 0.25 fwd − 0.10.
   Eat: spoon hand rim (bowl hand + 0.12 up, 0.07 to the spoon side) → dip (inside the bowl) → rim → mouth
   point → (pause) → rim. Measured in the meal: bowl hand ≤ 0.4 m from the chest and spoon hand ≤ 0.62 m (the
@@ -81,9 +80,7 @@ Per tick, world frame (metres, Y up, same frame as `pose.p`):
 ## Meal scenario (`scenarios/meal.ts`, `meal.test.ts`)
 Proving-ground lawn: table at (−6, −8.5) with a pot of stew (r1c2), 4 empty bowls, 4 spoons; campfire at
 (−6, −4) with 4 camp chairs at 2.4 m facing it. Each person: take the inner item, then the outer one without
-stepping, serve from the pot, `sit` on their chair (approach → turn → sit-down), `eat` until empty. Result:
-5 cycles each, bowls and pot at 0, **0 violations, 689 ticks (34.45 s), hash `baf84de6…ccbfd`** at
-walk_to e09a961 (a walk.ts change re-pins it). Also: `eat` inside a `converse` (base `talk`, converse still
+stepping, serve from the pot, `sit` on their chair (approach → turn → sit-down), `eat` until empty. Result: 5 cycles each, bowls and pot at 0, 0 violations and a pinned final hash (a `walk.ts` change re-pins it). Also: `eat` inside a `converse` (base `talk`, converse still
 holds them, `cycles` limit); put back on the table and on the ground; refusals (serve 2.5 m from the pot,
 second item into a full hand, someone else's bowl, a chair, empty bowl, eat while `walk_to` runs, occupied
 surface slot, occupied chair → `reservation.conflict`, far row of a table against a wall → `item.unreachable`
