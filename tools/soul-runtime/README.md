@@ -20,11 +20,14 @@ A host adapter must deduplicate offered identities and preserve one decision
 owner. A callback that blocks on inference must not run in the receiver loop.
 Receiver backoff counts consecutive failed connects, not quiet time: an event
 stream the server admitted (validated hello) that stayed open at least 5 s and
-then ended (an idle world rotates its stream about every 65 s) reconnects
-within 1 s jitter (`reconnecting`). Failed, refused or immediately dropped
-connects back off 1 s doubling to 30 s (`retrying`); a stated Retry-After on a
-429/503 is a floor (+0-20 % jitter, at most 120 s). One read stays outstanding
-per source, so reconnecting never adds a long-poll.
+then ended or was interrupted, with no error code (an idle world rotates its
+stream about every 65 s), reconnects within 1 s jitter (`reconnecting`). Every
+other retryable error, including a coded one on an open stream such as
+`JOURNAL_BACKLOG_FULL`, and failed, refused or quickly dropped connects, is
+`retrying`: full jitter, random(0, base), over a base of 1 s doubling to 30 s.
+A stated Retry-After on a 429/503 is a floor (+0-20 % jitter); the wait is
+capped at 60 s after the jitter (LOAD-CONTRACT v1 §3). One read stays
+outstanding per source, so reconnecting never adds a long-poll.
 
 Current tests inject process death after commit, stale concurrent cursor writes,
 conflicting duplicate events, host notification failure, terminal revocation,

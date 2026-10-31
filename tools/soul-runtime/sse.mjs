@@ -10,7 +10,7 @@ export function createEventReader({open,validateHello}){
    for(;;){
     if(signal?.aborted)throw Error('Event read aborted');
     let at=buffer.indexOf('\n\n');
-    if(at<0){let chunk;try{chunk=await readAbortable(reader,signal);}catch{throw Object.assign(Error('Event stream interrupted'),{transient:!signal?.aborted});}if(chunk.done)throw Object.assign(Error('Event stream ended'),{transient:true});buffer=(buffer+decoder.decode(chunk.value,{stream:true})).replace(/\r\n/g,'\n');if(buffer.length>1024*1024)throw Error('Event stream frame exceeded bound');continue;}
+    if(at<0){let chunk;try{chunk=await readAbortable(reader,signal);}catch{throw Object.assign(Error('Event stream interrupted'),{transient:!signal?.aborted,streamClosed:true});}if(chunk.done)throw Object.assign(Error('Event stream ended'),{transient:true,streamClosed:true});buffer=(buffer+decoder.decode(chunk.value,{stream:true})).replace(/\r\n/g,'\n');if(buffer.length>1024*1024)throw Error('Event stream frame exceeded bound');continue;}
     const frame=buffer.slice(0,at);buffer=buffer.slice(at+2);let kind='message',id=null,data=[];
     for(const line of frame.split('\n')){const colon=line.indexOf(':');if(colon<0)continue;const name=line.slice(0,colon),value=line.slice(colon+1).replace(/^ /,'');if(name==='event')kind=value;else if(name==='id')id=value;else if(name==='data')data.push(value);}
     if(!data.length)continue;
