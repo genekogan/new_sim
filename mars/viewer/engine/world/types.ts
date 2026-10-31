@@ -66,6 +66,8 @@ export type HumanState = {
   wateringV1?: import('../items/watering.ts').WateringMotion;
   /** Soul Actions 34: a handle-held item being taken or put by hand (the arm blends in and out on this timeline). */
   handTransferV1?: import('../items/watering.ts').HandTransfer;
+  /** Soul Actions 43: the last let-go before a reach (an idle gesture fades out on it); never controller context. */
+  letGoV1?: import('../items/let-go.ts').LetGoV1;
   activity: string; // 'idle' | 'walk' | 'carry' | 'support' | 'climb' | 'sit' | ...
   task?: string; // action id currently owning this actor
   grip?: { entity: string; slot: string };

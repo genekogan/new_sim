@@ -19,7 +19,7 @@ export type ItemTransferV1={item:string;hand:'left'|'right';action:string;mode?:
  *  withdraw, the same clock as the engine's hand lerp, so the torso can neither pop nor hop between solutions.
  *  `goal`: a pick-up's empty-handed reach, drawn instead of the engine hand point: from the drawn palm (clip and idle
  *  gesture, before the arm IK) to the grasp point `p`, `k` of the way (the reach clock). */
-export type ItemPresentation={weight:number;idleBlend:number;transfer?:true;posture?:{target:[number,number,number];hand:'left'|'right';k:number};goal?:{hand:'left'|'right';p:[number,number,number];k:number}};
+export type ItemPresentation={weight:number;idleBlend:number;transfer?:true;/** entry 43: the transfer's start tick, and whether it is a pick-up */start?:number;take?:true;posture?:{target:[number,number,number];hand:'left'|'right';k:number};goal?:{hand:'left'|'right';p:[number,number,number];k:number}};
 const smooth=(n:number)=>{const k=Math.max(0,Math.min(1,n));return k*k*(3-2*k)};
 /** Reach hump on the transfer clock: 0 before the reach, 1 at the grasp, 0 again once the withdraw is over. */
 export function itemPostureK(transfer:ItemTransferV1,tick:number,dt:number){
@@ -28,6 +28,10 @@ export function itemPostureK(transfer:ItemTransferV1,tick:number,dt:number){
  return u<=1?smooth(u):1-smooth(u-1);
 }
 export function itemPresentation(transfer:ItemTransferV1|undefined,held:{left?:string;right?:string}|undefined,tick:number,dt:number):ItemPresentation|undefined {
+ const r=presentationAt(transfer,held,tick,dt);
+ return r&&transfer?{...r,start:transfer.startTick,...(transfer.mode==='take'?{take:true as const}:{})}:r;
+}
+function presentationAt(transfer:ItemTransferV1|undefined,held:{left?:string;right?:string}|undefined,tick:number,dt:number):ItemPresentation|undefined {
  const holding=!!(held?.left||held?.right);
  if(!transfer)return holding?{weight:1,idleBlend:0}:undefined;
  const k=itemPostureK(transfer,tick,dt),posture={transfer:true as const,...(transfer.target&&k>0?{posture:{target:transfer.target,hand:transfer.hand,k}}:{})};

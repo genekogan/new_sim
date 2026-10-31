@@ -45,7 +45,7 @@ const KINDS: Record<WaterJetKind, { n: number; life: number; size: number; strea
   spout: { n: 900, life: 0.45, size: 0.011, streak: 0.85, glsl: `
     float on = step(fract(aSeed.y * 0.0731 + aSeed.z * 0.013), uFlow);
     float ang = r1 * 6.2831853, rad = 0.0045 * sqrt(r2);
-    float v = uSpeed * (0.94 + 0.12 * r3);
+    float v = uSpeed * (0.35 + 0.65 * uFlow) * (0.94 + 0.12 * r3);
     vec3 d = vec3(cos(uDir), sin(uDir), 0.0);
     float tl = (v * d.y + sqrt(max(0.0, v * v * d.y * d.y + 2.0 * 9.8 * uDrop))) / 9.8;
     float fa = min(a, tl);

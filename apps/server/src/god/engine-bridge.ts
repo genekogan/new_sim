@@ -1635,7 +1635,8 @@ export class EngineBridge {
         const id = `pick-up:${x.id}`, label = `Pick up ${name(x.id)} (${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
         caps.push({ id, verb: 'pick-up', label, target: { id: x.id, kind: 'item' }, available: true });
         const precise=(this.physics?.assets[x.def] as {capabilities?:{recordedItemPoseV1?:boolean}})?.capabilities?.recordedItemPoseV1&&levelOf(x)===(me.human.level??0);
-        plans.set(id, { label, steps: [...stand, ...(precise?[]:approach(x)), { verb: 'mars:take_item', params: { item: x.id, hand: 'right' } }] });
+        // entry 43: an opted-in pick-up lets an idle gesture go before the hand reaches (entry 41's M04 finding)
+        plans.set(id, { label, steps: [...stand, ...(precise?[{ verb: 'mars:let_go_v1', params: {} }]:approach(x)), { verb: 'mars:take_item', params: { item: x.id, hand: 'right' } }] });
       }
       if (held && asset.surfaceSlots?.length) {
         const taken = new Set(Object.values(ents).filter((o: any) => o.support?.kind === 'resting-on' && o.support.on === x.id).map((o: any) => o.support.slot));

@@ -27,6 +27,7 @@ import { checkStations, childrenState, walkCrew, type Children } from '../constr
 import { holdingDiagnostic } from '../construction/rules.ts';
 import { SIT_TRANSITION } from '../social/actions.ts';
 import { watering } from './watering.ts';
+import { letGo } from './let-go.ts';
 import {
   bodyFrame, bowlHand, carryHand, dipHand, HANDS, lerp3, mouthPoint, otherHand, restHand, rimHand, SEAT_DROP, smooth,
   type BodyFrame, type Hand,
@@ -689,4 +690,4 @@ export const eat: ActionDef<EatParams, { bowlHand: Hand }, EatExec> = {
   resumable: true,
 };
 
-export const ITEM_ACTIONS: ActionDef[] = [takeItem, putItem, serve, eat, holdItems, watering as unknown as ActionDef];
+export const ITEM_ACTIONS: ActionDef[] = [takeItem, putItem, serve, eat, holdItems, letGo as unknown as ActionDef, watering as unknown as ActionDef];

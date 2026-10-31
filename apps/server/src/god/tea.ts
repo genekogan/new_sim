@@ -83,6 +83,8 @@ export function createTea(h: TeaHost) {
     return { owner: owner.id, slot: s.slot as string, st, face, f, r, gap, depth: half - side * lz, top: it[1] };
   }
   const walk = (st: Vec3, face: number): Step => ({ verb: 'mars:walk_to', params: { x: r3(st[0]), z: r3(st[2]), level: 0, face: r3(face) } });
+  // entry 41's M04 finding: an idle gesture is let go before a hand reaches (let-go.ts), never faded over the reach
+  const LET_GO: Step = { verb: 'mars:let_go_v1', params: {} };
 
   /** Fill steps for a kettle on a counter: take it, fill it under the nearest tap, put it back where it was. */
   function fillSteps(kettle: string, me: Vec2): Step[] | Refusal {
@@ -101,7 +103,7 @@ export function createTea(h: TeaHost) {
     if (!clear(stand)) return { code: 'tea.tap-blocked', reason: `There is no room to stand beside ${m.pathOf(tap)} to fill the kettle (${(h.engine.clearanceAtV1?.(stand[0], stand[2], 0) ?? 0).toFixed(2)} m clear at ${stand.map(r3)}).` };
     const face = heading(twp, [1, 0]), kdef = defOf(kettle)!, have = num(stateOf(kettle).level);
     const litres = litresOf(kdef, (m.entities.get(kettle)?.params ?? {}) as Record<string, unknown>) || KETTLE_LITRES;
-    return [walk(at.st, at.face), { verb: 'mars:take_item', params: { item: kettle, hand: 'right' } },
+    return [walk(at.st, at.face), LET_GO, { verb: 'mars:take_item', params: { item: kettle, hand: 'right' } },
       { verb: 'mars:walk_to', params: { x: r3(stand[0]), z: r3(stand[2]), level: 0, face: r3(face) } },
       { verb: 'mars:watering_can_v1', params: { item: kettle, target: tap, stage: 'fill', face: r3(face), hold: toWorld(twp, grip).map(r3), valve: toWorld(twp, [valve[0], valve[1] + 0.02, valve[2]]).map(r3), seconds: KETTLE_FILL_SECONDS, levelAfter: 1, litres: r3((1 - have) * litres) } },
       walk(at.st, at.face), { verb: 'mars:put_item', params: { item: kettle, surfaceSlot: `${at.owner}#${at.slot}` } }];
@@ -114,7 +116,7 @@ export function createTea(h: TeaHost) {
     const k = ents()[kettle], q = k.pose.p as Vec3, yaw = k.pose.yaw as number, c = Math.cos(yaw), s = Math.sin(yaw);
     // engine frame: item-local x along (cos yaw, sin yaw), z along (−sin yaw, cos yaw)
     const sw: Vec3 = [q[0] + KETTLE_SWITCH[0] * c - KETTLE_SWITCH[2] * s, q[1] + KETTLE_SWITCH[1] + 0.008, q[2] + KETTLE_SWITCH[0] * s + KETTLE_SWITCH[2] * c];
-    return [...(walkFirst ? [walk(at.st, at.face)] : []), { verb: 'mars:hand_actuator_v1', params: { target: kettle, at: sw.map(r3) } }];
+    return [...(walkFirst ? [walk(at.st, at.face)] : []), LET_GO, { verb: 'mars:hand_actuator_v1', params: { target: kettle, at: sw.map(r3) } }];
   }
   /** The pour into `cup`: take the kettle, stand at the counter in front of the cup, pour, put the kettle back. */
   function pourSteps(kettle: string, cup: string, me: Vec2, levelNow: number): Step[] | Refusal {
@@ -126,7 +128,8 @@ export function createTea(h: TeaHost) {
     const C = ents()[cup].pose.p as Vec3, f = cAt.f, r = cAt.r;
     // where the spout tip is, from the grip, at the middle of the stream's tilt; the stream's run from there to the tea
     const T = KETTLE_TILT + KETTLE_TILT_MORE / 2, tip = canPoint([0, 0, 0], KETTLE_GRIP, 0, T, KETTLE_SPOUT);
-    const surface = C[1] + CUP_RIM.full, el = KETTLE_SPOUT_ANGLE - T, L = tip[0] + spoutRun(el, SPOUT_DROP);
+    // the tip stands SPOUT_DROP over a full cup; the full stream is aimed at the tea half way up (it rises as she pours)
+    const surface = C[1] + CUP_RIM.full, mid = C[1] + 0.014 + (CUP_RIM.full - 0.014) / 2, el = KETTLE_SPOUT_ANGLE - T, L = tip[0] + spoutRun(el, surface + SPOUT_DROP - mid);
     // the cup in the body frame (forward, right), the kettle hand at POUR_HAND_RIGHT; the kettle turns toward the cup
     const S = cAt.st, cf = (C[0] - S[0]) * f[0] + (C[2] - S[2]) * f[1], cr = (C[0] - S[0]) * r[0] + (C[2] - S[2]) * r[1];
     const lat = cr - POUR_HAND_RIGHT; if (Math.abs(lat) >= L) return { code: 'tea.cup-unreachable', reason: 'The cup is too far along the counter to pour into from here.' };
@@ -138,7 +141,7 @@ export function createTea(h: TeaHost) {
     const kdef = defOf(kettle)!, litres = litresOf(kdef, (M().entities.get(kettle)?.params ?? {}) as Record<string, unknown>) || KETTLE_LITRES;
     const after = Math.max(0, levelNow - CUP_LITRES / litres);
     const steps: Step[] = [];
-    if (!held) steps.push(walk(kAt!.st, kAt!.face), { verb: 'mars:take_item', params: { item: kettle, hand: 'right' } });
+    if (!held) steps.push(walk(kAt!.st, kAt!.face), LET_GO, { verb: 'mars:take_item', params: { item: kettle, hand: 'right' } });
     steps.push(walk(S, cAt.face), { verb: 'mars:watering_can_v1', params: { item: kettle, target: cup, stage: 'pour', face: r3(cAt.face), hold: grip.map(r3), steady: steady.map(r3), spoutYaw: r3(turn), tilt: r3(KETTLE_TILT), tiltMore: r3(KETTLE_TILT_MORE), seconds: CUP_POUR_SECONDS, levelAfter: r3(after), litres: CUP_LITRES } });
     if (kAt) steps.push(walk(kAt.st, kAt.face), { verb: 'mars:put_item', params: { item: kettle, surfaceSlot: `${kAt.owner}#${kAt.slot}` } });
     return steps;

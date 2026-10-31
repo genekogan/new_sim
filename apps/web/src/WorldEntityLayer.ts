@@ -9,7 +9,7 @@ import { godFeature, isFlagDef } from './god-ui/features.ts';
 import { loadSnapshot } from './snapshot-wire.ts';
 import * as THREE from 'three';
 import { TILE_M, TILE_N, Terrain, groundForTile, heightAt, waterLevelAt, type Ground } from '@sim/ground';
-import { WorldModel, CAN_OPENING, CAN_ROSE, CUP_RIM, KETTLE_OPENING, KETTLE_SPOUT, KETTLE_SPOUT_ANGLE, KETTLE_SWITCH, SPOUT_SPEED, cupSteam, isKettleDef, isTeaCupDef, kettleHeat, spoutRun, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
+import { WorldModel, CAN_OPENING, CAN_ROSE, CUP_RIM, KETTLE_OPENING, KETTLE_SPOUT, KETTLE_SPOUT_ANGLE, KETTLE_SWITCH, SPOUT_SPEED, cupSteam, spoutSpeed, isKettleDef, isTeaCupDef, kettleHeat, spoutRun, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
 import { GENERATORS } from '@sim/generators';
 import { meshFor, type MeshCtx } from './gen-mesh/index.ts';
 import { clearBuildingPrefetch, prefetchBuilding } from './gen-mesh/building.mesh.ts';
@@ -535,7 +535,7 @@ export class WorldEntityLayer {
     const guess = spoutRun(el, 0.07);
     let cup: string | null = null, best = 0.15, surface = tip.y - 0.5;
     for (const [cid, st] of this.steamers) { if (st.kind !== 'cup') continue; const c = this.drawn.get(cid); if (!c) continue; const p = c.obj.position, r = Math.hypot(p.x - (tip.x + fwd.x * guess), p.z - (tip.z + fwd.z * guess)); if (r < best && p.y < tip.y) { best = r; cup = cid; const tea = Number(this.model?.entities.get(cid)?.state?.tea ?? 0); surface = p.y + (0.014 + (CUP_RIM.full - 0.014) * Math.max(0, Math.min(1, tea))) * c.obj.scale.x; } }
-    const drop = Math.max(0.02, tip.y - surface), run = spoutRun(el, drop), land = [tip.x + fwd.x * run, surface, tip.z + fwd.z * run];
+    const drop = Math.max(0.02, tip.y - surface), run = spoutRun(el, drop, spoutSpeed(flow)), land = [tip.x + fwd.x * run, surface, tip.z + fwd.z * run];
     const c = cup ? this.drawn.get(cup)!.obj.position : null;
     d.obj.userData.pourDebug = { flow: +flow.toFixed(3), tilt: +tilt.toFixed(4), tip: tip.toArray().map((v) => +v.toFixed(4)), land: land.map((v) => +v.toFixed(4)), cup, rim: c ? +Math.hypot(land[0] - c.x, land[2] - c.z).toFixed(4) : null, drop: +drop.toFixed(3) };
     let pour = this.pours.get(id);

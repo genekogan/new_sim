@@ -40,8 +40,10 @@ export function kettleHeat(state: Record<string, unknown> | undefined, tick: num
 /** A kettle's stream leaves the spout tip along the spout at this speed (m/s): the server plans the pour with it and the
  *  viewer draws the stream with it, so the planned and the drawn landing agree. */
 export const SPOUT_SPEED = 0.55;
+/** The stream's speed at flow `flow` (0..1): a dribble as the water first reaches the spout, the full stream once tipped. */
+export const spoutSpeed = (flow: number) => SPOUT_SPEED * (0.35 + 0.65 * Math.max(0, Math.min(1, flow)));
 /** Where a spout stream leaving at elevation `el` (rad, above the horizontal) lands `drop` m lower: its horizontal run (m). */
-export function spoutRun(el: number, drop: number) { const v = SPOUT_SPEED, vy = v * Math.sin(el), t = (vy + Math.sqrt(vy * vy + 2 * 9.8 * Math.max(0, drop))) / 9.8; return v * Math.cos(el) * t; }
+export function spoutRun(el: number, drop: number, v = SPOUT_SPEED) { const vy = v * Math.sin(el), t = (vy + Math.sqrt(vy * vy + 2 * 9.8 * Math.max(0, drop))) / 9.8; return v * Math.cos(el) * t; }
 /** A cup of tea steams for this long after it was poured (s). */
 export const CUP_STEAM_SECONDS = 240;
 /** The cup's visible steam at `tick` (0..1): strongest just poured, gone after CUP_STEAM_SECONDS. */
@@ -127,11 +129,11 @@ const campSink: DefInput = {
     { kind: 'cyl', at: [0, 1.0, 0.07], r: 0.02, h: 0.14, segments: 8, tint: 'metal', pitch: Math.PI / 2 },
     { kind: 'cyl', at: [0, 1.14, 0.0], r: 0.045, h: 0.02, segments: 6, tint: 'valve' },
     { kind: 'cyl', at: [0, 0.995, 0.15], r: 0.016, h: 0.02, segments: 6, tint: 'nozzle' },
-    // the stand and its basin, the stream falls 0.24 m into it
-    { kind: 'box', at: [0, 0.36, 0.22], size: [0.38, 0.72, 0.36], round: 0.01, tint: 'wood' },
-    { kind: 'cyl', at: [0, 0.73, 0.22], r: 0.175, h: 0.03, segments: 16, tint: 'basin' },
-    { kind: 'cyl', at: [0, 0.752, 0.22], r: 0.15, h: 0.006, segments: 16, tint: 'water', material: 'water', when: '@on' }] } } as unknown as DefInput['make'],
-  params: { ...Object.fromEntries(Object.entries(sinkPalette).map(([k, v]) => [k, { type: 'color', default: v, doc: `${k} colour` }])), basinHeight: { type: 'number', min: 0, max: 2, default: 0.755, doc: 'where the stream lands when nothing is under it' } } as DefInput['params'], palette: sinkPalette,
+    // the stand and its basin (low enough that a kettle held under the spout clears it), the stream falls 0.34 m into it
+    { kind: 'box', at: [0, 0.31, 0.22], size: [0.38, 0.62, 0.36], round: 0.01, tint: 'wood' },
+    { kind: 'cyl', at: [0, 0.63, 0.22], r: 0.175, h: 0.03, segments: 16, tint: 'basin' },
+    { kind: 'cyl', at: [0, 0.652, 0.22], r: 0.15, h: 0.006, segments: 16, tint: 'water', material: 'water', when: '@on' }] } } as unknown as DefInput['make'],
+  params: { ...Object.fromEntries(Object.entries(sinkPalette).map(([k, v]) => [k, { type: 'color', default: v, doc: `${k} colour` }])), basinHeight: { type: 'number', min: 0, max: 2, default: 0.655, doc: 'where the stream lands when nothing is under it' } } as DefInput['params'], palette: sinkPalette,
   state: { on: { type: 'bool', default: false } } as DefInput['state'],
   components: { sound: { kind: 'water', radius: 8, volume: 0.35, when: 'on', mode: 'loop' } } as DefInput['components'],
   size: { box: [0.4, 1.16, 0.88] },
