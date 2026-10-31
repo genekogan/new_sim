@@ -1,6 +1,7 @@
 // node --test tools/world-launcher/launcher.test.mjs
-// Uses fake world processes (fake-world.mjs) on lane P3's ports 6200–6219 only: proxy :6219, children 6211–6218;
-// the smaller launchers below take 6200–6210.
+// Uses fake world processes (fake-world.mjs) on one block of 25 ports from LAUNCHER_TEST_PORT_BASE (default 6200, which
+// CI uses): base+0..19 (proxy base+19, children base+11..18; the smaller launchers below take base+0..10), the flood
+// launcher base+20..21 and the Eyes launcher base+22..24. Set the base to run beside other local processes.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
@@ -12,7 +13,10 @@ import { slugFor, listTemplates } from './registry.mjs';
 import { productionSettings, decorateCommand, shadowsExisting } from './production.mjs';
 import { backoffMs } from './children.mjs';
 
-const PORT = 6219, RANGE = [6211, 6218];
+const BASE = Number(process.env.LAUNCHER_TEST_PORT_BASE ?? 6200);
+if (!Number.isInteger(BASE) || BASE < 1024 || BASE > 65535 - 24) throw Error(`LAUNCHER_TEST_PORT_BASE must be a port from 1024 (got ${process.env.LAUNCHER_TEST_PORT_BASE})`);
+const at = (offset) => BASE + offset;
+const PORT = at(19), RANGE = [at(11), at(18)];
 const dir = mkdtempSync(join(tmpdir(), 'launcher-test-'));
 const templatesDir = join(dir, 'templates'); mkdirSync(templatesDir);
 writeFileSync(join(templatesDir, 'hello-hamlet.json'), JSON.stringify({ schema: 'genesis/1', name: 'Hello hamlet', description: 'a hamlet', batches: [{ ops: [{ op: 'place' }] }] }));
@@ -134,21 +138,21 @@ test('the registry survives a launcher restart and worlds wake again', async () 
 });
 
 test('with every port taken, the least recently used idle world sleeps to make room, and wakes on its next visit', async () => {
-  const L2 = await openLauncher({ port: 6210, range: [6209, 6209], dataDir: join(dir, 'data-small'), webDir, templatesDir, command, idleMs: 0, eager: 0, log: () => {} });
+  const L2 = await openLauncher({ port: at(10), range: [at(9), at(9)], dataDir: join(dir, 'data-small'), webDir, templatesDir, command, idleMs: 0, eager: 0, log: () => {} });
   try {
-    const post2 = (name) => fetch('http://127.0.0.1:6210/__sim/worlds', { method: 'POST', body: JSON.stringify({ name }) });
+    const post2 = (name) => fetch(`http://127.0.0.1:${at(10)}/__sim/worlds`, { method: 'POST', body: JSON.stringify({ name }) });
     assert.equal((await post2('First')).status, 201);
     await new Promise((r) => setTimeout(r, 20));
     assert.equal((await post2('Second')).status, 201);
-    const kids = async () => Object.fromEntries((await (await fetch('http://127.0.0.1:6210/__sim/launcher')).json()).children.map((c) => [c.slug, c.status]));
+    const kids = async () => Object.fromEntries((await (await fetch(`http://127.0.0.1:${at(10)}/__sim/launcher`)).json()).children.map((c) => [c.slug, c.status]));
     assert.deepEqual(await kids(), { first: 'asleep', second: 'running' });
-    assert.equal((await fetch('http://127.0.0.1:6210/w/first/healthz')).status, 200);
+    assert.equal((await fetch(`http://127.0.0.1:${at(10)}/w/first/healthz`)).status, 200);
     assert.deepEqual(await kids(), { first: 'running', second: 'asleep' });
   } finally { await L2.close(); }
 });
 test('an idle world falls asleep (frozen in place) and wakes at once on its next visit; a watched or busy one stays awake', async () => {
-  const P = 6204, base = `http://127.0.0.1:${P}`;
-  const L4 = await openLauncher({ port: P, range: [6202, 6203], dataDir: join(dir, 'data-sleep'), webDir, templatesDir, command, sleepMs: 400, eager: 0, log: () => {} });
+  const P = at(4), base = `http://127.0.0.1:${P}`;
+  const L4 = await openLauncher({ port: P, range: [at(2), at(3)], dataDir: join(dir, 'data-sleep'), webDir, templatesDir, command, sleepMs: 400, eager: 0, log: () => {} });
   const kids = async () => Object.fromEntries((await (await fetch(`${base}/__sim/launcher`)).json()).children.map((c) => [c.slug, c.status]));
   const { execFileSync } = await import('node:child_process');
   const stateOf = (pid) => execFileSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' }).trim()[0];
@@ -188,9 +192,9 @@ test('an idle world falls asleep (frozen in place) and wakes at once on its next
   } finally { await L4.close(); }
 });
 test('the Eyes render worker (user agent EdenEyes/1) is not a watcher: its page and socket let the world sleep', async () => {
-  // lane soul-eyes-on ports 7420-7429
-  const P = 7429, base = `http://127.0.0.1:${P}`, UA = 'Mozilla/5.0 HeadlessChrome EdenEyes/1';
-  const L6 = await openLauncher({ port: P, range: [7427, 7428], dataDir: join(dir, 'data-eyes'), webDir, templatesDir, command, sleepMs: 400, eager: 0, log: () => {} });
+  // the Eyes launcher: base+22..24
+  const P = at(24), base = `http://127.0.0.1:${P}`, UA = 'Mozilla/5.0 HeadlessChrome EdenEyes/1';
+  const L6 = await openLauncher({ port: P, range: [at(22), at(23)], dataDir: join(dir, 'data-eyes'), webDir, templatesDir, command, sleepMs: 400, eager: 0, log: () => {} });
   const kids = async () => Object.fromEntries((await (await fetch(`${base}/__sim/launcher`)).json()).children.map((c) => [c.slug, c.status]));
   try {
     assert.equal((await fetch(`${base}/__sim/worlds`, { method: 'POST', body: JSON.stringify({ name: 'Seen' }) })).status, 201);
@@ -206,8 +210,8 @@ test('the Eyes render worker (user agent EdenEyes/1) is not a watcher: its page 
 });
 
 test('a flood refusal (P2) neither wakes a sleeping world nor counts as its use', async () => {
-  const P = 6548, base = `http://127.0.0.1:${P}`;   // lane P2's ports
-  const L5 = await openLauncher({ port: P, range: [6549, 6549], dataDir: join(dir, 'data-flood'), webDir, templatesDir, command, sleepMs: 400, eager: 0, log: () => {}, floodLimits: { godTokenPerS: 0.001, godTokenBurst: 1 } });
+  const P = at(20), base = `http://127.0.0.1:${P}`;
+  const L5 = await openLauncher({ port: P, range: [at(21), at(21)], dataDir: join(dir, 'data-flood'), webDir, templatesDir, command, sleepMs: 400, eager: 0, log: () => {}, floodLimits: { godTokenPerS: 0.001, godTokenBurst: 1 } });
   const kids = async () => Object.fromEntries((await (await fetch(`${base}/__sim/launcher`)).json()).children.map((c) => [c.slug, c.status]));
   const asleep = async () => { for (let i = 0; i < 40 && (await kids()).calm !== 'asleep'; i++) await new Promise((r) => setTimeout(r, 100)); return (await kids()).calm; };
   const god = { headers: { authorization: 'Bearer god_ok' } };
@@ -227,12 +231,12 @@ test('a flood refusal (P2) neither wakes a sleeping world nor counts as its use'
 });
 test('children a hard-killed launcher left behind are stopped before their worlds start again', async () => {
   const { spawn } = await import('node:child_process');
-  const orphan = spawn(process.execPath, [fake], { env: { ...process.env, WORLD_KEY: 'orphan', PORT: '6208' }, stdio: 'ignore' });
+  const orphan = spawn(process.execPath, [fake], { env: { ...process.env, WORLD_KEY: 'orphan', PORT: String(at(8)) }, stdio: 'ignore' });
   await new Promise((r) => setTimeout(r, 300));
   const d = join(dir, 'data-orphan'); mkdirSync(d, { recursive: true });
-  writeFileSync(join(d, 'children.json'), JSON.stringify({ orphan: { pid: orphan.pid, port: 6208, script: fake } }));
+  writeFileSync(join(d, 'children.json'), JSON.stringify({ orphan: { pid: orphan.pid, port: at(8), script: fake } }));
   const exited = new Promise((r) => orphan.once('exit', (code, signal) => r(signal ?? code)));
-  const L3 = await openLauncher({ port: 6207, range: [6205, 6206], dataDir: d, webDir, templatesDir, command, eager: 0, log: () => {} });
+  const L3 = await openLauncher({ port: at(7), range: [at(5), at(6)], dataDir: d, webDir, templatesDir, command, eager: 0, log: () => {} });
   try { assert.equal(await exited, 'SIGTERM'); } finally { await L3.close(); }
 });
 
@@ -259,9 +263,9 @@ test('children get edge minds, no model keys, the public origin; the auth file s
   assert.ok(!JSON.stringify(c).includes('FAKE_FROM_FILE'), 'the launcher never reads the file');
 });
 test('production launcher under --base /worlds: one prefix for page, assets, API, worlds and WebSocket; caps, limits, health', async () => {
-  const P = 6204, base = `http://127.0.0.1:${P}`, B = '/worlds';
-  const L4 = await openLauncher({ port: P, range: [6201, 6203], dataDir: join(dir, 'data-prod'), webDir, templatesDir, command, eager: 0, log: () => {}, base: B,
-    publicOrigin: 'http://sim-worlds.localhost:6204', devAuth: true, worldHeapMb: 512, maxWorlds: 3, maxRunning: 2, idleMs: 60_000, createLimit: 3 });
+  const P = at(4), base = `http://127.0.0.1:${P}`, B = '/worlds';
+  const L4 = await openLauncher({ port: P, range: [at(1), at(3)], dataDir: join(dir, 'data-prod'), webDir, templatesDir, command, eager: 0, log: () => {}, base: B,
+    publicOrigin: `http://sim-worlds.localhost:${at(4)}`, devAuth: true, worldHeapMb: 512, maxWorlds: 3, maxRunning: 2, idleMs: 60_000, createLimit: 3 });
   const make = (name, headers = {}) => fetch(`${base}${B}/__sim/worlds`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ name }) });
   try {
     const h = await (await fetch(`${base}${B}/__sim/healthz`)).json();
@@ -273,7 +277,7 @@ test('production launcher under --base /worlds: one prefix for page, assets, API
     const a = await make('Mars'); assert.equal(a.status, 201); const ab = await a.json();
     assert.equal(ab.slug, 'my-mars'); assert.equal(ab.url, `${B}/w/my-mars/?dev=1&new=1`);
     const env = await (await fetch(`${base}${B}/w/my-mars/env`)).json();
-    assert.deepEqual(env, { MIND_DRIVER: 'edge', DEV_AUTH: '1', BRAIN_MODE: 'fake', PUBLIC_URL: 'http://sim-worlds.localhost:6204', ANTHROPIC_API_KEY: '', NODE_OPTIONS: '--max-old-space-size=512', FAKE_FROM_FILE: null, WORLD_PATH: `${B}/w/my-mars` });
+    assert.deepEqual(env, { MIND_DRIVER: 'edge', DEV_AUTH: '1', BRAIN_MODE: 'fake', PUBLIC_URL: `http://sim-worlds.localhost:${at(4)}`, ANTHROPIC_API_KEY: '', NODE_OPTIONS: '--max-old-space-size=512', FAKE_FROM_FILE: null, WORLD_PATH: `${B}/w/my-mars` });
     // behind the reverse proxy the visitor's x-forwarded-for reaches the world unchanged
     assert.equal((await fetch(`${base}${B}/w/my-mars/echo`, { method: 'POST', body: 'x', headers: { 'x-forwarded-for': '203.0.113.7' } })).headers.get('x-xff'), '203.0.113.7');
     const ws = await new Promise((yes, no) => { const s = connect(P, '127.0.0.1', () => s.write(`GET ${B}/w/my-mars/ws HTTP/1.1\r\nHost: x\r\nUpgrade: test\r\nConnection: Upgrade\r\n\r\n`)); s.once('data', (d) => { s.destroy(); yes(String(d)); }); s.on('error', no); });
@@ -295,8 +299,8 @@ test('production launcher under --base /worlds: one prefix for page, assets, API
   assert.throws(() => productionSettings({ range: [1, 2], base: '/a/b' }, 'http://x'), /one path segment/);
 });
 test('the world cap, the creation limit, and a watched world never sleeps', async () => {
-  const P = 6200, base = `http://127.0.0.1:${P}`;
-  const L5 = await openLauncher({ port: P, range: [6201, 6201], dataDir: join(dir, 'data-cap'), webDir, templatesDir, command, eager: 0, log: () => {}, maxWorlds: 2, idleMs: 0, createLimit: 2 });
+  const P = at(0), base = `http://127.0.0.1:${P}`;
+  const L5 = await openLauncher({ port: P, range: [at(1), at(1)], dataDir: join(dir, 'data-cap'), webDir, templatesDir, command, eager: 0, log: () => {}, maxWorlds: 2, idleMs: 0, createLimit: 2 });
   const make = (name, ip = '9.9.9.9') => fetch(`${base}/__sim/worlds`, { method: 'POST', headers: { 'x-forwarded-for': ip }, body: JSON.stringify({ name }) });
   try {
     assert.equal((await make('One')).status, 201);
