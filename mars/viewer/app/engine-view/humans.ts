@@ -634,9 +634,11 @@ export class HumanViews {
     // A low latch may need a small bend as well as a hand reach. Ease the whole
     // solved posture on the same timeline so the torso cannot pop in/out.
     if(v.handActuator){const k=handActuatorFrame(v.handActuator,(v.handActuatorTime??0)-v.handActuator.startTick*DT).weight;for(const key of ['drop','bend','rise','kneel'] as const)pz[key]*=k;}
-    // entry 43: a put's posture rises over its reach and settles over the hand's way back (a hump, as 29's item reach);
-    // at the put's full arm weight from its first frame the free arm swung 0.099 m in one sample as the bend switched on
-    if(v.transfer){const ts=(v.transferTime??0)-v.transfer.startTick*DT,r=v.transfer.reach,k=v.transfer.mode==='put'?(ts<r?smooth(ts/r):1-smooth((ts-r)/r)):transferWeight(v.transfer,ts).weight;for(const key of ['drop','bend','rise','kneel'] as const)pz[key]*=k;}
+    // entry 43: a take's or put's posture rises over its reach and settles over the hand's way back (a hump, as 29's item
+    // reach): at the put's full arm weight from its first frame the free arm swung 0.099 m in one sample as the bend
+    // switched on; and once a take has ended the hand hangs at its carry point and asks nothing of the body (held at full
+    // weight, a full kettle at the side kept a body 8 cm down, standing and walking, until the next put popped it up)
+    if(v.transfer){const ts=(v.transferTime??0)-v.transfer.startTick*DT,r=v.transfer.reach,k=v.transfer.endTick!==undefined&&v.transfer.mode==='take'?0:ts<r?smooth(ts/r):1-smooth((ts-r)/r);for(const key of ['drop','bend','rise','kneel'] as const)pz[key]*=k;}
 
     // on a frame's bracing: crouch / bend on the rod, never kneel or rise onto the toes
     return v.frame?.kind === 'stance' ? { ...pz, kneel: 0, rise: 0 } : pz;
