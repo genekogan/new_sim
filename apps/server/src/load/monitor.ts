@@ -28,7 +28,11 @@ export class LevelState {
     const b = this.baselineMs;
     if (s.service < 0.2) this.starvedSince ??= now; else this.starvedSince = null;
     if ((s.heapFrac > 0.92 && s.gcFrac > 0.40) || (this.starvedSince !== null && now - this.starvedSince >= BLACK_SERVICE_MS)) return 'black';
-    if (s.service < 0.5 || s.loopP99Ms > loopEnter(1000, b) || s.heapFrac > 0.85 || s.oldestMs > 6000) return 'red';
+    if (s.service < 0.5 || s.loopP99Ms > loopEnter(1000, b) || s.heapFrac > 0.85) return 'red';
+    // Queue age enters amber (the slow-down hint) but never red and never holds a level: at red the request budget is
+    // 8 ms/frame, so a queue that red itself starves could keep red forever (the eden2 bench, 2026-10-31: red held for
+    // whole windows at tick service 1.0 while the launcher shed every read as world.busy). Whether the thread is behind
+    // is what service / loop delay / heap say.
     if (s.service < 0.8 || s.loopP99Ms > loopEnter(200, b) || s.heapFrac > 0.70 || s.oldestMs > 2000) return 'amber';
     return 'green';
   }
@@ -36,8 +40,8 @@ export class LevelState {
     const b = this.baselineMs;
     switch (level) {
       case 'black': return s.service >= 0.4 && s.heapFrac < 0.85;
-      case 'red': return s.service >= 0.7 && s.loopP99Ms < loopLeave(400, b) && s.heapFrac < 0.75 && s.oldestMs < 3000;
-      case 'amber': return s.service >= 0.9 && s.loopP99Ms < loopLeave(100, b) && s.heapFrac < 0.60 && s.oldestMs < 1000;
+      case 'red': return s.service >= 0.7 && s.loopP99Ms < loopLeave(400, b) && s.heapFrac < 0.75;
+      case 'amber': return s.service >= 0.9 && s.loopP99Ms < loopLeave(100, b) && s.heapFrac < 0.60;
       default: return true;
     }
   }
