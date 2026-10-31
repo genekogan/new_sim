@@ -92,6 +92,9 @@ function stateRoles(root: THREE.Object3D, look: Look) {
     const role = o.userData.role as string | undefined; if (!role) return;
     if (role === 'door' && s.open !== undefined) o.rotation.y = s.open === true ? -Math.PI * 0.48 : 0;
     if (role === 'lid' && s.open !== undefined) o.rotation.x = s.open === true ? -Math.PI * 0.6 : 0;
+    // Soul Actions entry 23: curtains draw back to their outer ends (pleats bunch), a roller blind rolls up to its top
+    if ((role === 'curtain-l' || role === 'curtain-r') && s.open !== undefined) o.scale.x = s.open === true ? 0.22 : 1;
+    if (role === 'blind' && s.open !== undefined) o.scale.y = s.open === true ? 0.08 : 1;
     if (role === 'flame' && s.lit !== undefined) o.visible = s.lit !== false;
     if (role === 'fill' && typeof s.level === 'number') { o.scale.y = Math.max(0.001, Math.min(1, s.level)); o.visible = s.level > 0.001; }
     // W5: a bed's damp patch (role fill on a thing with `moisture`, no `level`) spreads across the soil as it is watered

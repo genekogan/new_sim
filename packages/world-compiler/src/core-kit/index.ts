@@ -10,6 +10,7 @@ import { WRITABLE_BOARDS } from './writable-boards.ts';
 import { HAND_WATER } from './hand-water.ts';
 import { HAND_MUSIC } from './hand-music.ts';
 import { HAND_FIRE } from './hand-fire.ts';
+import { HAND_COVERINGS } from './hand-coverings.ts';
 import { OFFICE_DESK_DEF } from './office-desk.ts';
 import props from './props.json' with { type: 'json' };
 import structures from './structures.json' with { type: 'json' };
@@ -49,7 +50,7 @@ import figures from './figures.json' with { type: 'json' };
 import meshLods from '../core-mesh-lods.json' with { type: 'json' };
 import type { DefInput } from '../schemas.ts';
 
-export const FAMILY_KITS: DefInput[] = /* @__PURE__ */ ([creatures, furniture, [PAINTING_EASEL_DEF, OFFICE_DESK_DEF, ...SWITCHABLE_LIGHTS, ...HAND_OPENINGS, ...WRITABLE_BOARDS, ...HAND_WATER, ...HAND_MUSIC, ...HAND_FIRE], props, structures, plants, transport, civic, play, kitchen, work, signage, mesh, terrain, mars, littlemartians, vocab, vocab2, vocabW1, vocabW2, vocabW3, layers, desert, scenery, lightMotion, figures].flat() as unknown as DefInput[]).map((def) => {
+export const FAMILY_KITS: DefInput[] = /* @__PURE__ */ ([creatures, furniture, [PAINTING_EASEL_DEF, OFFICE_DESK_DEF, ...SWITCHABLE_LIGHTS, ...HAND_OPENINGS, ...WRITABLE_BOARDS, ...HAND_WATER, ...HAND_MUSIC, ...HAND_FIRE, ...HAND_COVERINGS], props, structures, plants, transport, civic, play, kitchen, work, signage, mesh, terrain, mars, littlemartians, vocab, vocab2, vocabW1, vocabW2, vocabW3, layers, desert, scenery, lightMotion, figures].flat() as unknown as DefInput[]).map((def) => {
   const lod = def.make.kind === 'mesh' ? (meshLods as Record<string, { lod1: string }>)[def.make.asset] : undefined;
   return lod ? { ...def, make: { ...def.make, ...lod } } as DefInput : def;
 });
