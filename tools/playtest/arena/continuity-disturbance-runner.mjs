@@ -56,8 +56,9 @@ function pollTail(reader,consume,options){let callbackError;try{return reader.po
  * owner: {status,worldId,recipientSoulId,messageId,evidence}.
  * Uncertain sends without native identity remain unproved and are never resent.
  */
-export function createContinuityDisturbanceRunner({trialDirectory,outputDirectory,captureDirectory,runId,worldId,scenario,actors,fixtureActors=[],worldSenders={},evidence,pollMs=250,manifestWaitMs=30000},{sendWorld,sendOwner,now=Date.now,onFailure=()=>{},schedule=setTimeout,cancel=clearTimeout}={}){
+export function createContinuityDisturbanceRunner({trialDirectory,outputDirectory,captureDirectory,runId,worldId,scenario,actors,fixtureActors=[],worldSenders={},evidence,pollMs=250,manifestWaitMs=30000,fixtureVersion},{sendWorld,sendOwner,now=Date.now,onFailure=()=>{},schedule=setTimeout,cancel=clearTimeout}={}){
  if(![trialDirectory,outputDirectory,captureDirectory].every(p=>typeof p==='string'&&isAbsolute(p))||!id(runId)||!id(worldId)||!scenario||!id(scenario.id)||!Array.isArray(actors)||!actors.length||actors.length>5||!Array.isArray(fixtureActors)||fixtureActors.length>5||!cited(evidence)||!Number.isInteger(pollMs)||pollMs<1||pollMs>500||!Number.isInteger(manifestWaitMs)||manifestWaitMs<1||manifestWaitMs>600000)throw fault('INVALID_DISTURBANCE_RUNNER');
+ if(scenario.fixtureVersion!==undefined&&fixtureVersion!==scenario.fixtureVersion)throw fault('FIXTURE_VERSION_UNDECLARED');
  const trial=resolve(trialDirectory),out=resolve(outputDirectory),capture=resolve(captureDirectory),spec=clone(scenario),senders=clone(worldSenders),scope=new Map(),participants=new Map(),fixtures=new Map(),souls=new Set();evidence=clone(evidence);
  if(out===trial||out.startsWith(trial+'/')||realpathSync(resolve(out,'..'))!==resolve(out,'..'))throw fault('DISTURBANCE_OUTPUT_MUST_BE_SEPARATE');
  for(const [list,map]of [[actors,participants],[fixtureActors,fixtures]])for(const a of list){if(!id(a.actorId)||!id(a.soulId)||scope.has(a.actorId)||souls.has(a.soulId))throw fault('INVALID_DISTURBANCE_RUNNER_SCOPE');map.set(a.actorId,a.soulId);scope.set(a.actorId,a.soulId);souls.add(a.soulId);}
@@ -110,7 +111,7 @@ export function createContinuityDisturbanceRunner({trialDirectory,outputDirector
   for(const a of value.actors)if(participants.get(a.id)!==a.soulId||(a.releaseOffsetSec??0)!==(spec.actors.find(s=>s.id===a.id).releaseOffsetSec??0)||!digest(a.instructionSha256))throw fault('TRIAL_MANIFEST_ACTOR_MISMATCH');
   for(const a of value.fixtureActors)if(fixtures.get(a.id)!==a.soulId)throw fault('TRIAL_MANIFEST_ACTOR_MISMATCH');
   if(ownerRequired&&(!value.nativeEvidence||value.nativeEvidence.exportDirectory!=='native-export'||value.nativeEvidence.runId!==runId))throw fault('OWNER_NATIVE_EXPORT_NOT_CONFIGURED');
-  run=value;runDigest=hash(JSON.stringify(value));dispatcher=createContinuityDisturbances({scenario:spec,t0:run.startedAt,cutoffAt:run.cutoffAt,worldId,actors:[...participants].map(([actorId,soulId])=>({actorId,soulId})),evidence:[...evidence,join(trial,'run.json')]},{now,send,onRecord:record});
+  run=value;runDigest=hash(JSON.stringify(value));dispatcher=createContinuityDisturbances({scenario:spec,fixtureVersion,t0:run.startedAt,cutoffAt:run.cutoffAt,worldId,actors:[...participants].map(([actorId,soulId])=>({actorId,soulId})),evidence:[...evidence,join(trial,'run.json')]},{now,send,onRecord:record});
  }
  function captureStatus(){
   // Heartbeat age is judged against the time the read began: a slow read must

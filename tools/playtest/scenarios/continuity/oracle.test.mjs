@@ -220,7 +220,7 @@ test('staggered releases prove every actor schedule without imposing a dialogue 
 });
 test('garden errand trigger requires a timestamped actual three-body overlap before owner delivery',()=>{
  const participants=Object.fromEntries(['walker-1','walker-2','walker-3'].map(id=>[id,{coverageComplete:true,samples:Array.from({length:11},(_,n)=>({t:300000+n*1000,pos:{x:57,z:-10,src:'world'}}))}]));
- const d=deliveredDisturbance('garden-group-overlap',['walker-2'],310000,310500,{overlapFrom:300000,overlapTo:310000});d.deliveryEvents=[nativeDelivery('walker-2','owner',310500)];
+ const d=deliveredDisturbance('garden-group-overlap',['walker-2'],310000,310500,{gardenRef:'place-eden-stone-garden',overlapFrom:300000,overlapTo:310000});d.deliveryEvents=[nativeDelivery('walker-2','owner',310500)];
  const e={participants,disturbances:{'independent-errand':d},notifications:[{actor:'walker-2',eventId:'native-event',source:'owner',createdAt:310500}]},run=e=>disturbanceScore('eden-walk-three','independent-errand',e);
  assert.equal(run(e).status,'pass');
  const skewed=structuredClone(e);Object.values(skewed.participants).forEach((p,i)=>{p.samples=Array.from({length:12},(_,n)=>({t:300000+i*300+n*1000,pos:{x:57,z:-10,src:'world'}}));});

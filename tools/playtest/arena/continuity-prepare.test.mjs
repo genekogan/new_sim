@@ -162,3 +162,11 @@ test('occupied-seat proof requires fixture-only binding and matching authenticat
  const r=await occupyContinuitySeat(args,{now:()=>1000});assert.equal(r.status,'fail');assert.equal(r.failureCode,'OCCUPANCY_CURRENT_SOUL_MISMATCH');
  const participant=occupancy(t,{occupant:{actorId:'reader-a',soulId:'s_reader_a',worldId:'world',worldBase:'http://127.0.0.1:4999/w/fixture',evidence:['status']},seat:{fixtureCliJson:async()=>assert.fail('participant cannot be the fixture occupant')}});await assert.rejects(occupyContinuitySeat(participant,{now:()=>1000}),{code:'INVALID_OCCUPIED_SEAT_SETUP'});
 });
+test('garden-pool-v2 binds every sealed pool garden by its stable template ref',()=>{
+ const f=fixture('eden-walk-three'),s=snapshot();
+ s.entities=[...f.gardenCandidates.map((g,i)=>({id:'e_garden_'+i,name:g.ref,def:'core/chair@1',p:[g.region.pos[0],0,g.region.pos[1]],in:{parent:'world'}})),...['place-field','eden-library-1','eden-bandstand','commons-pavilion'].map(ref=>({id:'e_'+ref,name:ref,def:'core/chair@1',p:[0,0,0],in:{parent:'world'}}))];
+ const r=bindContinuityStaticRefs({fixture:f,snapshot:s,worldId:'fresh_world',boundAt:1000,evidence:['body-free.json']});
+ assert.deepEqual(r.missing,[]);
+ for(const [i,g]of f.gardenCandidates.entries())assert.equal(r.bindings[g.ref]?.entityId,'e_garden_'+i,g.ref);
+ delete f.gardenCandidates;assert.equal(bindContinuityStaticRefs({fixture:f,snapshot:s,worldId:'fresh_world',boundAt:1000,evidence:['body-free.json']}).bindings['land-garden-plot-1'],undefined,'v1 binds only the frozen stone garden');
+});

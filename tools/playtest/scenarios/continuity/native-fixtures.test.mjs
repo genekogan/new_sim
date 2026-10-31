@@ -11,6 +11,7 @@ import {bootEden} from '../../../../apps/server/test/eden-capabilities-timing.ts
 import {accept,invite} from '../../../../apps/server/test/native-owner-fixture.ts';
 import {hereFrame} from '../../../../apps/server/src/edge/perception/here.ts';
 import {insidePolygon} from '../../review/journey-oracles.mjs';
+import {poolGardenAt} from './garden-pool.mjs';
 
 const root=new URL('../../../../',import.meta.url),fixtureBytes=readFileSync(new URL('./fixtures.json',import.meta.url)),fixtures=JSON.parse(fixtureBytes),walk=fixtures.scenarios.find(s=>s.id==='eden-walk-three'),band=fixtures.scenarios.find(s=>s.id==='eden-bandstand-five');
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -57,6 +58,14 @@ test('sealed Eden holdout paths and bandstand crowd/performance have bounded nat
   const errand=walk.disturbances.find(d=>d.id==='independent-errand'),soul=walkers[1],binding=w.god.model.get(errand.errandRef);assert.ok(binding,'fresh Commons Pavilion binding');entry.binding=binding.id;
   const at=await journey(soul,'walk:'+errand.errandRef,entry);assert.ok(inRegion(at,errand.errandRegion),'native errand destination lies in the frozen region');entry.peerDistances=walkers.filter(s=>s!==soul).map(s=>Math.hypot(body(s).pos[0]-at.pos[0],body(s).pos[2]-at.pos[2]));assert.ok(entry.peerDistances.every(d=>d>=12),'errand can separate the walker from both garden peers');
   assert.ok(inRegion(await journey(soul,walk.venue.gardenWalkCapability,entry),walk.venue.gardenRegion),'native return reaches companions');
+ });
+ // garden-pool-v2: every other sealed pool garden is natively walkable and its
+ // arrivals fall in that garden under nearest-pool-centre membership.
+ const poolGarden=b=>poolGardenAt([b.pos[0],b.pos[2]],walk.gardenCandidates)?.ref;
+ for(const g of walk.gardenCandidates.filter(g=>g.ref!==walk.venue.gardenRef))await check('three walkers reach sealed pool garden '+g.ref,async entry=>{
+  entry.binding=w.god.model.get(g.ref)?.id??null;assert.ok(entry.binding,'fresh pool garden binding');
+  for(const soul of walkers)assert.equal(poolGarden(await journey(soul,g.walkCapability,entry)),g.ref,'native arrival lies in this pool garden');
+  entry.group=walkers.map(body);assert.ok(entry.group.every(b=>poolGarden(b)===g.ref),'all three are currently in the same pool garden');
  });
  for(const endpoint of walk.endpointCandidates)await check('three walkers reach sealed second landmark '+endpoint.ref,async entry=>{
   entry.binding=w.god.model.get(endpoint.ref)?.id??null;assert.ok(entry.binding,'fresh endpoint binding');for(const soul of walkers)assert.ok(inRegion(await journey(soul,endpoint.walkCapability,entry),endpoint.region),'native endpoint arrival lies in the frozen region');entry.group=walkers.map(body);assert.ok(entry.group.every(b=>inRegion(b,endpoint.region)),'all three fit at the same endpoint under occupancy');

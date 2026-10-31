@@ -1,6 +1,7 @@
 // Mechanical, once-only fixture disturbances. Observations never reach an actor;
 // only the frozen send boundary may write, and an ACK never proves delivery.
 import {createHash} from 'node:crypto';
+import {gardenPoolOf,poolGardenAt,validGardenPool} from '../scenarios/continuity/garden-pool.mjs';
 const fault=code=>Object.assign(Error(code),{code});
 const id=x=>typeof x==='string'&&/^[-A-Za-z0-9_]{1,120}$/.test(x);
 const cited=x=>Array.isArray(x)&&x.length>0&&x.length<=64&&x.every(s=>typeof s==='string'&&s.length>0&&s.length<=1000);
@@ -19,14 +20,20 @@ const releases=new Set(['scheduled-release','initial-supplement','staggered-rele
  * effectId?,operationId?}. Native delivery must independently match one of
  * those exact IDs. A timeout may return uncertain with a known operation ID.
  */
-export function createContinuityDisturbances({scenario,t0,cutoffAt,worldId,actors,evidence,maxSampleGapMs=2000},{now=Date.now,send,onRecord=()=>{}}={}){
+export function createContinuityDisturbances({scenario,t0,cutoffAt,worldId,actors,evidence,maxSampleGapMs=2000,fixtureVersion},{now=Date.now,send,onRecord=()=>{}}={}){
  if(!scenario||!id(scenario.id)||!Number.isFinite(t0)||!Number.isFinite(cutoffAt)||cutoffAt<=t0||!id(worldId)||!Array.isArray(actors)||!actors.length||actors.length>5||!cited(evidence)||maxSampleGapMs!==2000||typeof send!=='function'||typeof onRecord!=='function')throw fault('INVALID_DISTURBANCE_CONFIG');
  if(Buffer.byteLength(JSON.stringify(scenario))>128*1024)throw fault('DISTURBANCE_FIXTURE_BOUND');
+ // A versioned fixture (eden-walk-three garden-pool-v2) must be declared by the caller.
+ if(scenario.fixtureVersion!==undefined&&fixtureVersion!==scenario.fixtureVersion)throw fault('FIXTURE_VERSION_UNDECLARED');
+ if(!validGardenPool(scenario))throw fault('INVALID_DISTURBANCE_FIXTURE');
  evidence=clone(evidence);
  const spec=clone(scenario),mapping=new Map(),souls=new Set();
  for(const a of actors){if(!id(a?.actorId)||!id(a.soulId)||mapping.has(a.actorId)||souls.has(a.soulId))throw fault('INVALID_DISTURBANCE_ACTORS');mapping.set(a.actorId,a.soulId);souls.add(a.soulId);}
  if(!Array.isArray(spec.actors)||!equal([...mapping.keys()].sort(),spec.actors.map(a=>a.id).sort())||!Array.isArray(spec.disturbances)||spec.disturbances.length>16)throw fault('INVALID_DISTURBANCE_FIXTURE');
- const rows=new Map(),bodies=new Map(actors.map(a=>[a.actorId,[]])),receipts=new Map(actors.map(a=>[a.actorId,new Map()])),runs=new Map(actors.map(a=>[a.actorId,[]]));
+ // Garden runs per actor and garden: the single frozen region (key null), or
+ // each sealed pool garden under nearest-pool-centre membership (garden-pool-v2).
+ const pool=gardenPoolOf(spec),gardens=pool?pool.map(g=>g.ref):[null];
+ const rows=new Map(),bodies=new Map(actors.map(a=>[a.actorId,[]])),receipts=new Map(actors.map(a=>[a.actorId,new Map()])),runs=new Map(actors.map(a=>[a.actorId,new Map(gardens.map(g=>[g,[]]))]));
  let closed=false,lastNow=-Infinity,inputFailure=null,inFlight=null;
  const clock=()=>{const at=now();if(!Number.isFinite(at)||at<lastNow)throw fault('DISTURBANCE_CLOCK_REVERSED');lastNow=at;return at;};
  const record=(kind,row)=>onRecord({kind,at:clock(),id:row.id,scheduledAt:row.scheduledAt,triggerProof:clone(row.triggerProof),firstMotionContradiction:clone(row.firstMotionContradiction??null),dispatch:clone(row.dispatch),delivered:row.delivered,status:row.status,reason:row.reason});
@@ -72,8 +79,13 @@ export function createContinuityDisturbances({scenario,t0,cutoffAt,worldId,actor
      if(i>=0){const one=samples[i-1],two=samples[i];latch(r,due,{kind:s.kind,observedAt:two.at,receiptId:receipt.id,receiptAcceptedAt:receipt.acceptedAt,receiptAcceptanceProvenance:receipt.acceptanceProvenance,motionOnsetFromAt:r.onset.from,motionOnsetAt:r.onset.at,motionFromAt:one.at,motionToAt:two.at,evidence:[...r.onset.evidence.slice(0,48),...one.evidence.slice(0,8),...two.evidence.slice(0,8)]});}
     }
    }else if(r.status==='waiting'&&s.kind==='garden-group-overlap'){
-    const groups=spec.actors.map(a=>runs.get(a.id)),starts=[...new Set(groups.flat().map(w=>w.from))].sort((a,b)=>a-b),duration=s.minimumOverlapSec*1000;
-    for(const from of starts){const selected=groups.map(ws=>ws.find(w=>w.from<=from&&w.to>=from+duration));if(selected.every(Boolean)){const to=from+duration;latch(r,to,{kind:s.kind,observedAt:to,proofAvailableAt:clock(),overlapFrom:from,overlapTo:to,bodyIntervals:selected.map((w,i)=>({actor:spec.actors[i].id,from:w.from,to:w.to,evidence:[...w.firstEvidence.slice(0,4),...w.lastEvidence.slice(0,4)]})),evidence:selected.flatMap(w=>[...w.firstEvidence.slice(0,4),...w.lastEvidence.slice(0,4)])});break;}}
+    // Earliest first overlap across gardens; an exact tie keeps the earlier pool entry.
+    const duration=s.minimumOverlapSec*1000;let best=null;
+    for(const garden of gardens){
+     const groups=spec.actors.map(a=>runs.get(a.id).get(garden)),starts=[...new Set(groups.flat().map(w=>w.from))].sort((a,b)=>a-b);
+     for(const from of starts){const selected=groups.map(ws=>ws.find(w=>w.from<=from&&w.to>=from+duration));if(selected.every(Boolean)){if(!best||from<best.from)best={garden,from,selected};break;}}
+    }
+    if(best){const {garden,from,selected}=best,to=from+duration;latch(r,to,{kind:s.kind,...(pool?{gardenRef:garden}:{}),observedAt:to,proofAvailableAt:clock(),overlapFrom:from,overlapTo:to,bodyIntervals:selected.map((w,i)=>({actor:spec.actors[i].id,from:w.from,to:w.to,evidence:[...w.firstEvidence.slice(0,4),...w.lastEvidence.slice(0,4)]})),evidence:selected.flatMap(w=>[...w.firstEvidence.slice(0,4),...w.lastEvidence.slice(0,4)])});}
    }
   }
  }
@@ -84,11 +96,14 @@ export function createContinuityDisturbances({scenario,t0,cutoffAt,worldId,actor
   if(prior&&at<=prior.at){if(equal(prior,b))return;throw fault('DISTURBANCE_BODY_ORDER');}
   if(at<t0||at>cutoffAt)return;
   list.push(b);if(list.length>64){const removed=list.shift();for(const r of rows.values())if(r.spec.trigger.kind==='moving-body-journey'&&r.spec.trigger.recipients.includes(input.actorId))r.evictedThrough=removed.at;}
-  const region=spec.venue?.gardenRegion,meeting=t0+(spec.timing?.meetingOffsetSec??0)*1000,release=t0+(spec.actors.find(a=>a.id===input.actorId)?.releaseOffsetSec??0)*1000,windows=runs.get(input.actorId);
+  const region=spec.venue?.gardenRegion,meeting=t0+(spec.timing?.meetingOffsetSec??0)*1000,release=t0+(spec.actors.find(a=>a.id===input.actorId)?.releaseOffsetSec??0)*1000;
   if(region&&at>=Math.max(meeting,release)){
-   const inside=b.current&&p&&Math.hypot(p[0]-region.pos[0],p[1]-region.pos[1])<=region.radiusM,last=windows.at(-1);
-   if(inside){if(last&&last.open&&at-last.to<=maxSampleGapMs){last.to=at;last.lastEvidence=b.evidence;}else {windows.push({from:at,to:at,firstEvidence:b.evidence,lastEvidence:b.evidence,open:true});if(windows.length>32){windows.shift();for(const r of rows.values())if(r.spec.trigger.kind==='garden-group-overlap'&&r.status==='waiting')unmet(r,'first-overlap-history-unavailable');}}}
-   else if(last)last.open=false;
+   const member=!b.current||!p?undefined:pool?poolGardenAt(p,pool)?.ref:Math.hypot(p[0]-region.pos[0],p[1]-region.pos[1])<=region.radiusM?null:undefined;
+   for(const [garden,windows]of runs.get(input.actorId)){
+    const inside=member===garden,last=windows.at(-1);
+    if(inside){if(last&&last.open&&at-last.to<=maxSampleGapMs){last.to=at;last.lastEvidence=b.evidence;}else {windows.push({from:at,to:at,firstEvidence:b.evidence,lastEvidence:b.evidence,open:true});if(windows.length>32){windows.shift();for(const r of rows.values())if(r.spec.trigger.kind==='garden-group-overlap'&&r.status==='waiting')unmet(r,'first-overlap-history-unavailable');}}}
+    else if(last)last.open=false;
+   }
   }
   evaluate();
  }

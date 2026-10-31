@@ -33,6 +33,18 @@ Verified source facts:
   discovered. The walk holdout preserves agent choice and revision of its endpoint;
   library and bandstand form a sealed physically named candidate pool. No route
   sequence or endpoint coordinate is shown to the agents.
+- `eden-walk-three` is fixture version 2 (`gardenRule: garden-pool-v2`, declared
+  2026-10-31). The instruction names no garden, and native `explore garden` from
+  the field returns five, so the garden is a sealed pool like the endpoint:
+  Garden plots 1-4 and the stone garden (`gardenCandidates`, centres from the
+  template, v1's 4 m radius, nearest-centre membership in `garden-pool.mjs`).
+  The garden visit and its receipt use the reviewer-bound
+  `semantic.agreedGardenRef`; a garden outside the pool is out-of-fixture; no
+  agreement keeps the v1 stone garden. The errand trigger is the first 10-second
+  all-three overlap in one pool garden, and its proof names `gardenRef`.
+  Scorer evidence and the disturbance dispatcher/runner must declare
+  `fixtureVersion: 2`. Version 1 is git `3ad3c223d`; runs sealed under it keep
+  their v1 scores. Tests: `garden-pool-v2.test.mjs`.
 - Mars template operations move Chiba and its furnishings after initial placement.
   The final presenter box is [-14.412,-18.447]; the old cast's [-15.9,-20.6] is stale.
   `templateNames()` preserves first placement and is insufficient for this fixture.
