@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/cloud-session-start.sh", "timeout": 600 }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git merge-base:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(node --test:*)",
+      "Bash(node --check:*)",
+      "Bash(node tools/proof/tier.mjs:*)",
+      "Bash(node tools/changelog/compile.mjs --check)",
+      "Bash(node tools/assets/pull.mjs --check:*)",
+      "Bash(node tools/test-harness/walk/walk.mjs:*)",
+      "Bash(node .github/scripts/guards.mjs:*)",
+      "Bash(node .github/scripts/ci-scope.mjs:*)",
+      "Bash(pnpm install --frozen-lockfile)",
+      "Bash(pnpm assets:pull:*)",
+      "Bash(pnpm assets:check:*)",
+      "Bash(pnpm typecheck)",
+      "Bash(pnpm build)",
+      "Bash(pnpm test:*)",
+      "WebFetch(domain:sim.eden.art)",
+      "WebFetch(domain:assets.eden.art)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./**/.env)",
+      "Read(./**/.env.local)",
+      "Read(./**/.dev.vars)",
+      "Read(./**/.eden-agent.json)",
+      "Read(./**/.eden-god.json)",
+      "Read(./**/deploy.env)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push --mirror:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(ssh:*)",
+      "Bash(scp:*)",
+      "Bash(rsync:*)",
+      "Bash(modal:*)",
+      "Bash(tools/test-harness/release-gate.sh:*)",
+      "Bash(tools/world-launcher/deploy/ship.sh:*)",
+      "Bash(tools/world-launcher/deploy/release.sh:*)",
+      "Bash(tools/world-launcher/deploy/activate.sh:*)",
+      "Bash(node tools/cdn/publish.mjs:*)"
+    ]
+  }
+}
