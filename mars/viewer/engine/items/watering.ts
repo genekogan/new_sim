@@ -33,7 +33,7 @@ export type WateringParams = z.infer<typeof wateringParams>;
 export type WateringMotion = Omit<WateringParams, 'actor'> & { startTick: number; actionId?: string; abortedAt?: number };
 
 /** Timeline constants (s). The free hand on the valve uses the contact faculty's own reach and release times. */
-export const W = { fillIn: 0.7, valveReach: 0.65, valveHold: 0.35, valveRelease: 0.7, fullOut: 1.15, pourIn: 1.0, tiltIn: 0.8, untilt: 0.7, pourOut: 0.95, abortOut: 0.9 } as const;
+export const W = { fillIn: 0.7, valveReach: 0.9, valveHold: 0.35, valveRelease: 0.7, fullOut: 1.15, pourIn: 1.0, tiltIn: 0.8, untilt: 0.7, pourOut: 0.95, abortOut: 0.9 } as const;
 /** Spout tilt while pouring (rad): 50°, rising 6° as the can empties; the rose runs from 25°, fully from 35°. */
 export const TILT = 50 * Math.PI / 180, TILT_MORE = 6 * Math.PI / 180, FLOW_FROM = 25 * Math.PI / 180, FLOW_FULL = 35 * Math.PI / 180;
 /** A full can rides this much lower in the hand (m). */
