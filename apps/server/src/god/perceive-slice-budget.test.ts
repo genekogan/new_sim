@@ -111,10 +111,12 @@ test('queued perception reads replacement and deletion from the current model be
   }
   assert.equal(f.perceive.pending(), true);
   assert.equal(f.perceive.stats.runs, 1, 'the initial pass is still the only completed run');
-  assert.deepEqual(f.advanced, []);
-  assert.equal(f.logs().filter(row => row.action === 'advance').length, 0,
-    'exhausting the final apply defers the changed-object refresh to the next step');
-  assert.equal(f.states().get(f.ids[0])!.text, 'initial-0');
+  // L8 (2026-10-31, re-pinned): built kinds' advance is refresh-only, so each changed object is refreshed as it is applied
+  // (was: at the end of the run); a listing between slices reads every recomputed object's current state.
+  assert.deepEqual(f.advanced, f.ids, 'each applied object was refreshed in its own slice, FIFO');
+  assert.equal(f.logs().filter(row => row.action === 'advance').length, f.ids.length,
+    'the refresh is not deferred to the end of the run');
+  assert.equal(f.states().get(f.ids[0])!.text, 'changed-0');
   assert.equal(f.perceive.step(8), true);
   const referenceLiveOrder = [...reference.model.entities.keys()];
   assert.deepEqual(referenceLiveOrder, [...f.ids.filter((_, i) => i !== 1 && i !== 2), f.ids[2]],
