@@ -9,7 +9,8 @@
 // the per-tile patch follows L8's tiled Spatial.
 import { deckRaised, railGaps, rasterOf } from '@sim/generators';
 import { applyBatch, obbOverlap, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type ResidentMove, type WorldModel } from '@sim/world-compiler';
-import { assetFromDef, assetIdFor, isFixtureDef, isFloatingDef, nearestSurfaceSlot, nextEntityPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
+import { assetFromDef, assetIdFor, isFixtureDef, isFloatingDef, nearestSurfaceSlot, buildWorldEditPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
+import { createHash } from 'node:crypto';
 import type { WorldHost } from '../world.ts';
 import type { LogEvent } from '@sim/protocol';
 import type { EdgeLedger, FloorNear } from '../edge/ledger/ledger.ts';
@@ -202,7 +203,8 @@ type WriteBackBody = { pose: string; entity: Entity | undefined };
 
 export class EngineBridge {
   readonly host: WorldHost; readonly god: GodMode; readonly edge?: EdgeLedger;
-  /** What the engine was last told, per entity (JSON of its part), and the physics state that produced. */
+  /** What the engine was last told, per entity (sentKey of its part's JSON: a digest, not the text), and the physics
+   *  state that produced (the engine's own value once it folds the edit: entity-physics.ts buildWorldEditPhysics). */
   private sent = new Map<string, string>();
   private physics: EntityPhysicsV1 | undefined;
   private levels: Level[] = [];
@@ -418,8 +420,8 @@ export class EngineBridge {
     // engine share its parts and their cached hash texts (a clone made the first edit after boot stringify every part twice)
     this.physics = ep; this.levels = ep ? structuredClone(ep.levels) : [];
     // seed `sent` from the engine's own state so only real differences are sent
-    for (const [id, part] of Object.entries(ep?.byEntity ?? {})) this.sent.set(id, JSON.stringify(normPart(part as Part)));
-    for (const [id, e] of Object.entries(this.engine.world.entities)) if (e.tags?.includes('entity-world')) this.sent.set(id, JSON.stringify(normPart({ ...(ep?.byEntity[id] ?? {}), fixture: fixtureOfEngine(e) } as Part)));
+    for (const [id, part] of Object.entries(ep?.byEntity ?? {})) this.sent.set(id, sentKey(JSON.stringify(normPart(part as Part))));
+    for (const [id, e] of Object.entries(this.engine.world.entities)) if (e.tags?.includes('entity-world')) this.sent.set(id, sentKey(JSON.stringify(normPart({ ...(ep?.byEntity[id] ?? {}), fixture: fixtureOfEngine(e) } as Part))));
     const all = new Set<string>([...this.model.entities.keys(), ...this.sent.keys()]);
     this.send(all, 0, 'boot');
   }
@@ -455,11 +457,11 @@ export class EngineBridge {
       if (e && this.engineOwned(e)) continue;            // bodies and what they carry belong to the engine
       const part = e ? this.derive(e, assets, known) : null;
       for (const f of part?.surfaces ?? []) if (f.level) { const a = this.sendFloors.get(f.level) ?? []; a.push(f.obb); this.sendFloors.set(f.level, a); }
-      const key = part ? JSON.stringify(normPart(part)) : null;
+      const key = part ? sentKey(JSON.stringify(normPart(part))) : null;
       // A removed thing the engine still has (one a Soul held when it went: `sent` forgot it) is removed there too.
       const lingering = !e && (this.engine.world.entities[id]?.tags?.includes('entity-world') || !!this.physics?.byEntity[id]);
       if ((this.sent.get(id) ?? null) === key && !lingering) continue;
-      if (this.sent.get(id)?.includes('"links"') || part?.links?.length) linksMoved = true;
+      if (this.sent.get(id)?.startsWith('L') || part?.links?.length) linksMoved = true;
       set[id] = part;
       if (key) this.sent.set(id, key); else this.sent.delete(id);
     }
@@ -467,7 +469,7 @@ export class EngineBridge {
     // came, went or moved, every raised deck is derived again (only the changed ones are sent)
     if (linksMoved) for (const e of this.model.entities.values()) {
       if (set[e.id] !== undefined || !this.isRaisedDeck(e)) continue;
-      const part = this.derive(e, assets, known), key = part ? JSON.stringify(normPart(part)) : null;
+      const part = this.derive(e, assets, known), key = part ? sentKey(JSON.stringify(normPart(part))) : null;
       if ((this.sent.get(e.id) ?? null) === key) continue;
       set[e.id] = part;
       if (key) this.sent.set(e.id, key); else this.sent.delete(e.id);
@@ -475,7 +477,7 @@ export class EngineBridge {
     this.sendIds = null;
     if (!Object.keys(set).length) return;
     const draft: WorldEditV1 = { contract: 'world-edit/1', seq, hash: '', levels: structuredClone(this.levels), set, ...(Object.keys(assets).length ? { assets } : {}) };
-    this.physics = nextEntityPhysics(this.physics, draft);
+    this.physics = buildWorldEditPhysics(this.physics, draft);
     draft.hash = this.physics.hash;
     this.stats.edits++; this.stats.entities += Object.keys(set).length; this.stats.lastMs = Math.round((performance.now() - t0) * 10) / 10;
     const acceptance = { applied: false };
@@ -527,7 +529,7 @@ export class EngineBridge {
   /** Level ids still in use: by a part the engine holds (surfaces, link ends), one derived in this send, or a Soul. */
   private levelsInUse(): Set<number> {
     const live = new Set(this.levelsNow);
-    for (const key of this.sent.values()) for (const m of key.matchAll(/"level":(\d+)/g)) live.add(Number(m[1]));
+    for (const key of this.sent.values()) { const bar = key.indexOf('|'); if (bar > 1) for (const n of key.slice(1, bar).split(',')) live.add(Number(n)); }
     for (const e of Object.values(this.engine.world.entities) as { human?: { level?: number } }[]) if (e.human?.level) live.add(e.human.level);
     return live;
   }
@@ -1251,7 +1253,7 @@ export class EngineBridge {
       const e = this.model.entities.get(sid)!;
       // A thing in a body's hands is the engine's: forget what it was last told, so the god placing it again is sent.
       if (this.engineOwned(e)) { this.sent.delete(e.id); continue; }
-      this.sent.set(e.id, JSON.stringify(normPart(this.derive(e, {}, this.physics?.assets ?? {}) ?? {})));
+      this.sent.set(e.id, sentKey(JSON.stringify(normPart(this.derive(e, {}, this.physics?.assets ?? {}) ?? {}))));
     }
   }
 
@@ -1810,6 +1812,13 @@ export function rectOf(poly: Vec2[]): { c: Vec2; half: Vec2; yaw: number } {
   return { c: [r3(cu * ux - cv * uz), r3(cu * uz + cv * ux)], half: [r3((u1 - u0) / 2), r3((v1 - v0) / 2)], yaw: Math.abs(yaw) < 1e-9 ? 0 : r3(yaw) };
 }
 
+/** L4 #7: what `sent` keeps for a part's JSON: 'L' when it names stairs ("links": linksMoved), the levels it names
+ *  (levelsInUse), then a sha256 of the text (was the text itself: ~1 KB per entity, for equality only). Equal texts give
+ *  equal keys; RELEASED has no '|' and so never equals one. */
+function sentKey(json: string): string {
+  const levels = new Set<number>(); for (const m of json.matchAll(/"level":(\d+)/g)) levels.add(Number(m[1]));
+  return `${json.includes('"links"') ? 'L' : '-'}${[...levels].join(',')}|${createHash('sha256').update(json).digest('base64')}`;
+}
 function normPart(p: Part): Part { const o: Part = {}; if (p.surfaces?.length) o.surfaces = p.surfaces; if (p.solids?.length) o.solids = p.solids; if (p.links?.length) o.links = p.links; if (p.fixture) o.fixture = p.fixture; return o; }
 function fixtureOfEngine(e: any): FixtureSpecV1 { return { def: e.def, kind: e.kind === 'component' ? 'item' : 'fixture', label: e.label, p: [e.pose.p[0], e.pose.p[1], e.pose.p[2]], yaw: e.pose.yaw, ...(e.support ? { support: e.support } : {}), ...(e.kind !== 'component' && typeof e.level === 'number' ? { level: e.level } : {}) }; }
 function describeOp(op: Op, w: WorldModel): string {

@@ -84,6 +84,33 @@ export function nextEntityPhysics(prev: EntityPhysicsV1 | undefined, e: WorldEdi
   return cur;
 }
 
+/** L4 #7 (audit 2026-10-31): the physics a world-edit event was built into by its producer (the god bridge builds it to
+ *  log its hash), with the hash and seq of the physics it was built from. The engine's fold adopts that very value when
+ *  its own physics is the same one (same hash and seq: `nextEntityPhysics` is pure in exactly these), instead of building
+ *  it a second time: one build per edit, and one physics object shared by bridge and engine (was two full copies with
+ *  their own part clones, stable texts and admitted shapes; `nextEntityPhysics` retained 136 of 283 MB on a genesis
+ *  Eden 2026). A producer never mutates an event after this (the bridge only sets `hash` from the result). The entry
+ *  is taken by the first fold that reads it; replay, restore and any other engine build their own (same bytes). */
+const BUILT = new WeakMap<WorldEditV1, { prevHash: string; prevSeq: number; next: EntityPhysicsV1 }>();
+/** nextEntityPhysics for an event its caller is about to log: the engine's fold of that event adopts the result. */
+export function buildWorldEditPhysics(prev: EntityPhysicsV1 | undefined, e: WorldEditV1): EntityPhysicsV1 {
+  const next = nextEntityPhysics(prev, e);
+  BUILT.set(e, { prevHash: prev?.hash ?? '', prevSeq: prev?.seq ?? 0, next });
+  return next;
+}
+/** The physics `e` makes of `prev`: the one its producer built when that was from the same physics, else a new build. */
+function foldPhysics(prev: EntityPhysicsV1 | undefined, e: WorldEditV1): EntityPhysicsV1 {
+  const b = BUILT.get(e);
+  if (b) BUILT.delete(e);
+  if (b && b.prevHash === (prev?.hash ?? '') && b.prevSeq === (prev?.seq ?? 0) && b.next.hash === e.hash) {
+    if (CHECK_FOLD) { const own = nextEntityPhysics(prev, e); if (own.hash !== b.next.hash || own.seq !== b.next.seq || own.baseKey !== b.next.baseKey) throw new Error('entity-physics.adopted-differs'); }
+    return b.next;
+  }
+  return nextEntityPhysics(prev, e);
+}
+/** Oracle (tests, SIM_PHYSICS_CHECK=1): an adopted build is also built again and must match. */
+const CHECK_FOLD = typeof process !== 'undefined' && (process as { env?: Record<string, string | undefined> }).env?.SIM_PHYSICS_CHECK === '1';
+
 /** Labels are public perception metadata, not a reason to rebuild the navigation raster.
  * Compare only changed parts; fixtures are held separately from entityPhysicsV1. */
 export function worldEditChangesNavigation(world: WorldState, edit: WorldEditV1): boolean {
@@ -107,7 +134,7 @@ export function worldEditChangesNavigation(world: WorldState, edit: WorldEditV1)
  * because a body holds them (the server refuses such edits first; this is the engine's own guard).
  */
 export function applyWorldEdit(world: WorldState, e: WorldEditV1): { physics: EntityPhysicsV1; kept: string[] } {
-  const physics = nextEntityPhysics(world.entityPhysicsV1, e);
+  const physics = foldPhysics(world.entityPhysicsV1, e);
   registerAssets(physics.assets);
   world.entityPhysicsV1 = physics;
   const kept: string[] = [];
