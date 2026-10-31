@@ -3,7 +3,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {Hono} from 'hono';
-import {Admission, admissionMiddleware, classify, type RouteClass, type Ticket} from './load/admission.ts';
+import {Admission, admissionMiddleware, classify, FRAME_BUDGET_MS, frameBudgetMs, type RouteClass, type Ticket} from './load/admission.ts';
 import type {Level} from './load/shared.ts';
 
 const tick = () => new Promise(r => setTimeout(r, 2));
@@ -91,14 +91,16 @@ test('black: personal reads are shed at once, acts wait for their deadline answe
   f.adm.close();
 });
 
-test('budget: under contention a read over its Soul budget gets soul.slow-down + Retry-After; 3 in a minute → 60 s cool-down', async () => {
+test('budget: under contention a read over its Soul budget gets soul.slow-down + Retry-After; 3 impolite in a minute → 60 s cool-down', async () => {
   const f = fixture();
   // alone in a calm world A is never slowed, but its bucket is still charged: here learns ~500 ms, A spends its 2 s
   for (let i = 0; i < 12; i++) { const x = f.ask('A', route('GET', '/v1/edge/here'), 500); await tick(); await tick(); assert.equal(x.result, 'run'); f.advance(1000); }
   f.adm.setLoadLevel('red');   // budgets bind at red even for one Soul
   const slow: {retryAfterS: number; code: string}[] = [];
-  for (let i = 0; i < 3; i++) { const x = f.ask('A', route('GET', '/v1/edge/here')); if (typeof x.result === 'object') slow.push(x.result as never); }
-  assert.equal(slow.length, 3, JSON.stringify(slow)); assert.equal(slow[0].code, 'soul.slow-down'); assert.ok(slow[0].retryAfterS >= 1);
+  // the first refusal is polite (A was given no Retry-After yet); the next three ignore the one they were given: 3 strikes
+  // (re-pinned by srv-admission-calib: strikes count only impolite requests)
+  for (let i = 0; i < 4; i++) { const x = f.ask('A', route('GET', '/v1/edge/here')); if (typeof x.result === 'object') slow.push(x.result as never); }
+  assert.equal(slow.length, 4, JSON.stringify(slow)); assert.equal(slow[0].code, 'soul.slow-down'); assert.ok(slow[0].retryAfterS >= 1);
   const cooled = f.ask('A', route('POST', '/v1/edge/act'));
   assert.deepEqual([(cooled.result as {code: string}).code, (cooled.result as {retryAfterS: number}).retryAfterS], ['soul.slow-down', 60], 'cooled: even acts wait out the minute');
   f.advance(5000); const other = f.ask('B', route('GET', '/v1/edge/here')); await tick();
@@ -201,4 +203,106 @@ test('a read that cannot start before its deadline is answered world.busy at onc
   const act = f.ask('Y', route('POST', '/v1/edge/act'));
   assert.equal(act.result, undefined, 'the act queues');
   blocker.done(); f.adm.close();
+});
+
+const LEVELS4: Level[] = ['green', 'amber', 'red', 'black'];
+const r1 = (x: number) => Math.round(10 * x) / 10;
+test('frame budget from the measured quiet tick (srv-admission-calib): production 23/15/8/0, a 35 ms box 9/6/3/0', () => {
+  assert.deepEqual(LEVELS4.map(l => r1(frameBudgetMs(l, 12))), [22.8, 15, 7.6, 0], 'production (tick 12 ms): ≈ today');
+  assert.deepEqual(LEVELS4.map(l => r1(frameBudgetMs(l, 35))), [9, 6, 3, 0], 'a box ticking at 35 ms');
+  assert.deepEqual(LEVELS4.map(l => frameBudgetMs(l, 0)), [25, 15, 8, 0], 'not measured yet: the caps (today)');
+  assert.deepEqual(LEVELS4.map(l => frameBudgetMs(l, 5)), [25, 15, 8, 0], 'the laptop: capped at today');
+  assert.deepEqual(LEVELS4.map(l => frameBudgetMs(l, 60)), [2, 1, 0.5, 0], 'a tick that fills the frame: the floor, so the world still answers');
+  assert.deepEqual(LEVELS4.map(l => frameBudgetMs(l, Number.NaN)), [25, 15, 8, 0]);
+  for (const q of [0, 8, 12, 20, 35, 45, 49, 80]) for (const l of LEVELS4) assert.ok(frameBudgetMs(l, q) <= FRAME_BUDGET_MS[l], `${l}@${q}: never above today`);
+});
+
+test('world-total frame budget follows the quiet tick: at 12 ms and at 35 ms, requests take at most budget/50 of the thread', async () => {
+  for (const quiet of [12, 35]) for (const level of ['green', 'amber', 'red'] as Level[]) {
+    let now = 0, spent = 0; const adm = new Admission({now: () => now, yieldTurn: () => new Promise(() => {}), quietTickMs: () => quiet});
+    adm.setLoadLevel(level);
+    const queueAll = () => { for (let i = 0; i < 100; i++) { const k = `S${i}`; if (adm.outstanding.has(k)) continue; const t = adm.request({key: k, god: false, route: route('POST', '/v1/edge/act')}); if ('turn' in t) void t.turn.then(v => { if (v === 'run') { now += 2; spent += 2; t.done(); } }); } };
+    for (let step = 0; step < 200; step++) { queueAll(); await adm.drain(); now += 10; }
+    const share = spent / now, cap = frameBudgetMs(level, quiet) / 50;
+    assert.equal(adm.frameBudget(), frameBudgetMs(level, quiet));
+    assert.ok(share <= cap + 0.03, `${level}@${quiet}: requests took ${(100 * share).toFixed(1)} % of the thread (cap ${(100 * cap).toFixed(1)} %)`);
+    assert.ok(share >= cap * 0.6, `${level}@${quiet}: the budget is used (${(100 * share).toFixed(1)} %)`);
+    adm.close();
+  }
+});
+
+/** n Souls, each asking a `costMs` read every `periodMs` (staggered) and honouring every Retry-After, for `durMs` of
+ *  fake time on one thread (requests advance the clock by their cost). Counts what each Soul was refused. */
+async function soak(o: {quiet: number; n: number; costMs?: number; periodMs?: number; durMs?: number; level?: Level; polite?: boolean}) {
+  const {quiet, n, costMs = 150, periodMs = 4000, durMs = 240_000, level = 'green', polite = true} = o;
+  let now = 0; const adm = new Admission({now: () => now, yieldTurn: () => new Promise(() => {}), quietTickMs: () => quiet});
+  adm.setLoadLevel(level);
+  const next = Array.from({length: n}, (_, i) => i * periodMs / n), codes: Record<string, number> = {}; let ran = 0;
+  for (; now < durMs; now += 50) {
+    for (let i = 0; i < n; i++) {
+      if (now < next[i] || adm.outstanding.has('S' + i)) continue;
+      const t = adm.request({key: 'S' + i, god: false, route: route('GET', '/v1/edge/here')});
+      if ('refusal' in t) { codes[t.refusal.code] = (codes[t.refusal.code] ?? 0) + 1; next[i] = now + (polite ? t.refusal.retryAfterS * 1000 : 500); continue; }
+      next[i] = now + periodMs;
+      void t.turn.then(v => { if (v === 'run') { now += costMs; ran++; t.done(); } else codes[(v as {code?: string}).code ?? String(v)] = 1 + (codes[(v as {code?: string}).code ?? String(v)] ?? 0); });
+    }
+    await adm.drain(); await Promise.resolve();
+  }
+  adm.close();
+  return {codes, ran, cooled: adm.shed.cooled, adm};
+}
+
+test('per-Soul refill tied to the frame budget: the Souls\' buckets together never refill faster than the budget', () => {
+  for (const quiet of [0, 12, 35, 48]) for (const level of LEVELS4) for (const awake of [1, 2, 3, 6, 12, 24, 50, 100]) {
+    let now = 0; const adm = new Admission({now: () => now, quietTickMs: () => quiet}); adm.setLoadLevel(level);
+    for (let i = 0; i < awake; i++) { const t = adm.request({key: 'S' + i, god: false, route: route('POST', '/v1/edge/act')}); if ('turn' in t) { t.done(); } now += 1; }
+    assert.equal(adm.active(), awake);
+    const each = adm.refillPerS(), budgetPerS = 20 * frameBudgetMs(level, quiet);
+    assert.ok(awake * each <= budgetPerS + 1e-9, `${level}@${quiet} awake ${awake}: ${awake} × ${each} > ${budgetPerS}`);
+    assert.ok(each <= 200);
+    if (awake * 200 >= budgetPerS) assert.ok(Math.abs(awake * each - budgetPerS) < 1e-9, 'a crowd shares the whole budget');
+    adm.close();
+  }
+  const g = new Admission({quietTickMs: () => 35}); assert.equal(g.refillPerS(true), 125, 'the god reserve is unchanged'); g.setLoadLevel('amber'); assert.equal(g.refillPerS(true), 62.5); g.close();
+});
+
+test('production numbers (tick 12 ms): 12 Souls each get a 150 ms read every 4 s at green, never told to slow down', async () => {
+  const at = new Admission({quietTickMs: () => 12}); assert.ok(456 / 12 >= 150 / 4); at.close();
+  const r = await soak({quiet: 12, n: 12});
+  assert.equal(r.codes['soul.slow-down'] ?? 0, 0, JSON.stringify(r.codes)); assert.equal(r.cooled, 0);
+  assert.ok(r.ran >= 12 * 240 / 4 * 0.9, `reads answered: ${r.ran}`);
+});
+
+test('a 35 ms box: 4 Souls fit (budget 9 ms/frame = 180 ms/s); 12 are refused with Retry-After, within the budget, never cooled', async () => {
+  const four = await soak({quiet: 35, n: 4});
+  assert.deepEqual(four.codes, {}, JSON.stringify(four.codes)); assert.ok(four.ran >= 4 * 240 / 4 * 0.9, String(four.ran));
+  // 12 × 37.5 ms/s of demand against 180 ms/s: the buckets refill exactly what the dispatcher can serve, so the honest
+  // capacity shows as the queue's world.busy (Retry-After), not as strikes and not as request time taken from the tick
+  const twelve = await soak({quiet: 35, n: 12});
+  assert.ok(Object.values(twelve.codes).reduce((x, y) => x + y, 0) > 0, 'over capacity: refused with Retry-After ' + JSON.stringify(twelve.codes));
+  assert.equal(twelve.cooled, 0, 'honest Souls are never cooled');
+  assert.ok(twelve.ran * 150 <= 180 * 240 * 1.05 + 2000 * 12, `requests stayed within the budget's throughput: ${twelve.ran} reads`);
+});
+
+test('strikes only for impolite requests: a Soul that honours every Retry-After is never cooled; one that ignores it is, in 3', async () => {
+  // production numbers at green (budget 22.8 ms/frame = 456 ms/s); B holds a request in flight (contention), and A keeps
+  // asking for 400 ms reads: the dispatcher could serve A 456 ms/s, its bucket refills 200 ms/s, so A is over budget
+  for (const polite of [true, false]) {
+    let now = 0; const adm = new Admission({now: () => now, yieldTurn: () => new Promise(() => {}), quietTickMs: () => 12});
+    const hold = adm.request({key: 'B', god: false, route: route('GET', '/v1/edge/here')}); assert.ok('turn' in hold);
+    let at = 0, ran = 0, refused = 0, cooledAt = -1, strikesBeforeCool = 0;
+    for (; now < 600_000; now += 100) {
+      if (now < at || adm.outstanding.has('A')) { await adm.drain(); continue; }
+      const t = adm.request({key: 'A', god: false, route: route('GET', '/v1/edge/here')});
+      if ('refusal' in t) {
+        refused++;
+        if (t.refusal.retryAfterS === 60 && /in a minute/.test(t.refusal.message) && cooledAt < 0) { cooledAt = now; strikesBeforeCool = refused - 1; }
+        at = now + (polite ? t.refusal.retryAfterS * 1000 : 200);
+      } else { at = now; void t.turn.then(v => { if (v === 'run') { now += 400; ran++; t.done(); } }); }
+      await adm.drain(); await Promise.resolve();
+    }
+    adm.close();
+    if (polite) { assert.equal(adm.shed.cooled, 0, `polite: never cooled (${refused} refusals, ${ran} reads)`); assert.ok(refused > 0 && ran > 0, `over budget and still served: ${refused} refused, ${ran} ran`); }
+    else { assert.ok(adm.shed.cooled > 0, 'impolite: cooled'); assert.equal(strikesBeforeCool, 4, 'one polite refusal, then 3 impolite → the cool-down'); }
+  }
 });
