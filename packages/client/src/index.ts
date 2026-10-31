@@ -104,7 +104,7 @@ export type Handlers = {
   onPong?(pong:Extract<ServerMsg,{t:'pong'}>,receipt:PongReceipt):void;
   onTakes?(stream: Extract<ServerMsg, {t: 'takes'}>): void;
   onChange?(): void; onLog?(e: LogEvent[]): void; onBrain?(c: BrainCall[]): void; onCamera?(l: CameraLine): void; onTicker?(l: TickerLine[]): void;
-  onNarrative?(v: NarrativeView): void; onStats?(s: ServerStats): void; onKernel?(v: KernelView): void; onError?(code: string, message: string): void; onPlays?(p: PlayView[]): void; onTalk?(l: TalkLine[]): void; onWelcome?(me: Me | null, w: Extract<ServerMsg, { t: 'welcome' }>): void;
+  onNarrative?(v: NarrativeView): void; onStats?(s: ServerStats): void; onLoad?(level: 'green' | 'amber' | 'red' | 'black'): void; onKernel?(v: KernelView): void; onError?(code: string, message: string): void; onPlays?(p: PlayView[]): void; onTalk?(l: TalkLine[]): void; onWelcome?(me: Me | null, w: Extract<ServerMsg, { t: 'welcome' }>): void;
 };
 type WSLike = { send(s: string): void; close(): void; readyState: number; onopen: any; onmessage: any; onclose: any; onerror: any };
 export type PrivateMeSession={generation:number;worldId:string;epoch:string;connectionId:string;userId:string|null;revision:number};
@@ -126,6 +126,8 @@ export class Connection {
   private pendingHb: Heartbeat | null = null;
   private pingTimer: any = null;
   private reconnectTimer: any = null;
+  /** The world's load level from its last `{t:'load'}` frame (null until one arrives). */
+  load: 'green' | 'amber' | 'red' | 'black' | null = null;
   private lastMessageAt = 0;
   private resyncing = 0;
   /** The server process this replica was built from (batch numbers restart when the server does). */
@@ -261,6 +263,8 @@ export class Connection {
       let m:ServerMsg;try{m=JSON.parse(s) as ServerMsg;}catch{this.handlers.onError?.('message.invalid','The server message is not valid JSON.');return;}
       if(m&&typeof m==='object'&&(m as {type?:unknown}).type==='edge'){this.handlers.onEdge?.(m as unknown as EdgeSpectatorMessage);return;}
       if(!m||typeof m!=='object'||typeof m.t!=='string')return;
+      // LOAD-CONTRACT v1 §3: the hub's `{t:'load', level}` on change; a quiet hint, never an error.
+      if((m as {t:string}).t==='load'){const level=(m as {level?:unknown}).level;if(level==='green'||level==='amber'||level==='red'||level==='black'){this.load=level;this.handlers.onLoad?.(level);}return;}
       try{
         // columns/1 (lane JOINSET): a snapshot's entity table in the column form is put back exactly before anything reads it
         if(m.t==='snapshot'&&isPackedColumnsV1((m as {entities?:unknown}).entities))(m as {entities:unknown}).entities=unpackColumnsV1((m as unknown as {entities:Parameters<typeof unpackColumnsV1>[0]}).entities);
@@ -297,11 +301,15 @@ export class Connection {
       // after 50-150 ms: the launcher holds the new upgrade until the world is up again, so waiting longer only adds to
       // the visible pause. Only the first try: a server that closes again before welcoming us gets the backoff above.
       const restarting = ev?.code === 1001 && this.retry === 0;
+      // L6 (LOAD-CONTRACT v1 §3): jittered over the upper half of a window that doubles to a 30 s cap, so a world coming
+      // back is not met by every page at once and a page never retries faster than the floor; 1013 (the hub is full or the
+      // world is unavailable) waits at least 5 s.
+      const window = Math.min(30_000, 500 * 2 ** this.retry), backoffMs = Math.max(ev?.code === 1013 ? 5_000 : 0, window * (0.5 + 0.5 * Math.random()));
       // Resolve anonymous status during the existing jitter, never delaying the reconnect for auth.
       // A slow/failed lookup uses the ordinary frame hello. Recheck identity again once the socket opens.
       let anonymous=false;
       try{void this.getToken().then(token=>{anonymous=token===null;},()=>{});}catch{/* ordinary frame hello */}
-      this.reconnectTimer = setTimeout(() => this.open(anonymous), restarting ? 50 + 100 * Math.random() : Math.min(15_000, 500 * 2 ** this.retry) * (0.5 + Math.random()));
+      this.reconnectTimer = setTimeout(() => this.open(anonymous), restarting ? 50 + 100 * Math.random() : backoffMs);
       this.retry++;
     };
     ws.onerror = () => { try { ws.close(); } catch { /* already closed */ } };
