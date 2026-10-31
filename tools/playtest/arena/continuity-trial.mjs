@@ -106,11 +106,25 @@ async function verifyDevWorld(world,signal){
  return config;
 }
 
-const STDERR_TAIL_BYTES=4096;
-/** Last <=4 KB of launcher stderr as text, with credential-shaped values masked. */
-export function redactStderrTail(bytes){
+const STDERR_TAIL_BYTES=4096,STDERR_WINDOW_BYTES=16384;
+const SECRET_PATTERNS=[
+ [/\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]*/g,'[redacted]'], // JWT
+ [/\bsim_[A-Za-z0-9_-]{16,}/g,'[redacted]'], // Soul token sim_<soul>_<base64url> (apps/server/src/auth.ts)
+ [/\b(sk|pk|rk|ghp|gho|xox[abp])[-_][A-Za-z0-9_-]{8,}/g,'[redacted]'],
+ [/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi,'$1 [redacted]'],
+ // key=value, key: value and JSON "key":"value", also backslash-escaped inside a JSON-stringified line.
+ [/((?:token|secret|password|passwd|api[-_]?key|authorization|cookie)\\*["']?\s*[:=]\s*\\*["']?)[^\s"'\\,;}]+/gi,'$1[redacted]'],
+];
+const dropPartialFirstLine=text=>{const at=text.indexOf('\n');return at<0?'':text.slice(at+1);};
+/** Last <=4 KB of launcher stderr as text. Masks the whole retained window
+ * first, then cuts; a line cut at either edge is dropped, never half-kept. */
+export function redactStderrTail(bytes,{truncated=false}={}){
  if(!bytes?.length)return null;
- return bytes.toString('utf8').replace(/\b(sk|pk|rk|ghp|gho|xox[abp])[-_][A-Za-z0-9_-]{8,}/g,'[redacted]').replace(/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi,'$1 [redacted]').replace(/((?:token|secret|password|passwd|api[-_]?key|authorization|cookie)["']?\s*[:=]\s*["']?)[^\s"',;}]+/gi,'$1[redacted]');
+ let text=bytes.toString('utf8');if(truncated)text=dropPartialFirstLine(text);
+ for(const [pattern,replacement] of SECRET_PATTERNS)text=text.replace(pattern,replacement);
+ const masked=Buffer.from(text,'utf8');
+ if(masked.length>STDERR_TAIL_BYTES)text=dropPartialFirstLine(masked.subarray(masked.length-STDERR_TAIL_BYTES).toString('utf8'));
+ return text||null;
 }
 // Existing launcher/controller unchanged. Parent registration happens on receipt
 // of emitted session-created, not synchronously before the child's naming RPC.
@@ -126,7 +140,7 @@ export async function runManagedTrialActor({folder,directory,text,model,effort,r
  const args=[script,'--folder',folder,'--state',state,'--instruction',instruction,'--model',model,'--effort',effort,'--session-name',name,'--evidence',join(directory,'agent-evidence.jsonl'),'--seconds',String(localSeconds)];
  writeFileSync(join(directory,'controller.ndjson'),'',{flag:'wx',mode:0o600});
  const child=spawnProcess(process.execPath,args,{stdio:['ignore','pipe','pipe']});
- const controllers=new Map(),decoder=new StringDecoder('utf8');let sourceLine=0,exit=null,buffer='',failureCode=null,killTimer,drainTimer,shutdownTimer,leaderExited=false,stopping=false,pipeDrainTimedOut=false,finished=false,resolveDone,stderrBytes=0,stdoutBytes=0,stderrTail=Buffer.alloc(0);
+ const controllers=new Map(),decoder=new StringDecoder('utf8');let sourceLine=0,exit=null,buffer='',failureCode=null,killTimer,drainTimer,shutdownTimer,leaderExited=false,stopping=false,pipeDrainTimedOut=false,finished=false,resolveDone,stderrBytes=0,stdoutBytes=0,stderrTail=Buffer.alloc(0),stderrTruncated=false;
  const done=()=>{if(finished)return;finished=true;resolveDone();};
  const forceDrain=()=>{
   if(finished)return;
@@ -162,13 +176,13 @@ export async function runManagedTrialActor({folder,directory,text,model,effort,r
  });
  // Unstructured stderr may contain host configuration. Retain counts plus a
  // bounded, credential-redacted tail: the launcher's own last fault line.
- child.stderr.on('data',chunk=>{stderrBytes=Math.min(Number.MAX_SAFE_INTEGER,stderrBytes+chunk.length);stderrTail=Buffer.concat([stderrTail,chunk]);if(stderrTail.length>STDERR_TAIL_BYTES)stderrTail=stderrTail.subarray(stderrTail.length-STDERR_TAIL_BYTES);});
+ child.stderr.on('data',chunk=>{stderrBytes=Math.min(Number.MAX_SAFE_INTEGER,stderrBytes+chunk.length);stderrTail=Buffer.concat([stderrTail,chunk]);if(stderrTail.length>STDERR_WINDOW_BYTES){stderrTail=stderrTail.subarray(stderrTail.length-STDERR_WINDOW_BYTES);stderrTruncated=true;}});
  signal.addEventListener('abort',terminate,{once:true});if(signal.aborted)terminate();
  try{
   const creation={state:'launcher-spawned',launcherPid:child.pid,at:Date.now()};appendFileSync(join(directory,'controller.ndjson'),JSON.stringify(creation)+'\n');emit(creation,`${basename(directory)}/controller.ndjson:${++sourceLine}`);
   await completed;
  }catch(error){failureCode??=code(error);terminate();await completed;}finally{clearTimeout(killTimer);clearTimeout(drainTimer);clearTimeout(shutdownTimer);signal.removeEventListener('abort',terminate);}
- return {kind:'managed-continuity-runtime',launcherPid:child.pid,exit,failureCode,stderrBytes,stderrTail:redactStderrTail(stderrTail),stdoutBytes,pipeDrainTimedOut,evidenceComplete:!pipeDrainTimedOut,localSeconds,controllers:[...controllers.values()],endedAt:Date.now(),modelRequested:model,effortRequested:effort,actualModel:null,actualEffort:null,registrationOrdering:'emitted-before-child-name-rpc; parent-receipt registration is not synchronous durability'};
+ return {kind:'managed-continuity-runtime',launcherPid:child.pid,exit,failureCode,stderrBytes,stderrTail:redactStderrTail(stderrTail,{truncated:stderrTruncated}),stdoutBytes,pipeDrainTimedOut,evidenceComplete:!pipeDrainTimedOut,localSeconds,controllers:[...controllers.values()],endedAt:Date.now(),modelRequested:model,effortRequested:effort,actualModel:null,actualEffort:null,registrationOrdering:'emitted-before-child-name-rpc; parent-receipt registration is not synchronous durability'};
 }
 
 

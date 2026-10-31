@@ -7,7 +7,7 @@ import {mkdtempSync,mkdirSync,readFileSync,writeFileSync,appendFileSync,statSync
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import * as trialModule from './continuity-trial.mjs';
-import {CONTINUITY_ARMS,validateContinuityTrial,prepareR400Seat,runContinuityTrial,runManagedTrialActor,verifyBaselineTrialExit} from './continuity-trial.mjs';
+import {CONTINUITY_ARMS,validateContinuityTrial,prepareR400Seat,runContinuityTrial,runManagedTrialActor,verifyBaselineTrialExit,redactStderrTail} from './continuity-trial.mjs';
 import {verifyOwnedProbeExit,probeSessions} from './probe-sessions.mjs';
 import {buildContinuityBaselineArgs} from './adapters/continuity-baseline.mjs';
 
@@ -216,6 +216,25 @@ test('managed adapter uses existing launch, private evidence and exact cleanup m
  assert(spawned.args[0].endsWith('/soul-runtime/launch.mjs'));assert.equal(spawned.args[spawned.args.indexOf('--seconds')+1],'1');assert.equal(result.localSeconds,1);assert(spawned.args.includes('--evidence'));
  assert.equal(readFileSync(join(directory,'instruction.txt'),'utf8'),'entire mission');assert.equal(result.controllers[0].closed.ownedProcessesExited,true);
  assert(states.some(row=>row.state==='session-recovered'&&row.threadId==='t1'));assert.equal(result.actualEffort,null);
+});
+
+test('stderr tail masks before cutting: a secret straddling the 4 KB cut leaves no unmasked suffix',async t=>{
+ const f=fixture(t),directory=join(f.root,'stderr-straddle');mkdirSync(directory);const stop=new AbortController();
+ const child=new EventEmitter();child.pid=231;child.stdout=new PassThrough();child.stderr=new PassThrough();child.kill=()=>true;
+ const pending=runManagedTrialActor({folder:'/paired/current',directory,text:'mission',model:'m',effort:'high',remainingSeconds:1,name:'n',signal:stop.signal},{spawnProcess:()=>child});
+ const secret='Z9'.repeat(40),line='token='+secret+'\n',after='y'.repeat(4096-line.length+20)+'\nError: CONTROLLER_ABSENCE_UNKNOWN\n';
+ for(const chunk of [line.slice(0,30),line.slice(30),after])child.stderr.write(chunk);
+ await new Promise(resolve=>setImmediate(resolve));child.emit('exit',1,null);child.emit('close',1,null);const result=await pending;
+ assert(Buffer.byteLength(result.stderrTail)<=4096);assert.match(result.stderrTail,/CONTROLLER_ABSENCE_UNKNOWN\n$/);assert(Buffer.byteLength(line+after)>4096,'raw cut would land inside the secret');assert(!result.stderrTail.includes('Z9Z9'),'no straddling suffix');assert.match(result.stderrTail,/^token=\[redacted\]\n/);
+});
+
+test('stderr tail masks JSON-escaped keys, Soul tokens and JWTs; a truncated window drops its partial first line',()=>{
+ const soul='sim_s_reader_'+'A-b_'.repeat(8),jwt='eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.c2lnbmF0dXJlLXZhbHVl';
+ const raw=JSON.stringify({reason:JSON.stringify({token:'opaque-secret-1',apiKey:'opaque-secret-2'})})+'\n'+`auth ${soul} jwt ${jwt}\n`;
+ const out=redactStderrTail(Buffer.from(raw));
+ for(const leaked of ['opaque-secret-1','opaque-secret-2',soul.slice(13),'c2lnbmF0dXJl'])assert(!out.includes(leaked),leaked);
+ assert.match(out,/\\"token\\":\\"\[redacted\]/);assert.match(out,/auth \[redacted\] jwt \[redacted\]/);
+ assert.equal(redactStderrTail(Buffer.from('cret-suffix-not-a-key\nError: X\n'),{truncated:true}),'Error: X\n');assert.equal(redactStderrTail(Buffer.alloc(0)),null);
 });
 
 test('managed leader exit with an inherited pipe but no close drains within a bound and retains unknown cleanup',async t=>{
