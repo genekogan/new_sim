@@ -255,7 +255,7 @@ export function healthDash(o) {
       return { slug: w.slug, name: w.name ?? w.slug, template: w.template ?? null, status: st.status, viewers: o.live.get(w.slug) ?? 0,
         lastVisit: iso(kid?.lastUsed ?? w.lastLookAt ?? null), rssMb: st.pid ? rss.get(st.pid) ?? null : null, souls: s?.souls ?? w.souls ?? null,
         entities: s?.entities ?? w.entities ?? null, tickMs: h?.tickMs ?? null, clockRate: h?.clockRate ?? null, tickAt: iso(h?.at), lastEdit: iso(editAt(w.slug)),
-        restarts: st.restarts ?? 0, ...(o.ceilings ? { limits: o.ceilings.limits(w.slug), refused: o.ceilings.refused(w.slug) } : {}), upSince: iso(st.upSince), lastExit: st.lastExit ? { code: st.lastExit.code ?? null, signal: st.lastExit.signal ?? null, at: iso(st.lastExit.at) } : null };
+        restarts: st.restarts ?? 0, ...(st.restartsByReason ? { restartsByReason: st.restartsByReason } : {}), watchdogPort: st.healthPort ?? null, ...(st.held ? { held: st.held } : {}), ...(o.ceilings ? { limits: o.ceilings.limits(w.slug), refused: o.ceilings.refused(w.slug) } : {}), upSince: iso(st.upSince), lastExit: st.lastExit ? { code: st.lastExit.code ?? null, signal: st.lastExit.signal ?? null, at: iso(st.lastExit.at) } : null };
     }).sort((a, b) => (b.viewers - a.viewers) || String(b.lastVisit ?? '').localeCompare(String(a.lastVisit ?? '')));
 
     const keeper = readJson(join(o.dataDir, 'keeper.json'));

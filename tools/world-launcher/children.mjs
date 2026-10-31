@@ -61,8 +61,10 @@ export class ChildPool {
   // ---------- handover between launcher generations (keeper.mjs; lane C4 downtime)
   /** A world still run by the previous launcher (its child, its port): proxied to as is until takeOver(). Never booted,
    *  stopped, put to sleep or restarted by this pool while adopted, so its database has exactly one writer. */
-  adopt(world, { port, pid, script }) {
-    this.kids.set(world.slug, { slug: world.slug, world, restarts: 0, crashes: 0, status: 'running', port, child: null, adopted: { pid, script }, upSince: Date.now(), lastExit: null, ready: null, stopped: false, lastUsed: Date.now() });
+  adopt(world, { port, pid, script, healthPort }) {
+    // its watchdog port (lane L1) stays held here too: the next process keeps it (the old one is gone before the new
+    // one's watchdog listens), and no other world of this launcher may take it meanwhile
+    this.kids.set(world.slug, { slug: world.slug, world, restarts: 0, crashes: 0, status: 'running', port, ...(Number.isInteger(healthPort) ? { healthPort } : {}), child: null, adopted: { pid, script }, upSince: Date.now(), lastExit: null, ready: null, stopped: false, lastUsed: Date.now() });
     this.savePids();
   }
   /** Take an adopted world over: `release(slug)` makes the previous launcher stop it (snapshot saved, process gone);
@@ -110,7 +112,9 @@ export class ChildPool {
   /** Start the world's next process in standby (SIM_STANDBY=1, apps/server/src/standby.ts) on its current port, which
    *  is free again once the previous process is released; resolves when it reports its code loaded. */
   async standby(k, timeoutMs = 60_000) {
-    k.healthPort = await this.pickHealthPort(k, k.port);
+    // an adopted world keeps its watchdog port: the standby process opens it only after its go, when the previous
+    // process is gone (takeOver awaits gone()); a world that had none gets one if the range has room
+    if (!k.healthPort) k.healthPort = await this.pickHealthPort(k, k.port);
     const t0 = Date.now(), run = this.launch(k, k.port, { SIM_STANDBY: '1' }, { rotate: false });
     await new Promise((yes, no) => {
       let buf = '';
@@ -159,7 +163,7 @@ export class ChildPool {
   /** The next launcher's canary failed (keeper.mjs): this pool runs its worlds again. */
   unfence() { this.fenced = false; }
   /** The running children, for the next launcher to adopt. */
-  handoverList() { for (const k of this.kids.values()) this.thaw(k); return [...this.kids.values()].filter((k) => k.child && k.status === 'running').map((k) => ({ slug: k.slug, port: k.port, pid: k.child.pid, script: k.script })); }
+  handoverList() { for (const k of this.kids.values()) this.thaw(k); return [...this.kids.values()].filter((k) => k.child && k.status === 'running').map((k) => ({ slug: k.slug, port: k.port, pid: k.child.pid, script: k.script, ...(k.healthPort ? { healthPort: k.healthPort } : {}) })); }
 
   /** Children a previous launcher left running (it was killed hard): stop them before anyone opens their databases again. */
   async reapOrphans() {
@@ -182,7 +186,7 @@ export class ChildPool {
   savePids() {
     if (!this.o.pidFile) return;
     const rec = {};
-    for (const k of this.kids.values()) if (k.child?.pid) rec[k.slug] = { pid: k.child.pid, port: k.port, script: k.script }; else if (k.adopted?.pid) rec[k.slug] = { pid: k.adopted.pid, port: k.port, script: k.adopted.script };
+    for (const k of this.kids.values()) if (k.child?.pid) rec[k.slug] = { pid: k.child.pid, port: k.port, script: k.script, ...(k.healthPort ? { healthPort: k.healthPort } : {}) }; else if (k.adopted?.pid) rec[k.slug] = { pid: k.adopted.pid, port: k.port, script: k.adopted.script, ...(k.healthPort ? { healthPort: k.healthPort } : {}) };
     const tmp = `${this.o.pidFile}.${process.pid}.tmp`;
     try { writeFileSync(tmp, JSON.stringify(rec, null, 2) + '\n'); renameSync(tmp, this.o.pidFile); } catch { /* best effort */ }
   }
@@ -245,7 +249,7 @@ export class ChildPool {
     const k = this.kids.get(slug);
     if (!k) return { status: 'stopped' };
     return { status: k.frozen || (k.asleep && k.status === 'stopped') ? 'asleep' : k.status, ...(k.frozen ? { frozen: true } : {}), port: k.port, pid: k.child?.pid ?? k.adopted?.pid ?? null, ...(k.adopted ? { adopted: true } : {}), restarts: k.restarts, upSince: k.upSince, lastExit: k.lastExit,
-      ...(k.restartsBy ? { restartsByReason: { ...k.restartsBy } } : {}), ...(k.lastBootMs != null ? { lastBootMs: k.lastBootMs } : {}), ...(k.healthPort ? { healthPort: k.healthPort } : {}), ...(k.held ? { held: { ...k.held } } : {}), ...(k.wedging ? { wedging: { ...k.wedging } } : {}),
+      ...(k.restartsBy ? { restartsByReason: { ...k.restartsBy } } : {}), ...(k.lastBootMs != null ? { lastBootMs: k.lastBootMs } : {}), ...(k.healthPort ? { healthPort: k.healthPort } : k.noHealthPort ? { watchdog: 'none: live.json + main /healthz' } : {}), ...(k.held ? { held: { ...k.held } } : {}), ...(k.wedging ? { wedging: { ...k.wedging } } : {}),
       ...(k.boot && (k.status === 'starting' || k.status === 'handover') ? { boot: { ...k.boot } } : {}), ...(k.nextTryAt && k.status === 'restarting' ? { nextTryAt: k.nextTryAt } : {}),
       ...(k.live ? { level: k.live.level ?? null } : {}) };
   }
@@ -257,8 +261,9 @@ export class ChildPool {
     if (!this.o.healthPorts) return null;
     const [lo, hi] = this.o.range, used = this.usedPorts(k.slug);
     const prefer = k.healthPort && k.healthPort !== mainPort && !used.has(k.healthPort) ? [k.healthPort] : [];
-    for (const p of [...prefer, ...Array.from({ length: hi - lo + 1 }, (_, i) => hi - i)]) if (p !== mainPort && !used.has(p) && await portFree(p)) return p;
-    return null;
+    for (const p of [...prefer, ...Array.from({ length: hi - lo + 1 }, (_, i) => hi - i)]) if (p !== mainPort && !used.has(p) && await portFree(p)) { k.noHealthPort = false; return p; }
+    if (!k.noHealthPort) this.log(`world ${k.slug}: no free watchdog port in ${lo}-${hi}; liveness from live.json and the main /healthz only`);
+    k.noHealthPort = true; return null;
   }
   async pickPort(prefer, self) {
     const [lo, hi] = this.o.range, used = this.usedPorts(self);

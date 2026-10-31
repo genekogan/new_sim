@@ -869,6 +869,7 @@ export async function openLauncher(cfg = {}) {
   // lane L1 (LOAD-CONTRACT §4): every running world is looked at (wedged: restarted); what the guard finds (wedged, held,
   // crashloop, bootSlow) is in /__sim/healthz at once and in <data>/world-problems.json for deploy/host-health.mjs
   if (cfg.guard !== false) pool.startGuard();
+  if (cfg.guard !== false && !pool.o.healthPorts && !cfg.command) log(`no watchdog ports: children ${range[0]}-${range[1]} has ${range[1] - range[0] + 1} ports for ${prod.maxRunning} running worlds (2 each needed); liveness from live.json and the main /healthz only`);
   const problemsFile = join(dataDir, 'world-problems.json');
   const writeProblems = () => { try { writeFileSync(`${problemsFile}.tmp`, JSON.stringify({ at: new Date().toISOString(), problems: pool.problems() }) + '\n'); renameSync(`${problemsFile}.tmp`, problemsFile); } catch { /* next time */ } };
   writeProblems(); const problemsTimer = setInterval(writeProblems, cfg.problemsEveryMs ?? 10_000); problemsTimer.unref();

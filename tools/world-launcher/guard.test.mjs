@@ -185,3 +185,16 @@ test('(e) the launcher: a wedge is in /__sim/healthz (hostCodes) and world-probl
     assert.equal((await fetch(`${base}/w/${slug}/healthz`)).status, 200, 'resumed: the next visit boots it');
   } finally { await L.close(); }
 });
+
+test('watchdog ports across a handover: an adopted world keeps its port, held from every other world here, passed on again', async () => {
+  const p = pool(R, {}, { healthPorts: true });
+  p.adopt(world('ho'), { port: 5101, pid: 999_999, script: 'x', healthPort: 5103 });
+  assert.ok(p.usedPorts().has(5101) && p.usedPorts().has(5103), 'both of the previous process\'s ports are held');
+  const port = await p.ensure(world('other'));
+  assert.equal(port, 5102); assert.equal(p.state('other').healthPort, null, 'no third port: runs without one');
+  assert.ok(p.lines.some((l) => /world other: no free watchdog port in 5101-5103; liveness from live.json and the main \/healthz only/.test(l)), 'the degraded mode is said once');
+  assert.match(p.status('other').watchdog, /none/);
+  assert.equal(p.status('ho').healthPort, 5103);
+  p.kids.delete('ho');
+  await p.closeAll();
+});
