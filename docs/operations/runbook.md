@@ -123,19 +123,13 @@ build's world list at `/`, on the current release. Its launcher runs with `--old
   ```
 
   Do not move the stage link yourself; activate.sh records `legacy.previous` for its rollback.
-- **Stage setup:** `deploy/old-worlds/legacy-stage.sh check | setup | start | register | stop | status`, run as root
-  from inside the release it serves. `setup` is idempotent (settings, memory drop-in, stage link, data dirs, fork
-  descriptors) and never starts anything or overwrites a world's data; `register` adds the three forks, not
-  claimable. `LG_SCRATCH=1` runs a rehearsal twin on scratch paths and ports (`legacy-rehearsal.sh up|down|purge`).
-- **Redirect switch** (off by default): `deploy/old-worlds/legacy-redirects.sh status | on [key=/worlds/w/<slug>/ ...]
-  | off` writes `<data>/redirects.json`, which the launcher re-reads per request (`tools/world-launcher/redirects.mjs`).
-  Only page loads of `/`, `/w/<key>` and `/w/<key>/` get a 302; agents, the API and live viewers keep the original
-  world, and `?stay=1` always opens it. Each target must answer 200 before the switch turns on.
-- **Migration kit:** the other files in `deploy/old-worlds/` (`cutover.sh`, `rollback.sh`, `pack-release.py`,
-  `verify-release.py`, `run-world.mjs`, `port-map.mjs`, the `sim-old*` units, the parity and walk helpers,
-  `rollback-rehearsal.sh`, `dbhash.py`, `install-deps.sh`, `online-backup.py`,
-  `standin-runner.mjs`) moved the original worlds onto the host once. Releases do not use them, except
-  `compact-copy.py` (the row-verified compact database copy behind the release backups).
+- **Stage settings:** `/etc/sim-worlds/legacy.conf` and the legacy memory drop-in come back with every snapshot in
+  `host-config/` ([disaster recovery](disaster-recovery.md#3-secrets-and-settings)). The stage's world forks are
+  registered once and are not claimable; releases never re-register them.
+- **Redirect switch** (off by default): `<data>/redirects.json`, re-read when it changes
+  (`tools/world-launcher/redirects.mjs` documents the format): `enabled`, an optional `home` for `/`, and a target path
+  per original world. Only page loads of `/`, `/w/<key>` and `/w/<key>/` get a 302; agents, the API and live viewers
+  keep the original world, and `?stay=1` always opens it. Check that each target answers 200 before turning it on.
 
 ## After a reboot
 

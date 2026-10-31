@@ -61,8 +61,7 @@ Provision these by name; each is root:simworlds 0640 and never committed:
 
 The non-secret host settings come back with the data: every snapshot carries `host-config/` with the stage's
 `/etc/sim-worlds/<stage>.conf`, its memory drop-in, `/etc/caddy/sites/sim.caddy` and `/etc/caddy/sim-blobs.snippet`.
-Install `legacy.conf` and the legacy memory drop-in from there (step 4), or write them by hand; the line
-`legacy-stage.sh` defines is:
+Install `legacy.conf` and the legacy memory drop-in from there (step 4), or write them by hand; the legacy line is:
 
 ```sh
 SIM_WORLDS_ARGS=--old-worlds-root --port <port> --range <first>-<last> --data /srv/sim-worlds-data/legacy --public-origin https://sim.eden.art --auth-env /etc/sim-worlds/production-auth.env --max-worlds 3 --max-running 3 --min-free-mb 1500 --create-limit 0 --mars-web /srv/sim-worlds/legacy/mars-web --eager 3

@@ -26,7 +26,7 @@ The deterministic engine running live in the browser. Run `pnpm --filter mars-ca
 ## Scenario families
 
 Each selectable preset has a contract (group, start controls, terminal effects, limits, test references) in
-`mars/docs/engineering/SCENARIO_COVERAGE.json`; the panel shows the generated text (`app/lab/scenario-contracts.ts`).
+`mars/viewer/deploy/scenario-coverage.json`; the panel shows the generated text (`app/lab/scenario-contracts.ts`).
 Groups:
 
 | Group | Examples |

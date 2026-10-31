@@ -66,7 +66,7 @@ execution is deterministic and needs no LLM calls.
 | Renderer and camera adapters | Map authoritative state to poses and detached camera observations; no authority over entities, claims or outcomes |
 
 Each selectable preset has a contract (group, start controls, terminal effects, limits, test references) in
-`mars/docs/engineering/SCENARIO_COVERAGE.json`. `node deploy/scenario-contracts.mjs` generates
+`mars/viewer/deploy/scenario-coverage.json`. `node deploy/scenario-contracts.mjs` generates
 `app/lab/scenario-contracts.ts` from it (do not edit that file by hand); `--check` and
 `engine/test/scenario-contracts.test.ts` verify parity. A catalog row is not proof that the preset completes.
 

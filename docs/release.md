@@ -88,7 +88,7 @@ Steps, each checked by `ship/checks.mjs`:
 | Step | What it does | Pass when |
 |---|---|---|
 | preflight | Local only: clean tree, `node_modules`, Mars web assets, every ship tool present, the probe god folder, an unused output folder | nothing is missing |
-| backup | Copies `ship/compact-backup.sh`, `old-worlds/compact-copy.py` and `ship/quick-check.mjs` to the host; makes a row-verified compact copy of every production and legacy database (`/srv/sim-worlds-data/release-backups/pre-r<n>-<stage>-<time>`); runs `PRAGMA quick_check` on each | every copied row matches its source; every database `ok` |
+| backup | Copies `ship/compact-backup.sh`, `ship/compact-copy.py` and `ship/quick-check.mjs` to the host; makes a row-verified compact copy of every production and legacy database (`/srv/sim-worlds-data/release-backups/pre-r<n>-<stage>-<time>`); runs `PRAGMA quick_check` on each | every copied row matches its source; every database `ok` |
 | legacy-upload | `release.sh legacy`: builds and uploads `we-<sha12>-root` without activating it | exit 0 |
 | probe-start | Starts `release-probe.mjs` in the background (desktop and phone pages, god CLI edits in the probe world, `--expect-build we-<sha12>`); waits for `<out>/probe/ready` | ready in time |
 | release | `release.sh production --reload` | exit 0 |

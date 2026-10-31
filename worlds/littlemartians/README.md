@@ -17,7 +17,5 @@ share coordinates; movement, clearance and admission remain engine operations.
 The server requires the verified owner before seeding; one day is 72,000 ticks.
 
 Activity admission: `tools/floaters/POLICY.md`. Continuous movement/restart tests:
-`packages/engine-mars/src/worlds.test.ts`. Long fake qualification:
-`SOAK_DIR=<isolated-directory> BRAIN_MODE=fake node --expose-gc infra/soak-worlds.ts`.
-This starts no HTTP listener and rejects physical recovery as a failed soak.
+`packages/engine-mars/src/worlds.test.ts`.
 Lab `/l/littlemartians` is a separate paused browser-only snapshot.
