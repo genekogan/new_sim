@@ -2,9 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import {
-  Blocked, blockedMessage, checkLocal, contentType, githubTarget, httpTarget, linkMedia, pickTarget, releaseAssetName, uniqueName, uploadAll,
+  Blocked, blockedMessage, checkLocal, contentType, embedLine, githubTarget, httpTarget, linkMedia, makePreview, pickTarget, previewArgs, previewPath,
+  releaseAssetName, uniqueName, uploadAll, PREVIEW_MAX_BYTES,
 } from './upload.mjs';
 
 const dir = mkdtempSync(join(tmpdir(), 'proof-upload-'));
@@ -131,4 +132,36 @@ test('the blocked message names the files and the retry command, and forbids com
   assert.ok(m.includes(clip));
   assert.match(m, /upload\.mjs --pr 7 --proof/);
   assert.match(m, /Never commit media/);
+});
+
+test('previews: a GIF beside the clip, smaller frames until it fits 5 MB, skipped without ffmpeg', () => {
+  assert.equal(previewPath('/x/.e2e/desktop.mp4'), '/x/.e2e/desktop.preview.gif');
+  const args = previewArgs({ input: 'a.mp4', output: 'a.preview.gif', start: 2, seconds: 5, width: 360, fps: 8 });
+  assert.deepEqual(args.slice(args.indexOf('-ss'), args.indexOf('-ss') + 4), ['-ss', '2', '-t', '5']);
+  assert.match(args[args.indexOf('-vf') + 1], /^fps=8,scale=360:-2.*palettegen.*paletteuse/);
+  const widths = [];
+  const sizes = [9 * 1024 ** 2, 4 * 1024 ** 2];
+  const p = makePreview('/x/desktop.mp4', { ffmpeg: a => widths.push(Number(/scale=(\d+)/.exec(a[a.indexOf('-vf') + 1])[1])), size: () => sizes.shift() });
+  assert.deepEqual(widths, [480, 360]);
+  assert.deepEqual(p, { file: '/x/desktop.preview.gif', bytes: 4 * 1024 ** 2, width: 360, fps: 8 });
+  assert.match(makePreview('/x/d.mp4', { ffmpeg: () => {}, size: () => PREVIEW_MAX_BYTES + 1 }).skipped, /over 5 MB/);
+  assert.equal(makePreview('/x/d.mp4', { ffmpeg: () => { throw Object.assign(Error('spawn ffmpeg ENOENT'), { code: 'ENOENT' }); } }).skipped, 'ffmpeg is not installed');
+});
+
+test('uploadAll: each video gets its preview uploaded beside it and recorded in proof.json; images do not', async () => {
+  writeFileSync(proofPath, JSON.stringify({ schema: 'sim-proof/1', media: [{ file: 'desktop.mp4', kind: 'video', uncut: true, realSpeed: true }] }));
+  const shot = join(dir, 'still.png'); writeFileSync(shot, 'png');
+  const gh = fakeGh({ release: { id: 5 }, assets: [] }), asked = [], warned = [];
+  const preview = file => { asked.push(basename(file)); const out = previewPath(file); writeFileSync(out, 'gif'); return { file: out, bytes: 3 }; };
+  const out = await uploadAll({ pr: 8, files: [clip, shot], proofPath, target: githubTarget({ repo: 'o/r', run: gh.run }), preview, warn: m => warned.push(m) });
+  assert.deepEqual(asked, ['desktop.mp4']);
+  const base = 'https://github.com/o/r/releases/download/proofs/';
+  assert.equal(out.uploaded[0].preview, `${base}pr-8.desktop.preview.gif`);
+  assert.equal(JSON.parse(readFileSync(proofPath, 'utf8')).media[0].preview, `${base}pr-8.desktop.preview.gif`);
+  assert.equal(embedLine(out.uploaded[0]), `[![desktop.mp4](${base}pr-8.desktop.preview.gif)](${base}pr-8.desktop.mp4)`);
+  assert.equal(embedLine({ file: 'a.mp4', url: 'https://h/a.mp4' }), '[a.mp4](https://h/a.mp4)');
+  assert.deepEqual(warned, []);
+  const skipped = await uploadAll({ pr: 9, files: [clip], target: githubTarget({ repo: 'o/r', run: fakeGh({ release: { id: 5 } }).run }), preview: () => ({ skipped: 'ffmpeg is not installed' }), warn: m => warned.push(m) });
+  assert.equal(skipped.uploaded[0].preview, undefined);
+  assert.match(warned[0], /no inline preview \(ffmpeg is not installed\)/);
 });
