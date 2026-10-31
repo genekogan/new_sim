@@ -14,16 +14,17 @@ const gardenTap: DefInput = {
   description: 'A garden standpipe with a tap over a small stone basin. A Soul turns it on and off by hand; water runs into the basin while it is on.',
   tags: ['water', 'garden', 'tap', 'hand-operated'], form: 'point',
   make: { kind: 'gen', gen: 'kit/2', args: { round: 0.01, shapes: [
-    { kind: 'box', at: [0, 0.45, 0], size: [0.08, 0.9, 0.08], round: 0.01, tint: 'metal' },
+    // M03: the valve sits on top of a 1.12 m standpipe (at 0.93 m the reach knelt, like entry 20's 0.9 m knob)
+    { kind: 'box', at: [0, 0.56, 0], size: [0.08, 1.12, 0.08], round: 0.01, tint: 'metal' },
     { kind: 'cyl', at: [0, 0.8, 0.09], r: 0.022, h: 0.16, segments: 8, tint: 'metal', pitch: Math.PI / 2 },
-    { kind: 'cyl', at: [0, 0.93, 0.02], r: 0.045, h: 0.02, segments: 6, tint: 'valve' },
+    { kind: 'cyl', at: [0, 1.14, 0.02], r: 0.045, h: 0.02, segments: 6, tint: 'valve' },
     { kind: 'cyl', at: [0, 0.05, 0.2], r: 0.22, h: 0.1, segments: 12, r2: 0.18, tint: 'stone' },
     { kind: 'cyl', at: [0, 0.795, 0.17], r: 0.016, h: 0.02, segments: 6, tint: 'nozzle' },
     { kind: 'cyl', at: [0, 0.1, 0.2], r: 0.15, h: 0.012, segments: 12, tint: 'water', material: 'water', when: '@on' }] } } as unknown as DefInput['make'],
   params: params as DefInput['params'], palette,
   state: { on: { type: 'bool', default: false } } as DefInput['state'],
   components: water('water', 8, 0.35) as DefInput['components'],
-  size: { box: [0.44, 0.95, 0.88] },   // covers the basin in front of the spout, so nobody stands in it
+  size: { box: [0.44, 1.16, 0.88] },   // covers the basin in front of the spout, so nobody stands in it
   actions: switches('Turn on the tap', 'Turn off the tap') as DefInput['actions'],
 } as DefInput;
 
