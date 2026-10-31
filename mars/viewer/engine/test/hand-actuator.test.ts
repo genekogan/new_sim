@@ -25,3 +25,37 @@ for(const side of [1,-1] as const)for(const radius of [.88,1.035,2])test(`natura
 });
 
 test('natural policy active door restores held contact and modest facing tick for tick',()=>{const f=fixture();f.scene.obstacles=[];f.rt.services.spatial=new Spatial(f.scene);const o={hinge:[-6,0,-6] as [number,number,number],yaw:0,radius:.88,height:2.1,handleY:1.04,from:0,to:HAND_OPEN_ANGLE,side:1 as const,bodyPolicy:'door-natural-v2' as const};f.rt.world.entities.a.pose.p=actuatorPoint(o,0).root;const r=f.rt.submit('hand_actuator_v1',{actor:'a',target:'door',at:[-6,1,-6],opening:o});for(let i=0;i<25;i++)f.rt.step();const copy=Runtime.restore(f.rt.snapshot(),f.registry,{spatial:new Spatial(f.scene)},DEFAULT_INVARIANTS);for(let i=0;i<150;i++){f.rt.step();copy.step();assert.equal(copy.stateHash(),f.rt.stateHash())}assert.equal(r.status,'completed');assert.deepEqual(f.rt.violations,[]);});
+
+import {handClearanceStats} from '../social/hand-actuator.ts';
+// M01: clearance reads obstacles near the operation once per scene, not every obstacle in the world every tick.
+function doorWith(obstacles:{id:string;obb:{c:[number,number];half:[number,number];yaw:number};y0:number;y1:number;kind:'component'}[]){
+ const f=fixture(),o={hinge:[-6,0,-6] as [number,number,number],yaw:0,radius:.88,height:2.1,handleY:1.04,from:0,to:HAND_OPEN_ANGLE,side:1 as const,bodyPolicy:'door-natural-v2' as const};
+ f.rt.services.spatial=new Spatial({...provingGround(),obstacles});f.rt.world.entities.a.pose.p=actuatorPoint(o,0).root;
+ return {...f,o,r:f.rt.submit('hand_actuator_v1',{actor:'a',target:'door',at:[-6,1,-6],opening:o})};
+}
+const box=(id:string,x:number,z:number,h=.1)=>({id,obb:{c:[x,z] as [number,number],half:[h,h] as [number,number],yaw:0},y0:0,y1:2,kind:'component' as const});
+test('M01: 400 distant obstacles add no per-tick clearance work; the door still completes',()=>{
+ const far=Array.from({length:400},(_,i)=>box('far'+i,20+(i%20)*2,20+Math.floor(i/20)*2));
+ const v0=handClearanceStats.obstaclesVisited,b0=handClearanceStats.candidateBuilds,{rt,r}=doorWith([...far,box('door#leaf',-5.6,-6),box('door',-6,-6)]);let steps=0;
+ while(rt.isActive(r.id)&&steps<300){rt.step();steps++;}
+ assert.equal(r.status,'completed');assert.deepEqual(rt.violations,[]);
+ assert.equal(handClearanceStats.obstaclesVisited-v0,0,'distant obstacles and the target leaf are never visited per tick');
+ assert.equal(handClearanceStats.candidateBuilds-b0,1,'one candidate filter for an unchanged scene');
+});
+test('M01: a nearby obstacle in the operating path still refuses with the same step-blocked diagnostic',()=>{
+ const o={hinge:[-6,0,-6] as [number,number,number],yaw:0,radius:.88,height:2.1,handleY:1.04,from:0,to:HAND_OPEN_ANGLE,side:1 as const,bodyPolicy:'door-natural-v2' as const};
+ const end=actuatorPoint(o,HAND_OPEN_ANGLE).root,far=Array.from({length:200},(_,i)=>box('far'+i,30+i,30));
+ const {rt,r}=doorWith([...far,box('crate',end[0],end[2],.15)]);while(rt.isActive(r.id))rt.step();
+ assert.equal(r.status,'failed');assert.equal(r.diagnostic?.code,'contact.step-blocked');assert.deepEqual(r.diagnostic?.subjects,['a','crate']);
+});
+
+import {strokePoint} from '../social/hand-actuator.ts';
+// Entry 13: a writing/wiping hand stays on the face, moves continuously and commits only when the stroke ends.
+for(const kind of ['write','wipe'] as const)for(const lines of [1,3])test(`board ${kind} stroke (${lines} line) is continuous and commits at its end`,()=>{
+ const stroke={kind,yaw:.4,width:.55,height:.3,lines,seconds:kind==='write'?1.2+1.6*lines:2.4},m:HandActuatorMotion={target:'board',at:[1,1.2,2],startTick:0,stroke};
+ const end=HAND_REACH_SECONDS+stroke.seconds;assert.equal(handActuatorFrame(m,end-.05).contact,false,'no effect while still writing');assert.equal(handActuatorFrame(m,end).contact,true);
+ let prev=strokePoint(m.at,stroke,0),maxSpeed=0;const n=Math.round(stroke.seconds/.05);
+ for(let i=1;i<=n;i++){const p=strokePoint(m.at,stroke,i/n);maxSpeed=Math.max(maxSpeed,Math.hypot(p[0]-prev[0],p[1]-prev[1],p[2]-prev[2])/.05);prev=p;
+  const dx=p[0]-1,dz=p[2]-2,off=dx*Math.sin(.4)+dz*Math.cos(.4);assert.ok(off>=-1e-9&&off<.04,'hand stays on (or just off) the face plane');assert.ok(Math.abs(p[1]-1.2)<=.2,'within the face height');}
+ assert.ok(maxSpeed<1.8,`hand speed ${maxSpeed}`);
+});

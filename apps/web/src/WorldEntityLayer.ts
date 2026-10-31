@@ -17,6 +17,7 @@ import { MaterialLib } from './gen-mesh/materials.ts';
 import { animate, hasMotion, syncLightGlow } from './gen-mesh/motion.ts';
 import {lightDiffAhead} from './light-diff-clock.ts';
 import {itemDiffAhead} from './item-diff-clock.ts';
+import {defLights} from './WorldNightLights.ts';
 import {beginOpeningMotion,stepOpeningMotion,type OpeningMotion} from './opening-motion.ts';
 import { EntityInstancer, instanceable } from './EntityInstancer.ts';
 import { terrainColorFor, terrainColorDeferred, groundRealismFor } from './gen-mesh/ground-palette.ts';
@@ -105,14 +106,25 @@ export class WorldEntityLayer {
   /** Recorded contact drives the leaf on the same depicted tick as the body,
    * including reach, swing and release. No wall-clock tween during native operation. */
   drawHandActuators(entities:Record<string,{state:Record<string,unknown>}>,tick:number,dt:number){
-    for(const e of Object.values(entities)){
-      const m=e.state.handActuator as HandActuatorMotion|undefined;if(!m?.opening)continue;
+    // M01: no per-frame array; leaf parts found once per drawn object; an unchanged angle (the release and
+    // idle hand-off) leaves the leaf and its matrices alone. The angle is still the depicted tick's.
+    for(const id in entities){
+      const m=entities[id].state.handActuator as HandActuatorMotion|undefined;if(!m?.opening)continue;
       const d=this.drawn.get(m.target);if(!d)continue;
       const angle=handActuatorFrame(m,(tick-m.startTick)*dt).angle;
-      if(d.frozen)this.thaw(d);d.opening=undefined;
-      d.obj.traverse(o=>{if(o.userData.role==='door')o.rotation.y=angle;});d.obj.updateMatrixWorld(true);
+      let leaf=this.leaves.get(d.obj);
+      if(leaf&&leaf.angle===angle&&!d.opening&&!d.motion)continue;
+      if(!leaf){leaf={parts:[],angle};d.obj.traverse(o=>{if(o.userData.role==='door')leaf!.parts.push(o);});this.leaves.set(d.obj,leaf);}
+      if(d.frozen)this.thaw(d);d.opening=undefined;leaf.angle=angle;
+      for(const o of leaf.parts)o.rotation.y=angle;d.obj.updateMatrixWorld(true);
+      this.stats.leafWrites++;
     }
   }
+  private readonly leaves=new WeakMap<THREE.Object3D,{parts:THREE.Object3D[];angle:number}>();
+  /** Does this placed thing publish a lamp pool or a lighthouse beam (world-env's scan)? */
+  private lit(id:string){const e=this.model?.entities.get(id),def=e&&this.model!.resolvedDef(e.def);return !!def&&(defLights(def.components).length>0||!!def.tags?.includes('lighthouse'));}
+  /** M01: bumped only by a diff that can change a lamp pool (world-env's immediate repaint); other diffs keep its 2 Hz gate. */
+  lightSeq = 0;
   get entityCount() { return this.model?.entities.size ?? 0; }
   /** The placed entities once this layer's picture has reached edit `seq` (else null): GodPanel's flags read them here
    *  instead of downloading the public snapshot again on every edit (lane L3h). */
@@ -266,7 +278,7 @@ export class WorldEntityLayer {
   }
 
   /** Consume hub messages (the viewer keeps the last 300 edge messages; we only act on newer diffs). */
-  readonly stats = { edgeSeen: 0, applied: 0, resyncs: 0, lastError: null as string | null };
+  readonly stats = { edgeSeen: 0, applied: 0, resyncs: 0, leafWrites: 0, lastError: null as string | null };
   applyEdge(msgs: readonly { type: string; kind?: string; seq?: unknown; rev?: unknown }[], depictedTick=Infinity) {
     if (this.immutable || !this.model || this.building || this.filling) return;
     for(const m of msgs)if(m.kind==='world-diff'&&typeof m.seq==='number')this.bufferedSeq=Math.max(this.bufferedSeq,m.seq);
@@ -288,6 +300,7 @@ export class WorldEntityLayer {
     this.stairContacts.invalidateDiff(d);
     {
       const contextChanged=!!d.ground||!!d.diff.world||d.diff.defs.length>0||d.diff.removes.some(id=>contextStamp(this.model!.entities.get(id)))||d.diff.upserts.some(e=>contextStamp(e)!==contextStamp(this.model!.entities.get(e.id)));
+      let lit=!!d.ground||!!d.diff.world||d.diff.defs.length>0||!!d.defs?.length||d.diff.removes.some(id=>this.lit(id))||d.diff.upserts.some(e=>this.lit(e.id));
       this.seq = d.seq;
       const held = this.sites.heldRemovals(d, this.model);
       this.sites.apply(d);
@@ -296,6 +309,9 @@ export class WorldEntityLayer {
       for (const id of d.diff.removes) { this.model.delete(id); this.undraw(id, held.has(id) ? SITE_REFINEMENT.removalDelaySeconds : 0); }
       for (const e of d.diff.upserts) { if (this.model.entities.has(e.id)) this.model.delete(e.id); this.model.insert(e); }
       for (const e of d.diff.upserts) { const def = this.model.resolvedDef(e.def); if (def?.layer === 'solid') { try { this.model.index(e.id, this.model.footprint(e, def)); } catch { /* best effort */ } } }
+      // a moved parent carries its lamps (their pools move with it)
+      if (!lit) lit = d.diff.upserts.some(e => this.model!.subtree(e.id).some(id => this.lit(id)));
+      if (lit) this.lightSeq++;
       if ((d.diff as { constants?: WorldModel['constants'] }).constants) this.model.constants = (d.diff as { constants?: WorldModel['constants'] }).constants!;   // GOD-ENV: the world grew
       if (d.ground) { const grew = JSON.stringify(d.ground.extent) !== JSON.stringify(this.model.ground().extent); this.model.terrain = sameBase(this.model.ground(), d.ground) ? this.model.terrain.retile(d.ground, d.diff.tiles) : new Terrain(d.ground); this.rebuildTerrain(new Set(d.diff.tiles)); this.rebuildWater(); if (grew) this.buildHorizon(); }
       if (d.diff.world) { const before = JSON.stringify((this.model.state as { ground?: unknown }).ground ?? null); this.model.state = { ...this.model.state, ...d.diff.world } as WorldModel['state']; if (JSON.stringify((this.model.state as { ground?: unknown }).ground ?? null) !== before) this.rebuildTerrain(); }
