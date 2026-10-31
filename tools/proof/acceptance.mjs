@@ -103,9 +103,11 @@ export const isVideo = u => VIDEO.test(u) && !IMAGE.test(u);
 export const isImage = u => IMAGE.test(u);
 const isProofJson = u => /proof[^/]*\.json(\?|#|$)/i.test(u);
 
-/** Issue references in a Problem section: closing keywords, bare #n, or issue URLs. */
+/** Issue references in a Problem section: closing keywords first (the PR's own issue, which proof-check reads), then
+ *  bare #n and issue URLs in order. */
 export function linkedIssues(text = '') {
   const nums = new Set();
+  for (const m of String(text).matchAll(/\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+#(\d+)\b/gi)) nums.add(Number(m[1]));
   for (const m of String(text).matchAll(/(?:^|[^\w&])#(\d+)\b/g)) nums.add(Number(m[1]));
   for (const m of String(text).matchAll(/github\.com\/[\w.-]+\/[\w.-]+\/issues\/(\d+)/g)) nums.add(Number(m[1]));
   return [...nums];

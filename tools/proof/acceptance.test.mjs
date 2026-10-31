@@ -78,6 +78,9 @@ test('parseChecklist: ids, met/deferred/unmet/open and evidence notes', () => {
 
 test('linkedIssues: closing keywords, bare refs and issue URLs, not HTML entities', () => {
   assert.deepEqual(linkedIssues('Closes #12, see https://github.com/o/r/issues/40 and &#39;'), [12, 40]);
+  // the closing reference is the PR's own issue even when another issue is mentioned first (proof-check uses [0])
+  assert.deepEqual(linkedIssues('Found while shipping #388 (PR #392). Closes #397'), [397, 388, 392]);
+  assert.deepEqual(linkedIssues('fixes: #5 and resolves #6; see #1'), [5, 6, 1]);
 });
 
 test('parseAudit reads labelled top-level bullets with continuation lines', () => {
