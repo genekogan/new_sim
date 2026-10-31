@@ -1,7 +1,7 @@
 // Screenshot booklet pages: PLAYWRIGHT_BROWSERS_PATH=$HOME/Library/Caches/ms-playwright node shoot.mjs <booklet-dir> <out-dir> index.html <run>.html[#anchor] ...
 import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
-const { chromium } = createRequire('<repo>/mars/viewer/package.json')('@playwright/test');
+const { chromium } = createRequire(new URL('../../../../../mars/viewer/package.json', import.meta.url))('@playwright/test');
 const [dir, out, ...pages] = process.argv.slice(2);
 mkdirSync(out, { recursive: true });
 const b = await chromium.launch();

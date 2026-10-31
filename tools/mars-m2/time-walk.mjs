@@ -12,7 +12,7 @@ const args = process.argv.slice(2), flag = (k, d) => { const i = args.indexOf('-
 const base = flag('base'), out = flag('out'), dprs = flag('dpr', '1,2').split(',').map(Number), hours = flag('hours', '19,22').split(',').map(Number);
 assert(base && out); mkdirSync(out, { recursive: true });
 const { chromium } = createRequire(`${ROOT}/mars/viewer/package.json`)('@playwright/test');
-const { chromeLease } = await import('<team>/ops/chrome-lease.mjs');
+const { chromeLease } = await import(process.env.CHROME_LEASE_MODULE ?? '../god-skill/lib/chrome-lease.mjs');
 const release = await chromeLease('n3-time', { waitMs: 45 * 60000 });
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });
 try {

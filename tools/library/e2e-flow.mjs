@@ -106,7 +106,7 @@ try {
   // ---------------------------------------------------------------- what a visitor sees in beta (real Chrome)
   if (shots) {
     mkdirSync(shots, { recursive: true });
-    const { chromeLease } = await import('<team>/ops/chrome-lease.mjs');
+    const { chromeLease } = await import(process.env.CHROME_LEASE_MODULE ?? '../god-skill/lib/chrome-lease.mjs');
     const { chromium } = createRequire(new URL('../../mars/viewer/package.json', import.meta.url))('@playwright/test');
     const release = await chromeLease('library');
     try {

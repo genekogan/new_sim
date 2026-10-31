@@ -6,7 +6,7 @@
 import { createRequire } from 'node:module';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-const sharp = createRequire('<worktrees>/marsland-fork/node_modules/.pnpm/sharp@0.35.4_@types+node@22.20.4/node_modules/sharp/package.json')('sharp');
+const sharp = createRequire(createRequire(new URL('../../../../apps/server/package.json', import.meta.url)).resolve('@gltf-transform/functions'))('sharp');
 const args = process.argv.slice(2), flag = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args.splice(i, 2)[1] : d; };
 const views = flag('views', '').split(',').filter(Boolean), W = Number(flag('w', 800)), sfx = flag('sfx', '');
 const [out, ...cols] = args; mkdirSync(out, { recursive: true });

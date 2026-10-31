@@ -1,6 +1,6 @@
 // node shoot.cjs <html> <outPrefix> : viewport screenshots at 1280 (light) and 400 (dark) px — top, and the
 // timeline at 40% depth — plus horizontal-overflow and console-error checks.
-const { chromium } = require(require('module').createRequire('<repo>/mars/viewer/package.json').resolve('@playwright/test'));
+const { chromium } = require(require('module').createRequire(require('path').join(__dirname, '../../../../../mars/viewer/package.json')).resolve('@playwright/test'));
 (async () => {
   const [html, prefix] = process.argv.slice(2);
   const b = await chromium.launch();

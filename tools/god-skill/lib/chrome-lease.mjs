@@ -1,5 +1,5 @@
 // Chrome shares the same ownership/stale/release contract as state and keeper startup locks.
-// Slots (the team's <team>/ops/chrome-lease.mjs scheme): headless Chrome renders through the GPU, so a few
+// Slots (the same scheme as a machine-wide CHROME_LEASE_MODULE lease): headless Chrome renders through the GPU, so a few
 // run at once. Slot 0 is /tmp/eden-chrome-lease, slot i is /tmp/eden-chrome-lease.<i>; CHROME_LEASE_SLOTS (default 3) of
 // them. Every slot is one eden-lock/1 directory; older CLIs and lanes take slot 0 only, the team's lease any of them, this
 // one the highest free slot first.
