@@ -17,6 +17,8 @@ const SOULS = Number(arg('--souls', '6')), TICKS = Number(arg('--ticks', '1200')
 const DEBT = Number(arg('--debt-ms', '0')), GAP = Number(arg('--gap-ms', '20000'));
 // --pace: live ticks at the world's real 20 t/s (50 ms each) instead of flat out, so wall-clock floors admit real tick counts
 const PACE = process.argv.includes('--pace');
+// --walk-every N: every Soul walks again every N live ticks (default 400); small N puts inputs inside an in-flight sliced capture
+const WALK_EVERY = Number(arg('--walk-every', '400'));
 const log = (m: string) => console.error(`[bench] ${m}`);
 
 const w = await bootEden(log);
@@ -45,7 +47,7 @@ const captures: { tick: number; atMs: number; costMs: number; capture: number; f
 let lastCost = w.host.lastSnapshotCostMs;
 const t0 = performance.now();
 for (let i = 0; i < TICKS; i++) {
-  if (i % 400 === 0) await walkAll();
+  if (i % WALK_EVERY === 0) await walkAll();
   const a = performance.now(); w.host.tickOnce(); tickMs.push(performance.now() - a);
   for (let j = 0; j < 4; j++) await new Promise((r) => setImmediate(r));   // let a sliced capture finish its stages
   if (PACE) { const due = t0 + (i + 1) * 50 - performance.now(); if (due > 0) await new Promise((r) => setTimeout(r, due)); }
@@ -77,9 +79,28 @@ const differs = Object.keys(live).filter((key) => (got as Record<string, unknown
 const sorted = [...tickMs].sort((x, y) => x - y), avg = tickMs.reduce((s, x) => s + x, 0) / tickMs.length;
 const lastSnap = w.db.latestSnapshot(w.host.worldId)!.tick;
 const gaps = captures.map((c, i) => c.atMs - (i ? captures[i - 1].atMs : 0)).slice(1);
+// --every-snapshot: also boot from each older retained snapshot of the live run (newer ones deleted), so a bad
+// intermediate capture shows up, not only the last one
+const fromEach: { from: number; replayTicks: number; same: boolean; differs: string[] }[] = [];
+const EACH = process.argv.includes('--every-snapshot');
+b.stop();
+if (EACH) {
+  for (;;) {
+    const top = w.db.latestSnapshot(w.host.worldId)!.tick;
+    w.db.db.prepare('DELETE FROM snapshots WHERE world_id = ? AND tick = ?').run(w.host.worldId, top);
+    const next = w.db.latestSnapshot(w.host.worldId)?.tick;
+    if (next === undefined || next <= snap.tick) break;
+    const c = new WorldHost(w.db, factory, (w.host as unknown as { seed: string }).seed, 1e9, w.host.worldId);
+    c.boot(); const replayTicks = c.engine.world.tick - next;
+    while (c.engine.world.tick < live.tick) c.tickOnce();
+    const g = { tick: c.engine.world.tick, engine: c.engine.stateHash(), physical: c.engine.physicalHash(), kernel: kernelHash(c.kernel) };
+    const d = Object.keys(live).filter((key) => (g as Record<string, unknown>)[key] !== (live as Record<string, unknown>)[key]);
+    fromEach.push({ from: next, replayTicks, same: d.length === 0, differs: d }); c.stop();
+  }
+}
 const result = { souls: SOULS, debtMs: DEBT, gapMs: GAP, paced: PACE, captures, maxCaptureGapTicks: captures.length > 1 ? Math.max(...captures.slice(1).map((c, i) => c.tick - captures[i].tick)) : null, captureShareMax: gaps.length ? +Math.max(...captures.slice(1).map((c, i) => c.costMs / gaps[i])).toFixed(4) : null, lastSnapshotTick: lastSnap, snapshotTick: snap.tick, liveTicks: TICKS, liveTickMsAvg: +avg.toFixed(2), liveTickMsP95: +sorted[Math.floor(sorted.length * 0.95)].toFixed(2),
-  liveMs: Math.round(liveMs), boot: { ...booted, ms: Math.round(bootMs), replayedTo, replayTicks: replayedTo - lastSnap, phases: b.bootStats ?? null }, sameAsLive: same, differs };
+  liveMs: Math.round(liveMs), boot: { ...booted, ms: Math.round(bootMs), replayedTo, replayTicks: replayedTo - lastSnap, phases: b.bootStats ?? null }, sameAsLive: same, differs, fromEach };
 console.log(JSON.stringify(result));
 if (out) writeFileSync(out, JSON.stringify(result, null, 1));
-b.stop(); w.db.close();
-if (!same) process.exitCode = 1;
+w.db.close();
+if (!same || fromEach.some((f) => !f.same)) process.exitCode = 1;
