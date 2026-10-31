@@ -149,9 +149,12 @@ jobs:
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - name: Pull media
+        timeout-minutes: 15
         run: |
-          if node -e "process.exit(require('./package.json').scripts?.['assets:pull'] ? 0 : 1)"; then pnpm assets:pull
-          else echo "::error::package.json has no assets:pull script; a release build needs the media"; exit 1; fi
+          if ! timeout 840 pnpm assets:pull --quiet; then
+            echo "::error::Media pull failed or timed out: the paths above are missing from the CDN or fail tools/assets/manifest.json. Publish them (tools/cdn/publish.mjs) before releasing."
+            exit 1
+          fi
       - name: Browsers for the live walks
         run: pnpm --filter mars-campus-viewer exec playwright install --with-deps chromium
       - name: SSH
@@ -186,7 +189,8 @@ jobs:
           SIM_DEPLOY_USER: ${{ vars.SIM_DEPLOY_USER || secrets.SIM_DEPLOY_USER }}
           LABEL: ${{ needs.preflight.outputs.label }}
         run: |
-          export SIM_WORLDS_HOST="$SIM_DEPLOY_USER@$SIM_DEPLOY_HOST" SHIP_ORIGIN="$SIM_ORIGIN"
+          # ship.sh and release.sh read the box from SIM_DEPLOY_HOST / SIM_DEPLOY_USER (already in env).
+          export SHIP_ORIGIN="$SIM_ORIGIN"
           # The workflow's concurrency group replaces the laptop lease file; outputs stay on the runner.
           export SHIP_DEPLOY_LOCK="$RUNNER_TEMP/DEPLOY.lock" SHIP_OUT_ROOT="$RUNNER_TEMP/ship"
           export SHIP_LEGACY_RELEASE_FILE="$RUNNER_TEMP/ship/LEGACY-RELEASE"
