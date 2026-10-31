@@ -67,7 +67,7 @@ export class Admission {
   private credit = FRAME_BUDGET_MS.green; private creditAt = 0;
   private strikes = new Map<string, {slow: number[]; busy: number[]; coolUntil: number}>();
   private share = {god: 0, souls: 0};   // decaying ms spent, for the god's reserve
-  private draining = false; private wake: NodeJS.Timeout | null = null; private sweeper: NodeJS.Timeout | null = null;
+  private draining = false; private wake: NodeJS.Timeout | null = null; private soon: NodeJS.Immediate | null = null; private sweeper: NodeJS.Timeout | null = null;
   private now: () => number;
   private o: {now?: () => number; yieldTurn?: () => Promise<void>};
   constructor(o: {now?: () => number; yieldTurn?: () => Promise<void>} = {}) { this.o = o; this.now = o.now ?? (() => performance.now()); }
@@ -124,8 +124,10 @@ export class Admission {
       settle: v => { if (v === 'run') ranAt = this.now(); settle(v); }};
     this.outstanding.add(r.key);
     // fast path: nothing waiting, the dispatcher idle, frame credit left and nobody else in flight → run now, inline
-    // (no timer hop: the quiet case costs what it did before admission). Charged when it answers.
-    if (!this.queue.length && !this.draining && this.outstanding.size === 1 && this.level === 'green' && this.creditNow(now) > 0) {
+    // (no hop: the quiet case costs what it did before admission). Green or amber: a lone Soul in a world that is
+    // amber (a boot or creation spike still stepping down) is not slowed; red/black always queue (budgets bind).
+    // Charged when it answers.
+    if (!this.queue.length && !this.draining && this.outstanding.size === 1 && (this.level === 'green' || this.level === 'amber') && this.creditNow(now) > 0) {
       settle('run'); ranAt = now;
       return {turn, waitedMs: () => 0, done: () => { if (isDone) return; isDone = true; this.outstanding.delete(r.key); this.charge(r.key, r.god, r.route.id, this.now() - now, now); finish(); this.kick(); }};
     }
@@ -181,8 +183,10 @@ export class Admission {
     return best;
   }
   private kick() {
-    if (this.draining || this.wake || !this.queue.length) return;
-    this.wake = setTimeout(() => { this.wake = null; void this.drain(); }, 0);
+    if (this.draining || this.wake || this.soon || !this.queue.length) return;
+    // check phase, right after this poll's arrivals are all queued (writes-first ordering sees the whole batch), with
+    // no 1 ms timer clamp; the frame credit, not the hop, keeps requests to their share between ticks
+    this.soon = setImmediate(() => { this.soon = null; void this.drain(); });
     if (!this.sweeper) { this.sweeper = setInterval(() => { this.sweep(this.now()); if (!this.queue.length && this.sweeper) { clearInterval(this.sweeper); this.sweeper = null; } }, 100); this.sweeper.unref(); }
   }
   /** The dispatcher: runs queued jobs back to back while this frame's request budget lasts, then yields to the tick. */
@@ -204,7 +208,7 @@ export class Admission {
     } finally { this.draining = false; }
   }
   private later(ms: number) { if (this.wake) return; this.wake = setTimeout(() => { this.wake = null; void this.drain(); }, Math.max(1, Math.ceil(ms))); this.wake.unref?.(); }
-  close() { if (this.wake) clearTimeout(this.wake); if (this.sweeper) clearInterval(this.sweeper); this.wake = this.sweeper = null; }
+  close() { if (this.wake) clearTimeout(this.wake); if (this.soon) clearImmediate(this.soon); if (this.sweeper) clearInterval(this.sweeper); this.wake = this.sweeper = null; this.soon = null; }
 }
 
 export const NOTE: Record<Level, string | undefined> = {green: undefined, amber: 'It is crowded here right now; things take a little longer.', red: 'It is crowded here right now; things take a little longer.', black: 'The world is very crowded right now; it is slow to answer.'};
