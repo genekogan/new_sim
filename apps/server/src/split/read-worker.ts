@@ -17,8 +17,15 @@ import {ReadModel, type WorldDelta, type WorldInit} from './read-model.ts';
 import {classify, worldBlock, type PortDone, type Refusal} from '../load/admission.ts';
 import {LEVELS, S, type Level} from '../load/shared.ts';
 import {stripWorldRequestPath} from '../world-request-path.ts';
+import {readFileSync} from 'node:fs';
+import type {ReplicaWorld as RWT} from './replica-world.ts';
+import type {ReadOnlyHost as RHT, MainOnly as MOT} from './read-host.ts';
+import type {EdgeLedger} from '../edge/ledger/ledger.ts';
+import type {EdgeSoul} from '../edge/contract.ts';
 
-export type ReadWorkerData = {index: number; port: number; mode: number; worldPath: string; lag: SharedArrayBuffer; load?: SharedArrayBuffer; intents: MessagePort; authMs?: number};
+/** mode 2 (B-facade item 6): the world this worker reads, to open its own read-only view of it. */
+export type ReadWorld = {dbPath: string; worldId: string};
+export type ReadWorkerData = {index: number; port: number; mode: number; worldPath: string; lag: SharedArrayBuffer; load?: SharedArrayBuffer; intents: MessagePort; authMs?: number; world?: ReadWorld};
 export type ToWorker = {t: 'init'; gen: number; w: WorldInit} | {t: 'delta'; gen: number; d: WorldDelta} | {t: 'query'; id: number; kind: string; soulId: string} | {t: 'forget'};
 export type AuthAnswer = {t: 'auth'; id: number; soulId: string | null; account?: string | null};
 export type Forward = {method: string; url: string; headers: [string, string][]; body?: ArrayBuffer};
@@ -36,9 +43,78 @@ const answer = (kind: string, soulId: string) => {
   const ms = cpuMs() - c; if (kind !== 'stats') {cost.queries++; cost.queryCpuMs += ms; cost.maxQueryCpuMs = Math.max(cost.maxQueryCpuMs, ms);}
   return {...v, cpuMs: Math.round(ms * 1000) / 1000};
 };
+// ---- mode 2 (B-facade item 6): the read code itself over a ReplicaWorld + a read-only host (split/read-host.ts)
+const R2 = wd.mode >= 2 && wd.world ? await (async () => {
+  const [{ReplicaWorld}, {ReadOnlyHost, readLedger, MainOnly}] = await Promise.all([import('./replica-world.ts'), import('./read-host.ts')]);
+  return {ReplicaWorld, ReadOnlyHost, readLedger, MainOnly};
+})() : null;
+let RW: RWT | null = null, RH: RHT | null = null, RL: EdgeLedger | null = null, ready2 = false;
+/** A static edit moved the scene: connectivity relabels in slices between messages; reads go to main meanwhile. */
+let relabel: {since: number; rebuilds: number} | null = null;
+const c2 = {warmMs: 0, relabels: 0, relabelMs: 0, maxRelabelMs: 0, served: 0, cpuMs: 0, maxCpuMs: 0, fallbacks: {} as Record<string, number>, asks: 0, syncMs: 0};
+const fallback = (why: string) => {c2.fallbacks[why] = (c2.fallbacks[why] ?? 0) + 1;};
+function relabelSlice() {
+  if (!relabel || !RW?.spatial) {relabel = null; return;}
+  const done = RW.spatial.navWarmV1(25);
+  if (done) {const ms = performance.now() - relabel.since; c2.relabels++; c2.relabelMs += ms; c2.maxRelabelMs = Math.max(c2.maxRelabelMs, ms); relabel = null; return;}
+  setImmediate(relabelSlice);
+}
+function init2(w: WorldInit) {
+  RW ??= new R2!.ReplicaWorld();
+  RW.init(w as never);
+  if (!RH) {
+    RH = new R2!.ReadOnlyHost(RW, wd.world!.worldId, wd.world!.dbPath);
+    RL = R2!.readLedger(RH, process.env.PLACE_DATA ? JSON.parse(readFileSync(process.env.PLACE_DATA, 'utf8')) : undefined);
+  }
+  RL!.replicaSync(RW.R.faded);
+  // B-spatial: the first labelling takes seconds (8.7 s on the live copy): before 'ready', never inside a Soul's read
+  const t0 = performance.now(); RW.spatial?.connectivityV1(); c2.warmMs = performance.now() - t0; relabel = null; ready2 = true;
+}
+function apply2(d: WorldDelta): boolean {
+  const before = RW!.cost.spatialBuilds + RW!.cost.spatialRebuilds;
+  if (!RW!.apply(d as never)) return false;
+  const t0 = performance.now(); RL!.replicaSync(RW!.R.faded); c2.syncMs += performance.now() - t0;
+  if (RW!.cost.spatialBuilds + RW!.cost.spatialRebuilds !== before && RW!.spatial) {if (!relabel) {relabel = {since: performance.now(), rebuilds: RW!.cost.spatialRebuilds}; setImmediate(relabelSlice);}}
+  return true;
+}
+/** After a read: the verdicts it missed, to main's pump (answered with the next delta). */
+function askMisses() {
+  const box = RL?.knowledge.outbox; if (box?.length) {parentPort!.postMessage({t: 'writes', index: wd.index, rows: box.splice(0)});}
+  const m = RW?.verdicts.misses; if (!m?.size) return;
+  parentPort!.postMessage({t: 'ask', index: wd.index, misses: [...m.values()]}); c2.asks += m.size; m.clear();
+}
+const tickNow = () => R2 ? (RW?.R.pos.tick ?? -1) : M.tick;
+const LAG_GENS = 40;   // 2 s of ticks behind main: main answers instead
+/** The frame main's /v1/edge/here answers (edge/routes.ts), computed here; null = main should answer (counted). */
+function here2(soulId: string, query: string): {body: object; cpuMs: number} | null {
+  if (!RW || !RL || !RH || !ready2) {fallback('not-ready'); return null;}
+  if (relabel) {fallback('relabel'); return null;}
+  if (lag[0] - gen > LAG_GENS) {fallback('lag'); return null;}
+  const m = RH.minds.get(soulId); if (!m || !RW.R.entities.has(m.entityId)) {fallback('unknown-soul'); return null;}
+  const soul: EdgeSoul = {soulId, entityId: m.entityId, name: m.name, owner: m.owner};
+  const modern = (new URLSearchParams(query).get('include') ?? '').split(',').includes('doHere');
+  const c = cpuMs();
+  try {
+    const {hereFrame} = here2.mod!;
+    const body = {tick: RW.mw.world.tick, here: hereFrame(RL, soul, {doHere: modern}), ...(modern ? {apiContract: 'eden-edge/1.1'} : {})};
+    const ms = cpuMs() - c; c2.served++; c2.cpuMs += ms; c2.maxCpuMs = Math.max(c2.maxCpuMs, ms);
+    askMisses();
+    return {body, cpuMs: ms};
+  } catch (e) {
+    fallback(e instanceof (R2!.MainOnly as typeof MOT) ? (e as Error).message.replace(/^read worker: | is main-only$/g, '') : 'error');
+    if (!(e instanceof (R2!.MainOnly as typeof MOT))) console.error('[read-worker] here', wd.index, e instanceof Error ? (e.stack ?? e.message).split('\n').slice(0, 4).join(' | ') : e);
+    return null;
+  }
+}
+here2.mod = null as null | typeof import('../edge/perception/here.ts');
+if (R2) here2.mod = await import('../edge/perception/here.ts');
+
 parentPort!.on('message', (m: ToWorker) => {
-  if (m.t === 'init') {const c = cpuMs(); M.init(m.w); cost.initCpuMs = cpuMs() - c; myGen(m.gen); parentPort!.postMessage({t: 'ready', index: wd.index, gen: m.gen, tick: M.tick, stats: M.stats(), initCpuMs: cost.initCpuMs});}
-  else if (m.t === 'delta') {const c = cpuMs(); if (!M.apply(m.d)) {parentPort!.postMessage({t: 'resync', index: wd.index}); return;} const ms = cpuMs() - c; cost.deltas++; cost.ingestCpuMs += ms; cost.maxIngestCpuMs = Math.max(cost.maxIngestCpuMs, ms); myGen(m.gen);}
+  if (m.t === 'init') {
+    const c = cpuMs(); if (R2) init2(m.w); else M.init(m.w); cost.initCpuMs = cpuMs() - c; myGen(m.gen);
+    parentPort!.postMessage({t: 'ready', index: wd.index, gen: m.gen, tick: tickNow(), ...(R2 ? {warmMs: c2.warmMs} : {stats: M.stats()}), initCpuMs: cost.initCpuMs});
+  }
+  else if (m.t === 'delta') {const c = cpuMs(); if (R2 ? !RW || !apply2(m.d) : !M.apply(m.d)) {parentPort!.postMessage({t: 'resync', index: wd.index}); return;} const ms = cpuMs() - c; cost.deltas++; cost.ingestCpuMs += ms; cost.maxIngestCpuMs = Math.max(cost.maxIngestCpuMs, ms); myGen(m.gen);}
   else if (m.t === 'query') parentPort!.postMessage({t: 'answer', id: m.id, v: answer(m.kind, m.soulId)});
   else if (m.t === 'forget') tokens.clear();
 });
@@ -82,7 +158,9 @@ function send(res: ServerResponse, status: number, body: unknown, headers: Recor
 }
 function health(res: ServerResponse) {
   const mainGen = lag[0];
-  send(res, M.tick >= 0 ? 200 : 503, {ok: M.tick >= 0, worker: wd.index, gen, lagGens: Math.max(0, mainGen - gen), tick: M.tick, subset: wd.mode === 1, mode: wd.mode, served: cost.served, forwarded: cost.forwarded});
+  const tick = tickNow();
+  send(res, tick >= 0 ? 200 : 503, {ok: tick >= 0, worker: wd.index, gen, lagGens: Math.max(0, mainGen - gen), tick, subset: wd.mode === 1, mode: wd.mode, served: cost.served, forwarded: cost.forwarded,
+    ...(R2 ? {read: {ready: ready2, relabeling: !!relabel, ...c2, cpuMs: Math.round(c2.cpuMs), verdicts: RW ? {hits: RW.verdicts.hits, misses: RW.verdicts.missCount} : null, replica: RW?.cost ?? null}} : {})});
 }
 const HOP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'content-length', 'upgrade', 'expect']);
 /** Ask the main thread (through Admission) and relay its answer. */
@@ -116,7 +194,19 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
   const url = stripWorldRequestPath(req.url, wd.worldPath) ?? '/', q = url.indexOf('?'), path = q < 0 ? url : url.slice(0, q);
   if (req.method === 'GET' && (path === '/healthz' || path === '/healthz/read')) return health(res);
   const token = bearer(req);
-  if (wd.mode >= 1 && req.method === 'GET' && q < 0 && SUBSET.has(path) && token?.startsWith('sim_') && M.tick >= 0) {
+  if (R2 && req.method === 'GET' && path === '/v1/edge/here' && token?.startsWith('sim_')) {
+    const who = await soulOf(token);
+    if (who.soulId) {
+      const r = here2(who.soulId, q < 0 ? '' : url.slice(q + 1));
+      if (r) {
+        const lv = level(), acct: Record<string, string> = who.account ? {'x-sim-account': who.account} : {};
+        cost.served++;
+        return send(res, 200, {contract: CONTRACT, ...r.body, ...(lv !== 'green' ? {world: worldBlock(lv)} : {})}, {...acct, 'x-sim-read-cpu-ms': r.cpuMs.toFixed(3)});
+      }
+    }
+    return forward(req, res, url, path, token);
+  }
+  if (wd.mode === 1 && req.method === 'GET' && q < 0 && SUBSET.has(path) && token?.startsWith('sim_') && M.tick >= 0) {
     const who = await soulOf(token);
     if (who.soulId && knows(who.soulId)) {
       const lv = level(), world = lv !== 'green' ? {world: worldBlock(lv)} : {}, acct: Record<string, string> = who.account ? {'x-sim-account': who.account} : {};

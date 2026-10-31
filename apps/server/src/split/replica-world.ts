@@ -38,7 +38,7 @@ export class ReplicaWorld {
   private worldView: NativeWorld;
   private runtimeView: RuntimeView;
   /** One per init/apply: the time and what changed (cost in the worker). */
-  readonly cost = {inits: 0, applies: 0, refused: 0, spatialBuilds: 0, spatialRebuilds: 0};
+  readonly cost = {inits: 0, applies: 0, refused: 0, spatialBuilds: 0, spatialRebuilds: 0, spatialKept: 0};
 
   constructor() {
     const self = this;
@@ -140,8 +140,16 @@ export class ReplicaWorld {
   init(w: WorldInit & MenuWire) {
     this.R.init(w); this.ents = Object.fromEntries(this.R.entities); this.cost.inits++;
     this.applyMenu(w.menu, true);
-    this.sceneKey = ''; this.spatial = null; this.syncSpatial();
+    // a re-init on the same static scene (a resnapshot: a relocate, a resync) keeps the spatial service and its labels
+    // (the first labelling of a live world takes seconds): only the bodies are replaced
+    if (this.spatial && this.R.sceneKey === this.sceneKey) {
+      const now = this.humans(), ids = new Set(now.map(b => b.id)), gone = this.spatialBodies.filter(id => !ids.has(id));
+      this.spatial.applyBodies({bodies: now, gone}); this.cost.spatialKept++;
+    } else {this.sceneKey = ''; this.spatial = null;}
+    this.syncSpatial();
+    this.spatialBodies = this.humans().map(b => b.id);
   }
+  private spatialBodies: string[] = [];
   /** False (nothing applied): not the next delta; re-init. */
   apply(d: WorldDelta & MenuDeltaWire): boolean {
     if (!this.R.apply(d)) {this.cost.refused++; return false;}

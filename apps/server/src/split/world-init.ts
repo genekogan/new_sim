@@ -33,13 +33,14 @@ export function freshTables(host: WorldHost, L: EdgeLedger, tap: DeltaTap, opts:
   } as Fresh;
 }
 
-let cache: {key: string; init: WorldInit} | null = null;
+/** per host (two worlds in one process, e.g. tests, never share an init) */
+const caches = new WeakMap<object, {key: string; init: WorldInit}>();
 /** The WorldInit at the stream's current position (between ticks). Built once per (gen, seq, log seq, object gen,
  *  receipts seen, together version): consumers asking at the same state share one object (and one serialization). */
 export function worldInit(host: WorldHost, L: EdgeLedger, tap: DeltaTap): WorldInit {
   const pos = tap.pos, key = `${host.worldId}|${pos.gen}|${pos.seq}|${pos.tick}|${pos.logSeq}|${tap.objectTable()?.generation ?? 0}|${tap.receiptCount}|${L.together.version}|${L.faded.size}|${host.minds.size}`;
-  if (cache?.key === key) return cache.init;
+  const cache = caches.get(host); if (cache?.key === key) return cache.init;
   const init: WorldInit = {...pos, ...freshTables(host, L, tap)};
-  cache = {key, init};
+  caches.set(host, {key, init});
   return init;
 }

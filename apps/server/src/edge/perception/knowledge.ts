@@ -87,8 +87,19 @@ export class PlaceKnowledge {
       .map(r => [r.place_id, {visits: r.visits, firstTick: r.first_tick, lastTick: r.last_tick, how: r.how === 'found' ? 'found' : 'visited'} as Known]));
     this.memo.set(soulId, m); return m;
   }
+  /** Read worker (L.readOnly): the visits/finds a read records, for main to merge (the worker's database is read-only). */
+  readonly outbox: {soulId: string; placeId: string; k: Known}[] = [];
+  /** Main: a read worker's recorded visits/finds, merged as touch/find would (a visit beats a find; never downgraded). */
+  merge(rows: readonly {soulId: string; placeId: string; k: Known}[]) {
+    for (const r of rows) {
+      const have = this.memory(r.soulId).get(r.placeId);
+      if (have?.how === 'visited' || (have && r.k.how === 'found')) continue;
+      this.write(r.soulId, r.placeId, have ? {...r.k, firstTick: have.firstTick} : r.k);
+    }
+  }
   private write(soulId: string, placeId: string, k: Known) {
     this.memory(soulId).set(placeId, k);
+    if (this.L.readOnly) {if (this.outbox.length < 4096) this.outbox.push({soulId, placeId, k}); return;}
     this.L.db.db.prepare(`INSERT INTO edge_place_knowledge_v1 (world_id, soul_id, place_id, how, visits, first_tick, last_tick) VALUES (?,?,?,?,?,?,?)
       ON CONFLICT(world_id, soul_id, place_id) DO UPDATE SET how=excluded.how, visits=excluded.visits, last_tick=excluded.last_tick`).run(this.w, soulId, placeId, k.how, k.visits, k.firstTick, k.lastTick);
   }

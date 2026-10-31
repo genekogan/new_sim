@@ -92,6 +92,35 @@ export class ReadOnlyHost {
 
 /** The worker's ledger: the main ledger's read code over the read-only host. `placeData` = what main loaded (PLACE_DATA),
  *  else derived from the replicated world, as main derives it. */
-export function readLedger(host: ReadOnlyHost, placeData?: unknown) {
-  return new EdgeLedger(host as never, host.db, placeData, {readOnly: true});
+export function readLedger(host: ReadOnlyHost, placeData?: unknown, env: NodeJS.ProcessEnv = process.env) {
+  const L = new EdgeLedger(host as never, host.db, placeData, {readOnly: true});
+  L.comms = readComms(host, env.EDGE_FADING === '1', env.SIM_BEAM === '1') as never;
+  return L;
+}
+
+/** The comms reads the read code makes, from the database main writes (edge/comms/fading.ts status()). With the idle
+ *  beam-up on, a Soul's colour depends on main's in-memory holds: main answers (MainOnly). */
+function readComms(host: ReadOnlyHost, fading: boolean, beam: boolean) {
+  const db = host.db.db as DatabaseSync;
+  let q: ReturnType<DatabaseSync['prepare']> | null = null;
+  const objs: {gen: number; n: number; list: readonly unknown[]} = {gen: -1, n: -1, list: []};
+  return {
+    fading: {
+      status(soulId: string): {colour: string; idleSeconds: number} | null {
+        if (!fading) return null;
+        if (beam) throw new MainOnly('fading.status with SIM_BEAM');
+        q ??= db.prepare('SELECT last_at, colour FROM edge_comms_activity WHERE world_id = ? AND soul_id = ?');
+        const r = q.get(host.worldId, soulId) as {last_at: number; colour: string} | undefined;
+        if (!r) return {colour: 'green', idleSeconds: 0};
+        return r.colour === 'gone' ? {colour: 'gone', idleSeconds: Math.floor((Date.now() - r.last_at) / 1000)} : {colour: 'green', idleSeconds: 0};
+      },
+    },
+    get streams(): never {throw new MainOnly('comms.streams');},
+    /** the replicated comms object table (B-delta: L8 table snapshot + changes), in the table's id order */
+    objects: new Proxy({
+      all: () => {const R = host.rw.R; if (objs.gen !== R.objectGen || objs.n !== R.objects.size) {objs.gen = R.objectGen; objs.n = R.objects.size; objs.list = Object.freeze([...R.objects.values()].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0));} return objs.list;},
+      has: (id: string) => host.rw.R.objects.has(id),
+    } as Record<string, unknown>, {get: (t, k) => {if (k in t || typeof k === 'symbol') return t[k as string]; throw new MainOnly(`comms.objects.${String(k)}`);}}),
+    close() {/* nothing held */},
+  };
 }

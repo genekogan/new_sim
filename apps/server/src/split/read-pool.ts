@@ -29,6 +29,10 @@ export type ReadPoolOptions = {
   /** B-facade: a worker's verdict misses, to main's pump */
   ask?: (misses: {program: import('@sim/engine-contract').Program; scope: string}[]) => void;
   respawnMs?: number; heapMb?: number; log?: (m: string) => void;
+  /** mode 2: the place visits/finds a worker's reads recorded (its database is read-only), for main's ledger to merge */
+  writes?: (rows: {soulId: string; placeId: string; k: {visits: number; firstTick: number; lastTick: number; how: 'visited' | 'found'}}[]) => void;
+  /** mode 2 (B-facade): the world database and id each worker opens read-only */
+  world?: import('./read-worker.ts').ReadWorld;
 };
 type Slot = {index: number; worker: Worker | null; port: number; alive: boolean; ready: boolean; restarts: number; lastError?: string};
 
@@ -55,8 +59,8 @@ export class ReadPool {
   private spawn(s: Slot) {
     const ch = new MessageChannel();
     const data: ReadWorkerData = {index: s.index, port: this.o.ports?.[s.index] ?? 0, mode: this.mode, worldPath: this.o.worldPath, lag: this.lag.buffer as SharedArrayBuffer,
-      load: this.o.shared?.buffer as SharedArrayBuffer | undefined, intents: ch.port2};
-    const w = new Worker(new URL('./read-worker.ts', import.meta.url), {workerData: data, transferList: [ch.port2], execArgv: [], resourceLimits: {maxOldGenerationSizeMb: this.o.heapMb ?? 512}});
+      load: this.o.shared?.buffer as SharedArrayBuffer | undefined, intents: ch.port2, ...(this.o.world ? {world: this.o.world} : {})};
+    const w = new Worker(new URL('./read-worker.ts', import.meta.url), {workerData: data, transferList: [ch.port2], execArgv: [], resourceLimits: {maxOldGenerationSizeMb: this.o.heapMb ?? (this.mode >= 2 ? 1536 : 512)}});
     s.worker = w; s.alive = true; s.ready = false; s.port = 0; this.lag[1 + s.index] = 0;
     // the worker's intents: token lookups here, jobs into Admission
     ch.port1.on('message', (m: {t: string; id: number; token?: string}) => {
@@ -75,6 +79,7 @@ export class ReadPool {
       else if (m.t === 'ready') { s.ready = true; this.publish(); }
       else if (m.t === 'error') { s.lastError = m.error; this.log(`worker ${s.index}: ${m.error}`); }
       else if (m.t === 'resync') { this.stats.resyncs = (this.stats.resyncs ?? 0) + 1; this.reinit(); }
+      else if (m.t === 'writes') this.o.writes?.((m as unknown as {rows: Parameters<NonNullable<ReadPoolOptions['writes']>>[0]}).rows);
       else if (m.t === 'ask') this.o.ask?.((m as unknown as {misses: {program: import('@sim/engine-contract').Program; scope: string}[]}).misses);
     });
     w.on('error', (e) => { s.lastError = e.message; this.log(`worker ${s.index} failed: ${e.message}`); });
@@ -126,5 +131,6 @@ export async function deltaSource(host: import('../world.ts').WorldHost, L: impo
   const pump = tap.extend as import('./verdict-pump.ts').VerdictPump;
   return {tap, pump, init: () => worldInit(host, L, tap), cost: tap.cost,
     onDelta: (f: (d: WorldDelta) => void, resnapshot: () => void) => tap.subscribe(m => {if ('t' in m) resnapshot(); else f(m);}),
-    ask: (misses: {program: import('@sim/engine-contract').Program; scope: string}[]) => pump.ask(misses)};
+    ask: (misses: {program: import('@sim/engine-contract').Program; scope: string}[]) => pump.ask(misses),
+    writes: (rows: Parameters<typeof L.knowledge.merge>[0]) => L.knowledge.merge(rows)};
 }
