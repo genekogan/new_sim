@@ -1,4 +1,5 @@
-import {handActuatorFrame,type HandActuatorMotion} from '../../../mars/viewer/engine/social/hand-actuator.ts';
+import {handActuatorFrame,knockContacts,opPoint,HAND_REACH_SECONDS,LOCK_TURN_SECONDS,type HandActuatorMotion} from '../../../mars/viewer/engine/social/hand-actuator.ts';
+import {lockPose} from './gen-mesh/vocab-look.ts';
 // The entity world's picture (spec <eden4>/28 §8): terrain baked from the
 // same ground recipe the server uses, water, a horizon ring, and one mesh per
 // placed entity drawn from its def. Diffs arrive over the hub as
@@ -111,7 +112,7 @@ export class WorldEntityLayer {
     for(const id in entities){
       const m=entities[id].state.handActuator as HandActuatorMotion|undefined;if(!m?.opening&&!m?.slide)continue;
       const d=this.drawn.get(m.target);if(!d)continue;
-      const f=handActuatorFrame(m,(tick-m.startTick)*dt);
+      const sec=(tick-m.startTick)*dt,f=handActuatorFrame(m,sec);
       if(m.slide){
         // a drawer (entry 24) slides by the recorded travel, in its own units
         const target=this.model?.entities.get(m.target),scale=target?this.model!.worldPose(target).s||1:1;
@@ -120,6 +121,8 @@ export class WorldEntityLayer {
         continue;
       }
       const angle=f.angle;
+      // Soul Actions entry 32: the lock under the hand (bolt, thumb-turn, key) and its sounds, on the same depicted tick
+      if(m.op||m.passage?.relock){this.drawLock(d,m,f);this.contactSounds(id,m,sec,f.commitAt);}
       let leaf=this.leaves.get(d.obj);
       if(leaf&&leaf.angle===angle&&!d.opening&&!d.motion)continue;
       if(!leaf){leaf={parts:[],angle};d.obj.traverse(o=>{if(o.userData.role==='door')leaf!.parts.push(o);});this.leaves.set(d.obj,leaf);}
@@ -129,6 +132,36 @@ export class WorldEntityLayer {
     }
   }
   private readonly leaves=new WeakMap<THREE.Object3D,{parts:THREE.Object3D[];angle:number}>();
+  private readonly lockParts=new WeakMap<THREE.Object3D,{o:THREE.Object3D;role:string}[]>();
+  /** Entry 32: a lock turning under a hand. Until the turn's end the world still has the old state, so the drawn lock
+   *  turns from it; at the end the state lands (the diff waits for the depicted tick) and the rebuilt door agrees. */
+  private drawLock(d:Drawn,m:HandActuatorMotion,f:ReturnType<typeof handActuatorFrame>){
+    let parts=this.lockParts.get(d.obj);
+    if(!parts){const found:{o:THREE.Object3D;role:string}[]=[];d.obj.traverse(o=>{const r=o.userData.role;if(r==='bolt'||r==='thumb'||r==='key')found.push({o,role:r});});parts=found;this.lockParts.set(d.obj,parts);}
+    if(!parts.length)return;
+    const locked=this.model?.entities.get(m.target)?.state?.locked===true;let k:number|null=null,key=false;
+    if(m.op==='lock'||m.op==='unlock'){
+      // nothing to turn when the world already has it so (a walk's thumb-turn on a door somebody else unlocked)
+      if(!f.contact&&(m.op==='unlock')!==locked)return;
+      k=m.op==='lock'?f.turn:1-f.turn;key=m.opening?.side===1&&f.weight>.5;
+    }else if(m.passage?.relock&&m.passage.mode==='close'&&f.contact)k=1;
+    if(k===null)return;
+    if(d.frozen)this.thaw(d);
+    for(const p of parts)lockPose(p.o,p.role,k,key);
+    d.obj.updateMatrixWorld(true);
+  }
+  private readonly soundClock=new Map<string,number>();
+  /** Entry 32: the knock of each rap, the click of a lock and the latch, when the depicted time crosses that contact. */
+  private contactSounds(id:string,m:HandActuatorMotion,sec:number,commitAt:number){
+    const o=m.opening;if(!o||m.abortedAt!==undefined)return;
+    const at=(op:'lock'|'unlock'|'knock')=>opPoint(o,op,0) as [number,number,number];
+    const due:[ 'knock'|'click'|'latch',number,[number,number,number]][]=m.op==='knock'?knockContacts().map(t=>['knock',t,at('knock')]):m.op?[['click',HAND_REACH_SECONDS+LOCK_TURN_SECONDS*.85,at(m.op)]]:m.passage?.relock&&m.passage.mode==='close'?[['latch',commitAt,at('lock')]]:[];
+    if(!due.length)return;
+    const key=id+':'+(m.actionId??m.startTick),prev=this.soundClock.get(key);this.soundClock.set(key,sec);if(this.soundClock.size>64)this.soundClock.delete(this.soundClock.keys().next().value!);
+    if(prev===undefined||sec<=prev)return;   // first sight of a motion never plays a backlog
+    const sound=(window as unknown as {__edenSound?:{contact?:(k:string,a:[number,number,number])=>void}}).__edenSound;
+    for(const [kind,t,p] of due)if(prev<t&&sec>=t&&sec-t<.3)sound?.contact?.(kind,p);
+  }
   /** Does this placed thing publish a lamp pool or a lighthouse beam (world-env's scan)? */
   private lit(id:string){const e=this.model?.entities.get(id),def=e&&this.model!.resolvedDef(e.def);return !!def&&(defLights(def.components).length>0||!!def.tags?.includes('lighthouse'));}
   /** M01: bumped only by a diff that can change a lamp pool (world-env's immediate repaint); other diffs keep its 2 Hz gate. */

@@ -66,13 +66,15 @@ export type ActuatorHost = {
   /** The Soul's body position (x, z), or null. */
   bodyAt(soul: EdgeSoul): Vec2 | null;
   deferContacts?: boolean;
-  contactPlan?(soul:EdgeSoul,target:string,action:string,params?:Record<string,unknown>):{params:Record<string,unknown>;root:[number,number,number];level?:number;face?:[number,number]}|null;
+  contactPlan?(soul:EdgeSoul,target:string,action:string,params?:Record<string,unknown>):{params:Record<string,unknown>;root:[number,number,number];level?:number;face?:[number,number];/** entry 32: where to step back to afterwards (a knock) */after?:[number,number]}|null;
   /** Commit a state change of a god thing as an engine edit. */
   commit(id: string, patch: Record<string, unknown>, note: string): { accepted: boolean };
   /** The thing's actuator state as the world has it now (the object's copy may lag a sync behind). */
   stateOf?(id: string): Record<string, unknown> | null;
   /** LAYERS: why this Soul may not touch it (a private thing of someone else's), or null. */
   access?(id: string, soul: EdgeSoul): Refusal | null;
+  /** Soul Actions entry 32: who may lock, unlock or knock on a lockable door (owner-only lock; knock from outside). */
+  policy?(id: string, soul: EdgeSoul, action: string): Refusal | null;
   /** SOULFIX: a standing point within reach that the body can walk to (front, back, else any side), or null. */
   approach?(id: string, soul: EdgeSoul, front: Vec2 | null, radius?: number): { p: Vec2; level: number } | null;
   /** W5 water (water.ts): the things involved in moving water, and an atomic commit of several state changes. */
@@ -252,6 +254,7 @@ export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: Buil
       if (d > ACT_SIGHT) return { code: 'object.out-of-reach', reason: `${nameOf(s)} is ${Math.round(d)} m away; walk closer first.` };
       const denied = s.key ? host.access?.(s.key, ctx.soul) : null; if (denied) return denied;
       if(host.deferContacts&&def.tags.includes('wall-window')&&s.key&&!host.contactPlan?.(ctx.soul,s.key,a.name))return {code:'contact.out-of-reach',reason:'This window handle is outside standing hand reach from your floor.'};
+      const policy = s.key ? host.policy?.(s.key, ctx.soul, a.name) : null; if (policy) return policy;
       const water = s.key ? waterPlan(a, s.key, ctx.soul, host) : null; if (water) return isRefusal(water) ? water : null;
       const state = (s.key && host.stateOf?.(s.key)) || s.state || {};
       return whenRefusal(a, state, nameOf(s)) ?? (isListAction(def, a) ? listProblem(def, a, state, ctx.soul) : isGameAction(def, a) ? gameProblem(a, state, ctx.soul) : null);
@@ -264,7 +267,7 @@ export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: Buil
         const contact = host.deferContacts && isContactActuator(def, a);
         const motion=contact&&s.key?host.contactPlan?.(ctx.soul,s.key,a.name,params):null;
         if(motion){const me=host.bodyAt(ctx.soul)!,far=(motion.level??0)>0||Math.hypot(me[0]-motion.root[0],me[1]-motion.root[2])>.1;
-          return {state:s,result:{action:a.name,set:actionPatch(def,a,(s.key&&host.stateOf?.(s.key))||s.state||{},params,ctx.soul)},bodies:[{label:a.label,steps:[{verb:'stand',params:{}},...(far?[(motion.level??0)>0||motion.params.stroke?{verb:'mars:walk_to',params:{x:motion.root[0],z:motion.root[2],level:motion.level}}:{verb:'walk_to',params:{to:[motion.root[0],motion.root[2]],standoff:0}}]:[]),...(motion.face?[{verb:'mars:face',params:{target:{point:motion.face}}}]:[]),{verb:'mars:hand_actuator_v1',params:motion.params},...stepBack(def,a,motion),...gameStepBack(def,a,motion)]}]};}
+          return {state:s,result:{action:a.name,set:actionPatch(def,a,(s.key&&host.stateOf?.(s.key))||s.state||{},params,ctx.soul)},bodies:[{label:a.label,steps:[{verb:'stand',params:{}},...(far?[(motion.level??0)>0||motion.params.stroke?{verb:'mars:walk_to',params:{x:motion.root[0],z:motion.root[2],level:motion.level}}:{verb:'walk_to',params:{to:[motion.root[0],motion.root[2]],standoff:0}}]:[]),...(motion.face?[{verb:'mars:face',params:{target:{point:motion.face}}}]:[]),{verb:'mars:hand_actuator_v1',params:motion.params},...stepBack(def,a,motion),...gameStepBack(def,a,motion),...(motion.after?[{verb:'walk_to',params:{to:motion.after,standoff:0}}]:[])]}]};}
 
         const me = host.bodyAt(ctx.soul)!, to = s.front ?? s.at!, far = Math.hypot(s.at![0] - me[0], s.at![1] - me[1]) > (contact ? CONTACT_REACH : ACT_REACH);
         const water = s.key ? waterPlan(a, s.key, ctx.soul, host) : null;

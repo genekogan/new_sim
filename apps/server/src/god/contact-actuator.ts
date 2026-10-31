@@ -1,6 +1,6 @@
 // Contact effects commit at the recorded hand contact, with release still owned by the native action.
 // Durable receipt intent, no per-tick object scan and no effect from an interrupted walk.
-import {actuatorPoint,slidePoint,strokePoint,strokeRoot,STROKE_STAND,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
+import {actuatorPoint,opPoint,slidePoint,strokePoint,strokeRoot,STROKE_STAND,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
 import { createHash } from 'node:crypto';
 import { isDry } from './garden.ts';
 import { HUMAN_RADIUS } from '../../../../mars/viewer/engine/world/catalog.ts';
@@ -8,10 +8,16 @@ import { opSchema, contactStateKey, DRAWER_TRAVEL, pinSlot, signupSlot, pollSlot
 import type { EdgeSoul } from '../edge/contract.ts';
 import { actionPatch, actionsOf, actuatedState, boardTextProblem, gamePatch, gameProblem, isGameAction, isListAction, listProblem, pinNotes, pollChoice, pollLines, whenRefusal } from './actuators.ts';
 export const CONTACT_REACH = .8;
-export type ContactActuatorIntent = { target:string; action:string; actor:string; owner:string; binding:string; motionV1?:true; params?:Record<string,string> };
+export type ContactActuatorIntent = { target:string; action:string; actor:string; owner:string; binding:string; motionV1?:true; params?:Record<string,string>; /** entry 32: a passage's close re-locks the latch */ relock?:true; /** entry 32: a leg of a walk through the door */ passage?:true };
+/** Soul Actions entry 32: the hand operations on a lockable door that are not the leaf itself. */
+const LOCK_OPS=new Set(['lock','unlock','knock']);
+type Refusal={code:string;reason:string};
 export const isContactActuator = (def:StoredDef, action:{name:string}) => contactStateKey(def,action.name)!==null;
 const fail=(code:string,reason:string)=>({ok:false as const,code,reason});
-export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:number)=>number;model:()=>WorldModel;body:(id:string)=>{pose:{p:number[]};human?:{hands?:{left?:number[];right?:number[]};handActuator?:import('../../../../mars/viewer/engine/social/hand-actuator.ts').HandActuatorMotion}}|undefined;access:(id:string,soul:EdgeSoul)=>{code:string;reason:string}|null;record:(soul:EdgeSoul,id:string,action:string,params?:Record<string,unknown>)=>void;commit:(ops:Op[],note:string,done:()=>void)=>{accepted:boolean}}){
+export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:number)=>number;model:()=>WorldModel;body:(id:string)=>{pose:{p:number[]};human?:{hands?:{left?:number[];right?:number[]};handActuator?:import('../../../../mars/viewer/engine/social/hand-actuator.ts').HandActuatorMotion}}|undefined;access:(id:string,soul:EdgeSoul)=>{code:string;reason:string}|null;
+ /** entry 32: the thing's owner (a name) and whether it is this Soul; null when nobody owns it */ owner?:(id:string,soul:EdgeSoul)=>{name:string;mine:boolean}|null;
+ /** entry 32: a knock on the leaf landed (the first rap): tell those who hear it */ knock?:(soul:EdgeSoul,id:string)=>void;
+ record:(soul:EdgeSoul,id:string,action:string,params?:Record<string,unknown>)=>void;commit:(ops:Op[],note:string,done:()=>void)=>{accepted:boolean}}){
  const binding=(id:string)=>{const m=d.model(),e=m.entities.get(id);return e?createHash('sha256').update(JSON.stringify([e,m.worldPose(e),m.resolvedDef(e.def)?.hash])).digest('hex'):null;};
  return {
   /** `from`/`open` (entry 31's door passage): plan as if the body stood at `from` and the door were already open/shut. */
@@ -49,6 +55,7 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     const number=(key:string)=>Number(e.params?.[key]??def.params[key]?.default??1),sx=wp.s*number('sx'),sy=wp.s*number('sy');
     const hx=leaf.pivot[0]*sx,hz=(leaf.pivot[2]??0)*wp.s,c=Math.cos(wp.yaw),s=Math.sin(wp.yaw);
     const localZ=(me[0]-wp.x)*s+(me[2]-wp.z)*c;
+    if(LOCK_OPS.has(action)&&def.tags.includes('lockable'))params.op=action as 'lock'|'unlock'|'knock';
     params.opening={bodyPolicy:'door-natural-v2',...(def.tags.includes('wall-window')?{floorY:me[1]}:{}),hinge:[wp.x+hx*c+hz*s,wp.y,wp.z-hx*s+hz*c],yaw:wp.yaw,radius:((knob?.at?.[0]??(Number(def.components.opening?.width??leaf.size?.[0]??.8)/2-.1))-leaf.pivot[0])*sx,height:Number(def.components.opening?.height??leaf.size?.[1]??1.8)*sy,handleY:(knob?.at?.[1]??.85)*sy,from:(opts?.open??actuatedState(e,def).open===true)?HAND_OPEN_ANGLE:0,to:action==='open'?HAND_OPEN_ANGLE:0,side:def.tags.some(t=>['wall-window','hand-cabinet'].includes(t))?1:localZ<0?-1:1};
     if(def.tags.includes('wall-window')&&(wp.y+params.opening.handleY-me[1]>1.65||wp.y+params.opening.handleY-me[1]<.35))return null;
     root=actuatorPoint(params.opening,params.opening.from).root;
@@ -68,7 +75,9 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
      // reach is never added to a body turn (the hand actuator's own turn is then ~0).
      face=[params.at[0],params.at[2]];
     }}
-   return {params,root,level:d.levelAt?.(root[0],root[2],root[1])??0,...(face?{face}:{})};
+   // entry 32: after knocking, step back beside the door (latch side, out of its swing and of the way through) to wait
+   const o=params.opening,after:[number,number]|undefined=params.op==='knock'&&o?[+(wp.x+Math.cos(wp.yaw)*1.35+Math.sin(wp.yaw)*o.side*1.3).toFixed(3),+(wp.z-Math.sin(wp.yaw)*1.35+Math.cos(wp.yaw)*o.side*1.3).toFixed(3)]:undefined;
+   return {params,root,level:d.levelAt?.(root[0],root[2],root[1])??0,...(face?{face}:{}),...(after?{after}:{})};
   },
   /** What a Soul reads when it completes `read:<sign>` (never in ambient perception for Soul-written boards). */
   sign(target:string){
@@ -79,6 +88,23 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     const head=names.length?`Noughts and crosses: ${who('X')} (X)${names[1]?` against ${names[1]} (O)`:''}; ${st.winner?`${who(st.winner)} won`:st.draw?'a draw':`${who(st.turn)} to play`}`:'Noughts and crosses: a new game, X to play';
     return {id:e.id,name:e.name??def.name.replace(/^core-/,''),text:[head,...[0,1,2].map(r=>[...g.slice(r*3,r*3+3)].map(ch=>ch==='.'?'·':ch).join(' '))].join('\n'),by:null,writable:true};}
    return {id:e.id,name:e.name??def.name.replace(/^core-/,''),text,...(def.tags?.includes('pinboard')?{notes:pinNotes(e.state??{})}:{}),...(def.tags?.includes('signup')?{title:String(e.state?.title??''),text:[String(e.state?.title??'Sign up'),...pinNotes(e.state??{}).map((n,i)=>`${i+1}. ${n.text}`)].join('\n')}:{}),...(def.tags?.includes('poll')?{title:String(e.state?.title??''),text:[String(e.state?.title??''),pollLines(e.state??{})].join('\n')}:{}),by:typeof e.state?.textBy==='string'&&e.state.textBy&&!def.tags?.some(t=>t==='poll'||t==='signup')?e.state.textBy:null,writable:!!def.tags?.includes('hand-writable')};
+  },
+  /** Entry 32: who may lock, unlock and knock on a lockable door. Its owner locks and unlocks it (key outside, thumb-turn
+   *  inside); a door nobody owns locks for anyone. Knocking is for the outside (the front) of a closed door. A non-owner
+   *  inside never needs `unlock`: a walk out turns the thumb-turn on the way (door-passage.ts). */
+  policy(soul:EdgeSoul,target:string,action:string):Refusal|null{
+   if(!LOCK_OPS.has(action))return null;
+   const m=d.model(),e=m.entities.get(target),def=e&&m.resolvedDef(e.def);if(!e||!def?.tags.includes('lockable'))return null;
+   const name=e.name??'the door',side=this.side(soul,target);
+   if(action==='knock')return side==='inside'?{code:'door.inside',reason:`You are inside ${name}; knocking is for someone outside it.`}:null;
+   const own=d.owner?.(target,soul);
+   if(own&&!own.mine)return {code:'door.not-yours',reason:`Only ${own.name} can ${action} ${name}; it is ${own.name}'s.${action==='unlock'&&side==='inside'?' From inside you can always just walk out: the thumb-turn opens as you go.':''}`};
+   return null;
+  },
+  /** Which side of a door this Soul's body is on: the back (local -z) is the inside. */
+  side(soul:EdgeSoul,target:string):'inside'|'outside'|null{
+   const m=d.model(),e=m.entities.get(target),b=d.body(soul.entityId);if(!e||!b)return null;
+   const p=m.worldPose(e);return (b.pose.p[0]-p.x)*Math.sin(p.yaw)+(b.pose.p[2]-p.z)*Math.cos(p.yaw)<0?'inside':'outside';
   },
   /** A few current public facts for compact nearby perception, never the full state. */
   facts(target:string){
@@ -104,17 +130,26 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
    const denied=d.access(intent.target,soul);if(denied)return fail(denied.code,denied.reason);
    const b=d.body(soul.entityId),p=m.worldPose(e),motion=b?.human?.handActuator;
    const hand=b?.human?.hands?.left??b?.human?.hands?.right;
-   const expected=motion?.opening?actuatorPoint(motion.opening,intent.action==='close'?motion.opening.to:motion.opening.from).hand:motion?.slide?slidePoint(motion.slide,intent.action==='close'?motion.slide.to:motion.slide.from).hand:motion?.stroke?strokePoint(motion.at,motion.stroke,1):motion?.at;
+   const expected=motion?.opening&&motion.op?opPoint(motion.opening,motion.op,0):motion?.opening?actuatorPoint(motion.opening,intent.action==='close'?motion.opening.to:motion.opening.from).hand:motion?.slide?slidePoint(motion.slide,intent.action==='close'?motion.slide.to:motion.slide.from).hand:motion?.stroke?strokePoint(motion.at,motion.stroke,1):motion?.at;
    const reached=intent.motionV1?!!motion&&motion.target===intent.target&&!!hand&&!!expected&&Math.hypot(...hand.map((v,i)=>v-expected[i]))<.1&&Math.hypot(b!.pose.p[0]-hand[0],b!.pose.p[2]-hand[2])<.9&&Math.abs(b!.pose.p[1]-p.y)<1.2:!!b&&Math.hypot(b.pose.p[0]-p.x,b.pose.p[2]-p.z)<=CONTACT_REACH&&Math.abs(b.pose.p[1]-p.y)<=1.2;if(!b?.human||!reached)return fail('contact.not-reached','Your hand did not reach the target; no action was applied.');
-   const state=actuatedState(e,def),bad=whenRefusal(a,state,e.name??'object');if(bad)return fail(bad.code,bad.reason);
+   const state=actuatedState(e,def);
+   // entry 32: a walk's thumb-turn on a door somebody unlocked meanwhile has nothing left to do
+   if(intent.passage&&a.name==='unlock'&&state.locked!==true){done();return {ok:true as const};}
+   const bad=whenRefusal(a,state,e.name??'object');if(bad)return fail(bad.code,bad.reason);
+   // entry 32: a knock changes nothing in the world; those who hear it are told once
+   if(a.name==='knock'&&def.tags.includes('lockable')){d.knock?.(soul,e.id);d.record(soul,e.id,a.name);done();return {ok:true as const};}
    const text=isGameAction(def,a)?gameProblem(a,state,soul,a.name==='mark'?intent.params?.square??'':undefined):isListAction(def,a)?listProblem(def,a,state,soul,intent.params??{}):contactStateKey(def,a.name)==='text'&&a.name==='write'?boardTextProblem(intent.params?.text):null;if(text)return fail(text.code,text.reason);
    const patch=isGameAction(def,a)?gamePatch(a,state,soul,intent.params?.square):actionPatch(def,a,state,intent.params??{},soul);if(contactStateKey(def,a.name)==='text'&&a.name==='write')patch.textBy=soul.soulId;
+   // entry 32: a passage's close re-locks the latch
+   if(intent.relock&&a.name==='close'&&typeof state.locked==='boolean')patch.locked=true;
    // A sprinkler coming on soaks the planters (things with numeric moisture) in its forward arc within reach, in the same commit:
    // one pass over the world at this event, never per tick.
    const soak:Op[]=[];
    if(def.tags?.includes('sprinkler')&&a.name==='switch-on'){const reach=Number(e.params?.reach??(def.params.reach as {default?:number}|undefined)?.default??3.5);
     for(const o of m.entities.values()){const od=o.id!==e.id&&m.resolvedDef(o.def);if(!od||(od.state as Record<string,{type?:string}>).moisture?.type!=='number')continue;const op=m.worldPose(o);const fx=Math.sin(p.yaw),fz=Math.cos(p.yaw);if(Math.hypot(op.x-p.x,op.z-p.z)<=reach&&(op.x-p.x)*fx+(op.z-p.z)*fz>0&&o.state?.moisture!==1)soak.push(opSchema.parse({op:'set',id:o.id,state:{moisture:1}}));}}
-   const r=d.commit([opSchema.parse({op:'set',id:e.id,state:patch}),...soak],`${soul.soulId} ${a.name} ${e.name??e.id}`,()=>{d.record(soul,e.id,a.name,intent.params??{});done();});
+   const r=d.commit([opSchema.parse({op:'set',id:e.id,state:patch}),...soak],`${soul.soulId} ${a.name} ${e.name??e.id}`,()=>{
+    // entry 32: a guest's thumb-turn on the way out is part of the walk, not an `unlock` of theirs (that is the owner's)
+    if(!(intent.passage&&a.name==='unlock'))d.record(soul,e.id,a.name,intent.params??{});done();});
    return r.accepted?{ok:true as const}:fail('contact.commit-refused','The world refused the interaction.');
   }
  };

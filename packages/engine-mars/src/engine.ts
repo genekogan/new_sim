@@ -2072,7 +2072,12 @@ export class MarsEngine implements Engine {
     for(const o of this.programs.values()){if(o.id===p.id)break;if(o.actor===p.actor)continue;
       const passer=this.doorPassersV1(q.door).find(x=>x.actor===o.actor);if(passer&&passer.from===q.from&&(passer.phase==='approach'||passer.phase==='opening'))ahead++;}
     if(!ahead)return a.to;
-    for(const spot of q.queue.slice(Math.min(ahead-1,q.queue.length-1)))if(!this.plan(this.movementVerb(p.actor,spot[0],spot[1]),{actor:p.actor,x:spot[0],z:spot[1],level:this.ents[p.actor]?.human?.level??0}))return spot;
+    // the nearest free queue spot to where this Soul comes from (a follower from the hinge side waits there, never crossing
+    // the leader's way to the staging spot); a spot another body already stands on is taken
+    const me=this.ents[p.actor]?.pose.p,taken=(q2:[number,number])=>listEntities(this.ents).some((o:any)=>!!o.human&&o.id!==p.actor&&hypot(o.pose.p[0]-q2[0],o.pose.p[2]-q2[1])<.7);
+    // the first row (latch side, hinge side) before the row behind it; nearest first within a row
+    const d=(x:[number,number])=>me?hypot(x[0]-me[0],x[1]-me[2]):0,spots=q.queue.map((x,i)=>({x,row:i>>1})).sort((a2,b2)=>a2.row-b2.row||d(a2.x)-d(b2.x)).map(e=>e.x);
+    for(const spot of spots)if(!taken(spot)&&!this.plan(this.movementVerb(p.actor,spot[0],spot[1]),{actor:p.actor,x:spot[0],z:spot[1],level:this.ents[p.actor]?.human?.level??0}))return spot;
     return a.to;
   }
   /** Soul Actions entry 31 (pure): the closed doors walling this body off from its plan's first walk_to destination. Null
@@ -2110,6 +2115,14 @@ export class MarsEngine implements Engine {
       if(off===0)return false;
     }
     return false;
+  }
+  /** Soul Actions entry 32: the god model's lock state of a door, read by a passage's thumb-turn step (hand-actuator.ts). */
+  installDoorLockedV1(read:(id:string)=>boolean|null){this.rt.services.doorLockedV1=read;}
+  /** Soul Actions entry 32 (pure): does a walk on the ground reach `to` from `from` with the world as it is now (shut doors
+   * block their gaps)? Who hears a knock: a body the knocked door shuts in, on the other side. */
+  reachesV1(from:[number,number],to:[number,number]):boolean{
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);
+    return spatial.route(this.rt.world,HUMAN_PROFILE_V1,{level:0,p:from},{level:0,p:to},{proveUnreachable:true}).ok;
   }
   nearestStandableV1(at:[number,number],except?:string,minClear=HUMAN_RADIUS+.15,maxRing=80):[number,number]|null{
     const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const clear=spatial.clearTester(0,at,minClear);if(!clear)return null;

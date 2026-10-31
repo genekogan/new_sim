@@ -20,12 +20,21 @@ const stroke=z.object({kind:z.union([z.literal('write'),z.literal('wipe')]),yaw:
 const slide=z.object({at:vec,dir:z.tuple([z.number().finite(),z.number().finite()]),travel:z.number().min(.05).max(.8),from:z.number().min(0).max(.8),to:z.number().min(0).max(.8),floorY:z.number().finite()}).strict();
 /** Soul Actions entry 31: this operation is one leg of a walk through the door (`open` before the doorway, `close` after
  *  it). `door` is the doorway centre, `from` the side (door-local z sign) the walk comes from. */
-const passage=z.object({mode:z.enum(['open','close']),door:z.tuple([z.number().finite(),z.number().finite()]),from:z.union([z.literal(1),z.literal(-1)])}).strict();
-export const handActuatorParams=z.object({actor:z.string(),target:z.string(),at:vec,opening:opening.optional(),stroke:stroke.optional(),slide:slide.optional(),passage:passage.optional()}).strict();
+const passage=z.object({mode:z.enum(['unlock','open','close']),door:z.tuple([z.number().finite(),z.number().finite()]),from:z.union([z.literal(1),z.literal(-1)]),
+ /** entry 32: the door was locked when the walk was planned: the latch locks it again as it is shut behind */ relock:z.literal(true).optional()}).strict();
+/** Soul Actions entry 32: a lockable door's lock and leaf. `lock`/`unlock`: the hand turns the key (front) or thumb-turn
+ *  (back) and the bolt slides; `knock`: knuckles to the leaf, three raps. The leaf does not move (opening from = to = 0). */
+const op=z.enum(['lock','unlock','knock']);
+export const handActuatorParams=z.object({actor:z.string(),target:z.string(),at:vec,opening:opening.optional(),stroke:stroke.optional(),slide:slide.optional(),passage:passage.optional(),op:op.optional()}).strict();
 export type HandActuatorParams=z.infer<typeof handActuatorParams>;
 export type HandActuatorMotion=Omit<HandActuatorParams,'actor'> & {startTick:number;actionId?:string;abortedAt?:number;abortWeight?:number};
 const smooth=(v:number)=>{const k=Math.max(0,Math.min(1,v));return k*k*(3-2*k);};
-export function handSwingSeconds(m:Pick<HandActuatorMotion,'opening'|'stroke'|'slide'>){
+/** Entry 32: a key / thumb-turn turn, and three raps (the first starts KNOCK_LEAD after the reach, one every KNOCK_PERIOD). */
+export const LOCK_TURN_SECONDS=.9,UNLOCK_SLIDE_SECONDS=.4,KNOCK_RAPS=3,KNOCK_PERIOD=.3,KNOCK_LEAD=.1,KNOCK_IN=.35,KNOCK_SECONDS=KNOCK_LEAD+KNOCK_RAPS*KNOCK_PERIOD+.1;
+/** Depicted contact times of the raps (seconds from the motion's start). */
+export const knockContacts=()=>Array.from({length:KNOCK_RAPS},(_,i)=>HAND_REACH_SECONDS+KNOCK_LEAD+(i+KNOCK_IN)*KNOCK_PERIOD);
+export function handSwingSeconds(m:Pick<HandActuatorMotion,'opening'|'stroke'|'slide'|'op'>){
+ if(m.op)return m.op==='knock'?KNOCK_SECONDS:LOCK_TURN_SECONDS;
  if(m.slide)return Math.max(1,Math.abs(m.slide.to-m.slide.from)*3.2);   // a drawer: about a second, an ordinary pull
  const o=m.opening;if(!o)return m.stroke?.seconds??0;
  if(o.bodyPolicy==='door-natural-v2')return Math.max(HAND_SWING_SECONDS,(Math.abs(o.to-o.from)*(o.radius+.42)+.35)*1.5/1.2);
@@ -34,14 +43,23 @@ export function handSwingSeconds(m:Pick<HandActuatorMotion,'opening'|'stroke'|'s
 }
 export function handActuatorFrame(m:HandActuatorMotion,seconds:number){
  const swing=handSwingSeconds(m),releaseAt=HAND_REACH_SECONDS+swing;
- const commitAt=m.opening?.to===0||m.stroke||m.slide?.to===0?releaseAt:HAND_REACH_SECONDS;
+ // a turned lock changes at the end of the turn; a knock is heard at its first rap
+ const commitAt=m.op==='knock'?knockContacts()[0]:m.opening?.to===0||m.stroke||m.slide?.to===0?releaseAt:HAND_REACH_SECONDS;
  const k=smooth(((m.abortedAt??seconds)-HAND_REACH_SECONDS)/(swing||1));
  const angle=m.opening?m.opening.from+(m.opening.to-m.opening.from)*k:0,pos=m.slide?m.slide.from+(m.slide.to-m.slide.from)*k:0;
  const weight=m.abortedAt!==undefined?(m.abortWeight??0)*(1-smooth((seconds-m.abortedAt)/HAND_RELEASE_SECONDS))
    :smooth(seconds/HAND_REACH_SECONDS)*(1-smooth((seconds-releaseAt)/HAND_RELEASE_SECONDS));
+ // entry 32: a walk's thumb-turn / key keeps the hand up and slides it to the handle (`slide`), then hands over to the opening
+ if(m.passage?.mode==='unlock'&&m.abortedAt===undefined){
+  const turn=k,slide=smooth((seconds-releaseAt)/UNLOCK_SLIDE_SECONDS);
+  return {angle,pos,weight:smooth(seconds/HAND_REACH_SECONDS),idleBlend:0,idleWeight:1-smooth(seconds/HAND_REACH_SECONDS),armDown:false,commitAt,done:seconds>=releaseAt+UNLOCK_SLIDE_SECONDS,contact:seconds>=commitAt,turn,rap:0,slide};
+ }
  const armDownAt=(m.abortedAt??releaseAt)+HAND_RELEASE_SECONDS,idleBlend=smooth((seconds-armDownAt)/HAND_IDLE_HANDOFF_SECONDS);
  const idleWeight=m.abortedAt!==undefined||seconds<HAND_REACH_SECONDS?1-weight:idleBlend;
- return {angle,pos,weight,idleBlend,idleWeight,armDown:seconds>=armDownAt,commitAt,done:seconds>=armDownAt+HAND_IDLE_HANDOFF_SECONDS,contact:m.abortedAt===undefined&&seconds>=commitAt};
+ // entry 32: how far the key / thumb-turn has turned (0..1), and how far the knuckles are from the leaf (0 = touching)
+ const turn=m.op==='lock'||m.op==='unlock'?k:0;
+ let rap=0;if(m.op==='knock'){const f=(seconds-HAND_REACH_SECONDS-KNOCK_LEAD)/KNOCK_PERIOD;if(f<0)rap=1;else if(f>=KNOCK_RAPS)rap=1;else{const x=f%1;rap=x<KNOCK_IN?1-smooth(x/KNOCK_IN):smooth((x-KNOCK_IN)/(1-KNOCK_IN));}}
+ return {angle,pos,weight,idleBlend,idleWeight,armDown:seconds>=armDownAt,commitAt,done:seconds>=armDownAt+HAND_IDLE_HANDOFF_SECONDS,contact:m.abortedAt===undefined&&seconds>=commitAt,turn,rap,slide:0};
 }
 /** Three's local-Y rotation convention, converted to the native world frame. */
 export function actuatorPoint(o:NonNullable<HandActuatorParams['opening']>,angle:number){
@@ -83,6 +101,15 @@ export const strokeRoot=(at:Vec3,s:NonNullable<HandActuatorParams['stroke']>,y:n
 export function slidePoint(s:NonNullable<HandActuatorParams['slide']>,pos:number){
  const hand:Vec3=[s.at[0]+s.dir[0]*pos,s.at[1],s.at[2]+s.dir[1]*pos];
  return {hand,root:[hand[0]+s.dir[0]*.5,s.floorY,hand[2]+s.dir[1]*.5] as Vec3};
+}
+/** Entry 32: where the hand is on a lockable door: the key / thumb-turn (0.9 m on a standard door, under the knob), or the
+ *  knuckles on the leaf (about 1.38 m, a little towards the hinge). `rap` lifts the knuckles off the leaf between raps. */
+export const KNOCK_LIFT=.07;
+export function opPoint(o:NonNullable<HandActuatorParams['opening']>,op:'lock'|'unlock'|'knock',rap=0):Vec3{
+ const along=op==='knock'?o.radius*.62:o.radius-(o.side<0?.03:0),y=o.hinge[1]+(op==='knock'?o.handleY*1.33:o.handleY*.865),c=dcos(o.yaw),s=dsin(o.yaw);
+ // the palm point is a few centimetres off the face it touches (knuckles on the leaf at 0.03 m, fingers round the key bow)
+ const off=op==='knock'?.075+KNOCK_LIFT*rap:.085;
+ return [o.hinge[0]+c*along+s*off*o.side,y,o.hinge[2]-s*along+c*off*o.side];
 }
 export const actuatorHand=(o?:HandActuatorParams['opening']):'left'|'right'=>o?.bodyPolicy==='door-natural-v2'?'left':(o?.side===-1?'left':'right');
 const issue=(code:string,message:string,subjects:string[]):Diagnostic=>({code:'contact.'+code,message,subjects});
@@ -136,6 +163,8 @@ export const PASSAGE_QUEUE_SECONDS=40;
 /** Other Souls' door passages through `door` (engine-mars installs `doorPassersV1` from its programmes). */
 type Passer={actor:string;phase:'approach'|'opening'|'through'|'closing';from?:number};
 const passers=(rt:Runtime,door:string):Passer[]=>((rt.services as {doorPassersV1?:(d:string)=>Passer[]}).doorPassersV1?.(door)??[]);
+/** Entry 32: is the door locked now (god engine-bridge installs `doorLockedV1`); null when nobody says. */
+const doorLocked=(rt:Runtime,target:string)=>(rt.services as {doorLockedV1?:(id:string)=>boolean|null}).doorLockedV1?.(target)??null;
 /** Is the door's closed gap still a solid in the walk graph (god engine-bridge: `<door>#door:<opening>`)? */
 function doorShut(rt:Runtime,target:string){const sp=rt.services.spatial as Spatial|undefined;if(!sp)return false;sp.sync(rt.world);return sp.scene.obstacles.some(o=>o.id.startsWith(target+'#door:'));}
 /** Door-local frame: `u` along the wall towards the latch, `n` the normal whose sign is the side. */
@@ -178,7 +207,7 @@ function waitSpot(rt:Runtime,ex:Exec):[number,number]|null{
 /** In the doorway's lane or swing (door-local |x| < 0.95 m, |z| < 1.6 m): where a waiting body is in the way. */
 function inTheWay(ex:Exec,x:number,z:number){const [lx,lz]=doorFrame(ex.p).local(x,z);return Math.abs(lx)<.95&&Math.abs(lz)<1.6;}
 /** A short courtesy walk of this Soul's own (a child of the operation, so the body stays reserved to it). */
-function stepTo(rt:Runtime,ex:Exec,q:[number,number]){const r=rt.submit('walk_to',{actor:ex.p.actor,x:q[0],z:q[1]},{parent:ex.id});if(r.status!=='failed')ex.child=r.id;return r.status!=='failed';}
+function stepTo(rt:Runtime,ex:Exec,q:[number,number]){dropHandover(rt,ex);const r=rt.submit('walk_to',{actor:ex.p.actor,x:q[0],z:q[1]},{parent:ex.id});if(r.status!=='failed')ex.child=r.id;return r.status!=='failed';}
 /** One passage tick before or while operating: a result to return now, or null to run the ordinary operation. */
 function passageStep(rt:Runtime,ex:Exec,dt:number):StepResult|null{
  const p=ex.p,o=p.opening!,a=rt.world.entities[p.actor],pass=p.passage!;
@@ -186,6 +215,8 @@ function passageStep(rt:Runtime,ex:Exec,dt:number):StepResult|null{
  if(!ex.began){
   // entry 32: queued behind an earlier passage on this side: wait where the walk stopped (the queue spot) until it is through
   if(pass.mode!=='close'){const ahead=queuedBehind(rt,ex);if(ahead)return hold(rt,ex,'queue',ahead);}
+  // entry 32: the thumb-turn / key before the door: nothing to turn when somebody already unlocked or opened it
+  if(pass.mode==='unlock'&&(!doorShut(rt,p.target)||doorLocked(rt,p.target)===false)){const who=doorShut(rt,p.target)?null:passing(rt,ex);if(!who)return skip(rt,ex,doorShut(rt,p.target)?'already unlocked':'found open');return hold(rt,ex,'passing',who);}
   if(pass.mode==='open'&&!doorShut(rt,p.target)){const who=passing(rt,ex);if(!who)return skip(rt,ex,'found open');return hold(rt,ex,'passing',who);}
   if(pass.mode==='close'){if(doorShut(rt,p.target))return skip(rt,ex,'already shut');const who=following(rt,ex);if(who)return skip(rt,ex,'held open for '+who);}
   const hand=handOnDoor(rt,ex);if(hand)return hold(rt,ex,'passing',hand);
@@ -210,10 +241,13 @@ function passageStep(rt:Runtime,ex:Exec,dt:number):StepResult|null{
  *  or busy is not shooed off for a door: the Soul waits, and stops with a reason if the way does not clear. */
 function ask(rt:Runtime,who:string,keepClear:Vec2){const h=rt.world.entities[who]?.human;if(h&&h.activity==='idle'&&!h.sleepPose&&!h.baseActivity&&!h.task)makeWay(rt,who,keepClear);}
 const swingCentre=(o:NonNullable<HandActuatorParams['opening']>):Vec2=>{const a=o.yaw+(o.from+o.to)/2,r=o.radius*.6;return [o.hinge[0]+dcos(a)*r,o.hinge[2]-dsin(a)*r];};
-function skip(rt:Runtime,ex:Exec,why:string):StepResult{ex.skip=why;rt.mark('hand.passage-skip',{action:ex.id,target:ex.p.target,mode:ex.p.passage!.mode,why});return {status:'completed'};}
+/** Entry 32: a hand left on the handle by this Soul's own thumb-turn step, when the opening it handed over to is not
+ *  going ahead now (it waits, is skipped or stops): lower it (the viewer eases the arm back). */
+function dropHandover(rt:Runtime,ex:Exec){const h=rt.world.entities[ex.p.actor]?.human;if(!ex.began&&h?.handActuator&&h.handActuator.actionId!==ex.id&&h.handActuator.passage?.mode==='unlock'){delete h.handActuator;delete h.hands;}}
+function skip(rt:Runtime,ex:Exec,why:string):StepResult{dropHandover(rt,ex);ex.skip=why;rt.mark('hand.passage-skip',{action:ex.id,target:ex.p.target,mode:ex.p.passage!.mode,why});return {status:'completed'};}
 /** Wait before reaching: out of the way for a Soul passing; a body in the swing is asked to step aside after a second. */
 function hold(rt:Runtime,ex:Exec,why:'passing'|'swing'|'queue',who:string):StepResult{
- const p=ex.p,a=rt.world.entities[p.actor];ex.held??={since:rt.tick,why};if(ex.held.why!==why)ex.held={since:rt.tick,why};
+ const p=ex.p,a=rt.world.entities[p.actor];dropHandover(rt,ex);ex.held??={since:rt.tick,why};if(ex.held.why!==why)ex.held={since:rt.tick,why};
  const waited=(rt.tick-ex.held.since)*DT;
  if(why==='queue'){if(waited>PASSAGE_QUEUE_SECONDS)return {status:'failed',diagnostic:issue('door-busy','Someone ahead at the door did not get through; this walk stopped before it.',[p.target,who])};if(a.human&&!ex.child)a.human.activity='idle';return {status:'running',phase:'waiting'};}
  if(waited>(why==='passing'?PASSAGE_YIELD_SECONDS:PASSAGE_WAIT_SECONDS))return {status:'failed',diagnostic:why==='passing'?issue('door-busy','Someone else kept passing through the door; this walk stopped before it.',[p.target,who]):issue('swing-blocked','Someone is in the door’s swing and did not move aside; nothing was opened.',[p.target,who])};
@@ -234,12 +268,13 @@ export const handActuator:ActionDef<HandActuatorParams,true,Exec>={
  // A passage step shares the door with other passages and decides who goes first itself (passageStep: one hand on the
  // door at a time); against an explicit open/close it is exclusive as before, and waits for it (runtime nudgeHolds).
  reservations:(_w,p)=>[{resource:'actor:'+p.actor,mode:'exclusive'},{resource:'hand:'+p.actor+(':'+actuatorHand(p.opening)),mode:'exclusive'},{resource:'entity:'+p.target,mode:p.passage?'shared':'exclusive'}],
- plan(rt,p){const actor=rt.world.entities[p.actor],h=actor?.human;if(actor?.body?.family==='floater')return {ok:false,diagnostic:issue('no-arms','This body has no humanoid hand actuator.',[p.actor])};if(!h||h.grip||h.hands||h.on||h.carrier||h.riding||h.shore||h.holding||h.activity==='sit')return {ok:false,diagnostic:issue('body-busy','Stand with a free hand on stable ground first.',[p.actor])};return {ok:true,program:true};},
+ plan(rt,p){const actor=rt.world.entities[p.actor],h=actor?.human;if(actor?.body?.family==='floater')return {ok:false,diagnostic:issue('no-arms','This body has no humanoid hand actuator.',[p.actor])};if(!h||h.grip||(h.hands&&!(h.handActuator?.passage?.mode==='unlock'&&h.handActuator.target===p.target))||h.on||h.carrier||h.riding||h.shore||h.holding||h.activity==='sit')return {ok:false,diagnostic:issue('body-busy','Stand with a free hand on stable ground first.',[p.actor])};return {ok:true,program:true};},
  start(rt,p,_plan,_id){const a=rt.world.entities[p.actor];return {p:structuredClone(p),motion:{...structuredClone(p),startTick:rt.tick,actionId:_id},t:0,root:[...a.pose.p],yaw:a.pose.yaw,id:_id};},
  step(rt,ex,dt){
   const a=rt.world.entities[ex.p.actor],h=a?.human;if(!h)return {status:'failed',diagnostic:issue('body-gone','The original body is gone.',[ex.p.actor])};
   if(ex.p.passage&&ex.p.opening){const r=passageStep(rt,ex,dt);if(r)return r;}
   ex.t+=dt;const f=handActuatorFrame(ex.motion,ex.t),point=ex.p.opening?actuatorPoint(ex.p.opening,f.angle):ex.p.slide?slidePoint(ex.p.slide,f.pos):{hand:ex.p.stroke?strokePoint(ex.p.at,ex.p.stroke,(ex.t-HAND_REACH_SECONDS)/ex.p.stroke.seconds):ex.p.at,root:ex.root};
+  if(ex.p.op&&ex.p.opening){point.hand=opPoint(ex.p.opening,ex.p.op,f.rap);if(f.slide>0){const to=actuatorPoint(ex.p.opening,ex.p.opening.from).hand;point.hand=[point.hand[0]+(to[0]-point.hand[0])*f.slide,point.hand[1]+(to[1]-point.hand[1])*f.slide,point.hand[2]+(to[2]-point.hand[2])*f.slide];}}
   if(ex.p.opening&&Math.hypot(ex.root[0]-actuatorPoint(ex.p.opening,ex.p.opening.from).root[0],ex.root[2]-actuatorPoint(ex.p.opening,ex.p.opening.from).root[2])>.22){clear(rt,ex);return {status:'failed',diagnostic:issue('not-at-handle','Walk to the actual handle before operating it.',[ex.p.target])};}
   if(ex.p.slide&&Math.hypot(ex.root[0]-slidePoint(ex.p.slide,ex.p.slide.from).root[0],ex.root[2]-slidePoint(ex.p.slide,ex.p.slide.from).root[2])>.22){clear(rt,ex);return {status:'failed',diagnostic:issue('not-at-handle','Walk to the actual handle before operating it.',[ex.p.target])};}
   if(ex.p.stroke){const goal=strokeRoot(ex.p.at,ex.p.stroke,ex.root[1]);if(Math.hypot(goal[0]-ex.root[0],goal[2]-ex.root[2])>.5){clear(rt,ex);return {status:'failed',diagnostic:issue('not-at-board','Walk up to the board before writing on it.',[ex.p.target])};}
@@ -251,6 +286,8 @@ export const handActuator:ActionDef<HandActuatorParams,true,Exec>={
   a.pose.yaw=ex.yaw+turn*smooth(ex.t/.4);
   const speed=Math.hypot(a.pose.p[0]-before[0],a.pose.p[2]-before[2])/dt;h.activity=speed>.08?'walk':'operate';if(speed>.08)h.speed=speed;else delete h.speed;
   if(f.armDown){delete h.hands;h.activity='idle';delete h.speed;}else h.hands=actuatorHand(ex.p.opening)==='left'?{left:[...point.hand]}:{right:[...point.hand]};h.handActuator=ex.motion;
+  // entry 32: a walk's thumb-turn ends with the hand already on the handle: the opening that follows takes it from there
+  if(f.done&&ex.p.passage?.mode==='unlock'&&ex.motion.abortedAt===undefined){h.activity='operate';return {status:'completed'};}
   if(f.done){clear(rt,ex);return {status:'completed'};}return {status:'running',phase:ex.t<HAND_REACH_SECONDS?'reaching':ex.t<HAND_REACH_SECONDS+handSwingSeconds(ex.motion)?'operating':'releasing'};
  },
  cancel(rt,ex){

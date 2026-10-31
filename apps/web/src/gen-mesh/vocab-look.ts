@@ -14,7 +14,7 @@ import { DRAWER_TRAVEL } from '@sim/world-compiler';
 
 const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 const declared = (ctx: MeshCtx, k: string) => Object.hasOwn(ctx.def.params ?? {}, k);
-const STATE_LOOKS = ['open', 'lit', 'on', 'level', 'moisture'] as const;
+const STATE_LOOKS = ['open', 'lit', 'on', 'level', 'moisture', 'locked'] as const;
 
 export type Look = { sx: number; sy: number; sz: number; taper: number; bend: number; skew: number; tint: string | null; vary: number; condition: string; state: Record<string, unknown> };
 export function lookOf(ctx: MeshCtx): Look | null {
@@ -30,7 +30,7 @@ export function lookOf(ctx: MeshCtx): Look | null {
 }
 /** State only changes the picture when it differs from what the plain build shows (doors closed, flames on, glow on, full). */
 function stateMatters(s: Record<string, unknown>, ctx: MeshCtx) {
-  return s.open === true || s.lit === false || (s.on === false && !ctx.def.components.light) || (typeof s.level === 'number' && s.level < 1) || (typeof s.moisture === 'number' && s.moisture < 1);
+  return s.open === true || s.locked === true || s.lit === false || (s.on === false && !ctx.def.components.light) || (typeof s.level === 'number' && s.level < 1) || (typeof s.moisture === 'number' && s.moisture < 1);
 }
 
 const matCache = new Map<string, THREE.Material>();
@@ -98,6 +98,8 @@ function stateRoles(root: THREE.Object3D, look: Look) {
     if (role === 'blind' && s.open !== undefined) o.scale.y = s.open === true ? 0.08 : 1;
     // Soul Actions entry 24: a drawer slides straight out of the front; its closed place is kept for the hand's timeline
     if (role === 'drawer' && s.open !== undefined) { o.userData.restZ = o.position.z; if (s.open === true) o.position.z += DRAWER_TRAVEL; }
+    // Soul Actions entry 32: a lock's bolt thrown across into the keeper, the thumb-turn turned across; the key only in the hand
+    if (role === 'bolt' || role === 'thumb' || role === 'key') lockPose(o, role, s.locked === true ? 1 : 0, false);
     if (role === 'flame' && s.lit !== undefined) o.visible = s.lit !== false;
     if (role === 'fill' && typeof s.level === 'number') { o.scale.y = Math.max(0.001, Math.min(1, s.level)); o.visible = s.level > 0.001; }
     // W5: a bed's damp patch (role fill on a thing with `moisture`, no `level`) spreads across the soil as it is watered
@@ -110,6 +112,15 @@ function stateRoles(root: THREE.Object3D, look: Look) {
   });
 }
 
+/** Entry 32: a lock's moving part at `k` (0 unlocked … 1 locked): the bolt slides 6 cm across the gap into the keeper, the
+ *  thumb-turn and the key turn a quarter; the key is drawn only while a hand turns it. Shared with the entity layer, which
+ *  drives `k` from the hand's recorded turn. */
+export const LOCK_BOLT_TRAVEL = 0.06;
+export function lockPose(o: THREE.Object3D, role: string, k: number, keyShown: boolean) {
+  if (role === 'bolt') { const rest = o.userData.restPos as number[] | undefined; o.position.x = (rest?.[0] ?? o.position.x) + LOCK_BOLT_TRAVEL * k; }
+  else if (role === 'thumb') o.rotation.z = (Math.PI / 2) * k;
+  else if (role === 'key') { o.rotation.z = (Math.PI / 2) * k; o.visible = keyShown; }
+}
 /** A scaffold of poles and boards round the def's box: "under construction". */
 function scaffold(box: [number, number, number]): THREE.Object3D {
   const g = new THREE.Group(); g.name = 'vocab:scaffold';

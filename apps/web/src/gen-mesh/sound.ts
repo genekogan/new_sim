@@ -258,6 +258,29 @@ function oneShot(c: AudioContext, kind: SoundKind, gain: number) {
   setTimeout(() => out.disconnect(), 3000);
 }
 
+/** Soul Actions entry 32: hand contact on a door, scheduled on the depicted tick by the entity layer: knuckles on wood (a
+ *  knock), a lock's bolt seating (a click), a latch snapping shut. Heard with distance from the listener. */
+type ContactKind = 'knock' | 'click' | 'latch';
+type ContactRow = { t: number; kind: ContactKind; at: [number, number, number]; d: number; gain: number; ctxTime: number | null };
+const contacts: ContactRow[] = [];
+let listener: [number, number, number] | null = null;
+function contactSound(kind: ContactKind, at: [number, number, number]) {
+  const d = listener ? Math.hypot(at[0] - listener[0], at[1] - listener[1], at[2] - listener[2]) : 0;
+  const gain = falloff(d, kind === 'knock' ? 24 : 14, kind === 'knock' ? 0.95 : 0.7);
+  const row: ContactRow = { t: Math.round(performance.now()), kind, at, d: +d.toFixed(2), gain: +gain.toFixed(3), ctxTime: null };
+  contacts.push(row); if (contacts.length > 200) contacts.splice(0, contacts.length - 200);
+  if (!ctx || !master || gain < 0.001 || !audible()) return;
+  const c = ctx, out = c.createGain(); out.gain.value = gain; out.connect(master); const t = c.currentTime + 0.01; row.ctxTime = +t.toFixed(3);
+  if (kind === 'knock') {
+    // knuckles on a solid leaf: a dull wooden thump (low body, quick decay) with a little attack noise
+    tone(c, out, t, 190, 120, 0.13, 0.55, 'triangle'); tone(c, out, t, 92, 70, 0.16, 0.45, 'sine'); burst(c, out, t, 0.035, 0.5, 900, 'lowpass');
+  } else if (kind === 'click') {
+    // a bolt thrown: two small metal clicks (the cam, then the bolt seating) and a faint ring
+    burst(c, out, t, 0.018, 0.55, 2600); burst(c, out, t + 0.07, 0.025, 0.7, 1800); tone(c, out, t + 0.07, 2400, 2300, 0.08, 0.08, 'square');
+  } else { burst(c, out, t, 0.03, 0.75, 1200); tone(c, out, t, 160, 110, 0.1, 0.3, 'triangle'); burst(c, out, t + 0.05, 0.02, 0.5, 2400); }
+  setTimeout(() => out.disconnect(), 1500);
+}
+
 // ------------------------------------------------------------------ the layer
 
 type Heard = { id: string; kind: SoundKind; variant: number; source: Source; gain: number; d: number; e: Emitter };
@@ -309,6 +332,7 @@ function step(host: Host) {
   const now = performance.now(), seq = (model as unknown as { editSeq?: number }).editSeq ?? -2;
   if (now - lastScan > 2000 || seq !== lastSeq) { objects = emittersOf(model); jukeboxIds = jukeboxesOf(model, objects); if (seq !== lastSeq || now - lastScan > 10000 || !trees.count) scanWorld(model); lastScan = now; lastSeq = seq; }
   const { x, y, z } = host.camera.position;
+  listener = [x, y, z];
   const ground = host.layer.groundAt?.(x, z) ?? null;
   if (now - lastAmb > 500) {
     lastAmb = now;
@@ -422,6 +446,9 @@ export function startSoundLayer() {
       voices: [...voices.entries()].map(([id, v]) => ({ id, kind: v.kind, variant: v.variant, source: v.source, gain: +v.gain.toFixed(3) })) }),
     log: () => log.slice(),
     events: () => events.slice(),
+    /** Entry 32: door contact sounds (knocks, lock clicks, latches) as played: listener distance, gain, AudioContext time. */
+    contacts: () => contacts.slice(),
+    contact: (kind: ContactKind, at: [number, number, number]) => contactSound(kind, at),
     /** RMS of what is actually coming out (after the master gain), for proof that sound plays and that mute silences it. */
     level: () => { if (!ctx || !master) return 0; if (!meter) { meter = ctx.createAnalyser(); meter.fftSize = 2048; master.connect(meter); } const d = new Float32Array(meter.fftSize); meter.getFloatTimeDomainData(d); let q = 0; for (const v of d) q += v * v; return +Math.sqrt(q / d.length).toFixed(5); },
     /** RMS of the recorded ambient beds alone (their bus, after bed gains, before the master gain). */

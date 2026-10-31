@@ -533,13 +533,17 @@ export class EdgeLedger implements EdgeLedgerHooks {
   private passageApplied=new Set<string>();
   private contactTicks(tick:number){
     for(const id of this.contactPending){
-      const r=this.rows('receipt_id=?',id)[0],detail=r?.detail?JSON.parse(r.detail):{},passage=detail.doorPassageV1 as {door:string;open:ContactActuatorIntent;applied:string[]}|undefined;
+      const r=this.rows('receipt_id=?',id)[0],detail=r?.detail?JSON.parse(r.detail):{},passage=detail.doorPassageV1 as {door:string;open:ContactActuatorIntent;applied:string[];unlocked?:true}|undefined;
       let intent=detail.contactActuatorV1 as ContactActuatorIntent|undefined;
       if(!r||(!intent&&!passage)||detail.contactAppliedV1||passage&&!OPEN.includes(r.phase)){this.contactPending.delete(id);continue;}
       const m=this.host.minds.get(r.soul_id),body=m&&this.body(m.entityId),motion=body?.human?.handActuator;
       // entry 31: a passage walk binds two hand contacts on its door (open before the doorway, close after); each applies once
       if(passage){if(!m||!motion?.passage||motion.target!==passage.door||!motion.actionId||passage.applied.includes(motion.actionId)||this.passageApplied.has(id+'|'+motion.actionId))continue;
-        intent=motion.passage.mode==='open'?passage.open:this.contactActuator?.prepare({soulId:m.soulId,entityId:m.entityId,name:m.name,owner:m.owner},passage.door,'close')??undefined;if(!intent)continue;}
+        // entry 32: a walk that turned the lock first binds the open at contact (the lock's turn changed the door since the
+        // walk was admitted); the close of a walk through a locked door carries the latch (`relock`)
+        const who={soulId:m.soulId,entityId:m.entityId,name:m.name,owner:m.owner},mode=motion.passage.mode;
+        intent=mode==='open'&&!passage.unlocked?passage.open:this.contactActuator?.prepare(who,passage.door,mode)??undefined;if(!intent)continue;
+        intent={...intent,passage:true,...(mode==='close'&&motion.passage.relock?{relock:true as const}:{})};}
       if(!intent)continue;
       if(!motion||motion.target!==intent.target){if(!OPEN.includes(r.phase))this.contactPending.delete(id);continue;}
       if(motion.actionId&&(!r.program_id||this.host.engine.programAction?.(r.program_id)?.action.id!==motion.actionId))continue;
@@ -1226,7 +1230,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const remember = (id: string) => {
       if (note) this.update(id, {reason: note});
       if (approach) this.setDetail(id, {approach});
-      if (passage) {this.setDetail(id, {doorPassageV1: {door: passage.door, open: passage.open, applied: []}}); this.contactPending.add(id);}
+      if (passage) {this.setDetail(id, {doorPassageV1: {door: passage.door, open: passage.open, applied: [], ...(passage.unlocked ? {unlocked: true} : {})}}); this.contactPending.add(id);}
       this.launched.set(id, {soul, capability, label, steps}); if (this.launched.size > 512) this.launched.delete(this.launched.keys().next().value!);
     };
     if (issue) {

@@ -55,6 +55,7 @@ export const EVENT_KINDS: Record<string, {salience: 0 | 1 | 2 | 3; what: string}
   'chess.move': {salience: 2, what: 'opponent chess move/seat change'},
   'ride': {salience: 2, what: 'my ride: takeoff/landing/boarding'},
   'item.received': {salience: 2, what: 'gift received'},
+  'knock': {salience: 2, what: 'someone knocked at a door that shuts me in (or right by me)'},
   'fade.warning': {salience: 3, what: 'abandonment: yellow30min, red50min'},
   'fade.removed': {salience: 3, what: 'abandoned60min: faded; act to return'},
   'fade.reclaimed': {salience: 2, what: 'returned after fading'},

@@ -9,6 +9,7 @@ export function lightDiffAhead(model:WorldModel, message:unknown, depictedTick:n
   return !!d.diff?.upserts?.some(e=>{
     const before=model.entities.get(e.id),def=model.resolvedDef(e.def);
     const key=def&&contactStateKey(def);
-    return before&&key&&before.state?.[key]!==e.state?.[key];
+    // Soul Actions entry 32: a lockable door's lock turns under the hand too (key / thumb-turn, and the latch as it shuts)
+    return before&&key&&(before.state?.[key]!==e.state?.[key]||(key==='open'&&def.tags?.includes('lockable')&&(before.state?.locked??false)!==(e.state?.locked??false)));
   });
 }
