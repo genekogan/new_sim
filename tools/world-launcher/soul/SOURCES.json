@@ -53,13 +53,13 @@
   "runtime": {
     "directory": "runtime",
     "version": "0.1.0",
-    "source": "3aea9898d517dc055c2133a69eb1d77f6a599e8f",
-    "manifestSha256": "cecdcd3e665971a1fda4351b600098d75178d558ce98022b96a68d6f4a2282ca",
+    "source": "b847dd03054ad121e67bd87d9a9550a2c7c86ebc",
+    "manifestSha256": "2e6121663879d4cf0794189952b110994a6923cd49e8fc660fccc3e5ffe2d602",
     "artifacts": [
       {
         "file": "run.mjs",
-        "bytes": 178278,
-        "sha256": "98bd9c4425e2f7213591f293725ec400de9b34d197eaae4d9a31bf19401d0923"
+        "bytes": 179705,
+        "sha256": "51e4a04bdc5ca056bb473e25f6bf30c7984bc6a65953e029ffce7c4809b5bf1c"
       },
       {
         "file": "launch.mjs",
@@ -67,6 +67,6 @@
         "sha256": "4bd487efda67f97121fb33b891b0272ea3974ccdd9ae56d85b5d86982196af08"
       }
     ],
-    "note": "Managed runtime publication r15 (continuity on release 402): r14 gathering attention + deadline wake ahead of dated owner commitments. Built from the clean source commit with tools/soul-runtime/build.mjs; manifest pins every bundled input. Qualification and deployment remain pending."
+    "note": "Managed runtime publication r16 (404.1 follow-up to continuity on release 403/R4): r15 plus the receiver fix from soak r1 review B: a world event stream the server admitted that lived >= 5 s and then closed (an idle world rotates it every ~65 s) resets the receiver backoff and reconnects within 1 s jitter instead of climbing to a 30 s backoff; failed or refused connects still back off exponentially and honour Retry-After (+0-20 % jitter, cap 120 s). Changed inputs vs r15: receiver.mjs, world-client.mjs. Built from the clean source commit with tools/soul-runtime/build.mjs (two builds byte-identical); manifest pins every bundled input. Qualification and deployment remain pending."
   }
 }
