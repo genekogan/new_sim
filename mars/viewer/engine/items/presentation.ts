@@ -28,7 +28,7 @@ const bez3=(p:V3,b:V3,c:V3,d:V3,t:number):V3=>{const u=1-t,k0=u*u*u,k1=3*u*u*t,k
 const lin=(p:V3,q:V3,t:number):V3=>[p[0]+(q[0]-p[0])*t,p[1]+(q[1]-p[1])*t,p[2]+(q[2]-p[2])*t];
 const raw=(from:V3,v:InsideVia,to:V3,u:number):V3=>v.into?(u<v.a?bez3(from,v.c1,v.c2,v.j,u/v.a):lin(v.j,to,(u-v.a)/(1-v.a))):(u<v.a?lin(from,v.j,u/v.a):bez3(v.j,v.c1,v.c2,to,(u-v.a)/(1-v.a)));
 const ARC_N=48;
-function arcTable(from:V3,v:InsideVia,to:V3){const acc=[0];let p=raw(from,v,to,0);for(let i=1;i<=ARC_N;i++){const q=raw(from,v,to,i/ARC_N);acc.push(acc[i-1]+Math.hypot(q[0]-p[0],q[1]-p[1],q[2]-p[2]));p=q;}return acc;}
+function arcTable(from:V3,v:InsideVia,to:V3){const acc=[0];let p=raw(from,v,to,0);for(let i=1;i<=ARC_N;i++){const q=raw(from,v,to,i/ARC_N);{const a=q[0]-p[0],b=q[1]-p[1],c=q[2]-p[2];acc.push(acc[i-1]+Math.sqrt(a*a+b*b+c*c));}p=q;}return acc;}
 /** How long an inside path is (m). */
 export const insideLength=(from:V3,v:InsideVia,to:V3)=>arcTable(from,v,to)[ARC_N];
 /** A point on an inside path a share u of the way along it by length (0 at `from`, 1 at `to`), so the hand moves at the

@@ -201,7 +201,7 @@ const LEAN_FACE = 0.35;
 const LEAN_REACH = 0.5, LEAN_MAX = 0.2;
 /** Entry 42: the half step from the stand point toward the place (local z only, never past LEAN_FACE from the face). */
 function insideLean(owner: Entity, slot: SurfaceSlot, at: [number, number]): { out: [number, number]; in: [number, number] } | undefined {
-  const me = fixtureLocal(owner, [at[0], 0, at[1]]), l = slot.local!, reach = Math.hypot(l[0] - me[0], l[2] - me[2]);
+  const me = fixtureLocal(owner, [at[0], 0, at[1]]), l = slot.local!, dx = l[0] - me[0], dz = l[2] - me[2], reach = Math.sqrt(dx * dx + dz * dz);
   const z = Math.max(slot.inside!.face + LEAN_FACE, me[2] - Math.min(LEAN_MAX, Math.max(0, reach - LEAN_REACH)));
   if (me[2] - z < 0.02) return undefined;
   const q = fixturePoint(owner, [me[0], 0, z]);
