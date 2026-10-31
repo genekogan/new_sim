@@ -368,11 +368,11 @@ function summarize({ arm, rep, N, w, windows, cmds, health, proc, run, calibrati
   }
   // M5 wedge: longest span after boot with no healthz answer
   let gap = 0, last = health[0]?.at ?? 0; for (const h of health) { if (h.ok) { gap = Math.max(gap, h.at - last); last = h.at; } } gap = Math.max(gap, (health.at(-1)?.at ?? last) - last);
-  const heapPeak = Math.max(0, ...proc.map((x) => x.heapMb ?? 0)), rssPeak = Math.max(0, ...proc.map((x) => x.rssMb ?? 0));
+  const heaps = proc.map((x) => x.heapMb).filter((x) => x != null), heapPeak = heaps.length ? Math.max(...heaps) : null, rssPeak = Math.max(0, ...proc.map((x) => x.rssMb ?? 0));
   const worse = (k, hi) => { const a = perWindow.activeA[k], b = perWindow.activeB[k]; if (a == null) return b; if (b == null) return a; return hi ? Math.max(a, b) : Math.min(a, b); };
   const all = cmds.filter((x) => x.phase !== 'join'), timeouts = all.filter((x) => x.outcome === 'timeout').length;
   const headline = { N, tickService: worse('tickService', false), healthzP99Ms: worse('healthzP99Ms', true), actP99Ms: worse('actP99Ms', true), readP99Ms: worse('readP99Ms', true),
-    heapPeakMb: +heapPeak.toFixed(1), heapPeakPctCap: +(100 * heapPeak / HEAP_MB).toFixed(1), rssPeakMb: +rssPeak.toFixed(1), wedge: gap >= 30_000, longestHealthzGapS: +(gap / 1000).toFixed(1),
+    heapPeakMb: heapPeak == null ? null : +heapPeak.toFixed(1), heapPeakPctCap: heapPeak == null ? null : +(100 * heapPeak / HEAP_MB).toFixed(1), rssPeakMb: +rssPeak.toFixed(1), wedge: gap >= 30_000, longestHealthzGapS: +(gap / 1000).toFixed(1),
     timeouts, idleCpuSPerS: perWindow.idle.cpuSPerS, activeCpuSPerS: worse('cpuSPerS', true), idleRssMb: perWindow.idle.rssMbMean, idleHeapMb: perWindow.idle.heapMbMean,
     maxListenersPerSoul: Math.max(0, ...Object.values(run.maxListens)), listenSuperseded: run.listenExits.filter((x) => x.superseded).length, listenAlready: run.listenExits.filter((x) => x.already).length };
   const h = run.hostile; const hostile = arm === 'hostile' ? { ok: h.ok, refused: h.refused, error5xx: h.error5xx, other4xx: h.other4xx, failed: h.failed, requests: h.ms.length, p99Ms: pct(h.ms, 0.99) } : undefined;
