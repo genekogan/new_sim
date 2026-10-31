@@ -321,7 +321,10 @@ export class Runtime {
         this.finish(l, 'failed', r.diagnostic);
       }
     }
-    navTrustClose();
+    // L4: what runs between the loop and the pass changes no static entity unless it runs action code (a wait recovery
+    // hook, an admission, a social return): only then does trust close here, so a tick whose live steps were all
+    // nav-pure keeps the loop's scan for the pass (deadlockDiagnostics and the deferred emits only read and publish)
+    if (this.services.moverWaits || this.waiting.size || (this.services.socialReturns as unknown[] | undefined)?.length) navTrustClose();
     recoverPersistentWaits(this, (owner, mover) => {
       const l = this.live.get(owner);
       return l?.def.recoverWait?.(this, l.exec, mover) ?? { status: 'unavailable', diagnostic: { code: 'deadlock.recovery-unavailable', message: `no safe recovery hook for ${owner}/${mover}`, subjects: [mover] } };

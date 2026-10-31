@@ -52,3 +52,33 @@ test('nav trust: another entity table is never trusted from this one', () => {
     assert.equal(sp.sync(b), true, 'b differs from a: a real scan');
   } finally { navTrustClose(); }
 });
+
+test('nav trust (L4 audit): a seated body and a walker share one scan a tick; the pass reuses it', async () => {
+  const { Runtime } = await import('../runtime/runtime.ts');
+  const { DEFAULT_INVARIANTS } = await import('../runtime/invariants.ts');
+  const { provingGround } = await import('../scenes/proving-ground.ts');
+  const { FIXTURE } = await import('../world/factory.ts');
+  const { walkTo } = await import('../locomotion/walk.ts');
+  const { SOCIAL_ACTIONS } = await import('../social/actions.ts');
+  const { poseV1 } = await import('../social/pose.ts');
+  const base = provingGround();
+  const bench = { id: 'bench', def: 'bench-6ft', kind: 'fixture' as const, pose: { p: [0, 0, -8] as [number, number, number], yaw: Math.PI / 2 }, provenance: FIXTURE };
+  const w = addAll(emptyWorld('proving-ground', base), human('sitter', 0, -6), human('walker', -6, -6), human('poser', 4, -4), bench);
+  const reg = new Map<string, import('../actions/types.ts').ActionDef>([[walkTo.verb, walkTo], ...[...SOCIAL_ACTIONS, poseV1].map((a) => [a.verb, a] as [string, import('../actions/types.ts').ActionDef])]);
+  const sp = new Spatial(base);
+  const rt = new Runtime(w, reg, { spatial: sp }, DEFAULT_INVARIANTS);
+  setNavTrustCheck(true);   // every trusted sync scans anyway and throws on a static change the trust skipped
+  try {
+    const sit = rt.submit('sit', { actor: 'sitter', fixture: 'bench' }).id;
+    for (let i = 0; i < 200 && rt.records.get(sit)!.phase !== 'occupied'; i++) rt.step();
+    assert.equal(rt.records.get(sit)!.phase, 'occupied');
+    rt.submit('pose_v1', { actor: 'poser', activity: 'wave', seconds: 30 });
+    rt.submit('walk_to', { actor: 'walker', x: 6, z: 6 });
+    rt.step();
+    const scans = sp.stats.scans, trusted = sp.stats.trusted;
+    for (let i = 0; i < 20; i++) rt.step();
+    assert.equal(sp.stats.scans - scans, 20, 'one scan a tick (the first sync after the tick opens)');
+    assert.ok(sp.stats.trusted - trusted >= 20, 'the pass (and later syncs) take the scan');
+    assert.deepEqual(rt.violations, []);
+  } finally { setNavTrustCheck(false); navTrustClose(); }
+});
