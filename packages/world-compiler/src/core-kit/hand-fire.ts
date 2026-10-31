@@ -92,7 +92,7 @@ const standingTorch: DefInput = {
     ...torchHead(1.44)] } } as unknown as DefInput['make'],
   params: torchLook as DefInput['params'], palette: torchPalette,
   state: { on: { type: 'bool', default: false } } as DefInput['state'],
-  components: { light: { color: '#ff8b3d', range: 4.5, on: true, at: [0, 1.6, 0] }, sound: torchSound } as DefInput['components'],
+  components: { light: { color: '#ff7f30', range: 3.6, on: true, at: [0, 1.6, 0] }, sound: torchSound } as DefInput['components'],
   size: { box: [0.26, 1.78, 0.26] },
   actions: fireActions('Light the standing torch', 'Put out the standing torch') as DefInput['actions'],
 } as DefInput;
@@ -111,7 +111,7 @@ const wallTorch: DefInput = {
     ...torchHead(1.52, 0.02)] } } as unknown as DefInput['make'],
   params: torchLook as DefInput['params'], palette: torchPalette,
   state: { on: { type: 'bool', default: false } } as DefInput['state'],
-  components: { light: { color: '#ff8b3d', range: 4.5, on: true, at: [0, 1.68, 0.2] }, sound: torchSound } as DefInput['components'],
+  components: { light: { color: '#ff7f30', range: 3.6, on: true, at: [0, 1.68, 0.2] }, sound: torchSound } as DefInput['components'],
   size: { box: [0.2, 1.86, 0.28] },
   actions: fireActions('Light the wall torch', 'Put out the wall torch') as DefInput['actions'],
 } as DefInput;
@@ -145,7 +145,7 @@ const neonSign: DefInput = {
   state: { on: { type: 'bool', default: false }, text: { type: 'string', max: 32, default: 'OPEN' } } as DefInput['state'],
   // the coloured spill on the ground in front of the board (the viewer draws the glow on the board itself)
   components: { lights: [{ color: '#ff3d8e', range: 5, on: true, at: [-0.45, 1.78, 0.7] }, { color: '#ff3d8e', range: 5, on: true, at: [0.45, 1.78, 0.7] }],
-    sound: { kind: 'hum', radius: 7, volume: 0.16, when: 'on', mode: 'loop', variant: 2 } } as DefInput['components'],
+    sound: { kind: 'hum', radius: 9, volume: 0.32, when: 'on', mode: 'loop', variant: 2 } } as DefInput['components'],
   size: { box: [1.86, 2.18, 0.34] },
   actions: switches('Switch on the neon sign', 'Switch off the neon sign') as DefInput['actions'],
 } as DefInput;
