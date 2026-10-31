@@ -75,8 +75,8 @@ export function idPhase(id: string): number { let h = 2166136261; for (let i = 0
  *  on the boom 0.252 m ahead of the pole, 1.41 m up) seen from the singer's place 0.55 m in front of the pole; the palm
  *  sits a little to the right of, behind and below the handle's axis (the fingers close round it). */
 export const MIC_HAND: HandGoal = [0.55 - 0.252 - 0.014, 0.024, 1.402];
-const SING_REACH = 0.9;
-export const SING_LET_GO = 0.8;
+const SING_REACH = 1.1;
+export const SING_LET_GO = 1.0;
 /** Singing at a mic stand: the right hand eases onto the mic and holds it there; the left hangs easy and moves a little
  *  with the beat; she sways with the beat (one sway over two beats, eased in), leans a little toward the mic, her head
  *  lifts a touch on each sung note and her chest rises on the in-breath where a phrase ends (the rigs have no jaw). On

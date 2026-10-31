@@ -75,7 +75,7 @@ function pianoKey(c: AudioContext, out: AudioNode, at: number, midi: number, pea
 // Entry 14: Souls playing the piano, heard where they are. Notes come from the shared score at depicted world seconds
 // (the hands strike the same onsets); scheduled a short way ahead, each note once.
 const PIANO_RADIUS = 24, PIANO_VOLUME = 0.55, PIANO_AHEAD = 0.35, pianoDone = new Map<string, number>();
-let pianoNear = false;
+let pianoNear = false, audioNow = 0;
 function playPianos(host: Host, x: number, y: number, z: number) {
   pianoNear = false;
   const now = host.worldSeconds; if (typeof now !== 'number' || !ctx || !master) return;
@@ -84,8 +84,10 @@ function playPianos(host: Host, x: number, y: number, z: number) {
     const g = falloff(Math.hypot(r.p[0] - x, r.p[1] - y, r.p[2] - z), PIANO_RADIUS, PIANO_VOLUME); if (g <= 0.001) continue;
     pianoNear = true;
     for (const n of pianoNotes(r.body, now - 0.05, now + PIANO_AHEAD)) {
-      const key = `${r.body}:${n.t}`; if (pianoDone.has(key)) continue; pianoDone.set(key, n.t);
-      const at = ctx.currentTime + Math.max(0, n.t - now);
+      // entry 36: keyed by hand too (the bass and the melody often start together: keyed by time alone, the melody note
+      // on every half bar was dropped since entry 14)
+      const key = `${r.body}:${n.t}:${n.hand}`; if (pianoDone.has(key)) continue; pianoDone.set(key, n.t);
+      const at = audioNow + Math.max(0, n.t - now);
       pianoKey(ctx, master, at, n.midi, g * n.vel * 0.5); if (n.hand === 1) pianoAt.set(`${r.body}:${n.t}`, at);
     }
   }
@@ -112,7 +114,7 @@ function playDrums(host: Host, x: number, y: number, z: number) {
     drumsNear = true;
     for (const h of drumHits(r.body, now - 0.05, now + PIANO_AHEAD)) {
       const key = `${r.body}:${h.t}:${h.kind}`; if (drumDone.has(key)) continue; drumDone.set(key, h.t);
-      drumSound(ctx, master, ctx.currentTime + Math.max(0, h.t - now), h.kind, g * h.vel);
+      drumSound(ctx, master, audioNow + Math.max(0, h.t - now), h.kind, g * h.vel);
     }
   }
   for (const [k, t] of drumDone) if (t < now - 2) drumDone.delete(k);
@@ -122,7 +124,7 @@ function playDrums(host: Host, x: number, y: number, z: number) {
 // room. Notes come from the shared score at depicted world seconds, scheduled at the same AudioContext moment as the
 // piano's notes of the same second (so the two never drift), each once. Only within earshot of a singer; no accompanist,
 // no voice (the world ends her singing too). Nothing runs for a mic nobody sings at.
-const VOICE_RADIUS = 26, VOICE_VOLUME = 0.5, singers = new Map<string, { voice: Singer; done: Set<number>; with: string }>();
+const VOICE_RADIUS = 26, VOICE_VOLUME = 0.4, singers = new Map<string, { voice: Singer; done: Set<number>; with: string }>();
 let voiceNear = false, mic: AudioNode | null = null;
 const voiceLog: { singer: string; with: string; t: number; at: number; midi: number; syl: string; pianoAt?: number }[] = [];
 /** The ctx time each pianist's melody note of a world second was scheduled at (for the no-drift log). */
@@ -143,7 +145,7 @@ function playSingers(host: Host, x: number, y: number, z: number) {
       s.voice.out.gain.setTargetAtTime(g, ctx.currentTime, 0.08);
       for (const n of sungNotes(who, now - 0.05, now + PIANO_AHEAD)) {
         if (s.done.has(n.t)) continue; s.done.add(n.t);
-        const at = ctx.currentTime + Math.max(0, n.t - now);
+        const at = audioNow + Math.max(0, n.t - now);
         s.voice.schedule(n, at, 1); voiceLog.push({ singer: r.body, with: who.seed, t: n.t, at, midi: n.midi, syl: n.syl, ...(pianoAt.has(`${who.seed}:${n.t}`) ? { pianoAt: pianoAt.get(`${who.seed}:${n.t}`) } : {}) });
         if (voiceLog.length > 400) voiceLog.splice(0, voiceLog.length - 400);
       }
@@ -328,6 +330,9 @@ function step(host: Host) {
     ambient = ambienceAt({ x, y, z, ground, night, covered, waters, seaLevel, trees, exposure });
   }
   people = movement.emitters(host.residents?.() ?? [], { x, y, z, ground }, now / 1000);
+  // entry 36: one audio clock reading per tick for every instrument and the voice (ctx.currentTime moves in 128-sample
+  // steps while the tick runs: read per instrument, the voice landed up to one step (2.9 ms) off the piano's note)
+  audioNow = ctx?.currentTime ?? 0;
   if (!settings.muted) { playPianos(host, x, y, z); playDrums(host, x, y, z); playSingers(host, x, y, z); } else { pianoNear = drumsNear = voiceNear = false; if (singers.size && ctx) for (const [id, s] of singers) { s.voice.stop(ctx.currentTime); singers.delete(id); } }
   const heard: Heard[] = [], playlist = musicPlaying();
   for (const e of [...objects, ...ambient, ...people]) {
