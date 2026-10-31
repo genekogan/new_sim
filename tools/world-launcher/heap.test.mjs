@@ -5,11 +5,14 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { openLauncher } from './launcher.mjs';
+import { spawnSync } from 'node:child_process';
+import { openLauncher, withHeap } from './launcher.mjs';
 import { worldHeapMb, DEFAULT_WORLD_HEAP_MB, BIG_WORLD_HEAP_MB } from './registry.mjs';
 
 const fake = new URL('./fake-world.mjs', import.meta.url).pathname;
-const command = (w, port) => ({ cmd: process.execPath, args: [fake], env: { ...process.env, WORLD_KEY: w.slug, PORT: String(port) } });
+// a stray heap flag in the child's NODE_OPTIONS (production.mjs's old form) must never give a world a second cap
+const command = (w, port) => ({ cmd: process.execPath, args: [fake], env: { ...process.env, WORLD_KEY: w.slug, PORT: String(port), NODE_OPTIONS: '--max-old-space-size=300 --no-deprecation' } });
+const near = (got, mb) => got >= mb && got - mb <= 200;   // V8 adds its young generation (~100 MB) to the old-space cap
 
 test('worldHeapMb: the registry entry wins, the launcher flag is a default, Eden-2026-class worlds get 2048', () => {
   assert.equal(DEFAULT_WORLD_HEAP_MB, 1536); assert.equal(BIG_WORLD_HEAP_MB, 2048);
@@ -40,15 +43,25 @@ test('each world boots with its own heap flag; set-heap changes it from the next
   const op = (body) => fetch(`${base}/__sim/op/set-heap`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   try {
     const plain = await make('Plain'), big = await make('Big', 'eden-2026');
-    assert.deepEqual(await argv(plain.slug), { execArgv: ['--max-old-space-size=1536'], heapMb: '1536' });
-    assert.deepEqual(await argv(big.slug), { execArgv: ['--max-old-space-size=2048'], heapMb: '2048' });
+    const a = await argv(plain.slug), b = await argv(big.slug);
+    assert.deepEqual([a.execArgv, a.heapMb, a.nodeOptions], [['--max-old-space-size=1536'], '1536', '--no-deprecation']); assert.ok(near(a.limitMb, 1536), `limit ${a.limitMb}`);
+    assert.deepEqual([b.execArgv, b.heapMb], [['--max-old-space-size=2048'], '2048']); assert.ok(near(b.limitMb, 2048), `limit ${b.limitMb}`);
     assert.equal((await op({ slug: plain.slug, worldHeapMb: 99 })).status, 400);
     const r = await op({ slug: plain.slug, worldHeapMb: 2560 }); assert.equal(r.status, 200); assert.equal((await r.json()).heapMb, 2560);
     const kids = await fetch(`${base}/__sim/launcher`).then((x) => x.json());
     assert.equal(kids.children.find((c) => c.slug === plain.slug).heapMb, 2560);
     await L.pool.stop(plain.slug);
-    assert.deepEqual(await argv(plain.slug), { execArgv: ['--max-old-space-size=2560'], heapMb: '2560' });
+    const c = await argv(plain.slug); assert.deepEqual(c.execArgv, ['--max-old-space-size=2560']); assert.ok(near(c.limitMb, 2560), `limit ${c.limitMb}`);
     assert.equal((await op({ slug: plain.slug, worldHeapMb: null })).status, 200);
     assert.equal(JSON.parse(readFileSync(join(dir, 'data', 'worlds.json'), 'utf8')).worlds.find((w) => w.slug === plain.slug).worldHeapMb, undefined);
   } finally { await L.close(); }
+});
+
+test('the explicit node flag wins over a heap flag left in NODE_OPTIONS (an --env-file one cannot be stripped)', () => {
+  const d = withHeap({ cmd: process.execPath, args: ['x.mjs'], env: { NODE_OPTIONS: '--max-old-space-size=300' } }, 1536);
+  assert.equal(d.env.NODE_OPTIONS, undefined); assert.deepEqual(d.args, ['--max-old-space-size=1536', 'x.mjs']);
+  const r = spawnSync(process.execPath, ['--max-old-space-size=1536', '-e', "console.log(Math.round(require('v8').getHeapStatistics().heap_size_limit / 2 ** 20))"], { env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=300' }, encoding: 'utf8' });
+  assert.ok(near(Number(r.stdout.trim()), 1536), `limit ${r.stdout}`);
+  const other = withHeap({ cmd: '/usr/bin/env', args: [], env: { NODE_OPTIONS: '--max-old-space-size=300 --trace-gc' } }, 2048);
+  assert.equal(other.env.NODE_OPTIONS, '--trace-gc --max-old-space-size=2048');
 });

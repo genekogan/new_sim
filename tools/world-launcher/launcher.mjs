@@ -103,6 +103,8 @@ import { opSoul, opSetTest } from './op-souls.mjs';
  *  flag there loses to this one; any other command gets it in NODE_OPTIONS. */
 export function withHeap(d, heapMb) {
   const flag = `--max-old-space-size=${heapMb}`;
+  // one cap only: any heap flag already in the child's NODE_OPTIONS goes (an env file's loses to the command line anyway)
+  if (d.env.NODE_OPTIONS) { const rest = d.env.NODE_OPTIONS.split(/\s+/).filter((o) => o && !/^--max-old-space-size(=|$)/.test(o)).join(' '); if (rest) d.env.NODE_OPTIONS = rest; else delete d.env.NODE_OPTIONS; }
   if (d.cmd === process.execPath || /(^|\/)node(\.exe)?$/.test(d.cmd)) d.args = [flag, ...d.args.filter((a) => !a.startsWith('--max-old-space-size'))];
   else d.env.NODE_OPTIONS = [d.env.NODE_OPTIONS, flag].filter(Boolean).join(' ');
   d.env.SIM_WORLD_HEAP_MB = String(heapMb);
