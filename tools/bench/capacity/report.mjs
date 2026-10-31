@@ -23,6 +23,7 @@ export function report(receipt, results) {
   L.push('| receipt | value |', '|---|---|');
   for (const [k, v] of Object.entries({ source: `${h.sourceSha}${h.sourceDirty ? ' (dirty)' : ''}`, bench: h.benchSha, fixture: `${h.fixture} sha256 ${h.fixtureSha256}`, 'Soul CLI': `${h.cliVersion} sha256 ${h.cliSha256}`, world: `${h.worldKey} / ${h.worldId} (${h.engine})`,
     host: `${h.hostname} · ${h.cpu} · ${h.cores} cores · ${h.kernel} · node ${h.node}`, slice: h.slice ?? 'none (whole host)', heap: `${h.heapMb} MB cap`, phases: JSON.stringify(h.phases), 'CLI startup': `${h.cliStartupMedianMs} ms median (inside every act/read time)` })) L.push(`| ${k} | ${String(v).replace(/\|/g, '/')} |`);
+  if (h.viaLauncher) L.push(`| path | through the root's own launcher on :${h.viaLauncher.port} (children ${h.viaLauncher.childRange}, public origin ${h.viaLauncher.publicOrigin}: behind-proxy rules; hostile Souls one X-Forwarded-For each); heap from live.json when the world writes one, else — |`);
   L.push('');
   const failed = results.filter((r) => r.failed); if (failed.length) { L.push('**Failed runs:** ' + failed.map((r) => `${r.arm} r${r.rep}: ${r.failed}`).join('; '), ''); }
 
@@ -55,6 +56,14 @@ export function report(receipt, results) {
   if (by.hostile?.length) {
     L.push('## Hostile clients (4 instant-retry raw loops per Soul, 6 Souls; whole run after join)', '', '| repeat | requests | ok | designed refusals | 5xx | other 4xx | failed | p99 ms |', '|---|---|---|---|---|---|---|---|');
     for (const r of by.hostile) { const x = r.hostile; L.push(`| r${r.rep} | ${x.requests} | ${x.ok} | ${x.refused} | ${x.error5xx} | ${x.other4xx} | ${x.failed} | ${x.p99Ms} |`); }
+    L.push('');
+  }
+
+  const lv = ok.filter((r) => r.launcher !== undefined);
+  if (lv.length) {
+    L.push('## Launcher (its view of the world at the end of each run; launcher CPU is the worse active window)', '', '| run | world status | restarts | refusals by code (launcher ceilings) | launcher CPU-s/s |', '|---|---|---|---|---|');
+    for (const r of lv) { const x = r.launcher ?? {}, c = [r.windows.activeA.launcherCpuSPerS, r.windows.activeB.launcherCpuSPerS].filter((v) => v != null);
+      L.push(`| ${r.arm} r${r.rep} | ${x.status ?? '—'} | ${x.restarts ?? '—'} | ${x.refused ? (Object.entries(x.refused).map(([k, v]) => `${k} ${v}`).join(', ') || 'none') : 'n/a (no ceilings in this launcher)'} | ${c.length ? Math.max(...c).toFixed(3) : '—'} |`); }
     L.push('');
   }
 

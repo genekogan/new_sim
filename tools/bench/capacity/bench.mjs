@@ -7,6 +7,10 @@
 //        [--slice "systemd-run --scope -p AllowedCPUs=6-7 -p MemoryMax=4G --uid=simworlds --gid=simworlds"]
 //        [--world-user simworlds] [--world-key eden-2026] [--world-id <id; default: read from the fixture>] [--short]
 //        [--cli <eden.mjs the world serves; default the root's own>]
+//        [--via-launcher [--child-range 5154-5155]]   the world runs under the root's own launcher on --port (its proxy and ceilings in
+//        the path); the launcher's data dir is <run>/launcher with one worlds.json row for the fixture; heap from the world's live.json
+//        when it writes one (no --inspect: the launcher builds the child command), else RSS only; hostile Souls each send their own
+//        X-Forwarded-For (the launcher is told it is behind a proxy, as on eden2); the world serves the root's own CLI
 //
 // Writes <out>/<arm>-r<k>/{result.json,commands.jsonl,world.log}, <out>/receipt.json and <out>/REPORT.md (report.mjs).
 // The fixture's per-run copy is deleted after each run; the fixture itself is never written.
@@ -24,10 +28,13 @@ const { decorateCommand } = await import(pathToFileURL(join(ROOT0, 'tools/world-
 const argv = process.argv.slice(2), opt = (k, d) => { const i = argv.indexOf(`--${k}`); return i < 0 ? d : argv[i + 1]; }, flag = (k) => argv.includes(`--${k}`);
 const ROOT = resolve(opt('root', new URL('../../..', import.meta.url).pathname)), OUT = resolve(opt('out', 'bench-out'));
 const FIXTURE = opt('fixture', 'genesis:eden-2026'), ARMS = opt('arms', 'n1,n6,n12,n24,incident,hostile').split(','), REPEATS = Number(opt('repeats', 2));
+const VIA = flag('via-launcher'), CHILD_RANGE = opt('child-range', `${Number(opt('port', 5151)) + 1}-${Number(opt('port', 5151)) + 2}`);
 const PORT = Number(opt('port', 5151)), INSPECT = PORT + 1, HEAP_MB = Number(opt('heap-mb', 768)), HOST_LABEL = opt('host-label', 'laptop');
 const SLICE = opt('slice', ''), WORLD_USER = opt('world-user', ''), SLUG = opt('world-key', 'eden-2026'), SHORT = flag('short'), ENGINE = opt('engine', 'mars');
 const MARS_WEB = opt('mars-web', join(ROOT, 'mars/viewer/dist'));
 const CLI_FILE = resolve(opt('cli', join(ROOT, 'tools/world-launcher/soul/eden.mjs')));
+if (VIA && CLI_FILE !== resolve(join(ROOT, 'tools/world-launcher/soul/eden.mjs'))) throw new Error('--via-launcher: the launcher serves its own root\'s eden.mjs; drop --cli');
+if (VIA && SLICE) throw new Error('--via-launcher with --slice is not built yet (the slice would wrap the launcher, not the world)');
 const PH = SHORT ? { warm: 10, idle: 10, active: 20, calib: 5 } : { warm: 60, idle: 30, active: 120, calib: 20 };
 const TICK_HZ = 20, BUSY = /\b(world\.busy|world\.crowded|world\.starting|soul\.busy|soul\.slow-down|rate-limited)\b/;
 const TARGETS = ['the bandstand', 'the commons', 'the pond', 'the classroom', 'the orchard', 'the kitchen', 'the garden', 'the plaza'];
@@ -49,6 +56,7 @@ function worldIdOf(db) {   // the most common world_id in the fixture (a compact
   return sh('python3', ['-c', py, db]) || null;
 }
 const WORLD_ID = opt('world-id', genesis ? `${SLUG}-bench` : worldIdOf(fixtureFile));
+if (VIA && WORLD_ID !== `${SLUG}-1`) throw new Error(`--via-launcher: the launcher names the world ${SLUG}-1 but the fixture's world is ${WORLD_ID}`);
 const BASE = `http://127.0.0.1:${PORT}/w/${SLUG}`;
 const host = {
   label: HOST_LABEL, indicative: HOST_LABEL !== 'eden2-slice', hostname: hostname(), cpu: cpus()[0]?.model, cores: cpus().length, kernel: release(), node: process.version,
@@ -56,6 +64,7 @@ const host = {
   benchSha: sh('git', ['-C', new URL('.', import.meta.url).pathname, 'rev-parse', 'HEAD']),
   cli: CLI_FILE, cliSha256: await sha256File(CLI_FILE), cliVersion: /const VERSION = "([^"]+)"/.exec(readFileSync(CLI_FILE, 'utf8'))?.[1] ?? null,
   fixture: FIXTURE, fixtureSha256: await sha256File(fixtureFile), worldId: WORLD_ID, worldKey: SLUG, engine: ENGINE, phases: PH,
+  viaLauncher: VIA ? { port: PORT, childRange: CHILD_RANGE, publicOrigin: `http://localhost:${PORT}` } : null,
 };
 
 // ------------------------------------------------------------------ the world process
@@ -81,7 +90,8 @@ async function inspector() {   // Runtime.getHeapUsage only
   return { heapMb: async () => { const d = await call('Runtime.getHeapUsage'); return d?.result ? d.result.usedSize / 2 ** 20 : null; }, close: () => ws.close() };
 }
 
-async function bootWorld(dir, { settle = true } = {}) {
+async function bootWorld(dir, opts = {}) { return VIA ? bootLauncher(dir, opts) : bootDirect(dir, opts); }
+async function bootDirect(dir, { settle = true } = {}) {
   const data = join(dir, 'data'); mkdirSync(data, { recursive: true });
   if (!genesis) copyFileSync(fixtureFile, join(data, 'sim.db'));
   if (WORLD_USER) sh('chown', ['-R', `${WORLD_USER}:${WORLD_USER}`, dir]);
@@ -106,13 +116,58 @@ async function bootWorld(dir, { settle = true } = {}) {
   while (!up && now() - t0 < 900_000) { if (child.exitCode != null) throw new Error(`world exited at boot (${child.exitCode}); ${dir}/world.log ends:\n${wlog.trim().split('\n').slice(-12).join('\n')}`); up = (await healthz()).ok; if (!up) await sleep(1000); }
   if (!up) throw new Error('world did not answer /healthz in 15 min');
   const bootS = (now() - t0) / 1000, tc = now();
-  // settled = the boot's perceive catch-up logged, or (it logs only when slow) 30 s up with three calm ticks; cap 300 s
-  for (let calm = 0; settle && !/perceive catch-up/.test(wlog) && now() - tc < 300_000 && !(now() - tc > 30_000 && calm >= 3); ) { await sleep(1000); const x = await healthz(); calm = x.ok && x.tickMs?.avg < 25 ? calm + 1 : 0; }
+  await settleWorld(() => wlog, settle, tc);
   const pids = (sh('pgrep', ['-f', `inspect=127.0.0.1:${INSPECT}`]) ?? '').split('\n').map(Number).filter(Boolean);
   const pid = pids.find((x) => /node/.test(sh('ps', ['-o', 'comm=', '-p', String(x)]) ?? '')) ?? child.pid;   // the node process, not systemd-run
   return { child, pid, data, bootS, catchUpS: (now() - tc) / 1000 };
 }
+// settled = the boot's perceive catch-up logged, or (it logs only when slow) 30 s up with three calm ticks; cap 300 s
+async function settleWorld(wlog, settle, tc) {
+  for (let calm = 0; settle && !/perceive catch-up/.test(wlog()) && now() - tc < 300_000 && !(now() - tc > 30_000 && calm >= 3); ) { await sleep(1000); const x = await healthz(); calm = x.ok && x.tickMs?.avg < 25 ? calm + 1 : 0; }
+}
+// --via-launcher: the root's own launcher (its proxy, flood guard and, from R1, the Soul API ceilings) in front of the world
+async function bootLauncher(dir, { settle = true } = {}) {
+  const ldata = join(dir, 'launcher'), data = join(ldata, 'worlds', SLUG); mkdirSync(data, { recursive: true });
+  if (!genesis) copyFileSync(fixtureFile, join(data, 'sim.db'));
+  const template = genesis ? FIXTURE.slice(8) : existsSync(join(ROOT, 'worlds/templates', `${SLUG}.json`)) ? SLUG : 'empty';
+  writeFileSync(join(ldata, 'worlds.json'), JSON.stringify({ schema: 'world-launcher-registry/1', worlds: [{ slug: SLUG, name: 'Capacity bench', template, port: null, createdAt: Date.now(), unlisted: true, worldHeapMb: HEAP_MB }] }, null, 2) + '\n');
+  const args = [join(ROOT, 'tools/world-launcher/launcher.mjs'), '--port', String(PORT), '--data', ldata, '--range', CHILD_RANGE, '--public-origin', `http://localhost:${PORT}`,
+    '--world-heap-mb', String(HEAP_MB), '--mars-web', MARS_WEB, '--eager', '1'];
+  // the launcher's environment: no Eyes, no handover pre-warm (one world, one port pair); children never inherit the rest
+  const env = { ...process.env, SIM_PREWARM: '0' }; for (const k of Object.keys(env)) if (k.startsWith('EDGE_EYES') || /KEY|TOKEN|SECRET/.test(k)) delete env[k];
+  writeFileSync(join(dir, 'world-command.json'), JSON.stringify({ launcher: [process.execPath, ...args], registry: JSON.parse(readFileSync(join(ldata, 'worlds.json'), 'utf8')) }, null, 1));
+  const child = spawn(process.execPath, args, { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  let llog = ''; const ll = (b) => { llog = (llog + b).slice(-20000); appendFileSync(join(dir, 'launcher.log'), b); };
+  child.stdout.on('data', ll); child.stderr.on('data', ll);
+  const wlogFile = join(ldata, 'logs', `${SLUG}.log`), wlog = () => { try { return readFileSync(wlogFile, 'utf8').slice(-20000); } catch { return ''; } };
+  const t0 = now(); let up = false;
+  while (!up && now() - t0 < 900_000) { if (child.exitCode != null) throw new Error(`launcher exited at boot (${child.exitCode}); ${dir}/launcher.log ends:\n${llog.trim().split('\n').slice(-12).join('\n')}`); up = (await healthz()).ok; if (!up) await sleep(1000); }
+  if (!up) throw new Error(`world did not answer /healthz through the launcher in 15 min; ${wlogFile}`);
+  const bootS = (now() - t0) / 1000, tc = now();
+  await settleWorld(wlog, settle, tc);
+  const w = { child, launcherPid: child.pid, data, ldata, wlogFile, bootS, catchUpS: (now() - tc) / 1000 };
+  Object.defineProperty(w, 'pid', { get: () => worldPid(ldata) ?? child.pid });   // the world's node process; a restart changes it
+  return w;
+}
+function worldPid(ldata) { try { return JSON.parse(readFileSync(join(ldata, 'children.json'), 'utf8'))[SLUG]?.pid ?? null; } catch { return null; } }
+function liveHeapMb(w) {   // LOAD-CONTRACT §4 live.json (a world that writes one); fresh within 10 s, else null
+  try { const v = JSON.parse(readFileSync(join(w.data, 'live.json'), 'utf8')); const at = v.at > 1e12 ? v.at : v.at * 1000; return now() - at < 10_000 && Number.isFinite(v.heap?.usedMb) ? v.heap.usedMb : null; } catch { return null; }
+}
+async function launcherView() {   // the launcher's health page JSON for this world (limits, refusal counts, restarts), loopback
+  try { const d = await (await fetch(`http://127.0.0.1:${PORT}/__sim/health?json=1`, { signal: AbortSignal.timeout(5000) })).json(); const x = (d.worlds ?? []).find((y) => y.slug === SLUG) ?? null;
+    return x ? { status: x.status, restarts: x.restarts, limits: x.limits ?? null, refused: x.refused ?? null, lastExit: x.lastExit ?? null } : null; } catch { return null; }
+}
 async function stopWorld(w) {
+  if (w.launcherPid) {   // the launcher stops its world; the world is killed by pid only if it outlives the launcher
+    const wp = worldPid(w.ldata);
+    try { process.kill(w.launcherPid, 'SIGTERM'); } catch { /* gone */ }
+    for (let i = 0; i < 60 && w.child.exitCode == null; i++) await sleep(500);
+    if (w.child.exitCode == null) try { process.kill(w.launcherPid, 'SIGKILL'); } catch { /* gone */ }
+    if (wp) { for (let i = 0; i < 20; i++) { try { process.kill(wp, 0); } catch { break; } await sleep(500); } try { process.kill(wp, 'SIGKILL'); } catch { /* gone */ } }
+    const trash = join(homedir(), '.Trash', 'eden-cleanup-20261020'); mkdirSync(trash, { recursive: true });
+    try { renameSync(join(w.ldata, 'worlds'), join(trash, `bench-${Date.now()}-worlds`)); } catch { sh('mv', [join(w.ldata, 'worlds'), join(trash, `bench-${Date.now()}-worlds`)]); }
+    return;
+  }
   try { process.kill(w.pid, 'SIGTERM'); } catch { /* gone */ }
   for (let i = 0; i < 40 && w.child.exitCode == null; i++) await sleep(500);
   if (w.child.exitCode == null) try { process.kill(w.pid, 'SIGKILL'); } catch { /* gone */ }
@@ -208,11 +263,12 @@ function viewer(run, hello) {
   run.sockets.push(ws);
 }
 function hostile(run, soul) {   // 4 parallel loops that ignore Retry-After and retry at once
+  const H = { authorization: `Bearer ${soul.token}`, ...(VIA ? { 'x-forwarded-for': `10.66.0.${soul.i + 1}` } : {}) };   // via the launcher: one address per hostile Soul
   const reqs = [
-    () => fetch(`${BASE}/v1/edge/here?include=doHere`, { headers: { authorization: `Bearer ${soul.token}` }, signal: AbortSignal.timeout(30_000) }),
-    () => fetch(`${BASE}/v1/edge/capabilities`, { headers: { authorization: `Bearer ${soul.token}` }, signal: AbortSignal.timeout(30_000) }),
-    () => fetch(`${BASE}/v1/edge/act`, { method: 'POST', headers: { authorization: `Bearer ${soul.token}`, 'content-type': 'application/json' }, body: JSON.stringify({ capability: `go to ${pick(TARGETS)}` }), signal: AbortSignal.timeout(30_000) }),
-    () => fetch(`${BASE}/v1/edge/say`, { method: 'POST', headers: { authorization: `Bearer ${soul.token}`, 'content-type': 'application/json' }, body: JSON.stringify({ text: 'hostile bench' }), signal: AbortSignal.timeout(30_000) }),
+    () => fetch(`${BASE}/v1/edge/here?include=doHere`, { headers: H, signal: AbortSignal.timeout(30_000) }),
+    () => fetch(`${BASE}/v1/edge/capabilities`, { headers: H, signal: AbortSignal.timeout(30_000) }),
+    () => fetch(`${BASE}/v1/edge/act`, { method: 'POST', headers: { ...H, 'content-type': 'application/json' }, body: JSON.stringify({ capability: `go to ${pick(TARGETS)}` }), signal: AbortSignal.timeout(30_000) }),
+    () => fetch(`${BASE}/v1/edge/say`, { method: 'POST', headers: { ...H, 'content-type': 'application/json' }, body: JSON.stringify({ text: 'hostile bench' }), signal: AbortSignal.timeout(30_000) }),
   ];
   for (let k = 0; k < 4; k++) (async () => {
     let j = k;
@@ -239,11 +295,12 @@ async function oneRun(arm, rep) {
   log(`${arm} r${rep}: boot`);
   const w = await bootWorld(dir);
   log(`${arm} r${rep}: up ${w.bootS.toFixed(1)} s, catch-up ${w.catchUpS.toFixed(1)} s, pid ${w.pid}`);
-  const insp = await inspector().catch(() => null);
+  const insp = VIA ? null : await inspector().catch(() => null);
   let phase = 'join';
   run.rec = (r) => { r.phase = phase; cmds.push(r); appendFileSync(join(dir, 'commands.jsonl'), JSON.stringify(r) + '\n'); };
   const sampler = setInterval(async () => { const h = await healthz(); health.push({ at: now(), phase, ...h }); }, 1000);
-  const sampler2 = setInterval(async () => { const p = procStats(w.pid), hm = insp ? await insp.heapMb() : null; proc.push({ at: now(), phase, ...p, heapMb: hm }); }, 2000);
+  const sampler2 = setInterval(async () => { const p = procStats(w.pid), hm = insp ? await insp.heapMb() : VIA ? liveHeapMb(w) : null, lp = w.launcherPid ? procStats(w.launcherPid) : null;
+    proc.push({ at: now(), phase, ...p, heapMb: hm, ...(lp ? { launcherCpuS: lp.cpuS, launcherRssMb: lp.rssMb } : {}) }); }, 2000);
   const souls = [];
   try {
     for (let i = 0; i < N; i++) souls.push(await join_(run, i));
@@ -262,6 +319,7 @@ async function oneRun(arm, rep) {
     let calibration = null;
     if (arm === 'n1') calibration = await calibrate(souls[0], w, proc, windows.find((x) => x.name === 'idle'), (p) => { phase = p; });
     const result = summarize({ arm, rep, N, w, windows, cmds, health, proc, run, calibration, loadBefore, loadAfter: loadavg() });
+    if (VIA) result.launcher = await launcherView();
     writeFileSync(join(dir, 'result.json'), JSON.stringify(result, null, 1));
     log(`${arm} r${rep}: ${JSON.stringify(result.headline)}`);
     return result;
@@ -302,6 +360,7 @@ function summarize({ arm, rep, N, w, windows, cmds, health, proc, run, calibrati
       healthzP99Ms: pct(h.map((x) => x.ms), 0.99), healthzWithin1s: h.length ? +(h.filter((x) => x.ok && x.ms <= 1000).length / h.length).toFixed(3) : null,
       actP99Ms: pct(C1.map((x) => x.ms), 0.99), readP99Ms: pct(C2.map((x) => x.ms), 0.99), actP50Ms: pct(C1.map((x) => x.ms), 0.5), readP50Ms: pct(C2.map((x) => x.ms), 0.5),
       cpuSPerS: p.length > 1 ? +((p.at(-1).cpuS - p[0].cpuS) / ((p.at(-1).at - p[0].at) / 1000)).toFixed(3) : null,
+      ...(p.length > 1 && p[0].launcherCpuS != null ? { launcherCpuSPerS: +((p.at(-1).launcherCpuS - p[0].launcherCpuS) / ((p.at(-1).at - p[0].at) / 1000)).toFixed(3) } : {}),
       rssMbMean: p.length ? +(p.reduce((s, x) => s + x.rssMb, 0) / p.length).toFixed(1) : null,
       heapMbMean: p.filter((x) => x.heapMb != null).length ? +(p.filter((x) => x.heapMb != null).reduce((s, x) => s + x.heapMb, 0) / p.filter((x) => x.heapMb != null).length).toFixed(1) : null,
       commands: c.length, outcomes,
