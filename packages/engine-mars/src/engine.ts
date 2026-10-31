@@ -259,6 +259,8 @@ export class MarsEngine implements Engine {
     // logged static facts (nav/1, office guards, authored boundaries, upper floors, entity physics) so a restart equals
     // the live world in every state, including after all upper floors are removed. A no-op when the base id already matches.
     (rt.services.spatial as Spatial|undefined)?.refreshForWorld?.(rt.world);
+    // a restore keeps the navigation epoch its snapshot recorded (the ground/re-base rebuilds above moved it)
+    if(saved)(rt.services.spatial as Spatial|undefined)?.adoptRestoredEpoch?.();
     this.cursor = rt.events.length;
     this.startRecorder();
     const self = this;

@@ -144,6 +144,21 @@ export class Spatial {
   private gridsNow?: GridSet;
   private gridsLater: (() => GridSet) | null = null;
   epoch = 0;
+  /** Snapshot restore: the navigation epoch the snapshot recorded, until the engine adopts it (adoptRestoredEpoch). */
+  restoredEpoch?: number;
+  /**
+   * Snapshot restore: after the restoring engine rebuilt this world's derived scene (ground windows, world re-base), take
+   * the captured epoch back. Those rebuilds describe the same static world the capture synced against, so the epoch must
+   * not move: walkers compare it with their own (walk.ts) and would re-verify, re-key narrows and re-smooth mid-walk,
+   * which a live world that kept running never does. Caches keyed by the epochs passed through here are dropped.
+   */
+  adoptRestoredEpoch(): void {
+    const e = this.restoredEpoch;
+    this.restoredEpoch = undefined;
+    if (e === undefined || e === this.epoch) return;
+    this.epoch = e;
+    this.aroundCache.clear(); this.outside.clear(); this.narrowCache.clear();
+  }
   /** Set by `rt.profile = true`: wall ms per method (spatial.route includes its spatial.sync). */
   prof?: Profiler;
   /** Navigation-relevant snapshot of the static entities (in world order) at the last rebuild. */
