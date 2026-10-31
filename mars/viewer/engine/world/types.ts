@@ -123,6 +123,10 @@ export type HumanState = {
   instrument?: string;
   /** CN5 (social/pose.ts): a choreographed game's public turn state (who throws to whom and when). */
   game?: import('../social/pose.ts').GameState;
+  /** entry 35 (social/hand-hold.ts): holding hands with another body (offered, joined, letting go). */
+  handHold?: import('../social/hand-hold.ts').HandHoldState;
+  /** entry 35 (social/rps.ts): a rock-paper-scissors count's shared start and shoot ticks; the shape from the shoot only. */
+  rps?: import('../social/rps.ts').RpsState;
 };
 
 /** Persistent committed quantities for one bounded cold preparation batch. */
