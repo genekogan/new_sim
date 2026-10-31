@@ -59,4 +59,65 @@ const pinBoard: DefInput = { ...structuredClone(noticeV1), make: pinMake as unkn
       then: [{ op: 'set', field: 'text', value: '' }, { op: 'set', field: 'textBy', value: '' }] },
   ] as NonNullable<DefInput['actions']> };
 
-export const WRITABLE_BOARDS: DefInput[] = [whiteboard, noticeBoard, pinBoard];
+// Entry 25: public boards II. A standing chalkboard menu (the whiteboard's write/wipe contract, chalk on slate); a sign-up
+// sheet whose lines are the signers' own names (one each, only the signer crosses it off); a poll whose maker sets a question
+// and 2-4 options (state `title`, `options` "A|B|C"), one vote per Soul (a new vote moves it), tallied on the face. Like the
+// pinboard, `text` is what the face shows and a reader reads; `textBy` holds who wrote each line (sign-up) or each vote (poll:
+// "soulId:optionIndex"). The hand goes to the line it writes on (signupSlot / pollSlot, shared with the viewer).
+export const SIGNUP_MAX = 8, POLL_OPTIONS_MAX = 4;
+/** Where sign-up line i sits on the sheet (face-local metres, x right, y up), under the title. */
+export const signupSlot = (i: number): [number, number] => [-0.02, 0.15 - i * 0.047];
+/** Where option i's tally sits on the poll board (face-local), to the right of its label. */
+export const pollSlot = (i: number): [number, number] => [0.22, 0.13 - i * 0.12];
+/** A poll's options from its maker's `options` state ("Soup|Salad|Bread"), at most four. */
+export const pollOptions = (state: Record<string, unknown>): string[] => (typeof state.options === 'string' ? state.options.split('|').map(o => o.trim()).filter(Boolean) : []).slice(0, POLL_OPTIONS_MAX);
+
+const chalkV1 = signage.find(d => d.name === 'core-chalkboard')! as unknown as DefInput;
+const leg = (z: number, pitch: number) => ({ kind: 'box', at: [0, 0.72, z], size: [0.7, 1.44, 0.035], round: 0.008, tint: 'wood', pitch });
+const chalkboard: DefInput = { ...structuredClone(chalkV1), version: 2, tags: [...(chalkV1.tags ?? []), 'hand-writable'],
+  description: 'A tall A-frame chalkboard (1.45 m) for a café menu or the day\'s news. A Soul writes on it in chalk by hand, or wipes it clean.',
+  make: { kind: 'gen', gen: 'kit/2', args: { round: 0.01, shapes: [leg(0.17, -0.2), leg(-0.17, 0.2),
+    { kind: 'box', at: [0, 0.86, 0.19], size: [0.62, 0.92, 0.012], round: 0, tint: 'slate', pitch: -0.2 },
+    { kind: 'box', at: [0, 0.38, 0.12], size: [0.66, 0.03, 0.06], round: 0.005, tint: 'wood', pitch: -0.2 }],
+    faces: [{ at: [0, 0.88, 0.2], w: 0.56, h: 0.82, pitch: -0.2, bg: '#2b322e', ink: '#f4f2e8', font: '600' }] } } as unknown as DefInput['make'],
+  state: boardState as DefInput['state'], components: { ...structuredClone(chalkV1.components), readable: { pages: 1 }, sign: { lines: [] } },
+  size: { box: [0.7, 1.45, 0.62] }, actions: boardActions('chalkboard') };
+
+const stand = (h: number, tint = 'frame') => [
+  { kind: 'cyl', at: [0, h / 2, -0.02], r: 0.025, h, segments: 8, tint },
+  { kind: 'cyl', at: [0, 0.015, -0.02], r: 0.22, h: 0.03, segments: 12, tint }];
+const signupSheet: DefInput = {
+  schema: 'def/1', name: 'core-signup-sheet', version: 1,
+  description: `A sign-up sheet on a clipboard stand, with a title its maker sets (state title). Souls sign it by hand with their own name (one each, up to ${SIGNUP_MAX}); only a signer crosses their name off.`,
+  tags: ['signage', 'sign-text', 'board', 'signup', 'hand-writable'], form: 'point',
+  make: { kind: 'gen', gen: 'kit/2', args: { round: 0.006, shapes: [...stand(1.12),
+    { kind: 'box', at: [0, 1.25, 0], size: [0.38, 0.5, 0.02], round: 0.01, tint: 'board', pitch: -0.35 },
+    { kind: 'box', at: [0, 1.48, 0.1], size: [0.12, 0.03, 0.03], round: 0.006, tint: 'frame', pitch: -0.35 }],
+    faces: [{ at: [0, 1.24, 0.014], w: 0.33, h: 0.45, pitch: -0.35, bg: '#fbfaf4', ink: '#22303e' }] } } as unknown as DefInput['make'],
+  params: { frame: { type: 'color', default: '#3c3f44', doc: 'stand colour' }, board: { type: 'color', default: '#a8794c', doc: 'clipboard colour' } },
+  palette: { frame: '#3c3f44', board: '#a8794c' },
+  state: { title: { type: 'string', max: 60, default: 'Sign up' }, text: { type: 'string', max: SIGNUP_MAX * 41, default: '' }, textBy: { type: 'string', max: SIGNUP_MAX * 41, default: '' } } as DefInput['state'],
+  components: { readable: { pages: 1 }, sign: { lines: [] } } as DefInput['components'],
+  size: { box: [0.44, 1.5, 0.44] },
+  actions: [
+    // the naive `then` names the fields the composed list reads (actuatedState passes only those); the hand actuator composes
+    { name: 'sign', label: 'Sign the sign-up sheet with your name', then: [{ op: 'set', field: 'text', value: '' }, { op: 'set', field: 'textBy', value: '' }] },
+    { name: 'unsign', label: 'Cross your name off the sign-up sheet', when: [{ field: 'text', not: '' }], then: [{ op: 'set', field: 'text', value: '' }, { op: 'set', field: 'textBy', value: '' }] },
+  ] as NonNullable<DefInput['actions']> } as DefInput;
+
+const pollBoard: DefInput = {
+  schema: 'def/1', name: 'core-poll-board', version: 1,
+  description: `A poll board on a stand: a question and up to ${POLL_OPTIONS_MAX} options its maker sets (state title, options "A|B|C"). Each Soul votes once by hand, marking a tally beside its choice; a new vote moves it.`,
+  tags: ['signage', 'sign-text', 'board', 'poll', 'hand-writable'], form: 'point',
+  make: { kind: 'gen', gen: 'kit/2', args: { round: 0.01, shapes: [post(-0.52), post(0.52), foot(-0.52), foot(0.52),
+    { kind: 'box', at: [0, 1.22, 0], size: [1.0, 0.7, 0.04], round: 0.01, tint: 'frame' },
+    { kind: 'box', at: [0, 1.22, 0.021], size: [0.94, 0.64, 0.006], round: 0, tint: 'board' }],
+    faces: [{ at: [0, 1.22, 0.026], w: 0.9, h: 0.6, bg: '#f3efe2', ink: '#2a2622' }] } } as unknown as DefInput['make'],
+  params: { frame: { type: 'color', default: '#5b6a52', doc: 'frame colour' }, board: { type: 'color', default: '#f3efe2', doc: 'board colour' } },
+  palette: { frame: '#5b6a52', board: '#f3efe2' },
+  state: { title: { type: 'string', max: 60, default: 'Which one?' }, options: { type: 'string', max: 120, default: 'Yes|No' }, text: { type: 'string', max: 400, default: '' }, textBy: { type: 'string', max: 2000, default: '' } } as DefInput['state'],
+  components: { readable: { pages: 1 }, sign: { lines: [] } } as DefInput['components'],
+  size: { box: [1.1, 1.62, 0.3] },
+  actions: [{ name: 'vote', label: 'Vote on the poll', params: { choice: { type: 'string', max: 40, doc: 'the option you vote for, as written on the board' } }, when: [{ field: 'options', not: '' }, { field: 'title', not: '' }], then: [{ op: 'set', field: 'text', value: '' }, { op: 'set', field: 'textBy', value: '' }] }] as NonNullable<DefInput['actions']> } as DefInput;
+
+export const WRITABLE_BOARDS: DefInput[] = [whiteboard, noticeBoard, pinBoard, chalkboard, signupSheet, pollBoard];

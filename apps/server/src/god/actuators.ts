@@ -4,7 +4,7 @@
 // `object:<entity>:switch-off`, walks up to it, reaches out, and the lamp's state changes in the world (an engine edit:
 // in the ledger, broadcast to viewers, never the god's to undo). Nothing in the edge changes: the object framework's own
 // capabilities, admission, receipts and body plans carry it.
-import { PIN_NOTES_MAX, PIN_PER_SOUL, PIN_TEXT_MAX, type Entity, type StoredDef } from '@sim/world-compiler';
+import { PIN_NOTES_MAX, PIN_PER_SOUL, PIN_TEXT_MAX, SIGNUP_MAX, pollOptions, type Entity, type StoredDef } from '@sim/world-compiler';
 import type { EdgeSoul } from '../edge/contract.ts';
 import { isContactActuator, CONTACT_REACH } from './contact-actuator.ts';
 import { afterCommit } from '../edge/comms/store.ts';
@@ -139,15 +139,66 @@ export function pinPatch(a: { name: string }, state: Record<string, unknown>, so
   else { const i = notes.map(n => n.by).lastIndexOf(soul.soulId); if (i >= 0) notes.splice(i, 1); }
   return { text: notes.map(n => n.text).join('\n'), textBy: notes.map(n => n.by).join(',') };
 }
+/** Entry 25: a sign-up sheet (one line per signer: their own name) and a poll (one vote per Soul). */
+const signerName = (soul: EdgeSoul) => (soul.name || 'a Soul').replace(/[\n,—|:]/g, ' ').trim().slice(0, 40);
+export const isSignupAction = (def: StoredDef, a: { name: string }) => !!def.tags?.includes('signup') && (a.name === 'sign' || a.name === 'unsign');
+export const isPollAction = (def: StoredDef, a: { name: string }) => !!def.tags?.includes('poll') && a.name === 'vote';
+/** A board whose lines several Souls own (pinboard notes, sign-up names, poll votes). */
+export const isListAction = (def: StoredDef, a: { name: string }) => isPinAction(def, a) || isSignupAction(def, a) || isPollAction(def, a);
+/** The poll option a choice names: exact (any case), else the only option it starts. -1 = none. */
+export function pollChoice(state: Record<string, unknown>, choice: unknown): number {
+  const opts = pollOptions(state).map(o => o.toLowerCase()), c = typeof choice === 'string' ? choice.trim().toLowerCase().replace(/^(?:for|on)\s+/, '').replace(/^(?:the|a|an)\s+/, '') : '';
+  if (!c) return -1; const exact = opts.indexOf(c); if (exact >= 0) return exact;
+  const starts = opts.map((o, i) => (o.startsWith(c) || c.startsWith(o) ? i : -1)).filter(i => i >= 0);
+  return starts.length === 1 ? starts[0] : -1;
+}
+/** A poll's votes ("soulId:optionIndex", comma-separated) and the face/read lines they make ("Soup — 2 votes"). */
+export function pollVotes(state: Record<string, unknown>): { by: string; i: number }[] {
+  return (typeof state.textBy === 'string' && state.textBy ? state.textBy.split(',') : []).map(v => { const [by, i] = v.split(':'); return { by, i: Number(i) }; }).filter(v => v.by && Number.isInteger(v.i));
+}
+export const pollLines = (state: Record<string, unknown>, votes = pollVotes(state)) => pollOptions(state).map((o, i) => { const n = votes.filter(v => v.i === i).length; return `${o} — ${n} vote${n === 1 ? '' : 's'}`; }).join('\n');
+/** Why this Soul cannot do this list action here now (null = it can). `params` undefined = availability only. */
+export function listProblem(def: StoredDef, a: { name: string }, state: Record<string, unknown>, soul: EdgeSoul, params?: Record<string, unknown>): Refusal | null {
+  if (isPinAction(def, a)) return pinProblem(a, state, soul, a.name === 'pin' ? params?.text : undefined);
+  if (isSignupAction(def, a)) {
+    const names = pinNotes(state), mine = names.some(n => n.by === soul.soulId);
+    if (a.name === 'unsign') return mine ? null : { code: 'object.not-yours', reason: 'Your name is not on this sheet; only a signer crosses their own name off.' };
+    if (mine) return { code: 'object.state', reason: 'Your name is already on this sheet.' };
+    if (names.length >= SIGNUP_MAX) return { code: 'object.state', reason: `The sheet is full (${SIGNUP_MAX} names).` };
+    return null;
+  }
+  if (isPollAction(def, a)) {
+    const opts = pollOptions(state);
+    if (opts.length < 2) return { code: 'object.state', reason: 'This poll has no options to vote for yet.' };
+    if (params === undefined) return null;
+    const i = pollChoice(state, params.choice);
+    if (i < 0) return { code: 'capability.params', reason: `Say which option to vote for: ${opts.join(', ')}.` };
+    if (pollVotes(state).some(v => v.by === soul.soulId && v.i === i)) return { code: 'object.state', reason: `You already voted for ${opts[i]}.` };
+    return null;
+  }
+  return null;
+}
+/** The list board's next `text`/`textBy` after this Soul's action. */
+export function listPatch(def: StoredDef, a: { name: string }, state: Record<string, unknown>, soul: EdgeSoul, params: Record<string, unknown>): Record<string, unknown> {
+  if (isPinAction(def, a)) return pinPatch(a, state, soul, params.text);
+  if (isSignupAction(def, a)) {
+    const names = pinNotes(state).filter(n => n.by !== soul.soulId);
+    if (a.name === 'sign') names.push({ text: signerName(soul), by: soul.soulId });
+    return { text: names.map(n => n.text).join('\n'), textBy: names.map(n => n.by).join(',') };
+  }
+  const votes = pollVotes(state).filter(v => v.by !== soul.soulId), i = pollChoice(state, params.choice);
+  if (i >= 0) votes.push({ by: soul.soulId, i });
+  return { text: pollLines(state, votes), textBy: votes.map(v => `${v.by}:${v.i}`).join(',') };
+}
 /** After pinning or taking down a note a Soul steps back from the cork, so the next Soul can reach its own note. */
 function stepBack(def: StoredDef, a: Action, motion: { root: [number, number, number]; params: Record<string, unknown> }) {
   const yaw = (motion.params.stroke as { yaw?: number } | undefined)?.yaw;
-  if (!isPinAction(def, a) || typeof yaw !== 'number') return [];
+  if (!isListAction(def, a) || typeof yaw !== 'number') return [];
   return [{ verb: 'walk_to', params: { to: [motion.root[0] + Math.sin(yaw) * 0.8, motion.root[2] + Math.cos(yaw) * 0.8], standoff: 0 } }];
 }
 /** A def action's state patch: the `then` ops, or a pinboard's composed list. */
 export function actionPatch(def: StoredDef, a: Action, state: Record<string, unknown>, params: Record<string, unknown>, soul: EdgeSoul): Record<string, unknown> {
-  return isPinAction(def, a) ? pinPatch(a, state, soul, params.text) : thenPatch(a, state, params);
+  return isListAction(def, a) ? listPatch(def, a, state, soul, params) : thenPatch(a, state, params);
 }
 /** The Soul-facing params of a def action: its declared string params (board text). */
 function actionParams(a: Action): Record<string, { type: 'string'; maxLength: number; description?: string }> {
@@ -169,12 +220,12 @@ export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: Buil
       const denied = s.key ? host.access?.(s.key, ctx.soul) : null; if (denied) return denied;
       const water = s.key ? waterPlan(a, s.key, ctx.soul, host) : null; if (water) return isRefusal(water) ? water : null;
       const state = (s.key && host.stateOf?.(s.key)) || s.state || {};
-      return whenRefusal(a, state, nameOf(s)) ?? (isPinAction(def, a) ? pinProblem(a, state, ctx.soul) : null);
+      return whenRefusal(a, state, nameOf(s)) ?? (isListAction(def, a) ? listProblem(def, a, state, ctx.soul) : null);
     };
     out[a.name] = {
       label: a.label, roles: 'anyone', reach: 'anywhere', params: actionParams(a), movesBody: true,
       available: (s: BuiltLike, ctx: any) => check(s, ctx),
-      validate: (s: BuiltLike, p: Record<string, unknown>, ctx: any) => check(s, ctx) ?? (isPinAction(def, a) ? pinProblem(a, (s.key && host.stateOf?.(s.key)) || s.state || {}, ctx.soul, a.name === 'pin' ? p?.text : undefined) : null) ?? (a.name === 'write' && 'text' in actionParams(a) ? boardTextProblem(p?.text, actionParams(a).text.maxLength) : null),
+      validate: (s: BuiltLike, p: Record<string, unknown>, ctx: any) => check(s, ctx) ?? (isListAction(def, a) ? listProblem(def, a, (s.key && host.stateOf?.(s.key)) || s.state || {}, ctx.soul, p ?? {}) : null) ?? (a.name === 'write' && 'text' in actionParams(a) ? boardTextProblem(p?.text, actionParams(a).text.maxLength) : null),
       apply: (s: BuiltLike, params: Record<string, unknown>, ctx: any) => {
         const contact = host.deferContacts && isContactActuator(def, a);
         const motion=contact&&s.key?host.contactPlan?.(ctx.soul,s.key,a.name,params):null;
