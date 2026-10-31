@@ -52,6 +52,9 @@ export function createControllerOwner({state,inspectProcess=inspectOwnedProcess,
 
  const save=()=>{if(failure)throw failure;try{writePrivate(path,ledger);}catch(e){failure=e;throw e;}};
  const absent=target=>strictProcessAbsent(target,killProcess);
+ // Darwin: kill(-pgid,0) returns EPERM while every member is exiting/zombie (reproduced). That is
+ // neither absence nor a signalable owner: wait (never signal) until ESRCH or the cleanup deadline.
+ const groupGone=async(pgid,deadline)=>{for(;;){try{killProcess(-pgid,0);return false;}catch(e){if(e.code==='ESRCH')return true;if(e.code!=='EPERM')throw fault('CONTROLLER_ABSENCE_UNKNOWN');}if(now()>=deadline)throw fault('CONTROLLER_HOST_CLEANUP_UNVERIFIED');await sleep(25);}};
  const anchor=(host)=>{
   const leader=inspectProcess(host.birth.pid);if(!leader)throw fault('CONTROLLER_HOST_LEADER_GONE');if(!same(leader,host.birth))throw fault('CONTROLLER_HOST_BIRTH_CHANGED');
   const members=inspectGroup(host.birth.pgid),map=new Map(members.map(p=>[p.pid,p]));if(!map.has(leader.pid))throw fault('CONTROLLER_GROUP_UNKNOWN');
@@ -61,15 +64,15 @@ export function createControllerOwner({state,inspectProcess=inspectOwnedProcess,
  const cleanup=async(host,deadline)=>{
   if(host.state==='starting'||!host.birth)throw fault('CONTROLLER_HOST_RESERVATION_INCOMPLETE');
   if(host.state==='closed'){if(host.closeProof?.hostPid!==host.birth.pid||host.closeProof.groupClosed!==true||host.closeProof.groupVerification!=='absent')throw fault('CONTROLLER_HOST_CLOSURE_INVALID');return 'prior-verified';}
-  if(absent(-host.birth.pgid)){if(host.state!=='closed'&&!absent(host.birth.pid))throw fault('CONTROLLER_HOST_BIRTH_CHANGED');return;}
+  if(await groupGone(host.birth.pgid,deadline)){if(host.state!=='closed'&&!absent(host.birth.pid))throw fault('CONTROLLER_HOST_BIRTH_CHANGED');return;}
   let members;
   for(const [signal,grace] of [['SIGTERM',1000],['SIGKILL',5000]]){
    // Revalidate the exact live birth/ancestry immediately before each signal.
    if(now()>=deadline)throw fault('CONTROLLER_HOST_CLEANUP_UNVERIFIED');
-   try{members=anchor(host);}catch(e){if(e.code!=='CONTROLLER_HOST_LEADER_GONE')throw e;while(now()<deadline){if(absent(-host.birth.pgid)&&absent(host.birth.pid))return;await sleep(25);}if(absent(-host.birth.pgid)&&absent(host.birth.pid))return;throw fault('CONTROLLER_HOST_CLEANUP_UNVERIFIED');}
-   try{killProcess(-host.birth.pgid,signal);}catch(e){if(e.code!=='ESRCH')throw fault('CONTROLLER_CLEANUP_SIGNAL_UNKNOWN');}
-   const end=Math.min(deadline,now()+grace);while(now()<end){if(absent(-host.birth.pgid)&&members.every(p=>absent(p.pid)))return;await sleep(25);}
-   if(absent(-host.birth.pgid)&&members.every(p=>absent(p.pid)))return;
+   try{members=anchor(host);}catch(e){if(e.code!=='CONTROLLER_HOST_LEADER_GONE'&&!(await groupGone(host.birth.pgid,deadline)&&absent(host.birth.pid)))throw e;while(now()<deadline){if(await groupGone(host.birth.pgid,deadline)&&absent(host.birth.pid))return;await sleep(25);}if(await groupGone(host.birth.pgid,deadline)&&absent(host.birth.pid))return;throw fault('CONTROLLER_HOST_CLEANUP_UNVERIFIED');}
+   try{killProcess(-host.birth.pgid,signal);}catch(e){if(e.code!=='ESRCH'&&e.code!=='EPERM')throw fault('CONTROLLER_CLEANUP_SIGNAL_UNKNOWN');}
+   const end=Math.min(deadline,now()+grace);while(now()<end){if(await groupGone(host.birth.pgid,deadline)&&members.every(p=>absent(p.pid)))return;await sleep(25);}
+   if(await groupGone(host.birth.pgid,deadline)&&members.every(p=>absent(p.pid)))return;
   }
   throw fault('CONTROLLER_HOST_CLEANUP_UNVERIFIED');
  };
