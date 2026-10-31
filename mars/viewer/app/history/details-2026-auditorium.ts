@@ -2,7 +2,6 @@ import * as T from 'three';
 import {componentMeshes} from './cad-components';
 import {Kit,layers} from './kit';
 import {gallery2026Mounts} from './gallery-2026-anchors';
-import {photoTexture} from './archive-photos';
 
 export const AUDITORIUM_2026_SOURCES=[33334,33350,33355,33354];
 /** Source-backed portable auditorium arrangement. Tier geometry and screen
@@ -100,7 +99,7 @@ export function add2026AuditoriumDetails(root:T.Group){
  }
  // The recognizable upper-gallery portrait uses source pixels from c33334,
  // not a synthetic imitation. Crop retains photographed perspective.
- const art=new T.MeshBasicMaterial({map:photoTexture('/history/2026/auditorium-source-portrait.webp'),side:T.DoubleSide});art.name='2026 auditorium source portrait c33334';art.map!.colorSpace=T.SRGBColorSpace;
+ const art=new T.MeshBasicMaterial({map:new T.TextureLoader().load('/history/2026/auditorium-source-portrait.webp'),side:T.DoubleSide});art.name='2026 auditorium source portrait c33334';art.map!.colorSpace=T.SRGBColorSpace;
  const portrait=new T.Mesh(new T.PlaneGeometry(.80,1.10),art);portrait.position.set(8.0,3.85,-.20);k.tag(g,portrait,'auditorium upper gallery source portrait',layers.detail);portrait.userData.walkNoCollision=true;
  g.userData.accuracy='All furniture supported on actual CAD surfaces. Portable counts/layout fitted to multiple2026 photographs, not a single exact event; screen content not reconstructed.';
  for(let i=0;i<6;i++)for(const x of [-.38,.38])box('auditorium gallery source stand-off mount bracket',[.035,.055,.10],[i+x,0,0],'#66675d');

@@ -77,4 +77,6 @@ test('2021 native painted faces and new IDs fit a bounded mesh/texture budget',a
  for(const name of ['Mars flower front mural','native honeycomb paint'])assert.ok(mesh(container,name).material.map);
  const shell=bounds(mesh(container,'shipping container')),paint=bounds(mesh(container,'native honeycomb paint'));
  assert.ok(paint.max.x>shell.max.x+.005,'paint must clear its physical side face');
+ let bytes=0;for(const name of ['2021-container-flower.webp','2021-container-honeycomb.webp'])bytes+=(await fs.stat(new URL(`../public/history/2021/${name}`,import.meta.url))).size;
+ assert.ok(bytes<=26000,`${bytes} native paint bytes exceed budget`);
 });

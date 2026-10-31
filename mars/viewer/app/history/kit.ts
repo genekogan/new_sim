@@ -1,7 +1,6 @@
 import * as T from 'three';
 import {GROUND} from '../studio/ambience-math';
 import {RACK_FRAME_GREEN} from '../engine-view/palette';
-import {photoTexture} from './archive-photos';
 export const BAY = 3.6576;
 export const layers = {steel:'Rack steel', floor:'Timber, floors and stairs', roof:'Roofs and upper floors', wall:'Walls and screens', detail:'Interior details', context:'Site context'};
 type XYZ = [number,number,number];
@@ -62,7 +61,7 @@ export class Kit {
   if(!m){m=new T.MeshStandardMaterial({color,metalness,roughness:metalness?0.5:0.86});if(!metalness && ['#b89770','#b99b75','#b89a75','#aa8d64','#bfa17b','#ae9165'].includes(color)){const map=new T.TextureLoader().load('/modular/textures/kitchen-plywood-sample.jpg');map.colorSpace=T.SRGBColorSpace;map.anisotropy=4;(m as T.MeshStandardMaterial).map=map;(m as T.MeshStandardMaterial).color.set('#ead8b7');}this.materials.set(key,m);}return m;
  }
  photo(url:string) {
-  let m=this.materials.get(url);if(!m){const map=photoTexture(url);map.colorSpace=T.SRGBColorSpace;map.anisotropy=4;m=new T.MeshStandardMaterial({map,roughness:0.92,side:T.DoubleSide});this.materials.set(url,m);}return m;
+  let m=this.materials.get(url);if(!m){const map=new T.TextureLoader().load(url);map.colorSpace=T.SRGBColorSpace;map.anisotropy=4;m=new T.MeshStandardMaterial({map,roughness:0.92,side:T.DoubleSide});this.materials.set(url,m);}return m;
  }
  assembly(id:string,name:string,p:XYZ=[0,0,0],rotation=0,source='Photographic fit; dimensions and hidden surfaces remain provisional') {
   const g=new T.Group();g.name=name;g.position.set(...p);g.rotation.y=rotation;g.userData={assembly_id:id,source,year:this.year};this.root.add(g);this.hooks.assembly?.(this,g);return g;
@@ -142,8 +141,10 @@ export class Kit {
  table(g:T.Object3D,x:number,z:number,w=1.8,d=.75,y=.78){this.box(g,'table top',[w,.045,d],[x,y,z],'#d6d0bc');for(const a of [-1,1])for(const b of [-1,1]){const lx=x+a*(w/2-.12),lz=z+b*(d/2-.1),base=this.seat?this.surface(g,[[lx,lz],[lx-.022,lz],[lx+.022,lz],[lx,lz-.022],[lx,lz+.022]],y-.0225):.1;this.rod(g,'table leg',[lx,base,lz],[lx,y,lz],.022);}}
  screen(g:T.Object3D,x:number,y:number,z:number,w=1.3,angle=0,height=w*.5625){
   const s=this.box(g,'screen bezel',[w,height,.075],[x,y,z],'#17191c');s.rotation.y=angle;
-  // Every year starts with an unlit physical display; shared channels may explicitly show content.
-  const m=new T.MeshBasicMaterial({map:null,color:'#17232b',toneMapped:false});const o=new T.Mesh(new T.PlaneGeometry(w-.05,height-.05),m);o.position.set(x+Math.sin(angle)*.041,y,z+Math.cos(angle)*.041);o.rotation.y=angle;this.tag(g,o,'display content',layers.detail,'screen');
+  // The native Portal photograph belongs to2020. Other years start with
+  // an unlit physical display; shared channels may explicitly show content.
+  const map=this.year===2020?(this.photo('/2020/screens/portal-screen-02.webp') as T.MeshStandardMaterial).map:null;
+  const m=new T.MeshBasicMaterial({map,color:this.year===2020?'#ffffff':'#17232b',toneMapped:false});const o=new T.Mesh(new T.PlaneGeometry(w-.05,height-.05),m);o.position.set(x+Math.sin(angle)*.041,y,z+Math.cos(angle)*.041);o.rotation.y=angle;this.tag(g,o,'display content',layers.detail,'screen');
  }
  kitchen(g:T.Object3D,w:number,d:number,year=this.year){
   for(const x of [-w/2+.42,w/2-.42]){this.table(g,x,0,.7,d-1,.91);for(let i=0;i<6;i++){const cz=-d/2+.9+i*.68,cy=this.seat?this.surface(g,Kit.footprint(x,cz,.43,.45),.54)+.16:.38;this.box(g,'stored food crate',[.43,.32,.45],[x,cy,cz],['#92744e','#d2c3a2','#646b5a'][i%3]);}}

@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import {add2020ReconciliationDetails} from './details-2020-reconciliation';
 import { GROUND } from '../studio/ambience-math';
-import { photoTexture } from '../history/archive-photos';
 
 // Late-March 2020 evidence model. Coordinates are a photographic fit, not a survey.
 // One unit is one metre. The observed racks used dark frames and red beams.
@@ -153,7 +152,7 @@ function makePortal(root: THREE.Object3D) {
   box(g, 'dark ceiling above the TV aisle', [BAY - 0.1, 0.07, 2 * BAY - 0.1], [0, 2.49, 0], plywoodDark);
   box(g, 'raised center rooftop deck', [BAY - 0.12, 0.07, 2 * BAY - 0.13], [0, 4.57, 0], plywood);
   const screenMaterials = Array.from({ length: 12 }, (_, index) => {
-    const texture = photoTexture(`/2020/screens/portal-screen-${String(index).padStart(2, '0')}.webp`);
+    const texture = new THREE.TextureLoader().load(`/2020/screens/portal-screen-${String(index).padStart(2, '0')}.webp`);
     texture.colorSpace = THREE.SRGBColorSpace;
     return new THREE.MeshBasicMaterial({ map: texture, toneMapped: false, side: THREE.DoubleSide });
   });

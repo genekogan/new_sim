@@ -1,6 +1,5 @@
 import * as T from 'three';
 import {GROUND} from '../studio/ambience-math';
-import {photoTexture} from '../history/archive-photos';
 const BAY=3.6576;
 /** March2020 source reconciliations. Pin original identities before any fitting.
  * beforeDetails callback belongs to the historical dispatcher; standalone also works. */
@@ -11,7 +10,7 @@ export function add2020ReconciliationDetails(root:T.Group){
  const plywood=mat('#b39470'),navy=mat('#273747'),dark=mat('#273036'),white=mat('#d4d4cb'),red=mat('#c24237'),glass=mat('#324d59');
  const name=(o:T.Object3D,id:string)=>{o.name=id;o.userData.named_id='2020-'+id.toLowerCase().replace(/[^a-z0-9]+/g,'-');return o;};
  const box=(g:T.Object3D,id:string,size:[number,number,number],p:[number,number,number],m:T.Material=plywood)=>{const o=new T.Mesh(new T.BoxGeometry(...size),m);o.position.set(...p);o.castShadow=true;o.receiveShadow=true;g.add(o);name(o,id);return o;};
- const plane=(g:T.Object3D,id:string,w:number,h:number,p:[number,number,number],url:string,ry=0)=>{const map=photoTexture(url);map.colorSpace=T.SRGBColorSpace;const o=new T.Mesh(new T.PlaneGeometry(w,h),new T.MeshBasicMaterial({map,side:T.DoubleSide}));o.position.set(...p);o.rotation.y=ry;g.add(o);name(o,id);return o;};
+ const plane=(g:T.Object3D,id:string,w:number,h:number,p:[number,number,number],url:string,ry=0)=>{const map=new T.TextureLoader().load(url);map.colorSpace=T.SRGBColorSpace;const o=new T.Mesh(new T.PlaneGeometry(w,h),new T.MeshBasicMaterial({map,side:T.DoubleSide}));o.position.set(...p);o.rotation.y=ry;g.add(o);name(o,id);return o;};
  const all=(g:T.Object3D,n:string)=>{const a:T.Mesh[]=[];g.traverse(o=>{if(o instanceof T.Mesh&&o.name===n)a.push(o);});return a;};
  const hide=(o:T.Object3D,why:string)=>{o.visible=false;o.userData.walkNoCollision=true;o.userData.sourceQuarantine=why;};
  const portal=group('portal');
@@ -43,7 +42,7 @@ export function add2020ReconciliationDetails(root:T.Group){
  // Upper center perimeter: wood guards observed Mar17, station and cross-section fitted.
  for(const s of [-1,1]){box(portal,`roof timber guard ${s<0?'left':'right'}`,[.055,.065,5.7],[s*1.65,3.34,0]);for(let j=0;j<8;j++)box(portal,`guard post ${s<0?'left':'right'} ${j}`,[.055,.82,.055],[s*1.65,2.935,-2.66+j*.76]);}
  const container=group('container');
- const flower=all(container,'magenta flower end mural')[0];if(flower){const map=photoTexture('/history/2020/2020-container-flower.webp');map.colorSpace=T.SRGBColorSpace;flower.material=new T.MeshBasicMaterial({map,side:T.DoubleSide});}
+ const flower=all(container,'magenta flower end mural')[0];if(flower){const map=new T.TextureLoader().load('/history/2020/2020-container-flower.webp');map.colorSpace=T.SRGBColorSpace;flower.material=new T.MeshBasicMaterial({map,side:T.DoubleSide});}
  // DJI_0108/DJI_0112: eight small panels, paired in four stations, propped above roof.
  const panels=all(container,'solar panel'),frames=all(container,'solar panel frame');
  for(let i=0;i<8;i++){const x=-2.15+Math.floor(i/2)*1.4,z=(i%2?1:-1)*.62;const o=panels[i]??box(container,`extra solar panel ${i}`,[1.12,.015,.63],[x,2.86,z],dark);o.position.set(x,2.76,z);o.scale.set(panels.includes(o)?1.12/1.22:1,1,panels.includes(o)?.63/.68:1);o.rotation.x=-.28;const frame=frames[i]??box(container,`extra solar frame ${i}`,[1.20,.045,.69],[x,2.755,z],navy);frame.position.set(x,2.755,z);frame.scale.set(frames.includes(frame)?1.20/1.3:1,1,frames.includes(frame)?.69/.76:1);frame.rotation.x=-.28;

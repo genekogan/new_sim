@@ -28,8 +28,7 @@ def scrub(value):
 # `*` = within one path segment); a whole asset namespace that the app loads by
 # convention (engine/**) must be a glob, not a per-file list, so new files ship
 # without edits here. deploy/prepare-allowlist.test.mjs scans app/ and engine/ for
-# /engine|modular|browser|data|models/ URL literals (the Mars archive photos under /history and /2020 are not
-# distributed, so they are never staged) and fails if one is not
+# /engine|modular|browser|data|history|2020|models/ URL literals and fails if one is not
 # covered by `python3 deploy/prepare.py --list`.
 GLOBS = [
     'engine/**',
@@ -52,6 +51,13 @@ FILES = {
     'data': ['manifest.json', 'chiba.glb', 'campus.glb']
 }
 
+# history/ and 2020/ hold only the wall, mural, sign and Portal screen texture crops the year scenes load: exactly
+# the tools/assets/manifest.json entries there. The archive photo gallery, its captions and the 2020 evidence
+# images are not distributed, so a local copy of them is never staged.
+ASSET_MANIFEST = ROOT.parents[1] / 'tools/assets/manifest.json'
+TEXTURE_CROPS = sorted(f['path'][len('mars/viewer/public/'):] for f in json.loads(ASSET_MANIFEST.read_text())['files']
+    if re.match(r'mars/viewer/public/(history|2020)/', f['path']))
+
 def glob_regex(pattern):
     out = ''
     i = 0
@@ -68,7 +74,7 @@ def glob_regex(pattern):
 
 def resolve():
     """Every public/ path (relative, posix) the release stages, sorted."""
-    paths = {f'{ns}/{name}' for ns, names in FILES.items() for name in names}
+    paths = {f'{ns}/{name}' for ns, names in FILES.items() for name in names} | set(TEXTURE_CROPS)
     # The legacy photo page loads reference photographs from their original
     # public origin. Never stage source photographs or reconstruction projects.
     for pattern in GLOBS:

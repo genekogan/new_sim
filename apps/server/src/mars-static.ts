@@ -7,11 +7,10 @@ import { serveStatic } from '@hono/node-server/serve-static';
 const PUBLIC_ORIGIN = 'https://sim.mars.college';
 export const MARS_STATIC_CACHE = 'public, max-age=86400, stale-while-revalidate=604800';
 // Public, already-published derivatives only. Never source photos, Blender
-// projects, capabilities, private room APIs or arbitrary upstream URLs. The Mars archive photos (/history, /2020) are
-// not distributed, so they are not served or proxied.
+// projects, capabilities, private room APIs or arbitrary upstream URLs.
 export function publicMarsAsset(path: string): boolean {
   if (/[\\%]/.test(path) || path.includes('..')) return false;
-  return /^\/(browser|modular|engine|models)\/[a-zA-Z0-9_./-]+\.(glb|json|webp|png|jpg|jpeg|svg|bin)$/.test(path)
+  return /^\/(browser|modular|engine|history|2020|models)\/[a-zA-Z0-9_./-]+\.(glb|json|webp|png|jpg|jpeg|svg|bin)$/.test(path)
     || path === '/data/manifest.json';
 }
 
@@ -25,7 +24,7 @@ export function mountMarsStatic(app: Hono, root: string) {
     const r = await serveStatic({ root, rewriteRequestPath: p => p.replace(/^\/mars-assets/, '') })(c, next); const out = r ?? c.res;
     if (out.status === 200 && !out.headers.has('cache-control')) out.headers.set('cache-control', MARS_STATIC_CACHE); return r;
   });
-  for (const pattern of ['/engine/*', '/modular/*', '/models/*', '/browser/*', '/data/manifest.json']) {
+  for (const pattern of ['/engine/*', '/modular/*', '/models/*', '/history/*', '/2020/*', '/browser/*', '/data/manifest.json']) {
     app.get(pattern, compressGlb, async (c, next) => {
       if (!publicMarsAsset(c.req.path)) return c.notFound();
       // lane W1: published files on disk had no Cache-Control (the 1.8 MB character GLBs were cached by heuristics only)

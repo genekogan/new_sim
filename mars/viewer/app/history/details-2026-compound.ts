@@ -1,7 +1,6 @@
 import * as T from 'three';
 const cadId=(o:T.Object3D)=>o.userData.component_id??o.parent?.userData.component_id;
 import {Kit,layers} from './kit';
-import {photoTexture} from './archive-photos';
 
 /** Freeside detail registration: DJI_0002 t504 (2026-03-19) matches the CAD
  * northeast compound's three roof footprints. Placement remains an aerial/CAD
@@ -444,7 +443,7 @@ export function add2026CompletedKitchen(root:T.Group){
   k.box(leaf,'Freeside reused entry door lower panel',[1.02,1.12,.045],[sign*.51,.56,0],color,layers.wall);
   for(const xx of [sign*.035,sign*.985])k.box(leaf,'Freeside reused door upper stile',[.07,.97,.045],[xx,1.61,0],color,layers.wall);
   k.box(leaf,'Freeside reused entry door upper rail',[1.02,.08,.045],[sign*.51,2.065,0],color,layers.wall);
-  const paint=typeof document==='undefined'?null:photoTexture(x<3?'/history/2026/completion/tan-door-paint.webp':'/history/2026/completion/yellow-door-paint.webp');if(paint)paint.colorSpace=T.SRGBColorSpace;
+  const paint=typeof document==='undefined'?null:new T.TextureLoader().load(x<3?'/history/2026/completion/tan-door-paint.webp':'/history/2026/completion/yellow-door-paint.webp');if(paint)paint.colorSpace=T.SRGBColorSpace;
   const panelMat=new T.MeshStandardMaterial({map:paint,roughness:.94});
   k.box(leaf,'Freeside reused entry door painted upper panel',[.88,.84,.015],[sign*.51,1.59,0],panelMat,layers.wall);
   k.box(leaf,'Freeside entry door handle',[.035,.18,.065],[sign*.89,1.02,.04],'#554e3c',layers.detail);
