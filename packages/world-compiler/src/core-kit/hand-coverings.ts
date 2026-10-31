@@ -1,0 +1,60 @@
+// Curtains and a roller blind a Soul draws by hand (Soul Actions entry 23): a wall section with a glazed window, the
+// covering on the inside (+z) and a pull cord whose tassel is tinted `valve` (where the hand goes). State `open`: the
+// curtains drawn back / the blind rolled up. The viewer draws the pleated panels bunching to their outer ends (role
+// curtain-l / curtain-r scale in x about the pivot at the rod's end) and the blind rolling to its roller (role blind
+// scales in y about the top), easing over 1.1 s from the contact (opening-motion.ts).
+import type { DefInput } from '../schemas.ts';
+
+type Shape = Record<string, unknown>;
+const W = 2.4, H = 2.6, D = 0.16, OW = 1.4, SILL = 0.9, HEAD = 2.2;   // wall, window opening
+const wall = (): Shape[] => [
+  { kind: 'box', at: [-(W + OW) / 4, H / 2, 0], size: [(W - OW) / 2, H, D], round: 0.005, tint: 'plaster', collide: true },
+  { kind: 'box', at: [(W + OW) / 4, H / 2, 0], size: [(W - OW) / 2, H, D], round: 0.005, tint: 'plaster', collide: true },
+  { kind: 'box', at: [0, SILL / 2, 0], size: [OW, SILL, D], round: 0.005, tint: 'plaster', collide: true },
+  { kind: 'box', at: [0, (H + HEAD) / 2, 0], size: [OW, H - HEAD, D], round: 0.005, tint: 'plaster' },
+  { kind: 'box', at: [0, SILL + 0.015, 0.04], size: [OW + 0.08, 0.03, D + 0.1], round: 0.006, tint: 'frame' },
+  { kind: 'box', at: [0, (SILL + HEAD) / 2, 0], size: [0.04, HEAD - SILL, 0.05], round: 0.004, tint: 'frame' },
+  { kind: 'box', at: [0, (SILL + HEAD) / 2, 0], size: [OW, 0.04, 0.05], round: 0.004, tint: 'frame' },
+  { kind: 'box', at: [0, (SILL + HEAD) / 2, 0], size: [OW, HEAD - SILL, 0.012], round: 0, tint: 'glass', material: 'glass' },
+];
+// the pull cord hangs from the rod on the right; its tassel at 1.2 m is where the hand goes
+const cord = (x: number, top: number): Shape[] => [
+  { kind: 'cyl', at: [x, (top + 1.2) / 2, 0.15], r: 0.004, h: top - 1.2, segments: 4, tint: 'cord' },
+  { kind: 'cyl', at: [x, 1.17, 0.15], r: 0.018, h: 0.08, segments: 8, r2: 0.012, tint: 'valve' },
+];
+// a panel of six pleats (alternating depth), from the rod's end at x0 to the middle; all pleats share the end pivot
+const panel = (role: string, x0: number): Shape[] => Array.from({ length: 6 }, (_, i) => {
+  const w = 0.8 / 6, x = x0 + Math.sign(-x0) * (w / 2 + i * w);
+  return { kind: 'box', at: [x, (0.95 + 2.3) / 2, 0.12 + (i % 2) * 0.03], size: [w + 0.012, 2.3 - 0.95, 0.02], round: 0.006, tint: i % 2 ? 'cloth' : 'cloth2', role, pivot: [x0, 2.3, 0.13] };
+});
+const palette = { plaster: '#d9d2c3', frame: '#f1ede4', glass: '#a9c7d6', cloth: '#9a5b46', cloth2: '#8a4f3d', blind: '#e6dcc6', cord: '#e8e2d2', valve: '#c9b98f', rod: '#5b4a3a' };
+const params = Object.fromEntries(Object.entries(palette).map(([k, v]) => [k, { type: 'color', default: v, doc: `${k} colour${k === 'valve' ? ' (the pull cord tassel; the hand goes here)' : ''}` }]));
+const actions = (noun: string) => [
+  { name: 'open', label: `Open the ${noun}`, roles: 'anyone', reach: 'touch', params: {}, when: [{ field: 'open', is: false }], then: [{ op: 'set', field: 'open', value: true }] },
+  { name: 'close', label: `Close the ${noun}`, roles: 'anyone', reach: 'touch', params: {}, when: [{ field: 'open', is: true }], then: [{ op: 'set', field: 'open', value: false }] },
+];
+const common = { schema: 'def/1', version: 1, form: 'point', params, palette, state: { open: { type: 'bool', default: true } }, size: { box: [W, H, 0.2] } };
+
+const curtainedWindow = {
+  ...common, name: 'core-curtained-window',
+  description: 'A wall section (2.4 m) with a glazed window and a pair of curtains on a rod inside. A Soul opens and closes the curtains by hand at the pull cord; closed, they keep the room private and hide its light at night.',
+  tags: ['window', 'curtains', 'home', 'hand-operated', 'local-fixture'],
+  make: { kind: 'gen', gen: 'kit/2', args: { round: 0.005, shapes: [...wall(),
+    { kind: 'cyl', at: [0, 2.31, 0.13], r: 0.015, h: 1.9, segments: 8, tint: 'rod', roll: Math.PI / 2 },
+    ...panel('curtain-l', -0.95), ...panel('curtain-r', 0.95), ...cord(0.88, 2.3)] } },
+  actions: actions('curtains'),
+} as unknown as DefInput;
+
+const blindWindow = {
+  ...common, name: 'core-blind-window',
+  description: 'A wall section (2.4 m) with a glazed window and a roller blind inside. A Soul raises and lowers the blind by hand at the pull cord; lowered, it keeps the room private and hides its light at night.',
+  tags: ['window', 'blind', 'home', 'hand-operated', 'local-fixture'],
+  make: { kind: 'gen', gen: 'kit/2', args: { round: 0.005, shapes: [...wall(),
+    { kind: 'cyl', at: [0, HEAD + 0.06, 0.1], r: 0.035, h: OW + 0.06, segments: 10, tint: 'blind', roll: Math.PI / 2 },
+    { kind: 'box', at: [0, (SILL + 0.04 + HEAD) / 2, 0.1], size: [OW - 0.02, HEAD - SILL - 0.04, 0.008], round: 0, tint: 'blind', role: 'blind', pivot: [0, HEAD + 0.03, 0.1] },
+    { kind: 'box', at: [0, SILL + 0.06, 0.1], size: [OW - 0.02, 0.03, 0.02], round: 0.006, tint: 'rod', role: 'blind', pivot: [0, HEAD + 0.03, 0.1] },
+    ...cord(0.75, HEAD + 0.06)] } },
+  actions: [{ ...actions('blind')[0], label: 'Open the blind' }, { ...actions('blind')[1], label: 'Close the blind' }],
+} as unknown as DefInput;
+
+export const HAND_COVERINGS: DefInput[] = [curtainedWindow, blindWindow];
