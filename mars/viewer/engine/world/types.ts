@@ -31,7 +31,7 @@ export type Support =
   | { kind: 'ground' }
   | { kind: 'resting-on'; on: string; slot?: string } // slot: a table surfaceSlot id, or 'lap' (engine/items)
   | { kind: 'held'; by: string[] }
-  | { kind: 'in-hand'; by: string; hand: 'left' | 'right' } // a small item in one person's hand (engine/items)
+  | { kind: 'in-hand'; by: string; hand: 'left' | 'right'; /** entry 41: item yaw − holder yaw kept from a hand-over (absent: 0) */ turn?: number } // a small item in one person's hand (engine/items)
   | { kind: 'connected'; to: string[] }
   | { kind: 'forks'; vehicle: string }
   | { kind: 'ridden-by'; by: string } // a vehicle under its rider (engine/vehicles)

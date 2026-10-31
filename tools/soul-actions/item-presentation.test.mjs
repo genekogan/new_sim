@@ -29,3 +29,11 @@ test('pick-up presentation (entry 29 on M04): one reach clock for the drawn hand
  const c={...take,cancelTick:10+R/2};let w=at(10+R/2,c).weight;for(let t=10+R/2+1;t<=10+R/2+R;t++){const q=at(t,c);assert.ok(Math.abs(q.weight-w)<=1.5/R+1e-9,'cancel withdraw at '+t);assert.equal(q.goal.k,at(10+R/2,c).goal.k);w=q.weight}
  assert.ok(w<1e-9,'drawn arm back on the clip');assert.equal(itemPresentation({...c,releaseTick:10+R/2+R},undefined,10+R/2+R+3,dt).weight,0,'recovery keeps the clip');
 });
+test('entry 41: a hand-over hold keeps the bend while the hand is held out and eases it from holdTick, continuously',()=>{
+ const dt=.05,R=Math.round(ITEM_REACH_SECONDS/dt),p={item:'lamp',hand:'right',action:'a1',mode:'put',startTick:0,reachTick:10,target:[0,1,0],hold:true};
+ assert.equal(itemPostureK(p,10,dt),0);assert.equal(itemPostureK(p,10+R,dt),1);assert.equal(itemPostureK(p,10+R+400,dt),1,'held out: the bend stays');
+ const q={...p,holdTick:10+R+400};let prev=itemPostureK(q,10,dt),max=0;for(let t=11;t<=10+3*R+400;t++){const k=itemPostureK(q,t,dt);max=Math.max(max,Math.abs(k-prev));prev=k;}
+ assert.equal(itemPostureK(q,10+2*R+400,dt),0,'back to standing one reach after the hold ends');assert.ok(max<=.08,'no step '+max);
+ const early={...p,holdTick:15};assert.ok(itemPostureK(early,15,dt)>0&&itemPostureK(early,15+R,dt)===0,'a hold ended mid-raise eases down from where it was');
+ const old={item:'lamp',hand:'right',action:'a1',startTick:0,reachTick:10};assert.equal(itemPostureK(old,10+R+R/2,dt),1-(k=>k*k*(3-2*k))(.5),'records without hold: the old hump');
+});

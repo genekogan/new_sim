@@ -14,7 +14,9 @@ export const ITEM_GESTURE_FADE_SECONDS=2;
 export const ITEM_ARM_LEAD_SECONDS=.35;
 /** `target`: the grasp / placement point (world, m) the reach lerps to, fixed when the reach starts. `mode`: a pick-up
  *  ('take') or a put; absent on older records. `cancelTick`: the tick a reach was interrupted (the hand withdraws). */
-export type ItemTransferV1={item:string;hand:'left'|'right';action:string;mode?:'take'|'put';startTick:number;reachTick?:number;releaseTick?:number;cancelTick?:number;target?:[number,number,number]};
+/** `hold` (entry 41, a hand-over): the hand stays at `target` after the reach until `holdTick` (the change of holder, or
+ *  a lowering), so the bend holds there too and eases back from `holdTick`. */
+export type ItemTransferV1={item:string;hand:'left'|'right';action:string;mode?:'take'|'put';startTick:number;reachTick?:number;releaseTick?:number;cancelTick?:number;target?:[number,number,number];hold?:true;holdTick?:number};
 /** `posture`: bend toward the fixed grasp point, scaled by `k` — smoothstep up over the reach and down over the
  *  withdraw, the same clock as the engine's hand lerp, so the torso can neither pop nor hop between solutions.
  *  `goal`: a pick-up's empty-handed reach, drawn instead of the engine hand point: from the drawn palm (clip and idle
@@ -25,6 +27,7 @@ const smooth=(n:number)=>{const k=Math.max(0,Math.min(1,n));return k*k*(3-2*k)};
 export function itemPostureK(transfer:ItemTransferV1,tick:number,dt:number){
  if(transfer.reachTick===undefined)return 0;
  const u=(tick-transfer.reachTick)*dt/ITEM_REACH_SECONDS;
+ if(transfer.hold)return smooth(u)*(transfer.holdTick===undefined?1:1-smooth((tick-transfer.holdTick)*dt/ITEM_REACH_SECONDS));
  return u<=1?smooth(u):1-smooth(u-1);
 }
 export function itemPresentation(transfer:ItemTransferV1|undefined,held:{left?:string;right?:string}|undefined,tick:number,dt:number):ItemPresentation|undefined {

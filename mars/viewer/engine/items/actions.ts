@@ -9,6 +9,7 @@
 // the activity they are layered on ('sit' = seated).
 import { z } from 'zod';
 import {ITEM_REACH_SECONDS,ITEM_RECOVERY_SECONDS} from './presentation.ts';
+import { handOver } from './handover.ts';
 import { angleDelta, clamp, heading, q6, rot2, wrapAngle, type Vec3 } from '../core/math.ts';
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
 import { DT, type Runtime } from '../runtime/runtime.ts';
@@ -31,7 +32,7 @@ import {
   type BodyFrame, type Hand,
 } from './body.ts';
 import {
-  BODY_REACH, followHand, graspPoint, heldBy, inHand, isItem, placeOnGround, placeOnSlot, putInHand,
+  BODY_REACH, followHand, graspPoint, heldBy, heldYaw, inHand, isItem, placeOnGround, placeOnSlot, putInHand,
   reachOf, reachStation, slotOccupant, surfaceSlot, whereIs, type Station, type SurfaceSlot,
 } from './model.ts';
 
@@ -133,7 +134,7 @@ export const holdItems: ActionDef<{ actor: string }, null, HoldExec> = {
       if (it) {
         const q = carryHand(b, h);
         setHand(a, h, q);
-        followHand(it.item, q, a.pose.yaw);
+        followHand(it.item, q, heldYaw(it.item, a));
       } else setHand(a, h, undefined);
     }
     return held.length ? { status: 'running', phase: 'holding' } : { status: 'completed' };
@@ -288,7 +289,7 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
       }
       if(ex.phase==='cancel-withdraw'){
         const R=ex.reachTicks??ticks(REACH_TIME);ex.t++;const q=lerp3(ex.from!,ex.to!,smooth(ex.t/R));setHand(a,ex.hand,q);a.human!.activity='reach';
-        if(inHand(rt.world,ex.actor,ex.hand))followHand(it,q,a.pose.yaw);
+        if(inHand(rt.world,ex.actor,ex.hand))followHand(it,q,heldYaw(it,a));
         if(ex.t<R)return{status:'running',phase:'cancel-withdraw'};
         ex.phase='recover';ex.t=0;a.human!.itemTransferV1!.releaseTick=rt.tick;return{status:'running',phase:'recover'};
       }
@@ -331,7 +332,7 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
       const q = lerp3(ex.from!, ex.to!, k);
       setHand(a, ex.hand, q);
       const holding = (ex.mode === 'take') === (ex.phase === 'withdraw');
-      if (holding) followHand(it, q, a.pose.yaw);
+      if (holding) followHand(it, q, heldYaw(it, a));
       if (ex.t < R) return { status: 'running', phase: ex.phase };
       if (ex.phase === 'reach') {
         const b = bodyFrame(a);
@@ -680,4 +681,4 @@ export const eat: ActionDef<EatParams, { bowlHand: Hand }, EatExec> = {
   resumable: true,
 };
 
-export const ITEM_ACTIONS: ActionDef[] = [takeItem, putItem, serve, eat, holdItems];
+export const ITEM_ACTIONS: ActionDef[] = [takeItem, putItem, serve, eat, holdItems, handOver as ActionDef];
