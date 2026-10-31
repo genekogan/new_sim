@@ -14,6 +14,8 @@ import type {Db} from '../db.ts';
 import type {Mind} from '../world.ts';
 import {EdgeLedger} from '../edge/ledger/ledger.ts';
 import {setMenuWorld} from './menu-world.ts';
+import {lightningFrom} from '../god/lightning.ts';
+type Strike = Parameters<typeof lightningFrom>[0][number];
 import type {ReplicaWorld} from './replica-world.ts';
 import type {MindRow} from './read-model.ts';
 
@@ -95,6 +97,11 @@ export class ReadOnlyHost {
 export function readLedger(host: ReadOnlyHost, placeData?: unknown, env: NodeJS.ProcessEnv = process.env) {
   const L = new EdgeLedger(host as never, host.db, placeData, {readOnly: true});
   L.comms = readComms(host, env.EDGE_FADING === '1', env.SIM_BEAM === '1') as never;
+  // the god-fed reads, from what main's pump shipped (absent key = main has no such provider)
+  const E = host.rw.ledgerEnv as {weather?: unknown; strikes?: Strike[] | null; spots?: unknown};
+  L.weatherNow = (() => 'weather' in E ? E.weather ?? undefined : undefined) as never;
+  L.lightningNear = (x: number, z: number) => 'strikes' in E ? lightningFrom(E.strikes ?? [], x, z, host.rw.R.pos.tick) : null;
+  L.spotsProvider = () => (E.spots ?? null) as never;
   return L;
 }
 

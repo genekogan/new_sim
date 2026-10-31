@@ -216,6 +216,8 @@ if (process.env.SIM_READ_WORKER === '1' && edge) {
       return { status: r.status, headers: [...r.headers], body: await r.arrayBuffer() }; } }).start();
   source.onDelta((d) => pool.delta(d), () => pool.reinit());
   (globalThis as { __simReadPool?: unknown }).__simReadPool = pool;   // tests and the harness read pool.status()
+  // SIM_READ_ORACLE=1 (B-facade item 5, lane only): the five reads answered by main and by a replica ledger, compared
+  if (process.env.SIM_READ_ORACLE === '1') { const { installReadOracle } = await import('./split/read-oracle.ts'); await installReadOracle(host, edge, source as never, db.path); console.log('[read-oracle] on'); }
   console.log(`[read] ${pool.size} read worker(s), mode ${readMode === 2 ? 'read code (here)' : 'subset (here, capabilities)'}`);
 }
 const listener = getRequestListener(app.fetch);

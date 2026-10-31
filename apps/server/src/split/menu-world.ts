@@ -160,8 +160,11 @@ export type MenuStatics = {regions: unknown; navV1: unknown; rulesVersion: strin
   groundV1?: boolean; physical?: boolean; upperFloors?: unknown};
 /** A claimed fixture slot (runtime owners `slot:<fixture>#<slot>`): the slot id and the claiming record's actor. */
 export type ClaimRow = [slot: string, actor: string];
-export type MenuInit = {actions: ActionRow[]; records: RecordRow[]; verdicts: VerdictRow[]; statics: MenuStatics; claims?: ClaimRow[]};
-export type MenuDelta = {actions?: ActionRow[]; actionsGone?: string[]; records?: RecordRow[]; recordsGone?: string[]; verdicts?: VerdictRow[]; statics?: Omit<MenuStatics, 'kernel' | 'names'>; kernel?: unknown; names?: unknown; claims?: ClaimRow[]};
+/** The ledger's god-fed reads (main-only providers): weatherNow(), the recent lightning strikes, the god's activity spots.
+ *  A key present = its new value (null = none); resent when it changed. */
+export type LedgerEnv = {weather?: unknown; strikes?: unknown; spots?: unknown};
+export type MenuInit = {actions: ActionRow[]; records: RecordRow[]; verdicts: VerdictRow[]; statics: MenuStatics; claims?: ClaimRow[]; env?: LedgerEnv};
+export type MenuDelta = {actions?: ActionRow[]; actionsGone?: string[]; records?: RecordRow[]; recordsGone?: string[]; verdicts?: VerdictRow[]; statics?: Omit<MenuStatics, 'kernel' | 'names'>; kernel?: unknown; names?: unknown; claims?: ClaimRow[]; env?: LedgerEnv};
 export type VerdictRow = {soulId: string; actor: string; key: string; verdict: Diag | null; tick: number};
 /** The verdicts main computed for the programs a replica's reads ask about. A miss answers "feasible" (the planner's
  *  refusal then comes at act time, as `deferRouteChecks` offers do today) and is queued for main (`misses`). */

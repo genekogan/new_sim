@@ -30,6 +30,8 @@ export class ReplicaWorld {
   private records = new Map<string, RecordRow & {params: Record<string, unknown>; history?: {tick: number; status: string}[]}>();
   private statics: MenuStatics = {regions: {}, navV1: null, rulesVersion: '', verbs: [], anchors: []};
   kernel: unknown = null;
+  /** the ledger's god-fed reads (weather, lightning strikes, god activity spots): split/read-host.ts */
+  readonly ledgerEnv: {weather?: unknown; strikes?: unknown; spots?: unknown} = {};
   /** the host's name facts (profiles, old-name claims): split/read-host.ts */
   names: unknown = null;
   /** a pump's menu section has been seen (main runs a VerdictPump) */
@@ -131,6 +133,8 @@ export class ReplicaWorld {
     for (const id of (m as MenuDelta).recordsGone ?? []) this.records.delete(id);
     if (m.verdicts?.length) this.verdicts.apply(m.verdicts);
     if (m.claims) this.claims = new Map(m.claims as ClaimRow[]);
+    if (whole) for (const k of Object.keys(this.ledgerEnv)) delete (this.ledgerEnv as Record<string, unknown>)[k];
+    if (m.env) Object.assign(this.ledgerEnv, m.env);
     if (m.statics) {const {kernel: _k, names: _n, ...rest} = m.statics as MenuStatics; this.statics = {...this.statics, ...rest};}
     const k = whole ? (m as MenuInit).statics.kernel : (m as MenuDelta).kernel;
     if (k !== undefined) this.kernel = k;

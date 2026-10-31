@@ -110,6 +110,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
   weatherNow?: () => {clouds: number; rain: number; wind: number; fog: number; kind: string; lightning: number};
   /** GOD-ENV: what a Soul at (x, z) perceived of the lightning in the last minute (god worlds only). */
   lightningNear?: (x: number, z: number) => {last: string; strikes: number; nearest: number} | null;
+  /** Stage B: god/lightning.ts installs it; the verdict pump ships the list so a read worker answers lightningNear. */
+  recentStrikesV1?: () => {x: number; z: number; tick: number; god?: boolean}[];
   worldProfile?: (soul: EdgeSoul, caps: EdgeCapability[], plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>) => void;
   /** A world target whose physical use is unsupported must refuse, even during quiet renewal.
    * Checked on admission/dispatch/completion, never by a per-tick world scan. Historical terminal receipts stay immutable. */
@@ -398,12 +400,19 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
   /** Read worker (readOnly): after each applied delta, what main's afterTick keeps for the read code: the faded set (from
    *  the replicated one), the carrier places, the visit memory re-read from the database (main writes it). */
-  replicaSync(faded: Iterable<string>) {
+  replicaSync(faded: Iterable<string>, places?: readonly Place[]) {
     if (!this.readOnly) throw new Error('replicaSync: not a read-only ledger');
+    // main's places (derived, god-edited, carrier baskets: B-delta's static layer ships ledger.places whole)
+    if (places && places !== this.replicaPlaces) {
+      this.replicaPlaces = places; const P = this.places;
+      P.byId.clear(); P.occupierOf.clear(); P.carrierPlaces.clear(); for (const p of places) P.add(p);
+      this.carrierCount = -1;
+    }
     const next = new Set(faded);
     if (next.size !== this.faded.size || [...next].some(id => !this.faded.has(id))) {this.faded.clear(); for (const id of next) this.faded.add(id);}
     this.syncCarrierPlaces(); this.knowledge.reload();
   }
+  private replicaPlaces: readonly Place[] | null = null;
   private loadPlaces(raw: unknown): PlaceData {
     const world = this.mw.world as NativeWorld;
     if (raw === undefined) return derivePlaceData(world);

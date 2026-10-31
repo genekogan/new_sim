@@ -271,7 +271,7 @@ export class DeltaTap {
 export function installDeltaStream(host: WorldHost, L: EdgeLedger, env: NodeJS.ProcessEnv = process.env): DeltaTap | null {
   if (env.SIM_READ_WORKER !== '1') return null;
   const tap = new DeltaTap(host, L);
-  tap.extend = new VerdictPump(menuWorldOf(host) as LiveMenuWorld, host as never);
+  tap.extend = new VerdictPump(menuWorldOf(host) as LiveMenuWorld, host as never, L);
   host.splitTap = (tick, out) => tap.onTick(tick, out);
   return tap;
 }

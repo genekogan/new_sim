@@ -66,15 +66,22 @@ function init2(w: WorldInit) {
     RH = new R2!.ReadOnlyHost(RW, wd.world!.worldId, wd.world!.dbPath);
     RL = R2!.readLedger(RH, process.env.PLACE_DATA ? JSON.parse(readFileSync(process.env.PLACE_DATA, 'utf8')) : undefined);
   }
-  RL!.replicaSync(RW.R.faded);
-  // B-spatial: the first labelling takes seconds (8.7 s on the live copy): before 'ready', never inside a Soul's read
-  const t0 = performance.now(); RW.spatial?.connectivityV1(); c2.warmMs = performance.now() - t0; relabel = null; ready2 = true;
+  RL!.replicaSync(RW.R.faded, RW.R.static?.places);
+  relabel = null; warm2();
+}
+/** B-spatial: the first labelling takes seconds (8.7 s on the live copy): before 'ready', never inside a Soul's read.
+ *  No spatial service yet (the static scene arrives with a later delta): not ready; warmed when it is built. */
+function warm2() {
+  if (!RW?.spatial) {ready2 = false; return;}
+  const t0 = performance.now(); RW.spatial.connectivityV1(); c2.warmMs += performance.now() - t0;
+  if (!ready2) {ready2 = true; parentPort!.postMessage({t: 'ready', index: wd.index, gen, tick: tickNow(), warmMs: c2.warmMs});}
 }
 function apply2(d: WorldDelta): boolean {
   const before = RW!.cost.spatialBuilds + RW!.cost.spatialRebuilds;
   if (!RW!.apply(d as never)) return false;
-  const t0 = performance.now(); RL!.replicaSync(RW!.R.faded); c2.syncMs += performance.now() - t0;
-  if (RW!.cost.spatialBuilds + RW!.cost.spatialRebuilds !== before && RW!.spatial) {if (!relabel) {relabel = {since: performance.now(), rebuilds: RW!.cost.spatialRebuilds}; setImmediate(relabelSlice);}}
+  const t0 = performance.now(); RL!.replicaSync(RW!.R.faded, RW!.R.static?.places); c2.syncMs += performance.now() - t0;
+  if (!ready2) warm2();
+  else if (RW!.cost.spatialBuilds + RW!.cost.spatialRebuilds !== before && RW!.spatial) {if (!relabel) {relabel = {since: performance.now(), rebuilds: RW!.cost.spatialRebuilds}; setImmediate(relabelSlice);}}
   return true;
 }
 /** After a read: the verdicts it missed, to main's pump (answered with the next delta). */
@@ -111,8 +118,8 @@ if (R2) here2.mod = await import('../edge/perception/here.ts');
 
 parentPort!.on('message', (m: ToWorker) => {
   if (m.t === 'init') {
-    const c = cpuMs(); if (R2) init2(m.w); else M.init(m.w); cost.initCpuMs = cpuMs() - c; myGen(m.gen);
-    parentPort!.postMessage({t: 'ready', index: wd.index, gen: m.gen, tick: tickNow(), ...(R2 ? {warmMs: c2.warmMs} : {stats: M.stats()}), initCpuMs: cost.initCpuMs});
+    const c = cpuMs(); myGen(m.gen); if (R2) init2(m.w); else M.init(m.w); cost.initCpuMs = cpuMs() - c;
+    if (!R2) parentPort!.postMessage({t: 'ready', index: wd.index, gen: m.gen, tick: tickNow(), stats: M.stats(), initCpuMs: cost.initCpuMs});
   }
   else if (m.t === 'delta') {const c = cpuMs(); if (R2 ? !RW || !apply2(m.d) : !M.apply(m.d)) {parentPort!.postMessage({t: 'resync', index: wd.index}); return;} const ms = cpuMs() - c; cost.deltas++; cost.ingestCpuMs += ms; cost.maxIngestCpuMs = Math.max(cost.maxIngestCpuMs, ms); myGen(m.gen);}
   else if (m.t === 'query') parentPort!.postMessage({t: 'answer', id: m.id, v: answer(m.kind, m.soulId)});

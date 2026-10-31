@@ -31,7 +31,7 @@ test('read host: here over a ReplicaWorld + read-only sqlite equals main', {time
   RW.init(structuredClone(worldInit(f.host, edge, tap)));
   const H = new ReadOnlyHost(RW, f.host.worldId, path), RL = readLedger(H);
   t.after(() => {H.close(); f.brain.quiesce(); f.host.stop(); f.db.close(); rmSync(dir, {recursive: true, force: true});});
-  const flush = () => {for (const m of msgs.splice(0)) if ('t' in m || !RW.apply(m)) {msgs.length = 0; RW.init(structuredClone(worldInit(f.host, edge, tap))); break;} RL.replicaSync(RW.R.faded);};
+  const flush = () => {for (const m of msgs.splice(0)) if ('t' in m || !RW.apply(m)) {msgs.length = 0; RW.init(structuredClone(worldInit(f.host, edge, tap))); break;} RL.replicaSync(RW.R.faded, RW.R.static?.places);};
   const mind = f.host.minds.get(row.id)!, soul = {soulId: row.id, entityId: mind.entityId, name: 'Mira', owner: 'dev:mira'} as never;
   flush();
   const kinds = new Set<string>();

@@ -9,7 +9,7 @@
 // one delta). Shipped verdicts are re-asked when their actor's action changes (route keys) or any action changes
 // (scope-'' keys, e.g. a seat taken), under a CPU budget per tick, so a verdict is never older than its inputs for long.
 import type {Program, RuntimeView} from '@sim/engine-contract';
-import {LiveFeasibility, planKey, type ActionRow, type ClaimRow, type MenuDelta, type MenuInit, type MenuStatics, type RecordRow, type VerdictRow, type MenuWorld} from './menu-world.ts';
+import {LiveFeasibility, planKey, type ActionRow, type ClaimRow, type LedgerEnv, type MenuDelta, type MenuInit, type MenuStatics, type RecordRow, type VerdictRow, type MenuWorld} from './menu-world.ts';
 
 /** The record verbs the read code reads from `runtime.records` (held seats, berths, slots). */
 /** A test engine may lack a read: the statics then carry the empty value. */
@@ -17,6 +17,7 @@ const tryOr = <T>(f: () => T, d: T): T => {try {return f();} catch {return d;}};
 const HELD = new Set(['sit', 'take_slot']);
 const PARAMS = ['actor', 'fixture', 'on', 'slot', 'activity', 'seconds'] as const;
 
+type LedgerLike = {weatherNow?: () => unknown; recentStrikesV1?: () => unknown; spotsProvider?: () => unknown};
 type Host = {minds: Map<string, {soulId: string; entityId: string}>; mindByEntity?: Map<string, {soulId: string}>; kernel?: unknown; extra?: Record<string, unknown>};
 
 export class VerdictPump {
@@ -30,8 +31,9 @@ export class VerdictPump {
   budgetMs = 2;
   readonly cost = {ticks: 0, cpuMs: 0, maxCpuMs: 0, verdicts: 0, reasks: 0, asks: 0, actions: 0, records: 0, statics: 0, kernels: 0};
 
-  constructor(mw: MenuWorld & {feasibility: LiveFeasibility}, host: Host) {
-    this.mw = mw; this.host = host;
+  private L?: LedgerLike; private envKeys: Record<string, string> = {}; private spotsRef: unknown = undefined;
+  constructor(mw: MenuWorld & {feasibility: LiveFeasibility}, host: Host, L?: LedgerLike) {
+    this.mw = mw; this.host = host; this.L = L;
     mw.feasibility.fresh = [];
     for (const a of this.actionRows()) this.actionKeys.set(a.actor, JSON.stringify(a));
     for (const r of this.recordRows()) this.recordKeys.set(r.id, JSON.stringify(r));
@@ -74,6 +76,16 @@ export class VerdictPump {
       anchors: structuredClone(tryOr(() => this.mw.anchors(), [])), newcomer: this.mw.commonsNewcomerResourcesV1?.(), deliveries: this.mw.commonsFoodDeliveriesV1?.(),
       kernel: structuredClone(this.host.kernel ?? null), names: this.names(), ...this.movement()};
   }
+  /** The ledger's god-fed reads, changed keys only (`all`: every key a provider exists for). Spots by reference (the
+   *  provider returns the same object until the god's spots move). */
+  private ledgerEnv(all: boolean): LedgerEnv | undefined {
+    const L = this.L; if (!L) return undefined;
+    const out: LedgerEnv = {};
+    const put = (k: 'weather' | 'strikes', f: (() => unknown) | undefined) => {if (!f) return; const v = tryOr(f, null) ?? null, j = JSON.stringify(v); if (all || j !== this.envKeys[k]) {this.envKeys[k] = j; out[k] = JSON.parse(j);}};
+    put('weather', L.weatherNow?.bind(L)); put('strikes', L.recentStrikesV1?.bind(L));
+    if (L.spotsProvider) {const v = tryOr(() => L.spotsProvider!(), null) ?? null; if (all || v !== this.spotsRef) {this.spotsRef = v; out.spots = structuredClone(v);}}
+    return Object.keys(out).length ? out : undefined;
+  }
   /** What the engine's movementVerb / placeLevelV1 read besides the shipped world: groundV1, the physical-shore mode, upper floors. */
   private movement() {
     const e = (this.mw as {engine?: {physical?: unknown}}).engine, w = this.mw.world as unknown as {groundV1?: unknown; upperFloorsV1?: unknown};
@@ -99,7 +111,7 @@ export class VerdictPump {
   init(): MenuInit {
     const actions = this.actionRows(), records = this.recordRows(), statics = this.statics();
     const tick = this.mw.world.tick, verdicts = [...this.shipped].map(([key, s]) => ({soulId: this.soulOf(s.actor), actor: s.actor, key, verdict: JSON.parse(s.v), tick}));
-    return {actions, records, verdicts, statics, claims: this.claimRows()};
+    return {actions, records, verdicts, statics, claims: this.claimRows(), env: this.ledgerEnv(true)};
   }
   /** After each tick (from the tap): the changed rows, or undefined when nothing in the menu section moved. */
   delta(staticMoved: boolean): MenuDelta | undefined {
@@ -112,6 +124,7 @@ export class VerdictPump {
     for (const r of this.recordRows()) {rseen.add(r.id); const k = JSON.stringify(r); if (this.recordKeys.get(r.id) !== k) {this.recordKeys.set(r.id, k); (d.records ??= []).push(r);}}
     for (const id of this.recordKeys.keys()) if (!rseen.has(id)) {this.recordKeys.delete(id); (d.recordsGone ??= []).push(id);}
     {const c = this.claimRows(), k = JSON.stringify(c); if (k !== this.claimsKey) {this.claimsKey = k; d.claims = c;}}
+    {const e = this.ledgerEnv(false); if (e) d.env = e;}
     // statics: by reference (the engine replaces regions/navV1 on a static change) and on the tap's static epoch
     const refs = this.refs();
     if (staticMoved || refs.some((x, i) => x !== this.staticsRef[i]) || tick % 200 === 0) {
