@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Hosts proof media (clips, images, logs, proof.json) for a PR, so the PR links it and the repo never stores it.
 //
-//   node tools/proof/upload.mjs --pr <n> [--repo owner/name] [--proof <proof.json>] [--dry-run] [--json] <file>...
+//   node tools/proof/upload.mjs --pr <n> [--repo owner/name] [--proof <proof.json>] [--dry-run] [--json]
+//        [--no-preview] [--preview-start <s>] [--preview-seconds <s>] <file>...
 //
 // Targets:
 //   default   a GitHub release named `proofs` (a prerelease on tag `proofs`, created on first use), through `gh api`.
@@ -15,12 +16,18 @@
 // With --proof, each uploaded file's url is written into proof.json `media[]` (matched by file name; new media get
 // an entry to complete), then proof.json itself is uploaded last and its link printed: that is the link for the PR.
 //
+// Inline previews: GitHub serves release assets as downloads, so an mp4 link never plays in the PR. For each video,
+// ffmpeg makes `<clip>.preview.gif` beside it (the first --preview-seconds, default 6, from --preview-start, default 0;
+// real speed, at most 5 MB, smaller frames until it fits), uploads it next to the clip and records it as proof.json
+// `media[].preview`. The printed `[![...](preview.gif)](clip.mp4)` line embeds it in the PR, linked to the full clip.
+// Without ffmpeg the clip is uploaded alone, with a warning. --no-preview skips it.
+//
 // When the upload is blocked (no gh, not signed in, no permission, no network: common in cloud sessions) it exits 3
 // and says so. Then tell the user where the files are and ask them to attach them; never commit media to get
 // around it, and never push it to another branch.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { basename, extname, relative, resolve } from 'node:path';
+import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -134,21 +141,62 @@ export function pickTarget({ env = process.env, repo, run, fetchImpl, dryRun }) 
   return githubTarget({ repo, run, dryRun });
 }
 
+// ── previews ────────────────────────────────────────────────────────────────────────────────────────────────────
+export const PREVIEW_MAX_BYTES = 5 * 1024 ** 2;
+/** Frame width and rate, largest first; the first that fits PREVIEW_MAX_BYTES wins. */
+export const PREVIEW_LADDER = [{ width: 480, fps: 10 }, { width: 360, fps: 8 }, { width: 240, fps: 6 }];
+export const previewPath = file => join(dirname(file), `${basename(file, extname(file))}.preview.gif`);
+
+/** ffmpeg arguments for one animated GIF preview (palette per clip, loops forever, real speed). */
+export function previewArgs({ input, output, start = 0, seconds = 6, width = 480, fps = 10 }) {
+  return ['-y', '-v', 'error', '-ss', String(start), '-t', String(seconds), '-i', input,
+    '-vf', `fps=${fps},scale=${width}:-2:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer`,
+    '-loop', '0', output];
+}
+
+/**
+ * Makes the preview GIF for a video: { file, bytes, width, fps } or { skipped: reason }. `ffmpeg(args)` runs ffmpeg
+ * and `size(path)` returns bytes; both injected in tests.
+ */
+export function makePreview(file, { start = 0, seconds = 6, ffmpeg = args => execFileSync('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] }), size = p => statSync(p).size } = {}) {
+  const output = previewPath(file);
+  for (const step of PREVIEW_LADDER) {
+    try { ffmpeg(previewArgs({ input: file, output, start, seconds, ...step })); } catch (e) {
+      return { skipped: e.code === 'ENOENT' ? 'ffmpeg is not installed' : `ffmpeg failed: ${String(e.stderr ?? e.message).trim().split('\n')[0]}` };
+    }
+    const bytes = size(output);
+    if (bytes <= PREVIEW_MAX_BYTES) return { file: output, bytes, ...step };
+  }
+  return { skipped: `even a ${PREVIEW_LADDER.at(-1).width}px preview is over ${PREVIEW_MAX_BYTES / 1024 ** 2} MB; use --preview-seconds to shorten it` };
+}
+
+/** The Markdown that embeds a clip's preview in a PR, linked to the full clip. */
+export const embedLine = (u, alt = basename(u.file)) => u.preview ? `[![${alt}](${u.preview})](${u.url})` : `[${alt}](${u.url})`;
+
 /** Writes uploaded links into proof.json media[] (by file name); returns the updated object. */
 export function linkMedia(proof, uploaded) {
   const media = Array.isArray(proof.media) ? proof.media : [];
   for (const u of uploaded) {
     const file = basename(u.file);
     const entry = media.find(m => m.file && basename(m.file) === file);
-    if (entry) entry.url = u.url;
-    else media.push({ file, url: u.url, kind: kindOf(file), ...(kindOf(file) === 'video' ? { uncut: null, realSpeed: null, seconds: null, viewport: null } : {}), caption: '' });
+    if (entry) { entry.url = u.url; if (u.preview) entry.preview = u.preview; }
+    else media.push({ file, url: u.url, ...(u.preview ? { preview: u.preview } : {}), kind: kindOf(file), ...(kindOf(file) === 'video' ? { uncut: null, realSpeed: null, seconds: null, viewport: null } : {}), caption: '' });
   }
   return { ...proof, media };
 }
 
-export async function uploadAll({ pr, files, proofPath = null, target, read = readFileSync, write = writeFileSync }) {
+/** Uploads `files` (each video with its preview when `preview(file)` makes one), then proof.json last. */
+export async function uploadAll({ pr, files, proofPath = null, target, read = readFileSync, write = writeFileSync, preview = null, warn = () => {} }) {
   const uploaded = [];
-  for (const file of files) uploaded.push({ file, ...(await target.upload(pr, file)) });
+  for (const file of files) {
+    const u = { file, ...(await target.upload(pr, file)) };
+    if (preview && kindOf(file) === 'video') {
+      const p = preview(file);
+      if (p.skipped) warn(`${basename(file)}: no inline preview (${p.skipped}); the PR will link the clip only`);
+      else u.preview = (await target.upload(pr, p.file)).url;
+    }
+    uploaded.push(u);
+  }
   let proofLink = null;
   if (proofPath) {
     const proof = linkMedia(JSON.parse(read(proofPath, 'utf8')), uploaded);
@@ -181,11 +229,11 @@ function repoFromGit() {
 
 async function main(argv) {
   const opt = k => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : undefined; };
-  const valued = new Set(['--pr', '--repo', '--proof']);
+  const valued = new Set(['--pr', '--repo', '--proof', '--preview-start', '--preview-seconds']);
   const files = argv.filter((a, i) => !a.startsWith('--') && !valued.has(argv[i - 1]));
   const pr = opt('--pr'), proofPath = opt('--proof') ?? null, dryRun = argv.includes('--dry-run');
   if (!pr || !/^\d+$/.test(pr) || (!files.length && !proofPath)) {
-    console.error('usage: upload.mjs --pr <n> [--repo owner/name] [--proof proof.json] [--dry-run] [--json] <file>...');
+    console.error('usage: upload.mjs --pr <n> [--repo owner/name] [--proof proof.json] [--dry-run] [--json] [--no-preview] [--preview-start s] [--preview-seconds s] <file>...');
     return 2;
   }
   const local = checkLocal([...files, ...(proofPath ? [proofPath] : [])]);
@@ -196,10 +244,15 @@ async function main(argv) {
   try {
     const target = pickTarget({ repo, run, dryRun });
     console.error(`${dryRun ? 'dry run: would upload' : 'uploading'} ${files.length + (proofPath ? 1 : 0)} file(s) to ${target.name}`);
-    const out = await uploadAll({ pr: Number(pr), files, proofPath, target, write: dryRun ? () => {} : writeFileSync });
+    const previews = !dryRun && !argv.includes('--no-preview');
+    const start = Number(opt('--preview-start') ?? 0), seconds = Number(opt('--preview-seconds') ?? 6);
+    const out = await uploadAll({ pr: Number(pr), files, proofPath, target, write: dryRun ? () => {} : writeFileSync,
+      preview: previews ? file => makePreview(file, { start, seconds }) : null, warn: m => console.error(`warn: ${m}`) });
     if (argv.includes('--json')) console.log(JSON.stringify(out, null, 2));
     else {
-      for (const u of out.uploaded) console.log(`${u.url}  (${basename(u.file)})`);
+      for (const u of out.uploaded) console.log(`${u.url}  (${basename(u.file)})${u.preview ? `\n  preview ${u.preview}` : ''}`);
+      const clips = out.uploaded.filter(u => kindOf(u.file) === 'video');
+      if (clips.length) console.log(`\nFor the PR's Proof section (the preview plays inline and links to the full clip):\n${clips.map(u => `- ${embedLine(u)}`).join('\n')}`);
       if (out.proofLink) console.log(`\nproof.json for the PR's Proof section: ${out.proofLink}`);
     }
     return 0;

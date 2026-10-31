@@ -1,7 +1,9 @@
 # Claude reviews every non-draft PR against AGENTS.md and docs/process/PROOF-POLICY.yml, audits each acceptance
-# criterion against its evidence (the self-audit a milestone journal entry carries), and posts one review
-# comment (updated in place on later pushes). Runs on the maintainer's Claude subscription: repository secret
-# CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`) plus the Claude GitHub app installed on the repo.
+# criterion against its evidence (the self-audit a milestone journal entry carries), and writes its review to a file;
+# the "Post or update the review" step keeps ONE review comment per PR (found by its marker), updated in place on
+# later pushes and naming the head SHA it reviewed. Claude itself never posts. Runs on the maintainer's Claude
+# subscription: repository secret CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`) plus the Claude GitHub app
+# installed on the repo.
 name: claude-review
 on:
   pull_request:
@@ -50,11 +52,15 @@ jobs:
           node tools/proof/tier.mjs "${args[@]}" --json > "$RUNNER_TEMP/tier.json"
           echo "tier=$(node -p "require('$RUNNER_TEMP/tier.json').tier")" >> "$GITHUB_OUTPUT"
           node tools/proof/tier.mjs "${args[@]}"
+      - name: Clear the review file
+        if: env.SKIP_REVIEW != '1'
+        # The PR's tree could carry one; only what Claude writes in this run may be posted.
+        run: rm -rf .local/claude-review && mkdir -p .local/claude-review
       - uses: anthropics/claude-code-action@d535f5172dec02b204866b393d6b20b9b2aaf98d # v1.0.266
         if: env.SKIP_REVIEW != '1'
+        id: claude
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          use_sticky_comment: true
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
@@ -90,7 +96,9 @@ jobs:
                label for changes with nothing user-facing.
             6. Public-repo hygiene: no secrets, home paths, private host names, IPs, emails or personal details.
 
-            Post exactly ONE review comment with `gh pr comment`, structured as:
+            Write the review, as Markdown, to the file `.local/claude-review/review.md` with the Write tool (create
+            the folder's file; write nothing else anywhere). Do NOT post it or any other comment: the workflow posts
+            it, replacing your previous review on this PR. Structure it as:
             **Verdict**: approve / changes requested / needs maintainer (T3+ always needs the maintainer)
             **Tier**: stated vs computed
             **Blocking** (numbered, each with file:line and the fix)
@@ -99,4 +107,24 @@ jobs:
             **Proof / Self-audit / Docs / Changelog**: one line each
             Be specific and brief. Do not restate the diff. Do not push commits.
           claude_args: |
-            --allowedTools "Read,Grep,Glob,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git diff:*),Bash(git log:*),Bash(node tools/proof/tier.mjs:*),Bash(node tools/proof/acceptance.mjs:*),Bash(gh issue view:*)"
+            --allowedTools "Read,Grep,Glob,Write,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git diff:*),Bash(git log:*),Bash(node tools/proof/tier.mjs:*),Bash(node tools/proof/acceptance.mjs:*),Bash(gh issue view:*)"
+      - name: Post or update the review
+        if: env.SKIP_REVIEW != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          file=.local/claude-review/review.md
+          if [ ! -s "$file" ]; then echo "::warning::Claude wrote no review (.local/claude-review/review.md is missing or empty); nothing posted."; exit 0; fi
+          marker='<!-- sim-claude-review -->'
+          { echo "$marker"; cat "$file"; echo; echo "<sub>Claude review of ${HEAD_SHA:0:12}; this comment is updated on every push (claude-review.yml).</sub>"; } > "$RUNNER_TEMP/review.md"
+          # Our own earlier review: the marker, posted by this workflow's token.
+          id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | head -n1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@"$RUNNER_TEMP/review.md" --silent
+          else
+            gh api "repos/$REPO/issues/$PR/comments" -F body=@"$RUNNER_TEMP/review.md" --silent
+          fi
