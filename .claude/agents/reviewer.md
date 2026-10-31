@@ -17,7 +17,9 @@ Read `AGENTS.md` and `docs/process/PROOF-POLICY.yml`, then check, in order:
 2. **Tests**: the change is covered where it can break; tests assert behaviour, not implementation details.
 3. **Tier and proof**: `node tools/proof/tier.mjs --base <base> --head <head>`. The PR's tier is at least that,
    and its proof meets the tier's `required` list (clips uncut and real-speed; playtests with the policy's
-   repeats per arm).
+   repeats per arm). Then audit acceptance against evidence. For each criterion: does the cited evidence show it?
+   Is any issue criterion dropped or weakened? Are the failed attempts kept? Is the long-tail/externality check
+   measured where it matters? Are the limits honest? Is the proof from this head?
 4. **Docs and changelog**: changed behaviour is documented; a `changes/` fragment or `no-changelog`.
 5. **Hygiene**: `node .github/scripts/guards.mjs scrub --base <base> --head <head>`; no secrets or personal data.
 

@@ -78,26 +78,23 @@ new take; do not attach a clip that does not prove the claim.
 
 ## 5. Attach it to the PR (never commit it)
 
-In order of preference:
+```bash
+node tools/proof/upload.mjs --pr $N --proof .e2e/journal/$ISSUE/proof.json .e2e/proof/$SLUG/desktop.mp4 .e2e/proof/$SLUG/phone.mp4
+```
 
-1. **The documented proofs host.** If `.github/pull_request_template.md`, `CONTRIBUTING.md` or `AGENTS.md` names an
-   upload command or host for proof clips, use exactly that and paste the returned URL into the PR's Proof section.
-2. **A `proofs` release, if the maintainer created one** (check: `gh api repos/$REPO/releases/tags/proofs --jq .id`).
-   Upload the clip as a release asset named `pr<N>-<slug>-<viewport>.mp4`:
-   ```bash
-   RID=$(gh api repos/$REPO/releases/tags/proofs --jq .id)
-   gh api -X POST "https://uploads.github.com/repos/$REPO/releases/$RID/assets?name=pr$N-$SLUG-desktop.mp4" \
-     -H 'Content-Type: video/mp4' --input .e2e/proof/$SLUG/desktop.mp4 --jq .browser_download_url
-   ```
-   Do not create the release yourself; if it is missing or the upload returns 403/404, fall through.
-3. **No host available:** post a PR comment that says the clip exists but is not uploaded, with its duration,
-   viewport, sidecar summary (marks, console errors, commit) and the exact `record.mjs` command and steps file
-   contents, so anyone can re-record it. Mark the proof as pending in the PR body. Never paste video as base64,
-   never commit it, never push it to another branch.
+- The default target is the repo's `proofs` prerelease (it is created on first use). Assets are named
+  `pr-<n>.<file>`, and a re-take gets `-2`, `-3`, so earlier takes, including failed ones, stay linkable.
+  `SIM_PROOF_UPLOAD_URL` (+ `SIM_PROOF_UPLOAD_TOKEN`) switches to another endpoint, such as a CDN.
+- With `--proof`, the links are written into proof.json `media[]`, and proof.json is uploaded last. Paste its link
+  and the clip links into the PR's Proof section. The `journal` skill covers proof.json.
+- **Exit 3: the upload is blocked** (no `gh`, not signed in, no permission, or no network, as in many cloud
+  sessions). Tell the user which clips are waiting and where. Post a PR comment with each clip's duration,
+  viewport, sidecar summary (marks, console errors, commit), and the exact `record.mjs` command and steps file, so
+  anyone can re-record it. Mark the proof "pending upload" in the PR body. Never paste video as base64, never
+  commit it, and never push it to another branch.
 
-`$REPO` is `owner/name`: `REPO=${GITHUB_REPOSITORY:-$(git remote get-url origin | sed -E 's#\.git$##; s#.*[:/]([^/]+/[^/]+)$#\1#')}`.
-Comment with `gh api repos/$REPO/issues/$N/comments -F body=@.e2e/proof/$SLUG/comment.md` (`gh pr` is not available
-in cloud sessions; use `gh api` REST only).
+`gh pr` may not work in cloud sessions; comment with
+`gh api repos/$REPO/issues/$N/comments -F body=@.e2e/proof/$SLUG/comment.md`.
 
 ## What to write next to the clip
 One line per clip: what journey, which world template, viewport, duration, commit, and the moment the change is
