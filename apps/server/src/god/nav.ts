@@ -327,7 +327,9 @@ export class GodNav {
     // a Soul-dependent goal (the shore nearest me, the nearest point of a road) is never cached
     // MARSLIVED: a room's goal is refined live round whoever already stands there (roomGoal itself is cached per version)
     const mine = t.kind === 'water' || t.kind === 'room' || (t.kind === 'path' && !t.deck?.length) || (t.stands?.length ?? 0) > 1 || t.level > 0;
-    const key = `${t.ref}|${mine ? `${Math.round(me[0])},${Math.round(me[1])}` : ''}`;
+    // (L3: `except` too: the goal is a free standing point away from other bodies, so one Soul's cached goal could be the
+    // very spot another Soul stands on, and which one a listing got depended on who asked first in the last 50 ticks)
+    const key = `${t.ref}|${except ?? ''}|${mine ? `${Math.round(me[0])},${Math.round(me[1])}` : ''}`;
     const hit = this.goals.get(key); if (hit && tick - hit.tick < 50) return hit.goal;
     const near = (at: Vec2, level: number, ring = 24) => { const p = E.standableNearV1(at, level, except, 0.4, ring); return p ? { p: [r2(p[0]), r2(p[1])] as Vec2, level } : null; };
     // WALK3: a ground goal off the main walkable ground (a fenced court, a dense wood, a mountain band, a hill) moves to the
@@ -412,6 +414,7 @@ export class GodNav {
       if (!inner) this.blocked.set(t.ref, `The interior of ${t.ref} is not reachable right now; its entrance or the route inside is blocked.`);
       else this.blocked.delete(t.ref);
     }
+    if (this.goals.size > 50_000) this.goals.clear();   // per Soul and per position: bounded
     this.goals.set(key, { tick, key, goal });
     return goal;
   }

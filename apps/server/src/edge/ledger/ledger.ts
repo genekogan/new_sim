@@ -36,7 +36,7 @@ const bboxSpan = (p: [number, number][]) => {const xs = p.map(q => q[0]), zs = p
 const area = (p: [number, number][]) => Math.abs(p.reduce((s, [x, z], i) => {const [x2, z2] = p[(i + 1) % p.length]; return s + x * z2 - x2 * z;}, 0)) / 2;
 import {resolveCapability, tokens, placeMatch, placeMatchTier, typoFix, type VocabContext, type VocabResult} from './vocabulary.ts';
 import {isCampfire} from './fire.ts';
-import {activityCapabilities, loadSpots, ACTIVITY_SECONDS_MAX, SPOT_ACTIVITIES, type SpotsData} from './activities.ts';
+import {activityCapabilities, loadSpots, ACTIVITY_SECONDS_MAX, SPOT_ACTIVITIES, SPOT_REACH, type SpotsData} from './activities.ts';
 import type {PaintingIntent, PaintingService} from '../../art/painting-completion.ts';
 import {humanoidDims} from '../../../../../mars/viewer/engine/bodies/humanoid.ts';
 import {Together, PAIRED, type TogetherPlan} from './together.ts';
@@ -55,13 +55,18 @@ import {EDEN_LIBRARY_CATALOGUE} from '../content/eden-library-catalogue.ts';
 import {isVerificationProbe, PROBE_OWNER} from '../../verification-probe.ts';
 import {tx,afterCommit} from '../comms/store.ts';
 import {PlaceKnowledge} from '../perception/knowledge.ts';
-import {menuStats, countClear, cpuNow} from './menu-stats.ts';
+import {menuStats, countClear, cpuNow, MENU_ORACLE} from './menu-stats.ts';
 import {BodyRule, BODY_PATH_SAMPLE_M, type BodyKnobs, type BodySoul, type Posture} from './body-rule.ts';
 
 type Resolved = {from: string; to: string; note: string};
 const WAIT_CODES = new Set(['program.safe-stop-required', 'program.safe-stop-pending']);
 const WAIT_LIMIT_TICKS = 20 * 60;   // a waiting receipt that cannot start within a minute fails
 const NEAR_RADIUS = 20, GO_NEAR_RADIUS = 60;
+/** L3 menu cache: a kept menu is rebuilt at least this often (2 min: anything it reads without a version, e.g. a far
+ *  Soul's ambient sit), in cells of this size, bumped for Souls within this reach (fires 150 m). */
+// MENU_REACH_M covers SPOT_REACH: an activity spot is offered up to 200 m off, and a claim on it (an act whose target it
+// is) bumps the spot's cell, so every Soul that may list it rebuilds
+const MENU_MAX_AGE_TICKS = 2400, MENU_CELL_M = 32, MENU_REACH_M = SPOT_REACH;
 const OPEN: EdgeReceipt['phase'][] = ['waiting', 'started'];
 const WITH_PARAM = {type: 'array', items: 'Soul id or name', optional: true, description: 'Invite Souls near you; each joins only if they accept (shared walk / ride).'};
 type Row = {created_at: number; receipt_id: string; soul_id: string; capability: string; phase: EdgeReceipt['phase']; accepted_tick: number; started_tick: number | null; ended_tick: number | null; code: string | null; reason: string | null; program_id: string | null; client_ref: string | null; plan?: string | null; detail?: string | null};
@@ -69,6 +74,7 @@ type Pending = {receipt: string; soul: EdgeSoul; steps: Program['steps']; label:
 type StandReleaseV1={actor:string;owner:string;seats:{action:string;slot:string}[]};
 
 /** The body plans behind a Soul's offered capabilities, by capability id. */
+type MenuReads = {taken: {at: [number, number]; v: boolean}[]; groups: Map<string, number>};
 type Plans = Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>;
 
 export class EdgeLedger implements EdgeLedgerHooks {
@@ -119,7 +125,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
   private lastPlace = new Map<string, string | null>();
   /** Server start (ms): metrics count world model calls only from here, not copied history. */
   readonly startedAt = Date.now();
-  private capCache = new Map<string, {tick: number; value: {caps: EdgeCapability[]; plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>}}>();
+  private capCache = new Map<string, {tick: number; key: string; reads: MenuReads; value: {caps: EdgeCapability[]; plans: Plans}; last?: {tick: number; sig: string; value: {caps: EdgeCapability[]; plans: Plans}}}>();
   comms?: {streams: {headCursor(soulId: string): string;deliver?(soulId:string,kind:string,tick:number,body:Record<string,unknown>):unknown}; fading: {status(soulId: string): unknown; touch?(soulId: string): void}; objects: {prepareAct?(id:string,soul:EdgeSoul,input:Record<string,unknown>):ReturnType<import('../comms/objects/framework.ts').Objects['prepareAct']>;act?(id: string, soul: EdgeSoul, input: Record<string, unknown>): unknown;get?(id:string,soul:EdgeSoul):unknown; visibleTo(soul: EdgeSoul): unknown[]; create(i: {id: string; kind: string; name: string; description?: string; placeId: string; params?: Record<string, unknown>}): {id: string}; has?(id: string): boolean; all(): {id: string; kind: string; placeId: string; state: unknown}[]}; close(): void};
   attachComms(c: NonNullable<EdgeLedger['comms']>) {
     this.comms = c;this.notifyMail();
@@ -276,13 +282,19 @@ export class EdgeLedger implements EdgeLedgerHooks {
   private mergedSpots: {from: SpotsData; value: SpotsData} | null = null;
   private spotsSeen: SpotsData | null = null; private spotsSeq = 0; private staticSeq = 0;
   /** L3: the static world's version: the place index's writes, a new spots object (the provider returns the same object
-   *  while nothing changed), the engine's navigation epoch (moves with the static world only, not with paged windows)
-   *  and bumpStatic(). Caches of anything read from static geometry key on it. */
+   *  while nothing changed), the engine's navigation epoch (moves with the static world only, not with paged windows),
+   *  whether its navigation is warm, and bumpStatic(). Caches of anything read from static geometry key on it. */
   staticVersion(): string {
     const s = this.spots; if (s !== this.spotsSeen) {this.spotsSeen = s; this.spotsSeq++;}
-    const nav = (this.host.engine as unknown as {navEpochV1?(): number}).navEpochV1?.() ?? 0;
-    return `${this.places.version}.${this.spotsSeq}.${nav}.${this.staticSeq}`;
+    // (navWarmV1(0): the engine's connectivity labels are ready; until then walk goals off the main ground are not moved
+    // onto it, so a listing made during warm-up differs from one made after)
+    // the engine's part once per tick (reading it syncs the paged spatial service: ~1 ms each, L3 live-copy profile; a
+    // change made between ticks is seen on the next tick, as the tick-keyed menus before L3 saw it)
+    const tick = this.host.engine.world.tick;
+    if (this.navSeen?.tick !== tick) {const e = this.host.engine as unknown as {navEpochV1?(): number; navWarmV1?(budget: number): boolean}; this.navSeen = {tick, v: `${e.navEpochV1?.() ?? 0}`, warm: !!e.navWarmV1?.(0)};}
+    return `${this.places.version}.${this.spotsSeq}.${this.navSeen.v}.${this.staticSeq}${this.navSeen.warm ? 'w' : ''}`;
   }
+  private navSeen: {tick: number; v: string; warm: boolean} | null = null;
   /** Something static changed that the places, spots and navigation epoch do not show (a god layer switch…). */
   bumpStatic() {this.staticSeq++;}
   get spots(): SpotsData {
@@ -335,7 +347,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       spectate: m => {try {(this.comms as unknown as {core?: {spectate(m: object): void}} | undefined)?.core?.spectate({tick: this.host.engine.world.tick, ...m});} catch {/* spectators never break the ledger */}},
       touch: id => this.comms?.fading.touch?.(id),
       decide: (soul, receipt, capability, label, steps) => this.decide(soul, receipt, capability, label, steps)});
-    this.receiptListeners.push(r => {if(!OPEN.includes(r.phase))this.dropMenus('receipt-closed');});
+    this.receiptListeners.push(r => {if(!OPEN.includes(r.phase))this.menusChangedBy('receipt-closed', r.soulId, r.capability);});
     // D1: the card's doing line names an edge act's approach ("walking to Kitchen chair") from this ledger's plans
     host.approachV1 = m => {const program = host.engine.programOf(m.entityId), r = program ? this.rows("soul_id=? AND phase='started' AND program_id=?", m.soulId, program)[0] : undefined; return r ? this.approachFor(m, r.receipt_id) : null;};
     // Open receipts from a previous process: a started one whose programme the snapshot carries is still followed;
@@ -621,10 +633,126 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
 
   // ---------------------------------------------------------------- capabilities
+  /**
+   * L3 (server reliability, 2026-10-31): a Soul's menu, kept while nothing it reads has changed instead of for one tick.
+   * The expensive part (everything up to the ride shaping, `bindsCore`) is cached under `menuKey`; the cheap, fast-moving
+   * part (`bindsTail`: object providers such as a ride's phase, the seated-rider stand refusal, rigid bodies, secrets)
+   * is redone once per tick on copies, so callers that add on-demand offers never write into the cache. Within one
+   * tick the same object is returned (as before: on-demand additions made earlier in the tick are still seen).
+   */
   private binds(soul: EdgeSoul): {caps: EdgeCapability[]; plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>} {
-    const tick = this.host.engine.world.tick, hit = this.capCache.get(soul.soulId), c0 = cpuNow();
-    if (hit && hit.tick === tick) {menuStats.cap.hit++; return hit.value;}
-    menuStats.cap.miss++; if (hit) menuStats.cap.missTick++; else menuStats.cap.missAbsent++;
+    const tick = this.host.engine.world.tick, hit = this.capCache.get(soul.soulId);
+    // within one tick bodies do not move, but an act, a closed receipt or a god commit made earlier in this tick may have
+    // changed what this Soul can do (another Soul's claim on a spot): the same-tick copy is reused only while those hold
+    const sig = this.sameTickSig();
+    if (hit?.last?.tick === tick && hit.last.sig === sig) {menuStats.cap.hit++; return hit.last.value;}
+    const key = this.menuKey(soul, tick);
+    if (hit && hit.key === key && tick - hit.tick < MENU_MAX_AGE_TICKS && this.readsHold(soul, hit.reads)) {
+      menuStats.cap.hitKept++; const value = this.bindsTail(soul, hit.value); hit.last = {tick, sig, value};
+      if (MENU_ORACLE) {const diff = this.menuOracleV1(soul, value); if (diff) {menuStats.cap.oracleMiss++; console.error('[menu-oracle]', soul.soulId, diff);}}
+      return value;
+    }
+    menuStats.cap.miss++; if (hit) menuStats.cap[hit.key !== key ? 'missKey' : tick - hit.tick >= MENU_MAX_AGE_TICKS ? 'missAge' : 'missReads']++; else menuStats.cap.missAbsent++;
+    menuStats.missBySoul[soul.soulId] = (menuStats.missBySoul[soul.soulId] ?? 0) + 1;
+    const c0 = cpuNow(), {core, reads} = this.recordReads(() => this.bindsCore(soul)); menuStats.cap.cpuUs += cpuNow() - c0;
+    const value = this.bindsTail(soul, core); this.capCache.set(soul.soulId, {tick, key, reads, value: core, last: {tick, sig, value}}); return value;
+  }
+  /** Everything a Soul's menu reads that moves without a version of its own: its body (position to 5 cm, level, activity, ride),
+   *  the bodies within go-near reach (5 cm, activity), the cells versions near it (acts and closed receipts bump
+   *  them), the together version, the static world and the menu generation (global clears). Rigid bodies (creatures)
+   *  are keyed by tick (their shaping edits the offers in place). */
+  private menuKey(soul: EdgeSoul, tick: number): string {
+    const me = this.body(soul.entityId); if (!me || isRigidBody(me)) return `tick:${tick}`;
+    const [x, y, z] = me.pose.p, h = me.human as {activity?: unknown; baseActivity?: unknown; level?: unknown; seat?: unknown} | undefined;
+    const ride = this.aboard(soul.entityId), stepping = ride ? this.stepOutRefusal(soul.entityId) : null;
+    // positions to 5 cm: offers are ordered by distance (nearest spots first) and a wave faces where the other body
+    // stands, so a moving body (mine or a neighbour's) is a new menu; a still one keeps it (L3 measured: 1 m cells
+    // reordered activity spots within the cell)
+    const q = (v: number) => Math.round(v * 20);
+    let near = ''; const r2 = (GO_NEAR_RADIUS + 1) ** 2;
+    for (const o of this.host.minds.values()) {
+      if (o.soulId === soul.soulId || this.faded.has(o.soulId)) continue; const ob = this.body(o.entityId); if (!ob) continue;
+      const dx = ob.pose.p[0] - x, dz = ob.pose.p[2] - z; if (dx * dx + dz * dz > r2) continue;
+      // within wave reach the plan faces the exact point where they stand (a 1 cm drift is a different wave): exact there
+      const exact = dx * dx + dz * dz <= (NEAR_RADIUS + 1) ** 2;
+      near += exact ? `${o.soulId}=${ob.pose.p[0]},${ob.pose.p[1]},${ob.pose.p[2]},${String(ob.human?.activity ?? '')};` : `${o.soulId}@${q(ob.pose.p[0])},${q(ob.pose.p[1])},${q(ob.pose.p[2])},${String(ob.human?.activity ?? '')};`;
+    }
+    return `${this.staticVersion()}|${this.menuGen}|${this.together.version}|${this.cellsNear(x, z)}|${q(x)},${q(y)},${q(z)},${String(h?.activity ?? '')},${String(h?.baseActivity ?? '')},${String(h?.level ?? '')},${JSON.stringify(h?.seat ?? null)}|${ride ? `${ride.id},${ride.phase},${ride.riderPhase},${stepping?.code ?? ''}` : ''}|${this.faded.has(soul.soulId) ? 'f' : ''}|${this.clockMinute(tick)}|${near}`;
+  }
+  /** L3 oracle (tests; EDGE_MENU_ORACLE=1 on every kept menu): null when `menu` (default: what binds returns now) equals
+   *  a menu built fresh from the world as it is, else the first difference. Never writes the cache. */
+  menuOracleV1(soul: EdgeSoul, menu = this.binds(soul)): string | null {
+    const fresh = this.bindsTail(soul, this.bindsCore(soul));
+    const a = menu.caps.map(c => JSON.stringify(c)), b = fresh.caps.map(c => JSON.stringify(c));
+    for (let i = 0; i < Math.max(a.length, b.length); i++) if (a[i] !== b[i]) return `offer ${i}: kept ${a[i]?.slice(0, 300)} / fresh ${b[i]?.slice(0, 300)}`;
+    for (const [id, p] of fresh.plans) {const k = JSON.stringify(menu.plans.get(id)), f = JSON.stringify(p); if (k !== f) return `plan ${id}: kept ${k?.slice(0, 300)} / fresh ${f.slice(0, 300)}`;}
+    if (menu.plans.size !== fresh.plans.size) return `plans: kept ${menu.plans.size} / fresh ${fresh.plans.size}`;
+    return null;
+  }
+  /** What a menu build read from other bodies that the key does not carry: whether a spot (up to SPOT_REACH away) has a
+   *  body on it, and how many are in a together group ("1 waiting, join them"; a hearer needs a teller at the teller's
+   *  spot). A kept menu is reused only while every one of these reads would answer the same now. */
+  private menuReads: MenuReads | null = null;
+  private recordReads<T>(build: () => T): {core: T; reads: MenuReads} {
+    const outer = this.menuReads, reads: MenuReads = {taken: [], groups: new Map()}; this.menuReads = reads;
+    try {return {core: build(), reads};} finally {this.menuReads = outer;}
+  }
+  private readsHold(soul: EdgeSoul, reads: MenuReads): boolean {
+    if (!reads.taken.length && !reads.groups.size) return true;
+    const humans = Object.values((this.host.engine.world as NativeWorld).entities).filter(e => e.kind === 'human');
+    for (const [g, n] of reads.groups) if (humans.filter(e => e.human?.together?.group === g).length !== n) return false;
+    const others = humans.filter(e => e.id !== soul.entityId);
+    for (const t of reads.taken) if (others.some(o => Math.hypot(o.pose.p[0] - t.at[0], o.pose.p[2] - t.at[1]) < 0.7) !== t.v) return false;
+    return true;
+  }
+  /** The world clock's minute (activities name it: "it is 14:03 now"), or '' in a world without a day. */
+  private clockMinute(tick: number): string {
+    const l = this.host.living; if (!l) return ''; const c = clockAt(tick, l.origin, l.dayTicks); return `${c.hour}:${c.minute}`;
+  }
+  /** Global menu generation: bumped where every Soul's menu must rebuild (dropMenus). */
+  private menuGen = 0;
+  /** Bumped by every local change (menusChangedBy); with the together and static versions it guards the same-tick reuse. */
+  private menuEpoch = 0;
+  private sameTickSig(): string {return `${this.menuGen}|${this.menuEpoch}|${this.together.version}|${this.staticVersion()}`;}
+  /** Versions of 32 m cells, bumped where an act was accepted or a receipt closed (the actor's body, the act's target). */
+  private cellVersions = new Map<string, number>();
+  private bumpCellsAt(points: ([number, number] | null | undefined)[]) {
+    for (const p of points) if (p) {const k = `${Math.floor(p[0] / MENU_CELL_M)},${Math.floor(p[1] / MENU_CELL_M)}`; this.cellVersions.set(k, (this.cellVersions.get(k) ?? 0) + 1);}
+  }
+  /** Sum of the cell versions within MENU_REACH_M of a point (versions only grow, so any bump nearby moves the sum). */
+  private cellsNear(x: number, z: number): number {
+    if (!this.cellVersions.size) return 0;
+    const r = Math.ceil(MENU_REACH_M / MENU_CELL_M), cx = Math.floor(x / MENU_CELL_M), cz = Math.floor(z / MENU_CELL_M); let sum = 0;
+    for (let i = cx - r; i <= cx + r; i++) for (let k = cz - r; k <= cz + r; k++) sum += this.cellVersions.get(`${i},${k}`) ?? 0;
+    return sum;
+  }
+  /** L3: an act or a receipt changed what Souls near it can do (a seat taken, an invitation, a bicycle out): the menus
+   *  of the actor and of every Soul within reach of the actor or the act's target rebuild; Souls farther off keep theirs. */
+  private menusChangedBy(site: string, soulId: string, capability?: string) {
+    countClear(site, true); this.capCache.delete(soulId); this.menuEpoch++;
+    const m = this.host.minds.get(soulId), b = m ? this.body(m.entityId) : undefined;
+    this.bumpCellsAt([b ? [b.pose.p[0], b.pose.p[2]] : null, capability ? this.capabilityPoint(capability) : null]);
+  }
+  /** Where an offer's target is (a Soul, a thing, a place or an activity spot named after the verb), or null. */
+  private capabilityPoint(capability: string): [number, number] | null {
+    const rest = capability.slice(capability.indexOf(':') + 1), id = rest.startsWith('object:') ? rest : rest.split(':')[0]!;
+    const soul = this.host.minds.get(id), e = this.host.engine.world.entities[soul?.entityId ?? id];
+    if (e) return [e.pose.p[0], e.pose.p[2]];
+    const place = this.places.byId.get(id); if (place?.polygon?.length) return centroid(place.polygon);
+    const spot = this.spots.spots.find(s => s.id === id); return spot ? spot.at : null;
+  }
+  private bindsTail(soul: EdgeSoul, core: {caps: EdgeCapability[]; plans: Plans}): {caps: EdgeCapability[]; plans: Plans} {
+    const caps = core.caps.slice(), plans = new Map(core.plans), me = this.body(soul.entityId);
+    const ride = this.aboard(soul.entityId), stepping = ride ? this.stepOutRefusal(soul.entityId) : null;
+    for (const p of this.providers) try {caps.push(...p(soul));} catch {/* a provider fault hides only its own entries */}
+    if (ride && !stepping) {const seated = this.rideStandRefusal(soul.entityId, caps), i = seated ? caps.findIndex(c => c.id === 'stand:here') : -1; if (i >= 0) caps[i] = {...caps[i]!, available: false, blocked: seated!};}
+    shapeRigidCapabilities(me, caps, plans as never, {seconds: {type: 'integer', min: 1, max: 600, default: 60}});
+    // knowledge/1: an offer that leads to (or names) a secret place this Soul has not been to or found is not offered
+    if (this.knowledge.marked().size) for (let i = caps.length - 1; i >= 0; i--) {if (this.secretOffer(soul,caps[i]!)) {plans.delete(caps[i]!.id); caps.splice(i, 1);}}
+    return {caps, plans};
+  }
+  /** The menu before the tail (see binds): cached. */
+  private bindsCore(soul: EdgeSoul): {caps: EdgeCapability[]; plans: Plans} {
     const m = this.mind(soul), read = readHumanCapabilitiesV1(this.host, m, {registeredActivitiesV1: true, deferRouteChecks: true, skipRegisteredCards: true});
     const caps: EdgeCapability[] = [], plans = new Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>();
     const secondsParam = {seconds: {type: 'integer', min: 1, max: 600, default: 60}};
@@ -759,16 +887,11 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const stepping = this.stepOutRefusal(soul.entityId);
     if (ride && stepping) for (const c of caps) if (!/^object:[^:]+:leave$/.test(c.id) && !['accept', 'decline', 'ask-to-stop'].includes(c.verb)) {c.available = false; c.blocked = stepping;}
     if (ride && !stepping) for (const c of caps) if (c.verb === 'make' || (ride.phase === 'aloft' && !['rest:here', 'stand:here'].includes(c.id) && !['accept', 'decline', 'ask-to-stop'].includes(c.verb))) {c.available = false; c.blocked = {code: 'ride.aboard', reason: ride.phase === 'aloft' ? `You are travelling in ${ride.label}; it returns by itself and you step out then.` : `You are in ${ride.label}; leave it first.`};}
-    for (const p of this.providers) try {caps.push(...p(soul));} catch {/* a provider fault hides only its own entries */}
-    if (ride && !stepping) {const seated = this.rideStandRefusal(soul.entityId, caps), st = seated && caps.find(c => c.id === 'stand:here'); if (st) {st.available = false; st.blocked = seated!;}}
-    shapeRigidCapabilities(me,caps,plans as never,secondsParam);
-    // knowledge/1: an offer that leads to (or names) a secret place this Soul has not been to or found is not offered
-    if (this.knowledge.marked().size) for (let i = caps.length - 1; i >= 0; i--) {if (this.secretOffer(soul,caps[i]!)) {plans.delete(caps[i]!.id); caps.splice(i, 1);}}
-    const value = {caps, plans}; this.capCache.set(soul.soulId, {tick, value}); menuStats.cap.cpuUs += cpuNow() - c0; return value;
+    return {caps, plans};
   }
   invalidateBodies(){this.dropMenus('invalidateBodies');}
   /** Every Soul's menu rebuilds on its next read (`site` names the cause, for menu-stats). */
-  private dropMenus(site: string) {countClear(site); this.capCache.clear();}
+  private dropMenus(site: string) {countClear(site); this.menuGen++; this.capCache.clear();}
   /** One Soul's menu rebuilds on its next read. */
   private dropMenu(site: string, soulId: string) {countClear(site, true); this.capCache.delete(soulId);}
   bodyAssignmentReady(soul:EdgeSoul){return !this.faded.has(soul.soulId)&&!this.pending.has(soul.soulId)&&!this.openReceipts(soul.soulId).length&&!this.together.awaiting(soul.soulId)&&!this.together.heldBy(soul.soulId);}
@@ -853,7 +976,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
 
   async act(soul: EdgeSoul, input: {capability?: unknown; params?: unknown; clientRef?: unknown; verb?: unknown; target?: unknown}): Promise<{accepted: true; receipt: EdgeReceipt; resolved?: Resolved; result?: unknown} | {accepted: false; code: string; reason: string; capability: string; retry_after?: number; did_you_mean?: {id: string; label: string}[]; resolved?: Resolved}> {
     // intents/1 (Core-A): {verb, target} is resolved now and acted on as the concrete choice it reports
-    if (input.capability === undefined && input.verb !== undefined) {const out = await this.intents.act(soul, input as IntentInput); if (out.accepted) this.dropMenus('act-intent'); return out;}
+    if (input.capability === undefined && input.verb !== undefined) {const out = await this.intents.act(soul, input as IntentInput); if (out.accepted) this.menusChangedBy('act-intent', soul.soulId, out.receipt.capability); return out;}
     if(typeof input.capability==='string'){
       if(input.capability.length>=1&&input.capability.length<=200&&typeof input.clientRef==='string'&&input.clientRef.length<=100){const old=this.coreA.byClientRef(soul.soulId,input.clientRef);if(old)return {accepted:true,receipt:old};}
       // BODY refusals precede place/alias diagnostics, as in the original actOnce path.
@@ -869,12 +992,12 @@ export class EdgeLedger implements EdgeLedgerHooks {
         const receipt=this.coreA.setDetail(out.receipt.id,{chosen:{...place.chosen,...(out.receipt.chosen as Record<string,unknown>??{})}})??out.receipt;return {...out,receipt};
       }
     }
-    if(typeof input.capability==='string'){const walk=walkWithDestinationWords(input.capability,[...this.host.minds.values()].map(m=>m.name));if(walk){const out=await this.intents.act(soul,{...walk,...(input.params?{params:input.params}:{}),clientRef:input.clientRef});if(out.accepted){this.dropMenus('act-walk-words');return {...out,resolved:{from:input.capability,to:out.receipt.capability,note:'Walk to the named destination; companions receive an invitation and choose whether to join.'}};}
+    if(typeof input.capability==='string'){const walk=walkWithDestinationWords(input.capability,[...this.host.minds.values()].map(m=>m.name));if(walk){const out=await this.intents.act(soul,{...walk,...(input.params?{params:input.params}:{}),clientRef:input.clientRef});if(out.accepted){this.menusChangedBy('act-walk-words', soul.soulId, out.receipt.capability);return {...out,resolved:{from:input.capability,to:out.receipt.capability,note:'Walk to the named destination; companions receive an invitation and choose whether to join.'}};}
       // quality case 27: an ambiguous destination ("the library") falls back to the walk its plain words resolve to, still inviting
-      const alt=walkWithFallback(this,soul,walk);if(alt){const again=await this.actOnce(soul,{capability:alt.cap.id,params:{...(input.params&&typeof input.params==='object'?input.params as Record<string,unknown>:{}),with:walk.with},clientRef:input.clientRef});if(again.accepted){this.dropMenus('act-walk-fallback');return {...again,resolved:{from:input.capability,to:alt.cap.id,note:`Walk to ${alt.cap.label}; ${(walk.with as string[]).join(', ')} receive an invitation and choose whether to join.`}};}}
+      const alt=walkWithFallback(this,soul,walk);if(alt){const again=await this.actOnce(soul,{capability:alt.cap.id,params:{...(input.params&&typeof input.params==='object'?input.params as Record<string,unknown>:{}),with:walk.with},clientRef:input.clientRef});if(again.accepted){this.menusChangedBy('act-walk-fallback', soul.soulId, again.receipt.capability);return {...again,resolved:{from:input.capability,to:alt.cap.id,note:`Walk to ${alt.cap.label}; ${(walk.with as string[]).join(', ')} receive an invitation and choose whether to join.`}};}}
       return out;}}
     const out = await this.actOnce(soul, input);
-    if (out.accepted) this.dropMenus('act-accepted');     // invitations, items and follows change what others can do this tick
+    if (out.accepted) this.menusChangedBy('act-accepted', soul.soulId, out.receipt.capability);     // invitations, items and follows (together.version) and seats near the actor or target change what others can do
     return out;
   }
   private async actOnce(soul: EdgeSoul, input: {capability?: unknown; params?: unknown; clientRef?: unknown}): Promise<{accepted: true; receipt: EdgeReceipt; resolved?: Resolved; result?: unknown} | {accepted: false; code: string; reason: string; capability: string; retry_after?: number; did_you_mean?: {id: string; label: string}[]; resolved?: Resolved}> {
@@ -1444,7 +1567,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
       // read only against standing-room thresholds (≤ 0.95 m): capped at 1 m, answered without building far nav tiles (L1)
       clearance: (x: number, z: number) => level === 0 && engine.clearanceAtV1 ? (engine.clearanceUpToV1 ? engine.clearanceUpToV1(x, z, 1) : engine.clearanceAtV1(x, z)) : 0,
       open: (at: [number, number], min: number, rings: number) => level === 0 && engine.nearestStandableV1 ? engine.nearestStandableV1(at, soul.entityId, min, rings) : null,
-      taken: (at: [number, number], spotId?: string) => others.some(o => Math.hypot(o[0] - at[0], o[1] - at[1]) < 0.7) || (!!spotId && claimed.has(spotId)),
+      // (claims are covered by the menu key's cell versions; the bodies part is recorded for the kept-menu check)
+      taken: (at: [number, number], spotId?: string) => {const v = others.some(o => Math.hypot(o[0] - at[0], o[1] - at[1]) < 0.7); this.menuReads?.taken.push({at: [at[0], at[1]], v}); return v || (!!spotId && claimed.has(spotId));},
       // a spot inside a building is offered only when that building's interior was admitted (its walls are a shell, nav/1)
       enterable: (place: string | undefined) => {const b = enclosingBuilding(place); return !b || !!w.regions[b] || !!this.placeWalkable?.(b) || [...navIds].some(id => id.startsWith('nav-solid:' + b + '#w'));},
       seat: (radius: number, near?: boolean) => {
@@ -1454,7 +1578,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       // an installed upper-floor room/lobby is a world region the place data predates: name it by its label, never its id
       placeName: (id: string | undefined) => id ? this.places.byId.get(id)?.name ?? w.regions[id]?.label ?? null : null,
       ancestors: (id: string) => {const out: string[] = []; for (let p = this.places.byId.get(id); p?.parent; p = this.places.byId.get(p.parent)) {const q = this.places.byId.get(p.parent); if (q && (q.enclosed || q.kind === 'building')) out.push(q.id);} return out;},
-      groupSize: (group: string) => humans.filter(e => e.kind === 'human' && e.human?.together?.group === group).length,
+      groupSize: (group: string) => {const n = humans.filter(e => e.kind === 'human' && e.human?.together?.group === group).length; this.menuReads?.groups.set(group, n); return n;},
       clock: this.host.living ? (({hour, minute}) => ({hour, minute}))(clockAt(w.tick, this.host.living.origin, this.host.living.dayTicks)) : null,
     };
   }
@@ -1910,7 +2034,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
         if (self.aboard(s.entityId)?.phase === 'aloft') return {accepted: false as const, code: 'ride.aboard', reason: 'You are aloft; it lands by itself and you step out then.', capability};
         const stepOut = self.stepOutRefusal(s.entityId); if (stepOut) return {accepted: false as const, ...stepOut, capability};
         const refuse = (code: string, reason: string) => {self.recordRefusal(s.soulId, 'intent', capability, code, reason); return {accepted: false as const, code, reason, capability};};
-        const out = await self.launch(s, capability, label, steps, clientRef, {}, refuse,undefined,contentParams); if (out.accepted) self.dropMenus('coreA-launch'); return out;
+        const out = await self.launch(s, capability, label, steps, clientRef, {}, refuse,undefined,contentParams); if (out.accepted) self.menusChangedBy('coreA-launch', s.soulId, capability); return out;
       },
       /** A faded Soul's next act lands it at a starting place first (C9), as act() does. */
       reclaim: async (s: EdgeSoul) => {

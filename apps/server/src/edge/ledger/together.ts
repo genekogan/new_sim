@@ -198,7 +198,11 @@ export class Together {
   // ---------------------------------------------------------------- storage
   invite(id: string): Invite | null {const r = this.p.db.db.prepare('SELECT body FROM edge_invites_v1 WHERE world_id=? AND invite_id=?').get(this.p.host.worldId, id) as {body: string} | undefined; return r ? JSON.parse(r.body) as Invite : null;}
   private pending(): Invite[] {return (this.p.db.db.prepare("SELECT body FROM edge_invites_v1 WHERE world_id=? AND state='pending' ORDER BY created_at").all(this.p.host.worldId) as {body: string}[]).map(r => JSON.parse(r.body) as Invite);}
-  private saveInvite(i: Invite) {this.p.db.db.prepare('INSERT INTO edge_invites_v1 (world_id,invite_id,state,body,created_at) VALUES (?,?,?,?,?) ON CONFLICT (world_id,invite_id) DO UPDATE SET state=excluded.state, body=excluded.body').run(this.p.host.worldId, i.id, i.state, JSON.stringify(i), Date.now());for(const receipt of [i.hostReceipt,...Object.values(i.guestReceipts)].filter((r):r is string=>!!r))this.p.db.db.prepare('INSERT OR IGNORE INTO edge_invite_receipts_v1(world_id,receipt_id,invite_id) VALUES(?,?,?)').run(this.p.host.worldId,receipt,i.id);}
+  /** L3: moves on every invitation, item, item-op or follow write (and again when its in-memory copy updates after the
+   *  commit), so a menu cached on it never keeps an answered invitation or a handed-over item. */
+  version = 0;
+  private bump() {this.version++; try {afterCommit(this.p.db.db, () => this.version++);} catch {/* an untracked outer transaction: the first bump stands */}}
+  private saveInvite(i: Invite) {this.bump(); this.p.db.db.prepare('INSERT INTO edge_invites_v1 (world_id,invite_id,state,body,created_at) VALUES (?,?,?,?,?) ON CONFLICT (world_id,invite_id) DO UPDATE SET state=excluded.state, body=excluded.body').run(this.p.host.worldId, i.id, i.state, JSON.stringify(i), Date.now());for(const receipt of [i.hostReceipt,...Object.values(i.guestReceipts)].filter((r):r is string=>!!r))this.p.db.db.prepare('INSERT OR IGNORE INTO edge_invite_receipts_v1(world_id,receipt_id,invite_id) VALUES(?,?,?)').run(this.p.host.worldId,receipt,i.id);}
   inviteForReceipt(receipt:string):Invite|null{const r=this.p.db.db.prepare('SELECT invite_id FROM edge_invite_receipts_v1 WHERE world_id=? AND receipt_id=?').get(this.p.host.worldId,receipt) as {invite_id:string}|undefined;return r?this.invite(r.invite_id):null;}
   /** A paired gesture or a give whose host receipt is open while nobody has answered yet (quality case 32): the host is
    *  only walking over / holding out a hand, so the receipt reads `waiting` and `here` reads `inviting` until a guest
@@ -218,19 +222,20 @@ export class Together {
   heldBy(soulId: string): Item | null {const r = this.p.db.db.prepare("SELECT body FROM edge_items_v1 WHERE world_id=? AND holder=? AND state='held' LIMIT 1").get(this.p.host.worldId, soulId) as {body: string} | undefined; return r ? JSON.parse(r.body) as Item : null;}
   placed(): Item[] {return (this.p.db.db.prepare("SELECT body FROM edge_items_v1 WHERE world_id=? AND state='placed' ORDER BY updated_at").all(this.p.host.worldId) as {body: string}[]).map(r => JSON.parse(r.body) as Item);}
   private saveItem(i: Item) {
+    this.bump();
     if (i.state === 'gone') {this.p.db.db.prepare('DELETE FROM edge_items_v1 WHERE world_id=? AND item_id=?').run(this.p.host.worldId, i.id); this.p.spectate({kind: 'item', item: this.publicItem(i)}); return;}
     this.p.db.db.prepare('INSERT INTO edge_items_v1 (world_id,item_id,state,holder,place_id,body,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT (world_id,item_id) DO UPDATE SET state=excluded.state, holder=excluded.holder, place_id=excluded.place_id, body=excluded.body, updated_at=excluded.updated_at')
       .run(this.p.host.worldId, i.id, i.state, i.holder, i.placeId, JSON.stringify(i), Date.now());
     this.p.spectate({kind: 'item', item: this.publicItem(i)});
   }
   publicItem(i: Item) {return {id: i.id, kind: i.kind, name: i.name, state: i.state, holder: i.holder ? {soulId: i.holder, name: this.mindOf(i.holder)?.name ?? 'someone'} : null, placeId: i.placeId, at: i.at, untrusted: true};}
-  private saveOp(receipt: string, op: ItemOp) {this.p.db.db.prepare('INSERT OR REPLACE INTO edge_item_ops_v1 (world_id,receipt_id,body) VALUES (?,?,?)').run(this.p.host.worldId, receipt, JSON.stringify(op));}
+  private saveOp(receipt: string, op: ItemOp) {this.bump(); this.p.db.db.prepare('INSERT OR REPLACE INTO edge_item_ops_v1 (world_id,receipt_id,body) VALUES (?,?,?)').run(this.p.host.worldId, receipt, JSON.stringify(op));}
   private takeOp(receipt: string): ItemOp | null {
     const r = this.p.db.db.prepare('SELECT body FROM edge_item_ops_v1 WHERE world_id=? AND receipt_id=?').get(this.p.host.worldId, receipt) as {body: string} | undefined;
-    if (!r) return null; this.p.db.db.prepare('DELETE FROM edge_item_ops_v1 WHERE world_id=? AND receipt_id=?').run(this.p.host.worldId, receipt); return JSON.parse(r.body) as ItemOp;
+    if (!r) return null; this.bump(); this.p.db.db.prepare('DELETE FROM edge_item_ops_v1 WHERE world_id=? AND receipt_id=?').run(this.p.host.worldId, receipt); return JSON.parse(r.body) as ItemOp;
   }
-  private saveFollow(f: Follow) {this.p.db.db.prepare('INSERT OR REPLACE INTO edge_follows_v1 (world_id,receipt_id,body) VALUES (?,?,?)').run(this.p.host.worldId, f.receipt, JSON.stringify(f));afterCommit(this.p.db.db,()=>this.follows.set(f.receipt,f));}
-  private dropFollow(receipt: string) {this.p.db.db.prepare('DELETE FROM edge_follows_v1 WHERE world_id=? AND receipt_id=?').run(this.p.host.worldId, receipt);afterCommit(this.p.db.db,()=>this.follows.delete(receipt));}
+  private saveFollow(f: Follow) {this.bump(); this.p.db.db.prepare('INSERT OR REPLACE INTO edge_follows_v1 (world_id,receipt_id,body) VALUES (?,?,?)').run(this.p.host.worldId, f.receipt, JSON.stringify(f));afterCommit(this.p.db.db,()=>this.follows.set(f.receipt,f));}
+  private dropFollow(receipt: string) {this.bump(); this.p.db.db.prepare('DELETE FROM edge_follows_v1 WHERE world_id=? AND receipt_id=?').run(this.p.host.worldId, receipt);afterCommit(this.p.db.db,()=>this.follows.delete(receipt));}
   followingOf(soulId: string) {return [...this.follows.values()].find(f => f.soulId === soulId) ?? null;}
   followersOf(soulId: string) {return [...this.follows.values()].filter(f => f.target === soulId);}
   /** A guest with an unanswered invitation is not idle (ambient life leaves it be while its agent decides). */
