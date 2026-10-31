@@ -77,6 +77,7 @@ deploy.env
 !/apps/web/src/media/gallery-loop.mp4
 !/tools/god-skill/reference/kit-primitives.png
 !/tools/playtest/review/fixtures/runs/**/*.png
+!/apps/server/test/fixtures/sample-texture.jpg
 
 # --- local scratch: servers, runs, logs, test output
 /.local/

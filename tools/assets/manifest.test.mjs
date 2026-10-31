@@ -13,7 +13,7 @@ import { ROOT, globToRegExp, loadManifest, run, select } from './pull.mjs';
 const git = (args, input) => execFileSync('git', args, { cwd: ROOT, input, maxBuffer: 1 << 26 }).toString();
 const MEDIA = /\.(glb|gltf|bin|drc|ktx2|basis|hdr|exr|fbx|obj|blend|usdz|png|jpe?g|webp|avif|gif|bmp|tiff?|heic|psd|mp3|ogg|oga|wav|flac|m4a|aac|opus|mp4|m4v|webm|mov|mkv|db|sqlite\d?|zip|tar|tgz|gz|7z|pdf)$/i;
 // Same list as the negations in the root .gitignore (and the media audit's keep list).
-const KEEP = [/^apps\/web\/pwa\/icon-\d+\.png$/, /^apps\/web\/src\/media\/gallery-loop\.mp4$/, /^tools\/god-skill\/reference\/kit-primitives\.png$/, /^tools\/playtest\/review\/fixtures\/runs\/.+\.png$/];
+const KEEP = [/^apps\/web\/pwa\/icon-\d+\.png$/, /^apps\/web\/src\/media\/gallery-loop\.mp4$/, /^tools\/god-skill\/reference\/kit-primitives\.png$/, /^tools\/playtest\/review\/fixtures\/runs\/.+\.png$/, /^apps\/server\/test\/fixtures\/sample-texture\.jpg$/];
 // Dropped by decision: the Mars archive photo gallery, its captions and the 2020 evidence strip are never pulled or
 // committed. Under history/ and 2020/ only the wall, mural, sign and Portal screen texture crops are media.
 const DROPPED = /^mars\/viewer\/public\/(2020\/evidence\/|(history|2020)\/.*\.(json|html|md)$)|discord/i;
