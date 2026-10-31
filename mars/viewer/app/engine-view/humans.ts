@@ -144,6 +144,11 @@ type View = {
   prevBase?: string;
   restAge?: number;
   restFrom?: number;
+  /** Idle variety weight drawn at the last render (Idle_Neutral + variant; diagnostics only). */
+  variety?: number;
+  /** Seconds since the current walk began (its weight left 0), and the rest clock then; undefined: not walking / long ago. */
+  walkAge?: number;
+  restAgeAtWalk?: number;
   partner?: string;
   partnerP?: THREE.Vector3;
   dist: number;
@@ -226,6 +231,10 @@ export type SampledHuman = {
   prevActivity?: string;
   prevBaseActivity?: string;
   restAge?: number;
+  /** Seconds since the current walk began (the Walk weight left 0; absent: not walking, or longer than a gesture fade). */
+  walkAge?: number;
+  /** The rest clock (restAge) when that walk began; absent: unknown. */
+  restAgeAtWalk?: number;
 };
 export type { Hands };
 /** A gripped part's pose over the last two ticks (hand points follow the interpolated part). */
@@ -291,7 +300,28 @@ const baseOf = (act: string, base?: string) => { if (act === 'cycle') return 'si
 const onGround = (act: string, base?: string) => act === 'sit-ground' || (base === 'sit-ground' && OVERLAYS.has(act));
 /** Idle variety: now and then (about 6 s in every 25, per person) the Idle_Neutral clip blends in. */
 const IDLE_VARIETY_ONSET = 1.2;
-export const REST_ACTS = new Set(['idle', 'reach']);
+/** An idle gesture playing when a reach or a walk starts fades out over this long (s) instead of being cut. */
+export const GESTURE_FADE = 1.4;
+/** Track names (three-sanitised bone names) of the arms and hands: shoulders to fingertips. */
+const ARM_TRACK = /^(Shoulder|UpperArm|LowerArm|Wrist|Thumb|Index|Middle|Ring|Pinky)/;
+/** Per rig, an arms-only copy of a template clip (the gesture fades on the arms while the legs stride). */
+function armsAction(rig: Rig, name: string): THREE.AnimationAction | null {
+  const key = name + '#arms';
+  let a = rig.lib.get(key);
+  if (a === undefined) {
+    const c = THREE.AnimationClip.findByName(rig.template.gltf.animations, name), tracks = c?.tracks.filter((t) => ARM_TRACK.test(t.name)) ?? [];
+    a = c && tracks.length ? rig.mixer.clipAction(new THREE.AnimationClip(key, c.duration, tracks)) : null;
+    rig.lib.set(key, a);
+  }
+  return a;
+}
+// 'operate' (a hand actuator) is standing too: an idle gesture fades out over its reach and back in after the release.
+export const REST_ACTS = new Set(['idle', 'reach', 'operate']);
+/** Activities in which the body covers ground on its feet (walk.ts: `ex.gait ?? 'walk'`, wading). Idle variety fades out
+ *  with the Walk weight's ease at a walk start; the onset clock restarts only from a full stride (take-replay restAge). */
+export const GAIT_ACTS = new Set(['walk', 'wade', 'jog', 'run']);
+/** Walk weight of a full stride (walk-ease.ts WALK_FULL; the live path's eased walkW). */
+const WALK_FULL_LIVE = 0.98;
 function neutralWeight(id: string, t: number) { const ph = (hashId(id) % 997) / 997, u = ((t / 25 + ph) % 1) * 25; return u < 1 ? smooth(u) : u < 6 ? 1 : u < 7 ? 1 - smooth(u - 6) : 0; }
 const handList = (h: Hands): Vec3[] => [h.left, h.right].filter((q): q is Vec3 => !!q);
 const copyHands = (h?: Hands): Hands => ({ ...(h?.left ? { left: [...h.left] as Vec3 } : {}), ...(h?.right ? { right: [...h.right] as Vec3 } : {}) });
@@ -425,7 +455,6 @@ export class HumanViews {
       if (act !== v.activity) { v.prevAct = v.activity; v.prevBase = v.base; }
       v.age = act === v.activity ? v.age + 1 : 0;
       v.since = v.age * DT;
-      v.restAge = !REST_ACTS.has(act) ? 0 : v.restAge === undefined ? undefined : v.restAge + DT;
       v.activity = act;
       v.groundSeat = onGround(act, e.human.baseActivity);
       v.partner = (e.human as { partner?: string }).partner;
@@ -462,6 +491,12 @@ export class HumanViews {
       }
       const sitting = (base === 'sit' || base === 'sit-down') && !walking;
       const walkW = clamp01(c.walkW + (walking ? BLEND : -BLEND));
+      // idle-variety onset clock: restarts from a full stride or anything other than standing; a walk start (weight still
+      // easing in) or a short nudge does not restart it, so a gesture fades out with the walk's own blend
+      if (GAIT_ACTS.has(act)) { if (v.walkAge === undefined) { v.walkAge = 0; v.restAgeAtWalk = v.restAge; } else v.walkAge += DT; }
+      else v.walkAge = v.restAgeAtWalk = undefined;
+      const moving = GAIT_ACTS.has(act) && walkW >= WALK_FULL_LIVE;
+      v.restAge = moving || (!REST_ACTS.has(act) && !GAIT_ACTS.has(act)) ? 0 : v.restAge === undefined ? undefined : v.restAge + DT;
       // on a beam: short steps — the stride at half the Walk weight is about half the clip's, so the cadence doubles
       const rate = walking ? Math.max(0.35, v.speed / v.rig.template.walkSpeed) * (act === 'beam-walk' ? BEAM_CADENCE : 1) : 1;
       const dur = v.rig.walk.getClip().duration;
@@ -645,8 +680,10 @@ export class HumanViews {
       v.speed = typeof f.speed === 'number' ? f.speed : 0;
       v.since = f.activityAge;
       if (f.restAge !== undefined) v.restFrom = t - f.restAge;
-      else if (!REST_ACTS.has(act)) v.restFrom = t;
+      else if (!REST_ACTS.has(act) && !GAIT_ACTS.has(act)) v.restFrom = t;
       v.restAge = v.restFrom !== undefined && t >= v.restFrom ? t - v.restFrom : undefined;
+      v.walkAge = f.walkAge;
+      v.restAgeAtWalk = f.restAgeAtWalk;
       v.prevAct = f.prevActivity;
       v.prevBase = f.prevActivity === undefined ? undefined : baseOf(f.prevActivity, f.prevBaseActivity);
       v.partner = f.partner;
@@ -755,8 +792,19 @@ export class HumanViews {
     const libShare = lib.cur || lib.prev ? 1 - w : 0;
     const curW = lib.cur ? libShare * lib.fade : 0, prevW = lib.prev ? libShare * (1 - lib.fade) : 0;
     const waveW = waveClip && !lib.cur ? 1 - w : 0, interactW = interactClip && !lib.cur ? 1 - w : 0;
-    const idleFree = (v.activity === 'idle'||(!!v.itemPose&&v.activity==='reach')) && b.sitW === 0 && (!engineHands||(v.itemPose?.weight??1)<1) && freeBody && !lib.cur;
-    const idleHandoff=v.itemPose?.idleBlend??(v.handActuator?handActuatorFrame(v.handActuator,(v.handActuatorTime??tSec)-v.handActuator.startTick*DT).idleBlend:1);
+    // A hand actuator's reach out of an idle gesture (hand at the hair, folded arms): the gesture fades out over the reach
+    // while the arm travels from it to the target. It was cut on the first actuator frame (engine hands, idleBlend 0): the
+    // hand dropped from the hair to the hip in one frame, 0.747 m per 50 ms (entry 33, neon switch-off).
+    const reachS = v.handActuator ? (v.handActuatorTime ?? tSec) - v.handActuator.startTick * DT : 0;
+    const handoff = v.handActuator ? handActuatorFrame(v.handActuator, reachS) : null;
+    // Over GESTURE_FADE, not the 0.65 s reach: folded arms opening in 0.65 s still swung the free hand 0.13 m per 50 ms (0.084 over 1.2 s).
+    const reachFade = v.handActuator && v.handActuator.abortedAt === undefined && reachS >= 0 && reachS < GESTURE_FADE ? 1 - smooth(reachS / GESTURE_FADE) : 0;
+    // Idle variety also plays on into a walk start (scaled by 1 − walk weight, so it fades out with the walk's ease).
+    // An opted-in item transfer (lantern, bowl) keeps its own clock: idle variety may play through its reach until the
+    // item's arm weight is full, and its idleBlend is the handoff (0 while an item is held).
+    const itemReach = !!v.itemPose && v.activity === 'reach';
+    const idleFree = (v.activity === 'idle' || itemReach || GAIT_ACTS.has(v.activity) || (v.activity === 'operate' && reachFade > 0)) && b.sitW === 0 && (!engineHands || reachFade > 0 || (v.itemPose?.weight ?? 1) < 1) && freeBody && !lib.cur;
+    const idleHandoff = v.itemPose?.idleBlend ?? (handoff ? (reachS < 0 ? 1 : Math.max(handoff.idleBlend, reachFade)) : 1);
     // Idle variety (Idle_Neutral, fold arms, look around) fades in from when the body came to rest: switched on at full
     // weight it raised or crossed the arms in one frame whenever a walk ended inside a person's variety window
     // (entry 29's shared idle-onset fix, carried by entry 33: a hand-to-hair flash at each walk stop before a reach).
@@ -764,6 +812,19 @@ export class HumanViews {
     const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, tSec) * idleHandoff * restOnset : 0;
     const variant = idleFree ? idleVariant(h.name, tSec) : null, variantA = variant ? libAction(v.rig, variant.clip) : null;
     const variantW = variantA ? (1 - w - neutralW) * variant!.w * idleHandoff * restOnset : 0;
+    v.variety = neutralW + variantW;
+    // A walk starting out of an idle gesture: the legs take the walk's own ease (WALK_EASE, 0.35 s), but folded arms opening
+    // that fast swung a hand 0.28 m per 50 ms. On the arms alone (arms-only copies of the gesture clips) the gesture fades
+    // over GESTURE_FADE from the walk start: its share of the arm pose is (full-body share + A) / (1 + A) after the mixer
+    // normalises, so A is chosen to make that share the gesture level at the walk start × the fade.
+    let armsN = 0, armsV = 0;
+    const gv = idleVariant(h.name, tSec);
+    if ((v.activity === 'idle' || GAIT_ACTS.has(v.activity)) && v.walkAge !== undefined && v.walkAge < GESTURE_FADE && b.sitW === 0 && !engineHands && freeBody && !lib.cur) {
+      const g = 1 - smooth(v.walkAge / GESTURE_FADE), on = v.restAgeAtWalk === undefined ? 1 : smooth(Math.min(1, v.restAgeAtWalk / IDLE_VARIETY_ONSET));
+      const n0 = extra.idleNeutral ? neutralWeight(h.name, tSec) * on : 0, v0 = gv && libAction(v.rig, gv.clip) ? (1 - n0) * gv.w * on : 0;
+      const want = (n0 + v0) * g, have = neutralW + variantW;
+      if (want > have + 1e-4) { const k = Math.min(20, (want - have) / Math.max(1e-3, 1 - want)) / (n0 + v0); armsN = n0 * k; armsV = v0 * k; }
+    }
     const libOn = new Set<THREE.AnimationAction>();
     const libAt = (act: THREE.AnimationAction | null, weight: number, time: number) => {
       if (!act || weight <= 1e-4) return;
@@ -774,6 +835,8 @@ export class HumanViews {
     if (lib.cur) libAt(lib.cur.act, curW, lib.cur.time);
     if (lib.prev) libAt(lib.prev.act, prevW, lib.prev.time);
     if (variantA) libAt(variantA, variantW, tSec + (hashId(h.name) % 7));
+    if (armsN > 0) libAt(armsAction(v.rig, 'Idle_Neutral'), armsN, tSec);
+    if (armsV > 0 && gv) libAt(armsAction(v.rig, gv.clip), armsV, tSec + (hashId(h.name) % 7));
     if (jog) { const sp = jog.getClip().name === 'Sprint_Loop' ? v.rig.template.sprintSpeed : v.rig.template.jogSpeed; libAt(jog, runW, sp ? v.dist / sp : tSec); }
     for (const x of v.libOn) if (!libOn.has(x)) x.stop();
     v.libOn = libOn;
@@ -1243,7 +1306,7 @@ export class HumanViews {
 
   /** Per-person pose readout of the last render (lab hook `bones()`). */
   bones(id?: string) {
-    const out: Record<string, Diag & { activity: string; base: string; ankleH: number; armLen: number; walkW: number; template: string; body: Record<string, number>; armFit: { k: number; before: number }[]; on: string | null; goal: Posture; dims: Dims | null }> = {};
+    const out: Record<string, Diag & { activity: string; base: string; ankleH: number; armLen: number; walkW: number; variety: number; template: string; body: Record<string, number>; armFit: { k: number; before: number }[]; on: string | null; goal: Posture; dims: Dims | null }> = {};
     for (const [k, v] of this.views) {
       if (id && k !== id) continue;
       if (!v.diag) {
@@ -1253,7 +1316,7 @@ export class HumanViews {
       const d = v.dims, r4 = (x: number) => +x.toFixed(4);
       // standing rig measurements (Idle, t = 0): the body model's numbers as this rig has them
       const body = d ? { shoulderH: r4(d.pivotH + d.sh.up), armLen: r4(d.armLen), hipH: r4(d.hipH), thigh: r4(d.thigh), shin: r4(d.shin), kneelHip: r4(d.hipH - kneelDrop(d)), shoulderHalf: r4(d.shHalf) } : ({} as Record<string, number>);
-      out[k] = { ...v.diag, activity: v.activity, base: v.base, ankleH: r4(d?.ankleH ?? 0), armLen: r4(d?.armLen ?? 0), walkW: +v.cur.walkW.toFixed(3), template: v.rig.template.name, body, armFit: v.rig.template.arms, on: v.on ?? null, goal: v.cur.pose, dims: d ?? null };
+      out[k] = { ...v.diag, activity: v.activity, base: v.base, ankleH: r4(d?.ankleH ?? 0), armLen: r4(d?.armLen ?? 0), walkW: +v.cur.walkW.toFixed(3), variety: +(v.variety ?? 0).toFixed(3), template: v.rig.template.name, body, armFit: v.rig.template.arms, on: v.on ?? null, goal: v.cur.pose, dims: d ?? null };
     }
     return out;
   }

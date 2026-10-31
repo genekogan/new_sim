@@ -24,10 +24,11 @@ import { ComponentViews } from './components.ts';
 import {recordedSleepPose} from './recorded-sleep-pose.ts';
 import {itemPresentation} from '../../engine/items/presentation.ts';
 import { FixtureViews } from './fixtures.ts';
-import { HumanViews, REST_ACTS, type Hands, type SampledHuman } from './humans.ts';
+import { GAIT_ACTS, GESTURE_FADE, HumanViews, REST_ACTS, type Hands, type SampledHuman } from './humans.ts';
 import { takeLog, type LogLine, type TakeStep } from './take-log.ts';
 import type { Template } from './people.ts';
 import { walkCum } from './take-walk.ts';
+import { gaitSegments, lastFullStride, walkWeightAt, type GaitSegments } from './walk-ease.ts';
 import type { DepictionBeat } from './station-depiction.ts';
 import {shoreDepiction} from './recorded-shore.ts';
 import {matchedStairFlights,type SupplementalStair} from './stair-frame.ts';
@@ -140,7 +141,8 @@ export function shiftTake(take: Take, dy: number): Take {
 }
 
 type Walk = { ticks: number[]; cum: number[]; track: PoseSample[] };
-const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+/** Exact adjacent live take windows (RecordedGaitContinuity's rule): b continues a with no gap. */
+const adjacentTakes = (a: Take, b: Take) => a.startTick + a.ticks === b.startTick && a.dt === b.dt && a.finalStateHash === b.baselineStateHash;
 const EMPTY_SCENE: SpatialScene = { bounds: [0, 0, 0, 0], levels: [], surfaces: [], obstacles: [], links: [] };
 
 /**
@@ -163,6 +165,13 @@ export class TakePeople {
   private fixtures:FixtureViews;
   private humans:HumanViews;
   private walks = new Map<string, Walk>();
+  /** Per person: walking-share steps over this take and its adjacent takes (walk-ease.ts); null: no track. */
+  private gaits = new Map<string, GaitSegments | null>();
+  /** Per person: rest-clock answers that do not depend on the frame (a finished walk run's last full stride). */
+  private strides = new Map<string, number | null>();
+  /** Retained adjacent takes (live take windows) the walk ease reads across: before and after this one. */
+  private neighbours: { prev: Take | null; next: Take | null } = { prev: null, next: null };
+  private history: readonly Take[] = [];
   /** Per person: the ticks at which `activity` / `baseActivity` changed in this take, and the values (library clip
    *  crossfades and one-shots need how long the current activity has run and what came before). */
   private acts = new Map<string, { t: number[]; v: string[]; bt: number[]; bv: (string | null)[] }>();
@@ -202,6 +211,9 @@ export class TakePeople {
   private indexWalks() {
     this.walks.clear();
     this.acts.clear();
+    this.gaits.clear();
+    this.strides.clear();
+    this.neighbours = this.adjacent(this.history);
     for (const [tick, id, field, value] of this.take.changes) {
       if (field !== 'activity' && field !== 'baseActivity') continue;
       let a = this.acts.get(id);
@@ -234,6 +246,9 @@ export class TakePeople {
 
   /** Optional retained exact recording history; gaps/foreign physics never fill a transition. */
   setWaterHistory(takes:readonly Take[]){
+    // the walk ease reads across the adjacent take windows of the same history (a stop just past a window's edge)
+    this.history=takes;const nb=this.adjacent(takes);
+    if(nb.prev!==this.neighbours.prev||nb.next!==this.neighbours.next){this.neighbours=nb;this.gaits.clear();this.strides.clear();}
     const key=this.take.id+'|'+takes.map(t=>t.id).join('|');if(key===this.waterHistoryKey)return;
     this.waterTransition=waterTransitions(this.take,takes);this.waterHistoryKey=key;
   }
@@ -264,21 +279,73 @@ export class TakePeople {
   }
 
   /** How long `id`'s current activity has run at `tick` and what it did before (absent when it began before the take). */
-  private activityHistory(id: string, tick: number): Pick<SampledHuman, 'activityAge' | 'prevActivity' | 'prevBaseActivity' | 'restAge'> {
+  private activityHistory(id: string, tick: number, act: string, walk: number): Pick<SampledHuman, 'activityAge' | 'prevActivity' | 'prevBaseActivity' | 'restAge' | 'walkAge' | 'restAgeAtWalk'> {
     const a = this.acts.get(id);
-    if (!a) return {};
-    let k = -1;
-    for (let i = a.t.length - 1; i >= 0; i--) if (a.t[i] <= tick) { k = i; break; }
-    if (k < 1) return {};
+    const k = this.runAt(a, tick);
+    const rest = { ...this.restAge(id, a, k, tick, act), ...(walk > 0.02 ? this.walkStart(id, tick) : {}) };
+    if (!a || k < 1) return rest;
     let b: string | null = null;
     for (let i = a.bt.length - 1; i >= 0; i--) if (a.bt[i] < a.t[k]) { b = a.bv[i]; break; }
-    return { activityAge: (tick - a.t[k]) * this.take.dt, prevActivity: a.v[k - 1], ...(b ? { prevBaseActivity: b } : {}), ...this.restAge(a, k, tick) };
+    return { activityAge: (tick - a.t[k]) * this.take.dt, prevActivity: a.v[k - 1], ...(b ? { prevBaseActivity: b } : {}), ...rest };
   }
-  private restAge(a: { t: number[]; v: string[] }, k: number, tick: number): Pick<SampledHuman, 'restAge'> {
-    if (!REST_ACTS.has(a.v[k])) return {};
-    let i = k;
-    while (i > 0 && REST_ACTS.has(a.v[i - 1])) i--;
-    return i > 0 ? { restAge: (tick - a.t[i]) * this.take.dt } : {};
+
+  /**
+   * Idle-variety onset clock: seconds since the body last walked at a full stride or did something other than stand
+   * (absent: unknown). A walk that has not reached a full stride (its start, a short nudge) does not restart it, so a
+   * gesture fades out with the walk's own ease instead of being cut on the first walking frame; after a stop it restarts
+   * from the last full stride, which lies inside the stop's ease.
+   */
+  private restAge(id: string, a: { t: number[]; v: string[] } | undefined, k: number, tick: number, act: string): Pick<SampledHuman, 'restAge'> {
+    const cur = a && k >= 0 ? a.v[k] : act, dt = this.take.dt;
+    if (!REST_ACTS.has(cur) && !GAIT_ACTS.has(cur)) return {};
+    const seg = this.gaitSteps(id), age = (from: number) => ({ restAge: Math.max(0, tick - from) * dt });
+    for (let j = k; a && j >= 0; j--) {
+      const v = a.v[j];
+      if (GAIT_ACTS.has(v)) {
+        const f = !seg ? null : j === k ? lastFullStride(seg, a.t[j], tick, dt) : this.stride(`${id}#${j}`, () => lastFullStride(seg, a.t[j], a.t[j + 1], dt));
+        if (f !== null) return age(f);
+        continue;
+      }
+      if (!REST_ACTS.has(v)) return age(j === k ? tick : a.t[j + 1]);
+    }
+    // before the first change this take records (or none at all): a full stride on the track still restarts it
+    const t1 = a && k >= 0 ? a.t[0] : tick, f = seg && seg.t.length ? (a && k >= 0 ? this.stride(`${id}#pre`, () => lastFullStride(seg, seg.t[0], t1, dt, 60, false)) : lastFullStride(seg, seg.t[0], t1, dt, 60, false)) : null;
+    return f !== null ? age(f) : {};
+  }
+  private runAt(a: { t: number[] } | undefined, tick: number) {
+    if (a) for (let i = a.t.length - 1; i >= 0; i--) if (a.t[i] <= tick) return i;
+    return -1;
+  }
+  /** Walk weight above 0: seconds since it last left 0 (≤ one gesture fade back) and the rest clock at that moment, so an
+   *  idle gesture fades on the arms from the walk start (humans.ts armsAction). Absent when longer ago. */
+  private walkStart(id: string, tick: number): Pick<SampledHuman, 'walkAge' | 'restAgeAtWalk'> {
+    const seg = this.gaitSteps(id), dt = this.take.dt;
+    if (!seg || !seg.t.length) return {};
+    const back = Math.ceil(GESTURE_FADE / dt);
+    for (let k = Math.floor(tick); k >= Math.floor(tick) - back; k--) {
+      if (walkWeightAt(seg, k, dt) > 0.02) continue;
+      const a = this.acts.get(id), r = this.restAge(id, a, this.runAt(a, k), k, 'idle').restAge;
+      return { walkAge: (tick - k) * dt, ...(r !== undefined ? { restAgeAtWalk: r } : {}) };
+    }
+    return {};
+  }
+  private stride(key: string, f: () => number | null) { if (!this.strides.has(key)) this.strides.set(key, f()); return this.strides.get(key)!; }
+
+  /** The retained takes that continue straight into and out of this one (live take windows). */
+  private adjacent(takes: readonly Take[]) {
+    return { prev: takes.find((t) => t !== this.take && adjacentTakes(t, this.take)) ?? null, next: takes.find((t) => t !== this.take && adjacentTakes(this.take, t)) ?? null };
+  }
+  /** `id`'s walking-share steps on this take's tick axis, its adjacent takes included. */
+  private gaitSteps(id: string): GaitSegments | null {
+    if (this.gaits.has(id)) return this.gaits.get(id)!;
+    const own = this.take.tracks[id], parts: { track: PoseSample[]; offset: number }[] = [];
+    const { prev, next } = this.neighbours;
+    if (prev?.tracks[id]) parts.push({ track: prev.tracks[id], offset: prev.startTick - this.take.startTick });
+    if (own) parts.push({ track: own, offset: 0 });
+    if (next?.tracks[id]) parts.push({ track: next.tracks[id], offset: next.startTick - this.take.startTick });
+    const g = own ? gaitSegments(parts, this.take.dt) : null;
+    this.gaits.set(id, g);
+    return g;
   }
 
   /** Metres walked by `id` up to `tick` along its recorded track (horizontal). */
@@ -359,7 +426,9 @@ export class TakePeople {
       const speed = w && !carriedRide ? (this.walked(w, frame.tick + span) - this.walked(w, frame.tick - span)) / (2 * span * dt) : 0;
       const climbing = !!e.activity?.startsWith('climb');
       const g = st.grip;
-      const walk = climbing ? 1 : clamp01((speed - 0.06) / 0.25);
+      // eased over WALK_EASE (walk-ease.ts): the per-sample speed map snapped stride → stand in one 65 ms sample
+      const gs = w && !carriedRide ? this.gaitSteps(id) : null;
+      const walk = climbing ? 1 : gs ? walkWeightAt(gs, frame.tick, dt) : 0;
       this.lastGait.set(id, { dist, walk });
       // prone receiver (mars-take/4, W32): the lying heading in integer mrad and the phase progress in integer % → rad, 0–1
       const proneYaw = typeof st.proneYaw === 'number' ? st.proneYaw / ANG_Q : undefined;
@@ -369,7 +438,7 @@ export class TakePeople {
       const seatHeight=this.nativeBoat?.seatHeightFor(frame,id)??(typeof st.seatHeight==='number'&&Number.isFinite(st.seatHeight)?st.seatHeight:undefined);
       const publicSoulKey=(src.human as {soul?:unknown}|undefined)?.soul;
       const game=recordedGame(e.state.game);
-      people.push({itemPose:itemPresentation(e.state.itemTransferV1 as NonNullable<Entity['human']>['itemTransferV1'],e.state.heldItemsV1 as NonNullable<Entity['human']>['heldItemsV1'],this.take.startTick+frame.tick,this.take.dt),...(e.state.handActuator?{handActuator:e.state.handActuator as NonNullable<Entity['human']>['handActuator'],handActuatorTime:(this.take.startTick+frame.tick)*this.take.dt}:{}), ...(body?.modelUrl?{bodyModel:admittedBodyUrl(body.modelUrl)??body.modelUrl}:body?.params&&typeof body.model==='string'?{bodyModel:body.model}:{}),...(typeof publicSoulKey==='string'?{publicSoulKey}:{}), ...(seatHeight!==undefined?{seatHeight}:{}), ...(shore.status==='recorded'?{shore:shore.contact}:{}), shoreTime:(this.take.startTick+t/this.take.dt)*this.take.dt,waterTransition:this.waterTransition(id,t), id, p: e.p, yaw: e.yaw, walk, walkDist: dist, activity: e.activity, grip: g?.entity, gripSlot: g?.slot, hands: e.hands, baseActivity: st.baseActivity ?? undefined, ...this.activityHistory(id, frame.tick), ...(typeof (st as {partner?: unknown}).partner==='string'?{partner:(st as {partner:string}).partner}:{}), ...(typeof st.prop==='string'?{prop:st.prop}:{}), ...(typeof e.state.instrument==='string'?{instrument:e.state.instrument}:{}),...(game?{game,gameTick:this.take.startTick+frame.tick,gameDt:this.take.dt}:{}),...(Number.isFinite(speed)?{speed:Math.abs(speed)}:{}), on: st.on ?? undefined, ...(proneYaw !== undefined ? { proneYaw } : {}), ...(phaseK !== undefined ? { phaseK } : {}), ...(st.sleepPose ? { sleepPose: recordedSleepPose(this.take,id,frame.tick,st.sleepPose) } : {}) });
+      people.push({itemPose:itemPresentation(e.state.itemTransferV1 as NonNullable<Entity['human']>['itemTransferV1'],e.state.heldItemsV1 as NonNullable<Entity['human']>['heldItemsV1'],this.take.startTick+frame.tick,this.take.dt),...(e.state.handActuator?{handActuator:e.state.handActuator as NonNullable<Entity['human']>['handActuator'],handActuatorTime:(this.take.startTick+frame.tick)*this.take.dt}:{}), ...(body?.modelUrl?{bodyModel:admittedBodyUrl(body.modelUrl)??body.modelUrl}:body?.params&&typeof body.model==='string'?{bodyModel:body.model}:{}),...(typeof publicSoulKey==='string'?{publicSoulKey}:{}), ...(seatHeight!==undefined?{seatHeight}:{}), ...(shore.status==='recorded'?{shore:shore.contact}:{}), shoreTime:(this.take.startTick+t/this.take.dt)*this.take.dt,waterTransition:this.waterTransition(id,t), id, p: e.p, yaw: e.yaw, walk, walkDist: dist, activity: e.activity, grip: g?.entity, gripSlot: g?.slot, hands: e.hands, baseActivity: st.baseActivity ?? undefined, ...this.activityHistory(id, frame.tick, e.activity ?? 'idle', climbing ? 0 : walk), ...(typeof (st as {partner?: unknown}).partner==='string'?{partner:(st as {partner:string}).partner}:{}), ...(typeof st.prop==='string'?{prop:st.prop}:{}), ...(typeof e.state.instrument==='string'?{instrument:e.state.instrument}:{}),...(game?{game,gameTick:this.take.startTick+frame.tick,gameDt:this.take.dt}:{}),...(Number.isFinite(speed)?{speed:Math.abs(speed)}:{}), on: st.on ?? undefined, ...(proneYaw !== undefined ? { proneYaw } : {}), ...(phaseK !== undefined ? { phaseK } : {}), ...(st.sleepPose ? { sleepPose: recordedSleepPose(this.take,id,frame.tick,st.sleepPose) } : {}) });
     }
     this.stairs(comps);
     this.comps.onTick({ entities: comps });
