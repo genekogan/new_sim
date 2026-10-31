@@ -85,6 +85,8 @@ export class GodActivitySpots {
     this.locate = null; this.placeMemo = null;
     return this.continue(budgetMs);
   }
+  /** L4 item 6: a served world before its first spots: none yet (the host offers its base spots), a warm is asked for. */
+  pendingFirst(): boolean { if (this.cache || !this.h.sliced?.()) return false; this.wanted = true; return true; }
   /** A sliced derive is under way. */
   deriving(): boolean { return this.pass !== null; }
   /** The sliced derive: what it is a derive of (key), where it is, the place lookups it began with, CPU ms so far. */
