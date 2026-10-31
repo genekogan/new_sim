@@ -31,7 +31,7 @@ export type Support =
   | { kind: 'ground' }
   | { kind: 'resting-on'; on: string; slot?: string } // slot: a table surfaceSlot id, or 'lap' (engine/items)
   | { kind: 'held'; by: string[] }
-  | { kind: 'in-hand'; by: string; hand: 'left' | 'right' } // a small item in one person's hand (engine/items)
+  | { kind: 'in-hand'; by: string; hand: 'left' | 'right'; /** entry 41: item yaw − holder yaw kept from a hand-over (absent: 0) */ turn?: number } // a small item in one person's hand (engine/items)
   | { kind: 'connected'; to: string[] }
   | { kind: 'forks'; vehicle: string }
   | { kind: 'ridden-by'; by: string } // a vehicle under its rider (engine/vehicles)
@@ -125,6 +125,10 @@ export type HumanState = {
   instrument?: string;
   /** CN5 (social/pose.ts): a choreographed game's public turn state (who throws to whom and when). */
   game?: import('../social/pose.ts').GameState;
+  /** entry 35 (social/hand-hold.ts): holding hands with another body (offered, joined, letting go). */
+  handHold?: import('../social/hand-hold.ts').HandHoldState;
+  /** entry 35 (social/rps.ts): a rock-paper-scissors count's shared start and shoot ticks; the shape from the shoot only. */
+  rps?: import('../social/rps.ts').RpsState;
 };
 
 /** Persistent committed quantities for one bounded cold preparation batch. */

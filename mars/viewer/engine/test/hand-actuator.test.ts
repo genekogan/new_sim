@@ -48,3 +48,14 @@ test('M01: a nearby obstacle in the operating path still refuses with the same s
  const {rt,r}=doorWith([...far,box('crate',end[0],end[2],.15)]);while(rt.isActive(r.id))rt.step();
  assert.equal(r.status,'failed');assert.equal(r.diagnostic?.code,'contact.step-blocked');assert.deepEqual(r.diagnostic?.subjects,['a','crate']);
 });
+
+import {strokePoint} from '../social/hand-actuator.ts';
+// Entry 13: a writing/wiping hand stays on the face, moves continuously and commits only when the stroke ends.
+for(const kind of ['write','wipe'] as const)for(const lines of [1,3])test(`board ${kind} stroke (${lines} line) is continuous and commits at its end`,()=>{
+ const stroke={kind,yaw:.4,width:.55,height:.3,lines,seconds:kind==='write'?1.2+1.6*lines:2.4},m:HandActuatorMotion={target:'board',at:[1,1.2,2],startTick:0,stroke};
+ const end=HAND_REACH_SECONDS+stroke.seconds;assert.equal(handActuatorFrame(m,end-.05).contact,false,'no effect while still writing');assert.equal(handActuatorFrame(m,end).contact,true);
+ let prev=strokePoint(m.at,stroke,0),maxSpeed=0;const n=Math.round(stroke.seconds/.05);
+ for(let i=1;i<=n;i++){const p=strokePoint(m.at,stroke,i/n);maxSpeed=Math.max(maxSpeed,Math.hypot(p[0]-prev[0],p[1]-prev[1],p[2]-prev[2])/.05);prev=p;
+  const dx=p[0]-1,dz=p[2]-2,off=dx*Math.sin(.4)+dz*Math.cos(.4);assert.ok(off>=-1e-9&&off<.04,'hand stays on (or just off) the face plane');assert.ok(Math.abs(p[1]-1.2)<=.2,'within the face height');}
+ assert.ok(maxSpeed<1.8,`hand speed ${maxSpeed}`);
+});

@@ -136,6 +136,9 @@ export function graspPoint(item: Entity): Vec3 {
   const q = rot2([g[0], g[2]], item.pose.yaw);
   return [item.pose.p[0] + q[0], item.pose.p[1] + g[1], item.pose.p[2] + q[1]];
 }
+/** Item yaw while held: the holder's yaw plus the turn it was handed over with (entry 41; 0 for anything picked up), so a
+ *  handed-over item keeps the way it faced instead of spinning half round to its new holder's heading. */
+export const heldYaw = (item: Entity, holder: Entity) => { const t = (item.support as { turn?: number } | undefined)?.turn; return t ? Math.atan2(Math.sin(holder.pose.yaw + t), Math.cos(holder.pose.yaw + t)) : holder.pose.yaw; };
 export function followHand(item: Entity, hand: Vec3, yaw: number) {
   item.pose = { p: poseAtHand(item, hand, yaw), yaw };
 }

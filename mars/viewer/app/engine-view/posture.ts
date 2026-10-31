@@ -53,7 +53,7 @@ export type Dims = {
   foot: [number, number][];
 };
 
-export type Style = 'knees' | 'hips' | 'up' | 'walk' | 'lean';
+export type Style = 'knees' | 'hips' | 'up' | 'walk' | 'lean' | 'stand';
 export type Target = { f: number; up: number; lat: number };
 export type Posture = { drop: number; bend: number; rise: number; kneel: number };
 export const NEUTRAL: Posture = { drop: 0, bend: 0, rise: 0, kneel: 0 };
@@ -78,6 +78,10 @@ const STYLE: Record<Style, { bendMax: number; wDrop: number; wBend: number; rise
   // the hips, the knees only a little. 'hips' let a 1.6 m body squat 0.26 m to set a mug 0.49 m ahead on a 0.75 m table.
   lean: { bendMax: BODY_MODEL.bendMax.hips, wDrop: 2.4, wBend: 0.35, rise: false, kneel: 3.0, deep: 75 * DEG },
   walk: { bendMax: 25 * DEG, wDrop: 4, wBend: 2, rise: false, dropMax: 0.08 }, // 25°: walking a load held out ahead (hang_beam walk-in: hands 0.5–0.65 m ahead at hip height)
+  // Entry 33 (retest on M04): a hand reach to a switch or a torch at or above the hips is made standing. A target just
+  // past the plan reach (a 1.2 m switch from 0.55 m on a 1.67 m body) leans a few degrees in; under 'knees' the 0.04 m knee
+  // dip cost a fortieth of that lean, so the body dipped at the knees for a switch at chest height.
+  stand: { bendMax: BODY_MODEL.bendMax.knees, wDrop: 4, wBend: 1.4, rise: false },
 };
 
 /** Style for an engine activity (engine/construction/handup.ts phases, carry, raise, items). */

@@ -215,7 +215,7 @@ export class EngineBridge {
     if(this.edge)this.edge.contactActuator=createContactActuatorService({model:()=>this.god.model,levelAt:(x,z,y)=>this.levelAt(x,z,y),
       body:id=>this.host.engine.world.entities[id] as never,access:(id,soul)=>this.layers.refusal(id,soul),
       moreFacts:id=>this.tea?.facts(id)??null,
-      record:(soul,id,action)=>{const r=this.edge!.comms?.objects.act?.(id,soul,{action,params:{}}) as {accepted?:boolean}|undefined;if(!r?.accepted)throw Error('switch.object-record-refused');},
+      record:(soul,id,action,params={})=>{const r=this.edge!.comms?.objects.act?.(id,soul,{action,params}) as {accepted?:boolean}|undefined;if(!r?.accepted)throw Error('switch.object-record-refused');},
       commit:(ops,note,done)=>this.god.engineAct(ops,note,done)});
     // Entry 34: the watering-can act (watering.ts): planned for perceive's offers, its moments committed per tick
     this.watering = createWatering({ model: this.god.model, version: () => this.version, engine: this.host.engine as never, commit: (ops, note) => this.god.engineAct(ops as never, note), log: (m) => this.log(m) });

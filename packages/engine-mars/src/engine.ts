@@ -150,7 +150,7 @@ export const BODY_VERBS: VerbInfo[] = [
   {verb:'activity_readiness_v1',description:'My bounded voluntary standing wait for one host and venue; only a matching owned classroom may hand over this wait.',inputSchema:{type:'object',properties:{host:{type:'string'},venue:{type:'string'},activity:{const:'classroom'},seconds:{type:'number',minimum:20,maximum:300}},required:['host','venue','activity','seconds'],additionalProperties:false}},
   {verb:'control_classroom_v1',description:'Apply an owned host control to its actual classroom without replacing its body programme; accepted control is not completed cleanup.',inputSchema:{type:'object',properties:{session:{type:'string',maxLength:80},kind:{enum:['cancel','advance']}},required:['session','kind'],additionalProperties:false}},
   { verb: 'build_lookout', description: 'Choose one finite camp construction job: stage carries rack parts to the build site; frame raises/connects/releases the uprights; deck installs joists/sheets; stairs completes access. Use the exact unprefixed verb build_lookout, target:null, approach:[], and a single during step with phase. The card sets only $actor.doing; physical part progress is maintained by the engine, never invented target states or permission links. The committed crew finishes a safe segment before interruption.', inputSchema: {type:'object',properties:{phase:{type:'string',enum:['stage','frame','deck','stairs']}},required:['phase']} },
-  { verb: 'walk_to', description: 'Go to a thing or a point, stopping `standoff` metres short of it. Optional dry-ground gait: walk (default), jog (2.5 m/s), run (4 m/s), cycle (4.5 m/s, a docked bicycle); stairs remain slow.', inputSchema: { type: 'object', properties: { to: ref, standoff: num, gait: {enum:['walk','jog','run','cycle']}, pace: {enum:['shuffle']} }, required: ['to'] } },
+  { verb: 'walk_to', description: 'Go to a thing or a point, stopping `standoff` metres short of it. Optional dry-ground gait: walk (default), jog (2.5 m/s), run (4 m/s), cycle (4.5 m/s, a docked bicycle); stairs remain slow.', inputSchema: { type: 'object', properties: { to: ref, standoff: num, gait: {enum:['walk','jog','run','cycle']}, pace: {enum:['shuffle','together']} }, required: ['to'] } },
   { verb: 'sit', description: 'Go to a free seat of a fixture (a bench, a chair) and sit there for a number of seconds; stays seated afterwards.', inputSchema: { type: 'object', properties: { on: str, seconds: num }, required: ['on'] } },
   { verb: 'stand', description: 'Stand up, leaving a seat or a place in a gathering.', inputSchema: { type: 'object', properties: {} } },
   { verb: 'rest', description: 'Stay as you are (seated if sitting) for a number of seconds.', inputSchema: { type: 'object', properties: { seconds: num, seatedAt:str } } },
@@ -164,6 +164,8 @@ const BODY = new Set(BODY_VERBS.map((v) => v.verb));
 /** Offered only by an engine whose rules include disassembly/1 (never by the legacy body language). */
 export const UNBUILD_VERB: VerbInfo = { verb: 'unbuild_lookout', description: 'Choose one finite camp disassembly job, the build in reverse: stairs takes the treads and flight down; deck lifts the sheets and joists off and carries them back to their piles; frame holds the uprights, takes the beams out and lowers the uprights; stage carries the rack parts back to the rack pile. Phases come down latest first (stairs, deck, frame, stage). Use the exact unprefixed verb unbuild_lookout, target:null, approach:[], and a single during step with phase. Refused while anyone is on the lookout. The committed crew finishes a safe segment before interruption.', inputSchema: {type:'object',properties:{phase:{type:'string',enum:['stairs','deck','frame','stage']}},required:['phase']} };
 const NEEDS_BODY = new Set(['walk_to', 'sit', 'gather', 'converse', 'ambient_wander']);
+/** Entry 35: two walking hand in hand stroll (m/s): slower than a walk alone, so the follower keeps beside the leader. */
+const HAND_IN_HAND_SPEED = 1.0;
 /** Mars's meal scenario as a world: the same proving ground, furnished and with its cast of four already there. */
 export const MEAL_WORLD: MarsWorldConfig = { scene: 'meal', arrival: [-6, -12], arrivalPlace: 'lawn', reference: [-6, -10.5], grounds: { id: 'grounds', name: 'the grounds' } };
 
@@ -306,6 +308,7 @@ export class MarsEngine implements Engine {
     // advance, no quiet point, no one leaving. The clock, attention and take recorder change no entry.
     const table: EntityTable = listTable(this.ents);
     this.m.stepCarriers(this.rt, table);   // carrier/1: rides move their seated riders first (no carriers: no effect)
+    this.m.stepHandHolds(this.rt);         // entry 35: hands let go finish, a broken pair lets go (no holds: no effect)
     this.rt.step(table);
     const pass: EntityTable | null = (this.rt as any).passTable ?? null;
     const still = !!pass && pass.entities === this.ents && (this.rt as any).live.size === 0 && !this.quiet && this.programs.size === 0 && this.leaving.length === 0;
@@ -707,10 +710,10 @@ export class MarsEngine implements Engine {
         const movement = this.movementVerb(me,g.x,g.z);
         if (a.gait && a.gait !== 'walk' && movement !== 'walk_to') return {code:'gait.dry-ground-required',message:'This shore or water route does not support jogging or running; return to dry ground first.'};
         // LINK BODY: a zombie's shuffle (pace 'shuffle'): half the body's walking speed, dry ground at both ends only
-        const shuffle = a.pace === 'shuffle';
+        const shuffle = a.pace === 'shuffle', together = a.pace === 'together';
         if (shuffle && (movement !== 'walk_to' || a.gait || !this.dryGroundAtV1(g.x, g.z))) return {code:'shuffle.dry-ground-required',message:'A shuffle stays on dry ground.'};
-        const ops: Op[] = [{ verb: movement, params: { actor: me, x: g.x, z: g.z, level:g.level, ...(a.gait && a.gait !== 'walk' ? {gait:a.gait} : {}), ...(shuffle ? {speed: r3(0.5 * bodyProfile(this.ents[me]).speed)} : {}), ...(this.cfg.nativeArrivalWitnessV1&&movement==='walk_to'?{arrivalEvidence:'navigation-arrival/1'}:{}) }, settle: 'done', ...(a.spread === 'pond-lap/1' || shuffle ? { soft: true } : {}) }];
-        if (typeof a.to === 'string' && this.ents[a.to]) ops.push({ verb: 'face', params: { actor: me, target: { entity: a.to } }, settle: 'done', soft: true });
+        const ops: Op[] = [{ verb: movement, params: { actor: me, x: g.x, z: g.z, level:g.level, ...(a.gait && a.gait !== 'walk' ? {gait:a.gait} : {}), ...(shuffle ? {speed: r3(0.5 * bodyProfile(this.ents[me]).speed)} : {}), ...(together ? {speed: HAND_IN_HAND_SPEED} : {}), ...(this.cfg.nativeArrivalWitnessV1&&movement==='walk_to'?{arrivalEvidence:'navigation-arrival/1'}:{}) }, settle: 'done', ...(a.spread === 'pond-lap/1' || shuffle ? { soft: true } : {}) }];
+        if (typeof a.to === 'string' && this.ents[a.to] && !together) ops.push({ verb: 'face', params: { actor: me, target: { entity: a.to } }, settle: 'done', soft: true });
         return ops;
       }
       case 'rest': return typeof a.seatedAt==='string'&&!this.seatedAt(me,a.seatedAt)?{code:'rest.native-seat-required',message:'The requested seat is no longer held by this actor.'}:[{ wait: secs(a.seconds, 60) }];
@@ -850,7 +853,9 @@ export class MarsEngine implements Engine {
     const pots = program.steps.filter(s => ['mars:serve','mars:shared_food_break'].includes(s.verb)).map(s => s.params.pot);
     if (this.cfg.scene === 'eden-camp' && pots.length && [...this.programs.values()].some(p => p.actor !== program.actor && p.steps.some(s => ['mars:serve','mars:shared_food_break'].includes(s.verb) && pots.includes(s.params.pot)))) return {code:'food.service-in-use',message:'Someone is already using this pot and its serving space'};
     for (const step of program.steps) if (step.verb.startsWith('mars:')) {
-      const busy = this.jointIssue(step.params, program.actor,step.verb==='mars:classroom_session'); if (busy) return busy;
+      // entry 35: a hand hold names the other body only to find its hand; it never borrows it (consent is the ledger's);
+      // entry 41: a hand-over likewise (each body runs its own half)
+      const busy = step.verb === 'mars:hand_hold_v1' || step.verb === 'mars:hand_over_v1' ? null : this.jointIssue(step.params, program.actor,step.verb==='mars:classroom_session'); if (busy) return busy;
       if (step.verb === 'mars:serve') {
         const pot = this.ents[String(step.params.pot)];
         if (!pot?.contents || pot.contents.fraction < 0.25 || pot.foodPreparation?.complete === false) return {code: 'food.unavailable', message: 'there is no completed serving left in the pot'};
