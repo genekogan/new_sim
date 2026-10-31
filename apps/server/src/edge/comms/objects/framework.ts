@@ -71,8 +71,10 @@ export class Objects {
   ids(): string[] { return this.table.ids() as string[]; }
   /** `all()` of one kind (same order; frozen). */
   ofKind(kind: string): ObjectRecord[] { return this.table.ofKind(kind) as ObjectRecord[]; }
-  /** A counter that moves on every change to the object table (cache key for derived listings). */
-  changes(): number { return this.table.changes; }
+  /** The object table's generation: moves on every change (L9 Stage B: `table.snapshot()` / `table.changes(gen)`). */
+  generation(): number { return this.table.generation; }
+  /** L9 Stage B: the table's snapshot and its ordered delta stream (see table.ts). */
+  objectTable() { return this.table; }
   /** Re-read every object row: only after SQL that wrote `edge_comms_objects` without the framework (tests, repairs). */
   reload(): void { this.table.reload(); }
 

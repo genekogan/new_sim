@@ -14,6 +14,11 @@ import {rollbackGeneration} from '../store.ts';
 import type {ObjectRecord} from './types.ts';
 
 export const CELL = 32;
+/** deltas kept for `changes(since)` (a consumer further behind re-snapshots) */
+export const DELTA_KEEP = 4096;
+export type ObjectDelta = Readonly<{gen: number; id: string; record: ObjectRecord | null}>;
+export type ObjectSnapshot = {gen: number; records: readonly ObjectRecord[]};
+export type ObjectChanges = {gen: number; deltas: readonly ObjectDelta[]; settled: boolean};
 type KindIndex = {ids: string[]; list: readonly ObjectRecord[] | null};
 type Stmts = {all: ReturnType<Sql['prepare']>; one: ReturnType<Sql['prepare']>; version: ReturnType<Sql['prepare']>};
 
@@ -60,8 +65,12 @@ export class ObjectTable {
   private pending = new Map<string, string | null>();
   private pendingGen = 0;
   private dataVersion = -1;
-  /** moves on every change (load, put, drop) */
-  changes = 0;
+  /** L9 Stage B: moves by one on every change (load, put, drop); a delta carries the generation it made */
+  generation = 0;
+  /** the generation of the last whole load: deltas before it are void (a consumer re-snapshots) */
+  private resetGen = 0;
+  /** the most recent changes, oldest first, in generation order (at most DELTA_KEEP) */
+  private deltas: ObjectDelta[] = [];
   private stmts: Stmts;
   private db: Sql;
   private worldId: string;
@@ -100,7 +109,7 @@ export class ObjectTable {
   private load() {
     OBJECT_TABLE_STATS.loads++;
     this.rows.clear(); this.sorted = []; this.kinds.clear(); this.cells.clear(); this.cellOf.clear(); this.pending.clear();
-    this.list = null; this.idList = null; this.changes++;
+    this.list = null; this.idList = null; this.resetGen = ++this.generation; this.deltas = [];
     for (const r of this.stmts.all.all(this.worldId) as {body: string}[]) {
       const o = deepFreeze(JSON.parse(r.body) as ObjectRecord); OBJECT_TABLE_STATS.parsed++;
       this.rows.set(o.id, o); this.sorted.push(o.id); this.index(o);
@@ -121,11 +130,31 @@ export class ObjectTable {
     deepFreeze(o);
     const old = this.rows.get(o.id);
     if (old) this.unindex(old); else { insertSorted(this.sorted, o.id); this.idList = null; }
-    this.rows.set(o.id, o); this.index(o); this.list = null; this.changes++;
+    this.rows.set(o.id, o); this.index(o); this.list = null; this.delta(o.id, o);
   }
   private drop(id: string) {
     const old = this.rows.get(id); if (!old) return;
-    this.unindex(old); this.rows.delete(id); removeSorted(this.sorted, id); this.list = null; this.idList = null; this.changes++;
+    this.unindex(old); this.rows.delete(id); removeSorted(this.sorted, id); this.list = null; this.idList = null; this.delta(id, null);
+  }
+  private delta(id: string, record: ObjectRecord | null) {
+    this.deltas.push(Object.freeze({gen: ++this.generation, id, record}));
+    if (this.deltas.length > 2 * DELTA_KEEP) this.deltas = this.deltas.slice(-DELTA_KEEP);
+  }
+
+  /** L9 Stage B (read-model replication): every record, and the generation it is at. Apply `changes(gen)` from there. */
+  snapshot(): ObjectSnapshot { this.sync(); return {gen: this.generation, records: this.all()}; }
+  /** The changes after generation `since`, in order (each one a whole frozen record, or null = removed), or null when they
+   *  are no longer all known (a reload since, more than DELTA_KEEP since, or a generation this table never had): load a
+   *  new snapshot. `settled` is false while a transaction is open on this connection: a rollback is then reported as
+   *  further deltas (the rows put back), so a replica that must only see committed rows waits for `settled`. */
+  changes(since: number): ObjectChanges | null {
+    this.sync();
+    if (since > this.generation || since < this.resetGen) return null;
+    const settled = !this.pending.size;
+    if (since === this.generation) return {gen: since, deltas: [], settled};
+    const d = this.deltas, first = d.length ? d[0].gen : this.generation + 1;
+    if (since + 1 < first) return null;
+    return {gen: this.generation, deltas: d.slice(since + 1 - first), settled};
   }
 
   /** The framework wrote this body (already in the database). */

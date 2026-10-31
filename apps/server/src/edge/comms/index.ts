@@ -187,7 +187,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   app.get('/v1/edge/calendar', c => {
     const xff = c.req.header('x-forwarded-for'), wait = xff ? calendarReads.take(xff.split(',')[0].trim()) : 0;
     if (wait) { c.header('Retry-After', String(Math.ceil(wait / 1000))); return failure(c, new EdgeError(429, 'rate-limited', 'More than 60 calendar reads a minute from your address; wait a moment.')); }
-    const changes = objects.changes();
+    const changes = objects.generation();
     if (calendarItems?.changes !== changes) calendarItems = {changes, json: JSON.stringify(objects.ofKind('calendar-item').filter(o => (o.state as {phase: string}).phase !== 'over').map(o => ({id: o.id, ...(o.state as object)})))};
     return c.body(`${JSON.stringify(edgeBody({tick: core.tick()})).slice(0, -1)},"items":${calendarItems.json}}`, 200, {'Content-Type': 'application/json'});
   });

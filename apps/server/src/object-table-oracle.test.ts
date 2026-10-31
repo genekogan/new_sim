@@ -9,7 +9,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { Db } from './db.ts';
 import { commsFixture } from './edge/comms/testing.ts';
 import { tx } from './edge/comms/store.ts';
-import { OBJECT_TABLE_STATS } from './edge/comms/objects/table.ts';
+import { DELTA_KEEP, OBJECT_TABLE_STATS } from './edge/comms/objects/table.ts';
 import type { ObjectKind, ObjectRecord } from './edge/comms/objects/types.ts';
 
 type State = { n: number; target: number; at: [number, number] | null };
@@ -30,8 +30,21 @@ function fixture(t: TestContext, path = ':memory:') {
 }
 type F = ReturnType<typeof fixture>;
 const parsed = (f: F) => (f.db.db.prepare('SELECT body FROM edge_comms_objects WHERE world_id=? ORDER BY id').all(f.host.worldId) as { body: string }[]).map(r => JSON.parse(r.body) as ObjectRecord);
+/** L9 Stage B: a replica fed by snapshot + ordered deltas (re-snapshot only when the stream says so). */
+const replicas = new WeakMap<object, { gen: number; rows: Map<string, ObjectRecord>; resnaps: number }>();
+function replica(f: F) {
+  const t = f.objects.objectTable();
+  let r = replicas.get(f.db);
+  const snap = () => { const s = t.snapshot(); return { gen: s.gen, rows: new Map(s.records.map(o => [o.id, o])), resnaps: (r?.resnaps ?? -1) + 1 }; };
+  if (!r) replicas.set(f.db, r = snap());
+  const c = t.changes(r.gen);
+  if (!c) replicas.set(f.db, r = snap());
+  else { for (const d of c.deltas) { assert.equal(d.gen, ++r.gen, 'deltas come in generation order, one per change'); if (d.record) r.rows.set(d.id, d.record); else r.rows.delete(d.id); } assert.equal(r.gen, c.gen); }
+  return { rows: [...r.rows.values()].sort((a, b) => a.id < b.id ? -1 : 1), settled: c?.settled ?? true, resnaps: r.resnaps };
+}
 function same(f: F, why: string) {
   const want = parsed(f);
+  const rep = replica(f); if (rep.settled) assert.deepEqual(rep.rows, want, `snapshot + deltas replica after ${why}`);
   assert.deepEqual(f.objects.all(), want, `all() after ${why}`);
   assert.deepEqual(f.objects.ids(), want.map(o => o.id), `ids() after ${why}`);
   assert.deepEqual(f.objects.ofKind('oracle'), want.filter(o => o.kind === 'oracle'), `ofKind() after ${why}`);
@@ -97,4 +110,22 @@ test('reads are answered from memory: no parse after warm-up, the near filter us
   const all = f.objects.visibleTo(soul), near = f.objects.visibleTo(soul, { at: [500, 0], radius: 30, kinds: new Set(['oracle']) });
   assert.deepEqual(near, all.filter(v => Math.abs((v.public.at as [number, number])[0] - 500) <= 30));
   assert.deepEqual(near.map(v => v.id), ['p047', 'p048', 'p049', 'p050', 'p051', 'p052', 'p053']);
+});
+
+test('L9 Stage B: the delta stream is ordered, voided by a reload, bounded, and unsettled inside a transaction', t => {
+  const f = fixture(t), tbl = f.objects.objectTable();
+  f.add('a', 1); const s0 = tbl.snapshot();
+  f.add('b'); f.objects.fresh(); f.objects.remove('b');
+  const c = tbl.changes(s0.gen)!;
+  assert.deepEqual(c.deltas.map(d => [d.id, d.record ? d.record.version : null]), [['b', 1], ['a', 2], ['b', null]], 'create b, advance a, remove b');
+  assert.equal(c.settled, true); assert.deepEqual(tbl.changes(c.gen), { gen: c.gen, deltas: [], settled: true });
+  assert.equal(tbl.changes(c.gen + 1), null, 'a generation the table never had');
+  f.objects.reload(); assert.equal(tbl.changes(c.gen), null, 'a reload voids older generations: re-snapshot');
+  const s1 = tbl.snapshot();
+  for (let i = 0; i < DELTA_KEEP * 2 + 5; i++) f.objects.act('a', { soulId: f.id('Alice'), entityId: `h_${f.id('Alice')}`, name: 'Alice', owner: 'dev:Alice' } as never, { action: 'bump' });
+  assert.equal(tbl.changes(s1.gen), null, 'more than DELTA_KEEP behind: re-snapshot');
+  const s2 = tbl.snapshot();
+  tx(f.db.db as never, () => { f.add('c'); assert.equal(tbl.changes(s2.gen)!.settled, false, 'inside an open transaction'); });
+  assert.equal(tbl.changes(s2.gen)!.settled, true);
+  same(f, 'the delta-stream test');
 });
