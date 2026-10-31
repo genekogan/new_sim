@@ -20,12 +20,15 @@ pnpm install --frozen-lockfile
 pnpm assets:pull                      # media (models, textures, audio) from assets.eden.art, hash-checked
 cp .env.example .env
 pnpm --filter @sim/web build
+pnpm --filter mars-campus-viewer build:static  # people's bodies and animations (/modular), served from mars/viewer/dist/client
 BRAIN_MODE=fake DEV_AUTH=1 DATA_DIR=.local/dev node --env-file=.env apps/server/src/main.ts
 ```
 
-Open <http://localhost:4500/?dev=1> and sign in with any name (`admin` is an admin). `BRAIN_MODE=fake` makes no model
-calls and needs no keys. For hot reload, run `pnpm dev` instead of the last two lines (Vite on :5173, proxying to the
-server on :4500). More in [docs/development.md](docs/development.md).
+Open <http://localhost:4500/w/toy/?dev=1> (the server's root is the multi-world homepage, which lists only worlds
+from a launcher) and sign in with a name. Use `admin` to create Souls: `.env.example` sets `INVITE_REQUIRED=1`, so
+other names need an invite (or set `INVITE_REQUIRED=0`). `BRAIN_MODE=fake` makes no model calls and needs no keys.
+For hot reload, run `pnpm dev` instead of the web build and the server lines (Vite on :5173, proxying to the server on :4500). More in
+[docs/development.md](docs/development.md).
 
 Before opening a pull request, run the checks in [CONTRIBUTING.md](CONTRIBUTING.md).
 
