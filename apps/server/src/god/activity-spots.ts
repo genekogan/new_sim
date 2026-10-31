@@ -91,6 +91,16 @@ export class GodActivitySpots {
     return this.services.points;
   }
   data(): SpotsData { this.wanted = true; return this.get(); }
+  /** Continuity (warm after listen): derive the spots now (unless current) in slices of about `budgetMs`, one per step,
+   *  whether or not a listing has asked for them yet. Same derive and cache as `warm`/`get`. */
+  *servingWarmGen(budgetMs: number): Generator<void, void, void> {
+    for (;;) {
+      if (this.cache?.key === this.key()) return;
+      if (!this.pass) this.begin();
+      if (this.continue(budgetMs)) return;
+      yield;
+    }
+  }
   /** Derive now, off a Soul's listing, if the spots are stale and someone reads them (the host calls it once a god
    *  edit has been caught up with). Same derive and cache as data(): the next read finds them. True when it derived.
    *  L4 item 6: a served world (SpotsHost.sliced) derives in slices of `budgetMs` (one per tick while deriving()), and a
@@ -101,10 +111,14 @@ export class GodActivitySpots {
     if (!(this.wanted || (sliced && !this.cache)) || this.cache?.key === this.key() || this.h.catchingUp?.()) return false;
     this.wanted = false;
     if (!sliced) { this.get(); return true; }
+    this.begin();
+    return this.continue(budgetMs);
+  }
+  /** Open a sliced derive of the current key (continue() steps it). */
+  private begin() {
     const key = this.key(), gen = this.start();
     this.pass = { key, gen, locate: this.locate, memo: this.placeMemo, ms: 0 };
     this.locate = null; this.placeMemo = null;
-    return this.continue(budgetMs);
   }
   /** L4 item 6: a served world before its first spots: none yet (the host offers its base spots), a warm is asked for. */
   pendingFirst(): boolean { if (this.cache || !this.h.sliced?.()) return false; this.wanted = true; return true; }
