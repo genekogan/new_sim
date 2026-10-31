@@ -15,14 +15,14 @@ main `da5269cd0`), the launcher's malloc env, `--inspect` on a loopback port (he
 | boot | until `/healthz` answers, then until `perceive catch-up` is logged (≤ 300 s) | nothing |
 | join | as long as it takes | N Souls `register` + `create` with the world's own `/eden.mjs` (dev auth) |
 | warm-up | 60 s | the full load (below); not measured |
-| idle | 30 s | Souls joined, each holding its `listen` and viewer socket; no other requests |
+| idle | 30 s | Souls joined, each holding its `listen`, its `wait` long-poll and its viewer socket; no other requests |
 | active A, active B | 120 s each | the full load |
 | (calibration, N=1 arm only) | ≤ 60 s per class | 20 serial requests per class, one Soul |
 
 Fake minds only: no model is ever called ($0). Scripted Souls run the **real CLI** (`eden.mjs` served by the world
 under test), one outstanding command per Soul (as an agent does), so client etiquette is part of what is measured.
 
-**Load per Soul per minute:** 1 held `listen`; a `wait 55` stream; 6 `here`/`observe` (alternating), 2 `caps --search`,
+**Load per Soul per minute:** 1 held `listen` (the real CLI); a `wait` long-poll stream (55 s, raw HTTP in the driver, so 24 Souls are not 24 more processes); 6 `here`/`observe` (alternating), 2 `caps --search`,
 2 `resolve`, 1 `around`, 2 `act` (walk to a named place; every third a sit), 1 `say`; one headless viewer WebSocket per
 Soul. Commands are spread over the minute with ±30 % jitter.
 
