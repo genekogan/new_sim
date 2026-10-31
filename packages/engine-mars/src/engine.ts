@@ -2111,6 +2111,14 @@ export class MarsEngine implements Engine {
     }
     return false;
   }
+  /** Soul Actions entry 32: the god model's lock state of a door, read by a passage's thumb-turn step (hand-actuator.ts). */
+  installDoorLockedV1(read:(id:string)=>boolean|null){this.rt.services.doorLockedV1=read;}
+  /** Soul Actions entry 32 (pure): does a walk on the ground reach `to` from `from` with the world as it is now (shut doors
+   * block their gaps)? Who hears a knock: a body the knocked door shuts in, on the other side. */
+  reachesV1(from:[number,number],to:[number,number]):boolean{
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);
+    return spatial.route(this.rt.world,HUMAN_PROFILE_V1,{level:0,p:from},{level:0,p:to},{proveUnreachable:true}).ok;
+  }
   nearestStandableV1(at:[number,number],except?:string,minClear=HUMAN_RADIUS+.15,maxRing=80):[number,number]|null{
     const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const clear=spatial.clearTester(0,at,minClear);if(!clear)return null;
     const people=listEntities(this.ents).filter((o:any)=>o.kind==='human'&&o.id!==except).map((o:any)=>[o.pose.p[0],o.pose.p[2]] as [number,number]);

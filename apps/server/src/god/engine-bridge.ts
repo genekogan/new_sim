@@ -210,11 +210,13 @@ export class EngineBridge {
         bodies: [...this.host.minds.values()].flatMap(m => { const b = this.engine.world.entities[m.entityId]; return b && !isVerificationProbe(m.soulId) ? [{ name: m.name, soulId: m.soulId, at: [b.pose.p[0], b.pose.p[2]] as Vec2 }] : []; }),
       };
     };
+    // Soul Actions entry 32: a thing's owner for its lock, and who hears a knock on a door
+    const owner=(id:string,soul:EdgeSoul)=>{const o=this.layers.ownership(id);return o?.owner?{name:this.layers.nameOf(o.owner),mine:this.layers.isOf(o.owner,soul)}:null;};
     if(this.edge)this.edge.contactActuator=createContactActuatorService({model:()=>this.god.model,levelAt:(x,z,y)=>this.levelAt(x,z,y),
-      body:id=>this.host.engine.world.entities[id] as never,access:(id,soul)=>this.layers.refusal(id,soul),
+      body:id=>this.host.engine.world.entities[id] as never,access:(id,soul)=>this.layers.refusal(id,soul),owner,knock:(soul,id)=>this.knockHeard(soul,id),
       record:(soul,id,action)=>{const r=this.edge!.comms?.objects.act?.(id,soul,{action,params:{}}) as {accepted?:boolean}|undefined;if(!r?.accepted)throw Error('switch.object-record-refused');},
       commit:(ops,note,done)=>this.god.engineAct(ops,note,done)});
-    if(this.edge?.contactActuator)this.edge.doorPassage=createDoorPassage({engine:()=>this.host.engine as never,model:()=>this.god.model,contact:this.edge.contactActuator,access:(id,soul)=>this.layers.refusal(id,soul)});
+    if(this.edge?.contactActuator)this.edge.doorPassage=createDoorPassage({engine:()=>this.host.engine as never,model:()=>this.god.model,contact:this.edge.contactActuator,access:(id,soul)=>this.layers.refusal(id,soul),owner});
     this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), things: () => this.nav.things(), places: this.places, levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), commit: (ops, note) => this.god.engineAct(ops as never, note), layers: this.layers });
     this.god.onCommit((c) => { this.version++; if (c.diff.tiles.length || c.diff.defs.length) this.describeEpoch++; this.notePerceive([...c.diff.upserts.map((e) => e.id), ...c.diff.removes], c.diff.tiles.length > 0, c.by === 'engine' ? 'engine' : 'authored'); if (c.by !== 'engine') { this.godEdits++; this.editTick = this.host.engine.world.tick; this.onCommit(c.diff); } else if (c.diff.upserts.some(e => { const d=this.model.resolvedDef(e.def); return d?.components.opening && d.tags.includes('hand-operated'); })) { this.onCommit(c.diff); } });
     this.god.onBuild(e => { if (e.kind === 'started' || e.kind === 'resumed') this.editTick = this.host.engine.world.tick; });
@@ -854,6 +856,26 @@ export class EngineBridge {
     for (const id of ids.slice(0, 200)) { const e = m.entities.get(id); if (!e) continue; try { const p = m.worldPose(e); out.push([p.x, p.z]); } catch { /* unplaced */ } }
     return out;
   }
+  /** Soul Actions entry 32: a knock is heard, once, by the Souls the knocked door shuts in on its other side (no walk from
+   *  them to the knocker with the door shut) within 10 m of it, and by anyone within 3 m of the door. Never anyone else;
+   *  nothing about it stays in anyone's `here`. Returns who heard (tests, proof). */
+  readonly knockHeard=(soul:EdgeSoul,id:string):string[]=>{
+    const m=this.god.model,e=m.entities.get(id),w=this.host.engine.world,me=w.entities[soul.entityId];if(!e||!me)return [];
+    const p=m.worldPose(e),k=[Math.sin(p.yaw),Math.cos(p.yaw)],side=(x:number,z:number)=>((x-p.x)*k[0]+(z-p.z)*k[1])>=0?1:-1,mine=side(me.pose.p[0],me.pose.p[2]);
+    const eng=this.host.engine as unknown as {reachesV1?:(a:[number,number],b:[number,number])=>boolean},reaches=eng.reachesV1?.bind(eng),name=e.name??'a door',heard:string[]=[];
+    for(const mind of this.host.minds.values()){
+      if(mind.soulId===soul.soulId||isVerificationProbe(mind.soulId))continue;const b=w.entities[mind.entityId];if(!b?.human)continue;
+      const at:[number,number]=[b.pose.p[0],b.pose.p[2]],dist=Math.hypot(at[0]-p.x,at[1]-p.z);
+      // shut in by THIS door: they reach the spot just behind it but not the knocker (a Soul in another yard reaches neither)
+      const behind:[number,number]=[p.x-k[0]*mine*.8,p.z-k[1]*mine*.8];
+      const hears=dist<=3||(dist<=10&&side(at[0],at[1])!==mine&&!!reaches&&reaches(at,behind)&&!reaches(at,[me.pose.p[0],me.pose.p[2]]));
+      if(!hears)continue;heard.push(mind.soulId);
+      this.edge?.comms?.streams.deliver?.(mind.soulId,'knock',w.tick,{text:`${soul.name} knocks at ${name}.`,from:{soulId:soul.soulId,name:soul.name},door:id,where:{dist:Math.round(dist)}});
+    }
+    this.log(`knock: ${soul.name} at ${name}; heard by ${heard.length}`);this.lastKnock={tick:w.tick,by:soul.soulId,door:id,heard};
+    return heard;
+  };
+  lastKnock:{tick:number;by:string;door:string;heard:string[]}|null=null;
   private logSpots() { const st = this.activitySpots.stats; this.log(`activity spots: ${st.spots} spots, ${st.shelves} shelves in ${st.ms} ms`); }
   /** GODLIST: once a god edit is caught up with (perceive done), derive the activity spots in a tick instead of in the next
    *  Soul's listing (only when a listing has read them since the last such derive). */
