@@ -122,13 +122,16 @@ export function soulCeilings({ limitsFor = () => null, now = Date.now, log = (l)
     check(req, slug, rest, behindProxy) {
       if (!rest.startsWith('/v1/') && rest !== '/healthz') return null;
       const cls = requestClass(rest, req.method), edge = rest.startsWith('/v1/edge/'), l = limits(slug);
+      // only the Soul API is ceilinged: god and world routes (the world creator's own coding agent) keep the god-token
+      // bucket and the address flood guard (launcherFlood); a C3 public read still gets its class for the micro-cache
+      if (!edge) return cls === 'C3' ? { cls, soul: null, release() {} } : null;
       const xff = behindProxy ? req.headers['x-forwarded-for'] : undefined, ip = xff ? String(xff).split(',')[0].trim() : null;
       const soul = soulOf(req), acct = soul ? accounts.get(soul) ?? soul : null, heavy = edge && (cls === 'C1' || cls === 'C2');
       const len = Number(req.headers['content-length'] ?? 0);
       if (edge && !rest.startsWith('/v1/edge/body/uploads') && len > l.maxBodyKb * 1024) { note(slug, 'request.too-large', 'body'); return { refuse: { status: 413, headers: { 'cache-control': 'no-store' }, body: { ok: false, code: 'request.too-large', message: `a request body may be at most ${l.maxBodyKb} KB` } } }; }
       if (heavy && !req.headers.authorization) { note(slug, 'auth.required', 'token'); return { refuse: { status: 401, headers: { 'cache-control': 'no-store' }, body: { ok: false, code: 'auth.required', message: 'this needs a Soul token' } } }; }
       if (ip) {
-        if (edge) { const wait = bucket('ip', l.ipPer10s / 10, l.ipPer10s).take(`${slug}|${ip}`); if (wait) return no(slug, 429, 'client.rate', 'address', wait, `more than ${l.ipPer10s} requests in 10 s from your address to this world`); }
+        { const wait = bucket('ip', l.ipPer10s / 10, l.ipPer10s).take(`${slug}|${ip}`); if (wait) return no(slug, 429, 'client.rate', 'address', wait, `more than ${l.ipPer10s} requests in 10 s from your address to this world`); }
         if (n(`c|${ip}`) >= l.ipConcurrent) return no(slug, 429, 'client.rate', 'address', 1000, `more than ${l.ipConcurrent} requests at once from your address`);
         if (cls === 'listen' && n(`l|${ip}`) >= l.ipListen) return no(slug, 429, 'client.rate', 'address', 5000, `more than ${l.ipListen} listening connections from your address`);
       }

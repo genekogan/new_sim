@@ -6,7 +6,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openLauncher } from './launcher.mjs';
-import { requestClass, soulCeilings, SOUL_CEILINGS } from './flood.mjs';
+import { launcherFlood, requestClass, soulCeilings, SOUL_CEILINGS } from './flood.mjs';
 
 const req = (method, headers = {}) => ({ method, headers });
 
@@ -44,10 +44,57 @@ test('ceilings: address rate, listen per Soul / account / address, account rate,
   assert.equal(big.check(souls[2], 'w5', '/v1/edge/here', true).refuse.body.code, 'account.rate');
   assert.equal(c.check(req('POST', { authorization: 'Bearer sim_s_f_x', 'content-length': String(65 * 1024) }), 'w6', '/v1/edge/act', false).refuse.status, 413);
   assert.equal(c.check(req('GET', {}), 'w6', '/v1/edge/here', false).refuse.status, 401);
-  // address concurrency: ten in flight from one address, the eleventh refused
-  const many = []; for (let i = 0; i < SOUL_CEILINGS.ipConcurrent; i++) many.push(c.check(req('GET', { 'x-forwarded-for': '6.6.6.6' }), `w7-${i}`, '/v1/world/seq', true));
-  assert.equal(c.check(req('GET', { 'x-forwarded-for': '6.6.6.6' }), 'w8', '/v1/world/seq', true).refuse.body.code, 'client.rate');
+  // address concurrency on the Soul API: ten in flight from one address, the eleventh refused
+  const many = []; for (let i = 0; i < SOUL_CEILINGS.ipConcurrent; i++) many.push(c.check(req('GET', { 'x-forwarded-for': '6.6.6.6' }), `w7-${i}`, '/v1/edge/receipts/r1', true));
+  assert.equal(c.check(req('GET', { 'x-forwarded-for': '6.6.6.6' }), 'w8', '/v1/edge/receipts/r1', true).refuse.body.code, 'client.rate');
   assert.equal(c.socket('w8', '6.6.6.6'), null); many.forEach((m) => m.release()); assert.ok(c.socket('w8', '6.6.6.6'));
+});
+
+test('god and world routes are not under the Soul ceilings: 200 god calls from one address in 10 s, never client.rate', () => {
+  let t = 0; const c = soulCeilings({ now: () => t, log: () => {}, limitsFor: () => ({ ipPer10s: 5 }) });
+  const flood = launcherFlood({ now: () => t, log: () => {} });
+  const god = (m = 'POST') => req(m, { authorization: 'Bearer god_creator_secret', 'x-forwarded-for': '7.7.7.7' });
+  const held = [];   // all 200 still in flight: neither the address rate nor its concurrency applies
+  for (let i = 0; i < 200; i++, t += 50) {
+    const g = c.check(god(), 'eden', '/v1/god/query', true); assert.ok(!g?.refuse, JSON.stringify(g?.refuse?.body)); if (g) held.push(g);
+    const f = flood(god(), '/v1/god/query', true, 'eden'); if (f) assert.equal(f.body.limit.scope, 'god-token');
+  }
+  for (const r of ['/v1/world/seq', '/v1/god/status', '/healthz', '/v1/config']) assert.ok(!c.check(god('GET'), 'eden', r, true)?.refuse, r);
+  assert.equal(c.check(req('GET', { 'x-forwarded-for': '7.7.7.7' }), 'eden', '/v1/world/snapshot', true).cls, 'C3');   // still micro-cached
+  assert.equal(c.refused('eden')['client.rate'], undefined);
+  // the same address's Soul requests still count against ipPer10s (5 here), and the god calls used none of it
+  const soul = () => req('GET', { authorization: 'Bearer sim_s_g_x', 'x-forwarded-for': '7.7.7.7' });
+  for (let i = 0; i < 5; i++) { const r = c.check(soul(), 'eden', '/v1/edge/receipts/r1', true); assert.ok(r && !r.refuse); r.release(); }
+  assert.equal(c.check(soul(), 'eden', '/v1/edge/receipts/r1', true).refuse.body.code, 'client.rate');
+  held.forEach((h) => h.release());
+  // past the god bucket (30/s, burst 900) the refusal is the god token's, never the address's
+  const tight = launcherFlood({ now: () => t, log: () => {}, limits: { godTokenBurst: 30 } }); const codes = new Set();
+  for (let i = 0; i < 200; i++) { const f = tight(god(), '/v1/god/query', true, 'eden'); if (f) codes.add(f.body.limit.scope); }
+  assert.deepEqual([...codes], ['god-token']);
+});
+
+test('through the launcher: 200 god calls (50 at a time) from one address are never refused client.rate; a Soul request still is', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'l1-god-'));
+  const templatesDir = join(dir, 'templates'); mkdirSync(templatesDir);
+  const webDir = join(dir, 'web'); mkdirSync(webDir); writeFileSync(join(webDir, 'index.html'), '<!doctype html>');
+  const fake = new URL('./fake-world.mjs', import.meta.url).pathname;
+  const command = (w, port) => ({ cmd: process.execPath, args: [fake], env: { ...process.env, WORLD_KEY: w.slug, PORT: String(port) } });
+  const P = 5291, base = `http://127.0.0.1:${P}`;
+  const L = await openLauncher({ port: P, range: [5292, 5294], dataDir: join(dir, 'data'), webDir, templatesDir, command, eager: 0, log: () => {}, prewarm: false, publicOrigin: 'http://sim.test', devAuth: true, floodLimits: { godTokenBurst: 150 } });
+  try {
+    const { slug } = await (await fetch(`${base}/__sim/worlds`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Godspeed' }) })).json();
+    await (await fetch(`${base}/w/${slug}/v1/config`)).arrayBuffer();   // booted
+    const headers = { authorization: 'Bearer god_creator_secret', 'x-forwarded-for': '203.0.113.77', 'content-type': 'application/json' };
+    const out = [];   // four waves of 50 at once (more than one listen backlog's worth of connects resets on macOS)
+    for (let w = 0; w < 4; w++) out.push(...await Promise.all(Array.from({ length: 50 }, () => fetch(`${base}/w/${slug}/v1/god/query`, { method: 'POST', headers, body: '{}' }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) })))));
+    const refused = out.filter((r) => r.status === 429 || r.status === 503);
+    assert.ok(refused.length > 0 && refused.length <= 50, `${refused.length} refused (god bucket burst 150)`);
+    assert.ok(refused.every((r) => r.body?.limit?.scope === 'god-token' && r.body.code !== 'client.rate'), JSON.stringify(refused[0]));
+    await fetch(`${base}/__sim/op/set-limits`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ slug, limits: { ipPer10s: 3 } }) });
+    const soul = { authorization: 'Bearer sim_s_g_x', 'x-forwarded-for': '203.0.113.77' }, codes = [];
+    for (let i = 0; i < 4; i++) { const r = await fetch(`${base}/w/${slug}/v1/edge/receipts/r1`, { headers: soul }); codes.push(r.status === 429 ? (await r.json()).code : r.status); }
+    assert.equal(codes[3], 'client.rate', JSON.stringify(codes)); assert.ok(codes.slice(0, 3).every((c) => c !== 'client.rate'));
+  } finally { await L.close(); }
 });
 
 test('a 200 req/s hammer from one address: the world gets at most its budget, every refusal within 50 ms; C3 reads hit the world once a second', async () => {
