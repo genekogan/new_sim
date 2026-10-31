@@ -15,6 +15,10 @@
 //   node tools/changelog/compile.mjs --version <v> [--date YYYY-MM-DD] [--notes <file>] [--keep] [--dry-run]
 //       fold the fragments into a new `## <v>` section at the top of CHANGELOG.md, write the same section to
 //       --notes (for the GitHub Release), and delete the fragments (unless --keep). --dry-run prints the section.
+//   node tools/changelog/compile.mjs --version <v> --date <d> --out <file>
+//       write CHANGELOG.md with the new section to <file> instead; the tree (CHANGELOG.md and the fragments) is left as
+//       it is. release.yml's ship job builds the web app from it (SIM_CHANGELOG_FILE), so the public changelog page
+//       shows the release it ships (#393); publish later writes the same section into the committed CHANGELOG.md.
 import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -74,12 +78,17 @@ function main(argv) {
   const fragments = readFragments(dir); // throws on the first invalid fragment
   if (argv.includes('--check')) { console.log(`changelog: ${fragments.length} valid fragment(s)`); return 0; }
   const version = opt('--version');
-  if (!version) { console.error('usage: compile.mjs --check | --version <v> [--date YYYY-MM-DD] [--notes <file>] [--keep] [--dry-run]'); return 2; }
+  if (!version) { console.error('usage: compile.mjs --check | --version <v> [--date YYYY-MM-DD] [--notes <file>] [--keep] [--dry-run] [--out <file>]'); return 2; }
   const date = opt('--date') || new Date().toISOString().slice(0, 10);
   const existing = existsSync(file) ? readFileSync(file, 'utf8') : '';
   if (new RegExp(`^## ${version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} `, 'm').test(existing)) throw Error(`CHANGELOG.md already has ${version}`);
   const section = renderSection(version, date, fragments);
   if (argv.includes('--dry-run')) { console.log(section); return 0; }
+  if (opt('--out')) {
+    writeFileSync(resolve(opt('--out')), insertSection(existing, section));
+    console.log(`changelog: ${version} with ${fragments.length} fragment(s) -> ${opt('--out')} (tree unchanged)`);
+    return 0;
+  }
   writeFileSync(file, insertSection(existing, section));
   if (opt('--notes')) writeFileSync(resolve(opt('--notes')), section.split('\n').slice(2).join('\n'));
   if (!argv.includes('--keep')) for (const f of fragments) rmSync(join(dir, f.name));

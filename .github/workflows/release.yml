@@ -3,7 +3,10 @@
 #   gate       the full Modal release gate (tools/test-harness/release-gate.sh) against the last release tag
 #   ship       waits for the `production` environment's required reviewer, then tools/world-launcher/deploy/ship.sh
 #              over SSH (backup, upload, activate, probe, walks, poster, stall, cdn-walk), then healthz
-#   publish    compiles changes/ into CHANGELOG.md, tags v<version> on the shipped commit, creates the GitHub Release
+#              The web build renders the public changelog page from CHANGELOG.md with this release's section already
+#              compiled in (a copy outside the tree, SIM_CHANGELOG_FILE; #393), so the page shows the release it ships
+#   publish    compiles changes/ into CHANGELOG.md (same section, same date), tags v<version> on the shipped commit,
+#              creates the GitHub Release
 #
 # Secrets: MODAL_TOKEN_ID, MODAL_TOKEN_SECRET (repo); DEPLOY_SSH_KEY, SIM_DEPLOY_KNOWN_HOSTS (production environment);
 #          optional SIM_PROBE_GOD_JSON (the release-probe world's god file; without it the probe is skipped).
@@ -42,6 +45,7 @@ jobs:
       sha: ${{ steps.refs.outputs.sha }}
       baseline: ${{ steps.refs.outputs.baseline }}
       label: ${{ steps.refs.outputs.label }}
+      date: ${{ steps.refs.outputs.date }}
     steps:
       - name: Required secrets and variables
         env:
@@ -79,7 +83,8 @@ jobs:
           [ -n "$BASELINE" ] || { echo "::error::No v* tag to gate against yet; pass the baseline input (the commit that is live now)."; exit 1; }
           git rev-parse -q --verify "$BASELINE^{commit}" >/dev/null || { echo "::error::baseline '$BASELINE' is not a commit"; exit 1; }
           node tools/changelog/compile.mjs --check
-          { echo "sha=$(git rev-parse HEAD)"; echo "baseline=$(git rev-parse "$BASELINE^{commit}")"; echo "label=$LABEL"; } >> "$GITHUB_OUTPUT"
+          # One release date for the page the ship job builds and the CHANGELOG.md publish commits.
+          { echo "sha=$(git rev-parse HEAD)"; echo "baseline=$(git rev-parse "$BASELINE^{commit}")"; echo "label=$LABEL"; echo "date=$(date -u +%F)"; } >> "$GITHUB_OUTPUT"
           echo "Release v$VERSION: head $(git rev-parse --short HEAD), baseline $BASELINE, label $LABEL" >> "$GITHUB_STEP_SUMMARY"
 
   gate:
@@ -183,6 +188,16 @@ jobs:
             printf '%s' "$SIM_PROBE_GOD_JSON" > "$RUNNER_TEMP/release-probe/.eden-god.json" && chmod 600 "$RUNNER_TEMP/release-probe/.eden-god.json"
             echo "SHIP_PROBE_CLI=$RUNNER_TEMP/release-probe" >> "$GITHUB_ENV"
           fi
+      - name: Changelog page for this release
+        env:
+          VERSION: ${{ inputs.version }}
+          DATE: ${{ needs.preflight.outputs.date }}
+        run: |
+          # #393: the web build renders the changelog page from this copy (vite.config.ts reads SIM_CHANGELOG_FILE),
+          # with the shipped fragments folded in. The tree stays exactly HEAD; publish commits the same section later.
+          node tools/changelog/compile.mjs --version "$VERSION" --date "$DATE" --out "$RUNNER_TEMP/CHANGELOG.md"
+          grep -q "^## $VERSION " "$RUNNER_TEMP/CHANGELOG.md"
+          echo "SIM_CHANGELOG_FILE=$RUNNER_TEMP/CHANGELOG.md" >> "$GITHUB_ENV"
       - name: ship.sh
         env:
           SIM_DEPLOY_HOST: ${{ vars.SIM_DEPLOY_HOST || secrets.SIM_DEPLOY_HOST }}
@@ -233,6 +248,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
+          DATE: ${{ needs.preflight.outputs.date }}
           SHA: ${{ needs.preflight.outputs.sha }}
         run: |
           git config user.name "github-actions[bot]"
@@ -242,7 +258,7 @@ jobs:
           tmp="$RUNNER_TEMP/changelog"; rm -rf "$tmp"; mkdir -p "$tmp/changes"
           for f in $shipped; do git show "$SHA:$f" > "$tmp/$f"; done
           if [ -f CHANGELOG.md ]; then cp CHANGELOG.md "$tmp/"; fi
-          node tools/changelog/compile.mjs --root "$tmp" --version "$VERSION" --notes "$RUNNER_TEMP/notes.md"
+          node tools/changelog/compile.mjs --root "$tmp" --version "$VERSION" --date "$DATE" --notes "$RUNNER_TEMP/notes.md"
           cp "$tmp/CHANGELOG.md" CHANGELOG.md
           for f in $shipped; do git rm -q --ignore-unmatch "$f"; done
           git add CHANGELOG.md

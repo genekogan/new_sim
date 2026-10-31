@@ -59,6 +59,21 @@ test('CLI: --check validates, --version compiles, writes notes and removes fragm
   assert.throws(() => execFileSync(process.execPath, [SCRIPT, '--root', root, '--check'], { stdio: 'pipe' }));
 });
 
+test('CLI: --out writes the compiled changelog elsewhere and leaves the tree alone (#393)', () => {
+  const root = mkdtempSync(join(tmpdir(), 'changelog-'));
+  mkdirSync(join(root, 'changes'));
+  writeFileSync(join(root, 'changes', '7.md'), frag('feature', 'Walk on floors.'));
+  const before = '# Changelog\n\n## 0.9.0 (2026-10-01)\n\n- Old.\n';
+  writeFileSync(join(root, 'CHANGELOG.md'), before);
+  const out = join(root, 'build-changelog.md');
+  const run = (...a) => execFileSync(process.execPath, [SCRIPT, '--root', root, ...a], { encoding: 'utf8' });
+  run('--version', '1.0.0', '--date', '2026-11-01', '--out', out);
+  assert.equal(readFileSync(join(root, 'CHANGELOG.md'), 'utf8'), before, 'CHANGELOG.md untouched');
+  assert.ok(existsSync(join(root, 'changes', '7.md')), 'fragments kept for publish');
+  run('--version', '1.0.0', '--date', '2026-11-01');   // what publish does later
+  assert.equal(readFileSync(out, 'utf8'), readFileSync(join(root, 'CHANGELOG.md'), 'utf8'), 'the build saw exactly what publish commits');
+});
+
 test('the repo fragments are valid', () => {
   readFragments(fileURLToPath(new URL('../../changes/', import.meta.url)));
 });
