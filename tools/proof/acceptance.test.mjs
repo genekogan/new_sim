@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  checkPr, linkedIssues, loadChecks, parseAudit, parseChecklist, prMode, renderComment, sections, skeleton, validateProof, MARKER, SCHEMA,
+  checkPr, issueNumberFromPath, linkedIssues, loadChecks, parseAudit, parseChecklist, prMode, renderComment, sections, skeleton, validateProof, MARKER, SCHEMA,
 } from './acceptance.mjs';
 
 const policy = loadChecks();
@@ -156,6 +156,15 @@ test('skeleton turns issue criteria into unmet proof.json criteria', () => {
   const s = skeleton({ issueBody: '### Acceptance criteria\n- [ ] **A1** One\n- [ ] Two', tier: 'T3' });
   assert.deepEqual(s.criteria.map(c => [c.id, c.status]), [['A1', 'unmet'], ['A2', 'unmet']]);
   assert.ok(s.playtest && s.review);
+});
+
+test('init fills the issue number from a journal path and the commit it is given', () => {
+  assert.equal(issueNumberFromPath('.e2e/journal/388/issue.md'), 388);
+  assert.equal(issueNumberFromPath('/abs/clone/.e2e/journal/12/issue.md'), 12);
+  assert.equal(issueNumberFromPath('issue.md'), null);
+  assert.equal(issueNumberFromPath(undefined), null);
+  const s = skeleton({ issueBody: '### Acceptance criteria\n- [ ] **A1** One', issue: 388, commit: 'abc1234', tier: 'T2' });
+  assert.equal(s.issue, 388); assert.equal(s.commit, 'abc1234');
 });
 
 test('prMode reads the PR, files, issue and proof.json through injected gh/fetch', async () => {

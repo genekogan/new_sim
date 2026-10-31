@@ -25,11 +25,22 @@ Get the tier of the current diff with `node tools/proof/tier.mjs --base origin/m
 ## 1. Boot a fake-mind world
 
 Needs a built web client (`pnpm install --frozen-lockfile && pnpm --filter @sim/web build`; skip if
-`apps/web/dist/index.html` exists and is current for your change).
+`apps/web/dist/index.html` exists and is current for your change). In a fresh clone the build's prebuild check fails
+until the web media are in place: `node tools/assets/pull.mjs --only 'apps/web/**'` (a few files) is enough for it.
 
 ```bash
-node tools/god-skill/dev-world.mjs proof 4710 --genesis worlds/templates/hello-hamlet.json --fresh
+node tools/god-skill/dev-world.mjs proof 4710 --genesis worlds/templates/hello-hamlet.json --fresh --data .local/proof
 # prints http://127.0.0.1:4710/w/proof?dev=1 (pid N, log .lane/proof.log); the server keeps running detached
+```
+
+The homepage (world list, New world) is served by the world launcher, not by a single world. For a journey that
+starts there, run a launcher (its worlds always get fake minds) and make a world for the list through its API:
+
+```bash
+node tools/world-launcher/launcher.mjs --port 4720 --range 4721-4723 --data "$PWD/.local/proof-launcher" --eager 0 &
+curl -s -X POST -H 'content-type: application/json' -H 'authorization: Bearer dev:proof' \
+  -d '{"name":"Proof Garden","template":"hello-hamlet"}' http://127.0.0.1:4720/__sim/worlds
+# record against http://127.0.0.1:4720/ ; stop the launcher by its pid (it stops its worlds)
 ```
 
 Pick the template that contains the changed surface (`worlds/templates/`: hello-hamlet is small and fast; eden-2026,

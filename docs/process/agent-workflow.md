@@ -35,9 +35,10 @@ Two PRs that both append to one shared file conflict every time. So nothing a PR
 When a PR is ready, label it `merge:ready`. From there the train takes over, one PR at a time:
 
 1. **Rebase** the branch onto the current `main`.
-2. **Re-test**: the required `ci-ok` check (from the `ci` workflow), `security` and `changelog` run on the rebased
-   head. GitHub's merge queue re-runs them on the exact merge commit (`merge_group`), so `main` never gets a commit
-   that was tested only against an older base.
+2. **Re-test**: the required checks (`ci-ok` from the `ci` workflow, `gitleaks`, `path-guard`, `scrub-guard`,
+   `proof-ok` and `fragment`) run on the rebased head, and the train waits for them there (a personal-account repo
+   has no GitHub merge queue; `merge-train.yml` is the queue), so `main` never gets a commit tested only against an
+   older base.
 3. **Merge**, by tier ([PROOF-POLICY.yml](PROOF-POLICY.yml), `node tools/proof/tier.mjs`):
    - **T0–T2** merge automatically once every required check is green.
    - **T3–T4** wait for the maintainer's approval, then merge.

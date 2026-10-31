@@ -4,7 +4,8 @@
 //
 //   node tools/proof/acceptance.mjs check --body pr.md [--issue issue.md] [--proof proof.json] [--tier T2 |
 //        --files a,b | --base <ref>] [--label tier:T3 ...] [--head <sha>] [--json] [--comment out.md]
-//   node tools/proof/acceptance.mjs init --issue issue.md [--pr <n>] [--tier T2] > .e2e/proof/<slug>/proof.json
+//   node tools/proof/acceptance.mjs init --issue issue.md [--pr <n>] [--tier T2] [--issue-number <n>] [--commit <sha>]
+//        > .e2e/journal/<n>/proof.json      (issue: from --issue-number or a .e2e/journal/<n>/ path; commit: git HEAD)
 //   node tools/proof/acceptance.mjs pr --repo owner/name --pr <n> [--head <sha>] [--comment out.md]
 //        [--summary file] [--output file]          (proof-check.yml: reads the PR, its files, issue and proof.json
 //                                                   with `gh api`; prints the report; writes ok=true|false)
@@ -325,6 +326,10 @@ export function skeleton({ issueBody = '', pr = null, issue = null, tier = 'T1',
   };
 }
 
+/** The issue number in a journal path (`.e2e/journal/388/issue.md` -> 388), else null. */
+export const issueNumberFromPath = p => { const m = /(?:^|[\\/])journal[\\/](\d+)[\\/]/.exec(String(p ?? '')); return m ? Number(m[1]) : null; };
+const headCommit = () => { try { return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || null; } catch { return null; } };
+
 // ── CLI ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 const ghJson = (path, extra = []) => JSON.parse(execFileSync('gh', ['api', ...extra, path], { encoding: 'utf8', maxBuffer: 1 << 26 }));
 
@@ -378,7 +383,8 @@ async function main(argv) {
   const read = f => readFileSync(f, 'utf8');
   if (mode === 'init') {
     if (!opt('--issue')) { console.error('init needs --issue <file>'); return 2; }
-    console.log(JSON.stringify(skeleton({ issueBody: read(opt('--issue')), pr: opt('--pr') ? Number(opt('--pr')) : null, tier: opt('--tier') ?? 'T1' }), null, 2));
+    const issue = opt('--issue-number') ? Number(opt('--issue-number')) : issueNumberFromPath(opt('--issue'));
+    console.log(JSON.stringify(skeleton({ issueBody: read(opt('--issue')), pr: opt('--pr') ? Number(opt('--pr')) : null, issue, commit: opt('--commit') ?? headCommit(), tier: opt('--tier') ?? 'T1' }), null, 2));
     return 0;
   }
   if (mode === 'check') {
