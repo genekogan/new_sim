@@ -23,7 +23,7 @@ import { isPlywood } from '../../engine/construction/deck.ts';
 import { ComponentViews } from './components.ts';
 import {recordedSleepPose} from './recorded-sleep-pose.ts';
 import { FixtureViews } from './fixtures.ts';
-import { HumanViews, type Hands, type SampledHuman } from './humans.ts';
+import { HumanViews, REST_ACTS, type Hands, type SampledHuman } from './humans.ts';
 import { takeLog, type LogLine, type TakeStep } from './take-log.ts';
 import type { Template } from './people.ts';
 import { walkCum } from './take-walk.ts';
@@ -264,7 +264,7 @@ export class TakePeople {
   }
 
   /** How long `id`'s current activity has run at `tick` and what it did before (absent when it began before the take). */
-  private activityHistory(id: string, tick: number): Pick<SampledHuman, 'activityAge' | 'prevActivity' | 'prevBaseActivity'> {
+  private activityHistory(id: string, tick: number): Pick<SampledHuman, 'activityAge' | 'prevActivity' | 'prevBaseActivity' | 'restAge'> {
     const a = this.acts.get(id);
     if (!a) return {};
     let k = -1;
@@ -272,7 +272,13 @@ export class TakePeople {
     if (k < 1) return {};
     let b: string | null = null;
     for (let i = a.bt.length - 1; i >= 0; i--) if (a.bt[i] < a.t[k]) { b = a.bv[i]; break; }
-    return { activityAge: (tick - a.t[k]) * this.take.dt, prevActivity: a.v[k - 1], ...(b ? { prevBaseActivity: b } : {}) };
+    return { activityAge: (tick - a.t[k]) * this.take.dt, prevActivity: a.v[k - 1], ...(b ? { prevBaseActivity: b } : {}), ...this.restAge(a, k, tick) };
+  }
+  private restAge(a: { t: number[]; v: string[] }, k: number, tick: number): Pick<SampledHuman, 'restAge'> {
+    if (!REST_ACTS.has(a.v[k])) return {};
+    let i = k;
+    while (i > 0 && REST_ACTS.has(a.v[i - 1])) i--;
+    return i > 0 ? { restAge: (tick - a.t[i]) * this.take.dt } : {};
   }
 
   /** Metres walked by `id` up to `tick` along its recorded track (horizontal). */
