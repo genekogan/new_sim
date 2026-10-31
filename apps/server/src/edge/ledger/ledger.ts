@@ -65,6 +65,8 @@ type Resolved = {from: string; to: string; note: string};
 const WAIT_CODES = new Set(['program.safe-stop-required', 'program.safe-stop-pending']);
 const WAIT_LIMIT_TICKS = 20 * 60;   // a waiting receipt that cannot start within a minute fails
 const NEAR_RADIUS = 20, GO_NEAR_RADIUS = 60;
+/** srv-act-words (C): the destination words of a focus-shaped walk (vocabulary WORDS_FOCUS_SHAPE's walk arm). */
+const WALK_DEST = /^(?:please )?(?:go|walk|head)(?: over| back)? (?:to|into|inside|towards?) ([a-z0-9' -]+?)[.!]?$/;
 /** L3 menu cache: a kept menu is rebuilt at least this often (2 min: anything it reads without a version, e.g. a far
  *  Soul's ambient sit), in cells of this size, bumped for Souls within this reach (fires 150 m). */
 // MENU_REACH_M covers SPOT_REACH: an activity spot is offered up to 200 m off, and a claim on it (an act whose target it
@@ -820,6 +822,11 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const low = text.toLowerCase(), toks = tokens(low);
     if (/\b(?:him|her|them|they|she|he|me|us|my|with|together)\b/.test(low)) return null;
     for (const m of this.host.minds.values()) if (m.soulId !== soul.soulId && (low.includes(m.soulId.toLowerCase()) || tokens(m.name).some(t => toks.includes(t)))) return null;
+    // (C) a walk whose destination words name no place (placeMatch: names, ids, aliases, kinds, descriptions) is decided on
+    // the words menu before any focused build (a misspelt or unknown place answered unknown on the focus, then paid for the
+    // words menu too); a thing's name, a typo the words menu reads: the words menu, as before
+    const dest = WALK_DEST.exec(low.trim().replace(/\s+/g, ' '));
+    if (dest) {const {places, withheld} = this.vocabPlaces(soul); if (!placeMatch(tokens(dest[1]), places, withheld).length) {menuStats.words.focusSkipped++; return null;}}
     const f = this.bindFocus(soul, {ids: new Set(), verbs, targets: new Set()});
     if (this.together.resolve(soul, text, [...f.caps], new Map(f.plans) as Map<string, TogetherPlan>)) return null;
     const pre = this.resolveOnDemand(soul, text, [...f.caps], new Map(f.plans));
