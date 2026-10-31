@@ -345,7 +345,8 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
         return { status: 'running', phase: 'withdraw' };
       }
       if (ex.mode === 'put') setHand(a, ex.hand, undefined);
-      delete a.human!.handTransferV1;
+      // the record stays, ended: the drawn idle (and its gestures) eases back in from here (overwritten by the next one)
+      if (a.human!.handTransferV1) a.human!.handTransferV1 = { ...a.human!.handTransferV1, endTick: rt.tick };
       if (a.human!.task === ex.id) { a.human!.task = undefined; a.human!.activity = 'idle'; }
       return { status: 'completed', outputs: { item: ex.item, hand: ex.hand, support: rt.world.entities[ex.item].support } };
     },

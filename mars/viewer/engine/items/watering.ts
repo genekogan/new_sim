@@ -95,7 +95,9 @@ export function wateringFrame(m: WateringMotion, s: number): WateringFrame {
 }
 
 /** A handle-held item taken or put by hand (take_item / put_item): the reach and the hand back, `reach` s each. */
-export type HandTransfer = { mode: 'take' | 'put'; hand: 'left' | 'right'; startTick: number; reach: number };
+export type HandTransfer = { mode: 'take' | 'put'; hand: 'left' | 'right'; startTick: number; reach: number; endTick?: number };
+/** After a put the idle pose (and any idle gesture) comes back over this long (s), as after a hand actuator's release. */
+export const TRANSFER_HANDOFF = 1.2;
 /** How much of that arm the engine's hand point owns (the rest is the clip's pose): a take blends in over the reach and
  *  keeps hold; a put holds through the reach and blends back out to the clip over the hand's way back. */
 export function transferWeight(m: HandTransfer, s: number) {
@@ -140,7 +142,7 @@ function clearBody(rt: Runtime, ex: Exec) {
   const h = rt.world.entities[ex.p.actor]?.human; if (!h) return;
   delete h.wateringV1;
   if (h.hands) { delete h.hands.left; if (!h.hands.right) delete h.hands; }
-  if (h.activity === 'operate') h.activity = 'idle';
+  if (h.activity === 'reach') h.activity = 'idle';
 }
 export const watering: ActionDef<WateringParams, true, Exec> = {
   verb: 'watering_can_v1',
@@ -188,7 +190,8 @@ export const watering: ActionDef<WateringParams, true, Exec> = {
     followHand(it, right, a.pose.yaw);
     if (ex.p.valve && f.left > 1e-4) h.hands.left = [...lerp3(restHand(b, 'left'), ex.p.valve, f.left)];
     else delete h.hands.left;
-    h.activity = 'operate';
+    // 'reach': the drawn posture leans from the hips toward a low hold (a can under a tap), it does not crouch
+    h.activity = 'reach';
     h.wateringV1 = m;
     if (f.done) { clearBody(rt, ex); h.hands = { ...(h.hands ?? {}), right: [...carry] }; return { status: 'completed', outputs: { stage: m.stage, level: ex.p.levelAfter } }; }
     return { status: 'running', phase: m.stage === 'fill' ? (s < fillContacts(m).on ? 'reaching' : s < fillContacts(m).off ? 'filling' : 'lifting') : (f.flow > 0 ? 'pouring' : s < pourWindow(m).start ? 'raising' : 'lowering') };

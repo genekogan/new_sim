@@ -74,7 +74,7 @@ const growingPlanter: DefInput = {
   params: { ...Object.fromEntries(Object.entries(plantPalette).map(([k, v]) => [k, { type: 'color', default: v, doc: `${k} colour` }])), litres: { type: 'number', min: 1, max: 40, default: POUR_LITRES, doc: 'litres of water that soak it from dry to wet' } } as DefInput['params'], palette: plantPalette,
   state: { moisture: { type: 'number', min: 0, max: 1, default: 0.1 }, growth: { type: 'number', min: 0, max: 4, default: 0 }, thirst: { type: 'number', min: 0, max: 3, default: 0 }, pouring: { type: 'bool', default: false } } as DefInput['state'],
   // the patter of water from a can's rose on the soil, while it is poured
-  components: { sound: { kind: 'water', radius: 7, volume: 0.32, when: 'pouring', mode: 'loop', variant: 3 } } as DefInput['components'],
+  components: { sound: { kind: 'water', radius: 8, volume: 0.6, when: 'pouring', mode: 'loop', variant: 3 } } as DefInput['components'],
   size: { box: [0.9, 0.9, 0.5] },
 } as DefInput;
 

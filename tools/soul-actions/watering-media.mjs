@@ -18,7 +18,7 @@ const at=tick=>(wallOf(tick)-t0)/1000,cut=(name,s0,s1,crf=23,scale=1280)=>{const
 const clips=[];x.commands.forEach((c,i)=>{const s0=(c.start-t0)/1000-1,s1=(c.end-t0)/1000+3;clips.push(cut(`water-${i+1}`,s0,s1));});
 let whole=cut('whole-uncut',0,span,30,960);if(whole.mb>15)whole=cut('whole-uncut',0,span,34,854);clips.push(whole);
 // audio RMS around each pour (planter `pouring`)
-const raw=execFileSync(ff,['-v','error','-i',d+'/actual-audio.webm','-af','highpass=f=110','-f','f32le','-ac','1','-ar','8000','pipe:1'],{maxBuffer:200e6}),N=raw.length/4;
+const raw=execFileSync(ff,['-v','error','-i',d+'/actual-audio.webm','-af','highpass=f=1100,lowpass=f=3400','-f','f32le','-ac','1','-ar','8000','pipe:1'],{maxBuffer:200e6}),N=raw.length/4;
 const rms=(s0,s1)=>{let n=0,s=0;for(let i=Math.max(0,Math.floor(s0*8000));i<Math.min(N,s1*8000);i++){const v=raw.readFloatLE(i*4);s+=v*v;n++;}return +Math.sqrt(s/Math.max(1,n)).toFixed(5);};
 const pours=[];let on=null;for(const s of S){const p=!!(s.st.rose?.pouring||s.st.herb?.pouring);if(p&&on===null)on=s.tick;if(!p&&on!==null){pours.push([on,s.tick]);on=null;}}
 const rel=w=>(w-a.at)/1000,audio=pours.map(([p0,p1])=>({ticks:[p0,p1],before:rms(rel(wallOf(p0))-2.5,rel(wallOf(p0))-0.5),pouring:rms(rel(wallOf(p0))+0.3,rel(wallOf(p1))-0.1),after:rms(rel(wallOf(p1))+1.0,rel(wallOf(p1))+3.0)}));
