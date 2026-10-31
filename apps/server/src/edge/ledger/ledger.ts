@@ -662,7 +662,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const value = this.bindsTail(soul, core); this.capCache.set(soul.soulId, {tick, key, reads, value: core, last: {tick, sig, value}}); return value;
   }
   /** Everything a Soul's menu reads that moves without a version of its own: its body (position to 5 cm, level, activity, ride),
-   *  the bodies within go-near reach (5 cm, activity), the cells versions near it (acts and closed receipts bump
+   *  its look (`body`: a seat too high or low for its height is refused, R2 gate use-check),
+ *  the bodies within go-near reach (5 cm, activity), the cells versions near it (acts and closed receipts bump
    *  them), the together version, the static world and the menu generation (global clears). Rigid bodies (creatures)
    *  are keyed by tick (their shaping edits the offers in place). */
   /**
@@ -722,7 +723,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       const exact = dx * dx + dz * dz <= (NEAR_RADIUS + 1) ** 2;
       near += exact ? `${o.soulId}=${ob.pose.p[0]},${ob.pose.p[1]},${ob.pose.p[2]},${String(ob.human?.activity ?? '')};` : `${o.soulId}@${q(ob.pose.p[0])},${q(ob.pose.p[1])},${q(ob.pose.p[2])},${String(ob.human?.activity ?? '')};`;
     }
-    return `${this.staticVersion()}|${this.menuInputs()}|${this.menuGen}|${this.together.version}|${this.cellsNear(x, z)}|${q(x)},${q(y)},${q(z)},${String(h?.activity ?? '')},${String(h?.baseActivity ?? '')},${String(h?.level ?? '')},${JSON.stringify(h?.seat ?? null)}|${ride ? `${ride.id},${ride.phase},${ride.riderPhase},${stepping?.code ?? ''}` : ''}|${this.faded.has(soul.soulId) ? 'f' : ''}|${this.clockMinute(tick)}|${near}`;
+    return `${this.staticVersion()}|${this.menuInputs()}|${this.menuGen}|${this.together.version}|${this.cellsNear(x, z)}|${q(x)},${q(y)},${q(z)},${String(h?.activity ?? '')},${String(h?.baseActivity ?? '')},${String(h?.level ?? '')},${JSON.stringify(h?.seat ?? null)},${JSON.stringify((me as {body?: unknown}).body ?? null)}|${ride ? `${ride.id},${ride.phase},${ride.riderPhase},${stepping?.code ?? ''}` : ''}|${this.faded.has(soul.soulId) ? 'f' : ''}|${this.clockMinute(tick)}|${near}`;
   }
   /** L3 oracle (tests; EDGE_MENU_ORACLE=1 on every kept menu): null when `menu` (default: what binds returns now) equals
    *  a menu built fresh from the world as it is, else the first difference. Never writes the cache. */
