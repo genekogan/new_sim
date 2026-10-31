@@ -9,6 +9,7 @@ import {mountEdgeRoutes} from '../../apps/server/src/edge/routes.ts';
 import {GodMode} from '../../apps/server/src/god/god.ts';
 import {installEngineBridge} from '../../apps/server/src/god/engine-bridge.ts';
 import {WorldModel} from '../../packages/world-compiler/src/model.ts';
+import {isContactActuator} from '../../apps/server/src/god/contact-actuator.ts';
 
 // Entry 21: a garden fountain turned on and off by hand at the valve on its post; water changes only at contact.
 const out=process.env.SOUL_ACTIONS_OUT;
@@ -43,7 +44,7 @@ test('hand-operated fountain: valve contact, refusal, interruption, persistence,
   assert.equal(x.phase,'completed',JSON.stringify(edge.receipt(soul.soulId,r.receipt.id)).slice(0,400));assert.ok(x.contact,'actual hand contact ran');assert.equal(x.early,false,'no water before contact');assert.equal(state(name).on,cap.endsWith('on'));results[`${Object.keys(results).length+1}:${cap}`]=x;
   const m=body().human;assert.equal(m?.handActuator,undefined);
  }
-  assert.ok(!edge.capabilities(soul).some(c=>c.id===`object:${id('old-fountain')}:switch-on`&&c.contact),'v1 fountain has no hand contact');
+  const contact=(n,a)=>isContactActuator(god.model.resolvedDef(god.model.get(n).def),{name:a});assert.ok(!god.model.resolvedDef('core/fountain@1').actions.some(a=>contact('old-fountain',a.name)),'v1 fountain has no hand contact');assert.ok(contact('fountain','switch-on')&&contact('fountain','switch-off'),'the garden fountain is a hand contact');
  const restored=WorldModel.fromSnapshot(JSON.parse(JSON.stringify(god.model.snapshot())),undefined,god.model.library);assert.equal(restored.get('fountain').state.on,true);assert.equal(restored.get('tap').state.on,true);
  if(out){mkdirSync(out,{recursive:true});writeFileSync(`${out}/fountain.json`,JSON.stringify(god.model.snapshot()));}
  assert.deepEqual(f.host.engine.runtime.violations,[]);
