@@ -97,3 +97,21 @@ test('a 200 req/s hammer from one address: the world gets at most its budget, ev
     assert.equal(row.limits.worldBudgetRps, 50); assert.ok(row.refused['world.busy'] > 0 || row.refused['client.rate'] > 0);
   } finally { await L.close(); }
 });
+
+test('lane L7 mounts: /__sim/metrics (loopback only) carries the ceilings\' refusals; healthz has clientErrorsRate10m', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'l1-metrics-'));
+  const templatesDir = join(dir, 'templates'); mkdirSync(templatesDir);
+  const webDir = join(dir, 'web'); mkdirSync(webDir); writeFileSync(join(webDir, 'index.html'), '<!doctype html>');
+  const fake = new URL('./fake-world.mjs', import.meta.url).pathname;
+  const command = (w, port) => ({ cmd: process.execPath, args: [fake], env: { ...process.env, WORLD_KEY: w.slug, PORT: String(port) } });
+  const P = 5109, base = `http://127.0.0.1:${P}`;
+  const L = await openLauncher({ port: P, range: [5104, 5106], dataDir: join(dir, 'data'), webDir, templatesDir, command, eager: 0, log: () => {}, prewarm: false, publicOrigin: 'http://sim.test', devAuth: true });
+  try {
+    const { slug } = await (await fetch(`${base}/__sim/worlds`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Gauge' }) })).json();
+    assert.equal((await fetch(`${base}/w/${slug}/v1/edge/here`, { headers: { 'x-forwarded-for': '203.0.113.1' } })).status, 401);
+    const h = await (await fetch(`${base}/__sim/healthz`)).json(); assert.equal(typeof h.clientErrorsRate10m, 'number');
+    const m = await (await fetch(`${base}/__sim/metrics`)).text();
+    assert.match(m, new RegExp(`sim_world_refused_total\\{world="${slug}",class="auth.required"\\} 1`));
+    assert.equal((await fetch(`${base}/__sim/metrics`, { headers: { 'x-forwarded-for': '1.2.3.4' } })).status, 404);
+  } finally { await L.close(); }
+});
