@@ -3,6 +3,7 @@
 // the god's work holding a reserved quarter. One heavy request in flight per Soul (`soul.busy`); a per-Soul CPU-ms
 // bucket under contention (`soul.slow-down`); a job whose deadline passes is answered `world.busy` unrun, and a job
 // whose client went away is dropped. It queues, delays and refuses; it never chooses or retries an act for a Soul.
+import {createHash} from 'node:crypto';
 import type {Context, MiddlewareHandler} from 'hono';
 import type {Level} from './shared.ts';
 
@@ -193,27 +194,42 @@ const LOAD_KEY = 'simLoad';
 export const loadOf = (c: Context): Level | undefined => (c.get as (k: string) => unknown)(LOAD_KEY) as Level | undefined;
 
 /** Mount on '*' before the routes: classifies, admits, stamps X-Sim-Load (and Retry-After on refusals at amber+). */
-export function admissionMiddleware(adm: Admission, level: () => Level, bearer: (c: Context) => string | undefined): MiddlewareHandler {
-  const stamp = (c: Context, lv: Level) => {
+/** An opaque, stable id of the account behind a Soul token (the same for all its Souls), never the raw account id. */
+export const accountTag = (owner: string) => createHash('sha256').update('sim-account/1\0' + owner).digest('base64url').slice(0, 16);
+
+/** `account(token)` → the token's account (Soul owner) for `x-sim-account`, which the launcher's per-account ceilings read
+ *  and strip (LOAD-CONTRACT §2b). Cached per token for a minute (a token lookup reads the database). */
+export function admissionMiddleware(adm: Admission, level: () => Level, bearer: (c: Context) => string | undefined, account?: (token: string) => string | undefined): MiddlewareHandler {
+  const tags = new Map<string, {tag: string | null; at: number}>();
+  const tagOf = (token: string) => {
+    const now = Date.now(), hit = tags.get(token);
+    if (hit && now - hit.at < 60_000) return hit.tag;
+    let owner: string | undefined; try { owner = account?.(token); } catch { owner = undefined; }
+    const tag = owner ? accountTag(owner) : null;
+    if (tags.size > 4096) tags.clear();
+    tags.set(token, {tag, at: now}); return tag;
+  };
+  const stamp = (c: Context, lv: Level, token?: string) => {
     c.header('X-Sim-Load', lv);
+    if (token && account) { const tag = tagOf(token); if (tag) c.header('x-sim-account', tag); }
     if (lv !== 'green' && (c.res.status === 429 || c.res.status === 503) && !c.res.headers.has('Retry-After')) c.header('Retry-After', String(RETRY_S[lv]));
   };
   return async (c, next) => {
     const path = c.req.path, edge = path.startsWith('/v1/edge/') || path.startsWith('/v1/god/') || path.startsWith('/v1/world/');
     if (!edge) return next();
     const lv = level(); (c.set as (k: string, v: unknown) => void)(LOAD_KEY, lv);
-    const r = classify(c.req.method, path), token = r && (r.cls === 'C1' || r.cls === 'C2') ? bearer(c) : undefined;
-    if (!r || !token) { await next(); stamp(c, lv); return; }
+    const r = classify(c.req.method, path), token = bearer(c);
+    if (!r || !token || (r.cls !== 'C1' && r.cls !== 'C2')) { await next(); stamp(c, lv, token); return; }
     if (c.req.method !== 'GET' && c.req.method !== 'HEAD') await c.req.text().catch(() => '');   // read the body before the turn: its I/O is not request CPU
     const raw = c.req.raw, hint = Number(c.req.header('x-sim-timeout-ms'));
     const t = adm.request({key: r.god ? 'god' : 'soul:' + token, god: r.god, route: r, hintMs: Number.isFinite(hint) ? hint : undefined, closed: () => raw.signal?.aborted === true});
-    const refuse = (x: Refusal) => { c.header('Cache-Control', 'no-store'); c.header('Retry-After', String(x.retryAfterS)); c.header('X-Sim-Load', lv);
+    const refuse = (x: Refusal) => { c.header('Cache-Control', 'no-store'); c.header('Retry-After', String(x.retryAfterS)); stamp(c, lv, token);
       return c.json({contract: 'eden-edge/1', error: {code: x.code, message: x.message}, world: worldBlock(lv, x.retryAfterS)}, x.status); };
     if ('refusal' in t) return refuse(t.refusal);
     const v = await t.turn;
     if (v === 'dropped') return c.body(null, 499 as never);
     if (v !== 'run') return refuse(v);
     try { await next(); } finally { t.done(); }
-    stamp(c, lv);
+    stamp(c, lv, token);
   };
 }

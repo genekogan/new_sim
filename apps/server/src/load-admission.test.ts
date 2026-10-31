@@ -155,3 +155,17 @@ test('busy signal: X-Sim-Load on every edge answer; refusals carry Retry-After a
   assert.ok(!/\b(should|try|please|wait)\b/i.test(body.world.note), 'a world fact, not advice');
   adm.close();
 });
+
+test('x-sim-account: an opaque tag of the token\'s account on every Soul-token answer, the same for all its Souls', async () => {
+  const adm = new Admission(), app = new Hono();
+  const owners: Record<string, string> = {sim_a_1: 'acct_one', sim_b_1: 'acct_one', sim_c_1: 'acct_two'};
+  app.use('*', admissionMiddleware(adm, () => 'green', c => c.req.header('authorization')?.replace(/^Bearer\s+/i, ''), t => owners[t]));
+  app.get('/v1/edge/here', c => c.json({}));
+  app.get('/v1/edge/inbox/listen', c => c.json({}));
+  const tag = async (path: string, token?: string) => (await app.request(path, token ? {headers: {authorization: `Bearer ${token}`}} : {})).headers.get('x-sim-account');
+  const a = await tag('/v1/edge/here', 'sim_a_1'), b = await tag('/v1/edge/inbox/listen', 'sim_b_1'), c = await tag('/v1/edge/here', 'sim_c_1');
+  assert.ok(a && /^[A-Za-z0-9_-]{16}$/.test(a)); assert.equal(a, b, 'same account, same tag'); assert.notEqual(a, c);
+  assert.ok(!a!.includes('acct'), 'never the raw id');
+  assert.equal(await tag('/v1/edge/here', 'sim_unknown'), null); assert.equal(await tag('/v1/edge/here'), null);
+  adm.close();
+});
