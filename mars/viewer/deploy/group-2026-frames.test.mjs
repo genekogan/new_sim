@@ -13,7 +13,7 @@ const candidate = (id, x, z, length = 3.6576, yaw = Math.PI / 2) => ({
 const pair = [post('rack_member-0001', 0, 0), post('rack_member-0002', 1.02, 0)];
 
 test('all real 2026 input components appear exactly once, with stable counts', () => {
-  const data = JSON.parse(readFileSync(new URL('../../docs/engineering/data/campus-2026-frames.json', import.meta.url), 'utf8'));
+  const data = JSON.parse(readFileSync(new URL('./fixtures/campus-2026-frames.json', import.meta.url), 'utf8'));
   const manifest = JSON.parse(readFileSync(new URL('../public/modular/components.json', import.meta.url), 'utf8'));
   const inputs = manifest.instances.filter((i) => i.kind === 'rack_member' || i.kind === 'beam_candidate').map((i) => i.id);
   const outputs = [...data.frames.flatMap((f) => [...f.posts, ...f.members]), ...data.beams.map((b) => b.component), ...data.unclassified.map((u) => u.component)];

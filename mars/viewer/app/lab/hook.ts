@@ -488,7 +488,7 @@ export function installHook(view: LabView, notify: () => void) {
     /** The body model: the renderer's copy (app/engine-view/rig.ts) and the engine's (engine/body/model.ts). */
     bodyModel: () => JSON.parse(JSON.stringify({ renderer: BODY_MODEL, engine: ENGINE_BODY_MODEL })),
     /**
-     * Question captures (docs/engineering/questions/): outline entities / scene obstacles / region footprints by id
+     * Review captures: outline entities / scene obstacles / region footprints by id
      * (`x` exact, `x*` prefix) on top of everything and label each with a word + arrow. Adds to earlier highlights;
      * `runScenario` and `clearHighlights()` drop them. Returns the ids found / missing and the union box; throws if none match.
      */

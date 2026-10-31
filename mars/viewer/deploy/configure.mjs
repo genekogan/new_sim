@@ -32,12 +32,6 @@ export default {async fetch(request,env,ctx){
  const result=await handleSimulation(request,env,ctx);if(result)return result;
  const url=new URL(request.url),path=url.pathname;
  if(Object.hasOwn(assets,path))return serveDownload(request,env.MODELS,assets[path]);
- if(path==='/questions')return Response.redirect(new URL('/questions/',url),301);
- if(path==='/questions/'){ // Gene's questions page (deploy/prepare.py stages docs/engineering/questions/)
-  url.pathname='/questions/index.html';const response=await env.ASSETS.fetch(new Request(url,request));
-  const headers=new Headers(response.headers);headers.set('Cache-Control','no-cache');
-  return new Response(request.method==='HEAD'?null:response.body,{status:response.status,headers});
- }
  if(['/', '/photo', '/photo/', '/studio', '/studio/', '/simulation-guide', '/simulation-guide/', '/lab', '/lab/'].includes(path) || /^\\/studio\\/202[0-7]\\/?$/.test(path)){
   if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405,headers:{Allow:'GET, HEAD'}});
   url.pathname='/index.html';const response=await env.ASSETS.fetch(new Request(url,request));

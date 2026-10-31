@@ -1,6 +1,6 @@
 // Offline, deterministic interpretation of the 2026 CAD rack fragments.
 // The manifest supplies source dimensions; the scene supplies world-space prisms.
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
 
@@ -8,9 +8,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../..');
 const scenePath = resolve(root, 'viewer/public/engine/campus-2026.json');
 const manifestPath = resolve(root, 'viewer/public/modular/components.json');
-const outputPath = resolve(root, 'docs/engineering/data/campus-2026-frames.json');
-const reportPath = resolve(root, 'docs/engineering/data/campus-2026-frames-unclassified.md');
-const svgPath = resolve(root, 'docs/engineering/data/campus-2026-frames.svg');
+// The grouping (committed: the test fixture --check compares) and its human report + SVG overlay (generated, .local/).
+const outputPath = resolve(here, 'fixtures/campus-2026-frames.json');
+const localDir = resolve(root, '../.local/campus-2026-frames');
+const reportPath = resolve(localDir, 'campus-2026-frames-unclassified.md');
+const svgPath = resolve(localDir, 'campus-2026-frames.svg');
 
 export const tolerances = Object.freeze({
   postMinHeightM: 2,
@@ -305,9 +307,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const { data, report, overlay } = derive(scene, manifest);
   const files = [[outputPath, JSON.stringify(data, null, 2) + '\n'], [reportPath, report], [svgPath, overlay]];
   if (check) {
-    for (const [p, expected] of files) if (readFileSync(p, 'utf8') !== expected) throw new Error(`generated output differs: ${p}`);
+    const [[p, expected]] = files;
+    if (readFileSync(p, 'utf8') !== expected) throw new Error(`generated output differs: ${p}`);
     console.log('2026 frame grouping outputs are byte-identical');
   } else {
+    mkdirSync(localDir, { recursive: true });
     for (const [p, contents] of files) writeFileSync(p, contents);
     console.log(JSON.stringify(data.counts));
   }

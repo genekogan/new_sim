@@ -20,7 +20,6 @@
   "rollback_version": "9596510b-336a-4519-8dca-5f862acde364",
   "lab_url": "https://sim.mars.college/lab?scenario=room-preparation",
   "release_record": "../../docs/engineering/RELEASE_CHECKLIST.md#production-deploy42--2026-10-03--mars-world-v1-alpha",
-  "questions_url": "https://mars-campus-2026.<workers-subdomain>.workers.dev/questions/",
   "source_commit": "043957e8a061868836eacd811d2651e8589bad7d",
   "release": 42,
   "engine_evidence": "../../docs/engineering/EVIDENCE.md",
