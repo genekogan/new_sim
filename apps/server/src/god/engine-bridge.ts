@@ -137,6 +137,7 @@ export type BridgeOptions = { host: WorldHost; god: GodMode; edge?: EdgeLedger; 
  *  last line. Only built with SIM_L4_STATS=1. */
 class BridgeStats {
   private steps = new Map<string, { n: number; ms: number; max: number }>();
+  private lastReuse = 0;
   private last = { spatial: { pagedSyncs: 0, pagedMoved: 0, pagedChanged: 0, pagedMs: 0, gridBuilds: 0, gridMs: 0, scans: 0, scanMs: 0, trusted: 0 }, perceive: 0, spots: 0, wall: performance.now(), cpu: process.cpuUsage() };
   /** A line is due a minute of wall time after the last (ticks may run slow). */
   due(): boolean { return performance.now() - this.last.wall >= 60_000; }
@@ -152,8 +153,27 @@ class BridgeStats {
     const d = (k: keyof BridgeStats['last']['spatial']) => Math.round((sp?.[k] ?? 0) - this.last.spatial[k]);
     const pr = b.perceive.stats.runs - this.last.perceive, ds = b.activitySpots.stats.derives - this.last.spots;
     const out = `[l4] cpu ${(cpuS / wallS).toFixed(3)} core over ${Math.round(wallS)} s; tick p50 ${q(.5)} p99 ${q(.99)} max ${q(1)} ms (n ${ticks.length}); paged syncs ${d('pagedSyncs')} moved ${d('pagedMoved')} changed ${d('pagedChanged')} ${d('pagedMs')} ms, grids ${d('gridBuilds')} ${d('gridMs')} ms, nav scans ${d('scans')} ${d('scanMs')} ms trusted ${d('trusted')}; perceive runs ${pr} (last ${b.perceive.stats.lastIds}${b.perceive.stats.lastFull ? ' whole' : ''} ${b.perceive.stats.lastMs} ms); spots derives ${ds} (last ${b.activitySpots.stats.ms} ms); steps ms/n/max ${steps}`;
+    const sites = ((b.host.engine as unknown as { rt?: { services?: { spatial?: { scanSites?: Map<string, number> | null } } } }).rt?.services?.spatial)?.scanSites;
+    let extra = '';
+    if (sites) {
+      extra = `; scan sites ${[...sites].sort((x, y) => y[1] - x[1]).slice(0, 8).map(([k, v]) => `${k}=${v}`).join(' ')}`;
+      sites.clear();
+      const live = (b.host.engine as unknown as { rt?: { live?: Map<string, { rec: { verb: string } }> } }).rt?.live, verbs = new Map<string, number>();
+      for (const l of live?.values() ?? []) verbs.set(l.rec.verb, (verbs.get(l.rec.verb) ?? 0) + 1);
+      extra += `; live ${[...verbs].map(([k, v]) => `${k}=${v}`).join(' ') || 'none'}`;
+      const ents = (b.host.engine as unknown as { ents?: Record<string, unknown> }).ents;
+      if (ents) {
+        let t = performance.now(), k: string[] = []; for (let i = 0; i < 20; i++) k = Object.keys(ents); const keysUs = (performance.now() - t) * 50;
+        t = performance.now(); for (let i = 0; i < 20; i++) { const l = new Array(k.length); for (let j = 0; j < k.length; j++) l[j] = ents[k[j]]; } const fillUs = (performance.now() - t) * 50;
+        extra += `; table ${k.length} keys ${Math.round(keysUs)} us fill ${Math.round(fillUs)} us`;
+        const calls = ((b.host.engine as unknown as { constructor?: { tableWriteSitesV1?: Map<string, number> | null } }).constructor)?.tableWriteSitesV1;
+        if (calls) { extra += `; engine calls ${[...calls].sort((x, y) => y[1] - x[1]).slice(0, 14).map(([k, v]) => `${k}=${v}`).join(' ')}`; calls.clear(); }
+        const reuse = (b.host.engine as unknown as { tableReusesV1?: number }).tableReusesV1 ?? 0;
+        extra += `; table reused ${reuse - this.lastReuse} steps`; this.lastReuse = reuse;
+      }
+    }
     if (sp) this.last.spatial = { ...sp }; this.last.perceive = b.perceive.stats.runs; this.last.spots = b.activitySpots.stats.derives; this.last.wall = now; this.last.cpu = cpu; this.steps.clear();
-    return out;
+    return out + extra;
   }
 }
 
@@ -927,12 +947,20 @@ export class EngineBridge {
       // authoritative even at zero; the engine polls and invalidates without compiling a stale graph.
       const budgetMs = tickStartedAtMs === undefined ? 20
         : Math.min(20, Math.max(0, 40 - (performance.now() - tickStartedAtMs)));
+      const st = this.loadStats ? this.navProbe() : null, t0 = st ? performance.now() : 0;
       this.navWarm = E.navWarmV1(budgetMs);
+      if (st) { const ms = performance.now() - t0; if (ms > 50) { const now = this.navProbe(); this.log(`[l4] nav warm slice ${Math.round(ms)} ms: spatial paged ${Math.round(now.paged - st.paged)} grids ${Math.round(now.grids - st.grids)} scan ${Math.round(now.scan - st.scan)} ms; largest unit ${Math.round(now.unit)} ms (${now.phase})`); } }
       if (this.navWarm && this.navPending) {
         this.navPending = false; const spots = this.navDeferred; this.navDeferred = [];
         const lines = this.navLines(spots, this.navRescueSouls()); if (lines.length) this.navLater = [...this.navLater, ...lines].slice(-4);
       }
     } catch (e) { this.navWarm = true; this.navPending = false; this.log(`nav warm: ${(e as Error).message}`); }
+  }
+  /** L4 diagnostic (SIM_L4_STATS=1): the spatial ms counters and the connectivity build's largest unit so far. */
+  private navProbe() {
+    const rt = (this.engine as unknown as { rt?: { services?: { spatial?: { stats?: { pagedMs: number; gridMs: number; scanMs: number } } } }; conn?: { stats?: { maxStepMs: number; maxStepPhase: string } } });
+    const sp = rt.rt?.services?.spatial?.stats, c = rt.conn?.stats;
+    return { paged: sp?.pagedMs ?? 0, grids: sp?.gridMs ?? 0, scan: sp?.scanMs ?? 0, unit: c?.maxStepMs ?? 0, phase: c?.maxStepPhase ?? '' };
   }
   /** Last tick each Soul was stepped out (nav-connect/1): at most once a minute each, as the ledger's walk rescue. */
   private navRescuedAt = new Map<string, number>();

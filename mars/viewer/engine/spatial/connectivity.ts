@@ -166,7 +166,7 @@ export class NavConnectivity {
   }
   get ready(): boolean { return !this.pending && this.publishedKey === this.currentKey() && this.publishedGround === this.spatial.ground; }
   private get scene(): SpatialScene { return this.buildScene ?? this.spatial.scene; }
-  stats = { updates: 0, relabelled: 0, reused: 0, uniform: 0, lastMs: 0, lastRelabelled: 0, graphMs: 0, clusterMs: 0, links: 0, edges: 0, clusters: 0, clusterBuilds: 0, linkHits: 0 };
+  stats = { updates: 0, relabelled: 0, reused: 0, uniform: 0, lastMs: 0, lastRelabelled: 0, graphMs: 0, clusterMs: 0, links: 0, edges: 0, clusters: 0, clusterBuilds: 0, linkHits: 0, maxStepMs: 0, maxStepPhase: '' as string };
 
   constructor(spatial: Spatial, opts: { anchors: () => Vec2[]; clear?: number }) {
     this.spatial = spatial; this.anchors = opts.anchors; this.t = opts.clear ?? CONNECT_CLEAR;
@@ -207,6 +207,7 @@ export class NavConnectivity {
         // No yield crosses a stale static epoch. Window movement alone is deliberately not part of this key.
         if (job.key !== this.currentKey() || job.ground !== this.spatial.ground) { this.cancelBuild(); return false; }
         const start = performance.now(), step = job.steps.next(), ms = performance.now() - start;
+        if (ms > this.stats.maxStepMs) { this.stats.maxStepMs = ms; this.stats.maxStepPhase = String(step.value); }
         if (step.value === 'clusters') this.stats.clusterMs += ms;
         if (step.value === 'clusters' || step.value === 'graph') this.stats.graphMs += ms;
         if (step.done) {

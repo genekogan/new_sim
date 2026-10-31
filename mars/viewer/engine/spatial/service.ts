@@ -148,6 +148,8 @@ export class Spatial {
   /** Paged-ground counters (cheap integers, read by the server's load stats): syncs, rebuilds because only the windows
    *  moved / because the static world changed, the ms those rebuilds took, and window grids built (and their ms). */
   readonly stats = { pagedSyncs: 0, pagedMoved: 0, pagedChanged: 0, pagedMs: 0, gridBuilds: 0, gridMs: 0, scans: 0, scanMs: 0, trusted: 0 };
+  /** Diagnostic (SIM_L4_SCAN_SITES=1): scans per calling function (the first frame outside this file). */
+  readonly scanSites: Map<string, number> | null = typeof process !== 'undefined' && (process as { env?: Record<string, string | undefined> }).env?.SIM_L4_SCAN_SITES === '1' ? new Map() : null;
   /** Set by `rt.profile = true`: wall ms per method (spatial.route includes its spatial.sync). */
   prof?: Profiler;
   /** Navigation-relevant snapshot of the static entities (in world order) at the last rebuild. */
@@ -542,6 +544,11 @@ export class Spatial {
     }
     const t0 = performance.now(), changed = this.navScan(world, onBody);
     this.stats.scans++; this.stats.scanMs += performance.now() - t0;
+    if (this.scanSites) {
+      const f = (new Error().stack ?? '').split('\n').slice(2).find((l) => !l.includes('/spatial/service.ts')) ?? '?';
+      const k = f.trim().replace(/^at /, '').replace(/\(.*\/([^/]+:\d+):\d+\)$/, '$1');
+      this.scanSites.set(k, (this.scanSites.get(k) ?? 0) + 1);
+    }
     this.trustToken = token; this.trustEntities = world.entities;
     return changed;
   }
