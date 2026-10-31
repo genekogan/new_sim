@@ -15,6 +15,7 @@ import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import { humanTitle, meaningParts } from './meaning.ts';
 import { isShut } from './doors.ts';
+import type { MenuFocus } from '../edge/ledger/focus.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -482,7 +483,7 @@ export class GodNav {
   // ------------------------------------------------------------------ capabilities
 
   /** `walk:<path>` for the nearest named things and the rooms of near buildings (plus any this Soul asked for). */
-  capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Plans) {
+  capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Plans, focus?: MenuFocus | null) {
     const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human) return;
     const here: Vec2 = [me.pose.p[0], me.pose.p[2]], myLevel = me.human.level ?? 0;
     const seated = me.human.activity === 'sit' || me.human.baseActivity === 'sit';
@@ -512,7 +513,16 @@ export class GodNav {
       const inside = d <= UPPER_ROOMS_WITHIN || myLevel !== 0 || rooms.some((r) => r.level === 0 && !!r.poly && inPoly(here[0], here[1], r.poly));
       for (const rt of rooms) if (rt.level === 0 || (rt.rise ?? 0) < LOW_RISE_M || inside) pick.push({ t: rt, d: this.distance(rt, here) });
     }
-    for (const { t, d } of pick) this.offerWalk(soul, t, d, { here, myLevel, seated, exit }, caps, plans);
+    for (const { t, d } of pick) if (this.wantsThing(focus, t)) this.offerWalk(soul, t, d, { here, myLevel, seated, exit }, caps, plans);
+  }
+  /** L3 item 4: whether a focused build (EdgeLedger.bindOne) needs this thing's offers (walk, sit, hang out, stroll). */
+  private wantsThing(f: MenuFocus | null | undefined, t: Thing): boolean {
+    if (!f) return true;
+    if (['walk:', 'sit:', 'hang-out:', 'stroll:'].some((v) => f.ids.has(v + t.ref))) return true;
+    if (f.verbs.has('walk') || f.verbs.has('hang-out') || f.verbs.has('stroll') || (f.verbs.has('sit') && !!t.semanticPart?.seat)) return true;
+    if (!f.targets.size) return false;
+    if (f.targets.has(t.id) || (!!t.semanticPart?.entity && f.targets.has(t.semanticPart.entity))) return true;
+    const place = this.h.placeOf?.(t.ref); return !!place && f.targets.has(place);
   }
 
   /** A walk to one named place the listing leaves out for distance (the far big top, asked for by name): the same
