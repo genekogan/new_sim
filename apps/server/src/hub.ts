@@ -24,7 +24,7 @@ const clientMsg = z.discriminatedUnion('t', [
   z.object({ t: z.literal('ping'), n: z.number() }),
 ]);
 const MAX_PER_IP = 30, MAX_CLIENTS = 2000;
-type Client = { ws: WebSocket; me: Me | null; ready: boolean; alive: boolean; joinedAt: number; resyncs: number; sent: number; ip: string; msgs: number; windowStart: number; lastHello: number; lastSnapshot: number; stationContract:StationLiveContract|null;
+type Client = { heldSince?: number; ws: WebSocket; me: Me | null; ready: boolean; alive: boolean; joinedAt: number; resyncs: number; sent: number; ip: string; msgs: number; windowStart: number; lastHello: number; lastSnapshot: number; stationContract:StationLiveContract|null;
   authUserId?:string|null;helloGeneration?:number;meScope?:{contract:'me-live/1';connectionId:string;userId:string|null;revision:number;worldId:string;epoch:string};publishedMe?:string;takeTransport?:typeof TAKE_BOUNDARY_WIRE_V1;
   /** take-entities-ref/1 peers: the id of the last entity table this socket was sent (null: none yet); `join`:
    *  take-entities-join/1 was negotiated too (each snapshot names its table, which becomes `last`). */
@@ -67,6 +67,7 @@ export function publicTakes<T>(value: T, full = false): T {
   const v = value as { chunks?: unknown[] };
   return !full && Array.isArray(v?.chunks) ? { ...v, chunks: v.chunks.map((k) => viewerChunk(k)) } as T : value;
 }
+const SWEEP_MS = 15_000;
 export class Hub {
   wss: WebSocketServer;
   /** Other WebSocket endpoints on this server (EVENTS-v1 /v1/edge/events/ws); each returns true when it took the upgrade. */
@@ -138,10 +139,13 @@ export class Hub {
       onKernel: (view) => this.broadcast({ t: 'kernel', view }),
       onPlay: (p) => this.broadcast({ t: 'plays', plays: [p] }),
     });
-    setInterval(() => this.sweep(), 15_000).unref();
-    setInterval(() => { const full = this.stats(); this.broadcast({ t: 'stats', stats: full }, (c) => c.me?.role === 'admin'); this.broadcast({ t: 'stats', stats: publicStats(full) }, (c) => c.me?.role !== 'admin'); }, 2_000).unref();
+    setInterval(() => this.sweep(), SWEEP_MS).unref();
+    // load dial: viewer stats every 2 s at green, 4 s at amber, 8 s at red/black
+    let statsN = 0;
+    setInterval(() => { if (++statsN % ({green: 1, amber: 2, red: 4, black: 4} as const)[this.loadLevel] !== 0) return; const full = this.stats(); this.broadcast({ t: 'stats', stats: full }, (c) => c.me?.role === 'admin'); this.broadcast({ t: 'stats', stats: publicStats(full) }, (c) => c.me?.role !== 'admin'); }, 2_000).unref();
     // a socket that never introduces itself is not a viewer
-    setInterval(() => { const now = Date.now(); for (const c of this.clients) if (!c.ready && now - c.joinedAt > 15_000) { c.ws.close(1008, 'no hello'); this.clients.delete(c); } }, 5_000).unref();
+    // judged after the poll phase (setImmediate), so a hello that arrived during a stall is read first
+    setInterval(() => setImmediate(() => { const now = Date.now(); for (const c of this.clients) if (!c.ready && now - c.joinedAt > 15_000 + this.stallMs) { c.ws.close(1008, 'no hello'); this.clients.delete(c); } }), 5_000).unref();
   }
 
   private onConnect(ws: WebSocket, req: IncomingMessage) {
@@ -178,6 +182,13 @@ export class Hub {
     if (m.t === 'ping') return this.send(c, { t: 'pong', n: m.n, serverTime: Date.now() });
     // joining and resyncing each build a full view of the world: once every few seconds per socket is plenty
     const now = Date.now();
+    // load dial (black): a join or resync builds a full view of the world; hold it (up to 30 s) instead of adding that
+    // cost to a world that cannot keep up. The page hears {t:'load'} and shows "the world is busy" meanwhile.
+    if ((m.t === 'hello' || m.t === 'resync') && this.loadLevel === 'black') {
+      c.heldSince ??= now;
+      if (now - c.heldSince < 30_000) { if (now - c.heldSince < 100) this.send(c, {t: 'load', level: 'black'} as unknown as ServerMsg); setTimeout(() => { if (this.clients.has(c)) void this.onMessage(c, m); }, 2_000).unref(); return; }
+    }
+    c.heldSince = undefined;
     if (m.t === 'resync') { if (now - c.lastSnapshot < 2_000) return; c.lastSnapshot = now; }
     if (m.t === 'hello') { if (now - c.lastHello < 3_000) return; c.lastHello = now; c.lastSnapshot = now; }
     if (m.t === 'resync') { c.resyncs++; return this.send(c, { t: 'snapshot', reason: `resync: ${String(m.reason).slice(0, 80)}`, ...this.host.snapshotView() }); }
@@ -396,8 +407,25 @@ export class Hub {
     });
   }
 
+  /** Lag-aware heartbeat (srv-load, audit #5): a stall of the main thread delays both this timer and the reading of
+   *  the pongs that arrived meanwhile (timers run before the poll phase). So the verdict waits for the poll phase
+   *  (setImmediate), and a sweep that itself ran late by more than 5 s judges nobody: a slow world never cuts its
+   *  viewers, which would then all reconnect (and re-download the world) at once. */
+  private sweepAt = Date.now();
+  /** How late the last sweep ran (ms): also stretches the hello deadline. */
+  stallMs = 0;
   private sweep() {
-    for (const c of this.clients) { if (!c.alive) { c.ws.terminate(); this.clients.delete(c); continue; } c.alive = false; try { c.ws.ping(); } catch { /* closed */ } }
+    const now = Date.now(); this.stallMs = Math.max(0, now - this.sweepAt - SWEEP_MS); this.sweepAt = now;
+    const judge = this.stallMs <= 5_000 && this.loadLevel !== 'black';
+    setImmediate(() => {
+      for (const c of this.clients) { if (!c.alive && judge) { c.ws.terminate(); this.clients.delete(c); continue; } c.alive = false; try { c.ws.ping(); } catch { /* closed */ } }
+    });
+  }
+  /** Load dial (LOAD-CONTRACT §1, §3): viewers hear the level ({t:'load'}); at black new joins wait (see hello). */
+  loadLevel: 'green' | 'amber' | 'red' | 'black' = 'green';
+  setLoadLevel(level: 'green' | 'amber' | 'red' | 'black') {
+    if (level === this.loadLevel) return;
+    this.loadLevel = level; this.broadcast({t: 'load', level} as unknown as ServerMsg);
   }
 
   stats(): ServerStats {
