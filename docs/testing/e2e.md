@@ -29,7 +29,8 @@ node e2e/local-smoke.mjs --port 9950 --clip      # also one uncut, real-speed cl
 - **Checks**, step by step: the launcher answers healthy; the world list shows the world's card; clicking it opens
   the world, whose canvas has a live WebGL context and draws Ada's figure (a skinned person rig) with no "could not be
   prepared" notice; Explore → "Ada" → Enter follows her into the frame. Each step fails on any console error, page
-  error, failed request or HTTP error.
+  error, failed request or HTTP error. Requests the page cancels itself (`net::ERR_ABORTED`, an AbortController
+  superseding a fetch) are listed as `cancelledRequests` and don't fail it.
 - **Output** in `.local/e2e/<UTC timestamp>/` (`--out` to choose): `summary.json` (status, commit, port, PIDs, timings,
   every assertion, every error and failed request, teardown), `shots/1-world-list.png`, `2-world.png`,
   `3-person.png`, `launcher.log`, and with `--clip` `clip.mp4` (`clip.webm` without ffmpeg).

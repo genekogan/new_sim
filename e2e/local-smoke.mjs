@@ -177,7 +177,7 @@ export async function run(a) {
     dirty: (git('status', '--porcelain', '--untracked-files=no') ?? '') !== '', startedAt: startedAt.toISOString(),
     node: process.version, platform: `${process.platform}-${process.arch}`, port: null, worldPorts: null, url: null,
     world: { ...WORLD }, soul: { ...SOUL }, dataDir: rel(data), fakeMinds: true, steps: [], timings: {},
-    consoleErrors: [], pageErrors: [], failedRequests: [], httpErrors: [], screenshots: [], clip: null,
+    consoleErrors: [], pageErrors: [], failedRequests: [], cancelledRequests: [], httpErrors: [], screenshots: [], clip: null,
     processes: { launcher: null, worlds: [] }, teardown: null, error: null,
   };
   const write = () => writeFileSync(join(out, 'summary.json'), JSON.stringify(summary, null, 2) + '\n');
@@ -247,7 +247,9 @@ export async function run(a) {
     const since = () => +((Date.now() - t0) / 1000).toFixed(2);
     page.on('console', (m) => { if (m.type() === 'error') summary.consoleErrors.push({ at: since(), text: m.text().slice(0, 500), url: m.location()?.url }); });
     page.on('pageerror', (e) => summary.pageErrors.push({ at: since(), text: String(e?.stack ?? e).slice(0, 800) }));
-    page.on('requestfailed', (r) => summary.failedRequests.push({ at: since(), url: r.url(), error: r.failure()?.errorText }));
+    // net::ERR_ABORTED is the page cancelling its own request (an AbortController superseding a fetch, as
+    // WorldContextViews does): recorded, not a failure. Every other failure is.
+    page.on('requestfailed', (r) => { const error = r.failure()?.errorText; (error === 'net::ERR_ABORTED' ? summary.cancelledRequests : summary.failedRequests).push({ at: since(), url: r.url(), error }); });
     page.on('response', (r) => { if (r.status() >= 400) summary.httpErrors.push({ at: since(), status: r.status(), url: r.url() }); });
     const clean = (st, from) => {
       const errs = [...summary.consoleErrors, ...summary.pageErrors].filter((e) => e.at >= from);

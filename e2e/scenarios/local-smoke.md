@@ -36,7 +36,8 @@ assertion) and `shots/`, plus `clip.mp4` (or `clip.webm` without ffmpeg) with `-
 2. Open the world list at `/`.
    - expect: a card for "Smoke Hamlet" that links to /w/smoke-hamlet/
    - expect-console: no application errors
-   - expect-network: no failed requests and no HTTP errors
+   - expect-network: no failed requests and no HTTP errors (requests the page cancels itself, `net::ERR_ABORTED`, are
+     recorded as `cancelledRequests`, not failures)
    - screenshot: 1-world-list.png
 3. Click the card.
    - expect-url: matches /w/smoke-hamlet/
