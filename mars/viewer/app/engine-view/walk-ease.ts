@@ -9,9 +9,9 @@
 // moment the body starts or stops; at a steady speed the weight is what it was (the kernel integrates to 1).
 import { POS_Q, type PoseSample } from '../../engine/take/types.ts';
 
-/** Seconds a walk start or stop takes to blend the Walk clip in or out (smoothstep; 10–90 % in 0.3 s). At 0.35 s the
- *  frozen-stride arms still moved 0.097 m per 50 ms mid-stop on the real client (entry 39, take 1). */
-export const WALK_EASE = 0.5;
+/** Seconds a walk start or stop takes to blend the Walk clip in or out (smoothstep; 10–90 % in 0.34 s). On the real
+ *  client the frozen-stride arms moved 0.097 m per 50 ms mid-stop at 0.35 s (entry 39, take 1), 0.081 at 0.5 s (take 2). */
+export const WALK_EASE = 0.55;
 /** The Walk weight of a full stride; the idle-variety onset clock restarts from the last moment the weight was above it. */
 export const WALK_FULL = 0.98;
 /** Instantaneous Walk share of a ground speed (m/s): the replay's per-sample map (engine WALK_MIN ~0.06; full from 0.31). */

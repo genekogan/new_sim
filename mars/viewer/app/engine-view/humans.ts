@@ -804,7 +804,7 @@ export class HumanViews {
     const variant = idleFree ? idleVariant(h.name, tSec) : null, variantA = variant ? libAction(v.rig, variant.clip) : null;
     const variantW = variantA ? (1 - w - neutralW) * variant!.w * idleHandoff * restOnset : 0;
     v.variety = neutralW + variantW;
-    // A walk starting out of an idle gesture: the legs take the walk's own ease (WALK_EASE, 0.5 s), but folded arms opening
+    // A walk starting out of an idle gesture: the legs take the walk's own ease (WALK_EASE, 0.55 s), but folded arms opening
     // that fast swung a hand 0.28 m per 50 ms. On the arms alone (arms-only copies of the gesture clips) the gesture fades
     // over GESTURE_FADE from the walk start: its share of the arm pose is (full-body share + A) / (1 + A) after the mixer
     // normalises, so A is chosen to make that share the gesture level at the walk start × the fade.
