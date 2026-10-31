@@ -73,6 +73,8 @@ export class Objects {
   ofKind(kind: string): ObjectRecord[] { return this.table.ofKind(kind) as ObjectRecord[]; }
   /** The object table's generation: moves on every change (L9 Stage B: `table.snapshot()` / `table.changes(gen)`). */
   generation(): number { return this.table.generation; }
+  /** L3 seam: the write-version of the objects near a point (table.ts `generationNear`). */
+  generationNear(at: readonly [number, number], radius: number): number { return this.table.generationNear(at, radius); }
   /** L9 Stage B: the table's snapshot and its ordered delta stream (see table.ts). */
   objectTable() { return this.table; }
   /** Re-read every object row: only after SQL that wrote `edge_comms_objects` without the framework (tests, repairs). */

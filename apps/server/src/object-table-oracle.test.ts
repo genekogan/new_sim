@@ -129,3 +129,20 @@ test('L9 Stage B: the delta stream is ordered, voided by a reload, bounded, and 
   assert.equal(tbl.changes(s2.gen)!.settled, true);
   same(f, 'the delta-stream test');
 });
+
+test('L3 seam: generationNear moves only for changes to objects near the point (or unplaced), and on a reload', t => {
+  const f = fixture(t), o = f.objects, soul = { soulId: f.id('Alice'), entityId: `h_${f.id('Alice')}`, name: 'Alice', owner: 'dev:Alice' } as never;
+  f.add('near', 0, [5, 5]); f.add('far', 0, [500, 500]); f.add('nowhere');
+  const g0 = o.generationNear([0, 0], 20), far0 = o.generationNear([500, 500], 10);
+  o.act('far', soul, { action: 'bump' });
+  assert.equal(o.generationNear([0, 0], 20), g0, 'a far change does not move it');
+  assert.ok(o.generationNear([500, 500], 10) > far0, 'it moves where the change was');
+  const g1 = o.generationNear([0, 0], 20); o.act('near', soul, { action: 'bump' });
+  const g2 = o.generationNear([0, 0], 20); assert.ok(g2 > g1, 'a near change moves it');
+  o.act('nowhere', soul, { action: 'bump' });
+  const g3 = o.generationNear([0, 0], 20); assert.ok(g3 > g2, 'an unplaced object counts everywhere');
+  o.remove('near'); const g4 = o.generationNear([0, 0], 20); assert.ok(g4 > g3, 'a removal moves it');
+  assert.equal(o.generationNear([0, 0], 20), g4, 'reads do not move it');
+  o.reload(); assert.ok(o.generationNear([0, 0], 20) > g4, 'a reload moves every region');
+  assert.ok(o.generationNear([0, 0], 1e6) >= o.generationNear([500, 500], 10), 'a huge radius covers every cell');
+});

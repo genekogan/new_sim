@@ -71,6 +71,10 @@ export class ObjectTable {
   private resetGen = 0;
   /** the most recent changes, oldest first, in generation order (at most DELTA_KEEP) */
   private deltas: ObjectDelta[] = [];
+  /** per 32 m cell: the generation of the last change to an object whose `state.at` was or is in it */
+  private cellGen = new Map<string, number>();
+  /** the generation of the last change to an object without `state.at` (place-bound: in no cell) */
+  private unplacedGen = 0;
   private stmts: Stmts;
   private db: Sql;
   private worldId: string;
@@ -109,7 +113,7 @@ export class ObjectTable {
   private load() {
     OBJECT_TABLE_STATS.loads++;
     this.rows.clear(); this.sorted = []; this.kinds.clear(); this.cells.clear(); this.cellOf.clear(); this.pending.clear();
-    this.list = null; this.idList = null; this.resetGen = ++this.generation; this.deltas = [];
+    this.list = null; this.idList = null; this.resetGen = ++this.generation; this.deltas = []; this.cellGen.clear(); this.unplacedGen = this.resetGen;
     for (const r of this.stmts.all.all(this.worldId) as {body: string}[]) {
       const o = deepFreeze(JSON.parse(r.body) as ObjectRecord); OBJECT_TABLE_STATS.parsed++;
       this.rows.set(o.id, o); this.sorted.push(o.id); this.index(o);
@@ -130,11 +134,16 @@ export class ObjectTable {
     deepFreeze(o);
     const old = this.rows.get(o.id);
     if (old) this.unindex(old); else { insertSorted(this.sorted, o.id); this.idList = null; }
-    this.rows.set(o.id, o); this.index(o); this.list = null; this.delta(o.id, o);
+    this.rows.set(o.id, o); this.index(o); this.list = null; this.delta(o.id, o); this.touch(old); this.touch(o);
   }
   private drop(id: string) {
     const old = this.rows.get(id); if (!old) return;
-    this.unindex(old); this.rows.delete(id); removeSorted(this.sorted, id); this.list = null; this.idList = null; this.delta(id, null);
+    this.unindex(old); this.rows.delete(id); removeSorted(this.sorted, id); this.list = null; this.idList = null; this.delta(id, null); this.touch(old);
+  }
+  private touch(o: ObjectRecord | undefined) {
+    if (!o) return;
+    const at = atOf(o);
+    if (at) this.cellGen.set(cellKey(Math.floor(at[0] / CELL), Math.floor(at[1] / CELL)), this.generation); else this.unplacedGen = this.generation;
   }
   private delta(id: string, record: ObjectRecord | null) {
     this.deltas.push(Object.freeze({gen: ++this.generation, id, record}));
@@ -143,6 +152,18 @@ export class ObjectTable {
 
   /** L9 Stage B (read-model replication): every record, and the generation it is at. Apply `changes(gen)` from there. */
   snapshot(): ObjectSnapshot { this.sync(); return {gen: this.generation, records: this.all()}; }
+  /** L3 seam: a write-version for the objects that can be within `radius` of `at`: the highest generation of any change to
+   *  an object whose `state.at` was or is in a 32 m cell the circle touches, of any change to an object without `at`, and of
+   *  the last whole load. Monotonic; unchanged means no object record there (or unplaced) was created, changed or removed.
+   *  Records only: time-driven advances count once written (a listing or the sweep), roles/places/carriers are not covered. */
+  generationNear(at: readonly [number, number], radius: number): number {
+    this.sync();
+    let g = Math.max(this.resetGen, this.unplacedGen);
+    const x0 = Math.floor((at[0] - radius) / CELL), x1 = Math.floor((at[0] + radius) / CELL), z0 = Math.floor((at[1] - radius) / CELL), z1 = Math.floor((at[1] + radius) / CELL);
+    if ((x1 - x0 + 1) * (z1 - z0 + 1) > this.cellGen.size) { for (const [k, v] of this.cellGen) if (v > g) { const [cx, cz] = k.split(',').map(Number); if (cx >= x0 && cx <= x1 && cz >= z0 && cz <= z1) g = v; } }
+    else for (let cx = x0; cx <= x1; cx++) for (let cz = z0; cz <= z1; cz++) { const v = this.cellGen.get(cellKey(cx, cz)); if (v !== undefined && v > g) g = v; }
+    return g;
+  }
   /** The changes after generation `since`, in order (each one a whole frozen record, or null = removed), or null when they
    *  are no longer all known (a reload since, more than DELTA_KEEP since, or a generation this table never had): load a
    *  new snapshot. `settled` is false while a transaction is open on this connection: a rollback is then reported as
