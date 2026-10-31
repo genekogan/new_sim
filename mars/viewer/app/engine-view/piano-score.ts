@@ -34,3 +34,31 @@ export function pianoHands(seed: string, t: number): [{ press: number; along: nu
   }
   return hands;
 }
+// Entry 26: a drummer plays on the piano's own clock (the same PIANO_STEP grid and 32-step phrase), so a pianist and a drummer
+// near each other are in time: the kick and snare mark the half bars the piano's left hand plays, the hi-hat the eighths, and
+// a tom fill closes every other phrase where the piano's phrase ends. Seeded per player for small variations (hat density,
+// kick pickup). Pure function of (player, world time), like the piano.
+export type DrumHit = { t: number; kind: 'kick' | 'snare' | 'hat' | 'tom' | 'crash'; hand: 0 | 1 | -1; vel: number };
+export function drumHits(seed: string, a: number, b: number): DrumHit[] {
+  const h = hash('drums:' + seed), sparse = h % 3 === 0, pickup = h % 2 === 0, out: DrumHit[] = [];
+  for (let k = Math.ceil(a / PIANO_STEP - 1e-9); k * PIANO_STEP < b; k++) {
+    const i = ((k % BAR) + BAR) % BAR, phrase = Math.floor(k / BAR), t = k * PIANO_STEP, fill = phrase % 2 === 1 && i >= 28;
+    if (i === 0 && phrase % 2 === 0) out.push({ t, kind: 'crash', hand: 1, vel: 0.7 });
+    if (i % 8 === 0 || (pickup && i % 8 === 6 && !fill)) out.push({ t, kind: 'kick', hand: -1, vel: i % 8 === 0 ? 0.95 : 0.7 });
+    if (fill) { out.push({ t, kind: 'tom', hand: (i % 2) as 0 | 1, vel: 0.65 + (i - 28) * 0.08 }); continue; }
+    if (i % 8 === 4) out.push({ t, kind: 'snare', hand: 0, vel: 0.85 });
+    if (!(i === 0 && phrase % 2 === 0) && (!sparse || i % 2 === 0)) out.push({ t, kind: 'hat', hand: 1, vel: i % 2 === 0 ? 0.5 : 0.32 });
+  }
+  return out;
+}
+/** Each stick's height above its drum (0 at a hit; it lifts after a hit and comes back down onto the next, so the stick
+ *  meets the drum exactly when the hit is heard) and where it plays: 0 hi-hat/snare, 1 tom/cymbal. */
+export function drumHands(seed: string, t: number): [{ lift: number; reach: number }, { lift: number; reach: number }] {
+  const around = drumHits(seed, t - 1.5, t + 1.5), out: [{ lift: number; reach: number }, { lift: number; reach: number }] = [{ lift: 1, reach: 0 }, { lift: 1, reach: 0 }];
+  for (const hand of [0, 1] as const) {
+    const mine = around.filter((n) => n.hand === hand), last = mine.filter((n) => n.t <= t + 1e-9).at(-1), next = mine.find((n) => n.t > t + 1e-9);
+    const since = last ? t - last.t : 9, until = next ? next.t - t : 9, k = Math.min(1, Math.min(since, until) / 0.12);
+    out[hand] = { lift: k * k * (3 - 2 * k), reach: (until < since ? next : last)?.kind === 'tom' || (until < since ? next : last)?.kind === 'crash' ? 1 : 0 };
+  }
+  return out;
+}

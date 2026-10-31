@@ -185,6 +185,7 @@ export class TakePeople {
   sampleMs = 0;
   appearancesSettled(ids?:ReadonlySet<string>){return this.humans.appearancesSettled(ids);}
   contactDiagnostics(){return this.humans.bones();}
+  instrumentOf(id:string){return this.humans.instrumentOf(id);}
   appearanceStatus(){return this.humans.appearanceStatus();}
 
   constructor(take: Take, opts: { scene?: SpatialScene; commonsContrast?:boolean; humanPresets?:boolean; nativeBoat?:{layout:NativeBoatLayoutV1;proposal:ShoreDesign['boat']} } = {}) {
