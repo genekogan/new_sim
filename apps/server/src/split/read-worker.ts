@@ -55,7 +55,7 @@ const c2 = {warmMs: 0, relabels: 0, relabelMs: 0, maxRelabelMs: 0, served: 0, cp
 const fallback = (why: string) => {c2.fallbacks[why] = (c2.fallbacks[why] ?? 0) + 1;};
 function relabelSlice() {
   if (!relabel || !RW?.spatial) {relabel = null; return;}
-  const done = RW.spatial.navWarmV1(25);
+  const done = RW.spatial.warmSliceV1(25);
   if (done) {const ms = performance.now() - relabel.since; c2.relabels++; c2.relabelMs += ms; c2.maxRelabelMs = Math.max(c2.maxRelabelMs, ms); relabel = null; return;}
   setImmediate(relabelSlice);
 }
@@ -73,7 +73,7 @@ function init2(w: WorldInit) {
  *  No spatial service yet (the static scene arrives with a later delta): not ready; warmed when it is built. */
 function warm2() {
   if (!RW?.spatial) {ready2 = false; return;}
-  const t0 = performance.now(); RW.spatial.connectivityV1(); c2.warmMs += performance.now() - t0;
+  c2.warmMs += RW.spatial.warmLabelsV1();
   if (!ready2) {ready2 = true; parentPort!.postMessage({t: 'ready', index: wd.index, gen, tick: tickNow(), warmMs: c2.warmMs});}
 }
 function apply2(d: WorldDelta): boolean {
@@ -130,6 +130,21 @@ parentPort!.on('message', (m: ToWorker) => {
 const port = wd.intents;
 let seq = 0;
 const waiting = new Map<number, (m: PortDone | AuthAnswer) => void>();
+/** mode 2: main's inbox block for this Soul (touch + view, as main's middleware does), within INBOX_MS; else the
+ *  worker's own view of the database (lastSeenAt = now; an open listen main holds in memory reads as its last open). */
+const INBOX_MS = 250;
+let ownInbox: {view(s: object): Record<string, unknown>} | null = null;
+async function inboxOf(soulId: string, owner: string): Promise<unknown> {
+  const id = ++seq;
+  const main = new Promise<unknown>(res => waiting.set(id, m => res((m as unknown as {inbox: unknown}).inbox)));
+  port.postMessage({t: 'inbox', id, soulId});
+  const t = new Promise<undefined>(res => setTimeout(() => res(undefined), INBOX_MS).unref());
+  const got = await Promise.race([main, t]);
+  if (got !== undefined) return got;   // null: main has no inbox (no block, as main's own answer)
+  waiting.delete(id); fallback('inbox-timeout');
+  if (!ownInbox && RH) {const {AgentInbox} = await import('../inbox.ts'); ownInbox = new AgentInbox(RH.db, RH.worldId) as never;}
+  try {return ownInbox ? {...ownInbox.view({scope: `soul:${soulId}`, owner}), lastSeenAt: Date.now()} : null;} catch {return null;}
+}
 port.on('message', (m: PortDone | AuthAnswer) => {const f = waiting.get(m.id); if (f) {waiting.delete(m.id); f(m);}});
 const tokens = new Map<string, {soulId: string | null; account?: string | null; at: number}>(), checking = new Map<string, Promise<{soulId: string | null; account?: string | null}>>();
 /** Ask main who a token is (one question per token at a time); a token main no longer knows is forgotten. */
@@ -207,8 +222,9 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
       const r = here2(who.soulId, q < 0 ? '' : url.slice(q + 1));
       if (r) {
         const lv = level(), acct: Record<string, string> = who.account ? {'x-sim-account': who.account} : {};
+        const inbox = await inboxOf(who.soulId, RH!.minds.get(who.soulId)?.owner ?? '');
         cost.served++;
-        return send(res, 200, {contract: CONTRACT, ...r.body, ...(lv !== 'green' ? {world: worldBlock(lv)} : {})}, {...acct, 'x-sim-read-cpu-ms': r.cpuMs.toFixed(3)});
+        return send(res, 200, {contract: CONTRACT, ...r.body, ...(lv !== 'green' ? {world: worldBlock(lv)} : {}), ...(inbox ? {inbox} : {})}, {...acct, 'x-sim-read-cpu-ms': r.cpuMs.toFixed(3)});
       }
     }
     return forward(req, res, url, path, token);

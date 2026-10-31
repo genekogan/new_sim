@@ -31,6 +31,8 @@ export type ReadPoolOptions = {
   respawnMs?: number; heapMb?: number; log?: (m: string) => void;
   /** mode 2: the place visits/finds a worker's reads recorded (its database is read-only), for main's ledger to merge */
   writes?: (rows: {soulId: string; placeId: string; k: {visits: number; firstTick: number; lastTick: number; how: 'visited' | 'found'}}[]) => void;
+  /** mode 2: the agent inbox block main's middleware adds to a Soul's private answer (inbox-routes.ts: touch, then view) */
+  inbox?: (soulId: string) => unknown;
   /** mode 2 (B-facade): the world database and id each worker opens read-only */
   world?: import('./read-worker.ts').ReadWorld;
 };
@@ -63,7 +65,8 @@ export class ReadPool {
     const w = new Worker(new URL('./read-worker.ts', import.meta.url), {workerData: data, transferList: [ch.port2], execArgv: [], resourceLimits: {maxOldGenerationSizeMb: this.o.heapMb ?? (this.mode >= 2 ? 1536 : 512)}});
     s.worker = w; s.alive = true; s.ready = false; s.port = 0; this.lag[1 + s.index] = 0;
     // the worker's intents: token lookups here, jobs into Admission
-    ch.port1.on('message', (m: {t: string; id: number; token?: string}) => {
+    ch.port1.on('message', (m: {t: string; id: number; token?: string; soulId?: string}) => {
+      if (m.t === 'inbox') {let inbox: unknown = null; try { inbox = this.o.inbox?.(m.soulId ?? '') ?? null; } catch { /* the worker falls back */ } ch.port1.postMessage({t: 'inbox', id: m.id, inbox}); return;}
       if (m.t !== 'auth') return;
       this.stats.auths++;
       let a: {soulId: string | null; account?: string | null} = {soulId: null};

@@ -67,6 +67,8 @@ export interface MenuWorld {
   movementVerb?(actor: string, x: number, z: number): string;
   /** body-state.ts: how deep the water is over the body's root (0 on dry ground, aboard, upstairs) */
   bodyWaterDepthV1?(actor: string): number;
+  /** intents.ts eta: the walk planner's route length from the body to a point */
+  routeEstimateV1?(actor: string, to: V2, level?: number): {ok: true; metres: number} | {ok: false; code: string; message: string};
   // (c)
   readonly feasibility: Feasibility;
 }
@@ -76,7 +78,7 @@ export interface MenuWorld {
 const OPTIONAL = ['programAction', 'commonsNewcomerResourcesV1', 'commonsFoodDeliveriesV1', 'carriers', 'carrierOf', 'placeLevelV1',
   'bodyUsesV1', 'seatOccupantsV1', 'withFeasibilityRead', 'readPassV1', 'staticEpochV1', 'navEpochV1', 'navWarmV1', 'navCheckV1', 'navNearestMainV1',
   'clearanceAtV1', 'clearanceUpToV1', 'nearestStandableV1', 'standableNearV1', 'clearSpotsV1', 'dryGroundAtV1', 'lyingRoomAtV1',
-  'standYAtV1', 'nativeSeatLevelsV1', 'movementVerb', 'bodyWaterDepthV1'] as const;
+  'standYAtV1', 'nativeSeatLevelsV1', 'movementVerb', 'bodyWaterDepthV1', 'routeEstimateV1'] as const;
 
 /** `E.withFeasibilityRead(read)` when the world has it, else `read()` (the engine contract's optional batch). */
 export const withRead = <T>(E: MenuWorld, read: () => T): T => E.withFeasibilityRead ? E.withFeasibilityRead(read) : read();
@@ -201,6 +203,7 @@ export type ReplicaSources = {
   seatOccupantsV1?(id: string, kind?: string): {slot: string; body: string}[];
   movementVerb?(actor: string, x: number, z: number): string;
   bodyWaterDepthV1?(actor: string): number;
+  routeEstimateV1?(actor: string, to: V2, level?: number): {ok: true; metres: number} | {ok: false; code: string; message: string};
   /** B-spatial's SpatialReplica (same method names as the engine). */
   spatial: Partial<Pick<MenuWorld, 'readPassV1' | 'staticEpochV1' | 'navEpochV1' | 'navWarmV1' | 'navCheckV1' | 'navNearestMainV1' | 'clearanceAtV1'
     | 'clearanceUpToV1' | 'nearestStandableV1' | 'standableNearV1' | 'clearSpotsV1' | 'dryGroundAtV1' | 'lyingRoomAtV1' | 'standYAtV1'
@@ -217,7 +220,7 @@ export class ReplicaMenuWorld implements MenuWorld {
     for (const k of Object.keys(sp)) if (typeof sp[k] === 'function') self[k] = (sp[k] as (...a: unknown[]) => unknown).bind(s.spatial);
     if (s.carriers) self.carriers = s.carriers; if (s.carrierOf) self.carrierOf = s.carrierOf;
     if (s.placeLevelV1) self.placeLevelV1 = s.placeLevelV1; if (s.bodyUsesV1) self.bodyUsesV1 = s.bodyUsesV1;
-    if (s.seatOccupantsV1) self.seatOccupantsV1 = s.seatOccupantsV1; if (s.movementVerb) self.movementVerb = s.movementVerb; if (s.bodyWaterDepthV1) self.bodyWaterDepthV1 = s.bodyWaterDepthV1;
+    if (s.seatOccupantsV1) self.seatOccupantsV1 = s.seatOccupantsV1; if (s.movementVerb) self.movementVerb = s.movementVerb; if (s.bodyWaterDepthV1) self.bodyWaterDepthV1 = s.bodyWaterDepthV1; if (s.routeEstimateV1) self.routeEstimateV1 = s.routeEstimateV1;
     if ('newcomer' in s.statics) self.commonsNewcomerResourcesV1 = () => structuredClone(s.statics.newcomer);
     if ('deliveries' in s.statics) self.commonsFoodDeliveriesV1 = () => structuredClone(s.statics.deliveries);
   }

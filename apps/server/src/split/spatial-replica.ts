@@ -118,9 +118,13 @@ export class SpatialReplica {
    *  bodyWaterDepthV1: they read a body's pose and the ground field). */
   service(): Spatial { return this.sync(); }
   /** engine.reachV1 (B-facade item 2): the planner's route proof between two standing points, over the replica's service. */
-  reachV1(from: { p: Vec2; level?: number }, to: { p: Vec2; level?: number }): { ok: true; length: number; legs: number; levels: number[] } | { ok: false; code: string; message: string } {
-    const r = this.sync().route(this.world, HUMAN_PROFILE, { level: from.level ?? 0, p: from.p }, { level: to.level ?? 0, p: to.p }, { proveUnreachable: true }) as
+  /** The planner's route between two standing points (proveUnreachable: a failing search ends early, same answer). */
+  routeV1(from: { p: Vec2; level?: number }, to: { p: Vec2; level?: number }) {
+    return this.sync().route(this.world, HUMAN_PROFILE, { level: from.level ?? 0, p: from.p }, { level: to.level ?? 0, p: to.p }, { proveUnreachable: true }) as
       { ok: true; route: { length: number; legs: { kind: string; level?: number; link?: { to: { level: number } } }[] } } | { ok: false; diagnostic: { code: string; message: string } };
+  }
+  reachV1(from: { p: Vec2; level?: number }, to: { p: Vec2; level?: number }): { ok: true; length: number; legs: number; levels: number[] } | { ok: false; code: string; message: string } {
+    const r = this.routeV1(from, to);
     if (!r.ok) return { ok: false, code: r.diagnostic.code, message: r.diagnostic.message };
     const levels = [...new Set(r.route.legs.map((l) => l.kind === 'walk' ? l.level! : l.link!.to.level))];
     return { ok: true, length: Math.round(r.route.length * 100) / 100, legs: r.route.legs.length, levels };
@@ -190,6 +194,19 @@ export class SpatialReplica {
     if (!this.conn || this.conn.spatial !== spatial) this.conn = new NavConnectivity(spatial, { anchors: () => [arrival] });
     if (this.navReady !== undefined) { if (this.navReady) this.conn.update(Infinity); return this.navReady; }
     return this.conn.update(budgetMs === Infinity ? Infinity : Math.max(0, budgetMs - (performance.now() - started)));
+  }
+  /** B-facade (read worker): label connectivity now, whatever main's own warm state is (a worker warms before 'ready'
+   *  and after a rebuild, never inside a Soul's read). Returns the ms it took. */
+  warmLabelsV1(): number {
+    const t0 = performance.now(), spatial = this.sync();
+    if (!this.conn || this.conn.spatial !== spatial) this.conn = new NavConnectivity(spatial, { anchors: () => [this.scene.arrival] });
+    this.conn.update(Infinity); return performance.now() - t0;
+  }
+  /** One slice of labelling (budget ms): true when the labels are complete. */
+  warmSliceV1(budgetMs: number): boolean {
+    const spatial = this.sync();
+    if (!this.conn || this.conn.spatial !== spatial) this.conn = new NavConnectivity(spatial, { anchors: () => [this.scene.arrival] });
+    return this.conn.update(budgetMs);
   }
   /** engine.connectivityV1 */
   connectivityV1(): NavConnectivity { this.navWarmV1(Infinity); return this.conn!; }

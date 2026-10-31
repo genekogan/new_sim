@@ -67,7 +67,7 @@ export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {ta
   const H = new ReadOnlyHost(RW, host.worldId, dbPath), RL = readLedger(H, process.env.PLACE_DATA ? JSON.parse(readFileSync(process.env.PLACE_DATA, 'utf8')) : undefined);
   let warmMs = 0, warmed: unknown = null;
   /** as a worker does before 'ready': label connectivity outside any read (again after a rebuild) */
-  const warm = () => {if (RW.spatial && warmed !== RW.spatial) {const t0 = performance.now(); RW.spatial.connectivityV1(); warmMs += performance.now() - t0; warmed = RW.spatial;}};
+  const warm = () => {if (RW.spatial && warmed !== RW.spatial) {warmMs += RW.spatial.warmLabelsV1(); warmed = RW.spatial;}};
   const S: Soak = {startedAt: Date.now(), rounds: 0, skipped: {}, replica: null,
     reads: Object.fromEntries(READS.map(r => [r, {...tally(), mainOnly: {}, liveMs: 0, replicaMs: 0}])) as Soak['reads']};
   const skip = (why: string) => {S.skipped[why] = (S.skipped[why] ?? 0) + 1;};

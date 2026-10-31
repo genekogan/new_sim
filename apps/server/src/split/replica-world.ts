@@ -69,6 +69,7 @@ export class ReplicaWorld {
       seatOccupantsV1: (id, kind) => this.seatOccupantsV1(id, kind),
       movementVerb: (actor, x, z) => this.movementVerb(actor, x, z),
       bodyWaterDepthV1: actor => this.bodyWaterDepthV1(actor),
+      routeEstimateV1: (actor, to, level) => this.routeEstimateV1(actor, to, level),
     });
   }
   private programAction(pid: string): ProgramAction | null {
@@ -110,6 +111,15 @@ export class ReplicaWorld {
     const x = e.pose.p[0], z = e.pose.p[2], lvl = g.base.waterLevel(x, z); if (lvl === null) return 0;
     if ((g.field as unknown) !== g.base && e.pose.p[1] >= g.field.height(x, z) - 0.5 && g.field.height(x, z) >= lvl) return 0;
     return Math.max(0, lvl - g.base.height(x, z));
+  }
+  /** engine.routeEstimateV1 = walk_to's plan length from the body. Here: the planner's route from the body's pose on its
+   *  level (walk_to adds the sleeper and grip refusals and its start snapping; the oracle measures the difference). */
+  private routeEstimateV1(actor: string, to: [number, number], level?: number): {ok: true; metres: number} | {ok: false; code: string; message: string} {
+    const a = this.ents[actor], h = a?.human as {level?: number} | undefined;
+    if (!a || !h) return {ok: false, code: 'actor.unknown', message: 'no such body'};
+    if (!this.spatial) return {ok: false, code: 'replica.no-spatial', message: 'no spatial service yet'};
+    const r = this.spatial.routeV1({p: [a.pose.p[0], a.pose.p[2]], level: h.level ?? 0}, {p: to, level: level ?? h.level ?? 0});
+    return r.ok ? {ok: true, metres: Math.round(r.route.length * 10) / 10} : {ok: false, code: r.diagnostic.code, message: r.diagnostic.message};
   }
   private fixture = (id: string): FixtureRow | undefined => {const o = this.ents[id] as (Ent & {support?: {kind?: string}; level?: number}) | undefined; return o ? {id, def: String(o.def), kind: String(o.kind), ...(o.support?.kind ? {support: o.support.kind} : {}), ...(typeof o.level === 'number' ? {level: o.level} : {}), y: o.pose.p[1]} : undefined;};
   private humans(): ReplicaBody[] {const out: ReplicaBody[] = []; for (const e of Object.values(this.ents)) if (e.kind === 'human') out.push(bodyOf(e)); return out;}
