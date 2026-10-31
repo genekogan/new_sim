@@ -12,6 +12,8 @@ import {installEngineBridge} from '../../apps/server/src/god/engine-bridge.ts';
 import {gardenStats, growDay} from '../../apps/server/src/god/garden.ts';
 import {wateringFrame, wateringEvents, TILT} from '../../mars/viewer/engine/items/watering.ts';
 import {WorldModel} from '../../packages/world-compiler/src/model.ts';
+import {HOOK_PEG, CAN_GRIP} from '../../packages/world-compiler/src/core-kit/watering-can.ts';
+const HANG=[HOOK_PEG[0]-CAN_GRIP[0],HOOK_PEG[1]-CAN_GRIP[1],HOOK_PEG[2]-CAN_GRIP[2]];
 
 // Entry 34: "water the planter" — the can from its hook by the handle, filled at the tap if empty, poured through the
 // rose, hung back; growth stages a day at a time; nothing for distant Souls.
@@ -31,14 +33,14 @@ test('watering can and growth stages', {timeout:600000}, async t=>{
 
  // ---- context: absent, then 100 distant growing planters (and 100 cans on hooks), then nearby ----
  const absent=await here();
- const distant=[];for(let i=0;i<100;i++){const x=120+i%10*3,z=120+Math.floor(i/10)*3;distant.push({op:'place',def:'core/garden-planter@2',name:`far-bed-${i}`,p:[x,z],state:{moisture:i%2?1:0.1,growth:i%5}},{op:'place',def:'core/can-hook@1',tmp:`$h${i}`,name:`far-hook-${i}`,p:[x+1.2,z]},{op:'place',def:'core/watering-can@2',name:`far-can-${i}`,in:{parent:`$h${i}`},p:[0,0.83,0.14],state:{level:1}});}
+ const distant=[];for(let i=0;i<100;i++){const x=120+i%10*3,z=120+Math.floor(i/10)*3;distant.push({op:'place',def:'core/garden-planter@2',name:`far-bed-${i}`,p:[x,z],state:{moisture:i%2?1:0.1,growth:i%5}},{op:'place',def:'core/can-hook@1',tmp:`$h${i}`,name:`far-hook-${i}`,p:[x+1.2,z]},{op:'place',def:'core/watering-can@2',name:`far-can-${i}`,in:{parent:`$h${i}`},p:HANG,state:{level:1}});}
  for(let i=0;i<distant.length;i+=150){const placed=god.act({ops:distant.slice(i,i+150)});assert.equal(placed.accepted,true,JSON.stringify(placed.failures?.slice(0,3)));}await tick(45);
  const far=await here();
  const byName=n=>[...god.model.entities.values()].find(e=>e.name===n);
  const farIds=new Set(distant.filter(d=>d.name).map(d=>byName(d.name).id));
  assert.deepEqual(edge.capabilities(soul).filter(c=>c.object&&farIds.has(c.object)).map(c=>c.id),[],'no distant offers');
  // the scene beside Ana: a hook with an empty can, the garden tap, two planters@2
- const sc=god.act({ops:[{op:'place',def:'core/can-hook@1',tmp:'$hook',name:'can-hook',p:[ax+1.8,az-1.5]},{op:'place',def:'core/watering-can@2',name:'watering-can',in:{parent:'$hook'},p:[0,0.83,0.14],r:Math.PI/2,state:{level:0}},
+ const sc=god.act({ops:[{op:'place',def:'core/can-hook@1',tmp:'$hook',name:'can-hook',p:[ax+1.8,az-1.5]},{op:'place',def:'core/watering-can@2',name:'watering-can',in:{parent:'$hook'},p:HANG,r:Math.PI/2,state:{level:0}},
   {op:'place',def:'core/garden-tap@1',name:'garden-tap',p:[ax-2.2,az-1.2]},{op:'place',def:'core/garden-planter@2',name:'rose-bed',p:[ax+0.6,az+2.6]},{op:'place',def:'core/garden-planter@2',name:'herb-bed',p:[ax-1.6,az+2.6],state:{growth:2,moisture:0.2}}]});
  assert.equal(sc.accepted,true,JSON.stringify(sc.failures?.slice(0,3)));await tick(45);
  const id=n=>byName(n).id,state=n=>byName(n).state??{},ent=n=>f.host.engine.world.entities[id(n)];
@@ -51,14 +53,15 @@ test('watering can and growth stages', {timeout:600000}, async t=>{
  // ---- the act: words resolve to it ----
  const act=async(capability,accepted=true)=>{const r=await accept(f.host,app.request('/v1/edge/act',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({capability})}));const b=await r.json();assert.equal(b.accepted,accepted,JSON.stringify(b).slice(0,600));return b;};
  const timeline=[];let last={};
- const watch=async(r,limit=4000)=>{for(let n=0;n<limit;n++){const b=body(),h=b.human,can=ent('watering-can'),s={tick:f.host.engine.world.tick,tap:!!state('garden-tap').on,level:state('watering-can').level,moisture:state('rose-bed').moisture,pouring:!!state('rose-bed').pouring,support:can?.support?.kind,on:can?.support?.on,phase:edge.receipt(soul.soulId,r.receipt.id)?.phase,motion:h?.wateringV1?.stage,activity:h?.activity};
-   const key=JSON.stringify({...s,tick:0});if(key!==JSON.stringify({...last,tick:0}))timeline.push(s);last=s;
+ const watch=async(r,limit=4000)=>{for(let n=0;n<limit;n++){const b=body(),h=b.human,can=ent('watering-can'),s={tick:f.host.engine.world.tick,tap:!!state('garden-tap').on,level:state('watering-can').level,moisture:state('rose-bed').moisture,pouring:!!state('rose-bed').pouring,support:can?.support?.kind,on:can?.support?.on,phase:edge.receipt(soul.soulId,r.receipt.id)?.phase,motion:h?.wateringV1?.stage,activity:h?.activity,yawGap:can?.support?.kind==='in-hand'?r3(Math.abs(((can.pose.yaw-b.pose.yaw+Math.PI*3)%(Math.PI*2))-Math.PI)):undefined};
+   const key=JSON.stringify({...s,tick:0,yawGap:0});if(key!==JSON.stringify({...last,tick:0,yawGap:0}))timeline.push(s);last=s;
    if(['completed','failed','cancelled','replaced'].includes(s.phase))return s;await tick(1);}return last;};
  const r1=await act(`object:${id('rose-bed')}:water`);
  assert.equal(state('rose-bed').moisture,0.1,'admission changes nothing');
  const end1=await watch(r1);
  assert.equal(end1.phase,'completed',JSON.stringify(edge.receipt(soul.soulId,r1.receipt.id)).slice(0,600)+'\n'+JSON.stringify(timeline.slice(-6)));
  const receipt1=edge.receipt(soul.soulId,r1.receipt.id);
+ const grasp=timeline.find(x=>x.support==='in-hand');assert.ok(grasp&&grasp.yawGap<0.05,'the can comes off the hook facing the way the body faces (no turn at the grasp): '+JSON.stringify(grasp));
  console.log(JSON.stringify(timeline,null,0));
  assert.equal(state('garden-tap').on,false,'the tap is off again');
  assert.ok(timeline.some(s=>s.tap),'the tap ran during the fill');

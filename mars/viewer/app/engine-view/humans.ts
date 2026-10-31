@@ -1,4 +1,5 @@
 import {handActuatorFrame,type HandActuatorMotion} from '../../engine/social/hand-actuator.ts';
+import {wateringFrame,type WateringMotion} from '../../engine/items/watering.ts';
 // Engine humans → animated rigs. Renderers only read world state (guide):
 // after every fixed tick we snapshot pose + derive clip state; frames
 // interpolate between the last two ticks, so visuals are a deterministic
@@ -75,6 +76,9 @@ type View = {
   activity: string;
   handActuator?:HandActuatorMotion;
   handActuatorTime?:number;
+  /** Soul Actions 34: a watering-can stage (fill / pour), on the take clock. */
+  watering?:WateringMotion;
+  wateringTime?:number;
   sleepPose?: NonNullable<Entity['human']>['sleepPose'];
   shore?: ShoreContactV1;
   shoreTime?: number;
@@ -202,6 +206,9 @@ export type SampledHuman = {
   phaseK?: number;
   handActuator?:HandActuatorMotion;
   handActuatorTime?:number;
+  /** Soul Actions 34: a watering-can stage (fill / pour), on the take clock. */
+  watering?:WateringMotion;
+  wateringTime?:number;
   sleepPose?: NonNullable<Entity['human']>['sleepPose'];
   shore?: ShoreContactV1;
   shoreTime?: number;
@@ -426,7 +433,7 @@ export class HumanViews {
       v.shore = undefined;
       v.shoreTime = undefined;
       v.waterTransition = undefined;
-      v.handActuator=e.human?.handActuator;v.handActuatorTime=world.tick*DT;
+      v.handActuator=e.human?.handActuator;v.handActuatorTime=world.tick*DT;v.watering=e.human?.wateringV1;v.wateringTime=world.tick*DT;
       v.sleepPose = e.human?.sleepPose;
       v.base = base;
       v.propWanted = (e.human as { prop?: string }).prop;
@@ -606,7 +613,7 @@ export class HumanViews {
       if(!f.bodyModel)this.syncAppearance(v,f.publicSoulKey);
       const walkDur = v.rig.walk.getClip().duration, idleDur = v.rig.idle.getClip().duration;
       v.activity = act;
-      v.handActuator=f.handActuator;v.handActuatorTime=f.handActuatorTime;
+      v.handActuator=f.handActuator;v.handActuatorTime=f.handActuatorTime;v.watering=f.watering;v.wateringTime=f.wateringTime;
       v.sleepPose = f.sleepPose;
       v.shore = f.shore;
       v.shoreTime = f.shoreTime;
@@ -888,6 +895,7 @@ export class HumanViews {
     if(water?.kind==='surface-swim')surfaceSwimBody(v,water);
     if(water?.floating)waterLegs(v,water);
     // arms
+    h.userData.wateringTilt=0;h.userData.wateringFlow=0;
     const targets: (THREE.Vector3 | null)[] = v.arms.map(() => null);
     let source: Source = null;
     if (hasHands) {
@@ -927,15 +935,20 @@ export class HumanViews {
       // Blend the actual arm bones to/from the existing idle/walk clip; lowering a
       // Cartesian hand target alone leaves the elbow/shoulder snapping at release.
       const weight=v.handActuator?handActuatorFrame(v.handActuator,(v.handActuatorTime??tSec)-v.handActuator.startTick*DT).weight:1;
-      const armBase=weight<1?v.arms.flatMap(arm=>[...(arm.shoulder?[arm.shoulder]:[]),arm.upper,arm.lower,arm.hand]).map(o=>({o,q:o.quaternion.clone(),p:o.position.clone()})):[];
+      // Soul Actions 34: the can hand stays on the can; the free hand blends in to the valve and back out to the clip
+      // between take frames: the frame's own time plus how far the render is past it (the hands interpolate the same way)
+      const wf=v.watering?wateringFrame(v.watering,(v.wateringTime!==undefined?v.wateringTime+(tSec-b.expressionT):tSec)-v.watering.startTick*DT):null;
+      const armW=(i:number)=>wf?(armSide(v,i)==='left'?wf.left:1):weight;
+      h.userData.wateringTilt=wf?.tilt??0;h.userData.wateringFlow=wf?.flow??0;
+      const armBase=v.arms.some((_,i)=>armW(i)<1)?v.arms.flatMap((arm,i)=>[...(arm.shoulder?[arm.shoulder]:[]),arm.upper,arm.lower,arm.hand].map(o=>({o,w:armW(i)}))).map(({o,w})=>({o,w,q:o.quaternion.clone(),p:o.position.clone()})):[];
       const k = reachTo(v, targets, pz.rise > 0, BODY_MODEL.maxExtension, undefined, pa);
       v.arms.forEach((arm, i) => {
         if (!targets[i] && sitW > 0 && !seatClip) handOnThigh(v, i, sitW);
       });
       if (sitW <= 0) dangle(v, proneW > 0 ? Math.max(pz.bend * (1 - proneW), pr!.bend * proneW) : pz.bend, k);
       v.arms.forEach((arm, i) => flat[i] > 0 && k[i] > 0 && flatHand(v, arm, targets[i]!, h.position.y, flat[i] * k[i], pa!.pole(arm, targets[i]!)));
-      for(const b of armBase){b.o.quaternion.slerp(b.q,1-weight);b.o.position.lerp(b.p,1-weight);}if(armBase.length)h.updateMatrixWorld(true);
-      closeHands(v, k.map((c, i) => weight*(expression?.kind === 'planted-dance' ? 0 : c * (1 - flat[i]))));
+      for(const b of armBase){b.o.quaternion.slerp(b.q,1-b.w);b.o.position.lerp(b.p,1-b.w);}if(armBase.length)h.updateMatrixWorld(true);
+      closeHands(v, k.map((c, i) => armW(i)*(expression?.kind === 'planted-dance' ? 0 : c * (1 - flat[i]))));
     } else if (v.sleepPose && pr && v.dims && proneW > 0) {
       // Free contact expression is private to the current rig, never authoritative hands/grips.
       source = 'sleep';

@@ -9,8 +9,8 @@ export const CAN_LITRES = 10, POUR_LITRES = 4;
 export const CAN_GRIP: [number, number, number] = [0, 0.39, 0], CAN_ROSE: [number, number, number] = [0.465, 0.352, 0];
 /** The filler opening on top of the can (the tap's water goes in here). */
 export const CAN_OPENING: [number, number, number] = [0.115, 0.27, 0];
-/** The hook's peg (local), where the can's handle grip rests when it hangs. */
-export const HOOK_PEG: [number, number, number] = [0, 1.22, 0.14];
+/** The hook (local): where the can's handle grip rests on its arm when it hangs, clear of the post. */
+export const HOOK_PEG: [number, number, number] = [0, 1.226, 0.22];
 
 const canPalette = { metal: '#9aa3a6', dark: '#4f5659', water: '#5b8fb8' };
 const wateringCan: DefInput = {
@@ -20,7 +20,8 @@ const wateringCan: DefInput = {
   make: { kind: 'gen', gen: 'kit/2', args: { round: 0.006, shapes: [
     // body: a slightly tapered drum with a domed shoulder
     { kind: 'lathe', at: [0.06, 0, 0], profile: [[0, 0], [0.122, 0], [0.126, 0.012], [0.12, 0.215], [0.104, 0.248], [0.07, 0.266], [0, 0.27]], segments: 18, tint: 'metal' },
-    { kind: 'torus', at: [0.06, 0.012, 0], r: 0.124, h: 0.008, segments: 18, tint: 'dark', pitch: Math.PI / 2 },
+    { kind: 'cyl', at: [0.06, 0.012, 0], r: 0.127, h: 0.016, segments: 18, tint: 'dark' },
+    { kind: 'cyl', at: [0.06, 0.252, 0], r: 0.106, h: 0.01, segments: 18, tint: 'dark' },
     // filler opening ahead of the handle, with a rolled collar; water shows in it when there is some
     { kind: 'cyl', at: [CAN_OPENING[0], 0.266, 0], r: 0.05, h: 0.022, segments: 14, tint: 'metal' },
     { kind: 'cyl', at: [CAN_OPENING[0], 0.276, 0], r: 0.04, h: 0.004, segments: 14, tint: 'dark' },
@@ -48,13 +49,14 @@ const canHook: DefInput = {
   make: { kind: 'gen', gen: 'kit/2', args: { round: 0.01, shapes: [
     { kind: 'box', at: [0, 0.75, 0], size: [0.09, 1.5, 0.09], tint: 'wood' },
     { kind: 'box', at: [0, 1.52, 0], size: [0.11, 0.04, 0.11], tint: 'wood' },
-    { kind: 'box', at: [0, HOOK_PEG[1] + 0.03, 0.075], size: [0.04, 0.03, 0.08], tint: 'metal' },
-    { kind: 'cyl', at: [0, HOOK_PEG[1] + 0.03, HOOK_PEG[2]], r: 0.011, h: 0.06, segments: 6, tint: 'metal' },
-    { kind: 'sphere', at: [0, HOOK_PEG[1] + 0.062, HOOK_PEG[2]], r: 0.014, segments: 6, tint: 'metal' }] } } as unknown as DefInput['make'],
+    // an iron arm out from the post; the can's handle rests on it, kept on by the upturned tip
+    { kind: 'box', at: [0, HOOK_PEG[1] - 0.026, 0.15], size: [0.03, 0.03, 0.21], tint: 'metal' },
+    { kind: 'cyl', at: [0, HOOK_PEG[1] + 0.01, 0.255], r: 0.01, h: 0.07, segments: 6, tint: 'metal' },
+    { kind: 'sphere', at: [0, HOOK_PEG[1] + 0.046, 0.255], r: 0.013, segments: 6, tint: 'metal' }] } } as unknown as DefInput['make'],
   params: Object.fromEntries(Object.entries(hookPalette).map(([k, v]) => [k, { type: 'color', default: v, doc: `${k} colour` }])) as DefInput['params'], palette: hookPalette,
   // the can's base hangs here (its handle grip then rests on the peg)
   slots: [{ id: 'peg', kind: 'hang', p: [HOOK_PEG[0] - CAN_GRIP[0], HOOK_PEG[1] - CAN_GRIP[1], HOOK_PEG[2] - CAN_GRIP[2]], yaw: 0 }] as DefInput['slots'],
-  size: { box: [0.12, 1.55, 0.12] },
+  size: { box: [0.12, 1.55, 0.14] },
 } as unknown as DefInput;
 
 /** Growth stages of a planter@2 (state `growth`, a whole number); a word each for nearby perception. */

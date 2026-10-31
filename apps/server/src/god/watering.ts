@@ -19,6 +19,8 @@ export const WATERING_REACH = 30;
 export const FILL_SECONDS = 3.2, POUR_SECONDS_PER_L = 0.8;
 /** A can holding less than this is empty (it is filled first). */
 const EMPTY_L = 0.25, GRACE_TICKS = 1200;
+/** At the hook the body stands this far behind the handle (m). */
+const HOOK_STAND = 0.5;
 /** Pour: the hand holds the can out at the side over the bed (body frame, m), the stream lands this far past the rose. */
 const POUR_HAND = { fwd: 0.42, side: 0.3, rose: 0.22 }, STREAM_RUN = 0.08, SWEEP = 0.18;
 
@@ -100,7 +102,14 @@ export function createWatering(h: WateringHost) {
     if (want <= 0.05) return { code: 'water.plant-wet', reason: `${m.pathOf(plantId)} is already well watered.` };
     const fill = have < EMPTY_L, litres = Math.min(POUR_LITRES, want, fill ? canL : have);
     const steps: Step[] = [];
-    if (!heldNow) steps.push({ verb: 'mars:take_item', params: { item: canId, hand: 'right' } });
+    // at the hook: stand behind the can's handle, facing the way its spout points, so the hand closes on the handle and
+    // lifts it off without turning it (and hangs it back the same way)
+    const hookStation = (grip: Vec3, yaw: number): Step | null => {
+      const f: Vec2 = [Math.cos(yaw), Math.sin(yaw)], st: Vec3 = [grip[0] - f[0] * HOOK_STAND, 0, grip[2] - f[1] * HOOK_STAND];
+      return clear(st) ? { verb: 'mars:walk_to', params: { x: r3(st[0]), z: r3(st[2]), level: 0, face: r3(yaw) } } : null;
+    };
+    const hungYaw = heldNow ? null : num(ents()[canId]?.pose?.yaw);
+    if (!heldNow) { const c = ents()[canId], at = hookStation([c.pose.p[0], c.pose.p[1] + CAN_GRIP[1], c.pose.p[2]], hungYaw!); if (at) steps.push(at); steps.push({ verb: 'mars:take_item', params: { item: canId, hand: 'right' } }); }
     if (fill) {
       const canAt = pose(canId)!; let tap: string | null = null, best = WATERING_REACH;
       for (const t of ix.taps) { const e = m.entities.get(t); if (!e) continue; const q = m.worldPose(e), d = Math.hypot(q.x - canAt.x, q.z - canAt.z); if (d < best) { best = d; tap = t; } }
@@ -130,15 +139,23 @@ export function createWatering(h: WateringHost) {
     const after = Math.max(0, ((fill ? canL : have) - litres) / canL);
     steps.push({ verb: 'mars:walk_to', params: { x: r3(pick.st[0]), z: r3(pick.st[2]), level: 0, face: r3(face) } },
       { verb: 'mars:watering_can_v1', params: { item: can, target: plantId, stage: 'pour', face: r3(face), hold: hold.map(r3), sweep: [r3(along[0]), r3(along[2])], seconds: r3(Math.max(1, litres * POUR_SECONDS_PER_L)), levelAfter: r3(after), litres: r3(litres) } });
-    if (hook) steps.push({ verb: 'mars:put_item', params: { item: can, surfaceSlot: `${hook.owner}#${hook.slot}` } });
+    if (hook) {
+      const hk = m.entities.get(hook.owner)!, hwp = m.worldPose(hk), slot = (m.resolvedDef(hk.def) as any).slots.find((x: { id: string }) => x.id === hook!.slot);
+      const grip = toWorld(hwp, [slot.p[0] + CAN_GRIP[0], slot.p[1] + CAN_GRIP[1], slot.p[2] + CAN_GRIP[2]]), at = hookStation(grip, hungYaw ?? heading(hwp, [1, 0]));
+      if (at) steps.push(at);
+      steps.push({ verb: 'mars:put_item', params: { item: canId, surfaceSlot: `${hook.owner}#${hook.slot}` } });
+    }
     const fmt = (l: number) => String(Math.round(l * 10) / 10);
+    planned.set(soul.entityId, canId);
     return { steps, can: canId, litres, fill, summary: `Watered ${m.pathOf(plantId)} with ${fmt(litres)} L from the watering can${fill ? ' (filled it at the tap first)' : ''}${hook ? ', and hung the can back on its hook' : ''}; the can has ${fmt(Math.max(0, (fill ? canL : have) - litres))} L left.` };
   }
 
   // ---- the world changes at the motion's moments ----
   const watching = new Map<string, number>(), fired = new Map<string, Set<string>>(), poured = new Map<string, number>();
   /** A body was given the act: watch its watering motions until they are done (with a minute's grace before them). */
-  function expect(body: string) { watching.set(body, h.engine.world.tick + GRACE_TICKS); }
+  function expect(body: string) { watching.set(body, h.engine.world.tick + GRACE_TICKS); const c = planned.get(body); if (c) canOf.set(body, c); }
+  /** The can each watched body's act uses, and how it was last supported (a grasp or a release reaches the world at once). */
+  const planned = new Map<string, string>(), canOf = new Map<string, string>(), lastSupport = new Map<string, string>();
   function commitEvent(m: WateringMotion & { actor?: string }, actor: string, key: string, data: Record<string, unknown>) {
     const model = M(), target = model.entities.get(m.target), tdef = target && model.resolvedDef(target.def), can = model.entities.get(m.item);
     if (!target || !tdef) return;
@@ -158,9 +175,17 @@ export function createWatering(h: WateringHost) {
     const r = h.commit(ops, `${actor} watering ${key} ${m.target}`);
     if (!r.accepted) h.log(`watering ${key}: the world refused ${JSON.stringify(ops)}`);
   }
-  /** Per tick, only for bodies given the act (usually none): commit the motion's moments that have now passed. */
-  function tick() {
-    if (!watching.size) return;
+  /** Per tick, only for bodies given the act (usually none): commit the motion's moments that have now passed. Returns the
+   *  cans whose grasp or release happened this tick, for the bridge to write back on this same tick. */
+  function tick(): string[] {
+    if (!watching.size) return [];
+    const moved: string[] = [];
+    for (const [body, can] of canOf) {
+      const s = ents()[can]?.support, key = s ? `${s.kind}:${s.by ?? s.on ?? ''}:${s.slot ?? ''}` : '';
+      if (lastSupport.has(can) && lastSupport.get(can) !== key) moved.push(can);
+      lastSupport.set(can, key);
+      if (!watching.has(body)) { canOf.delete(body); lastSupport.delete(can); }
+    }
     const dt = h.engine.dt ?? 0.05, tickNow = h.engine.world.tick;
     for (const [body, until] of watching) {
       const b = ents()[body], m = b?.human?.wateringV1 as WateringMotion | undefined;
@@ -173,6 +198,7 @@ export function createWatering(h: WateringHost) {
       for (const e of wateringEvents(m)) if (s >= e.at && !done.has(e.key)) { done.add(e.key); try { commitEvent(m, body, e.key, e.data); } catch (err) { h.log(`watering ${e.key}: ${(err as Error).message}`); } }
       if (fired.size > 64) for (const k of [...fired.keys()].slice(0, 32)) fired.delete(k);
     }
+    return moved;
   }
   return { plan, expect, tick, watchingCount: () => watching.size };
 }
