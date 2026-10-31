@@ -63,9 +63,9 @@ export function launcherFlood({ limits = {}, now = Date.now, log = (l) => consol
 // address. Caddy, not the launcher, accepts the connections, so "connections per address" is counted as the address's
 // requests in flight to world APIs and its WebSockets.
 export const SOUL_CEILINGS = Object.freeze({
-  ipPer10s: 60,             // Soul API requests per address per world per 10 s
+  ipPer10s: 120,            // Soul API requests per address per world per 10 s
   ipConcurrent: 10,         // API requests in flight + WebSockets per address
-  ipListen: 4,              // listen/wait long-polls per address
+  ipListen: 8,              // listen/wait long-polls per address
   soulListen: 2,            // listen/wait per Soul token
   accountListen: 8,         // listen/wait per account (learned from the world's x-sim-account header, else per Soul)
   accountHeavyPerMin: 120,  // C1/C2 per account (as above) per minute

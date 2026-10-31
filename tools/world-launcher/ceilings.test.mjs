@@ -91,7 +91,7 @@ test('a 200 req/s hammer from one address: the world gets at most its budget, ev
     const r = await fetch(`${base}/__sim/op/set-limits`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ slug, limits: { worldBudgetRps: 50, nope: 1 } }) });
     assert.equal(r.status, 400);
     const ok = await (await fetch(`${base}/__sim/op/set-limits`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ slug, limits: { worldBudgetRps: 50 } }) })).json();
-    assert.equal(ok.limits.worldBudgetRps, 50); assert.equal(ok.limits.ipListen, 4);
+    assert.equal(ok.limits.worldBudgetRps, 50); assert.equal(ok.limits.ipListen, 8);
     const dash = await (await fetch(`${base}/__sim/health?json=1`)).json();
     const row = dash.worlds.find((w) => w.slug === slug);
     assert.equal(row.limits.worldBudgetRps, 50); assert.ok(row.refused['world.busy'] > 0 || row.refused['client.rate'] > 0);
