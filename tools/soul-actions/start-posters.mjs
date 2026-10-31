@@ -3,7 +3,7 @@
 import {startWorld} from '../god-skill/dev-world.mjs';import {writeFileSync,mkdirSync} from 'node:fs';import {resolve} from 'node:path';
 const out=process.env.SOUL_POSTERS_SCENE??'<team>/soul-actions/day-38/scene',port=Number(process.env.SOUL_POSTERS_PORT??7873);mkdirSync(out,{recursive:true});
 const look=process.env.SOUL_POSTERS_LOOK==='1';
-const wall=JSON.stringify([0,1,2,3].map(s=>({s,t:`distant show ${s}`,d:'somewhere far',by:'s_z',n:'Zed',day:-s}))),board=JSON.stringify(['w','o'].flatMap(c=>[0,1,2].map(r=>({c,r,t:`${c==='w'?'Wanted':'Offered'}: distant thing ${r}`,by:'s_z',n:'Zed',re:[]}))));
+const wall=JSON.stringify([0,1,2,3].map(s=>({s,t:`distant show ${s}`,d:'somewhere far',by:'s_z',n:'Zed',day:-s}))),board=JSON.stringify(['w','o'].flatMap(c=>[0,1].map(r=>({c,r,t:`${c==='w'?'Wanted':'Offered'}: distant thing ${r}`,by:'s_z',n:'Zed',re:[]}))));
 // the near wall starts with one old poster (Zed's jumble sale, 4 world days before day 0: out of date)
 const near=look?[{s:0,t:'Jumble sale',d:'Saturday, the old barn',by:'s_zed',n:'Zed',day:-4},{s:1,t:'Concert at the bandstand',d:'Tonight at 8 · bring a blanket',by:'s_a',n:'Ada',day:0},{s:2,t:'Pottery class',d:'Saturday 10:00\nat the studio',by:'s_b',n:'Ben',day:-1},{s:3,t:'Lost: blue scarf',d:'ask Ben',by:'s_b',n:'Ben',day:0}]:[{s:0,t:'Jumble sale',d:'Saturday, the old barn',by:'s_zed',n:'Zed',day:-4}];
 const notes=look?[{c:'w',r:0,t:'Wanted: help carrying chairs to the bandstand',by:'s_a',n:'Ada',re:[],tk:{by:'s_c',n:'Cy'}},{c:'o',r:0,t:'Offered: spare blankets for the concert',by:'s_b',n:'Ben',re:[{t:'Two please!',by:'s_c',n:'Cy'}]},{c:'w',r:1,t:'Wanted: a ladder for the weekend',by:'s_c',n:'Cy',re:[]}]:[];

@@ -32,7 +32,7 @@ test('posters and wanted/offered notes', {timeout:400000}, async t=>{
  const today=worldDay();
  const absent=await here(ana);
  // 100 distant full poster walls and 100 distant full wanted boards (secret words everywhere)
- const fullWall=JSON.stringify([0,1,2,3].map(s=>({s,t:`secret show ${s}`,d:'secret detail',by:'s_z',n:'Zed',day:today-s}))),fullBoard=JSON.stringify(['w','o'].flatMap(c=>[0,1,2].map(r=>({c,r,t:`${c==='w'?'Wanted':'Offered'}: secret thing ${r}`,by:'s_z',n:'Zed',re:[{t:'secret reply',by:'s_y',n:'Yan'}],...(r===0?{tk:{by:'s_y',n:'Yan'}}:{})}))));
+ const fullWall=JSON.stringify([0,1,2,3].map(s=>({s,t:`secret show ${s}`,d:'secret detail',by:'s_z',n:'Zed',day:today-s}))),fullBoard=JSON.stringify(['w','o'].flatMap(c=>[0,1].map(r=>({c,r,t:`${c==='w'?'Wanted':'Offered'}: secret thing ${r}`,by:'s_z',n:'Zed',re:[{t:'secret reply',by:'s_y',n:'Yan'}],...(r===0?{tk:{by:'s_y',n:'Yan'}}:{})}))));
  const distant=Array.from({length:200},(_,i)=>{const p=[120+i%20*4,120+Math.floor(i/20)*4];return i%2?{op:'place',def:'core/poster-wall@1',name:`distant-wall-${i}`,p,state:{text:'secret show',textBy:fullWall}}:{op:'place',def:'core/wanted-board@1',name:`distant-board-${i}`,p,state:{text:'secret thing',textBy:fullBoard}};});
  for(let i=0;i<200;i+=100){const r=god.act({ops:distant.slice(i,i+100)});assert.equal(r.accepted,true,JSON.stringify(r).slice(0,300));}await tick(45);
  const far=await here(ana);assert.ok(!/secret|distant/i.test(JSON.stringify(far)),'distant boards add nothing to here');

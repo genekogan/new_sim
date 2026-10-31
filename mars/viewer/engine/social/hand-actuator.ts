@@ -15,7 +15,7 @@ const opening=z.object({hinge:vec,yaw:z.number().finite(),radius:z.number().min(
 // Soul Actions entry 38: a poster is put up (or taken down) with both hands: `width`/`height` are the sheet's, `at` its centre on
 // the wall's surface, and `sheet` what is printed on it (so every viewer draws the same paper in the hands as on the wall).
 const sheet=z.object({title:z.string().max(40),detail:z.string().max(80),name:z.string().max(40).optional(),paper:z.number().int().min(0).max(15),age:z.number().min(0).max(99).optional()}).strict();
-const stroke=z.object({kind:z.union([z.literal('write'),z.literal('wipe'),z.literal('poster'),z.literal('unposter')]),yaw:z.number().finite(),stand:z.number().min(.3).max(.7).optional(),width:z.number().min(.1).max(1.2),height:z.number().min(.05).max(.8),lines:z.number().int().min(1).max(3),seconds:z.number().min(.8).max(6),release:z.number().min(.7).max(1.6).optional(),lead:z.object({y:z.number().finite(),out:z.number().min(0).max(.5)}).strict().optional(),sheet:sheet.optional()}).strict();
+const stroke=z.object({kind:z.union([z.literal('write'),z.literal('wipe'),z.literal('poster'),z.literal('unposter')]),yaw:z.number().finite(),stand:z.number().min(.3).max(.7).optional(),width:z.number().min(.1).max(1.2),height:z.number().min(.05).max(.8),lines:z.number().int().min(1).max(3),seconds:z.number().min(.8).max(6),release:z.number().min(.7).max(1.6).optional(),lead:z.object({y:z.number().finite(),out:z.number().min(0).max(.5)}).strict().optional(),handoff:z.number().min(0).max(1.2).optional(),sheet:sheet.optional()}).strict();
 export const handActuatorParams=z.object({actor:z.string(),target:z.string(),at:vec,opening:opening.optional(),stroke:stroke.optional()}).strict();
 export type HandActuatorParams=z.infer<typeof handActuatorParams>;
 export type HandActuatorMotion=Omit<HandActuatorParams,'actor'> & {startTick:number;actionId?:string;abortedAt?:number;abortWeight?:number};
@@ -35,8 +35,10 @@ export function handActuatorFrame(m:HandActuatorMotion,seconds:number){
  const rel=m.stroke?.release??HAND_RELEASE_SECONDS;
  const weight=m.abortedAt!==undefined?(m.abortWeight??0)*(1-smooth((seconds-m.abortedAt)/rel))
    :smooth(seconds/HAND_REACH_SECONDS)*(1-smooth((seconds-releaseAt)/rel));
- const armDownAt=(m.abortedAt??releaseAt)+rel,idleBlend=smooth((seconds-armDownAt)/HAND_IDLE_HANDOFF_SECONDS);
- return {angle,weight,idleBlend,armDown:seconds>=armDownAt,commitAt,done:seconds>=armDownAt+HAND_IDLE_HANDOFF_SECONDS,contact:m.abortedAt===undefined&&seconds>=commitAt};
+ // Entry 38: a stroke followed by a step back hands the body over soon after the arm is down (`handoff`), before an idle
+ // gesture can rise in the 1.2 s idle handoff (take 4: a hand went up to the hair at 0.1 m per 50 ms, then the step back)
+ const armDownAt=(m.abortedAt??releaseAt)+rel,idleBlend=smooth((seconds-armDownAt)/HAND_IDLE_HANDOFF_SECONDS),handoff=m.stroke?.handoff??HAND_IDLE_HANDOFF_SECONDS;
+ return {angle,weight,idleBlend,armDown:seconds>=armDownAt,commitAt,done:seconds>=armDownAt+handoff,contact:m.abortedAt===undefined&&seconds>=commitAt};
 }
 /** Three's local-Y rotation convention, converted to the native world frame. */
 export function actuatorPoint(o:NonNullable<HandActuatorParams['opening']>,angle:number){
@@ -75,7 +77,7 @@ export function posterLocal(s:NonNullable<HandActuatorParams['stroke']>,u:number
  return posterBase(s,strokeWork(s,u));
 }
 function posterBase(s:NonNullable<HandActuatorParams['stroke']>,u:number):{x:number;y:number;o:number;spread:number}{
- const k=Math.max(0,Math.min(1,u)),yT=s.height/2-.07,yB=-s.height/2+.045,seg=(a:number,b:number)=>smooth((k-a)/(b-a)),lerp=(a:number,b:number,t:number)=>a+(b-a)*t;
+ const k=Math.max(0,Math.min(1,u)),yT=s.height/2-.08,yB=-s.height/2+.045,seg=(a:number,b:number)=>smooth((k-a)/(b-a)),lerp=(a:number,b:number,t:number)=>a+(b-a)*t;
  if(s.kind==='unposter'){
   if(k<.15)return {x:0,y:yT,o:lerp(POSTER_OFF,POSTER_ON,seg(0,.15)),spread:1};
   if(k<.55){const f=seg(.15,.55);return {x:0,y:lerp(yT,yB,f),o:lerp(POSTER_ON,.06,f),spread:1};}

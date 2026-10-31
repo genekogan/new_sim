@@ -161,15 +161,15 @@ export function wantedTexture(notes: WantedRec[], f: Face): THREE.Texture {
   const { c, g, cw, ch, px } = canvasOf(f, 1536); let seed = 5; const rnd = () => ((seed = Math.imul(seed ^ (seed >>> 13), 1103515245) + 12345 | 0) >>> 0) / 4294967296;
   g.fillStyle = f.bg ?? '#b88a5a'; g.fillRect(0, 0, cw, ch);
   for (let i = 0; i < 5200; i++) { g.fillStyle = rnd() < 0.5 ? 'rgba(70,40,15,0.22)' : 'rgba(235,200,150,0.18)'; g.fillRect(rnd() * cw, rnd() * ch, 2 + rnd() * 3, 2 + rnd() * 3); }
-  g.fillStyle = 'rgba(60,35,15,0.5)'; g.fillRect(cw / 2 - 3, 0.12 * px, 6, ch);   // the line between the columns
+  g.fillStyle = 'rgba(60,35,15,0.5)'; g.fillRect(cw / 2 - 3, 0.1 * px, 6, ch);   // the line between the columns
   for (const [col, label, paint] of [[0, 'WANTED', '#8e2f22'], [1, 'OFFERED', '#2f6046']] as const) {
-    const [sx] = wantedSlot(col, 0), x = (sx / f.w + 0.5) * cw, w = 0.5 * px, h = 0.085 * px, y = 0.07 * px;
+    const [sx] = wantedSlot(col, 0), x = (sx / f.w + 0.5) * cw, w = 0.5 * px, h = 0.075 * px, y = 0.055 * px;
     g.fillStyle = 'rgba(20,10,5,0.35)'; g.fillRect(x - w / 2 + 5, y - h / 2 + 6, w, h); g.fillStyle = paint; g.fillRect(x - w / 2, y - h / 2, w, h);
     g.fillStyle = '#f3ead2'; g.font = `800 ${Math.round(0.058 * px)}px Georgia, 'Times New Roman', serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(label, x, y + 2, w * 0.9);
   }
   const papers = ['#fbf6e4', '#fdf0a6', '#d9ecf7', '#f8dbe0', '#e3f2d6'], hash = (t: string) => { let h = 2166136261; for (const ch of t) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return (h >>> 0) / 4294967296; };
   for (const n of notes) {
-    const [sx, sy] = wantedSlot(n.c === 'o' ? 1 : 0, n.r), x = (sx / f.w + 0.5) * cw, y = (0.5 - sy / f.h) * ch, w = 0.62 * px, h = 0.23 * px, r = hash(n.t + n.n);
+    const [sx, sy] = wantedSlot(n.c === 'o' ? 1 : 0, n.r), x = (sx / f.w + 0.5) * cw, y = (0.5 - sy / f.h) * ch, w = 0.62 * px, h = 0.21 * px, r = hash(n.t + n.n);
     g.save(); g.translate(x, y); g.rotate((r - 0.5) * 0.06);
     g.fillStyle = 'rgba(30,15,5,0.35)'; g.fillRect(-w / 2 + 6, -h / 2 + 8, w, h); g.fillStyle = papers[Math.floor(r * papers.length)]; g.fillRect(-w / 2, -h / 2, w, h);
     const words = n.t.replace(/^(?:wanted|offered)\s*[:\-–—]?\s*/i, '');
