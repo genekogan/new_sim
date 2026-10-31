@@ -99,8 +99,14 @@ test('read worker mode 2: here, observe, capabilities (incl. ?all=1) and view?al
   const r = await accept(f.host, edge.act(soul, {capability: 'dance', params: {seconds: 5}})) as {accepted?: boolean};
   assert.equal(r.accepted, true);
   for (let i = 0; i < 4; i++) {await settle(10); await check(`dance ${i}`);}
+  // a resnapshot (main's tap restarts: engine or object table replaced): the worker loads a new WorldInit and answers as
+  // main again, during an act begun before it and one begun after
+  source.tap.restart('test'); await settle(2); await until(() => p.slots[0].ready); await check('after resnapshot');
+  const r2 = await accept(f.host, edge.act(soul, {capability: 'dance', params: {seconds: 5}})) as {accepted?: boolean};
+  assert.equal(r2.accepted, true);
+  for (let i = 0; i < 3; i++) {await settle(10); await check(`dance after resnapshot ${i}`);}
   const h = await (await fetch(`http://127.0.0.1:${port}/w/eden/healthz/read`)).json() as {read: {served: number; warmMs: number; fallbacks: Record<string, number>}};
-  assert.equal(h.read.served, 5 * 5, JSON.stringify(h.read));
+  assert.equal(h.read.served, 9 * 5, JSON.stringify(h.read));
   assert.deepEqual(forwarded, [], 'nothing forwarded');
   // a picture (main's render worker) and a gaze (an attention write) are main's
   for (const q of ['view', 'view?gaze=left&alt=only']) {const {j} = await get(q); assert.deepEqual(j, {main: true}, q);}

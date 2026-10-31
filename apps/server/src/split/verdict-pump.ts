@@ -23,7 +23,15 @@ type LedgerLike = {weatherNow?: () => unknown; recentStrikesV1?: () => unknown; 
 type Host = {minds: Map<string, {soulId: string; entityId: string}>; mindByEntity?: Map<string, {soulId: string}>; kernel?: unknown; extra?: Record<string, unknown>};
 
 export class VerdictPump {
-  private mw: MenuWorld & {feasibility: LiveFeasibility}; private host: Host;
+  private mwOf: () => MenuWorld & {feasibility: LiveFeasibility}; private mwNow: (MenuWorld & {feasibility: LiveFeasibility}) | null = null; private host: Host;
+  /** main's MenuWorld for its CURRENT engine (menuWorldOf is one per engine): a host whose engine is replaced (a quiet
+   *  renewal, a restore) must be read through the new one, or every action row, record, static and verdict shipped from
+   *  then on is the old engine's (lane B-serve: the replica diverged after the tap's 'engine replaced' restart). */
+  private get mw() {
+    const m = this.mwOf();
+    if (m !== this.mwNow) {this.mwNow = m; m.feasibility.fresh ??= [];}
+    return m;
+  }
   private actionKeys = new Map<string, string>(); private recordKeys = new Map<string, string>();
   private shipped = new Map<string, {actor: string; program: Program; scope: string; v: string}>();
   private asks = new Map<string, {program: Program; scope: string}>();
@@ -34,9 +42,9 @@ export class VerdictPump {
   readonly cost = {ticks: 0, cpuMs: 0, maxCpuMs: 0, verdicts: 0, reasks: 0, asks: 0, actions: 0, records: 0, statics: 0, kernels: 0};
 
   private L?: LedgerLike; private envKeys: Record<string, string> = {}; private spotsRef: unknown = undefined;
-  constructor(mw: MenuWorld & {feasibility: LiveFeasibility}, host: Host, L?: LedgerLike) {
-    this.mw = mw; this.host = host; this.L = L;
-    mw.feasibility.fresh = [];
+  constructor(mw: (MenuWorld & {feasibility: LiveFeasibility}) | (() => MenuWorld & {feasibility: LiveFeasibility}), host: Host, L?: LedgerLike) {
+    this.mwOf = typeof mw === 'function' ? mw : () => mw; this.host = host; this.L = L;
+    this.mw.feasibility.fresh = [];
     for (const a of this.actionRows()) this.actionKeys.set(a.actor, JSON.stringify(a));
     for (const r of this.recordRows()) this.recordKeys.set(r.id, JSON.stringify(r));
     const s = this.statics(); this.staticsRef = this.refs(); this.staticsKey = JSON.stringify([s.anchors, s.newcomer ?? null, s.deliveries ?? null, s.groundV1, s.physical, s.upperFloors]); this.kernelKey = JSON.stringify(s.kernel); this.namesKey = JSON.stringify(s.names);
