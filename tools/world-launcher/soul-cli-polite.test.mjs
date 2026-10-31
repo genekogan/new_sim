@@ -123,3 +123,23 @@ test('one listener per Soul: a second listen exits 0 at once; a stale lock is ta
   await new Promise(r => setTimeout(r, 100));
   assert.equal(listens(), 2, 'only the two real listeners asked the world');
 });
+
+test('a live but stuck listener (lock not renewed for 60 s) is stopped and its lock taken over; a fresh one is left alone', { timeout: 10_000 }, async t => {
+  const f = await fixture(t, () => { /* hold every long-poll open */ });
+  const lock = join(f.dir, '.listen.lock'), holder = () => { try { return JSON.parse(readFileSync(lock, 'utf8')); } catch { return null; } };
+  const stuck = f.start('listen');
+  for (let i = 0; i < 100 && holder()?.pid !== stuck.pid; i++) await new Promise(r => setTimeout(r, 20));
+  assert.ok(holder().beatAt, 'the lock carries a heartbeat');
+  const fresh = await f.run('listen');
+  assert.equal(JSON.parse(fresh.stdout).alreadyListening, true, 'a renewed lock still refuses a second listen');
+  stuck.kill('SIGSTOP');   // suspended: it can no longer renew; age its heartbeat past the 60 s limit
+  writeFileSync(lock, JSON.stringify({ ...holder(), beatAt: new Date(Date.now() - 120_000).toISOString() }));
+  const next = f.start('listen');
+  for (let i = 0; i < 100 && holder()?.pid !== next.pid; i++) await new Promise(r => setTimeout(r, 20));
+  assert.equal(holder()?.pid, next.pid, 'the stuck listener\'s lock was taken over');
+  stuck.kill('SIGCONT');
+  const end = await stuck.done;
+  assert.ok(end.code === 143 || end.signal === 'SIGTERM', `the stuck listener was stopped (${end.code}/${end.signal})`);
+  assert.equal(holder()?.pid, next.pid, 'its exit did not remove the new holder\'s lock');
+  assert.match(next.err, new RegExp(`listener pid ${stuck.pid} has not renewed its lock for 120 s`));
+});
