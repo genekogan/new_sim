@@ -8,6 +8,7 @@ import { changelogHtml } from './src/changelog-page.ts';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { resolve as resolvePath } from 'node:path';
 
 // Lane L3h: a new world's /v1/world/snapshot GET leaves from index.html's head, before any chunk downloads
 // (src/snapshot-prefetch.ts); WorldEntityLayer.start takes that response. The workbench page has no world.
@@ -95,9 +96,11 @@ function pwa(): Plugin {
 // Issue #388: the public changelog page (changelog.html, served at <base>/changelog by the world launcher) is the repo's
 // CHANGELOG.md rendered at build time (src/changelog-page.ts): static HTML, no script, nothing fetched at runtime. A
 // CHANGELOG.md with no release headings fails the build. Dev server too, so `vite` shows the same page.
+// #393: SIM_CHANGELOG_FILE names another copy to render; the release workflow points it at CHANGELOG.md with the
+// shipping release's section already compiled in (tools/changelog/compile.mjs --out), so the page shows that release.
 function changelogPage(): Plugin {
   let base = '/';
-  const file = fileURLToPath(new URL('../../CHANGELOG.md', import.meta.url));
+  const file = process.env.SIM_CHANGELOG_FILE ? resolvePath(process.env.SIM_CHANGELOG_FILE) : fileURLToPath(new URL('../../CHANGELOG.md', import.meta.url));
   return {
     name: 'sim-changelog-page',
     configResolved(c) { base = c.base; },
