@@ -1,5 +1,6 @@
 import {handActuatorFrame,type HandActuatorMotion} from '../../engine/social/hand-actuator.ts';
 import {itemPresentation,type ItemPresentation} from '../../engine/items/presentation.ts';
+import {wateringFrame,transferWeight,TRANSFER_HANDOFF,type HandTransfer,type WateringMotion} from '../../engine/items/watering.ts';
 // Engine humans → animated rigs. Renderers only read world state (guide):
 // after every fixed tick we snapshot pose + derive clip state; frames
 // interpolate between the last two ticks, so visuals are a deterministic
@@ -77,6 +78,12 @@ type View = {
   handActuator?:HandActuatorMotion;
   handActuatorTime?:number;
   itemPose?:ItemPresentation;
+  /** Soul Actions 34: a watering-can stage (fill / pour), on the take clock. */
+  watering?:WateringMotion;
+  wateringTime?:number;
+  /** Soul Actions 34: a handle-held item taken or put by hand (take_item / put_item), on the take clock. */
+  transfer?:HandTransfer;
+  transferTime?:number;
   sleepPose?: NonNullable<Entity['human']>['sleepPose'];
   shore?: ShoreContactV1;
   shoreTime?: number;
@@ -212,6 +219,12 @@ export type SampledHuman = {
   handActuator?:HandActuatorMotion;
   handActuatorTime?:number;
   itemPose?:ItemPresentation;
+  /** Soul Actions 34: a watering-can stage (fill / pour), on the take clock. */
+  watering?:WateringMotion;
+  wateringTime?:number;
+  /** Soul Actions 34: a handle-held item taken or put by hand (take_item / put_item), on the take clock. */
+  transfer?:HandTransfer;
+  transferTime?:number;
   sleepPose?: NonNullable<Entity['human']>['sleepPose'];
   shore?: ShoreContactV1;
   shoreTime?: number;
@@ -493,7 +506,7 @@ export class HumanViews {
       v.shore = undefined;
       v.shoreTime = undefined;
       v.waterTransition = undefined;
-      v.handActuator=e.human?.handActuator;v.handActuatorTime=world.tick*DT;
+      v.handActuator=e.human?.handActuator;v.handActuatorTime=world.tick*DT;v.watering=e.human?.wateringV1;v.wateringTime=world.tick*DT;v.transfer=e.human?.handTransferV1;v.transferTime=world.tick*DT;
       v.itemPose=itemPresentation(e.human?.itemTransferV1,e.human?.heldItemsV1,world.tick,DT);
       v.sleepPose = e.human?.sleepPose;
       v.base = base;
@@ -575,7 +588,8 @@ export class HumanViews {
     const ts: Target[] = [];
     const hands = e.human?.hands;
     if (hands && (hands.left || hands.right)) {
-      if (hands.left) ts.push(toBody(hands.left[0], hands.left[1], hands.left[2], -1));
+      // Soul Actions 34: the free hand on a tap's valve (chest height) asks nothing of the body; only the can hand leans it
+      if (hands.left && !e.human?.wateringV1) ts.push(toBody(hands.left[0], hands.left[1], hands.left[2], -1));
       if (hands.right) ts.push(toBody(hands.right[0], hands.right[1], hands.right[2], 1));
     } else if (v.grip && v.gripSlot !== STATION_SLOT) {
       const part = world.entities[v.grip];
@@ -602,6 +616,7 @@ export class HumanViews {
     // A low latch may need a small bend as well as a hand reach. Ease the whole
     // solved posture on the same timeline so the torso cannot pop in/out.
     if(v.handActuator){const k=handActuatorFrame(v.handActuator,(v.handActuatorTime??0)-v.handActuator.startTick*DT).weight;for(const key of ['drop','bend','rise','kneel'] as const)pz[key]*=k;}
+    if(v.transfer){const k=transferWeight(v.transfer,(v.transferTime??0)-v.transfer.startTick*DT).weight;for(const key of ['drop','bend','rise','kneel'] as const)pz[key]*=k;}
 
     // on a frame's bracing: crouch / bend on the rod, never kneel or rise onto the toes
     return v.frame?.kind === 'stance' ? { ...pz, kneel: 0, rise: 0 } : pz;
@@ -688,7 +703,7 @@ export class HumanViews {
       if(!f.bodyModel)this.syncAppearance(v,f.publicSoulKey);
       const walkDur = v.rig.walk.getClip().duration, idleDur = v.rig.idle.getClip().duration;
       v.activity = act;
-      v.handActuator=f.handActuator;v.handActuatorTime=f.handActuatorTime;
+      v.handActuator=f.handActuator;v.handActuatorTime=f.handActuatorTime;v.watering=f.watering;v.wateringTime=f.wateringTime;v.transfer=f.transfer;v.transferTime=f.transferTime;
       v.itemPose=f.itemPose;
       v.sleepPose = f.sleepPose;
       v.shore = f.shore;
@@ -723,7 +738,7 @@ export class HumanViews {
       const free=!f.hands?.left&&!f.hands?.right&&!f.grip&&!f.on;
       const waterWeight=free?clamp01((water?targetWeight:0)+(1-targetWeight)*priorWater):0;
       const walk = SEATED.has(base) ? 0 : f.walk * (1-waterWeight);
-      const e = { id: f.id, def: 'human', kind: 'human', pose: { p: f.p, yaw: f.yaw }, human: { activity: act, level: 0, hands: f.hands, proneYaw: f.proneYaw, phaseK: f.phaseK, sleepPose: f.sleepPose } } as unknown as Entity;
+      const e = { id: f.id, def: 'human', kind: 'human', pose: { p: f.p, yaw: f.yaw }, human: { activity: act, level: 0, hands: f.hands, proneYaw: f.proneYaw, phaseK: f.phaseK, sleepPose: f.sleepPose, wateringV1: f.watering } } as unknown as Entity;
       const snap: Snap = {
         p: [...f.p],
         yaw: f.yaw,
@@ -827,13 +842,16 @@ export class HumanViews {
     const reachS = v.handActuator ? (v.handActuatorTime ?? tSec) - v.handActuator.startTick * DT : 0;
     const handoff = v.handActuator ? handActuatorFrame(v.handActuator, reachS) : null;
     // Over GESTURE_FADE, not the 0.65 s reach: folded arms opening in 0.65 s still swung the free hand 0.13 m per 50 ms (0.084 over 1.2 s).
-    const reachFade = v.handActuator && v.handActuator.abortedAt === undefined && reachS >= 0 && reachS < GESTURE_FADE ? 1 - smooth(reachS / GESTURE_FADE) : 0;
+    const transferS = v.transfer ? (v.transferTime ?? tSec) - v.transfer.startTick * DT : -1;
+    // Soul Actions 34: an idle gesture fades out the same way over a hand-held item's reach (take_item / put_item)
+    const reachFade = v.handActuator && v.handActuator.abortedAt === undefined && reachS >= 0 && reachS < GESTURE_FADE ? 1 - smooth(reachS / GESTURE_FADE)
+      : v.transfer && transferS >= 0 && transferS < GESTURE_FADE ? 1 - smooth(transferS / GESTURE_FADE) : 0;
     // Idle variety also plays on into a walk start (scaled by 1 − walk weight, so it fades out with the walk's ease).
     // An opted-in item transfer (lantern, bowl) keeps its own clock (presentation.ts): idle variety plays on through its
     // turn and fades out over a pick-up from the reach start, as a hand actuator's does; 0 while an item is held.
     const itemReach = !!v.itemPose && v.activity === 'reach';
-    const idleFree = (v.activity === 'idle' || itemReach || GAIT_ACTS.has(v.activity) || (v.activity === 'operate' && reachFade > 0)) && b.sitW === 0 && (!engineHands || reachFade > 0 || (v.itemPose?.idleBlend ?? 0) > 0) && freeBody && !lib.cur;
-    const idleHandoff = v.itemPose?.idleBlend ?? (handoff ? (reachS < 0 ? 1 : Math.max(handoff.idleBlend, reachFade)) : 1);
+    const idleFree = (v.activity === 'idle' || itemReach || GAIT_ACTS.has(v.activity) || ((v.activity === 'operate' || v.activity === 'reach') && reachFade > 0)) && b.sitW === 0 && (!engineHands || reachFade > 0 || (v.itemPose?.idleBlend ?? 0) > 0) && freeBody && !lib.cur;
+    const idleHandoff = v.itemPose?.idleBlend ?? (handoff ? (reachS < 0 ? 1 : Math.max(handoff.idleBlend, reachFade)) : v.transfer?.endTick !== undefined ? smooth(((v.transferTime ?? tSec) - v.transfer.endTick * DT) / TRANSFER_HANDOFF) : v.transfer && transferS >= 0 ? reachFade : 1);
     // Idle variety (Idle_Neutral, fold arms, look around) fades in from when the body came to rest: switched on at full
     // weight it raised or crossed the arms in one frame whenever a walk ended inside a person's variety window
     // (entry 29's shared idle-onset fix, carried by entry 33: a hand-to-hair flash at each walk stop before a reach).
@@ -1008,6 +1026,7 @@ export class HumanViews {
     if(water?.kind==='surface-swim')surfaceSwimBody(v,water);
     if(water?.floating)waterLegs(v,water);
     // arms
+    h.userData.wateringTilt=0;h.userData.wateringFlow=0;
     const targets: (THREE.Vector3 | null)[] = v.arms.map(() => null);
     let source: Source = null;
     if (hasHands) {
@@ -1050,7 +1069,14 @@ export class HumanViews {
       // Blend the actual arm bones to/from the existing idle/walk clip; lowering a
       // Cartesian hand target alone leaves the elbow/shoulder snapping at release.
       const weight=v.itemPose?.weight??(v.handActuator?handActuatorFrame(v.handActuator,(v.handActuatorTime??tSec)-v.handActuator.startTick*DT).weight:1);
-      const armBase=weight<1?v.arms.flatMap(arm=>[...(arm.shoulder?[arm.shoulder]:[]),arm.upper,arm.lower,arm.hand]).map(o=>({o,q:o.quaternion.clone(),p:o.position.clone()})):[];
+      // Soul Actions 34: the can hand stays on the can; the free hand blends in to the valve and back out to the clip
+      // between take frames: the frame's own time plus how far the render is past it (the hands interpolate the same way)
+      const wf=v.watering?wateringFrame(v.watering,(v.wateringTime!==undefined?v.wateringTime+(tSec-b.expressionT):tSec)-v.watering.startTick*DT):null;
+      // a handle-held item's reach blends that arm in from (and its release back out to) the clip's own pose
+      const tw=v.transfer?transferWeight(v.transfer,(v.transferTime!==undefined?v.transferTime+(tSec-b.expressionT):tSec)-v.transfer.startTick*DT).weight:null;
+      const armW=(i:number)=>wf?(armSide(v,i)==='left'?wf.left:1):tw!==null&&armSide(v,i)===v.transfer!.hand?tw:weight;
+      h.userData.wateringTilt=wf?.tilt??0;h.userData.wateringFlow=wf?.flow??0;
+      const armBase=v.arms.some((_,i)=>armW(i)<1)?v.arms.flatMap((arm,i)=>[...(arm.shoulder?[arm.shoulder]:[]),arm.upper,arm.lower,arm.hand].map(o=>({o,w:armW(i)}))).map(({o,w})=>({o,w,q:o.quaternion.clone(),p:o.position.clone()})):[];
       const k = reachTo(v, targets, pz.rise > 0, BODY_MODEL.maxExtension, undefined, pa);
       v.arms.forEach((arm, i) => {
         if (!targets[i] && sitW > 0 && !seatClip) handOnThigh(v, i, sitW);
@@ -1060,8 +1086,8 @@ export class HumanViews {
       // pick-up) keeps the free arm until it has gone: hung at the bend's rate, it dropped 0.11 m per 50 ms
       if (sitW <= 0) dangle(v, proneW > 0 ? Math.max(pz.bend * (1 - proneW), pr!.bend * proneW) : pz.bend, k, v.itemPose?.posture ? 0 : DANGLE_FROM, v.itemPose?.posture ? 1 - clamp01(v.variety ?? 0) : 1);
       v.arms.forEach((arm, i) => flat[i] > 0 && k[i] > 0 && flatHand(v, arm, targets[i]!, h.position.y, flat[i] * k[i], pa!.pole(arm, targets[i]!)));
-      for(const b of armBase){b.o.quaternion.slerp(b.q,1-weight);b.o.position.lerp(b.p,1-weight);}if(armBase.length)h.updateMatrixWorld(true);
-      closeHands(v, k.map((c, i) => weight*(expression?.kind === 'planted-dance' ? 0 : c * (1 - flat[i]))));
+      for(const b of armBase){b.o.quaternion.slerp(b.q,1-b.w);b.o.position.lerp(b.p,1-b.w);}if(armBase.length)h.updateMatrixWorld(true);
+      closeHands(v, k.map((c, i) => armW(i)*(expression?.kind === 'planted-dance' ? 0 : c * (1 - flat[i]))));
     } else if (v.sleepPose && pr && v.dims && proneW > 0) {
       // Free contact expression is private to the current rig, never authoritative hands/grips.
       source = 'sleep';

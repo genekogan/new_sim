@@ -96,6 +96,10 @@ function stateRoles(root: THREE.Object3D, look: Look) {
     if (role === 'fill' && typeof s.level === 'number') { o.scale.y = Math.max(0.001, Math.min(1, s.level)); o.visible = s.level > 0.001; }
     // W5: a bed's damp patch (role fill on a thing with `moisture`, no `level`) spreads across the soil as it is watered
     else if (role === 'fill' && typeof s.moisture === 'number') { const m = Math.max(0.001, Math.min(1, s.moisture)); o.scale.set(m, 1, m); o.visible = s.moisture > 0.02; }
+    // Entry 16: a planter's plant (parts with role head on a thing with moisture) droops and browns when dry
+    if (role === 'head' && typeof s.moisture === 'number' && s.moisture < 1) { const dry = 1 - Math.max(0, Math.min(1, s.moisture));
+      o.scale.y *= 1 - 0.45 * dry; o.rotation.z += (o.position.x >= 0 ? -1 : 1) * 0.5 * dry;
+      const q = Math.round(dry * 4) / 4; if (q > 0) o.traverse((c) => { const m = (c as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined; if (m?.color) (c as THREE.Mesh).material = lookMaterial(m, 'dry' + q, (x) => x.color.lerp(new THREE.Color('#8a7246'), 0.7 * q)); }); }
     if ((role === 'light' || role === 'screen') && s.on === false) o.traverse((c) => { const m = (c as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined; if (m?.emissive) (c as THREE.Mesh).material = lookMaterial(m, 'off', (x) => { x.emissiveIntensity = 0; }); });
   });
 }
@@ -126,7 +130,8 @@ export function applyLook(obj: THREE.Object3D | null, ctx: MeshCtx): THREE.Objec
   const apply = (root: THREE.Object3D) => { warpSubtree(root, look, h); paintSubtree(root, look, ctx); stateRoles(root, look); };
   apply(obj);
   // imported meshes arrive after build (mesh.mesh.ts adds the GLB later): give them the same look when they land
-  obj.addEventListener('childadded', (e: { child?: THREE.Object3D }) => { if (e.child) queueMicrotask(() => apply(e.child!)); });
+  // the event object is reused (its child is null again by the microtask): keep the child itself (entry 34 found it)
+  obj.addEventListener('childadded', (e: { child?: THREE.Object3D }) => { const child = e.child; if (child) queueMicrotask(() => apply(child)); });
   if (look.condition === 'damaged') { obj.rotation.z = (hashSeed(ctx.entity.id) - 0.5) * 0.06; obj.rotation.x = (hashSeed(ctx.entity.id + 'x') - 0.5) * 0.05; }
   const stretched = look.sx !== 1 || look.sy !== 1 || look.sz !== 1;
   if (!stretched && look.condition !== 'construction') return obj;

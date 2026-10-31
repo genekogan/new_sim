@@ -61,6 +61,8 @@ const FIELDS: [string, (e: Entity) => unknown][] = [
   ['paint', (e) => e.paint], // work/paint.ts: colour / texture, coverage (0.01 steps), per band
   // mars-take/2 (BODY_MODEL.md "take fields"): what a replay needs to pose people exactly as the engine did
   ['handActuator', e=>e.human?.handActuator], // one finite native contact timeline; never controller context
+  ['wateringV1', e=>e.human?.wateringV1],
+  ['handTransferV1', e=>e.human?.handTransferV1], // Soul Actions 34: a handle-held item's reach / release timeline // Soul Actions 34: one finite watering-can stage; never controller context
   ['hands', takeHands], // human.hands, integer mm (hand-up, items, eating, paint)
   ['heldItemsV1', e => e.human?.heldItemsV1],
   ['itemTransferV1', e => e.human?.itemTransferV1],

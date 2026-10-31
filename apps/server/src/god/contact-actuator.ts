@@ -2,6 +2,7 @@
 // Durable receipt intent, no per-tick object scan and no effect from an interrupted walk.
 import {actuatorPoint,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
 import { createHash } from 'node:crypto';
+import { isDry, stageWord } from './garden.ts';
 import { HUMAN_RADIUS } from '../../../../mars/viewer/engine/world/catalog.ts';
 import { opSchema, contactStateKey, type WorldModel, type Op, type StoredDef } from '@sim/world-compiler';
 import type { EdgeSoul } from '../edge/contract.ts';
@@ -16,7 +17,7 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
   plan(soul:EdgeSoul,target:string,action:string){
    const m=d.model(),e=m.entities.get(target),def=e&&m.resolvedDef(e.def),body=d.body(soul.entityId);if(!e||!def||!body)return null;
    const wp=m.worldPose(e),me=body.pose.p,at:[number,number,number]=[wp.x,wp.y+1.04*wp.s,wp.z];
-   const params:Omit<HandActuatorParams,'actor'>={target,at};let root:[number,number,number];
+   const params:Omit<HandActuatorParams,'actor'>={target,at};let root:[number,number,number],face:[number,number]|undefined;
    if(def.components.opening){
     const shapes=def.make.kind==='gen'?(def.make.args as {shapes?:{role?:string;pivot?:number[];at?:number[];tint?:string}[]})?.shapes:undefined;
     const leaf=shapes?.find(s=>s.role==='door'&&s.pivot),knob=shapes?.find(s=>s.role==='door'&&s.tint==='brass');if(!leaf?.pivot)return null;
@@ -36,12 +37,22 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
      const c=Math.cos(wp.yaw),s=Math.sin(wp.yaw),[hx,,hz]=def.size.box.map(v=>v*wp.s/2),outside=(p:number[])=>{const lx=(p[0]-wp.x)*c-(p[2]-wp.z)*s,lz=(p[0]-wp.x)*s+(p[2]-wp.z)*c;return Math.abs(lx)>hx+HUMAN_RADIUS||Math.abs(lz)>hz+HUMAN_RADIUS;};
      const want=Math.atan2(dz,dx),best=Array.from({length:8},(_,i)=>i*Math.PI/4).map(a=>[params.at[0]+Math.cos(a)*.55,wp.y,params.at[2]+Math.sin(a)*.55,Math.abs(((a-want+Math.PI*3)%(Math.PI*2))-Math.PI)]).filter(outside).sort((p,q)=>p[3]-q[3])[0];
      if(best)root=[best[0],best[1],best[2]];
+     // Entry 33 (take 4): a stand point beside the valve can leave the body ~40° off the valve when it arrives (a wall
+     // torch approached along its wall); the Soul turns to face the valve on arrival, before the arm comes up, so the
+     // reach is never added to a body turn (the hand actuator's own turn is then ~0).
+     face=[params.at[0],params.at[2]];
     }}
-   return {params,root,level:d.levelAt?.(root[0],root[2],root[1])??0};
+   return {params,root,level:d.levelAt?.(root[0],root[2],root[1])??0,...(face?{face}:{})};
   },
   /** A few current public facts for compact nearby perception, never the full state. */
   facts(target:string){
    const m=d.model(),e=m.entities.get(target),def=e&&m.resolvedDef(e.def),key=def&&contactStateKey(def);
+   // Entry 18: a thirsty planter says so (only when dry; a watered garden adds nothing)
+   if(e&&def&&!key&&(def.state as Record<string,{type?:string}>).moisture?.type==='number'){
+    const st=def.state as Record<string,{type?:string;default?:unknown}>,dry=isDry(e.state?.moisture??st.moisture?.default);
+    // Entry 34: a growing planter says its stage in a word (and dry only when dry)
+    const stage=st.growth?.type==='number'?stageWord(e.state?.growth??st.growth.default):null;
+    return stage?{stage,...(dry?{dry:true}:{})}:dry?{dry:true}:null;}
    if(!e||!def||!key)return null;const state=actuatedState(e,def),facts:Record<string,boolean>={};
    if(typeof state[key]==='boolean')facts[key]=state[key] as boolean;
    if(key==='open'&&typeof state.locked==='boolean')facts.locked=state.locked;
@@ -61,7 +72,12 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
    const expected=motion?.opening?actuatorPoint(motion.opening,intent.action==='close'?motion.opening.to:motion.opening.from).hand:motion?.at;
    const reached=intent.motionV1?!!motion&&motion.target===intent.target&&!!hand&&!!expected&&Math.hypot(...hand.map((v,i)=>v-expected[i]))<.1&&Math.hypot(b!.pose.p[0]-hand[0],b!.pose.p[2]-hand[2])<.9&&Math.abs(b!.pose.p[1]-p.y)<1.2:!!b&&Math.hypot(b.pose.p[0]-p.x,b.pose.p[2]-p.z)<=CONTACT_REACH&&Math.abs(b.pose.p[1]-p.y)<=1.2;if(!b?.human||!reached)return fail('contact.not-reached','Your hand did not reach the target; no action was applied.');
    const state=actuatedState(e,def),bad=whenRefusal(a,state,e.name??'object');if(bad)return fail(bad.code,bad.reason);
-   const r=d.commit([opSchema.parse({op:'set',id:e.id,state:thenPatch(a,state)})],`${soul.soulId} ${a.name} ${e.name??e.id}`,()=>{d.record(soul,e.id,a.name);done();});
+   // A sprinkler coming on soaks the planters (things with numeric moisture) in its forward arc within reach, in the same commit:
+   // one pass over the world at this event, never per tick.
+   const soak:Op[]=[];
+   if(def.tags?.includes('sprinkler')&&a.name==='switch-on'){const reach=Number(e.params?.reach??(def.params.reach as {default?:number}|undefined)?.default??3.5);
+    for(const o of m.entities.values()){const od=o.id!==e.id&&m.resolvedDef(o.def);if(!od||(od.state as Record<string,{type?:string}>).moisture?.type!=='number')continue;const op=m.worldPose(o);const fx=Math.sin(p.yaw),fz=Math.cos(p.yaw);if(Math.hypot(op.x-p.x,op.z-p.z)<=reach&&(op.x-p.x)*fx+(op.z-p.z)*fz>0&&o.state?.moisture!==1)soak.push(opSchema.parse({op:'set',id:o.id,state:{moisture:1}}));}}
+   const r=d.commit([opSchema.parse({op:'set',id:e.id,state:thenPatch(a,state)}),...soak],`${soul.soulId} ${a.name} ${e.name??e.id}`,()=>{d.record(soul,e.id,a.name);done();});
    return r.accepted?{ok:true as const}:fail('contact.commit-refused','The world refused the interaction.');
   }
  };

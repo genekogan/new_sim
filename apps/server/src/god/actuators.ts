@@ -65,7 +65,7 @@ export type ActuatorHost = {
   /** The Soul's body position (x, z), or null. */
   bodyAt(soul: EdgeSoul): Vec2 | null;
   deferContacts?: boolean;
-  contactPlan?(soul:EdgeSoul,target:string,action:string):{params:Record<string,unknown>;root:[number,number,number];level?:number}|null;
+  contactPlan?(soul:EdgeSoul,target:string,action:string):{params:Record<string,unknown>;root:[number,number,number];level?:number;face?:[number,number]}|null;
   /** Commit a state change of a god thing as an engine edit. */
   commit(id: string, patch: Record<string, unknown>, note: string): { accepted: boolean };
   /** The thing's actuator state as the world has it now (the object's copy may lag a sync behind). */
@@ -76,6 +76,10 @@ export type ActuatorHost = {
   approach?(id: string, soul: EdgeSoul, front: Vec2 | null, radius?: number): { p: Vec2; level: number } | null;
   /** W5 water (water.ts): the things involved in moving water, and an atomic commit of several state changes. */
   water?: WaterHost;
+  /** Entry 34 (watering.ts): "water <plant>" with a watering can from its hook, as one act of native steps; null = W5. */
+  watering?(soul: EdgeSoul, plant: string, action: string): { steps: { verb: string; params: Record<string, unknown> }[]; summary: string } | Refusal | null;
+  /** The act was accepted: watch this Soul's body for its watering moments. */
+  wateringBegun?(soul: EdgeSoul): void;
 };
 export type Thing = { id: string; name: string; def: StoredDef; state: Record<string, unknown>; params: Record<string, unknown> };
 export type WaterHost = {
@@ -117,6 +121,7 @@ export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: Buil
       const d = Math.hypot(s.at[0] - me[0], s.at[1] - me[1]);
       if (d > ACT_SIGHT) return { code: 'object.out-of-reach', reason: `${nameOf(s)} is ${Math.round(d)} m away; walk closer first.` };
       const denied = s.key ? host.access?.(s.key, ctx.soul) : null; if (denied) return denied;
+      const can = s.key && a.name === 'water' ? host.watering?.(ctx.soul, s.key, a.name) : null; if (can) return 'code' in can ? can : null;
       const water = s.key ? waterPlan(a, s.key, ctx.soul, host) : null; if (water) return isRefusal(water) ? water : null;
       return whenRefusal(a, (s.key && host.stateOf?.(s.key)) || s.state || {}, nameOf(s));
     };
@@ -125,10 +130,12 @@ export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: Buil
       available: (s: BuiltLike, ctx: any) => check(s, ctx),
       validate: (s: BuiltLike, _p: unknown, ctx: any) => check(s, ctx),
       apply: (s: BuiltLike, params: Record<string, unknown>, ctx: any) => {
+        const can = s.key && a.name === 'water' ? host.watering?.(ctx.soul, s.key, a.name) : null;
+        if (can && !('code' in can)) return { state: s, result: { action: a.name, summary: can.summary }, bodies: [{ label: a.label, steps: can.steps }] };
         const contact = host.deferContacts && isContactActuator(def, a);
         const motion=contact&&s.key?host.contactPlan?.(ctx.soul,s.key,a.name):null;
         if(motion){const me=host.bodyAt(ctx.soul)!,far=(motion.level??0)>0||Math.hypot(me[0]-motion.root[0],me[1]-motion.root[2])>.1;
-          return {state:s,result:{action:a.name,set:thenPatch(a,(s.key&&host.stateOf?.(s.key))||s.state||{},params)},bodies:[{label:a.label,steps:[{verb:'stand',params:{}},...(far?[(motion.level??0)>0?{verb:'mars:walk_to',params:{x:motion.root[0],z:motion.root[2],level:motion.level}}:{verb:'walk_to',params:{to:[motion.root[0],motion.root[2]],standoff:0}}]:[]),{verb:'mars:hand_actuator_v1',params:motion.params}]}]};}
+          return {state:s,result:{action:a.name,set:thenPatch(a,(s.key&&host.stateOf?.(s.key))||s.state||{},params)},bodies:[{label:a.label,steps:[{verb:'stand',params:{}},...(far?[(motion.level??0)>0?{verb:'mars:walk_to',params:{x:motion.root[0],z:motion.root[2],level:motion.level}}:{verb:'walk_to',params:{to:[motion.root[0],motion.root[2]],standoff:0}}]:[]),...(motion.face?[{verb:'mars:face',params:{target:{point:motion.face}}}]:[]),{verb:'mars:hand_actuator_v1',params:motion.params}]}]};}
 
         const me = host.bodyAt(ctx.soul)!, to = s.front ?? s.at!, far = Math.hypot(s.at![0] - me[0], s.at![1] - me[1]) > (contact ? CONTACT_REACH : ACT_REACH);
         const water = s.key ? waterPlan(a, s.key, ctx.soul, host) : null;
@@ -157,6 +164,8 @@ export function wrapAct(objects: { act(id: string, soul: EdgeSoul, input: Record
     const t = find(id), a = t ? actionsOf(t.def).find((x) => x.name === input.action) : undefined;
     if (!t || !a) return out;
     if (host.deferContacts && isContactActuator(t.def, a)) return out;
+    // Entry 34: the watering-can act changes the world at its own native moments (watering.ts), never here
+    if (a.name === 'water' && host.watering?.(soul, id, a.name)) { host.wateringBegun?.(soul); return out; }
     // W5: water moves between two things (tank → can, can → planter) in one commit, planned again at commit time
     const water = waterPlan(a, id, soul, host);
     if (water) {

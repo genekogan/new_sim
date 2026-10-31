@@ -92,6 +92,8 @@ function makeVoice(c: AudioContext, kind: SoundKind, variant: number, source: So
     case 'water':
       if (variant === 1) { const a = bed('lowpass', 500, 0.8, 1.0); nodes.push(lfo(c, 0.18, 0.45, a.g.gain)); }   // still water lapping
       else if (variant === 2) { bed('bandpass', 1600, 0.8, 0.35); every((at) => { tone(c, out, at, 900 + r() * 900, 1400 + r() * 900, 0.05, 0.12); return 0.12 + r() * 0.5; }); }   // dripping basin
+      // entry 34: a watering can's rose on soil: a soft hiss of fine jets over a quick, damp patter of drops landing
+      else if (variant === 3) { const a = bed('bandpass', 2600, 0.7, 0.5); nodes.push(lfo(c, 0.9, 0.12, a.g.gain)); bed('lowpass', 420, 0.7, 0.35); every((at) => { burst(c, out, at, 0.012 + r() * 0.02, 0.12 + r() * 0.18, 1400 + r() * 1600, 'bandpass'); return 0.018 + r() * 0.05; }); }
       else { const a = bed('bandpass', 1100, 0.6, 0.9); nodes.push(lfo(c, 0.37, 260, a.b.frequency)); const s = bed('highpass', 3800, 0.5, 0.25); nodes.push(lfo(c, 1.7, 0.12, s.g.gain)); }   // fountain
       break;
     case 'stream': { const a = bed('lowpass', variant ? 900 : 650, 0.9, 1.1); nodes.push(lfo(c, 0.23, 180, a.b.frequency)); every((at) => { tone(c, out, at, 380 + r() * 500, 700 + r() * 600, 0.08, 0.05); return 0.15 + r() * (variant ? 0.3 : 0.5); }); break; }

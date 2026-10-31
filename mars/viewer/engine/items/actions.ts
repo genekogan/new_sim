@@ -26,12 +26,13 @@ const BUILT_IN_ITEMS: ReadonlySet<string> = new Set(ITEM_ASSETS.map((d) => d.id)
 import { checkStations, childrenState, walkCrew, type Children } from '../construction/children.ts';
 import { holdingDiagnostic } from '../construction/rules.ts';
 import { SIT_TRANSITION } from '../social/actions.ts';
+import { watering } from './watering.ts';
 import {
   bodyFrame, bowlHand, carryHand, dipHand, HANDS, lerp3, mouthPoint, otherHand, restHand, rimHand, SEAT_DROP, smooth,
   type BodyFrame, type Hand,
 } from './body.ts';
 import {
-  BODY_REACH, followHand, graspPoint, heldBy, inHand, isItem, placeOnGround, placeOnSlot, putInHand,
+  BODY_REACH, carryPoint, followHand, graspPoint, heldBy, inHand, isItem, itemReachSeconds, placeOnGround, placeOnSlot, putInHand,
   reachOf, reachStation, slotOccupant, surfaceSlot, whereIs, type Station, type SurfaceSlot,
 } from './model.ts';
 
@@ -131,7 +132,7 @@ export const holdItems: ActionDef<{ actor: string }, null, HoldExec> = {
       if (driven(rt, ex.actor, h)) continue;
       const it = held.find((x) => x.hand === h);
       if (it) {
-        const q = carryHand(b, h);
+        const q = carryPoint(it.item, b, h);
         setHand(a, h, q);
         followHand(it.item, q, a.pose.yaw);
       } else setHand(a, h, undefined);
@@ -325,14 +326,17 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
         ex.to = ex.target;
       }
       a.human!.activity = 'reach';
+      // Soul Actions 34: a handle-held item's reach and release are recorded, so the drawn arm blends on their timeline
+      const opted = itemReachSeconds(it);
+      if (opted !== undefined && ex.phase === 'reach' && ex.t === 0) a.human!.handTransferV1 = { mode: ex.mode, hand: ex.hand, startTick: rt.tick, reach: opted };
       ex.t++;
-      const R = ex.reachTicks ?? ticks(REACH_TIME);
-      const k = smooth(ex.t / R);
+      const reachTicks = ex.reachTicks ?? ticks(itemReachSeconds(it) ?? REACH_TIME);
+      const k = smooth(ex.t / reachTicks);
       const q = lerp3(ex.from!, ex.to!, k);
       setHand(a, ex.hand, q);
       const holding = (ex.mode === 'take') === (ex.phase === 'withdraw');
       if (holding) followHand(it, q, a.pose.yaw);
-      if (ex.t < R) return { status: 'running', phase: ex.phase };
+      if (ex.t < reachTicks) return { status: 'running', phase: ex.phase };
       if (ex.phase === 'reach') {
         const b = bodyFrame(a);
         if (ex.mode === 'take') {
@@ -340,7 +344,7 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
           followHand(it, q, a.pose.yaw);
           const d = ensureHolder(rt, ex.actor);
           if (d) return { status: 'failed', diagnostic: d };
-          ex.to = carryHand(b, ex.hand);
+          ex.to = carryPoint(it, b, ex.hand);
         } else {
           if ('slot' in ex.dest!) {
             const dest = ex.dest, owner = rt.world.entities[dest.slot.owner];
@@ -362,7 +366,8 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
               message: `${ex.actor} cannot release ${ex.item}: ${dest.slot.id} is now occupied by ${occupied.id}`,
               subjects: [ex.actor, ex.item, dest.slot.id, occupied.id],
             } };
-            placeOnSlot(it, dest.slot, owner.pose.yaw);
+            // a hook (Soul Actions 34): what hangs keeps the yaw it was hung with (no turn at the release)
+            placeOnSlot(it, dest.slot, dest.slot.hang ? it.pose.yaw : owner.pose.yaw);
           }
           else placeOnGround(it, ex.dest!.ground, a.pose.yaw);
           ex.to = restHand(b, ex.hand);
@@ -374,6 +379,8 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
       }
       const presented = a.human!.itemTransferV1?.action === ex.id;
       if (ex.mode === 'put' && !presented) setHand(a, ex.hand, undefined);
+      // the record stays, ended: the drawn idle (and its gestures) eases back in from here (overwritten by the next one)
+      if (a.human!.handTransferV1) a.human!.handTransferV1 = { ...a.human!.handTransferV1, endTick: rt.tick };
       if (a.human!.task === ex.id) { a.human!.task = undefined; a.human!.activity = 'idle'; }
       if(presented){ex.phase='recover';ex.t=0;a.human!.itemTransferV1!.releaseTick=rt.tick;return{status:'running',phase:'recover'};}
       return { status: 'completed', outputs: { item: ex.item, hand: ex.hand, support: rt.world.entities[ex.item].support } };
@@ -398,6 +405,7 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
         }
         if(a.human.itemTransferV1?.action===ex.id)delete a.human.itemTransferV1;
         if (!inHand(rt.world, ex.actor, ex.hand)) setHand(a, ex.hand, undefined);
+        delete a.human.handTransferV1;
         if (a.human.task === ex.id) { a.human.task = undefined; a.human.activity = 'idle'; }
       }
       return { ok: true };
@@ -680,4 +688,4 @@ export const eat: ActionDef<EatParams, { bowlHand: Hand }, EatExec> = {
   resumable: true,
 };
 
-export const ITEM_ACTIONS: ActionDef[] = [takeItem, putItem, serve, eat, holdItems];
+export const ITEM_ACTIONS: ActionDef[] = [takeItem, putItem, serve, eat, holdItems, watering as unknown as ActionDef];

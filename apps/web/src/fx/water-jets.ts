@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { RIPPLE } from '../atmosphere/motion.ts';
 
-export type WaterJetKind = 'sprinkler' | 'stream' | 'shower';
+export type WaterJetKind = 'sprinkler' | 'stream' | 'shower' | 'pour';
 type Def = { tags?: readonly string[]; params?: Record<string, { default?: unknown }>; make?: { kind: string; args?: unknown } };
 /** Which moving water a def draws while it is on (by its tags), or null. */
 export function waterJetKind(def: Def): WaterJetKind | null {
@@ -23,6 +23,22 @@ export function nozzleOf(def: Def): [number, number, number] | null {
 
 // per kind: droplet count, life (s), droplet size (m), and the shader body that places a droplet of age `a`
 const KINDS: Record<WaterJetKind, { n: number; life: number; size: number; streak: number; glsl: string }> = {
+  // Entry 34: a watering can's rose. Fine jets leave the rose's face in a cone along the spout (uDir: its angle above the
+  // horizontal, which falls as the can tips), arc down onto the soil uDrop below and splash; uFlow (0..1) thins the
+  // shower as the water reaches the rose and as it stops.
+  pour: { n: 1600, life: 0.5, size: 0.013, streak: 0.5, glsl: `
+    float on = step(fract(aSeed.y * 0.0731 + aSeed.z * 0.013), uFlow);
+    float ang = r1 * 6.2831853, rad = 0.032 * sqrt(r2);
+    float el = uDir + (r3 - 0.5) * 0.42, az = (r4 - 0.5) * 0.5;
+    float v = uSpeed * (0.78 + 0.44 * h(aSeed.w + cyc * 1.9)) * (0.55 + 0.45 * uFlow);
+    vec3 d = vec3(cos(el) * cos(az), sin(el), cos(el) * sin(az));
+    vec3 o = vec3(-sin(uDir) * cos(ang) * rad, cos(uDir) * cos(ang) * rad, sin(ang) * rad);
+    float tl = (v * d.y + sqrt(max(0.0, v * v * d.y * d.y + 2.0 * 9.8 * uDrop))) / 9.8;
+    float fa = min(a, tl);
+    p = o + d * v * fa + vec3(0.0, -4.9 * fa * fa, 0.0);
+    if (a > tl) { float s = a - tl, sa = r3 * 6.2831853; p += vec3(cos(sa), 0.0, sin(sa)) * (0.12 + 0.3 * r4) * s + vec3(0.0, 0.45 * s - 4.9 * s * s, 0.0); alpha = clamp(1.0 - s / 0.12, 0.0, 1.0) * 0.6; size *= 0.7; }
+    else alpha = 0.88;
+    alpha *= on;` },
   // An oscillating garden sprinkler: a fan of twelve jets sweeps ±45° about the forward axis every 6 s; each droplet keeps the
   // direction it was launched in and falls under gravity to the ground (uDrop below the nozzle), then splashes.
   sprinkler: { n: 4800, life: 1.7, size: 0.04, streak: 0.25, glsl: `
@@ -61,8 +77,8 @@ function material(kind: WaterJetKind) {
   const k = KINDS[kind];
   m = new THREE.ShaderMaterial({
     name: `water jets (${kind})`, transparent: true, depthWrite: false,
-    uniforms: { uEdenRipple: RIPPLE, uSpeed: { value: 5.5 }, uDrop: { value: 0.66 } },
-    vertexShader: /* glsl */`uniform vec4 uEdenRipple; uniform float uSpeed; uniform float uDrop; attribute vec4 aSeed; varying float vAlpha;
+    uniforms: { uEdenRipple: RIPPLE, uSpeed: { value: 5.5 }, uDrop: { value: 0.66 }, uFlow: { value: 1 }, uDir: { value: 0 } },
+    vertexShader: /* glsl */`uniform vec4 uEdenRipple; uniform float uSpeed; uniform float uDrop; uniform float uFlow; uniform float uDir; attribute vec4 aSeed; varying float vAlpha;
       float h(float x){ return fract(sin(x * 91.3458) * 47453.5453); }
       void main(){
         float t = uEdenRipple.x, life = ${k.life.toFixed(3)}, u = t / life + aSeed.x, cyc = floor(u), a = (u - cyc) * life;
@@ -95,12 +111,23 @@ export function waterJets(def: Def, state: Record<string, unknown> | undefined, 
   const kind = waterJetKind(def), at = nozzleOf(def);
   if (!kind || !at || state?.on !== true) return null;
   const reach = Number(params.reach ?? def.params?.reach?.default ?? 3.5);
-  const m = kind === 'sprinkler' ? material(kind).clone() : material(kind);
+  // a sprinkler's and a tap's own copy (a tap's stream is caught short by a can held under it: entry 34)
+  const m = kind === 'sprinkler' || kind === 'stream' ? material(kind).clone() : material(kind);
+  if (m !== material(kind)) m.uniforms.uEdenRipple = RIPPLE;
   m.uniforms.uDrop.value = Math.max(0.05, at[1] - (kind === 'stream' ? 0.1 : kind === 'shower' ? 0.04 : 0));
   // a sprinkler's speed carries the farthest drops to its reach (flat-ground range at the mean launch angle, plus height)
   if (kind === 'sprinkler') { m.uniforms.uEdenRipple = RIPPLE; m.uniforms.uSpeed.value = Math.sqrt(reach * 9.8 / Math.sin(2 * 0.62)) * 0.92; }
   const pts = new THREE.Points(geometry(kind), m);
   pts.name = `water jets (${kind})`; pts.position.set(at[0], at[1], at[2]); pts.frustumCulled = false; pts.renderOrder = 2;
   pts.userData.cameraTransparent = true;
+  pts.userData.waterJet = kind; pts.userData.dropDefault = m.uniforms.uDrop.value;
+  return pts;
+}
+/** Entry 34: a watering can's rose shower (its own material: the layer drives uFlow, uDir, uDrop and uSpeed per frame,
+ *  from the can's recorded tilt). In world space; the layer places it at the drawn rose and turns it to the spout. */
+export function pourJets(): THREE.Points {
+  const m = material('pour').clone(); m.uniforms.uEdenRipple = RIPPLE; m.uniforms.uSpeed.value = 1.15; m.uniforms.uFlow.value = 0;
+  const pts = new THREE.Points(geometry('pour'), m);
+  pts.name = 'water jets (pour)'; pts.frustumCulled = false; pts.renderOrder = 2; pts.userData.cameraTransparent = true;
   return pts;
 }

@@ -36,9 +36,11 @@ const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite
 
 /** FNV-1a: a stable small hash for variant choice and grid scatter. */
 export function hash(s: string): number { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); } return h >>> 0; }
+/** Voicings only a def can ask for by number (never hashed onto other things): water 3 = a can's rose on soil (entry 34). */
+export const PINNED_ONLY: Partial<Record<SoundKind, number>> = { water: 1 };
 export const variantOf = (kind: SoundKind, key: string, pinned?: unknown) => {
-  const n = VARIANTS[kind];
-  return typeof pinned === 'number' && Number.isInteger(pinned) ? ((pinned % n) + n) % n : hash(key) % n;
+  const n = VARIANTS[kind], all = n + (PINNED_ONLY[kind] ?? 0);
+  return typeof pinned === 'number' && Number.isInteger(pinned) ? ((pinned % all) + all) % all : hash(key) % n;
 };
 
 /** The condition `when` against an entity's state (with the def's state defaults): 'on', '!open'. `day` and `night`
