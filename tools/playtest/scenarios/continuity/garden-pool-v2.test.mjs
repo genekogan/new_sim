@@ -95,8 +95,7 @@ function evidence({participants,disturbances,notifications,agreedGardenRef,versi
 }
 const GARDEN_ROWS=['walker-1:garden visit','walker-2:garden visit','walker-3:garden visit','garden-three-way-overlap','disturbance:independent-errand'];
 const pick=(result,ids=GARDEN_ROWS)=>Object.fromEntries(ids.map(id=>{const r=result.rows.find(r=>r.id===id);assert.ok(r,'missing row '+id);return [id,r.status];}));
-async function both({at,capability,agreedGardenRef}){
- const participants=bodies({at,capability});
+async function both({at,capability,agreedGardenRef,participants=bodies({at,capability})}){
  const v2=await dispatch(walk,participants),v1f=v1Fixtures(),v1=await dispatch(v1f.scenarios.find(s=>s.id==='eden-walk-three'),participants);
  return {
   v2:{dispatch:v2,score:scoreContinuity({fixtures,oracles,evidence:{...evidence({participants,...v2,agreedGardenRef})}})},
@@ -125,7 +124,8 @@ test('Garden plot 1 agreed: visit, receipt, overlap and the errand trigger are e
  // A plot-1 visit is not a plot-2 visit: the receipt and membership still bind.
  const plot2=scoreContinuity({fixtures,oracles,evidence:evidence({participants:bodies({at:plot.region.pos,capability:plot.walkCapability}),...v2.dispatch,agreedGardenRef:'land-garden-plot-2'})});
  assert.deepEqual(pick(plot2,GARDEN_ROWS.slice(0,4)),Object.fromEntries(GARDEN_ROWS.slice(0,4).map(id=>[id,'fail'])));
- assert.equal(pick(plot2)['disturbance:independent-errand'],'pass','the mechanical trigger stays at the garden actually co-visited');
+ const off=plot2.rows.filter(r=>['disturbance:independent-errand','independent-errand-then-regroup','twelve-metre-separation-ten-seconds'].includes(r.id));
+ assert.equal(off.length,3);for(const r of off){assert.equal(r.status,'unknown',r.id);assert.match(r.detail,/^trigger in non-agreed garden, out-of-fixture: trigger proof garden "land-garden-plot-1", agreed garden "land-garden-plot-2"/);}
 });
 
 test('a garden outside the pool is reported out-of-fixture, never scored',async()=>{
@@ -168,4 +168,32 @@ test('trigger proof must name the earliest co-visited pool garden',async()=>{
  assert.equal(run(earlier).status,'fail','plot-1 proof postponed past the first stone-garden overlap');
  const replay=await dispatch(walk,Object.entries(earlier.participants));
  assert.equal(replay.disturbances['independent-errand'].triggerProof.gardenRef,stone.ref,'the live dispatcher latches the earliest pool garden');
+});
+
+
+const ERRAND_ROWS=['disturbance:independent-errand','independent-errand-then-regroup','twelve-metre-separation-ten-seconds'];
+const nonAgreed=(result,ids=ERRAND_ROWS)=>{for(const id of ids){const r=result.rows.find(r=>r.id===id);assert.equal(r.status,'unknown',id);assert.match(r.detail,/^trigger in non-agreed garden, out-of-fixture: /,id);}};
+test('no agreement + plot co-visit: the plot trigger is out-of-fixture and every other row equals v1',async()=>{
+ const plot=garden('land-garden-plot-1'),{v1,v2}=await both({at:plot.region.pos,capability:plot.walkCapability});
+ assert.equal(v2.dispatch.disturbances['independent-errand'].triggerProof.gardenRef,plot.ref,'the live dispatcher still latches the co-visited pool garden');
+ assert.equal(v1.dispatch.disturbances['independent-errand'].status,'unmet');
+ nonAgreed(v2.score);assert.match(v2.score.rows.find(r=>r.id==='disturbance:independent-errand').detail,/agreed garden "place-eden-stone-garden" \(no-agreement-v1-default\)/);
+ // v2 actually delivered the errand, so only its delivery-latency rows are extra;
+ // every other row is identical and no row passes that v1 did not pass.
+ const keep=r=>!ERRAND_ROWS.includes(r.id)&&!r.id.startsWith('notification');
+ assert.deepEqual(v2.score.rows.filter(keep),v1.score.rows.filter(keep));
+ for(const r of v2.score.rows.filter(r=>r.status==='pass'))assert.equal(v1.score.rows.find(x=>x.id===r.id)?.status,'pass',r.id);
+ assert.equal(v2.score.status,v1.score.status);
+ // Scored on the v1 run's own dispatcher evidence (trigger never fired), v2 equals v1 row for row.
+ const same=scoreContinuity({fixtures,oracles,evidence:evidence({participants:bodies({at:plot.region.pos,capability:plot.walkCapability}),...v1.dispatch})});
+ assert.deepEqual(same.rows,v1.score.rows);
+});
+test('stone garden agreed after an earlier plot linger: the consumed trigger is out-of-fixture, not pass',async()=>{
+ const plot=garden('land-garden-plot-1'),stone=garden('place-eden-stone-garden'),participants=bodies({at:stone.region.pos,capability:stone.walkCapability});
+ for(const [,p]of participants)for(const s of p.samples){const sec=(s.t-T0)/1000;if(sec>=280&&sec<=295)Object.assign(s.pos,{x:plot.region.pos[0],z:plot.region.pos[1]});}
+ const v2=await dispatch(walk,participants),d=v2.disturbances['independent-errand'];
+ assert.equal(d.triggerProof.gardenRef,plot.ref);assert.equal(d.triggerProof.overlapFrom,ms(280));assert.equal(d.status,'delivered');
+ const result=scoreContinuity({fixtures,oracles,evidence:evidence({participants,...v2,agreedGardenRef:stone.ref})});
+ nonAgreed(result);
+ assert.deepEqual(pick(result,GARDEN_ROWS.slice(0,4)),Object.fromEntries(GARDEN_ROWS.slice(0,4).map(id=>[id,'pass'])),'the agreed stone-garden visit itself still passes');
 });

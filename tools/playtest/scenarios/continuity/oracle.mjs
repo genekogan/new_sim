@@ -209,7 +209,7 @@ function errandReport(actor,reads,evidence,cutoff){
  * dialogue. Native per-recipient event records, not a successful speech POST,
  * establish that the required Soul actually heard the disturbance. */
 export function scoreDisturbance({scenario,disturbance,evidence,t0,cutoff,maxGapSec,bindings}){
- const spec=disturbance.trigger,d=evidence.disturbances?.[disturbance.id],p=d?.triggerProof,failures=[],missing=[];
+ const spec=disturbance.trigger,d=evidence.disturbances?.[disturbance.id],p=d?.triggerProof,failures=[],missing=[];let offAgreed=null;
  const need=(ok,why)=>{if(!ok)missing.push(why);},check=(ok,why)=>{if(!ok)failures.push(why);};
  if(!spec||!d)return row('disturbance:'+disturbance.id,'unknown','Frozen typed trigger and source-backed delivery evidence required');
  need(d.delivered===true,'delivery not proven');need(cited(d.evidence),'delivery sources');need(cited(p?.evidence),'trigger sources');
@@ -272,6 +272,9 @@ export function scoreDisturbance({scenario,disturbance,evidence,t0,cutoff,maxGap
   // earliest across the sealed pool (exact ties to the earlier pool entry).
   const pool=gardenPoolOf(scenario),named=pool?.find(g=>g.ref===p?.gardenRef),gardenRegion=pool?named&&poolGardenRegion(named,pool):scenario.venue.gardenRegion;
   if(pool&&!named)need(false,'sealed pool garden named by trigger proof');
+  // The trigger applies to the agreed pool garden (or the v1 default when no
+  // garden was agreed). A valid trigger elsewhere is out-of-fixture, not scored.
+  const agreed=pool?agreedGarden(scenario,evidence):null;if(named&&agreed&&named.ref!==agreed.ref)offAgreed=nonAgreedTrigger(named.ref,agreed);
   const holdsIn=region=>scenario.actors.map(a=>observedHolds({samples:actor(a.id).samples,phase:{region,holdSec:spec.minimumOverlapSec},from:Math.max(t0+scenario.timing.meetingOffsetSec*1000,t0+a.releaseOffsetSec*1000),to:cutoff,maxGapSec}).windows);
   if(Number.isFinite(from)&&Number.isFinite(to)&&gardenRegion){
    check(from>=t0+scenario.timing.meetingOffsetSec*1000&&to-from>=spec.minimumOverlapSec*1000,'garden overlap duration/order');
@@ -336,11 +339,13 @@ export function scoreDisturbance({scenario,disturbance,evidence,t0,cutoff,maxGap
    exact(delivered,Math.max(...events.map(e=>at(e.createdAt))),'delivery must use native event time, not POST acknowledgement');
   }
  }
+ if(offAgreed&&!failures.length)return row('disturbance:'+disturbance.id,'unknown',offAgreed,d.evidence??[]);
  return row('disturbance:'+disturbance.id,failures.length?'fail':missing.length?'unknown':'pass',failures.length?failures.join('; '):missing.length?'Missing '+[...new Set(missing)].join(', '):'Frozen trigger, timing, recipient and native delivery proof agree',d.evidence??[]);
 }
 /** garden-pool-v2 binding, mirroring the endpoint rule: the reviewer binds
  * semantic.agreedGardenRef to a sealed pool garden; another garden is
  * out-of-fixture; no agreement keeps the v1 default (venue.gardenRef). */
+const nonAgreedTrigger=(ref,agreed)=>`trigger in non-agreed garden, out-of-fixture: trigger proof garden ${JSON.stringify(ref)}, agreed garden ${JSON.stringify(agreed.ref)} (${agreed.basis}); reported, never scored as failure or success`;
 function agreedGarden(scenario,evidence){
  const pool=gardenPoolOf(scenario);if(!pool)return null;
  const ref=evidence.semantic?.agreedGardenRef;
@@ -454,16 +459,19 @@ export function scoreContinuity({fixtures,oracles,evidence}){
   const finish=revised?groupAt(final.region,meeting,cutoff,scenario.timing.minimumGroupOverlapSec):null;
   rows.push(row('all-at-revised-endpoint',finish?'pass':revised?miss:'unknown','Final revised endpoint comes from cited world-visible agreement, then all bodies overlap there',finish?[finish]:[]));
   const errand=scenario.disturbances.find(d=>d.id==='independent-errand'),delivered=at(evidence.disturbances?.[errand.id]?.deliveredAt);
+  const triggerGarden=evidence.disturbances?.[errand.id]?.triggerProof?.gardenRef,offAgreed=garden&&typeof triggerGarden==='string'&&triggerGarden!==garden.ref?nonAgreedTrigger(triggerGarden,garden):null;
   const visit=Number.isFinite(delivered)?observedHolds({samples:actors['walker-2']?.samples,phase:{region:errand.errandRegion,holdSec:0},from:delivered,to:cutoff,maxGapSec:maxGap}).windows[0]:null;
   const regroup=visit&&final?groupAt(final.region,visit.to,cutoff,scenario.timing.minimumGroupOverlapSec):null;
-  rows.push(row('independent-errand-then-regroup',visit&&regroup?'pass':Number.isFinite(delivered)?miss:'unknown','Walker-2 current body visits the fixed independent errand after delivery, then rejoins at final agreement',visit&&regroup?[visit,regroup]:[]));
+  if(offAgreed)rows.push(row('independent-errand-then-regroup','unknown',offAgreed));
+  else rows.push(row('independent-errand-then-regroup',visit&&regroup?'pass':Number.isFinite(delivered)?miss:'unknown','Walker-2 current body visits the fixed independent errand after delivery, then rejoins at final agreement',visit&&regroup?[visit,regroup]:[]));
   const me=actors['walker-2']?.samples??[],peers=['walker-1','walker-3'].map(id=>actors[id]?.samples??[]);
   const derived=me.map(s=>{const p=xz(s.pos),near=peers.map(ss=>ss.filter(q=>current(q)&&Math.abs(at(q.t)-at(s.t))<=maxGap*1000).sort((a,b)=>Math.abs(at(a.t)-at(s.t))-Math.abs(at(b.t)-at(s.t)))[0]);
    const separate=current(s)&&p?.every(Number.isFinite)&&near.every(q=>q&&Math.hypot(xz(q.pos)[0]-p[0],xz(q.pos)[1]-p[1])>=oracles.numeric.separationDistanceM);
    return {...s,activity:separate?'derived-separated':'derived-not-separated'};
   });
   const separation=Number.isFinite(delivered)?observedHolds({samples:derived,phase:{region:{pos:[0,0],radiusM:10000},activities:['derived-separated'],holdSec:oracles.numeric.separationRealHoldSec},from:delivered,to:regroup?.from??cutoff,maxGapSec:maxGap}).windows:[];
-  rows.push(row('twelve-metre-separation-ten-seconds',separation.length?'pass':Number.isFinite(delivered)?miss:'unknown','Derived from three current body samples, peer timestamp skew <=2s; no private locations sent to agents',separation));
+  if(offAgreed)rows.push(row('twelve-metre-separation-ten-seconds','unknown',offAgreed));
+  else rows.push(row('twelve-metre-separation-ten-seconds',separation.length?'pass':Number.isFinite(delivered)?miss:'unknown','Derived from three current body samples, peer timestamp skew <=2s; no private locations sent to agents',separation));
  }
  const notifications=evidence.notifications??[];
  if(!notifications.length)rows.push(row('notification-latency','unknown','No declared event timing evidence'));
