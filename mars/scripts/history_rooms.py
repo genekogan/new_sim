@@ -1,7 +1,8 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import mars_root  # noqa: E402
 import json,sys,re
 from pathlib import Path
 from PIL import Image,ImageDraw
-ROOT=Path('~/Mars');D=ROOT/'docs/media/reconstruction/campus-history'
+ROOT=mars_root();D=ROOT/'docs/media/reconstruction/campus-history'
 sys.path.insert(0,str(ROOT/'tools/media'));import mars_media
 idx=mars_media.load_indexer();rows=json.loads((D/'catalog-audit.json').read_text())['candidates']
 for year in range(2020,2027):

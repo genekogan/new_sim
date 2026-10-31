@@ -1,3 +1,4 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 """Replace the visually verified, four-person CAD silhouette definition.
 
 Keep original group IDs/transforms for saved layouts. Individual replacements
@@ -6,7 +7,7 @@ are shared reusable human meshes, anchored at each original silhouette's feet.
 import bpy,json,pathlib,shutil,collections,math,csv
 import numpy as np
 from mathutils import Matrix,Vector
-O=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular/deliverable');R=O.parent/'research/silhouettes'
+O=media('reconstruction/2026-campus/modular/deliverable');R=O.parent/'research/silhouettes'
 for name in ['mars-2026-modular.blend','components.json']:
  backup=R/('before-'+name)
  if not backup.exists():shutil.copy2(O/name,backup)

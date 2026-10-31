@@ -1,8 +1,9 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import mars_root  # noqa: E402
 """Publish deliberately reviewed campus references; keep full provenance in private research."""
 import json,sys,re
 from pathlib import Path
 from PIL import Image,ImageOps
-ROOT=Path('~/Mars');DATA=ROOT/'docs/media/reconstruction/campus-history';OUT=ROOT/'code/campus-2026-reconstruction/viewer/public/history'
+ROOT=mars_root();DATA=ROOT/'docs/media/reconstruction/campus-history';OUT=ROOT/'code/campus-2026-reconstruction/viewer/public/history'
 sys.path.insert(0,str(ROOT/'tools/media'));import mars_media
 idx=mars_media.load_indexer()
 selected={2020:{'interior':[4,5,9,15,16,19,24],'exterior':[1,2,3]},2021:{'aerial':[1,21],'interior':[5,8,10,18,23]},2022:{'aerial':[2,3,10,15,18],'exterior':[9,10,11,20,24],'interior':[1,3,4,7,8,14,15,23]},2023:{'aerial':[1,9],'exterior':[4,5,9,10,12,18,19,20],'interior':[1,2,5,6,15,18,21]},2024:{'aerial':[1,20],'exterior':[1,4,6,13,15,19,21],'interior':[3,8,11,12,13,18]},2025:{'aerial':[1,4],'exterior':[3,7,13,16,18,19,20],'interior':[1,3,4,5,10,11,12]},2026:{'exterior':[3,4,7,15,16,18,20,22],'interior':[7,8,9,10,12,13,18,21,24]}}

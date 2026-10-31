@@ -1,7 +1,8 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import bpy,bmesh,pathlib,json,collections,hashlib
 import numpy as np
 from mathutils import Vector
-O=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular/deliverable');bpy.ops.wm.open_mainfile(filepath=str(O/'mars-2026-modular.blend'));s=bpy.context.scene;m=json.load(open(O/'components.json'));removed=[];clipped=[];unprojected=[]
+O=media('reconstruction/2026-campus/modular/deliverable');bpy.ops.wm.open_mainfile(filepath=str(O/'mars-2026-modular.blend'));s=bpy.context.scene;m=json.load(open(O/'components.json'));removed=[];clipped=[];unprojected=[]
 # Sample an unobstructed plywood wall from the inspected kitchen photograph.
 crop=json.load(open(O/'textures/kitchen-crop.json'));src=crop['source_path'];box=crop['crop']
 photo=bpy.data.images.load(str(O/'textures/kitchen-plywood-sample.jpg'),check_existing=True)

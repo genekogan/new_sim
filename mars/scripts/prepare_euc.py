@@ -1,7 +1,8 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 """Adapt the CC BY 4.0 Thingiverse EUC printable mesh for the simulation."""
 import bpy, pathlib, math, json
 from mathutils import Vector
-B=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular');p=B/'research/appearance/euc';out=B/'deliverable/environment'
+B=media('reconstruction/2026-campus/modular');p=B/'research/appearance/euc';out=B/'deliverable/environment'
 bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
 def mat(n,c,metal=0):
  m=bpy.data.materials.new(n);m.diffuse_color=(*c,1);m.use_nodes=True;s=m.node_tree.nodes.get('Principled BSDF');s.inputs['Base Color'].default_value=(*c,1);s.inputs['Metallic'].default_value=metal;s.inputs['Roughness'].default_value=.5;return m

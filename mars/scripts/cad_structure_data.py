@@ -1,6 +1,7 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import bpy,pathlib,json,numpy as np,math
 from mathutils import Vector
-b=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular/research');bpy.ops.wm.open_mainfile(filepath=str(b/'cad-reference.blend'));rows=[];angles=[]
+b=media('reconstruction/2026-campus/modular/research');bpy.ops.wm.open_mainfile(filepath=str(b/'cad-reference.blend'));rows=[];angles=[]
 for o in bpy.context.scene.objects:
  row={'name':o.name,'parent':o.parent.name if o.parent else None,'type':o.type,'world_matrix':[list(v) for v in o.matrix_world],'local_matrix':[list(v) for v in o.matrix_local]}
  if o.type=='MESH':

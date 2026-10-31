@@ -1,6 +1,7 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import json,pathlib,math
 from PIL import Image,ImageDraw
-OUT=pathlib.Path('<mars-media>/reconstruction/campus-history/cad')
+OUT=media('reconstruction/campus-history/cad')
 for file in OUT.glob('*.geometry.json'):
  parts=json.loads(file.read_text());verts=[v for p in parts for v in p['vertices']];lo=[min(v[i] for v in verts) for i in range(3)];hi=[max(v[i] for v in verts) for i in range(3)];print(file.stem,lo,hi)
  image=Image.new('RGB',(1500,850),'#e6e2d5');draw=ImageDraw.Draw(image)

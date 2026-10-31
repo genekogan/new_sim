@@ -1,6 +1,7 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import pathlib,json,struct,io
 from PIL import Image
-O=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular/deliverable')
+O=media('reconstruction/2026-campus/modular/deliverable')
 for name in ['campus-components.glb','chiba-components.glb','chiba-photo-reference.glb']:
  p=O/name;raw=p.read_bytes();n=struct.unpack_from('<I',raw,12)[0];doc=json.loads(raw[20:20+n]);bstart=20+n+8;binary=raw[bstart:];images={im['bufferView']:im for im in doc.get('images',[]) if 'bufferView'in im};new=bytearray();sizes=[]
  for i,view in enumerate(doc['bufferViews']):

@@ -1,6 +1,7 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import pathlib,json,cv2,numpy as np,pycolmap
 from align_cameras import similarity
-BASE=pathlib.Path('<mars-media>/reconstruction/2026-campus');out=BASE/'validation/holdout-campus';images=out/'images';sfm=BASE/'models/sfm-campus-constrained'
+BASE=media('reconstruction/2026-campus');out=BASE/'validation/holdout-campus';images=out/'images';sfm=BASE/'models/sfm-campus-constrained'
 models=[pycolmap.Reconstruction(p) for p in sfm.iterdir() if p.is_dir() and (p/'images.bin').exists()];r=max(models,key=lambda r:r.num_reg_images());cam=next(c for c in r.cameras.values() if c.width==1920);f,cx,cy,k=cam.params;K=np.array([[f,0,cx],[0,f,cy],[0,0,1.]]);dist=np.array([k,0,0,0,0.])
 a={p['file']:p for p in json.load(open(BASE/'models/campus-v1/poses.json'))};common=[im for im in r.images.values() if im.name in a];x=np.array([im.projection_center() for im in common]);y=np.array([a[im.name]['translation'] for im in common]);s,R,t=similarity(x,y);err=np.linalg.norm(s*x@R.T+t-y,axis=1)
 (BASE/'validation/campus-sfm-to-apple.json').write_text(json.dumps({'scale':s,'rotation':R.tolist(),'translation':t.tolist(),'common_cameras':len(common),'center_rms':float(np.sqrt(np.mean(err**2))),'center_median':float(np.median(err)),'cameras':{str(c.camera_id):{'width':c.width,'height':c.height,'params':c.params.tolist()} for c in r.cameras.values()}},indent=2))

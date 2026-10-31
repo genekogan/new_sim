@@ -1,6 +1,7 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media,campus_repo  # noqa: E402
 import pathlib,json,collections,csv,html
 import markdown
-P=pathlib.Path('<mars-campus-repo>');O=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular/deliverable');m=json.load(open(O/'components.json'));n=len([r for r in m['instances'] if r['kind'] not in ['reference','context_person']])
+P=campus_repo();O=media('reconstruction/2026-campus/modular/deliverable');m=json.load(open(O/'components.json'));n=len([r for r in m['instances'] if r['kind'] not in ['reference','context_person']])
 text=f'''# Mars 2026 — editable component replica
 
 This is a working, evidence-informed replica for design development. It is **not yet a dimensionally verified as-built**. The original aerial reconstruction remains available for visual comparison. The modular model combines archived campus CAD, the user's nominal rack dimensions, drone-derived finish maps, and reviewed 2026 interior photographs.

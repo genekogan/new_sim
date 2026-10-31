@@ -1,8 +1,9 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import mars_root  # noqa: E402
 """Read-only catalog audit and review sheets for seasonal campus reconstruction."""
 import sys,json,re,sqlite3
 from pathlib import Path
 from collections import Counter
-ROOT=Path('~/Mars');OUT=ROOT/'docs/media/reconstruction/campus-history'
+ROOT=mars_root();OUT=ROOT/'docs/media/reconstruction/campus-history'
 sys.path.insert(0,str(ROOT/'tools/media'))
 import mars_media as media
 from PIL import Image,ImageDraw

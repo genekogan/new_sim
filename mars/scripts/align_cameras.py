@@ -1,6 +1,7 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import numpy as np,json,pathlib,pycolmap
 from scipy.spatial.transform import Rotation
-BASE=pathlib.Path('<mars-media>/reconstruction/2026-campus')
+BASE=media('reconstruction/2026-campus')
 def similarity(x,y):
  mx=x.mean(0);my=y.mean(0);xx=x-mx;yy=y-my;U,S,Vt=np.linalg.svd(yy.T@xx/len(x));d=np.ones(3);d[-1]=np.linalg.det(U@Vt);R=U@np.diag(d)@Vt;s=(S*d).sum()/(xx**2).sum()*len(x);t=my-s*R@mx;return s,R,t
 if __name__=='__main__':

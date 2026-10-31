@@ -1,6 +1,7 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import mars_root  # noqa: E402
 """Read original SketchUp geometry locally; originals remain untouched. Requires Python 3.11."""
 import sys,json,pathlib,math
-BASE=pathlib.Path('~/Mars')
+BASE=mars_root()
 sys.path.insert(0,str(BASE/'code/campus-2026-reconstruction/vendor/sketchup/sketchup_importer'))
 import sketchup
 OUT=BASE/'docs/media/reconstruction/campus-history/cad'

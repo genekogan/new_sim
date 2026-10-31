@@ -1,7 +1,8 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import json,struct,pathlib,hashlib,collections,io
 import numpy as np
 from PIL import Image
-O=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular/deliverable')
+O=media('reconstruction/2026-campus/modular/deliverable')
 def glb(path):
  b=path.read_bytes();magic,v,total=struct.unpack_from('<4sII',b,0);assert magic==b'glTF' and v==2 and total==len(b);n=struct.unpack_from('<I',b,12)[0];j=json.loads(b[20:20+n]);bin=b[28+n:];assert j['buffers'][0]['byteLength']<=len(bin)
  for bv in j.get('bufferViews',[]):assert bv.get('byteOffset',0)+bv['byteLength']<=len(bin)
@@ -33,7 +34,7 @@ for name in ['campus-components.glb','chiba-components.glb','component-library.g
  if name=='campus-components.glb':assert set(ids)==expected,(len(ids),len(expected));assert not any(n.get('extras',{}).get('kind')=='reference' for n in j['nodes'])
  report['exports'].append({'file':name,'bytes':size,'nodes':len(j['nodes']),'meshes':len(j.get('meshes',[])),'component_ids':len(ids),'valid_embedded_images':imagecount,'bounds_m':[lo.tolist(),hi.tolist()],'sha256':hashlib.sha256((O/name).read_bytes()).hexdigest()})
 layout=json.load(open(O.parent/'research/layout-ui-roundtrip.json'));addition=next(e for e in layout['edits'] if e.get('added')=='upright_frame_19ft_3ft');assert addition['position'][0]==12.5;assert np.allclose(addition['quaternion'],[0,2**-.5,0,2**-.5]);report['layout_roundtrip']={'added_definition':addition['added'],'position':addition['position'],'quaternion':addition['quaternion']}
-p=pathlib.Path('~/Downloads/mars-campus-edited.glb')
-if p.exists():
+p=pathlib.Path(os.environ['MARS_EDITED_GLB']) if os.environ.get('MARS_EDITED_GLB') else None  # an optional edited export
+if p and p.exists():
  j,_,size=glb(p);a=next(n for n in j['nodes'] if n.get('extras',{}).get('added_definition')=='upright_frame_19ft_3ft');mat=np.array(a['matrix']).reshape(4,4).T;assert abs(mat[0,3]-12.5)<1e-5;assert abs(mat[0,0])<1e-5;report['edited_export']={'bytes':size,'added_part_transform_preserved':True}
 (O/'verification.json').write_text(json.dumps(report,indent=2));print(json.dumps({'status':report['status'],'component_count':len(expected),'verified_stock_definitions':len(report['stock_dimensions']),'exports':[(e['file'],e['bytes']) for e in report['exports']]},indent=2))

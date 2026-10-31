@@ -1,8 +1,9 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 """Export existing licensed Quaternius sources with their original walk/idle clips.
 Only presentation assets are written; editable campus geometry is unchanged.
 """
 import bpy, pathlib, json
-B=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular')
+B=media('reconstruction/2026-campus/modular')
 O=B/'deliverable/environment'; O.mkdir(exist_ok=True)
 for name,source in [('casual','Casual_2.blend'),('punk','Punk.blend'),('woman','Woman_Casual.blend')]:
  bpy.ops.wm.open_mainfile(filepath=str(B/'research/appearance'/source))

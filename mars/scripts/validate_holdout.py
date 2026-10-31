@@ -1,5 +1,6 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import mars_root  # noqa: E402
 import pathlib,json,subprocess,cv2,numpy as np,pycolmap
-ROOT=pathlib.Path('~/Mars');BASE=ROOT/'docs/media/reconstruction/2026-campus';out=BASE/'validation/holdout-orbit';out.mkdir(parents=True,exist_ok=True);images=out/'images';images.mkdir(exist_ok=True)
+ROOT=mars_root();BASE=ROOT/'docs/media/reconstruction/2026-campus';out=BASE/'validation/holdout-orbit';out.mkdir(parents=True,exist_ok=True);images=out/'images';images.mkdir(exist_ok=True)
 times=[8.,23.,38.,53.,68.,83.,98.,113.,128.,143.,158.,171.]
 for t in times:
  p=images/f'check_{t:06.2f}.jpg'

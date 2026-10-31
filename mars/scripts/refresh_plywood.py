@@ -1,6 +1,7 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import bpy,pathlib
 from mathutils import Vector
-O=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular/deliverable');bpy.ops.wm.open_mainfile(filepath=str(O/'mars-2026-modular.blend'));s=bpy.context.scene;im=bpy.data.images.load(str(O/'textures/kitchen-plywood-sample.jpg'),check_existing=False);im.pack()
+O=media('reconstruction/2026-campus/modular/deliverable');bpy.ops.wm.open_mainfile(filepath=str(O/'mars-2026-modular.blend'));s=bpy.context.scene;im=bpy.data.images.load(str(O/'textures/kitchen-plywood-sample.jpg'),check_existing=False);im.pack()
 for ma in bpy.data.materials:
  if ma.use_nodes:
   for n in ma.node_tree.nodes:

@@ -1,6 +1,7 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import pathlib,json,cv2,numpy as np,pycolmap,os
 from align_cameras import similarity
-BASE=pathlib.Path('<mars-media>/reconstruction/2026-campus');out=BASE/'validation/stills-to-orbit';out.mkdir(exist_ok=True);images=out/'images';images.mkdir(exist_ok=True)
+BASE=media('reconstruction/2026-campus');out=BASE/'validation/stills-to-orbit';out.mkdir(exist_ok=True);images=out/'images';images.mkdir(exist_ok=True)
 frames=[r for r in json.load(open(BASE/'inventory/campus-march19-frames.json')) if 'gps' in r]
 for f in frames:
  dest=images/f['file']

@@ -1,8 +1,9 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 """Apply evidence-backed facade finishes and independently editable context people."""
 import bpy,json,pathlib,shutil,math
 import numpy as np
 from mathutils import Matrix,Vector
-O=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular/deliverable')
+O=media('reconstruction/2026-campus/modular/deliverable')
 B=O.parent/'research/appearance'
 for name in ['mars-2026-modular.blend','components.json']:
  backup=B/('before-appearance-'+name)

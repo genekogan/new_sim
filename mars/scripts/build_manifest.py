@@ -1,7 +1,8 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import pathlib,json,numpy as np,math,shutil
 from PIL import Image
 from scipy.spatial.transform import Rotation
-BASE=pathlib.Path('<mars-media>/reconstruction/2026-campus');out=BASE/'deliverable';(out/'images').mkdir(exist_ok=True)
+BASE=media('reconstruction/2026-campus');out=BASE/'deliverable';(out/'images').mkdir(exist_ok=True)
 reg=json.load(open(BASE/'validation/sfm-to-apple.json'));s=reg['scale'];R=np.array(reg['rotation']);t=np.array(reg['translation']);views=[]
 for row in sorted(json.load(open(BASE/'validation/holdout-orbit/results.json')),key=lambda x:x['timestamp_seconds']):
  if not row['success']:continue

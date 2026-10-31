@@ -1,6 +1,7 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media,env_path  # noqa: E402
 import bpy,pathlib,json,math
 from mathutils import Vector
-b=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular/research');p='~/Mars/code/godot-mars/Imported Models/Mars Aerial/Mars 2026 - Aerial Located.glb';bpy.ops.wm.read_factory_settings(use_empty=True);bpy.ops.import_scene.gltf(filepath=p);bpy.context.view_layer.update();meshes=[o for o in bpy.context.scene.objects if o.type=='MESH'];rows=[]
+b=media('reconstruction/2026-campus/modular/research');p=str(env_path('MARS_AERIAL_GLB','the Mars 2026 aerial GLB'));bpy.ops.wm.read_factory_settings(use_empty=True);bpy.ops.import_scene.gltf(filepath=p);bpy.context.view_layer.update();meshes=[o for o in bpy.context.scene.objects if o.type=='MESH'];rows=[]
 for o in bpy.context.scene.objects:
  coords=[child.matrix_world@Vector(c) for child in [o,*o.children_recursive] if child.type=='MESH' for c in child.bound_box]
  if not coords:continue

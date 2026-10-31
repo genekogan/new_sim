@@ -1,6 +1,7 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import pathlib,json,pycolmap,numpy as np
 from scipy.spatial.transform import Rotation
-b=pathlib.Path('<mars-media>/reconstruction/2026-campus');out=b/'models/sfm-campus-constrained';init=out/'native-initial';init.mkdir(parents=True,exist_ok=True);db=b/'models/sfm-campus-shared/database.db';a={p['file']:p for p in json.load(open(b/'models/campus-v1/poses.json'))};connection=pycolmap.Database.open(db);ims=connection.read_all_images();cams=connection.read_all_cameras();lines=[]
+b=media('reconstruction/2026-campus');out=b/'models/sfm-campus-constrained';init=out/'native-initial';init.mkdir(parents=True,exist_ok=True);db=b/'models/sfm-campus-shared/database.db';a={p['file']:p for p in json.load(open(b/'models/campus-v1/poses.json'))};connection=pycolmap.Database.open(db);ims=connection.read_all_images();cams=connection.read_all_cameras();lines=[]
 for c in cams:lines.append(f'{c.camera_id} SIMPLE_RADIAL {c.width} {c.height} '+ ' '.join(str(v) for v in c.params))
 (init/'cameras.txt').write_text('\n'.join(lines)+'\n');lines=[]
 for im in ims:

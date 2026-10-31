@@ -1,8 +1,9 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import mars_root  # noqa: E402
 """Publish reviewed correction evidence; never mutate source media."""
 import json, html, re
 from pathlib import Path
 from PIL import Image,ImageOps
-ROOT=Path('~/Mars');BASE=ROOT/'docs/media/reconstruction/campus-history';RESEARCH=BASE/'corrections-20260926';OUT=ROOT/'code/campus-2026-reconstruction/viewer/public/history'
+ROOT=mars_root();BASE=ROOT/'docs/media/reconstruction/campus-history';RESEARCH=BASE/'corrections-20260926';OUT=ROOT/'code/campus-2026-reconstruction/viewer/public/history'
 selections={2021:[(18,'corridor-ground','Separate rack buildings and bare desert aisle','Ground view shows the unfloored corridor between the two parallel buildings.'),(30,'corridor-occupied','Ground-level corridor in use','People occupy the bare-ground aisle alongside the raised side decks.')],2022:[(29,'courtyard-elevated','Elevated courtyard view','Four separate sides and ground-level access gaps; construction-stage view used for geometry, not late-season finishes.'),(41,'courtyard-march','March rooftop panorama','Late-season painted buildings and open central courtyard seen from the roof.')],2024:[(5,'front-full','Full frontage — painted wall, solar and glazing','Near-frontal group photograph: the left PV array steps inward; the right wing is glazing. The central mural remains exposed.'),(28,'front-oblique','January 29 — raked frontage and reused windows','Oblique view establishes the slope of the frontage and the right-hand glazing/eye insert. Earlier paint state; March references govern the mural.') ]}
 private=[]
 for year,choices in selections.items():

@@ -1,7 +1,8 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import pathlib,json,hashlib
 import numpy as np
 from PIL import Image,ImageOps
-B=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular');O=B/'deliverable';R=B/'research';(O/'references').mkdir(parents=True,exist_ok=True)
+B=media('reconstruction/2026-campus/modular');O=B/'deliverable';R=B/'research';(O/'references').mkdir(parents=True,exist_ok=True)
 r=json.load(open(R/'interior-candidates.json'))
 selection=[(0,'Main hall during build','Tiered timber seating, central aisle and rack skeleton. December 2025 build for the 2026 season.'),(110,'Main hall · projector wall','Tall white projection surface between uprights; side galleries and lower rooms. February 2026.'),(11,'Main hall · upper gallery','Upper-floor gallery overlooking the double-height classroom.'),(37,'Kitchen','Perimeter plywood counters, stainless prep table and sink beneath the far window. Exact cabinet dimensions unmeasured.'),(5,'Kitchen during build','Window openings and perimeter counter arrangement before finish.'),(80,'Mimos · transparent wall','Sloping transparent panels with timber framing, blue rack uprights, orange beams and seating.'),(77,'Mimos · coffee counter','Coffee equipment and café signage; movable furnishings.'),(71,'Mimos · seating','Long café interior with tables and soft seating.'),(102,'Desk and screens','2026 workspace photo; exact location within upper-floor plan remains unconfirmed.'),(95,'Electronics workspace candidate','Useful furniture/equipment reference. Identification as the compute room is unconfirmed.')]
 refs=[]

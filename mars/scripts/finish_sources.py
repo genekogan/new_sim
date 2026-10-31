@@ -1,7 +1,8 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import bpy,pathlib,json,math
 import numpy as np
 from mathutils import Vector,Matrix
-B=pathlib.Path('<mars-media>/reconstruction/2026-campus');R=B/'modular/research';O=B/'modular/deliverable';T=O/'textures';T.mkdir(exist_ok=True)
+B=media('reconstruction/2026-campus');R=B/'modular/research';O=B/'modular/deliverable';T=O/'textures';T.mkdir(exist_ok=True)
 bpy.ops.wm.open_mainfile(filepath=str(B/'models/orbit-raw/campus.blend'));scene=bpy.context.scene
 fit=json.load(open(R/'chiba-local-alignment.json'));s=fit['scale'];r=np.array(fit['rotation']);t=np.array(fit['translation'])-np.array([177,66]);M=Matrix.Identity(4)
 for i in range(2):

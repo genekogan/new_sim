@@ -1,8 +1,9 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media,campus_repo  # noqa: E402
 """Recover editable CAD components; retain provenance and nominal stock separately."""
 import bpy, pathlib, json, math, hashlib, collections
 import numpy as np
 from mathutils import Matrix,Vector
-P=pathlib.Path('<mars-campus-repo>'); B=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular'); R=B/'research'; O=B/'deliverable';O.mkdir(exist_ok=True);(O/'textures').mkdir(exist_ok=True)
+P=campus_repo(); B=media('reconstruction/2026-campus/modular'); R=B/'research'; O=B/'deliverable';O.mkdir(exist_ok=True);(O/'textures').mkdir(exist_ok=True)
 bpy.ops.wm.open_mainfile(filepath=str(R/'cad-reference.blend'))
 scene=bpy.context.scene
 source='code/godot-mars/Imported Models/Mars Aerial/Mars 2026 - Aerial Located.glb'
