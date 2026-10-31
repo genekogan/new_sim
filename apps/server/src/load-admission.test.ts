@@ -170,3 +170,22 @@ test('x-sim-account: an opaque tag of the token\'s account on every Soul-token a
   assert.equal(await tag('/v1/edge/here', 'sim_unknown'), null); assert.equal(await tag('/v1/edge/here'), null);
   adm.close();
 });
+
+test('over real HTTP: a queued POST whose body was read still runs; a client that hung up while queued is dropped unrun', async t => {
+  const {createServer} = await import('node:http'); const {getRequestListener} = await import('@hono/node-server');
+  const adm = new Admission(), app = new Hono(); let ran = 0;
+  app.use('*', admissionMiddleware(adm, () => 'green', c => c.req.header('authorization')?.slice(7)));
+  app.post('/v1/edge/act', async c => { ran++; return c.json({got: await c.req.json()}); });
+  const server = createServer(getRequestListener(app.fetch)); await new Promise<void>(r => server.listen(5187, '127.0.0.1', r));
+  t.after(() => { server.close(); adm.close(); });
+  const post = (token: string, signal?: AbortSignal) => fetch('http://127.0.0.1:5187/v1/edge/act', {method: 'POST', headers: {authorization: `Bearer ${token}`, 'content-type': 'application/json'}, body: JSON.stringify({verb: 'go'}), signal});
+  adm.setLoadLevel('black');   // budget 0: acts queue (and would wait for their deadline)
+  const ok = post('sim_a'); const ac = new AbortController(); const gone = post('sim_b', ac.signal).catch(() => null);
+  await new Promise(r => setTimeout(r, 150));
+  assert.equal(adm.queue.length, 2, 'both queued');
+  ac.abort(); await gone; await new Promise(r => setTimeout(r, 250));
+  assert.equal(adm.shed.dropped, 1, 'the hung-up one is dropped'); assert.equal(adm.queue.length, 1);
+  adm.setLoadLevel('green');
+  const res = await ok; assert.equal(res.status, 200); assert.deepEqual(await res.json(), {got: {verb: 'go'}});
+  assert.equal(ran, 1);
+});
