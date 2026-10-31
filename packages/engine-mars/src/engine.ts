@@ -248,6 +248,7 @@ export class MarsEngine implements Engine {
     if(rt.world.groundV1){attachGround(rt);this.registry=rt.registry;}
     if(this.cfg.walkSettleWaitV1===true)this.rt.services.walkSettleWaitV1=true;
     if(this.cfg.shoreDepartV1===true)this.rt.services.shoreDepartV1=true;
+    this.rt.services.doorPassersV1=this.doorPassersV1;
     if(rt.world.authoredBoundariesV1)immutableAuthoredBoundaryFact(rt.world.authoredBoundariesV1);
     this.schema = rt.world.schema;
     if (saved) { for (const p of saved.programs) { for(const step of p.steps)if(step.params?.spreadWaitPolicy!==undefined&&!this.sharedWaterStep(step))throw Error('snapshot.unknown-spread-wait-policy');this.programs.set(p.id, p); this.byActor.set(p.actor, p.id); } this.nextProg = saved.nextProg; this.leaving = saved.leaving; }
@@ -295,6 +296,7 @@ export class MarsEngine implements Engine {
     // Rebased physical runtimes rebuild service state; the accepted policy stays in cfg.
     if(this.cfg.walkSettleWaitV1===true)this.rt.services.walkSettleWaitV1=true;
     if(this.cfg.shoreDepartV1===true)this.rt.services.shoreDepartV1=true;
+    this.rt.services.doorPassersV1=this.doorPassersV1;
     // Reader wrappers finish restoring public policies after construction.
     // Discard only their empty initial recorder before the first new frame.
     if(!this.readerRecordingDepth&&this.renderBaseKey!==this.renderContextKeyV1()){this.finishRecorder();this.startRecorder();}
@@ -701,7 +703,7 @@ export class MarsEngine implements Engine {
       case 'control_classroom_v1': return [{verb:'classroom_control',params:{session:a.session,intent:{kind:a.kind}},settle:'done',raw:true}];
       case 'walk_to': {
         const gaitIssue = this.gaitIssue(me, a); if (gaitIssue) return gaitIssue;
-        const g = (a.spread === 'pond/1' || a.spread === 'region/1' || a.spread === 'pond-lap/1') && typeof a.to === 'string' && this.rt.world.regions[a.to] ? this.spreadGoalV1(me, a.to, a.spread,this.sharedWaterStep(step),a.regionOutside) : this.goalNear(me, a.to, typeof a.standoff === 'number' ? a.standoff : 0);
+        const g = (a.spread === 'pond/1' || a.spread === 'region/1' || a.spread === 'pond-lap/1') && typeof a.to === 'string' && this.rt.world.regions[a.to] ? this.spreadGoalV1(me, a.to, a.spread,this.sharedWaterStep(step),a.regionOutside) : this.goalNear(me, a.doorQueueV1 ? this.doorQueueGoalV1(p, a) : a.to, typeof a.standoff === 'number' ? a.standoff : 0);
         if (g === 'here') return [];
         if ('code' in g) return g;
         const movement = this.movementVerb(me,g.x,g.z);
@@ -2046,6 +2048,68 @@ export class MarsEngine implements Engine {
         const res=spatial.route(this.rt.world,HUMAN_PROFILE_V1,start,{level,p:q},{proveUnreachable:true});
         if(res.ok)return {to:q,goal:[t[0],t[1]],short:Math.round(hypot(q[0]-t[0],q[1]-t[1])*10)/10,level};}}
     return null;
+  }
+  /** Soul Actions entry 31 (door passage): the programmes walking through `door` (an `open` passage hand step, then the
+   * walk through, then the `close` one) and where each is in it. Read by hand-actuator.ts (who is following, who is passing). */
+  readonly doorPassersV1=(door:string)=>{
+    // In programme start order (the Map keeps insertion order): an earlier passage on the same side goes first.
+    // Entry 32: a passage may turn the lock before it opens (`unlock`); `opening` covers both hand steps.
+    const out:{actor:string;phase:'approach'|'opening'|'through'|'closing';from:number}[]=[];
+    for(const p of this.programs.values()){
+      const pass=(s:{verb:string;params?:Record<string,unknown>}|undefined)=>s?.verb==='mars:hand_actuator_v1'&&s.params?.target===door?s.params?.passage as {mode?:string;from?:number}|undefined:undefined;
+      const open=p.steps.findIndex(s=>pass(s)?.mode==='open');if(open<0)continue;
+      const first=p.steps.findIndex(s=>!!pass(s)),close=p.steps.findIndex((s,j)=>j>open&&pass(s)?.mode==='close'),i=p.index;
+      const phase=i===first-1?'approach':i>=first&&i<=open?'opening':i>open&&(close<0||i<close)?'through':i===close?'closing':null;
+      if(phase)out.push({actor:p.actor,phase,from:Number(pass(p.steps[open])!.from)});}
+    return out;
+  };
+  /** Soul Actions entry 32: the goal of a passage's staging walk, chosen when the walk begins. The first passage on this side
+   * of this door gets the staging spot (`to`); a later one still approaching or opening behind it gets a queue spot about a
+   * metre back (out of the doorway lane and the swing), so two Souls never walk into each other at one waiting spot. */
+  private doorQueueGoalV1(p:Prog,a:Record<string,unknown>):unknown{
+    const q=a.doorQueueV1 as {door:string;from:number;queue:[number,number][]}|undefined;if(!q||!Array.isArray(q.queue))return a.to;
+    let ahead=0;
+    for(const o of this.programs.values()){if(o.id===p.id)break;if(o.actor===p.actor)continue;
+      const passer=this.doorPassersV1(q.door).find(x=>x.actor===o.actor);if(passer&&passer.from===q.from&&(passer.phase==='approach'||passer.phase==='opening'))ahead++;}
+    if(!ahead)return a.to;
+    for(const spot of q.queue.slice(Math.min(ahead-1,q.queue.length-1)))if(!this.plan(this.movementVerb(p.actor,spot[0],spot[1]),{actor:p.actor,x:spot[0],z:spot[1],level:this.ents[p.actor]?.human?.level??0}))return spot;
+    return a.to;
+  }
+  /** Soul Actions entry 31 (pure): the closed doors walling this body off from its plan's first walk_to destination. Null
+   * when a walk reaches it (or it names nothing). Doors are the walk graph's closed-gap solids (`<door>#door:<opening>`,
+   * god engine-bridge) bordering the region the failed route exhausted; nearest to the way there first, at most `max`. */
+  closedDoorsOnWalkV1(actor:string,steps:{verb:string;params?:Record<string,unknown>}[],max=4):{goal:[number,number];doors:string[];goalDoors:()=>string[]}|null{
+    const step=steps.find(s=>s.verb==='walk_to'),e=this.ents[actor];if(!step||!e?.human||(e.human.level??0)!==0)return null;
+    const t=this.pointOf(step.params?.to);if(!t)return null;
+    const start=this.godWalkoutStartV1(actor);if(!start)return null;
+    const goal=this.nearestStandableV1([t[0],t[1]],actor,HUMAN_RADIUS+.05,8);if(!goal)return null;
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);
+    const r=spatial.route(this.rt.world,HUMAN_PROFILE_V1,start,{level:0,p:goal},{nameObstacles:id=>id.includes('#door:')});
+    if(r.ok||r.diagnostic.code!=='route.unreachable')return null;
+    const pos=(id:string)=>{const o=spatial.scene.obstacles.find(x=>x.id.startsWith(id+'#door:'));return o?o.obb.c:null;};
+    const along=(c:[number,number])=>hypot(c[0]-start.p[0],c[1]-start.p[1])+hypot(c[0]-goal[0],c[1]-goal[1]);
+    const named=(d:{subjects?:string[]})=>[...new Set((d.subjects??[]).filter(s=>s.includes('#door:')).map(s=>s.split('#')[0]))].map(id=>({id,c:pos(id)})).filter((x):x is {id:string;c:[number,number]}=>!!x.c)
+      .sort((a,b)=>along(a.c)-along(b.c)).slice(0,max).map(x=>x.id);
+    const ids=named(r.diagnostic);
+    // asked only when no door on this side opens the way: the doors walling the destination's own side (the same search
+    // from the destination, which floods that side once), so a locked door there refuses instead of a closest approach
+    const goalDoors=()=>{const back=spatial.route(this.rt.world,HUMAN_PROFILE_V1,{level:0,p:goal},{level:0,p:start.p},{nameObstacles:id=>id.includes('#door:')});return back.ok?[]:named(back.diagnostic);};
+    return {goal,doors:ids,goalDoors};
+  }
+  /** Soul Actions entry 31 (pure): does a walk from `from` (level 0) reach this plan's first walk_to destination, a
+   * standing point at its standoff as the walk itself would choose (goalNear's turns), with the world as it is now? */
+  walkFromReachesV1(actor:string,from:[number,number],steps:{verb:string;params?:Record<string,unknown>}[]):boolean{
+    const step=steps.find(s=>s.verb==='walk_to'),e=this.ents[actor];if(!step||!e?.human)return false;
+    const to=step.params?.to,t=this.pointOf(to);if(!t)return false;
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const g=spatial.levelAt(0,from);if(!g)return false;
+    const off=Math.max(typeof step.params?.standoff==='number'?step.params.standoff:0,typeof to==='string'&&!!this.ents[to]?.9:0),base=Math.atan2(from[1]-t[1],from[0]-t[0]);
+    if(hypot(from[0]-t[0],from[1]-t[1])<=off+.4)return true;
+    for(const turn of [0,.6,-.6,1.2,-1.2,1.9,-1.9,Math.PI]){
+      const q:[number,number]=off===0?(this.nearestStandableV1([t[0],t[1]],actor,HUMAN_RADIUS+.05,8)??[t[0],t[1]]):[r3(t[0]+Math.cos(base+turn)*off),r3(t[1]+Math.sin(base+turn)*off)];
+      if(spatial.route(this.rt.world,bodyProfile(e),{level:0,p:from},{level:0,p:q},{proveUnreachable:true}).ok)return true;
+      if(off===0)return false;
+    }
+    return false;
   }
   nearestStandableV1(at:[number,number],except?:string,minClear=HUMAN_RADIUS+.15,maxRing=80):[number,number]|null{
     const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const clear=spatial.clearTester(0,at,minClear);if(!clear)return null;

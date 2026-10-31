@@ -213,7 +213,7 @@ export class Runtime {
       // M03 (Soul Actions entry 28): a courtesy step-aside (walk.ts makeWay, id `…:make-way:N`) is a short transient walk,
       // not a new owner of the body. An action that conflicts only with such nudges waits for them to end and is then
       // planned again from where the body stands, instead of failing at once (only pose_v1 used to wait this out).
-      const nudges = this.nudgeHolds(res, opts.parent);
+      const nudges = this.nudgeHolds(res, opts.parent, verb, parsed.data);
       if (nudges) { this.waiting.set(id, { rec, def, params: parsed.data, parent: opts.parent, holds: nudges }); this.emit(rec, 'requested', undefined, 'make-way'); this.mark('runtime.make-way-wait', { action: id, verb, holds: nudges }); return rec; }
       return this.fail(rec, conflict);
     }
@@ -473,11 +473,14 @@ export class Runtime {
   }
 
   /** The make-way nudges this reservation set conflicts with, when they are its only conflicts (else null). */
-  private nudgeHolds(res: Reservation[], parent?: string): string[] | null {
+  private nudgeHolds(res: Reservation[], parent?: string, verb?: string, params?: unknown): string[] | null {
     const ancestors = new Set<string>(), out = new Set<string>();
     for (let p = parent; p; p = this.records.get(p)?.parent) ancestors.add(p);
+    // Soul Actions entry 31: a door passage's hand step waits for another body's hand on the same door (one hand at a time)
+    const door = verb === 'hand_actuator_v1' && (params as { passage?: unknown; target?: string } | undefined)?.passage ? 'entity:' + (params as { target: string }).target : null;
     for (const r of res) for (const o of this.owners.get(r.resource) ?? []) {
       if (ancestors.has(o.action) || (r.mode !== 'exclusive' && o.mode !== 'exclusive')) continue;
+      if (door && r.resource === door && this.live.has(o.action) && this.records.get(o.action)?.verb === 'hand_actuator_v1') { out.add(o.action); continue; }
       if (!/:make-way:\d+$/.test(o.action) || !this.live.has(o.action)) return null;
       out.add(o.action);
     }

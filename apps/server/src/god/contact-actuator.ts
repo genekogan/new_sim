@@ -14,9 +14,10 @@ const fail=(code:string,reason:string)=>({ok:false as const,code,reason});
 export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:number)=>number;model:()=>WorldModel;body:(id:string)=>{pose:{p:number[]};human?:{hands?:{left?:number[];right?:number[]};handActuator?:import('../../../../mars/viewer/engine/social/hand-actuator.ts').HandActuatorMotion}}|undefined;access:(id:string,soul:EdgeSoul)=>{code:string;reason:string}|null;record:(soul:EdgeSoul,id:string,action:string,params?:Record<string,unknown>)=>void;commit:(ops:Op[],note:string,done:()=>void)=>{accepted:boolean}}){
  const binding=(id:string)=>{const m=d.model(),e=m.entities.get(id);return e?createHash('sha256').update(JSON.stringify([e,m.worldPose(e),m.resolvedDef(e.def)?.hash])).digest('hex'):null;};
  return {
-  plan(soul:EdgeSoul,target:string,action:string,input:Record<string,unknown>={}){
+  /** `from`/`open` (entry 31's door passage): plan as if the body stood at `from` and the door were already open/shut. */
+  plan(soul:EdgeSoul,target:string,action:string,input:Record<string,unknown>={},opts?:{from?:[number,number];open?:boolean}){
    const m=d.model(),e=m.entities.get(target),def=e&&m.resolvedDef(e.def),body=d.body(soul.entityId);if(!e||!def||!body)return null;
-   const wp=m.worldPose(e),me=body.pose.p,at:[number,number,number]=[wp.x,wp.y+1.04*wp.s,wp.z];
+   const wp=m.worldPose(e),me=opts?.from?[opts.from[0],body.pose.p[1],opts.from[1]]:body.pose.p,at:[number,number,number]=[wp.x,wp.y+1.04*wp.s,wp.z];
    const params:Omit<HandActuatorParams,'actor'>={target,at};let root:[number,number,number],face:[number,number]|undefined;
    if(contactStateKey(def,action)==='text'){
     // Stand square in front of the board's face; the hand works across the face from its centre.
@@ -48,7 +49,7 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     const number=(key:string)=>Number(e.params?.[key]??def.params[key]?.default??1),sx=wp.s*number('sx'),sy=wp.s*number('sy');
     const hx=leaf.pivot[0]*sx,hz=(leaf.pivot[2]??0)*wp.s,c=Math.cos(wp.yaw),s=Math.sin(wp.yaw);
     const localZ=(me[0]-wp.x)*s+(me[2]-wp.z)*c;
-    params.opening={bodyPolicy:'door-natural-v2',...(def.tags.includes('wall-window')?{floorY:me[1]}:{}),hinge:[wp.x+hx*c+hz*s,wp.y,wp.z-hx*s+hz*c],yaw:wp.yaw,radius:((knob?.at?.[0]??(Number(def.components.opening?.width??leaf.size?.[0]??.8)/2-.1))-leaf.pivot[0])*sx,height:Number(def.components.opening?.height??leaf.size?.[1]??1.8)*sy,handleY:(knob?.at?.[1]??.85)*sy,from:actuatedState(e,def).open===true?HAND_OPEN_ANGLE:0,to:action==='open'?HAND_OPEN_ANGLE:0,side:def.tags.some(t=>['wall-window','hand-cabinet'].includes(t))?1:localZ<0?-1:1};
+    params.opening={bodyPolicy:'door-natural-v2',...(def.tags.includes('wall-window')?{floorY:me[1]}:{}),hinge:[wp.x+hx*c+hz*s,wp.y,wp.z-hx*s+hz*c],yaw:wp.yaw,radius:((knob?.at?.[0]??(Number(def.components.opening?.width??leaf.size?.[0]??.8)/2-.1))-leaf.pivot[0])*sx,height:Number(def.components.opening?.height??leaf.size?.[1]??1.8)*sy,handleY:(knob?.at?.[1]??.85)*sy,from:(opts?.open??actuatedState(e,def).open===true)?HAND_OPEN_ANGLE:0,to:action==='open'?HAND_OPEN_ANGLE:0,side:def.tags.some(t=>['wall-window','hand-cabinet'].includes(t))?1:localZ<0?-1:1};
     if(def.tags.includes('wall-window')&&(wp.y+params.opening.handleY-me[1]>1.65||wp.y+params.opening.handleY-me[1]<.35))return null;
     root=actuatorPoint(params.opening,params.opening.from).root;
    }else{
