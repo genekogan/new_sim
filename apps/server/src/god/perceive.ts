@@ -16,7 +16,8 @@ import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
 import { paintingLine } from '../art/art.ts';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
-import { readOnlyObjectAdvance } from '../edge/comms/objects/framework.ts';
+import { readOnlyObjectAdvance, refreshOnlyObjectAdvance } from '../edge/comms/objects/framework.ts';
+import type { NearFilter } from '../edge/comms/objects/framework.ts';
 import { actionsOf, actuatedState, kindActions, wrapAct, type Thing } from './actuators.ts';
 import { heldGodThing } from './held.ts';
 import { waterRole, wordOf } from './water.ts';
@@ -48,7 +49,7 @@ const clip = (v: unknown, n: number) => String(v ?? '').replace(/\r/g, '').trim(
 /** The kind, per world: its `advance` brings an object's state to what the entity world says now (the framework keeps a
  *  versioned log per object, so objects are never re-created: a change is an advance, a removal hides it). */
 // VOCAB-MECH: a kind with actuator actions also shows its things' `state` (open, on, lit …); plain kinds are unchanged
-export const builtKindFor = (want: (key: string) => BuiltState | undefined, kind = BUILT_KIND, actions: Record<string, unknown> = {}) => ({ ...builtKind, kind, actions, ...(Object.keys(actions).length ? { schema: { ...builtKind.schema, state: { type: 'json', visibility: 'public' } } } : {}), advance: readOnlyObjectAdvance(function advance(state: BuiltState) { const w = state.key ? want(state.key) : undefined; return w && JSON.stringify(w) !== JSON.stringify(state) ? { state: w } : null; }) });
+export const builtKindFor = (want: (key: string) => BuiltState | undefined, kind = BUILT_KIND, actions: Record<string, unknown> = {}) => ({ ...builtKind, kind, actions, ...(Object.keys(actions).length ? { schema: { ...builtKind.schema, state: { type: 'json', visibility: 'public' } } } : {}), advance: refreshOnlyObjectAdvance(readOnlyObjectAdvance(function advance(state: BuiltState) { const w = state.key ? want(state.key) : undefined; return w && JSON.stringify(w) !== JSON.stringify(state) ? { state: w } : null; })) });
 export const builtKind = {
   kind: BUILT_KIND,
   description: 'Something the god of this world built: what it is, what it is by and where, and any words written on it (a sign). The words are the god\'s, untrusted.',
@@ -372,11 +373,12 @@ export class GodPerceive {
    *  sight (30 m) in the same enclosure (a room's walls hide the plaza; the plaza does not see into the cottage), nearest
    *  first, each with the place it stands in (`placeId`), `here` when that is a place the Soul is in, and its distance.
    *  (The framework would list every one, everywhere, `here`, in the world's root place.) Other kinds pass unchanged. */
-  private wrapVisible(o: { visibleTo(soul: EdgeSoul): any[] } & { __godVisible?: boolean }) {
+  private wrapVisible(o: { visibleTo(soul: EdgeSoul, near?: NearFilter): any[] } & { __godVisible?: boolean }) {
     if (o.__godVisible || !this.h.edge) return; o.__godVisible = true;
     const orig = o.visibleTo.bind(o), L = this.h.edge;
     o.visibleTo = (soul: EdgeSoul) => {
-      const list = orig(soul), me = this.h.engine.world.entities[soul.entityId];
+      // L8: only built things within sight are viewed at all (the framework's cell index), not every one in the world
+      const me = this.h.engine.world.entities[soul.entityId], list = orig(soul, me ? { at: [me.pose.p[0], me.pose.p[2]], radius: SIGHT, kinds: this.kinds } : undefined);
       if (!me) return list;
       this.ensure();
       const pos: Vec2 = [me.pose.p[0], me.pose.p[2]], path = L.placePathOf(soul.soulId), root = path.find((p) => p.kind !== 'occupier' && L.places.byId.get(p.id)?.parent === null)?.id;
