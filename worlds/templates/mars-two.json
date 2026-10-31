@@ -13266,6 +13266,42 @@
      }
     }
    ]
+  },
+  {
+   "group": "mars-chiba-seating-20261029",
+   "note": "Keep the four named Chiba tier cushions on their existing supported treads, clear of the central stair landings and static solids; preserve all seat definitions and capability identities.",
+   "ops": [
+    {
+     "op": "move",
+     "id": "tier",
+     "p": [
+      -12.606,
+      0.742,
+      -19.978
+     ],
+     "r": -1.431
+    },
+    {
+     "op": "move",
+     "id": "tier-2",
+     "p": [
+      -12.753,
+      1.123,
+      -21.017
+     ],
+     "r": -1.431
+    },
+    {
+     "op": "move",
+     "id": "tier-4",
+     "p": [
+      -13.181,
+      2.266,
+      -24.062
+     ],
+     "r": -1.431
+    }
+   ]
   }
  ]
 }

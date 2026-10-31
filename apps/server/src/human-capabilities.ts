@@ -14,7 +14,7 @@ const key=(goal:string,ref:string)=>goal+':'+ref;
 // schema: ~4 ms on each menu build, for a set of names that never changes while the rules do not)
 const VERBS=new WeakMap<object,{rules:string;verbs:Set<string>}>();
 function engineVerbs(engine:WorldHost['engine']):Set<string>{const hit=VERBS.get(engine);if(hit&&hit.rules===engine.rulesVersion)return hit.verbs;const verbs=new Set(engine.describeVerbs().map(v=>v.verb));VERBS.set(engine,{rules:engine.rulesVersion,verbs});return verbs;}
-export function readHumanCapabilitiesV1(host:WorldHost,m:Mind,options?:{registeredActivitiesV1?:boolean;deferRouteChecks?:boolean;skipRegisteredCards?:boolean}):HumanRegistryReadV1 {
+export function readHumanCapabilitiesV1(host:WorldHost,m:Mind,options?:{registeredActivitiesV1?:boolean;deferRouteChecks?:boolean;skipRegisteredCards?:boolean;onlyWalkTarget?:string}):HumanRegistryReadV1 {
  const read=()=>{
   const w=host.engine.world as NativeWorld,body=w.entities[m.entityId],bindings=new Map<string,HumanBindingV1>();if(!body?.human)throw Error('human-capabilities.body-unavailable');
   const verbs=engineVerbs(host.engine),humanoid=!body.body||body.body.family==='humanoid';
@@ -31,21 +31,22 @@ export function readHumanCapabilitiesV1(host:WorldHost,m:Mind,options?:{register
    bindings.set(id,{id,goal,targetId,label,aliases:[...new Set(aliases)],steps,card,available:!issue,...(issue?{blockedCode:issue.code}:{}),...(seatedWitness?{seatedWitness}:{}),distance:pos?Math.hypot(pos[0]-body.pose.p[0],pos[2]-body.pose.p[2]):0,green});
   };
   for(const a of host.engine.anchors()){
+   if(options?.onlyWalkTarget!==undefined&&a.id!==options.onlyWalkTarget)continue;
    const t=host.kernel.things[a.id];if(!t||t.by!=='world'||t.kind!=='place'||!engineRef(host,a.id))continue;
    if(verbs.has('walk_to')){
     // A place region takes many bodies: the engine spaces arrivals instead of one centroid lock.
     const to=w.regions[a.id]?{to:a.id,spread:'region/1'}:{to:a.id};
     add('walk',key('walk',a.id),a.name,a.id,[{verb:'walk_to',params:to},{verb:'rest',params:{seconds:1}}],1);
-    add('hang_out',key('hang_out',a.id),a.name,a.id,[{verb:'walk_to',params:to},{verb:'rest',params:{seconds:60}}],1,/\b(?:tree|garden|forest|grove|green)\b/i.test(a.name));}
-   const entity=a.entity?w.entities[a.entity]:undefined;if(humanoid&&verbs.has('sit')&&entity&&CATALOG[entity.def]?.slots?.some(s=>s.kind==='seat'))add('sit',key('sit',a.id),a.name,a.id,[{verb:'sit',params:{on:entity.id,seconds:1}},{verb:'rest',params:{seconds:60}}],1);
+    if(options?.onlyWalkTarget===undefined)add('hang_out',key('hang_out',a.id),a.name,a.id,[{verb:'walk_to',params:to},{verb:'rest',params:{seconds:60}}],1,/\b(?:tree|garden|forest|grove|green)\b/i.test(a.name));}
+   const entity=a.entity?w.entities[a.entity]:undefined;if(options?.onlyWalkTarget===undefined&&humanoid&&verbs.has('sit')&&entity&&CATALOG[entity.def]?.slots?.some(s=>s.kind==='seat'))add('sit',key('sit',a.id),a.name,a.id,[{verb:'sit',params:{on:entity.id,seconds:1}},{verb:'rest',params:{seconds:60}}],1);
   }
-  if(verbs.has('rest'))add('rest','rest:self','Rest here',undefined,[{verb:'rest',params:{seconds:60}}],0);
-  if(humanoid&&verbs.has('mars:eat')&&/\+(?:commons-provisions\/1|cp\/2)(?:\+|$)/.test(host.engine.rulesVersion)){
+  if(options?.onlyWalkTarget===undefined&&verbs.has('rest'))add('rest','rest:self','Rest here',undefined,[{verb:'rest',params:{seconds:60}}],0);
+  if(options?.onlyWalkTarget===undefined&&humanoid&&verbs.has('mars:eat')&&/\+(?:commons-provisions\/1|cp\/2)(?:\+|$)/.test(host.engine.rulesVersion)){
    const resources=[...COMMONS_PERSONAL_RESOURCES,...(host.engine.commonsNewcomerResourcesV1?.()??[])];
    const births=host.db.db.prepare("SELECT payload FROM events WHERE world_id=? AND kind='birth' ORDER BY seq LIMIT ?").all(host.worldId,resources.length) as {payload:string}[],i=births.findIndex(b=>JSON.parse(b.payload).soulId===m.soulId);
    if(i>=0){const meals=[{batch:0,...resources[i]},...(i<COMMONS_PERSONAL_RESOURCES.length?(host.engine.commonsFoodDeliveriesV1?.()??[]).map(d=>({batch:d.batch,...commonsFoodDeliveryItemsV1(d.batch).resources[i]})):[])];for(const r of meals)if(w.entities[r.bowl]&&w.entities[r.spoon])add('eat',key('eat',r.bowl),`My meal ${r.batch}`,undefined,[{verb:'mars:take_item',params:{item:r.bowl,hand:'left'}},{verb:'mars:take_item',params:{item:r.spoon,hand:'right'}},{verb:'mars:eat',params:{bowl:r.bowl,spoon:r.spoon}},{verb:'mars:put_item',params:{item:r.spoon,surfaceSlot:'ground'}},{verb:'mars:put_item',params:{item:r.bowl,surfaceSlot:'ground'}}],2);}
   }
-  if(options?.registeredActivitiesV1&&humanoid&&host.engine.rulesVersion.includes('retained-shore/1')&&w.regions['shore-water']){
+  if(options?.onlyWalkTarget===undefined&&options?.registeredActivitiesV1&&humanoid&&host.engine.rulesVersion.includes('retained-shore/1')&&w.regions['shore-water']){
    // The engine picks a spaced free spot in the canonical pond when the walk expands
    // (and again on retry), so one body on the bank or in the water never blocks all;
    // then five native laps between spaced deep spots (actual swimming), then a short tread.
@@ -54,7 +55,7 @@ export function readHumanCapabilitiesV1(host:WorldHost,m:Mind,options?:{register
    const card:Card={name:'human goal swim supported pond '+hashOf({id,steps}).slice(0,12),summary:'Walk through the supported shore transitions into the canonical pond, swim and tread there.',good_when:'Owner asks for a swim; uses the admitted original pond rather than scenery-only water.',not_for:'Unadmitted western lake/river, a body without swimming equivalence, or unsafe current action.',target:null,when:[],then:[{set:['$actor','doing','swimming in the supported pond']}],approach:steps.slice(0,seatedNow?2:1),during:steps.slice(seatedNow?2:1),takes:'minutes'};
    bindings.set(id,{id,goal:'activity',targetId:'shore-water',label:'Swim in the supported pond',aliases:['swim','go for a swim','swim in the pond','go for a swim in the pond','go swimming','go swimming in the pond','take a swim','have a swim','go for a dip','take a dip','swim in the water','swim at the shore'],steps,card,available:!issue,...(issue?{blockedCode:issue.code}:{}),distance:0,green:false});
   }
-  if(options?.registeredActivitiesV1&&!options.skipRegisteredCards)for(const option of registeredOptionsFor(host,m,128)){
+  if(options?.onlyWalkTarget===undefined&&options?.registeredActivitiesV1&&!options.skipRegisteredCards)for(const option of registeredOptionsFor(host,m,128)){
    if(!host.ownLectureRosterV1(m.soulId,option.steps))continue;
    if(option.card.startsWith('human goal '))continue;const card=host.kernel.vocab.cards[option.card];if(!card||card.hash!==option.hash||!host.kernel.decks[m.soulId].cards.includes(option.card))continue;
    const target=option.cardTarget?host.kernel.things[option.cardTarget]:undefined,ready=card.during.some(s=>s.verb==='activity_readiness_v1'),prepared=card.during.some(s=>s.verb==='mars:classroom_session'&&s.params.handoverScope==='owned-readiness/1'),label=ready?'Prepare for my Eden lecture':prepared?'Host a prepared Eden lecture':(option.card+(target?' '+target.name:'')).slice(0,100),id='activity:'+hashOf({card:option.card,hash:option.hash,target:option.cardTarget}).slice(0,24);

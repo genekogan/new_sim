@@ -76,6 +76,9 @@ export type LayersHost = {
   engineAct(ops: Op[], note: string): Result;
   /** The place a thing is (its own, else the innermost holding it). */
   placeOf?(e: Entity): { id: string; name: string } | null;
+  /** Exact currently installed authored identity for place-ID travel offers.
+   * Native IDs and unknown/overridden mappings return undefined. */
+  authoredPlaceRef?(id: string): string | undefined;
   /** Optional calendar-only lookup, prepared lazily when a new occurrence needs a place. */
   calendarPlaces?(sources: readonly Entity[]): (e: Entity) => { id: string; name: string } | null;
   building?: (id: string) => { id: string; title: string; step: string } | null;
@@ -337,8 +340,12 @@ export class GodLayers {
       const construction = this.constructionRefusal(soul, plans.get(c.id)?.steps ?? [], target, sites);
       if (construction) { c.available = false; c.blocked = construction; plans.delete(c.id); continue; }
       // a walk into a private building or room of someone else's (walk:ana-house, walk:ana-house/living)
-      if (['walk', 'hang-out', 'stroll'].includes(c.verb) && /^(walk|hang-out|stroll):/.test(c.id)) {
-        const ref = c.id.slice(c.id.indexOf(':') + 1), e = this.m.get(ref) ?? (ref.includes('/') ? this.m.get(ref.slice(0, ref.lastIndexOf('/'))) : undefined);
+      if (['walk', 'hang-out', 'stroll', 'run', 'jog'].includes(c.verb) && /^(walk|hang-out|stroll|run|jog):/.test(c.id)) {
+        // Gaits use place IDs (run:g-house.room), not model refs. Resolve only
+        // the bridge's verified authored identity; never decode IDs or aliases.
+        const gait=c.verb==='run'||c.verb==='jog';
+        const ref=gait?(c.target?.kind==='place'?this.h.authoredPlaceRef?.(c.target.id):undefined):c.id.slice(c.id.indexOf(':')+1);
+        const e = ref ? this.m.get(ref) ?? (ref.includes('/') ? this.m.get(ref.slice(0, ref.lastIndexOf('/'))) : undefined) : undefined;
         const r = e ? this.buildingRefusal(e.id, soul) ?? (this.enclosed(e) ? this.refusal(e.id, soul) : null) : null;
         if (r) { c.available = false; (c as any).blocked = r; plans.delete(c.id); }   // private says more than any other block
         continue;

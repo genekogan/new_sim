@@ -18,6 +18,7 @@ import { Hub } from './hub.ts';
 import { handleMcp } from './mcp.ts';
 import { Souls } from './souls.ts';
 import { WorldHost } from './world.ts';
+import { enableEdgeRuntimeRules } from './edge-runtime-rules.ts';
 import { LivingWorld } from './living.ts';
 import { CampCards } from './camp.ts';
 import {FloaterCards} from './floaters.ts';
@@ -158,7 +159,7 @@ hub.brain = brain; hub.build = config.build; hub.persistTakes = config.takesPers
 const takes=new TakeArchive(db,host.worldId,config.archiveTakes?r2Store(config):null,`${config.r2.prefix}/takes`,config.worldEngine?Number(process.env.TAKES_LOCAL_KEEP_TICKS??72000):0); if(host.engine.takeChunks&&config.takesPersist)takes.start(host);
 // Edge worlds mount EDGE-CONTRACT-v1; PLACE_DATA names a PLACE-DATA-v1 file (else places derive from native regions).
 const edge = config.mindDriver === 'edge' ? new EdgeLedger(host, db, process.env.PLACE_DATA ? JSON.parse(readFileSync(process.env.PLACE_DATA, 'utf8')) : undefined) : undefined;
-if (edge && host.engine.configureRuntimePolicy && host.enableQuietStallReleaseV1) void host.enableQuietStallReleaseV1().then(async () => { await host.enableYieldTimeoutV1?.(); await host.enableSpreadV2?.(); });
+if (edge && host.engine.configureRuntimePolicy) void enableEdgeRuntimeRules(host, config.worldKey);  // not the stair-traffic rules on the Little Martians worlds
 // God mode + entity world (spec eden4/28): the owner's edge agent builds the world; viewers get diffs over the hub.
 const genesis = process.env.GENESIS_FILE ? JSON.parse(readFileSync(process.env.GENESIS_FILE, 'utf8')) : undefined;
 const god = config.worldEngine ? new GodMode(db, { genesis, worldId: host.worldId, ownerId: process.env.WORLD_OWNER_ID || null /* explicit only: on a fresh world the first person to claim it becomes its god */, tick: () => host.engine.world.tick, emit: (m) => hub.broadcast(m as never), cobuilders: process.env.SIM_COBUILDERS === '1' /* off: one god per world (Gene 2026-10-16) */ }) : undefined;
@@ -199,7 +200,12 @@ if (process.env.SIM_WAKING_LIMIT === '1' && edge?.bodyRule) {
   monitor.register('waking', (l) => waking!.setLoadLevel(l));
   console.log(`[load] waking limit ON: ${Number(process.env.SIM_MAX_AWAKE) || 12} awake`);
 }
-if(edge)installPuntActivities(host,edge,m=>console.log(`[activities] ${m}`));
+// A punt install moves the static world (new carriers and rides), so the caches warmed before listening are rebuilt in
+// their own turn shortly after, not by the next Soul's `here`.
+// `closing` is declared before this closure: a slow boot hook below must not let the timer reach it uninitialized (TDZ).
+let closing = false;
+const rewarm=()=>{if(closing||!edge)return;try{const w=edge.prepareForServing();console.log(`[activities] edge capability caches rebuilt in ${w.ms} ms for ${w.souls} Souls at tick ${host.engine.world.tick}`);}catch(error){console.error('[activities] edge capability cache rebuild failed; Souls build them on demand',error);}};
+if(edge)installPuntActivities(host,edge,m=>console.log(`[activities] ${m}`),engineBridge?()=>{setTimeout(rewarm,1000).unref();}:undefined);
 const listener = getRequestListener(app.fetch);
 // G9 (lane Z1): a write in flight when the world is told to stop (a release hands it over, the launcher puts it to sleep)
 // is answered before the snapshot is saved and the process exits, instead of dying with its connection (the god's CLI
@@ -249,7 +255,6 @@ if (config.seedNatives && db.liveSouls(host.worldId).length === 0) {
 {const {retireResidentsBootHook}=await import('./retire-residents.ts');await retireResidentsBootHook(souls,db,host.worldId,config.dataDir,process.env);}
 // A full model is not ready for HTTP until its ordinary queued projection has folded into the engine.
 // Keep start, maintenance and input ordering above unchanged; this is a readiness boundary, not a CPU saving.
-let closing = false;
 if (engineBridge) {
   const waitAt = performance.now(), abort = new AbortController();
   bootPhase('boot:projection', host.engine.world.tick);
@@ -269,6 +274,9 @@ if (engineBridge) {
     bootPhase('boot:prepare', host.engine.world.tick);
     host.engine.prepareForServing?.();
     console.log(`[boot] prepare ${Math.round(performance.now() - prepareAt)} ms serving caches at tick ${host.engine.world.tick}`);
+    // The first rich `here` after a restart otherwise builds these on its own request (~1.5 s blocked on Eden 2026).
+    // An optimisation only: a failure here is logged and the world still opens HTTP (Souls then build them on demand).
+    if (edge) { try { const w = edge.prepareForServing(); console.log(`[boot] edge capability caches ${w.ms} ms for ${w.souls} Souls${w.failed ? ` (${w.failed} failed)` : ''} at tick ${host.engine.world.tick}`); } catch (error) { console.error('[boot] edge capability cache warm failed; opening HTTP without it', error); } }
   } catch (error) {
     closing = true; console.error('[boot] initial physics unavailable; HTTP was not opened', error);
     try {

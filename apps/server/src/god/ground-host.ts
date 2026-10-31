@@ -10,6 +10,7 @@
 // `walk:flag-<name>` for every god flag, `swim:<water>` for every water body
 // (enter nearby reachable deep water; an explicit middle target is also offered).
 import type { DatabaseSync } from 'node:sqlite';
+import type {EdgeLedger} from '../edge/ledger/ledger.ts';
 import type { Db } from '../db.ts';
 import type { WorldHost } from '../world.ts';
 import type { GodMode } from './god.ts';
@@ -73,9 +74,7 @@ import { groundField as groundFieldOf } from '@sim/engine-mars';
 
 // ---------------------------------------------------------------- edge capabilities
 
-type Cap = { id: string; verb: string; label: string; available: boolean; target?: { id: string; kind: string }; params?: Record<string, unknown>; blocked?: {code:string;reason:string} };
-type Plan = { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean; stop?: boolean };
-type Ledger = { worldProfile?: (soul: { soulId: string; entityId: string }, caps: Cap[], plans: Map<string, Plan>) => void };
+type Ledger=Pick<EdgeLedger,'worldProfile'>&Partial<Pick<EdgeLedger,'registerExactWalkProfile'>>;
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'flag';
 const centroid = (pts: [number, number][]) => { let x = 0, z = 0; for (const p of pts) { x += p[0]; z += p[1]; } return [x / pts.length, z / pts.length] as [number, number]; };
@@ -83,18 +82,22 @@ const centroid = (pts: [number, number][]) => { let x = 0, z = 0; for (const p o
 /** Offer `walk:flag-<name>` and `swim:<water>` capabilities from the god world (chains any profile already installed). */
 const DEEP_MIDDLE = new Map<string, boolean>();
 export function installGroundCapabilities(ledger: Ledger, god: GodMode, host: WorldHost) {
+  const offerFlags=(soul:Parameters<NonNullable<EdgeLedger['worldProfile']>>[0],caps:Parameters<NonNullable<EdgeLedger['worldProfile']>>[1],plans:Parameters<NonNullable<EdgeLedger['worldProfile']>>[2],only?:string)=>{
+    const me=host.engine.world.entities[soul.entityId];if(!me)return;
+    for (const e of god.model.entities.values()) {
+      if (!/^core[-/]flag@/.test(god.model.def(e.def)?.ref ?? e.def)) continue;
+      const wp = god.model.worldPose(e), label = String(e.state?.label ?? e.name ?? e.id), id = `walk:flag-${slug(e.name ?? label)}`;
+      if ((only!==undefined&&id!==only)||caps.some((c) => c.id === id)) continue;
+      caps.push({ id, verb: 'walk', label: `Walk to the flag "${label}" (${Math.round(Math.hypot(wp.x - me.pose.p[0], wp.z - me.pose.p[2]))} m)`, available: true, target: { id: e.id, kind: 'object' } });
+      plans.set(id, { label: `Walk to ${label}`, steps: [{ verb: 'walk_to', params: { to: [wp.x, wp.z], standoff: 0.8 } }] });
+    }
+  };
   const prev = ledger.worldProfile;
   ledger.worldProfile = (soul, caps, plans) => {
     prev?.(soul, caps, plans);
     const me = (host.engine.world.entities as Record<string, { pose: { p: number[] } }>)[soul.entityId];
     if (!me) return;
-    for (const e of god.model.entities.values()) {
-      if (!/^core[-/]flag@/.test(god.model.def(e.def)?.ref ?? e.def)) continue;
-      const wp = god.model.worldPose(e), label = String(e.state?.label ?? e.name ?? e.id), id = `walk:flag-${slug(e.name ?? label)}`;
-      if (caps.some((c) => c.id === id)) continue;
-      caps.push({ id, verb: 'walk', label: `Walk to the flag "${label}" (${Math.round(Math.hypot(wp.x - me.pose.p[0], wp.z - me.pose.p[2]))} m)`, available: true, target: { id: e.id, kind: 'object' } });
-      plans.set(id, { label: `Walk to ${label}`, steps: [{ verb: 'walk_to', params: { to: [wp.x, wp.z], standoff: 0.8 } }] });
-    }
+    offerFlags(soul,caps,plans);
     const ground=god.model.ground(),recipe=(host.engine.world as unknown as {groundV1?:{recipeHash:string}}).groundV1?.recipeHash,field=recipe?groundFieldOf(recipe):null;
     for (const w of ground.waters) {
       const pts = (w.area ?? w.path) as [number, number][], mid = centroid(pts), named = god.model.entities.get(w.id)?.name ?? w.id, id = `swim:${slug(named)}`;
@@ -110,4 +113,5 @@ export function installGroundCapabilities(ledger: Ledger, god: GodMode, host: Wo
       if(middle)plans.set(`${id}/middle`,{label:`Swim to the middle of ${named}`,steps:[{verb:'mars:swim_in',params:{water:w.id,x:mid[0],z:mid[1]}}]});
     }
   };
+  ledger.registerExactWalkProfile?.(ledger.worldProfile,prev,(soul,asked,caps,plans)=>{offerFlags(soul,caps,plans,asked);return true;});
 }

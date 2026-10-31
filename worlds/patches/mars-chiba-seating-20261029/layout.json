@@ -1,0 +1,21 @@
+{
+  "schema": "mars-chiba-seating/1",
+  "id": "mars-chiba-seating-20261029",
+  "status": "Native static use-checks and all 24 occupied seating orders verified with occupied-link-routing/1; root-owned semantic receipt confirmation and visual review pending. Earlier failed proof retained.",
+  "source": {
+    "name": "chiba",
+    "ref": "mars-fidelity-chiba@1",
+    "hash": "0df8a713c1acd95d1a53316e84488eba5f308a772adad4c038b9d621b219ad2f",
+    "p": [-14.643, 0, -28.174],
+    "r": -1.431,
+    "mesh": "99d5c2f524280ef10ca5ef88e9095434ff30a177d42bc67ff5e8d451836e89af",
+    "footprint": "81961faa571d8311fdb4689c50eeb6d325856ba8ef1b578b258d112c0a57dca0"
+  },
+  "seats": [
+    {"name":"tier","ref":"core-mars-tier@2","hash":"e7b8a5d338507ec181ffa3ecc760c9ec3eea5a22858a4fcfb771e8ac3bacdf17","before":[-13.132,0.742,-20.04],"after":[-12.606,0.742,-19.978],"r":-1.431,"level":3},
+    {"name":"tier-2","ref":"core-mars-tier-2@2","hash":"6b8662006d094507b364dc30c588425c3ffb181ae46dab12e11ea5693a5529d5","before":[-14.411,1.123,-20.881],"after":[-12.753,1.123,-21.017],"r":-1.431,"level":4},
+    {"name":"tier-3","ref":"core-mars-tier-3@2","hash":"922c0cf9be9d72ed19e8fc060800cc5f570b65f132d7ef0ceb3c15c665c99314","before":[-12.919,1.504,-22.12],"after":[-12.919,1.504,-22.12],"r":-1.431,"level":5},
+    {"name":"tier-4","ref":"core-mars-tier-4@2","hash":"d4a4ff14ab308cc00d3c0a557057da09abb8021d7c48232e9a8164f916b08755","before":[-14.241,2.266,-23.984],"after":[-13.181,2.266,-24.062],"r":-1.431,"level":7},
+    {"name":"presenter-timber-box","ref":"core-mars-presenter-timber-box@2","hash":"b21371e688ddef2086e1733cef6cf78d69e4342d9437756b4dac3eed74e65a17","before":[-14.412,0.373,-18.447],"after":[-14.412,0.373,-18.447],"r":-1.431,"level":0}
+  ]
+}

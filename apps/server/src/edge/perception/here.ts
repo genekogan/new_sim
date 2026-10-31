@@ -158,10 +158,12 @@ export class Perception {
     }
     return null;
   }
-  /** The seat (fixture id, as in sit:<id>) this body holds, from the engine's live sit action. */
+  /** The actor-owned native seat slot; legacy engines fall back to the live request's fixture. */
   seat(): string | null {
+    const held = this.L.host.engine.nativeSeatHoldsV1?.(this.soul.entityId);
+    if (held?.length) return held[0]!.slot;
     const rt = this.L.host.engine.runtime, live = new Set(rt.liveIds());
-    for (const r of rt.records.values()) {const p = r.params as {actor?: string; fixture?: unknown; slot?: unknown; on?: unknown}; if (live.has(r.id) && r.verb === 'sit' && p.actor === this.soul.entityId) return typeof p.fixture === 'string' ? p.fixture : typeof p.on === 'string' ? p.on : typeof p.slot === 'string' ? p.slot : null;}
+    for (const r of rt.records.values()) {const p = r.params as {actor?: string; fixture?: unknown; slot?: unknown; on?: unknown}; if (live.has(r.id) && r.verb === 'sit' && p.actor === this.soul.entityId) return typeof p.slot === 'string' ? p.slot : typeof p.fixture === 'string' ? p.fixture : typeof p.on === 'string' ? p.on : null;}
     return null;
   }
   /** Where the Soul is and how it is (also used for receipts' endedAt). */
@@ -237,11 +239,10 @@ function exitCandidates(ledger: EdgeLedger, inside: ReadonlySet<string>, pos: V2
   return out;
 }
 
-/** The `here` frame (EDGE-CONTRACT-v1 §8.1). Target ≤ ~600 tokens. */
-export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:boolean}={}) {
-  const P = new Perception(ledger, soul), tick = P.tick, me = P.me(), b = me.body, host = ledger.host;
-  const day = host.living, c = day ? clockAt(tick, day.origin, day.dayTicks) : null;
-  const weather = skyOf(ledger.weatherNow?.() ?? (P.w as {env?: {weather?: {clouds: number; rain: number; wind: number}}}).env?.weather);
+/** Own-body fields shared by rich perception and the explicit physical projection.
+ * Do not derive nearby context, capability offers or route plans here. */
+function hereMe(ledger:EdgeLedger,soul:EdgeSoul,P:Perception,me:ReturnType<Perception['me']>) {
+  const tick=P.tick,b=me.body,host=ledger.host;
   // my current body act and how long its timed step has left
   const open = ledger.openReceipts(soul.soulId).filter(r => (r as {channel?: string}).channel !== 'attention');
   const program = host.engine.programOf(soul.entityId), action = program ? host.engine.programAction?.(program) : null;
@@ -258,6 +259,27 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
   const gaze = b?.human?.gaze as {kind: string; target?: string; at?: V2} | undefined;
   const nameOfEntity = (id: string) => host.mindByEntity?.get(id)?.name ?? (P.w.entities[id]?.label as string | undefined) ?? id;
   const holding = (() => {try {return ledger.together.observe(soul).holding as {name?: string} | null;} catch {return null;}})();
+  return {soulId:soul.soulId,name:host.minds.get(soul.soulId)?.name??soul.name,profileRevision:host.profileFact(soul.soulId)?.revision??0,place: me.place, placePath: me.placePath, pos: me.pos, heading: me.heading, facing: compassPoint(me.heading), posture: me.posture, body:P.w.entities[soul.entityId]?.body??{family:'humanoid'}, ...(me.seat ? {seat: me.seat} : {}),
+      activity: inviting ? {kind: 'inviting', what: inviting.what, with: inviting.waitingFor.map(g => g.name), answerWithin: durationWord(inviting.expiresInSeconds)} : {kind: activityKind, ...(endsIn ? {endsIn} : {})},
+      // An open compound receipt describes intent, including its approach.
+      // Expose the current native pose separately so observers cannot mistake
+      // walking toward a book or instrument for already reading or playing.
+      actualActivity: typeof b?.human?.activity === 'string' ? {kind:b.human.activity, ...(b.human.instrument ? {instrument:b.human.instrument} : {})} : null,
+      ...(gaze ? {gaze: {kind: gaze.kind, ...(gaze.target ? {at: nameOfEntity(gaze.target)} : gaze.at && P.pos ? {bearing: P.bearing(gaze.at)} : {})}} : {}),
+      ...(holding?.name ? {holding: holding.name} : {}), ...(fade?.colour ? {fade: fade.colour} : {})};
+}
+
+/** Explicit own-body projection; default rich perception remains unchanged. */
+export function hereBodyFrame(ledger:EdgeLedger,soul:EdgeSoul) {
+  const P=new Perception(ledger,soul);return {tick:P.tick,view:'body' as const,me:hereMe(ledger,soul,P,P.me())};
+}
+
+/** The `here` frame (EDGE-CONTRACT-v1 §8.1). Target ≤ ~600 tokens. */
+export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:boolean}={}) {
+  const P = new Perception(ledger, soul), tick = P.tick, me = P.me(), host = ledger.host;
+  const day = host.living, c = day ? clockAt(tick, day.origin, day.dayTicks) : null;
+  const weather = skyOf(ledger.weatherNow?.() ?? (P.w as {env?: {weather?: {clouds: number; rain: number; wind: number}}}).env?.weather);
+  const ownMe=hereMe(ledger,soul,P,me);
   // conversations: who is talking with whom (members only; never what is said)
   const talks = ledger.coreA.conversations();
   const seen = P.souls(SIGHT_RADIUS), seenIds = new Set(seen.map(s => s.soulId));
@@ -296,10 +318,7 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
     ...(c ? {now: worldNow(c)} : {}), tick, ...(c ? {clock: `${String(c.hour).padStart(2, '0')}:${String(c.minute).padStart(2, '0')}`, day: WEEKDAYS[new Date(c.datetime).getUTCDay()], light: lightOf(c.hour, c.minute)} : {}),
     ...(weather ? {weather: (() => {const l = P.pos ? ledger.lightningNear?.(P.pos[0], P.pos[1]) : null; return l ? {...weather, lightning: l} : weather;})()} : {}),
     ...(where?{where}:{}),
-    me: {soulId:soul.soulId,name:host.minds.get(soul.soulId)?.name??soul.name,profileRevision:host.profileFact(soul.soulId)?.revision??0,place: me.place, placePath: me.placePath, pos: me.pos, heading: me.heading, facing: compassPoint(me.heading), posture: me.posture, body:P.w.entities[soul.entityId]?.body??{family:'humanoid'}, ...(me.seat ? {seat: me.seat} : {}),
-      activity: inviting ? {kind: 'inviting', what: inviting.what, with: inviting.waitingFor.map(g => g.name), answerWithin: durationWord(inviting.expiresInSeconds)} : {kind: activityKind, ...(endsIn ? {endsIn} : {})},
-      ...(gaze ? {gaze: {kind: gaze.kind, ...(gaze.target ? {at: nameOfEntity(gaze.target)} : gaze.at && P.pos ? {bearing: P.bearing(gaze.at)} : {})}} : {}),
-      ...(holding?.name ? {holding: holding.name} : {}), ...(fade?.colour ? {fade: fade.colour} : {})},
+    me: ownMe,
     near, objects, ...(Object.keys(more).length ? {more} : {}), conversations_in_earshot: conversations, exits, ...(() => {const f = floorLines(ledger, P); return f.length ? {floors: f} : {};})(),
     // knowledge/1: the district summarised, far districts as names and directions (more once visited)
     ...(ledger.knowledge?.scales(soul.soulId, ledger.placePathOf(soul.soulId).filter(p => p.kind !== 'occupier').map(p => p.id), P.pos, c ? c.hour * 60 + c.minute : null) ?? {}),
