@@ -13,6 +13,7 @@ export type SoulRow = { id: string; world_id: string; owner: string; entity_id: 
 
 export class BudgetReservationUnavailable extends Error {}
 
+type VerifiedCapture={key:string;capture:RenderSceneCaptureV1;json?:string};
 export class Db {
   db: DatabaseSync;
   path: string;
@@ -25,7 +26,9 @@ export class Db {
     this.migrated = migrate(this.db);
   }
   migrated: number[] = [];
-  private renderCaptureCache=new Map<string,{encoded:string;capture:RenderSceneCaptureV1}>();
+  /** L8: verified render scene captures (content-addressed rows, never updated or deleted): each verified once by hash,
+   * then served from here, the response JSON serialized once. Filled only outside transactions or after a commit. */
+  private renderCaptureCache=new Map<string,VerifiedCapture>();
 
   paidCost(now = Date.now()): number {
     return Number((this.db.prepare('SELECT COALESCE(SUM(cost),0) AS cost FROM paid_costs WHERE at >= ?').get(now - 86400_000) as { cost: number }).cost);
@@ -58,7 +61,7 @@ export class Db {
     this.db.exec('BEGIN IMMEDIATE');
     try {
       if(captured)this.db.prepare('INSERT OR IGNORE INTO render_scene_captures VALUES (?,?,?)').run(worldId,ref.hash,JSON.stringify(captured));
-      const stored=this.renderSceneCapture(worldId,ref.hash);
+      const verified=this.verifiedCapture(worldId,ref.hash),stored=verified?.capture;
       if(!stored||stored.ref.rulesVersion!==ref.rulesVersion)throw new Error('take render scene capture unavailable');
       const existing=this.db.prepare('SELECT body FROM take_chunks WHERE world_id=? AND to_tick=?').get(worldId,chunk.toTick) as {body:Uint8Array}|undefined;
       if(existing) {
@@ -67,6 +70,7 @@ export class Db {
       }
       this.db.prepare('INSERT OR IGNORE INTO take_chunks VALUES (?,?,?,?)').run(worldId, chunk.fromTick, chunk.toTick, body);
       this.db.exec('COMMIT');
+      this.cacheCapture(verified);
     } catch(error) {this.db.exec('ROLLBACK');throw error;}
   }
   /** Stores only the public render scene a live take references (tiny, one row per
@@ -79,18 +83,30 @@ export class Db {
   /** Public rendering data only, scoped to the selected world and verified on
    * read. Retained separately from take pruning and independent of live code. */
   renderSceneCapture(worldId:string,hash:string):RenderSceneCaptureV1|undefined {
+    const v=this.verifiedCapture(worldId,hash);
+    return v?structuredClone(v.capture):undefined;
+  }
+  /** The public `/v1/scenes/:hash` body (`{worldId, ...capture}`), serialized once per verified capture. */
+  renderSceneCaptureJson(worldId:string,hash:string):string|undefined {
+    const v=this.verifiedCapture(worldId,hash);
+    return v?(v.json??=JSON.stringify({worldId,...v.capture})):undefined;
+  }
+  private verifiedCapture(worldId:string,hash:string):VerifiedCapture|undefined {
+    const key=`${worldId}\0${hash}`,hit=this.renderCaptureCache.get(key);
+    if(hit){this.renderCaptureCache.delete(key);this.renderCaptureCache.set(key,hit);return hit;}
     const row=this.db.prepare('SELECT body FROM render_scene_captures WHERE world_id=? AND hash=?').get(worldId,hash) as {body:string}|undefined;
     if(!row)return undefined;
-    const key=JSON.stringify([worldId,hash]),cached=this.renderCaptureCache.get(key);
-    // Compare exact stored bytes on every read. A changed/corrupt row cannot use
-    // a previous verification; a bounded cache avoids hashing large immutable
-    // scenery once per one-second take. Returned values remain detached.
-    if(cached?.encoded===row.body)return structuredClone(cached.capture);
     const capture=parseRenderSceneCapture(JSON.parse(row.body));
     if(capture.ref.hash!==hash)throw new Error('stored render scene capture hash mismatch');
-    this.renderCaptureCache.delete(key);this.renderCaptureCache.set(key,{encoded:row.body,capture});
-    if(this.renderCaptureCache.size>16)this.renderCaptureCache.delete(this.renderCaptureCache.keys().next().value!);
-    return structuredClone(capture);
+    const v:VerifiedCapture={key,capture};
+    // A read inside a transaction may see a row the transaction then rolls back: cache it only once committed.
+    if(!this.db.isTransaction)this.cacheCapture(v);
+    return v;
+  }
+  private cacheCapture(v:VerifiedCapture|undefined){
+    if(!v)return;
+    this.renderCaptureCache.delete(v.key);this.renderCaptureCache.set(v.key,v);
+    while(this.renderCaptureCache.size>8)this.renderCaptureCache.delete(this.renderCaptureCache.keys().next().value!);
   }
   hasRenderSceneCapture(worldId:string,hash:string):boolean {
     return !!this.db.prepare('SELECT 1 FROM render_scene_captures WHERE world_id=? AND hash=?').get(worldId,hash);

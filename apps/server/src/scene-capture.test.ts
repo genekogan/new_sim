@@ -38,12 +38,12 @@ const count=(db:Db,table:string)=>Number((db.db.prepare(`SELECT COUNT(*) AS n FR
 test('native take and scene capture persist atomically, deduplicate, and reload without a model or render source',async t=>{
   const f=await nativeChunk(),path=tmp(t);let db=new Db(path);const reader=new Db(path);
   t.after(()=>{db.close();reader.close();});
-  const read=db.renderSceneCapture.bind(db);let sawTransaction=false;
-  db.renderSceneCapture=(worldId,hash)=>{
+  const hooked=db as unknown as {verifiedCapture(w:string,h:string):unknown},read=hooked.verifiedCapture.bind(db);let sawTransaction=false;
+  hooked.verifiedCapture=(worldId,hash)=>{
     assert.equal(reader.renderSceneCapture(worldId,hash),undefined);assert.equal(reader.takes(worldId,0,100,10).chunks.length,0);
     sawTransaction=true;return read(worldId,hash);
   };
-  db.saveTake('eden-proof',f.chunk,f.capture);assert.ok(sawTransaction);db.renderSceneCapture=read;
+  db.saveTake('eden-proof',f.chunk,f.capture);assert.ok(sawTransaction);hooked.verifiedCapture=read;
   assert.deepEqual(reader.renderSceneCapture('eden-proof',f.capture.ref.hash),f.capture);
   db.saveTake('eden-proof',f.chunk);assert.equal(count(db,'render_scene_captures'),1);assert.equal(count(db,'take_chunks'),1);
   assert.equal(db.renderSceneCapture('other-world',f.capture.ref.hash),undefined);
@@ -53,7 +53,7 @@ test('native take and scene capture persist atomically, deduplicate, and reload 
 });
 
 test('scene/take write failure rolls back the capture and never leaves an unresolved reference',async t=>{
-  const f=await nativeChunk(),db=new Db(':memory:');t.after(()=>db.close());
+  const f=await nativeChunk(),path=tmp(t),db=new Db(path);t.after(()=>db.close());
   db.db.exec("CREATE TEMP TRIGGER reject_take BEFORE INSERT ON take_chunks BEGIN SELECT RAISE(ABORT,'fixture write refusal'); END");
   assert.throws(()=>db.saveTake('eden-proof',f.chunk,f.capture),/fixture write refusal/);
   assert.equal(count(db,'render_scene_captures'),0);assert.equal(count(db,'take_chunks'),0);
@@ -68,7 +68,10 @@ test('scene/take write failure rolls back the capture and never leaves an unreso
   assert.equal(count(db,'render_scene_captures'),0);
   db.saveTake('eden-proof',f.chunk,f.capture);
   db.db.prepare('UPDATE render_scene_captures SET body=?').run(JSON.stringify(tampered));
-  assert.throws(()=>db.renderSceneCapture('eden-proof',f.capture.ref.hash),/hash mismatch/);
+  // L8: a capture is verified once by hash (rows are never rewritten) and then served from memory; a connection that has
+  // not verified it yet (the next process) still refuses the tampered row.
+  const cold=new Db(path);t.after(()=>cold.close());
+  assert.throws(()=>cold.renderSceneCapture('eden-proof',f.capture.ref.hash),/hash mismatch/);
 });
 
 for(const phase of ['before-take','before-commit','after-commit'] as const)
@@ -142,6 +145,10 @@ test('real Hub/anonymous socket and Hono scene routes expose scoped immutable pu
   assert.deepEqual(decodeSceneCapturePublication(capture),capture);
   // lane W1: a page that names its world may keep the content-addressed capture; another world's name is not found
   const kept=await app.request(`/v1/scenes/${ref.hash}?world=${encodeURIComponent(host.worldId)}`);assert.equal(kept.status,200);assert.equal(kept.headers.get('cache-control'),'private, max-age=604800, immutable');assert.deepEqual(await kept.json(),capture);
+  // L8: the content address is the ETag; a revalidation is a 304 with no body
+  assert.equal(kept.headers.get('etag'),`"${ref.hash}"`);
+  const again=await app.request(`/v1/scenes/${ref.hash}?world=${encodeURIComponent(host.worldId)}`,{headers:{'if-none-match':`W/"x", "${ref.hash}"`}});
+  assert.equal(again.status,304);assert.equal(await again.text(),'');assert.equal(again.headers.get('cache-control'),'private, max-age=604800, immutable');
   const elsewhere=await app.request(`/v1/scenes/${ref.hash}?world=other-world`);assert.equal(elsewhere.status,404);assert.equal(elsewhere.headers.get('cache-control'),'no-store');
   const {worldId:_worldId,...body}=capture;assert.deepEqual(body,db.renderSceneCapture(host.worldId,ref.hash));
   const current=await (await app.request('/v1/scene')).json() as any;assert.deepEqual(current.renderSceneRef,ref);
