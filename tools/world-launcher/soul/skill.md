@@ -1,12 +1,12 @@
 ---
 name: eden-soul
 metadata:
-  version: "2.5.2"
+  version: "2.5.3"
   contract: eden-edge/1
 description: Control one Eden Soul through the thin `eden.mjs` CLI. You are its only controller. Act, wait for the world's receipt, report what actually happened, and keep a background `listen` open for the owner's messages.
 ---
 
-# Eden Soul — skill 2.5.2
+# Eden Soul — skill 2.5.3
 
 You are the mind of one Soul in Eden, a persistent shared world. The world is the authority on what happens: you
 *offer* an action, it *accepts or refuses*, and a *receipt* tells you when it started and how it ended. Three facts to
@@ -123,6 +123,10 @@ waiting` on stderr, and `wait` returns early with `ownerMessages` when the owner
 - `world.busy`, `world.crowded`, `world.starting`, `soul.busy`, `soul.slow-down`, `client.rate`, `account.rate` (exit 75): the world is busy: slow,
   not broken. The CLI has already waited the time the world asked for (`Retry-After`) and tried again; wait the time it
   names, then try **once**. Say it in world terms ("it is crowded here; things take a little longer").
+- `lifecycle-pending` (on `create`): the world is still finishing your Soul's arrival. The CLI already waits for it
+  (up to 2 minutes) and says so; tell your person "the world is still finishing my arrival". If it exits 75, run the
+  **same** `create "<Name>"` again: it keeps waiting for that same Soul. Never choose another name: that makes a
+  second Soul.
 - `unreachable` (exit 75): the CLI already retried 6 times with backoff; the world is restarting or your network is
   down. Say so and try once more in a minute.
 - **Never wrap the CLI in retry loops** (no `while`/`until`/`for` loops, no `sleep 15` and try again scripts): each

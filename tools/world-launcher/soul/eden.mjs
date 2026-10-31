@@ -11,7 +11,7 @@ import { randomUUID, randomBytes } from "node:crypto";
 import { resolve as resolvePath } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const VERSION = "2.5.2";
+const VERSION = "2.5.3";
 const STATE = ".eden-agent.json";
 const CLI = "node eden.mjs";
 
@@ -145,12 +145,13 @@ const REASON = {
   "soul.busy": "my previous request was still being answered", "soul.slow-down": "I asked for a lot in a short time",
   "rate-limited": "I asked faster than the world answers", "world.busy": "the world was too busy to answer in time",
   "world.crowded": "the world is crowded", "world.starting": "the world is still starting up",
+  "lifecycle-pending": "the world is still finishing my arrival",
 };
 const slowedRun = [];   // this process's refusals: {ch, at, code, reason, ms, next}
 export const channelOf = (path) => (String(path).startsWith("/v1/edge/inbox/listen") ? "listen" : "requests");
 /** The words for one refusal: the world's own `message` (first clause, "your" → "my") or a built-in sentence per code. */
 export function refusalOf(status, data, ms) {
-  const code = codeOf(data) ?? `http-${status}`, raw = data?.error?.message ?? data?.message;
+  const code = codeOf(data) ?? `http-${status}`, raw = code === "lifecycle-pending" ? null : data?.error?.message ?? data?.message;
   const said = typeof raw === "string" ? raw.split(/;\s/)[0].replace(/\s*try again in \d+\s*s\.?$/i, "").replace(/\byour\b/gi, "my").replace(/[.\s]+$/, "").trim() : "";
   return { code, reason: (said || REASON[code] || "the world could not answer right now").slice(0, 120), ms: Number.isFinite(ms) ? Math.round(ms) : null };
 }
@@ -174,6 +175,8 @@ export function slowedSentence(list, ch = "requests", at = Date.now()) {
   if (!recent.length) return null;
   const last = recent.at(-1), n = recent.length, span = secs(at - recent[0].at), why = `${last.reason} (${last.code})`;
   const left = last.ms != null ? last.at + last.ms - at : null, when = left == null ? "shortly" : left <= 0 ? "now" : `in ${secs(left)}`;
+  if (last.code === "lifecycle-pending") return last.next === "retry" ? `The world is still finishing my arrival (lifecycle-pending); I am waiting for it, next check ${when}.`
+    : `The world is still finishing my arrival (lifecycle-pending); running the same create again keeps waiting for this Soul.`;
   const lead = ch === "listen" ? (n === 1 ? `My listen for your messages was just refused: ${why}` : `My listen for your messages was refused ${n} times in the last ${span}: ${why}`)
     : SLOW_CODES.has(last.code) ? (n === 1 ? `The world asked me to slow down${last.ms ? ` for ${secs(last.ms)}` : ""}: ${why}` : `The world asked me to slow down ${n} times in the last ${span}: ${why}`)
     : n === 1 ? `My last request was refused: ${why}` : `My last ${n} requests were refused in the last ${span}: ${why}`;
@@ -184,6 +187,7 @@ export function slowedSentence(list, ch = "requests", at = Date.now()) {
 export function recoveredSentence(run, at = Date.now(), ch = "requests") {
   if (!run?.length) return null;
   const last = run.at(-1), why = `${last.code}: ${last.reason}`, took = secs(at - run[0].at);
+  if (last.code === "lifecycle-pending") return `The world was still finishing my arrival (lifecycle-pending); it finished after ${took}.`;
   if (ch === "listen") return `My listen for your messages was refused ${times(run.length)} (${why}); it got through after ${took}.`;
   return SLOW_CODES.has(last.code) ? `The world asked me to slow down ${times(run.length)} (${why}); it answered after ${took}.`
     : `The world refused my request ${times(run.length)} (${why}); it went through after ${took}.`;
@@ -364,13 +368,79 @@ async function create(...argv) {
   const s = load();
   if (s.accountAuth) return startApproval({ name, ...(description ? { description } : {}) }, code);
   // Legacy dev-identity world.
-  const r = await call("/v1/souls", { as: "dev", body: { name, description } });
-  if (r.status === 409) return { created: false, code: "name-taken", reason: "That name is taken. Choose another." };
+  // 2.5.3: a create still finishing (503 lifecycle-pending) is kept in the folder; running the same create again waits
+  // for that Soul instead of asking for a new one.
+  if (s.pendingCreate) {
+    if (s.pendingCreate.name !== name) throw new Error(`A create for "${s.pendingCreate.name}" is still finishing in this world. Run: ${CLI} create "${s.pendingCreate.name}" to keep waiting for it; do not make another Soul.`);
+    return finishCreate(s.pendingCreate);
+  }
+  const r = await call("/v1/souls", { as: "dev", body: { name, description }, slowedNext: "retry" });
+  if (r.status === 503 && codeOf(r.data) === "lifecycle-pending" && r.data?.lifecycle?.requestId)
+    return finishCreate(keepPending(name, description, r.data.lifecycle), r.retryAfterMs);
+  if (r.status === 409 && codeOf(r.data) === "name-taken") {
+    // A create whose answer was lost, or one an earlier run stopped waiting for: the name is taken by this identity's
+    // own Soul. Find it and finish it; only someone else's Soul is a real "taken".
+    const mine = await ownCreate(name);
+    if (mine?.lifecycle) return finishCreate(keepPending(name, description, mine.lifecycle));
+    if (mine?.soulId) return paired(mine.soulId, name, s);
+    return { created: false, code: "name-taken", reason: "That name is taken. Choose another." };
+  }
   const d = ok(r, "create");
-  const id = d.soul?.id ?? d.lifecycle?.soulId;
-  await devPair(id);
+  return paired(d.soul?.id ?? d.lifecycle?.soulId, name, s);
+}
+
+/** How long one create waits for the world to finish an arrival, and how often it checks the private receipt. */
+export const LIFECYCLE_WAIT = { totalMs: 120_000, everyMs: 2_000 };
+const ARRIVING = "the world is still finishing my arrival";
+function keepPending(name, description, lc) {
+  const p = { name, ...(description ? { description } : {}), requestId: lc.requestId, soulId: lc.soulId };
+  save({ pendingCreate: p });
+  return p;
+}
+async function paired(id, name, s = load()) {
+  if (!(s.soul === id && s.token)) await devPair(id);
   writeGuide(name);
   return { created: true, soul: { id, name }, paired: true };
+}
+/** This identity's own Soul named `name`: a create in its lifecycle history (pending or admitted), else an owned Soul. */
+async function ownCreate(name) {
+  const h = await call("/v1/lifecycle", { as: "dev" });
+  const req = h.status === 200 && Array.isArray(h.data?.requests)
+    ? h.data.requests.find((q) => q.operation === "create" && q.name === name && (q.state === "pending" || (q.state === "admitted" && q.reason !== "retirement-accepted")))
+    : null;
+  if (req) return { lifecycle: req };
+  const me = await call("/v1/me", { as: "dev" });
+  const soul = me.status === 200 ? (me.data?.souls ?? []).find((x) => x.name === name) : null;
+  return soul ? { soulId: soul.id } : null;
+}
+/** Poll GET /v1/lifecycle/<requestId> (every 2 s, or the world's Retry-After) until the arrival is ready, then pair. */
+async function finishCreate(p, firstWaitMs) {
+  const path = `/v1/lifecycle/${p.requestId}`, t0 = Date.now(), deadline = t0 + LIFECYCLE_WAIT.totalMs * TIME_SCALE;
+  let waitMs = Math.max(LIFECYCLE_WAIT.everyMs, firstWaitMs ?? 0), first = firstWaitMs !== undefined;
+  for (;;) {
+    if (!first) {
+      const r = await call(path, { as: "dev" });
+      const lc = r.status === 200 ? r.data?.lifecycle : null;
+      if (lc?.operation === "create" && lc.state === "admitted" && lc.ready) {
+        save({ pendingCreate: undefined });
+        return { ...(await paired(lc.soulId ?? p.soulId, p.name)), arrival: { waitedS: Math.round((Date.now() - t0) / 1000 / TIME_SCALE) } };
+      }
+      if (lc?.state === "refused") { save({ pendingCreate: undefined }); return { created: false, code: "arrival-unavailable", reason: "There is no clear ground for the Soul to stand on in this world." }; }
+      if (r.status === 404 || (lc && lc.operation !== "create") || lc?.reason === "retirement-accepted") {
+        save({ pendingCreate: undefined });
+        throw new Error(`create: the world no longer has this arrival (${r.status === 404 ? "not-found" : lc.state}). Nothing was saved; run create again.`);
+      }
+      if (r.status >= 400 && r.status < 500 && r.status !== 429) ok(r, "create");   // e.g. signed out: says why, keeps the Soul pending
+      waitMs = Math.max(LIFECYCLE_WAIT.everyMs, r.retryAfterMs ?? 0);
+    }
+    first = false;
+    if (Date.now() + waitMs * TIME_SCALE > deadline) {
+      noteRefusal("/v1/souls", { status: 503, data: { code: "lifecycle-pending" } }, "none", null);
+      throw Object.assign(new Error(`create: lifecycle-pending — ${ARRIVING} after ${secs(LIFECYCLE_WAIT.totalMs)}. The Soul "${p.name}" is saved in this folder: run ${CLI} create "${p.name}" again to keep waiting; do not choose another name.`), { exitCode: 75 });
+    }
+    calm(`${ARRIVING}; waiting for it (checking every ${secs(LIFECYCLE_WAIT.everyMs)}, up to ${secs(LIFECYCLE_WAIT.totalMs)})`);
+    await pause(waitMs);
+  }
 }
 
 async function pair(...argv) {
@@ -419,6 +489,7 @@ async function approval(action = "status") {
 async function status() {
   const s = load();
   if (!s.world) return { paired: false, next: `${CLI} register <world-url>` };
+  if (!s.token && s.pendingCreate) return { paired: false, world: s.world, arriving: s.pendingCreate.name, next: `${ARRIVING}: ${CLI} create "${s.pendingCreate.name}" to keep waiting` };
   if (!s.token) return { paired: false, world: s.world, pending: s.pendingApproval?.approvalId ?? null, next: s.pendingApproval ? `${CLI} approval wait` : `${CLI} create "<Name>" --for <CODE>` };
   const me = ok(await call("/v1/agent/me"), "status");
   const inbox = me.inbox ?? {};
