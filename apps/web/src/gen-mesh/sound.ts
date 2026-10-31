@@ -128,7 +128,7 @@ function playJukeboxes(host: Host, x: number, y: number, z: number) {
 // Soul's clock) cross-fades through a burst of static and a sweeping whistle; power on crackles and fades in; power off is
 // silent within a tick. Radios are picked out of the emitter scan like jukeboxes; each tick reads only the known radios'
 // live `on` and `station` (a map lookup each), never a world scan.
-const RADIO_AHEAD = 0.35, RADIO_LINGER_MS = 6000, radioDone = new Map<string, number>();
+const RADIO_STATIC = 1.5, RADIO_AHEAD = 0.35, RADIO_LINGER_MS = 6000, radioDone = new Map<string, number>();
 type RadioRt = { bus: GainNode; voice: AudioNode; hiss: GainNode; hissSrc: AudioBufferSourceNode; ch: Map<string, GainNode>; station: string; on: boolean; tunedAt: number; prev: string | null; quietSince: number; gain: number; tunes: number };
 const radios = new Map<string, RadioRt>();
 let radioIds = new Set<string>(), radioNear = false;
@@ -143,10 +143,11 @@ function radioChannel(c: AudioContext, r: RadioRt, station: string) {
 }
 function makeRadio(c: AudioContext, station: string, on: boolean): RadioRt {
   const bus = c.createGain(); bus.gain.value = 0; bus.connect(master!);
-  // a small cabinet speaker: no deep bass, no air, a little presence
-  const hp = filt(c, 'highpass', 190), lp = filt(c, 'lowpass', 3600), mid = c.createBiquadFilter(); mid.type = 'peaking'; mid.frequency.value = 1300; mid.gain.value = 4; mid.Q.value = 0.8;
-  hp.connect(lp).connect(mid).connect(bus);
-  const hiss = c.createGain(); hiss.gain.value = 0; const hissSrc = noise(c), hf = filt(c, 'bandpass', 2600, 0.45); hissSrc.connect(hf).connect(hiss).connect(bus);
+  // a small cabinet speaker on the AM band: no deep bass, nothing above ~3 kHz (two lowpasses), a little presence. The
+  // static bypasses it: a broadband hiss (take 2: through the same band it was no louder above 2 kHz than the piano)
+  const hp = filt(c, 'highpass', 190), lp = filt(c, 'lowpass', 2900), lp2 = filt(c, 'lowpass', 3300), mid = c.createBiquadFilter(); mid.type = 'peaking'; mid.frequency.value = 1300; mid.gain.value = 4; mid.Q.value = 0.8;
+  hp.connect(lp).connect(lp2).connect(mid).connect(bus);
+  const hiss = c.createGain(); hiss.gain.value = 0; const hissSrc = noise(c), hf = filt(c, 'bandpass', 3400, 0.35); hissSrc.connect(hf).connect(hiss).connect(bus);
   const r: RadioRt = { bus, voice: hp, hiss, hissSrc, ch: new Map(), station, on, tunedAt: -1e9, prev: null, quietSince: 0, gain: 0, tunes: 0 };
   radioChannel(c, r, station).gain.value = 1;
   return r;
@@ -157,7 +158,7 @@ function tuneRadio(c: AudioContext, r: RadioRt, from: string, to: string) {
   const t = c.currentTime, a = radioChannel(c, r, from), b = radioChannel(c, r, to);
   a.gain.cancelScheduledValues(t); a.gain.setValueAtTime(a.gain.value, t); a.gain.linearRampToValueAtTime(0, t + TUNE.fromOut);
   b.gain.cancelScheduledValues(t); b.gain.setValueAtTime(0, t); b.gain.setValueAtTime(0, t + TUNE.toIn); b.gain.linearRampToValueAtTime(1, t + TUNE.toLocked);
-  const h = r.hiss.gain; h.cancelScheduledValues(t); h.setValueAtTime(h.value, t); h.linearRampToValueAtTime(0.55, t + TUNE.staticUp); h.setValueAtTime(0.55, t + TUNE.staticHold); h.linearRampToValueAtTime(0, t + TUNE.staticOut);
+  const h = r.hiss.gain; h.cancelScheduledValues(t); h.setValueAtTime(h.value, t); h.linearRampToValueAtTime(RADIO_STATIC, t + TUNE.staticUp); h.setValueAtTime(RADIO_STATIC, t + TUNE.staticHold); h.linearRampToValueAtTime(0, t + TUNE.staticOut);
   for (let i = 0; i < 9; i++) burst(c, r.bus, t + 0.04 + Math.random() * (TUNE.staticOut - 0.15), 0.012 + Math.random() * 0.02, 0.25 + Math.random() * 0.3, 1800);   // crackle
   const o = c.createOscillator(), og = c.createGain(); o.type = 'sine';
   o.frequency.setValueAtTime(2400, t); o.frequency.exponentialRampToValueAtTime(320, t + 0.38); o.frequency.exponentialRampToValueAtTime(1500, t + 0.72);
