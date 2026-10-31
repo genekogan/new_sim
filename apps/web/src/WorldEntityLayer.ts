@@ -120,17 +120,22 @@ export class WorldEntityLayer {
         if(box!==m.target)continue;const k=this.drawn.get(id);if(!k||k.removing)continue;
         if(k.frozen)this.thaw(k);
         if(m.slide){const off=f.pos-m.slide.travel;k.obj.position.set(k.to.p.x+m.slide.dir[0]*off,k.to.p.y,k.to.p.z+m.slide.dir[1]*off);k.settled=false;}
-        if(k.inst)this.instancer.set(k.inst,id,k.obj.position,k.obj.rotation.y,k.obj.scale.x,[k.obj.rotation.x,k.obj.rotation.z]);else k.obj.visible=true;
-        k.obj.updateMatrixWorld(true);
+        this.showKept(id,k,true);
       }
     }
     // entry 42: this runs after update(), which saw last frame's moving containers: a drawer whose hand just let go shows
     // what is in it where it is now (shut: hidden; open: at its place), never one frame back at the open place
     for(const [id,box] of this.keptIn){
-      if(this.movingBoxes.has(box))continue;const k=this.drawn.get(id);if(!k||k.removing||k.inst)continue;
+      if(this.movingBoxes.has(box))continue;const k=this.drawn.get(id);if(!k||k.removing)continue;
       const open=this.model?.entities.get(box)?.state?.open===true;
-      if(!open)k.obj.visible=false;else if(k.obj.position.distanceToSquared(k.to.p)>1e-8&&k.settled){k.obj.position.copy(k.to.p);k.obj.updateMatrixWorld(true);}
+      if(!open){if(k.inst?k.shown!==false:k.obj.visible)this.showKept(id,k,false);}
+      else if(k.obj.position.distanceToSquared(k.to.p)>1e-8&&k.settled){k.obj.position.copy(k.to.p);this.showKept(id,k,true);}
     }
+  }
+  /** Entry 42: show or hide a stored thing where its drawn object is now (instanced or not). */
+  private showKept(id:string,k:Drawn,shown:boolean){
+    if(k.inst){this.instancer.set(k.inst,id,k.obj.position,k.obj.rotation.y,shown?k.obj.scale.x:0,[k.obj.rotation.x,k.obj.rotation.z]);k.shown=shown;}
+    else{k.obj.visible=shown;k.obj.updateMatrixWorld(true);}
   }
   /** Entry 42: things kept inside a container (item id → container id), and the containers whose drawer or door a hand
    *  is moving this frame. Only stored things, never a scan of the world. */
@@ -138,7 +143,7 @@ export class WorldEntityLayer {
   private movingBoxes=new Set<string>();
   private movingAt=-Infinity;
   /** Entry 42, for proofs: whether a stored thing is drawn now and where. */
-  keptView(id:string){const d=this.drawn.get(id);return d?{box:this.keptIn.get(id)??null,visible:d.inst?(d.shown??true):d.obj.visible,p:d.obj.position.toArray()}:null;}
+  keptView(id:string){const d=this.drawn.get(id);return d?{box:this.keptIn.get(id)??null,visible:d.inst?(d.shown??true):d.obj.visible,inst:!!d.inst,p:d.obj.position.toArray()}:null;}
   get entityCount() { return this.model?.entities.size ?? 0; }
   /** The placed entities once this layer's picture has reached edit `seq` (else null): GodPanel's flags read them here
    *  instead of downloading the public snapshot again on every edit (lane L3h). */
@@ -847,7 +852,7 @@ export class WorldEntityLayer {
     const mdef = rideMotionDef(def);  // BALLOON-BODY: a ride balloon does not hover; Core's vehicle owns its motion
     this.drawn.set(e.id, { ...(opening ? {opening} : {}), ...(instKey ? { inst: instKey, settled: false } : {}), obj: built, from, to, t0: this.now, dur: ease ? refinement?.seconds ?? EASE_IN_S : 0.001, defHash, world: isWorld, ...(hasMotion(mdef) ? { motion: { entity: e, def: mdef, yaw: wp.yaw, glowOnly: glowOnly(mdef) } } : {}) });
     // entry 42: a thing kept in a shut container is hidden from its first frame (a resync can draw before the next update)
-    if (this.keptIn.has(e.id)) { const k = this.drawn.get(e.id)!; if (!k.inst) k.obj.visible = this.interiorVisible(e.id, k); }
+    if (this.keptIn.has(e.id)) { const k = this.drawn.get(e.id)!, v = this.interiorVisible(e.id, k); if (k.inst) k.shown = v; else k.obj.visible = v; }
   }
   private undraw(id: string, delaySeconds = 0) {
     this.held.delete(id); this.horizonBy.delete(id); this.keptIn.delete(id);
