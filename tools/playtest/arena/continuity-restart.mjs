@@ -73,7 +73,7 @@ export function createManagedRestartObserver(config,{
  const minimumFutureWakeMs=config.minimumFutureWakeMs??20000,triggerMaxDelayMs=config.triggerMaxDelayMs??5000,recoveryMaxMs=config.recoveryMaxMs??25000;
  if(preDispatch!==null&&typeof preDispatch!=='function')throw fault('INVALID_RESTART_REFRESH');
  if(!identifier(actorId)||!identifier(setupId)||typeof journalPath!=='string'||!identifier(worldId)||!identifier(soulId)||!hash(originalInstructionSha256)||!time(cutoffAt)||minimumFutureWakeMs!==20000||triggerMaxDelayMs!==5000||recoveryMaxMs!==25000)throw fault('INVALID_RESTART_CONTRACT');
- let state='watching',failure=null,ownership=null,before=null,triggerAt=null,deathAt=null,controllerExitAt=null,oldGroupsAbsentAt=null,readyAt=null,recoveryStartedAt=null,oldOwnership=null,after=null,dispatchAttempted=false,preDispatchObservation=null;
+ let launcherEnded=null,state='watching',failure=null,ownership=null,before=null,triggerAt=null,deathAt=null,controllerExitAt=null,oldGroupsAbsentAt=null,readyAt=null,recoveryStartedAt=null,oldOwnership=null,after=null,dispatchAttempted=false,preDispatchObservation=null;
  const signals=[],proofs=new Map(),lifecycle=[],absenceProbes=new Map(),staleMembers={count:0,recorded:[]},staleSeen=new Set();
  const fail=(code,unknown=false)=>{failure??={code,at:now(),status:unknown?'unknown':'fail'};state=failure.status;};
  const scope=s=>s?.worldId===worldId&&s?.soulId===soulId&&s?.checkpoint?.initialInstructionSha256===originalInstructionSha256;
@@ -264,11 +264,21 @@ export function createManagedRestartObserver(config,{
    }
    return this.snapshot();
   },
+  // Report quality only: once the owning launcher has itself ended after the
+  // declared death and before readiness, nothing can relaunch the controller.
+  // Name that directly instead of waiting out the same recovery bound; the
+  // status is the bound's own 'fail'. Ends at/after cutoff keep their old path.
+  launcherExited(e={}){
+   if(['ready','fail','unknown','unexercised'].includes(state)||deathAt===null||launcherEnded)return this.snapshot();
+   const at=now();launcherEnded={at,beforeCutoff:at<cutoffAt,code:Number.isSafeInteger(e.exit?.code)?e.exit.code:null,signal:typeof e.exit?.signal==='string'&&/^SIG[A-Z0-9]{1,12}$/.test(e.exit.signal)?e.exit.signal:null,failureCode:typeof e.failureCode==='string'&&/^[A-Z][A-Z0-9_]{0,63}$/.test(e.failureCode)?e.failureCode:null};
+   if(at<cutoffAt)fail('RESTART_LAUNCHER_ENDED_BEFORE_READY');
+   return this.snapshot();
+  },
   finish(){if(!['ready','fail','unknown'].includes(state)){if(deathAt!==null)fail('RESTART_READINESS_UNPROVEN',true);else state='unexercised';}return this.snapshot();},
   snapshot(){return {
    schema:'sim-continuity-managed-restart/1',actor:actorId,setupId,worldId,soulId,state,failure,
    contract:{kind:'checkpoint-future-wake',minimumFutureWakeMs,triggerMaxDelayMs,recoveryMaxMs,cutoffAt,dispatcherRestarts:false,baselineAssistedResume:false},
-   triggerAt,deathAt,controllerExitAt,oldGroupsAbsentAt,recoveryStartedAt,readyAt,recoveryLatencyMs:readyAt===null?null:readyAt-deathAt,
+   triggerAt,deathAt,controllerExitAt,launcherEnded:launcherEnded?{...launcherEnded}:null,oldGroupsAbsentAt,recoveryStartedAt,readyAt,recoveryLatencyMs:readyAt===null?null:readyAt-deathAt,
    timestampSemantics:{deathAt:'first successfully delivered destructive signal',controllerExitAt:'first observed exact old controller PID absence',oldGroupsAbsentAt:'first observed absence of all identified old writer groups',readyAt:'maximum source startup/session/running/receiver proof time and old-writer absence observation; never spawn time'},
    triggerExercised:deathAt!==null,dispatchAttempted,preDispatchObservation:structuredClone(preDispatchObservation),signals:structuredClone(signals),absenceProbes:[...absenceProbes.values()].map(p=>structuredClone(p)),before:before?structuredClone(before):null,after:after?structuredClone(after):null,
    oldOwnership:oldOwnership?structuredClone(oldOwnership):null,lifecycle:structuredClone(lifecycle),

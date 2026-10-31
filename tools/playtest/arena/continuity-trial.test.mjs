@@ -324,7 +324,7 @@ test('baseline restart declaration records unsupported/unexercised without anoth
  assert.equal(JSON.parse(readFileSync(join(f.config.directory,'restart-proof.json'),'utf8')).triggerExercised,false);
 });
 
-function managedRestartFixture(t,{eligible=true,omitOwner=false,missingEvidence=false,unknownInventory=false,slowObservation=false,missingLaterClose=false,wrongEvidenceScope=false,priorHostRestart=false,priorHostUnverified=false,reusedHostPid=false,turnDuringInspection=false,shortLivedMember=false,...overrides}={}){
+function managedRestartFixture(t,{eligible=true,omitOwner=false,missingEvidence=false,unknownInventory=false,slowObservation=false,missingLaterClose=false,wrongEvidenceScope=false,priorHostRestart=false,priorHostUnverified=false,reusedHostPid=false,turnDuringInspection=false,shortLivedMember=false,launcherDies=false,...overrides}={}){
  const f=fixture(t,{arm:CONTINUITY_ARMS[1],seconds:40,actors:[{id:'a',folder:'/synthetic/a',instruction:'Retain original strategic task'}],restart:{actorId:'a',setupId:'frozen-setup'},...overrides});
  const sha=s=>createHash('sha256').update(s).digest('hex'),processes=new Map(),signals=[];let current,child,args,activeController=1001,activeHost=1100,controllerInspections=0,groupInspections=0;
  const identity=(pid,ppid,pgid)=>({pid,ppid,pgid,startToken:'birth-'+pid});
@@ -342,6 +342,8 @@ function managedRestartFixture(t,{eligible=true,omitOwner=false,missingEvidence=
   if(signal===0)return;
   signals.push({target,signal,at:f.clock.now()});assert.equal(signal,'SIGKILL');
   if(target>0){processes.delete(target);for(const p of processes.values())if(p.ppid===target)p.ppid=1;
+   // reading-candidate-11: the launcher's own cleanup faults and it exits 1 instead of relaunching.
+   if(launcherDies){f.clock.schedule(()=>{child.stderr.write('x'.repeat(6000)+'\n');child.stderr.write('Error: CONTROLLER_ABSENCE_UNKNOWN; ownership/state retained Bearer abcdefgh12345678 token=sk-live-abcdefgh12345678\n');},400);f.clock.schedule(()=>{for(const [id,p]of processes)if(id===1000||p.pgid===activeHost)processes.delete(id);child.emit('exit',1,null);child.emit('close',1,null);},500);return;}
    f.clock.schedule(()=>{activeController=2001;activeHost=2100;add(activeController,activeHost);current={...current,checkpoint:{...current.checkpoint,revision:current.checkpoint.revision+1,at:f.clock.now()},controller:{generation:current.controller.generation+1,ownerSha256:sha('owner-'+(current.controller.generation+1)),expiresAt:f.clock.now()+15000},startupResponseId:'startup-'+(current.controller.generation+1)};startup(activeController,activeHost,true);},1000);
   }else for(const [id,p]of processes)if(p.pgid===-target)processes.delete(id);
  };
@@ -389,6 +391,24 @@ for(const missing of ['owner readiness','host evidence','process inventory'])tes
  else {assert.equal(result.restart.integration.status,'unknown');assert(result.restart.integration.failureCode);assert.deepEqual(f.signals,[]);}
 });
 
+
+test('a launcher that ends after the declared death and before readiness fails fast with its own code and a bounded redacted stderr tail (reading-candidate-11)',async t=>{
+ const f=managedRestartFixture(t,{launcherDies:true});const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(40000);const result=await pending;
+ assert.deepEqual(f.signals.map(s=>s.target),[1001,-1100]);assert.equal(f.calls.length,1,'the harness never relaunches');
+ assert.equal(result.restart.state,'fail','same capability-failure status as the recovery bound it replaces');assert.equal(result.restart.failure.code,'RESTART_LAUNCHER_ENDED_BEFORE_READY');
+ assert(result.restart.failure.at-result.restart.deathAt<2000,'named at launcher end, not after the 25 s recovery bound');assert.equal(result.restart.readyAt,null);
+ assert.equal(result.restart.launcherEnded.code,1);assert.equal(result.restart.launcherEnded.beforeCutoff,true);
+ const actor=JSON.parse(readFileSync(join(f.config.directory,'a','actor-result.json'),'utf8'));
+ assert(actor.stderrBytes>6000);assert(Buffer.byteLength(actor.stderrTail)<=4096);assert.match(actor.stderrTail,/CONTROLLER_ABSENCE_UNKNOWN; ownership\/state retained/);
+ assert(!actor.stderrTail.includes('abcdefgh12345678'),'credential-shaped values are masked');
+});
+
+test('a launcher that ends before any declared death or after readiness keeps its existing restart outcome',async t=>{
+ const ready=managedRestartFixture(t);const pending=runContinuityTrial(ready.config,ready.deps);await ready.clock.tick(40000);const result=await pending;
+ assert.equal(result.restart.state,'ready');assert.equal(result.restart.launcherEnded,null);assert.equal(result.restart.failure,null);
+ const idle=managedRestartFixture(t,{eligible:false});const second=runContinuityTrial(idle.config,idle.deps);await idle.clock.tick(40000);const unexercised=await second;
+ assert.equal(unexercised.restart.state,'unexercised');assert.equal(unexercised.restart.launcherEnded,null);
+});
 
 for(const mode of ['once','listed'])test('a short-lived host-group child gone before the ps -p recheck does not end restart coverage (reading-candidate-9): '+mode,async t=>{
  const f=managedRestartFixture(t,{shortLivedMember:mode});const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(40000);const result=await pending;

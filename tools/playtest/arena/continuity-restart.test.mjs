@@ -206,6 +206,14 @@ test('recovery timeout is a capability failure; missing readiness at final stop 
  const baseline=baselineAutomaticRestartCapability();assert.equal(baseline.status,'fail');assert.equal(baseline.supported,false);assert.equal(baseline.triggerExercised,false);assert.equal(baseline.assistedResume,false);
 });
 
+test('a launcher exit after death and before readiness is named at once; before death, after ready or at cutoff it changes nothing',()=>{
+ const f=fixture();f.arm();f.observer.tick();f.setTime(101000);const result=f.observer.launcherExited({exit:{code:1,signal:null},failureCode:'not a code;'});
+ assert.equal(result.state,'fail');assert.equal(result.failure.code,'RESTART_LAUNCHER_ENDED_BEFORE_READY');assert.equal(result.failure.at,101000);assert.deepEqual(result.launcherEnded,{at:101000,beforeCutoff:true,code:1,signal:null,failureCode:null});
+ const g=fixture();g.arm();assert.equal(g.observer.launcherExited({exit:{code:0}}).launcherEnded,null);assert.equal(g.observer.finish().state,'unexercised');
+ const h=fixture();h.arm();h.observer.tick();h.recover();assert.equal(h.observer.tick().state,'ready');assert.equal(h.observer.launcherExited({exit:{code:0}}).state,'ready');
+ const late=fixture({cutoffAt:130000});late.arm();late.observer.tick();late.setTime(130001);const after=late.observer.launcherExited({exit:{code:null,signal:'SIGTERM'}});assert.equal(after.failure,null);assert.equal(after.launcherEnded.beforeCutoff,false);assert.equal(late.observer.tick().failure.code,'RESTART_RECOVERY_TIMEOUT');
+});
+
 test('terminal measurement never rearms or changes an already proved outcome on later runtime events',()=>{
  const f=fixture();f.arm();f.observer.tick();f.recover();f.observer.tick();const before=f.observer.snapshot();f.observer.observeLifecycle(row('startup-reconciled',2001,104000,{initialInstructionSha256:'unsafe'}));f.observer.registerOwnership({});assert.deepEqual(f.observer.tick(),before);
  const g=fixture();g.observer.finish();g.arm();assert.equal(g.observer.tick().state,'unexercised');assert.equal(g.calls.filter(c=>c.signal==='SIGKILL').length,0);

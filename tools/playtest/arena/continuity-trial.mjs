@@ -106,6 +106,12 @@ async function verifyDevWorld(world,signal){
  return config;
 }
 
+const STDERR_TAIL_BYTES=4096;
+/** Last <=4 KB of launcher stderr as text, with credential-shaped values masked. */
+export function redactStderrTail(bytes){
+ if(!bytes?.length)return null;
+ return bytes.toString('utf8').replace(/\b(sk|pk|rk|ghp|gho|xox[abp])[-_][A-Za-z0-9_-]{8,}/g,'[redacted]').replace(/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi,'$1 [redacted]').replace(/((?:token|secret|password|passwd|api[-_]?key|authorization|cookie)["']?\s*[:=]\s*["']?)[^\s"',;}]+/gi,'$1[redacted]');
+}
 // Existing launcher/controller unchanged. Parent registration happens on receipt
 // of emitted session-created, not synchronously before the child's naming RPC.
 // Final controller closure manifests also recover IDs if naming fails.
@@ -120,7 +126,7 @@ export async function runManagedTrialActor({folder,directory,text,model,effort,r
  const args=[script,'--folder',folder,'--state',state,'--instruction',instruction,'--model',model,'--effort',effort,'--session-name',name,'--evidence',join(directory,'agent-evidence.jsonl'),'--seconds',String(localSeconds)];
  writeFileSync(join(directory,'controller.ndjson'),'',{flag:'wx',mode:0o600});
  const child=spawnProcess(process.execPath,args,{stdio:['ignore','pipe','pipe']});
- const controllers=new Map(),decoder=new StringDecoder('utf8');let sourceLine=0,exit=null,buffer='',failureCode=null,killTimer,drainTimer,shutdownTimer,leaderExited=false,stopping=false,pipeDrainTimedOut=false,finished=false,resolveDone,stderrBytes=0,stdoutBytes=0;
+ const controllers=new Map(),decoder=new StringDecoder('utf8');let sourceLine=0,exit=null,buffer='',failureCode=null,killTimer,drainTimer,shutdownTimer,leaderExited=false,stopping=false,pipeDrainTimedOut=false,finished=false,resolveDone,stderrBytes=0,stdoutBytes=0,stderrTail=Buffer.alloc(0);
  const done=()=>{if(finished)return;finished=true;resolveDone();};
  const forceDrain=()=>{
   if(finished)return;
@@ -154,14 +160,15 @@ export async function runManagedTrialActor({folder,directory,text,model,effort,r
    let at;while((at=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,at);buffer=buffer.slice(at+1);let state;try{state=JSON.parse(line);}catch{continue;}appendFileSync(join(directory,'controller.ndjson'),JSON.stringify(state)+'\n');emit(state,`${basename(directory)}/controller.ndjson:${++sourceLine}`);}
   }catch(error){failureCode=code(error);terminate();}
  });
- // Unstructured stderr may contain host configuration. Retain counts only.
- child.stderr.on('data',chunk=>{stderrBytes=Math.min(Number.MAX_SAFE_INTEGER,stderrBytes+chunk.length);});
+ // Unstructured stderr may contain host configuration. Retain counts plus a
+ // bounded, credential-redacted tail: the launcher's own last fault line.
+ child.stderr.on('data',chunk=>{stderrBytes=Math.min(Number.MAX_SAFE_INTEGER,stderrBytes+chunk.length);stderrTail=Buffer.concat([stderrTail,chunk]);if(stderrTail.length>STDERR_TAIL_BYTES)stderrTail=stderrTail.subarray(stderrTail.length-STDERR_TAIL_BYTES);});
  signal.addEventListener('abort',terminate,{once:true});if(signal.aborted)terminate();
  try{
   const creation={state:'launcher-spawned',launcherPid:child.pid,at:Date.now()};appendFileSync(join(directory,'controller.ndjson'),JSON.stringify(creation)+'\n');emit(creation,`${basename(directory)}/controller.ndjson:${++sourceLine}`);
   await completed;
  }catch(error){failureCode??=code(error);terminate();await completed;}finally{clearTimeout(killTimer);clearTimeout(drainTimer);clearTimeout(shutdownTimer);signal.removeEventListener('abort',terminate);}
- return {kind:'managed-continuity-runtime',launcherPid:child.pid,exit,failureCode,stderrBytes,stdoutBytes,pipeDrainTimedOut,evidenceComplete:!pipeDrainTimedOut,localSeconds,controllers:[...controllers.values()],endedAt:Date.now(),modelRequested:model,effortRequested:effort,actualModel:null,actualEffort:null,registrationOrdering:'emitted-before-child-name-rpc; parent-receipt registration is not synchronous durability'};
+ return {kind:'managed-continuity-runtime',launcherPid:child.pid,exit,failureCode,stderrBytes,stderrTail:redactStderrTail(stderrTail),stdoutBytes,pipeDrainTimedOut,evidenceComplete:!pipeDrainTimedOut,localSeconds,controllers:[...controllers.values()],endedAt:Date.now(),modelRequested:model,effortRequested:effort,actualModel:null,actualEffort:null,registrationOrdering:'emitted-before-child-name-rpc; parent-receipt registration is not synchronous durability'};
 }
 
 
@@ -251,6 +258,8 @@ export function createTrialRestartProbe(config,deps={}){
    }catch(error){fail(error);}
    try{return persist();}catch(error){fail(error);return snapshot();}
   },
+  // Drain once more (late readiness wins), then name the ended launcher.
+  launcherExited(result){if(finished)return snapshot();this.poll();if(!failureCode)observer.launcherExited({exit:result?.exit,failureCode:result?.failureCode});try{return persist();}catch(error){fail(error);return snapshot();}},
   finish({required=false}={}){this.poll({final:true,required});finished=true;observer.finish();try{return persist();}catch(error){fail(error);return snapshot();}},
   attach(result){
    const proof=snapshot(),old=proof.oldOwnership;
@@ -413,6 +422,7 @@ export async function runContinuityTrial(config,deps={}){
    if(arm===CONTINUITY_ARMS[0]&&(row.result.ephemeral===true)!==baselineEphemeral)row.failureCode='SESSION_PERSISTENCE_MODE_MISMATCH';
    if(row.result.evidenceComplete===false)row.failureCode='ACTOR_EVIDENCE_INCOMPLETE';
    checkUsage([row.actor.id]);
+   if(restartProbe&&row.actor.id===config.restart.actorId&&!stop.signal.aborted)restartProbe.launcherExited(row.result);
    // Ordinary completion is behavior, not an infrastructure abort or permission
    // to manufacture another turn. Keep observing every actor until cutoff.
    record('actor-ended',{actor:row.actor.id,endedAt:now(),beforeCutoff:now()<cutoffAt,exit:row.result.exit,stopReason:row.result.stopReason??null,failureCode:row.result.failureCode??null});
@@ -454,7 +464,7 @@ export async function runContinuityTrial(config,deps={}){
  for(const row of rows){
   if(row.result)row.cleanupVerified=arm===CONTINUITY_ARMS[0]?verifyBaseline(row.result):verifyCandidate(row.result);
   if(row.threads.size&&!row.cleanupVerified)failureCode??='OWNED_CLEANUP_UNVERIFIED';
-  if(row.result)privateJson(join(row.directory,'actor-result.json'),{exit:row.result.exit,failureCode:row.failureCode??row.result.failureCode??null,cleanupVerified:row.cleanupVerified,execProof:row.result.execProof??null,metadataGroups:row.result.metadataGroups??null,ephemeral:row.result.ephemeral===true,controllers:row.result.controllers?.map(controller=>({...controller,hostPids:[...(controller.hostPids??[])]}))??null,usage:row.result.usage??null,evidenceComplete:row.result.evidenceComplete??null,restartProofs:row.result.restartProofs??null});
+  if(row.result)privateJson(join(row.directory,'actor-result.json'),{exit:row.result.exit,failureCode:row.failureCode??row.result.failureCode??null,cleanupVerified:row.cleanupVerified,execProof:row.result.execProof??null,metadataGroups:row.result.metadataGroups??null,ephemeral:row.result.ephemeral===true,controllers:row.result.controllers?.map(controller=>({...controller,hostPids:[...(controller.hostPids??[])]}))??null,usage:row.result.usage??null,evidenceComplete:row.result.evidenceComplete??null,stderrBytes:row.result.stderrBytes??null,stderrTail:row.result.stderrTail??null,restartProofs:row.result.restartProofs??null});
  }
  const summary={schema:'sim-continuity-trial-result/1',arm,purpose,startedAt,cutoffAt,endedAt:now(),endReason,failureCode,qualification:'not assessed',coverage:{disturbances:'unknown',restart:'unknown',semanticOutcome:'not scored',actualEffort:'only authoritative host metadata; otherwise unknown'},actors:rows.map(row=>({id:row.actor.id,soulId:row.paired.soul,releasedAt:row.releasedAt??null,threads:[...row.threads],ephemeralThreads:[...row.ephemeralThreads],cleanupVerified:row.cleanupVerified,failureCode:row.failureCode??row.result?.failureCode??null,exit:row.result?.exit??null,actualModel:row.result?.actualModel??null,actualEffort:row.result?.actualEffort??null,endedBeforeCutoff:row.result?.endedAt!==undefined?row.result.endedAt<cutoffAt:null}))};
  // Any actor's own failure (code, nonzero exit, or signal death) fails the trial
