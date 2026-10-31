@@ -15,7 +15,7 @@ try{
  await post('/v1/god/env',{timeOfDay:'14:00',timeScale:0,weather:{kind:'clear'}});
  await page.goto(base+'/?eye=-1.55,1.55,1.35&at=0,1.2,4');await page.waitForFunction(()=>window.__simEntity?.contactFrame()?.bones&&Object.keys(window.__simEntity.contactFrame().bones).length>=3,null,{timeout:120000});await page.waitForFunction(()=>!document.querySelector('.viewer-arrival-title'),null,{timeout:300000});await page.waitForTimeout(3000);await installFrameStamp(page);
  timer=setInterval(async()=>{if(busy)return;busy=true;try{const s=await sample();if(s)samples.push(s);}finally{busy=false;}},50);
- const WIDE=[[-1.55,1.55,1.35],[0,1.2,4]],CLOSE=[[0.15,1.35,2.85],[0,1.25,4]];
+ const WIDE=[[-1.55,1.55,1.35],[0,1.2,4]],CLOSE=[[0.35,1.45,2.75],[0,1.25,4]];
  await camera(...WIDE);await page.waitForTimeout(1500);
  const M=(seat,square,expect)=>act(seat,'mark a square on the game board',{square},expect);
  await M('ada','centre');

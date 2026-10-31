@@ -134,6 +134,12 @@ export function gamePatch(a: { name: string }, state: Record<string, unknown>, s
   if (i >= 0 && g[i] === '.') g[i] = ids.indexOf(soul.soulId) === 0 ? 'X' : 'O';
   return { text: g.join(''), textBy: ids.join(','), players: names.join(',') };
 }
+/** After a move a player steps back from the board, so the other can reach it and both can see the game (entry 27). */
+function gameStepBack(def: StoredDef, a: Action, motion: { root: [number, number, number]; params: Record<string, unknown> }) {
+  const yaw = (motion.params.stroke as { yaw?: number } | undefined)?.yaw;
+  if (!isGameAction(def, a) || typeof yaw !== 'number') return [];
+  return [{ verb: 'walk_to', params: { to: [motion.root[0] + Math.sin(yaw) * 0.9, motion.root[2] + Math.cos(yaw) * 0.9], standoff: 0 } }];
+}
 /** Soul-written board text (entry 13): short, at most three lines, printable. Null = acceptable. */
 export function boardTextProblem(v: unknown, max = 100, lines = 3): Refusal | null {
   if (typeof v !== 'string' || !v.trim()) return { code: 'capability.params', reason: 'Say what to write: text is required.' };
@@ -173,7 +179,7 @@ export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: Buil
         const contact = host.deferContacts && isContactActuator(def, a);
         const motion=contact&&s.key?host.contactPlan?.(ctx.soul,s.key,a.name,params):null;
         if(motion){const me=host.bodyAt(ctx.soul)!,far=(motion.level??0)>0||Math.hypot(me[0]-motion.root[0],me[1]-motion.root[2])>.1;
-          return {state:s,result:{action:a.name,set:thenPatch(a,(s.key&&host.stateOf?.(s.key))||s.state||{},params)},bodies:[{label:a.label,steps:[{verb:'stand',params:{}},...(far?[(motion.level??0)>0||motion.params.stroke?{verb:'mars:walk_to',params:{x:motion.root[0],z:motion.root[2],level:motion.level}}:{verb:'walk_to',params:{to:[motion.root[0],motion.root[2]],standoff:0}}]:[]),{verb:'mars:hand_actuator_v1',params:motion.params}]}]};}
+          return {state:s,result:{action:a.name,set:thenPatch(a,(s.key&&host.stateOf?.(s.key))||s.state||{},params)},bodies:[{label:a.label,steps:[{verb:'stand',params:{}},...(far?[(motion.level??0)>0||motion.params.stroke?{verb:'mars:walk_to',params:{x:motion.root[0],z:motion.root[2],level:motion.level}}:{verb:'walk_to',params:{to:[motion.root[0],motion.root[2]],standoff:0}}]:[]),{verb:'mars:hand_actuator_v1',params:motion.params},...gameStepBack(def,a,motion)]}]};}
 
         const me = host.bodyAt(ctx.soul)!, to = s.front ?? s.at!, far = Math.hypot(s.at![0] - me[0], s.at![1] - me[1]) > (contact ? CONTACT_REACH : ACT_REACH);
         const water = s.key ? waterPlan(a, s.key, ctx.soul, host) : null;
