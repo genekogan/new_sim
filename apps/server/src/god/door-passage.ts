@@ -16,10 +16,10 @@ export type DoorPassageRefusal={refuse:true;code:string;reason:string};
 const FAR=1;
 /** Where the walk stops before the hand takes over: door-local (along the wall to the latch side, out from it), metres. */
 const STAGE=[.7,1.65];
-/** Entry 32: where a second (third) passage on the same side waits instead, about a metre behind the staging spot on the
- *  latch side, outside the doorway lane and the swing; the last is a hinge-side spare. The engine picks one when the
- *  staging walk begins (`doorQueueV1`). */
-const QUEUE=[[1.25,2.5],[1.25,3.5],[-1.6,2.5]];
+/** Entry 32: where a second (third) passage on the same side waits instead: about a metre behind the staging spot on the
+ *  latch side, or as far out on the hinge side, outside the doorway lane and the swing, and a row further back. The engine
+ *  picks the nearest free one to the Soul when its staging walk begins (`doorQueueV1`). */
+const QUEUE=[[1.25,2.5],[-1.6,2.5],[1.25,3.5],[-1.6,3.5]];
 
 export function createDoorPassage(d:{engine:()=>Engine;model:()=>WorldModel;contact:ContactActuatorService;access:(id:string,soul:EdgeSoul)=>{code:string;reason:string}|null;owner?:(id:string,soul:EdgeSoul)=>{name:string;mine:boolean}|null}){
  /** Entry 32: a locked door refused to a walk, naming its owner (and that knocking is possible) when it has one. */
