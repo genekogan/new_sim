@@ -17,7 +17,7 @@ import { DT, type Runtime } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
 import { angleDelta, datan2, hypot, wrapAngle, type Vec3 } from '../core/math.ts';
 import { bodyFrame, carryHand, lerp3, restHand, sideOf, smooth, at, type Hand } from './body.ts';
-import { HANDOVER_SETTLE_SECONDS, ITEM_REACH_SECONDS, ITEM_RECOVERY_SECONDS } from './presentation.ts';
+import { HANDOVER_IDLE_RETURN_SECONDS, HANDOVER_SETTLE_SECONDS, ITEM_REACH_SECONDS, ITEM_RECOVERY_SECONDS } from './presentation.ts';
 import { graspPoint, heldYaw, inHand, isItem, poseAtHand, putInHand } from './model.ts';
 import { HUMAN_RADIUS } from '../world/catalog.ts';
 import type { Spatial } from '../spatial/service.ts';
@@ -203,7 +203,8 @@ function stepOffer(rt: Runtime, ex: Exec, a: Entity, b: Entity | undefined, it: 
   const mine = !!it && it.support?.kind === 'in-hand' && (it.support as { by: string }).by === a.id;
   if (ex.phase === 'recover') {
     h.activity = 'idle'; ex.t++; setHand(a, ex.hand, restHand(bodyFrame(a), ex.hand));
-    return ex.t < ticks(ITEM_RECOVERY_SECONDS) ? { status: 'running', phase: 'recover' } : { status: 'completed', outputs: { given: true } };
+    // the arm eases to the clip (ITEM_RECOVERY_SECONDS), then idle gestures fade in (HANDOVER_IDLE_RETURN_SECONDS)
+    return ex.t < ticks(ITEM_RECOVERY_SECONDS + HANDOVER_IDLE_RETURN_SECONDS) ? { status: 'running', phase: 'recover' } : { status: 'completed', outputs: { given: true } };
   }
   if (ex.phase === 'let-go') {
     // the receiver holds it now: the empty hand comes back to the side; the arm then eases to the clip (recover)

@@ -21,6 +21,9 @@ export const ITEM_ARM_LEAD_SECONDS=.35;
 export type ItemTransferV1={item:string;hand:'left'|'right';action:string;mode?:'take'|'put';startTick:number;reachTick?:number;releaseTick?:number;cancelTick?:number;target?:[number,number,number];hold?:true;holdTick?:number;fadeTick?:number};
 /** A receiver lets its idle gesture go (folded arms open, a hand comes down from the hair) before reaching (s). */
 export const HANDOVER_SETTLE_SECONDS=1.4;
+/** After a giver's arm is back on the standing clip, idle gestures fade in over this long (s); the giver's hand-over
+ *  record lasts ITEM_RECOVERY_SECONDS + this after its release, so the fade ends before the record clears. */
+export const HANDOVER_IDLE_RETURN_SECONDS=2;
 /** `posture`: bend toward the fixed grasp point, scaled by `k` — smoothstep up over the reach and down over the
  *  withdraw, the same clock as the engine's hand lerp, so the torso can neither pop nor hop between solutions.
  *  `goal`: a pick-up's empty-handed reach, drawn instead of the engine hand point: from the drawn palm (clip and idle
@@ -65,6 +68,10 @@ export function itemPresentation(transfer:ItemTransferV1|undefined,held:{left?:s
  // After release the engine keeps the hand at its rest point through recovery: the drawn arm eases from it to the clip.
  // A pick-up's recovery ends holding the item: no gesture comes back (it would be cut when the record clears), only
  // the reach-start fade runs out.
- if(transfer.releaseTick!==undefined){const r=smooth((tick-transfer.releaseTick)*dt/ITEM_RECOVERY_SECONDS);return{weight:holding?1:pickUp&&transfer.cancelTick!==undefined?0:1-r,idleBlend:holding?fade:Math.max(r,fade),...posture};}
+ if(transfer.releaseTick!==undefined){const r=smooth((tick-transfer.releaseTick)*dt/ITEM_RECOVERY_SECONDS);
+  // a giver after a hand-over: the arm goes back to the plain standing clip first, and only then does an idle gesture
+  // come in, slowly (take 3: folded arms blending in over the arm's own recovery swung both hands out in front first)
+  if(transfer.hold&&!pickUp&&!holding)return{weight:1-r,idleBlend:smooth(((tick-transfer.releaseTick)*dt-ITEM_RECOVERY_SECONDS)/HANDOVER_IDLE_RETURN_SECONDS),...posture};
+  return{weight:holding?1:pickUp&&transfer.cancelTick!==undefined?0:1-r,idleBlend:holding?fade:Math.max(r,fade),...posture};}
  return{weight:holding?1:cancelled?back:reaching?lead:pickUp?smooth(s/ITEM_REACH_SECONDS):1,idleBlend:fade,...goal,...posture};
 }
