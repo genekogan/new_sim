@@ -45,4 +45,29 @@ const beachShower: DefInput = {
   actions: switches('Turn on the shower', 'Turn off the shower') as DefInput['actions'],
 } as DefInput;
 
-export const HAND_WATER: DefInput[] = [gardenTap, beachShower];
+// Entry 21: a garden fountain whose valve stands on a short post outside the rim (1.05 m: reached standing). Still water
+// fills the basin and the upper bowl either way; while it is on, a jet rises from the top into the bowl and the bowl spills
+// into the basin (fx/water-jets.ts reads the two water surfaces for where the drops land).
+const gardenFountain: DefInput = {
+  schema: 'def/1', name: 'core-garden-fountain', version: 1,
+  description: 'A stone garden fountain: a round basin, a pedestal and an upper bowl. A Soul turns it on and off by hand at the valve on the post beside it; while it is on a jet rises from the top and the bowl spills into the basin.',
+  tags: ['water', 'garden', 'fountain', 'hand-operated', 'local-fixture'], form: 'point',
+  make: { kind: 'gen', gen: 'kit/2', args: { round: 0.02, shapes: [
+    { kind: 'lathe', at: [0, 0, 0], profile: [[1.1, 0], [1.15, 0.08], [1.15, 0.48], [1.0, 0.52], [1.0, 0.15], [0, 0.15]], segments: 24, tint: 'stone', collide: true },
+    { kind: 'cyl', at: [0, 0.42, 0], r: 1.0, h: 0.03, segments: 24, tint: 'water', material: 'water' },
+    { kind: 'cyl', at: [0, 0.75, 0], r: 0.14, h: 0.7, segments: 12, r2: 0.1, tint: 'stone' },
+    { kind: 'lathe', at: [0, 1.0, 0], profile: [[0, 0], [0.5, 0.2], [0.47, 0.24], [0, 0.1]], segments: 20, tint: 'stone' },
+    { kind: 'cyl', at: [0, 1.18, 0], r: 0.45, h: 0.02, segments: 20, tint: 'water', material: 'water' },
+    { kind: 'cyl', at: [0, 1.3, 0], r: 0.04, h: 0.2, segments: 8, tint: 'stone' },
+    { kind: 'cyl', at: [0, 1.405, 0], r: 0.022, h: 0.012, segments: 8, tint: 'nozzle' },
+    { kind: 'box', at: [1.27, 0.1, 0], size: [0.24, 0.04, 0.04], round: 0.01, tint: 'metal' },
+    { kind: 'box', at: [1.37, 0.51, 0], size: [0.07, 1.02, 0.07], round: 0.01, tint: 'metal' },
+    { kind: 'cyl', at: [1.37, 1.05, 0], r: 0.05, h: 0.025, segments: 6, tint: 'valve' }] } } as unknown as DefInput['make'],
+  params: params as DefInput['params'], palette: { ...palette, stone: '#b6afa2' },
+  state: { on: { type: 'bool', default: false } } as DefInput['state'],
+  components: water('water', 12, 0.45) as DefInput['components'],
+  size: { box: [2.9, 1.45, 2.3] },   // the basin and the valve post, so the stand point is beside the post, off the rim
+  actions: switches('Turn on the fountain', 'Turn off the fountain') as DefInput['actions'],
+} as DefInput;
+
+export const HAND_WATER: DefInput[] = [gardenTap, beachShower, gardenFountain];

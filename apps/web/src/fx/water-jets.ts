@@ -6,13 +6,19 @@
 import * as THREE from 'three';
 import { RIPPLE } from '../atmosphere/motion.ts';
 
-export type WaterJetKind = 'sprinkler' | 'stream' | 'shower';
+export type WaterJetKind = 'sprinkler' | 'stream' | 'shower' | 'fountain';
 type Def = { tags?: readonly string[]; params?: Record<string, { default?: unknown }>; make?: { kind: string; args?: unknown } };
 /** Which moving water a def draws while it is on (by its tags), or null. */
 export function waterJetKind(def: Def): WaterJetKind | null {
   const t = def.tags ?? [];
   if (!t.includes('hand-operated')) return null;
-  return t.includes('sprinkler') ? 'sprinkler' : t.includes('tap') ? 'stream' : t.includes('shower') ? 'shower' : null;
+  return t.includes('sprinkler') ? 'sprinkler' : t.includes('tap') ? 'stream' : t.includes('shower') ? 'shower' : t.includes('fountain') ? 'fountain' : null;
+}
+/** A fountain's two still-water surfaces (the parts tinted `water`): the upper bowl and the basin pool, as [y, r]. */
+function waterSurfaces(def: Def): { bowl: [number, number]; pool: [number, number] } | null {
+  const shapes = def.make?.kind === 'gen' ? (def.make.args as { shapes?: { tint?: string; at?: number[]; r?: number }[] } | undefined)?.shapes : undefined;
+  const w = (shapes ?? []).filter((s) => s.tint === 'water' && s.at && s.r).sort((a, b) => a.at![1] - b.at![1]);
+  return w.length >= 2 ? { bowl: [w.at(-1)!.at![1], w.at(-1)!.r!], pool: [w[0].at![1], w[0].r!] } : null;
 }
 /** The part tinted `nozzle` (where the water leaves), in the def's local frame. */
 export function nozzleOf(def: Def): [number, number, number] | null {
@@ -54,6 +60,29 @@ const KINDS: Record<WaterJetKind, { n: number; life: number; size: number; strea
     p = vec3(cos(ang) * rad, 0.0, sin(ang) * rad) + v * fa + vec3(0.0, -4.9 * fa * fa, 0.0);
     if (a > tl) { float s = a - tl; p += vec3((r4 - 0.5) * 0.6, 0.5 - 4.9 * s, (r1 - 0.5) * 0.6) * s; alpha = clamp(1.0 - s / 0.16, 0.0, 1.0) * 0.7; }
     else alpha = 0.85;` },
+  // A garden fountain: three fifths of the drops are the jet, rising from the top, opening like an umbrella and falling into
+  // the upper bowl (uBowl.x below the nozzle); the rest spill over the bowl's rim (radius uBowl.y) as a curtain that falls to
+  // the basin pool (uBowl.z below the nozzle). Both splash and fade where they land.
+  fountain: { n: 3600, life: 0.9, size: 0.03, streak: 0.45, glsl: `
+    float az = r1 * 6.2831853;
+    vec3 out_ = vec3(cos(az), 0.0, sin(az));
+    if (aSeed.y < 60.0) {
+      float el = 0.2 * sqrt(r2), v = uSpeed * (0.82 + 0.18 * r3);
+      vec3 d = vec3(sin(el) * out_.x, cos(el), sin(el) * out_.z);
+      float tl = (v * d.y + sqrt(v * v * d.y * d.y + 2.0 * 9.8 * uBowl.x)) / 9.8;
+      float fa = min(a, tl);
+      p = d * v * fa + vec3(0.0, -4.9 * fa * fa, 0.0);
+      if (a > tl) { float s = a - tl; p += out_ * (0.15 + 0.3 * r4) * s + vec3(0.0, 0.45 * s - 4.9 * s * s, 0.0); alpha = clamp(1.0 - s / 0.14, 0.0, 1.0) * 0.7; size *= 0.7; }
+      else alpha = 0.9;
+    } else {
+      float fall = uBowl.z - uBowl.x, sp = 0.22 + 0.18 * r2;
+      vec3 o = out_ * uBowl.y + vec3(0.0, -uBowl.x + 0.03, 0.0), v = out_ * sp + vec3(0.0, -0.05, 0.0);
+      float tl = (v.y + sqrt(v.y * v.y + 2.0 * 9.8 * fall)) / 9.8;
+      float fa = min(a, tl);
+      p = o + v * fa + vec3((r3 - 0.5) * 0.02, -4.9 * fa * fa, (r4 - 0.5) * 0.02);
+      if (a > tl) { float s = a - tl, ang = r3 * 6.2831853; p += (out_ * 0.2 + vec3(cos(ang), 0.0, sin(ang)) * 0.3 * r4) * s + vec3(0.0, 0.5 * s - 4.9 * s * s, 0.0); alpha = clamp(1.0 - s / 0.16, 0.0, 1.0) * 0.7; size *= 0.75; }
+      else alpha = 0.85;
+    }` },
 };
 const materials = new Map<WaterJetKind, THREE.ShaderMaterial>(), geometries = new Map<WaterJetKind, THREE.BufferGeometry>();
 function material(kind: WaterJetKind) {
@@ -61,8 +90,8 @@ function material(kind: WaterJetKind) {
   const k = KINDS[kind];
   m = new THREE.ShaderMaterial({
     name: `water jets (${kind})`, transparent: true, depthWrite: false,
-    uniforms: { uEdenRipple: RIPPLE, uSpeed: { value: 5.5 }, uDrop: { value: 0.66 } },
-    vertexShader: /* glsl */`uniform vec4 uEdenRipple; uniform float uSpeed; uniform float uDrop; attribute vec4 aSeed; varying float vAlpha;
+    uniforms: { uEdenRipple: RIPPLE, uSpeed: { value: 5.5 }, uDrop: { value: 0.66 }, uBowl: { value: new THREE.Vector3(0.22, 0.5, 1.0) } },
+    vertexShader: /* glsl */`uniform vec4 uEdenRipple; uniform float uSpeed; uniform float uDrop; uniform vec3 uBowl; attribute vec4 aSeed; varying float vAlpha;
       float h(float x){ return fract(sin(x * 91.3458) * 47453.5453); }
       void main(){
         float t = uEdenRipple.x, life = ${k.life.toFixed(3)}, u = t / life + aSeed.x, cyc = floor(u), a = (u - cyc) * life;
@@ -95,9 +124,11 @@ export function waterJets(def: Def, state: Record<string, unknown> | undefined, 
   const kind = waterJetKind(def), at = nozzleOf(def);
   if (!kind || !at || state?.on !== true) return null;
   const reach = Number(params.reach ?? def.params?.reach?.default ?? 3.5);
-  const m = kind === 'sprinkler' ? material(kind).clone() : material(kind);
+  const m = kind === 'sprinkler' || kind === 'fountain' ? material(kind).clone() : material(kind);
   m.uniforms.uDrop.value = Math.max(0.05, at[1] - (kind === 'stream' ? 0.1 : kind === 'shower' ? 0.04 : 0));
   // a sprinkler's speed carries the farthest drops to its reach (flat-ground range at the mean launch angle, plus height)
+  // a fountain's jet falls into its upper bowl and the bowl spills from its rim into the pool (distances below the nozzle)
+  if (kind === 'fountain') { const w = waterSurfaces(def); if (!w) return null; m.uniforms.uEdenRipple = RIPPLE; m.uniforms.uSpeed.value = 2.4; m.uniforms.uBowl.value = new THREE.Vector3(at[1] - w.bowl[0], w.bowl[1] + 0.05, at[1] - w.pool[0]); }
   if (kind === 'sprinkler') { m.uniforms.uEdenRipple = RIPPLE; m.uniforms.uSpeed.value = Math.sqrt(reach * 9.8 / Math.sin(2 * 0.62)) * 0.92; }
   const pts = new THREE.Points(geometry(kind), m);
   pts.name = `water jets (${kind})`; pts.position.set(at[0], at[1], at[2]); pts.frustumCulled = false; pts.renderOrder = 2;
