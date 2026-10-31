@@ -129,7 +129,8 @@ export class WorldEntityLayer {
   private peeled=new Set<THREE.Object3D>();
   private readonly leaves=new WeakMap<THREE.Object3D,{parts:THREE.Object3D[];angle:number}>();
   /** Entry 38: redraw every drawn thing whose def has this tag (posters age by the world day shown). */
-  redrawTagged(tag:string){const m=this.model;if(!m)return;for(const id of this.drawn.keys()){const e=m.entities.get(id),def=e&&m.resolvedDef(e.def);if(e&&def?.tags.includes(tag))this.draw(e,false,true);}}
+  redrawTagged(tag:string){const m=this.model;if(!m)return;for(const id of [...this.drawn.keys()]){   // a copy: draw() deletes and re-adds the key (a live Map iterator would visit it again, forever)
+    const e=m.entities.get(id),def=e&&m.resolvedDef(e.def);if(e&&def?.tags.includes(tag))this.draw(e,false,true);}}
   /** Does this placed thing publish a lamp pool or a lighthouse beam (world-env's scan)? */
   private lit(id:string){const e=this.model?.entities.get(id),def=e&&this.model!.resolvedDef(e.def);return !!def&&(defLights(def.components).length>0||!!def.tags?.includes('lighthouse'));}
   /** M01: bumped only by a diff that can change a lamp pool (world-env's immediate repaint); other diffs keep its 2 Hz gate. */
