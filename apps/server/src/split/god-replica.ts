@@ -47,7 +47,9 @@ export class GodReplica {
     this._builds = this.newBuilds();
   }
   now(): number {return Date.now();}
-  get builds(): GodBuilds {this.syncBuilds(); return this._builds;}
+  /** Open builds as of the last `sync()` (each read syncs first): the revision is one sqlite query, and a menu reads the
+   *  builds hundreds of times (layers' building refusals; was a query per access, ~8 s of a 2-min probe's reads). */
+  get builds(): GodBuilds {if (this.buildsRev < 0) this.syncBuilds(); return this._builds;}
   onCommit(fn: CommitListener) {this.commitListeners.push(fn); return () => {this.commitListeners = this.commitListeners.filter(f => f !== fn);};}
   onBuild(fn: (e: BuildNotice) => void) {this.buildListeners.push(fn); return () => {this.buildListeners = this.buildListeners.filter(f => f !== fn);};}
   engineAct(): never {throw new MainOnly('god.engineAct');}

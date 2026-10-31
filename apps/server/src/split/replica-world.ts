@@ -97,7 +97,11 @@ export class ReplicaWorld {
     return out;
   }
   /** The engine's helpers read `rt.world` and `rt.services.spatial` only. */
-  private rt() {return {world: this.worldView, services: {spatial: this.spatial?.service()}} as never;}
+  // (the service is synced against the replica's own world, which holds no entities: the static scene comes whole with
+  //  the export. Handing the helpers the service itself let swim.ts destinationInDeepWater `sync(rt.world)` it against this
+  //  view, which has every entity: a whole solids rebuild, and another on the replica's next read: ~5 s of a 2-min probe,
+  //  and a held read pass let go. The helpers read `ground` (field, base) and call `sync` only.)
+  private rt() {const sp = this.spatial?.service(); return {world: this.worldView, services: {spatial: sp ? {ground: sp.ground, sync: () => false} : undefined}} as never;}
   private movementVerb(actor: string, x: number, z: number): string {
     const a = this.ents[actor], w = {navV1: this.statics.navV1} as never;
     if (this.statics.groundV1 && this.spatial && (inDeepWater(this.rt(), actor) || destinationInDeepWater(this.rt(), x, z))) return 'ground_travel';
