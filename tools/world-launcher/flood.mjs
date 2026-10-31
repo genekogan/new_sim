@@ -62,14 +62,18 @@ export function launcherFlood({ limits = {}, now = Date.now, log = (l) => consol
 // Per address only behind the reverse proxy (x-forwarded-for, which Caddy sets itself); this machine is never limited by
 // address. Caddy, not the launcher, accepts the connections, so "connections per address" is counted as the address's
 // requests in flight to world APIs and its WebSockets.
+// Re-derived 2026-10-31 (Gene, 13:40Z, team/scratch/ship/CEILINGS-DECISION-20261031.md: "I want real scalability
+// solutions, not limits"): a floor an order of magnitude above legitimate use — 6 Souls at home are 20–30 requests per
+// 10 s and ~110 heavy per minute; the first numbers were set before Stage A was measured and sat at that edge. The world
+// budget is a stop-gap until shedding is load-driven (the world's green/amber/red/black, LOAD-CONTRACT §1).
 export const SOUL_CEILINGS = Object.freeze({
-  ipPer10s: 120,            // Soul API requests per address per world per 10 s
-  ipConcurrent: 10,         // API requests in flight + WebSockets per address
-  ipListen: 8,              // listen/wait long-polls per address
-  soulListen: 4,            // listen/wait per Soul token
-  accountListen: 12,        // listen/wait per account (learned from the world's x-sim-account header, else per Soul)
-  accountHeavyPerMin: 120,  // C1/C2 per account (as above) per minute
-  worldBudgetRps: 10,       // C1/C2 forwarded to the world per second, every Soul together (bursts of 2 s)
+  ipPer10s: 600,            // Soul API requests per address per world per 10 s
+  ipConcurrent: 50,         // API requests in flight + WebSockets per address
+  ipListen: 40,             // listen/wait long-polls per address
+  soulListen: 4,            // listen/wait per Soul token (a Soul needs 1–2; more is a client bug)
+  accountListen: 40,        // listen/wait per account (learned from the world's x-sim-account header, else per Soul)
+  accountHeavyPerMin: 900,  // C1/C2 per account (as above) per minute
+  worldBudgetRps: 200,      // C1/C2 forwarded to the world per second, every Soul together (bursts of 2 s)
   maxBodyKb: 64,            // a Soul API request body (body uploads excepted)
   c3CacheMs: 1000,          // C3 public reads: one world call per this long per URL (the micro-cache)
 });

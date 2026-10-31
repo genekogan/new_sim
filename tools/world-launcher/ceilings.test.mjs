@@ -106,7 +106,9 @@ test('a 200 req/s hammer from one address: the world gets at most its budget, ev
   const fake = new URL('./fake-world.mjs', import.meta.url).pathname;
   const command = (w, port) => ({ cmd: process.execPath, args: [fake], env: { ...process.env, WORLD_KEY: w.slug, PORT: String(port), FAKE_HITS: hits } });
   const P = 5109, base = `http://127.0.0.1:${P}`;
-  const L = await openLauncher({ port: P, range: [5104, 5106], dataDir: join(dir, 'data'), webDir, templatesDir, command, eager: 0, log: () => {}, prewarm: false, publicOrigin: 'http://sim.test', devAuth: true });
+  // the hammer tests the mechanism at tight limits (the release-402 numbers); the shipped defaults are far above a 200 req/s single address
+  const tight = { ipPer10s: 120, ipConcurrent: 10, worldBudgetRps: 10 };
+  const L = await openLauncher({ port: P, range: [5104, 5106], dataDir: join(dir, 'data'), webDir, templatesDir, command, eager: 0, log: () => {}, prewarm: false, publicOrigin: 'http://sim.test', devAuth: true, soulLimits: tight });
   try {
     const made = await (await fetch(`${base}/__sim/worlds`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Anvil' }) })).json();
     const slug = made.slug, path = `${base}/w/${slug}/v1/edge/here`;
@@ -122,7 +124,7 @@ test('a 200 req/s hammer from one address: the world gets at most its budget, ev
     const reached = readFileSync(hits, 'utf8').split('\n').filter((l) => l === '/v1/edge/here').length;
     const refused = out.filter((r) => r.status === 429 || r.status === 503), worst = Math.max(...refused.map((r) => r.ms));
     const p99 = refused.map((r) => r.ms).sort((a, b) => a - b)[Math.floor(refused.length * 0.99)];
-    const budget = SOUL_CEILINGS.worldBudgetRps * Math.ceil(elapsed) + 2 * SOUL_CEILINGS.worldBudgetRps;
+    const budget = tight.worldBudgetRps * Math.ceil(elapsed) + 2 * tight.worldBudgetRps;
     console.log(`hammer: ${out.length} requests in ${elapsed.toFixed(1)} s; world reached ${reached} (budget ${budget}); refused ${refused.length}, p99 ${p99.toFixed(1)} ms, worst ${worst.toFixed(1)} ms`);
     assert.ok(reached <= budget, `world reached ${reached} > ${budget}`);
     assert.ok(refused.length >= out.length - budget);
@@ -139,7 +141,7 @@ test('a 200 req/s hammer from one address: the world gets at most its budget, ev
     const r = await fetch(`${base}/__sim/op/set-limits`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ slug, limits: { worldBudgetRps: 50, nope: 1 } }) });
     assert.equal(r.status, 400);
     const ok = await (await fetch(`${base}/__sim/op/set-limits`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ slug, limits: { worldBudgetRps: 50 } }) })).json();
-    assert.equal(ok.limits.worldBudgetRps, 50); assert.equal(ok.limits.ipListen, 8);
+    assert.equal(ok.limits.worldBudgetRps, 50); assert.equal(ok.limits.ipListen, SOUL_CEILINGS.ipListen);
     const dash = await (await fetch(`${base}/__sim/health?json=1`)).json();
     const row = dash.worlds.find((w) => w.slug === slug);
     assert.equal(row.limits.worldBudgetRps, 50); assert.ok(row.refused['world.busy'] > 0 || row.refused['client.rate'] > 0);
