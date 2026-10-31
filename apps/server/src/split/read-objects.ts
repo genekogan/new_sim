@@ -9,13 +9,14 @@
 //   - no writes: a time-driven advance a listing applies is computed as main computes it and returned, never saved (main
 //     saves it when it lists, and the delta brings the row); create/refresh (GodPerceive bringing objects in line with the
 //     god's edits) are main's: the row arrives with the delta. Acting is main-only.
-import {Objects} from '../edge/comms/objects/framework.ts';
+import {Objects, checkState, isRefreshOnlyObjectAdvance} from '../edge/comms/objects/framework.ts';
+import {canonicalJson, stateDigest} from '../edge/comms/objects/table.ts';
 import {chessKind} from '../edge/comms/objects/chess.ts';
 import {presentationKind} from '../edge/comms/objects/presentation.ts';
 import {markKind, projectKind} from '../edge/comms/objects/marks.ts';
 import {calendarKind} from '../edge/comms/objects/calendar.ts';
 import {rideKind} from '../edge/comms/objects/ride.ts';
-import type {ObjectRecord} from '../edge/comms/objects/types.ts';
+import type {ObjectKind, ObjectRecord, TimeCtx} from '../edge/comms/objects/types.ts';
 import type {CommsCore} from '../edge/comms/core.ts';
 import type {EdgeLedger} from '../edge/ledger/ledger.ts';
 
@@ -26,6 +27,8 @@ const atOf = (o: ObjectRecord): [number, number] | null => {
   return Array.isArray(at) && at.length >= 2 && Number.isFinite(at[0]) && Number.isFinite(at[1]) ? [at[0] as number, at[1] as number] : null;
 };
 const EMPTY: readonly ObjectRecord[] = Object.freeze([]);
+/** kinds whose advance is marked readOnlyObjectAdvance on main (it neither mutates nor keeps its input) */
+const READ_ONLY_KINDS = new Set(['calendar-item']);
 type Source = () => {objectGen: number; objects: Map<string, ObjectRecord>};
 
 /** ObjectTable's read API over the replicated rows (rebuilt when the replica's object generation or map moves). */
@@ -94,6 +97,25 @@ export function replicaObjects(o: ReplicaObjectsOpts): Objects & {replicaTable: 
   x.create = (input: {id: string; kind: string; name: string; description?: string; placeId: string}) => table.sync().get(input.id) ?? {...input, description: input.description ?? '', version: 0, state: {}, createdAt: 0};
   x.refresh = () => {/* main's */};
   x.reload = () => {/* follows the replica */};
+  // main's freshList, without the writes: after main's first written advance it re-reads each later row in its own
+  // transaction (an emit may have changed it); nothing is written here, so every row is advanced as read (one savepoint per
+  // object of a world was ~2x main's own listing). Same records out: an advance that changes nothing (same state, no
+  // events) keeps the row, otherwise the row with the new state and the next version, exactly as main's `advanced`.
+  const kinds = (objs as unknown as {kinds: Map<string, ObjectKind>}).kinds, timeCtx = () => (objs as unknown as {timeCtx(): TimeCtx}).timeCtx();
+  x.freshList = (only: readonly ObjectRecord[] | undefined, withRefreshOnly: boolean): ObjectRecord[] => {
+    const rows = only ?? table.sync().all();
+    let ctx: TimeCtx | undefined;
+    return rows.map(o => {
+      const kind = kinds.get(o.kind), advance = kind?.advance;
+      if (!kind || !advance || (!withRefreshOnly && isRefreshOnlyObjectAdvance(advance))) return o;
+      // READ_ONLY advances (calendar items: thousands of them) read the state without a defensive copy, as on main
+      const step = advance.call(kind, READ_ONLY_KINDS.has(o.kind) ? o.state : structuredClone(o.state), ctx ??= timeCtx());
+      if (!step) return o;
+      checkState(kind, step.state);
+      if (!step.events?.length && canonicalJson(step.state) === stateDigest(o.state)) return o;
+      return {...o, state: step.state, version: o.version + 1};
+    });
+  };
   for (const k of ['act', 'prepareAct', 'remove', 'sweep', 'sweepSteps']) x[k] = () => o.mainOnly(`comms.objects.${k}`);
   return Object.assign(objs, {replicaTable: table});
 }

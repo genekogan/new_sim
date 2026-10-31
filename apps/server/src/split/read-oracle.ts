@@ -57,7 +57,7 @@ import type {DeltaTap, StreamMessage} from './delta.ts';
 
 export type ReadName = 'here' | 'observe' | 'capabilities' | 'resolve' | 'around';
 export const READS: readonly ReadName[] = ['here', 'observe', 'capabilities', 'resolve', 'around'];
-export type Soak = {startedAt: number; rounds: number; skipped: Record<string, number>; reads: Record<ReadName, OracleTally & {mainOnly: Record<string, number>; liveMs: number; replicaMs: number; paths: Record<string, number>}>; replica: unknown};
+export type Soak = {startedAt: number; rounds: number; skipped: Record<string, number>; reads: Record<ReadName, OracleTally & {mainOnly: Record<string, number>; liveMs: number; replicaMs: number; paths: Record<string, number>; lateDelta?: number}>; replica: unknown};
 
 export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {tap: DeltaTap; init: () => unknown; ask: (m: never[]) => void}, dbPath: string, o: {everyMs?: number; log?: (s: string) => void; logEveryMs?: number} = {}) {
   const [{ReplicaWorld}, {ReadOnlyHost, readLedger, MainOnly}, {hereFrame}, {aroundFrame}, {readBridgeSync, readBridgeCost}] = await Promise.all([import('./replica-world.ts'), import('./read-host.ts'), import('../edge/perception/here.ts'), import('../edge/perception/around.ts'), import('./read-bridge.ts')]);
@@ -108,13 +108,17 @@ export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {ta
     // the object table moves between deltas too (a layer step after the tick, an advance a listing wrote): the next delta brings it
     {const g = (L.comms as unknown as {objects?: {generation?(): number}} | undefined)?.objects?.generation?.(); if (g !== undefined && g !== RW.R.objectGen) {skip('objectGen'); return;}}
     warm(); if (!RW.spatial) {skip('no-spatial'); return;}
+    // main's own god places not published yet (boot): main answers from a half-built world the worker is already past
+    if (!(L as unknown as {bodyPlacesReady(): boolean}).bodyPlacesReady()) {skip('main-places'); return;}
     const all = souls(); if (!all.length) {skip('no-souls'); return;}
     const s = all[next++ % all.length]; S.rounds++;
     readBridgeSync(H, RL);   // as a worker does before each read
     for (const name of READS) {
       const T = S.reads[name];
       let a: unknown, b: unknown, t = performance.now();
+      const genOf = () => (L.comms as unknown as {objects?: {generation?(): number}} | undefined)?.objects?.generation?.(), g0 = genOf();
       try {a = JSON.parse(JSON.stringify(ask[name](L, s, S.rounds)));} catch (e) {a = {error: String(e)};}
+      const mainWrote = genOf() !== g0;
       T.liveMs += performance.now() - t;
       const missBefore = RW.verdicts.missCount; t = performance.now();
       try {b = JSON.parse(JSON.stringify(ask[name](RL, s, S.rounds)));}
@@ -127,6 +131,9 @@ export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {ta
       if (diffs.length) {const k = diffs[0].path.replace(/\[\d+\]/g, '[]').split('.').slice(0, 3).join('.'); T.paths[k] = (T.paths[k] ?? 0) + 1;}
       // SIM_READ_ORACLE_DUMP=<dir>: the first three unequal pairs per read, whole (diagnosis; lane only)
       if (diffs.length && DUMP && S.rounds > DUMP_AFTER && (dumped[name] = (dumped[name] ?? 0) + 1) <= 3) {const dl = diag(L, s) as {path?: string[]}, ids = dl.path ?? []; writeFileSync(`${DUMP}/${name}-${dumped[name]}.json`, JSON.stringify({soulId: s.soulId, tick: RW.R.pos.tick, diag: {live: dl, replica: diag(RL, s), placesLive: facts(L, ids), placesReplica: facts(RL, ids), ...(name === 'capabilities' ? {full: fullDiff(s)} : {})}, live: a, replica: b}));}
+      // main wrote objects inside its own read (a perception catch-up the read started, a listing's advance): the replica
+      // shows the rows main had before it, and the next delta brings the new ones. Counted apart, never as equal.
+      if (diffs.length && mainWrote) {T.lateDelta = (T.lateDelta ?? 0) + 1; T.reads++; continue;}
       record(T, name, s.soulId, diffs, missed);
     }
     if (RW.verdicts.misses.size) {src.ask([...RW.verdicts.misses.values()] as never[]); RW.verdicts.misses.clear();}
