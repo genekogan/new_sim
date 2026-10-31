@@ -93,7 +93,8 @@ const signupSheet: DefInput = {
   make: { kind: 'gen', gen: 'kit/2', args: { round: 0.006, shapes: [...stand(1.12),
     { kind: 'box', at: [0, 1.25, 0], size: [0.38, 0.5, 0.02], round: 0.01, tint: 'board', pitch: -0.35 },
     { kind: 'box', at: [0, 1.48, 0.1], size: [0.12, 0.03, 0.03], round: 0.006, tint: 'frame', pitch: -0.35 }],
-    faces: [{ at: [0, 1.24, 0.014], w: 0.33, h: 0.45, pitch: -0.35, bg: '#fbfaf4', ink: '#22303e' }] } } as unknown as DefInput['make'],
+    faces: [{ at: [0, 1.25, 0.022], w: 0.33, h: 0.45, pitch: -0.35,   // on the board's own pivot height, 1.2 cm proud (at 1.24/0.014 it sat 0.3 mm behind the tilted front and z-fought)
+ bg: '#fbfaf4', ink: '#22303e' }] } } as unknown as DefInput['make'],
   params: { frame: { type: 'color', default: '#3c3f44', doc: 'stand colour' }, board: { type: 'color', default: '#a8794c', doc: 'clipboard colour' } },
   palette: { frame: '#3c3f44', board: '#a8794c' },
   state: { title: { type: 'string', max: 60, default: 'Sign up' }, text: { type: 'string', max: SIGNUP_MAX * 41, default: '' }, textBy: { type: 'string', max: SIGNUP_MAX * 41, default: '' } } as DefInput['state'],

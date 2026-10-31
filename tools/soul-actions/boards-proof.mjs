@@ -26,7 +26,7 @@ try{
  await act('ada','vote on the poll',{choice:'soup'});await act('ben','vote on the poll',{choice:'salad'});await act('cy','vote on the poll',{choice:'salad'});
  await act('ada','vote on the poll',{choice:'salad'});
  const read=await act('cy','read the poll');
- for(const [n,cam] of [['chalk',[[-3.0,1.3,2.9],[-2.55,0.95,4]]],['sheet',[[-0.2,1.5,3.15],[0,1.22,4]]],['poll',[[2.45,1.35,2.8],[2.6,1.22,4]]]]){await camera(...cam);await page.waitForTimeout(3000);await page.screenshot({path:out+`/close-${n}.png`});}
+ for(const [n,cam] of [['chalk',[[-3.0,1.3,2.9],[-2.55,0.95,4]]],['sheet',[[-0.2,1.5,3.15],[0,1.22,4]]],['poll',[[3.3,1.45,2.75],[2.6,1.22,4]]]]){await camera(...cam);await page.waitForTimeout(3000);await page.screenshot({path:out+`/close-${n}.png`});}
  assert.deepEqual(errors,[]);
  // a note appears (or comes down) only at the depicted stroke end
  const early=[];for(const s of samples)for(const b of s.bodies){const m=b.motion;if(!m?.stroke)continue;const t=(s.tick-m.startTick)*s.dt,board=s.boards.find(x=>x.id===m.target),before=samples.filter(p=>p.tick<m.startTick).at(-1)?.boards.find(x=>x.id===m.target)?.text;if(board&&before!==undefined&&t<.65+m.stroke.seconds-.06&&board.text!==before)early.push({tick:s.tick,t,text:board.text});}

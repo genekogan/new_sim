@@ -82,7 +82,9 @@ export function chalkTexture(lines: string[], f: Face): THREE.Texture {
   const key = JSON.stringify(['chalk', lines, f.w, f.h, f.bg]); const hit = texCache.get(key); if (hit) return hit;
   const { c, g, cw, ch } = canvasOf(f, 768); let seed = 11; const rnd = () => ((seed = Math.imul(seed ^ (seed >>> 13), 1103515245) + 12345 | 0) >>> 0) / 4294967296;
   g.fillStyle = f.bg ?? '#2b322e'; g.fillRect(0, 0, cw, ch);
-  for (let i = 0; i < 90; i++) { g.fillStyle = `rgba(230,230,220,${0.02 + rnd() * 0.04})`; g.beginPath(); g.ellipse(rnd() * cw, rnd() * ch, 30 + rnd() * 90, 10 + rnd() * 30, rnd() * 3, 0, Math.PI * 2); g.fill(); }
+  // old wiping: a few broad, faint horizontal smears, then fine chalk dust
+  for (let i = 0; i < 14; i++) { g.fillStyle = `rgba(235,235,225,${0.015 + rnd() * 0.02})`; g.beginPath(); g.ellipse(rnd() * cw, rnd() * ch, 120 + rnd() * 200, 18 + rnd() * 26, (rnd() - 0.5) * 0.25, 0, Math.PI * 2); g.fill(); }
+  for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(240,240,230,${0.04 + rnd() * 0.08})`; g.fillRect(rnd() * cw, rnd() * ch, 1.5, 1.5); }
   const ls = lines.filter((l) => l.trim()).slice(0, 6); let size = 74; g.font = `600 ${size}px ${CHALK}`;
   while (size > 22 && (ls.some((l) => g.measureText(l).width > cw * 0.86) || ls.length * size * 1.25 > ch * 0.85)) { size -= 2; g.font = `600 ${size}px ${CHALK}`; }
   g.fillStyle = f.ink ?? '#f4f2e8'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.shadowColor = 'rgba(255,255,255,0.35)'; g.shadowBlur = 3;
