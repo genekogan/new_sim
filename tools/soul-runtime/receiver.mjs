@@ -11,14 +11,26 @@ export async function receivePage(journal, source, read, {signal,onCommitted=()=
 }
 
 /** Receiver never waits for a host notification or model response. Terminal
- * auth/supersession propagates; only explicitly classified errors retry. */
-export async function runReceiver({journal,source,read,signal,onState=()=>{},retryable=()=>false,sleep=abortableSleep,maxBackoffMs=30000}) {
-  let backoff=0,ready=false;
+ * auth/supersession propagates; only explicitly classified errors retry.
+ *
+ * Backoff counts consecutive failed connects, not quiet time. A stream the
+ * server admitted (validated hello) that stayed open at least minHealthyMs and
+ * then closed (sse.mjs marks a stream end or interruption streamClosed; an idle
+ * world's stream rotates about every 65 s) is a normal rotation: it resets the
+ * backoff and reconnects within healthyReconnectMs jitter. Every other error,
+ * including a coded one on an open stream such as JOURNAL_BACKLOG_FULL, a
+ * failed, refused (non-2xx) or quickly dropped connect, takes the failure path:
+ * full jitter over a 1 s base doubling to maxBackoffMs (LOAD-CONTRACT v1 §3),
+ * with a stated Retry-After (429/503) as a floor (+0-20 % jitter), the result
+ * capped at maxRetryAfterMs. One read is outstanding per source, so
+ * reconnecting never adds a long-poll. */
+export async function runReceiver({journal,source,read,signal,onState=()=>{},retryable=()=>false,sleep=abortableSleep,maxBackoffMs=30000,healthyReconnectMs=1000,minHealthyMs=5000,maxRetryAfterMs=60000,random=Math.random,now=Date.now}) {
+  let backoff=0,ready=false,connectedAt=null;
   const markReady=mode=>{if(!ready&&!signal?.aborted){ready=true;onState({source,state:'receiver-ready',successful:true,mode,at:Date.now()});}};
   while(!signal?.aborted){
     try {
       onState({source,state:'receiving'});
-      const result=await receivePage(journal,source,read,{signal,onCommitted:onState,initial:!ready,onReady:proof=>{if(proof?.mode==='stream-adopted'&&proof.successful===true)markReady('stream-adopted');}});
+      const result=await receivePage(journal,source,read,{signal,onCommitted:onState,initial:!ready,onReady:proof=>{if(proof?.successful!==true)return;connectedAt=now();if(proof.mode==='stream-adopted')markReady('stream-adopted');}});
       if(result.aborted)break;
       markReady('page-committed');
       backoff=0;
@@ -28,9 +40,20 @@ export async function runReceiver({journal,source,read,signal,onState=()=>{},ret
         onState({source,state:'blocked',reason:String(error.message)});
         throw error;
       }
-      backoff=Math.min(maxBackoffMs,backoff?backoff*2:1000);
-      onState({source,state:'retrying',delayMs:backoff,reason:String(error.message),...(typeof error.code==='string'?{code:error.code}:{})});
-      await sleep(backoff,signal);
+      const statedMs=Number.isFinite(error?.retryAfterMs)&&error.retryAfterMs>0?error.retryAfterMs:0;
+      const lived=connectedAt===null?null:now()-connectedAt;connectedAt=null;
+      const extra={reason:String(error.message),...(typeof error.code==='string'?{code:error.code}:{}),...(statedMs?{retryAfterMs:statedMs}:{})};
+      let delayMs;
+      if(error?.streamClosed===true&&typeof error.code!=='string'&&lived!==null&&lived>=minHealthyMs&&!statedMs){
+        backoff=0;delayMs=Math.floor(random()*healthyReconnectMs);
+        onState({source,state:'reconnecting',delayMs,connectedMs:lived,...extra});
+      }else{
+        backoff=Math.min(maxBackoffMs,backoff?backoff*2:1000);
+        delayMs=Math.floor(random()*backoff);
+        if(statedMs)delayMs=Math.max(delayMs,Math.min(maxRetryAfterMs,statedMs+Math.floor(random()*statedMs*0.2)));
+        onState({source,state:'retrying',delayMs,backoffMs:backoff,...extra});
+      }
+      await sleep(delayMs,signal);
     }
   }
   onState({source,state:'stopped'});

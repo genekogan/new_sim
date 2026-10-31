@@ -116,3 +116,15 @@ test('here physical view is explicit while default agent here keeps rich offers 
  const refused=mock(async()=>Response.json({error:{code:'unauthorized'}},{status:401}));
  await assert.rejects(refused.read('here',{view:'body'}),e=>e.status===401&&!e.transient);
 });
+
+test('refusals carry the stated Retry-After for the receiver backoff floor',async()=>{
+ const {retryAfterMs}=await import('./world-client.mjs');
+ const busy=mock(async()=>Response.json({error:{code:'world.busy'},world:{load:'red',retry_after_s:3}},{status:503,headers:{'retry-after':'2'}}));
+ await assert.rejects(busy.ownerPage({after:null}),e=>e.transient===true&&e.status===503&&e.retryAfterMs===2000);
+ const bodyOnly=mock(async()=>Response.json({error:{code:'soul.slow-down'},world:{retry_after_s:4}},{status:429}));
+ await assert.rejects(bodyOnly.ownerPage({after:null}),e=>e.retryAfterMs===4000);
+ const stream=mock(async()=>new Response('{}',{status:429,headers:{'retry-after':'7','content-type':'application/json'}}));
+ await assert.rejects(stream.eventPage({after:'c_1'}),e=>e.code==='stream.refused'&&e.transient===true&&e.retryAfterMs===7000);
+ const plain=mock(async()=>Response.json({error:{code:'x'}},{status:500}));await assert.rejects(plain.ownerPage({after:null}),e=>e.retryAfterMs===null);
+ assert.equal(retryAfterMs({get:()=>new Date(Date.now()+60000).toUTCString()})>50000,true);
+});

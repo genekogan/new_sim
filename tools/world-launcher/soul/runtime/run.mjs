@@ -403,8 +403,8 @@ async function receivePage(journal, source, read, { signal, onCommitted = () => 
   return { ...result, pending: journal.pending().length };
 }
 async function runReceiver({ journal, source, read, signal, onState = () => {
-}, retryable = () => false, sleep = abortableSleep, maxBackoffMs = 3e4 }) {
-  let backoff = 0, ready = false;
+}, retryable = () => false, sleep = abortableSleep, maxBackoffMs = 3e4, healthyReconnectMs = 1e3, minHealthyMs = 5e3, maxRetryAfterMs = 6e4, random = Math.random, now = Date.now }) {
+  let backoff = 0, ready = false, connectedAt = null;
   const markReady = (mode) => {
     if (!ready && !signal?.aborted) {
       ready = true;
@@ -415,7 +415,9 @@ async function runReceiver({ journal, source, read, signal, onState = () => {
     try {
       onState({ source, state: "receiving" });
       const result = await receivePage(journal, source, read, { signal, onCommitted: onState, initial: !ready, onReady: (proof) => {
-        if (proof?.mode === "stream-adopted" && proof.successful === true) markReady("stream-adopted");
+        if (proof?.successful !== true) return;
+        connectedAt = now();
+        if (proof.mode === "stream-adopted") markReady("stream-adopted");
       } });
       if (result.aborted) break;
       markReady("page-committed");
@@ -426,9 +428,22 @@ async function runReceiver({ journal, source, read, signal, onState = () => {
         onState({ source, state: "blocked", reason: String(error2.message) });
         throw error2;
       }
-      backoff = Math.min(maxBackoffMs, backoff ? backoff * 2 : 1e3);
-      onState({ source, state: "retrying", delayMs: backoff, reason: String(error2.message), ...typeof error2.code === "string" ? { code: error2.code } : {} });
-      await sleep(backoff, signal);
+      const statedMs = Number.isFinite(error2?.retryAfterMs) && error2.retryAfterMs > 0 ? error2.retryAfterMs : 0;
+      const lived = connectedAt === null ? null : now() - connectedAt;
+      connectedAt = null;
+      const extra = { reason: String(error2.message), ...typeof error2.code === "string" ? { code: error2.code } : {}, ...statedMs ? { retryAfterMs: statedMs } : {} };
+      let delayMs;
+      if (error2?.streamClosed === true && typeof error2.code !== "string" && lived !== null && lived >= minHealthyMs && !statedMs) {
+        backoff = 0;
+        delayMs = Math.floor(random() * healthyReconnectMs);
+        onState({ source, state: "reconnecting", delayMs, connectedMs: lived, ...extra });
+      } else {
+        backoff = Math.min(maxBackoffMs, backoff ? backoff * 2 : 1e3);
+        delayMs = Math.floor(random() * backoff);
+        if (statedMs) delayMs = Math.max(delayMs, Math.min(maxRetryAfterMs, statedMs + Math.floor(random() * statedMs * 0.2)));
+        onState({ source, state: "retrying", delayMs, backoffMs: backoff, ...extra });
+      }
+      await sleep(delayMs, signal);
     }
   }
   onState({ source, state: "stopped" });
@@ -1499,9 +1514,9 @@ function createEventReader({ open, validateHello }) {
           try {
             chunk = await readAbortable(reader, signal);
           } catch {
-            throw Object.assign(Error("Event stream interrupted"), { transient: !signal?.aborted });
+            throw Object.assign(Error("Event stream interrupted"), { transient: !signal?.aborted, streamClosed: true });
           }
-          if (chunk.done) throw Object.assign(Error("Event stream ended"), { transient: true });
+          if (chunk.done) throw Object.assign(Error("Event stream ended"), { transient: true, streamClosed: true });
           buffer = (buffer + decoder.decode(chunk.value, { stream: true })).replace(/\r\n/g, "\n");
           if (buffer.length > 1024 * 1024) throw Error("Event stream frame exceeded bound");
           continue;
@@ -1611,6 +1626,17 @@ var observed = (response) => {
   const reconciliation = { evidence: "observed-native-state", note: "The requested effect is present in native state; this does not prove this operation executed." };
   return { state: "recorded", evidence: reconciliation.evidence, status: 200, response: { ...response, reconciliation } };
 };
+function retryAfterMs(headers, data) {
+  const h = headers?.get?.("retry-after");
+  if (h) {
+    const n = Number(h);
+    if (Number.isFinite(n) && n >= 0) return n * 1e3;
+    const at = Date.parse(h);
+    if (Number.isFinite(at)) return Math.max(0, at - Date.now());
+  }
+  for (const v of [data?.world?.retry_after_s, data?.error?.retry_after_s, data?.retry_after_s]) if (Number.isFinite(v) && v >= 0) return v * 1e3;
+  return null;
+}
 function createWorldClient({ world, token, fetchImpl = fetch, timeoutMs = 65e3, expectedSoulId = null }) {
   const base = new URL(world);
   if (base.username || base.password || base.search || base.hash || !(base.protocol === "https:" || base.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(base.hostname))) throw Error("World must be HTTPS or loopback HTTP without credentials/query");
@@ -1634,7 +1660,7 @@ function createWorldClient({ world, token, fetchImpl = fetch, timeoutMs = 65e3, 
     } catch {
       throw error("transport.body", "World response body was incomplete or invalid", { transient: readOnly && (response.status >= 500 || response.status < 300), uncertain: !readOnly, status: response.status });
     }
-    if (!response.ok) throw error(data.error?.code ?? data.code ?? `http.${response.status}`, data.error?.message ?? data.message ?? "World request refused", { status: response.status, transient: readOnly && (response.status === 429 || response.status >= 500), uncertain: !readOnly && response.status >= 500 });
+    if (!response.ok) throw error(data.error?.code ?? data.code ?? `http.${response.status}`, data.error?.message ?? data.message ?? "World request refused", { status: response.status, transient: readOnly && (response.status === 429 || response.status >= 500), uncertain: !readOnly && response.status >= 500, retryAfterMs: retryAfterMs(response.headers, data) });
     return data;
   }
   const eventPage = createEventReader({ open: async (after, signal) => {
@@ -1644,7 +1670,9 @@ function createWorldClient({ world, token, fetchImpl = fetch, timeoutMs = 65e3, 
     } catch {
       throw error("transport.unreachable", "Event stream unavailable", { transient: !signal?.aborted });
     }
-    if (!response.ok) throw error("stream.refused", "Event stream refused", { status: response.status, transient: response.status === 429 || response.status >= 500 });
+    if (!response.ok) {
+      throw error("stream.refused", "Event stream refused", { status: response.status, transient: response.status === 429 || response.status >= 500, retryAfterMs: retryAfterMs(response.headers) });
+    }
     if (!response.headers.get("content-type")?.toLowerCase().includes("text/event-stream")) throw error("stream.invalid", "Event stream content type unavailable");
     return response;
   }, validateHello: (hello, { after }) => {
