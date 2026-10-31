@@ -17,7 +17,7 @@ const tryOr = <T>(f: () => T, d: T): T => {try {return f();} catch {return d;}};
 const HELD = new Set(['sit', 'take_slot']);
 const PARAMS = ['actor', 'fixture', 'on', 'slot', 'activity', 'seconds'] as const;
 
-type LedgerLike = {weatherNow?: () => unknown; recentStrikesV1?: () => unknown; spotsProvider?: () => unknown};
+type LedgerLike = {weatherNow?: () => unknown; recentStrikesV1?: () => unknown; spotsProvider?: () => unknown; godPhysicsV1?: {hash(): string; read(): unknown}};
 type Host = {minds: Map<string, {soulId: string; entityId: string}>; mindByEntity?: Map<string, {soulId: string}>; kernel?: unknown; extra?: Record<string, unknown>};
 
 export class VerdictPump {
@@ -84,6 +84,8 @@ export class VerdictPump {
     const put = (k: 'weather' | 'strikes', f: (() => unknown) | undefined) => {if (!f) return; const v = tryOr(f, null) ?? null, j = JSON.stringify(v); if (all || j !== this.envKeys[k]) {this.envKeys[k] = j; out[k] = JSON.parse(j);}};
     put('weather', L.weatherNow?.bind(L)); put('strikes', L.recentStrikesV1?.bind(L));
     if (L.spotsProvider) {const v = tryOr(() => L.spotsProvider!(), null) ?? null; if (all || v !== this.spotsRef) {this.spotsRef = v; out.spots = structuredClone(v);}}
+    // the god bridge's physics facts (seat/bed/item/surface assets, levels): by hash, sent whole when it moved
+    if (L.godPhysicsV1) {const h = tryOr(() => L.godPhysicsV1!.hash(), ''); if (all || h !== this.envKeys.physics) {this.envKeys.physics = h; out.physics = tryOr(() => L.godPhysicsV1!.read(), null);}}
     return Object.keys(out).length ? out : undefined;
   }
   /** What the engine's movementVerb / placeLevelV1 read besides the shipped world: groundV1, the physical-shore mode, upper floors. */

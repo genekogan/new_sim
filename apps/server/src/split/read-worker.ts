@@ -45,8 +45,8 @@ const answer = (kind: string, soulId: string) => {
 };
 // ---- mode 2 (B-facade item 6): the read code itself over a ReplicaWorld + a read-only host (split/read-host.ts)
 const R2 = wd.mode >= 2 && wd.world ? await (async () => {
-  const [{ReplicaWorld}, {ReadOnlyHost, readLedger, MainOnly}] = await Promise.all([import('./replica-world.ts'), import('./read-host.ts')]);
-  return {ReplicaWorld, ReadOnlyHost, readLedger, MainOnly};
+  const [{ReplicaWorld}, {ReadOnlyHost, readLedger, MainOnly}, {readBridgeSync, readBridgeCost}] = await Promise.all([import('./replica-world.ts'), import('./read-host.ts'), import('./read-bridge.ts')]);
+  return {ReplicaWorld, ReadOnlyHost, readLedger, MainOnly, readBridgeSync, readBridgeCost};
 })() : null;
 let RW: RWT | null = null, RH: RHT | null = null, RL: EdgeLedger | null = null, ready2 = false;
 /** A static edit moved the scene: connectivity relabels in slices between messages; reads go to main meanwhile. */
@@ -103,6 +103,7 @@ function here2(soulId: string, query: string): {body: object; cpuMs: number} | n
   const c = cpuMs();
   try {
     const {hereFrame} = here2.mod!;
+    R2!.readBridgeSync(RH, RL);   // the god layer's reads (split/read-bridge.ts), current to main's last god commit
     const body = {tick: RW.mw.world.tick, here: hereFrame(RL, soul, {doHere: modern}), ...(modern ? {apiContract: 'eden-edge/1.1'} : {})};
     const ms = cpuMs() - c; c2.served++; c2.cpuMs += ms; c2.maxCpuMs = Math.max(c2.maxCpuMs, ms);
     askMisses();
@@ -182,7 +183,7 @@ function health(res: ServerResponse) {
   const mainGen = lag[0];
   const tick = tickNow();
   send(res, tick >= 0 ? 200 : 503, {ok: tick >= 0, worker: wd.index, gen, lagGens: Math.max(0, mainGen - gen), tick, subset: wd.mode === 1, mode: wd.mode, served: cost.served, forwarded: cost.forwarded,
-    ...(R2 ? {read: {ready: ready2, relabeling: !!relabel, ...c2, cpuMs: Math.round(c2.cpuMs), verdicts: RW ? {hits: RW.verdicts.hits, misses: RW.verdicts.missCount} : null, replica: RW?.cost ?? null}} : {})});
+    ...(R2 ? {read: {ready: ready2, relabeling: !!relabel, ...c2, cpuMs: Math.round(c2.cpuMs), verdicts: RW ? {hits: RW.verdicts.hits, misses: RW.verdicts.missCount} : null, replica: RW?.cost ?? null, god: RL ? R2.readBridgeCost(RL) : null}} : {})});
 }
 const HOP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'content-length', 'upgrade', 'expect']);
 /** Ask the main thread (through Admission) and relay its answer. */

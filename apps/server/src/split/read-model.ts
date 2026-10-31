@@ -41,6 +41,8 @@ export type StaticLayer = {
   fires: {id: string; name: string; at: V2}[];
   regions: {id: string; name: string; c: V2}[];   // world regions that are also places (gather offers)
   spots: {id: string; label: string; activity: string; at: V2}[];
+  /** B-facade: the god places main's bridge installed (its ledger's placeWalkable) */
+  walkable?: string[];
 };
 /** Position in the stream: `gen` changes only when the stream itself restarts (the engine was replaced, the object
  *  table reloaded, the world recovered); `seq` counts deltas within a gen (one per tick, contiguous); `logSeq` = host.seq. */

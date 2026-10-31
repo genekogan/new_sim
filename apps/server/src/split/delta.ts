@@ -158,7 +158,8 @@ export class DeltaTap {
     const fires = Object.values(w.entities).filter(e => isCampfire(e as never)).map(e => ({id: e.id, name: e.label ?? 'campfire', at: [e.pose.p[0], e.pose.p[2]] as V2}));
     const regions = Object.entries(w.regions ?? {}).filter(([id]) => L.places.byId.has(id)).map(([id, r]) => ({id, name: L.places.byId.get(id)!.name, c: centroid(r.polygon)}));
     const spots = L.spots.spots.map(s => ({id: s.id, label: s.label ?? s.activity, activity: s.activity, at: s.at as V2}));
-    return this.staticCache = copy({epoch, places: [...L.places.byId.values()], shells, solids, fires, regions, spots});
+    const pw = (L as {placeWalkable?: (id: string) => boolean}).placeWalkable, walkable = pw ? [...L.places.byId.keys()].filter(id => pw(id)) : undefined;
+    return this.staticCache = copy({epoch, places: [...L.places.byId.values()], shells, solids, fires, regions, spots, ...(walkable ? {walkable} : {})});
   }
 
   /** world.ts splitTap: after a completed tick, with that tick's own paths/changes. Never throws into the tick. */

@@ -60,7 +60,7 @@ export const READS: readonly ReadName[] = ['here', 'observe', 'capabilities', 'r
 export type Soak = {startedAt: number; rounds: number; skipped: Record<string, number>; reads: Record<ReadName, OracleTally & {mainOnly: Record<string, number>; liveMs: number; replicaMs: number}>; replica: unknown};
 
 export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {tap: DeltaTap; init: () => unknown; ask: (m: never[]) => void}, dbPath: string, o: {everyMs?: number; log?: (s: string) => void; logEveryMs?: number} = {}) {
-  const [{ReplicaWorld}, {ReadOnlyHost, readLedger, MainOnly}, {hereFrame}, {aroundFrame}] = await Promise.all([import('./replica-world.ts'), import('./read-host.ts'), import('../edge/perception/here.ts'), import('../edge/perception/around.ts')]);
+  const [{ReplicaWorld}, {ReadOnlyHost, readLedger, MainOnly}, {hereFrame}, {aroundFrame}, {readBridgeSync, readBridgeCost}] = await Promise.all([import('./replica-world.ts'), import('./read-host.ts'), import('../edge/perception/here.ts'), import('../edge/perception/around.ts'), import('./read-bridge.ts')]);
   const {readFileSync} = await import('node:fs');
   const RW = new ReplicaWorld();
   RW.init(structuredClone(src.init()) as never);
@@ -90,6 +90,7 @@ export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {ta
     warm(); if (!RW.spatial) {skip('no-spatial'); return;}
     const all = souls(); if (!all.length) {skip('no-souls'); return;}
     const s = all[next++ % all.length]; S.rounds++;
+    readBridgeSync(H, RL);   // as a worker does before each read
     for (const name of READS) {
       const T = S.reads[name];
       let a: unknown, b: unknown, t = performance.now();
@@ -106,7 +107,7 @@ export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {ta
     RL.knowledge.outbox.length = 0;
   };
   const iv = setInterval(() => {try {round();} catch (e) {skip('error'); console.error('[read-oracle]', e instanceof Error ? e.stack?.split('\n').slice(0, 3).join(' | ') : e);}}, o.everyMs ?? 1000); iv.unref();
-  const summary = () => ({...S, warmMs: Math.round(warmMs), replica: RW.cost, verdicts: {hits: RW.verdicts.hits, misses: RW.verdicts.missCount},
+  const summary = () => ({...S, warmMs: Math.round(warmMs), replica: RW.cost, god: readBridgeCost(RL), verdicts: {hits: RW.verdicts.hits, misses: RW.verdicts.missCount},
     reads: Object.fromEntries(READS.map(r => {const T = S.reads[r]; return [r, {...T, liveMs: Math.round(T.liveMs), replicaMs: Math.round(T.replicaMs)}];}))});
   const lg = setInterval(() => (o.log ?? console.log)('[read-oracle] ' + JSON.stringify(summary())), o.logEveryMs ?? 60_000); lg.unref();
   return {summary, stop: () => {clearInterval(iv); clearInterval(lg); H.close();}};
