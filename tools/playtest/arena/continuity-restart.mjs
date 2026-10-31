@@ -74,7 +74,7 @@ export function createManagedRestartObserver(config,{
  if(preDispatch!==null&&typeof preDispatch!=='function')throw fault('INVALID_RESTART_REFRESH');
  if(!identifier(actorId)||!identifier(setupId)||typeof journalPath!=='string'||!identifier(worldId)||!identifier(soulId)||!hash(originalInstructionSha256)||!time(cutoffAt)||minimumFutureWakeMs!==20000||triggerMaxDelayMs!==5000||recoveryMaxMs!==25000)throw fault('INVALID_RESTART_CONTRACT');
  let state='watching',failure=null,ownership=null,before=null,triggerAt=null,deathAt=null,controllerExitAt=null,oldGroupsAbsentAt=null,readyAt=null,recoveryStartedAt=null,oldOwnership=null,after=null,dispatchAttempted=false,preDispatchObservation=null;
- const signals=[],proofs=new Map(),lifecycle=[],absenceProbes=new Map();
+ const signals=[],proofs=new Map(),lifecycle=[],absenceProbes=new Map(),staleMembers={count:0,recorded:[]},staleSeen=new Set();
  const fail=(code,unknown=false)=>{failure??={code,at:now(),status:unknown?'unknown':'fail'};state=failure.status;};
  const scope=s=>s?.worldId===worldId&&s?.soulId===soulId&&s?.checkpoint?.initialInstructionSha256===originalInstructionSha256;
  const validSnapshot=s=>scope(s)&&hash(s.journalIdentity)&&time(s.checkpoint.at)&&Number.isSafeInteger(s.checkpoint.revision)&&s.checkpoint.revision>0&&identifier(s.checkpoint.threadId)&&Number.isSafeInteger(s.controller?.generation)&&s.controller.generation>0&&hash(s.controller.ownerSha256)&&time(s.controller.expiresAt)&&Array.isArray(s.operations)&&s.operations.length<=64;
@@ -100,7 +100,7 @@ export function createManagedRestartObserver(config,{
   absenceProbes.set(target,record);return status;
  };
  const inspect=p=>{const observed=inspectProcess(p.pid);if(!sameProcess(observed,p))throw fault('RESTART_PROCESS_IDENTITY_CHANGED');return observed;};
- const validateOwnership=(p,{initial=false}={})=>{
+ const validateOwnership=(p,{initial=false,phase='registration'}={})=>{
   if(!p||p.actorId!==actorId||p.setupId!==setupId||p.worldId!==worldId||p.soulId!==soulId||p.descendantsComplete!==true||!evidence(p.evidence)||!processIdentity(p.launcher)||!processIdentity(p.controller)||p.controller.ppid!==p.launcher.pid||p.controller.pid===process.pid||p.launcher.pid===p.controller.pid||!Array.isArray(p.groups)||p.groups.length<1||p.groups.length>16)throw fault('RESTART_OWNERSHIP_UNPROVEN');
   const all=new Map([[p.controller.pid,p.controller]]),groupIds=new Set();
   for(const g of p.groups){
@@ -114,7 +114,34 @@ export function createManagedRestartObserver(config,{
   }
   const launcher=inspect(p.launcher),controller=inspect(p.controller);
   if(controller.ppid!==launcher.pid)throw fault('RESTART_PROCESS_IDENTITY_CHANGED');
-  for(const g of p.groups)for(const member of g.members){const observed=inspect(member);if(initial&&observed.ppid!==member.ppid)throw fault('RESTART_PROCESS_IDENTITY_CHANGED');}
+  // A registered inventory is a sampled snapshot. A short-lived NON-LEADER
+  // member that has already exited (ps finds no such pid) is a stale entry:
+  // skip it with a bounded note and keep the registered record unchanged, so
+  // the exact group kill and the later absence checks still cover it. Leaders
+  // stay strict: launcher/controller above and a group's own leader
+  // (pid===pgid) here. A present process with a different birth, pgid or
+  // (initially) ppid, a group with no live member, or a stale parent of a live
+  // member all still fail closed exactly as before.
+  const stale=[];
+  for(const g of p.groups){
+   let live=0;
+   for(const member of g.members){
+    const observed=inspectProcess(member.pid);
+    if(observed===null&&member.pid!==g.pgid){stale.push(member);continue;}
+    if(!sameProcess(observed,member)||initial&&observed.ppid!==member.ppid)throw fault('RESTART_PROCESS_IDENTITY_CHANGED');
+    live++;
+   }
+   if(!live)throw fault('RESTART_PROCESS_IDENTITY_CHANGED');
+  }
+  if(!stale.length)return p;
+  const stalePids=new Set(stale.map(m=>m.pid));
+  if(p.groups.some(g=>g.members.some(m=>!stalePids.has(m.pid)&&stalePids.has(m.ppid))))throw fault('RESTART_PROCESS_IDENTITY_CHANGED');
+  const at=now();
+  for(const m of stale){
+   const key=`${m.pid}:${m.startToken}`;if(staleSeen.has(key))continue;
+   if(staleSeen.size<4096)staleSeen.add(key);staleMembers.count=Math.min(65535,staleMembers.count+1);
+   if(staleMembers.recorded.length<32)staleMembers.recorded.push({phase,at,pid:m.pid,ppid:m.ppid,pgid:m.pgid,startToken:m.startToken});
+  }
   return p;
  };
  const attemptSignal=(target,role)=>{
@@ -125,7 +152,7 @@ export function createManagedRestartObserver(config,{
  };
  const ready=()=>{
   if(!ownership||ownership.controller.pid===oldOwnership.controller.pid||oldGroupsAbsentAt===null)return;
-  validateOwnership(ownership);
+  validateOwnership(ownership,{phase:'recovery'});
   if(!sameProcess(ownership.launcher,oldOwnership.launcher))throw fault('RESTART_LAUNCHER_CHANGED');
   const s=readSnapshot(journalPath);after=s;
   if(!validSnapshot(s)||s.journalIdentity!==before.journalIdentity||s.checkpoint.threadId!==before.checkpoint.threadId)throw fault('RESTART_DURABLE_IDENTITY_CHANGED');
@@ -185,7 +212,7 @@ export function createManagedRestartObserver(config,{
      if(now()-triggerAt>triggerMaxDelayMs){fail('RESTART_DISPATCH_LATE');return this.snapshot();}
      if(!ownership)return this.snapshot();
      if(!eligible(current)||!initialOwnerProved(current)||current.journalIdentity!==before.journalIdentity||current.controller.generation!==before.controller.generation||current.controller.ownerSha256!==before.controller.ownerSha256||current.checkpoint.threadId!==before.checkpoint.threadId||current.checkpoint.lastDecisionId!==before.checkpoint.lastDecisionId||current.checkpoint.wakeAt!==before.checkpoint.wakeAt)throw fault('RESTART_TRIGGER_CHANGED');
-     validateOwnership(ownership,{initial:true});
+     validateOwnership(ownership,{initial:true,phase:'pre-dispatch'});
      // Cross-process evidence is sampled, never an atomic idle-at-signal lock.
      // Drain the exact source after potentially slow ps calls, then reread the
      // durable boundary. No model/controller cooperation is introduced.
@@ -245,6 +272,7 @@ export function createManagedRestartObserver(config,{
    timestampSemantics:{deathAt:'first successfully delivered destructive signal',controllerExitAt:'first observed exact old controller PID absence',oldGroupsAbsentAt:'first observed absence of all identified old writer groups',readyAt:'maximum source startup/session/running/receiver proof time and old-writer absence observation; never spawn time'},
    triggerExercised:deathAt!==null,dispatchAttempted,preDispatchObservation:structuredClone(preDispatchObservation),signals:structuredClone(signals),absenceProbes:[...absenceProbes.values()].map(p=>structuredClone(p)),before:before?structuredClone(before):null,after:after?structuredClone(after):null,
    oldOwnership:oldOwnership?structuredClone(oldOwnership):null,lifecycle:structuredClone(lifecycle),
+   staleMembers:{count:staleMembers.count,recorded:structuredClone(staleMembers.recorded),semantics:'Registered non-leader members already exited (ps: no such pid) at validation; skipped as stale snapshot entries (first sighting per identity), never an identity change; the registered inventory and group kill are unchanged. Leaders and present mismatches stay strict.'},
    threadResumed:readyAt===null?null:after.checkpoint.threadId===before.checkpoint.threadId,
    hostTurns:[...proofs].filter(([,p])=>p.lastTurn).map(([controllerPid,p])=>({controllerPid,activeTurn:p.activeTurn,lastTurn:structuredClone(p.lastTurn)})),
    originalIntentRetained:'not scored; exact initial instruction/timer identity checked at startup, subsequent native/semantic outcomes still required',

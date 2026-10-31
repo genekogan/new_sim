@@ -184,13 +184,13 @@ export function createTrialRestartProbe(config,deps={}){
  const groupAbsent=pgid=>{try{killProcess(-pgid,0);return false;}catch(e){if(e.code==='ESRCH')return true;throw fault('RESTART_GROUP_ABSENCE_UNKNOWN');}};
  const observer=createManagedRestartObserver({actorId,setupId,journalPath:join(directory,'runtime','continuity.sqlite'),worldId,soulId,originalInstructionSha256,cutoffAt},{now,...(deps.readSnapshot?{readSnapshot:deps.readSnapshot}:{}),inspectProcess:inspect,...(deps.killProcess?{killProcess:deps.killProcess}:{}),preDispatch:()=>{const fresh=drainTurns({required:true});if(pending.length||fresh.pendingBytes||fresh.missing)throw fault('RESTART_HOST_TURN_REFRESH_INCOMPLETE');return {at:now(),reader:fresh,evidence:[`${basename(directory)}/agent-evidence.jsonl:${fresh.lines}`]};}});
  const tail=createUsageTail(join(directory,'agent-evidence.jsonl'),{maxLineBytes:4*1024*1024+8192,maxPollBytes:8*1024*1024});
- const controllers=new Map(),registered=new Map(),pending=[];let launcher=null,failureCode=null,reasonCode=null,ownershipLines=0,lastBinding=null,finished=false,reader=null;
+ const controllers=new Map(),registered=new Map(),pending=[];let launcher=null,failureCode=null,failedAt=null,reasonCode=null,ownershipLines=0,lastBinding=null,finished=false,reader=null;
  const sourceFile=`${basename(directory)}/restart-ownership.jsonl`,proofPath=join(directory,'restart-proof.json');
  writeFileSync(join(directory,'restart-ownership.jsonl'),'',{flag:'wx',mode:0o600});
- const fail=error=>{if(!failureCode){failureCode=/^RESTART_[A-Z_]+$/.test(error?.code??'')?error.code:'RESTART_EVIDENCE_UNKNOWN';reasonCode=code(error);}};
+ const fail=error=>{if(!failureCode){failureCode=/^RESTART_[A-Z_]+$/.test(error?.code??'')?error.code:'RESTART_EVIDENCE_UNKNOWN';failedAt=now();reasonCode=code(error);}};
  const terminal=()=>['ready','fail','unknown','unexercised'].includes(observer.snapshot().state);
  const persist=()=>{const proof=snapshot();writeFileSync(proofPath+'.tmp',JSON.stringify(proof,null,2)+'\n',{mode:0o600});renameSync(proofPath+'.tmp',proofPath);return proof;};
- const snapshot=()=>({...observer.snapshot(),integration:{status:failureCode?'unknown':observer.snapshot().state,failureCode,reasonCode,pollMs:1000,hostInventory:'only explicitly registered detached host groups; runtime HOST_CONFIG disables tool/app/plugin execution',reader,proofSource:`${basename(directory)}/restart-proof.json`,ownershipSource:sourceFile}});
+ const snapshot=()=>({...observer.snapshot(),integration:{status:failureCode?'unknown':observer.snapshot().state,failureCode,failedAt,reasonCode,pollMs:1000,hostInventory:'only explicitly registered detached host groups; runtime HOST_CONFIG disables tool/app/plugin execution',reader,proofSource:`${basename(directory)}/restart-proof.json`,ownershipSource:sourceFile}});
  const eventTime=s=>{const t=typeof s.at==='string'?Date.parse(s.at):s.at;if(!Number.isSafeInteger(t)||t<0)throw fault('RESTART_LIFECYCLE_TIME_UNKNOWN');return t;};
  const consumeTurn=(e,line)=>{
   if(e.kind!=='host-event'||!['turn/started','turn/completed'].includes(e.method))return;
@@ -464,6 +464,11 @@ export async function runContinuityTrial(config,deps={}){
  summary.settleGate=settleGate;
  summary.usageGuard=usageState;
  summary.restart=restartResult;
+ // Report-only: a managed restart observer that went terminal before any
+ // trigger cannot exercise restart for the rest of the run. Coverage and
+ // pass/fail fields below are computed exactly as before.
+ const restartAt=restartResult?.integration?.failureCode?restartResult.integration.failedAt:restartResult?.failure?.at;
+ summary.restartTerminalBeforeTrigger=restartProbe&&restartResult?.triggerAt===null&&['fail','unknown'].includes(restartResult.integration?.status)?{status:restartResult.integration.status,code:restartResult.integration.failureCode??restartResult.failure?.code??null,source:restartResult.integration.failureCode?'integration':'observer',at:Number.isSafeInteger(restartAt)?restartAt:null,offsetMs:Number.isSafeInteger(restartAt)&&startedAt!==null?restartAt-startedAt:null,note:'restart observer became terminal before its trigger; restart remained unexercised for the rest of the run (report only)'}:null;
  summary.nativeEvidence=nativeResult;
  summary.coverage.nativeSources=nativeResult?.status??'unknown';
  if(config.restart)summary.coverage.restart=arm===CONTINUITY_ARMS[0]?'unsupported':restartResult?.integration?.status??'unknown';

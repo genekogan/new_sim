@@ -324,9 +324,9 @@ test('baseline restart declaration records unsupported/unexercised without anoth
  assert.equal(JSON.parse(readFileSync(join(f.config.directory,'restart-proof.json'),'utf8')).triggerExercised,false);
 });
 
-function managedRestartFixture(t,{eligible=true,omitOwner=false,missingEvidence=false,unknownInventory=false,slowObservation=false,missingLaterClose=false,wrongEvidenceScope=false,priorHostRestart=false,priorHostUnverified=false,reusedHostPid=false,turnDuringInspection=false,...overrides}={}){
+function managedRestartFixture(t,{eligible=true,omitOwner=false,missingEvidence=false,unknownInventory=false,slowObservation=false,missingLaterClose=false,wrongEvidenceScope=false,priorHostRestart=false,priorHostUnverified=false,reusedHostPid=false,turnDuringInspection=false,shortLivedMember=false,...overrides}={}){
  const f=fixture(t,{arm:CONTINUITY_ARMS[1],seconds:40,actors:[{id:'a',folder:'/synthetic/a',instruction:'Retain original strategic task'}],restart:{actorId:'a',setupId:'frozen-setup'},...overrides});
- const sha=s=>createHash('sha256').update(s).digest('hex'),processes=new Map(),signals=[];let current,child,args,activeController=1001,activeHost=1100,controllerInspections=0;
+ const sha=s=>createHash('sha256').update(s).digest('hex'),processes=new Map(),signals=[];let current,child,args,activeController=1001,activeHost=1100,controllerInspections=0,groupInspections=0;
  const identity=(pid,ppid,pgid)=>({pid,ppid,pgid,startToken:'birth-'+pid});
  const add=(controller,host)=>{for(const p of [identity(controller,1000,900),identity(host,controller,host),identity(host+1,host,host)])processes.set(p.pid,p);};
  processes.set(1000,identity(1000,999,900));add(1001,1100);
@@ -345,7 +345,7 @@ function managedRestartFixture(t,{eligible=true,omitOwner=false,missingEvidence=
    f.clock.schedule(()=>{activeController=2001;activeHost=2100;add(activeController,activeHost);current={...current,checkpoint:{...current.checkpoint,revision:current.checkpoint.revision+1,at:f.clock.now()},controller:{generation:current.controller.generation+1,ownerSha256:sha('owner-'+(current.controller.generation+1)),expiresAt:f.clock.now()+15000},startupResponseId:'startup-'+(current.controller.generation+1)};startup(activeController,activeHost,true);},1000);
   }else for(const [id,p]of processes)if(p.pgid===-target)processes.delete(id);
  };
- f.deps.restart={inspectProcess:pid=>{if(turnDuringInspection&&pid===1001&&++controllerInspections===3)appendFileSync(join(args.directory,'agent-evidence.jsonl'),JSON.stringify({kind:'host-event',method:'turn/started',controllerPid:1001,hostPid:activeHost,worldId:'fresh-world',soulId:'s_a',threadId:'thread-a',turnId:'urgent-new-turn',at:f.clock.now()})+'\n');return processes.has(pid)?structuredClone(processes.get(pid)):null;},inspectGroup:pgid=>{if(unknownInventory)throw Object.assign(Error('unknown'),{code:'RESTART_GROUP_INSPECTION_UNKNOWN'});return [...processes.values()].filter(p=>p.pgid===pgid).map(p=>structuredClone(p));},readSnapshot:()=>structuredClone(current),killProcess:kill};
+ f.deps.restart={inspectProcess:pid=>{if(turnDuringInspection&&pid===1001&&++controllerInspections===3)appendFileSync(join(args.directory,'agent-evidence.jsonl'),JSON.stringify({kind:'host-event',method:'turn/started',controllerPid:1001,hostPid:activeHost,worldId:'fresh-world',soulId:'s_a',threadId:'thread-a',turnId:'urgent-new-turn',at:f.clock.now()})+'\n');return processes.has(pid)?structuredClone(processes.get(pid)):null;},inspectGroup:pgid=>{if(unknownInventory)throw Object.assign(Error('unknown'),{code:'RESTART_GROUP_INSPECTION_UNKNOWN'});const listed=[...processes.values()].filter(p=>p.pgid===pgid).map(p=>structuredClone(p));if(shortLivedMember&&pgid===1100&&(shortLivedMember==='listed'||++groupInspections===1))listed.push(identity(1102,1100,1100));return listed;},readSnapshot:()=>structuredClone(current),killProcess:kill};
  f.deps.verifyCandidate=result=>verifyOwnedProbeExit(result,kill);
  f.deps.launchCandidate=call=>{
   args=call;f.calls.push(call);child=new EventEmitter();child.pid=1000;child.stdout=new PassThrough();child.stderr=new PassThrough();child.kill=signal=>{assert.equal(signal,'SIGTERM');for(const [id,p]of processes)if(id===1000||id===activeController||p.pgid===activeHost)processes.delete(id);if(!missingLaterClose)emit({state:'controller-closed',controllerPid:activeController,ownedProcessesExited:true,ownedHosts:[{hostPid:activeHost,threadId:'thread-a',groupClosed:true,groupVerification:'absent'}]});child.emit('exit',0,null);child.emit('close',0,null);return true;};
@@ -389,6 +389,24 @@ for(const missing of ['owner readiness','host evidence','process inventory'])tes
  else {assert.equal(result.restart.integration.status,'unknown');assert(result.restart.integration.failureCode);assert.deepEqual(f.signals,[]);}
 });
 
+
+for(const mode of ['once','listed'])test('a short-lived host-group child gone before the ps -p recheck does not end restart coverage (reading-candidate-9): '+mode,async t=>{
+ const f=managedRestartFixture(t,{shortLivedMember:mode});const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(40000);const result=await pending;
+ assert.equal(result.restart.failure,null);assert.equal(result.restart.integration.failureCode,null);assert.equal(result.restart.state,'ready');
+ assert.deepEqual(f.signals.map(s=>s.target),[1001,-1100]);assert.equal(result.restart.staleMembers.count,1);assert.equal(result.restart.staleMembers.recorded[0].pid,1102);
+ assert.equal(result.restartTerminalBeforeTrigger,null);assert.equal(result.coverage.restart,'ready');assert.equal(result.actors[0].cleanupVerified,true,'old-writer termination proof still binds the registered inventory');assert.equal(result.failureCode,null);
+ const lines=readFileSync(join(f.config.directory,'a','restart-ownership.jsonl'),'utf8').trim().split('\n').map(l=>JSON.parse(l));assert(lines[0].ownership.groups[0].members.some(m=>m.pid===1102),'the raw sampled inventory is retained');
+ if(mode==='listed')assert(result.restart.oldOwnership.groups[0].members.some(m=>m.pid===1102),'a stale member stays in the killed inventory');
+});
+
+test('an observer terminal before its trigger is surfaced in the summary without changing coverage or pass/fail',async t=>{
+ const f=managedRestartFixture(t,{unknownInventory:true});const pending=runContinuityTrial(f.config,f.deps);await f.clock.tick(40000);const result=await pending;
+ assert.deepEqual(f.signals,[]);assert.equal(result.coverage.restart,'unknown');assert.equal(result.failureCode,null);
+ assert.equal(result.restartTerminalBeforeTrigger.status,'unknown');assert.equal(result.restartTerminalBeforeTrigger.code,'RESTART_GROUP_INSPECTION_UNKNOWN');assert.equal(result.restartTerminalBeforeTrigger.source,'integration');
+ assert(Number.isSafeInteger(result.restartTerminalBeforeTrigger.offsetMs)&&result.restartTerminalBeforeTrigger.offsetMs>=0&&result.restartTerminalBeforeTrigger.offsetMs<40000);
+ const g=managedRestartFixture(t,{eligible:false});const p2=runContinuityTrial(g.config,g.deps);await g.clock.tick(40000);assert.equal((await p2).restartTerminalBeforeTrigger,null,'unexercised is not an early terminal');
+ const h=managedRestartFixture(t);const p3=runContinuityTrial(h.config,h.deps);await h.clock.tick(40000);assert.equal((await p3).restartTerminalBeforeTrigger,null);
+});
 
 test('restart eligibility never shifts the cutoff for a late release',async t=>{
  const f=managedRestartFixture(t,{actors:[{id:'a',folder:'/synthetic/a',instruction:'Retain original strategic task',releaseOffsetSec:20}]});

@@ -255,3 +255,55 @@ test('fresh checkpoint changes and malformed/asynchronous refresh cannot dispatc
 test('successful dispatch records the refreshed sampled boundary without an atomic-idle claim',()=>{
  const f=fixture();f.arm();f.observer.tick();const sample=f.observer.snapshot().preDispatchObservation;assert.equal(sample.sampledAt,100000);assert.equal(sample.hostTailRefreshedAt,100000);assert.equal(sample.checkpointRevision,10);assert.deepEqual(sample.evidence,['synthetic-host-tail:1']);assert.match(sample.semantics,/not atomic/);
 });
+
+// reading-candidate-9 (c9-review-local/REVIEW.md): a short-lived host-group
+// child enumerated by `ps -g` exited before the observer's `ps -p` re-check.
+const withShortLivedMember=f=>{const child=identity(1101,1100,1100);f.ownership.groups[0].members.push(child);return child;};
+
+test('a non-leader group member that exits between enumeration and validation is a stale snapshot entry, not an identity change',()=>{
+ const f=fixture();withShortLivedMember(f);f.arm();
+ const registered=f.observer.snapshot();
+ assert.equal(registered.failure,null);assert.equal(registered.state,'watching');
+ assert.equal(registered.staleMembers.count,1);assert.deepEqual(registered.staleMembers.recorded[0],{phase:'registration',at:100000,pid:1101,ppid:1100,pgid:1100,startToken:'1101'});
+ const result=f.observer.tick();
+ assert.equal(result.state,'recovering');assert.deepEqual(f.calls.filter(c=>c.signal==='SIGKILL').map(c=>c.target),[1001,-1100,-1200],'whole groups are still killed');
+ assert.deepEqual(result.oldOwnership.groups[0].members.map(m=>m.pid),[1100,1101],'the registered inventory is kept unchanged');
+ f.observer.tick();assert.equal(f.observer.snapshot().staleMembers.count,1,'one note per stale identity');
+ f.recover();assert.equal(f.observer.tick().state,'ready');
+});
+
+test('a non-leader member that exits after registration is skipped at the pre-dispatch recheck; the kill still requires ESRCH for leader and group',()=>{
+ const f=fixture();withShortLivedMember(f);f.processes.set(1101,identity(1101,1100,1100));f.arm();
+ assert.equal(f.observer.snapshot().staleMembers.count,0);f.processes.delete(1101);
+ const result=f.observer.tick();assert.equal(result.state,'recovering');assert.equal(result.staleMembers.recorded[0].phase,'pre-dispatch');
+ assert.deepEqual(f.calls.filter(c=>c.signal==='SIGKILL').map(c=>c.target),[1001,-1100,-1200]);
+ const g=fixture();withShortLivedMember(g);g.processes.set(1101,identity(1101,1100,1100));g.setSticky(true);g.arm();g.processes.delete(1101);g.observer.tick();g.setTime(105001);
+ assert.equal(g.observer.tick().failure.code,'RESTART_OLD_WRITERS_REMAIN','surviving group members still block an absence proof');
+});
+
+test('leader identity changes and present non-leader mismatches still fail closed',()=>{
+ const cases={
+  'group leader exited':f=>f.processes.delete(1100),
+  'group leader reused':f=>{f.processes.get(1100).startToken='reused';},
+  'controller reused':f=>{f.processes.get(1001).startToken='reused';},
+  'controller moved group':f=>{f.processes.get(1001).pgid=901;},
+  'launcher exited':f=>f.processes.delete(1000),
+  'launcher reused':f=>{f.processes.get(1000).startToken='reused';},
+  'present member reused':f=>{f.processes.set(1101,identity(1101,1100,1100,'reused'));},
+  'present member moved group (setpgid)':f=>{f.processes.set(1101,identity(1101,1100,1300));},
+  'present member reparented':f=>{f.processes.set(1101,identity(1101,1,1100));},
+ };
+ for(const [name,mutate]of Object.entries(cases)){
+  const f=fixture();withShortLivedMember(f);mutate(f);f.arm();
+  assert.equal(f.observer.snapshot().failure?.code,'RESTART_PROCESS_IDENTITY_CHANGED',name);assert.equal(f.calls.length,0,name);
+ }
+ const g=fixture();withShortLivedMember(g);g.arm();g.processes.delete(1100);
+ assert.equal(g.observer.tick().failure.code,'RESTART_PROCESS_IDENTITY_CHANGED','leader exit before dispatch');assert.equal(g.calls.filter(c=>c.signal==='SIGKILL').length,0);
+});
+
+test('a stale parent of a retained member and an all-stale leaderless group fail closed',()=>{
+ const f=fixture();withShortLivedMember(f);const grandchild=identity(1102,1101,1100);f.ownership.groups[0].members.push(grandchild);f.processes.set(1102,structuredClone(grandchild));f.arm();
+ assert.equal(f.observer.snapshot().failure.code,'RESTART_PROCESS_IDENTITY_CHANGED');
+ const g=fixture();const orphan=identity(1201,1100,1200);g.ownership.groups[1].members=[orphan];g.arm();
+ assert.equal(g.observer.snapshot().failure.code,'RESTART_PROCESS_IDENTITY_CHANGED');assert.equal(g.calls.length,0);
+});
