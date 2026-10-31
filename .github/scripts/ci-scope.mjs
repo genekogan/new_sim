@@ -4,7 +4,8 @@
 //   node .github/scripts/ci-scope.mjs --base <ref|sha> [--head <ref|sha>]   (or --files a,b,c for tests)
 //
 // Paths no rule names (root files, the lockfile, mars/, worlds/, vendor/, .github/ ...) run every job; docs and
-// tools-only changes run none (ci-ok still reports). Writes `matrix`, `any` and `scope` to $GITHUB_OUTPUT when set.
+// tools-only changes run none (ci-ok still reports). Writes `matrix`, `any`, `scope` and `smoke` to $GITHUB_OUTPUT when set.
+// `smoke` (the browser local smoke, e2e/local-smoke.mjs) runs when apps/web, apps/server or e2e change, or with no base.
 import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -30,6 +31,10 @@ export function jobsFor(files) {
   return { scope: scope.resolved, steps: scope.steps, include: include.map(({ steps, ...job }) => job), diff: scope.diff };
 }
 
+/** The local smoke job: changes under apps/web, apps/server or e2e; null (no usable base) runs it too. */
+export const SMOKE_PATHS = /^(apps\/web|apps\/server|e2e)\//;
+export const smokeFor = files => files === null || files.some(f => SMOKE_PATHS.test(f));
+
 const ZERO = /^0+$/;
 export function changedFiles(base, head = 'HEAD', git = (...a) => execFileSync('git', a, { encoding: 'utf8' })) {
   if (!base || ZERO.test(base)) return null; // a new branch or a missing base: run everything
@@ -41,11 +46,11 @@ function main(argv) {
   const opt = k => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : undefined; };
   const files = opt('--files') !== undefined ? opt('--files').split(',').filter(Boolean) : changedFiles(opt('--base'), opt('--head'));
   const plan = files ? jobsFor(files) : { scope: 'full', steps: REQUIRED_STEPS, include: JOBS.map(({ steps, ...job }) => job), diff: { reason: 'no usable base' } };
-  const out = { matrix: JSON.stringify({ include: plan.include }), any: String(plan.include.length > 0), scope: plan.scope };
+  const out = { matrix: JSON.stringify({ include: plan.include }), any: String(plan.include.length > 0), scope: plan.scope, smoke: String(smokeFor(files)) };
   console.log(JSON.stringify({ ...out, matrix: plan.include.map(j => j.name), diff: plan.diff }, null, 2));
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(out).map(([k, v]) => `${k}=${v}\n`).join(''));
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY,
-    `### CI scope: ${plan.scope}\n\nJobs: ${plan.include.map(j => '`' + j.name + '`').join(', ') || 'none (docs/tools only)'}\n`);
+    `### CI scope: ${plan.scope}\n\nJobs: ${plan.include.map(j => '`' + j.name + '`').join(', ') || 'none (docs/tools only)'}; local smoke: ${out.smoke}\n`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main(process.argv.slice(2));
