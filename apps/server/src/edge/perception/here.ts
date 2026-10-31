@@ -281,7 +281,7 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
     me: {soulId:soul.soulId,name:host.minds.get(soul.soulId)?.name??soul.name,profileRevision:host.profileFact(soul.soulId)?.revision??0,place: me.place, placePath: me.placePath, pos: me.pos, heading: me.heading, facing: compassPoint(me.heading), posture: me.posture, body:P.w.entities[soul.entityId]?.body??{family:'humanoid'}, ...(me.seat ? {seat: me.seat} : {}),
       activity: inviting ? {kind: 'inviting', what: inviting.what, with: inviting.waitingFor.map(g => g.name), answerWithin: durationWord(inviting.expiresInSeconds)} : {kind: activityKind, ...(endsIn ? {endsIn} : {})},
       ...(gaze ? {gaze: {kind: gaze.kind, ...(gaze.target ? {at: nameOfEntity(gaze.target)} : gaze.at && P.pos ? {bearing: P.bearing(gaze.at)} : {})}} : {}),
-      ...(holding?.name ? {holding: holding.name} : {}), ...(fade?.colour ? {fade: fade.colour} : {})},
+      ...(holding?.name ? {holding: holding.name} : {}), ...(fade?.colour ? {fade: fade.colour} : {}), ...(() => {try {return ledger.together.handLines(soul);} catch {return {};}})()},
     near, objects, ...(Object.keys(more).length ? {more} : {}), conversations_in_earshot: conversations, exits, ...(() => {const f = floorLines(ledger, P); return f.length ? {floors: f} : {};})(),
     // knowledge/1: the district summarised, far districts as names and directions (more once visited)
     ...(ledger.knowledge?.scales(soul.soulId, ledger.placePathOf(soul.soulId).filter(p => p.kind !== 'occupier').map(p => p.id), P.pos, c ? c.hour * 60 + c.minute : null) ?? {}),
