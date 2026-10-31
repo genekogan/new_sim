@@ -253,13 +253,15 @@ export class Together {
     const nameOf = (id?: string) => (id ? this.p.places.byId.get(id)?.name : undefined) ?? 'the shelf';
     for (const s of this.p.spots().shelves) out.push({id: 'shelf:' + s.id, kind: 'book', label: `a shelf in ${nameOf(s.place)}`, at: s.at, ...(s.faceTo ? {face: s.faceTo} : {}), place: s.place ?? null});
     for (const s of this.p.spots().spots) if (s.activity === 'write' || s.activity === 'post-letter') out.push({id: 'spot:' + s.id, kind: 'letter', label: s.label ?? 'a writing desk', at: s.at, ...(s.faceTo ? {face: s.faceTo} : {}), place: s.place ?? null});
-    const engine = menuWorldOf(this.p.host) as unknown as {nearestStandableV1?: (at: V2, except?: string, min?: number, rings?: number) => V2 | null};
+    // a place source's spot ignores people (withPeople false): people are not in the cache key, so a person-avoiding spot
+    // depended on who stood on the centroid when the cache was built (main's own answers flipped; main vs read worker ~1 m)
+    const engine = menuWorldOf(this.p.host) as unknown as {nearestStandableV1?: (at: V2, except?: string, min?: number, rings?: number, withPeople?: boolean) => V2 | null};
     for (const place of [...this.p.places.byId.values()].sort((a, b) => a.id.localeCompare(b.id))) {
       // places come from the place registry (a mars-engine world keeps its places there, not in world.regions)
       if (!place.polygon?.length || place.kind === 'water' || place.carrier) continue;
       const text = (place.id + ' ' + place.name).toLowerCase(), kinds = SOURCE_WORDS.filter(([, re]) => re.test(text)).map(([k]) => k);
       if (!kinds.length) continue;
-      const at = engine.nearestStandableV1?.(centroid(place.polygon), undefined, 0.6, 24) ?? null; if (!at) continue;
+      const at = engine.nearestStandableV1?.(centroid(place.polygon), undefined, 0.6, 24, false) ?? null; if (!at) continue;
       for (const kind of [...new Set(kinds)]) out.push({id: 'place:' + place.id, kind, label: place.name, at, place: place.id});
     }
     this.sourceCache = {key, list: out}; menuStats.src.cpuUs += cpuNow() - c0; return out;

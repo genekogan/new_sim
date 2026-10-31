@@ -2080,9 +2080,10 @@ export class MarsEngine implements Engine {
         if(res.ok)return {to:q,goal:[t[0],t[1]],short:Math.round(hypot(q[0]-t[0],q[1]-t[1])*10)/10,level};}}
     return null;
   }
-  nearestStandableV1(at:[number,number],except?:string,minClear=HUMAN_RADIUS+.15,maxRing=80):[number,number]|null{
+  /** `people` false: ignore bodies standing there (a static spot, e.g. an item source's, that must not depend on who stands where). */
+  nearestStandableV1(at:[number,number],except?:string,minClear=HUMAN_RADIUS+.15,maxRing=80,withPeople=true):[number,number]|null{
     const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const clear=spatial.clearTester(0,at,minClear);if(!clear)return null;
-    const people=listEntities(this.ents).filter((o:any)=>o.kind==='human'&&o.id!==except).map((o:any)=>[o.pose.p[0],o.pose.p[2]] as [number,number]);
+    const people=withPeople?listEntities(this.ents).filter((o:any)=>o.kind==='human'&&o.id!==except).map((o:any)=>[o.pose.p[0],o.pose.p[2]] as [number,number]):[];
     for(let ring=0;ring<=maxRing;ring++){const n=Math.max(1,ring*8);for(let k=0;k<n;k++){
       const ang=(k/n)*Math.PI*2,x=r3(at[0]+dcos(ang)*ring*.5),z=r3(at[1]+dsin(ang)*ring*.5);
       if(!clear([x,z])||people.some(([px,pz])=>hypot(px-x,pz-z)<.8))continue;return [x,z];}}

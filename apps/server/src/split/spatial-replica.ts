@@ -158,10 +158,10 @@ export class SpatialReplica {
     if (this.scene.physical) throw new Error('spatial-replica: dryGroundAtV1 on a physical binding needs its shore domain');
     const f = this.spatial.ground?.field; return !f || f.medium(x, z) === 0;
   }
-  /** engine.nearestStandableV1 */
-  nearestStandableV1(at: Vec2, except?: string, minClear = HUMAN_RADIUS + .15, maxRing = 80): Vec2 | null {
+  /** engine.nearestStandableV1 (`withPeople` false: a static spot that ignores bodies, e.g. an item source's) */
+  nearestStandableV1(at: Vec2, except?: string, minClear = HUMAN_RADIUS + .15, maxRing = 80, withPeople = true): Vec2 | null {
     const spatial = this.sync(), clear = spatial.clearTester(0, at, minClear); if (!clear) return null;
-    const people = this.people(except);
+    const people = withPeople ? this.people(except) : [];
     for (let ring = 0; ring <= maxRing; ring++) { const n = Math.max(1, ring * 8); for (let k = 0; k < n; k++) {
       const ang = (k / n) * Math.PI * 2, x = r3(at[0] + dcos(ang) * ring * .5), z = r3(at[1] + dsin(ang) * ring * .5);
       if (!clear([x, z]) || people.some(([px, pz]) => hypot(px - x, pz - z) < .8)) continue; return [x, z]; } }

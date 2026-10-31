@@ -57,7 +57,7 @@ export interface MenuWorld {
   navNearestMainV1?(p: V2, except?: string, maxR?: number): V2 | null;
   clearanceAtV1?(x: number, z: number, level?: number): number;
   clearanceUpToV1?(x: number, z: number, cap?: number, level?: number): number;
-  nearestStandableV1?(at: V2, except?: string, minClear?: number, maxRing?: number): V2 | null;
+  nearestStandableV1?(at: V2, except?: string, minClear?: number, maxRing?: number, withPeople?: boolean): V2 | null;
   standableNearV1?(at: V2, level?: number, except?: string, minClear?: number, maxRing?: number): V2 | null;
   clearSpotsV1?(polygon: V2[], n: number): V2[];
   dryGroundAtV1?(x: number, z: number): boolean;

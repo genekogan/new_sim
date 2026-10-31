@@ -31,7 +31,7 @@ function same(e: Eng, r: SpatialReplica, what: string) {
   const calls: [string, unknown[]][] = [['staticEpochV1', []], ['navEpochV1', []], ['levelsV1', []], ['clearSpotsV1', [[[-6, -6], [12, -6], [12, 8], [-6, 8]], 5]]];
   for (let x = -4; x <= 14; x += 1.7) for (let z = -3; z <= 5; z += 1.3) {
     calls.push(['clearanceAtV1', [x, z]], ['clearanceUpToV1', [x, z, 1]], ['lyingRoomAtV1', [x, z, 0, 0.1]], ['standYAtV1', [x, z]], ['dryGroundAtV1', [x, z]],
-      ['nearestStandableV1', [[x, z], 'h_ana']], ['standableNearV1', [[x, z], 0, 'h_bo', 0.4, 6]]);
+      ['nearestStandableV1', [[x, z], 'h_ana']], ['nearestStandableV1', [[x, z], undefined, 0.6, 24, false]], ['standableNearV1', [[x, z], 0, 'h_bo', 0.4, 6]]);
   }
   calls.push(['navCheckV1', [[{ id: 'a', p: [0, 0] }, { id: 'b', p: [5, 2] }, { id: 'c', p: [7.2, 0.9], tol: 0.5 }]]], ['navNearestMainV1', [[5, 2], 'h_cy']], ['navWarmV1', [0]]);
   for (const [m, a] of calls) {
