@@ -5,12 +5,13 @@
 // no guards. Every command is one or two HTTP calls to the world and prints JSON.
 // Private state (world URL, Soul id, bearer token) lives in .eden-agent.json.
 
-import { existsSync, readFileSync, writeFileSync, renameSync, lstatSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, renameSync, lstatSync, openSync, closeSync, unlinkSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { randomUUID, randomBytes } from "node:crypto";
 import { resolve as resolvePath } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const VERSION = "2.4.0";
+const VERSION = "2.5.0";
 const STATE = ".eden-agent.json";
 const CLI = "node eden.mjs";
 
@@ -87,23 +88,91 @@ const TERMINAL = new Set(["completed", "failed", "replaced"]);
 
 // ---------------------------------------------------------------- transport
 
+// Polite by construction (LOAD-CONTRACT v1 §3): a busy world answers 503/429 with a code and Retry-After, and this
+// client waits that long (±20 %) instead of asking again at once. Only reads, and writes that carry an
+// Idempotency-Key (the world returns the first answer to a repeat), are ever retried; `unreachable` gets full-jitter
+// exponential backoff (1 s base, 60 s cap, 6 tries) and then a clear exit 75. Nothing loops forever except listen,
+// which is one held long-poll per Soul (.listen.lock) and backs off the same way.
+export const BUSY_CODES = new Set(["world.busy", "soul.busy", "soul.slow-down", "world.starting", "world.crowded", "rate-limited"]);
+export const RETRY = { tries: 6, baseMs: 1_000, capMs: 60_000, busyWaits: 3 };
+const TIME_SCALE = Number(process.env.EDEN_TIME_SCALE) > 0 ? Number(process.env.EDEN_TIME_SCALE) : 1; // tests only
+const pause = (ms) => sleep(ms * TIME_SCALE);
+/** Full jitter: uniform in [0, min(cap, base·2^attempt)]. */
+export const fullJitter = (attempt, rnd = Math.random) => rnd() * Math.min(RETRY.capMs, RETRY.baseMs * 2 ** attempt);
+/** A stated wait, spread ±20 % so a crowd told "4 s" does not come back on the same millisecond. */
+export const statedJitter = (ms, rnd = Math.random) => Math.min(RETRY.capMs, ms) * (0.8 + 0.4 * rnd());
+/** Retry-After in ms, from the header (seconds or an HTTP date) or the body (world.retry_after_s, retry_after). */
+export function retryAfterMs(headers, data) {
+  const h = headers?.get?.("retry-after");
+  if (h) { const n = Number(h); if (Number.isFinite(n) && n >= 0) return n * 1000; const at = Date.parse(h); if (Number.isFinite(at)) return Math.max(0, at - Date.now()); }
+  for (const v of [data?.world?.retry_after_s, data?.error?.retry_after_s, data?.retry_after_s, data?.error?.retry_after, data?.retry_after]) if (Number.isFinite(v) && v >= 0) return v * 1000;
+  return null;
+}
+export const codeOf = (data) => data?.error?.code ?? data?.code ?? null;
+/** A designed refusal that says "later", not "no". */
+export const isBusy = (status, data) => (status === 503 || status === 429) && BUSY_CODES.has(codeOf(data));
+// Writes the world deduplicates by Idempotency-Key (apps/server/src/edge/events/idempotency.ts) — the only writes that retry.
+const KEYED = /^\/v1\/edge\/(act|say|converse|plan(\/.*)?|objects\/.+)$/;
+const READ_POSTS = /^\/v1\/edge\/resolve$/;
+/** "read" (safe to repeat), "keyed" (a write the world deduplicates by key) or "none" (never repeated). */
+export function retryClass(method, path) {
+  const p = path.split("?")[0];
+  if (method === "GET" || READ_POSTS.test(p)) return "read";
+  return KEYED.test(p) ? "keyed" : "none";
+}
+const WAITING = {
+  "world.busy": "the world is busy", "world.crowded": "the world is crowded", "world.starting": "the world is starting",
+  "soul.busy": "your previous request is still being answered", "soul.slow-down": "you are asking faster than the world answers",
+  "rate-limited": "you are asking faster than the world answers",
+};
+const said = new Set();
+/** One calm line per distinct thing (stderr), never a stream. */
+function calm(line) { if (!said.has(line)) { said.add(line); process.stderr.write(line + "\n"); } }
+/** The world's own note ("It is crowded here right now; …") is a fact about the world: pass it on once. */
+function worldNote(data) { const n = data?.world?.note; if (typeof n === "string" && n.trim()) calm(`WORLD: ${n.trim()}`); }
+const secs = (ms) => `${Math.max(1, Math.round(ms / 1000))} s`;
+
 // as: "soul" (default, the Soul's delegated token), "owner" (account routes under /v1/agent, same token),
-// "dev" (legacy self-made identity), "none".
-async function call(path, { method, body, as = "soul", timeoutMs = 90_000, recoverRead = false } = {}) {
+// "dev" (legacy self-made identity), "none". retry: false hands every answer back at once (listen runs its own loop).
+async function call(path, { method, body, as = "soul", timeoutMs, recoverRead = false, retry = true } = {}) {
   const s = load();
   if (as === "soul") ({ path, body } = withNow(path, body));
   const url = need(s, "world", `Run: ${CLI} register <world-url>`) + path;
+  method ??= body ? "POST" : "GET";
+  const cls = retry ? retryClass(method, path) : "none";
+  timeoutMs ??= cls === "read" ? 25_000 : cls === "keyed" ? 40_000 : 90_000;
   const headers = { "content-type": "application/json" };
   if ((as === "soul" || as === "owner") && s.token) headers.authorization = `Bearer ${s.token}`;
   if (as === "dev" && s.identity) headers.authorization = `Bearer dev:${s.identity}`;
+  if (cls === "keyed") headers["idempotency-key"] = randomUUID();   // one key for every try of this one write
+  const t0 = Date.now();
+  for (let failed = 0, busy = 0; ; ) {
+    const r = await callOnce(url, { method, headers, body, timeoutMs, recoverRead });
+    if (r.load && r.load !== "green") calm(`the world is under load (${r.load}); answers may be slow`);
+    worldNote(r.data);
+    if (r.status === 0 && cls !== "none") {
+      if (++failed < RETRY.tries) {
+        const ms = fullJitter(failed - 1);
+        process.stderr.write(`the world did not answer (${r.data.error.message.slice(0, 80)}); trying again in ${secs(ms)} (try ${failed + 1} of ${RETRY.tries})\n`);
+        await pause(ms); continue;
+      }
+      r.data.error.tries = failed; r.data.error.seconds = Math.round((Date.now() - t0) / 1000);
+    } else if (isBusy(r.status, r.data) && cls !== "none" && busy < RETRY.busyWaits) {
+      busy++;
+      const ms = statedJitter(r.retryAfterMs ?? Math.max(1_000, fullJitter(busy + 1)));
+      calm(`${WAITING[codeOf(r.data)] ?? "the world is busy"}; waiting ${secs(ms)}`);
+      await pause(ms); continue;
+    }
+    if (r.status === 0 && cls === "none") r.data.error.notRetried = true;
+    if (headers.authorization && !path.startsWith("/v1/edge/inbox/")) noticeInbox(r.data);
+    return r;
+  }
+}
+
+async function callOnce(url, { method, headers, body, timeoutMs, recoverRead }) {
   let r;
   try {
-    r = await fetch(url, {
-      method: method ?? (body ? "POST" : "GET"),
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-      signal: AbortSignal.timeout(timeoutMs),
-    });
+    r = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(timeoutMs) });
   } catch (e) {
     return { status: 0, data: { error: { code: "unreachable", message: String(e.message) } } };
   }
@@ -117,8 +186,7 @@ async function call(path, { method, body, as = "soul", timeoutMs = 90_000, recov
   }
   let data;
   try { data = JSON.parse(text); } catch { data = { raw: text.slice(0, 200) }; }
-  if (headers.authorization && !path.startsWith("/v1/edge/inbox/")) noticeInbox(data);
-  return { status: r.status, data };
+  return { status: r.status, data, retryAfterMs: retryAfterMs(r.headers, data), load: r.headers.get("x-sim-load") ?? data?.world?.load ?? null };
 }
 
 // Every authenticated response carries `inbox`: whether a listen is open and how many
@@ -135,6 +203,19 @@ function ok(r, what) {
   const err = r.data?.error ?? r.data ?? {};
   const code = err.code ?? r.data?.code ?? `http-${r.status}`;
   const msg = err.message ?? r.data?.message ?? JSON.stringify(r.data).slice(0, 200);
+  // Exit 75 (try later): a busy world or one that does not answer. The CLI has already waited and retried as far as is
+  // safe, so the next step is a pause, never a loop.
+  if (isBusy(r.status, r.data)) {
+    const after = r.retryAfterMs != null ? ` again in ${secs(r.retryAfterMs)}` : " again in a little while";
+    const note = r.data?.world?.note ? ` World: ${r.data.world.note}` : "";
+    throw Object.assign(new Error(`${what}: ${code} — ${WAITING[code] ?? "the world is busy"}. Try once${after}; do not loop. A busy world is slow, not broken.${note}`), { exitCode: 75 });
+  }
+  if (r.status === 0 && code === "unreachable") {
+    const how = err.notRetried
+      ? "Not retried: this write has no safe retry. Check `receipt` or `here` before doing it again."
+      : `Tried ${err.tries ?? 1} times over ${err.seconds ?? 0} s; it may be restarting. Do not loop: try once more in a minute.`;
+    throw Object.assign(new Error(`${what}: unreachable — the world did not answer (${msg}). ${how}`), { exitCode: 75 });
+  }
   if (r.status === 401) {
     throw new Error(
       `${what}: this folder no longer controls the Soul (${code}: ${msg}). ` +
@@ -540,7 +621,11 @@ async function waitRaw(seconds = 45, receiptId) {
     const t = Math.max(1, Math.min(55, Math.round((until - Date.now()) / 1000)));
     const q = `timeout=${t}&after=${encodeURIComponent(cursor)}` + (Number.isSafeInteger(ownerMark) ? `&ownerSince=${ownerMark}` : "");
     const r = await call(`/v1/edge/wait?${q}`, { timeoutMs: (t + 10) * 1000 });
-    if (r.status === 429) { await sleep((r.data?.retry_after ?? 5) * 1000); continue; }
+    if (isBusy(r.status, r.data) || r.status === 429) {
+      const ms = statedJitter(r.retryAfterMs ?? 5_000);
+      if (Date.now() + ms * TIME_SCALE >= until) break;
+      await pause(ms); continue;
+    }
     const d = ok(r, "wait");
     if (!d.gap) seen.push(...(d.events ?? []));
     cursor = d.cursor ?? cursor;
@@ -604,6 +689,41 @@ const messagesOf = (d) => {
   return list.filter((m) => m?.id && m.state !== "acknowledged").map((m) => ({ id: m.id, text: m.text, sentAt: m.sentAt }));
 };
 
+// .listen.lock beside .eden-agent.json: {pid, start, soul}. Taken with O_EXCL; a lock whose pid is gone (or is no
+// longer a listen, after pid reuse) is stale and taken over. Released on exit and on SIGINT/SIGTERM/SIGHUP.
+export const LISTEN_LOCK = ".listen.lock";
+function readLock() { try { return JSON.parse(readFileSync(LISTEN_LOCK, "utf8")); } catch { return null; } }
+export function lockIsLive(holder) {
+  if (!Number.isSafeInteger(holder?.pid) || holder.pid <= 0) return false;
+  try { process.kill(holder.pid, 0); } catch (e) { if (e.code !== "EPERM") return false; }
+  try { const cmd = execFileSync("ps", ["-o", "command=", "-p", String(holder.pid)], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); return /listen/.test(cmd); }
+  catch { return true; }   // no ps (or it failed): trust the live pid
+}
+export function listenLockHolder() { const h = readLock(); return h && lockIsLive(h) ? h : null; }
+export function takeListenLock() {
+  const mine = { pid: process.pid, start: now(), soul: load().soul ?? null };
+  for (let i = 0; i < 3; i++) {
+    try {
+      const fd = openSync(LISTEN_LOCK, "wx", 0o600); writeFileSync(fd, JSON.stringify(mine) + "\n"); closeSync(fd);
+      const release = () => { try { if (readLock()?.pid === process.pid) unlinkSync(LISTEN_LOCK); } catch { /* gone already */ } };
+      process.once("exit", release);
+      for (const [sig, n] of [["SIGINT", 130], ["SIGTERM", 143], ["SIGHUP", 129]]) process.once(sig, () => { release(); process.exit(n); });
+      return { ok: true };
+    } catch (e) {
+      if (e.code !== "EEXIST") throw e;
+      const holder = readLock();
+      if (holder && lockIsLive(holder)) return { ok: false, holder };
+      try { renameSync(LISTEN_LOCK, `${LISTEN_LOCK}.stale-${process.pid}`); unlinkSync(`${LISTEN_LOCK}.stale-${process.pid}`); } catch { /* another listen took it over first */ }
+    }
+  }
+  const holder = readLock();
+  return { ok: false, holder: holder ?? { pid: null } };
+}
+function alreadyListening(holder) {
+  process.stderr.write(`already listening (pid ${holder.pid}${holder.start ? `, since ${holder.start}` : ""}); you are fine, one listen per Soul is enough\n`);
+  return { alreadyListening: true, pid: holder.pid, since: holder.start ?? null, next: "nothing to do: the open listen prints owner messages when they arrive" };
+}
+
 // listen [--after <id>] [--once]: hold one long-poll open (this is also the Soul's "agent is
 // listening" presence) and exit as soon as the owner has written, printing every waiting message.
 async function listen(...args) {
@@ -613,18 +733,27 @@ async function listen(...args) {
     else if (args[i] === "--once") once = true;
     else throw new Error("usage: listen [--after <message-id>] [--once]");
   }
-  let backoff = 0;
+  // One listener per Soul: a second `listen` (an agent relaunching it, a second chat) leaves the first alone.
+  if (!once) {
+    const lock = takeListenLock();
+    if (!lock.ok) return alreadyListening(lock.holder);
+  }
+  let attempt = 0, lastCode;
   for (;;) {
     const q = new URLSearchParams({ timeoutMs: once ? "0" : "50000", ...(after ? { after } : {}) });
-    const r = await call(`/v1/edge/inbox/listen?${q}`, { timeoutMs: 60_000, recoverRead: !once });
+    const r = await call(`/v1/edge/inbox/listen?${q}`, { timeoutMs: 60_000, recoverRead: !once, retry: false });
+    if (!once) { const holder = listenLockHolder(); if (holder && holder.pid !== process.pid) return alreadyListening(holder); }
     if (r.status === 0 || r.status === 429 || r.status >= 500) {
-      backoff = Math.min(30_000, backoff ? backoff * 2 : 1000);
-      process.stderr.write(`listen: ${r.data?.error?.code ?? r.status}, retrying in ${backoff / 1000}s\n`);
-      await sleep(backoff);
+      const code = codeOf(r.data) ?? `http-${r.status}`;
+      const ms = r.retryAfterMs != null ? statedJitter(r.retryAfterMs) : fullJitter(attempt);
+      attempt = Math.min(attempt + 1, 6);
+      if (code !== lastCode) process.stderr.write(`listen: ${WAITING[code] ?? code}; still listening, next try in ${secs(ms)} (backing off up to 60 s)\n`);
+      lastCode = code;
+      await pause(ms);
       continue;
     }
     const d = ok(r, "listen");
-    backoff = 0;
+    attempt = 0; lastCode = undefined;
     const messages = messagesOf(d).filter((m) => m.id !== after);
     if (messages.length || once) {
       return { messages, next: messages.length ? `ack each (ack <id> "Got it: …"), restart listen --after ${messages.at(-1).id} in the background, then do them in order and result <id> done|failed "…"` : "nothing waiting" };
@@ -774,6 +903,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     process.stdout.write(typeof out === "string" ? out : JSON.stringify(out, null, 1) + "\n");
   }, (e) => {
     process.stderr.write(`error: ${e.message}\n`);
-    process.exit(1);
+    process.exit(e.exitCode ?? 1);
   });
 }
