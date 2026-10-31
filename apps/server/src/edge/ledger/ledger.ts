@@ -67,6 +67,8 @@ const WAIT_LIMIT_TICKS = 20 * 60;   // a waiting receipt that cannot start withi
 const NEAR_RADIUS = 20, GO_NEAR_RADIUS = 60;
 /** srv-act-words (C): the destination words of a focus-shaped walk (vocabulary WORDS_FOCUS_SHAPE's walk arm). */
 const WALK_DEST = /^(?:please )?(?:go|walk|head)(?: over| back)? (?:to|into|inside|towards?) ([a-z0-9' -]+?)[.!]?$/;
+/** srv-act-words (C): whether a walk's destination words name a place, per vocabPlaces listing (its value object). */
+const NAMES_PLACE = new WeakMap<object, Map<string, boolean>>();
 /** L3 menu cache: a kept menu is rebuilt at least this often (2 min: anything it reads without a version, e.g. a far
  *  Soul's ambient sit), in cells of this size, bumped for Souls within this reach (fires 150 m). */
 // MENU_REACH_M covers SPOT_REACH: an activity spot is offered up to 200 m off, and a claim on it (an act whose target it
@@ -828,7 +830,11 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const dest = WALK_DEST.exec(low.trim().replace(/\s+/g, ' '));
     let keep: MenuFocus['walkKeep'] | undefined;
     if (dest) {
-      const {places, withheld} = this.vocabPlaces(soul); if (!placeMatch(tokens(dest[1]), places, withheld).length) {menuStats.words.focusSkipped++; return null;}
+      const vp = this.vocabPlaces(soul), {places, withheld} = vp;
+      // (whether the words name a place, kept per places listing: a miss scans every place's words, ~1 ms on Eden 2026)
+      let named = NAMES_PLACE.get(vp); if (!named) NAMES_PLACE.set(vp, named = new Map());
+      let hit = named.get(dest[1]); if (hit === undefined) {hit = placeMatch(tokens(dest[1]), places, withheld).length > 0; if (named.size >= 512) named.clear(); named.set(dest[1], hit);}
+      if (!hit) {menuStats.words.focusSkipped++; return null;}
       // (D) ... and builds only the walks those words could choose (vocabulary walkKeepV1), not every walk's route goal
       const test = walkKeepV1(dest[1], places, this.vocabularyOf(soul, []).target);
       if (test) keep = {sig: dest[1], keep: test};
