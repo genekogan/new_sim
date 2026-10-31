@@ -63,14 +63,18 @@ export function launcherFlood({ limits = {}, now = Date.now, log = (l) => consol
 // Per address only behind the reverse proxy (x-forwarded-for, which Caddy sets itself); this machine is never limited by
 // address. Caddy, not the launcher, accepts the connections, so "connections per address" is counted as the address's
 // requests in flight to world APIs and its WebSockets.
+// Re-derived 2026-10-31 (Gene, 13:40Z, team/scratch/ship/CEILINGS-DECISION-20261031.md: "I want real scalability
+// solutions, not limits"): a floor an order of magnitude above legitimate use — 6 Souls at home are 20–30 requests per
+// 10 s and ~110 heavy per minute; the first numbers were set before Stage A was measured and sat at that edge. The world
+// budget is a stop-gap until shedding is load-driven (the world's green/amber/red/black, LOAD-CONTRACT §1).
 export const SOUL_CEILINGS = Object.freeze({
-  ipPer10s: 120,            // Soul API requests per address per world per 10 s
-  ipConcurrent: 10,         // API requests in flight + WebSockets per address
-  ipListen: 8,              // listen/wait long-polls per address
-  soulListen: 4,            // listen/wait per Soul token
-  accountListen: 12,        // listen/wait per account (learned from the world's x-sim-account header, else per Soul)
-  accountHeavyPerMin: 120,  // C1/C2 per account (as above) per minute
-  worldBudgetRps: 10,       // C1/C2 forwarded to the world's main thread per second, every Soul together (bursts of 2 s); reads its read workers answer are exempt
+  ipPer10s: 600,            // Soul API requests per address per world per 10 s
+  ipConcurrent: 50,         // API requests in flight + WebSockets per address
+  ipListen: 40,             // listen/wait long-polls per address
+  soulListen: 4,            // listen/wait per Soul token (a Soul needs 1–2; more is a client bug)
+  accountListen: 40,        // listen/wait per account (learned from the world's x-sim-account header, else per Soul)
+  accountHeavyPerMin: 900,  // C1/C2 per account (as above) per minute
+  worldBudgetRps: 200,      // C1/C2 forwarded to the world's main thread per second, every Soul together (bursts of 2 s); reads its read workers answer are exempt. Stop-gap until shedding is load-driven
   maxBodyKb: 64,            // a Soul API request body (body uploads excepted)
   c3CacheMs: 1000,          // C3 public reads: one world call per this long per URL (the micro-cache)
 });
@@ -86,7 +90,8 @@ export function requestClass(rest, method = 'GET') {
   if (/^(receipts(\/|$)|inbox(\/|$)|schema\/?$|boot\/static\/?$)/.test(r)) return 'C0';
   // `around` explores (it records the places found and invalidates menus): a write, as in-world admission classes it
   if (/^around\/?$/.test(r)) return 'C1';
-  if (read && /^(map|rides|items|platforms)\/?$/.test(r)) return 'C3';
+  // public/souls/:id is the visitor page's Soul chip (apps/web PublicSoulRecord): a public read, served without a token
+  if (read && /^(map|rides|items|platforms)\/?$|^public\//.test(r)) return 'C3';
   return read ? 'C2' : 'C1';
 }
 
@@ -134,13 +139,16 @@ export function soulCeilings({ limitsFor = () => null, now = Date.now, log = (l)
     check(req, slug, rest, behindProxy, { toWorker = false } = {}) {
       if (!rest.startsWith('/v1/') && rest !== '/healthz') return null;
       const cls = requestClass(rest, req.method), edge = rest.startsWith('/v1/edge/'), l = limits(slug);
+      // only the Soul API is ceilinged: god and world routes (the world creator's own coding agent) keep the god-token
+      // bucket and the address flood guard (launcherFlood); a C3 public read still gets its class for the micro-cache
+      if (!edge) return cls === 'C3' ? { cls, soul: null, release() {} } : null;
       const xff = behindProxy ? req.headers['x-forwarded-for'] : undefined, ip = xff ? String(xff).split(',')[0].trim() : null;
       const soul = soulOf(req), acct = soul ? accounts.get(soul) ?? soul : null, heavy = edge && (cls === 'C1' || cls === 'C2');
       const len = Number(req.headers['content-length'] ?? 0);
       if (edge && !rest.startsWith('/v1/edge/body/uploads') && len > l.maxBodyKb * 1024) { note(slug, 'request.too-large', 'body'); return { refuse: { status: 413, headers: { 'cache-control': 'no-store' }, body: { ok: false, code: 'request.too-large', message: `a request body may be at most ${l.maxBodyKb} KB` } } }; }
       if (heavy && !req.headers.authorization) { note(slug, 'auth.required', 'token'); return { refuse: { status: 401, headers: { 'cache-control': 'no-store' }, body: { ok: false, code: 'auth.required', message: 'this needs a Soul token' } } }; }
       if (ip) {
-        if (edge) { const wait = bucket('ip', l.ipPer10s / 10, l.ipPer10s).take(`${slug}|${ip}`); if (wait) return no(slug, 429, 'client.rate', 'address', wait, `more than ${l.ipPer10s} requests in 10 s from your address to this world`); }
+        { const wait = bucket('ip', l.ipPer10s / 10, l.ipPer10s).take(`${slug}|${ip}`); if (wait) return no(slug, 429, 'client.rate', 'address', wait, `more than ${l.ipPer10s} requests in 10 s from your address to this world`); }
         if (n(`c|${ip}`) >= l.ipConcurrent) return no(slug, 429, 'client.rate', 'address', 1000, `more than ${l.ipConcurrent} requests at once from your address`);
         if (cls === 'listen' && n(`l|${ip}`) >= l.ipListen) return no(slug, 429, 'client.rate', 'address', 5000, `more than ${l.ipListen} listening connections from your address`);
       }
