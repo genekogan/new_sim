@@ -69,3 +69,25 @@ test('a walk starting out of an idle gesture fades the gesture with the walk eas
  if(process.env.M04_DEBUG)for(const r of rows)console.log(r.t.toFixed(2),r.w.toFixed(3),r.variety.toFixed(3),r.p.map(p=>[p[0]-r.x,p[1],p[2]].map(x=>x.toFixed(3)).join(',')).join(' | '));
  assert.ok(max<=.08,`palm step per 50 ms while the walk eases in ${max.toFixed(3)}`);
 });
+
+// Entry 38 (take 6): a board stroke hands the body over 0.1 s after its arm is down (`stroke.handoff`) and the Soul steps
+// back. The arm-down came inside a fold-arms window; the walk-start arms-only copies drew the gesture's arms at the walk's
+// start (the body was never in it: the idle handoff had only begun): 0.73 m per 50 ms. Now the gesture level at the walk
+// start carries the idle handoff of the actuator that just ended.
+test('a step back right after an early hand-over does not throw the arms into an idle gesture',async()=>{
+ const v=await views(),tg=gestureClock(),at:[number,number,number]=[.45,1.3,0];
+ const stroke={kind:'write' as const,yaw:-Math.PI/2,stand:.45,width:.2,height:.05,lines:1,seconds:1.8,release:1.1,handoff:.1};
+ // the actuator starts so that its arm is down (+0.1 s hand-over) 1 s into the gesture's full-weight window
+ const end=HAND_REACH_SECONDS+stroke.seconds+stroke.release+stroke.handoff,ts=+(tg+1-end).toFixed(2),start=Math.round(ts/DT),tw=ts+end,v0=1.0;
+ const kw=Math.round(tw/DT),track=[[0,0,0,0,0],[kw,0,0,0,0],[kw+80,-Math.round(80*DT*v0*POS_Q),0,0,0]],seg=gaitSegments([{track,offset:0}],DT);
+ const since=(t:number)=>{for(let k=Math.floor(t/DT+1e-6);k>=Math.floor(t/DT+1e-6)-24;k--)if(walkWeightAt(seg,k,DT)<=.02)return {walkAge:t-k*DT,restAgeAtWalk:30+k*DT-ts};return {};};
+ const frame=(t:number):SampledHuman=>{
+  if(t<ts)return {id:ID,p:[0,0,0],yaw:0,walk:0,walkDist:0,activity:'idle',restAge:30+t-ts};
+  // as the engine records it: hands and 'operate' until the arm is down, then 'idle' until the hand-over
+  if(t<tw){const up=t<ts+HAND_REACH_SECONDS+stroke.seconds+stroke.release;const w=walkWeightAt(seg,t/DT,DT);return {id:ID,p:[0,0,0],yaw:0,walk:w,walkDist:0,activity:up?'operate':'idle',restAge:30+t-ts,...(up?{hands:{right:at}}:{}),...(w>.02?since(t):{}),handActuator:{target:'board',at,stroke,startTick:start},handActuatorTime:t};}
+  const x=-Math.max(0,t-tw)*v0,w=walkWeightAt(seg,t/DT,DT);return {id:ID,p:[x,0,0],yaw:0,walk:w,walkDist:-x,activity:w>.02?'walk':'idle',restAge:30+t-ts,speed:v0,...(w>.02?since(t):{})};};
+ const rows:{t:number;x:number;p:number[][];w:number}[]=[];
+ for(let t=tw-.6;t<=tw+1.6;t+=DT){const f=frame(+t.toFixed(4));v.setFrame([f],+t.toFixed(4));v.render(1);rows.push({t,x:f.p[0],p:palms(v),w:f.walk});}
+ let max=0;for(let i=1;i<rows.length;i++){if(rows[i-1].w>=.9&&rows[i].w>=.9)continue;const st=step(rows[i-1].p.map(p=>[p[0]-rows[i-1].x,p[1],p[2]]),rows[i].p.map(p=>[p[0]-rows[i].x,p[1],p[2]]));if(process.env.M04_DEBUG)console.log('H',(rows[i].t-tw).toFixed(2),rows[i].w.toFixed(3),st.toFixed(3),(v.bones(ID)[ID] as {variety?:number}).variety);max=Math.max(max,st);}
+ assert.ok(max<=.08,`palm step per 50 ms across the hand-over and the step back's ease ${max.toFixed(3)}`);
+});

@@ -1,5 +1,6 @@
-import {handActuatorFrame,type HandActuatorMotion} from '../../engine/social/hand-actuator.ts';
+import {handActuatorFrame,posterLocal,strokeWork,twoHanded,HAND_REACH_SECONDS,HAND_RELEASE_SECONDS,type HandActuatorMotion} from '../../engine/social/hand-actuator.ts';
 import {wateringFrame,transferWeight,TRANSFER_HANDOFF,type HandTransfer,type WateringMotion} from '../../engine/items/watering.ts';
+import { posterTexture, sheetGeometry, sheetLift as sheetLiftAt, tapeStrips, rollMesh, PAPERS } from './poster-sheet.ts';
 // Engine humans → animated rigs. Renderers only read world state (guide):
 // after every fixed tick we snapshot pose + derive clip state; frames
 // interpolate between the last two ticks, so visuals are a deterministic
@@ -82,6 +83,8 @@ type View = {
   /** Soul Actions 34: a handle-held item taken or put by hand (take_item / put_item), on the take clock. */
   transfer?:HandTransfer;
   transferTime?:number;
+  /** Entry 38: the actuator that just ended, while its idle handoff is still fading in. */
+  lastHandActuator?:HandActuatorMotion;
   sleepPose?: NonNullable<Entity['human']>['sleepPose'];
   shore?: ShoreContactV1;
   shoreTime?: number;
@@ -142,6 +145,8 @@ type View = {
   /** todo (leisure): the dock bicycle under a cycling body, metres ridden (turns the cranks), when it last cycled (s). */
   bike?: THREE.Group; ridden?: number; bikeAt?: number;
   prop?: { kind: PropKind; obj: THREE.Object3D };
+  /** Soul Actions entry 38: the poster in the hands while it goes up or comes down (sheet on the wall, roll between the palms). */
+  sheet?: { key: string; group: THREE.Group; flat: THREE.Mesh; roll: THREE.Mesh; tapes: THREE.Mesh[] };
   /** Library clip layer (clip-library.ts): seconds since `activity` began (undefined: before the record), the activity
    *  and base before it (crossfade), the paired-gesture partner and where it is, metres walked, speaking now. */
   since?: number;
@@ -503,6 +508,7 @@ export class HumanViews {
       v.shore = undefined;
       v.shoreTime = undefined;
       v.waterTransition = undefined;
+      if(v.handActuator&&!e.human?.handActuator)v.lastHandActuator=v.handActuator;else if(e.human?.handActuator)v.lastHandActuator=undefined;
       v.handActuator=e.human?.handActuator;v.handActuatorTime=world.tick*DT;v.watering=e.human?.wateringV1;v.wateringTime=world.tick*DT;v.transfer=e.human?.handTransferV1;v.transferTime=world.tick*DT;
       v.sleepPose = e.human?.sleepPose;
       v.base = base;
@@ -693,6 +699,7 @@ export class HumanViews {
       if(!f.bodyModel)this.syncAppearance(v,f.publicSoulKey);
       const walkDur = v.rig.walk.getClip().duration, idleDur = v.rig.idle.getClip().duration;
       v.activity = act;
+      if(v.handActuator&&!f.handActuator)v.lastHandActuator=v.handActuator;else if(f.handActuator)v.lastHandActuator=undefined;
       v.handActuator=f.handActuator;v.handActuatorTime=f.handActuatorTime;v.watering=f.watering;v.wateringTime=f.wateringTime;v.transfer=f.transfer;v.transferTime=f.transferTime;
       v.sleepPose = f.sleepPose;
       v.shore = f.shore;
@@ -839,7 +846,11 @@ export class HumanViews {
       : v.transfer && transferS >= 0 && transferS < GESTURE_FADE ? 1 - smooth(transferS / GESTURE_FADE) : 0;
     // Idle variety also plays on into a walk start (scaled by 1 − walk weight, so it fades out with the walk's ease).
     const idleFree = (v.activity === 'idle' || GAIT_ACTS.has(v.activity) || ((v.activity === 'operate' || v.activity === 'reach') && reachFade > 0)) && b.sitW === 0 && (!engineHands || reachFade > 0) && freeBody && !lib.cur;
-    const idleHandoff = handoff ? (reachS < 0 ? 1 : Math.max(handoff.idleBlend, reachFade)) : v.transfer?.endTick !== undefined ? smooth(((v.transferTime ?? tSec) - v.transfer.endTick * DT) / TRANSFER_HANDOFF) : v.transfer && transferS >= 0 ? reachFade : 1;
+    // Entry 38: an actuator that hands the body over soon after its arm is down (a board stroke and its step back) keeps
+    // the idle handoff fading in after it ends, instead of switching idle variety on at full weight (a 0.31 m palm jump, take 5)
+    const after = !handoff && v.lastHandActuator ? handActuatorFrame(v.lastHandActuator, (v.handActuatorTime ?? tSec) - v.lastHandActuator.startTick * DT).idleBlend : 1;
+    if (after >= 1) v.lastHandActuator = undefined;
+    const idleHandoff = handoff ? (reachS < 0 ? 1 : Math.max(handoff.idleBlend, reachFade)) : v.transfer?.endTick !== undefined ? smooth(((v.transferTime ?? tSec) - v.transfer.endTick * DT) / TRANSFER_HANDOFF) : v.transfer && transferS >= 0 ? reachFade : after;
     // Idle variety (Idle_Neutral, fold arms, look around) fades in from when the body came to rest: switched on at full
     // weight it raised or crossed the arms in one frame whenever a walk ended inside a person's variety window
     // (entry 29's shared idle-onset fix, carried by entry 33: a hand-to-hair flash at each walk stop before a reach).
@@ -857,7 +868,9 @@ export class HumanViews {
     if ((v.activity === 'idle' || GAIT_ACTS.has(v.activity)) && v.walkAge !== undefined && v.walkAge < GESTURE_FADE && b.sitW === 0 && !engineHands && freeBody && !lib.cur) {
       const g = 1 - smooth(v.walkAge / GESTURE_FADE), on = v.restAgeAtWalk === undefined ? 1 : smooth(Math.min(1, v.restAgeAtWalk / IDLE_VARIETY_ONSET));
       const n0 = extra.idleNeutral ? neutralWeight(h.name, tSec) * on : 0, v0 = gv && libAction(v.rig, gv.clip) ? (1 - n0) * gv.w * on : 0;
-      const want = (n0 + v0) * g, have = neutralW + variantW;
+      // Entry 38: × the idle handoff of an actuator that just ended (a board stroke handing over to its step back): the body
+      // was not in the gesture then, and the arms-only copies drew the folded arms in one frame (0.73 m per 50 ms, take 6)
+      const want = (n0 + v0) * g * idleHandoff, have = neutralW + variantW;
       if (want > have + 1e-4) { const k = Math.min(20, (want - have) / Math.max(1e-3, 1 - want)) / (n0 + v0); armsN = n0 * k; armsV = v0 * k; }
     }
     const libOn = new Set<THREE.AnimationAction>();
@@ -1172,6 +1185,7 @@ export class HumanViews {
       // placeProp wrote a world matrix: express it in the holder's frame (the prop is the holder's child)
       v.prop.obj.matrix.premultiply(_inv.copy(h.matrixWorld).invert());
     }
+    heldSheet(v, h, tSec);
     if (v.spine?.head && Math.abs(gaze) > 1e-5) {
       const head = v.spine.head;
       const axis = new THREE.Vector3(0, 1, 0).applyQuaternion(head.parent!.getWorldQuaternion(new THREE.Quaternion()).invert());
@@ -1445,6 +1459,72 @@ function lerpHands(a: Hands, b: Hands, t: number): Hands {
 }
 
 const V = () => new THREE.Vector3();
+/** Soul Actions entry 38: the poster in a Soul's hands, from the recorded hand-actuator timeline (posterLocal) and the drawn
+ *  palms. Putting up: a roll held between the palms is raised to the slot, its top edge pressed to the wall, and the sheet
+ *  unrolls downward under the sliding palms; tape goes on the bottom corners, then the top. Taking down: the tape comes off,
+ *  the sheet rolls up from the top under the palms and the roll is lifted away. The flat part is the same bent sheet the
+ *  wall draws (poster-sheet.ts), 1.5 mm proud of it, so the handoff at the commit is invisible. */
+const _sheetM = new THREE.Matrix4(), _sheetQ = new THREE.Quaternion(), _rollAxis = new THREE.Vector3(), _rollY = new THREE.Vector3(0, 1, 0);
+function heldSheet(v: View, h: THREE.Object3D, tSec: number) {
+  const m = v.handActuator, s = m?.stroke;
+  if (!m || !s || !twoHanded(s) || !s.sheet || !v.arms.length) { if (v.sheet) { h.remove(v.sheet.group); v.sheet.flat.geometry.dispose(); v.sheet = undefined; } return; }
+  const key = `${m.startTick}:${m.target}:${s.kind}`, el = (v.handActuatorTime ?? tSec) - m.startTick * DT, u = (el - HAND_REACH_SECONDS) / s.seconds, W = s.width, H = s.height, age = s.sheet.age ?? 0;
+  if (!v.sheet || v.sheet.key !== key) {
+    if (v.sheet) { h.remove(v.sheet.group); v.sheet.flat.geometry.dispose(); }
+    const group = new THREE.Group(); group.name = 'held poster'; group.matrixAutoUpdate = false;
+    const map = posterTexture(s.sheet.title, s.sheet.detail, s.sheet.name ?? '', s.sheet.paper, age);
+    const flat = new THREE.Mesh(sheetGeometry(W, H, 1, age), new THREE.MeshStandardMaterial({ map: map ?? undefined, color: map ? '#ffffff' : PAPERS[s.sheet.paper % PAPERS.length].paper, roughness: 0.92, metalness: 0, side: THREE.DoubleSide }));
+    const wall = new THREE.Group(); wall.name = 'held poster wall frame'; wall.add(flat);
+    const tapes = tapeStrips(W, H, s.sheet.title + (s.sheet.name ?? '')); for (const t of tapes) wall.add(t);
+    const roll = rollMesh(s.sheet.paper); roll.matrixAutoUpdate = false;
+    group.add(wall, roll); h.add(group); v.sheet = { key, group, flat, roll, tapes };
+  }
+  const sh = v.sheet, wall = sh.group.children[0] as THREE.Group;
+  // the wall frame: at the slot centre, turned to the wall (engine yaw is Three's rotation.y), 1.5 mm proud of the wall poster
+  _sheetM.makeRotationY(s.yaw).setPosition(m.at[0], m.at[1], m.at[2]); _sheetM.multiply(new THREE.Matrix4().makeTranslation(0, 0, 0.0015));
+  sh.group.matrix.copy(_inv.copy(h.matrixWorld).invert()).multiply(_sheetM); sh.group.matrixWorldNeedsUpdate = true;
+  const local = posterLocal(s, Math.max(0, Math.min(1, u)), m.at);
+  const w = strokeWork(s, u);   // the work's own progress (negative while the lead brings the hands up to the chest)
+  const yH = local.y;   // the palms' height on the sheet (face-local)
+  // how much of the sheet lies flat on the wall: [from, to] in v (0 = bottom edge, 1 = top edge)
+  let from = 1, to = 1, rolled = 1;
+  if (s.kind === 'poster') {
+    if (w >= .45) { from = 0; rolled = 0; } else if (w > .09) { from = Math.max(0, Math.min(1, (yH - .006 + H / 2) / H)); rolled = from; } else { from = 1; rolled = 1; }
+  } else {
+    if (w < .15) { from = 0; to = 1; rolled = 0; } else if (w < .55) { from = 0; to = Math.max(0, Math.min(1, (yH + .006 + H / 2) / H)); rolled = 1 - to; } else { from = 0; to = 0; rolled = 1; }
+  }
+  const flatOn = to - from > .002;
+  sh.flat.visible = flatOn; if (flatOn) sheetGeometryRange(sh.flat.geometry as THREE.BufferGeometry, W, H, from, to, age);
+  // tape: putting up, bottom corners at u .50, top at .83 (the presses in posterLocal); taking down, top comes off at .12, bottom at .55
+  const tapeOn = (i: number) => s.kind === 'poster' ? (i >= 2 ? w >= .5 : w >= .83) : (i >= 2 ? w < .55 : w < .12);
+  sh.tapes.forEach((t, i) => { t.visible = tapeOn(i) && !(i === 3 && age >= 1.8); });
+  // the roll: between the drawn palms, a paper tube as long as the sheet is wide; its radius follows how much is rolled
+  const L = palmSide(v, 'left'), R = palmSide(v, 'right');
+  const showRoll = rolled > .01 && !!L && !!R;
+  if (!showRoll) { sh.roll.visible = false; return; }
+  const f = handActuatorFrame(m, el), releaseAt = HAND_REACH_SECONDS + s.seconds;
+  // appearing in the hands as they rise (putting up) and put away as they lower (taking down)
+  const grow = s.kind === 'poster' ? smooth(clamp01(el / .35)) : 1 - smooth(clamp01((el - releaseAt - (s.release ?? HAND_RELEASE_SECONDS) * .35) / ((s.release ?? HAND_RELEASE_SECONDS) * .65)));
+  if (grow <= .01 || (s.kind === 'poster' && f.weight <= 1e-3 && el > HAND_REACH_SECONDS)) { sh.roll.visible = false; return; }
+  const r = (.006 + .022 * Math.sqrt(rolled)) * grow, len = W * grow;
+  const mid = V().addVectors(L!, R!).multiplyScalar(.5);
+  // the tube sits between the palms, toward the wall (the palms hold its ends from the room side)
+  const out = V().set(Math.sin(s.yaw), 0, Math.cos(s.yaw)); mid.addScaledVector(out, -Math.min(.012, r * .4));
+  _rollAxis.subVectors(R!, L!); if (_rollAxis.lengthSq() < 1e-6) _rollAxis.set(Math.cos(s.yaw), 0, -Math.sin(s.yaw)); _rollAxis.normalize();
+  _sheetQ.setFromUnitVectors(_rollY, _rollAxis);
+  const world = new THREE.Matrix4().compose(mid, _sheetQ, V().set(r, len, r));
+  sh.roll.matrix.copy(_inv.copy(sh.group.matrixWorld.copy(h.matrixWorld).multiply(sh.group.matrix)).invert()).multiply(world); sh.roll.matrixWorldNeedsUpdate = true; sh.roll.visible = true;
+  void wall;
+}
+function palmSide(v: View, side: 'left' | 'right') { const i = v.arms.findIndex((_, k) => armSide(v, k) === side); return i >= 0 ? palm(v.arms[i], V()) : null; }
+/** sheetGeometry over a v range [from, to] (taking down rolls from the top, so the flat part is the bottom). */
+function sheetGeometryRange(g: THREE.BufferGeometry, w: number, h: number, from: number, to: number, age: number) {
+  sheetGeometry(w, h, from, age, g);
+  if (to >= 1) return;
+  const pos = g.getAttribute('position') as THREE.BufferAttribute, uv = g.getAttribute('uv') as THREE.BufferAttribute;
+  for (let k = 0; k < pos.count; k++) { const v0 = uv.getY(k), v = from + (v0 - from) / Math.max(1e-6, 1 - from) * (to - from), y = (v - .5) * h, x = pos.getX(k); uv.setY(k, v); pos.setXYZ(k, x, y, sheetLiftAt(x, y, w, h, age)); }
+  pos.needsUpdate = true; uv.needsUpdate = true; g.computeVertexNormals(); g.computeBoundingSphere();
+}
 const _s = V(), _fwd = V(), _right = V(), _ax = V(), _hip = V(), _knee = V(), _tmp = V(), _c = V();
 const _goals: THREE.Vector3[] = [V(), V()];
 const _qh = new THREE.Quaternion(), _qf = new THREE.Quaternion(), _qt = new THREE.Quaternion();

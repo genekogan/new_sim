@@ -14,7 +14,10 @@ export const HAND_OPEN_ANGLE=-Math.PI*.48;
 const vec=z.tuple([z.number().finite(),z.number().finite(),z.number().finite()]);
 const opening=z.object({floorY:z.number().finite().optional(),hinge:vec,yaw:z.number().finite(),radius:z.number().min(.2).max(2),height:z.number().min(.3).max(3),handleY:z.number().min(.3).max(2),from:z.number().min(-1.6).max(0),to:z.number().min(-1.6).max(0),side:z.union([z.literal(1),z.literal(-1)]),bodyPolicy:z.literal('door-natural-v2').optional()}).strict();
 // A hand that writes or wipes across a flat face (a board): `at` is the face centre, `yaw` its facing.
-const stroke=z.object({kind:z.union([z.literal('write'),z.literal('wipe')]),yaw:z.number().finite(),stand:z.number().min(.3).max(.7).optional(),width:z.number().min(.1).max(1.2),height:z.number().min(.05).max(.8),lines:z.number().int().min(1).max(3),seconds:z.number().min(.8).max(6)}).strict();
+// Soul Actions entry 38: a poster is put up (or taken down) with both hands: `width`/`height` are the sheet's, `at` its centre on
+// the wall's surface, and `sheet` what is printed on it (so every viewer draws the same paper in the hands as on the wall).
+const sheet=z.object({title:z.string().max(40),detail:z.string().max(80),name:z.string().max(40).optional(),paper:z.number().int().min(0).max(15),age:z.number().min(0).max(99).optional()}).strict();
+const stroke=z.object({kind:z.union([z.literal('write'),z.literal('wipe'),z.literal('poster'),z.literal('unposter')]),yaw:z.number().finite(),stand:z.number().min(.3).max(.7).optional(),width:z.number().min(.1).max(1.2),height:z.number().min(.05).max(.8),lines:z.number().int().min(1).max(3),seconds:z.number().min(.8).max(6),release:z.number().min(.7).max(1.6).optional(),lead:z.object({y:z.number().finite(),out:z.number().min(0).max(.5)}).strict().optional(),handoff:z.number().min(0).max(1.2).optional(),sheet:sheet.optional()}).strict();
 // Soul Actions entry 24: a drawer slides straight out along `dir` (the chest's front, world xz); `at` is the knob closed,
 // `from`/`to` the travel out (m). The hand stays on the knob; the body keeps half a metre in front of it, facing the chest.
 const slide=z.object({at:vec,dir:z.tuple([z.number().finite(),z.number().finite()]),travel:z.number().min(.05).max(.8),from:z.number().min(0).max(.8),to:z.number().min(0).max(.8),floorY:z.number().finite()}).strict();
@@ -26,6 +29,7 @@ const passage=z.object({mode:z.enum(['unlock','open','close']),door:z.tuple([z.n
  *  (back) and the bolt slides; `knock`: knuckles to the leaf, three raps. The leaf does not move (opening from = to = 0). */
 const op=z.enum(['lock','unlock','knock']);
 export const handActuatorParams=z.object({actor:z.string(),target:z.string(),at:vec,opening:opening.optional(),stroke:stroke.optional(),slide:slide.optional(),passage:passage.optional(),op:op.optional()}).strict();
+
 export type HandActuatorParams=z.infer<typeof handActuatorParams>;
 export type HandActuatorMotion=Omit<HandActuatorParams,'actor'> & {startTick:number;actionId?:string;abortedAt?:number;abortWeight?:number};
 const smooth=(v:number)=>{const k=Math.max(0,Math.min(1,v));return k*k*(3-2*k);};
@@ -47,19 +51,23 @@ export function handActuatorFrame(m:HandActuatorMotion,seconds:number){
  const commitAt=m.op==='knock'?knockContacts()[0]:m.opening?.to===0||m.stroke||m.slide?.to===0?releaseAt:HAND_REACH_SECONDS;
  const k=smooth(((m.abortedAt??seconds)-HAND_REACH_SECONDS)/(swing||1));
  const angle=m.opening?m.opening.from+(m.opening.to-m.opening.from)*k:0,pos=m.slide?m.slide.from+(m.slide.to-m.slide.from)*k:0;
- const weight=m.abortedAt!==undefined?(m.abortWeight??0)*(1-smooth((seconds-m.abortedAt)/HAND_RELEASE_SECONDS))
-   :smooth(seconds/HAND_REACH_SECONDS)*(1-smooth((seconds-releaseAt)/HAND_RELEASE_SECONDS));
+ // Entry 38: a stroke may lower the arm more slowly (a hand coming down from above the shoulder; default 0.7 s)
+ const rel=m.stroke?.release??HAND_RELEASE_SECONDS;
+ const weight=m.abortedAt!==undefined?(m.abortWeight??0)*(1-smooth((seconds-m.abortedAt)/rel))
+   :smooth(seconds/HAND_REACH_SECONDS)*(1-smooth((seconds-releaseAt)/rel));
  // entry 32: a walk's thumb-turn / key keeps the hand up and slides it to the handle (`slide`), then hands over to the opening
  if(m.passage?.mode==='unlock'&&m.abortedAt===undefined){
   const turn=k,slide=smooth((seconds-releaseAt)/UNLOCK_SLIDE_SECONDS);
   return {angle,pos,weight:smooth(seconds/HAND_REACH_SECONDS),idleBlend:0,idleWeight:1-smooth(seconds/HAND_REACH_SECONDS),armDown:false,commitAt,done:seconds>=releaseAt+UNLOCK_SLIDE_SECONDS,contact:seconds>=commitAt,turn,rap:0,slide};
  }
- const armDownAt=(m.abortedAt??releaseAt)+HAND_RELEASE_SECONDS,idleBlend=smooth((seconds-armDownAt)/HAND_IDLE_HANDOFF_SECONDS);
+ // Entry 38: a stroke followed by a step back hands the body over soon after the arm is down (`handoff`), before an idle
+ // gesture can rise in the 1.2 s idle handoff (take 4: a hand went up to the hair at 0.1 m per 50 ms, then the step back)
+ const armDownAt=(m.abortedAt??releaseAt)+rel,idleBlend=smooth((seconds-armDownAt)/HAND_IDLE_HANDOFF_SECONDS),handoff=m.stroke?.handoff??HAND_IDLE_HANDOFF_SECONDS;
  const idleWeight=m.abortedAt!==undefined||seconds<HAND_REACH_SECONDS?1-weight:idleBlend;
  // entry 32: how far the key / thumb-turn has turned (0..1), and how far the knuckles are from the leaf (0 = touching)
  const turn=m.op==='lock'||m.op==='unlock'?k:0;
  let rap=0;if(m.op==='knock'){const f=(seconds-HAND_REACH_SECONDS-KNOCK_LEAD)/KNOCK_PERIOD;if(f<0)rap=1;else if(f>=KNOCK_RAPS)rap=1;else{const x=f%1;rap=x<KNOCK_IN?1-smooth(x/KNOCK_IN):smooth((x-KNOCK_IN)/(1-KNOCK_IN));}}
- return {angle,pos,weight,idleBlend,idleWeight,armDown:seconds>=armDownAt,commitAt,done:seconds>=armDownAt+HAND_IDLE_HANDOFF_SECONDS,contact:m.abortedAt===undefined&&seconds>=commitAt,turn,rap,slide:0};
+ return {angle,pos,weight,idleBlend,idleWeight,armDown:seconds>=armDownAt,commitAt,done:seconds>=armDownAt+handoff,contact:m.abortedAt===undefined&&seconds>=commitAt,turn,rap,slide:0};
 }
 /** Three's local-Y rotation convention, converted to the native world frame. */
 export function actuatorPoint(o:NonNullable<HandActuatorParams['opening']>,angle:number){
@@ -84,7 +92,50 @@ export function actuatorPoint(o:NonNullable<HandActuatorParams['opening']>,angle
 }
 /** Where a writing or wiping hand is on the face at stroke progress `u` (0..1): rows of small letter strokes, left to
  *  right, with a slight lift back to the next row; a wipe is three overlapping sweeps. Continuous at u=0 and u=1. */
+export const twoHanded=(s?:HandActuatorParams['stroke'])=>s?.kind==='poster'||s?.kind==='unposter';
+/** Entry 38: where both palms are while putting a poster up (u 0..1 of the stroke). Face-local [x right, y up, out from the
+ *  wall]: press the rolled top edge to the wall, unroll it downward with both palms sliding down the sides, press (tape) the
+ *  bottom corners, smooth back up the sides and press (tape) the top corners. Taking down: hands to the top corners, peel, roll
+ *  the sheet up from the top as the hands go down, then lift the roll away toward the chest. Continuous at u=0 and u=1. */
+export const POSTER_ON=.035,POSTER_OFF=.07;
+/** Entry 38 (take 3): a stroke with a `lead` first brings the hand(s) up to the front of the chest (world height `lead.y`,
+ *  `lead.out` from the face) and only then to where the work starts, so the 0.65 s reach covers the short way from the side
+ *  (a hand raised straight from the hip to above the shoulder in 0.65 s moved 0.15 m per 50 ms). STROKE_LEAD of the stroke. */
+export const STROKE_LEAD=.2;
+/** The stroke's own progress (0..1) at u; negative while the lead is still bringing the hands up. */
+export const strokeWork=(s:NonNullable<HandActuatorParams['stroke']>,u:number)=>!s.lead?u:(Math.max(0,Math.min(1,u))-STROKE_LEAD)/(1-STROKE_LEAD);
+const leadMix=(s:NonNullable<HandActuatorParams['stroke']>,u:number)=>s.lead&&u<STROKE_LEAD?smooth(Math.max(0,u)/STROKE_LEAD):1;
+export function posterLocal(s:NonNullable<HandActuatorParams['stroke']>,u:number,at?:Vec3):{x:number;y:number;o:number;spread:number}{
+ if(s.lead&&u<STROKE_LEAD){const to=posterBase(s,0),f=leadMix(s,u),ly=s.lead.y-(at?.[1]??s.lead.y+.2);return {x:0,y:ly+(to.y-ly)*f,o:s.lead.out+(to.o-s.lead.out)*f,spread:.8+(to.spread-.8)*f};}
+ return posterBase(s,strokeWork(s,u));
+}
+function posterBase(s:NonNullable<HandActuatorParams['stroke']>,u:number):{x:number;y:number;o:number;spread:number}{
+ const k=Math.max(0,Math.min(1,u)),yT=s.height/2-.08,yB=-s.height/2+.045,seg=(a:number,b:number)=>smooth((k-a)/(b-a)),lerp=(a:number,b:number,t:number)=>a+(b-a)*t;
+ if(s.kind==='unposter'){
+  if(k<.15)return {x:0,y:yT,o:lerp(POSTER_OFF,POSTER_ON,seg(0,.15)),spread:1};
+  if(k<.55){const f=seg(.15,.55);return {x:0,y:lerp(yT,yB,f),o:lerp(POSTER_ON,.06,f),spread:1};}
+  const f=seg(.55,1);return {x:0,y:lerp(yB,-.2,f),o:lerp(.06,.15,f),spread:lerp(1,.85,f)};   // the roll held low in front, not at the chin
+ }
+ if(k<.09)return {x:0,y:yT,o:lerp(POSTER_OFF,POSTER_ON,seg(0,.09)),spread:1};
+ if(k<.45)return {x:0,y:lerp(yT,yB,seg(.09,.45)),o:POSTER_ON,spread:1};
+ if(k<.56)return {x:0,y:yB,o:POSTER_ON-.006*dsin(Math.PI*(k-.45)/.11),spread:1};
+ if(k<.78){const f=(k-.56)/.22;return {x:0,y:lerp(yB,yT,smooth(f)),o:POSTER_ON+.03*dsin(Math.PI*f),spread:1};}
+ if(k<.88)return {x:0,y:yT,o:POSTER_ON-.006*dsin(Math.PI*(k-.78)/.10),spread:1};
+ // last, the palms slide off the top corners down the sheet's sides to chest height and come away, so the arms are lowered
+ // from there and not from above the shoulders
+ const f=seg(.88,1);return {x:0,y:lerp(yT,-.06,f),o:lerp(POSTER_ON,.11,f),spread:lerp(1,.86,f)};
+}
+export function strokeHands(at:Vec3,s:NonNullable<HandActuatorParams['stroke']>,u:number):{left:Vec3;right:Vec3}{
+ const right:[number,number]=[dcos(s.yaw),-dsin(s.yaw)],out:[number,number]=[dsin(s.yaw),dcos(s.yaw)],l=posterLocal(s,u,at),half=(s.width/2-.04)*l.spread;
+ const p=(x:number):Vec3=>[at[0]+right[0]*x+out[0]*l.o,at[1]+l.y,at[2]+right[1]*x+out[1]*l.o];
+ return {left:p(-half),right:p(half)};
+}
 export function strokePoint(at:Vec3,s:NonNullable<HandActuatorParams['stroke']>,u:number):Vec3 {
+ if(twoHanded(s))return strokeHands(at,s,u).right;
+ if(s.lead&&u<STROKE_LEAD){const to=strokePoint({...at},{...s,lead:undefined},0),out:[number,number]=[dsin(s.yaw),dcos(s.yaw)],f=leadMix(s,u);
+  // the lead point: in front of the chest, below the start of the work, out from the face
+  const from:Vec3=[to[0]+out[0]*(s.lead.out-.04),s.lead.y,to[2]+out[1]*(s.lead.out-.04)];return [from[0]+(to[0]-from[0])*f,from[1]+(to[1]-from[1])*f,from[2]+(to[2]-from[2])*f];}
+ if(s.lead)u=strokeWork(s,u);
  const k=Math.max(0,Math.min(1,u)),right:[number,number]=[dcos(s.yaw),-dsin(s.yaw)],out:[number,number]=[dsin(s.yaw),dcos(s.yaw)];
  let x:number,y:number,lift=0;
  if(s.kind==='wipe'){const pass=Math.min(2,Math.floor(k*3)),f=k*3-pass,dir=pass%2?-1:1;x=dir*(f-.5)*s.width;y=s.height*.3*(1-2*k)+.03*Math.sin(f*Math.PI*6);}
@@ -267,7 +318,7 @@ export const handActuator:ActionDef<HandActuatorParams,true,Exec>={
  verb:'hand_actuator_v1',description:'Reach, operate a switch or hinged opening with continuous hand contact, and lower the arm before releasing the body.',schema:handActuatorParams,
  // A passage step shares the door with other passages and decides who goes first itself (passageStep: one hand on the
  // door at a time); against an explicit open/close it is exclusive as before, and waits for it (runtime nudgeHolds).
- reservations:(_w,p)=>[{resource:'actor:'+p.actor,mode:'exclusive'},{resource:'hand:'+p.actor+(':'+actuatorHand(p.opening)),mode:'exclusive'},{resource:'entity:'+p.target,mode:p.passage?'shared':'exclusive'}],
+ reservations:(_w,p)=>[{resource:'actor:'+p.actor,mode:'exclusive'},{resource:'hand:'+p.actor+(':'+actuatorHand(p.opening)),mode:'exclusive'},...(twoHanded(p.stroke)?[{resource:'hand:'+p.actor+':left',mode:'exclusive' as const}]:[]),{resource:'entity:'+p.target,mode:p.passage?'shared':'exclusive'}],
  plan(rt,p){const actor=rt.world.entities[p.actor],h=actor?.human;if(actor?.body?.family==='floater')return {ok:false,diagnostic:issue('no-arms','This body has no humanoid hand actuator.',[p.actor])};if(!h||h.grip||(h.hands&&!(h.handActuator?.passage?.mode==='unlock'&&h.handActuator.target===p.target))||h.on||h.carrier||h.riding||h.shore||h.holding||h.activity==='sit')return {ok:false,diagnostic:issue('body-busy','Stand with a free hand on stable ground first.',[p.actor])};return {ok:true,program:true};},
  start(rt,p,_plan,_id){const a=rt.world.entities[p.actor];return {p:structuredClone(p),motion:{...structuredClone(p),startTick:rt.tick,actionId:_id},t:0,root:[...a.pose.p],yaw:a.pose.yaw,id:_id};},
  step(rt,ex,dt){
@@ -287,7 +338,7 @@ export const handActuator:ActionDef<HandActuatorParams,true,Exec>={
   // keeps its 0.4 s), so the reaching hand and the turning torso do not add up to a fast sweep
   a.pose.yaw=ex.yaw+turn*smooth(ex.t/(ex.p.opening||ex.p.slide||ex.p.stroke?.4:HAND_REACH_SECONDS));
   const speed=Math.hypot(a.pose.p[0]-before[0],a.pose.p[2]-before[2])/dt;h.activity=speed>.08?'walk':'operate';if(speed>.08)h.speed=speed;else delete h.speed;
-  if(f.armDown){delete h.hands;h.activity='idle';delete h.speed;}else h.hands=actuatorHand(ex.p.opening)==='left'?{left:[...point.hand]}:{right:[...point.hand]};h.handActuator=ex.motion;
+  if(f.armDown){delete h.hands;h.activity='idle';delete h.speed;}else if(twoHanded(ex.p.stroke)){const two=strokeHands(ex.p.at,ex.p.stroke!,(ex.t-HAND_REACH_SECONDS)/ex.p.stroke!.seconds);h.hands={left:two.left,right:two.right};}else h.hands=actuatorHand(ex.p.opening)==='left'?{left:[...point.hand]}:{right:[...point.hand]};h.handActuator=ex.motion;
   // entry 32: a walk's thumb-turn ends with the hand already on the handle: the opening that follows takes it from there
   if(f.done&&ex.p.passage?.mode==='unlock'&&ex.motion.abortedAt===undefined){h.activity='operate';return {status:'completed'};}
   if(f.done){clear(rt,ex);return {status:'completed'};}return {status:'running',phase:ex.t<HAND_REACH_SECONDS?'reaching':ex.t<HAND_REACH_SECONDS+handSwingSeconds(ex.motion)?'operating':'releasing'};

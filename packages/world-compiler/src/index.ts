@@ -10,6 +10,7 @@ export { CORE_KIT, coreRef } from './core-kit.ts';
 export { PIN_NOTES_MAX, PIN_TEXT_MAX, PIN_PER_SOUL, pinSlot } from './core-kit/writable-boards.ts'; // Soul Actions entry 19
 export { SIGNUP_MAX, POLL_OPTIONS_MAX, signupSlot, pollSlot, pollOptions } from './core-kit/writable-boards.ts'; // Soul Actions entry 25
 export { CAN_GRIP, CAN_LITRES, CAN_OPENING, CAN_ROSE, GROWTH_STAGES, HOOK_PEG, POUR_LITRES } from './core-kit/watering-can.ts';
+export { POSTERS_MAX, POSTERS_PER_SOUL, POSTER_TITLE_MAX, POSTER_DETAIL_MAX, POSTER_STALE_DAYS, POSTER_W, POSTER_H, posterSlot, posterList, posterPaper, WANTED_ROWS, WANTED_TEXT_MAX, WANTED_PER_SOUL, WANTED_REPLY_MAX, WANTED_REPLIES, wantedSlot, wantedList, type PosterRec, type WantedRec } from './core-kit/writable-boards.ts'; // Soul Actions entry 38
 export { stormStrikes, strikesBetween, STRIKE_CELL, STRIKE_FRESH, SOUND_MPS, type Strike } from './lightning.ts';
 export { WEATHER_RULES, isWetSetting, showerMinutes, showerUntil, setWeatherInForce } from './weather-rules.ts';
 export * as vocab from './vocab/index.ts';

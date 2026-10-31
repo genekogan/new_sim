@@ -7,6 +7,7 @@
 import { PIN_NOTES_MAX, PIN_PER_SOUL, PIN_TEXT_MAX, SIGNUP_MAX, gameSquareOf, gameStatus, pollOptions, type Entity, type StoredDef } from '@sim/world-compiler';
 import type { EdgeSoul } from '../edge/contract.ts';
 import { isContactActuator, CONTACT_REACH } from './contact-actuator.ts';
+import { isPosterAction, isWantedAction, posterProblem, posterPatch, wantedProblem, wantedPatch } from './poster-boards.ts';
 import { afterCommit } from '../edge/comms/store.ts';
 import { SOURCE_NEAR_VESSEL, asPlant, asTank, drawWater, isWaterAction, waterActions, waterFields, waterPlant, waterRole, type Transfer } from './water.ts';
 
@@ -183,7 +184,7 @@ const signerName = (soul: EdgeSoul) => (soul.name || 'a Soul').replace(/[\n,—|
 export const isSignupAction = (def: StoredDef, a: { name: string }) => !!def.tags?.includes('signup') && (a.name === 'sign' || a.name === 'unsign');
 export const isPollAction = (def: StoredDef, a: { name: string }) => !!def.tags?.includes('poll') && a.name === 'vote';
 /** A board whose lines several Souls own (pinboard notes, sign-up names, poll votes). */
-export const isListAction = (def: StoredDef, a: { name: string }) => isPinAction(def, a) || isSignupAction(def, a) || isPollAction(def, a);
+export const isListAction = (def: StoredDef, a: { name: string }) => isPinAction(def, a) || isSignupAction(def, a) || isPollAction(def, a) || isPosterAction(def, a) || isWantedAction(def, a);
 /** The poll option a choice names: exact (any case), else the only option it starts. -1 = none. */
 export function pollChoice(state: Record<string, unknown>, choice: unknown): number {
   const opts = pollOptions(state).map(o => o.toLowerCase()), c = typeof choice === 'string' ? choice.trim().toLowerCase().replace(/^(?:for|on)\s+/, '').replace(/^(?:the|a|an)\s+/, '') : '';
@@ -198,6 +199,8 @@ export function pollVotes(state: Record<string, unknown>): { by: string; i: numb
 export const pollLines = (state: Record<string, unknown>, votes = pollVotes(state)) => pollOptions(state).map((o, i) => { const n = votes.filter(v => v.i === i).length; return `${o} — ${n} vote${n === 1 ? '' : 's'}`; }).join('\n');
 /** Why this Soul cannot do this list action here now (null = it can). `params` undefined = availability only. */
 export function listProblem(def: StoredDef, a: { name: string }, state: Record<string, unknown>, soul: EdgeSoul, params?: Record<string, unknown>): Refusal | null {
+  if (isPosterAction(def, a)) return posterProblem(a, state, soul, params);   // entry 38
+  if (isWantedAction(def, a)) return wantedProblem(a, state, soul, params);
   if (isPinAction(def, a)) return pinProblem(a, state, soul, a.name === 'pin' ? params?.text : undefined);
   if (isSignupAction(def, a)) {
     const names = pinNotes(state), mine = names.some(n => n.by === soul.soulId);
@@ -219,6 +222,8 @@ export function listProblem(def: StoredDef, a: { name: string }, state: Record<s
 }
 /** The list board's next `text`/`textBy` after this Soul's action. */
 export function listPatch(def: StoredDef, a: { name: string }, state: Record<string, unknown>, soul: EdgeSoul, params: Record<string, unknown>): Record<string, unknown> {
+  if (isPosterAction(def, a)) return posterPatch(a, state, soul, params);   // entry 38
+  if (isWantedAction(def, a)) return wantedPatch(a, state, soul, params);
   if (isPinAction(def, a)) return pinPatch(a, state, soul, params.text);
   if (isSignupAction(def, a)) {
     const names = pinNotes(state).filter(n => n.by !== soul.soulId);
@@ -240,9 +245,10 @@ export function actionPatch(def: StoredDef, a: Action, state: Record<string, unk
   return isListAction(def, a) ? listPatch(def, a, state, soul, params) : thenPatch(a, state, params);
 }
 /** The Soul-facing params of a def action: its declared string params (board text). */
-function actionParams(a: Action): Record<string, { type: 'string'; maxLength: number; description?: string }> {
-  const out: Record<string, { type: 'string'; maxLength: number; description?: string }> = {};
-  for (const [k, f] of Object.entries(a.params ?? {})) if (f.type === 'string') out[k] = { type: 'string', maxLength: f.max, ...(f.doc ? { description: f.doc } : {}) };
+function actionParams(a: Action): Record<string, { type: 'string'; maxLength: number; description?: string; optional?: true }> {
+  const out: Record<string, { type: 'string'; maxLength: number; description?: string; optional?: true }> = {};
+  // entry 38: a param with a default ('') is optional (a poster's detail, a note's column)
+  for (const [k, f] of Object.entries(a.params ?? {})) if (f.type === 'string') out[k] = { type: 'string', maxLength: f.max, ...(f.doc ? { description: f.doc } : {}), ...((f as { default?: unknown }).default !== undefined ? { optional: true } : {}) };
   return out;
 }
 

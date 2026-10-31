@@ -84,7 +84,7 @@ const SYNONYMS: Record<string, string[]> = {
   dinner: ['dining'], food: ['dining', 'kitchen'], eat: ['dining', 'kitchen'], cafe: ['tea', 'café'], tea: ['café'], playground: ['playground'],
 };
 /** VOCAB-MECH: everyday words for god things' actuator actions (only used when such an action is offered). */
-const ACT_ALIASES: Record<string, string> = {'turn-on': 'switch-on', 'turn-off': 'switch-off', shut: 'close', 'shut-off': 'switch-off', extinguish: 'put-out', 'blow-out': 'put-out', ignite: 'light', kindle: 'light', 'light-up': 'light', 'fill-up': 'fill', drain: 'empty', wipe: 'erase', 'wipe-off': 'erase', clean: 'erase', 'take-down': 'unpin', remove: 'unpin', 'put-up': 'pin', 'sign-up': 'sign', 'cross-off': 'unsign', 'cross-out': 'unsign', 'strike-off': 'unsign'};
+const ACT_ALIASES: Record<string, string> = {'turn-on': 'switch-on', 'turn-off': 'switch-off', shut: 'close', 'shut-off': 'switch-off', extinguish: 'put-out', 'blow-out': 'put-out', ignite: 'light', kindle: 'light', 'light-up': 'light', 'fill-up': 'fill', drain: 'empty', wipe: 'erase', 'wipe-off': 'erase', clean: 'erase', 'take-down': 'unpin', remove: 'unpin', 'put-up': 'pin', 'sign-up': 'sign', 'cross-off': 'unsign', 'cross-out': 'unsign', 'strike-off': 'unsign', answer: 'reply', 'reply-to': 'reply', 'write-back': 'reply', claim: 'take-on', 'take-up': 'take-on', 'put-up-poster': 'pin'};
 export const tokens = (s: string) => s.toLowerCase().replace(/\[[^\]]*\]/g, ' ').split(/[^a-z0-9]+/).filter(t => t && !STOP.has(t));
 const norm = (s: string) => tokens(s).join(' ');
 // D3b (cloud fix-r3 basics-1 pip-010: "walk to the kitchen in eden-house-2" walked to eden-house-1/kitchen-chair-2, its
@@ -606,6 +606,14 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       const r = one(pool.filter(c => words.every(w => syn(w, info.get(c.id)!.ownTokens))), c => `${input} is ${c.id} (${c.label}).`)
         ?? one(pool.filter(c => {const a = info.get(c.id)!.t.around.flatMap(tokens); return a.length > 0 && words.every(w => syn(w, a));}), c => `${input}: ${c.id} (${c.label}) is there.`);
       if (r) return r;
+    }
+    // 3d (Soul Actions entry 38): a thing's action whose words also say what is written ("put up a poster for the concert at
+    // the bandstand tonight", "reply to Ben's note on the wanted board"): the one offered thing whose own names hold the most
+    // of the words, when exactly one holds the most and it holds at least one. Thing actions only (never places or walks).
+    if (!PLACE_VERBS.has(verb) && pool.length >= 1 && pool.every(c => c.verb === 'object' && /^e_/.test(c.object ?? ''))) {
+      const score = (c: EdgeCapability) => q.filter(w => tokenHit(w, info.get(c.id)!.strictTokens)).length, scored = pool.map(c => ({c, n: score(c)})).sort((a, b) => b.n - a.n);
+      const top = scored.filter(x => x.n === scored[0].n && x.n > 0);
+      if (top.length && new Set(top.map(x => x.c.object)).size === 1) {const r = one(top.map(x => x.c), c => `${input} is ${c.id} (${c.label}; ${top[0].n} of the words name it).`); if (r) return r;}
     }
     // 3b. Places by name/description words and everyday synonyms (the park, the woods, the lake, the campfire).
     // CN5 (Gene: "walk to the harbour" went to the park): a named place resolves only to itself, a place inside it, or the

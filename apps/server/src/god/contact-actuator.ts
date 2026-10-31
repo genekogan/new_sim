@@ -1,10 +1,11 @@
 // Contact effects commit at the recorded hand contact, with release still owned by the native action.
 // Durable receipt intent, no per-tick object scan and no effect from an interrupted walk.
-import {actuatorPoint,opPoint,slidePoint,strokePoint,strokeRoot,STROKE_STAND,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
+import {actuatorPoint,opPoint,slidePoint,strokePoint,strokeRoot,twoHanded,STROKE_STAND,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
 import { createHash } from 'node:crypto';
 import { isDry, stageWord } from './garden.ts';
 import { HUMAN_RADIUS } from '../../../../mars/viewer/engine/world/catalog.ts';
-import { opSchema, contactStateKey, DRAWER_TRAVEL, pinSlot, signupSlot, pollSlot, gameSquare, gameSquareOf, gameStatus, type WorldModel, type Op, type StoredDef } from '@sim/world-compiler';
+import { opSchema, contactStateKey, DRAWER_TRAVEL, pinSlot, signupSlot, pollSlot, gameSquare, gameSquareOf, gameStatus, posterSlot, posterList, posterPaper, wantedSlot, wantedList, POSTER_W, POSTER_H, type WorldModel, type Op, type StoredDef } from '@sim/world-compiler';
+import { posterName, posterFreeSlot, posterTarget, posterAge, posterStale, wantedColumn, wantedFreeRow, wantedTarget } from './poster-boards.ts';
 import type { EdgeSoul } from '../edge/contract.ts';
 import { actionPatch, actionsOf, actuatedState, boardTextProblem, gamePatch, gameProblem, isGameAction, isListAction, listProblem, pinNotes, pollChoice, pollLines, whenRefusal } from './actuators.ts';
 export const CONTACT_REACH = .8;
@@ -26,7 +27,7 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
   plan(soul:EdgeSoul,target:string,action:string,input:Record<string,unknown>={},opts?:{from?:[number,number];open?:boolean}){
    const m=d.model(),e=m.entities.get(target),def=e&&m.resolvedDef(e.def),body=d.body(soul.entityId);if(!e||!def||!body)return null;
    const wp=m.worldPose(e),me=opts?.from?[opts.from[0],body.pose.p[1],opts.from[1]]:body.pose.p,at:[number,number,number]=[wp.x,wp.y+1.04*wp.s,wp.z];
-   const params:Omit<HandActuatorParams,'actor'>={target,at};let root:[number,number,number],face:[number,number]|undefined;
+   const params:Omit<HandActuatorParams,'actor'>={target,at};let root:[number,number,number],face:[number,number]|undefined,faceTo:[number,number]|undefined;
    if(contactStateKey(def,action)==='text'){
     // Stand square in front of the board's face; the hand works across the face from its centre.
     const face=(def.make.kind==='gen'?(def.make.args as {faces?:{at?:number[];w?:number;h?:number}[]})?.faces?.[0]:undefined);if(!face?.at)return null;
@@ -38,13 +39,32 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     // Entry 25: a sign-up name goes on the sheet's next line (or comes off its own); a vote is a tally mark beside the option.
     if(list){const st=actuatedState(e,def),names=pinNotes(st),i=action==='vote'?Math.max(0,pollChoice(st,input.choice)):action==='sign'?names.length:Math.max(0,names.map(n=>n.by).indexOf(soul.soulId)),[dx,dy]=(action==='vote'?pollSlot(i):signupSlot(i)).map(v=>v*wp.s);params.at=[centre[0]+dx*c+s*.04,centre[1]+dy,centre[2]-dx*s+c*.04];}
     if(pin){const notes=pinNotes(actuatedState(e,def)),i=action==='pin'?notes.length:notes.map(n=>n.by).lastIndexOf(soul.soulId),[dx,dy]=pinSlot(Math.max(0,i)).map(v=>v*wp.s);params.at=[centre[0]+dx*c+s*.04,centre[1]+dy,centre[2]-dx*s+c*.04];}
+    // Entry 38: a poster goes up at (or comes down from) its slot with both hands; a wanted/offered note at its column and row,
+    // a reply on the note's lower half, "taken by" across the note.
+    const posters=!!def.tags?.includes('posters'),wanted=!!def.tags?.includes('wanted');
+    const local=(dx:number,dy:number,out:number):[number,number,number]=>[centre[0]+dx*wp.s*c+s*out,centre[1]+dy*wp.s,centre[2]-dx*wp.s*s+c*out];
+    let sheet:{title:string;detail:string;name:string;paper:number;age?:number}|undefined;
+    if(posters){const st=actuatedState(e,def),list=posterList(st),p=action==='pin'?null:posterTarget(st,soul,input.which),slot=action==='pin'?Math.max(0,posterFreeSlot(list)):(p?.s??0),[dx,dy]=posterSlot(slot);
+     params.at=local(dx,dy,.004);
+     const title=action==='pin'?String(input.title??'').trim():p?.t??'',detail=action==='pin'?String(input.detail??'').trim():p?.d??'';
+     sheet={title:title.slice(0,40),detail:detail.slice(0,80),name:(action==='pin'?posterName(soul):p?.n??'').slice(0,40),paper:posterPaper(title,action==='pin'?posterName(soul):p?.n??''),...(p?{age:Math.min(99,posterAge(p))}:{})};}
+    if(wanted){const st=actuatedState(e,def),list=wantedList(st);let col=0,row=0,dx=0,dy=0;
+     if(action==='pin'){const k=wantedColumn(input)??'w';col=k==='o'?1:0;row=Math.max(0,wantedFreeRow(list,k));}
+     else{const n=wantedTarget(st,soul,input.note,action==='unpin'?'own':'any');col=n?.c==='o'?1:0;row=n?.r??0;if(action==='reply'){dx=.06;dy=-.075-.03*(n?.re.length??0);}if(action==='take-on'){dx=.1;dy=-.01;}}
+     const [sx,sy]=wantedSlot(col,row);params.at=local(sx+dx,sy+dy,.04);}
     // Stand clear of the board's own footprint (its depth beyond the face) with a body radius to spare.
     const stand=Math.min(.7,Math.max(STROKE_STAND,(def.size.box[2]/2-(face.at[2]??0))*wp.s+HUMAN_RADIUS+.06-.04));
     // Entry 27: a noughts-and-crosses mark goes to its own square (gameSquare, shared with the viewer's face)
     const mark=action==='mark'&&def.tags.includes('tictactoe')?gameSquareOf(input.square):-1;
     if(mark>=0){const [dx,dy]=gameSquare(mark).map(v=>v*wp.s);params.at=[centre[0]+dx*c+s*.04,centre[1]+dy,centre[2]-dx*s+c*.04];}
-    params.stroke=mark>=0?{kind:'write',yaw:wp.yaw,stand,width:.1,height:.08,lines:1,seconds:1.2}:list?{kind:action==='unsign'?'wipe':'write',yaw:wp.yaw,stand,width:action==='vote'?.1:Math.min(.16,(face.w??.4)*wp.s*.45),height:.05,lines:1,seconds:action==='unsign'?1.0:1.4}:pin?{kind:action==='unpin'?'wipe':'write',yaw:wp.yaw,stand,width:Math.min(.22,(face.w??.6)*wp.s*.25),height:.06,lines:1,seconds:action==='unpin'?1.2:1.6}:{kind:action==='erase'?'wipe':'write',yaw:wp.yaw,stand,width:Math.min(.55,(face.w??.6)*wp.s*.6),height:Math.min(.3,(face.h??.4)*wp.s*.5),lines,seconds:action==='erase'?2.4:Math.min(6,1.2+1.6*lines)};   // 1.2+1.6*3 is 6.000000000000001 in floating point; the schema caps a stroke at 6 s (a three-line note failed)
+    if(mark>=0)params.stroke={kind:'write',yaw:wp.yaw,stand,width:.1,height:.08,lines:1,seconds:1.2};
+    else if(posters)params.stroke={kind:action==='unpin'?'unposter':'poster',yaw:wp.yaw,stand:Math.max(.4,stand),width:POSTER_W*wp.s,height:POSTER_H*wp.s,lines:1,seconds:action==='unpin'?4.2:5.6,release:1.1,handoff:.1,lead:{y:wp.y+1.05,out:.2},...(sheet?{sheet}:{})};
+    else if(wanted)params.stroke={kind:action==='unpin'?'wipe':'write',yaw:wp.yaw,stand,width:action==='take-on'?.14:action==='reply'?.16:.22,height:.05,lines:1,seconds:action==='unpin'||action==='take-on'?1.8:2.2,release:1.1,handoff:.1,lead:{y:wp.y+1.1,out:.26}};
+    else params.stroke=list?{kind:action==='unsign'?'wipe':'write',yaw:wp.yaw,stand,width:action==='vote'?.1:Math.min(.16,(face.w??.4)*wp.s*.45),height:.05,lines:1,seconds:action==='unsign'?1.0:1.4}:pin?{kind:action==='unpin'?'wipe':'write',yaw:wp.yaw,stand,width:Math.min(.22,(face.w??.6)*wp.s*.25),height:.06,lines:1,seconds:action==='unpin'?1.2:1.6}:{kind:action==='erase'?'wipe':'write',yaw:wp.yaw,stand,width:Math.min(.55,(face.w??.6)*wp.s*.6),height:Math.min(.3,(face.h??.4)*wp.s*.5),lines,seconds:action==='erase'?2.4:Math.min(6,1.2+1.6*lines)};   // 1.2+1.6*3 is 6.000000000000001 in floating point; the schema caps a stroke at 6 s (a three-line note failed)
     root=strokeRoot(params.at,params.stroke,wp.y);
+    // Entry 38 (take 2): a Soul arriving along the wall turned to it during the reach and swung an arm out wide; posters and
+    // wanted/offered notes turn to face the board on arrival first (entry 33's turn-then-reach), then the hands come up
+    if(posters||wanted)faceTo=[params.at[0],params.at[2]];
    }else if(def.tags.includes('hand-drawer')){
     // a drawer slides straight out of the front (+z): the hand takes its knob, the body stands half a metre in front
     const shapes=def.make.kind==='gen'?(def.make.args as {shapes?:{role?:string;at?:number[];tint?:string}[]})?.shapes:undefined,knob=shapes?.find(s=>s.role==='drawer'&&s.tint==='brass'&&s.at);if(!knob?.at)return null;
@@ -81,7 +101,7 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     }}
    // entry 32: after knocking, step back beside the door (latch side, out of its swing and of the way through) to wait
    const o=params.opening,after:[number,number]|undefined=params.op==='knock'&&o?[+(wp.x+Math.cos(wp.yaw)*1.35+Math.sin(wp.yaw)*o.side*1.3).toFixed(3),+(wp.z-Math.sin(wp.yaw)*1.35+Math.cos(wp.yaw)*o.side*1.3).toFixed(3)]:undefined;
-   return {params,root,level:d.levelAt?.(root[0],root[2],root[1])??0,...(face?{face}:{}),...(after?{after}:{})};
+   return {params,root,level:d.levelAt?.(root[0],root[2],root[1])??0,...(face?{face}:faceTo?{face:faceTo}:{}),...(after?{after}:{})};
   },
   /** What a Soul reads when it completes `read:<sign>` (never in ambient perception for Soul-written boards). */
   sign(target:string){
@@ -91,7 +111,7 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
    if(def.tags?.includes('tictactoe')){const g=String(e.state?.text??'').padEnd(9,'.').slice(0,9),st=gameStatus(g),names=String(e.state?.players??'').split(',').filter(Boolean),who=(m:'X'|'O')=>names[m==='X'?0:1]??m;
     const head=names.length?`Noughts and crosses: ${who('X')} (X)${names[1]?` against ${names[1]} (O)`:''}; ${st.winner?`${who(st.winner)} won`:st.draw?'a draw':`${who(st.turn)} to play`}`:'Noughts and crosses: a new game, X to play';
     return {id:e.id,name:e.name??def.name.replace(/^core-/,''),text:[head,...[0,1,2].map(r=>[...g.slice(r*3,r*3+3)].map(ch=>ch==='.'?'·':ch).join(' '))].join('\n'),by:null,writable:true};}
-   return {id:e.id,name:e.name??def.name.replace(/^core-/,''),text,...(def.tags?.includes('pinboard')?{notes:pinNotes(e.state??{})}:{}),...(def.tags?.includes('signup')?{title:String(e.state?.title??''),text:[String(e.state?.title??'Sign up'),...pinNotes(e.state??{}).map((n,i)=>`${i+1}. ${n.text}`)].join('\n')}:{}),...(def.tags?.includes('poll')?{title:String(e.state?.title??''),text:[String(e.state?.title??''),pollLines(e.state??{})].join('\n')}:{}),by:typeof e.state?.textBy==='string'&&e.state.textBy&&!def.tags?.some(t=>t==='poll'||t==='signup')?e.state.textBy:null,writable:!!def.tags?.includes('hand-writable')};
+   return {id:e.id,name:e.name??def.name.replace(/^core-/,''),text,...(def.tags?.includes('pinboard')?{notes:pinNotes(e.state??{})}:{}),...(def.tags?.includes('signup')?{title:String(e.state?.title??''),text:[String(e.state?.title??'Sign up'),...pinNotes(e.state??{}).map((n,i)=>`${i+1}. ${n.text}`)].join('\n')}:{}),...(def.tags?.includes('poll')?{title:String(e.state?.title??''),text:[String(e.state?.title??''),pollLines(e.state??{})].join('\n')}:{}),...(def.tags?.includes('posters')?{posters:posterList(e.state??{}).map(p=>({...p,age:posterAge(p),stale:posterStale(p)}))}:{}),...(def.tags?.includes('wanted')?{wanted:wantedList(e.state??{})}:{}),by:typeof e.state?.textBy==='string'&&e.state.textBy&&!def.tags?.some(t=>t==='poll'||t==='signup'||t==='posters'||t==='wanted')?e.state.textBy:null,writable:!!def.tags?.includes('hand-writable')};
   },
   /** Entry 32: who may lock, unlock and knock on a lockable door. Its owner locks and unlocks it (key outside, thumb-turn
    *  inside); a door nobody owns locks for anyone. Knocking is for the outside (the front) of a closed door. A non-owner
@@ -145,7 +165,7 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
    if(!e||!def||!a||binding(intent.target)!==intent.binding)return fail('contact.target-changed','The target changed during the approach; no action was applied.');
    const denied=d.access(intent.target,soul);if(denied)return fail(denied.code,denied.reason);
    const b=d.body(soul.entityId),p=m.worldPose(e),motion=b?.human?.handActuator;
-   const hand=b?.human?.hands?.left??b?.human?.hands?.right;
+   const hand=twoHanded(motion?.stroke)?b?.human?.hands?.right:b?.human?.hands?.left??b?.human?.hands?.right;
    const expected=motion?.opening&&motion.op?opPoint(motion.opening,motion.op,0):motion?.opening?actuatorPoint(motion.opening,intent.action==='close'?motion.opening.to:motion.opening.from).hand:motion?.slide?slidePoint(motion.slide,intent.action==='close'?motion.slide.to:motion.slide.from).hand:motion?.stroke?strokePoint(motion.at,motion.stroke,1):motion?.at;
    const reached=intent.motionV1?!!motion&&motion.target===intent.target&&!!hand&&!!expected&&Math.hypot(...hand.map((v,i)=>v-expected[i]))<.1&&Math.hypot(b!.pose.p[0]-hand[0],b!.pose.p[2]-hand[2])<.9&&Math.abs(b!.pose.p[1]-p.y)<1.2:!!b&&Math.hypot(b.pose.p[0]-p.x,b.pose.p[2]-p.z)<=CONTACT_REACH&&Math.abs(b.pose.p[1]-p.y)<=1.2;if(!b?.human||!reached)return fail('contact.not-reached','Your hand did not reach the target; no action was applied.');
    const state=actuatedState(e,def);

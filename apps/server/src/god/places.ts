@@ -37,7 +37,7 @@ function placeIndex(list: GodPlace[]) {
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const SHORE = 3;                   // m: a water's bank, round it
 const LANDMARK_MIN = 1.5;          // a named point thing at least this wide (m) standing on its own is a landmark
-const NOT_LANDMARKS = /^(sign|signpost|notice-board|lamp-post|lantern|flagpole|bollard|bin|wheelie-bin|mailbox|hydrant|crate|barrel|sack|flower-pot|poster|banner|picture-frame|screen|chalkboard|power-line)$/;
+const NOT_LANDMARKS = /^(sign|signpost|notice-board|lamp-post|lantern|flagpole|bollard|bin|wheelie-bin|mailbox|hydrant|crate|barrel|sack|flower-pot|poster|banner|picture-frame|screen|chalkboard|power-line|poster-wall|wanted-board)$/;   // entry 38: boards stay things, as notice-board does
 const WORDS = ['no', 'a', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
 const shortDef = (def: StoredDef) => def.name.replace(/^core-/, '').replace(/^ew-/, '').replace(/-pack$/, '');
 const article = (w: string) => (/^[aeiou]/.test(w) ? `an ${w}` : `a ${w}`);
