@@ -51,31 +51,25 @@ export class LevelState {
   }
 }
 
-/** The quiet baseline: one value per completed 5 s loop-delay window that was quiet (nothing queued, request time
- *  under 5 % of the window). Boot: the median of the quiet windows in the first 60 s; after that a slow EWMA that
- *  rises slowly (~4 min) and falls faster (~50 s), so sustained load is not learned as normal and a recovered world
- *  regains its tight bands. Capped at 400 ms (amber enter ≤ 800 ms stays below red's 1 s). */
-export const BOOT_BASELINE_MS = 60_000, QUIET_REQUEST_FRAC = 0.05;
+/** The quiet baseline: a peak-hold of the loop p99 of quiet windows (nothing queued, request time < 5 % of the window,
+ *  tick service >= 0.95), decaying 2 % per window (half-life ~3 min). A peak, not a mean: a quiet large world's loop p99
+ *  is mostly low (the live Eden copy: ~30 ms) with a window at its heavy ticks' length (~150 ms) every 10-15 s, and the
+ *  level signal is the max of two windows, so a mean-like baseline still held it at amber. Each sample is bounded by
+ *  the world's own tick p99 × 1.25 + 10 ms (a quiet world's peaks are its ticks; un-admitted work such as account
+ *  creation is not learned) and capped at 400 ms (amber enter <= 800 ms stays below red's 1 s). Load never teaches it
+ *  and it holds through load. */
+export const BASELINE_DECAY = 0.98, QUIET_REQUEST_FRAC = 0.05;
 export class QuietBaseline {
   value = 0;
-  private boot: number[] = [];
-  private bootEnd: number | null = null;
   readonly pinned: number | undefined;
-  private bootMs: number; private windowMs: number;
-  constructor(pinned?: number, bootMs = BOOT_BASELINE_MS, windowMs = 5000) {
-    this.bootMs = bootMs; this.windowMs = windowMs;
+  constructor(pinned?: number) {
     this.pinned = pinned !== undefined && Number.isFinite(pinned) ? Math.min(BASELINE_CAP_MS, Math.max(0, pinned)) : undefined;
     this.value = this.pinned ?? 0;
   }
-  /** A completed window's loop p99 (ms) and whether it was quiet. Returns the baseline. */
-  window(loopP99Ms: number, quiet: boolean, now: number): number {
-    if (this.pinned !== undefined) return this.value;
-    this.bootEnd ??= now - this.windowMs + this.bootMs;   // the first window closes 5 s after the monitor starts (at serving)
-    if (!quiet || !Number.isFinite(loopP99Ms) || loopP99Ms < 0) return this.value;
-    const x = Math.min(BASELINE_CAP_MS, loopP99Ms);
-    if (now <= this.bootEnd) { this.boot.push(x); const v = [...this.boot].sort((p, q) => p - q); this.value = v[Math.floor((v.length - 1) / 2)]; }
-    else if (!this.boot.length) { this.boot.push(x); this.value = x; }   // no quiet window during boot: the first one seeds it
-    else this.value += (x > this.value ? 0.02 : 0.1) * (x - this.value);
+  /** A completed window's loop p99 (ms, already bounded by the tick p99) and whether it was quiet. Returns the baseline. */
+  window(loopP99Ms: number, quiet: boolean): number {
+    if (this.pinned !== undefined || !quiet || !Number.isFinite(loopP99Ms) || loopP99Ms < 0) return this.value;
+    this.value = Math.max(Math.min(BASELINE_CAP_MS, loopP99Ms), this.value * BASELINE_DECAY);
     return this.value;
   }
 }
@@ -96,7 +90,7 @@ export type MonitorOpts = {
   /** Black for this long → planned restart (main.ts: snapshot, exit 75). */
   onBlackTooLong?: () => void; blackLimitMs?: number;
   shared?: Float64Array; now?: () => number; sampleMs?: number;
-  /** Loop-delay window (default 5 s; tests shorten it). The boot baseline spans 12 windows (60 s). */
+  /** Loop-delay window (default 5 s; tests shorten it). */
   windowMs?: number;
   /** Drill only (SIM_LOAD_DRILL_LEVEL): hold this level whatever the signals say, to exercise dials and the restart path. */
   drill?: Level;
@@ -126,7 +120,7 @@ export class LoadMonitor {
   private a: Float64Array;
   private now: () => number;
   private o: MonitorOpts;
-  constructor(o: MonitorOpts) { this.o = o; this.a = o.shared ?? sharedLoad; this.now = o.now ?? Date.now; this.windowMs = o.windowMs ?? 5000; this.baseline = new QuietBaseline(o.baselineMs, 12 * this.windowMs, this.windowMs); this.state.baselineMs = this.baseline.value; }
+  constructor(o: MonitorOpts) { this.o = o; this.a = o.shared ?? sharedLoad; this.now = o.now ?? Date.now; this.windowMs = o.windowMs ?? 5000; this.baseline = new QuietBaseline(o.baselineMs); this.state.baselineMs = this.baseline.value; }
 
   /** The dial registry (LOAD-CONTRACT §1). A dial is told the current level at once and on every change. */
   register(name: string, dial: Dial) { this.dials.set(name, dial); try { dial(this.level); } catch (e) { console.error(`[load] dial ${name} failed`, e); } }
@@ -189,15 +183,13 @@ export class LoadMonitor {
     a[S.shedReads] = shed.reads; a[S.shedActs] = shed.acts; a[S.sampledAt] = now;
     return to;
   }
-  /** A loop window closed: feed the quiet baseline. Quiet = nothing queued, requests under 5 % of the window and tick
-   *  service ≥ 0.95. The sample is the window's loop p99 bounded by the world's own tick p99 (×1.25 + 10 ms): what
-   *  sets a quiet world's floor is its ticks, so un-admitted main-thread work (account creation, a god import) in an
-   *  otherwise quiet window is not learned as normal. Public for tests. */
+  /** A loop window closed: feed the quiet baseline (QuietBaseline). The serving warm-up windows are not quiet. Public for tests. */
   windowDone(loopP99Ms: number, now: number) {
     const reqMs = this.o.requestMs?.() ?? 0, spanMs = Math.max(1, now - this.histAt);
-    const quiet = this.quiet.depth === 0 && reqMs - this.quiet.reqMs < QUIET_REQUEST_FRAC * spanMs && this.quiet.service >= 0.95;
+    const warm = this.startedAt !== null && now - this.startedAt < 2 * this.windowMs;
+    const quiet = !warm && this.quiet.depth === 0 && reqMs - this.quiet.reqMs < QUIET_REQUEST_FRAC * spanMs && this.quiet.service >= 0.95;
     const own = this.tickStats.n > 0 ? Math.min(loopP99Ms, 1.25 * this.tickStats.p99 + 10) : loopP99Ms;
-    this.state.baselineMs = this.baseline.window(own, quiet, now);
+    this.state.baselineMs = this.baseline.window(own, quiet);
     this.quiet = {depth: 0, reqMs, service: 1};
   }
   /** Mark a main-thread turn without a full sample (after a tick). */

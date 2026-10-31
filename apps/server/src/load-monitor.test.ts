@@ -58,22 +58,21 @@ test('levels: loop bands are relative to the quiet baseline (a 170 ms-quiet worl
   assert.equal(red.update(at({loopP99Ms: 1100}), 1), 'red');
 });
 
-test('quiet baseline: boot median over 60 s, only quiet windows, slow rise, faster fall, cap, registry pin', () => {
-  const b = new QuietBaseline(); let t = 5000;
-  b.window(900, true, t);   // a JIT-warm first window
-  for (const x of [170, 165, 175, 168]) b.window(x, true, t += 5000);
-  b.window(2000, false, t += 5000);   // loaded: ignored
-  assert.equal(b.value, 170, 'median of the quiet boot windows, the warm-up and loaded windows do not move it');
-  t = 65_000; for (let i = 0; i < 12; i++) b.window(400, true, t += 5000);   // sustained heavier ticks for a minute
-  assert.ok(b.value > 170 && b.value < 240, `rises slowly: ${b.value}`);
-  for (let i = 0; i < 12; i++) b.window(400, false, t += 5000);
-  const before = b.value; assert.equal(b.window(5000, false, t += 5000), before, 'load never teaches it');
-  for (let i = 0; i < 20; i++) b.window(60, true, t += 5000);
-  assert.ok(b.value < 80, `falls back within ~100 s: ${b.value}`);
-  const late = new QuietBaseline(); late.window(300, false, 5000); late.window(500, false, 70_000);
-  assert.equal(late.value, 0); late.window(150, true, 75_000); assert.equal(late.value, 150, 'no quiet boot: the first quiet window seeds it');
-  const capped = new QuietBaseline(); capped.window(3000, true, 5000); assert.equal(capped.value, BASELINE_CAP_MS);
-  const pin = new QuietBaseline(120); pin.window(10, true, 5000); assert.equal(pin.value, 120, 'pinned: never learned');
+test('quiet baseline: a decaying peak of quiet windows (the live Eden pattern: ~30 ms, a 150 ms window every 10-15 s)', () => {
+  const b = new QuietBaseline();
+  const quietEden = [25, 32, 159, 32, 145, 25, 32, 31, 25, 26, 150, 24];
+  for (const x of quietEden) b.window(x, true);
+  assert.ok(b.value > 140 && b.value <= 159, `holds the quiet peaks: ${b.value}`);
+  const l = new LevelState(); l.baselineMs = b.value; let t = 0;
+  l.update(at({loopP99Ms: 600}), t); assert.equal(l.level, 'amber');
+  for (const x of [159, 159, 32, 145, 145, 32, 150, 150]) l.update(at({loopP99Ms: x}), t += 5000);   // max of two windows
+  assert.equal(l.level, 'green', 'max-of-two-windows signal of a quiet Eden stays under 1.2 × the peak: green after 30 s');
+  const before = b.value; for (let i = 0; i < 50; i++) b.window(5000, false);
+  assert.equal(b.value, before, 'load neither teaches it nor decays it');
+  for (let i = 0; i < 70; i++) b.window(20, true);
+  assert.ok(b.value < 50, `decays to a lighter world in ~6 min: ${b.value}`);
+  const capped = new QuietBaseline(); capped.window(3000, true); assert.equal(capped.value, BASELINE_CAP_MS);
+  const pin = new QuietBaseline(120); pin.window(10, true); assert.equal(pin.value, 120, 'pinned: never learned');
   assert.equal(new QuietBaseline(Number.NaN).pinned, undefined, 'a bad pin is ignored');
 });
 
