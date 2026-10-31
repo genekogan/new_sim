@@ -28,42 +28,45 @@ const passage=z.object({mode:z.enum(['unlock','open','close']),door:z.tuple([z.n
 /** Soul Actions entry 32: a lockable door's lock and leaf. `lock`/`unlock`: the hand turns the key (front) or thumb-turn
  *  (back) and the bolt slides; `knock`: knuckles to the leaf, three raps. The leaf does not move (opening from = to = 0). */
 const op=z.enum(['lock','unlock','knock']);
-export const handActuatorParams=z.object({actor:z.string(),target:z.string(),at:vec,opening:opening.optional(),stroke:stroke.optional(),slide:slide.optional(),passage:passage.optional(),op:op.optional()}).strict();
+// Entry 37: `hold` keeps the hand on a switch for a while after contact (a radio's tuning knob turns while the dial sweeps);
+// `reach` is a slower, deliberate reach to a small knob (default HAND_REACH_SECONDS), contact at its end.
+export const handActuatorParams=z.object({actor:z.string(),target:z.string(),at:vec,opening:opening.optional(),stroke:stroke.optional(),slide:slide.optional(),passage:passage.optional(),op:op.optional(),hold:z.number().min(0).max(2).optional(),reach:z.number().min(.3).max(2).optional()}).strict();
 
 export type HandActuatorParams=z.infer<typeof handActuatorParams>;
 export type HandActuatorMotion=Omit<HandActuatorParams,'actor'> & {startTick:number;actionId?:string;abortedAt?:number;abortWeight?:number};
 const smooth=(v:number)=>{const k=Math.max(0,Math.min(1,v));return k*k*(3-2*k);};
+export const handReachSeconds=(m:Pick<HandActuatorMotion,'reach'>)=>m.reach??HAND_REACH_SECONDS;
 /** Entry 32: a key / thumb-turn turn, and three raps (the first starts KNOCK_LEAD after the reach, one every KNOCK_PERIOD). */
 export const LOCK_TURN_SECONDS=.9,UNLOCK_SLIDE_SECONDS=.4,KNOCK_RAPS=3,KNOCK_PERIOD=.3,KNOCK_LEAD=.1,KNOCK_IN=.35,KNOCK_SECONDS=KNOCK_LEAD+KNOCK_RAPS*KNOCK_PERIOD+.1;
 /** Depicted contact times of the raps (seconds from the motion's start). */
 export const knockContacts=()=>Array.from({length:KNOCK_RAPS},(_,i)=>HAND_REACH_SECONDS+KNOCK_LEAD+(i+KNOCK_IN)*KNOCK_PERIOD);
-export function handSwingSeconds(m:Pick<HandActuatorMotion,'opening'|'stroke'|'slide'|'op'>){
+export function handSwingSeconds(m:Pick<HandActuatorMotion,'opening'|'stroke'|'slide'|'op'|'hold'>){
  if(m.op)return m.op==='knock'?KNOCK_SECONDS:LOCK_TURN_SECONDS;
  if(m.slide)return Math.max(1,Math.abs(m.slide.to-m.slide.from)*3.2);   // a drawer: about a second, an ordinary pull
- const o=m.opening;if(!o)return m.stroke?.seconds??0;
+ const o=m.opening;if(!o)return m.stroke?.seconds??m.hold??0;
  if(o.bodyPolicy==='door-natural-v2')return Math.max(HAND_SWING_SECONDS,(Math.abs(o.to-o.from)*(o.radius+.42)+.35)*1.5/1.2);
  // Slow a larger opted-in leaf rather than exceeding ordinary walking speed.
  return Math.max(HAND_SWING_SECONDS,Math.abs(o.to-o.from)*Math.hypot(o.radius+(o.side<0?-.5:0),.42)*1.5/1.2);
 }
 export function handActuatorFrame(m:HandActuatorMotion,seconds:number){
- const swing=handSwingSeconds(m),releaseAt=HAND_REACH_SECONDS+swing;
+ const R=handReachSeconds(m),swing=handSwingSeconds(m),releaseAt=R+swing;
  // a turned lock changes at the end of the turn; a knock is heard at its first rap
- const commitAt=m.op==='knock'?knockContacts()[0]:m.opening?.to===0||m.stroke||m.slide?.to===0?releaseAt:HAND_REACH_SECONDS;
- const k=smooth(((m.abortedAt??seconds)-HAND_REACH_SECONDS)/(swing||1));
+ const commitAt=m.op==='knock'?knockContacts()[0]:m.opening?.to===0||m.stroke||m.slide?.to===0?releaseAt:R;
+ const k=smooth(((m.abortedAt??seconds)-R)/(swing||1));
  const angle=m.opening?m.opening.from+(m.opening.to-m.opening.from)*k:0,pos=m.slide?m.slide.from+(m.slide.to-m.slide.from)*k:0;
  // Entry 38: a stroke may lower the arm more slowly (a hand coming down from above the shoulder; default 0.7 s)
  const rel=m.stroke?.release??HAND_RELEASE_SECONDS;
  const weight=m.abortedAt!==undefined?(m.abortWeight??0)*(1-smooth((seconds-m.abortedAt)/rel))
-   :smooth(seconds/HAND_REACH_SECONDS)*(1-smooth((seconds-releaseAt)/rel));
+   :smooth(seconds/R)*(1-smooth((seconds-releaseAt)/rel));
  // entry 32: a walk's thumb-turn / key keeps the hand up and slides it to the handle (`slide`), then hands over to the opening
  if(m.passage?.mode==='unlock'&&m.abortedAt===undefined){
   const turn=k,slide=smooth((seconds-releaseAt)/UNLOCK_SLIDE_SECONDS);
-  return {angle,pos,weight:smooth(seconds/HAND_REACH_SECONDS),idleBlend:0,idleWeight:1-smooth(seconds/HAND_REACH_SECONDS),armDown:false,commitAt,done:seconds>=releaseAt+UNLOCK_SLIDE_SECONDS,contact:seconds>=commitAt,turn,rap:0,slide};
+  return {angle,pos,weight:smooth(seconds/R),idleBlend:0,idleWeight:1-smooth(seconds/R),armDown:false,commitAt,done:seconds>=releaseAt+UNLOCK_SLIDE_SECONDS,contact:seconds>=commitAt,turn,rap:0,slide};
  }
  // Entry 38: a stroke followed by a step back hands the body over soon after the arm is down (`handoff`), before an idle
  // gesture can rise in the 1.2 s idle handoff (take 4: a hand went up to the hair at 0.1 m per 50 ms, then the step back)
  const armDownAt=(m.abortedAt??releaseAt)+rel,idleBlend=smooth((seconds-armDownAt)/HAND_IDLE_HANDOFF_SECONDS),handoff=m.stroke?.handoff??HAND_IDLE_HANDOFF_SECONDS;
- const idleWeight=m.abortedAt!==undefined||seconds<HAND_REACH_SECONDS?1-weight:idleBlend;
+ const idleWeight=m.abortedAt!==undefined||seconds<R?1-weight:idleBlend;
  // entry 32: how far the key / thumb-turn has turned (0..1), and how far the knuckles are from the leaf (0 = touching)
  const turn=m.op==='lock'||m.op==='unlock'?k:0;
  let rap=0;if(m.op==='knock'){const f=(seconds-HAND_REACH_SECONDS-KNOCK_LEAD)/KNOCK_PERIOD;if(f<0)rap=1;else if(f>=KNOCK_RAPS)rap=1;else{const x=f%1;rap=x<KNOCK_IN?1-smooth(x/KNOCK_IN):smooth((x-KNOCK_IN)/(1-KNOCK_IN));}}
@@ -336,18 +339,18 @@ export const handActuator:ActionDef<HandActuatorParams,true,Exec>={
   const face=ex.p.slide?heading([-ex.p.slide.dir[0],-ex.p.slide.dir[1]]):ex.p.opening?heading([-dsin(ex.p.opening.yaw+(ex.p.opening.bodyPolicy==='door-natural-v2'?(ex.p.opening.side===-1?f.angle*.34:0):f.angle))*ex.p.opening.side,-dcos(ex.p.opening.yaw+(ex.p.opening.bodyPolicy==='door-natural-v2'?(ex.p.opening.side===-1?f.angle*.34:0):f.angle))*ex.p.opening.side]):ex.p.stroke?heading([-dsin(ex.p.stroke.yaw),-dcos(ex.p.stroke.yaw)]):heading([point.hand[0]-a.pose.p[0],point.hand[2]-a.pose.p[2]]),turn=((face-ex.yaw+Math.PI*3)%(Math.PI*2))-Math.PI;
   // Soul Actions entry 33: a switch or valve contact turns the body over the whole reach (a door, drawer or board stroke
   // keeps its 0.4 s), so the reaching hand and the turning torso do not add up to a fast sweep
-  a.pose.yaw=ex.yaw+turn*smooth(ex.t/(ex.p.opening||ex.p.slide||ex.p.stroke?.4:HAND_REACH_SECONDS));
+  a.pose.yaw=ex.yaw+turn*smooth(ex.t/(ex.p.opening||ex.p.slide||ex.p.stroke?.4:handReachSeconds(ex.motion)));
   const speed=Math.hypot(a.pose.p[0]-before[0],a.pose.p[2]-before[2])/dt;h.activity=speed>.08?'walk':'operate';if(speed>.08)h.speed=speed;else delete h.speed;
   if(f.armDown){delete h.hands;h.activity='idle';delete h.speed;}else if(twoHanded(ex.p.stroke)){const two=strokeHands(ex.p.at,ex.p.stroke!,(ex.t-HAND_REACH_SECONDS)/ex.p.stroke!.seconds);h.hands={left:two.left,right:two.right};}else h.hands=actuatorHand(ex.p.opening)==='left'?{left:[...point.hand]}:{right:[...point.hand]};h.handActuator=ex.motion;
   // entry 32: a walk's thumb-turn ends with the hand already on the handle: the opening that follows takes it from there
   if(f.done&&ex.p.passage?.mode==='unlock'&&ex.motion.abortedAt===undefined){h.activity='operate';return {status:'completed'};}
-  if(f.done){clear(rt,ex);return {status:'completed'};}return {status:'running',phase:ex.t<HAND_REACH_SECONDS?'reaching':ex.t<HAND_REACH_SECONDS+handSwingSeconds(ex.motion)?'operating':'releasing'};
+  if(f.done){clear(rt,ex);return {status:'completed'};}return {status:'running',phase:ex.t<handReachSeconds(ex.motion)?'reaching':ex.t<handReachSeconds(ex.motion)+handSwingSeconds(ex.motion)?'operating':'releasing'};
  },
  cancel(rt,ex){
   // Before contact, return the partly raised arm without applying anything.
   // Once grasped, complete the short safe swing/release before a new walk owns the body.
   if(ex.p.passage&&!ex.began)return {ok:true};
-  if(ex.t<HAND_REACH_SECONDS&&ex.motion.abortedAt===undefined){ex.motion.abortWeight=handActuatorFrame(ex.motion,ex.t).weight;ex.motion.abortedAt=ex.t;}
+  if(ex.t<handReachSeconds(ex.motion)&&ex.motion.abortedAt===undefined){ex.motion.abortWeight=handActuatorFrame(ex.motion,ex.t).weight;ex.motion.abortedAt=ex.t;}
   return {ok:true,deferred:true};
  },resumable:true,
 };

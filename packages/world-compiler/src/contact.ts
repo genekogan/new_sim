@@ -11,9 +11,12 @@ export function contactStateKey(def:{tags?:readonly string[];components?:{light?
   if(def.components?.sign&&def.tags?.includes('hand-writable')&&(!action||['write','erase','pin','unpin','sign','unsign','vote','mark','reply','take-on'].includes(action)))return 'text';
   // Opted-in drawn coverings without a hinge (curtains, a roller blind): open/close at a pull cord, the same contact.
   if(!def.components?.opening&&def.tags?.includes('hand-operated')&&def.state&&Object.hasOwn(def.state,'open')&&(!action||['open','close'].includes(action)))return 'open';
-  // Opted-in hand switches without a light (a tap, a shower valve): the same on/off contact.
-  if(!def.components?.opening&&def.tags?.includes('hand-operated')&&(!action||['switch-on','switch-off'].includes(action)))return 'on';
+  // Opted-in hand switches without a light (a tap, a shower valve): the same on/off contact. Entry 37: a radio's
+  // tuning knob (`change-station`) is the same contact; the station it sets is depicted on the same clock.
+  if(!def.components?.opening&&def.tags?.includes('hand-operated')&&(!action||['switch-on','switch-off','change-station'].includes(action)))return 'on';
   // Opted-in fire (a candle, a campfire): "light" / "put out" are the same on/off contact, under their own words.
   if(def.tags?.includes('hand-operated')&&action!==undefined&&['light','put-out'].includes(action))return 'on';
   return null;
 }
+/** Entry 37: besides `on`/`open`, the other fields a hand contact sets that viewers depict on the same clock. */
+export const CONTACT_EXTRA_FIELDS=['station'] as const;

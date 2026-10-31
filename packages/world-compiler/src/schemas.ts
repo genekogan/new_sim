@@ -101,6 +101,8 @@ export const actionSchema = z.object({
   then: z.array(z.discriminatedUnion('op', [
     z.object({ op: z.literal('set'), field: z.string(), value: z.union([value, z.object({ param: z.string() })]) }),
     z.object({ op: z.literal('toggle'), field: z.string() }),
+    /** Soul Actions entry 37: step a field to the next of `values` (wrapping), e.g. a radio's station. */
+    z.object({ op: z.literal('cycle'), field: z.string(), values: z.array(z.string().max(80)).min(2).max(16) }),
     z.object({ op: z.literal('attach'), what: z.enum(['actor', 'held']), slot: z.string() }),
     z.object({ op: z.literal('detach'), what: z.enum(['actor', 'held']) }),
   ])).min(1).max(8),

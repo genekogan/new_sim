@@ -9,6 +9,12 @@ import { posterName, posterFreeSlot, posterTarget, posterAge, posterStale, wante
 import type { EdgeSoul } from '../edge/contract.ts';
 import { actionPatch, actionsOf, actuatedState, boardTextProblem, gamePatch, gameProblem, isGameAction, isListAction, listProblem, pinNotes, pollChoice, pollLines, whenRefusal } from './actuators.ts';
 export const CONTACT_REACH = .8;
+/** Entry 37: how long the hand stays on a radio's tuning knob after contact while the dial sweeps to the next station. */
+export const TUNE_HOLD_SECONDS = .9;
+/** Entry 37: how far in front of a panel of knobs (a radio) the body stands. */
+export const PANEL_STAND = .45;
+/** Entry 37: a reach to a panel's small knob is deliberate: 1 s instead of the 0.65 s switch reach. */
+export const PANEL_REACH_SECONDS = 1;
 /** Entry 33: the most of a neon sign's words a nearby Soul is shown (the sign's own limit, 32, plus a line break shown as " / "). */
 const NEON_WORDS = 34;
 export type ContactActuatorIntent = { target:string; action:string; actor:string; owner:string; binding:string; motionV1?:true; params?:Record<string,string>; /** entry 32: a passage's close re-locks the latch */ relock?:true; /** entry 32: a leg of a walk through the door */ passage?:true };
@@ -83,8 +89,13 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     root=actuatorPoint(params.opening,params.opening.from).root;
    }else{
     // A def's part tinted `valve` (a tap handle) is where the hand goes; otherwise the old switch height at the centre.
+    // Entry 37: a radio's tuning knob (tinted `tuner`) is where the hand goes to change the station; she stands where she
+    // works the power knob (the `valve`), so both knobs are worked from one place, and holds the tuning knob while it turns.
     const shapes=def.make.kind==='gen'?(def.make.args as {shapes?:{tint?:string;at?:number[]}[]})?.shapes:undefined,valve=shapes?.find(s=>s.tint==='valve'&&s.at);
-    if(valve?.at){const c=Math.cos(wp.yaw),s=Math.sin(wp.yaw),[vx,vy,vz]=valve.at.map(v=>v*wp.s);params.at=[wp.x+vx*c+vz*s,wp.y+vy,wp.z-vx*s+vz*c];}
+    const part=action==='change-station'?shapes?.find(s=>s.tint==='tuner'&&s.at)??valve:valve;
+    const placeOf=(at:number[]):[number,number,number]=>{const c=Math.cos(wp.yaw),s=Math.sin(wp.yaw),[vx,vy,vz]=at.map(v=>v*wp.s);return [wp.x+vx*c+vz*s,wp.y+vy,wp.z-vx*s+vz*c];};
+    if(valve?.at)params.at=placeOf(valve.at);
+    if(part&&part!==valve&&part.at)params.hold=TUNE_HOLD_SECONDS;
     const dx=me[0]-params.at[0],dz=me[2]-params.at[2],n=Math.hypot(dx,dz)||1;root=[params.at[0]+dx/n*.5,wp.y,params.at[2]+dz/n*.5];
     if(valve?.at){
      // Stand beside the valve, clear of the thing's own footprint (a basin, a tray) by a body radius: of eight
@@ -94,9 +105,18 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
      const clear=(p:number[])=>!d.clearance||d.clearance(p[0],p[2],d.levelAt?.(p[0],p[2],wp.y)??0)>=HUMAN_RADIUS+.04;
      const want=Math.atan2(dz,dx),best=Array.from({length:8},(_,i)=>i*Math.PI/4).map(a=>[params.at[0]+Math.cos(a)*.55,wp.y,params.at[2]+Math.sin(a)*.55,Math.abs(((a-want+Math.PI*3)%(Math.PI*2))-Math.PI)]).filter(outside).filter(clear).sort((p,q)=>p[3]-q[3])[0];
      if(best)root=[best[0],best[1],best[2]];
+     // Entry 37: a panel of knobs (a def with a tuning knob as well as the power knob) is worked from straight in front of
+     // the panel, centred between the knobs, from wherever the Soul comes: never from the side or a diagonal, and never a
+     // shuffle between the two knobs. 0.45 m out (take 2: at 0.55 m the reach out of folded arms peaked at 0.087 m/50 ms):
+     // elbows bent at a radio, the hands' travel shorter.
+     const tuner=shapes?.find(s=>s.tint==='tuner'&&s.at);
+     // Take 3: out of an idle gesture with the hand at the head, the 0.65 s reach to a knob 0.5 m lower drew the hand at
+     // 0.108 m/50 ms mid-reach; a small knob is reached deliberately, over PANEL_REACH (contact at its end).
+     if(tuner?.at&&valve.at){const mid=placeOf(valve.at.map((v,i)=>(v+tuner.at![i])/2));root=[mid[0]+s*PANEL_STAND,wp.y,mid[2]+c*PANEL_STAND];params.reach=PANEL_REACH_SECONDS;}
      // Entry 33 (take 4): a stand point beside the valve can leave the body ~40° off the valve when it arrives (a wall
      // torch approached along its wall); the Soul turns to face the valve on arrival, before the arm comes up, so the
      // reach is never added to a body turn (the hand actuator's own turn is then ~0).
+     if(part?.at)params.at=placeOf(part.at);
      face=[params.at[0],params.at[2]];
     }}
    // entry 32: after knocking, step back beside the door (latch side, out of its swing and of the way through) to wait
@@ -139,9 +159,11 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     // Entry 34: a growing planter says its stage in a word (and dry only when dry)
     const stage=st.growth?.type==='number'?stageWord(e.state?.growth??st.growth.default):null;
     return stage?{stage,...(dry?{dry:true}:{})}:dry?{dry:true}:null;}
-   if(!e||!def||!key)return null;const state=actuatedState(e,def),facts:Record<string,boolean>={};
+   if(!e||!def||!key)return null;const state=actuatedState(e,def),facts:Record<string,boolean|string>={};
    if(typeof state[key]==='boolean')facts[key]=state[key] as boolean;
    if(key==='open'&&typeof state.locked==='boolean')facts.locked=state.locked;
+   // Entry 37: a radio that is on says which station it plays ("radio: on, quiet piano"); off, only that it is off.
+   if(state.on===true&&typeof state.station==='string')facts.station=state.station;
    return facts;
   },
   /** Entry 33: a neon sign's words for a Soul near it (the same nearby rule as `facts`): its owner's text, at most 32

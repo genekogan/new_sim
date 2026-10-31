@@ -1,4 +1,4 @@
-import {contactStateKey,type WorldModel,type Entity} from '@sim/world-compiler';
+import {contactStateKey,CONTACT_EXTRA_FIELDS,type WorldModel,type Entity} from '@sim/world-compiler';
 
 /** Native interactions use the same depicted tick as the Soul performing them.
  * The ordered diff stream waits here; it must not show a lamp's result ahead of
@@ -10,6 +10,6 @@ export function lightDiffAhead(model:WorldModel, message:unknown, depictedTick:n
     const before=model.entities.get(e.id),def=model.resolvedDef(e.def);
     const key=def&&contactStateKey(def);
     // Soul Actions entry 32: a lockable door's lock turns under the hand too (key / thumb-turn, and the latch as it shuts)
-    return before&&key&&(before.state?.[key]!==e.state?.[key]||(key==='open'&&def.tags?.includes('lockable')&&(before.state?.locked??false)!==(e.state?.locked??false)));
+    return before&&key&&(before.state?.[key]!==e.state?.[key]||(key==='open'&&def.tags?.includes('lockable')&&(before.state?.locked??false)!==(e.state?.locked??false))||CONTACT_EXTRA_FIELDS.some(f=>before.state?.[f]!==e.state?.[f]));
   });
 }

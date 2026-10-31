@@ -7,14 +7,14 @@
 //   paint    tint vary          multiply every surface by a colour; per-instance colour variation from the seed
 //   wear     condition          worn (faded), damaged (dark, askew), construction (a scaffold round it)
 //   state    open lit on level  role:door / role:lid swing open; role:flame shows when lit; glow off when on=false;
-//                               role:fill rises with level (0..1)
+//                               role:fill rises with level (0..1); station: role:needle slides, role:knob turns
 import * as THREE from 'three';
 import type { MeshCtx } from './registry.ts';
 import { DRAWER_TRAVEL } from '@sim/world-compiler';
 
 const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 const declared = (ctx: MeshCtx, k: string) => Object.hasOwn(ctx.def.params ?? {}, k);
-const STATE_LOOKS = ['open', 'lit', 'on', 'level', 'moisture', 'locked'] as const;
+const STATE_LOOKS = ['open', 'lit', 'on', 'level', 'moisture', 'locked', 'station'] as const;
 
 export type Look = { sx: number; sy: number; sz: number; taper: number; bend: number; skew: number; tint: string | null; vary: number; condition: string; state: Record<string, unknown> };
 export function lookOf(ctx: MeshCtx): Look | null {
@@ -30,7 +30,7 @@ export function lookOf(ctx: MeshCtx): Look | null {
 }
 /** State only changes the picture when it differs from what the plain build shows (doors closed, flames on, glow on, full). */
 function stateMatters(s: Record<string, unknown>, ctx: MeshCtx) {
-  return s.open === true || s.locked === true || s.lit === false || (s.on === false && !ctx.def.components.light) || (typeof s.level === 'number' && s.level < 1) || (typeof s.moisture === 'number' && s.moisture < 1);
+  return s.open === true || s.locked === true || s.lit === false || (s.on === false && !ctx.def.components.light) || (typeof s.level === 'number' && s.level < 1) || (typeof s.moisture === 'number' && s.moisture < 1) || typeof s.station === 'string';
 }
 
 const matCache = new Map<string, THREE.Material>();
@@ -86,9 +86,16 @@ function warpSubtree(root: THREE.Object3D, look: Look, height: number) {
   });
 }
 
-/** State drawn by roles (kit parts with `role`): door/lid swing, flame shows, fill rises. */
-function stateRoles(root: THREE.Object3D, look: Look) {
+/** Entry 37: a radio's needle slides along the dial to its station's mark (± RADIO_NEEDLE_STEP m) and its tuning knob turns. */
+export const RADIO_NEEDLE_STEP = 0.06, RADIO_KNOB_TURN = -1.35;
+export function stationIndex(def: MeshCtx['def'], station: unknown): number {
+  const values = (def.state as Record<string, { values?: string[] }> | undefined)?.station?.values ?? [];
+  return Math.max(0, values.indexOf(String(station)));
+}
+/** State drawn by roles (kit parts with `role`): door/lid swing, flame shows, fill rises, a radio's needle and knob. */
+function stateRoles(root: THREE.Object3D, look: Look, ctx: MeshCtx) {
   const s = look.state;
+  const tuned = typeof s.station === 'string' ? stationIndex(ctx.def, s.station) - 1 : null;
   root.traverse((o) => {
     const role = o.userData.role as string | undefined; if (!role) return;
     if (role === 'door' && s.open !== undefined) o.rotation.y = s.open === true ? -Math.PI * 0.48 : 0;
@@ -108,6 +115,8 @@ function stateRoles(root: THREE.Object3D, look: Look) {
     if (role === 'head' && typeof s.moisture === 'number' && s.moisture < 1) { const dry = 1 - Math.max(0, Math.min(1, s.moisture));
       o.scale.y *= 1 - 0.45 * dry; o.rotation.z += (o.position.x >= 0 ? -1 : 1) * 0.5 * dry;
       const q = Math.round(dry * 4) / 4; if (q > 0) o.traverse((c) => { const m = (c as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined; if (m?.color) (c as THREE.Mesh).material = lookMaterial(m, 'dry' + q, (x) => x.color.lerp(new THREE.Color('#8a7246'), 0.7 * q)); }); }
+    if (role === 'needle' && tuned !== null) { o.userData.restX ??= o.position.x; o.position.x = (o.userData.restX as number) + tuned * RADIO_NEEDLE_STEP; }
+    if (role === 'knob' && tuned !== null) o.rotation.z = (tuned + 1) * RADIO_KNOB_TURN;
     if ((role === 'light' || role === 'screen') && s.on === false) o.traverse((c) => { const m = (c as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined; if (m?.emissive) (c as THREE.Mesh).material = lookMaterial(m, 'off', (x) => { x.emissiveIntensity = 0; }); });
   });
 }
@@ -144,7 +153,7 @@ export function applyLook(obj: THREE.Object3D | null, ctx: MeshCtx): THREE.Objec
   const look = lookOf(ctx); if (!look) return obj;
   const box = ctx.baked.box as [number, number, number];
   const h = box[1] / (look.sy || 1);   // the picture is built at the unstretched size
-  const apply = (root: THREE.Object3D) => { warpSubtree(root, look, h); paintSubtree(root, look, ctx); stateRoles(root, look); };
+  const apply = (root: THREE.Object3D) => { warpSubtree(root, look, h); paintSubtree(root, look, ctx); stateRoles(root, look, ctx); };
   apply(obj);
   // imported meshes arrive after build (mesh.mesh.ts adds the GLB later): give them the same look when they land
   // the event object is reused (its child is null again by the microtask): keep the child itself (entry 34 found it)
