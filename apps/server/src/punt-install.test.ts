@@ -67,8 +67,8 @@ test('search exceptions release pending state and retry after one second; a comp
   f.tick(20);assert.deepEqual(cancelled,[1]);assert.match(f.logs[0],/search failed: fixture search failure/);
   for(let n=21;n<40;n++)f.tick(n);assert.equal(f.generations(),1);
   f.tick(40);assert.equal(f.generations(),2);
-  for(let n=41;n<5000;n++)f.tick(n);assert.equal(f.generations(),2,'L4: the negative result holds while the static epoch stands');
-  epoch=2;f.tick(5000);assert.equal(f.generations(),3,'a static change searches again at the next cadence');f.handle.close();
+  for(let n=41;n<=5000;n++)f.tick(n);assert.equal(f.generations(),2,'L4: the negative result holds while the static epoch stands');
+  epoch=2;for(let n=5001;n<5200;n++)f.tick(n);assert.equal(f.generations(),2,'the settled key is looked at every 200 ticks');f.tick(5200);assert.equal(f.generations(),3,'a static change searches again at the next look');f.handle.close();
 });
 
 test('new ground source bypasses retry backoff, and live admission refusal creates no ride object',async()=>{

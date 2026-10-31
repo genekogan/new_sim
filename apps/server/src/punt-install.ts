@@ -51,7 +51,8 @@ export function installPuntActivities(host:WorldHost,edge:EdgeLedger,log:(text:s
         if(tick<holdUntil&&!restart)return;
         // L4 negative cache: a finished search whose every candidate exists (or none was found) is not repeated until the
         // static world (its epoch), the water source or the set of punts changes.
-        if(!restart&&settled&&settled===keyOf(engine))return;
+        // (the key costs a spatial sync: a settled search looks again every 10 s, not every second)
+        if(!restart&&settled&&(tick%200!==0||settled===keyOf(engine)))return;
         if(!restart&&!settled&&source===lastSource&&tick<retryAt)return;
         restart=false;settled='';
         if(!engine.puntCandidatesJobV1){
