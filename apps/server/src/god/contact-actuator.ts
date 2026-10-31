@@ -8,13 +8,15 @@ import { opSchema, contactStateKey, DRAWER_TRAVEL, pinSlot, signupSlot, pollSlot
 import type { EdgeSoul } from '../edge/contract.ts';
 import { actionPatch, actionsOf, actuatedState, boardTextProblem, gamePatch, gameProblem, isGameAction, isListAction, listProblem, pinNotes, pollChoice, pollLines, whenRefusal } from './actuators.ts';
 export const CONTACT_REACH = .8;
+/** Entry 33: the most of a neon sign's words a nearby Soul is shown (the sign's own limit, 32, plus a line break shown as " / "). */
+const NEON_WORDS = 34;
 export type ContactActuatorIntent = { target:string; action:string; actor:string; owner:string; binding:string; motionV1?:true; params?:Record<string,string>; /** entry 32: a passage's close re-locks the latch */ relock?:true; /** entry 32: a leg of a walk through the door */ passage?:true };
 /** Soul Actions entry 32: the hand operations on a lockable door that are not the leaf itself. */
 const LOCK_OPS=new Set(['lock','unlock','knock']);
 type Refusal={code:string;reason:string};
 export const isContactActuator = (def:StoredDef, action:{name:string}) => contactStateKey(def,action.name)!==null;
 const fail=(code:string,reason:string)=>({ok:false as const,code,reason});
-export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:number)=>number;model:()=>WorldModel;body:(id:string)=>{pose:{p:number[]};human?:{hands?:{left?:number[];right?:number[]};handActuator?:import('../../../../mars/viewer/engine/social/hand-actuator.ts').HandActuatorMotion}}|undefined;access:(id:string,soul:EdgeSoul)=>{code:string;reason:string}|null;
+export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:number)=>number;clearance?:(x:number,z:number,level?:number)=>number;model:()=>WorldModel;body:(id:string)=>{pose:{p:number[]};human?:{hands?:{left?:number[];right?:number[]};handActuator?:import('../../../../mars/viewer/engine/social/hand-actuator.ts').HandActuatorMotion}}|undefined;access:(id:string,soul:EdgeSoul)=>{code:string;reason:string}|null;
  /** entry 32: the thing's owner (a name) and whether it is this Soul; null when nobody owns it */ owner?:(id:string,soul:EdgeSoul)=>{name:string;mine:boolean}|null;
  /** entry 32: a knock on the leaf landed (the first rap): tell those who hear it */ knock?:(soul:EdgeSoul,id:string)=>void;
  record:(soul:EdgeSoul,id:string,action:string,params?:Record<string,unknown>)=>void;commit:(ops:Op[],note:string,done:()=>void)=>{accepted:boolean}}){
@@ -66,9 +68,11 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     const dx=me[0]-params.at[0],dz=me[2]-params.at[2],n=Math.hypot(dx,dz)||1;root=[params.at[0]+dx/n*.5,wp.y,params.at[2]+dz/n*.5];
     if(valve?.at){
      // Stand beside the valve, clear of the thing's own footprint (a basin, a tray) by a body radius: of eight
-     // directions around the valve, the one nearest the Soul's approach whose stand point is outside.
+     // directions around the valve, the one nearest the Soul's approach whose stand point is outside. Entry 33: and clear
+     // of the world's other obstacles (a wall behind a wall torch), so the body never walks into one to reach a valve.
      const c=Math.cos(wp.yaw),s=Math.sin(wp.yaw),[hx,,hz]=def.size.box.map(v=>v*wp.s/2),outside=(p:number[])=>{const lx=(p[0]-wp.x)*c-(p[2]-wp.z)*s,lz=(p[0]-wp.x)*s+(p[2]-wp.z)*c;return Math.abs(lx)>hx+HUMAN_RADIUS||Math.abs(lz)>hz+HUMAN_RADIUS;};
-     const want=Math.atan2(dz,dx),best=Array.from({length:8},(_,i)=>i*Math.PI/4).map(a=>[params.at[0]+Math.cos(a)*.55,wp.y,params.at[2]+Math.sin(a)*.55,Math.abs(((a-want+Math.PI*3)%(Math.PI*2))-Math.PI)]).filter(outside).sort((p,q)=>p[3]-q[3])[0];
+     const clear=(p:number[])=>!d.clearance||d.clearance(p[0],p[2],d.levelAt?.(p[0],p[2],wp.y)??0)>=HUMAN_RADIUS+.04;
+     const want=Math.atan2(dz,dx),best=Array.from({length:8},(_,i)=>i*Math.PI/4).map(a=>[params.at[0]+Math.cos(a)*.55,wp.y,params.at[2]+Math.sin(a)*.55,Math.abs(((a-want+Math.PI*3)%(Math.PI*2))-Math.PI)]).filter(outside).filter(clear).sort((p,q)=>p[3]-q[3])[0];
      if(best)root=[best[0],best[1],best[2]];
      // Entry 33 (take 4): a stand point beside the valve can leave the body ~40° off the valve when it arrives (a wall
      // torch approached along its wall); the Soul turns to face the valve on arrival, before the arm comes up, so the
@@ -115,6 +119,14 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
    if(typeof state[key]==='boolean')facts[key]=state[key] as boolean;
    if(key==='open'&&typeof state.locked==='boolean')facts.locked=state.locked;
    return facts;
+  },
+  /** Entry 33: a neon sign's words for a Soul near it (the same nearby rule as `facts`): its owner's text, at most 32
+   *  characters on two lines, control characters removed, with the owner ref that set it. Untrusted text. */
+  words(target:string){
+   const m=d.model(),e=m.entities.get(target),def=e&&m.resolvedDef(e.def);if(!e||!def||!def.tags.includes('neon'))return null;
+   const raw=typeof e.state?.text==='string'?e.state.text:(def.state as Record<string,{default?:unknown}>|undefined)?.text?.default;
+   const text=typeof raw==='string'?raw.replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/g,'').split('\n').map(l=>l.trim()).filter(Boolean).slice(0,2).join(' / ').slice(0,NEON_WORDS):'';
+   return text?{text,owner:e.owner??'god'}:null;
   },
   prepare(soul:EdgeSoul,target:string,action:string,input:Record<string,unknown>={}):ContactActuatorIntent|null{
    const m=d.model(),e=m.entities.get(target),def=e&&m.resolvedDef(e.def),a=def&&actionsOf(def).find(a=>a.name===action);

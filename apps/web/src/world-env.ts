@@ -217,7 +217,9 @@ export class GodWorldLiving {
         const pattern = light.pattern ?? (flame ? 'flicker' as const : undefined);
         const phase = lightPhase(e.id, i, lights.length, pattern);
         sources.push({ x, z, base, radius: range * (fire ? 0.4 : POOL_RADIUS) * this.pools.radius, intensity: fire ? 1.1 : POOL_LAMP, color: light.color ?? '#ffe9c4', halo: range * POOL_HALO * this.pools.radius, pattern, phase });
-        marks.push([x, at ? p.y + (at.length === 3 ? at[1] * scale : 0) : base, z, at ? 'festoon' : fire ? 'fire' : 'lamp', range / 8, pattern, phase, at || light.pattern || components?.lights ? light.color : undefined]);
+        // Soul Actions entry 33: a neon sign draws its own bloom, following each tube as it strikes (fx/neon.ts); its
+        // lights are only the coloured pools on the ground
+        if (!def?.tags?.includes('neon')) marks.push([x, at ? p.y + (at.length === 3 ? at[1] * scale : 0) : base, z, at ? (/torch/.test(e.def) ? 'torch' : 'festoon') : fire ? 'fire' : 'lamp', range / 8, pattern, phase, at || light.pattern || components?.lights ? light.color : undefined]);
       }
     } };
     if (m.readPass) m.readPass(scan); else scan();

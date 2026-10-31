@@ -36,9 +36,12 @@ const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite
 
 /** FNV-1a: a stable small hash for variant choice and grid scatter. */
 export function hash(s: string): number { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); } return h >>> 0; }
+/** Voicings reached only when a def pins them (never by the hash pick, so existing things keep their voices):
+ *  hum 2 is a neon sign's transformer buzz (Soul Actions entry 33). */
+const PINNABLE: Partial<Record<SoundKind, number>> = { hum: 3 };
 export const variantOf = (kind: SoundKind, key: string, pinned?: unknown) => {
-  const n = VARIANTS[kind];
-  return typeof pinned === 'number' && Number.isInteger(pinned) ? ((pinned % n) + n) % n : hash(key) % n;
+  const n = VARIANTS[kind], m = PINNABLE[kind] ?? n;
+  return typeof pinned === 'number' && Number.isInteger(pinned) ? ((pinned % m) + m) % m : hash(key) % n;
 };
 
 /** The condition `when` against an entity's state (with the def's state defaults): 'on', '!open'. `day` and `night`
