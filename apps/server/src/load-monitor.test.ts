@@ -13,10 +13,20 @@ test('levels: enter on any condition, at once and straight to the highest that h
   assert.equal(l.update(calm, 0), 'green');
   assert.equal(l.update(at({loopP99Ms: 250}), 1), 'amber');
   assert.equal(new LevelState().update(at({heapFrac: 0.86}), 0), 'red');
-  assert.equal(new LevelState().update(at({oldestMs: 6500}), 0), 'red');
+  assert.equal(new LevelState().update(at({oldestMs: 6500}), 0), 'amber', 'queue age alone is amber (the hint), never red');
   assert.equal(new LevelState().update(at({service: 0.79}), 0), 'amber');
   assert.equal(new LevelState().update(at({heapFrac: 0.93, gcFrac: 0.41}), 0), 'black');
   assert.equal(new LevelState().update(at({heapFrac: 0.93, gcFrac: 0.2}), 0), 'red', 'a full heap alone is red, not black');
+});
+
+test('levels: a queue red itself starves cannot hold red (the red lock): service 1.0 with a 6 s queue steps down in 30 s', () => {
+  const l = new LevelState(); let t = 0;
+  l.update(at({service: 0.3}), t); assert.equal(l.level, 'red', 'a real stall enters red');
+  l.update(at({oldestMs: 6100}), t += 1000); assert.equal(l.level, 'red', 'the queue left behind is not yet 30 s calm');
+  l.update(at({oldestMs: 6100}), t += STEP_DOWN_MS); assert.equal(l.level, 'amber', 'service/loop/heap calm: down one step despite the queue');
+  l.update(at({oldestMs: 2500}), t += 1000); assert.equal(l.level, 'amber', 'a 2.5 s queue is between the amber bands: calm starts');
+  l.update(at({oldestMs: 2500}), t += STEP_DOWN_MS); assert.equal(l.level, 'green', 'and the queue cannot hold amber either');
+  assert.equal(new LevelState().update(at({oldestMs: 2500}), 0), 'amber', 'a 2 s queue still raises the hint');
 });
 
 test('levels: black on tick service < 0.2 only after 30 s of it', () => {
