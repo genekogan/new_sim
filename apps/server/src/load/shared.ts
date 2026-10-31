@@ -19,7 +19,12 @@ export const S = {
   awake: 15, waiting: 16, connected: 17,
   shedReads: 18, shedActs: 19,
   sampledAt: 20,   // epoch ms of the last full monitor sample (tick/heap/level numbers)
-  size: 24,
+  // Stage B (lane B-port, SIM_READ_WORKER=1 only; all 0 otherwise, and live.json then has no read fields):
+  readMode: 21,    // 0 = no read workers; 1 = the spike's subset (here, capabilities); 2 = full (B-facade: every C2 read)
+  readWorkers: 22, // read workers alive
+  readLagGens: 23, // the largest delta gap (generations) between the main thread and a live read worker
+  readPorts: 24,   // 4 slots: each read worker's loopback HTTP port (0 = none)
+  size: 28,
 } as const;
 
 export type LiveJson = {
@@ -32,7 +37,13 @@ export type LiveJson = {
   queue?: {depth: number; oldestMs: number};
   souls?: {awake: number; waiting: number; connected: number};
   shed: {reads: number; acts: number};
+  /** Stage B: the first read worker's port (the launcher routes C2 reads here); present only with read workers. */
+  readPort?: number;
+  read?: {ports: number[]; workers: number; lagGens: number; subset: boolean; routes: string[]};
 };
+
+/** The routes a read worker answers itself, by mode (S.readMode): what the launcher may route to its port. */
+export const READ_ROUTES: Record<number, string[]> = {1: ['here', 'capabilities'], 2: ['here', 'observe', 'capabilities', 'resolve', 'view']};
 
 export const newSharedLoad = () => new Float64Array(new SharedArrayBuffer(S.size * Float64Array.BYTES_PER_ELEMENT));
 /** The process's one shared array (the watchdog gets this buffer). Tests make their own with newSharedLoad(). */
@@ -54,6 +65,11 @@ export function liveOf(a: Float64Array, pid: number, now: number): LiveJson {
     out.tick = {world: a[S.worldTick], service5s: r2(a[S.service5s]), p99Ms: r1(a[S.tickP99Ms])};
     out.queue = {depth: a[S.queueDepth], oldestMs: Math.round(a[S.queueOldestMs])};
     out.souls = {awake: a[S.awake], waiting: a[S.waiting], connected: a[S.connected]};
+  }
+  const mode = a[S.readMode], ports = [0, 1, 2, 3].map(i => a[S.readPorts + i]).filter(p => p > 0);
+  if (mode > 0 && ports.length) {
+    out.readPort = ports[0];
+    out.read = {ports, workers: a[S.readWorkers], lagGens: a[S.readLagGens], subset: mode === 1, routes: READ_ROUTES[mode] ?? []};
   }
   return out;
 }

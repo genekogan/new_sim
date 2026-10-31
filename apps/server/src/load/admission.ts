@@ -248,6 +248,9 @@ export function admissionMiddleware(adm: Admission, level: () => Level, bearer: 
     if (!edge) return next();
     const lv = level(); (c.set as (k: string, v: unknown) => void)(LOAD_KEY, lv);
     const r = classify(c.req.method, path), token = bearer(c);
+    // admitted already by the MessagePort front end (a read worker's forward, admissionPort below); the env is set
+    // only by an in-process app.fetch, never by a client
+    if ((c.env as {simAdmitted?: boolean} | undefined)?.simAdmitted === true) { await next(); stamp(c, lv, token); return; }
     if (!r || !token || (r.cls !== 'C1' && r.cls !== 'C2')) { await next(); stamp(c, lv, token); return; }
     // waking limit (dark): a Soul waiting its turn has its acts answered world.crowded; its reads still answer
     const line = r.cls === 'C1' && !r.god ? crowded?.(token) : null;
@@ -268,4 +271,40 @@ export function admissionMiddleware(adm: Admission, level: () => Level, bearer: 
     try { await next(); } finally { t.done(); }
     stamp(c, lv, token);
   };
+}
+
+// ---------- Stage B (lane B-port): the MessagePort front end. A read worker (split/read-worker.ts) that is asked for
+// something it cannot answer itself (a C1 by mistake, a read outside its subset) sends it here as a job: the same
+// Admission.request as the HTTP middleware (key = the Soul's token or 'god', class, deadline), with closed() answered
+// by the port (the worker posts {t:'closed', id} when its client hangs up). The job's payload is run by `run` when its
+// turn comes (today: the HTTP request through the app, already admitted; B-facade: an act with a bound plan) and the
+// result (the receipt) goes back over the port. Without admission (SIM_ADMISSION=0) jobs run at once.
+export type PortJob = {t: 'job'; id: number; key: string; god: boolean; route: RouteClass | null; hintMs?: number; payload: unknown};
+export type PortClosed = {t: 'closed'; id: number};
+export type PortDone = {t: 'done'; id: number; refusal?: Refusal; dropped?: true; result?: unknown; error?: string};
+type PortLike = {on(ev: 'message', f: (m: unknown) => void): unknown; postMessage(m: unknown, transfer?: readonly ArrayBuffer[]): void};
+export function admissionPort(adm: Admission | undefined, port: PortLike, run: (payload: unknown, job: PortJob) => Promise<{result: unknown; transfer?: ArrayBuffer[]}>) {
+  const closed = new Set<number>(), stats = {jobs: 0, refused: 0, dropped: 0, failed: 0};
+  const reply = (d: PortDone, transfer?: ArrayBuffer[]) => { closed.delete(d.id); port.postMessage(d, transfer); };
+  const go = async (m: PortJob, done?: () => void) => {
+    try { const r = await run(m.payload, m); reply({t: 'done', id: m.id, result: r.result}, r.transfer); }
+    catch (e) { stats.failed++; reply({t: 'done', id: m.id, error: e instanceof Error ? e.message : String(e)}); }
+    finally { done?.(); }
+  };
+  port.on('message', (x) => {
+    const m = x as PortJob | PortClosed;
+    if (m?.t === 'closed') { closed.add(m.id); return; }
+    if (m?.t !== 'job') return;
+    stats.jobs++;
+    if (!adm || !m.route || (m.route.cls !== 'C1' && m.route.cls !== 'C2')) { void go(m); return; }
+    const t = adm.request({key: m.key, god: m.god, route: m.route, hintMs: m.hintMs, closed: () => closed.has(m.id)});
+    if ('refusal' in t) { stats.refused++; reply({t: 'done', id: m.id, refusal: t.refusal}); return; }
+    // (a dropped or refused job is already out of `outstanding`: done() is not called, as in the middleware)
+    void t.turn.then((v) => {
+      if (v === 'dropped') { stats.dropped++; reply({t: 'done', id: m.id, dropped: true}); return; }
+      if (v !== 'run') { stats.refused++; reply({t: 'done', id: m.id, refusal: v}); return; }
+      void go(m, t.done);
+    });
+  });
+  return stats;
 }
