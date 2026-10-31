@@ -18,6 +18,15 @@ Shared contract for the server-reliability tranche (`<team>/TRANCHE-SERVER-RELIA
 
 Every file that owns a cost has a **dial** and exposes `setLoadLevel(level: Level): void`; the monitor only sets levels, it never reaches into another module's state. Dials registered in v1: perception slice cadence and radius (L4), menu listing radius (L3), Eyes pause (L2, `edge/eyes/routes.ts`), hub batch interval (L2, `hub.ts`), derive scheduling (L4), admission frame budget (L2). Each dial documents its green/amber/red/black values beside the code.
 
+**The admission frame budget is calibrated to the world's own tick (as built, lane srv-admission-calib, 2026-10-31).** `FRAME_BUDGET_MS[level] = min(cap, max(floor, k × max(0, 50 − quietTickMs)))`, `cap` = 25/15/8/0 ms (the laptop-tuned values), `k` = 0.6/0.4/0.2/0, `floor` = 2/1/0.5/0 ms (a world whose tick nearly fills the frame still answers, slowly) for green/amber/red/black (`admission.ts` `frameBudgetMs`). *quietTickMs* = an EWMA (α 0.1 per 5 s window, time constant ~50 s) of each quiet loop window's own tick average (the ticks run in that window, from the host's tick-time ring; same quiet test as the baseline; a window needs ≥ 20 ticks); until the first quiet window, non-warm windows with tick service ≥ 0.95 seed it provisionally, so a world that boots straight into load still calibrates; 0 = not measured yet → the caps (`monitor.ts` `QuietTick`). Published as `S.quietTickMs`, `live.json` `tick.quietAvgMs` and `/healthz` `load.quietTickMs` + `load.frameBudgetMs` (the current level's). Why: on eden2 a read costs 100–300 ms (laptop 33 ms) and the bench's 2-core slice had 9.5–18 ms of slack per frame, so green's 25 ms handed the requests time the tick needed and the world went amber/red at N = 6 (`team/scratch/srv/b-soak/eden2-a99ff2d54/REPORT.md` §1, §4).
+
+| quiet tick | green | amber | red | black |
+|---|---|---|---|---|
+| ≤ 8 ms (laptop) / not measured | 25 | 15 | 8 | 0 |
+| 12 ms (production Eden 2026) | 22.8 | 15 | 7.6 | 0 |
+| 35 ms (a loaded 2-core box) | 9 | 6 | 3 | 0 |
+| ≥ 50 ms | 2 | 1 | 0.5 | 0 |
+
 ## 2. Request classes
 
 | Class | Routes | Policy |
@@ -27,7 +36,7 @@ Every file that owns a cost has a **dial** and exposes `setLoadLevel(level: Leve
 | **C2 personal reads** | `here`, `observe`, `capabilities`, `around`, `resolve`, `view` (Eyes), route preview | Shed first. At amber/red may be served stale from cache with `stale: true, asOfTick`. Default deadline 8 s. |
 | **C3 public reads** | `map`, `rides`, `items`, `platforms`, `/v1/world/snapshot` | Cached 1–2 s at the launcher so N browsers cost one world call. |
 
-Admission (L2, `apps/server/src/load/admission.ts`): one outstanding heavy (C1/C2) request per Soul; per-Soul CPU-ms token bucket (refill `min(200, 500/awake)` ms/s, capacity 2,000 ms, charged measured handler time); the god holds a reserved 25 % of the request budget; heavy handlers run from a dispatcher after `tickOnce` within a frame budget (25 ms of each 50 ms at green, less above), round-robin across Souls, writes before reads; a job whose deadline passed is answered `world.busy` without running; a job whose socket closed is dropped. Shedding order: duplicate concurrent → C3 to launcher cache → C2 over budget → C2 past deadline (oldest first) → C1 past deadline only.
+Admission (L2, `apps/server/src/load/admission.ts`): one outstanding heavy (C1/C2) request per Soul; per-Soul CPU-ms token bucket (refill `min(200, 20 × frameBudget / awake)` ms/s, so the Souls' buckets together refill at the frame budget's own throughput; capacity 2,000 ms, charged measured handler time; was `min(200, 500/awake) × {1, ½, ¼}` until srv-admission-calib); the god holds a reserved 25 % of the request budget (its bucket unchanged: 125 ms/s × {1, ½, ¼, ¼}); heavy handlers run from a dispatcher after `tickOnce` within a frame budget (at most 25 ms of each 50 ms at green, less above, calibrated to the tick: §1), round-robin across Souls, writes before reads; a job whose deadline passed is answered `world.busy` without running; a job whose socket closed is dropped. Shedding order: duplicate concurrent → C3 to launcher cache → C2 over budget → C2 past deadline (oldest first) → C1 past deadline only.
 
 ## 2b. Ceilings for untrusted clients (Gene, 2026-10-31 04:40Z: agents that run Souls are untrusted users; the world must be immune to being taken down by them, accidentally or adversarially)
 
@@ -38,7 +47,7 @@ Enforced server-side whether or not the client honours §3. Two layers, so a wor
 | Launcher, per source IP | 600 requests/10 s to any one world's Soul API; 50 requests in flight + WebSockets; 40 concurrent `listen` sockets (re-derived 2026-10-31 13:40Z from 60 / 10 / 8 — see "Re-derived" below) | `429 client.rate` + Retry-After; connections above the cap closed at accept |
 | Launcher, per account (Soul token → account) | 4 concurrent `listen` per Soul, 40 per account; 900 heavy (C1/C2) requests/min per account across all its Souls (was 2 / 12 / 120) | `429 soul.busy` / `account.rate` + Retry-After |
 | Launcher, per world | total heavy requests/s = `worldBudgetRps` from the registry (default 200, a stop-gap; the real instrument is load-driven shedding below); request body ≤ 64 KB; C3 public reads served from the 1–2 s micro-cache, never forwarded more than once per second each | `503 world.busy` + Retry-After, answered by the launcher without touching the world |
-| World (L2 admission) | one outstanding heavy request per Soul; per-Soul CPU-ms budget; god reserve 25 %; **world total CPU-ms budget per frame** (the dispatcher never spends more than its frame budget on requests, whatever the sum of per-Soul budgets) | `429 soul.slow-down` / `503 world.busy`; a Soul over budget 3× in a minute gets a 60 s cool-down (Retry-After: 60) |
+| World (L2 admission) | one outstanding heavy request per Soul; per-Soul CPU-ms budget; god reserve 25 %; **world total CPU-ms budget per frame** (the dispatcher never spends more than its frame budget on requests, whatever the sum of per-Soul budgets) | `429 soul.slow-down` / `503 world.busy`; a Soul over budget **impolitely** 3× in a minute gets a 60 s cool-down (Retry-After: 60). Impolite = the request arrived before the Retry-After the Soul was last given (by any refusal) had elapsed; a Soul that waited and is still over budget is refused with a new Retry-After but not struck (srv-admission-calib: on eden2 honest Souls collected 3 strikes and the cool-down was 45–59 % of all read wall time at N = 6) |
 | Both | every heavy read requires a Soul or god token (no unauthenticated C2/C3 that costs more than a cache hit — `calendar`, `scenes` are L8's) | `401` |
 
 Design rule for every lane: **the marginal cost of one more agent must be near zero when it is idle and bounded when it is busy**. A connected agent that only listens costs a held socket; its first request costs its own neighbourhood, never the world (§2 of the design, lanes L3/L4/L8). Growth in agents is therefore a budget question (how many budgets the frame can serve), not a stability question.
@@ -85,7 +94,7 @@ A `worker_threads` watchdog started first in `main.ts` reads a SharedArrayBuffer
 {"v":1,"pid":748574,"at":1761880380123,"phase":"serving",
  "boot":{"stage":"replay","tick":51200,"target":53400},
  "loop":{"lastTurnAgeMs":40,"delayP99Ms":180},
- "tick":{"world":53411,"service5s":0.92,"p99Ms":61},
+ "tick":{"world":53411,"service5s":0.92,"p99Ms":61,"quietAvgMs":12.1},
  "heap":{"usedMb":612,"limitMb":1536,"gcPct10s":6},
  "level":"green",
  "queue":{"depth":2,"oldestMs":310},
