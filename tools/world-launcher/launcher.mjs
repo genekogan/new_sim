@@ -574,7 +574,10 @@ export async function openLauncher(cfg = {}) {
     // lane L1 (LOAD-CONTRACT §4): the Soul API of a booting world, a world just restarted, or a world at red/black is
     // answered here at once (before the ceilings: a boot is not a client's fault), without waiting on the world
     const edgeRest = url.pathname.slice(wp(slug).length) || '/', edgeCls = !retried && edgeRest.startsWith('/v1/edge/') ? requestClass(edgeRest, req.method) : null;
-    const held = edgeCls ? admission(slug, { cls: edgeCls, soul: ceilings.soulOf(req) }) : null;
+    let held = edgeCls ? admission(slug, { cls: edgeCls, soul: ceilings.soulOf(req) }) : null;
+    // Stage B (lane B-port): shedding is for a world that cannot answer. At red/black a C2 read its read workers answer
+    // (live.json lists them, lag ≤ READ_SHED_LAG_GENS) goes to them instead of being refused here (counted by level)
+    if (held?.scope?.startsWith('load:') && readTarget(slug, w, edgeRest, req.method, url.search, { maxLagGens: READ_SHED_LAG_GENS })) held = null;
     if (held) { ceilings.note(slug, held.code, held.scope); json(res, 503, { ok: false, code: held.code, slug, message: held.message, retry_after: held.s }, { 'retry-after': String(held.s), 'cache-control': 'no-store' }); return; }
     // lane L1: the Soul API's ceilings (flood.mjs soulCeilings), answered at once without the world
     const gated = retried ? null : ceilings.check(req, slug, url.pathname.slice(wp(slug).length) || '/', behindProxy);
@@ -616,12 +619,13 @@ export async function openLauncher(cfg = {}) {
   // goes to main exactly as before. The world says in live.json (pid-checked, re-read at most once a second) which
   // ports and which routes its workers answer; `around` (C1) and every C1 stay on main; while the workers serve the
   // spike's subset (read.subset) only query-less GETs of those routes go there. A worker error, a 5xx or no answer in
-  // READ_TIMEOUT_MS: asked of main once, counted. The ceilings and the proxy admission above apply unchanged.
-  const READ_TIMEOUT_MS = 2000, READ_LIVE_MS = 1000, READ_LIVE_MAX_AGE_MS = 10_000;
+  // READ_TIMEOUT_MS: asked of main once, counted. The ceilings apply unchanged; the proxy's red/black C2 shed does not
+  // apply to a read the workers answer while their lag is ≤ READ_SHED_LAG_GENS (cfg.readShedLagGens, default 2).
+  const READ_TIMEOUT_MS = 2000, READ_LIVE_MS = 1000, READ_LIVE_MAX_AGE_MS = 10_000, READ_SHED_LAG_GENS = cfg.readShedLagGens ?? 2;
   const READ_GET = /^\/v1\/edge\/(here|observe|capabilities|view)$/;
   const readStats = new Map();   // slug -> { routed, fallback, lastFallback }
   const readLives = new Map();   // slug -> { at, pid, live, rr }
-  function readTarget(slug, w, rest, method, search) {
+  function readTarget(slug, w, rest, method, search, { maxLagGens = Infinity } = {}) {
     if (!readWorkersOf(w, cfg.readWorkerEnv ?? process.env)) return null;
     const name = method === 'GET' ? (rest === '/healthz/read' ? 'healthz' : READ_GET.exec(rest)?.[1]) : null;
     if (!name) return null;
@@ -635,12 +639,13 @@ export async function openLauncher(cfg = {}) {
     const r = e.live?.read, ports = Array.isArray(r?.ports) ? r.ports.filter((x) => Number.isInteger(x) && x > 0) : [];
     if (!r || !ports.length || now - e.live.at > READ_LIVE_MAX_AGE_MS) return null;
     if (name !== 'healthz' && (!r.routes?.includes(name) || (r.subset && search))) return null;
+    if (!(Number(r.lagGens) <= maxLagGens)) return null;
     return ports[e.rr++ % ports.length];
   }
   function proxyRead(req, res, slug, readPort, mainPort, opts) {
     if (clientGone(req, res)) return;
-    let st = readStats.get(slug); if (!st) readStats.set(slug, st = { routed: 0, fallback: 0, lastFallback: null });
-    st.routed++;
+    let st = readStats.get(slug); if (!st) readStats.set(slug, st = { routed: 0, routedBy: {}, fallback: 0, lastFallback: null });
+    st.routed++; const lv = levelOf(slug); st.routedBy[lv] = (st.routedBy[lv] ?? 0) + 1;
     let settled = false, fellBack = false;
     const xff = behindProxy && req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'] : (req.socket.remoteAddress ?? '127.0.0.1');
     const fallback = (why) => {

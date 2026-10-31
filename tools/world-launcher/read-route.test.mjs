@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openLauncher } from './launcher.mjs';
 import { readWorkersOf } from './registry.mjs';
+import { requestClass } from './flood.mjs';
 
 const fake = new URL('./fake-world.mjs', import.meta.url).pathname;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -33,6 +34,7 @@ const advertised = (L, slug) => until(() => { try { return JSON.parse(readFileSy
 test('registry readWorkers: explicit wins (0 = off, capped at 4), else SIM_READ_WORKER=1 → 1', () => {
   assert.equal(readWorkersOf({}, {}), 0); assert.equal(readWorkersOf({}, { SIM_READ_WORKER: '1' }), 1);
   assert.equal(readWorkersOf({ readWorkers: 0 }, { SIM_READ_WORKER: '1' }), 0); assert.equal(readWorkersOf({ readWorkers: 3 }, {}), 3);
+  assert.equal(requestClass('/v1/edge/around'), 'C1', 'around is a write, as in-world admission says'); assert.equal(requestClass('/v1/edge/here'), 'C2');
   assert.equal(readWorkersOf({ readWorkers: 9 }, {}), 4); assert.equal(readWorkersOf({ readWorkers: 'x' }, { SIM_READ_WORKER: '1' }), 1);
 });
 
@@ -84,7 +86,8 @@ test('flag on (subset): here/capabilities to the worker, the rest to main; fallb
     assert.equal(await to('/v1/edge/here'), 'worker');
     const m = await fetch(`${base}/__sim/metrics`).then((r) => r.text());
     const val = (name) => Number(new RegExp(`^${name}\\{world="${slug}"\\} (\\S+)$`, 'm').exec(m)?.[1]);
-    assert.equal(val('sim_world_read_fallback_total'), 3); assert.equal(val('sim_world_read_routed_total'), 8);
+    assert.equal(val('sim_world_read_fallback_total'), 3);
+    assert.equal(Number(new RegExp(`^sim_world_read_routed_total\\{world="${slug}",level="green"\\} (\\S+)$`, 'm').exec(m)?.[1]), 8);
     assert.equal(val('sim_world_read_workers'), 1); assert.equal(val('sim_world_read_lag_gens'), 0);
   } finally { await L.close(); }
 });
@@ -118,5 +121,27 @@ test('full mode (B-facade route set): observe and view to the worker too, with q
     assert.equal((await fetch(`http://127.0.0.1:5240/__sim/op/set-read-workers`, { method: 'POST', body: JSON.stringify({ slug: off, readWorkers: 7 }) })).status, 400);
     assert.equal(readWorkersOf(L.registry.get(off), { SIM_READ_WORKER: '1' }), 0);
     assert.equal((await call(off, '/v1/edge/here')).body.from, 'main', 'off from the registry: routed to main at once');
+  } finally { await L.close(); }
+});
+
+test('at red/black a read the workers answer is routed to them, not shed (lag ≤ 2 gens); around is C1 (never shed as a read)', async () => {
+  const { L, base, make, call } = await launcher({ port: 5240, range: [5231, 5234], on: true });
+  try {
+    const slug = await make('Hot'); await advertised(L, slug);
+    await call(slug, '/level?l=red'); await call(slug, '/healthz');   // the next answer carries X-Sim-Load: red
+    const here = await call(slug, '/v1/edge/here');
+    assert.equal(here.status, 200); assert.equal(here.body.from, 'worker', 'red: routed, not shed');
+    const q = await call(slug, '/v1/edge/here?include=doHere');
+    assert.equal(q.status, 503); assert.equal(q.body.code, 'world.busy', 'red: a read the subset worker does not answer is still shed');
+    assert.equal((await call(slug, '/v1/edge/observe')).status, 503);
+    assert.equal((await call(slug, '/v1/edge/around')).body?.from, 'main', 'around is C1: not shed at red');
+    // a worker more than 2 gens behind: shed as before; caught up: routed again
+    await call(slug, '/read-lag?n=5'); await sleep(1300);
+    assert.equal((await call(slug, '/v1/edge/here')).status, 503, 'red + lagging worker: shed');
+    await call(slug, '/level?l=black'); await call(slug, '/read-lag?n=2'); await call(slug, '/healthz'); await sleep(1300);
+    assert.equal((await call(slug, '/v1/edge/capabilities')).body?.from, 'worker', 'black + lag 2: routed');
+    const m = await fetch(`${base}/__sim/metrics`).then((r) => r.text());
+    const by = (lv) => Number(new RegExp(`^sim_world_read_routed_total\\{world="${slug}",level="${lv}"\\} (\\S+)$`, 'm').exec(m)?.[1]);
+    assert.equal(by('red'), 1); assert.equal(by('black'), 1);
   } finally { await L.close(); }
 });

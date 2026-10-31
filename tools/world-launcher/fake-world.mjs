@@ -31,10 +31,12 @@ const server = createServer((req, res) => {
   if (path === '/wedge') { res.end('stuck'); setTimeout(() => { for (;;) { /* a stuck main thread (lane L1 guard tests) */ } }, 10); return; }
   if (path.startsWith('/level')) { L[3] = LEVELS.indexOf(new URL(req.url, 'http://x').searchParams.get('l') ?? 'green'); return res.end('ok'); }
   // Stage B (lane B-port) tests. FAKE_EDGE=1: the C2 reads answer {from: 'main'} here; /busy?ms= holds the main thread
-  // that long; /read-fail?m=ok|error|500|slow sets how the read worker (below) answers its next requests.
+  // that long; /read-fail?m=ok|error|500|slow sets how the read worker (below) answers its next requests; /read-lag?n=
+  // the lagGens live.json reports.
   if (process.env.FAKE_EDGE === '1' && /^\/v1\/edge\/(here|observe|capabilities|view|around)(\?|$)/.test(path)) return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ from: 'main', path }));
   if (path.startsWith('/busy')) { const ms = Number(new URL(req.url, 'http://x').searchParams.get('ms') ?? 2000); res.end('busy'); setTimeout(() => { const end = Date.now() + ms; while (Date.now() < end) { /* the main thread is held */ } }, 20); return; }
   if (path === '/read-env') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(Object.fromEntries(['SIM_READ_WORKER', 'SIM_READ_WORKERS', 'SIM_READ_PORTS'].map((k) => [k, process.env[k] ?? null]))));
+  if (path.startsWith('/read-lag')) { L[7] = Number(new URL(req.url, 'http://x').searchParams.get('n') ?? 0); return res.end('ok'); }
   if (path.startsWith('/read-fail')) { L[6] = ['ok', 'error', '500', 'slow'].indexOf(new URL(req.url, 'http://x').searchParams.get('m') ?? 'ok'); return res.end('ok'); }
   if (path === '/crash') { res.end('bye'); setTimeout(() => process.exit(3), 10); return; }
   // a crash whose open connections outlive the process for a while (their fds handed to a short-lived helper): the
@@ -66,7 +68,7 @@ const LEVELS = ['green', 'amber', 'red', 'black'], L = new Float64Array(new Shar
 L[0] = Date.now(); setInterval(() => { L[0] = Date.now(); }, 50).unref();
 if (process.env.FAKE_LIVE === '1') new Worker(`
   const { workerData: w } = require('node:worker_threads'), fs = require('node:fs'), L = new Float64Array(w.buf);
-  const live = () => { const now = Date.now(), serving = L[1] === 1, o = { v: 1, pid: w.pid, at: now, phase: serving ? 'serving' : 'boot:replay', loop: { lastTurnAgeMs: Math.round(now - L[0]), delayP99Ms: 1 }, level: ${JSON.stringify(LEVELS)}[L[3]] ?? 'green' }; if (!serving) o.boot = { stage: 'replay', tick: L[2], target: 1000 }; if (L[4] > 0) { o.readPort = L[4]; o.read = { ports: [L[4]], workers: 1, lagGens: 0, subset: L[5] === 1, routes: L[5] === 1 ? ['here', 'capabilities'] : ['here', 'observe', 'capabilities', 'resolve', 'view'] }; } return o; };
+  const live = () => { const now = Date.now(), serving = L[1] === 1, o = { v: 1, pid: w.pid, at: now, phase: serving ? 'serving' : 'boot:replay', loop: { lastTurnAgeMs: Math.round(now - L[0]), delayP99Ms: 1 }, level: ${JSON.stringify(LEVELS)}[L[3]] ?? 'green' }; if (!serving) o.boot = { stage: 'replay', tick: L[2], target: 1000 }; if (L[4] > 0) { o.readPort = L[4]; o.read = { ports: [L[4]], workers: 1, lagGens: L[7], subset: L[5] === 1, routes: L[5] === 1 ? ['here', 'capabilities'] : ['here', 'observe', 'capabilities', 'resolve', 'view'] }; } return o; };
   const write = () => { if (!w.file) return; fs.writeFileSync(w.file + '.tmp', JSON.stringify(live())); fs.renameSync(w.file + '.tmp', w.file); };
   write(); setInterval(write, w.every);
   if (w.port) require('node:http').createServer((q, r) => { const l = live(), up = l.phase === 'serving' && l.loop.lastTurnAgeMs < w.turnMs; r.writeHead(up ? 200 : 503, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: up, ...l })); }).listen(w.port, '127.0.0.1');
@@ -78,7 +80,7 @@ if (process.env.SIM_READ_WORKER === '1') { L[5] = process.env.FAKE_READ_MODE ===
   const { workerData: w } = require('node:worker_threads'), L = new Float64Array(w.buf);
   const s = require('node:http').createServer((q, r) => {
     const f = L[6]; if (f === 1) return q.socket.destroy(); if (f === 2) return r.writeHead(500).end('{}');
-    const answer = () => r.writeHead(200, { 'content-type': 'application/json', 'x-sim-read': 'worker', 'x-sim-load': 'green' }).end(JSON.stringify({ from: 'worker', url: q.url, auth: q.headers.authorization ?? null }));
+    const answer = () => r.writeHead(200, { 'content-type': 'application/json', 'x-sim-read': 'worker', 'x-sim-load': ['green', 'amber', 'red', 'black'][L[3]] ?? 'green' }).end(JSON.stringify({ from: 'worker', url: q.url, auth: q.headers.authorization ?? null }));
     if (f === 3) setTimeout(answer, 3000); else answer();
   });
   s.listen(w.port, '127.0.0.1', () => { L[4] = s.address().port; });

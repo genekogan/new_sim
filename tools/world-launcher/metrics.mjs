@@ -91,7 +91,7 @@ export function metricsText({ worlds = [], launcher = {}, clientErrors = null, n
     g('sim_world_last_boot_seconds', 'Seconds the world\'s last boot took (start to healthy).', L, num(w.lastBootMs) === null ? null : w.lastBootMs / 1000);
     // Stage B (lane B-port): C2 reads the launcher sent to the world's read workers, and those it then asked main (a
     // worker error, a 5xx or no answer in 2 s); only for worlds with read workers on
-    if (w.read) { c('sim_world_read_routed_total', 'C2 reads the launcher routed to the world\'s read workers.', L, w.read.routed); c('sim_world_read_fallback_total', 'Routed reads asked of the main thread instead (worker error, 5xx or 2 s timeout).', L, w.read.fallback); }
+    if (w.read) { for (const [level, n] of Object.entries(w.read.routedBy ?? {})) if (LEVELS.includes(level)) c('sim_world_read_routed_total', 'C2 reads the launcher routed to the world\'s read workers, by the world\'s load level then (at red/black: reads not shed).', { world, level }, n); c('sim_world_read_fallback_total', 'Routed reads asked of the main thread instead (worker error, 5xx or 2 s timeout).', L, w.read.fallback); }
 
     const v = w.live; if (!v) continue;
     const at = num(v.at);
