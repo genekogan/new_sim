@@ -103,6 +103,13 @@ export class Admission {
       return {refusal: {status: 429, code: 'soul.slow-down', retryAfterS: Math.max(1, Math.ceil((est - b.tokens) / Math.max(rate, 1e-6) / 1000)), message: 'this Soul has asked for a lot in a short time; the world can answer it again shortly'}};
     }
     const deadline = now + Math.min(r.route.deadlineMs, r.hintMs && r.hintMs > 0 ? r.hintMs : Infinity);
+    // a read that cannot start before its deadline (the time already queued, paid at the frame budget) is answered now,
+    // not after the client has waited for nothing; acts always queue (refused only past their deadline)
+    if (read && this.queue.length) {
+      let ahead = 0; for (const j of this.queue) ahead += this.estimate(j.route.id);
+      const wait = ahead * FRAME_MS / Math.max(1, FRAME_BUDGET_MS[this.level]);
+      if (now + wait + est + ANSWER_MARGIN_MS >= deadline) { this.shed.reads++; return {refusal: {...busyRefusal(this.level), retryAfterS: Math.max(busyRefusal(this.level).retryAfterS, Math.ceil(wait / 1000))}}; }
+    }
     let settle!: Job['settle'], finish!: () => void;
     const turn = new Promise<'run' | 'dropped' | Refusal>(res => { settle = res; });
     const finished = new Promise<void>(res => { finish = res; });

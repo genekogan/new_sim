@@ -189,3 +189,15 @@ test('over real HTTP: a queued POST whose body was read still runs; a client tha
   const res = await ok; assert.equal(res.status, 200); assert.deepEqual(await res.json(), {got: {verb: 'go'}});
   assert.equal(ran, 1);
 });
+
+test('a read that cannot start before its deadline is answered world.busy at once (not after the wait); acts still queue', async () => {
+  const f = fixture();
+  for (let i = 0; i < 3; i++) { f.ask('L' + i, route('GET', '/v1/edge/here'), 1000); await tick(); f.advance(3000); }   // here costs ~1 s
+  const blocker = f.adm.request({key: 'X', god: false, route: route('GET', '/v1/edge/observe')}) as {done: () => void};
+  for (let i = 0; i < 6; i++) f.ask('Q' + i, route('GET', '/v1/edge/here'), 1000);   // 6 s of reads queued = 12 s at 25 of 50 ms
+  const late = f.ask('Z', route('GET', '/v1/edge/here'));
+  assert.equal((late.result as {code: string}).code, 'world.busy'); assert.ok((late.result as {retryAfterS: number}).retryAfterS >= 8);
+  const act = f.ask('Y', route('POST', '/v1/edge/act'));
+  assert.equal(act.result, undefined, 'the act queues');
+  blocker.done(); f.adm.close();
+});
