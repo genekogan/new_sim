@@ -41,11 +41,11 @@ export function readLive(dataDir) {
 /** A small builder: families keep HELP/TYPE once, samples in insertion order. */
 function registry() {
   const fams = new Map();
-  const add = (name, type, help, labels, value) => {
+  const add = (name, type, help, labels, value, suffix = '') => {
     const v = num(value); if (v === null) return;
     let f = fams.get(name); if (!f) fams.set(name, (f = { type, help, rows: [] }));
     const l = Object.entries(labels ?? {}).map(([k, x]) => `${k}="${esc(x)}"`).join(',');
-    f.rows.push(`${name}${l ? `{${l}}` : ''} ${fmt(v)}`);
+    f.rows.push(`${name}${suffix}${l ? `{${l}}` : ''} ${fmt(v)}`);
   };
   const text = () => {
     let out = '';
@@ -60,6 +60,8 @@ function registry() {
  *  worlds: [{slug, status, restarts?, restartsByReason?: {exit|wedged|crashloop|planned: n}, lastBootMs?, refused?, live?}]
  *          refused = the launcher's ceilings: requests it refused for this world since it started, by class
  *          ({'client.rate': n, 'account.rate': n, 'world.busy': n}) → sim_world_refused_total{world,class}
+ *          listenHeld = { served, refused, gone, ended, seconds } (lane srv-shed) → sim_world_listen_held_total{world,outcome},
+ *          sim_world_listen_held_seconds_sum/_count{world}
  *          (status from the launcher's pool; live = readLive(world.dataDir) or null)
  *  launcher: {build?, maxRunning?, maxWorlds?, memAvailableMb?}
  *  clientErrors: the clientErrors() table (client-errors.mjs) or null
@@ -87,6 +89,13 @@ export function metricsText({ worlds = [], launcher = {}, clientErrors = null, n
     else c('sim_world_restarts_total', 'World restarts by the launcher, by reason.', { world, reason: 'exit' }, w.restarts);   // a launcher without reasons
     for (const [cls, n] of Object.entries(w.refused && typeof w.refused === 'object' ? w.refused : {})) {
       if (/^[a-z][a-z0-9_.]{0,31}$/.test(cls)) c('sim_world_refused_total', 'Requests the launcher refused for this world (its ceilings), by class.', { world, class: cls }, n);
+    }
+    // lane srv-shed: listens over a listen ceiling held for a slot (then served, or refused after the hold)
+    const lh = w.listenHeld && typeof w.listenHeld === 'object' ? w.listenHeld : null;
+    if (lh) {
+      for (const outcome of ['served', 'refused', 'gone']) c('sim_world_listen_held_total', 'Listen/wait long-polls held at the launcher for a free slot, by how the hold ended.', { world, outcome }, num(lh[outcome]) ?? 0);
+      r.add('sim_world_listen_held_seconds', 'summary', 'Seconds listen/wait long-polls spent held for a slot.', L, lh.seconds, '_sum');
+      r.add('sim_world_listen_held_seconds', 'summary', 'Seconds listen/wait long-polls spent held for a slot.', L, lh.ended, '_count');
     }
     g('sim_world_last_boot_seconds', 'Seconds the world\'s last boot took (start to healthy).', L, num(w.lastBootMs) === null ? null : w.lastBootMs / 1000);
     // Stage B (lane B-port): C2 reads the launcher sent to the world's read workers, and those it then asked main (a

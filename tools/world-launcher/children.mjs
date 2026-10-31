@@ -298,6 +298,9 @@ export class ChildPool {
   /** Start (or join the start of) a world; resolves with its port once /healthz answers. */
   ensure(world, { timeoutMs = 90_000, passive = false } = {}) {
     if (this.fenced) { const e = new Error(`world ${world.slug} is served by a newer launcher`); e.code = 'handed-over'; return Promise.reject(e); }
+    // closing (closeAll): nothing boots again, e.g. a long-poll's GET retried after its world was stopped under it would
+    // otherwise start a world no one stops (lane srv-shed, found with 100 listens open at close)
+    if (this.closing) { const e = new Error(`world ${world.slug}: this launcher is closing`); e.code = 'stopping'; return Promise.reject(e); }
     let k = this.kids.get(world.slug);
     if (k?.handedBack) { const e = new Error(`world ${world.slug} is going back to the previous launcher`); e.code = 'handed-back'; return Promise.reject(e); }
     // being stopped (put to sleep, its memory given back): boot it again only once that process is gone (one writer)
