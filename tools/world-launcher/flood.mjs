@@ -83,6 +83,8 @@ export function requestClass(rest, method = 'GET') {
   const r = rest.slice('/v1/edge/'.length);
   if (/^(inbox\/listen|wait)\/?$/.test(r)) return 'listen';
   if (/^(receipts(\/|$)|inbox(\/|$)|schema\/?$|boot\/static\/?$)/.test(r)) return 'C0';
+  // `around` explores (it records the places found and invalidates menus): a write, as in-world admission classes it
+  if (/^around\/?$/.test(r)) return 'C1';
   if (read && /^(map|rides|items|platforms)\/?$/.test(r)) return 'C3';
   return read ? 'C2' : 'C1';
 }

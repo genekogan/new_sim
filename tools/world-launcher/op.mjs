@@ -11,6 +11,7 @@
 //        (a world with no god that nobody may claim: the homepage stops saying "open it to claim it")
 //   node tools/world-launcher/op.mjs set-unlisted --port 4620 [--base /worlds] --slug <slug> --unlisted true|false
 //   node tools/world-launcher/op.mjs set-heap --port 4620 [--base /worlds] --slug <slug> --mb 2048|default   (heap from its next boot)
+//   node tools/world-launcher/op.mjs set-read-workers --port 4620 [--base /worlds] --slug <slug> --n 0-4|default   (Stage B read workers, next boot)
 //        (left out of the public world list, still served at its URL; bench worlds and "… (scratch)" names default to true)
 //   node tools/world-launcher/op.mjs archive-world --port 4620 [--base /worlds] --slug <slug> [--reason <text>]
 //        (stops it, moves its data to <data>/archive/<id>/world, unregisters it; nothing is deleted)
@@ -47,6 +48,7 @@ const usage = () => {
     + '       op.mjs set-unlisted --port <launcher port> [--base /worlds] --slug <slug> --unlisted true|false\n'
     + '       op.mjs set-limits --port <launcher port> [--base /worlds] --slug <slug> --limits \'{"worldBudgetRps":20,"ipListen":null}\'\n'
     + '       op.mjs set-heap --port <launcher port> [--base /worlds] --slug <slug> --mb <256-8192|default>\n'
+    + '       op.mjs set-read-workers --port <launcher port> [--base /worlds] --slug <slug> --n <0-4|default>\n'
     + '       op.mjs resume-world --port <launcher port> [--base /worlds] --slug <slug>   (a world held after 5 failures in 30 min)\n'
     + '       op.mjs archive-world --port <launcher port> [--base /worlds] --slug <slug> [--reason <text>]\n'
     + '       op.mjs restore-world --port <launcher port> [--base /worlds] --id <archive id>\n'
@@ -84,6 +86,9 @@ if (cmd === 'create-world') {
 } else if (cmd === 'set-heap') {
   if (!flag('port') || !flag('slug') || !flag('mb')) usage();
   body = { slug: flag('slug'), worldHeapMb: flag('mb') === 'default' ? null : Number(flag('mb')) };
+} else if (cmd === 'set-read-workers') {
+  if (!flag('port') || !flag('slug') || !flag('n')) usage();
+  body = { slug: flag('slug'), readWorkers: flag('n') === 'default' ? null : Number(flag('n')) };
 } else if (cmd === 'resume-world') {
   if (!flag('port') || !flag('slug')) usage();
   body = { slug: flag('slug') };
